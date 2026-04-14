@@ -1,6 +1,10 @@
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
 import Fastify, { FastifyInstance } from "fastify";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 import { getConfig, Config } from "./config.js";
 import { initDatabase } from "./db/index.js";
 import { authMiddleware } from "./middleware/auth.js";
