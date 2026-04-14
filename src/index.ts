@@ -1,3 +1,5 @@
+import path from "node:path";
+import { existsSync } from "node:fs";
 import Fastify, { FastifyInstance } from "fastify";
 import { getConfig, Config } from "./config.js";
 import { initDatabase } from "./db/index.js";
@@ -5,6 +7,7 @@ import { authMiddleware } from "./middleware/auth.js";
 import { openaiProxy } from "./proxy/openai.js";
 import { anthropicProxy } from "./proxy/anthropic.js";
 import { adminRoutes } from "./admin/routes.js";
+import fastifyStatic from "@fastify/static";
 import Database from "better-sqlite3";
 
 export interface AppOptions {
@@ -52,6 +55,35 @@ export async function buildApp(
     adminPassword: config.ADMIN_PASSWORD,
     encryptionKey: config.ENCRYPTION_KEY,
   });
+
+  // 前端静态文件服务（生产环境）
+  const frontendDist = path.resolve(
+    process.env.FRONTEND_DIST || path.join(__dirname, "../frontend-dist")
+  );
+
+  if (existsSync(frontendDist)) {
+    app.register(fastifyStatic, {
+      root: frontendDist,
+      prefix: "/admin/",
+      wildcard: false,
+      decorateReply: false,
+    });
+
+    // SPA fallback: /admin/ 下非 API 路径返回 index.html
+    app.setNotFoundHandler((request, reply) => {
+      if (
+        request.url.startsWith("/admin") &&
+        !request.url.startsWith("/admin/api")
+      ) {
+        return reply.sendFile("index.html");
+      }
+      reply.code(404).send({ error: "Not Found" });
+    });
+  } else {
+    app.log.warn(
+      `Frontend dist not found at ${frontendDist}, skipping static serving`
+    );
+  }
 
   app.get("/health", async () => {
     return { status: "ok" };
