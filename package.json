@@ -7,17 +7,22 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "docker:build": "docker build -t llm-simple-router .",
+    "docker:run": "docker compose up -d"
   },
   "dependencies": {
+    "@fastify/cookie": "^11.0.2",
     "better-sqlite3": "^11.9.1",
     "dotenv": "^16.4.7",
     "fastify": "^5.3.3",
     "fastify-plugin": "^5.1.0",
+    "jsonwebtoken": "^9.0.3",
     "pino": "^9.6.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.15.3",
     "tsx": "^4.19.3",
     "typescript": "^5.8.3",

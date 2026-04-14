@@ -4,6 +4,7 @@ import { initDatabase } from "./db/index.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { openaiProxy } from "./proxy/openai.js";
 import { anthropicProxy } from "./proxy/anthropic.js";
+import { adminRoutes } from "./admin/routes.js";
 import Database from "better-sqlite3";
 
 export interface AppOptions {
@@ -44,6 +45,12 @@ export async function buildApp(
     db,
     encryptionKey: config.ENCRYPTION_KEY,
     streamTimeoutMs: config.STREAM_TIMEOUT_MS,
+  });
+
+  app.register(adminRoutes, {
+    db,
+    adminPassword: config.ADMIN_PASSWORD,
+    encryptionKey: config.ENCRYPTION_KEY,
   });
 
   app.get("/health", async () => {
