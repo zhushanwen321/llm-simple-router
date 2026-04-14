@@ -2,43 +2,56 @@
   <div class="p-6">
     <h2 class="text-lg font-semibold text-gray-900 mb-4">仪表盘</h2>
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-      <div class="bg-white rounded-lg border p-4">
-        <p class="text-sm text-gray-500">总请求数</p>
-        <p class="text-2xl font-bold text-gray-900 mt-1">{{ stats.totalRequests }}</p>
-      </div>
-      <div class="bg-white rounded-lg border p-4">
-        <p class="text-sm text-gray-500">成功率</p>
-        <p class="text-2xl font-bold text-green-600 mt-1">{{ (stats.successRate * 100).toFixed(1) }}%</p>
-      </div>
-      <div class="bg-white rounded-lg border p-4">
-        <p class="text-sm text-gray-500">平均延迟</p>
-        <p class="text-2xl font-bold text-gray-900 mt-1">{{ Math.round(stats.avgLatency) }}ms</p>
-      </div>
-      <div class="bg-white rounded-lg border p-4">
-        <p class="text-sm text-gray-500">24h 请求数</p>
-        <p class="text-2xl font-bold text-gray-900 mt-1">{{ stats.recentRequests }}</p>
-      </div>
+      <Card>
+        <CardContent class="p-4">
+          <p class="text-sm text-gray-500">总请求数</p>
+          <p class="text-2xl font-bold text-gray-900 mt-1">{{ stats.totalRequests }}</p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardContent class="p-4">
+          <p class="text-sm text-gray-500">成功率</p>
+          <p class="text-2xl font-bold text-green-600 mt-1">{{ (stats.successRate * 100).toFixed(1) }}%</p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardContent class="p-4">
+          <p class="text-sm text-gray-500">平均延迟</p>
+          <p class="text-2xl font-bold text-gray-900 mt-1">{{ Math.round(stats.avgLatency) }}ms</p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardContent class="p-4">
+          <p class="text-sm text-gray-500">24h 请求数</p>
+          <p class="text-2xl font-bold text-gray-900 mt-1">{{ stats.recentRequests }}</p>
+        </CardContent>
+      </Card>
     </div>
-    <div v-if="Object.keys(stats.requestsByType).length > 0" class="bg-white rounded-lg border p-4">
-      <h3 class="text-sm font-medium text-gray-700 mb-3">请求分布（按类型）</h3>
-      <div class="flex items-end gap-6 h-40">
-        <div v-for="(count, type) in stats.requestsByType" :key="type" class="flex flex-col items-center gap-1">
-          <div
-            :class="type === 'openai' ? 'bg-blue-500' : 'bg-purple-500'"
-            class="rounded-t w-20"
-            :style="{ height: barHeight(count) + 'px' }"
-          ></div>
-          <span class="text-xs text-gray-500">{{ type }}</span>
-          <span class="text-xs font-medium">{{ count }}</span>
+    <Card v-if="Object.keys(stats.requestsByType).length > 0">
+      <CardHeader>
+        <CardTitle class="text-sm font-medium text-gray-700">请求分布（按类型）</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div class="flex items-end gap-6 h-40">
+          <div v-for="(count, type) in stats.requestsByType" :key="type" class="flex flex-col items-center gap-1">
+            <div
+              :class="type === 'openai' ? 'bg-blue-500' : 'bg-purple-500'"
+              class="rounded-t w-20"
+              :style="{ height: barHeight(count) + 'px' }"
+            ></div>
+            <span class="text-xs text-gray-500">{{ type }}</span>
+            <span class="text-xs font-medium">{{ count }}</span>
+          </div>
         </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { api } from '@/api/client'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 const stats = ref({
   totalRequests: 0,

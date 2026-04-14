@@ -23,15 +23,16 @@
       </router-link>
     </nav>
     <div class="p-3 border-t border-slate-700">
-      <button
+      <Button
+        variant="ghost"
+        class="w-full justify-start text-gray-400 hover:text-white hover:bg-slate-700"
         @click="handleLogout"
-        class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-slate-700 w-full"
       >
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
         </svg>
         登出
-      </button>
+      </Button>
     </div>
   </aside>
 </template>
@@ -39,6 +40,7 @@
 <script setup lang="ts">
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '@/api/client'
+import { Button } from '@/components/ui/button'
 
 const route = useRoute()
 const router = useRouter()
