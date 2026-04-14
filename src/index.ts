@@ -1,5 +1,7 @@
 import Fastify from "fastify";
 import { getConfig } from "./config.js";
+import { authMiddleware } from "./middleware/auth.js";
+import { openaiProxy } from "./proxy/openai.js";
 
 async function main() {
   const config = getConfig();
@@ -10,8 +12,19 @@ async function main() {
     },
   });
 
+  // 注册认证中间件
+  app.register(authMiddleware, { apiKey: config.ROUTER_API_KEY });
+
   app.get("/health", async () => {
     return { status: "ok" };
+  });
+
+  // 注册 OpenAI 代理路由
+  // TODO: Task 6 中注入 db via options
+  app.register(openaiProxy, {
+    db: /* Task 6 注入 */ null as any,
+    encryptionKey: config.ENCRYPTION_KEY,
+    streamTimeoutMs: config.STREAM_TIMEOUT_MS,
   });
 
   try {
