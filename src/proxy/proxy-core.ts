@@ -5,6 +5,8 @@ import type { FastifyReply } from "fastify";
 import Database from "better-sqlite3";
 import type { Provider } from "../db/index.js";
 import { insertRequestLog } from "../db/index.js";
+import type { SSEMetricsTransform } from "../metrics/sse-metrics-transform.js";
+import type { MetricsResult } from "../metrics/metrics-extractor.js";
 
 // ---------- Types ----------
 
@@ -31,6 +33,8 @@ export interface StreamProxyResult {
   responseBody?: string;
   upstreamResponseHeaders?: Record<string, string>;
   sentHeaders?: Record<string, string>;
+  /** 流结束时从 SSEMetricsTransform 采集的指标，仅当传入了 metricsTransform 时存在 */
+  metricsResult?: MetricsResult;
 }
 
 export interface GetProxyResult {
@@ -191,7 +195,8 @@ export function proxyStream(
   clientHeaders: RawHeaders,
   reply: FastifyReply,
   timeoutMs: number,
-  upstreamPath: string
+  upstreamPath: string,
+  metricsTransform?: SSEMetricsTransform
 ): Promise<StreamProxyResult> {
   return new Promise((resolve, reject) => {
     const url = new URL(`${backend.base_url}${upstreamPath}`);
@@ -226,7 +231,15 @@ export function proxyStream(
       reply.raw.writeHead(statusCode, sseHeaders);
 
       const passThrough = new PassThrough();
-      passThrough.pipe(reply.raw);
+      if (metricsTransform) {
+        // 管道: upstreamRes → metricsTransform → passThrough → reply.raw
+        metricsTransform.pipe(passThrough).pipe(reply.raw);
+      } else {
+        passThrough.pipe(reply.raw);
+      }
+
+      // 管道入口：有 metricsTransform 时写入它，否则直接写 passThrough
+      const pipeEntry = metricsTransform ?? passThrough;
 
       const captureChunks: Buffer[] = [];
       let idleTimer: NodeJS.Timeout | null = null;
@@ -236,13 +249,24 @@ export function proxyStream(
         if (idleTimer) clearTimeout(idleTimer);
         idleTimer = null;
         if (!passThrough.destroyed) passThrough.destroy();
+        if (metricsTransform && !metricsTransform.destroyed) metricsTransform.destroy();
         if (!upstreamRes.destroyed) upstreamRes.destroy();
+      }
+
+      /** 从 metricsTransform 中提取指标，供 resolve 时附带 */
+      function collectMetrics(isComplete: boolean): MetricsResult | undefined {
+        if (!metricsTransform) return undefined;
+        const result = metricsTransform.getExtractor().getMetrics();
+        if (!isComplete) {
+          return { ...result, is_complete: 0 };
+        }
+        return result;
       }
 
       reply.raw.on("close", () => {
         if (!resolved) {
           cleanup();
-          resolve({ statusCode, responseBody: undefined, upstreamResponseHeaders: sseHeaders, sentHeaders: upstreamHeaders });
+          resolve({ statusCode, responseBody: undefined, upstreamResponseHeaders: sseHeaders, sentHeaders: upstreamHeaders, metricsResult: collectMetrics(false) });
         }
       });
 
@@ -250,7 +274,7 @@ export function proxyStream(
         cleanup();
         if (!resolved) {
           resolved = true;
-          resolve({ statusCode, responseBody: undefined, upstreamResponseHeaders: sseHeaders, sentHeaders: upstreamHeaders });
+          resolve({ statusCode, responseBody: undefined, upstreamResponseHeaders: sseHeaders, sentHeaders: upstreamHeaders, metricsResult: collectMetrics(false) });
         }
       });
 
@@ -260,7 +284,7 @@ export function proxyStream(
           cleanup();
           if (!resolved) {
             resolved = true;
-            resolve({ statusCode, responseBody: undefined, upstreamResponseHeaders: sseHeaders, sentHeaders: upstreamHeaders });
+            resolve({ statusCode, responseBody: undefined, upstreamResponseHeaders: sseHeaders, sentHeaders: upstreamHeaders, metricsResult: collectMetrics(false) });
           }
         }, timeoutMs);
       }
@@ -270,7 +294,7 @@ export function proxyStream(
       upstreamRes.on("data", (chunk: Buffer) => {
         if (resolved) return;
         resetIdleTimer();
-        passThrough.write(chunk);
+        pipeEntry.write(chunk);
         captureChunks.push(chunk);
       });
 
@@ -278,13 +302,14 @@ export function proxyStream(
         if (resolved) return;
         resolved = true;
         if (idleTimer) clearTimeout(idleTimer);
-        passThrough.end();
+        pipeEntry.end();
         reply.raw.end();
         resolve({
           statusCode,
           responseBody: Buffer.concat(captureChunks).toString("utf-8"),
           upstreamResponseHeaders: sseHeaders,
           sentHeaders: upstreamHeaders,
+          metricsResult: collectMetrics(true),
         });
       });
 

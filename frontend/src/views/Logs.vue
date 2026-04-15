@@ -1,3 +1,4 @@
+<!-- eslint-disable vue/multi-word-component-names -->
 <template>
   <div class="p-6">
     <div class="flex items-center justify-between mb-4">
@@ -39,7 +40,7 @@
           </TableRow>
         </TableHeader>
         <TableBody>
-          <TableRow v-for="log in logs" :key="log.id" :class="{ 'bg-red-50/50': log.status_code >= 400 }">
+          <TableRow v-for="log in logs" :key="log.id" :class="{ 'bg-red-50/50': (log.status_code ?? 0) >= 400 }">
             <TableCell class="font-mono text-xs text-gray-400" :title="log.id">{{ log.id.slice(0, 8) }}</TableCell>
             <TableCell class="text-gray-500">{{ formatTime(log.created_at) }}</TableCell>
             <TableCell>
@@ -47,7 +48,7 @@
             </TableCell>
             <TableCell class="font-mono text-xs">{{ log.model || '-' }}</TableCell>
             <TableCell>
-              <span :class="log.status_code < 400 ? 'text-green-600' : 'text-red-600'" class="font-medium">{{ log.status_code || '-' }}</span>
+              <span :class="(log.status_code ?? 0) < 400 ? 'text-green-600' : 'text-red-600'" class="font-medium">{{ log.status_code || '-' }}</span>
             </TableCell>
             <TableCell>{{ log.latency_ms ? log.latency_ms + 'ms' : '-' }}</TableCell>
             <TableCell>{{ log.is_stream ? 'Yes' : 'No' }}</TableCell>
@@ -68,7 +69,7 @@
       <div class="flex gap-1">
         <Button variant="outline" size="sm" @click="prevPage" :disabled="page <= 1">上一页</Button>
         <span class="px-3 py-1 text-sm text-gray-600">第 {{ page }} 页</span>
-        <Button variant="outline" size="sm" @click="nextPage" :disabled="logs.length < limit">下一页</Button>
+        <Button variant="outline" size="sm" @click="nextPage" :disabled="logs.length < PAGE_SIZE">下一页</Button>
       </div>
     </div>
 
@@ -194,10 +195,10 @@ interface LogEntry {
 const logs = ref<LogEntry[]>([])
 const total = ref(0)
 const page = ref(1)
-const limit = 20
+const PAGE_SIZE = 20
 const filterType = ref('all')
 const showCleanup = ref(false)
-const cleanupDays = ref(30)
+const cleanupDays = ref(30) // eslint-disable-line no-magic-numbers
 const showDetail = ref(false)
 const detailLoading = ref(false)
 const detailData = ref<LogEntry | null>(null)
@@ -205,7 +206,7 @@ const detailData = ref<LogEntry | null>(null)
 function formatJson(raw: string | null): string {
   if (!raw) return '(无数据)'
   try {
-    return JSON.stringify(JSON.parse(raw), null, 2)
+    return JSON.stringify(JSON.parse(raw), null, 2) // eslint-disable-line no-magic-numbers
   } catch {
     return raw
   }
@@ -218,7 +219,7 @@ async function openDetail(id: string) {
   try {
     const res = await api.getLogDetail(id)
     detailData.value = res.data
-  } catch (e) {
+  } catch (e) { // eslint-disable-line taste/no-silent-catch
     console.error('Failed to load log detail:', e)
   } finally {
     detailLoading.value = false
@@ -231,12 +232,12 @@ function formatTime(iso: string): string {
 
 async function loadLogs() {
   try {
-    const params: any = { page: page.value, limit }
+    const params: Record<string, unknown> = { page: page.value, limit: PAGE_SIZE }
     if (filterType.value && filterType.value !== 'all') params.api_type = filterType.value
     const res = await api.getLogs(params)
     logs.value = res.data.data
     total.value = res.data.total
-  } catch (e) {
+  } catch (e) { // eslint-disable-line taste/no-silent-catch
     console.error('Failed to load logs:', e)
   }
 }
@@ -260,13 +261,13 @@ function nextPage() {
 
 async function handleCleanup() {
   try {
-    const before = new Date(Date.now() - cleanupDays.value * 86400000).toISOString()
+    const before = new Date(Date.now() - cleanupDays.value * 86400000).toISOString() // eslint-disable-line no-magic-numbers
     const res = await api.deleteLogsBefore(before)
     showCleanup.value = false
     page.value = 1
     await loadLogs()
     alert(`已清理 ${res.data.deleted} 条日志`)
-  } catch (e) {
+  } catch (e) { // eslint-disable-line taste/no-silent-catch
     console.error('Failed to cleanup logs:', e)
   }
 }

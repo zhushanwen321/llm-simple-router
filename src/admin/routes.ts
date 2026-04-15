@@ -5,6 +5,7 @@ import { adminProviderRoutes } from "./providers.js";
 import { adminMappingRoutes } from "./mappings.js";
 import { adminLogRoutes } from "./logs.js";
 import { adminStatsRoutes } from "./stats.js";
+import { adminMetricsRoutes } from "./metrics.js";
 
 interface AdminRoutesOptions {
   db: Database.Database;
@@ -20,5 +21,6 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (app, opti
   app.register(adminMappingRoutes, { db: options.db });
   app.register(adminLogRoutes, { db: options.db });
   app.register(adminStatsRoutes, { db: options.db });
+  app.register(adminMetricsRoutes, { db: options.db });
   done();
 };

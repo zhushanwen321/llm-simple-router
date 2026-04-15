@@ -9,7 +9,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "docker:build": "docker build -t llm-simple-router .",
-    "docker:run": "docker compose up -d"
+    "docker:run": "docker compose up -d",
+    "lint": "eslint . --max-warnings=0"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",
@@ -22,11 +23,15 @@
     "pino": "^9.6.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/better-sqlite3": "^7.6.13",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.15.3",
+    "eslint": "^10.2.0",
+    "eslint-plugin-vue": "^10.8.0",
     "tsx": "^4.19.3",
     "typescript": "^5.8.3",
+    "typescript-eslint": "^8.58.2",
     "vitest": "^3.1.2"
   }
 }

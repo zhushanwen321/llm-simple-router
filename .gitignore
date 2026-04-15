@@ -113,3 +113,4 @@ data/
 .claude/
 .mcp.json
 .playwright-mcp/
+.superpowers/
