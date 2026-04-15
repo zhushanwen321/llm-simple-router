@@ -1,0 +1,20 @@
+version: "3.8"
+
+services:
+  router:
+    build: .
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      - ROUTER_API_KEY=${ROUTER_API_KEY}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - TZ=Asia/Shanghai
+    volumes:
+      - router-data:/app/data
+    env_file:
+      - .env
+    restart: unless-stopped
+
+volumes:
+  router-data:
