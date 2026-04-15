@@ -165,7 +165,23 @@ export interface MetricsRow {
   created_at: string;
 }
 
-export function insertMetrics(db: Database.Database, m: Omit<MetricsRow, "id" | "created_at">): string {
+export type MetricsInsert = {
+  request_log_id: string;
+  provider_id: string;
+  backend_model: string;
+  api_type: string;
+  input_tokens?: number | null;
+  output_tokens?: number | null;
+  cache_creation_tokens?: number | null;
+  cache_read_tokens?: number | null;
+  ttft_ms?: number | null;
+  total_duration_ms?: number | null;
+  tokens_per_second?: number | null;
+  stop_reason?: string | null;
+  is_complete?: number;
+};
+
+export function insertMetrics(db: Database.Database, m: MetricsInsert): string {
   const id = randomUUID();
   db.prepare(
     `INSERT INTO request_metrics (id, request_log_id, provider_id, backend_model, api_type, input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, ttft_ms, total_duration_ms, tokens_per_second, stop_reason, is_complete)
