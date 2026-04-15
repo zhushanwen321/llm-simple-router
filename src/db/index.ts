@@ -284,6 +284,11 @@ export function deleteLogsBefore(db: Database.Database, beforeDate: string): num
   return db.prepare("DELETE FROM request_logs WHERE created_at < ?").run(beforeDate).changes;
 }
 
+// --- Metrics (re-export from metrics.ts) ---
+
+export { getMetricsSummary, getMetricsTimeseries } from "./metrics.js";
+export type { MetricsSummaryRow, MetricsTimeseriesRow, MetricsPeriod, MetricsMetric } from "./metrics.js";
+
 export function getStats(db: Database.Database): Stats {
   const total = (db.prepare("SELECT COUNT(*) as count FROM request_logs").get() as CountRow).count;
   const successCount = (db.prepare("SELECT COUNT(*) as count FROM request_logs WHERE status_code >= 200 AND status_code < 300").get() as CountRow).count;

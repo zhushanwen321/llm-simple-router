@@ -1,0 +1,129 @@
+import Database from "better-sqlite3";
+
+export type MetricsPeriod = "1h" | "6h" | "24h" | "7d" | "30d";
+export type MetricsMetric = "ttft" | "tps" | "tokens" | "cache_rate" | "request_count";
+
+const PERIOD_OFFSET: Record<MetricsPeriod, string> = {
+  "1h": "-1 hours",
+  "6h": "-6 hours",
+  "24h": "-1 day",
+  "7d": "-7 days",
+  "30d": "-30 days",
+};
+
+const BUCKET_SECONDS: Record<MetricsPeriod, number> = {
+  "1h": 60,
+  "6h": 300,
+  "24h": 900,
+  "7d": 3600,
+  "30d": 14400,
+};
+
+// unix epoch 秒转毫秒的乘数
+const MS_PER_SEC = 1000;
+
+export interface MetricsSummaryRow {
+  provider_id: string;
+  provider_name: string;
+  backend_model: string;
+  request_count: number;
+  avg_ttft_ms: number | null;
+  // TODO: 实现 p50/p95 百分位（SQLite 不原生支持 PERCENTILE，需要用 JSON 数组或子查询方案）
+  p50_ttft_ms: null;
+  p95_ttft_ms: null;
+  avg_tps: number | null;
+  total_input_tokens: number;
+  total_output_tokens: number;
+  total_cache_hit_tokens: number;
+  cache_hit_rate: number | null;
+}
+
+export function getMetricsSummary(
+  db: Database.Database,
+  period: MetricsPeriod,
+  providerId?: string,
+  backendModel?: string
+): MetricsSummaryRow[] {
+  const offset = PERIOD_OFFSET[period];
+  const conditions = ["rm.is_complete = 1", "rm.created_at >= datetime('now', ?)"];
+  const params: unknown[] = [offset];
+
+  if (providerId) { conditions.push("rm.provider_id = ?"); params.push(providerId); }
+  if (backendModel) { conditions.push("rm.backend_model = ?"); params.push(backendModel); }
+
+  const where = conditions.join(" AND ");
+
+  return db.prepare(`
+    SELECT
+      rm.provider_id,
+      COALESCE(p.name, rm.provider_id) AS provider_name,
+      rm.backend_model,
+      COUNT(*) AS request_count,
+      AVG(rm.ttft_ms) AS avg_ttft_ms,
+      NULL AS p50_ttft_ms,
+      NULL AS p95_ttft_ms,
+      AVG(rm.tokens_per_second) AS avg_tps,
+      COALESCE(SUM(rm.input_tokens), 0) AS total_input_tokens,
+      COALESCE(SUM(rm.output_tokens), 0) AS total_output_tokens,
+      COALESCE(SUM(rm.cache_read_tokens), 0) AS total_cache_hit_tokens,
+      CASE WHEN SUM(rm.input_tokens) > 0
+        THEN SUM(rm.cache_read_tokens) * 1.0 / SUM(rm.input_tokens)
+        ELSE NULL
+      END AS cache_hit_rate
+    FROM request_metrics rm
+    LEFT JOIN providers p ON p.id = rm.provider_id
+    WHERE ${where}
+    GROUP BY rm.provider_id, rm.backend_model
+    ORDER BY request_count DESC
+  `).all(...params) as MetricsSummaryRow[];
+}
+
+export interface MetricsTimeseriesRow {
+  time_bucket: string;
+  avg_value: number | null;
+  count: number;
+}
+
+const METRIC_EXPR: Record<MetricsMetric, string> = {
+  ttft: "AVG(rm.ttft_ms)",
+  tps: "AVG(rm.tokens_per_second)",
+  tokens: "SUM(rm.output_tokens)",
+  cache_rate: "CASE WHEN SUM(rm.input_tokens) > 0 THEN SUM(rm.cache_read_tokens) * 1.0 / SUM(rm.input_tokens) ELSE NULL END",
+  request_count: "COUNT(*)",
+};
+
+export function getMetricsTimeseries(
+  db: Database.Database,
+  period: MetricsPeriod,
+  metric: MetricsMetric,
+  providerId?: string,
+  backendModel?: string
+): MetricsTimeseriesRow[] {
+  const offset = PERIOD_OFFSET[period];
+  const bucketSec = BUCKET_SECONDS[period];
+  const conditions = ["rm.is_complete = 1", "rm.created_at >= datetime('now', ?)"];
+  const params: unknown[] = [offset];
+
+  if (providerId) { conditions.push("rm.provider_id = ?"); params.push(providerId); }
+  if (backendModel) { conditions.push("rm.backend_model = ?"); params.push(backendModel); }
+
+  const where = conditions.join(" AND ");
+  const expr = METRIC_EXPR[metric];
+
+  const rows = db.prepare(`
+    SELECT
+      (unixepoch(rm.created_at) / ?) * ? AS bucket_key,
+      ${expr} AS avg_value,
+      COUNT(*) AS count
+    FROM request_metrics rm
+    WHERE ${where}
+    GROUP BY bucket_key
+    ORDER BY bucket_key ASC
+  `).all(bucketSec, bucketSec, ...params) as { bucket_key: number; avg_value: number | null; count: number }[];
+
+  return rows.map((r) => ({
+    time_bucket: new Date(r.bucket_key * MS_PER_SEC).toISOString(),
+    avg_value: r.avg_value,
+    count: r.count,
+  }));
+}
