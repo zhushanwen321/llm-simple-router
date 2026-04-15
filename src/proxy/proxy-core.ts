@@ -2,9 +2,13 @@ import { request as httpRequestFn, IncomingMessage } from "http";
 import { request as httpsRequestFn } from "https";
 import { PassThrough } from "stream";
 import type { FastifyReply } from "fastify";
+import Database from "better-sqlite3";
 import type { Provider } from "../db/index.js";
+import { insertRequestLog } from "../db/index.js";
 
 // ---------- Types ----------
+
+export type RawHeaders = Record<string, string | string[] | undefined>;
 
 export interface UpstreamRequestOptions {
   hostname: string;
@@ -26,6 +30,7 @@ export interface StreamProxyResult {
   statusCode: number;
   responseBody?: string;
   upstreamResponseHeaders?: Record<string, string>;
+  sentHeaders?: Record<string, string>;
 }
 
 export interface GetProxyResult {
@@ -36,10 +41,10 @@ export interface GetProxyResult {
 
 // ---------- Constants ----------
 
+export const UPSTREAM_SUCCESS = 200;
 const HTTPS_DEFAULT_PORT = 443;
 const HTTP_DEFAULT_PORT = 80;
 const UPSTREAM_BAD_GATEWAY = 502;
-const UPSTREAM_SUCCESS = 200;
 
 // ---------- Header utilities ----------
 
@@ -62,7 +67,7 @@ export const SKIP_DOWNSTREAM = new Set([
 ]);
 
 export function selectHeaders(
-  raw: Record<string, string | string[] | undefined>,
+  raw: RawHeaders,
   skip: Set<string>
 ): Record<string, string> {
   const out: Record<string, string> = {};
@@ -77,14 +82,16 @@ export function selectHeaders(
 // 如果未来需要支持其他鉴权方式，需要参数化 header 构造
 /** 构建发往上游的请求 headers：过滤客户端 headers + 注入后端 API key */
 export function buildUpstreamHeaders(
-  clientHeaders: Record<string, string | string[] | undefined>,
+  clientHeaders: RawHeaders,
   apiKey: string,
-  payloadBytes: number
+  payloadBytes?: number
 ): Record<string, string> {
   const headers = selectHeaders(clientHeaders, SKIP_UPSTREAM);
   headers["Authorization"] = `Bearer ${apiKey}`;
-  headers["Content-Type"] = "application/json";
-  headers["Content-Length"] = String(payloadBytes);
+  if (payloadBytes !== undefined) {
+    headers["Content-Type"] = "application/json";
+    headers["Content-Length"] = String(payloadBytes);
+  }
   return headers;
 }
 
@@ -110,13 +117,43 @@ export function buildRequestOptions(
   };
 }
 
+// ---------- Logging ----------
+
+/** 插入成功请求日志，供 openai/anthropic 插件共享 */
+export function insertSuccessLog(
+  db: Database.Database,
+  apiType: string,
+  logId: string,
+  model: string,
+  provider: Provider,
+  isStream: boolean,
+  startTime: number,
+  reqBody: string,
+  clientReq: string,
+  upstreamReq: string,
+  status: number,
+  respBody: string | null,
+  upHdrs: Record<string, string>,
+  cliHdrs: Record<string, string>,
+) {
+  insertRequestLog(db, {
+    id: logId, api_type: apiType, model, provider_id: provider.id,
+    status_code: status, latency_ms: Date.now() - startTime,
+    is_stream: isStream ? 1 : 0, error_message: null,
+    created_at: new Date().toISOString(), request_body: reqBody,
+    response_body: respBody, client_request: clientReq, upstream_request: upstreamReq,
+    upstream_response: JSON.stringify({ statusCode: status, headers: upHdrs, body: respBody }),
+    client_response: JSON.stringify({ statusCode: status, headers: cliHdrs, body: respBody }),
+  });
+}
+
 // ---------- Non-stream proxy ----------
 
 export function proxyNonStream(
   backend: Provider,
   apiKey: string,
   body: Record<string, unknown>,
-  clientHeaders: Record<string, string | string[] | undefined>,
+  clientHeaders: RawHeaders,
   upstreamPath: string
 ): Promise<ProxyResult> {
   return new Promise((resolve, reject) => {
@@ -133,10 +170,7 @@ export function proxyNonStream(
         resolve({
           statusCode: res.statusCode || UPSTREAM_BAD_GATEWAY,
           body: Buffer.concat(chunks).toString("utf-8"),
-          headers: selectHeaders(
-            res.headers as Record<string, string | string[] | undefined>,
-            SKIP_DOWNSTREAM
-          ),
+          headers: selectHeaders(res.headers as RawHeaders, SKIP_DOWNSTREAM),
           sentHeaders: { ...upstreamHeaders },
           sentBody: payload,
         });
@@ -154,7 +188,7 @@ export function proxyStream(
   backend: Provider,
   apiKey: string,
   body: Record<string, unknown>,
-  clientHeaders: Record<string, string | string[] | undefined>,
+  clientHeaders: RawHeaders,
   reply: FastifyReply,
   timeoutMs: number,
   upstreamPath: string
@@ -170,27 +204,22 @@ export function proxyStream(
       const statusCode = upstreamRes.statusCode || UPSTREAM_BAD_GATEWAY;
 
       if (statusCode !== UPSTREAM_SUCCESS) {
+        // 非200路径：仅返回错误信息，不操作 reply
         const chunks: Buffer[] = [];
         upstreamRes.on("data", (chunk: Buffer) => chunks.push(chunk));
         upstreamRes.on("end", () => {
           const errorBody = Buffer.concat(chunks).toString("utf-8");
-          const errHeaders = selectHeaders(
-            upstreamRes.headers as Record<string, string | string[] | undefined>,
-            SKIP_DOWNSTREAM
-          );
-          resolve({ statusCode, responseBody: errorBody, upstreamResponseHeaders: errHeaders });
-          for (const [key, value] of Object.entries(errHeaders)) {
-            reply.header(key, value);
-          }
-          reply.status(statusCode).send(errorBody);
+          resolve({
+            statusCode,
+            responseBody: errorBody,
+            upstreamResponseHeaders: selectHeaders(upstreamRes.headers as RawHeaders, SKIP_DOWNSTREAM),
+            sentHeaders: upstreamHeaders,
+          });
         });
         return;
       }
 
-      const sseHeaders = selectHeaders(
-        upstreamRes.headers as Record<string, string | string[] | undefined>,
-        SKIP_DOWNSTREAM
-      );
+      const sseHeaders = selectHeaders(upstreamRes.headers as RawHeaders, SKIP_DOWNSTREAM);
       sseHeaders["Content-Type"] = "text/event-stream";
       sseHeaders["Cache-Control"] = "no-cache";
       sseHeaders["Connection"] = "keep-alive";
@@ -213,7 +242,7 @@ export function proxyStream(
       reply.raw.on("close", () => {
         if (!resolved) {
           cleanup();
-          resolve({ statusCode, responseBody: undefined, upstreamResponseHeaders: sseHeaders });
+          resolve({ statusCode, responseBody: undefined, upstreamResponseHeaders: sseHeaders, sentHeaders: upstreamHeaders });
         }
       });
 
@@ -221,7 +250,7 @@ export function proxyStream(
         cleanup();
         if (!resolved) {
           resolved = true;
-          resolve({ statusCode, responseBody: undefined, upstreamResponseHeaders: sseHeaders });
+          resolve({ statusCode, responseBody: undefined, upstreamResponseHeaders: sseHeaders, sentHeaders: upstreamHeaders });
         }
       });
 
@@ -231,7 +260,7 @@ export function proxyStream(
           cleanup();
           if (!resolved) {
             resolved = true;
-            resolve({ statusCode, responseBody: undefined, upstreamResponseHeaders: sseHeaders });
+            resolve({ statusCode, responseBody: undefined, upstreamResponseHeaders: sseHeaders, sentHeaders: upstreamHeaders });
           }
         }, timeoutMs);
       }
@@ -255,6 +284,7 @@ export function proxyStream(
           statusCode,
           responseBody: Buffer.concat(captureChunks).toString("utf-8"),
           upstreamResponseHeaders: sseHeaders,
+          sentHeaders: upstreamHeaders,
         });
       });
 
@@ -277,13 +307,12 @@ export function proxyStream(
 export function proxyGetRequest(
   backend: Provider,
   apiKey: string,
-  clientHeaders: Record<string, string | string[] | undefined>,
+  clientHeaders: RawHeaders,
   upstreamPath: string
 ): Promise<GetProxyResult> {
   return new Promise((resolve, reject) => {
     const url = new URL(`${backend.base_url}${upstreamPath}`);
-    const headers = selectHeaders(clientHeaders, SKIP_UPSTREAM);
-    headers["Authorization"] = `Bearer ${apiKey}`;
+    const headers = buildUpstreamHeaders(clientHeaders, apiKey);
     const options = buildRequestOptions(url, headers, "GET");
 
     const req = createUpstreamRequest(url, options);
@@ -294,10 +323,7 @@ export function proxyGetRequest(
         resolve({
           statusCode: res.statusCode || UPSTREAM_BAD_GATEWAY,
           body: Buffer.concat(chunks).toString("utf-8"),
-          headers: selectHeaders(
-            res.headers as Record<string, string | string[] | undefined>,
-            SKIP_DOWNSTREAM
-          ),
+          headers: selectHeaders(res.headers as RawHeaders, SKIP_DOWNSTREAM),
         });
       });
     });

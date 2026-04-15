@@ -4,12 +4,12 @@ import Database from "better-sqlite3";
 import fp from "fastify-plugin";
 import {
   getActiveProviders, getModelMapping, getProviderById,
-  insertRequestLog, type Provider,
+  insertRequestLog,
 } from "../db/index.js";
 import { decrypt } from "../utils/crypto.js";
 import {
   proxyNonStream, proxyStream, proxyGetRequest,
-  buildUpstreamHeaders, type ProxyResult,
+  buildUpstreamHeaders, insertSuccessLog, UPSTREAM_SUCCESS, type ProxyResult, type RawHeaders,
 } from "./proxy-core.js";
 
 export interface OpenaiProxyOptions {
@@ -33,22 +33,6 @@ function sendError(reply: FastifyReply, e: ReturnType<typeof openaiError>) {
   return reply.status(e.statusCode).send(e.body);
 }
 
-function insertSuccessLog(
-  db: Database.Database, logId: string, model: string, provider: Provider, isStream: boolean,
-  startTime: number, reqBody: string, clientReq: string, upstreamReq: string, status: number,
-  respBody: string | null, upHdrs: Record<string, string>, cliHdrs: Record<string, string>,
-) {
-  insertRequestLog(db, {
-    id: logId, api_type: "openai", model, provider_id: provider.id,
-    status_code: status, latency_ms: Date.now() - startTime,
-    is_stream: isStream ? 1 : 0, error_message: null,
-    created_at: new Date().toISOString(), request_body: reqBody,
-    response_body: respBody, client_request: clientReq, upstream_request: upstreamReq,
-    upstream_response: JSON.stringify({ statusCode: status, headers: upHdrs, body: respBody }),
-    client_response: JSON.stringify({ statusCode: status, headers: cliHdrs, body: respBody }),
-  });
-}
-
 const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, done) => {
   const { db, encryptionKey, streamTimeoutMs } = opts;
   app.post(CHAT_COMPLETIONS_PATH, async (request, reply) => {
@@ -69,24 +53,31 @@ const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, do
     const apiKey = decrypt(provider.api_key, encryptionKey);
     const isStream = body.stream === true;
     const reqBodyStr = JSON.stringify(body);
-    const cliHdrs = request.headers as Record<string, string | string[] | undefined>;
-    const upReqHdrs = buildUpstreamHeaders(cliHdrs, apiKey, Buffer.byteLength(reqBodyStr));
+    const cliHdrs: RawHeaders = request.headers as RawHeaders;
     const clientReq = JSON.stringify({ headers: cliHdrs, body: originalBody });
-    const upstreamReq = JSON.stringify({ url: `${provider.base_url}${CHAT_COMPLETIONS_PATH}`, headers: upReqHdrs, body: reqBodyStr });
 
     try {
       if (isStream) {
         const r = await proxyStream(provider, apiKey, body, cliHdrs, reply, streamTimeoutMs, CHAT_COMPLETIONS_PATH);
         const h = r.upstreamResponseHeaders ?? {};
-        insertSuccessLog(db, logId, clientModel, provider, true, startTime, reqBodyStr, clientReq, upstreamReq, r.statusCode, r.responseBody ?? null, h, h);
+        const sentH = r.sentHeaders ?? {};
+        const upstreamReq = JSON.stringify({ url: `${provider.base_url}${CHAT_COMPLETIONS_PATH}`, headers: sentH, body: reqBodyStr });
+        if (r.statusCode !== UPSTREAM_SUCCESS) {
+          for (const [k, v] of Object.entries(r.upstreamResponseHeaders ?? {})) reply.header(k, v);
+          reply.status(r.statusCode).send(r.responseBody);
+        }
+        insertSuccessLog(db, "openai", logId, clientModel, provider, true, startTime, reqBodyStr, clientReq, upstreamReq, r.statusCode, r.responseBody ?? null, h, h);
         return reply;
       }
       const r: ProxyResult = await proxyNonStream(provider, apiKey, body, cliHdrs, CHAT_COMPLETIONS_PATH);
-      insertSuccessLog(db, logId, clientModel, provider, false, startTime, reqBodyStr, clientReq, upstreamReq, r.statusCode, r.body, r.sentHeaders, r.headers);
+      const upstreamReq = JSON.stringify({ url: `${provider.base_url}${CHAT_COMPLETIONS_PATH}`, headers: r.sentHeaders, body: reqBodyStr });
+      insertSuccessLog(db, "openai", logId, clientModel, provider, false, startTime, reqBodyStr, clientReq, upstreamReq, r.statusCode, r.body, r.sentHeaders, r.headers);
       for (const [k, v] of Object.entries(r.headers)) reply.header(k, v);
       return reply.status(r.statusCode).send(r.body);
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : String(err);
+      const sentH = buildUpstreamHeaders(cliHdrs, apiKey, Buffer.byteLength(reqBodyStr));
+      const upstreamReq = JSON.stringify({ url: `${provider.base_url}${CHAT_COMPLETIONS_PATH}`, headers: sentH, body: reqBodyStr });
       insertRequestLog(db, {
         id: logId, api_type: "openai", model: clientModel, provider_id: provider.id,
         status_code: HTTP_BAD_GATEWAY, latency_ms: Date.now() - startTime,
@@ -103,7 +94,7 @@ const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, do
     if (providers.length === 0) return sendError(reply, openaiError("No active OpenAI provider configured", "invalid_request_error", "no_provider", HTTP_NOT_FOUND));
     const provider = providers[0];
     const apiKey = decrypt(provider.api_key, encryptionKey);
-    const cliHdrs = request.headers as Record<string, string | string[] | undefined>;
+    const cliHdrs: RawHeaders = request.headers as RawHeaders;
     try {
       const result = await proxyGetRequest(provider, apiKey, cliHdrs, MODELS_PATH);
       for (const [k, v] of Object.entries(result.headers)) reply.header(k, v);
