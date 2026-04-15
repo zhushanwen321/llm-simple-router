@@ -157,7 +157,7 @@ describe("Provider CRUD", () => {
     expect(res.json().id).toBeDefined();
   });
 
-  it("GET returns services with masked api_key", async () => {
+  it("GET returns services with api_key_preview instead of raw api_key", async () => {
     await app.inject({
       method: "POST",
       url: "/admin/api/providers",
@@ -178,7 +178,8 @@ describe("Provider CRUD", () => {
     expect(res.statusCode).toBe(200);
     const services = res.json();
     expect(services.length).toBe(1);
-    expect(services[0].api_key).toBe("sk-t...3xyz");
+    expect(services[0].api_key_preview).toBe("sk-t...3xyz");
+    expect(services[0].api_key).toBeUndefined();
   });
 
   it("PUT updates service", async () => {
