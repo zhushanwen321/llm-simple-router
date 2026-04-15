@@ -3,12 +3,12 @@
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-lg font-semibold text-gray-900">请求日志</h2>
       <div class="flex items-center gap-2">
-        <Select v-model="filterType" @update:model-value="loadLogs">
+        <Select v-model="filterType" @update:model-value="handleFilterChange">
           <SelectTrigger class="w-[140px]">
             <SelectValue placeholder="全部类型" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">全部类型</SelectItem>
+            <SelectItem value="all">全部类型</SelectItem>
             <SelectItem value="openai">OpenAI</SelectItem>
             <SelectItem value="anthropic">Anthropic</SelectItem>
           </SelectContent>
@@ -27,6 +27,7 @@
       <Table>
         <TableHeader>
           <TableRow class="bg-gray-50">
+            <TableHead class="text-gray-600">ID</TableHead>
             <TableHead class="text-gray-600">时间</TableHead>
             <TableHead class="text-gray-600">类型</TableHead>
             <TableHead class="text-gray-600">模型</TableHead>
@@ -39,6 +40,7 @@
         </TableHeader>
         <TableBody>
           <TableRow v-for="log in logs" :key="log.id" :class="{ 'bg-red-50/50': log.status_code >= 400 }">
+            <TableCell class="font-mono text-xs text-gray-400" :title="log.id">{{ log.id.slice(0, 8) }}</TableCell>
             <TableCell class="text-gray-500">{{ formatTime(log.created_at) }}</TableCell>
             <TableCell>
               <Badge :variant="log.api_type === 'openai' ? 'default' : 'secondary'">{{ log.api_type }}</Badge>
@@ -55,7 +57,7 @@
             </TableCell>
           </TableRow>
           <TableRow v-if="logs.length === 0">
-            <TableCell colspan="8" class="text-center text-gray-400 py-8">暂无日志</TableCell>
+            <TableCell colspan="9" class="text-center text-gray-400 py-8">暂无日志</TableCell>
           </TableRow>
         </TableBody>
       </Table>
@@ -81,6 +83,7 @@
           <div>
             <h3 class="text-sm font-medium text-gray-700 mb-1">基本信息</h3>
             <div class="bg-gray-50 rounded-md p-3 text-sm grid grid-cols-3 gap-2">
+              <div class="col-span-3"><span class="text-gray-500">ID:</span> <span class="font-mono text-xs select-all">{{ detailData.id }}</span></div>
               <div><span class="text-gray-500">类型:</span> {{ detailData.api_type }}</div>
               <div><span class="text-gray-500">模型:</span> {{ detailData.model || '-' }}</div>
               <div><span class="text-gray-500">状态码:</span> {{ detailData.status_code || '-' }}</div>
@@ -192,7 +195,7 @@ const logs = ref<LogEntry[]>([])
 const total = ref(0)
 const page = ref(1)
 const limit = 20
-const filterType = ref('')
+const filterType = ref('all')
 const showCleanup = ref(false)
 const cleanupDays = ref(30)
 const showDetail = ref(false)
@@ -229,13 +232,18 @@ function formatTime(iso: string): string {
 async function loadLogs() {
   try {
     const params: any = { page: page.value, limit }
-    if (filterType.value) params.api_type = filterType.value
+    if (filterType.value && filterType.value !== 'all') params.api_type = filterType.value
     const res = await api.getLogs(params)
     logs.value = res.data.data
     total.value = res.data.total
   } catch (e) {
     console.error('Failed to load logs:', e)
   }
+}
+
+function handleFilterChange() {
+  page.value = 1
+  loadLogs()
 }
 
 function prevPage() {
