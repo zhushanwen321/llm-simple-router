@@ -98,11 +98,15 @@ function createApp() {
     db,
     encryptionKey: TEST_ENCRYPTION_KEY,
     streamTimeoutMs: 5000,
+    retryMaxAttempts: 0,
+    retryBaseDelayMs: 0,
   });
   app.register(anthropicProxy, {
     db,
     encryptionKey: TEST_ENCRYPTION_KEY,
     streamTimeoutMs: 5000,
+    retryMaxAttempts: 0,
+    retryBaseDelayMs: 0,
   });
 
   return { app, db };

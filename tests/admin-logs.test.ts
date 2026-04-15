@@ -19,6 +19,8 @@ function makeConfig() {
     LOG_LEVEL: "silent",
     TZ: "Asia/Shanghai",
     STREAM_TIMEOUT_MS: 5000,
+    RETRY_MAX_ATTEMPTS: 0,
+    RETRY_BASE_DELAY_MS: 0,
   };
 }
 
