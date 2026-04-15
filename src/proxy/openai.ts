@@ -4,9 +4,11 @@ import Database from "better-sqlite3";
 import fp from "fastify-plugin";
 import {
   getActiveProviders, getModelMapping, getProviderById,
-  insertRequestLog,
+  insertRequestLog, insertMetrics,
 } from "../db/index.js";
 import { decrypt } from "../utils/crypto.js";
+import { SSEMetricsTransform } from "../metrics/sse-metrics-transform.js";
+import { MetricsExtractor } from "../metrics/metrics-extractor.js";
 import {
   proxyNonStream, proxyStream, proxyGetRequest,
   buildUpstreamHeaders, insertSuccessLog, UPSTREAM_SUCCESS, type ProxyResult, type RawHeaders,
@@ -52,13 +54,20 @@ const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, do
     body.model = mapping.backend_model;
     const apiKey = decrypt(provider.api_key, encryptionKey);
     const isStream = body.stream === true;
+
+    // 流式请求时注入 stream_options 以获取 usage 信息
+    if (isStream && !body.stream_options) {
+      body.stream_options = { include_usage: true };
+    }
+
     const reqBodyStr = JSON.stringify(body);
     const cliHdrs: RawHeaders = request.headers as RawHeaders;
     const clientReq = JSON.stringify({ headers: cliHdrs, body: originalBody });
 
     try {
       if (isStream) {
-        const r = await proxyStream(provider, apiKey, body, cliHdrs, reply, streamTimeoutMs, CHAT_COMPLETIONS_PATH);
+        const metricsTransform = new SSEMetricsTransform("openai", startTime);
+        const r = await proxyStream(provider, apiKey, body, cliHdrs, reply, streamTimeoutMs, CHAT_COMPLETIONS_PATH, metricsTransform);
         const h = r.upstreamResponseHeaders ?? {};
         const sentH = r.sentHeaders ?? {};
         const upstreamReq = JSON.stringify({ url: `${provider.base_url}${CHAT_COMPLETIONS_PATH}`, headers: sentH, body: reqBodyStr });
@@ -67,11 +76,26 @@ const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, do
           reply.status(r.statusCode).send(r.responseBody);
         }
         insertSuccessLog(db, "openai", logId, clientModel, provider, true, startTime, reqBodyStr, clientReq, upstreamReq, r.statusCode, r.responseBody ?? null, h, h);
+        if (r.metricsResult) {
+          try {
+            insertMetrics(db, { ...r.metricsResult, request_log_id: logId, provider_id: provider.id, backend_model: mapping.backend_model, api_type: "openai" });
+          } catch (err) {
+            request.log.error({ err }, "Failed to insert metrics");
+          }
+        }
         return reply;
       }
       const r: ProxyResult = await proxyNonStream(provider, apiKey, body, cliHdrs, CHAT_COMPLETIONS_PATH);
       const upstreamReq = JSON.stringify({ url: `${provider.base_url}${CHAT_COMPLETIONS_PATH}`, headers: r.sentHeaders, body: reqBodyStr });
       insertSuccessLog(db, "openai", logId, clientModel, provider, false, startTime, reqBodyStr, clientReq, upstreamReq, r.statusCode, r.body, r.sentHeaders, r.headers);
+      try {
+        const metricsResult = MetricsExtractor.fromNonStreamResponse("openai", r.body);
+        if (metricsResult) {
+          insertMetrics(db, { ...metricsResult, request_log_id: logId, provider_id: provider.id, backend_model: mapping.backend_model, api_type: "openai" });
+        }
+      } catch (err) {
+        request.log.error({ err }, "Failed to insert metrics");
+      }
       for (const [k, v] of Object.entries(r.headers)) reply.header(k, v);
       return reply.status(r.statusCode).send(r.body);
     } catch (err: unknown) {
