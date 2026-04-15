@@ -32,6 +32,7 @@ export const api = {
 
   getLogs: (params: { page: number; limit: number; api_type?: string }) =>
     client.get('/logs', { params }),
+  getLogDetail: (id: string) => client.get(`/logs/${id}`),
   deleteLogsBefore: (before: string) =>
     client.delete('/logs/before', { data: { before } }),
 

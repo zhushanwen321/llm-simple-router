@@ -106,11 +106,17 @@ export function insertRequestLog(
     is_stream: number;
     error_message: string | null;
     created_at: string;
+    request_body?: string | null;
+    response_body?: string | null;
+    client_request?: string | null;
+    upstream_request?: string | null;
+    upstream_response?: string | null;
+    client_response?: string | null;
   }
 ): void {
   db.prepare(
-    `INSERT INTO request_logs (id, api_type, model, backend_service_id, status_code, latency_ms, is_stream, error_message, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO request_logs (id, api_type, model, backend_service_id, status_code, latency_ms, is_stream, error_message, created_at, request_body, response_body, client_request, upstream_request, upstream_response, client_response)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     log.id,
     log.api_type,
@@ -120,7 +126,13 @@ export function insertRequestLog(
     log.latency_ms,
     log.is_stream,
     log.error_message,
-    log.created_at
+    log.created_at,
+    log.request_body ?? null,
+    log.response_body ?? null,
+    log.client_request ?? null,
+    log.upstream_request ?? null,
+    log.upstream_response ?? null,
+    log.client_response ?? null
   );
 }
 
@@ -136,6 +148,12 @@ export interface RequestLog {
   is_stream: number;
   error_message: string | null;
   created_at: string;
+  request_body: string | null;
+  response_body: string | null;
+  client_request: string | null;
+  upstream_request: string | null;
+  upstream_response: string | null;
+  client_response: string | null;
 }
 
 export interface Stats {
@@ -239,6 +257,13 @@ export function getRequestLogs(
     `SELECT * FROM request_logs WHERE ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`
   ).all(...params, options.limit, offset) as RequestLog[];
   return { data, total };
+}
+
+export function getRequestLogById(
+  db: Database.Database,
+  id: string
+): RequestLog | undefined {
+  return db.prepare("SELECT * FROM request_logs WHERE id = ?").get(id) as RequestLog | undefined;
 }
 
 export function deleteLogsBefore(db: Database.Database, beforeDate: string): number {

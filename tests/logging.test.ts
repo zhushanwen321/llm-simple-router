@@ -52,7 +52,13 @@ function createTestDb(): Database.Database {
       latency_ms INTEGER,
       is_stream INTEGER,
       error_message TEXT,
-      created_at TEXT NOT NULL
+      created_at TEXT NOT NULL,
+      request_body TEXT,
+      response_body TEXT,
+      client_request TEXT,
+      upstream_request TEXT,
+      upstream_response TEXT,
+      client_response TEXT
     );
   `);
   return db;

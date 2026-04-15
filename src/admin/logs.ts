@@ -1,5 +1,5 @@
 import { FastifyPluginCallback } from "fastify";
-import { getRequestLogs, deleteLogsBefore } from "../db/index.js";
+import { getRequestLogs, getRequestLogById, deleteLogsBefore } from "../db/index.js";
 
 interface LogRoutesOptions {
   db: any;
@@ -19,6 +19,15 @@ export const adminLogRoutes: FastifyPluginCallback<LogRoutesOptions> = (app, opt
       model: query.model || undefined,
     });
     return reply.send({ ...result, page, limit });
+  });
+
+  app.get("/admin/api/logs/:id", async (request, reply) => {
+    const params = request.params as { id: string };
+    const log = getRequestLogById(db, params.id);
+    if (!log) {
+      return reply.code(404).send({ error: { message: "Log not found" } });
+    }
+    return reply.send(log);
   });
 
   app.delete("/admin/api/logs/before", async (request, reply) => {

@@ -48,7 +48,8 @@ function setupTables(db: Database.Database) {
     );
     CREATE TABLE IF NOT EXISTS request_logs (
       id TEXT PRIMARY KEY, api_type TEXT NOT NULL, model TEXT, backend_service_id TEXT,
-      status_code INTEGER, latency_ms INTEGER, is_stream INTEGER, error_message TEXT, created_at TEXT NOT NULL
+      status_code INTEGER, latency_ms INTEGER, is_stream INTEGER, error_message TEXT, created_at TEXT NOT NULL,
+      request_body TEXT, response_body TEXT, client_request TEXT, upstream_request TEXT, upstream_response TEXT, client_response TEXT
     );
   `);
 }

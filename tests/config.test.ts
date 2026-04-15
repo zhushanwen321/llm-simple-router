@@ -15,6 +15,12 @@ describe("getConfig", () => {
   it("should throw when required env vars are missing", async () => {
     const mod = await import("../src/config.js?t=" + Date.now());
     const { getConfig, resetConfig } = mod;
+
+    // dotenv/config 在动态 import 时会重新从 .env 加载变量，需要再次清除
+    delete process.env.ROUTER_API_KEY;
+    delete process.env.ADMIN_PASSWORD;
+    delete process.env.ENCRYPTION_KEY;
+
     resetConfig();
 
     expect(() => getConfig()).toThrow("ROUTER_API_KEY");

@@ -8,3 +8,5 @@ data/
 .claude/
 .mcp.json
 .playwright-mcp/
+# Added by code-review-graph
+.code-review-graph/
