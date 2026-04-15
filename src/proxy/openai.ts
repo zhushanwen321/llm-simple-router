@@ -1,5 +1,10 @@
 import { FastifyPluginCallback } from "fastify";
-import { request as httpRequestParam, IncomingMessage } from "http";
+import { request as httpRequest, IncomingMessage } from "http";
+import { request as httpsRequest } from "https";
+
+function createUpstreamRequest(url: URL, options: any) {
+  return url.protocol === "https:" ? httpsRequest(options) : httpRequest(options);
+}
 import { PassThrough } from "stream";
 import { randomUUID } from "crypto";
 import Database from "better-sqlite3";
@@ -94,13 +99,14 @@ function proxyNonStream(
 
     const options = {
       hostname: url.hostname,
-      port: url.port || 80,
+      port: url.port || (url.protocol === "https:" ? 443 : 80),
       path: url.pathname,
       method: "POST",
       headers: fwd,
     };
 
-    const req = httpRequestParam(options, (res: IncomingMessage) => {
+    const req = createUpstreamRequest(url, options);
+    req.on("response", (res: IncomingMessage) => {
       const chunks: Buffer[] = [];
       res.on("data", (chunk: Buffer) => chunks.push(chunk));
       res.on("end", () => {
@@ -144,15 +150,14 @@ function proxyStream(
 
     const options = {
       hostname: url.hostname,
-      port: url.port || 80,
+      port: url.port || (url.protocol === "https:" ? 443 : 80),
       path: url.pathname,
       method: "POST",
       headers: fwd,
     };
 
-    const upstreamReq = httpRequestParam(
-      options,
-      (upstreamRes: IncomingMessage) => {
+    const upstreamReq = createUpstreamRequest(url, options);
+    upstreamReq.on("response", (upstreamRes: IncomingMessage) => {
         const statusCode = upstreamRes.statusCode || 502;
 
         if (statusCode !== 200) {
@@ -265,8 +270,7 @@ function proxyStream(
           cleanup();
           reject(err);
         });
-      }
-    );
+      });
 
     upstreamReq.on("error", (err) => reject(err));
     upstreamReq.write(payload);
@@ -293,13 +297,14 @@ function proxyModelsRequest(
 
     const options = {
       hostname: url.hostname,
-      port: url.port || 80,
+      port: url.port || (url.protocol === "https:" ? 443 : 80),
       path: url.pathname,
       method: "GET",
       headers: fwd,
     };
 
-    const req = httpRequestParam(options, (res: IncomingMessage) => {
+    const req = createUpstreamRequest(url, options);
+    req.on("response", (res: IncomingMessage) => {
       const chunks: Buffer[] = [];
       res.on("data", (chunk: Buffer) => chunks.push(chunk));
       res.on("end", () => {

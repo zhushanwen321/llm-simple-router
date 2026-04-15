@@ -1,5 +1,10 @@
 import { FastifyPluginCallback } from "fastify";
-import { request as httpRequestParam, IncomingMessage } from "http";
+import { request as httpRequest, IncomingMessage } from "http";
+import { request as httpsRequest } from "https";
+
+function createUpstreamRequest(url: URL, options: any) {
+  return url.protocol === "https:" ? httpsRequest(options) : httpRequest(options);
+}
 import { PassThrough } from "stream";
 import { randomUUID } from "crypto";
 import Database from "better-sqlite3";
@@ -27,8 +32,7 @@ const SKIP_UPSTREAM = new Set([
   "host", // Node.js http 根据目标 URL 设置
   "content-length", // 按实际 payload 重新计算
   "accept-encoding", // 代理需要读取明文 body 用于日志
-  "x-api-key", // 替换为后端服务的 key
-  "authorization", // 客户端发给路由器的认证 token，不应透传到上游
+  "authorization", // 替换为后端服务的 key
   "connection",
   "keep-alive",
   "transfer-encoding",
@@ -86,19 +90,20 @@ function proxyNonStream(
     const payload = JSON.stringify(body);
 
     const fwd = selectHeaders(clientHeaders, SKIP_UPSTREAM);
-    fwd["x-api-key"] = apiKey;
+    fwd["authorization"] = `Bearer ${apiKey}`;
     fwd["Content-Type"] = "application/json";
     fwd["Content-Length"] = String(Buffer.byteLength(payload));
 
     const options = {
       hostname: url.hostname,
-      port: url.port || 80,
+      port: url.port || (url.protocol === "https:" ? 443 : 80),
       path: url.pathname,
       method: "POST",
       headers: fwd,
     };
 
-    const req = httpRequestParam(options, (res: IncomingMessage) => {
+    const req = createUpstreamRequest(url, options);
+    req.on("response", (res: IncomingMessage) => {
       const chunks: Buffer[] = [];
       res.on("data", (chunk: Buffer) => chunks.push(chunk));
       res.on("end", () => {
@@ -136,21 +141,20 @@ function proxyStream(
     const payload = JSON.stringify(body);
 
     const fwd = selectHeaders(clientHeaders, SKIP_UPSTREAM);
-    fwd["x-api-key"] = apiKey;
+    fwd["authorization"] = `Bearer ${apiKey}`;
     fwd["Content-Type"] = "application/json";
     fwd["Content-Length"] = String(Buffer.byteLength(payload));
 
     const options = {
       hostname: url.hostname,
-      port: url.port || 80,
+      port: url.port || (url.protocol === "https:" ? 443 : 80),
       path: url.pathname,
       method: "POST",
       headers: fwd,
     };
 
-    const upstreamReq = httpRequestParam(
-      options,
-      (upstreamRes: IncomingMessage) => {
+    const upstreamReq = createUpstreamRequest(url, options);
+    upstreamReq.on("response", (upstreamRes: IncomingMessage) => {
         const statusCode = upstreamRes.statusCode || 502;
 
         if (statusCode !== 200) {
@@ -262,8 +266,7 @@ function proxyStream(
           cleanup();
           reject(err);
         });
-      }
-    );
+      });
 
     upstreamReq.on("error", (err) => reject(err));
     upstreamReq.write(payload);
@@ -329,7 +332,7 @@ const anthropicProxyRaw: FastifyPluginCallback<AnthropicProxyOptions> = (
 
     // 5. 构建日志数据
     const upstreamReqHeaders = selectHeaders(clientHeaders, SKIP_UPSTREAM);
-    upstreamReqHeaders["x-api-key"] = apiKey;
+    upstreamReqHeaders["authorization"] = `Bearer ${apiKey}`;
     upstreamReqHeaders["Content-Type"] = "application/json";
     upstreamReqHeaders["Content-Length"] = String(Buffer.byteLength(requestBodyStr));
     const clientRequest = JSON.stringify({ headers: clientHeaders, body: originalBody });
