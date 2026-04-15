@@ -50,7 +50,9 @@ function createTestDb(): Database.Database {
       client_request TEXT,
       upstream_request TEXT,
       upstream_response TEXT,
-      client_response TEXT
+      client_response TEXT,
+      is_retry INTEGER NOT NULL DEFAULT 0,
+      original_request_id TEXT
     );
   `);
   return db;
