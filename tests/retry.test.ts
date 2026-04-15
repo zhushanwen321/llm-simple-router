@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { isRetryableResult, isRetryableThrow, retryableCall } from "../src/proxy/retry.js";
 import type { RetryConfig } from "../src/proxy/retry.js";
-import type { ProxyResult, StreamProxyResult } from "../src/proxy/proxy-core.js";
+import type { ProxyResult } from "../src/proxy/proxy-core.js";
 
 const DEFAULT_CONFIG: RetryConfig = {
   maxRetries: 2,

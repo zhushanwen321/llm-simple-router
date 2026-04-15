@@ -28,11 +28,11 @@ export type ProxyFn<T = ProxyResult | StreamProxyResult> = () => Promise<T>;
 // ---------- Constants ----------
 
 const RETRYABLE_THROW_CODES = new Set(["ETIMEDOUT", "ECONNRESET", "ECONNREFUSED"]);
+const HTTP_BAD_REQUEST = 400;
+const HTTP_TOO_MANY_REQUESTS = 429;
+const HTTP_SERVICE_UNAVAILABLE = 503;
 const BACKOFF_BASE = 2;
-const STATUS_TOO_MANY_REQUESTS = 429;
-const STATUS_SERVICE_UNAVAILABLE = 503;
-const STATUS_BAD_REQUEST = 400;
-const RETRY_AFTER_MS_MULTIPLIER = 1000;
+const MS_PER_SECOND = 1000;
 
 // ---------- Shared helpers ----------
 
@@ -50,7 +50,7 @@ export function buildRetryConfig(maxRetries: number, baseDelayMs: number): Retry
   return {
     maxRetries,
     baseDelayMs,
-    retryableStatuses: new Set([STATUS_TOO_MANY_REQUESTS, STATUS_SERVICE_UNAVAILABLE]),
+    retryableStatuses: new Set([HTTP_TOO_MANY_REQUESTS, HTTP_SERVICE_UNAVAILABLE]),
     isRetryableBody: isRetryable400Body,
   };
 }
@@ -59,7 +59,7 @@ export function buildRetryConfig(maxRetries: number, baseDelayMs: number): Retry
 
 export function isRetryableResult(statusCode: number, body?: string, config?: RetryConfig): boolean {
   if (config?.retryableStatuses.has(statusCode)) return true;
-  if (statusCode === STATUS_BAD_REQUEST && body && config?.isRetryableBody?.(body)) return true;
+  if (statusCode === HTTP_BAD_REQUEST && body && config?.isRetryableBody?.(body)) return true;
   return false;
 }
 
@@ -86,7 +86,7 @@ function parseRetryAfter(headers: Record<string, string> | undefined): number | 
   const val = headers["retry-after"] ?? headers["Retry-After"];
   if (!val) return null;
   const seconds = parseInt(val, 10);
-  return isNaN(seconds) ? null : seconds * RETRY_AFTER_MS_MULTIPLIER;
+  return isNaN(seconds) ? null : seconds * MS_PER_SECOND;
 }
 
 function extractHeaders(result: ProxyResult | StreamProxyResult): Record<string, string> {
@@ -122,7 +122,7 @@ export async function retryableCall<T extends ProxyResult | StreamProxyResult>(
         responseBody: body,
       });
 
-      if (result.statusCode < STATUS_BAD_REQUEST || !isRetryableResult(result.statusCode, body ?? undefined, config)) {
+      if (result.statusCode < HTTP_BAD_REQUEST || !isRetryableResult(result.statusCode, body ?? undefined, config)) {
         return { result, attempts };
       }
 
@@ -135,7 +135,7 @@ export async function retryableCall<T extends ProxyResult | StreamProxyResult>(
       }
 
       const headers = extractHeaders(result);
-      const retryAfterMs = result.statusCode === STATUS_TOO_MANY_REQUESTS ? parseRetryAfter(headers) : null;
+      const retryAfterMs = result.statusCode === HTTP_TOO_MANY_REQUESTS ? parseRetryAfter(headers) : null;
       const delay = retryAfterMs ?? getBackoffMs(config.baseDelayMs, attempt);
       await sleep(delay);
     } catch (err: unknown) {
