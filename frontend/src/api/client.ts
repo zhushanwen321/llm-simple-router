@@ -20,10 +20,10 @@ export const api = {
   login: (password: string) => client.post('/login', { password }),
   logout: () => client.post('/logout'),
 
-  getServices: () => client.get('/services'),
-  createService: (data: any) => client.post('/services', data),
-  updateService: (id: string, data: any) => client.put(`/services/${id}`, data),
-  deleteService: (id: string) => client.delete(`/services/${id}`),
+  getProviders: () => client.get('/providers'),
+  createProvider: (data: any) => client.post('/providers', data),
+  updateProvider: (id: string, data: any) => client.put(`/providers/${id}`, data),
+  deleteProvider: (id: string) => client.delete(`/providers/${id}`),
 
   getMappings: () => client.get('/mappings'),
   createMapping: (data: any) => client.post('/mappings', data),

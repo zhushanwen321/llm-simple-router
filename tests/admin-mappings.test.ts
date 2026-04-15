@@ -24,18 +24,18 @@ function createTestDb(): Database.Database {
   const db = new Database(":memory:");
   db.exec(`
     CREATE TABLE IF NOT EXISTS migrations (name TEXT PRIMARY KEY, applied_at TEXT NOT NULL);
-    CREATE TABLE IF NOT EXISTS backend_services (
+    CREATE TABLE IF NOT EXISTS providers (
       id TEXT PRIMARY KEY, name TEXT NOT NULL, api_type TEXT NOT NULL CHECK(api_type IN ('openai', 'anthropic')),
       base_url TEXT NOT NULL, api_key TEXT NOT NULL, is_active INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL, updated_at TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS model_mappings (
       id TEXT PRIMARY KEY, client_model TEXT NOT NULL UNIQUE, backend_model TEXT NOT NULL,
-      backend_service_id TEXT NOT NULL, is_active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL,
-      FOREIGN KEY (backend_service_id) REFERENCES backend_services(id)
+      provider_id TEXT NOT NULL, is_active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL,
+      FOREIGN KEY (provider_id) REFERENCES providers(id)
     );
     CREATE TABLE IF NOT EXISTS request_logs (
-      id TEXT PRIMARY KEY, api_type TEXT NOT NULL, model TEXT, backend_service_id TEXT,
+      id TEXT PRIMARY KEY, api_type TEXT NOT NULL, model TEXT, provider_id TEXT,
       status_code INTEGER, latency_ms INTEGER, is_stream INTEGER, error_message TEXT, created_at TEXT NOT NULL,
       request_body TEXT, response_body TEXT, client_request TEXT, upstream_request TEXT, upstream_response TEXT, client_response TEXT
     );
@@ -58,7 +58,7 @@ describe("Mapping CRUD", () => {
   let db: Database.Database;
   let close: () => Promise<void>;
   let cookie: string;
-  let serviceId: string;
+  let providerId: string;
 
   beforeEach(async () => {
     db = createTestDb();
@@ -67,19 +67,19 @@ describe("Mapping CRUD", () => {
     close = result.close;
     cookie = await login(app);
 
-    // 创建一个后端服务供映射使用
+    // 创建一个 provider 供映射使用
     const res = await app.inject({
       method: "POST",
-      url: "/admin/api/services",
+      url: "/admin/api/providers",
       headers: { cookie, "content-type": "application/json" },
       payload: {
-        name: "Test Service",
+        name: "Test Provider",
         api_type: "openai",
         base_url: "https://api.openai.com",
         api_key: "sk-test-abc123xyz",
       },
     });
-    serviceId = res.json().id;
+    providerId = res.json().id;
   });
 
   afterEach(async () => {
@@ -104,7 +104,7 @@ describe("Mapping CRUD", () => {
       payload: {
         client_model: "gpt-4",
         backend_model: "gpt-4-turbo",
-        backend_service_id: serviceId,
+        provider_id: providerId,
       },
     });
     expect(res.statusCode).toBe(201);
@@ -119,7 +119,7 @@ describe("Mapping CRUD", () => {
       payload: {
         client_model: "gpt-4",
         backend_model: "gpt-4-turbo",
-        backend_service_id: serviceId,
+        provider_id: providerId,
       },
     });
 
@@ -141,7 +141,7 @@ describe("Mapping CRUD", () => {
       payload: {
         client_model: "gpt-4",
         backend_model: "gpt-4-turbo",
-        backend_service_id: serviceId,
+        provider_id: providerId,
       },
     });
     const id = createRes.json().id;
@@ -169,7 +169,7 @@ describe("Mapping CRUD", () => {
       payload: {
         client_model: "gpt-4",
         backend_model: "gpt-4-turbo",
-        backend_service_id: serviceId,
+        provider_id: providerId,
       },
     });
     const id = createRes.json().id;
@@ -197,7 +197,7 @@ describe("Mapping CRUD", () => {
       payload: {
         client_model: "gpt-4",
         backend_model: "gpt-4-turbo",
-        backend_service_id: serviceId,
+        provider_id: providerId,
       },
     });
 
@@ -208,13 +208,13 @@ describe("Mapping CRUD", () => {
       payload: {
         client_model: "gpt-4",
         backend_model: "gpt-4",
-        backend_service_id: serviceId,
+        provider_id: providerId,
       },
     });
     expect(res.statusCode).toBe(409);
   });
 
-  it("POST with non-existent service_id returns 400", async () => {
+  it("POST with non-existent provider_id returns 400", async () => {
     const res = await app.inject({
       method: "POST",
       url: "/admin/api/mappings",
@@ -222,7 +222,7 @@ describe("Mapping CRUD", () => {
       payload: {
         client_model: "gpt-4",
         backend_model: "gpt-4-turbo",
-        backend_service_id: "non-existent",
+        provider_id: "non-existent",
       },
     });
     expect(res.statusCode).toBe(400);

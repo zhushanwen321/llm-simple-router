@@ -34,7 +34,7 @@ function createTestDb(): Database.Database {
       name TEXT PRIMARY KEY,
       applied_at TEXT NOT NULL
     );
-    CREATE TABLE IF NOT EXISTS backend_services (
+    CREATE TABLE IF NOT EXISTS providers (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       api_type TEXT NOT NULL CHECK(api_type IN ('openai', 'anthropic')),
@@ -48,16 +48,16 @@ function createTestDb(): Database.Database {
       id TEXT PRIMARY KEY,
       client_model TEXT NOT NULL UNIQUE,
       backend_model TEXT NOT NULL,
-      backend_service_id TEXT NOT NULL,
+      provider_id TEXT NOT NULL,
       is_active INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL,
-      FOREIGN KEY (backend_service_id) REFERENCES backend_services(id)
+      FOREIGN KEY (provider_id) REFERENCES providers(id)
     );
     CREATE TABLE IF NOT EXISTS request_logs (
       id TEXT PRIMARY KEY,
       api_type TEXT NOT NULL,
       model TEXT,
-      backend_service_id TEXT,
+      provider_id TEXT,
       status_code INTEGER,
       latency_ms INTEGER,
       is_stream INTEGER,
@@ -238,7 +238,7 @@ describe("Integration tests", () => {
     const encryptedKey = encrypt("sk-backend-key", TEST_ENCRYPTION_KEY);
 
     db.prepare(
-      `INSERT INTO backend_services (id, name, api_type, base_url, api_key, is_active, created_at, updated_at)
+      `INSERT INTO providers (id, name, api_type, base_url, api_key, is_active, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       "svc-openai",
@@ -252,7 +252,7 @@ describe("Integration tests", () => {
     );
 
     db.prepare(
-      `INSERT INTO backend_services (id, name, api_type, base_url, api_key, is_active, created_at, updated_at)
+      `INSERT INTO providers (id, name, api_type, base_url, api_key, is_active, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       "svc-anthropic",
@@ -264,6 +264,17 @@ describe("Integration tests", () => {
       now,
       now
     );
+
+    // 插入默认模型映射，使代理能路由请求
+    db.prepare(
+      `INSERT INTO model_mappings (id, client_model, backend_model, provider_id, is_active, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    ).run("map-gpt4", "gpt-4", "gpt-4", "svc-openai", 1, now);
+
+    db.prepare(
+      `INSERT INTO model_mappings (id, client_model, backend_model, provider_id, is_active, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    ).run("map-claude3", "claude-3-sonnet", "claude-3-sonnet", "svc-anthropic", 1, now);
   });
 
   afterEach(async () => {
@@ -353,12 +364,12 @@ describe("Integration tests", () => {
   });
 
   it("should apply model mapping in integration", async () => {
-    // 配置模型映射：客户端用 gpt-4，后端收到 gpt-4-turbo
+    // 配置模型映射：客户端用 gpt-4-mapped，后端收到 gpt-4-turbo
     const now = new Date().toISOString();
     db.prepare(
-      `INSERT INTO model_mappings (id, client_model, backend_model, backend_service_id, is_active, created_at)
+      `INSERT INTO model_mappings (id, client_model, backend_model, provider_id, is_active, created_at)
        VALUES (?, ?, ?, ?, ?, ?)`
-    ).run("map-1", "gpt-4", "gpt-4-turbo", "svc-openai", 1, now);
+    ).run("map-test", "gpt-4-mapped", "gpt-4-turbo", "svc-openai", 1, now);
 
     // 创建验证后端收到 model 的 mock
     let receivedModel: string | null = null;
@@ -394,7 +405,7 @@ describe("Integration tests", () => {
 
     // 更新后端服务地址
     db.prepare(
-      `UPDATE backend_services SET base_url = ? WHERE id = ?`
+      `UPDATE providers SET base_url = ? WHERE id = ?`
     ).run(`http://127.0.0.1:${mockOpenAI.port}`, "svc-openai");
 
     await app.inject({
@@ -402,7 +413,7 @@ describe("Integration tests", () => {
       url: "/v1/chat/completions",
       headers: { ...AUTH_HEADER, "content-type": "application/json" },
       payload: {
-        model: "gpt-4",
+        model: "gpt-4-mapped",
         messages: [{ role: "user", content: "test" }],
       },
     });

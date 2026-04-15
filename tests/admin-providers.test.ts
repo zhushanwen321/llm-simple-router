@@ -36,18 +36,18 @@ async function login(app: FastifyInstance): Promise<string> {
 function setupTables(db: Database.Database) {
   db.exec(`
     CREATE TABLE IF NOT EXISTS migrations (name TEXT PRIMARY KEY, applied_at TEXT NOT NULL);
-    CREATE TABLE IF NOT EXISTS backend_services (
+    CREATE TABLE IF NOT EXISTS providers (
       id TEXT PRIMARY KEY, name TEXT NOT NULL, api_type TEXT NOT NULL CHECK(api_type IN ('openai', 'anthropic')),
       base_url TEXT NOT NULL, api_key TEXT NOT NULL, is_active INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL, updated_at TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS model_mappings (
       id TEXT PRIMARY KEY, client_model TEXT NOT NULL UNIQUE, backend_model TEXT NOT NULL,
-      backend_service_id TEXT NOT NULL, is_active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL,
-      FOREIGN KEY (backend_service_id) REFERENCES backend_services(id)
+      provider_id TEXT NOT NULL, is_active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL,
+      FOREIGN KEY (provider_id) REFERENCES providers(id)
     );
     CREATE TABLE IF NOT EXISTS request_logs (
-      id TEXT PRIMARY KEY, api_type TEXT NOT NULL, model TEXT, backend_service_id TEXT,
+      id TEXT PRIMARY KEY, api_type TEXT NOT NULL, model TEXT, provider_id TEXT,
       status_code INTEGER, latency_ms INTEGER, is_stream INTEGER, error_message TEXT, created_at TEXT NOT NULL,
       request_body TEXT, response_body TEXT, client_request TEXT, upstream_request TEXT, upstream_response TEXT, client_response TEXT
     );
@@ -94,7 +94,7 @@ describe("Admin Auth", () => {
   it("unauthenticated CRUD returns 401", async () => {
     const res = await app.inject({
       method: "GET",
-      url: "/admin/api/services",
+      url: "/admin/api/providers",
     });
     expect(res.statusCode).toBe(401);
   });
@@ -110,7 +110,7 @@ describe("Admin Auth", () => {
   });
 });
 
-describe("Service CRUD", () => {
+describe("Provider CRUD", () => {
   let app: FastifyInstance;
   let db: Database.Database;
   let close: () => Promise<void>;
@@ -132,7 +132,7 @@ describe("Service CRUD", () => {
   it("GET services returns empty list", async () => {
     const res = await app.inject({
       method: "GET",
-      url: "/admin/api/services",
+      url: "/admin/api/providers",
       headers: { cookie },
     });
     expect(res.statusCode).toBe(200);
@@ -142,7 +142,7 @@ describe("Service CRUD", () => {
   it("POST creates service successfully", async () => {
     const res = await app.inject({
       method: "POST",
-      url: "/admin/api/services",
+      url: "/admin/api/providers",
       headers: { cookie, "content-type": "application/json" },
       payload: {
         name: "Test OpenAI",
@@ -158,7 +158,7 @@ describe("Service CRUD", () => {
   it("GET returns services with masked api_key", async () => {
     await app.inject({
       method: "POST",
-      url: "/admin/api/services",
+      url: "/admin/api/providers",
       headers: { cookie, "content-type": "application/json" },
       payload: {
         name: "Test OpenAI",
@@ -170,7 +170,7 @@ describe("Service CRUD", () => {
 
     const res = await app.inject({
       method: "GET",
-      url: "/admin/api/services",
+      url: "/admin/api/providers",
       headers: { cookie },
     });
     expect(res.statusCode).toBe(200);
@@ -182,7 +182,7 @@ describe("Service CRUD", () => {
   it("PUT updates service", async () => {
     const createRes = await app.inject({
       method: "POST",
-      url: "/admin/api/services",
+      url: "/admin/api/providers",
       headers: { cookie, "content-type": "application/json" },
       payload: {
         name: "Test OpenAI",
@@ -195,7 +195,7 @@ describe("Service CRUD", () => {
 
     const updateRes = await app.inject({
       method: "PUT",
-      url: `/admin/api/services/${id}`,
+      url: `/admin/api/providers/${id}`,
       headers: { cookie, "content-type": "application/json" },
       payload: { name: "Updated Name" },
     });
@@ -203,7 +203,7 @@ describe("Service CRUD", () => {
 
     const getRes = await app.inject({
       method: "GET",
-      url: "/admin/api/services",
+      url: "/admin/api/providers",
       headers: { cookie },
     });
     expect(getRes.json()[0].name).toBe("Updated Name");
@@ -212,7 +212,7 @@ describe("Service CRUD", () => {
   it("DELETE removes service", async () => {
     const createRes = await app.inject({
       method: "POST",
-      url: "/admin/api/services",
+      url: "/admin/api/providers",
       headers: { cookie, "content-type": "application/json" },
       payload: {
         name: "Test OpenAI",
@@ -225,14 +225,14 @@ describe("Service CRUD", () => {
 
     const delRes = await app.inject({
       method: "DELETE",
-      url: `/admin/api/services/${id}`,
+      url: `/admin/api/providers/${id}`,
       headers: { cookie },
     });
     expect(delRes.statusCode).toBe(200);
 
     const getRes = await app.inject({
       method: "GET",
-      url: "/admin/api/services",
+      url: "/admin/api/providers",
       headers: { cookie },
     });
     expect(getRes.json()).toEqual([]);
@@ -241,7 +241,7 @@ describe("Service CRUD", () => {
   it("POST with missing required field returns 400", async () => {
     const res = await app.inject({
       method: "POST",
-      url: "/admin/api/services",
+      url: "/admin/api/providers",
       headers: { cookie, "content-type": "application/json" },
       payload: { name: "NoKey" },
     });

@@ -5,10 +5,10 @@ import { randomUUID } from "crypto";
 import Database from "better-sqlite3";
 import fp from "fastify-plugin";
 import {
-  getActiveBackendServices,
   getModelMapping,
+  getProviderById,
   insertRequestLog,
-  BackendService,
+  Provider,
 } from "../db/index.js";
 import { decrypt } from "../utils/crypto.js";
 
@@ -70,7 +70,7 @@ function anthropicError(message: string, type: string, statusCode: number) {
 // ---------- 非流式代理 ----------
 
 function proxyNonStream(
-  backend: BackendService,
+  backend: Provider,
   apiKey: string,
   body: Record<string, unknown>,
   clientHeaders: Record<string, string | string[] | undefined>
@@ -124,7 +124,7 @@ function proxyNonStream(
 // ---------- 流式代理（SSE） ----------
 
 function proxyStream(
-  backend: BackendService,
+  backend: Provider,
   apiKey: string,
   body: Record<string, unknown>,
   clientHeaders: Record<string, string | string[] | undefined>,
@@ -287,31 +287,38 @@ const anthropicProxyRaw: FastifyPluginCallback<AnthropicProxyOptions> = (
     const startTime = Date.now();
     const logId = randomUUID();
 
-    // 1. 查找后端服务
-    const backends = getActiveBackendServices(db, "anthropic");
-    if (backends.length === 0) {
-      const err = anthropicError(
-        "No active Anthropic backend service found",
-        "invalid_request_error",
-        404
-      );
-      return reply.status(err.statusCode).send(err.body);
-    }
-    const backend = backends[0];
-
-    // 2. 提取请求 body，保存客户端原始请求
+    // 1. 提取请求 body
     const body = request.body as Record<string, unknown>;
     const originalBody = JSON.parse(JSON.stringify(body));
     const clientModel = (body.model as string) || "unknown";
 
-    // 3. 模型映射
+    // 2. 查找模型映射
     const mapping = getModelMapping(db, clientModel);
-    if (mapping) {
-      body.model = mapping.backend_model;
+    if (!mapping) {
+      return reply.status(404).send({
+        type: "error",
+        error: { type: "not_found_error", message: `Model '${clientModel}' is not configured` },
+      });
     }
 
-    // 4. 解密 API Key
-    const apiKey = decrypt(backend.api_key, encryptionKey);
+    // 3. 通过映射找到对应的供应商
+    const provider = getProviderById(db, mapping.provider_id);
+    if (!provider || !provider.is_active) {
+      return reply.status(503).send({
+        type: "error",
+        error: { type: "api_error", message: "Provider unavailable" },
+      });
+    }
+    if (provider.api_type !== "anthropic") {
+      return reply.status(500).send({
+        type: "error",
+        error: { type: "api_error", message: "Provider type mismatch for this endpoint" },
+      });
+    }
+
+    // 4. 替换模型名称 + 解密 API Key
+    body.model = mapping.backend_model;
+    const apiKey = decrypt(provider.api_key, encryptionKey);
 
     const isStream = body.stream === true;
     const requestBodyStr = JSON.stringify(body);
@@ -326,12 +333,12 @@ const anthropicProxyRaw: FastifyPluginCallback<AnthropicProxyOptions> = (
     upstreamReqHeaders["Content-Type"] = "application/json";
     upstreamReqHeaders["Content-Length"] = String(Buffer.byteLength(requestBodyStr));
     const clientRequest = JSON.stringify({ headers: clientHeaders, body: originalBody });
-    const upstreamRequest = JSON.stringify({ url: `${backend.base_url}/v1/messages`, headers: upstreamReqHeaders, body: requestBodyStr });
+    const upstreamRequest = JSON.stringify({ url: `${provider.base_url}/v1/messages`, headers: upstreamReqHeaders, body: requestBodyStr });
 
     try {
       if (isStream) {
         const result = await proxyStream(
-          backend,
+          provider,
           apiKey,
           body,
           clientHeaders,
@@ -343,7 +350,7 @@ const anthropicProxyRaw: FastifyPluginCallback<AnthropicProxyOptions> = (
           id: logId,
           api_type: "anthropic",
           model: clientModel,
-          backend_service_id: backend.id,
+          provider_id: provider.id,
           status_code: result.statusCode,
           latency_ms: Date.now() - startTime,
           is_stream: 1,
@@ -360,7 +367,7 @@ const anthropicProxyRaw: FastifyPluginCallback<AnthropicProxyOptions> = (
         return reply;
       } else {
         const result = await proxyNonStream(
-          backend,
+          provider,
           apiKey,
           body,
           clientHeaders
@@ -370,7 +377,7 @@ const anthropicProxyRaw: FastifyPluginCallback<AnthropicProxyOptions> = (
           id: logId,
           api_type: "anthropic",
           model: clientModel,
-          backend_service_id: backend.id,
+          provider_id: provider.id,
           status_code: result.statusCode,
           latency_ms: Date.now() - startTime,
           is_stream: 0,
@@ -394,7 +401,7 @@ const anthropicProxyRaw: FastifyPluginCallback<AnthropicProxyOptions> = (
         id: logId,
         api_type: "anthropic",
         model: clientModel,
-        backend_service_id: backend.id,
+        provider_id: provider.id,
         status_code: 502,
         latency_ms: Date.now() - startTime,
         is_stream: isStream ? 1 : 0,

@@ -1,5 +1,5 @@
 import { FastifyPluginCallback } from "fastify";
-import { getAllModelMappings, createModelMapping, updateModelMapping, deleteModelMapping, getBackendServiceById } from "../db/index.js";
+import { getAllModelMappings, createModelMapping, updateModelMapping, deleteModelMapping, getProviderById } from "../db/index.js";
 
 interface MappingRoutesOptions {
   db: any;
@@ -15,18 +15,18 @@ export const adminMappingRoutes: FastifyPluginCallback<MappingRoutesOptions> = (
 
   app.post("/admin/api/mappings", async (request, reply) => {
     const body = request.body as any;
-    if (!body.client_model || !body.backend_model || !body.backend_service_id) {
-      return reply.code(400).send({ error: { message: "Missing required fields: client_model, backend_model, backend_service_id" } });
+    if (!body.client_model || !body.backend_model || !body.provider_id) {
+      return reply.code(400).send({ error: { message: "Missing required fields: client_model, backend_model, provider_id" } });
     }
-    const service = getBackendServiceById(db, body.backend_service_id);
-    if (!service) {
-      return reply.code(400).send({ error: { message: "backend_service_id not found" } });
+    const provider = getProviderById(db, body.provider_id);
+    if (!provider) {
+      return reply.code(400).send({ error: { message: "provider_id not found" } });
     }
     try {
       const id = createModelMapping(db, {
         client_model: body.client_model,
         backend_model: body.backend_model,
-        backend_service_id: body.backend_service_id,
+        provider_id: body.provider_id,
         is_active: body.is_active ?? 1,
       });
       return reply.code(201).send({ id });
@@ -44,7 +44,7 @@ export const adminMappingRoutes: FastifyPluginCallback<MappingRoutesOptions> = (
     const fields: any = {};
     if (body.client_model !== undefined) fields.client_model = body.client_model;
     if (body.backend_model !== undefined) fields.backend_model = body.backend_model;
-    if (body.backend_service_id !== undefined) fields.backend_service_id = body.backend_service_id;
+    if (body.provider_id !== undefined) fields.provider_id = body.provider_id;
     if (body.is_active !== undefined) fields.is_active = body.is_active;
     try {
       updateModelMapping(db, id, fields);

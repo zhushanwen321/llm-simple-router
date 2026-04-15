@@ -22,7 +22,7 @@ function createTestDb(): Database.Database {
       name TEXT PRIMARY KEY,
       applied_at TEXT NOT NULL
     );
-    CREATE TABLE IF NOT EXISTS backend_services (
+    CREATE TABLE IF NOT EXISTS providers (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       api_type TEXT NOT NULL CHECK(api_type IN ('openai', 'anthropic')),
@@ -36,16 +36,16 @@ function createTestDb(): Database.Database {
       id TEXT PRIMARY KEY,
       client_model TEXT NOT NULL UNIQUE,
       backend_model TEXT NOT NULL,
-      backend_service_id TEXT NOT NULL,
+      provider_id TEXT NOT NULL,
       is_active INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL,
-      FOREIGN KEY (backend_service_id) REFERENCES backend_services(id)
+      FOREIGN KEY (provider_id) REFERENCES providers(id)
     );
     CREATE TABLE IF NOT EXISTS request_logs (
       id TEXT PRIMARY KEY,
       api_type TEXT NOT NULL,
       model TEXT,
-      backend_service_id TEXT,
+      provider_id TEXT,
       status_code INTEGER,
       latency_ms INTEGER,
       is_stream INTEGER,
@@ -149,7 +149,7 @@ function insertMockBackend(
   const encryptedKey = encrypt("sk-backend-key", TEST_ENCRYPTION_KEY);
   mockDb
     .prepare(
-      `INSERT INTO backend_services (id, name, api_type, base_url, api_key, is_active, created_at, updated_at)
+      `INSERT INTO providers (id, name, api_type, base_url, api_key, is_active, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
@@ -172,7 +172,7 @@ function insertModelMapping(
   const now = new Date().toISOString();
   mockDb
     .prepare(
-      `INSERT INTO model_mappings (id, client_model, backend_model, backend_service_id, is_active, created_at)
+      `INSERT INTO model_mappings (id, client_model, backend_model, provider_id, is_active, created_at)
        VALUES (?, ?, ?, ?, ?, ?)`
     )
     .run("map-1", clientModel, backendModel, "svc-openai", 1, now);
@@ -207,6 +207,7 @@ describe("OpenAI proxy", () => {
     );
 
     insertMockBackend(mockDb, `http://127.0.0.1:${port}`);
+    insertModelMapping(mockDb, "gpt-4", "gpt-4");
 
     app = buildTestApp(mockDb);
     const response = await sendRequest(app, {
@@ -244,6 +245,7 @@ describe("OpenAI proxy", () => {
     );
 
     insertMockBackend(mockDb, `http://127.0.0.1:${port}`);
+    insertModelMapping(mockDb, "gpt-4", "gpt-4");
 
     app = buildTestApp(mockDb);
     const response = await app.inject({
@@ -301,33 +303,28 @@ describe("OpenAI proxy", () => {
     await closeServer(backendServer);
   });
 
-  // 4. 模型无映射透传
-  it("should keep original model when no mapping exists", async () => {
-    let receivedBody: string = "";
-
+  // 4. 模型无映射 - 返回 404
+  it("should return 404 when no model mapping exists", async () => {
     const { server: backendServer, port } = await createMockBackend(
       (req, res) => {
-        let body = "";
-        req.on("data", (chunk) => (body += chunk));
-        req.on("end", () => {
-          receivedBody = body;
-          res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(JSON.stringify(OPENAI_NON_STREAM_RESPONSE));
-        });
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(OPENAI_NON_STREAM_RESPONSE));
       }
     );
 
     insertMockBackend(mockDb, `http://127.0.0.1:${port}`);
 
-    // 不插入映射，model 应原样透传
+    // 不插入映射
     app = buildTestApp(mockDb);
-    await sendRequest(app, {
+    const response = await sendRequest(app, {
       model: "gpt-4o",
       messages: [{ role: "user", content: "Hi" }],
     });
 
-    const parsed = JSON.parse(receivedBody);
-    expect(parsed.model).toBe("gpt-4o");
+    expect(response.statusCode).toBe(404);
+    const json = response.json();
+    expect(json.error).toBeDefined();
+    expect(json.error.code).toBe("model_not_found");
 
     await closeServer(backendServer);
   });
@@ -336,6 +333,7 @@ describe("OpenAI proxy", () => {
   it("should return 502 when backend is unreachable", async () => {
     // 指向一个不存在的端口
     insertMockBackend(mockDb, "http://127.0.0.1:19999");
+    insertModelMapping(mockDb, "gpt-4", "gpt-4");
 
     app = buildTestApp(mockDb);
     const response = await sendRequest(app, {
@@ -367,6 +365,7 @@ describe("OpenAI proxy", () => {
     );
 
     insertMockBackend(mockDb, `http://127.0.0.1:${port}`);
+    insertModelMapping(mockDb, "gpt-4", "gpt-4");
 
     app = buildTestApp(mockDb);
     const response = await sendRequest(app, {

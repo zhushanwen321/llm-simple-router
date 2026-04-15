@@ -1,10 +1,10 @@
 <template>
   <div class="p-6">
     <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-semibold text-gray-900">后端服务</h2>
+      <h2 class="text-lg font-semibold text-gray-900">供应商</h2>
       <Button @click="openCreate" class="flex items-center gap-1">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-        添加服务
+        添加供应商
       </Button>
     </div>
 
@@ -21,23 +21,23 @@
           </TableRow>
         </TableHeader>
         <TableBody>
-          <TableRow v-for="s in services" :key="s.id" :class="{ 'opacity-60': !s.is_active }">
-            <TableCell class="font-medium">{{ s.name }}</TableCell>
+          <TableRow v-for="p in providers" :key="p.id" :class="{ 'opacity-60': !p.is_active }">
+            <TableCell class="font-medium">{{ p.name }}</TableCell>
             <TableCell>
-              <Badge :variant="s.api_type === 'openai' ? 'default' : 'secondary'">{{ s.api_type }}</Badge>
+              <Badge :variant="p.api_type === 'openai' ? 'default' : 'secondary'">{{ p.api_type }}</Badge>
             </TableCell>
-            <TableCell class="text-gray-500">{{ s.base_url }}</TableCell>
-            <TableCell class="text-gray-500 font-mono text-xs">{{ s.api_key }}</TableCell>
+            <TableCell class="text-gray-500">{{ p.base_url }}</TableCell>
+            <TableCell class="text-gray-500 font-mono text-xs">{{ p.api_key }}</TableCell>
             <TableCell>
-              <Badge :variant="s.is_active ? 'default' : 'secondary'">{{ s.is_active ? '启用' : '禁用' }}</Badge>
+              <Badge :variant="p.is_active ? 'default' : 'secondary'">{{ p.is_active ? '启用' : '禁用' }}</Badge>
             </TableCell>
             <TableCell class="text-right">
-              <Button variant="ghost" size="sm" @click="openEdit(s)" class="text-gray-400 hover:text-blue-600 mr-2">编辑</Button>
-              <Button variant="ghost" size="sm" @click="confirmDelete(s)" class="text-gray-400 hover:text-red-600">删除</Button>
+              <Button variant="ghost" size="sm" @click="openEdit(p)" class="text-gray-400 hover:text-blue-600 mr-2">编辑</Button>
+              <Button variant="ghost" size="sm" @click="confirmDelete(p)" class="text-gray-400 hover:text-red-600">删除</Button>
             </TableCell>
           </TableRow>
-          <TableRow v-if="services.length === 0">
-            <TableCell colspan="6" class="text-center text-gray-400 py-8">暂无服务</TableCell>
+          <TableRow v-if="providers.length === 0">
+            <TableCell colspan="6" class="text-center text-gray-400 py-8">暂无供应商</TableCell>
           </TableRow>
         </TableBody>
       </Table>
@@ -47,7 +47,7 @@
     <Dialog v-model:open="dialogOpen">
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{{ editingId ? '编辑服务' : '添加服务' }}</DialogTitle>
+          <DialogTitle>{{ editingId ? '编辑供应商' : '添加供应商' }}</DialogTitle>
         </DialogHeader>
         <form @submit.prevent="handleSave" class="space-y-3">
           <div>
@@ -91,7 +91,7 @@
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>确认删除</AlertDialogTitle>
-          <AlertDialogDescription>确定要删除服务「{{ deleteTarget?.name }}」吗？此操作不可撤销。</AlertDialogDescription>
+          <AlertDialogDescription>确定要删除供应商「{{ deleteTarget?.name }}」吗？此操作不可撤销。</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>取消</AlertDialogCancel>
@@ -114,7 +114,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog'
 
-interface Service {
+interface Provider {
   id: string
   name: string
   api_type: string
@@ -123,18 +123,18 @@ interface Service {
   is_active: number
 }
 
-const services = ref<Service[]>([])
+const providers = ref<Provider[]>([])
 const dialogOpen = ref(false)
 const editingId = ref<string | null>(null)
-const deleteTarget = ref<Service | null>(null)
+const deleteTarget = ref<Provider | null>(null)
 const form = ref({ name: '', api_type: 'openai', base_url: '', api_key: '', is_active: true })
 
-async function loadServices() {
+async function loadProviders() {
   try {
-    const res = await api.getServices()
-    services.value = res.data
+    const res = await api.getProviders()
+    providers.value = res.data
   } catch (e) {
-    console.error('Failed to load services:', e)
+    console.error('Failed to load providers:', e)
   }
 }
 
@@ -144,9 +144,9 @@ function openCreate() {
   dialogOpen.value = true
 }
 
-function openEdit(s: Service) {
-  editingId.value = s.id
-  form.value = { name: s.name, api_type: s.api_type, base_url: s.base_url, api_key: '', is_active: !!s.is_active }
+function openEdit(p: Provider) {
+  editingId.value = p.id
+  form.value = { name: p.name, api_type: p.api_type, base_url: p.base_url, api_key: '', is_active: !!p.is_active }
   dialogOpen.value = true
 }
 
@@ -161,32 +161,32 @@ async function handleSave() {
     if (form.value.api_key) data.api_key = form.value.api_key
 
     if (editingId.value) {
-      await api.updateService(editingId.value, data)
+      await api.updateProvider(editingId.value, data)
     } else {
       data.api_key = form.value.api_key
-      await api.createService(data)
+      await api.createProvider(data)
     }
     dialogOpen.value = false
-    await loadServices()
+    await loadProviders()
   } catch (e) {
-    console.error('Failed to save service:', e)
+    console.error('Failed to save provider:', e)
   }
 }
 
-function confirmDelete(s: Service) {
-  deleteTarget.value = s
+function confirmDelete(p: Provider) {
+  deleteTarget.value = p
 }
 
 async function handleDelete() {
   if (!deleteTarget.value) return
   try {
-    await api.deleteService(deleteTarget.value.id)
+    await api.deleteProvider(deleteTarget.value.id)
     deleteTarget.value = null
-    await loadServices()
+    await loadProviders()
   } catch (e) {
-    console.error('Failed to delete service:', e)
+    console.error('Failed to delete provider:', e)
   }
 }
 
-onMounted(loadServices)
+onMounted(loadProviders)
 </script>

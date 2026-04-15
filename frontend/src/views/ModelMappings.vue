@@ -15,7 +15,7 @@
             <TableHead class="text-gray-600">客户端模型</TableHead>
             <TableHead class="text-center text-gray-600"></TableHead>
             <TableHead class="text-gray-600">后端模型</TableHead>
-            <TableHead class="text-gray-600">关联服务</TableHead>
+            <TableHead class="text-gray-600">关联供应商</TableHead>
             <TableHead class="text-gray-600">状态</TableHead>
             <TableHead class="text-right text-gray-600">操作</TableHead>
           </TableRow>
@@ -25,7 +25,7 @@
             <TableCell class="font-mono text-sm">{{ m.client_model }}</TableCell>
             <TableCell class="text-center text-gray-400">&rarr;</TableCell>
             <TableCell class="font-mono text-sm">{{ m.backend_model }}</TableCell>
-            <TableCell class="text-gray-500">{{ getServiceName(m.backend_service_id) }}</TableCell>
+            <TableCell class="text-gray-500">{{ getProviderName(m.provider_id) }}</TableCell>
             <TableCell>
               <Badge :variant="m.is_active ? 'default' : 'secondary'">{{ m.is_active ? '启用' : '禁用' }}</Badge>
             </TableCell>
@@ -57,13 +57,13 @@
             <Input v-model="form.backend_model" type="text" required />
           </div>
           <div>
-            <Label class="block text-sm font-medium text-gray-700 mb-1">关联服务</Label>
-            <Select v-model="form.backend_service_id">
+            <Label class="block text-sm font-medium text-gray-700 mb-1">关联供应商</Label>
+            <Select v-model="form.provider_id">
               <SelectTrigger>
-                <SelectValue placeholder="选择服务" />
+                <SelectValue placeholder="选择供应商" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem v-for="s in servicesList" :key="s.id" :value="s.id">{{ s.name }}</SelectItem>
+                <SelectItem v-for="p in providersList" :key="p.id" :value="p.id">{{ p.name }}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -111,31 +111,31 @@ interface Mapping {
   id: string
   client_model: string
   backend_model: string
-  backend_service_id: string
+  provider_id: string
   is_active: number
 }
 
-interface Service {
+interface Provider {
   id: string
   name: string
 }
 
 const mappings = ref<Mapping[]>([])
-const servicesList = ref<Service[]>([])
+const providersList = ref<Provider[]>([])
 const dialogOpen = ref(false)
 const editingId = ref<string | null>(null)
 const deleteTarget = ref<Mapping | null>(null)
-const form = ref({ client_model: '', backend_model: '', backend_service_id: '', is_active: true })
+const form = ref({ client_model: '', backend_model: '', provider_id: '', is_active: true })
 
-function getServiceName(id: string): string {
-  return servicesList.value.find(s => s.id === id)?.name || id
+function getProviderName(id: string): string {
+  return providersList.value.find(p => p.id === id)?.name || id
 }
 
 async function loadData() {
   try {
-    const [mapRes, svcRes] = await Promise.all([api.getMappings(), api.getServices()])
+    const [mapRes, provRes] = await Promise.all([api.getMappings(), api.getProviders()])
     mappings.value = mapRes.data
-    servicesList.value = svcRes.data
+    providersList.value = provRes.data
   } catch (e) {
     console.error('Failed to load data:', e)
   }
@@ -143,13 +143,13 @@ async function loadData() {
 
 function openCreate() {
   editingId.value = null
-  form.value = { client_model: '', backend_model: '', backend_service_id: servicesList.value[0]?.id || '', is_active: true }
+  form.value = { client_model: '', backend_model: '', provider_id: providersList.value[0]?.id || '', is_active: true }
   dialogOpen.value = true
 }
 
 function openEdit(m: Mapping) {
   editingId.value = m.id
-  form.value = { client_model: m.client_model, backend_model: m.backend_model, backend_service_id: m.backend_service_id, is_active: !!m.is_active }
+  form.value = { client_model: m.client_model, backend_model: m.backend_model, provider_id: m.provider_id, is_active: !!m.is_active }
   dialogOpen.value = true
 }
 
@@ -158,7 +158,7 @@ async function handleSave() {
     const data = {
       client_model: form.value.client_model,
       backend_model: form.value.backend_model,
-      backend_service_id: form.value.backend_service_id,
+      provider_id: form.value.provider_id,
       is_active: form.value.is_active ? 1 : 0,
     }
     if (editingId.value) {

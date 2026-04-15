@@ -23,7 +23,7 @@ describe("initDatabase", () => {
 
     const tableNames = tables.map((t) => t.name);
     expect(tableNames).toContain("migrations");
-    expect(tableNames).toContain("backend_services");
+    expect(tableNames).toContain("providers");
     expect(tableNames).toContain("model_mappings");
     expect(tableNames).toContain("request_logs");
   });
@@ -35,10 +35,11 @@ describe("initDatabase", () => {
       .prepare("SELECT name FROM migrations")
       .all() as { name: string }[];
 
-    expect(rows.length).toBe(3);
+    expect(rows.length).toBe(4);
     expect(rows[0].name).toBe("001_init.sql");
     expect(rows[1].name).toBe("002_add_request_response_body.sql");
     expect(rows[2].name).toBe("003_add_full_request_chain_log.sql");
+    expect(rows[3].name).toBe("004_rename_to_providers.sql");
   });
 
   it("should be idempotent - running twice does not error", () => {
@@ -60,12 +61,12 @@ describe("initDatabase", () => {
 
     const now = new Date().toISOString();
     db.prepare(
-      `INSERT INTO backend_services (id, name, api_type, base_url, api_key, is_active, created_at, updated_at)
+      `INSERT INTO providers (id, name, api_type, base_url, api_key, is_active, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     ).run("svc-1", "Test OpenAI", "openai", "https://api.openai.com", "encrypted-key", 1, now, now);
 
     const row = db
-      .prepare("SELECT * FROM backend_services WHERE id = ?")
+      .prepare("SELECT * FROM providers WHERE id = ?")
       .get("svc-1") as any;
     expect(row.name).toBe("Test OpenAI");
     expect(row.api_type).toBe("openai");
@@ -77,7 +78,7 @@ describe("initDatabase", () => {
     const now = new Date().toISOString();
     expect(() =>
       db!.prepare(
-        `INSERT INTO backend_services (id, name, api_type, base_url, api_key, is_active, created_at, updated_at)
+        `INSERT INTO providers (id, name, api_type, base_url, api_key, is_active, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
       ).run("svc-2", "Bad", "invalid_type", "https://example.com", "key", 1, now, now)
     ).toThrow();
@@ -88,12 +89,12 @@ describe("initDatabase", () => {
 
     const now = new Date().toISOString();
     db.prepare(
-      `INSERT INTO backend_services (id, name, api_type, base_url, api_key, is_active, created_at, updated_at)
+      `INSERT INTO providers (id, name, api_type, base_url, api_key, is_active, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     ).run("svc-1", "Test", "openai", "https://api.openai.com", "key", 1, now, now);
 
     db.prepare(
-      `INSERT INTO model_mappings (id, client_model, backend_model, backend_service_id, is_active, created_at)
+      `INSERT INTO model_mappings (id, client_model, backend_model, provider_id, is_active, created_at)
        VALUES (?, ?, ?, ?, ?, ?)`
     ).run("map-1", "gpt-4", "gpt-4-turbo", "svc-1", 1, now);
 
@@ -109,18 +110,18 @@ describe("initDatabase", () => {
 
     const now = new Date().toISOString();
     db.prepare(
-      `INSERT INTO backend_services (id, name, api_type, base_url, api_key, is_active, created_at, updated_at)
+      `INSERT INTO providers (id, name, api_type, base_url, api_key, is_active, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     ).run("svc-1", "Test", "openai", "https://api.openai.com", "key", 1, now, now);
 
     db.prepare(
-      `INSERT INTO model_mappings (id, client_model, backend_model, backend_service_id, is_active, created_at)
+      `INSERT INTO model_mappings (id, client_model, backend_model, provider_id, is_active, created_at)
        VALUES (?, ?, ?, ?, ?, ?)`
     ).run("map-1", "gpt-4", "gpt-4-turbo", "svc-1", 1, now);
 
     expect(() =>
       db!.prepare(
-        `INSERT INTO model_mappings (id, client_model, backend_model, backend_service_id, is_active, created_at)
+        `INSERT INTO model_mappings (id, client_model, backend_model, provider_id, is_active, created_at)
          VALUES (?, ?, ?, ?, ?, ?)`
       ).run("map-2", "gpt-4", "gpt-4o", "svc-1", 1, now)
     ).toThrow();

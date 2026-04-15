@@ -24,7 +24,7 @@ function createTestDb(): Database.Database {
       name TEXT PRIMARY KEY,
       applied_at TEXT NOT NULL
     );
-    CREATE TABLE IF NOT EXISTS backend_services (
+    CREATE TABLE IF NOT EXISTS providers (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       api_type TEXT NOT NULL CHECK(api_type IN ('openai', 'anthropic')),
@@ -38,16 +38,16 @@ function createTestDb(): Database.Database {
       id TEXT PRIMARY KEY,
       client_model TEXT NOT NULL UNIQUE,
       backend_model TEXT NOT NULL,
-      backend_service_id TEXT NOT NULL,
+      provider_id TEXT NOT NULL,
       is_active INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL,
-      FOREIGN KEY (backend_service_id) REFERENCES backend_services(id)
+      FOREIGN KEY (provider_id) REFERENCES providers(id)
     );
     CREATE TABLE IF NOT EXISTS request_logs (
       id TEXT PRIMARY KEY,
       api_type TEXT NOT NULL,
       model TEXT,
-      backend_service_id TEXT,
+      provider_id TEXT,
       status_code INTEGER,
       latency_ms INTEGER,
       is_stream INTEGER,
@@ -110,7 +110,7 @@ function insertOpenAIBackend(db: Database.Database, port: number) {
   const now = new Date().toISOString();
   const encryptedKey = encrypt("sk-backend", TEST_ENCRYPTION_KEY);
   db.prepare(
-    `INSERT INTO backend_services (id, name, api_type, base_url, api_key, is_active, created_at, updated_at)
+    `INSERT INTO providers (id, name, api_type, base_url, api_key, is_active, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     "svc-o1",
@@ -122,13 +122,18 @@ function insertOpenAIBackend(db: Database.Database, port: number) {
     now,
     now
   );
+  // gpt-4 映射到 provider
+  db.prepare(
+    `INSERT INTO model_mappings (id, client_model, backend_model, provider_id, is_active, created_at)
+     VALUES (?, ?, ?, ?, ?, ?)`
+  ).run("map-o1", "gpt-4", "gpt-4-turbo", "svc-o1", 1, now);
 }
 
 function insertAnthropicBackend(db: Database.Database, port: number) {
   const now = new Date().toISOString();
   const encryptedKey = encrypt("sk-backend", TEST_ENCRYPTION_KEY);
   db.prepare(
-    `INSERT INTO backend_services (id, name, api_type, base_url, api_key, is_active, created_at, updated_at)
+    `INSERT INTO providers (id, name, api_type, base_url, api_key, is_active, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     "svc-a1",
@@ -140,6 +145,11 @@ function insertAnthropicBackend(db: Database.Database, port: number) {
     now,
     now
   );
+  // claude-3-sonnet 映射到 provider
+  db.prepare(
+    `INSERT INTO model_mappings (id, client_model, backend_model, provider_id, is_active, created_at)
+     VALUES (?, ?, ?, ?, ?, ?)`
+  ).run("map-a1", "claude-3-sonnet", "claude-3-sonnet", "svc-a1", 1, now);
 }
 
 function getRequestLogs(db: Database.Database) {
@@ -255,7 +265,7 @@ describe("Request logging", () => {
       expect(logs.length).toBe(1);
       expect(logs[0].api_type).toBe("openai");
       expect(logs[0].model).toBe("gpt-4");
-      expect(logs[0].backend_service_id).toBe("svc-o1");
+      expect(logs[0].provider_id).toBe("svc-o1");
       expect(logs[0].status_code).toBe(200);
       expect(logs[0].latency_ms).toBeGreaterThanOrEqual(0);
       expect(logs[0].is_stream).toBe(0);
@@ -272,7 +282,7 @@ describe("Request logging", () => {
       const now = new Date().toISOString();
       const encryptedKey = encrypt("sk-key", TEST_ENCRYPTION_KEY);
       db.prepare(
-        `INSERT INTO backend_services (id, name, api_type, base_url, api_key, is_active, created_at, updated_at)
+        `INSERT INTO providers (id, name, api_type, base_url, api_key, is_active, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         "svc-bad",
@@ -284,6 +294,10 @@ describe("Request logging", () => {
         now,
         now
       );
+      db.prepare(
+        `INSERT INTO model_mappings (id, client_model, backend_model, provider_id, is_active, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      ).run("map-bad", "gpt-4", "gpt-4-turbo", "svc-bad", 1, now);
 
       await app.inject({
         method: "POST",

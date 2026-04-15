@@ -16,7 +16,7 @@ function createTestDb(): Database.Database {
       name TEXT PRIMARY KEY,
       applied_at TEXT NOT NULL
     );
-    CREATE TABLE IF NOT EXISTS backend_services (
+    CREATE TABLE IF NOT EXISTS providers (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       api_type TEXT NOT NULL CHECK(api_type IN ('openai', 'anthropic')),
@@ -30,16 +30,16 @@ function createTestDb(): Database.Database {
       id TEXT PRIMARY KEY,
       client_model TEXT NOT NULL UNIQUE,
       backend_model TEXT NOT NULL,
-      backend_service_id TEXT NOT NULL,
+      provider_id TEXT NOT NULL,
       is_active INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL,
-      FOREIGN KEY (backend_service_id) REFERENCES backend_services(id)
+      FOREIGN KEY (provider_id) REFERENCES providers(id)
     );
     CREATE TABLE IF NOT EXISTS request_logs (
       id TEXT PRIMARY KEY,
       api_type TEXT NOT NULL,
       model TEXT,
-      backend_service_id TEXT,
+      provider_id TEXT,
       status_code INTEGER,
       latency_ms INTEGER,
       is_stream INTEGER,
@@ -79,7 +79,7 @@ function closeServer(server: Server): Promise<void> {
   });
 }
 
-function insertBackendService(
+function insertProvider(
   db: Database.Database,
   port: number,
   overrides: Record<string, any> = {}
@@ -98,7 +98,7 @@ function insertBackendService(
   };
   const row = { ...defaults, ...overrides };
   db.prepare(
-    `INSERT INTO backend_services (id, name, api_type, base_url, api_key, is_active, created_at, updated_at)
+    `INSERT INTO providers (id, name, api_type, base_url, api_key, is_active, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     row.id,
@@ -151,7 +151,7 @@ describe("GET /v1/models proxy", () => {
       }
     );
 
-    insertBackendService(db, port);
+    insertProvider(db, port);
 
     app = Fastify();
     app.register(openaiProxy, {
@@ -191,11 +191,11 @@ describe("GET /v1/models proxy", () => {
     expect(response.statusCode).toBe(404);
     const body = response.json();
     expect(body.error).toBeDefined();
-    expect(body.error.message).toContain("No active OpenAI backend");
+    expect(body.error.message).toContain("No active OpenAI provider");
   });
 
   it("should return 502 when backend is unreachable", async () => {
-    insertBackendService(db, 1);
+    insertProvider(db, 1);
 
     app = Fastify();
     app.register(openaiProxy, {
@@ -215,7 +215,7 @@ describe("GET /v1/models proxy", () => {
   });
 
   it("should not use inactive backend services", async () => {
-    insertBackendService(db, 9999, { is_active: 0 });
+    insertProvider(db, 9999, { is_active: 0 });
 
     app = Fastify();
     app.register(openaiProxy, {

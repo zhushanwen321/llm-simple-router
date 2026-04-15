@@ -17,7 +17,7 @@ function createTestDb(): Database.Database {
       name TEXT PRIMARY KEY,
       applied_at TEXT NOT NULL
     );
-    CREATE TABLE IF NOT EXISTS backend_services (
+    CREATE TABLE IF NOT EXISTS providers (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       api_type TEXT NOT NULL CHECK(api_type IN ('openai', 'anthropic')),
@@ -31,16 +31,16 @@ function createTestDb(): Database.Database {
       id TEXT PRIMARY KEY,
       client_model TEXT NOT NULL UNIQUE,
       backend_model TEXT NOT NULL,
-      backend_service_id TEXT NOT NULL,
+      provider_id TEXT NOT NULL,
       is_active INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL,
-      FOREIGN KEY (backend_service_id) REFERENCES backend_services(id)
+      FOREIGN KEY (provider_id) REFERENCES providers(id)
     );
     CREATE TABLE IF NOT EXISTS request_logs (
       id TEXT PRIMARY KEY,
       api_type TEXT NOT NULL,
       model TEXT,
-      backend_service_id TEXT,
+      provider_id TEXT,
       status_code INTEGER,
       latency_ms INTEGER,
       is_stream INTEGER,
@@ -174,7 +174,7 @@ function insertMockBackend(
   const encryptedKey = encrypt("sk-ant-backend-key", TEST_ENCRYPTION_KEY);
   mockDb
     .prepare(
-      `INSERT INTO backend_services (id, name, api_type, base_url, api_key, is_active, created_at, updated_at)
+      `INSERT INTO providers (id, name, api_type, base_url, api_key, is_active, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
@@ -197,7 +197,7 @@ function insertModelMapping(
   const now = new Date().toISOString();
   mockDb
     .prepare(
-      `INSERT INTO model_mappings (id, client_model, backend_model, backend_service_id, is_active, created_at)
+      `INSERT INTO model_mappings (id, client_model, backend_model, provider_id, is_active, created_at)
        VALUES (?, ?, ?, ?, ?, ?)`
     )
     .run("map-a1", clientModel, backendModel, "svc-anthropic", 1, now);
@@ -232,6 +232,7 @@ describe("Anthropic proxy", () => {
     );
 
     insertMockBackend(mockDb, `http://127.0.0.1:${port}`);
+    insertModelMapping(mockDb, "claude-3-opus-20240229", "claude-3-opus-20240229");
 
     app = buildTestApp(mockDb);
     const response = await sendRequest(app, {
@@ -270,6 +271,7 @@ describe("Anthropic proxy", () => {
     );
 
     insertMockBackend(mockDb, `http://127.0.0.1:${port}`);
+    insertModelMapping(mockDb, "claude-3-opus-20240229", "claude-3-opus-20240229");
 
     app = buildTestApp(mockDb);
     const response = await app.inject({
@@ -327,33 +329,29 @@ describe("Anthropic proxy", () => {
     await closeServer(backendServer);
   });
 
-  // 4. 模型无映射透传
-  it("should keep original model when no mapping exists", async () => {
-    let receivedBody: string = "";
-
+  // 4. 模型无映射 - 返回 404
+  it("should return 404 when no model mapping exists", async () => {
     const { server: backendServer, port } = await createMockBackend(
       (req, res) => {
-        let body = "";
-        req.on("data", (chunk) => (body += chunk));
-        req.on("end", () => {
-          receivedBody = body;
-          res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(JSON.stringify(ANTHROPIC_NON_STREAM_RESPONSE));
-        });
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(ANTHROPIC_NON_STREAM_RESPONSE));
       }
     );
 
     insertMockBackend(mockDb, `http://127.0.0.1:${port}`);
 
+    // 不插入映射
     app = buildTestApp(mockDb);
-    await sendRequest(app, {
+    const response = await sendRequest(app, {
       model: "claude-3-sonnet-20240229",
       messages: [{ role: "user", content: "Hi" }],
       max_tokens: 1024,
     });
 
-    const parsed = JSON.parse(receivedBody);
-    expect(parsed.model).toBe("claude-3-sonnet-20240229");
+    expect(response.statusCode).toBe(404);
+    const json = response.json();
+    expect(json.type).toBe("error");
+    expect(json.error.type).toBe("not_found_error");
 
     await closeServer(backendServer);
   });
@@ -361,6 +359,7 @@ describe("Anthropic proxy", () => {
   // 5. 后端不可达 - 502
   it("should return 502 when backend is unreachable", async () => {
     insertMockBackend(mockDb, "http://127.0.0.1:19999");
+    insertModelMapping(mockDb, "claude-3-opus-20240229", "claude-3-opus-20240229");
 
     app = buildTestApp(mockDb);
     const response = await sendRequest(app, {
@@ -393,6 +392,7 @@ describe("Anthropic proxy", () => {
     );
 
     insertMockBackend(mockDb, `http://127.0.0.1:${port}`);
+    insertModelMapping(mockDb, "claude-3-opus-20240229", "claude-3-opus-20240229");
 
     app = buildTestApp(mockDb);
     const response = await sendRequest(app, {
@@ -422,6 +422,6 @@ describe("Anthropic proxy", () => {
     expect(response.statusCode).toBe(404);
     const json = response.json();
     expect(json.type).toBe("error");
-    expect(json.error.type).toBe("invalid_request_error");
+    expect(json.error.type).toBe("not_found_error");
   });
 });

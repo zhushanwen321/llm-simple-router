@@ -52,7 +52,7 @@ export function initDatabase(dbPath: string): Database.Database {
   return db;
 }
 
-export interface BackendService {
+export interface Provider {
   id: string;
   name: string;
   api_type: "openai" | "anthropic";
@@ -67,20 +67,20 @@ export interface ModelMapping {
   id: string;
   client_model: string;
   backend_model: string;
-  backend_service_id: string;
+  provider_id: string;
   is_active: number;
   created_at: string;
 }
 
-export function getActiveBackendServices(
+export function getActiveProviders(
   db: Database.Database,
   apiType: "openai" | "anthropic"
-): BackendService[] {
+): Provider[] {
   return db
     .prepare(
-      "SELECT * FROM backend_services WHERE api_type = ? AND is_active = 1"
+      "SELECT * FROM providers WHERE api_type = ? AND is_active = 1"
     )
-    .all(apiType) as BackendService[];
+    .all(apiType) as Provider[];
 }
 
 export function getModelMapping(
@@ -100,7 +100,7 @@ export function insertRequestLog(
     id: string;
     api_type: string;
     model: string | null;
-    backend_service_id: string | null;
+    provider_id: string | null;
     status_code: number | null;
     latency_ms: number | null;
     is_stream: number;
@@ -115,13 +115,13 @@ export function insertRequestLog(
   }
 ): void {
   db.prepare(
-    `INSERT INTO request_logs (id, api_type, model, backend_service_id, status_code, latency_ms, is_stream, error_message, created_at, request_body, response_body, client_request, upstream_request, upstream_response, client_response)
+    `INSERT INTO request_logs (id, api_type, model, provider_id, status_code, latency_ms, is_stream, error_message, created_at, request_body, response_body, client_request, upstream_request, upstream_response, client_response)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     log.id,
     log.api_type,
     log.model,
-    log.backend_service_id,
+    log.provider_id,
     log.status_code,
     log.latency_ms,
     log.is_stream,
@@ -142,7 +142,7 @@ export interface RequestLog {
   id: string;
   api_type: string;
   model: string | null;
-  backend_service_id: string | null;
+  provider_id: string | null;
   status_code: number | null;
   latency_ms: number | null;
   is_stream: number;
@@ -164,31 +164,31 @@ export interface Stats {
   recentRequests: number;
 }
 
-export function getAllBackendServices(db: Database.Database): BackendService[] {
-  return db.prepare("SELECT * FROM backend_services ORDER BY created_at DESC").all() as BackendService[];
+export function getAllProviders(db: Database.Database): Provider[] {
+  return db.prepare("SELECT * FROM providers ORDER BY created_at DESC").all() as Provider[];
 }
 
-export function getBackendServiceById(db: Database.Database, id: string): BackendService | undefined {
-  return db.prepare("SELECT * FROM backend_services WHERE id = ?").get(id) as BackendService | undefined;
+export function getProviderById(db: Database.Database, id: string): Provider | undefined {
+  return db.prepare("SELECT * FROM providers WHERE id = ?").get(id) as Provider | undefined;
 }
 
-export function createBackendService(
+export function createProvider(
   db: Database.Database,
-  service: { name: string; api_type: "openai" | "anthropic"; base_url: string; api_key: string; is_active?: number }
+  provider: { name: string; api_type: "openai" | "anthropic"; base_url: string; api_key: string; is_active?: number }
 ): string {
   const id = randomUUID();
   const now = new Date().toISOString();
   db.prepare(
-    `INSERT INTO backend_services (id, name, api_type, base_url, api_key, is_active, created_at, updated_at)
+    `INSERT INTO providers (id, name, api_type, base_url, api_key, is_active, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(id, service.name, service.api_type, service.base_url, service.api_key, service.is_active ?? 1, now, now);
+  ).run(id, provider.name, provider.api_type, provider.base_url, provider.api_key, provider.is_active ?? 1, now, now);
   return id;
 }
 
-export function updateBackendService(
+export function updateProvider(
   db: Database.Database,
   id: string,
-  fields: Partial<Pick<BackendService, 'name' | 'api_type' | 'base_url' | 'api_key' | 'is_active'>>
+  fields: Partial<Pick<Provider, 'name' | 'api_type' | 'base_url' | 'api_key' | 'is_active'>>
 ): void {
   const sets: string[] = [];
   const values: unknown[] = [];
@@ -199,11 +199,11 @@ export function updateBackendService(
   sets.push("updated_at = ?");
   values.push(new Date().toISOString());
   values.push(id);
-  db.prepare(`UPDATE backend_services SET ${sets.join(", ")} WHERE id = ?`).run(...values);
+  db.prepare(`UPDATE providers SET ${sets.join(", ")} WHERE id = ?`).run(...values);
 }
 
-export function deleteBackendService(db: Database.Database, id: string): void {
-  db.prepare("DELETE FROM backend_services WHERE id = ?").run(id);
+export function deleteProvider(db: Database.Database, id: string): void {
+  db.prepare("DELETE FROM providers WHERE id = ?").run(id);
 }
 
 export function getAllModelMappings(db: Database.Database): ModelMapping[] {
@@ -212,21 +212,21 @@ export function getAllModelMappings(db: Database.Database): ModelMapping[] {
 
 export function createModelMapping(
   db: Database.Database,
-  mapping: { client_model: string; backend_model: string; backend_service_id: string; is_active?: number }
+  mapping: { client_model: string; backend_model: string; provider_id: string; is_active?: number }
 ): string {
   const id = randomUUID();
   const now = new Date().toISOString();
   db.prepare(
-    `INSERT INTO model_mappings (id, client_model, backend_model, backend_service_id, is_active, created_at)
+    `INSERT INTO model_mappings (id, client_model, backend_model, provider_id, is_active, created_at)
      VALUES (?, ?, ?, ?, ?, ?)`
-  ).run(id, mapping.client_model, mapping.backend_model, mapping.backend_service_id, mapping.is_active ?? 1, now);
+  ).run(id, mapping.client_model, mapping.backend_model, mapping.provider_id, mapping.is_active ?? 1, now);
   return id;
 }
 
 export function updateModelMapping(
   db: Database.Database,
   id: string,
-  fields: Partial<Pick<ModelMapping, 'client_model' | 'backend_model' | 'backend_service_id' | 'is_active'>>
+  fields: Partial<Pick<ModelMapping, 'client_model' | 'backend_model' | 'provider_id' | 'is_active'>>
 ): void {
   const sets: string[] = [];
   const values: unknown[] = [];
