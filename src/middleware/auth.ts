@@ -1,7 +1,10 @@
-import { FastifyInstance, FastifyPluginCallback } from "fastify";
+import { FastifyInstance, FastifyPluginCallback, FastifyReply } from "fastify";
+import { timingSafeEqual } from "crypto";
 import fp from "fastify-plugin";
 
 const SKIP_PATHS = ["/health", "/admin"];
+const HTTP_UNAUTHORIZED = 401;
+const BEARER_PREFIX_LENGTH = "Bearer ".length;
 
 function shouldSkipAuth(url: string): boolean {
   // url 可能包含查询字符串，只取路径部分
@@ -11,8 +14,8 @@ function shouldSkipAuth(url: string): boolean {
   );
 }
 
-function unauthorizedReply(reply: any): void {
-  reply.code(401).send({
+function unauthorizedReply(reply: FastifyReply): void {
+  reply.code(HTTP_UNAUTHORIZED).send({
     error: {
       message: "Invalid API key",
       type: "invalid_request_error",
@@ -37,8 +40,10 @@ const authMiddlewareRaw: FastifyPluginCallback<{ apiKey: string }> = (
       return reply;
     }
 
-    const token = authHeader.slice(7);
-    if (token !== options.apiKey) {
+    const token = authHeader.slice(BEARER_PREFIX_LENGTH);
+    const tokenBuf = Buffer.from(token);
+    const keyBuf = Buffer.from(options.apiKey);
+    if (tokenBuf.length !== keyBuf.length || !timingSafeEqual(tokenBuf, keyBuf)) {
       unauthorizedReply(reply);
       return reply;
     }

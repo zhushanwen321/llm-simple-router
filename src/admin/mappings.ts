@@ -1,8 +1,28 @@
 import { FastifyPluginCallback } from "fastify";
+import Database from "better-sqlite3";
+import type { ModelMapping } from "../db/index.js";
 import { getAllModelMappings, createModelMapping, updateModelMapping, deleteModelMapping, getProviderById } from "../db/index.js";
 
+const HTTP_BAD_REQUEST = 400;
+const HTTP_CREATED = 201;
+const HTTP_CONFLICT = 409;
+
+interface CreateMappingBody {
+  client_model: string;
+  backend_model: string;
+  provider_id: string;
+  is_active?: number;
+}
+
+interface UpdateMappingBody {
+  client_model?: string;
+  backend_model?: string;
+  provider_id?: string;
+  is_active?: number;
+}
+
 interface MappingRoutesOptions {
-  db: any;
+  db: Database.Database;
 }
 
 export const adminMappingRoutes: FastifyPluginCallback<MappingRoutesOptions> = (app, options, done) => {
@@ -14,13 +34,13 @@ export const adminMappingRoutes: FastifyPluginCallback<MappingRoutesOptions> = (
   });
 
   app.post("/admin/api/mappings", async (request, reply) => {
-    const body = request.body as any;
+    const body = request.body as CreateMappingBody;
     if (!body.client_model || !body.backend_model || !body.provider_id) {
-      return reply.code(400).send({ error: { message: "Missing required fields: client_model, backend_model, provider_id" } });
+      return reply.code(HTTP_BAD_REQUEST).send({ error: { message: "Missing required fields: client_model, backend_model, provider_id" } });
     }
     const provider = getProviderById(db, body.provider_id);
     if (!provider) {
-      return reply.code(400).send({ error: { message: "provider_id not found" } });
+      return reply.code(HTTP_BAD_REQUEST).send({ error: { message: "provider_id not found" } });
     }
     try {
       const id = createModelMapping(db, {
@@ -29,10 +49,10 @@ export const adminMappingRoutes: FastifyPluginCallback<MappingRoutesOptions> = (
         provider_id: body.provider_id,
         is_active: body.is_active ?? 1,
       });
-      return reply.code(201).send({ id });
-    } catch (err: any) {
-      if (err.message?.includes("UNIQUE constraint")) {
-        return reply.code(409).send({ error: { message: "client_model already exists" } });
+      return reply.code(HTTP_CREATED).send({ id });
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message.includes("UNIQUE constraint")) {
+        return reply.code(HTTP_CONFLICT).send({ error: { message: "client_model already exists" } });
       }
       throw err;
     }
@@ -40,8 +60,8 @@ export const adminMappingRoutes: FastifyPluginCallback<MappingRoutesOptions> = (
 
   app.put("/admin/api/mappings/:id", async (request, reply) => {
     const { id } = request.params as { id: string };
-    const body = request.body as any;
-    const fields: any = {};
+    const body = request.body as UpdateMappingBody;
+    const fields: Partial<Pick<ModelMapping, 'client_model' | 'backend_model' | 'provider_id' | 'is_active'>> = {};
     if (body.client_model !== undefined) fields.client_model = body.client_model;
     if (body.backend_model !== undefined) fields.backend_model = body.backend_model;
     if (body.provider_id !== undefined) fields.provider_id = body.provider_id;
@@ -49,9 +69,9 @@ export const adminMappingRoutes: FastifyPluginCallback<MappingRoutesOptions> = (
     try {
       updateModelMapping(db, id, fields);
       return reply.send({ success: true });
-    } catch (err: any) {
-      if (err.message?.includes("UNIQUE constraint")) {
-        return reply.code(409).send({ error: { message: "client_model already exists" } });
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message.includes("UNIQUE constraint")) {
+        return reply.code(HTTP_CONFLICT).send({ error: { message: "client_model already exists" } });
       }
       throw err;
     }

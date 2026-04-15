@@ -2,6 +2,7 @@ import { createCipheriv, createDecipheriv, randomBytes } from "crypto";
 
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12;
+const ENCRYPTED_PARTS_COUNT = 3;
 
 export function encrypt(text: string, key: string): string {
   const keyBuf = Buffer.from(key, "hex");
@@ -20,7 +21,7 @@ export function encrypt(text: string, key: string): string {
 export function decrypt(encrypted: string, key: string): string {
   const keyBuf = Buffer.from(key, "hex");
   const parts = encrypted.split(":");
-  if (parts.length !== 3) {
+  if (parts.length !== ENCRYPTED_PARTS_COUNT) {
     throw new Error("Invalid encrypted format, expected iv:authTag:ciphertext");
   }
 

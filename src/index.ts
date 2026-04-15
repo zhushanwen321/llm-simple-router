@@ -3,6 +3,8 @@ import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
 import Fastify, { FastifyInstance } from "fastify";
 
+const HTTP_NOT_FOUND = 404;
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 import { getConfig, Config } from "./config.js";
@@ -57,6 +59,7 @@ export async function buildApp(
   app.register(adminRoutes, {
     db,
     adminPassword: config.ADMIN_PASSWORD,
+    jwtSecret: config.JWT_SECRET,
     encryptionKey: config.ENCRYPTION_KEY,
   });
 
@@ -81,7 +84,7 @@ export async function buildApp(
       ) {
         return reply.sendFile("index.html");
       }
-      reply.code(404).send({ error: "Not Found" });
+      reply.code(HTTP_NOT_FOUND).send({ error: "Not Found" });
     });
   } else {
     app.log.warn(

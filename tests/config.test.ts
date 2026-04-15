@@ -5,6 +5,7 @@ describe("getConfig", () => {
     delete process.env.ROUTER_API_KEY;
     delete process.env.ADMIN_PASSWORD;
     delete process.env.ENCRYPTION_KEY;
+    delete process.env.JWT_SECRET;
     delete process.env.PORT;
     delete process.env.DB_PATH;
     delete process.env.LOG_LEVEL;
@@ -20,6 +21,7 @@ describe("getConfig", () => {
     delete process.env.ROUTER_API_KEY;
     delete process.env.ADMIN_PASSWORD;
     delete process.env.ENCRYPTION_KEY;
+    delete process.env.JWT_SECRET;
 
     resetConfig();
 
@@ -30,6 +32,7 @@ describe("getConfig", () => {
     process.env.ROUTER_API_KEY = "sk-test-key";
     process.env.ADMIN_PASSWORD = "admin123";
     process.env.ENCRYPTION_KEY = "0".repeat(64);
+    process.env.JWT_SECRET = "0".repeat(64);
 
     const mod = await import("../src/config.js?t=" + Date.now());
     const { getConfig, resetConfig } = mod;
@@ -50,6 +53,7 @@ describe("getConfig", () => {
     process.env.ROUTER_API_KEY = "sk-test-key";
     process.env.ADMIN_PASSWORD = "admin123";
     process.env.ENCRYPTION_KEY = "0".repeat(64);
+    process.env.JWT_SECRET = "0".repeat(64);
     process.env.PORT = "8080";
 
     const mod = await import("../src/config.js?t=" + Date.now());
@@ -64,6 +68,7 @@ describe("getConfig", () => {
     process.env.ROUTER_API_KEY = "sk-cached";
     process.env.ADMIN_PASSWORD = "pw";
     process.env.ENCRYPTION_KEY = "a".repeat(64);
+    process.env.JWT_SECRET = "a".repeat(64);
 
     const mod = await import("../src/config.js?t=" + Date.now());
     const { getConfig, resetConfig } = mod;

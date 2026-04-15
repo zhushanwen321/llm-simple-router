@@ -1,0 +1,61 @@
+/**
+ * CodeTaste ESLint 基础配置 — TypeScript / Node.js 项目
+ *
+ * 使用：在项目 eslint.config.mjs 中导入
+ *   import tasteConfig from './taste-lint/base.mjs';
+ *   export default tasteConfig;
+ *
+ * 依赖：typescript-eslint
+ */
+import tseslint from 'typescript-eslint';
+import preferAllsettled from './rules/prefer-allsettled.mjs';
+import noSilentCatch from './rules/no-silent-catch.mjs';
+import noUnsafeObjectEntries from './rules/no-unsafe-object-entries.mjs';
+
+export const tastePlugin = {
+  meta: { name: 'eslint-plugin-taste' },
+  rules: {
+    'prefer-allsettled': preferAllsettled,
+    'no-silent-catch': noSilentCatch,
+    'no-unsafe-object-entries': noUnsafeObjectEntries,
+  },
+};
+
+/** 品味规则配置，可在 vue.mjs 等扩展配置中复用 */
+export const tasteRules = {
+  // 类型即契约
+  '@typescript-eslint/no-explicit-any': 'error',
+
+  // 结构先于一切
+  'max-lines': ['warn', { max: 300, skipBlankLines: true, skipComments: true }],
+
+  // 语义化命名
+  'no-magic-numbers': ['warn', {
+    ignore: [0, 1, -1],
+    ignoreArrayIndexes: true,
+  }],
+
+  // 反馈不断裂
+  'no-empty': 'error',
+
+  // 安全无例外
+  'no-eval': 'error',
+  'no-implied-eval': 'error',
+
+  // 品味自定义规则
+  'taste/prefer-allsettled': 'warn',
+  'taste/no-silent-catch': 'warn',
+  'taste/no-unsafe-object-entries': 'warn',
+};
+
+export default tseslint.config(
+  tseslint.configs.recommended,
+  {
+    files: ['**/*.ts'],
+    plugins: { taste: tastePlugin },
+    rules: tasteRules,
+  },
+  {
+    ignores: ['node_modules/**', 'dist/**', '*.d.ts', '**/*.generated.*', '**/*.test.ts', '**/*.spec.ts'],
+  },
+);

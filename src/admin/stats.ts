@@ -1,8 +1,9 @@
 import { FastifyPluginCallback } from "fastify";
+import Database from "better-sqlite3";
 import { getStats } from "../db/index.js";
 
 interface StatsRoutesOptions {
-  db: any;
+  db: Database.Database;
 }
 
 export const adminStatsRoutes: FastifyPluginCallback<StatsRoutesOptions> = (app, options, done) => {

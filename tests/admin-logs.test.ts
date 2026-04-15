@@ -5,12 +5,14 @@ import { buildApp } from "../src/index.js";
 
 const TEST_ENCRYPTION_KEY = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 const ADMIN_PASSWORD = "test-admin-pass";
+const JWT_SECRET = "test-jwt-secret-for-testing";
 const API_KEY = "sk-test-key";
 
 function makeConfig() {
   return {
     ROUTER_API_KEY: API_KEY,
     ADMIN_PASSWORD,
+    JWT_SECRET,
     ENCRYPTION_KEY: TEST_ENCRYPTION_KEY,
     PORT: 3000,
     DB_PATH: ":memory:",

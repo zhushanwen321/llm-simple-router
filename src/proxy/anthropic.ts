@@ -1,18 +1,15 @@
-import { FastifyPluginCallback } from "fastify";
-import { request as httpRequestParam, IncomingMessage } from "http";
-import { PassThrough } from "stream";
 import { randomUUID } from "crypto";
+import type { FastifyPluginCallback, FastifyReply } from "fastify";
 import Database from "better-sqlite3";
 import fp from "fastify-plugin";
 import {
-  getModelMapping,
-  getProviderById,
-  insertRequestLog,
-  Provider,
+  getModelMapping, getProviderById, insertRequestLog,
 } from "../db/index.js";
 import { decrypt } from "../utils/crypto.js";
-
-// ---------- 类型声明 ----------
+import {
+  proxyNonStream, proxyStream,
+  buildUpstreamHeaders, insertSuccessLog, UPSTREAM_SUCCESS, type ProxyResult, type RawHeaders,
+} from "./proxy-core.js";
 
 export interface AnthropicProxyOptions {
   db: Database.Database;
@@ -20,410 +17,77 @@ export interface AnthropicProxyOptions {
   streamTimeoutMs: number;
 }
 
-// ---------- Header 透传工具 ----------
+const HTTP_NOT_FOUND = 404;
+const HTTP_SERVICE_UNAVAILABLE = 503;
+const HTTP_INTERNAL_ERROR = 500;
+const HTTP_BAD_GATEWAY = 502;
+const MESSAGES_PATH = "/v1/messages";
 
-// 请求方向：跳过这些 client header，由代理自行设置
-const SKIP_UPSTREAM = new Set([
-  "host", // Node.js http 根据目标 URL 设置
-  "content-length", // 按实际 payload 重新计算
-  "accept-encoding", // 代理需要读取明文 body 用于日志
-  "x-api-key", // 替换为后端服务的 key
-  "authorization", // 客户端发给路由器的认证 token，不应透传到上游
-  "connection",
-  "keep-alive",
-  "transfer-encoding",
-  "upgrade",
-]);
-
-// 响应方向：跳过这些 upstream header，由框架 / SSE 协议自行管理
-const SKIP_DOWNSTREAM = new Set([
-  "content-length", // Fastify 自动计算
-  "transfer-encoding",
-  "connection",
-  "keep-alive",
-]);
-
-function selectHeaders(
-  raw: Record<string, string | string[] | undefined>,
-  skip: Set<string>
-): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const [key, value] of Object.entries(raw)) {
-    if (value == null || skip.has(key.toLowerCase())) continue;
-    out[key] = Array.isArray(value) ? value.join(", ") : value;
-  }
-  return out;
+function anthropicError(msg: string, type: string, status: number) {
+  return { statusCode: status, body: { type: "error", error: { type, message: msg } } };
 }
 
-// ---------- 错误响应工具（Anthropic 格式） ----------
-
-function anthropicError(message: string, type: string, statusCode: number) {
-  return {
-    statusCode,
-    body: {
-      type: "error",
-      error: { type, message },
-    },
-  };
+function sendError(reply: FastifyReply, e: ReturnType<typeof anthropicError>) {
+  return reply.status(e.statusCode).send(e.body);
 }
 
-// ---------- 非流式代理 ----------
-
-function proxyNonStream(
-  backend: Provider,
-  apiKey: string,
-  body: Record<string, unknown>,
-  clientHeaders: Record<string, string | string[] | undefined>
-): Promise<{
-  statusCode: number;
-  body: string;
-  headers: Record<string, string>;
-  sentHeaders: Record<string, string>;
-  sentBody: string;
-}> {
-  return new Promise((resolve, reject) => {
-    const url = new URL(`${backend.base_url}/v1/messages`);
-    const payload = JSON.stringify(body);
-
-    const fwd = selectHeaders(clientHeaders, SKIP_UPSTREAM);
-    fwd["x-api-key"] = apiKey;
-    fwd["Content-Type"] = "application/json";
-    fwd["Content-Length"] = String(Buffer.byteLength(payload));
-
-    const options = {
-      hostname: url.hostname,
-      port: url.port || 80,
-      path: url.pathname,
-      method: "POST",
-      headers: fwd,
-    };
-
-    const req = httpRequestParam(options, (res: IncomingMessage) => {
-      const chunks: Buffer[] = [];
-      res.on("data", (chunk: Buffer) => chunks.push(chunk));
-      res.on("end", () => {
-        resolve({
-          statusCode: res.statusCode || 502,
-          body: Buffer.concat(chunks).toString("utf-8"),
-          headers: selectHeaders(
-            res.headers as Record<string, string | string[] | undefined>,
-            SKIP_DOWNSTREAM
-          ),
-          sentHeaders: { ...fwd },
-          sentBody: payload,
-        });
-      });
-    });
-
-    req.on("error", (err) => reject(err));
-    req.write(payload);
-    req.end();
-  });
-}
-
-// ---------- 流式代理（SSE） ----------
-
-function proxyStream(
-  backend: Provider,
-  apiKey: string,
-  body: Record<string, unknown>,
-  clientHeaders: Record<string, string | string[] | undefined>,
-  reply: any,
-  timeoutMs: number
-): Promise<{ statusCode: number; responseBody?: string; upstreamResponseHeaders?: Record<string, string> }> {
-  return new Promise((resolve, reject) => {
-    const url = new URL(`${backend.base_url}/v1/messages`);
-    const payload = JSON.stringify(body);
-
-    const fwd = selectHeaders(clientHeaders, SKIP_UPSTREAM);
-    fwd["x-api-key"] = apiKey;
-    fwd["Content-Type"] = "application/json";
-    fwd["Content-Length"] = String(Buffer.byteLength(payload));
-
-    const options = {
-      hostname: url.hostname,
-      port: url.port || 80,
-      path: url.pathname,
-      method: "POST",
-      headers: fwd,
-    };
-
-    const upstreamReq = httpRequestParam(
-      options,
-      (upstreamRes: IncomingMessage) => {
-        const statusCode = upstreamRes.statusCode || 502;
-
-        if (statusCode !== 200) {
-          const chunks: Buffer[] = [];
-          upstreamRes.on("data", (chunk: Buffer) => chunks.push(chunk));
-          upstreamRes.on("end", () => {
-            const errorBody = Buffer.concat(chunks).toString("utf-8");
-            const errHeaders = selectHeaders(
-              upstreamRes.headers as Record<
-                string,
-                string | string[] | undefined
-              >,
-              SKIP_DOWNSTREAM
-            );
-            resolve({ statusCode, responseBody: errorBody, upstreamResponseHeaders: errHeaders });
-            for (const [key, value] of Object.entries(errHeaders)) {
-              reply.header(key, value);
-            }
-            reply.status(statusCode).send(errorBody);
-          });
-          return;
-        }
-
-        // 合并上游 header + SSE 必要 header（SSE 字段优先）
-        const sseHeaders = selectHeaders(
-          upstreamRes.headers as Record<
-            string,
-            string | string[] | undefined
-          >,
-          SKIP_DOWNSTREAM
-        );
-        sseHeaders["Content-Type"] = "text/event-stream";
-        sseHeaders["Cache-Control"] = "no-cache";
-        sseHeaders["Connection"] = "keep-alive";
-        reply.raw.writeHead(statusCode, sseHeaders);
-
-        const passThrough = new PassThrough();
-        passThrough.pipe(reply.raw);
-
-        const captureChunks: Buffer[] = [];
-        let idleTimer: NodeJS.Timeout | null = null;
-        let resolved = false;
-
-        function cleanup() {
-          if (idleTimer) clearTimeout(idleTimer);
-          idleTimer = null;
-          try {
-            passThrough.destroy();
-          } catch {
-            /* already destroyed */
-          }
-          try {
-            upstreamRes.destroy();
-          } catch {
-            /* already destroyed */
-          }
-        }
-
-        // 客户端断开时清理资源，防止 EPIPE 崩溃
-        reply.raw.on("close", () => {
-          if (!resolved) {
-            cleanup();
-            resolve({ statusCode, responseBody: undefined, upstreamResponseHeaders: sseHeaders });
-          }
-        });
-
-        // 防止 pipe 回传的 socket 错误导致未捕获异常
-        passThrough.on("error", () => {
-          cleanup();
-          if (!resolved) {
-            resolved = true;
-            resolve({ statusCode, responseBody: undefined, upstreamResponseHeaders: sseHeaders });
-          }
-        });
-
-        function resetIdleTimer() {
-          if (idleTimer) clearTimeout(idleTimer);
-          idleTimer = setTimeout(() => {
-            cleanup();
-            if (!resolved) {
-              resolved = true;
-              resolve({ statusCode, responseBody: undefined, upstreamResponseHeaders: sseHeaders });
-            }
-          }, timeoutMs);
-        }
-
-        resetIdleTimer();
-
-        upstreamRes.on("data", (chunk: Buffer) => {
-          if (resolved) return;
-          resetIdleTimer();
-          passThrough.write(chunk);
-          captureChunks.push(chunk);
-        });
-
-        upstreamRes.on("end", () => {
-          if (resolved) return;
-          resolved = true;
-          if (idleTimer) clearTimeout(idleTimer);
-          passThrough.end();
-          reply.raw.end();
-          const responseBody = Buffer.concat(captureChunks).toString("utf-8");
-          resolve({ statusCode, responseBody, upstreamResponseHeaders: sseHeaders });
-        });
-
-        upstreamRes.on("error", (err) => {
-          if (resolved) return;
-          resolved = true;
-          cleanup();
-          reject(err);
-        });
-      }
-    );
-
-    upstreamReq.on("error", (err) => reject(err));
-    upstreamReq.write(payload);
-    upstreamReq.end();
-  });
-}
-
-// ---------- Fastify 插件 ----------
-
-const anthropicProxyRaw: FastifyPluginCallback<AnthropicProxyOptions> = (
-  app,
-  options,
-  done
-) => {
-  const { db, encryptionKey, streamTimeoutMs } = options;
-
-  app.post("/v1/messages", async (request, reply) => {
-    // 客户端断开后 socket 写入会触发 EPIPE，必须监听否则进程崩溃
-    request.raw.socket.on("error", () => {});
-
+const anthropicProxyRaw: FastifyPluginCallback<AnthropicProxyOptions> = (app, opts, done) => {
+  const { db, encryptionKey, streamTimeoutMs } = opts;
+  app.post(MESSAGES_PATH, async (request, reply) => {
+    request.raw.socket.on("error", (err) => request.log.debug({ err }, "client socket error"));
     const startTime = Date.now();
     const logId = randomUUID();
-
-    // 1. 提取请求 body
     const body = request.body as Record<string, unknown>;
     const originalBody = JSON.parse(JSON.stringify(body));
     const clientModel = (body.model as string) || "unknown";
-
-    // 2. 查找模型映射
     const mapping = getModelMapping(db, clientModel);
-    if (!mapping) {
-      return reply.status(404).send({
-        type: "error",
-        error: { type: "not_found_error", message: `Model '${clientModel}' is not configured` },
-      });
-    }
+    if (!mapping) return sendError(reply, anthropicError(`Model '${clientModel}' is not configured`, "not_found_error", HTTP_NOT_FOUND));
 
-    // 3. 通过映射找到对应的供应商
     const provider = getProviderById(db, mapping.provider_id);
-    if (!provider || !provider.is_active) {
-      return reply.status(503).send({
-        type: "error",
-        error: { type: "api_error", message: "Provider unavailable" },
-      });
-    }
-    if (provider.api_type !== "anthropic") {
-      return reply.status(500).send({
-        type: "error",
-        error: { type: "api_error", message: "Provider type mismatch for this endpoint" },
-      });
-    }
+    if (!provider || !provider.is_active) return sendError(reply, anthropicError("Provider unavailable", "api_error", HTTP_SERVICE_UNAVAILABLE));
+    if (provider.api_type !== "anthropic") return sendError(reply, anthropicError("Provider type mismatch for this endpoint", "api_error", HTTP_INTERNAL_ERROR));
 
-    // 4. 替换模型名称 + 解密 API Key
     body.model = mapping.backend_model;
     const apiKey = decrypt(provider.api_key, encryptionKey);
-
     const isStream = body.stream === true;
-    const requestBodyStr = JSON.stringify(body);
-    const clientHeaders = request.headers as Record<
-      string,
-      string | string[] | undefined
-    >;
-
-    // 5. 构建日志数据
-    const upstreamReqHeaders = selectHeaders(clientHeaders, SKIP_UPSTREAM);
-    upstreamReqHeaders["x-api-key"] = apiKey;
-    upstreamReqHeaders["Content-Type"] = "application/json";
-    upstreamReqHeaders["Content-Length"] = String(Buffer.byteLength(requestBodyStr));
-    const clientRequest = JSON.stringify({ headers: clientHeaders, body: originalBody });
-    const upstreamRequest = JSON.stringify({ url: `${provider.base_url}/v1/messages`, headers: upstreamReqHeaders, body: requestBodyStr });
+    const reqBodyStr = JSON.stringify(body);
+    const cliHdrs: RawHeaders = request.headers as RawHeaders;
+    const clientReq = JSON.stringify({ headers: cliHdrs, body: originalBody });
 
     try {
       if (isStream) {
-        const result = await proxyStream(
-          provider,
-          apiKey,
-          body,
-          clientHeaders,
-          reply,
-          streamTimeoutMs
-        );
-
-        insertRequestLog(db, {
-          id: logId,
-          api_type: "anthropic",
-          model: clientModel,
-          provider_id: provider.id,
-          status_code: result.statusCode,
-          latency_ms: Date.now() - startTime,
-          is_stream: 1,
-          error_message: null,
-          created_at: new Date().toISOString(),
-          request_body: requestBodyStr,
-          response_body: result.responseBody ?? null,
-          client_request: clientRequest,
-          upstream_request: upstreamRequest,
-          upstream_response: JSON.stringify({ statusCode: result.statusCode, headers: result.upstreamResponseHeaders ?? {}, body: result.responseBody }),
-          client_response: JSON.stringify({ statusCode: result.statusCode, headers: result.upstreamResponseHeaders ?? {}, body: result.responseBody }),
-        });
-
-        return reply;
-      } else {
-        const result = await proxyNonStream(
-          provider,
-          apiKey,
-          body,
-          clientHeaders
-        );
-
-        insertRequestLog(db, {
-          id: logId,
-          api_type: "anthropic",
-          model: clientModel,
-          provider_id: provider.id,
-          status_code: result.statusCode,
-          latency_ms: Date.now() - startTime,
-          is_stream: 0,
-          error_message: null,
-          created_at: new Date().toISOString(),
-          request_body: requestBodyStr,
-          response_body: result.body,
-          client_request: clientRequest,
-          upstream_request: upstreamRequest,
-          upstream_response: JSON.stringify({ statusCode: result.statusCode, headers: result.sentHeaders, body: result.body }),
-          client_response: JSON.stringify({ statusCode: result.statusCode, headers: result.headers, body: result.body }),
-        });
-
-        for (const [key, value] of Object.entries(result.headers)) {
-          reply.header(key, value);
+        const r = await proxyStream(provider, apiKey, body, cliHdrs, reply, streamTimeoutMs, MESSAGES_PATH);
+        const h = r.upstreamResponseHeaders ?? {};
+        const sentH = r.sentHeaders ?? {};
+        const upstreamReq = JSON.stringify({ url: `${provider.base_url}${MESSAGES_PATH}`, headers: sentH, body: reqBodyStr });
+        if (r.statusCode !== UPSTREAM_SUCCESS) {
+          for (const [k, v] of Object.entries(r.upstreamResponseHeaders ?? {})) reply.header(k, v);
+          reply.status(r.statusCode).send(r.responseBody);
         }
-        return reply.status(result.statusCode).send(result.body);
+        insertSuccessLog(db, "anthropic", logId, clientModel, provider, true, startTime, reqBodyStr, clientReq, upstreamReq, r.statusCode, r.responseBody ?? null, h, h);
+        return reply;
       }
-    } catch (err: any) {
+      const r: ProxyResult = await proxyNonStream(provider, apiKey, body, cliHdrs, MESSAGES_PATH);
+      const upstreamReq = JSON.stringify({ url: `${provider.base_url}${MESSAGES_PATH}`, headers: r.sentHeaders, body: reqBodyStr });
+      insertSuccessLog(db, "anthropic", logId, clientModel, provider, false, startTime, reqBodyStr, clientReq, upstreamReq, r.statusCode, r.body, r.sentHeaders, r.headers);
+      for (const [k, v] of Object.entries(r.headers)) reply.header(k, v);
+      return reply.status(r.statusCode).send(r.body);
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      const sentH = buildUpstreamHeaders(cliHdrs, apiKey, Buffer.byteLength(reqBodyStr));
+      const upstreamReq = JSON.stringify({ url: `${provider.base_url}${MESSAGES_PATH}`, headers: sentH, body: reqBodyStr });
       insertRequestLog(db, {
-        id: logId,
-        api_type: "anthropic",
-        model: clientModel,
-        provider_id: provider.id,
-        status_code: 502,
-        latency_ms: Date.now() - startTime,
-        is_stream: isStream ? 1 : 0,
-        error_message: err.message || "Upstream connection failed",
-        created_at: new Date().toISOString(),
-        request_body: requestBodyStr,
-        client_request: clientRequest,
-        upstream_request: upstreamRequest,
+        id: logId, api_type: "anthropic", model: clientModel, provider_id: provider.id,
+        status_code: HTTP_BAD_GATEWAY, latency_ms: Date.now() - startTime,
+        is_stream: isStream ? 1 : 0, error_message: errMsg || "Upstream connection failed",
+        created_at: new Date().toISOString(), request_body: reqBodyStr,
+        client_request: clientReq, upstream_request: upstreamReq,
       });
-
-      const errorResp = anthropicError(
-        "Failed to connect to upstream service",
-        "upstream_error",
-        502
-      );
-      return reply.status(502).send(errorResp.body);
+      return sendError(reply, anthropicError("Failed to connect to upstream service", "upstream_error", HTTP_BAD_GATEWAY));
     }
   });
 
   done();
 };
 
-export const anthropicProxy = fp(anthropicProxyRaw, {
-  name: "anthropic-proxy",
-});
+export const anthropicProxy = fp(anthropicProxyRaw, { name: "anthropic-proxy" });

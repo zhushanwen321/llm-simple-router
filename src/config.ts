@@ -4,6 +4,7 @@ export interface Config {
   ROUTER_API_KEY: string;
   ADMIN_PASSWORD: string;
   ENCRYPTION_KEY: string;
+  JWT_SECRET: string;
   PORT: number;
   DB_PATH: string;
   LOG_LEVEL: string;
@@ -20,7 +21,7 @@ export function resetConfig(): void {
 export function getConfig(): Config {
   if (cachedConfig) return cachedConfig;
 
-  const requiredVars = ["ROUTER_API_KEY", "ADMIN_PASSWORD", "ENCRYPTION_KEY"];
+  const requiredVars = ["ROUTER_API_KEY", "ADMIN_PASSWORD", "ENCRYPTION_KEY", "JWT_SECRET"];
   for (const name of requiredVars) {
     if (!process.env[name]) {
       throw new Error(`Missing required environment variable: ${name}`);
@@ -31,6 +32,7 @@ export function getConfig(): Config {
     ROUTER_API_KEY: process.env.ROUTER_API_KEY!,
     ADMIN_PASSWORD: process.env.ADMIN_PASSWORD!,
     ENCRYPTION_KEY: process.env.ENCRYPTION_KEY!,
+    JWT_SECRET: process.env.JWT_SECRET!,
     PORT: parseInt(process.env.PORT || "3000", 10),
     DB_PATH: process.env.DB_PATH || "./data/router.db",
     LOG_LEVEL: process.env.LOG_LEVEL || "info",
