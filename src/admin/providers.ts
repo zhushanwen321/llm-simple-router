@@ -1,16 +1,40 @@
 import { FastifyPluginCallback } from "fastify";
+import Database from "better-sqlite3";
+import type { Provider } from "../db/index.js";
 import { getAllProviders, getProviderById, createProvider, updateProvider, deleteProvider } from "../db/index.js";
-import { decrypt, encrypt } from "../utils/crypto.js";
+import { encrypt } from "../utils/crypto.js";
+
+const HTTP_BAD_REQUEST = 400;
+const HTTP_CREATED = 201;
+const HTTP_NOT_FOUND = 404;
+
+const API_KEY_PREVIEW_MIN_LEN = 8;
+const API_KEY_PREVIEW_PREFIX_LEN = 4;
+
+interface CreateProviderBody {
+  name: string;
+  api_type: string;
+  base_url: string;
+  api_key: string;
+  is_active?: number;
+}
+
+interface UpdateProviderBody {
+  name?: string;
+  api_type?: string;
+  base_url?: string;
+  api_key?: string;
+  is_active?: number;
+}
 
 interface ProviderRoutesOptions {
-  db: any;
+  db: Database.Database;
   encryptionKey: string;
 }
 
-function maskApiKey(encrypted: string, key: string): string {
-  const decrypted = decrypt(encrypted, key);
-  if (decrypted.length <= 8) return "****";
-  return `${decrypted.slice(0, 4)}...${decrypted.slice(-4)}`;
+function computeApiKeyPreview(apiKey: string): string {
+  if (apiKey.length <= API_KEY_PREVIEW_MIN_LEN) return "****";
+  return `${apiKey.slice(0, API_KEY_PREVIEW_PREFIX_LEN)}...${apiKey.slice(-API_KEY_PREVIEW_PREFIX_LEN)}`;
 }
 
 export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> = (app, options, done) => {
@@ -19,43 +43,54 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
   app.get("/admin/api/providers", async (_request, reply) => {
     const providers = getAllProviders(db);
     return reply.send(providers.map((s) => ({
-      ...s,
-      api_key: maskApiKey(s.api_key, encryptionKey),
+      id: s.id,
+      name: s.name,
+      api_type: s.api_type,
+      base_url: s.base_url,
+      api_key_preview: s.api_key_preview || "****",
+      is_active: s.is_active,
+      created_at: s.created_at,
+      updated_at: s.updated_at,
     })));
   });
 
   app.post("/admin/api/providers", async (request, reply) => {
-    const body = request.body as any;
+    const body = request.body as CreateProviderBody;
     if (!body.name || !body.api_type || !body.base_url || !body.api_key) {
-      return reply.code(400).send({ error: { message: "Missing required fields: name, api_type, base_url, api_key" } });
+      return reply.code(HTTP_BAD_REQUEST).send({ error: { message: "Missing required fields: name, api_type, base_url, api_key" } });
     }
     if (!["openai", "anthropic"].includes(body.api_type)) {
-      return reply.code(400).send({ error: { message: "api_type must be 'openai' or 'anthropic'" } });
+      return reply.code(HTTP_BAD_REQUEST).send({ error: { message: "api_type must be 'openai' or 'anthropic'" } });
     }
     const encryptedKey = encrypt(body.api_key, encryptionKey);
+    const apiKeyPreview = computeApiKeyPreview(body.api_key);
     const id = createProvider(db, {
       name: body.name,
-      api_type: body.api_type,
+      api_type: body.api_type as "openai" | "anthropic",
       base_url: body.base_url,
       api_key: encryptedKey,
+      api_key_preview: apiKeyPreview,
       is_active: body.is_active ?? 1,
     });
-    return reply.code(201).send({ id });
+    return reply.code(HTTP_CREATED).send({ id });
   });
 
   app.put("/admin/api/providers/:id", async (request, reply) => {
     const { id } = request.params as { id: string };
     const existing = getProviderById(db, id);
     if (!existing) {
-      return reply.code(404).send({ error: { message: "Provider not found" } });
+      return reply.code(HTTP_NOT_FOUND).send({ error: { message: "Provider not found" } });
     }
-    const body = request.body as any;
-    const fields: any = {};
+    const body = request.body as UpdateProviderBody;
+    const fields: Partial<Pick<Provider, 'name' | 'api_type' | 'base_url' | 'api_key' | 'api_key_preview' | 'is_active'>> = {};
     if (body.name !== undefined) fields.name = body.name;
-    if (body.api_type !== undefined) fields.api_type = body.api_type;
+    if (body.api_type !== undefined) fields.api_type = body.api_type as "openai" | "anthropic";
     if (body.base_url !== undefined) fields.base_url = body.base_url;
     if (body.is_active !== undefined) fields.is_active = body.is_active;
-    if (body.api_key) fields.api_key = encrypt(body.api_key, encryptionKey);
+    if (body.api_key) {
+      fields.api_key = encrypt(body.api_key, encryptionKey);
+      fields.api_key_preview = computeApiKeyPreview(body.api_key);
+    }
     updateProvider(db, id, fields);
     return reply.send({ success: true });
   });

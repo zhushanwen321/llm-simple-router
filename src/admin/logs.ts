@@ -1,15 +1,26 @@
 import { FastifyPluginCallback } from "fastify";
+import Database from "better-sqlite3";
 import { getRequestLogs, getRequestLogById, deleteLogsBefore } from "../db/index.js";
 
+const HTTP_BAD_REQUEST = 400;
+const HTTP_NOT_FOUND = 404;
+
+interface LogQueryParams {
+  page?: string;
+  limit?: string;
+  api_type?: string;
+  model?: string;
+}
+
 interface LogRoutesOptions {
-  db: any;
+  db: Database.Database;
 }
 
 export const adminLogRoutes: FastifyPluginCallback<LogRoutesOptions> = (app, options, done) => {
   const { db } = options;
 
   app.get("/admin/api/logs", async (request, reply) => {
-    const query = request.query as any;
+    const query = request.query as LogQueryParams;
     const page = parseInt(query.page || "1", 10);
     const limit = parseInt(query.limit || "20", 10);
     const result = getRequestLogs(db, {
@@ -25,7 +36,7 @@ export const adminLogRoutes: FastifyPluginCallback<LogRoutesOptions> = (app, opt
     const params = request.params as { id: string };
     const log = getRequestLogById(db, params.id);
     if (!log) {
-      return reply.code(404).send({ error: { message: "Log not found" } });
+      return reply.code(HTTP_NOT_FOUND).send({ error: { message: "Log not found" } });
     }
     return reply.send(log);
   });
@@ -33,7 +44,7 @@ export const adminLogRoutes: FastifyPluginCallback<LogRoutesOptions> = (app, opt
   app.delete("/admin/api/logs/before", async (request, reply) => {
     const body = request.body as { before?: string };
     if (!body.before) {
-      return reply.code(400).send({ error: { message: "Missing required field: before" } });
+      return reply.code(HTTP_BAD_REQUEST).send({ error: { message: "Missing required field: before" } });
     }
     const deleted = deleteLogsBefore(db, body.before);
     return reply.send({ deleted });

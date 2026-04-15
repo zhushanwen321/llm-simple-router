@@ -1,4 +1,5 @@
 import { FastifyPluginCallback } from "fastify";
+import Database from "better-sqlite3";
 import { adminAuthPlugin, adminLoginRoutes } from "../middleware/admin-auth.js";
 import { adminProviderRoutes } from "./providers.js";
 import { adminMappingRoutes } from "./mappings.js";
@@ -6,14 +7,15 @@ import { adminLogRoutes } from "./logs.js";
 import { adminStatsRoutes } from "./stats.js";
 
 interface AdminRoutesOptions {
-  db: any;
+  db: Database.Database;
   adminPassword: string;
+  jwtSecret: string;
   encryptionKey: string;
 }
 
 export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (app, options, done) => {
-  app.register(adminAuthPlugin, { adminPassword: options.adminPassword });
-  app.register(adminLoginRoutes, { adminPassword: options.adminPassword });
+  app.register(adminAuthPlugin, { adminPassword: options.adminPassword, jwtSecret: options.jwtSecret });
+  app.register(adminLoginRoutes, { adminPassword: options.adminPassword, jwtSecret: options.jwtSecret });
   app.register(adminProviderRoutes, { db: options.db, encryptionKey: options.encryptionKey });
   app.register(adminMappingRoutes, { db: options.db });
   app.register(adminLogRoutes, { db: options.db });

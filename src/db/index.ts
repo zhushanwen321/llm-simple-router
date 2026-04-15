@@ -9,6 +9,9 @@ const __dirname = dirname(__filename);
 
 const MIGRATIONS_DIR = join(__dirname, "migrations");
 
+type CountRow = { count: number };
+type AvgRow = { avg: number | null };
+
 export function initDatabase(dbPath: string): Database.Database {
   // 自动创建目录（非内存数据库时）
   if (dbPath !== ":memory:") {
@@ -41,8 +44,13 @@ export function initDatabase(dbPath: string): Database.Database {
   for (const file of files) {
     if (applied.has(file)) continue;
 
-    const sql = readFileSync(join(MIGRATIONS_DIR, file), "utf-8");
-    db.exec(sql);
+    try {
+      const sql = readFileSync(join(MIGRATIONS_DIR, file), "utf-8");
+      db.exec(sql);
+    } catch (err) {
+      console.error(`Failed to apply migration ${file}:`, err);
+      throw err;
+    }
     db.prepare("INSERT INTO migrations (name, applied_at) VALUES (?, ?)").run(
       file,
       new Date().toISOString()
@@ -58,6 +66,7 @@ export interface Provider {
   api_type: "openai" | "anthropic";
   base_url: string;
   api_key: string;
+  api_key_preview?: string;
   is_active: number;
   created_at: string;
   updated_at: string;
@@ -174,25 +183,27 @@ export function getProviderById(db: Database.Database, id: string): Provider | u
 
 export function createProvider(
   db: Database.Database,
-  provider: { name: string; api_type: "openai" | "anthropic"; base_url: string; api_key: string; is_active?: number }
+  provider: { name: string; api_type: "openai" | "anthropic"; base_url: string; api_key: string; api_key_preview?: string; is_active?: number }
 ): string {
   const id = randomUUID();
   const now = new Date().toISOString();
   db.prepare(
-    `INSERT INTO providers (id, name, api_type, base_url, api_key, is_active, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(id, provider.name, provider.api_type, provider.base_url, provider.api_key, provider.is_active ?? 1, now, now);
+    `INSERT INTO providers (id, name, api_type, base_url, api_key, api_key_preview, is_active, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(id, provider.name, provider.api_type, provider.base_url, provider.api_key, provider.api_key_preview ?? null, provider.is_active ?? 1, now, now);
   return id;
 }
 
 export function updateProvider(
   db: Database.Database,
   id: string,
-  fields: Partial<Pick<Provider, 'name' | 'api_type' | 'base_url' | 'api_key' | 'is_active'>>
+  fields: Partial<Pick<Provider, 'name' | 'api_type' | 'base_url' | 'api_key' | 'api_key_preview' | 'is_active'>>
 ): void {
+  const ALLOWED_PROVIDER_FIELDS = new Set(['name', 'api_type', 'base_url', 'api_key', 'api_key_preview', 'is_active']);
   const sets: string[] = [];
   const values: unknown[] = [];
   for (const [key, value] of Object.entries(fields)) {
+    if (!ALLOWED_PROVIDER_FIELDS.has(key)) continue;
     sets.push(`${key} = ?`);
     values.push(value);
   }
@@ -228,9 +239,11 @@ export function updateModelMapping(
   id: string,
   fields: Partial<Pick<ModelMapping, 'client_model' | 'backend_model' | 'provider_id' | 'is_active'>>
 ): void {
+  const ALLOWED_MAPPING_FIELDS = new Set(['client_model', 'backend_model', 'provider_id', 'is_active']);
   const sets: string[] = [];
   const values: unknown[] = [];
   for (const [key, value] of Object.entries(fields)) {
+    if (!ALLOWED_MAPPING_FIELDS.has(key)) continue;
     sets.push(`${key} = ?`);
     values.push(value);
   }
@@ -272,14 +285,14 @@ export function deleteLogsBefore(db: Database.Database, beforeDate: string): num
 }
 
 export function getStats(db: Database.Database): Stats {
-  const total = (db.prepare("SELECT COUNT(*) as count FROM request_logs").get() as { count: number }).count;
+  const total = (db.prepare("SELECT COUNT(*) as count FROM request_logs").get() as CountRow).count;
   const successCount = (db.prepare(
     "SELECT COUNT(*) as count FROM request_logs WHERE status_code >= 200 AND status_code < 300"
-  ).get() as { count: number }).count;
-  const avgResult = db.prepare("SELECT AVG(latency_ms) as avg FROM request_logs WHERE latency_ms IS NOT NULL").get() as { avg: number | null };
+  ).get() as CountRow).count;
+  const avgResult = db.prepare("SELECT AVG(latency_ms) as avg FROM request_logs WHERE latency_ms IS NOT NULL").get() as AvgRow;
   const recentCount = (db.prepare(
     "SELECT COUNT(*) as count FROM request_logs WHERE created_at >= datetime('now', '-1 day')"
-  ).get() as { count: number }).count;
+  ).get() as CountRow).count;
 
   const typeRows = db.prepare("SELECT api_type, COUNT(*) as count FROM request_logs GROUP BY api_type").all() as { api_type: string; count: number }[];
   const requestsByType: Record<string, number> = {};

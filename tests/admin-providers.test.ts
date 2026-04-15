@@ -5,12 +5,14 @@ import { buildApp } from "../src/index.js";
 
 const TEST_ENCRYPTION_KEY = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 const ADMIN_PASSWORD = "test-admin-pass";
+const JWT_SECRET = "test-jwt-secret-for-testing";
 const API_KEY = "sk-test-key";
 
 function makeConfig() {
   return {
     ROUTER_API_KEY: API_KEY,
     ADMIN_PASSWORD,
+    JWT_SECRET,
     ENCRYPTION_KEY: TEST_ENCRYPTION_KEY,
     PORT: 3000,
     DB_PATH: ":memory:",
@@ -38,7 +40,7 @@ function setupTables(db: Database.Database) {
     CREATE TABLE IF NOT EXISTS migrations (name TEXT PRIMARY KEY, applied_at TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS providers (
       id TEXT PRIMARY KEY, name TEXT NOT NULL, api_type TEXT NOT NULL CHECK(api_type IN ('openai', 'anthropic')),
-      base_url TEXT NOT NULL, api_key TEXT NOT NULL, is_active INTEGER NOT NULL DEFAULT 1,
+      base_url TEXT NOT NULL, api_key TEXT NOT NULL, api_key_preview TEXT, is_active INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL, updated_at TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS model_mappings (
@@ -155,7 +157,7 @@ describe("Provider CRUD", () => {
     expect(res.json().id).toBeDefined();
   });
 
-  it("GET returns services with masked api_key", async () => {
+  it("GET returns services with api_key_preview instead of raw api_key", async () => {
     await app.inject({
       method: "POST",
       url: "/admin/api/providers",
@@ -176,7 +178,8 @@ describe("Provider CRUD", () => {
     expect(res.statusCode).toBe(200);
     const services = res.json();
     expect(services.length).toBe(1);
-    expect(services[0].api_key).toBe("sk-t...3xyz");
+    expect(services[0].api_key_preview).toBe("sk-t...3xyz");
+    expect(services[0].api_key).toBeUndefined();
   });
 
   it("PUT updates service", async () => {
