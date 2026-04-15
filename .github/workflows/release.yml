@@ -1,0 +1,64 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build-and-attach:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      # 复制运行时所需文件到打包目录
+      - name: Prepare dist archive
+        run: |
+          mkdir -p package/dist/db/migrations package/frontend-dist
+          cp -r dist/ package/dist/
+          cp -r src/db/migrations/ package/dist/db/migrations/
+          cp package.json package/
+          cp package-lock.json package/
+          cp .env.example package/
+          cp README.md package/
+          # 生产依赖安装
+          cd package && npm ci --omit=dev && cd ..
+          tar czf llm-simple-router-linux-x64.tar.gz -C package .
+
+      # Docker 镜像推 GHCR
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      # 上传 tar.gz 到 Release Assets
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: llm-simple-router-linux-x64.tar.gz
