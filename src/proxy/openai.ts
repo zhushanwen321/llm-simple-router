@@ -25,6 +25,7 @@ export interface OpenaiProxyOptions {
 }
 
 const HTTP_NOT_FOUND = 404;
+const HTTP_FORBIDDEN = 403;
 const HTTP_SERVICE_UNAVAILABLE = 503;
 const HTTP_INTERNAL_ERROR = 500;
 const HTTP_BAD_GATEWAY = 502;
@@ -45,11 +46,23 @@ const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, do
     request.raw.socket.on("error", (err) => request.log.debug({ err }, "client socket error"));
     const startTime = Date.now();
     const logId = randomUUID();
+    const routerKeyId = request.routerKey?.id ?? null;
     const body = request.body as Record<string, unknown>;
     const originalBody = JSON.parse(JSON.stringify(body));
     const clientModel = (body.model as string) || "unknown";
     const mapping = getModelMapping(db, clientModel);
     if (!mapping) return sendError(reply, openaiError(`Model '${clientModel}' is not configured`, "invalid_request_error", "model_not_found", HTTP_NOT_FOUND));
+
+    // 白名单校验
+    const allowedModels = request.routerKey?.allowed_models;
+    if (allowedModels) {
+      try {
+        const models: string[] = JSON.parse(allowedModels);
+        if (models.length > 0 && !models.includes(mapping.backend_model)) {
+          return sendError(reply, openaiError(`Model '${mapping.backend_model}' is not allowed for this API key`, "invalid_request_error", "model_not_allowed", HTTP_FORBIDDEN));
+        }
+      } catch { request.log.warn("Invalid allowed_models JSON, allowing all models"); }
+    }
 
     const provider = getProviderById(db, mapping.provider_id);
     if (!provider || !provider.is_active) return sendError(reply, openaiError("Provider unavailable", "server_error", "provider_unavailable", HTTP_SERVICE_UNAVAILABLE));
@@ -101,6 +114,7 @@ const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, do
             created_at: new Date().toISOString(), request_body: reqBodyStr,
             client_request: clientReq, upstream_request: upstreamReqBase,
             is_retry: isOriginal ? 0 : 1, original_request_id: isOriginal ? null : logId,
+            router_key_id: routerKeyId,
           });
         } else if (attempt.statusCode !== UPSTREAM_SUCCESS) {
           insertRequestLog(db, {
@@ -112,6 +126,7 @@ const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, do
             upstream_response: JSON.stringify({ statusCode: attempt.statusCode, body: attempt.responseBody }),
             client_response: JSON.stringify({ statusCode: attempt.statusCode, body: attempt.responseBody }),
             is_retry: isOriginal ? 0 : 1, original_request_id: isOriginal ? null : logId,
+            router_key_id: routerKeyId,
           });
         } else {
           const h = isStream
@@ -119,7 +134,7 @@ const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, do
             : ((r as ProxyResult).headers);
           insertSuccessLog(db, "openai", attemptLogId, clientModel, provider, isStream, startTime,
             reqBodyStr, clientReq, upstreamReqBase, r.statusCode, attempt.responseBody, h, h,
-            !isOriginal, isOriginal ? null : logId);
+            !isOriginal, isOriginal ? null : logId, routerKeyId);
           lastSuccessLogId = attemptLogId;
         }
       }
@@ -162,6 +177,7 @@ const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, do
         is_stream: isStream ? 1 : 0, error_message: errMsg || "Upstream connection failed",
         created_at: new Date().toISOString(), request_body: reqBodyStr,
         client_request: clientReq, upstream_request: upstreamReq,
+        router_key_id: routerKeyId,
       });
       return sendError(reply, openaiError("Failed to connect to upstream service", "upstream_error", "upstream_connection_failed", HTTP_BAD_GATEWAY));
     }

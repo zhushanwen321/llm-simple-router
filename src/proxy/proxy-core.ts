@@ -140,6 +140,7 @@ export function insertSuccessLog(
   upHdrs: Record<string, string>,
   cliHdrs: Record<string, string>,
   isRetry: boolean = false, originalRequestId: string | null = null,
+  routerKeyId: string | null = null,
 ) {
   insertRequestLog(db, {
     id: logId, api_type: apiType, model, provider_id: provider.id,
@@ -150,6 +151,7 @@ export function insertSuccessLog(
     upstream_response: JSON.stringify({ statusCode: status, headers: upHdrs, body: respBody }),
     client_response: JSON.stringify({ statusCode: status, headers: cliHdrs, body: respBody }),
     is_retry: isRetry ? 1 : 0, original_request_id: originalRequestId,
+    router_key_id: routerKeyId,
   });
 }
 
