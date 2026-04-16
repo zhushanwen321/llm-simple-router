@@ -111,8 +111,8 @@
               <span class="transition-transform data-[state=open]:rotate-90">&#9654;</span>
               客户端原始请求
             </CollapsibleTrigger>
-            <CollapsibleContent>
-              <pre class="bg-gray-900 text-green-400 rounded-md p-3 text-xs overflow-auto max-h-[25vh] whitespace-pre-wrap break-all mt-1">{{ formatJson(detailData.client_request) }}</pre>
+            <CollapsibleContent class="mt-1">
+              <LogRequestViewer :raw="detailData.client_request" :api-type="asApiType(detailData.api_type)" />
             </CollapsibleContent>
           </Collapsible>
           <Collapsible v-if="detailData.upstream_request" class="space-y-1">
@@ -120,8 +120,8 @@
               <span class="transition-transform data-[state=open]:rotate-90">&#9654;</span>
               代理发送给 LLM API 的请求
             </CollapsibleTrigger>
-            <CollapsibleContent>
-              <pre class="bg-gray-900 text-yellow-400 rounded-md p-3 text-xs overflow-auto max-h-[25vh] whitespace-pre-wrap break-all mt-1">{{ formatJson(detailData.upstream_request) }}</pre>
+            <CollapsibleContent class="mt-1">
+              <LogRequestViewer show-url :raw="detailData.upstream_request" :api-type="asApiType(detailData.api_type)" />
             </CollapsibleContent>
           </Collapsible>
           <Collapsible v-if="detailData.upstream_response" class="space-y-1">
@@ -129,8 +129,8 @@
               <span class="transition-transform data-[state=open]:rotate-90">&#9654;</span>
               LLM API 返回的原始响应
             </CollapsibleTrigger>
-            <CollapsibleContent>
-              <pre class="bg-gray-900 text-blue-400 rounded-md p-3 text-xs overflow-auto max-h-[25vh] whitespace-pre-wrap break-all mt-1">{{ formatJson(detailData.upstream_response) }}</pre>
+            <CollapsibleContent class="mt-1">
+              <LogResponseViewer :raw="detailData.upstream_response" :api-type="asApiType(detailData.api_type)" :is-stream="!!detailData.is_stream" />
             </CollapsibleContent>
           </Collapsible>
           <Collapsible v-if="detailData.client_response" class="space-y-1">
@@ -138,20 +138,20 @@
               <span class="transition-transform data-[state=open]:rotate-90">&#9654;</span>
               代理返回给客户端的响应
             </CollapsibleTrigger>
-            <CollapsibleContent>
-              <pre class="bg-gray-900 text-purple-400 rounded-md p-3 text-xs overflow-auto max-h-[25vh] whitespace-pre-wrap break-all mt-1">{{ formatJson(detailData.client_response) }}</pre>
+            <CollapsibleContent class="mt-1">
+              <LogResponseViewer :raw="detailData.client_response" :api-type="asApiType(detailData.api_type)" :is-stream="!!detailData.is_stream" />
             </CollapsibleContent>
           </Collapsible>
 
           <!-- 兼容旧日志（无四阶段数据时展示旧字段） -->
           <template v-if="!detailData.client_request">
-            <div>
+            <div v-if="detailData.request_body">
               <h3 class="text-sm font-medium text-gray-700 mb-1">Request Body</h3>
-              <pre class="bg-gray-900 text-green-400 rounded-md p-3 text-xs overflow-auto max-h-[25vh] whitespace-pre-wrap break-all">{{ formatJson(detailData.request_body) }}</pre>
+              <LogRequestViewer :raw="detailData.request_body" :api-type="asApiType(detailData.api_type)" />
             </div>
-            <div>
+            <div v-if="detailData.response_body">
               <h3 class="text-sm font-medium text-gray-700 mb-1">Response Body</h3>
-              <pre class="bg-gray-900 text-blue-400 rounded-md p-3 text-xs overflow-auto max-h-[25vh] whitespace-pre-wrap break-all">{{ formatJson(detailData.response_body) }}</pre>
+              <LogResponseViewer :raw="detailData.response_body" :api-type="asApiType(detailData.api_type)" :is-stream="!!detailData.is_stream" />
             </div>
           </template>
           <div v-if="detailData.error_message">
@@ -195,6 +195,8 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogScrollContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import LogRequestViewer from '@/components/logs/LogRequestViewer.vue'
+import LogResponseViewer from '@/components/logs/LogResponseViewer.vue'
 
 interface LogEntry {
   id: string
@@ -226,13 +228,8 @@ const showDetail = ref(false)
 const detailLoading = ref(false)
 const detailData = ref<LogEntry | null>(null)
 
-function formatJson(raw: string | null): string {
-  if (!raw) return '(无数据)'
-  try {
-    return JSON.stringify(JSON.parse(raw), null, 2) // eslint-disable-line no-magic-numbers
-  } catch {
-    return raw
-  }
+function asApiType(t: string): 'openai' | 'anthropic' {
+  return t === 'openai' ? 'openai' : 'anthropic'
 }
 
 async function openDetail(id: string) {

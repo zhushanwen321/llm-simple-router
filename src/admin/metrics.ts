@@ -1,56 +1,55 @@
 import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
+import { Type, Static } from "@sinclair/typebox";
 import { getMetricsSummary, getMetricsTimeseries } from "../db/index.js";
+import { HTTP_BAD_REQUEST } from "./constants.js";
 
 type MetricsPeriod = "1h" | "6h" | "24h" | "7d" | "30d";
-type MetricsMetric = "ttft" | "tps" | "tokens" | "cache_rate" | "request_count";
+type MetricsMetric = "ttft" | "tps" | "tokens" | "cache_rate" | "request_count" | "input_tokens" | "output_tokens" | "cache_hit_tokens";
 
-const HTTP_BAD_REQUEST = 400;
+const PeriodEnum = Type.Union([
+  Type.Literal("1h"), Type.Literal("6h"), Type.Literal("24h"),
+  Type.Literal("7d"), Type.Literal("30d"),
+]);
 
-const VALID_PERIODS: Set<string> = new Set(["1h", "6h", "24h", "7d", "30d"]);
-const VALID_METRICS: Set<string> = new Set(["ttft", "tps", "tokens", "cache_rate", "request_count"]);
+const MetricEnum = Type.Union([
+  Type.Literal("ttft"), Type.Literal("tps"), Type.Literal("tokens"),
+  Type.Literal("cache_rate"), Type.Literal("request_count"),
+  Type.Literal("input_tokens"), Type.Literal("output_tokens"),
+  Type.Literal("cache_hit_tokens"),
+]);
+
+const SummaryQuerySchema = Type.Object({
+  period: Type.Optional(PeriodEnum),
+  provider_id: Type.Optional(Type.String()),
+  backend_model: Type.Optional(Type.String()),
+  router_key_id: Type.Optional(Type.String()),
+});
+
+const TimeseriesQuerySchema = Type.Object({
+  period: Type.Optional(PeriodEnum),
+  metric: MetricEnum,
+  provider_id: Type.Optional(Type.String()),
+  backend_model: Type.Optional(Type.String()),
+  router_key_id: Type.Optional(Type.String()),
+});
 
 interface MetricsRoutesOptions {
   db: Database.Database;
 }
 
 export const adminMetricsRoutes: FastifyPluginCallback<MetricsRoutesOptions> = (app, options, done) => {
-  app.get("/admin/api/metrics/summary", async (request, reply) => {
-    const query = request.query as {
-      period?: string;
-      provider_id?: string;
-      backend_model?: string;
-      router_key_id?: string;
-    };
-
+  app.get("/admin/api/metrics/summary", { schema: { querystring: SummaryQuerySchema } }, async (request, reply) => {
+    const query = request.query as Static<typeof SummaryQuerySchema>;
     const period = (query.period ?? "24h") as MetricsPeriod;
-    if (!VALID_PERIODS.has(period)) {
-      return reply.status(HTTP_BAD_REQUEST).send({ error: `Invalid period: ${period}. Must be one of: 1h, 6h, 24h, 7d, 30d` });
-    }
-
     const summary = getMetricsSummary(options.db, period, query.provider_id, query.backend_model, query.router_key_id);
     return reply.send(summary);
   });
 
-  app.get("/admin/api/metrics/timeseries", async (request, reply) => {
-    const query = request.query as {
-      period?: string;
-      metric?: string;
-      provider_id?: string;
-      backend_model?: string;
-      router_key_id?: string;
-    };
-
+  app.get("/admin/api/metrics/timeseries", { schema: { querystring: TimeseriesQuerySchema } }, async (request, reply) => {
+    const query = request.query as Static<typeof TimeseriesQuerySchema>;
     const period = (query.period ?? "24h") as MetricsPeriod;
-    if (!VALID_PERIODS.has(period)) {
-      return reply.status(HTTP_BAD_REQUEST).send({ error: `Invalid period: ${period}. Must be one of: 1h, 6h, 24h, 7d, 30d` });
-    }
-
     const metric = query.metric as MetricsMetric;
-    if (!metric || !VALID_METRICS.has(metric)) {
-      return reply.status(HTTP_BAD_REQUEST).send({ error: `Invalid or missing metric. Must be one of: ttft, tps, tokens, cache_rate, request_count` });
-    }
-
     const timeseries = getMetricsTimeseries(options.db, period, metric, query.provider_id, query.backend_model, query.router_key_id);
     return reply.send(timeseries);
   });

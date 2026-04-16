@@ -1,5 +1,6 @@
 import Database from "better-sqlite3";
 import { randomUUID } from "crypto";
+import { buildUpdateQuery, deleteById } from "./helpers.js";
 
 export interface RouterKey {
   id: string;
@@ -38,22 +39,18 @@ export function createRouterKey(
   return id;
 }
 
-export function updateRouterKey(db: Database.Database, id: string, fields: Partial<Pick<RouterKey, 'name' | 'allowed_models' | 'is_active'>>): void {
-  const ALLOWED = new Set(['name', 'allowed_models', 'is_active']);
-  const sets: string[] = [];
-  const values: unknown[] = [];
-  for (const [k, value] of Object.entries(fields)) {
-    if (!ALLOWED.has(k)) continue;
-    sets.push(`${k} = ?`);
-    values.push(value);
-  }
-  sets.push("updated_at = ?");
-  values.push(new Date().toISOString(), id);
-  db.prepare(`UPDATE router_keys SET ${sets.join(", ")} WHERE id = ?`).run(...values);
+const ROUTER_KEY_FIELDS = new Set(["name", "allowed_models", "is_active"]);
+
+export function updateRouterKey(
+  db: Database.Database,
+  id: string,
+  fields: Partial<Pick<RouterKey, "name" | "allowed_models" | "is_active">>,
+): void {
+  buildUpdateQuery(db, "router_keys", id, fields, ROUTER_KEY_FIELDS, { updatedAt: true });
 }
 
 export function deleteRouterKey(db: Database.Database, id: string): void {
-  db.prepare("DELETE FROM router_keys WHERE id = ?").run(id);
+  deleteById(db, "router_keys", id);
 }
 
 export function getAvailableModels(db: Database.Database): string[] {

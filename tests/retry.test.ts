@@ -1,18 +1,24 @@
 import { describe, it, expect } from "vitest";
 import { isRetryableResult, isRetryableThrow, retryableCall } from "../src/proxy/retry.js";
 import type { RetryConfig } from "../src/proxy/retry.js";
+import { RetryRuleMatcher } from "../src/proxy/retry-rules.js";
 import type { ProxyResult } from "../src/proxy/proxy-core.js";
 
+// 模拟 DB 规则加载后的 matcher（429/503 通配 + 400 特定模式）
+function createMatcherWithDefaults(): RetryRuleMatcher {
+  const matcher = new RetryRuleMatcher();
+  matcher["cache"] = new Map([
+    [429, [/^.*$/]],
+    [503, [/^.*$/]],
+  ]);
+  return matcher;
+}
+
+const DEFAULT_MATCHER = createMatcherWithDefaults();
 const DEFAULT_CONFIG: RetryConfig = {
   maxRetries: 2,
   baseDelayMs: 10,
-  retryableStatuses: new Set([429, 503]),
-  isRetryableBody: (body: string) => {
-    try {
-      const parsed = JSON.parse(body);
-      return parsed?.error?.code === "1234" || (parsed?.error?.message?.includes("请稍后重试") ?? false);
-    } catch { return false; }
-  },
+  ruleMatcher: DEFAULT_MATCHER,
 };
 
 function mockResult(statusCode: number, body = ""): ProxyResult {
@@ -20,20 +26,27 @@ function mockResult(statusCode: number, body = ""): ProxyResult {
 }
 
 describe("isRetryableResult", () => {
-  it("returns true for 429", () => expect(isRetryableResult(429, undefined, DEFAULT_CONFIG)).toBe(true));
-  it("returns true for 503", () => expect(isRetryableResult(503, undefined, DEFAULT_CONFIG)).toBe(true));
-  it("returns false for 200", () => expect(isRetryableResult(200, undefined, DEFAULT_CONFIG)).toBe(false));
-  it("returns false for 401", () => expect(isRetryableResult(401, undefined, DEFAULT_CONFIG)).toBe(false));
-  it("returns false for 502", () => expect(isRetryableResult(502, undefined, DEFAULT_CONFIG)).toBe(false));
-  it("returns true for 400 with code=1234", () => {
-    expect(isRetryableResult(400, JSON.stringify({ error: { code: "1234", message: "网络错误" } }), DEFAULT_CONFIG)).toBe(true);
+  it("returns true for 429", () => expect(isRetryableResult(429, "any", DEFAULT_CONFIG)).toBe(true));
+  it("returns true for 503", () => expect(isRetryableResult(503, "any", DEFAULT_CONFIG)).toBe(true));
+  it("returns false for 200", () => expect(isRetryableResult(200, "ok", DEFAULT_CONFIG)).toBe(false));
+  it("returns false for 401", () => expect(isRetryableResult(401, "unauthorized", DEFAULT_CONFIG)).toBe(false));
+  it("returns false for 502", () => expect(isRetryableResult(502, "bad gateway", DEFAULT_CONFIG)).toBe(false));
+  it("returns false without body", () => expect(isRetryableResult(429, undefined, DEFAULT_CONFIG)).toBe(false));
+
+  it("returns true for 400 when ruleMatcher matches", () => {
+    const matcher = new RetryRuleMatcher();
+    matcher["cache"] = new Map([[400, [/请稍后重试/]]]);
+    const config: RetryConfig = { maxRetries: 2, baseDelayMs: 10, ruleMatcher: matcher };
+    expect(isRetryableResult(400, JSON.stringify({ error: { code: "9999", message: "网络错误，请稍后重试" } }), config)).toBe(true);
   });
-  it("returns true for 400 with 请稍后重试", () => {
-    expect(isRetryableResult(400, JSON.stringify({ error: { code: "9999", message: "网络错误，请稍后重试" } }), DEFAULT_CONFIG)).toBe(true);
+
+  it("returns false for 400 when ruleMatcher does not match", () => {
+    const matcher = new RetryRuleMatcher();
+    matcher["cache"] = new Map([[400, [/请稍后重试/]]]);
+    const config: RetryConfig = { maxRetries: 2, baseDelayMs: 10, ruleMatcher: matcher };
+    expect(isRetryableResult(400, JSON.stringify({ error: { code: "1211", message: "模型不存在" } }), config)).toBe(false);
   });
-  it("returns false for 400 non-retryable", () => {
-    expect(isRetryableResult(400, JSON.stringify({ error: { code: "1211", message: "模型不存在" } }), DEFAULT_CONFIG)).toBe(false);
-  });
+
   it("returns false for 400 without config", () => {
     expect(isRetryableResult(400, JSON.stringify({ error: { code: "1234" } }))).toBe(false);
   });
@@ -63,7 +76,11 @@ describe("retryableCall", () => {
 
   it("succeeds after retry", async () => {
     let n = 0;
-    const { result, attempts } = await retryableCall(() => Promise.resolve(mockResult(++n === 1 ? 429 : 200)), DEFAULT_CONFIG);
+    const { result, attempts } = await retryableCall(() => {
+      n++;
+      if (n === 1) return Promise.resolve(mockResult(429, "rate limited"));
+      return Promise.resolve(mockResult(200));
+    }, DEFAULT_CONFIG);
     expect(result.statusCode).toBe(200);
     expect(attempts).toHaveLength(2);
   });
@@ -95,7 +112,7 @@ describe("retryableCall", () => {
 
   it("respects maxRetries=0", async () => {
     const config = { ...DEFAULT_CONFIG, maxRetries: 0 };
-    const { result, attempts } = await retryableCall(() => Promise.resolve(mockResult(429)), config);
+    const { result, attempts } = await retryableCall(() => Promise.resolve(mockResult(429, "rate limited")), config);
     expect(result.statusCode).toBe(429);
     expect(attempts).toHaveLength(1);
   });

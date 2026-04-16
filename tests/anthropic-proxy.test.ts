@@ -155,6 +155,18 @@ function insertModelMapping(
        VALUES (?, ?, ?, ?, ?, ?)`
     )
     .run("map-a1", clientModel, backendModel, "svc-anthropic", 1, now);
+  mockDb
+    .prepare(
+      `INSERT INTO mapping_groups (id, client_model, strategy, rule, created_at)
+       VALUES (?, ?, ?, ?, ?)`
+    )
+    .run(
+      "mg-a1",
+      clientModel,
+      "scheduled",
+      JSON.stringify({ default: { backend_model: backendModel, provider_id: "svc-anthropic" } }),
+      now
+    );
 }
 
 // ---------- 测试 ----------

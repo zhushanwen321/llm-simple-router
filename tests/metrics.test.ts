@@ -29,12 +29,13 @@ describe("request_metrics migration and insertMetrics", () => {
       .prepare("SELECT name FROM migrations")
       .all() as { name: string }[];
 
-    expect(rows).toHaveLength(10);
+    expect(rows).toHaveLength(11);
     expect(rows[5].name).toBe("006_create_request_metrics.sql");
     expect(rows[6].name).toBe("007_add_retry_fields.sql");
     expect(rows[7].name).toBe("008_create_router_keys.sql");
     expect(rows[8].name).toBe("009_add_request_logs_indexes.sql");
     expect(rows[9].name).toBe("010_add_key_encrypted.sql");
+    expect(rows[10].name).toBe("011_create_mapping_groups.sql");
   });
 
   it("should create indexes", () => {
@@ -148,7 +149,7 @@ describe("request_metrics migration and insertMetrics", () => {
     db = initDatabase(":memory:");
 
     const logId = "log-unique-1";
-    insertRequestLog(db, {
+    insertRequestLog(db!, {
       id: logId,
       api_type: "openai",
       model: "gpt-4",
@@ -160,7 +161,7 @@ describe("request_metrics migration and insertMetrics", () => {
       created_at: new Date().toISOString(),
     });
 
-    insertMetrics(db, {
+    insertMetrics(db!, {
       request_log_id: logId,
       provider_id: "provider-1",
       backend_model: "gpt-4-turbo",
@@ -169,7 +170,7 @@ describe("request_metrics migration and insertMetrics", () => {
     });
 
     expect(() =>
-      insertMetrics(db, {
+      insertMetrics(db!, {
         request_log_id: logId,
         provider_id: "provider-1",
         backend_model: "gpt-4-turbo",
@@ -195,7 +196,7 @@ describe("request_metrics migration and insertMetrics", () => {
       created_at: new Date().toISOString(),
     });
 
-    insertMetrics(db, {
+    insertMetrics(db!, {
       request_log_id: logId,
       provider_id: "provider-1",
       backend_model: "gpt-4-turbo",
@@ -204,9 +205,9 @@ describe("request_metrics migration and insertMetrics", () => {
     });
 
     // 删除 request_log，metrics 应该被级联删除
-    db.prepare("DELETE FROM request_logs WHERE id = ?").run(logId);
+    db!.prepare("DELETE FROM request_logs WHERE id = ?").run(logId);
 
-    const metrics = db
+    const metrics = db!
       .prepare("SELECT * FROM request_metrics WHERE request_log_id = ?")
       .all(logId) as any[];
 

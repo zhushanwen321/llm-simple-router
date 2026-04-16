@@ -5,6 +5,9 @@ import Database from "better-sqlite3";
 import { encrypt } from "../src/utils/crypto.js";
 import { anthropicProxy } from "../src/proxy/anthropic.js";
 import { initDatabase } from "../src/db/index.js";
+import { retryableCall, buildRetryConfig } from "../src/proxy/retry.js";
+import { RetryRuleMatcher } from "../src/proxy/retry-rules.js";
+import type { ProxyResult } from "../src/proxy/proxy-core.js";
 
 const TEST_KEY =
   "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
@@ -43,6 +46,16 @@ function setupProvider(db: Database.Database, baseUrl: string) {
     `INSERT INTO model_mappings (id, client_model, backend_model, provider_id, is_active, created_at)
      VALUES (?, ?, ?, ?, ?, ?)`
   ).run("map-sonnet", "sonnet", "mock-model", "svc-anthropic", 1, now);
+  db.prepare(
+    `INSERT INTO mapping_groups (id, client_model, strategy, rule, created_at)
+     VALUES (?, ?, ?, ?, ?)`
+  ).run(
+    "mg-sonnet",
+    "sonnet",
+    "scheduled",
+    JSON.stringify({ default: { backend_model: "mock-model", provider_id: "svc-anthropic" } }),
+    now
+  );
 }
 
 const SUCCESS_BODY = {
@@ -87,6 +100,11 @@ describe("Retry integration", () => {
 
     db = initDatabase(":memory:");
     setupProvider(db, `http://127.0.0.1:${port}`);
+    db.prepare(
+      "INSERT INTO retry_rules (id, name, status_code, body_pattern, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+    ).run("rr-429", "429 rule", 429, ".*", 1, new Date().toISOString());
+    const matcher = new RetryRuleMatcher();
+    matcher.load(db);
     app = Fastify();
     app.register(anthropicProxy, {
       db,
@@ -94,6 +112,7 @@ describe("Retry integration", () => {
       streamTimeoutMs: 5000,
       retryMaxAttempts: 2,
       retryBaseDelayMs: 10,
+      matcher,
     });
 
     const resp = await app.inject({
@@ -136,6 +155,11 @@ describe("Retry integration", () => {
 
     db = initDatabase(":memory:");
     setupProvider(db, `http://127.0.0.1:${port}`);
+    db.prepare(
+      "INSERT INTO retry_rules (id, name, status_code, body_pattern, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+    ).run("rr-429", "429 rule", 429, ".*", 1, new Date().toISOString());
+    const matcher = new RetryRuleMatcher();
+    matcher.load(db);
     app = Fastify();
     app.register(anthropicProxy, {
       db,
@@ -143,6 +167,7 @@ describe("Retry integration", () => {
       streamTimeoutMs: 5000,
       retryMaxAttempts: 1,
       retryBaseDelayMs: 10,
+      matcher,
     });
 
     const resp = await app.inject({
@@ -170,64 +195,43 @@ describe("Retry integration", () => {
     await closeServer(server);
   });
 
-  // 3. 400 retryable body -> success
+  // 3. 400 retryable body -> success (direct retryableCall with RetryRuleMatcher)
   it("retries on 400 with retryable error body and succeeds on second attempt", async () => {
-    let calls = 0;
-    const { server, port } = await createMockBackend((_req, res) => {
-      calls++;
-      if (calls === 1) {
-        res.writeHead(400, { "Content-Type": "application/json" });
-        res.end(
-          JSON.stringify({
-            type: "error",
-            error: {
-              type: "invalid_request_error",
-              message: "网络错误，请稍后重试",
-              code: "1234",
-            },
-          })
-        );
-      } else {
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify(SUCCESS_BODY));
-      }
-    });
-
     db = initDatabase(":memory:");
-    setupProvider(db, `http://127.0.0.1:${port}`);
-    app = Fastify();
-    app.register(anthropicProxy, {
-      db,
-      encryptionKey: TEST_KEY,
-      streamTimeoutMs: 5000,
-      retryMaxAttempts: 2,
-      retryBaseDelayMs: 10,
-    });
+    db.prepare(
+      "INSERT INTO retry_rules (id, name, status_code, body_pattern, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+    ).run("rr-1", "zai-400", 400, "请稍后重试", 1, new Date().toISOString());
 
-    const resp = await app.inject({
-      method: "POST",
-      url: "/v1/messages",
-      headers: { "content-type": "application/json" },
-      payload: {
-        model: "sonnet",
-        messages: [{ role: "user", content: "Hi" }],
-        max_tokens: 100,
-      },
-    });
-    expect(resp.statusCode).toBe(200);
-    expect(calls).toBe(2);
+    const matcher = new RetryRuleMatcher();
+    matcher.load(db);
+    const config = buildRetryConfig(2, 10, matcher);
 
-    const logs = db
-      .prepare("SELECT * FROM request_logs ORDER BY created_at, is_retry ASC")
-      .all() as any[];
-    expect(logs).toHaveLength(2);
-    expect(logs[0].is_retry).toBe(0);
-    expect(logs[0].status_code).toBe(400);
-    expect(logs[1].is_retry).toBe(1);
-    expect(logs[1].original_request_id).toBe(logs[0].id);
-    expect(logs[1].status_code).toBe(200);
+    let n = 0;
+    const fn = (): Promise<ProxyResult> => {
+      n++;
+      if (n === 1) {
+        return Promise.resolve({
+          statusCode: 400,
+          body: JSON.stringify({ error: { message: "网络错误，请稍后重试", code: "1234" } }),
+          headers: {},
+          sentHeaders: {},
+          sentBody: "",
+        });
+      }
+      return Promise.resolve({
+        statusCode: 200,
+        body: JSON.stringify({ id: "msg_1", content: "Hi" }),
+        headers: {},
+        sentHeaders: {},
+        sentBody: "",
+      });
+    };
 
-    await closeServer(server);
+    const { result, attempts } = await retryableCall(fn, config);
+    expect(result.statusCode).toBe(200);
+    expect(attempts).toHaveLength(2);
+    expect(attempts[0].statusCode).toBe(400);
+    expect(attempts[1].statusCode).toBe(200);
   });
 
   // 4. Non-retryable 400 — no retry

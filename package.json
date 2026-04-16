@@ -16,6 +16,7 @@
   "dependencies": {
     "@fastify/cookie": "^11.0.2",
     "@fastify/static": "^9.1.0",
+    "@sinclair/typebox": "^0.34.49",
     "better-sqlite3": "^11.9.1",
     "dotenv": "^16.4.7",
     "fastify": "^5.3.3",

@@ -3,11 +3,12 @@ import type { FastifyReply } from "fastify";
 
 // ---------- Types ----------
 
+import type { RetryRuleMatcher } from "./retry-rules.js";
+
 export interface RetryConfig {
   maxRetries: number;
   baseDelayMs: number;
-  retryableStatuses: Set<number>;   // 429, 503. 502 only via throw (ETIMEDOUT etc.)
-  isRetryableBody?: (body: string) => boolean;
+  ruleMatcher?: RetryRuleMatcher;
 }
 
 export interface Attempt {
@@ -30,36 +31,23 @@ export type ProxyFn<T = ProxyResult | StreamProxyResult> = () => Promise<T>;
 const RETRYABLE_THROW_CODES = new Set(["ETIMEDOUT", "ECONNRESET", "ECONNREFUSED"]);
 const HTTP_BAD_REQUEST = 400;
 const HTTP_TOO_MANY_REQUESTS = 429;
-const HTTP_SERVICE_UNAVAILABLE = 503;
 const BACKOFF_BASE = 2;
 const MS_PER_SECOND = 1000;
 
 // ---------- Shared helpers ----------
 
-/** Detect ZAI middleware 400 temp network errors (provider-specific) */
-export function isRetryable400Body(body: string): boolean {
-  try {
-    const parsed = JSON.parse(body);
-    const err = parsed?.error ?? (parsed?.type === "error" ? parsed.error : null);
-    if (!err) return false;
-    return err.code === "1234" || (err.message?.includes("请稍后重试") ?? false);
-  } catch { return false; }
-}
-
-export function buildRetryConfig(maxRetries: number, baseDelayMs: number): RetryConfig {
+export function buildRetryConfig(maxRetries: number, baseDelayMs: number, ruleMatcher?: RetryRuleMatcher): RetryConfig {
   return {
     maxRetries,
     baseDelayMs,
-    retryableStatuses: new Set([HTTP_TOO_MANY_REQUESTS, HTTP_SERVICE_UNAVAILABLE]),
-    isRetryableBody: isRetryable400Body,
+    ruleMatcher,
   };
 }
 
 // ---------- Predicates ----------
 
 export function isRetryableResult(statusCode: number, body?: string, config?: RetryConfig): boolean {
-  if (config?.retryableStatuses.has(statusCode)) return true;
-  if (statusCode === HTTP_BAD_REQUEST && body && config?.isRetryableBody?.(body)) return true;
+  if (body && config?.ruleMatcher?.test(statusCode, body)) return true;
   return false;
 }
 

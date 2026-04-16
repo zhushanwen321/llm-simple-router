@@ -10,11 +10,12 @@ const KEY_PREFIX_LENGTH = 8;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 import { getConfig, Config } from "./config.js";
-import { initDatabase } from "./db/index.js";
+import { initDatabase, seedDefaultRules } from "./db/index.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { openaiProxy } from "./proxy/openai.js";
 import { anthropicProxy } from "./proxy/anthropic.js";
 import { adminRoutes } from "./admin/routes.js";
+import { RetryRuleMatcher } from "./proxy/retry-rules.js";
 import fastifyStatic from "@fastify/static";
 import Database from "better-sqlite3";
 
@@ -44,6 +45,32 @@ export async function buildApp(
     logger: {
       level: config.LOG_LEVEL,
     },
+    // 统一 schema validation 错误格式为 { error: { message } }
+    ajv: {
+      customOptions: {
+        messages: true,
+      },
+    },
+  });
+
+  app.setSchemaErrorFormatter((errors) => {
+    const message = errors
+      .map((e) => {
+        const field = e.instancePath ? e.instancePath.slice(1) : e.params?.missingProperty ?? "field";
+        return `${field} ${e.message}`;
+      })
+      .join("; ");
+    return new Error(message);
+  });
+
+  // 统一 schema validation 错误响应格式
+  app.setErrorHandler((error: Error, _request, reply) => {
+    const fastifyError = error as Error & { statusCode?: number; validation?: unknown[] };
+    const status = fastifyError.statusCode ?? 500;
+    if (status === 400 && fastifyError.validation) {
+      return reply.code(400).send({ error: { message: fastifyError.message } });
+    }
+    return reply.code(status).send({ error: { message: fastifyError.message } });
   });
 
   // 自动迁移：仅在自行创建 DB 时执行（测试注入 DB 跳过）
@@ -59,6 +86,11 @@ export async function buildApp(
     }
   }
 
+  // 首次启动时插入默认重试规则（表为空时）
+  seedDefaultRules(db);
+  const matcher = new RetryRuleMatcher();
+  matcher.load(db);
+
   app.register(authMiddleware, { db });
   app.register(openaiProxy, {
     db,
@@ -66,6 +98,7 @@ export async function buildApp(
     streamTimeoutMs: config.STREAM_TIMEOUT_MS,
     retryMaxAttempts: config.RETRY_MAX_ATTEMPTS,
     retryBaseDelayMs: config.RETRY_BASE_DELAY_MS,
+    matcher,
   });
   app.register(anthropicProxy, {
     db,
@@ -73,6 +106,7 @@ export async function buildApp(
     streamTimeoutMs: config.STREAM_TIMEOUT_MS,
     retryMaxAttempts: config.RETRY_MAX_ATTEMPTS,
     retryBaseDelayMs: config.RETRY_BASE_DELAY_MS,
+    matcher,
   });
 
   app.register(adminRoutes, {
@@ -80,6 +114,7 @@ export async function buildApp(
     adminPassword: config.ADMIN_PASSWORD,
     jwtSecret: config.JWT_SECRET,
     encryptionKey: config.ENCRYPTION_KEY,
+    matcher,
   });
 
   // 前端静态文件服务（生产环境）

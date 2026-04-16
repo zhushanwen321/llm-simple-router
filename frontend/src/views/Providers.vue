@@ -135,8 +135,8 @@ const form = ref({ ...DEFAULT_FORM })
 
 async function loadProviders() {
   try {
-    const res = await api.getProviders()
-    providers.value = res.data
+    const data = await api.getProviders()
+    providers.value = data as Provider[]
   } catch (e) {
     console.error('Failed to load providers:', e)
     toast.error('加载供应商失败')

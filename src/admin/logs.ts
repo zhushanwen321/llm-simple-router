@@ -1,17 +1,20 @@
 import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
+import { Type, Static } from "@sinclair/typebox";
 import { getRequestLogs, getRequestLogById, deleteLogsBefore } from "../db/index.js";
+import { HTTP_NOT_FOUND } from "./constants.js";
 
-const HTTP_BAD_REQUEST = 400;
-const HTTP_NOT_FOUND = 404;
+const LogQuerySchema = Type.Object({
+  page: Type.Optional(Type.String()),
+  limit: Type.Optional(Type.String()),
+  api_type: Type.Optional(Type.String()),
+  model: Type.Optional(Type.String()),
+  router_key_id: Type.Optional(Type.String()),
+});
 
-interface LogQueryParams {
-  page?: string;
-  limit?: string;
-  api_type?: string;
-  model?: string;
-  router_key_id?: string;
-}
+const DeleteLogsBeforeSchema = Type.Object({
+  before: Type.String({ minLength: 1 }),
+});
 
 interface LogRoutesOptions {
   db: Database.Database;
@@ -20,8 +23,8 @@ interface LogRoutesOptions {
 export const adminLogRoutes: FastifyPluginCallback<LogRoutesOptions> = (app, options, done) => {
   const { db } = options;
 
-  app.get("/admin/api/logs", async (request, reply) => {
-    const query = request.query as LogQueryParams;
+  app.get("/admin/api/logs", { schema: { querystring: LogQuerySchema } }, async (request, reply) => {
+    const query = request.query as Static<typeof LogQuerySchema>;
     const page = parseInt(query.page || "1", 10);
     const limit = parseInt(query.limit || "20", 10);
     const result = getRequestLogs(db, {
@@ -43,11 +46,8 @@ export const adminLogRoutes: FastifyPluginCallback<LogRoutesOptions> = (app, opt
     return reply.send(log);
   });
 
-  app.delete("/admin/api/logs/before", async (request, reply) => {
-    const body = request.body as { before?: string };
-    if (!body.before) {
-      return reply.code(HTTP_BAD_REQUEST).send({ error: { message: "Missing required field: before" } });
-    }
+  app.delete("/admin/api/logs/before", { schema: { body: DeleteLogsBeforeSchema } }, async (request, reply) => {
+    const body = request.body as Static<typeof DeleteLogsBeforeSchema>;
     const deleted = deleteLogsBefore(db, body.before);
     return reply.send({ deleted });
   });

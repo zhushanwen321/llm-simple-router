@@ -1,28 +1,28 @@
 import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
 import { randomBytes, createHash } from "crypto";
+import { Type, Static } from "@sinclair/typebox";
 import { encrypt, decrypt } from "../utils/crypto.js";
 import {
   getAllRouterKeys, getRouterKeyById, createRouterKey, updateRouterKey, deleteRouterKey, getAvailableModels,
 } from "../db/index.js";
 import type { RouterKey } from "../db/index.js";
 
-const HTTP_BAD_REQUEST = 400;
 const HTTP_CREATED = 201;
 const HTTP_NOT_FOUND = 404;
 const KEY_RANDOM_BYTES = 32;
 const KEY_PREFIX_LENGTH = 8;
 
-interface CreateRouterKeyBody {
-  name: string;
-  allowed_models?: string[] | null;
-}
+const CreateRouterKeySchema = Type.Object({
+  name: Type.String({ minLength: 1 }),
+  allowed_models: Type.Optional(Type.Union([Type.Array(Type.String()), Type.Null()])),
+});
 
-interface UpdateRouterKeyBody {
-  name?: string;
-  allowed_models?: string[] | null;
-  is_active?: number;
-}
+const UpdateRouterKeySchema = Type.Object({
+  name: Type.Optional(Type.String({ minLength: 1 })),
+  allowed_models: Type.Optional(Type.Union([Type.Array(Type.String()), Type.Null()])),
+  is_active: Type.Optional(Type.Number()),
+});
 
 interface RouterKeyRoutesOptions {
   db: Database.Database;
@@ -58,11 +58,8 @@ export const adminRouterKeyRoutes: FastifyPluginCallback<RouterKeyRoutesOptions>
     return reply.send(keys.map((rk) => toPublicRouterKey(rk, encryptionKey)));
   });
 
-  app.post("/admin/api/router-keys", async (request, reply) => {
-    const body = request.body as CreateRouterKeyBody;
-    if (!body.name) {
-      return reply.code(HTTP_BAD_REQUEST).send({ error: { message: "Missing required field: name" } });
-    }
+  app.post("/admin/api/router-keys", { schema: { body: CreateRouterKeySchema } }, async (request, reply) => {
+    const body = request.body as Static<typeof CreateRouterKeySchema>;
     const { key, hash, prefix, encrypted } = generateRouterKey(encryptionKey);
     const allowedModels = body.allowed_models ? JSON.stringify(body.allowed_models) : null;
     const id = createRouterKey(db, { name: body.name, key_hash: hash, key_prefix: prefix, key_encrypted: encrypted, allowed_models: allowedModels });
@@ -77,13 +74,13 @@ export const adminRouterKeyRoutes: FastifyPluginCallback<RouterKeyRoutesOptions>
     });
   });
 
-  app.put("/admin/api/router-keys/:id", async (request, reply) => {
+  app.put("/admin/api/router-keys/:id", { schema: { body: UpdateRouterKeySchema } }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const existing = getRouterKeyById(db, id);
     if (!existing) {
       return reply.code(HTTP_NOT_FOUND).send({ error: { message: "Router key not found" } });
     }
-    const body = request.body as UpdateRouterKeyBody;
+    const body = request.body as Static<typeof UpdateRouterKeySchema>;
     const fields: Partial<Pick<RouterKey, 'name' | 'allowed_models' | 'is_active'>> = {};
     if (body.name !== undefined) fields.name = body.name;
     if (body.allowed_models !== undefined) fields.allowed_models = JSON.stringify(body.allowed_models);

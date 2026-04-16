@@ -2,24 +2,19 @@ import Database from "better-sqlite3";
 import { readFileSync, readdirSync, mkdirSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
-import { randomUUID } from "crypto";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const MIGRATIONS_DIR = join(__dirname, "migrations");
 
-type CountRow = { count: number };
-
 export function initDatabase(dbPath: string): Database.Database {
-  // 自动创建目录（非内存数据库时）
   if (dbPath !== ":memory:") {
     mkdirSync(dirname(dbPath), { recursive: true });
   }
 
   const db = new Database(dbPath);
 
-  // 确保 migrations 表存在
   db.exec(`
     CREATE TABLE IF NOT EXISTS migrations (
       name TEXT PRIMARY KEY,
@@ -29,13 +24,10 @@ export function initDatabase(dbPath: string): Database.Database {
 
   const applied = new Set(
     (
-      db.prepare("SELECT name FROM migrations").all() as {
-        name: string;
-      }[]
-    ).map((r) => r.name)
+      db.prepare("SELECT name FROM migrations").all() as { name: string }[]
+    ).map((r) => r.name),
   );
 
-  // 读取目录下的 .sql 文件，按文件名排序
   const files = readdirSync(MIGRATIONS_DIR)
     .filter((f) => f.endsWith(".sql"))
     .sort();
@@ -52,241 +44,69 @@ export function initDatabase(dbPath: string): Database.Database {
     }
     db.prepare("INSERT INTO migrations (name, applied_at) VALUES (?, ?)").run(
       file,
-      new Date().toISOString()
+      new Date().toISOString(),
     );
   }
 
   return db;
 }
 
-export interface Provider {
-  id: string;
-  name: string;
-  api_type: "openai" | "anthropic";
-  base_url: string;
-  api_key: string;
-  api_key_preview?: string;
-  is_active: number;
-  created_at: string;
-  updated_at: string;
-}
+// --- Re-export from per-table modules ---
 
-export interface ModelMapping {
-  id: string;
-  client_model: string;
-  backend_model: string;
-  provider_id: string;
-  is_active: number;
-  created_at: string;
-}
+export {
+  getActiveProviders,
+  getAllProviders,
+  getProviderById,
+  createProvider,
+  updateProvider,
+  deleteProvider,
+} from "./providers.js";
+export type { Provider } from "./providers.js";
 
-export function getActiveProviders(
-  db: Database.Database,
-  apiType: "openai" | "anthropic"
-): Provider[] {
-  return db
-    .prepare(
-      "SELECT * FROM providers WHERE api_type = ? AND is_active = 1"
-    )
-    .all(apiType) as Provider[];
-}
+export {
+  getModelMapping,
+  getAllModelMappings,
+  createModelMapping,
+  updateModelMapping,
+  deleteModelMapping,
+  getMappingGroup,
+  getMappingGroupById,
+  getAllMappingGroups,
+  createMappingGroup,
+  updateMappingGroup,
+  deleteMappingGroup,
+} from "./mappings.js";
+export type { ModelMapping, MappingGroup } from "./mappings.js";
 
-export function getModelMapping(
-  db: Database.Database,
-  clientModel: string
-): ModelMapping | undefined {
-  return db
-    .prepare(
-      "SELECT * FROM model_mappings WHERE client_model = ? AND is_active = 1"
-    )
-    .get(clientModel) as ModelMapping | undefined;
-}
+export {
+  getActiveRetryRules,
+  getAllRetryRules,
+  createRetryRule,
+  updateRetryRule,
+  deleteRetryRule,
+  seedDefaultRules,
+} from "./retry-rules.js";
+export type { RetryRule } from "./retry-rules.js";
 
-export function insertRequestLog(db: Database.Database, log: {
-  id: string; api_type: string; model: string | null; provider_id: string | null;
-  status_code: number | null; latency_ms: number | null; is_stream: number; error_message: string | null;
-  created_at: string;
-  request_body?: string | null; response_body?: string | null;
-  client_request?: string | null; upstream_request?: string | null;
-  upstream_response?: string | null; client_response?: string | null;
-  is_retry?: number; original_request_id?: string | null;
-  router_key_id?: string | null;
-}): void {
-  db.prepare(
-    `INSERT INTO request_logs (id, api_type, model, provider_id, status_code, latency_ms, is_stream, error_message, created_at, request_body, response_body, client_request, upstream_request, upstream_response, client_response, is_retry, original_request_id, router_key_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(log.id, log.api_type, log.model, log.provider_id, log.status_code, log.latency_ms, log.is_stream,
-    log.error_message, log.created_at, log.request_body ?? null, log.response_body ?? null,
-    log.client_request ?? null, log.upstream_request ?? null, log.upstream_response ?? null, log.client_response ?? null,
-    log.is_retry ?? 0, log.original_request_id ?? null, log.router_key_id ?? null);
-}
+export {
+  insertRequestLog,
+  getRequestLogs,
+  getRequestLogById,
+  deleteLogsBefore,
+  insertMetrics,
+} from "./logs.js";
+export type { RequestLog, MetricsRow, MetricsInsert } from "./logs.js";
 
-// --- Admin CRUD ---
-
-export interface RequestLog {
-  id: string;
-  api_type: string;
-  model: string | null;
-  provider_id: string | null;
-  status_code: number | null;
-  latency_ms: number | null;
-  is_stream: number;
-  error_message: string | null;
-  created_at: string;
-  request_body: string | null;
-  response_body: string | null;
-  client_request: string | null;
-  upstream_request: string | null;
-  upstream_response: string | null;
-  client_response: string | null;
-  is_retry: number;
-  original_request_id: string | null;
-}
-
-export interface MetricsRow {
-  id: string;
-  request_log_id: string;
-  provider_id: string;
-  backend_model: string;
-  api_type: string;
-  input_tokens: number | null;
-  output_tokens: number | null;
-  cache_creation_tokens: number | null;
-  cache_read_tokens: number | null;
-  ttft_ms: number | null;
-  total_duration_ms: number | null;
-  tokens_per_second: number | null;
-  stop_reason: string | null;
-  is_complete: number;
-  created_at: string;
-}
-
-export type MetricsInsert = {
-  request_log_id: string;
-  provider_id: string;
-  backend_model: string;
-  api_type: string;
-  input_tokens?: number | null;
-  output_tokens?: number | null;
-  cache_creation_tokens?: number | null;
-  cache_read_tokens?: number | null;
-  ttft_ms?: number | null;
-  total_duration_ms?: number | null;
-  tokens_per_second?: number | null;
-  stop_reason?: string | null;
-  is_complete?: number;
-};
-
-export function insertMetrics(db: Database.Database, m: MetricsInsert): string {
-  const id = randomUUID();
-  db.prepare(
-    `INSERT INTO request_metrics (id, request_log_id, provider_id, backend_model, api_type, input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, ttft_ms, total_duration_ms, tokens_per_second, stop_reason, is_complete)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(id, m.request_log_id, m.provider_id, m.backend_model, m.api_type,
-    m.input_tokens ?? null, m.output_tokens ?? null, m.cache_creation_tokens ?? null, m.cache_read_tokens ?? null,
-    m.ttft_ms ?? null, m.total_duration_ms ?? null, m.tokens_per_second ?? null, m.stop_reason ?? null, m.is_complete ?? 1);
-  return id;
-}
-
-// --- Router Keys (re-export from router-keys.ts) ---
-
-export { getRouterKeyByHash, getAllRouterKeys, getRouterKeyById, createRouterKey, updateRouterKey, deleteRouterKey, getAvailableModels } from "./router-keys.js";
+export {
+  getRouterKeyByHash,
+  getAllRouterKeys,
+  getRouterKeyById,
+  createRouterKey,
+  updateRouterKey,
+  deleteRouterKey,
+  getAvailableModels,
+} from "./router-keys.js";
 export type { RouterKey } from "./router-keys.js";
-
-export function getAllProviders(db: Database.Database): Provider[] {
-  return db.prepare("SELECT * FROM providers ORDER BY created_at DESC").all() as Provider[];
-}
-
-export function getProviderById(db: Database.Database, id: string): Provider | undefined {
-  return db.prepare("SELECT * FROM providers WHERE id = ?").get(id) as Provider | undefined;
-}
-
-export function createProvider(
-  db: Database.Database,
-  provider: { name: string; api_type: "openai" | "anthropic"; base_url: string; api_key: string; api_key_preview?: string; is_active?: number }
-): string {
-  const id = randomUUID();
-  const now = new Date().toISOString();
-  db.prepare(
-    `INSERT INTO providers (id, name, api_type, base_url, api_key, api_key_preview, is_active, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(id, provider.name, provider.api_type, provider.base_url, provider.api_key, provider.api_key_preview ?? null, provider.is_active ?? 1, now, now);
-  return id;
-}
-
-export function updateProvider(db: Database.Database, id: string, fields: Partial<Pick<Provider, 'name' | 'api_type' | 'base_url' | 'api_key' | 'api_key_preview' | 'is_active'>>): void {
-  const ALLOWED = new Set(['name', 'api_type', 'base_url', 'api_key', 'api_key_preview', 'is_active']);
-  const sets: string[] = [];
-  const values: unknown[] = [];
-  for (const [key, value] of Object.entries(fields)) {
-    if (!ALLOWED.has(key)) continue;
-    sets.push(`${key} = ?`);
-    values.push(value);
-  }
-  sets.push("updated_at = ?");
-  values.push(new Date().toISOString(), id);
-  db.prepare(`UPDATE providers SET ${sets.join(", ")} WHERE id = ?`).run(...values);
-}
-
-export function deleteProvider(db: Database.Database, id: string): void {
-  db.prepare("DELETE FROM providers WHERE id = ?").run(id);
-}
-
-export function getAllModelMappings(db: Database.Database): ModelMapping[] {
-  return db.prepare("SELECT * FROM model_mappings ORDER BY created_at DESC").all() as ModelMapping[];
-}
-
-export function createModelMapping(
-  db: Database.Database,
-  mapping: { client_model: string; backend_model: string; provider_id: string; is_active?: number }
-): string {
-  const id = randomUUID();
-  const now = new Date().toISOString();
-  db.prepare(
-    `INSERT INTO model_mappings (id, client_model, backend_model, provider_id, is_active, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)`
-  ).run(id, mapping.client_model, mapping.backend_model, mapping.provider_id, mapping.is_active ?? 1, now);
-  return id;
-}
-
-export function updateModelMapping(db: Database.Database, id: string, fields: Partial<Pick<ModelMapping, 'client_model' | 'backend_model' | 'provider_id' | 'is_active'>>): void {
-  const ALLOWED = new Set(['client_model', 'backend_model', 'provider_id', 'is_active']);
-  const sets: string[] = [];
-  const values: unknown[] = [];
-  for (const [key, value] of Object.entries(fields)) {
-    if (!ALLOWED.has(key)) continue;
-    sets.push(`${key} = ?`);
-    values.push(value);
-  }
-  values.push(id);
-  db.prepare(`UPDATE model_mappings SET ${sets.join(", ")} WHERE id = ?`).run(...values);
-}
-
-export function deleteModelMapping(db: Database.Database, id: string): void {
-  db.prepare("DELETE FROM model_mappings WHERE id = ?").run(id);
-}
-
-export function getRequestLogs(db: Database.Database, options: { page: number; limit: number; api_type?: string; model?: string; router_key_id?: string }): { data: RequestLog[]; total: number } {
-  let where = "1=1";
-  const params: unknown[] = [];
-  if (options.api_type) { where += " AND api_type = ?"; params.push(options.api_type); }
-  if (options.model) { where += " AND model LIKE ?"; params.push(`%${options.model}%`); }
-  if (options.router_key_id) { where += " AND router_key_id = ?"; params.push(options.router_key_id); }
-  const total = (db.prepare(`SELECT COUNT(*) as count FROM request_logs WHERE ${where}`).get(...params) as CountRow).count;
-  const offset = (options.page - 1) * options.limit;
-  const data = db.prepare(`SELECT id, api_type, model, provider_id, status_code, latency_ms, is_stream, error_message, created_at FROM request_logs WHERE ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`).all(...params, options.limit, offset) as RequestLog[];
-  return { data, total };
-}
-
-export function getRequestLogById(db: Database.Database, id: string): RequestLog | undefined {
-  return db.prepare("SELECT * FROM request_logs WHERE id = ?").get(id) as RequestLog | undefined;
-}
-
-export function deleteLogsBefore(db: Database.Database, beforeDate: string): number {
-  return db.prepare("DELETE FROM request_logs WHERE created_at < ?").run(beforeDate).changes;
-}
-
-// --- Metrics (re-export from metrics.ts) ---
 
 export { getMetricsSummary, getMetricsTimeseries } from "./metrics.js";
 export type { MetricsSummaryRow, MetricsTimeseriesRow, MetricsPeriod, MetricsMetric } from "./metrics.js";
