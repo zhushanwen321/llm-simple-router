@@ -10,7 +10,7 @@ const KEY_PREFIX_LENGTH = 8;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 import { getConfig, Config } from "./config.js";
-import { initDatabase } from "./db/index.js";
+import { initDatabase, seedDefaultRules } from "./db/index.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { openaiProxy } from "./proxy/openai.js";
 import { anthropicProxy } from "./proxy/anthropic.js";
@@ -86,6 +86,8 @@ export async function buildApp(
     }
   }
 
+  // 首次启动时插入默认重试规则（表为空时）
+  seedDefaultRules(db);
   const matcher = new RetryRuleMatcher();
   matcher.load(db);
 

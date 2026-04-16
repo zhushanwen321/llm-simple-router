@@ -62,7 +62,7 @@ describe("Retry Rule CRUD", () => {
     expect(res.statusCode).toBe(200);
     const rules = res.json();
     expect(rules.length).toBeGreaterThanOrEqual(3);
-    expect(rules.some((r: any) => r.name === "ZAI 429")).toBe(true);
+    expect(rules.some((r: any) => r.name === "429 Too Many Requests")).toBe(true);
   });
 
   it("POST creates retry rule", async () => {

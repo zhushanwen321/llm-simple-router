@@ -84,6 +84,7 @@ export {
   createRetryRule,
   updateRetryRule,
   deleteRetryRule,
+  seedDefaultRules,
 } from "./retry-rules.js";
 export type { RetryRule } from "./retry-rules.js";
 

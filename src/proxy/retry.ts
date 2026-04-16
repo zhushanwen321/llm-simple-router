@@ -8,7 +8,6 @@ import type { RetryRuleMatcher } from "./retry-rules.js";
 export interface RetryConfig {
   maxRetries: number;
   baseDelayMs: number;
-  retryableStatuses: Set<number>;   // 429, 503. 502 only via throw (ETIMEDOUT etc.)
   ruleMatcher?: RetryRuleMatcher;
 }
 
@@ -32,7 +31,6 @@ export type ProxyFn<T = ProxyResult | StreamProxyResult> = () => Promise<T>;
 const RETRYABLE_THROW_CODES = new Set(["ETIMEDOUT", "ECONNRESET", "ECONNREFUSED"]);
 const HTTP_BAD_REQUEST = 400;
 const HTTP_TOO_MANY_REQUESTS = 429;
-const HTTP_SERVICE_UNAVAILABLE = 503;
 const BACKOFF_BASE = 2;
 const MS_PER_SECOND = 1000;
 
@@ -42,7 +40,6 @@ export function buildRetryConfig(maxRetries: number, baseDelayMs: number, ruleMa
   return {
     maxRetries,
     baseDelayMs,
-    retryableStatuses: new Set([HTTP_TOO_MANY_REQUESTS, HTTP_SERVICE_UNAVAILABLE]),
     ruleMatcher,
   };
 }
@@ -50,7 +47,6 @@ export function buildRetryConfig(maxRetries: number, baseDelayMs: number, ruleMa
 // ---------- Predicates ----------
 
 export function isRetryableResult(statusCode: number, body?: string, config?: RetryConfig): boolean {
-  if (config?.retryableStatuses.has(statusCode)) return true;
   if (body && config?.ruleMatcher?.test(statusCode, body)) return true;
   return false;
 }

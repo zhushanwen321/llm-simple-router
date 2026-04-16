@@ -451,7 +451,9 @@ const anthropicDeltaGroups = computed(() => {
       g.kept++
     } else {
       g.folded++
-      const text = String((delta as Record<string, string>).text || '')
+      // thinking_delta 用 delta.thinking，text_delta 用 delta.text
+      const d = delta as Record<string, string>
+      const text = String(d.thinking || d.text || d.partial_json || '')
       g.foldedChars += text.length
     }
   }

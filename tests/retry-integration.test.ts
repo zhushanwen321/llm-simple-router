@@ -100,6 +100,11 @@ describe("Retry integration", () => {
 
     db = initDatabase(":memory:");
     setupProvider(db, `http://127.0.0.1:${port}`);
+    db.prepare(
+      "INSERT INTO retry_rules (id, name, status_code, body_pattern, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+    ).run("rr-429", "429 rule", 429, ".*", 1, new Date().toISOString());
+    const matcher = new RetryRuleMatcher();
+    matcher.load(db);
     app = Fastify();
     app.register(anthropicProxy, {
       db,
@@ -107,6 +112,7 @@ describe("Retry integration", () => {
       streamTimeoutMs: 5000,
       retryMaxAttempts: 2,
       retryBaseDelayMs: 10,
+      matcher,
     });
 
     const resp = await app.inject({
@@ -149,6 +155,11 @@ describe("Retry integration", () => {
 
     db = initDatabase(":memory:");
     setupProvider(db, `http://127.0.0.1:${port}`);
+    db.prepare(
+      "INSERT INTO retry_rules (id, name, status_code, body_pattern, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+    ).run("rr-429", "429 rule", 429, ".*", 1, new Date().toISOString());
+    const matcher = new RetryRuleMatcher();
+    matcher.load(db);
     app = Fastify();
     app.register(anthropicProxy, {
       db,
@@ -156,6 +167,7 @@ describe("Retry integration", () => {
       streamTimeoutMs: 5000,
       retryMaxAttempts: 1,
       retryBaseDelayMs: 10,
+      matcher,
     });
 
     const resp = await app.inject({

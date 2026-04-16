@@ -67,6 +67,7 @@
       :editing-id="editingId"
       :form="form"
       :providers="providersList"
+      :provider-models="providerModelsMap"
       @save="handleSave"
       @add-window="addWindow"
       @remove-window="removeWindow"
@@ -136,6 +137,28 @@ const providerNameMap = computed(() => {
   return map
 })
 
+// 从已有分组中提取每个 provider 对应的去重模型列表
+const providerModelsMap = computed(() => {
+  const map = new Map<string, Set<string>>()
+  for (const g of groups.value) {
+    try {
+      const rule = JSON.parse(g.rule) as Rule
+      const entries = [
+        rule.default,
+        ...(rule.windows || []),
+      ].filter(Boolean) as Array<{ provider_id?: string; backend_model?: string }>
+      for (const e of entries) {
+        if (e.provider_id && e.backend_model) {
+          const set = map.get(e.provider_id) || new Set<string>()
+          set.add(e.backend_model)
+          map.set(e.provider_id, set)
+        }
+      }
+    } catch { /* skip invalid rule */ }
+  }
+  return new Map([...map.entries()].map(([k, v]) => [k, [...v]]))
+})
+
 // 预解析 rule，避免模板中重复调用 parsedRule()
 const groupsWithParsedRule = computed(() =>
   groups.value.map((g) => {
@@ -148,16 +171,20 @@ const groupsWithParsedRule = computed(() =>
 )
 
 async function loadData() {
-  try {
-    const [groupRes, provRes] = await Promise.allSettled([
-      api.getMappingGroups(),
-      api.getProviders(),
-    ])
-    if (groupRes.status === 'fulfilled') groups.value = groupRes.value.data
-    if (provRes.status === 'fulfilled') providersList.value = provRes.value.value as Provider[]
-  } catch (e) {
-    console.error('Failed to load data:', e)
-    toast.error('加载数据失败')
+  const results = await Promise.allSettled([
+    api.getMappingGroups(),
+    api.getProviders(),
+  ])
+  if (results[0].status === 'fulfilled') {
+    groups.value = results[0].value.data
+  } else {
+    console.error('Failed to load groups:', results[0].reason)
+  }
+  if (results[1].status === 'fulfilled') {
+    providersList.value = results[1].value as Provider[]
+  } else {
+    console.error('Failed to load providers:', results[1].reason)
+    toast.error('加载供应商失败')
   }
 }
 

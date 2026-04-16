@@ -30,9 +30,4 @@ SELECT
 FROM model_mappings
 WHERE is_active = 1;
 
--- 预置 ZAI 相关重试规则
-INSERT INTO retry_rules (id, name, status_code, body_pattern, is_active, created_at)
-VALUES
-  (lower(hex(randomblob(16))), 'ZAI 429', 429, '.*', 1, datetime('now')),
-  (lower(hex(randomblob(16))), 'ZAI 500', 500, '.*', 1, datetime('now')),
-  (lower(hex(randomblob(16))), 'ZAI 503', 503, '.*', 1, datetime('now'));
+-- 默认重试规则在首次启动时通过 seedDefaultRules() 自动插入，不在此处硬编码

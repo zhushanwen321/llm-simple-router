@@ -15,7 +15,7 @@
         <TableHeader>
           <TableRow class="bg-gray-50">
             <TableHead class="text-gray-600">名称</TableHead>
-            <TableHead class="text-gray-600">状态码</TableHead>
+            <TableHead class="text-gray-600">HTTP 状态码</TableHead>
             <TableHead class="text-gray-600">响应体匹配</TableHead>
             <TableHead class="text-gray-600">状态</TableHead>
             <TableHead class="text-right text-gray-600">操作</TableHead>
@@ -53,7 +53,7 @@
             <Input v-model="form.name" type="text" required />
           </div>
           <div>
-            <Label class="block text-sm font-medium text-gray-700 mb-1">状态码</Label>
+            <Label class="block text-sm font-medium text-gray-700 mb-1">HTTP 状态码</Label>
             <Input v-model.number="form.status_code" type="number" required />
           </div>
           <div>
