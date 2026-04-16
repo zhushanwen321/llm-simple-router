@@ -1,5 +1,6 @@
 import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
+import { Type, Static } from "@sinclair/typebox";
 import type { RetryRule } from "../db/index.js";
 import {
   getAllRetryRules,
@@ -10,19 +11,19 @@ import {
 import { RetryRuleMatcher } from "../proxy/retry-rules.js";
 import { HTTP_BAD_REQUEST, HTTP_CREATED } from "./constants.js";
 
-interface CreateRetryRuleBody {
-  name: string;
-  status_code: number;
-  body_pattern: string;
-  is_active?: number;
-}
+const CreateRetryRuleSchema = Type.Object({
+  name: Type.String({ minLength: 1 }),
+  status_code: Type.Number({ minimum: 100, maximum: 599 }),
+  body_pattern: Type.String({ minLength: 1 }),
+  is_active: Type.Optional(Type.Number()),
+});
 
-interface UpdateRetryRuleBody {
-  name?: string;
-  status_code?: number;
-  body_pattern?: string;
-  is_active?: number;
-}
+const UpdateRetryRuleSchema = Type.Object({
+  name: Type.Optional(Type.String({ minLength: 1 })),
+  status_code: Type.Optional(Type.Number({ minimum: 100, maximum: 599 })),
+  body_pattern: Type.Optional(Type.String({ minLength: 1 })),
+  is_active: Type.Optional(Type.Number()),
+});
 
 interface RetryRuleRoutesOptions {
   db: Database.Database;
@@ -46,11 +47,8 @@ export const adminRetryRuleRoutes: FastifyPluginCallback<RetryRuleRoutesOptions>
     return reply.send(rules);
   });
 
-  app.post("/admin/api/retry-rules", async (request, reply) => {
-    const body = request.body as CreateRetryRuleBody;
-    if (!body.name || body.status_code === undefined || !body.body_pattern) {
-      return reply.code(HTTP_BAD_REQUEST).send({ error: { message: "Missing required fields: name, status_code, body_pattern" } });
-    }
+  app.post("/admin/api/retry-rules", { schema: { body: CreateRetryRuleSchema } }, async (request, reply) => {
+    const body = request.body as Static<typeof CreateRetryRuleSchema>;
     const regexError = validateBodyPattern(body.body_pattern);
     if (regexError) {
       return reply.code(HTTP_BAD_REQUEST).send({ error: { message: regexError } });
@@ -67,9 +65,9 @@ export const adminRetryRuleRoutes: FastifyPluginCallback<RetryRuleRoutesOptions>
     return reply.code(HTTP_CREATED).send({ id });
   });
 
-  app.put("/admin/api/retry-rules/:id", async (request, reply) => {
+  app.put("/admin/api/retry-rules/:id", { schema: { body: UpdateRetryRuleSchema } }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const body = request.body as UpdateRetryRuleBody;
+    const body = request.body as Static<typeof UpdateRetryRuleSchema>;
     const fields: Partial<Pick<RetryRule, "name" | "status_code" | "body_pattern" | "is_active">> = {};
     if (body.name !== undefined) fields.name = body.name;
     if (body.status_code !== undefined) fields.status_code = body.status_code;

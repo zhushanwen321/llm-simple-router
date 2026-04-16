@@ -1,28 +1,29 @@
 import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
+import { Type, Static } from "@sinclair/typebox";
 import type { Provider } from "../db/index.js";
 import { getAllProviders, getProviderById, createProvider, updateProvider, deleteProvider, getAllMappingGroups } from "../db/index.js";
 import { encrypt } from "../utils/crypto.js";
-import { HTTP_BAD_REQUEST, HTTP_CREATED, HTTP_NOT_FOUND, HTTP_CONFLICT } from "./constants.js";
+import { HTTP_CREATED, HTTP_NOT_FOUND, HTTP_CONFLICT } from "./constants.js";
 
 const API_KEY_PREVIEW_MIN_LEN = 8;
 const API_KEY_PREVIEW_PREFIX_LEN = 4;
 
-interface CreateProviderBody {
-  name: string;
-  api_type: string;
-  base_url: string;
-  api_key: string;
-  is_active?: number;
-}
+const CreateProviderSchema = Type.Object({
+  name: Type.String({ minLength: 1 }),
+  api_type: Type.Union([Type.Literal("openai"), Type.Literal("anthropic")]),
+  base_url: Type.String({ minLength: 1 }),
+  api_key: Type.String({ minLength: 1 }),
+  is_active: Type.Optional(Type.Number()),
+});
 
-interface UpdateProviderBody {
-  name?: string;
-  api_type?: string;
-  base_url?: string;
-  api_key?: string;
-  is_active?: number;
-}
+const UpdateProviderSchema = Type.Object({
+  name: Type.Optional(Type.String({ minLength: 1 })),
+  api_type: Type.Optional(Type.Union([Type.Literal("openai"), Type.Literal("anthropic")])),
+  base_url: Type.Optional(Type.String({ minLength: 1 })),
+  api_key: Type.Optional(Type.String({ minLength: 1 })),
+  is_active: Type.Optional(Type.Number()),
+});
 
 interface ProviderRoutesOptions {
   db: Database.Database;
@@ -51,19 +52,13 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     })));
   });
 
-  app.post("/admin/api/providers", async (request, reply) => {
-    const body = request.body as CreateProviderBody;
-    if (!body.name || !body.api_type || !body.base_url || !body.api_key) {
-      return reply.code(HTTP_BAD_REQUEST).send({ error: { message: "Missing required fields: name, api_type, base_url, api_key" } });
-    }
-    if (!["openai", "anthropic"].includes(body.api_type)) {
-      return reply.code(HTTP_BAD_REQUEST).send({ error: { message: "api_type must be 'openai' or 'anthropic'" } });
-    }
+  app.post("/admin/api/providers", { schema: { body: CreateProviderSchema } }, async (request, reply) => {
+    const body = request.body as Static<typeof CreateProviderSchema>;
     const encryptedKey = encrypt(body.api_key, encryptionKey);
     const apiKeyPreview = computeApiKeyPreview(body.api_key);
     const id = createProvider(db, {
       name: body.name,
-      api_type: body.api_type as "openai" | "anthropic",
+      api_type: body.api_type,
       base_url: body.base_url,
       api_key: encryptedKey,
       api_key_preview: apiKeyPreview,
@@ -72,16 +67,16 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     return reply.code(HTTP_CREATED).send({ id });
   });
 
-  app.put("/admin/api/providers/:id", async (request, reply) => {
+  app.put("/admin/api/providers/:id", { schema: { body: UpdateProviderSchema } }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const existing = getProviderById(db, id);
     if (!existing) {
       return reply.code(HTTP_NOT_FOUND).send({ error: { message: "Provider not found" } });
     }
-    const body = request.body as UpdateProviderBody;
+    const body = request.body as Static<typeof UpdateProviderSchema>;
     const fields: Partial<Pick<Provider, 'name' | 'api_type' | 'base_url' | 'api_key' | 'api_key_preview' | 'is_active'>> = {};
     if (body.name !== undefined) fields.name = body.name;
-    if (body.api_type !== undefined) fields.api_type = body.api_type as "openai" | "anthropic";
+    if (body.api_type !== undefined) fields.api_type = body.api_type;
     if (body.base_url !== undefined) fields.base_url = body.base_url;
     if (body.is_active !== undefined) fields.is_active = body.is_active;
     if (body.api_key) {

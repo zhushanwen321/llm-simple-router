@@ -1,5 +1,6 @@
 import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
+import { Type, Static } from "@sinclair/typebox";
 import type { MappingGroup } from "../db/index.js";
 import {
   getAllMappingGroups,
@@ -8,19 +9,19 @@ import {
   deleteMappingGroup,
   getProviderById,
 } from "../db/index.js";
-import { HTTP_BAD_REQUEST, HTTP_CREATED, HTTP_NOT_FOUND, HTTP_CONFLICT } from "./constants.js";
+import { HTTP_BAD_REQUEST, HTTP_CREATED, HTTP_CONFLICT } from "./constants.js";
 
-interface CreateGroupBody {
-  client_model: string;
-  strategy: string;
-  rule: string;
-}
+const CreateGroupSchema = Type.Object({
+  client_model: Type.String({ minLength: 1 }),
+  strategy: Type.String({ minLength: 1 }),
+  rule: Type.String(),
+});
 
-interface UpdateGroupBody {
-  client_model?: string;
-  strategy?: string;
-  rule?: string;
-}
+const UpdateGroupSchema = Type.Object({
+  client_model: Type.Optional(Type.String({ minLength: 1 })),
+  strategy: Type.Optional(Type.String({ minLength: 1 })),
+  rule: Type.Optional(Type.String()),
+});
 
 interface GroupRoutesOptions {
   db: Database.Database;
@@ -95,11 +96,8 @@ export const adminGroupRoutes: FastifyPluginCallback<GroupRoutesOptions> = (app,
     return reply.send(groups);
   });
 
-  app.post("/admin/api/mapping-groups", async (request, reply) => {
-    const body = request.body as CreateGroupBody;
-    if (!body.client_model || !body.strategy || body.rule === undefined) {
-      return reply.code(HTTP_BAD_REQUEST).send({ error: { message: "Missing required fields: client_model, strategy, rule" } });
-    }
+  app.post("/admin/api/mapping-groups", { schema: { body: CreateGroupSchema } }, async (request, reply) => {
+    const body = request.body as Static<typeof CreateGroupSchema>;
     const validationError = await validateRule(db, body.strategy, body.rule);
     if (validationError) {
       return reply.code(HTTP_BAD_REQUEST).send({ error: { message: validationError } });
@@ -119,9 +117,9 @@ export const adminGroupRoutes: FastifyPluginCallback<GroupRoutesOptions> = (app,
     }
   });
 
-  app.put("/admin/api/mapping-groups/:id", async (request, reply) => {
+  app.put("/admin/api/mapping-groups/:id", { schema: { body: UpdateGroupSchema } }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const body = request.body as UpdateGroupBody;
+    const body = request.body as Static<typeof UpdateGroupSchema>;
     const fields: Partial<Pick<MappingGroup, "client_model" | "strategy" | "rule">> = {};
     if (body.client_model !== undefined) fields.client_model = body.client_model;
     if (body.strategy !== undefined) fields.strategy = body.strategy;

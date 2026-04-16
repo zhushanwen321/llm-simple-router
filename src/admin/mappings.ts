@@ -1,5 +1,6 @@
 import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
+import { Type, Static } from "@sinclair/typebox";
 import {
   getAllMappingGroups,
   createMappingGroup,
@@ -9,19 +10,17 @@ import {
 } from "../db/index.js";
 import { HTTP_BAD_REQUEST, HTTP_CREATED, HTTP_NOT_FOUND, HTTP_CONFLICT } from "./constants.js";
 
-interface CreateMappingBody {
-  client_model: string;
-  backend_model: string;
-  provider_id: string;
-  is_active?: number;
-}
+const CreateMappingSchema = Type.Object({
+  client_model: Type.String({ minLength: 1 }),
+  backend_model: Type.String({ minLength: 1 }),
+  provider_id: Type.String({ minLength: 1 }),
+});
 
-interface UpdateMappingBody {
-  client_model?: string;
-  backend_model?: string;
-  provider_id?: string;
-  is_active?: number;
-}
+const UpdateMappingSchema = Type.Object({
+  client_model: Type.Optional(Type.String({ minLength: 1 })),
+  backend_model: Type.Optional(Type.String({ minLength: 1 })),
+  provider_id: Type.Optional(Type.String({ minLength: 1 })),
+});
 
 interface MappingRoutesOptions {
   db: Database.Database;
@@ -72,11 +71,8 @@ export const adminMappingRoutes: FastifyPluginCallback<MappingRoutesOptions> = (
     return reply.send(legacy);
   });
 
-  app.post("/admin/api/mappings", async (request, reply) => {
-    const body = request.body as CreateMappingBody;
-    if (!body.client_model || !body.backend_model || !body.provider_id) {
-      return reply.code(HTTP_BAD_REQUEST).send({ error: { message: "Missing required fields: client_model, backend_model, provider_id" } });
-    }
+  app.post("/admin/api/mappings", { schema: { body: CreateMappingSchema } }, async (request, reply) => {
+    const body = request.body as Static<typeof CreateMappingSchema>;
     const provider = getProviderById(db, body.provider_id);
     if (!provider) {
       return reply.code(HTTP_BAD_REQUEST).send({ error: { message: "provider_id not found" } });
@@ -99,13 +95,13 @@ export const adminMappingRoutes: FastifyPluginCallback<MappingRoutesOptions> = (
     }
   });
 
-  app.put("/admin/api/mappings/:id", async (request, reply) => {
+  app.put("/admin/api/mappings/:id", { schema: { body: UpdateMappingSchema } }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const group = findGroupByIdOrClientModel(db, id);
     if (!group) {
       return reply.code(HTTP_NOT_FOUND).send({ error: { message: "Mapping not found" } });
     }
-    const body = request.body as UpdateMappingBody;
+    const body = request.body as Static<typeof UpdateMappingSchema>;
 
     let rule: Record<string, unknown>;
     try {
