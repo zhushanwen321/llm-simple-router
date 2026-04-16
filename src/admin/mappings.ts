@@ -7,7 +7,11 @@ import {
   updateMappingGroup,
   deleteMappingGroup,
   getProviderById,
+  getMappingGroupById,
+  getMappingGroup,
 } from "../db/index.js";
+import type { MappingGroup } from "../db/index.js";
+import { STRATEGY_NAMES } from "../proxy/strategy/types.js";
 import { HTTP_BAD_REQUEST, HTTP_CREATED, HTTP_NOT_FOUND, HTTP_CONFLICT } from "./constants.js";
 
 const CreateMappingSchema = Type.Object({
@@ -57,9 +61,8 @@ function toLegacy(group: { id: string; client_model: string; rule: string; creat
 function findGroupByIdOrClientModel(
   db: Database.Database,
   id: string
-): { id: string; client_model: string; rule: string; created_at: string } | undefined {
-  const groups = getAllMappingGroups(db);
-  return groups.find((g) => g.id === id) ?? groups.find((g) => g.client_model === id);
+): MappingGroup | undefined {
+  return getMappingGroupById(db, id) ?? getMappingGroup(db, id);
 }
 
 export const adminMappingRoutes: FastifyPluginCallback<MappingRoutesOptions> = (app, options, done) => {
@@ -80,7 +83,7 @@ export const adminMappingRoutes: FastifyPluginCallback<MappingRoutesOptions> = (
     try {
       const id = createMappingGroup(db, {
         client_model: body.client_model,
-        strategy: "scheduled",
+        strategy: STRATEGY_NAMES.SCHEDULED,
         rule: JSON.stringify({
           default: { backend_model: body.backend_model, provider_id: body.provider_id },
           windows: [],

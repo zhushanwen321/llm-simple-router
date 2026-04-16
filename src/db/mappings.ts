@@ -73,6 +73,15 @@ export function getMappingGroup(
     .get(clientModel) as MappingGroup | undefined;
 }
 
+export function getMappingGroupById(
+  db: Database.Database,
+  id: string,
+): MappingGroup | undefined {
+  return db
+    .prepare("SELECT * FROM mapping_groups WHERE id = ?")
+    .get(id) as MappingGroup | undefined;
+}
+
 export function getAllMappingGroups(db: Database.Database): MappingGroup[] {
   return db
     .prepare("SELECT * FROM mapping_groups ORDER BY created_at DESC")

@@ -1,10 +1,11 @@
 import Database from "better-sqlite3";
 import type { Target, ResolveContext } from "./strategy/types.js";
+import { STRATEGY_NAMES } from "./strategy/types.js";
 import { ScheduledStrategy } from "./strategy/scheduled.js";
 import { getMappingGroup } from "../db/index.js";
 
 const STRATEGIES: Record<string, import("./strategy/types.js").MappingStrategy> = {
-  scheduled: new ScheduledStrategy(),
+  [STRATEGY_NAMES.SCHEDULED]: new ScheduledStrategy(),
 };
 
 export function resolveMapping(
@@ -16,7 +17,7 @@ export function resolveMapping(
   if (!group) return null;
 
   let rule: unknown;
-  try { rule = JSON.parse(group.rule); } catch { return null; }
+  try { rule = JSON.parse(group.rule); } catch { console.warn(`[mapping-resolver] Failed to parse rule for client_model '${group.client_model}'`); return null; }
 
   const strategy = STRATEGIES[group.strategy];
   if (!strategy) return null;

@@ -39,6 +39,10 @@ function validateBodyPattern(pattern: string): string | undefined {
   }
 }
 
+function refreshMatcher(matcher: RetryRuleMatcher | null, db: Database.Database) {
+  if (matcher) matcher.load(db);
+}
+
 export const adminRetryRuleRoutes: FastifyPluginCallback<RetryRuleRoutesOptions> = (app, options, done) => {
   const { db, matcher } = options;
 
@@ -59,9 +63,7 @@ export const adminRetryRuleRoutes: FastifyPluginCallback<RetryRuleRoutesOptions>
       body_pattern: body.body_pattern,
       is_active: body.is_active ?? 1,
     });
-    if (matcher) {
-      matcher.load(db);
-    }
+    refreshMatcher(matcher, db);
     return reply.code(HTTP_CREATED).send({ id });
   });
 
@@ -80,18 +82,14 @@ export const adminRetryRuleRoutes: FastifyPluginCallback<RetryRuleRoutesOptions>
     }
     if (body.is_active !== undefined) fields.is_active = body.is_active;
     updateRetryRule(db, id, fields);
-    if (matcher) {
-      matcher.load(db);
-    }
+    refreshMatcher(matcher, db);
     return reply.send({ success: true });
   });
 
   app.delete("/admin/api/retry-rules/:id", async (request, reply) => {
     const { id } = request.params as { id: string };
     deleteRetryRule(db, id);
-    if (matcher) {
-      matcher.load(db);
-    }
+    refreshMatcher(matcher, db);
     return reply.send({ success: true });
   });
 

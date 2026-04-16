@@ -8,7 +8,9 @@ import {
   updateMappingGroup,
   deleteMappingGroup,
   getProviderById,
+  getMappingGroupById,
 } from "../db/index.js";
+import { STRATEGY_NAMES } from "../proxy/strategy/types.js";
 import { HTTP_BAD_REQUEST, HTTP_CREATED, HTTP_CONFLICT } from "./constants.js";
 
 const CreateGroupSchema = Type.Object({
@@ -58,7 +60,7 @@ async function validateRule(
     return "Invalid rule JSON";
   }
 
-  if (strategy === "scheduled") {
+  if (strategy === STRATEGY_NAMES.SCHEDULED) {
     const r = rule as ScheduledRule;
     if (!r.default || !r.default.backend_model || !r.default.provider_id) {
       return "rule.default.backend_model and rule.default.provider_id are required";
@@ -152,14 +154,12 @@ export const adminGroupRoutes: FastifyPluginCallback<GroupRoutesOptions> = (app,
   done();
 };
 
-async function findGroupStrategy(db: Database.Database, id: string): Promise<string> {
-  const groups = getAllMappingGroups(db);
-  const g = groups.find((x) => x.id === id);
-  return g?.strategy ?? "scheduled";
+function findGroupStrategy(db: Database.Database, id: string): string {
+  const g = getMappingGroupById(db, id);
+  return g?.strategy ?? STRATEGY_NAMES.SCHEDULED;
 }
 
-async function findGroupRule(db: Database.Database, id: string): Promise<string> {
-  const groups = getAllMappingGroups(db);
-  const g = groups.find((x) => x.id === id);
+function findGroupRule(db: Database.Database, id: string): string {
+  const g = getMappingGroupById(db, id);
   return g?.rule ?? "{}";
 }

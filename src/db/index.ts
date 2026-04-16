@@ -70,6 +70,7 @@ export {
   updateModelMapping,
   deleteModelMapping,
   getMappingGroup,
+  getMappingGroupById,
   getAllMappingGroups,
   createMappingGroup,
   updateMappingGroup,

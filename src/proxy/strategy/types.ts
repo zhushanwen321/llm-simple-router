@@ -1,3 +1,7 @@
+export const STRATEGY_NAMES = {
+  SCHEDULED: "scheduled",
+} as const;
+
 export interface Target {
   backend_model: string;
   provider_id: string;

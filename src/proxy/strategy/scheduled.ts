@@ -36,12 +36,14 @@ function isTimeWindow(value: unknown): value is TimeWindow {
 }
 
 function isScheduledRule(value: unknown): value is ScheduledRule {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    (!(value as ScheduledRule).default || isTarget((value as ScheduledRule).default)) &&
-    (!(value as ScheduledRule).windows || Array.isArray((value as ScheduledRule).windows))
-  );
+  if (typeof value !== "object" || value === null) return false;
+  const r = value as ScheduledRule;
+  if (r.default !== undefined && !isTarget(r.default)) return false;
+  if (r.windows !== undefined) {
+    if (!Array.isArray(r.windows)) return false;
+    if (!r.windows.every((w) => isTimeWindow(w))) return false;
+  }
+  return true;
 }
 
 function timeMatches(now: string, start: string, end: string): boolean {
