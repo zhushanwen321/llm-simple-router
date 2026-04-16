@@ -25,7 +25,7 @@
             <TableCell class="font-mono text-sm">{{ m.client_model }}</TableCell>
             <TableCell class="text-center text-gray-400">&rarr;</TableCell>
             <TableCell class="font-mono text-sm">{{ m.backend_model }}</TableCell>
-            <TableCell class="text-gray-500">{{ getProviderName(m.provider_id) }}</TableCell>
+            <TableCell class="text-gray-500">{{ providerNameMap.get(m.provider_id) ?? m.provider_id }}</TableCell>
             <TableCell>
               <Badge :variant="m.is_active ? 'default' : 'secondary'">{{ m.is_active ? '启用' : '禁用' }}</Badge>
             </TableCell>
@@ -96,8 +96,8 @@
 </template>
 
 <script setup lang="ts">
-/* eslint-disable taste/no-silent-catch, taste/prefer-allsettled */
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { toast } from 'vue-sonner'
 import { api } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -121,30 +121,39 @@ interface Provider {
   name: string
 }
 
+const DEFAULT_FORM = { client_model: '', backend_model: '', provider_id: '', is_active: true }
+
 const mappings = ref<Mapping[]>([])
 const providersList = ref<Provider[]>([])
 const dialogOpen = ref(false)
 const editingId = ref<string | null>(null)
 const deleteTarget = ref<Mapping | null>(null)
-const form = ref({ client_model: '', backend_model: '', provider_id: '', is_active: true })
+const form = ref({ ...DEFAULT_FORM })
 
-function getProviderName(id: string): string {
-  return providersList.value.find(p => p.id === id)?.name || id
-}
+// O(1) supplier name lookup
+const providerNameMap = computed(() => {
+  const map = new Map<string, string>()
+  for (const p of providersList.value) map.set(p.id, p.name)
+  return map
+})
 
 async function loadData() {
   try {
-    const [mapRes, provRes] = await Promise.all([api.getMappings(), api.getProviders()])
-    mappings.value = mapRes.data
-    providersList.value = provRes.data
+    const [mapRes, provRes] = await Promise.allSettled([
+      api.getMappings(),
+      api.getProviders(),
+    ])
+    if (mapRes.status === 'fulfilled') mappings.value = mapRes.value.data
+    if (provRes.status === 'fulfilled') providersList.value = provRes.value.data
   } catch (e) {
     console.error('Failed to load data:', e)
+    toast.error('加载数据失败')
   }
 }
 
 function openCreate() {
   editingId.value = null
-  form.value = { client_model: '', backend_model: '', provider_id: providersList.value[0]?.id || '', is_active: true }
+  form.value = { ...DEFAULT_FORM, provider_id: providersList.value[0]?.id || '' }
   dialogOpen.value = true
 }
 
@@ -156,21 +165,22 @@ function openEdit(m: Mapping) {
 
 async function handleSave() {
   try {
-    const data = {
+    const payload = {
       client_model: form.value.client_model,
       backend_model: form.value.backend_model,
       provider_id: form.value.provider_id,
       is_active: form.value.is_active ? 1 : 0,
     }
     if (editingId.value) {
-      await api.updateMapping(editingId.value, data)
+      await api.updateMapping(editingId.value, payload)
     } else {
-      await api.createMapping(data)
+      await api.createMapping(payload)
     }
     dialogOpen.value = false
     await loadData()
   } catch (e) {
     console.error('Failed to save mapping:', e)
+    toast.error('保存映射失败')
   }
 }
 
@@ -187,6 +197,7 @@ async function handleDelete() {
     await loadData()
   } catch (e) {
     console.error('Failed to delete mapping:', e)
+    toast.error('删除映射失败')
   }
 }
 

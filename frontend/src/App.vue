@@ -6,12 +6,14 @@
     </main>
   </div>
   <router-view v-else />
+  <Toaster richColors position="top-center" />
 </template>
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import Sidebar from '@/components/layout/Sidebar.vue'
+import { Toaster } from '@/components/ui/sonner'
 import { api } from '@/api/client'
 
 const router = useRouter()

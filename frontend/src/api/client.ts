@@ -1,8 +1,6 @@
 import axios from 'axios'
 import router from '@/router'
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 const client = axios.create({
   baseURL: '/admin/api',
   withCredentials: true,
@@ -18,18 +16,48 @@ client.interceptors.response.use(
   }
 )
 
+// --- Payload types ---
+
+interface ProviderPayload {
+  name: string
+  api_type: string
+  base_url: string
+  api_key?: string
+  is_active: number
+}
+
+interface MappingPayload {
+  client_model: string
+  backend_model: string
+  provider_id: string
+  is_active: number
+}
+
+interface RouterKeyCreatePayload {
+  name: string
+  allowed_models?: string[] | null
+}
+
+interface RouterKeyUpdatePayload {
+  name?: string
+  allowed_models?: string[] | null
+  is_active?: number
+}
+
+// --- API ---
+
 export const api = {
   login: (password: string) => client.post('/login', { password }),
   logout: () => client.post('/logout'),
 
   getProviders: () => client.get('/providers'),
-  createProvider: (data: any) => client.post('/providers', data),
-  updateProvider: (id: string, data: any) => client.put(`/providers/${id}`, data),
+  createProvider: (data: ProviderPayload) => client.post('/providers', data),
+  updateProvider: (id: string, data: Partial<ProviderPayload>) => client.put(`/providers/${id}`, data),
   deleteProvider: (id: string) => client.delete(`/providers/${id}`),
 
   getMappings: () => client.get('/mappings'),
-  createMapping: (data: any) => client.post('/mappings', data),
-  updateMapping: (id: string, data: any) => client.put(`/mappings/${id}`, data),
+  createMapping: (data: MappingPayload) => client.post('/mappings', data),
+  updateMapping: (id: string, data: MappingPayload) => client.put(`/mappings/${id}`, data),
   deleteMapping: (id: string) => client.delete(`/mappings/${id}`),
 
   getLogs: (params: { page: number; limit: number; api_type?: string; router_key_id?: string }) =>
@@ -47,12 +75,10 @@ export const api = {
     client.get('/metrics/timeseries', { params }),
 
   getRouterKeys: () => client.get('/router-keys'),
-  createRouterKey: (data: { name: string; allowed_models?: string[] | null }) =>
+  createRouterKey: (data: RouterKeyCreatePayload) =>
     client.post('/router-keys', data),
-  updateRouterKey: (id: string, data: { name?: string; allowed_models?: string[] | null; is_active?: number }) =>
+  updateRouterKey: (id: string, data: RouterKeyUpdatePayload) =>
     client.put(`/router-keys/${id}`, data),
   deleteRouterKey: (id: string) => client.delete(`/router-keys/${id}`),
   getAvailableModels: () => client.get('/models/available'),
 }
-
-export default client

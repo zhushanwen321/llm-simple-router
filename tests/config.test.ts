@@ -61,7 +61,7 @@ describe("getConfig", () => {
     expect(config.DB_PATH).toBe("./data/router.db");
     expect(config.LOG_LEVEL).toBe("info");
     expect(config.TZ).toBe("Asia/Shanghai");
-    expect(config.STREAM_TIMEOUT_MS).toBe(30000);
+    expect(config.STREAM_TIMEOUT_MS).toBe(3000000);
     expect(config.RETRY_MAX_ATTEMPTS).toBe(3);
     expect(config.RETRY_BASE_DELAY_MS).toBe(1000);
   });

@@ -104,8 +104,8 @@
 </template>
 
 <script setup lang="ts">
-/* eslint-disable taste/no-silent-catch */
 import { ref, onMounted } from 'vue'
+import { toast } from 'vue-sonner'
 import { api } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -125,11 +125,13 @@ interface Provider {
   is_active: number
 }
 
+const DEFAULT_FORM = { name: '', api_type: 'openai', base_url: '', api_key: '', is_active: true }
+
 const providers = ref<Provider[]>([])
 const dialogOpen = ref(false)
 const editingId = ref<string | null>(null)
 const deleteTarget = ref<Provider | null>(null)
-const form = ref({ name: '', api_type: 'openai', base_url: '', api_key: '', is_active: true })
+const form = ref({ ...DEFAULT_FORM })
 
 async function loadProviders() {
   try {
@@ -137,12 +139,13 @@ async function loadProviders() {
     providers.value = res.data
   } catch (e) {
     console.error('Failed to load providers:', e)
+    toast.error('加载供应商失败')
   }
 }
 
 function openCreate() {
   editingId.value = null
-  form.value = { name: '', api_type: 'openai', base_url: '', api_key: '', is_active: true }
+  form.value = { ...DEFAULT_FORM }
   dialogOpen.value = true
 }
 
@@ -152,27 +155,31 @@ function openEdit(p: Provider) {
   dialogOpen.value = true
 }
 
+function buildPayload(): { name: string; api_type: string; base_url: string; api_key?: string; is_active: number } {
+  const payload: { name: string; api_type: string; base_url: string; api_key?: string; is_active: number } = {
+    name: form.value.name,
+    api_type: form.value.api_type,
+    base_url: form.value.base_url,
+    is_active: form.value.is_active ? 1 : 0,
+  }
+  if (form.value.api_key) payload.api_key = form.value.api_key
+  return payload
+}
+
 async function handleSave() {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data: any = {
-      name: form.value.name,
-      api_type: form.value.api_type,
-      base_url: form.value.base_url,
-      is_active: form.value.is_active ? 1 : 0,
-    }
-    if (form.value.api_key) data.api_key = form.value.api_key
-
+    const payload = buildPayload()
     if (editingId.value) {
-      await api.updateProvider(editingId.value, data)
+      await api.updateProvider(editingId.value, payload)
     } else {
-      data.api_key = form.value.api_key
-      await api.createProvider(data)
+      payload.api_key = form.value.api_key
+      await api.createProvider(payload)
     }
     dialogOpen.value = false
     await loadProviders()
   } catch (e) {
     console.error('Failed to save provider:', e)
+    toast.error('保存供应商失败')
   }
 }
 
@@ -189,6 +196,7 @@ async function handleDelete() {
     await loadProviders()
   } catch (e) {
     console.error('Failed to delete provider:', e)
+    toast.error('删除供应商失败')
   }
 }
 

@@ -75,10 +75,10 @@
             <Label class="block text-sm font-medium text-gray-700 mb-1">白名单模型</Label>
             <div class="text-xs text-gray-400 mb-2">不选择 = 允许所有模型</div>
             <div class="border rounded-md p-3 max-h-48 overflow-y-auto space-y-2 bg-gray-50">
-              <label
+              <Label
                 v-for="model in availableModels"
                 :key="model"
-                class="flex items-center gap-2 cursor-pointer text-sm"
+                class="flex items-center gap-2 cursor-pointer text-sm font-normal"
               >
                 <input
                   type="checkbox"
@@ -88,7 +88,7 @@
                   @change="toggleModel(model)"
                 />
                 <span class="font-mono text-xs">{{ model }}</span>
-              </label>
+              </Label>
               <div v-if="availableModels.length === 0" class="text-gray-400 text-sm text-center py-2">
                 暂无可用模型，请先配置模型映射
               </div>
@@ -96,7 +96,7 @@
             <div v-if="form.allowed_models.length > 0" class="flex flex-wrap gap-1 mt-2">
               <Badge v-for="m in form.allowed_models" :key="m" variant="outline" class="text-xs">
                 {{ m }}
-                <button type="button" class="ml-1 text-gray-400 hover:text-red-500" @click="removeModel(m)">&times;</button>
+                <Button type="button" variant="ghost" size="sm" class="ml-1 h-4 w-4 p-0 text-gray-400 hover:text-red-500" @click="removeModel(m)">&times;</Button>
               </Badge>
             </div>
           </div>
@@ -147,6 +147,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { toast } from 'vue-sonner'
 import { api } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -155,8 +156,6 @@ import { Badge } from '@/components/ui/badge'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from '@/components/ui/alert-dialog'
-
-/* eslint-disable @typescript-eslint/no-explicit-any */
 
 interface RouterKey {
   id: string
@@ -168,12 +167,15 @@ interface RouterKey {
   created_at: string
 }
 
+const DEFAULT_FORM = { name: '', allowed_models: [] as string[], is_active: true }
+const COPY_FEEDBACK_MS = 2000
+
 const keys = ref<RouterKey[]>([])
 const availableModels = ref<string[]>([])
 const dialogOpen = ref(false)
 const editingId = ref<string | null>(null)
 const deleteTarget = ref<RouterKey | null>(null)
-const form = ref({ name: '', allowed_models: [] as string[], is_active: true })
+const form = ref({ ...DEFAULT_FORM, allowed_models: [] as string[] })
 
 const showKeyDialog = ref(false)
 const createdKey = ref('')
@@ -208,14 +210,13 @@ async function loadData() {
     if (modelsRes.status === 'fulfilled') availableModels.value = modelsRes.value.data
   } catch (e) {
     console.error('Failed to load data:', e)
-    keys.value = []
-    availableModels.value = []
+    toast.error('加载数据失败')
   }
 }
 
 function openCreate() {
   editingId.value = null
-  form.value = { name: '', allowed_models: [], is_active: true }
+  form.value = { ...DEFAULT_FORM, allowed_models: [] }
   dialogOpen.value = true
 }
 
@@ -229,19 +230,27 @@ function openEdit(k: RouterKey) {
   dialogOpen.value = true
 }
 
+function buildUpdatePayload(): { name: string; allowed_models: string[] | null; is_active: number } {
+  return {
+    name: form.value.name,
+    allowed_models: form.value.allowed_models.length > 0 ? form.value.allowed_models : null,
+    is_active: form.value.is_active ? 1 : 0,
+  }
+}
+
+function buildCreatePayload(): { name: string; allowed_models: string[] | null } {
+  return {
+    name: form.value.name,
+    allowed_models: form.value.allowed_models.length > 0 ? form.value.allowed_models : null,
+  }
+}
+
 async function handleSave() {
   try {
     if (editingId.value) {
-      const data: any = {
-        name: form.value.name,
-        is_active: form.value.is_active ? 1 : 0,
-      }
-      data.allowed_models = form.value.allowed_models.length > 0 ? form.value.allowed_models : null
-      await api.updateRouterKey(editingId.value, data)
+      await api.updateRouterKey(editingId.value, buildUpdatePayload())
     } else {
-      const data: any = { name: form.value.name }
-      data.allowed_models = form.value.allowed_models.length > 0 ? form.value.allowed_models : null
-      const res = await api.createRouterKey(data)
+      const res = await api.createRouterKey(buildCreatePayload())
       if (res.data?.key) {
         createdKey.value = res.data.key
         showKeyDialog.value = true
@@ -251,7 +260,7 @@ async function handleSave() {
     await loadData()
   } catch (e) {
     console.error('Failed to save router key:', e)
-    alert('保存失败，请重试')
+    toast.error('保存密钥失败')
   }
 }
 
@@ -268,20 +277,18 @@ async function handleDelete() {
     await loadData()
   } catch (e) {
     console.error('Failed to delete router key:', e)
-    alert('删除失败，请重试')
+    toast.error('删除密钥失败')
   }
 }
-
-const COPY_FEEDBACK_MS = 2000
 
 async function copyKey() {
   try {
     await navigator.clipboard.writeText(createdKey.value)
     copied.value = true
     setTimeout(() => { copied.value = false }, COPY_FEEDBACK_MS)
-  // eslint-disable-next-line taste/no-silent-catch
   } catch (e) {
     console.error('Failed to copy key:', e)
+    toast.error('复制失败')
   }
 }
 
@@ -290,9 +297,9 @@ async function copyKeyOf(id: string, key: string) {
     await navigator.clipboard.writeText(key)
     copiedId.value = id
     setTimeout(() => { copiedId.value = '' }, COPY_FEEDBACK_MS)
-  // eslint-disable-next-line taste/no-silent-catch
   } catch (e) {
     console.error('Failed to copy key:', e)
+    toast.error('复制失败')
   }
 }
 

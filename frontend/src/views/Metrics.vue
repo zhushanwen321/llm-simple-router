@@ -129,8 +129,8 @@
 </template>
 
 <script setup lang="ts">
-/* eslint-disable taste/no-silent-catch */
 import { ref, computed, watch, onMounted } from 'vue'
+import { toast } from 'vue-sonner'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -252,12 +252,17 @@ async function fetchMetrics() {
     modelOptions.value = [...new Set(summaryRows.value.map((r: SummaryRow) => r.backend_model))]
   } catch (e) {
     console.error('Failed to load metrics:', e)
+    toast.error('加载性能指标失败')
   } finally {
     loading.value = false
   }
 }
 
-watch([period, modelFilter, routerKeyFilter], () => fetchMetrics())
+let filterTimer: ReturnType<typeof setTimeout> | null = null
+watch([period, modelFilter, routerKeyFilter], () => {
+  if (filterTimer) clearTimeout(filterTimer)
+  filterTimer = setTimeout(() => fetchMetrics(), 300) // eslint-disable-line no-magic-numbers
+})
 
 async function loadRouterKeys() {
   try {
@@ -265,6 +270,7 @@ async function loadRouterKeys() {
     routerKeys.value = res.data
   } catch (e) {
     console.error('Failed to load router keys:', e)
+    toast.error('加载密钥列表失败')
   }
 }
 

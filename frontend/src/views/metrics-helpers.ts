@@ -41,13 +41,18 @@ function formatLabel(date: Date, periodStr: string): string {
   return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
 }
 
+interface TimeseriesRawRow {
+  time_bucket: string
+  avg_value: number | null
+  count: number
+}
+
 function bucketMs(bucketSec: number): number {
   return bucketSec * MS_PER_SEC
 }
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 export function fillTimeseries(
-  raw: any[],
+  raw: TimeseriesRawRow[],
   periodStr: string,
 ): { labels: string[]; values: number[] } {
   const bucketSec = BUCKET_SEC[periodStr] ?? DEFAULT_BUCKET_SEC
@@ -58,7 +63,7 @@ export function fillTimeseries(
   const startBucket = nowBucket - totalSec * MS_PER_SEC
   const totalBuckets = Math.round(totalSec / bucketSec)
 
-  const byKey = new Map<number, any>()
+  const byKey = new Map<number, TimeseriesRawRow>()
   for (const r of raw) {
     const d = new Date(r.time_bucket)
     const key = Math.floor(d.getTime() / bMs)
@@ -78,7 +83,6 @@ export function fillTimeseries(
 
   return { labels, values }
 }
-/* eslint-enable @typescript-eslint/no-explicit-any */
 
 function tickIndices(total: number): Set<number> {
   const result = new Set<number>()

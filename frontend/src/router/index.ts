@@ -50,8 +50,8 @@ const router = createRouter({
 router.beforeEach(async (to, _from, next) => {
   if (to.meta.requiresAuth) {
     try {
-      const axios = (await import('@/api/client')).default
-      await axios.get('/stats')
+      const { api } = await import('@/api/client')
+      await api.getStats()
       next()
     } catch {
       next('/login')

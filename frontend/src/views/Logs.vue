@@ -59,7 +59,7 @@
             </TableCell>
             <TableCell class="font-mono text-xs">{{ log.model || '-' }}</TableCell>
             <TableCell>
-              <span :class="(log.status_code ?? 0) < 400 ? 'text-green-600' : 'text-red-600'" class="font-medium">{{ log.status_code || '-' }}</span>
+              <Badge :variant="(log.status_code ?? 0) < 400 ? 'default' : 'destructive'">{{ log.status_code || '-' }}</Badge>
             </TableCell>
             <TableCell>{{ log.latency_ms ? log.latency_ms + 'ms' : '-' }}</TableCell>
             <TableCell>{{ log.is_stream ? 'Yes' : 'No' }}</TableCell>
@@ -106,34 +106,42 @@
           </div>
 
           <!-- 四阶段请求链路 -->
-          <details v-if="detailData.client_request" class="group">
-            <summary class="text-sm font-medium text-gray-700 cursor-pointer select-none flex items-center gap-1">
-              <span class="transition-transform group-open:rotate-90">&#9654;</span>
+          <Collapsible v-if="detailData.client_request" class="space-y-1">
+            <CollapsibleTrigger class="text-sm font-medium text-gray-700 cursor-pointer select-none flex items-center gap-1">
+              <span class="transition-transform data-[state=open]:rotate-90">&#9654;</span>
               客户端原始请求
-            </summary>
-            <pre class="bg-gray-900 text-green-400 rounded-md p-3 text-xs overflow-auto max-h-[25vh] whitespace-pre-wrap break-all mt-1">{{ formatJson(detailData.client_request) }}</pre>
-          </details>
-          <details v-if="detailData.upstream_request" class="group">
-            <summary class="text-sm font-medium text-gray-700 cursor-pointer select-none flex items-center gap-1">
-              <span class="transition-transform group-open:rotate-90">&#9654;</span>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <pre class="bg-gray-900 text-green-400 rounded-md p-3 text-xs overflow-auto max-h-[25vh] whitespace-pre-wrap break-all mt-1">{{ formatJson(detailData.client_request) }}</pre>
+            </CollapsibleContent>
+          </Collapsible>
+          <Collapsible v-if="detailData.upstream_request" class="space-y-1">
+            <CollapsibleTrigger class="text-sm font-medium text-gray-700 cursor-pointer select-none flex items-center gap-1">
+              <span class="transition-transform data-[state=open]:rotate-90">&#9654;</span>
               代理发送给 LLM API 的请求
-            </summary>
-            <pre class="bg-gray-900 text-yellow-400 rounded-md p-3 text-xs overflow-auto max-h-[25vh] whitespace-pre-wrap break-all mt-1">{{ formatJson(detailData.upstream_request) }}</pre>
-          </details>
-          <details v-if="detailData.upstream_response" class="group">
-            <summary class="text-sm font-medium text-gray-700 cursor-pointer select-none flex items-center gap-1">
-              <span class="transition-transform group-open:rotate-90">&#9654;</span>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <pre class="bg-gray-900 text-yellow-400 rounded-md p-3 text-xs overflow-auto max-h-[25vh] whitespace-pre-wrap break-all mt-1">{{ formatJson(detailData.upstream_request) }}</pre>
+            </CollapsibleContent>
+          </Collapsible>
+          <Collapsible v-if="detailData.upstream_response" class="space-y-1">
+            <CollapsibleTrigger class="text-sm font-medium text-gray-700 cursor-pointer select-none flex items-center gap-1">
+              <span class="transition-transform data-[state=open]:rotate-90">&#9654;</span>
               LLM API 返回的原始响应
-            </summary>
-            <pre class="bg-gray-900 text-blue-400 rounded-md p-3 text-xs overflow-auto max-h-[25vh] whitespace-pre-wrap break-all mt-1">{{ formatJson(detailData.upstream_response) }}</pre>
-          </details>
-          <details v-if="detailData.client_response" class="group">
-            <summary class="text-sm font-medium text-gray-700 cursor-pointer select-none flex items-center gap-1">
-              <span class="transition-transform group-open:rotate-90">&#9654;</span>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <pre class="bg-gray-900 text-blue-400 rounded-md p-3 text-xs overflow-auto max-h-[25vh] whitespace-pre-wrap break-all mt-1">{{ formatJson(detailData.upstream_response) }}</pre>
+            </CollapsibleContent>
+          </Collapsible>
+          <Collapsible v-if="detailData.client_response" class="space-y-1">
+            <CollapsibleTrigger class="text-sm font-medium text-gray-700 cursor-pointer select-none flex items-center gap-1">
+              <span class="transition-transform data-[state=open]:rotate-90">&#9654;</span>
               代理返回给客户端的响应
-            </summary>
-            <pre class="bg-gray-900 text-purple-400 rounded-md p-3 text-xs overflow-auto max-h-[25vh] whitespace-pre-wrap break-all mt-1">{{ formatJson(detailData.client_response) }}</pre>
-          </details>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <pre class="bg-gray-900 text-purple-400 rounded-md p-3 text-xs overflow-auto max-h-[25vh] whitespace-pre-wrap break-all mt-1">{{ formatJson(detailData.client_response) }}</pre>
+            </CollapsibleContent>
+          </Collapsible>
 
           <!-- 兼容旧日志（无四阶段数据时展示旧字段） -->
           <template v-if="!detailData.client_request">
@@ -177,6 +185,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { toast } from 'vue-sonner'
 import { api } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -185,6 +194,7 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogScrollContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 
 interface LogEntry {
   id: string
@@ -232,8 +242,9 @@ async function openDetail(id: string) {
   try {
     const res = await api.getLogDetail(id)
     detailData.value = res.data
-  } catch (e) { // eslint-disable-line taste/no-silent-catch
+  } catch (e) {
     console.error('Failed to load log detail:', e)
+    toast.error('加载日志详情失败')
   } finally {
     detailLoading.value = false
   }
@@ -251,8 +262,9 @@ async function loadLogs() {
     const res = await api.getLogs(params)
     logs.value = res.data.data
     total.value = res.data.total
-  } catch (e) { // eslint-disable-line taste/no-silent-catch
+  } catch (e) {
     console.error('Failed to load logs:', e)
+    toast.error('加载日志失败')
   }
 }
 
@@ -280,9 +292,10 @@ async function handleCleanup() {
     showCleanup.value = false
     page.value = 1
     await loadLogs()
-    alert(`已清理 ${res.data.deleted} 条日志`)
-  } catch (e) { // eslint-disable-line taste/no-silent-catch
+    toast.success(`已清理 ${res.data.deleted} 条日志`)
+  } catch (e) {
     console.error('Failed to cleanup logs:', e)
+    toast.error('清理日志失败')
   }
 }
 
@@ -290,9 +303,9 @@ async function loadRouterKeys() {
   try {
     const res = await api.getRouterKeys()
     routerKeys.value = res.data
-  // eslint-disable-next-line taste/no-silent-catch
   } catch (e) {
     console.error('Failed to load router keys:', e)
+    toast.error('加载密钥列表失败')
   }
 }
 
