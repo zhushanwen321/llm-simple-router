@@ -391,10 +391,6 @@ export interface ProxyHandlerDeps {
   matcher?: RetryRuleMatcher;
 }
 
-const HTTP_NOT_FOUND = 404;
-const HTTP_FORBIDDEN = 403;
-const HTTP_SERVICE_UNAVAILABLE = 503;
-const HTTP_INTERNAL_ERROR = 500;
 const HTTP_BAD_GATEWAY = 502;
 
 /**
