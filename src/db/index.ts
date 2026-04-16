@@ -112,4 +112,4 @@ export { getMetricsSummary, getMetricsTimeseries } from "./metrics.js";
 export type { MetricsSummaryRow, MetricsTimeseriesRow, MetricsPeriod, MetricsMetric } from "./metrics.js";
 
 export { getStats } from "./stats.js";
-export type { Stats } from "./stats.js";
+export type { Stats, StatsPeriod } from "./stats.js";

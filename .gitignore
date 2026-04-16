@@ -1,5 +1,4 @@
 # Logs
-logs
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -108,6 +107,7 @@ vite.config.ts.timestamp-*
 # Project specific
 data/
 *.db
+__pycache__/
 .DS_Store
 .code-review-graph/
 .claude/

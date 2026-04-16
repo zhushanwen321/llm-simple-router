@@ -2,10 +2,7 @@ import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
 import { Type, Static } from "@sinclair/typebox";
 import { getMetricsSummary, getMetricsTimeseries } from "../db/index.js";
-import { HTTP_BAD_REQUEST } from "./constants.js";
-
-type MetricsPeriod = "1h" | "6h" | "24h" | "7d" | "30d";
-type MetricsMetric = "ttft" | "tps" | "tokens" | "cache_rate" | "request_count" | "input_tokens" | "output_tokens" | "cache_hit_tokens";
+import type { MetricsPeriod, MetricsMetric } from "../db/metrics.js";
 
 const PeriodEnum = Type.Union([
   Type.Literal("1h"), Type.Literal("6h"), Type.Literal("24h"),

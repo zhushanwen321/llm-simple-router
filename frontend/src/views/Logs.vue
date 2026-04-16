@@ -2,7 +2,7 @@
 <template>
   <div class="p-6">
     <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-semibold text-gray-900">请求日志</h2>
+      <h2 class="text-lg font-semibold text-foreground">请求日志</h2>
       <div class="flex items-center gap-2">
         <Select v-model="filterType" @update:model-value="handleFilterChange">
           <SelectTrigger class="w-[140px]">
@@ -27,7 +27,7 @@
         </Select>
         <Button
           variant="outline"
-          class="text-red-600 border-red-300 hover:bg-red-50"
+          class="text-destructive border-destructive hover:bg-destructive/10"
           @click="showCleanup = true"
         >
           清理日志
@@ -38,22 +38,23 @@
     <div class="bg-white rounded-lg border overflow-hidden">
       <Table>
         <TableHeader>
-          <TableRow class="bg-gray-50">
-            <TableHead class="text-gray-600">ID</TableHead>
-            <TableHead class="text-gray-600">时间</TableHead>
-            <TableHead class="text-gray-600">类型</TableHead>
-            <TableHead class="text-gray-600">模型</TableHead>
-            <TableHead class="text-gray-600">状态码</TableHead>
-            <TableHead class="text-gray-600">延迟</TableHead>
-            <TableHead class="text-gray-600">流式</TableHead>
-            <TableHead class="text-gray-600">错误</TableHead>
-            <TableHead class="text-gray-600">操作</TableHead>
+          <TableRow class="bg-muted">
+            <TableHead class="text-muted-foreground">ID</TableHead>
+            <TableHead class="text-muted-foreground">时间</TableHead>
+            <TableHead class="text-muted-foreground">类型</TableHead>
+            <TableHead class="text-muted-foreground">模型</TableHead>
+            <TableHead class="text-muted-foreground">状态码</TableHead>
+            <TableHead class="text-muted-foreground">延迟</TableHead>
+            <TableHead class="text-muted-foreground">流式</TableHead>
+            <TableHead class="text-muted-foreground">重试</TableHead>
+            <TableHead class="text-muted-foreground">错误</TableHead>
+            <TableHead class="text-muted-foreground">操作</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          <TableRow v-for="log in logs" :key="log.id" :class="{ 'bg-red-50/50': (log.status_code ?? 0) >= 400 }">
-            <TableCell class="font-mono text-xs text-gray-400" :title="log.id">{{ log.id.slice(0, 8) }}</TableCell>
-            <TableCell class="text-gray-500">{{ formatTime(log.created_at) }}</TableCell>
+          <TableRow v-for="log in logs" :key="log.id" :class="{ 'bg-destructive/10': (log.status_code ?? 0) >= 400, 'bg-warning-light': log.is_retry }">
+            <TableCell class="font-mono text-xs text-muted-foreground" :title="log.id">{{ log.id.slice(0, 8) }}</TableCell>
+            <TableCell class="text-muted-foreground">{{ formatTime(log.created_at) }}</TableCell>
             <TableCell>
               <Badge :variant="log.api_type === 'openai' ? 'default' : 'secondary'">{{ log.api_type }}</Badge>
             </TableCell>
@@ -63,23 +64,27 @@
             </TableCell>
             <TableCell>{{ log.latency_ms ? log.latency_ms + 'ms' : '-' }}</TableCell>
             <TableCell>{{ log.is_stream ? 'Yes' : 'No' }}</TableCell>
-            <TableCell class="text-red-500 text-xs">{{ log.error_message || '-' }}</TableCell>
+            <TableCell>
+              <Badge v-if="log.is_retry" variant="outline" class="text-warning-dark border-warning">重试</Badge>
+              <span v-else class="text-muted-foreground">-</span>
+            </TableCell>
+            <TableCell class="text-destructive text-xs">{{ log.error_message || '-' }}</TableCell>
             <TableCell>
               <Button variant="ghost" size="sm" @click="openDetail(log.id)">详情</Button>
             </TableCell>
           </TableRow>
           <TableRow v-if="logs.length === 0">
-            <TableCell colspan="9" class="text-center text-gray-400 py-8">暂无日志</TableCell>
+            <TableCell colspan="10" class="text-center text-muted-foreground py-8">暂无日志</TableCell>
           </TableRow>
         </TableBody>
       </Table>
     </div>
 
     <div class="flex items-center justify-between mt-4">
-      <p class="text-sm text-gray-500">共 {{ total }} 条</p>
+      <p class="text-sm text-muted-foreground">共 {{ total }} 条</p>
       <div class="flex gap-1">
         <Button variant="outline" size="sm" @click="prevPage" :disabled="page <= 1">上一页</Button>
-        <span class="px-3 py-1 text-sm text-gray-600">第 {{ page }} 页</span>
+        <span class="px-3 py-1 text-sm text-muted-foreground">第 {{ page }} 页</span>
         <Button variant="outline" size="sm" @click="nextPage" :disabled="logs.length < PAGE_SIZE">下一页</Button>
       </div>
     </div>
@@ -88,78 +93,60 @@
     <Dialog v-model:open="showDetail">
       <DialogScrollContent class="max-w-4xl max-h-[85vh]">
         <DialogHeader>
-          <DialogTitle>请求详情</DialogTitle>
+          <DialogTitle class="flex items-center gap-2">请求详情 <span v-if="detailData" class="font-mono text-xs text-muted-foreground font-normal select-all">{{ detailData.id }}</span></DialogTitle>
         </DialogHeader>
-        <div v-if="detailLoading" class="py-8 text-center text-gray-400">加载中...</div>
-        <div v-else-if="detailData" class="space-y-4">
-          <div>
-            <h3 class="text-sm font-medium text-gray-700 mb-1">基本信息</h3>
-            <div class="bg-gray-50 rounded-md p-3 text-sm grid grid-cols-3 gap-2">
-              <div class="col-span-3"><span class="text-gray-500">ID:</span> <span class="font-mono text-xs select-all">{{ detailData.id }}</span></div>
-              <div><span class="text-gray-500">类型:</span> {{ detailData.api_type }}</div>
-              <div><span class="text-gray-500">模型:</span> {{ detailData.model || '-' }}</div>
-              <div><span class="text-gray-500">状态码:</span> {{ detailData.status_code || '-' }}</div>
-              <div><span class="text-gray-500">延迟:</span> {{ detailData.latency_ms ? detailData.latency_ms + 'ms' : '-' }}</div>
-              <div><span class="text-gray-500">流式:</span> {{ detailData.is_stream ? 'Yes' : 'No' }}</div>
-              <div><span class="text-gray-500">时间:</span> {{ formatTime(detailData.created_at) }}</div>
-            </div>
+        <!-- 骨架屏加载状态 -->
+        <template v-if="detailLoading">
+          <div class="space-y-3 py-4">
+            <div class="flex gap-2"><Skeleton class="h-6 w-16" /><Skeleton class="h-6 w-48" /><Skeleton class="h-6 w-12" /></div>
+            <Skeleton class="h-12 w-full" v-for="n in 4" :key="n" />
           </div>
+        </template>
 
-          <!-- 四阶段请求链路 -->
-          <Collapsible v-if="detailData.client_request" class="space-y-1">
-            <CollapsibleTrigger class="text-sm font-medium text-gray-700 cursor-pointer select-none flex items-center gap-1">
-              <span class="transition-transform data-[state=open]:rotate-90">&#9654;</span>
-              客户端原始请求
-            </CollapsibleTrigger>
-            <CollapsibleContent class="mt-1">
-              <LogRequestViewer :raw="detailData.client_request" :api-type="asApiType(detailData.api_type)" />
-            </CollapsibleContent>
-          </Collapsible>
-          <Collapsible v-if="detailData.upstream_request" class="space-y-1">
-            <CollapsibleTrigger class="text-sm font-medium text-gray-700 cursor-pointer select-none flex items-center gap-1">
-              <span class="transition-transform data-[state=open]:rotate-90">&#9654;</span>
-              代理发送给 LLM API 的请求
-            </CollapsibleTrigger>
-            <CollapsibleContent class="mt-1">
-              <LogRequestViewer show-url :raw="detailData.upstream_request" :api-type="asApiType(detailData.api_type)" />
-            </CollapsibleContent>
-          </Collapsible>
-          <Collapsible v-if="detailData.upstream_response" class="space-y-1">
-            <CollapsibleTrigger class="text-sm font-medium text-gray-700 cursor-pointer select-none flex items-center gap-1">
-              <span class="transition-transform data-[state=open]:rotate-90">&#9654;</span>
-              LLM API 返回的原始响应
-            </CollapsibleTrigger>
-            <CollapsibleContent class="mt-1">
-              <LogResponseViewer :raw="detailData.upstream_response" :api-type="asApiType(detailData.api_type)" :is-stream="!!detailData.is_stream" />
-            </CollapsibleContent>
-          </Collapsible>
-          <Collapsible v-if="detailData.client_response" class="space-y-1">
-            <CollapsibleTrigger class="text-sm font-medium text-gray-700 cursor-pointer select-none flex items-center gap-1">
-              <span class="transition-transform data-[state=open]:rotate-90">&#9654;</span>
-              代理返回给客户端的响应
-            </CollapsibleTrigger>
-            <CollapsibleContent class="mt-1">
-              <LogResponseViewer :raw="detailData.client_response" :api-type="asApiType(detailData.api_type)" :is-stream="!!detailData.is_stream" />
-            </CollapsibleContent>
-          </Collapsible>
-
-          <!-- 兼容旧日志（无四阶段数据时展示旧字段） -->
-          <template v-if="!detailData.client_request">
+        <template v-else-if="detailData">
+          <!-- 重试关联信息 -->
+          <div v-if="detailData.is_retry" class="flex items-center gap-2 mb-3 px-1">
+            <Badge variant="outline" class="text-warning-dark border-warning">重试请求</Badge>
+            <span class="text-xs text-muted-foreground">
+              原始请求：
+              <Button variant="link" class="h-auto p-0 text-xs font-mono text-primary underline" @click="jumpToRequest(detailData.original_request_id!)">
+                {{ detailData.original_request_id?.slice(0, 8) }}
+              </Button>
+            </span>
+          </div>
+          <!-- 有四阶段数据：使用新组件 -->
+          <template v-if="detailData.client_request">
+            <LogDetailFlow
+              v-if="viewState === 'timeline'"
+              :log="detailData"
+              :mode="globalMode"
+              @select-stage="selectedStage = $event; viewState = 'detail'"
+              @update:mode="globalMode = $event"
+            />
+            <LogStageDetail
+              v-else
+              :log="detailData"
+              :stage="selectedStage"
+              :mode="globalMode"
+              @back="viewState = 'timeline'"
+              @select-stage="selectedStage = $event"
+              @update:mode="globalMode = $event"
+            />
+          </template>
+          <!-- 旧日志兼容（无四阶段数据） -->
+          <template v-else>
             <div v-if="detailData.request_body">
-              <h3 class="text-sm font-medium text-gray-700 mb-1">Request Body</h3>
               <LogRequestViewer :raw="detailData.request_body" :api-type="asApiType(detailData.api_type)" />
             </div>
             <div v-if="detailData.response_body">
-              <h3 class="text-sm font-medium text-gray-700 mb-1">Response Body</h3>
               <LogResponseViewer :raw="detailData.response_body" :api-type="asApiType(detailData.api_type)" :is-stream="!!detailData.is_stream" />
             </div>
           </template>
-          <div v-if="detailData.error_message">
-            <h3 class="text-sm font-medium text-gray-700 mb-1">错误信息</h3>
-            <pre class="bg-red-50 text-red-600 rounded-md p-3 text-xs overflow-auto max-h-[10vh] whitespace-pre-wrap">{{ detailData.error_message }}</pre>
+          <div v-if="detailData.error_message" class="mt-4 bg-danger-light text-danger-dark rounded-md p-3 text-sm">
+            {{ detailData.error_message }}
           </div>
-        </div>
-        <div v-else class="py-8 text-center text-gray-400">未找到日志</div>
+        </template>
+        <div v-else class="py-8 text-center text-muted-foreground">未找到日志</div>
       </DialogScrollContent>
     </Dialog>
 
@@ -169,9 +156,9 @@
         <DialogHeader>
           <DialogTitle>清理日志</DialogTitle>
         </DialogHeader>
-        <p class="text-sm text-gray-600">删除指定天数之前的日志</p>
+        <p class="text-sm text-muted-foreground">删除指定天数之前的日志</p>
         <div class="mb-4">
-          <Label class="block text-sm font-medium text-gray-700 mb-1">保留最近天数</Label>
+          <Label class="block text-sm font-medium text-foreground mb-1">保留最近天数</Label>
           <Input v-model.number="cleanupDays" type="number" :min="1" />
         </div>
         <DialogFooter>
@@ -194,9 +181,12 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogScrollContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { Skeleton } from '@/components/ui/skeleton'
 import LogRequestViewer from '@/components/logs/LogRequestViewer.vue'
 import LogResponseViewer from '@/components/logs/LogResponseViewer.vue'
+import LogDetailFlow from '@/components/logs/LogDetailFlow.vue'
+import LogStageDetail from '@/components/logs/LogStageDetail.vue'
+import type { StageKey } from '@/components/logs/logColors'
 
 interface LogEntry {
   id: string
@@ -213,6 +203,8 @@ interface LogEntry {
   upstream_request: string | null
   upstream_response: string | null
   client_response: string | null
+  is_retry: number
+  original_request_id: string | null
 }
 
 const logs = ref<LogEntry[]>([])
@@ -228,6 +220,10 @@ const showDetail = ref(false)
 const detailLoading = ref(false)
 const detailData = ref<LogEntry | null>(null)
 
+const viewState = ref<'timeline' | 'detail'>('timeline')
+const selectedStage = ref<StageKey>('client_req')
+const globalMode = ref<'structured' | 'raw'>('structured')
+
 function asApiType(t: string): 'openai' | 'anthropic' {
   return t === 'openai' ? 'openai' : 'anthropic'
 }
@@ -236,6 +232,8 @@ async function openDetail(id: string) {
   showDetail.value = true
   detailLoading.value = true
   detailData.value = null
+  viewState.value = 'timeline'
+  globalMode.value = 'structured'
   try {
     const res = await api.getLogDetail(id)
     detailData.value = res.data
@@ -245,6 +243,10 @@ async function openDetail(id: string) {
   } finally {
     detailLoading.value = false
   }
+}
+
+function jumpToRequest(id: string) {
+  openDetail(id)
 }
 
 function formatTime(iso: string): string {

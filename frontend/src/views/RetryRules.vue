@@ -1,7 +1,7 @@
 <template>
   <div class="p-6">
     <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-semibold text-gray-900">重试规则</h2>
+      <h2 class="text-lg font-semibold text-foreground">重试规则</h2>
       <Button @click="openCreate" class="flex items-center gap-1">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
@@ -13,29 +13,29 @@
     <div class="bg-white rounded-lg border overflow-hidden">
       <Table>
         <TableHeader>
-          <TableRow class="bg-gray-50">
-            <TableHead class="text-gray-600">名称</TableHead>
-            <TableHead class="text-gray-600">HTTP 状态码</TableHead>
-            <TableHead class="text-gray-600">响应体匹配</TableHead>
-            <TableHead class="text-gray-600">状态</TableHead>
-            <TableHead class="text-right text-gray-600">操作</TableHead>
+          <TableRow class="bg-muted">
+            <TableHead class="text-muted-foreground">名称</TableHead>
+            <TableHead class="text-muted-foreground">HTTP 状态码</TableHead>
+            <TableHead class="text-muted-foreground">响应体匹配</TableHead>
+            <TableHead class="text-muted-foreground">状态</TableHead>
+            <TableHead class="text-right text-muted-foreground">操作</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           <TableRow v-for="r in rules" :key="r.id">
             <TableCell class="font-mono text-sm">{{ r.name }}</TableCell>
             <TableCell>{{ r.status_code }}</TableCell>
-            <TableCell class="font-mono text-xs text-gray-500">{{ r.body_pattern }}</TableCell>
+            <TableCell class="font-mono text-xs text-muted-foreground">{{ r.body_pattern }}</TableCell>
             <TableCell>
               <Badge :variant="r.is_active ? 'default' : 'secondary'">{{ r.is_active ? '启用' : '禁用' }}</Badge>
             </TableCell>
             <TableCell class="text-right">
               <Button variant="ghost" size="sm" @click="openEdit(r)" class="mr-2">编辑</Button>
-              <Button variant="ghost" size="sm" class="text-red-600 hover:text-red-700" @click="confirmDelete(r)">删除</Button>
+              <Button variant="ghost" size="sm" class="text-destructive hover:text-destructive" @click="confirmDelete(r)">删除</Button>
             </TableCell>
           </TableRow>
           <TableRow v-if="rules.length === 0">
-            <TableCell colspan="5" class="text-center text-gray-400 py-8">暂无规则</TableCell>
+            <TableCell colspan="5" class="text-center text-muted-foreground py-8">暂无规则</TableCell>
           </TableRow>
         </TableBody>
       </Table>
@@ -49,20 +49,20 @@
         </DialogHeader>
         <form @submit.prevent="handleSave" class="space-y-3">
           <div>
-            <Label class="block text-sm font-medium text-gray-700 mb-1">名称</Label>
+            <Label class="block text-sm font-medium text-foreground mb-1">名称</Label>
             <Input v-model="form.name" type="text" required />
           </div>
           <div>
-            <Label class="block text-sm font-medium text-gray-700 mb-1">HTTP 状态码</Label>
+            <Label class="block text-sm font-medium text-foreground mb-1">HTTP 状态码</Label>
             <Input v-model.number="form.status_code" type="number" required />
           </div>
           <div>
-            <Label class="block text-sm font-medium text-gray-700 mb-1">响应体匹配</Label>
+            <Label class="block text-sm font-medium text-foreground mb-1">响应体匹配</Label>
             <Input v-model="form.body_pattern" type="text" placeholder="正则表达式，例如 .*rate_limit.*" required />
           </div>
           <div class="flex items-center gap-2">
             <input v-model="form.is_active" type="checkbox" id="rule-active" class="rounded" />
-            <Label for="rule-active" class="text-sm text-gray-700">启用</Label>
+            <Label for="rule-active" class="text-sm text-foreground">启用</Label>
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" @click="dialogOpen = false">取消</Button>

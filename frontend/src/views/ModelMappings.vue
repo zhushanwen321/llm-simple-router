@@ -1,7 +1,7 @@
 <template>
   <div class="p-6">
     <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-semibold text-gray-900">模型映射</h2>
+      <h2 class="text-lg font-semibold text-foreground">模型映射</h2>
       <Button @click="openCreate" class="flex items-center gap-1">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
@@ -25,39 +25,39 @@
                 </Button>
               </CollapsibleTrigger>
               <Button variant="ghost" size="sm" @click="openEdit(g)">编辑</Button>
-              <Button variant="ghost" size="sm" class="text-red-600 hover:text-red-700" @click="deleteTarget = g">删除</Button>
+              <Button variant="ghost" size="sm" class="text-destructive hover:text-destructive" @click="deleteTarget = g">删除</Button>
             </div>
           </CardHeader>
           <CollapsibleContent>
             <CardContent>
               <div class="space-y-3">
                 <div class="flex items-center gap-2 text-sm">
-                  <span class="text-gray-500">默认模型:</span>
+                  <span class="text-muted-foreground">默认模型:</span>
                   <span class="font-mono">{{ g.parsedRule.default?.backend_model || '-' }}</span>
-                  <span class="text-gray-400">/</span>
+                  <span class="text-muted-foreground">/</span>
                   <span>{{ providerNameMap.get(g.parsedRule.default?.provider_id || '') || '-' }}</span>
                 </div>
                 <div v-if="g.parsedRule.windows?.length" class="space-y-2">
-                  <div class="text-sm text-gray-500">时间窗口</div>
+                  <div class="text-sm text-muted-foreground">时间窗口</div>
                   <div
                     v-for="(w, idx) in g.parsedRule.windows"
                     :key="idx"
                     class="flex items-center gap-2 text-sm"
                   >
-                    <span class="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded">{{ w.start }} - {{ w.end }}</span>
+                    <span class="font-mono text-xs bg-muted px-2 py-0.5 rounded">{{ w.start }} - {{ w.end }}</span>
                     <span class="font-mono">{{ w.backend_model }}</span>
-                    <span class="text-gray-400">/</span>
+                    <span class="text-muted-foreground">/</span>
                     <span>{{ providerNameMap.get(w.provider_id) || w.provider_id }}</span>
                   </div>
                 </div>
-                <div v-else class="text-sm text-gray-400">无时间窗口</div>
+                <div v-else class="text-sm text-muted-foreground">无时间窗口</div>
               </div>
             </CardContent>
           </CollapsibleContent>
         </Collapsible>
       </Card>
 
-      <div v-if="groups.length === 0" class="text-center text-gray-400 py-12 bg-white rounded-xl border">
+      <div v-if="groups.length === 0" class="text-center text-muted-foreground py-12 bg-white rounded-xl border">
         暂无映射分组
       </div>
     </div>
@@ -108,8 +108,10 @@ interface Provider {
 interface RuleWindow {
   start: string
   end: string
-  backend_model: string
-  provider_id: string
+  target: {
+    backend_model: string
+    provider_id: string
+  }
 }
 
 interface Rule {
@@ -137,26 +139,16 @@ const providerNameMap = computed(() => {
   return map
 })
 
-// 从已有分组中提取每个 provider 对应的去重模型列表
+// 从供应商的 models 字段获取可用模型列表
 const providerModelsMap = computed(() => {
-  const map = new Map<string, Set<string>>()
-  for (const g of groups.value) {
-    try {
-      const rule = JSON.parse(g.rule) as Rule
-      const entries = [
-        rule.default,
-        ...(rule.windows || []),
-      ].filter(Boolean) as Array<{ provider_id?: string; backend_model?: string }>
-      for (const e of entries) {
-        if (e.provider_id && e.backend_model) {
-          const set = map.get(e.provider_id) || new Set<string>()
-          set.add(e.backend_model)
-          map.set(e.provider_id, set)
-        }
-      }
-    } catch { /* skip invalid rule */ }
+  const map = new Map<string, string[]>()
+  for (const p of providersList.value) {
+    const models = (p as Provider & { models?: string[] }).models
+    if (Array.isArray(models) && models.length > 0) {
+      map.set(p.id, [...models])
+    }
   }
-  return new Map([...map.entries()].map(([k, v]) => [k, [...v]]))
+  return map
 })
 
 // 预解析 rule，避免模板中重复调用 parsedRule()
@@ -165,7 +157,10 @@ const groupsWithParsedRule = computed(() =>
     let parsedRule: Rule = {}
     try {
       parsedRule = JSON.parse(g.rule) as Rule
-    } catch { /* keep default empty */ }
+    // eslint-disable-next-line taste/no-silent-catch -- computed 中无法传播异常，使用空默认值
+    } catch {
+      // rule 格式异常时使用空默认值
+    }
     return { ...g, parsedRule }
   })
 )
@@ -190,9 +185,11 @@ async function loadData() {
 
 function openCreate() {
   editingId.value = null
+  const firstProviderId = providersList.value[0]?.id || ''
+  const firstModels = providerModelsMap.value.get(firstProviderId) || []
   form.value = {
     ...DEFAULT_FORM,
-    default: { backend_model: '', provider_id: providersList.value[0]?.id || '' },
+    default: { backend_model: firstModels[0] || '', provider_id: firstProviderId },
   }
   dialogOpen.value = true
 }
@@ -200,7 +197,7 @@ function openCreate() {
 function openEdit(g: MappingGroup & { parsedRule?: Rule }) {
   editingId.value = g.id
   let rule: Rule = {}
-  try { rule = JSON.parse(g.rule) as Rule } catch { /* empty */ }
+  try { rule = JSON.parse(g.rule) as Rule } catch { /* eslint-disable-line taste/no-silent-catch -- 格式异常时使用空默认值 */ }
   form.value = {
     client_model: g.client_model,
     strategy: g.strategy,
@@ -214,11 +211,15 @@ function openEdit(g: MappingGroup & { parsedRule?: Rule }) {
 }
 
 function addWindow() {
+  const firstProviderId = providersList.value[0]?.id || ''
+  const firstModels = providerModelsMap.value.get(firstProviderId) || []
   form.value.windows.push({
     start: '',
     end: '',
-    backend_model: '',
-    provider_id: providersList.value[0]?.id || '',
+    target: {
+      backend_model: firstModels[0] || '',
+      provider_id: firstProviderId,
+    },
   })
 }
 

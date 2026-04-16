@@ -8,7 +8,7 @@
     >
       {{ copied ? '已复制' : '复制' }}
     </Button>
-    <pre class="bg-gray-900 text-gray-100 rounded-md p-3 text-xs overflow-auto max-h-[40vh] whitespace-pre-wrap break-all">{{ content }}</pre>
+    <pre class="bg-background text-foreground rounded-md p-3 text-xs overflow-auto max-h-[40vh] whitespace-pre-wrap break-all border">{{ content }}</pre>
   </div>
 </template>
 
@@ -17,11 +17,13 @@ import { ref } from 'vue'
 import { Button } from '@/components/ui/button'
 
 const props = defineProps<{ content: string }>()
+const COPIED_FEEDBACK_MS = 1500
+
 const copied = ref(false)
 
 async function handleCopy() {
   await navigator.clipboard.writeText(props.content)
   copied.value = true
-  setTimeout(() => { copied.value = false }, 1500)
+  setTimeout(() => { copied.value = false }, COPIED_FEEDBACK_MS)
 }
 </script>

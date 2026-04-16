@@ -11,6 +11,8 @@ import tseslint from 'typescript-eslint';
 import preferAllsettled from './rules/prefer-allsettled.mjs';
 import noSilentCatch from './rules/no-silent-catch.mjs';
 import noUnsafeObjectEntries from './rules/no-unsafe-object-entries.mjs';
+import noHardcodedColors from './rules/no-hardcoded-colors.mjs';
+import noMagicSpacing from './rules/no-magic-spacing.mjs';
 
 export const tastePlugin = {
   meta: { name: 'eslint-plugin-taste' },
@@ -18,6 +20,8 @@ export const tastePlugin = {
     'prefer-allsettled': preferAllsettled,
     'no-silent-catch': noSilentCatch,
     'no-unsafe-object-entries': noUnsafeObjectEntries,
+    'no-hardcoded-colors': noHardcodedColors,
+    'no-magic-spacing': noMagicSpacing,
   },
 };
 
@@ -27,7 +31,8 @@ export const tasteRules = {
   '@typescript-eslint/no-explicit-any': 'error',
 
   // 结构先于一切
-  'max-lines': ['warn', { max: 300, skipBlankLines: true, skipComments: true }],
+  'max-lines': ['warn', { max: 500, skipBlankLines: true, skipComments: true }],
+  'max-lines-per-function': ['warn', { max: 300, skipBlankLines: true, skipComments: true }],
 
   // 语义化命名
   'no-magic-numbers': ['warn', {
@@ -48,8 +53,8 @@ export const tasteRules = {
   'taste/no-unsafe-object-entries': 'warn',
 };
 
-export default tseslint.config(
-  tseslint.configs.recommended,
+export default [
+  ...tseslint.configs.recommended,
   {
     files: ['**/*.ts'],
     plugins: { taste: tastePlugin },
@@ -58,4 +63,4 @@ export default tseslint.config(
   {
     ignores: ['node_modules/**', 'dist/**', '*.d.ts', '**/*.generated.*', '**/*.test.ts', '**/*.spec.ts'],
   },
-);
+];

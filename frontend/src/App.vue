@@ -1,7 +1,7 @@
 <template>
   <div v-if="isAuthenticated" class="min-h-screen flex">
     <Sidebar />
-    <main class="flex-1 overflow-auto bg-gray-50">
+    <main class="flex-1 overflow-auto bg-muted">
       <router-view />
     </main>
   </div>

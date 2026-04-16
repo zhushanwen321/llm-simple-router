@@ -8,11 +8,11 @@
       </DialogHeader>
       <form @submit.prevent="handleSave" class="space-y-4">
         <div>
-          <Label class="block text-sm font-medium text-gray-700 mb-1">客户端模型</Label>
+          <Label class="block text-sm font-medium text-foreground mb-1">客户端模型</Label>
           <Input v-model="form.client_model" type="text" required />
         </div>
         <div>
-          <Label class="block text-sm font-medium text-gray-700 mb-1">策略</Label>
+          <Label class="block text-sm font-medium text-foreground mb-1">策略</Label>
           <Select v-model="form.strategy">
             <SelectTrigger>
               <SelectValue placeholder="选择策略" />
@@ -24,11 +24,11 @@
         </div>
 
         <div class="border rounded-lg p-3 space-y-3">
-          <div class="text-sm font-medium text-gray-700">默认目标</div>
+          <div class="text-sm font-medium text-foreground">默认目标</div>
           <div class="flex gap-3">
             <div class="flex-1">
-              <Label class="block text-xs text-gray-500 mb-1">供应商</Label>
-              <Select v-model="form.default.provider_id" @update:model-value="onDefaultProviderChange">
+              <Label class="block text-xs text-muted-foreground mb-1">供应商</Label>
+              <Select :model-value="form.default.provider_id" @update:model-value="onDefaultProviderChange">
                 <SelectTrigger>
                   <SelectValue placeholder="选择供应商" />
                 </SelectTrigger>
@@ -38,23 +38,22 @@
               </Select>
             </div>
             <div class="flex-1">
-              <Label class="block text-xs text-gray-500 mb-1">后端模型</Label>
-              <Input
-                v-model="form.default.backend_model"
-                type="text"
-                list="datalist-default-model"
-                required
-              />
-              <datalist id="datalist-default-model">
-                <option v-for="m in defaultModels" :key="m" :value="m" />
-              </datalist>
+              <Label class="block text-xs text-muted-foreground mb-1">后端模型</Label>
+              <Select v-model="form.default.backend_model" :disabled="defaultModels.length === 0">
+                <SelectTrigger>
+                  <SelectValue :placeholder="defaultModels.length === 0 ? '暂无可用模型' : '选择后端模型'" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem v-for="m in defaultModels" :key="m" :value="m">{{ m }}</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </div>
 
         <div class="border rounded-lg p-3 space-y-3">
           <div class="flex items-center justify-between">
-            <div class="text-sm font-medium text-gray-700">时间窗口</div>
+            <div class="text-sm font-medium text-foreground">时间窗口</div>
             <Button type="button" variant="outline" size="sm" @click="emit('addWindow')">添加窗口</Button>
           </div>
           <div
@@ -64,21 +63,21 @@
           >
             <div class="flex items-end gap-2">
               <div class="w-24">
-                <Label class="block text-xs text-gray-500 mb-1">开始</Label>
+                <Label class="block text-xs text-muted-foreground mb-1">开始</Label>
                 <Input v-model="w.start" type="text" placeholder="HH:MM" required />
               </div>
-              <span class="text-gray-400 pb-1.5">-</span>
+              <span class="text-muted-foreground pb-1.5">-</span>
               <div class="w-24">
-                <Label class="block text-xs text-gray-500 mb-1">结束</Label>
+                <Label class="block text-xs text-muted-foreground mb-1">结束</Label>
                 <Input v-model="w.end" type="text" placeholder="HH:MM" required />
               </div>
               <div class="flex-1" />
-              <Button type="button" variant="ghost" size="sm" class="text-red-600 shrink-0" @click="emit('removeWindow', idx)">删除</Button>
+              <Button type="button" variant="ghost" size="sm" class="text-destructive shrink-0" @click="emit('removeWindow', idx)">删除</Button>
             </div>
             <div class="flex gap-2">
               <div class="flex-1">
-                <Label class="block text-xs text-gray-500 mb-1">供应商</Label>
-                <Select v-model="w.provider_id" @update:model-value="onWindowProviderChange(idx, $event)">
+                <Label class="block text-xs text-muted-foreground mb-1">供应商</Label>
+                <Select :model-value="w.target.provider_id" @update:model-value="onWindowProviderChange(idx, $event)">
                   <SelectTrigger>
                     <SelectValue placeholder="选择供应商" />
                   </SelectTrigger>
@@ -88,20 +87,19 @@
                 </Select>
               </div>
               <div class="flex-1">
-                <Label class="block text-xs text-gray-500 mb-1">后端模型</Label>
-                <Input
-                  v-model="w.backend_model"
-                  type="text"
-                  :list="`datalist-window-model-${idx}`"
-                  required
-                />
-                <datalist :id="`datalist-window-model-${idx}`">
-                  <option v-for="m in getWindowModels(idx)" :key="m" :value="m" />
-                </datalist>
+                <Label class="block text-xs text-muted-foreground mb-1">后端模型</Label>
+                <Select v-model="w.target.backend_model" :disabled="getWindowModels(idx).length === 0">
+                  <SelectTrigger>
+                    <SelectValue :placeholder="getWindowModels(idx).length === 0 ? '暂无可用模型' : '选择后端模型'" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem v-for="m in getWindowModels(idx)" :key="m" :value="m">{{ m }}</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </div>
-          <div v-if="form.windows.length === 0" class="text-sm text-gray-400">暂无窗口</div>
+          <div v-if="form.windows.length === 0" class="text-sm text-muted-foreground">暂无窗口</div>
         </div>
 
         <DialogFooter>
@@ -129,8 +127,10 @@ interface Provider {
 interface RuleWindow {
   start: string
   end: string
-  backend_model: string
-  provider_id: string
+  target: {
+    backend_model: string
+    provider_id: string
+  }
 }
 
 interface FormData {
@@ -160,26 +160,24 @@ const defaultModels = computed(() =>
 )
 
 function getWindowModels(idx: number): string[] {
-  const providerId = props.form.windows[idx]?.provider_id
+  const providerId = props.form.windows[idx]?.target?.provider_id
   return providerId ? (props.providerModels.get(providerId) || []) : []
 }
 
-function onDefaultProviderChange() {
-  // 供应商切换时，如果当前模型不在新供应商的列表中，清空模型
-  const models = props.providerModels.get(props.form.default.provider_id) || []
-  if (props.form.default.backend_model && models.length > 0 && !models.includes(props.form.default.backend_model)) {
-    // eslint-disable-next-line vue/no-mutating-props
-    props.form.default.backend_model = ''
-  }
+function onDefaultProviderChange(providerId: string) {
+  // eslint-disable-next-line vue/no-mutating-props
+  props.form.default.provider_id = providerId
+  const models = props.providerModels.get(providerId) || []
+  // eslint-disable-next-line vue/no-mutating-props
+  props.form.default.backend_model = models[0] || ''
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function onWindowProviderChange(idx: number, _providerId: string) {
-  const models = props.providerModels.get(props.form.windows[idx]?.provider_id || '') || []
-  if (props.form.windows[idx]?.backend_model && models.length > 0 && !models.includes(props.form.windows[idx].backend_model)) {
-    // eslint-disable-next-line vue/no-mutating-props
-    props.form.windows[idx].backend_model = ''
-  }
+function onWindowProviderChange(idx: number, providerId: string) {
+  // eslint-disable-next-line vue/no-mutating-props
+  props.form.windows[idx].target.provider_id = providerId
+  const models = props.providerModels.get(providerId) || []
+  // eslint-disable-next-line vue/no-mutating-props
+  props.form.windows[idx].target.backend_model = models[0] || ''
 }
 
 function handleSave() {

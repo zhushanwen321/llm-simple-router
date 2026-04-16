@@ -58,6 +58,27 @@ export default {
           border: 'var(--sidebar-border)',
           ring: 'var(--sidebar-ring)',
         },
+        success: {
+          DEFAULT: 'var(--color-success)',
+          light: 'var(--color-success-light)',
+          dark: 'var(--color-success-dark)',
+        },
+        warning: {
+          DEFAULT: 'var(--color-warning)',
+          light: 'var(--color-warning-light)',
+          dark: 'var(--color-warning-dark)',
+        },
+        danger: {
+          DEFAULT: 'var(--color-danger)',
+          light: 'var(--color-danger-light)',
+          dark: 'var(--color-danger-dark)',
+        },
+        info: {
+          DEFAULT: 'var(--color-info)',
+          light: 'var(--color-info-light)',
+          dark: 'var(--color-info-dark)',
+        },
+        page: 'var(--color-bg-page)',
       },
       borderRadius: {
         lg: 'var(--radius)',
@@ -67,6 +88,16 @@ export default {
       fontFamily: {
         sans: ['var(--font-sans)'],
         heading: ['var(--font-heading)'],
+      },
+      boxShadow: {
+        card: 'var(--shadow-card)',
+        elevated: 'var(--shadow-elevated)',
+        focus: 'var(--shadow-focus)',
+      },
+      zIndex: {
+        dropdown: 'var(--z-dropdown)',
+        modal: 'var(--z-modal)',
+        toast: 'var(--z-toast)',
       },
     },
   },

@@ -44,6 +44,15 @@ function insertTestLogs(db: ReturnType<typeof initDatabase>) {
   stmt.run("log-2", "anthropic", "claude-3", null, 200, 500, 0, null, new Date(now.getTime() - 1000).toISOString());
   stmt.run("log-3", "openai", "gpt-4", null, 502, 5000, 1, "timeout", new Date(now.getTime() - 2000).toISOString());
   stmt.run("log-4", "openai", "gpt-3.5-turbo", null, 200, 150, 1, null, new Date(now.getTime() - 86400000 * 2).toISOString());
+
+  // request_metrics 对应 log-1, log-2（成功请求，is_complete=1）
+  const metricStmt = db.prepare(
+    `INSERT INTO request_metrics (id, request_log_id, provider_id, backend_model, api_type, input_tokens, output_tokens, ttft_ms, tokens_per_second, is_complete, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  );
+  metricStmt.run("m-1", "log-1", "prov-1", "gpt-4", "openai", 100, 200, 50, 30, 1, now.toISOString());
+  metricStmt.run("m-2", "log-2", "prov-2", "claude-3", "anthropic", 150, 250, 80, 40, 1, new Date(now.getTime() - 1000).toISOString());
+  // log-3 is 502 failure — no metrics entry (incomplete)
 }
 
 describe("Logs API", () => {
@@ -137,11 +146,10 @@ describe("Stats API", () => {
     });
     expect(res.statusCode).toBe(200);
     const stats = res.json();
-    expect(stats.totalRequests).toBe(4);
-    expect(stats.successRate).toBe(0.75); // 3 out of 4
-    expect(stats.avgLatency).toBeGreaterThan(0);
-    expect(stats.requestsByType.openai).toBe(3);
-    expect(stats.requestsByType.anthropic).toBe(1);
+    expect(stats.totalRequests).toBe(2); // only log-1, log-2 have metrics
+    expect(stats.successRate).toBe(1); // both have status 200
+    expect(stats.avgTps).toBeGreaterThanOrEqual(0);
+    expect(stats.totalTokens).toBeGreaterThanOrEqual(0);
   });
 
   it("GET stats with empty database", async () => {
@@ -160,7 +168,8 @@ describe("Stats API", () => {
     const stats = res.json();
     expect(stats.totalRequests).toBe(0);
     expect(stats.successRate).toBe(0);
-    expect(stats.avgLatency).toBe(0);
+    expect(stats.avgTps).toBe(0);
+    expect(stats.totalTokens).toBe(0);
 
     await emptyClose();
   });

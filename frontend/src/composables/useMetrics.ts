@@ -3,6 +3,7 @@ import { toast } from 'vue-sonner'
 import type { ChartData } from 'chart.js'
 import { api } from '@/api/client'
 import { fillTimeseries } from '@/views/metrics-helpers'
+import { CHART_COLORS } from '@/styles/design-tokens'
 
 const PERCENT_MULTIPLIER = 100
 
@@ -99,17 +100,17 @@ export function useMetrics() {
 
       const hasAny = ttftOk?.length || tpsOk?.length || inputTokensOk?.length || outputTokensOk?.length || cacheHitTokensOk?.length || cacheRateOk?.length
 
-      ttftData.value = hasAny ? toDataset('TTFT (ms)', '#3b82f6', 'rgba(59,130,246,0.1)', false, ttftFilled) : null
-      tpsData.value = hasAny ? toDataset('TPS', '#8b5cf6', 'rgba(139,92,246,0.1)', false, tpsFilled) : null
+      ttftData.value = hasAny ? toDataset('TTFT (ms)', CHART_COLORS.blue, CHART_COLORS.blueFillLight, false, ttftFilled) : null
+      tpsData.value = hasAny ? toDataset('TPS', CHART_COLORS.purple, CHART_COLORS.purpleFill, false, tpsFilled) : null
       tokensData.value = hasAny ? {
         labels: inputTokensFilled.labels,
         datasets: [
-          { label: 'Input Tokens', data: inputTokensFilled.values, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.3)', fill: true, tension: 0.4, pointRadius: 0 },
-          { label: 'Output Tokens', data: outputTokensFilled.values, borderColor: '#8b5cf6', backgroundColor: 'rgba(139,92,246,0.3)', fill: true, tension: 0.4, pointRadius: 0 },
-          { label: 'Cache Hit Tokens', data: cacheHitTokensFilled.values, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.3)', fill: true, tension: 0.4, pointRadius: 0 },
+          { label: 'Input Tokens', data: inputTokensFilled.values, borderColor: CHART_COLORS.blue, backgroundColor: CHART_COLORS.blueFill, fill: true, tension: 0.4, pointRadius: 0 },
+          { label: 'Output Tokens', data: outputTokensFilled.values, borderColor: CHART_COLORS.purple, backgroundColor: CHART_COLORS.purpleFill, fill: true, tension: 0.4, pointRadius: 0 },
+          { label: 'Cache Hit Tokens', data: cacheHitTokensFilled.values, borderColor: CHART_COLORS.green, backgroundColor: CHART_COLORS.greenFill, fill: true, tension: 0.4, pointRadius: 0 },
         ],
       } : null
-      cacheRateData.value = hasAny ? toDataset('Cache Hit Rate', '#f59e0b', 'rgba(245,158,11,0.1)', false, {
+      cacheRateData.value = hasAny ? toDataset('Cache Hit Rate', CHART_COLORS.amber, CHART_COLORS.amberFill, false, {
         labels: cacheRateFilled.labels,
         values: cacheRateFilled.values.map((v) => v * PERCENT_MULTIPLIER),
       }) : null
