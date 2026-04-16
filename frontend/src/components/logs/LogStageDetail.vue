@@ -12,7 +12,7 @@
     <!-- 2. 阶段快速切换 tabs + 模式切换（sticky） -->
     <div class="flex items-center justify-between mb-3 border-b pb-2 sticky top-0 z-10 bg-background">
       <div class="flex gap-1">
-        <Button v-for="(s, key) in stageList" :key="key" variant="ghost" size="xs"
+        <Button v-for="(_, key) in stageList" :key="key" variant="ghost" size="xs"
           :class="[STAGE_COLORS[key as StageKey].text, stage === key ? 'ring-1 ring-ring' : 'opacity-50']"
           @click="emit('selectStage', key as StageKey)">
           {{ STAGE_COLORS[key as StageKey].label }}

@@ -4,7 +4,7 @@
     <!-- 摘要条 -->
     <div class="flex flex-wrap items-center gap-2 pb-3 border-b">
       <Badge v-if="clientParsed?.method" variant="secondary" class="font-mono">{{ clientParsed.method }}</Badge>
-      <span v-if="clientParsed?.url" class="text-xs font-mono text-muted-foreground truncate max-w-[200px]" :title="clientParsed.url">{{ clientParsed.url }}</span>
+      <span v-if="clientParsed?.url" class="text-xs font-mono text-muted-foreground truncate max-w-[200px]" :title="String(clientParsed.url)">{{ clientParsed.url }}</span>
       <Badge v-if="respParsed?.statusCode" :variant="(respParsed.statusCode ?? 0) < 400 ? 'default' : 'destructive'">{{ respParsed.statusCode }}</Badge>
       <span v-if="log.latency_ms" class="text-xs tabular-nums text-muted-foreground">{{ log.latency_ms }}ms</span>
       <Badge v-if="log.is_stream" variant="outline" class="border-dashed">SSE</Badge>

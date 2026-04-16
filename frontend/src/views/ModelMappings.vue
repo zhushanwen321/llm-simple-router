@@ -45,9 +45,9 @@
                     class="flex items-center gap-2 text-sm"
                   >
                     <span class="font-mono text-xs bg-muted px-2 py-0.5 rounded">{{ w.start }} - {{ w.end }}</span>
-                    <span class="font-mono">{{ w.backend_model }}</span>
+                    <span class="font-mono">{{ w.target.backend_model }}</span>
                     <span class="text-muted-foreground">/</span>
-                    <span>{{ providerNameMap.get(w.provider_id) || w.provider_id }}</span>
+                    <span>{{ providerNameMap.get(w.target.provider_id) || w.target.provider_id }}</span>
                   </div>
                 </div>
                 <div v-else class="text-sm text-muted-foreground">无时间窗口</div>
