@@ -5,6 +5,7 @@
 1. 禁止使用原生 HTML 元素（应使用 shadcn-vue 组件）
 2. 禁止使用 Emoji 图标（应使用 lucide-vue-next）
 3. 禁止编写自定义 CSS（应使用 Tailwind 工具类）
+4. <template> 行数上限 400 行，<script setup> 行数上限 300 行
 
 用法：
   单文件: python3 vue_rules_checker.py <absolute_path> <relative_path>
@@ -31,6 +32,10 @@ SHADCN_COMPONENTS_MAP = {
 
 # 允许保留原生 HTML 元素的文件（子串匹配）
 NATIVE_ELEM_WHITELIST: list[str] = []
+
+# .vue 文件各区块行数上限
+MAX_TEMPLATE_LINES = 400
+MAX_SCRIPT_LINES = 300
 
 # 允许保留 <style scoped> 的文件（子串匹配）
 STYLE_SCOPED_WHITELIST: list[str] = []
@@ -224,7 +229,49 @@ def check_vue_file(content: str, relative_path: str) -> tuple[int, list[str]]:
             'transition' in stripped):
             continue
 
-    # 检查 3: 组件使用规范
+    # 检查 3: <template> / <script setup> 行数上限
+    template_lines = 0
+    script_lines = 0
+    in_template = False
+    in_script = False
+
+    for line in lines:
+        if '<template' in line and '</template>' not in line:
+            in_template = True
+            continue
+        if '</template>' in line:
+            in_template = False
+            continue
+        if in_template:
+            template_lines += 1
+            continue
+
+        if '<script' in line and 'setup' in line and '</script>' not in line:
+            in_script = True
+            continue
+        if '</script>' in line:
+            in_script = False
+            continue
+        if in_script:
+            script_lines += 1
+
+    if template_lines > MAX_TEMPLATE_LINES:
+        issues.append(
+            f"  <template> 共 {template_lines} 行，"
+            f"超出上限 {MAX_TEMPLATE_LINES} 行"
+        )
+        issues.append("    请提取子组件拆分模板")
+        exit_code = 2
+
+    if script_lines > MAX_SCRIPT_LINES:
+        issues.append(
+            f"  <script setup> 共 {script_lines} 行，"
+            f"超出上限 {MAX_SCRIPT_LINES} 行"
+        )
+        issues.append("    请提取 composable 或子组件拆分逻辑")
+        exit_code = 2
+
+    # 检查 4: 组件使用规范
     comp_exit, comp_issues = check_vue_component_usage(content, relative_path)
     if comp_exit > exit_code:
         exit_code = comp_exit
