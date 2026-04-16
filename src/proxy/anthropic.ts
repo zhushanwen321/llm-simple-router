@@ -16,12 +16,15 @@ import {
 import { retryableCall, buildRetryConfig } from "./retry.js";
 import { resolveMapping } from "./mapping-resolver.js";
 
+import { RetryRuleMatcher } from "./retry-rules.js";
+
 export interface AnthropicProxyOptions {
   db: Database.Database;
   encryptionKey: string;
   streamTimeoutMs: number;
   retryMaxAttempts: number;
   retryBaseDelayMs: number;
+  matcher?: RetryRuleMatcher;
 }
 
 const HTTP_NOT_FOUND = 404;
@@ -40,7 +43,7 @@ function sendError(reply: FastifyReply, e: ReturnType<typeof anthropicError>) {
 }
 
 const anthropicProxyRaw: FastifyPluginCallback<AnthropicProxyOptions> = (app, opts, done) => {
-  const { db, encryptionKey, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs } = opts;
+  const { db, encryptionKey, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher } = opts;
   app.post(MESSAGES_PATH, async (request, reply) => {
     request.raw.socket.on("error", (err) => request.log.debug({ err }, "client socket error"));
     const startTime = Date.now();
@@ -74,7 +77,7 @@ const anthropicProxyRaw: FastifyPluginCallback<AnthropicProxyOptions> = (app, op
     const cliHdrs: RawHeaders = request.headers as RawHeaders;
     const clientReq = JSON.stringify({ headers: cliHdrs, body: originalBody });
 
-    const retryConfig = buildRetryConfig(retryMaxAttempts, retryBaseDelayMs);
+    const retryConfig = buildRetryConfig(retryMaxAttempts, retryBaseDelayMs, matcher);
     const upstreamReqBase = JSON.stringify({ url: `${provider.base_url}${MESSAGES_PATH}`, headers: buildUpstreamHeaders(cliHdrs, apiKey, Buffer.byteLength(reqBodyStr)), body: reqBodyStr });
 
     try {

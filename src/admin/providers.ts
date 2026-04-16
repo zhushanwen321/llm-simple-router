@@ -7,6 +7,7 @@ import { encrypt } from "../utils/crypto.js";
 const HTTP_BAD_REQUEST = 400;
 const HTTP_CREATED = 201;
 const HTTP_NOT_FOUND = 404;
+const HTTP_CONFLICT = 409;
 
 const API_KEY_PREVIEW_MIN_LEN = 8;
 const API_KEY_PREVIEW_PREFIX_LEN = 4;
