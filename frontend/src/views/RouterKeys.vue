@@ -25,9 +25,9 @@
             <TableCell class="font-medium">{{ k.name }}</TableCell>
             <TableCell>
               <div class="flex items-center gap-1">
-                <span class="font-mono text-xs text-gray-500">{{ k.key_prefix }}...</span>
-                <Button variant="ghost" size="sm" class="h-6 w-6 p-0" @click="copyPrefix(k.key_prefix)">
-                  <svg v-if="copiedPrefix !== k.key_prefix" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <span class="font-mono text-xs text-gray-500">{{ k.key }}</span>
+                <Button variant="ghost" size="sm" class="h-6 w-6 p-0" @click="copyKeyOf(k.id, k.key)">
+                  <svg v-if="copiedId !== k.id" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
                   </svg>
                   <svg v-else class="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -138,7 +138,7 @@
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>取消</AlertDialogCancel>
-          <AlertDialogAction @click="handleDelete">删除</AlertDialogAction>
+          <Button variant="destructive" @click="handleDelete">删除</Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -154,13 +154,14 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog'
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from '@/components/ui/alert-dialog'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 interface RouterKey {
   id: string
   name: string
+  key: string
   key_prefix: string
   allowed_models: string[] | null
   is_active: number
@@ -177,7 +178,7 @@ const form = ref({ name: '', allowed_models: [] as string[], is_active: true })
 const showKeyDialog = ref(false)
 const createdKey = ref('')
 const copied = ref(false)
-const copiedPrefix = ref('')
+const copiedId = ref('')
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleString('zh-CN')
@@ -284,14 +285,14 @@ async function copyKey() {
   }
 }
 
-async function copyPrefix(prefix: string) {
+async function copyKeyOf(id: string, key: string) {
   try {
-    await navigator.clipboard.writeText(prefix)
-    copiedPrefix.value = prefix
-    setTimeout(() => { copiedPrefix.value = '' }, COPY_FEEDBACK_MS)
+    await navigator.clipboard.writeText(key)
+    copiedId.value = id
+    setTimeout(() => { copiedId.value = '' }, COPY_FEEDBACK_MS)
   // eslint-disable-next-line taste/no-silent-catch
   } catch (e) {
-    console.error('Failed to copy prefix:', e)
+    console.error('Failed to copy key:', e)
   }
 }
 

@@ -39,7 +39,7 @@ export function getConfig(): Config {
     DB_PATH: process.env.DB_PATH || "./data/router.db",
     LOG_LEVEL: process.env.LOG_LEVEL || "info",
     TZ: process.env.TZ || "Asia/Shanghai",
-    STREAM_TIMEOUT_MS: parseInt(process.env.STREAM_TIMEOUT_MS || "30000", 10),
+    STREAM_TIMEOUT_MS: parseInt(process.env.STREAM_TIMEOUT_MS || "3000000", 10),
     RETRY_MAX_ATTEMPTS: parseInt(process.env.RETRY_MAX_ATTEMPTS || "3", 10),
     RETRY_BASE_DELAY_MS: parseInt(process.env.RETRY_BASE_DELAY_MS || "1000", 10),
   };

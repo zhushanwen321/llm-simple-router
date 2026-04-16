@@ -54,7 +54,7 @@
           </CardHeader>
           <CardContent>
             <div class="h-64">
-              <Line v-if="ttftData" :data="ttftData" :options="lineOptions('ms')" />
+              <Line v-if="ttftData" :data="ttftData" :options="lineOptions('ms', ttftData.labels as string[])" />
             </div>
           </CardContent>
         </Card>
@@ -66,7 +66,7 @@
           </CardHeader>
           <CardContent>
             <div class="h-64">
-              <Line v-if="tpsData" :data="tpsData" :options="lineOptions('tokens/s')" />
+              <Line v-if="tpsData" :data="tpsData" :options="lineOptions('tokens/s', tpsData.labels as string[])" />
             </div>
           </CardContent>
         </Card>
@@ -78,7 +78,7 @@
           </CardHeader>
           <CardContent>
             <div class="h-64">
-              <Line v-if="tokensData" :data="tokensData" :options="stackedAreaOptions()" />
+              <Line v-if="tokensData" :data="tokensData" :options="stackedAreaOptions(tokensData.labels as string[])" />
             </div>
           </CardContent>
         </Card>
@@ -142,7 +142,6 @@ import {
   Legend,
   Filler,
   type ChartData,
-  type ChartOptions,
 } from 'chart.js'
 import { Line } from 'vue-chartjs'
 import { api } from '@/api/client'
@@ -151,6 +150,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
+import { fillTimeseries, lineOptions, stackedAreaOptions } from './metrics-helpers'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler)
 
@@ -190,37 +190,6 @@ const noData = computed(() => {
   return !hasChart && summaryRows.value.length === 0
 })
 
-function lineOptions(unit: string): ChartOptions<'line'> {
-  return {
-    responsive: true,
-    maintainAspectRatio: false,
-    interaction: { mode: 'index', intersect: false },
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        callbacks: { label: (ctx) => `${ctx.parsed.y} ${unit}` },
-      },
-    },
-    scales: {
-      x: { display: true, grid: { display: false } },
-      y: { display: true, beginAtZero: true },
-    },
-  }
-}
-
-function stackedAreaOptions(): ChartOptions<'line'> {
-  return {
-    responsive: true,
-    maintainAspectRatio: false,
-    interaction: { mode: 'index', intersect: false },
-    plugins: { legend: { position: 'bottom' } },
-    scales: {
-      x: { stacked: true, grid: { display: false } },
-      y: { stacked: true, beginAtZero: true },
-    },
-  }
-}
-
 function buildTimeseriesParams(metric: string) {
   const params: { period: string; metric: string; backend_model?: string; router_key_id?: string } = { period: period.value, metric }
   if (modelFilter.value !== 'all') params.backend_model = modelFilter.value
@@ -235,6 +204,21 @@ function buildSummaryParams() {
   return params
 }
 
+function toDataset(label: string, color: string, bgColor: string, filled: boolean, data: { labels: string[]; values: number[] }) {
+  return {
+    labels: data.labels,
+    datasets: [{
+      label,
+      data: data.values,
+      borderColor: color,
+      backgroundColor: bgColor,
+      fill: filled,
+      tension: 0.4,
+      pointRadius: 0,
+    }],
+  }
+}
+
 async function fetchMetrics() {
   loading.value = true
   try {
@@ -246,61 +230,26 @@ async function fetchMetrics() {
     ])
 
     const fulfilled = <T>(r: PromiseSettledResult<T>): r is PromiseFulfilledResult<T> => r.status === 'fulfilled'
-
-    // 后端返回 [{ time_bucket, avg_value, count }, ...]，在 res.data 中
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const toLabels = (arr: any[]) => arr.map((r: any) => {
-      const d = new Date(r.time_bucket)
-      return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
-    })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const toValues = (arr: any[]) => arr.map((r: any) => r.avg_value)
+    const p = period.value
 
     const ttftOk = fulfilled(ttftRes) ? ttftRes.value.data : null
     const tpsOk = fulfilled(tpsRes) ? tpsRes.value.data : null
     const tokensOk = fulfilled(tokensRes) ? tokensRes.value.data : null
     const summaryOk = fulfilled(summaryRes) ? summaryRes.value.data : null
 
-    ttftData.value = ttftOk && ttftOk.length > 0 ? {
-      labels: toLabels(ttftOk),
-      datasets: [{
-        label: 'TTFT (ms)',
-        data: toValues(ttftOk),
-        borderColor: '#3b82f6',
-        backgroundColor: 'rgba(59,130,246,0.1)',
-        fill: false,
-        tension: 0.3,
-      }],
-    } : null
+    const emptyAxis = fillTimeseries([], p)
+    const ttftFilled = ttftOk?.length ? fillTimeseries(ttftOk, p) : emptyAxis
+    const tpsFilled = tpsOk?.length ? fillTimeseries(tpsOk, p) : emptyAxis
+    const tokensFilled = tokensOk?.length ? fillTimeseries(tokensOk, p) : emptyAxis
 
-    tpsData.value = tpsOk && tpsOk.length > 0 ? {
-      labels: toLabels(tpsOk),
-      datasets: [{
-        label: 'TPS',
-        data: toValues(tpsOk),
-        borderColor: '#8b5cf6',
-        backgroundColor: 'rgba(139,92,246,0.1)',
-        fill: false,
-        tension: 0.3,
-      }],
-    } : null
+    const hasAny = ttftOk?.length || tpsOk?.length || tokensOk?.length
 
-    tokensData.value = tokensOk && tokensOk.length > 0 ? {
-      labels: toLabels(tokensOk),
-      datasets: [{
-        label: 'Output Tokens',
-        data: toValues(tokensOk),
-        borderColor: '#8b5cf6',
-        backgroundColor: 'rgba(139,92,246,0.3)',
-        fill: true,
-        tension: 0.3,
-      }],
-    } : null
+    ttftData.value = hasAny ? toDataset('TTFT (ms)', '#3b82f6', 'rgba(59,130,246,0.1)', false, ttftFilled) : null
+    tpsData.value = hasAny ? toDataset('TPS', '#8b5cf6', 'rgba(139,92,246,0.1)', false, tpsFilled) : null
+    tokensData.value = hasAny ? toDataset('Output Tokens', '#8b5cf6', 'rgba(139,92,246,0.3)', true, tokensFilled) : null
 
-    // 后端 summary 直接返回数组
     summaryRows.value = Array.isArray(summaryOk) ? summaryOk : []
-    const models = [...new Set(summaryRows.value.map((r: SummaryRow) => r.backend_model))]
-    modelOptions.value = models
+    modelOptions.value = [...new Set(summaryRows.value.map((r: SummaryRow) => r.backend_model))]
   } catch (e) {
     console.error('Failed to load metrics:', e)
   } finally {

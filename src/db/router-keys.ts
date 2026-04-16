@@ -6,6 +6,7 @@ export interface RouterKey {
   name: string;
   key_hash: string;
   key_prefix: string;
+  key_encrypted: string | null;
   allowed_models: string | null;
   is_active: number;
   created_at: string;
@@ -26,14 +27,14 @@ export function getRouterKeyById(db: Database.Database, id: string): RouterKey |
 
 export function createRouterKey(
   db: Database.Database,
-  key: { name: string; key_hash: string; key_prefix: string; allowed_models?: string | null }
+  key: { name: string; key_hash: string; key_prefix: string; key_encrypted: string; allowed_models?: string | null }
 ): string {
   const id = randomUUID();
   const now = new Date().toISOString();
   db.prepare(
-    `INSERT INTO router_keys (id, name, key_hash, key_prefix, allowed_models, is_active, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, 1, ?, ?)`
-  ).run(id, key.name, key.key_hash, key.key_prefix, key.allowed_models ?? null, now, now);
+    `INSERT INTO router_keys (id, name, key_hash, key_prefix, key_encrypted, allowed_models, is_active, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`
+  ).run(id, key.name, key.key_hash, key.key_prefix, key.key_encrypted, key.allowed_models ?? null, now, now);
   return id;
 }
 

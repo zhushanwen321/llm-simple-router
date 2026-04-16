@@ -21,7 +21,7 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (app, opti
   app.register(adminProviderRoutes, { db: options.db, encryptionKey: options.encryptionKey });
   app.register(adminMappingRoutes, { db: options.db });
   app.register(adminLogRoutes, { db: options.db });
-  app.register(adminRouterKeyRoutes, { db: options.db });
+  app.register(adminRouterKeyRoutes, { db: options.db, encryptionKey: options.encryptionKey });
   app.register(adminStatsRoutes, { db: options.db });
   app.register(adminMetricsRoutes, { db: options.db });
   done();

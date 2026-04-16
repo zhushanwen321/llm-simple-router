@@ -1,6 +1,7 @@
 import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
 import { randomBytes, createHash } from "crypto";
+import { encrypt, decrypt } from "../utils/crypto.js";
 import {
   getAllRouterKeys, getRouterKeyById, createRouterKey, updateRouterKey, deleteRouterKey, getAvailableModels,
 } from "../db/index.js";
@@ -25,20 +26,23 @@ interface UpdateRouterKeyBody {
 
 interface RouterKeyRoutesOptions {
   db: Database.Database;
+  encryptionKey: string;
 }
 
-function generateRouterKey(): { key: string; hash: string; prefix: string } {
+function generateRouterKey(encryptionKey: string): { key: string; hash: string; prefix: string; encrypted: string } {
   const key = `sk-router-${randomBytes(KEY_RANDOM_BYTES).toString("hex")}`;
   const hash = createHash("sha256").update(key).digest("hex");
   const prefix = key.slice(0, KEY_PREFIX_LENGTH);
-  return { key, hash, prefix };
+  const encrypted = encrypt(key, encryptionKey);
+  return { key, hash, prefix, encrypted };
 }
 
-function toPublicRouterKey(rk: RouterKey) {
+function toPublicRouterKey(rk: RouterKey, encryptionKey: string) {
   return {
     id: rk.id,
     name: rk.name,
     key_prefix: rk.key_prefix,
+    key: rk.key_encrypted ? decrypt(rk.key_encrypted, encryptionKey) : null,
     allowed_models: rk.allowed_models ? JSON.parse(rk.allowed_models) : null,
     is_active: rk.is_active,
     created_at: rk.created_at,
@@ -47,11 +51,11 @@ function toPublicRouterKey(rk: RouterKey) {
 }
 
 export const adminRouterKeyRoutes: FastifyPluginCallback<RouterKeyRoutesOptions> = (app, options, done) => {
-  const { db } = options;
+  const { db, encryptionKey } = options;
 
   app.get("/admin/api/router-keys", async (_request, reply) => {
     const keys = getAllRouterKeys(db);
-    return reply.send(keys.map(toPublicRouterKey));
+    return reply.send(keys.map((rk) => toPublicRouterKey(rk, encryptionKey)));
   });
 
   app.post("/admin/api/router-keys", async (request, reply) => {
@@ -59,9 +63,9 @@ export const adminRouterKeyRoutes: FastifyPluginCallback<RouterKeyRoutesOptions>
     if (!body.name) {
       return reply.code(HTTP_BAD_REQUEST).send({ error: { message: "Missing required field: name" } });
     }
-    const { key, hash, prefix } = generateRouterKey();
+    const { key, hash, prefix, encrypted } = generateRouterKey(encryptionKey);
     const allowedModels = body.allowed_models ? JSON.stringify(body.allowed_models) : null;
-    const id = createRouterKey(db, { name: body.name, key_hash: hash, key_prefix: prefix, allowed_models: allowedModels });
+    const id = createRouterKey(db, { name: body.name, key_hash: hash, key_prefix: prefix, key_encrypted: encrypted, allowed_models: allowedModels });
     return reply.code(HTTP_CREATED).send({
       id,
       name: body.name,
