@@ -92,7 +92,7 @@ export const api = {
   login: (password: string) => client.post(API.LOGIN, { password }),
   logout: () => client.post(API.LOGOUT),
 
-  getProviders: () => request<unknown[]>(API.PROVIDERS),
+  getProviders: () => request<unknown[]>('get', API.PROVIDERS),
   createProvider: (data: ProviderPayload) => request<{ id: string }>('post', API.PROVIDERS, data),
   updateProvider: (id: string, data: Partial<ProviderPayload>) => client.put(`${API.PROVIDERS}/${id}`, data),
   deleteProvider: (id: string) => client.delete(`${API.PROVIDERS}/${id}`),
