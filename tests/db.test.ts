@@ -26,6 +26,8 @@ describe("initDatabase", () => {
     expect(tableNames).toContain("providers");
     expect(tableNames).toContain("model_mappings");
     expect(tableNames).toContain("request_logs");
+    expect(tableNames).toContain("request_metrics");
+    expect(tableNames).toContain("router_keys");
   });
 
   it("should record migration in migrations table", () => {
@@ -35,7 +37,7 @@ describe("initDatabase", () => {
       .prepare("SELECT name FROM migrations")
       .all() as { name: string }[];
 
-    expect(rows.length).toBe(7);
+    expect(rows.length).toBe(8);
     expect(rows[0].name).toBe("001_init.sql");
     expect(rows[1].name).toBe("002_add_request_response_body.sql");
     expect(rows[2].name).toBe("003_add_full_request_chain_log.sql");
@@ -43,6 +45,7 @@ describe("initDatabase", () => {
     expect(rows[4].name).toBe("005_add_api_key_preview.sql");
     expect(rows[5].name).toBe("006_create_request_metrics.sql");
     expect(rows[6].name).toBe("007_add_retry_fields.sql");
+    expect(rows[7].name).toBe("008_create_router_keys.sql");
   });
 
   it("should be idempotent - running twice does not error", () => {

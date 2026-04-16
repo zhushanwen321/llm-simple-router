@@ -111,14 +111,15 @@ export function insertRequestLog(db: Database.Database, log: {
   client_request?: string | null; upstream_request?: string | null;
   upstream_response?: string | null; client_response?: string | null;
   is_retry?: number; original_request_id?: string | null;
+  router_key_id?: string | null;
 }): void {
   db.prepare(
-    `INSERT INTO request_logs (id, api_type, model, provider_id, status_code, latency_ms, is_stream, error_message, created_at, request_body, response_body, client_request, upstream_request, upstream_response, client_response, is_retry, original_request_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO request_logs (id, api_type, model, provider_id, status_code, latency_ms, is_stream, error_message, created_at, request_body, response_body, client_request, upstream_request, upstream_response, client_response, is_retry, original_request_id, router_key_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(log.id, log.api_type, log.model, log.provider_id, log.status_code, log.latency_ms, log.is_stream,
     log.error_message, log.created_at, log.request_body ?? null, log.response_body ?? null,
     log.client_request ?? null, log.upstream_request ?? null, log.upstream_response ?? null, log.client_response ?? null,
-    log.is_retry ?? 0, log.original_request_id ?? null);
+    log.is_retry ?? 0, log.original_request_id ?? null, log.router_key_id ?? null);
 }
 
 // --- Admin CRUD ---
@@ -196,6 +197,11 @@ export function insertMetrics(db: Database.Database, m: MetricsInsert): string {
   return id;
 }
 
+// --- Router Keys (re-export from router-keys.ts) ---
+
+export { getRouterKeyByHash, getAllRouterKeys, getRouterKeyById, createRouterKey, updateRouterKey, deleteRouterKey, getAvailableModels } from "./router-keys.js";
+export type { RouterKey } from "./router-keys.js";
+
 export function getAllProviders(db: Database.Database): Provider[] {
   return db.prepare("SELECT * FROM providers ORDER BY created_at DESC").all() as Provider[];
 }
@@ -269,11 +275,12 @@ export function deleteModelMapping(db: Database.Database, id: string): void {
   db.prepare("DELETE FROM model_mappings WHERE id = ?").run(id);
 }
 
-export function getRequestLogs(db: Database.Database, options: { page: number; limit: number; api_type?: string; model?: string }): { data: RequestLog[]; total: number } {
+export function getRequestLogs(db: Database.Database, options: { page: number; limit: number; api_type?: string; model?: string; router_key_id?: string }): { data: RequestLog[]; total: number } {
   let where = "1=1";
   const params: unknown[] = [];
   if (options.api_type) { where += " AND api_type = ?"; params.push(options.api_type); }
   if (options.model) { where += " AND model LIKE ?"; params.push(`%${options.model}%`); }
+  if (options.router_key_id) { where += " AND router_key_id = ?"; params.push(options.router_key_id); }
   const total = (db.prepare(`SELECT COUNT(*) as count FROM request_logs WHERE ${where}`).get(...params) as CountRow).count;
   const offset = (options.page - 1) * options.limit;
   const data = db.prepare(`SELECT * FROM request_logs WHERE ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`).all(...params, options.limit, offset) as RequestLog[];

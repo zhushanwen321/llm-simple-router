@@ -1,7 +1,7 @@
 import "dotenv/config";
 
 export interface Config {
-  ROUTER_API_KEY: string;
+  ROUTER_API_KEY: string; // 可选，仅用于首次自动迁移到 router_keys 表
   ADMIN_PASSWORD: string;
   ENCRYPTION_KEY: string;
   JWT_SECRET: string;
@@ -23,7 +23,7 @@ export function resetConfig(): void {
 export function getConfig(): Config {
   if (cachedConfig) return cachedConfig;
 
-  const requiredVars = ["ROUTER_API_KEY", "ADMIN_PASSWORD", "ENCRYPTION_KEY", "JWT_SECRET"];
+  const requiredVars = ["ADMIN_PASSWORD", "ENCRYPTION_KEY", "JWT_SECRET"];
   for (const name of requiredVars) {
     if (!process.env[name]) {
       throw new Error(`Missing required environment variable: ${name}`);
@@ -31,7 +31,7 @@ export function getConfig(): Config {
   }
 
   cachedConfig = {
-    ROUTER_API_KEY: process.env.ROUTER_API_KEY!,
+    ROUTER_API_KEY: process.env.ROUTER_API_KEY || "",
     ADMIN_PASSWORD: process.env.ADMIN_PASSWORD!,
     ENCRYPTION_KEY: process.env.ENCRYPTION_KEY!,
     JWT_SECRET: process.env.JWT_SECRET!,
