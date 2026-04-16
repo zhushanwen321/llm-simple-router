@@ -4,60 +4,10 @@ import { createServer, Server, IncomingMessage, ServerResponse } from "http";
 import Database from "better-sqlite3";
 import { encrypt } from "../src/utils/crypto.js";
 import { anthropicProxy } from "../src/proxy/anthropic.js";
+import { initDatabase } from "../src/db/index.js";
 
 const TEST_ENCRYPTION_KEY =
   "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-
-// ---------- 辅助工具 ----------
-
-function createTestDb(): Database.Database {
-  const db = new Database(":memory:");
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS migrations (
-      name TEXT PRIMARY KEY,
-      applied_at TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS providers (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      api_type TEXT NOT NULL CHECK(api_type IN ('openai', 'anthropic')),
-      base_url TEXT NOT NULL,
-      api_key TEXT NOT NULL,
-      is_active INTEGER NOT NULL DEFAULT 1,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS model_mappings (
-      id TEXT PRIMARY KEY,
-      client_model TEXT NOT NULL UNIQUE,
-      backend_model TEXT NOT NULL,
-      provider_id TEXT NOT NULL,
-      is_active INTEGER NOT NULL DEFAULT 1,
-      created_at TEXT NOT NULL,
-      FOREIGN KEY (provider_id) REFERENCES providers(id)
-    );
-    CREATE TABLE IF NOT EXISTS request_logs (
-      id TEXT PRIMARY KEY,
-      api_type TEXT NOT NULL,
-      model TEXT,
-      provider_id TEXT,
-      status_code INTEGER,
-      latency_ms INTEGER,
-      is_stream INTEGER,
-      error_message TEXT,
-      created_at TEXT NOT NULL,
-      request_body TEXT,
-      response_body TEXT,
-      client_request TEXT,
-      upstream_request TEXT,
-      upstream_response TEXT,
-      client_response TEXT,
-      is_retry INTEGER NOT NULL DEFAULT 0,
-      original_request_id TEXT
-    );
-  `);
-  return db;
-}
 
 function createMockBackend(
   handler: (req: IncomingMessage, res: ServerResponse) => void
@@ -214,7 +164,7 @@ describe("Anthropic proxy", () => {
   let mockDb: Database.Database;
 
   beforeEach(() => {
-    mockDb = createTestDb();
+    mockDb = initDatabase(":memory:");
   });
 
   afterEach(async () => {

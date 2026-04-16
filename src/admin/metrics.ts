@@ -20,6 +20,7 @@ export const adminMetricsRoutes: FastifyPluginCallback<MetricsRoutesOptions> = (
       period?: string;
       provider_id?: string;
       backend_model?: string;
+      router_key_id?: string;
     };
 
     const period = (query.period ?? "24h") as MetricsPeriod;
@@ -27,7 +28,7 @@ export const adminMetricsRoutes: FastifyPluginCallback<MetricsRoutesOptions> = (
       return reply.status(HTTP_BAD_REQUEST).send({ error: `Invalid period: ${period}. Must be one of: 1h, 6h, 24h, 7d, 30d` });
     }
 
-    const summary = getMetricsSummary(options.db, period, query.provider_id, query.backend_model);
+    const summary = getMetricsSummary(options.db, period, query.provider_id, query.backend_model, query.router_key_id);
     return reply.send(summary);
   });
 
@@ -37,6 +38,7 @@ export const adminMetricsRoutes: FastifyPluginCallback<MetricsRoutesOptions> = (
       metric?: string;
       provider_id?: string;
       backend_model?: string;
+      router_key_id?: string;
     };
 
     const period = (query.period ?? "24h") as MetricsPeriod;
@@ -49,7 +51,7 @@ export const adminMetricsRoutes: FastifyPluginCallback<MetricsRoutesOptions> = (
       return reply.status(HTTP_BAD_REQUEST).send({ error: `Invalid or missing metric. Must be one of: ttft, tps, tokens, cache_rate, request_count` });
     }
 
-    const timeseries = getMetricsTimeseries(options.db, period, metric, query.provider_id, query.backend_model);
+    const timeseries = getMetricsTimeseries(options.db, period, metric, query.provider_id, query.backend_model, query.router_key_id);
     return reply.send(timeseries);
   });
 

@@ -42,7 +42,8 @@ export function getMetricsSummary(
   db: Database.Database,
   period: MetricsPeriod,
   providerId?: string,
-  backendModel?: string
+  backendModel?: string,
+  routerKeyId?: string
 ): MetricsSummaryRow[] {
   const offset = PERIOD_OFFSET[period];
   const conditions = ["rm.is_complete = 1", "rm.created_at >= datetime('now', ?)"];
@@ -51,8 +52,27 @@ export function getMetricsSummary(
   if (providerId) { conditions.push("rm.provider_id = ?"); params.push(providerId); }
   if (backendModel) { conditions.push("rm.backend_model = ?"); params.push(backendModel); }
 
-  const where = conditions.join(" AND ");
+  const joins = "LEFT JOIN providers p ON p.id = rm.provider_id";
+  if (routerKeyId) {
+    conditions.push("rl.router_key_id = ?");
+    params.push(routerKeyId);
+    return db.prepare(`
+      SELECT
+        rm.provider_id, COALESCE(p.name, rm.provider_id) AS provider_name, rm.backend_model,
+        COUNT(*) AS request_count, AVG(rm.ttft_ms) AS avg_ttft_ms, NULL AS p50_ttft_ms, NULL AS p95_ttft_ms,
+        AVG(rm.tokens_per_second) AS avg_tps,
+        COALESCE(SUM(rm.input_tokens), 0) AS total_input_tokens, COALESCE(SUM(rm.output_tokens), 0) AS total_output_tokens,
+        COALESCE(SUM(rm.cache_read_tokens), 0) AS total_cache_hit_tokens,
+        CASE WHEN SUM(rm.input_tokens) > 0 THEN SUM(rm.cache_read_tokens) * 1.0 / SUM(rm.input_tokens) ELSE NULL END AS cache_hit_rate
+      FROM request_metrics rm
+      LEFT JOIN providers p ON p.id = rm.provider_id
+      LEFT JOIN request_logs rl ON rl.id = rm.request_log_id
+      WHERE ${conditions.join(" AND ")}
+      GROUP BY rm.provider_id, rm.backend_model ORDER BY request_count DESC
+    `).all(...params) as MetricsSummaryRow[];
+  }
 
+  const where = conditions.join(" AND ");
   return db.prepare(`
     SELECT
       rm.provider_id,
@@ -71,7 +91,7 @@ export function getMetricsSummary(
         ELSE NULL
       END AS cache_hit_rate
     FROM request_metrics rm
-    LEFT JOIN providers p ON p.id = rm.provider_id
+    ${joins}
     WHERE ${where}
     GROUP BY rm.provider_id, rm.backend_model
     ORDER BY request_count DESC
@@ -97,7 +117,8 @@ export function getMetricsTimeseries(
   period: MetricsPeriod,
   metric: MetricsMetric,
   providerId?: string,
-  backendModel?: string
+  backendModel?: string,
+  routerKeyId?: string
 ): MetricsTimeseriesRow[] {
   const offset = PERIOD_OFFSET[period];
   const bucketSec = BUCKET_SECONDS[period];
@@ -106,9 +127,11 @@ export function getMetricsTimeseries(
 
   if (providerId) { conditions.push("rm.provider_id = ?"); params.push(providerId); }
   if (backendModel) { conditions.push("rm.backend_model = ?"); params.push(backendModel); }
+  if (routerKeyId) { conditions.push("rl.router_key_id = ?"); params.push(routerKeyId); }
 
   const where = conditions.join(" AND ");
   const expr = METRIC_EXPR[metric];
+  const joinClause = routerKeyId ? "LEFT JOIN request_logs rl ON rl.id = rm.request_log_id" : "";
 
   const rows = db.prepare(`
     SELECT
@@ -116,6 +139,7 @@ export function getMetricsTimeseries(
       ${expr} AS avg_value,
       COUNT(*) AS count
     FROM request_metrics rm
+    ${joinClause}
     WHERE ${where}
     GROUP BY bucket_key
     ORDER BY bucket_key ASC

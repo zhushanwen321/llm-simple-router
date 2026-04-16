@@ -1,13 +1,22 @@
-import { FastifyInstance, FastifyPluginCallback, FastifyReply } from "fastify";
-import { timingSafeEqual } from "crypto";
+import { FastifyPluginCallback, FastifyReply } from "fastify";
+import { createHash } from "crypto";
 import fp from "fastify-plugin";
+import Database from "better-sqlite3";
+
+declare module "fastify" {
+  interface FastifyRequest {
+    // allowed_models 是 JSON 字符串，需 JSON.parse
+    routerKey?: { id: string; name: string; allowed_models: string | null };
+  }
+}
+
+interface RouterKeyRow { id: string; name: string; allowed_models: string | null; }
 
 const SKIP_PATHS = ["/health", "/admin"];
 const HTTP_UNAUTHORIZED = 401;
 const BEARER_PREFIX_LENGTH = "Bearer ".length;
 
 function shouldSkipAuth(url: string): boolean {
-  // url 可能包含查询字符串，只取路径部分
   const path = url.split("?")[0];
   return SKIP_PATHS.some(
     (prefix) => path === prefix || path.startsWith(prefix + "/")
@@ -24,11 +33,15 @@ function unauthorizedReply(reply: FastifyReply): void {
   });
 }
 
-const authMiddlewareRaw: FastifyPluginCallback<{ apiKey: string }> = (
-  app: FastifyInstance,
+const authMiddlewareRaw: FastifyPluginCallback<{ db: Database.Database }> = (
+  app,
   options,
   done
 ) => {
+  const stmt = options.db.prepare(
+    "SELECT id, name, allowed_models FROM router_keys WHERE key_hash = ? AND is_active = 1"
+  );
+
   app.addHook("onRequest", async (request, reply) => {
     if (shouldSkipAuth(request.url)) {
       return;
@@ -41,16 +54,17 @@ const authMiddlewareRaw: FastifyPluginCallback<{ apiKey: string }> = (
     }
 
     const token = authHeader.slice(BEARER_PREFIX_LENGTH);
-    const tokenBuf = Buffer.from(token);
-    const keyBuf = Buffer.from(options.apiKey);
-    if (tokenBuf.length !== keyBuf.length || !timingSafeEqual(tokenBuf, keyBuf)) {
+    const hash = createHash("sha256").update(token).digest("hex");
+    const row = stmt.get(hash) as RouterKeyRow | undefined;
+    if (!row) {
       unauthorizedReply(reply);
       return reply;
     }
+
+    request.routerKey = { id: row.id, name: row.name, allowed_models: row.allowed_models };
   });
 
   done();
 };
 
-// 用 fp 包装以打破 Fastify 的封装，使 hook 作用于全局
 export const authMiddleware = fp(authMiddlewareRaw, { name: "auth-middleware" });

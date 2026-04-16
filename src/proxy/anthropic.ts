@@ -24,6 +24,7 @@ export interface AnthropicProxyOptions {
 }
 
 const HTTP_NOT_FOUND = 404;
+const HTTP_FORBIDDEN = 403;
 const HTTP_SERVICE_UNAVAILABLE = 503;
 const HTTP_INTERNAL_ERROR = 500;
 const HTTP_BAD_GATEWAY = 502;
@@ -43,11 +44,23 @@ const anthropicProxyRaw: FastifyPluginCallback<AnthropicProxyOptions> = (app, op
     request.raw.socket.on("error", (err) => request.log.debug({ err }, "client socket error"));
     const startTime = Date.now();
     const logId = randomUUID();
+    const routerKeyId = request.routerKey?.id ?? null;
     const body = request.body as Record<string, unknown>;
     const originalBody = JSON.parse(JSON.stringify(body));
     const clientModel = (body.model as string) || "unknown";
     const mapping = getModelMapping(db, clientModel);
     if (!mapping) return sendError(reply, anthropicError(`Model '${clientModel}' is not configured`, "not_found_error", HTTP_NOT_FOUND));
+
+    // 白名单校验
+    const allowedModels = request.routerKey?.allowed_models;
+    if (allowedModels) {
+      try {
+        const models: string[] = JSON.parse(allowedModels);
+        if (models.length > 0 && !models.includes(mapping.backend_model)) {
+          return sendError(reply, anthropicError(`Model '${mapping.backend_model}' is not allowed for this API key`, "forbidden_error", HTTP_FORBIDDEN));
+        }
+      } catch { request.log.warn("Invalid allowed_models JSON, allowing all models"); }
+    }
 
     const provider = getProviderById(db, mapping.provider_id);
     if (!provider || !provider.is_active) return sendError(reply, anthropicError("Provider unavailable", "api_error", HTTP_SERVICE_UNAVAILABLE));
@@ -93,6 +106,7 @@ const anthropicProxyRaw: FastifyPluginCallback<AnthropicProxyOptions> = (app, op
             created_at: new Date().toISOString(), request_body: reqBodyStr,
             client_request: clientReq, upstream_request: upstreamReqBase,
             is_retry: isOriginal ? 0 : 1, original_request_id: isOriginal ? null : logId,
+            router_key_id: routerKeyId,
           });
         } else if (attempt.statusCode !== UPSTREAM_SUCCESS) {
           insertRequestLog(db, {
@@ -104,6 +118,7 @@ const anthropicProxyRaw: FastifyPluginCallback<AnthropicProxyOptions> = (app, op
             upstream_response: JSON.stringify({ statusCode: attempt.statusCode, body: attempt.responseBody }),
             client_response: JSON.stringify({ statusCode: attempt.statusCode, body: attempt.responseBody }),
             is_retry: isOriginal ? 0 : 1, original_request_id: isOriginal ? null : logId,
+            router_key_id: routerKeyId,
           });
         } else {
           const h = isStream
@@ -111,7 +126,7 @@ const anthropicProxyRaw: FastifyPluginCallback<AnthropicProxyOptions> = (app, op
             : ((r as ProxyResult).headers);
           insertSuccessLog(db, "anthropic", attemptLogId, clientModel, provider, isStream, startTime,
             reqBodyStr, clientReq, upstreamReqBase, r.statusCode, attempt.responseBody, h, h,
-            !isOriginal, isOriginal ? null : logId);
+            !isOriginal, isOriginal ? null : logId, routerKeyId);
           lastSuccessLogId = attemptLogId;
         }
       }
@@ -154,6 +169,7 @@ const anthropicProxyRaw: FastifyPluginCallback<AnthropicProxyOptions> = (app, op
         is_stream: isStream ? 1 : 0, error_message: errMsg || "Upstream connection failed",
         created_at: new Date().toISOString(), request_body: reqBodyStr,
         client_request: clientReq, upstream_request: upstreamReq,
+        router_key_id: routerKeyId,
       });
       return sendError(reply, anthropicError("Failed to connect to upstream service", "upstream_error", HTTP_BAD_GATEWAY));
     }

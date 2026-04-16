@@ -7,8 +7,10 @@ import {
   ServerResponse,
 } from "http";
 import Database from "better-sqlite3";
+import { createHash } from "crypto";
 import { buildApp } from "../src/index.js";
 import { encrypt } from "../src/utils/crypto.js";
+import { initDatabase } from "../src/db/index.js";
 
 const TEST_ENCRYPTION_KEY =
   "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
@@ -18,6 +20,7 @@ function makeTestConfig() {
   return {
     ROUTER_API_KEY: API_KEY,
     ADMIN_PASSWORD: "admin123",
+    JWT_SECRET: "test-jwt-secret-for-testing",
     ENCRYPTION_KEY: TEST_ENCRYPTION_KEY,
     PORT: 3000,
     DB_PATH: ":memory:",
@@ -27,55 +30,6 @@ function makeTestConfig() {
     RETRY_MAX_ATTEMPTS: 0,
     RETRY_BASE_DELAY_MS: 0,
   };
-}
-
-function createTestDb(): Database.Database {
-  const db = new Database(":memory:");
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS migrations (
-      name TEXT PRIMARY KEY,
-      applied_at TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS providers (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      api_type TEXT NOT NULL CHECK(api_type IN ('openai', 'anthropic')),
-      base_url TEXT NOT NULL,
-      api_key TEXT NOT NULL,
-      is_active INTEGER NOT NULL DEFAULT 1,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS model_mappings (
-      id TEXT PRIMARY KEY,
-      client_model TEXT NOT NULL UNIQUE,
-      backend_model TEXT NOT NULL,
-      provider_id TEXT NOT NULL,
-      is_active INTEGER NOT NULL DEFAULT 1,
-      created_at TEXT NOT NULL,
-      FOREIGN KEY (provider_id) REFERENCES providers(id)
-    );
-    CREATE TABLE IF NOT EXISTS request_logs (
-      id TEXT PRIMARY KEY,
-      api_type TEXT NOT NULL,
-      model TEXT,
-      provider_id TEXT,
-      status_code INTEGER,
-      latency_ms INTEGER,
-      is_stream INTEGER,
-      error_message TEXT,
-      created_at TEXT NOT NULL,
-      request_body TEXT,
-      response_body TEXT,
-      client_request TEXT,
-      upstream_request TEXT,
-      upstream_response TEXT,
-      client_response TEXT,
-      is_retry INTEGER NOT NULL DEFAULT 0,
-      original_request_id TEXT
-    );
-  `);
-  return db;
 }
 
 function createMockBackend(
@@ -113,7 +67,7 @@ describe("Integration tests", () => {
     process.env.ENCRYPTION_KEY = TEST_ENCRYPTION_KEY;
     process.env.LOG_LEVEL = "silent";
 
-    db = createTestDb();
+    db = initDatabase(":memory:");
 
     // Mock OpenAI 后端
     mockOpenAI = await createMockBackend((req, res) => {
@@ -236,6 +190,12 @@ describe("Integration tests", () => {
     const result = await buildApp({ config, db });
     app = result.app;
     close = result.close;
+
+    // 插入测试用的 router key，使 auth middleware 能通过 Bearer token 认证
+    const apiKeyHash = createHash("sha256").update(API_KEY).digest("hex");
+    db.prepare(
+      "INSERT INTO router_keys (id, name, key_hash, key_prefix) VALUES (?, ?, ?, ?)"
+    ).run("test-key-id", "Test Key", apiKeyHash, API_KEY.slice(0, 8));
 
     // 插入后端服务（api_key 需要加密存储）
     const now = new Date().toISOString();

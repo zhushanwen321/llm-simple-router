@@ -1,3 +1,4 @@
+<!-- eslint-disable vue/multi-word-component-names -->
 <template>
   <div class="min-h-screen flex items-center justify-center bg-gray-100">
     <Card class="w-full max-w-sm shadow-lg">
@@ -55,7 +56,8 @@ async function handleLogin() {
   loading.value = true
   try {
     await api.login(password.value)
-    router.push('/admin/')
+    router.push('/')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (e: any) {
     error.value = e.response?.data?.error?.message || '登录失败'
   } finally {

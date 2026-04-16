@@ -15,19 +15,32 @@ describe("getConfig", () => {
     delete process.env.RETRY_BASE_DELAY_MS;
   });
 
-  it("should throw when required env vars are missing", async () => {
+  it("should throw when required env vars (except ROUTER_API_KEY) are missing", async () => {
     const mod = await import("../src/config.js?t=" + Date.now());
     const { getConfig, resetConfig } = mod;
 
-    // dotenv/config 在动态 import 时会重新从 .env 加载变量，需要再次清除
-    delete process.env.ROUTER_API_KEY;
     delete process.env.ADMIN_PASSWORD;
     delete process.env.ENCRYPTION_KEY;
     delete process.env.JWT_SECRET;
 
     resetConfig();
 
-    expect(() => getConfig()).toThrow("ROUTER_API_KEY");
+    expect(() => getConfig()).toThrow("ADMIN_PASSWORD");
+  });
+
+  it("should not throw when ROUTER_API_KEY is missing", async () => {
+    const mod = await import("../src/config.js?t=" + Date.now());
+    const { getConfig, resetConfig } = mod;
+
+    delete process.env.ROUTER_API_KEY;
+    process.env.ADMIN_PASSWORD = "admin123";
+    process.env.ENCRYPTION_KEY = "0".repeat(64);
+    process.env.JWT_SECRET = "0".repeat(64);
+
+    resetConfig();
+
+    const config = getConfig();
+    expect(config.ROUTER_API_KEY).toBe("");
   });
 
   it("should return config with defaults when required vars are set", async () => {
@@ -48,7 +61,7 @@ describe("getConfig", () => {
     expect(config.DB_PATH).toBe("./data/router.db");
     expect(config.LOG_LEVEL).toBe("info");
     expect(config.TZ).toBe("Asia/Shanghai");
-    expect(config.STREAM_TIMEOUT_MS).toBe(30000);
+    expect(config.STREAM_TIMEOUT_MS).toBe(3000000);
     expect(config.RETRY_MAX_ATTEMPTS).toBe(3);
     expect(config.RETRY_BASE_DELAY_MS).toBe(1000);
   });

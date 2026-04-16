@@ -10,7 +10,8 @@
     "test:watch": "vitest",
     "docker:build": "docker build -t llm-simple-router .",
     "docker:run": "docker compose up -d",
-    "lint": "eslint . --max-warnings=0"
+    "lint": "eslint . --max-warnings=0",
+    "prepare": "cd .githooks && ./install-hooks.sh"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",
