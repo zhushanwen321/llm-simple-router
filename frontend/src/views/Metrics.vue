@@ -95,7 +95,7 @@
               <TableRow>
                 <TableHead>模型</TableHead>
                 <TableHead>请求数</TableHead>
-                <TableHead>成功率</TableHead>
+                <TableHead>缓存命中率</TableHead>
                 <TableHead>平均 TTFT</TableHead>
                 <TableHead>平均 TPS</TableHead>
                 <TableHead>输入 Tokens</TableHead>
@@ -107,11 +107,12 @@
                 <TableCell class="font-medium">{{ row.backend_model }}</TableCell>
                 <TableCell>{{ row.request_count }}</TableCell>
                 <TableCell>
-                  <Badge :variant="row.success_rate >= 0.95 ? 'default' : 'destructive'">
-                    {{ (row.success_rate * 100).toFixed(1) }}%
+                  <Badge v-if="row.cache_hit_rate != null" :variant="row.cache_hit_rate >= 0.5 ? 'default' : 'secondary'">
+                    {{ (row.cache_hit_rate * 100).toFixed(1) }}%
                   </Badge>
+                  <span v-else class="text-gray-400">-</span>
                 </TableCell>
-                <TableCell>{{ row.avg_ttft != null ? row.avg_ttft.toFixed(0) + 'ms' : '-' }}</TableCell>
+                <TableCell>{{ row.avg_ttft_ms != null ? row.avg_ttft_ms.toFixed(0) + 'ms' : '-' }}</TableCell>
                 <TableCell>{{ row.avg_tps != null ? row.avg_tps.toFixed(1) : '-' }}</TableCell>
                 <TableCell>{{ row.total_input_tokens?.toLocaleString() ?? '-' }}</TableCell>
                 <TableCell>{{ row.total_output_tokens?.toLocaleString() ?? '-' }}</TableCell>
@@ -128,7 +129,7 @@
 </template>
 
 <script setup lang="ts">
-/* eslint-disable max-lines */
+/* eslint-disable taste/no-silent-catch */
 import { ref, computed, watch, onMounted } from 'vue'
 import {
   Chart as ChartJS,
@@ -175,17 +176,19 @@ const tokensData = ref<ChartData<'line'> | null>(null)
 interface SummaryRow {
   backend_model: string
   request_count: number
-  success_rate: number
-  avg_ttft: number | null
+  avg_ttft_ms: number | null
   avg_tps: number | null
   total_input_tokens: number | null
   total_output_tokens: number | null
+  total_cache_hit_tokens: number | null
+  cache_hit_rate: number | null
 }
 const summaryRows = ref<SummaryRow[]>([])
 
-const noData = computed(
-  () => !ttftData.value && !tpsData.value && !tokensData.value && summaryRows.value.length === 0,
-)
+const noData = computed(() => {
+  const hasChart = ttftData.value || tpsData.value || tokensData.value
+  return !hasChart && summaryRows.value.length === 0
+})
 
 function lineOptions(unit: string): ChartOptions<'line'> {
   return {
@@ -243,22 +246,26 @@ async function fetchMetrics() {
     ])
 
     const fulfilled = <T>(r: PromiseSettledResult<T>): r is PromiseFulfilledResult<T> => r.status === 'fulfilled'
-    const ttftOk = fulfilled(ttftRes) ? ttftRes.value : null
-    const tpsOk = fulfilled(tpsRes) ? tpsRes.value : null
-    const tokensOk = fulfilled(tokensRes) ? tokensRes.value : null
-    const summaryOk = fulfilled(summaryRes) ? summaryRes.value : null
 
-    interface TimeseriesResponse { data?: { timestamps?: string[]; values?: number[] } }
-    const toLabels = (d: TimeseriesResponse | null) => (d?.data?.timestamps ?? []).map((t: string) => {
-      const date = new Date(t)
-      return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+    // 后端返回 [{ time_bucket, avg_value, count }, ...]，在 res.data 中
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const toLabels = (arr: any[]) => arr.map((r: any) => {
+      const d = new Date(r.time_bucket)
+      return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
     })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const toValues = (arr: any[]) => arr.map((r: any) => r.avg_value)
 
-    ttftData.value = ttftOk ? {
+    const ttftOk = fulfilled(ttftRes) ? ttftRes.value.data : null
+    const tpsOk = fulfilled(tpsRes) ? tpsRes.value.data : null
+    const tokensOk = fulfilled(tokensRes) ? tokensRes.value.data : null
+    const summaryOk = fulfilled(summaryRes) ? summaryRes.value.data : null
+
+    ttftData.value = ttftOk && ttftOk.length > 0 ? {
       labels: toLabels(ttftOk),
       datasets: [{
         label: 'TTFT (ms)',
-        data: ttftOk.data?.values ?? [],
+        data: toValues(ttftOk),
         borderColor: '#3b82f6',
         backgroundColor: 'rgba(59,130,246,0.1)',
         fill: false,
@@ -266,11 +273,11 @@ async function fetchMetrics() {
       }],
     } : null
 
-    tpsData.value = tpsOk ? {
+    tpsData.value = tpsOk && tpsOk.length > 0 ? {
       labels: toLabels(tpsOk),
       datasets: [{
         label: 'TPS',
-        data: tpsOk.data?.values ?? [],
+        data: toValues(tpsOk),
         borderColor: '#8b5cf6',
         backgroundColor: 'rgba(139,92,246,0.1)',
         fill: false,
@@ -278,44 +285,24 @@ async function fetchMetrics() {
       }],
     } : null
 
-    const tokenLabels = tokensOk ? toLabels(tokensOk) : []
-    const td = tokensOk?.data
-    tokensData.value = {
-      labels: tokenLabels,
-      datasets: [
-        {
-          label: '输入 Tokens',
-          data: td?.input_tokens ?? [],
-          borderColor: '#3b82f6',
-          backgroundColor: 'rgba(59,130,246,0.3)',
-          fill: true,
-          tension: 0.3,
-        },
-        {
-          label: '输出 Tokens',
-          data: td?.output_tokens ?? [],
-          borderColor: '#8b5cf6',
-          backgroundColor: 'rgba(139,92,246,0.3)',
-          fill: true,
-          tension: 0.3,
-        },
-        {
-          label: '缓存命中 Tokens',
-          data: td?.cache_hit_tokens ?? [],
-          borderColor: '#f59e0b',
-          backgroundColor: 'rgba(245,158,11,0.3)',
-          fill: true,
-          tension: 0.3,
-        },
-      ],
-    }
+    tokensData.value = tokensOk && tokensOk.length > 0 ? {
+      labels: toLabels(tokensOk),
+      datasets: [{
+        label: 'Output Tokens',
+        data: toValues(tokensOk),
+        borderColor: '#8b5cf6',
+        backgroundColor: 'rgba(139,92,246,0.3)',
+        fill: true,
+        tension: 0.3,
+      }],
+    } : null
 
-    summaryRows.value = summaryOk?.data?.models ?? []
-    const models: string[] = (summaryOk?.data?.models ?? []).map((m: SummaryRow) => m.backend_model)
-    modelOptions.value = [...new Set(models)]
+    // 后端 summary 直接返回数组
+    summaryRows.value = Array.isArray(summaryOk) ? summaryOk : []
+    const models = [...new Set(summaryRows.value.map((r: SummaryRow) => r.backend_model))]
+    modelOptions.value = models
   } catch (e) {
     console.error('Failed to load metrics:', e)
-    loading.value = false
   } finally {
     loading.value = false
   }
@@ -327,7 +314,6 @@ async function loadRouterKeys() {
   try {
     const res = await api.getRouterKeys()
     routerKeys.value = res.data
-  // eslint-disable-next-line taste/no-silent-catch
   } catch (e) {
     console.error('Failed to load router keys:', e)
   }

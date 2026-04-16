@@ -4,42 +4,42 @@ const router = createRouter({
   history: createWebHistory('/admin/'),
   routes: [
     {
-      path: '/admin/login',
+      path: '/login',
       name: 'login',
       component: () => import('@/views/Login.vue'),
     },
     {
-      path: '/admin/',
+      path: '/',
       name: 'dashboard',
       component: () => import('@/views/Dashboard.vue'),
       meta: { requiresAuth: true },
     },
     {
-      path: '/admin/providers',
+      path: '/providers',
       name: 'providers',
       component: () => import('@/views/Providers.vue'),
       meta: { requiresAuth: true },
     },
     {
-      path: '/admin/metrics',
+      path: '/metrics',
       name: 'metrics',
       component: () => import('@/views/Metrics.vue'),
       meta: { requiresAuth: true },
     },
     {
-      path: '/admin/mappings',
+      path: '/mappings',
       name: 'mappings',
       component: () => import('@/views/ModelMappings.vue'),
       meta: { requiresAuth: true },
     },
     {
-      path: '/admin/router-keys',
+      path: '/router-keys',
       name: 'router-keys',
       component: () => import('@/views/RouterKeys.vue'),
       meta: { requiresAuth: true },
     },
     {
-      path: '/admin/logs',
+      path: '/logs',
       name: 'logs',
       component: () => import('@/views/Logs.vue'),
       meta: { requiresAuth: true },
@@ -54,7 +54,7 @@ router.beforeEach(async (to, _from, next) => {
       await axios.get('/stats')
       next()
     } catch {
-      next('/admin/login')
+      next('/login')
     }
   } else {
     next()

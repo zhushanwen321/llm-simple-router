@@ -12,7 +12,7 @@ client.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) { // eslint-disable-line no-magic-numbers
-      router.push('/admin/login')
+      router.push('/login')
     }
     return Promise.reject(error)
   }

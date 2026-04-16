@@ -13,7 +13,7 @@
         <TableHeader>
           <TableRow class="bg-gray-50">
             <TableHead class="text-gray-600">名称</TableHead>
-            <TableHead class="text-gray-600">密钥前缀</TableHead>
+            <TableHead class="text-gray-600">密钥</TableHead>
             <TableHead class="text-gray-600">白名单模型</TableHead>
             <TableHead class="text-gray-600">状态</TableHead>
             <TableHead class="text-gray-600">创建时间</TableHead>
@@ -23,7 +23,19 @@
         <TableBody>
           <TableRow v-for="k in keys" :key="k.id" :class="{ 'opacity-60': !k.is_active }">
             <TableCell class="font-medium">{{ k.name }}</TableCell>
-            <TableCell class="font-mono text-xs text-gray-500">{{ k.key_prefix }}...</TableCell>
+            <TableCell>
+              <div class="flex items-center gap-1">
+                <span class="font-mono text-xs text-gray-500">{{ k.key_prefix }}...</span>
+                <Button variant="ghost" size="sm" class="h-6 w-6 p-0" @click="copyPrefix(k.key_prefix)">
+                  <svg v-if="copiedPrefix !== k.key_prefix" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                  </svg>
+                  <svg v-else class="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                  </svg>
+                </Button>
+              </div>
+            </TableCell>
             <TableCell>
               <template v-if="k.allowed_models && k.allowed_models.length > 0">
                 <div class="flex flex-wrap gap-1">
@@ -165,6 +177,7 @@ const form = ref({ name: '', allowed_models: [] as string[], is_active: true })
 const showKeyDialog = ref(false)
 const createdKey = ref('')
 const copied = ref(false)
+const copiedPrefix = ref('')
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleString('zh-CN')
@@ -246,10 +259,11 @@ function confirmDelete(k: RouterKey) {
 }
 
 async function handleDelete() {
-  if (!deleteTarget.value) return
+  const target = deleteTarget.value
+  if (!target) return
+  deleteTarget.value = null
   try {
-    await api.deleteRouterKey(deleteTarget.value.id)
-    deleteTarget.value = null
+    await api.deleteRouterKey(target.id)
     await loadData()
   } catch (e) {
     console.error('Failed to delete router key:', e)
@@ -267,6 +281,17 @@ async function copyKey() {
   // eslint-disable-next-line taste/no-silent-catch
   } catch (e) {
     console.error('Failed to copy key:', e)
+  }
+}
+
+async function copyPrefix(prefix: string) {
+  try {
+    await navigator.clipboard.writeText(prefix)
+    copiedPrefix.value = prefix
+    setTimeout(() => { copiedPrefix.value = '' }, COPY_FEEDBACK_MS)
+  // eslint-disable-next-line taste/no-silent-catch
+  } catch (e) {
+    console.error('Failed to copy prefix:', e)
   }
 }
 

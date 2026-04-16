@@ -19,7 +19,7 @@ const route = useRoute()
 const isAuthenticated = ref(false)
 
 async function checkAuth() {
-  if (route.path === '/admin/login') {
+  if (route.path === '/login') {
     isAuthenticated.value = false
     return
   }
@@ -28,7 +28,7 @@ async function checkAuth() {
     isAuthenticated.value = true
   } catch {
     isAuthenticated.value = false
-    router.push('/admin/login')
+    router.push('/login')
   }
 }
 

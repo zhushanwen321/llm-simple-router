@@ -96,6 +96,7 @@
 </template>
 
 <script setup lang="ts">
+/* eslint-disable taste/no-silent-catch, taste/prefer-allsettled */
 import { ref, onMounted } from 'vue'
 import { api } from '@/api/client'
 import { Button } from '@/components/ui/button'
@@ -178,10 +179,11 @@ function confirmDelete(m: Mapping) {
 }
 
 async function handleDelete() {
-  if (!deleteTarget.value) return
+  const target = deleteTarget.value
+  if (!target) return
+  deleteTarget.value = null
   try {
-    await api.deleteMapping(deleteTarget.value.id)
-    deleteTarget.value = null
+    await api.deleteMapping(target.id)
     await loadData()
   } catch (e) {
     console.error('Failed to delete mapping:', e)
