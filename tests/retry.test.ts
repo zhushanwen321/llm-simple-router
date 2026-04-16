@@ -1,18 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { isRetryableResult, isRetryableThrow, retryableCall } from "../src/proxy/retry.js";
 import type { RetryConfig } from "../src/proxy/retry.js";
+import { RetryRuleMatcher } from "../src/proxy/retry-rules.js";
 import type { ProxyResult } from "../src/proxy/proxy-core.js";
 
 const DEFAULT_CONFIG: RetryConfig = {
   maxRetries: 2,
   baseDelayMs: 10,
   retryableStatuses: new Set([429, 503]),
-  isRetryableBody: (body: string) => {
-    try {
-      const parsed = JSON.parse(body);
-      return parsed?.error?.code === "1234" || (parsed?.error?.message?.includes("请稍后重试") ?? false);
-    } catch { return false; }
-  },
 };
 
 function mockResult(statusCode: number, body = ""): ProxyResult {
@@ -25,15 +20,21 @@ describe("isRetryableResult", () => {
   it("returns false for 200", () => expect(isRetryableResult(200, undefined, DEFAULT_CONFIG)).toBe(false));
   it("returns false for 401", () => expect(isRetryableResult(401, undefined, DEFAULT_CONFIG)).toBe(false));
   it("returns false for 502", () => expect(isRetryableResult(502, undefined, DEFAULT_CONFIG)).toBe(false));
-  it("returns true for 400 with code=1234", () => {
-    expect(isRetryableResult(400, JSON.stringify({ error: { code: "1234", message: "网络错误" } }), DEFAULT_CONFIG)).toBe(true);
+
+  it("returns true for 400 when ruleMatcher matches", () => {
+    const matcher = new RetryRuleMatcher();
+    matcher["cache"] = new Map([[400, [/请稍后重试/]]]);
+    const config: RetryConfig = { ...DEFAULT_CONFIG, ruleMatcher: matcher };
+    expect(isRetryableResult(400, JSON.stringify({ error: { code: "9999", message: "网络错误，请稍后重试" } }), config)).toBe(true);
   });
-  it("returns true for 400 with 请稍后重试", () => {
-    expect(isRetryableResult(400, JSON.stringify({ error: { code: "9999", message: "网络错误，请稍后重试" } }), DEFAULT_CONFIG)).toBe(true);
+
+  it("returns false for 400 when ruleMatcher does not match", () => {
+    const matcher = new RetryRuleMatcher();
+    matcher["cache"] = new Map([[400, [/请稍后重试/]]]);
+    const config: RetryConfig = { ...DEFAULT_CONFIG, ruleMatcher: matcher };
+    expect(isRetryableResult(400, JSON.stringify({ error: { code: "1211", message: "模型不存在" } }), config)).toBe(false);
   });
-  it("returns false for 400 non-retryable", () => {
-    expect(isRetryableResult(400, JSON.stringify({ error: { code: "1211", message: "模型不存在" } }), DEFAULT_CONFIG)).toBe(false);
-  });
+
   it("returns false for 400 without config", () => {
     expect(isRetryableResult(400, JSON.stringify({ error: { code: "1234" } }))).toBe(false);
   });
