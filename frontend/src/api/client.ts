@@ -16,6 +16,23 @@ client.interceptors.response.use(
   }
 )
 
+// --- API endpoint constants ---
+
+const API = {
+  LOGIN: '/login',
+  LOGOUT: '/logout',
+  PROVIDERS: '/providers',
+  MAPPINGS: '/mappings',
+  MAPPING_GROUPS: '/mapping-groups',
+  RETRY_RULES: '/retry-rules',
+  LOGS: '/logs',
+  STATS: '/stats',
+  METRICS_SUMMARY: '/metrics/summary',
+  METRICS_TIMESERIES: '/metrics/timeseries',
+  ROUTER_KEYS: '/router-keys',
+  MODELS_AVAILABLE: '/models/available',
+} as const
+
 // --- Payload types ---
 
 interface ProviderPayload {
@@ -60,52 +77,52 @@ interface RetryRulePayload {
 // --- API ---
 
 export const api = {
-  login: (password: string) => client.post('/login', { password }),
-  logout: () => client.post('/logout'),
+  login: (password: string) => client.post(API.LOGIN, { password }),
+  logout: () => client.post(API.LOGOUT),
 
-  getProviders: () => client.get('/providers'),
-  createProvider: (data: ProviderPayload) => client.post('/providers', data),
-  updateProvider: (id: string, data: Partial<ProviderPayload>) => client.put(`/providers/${id}`, data),
-  deleteProvider: (id: string) => client.delete(`/providers/${id}`),
+  getProviders: () => client.get(API.PROVIDERS),
+  createProvider: (data: ProviderPayload) => client.post(API.PROVIDERS, data),
+  updateProvider: (id: string, data: Partial<ProviderPayload>) => client.put(`${API.PROVIDERS}/${id}`, data),
+  deleteProvider: (id: string) => client.delete(`${API.PROVIDERS}/${id}`),
 
-  getMappings: () => client.get('/mappings'),
-  createMapping: (data: MappingPayload) => client.post('/mappings', data),
-  updateMapping: (id: string, data: MappingPayload) => client.put(`/mappings/${id}`, data),
-  deleteMapping: (id: string) => client.delete(`/mappings/${id}`),
+  getMappings: () => client.get(API.MAPPINGS),
+  createMapping: (data: MappingPayload) => client.post(API.MAPPINGS, data),
+  updateMapping: (id: string, data: MappingPayload) => client.put(`${API.MAPPINGS}/${id}`, data),
+  deleteMapping: (id: string) => client.delete(`${API.MAPPINGS}/${id}`),
 
   getLogs: (params: { page: number; limit: number; api_type?: string; router_key_id?: string }) =>
-    client.get('/logs', { params }),
-  getLogDetail: (id: string) => client.get(`/logs/${id}`),
+    client.get(API.LOGS, { params }),
+  getLogDetail: (id: string) => client.get(`${API.LOGS}/${id}`),
   deleteLogsBefore: (before: string) =>
-    client.delete('/logs/before', { data: { before } }),
+    client.delete(`${API.LOGS}/before`, { data: { before } }),
 
   getStats: (params?: { router_key_id?: string }) =>
-    client.get('/stats', { params }),
+    client.get(API.STATS, { params }),
 
   getMetricsSummary: (params: { period: string; provider_id?: string; backend_model?: string; router_key_id?: string }) =>
-    client.get('/metrics/summary', { params }),
+    client.get(API.METRICS_SUMMARY, { params }),
   getMetricsTimeseries: (params: { period: string; metric: string; provider_id?: string; backend_model?: string; router_key_id?: string }) =>
-    client.get('/metrics/timeseries', { params }),
+    client.get(API.METRICS_TIMESERIES, { params }),
 
-  getRouterKeys: () => client.get('/router-keys'),
+  getRouterKeys: () => client.get(API.ROUTER_KEYS),
   createRouterKey: (data: RouterKeyCreatePayload) =>
-    client.post('/router-keys', data),
+    client.post(API.ROUTER_KEYS, data),
   updateRouterKey: (id: string, data: RouterKeyUpdatePayload) =>
-    client.put(`/router-keys/${id}`, data),
-  deleteRouterKey: (id: string) => client.delete(`/router-keys/${id}`),
-  getAvailableModels: () => client.get('/models/available'),
+    client.put(`${API.ROUTER_KEYS}/${id}`, data),
+  deleteRouterKey: (id: string) => client.delete(`${API.ROUTER_KEYS}/${id}`),
+  getAvailableModels: () => client.get(API.MODELS_AVAILABLE),
 
-  getMappingGroups: () => client.get('/mapping-groups'),
+  getMappingGroups: () => client.get(API.MAPPING_GROUPS),
   createMappingGroup: (data: MappingGroupPayload) =>
-    client.post('/mapping-groups', data),
+    client.post(API.MAPPING_GROUPS, data),
   updateMappingGroup: (id: string, data: MappingGroupPayload) =>
-    client.put(`/mapping-groups/${id}`, data),
-  deleteMappingGroup: (id: string) => client.delete(`/mapping-groups/${id}`),
+    client.put(`${API.MAPPING_GROUPS}/${id}`, data),
+  deleteMappingGroup: (id: string) => client.delete(`${API.MAPPING_GROUPS}/${id}`),
 
-  getRetryRules: () => client.get('/retry-rules'),
+  getRetryRules: () => client.get(API.RETRY_RULES),
   createRetryRule: (data: RetryRulePayload) =>
-    client.post('/retry-rules', data),
+    client.post(API.RETRY_RULES, data),
   updateRetryRule: (id: string, data: RetryRulePayload) =>
-    client.put(`/retry-rules/${id}`, data),
-  deleteRetryRule: (id: string) => client.delete(`/retry-rules/${id}`),
+    client.put(`${API.RETRY_RULES}/${id}`, data),
+  deleteRetryRule: (id: string) => client.delete(`${API.RETRY_RULES}/${id}`),
 }

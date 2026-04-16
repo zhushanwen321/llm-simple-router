@@ -11,7 +11,7 @@
     </div>
 
     <div class="space-y-4">
-      <Card v-for="g in groups" :key="g.id" class="bg-white">
+      <Card v-for="g in groupsWithParsedRule" :key="g.id" class="bg-white">
         <Collapsible :default-open="false">
           <CardHeader class="flex flex-row items-center justify-between gap-4">
             <div class="flex items-center gap-3">
@@ -25,7 +25,7 @@
                 </Button>
               </CollapsibleTrigger>
               <Button variant="ghost" size="sm" @click="openEdit(g)">编辑</Button>
-              <Button variant="ghost" size="sm" class="text-red-600 hover:text-red-700" @click="confirmDelete(g)">删除</Button>
+              <Button variant="ghost" size="sm" class="text-red-600 hover:text-red-700" @click="deleteTarget = g">删除</Button>
             </div>
           </CardHeader>
           <CollapsibleContent>
@@ -33,14 +33,14 @@
               <div class="space-y-3">
                 <div class="flex items-center gap-2 text-sm">
                   <span class="text-gray-500">默认模型:</span>
-                  <span class="font-mono">{{ parsedRule(g.rule).default?.backend_model || '-' }}</span>
+                  <span class="font-mono">{{ g.parsedRule.default?.backend_model || '-' }}</span>
                   <span class="text-gray-400">/</span>
-                  <span>{{ providerNameMap.get(parsedRule(g.rule).default?.provider_id || '') || '-' }}</span>
+                  <span>{{ providerNameMap.get(g.parsedRule.default?.provider_id || '') || '-' }}</span>
                 </div>
-                <div v-if="parsedRule(g.rule).windows?.length" class="space-y-2">
+                <div v-if="g.parsedRule.windows?.length" class="space-y-2">
                   <div class="text-sm text-gray-500">时间窗口</div>
                   <div
-                    v-for="(w, idx) in parsedRule(g.rule).windows"
+                    v-for="(w, idx) in g.parsedRule.windows"
                     :key="idx"
                     class="flex items-center gap-2 text-sm"
                   >
@@ -62,109 +62,21 @@
       </div>
     </div>
 
-    <!-- Create/Edit Dialog -->
-    <Dialog v-model:open="dialogOpen">
-      <DialogContent class="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>{{ editingId ? '编辑分组' : '添加分组' }}</DialogTitle>
-        </DialogHeader>
-        <form @submit.prevent="handleSave" class="space-y-4">
-          <div>
-            <Label class="block text-sm font-medium text-gray-700 mb-1">客户端模型</Label>
-            <Input v-model="form.client_model" type="text" required />
-          </div>
-          <div>
-            <Label class="block text-sm font-medium text-gray-700 mb-1">策略</Label>
-            <Select v-model="form.strategy">
-              <SelectTrigger>
-                <SelectValue placeholder="选择策略" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="scheduled">scheduled</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+    <MappingGroupFormDialog
+      v-model:open="dialogOpen"
+      :editing-id="editingId"
+      :form="form"
+      :providers="providersList"
+      @save="handleSave"
+      @add-window="addWindow"
+      @remove-window="removeWindow"
+    />
 
-          <div class="border rounded-lg p-3 space-y-3">
-            <div class="text-sm font-medium text-gray-700">默认目标</div>
-            <div class="flex gap-3">
-              <div class="flex-1">
-                <Label class="block text-xs text-gray-500 mb-1">后端模型</Label>
-                <Input v-model="form.default.backend_model" type="text" required />
-              </div>
-              <div class="flex-1">
-                <Label class="block text-xs text-gray-500 mb-1">供应商</Label>
-                <Select v-model="form.default.provider_id">
-                  <SelectTrigger>
-                    <SelectValue placeholder="选择供应商" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem v-for="p in providersList" :key="p.id" :value="p.id">{{ p.name }}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-
-          <div class="border rounded-lg p-3 space-y-3">
-            <div class="flex items-center justify-between">
-              <div class="text-sm font-medium text-gray-700">时间窗口</div>
-              <Button type="button" variant="outline" size="sm" @click="addWindow">添加窗口</Button>
-            </div>
-            <div
-              v-for="(w, idx) in form.windows"
-              :key="idx"
-              class="flex gap-3 items-end"
-            >
-              <div class="w-28">
-                <Label class="block text-xs text-gray-500 mb-1">开始</Label>
-                <Input v-model="w.start" type="text" placeholder="HH:MM" required />
-              </div>
-              <div class="w-28">
-                <Label class="block text-xs text-gray-500 mb-1">结束</Label>
-                <Input v-model="w.end" type="text" placeholder="HH:MM" required />
-              </div>
-              <div class="flex-1">
-                <Label class="block text-xs text-gray-500 mb-1">后端模型</Label>
-                <Input v-model="w.backend_model" type="text" required />
-              </div>
-              <div class="flex-1">
-                <Label class="block text-xs text-gray-500 mb-1">供应商</Label>
-                <Select v-model="w.provider_id">
-                  <SelectTrigger>
-                    <SelectValue placeholder="选择供应商" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem v-for="p in providersList" :key="p.id" :value="p.id">{{ p.name }}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button type="button" variant="ghost" size="sm" class="text-red-600" @click="removeWindow(idx)">删除</Button>
-            </div>
-            <div v-if="form.windows.length === 0" class="text-sm text-gray-400">暂无窗口</div>
-          </div>
-
-          <DialogFooter>
-            <Button type="button" variant="outline" @click="dialogOpen = false">取消</Button>
-            <Button type="submit">保存</Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-
-    <!-- Delete Confirm AlertDialog -->
-    <AlertDialog :open="!!deleteTarget" @update:open="(val) => { if (!val) deleteTarget = null }">
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>确认删除</AlertDialogTitle>
-          <AlertDialogDescription>确定要删除分组「{{ deleteTarget?.client_model }}」吗？</AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>取消</AlertDialogCancel>
-          <Button variant="destructive" @click="handleDelete">删除</Button>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <MappingGroupDeleteDialog
+      :target="deleteTarget"
+      @confirm="handleDelete"
+      @cancel="deleteTarget = null"
+    />
   </div>
 </template>
 
@@ -173,14 +85,11 @@ import { ref, computed, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
 import { api } from '@/api/client'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from '@/components/ui/alert-dialog'
+import MappingGroupFormDialog from '@/components/mappings/MappingGroupFormDialog.vue'
+import MappingGroupDeleteDialog from '@/components/mappings/MappingGroupDeleteDialog.vue'
 
 interface MappingGroup {
   id: string
@@ -203,10 +112,7 @@ interface RuleWindow {
 }
 
 interface Rule {
-  default?: {
-    backend_model: string
-    provider_id: string
-  }
+  default?: { backend_model: string; provider_id: string }
   windows?: RuleWindow[]
 }
 
@@ -230,13 +136,16 @@ const providerNameMap = computed(() => {
   return map
 })
 
-function parsedRule(ruleJson: string): Rule {
-  try {
-    return JSON.parse(ruleJson) as Rule
-  } catch {
-    return {}
-  }
-}
+// 预解析 rule，避免模板中重复调用 parsedRule()
+const groupsWithParsedRule = computed(() =>
+  groups.value.map((g) => {
+    let parsedRule: Rule = {}
+    try {
+      parsedRule = JSON.parse(g.rule) as Rule
+    } catch { /* keep default empty */ }
+    return { ...g, parsedRule }
+  })
+)
 
 async function loadData() {
   try {
@@ -261,9 +170,10 @@ function openCreate() {
   dialogOpen.value = true
 }
 
-function openEdit(g: MappingGroup) {
+function openEdit(g: MappingGroup & { parsedRule?: Rule }) {
   editingId.value = g.id
-  const rule = parsedRule(g.rule)
+  let rule: Rule = {}
+  try { rule = JSON.parse(g.rule) as Rule } catch { /* empty */ }
   form.value = {
     client_model: g.client_model,
     strategy: g.strategy,
@@ -310,10 +220,6 @@ async function handleSave() {
     console.error('Failed to save mapping group:', e)
     toast.error('保存分组失败')
   }
-}
-
-function confirmDelete(g: MappingGroup) {
-  deleteTarget.value = g
 }
 
 async function handleDelete() {

@@ -31,10 +31,10 @@
 
         <!-- Parameter badges -->
         <div class="flex flex-wrap gap-2">
-          <Badge v-if="parsed.body?.model" variant="outline">model: {{ String(parsed.body.model) }}</Badge>
-          <Badge v-if="parsed.body?.stream != null" variant="outline">stream: {{ String(parsed.body.stream) }}</Badge>
-          <Badge v-if="parsed.body?.max_tokens != null" variant="outline">max_tokens: {{ String(parsed.body.max_tokens) }}</Badge>
-          <Badge v-if="parsed.body?.thinking != null" variant="outline">thinking</Badge>
+          <Badge v-if="(parsed.body as Record<string, unknown>)?.model" variant="outline">model: {{ String((parsed.body as Record<string, unknown>).model) }}</Badge>
+          <Badge v-if="(parsed.body as Record<string, unknown>)?.stream != null" variant="outline">stream: {{ String((parsed.body as Record<string, unknown>).stream) }}</Badge>
+          <Badge v-if="(parsed.body as Record<string, unknown>)?.max_tokens != null" variant="outline">max_tokens: {{ String((parsed.body as Record<string, unknown>).max_tokens) }}</Badge>
+          <Badge v-if="(parsed.body as Record<string, unknown>)?.thinking != null" variant="outline">thinking</Badge>
         </div>
 
         <!-- Headers -->
@@ -164,11 +164,11 @@ const headersOpen = ref(false)
 const expanded = reactive<Record<string, boolean>>({})
 const toolsExpanded = ref(false)
 
-const parsed = computed(() => {
+const parsed = computed<Record<string, unknown>>(() => {
   try {
     return JSON.parse(props.raw) as Record<string, unknown>
   } catch {
-    return {} as Record<string, unknown>
+    return {}
   }
 })
 
