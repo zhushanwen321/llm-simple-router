@@ -3,12 +3,12 @@ import Database from "better-sqlite3";
 import { getMetricsSummary, getMetricsTimeseries } from "../db/index.js";
 
 type MetricsPeriod = "1h" | "6h" | "24h" | "7d" | "30d";
-type MetricsMetric = "ttft" | "tps" | "tokens" | "cache_rate" | "request_count";
+type MetricsMetric = "ttft" | "tps" | "tokens" | "cache_rate" | "request_count" | "input_tokens" | "output_tokens" | "cache_hit_tokens";
 
 const HTTP_BAD_REQUEST = 400;
 
 const VALID_PERIODS: Set<string> = new Set(["1h", "6h", "24h", "7d", "30d"]);
-const VALID_METRICS: Set<string> = new Set(["ttft", "tps", "tokens", "cache_rate", "request_count"]);
+const VALID_METRICS: Set<string> = new Set(["ttft", "tps", "tokens", "cache_rate", "request_count", "input_tokens", "output_tokens", "cache_hit_tokens"]);
 
 interface MetricsRoutesOptions {
   db: Database.Database;

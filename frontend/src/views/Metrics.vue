@@ -82,6 +82,18 @@
             </div>
           </CardContent>
         </Card>
+
+        <!-- 缓存命中率 -->
+        <Card class="lg:col-span-2">
+          <CardHeader>
+            <CardTitle class="text-sm font-medium text-gray-700">缓存命中率</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div class="h-64">
+              <Line v-if="cacheRateData" :data="cacheRateData" :options="lineOptions('%', cacheRateData.labels as string[])" />
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <!-- 模型对比表 -->
@@ -100,6 +112,7 @@
                 <TableHead>平均 TPS</TableHead>
                 <TableHead>输入 Tokens</TableHead>
                 <TableHead>输出 Tokens</TableHead>
+                <TableHead>缓存命中 Tokens</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -116,9 +129,10 @@
                 <TableCell>{{ row.avg_tps != null ? row.avg_tps.toFixed(1) : '-' }}</TableCell>
                 <TableCell>{{ row.total_input_tokens?.toLocaleString() ?? '-' }}</TableCell>
                 <TableCell>{{ row.total_output_tokens?.toLocaleString() ?? '-' }}</TableCell>
+                <TableCell>{{ row.total_cache_hit_tokens?.toLocaleString() ?? '-' }}</TableCell>
               </TableRow>
               <TableRow v-if="summaryRows.length === 0">
-                <TableCell colspan="7" class="text-center text-gray-400">暂无数据</TableCell>
+                <TableCell colspan="8" class="text-center text-gray-400">暂无数据</TableCell>
               </TableRow>
             </TableBody>
           </Table>
@@ -172,6 +186,7 @@ const modelOptions = ref<string[]>([])
 const ttftData = ref<ChartData<'line'> | null>(null)
 const tpsData = ref<ChartData<'line'> | null>(null)
 const tokensData = ref<ChartData<'line'> | null>(null)
+const cacheRateData = ref<ChartData<'line'> | null>(null)
 
 interface SummaryRow {
   backend_model: string
@@ -186,7 +201,7 @@ interface SummaryRow {
 const summaryRows = ref<SummaryRow[]>([])
 
 const noData = computed(() => {
-  const hasChart = ttftData.value || tpsData.value || tokensData.value
+  const hasChart = ttftData.value || tpsData.value || tokensData.value || cacheRateData.value
   return !hasChart && summaryRows.value.length === 0
 })
 
@@ -222,10 +237,13 @@ function toDataset(label: string, color: string, bgColor: string, filled: boolea
 async function fetchMetrics() {
   loading.value = true
   try {
-    const [ttftRes, tpsRes, tokensRes, summaryRes] = await Promise.allSettled([
+    const [ttftRes, tpsRes, inputTokensRes, outputTokensRes, cacheHitTokensRes, cacheRateRes, summaryRes] = await Promise.allSettled([
       api.getMetricsTimeseries(buildTimeseriesParams('ttft')),
       api.getMetricsTimeseries(buildTimeseriesParams('tps')),
-      api.getMetricsTimeseries(buildTimeseriesParams('tokens')),
+      api.getMetricsTimeseries(buildTimeseriesParams('input_tokens')),
+      api.getMetricsTimeseries(buildTimeseriesParams('output_tokens')),
+      api.getMetricsTimeseries(buildTimeseriesParams('cache_hit_tokens')),
+      api.getMetricsTimeseries(buildTimeseriesParams('cache_rate')),
       api.getMetricsSummary(buildSummaryParams()),
     ])
 
@@ -234,19 +252,37 @@ async function fetchMetrics() {
 
     const ttftOk = fulfilled(ttftRes) ? ttftRes.value.data : null
     const tpsOk = fulfilled(tpsRes) ? tpsRes.value.data : null
-    const tokensOk = fulfilled(tokensRes) ? tokensRes.value.data : null
+    const inputTokensOk = fulfilled(inputTokensRes) ? inputTokensRes.value.data : null
+    const outputTokensOk = fulfilled(outputTokensRes) ? outputTokensRes.value.data : null
+    const cacheHitTokensOk = fulfilled(cacheHitTokensRes) ? cacheHitTokensRes.value.data : null
+    const cacheRateOk = fulfilled(cacheRateRes) ? cacheRateRes.value.data : null
     const summaryOk = fulfilled(summaryRes) ? summaryRes.value.data : null
 
     const emptyAxis = fillTimeseries([], p)
     const ttftFilled = ttftOk?.length ? fillTimeseries(ttftOk, p) : emptyAxis
     const tpsFilled = tpsOk?.length ? fillTimeseries(tpsOk, p) : emptyAxis
-    const tokensFilled = tokensOk?.length ? fillTimeseries(tokensOk, p) : emptyAxis
+    const inputTokensFilled = inputTokensOk?.length ? fillTimeseries(inputTokensOk, p) : emptyAxis
+    const outputTokensFilled = outputTokensOk?.length ? fillTimeseries(outputTokensOk, p) : emptyAxis
+    const cacheHitTokensFilled = cacheHitTokensOk?.length ? fillTimeseries(cacheHitTokensOk, p) : emptyAxis
+    const cacheRateFilled = cacheRateOk?.length ? fillTimeseries(cacheRateOk, p) : emptyAxis
 
-    const hasAny = ttftOk?.length || tpsOk?.length || tokensOk?.length
+    const hasAny = ttftOk?.length || tpsOk?.length || inputTokensOk?.length || outputTokensOk?.length || cacheHitTokensOk?.length || cacheRateOk?.length
 
     ttftData.value = hasAny ? toDataset('TTFT (ms)', '#3b82f6', 'rgba(59,130,246,0.1)', false, ttftFilled) : null
     tpsData.value = hasAny ? toDataset('TPS', '#8b5cf6', 'rgba(139,92,246,0.1)', false, tpsFilled) : null
-    tokensData.value = hasAny ? toDataset('Output Tokens', '#8b5cf6', 'rgba(139,92,246,0.3)', true, tokensFilled) : null
+    tokensData.value = hasAny ? {
+      labels: inputTokensFilled.labels,
+      datasets: [
+        { label: 'Input Tokens', data: inputTokensFilled.values, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.3)', fill: true, tension: 0.4, pointRadius: 0 },
+        { label: 'Output Tokens', data: outputTokensFilled.values, borderColor: '#8b5cf6', backgroundColor: 'rgba(139,92,246,0.3)', fill: true, tension: 0.4, pointRadius: 0 },
+        { label: 'Cache Hit Tokens', data: cacheHitTokensFilled.values, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.3)', fill: true, tension: 0.4, pointRadius: 0 },
+      ],
+    } : null
+    const PERCENT_MULTIPLIER = 100
+    cacheRateData.value = hasAny ? toDataset('Cache Hit Rate', '#f59e0b', 'rgba(245,158,11,0.1)', false, {
+      labels: cacheRateFilled.labels,
+      values: cacheRateFilled.values.map((v) => v * PERCENT_MULTIPLIER),
+    }) : null
 
     summaryRows.value = Array.isArray(summaryOk) ? summaryOk : []
     modelOptions.value = [...new Set(summaryRows.value.map((r: SummaryRow) => r.backend_model))]

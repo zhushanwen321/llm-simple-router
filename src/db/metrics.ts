@@ -1,7 +1,7 @@
 import Database from "better-sqlite3";
 
 export type MetricsPeriod = "1h" | "6h" | "24h" | "7d" | "30d";
-export type MetricsMetric = "ttft" | "tps" | "tokens" | "cache_rate" | "request_count";
+export type MetricsMetric = "ttft" | "tps" | "tokens" | "cache_rate" | "request_count" | "input_tokens" | "output_tokens" | "cache_hit_tokens";
 
 const PERIOD_OFFSET: Record<MetricsPeriod, string> = {
   "1h": "-1 hours",
@@ -110,6 +110,9 @@ const METRIC_EXPR: Record<MetricsMetric, string> = {
   tokens: "SUM(rm.output_tokens)",
   cache_rate: "CASE WHEN SUM(rm.input_tokens) > 0 THEN SUM(rm.cache_read_tokens) * 1.0 / SUM(rm.input_tokens) ELSE NULL END",
   request_count: "COUNT(*)",
+  input_tokens: "SUM(rm.input_tokens)",
+  output_tokens: "SUM(rm.output_tokens)",
+  cache_hit_tokens: "SUM(rm.cache_read_tokens)",
 };
 
 export function getMetricsTimeseries(
