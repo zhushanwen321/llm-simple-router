@@ -14,6 +14,7 @@ import {
   type ProxyResult, type StreamProxyResult, type RawHeaders,
 } from "./proxy-core.js";
 import { retryableCall, buildRetryConfig } from "./retry.js";
+import { resolveMapping } from "./mapping-resolver.js";
 
 export interface AnthropicProxyOptions {
   db: Database.Database;
@@ -48,25 +49,25 @@ const anthropicProxyRaw: FastifyPluginCallback<AnthropicProxyOptions> = (app, op
     const body = request.body as Record<string, unknown>;
     const originalBody = JSON.parse(JSON.stringify(body));
     const clientModel = (body.model as string) || "unknown";
-    const mapping = getModelMapping(db, clientModel);
-    if (!mapping) return sendError(reply, anthropicError(`Model '${clientModel}' is not configured`, "not_found_error", HTTP_NOT_FOUND));
+    const resolved = resolveMapping(db, clientModel, { now: new Date() });
+    if (!resolved) return sendError(reply, anthropicError(`Model '${clientModel}' is not configured`, "not_found_error", HTTP_NOT_FOUND));
 
     // 白名单校验
     const allowedModels = request.routerKey?.allowed_models;
     if (allowedModels) {
       try {
         const models: string[] = JSON.parse(allowedModels);
-        if (models.length > 0 && !models.includes(mapping.backend_model)) {
-          return sendError(reply, anthropicError(`Model '${mapping.backend_model}' is not allowed for this API key`, "forbidden_error", HTTP_FORBIDDEN));
+        if (models.length > 0 && !models.includes(resolved.backend_model)) {
+          return sendError(reply, anthropicError(`Model '${resolved.backend_model}' is not allowed for this API key`, "forbidden_error", HTTP_FORBIDDEN));
         }
       } catch { request.log.warn("Invalid allowed_models JSON, allowing all models"); }
     }
 
-    const provider = getProviderById(db, mapping.provider_id);
+    const provider = getProviderById(db, resolved.provider_id);
     if (!provider || !provider.is_active) return sendError(reply, anthropicError("Provider unavailable", "api_error", HTTP_SERVICE_UNAVAILABLE));
     if (provider.api_type !== "anthropic") return sendError(reply, anthropicError("Provider type mismatch for this endpoint", "api_error", HTTP_INTERNAL_ERROR));
 
-    body.model = mapping.backend_model;
+    body.model = resolved.backend_model;
     const apiKey = decrypt(provider.api_key, encryptionKey);
     const isStream = body.stream === true;
     const reqBodyStr = JSON.stringify(body);
@@ -148,13 +149,13 @@ const anthropicProxyRaw: FastifyPluginCallback<AnthropicProxyOptions> = (app, op
         if (isStream) {
           const streamResult = r as StreamProxyResult;
           if (streamResult.metricsResult) {
-            try { insertMetrics(db, { ...streamResult.metricsResult, request_log_id: lastSuccessLogId, provider_id: provider.id, backend_model: mapping.backend_model, api_type: "anthropic" }); }
+            try { insertMetrics(db, { ...streamResult.metricsResult, request_log_id: lastSuccessLogId, provider_id: provider.id, backend_model: resolved.backend_model, api_type: "anthropic" }); }
             catch (err) { request.log.error({ err }, "Failed to insert metrics"); }
           }
         } else {
           try {
             const mr = MetricsExtractor.fromNonStreamResponse("anthropic", (r as ProxyResult).body);
-            if (mr) insertMetrics(db, { ...mr, request_log_id: lastSuccessLogId, provider_id: provider.id, backend_model: mapping.backend_model, api_type: "anthropic" });
+            if (mr) insertMetrics(db, { ...mr, request_log_id: lastSuccessLogId, provider_id: provider.id, backend_model: resolved.backend_model, api_type: "anthropic" });
           } catch (err) { request.log.error({ err }, "Failed to insert metrics"); }
         }
       }

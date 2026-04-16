@@ -15,6 +15,7 @@ import {
   type ProxyResult, type StreamProxyResult, type RawHeaders,
 } from "./proxy-core.js";
 import { retryableCall, buildRetryConfig } from "./retry.js";
+import { resolveMapping } from "./mapping-resolver.js";
 
 export interface OpenaiProxyOptions {
   db: Database.Database;
@@ -50,25 +51,25 @@ const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, do
     const body = request.body as Record<string, unknown>;
     const originalBody = JSON.parse(JSON.stringify(body));
     const clientModel = (body.model as string) || "unknown";
-    const mapping = getModelMapping(db, clientModel);
-    if (!mapping) return sendError(reply, openaiError(`Model '${clientModel}' is not configured`, "invalid_request_error", "model_not_found", HTTP_NOT_FOUND));
+    const resolved = resolveMapping(db, clientModel, { now: new Date() });
+    if (!resolved) return sendError(reply, openaiError(`Model '${clientModel}' is not configured`, "invalid_request_error", "model_not_found", HTTP_NOT_FOUND));
 
     // 白名单校验
     const allowedModels = request.routerKey?.allowed_models;
     if (allowedModels) {
       try {
         const models: string[] = JSON.parse(allowedModels);
-        if (models.length > 0 && !models.includes(mapping.backend_model)) {
-          return sendError(reply, openaiError(`Model '${mapping.backend_model}' is not allowed for this API key`, "invalid_request_error", "model_not_allowed", HTTP_FORBIDDEN));
+        if (models.length > 0 && !models.includes(resolved.backend_model)) {
+          return sendError(reply, openaiError(`Model '${resolved.backend_model}' is not allowed for this API key`, "invalid_request_error", "model_not_allowed", HTTP_FORBIDDEN));
         }
       } catch { request.log.warn("Invalid allowed_models JSON, allowing all models"); }
     }
 
-    const provider = getProviderById(db, mapping.provider_id);
+    const provider = getProviderById(db, resolved.provider_id);
     if (!provider || !provider.is_active) return sendError(reply, openaiError("Provider unavailable", "server_error", "provider_unavailable", HTTP_SERVICE_UNAVAILABLE));
     if (provider.api_type !== "openai") return sendError(reply, openaiError("Provider type mismatch for this endpoint", "server_error", "provider_type_mismatch", HTTP_INTERNAL_ERROR));
 
-    body.model = mapping.backend_model;
+    body.model = resolved.backend_model;
     const apiKey = decrypt(provider.api_key, encryptionKey);
     const isStream = body.stream === true;
 
@@ -156,13 +157,13 @@ const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, do
         if (isStream) {
           const streamResult = r as StreamProxyResult;
           if (streamResult.metricsResult) {
-            try { insertMetrics(db, { ...streamResult.metricsResult, request_log_id: lastSuccessLogId, provider_id: provider.id, backend_model: mapping.backend_model, api_type: "openai" }); }
+            try { insertMetrics(db, { ...streamResult.metricsResult, request_log_id: lastSuccessLogId, provider_id: provider.id, backend_model: resolved.backend_model, api_type: "openai" }); }
             catch (err) { request.log.error({ err }, "Failed to insert metrics"); }
           }
         } else {
           try {
             const mr = MetricsExtractor.fromNonStreamResponse("openai", (r as ProxyResult).body);
-            if (mr) insertMetrics(db, { ...mr, request_log_id: lastSuccessLogId, provider_id: provider.id, backend_model: mapping.backend_model, api_type: "openai" });
+            if (mr) insertMetrics(db, { ...mr, request_log_id: lastSuccessLogId, provider_id: provider.id, backend_model: resolved.backend_model, api_type: "openai" });
           } catch (err) { request.log.error({ err }, "Failed to insert metrics"); }
         }
       }

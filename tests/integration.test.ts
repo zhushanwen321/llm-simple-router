@@ -234,11 +234,31 @@ describe("Integration tests", () => {
       `INSERT INTO model_mappings (id, client_model, backend_model, provider_id, is_active, created_at)
        VALUES (?, ?, ?, ?, ?, ?)`
     ).run("map-gpt4", "gpt-4", "gpt-4", "svc-openai", 1, now);
+    db.prepare(
+      `INSERT INTO mapping_groups (id, client_model, strategy, rule, created_at)
+       VALUES (?, ?, ?, ?, ?)`
+    ).run(
+      "mg-gpt4",
+      "gpt-4",
+      "scheduled",
+      JSON.stringify({ default: { backend_model: "gpt-4", provider_id: "svc-openai" } }),
+      now
+    );
 
     db.prepare(
       `INSERT INTO model_mappings (id, client_model, backend_model, provider_id, is_active, created_at)
        VALUES (?, ?, ?, ?, ?, ?)`
     ).run("map-claude3", "claude-3-sonnet", "claude-3-sonnet", "svc-anthropic", 1, now);
+    db.prepare(
+      `INSERT INTO mapping_groups (id, client_model, strategy, rule, created_at)
+       VALUES (?, ?, ?, ?, ?)`
+    ).run(
+      "mg-claude3",
+      "claude-3-sonnet",
+      "scheduled",
+      JSON.stringify({ default: { backend_model: "claude-3-sonnet", provider_id: "svc-anthropic" } }),
+      now
+    );
   });
 
   afterEach(async () => {
@@ -334,6 +354,16 @@ describe("Integration tests", () => {
       `INSERT INTO model_mappings (id, client_model, backend_model, provider_id, is_active, created_at)
        VALUES (?, ?, ?, ?, ?, ?)`
     ).run("map-test", "gpt-4-mapped", "gpt-4-turbo", "svc-openai", 1, now);
+    db.prepare(
+      `INSERT INTO mapping_groups (id, client_model, strategy, rule, created_at)
+       VALUES (?, ?, ?, ?, ?)`
+    ).run(
+      "mg-test",
+      "gpt-4-mapped",
+      "scheduled",
+      JSON.stringify({ default: { backend_model: "gpt-4-turbo", provider_id: "svc-openai" } }),
+      now
+    );
 
     // 创建验证后端收到 model 的 mock
     let receivedModel: string | null = null;

@@ -46,6 +46,16 @@ function setupProvider(db: Database.Database, baseUrl: string) {
     `INSERT INTO model_mappings (id, client_model, backend_model, provider_id, is_active, created_at)
      VALUES (?, ?, ?, ?, ?, ?)`
   ).run("map-sonnet", "sonnet", "mock-model", "svc-anthropic", 1, now);
+  db.prepare(
+    `INSERT INTO mapping_groups (id, client_model, strategy, rule, created_at)
+     VALUES (?, ?, ?, ?, ?)`
+  ).run(
+    "mg-sonnet",
+    "sonnet",
+    "scheduled",
+    JSON.stringify({ default: { backend_model: "mock-model", provider_id: "svc-anthropic" } }),
+    now
+  );
 }
 
 const SUCCESS_BODY = {
