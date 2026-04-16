@@ -149,7 +149,7 @@ describe("request_metrics migration and insertMetrics", () => {
     db = initDatabase(":memory:");
 
     const logId = "log-unique-1";
-    insertRequestLog(db, {
+    insertRequestLog(db!, {
       id: logId,
       api_type: "openai",
       model: "gpt-4",
@@ -161,7 +161,7 @@ describe("request_metrics migration and insertMetrics", () => {
       created_at: new Date().toISOString(),
     });
 
-    insertMetrics(db, {
+    insertMetrics(db!, {
       request_log_id: logId,
       provider_id: "provider-1",
       backend_model: "gpt-4-turbo",
@@ -170,7 +170,7 @@ describe("request_metrics migration and insertMetrics", () => {
     });
 
     expect(() =>
-      insertMetrics(db, {
+      insertMetrics(db!, {
         request_log_id: logId,
         provider_id: "provider-1",
         backend_model: "gpt-4-turbo",
@@ -196,7 +196,7 @@ describe("request_metrics migration and insertMetrics", () => {
       created_at: new Date().toISOString(),
     });
 
-    insertMetrics(db, {
+    insertMetrics(db!, {
       request_log_id: logId,
       provider_id: "provider-1",
       backend_model: "gpt-4-turbo",
@@ -205,9 +205,9 @@ describe("request_metrics migration and insertMetrics", () => {
     });
 
     // 删除 request_log，metrics 应该被级联删除
-    db.prepare("DELETE FROM request_logs WHERE id = ?").run(logId);
+    db!.prepare("DELETE FROM request_logs WHERE id = ?").run(logId);
 
-    const metrics = db
+    const metrics = db!
       .prepare("SELECT * FROM request_metrics WHERE request_log_id = ?")
       .all(logId) as any[];
 
