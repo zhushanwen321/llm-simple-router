@@ -230,15 +230,6 @@ const showDetail = ref(false)
 const detailLoading = ref(false)
 const detailData = ref<LogEntry | null>(null)
 
-function formatJson(raw: string | null): string {
-  if (!raw) return '(无数据)'
-  try {
-    return JSON.stringify(JSON.parse(raw), null, 2) // eslint-disable-line no-magic-numbers
-  } catch {
-    return raw
-  }
-}
-
 async function openDetail(id: string) {
   showDetail.value = true
   detailLoading.value = true
