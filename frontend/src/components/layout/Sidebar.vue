@@ -58,6 +58,7 @@ interface NavItem {
   icon: Component
 }
 
+// 与 router/index.ts 路由定义保持同步
 const navItems: NavItem[] = [
   { path: '/', label: '仪表盘', icon: LayoutDashboard },
   { path: '/providers', label: '供应商', icon: Server },

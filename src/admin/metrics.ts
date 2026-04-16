@@ -7,9 +7,6 @@ import { HTTP_BAD_REQUEST } from "./constants.js";
 type MetricsPeriod = "1h" | "6h" | "24h" | "7d" | "30d";
 type MetricsMetric = "ttft" | "tps" | "tokens" | "cache_rate" | "request_count" | "input_tokens" | "output_tokens" | "cache_hit_tokens";
 
-const VALID_PERIODS: Set<string> = new Set(["1h", "6h", "24h", "7d", "30d"]);
-const VALID_METRICS: Set<string> = new Set(["ttft", "tps", "tokens", "cache_rate", "request_count", "input_tokens", "output_tokens", "cache_hit_tokens"]);
-
 const PeriodEnum = Type.Union([
   Type.Literal("1h"), Type.Literal("6h"), Type.Literal("24h"),
   Type.Literal("7d"), Type.Literal("30d"),

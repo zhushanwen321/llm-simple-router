@@ -74,14 +74,26 @@ interface RetryRulePayload {
   is_active?: number
 }
 
+// --- Typed request helper ---
+// 解包 AxiosResponse.data，让调用方直接拿到类型化的响应体。
+// 适用于无参数 GET 和带 body 的 POST/PUT/DELETE。
+// 带查询参数的 GET（如 getStats）保持原样用 client.get(url, { params })。
+
+async function request<T>(method: 'get' | 'post' | 'put' | 'delete', url: string, data?: unknown): Promise<T> {
+  const res = method === 'get'
+    ? await client.get(url)
+    : await client[method](url, data)
+  return res.data as T
+}
+
 // --- API ---
 
 export const api = {
   login: (password: string) => client.post(API.LOGIN, { password }),
   logout: () => client.post(API.LOGOUT),
 
-  getProviders: () => client.get(API.PROVIDERS),
-  createProvider: (data: ProviderPayload) => client.post(API.PROVIDERS, data),
+  getProviders: () => request<unknown[]>(API.PROVIDERS),
+  createProvider: (data: ProviderPayload) => request<{ id: string }>('post', API.PROVIDERS, data),
   updateProvider: (id: string, data: Partial<ProviderPayload>) => client.put(`${API.PROVIDERS}/${id}`, data),
   deleteProvider: (id: string) => client.delete(`${API.PROVIDERS}/${id}`),
 

@@ -154,7 +154,7 @@ async function loadData() {
       api.getProviders(),
     ])
     if (groupRes.status === 'fulfilled') groups.value = groupRes.value.data
-    if (provRes.status === 'fulfilled') providersList.value = provRes.value.data
+    if (provRes.status === 'fulfilled') providersList.value = provRes.value.value as Provider[]
   } catch (e) {
     console.error('Failed to load data:', e)
     toast.error('加载数据失败')
