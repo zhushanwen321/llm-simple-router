@@ -65,7 +65,7 @@
                       <Button variant="ghost" size="xs" class="px-0 h-auto text-xs">内容</Button>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
-                      <pre class="mt-1 whitespace-pre-wrap break-all text-xs bg-background rounded p-2 border">{{ choice.content }}</pre>
+                      <pre class="mt-1 whitespace-pre-wrap break-all text-xs bg-muted rounded-md p-2 border">{{ choice.content }}</pre>
                     </CollapsibleContent>
                   </Collapsible>
                 </CardContent>
@@ -145,8 +145,8 @@
         <template v-else>
           <div class="space-y-3">
             <div class="flex gap-1">
-              <Button variant="ghost" :class="streamTab === 'assembled' ? 'bg-secondary' : ''" size="xs" class="h-auto px-2 py-1 text-xs" @click="streamTab = 'assembled'">完整响应</Button>
-              <Button variant="ghost" :class="streamTab === 'raw-events' ? 'bg-secondary' : ''" size="xs" class="h-auto px-2 py-1 text-xs" @click="streamTab = 'raw-events'">原始事件流</Button>
+              <Button variant="ghost" :class="streamTab === 'assembled' ? 'bg-secondary' : ''" size="xs" class="h-auto py-1" @click="streamTab = 'assembled'">完整响应</Button>
+              <Button variant="ghost" :class="streamTab === 'raw-events' ? 'bg-secondary' : ''" size="xs" class="h-auto py-1" @click="streamTab = 'raw-events'">原始事件流</Button>
             </div>
 
             <!-- 完整响应 -->
@@ -165,10 +165,10 @@
                     <span v-if="blk.toolName" class="text-xs font-mono">{{ blk.toolName }}</span>
                   </div>
                   <template v-if="blk.content.length > 500 && !expandedBlock[idx]">
-                    <pre class="whitespace-pre-wrap break-all text-sm">{{ blk.content.slice(0, 500) }}...</pre>
+                    <pre class="whitespace-pre-wrap break-all text-sm bg-muted rounded-md p-3 border">{{ blk.content.slice(0, 500) }}...</pre>
                     <Button variant="link" size="xs" class="px-0" @click="expandedBlock[idx] = true">展开全部</Button>
                   </template>
-                  <pre v-else class="whitespace-pre-wrap break-all text-sm max-h-[40vh] overflow-auto">{{ blk.content }}</pre>
+                  <pre v-else class="whitespace-pre-wrap break-all text-sm bg-muted rounded-md p-3 border max-h-[40vh] overflow-auto">{{ blk.content }}</pre>
                 </div>
                 <div class="flex gap-2 text-xs text-muted-foreground">
                   <span>stop_reason: {{ sseMeta.stopReason || '-' }}</span>
@@ -184,7 +184,7 @@
                   <Badge v-if="openaiAssembled.finishReason" variant="outline">finish: {{ openaiAssembled.finishReason }}</Badge>
                 </div>
                 <div :class="['rounded-md border p-3', blockBorderClass('text')]">
-                  <pre class="whitespace-pre-wrap break-all text-sm max-h-[40vh] overflow-auto">{{ openaiAssembled.content }}</pre>
+                  <pre class="whitespace-pre-wrap break-all text-sm bg-muted rounded-md p-3 max-h-[40vh] overflow-auto">{{ openaiAssembled.content }}</pre>
                 </div>
                 <div v-if="openaiAssembled.usage" class="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <Card class="bg-muted/40"><CardContent class="py-2 px-3 text-xs">
@@ -253,7 +253,7 @@
                     <span v-if="group.folded > 0" class="text-muted-foreground ml-2">+{{ group.folded }} 个 {{ group.deltaType }} 事件已折叠 ({{ group.foldedChars }} 字符)</span>
                   </div>
                 </div>
-                <div v-if="anthropicMessageDelta" class="text-sm bg-warning-light rounded p-2">
+                <div v-if="anthropicMessageDelta" class="text-sm bg-warning-light text-warning-dark rounded-md p-3">
                   <span class="text-muted-foreground">message_delta:</span> output_tokens={{ anthropicMessageDelta.output_tokens }} stop_reason={{ anthropicMessageDelta.stop_reason }}
                 </div>
                 <div v-if="anthropicMessageStop" class="text-sm text-muted-foreground">流结束</div>

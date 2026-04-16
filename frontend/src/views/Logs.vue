@@ -151,9 +151,9 @@
               <LogResponseViewer :raw="detailData.response_body" :api-type="asApiType(detailData.api_type)" :is-stream="!!detailData.is_stream" />
             </div>
           </template>
-          <div v-if="detailData.error_message" class="mt-4 bg-danger-light text-danger-dark rounded-md p-3 text-sm">
-            {{ detailData.error_message }}
-          </div>
+          <Card v-if="detailData.error_message" class="mt-4 bg-danger-light ring-danger/20">
+            <CardContent class="py-3 text-sm text-danger-dark">{{ detailData.error_message }}</CardContent>
+          </Card>
         </template>
         <div v-else class="py-8 text-center text-muted-foreground">未找到日志</div>
       </DialogScrollContent>
@@ -187,6 +187,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogScrollContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'

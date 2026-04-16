@@ -6,7 +6,7 @@
         <TabsTrigger value="structured">结构化</TabsTrigger>
         <TabsTrigger value="raw">原始 JSON</TabsTrigger>
       </TabsList>
-      <Button variant="ghost" size="xs" class="h-auto px-2 py-1 text-xs" @click="copyRaw">
+      <Button variant="ghost" size="xs" class="h-auto py-1" @click="copyRaw">
         {{ copied ? '已复制' : '复制 JSON' }}
       </Button>
     </div>
@@ -46,7 +46,7 @@
         <!-- Headers -->
         <Collapsible v-model:open="headersOpen">
           <CollapsibleTrigger as-child>
-            <Button variant="ghost" size="xs" class="px-0 h-auto text-xs">
+            <Button variant="ghost" size="xs" class="px-0 h-auto">
               Headers ({{ headerEntries.length }} 个)
             </Button>
           </CollapsibleTrigger>
@@ -84,7 +84,7 @@
                 <div v-if="block.type === 'text'">
                   <div v-if="block.text.length > 120 && !expanded[`${idx}-${bidx}`]" class="text-sm">
                     {{ block.text.slice(0, 120) }}
-                    <Button variant="link" size="xs" class="px-0 h-auto text-xs" @click="expanded[`${idx}-${bidx}`] = true">展开</Button>
+                    <Button variant="link" size="xs" class="px-0 h-auto" @click="expanded[`${idx}-${bidx}`] = true">展开</Button>
                   </div>
                   <div v-else class="text-sm whitespace-pre-wrap break-all">{{ block.text }}</div>
                 </div>
@@ -92,13 +92,13 @@
                 <div v-else-if="block.text" class="text-xs text-muted-foreground">
                   <Collapsible>
                     <CollapsibleTrigger as-child>
-                      <Button variant="ghost" size="xs" class="px-0 h-auto text-xs">
+                      <Button variant="ghost" size="xs" class="px-0 h-auto">
                         <Badge :class="tagClass(block.type)" class="mr-1">{{ block.label || block.type }}</Badge>
                         {{ formatSize(block.text) }}
                       </Button>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
-                      <pre class="mt-1 whitespace-pre-wrap break-all text-[11px] bg-background rounded p-2 border">{{ block.text }}</pre>
+                      <pre class="mt-1 whitespace-pre-wrap break-all text-[11px] bg-muted rounded-md p-2 border">{{ block.text }}</pre>
                     </CollapsibleContent>
                   </Collapsible>
                 </div>
@@ -116,7 +116,7 @@
           <div class="text-xs font-medium text-muted-foreground mb-1">Tools</div>
           <div class="flex flex-wrap gap-1">
             <Badge v-for="name in displayedToolNames" :key="name" variant="secondary">{{ name }}</Badge>
-            <Button v-if="toolNames.length > 8" variant="ghost" size="xs" class="px-1 h-5 text-xs" @click="toolsExpanded = !toolsExpanded">
+            <Button v-if="toolNames.length > 8" variant="ghost" size="xs" class="px-1 h-5" @click="toolsExpanded = !toolsExpanded">
               {{ toolsExpanded ? '收起' : `+${toolNames.length - 8}` }}
             </Button>
           </div>
@@ -138,7 +138,7 @@
         <!-- Other fields -->
         <Collapsible v-if="otherFieldsKeys.length">
           <CollapsibleTrigger as-child>
-            <Button variant="ghost" size="xs" class="px-0 h-auto text-xs">
+            <Button variant="ghost" size="xs" class="px-0 h-auto">
               其他字段
             </Button>
           </CollapsibleTrigger>

@@ -2,7 +2,7 @@
   <div>
     <!-- 1. 面包屑 -->
     <div class="flex items-center gap-2 mb-3">
-      <Button variant="ghost" size="xs" class="px-0 h-auto text-xs" @click="emit('back')">
+      <Button variant="ghost" size="xs" class="px-0 h-auto" @click="emit('back')">
         ← 返回请求链路
       </Button>
       <span class="text-muted-foreground">/</span>
@@ -19,8 +19,8 @@
         </Button>
       </div>
       <div class="flex gap-1">
-        <Button variant="ghost" :class="mode === 'structured' ? 'bg-secondary' : ''" size="xs" class="h-auto px-2 py-1 text-xs" @click="emit('update:mode', 'structured')">结构化</Button>
-        <Button variant="ghost" :class="mode === 'raw' ? 'bg-secondary' : ''" size="xs" class="h-auto px-2 py-1 text-xs" @click="emit('update:mode', 'raw')">原始</Button>
+        <Button variant="ghost" :class="mode === 'structured' ? 'bg-secondary' : ''" size="xs" class="h-auto py-1" @click="emit('update:mode', 'structured')">结构化</Button>
+        <Button variant="ghost" :class="mode === 'raw' ? 'bg-secondary' : ''" size="xs" class="h-auto py-1" @click="emit('update:mode', 'raw')">原始</Button>
       </div>
     </div>
 
@@ -44,14 +44,18 @@
     </Card>
 
     <!-- 4. 差异提示条（仅 upstream_req 阶段） -->
-    <div v-if="stage === 'upstream_req' && diffFields.length" class="mb-3 bg-warning-light text-warning-dark rounded-md p-2 text-xs flex flex-wrap gap-1">
-      <Badge v-for="d in diffFields" :key="d.field" variant="outline" class="text-warning-dark">{{ d.field }}: {{ String(d.old ?? '-') }} → {{ String(d.new ?? '-') }}</Badge>
-    </div>
+    <Card v-if="stage === 'upstream_req' && diffFields.length" class="mb-3 bg-warning-light ring-warning/20">
+      <CardContent class="py-2 px-3 text-xs flex flex-wrap gap-1 text-warning-dark">
+        <Badge v-for="d in diffFields" :key="d.field" variant="outline" class="text-warning-dark">{{ d.field }}: {{ String(d.old ?? '-') }} → {{ String(d.new ?? '-') }}</Badge>
+      </CardContent>
+    </Card>
 
     <!-- 5. 响应间格式转换提示（仅 client_resp 流式） -->
-    <div v-if="stage === 'client_resp' && log.is_stream && hasFormatConversion" class="mb-3 bg-muted rounded-md p-2 text-xs text-muted-foreground">
-      代理可能对 SSE 格式进行了转换（如 Anthropic → OpenAI），原始事件流与上游响应可能不完全一致。
-    </div>
+    <Card v-if="stage === 'client_resp' && log.is_stream && hasFormatConversion" class="mb-3 bg-muted ring-muted-foreground/10">
+      <CardContent class="py-2 px-3 text-xs text-muted-foreground">
+        代理可能对 SSE 格式进行了转换（如 Anthropic → OpenAI），原始事件流与上游响应可能不完全一致。
+      </CardContent>
+    </Card>
 
     <!-- 6. 内容区 -->
     <LogRequestViewer v-if="isRequest" :raw="stageData ?? ''" :api-type="asApiType(log.api_type)" :show-url="stage === 'upstream_req'" :mode="mode" />

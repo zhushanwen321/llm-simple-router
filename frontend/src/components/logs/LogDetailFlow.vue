@@ -10,8 +10,8 @@
       <Badge v-if="log.is_stream" variant="outline" class="border-dashed">SSE</Badge>
       <Badge variant="outline">{{ log.api_type }}</Badge>
       <div class="ml-auto flex gap-1">
-        <Button variant="ghost" :class="mode === 'structured' ? 'bg-secondary' : ''" size="xs" class="h-auto px-2 py-1 text-xs" @click="emit('update:mode', 'structured')">结构化</Button>
-        <Button variant="ghost" :class="mode === 'raw' ? 'bg-secondary' : ''" size="xs" class="h-auto px-2 py-1 text-xs" @click="emit('update:mode', 'raw')">原始</Button>
+        <Button variant="ghost" :class="mode === 'structured' ? 'bg-secondary' : ''" size="xs" class="h-auto py-1" @click="emit('update:mode', 'structured')">结构化</Button>
+        <Button variant="ghost" :class="mode === 'raw' ? 'bg-secondary' : ''" size="xs" class="h-auto py-1" @click="emit('update:mode', 'raw')">原始</Button>
       </div>
     </div>
 
@@ -32,7 +32,7 @@
             <Badge v-if="stage.meta.stream != null" variant="outline" class="text-xs">stream: {{ stage.meta.stream }}</Badge>
             <Badge v-if="stage.meta.statusCode" :variant="stage.meta.statusCode < 400 ? 'default' : 'destructive'" class="text-xs">{{ stage.meta.statusCode }}</Badge>
           </div>
-          <Button variant="ghost" size="xs" class="h-auto px-1 py-0.5 text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button variant="ghost" size="xs" class="h-auto px-1 py-0.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
             查看详情 →
           </Button>
         </div>
@@ -40,15 +40,16 @@
     </div>
 
     <!-- 错误卡片 -->
-    <div v-if="log.error_message" class="bg-danger-light text-danger-dark rounded-md p-3 text-sm">
-      {{ log.error_message }}
-    </div>
+    <Card v-if="log.error_message" class="bg-danger-light ring-danger/20">
+      <CardContent class="py-3 text-sm text-danger-dark">{{ log.error_message }}</CardContent>
+    </Card>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Badge } from '@/components/ui/badge'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import type { StageKey } from './logColors'
 import { STAGE_COLORS } from './logColors'
