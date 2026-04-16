@@ -3,11 +3,7 @@ import Database from "better-sqlite3";
 import type { Provider } from "../db/index.js";
 import { getAllProviders, getProviderById, createProvider, updateProvider, deleteProvider, getAllMappingGroups } from "../db/index.js";
 import { encrypt } from "../utils/crypto.js";
-
-const HTTP_BAD_REQUEST = 400;
-const HTTP_CREATED = 201;
-const HTTP_NOT_FOUND = 404;
-const HTTP_CONFLICT = 409;
+import { HTTP_BAD_REQUEST, HTTP_CREATED, HTTP_NOT_FOUND, HTTP_CONFLICT } from "./constants.js";
 
 const API_KEY_PREVIEW_MIN_LEN = 8;
 const API_KEY_PREVIEW_PREFIX_LEN = 4;
@@ -100,9 +96,13 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     const { id } = request.params as { id: string };
     const groups = getAllMappingGroups(db);
     for (const g of groups) {
-      if (g.rule.includes(id)) {
-        return reply.code(HTTP_CONFLICT).send({ error: { message: `Provider is referenced by mapping group '${g.client_model}'` } });
-      }
+      try {
+        const rule = JSON.parse(g.rule);
+        const targets = [rule.default, ...(rule.windows || [])].filter(Boolean);
+        if (targets.some((t: any) => t.provider_id === id)) {
+          return reply.code(HTTP_CONFLICT).send({ error: { message: `Provider is referenced by mapping group '${g.client_model}'` } });
+        }
+      } catch { /* rule format invalid, skip */ }
     }
     deleteProvider(db, id);
     return reply.send({ success: true });

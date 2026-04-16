@@ -1,9 +1,7 @@
 import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
 import { getRequestLogs, getRequestLogById, deleteLogsBefore } from "../db/index.js";
-
-const HTTP_BAD_REQUEST = 400;
-const HTTP_NOT_FOUND = 404;
+import { HTTP_BAD_REQUEST, HTTP_NOT_FOUND } from "./constants.js";
 
 interface LogQueryParams {
   page?: string;

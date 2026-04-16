@@ -8,9 +8,7 @@ import {
   deleteRetryRule,
 } from "../db/index.js";
 import { RetryRuleMatcher } from "../proxy/retry-rules.js";
-
-const HTTP_BAD_REQUEST = 400;
-const HTTP_CREATED = 201;
+import { HTTP_BAD_REQUEST, HTTP_CREATED } from "./constants.js";
 
 interface CreateRetryRuleBody {
   name: string;

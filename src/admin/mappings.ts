@@ -7,11 +7,7 @@ import {
   deleteMappingGroup,
   getProviderById,
 } from "../db/index.js";
-
-const HTTP_BAD_REQUEST = 400;
-const HTTP_CREATED = 201;
-const HTTP_NOT_FOUND = 404;
-const HTTP_CONFLICT = 409;
+import { HTTP_BAD_REQUEST, HTTP_CREATED, HTTP_NOT_FOUND, HTTP_CONFLICT } from "./constants.js";
 
 interface CreateMappingBody {
   client_model: string;
