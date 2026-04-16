@@ -274,7 +274,7 @@ export function getRequestLogs(db: Database.Database, options: { page: number; l
   if (options.router_key_id) { where += " AND router_key_id = ?"; params.push(options.router_key_id); }
   const total = (db.prepare(`SELECT COUNT(*) as count FROM request_logs WHERE ${where}`).get(...params) as CountRow).count;
   const offset = (options.page - 1) * options.limit;
-  const data = db.prepare(`SELECT * FROM request_logs WHERE ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`).all(...params, options.limit, offset) as RequestLog[];
+  const data = db.prepare(`SELECT id, api_type, model, provider_id, status_code, latency_ms, is_stream, error_message, created_at FROM request_logs WHERE ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`).all(...params, options.limit, offset) as RequestLog[];
   return { data, total };
 }
 

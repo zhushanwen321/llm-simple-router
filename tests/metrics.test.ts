@@ -29,10 +29,11 @@ describe("request_metrics migration and insertMetrics", () => {
       .prepare("SELECT name FROM migrations")
       .all() as { name: string }[];
 
-    expect(rows).toHaveLength(8);
+    expect(rows).toHaveLength(9);
     expect(rows[5].name).toBe("006_create_request_metrics.sql");
     expect(rows[6].name).toBe("007_add_retry_fields.sql");
     expect(rows[7].name).toBe("008_create_router_keys.sql");
+    expect(rows[8].name).toBe("009_add_request_logs_indexes.sql");
   });
 
   it("should create indexes", () => {
