@@ -33,6 +33,12 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: '/retry-rules',
+      name: 'retry-rules',
+      component: () => import('@/views/RetryRules.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
       path: '/router-keys',
       name: 'router-keys',
       component: () => import('@/views/RouterKeys.vue'),

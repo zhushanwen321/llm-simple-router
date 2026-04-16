@@ -44,6 +44,19 @@ interface RouterKeyUpdatePayload {
   is_active?: number
 }
 
+interface MappingGroupPayload {
+  client_model: string
+  strategy: string
+  rule: string  // JSON string
+}
+
+interface RetryRulePayload {
+  name: string
+  status_code: number
+  body_pattern: string
+  is_active?: number
+}
+
 // --- API ---
 
 export const api = {
@@ -81,4 +94,18 @@ export const api = {
     client.put(`/router-keys/${id}`, data),
   deleteRouterKey: (id: string) => client.delete(`/router-keys/${id}`),
   getAvailableModels: () => client.get('/models/available'),
+
+  getMappingGroups: () => client.get('/mapping-groups'),
+  createMappingGroup: (data: MappingGroupPayload) =>
+    client.post('/mapping-groups', data),
+  updateMappingGroup: (id: string, data: MappingGroupPayload) =>
+    client.put(`/mapping-groups/${id}`, data),
+  deleteMappingGroup: (id: string) => client.delete(`/mapping-groups/${id}`),
+
+  getRetryRules: () => client.get('/retry-rules'),
+  createRetryRule: (data: RetryRulePayload) =>
+    client.post('/retry-rules', data),
+  updateRetryRule: (id: string, data: RetryRulePayload) =>
+    client.put(`/retry-rules/${id}`, data),
+  deleteRetryRule: (id: string) => client.delete(`/retry-rules/${id}`),
 }
