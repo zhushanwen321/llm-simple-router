@@ -80,6 +80,23 @@ export interface ModelMapping {
   created_at: string;
 }
 
+export interface MappingGroup {
+  id: string;
+  client_model: string;
+  strategy: string;
+  rule: string;
+  created_at: string;
+}
+
+export interface RetryRule {
+  id: string;
+  name: string;
+  status_code: number;
+  body_pattern: string;
+  is_active: number;
+  created_at: string;
+}
+
 export function getActiveProviders(
   db: Database.Database,
   apiType: "openai" | "anthropic"
@@ -264,6 +281,114 @@ export function updateModelMapping(db: Database.Database, id: string, fields: Pa
 
 export function deleteModelMapping(db: Database.Database, id: string): void {
   db.prepare("DELETE FROM model_mappings WHERE id = ?").run(id);
+}
+
+// --- MappingGroups CRUD ---
+
+export function getMappingGroup(
+  db: Database.Database,
+  clientModel: string
+): MappingGroup | undefined {
+  return db
+    .prepare("SELECT * FROM mapping_groups WHERE client_model = ?")
+    .get(clientModel) as MappingGroup | undefined;
+}
+
+export function getAllMappingGroups(db: Database.Database): MappingGroup[] {
+  return db
+    .prepare("SELECT * FROM mapping_groups ORDER BY created_at DESC")
+    .all() as MappingGroup[];
+}
+
+export function createMappingGroup(
+  db: Database.Database,
+  mapping: { client_model: string; strategy: string; rule: string }
+): string {
+  const id = randomUUID();
+  const now = new Date().toISOString();
+  db.prepare(
+    `INSERT INTO mapping_groups (id, client_model, strategy, rule, created_at)
+     VALUES (?, ?, ?, ?, ?)`
+  ).run(id, mapping.client_model, mapping.strategy, mapping.rule, now);
+  return id;
+}
+
+export function updateMappingGroup(
+  db: Database.Database,
+  id: string,
+  fields: Partial<Pick<MappingGroup, "client_model" | "strategy" | "rule">>
+): void {
+  const ALLOWED = new Set(["client_model", "strategy", "rule"]);
+  const sets: string[] = [];
+  const values: unknown[] = [];
+  for (const [key, value] of Object.entries(fields)) {
+    if (!ALLOWED.has(key)) continue;
+    sets.push(`${key} = ?`);
+    values.push(value);
+  }
+  if (sets.length === 0) return;
+  values.push(id);
+  db.prepare(`UPDATE mapping_groups SET ${sets.join(", ")} WHERE id = ?`).run(
+    ...values
+  );
+}
+
+export function deleteMappingGroup(
+  db: Database.Database,
+  id: string
+): void {
+  db.prepare("DELETE FROM mapping_groups WHERE id = ?").run(id);
+}
+
+// --- RetryRules CRUD ---
+
+export function getActiveRetryRules(db: Database.Database): RetryRule[] {
+  return db
+    .prepare("SELECT * FROM retry_rules WHERE is_active = 1 ORDER BY created_at DESC")
+    .all() as RetryRule[];
+}
+
+export function getAllRetryRules(db: Database.Database): RetryRule[] {
+  return db
+    .prepare("SELECT * FROM retry_rules ORDER BY created_at DESC")
+    .all() as RetryRule[];
+}
+
+export function createRetryRule(
+  db: Database.Database,
+  rule: { name: string; status_code: number; body_pattern: string; is_active?: number }
+): string {
+  const id = randomUUID();
+  const now = new Date().toISOString();
+  db.prepare(
+    `INSERT INTO retry_rules (id, name, status_code, body_pattern, is_active, created_at)
+     VALUES (?, ?, ?, ?, ?, ?)`
+  ).run(id, rule.name, rule.status_code, rule.body_pattern, rule.is_active ?? 1, now);
+  return id;
+}
+
+export function updateRetryRule(
+  db: Database.Database,
+  id: string,
+  fields: Partial<Pick<RetryRule, "name" | "status_code" | "body_pattern" | "is_active">>
+): void {
+  const ALLOWED = new Set(["name", "status_code", "body_pattern", "is_active"]);
+  const sets: string[] = [];
+  const values: unknown[] = [];
+  for (const [key, value] of Object.entries(fields)) {
+    if (!ALLOWED.has(key)) continue;
+    sets.push(`${key} = ?`);
+    values.push(value);
+  }
+  if (sets.length === 0) return;
+  values.push(id);
+  db.prepare(`UPDATE retry_rules SET ${sets.join(", ")} WHERE id = ?`).run(
+    ...values
+  );
+}
+
+export function deleteRetryRule(db: Database.Database, id: string): void {
+  db.prepare("DELETE FROM retry_rules WHERE id = ?").run(id);
 }
 
 export function getRequestLogs(db: Database.Database, options: { page: number; limit: number; api_type?: string; model?: string; router_key_id?: string }): { data: RequestLog[]; total: number } {
