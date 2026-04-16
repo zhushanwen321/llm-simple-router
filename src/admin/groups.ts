@@ -127,8 +127,8 @@ export const adminGroupRoutes: FastifyPluginCallback<GroupRoutesOptions> = (app,
     if (body.strategy !== undefined) fields.strategy = body.strategy;
     if (body.rule !== undefined) fields.rule = body.rule;
 
-    const strategy = body.strategy ?? (await findGroupStrategy(db, id));
-    const ruleJson = body.rule ?? (await findGroupRule(db, id));
+    const strategy = body.strategy ?? findGroupStrategy(db, id);
+    const ruleJson = body.rule ?? findGroupRule(db, id);
     const validationError = await validateRule(db, strategy, ruleJson);
     if (validationError) {
       return reply.code(HTTP_BAD_REQUEST).send({ error: { message: validationError } });
