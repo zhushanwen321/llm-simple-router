@@ -510,19 +510,119 @@ git commit -m "docs: update design system documentation for v2"
 
 ---
 
-## Task 8: 端到端验证
+## Task 8: 页面样式迁移（bg-white + 原生 checkbox）
+
+**Files:**
+- Modify: `frontend/src/views/Logs.vue:38`
+- Modify: `frontend/src/views/Providers.vue:12,96`
+- Modify: `frontend/src/views/ModelMappings.vue:14,60`
+- Modify: `frontend/src/views/RouterKeys.vue:11,84,104`
+- Modify: `frontend/src/views/RetryRules.vue:13,64`
+
+- [ ] **Step 1: 替换所有 `bg-white` 为 `bg-card`**
+
+涉及 5 处（Logs:38, Providers:12, ModelMappings:14,60, RouterKeys:11, RetryRules:13）：
+```vue
+<!-- 前 --> class="bg-white rounded-lg border overflow-hidden"
+<!-- 后 --> class="bg-card rounded-lg border overflow-hidden"
+```
+
+ModelMappings:14 的 Card 上额外移除 `bg-white`：
+```vue
+<!-- 前 --> <Card class="bg-white ...">
+<!-- 后 --> <Card class="...">
+```
+
+- [ ] **Step 2: 安装 Checkbox 组件**
+
+Run: `cd frontend && npx shadcn-vue@latest add checkbox`
+
+- [ ] **Step 3: 替换原生 checkbox 为 Checkbox 组件**
+
+涉及 4 处（Providers:96, RouterKeys:84,104, RetryRules:64）。
+
+每处的替换模式：
+```vue
+<!-- 前 -->
+<input type="checkbox" v-model="item.enabled" class="rounded" />
+
+<!-- 后 -->
+<script setup>
+import { Checkbox } from '@/components/ui/checkbox'
+// 需要将 v-model 拆为 :checked + @update:checked
+</script>
+<Checkbox :checked="item.enabled" @update:checked="item.enabled = $event" />
+```
+
+注意：shadcn-vue Checkbox 的 v-model 使用 `checked` prop + `update:checked` event，不兼容原生 `v-model`。
+
+- [ ] **Step 4: 验证构建**
+
+Run: `cd frontend && npm run build`
+Expected: 构建成功，无类型错误。
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add frontend/src/views/ frontend/src/components/ui/checkbox/
+git commit -m "fix: replace bg-white with bg-card, native checkbox with shadcn-vue Checkbox"
+```
+
+---
+
+## Task 9: Chart.js 色彩更新
+
+**Files:**
+- Modify: `frontend/src/styles/design-tokens.ts`
+
+- [ ] **Step 1: 更新 CHART_COLORS 使用 teal 品牌色**
+
+```ts
+export const CHART_COLORS = {
+  teal: 'oklch(0.58 0.14 175)',
+  tealFill: 'oklch(0.58 0.14 175 / 0.3)',
+  tealFillLight: 'oklch(0.58 0.14 175 / 0.1)',
+  indigo: 'oklch(0.65 0.14 260)',
+  indigoFill: 'oklch(0.65 0.14 260 / 0.3)',
+  green: 'oklch(0.65 0.17 150)',
+  amber: 'oklch(0.78 0.16 80)',
+  amberFill: 'oklch(0.78 0.16 80 / 0.1)',
+} as const
+```
+
+- [ ] **Step 2: 更新 Dashboard.vue 中引用 CHART_COLORS 的位置**
+
+将原来使用 `CHART_COLORS.blue` 的地方替换为 `CHART_COLORS.teal`，`CHART_COLORS.purple` 替换为 `CHART_COLORS.indigo`。
+
+- [ ] **Step 3: 验证**
+
+Run: `cd frontend && npm run build`
+启动 dev server，检查 Dashboard 图表颜色为 teal 系。
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add frontend/src/styles/design-tokens.ts frontend/src/views/Dashboard.vue
+git commit -m "feat(dashboard): update chart colors to teal brand palette"
+```
+
+---
+
+## Task 10: 端到端验证
 
 - [ ] **Step 1: 浅色模式验证**
 
 启动 `cd frontend && npm run dev`，检查：
-- Dashboard 主按钮/选中态为 teal 色
-- 切换到 Logs 页面，badge/状态色正常显示
+- Dashboard 主按钮/选中态为 teal 色，图表为 teal 系
+- Logs 页面表格背景适应暗色模式，badge/状态色正常
+- Providers / ModelMappings / RouterKeys / RetryRules 页面 checkbox 正常工作
 - 无 console 报错
 
 - [ ] **Step 2: 暗色模式验证**
 
 切换浏览器到暗色模式（或手动添加 `.dark` class），检查：
 - primary 按钮为 teal-400
+- 表格容器 `bg-card` 在暗色下正确显示
 - 角色色背景在深色下可辨认
 - 文字对比度可读
 
@@ -530,3 +630,10 @@ git commit -m "docs: update design system documentation for v2"
 
 Run: `npm run build && npm test`
 Expected: 后端构建和测试正常，前端改动不影响后端。
+
+---
+
+## 后续任务（本次不实施）
+
+- 日志详情 Modal 重构：参考 mockup 将时间线+阶段钻取模式改为单页折叠模式，集成 MessageRow / SseEventLine / InfoBanner / TagPill / StatPill 组件
+- Login 页面品牌化：引入 teal 品牌色增强视觉识别
