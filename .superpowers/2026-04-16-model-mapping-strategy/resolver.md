@@ -33,11 +33,13 @@ interface ResolveContext { now: Date; }
 ## scheduled 策略 select 逻辑
 
 1. 将 `windows` 按 `start` 排序
-2. 取当前本地时间 `HH:MM`
+2. 取当前时间 `HH:MM`（使用 `Intl.DateTimeFormat` + `timeZone: 'local'`，即 Node.js 进程的时区）
 3. 遍历找 `time_start <= now <= time_end` 的匹配
    - 跨午夜：`start > end` 表示跨 0 点，匹配条件为 `now >= start || now <= end`
 4. 无匹配返回 `rule.default`
 5. `default` 也不存在返回 `undefined`
+
+**时区说明**：使用服务器本地时间。Docker 部署时需通过 `TZ` 环境变量设置时区（如 `TZ=Asia/Shanghai`），否则默认 UTC。配置的时间窗口应与服务器时区一致。
 
 ## 代理层调用
 

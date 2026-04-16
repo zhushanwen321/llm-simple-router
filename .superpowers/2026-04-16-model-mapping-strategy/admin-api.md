@@ -21,7 +21,14 @@
 
 ## 旧 API 兼容
 
-GET/POST/PUT/DELETE `/admin/api/mappings` 标记废弃但保留，内部转发到 groups API，迁移过渡期后移除。
+GET/POST/PUT/DELETE `/admin/api/mappings` 标记废弃但保留，转换逻辑：
+
+- **GET**：查 mapping_groups，返回时将 rule.default 展开为 `{ client_model, backend_model, provider_id, is_active }` 格式（兼容旧前端）
+- **POST**：创建 mapping_group，strategy='scheduled'，rule=`{ default: { backend_model, provider_id }, windows: [] }`
+- **PUT**：更新 group 的 rule.default
+- **DELETE**：删除对应 group
+
+迁移过渡期后移除旧 API。
 
 ## retry_rules CRUD
 

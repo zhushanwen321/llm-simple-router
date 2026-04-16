@@ -15,11 +15,11 @@
 ```sql
 CREATE TABLE retry_rules (
   id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,            -- 描述性名称，如 "ZAI 临时网络错误"
-  status_code INTEGER NOT NULL,  -- 匹配的 HTTP 状态码
-  body_pattern TEXT NOT NULL,    -- 正则表达式，匹配响应体
-  is_active INTEGER DEFAULT 1,
-  created_at TEXT NOT NULL
+  name TEXT NOT NULL,
+  status_code INTEGER NOT NULL,
+  body_pattern TEXT NOT NULL,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 ```
 
@@ -27,9 +27,9 @@ CREATE TABLE retry_rules (
 
 | name | status_code | body_pattern |
 |------|-------------|--------------|
-| ZAI 网络错误 (code 1234) | 400 | `"code"\s*:\s*"1234"` |
-| ZAI 临时不可用 | 400 | `请稍后重试` |
-| ZAI 操作失败 (code 500) | 400 | `"code"\s*:\s*"500"` |
+| ZAI 网络错误 (code 1234) | 400 | `"type"\s*:\s*"error".*"code"\s*:\s*"1234"` |
+| ZAI 临时不可用 | 400 | `"type"\s*:\s*"error".*请稍后重试` |
+| ZAI 操作失败 (code 500) | 400 | `"type"\s*:\s*"error".*"code"\s*:\s*"500"` |
 
 ## 运行时逻辑
 
