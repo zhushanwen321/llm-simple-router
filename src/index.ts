@@ -1,9 +1,11 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
+import { createHash, randomUUID } from "crypto";
 import Fastify, { FastifyInstance } from "fastify";
 
 const HTTP_NOT_FOUND = 404;
+const KEY_PREFIX_LENGTH = 8;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -44,7 +46,20 @@ export async function buildApp(
     },
   });
 
-  app.register(authMiddleware, { apiKey: config.ROUTER_API_KEY });
+  // 自动迁移：仅在自行创建 DB 时执行（测试注入 DB 跳过）
+  if (!options?.db && config.ROUTER_API_KEY) {
+    const count = (db.prepare("SELECT COUNT(*) as c FROM router_keys").get() as { c: number }).c;
+    if (count === 0) {
+      const hash = createHash("sha256").update(config.ROUTER_API_KEY).digest("hex");
+      const prefix = config.ROUTER_API_KEY.slice(0, KEY_PREFIX_LENGTH);
+      db.prepare(
+        "INSERT INTO router_keys (id, name, key_hash, key_prefix) VALUES (?, ?, ?, ?)"
+      ).run(randomUUID(), "Default", hash, prefix);
+      app.log.info("Migrated ROUTER_API_KEY to router_keys table as 'Default'");
+    }
+  }
+
+  app.register(authMiddleware, { db });
   app.register(openaiProxy, {
     db,
     encryptionKey: config.ENCRYPTION_KEY,

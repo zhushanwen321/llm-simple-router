@@ -1,3 +1,4 @@
+<!-- eslint-disable vue/multi-word-component-names -->
 <template>
   <div class="p-6">
     <div class="flex items-center justify-between mb-4">
@@ -95,7 +96,7 @@
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>取消</AlertDialogCancel>
-          <AlertDialogAction @click="handleDelete">删除</AlertDialogAction>
+          <Button variant="destructive" @click="handleDelete">删除</Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -104,6 +105,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { toast } from 'vue-sonner'
 import { api } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -112,7 +114,7 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog'
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from '@/components/ui/alert-dialog'
 
 interface Provider {
   id: string
@@ -123,11 +125,13 @@ interface Provider {
   is_active: number
 }
 
+const DEFAULT_FORM = { name: '', api_type: 'openai', base_url: '', api_key: '', is_active: true }
+
 const providers = ref<Provider[]>([])
 const dialogOpen = ref(false)
 const editingId = ref<string | null>(null)
 const deleteTarget = ref<Provider | null>(null)
-const form = ref({ name: '', api_type: 'openai', base_url: '', api_key: '', is_active: true })
+const form = ref({ ...DEFAULT_FORM })
 
 async function loadProviders() {
   try {
@@ -135,12 +139,13 @@ async function loadProviders() {
     providers.value = res.data
   } catch (e) {
     console.error('Failed to load providers:', e)
+    toast.error('加载供应商失败')
   }
 }
 
 function openCreate() {
   editingId.value = null
-  form.value = { name: '', api_type: 'openai', base_url: '', api_key: '', is_active: true }
+  form.value = { ...DEFAULT_FORM }
   dialogOpen.value = true
 }
 
@@ -150,26 +155,31 @@ function openEdit(p: Provider) {
   dialogOpen.value = true
 }
 
+function buildPayload(): { name: string; api_type: string; base_url: string; api_key?: string; is_active: number } {
+  const payload: { name: string; api_type: string; base_url: string; api_key?: string; is_active: number } = {
+    name: form.value.name,
+    api_type: form.value.api_type,
+    base_url: form.value.base_url,
+    is_active: form.value.is_active ? 1 : 0,
+  }
+  if (form.value.api_key) payload.api_key = form.value.api_key
+  return payload
+}
+
 async function handleSave() {
   try {
-    const data: any = {
-      name: form.value.name,
-      api_type: form.value.api_type,
-      base_url: form.value.base_url,
-      is_active: form.value.is_active ? 1 : 0,
-    }
-    if (form.value.api_key) data.api_key = form.value.api_key
-
+    const payload = buildPayload()
     if (editingId.value) {
-      await api.updateProvider(editingId.value, data)
+      await api.updateProvider(editingId.value, payload)
     } else {
-      data.api_key = form.value.api_key
-      await api.createProvider(data)
+      payload.api_key = form.value.api_key
+      await api.createProvider(payload)
     }
     dialogOpen.value = false
     await loadProviders()
   } catch (e) {
     console.error('Failed to save provider:', e)
+    toast.error('保存供应商失败')
   }
 }
 
@@ -178,13 +188,15 @@ function confirmDelete(p: Provider) {
 }
 
 async function handleDelete() {
-  if (!deleteTarget.value) return
+  const target = deleteTarget.value
+  if (!target) return
+  deleteTarget.value = null
   try {
-    await api.deleteProvider(deleteTarget.value.id)
-    deleteTarget.value = null
+    await api.deleteProvider(target.id)
     await loadProviders()
   } catch (e) {
     console.error('Failed to delete provider:', e)
+    toast.error('删除供应商失败')
   }
 }
 

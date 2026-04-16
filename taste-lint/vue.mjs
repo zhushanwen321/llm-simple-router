@@ -47,6 +47,9 @@ export default [
       'vue/singleline-html-element-content-newline': 'off',
       'vue/html-closing-bracket-spacing': 'off',
       'vue/attributes-order': 'off',
+
+      // shadcn-vue 组件库使用单字名称，允许例外
+      'vue/multi-word-component-names': 'off',
     },
   },
 ];

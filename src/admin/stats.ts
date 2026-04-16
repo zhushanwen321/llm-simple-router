@@ -7,8 +7,9 @@ interface StatsRoutesOptions {
 }
 
 export const adminStatsRoutes: FastifyPluginCallback<StatsRoutesOptions> = (app, options, done) => {
-  app.get("/admin/api/stats", async (_request, reply) => {
-    const stats = getStats(options.db);
+  app.get("/admin/api/stats", async (request, reply) => {
+    const query = request.query as { router_key_id?: string };
+    const stats = getStats(options.db, query.router_key_id);
     return reply.send(stats);
   });
 
