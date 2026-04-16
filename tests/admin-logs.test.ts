@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { FastifyInstance } from "fastify";
-import Database from "better-sqlite3";
 import { buildApp } from "../src/index.js";
+import { initDatabase } from "../src/db/index.js";
 
 const TEST_ENCRYPTION_KEY = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 const ADMIN_PASSWORD = "test-admin-pass";
@@ -24,30 +24,6 @@ function makeConfig() {
   };
 }
 
-function createTestDb(): Database.Database {
-  const db = new Database(":memory:");
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS migrations (name TEXT PRIMARY KEY, applied_at TEXT NOT NULL);
-    CREATE TABLE IF NOT EXISTS providers (
-      id TEXT PRIMARY KEY, name TEXT NOT NULL, api_type TEXT NOT NULL CHECK(api_type IN ('openai', 'anthropic')),
-      base_url TEXT NOT NULL, api_key TEXT NOT NULL, is_active INTEGER NOT NULL DEFAULT 1,
-      created_at TEXT NOT NULL, updated_at TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS model_mappings (
-      id TEXT PRIMARY KEY, client_model TEXT NOT NULL UNIQUE, backend_model TEXT NOT NULL,
-      provider_id TEXT NOT NULL, is_active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL,
-      FOREIGN KEY (provider_id) REFERENCES providers(id)
-    );
-    CREATE TABLE IF NOT EXISTS request_logs (
-      id TEXT PRIMARY KEY, api_type TEXT NOT NULL, model TEXT, provider_id TEXT,
-      status_code INTEGER, latency_ms INTEGER, is_stream INTEGER, error_message TEXT, created_at TEXT NOT NULL,
-      request_body TEXT, response_body TEXT, client_request TEXT, upstream_request TEXT, upstream_response TEXT, client_response TEXT,
-      is_retry INTEGER NOT NULL DEFAULT 0, original_request_id TEXT
-    );
-  `);
-  return db;
-}
-
 async function login(app: FastifyInstance): Promise<string> {
   const res = await app.inject({
     method: "POST",
@@ -58,7 +34,7 @@ async function login(app: FastifyInstance): Promise<string> {
   return `admin_token=${match![1]}`;
 }
 
-function insertTestLogs(db: Database.Database) {
+function insertTestLogs(db: ReturnType<typeof initDatabase>) {
   const now = new Date();
   const stmt = db.prepare(
     `INSERT INTO request_logs (id, api_type, model, provider_id, status_code, latency_ms, is_stream, error_message, created_at)
@@ -72,12 +48,12 @@ function insertTestLogs(db: Database.Database) {
 
 describe("Logs API", () => {
   let app: FastifyInstance;
-  let db: Database.Database;
+  let db: ReturnType<typeof initDatabase>;
   let close: () => Promise<void>;
   let cookie: string;
 
   beforeEach(async () => {
-    db = createTestDb();
+    db = initDatabase(":memory:");
     insertTestLogs(db);
     const result = await buildApp({ config: makeConfig() as any, db });
     app = result.app;
@@ -136,12 +112,12 @@ describe("Logs API", () => {
 
 describe("Stats API", () => {
   let app: FastifyInstance;
-  let db: Database.Database;
+  let db: ReturnType<typeof initDatabase>;
   let close: () => Promise<void>;
   let cookie: string;
 
   beforeEach(async () => {
-    db = createTestDb();
+    db = initDatabase(":memory:");
     insertTestLogs(db);
     const result = await buildApp({ config: makeConfig() as any, db });
     app = result.app;
@@ -169,7 +145,7 @@ describe("Stats API", () => {
   });
 
   it("GET stats with empty database", async () => {
-    const emptyDb = createTestDb();
+    const emptyDb = initDatabase(":memory:");
     const result = await buildApp({ config: makeConfig() as any, db: emptyDb });
     const emptyApp = result.app;
     const emptyClose = result.close;
