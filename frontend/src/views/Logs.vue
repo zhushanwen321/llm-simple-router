@@ -232,7 +232,7 @@ function formatTime(iso: string): string {
 
 async function loadLogs() {
   try {
-    const params: Record<string, unknown> = { page: page.value, limit: PAGE_SIZE }
+    const params: { page: number; limit: number; api_type?: string } = { page: page.value, limit: PAGE_SIZE }
     if (filterType.value && filterType.value !== 'all') params.api_type = filterType.value
     const res = await api.getLogs(params)
     logs.value = res.data.data
