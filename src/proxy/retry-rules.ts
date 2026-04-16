@@ -1,6 +1,5 @@
-import type { Database } from "better-sqlite3";
-import type { RetryRule } from "../db/index.js";
-import { getActiveRetryRules } from "../db/index.js";
+import Database from "better-sqlite3";
+import { getActiveRetryRules, type RetryRule } from "../db/index.js";
 
 export class RetryRuleMatcher {
   private cache = new Map<number, RegExp[]>();
