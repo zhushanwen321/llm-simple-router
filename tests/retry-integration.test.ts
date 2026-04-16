@@ -110,7 +110,7 @@ describe("Retry integration", () => {
     expect(calls).toBe(2);
 
     const logs = db
-      .prepare("SELECT * FROM request_logs ORDER BY created_at")
+      .prepare("SELECT * FROM request_logs ORDER BY created_at, is_retry ASC")
       .all() as any[];
     expect(logs).toHaveLength(2);
     expect(logs[0].is_retry).toBe(0);
@@ -158,7 +158,7 @@ describe("Retry integration", () => {
     expect(resp.statusCode).toBe(429);
 
     const logs = db
-      .prepare("SELECT * FROM request_logs ORDER BY created_at")
+      .prepare("SELECT * FROM request_logs ORDER BY created_at, is_retry ASC")
       .all() as any[];
     expect(logs).toHaveLength(2);
     expect(logs[0].is_retry).toBe(0);
@@ -218,7 +218,7 @@ describe("Retry integration", () => {
     expect(calls).toBe(2);
 
     const logs = db
-      .prepare("SELECT * FROM request_logs ORDER BY created_at")
+      .prepare("SELECT * FROM request_logs ORDER BY created_at, is_retry ASC")
       .all() as any[];
     expect(logs).toHaveLength(2);
     expect(logs[0].is_retry).toBe(0);
