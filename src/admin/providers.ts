@@ -1,7 +1,7 @@
 import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
 import type { Provider } from "../db/index.js";
-import { getAllProviders, getProviderById, createProvider, updateProvider, deleteProvider } from "../db/index.js";
+import { getAllProviders, getProviderById, createProvider, updateProvider, deleteProvider, getAllMappingGroups } from "../db/index.js";
 import { encrypt } from "../utils/crypto.js";
 
 const HTTP_BAD_REQUEST = 400;
@@ -97,6 +97,12 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
 
   app.delete("/admin/api/providers/:id", async (request, reply) => {
     const { id } = request.params as { id: string };
+    const groups = getAllMappingGroups(db);
+    for (const g of groups) {
+      if (g.rule.includes(id)) {
+        return reply.code(HTTP_CONFLICT).send({ error: { message: `Provider is referenced by mapping group '${g.client_model}'` } });
+      }
+    }
     deleteProvider(db, id);
     return reply.send({ success: true });
   });

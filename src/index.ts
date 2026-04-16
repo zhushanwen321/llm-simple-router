@@ -15,6 +15,7 @@ import { authMiddleware } from "./middleware/auth.js";
 import { openaiProxy } from "./proxy/openai.js";
 import { anthropicProxy } from "./proxy/anthropic.js";
 import { adminRoutes } from "./admin/routes.js";
+import { RetryRuleMatcher } from "./proxy/retry-rules.js";
 import fastifyStatic from "@fastify/static";
 import Database from "better-sqlite3";
 
@@ -59,6 +60,9 @@ export async function buildApp(
     }
   }
 
+  const matcher = new RetryRuleMatcher();
+  matcher.load(db);
+
   app.register(authMiddleware, { db });
   app.register(openaiProxy, {
     db,
@@ -66,6 +70,7 @@ export async function buildApp(
     streamTimeoutMs: config.STREAM_TIMEOUT_MS,
     retryMaxAttempts: config.RETRY_MAX_ATTEMPTS,
     retryBaseDelayMs: config.RETRY_BASE_DELAY_MS,
+    matcher,
   });
   app.register(anthropicProxy, {
     db,
@@ -73,6 +78,7 @@ export async function buildApp(
     streamTimeoutMs: config.STREAM_TIMEOUT_MS,
     retryMaxAttempts: config.RETRY_MAX_ATTEMPTS,
     retryBaseDelayMs: config.RETRY_BASE_DELAY_MS,
+    matcher,
   });
 
   app.register(adminRoutes, {
@@ -80,6 +86,7 @@ export async function buildApp(
     adminPassword: config.ADMIN_PASSWORD,
     jwtSecret: config.JWT_SECRET,
     encryptionKey: config.ENCRYPTION_KEY,
+    matcher,
   });
 
   // 前端静态文件服务（生产环境）
