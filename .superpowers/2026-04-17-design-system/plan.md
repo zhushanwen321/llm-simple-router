@@ -37,7 +37,7 @@
 
 - [ ] **Step 2: 在语义色之后添加角色色**
 
-在 `--color-text-tertiary` 之后插入：
+在 `:root` 块中 `--color-text-tertiary` 之后、间距注释 `/* === 间距 ===` 之前插入：
 
 ```css
   /* === 角色色 === */
@@ -69,7 +69,7 @@
 
 - [ ] **Step 4: 在 `.dark` 块中添加暗色覆盖**
 
-在 `.dark` 的 `--color-text-tertiary` 之后插入：
+在 `.dark` 块末尾 `}` 闭合之前（`--color-text-tertiary` 之后）插入：
 
 ```css
   --color-role-user-bg:     oklch(0.28 0.04 175);
@@ -134,6 +134,14 @@ git commit -m "feat(tokens): add teal brand color, role colors, SSE event colors
 
 /* 前 */ --sidebar-primary: oklch(0.488 0.243 264.376);
 /* 后 */ --sidebar-primary: oklch(0.68 0.13 175); /* teal-400 */
+```
+
+同时更新 `tokens.css` 中的 `--shadow-focus` 从 hue 250 改为 hue 175：
+
+```css
+/* tokens.css :root 中 */
+/* 前 */ --shadow-focus: 0 0 0 2px oklch(0.62 0.18 250);
+/* 后 */ --shadow-focus: 0 0 0 2px oklch(0.58 0.14 175);
 ```
 
 - [ ] **Step 3: 添加 mono 字体**
@@ -295,28 +303,32 @@ git commit -m "feat(ui): add tooltip, separator, scroll-area, avatar, switch com
 
 - [ ] **Step 1: 创建 TagPill**
 
-等宽小标签，用于工具名列表、content_type 标识。基于 Badge 变体。
+等宽小标签，用于工具名列表、content_type 标识。基于 Badge 组件。
 
 ```vue
 <script setup lang="ts">
+import { Badge } from '@/components/ui/badge'
+
 defineProps<{
   label: string
 }>()
 </script>
 
 <template>
-  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono bg-muted text-muted-foreground border">
+  <Badge variant="outline" class="font-mono text-[10px] rounded-full px-2 py-0.5">
     {{ label }}
-  </span>
+  </Badge>
 </template>
 ```
 
 - [ ] **Step 2: 创建 StatPill**
 
-参数标签，用于 model/stream/max_tokens 等键值对。model 值使用品牌色强调。
+参数标签，用于 model/stream/max_tokens 等键值对。基于 Badge 组件，model 值使用品牌色强调。
 
 ```vue
 <script setup lang="ts">
+import { Badge } from '@/components/ui/badge'
+
 defineProps<{
   label: string
   value: string
@@ -325,13 +337,13 @@ defineProps<{
 </script>
 
 <template>
-  <span
-    class="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-mono"
-    :class="highlight ? 'bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300' : 'bg-muted text-foreground'"
+  <Badge
+    :variant="highlight ? 'default' : 'secondary'"
+    class="font-mono text-sm px-3 py-1.5 rounded-md gap-1"
   >
-    <span class="text-muted-foreground">{{ label }}:</span>
+    <span class="opacity-70">{{ label }}:</span>
     {{ value }}
-  </span>
+  </Badge>
 </template>
 ```
 
@@ -410,7 +422,7 @@ defineProps<{
 <template>
   <div
     class="px-3 py-2 flex items-center gap-2"
-    :class="highlight ? 'bg-warning-light dark:bg-warning-light' : ''"
+    :class="highlight ? 'bg-warning/10' : ''"
   >
     <span
       class="px-1.5 py-0.5 rounded text-[10px] font-medium"
@@ -419,7 +431,7 @@ defineProps<{
         'bg-teal-300 text-teal-700 dark:bg-teal-700 dark:text-teal-200': eventType === 'content_block_start',
         'bg-muted text-muted-foreground': eventType === 'content_block_delta',
         'bg-teal-500 text-white dark:bg-teal-600': eventType === 'message_delta',
-        'bg-success-light text-success-dark': eventType === 'message_stop',
+        'bg-success-light text-success': eventType === 'message_stop',
       }"
     >{{ eventType }}</span>
     <span class="text-xs text-foreground">{{ summary }}</span>
@@ -445,7 +457,7 @@ defineProps<{
 
 <template>
   <Card class="border-teal-200 dark:border-teal-800">
-    <CardContent class="p-3 flex items-center gap-3 bg-teal-50 dark:bg-teal-950">
+    <CardContent class="p-3 flex items-center gap-3 bg-teal-50 dark:bg-teal-900">
       <div class="w-8 h-8 rounded-full bg-teal-600 text-white flex items-center justify-center text-xs font-bold">
         {{ icon }}
       </div>
