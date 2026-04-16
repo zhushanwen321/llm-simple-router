@@ -40,6 +40,7 @@ interface ProviderPayload {
   api_type: string
   base_url: string
   api_key?: string
+  models?: string[]
   is_active: number
 }
 
@@ -82,7 +83,7 @@ interface RetryRulePayload {
 async function request<T>(method: 'get' | 'post' | 'put' | 'delete', url: string, data?: unknown): Promise<T> {
   const res = method === 'get'
     ? await client.get(url)
-    : await client[method](url, data)
+    : await client.request({ method, url, data })
   return res.data as T
 }
 
@@ -108,7 +109,7 @@ export const api = {
   deleteLogsBefore: (before: string) =>
     client.delete(`${API.LOGS}/before`, { data: { before } }),
 
-  getStats: (params?: { router_key_id?: string }) =>
+  getStats: (params?: { period?: string; router_key_id?: string }) =>
     client.get(API.STATS, { params }),
 
   getMetricsSummary: (params: { period: string; provider_id?: string; backend_model?: string; router_key_id?: string }) =>

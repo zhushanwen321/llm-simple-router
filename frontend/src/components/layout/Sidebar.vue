@@ -1,10 +1,10 @@
 <!-- eslint-disable vue/multi-word-component-names -->
 <template>
-  <aside class="w-56 bg-slate-800 text-white flex-shrink-0 flex flex-col">
-    <div class="p-4 border-b border-slate-700">
+  <aside class="w-56 bg-sidebar text-sidebar-foreground flex-shrink-0 flex flex-col">
+    <div class="p-4 border-b border-sidebar-border">
       <div class="flex items-center gap-2">
-        <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="w-8 h-8 bg-sidebar-primary rounded-lg flex items-center justify-center">
+          <svg class="w-5 h-5 text-sidebar-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
           </svg>
         </div>
@@ -17,16 +17,16 @@
         :key="item.path"
         :to="item.path"
         class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors"
-        :class="isActive(item.path) ? 'bg-slate-700 text-blue-400' : 'text-gray-300 hover:bg-slate-700'"
+        :class="isActive(item.path) ? 'bg-sidebar-accent text-sidebar-primary' : 'text-sidebar-foreground hover:bg-sidebar-accent'"
       >
         <component :is="item.icon" class="w-4 h-4" />
         {{ item.label }}
       </router-link>
     </nav>
-    <div class="p-3 border-t border-slate-700">
+    <div class="p-3 border-t border-sidebar-border">
       <Button
         variant="ghost"
-        class="w-full justify-start text-gray-400 hover:text-white hover:bg-slate-700"
+        class="w-full justify-start text-sidebar-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent"
         @click="handleLogout"
       >
         <LogOut class="w-4 h-4" />
@@ -37,12 +37,11 @@
 </template>
 
 <script setup lang="ts">
-import { type Component, h } from 'vue'
+import { type Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   LayoutDashboard,
   Server,
-  BarChart3,
   ArrowLeftRight,
   KeyRound,
   RefreshCcw,
@@ -62,7 +61,6 @@ interface NavItem {
 const navItems: NavItem[] = [
   { path: '/', label: '仪表盘', icon: LayoutDashboard },
   { path: '/providers', label: '供应商', icon: Server },
-  { path: '/metrics', label: '性能指标', icon: BarChart3 },
   { path: '/mappings', label: '模型映射', icon: ArrowLeftRight },
   { path: '/router-keys', label: 'API 密钥', icon: KeyRound },
   { path: '/retry-rules', label: '重试规则', icon: RefreshCcw },

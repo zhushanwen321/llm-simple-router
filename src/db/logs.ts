@@ -125,7 +125,7 @@ export function getRequestLogs(
   const offset = (options.page - 1) * options.limit;
   const data = db
     .prepare(
-      `SELECT id, api_type, model, provider_id, status_code, latency_ms, is_stream, error_message, created_at
+      `SELECT id, api_type, model, provider_id, status_code, latency_ms, is_stream, error_message, created_at, is_retry, original_request_id
        FROM request_logs WHERE ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
     )
     .all(...params, options.limit, offset) as RequestLog[];

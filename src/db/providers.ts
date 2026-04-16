@@ -9,13 +9,14 @@ export interface Provider {
   base_url: string;
   api_key: string;
   api_key_preview?: string;
+  models: string; // JSON 数组文本
   is_active: number;
   created_at: string;
   updated_at: string;
 }
 
 const PROVIDER_FIELDS = new Set([
-  "name", "api_type", "base_url", "api_key", "api_key_preview", "is_active",
+  "name", "api_type", "base_url", "api_key", "api_key_preview", "models", "is_active",
 ]);
 
 export function getActiveProviders(
@@ -43,17 +44,19 @@ export function createProvider(
     base_url: string;
     api_key: string;
     api_key_preview?: string;
+    models?: string;
     is_active?: number;
   },
 ): string {
   const id = randomUUID();
   const now = new Date().toISOString();
   db.prepare(
-    `INSERT INTO providers (id, name, api_type, base_url, api_key, api_key_preview, is_active, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO providers (id, name, api_type, base_url, api_key, api_key_preview, models, is_active, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     id, provider.name, provider.api_type, provider.base_url,
     provider.api_key, provider.api_key_preview ?? null,
+    provider.models ?? "[]",
     provider.is_active ?? 1, now, now,
   );
   return id;

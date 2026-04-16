@@ -1,7 +1,7 @@
 <template>
   <div class="p-6">
     <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-semibold text-gray-900">API 密钥</h2>
+      <h2 class="text-lg font-semibold text-foreground">API 密钥</h2>
       <Button @click="openCreate" class="flex items-center gap-1">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
         创建密钥
@@ -11,13 +11,13 @@
     <div class="bg-white rounded-lg border overflow-hidden">
       <Table>
         <TableHeader>
-          <TableRow class="bg-gray-50">
-            <TableHead class="text-gray-600">名称</TableHead>
-            <TableHead class="text-gray-600">密钥</TableHead>
-            <TableHead class="text-gray-600">白名单模型</TableHead>
-            <TableHead class="text-gray-600">状态</TableHead>
-            <TableHead class="text-gray-600">创建时间</TableHead>
-            <TableHead class="text-right text-gray-600">操作</TableHead>
+          <TableRow class="bg-muted">
+            <TableHead class="text-muted-foreground">名称</TableHead>
+            <TableHead class="text-muted-foreground">密钥</TableHead>
+            <TableHead class="text-muted-foreground">白名单模型</TableHead>
+            <TableHead class="text-muted-foreground">状态</TableHead>
+            <TableHead class="text-muted-foreground">创建时间</TableHead>
+            <TableHead class="text-right text-muted-foreground">操作</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -25,12 +25,12 @@
             <TableCell class="font-medium">{{ k.name }}</TableCell>
             <TableCell>
               <div class="flex items-center gap-1">
-                <span class="font-mono text-xs text-gray-500">{{ k.key }}</span>
+                <span class="font-mono text-xs text-muted-foreground">{{ k.key }}</span>
                 <Button variant="ghost" size="sm" class="h-6 w-6 p-0" @click="copyKeyOf(k.id, k.key)">
                   <svg v-if="copiedId !== k.id" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
                   </svg>
-                  <svg v-else class="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg v-else class="w-3.5 h-3.5 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                   </svg>
                 </Button>
@@ -47,14 +47,14 @@
             <TableCell>
               <Badge :variant="k.is_active ? 'default' : 'secondary'">{{ k.is_active ? '启用' : '禁用' }}</Badge>
             </TableCell>
-            <TableCell class="text-gray-500 text-sm">{{ formatDate(k.created_at) }}</TableCell>
+            <TableCell class="text-muted-foreground text-sm">{{ formatDate(k.created_at) }}</TableCell>
             <TableCell class="text-right">
-              <Button variant="ghost" size="sm" @click="openEdit(k)" class="text-gray-400 hover:text-blue-600 mr-2">编辑</Button>
-              <Button variant="ghost" size="sm" @click="confirmDelete(k)" class="text-gray-400 hover:text-red-600">删除</Button>
+              <Button variant="ghost" size="sm" @click="openEdit(k)" class="text-muted-foreground hover:text-primary mr-2">编辑</Button>
+              <Button variant="ghost" size="sm" @click="confirmDelete(k)" class="text-muted-foreground hover:text-destructive">删除</Button>
             </TableCell>
           </TableRow>
           <TableRow v-if="keys.length === 0">
-            <TableCell colspan="6" class="text-center text-gray-400 py-8">暂无密钥</TableCell>
+            <TableCell colspan="6" class="text-center text-muted-foreground py-8">暂无密钥</TableCell>
           </TableRow>
         </TableBody>
       </Table>
@@ -68,13 +68,13 @@
         </DialogHeader>
         <form @submit.prevent="handleSave" class="space-y-4">
           <div>
-            <Label class="block text-sm font-medium text-gray-700 mb-1">名称</Label>
+            <Label class="block text-sm font-medium text-foreground mb-1">名称</Label>
             <Input v-model="form.name" type="text" required placeholder="例如：生产环境" />
           </div>
           <div>
-            <Label class="block text-sm font-medium text-gray-700 mb-1">白名单模型</Label>
-            <div class="text-xs text-gray-400 mb-2">不选择 = 允许所有模型</div>
-            <div class="border rounded-md p-3 max-h-48 overflow-y-auto space-y-2 bg-gray-50">
+            <Label class="block text-sm font-medium text-foreground mb-1">白名单模型</Label>
+            <div class="text-xs text-muted-foreground mb-2">不选择 = 允许所有模型</div>
+            <div class="border rounded-md p-3 max-h-48 overflow-y-auto space-y-2 bg-muted">
               <Label
                 v-for="model in availableModels"
                 :key="model"
@@ -89,20 +89,20 @@
                 />
                 <span class="font-mono text-xs">{{ model }}</span>
               </Label>
-              <div v-if="availableModels.length === 0" class="text-gray-400 text-sm text-center py-2">
+              <div v-if="availableModels.length === 0" class="text-muted-foreground text-sm text-center py-2">
                 暂无可用模型，请先配置模型映射
               </div>
             </div>
             <div v-if="form.allowed_models.length > 0" class="flex flex-wrap gap-1 mt-2">
               <Badge v-for="m in form.allowed_models" :key="m" variant="outline" class="text-xs">
                 {{ m }}
-                <Button type="button" variant="ghost" size="sm" class="ml-1 h-4 w-4 p-0 text-gray-400 hover:text-red-500" @click="removeModel(m)">&times;</Button>
+                <Button type="button" variant="ghost" size="sm" class="ml-1 h-4 w-4 p-0 text-muted-foreground hover:text-destructive" @click="removeModel(m)">&times;</Button>
               </Badge>
             </div>
           </div>
           <div v-if="editingId" class="flex items-center gap-2">
             <input v-model="form.is_active" type="checkbox" id="key-active" class="rounded" />
-            <Label for="key-active" class="text-sm text-gray-700">启用</Label>
+            <Label for="key-active" class="text-sm text-foreground">启用</Label>
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" @click="dialogOpen = false">取消</Button>
@@ -119,8 +119,8 @@
           <DialogTitle>密钥创建成功</DialogTitle>
         </DialogHeader>
         <div class="space-y-3">
-          <p class="text-sm text-gray-600">请立即保存此密钥，关闭后将无法再次查看完整密钥。</p>
-          <div class="bg-gray-100 rounded-md p-3 font-mono text-sm break-all select-all">{{ createdKey }}</div>
+          <p class="text-sm text-muted-foreground">请立即保存此密钥，关闭后将无法再次查看完整密钥。</p>
+          <div class="bg-muted rounded-md p-3 font-mono text-sm break-all select-all">{{ createdKey }}</div>
           <Button variant="outline" size="sm" @click="copyKey">{{ copied ? '已复制' : '复制密钥' }}</Button>
         </div>
         <DialogFooter>

@@ -1,9 +1,15 @@
 <template>
-  <Tabs default-value="structured" class="w-full">
-    <TabsList class="mb-2">
-      <TabsTrigger value="structured">结构化</TabsTrigger>
-      <TabsTrigger value="raw">原始 JSON</TabsTrigger>
-    </TabsList>
+  <Tabs :default-value="mode ?? 'structured'" :model-value="mode" class="w-full">
+    <!-- 外部控制模式时不渲染内部控制栏 -->
+    <div v-if="!mode" class="flex items-center justify-between py-2 border-b mb-2">
+      <TabsList>
+        <TabsTrigger value="structured">结构化</TabsTrigger>
+        <TabsTrigger value="raw">原始 JSON</TabsTrigger>
+      </TabsList>
+      <Button variant="ghost" size="xs" class="h-auto px-2 py-1 text-xs" @click="copyRaw">
+        {{ copied ? '已复制' : '复制 JSON' }}
+      </Button>
+    </div>
 
     <TabsContent value="structured" class="space-y-3">
       <template v-if="parseError">
@@ -11,14 +17,14 @@
       </template>
       <template v-else>
         <!-- Claude Code context card -->
-        <Card v-if="isClaudeCode" class="border-indigo-200 bg-indigo-50 dark:border-indigo-900 dark:bg-indigo-950">
+        <Card v-if="isClaudeCode" class="border-border bg-info-light">
           <CardHeader class="pb-2">
             <div class="flex items-center gap-2">
-              <span class="text-sm font-semibold text-indigo-700 dark:text-indigo-300">Claude Code 请求</span>
+              <span class="text-sm font-semibold text-info-dark dark:text-info">Claude Code 请求</span>
               <Badge variant="secondary">{{ claudeMode }}</Badge>
             </div>
           </CardHeader>
-          <CardContent class="flex flex-wrap gap-3 text-sm text-indigo-800 dark:text-indigo-200">
+          <CardContent class="flex flex-wrap gap-3 text-sm text-info-dark dark:text-info">
             <div v-if="thinkingBudget != null">Thinking budget: {{ thinkingBudget }}</div>
             <div v-if="toolsCount != null">Tools: {{ toolsCount }}</div>
           </CardContent>
@@ -69,15 +75,26 @@
           <div class="text-xs font-medium text-muted-foreground">Messages</div>
           <Card v-for="(msg, idx) in messages" :key="idx" class="bg-muted/40">
             <CardHeader class="pb-2 flex flex-row items-center gap-2">
-              <Badge :class="roleBadgeClass(msg.role)">{{ msg.role }}</Badge>
+              <Badge :class="roleClass(msg.role)">{{ msg.role }}</Badge>
+              <span v-if="msg.blockSummary" class="text-xs text-muted-foreground">{{ msg.blockSummary }}</span>
             </CardHeader>
             <CardContent class="space-y-2">
               <div v-for="(block, bidx) in msg.blocks" :key="bidx">
-                <div v-if="block.type === 'system-reminder'" class="text-xs text-muted-foreground">
+                <!-- 纯文本 -->
+                <div v-if="block.type === 'text'">
+                  <div v-if="block.text.length > 120 && !expanded[`${idx}-${bidx}`]" class="text-sm">
+                    {{ block.text.slice(0, 120) }}
+                    <Button variant="link" size="xs" class="px-0 h-auto text-xs" @click="expanded[`${idx}-${bidx}`] = true">展开</Button>
+                  </div>
+                  <div v-else class="text-sm whitespace-pre-wrap break-all">{{ block.text }}</div>
+                </div>
+                <!-- 有内容的标签块：可折叠 -->
+                <div v-else-if="block.text" class="text-xs text-muted-foreground">
                   <Collapsible>
                     <CollapsibleTrigger as-child>
                       <Button variant="ghost" size="xs" class="px-0 h-auto text-xs">
-                        system-reminder 已折叠 · {{ formatSize(block.text) }}
+                        <Badge :class="tagClass(block.type)" class="mr-1">{{ block.label || block.type }}</Badge>
+                        {{ formatSize(block.text) }}
                       </Button>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
@@ -85,15 +102,9 @@
                     </CollapsibleContent>
                   </Collapsible>
                 </div>
-                <div v-else-if="block.type === 'text'">
-                  <div v-if="block.text.length > 120 && !expanded[`${idx}-${bidx}`]" class="text-sm">
-                    {{ block.text.slice(0, 120) }}
-                    <Button variant="link" size="xs" class="px-0 h-auto text-xs" @click="expanded[`${idx}-${bidx}`] = true">展开</Button>
-                  </div>
-                  <div v-else class="text-sm whitespace-pre-wrap break-all">{{ block.text }}</div>
-                </div>
-                <div v-else class="text-xs text-muted-foreground">
-                  <Badge variant="secondary">{{ block.type }}</Badge>
+                <!-- 空内容：仅显示标签 Badge -->
+                <div v-else class="text-xs">
+                  <Badge :class="tagClass(block.type)" class="mr-1">{{ block.label || block.type }}</Badge>
                 </div>
               </div>
             </CardContent>
@@ -153,16 +164,22 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import JsonCopyBlock from './JsonCopyBlock.vue'
+import { roleClass, tagClass } from './logColors'
+import { extractBlocks } from './requestBlockParser'
+import type { MsgBlock } from './requestBlockParser'
 
 const props = defineProps<{
   raw: string
   apiType: 'openai' | 'anthropic'
   showUrl?: boolean
+  /** 外部控制显示模式时传入，组件内部不渲染 tabs 和复制按钮 */
+  mode?: 'structured' | 'raw'
 }>()
 
 const headersOpen = ref(false)
 const expanded = reactive<Record<string, boolean>>({})
 const toolsExpanded = ref(false)
+const copied = ref(false)
 
 const parsed = computed<Record<string, unknown>>(() => {
   try {
@@ -181,9 +198,20 @@ const parseError = computed(() => {
   }
 })
 
+async function copyRaw() {
+  try {
+    await navigator.clipboard.writeText(props.raw)
+    copied.value = true
+    setTimeout(() => { copied.value = false }, 2000) // eslint-disable-line no-magic-numbers
+  } catch { copied.value = false }
+}
+
 const headerEntries = computed(() => {
   const headers = (parsed.value.headers || {}) as Record<string, string>
-  return Object.entries(headers).map(([k, v]) => {
+  const ALLOWED_HEADER_KEYS = new Set(Object.keys(headers))
+  return Object.entries(headers)
+    .filter(([k]) => ALLOWED_HEADER_KEYS.has(k))
+    .map(([k, v]) => {
     if (k.toLowerCase() === 'authorization') {
       return [k, 'Bearer sk-****'] as [string, string]
     }
@@ -191,7 +219,14 @@ const headerEntries = computed(() => {
   })
 })
 
-const body = computed(() => (parsed.value.body || {}) as Record<string, unknown>)
+const body = computed(() => {
+  const raw = parsed.value.body
+  // upstream_request 中 body 是二次 JSON 编码的字符串，需要再 parse 一次
+  if (typeof raw === 'string') {
+    try { return JSON.parse(raw) as Record<string, unknown> } catch { return {} }
+  }
+  return (raw || {}) as Record<string, unknown>
+})
 
 const isClaudeCode = computed(() => {
   const ua = (parsed.value.headers as Record<string, string> | undefined)?.['user-agent'] || ''
@@ -214,70 +249,43 @@ const toolsCount = computed(() => {
   return Array.isArray(tools) ? tools.length : undefined
 })
 
-type ContentBlock = { type: string; text?: string }
-type MsgBlock = { role: string; blocks: { type: string; text: string }[] }
-
-function extractBlocks(content: unknown): { type: string; text: string }[] {
-  if (typeof content === 'string') {
-    return [{ type: 'text', text: content }]
-  }
-  if (Array.isArray(content)) {
-    return content.map((item: unknown) => {
-      const block = item as ContentBlock
-      if (block.type === 'text' && typeof block.text === 'string') {
-        return { type: 'text', text: block.text }
-      }
-      if (block.type === 'image') {
-        return { type: 'image', text: '' }
-      }
-      return { type: block.type || 'unknown', text: typeof block.text === 'string' ? block.text : '' }
-    })
-  }
-  return [{ type: 'text', text: String(content ?? '') }]
-}
-
-function isSystemReminder(text: string): boolean {
-  return text.includes('<system-reminder>')
-}
-
 const messages = computed<MsgBlock[]>(() => {
   const msgs = (body.value.messages || []) as Array<{ role: string; content: unknown }>
   return msgs.map((m) => {
     const blocks = extractBlocks(m.content)
-    const processed = blocks.map((b) => {
-      if (b.type === 'text' && isSystemReminder(b.text)) {
-        return { type: 'system-reminder', text: b.text }
+    // 统计非 text 的 block 类型和数量
+    const tagCounts: Record<string, number> = {}
+    for (const b of blocks) {
+      if (b.type !== 'text' && b.text) {
+        tagCounts[b.type] = (tagCounts[b.type] || 0) + 1
       }
-      return b
-    })
-    return { role: m.role, blocks: processed }
+    }
+    const ALLOWED_TAG_KEYS = new Set(Object.keys(tagCounts))
+    const blockSummary = Object.entries(tagCounts)
+      .filter(([k]) => ALLOWED_TAG_KEYS.has(k))
+      .map(([t, c]) => `${t}${c > 1 ? ` x${c}` : ''}`)
+      .join(', ') || undefined
+    return { role: m.role, blocks, blockSummary }
   })
 })
 
-function roleBadgeClass(role: string): string {
-  const map: Record<string, string> = {
-    system: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
-    user: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-    assistant: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-    tool: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
-  }
-  return map[role] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
-}
 
 const toolNames = computed(() => {
   const tools = (body.value.tools || []) as Array<{ function?: { name?: string }; name?: string }>
   return tools.map((t) => t.function?.name || t.name || 'unknown').filter(Boolean)
 })
 
+const TOOL_PREVIEW_COUNT = 8
+
 const displayedToolNames = computed(() => {
-  return toolsExpanded.value ? toolNames.value : toolNames.value.slice(0, 8)
+  return toolsExpanded.value ? toolNames.value : toolNames.value.slice(0, TOOL_PREVIEW_COUNT)
 })
 
 const systemBlocks = computed(() => {
   const sys = body.value.system
   if (!sys) return [] as { type: string; text: string }[]
   if (Array.isArray(sys)) {
-    return (sys as ContentBlock[]).map((s) => ({ type: s.type || 'text', text: s.text || '' }))
+    return (sys as Array<{ type?: string; text?: string }>).map((s) => ({ type: s.type || 'text', text: s.text || '' }))
   }
   if (typeof sys === 'string') {
     return [{ type: 'text', text: sys }]
@@ -307,9 +315,11 @@ const otherFields = computed(() => {
 
 const otherFieldsKeys = computed(() => Object.keys(otherFields.value))
 
+const BYTES_PER_KB = 1024
+
 function formatSize(text: string): string {
   const bytes = new TextEncoder().encode(text).length
-  if (bytes < 1024) return `${bytes}B`
-  return `${(bytes / 1024).toFixed(1)}KB`
+  if (bytes < BYTES_PER_KB) return `${bytes}B`
+  return `${(bytes / BYTES_PER_KB).toFixed(1)}KB`
 }
 </script>

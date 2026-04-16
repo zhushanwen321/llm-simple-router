@@ -54,6 +54,10 @@ export function deleteRouterKey(db: Database.Database, id: string): void {
 }
 
 export function getAvailableModels(db: Database.Database): string[] {
-  const rows = db.prepare("SELECT DISTINCT backend_model FROM model_mappings ORDER BY backend_model").all() as { backend_model: string }[];
-  return rows.map(r => r.backend_model);
+  const rows = db.prepare("SELECT models FROM providers WHERE is_active = 1").all() as { models: string }[];
+  const set = new Set<string>();
+  for (const r of rows) {
+    try { JSON.parse(r.models || "[]").forEach((m: string) => set.add(m)); } catch { /* skip invalid JSON */ }
+  }
+  return [...set].sort();
 }

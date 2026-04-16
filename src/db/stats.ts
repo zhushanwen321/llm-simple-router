@@ -1,30 +1,53 @@
 import Database from "better-sqlite3";
 
+export type StatsPeriod = "1h" | "6h" | "24h" | "7d" | "30d";
+
 export interface Stats {
   totalRequests: number;
   successRate: number;
-  avgLatency: number;
-  requestsByType: Record<string, number>;
-  recentRequests: number;
+  avgTps: number;
+  totalTokens: number;
 }
 
-interface CountRow { count: number }
-interface AvgRow { avg: number | null }
+interface StatsRow {
+  total_requests: number;
+  success_count: number;
+  avg_tps: number | null;
+  total_tokens: number;
+}
 
-export function getStats(db: Database.Database, routerKeyId?: string): Stats {
-  const baseWhere = routerKeyId ? "WHERE router_key_id = ?" : "";
-  const params = routerKeyId ? [routerKeyId] : [];
-  const total = (db.prepare(`SELECT COUNT(*) as count FROM request_logs ${baseWhere}`).get(...params) as CountRow).count;
-  const successWhere = routerKeyId ? "WHERE router_key_id = ? AND status_code >= 200 AND status_code < 300" : "WHERE status_code >= 200 AND status_code < 300";
-  const successCount = (db.prepare(`SELECT COUNT(*) as count FROM request_logs ${successWhere}`).get(...params) as CountRow).count;
-  const avgWhere = routerKeyId ? "WHERE router_key_id = ? AND latency_ms IS NOT NULL" : "WHERE latency_ms IS NOT NULL";
-  const avgResult = db.prepare(`SELECT AVG(latency_ms) as avg FROM request_logs ${avgWhere}`).get(...params) as AvgRow;
-  const recentWhere = routerKeyId ? "WHERE router_key_id = ? AND created_at >= datetime('now', '-1 day')" : "WHERE created_at >= datetime('now', '-1 day')";
-  const recentCount = (db.prepare(`SELECT COUNT(*) as count FROM request_logs ${recentWhere}`).get(...params) as CountRow).count;
-  const typeWhere = routerKeyId ? "WHERE router_key_id = ?" : "";
-  const requestsByType: Record<string, number> = {};
-  for (const row of db.prepare(`SELECT api_type, COUNT(*) as count FROM request_logs ${typeWhere} GROUP BY api_type`).all(...params) as { api_type: string; count: number }[]) {
-    requestsByType[row.api_type] = row.count;
-  }
-  return { totalRequests: total, successRate: total > 0 ? successCount / total : 0, avgLatency: avgResult?.avg ?? 0, requestsByType, recentRequests: recentCount };
+const PERIOD_OFFSET: Record<StatsPeriod, string> = {
+  "1h": "-1 hours",
+  "6h": "-6 hours",
+  "24h": "-1 day",
+  "7d": "-7 days",
+  "30d": "-30 days",
+};
+
+export function getStats(db: Database.Database, period: StatsPeriod, routerKeyId?: string): Stats {
+  const offset = PERIOD_OFFSET[period];
+
+  const conditions = ["rm.is_complete = 1", "rm.created_at >= datetime('now', ?)"];
+  const params: unknown[] = [offset];
+  if (routerKeyId) { conditions.push("rl.router_key_id = ?"); params.push(routerKeyId); }
+  const where = conditions.join(" AND ");
+
+  const row = db.prepare(`
+    SELECT
+      COUNT(*) AS total_requests,
+      SUM(CASE WHEN rl.status_code >= 200 AND rl.status_code < 300 THEN 1 ELSE 0 END) AS success_count,
+      AVG(rm.tokens_per_second) AS avg_tps,
+      COALESCE(SUM(rm.input_tokens), 0) + COALESCE(SUM(rm.output_tokens), 0) AS total_tokens
+    FROM request_metrics rm
+    JOIN request_logs rl ON rl.id = rm.request_log_id
+    WHERE ${where}
+  `).get(...params) as StatsRow;
+
+  const total = row?.total_requests ?? 0;
+  return {
+    totalRequests: total,
+    successRate: total > 0 ? (row?.success_count ?? 0) / total : 0,
+    avgTps: row?.avg_tps ?? 0,
+    totalTokens: row?.total_tokens ?? 0,
+  };
 }

@@ -1,0 +1,59 @@
+/* === 状态色 === */
+:root {
+  --color-success: oklch(0.65 0.17 150);
+  --color-success-light: oklch(0.92 0.05 150);
+  --color-success-dark: oklch(0.45 0.15 150);
+  --color-warning: oklch(0.78 0.16 80);
+  --color-warning-light: oklch(0.94 0.06 80);
+  --color-warning-dark: oklch(0.55 0.14 80);
+  --color-danger: oklch(0.58 0.22 25);
+  --color-danger-light: oklch(0.90 0.08 25);
+  --color-danger-dark: oklch(0.40 0.18 25);
+  --color-info: oklch(0.62 0.18 250);
+  --color-info-light: oklch(0.91 0.06 250);
+  --color-info-dark: oklch(0.43 0.16 250);
+
+  /* === 语义色（引用 shadcn-vue 变量，保持单一数据源） === */
+  --color-bg-page: var(--background);
+  --color-bg-card: var(--card);
+  --color-bg-sidebar: oklch(0.205 0 0);
+  --color-text-primary: var(--foreground);
+  --color-text-secondary: var(--muted-foreground);
+  --color-text-tertiary: oklch(0.65 0 0);
+
+  /* === 间距 === */
+  --spacing-page: 1.5rem;
+  --spacing-section: 1.25rem;
+  --spacing-card: 1rem;
+  --spacing-tight: 0.5rem;
+  --gap-icon-text: 0.375rem;
+
+  /* === 圆角 === */
+  --radius-pill: 9999px;
+
+  /* === 阴影 === */
+  --shadow-card: 0 1px 3px oklch(0 0 0 / 0.1);
+  --shadow-elevated: 0 4px 12px oklch(0 0 0 / 0.12);
+  --shadow-focus: 0 0 0 2px oklch(0.62 0.18 250);
+
+  /* === 动画 === */
+  --duration-fast: 150ms;
+  --duration-normal: 200ms;
+  --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* === z-index === */
+  --z-dropdown: 50;
+  --z-modal: 100;
+  --z-toast: 200;
+}
+
+.dark {
+  --color-success-light: oklch(0.30 0.05 150);
+  --color-warning-light: oklch(0.32 0.06 80);
+  --color-danger-light: oklch(0.28 0.08 25);
+  --color-info-light: oklch(0.28 0.06 250);
+
+  /* 语义色通过 var() 引用 shadcn 变量，暗色模式自动跟随 shadcn .dark 覆盖 */
+  --color-bg-sidebar: oklch(0.145 0 0);
+  --color-text-tertiary: oklch(0.556 0 0);
+}

@@ -14,6 +14,7 @@ const CreateProviderSchema = Type.Object({
   api_type: Type.Union([Type.Literal("openai"), Type.Literal("anthropic")]),
   base_url: Type.String({ minLength: 1 }),
   api_key: Type.String({ minLength: 1 }),
+  models: Type.Optional(Type.Array(Type.String())),
   is_active: Type.Optional(Type.Number()),
 });
 
@@ -22,6 +23,7 @@ const UpdateProviderSchema = Type.Object({
   api_type: Type.Optional(Type.Union([Type.Literal("openai"), Type.Literal("anthropic")])),
   base_url: Type.Optional(Type.String({ minLength: 1 })),
   api_key: Type.Optional(Type.String({ minLength: 1 })),
+  models: Type.Optional(Type.Array(Type.String())),
   is_active: Type.Optional(Type.Number()),
 });
 
@@ -46,6 +48,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
       api_type: s.api_type,
       base_url: s.base_url,
       api_key_preview: s.api_key_preview || "****",
+      models: JSON.parse(s.models || "[]"),
       is_active: s.is_active,
       created_at: s.created_at,
       updated_at: s.updated_at,
@@ -62,6 +65,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
       base_url: body.base_url,
       api_key: encryptedKey,
       api_key_preview: apiKeyPreview,
+      models: JSON.stringify(body.models ?? []),
       is_active: body.is_active ?? 1,
     });
     return reply.code(HTTP_CREATED).send({ id });
@@ -74,11 +78,12 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
       return reply.code(HTTP_NOT_FOUND).send({ error: { message: "Provider not found" } });
     }
     const body = request.body as Static<typeof UpdateProviderSchema>;
-    const fields: Partial<Pick<Provider, 'name' | 'api_type' | 'base_url' | 'api_key' | 'api_key_preview' | 'is_active'>> = {};
+    const fields: Partial<Pick<Provider, 'name' | 'api_type' | 'base_url' | 'api_key' | 'api_key_preview' | 'models' | 'is_active'>> = {};
     if (body.name !== undefined) fields.name = body.name;
     if (body.api_type !== undefined) fields.api_type = body.api_type;
     if (body.base_url !== undefined) fields.base_url = body.base_url;
     if (body.is_active !== undefined) fields.is_active = body.is_active;
+    if (body.models !== undefined) fields.models = JSON.stringify(body.models);
     if (body.api_key) {
       fields.api_key = encrypt(body.api_key, encryptionKey);
       fields.api_key_preview = computeApiKeyPreview(body.api_key);

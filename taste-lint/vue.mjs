@@ -52,4 +52,16 @@ export default [
       'vue/multi-word-component-names': 'off',
     },
   },
+
+  // 设计系统 token 规则 — 仅作用于前端源码
+  {
+    files: ['frontend/src/**/*.vue'],
+    plugins: {
+      taste: tastePlugin,
+    },
+    rules: {
+      'taste/no-hardcoded-colors': 'error',
+      'taste/no-magic-spacing': 'error',
+    },
+  },
 ];

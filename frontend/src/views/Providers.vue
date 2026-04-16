@@ -2,7 +2,7 @@
 <template>
   <div class="p-6">
     <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-semibold text-gray-900">供应商</h2>
+      <h2 class="text-lg font-semibold text-foreground">供应商</h2>
       <Button @click="openCreate" class="flex items-center gap-1">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
         添加供应商
@@ -12,13 +12,14 @@
     <div class="bg-white rounded-lg border overflow-hidden">
       <Table>
         <TableHeader>
-          <TableRow class="bg-gray-50">
-            <TableHead class="text-gray-600">名称</TableHead>
-            <TableHead class="text-gray-600">类型</TableHead>
-            <TableHead class="text-gray-600">Base URL</TableHead>
-            <TableHead class="text-gray-600">API Key</TableHead>
-            <TableHead class="text-gray-600">状态</TableHead>
-            <TableHead class="text-right text-gray-600">操作</TableHead>
+          <TableRow class="bg-muted">
+            <TableHead class="text-muted-foreground">名称</TableHead>
+            <TableHead class="text-muted-foreground">类型</TableHead>
+            <TableHead class="text-muted-foreground">Base URL</TableHead>
+            <TableHead class="text-muted-foreground">API Key</TableHead>
+            <TableHead class="text-muted-foreground">模型</TableHead>
+            <TableHead class="text-muted-foreground">状态</TableHead>
+            <TableHead class="text-right text-muted-foreground">操作</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -27,18 +28,24 @@
             <TableCell>
               <Badge :variant="p.api_type === 'openai' ? 'default' : 'secondary'">{{ p.api_type }}</Badge>
             </TableCell>
-            <TableCell class="text-gray-500">{{ p.base_url }}</TableCell>
-            <TableCell class="text-gray-500 font-mono text-xs">{{ p.api_key }}</TableCell>
+            <TableCell class="text-muted-foreground">{{ p.base_url }}</TableCell>
+            <TableCell class="text-muted-foreground font-mono text-xs">{{ p.api_key }}</TableCell>
+            <TableCell>
+              <div class="flex flex-wrap gap-1">
+                <Badge v-for="m in (p.models || [])" :key="m" variant="secondary" class="text-xs">{{ m }}</Badge>
+                <span v-if="!p.models?.length" class="text-muted-foreground text-xs">-</span>
+              </div>
+            </TableCell>
             <TableCell>
               <Badge :variant="p.is_active ? 'default' : 'secondary'">{{ p.is_active ? '启用' : '禁用' }}</Badge>
             </TableCell>
             <TableCell class="text-right">
-              <Button variant="ghost" size="sm" @click="openEdit(p)" class="text-gray-400 hover:text-blue-600 mr-2">编辑</Button>
-              <Button variant="ghost" size="sm" @click="confirmDelete(p)" class="text-gray-400 hover:text-red-600">删除</Button>
+              <Button variant="ghost" size="sm" @click="openEdit(p)" class="text-muted-foreground hover:text-primary mr-2">编辑</Button>
+              <Button variant="ghost" size="sm" @click="confirmDelete(p)" class="text-muted-foreground hover:text-destructive">删除</Button>
             </TableCell>
           </TableRow>
           <TableRow v-if="providers.length === 0">
-            <TableCell colspan="6" class="text-center text-gray-400 py-8">暂无供应商</TableCell>
+            <TableCell colspan="7" class="text-center text-muted-foreground py-8">暂无供应商</TableCell>
           </TableRow>
         </TableBody>
       </Table>
@@ -52,11 +59,11 @@
         </DialogHeader>
         <form @submit.prevent="handleSave" class="space-y-3">
           <div>
-            <Label class="block text-sm font-medium text-gray-700 mb-1">名称</Label>
+            <Label class="block text-sm font-medium text-foreground mb-1">名称</Label>
             <Input v-model="form.name" type="text" required />
           </div>
           <div>
-            <Label class="block text-sm font-medium text-gray-700 mb-1">类型</Label>
+            <Label class="block text-sm font-medium text-foreground mb-1">类型</Label>
             <Select v-model="form.api_type">
               <SelectTrigger>
                 <SelectValue placeholder="选择类型" />
@@ -68,16 +75,26 @@
             </Select>
           </div>
           <div>
-            <Label class="block text-sm font-medium text-gray-700 mb-1">Base URL</Label>
+            <Label class="block text-sm font-medium text-foreground mb-1">Base URL</Label>
             <Input v-model="form.base_url" type="url" required />
           </div>
           <div>
-            <Label class="block text-sm font-medium text-gray-700 mb-1">API Key {{ editingId ? '(留空不修改)' : '' }}</Label>
+            <Label class="block text-sm font-medium text-foreground mb-1">API Key {{ editingId ? '(留空不修改)' : '' }}</Label>
             <Input v-model="form.api_key" :type="editingId ? 'password' : 'text'" :required="!editingId" />
+          </div>
+          <div>
+            <Label class="block text-sm font-medium text-foreground mb-1">可用模型</Label>
+            <div class="flex flex-wrap gap-1.5 mb-1.5">
+              <Badge v-for="(m, i) in form.models" :key="i" variant="secondary" class="gap-1 pr-1">
+                {{ m }}
+                <Button type="button" variant="ghost" size="icon" class="h-4 w-4 rounded-full hover:bg-muted p-0 text-xs leading-none" @click="removeModel(i)">&times;</Button>
+              </Badge>
+            </div>
+            <Input v-model="modelInput" placeholder="输入模型名称，按 Enter 添加" @keydown.enter.prevent="addModel" />
           </div>
           <div class="flex items-center gap-2">
             <input v-model="form.is_active" type="checkbox" id="svc-active" class="rounded" />
-            <Label for="svc-active" class="text-sm text-gray-700">启用</Label>
+            <Label for="svc-active" class="text-sm text-foreground">启用</Label>
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" @click="dialogOpen = false">取消</Button>
@@ -122,10 +139,12 @@ interface Provider {
   api_type: string
   base_url: string
   api_key: string
+  models: string[]
   is_active: number
 }
 
-const DEFAULT_FORM = { name: '', api_type: 'openai', base_url: '', api_key: '', is_active: true }
+const DEFAULT_FORM = { name: '', api_type: 'openai', base_url: '', api_key: '', models: [] as string[], is_active: true }
+const modelInput = ref('')
 
 const providers = ref<Provider[]>([])
 const dialogOpen = ref(false)
@@ -143,23 +162,38 @@ async function loadProviders() {
   }
 }
 
+function addModel() {
+  const name = modelInput.value.trim()
+  if (name && !form.value.models.includes(name)) {
+    form.value.models.push(name)
+  }
+  modelInput.value = ''
+}
+
+function removeModel(index: number) {
+  form.value.models.splice(index, 1)
+}
+
 function openCreate() {
   editingId.value = null
-  form.value = { ...DEFAULT_FORM }
+  form.value = { name: '', api_type: 'openai', base_url: '', api_key: '', models: [], is_active: true }
+  modelInput.value = ''
   dialogOpen.value = true
 }
 
 function openEdit(p: Provider) {
   editingId.value = p.id
-  form.value = { name: p.name, api_type: p.api_type, base_url: p.base_url, api_key: '', is_active: !!p.is_active }
+  form.value = { name: p.name, api_type: p.api_type, base_url: p.base_url, api_key: '', models: [...(p.models || [])], is_active: !!p.is_active }
+  modelInput.value = ''
   dialogOpen.value = true
 }
 
-function buildPayload(): { name: string; api_type: string; base_url: string; api_key?: string; is_active: number } {
-  const payload: { name: string; api_type: string; base_url: string; api_key?: string; is_active: number } = {
+function buildPayload(): { name: string; api_type: string; base_url: string; api_key?: string; models: string[]; is_active: number } {
+  const payload: { name: string; api_type: string; base_url: string; api_key?: string; models: string[]; is_active: number } = {
     name: form.value.name,
     api_type: form.value.api_type,
     base_url: form.value.base_url,
+    models: form.value.models,
     is_active: form.value.is_active ? 1 : 0,
   }
   if (form.value.api_key) payload.api_key = form.value.api_key

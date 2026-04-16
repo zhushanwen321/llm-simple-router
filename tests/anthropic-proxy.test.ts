@@ -298,7 +298,7 @@ describe("Anthropic proxy", () => {
   // 4. 模型无映射 - 返回 404
   it("should return 404 when no model mapping exists", async () => {
     const { server: backendServer, port } = await createMockBackend(
-      (req, res) => {
+      (_req, res) => {
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify(ANTHROPIC_NON_STREAM_RESPONSE));
       }
@@ -343,7 +343,7 @@ describe("Anthropic proxy", () => {
   // 6. 后端错误透传
   it("should proxy backend error status code and body", async () => {
     const { server: backendServer, port } = await createMockBackend(
-      (req, res) => {
+      (_req, res) => {
         res.writeHead(429, { "Content-Type": "application/json" });
         res.end(
           JSON.stringify({
