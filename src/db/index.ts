@@ -10,7 +10,6 @@ const __dirname = dirname(__filename);
 const MIGRATIONS_DIR = join(__dirname, "migrations");
 
 type CountRow = { count: number };
-type AvgRow = { avg: number | null };
 
 export function initDatabase(dbPath: string): Database.Database {
   // 自动创建目录（非内存数据库时）
@@ -142,14 +141,6 @@ export interface RequestLog {
   client_response: string | null;
   is_retry: number;
   original_request_id: string | null;
-}
-
-export interface Stats {
-  totalRequests: number;
-  successRate: number;
-  avgLatency: number;
-  requestsByType: Record<string, number>;
-  recentRequests: number;
 }
 
 export interface MetricsRow {
@@ -300,14 +291,5 @@ export function deleteLogsBefore(db: Database.Database, beforeDate: string): num
 export { getMetricsSummary, getMetricsTimeseries } from "./metrics.js";
 export type { MetricsSummaryRow, MetricsTimeseriesRow, MetricsPeriod, MetricsMetric } from "./metrics.js";
 
-export function getStats(db: Database.Database): Stats {
-  const total = (db.prepare("SELECT COUNT(*) as count FROM request_logs").get() as CountRow).count;
-  const successCount = (db.prepare("SELECT COUNT(*) as count FROM request_logs WHERE status_code >= 200 AND status_code < 300").get() as CountRow).count;
-  const avgResult = db.prepare("SELECT AVG(latency_ms) as avg FROM request_logs WHERE latency_ms IS NOT NULL").get() as AvgRow;
-  const recentCount = (db.prepare("SELECT COUNT(*) as count FROM request_logs WHERE created_at >= datetime('now', '-1 day')").get() as CountRow).count;
-  const requestsByType: Record<string, number> = {};
-  for (const row of db.prepare("SELECT api_type, COUNT(*) as count FROM request_logs GROUP BY api_type").all() as { api_type: string; count: number }[]) {
-    requestsByType[row.api_type] = row.count;
-  }
-  return { totalRequests: total, successRate: total > 0 ? successCount / total : 0, avgLatency: avgResult?.avg ?? 0, requestsByType, recentRequests: recentCount };
-}
+export { getStats } from "./stats.js";
+export type { Stats } from "./stats.js";

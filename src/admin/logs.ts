@@ -10,6 +10,7 @@ interface LogQueryParams {
   limit?: string;
   api_type?: string;
   model?: string;
+  router_key_id?: string;
 }
 
 interface LogRoutesOptions {
@@ -28,6 +29,7 @@ export const adminLogRoutes: FastifyPluginCallback<LogRoutesOptions> = (app, opt
       limit,
       api_type: query.api_type || undefined,
       model: query.model || undefined,
+      router_key_id: query.router_key_id || undefined,
     });
     return reply.send({ ...result, page, limit });
   });
