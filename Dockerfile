@@ -12,6 +12,9 @@ RUN npm run build
 # 阶段1：构建后端
 FROM node:22-alpine AS builder
 
+# prepare 脚本需要 bash
+RUN apk add --no-cache bash
+
 WORKDIR /app
 
 COPY package*.json ./
@@ -24,6 +27,9 @@ RUN npm run build
 
 # 阶段2：运行时
 FROM node:22-alpine
+
+# prepare 脚本需要 bash
+RUN apk add --no-cache bash
 
 WORKDIR /app
 
