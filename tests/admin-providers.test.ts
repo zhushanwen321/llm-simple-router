@@ -19,6 +19,8 @@ function makeConfig() {
     LOG_LEVEL: "silent",
     TZ: "Asia/Shanghai",
     STREAM_TIMEOUT_MS: 5000,
+    RETRY_MAX_ATTEMPTS: 0,
+    RETRY_BASE_DELAY_MS: 0,
   };
 }
 
@@ -51,7 +53,8 @@ function setupTables(db: Database.Database) {
     CREATE TABLE IF NOT EXISTS request_logs (
       id TEXT PRIMARY KEY, api_type TEXT NOT NULL, model TEXT, provider_id TEXT,
       status_code INTEGER, latency_ms INTEGER, is_stream INTEGER, error_message TEXT, created_at TEXT NOT NULL,
-      request_body TEXT, response_body TEXT, client_request TEXT, upstream_request TEXT, upstream_response TEXT, client_response TEXT
+      request_body TEXT, response_body TEXT, client_request TEXT, upstream_request TEXT, upstream_response TEXT, client_response TEXT,
+      is_retry INTEGER NOT NULL DEFAULT 0, original_request_id TEXT
     );
   `);
 }

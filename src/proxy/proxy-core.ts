@@ -139,6 +139,7 @@ export function insertSuccessLog(
   respBody: string | null,
   upHdrs: Record<string, string>,
   cliHdrs: Record<string, string>,
+  isRetry: boolean = false, originalRequestId: string | null = null,
 ) {
   insertRequestLog(db, {
     id: logId, api_type: apiType, model, provider_id: provider.id,
@@ -148,6 +149,7 @@ export function insertSuccessLog(
     response_body: respBody, client_request: clientReq, upstream_request: upstreamReq,
     upstream_response: JSON.stringify({ statusCode: status, headers: upHdrs, body: respBody }),
     client_response: JSON.stringify({ statusCode: status, headers: cliHdrs, body: respBody }),
+    is_retry: isRetry ? 1 : 0, original_request_id: originalRequestId,
   });
 }
 

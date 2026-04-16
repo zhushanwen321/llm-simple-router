@@ -35,13 +35,14 @@ describe("initDatabase", () => {
       .prepare("SELECT name FROM migrations")
       .all() as { name: string }[];
 
-    expect(rows.length).toBe(6);
+    expect(rows.length).toBe(7);
     expect(rows[0].name).toBe("001_init.sql");
     expect(rows[1].name).toBe("002_add_request_response_body.sql");
     expect(rows[2].name).toBe("003_add_full_request_chain_log.sql");
     expect(rows[3].name).toBe("004_rename_to_providers.sql");
     expect(rows[4].name).toBe("005_add_api_key_preview.sql");
     expect(rows[5].name).toBe("006_create_request_metrics.sql");
+    expect(rows[6].name).toBe("007_add_retry_fields.sql");
   });
 
   it("should be idempotent - running twice does not error", () => {

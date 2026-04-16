@@ -24,6 +24,8 @@ function makeTestConfig() {
     LOG_LEVEL: "silent",
     TZ: "Asia/Shanghai",
     STREAM_TIMEOUT_MS: 5000,
+    RETRY_MAX_ATTEMPTS: 0,
+    RETRY_BASE_DELAY_MS: 0,
   };
 }
 
@@ -68,7 +70,9 @@ function createTestDb(): Database.Database {
       client_request TEXT,
       upstream_request TEXT,
       upstream_response TEXT,
-      client_response TEXT
+      client_response TEXT,
+      is_retry INTEGER NOT NULL DEFAULT 0,
+      original_request_id TEXT
     );
   `);
   return db;

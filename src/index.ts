@@ -49,11 +49,15 @@ export async function buildApp(
     db,
     encryptionKey: config.ENCRYPTION_KEY,
     streamTimeoutMs: config.STREAM_TIMEOUT_MS,
+    retryMaxAttempts: config.RETRY_MAX_ATTEMPTS,
+    retryBaseDelayMs: config.RETRY_BASE_DELAY_MS,
   });
   app.register(anthropicProxy, {
     db,
     encryptionKey: config.ENCRYPTION_KEY,
     streamTimeoutMs: config.STREAM_TIMEOUT_MS,
+    retryMaxAttempts: config.RETRY_MAX_ATTEMPTS,
+    retryBaseDelayMs: config.RETRY_BASE_DELAY_MS,
   });
 
   app.register(adminRoutes, {
