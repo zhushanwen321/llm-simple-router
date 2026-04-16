@@ -27,6 +27,17 @@
           </SelectItem>
         </SelectContent>
       </Select>
+      <Select v-model="routerKeyFilter">
+        <SelectTrigger class="w-48">
+          <SelectValue placeholder="全部密钥" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">全部密钥</SelectItem>
+          <SelectItem v-for="rk in routerKeys" :key="rk.id" :value="rk.id">
+            {{ rk.name }}
+          </SelectItem>
+        </SelectContent>
+      </Select>
     </div>
 
     <!-- 加载 & 空状态 -->
@@ -117,6 +128,7 @@
 </template>
 
 <script setup lang="ts">
+/* eslint-disable max-lines */
 import { ref, computed, watch, onMounted } from 'vue'
 import {
   Chart as ChartJS,
@@ -151,7 +163,9 @@ const periods = [
 
 const period = ref('24h')
 const modelFilter = ref('all')
+const routerKeyFilter = ref('all')
 const loading = ref(false)
+const routerKeys = ref<{ id: string; name: string }[]>([])
 const modelOptions = ref<string[]>([])
 
 const ttftData = ref<ChartData<'line'> | null>(null)
@@ -205,14 +219,16 @@ function stackedAreaOptions(): ChartOptions<'line'> {
 }
 
 function buildTimeseriesParams(metric: string) {
-  const params: { period: string; metric: string; backend_model?: string } = { period: period.value, metric }
+  const params: { period: string; metric: string; backend_model?: string; router_key_id?: string } = { period: period.value, metric }
   if (modelFilter.value !== 'all') params.backend_model = modelFilter.value
+  if (routerKeyFilter.value !== 'all') params.router_key_id = routerKeyFilter.value
   return params
 }
 
 function buildSummaryParams() {
-  const params: { period: string; backend_model?: string } = { period: period.value }
+  const params: { period: string; backend_model?: string; router_key_id?: string } = { period: period.value }
   if (modelFilter.value !== 'all') params.backend_model = modelFilter.value
+  if (routerKeyFilter.value !== 'all') params.router_key_id = routerKeyFilter.value
   return params
 }
 
@@ -305,6 +321,20 @@ async function fetchMetrics() {
   }
 }
 
-watch([period, modelFilter], () => fetchMetrics())
-onMounted(() => fetchMetrics())
+watch([period, modelFilter, routerKeyFilter], () => fetchMetrics())
+
+async function loadRouterKeys() {
+  try {
+    const res = await api.getRouterKeys()
+    routerKeys.value = res.data
+  // eslint-disable-next-line taste/no-silent-catch
+  } catch (e) {
+    console.error('Failed to load router keys:', e)
+  }
+}
+
+onMounted(() => {
+  loadRouterKeys()
+  fetchMetrics()
+})
 </script>

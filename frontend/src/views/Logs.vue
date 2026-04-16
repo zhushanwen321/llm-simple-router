@@ -14,6 +14,17 @@
             <SelectItem value="anthropic">Anthropic</SelectItem>
           </SelectContent>
         </Select>
+        <Select v-model="filterRouterKey" @update:model-value="handleFilterChange">
+          <SelectTrigger class="w-48">
+            <SelectValue placeholder="全部密钥" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">全部密钥</SelectItem>
+            <SelectItem v-for="rk in routerKeys" :key="rk.id" :value="rk.id">
+              {{ rk.name }}
+            </SelectItem>
+          </SelectContent>
+        </Select>
         <Button
           variant="outline"
           class="text-red-600 border-red-300 hover:bg-red-50"
@@ -197,6 +208,8 @@ const total = ref(0)
 const page = ref(1)
 const PAGE_SIZE = 20
 const filterType = ref('all')
+const filterRouterKey = ref('all')
+const routerKeys = ref<{ id: string; name: string }[]>([])
 const showCleanup = ref(false)
 const cleanupDays = ref(30) // eslint-disable-line no-magic-numbers
 const showDetail = ref(false)
@@ -232,8 +245,9 @@ function formatTime(iso: string): string {
 
 async function loadLogs() {
   try {
-    const params: { page: number; limit: number; api_type?: string } = { page: page.value, limit: PAGE_SIZE }
+    const params: { page: number; limit: number; api_type?: string; router_key_id?: string } = { page: page.value, limit: PAGE_SIZE }
     if (filterType.value && filterType.value !== 'all') params.api_type = filterType.value
+    if (filterRouterKey.value && filterRouterKey.value !== 'all') params.router_key_id = filterRouterKey.value
     const res = await api.getLogs(params)
     logs.value = res.data.data
     total.value = res.data.total
@@ -272,5 +286,18 @@ async function handleCleanup() {
   }
 }
 
-onMounted(loadLogs)
+async function loadRouterKeys() {
+  try {
+    const res = await api.getRouterKeys()
+    routerKeys.value = res.data
+  // eslint-disable-next-line taste/no-silent-catch
+  } catch (e) {
+    console.error('Failed to load router keys:', e)
+  }
+}
+
+onMounted(() => {
+  loadRouterKeys()
+  loadLogs()
+})
 </script>

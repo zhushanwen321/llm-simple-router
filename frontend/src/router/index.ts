@@ -33,6 +33,12 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: '/admin/router-keys',
+      name: 'router-keys',
+      component: () => import('@/views/RouterKeys.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
       path: '/admin/logs',
       name: 'logs',
       component: () => import('@/views/Logs.vue'),
