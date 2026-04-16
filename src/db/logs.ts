@@ -23,6 +23,12 @@ export interface RequestLog {
   original_request_id: string | null;
 }
 
+/** 列表查询扩展字段：JOIN request_metrics + providers 获得 */
+export interface RequestLogListRow extends RequestLog {
+  backend_model: string | null;
+  provider_name: string | null;
+}
+
 export interface MetricsRow {
   id: string;
   request_log_id: string;
@@ -104,31 +110,36 @@ export function getRequestLogs(
     model?: string;
     router_key_id?: string;
   },
-): { data: RequestLog[]; total: number } {
+): { data: RequestLogListRow[]; total: number } {
   let where = "1=1";
   const params: unknown[] = [];
   if (options.api_type) {
-    where += " AND api_type = ?";
+    where += " AND rl.api_type = ?";
     params.push(options.api_type);
   }
   if (options.model) {
-    where += " AND model LIKE ?";
+    where += " AND rl.model LIKE ?";
     params.push(`%${options.model}%`);
   }
   if (options.router_key_id) {
-    where += " AND router_key_id = ?";
+    where += " AND rl.router_key_id = ?";
     params.push(options.router_key_id);
   }
   const total = (
-    db.prepare(`SELECT COUNT(*) as count FROM request_logs WHERE ${where}`).get(...params) as CountRow
+    db.prepare(`SELECT COUNT(*) as count FROM request_logs rl WHERE ${where}`).get(...params) as CountRow
   ).count;
   const offset = (options.page - 1) * options.limit;
   const data = db
     .prepare(
-      `SELECT id, api_type, model, provider_id, status_code, latency_ms, is_stream, error_message, created_at, is_retry, original_request_id
-       FROM request_logs WHERE ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+      `SELECT rl.id, rl.api_type, rl.model, rl.provider_id, rl.status_code, rl.latency_ms,
+              rl.is_stream, rl.error_message, rl.created_at, rl.is_retry, rl.original_request_id,
+              rm.backend_model, COALESCE(p.name, rl.provider_id) AS provider_name
+       FROM request_logs rl
+       LEFT JOIN request_metrics rm ON rm.request_log_id = rl.id
+       LEFT JOIN providers p ON p.id = rl.provider_id
+       WHERE ${where} ORDER BY rl.created_at DESC LIMIT ? OFFSET ?`,
     )
-    .all(...params, options.limit, offset) as RequestLog[];
+    .all(...params, options.limit, offset) as RequestLogListRow[];
   return { data, total };
 }
 

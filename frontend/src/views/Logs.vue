@@ -43,6 +43,7 @@
             <TableHead class="text-muted-foreground">时间</TableHead>
             <TableHead class="text-muted-foreground">类型</TableHead>
             <TableHead class="text-muted-foreground">模型</TableHead>
+            <TableHead class="text-muted-foreground">实际转发</TableHead>
             <TableHead class="text-muted-foreground">状态码</TableHead>
             <TableHead class="text-muted-foreground">延迟</TableHead>
             <TableHead class="text-muted-foreground">流式</TableHead>
@@ -59,6 +60,14 @@
               <Badge :variant="log.api_type === 'openai' ? 'default' : 'secondary'">{{ log.api_type }}</Badge>
             </TableCell>
             <TableCell class="font-mono text-xs">{{ log.model || '-' }}</TableCell>
+            <TableCell class="text-xs">
+              <template v-if="log.backend_model || log.provider_name">
+                <span class="font-mono">{{ log.backend_model || '-' }}</span>
+                <span class="text-muted-foreground"> @ </span>
+                <Badge variant="outline" class="text-[10px] px-1 py-0">{{ log.provider_name || log.provider_id || '-' }}</Badge>
+              </template>
+              <span v-else class="text-muted-foreground">-</span>
+            </TableCell>
             <TableCell>
               <Badge :variant="(log.status_code ?? 0) < 400 ? 'default' : 'destructive'">{{ log.status_code || '-' }}</Badge>
             </TableCell>
@@ -192,6 +201,7 @@ interface LogEntry {
   id: string
   api_type: string
   model: string | null
+  provider_id: string | null
   status_code: number | null
   latency_ms: number | null
   is_stream: number
@@ -205,6 +215,8 @@ interface LogEntry {
   client_response: string | null
   is_retry: number
   original_request_id: string | null
+  backend_model: string | null
+  provider_name: string | null
 }
 
 const logs = ref<LogEntry[]>([])
