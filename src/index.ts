@@ -77,7 +77,6 @@ export async function buildApp(
       root: frontendDist,
       prefix: "/admin/",
       wildcard: false,
-      decorateReply: false,
     });
 
     // SPA fallback: /admin/ 下非 API 路径返回 index.html
