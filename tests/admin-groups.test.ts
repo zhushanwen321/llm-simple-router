@@ -266,4 +266,106 @@ describe("Mapping Group CRUD", () => {
     });
     expect(res.statusCode).toBe(401);
   });
+
+  it("POST creates round-robin group", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/api/mapping-groups",
+      headers: { cookie, "content-type": "application/json" },
+      payload: {
+        client_model: "gpt-4-rr",
+        strategy: "round-robin",
+        rule: JSON.stringify({
+          targets: [
+            { backend_model: "gpt-4-turbo", provider_id: providerId },
+            { backend_model: "gpt-4o", provider_id: providerId },
+          ],
+        }),
+      },
+    });
+    expect(res.statusCode).toBe(201);
+  });
+
+  it("POST creates random group", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/api/mapping-groups",
+      headers: { cookie, "content-type": "application/json" },
+      payload: {
+        client_model: "gpt-4-rand",
+        strategy: "random",
+        rule: JSON.stringify({
+          targets: [
+            { backend_model: "gpt-4-turbo", provider_id: providerId },
+          ],
+        }),
+      },
+    });
+    expect(res.statusCode).toBe(201);
+  });
+
+  it("POST creates failover group", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/api/mapping-groups",
+      headers: { cookie, "content-type": "application/json" },
+      payload: {
+        client_model: "gpt-4-fo",
+        strategy: "failover",
+        rule: JSON.stringify({
+          targets: [
+            { backend_model: "gpt-4-turbo", provider_id: providerId },
+            { backend_model: "gpt-4o", provider_id: providerId },
+          ],
+        }),
+      },
+    });
+    expect(res.statusCode).toBe(201);
+  });
+
+  it("POST failover with single target returns 400", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/api/mapping-groups",
+      headers: { cookie, "content-type": "application/json" },
+      payload: {
+        client_model: "gpt-4-fo2",
+        strategy: "failover",
+        rule: JSON.stringify({
+          targets: [
+            { backend_model: "gpt-4-turbo", provider_id: providerId },
+          ],
+        }),
+      },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("POST round-robin with empty targets returns 400", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/api/mapping-groups",
+      headers: { cookie, "content-type": "application/json" },
+      payload: {
+        client_model: "gpt-4-rr2",
+        strategy: "round-robin",
+        rule: JSON.stringify({ targets: [] }),
+      },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("POST with unknown strategy returns 400", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/api/mapping-groups",
+      headers: { cookie, "content-type": "application/json" },
+      payload: {
+        client_model: "gpt-4-unk",
+        strategy: "unknown-strategy",
+        rule: JSON.stringify({ targets: [] }),
+      },
+    });
+    expect(res.statusCode).toBe(400);
+  });
 });
