@@ -1,0 +1,4 @@
+ALTER TABLE retry_rules ADD COLUMN retry_strategy TEXT NOT NULL DEFAULT 'exponential';
+ALTER TABLE retry_rules ADD COLUMN retry_delay_ms INTEGER NOT NULL DEFAULT 5000;
+ALTER TABLE retry_rules ADD COLUMN max_retries INTEGER NOT NULL DEFAULT 10;
+ALTER TABLE retry_rules ADD COLUMN max_delay_ms INTEGER NOT NULL DEFAULT 60000;

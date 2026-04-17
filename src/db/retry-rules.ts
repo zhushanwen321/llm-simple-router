@@ -9,9 +9,13 @@ export interface RetryRule {
   body_pattern: string;
   is_active: number;
   created_at: string;
+  retry_strategy: "fixed" | "exponential";
+  retry_delay_ms: number;
+  max_retries: number;
+  max_delay_ms: number;
 }
 
-const RETRY_FIELDS = new Set(["name", "status_code", "body_pattern", "is_active"]);
+const RETRY_FIELDS = new Set(["name", "status_code", "body_pattern", "is_active", "retry_strategy", "retry_delay_ms", "max_retries", "max_delay_ms"]);
 
 export function getActiveRetryRules(db: Database.Database): RetryRule[] {
   return db
@@ -27,21 +31,25 @@ export function getAllRetryRules(db: Database.Database): RetryRule[] {
 
 export function createRetryRule(
   db: Database.Database,
-  rule: { name: string; status_code: number; body_pattern: string; is_active?: number },
+  rule: {
+    name: string; status_code: number; body_pattern: string; is_active?: number;
+    retry_strategy?: string; retry_delay_ms?: number; max_retries?: number; max_delay_ms?: number;
+  },
 ): string {
   const id = randomUUID();
   const now = new Date().toISOString();
   db.prepare(
-    `INSERT INTO retry_rules (id, name, status_code, body_pattern, is_active, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-  ).run(id, rule.name, rule.status_code, rule.body_pattern, rule.is_active ?? 1, now);
+    `INSERT INTO retry_rules (id, name, status_code, body_pattern, is_active, created_at, retry_strategy, retry_delay_ms, max_retries, max_delay_ms)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(id, rule.name, rule.status_code, rule.body_pattern, rule.is_active ?? 1, now,
+    rule.retry_strategy ?? "exponential", rule.retry_delay_ms ?? 5000, rule.max_retries ?? 10, rule.max_delay_ms ?? 60000);
   return id;
 }
 
 export function updateRetryRule(
   db: Database.Database,
   id: string,
-  fields: Partial<Pick<RetryRule, "name" | "status_code" | "body_pattern" | "is_active">>,
+  fields: Partial<Pick<RetryRule, "name" | "status_code" | "body_pattern" | "is_active" | "retry_strategy" | "retry_delay_ms" | "max_retries" | "max_delay_ms">>,
 ): void {
   buildUpdateQuery(db, "retry_rules", id, fields, RETRY_FIELDS);
 }
