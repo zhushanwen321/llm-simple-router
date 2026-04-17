@@ -80,12 +80,9 @@
                 :key="model"
                 class="flex items-center gap-2 cursor-pointer text-sm font-normal"
               >
-                <input
-                  type="checkbox"
-                  :value="model"
+                <Checkbox
                   :checked="form.allowed_models.includes(model)"
-                  class="rounded"
-                  @change="toggleModel(model)"
+                  @update:checked="(val: boolean) => { if (val && !form.allowed_models.includes(model)) form.allowed_models.push(model); else if (!val) { const idx = form.allowed_models.indexOf(model); if (idx >= 0) form.allowed_models.splice(idx, 1) } }"
                 />
                 <span class="font-mono text-xs">{{ model }}</span>
               </Label>
@@ -101,7 +98,7 @@
             </div>
           </div>
           <div v-if="editingId" class="flex items-center gap-2">
-            <input v-model="form.is_active" type="checkbox" id="key-active" class="rounded" />
+            <Checkbox :checked="form.is_active" @update:checked="(val: boolean) => form.is_active = val" id="key-active" />
             <Label for="key-active" class="text-sm text-foreground">启用</Label>
           </div>
           <DialogFooter>
@@ -156,6 +153,7 @@ import { Badge } from '@/components/ui/badge'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from '@/components/ui/alert-dialog'
+import { Checkbox } from '@/components/ui/checkbox'
 
 interface RouterKey {
   id: string
@@ -184,15 +182,6 @@ const copiedId = ref('')
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleString('zh-CN')
-}
-
-function toggleModel(model: string) {
-  const idx = form.value.allowed_models.indexOf(model)
-  if (idx >= 0) {
-    form.value.allowed_models.splice(idx, 1)
-  } else {
-    form.value.allowed_models.push(model)
-  }
 }
 
 function removeModel(model: string) {

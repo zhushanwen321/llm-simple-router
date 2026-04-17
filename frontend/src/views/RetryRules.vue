@@ -61,7 +61,7 @@
             <Input v-model="form.body_pattern" type="text" placeholder="正则表达式，例如 .*rate_limit.*" required />
           </div>
           <div class="flex items-center gap-2">
-            <input v-model="form.is_active" type="checkbox" id="rule-active" class="rounded" />
+            <Checkbox :checked="form.is_active" @update:checked="(val: boolean) => form.is_active = val" id="rule-active" />
             <Label for="rule-active" class="text-sm text-foreground">启用</Label>
           </div>
           <DialogFooter>
@@ -99,6 +99,7 @@ import { Badge } from '@/components/ui/badge'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from '@/components/ui/alert-dialog'
+import { Checkbox } from '@/components/ui/checkbox'
 
 interface RetryRule {
   id: string
