@@ -13,6 +13,8 @@ import {
 import { STRATEGY_NAMES } from "../proxy/strategy/types.js";
 import { HTTP_BAD_REQUEST, HTTP_CREATED, HTTP_CONFLICT } from "./constants.js";
 
+const MIN_FAILOVER_TARGETS = 2;
+
 const CreateGroupSchema = Type.Object({
   client_model: Type.String({ minLength: 1 }),
   strategy: Type.String({ minLength: 1 }),
@@ -29,7 +31,9 @@ interface GroupRoutesOptions {
   db: Database.Database;
 }
 
-interface ScheduledRuleDefault {
+type ScheduledRuleDefault = TargetInput;
+
+interface TargetInput {
   backend_model?: string;
   provider_id?: string;
 }
@@ -37,10 +41,7 @@ interface ScheduledRuleDefault {
 interface ScheduledRuleWindow {
   start: string;
   end: string;
-  target: {
-    backend_model: string;
-    provider_id: string;
-  };
+  target: TargetInput;
 }
 
 interface ScheduledRule {
@@ -53,6 +54,11 @@ async function validateRule(
   strategy: string,
   ruleJson: string
 ): Promise<string | undefined> {
+  const VALID_STRATEGIES: Set<string> = new Set(Object.values(STRATEGY_NAMES));
+  if (!VALID_STRATEGIES.has(strategy)) {
+    return `Unknown strategy '${strategy}'. Valid: ${[...VALID_STRATEGIES].join(", ")}`;
+  }
+
   let rule: unknown;
   try {
     rule = JSON.parse(ruleJson);
@@ -83,6 +89,27 @@ async function validateRule(
         if (!p) {
           return `window[${i}] provider_id '${w.target.provider_id}' not found`;
         }
+      }
+    }
+  }
+
+  if (strategy === STRATEGY_NAMES.ROUND_ROBIN || strategy === STRATEGY_NAMES.RANDOM || strategy === STRATEGY_NAMES.FAILOVER) {
+    const r = rule as { targets?: unknown[] };
+    if (!Array.isArray(r.targets) || r.targets.length === 0) {
+      return "rule.targets must be a non-empty array";
+    }
+    const minTargets = strategy === STRATEGY_NAMES.FAILOVER ? MIN_FAILOVER_TARGETS : 1;
+    if (r.targets.length < minTargets) {
+      return `strategy '${strategy}' requires at least ${minTargets} target(s)`;
+    }
+    for (let i = 0; i < r.targets.length; i++) {
+      const t = r.targets[i] as TargetInput;
+      if (!t.backend_model || !t.provider_id) {
+        return `targets[${i}] missing backend_model or provider_id`;
+      }
+      const p = getProviderById(db, t.provider_id);
+      if (!p) {
+        return `targets[${i}] provider_id '${t.provider_id}' not found`;
       }
     }
   }

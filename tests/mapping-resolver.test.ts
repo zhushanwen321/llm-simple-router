@@ -61,4 +61,64 @@ describe("resolveMapping", () => {
     const result = resolveMapping(db, "my-model", { now: new Date() });
     expect(result).toBeNull();
   });
+
+  it("resolves round-robin strategy", () => {
+    const rule = JSON.stringify({
+      targets: [
+        { backend_model: "gpt-4", provider_id: "p1" },
+        { backend_model: "claude-3", provider_id: "p2" },
+      ],
+    });
+    db.prepare("INSERT INTO mapping_groups (id, client_model, strategy, rule, created_at) VALUES (?, ?, ?, ?, ?)")
+      .run("g1", "my-model", "round-robin", rule, new Date().toISOString());
+
+    const result = resolveMapping(db, "my-model", { now: new Date() });
+    expect(result).toEqual({ backend_model: "gpt-4", provider_id: "p1" });
+  });
+
+  it("resolves random strategy", () => {
+    const rule = JSON.stringify({
+      targets: [
+        { backend_model: "gpt-4", provider_id: "p1" },
+        { backend_model: "claude-3", provider_id: "p2" },
+      ],
+    });
+    db.prepare("INSERT INTO mapping_groups (id, client_model, strategy, rule, created_at) VALUES (?, ?, ?, ?, ?)")
+      .run("g1", "my-model", "random", rule, new Date().toISOString());
+
+    const result = resolveMapping(db, "my-model", { now: new Date() });
+    expect(result?.backend_model).toBeDefined();
+    expect(result?.provider_id).toBeDefined();
+  });
+
+  it("resolves failover strategy", () => {
+    const rule = JSON.stringify({
+      targets: [
+        { backend_model: "gpt-4", provider_id: "p1" },
+        { backend_model: "claude-3", provider_id: "p2" },
+      ],
+    });
+    db.prepare("INSERT INTO mapping_groups (id, client_model, strategy, rule, created_at) VALUES (?, ?, ?, ?, ?)")
+      .run("g1", "my-model", "failover", rule, new Date().toISOString());
+
+    const result = resolveMapping(db, "my-model", { now: new Date() });
+    expect(result).toEqual({ backend_model: "gpt-4", provider_id: "p1" });
+  });
+
+  it("resolves failover with excludeTargets", () => {
+    const rule = JSON.stringify({
+      targets: [
+        { backend_model: "gpt-4", provider_id: "p1" },
+        { backend_model: "claude-3", provider_id: "p2" },
+      ],
+    });
+    db.prepare("INSERT INTO mapping_groups (id, client_model, strategy, rule, created_at) VALUES (?, ?, ?, ?, ?)")
+      .run("g1", "my-model", "failover", rule, new Date().toISOString());
+
+    const result = resolveMapping(db, "my-model", {
+      now: new Date(),
+      excludeTargets: [{ backend_model: "gpt-4", provider_id: "p1" }],
+    });
+    expect(result).toEqual({ backend_model: "claude-3", provider_id: "p2" });
+  });
 });

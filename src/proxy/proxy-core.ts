@@ -11,9 +11,11 @@ import { getSetting } from "../db/settings.js";
 import { SSEMetricsTransform } from "../metrics/sse-metrics-transform.js";
 import { MetricsExtractor } from "../metrics/metrics-extractor.js";
 import type { MetricsResult } from "../metrics/metrics-extractor.js";
+import { getMappingGroup } from "../db/index.js";
 import { resolveMapping } from "./mapping-resolver.js";
 import { retryableCall, buildRetryConfig } from "./retry.js";
 import type { RetryRuleMatcher } from "./retry-rules.js";
+import type { Target } from "./strategy/types.js";
 
 // ---------- Types ----------
 
@@ -53,6 +55,8 @@ export interface GetProxyResult {
 // ---------- Constants ----------
 
 export const UPSTREAM_SUCCESS = 200;
+// failover 判断上游请求失败的 HTTP 状态码阈值
+const FAILOVER_FAIL_THRESHOLD = 400;
 const HTTPS_DEFAULT_PORT = 443;
 const HTTP_DEFAULT_PORT = 80;
 const UPSTREAM_BAD_GATEWAY = 502;
@@ -396,6 +400,9 @@ const HTTP_BAD_GATEWAY = 502;
 /**
  * 共享 POST handler，参数化 apiType/errorFormat/upstreamPath 等差异，
  * 消除 openai.ts / anthropic.ts 中约 120 行重复代码。
+ *
+ * 当分组策略为 failover 时，在 while 循环中依次尝试不同 target，
+ * 直到成功（或 headers 已发送）才返回。
  */
 export async function handleProxyPost(
   request: FastifyRequest,
@@ -411,150 +418,177 @@ export async function handleProxyPost(
   const { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher } = deps;
 
   request.raw.socket.on("error", (err) => request.log.debug({ err }, "client socket error"));
-  const startTime = Date.now();
-  const logId = randomUUID();
-  const routerKeyId = request.routerKey?.id ?? null;
-  const body = request.body as Record<string, unknown>;
-  const originalBody = JSON.parse(JSON.stringify(body));
-  const clientModel = (body.model as string) || "unknown";
-  const resolved = resolveMapping(db, clientModel, { now: new Date() });
-  if (!resolved) {
-    const e = errors.modelNotFound(clientModel);
-    return reply.status(e.statusCode).send(e.body);
-  }
+  const clientModel = ((request.body as Record<string, unknown>).model as string) || "unknown";
 
-  // 白名单校验
-  const allowedModels = request.routerKey?.allowed_models;
-  if (allowedModels) {
+  // 查询分组策略（只查一次）
+  const group = getMappingGroup(db, clientModel);
+  const isFailover = group?.strategy === "failover";
+  const excludeTargets: Target[] = [];
+
+  while (true) {
+    const startTime = Date.now();
+    const logId = randomUUID();
+    const routerKeyId = request.routerKey?.id ?? null;
+    const body = request.body as Record<string, unknown>;
+    const originalBody = JSON.parse(JSON.stringify(body));
+
+    const resolved = resolveMapping(db, clientModel, { now: new Date(), excludeTargets });
+    if (!resolved) {
+      if (isFailover && excludeTargets.length > 0) {
+        // 所有 failover target 都已尝试，reply 已在上一轮发送
+        return reply;
+      }
+      const e = errors.modelNotFound(clientModel);
+      return reply.status(e.statusCode).send(e.body);
+    }
+
+    // 白名单校验（只在首次循环检查，allowed_models 基于 clientModel 而非 backend_model）
+    if (excludeTargets.length === 0) {
+      const allowedModels = request.routerKey?.allowed_models;
+      if (allowedModels) {
+        try {
+          const models: string[] = JSON.parse(allowedModels);
+          if (models.length > 0 && !models.includes(resolved.backend_model)) {
+            const e = errors.modelNotAllowed(resolved.backend_model);
+            return reply.status(e.statusCode).send(e.body);
+          }
+        } catch { request.log.warn("Invalid allowed_models JSON, allowing all models"); }
+      }
+    }
+
+    const provider = getProviderById(db, resolved.provider_id);
+    if (!provider || !provider.is_active) {
+      const e = errors.providerUnavailable();
+      return reply.status(e.statusCode).send(e.body);
+    }
+    if (provider.api_type !== apiType) {
+      const e = errors.providerTypeMismatch();
+      return reply.status(e.statusCode).send(e.body);
+    }
+
+    body.model = resolved.backend_model;
+    const apiKey = decrypt(provider.api_key, getSetting(db, "encryption_key")!);
+    const isStream = body.stream === true;
+
+    // 允许调用方在发送代理请求前修改 body（如 openai 的 stream_options 注入）
+    options?.beforeSendProxy?.(body, isStream);
+
+    const reqBodyStr = JSON.stringify(body);
+    const cliHdrs: RawHeaders = request.headers as RawHeaders;
+    const clientReq = JSON.stringify({ headers: cliHdrs, body: originalBody });
+    const retryConfig = buildRetryConfig(retryMaxAttempts, retryBaseDelayMs, matcher);
+    const upstreamReqBase = JSON.stringify({ url: `${provider.base_url}${upstreamPath}`, headers: buildUpstreamHeaders(cliHdrs, apiKey, Buffer.byteLength(reqBodyStr)), body: reqBodyStr });
+
     try {
-      const models: string[] = JSON.parse(allowedModels);
-      if (models.length > 0 && !models.includes(resolved.backend_model)) {
-        const e = errors.modelNotAllowed(resolved.backend_model);
-        return reply.status(e.statusCode).send(e.body);
+      const { result: r, attempts } = isStream
+        ? await retryableCall(
+            () => {
+              const metricsTransform = new SSEMetricsTransform(apiType, startTime);
+              return proxyStream(provider, apiKey, body, cliHdrs, reply, streamTimeoutMs, upstreamPath, metricsTransform);
+            },
+            retryConfig,
+            reply,
+          )
+        : await retryableCall(
+            () => proxyNonStream(provider, apiKey, body, cliHdrs, upstreamPath),
+            retryConfig,
+            reply,
+          );
+
+      // 记录所有尝试的日志
+      let lastSuccessLogId = logId;
+      for (const attempt of attempts) {
+        const isOriginal = attempt.attemptIndex === 0;
+        const attemptLogId = isOriginal ? logId : randomUUID();
+
+        if (attempt.error) {
+          insertRequestLog(db, {
+            id: attemptLogId, api_type: apiType, model: clientModel, provider_id: provider.id,
+            status_code: HTTP_BAD_GATEWAY, latency_ms: attempt.latencyMs,
+            is_stream: isStream ? 1 : 0, error_message: attempt.error,
+            created_at: new Date().toISOString(), request_body: reqBodyStr,
+            client_request: clientReq, upstream_request: upstreamReqBase,
+            is_retry: isOriginal ? 0 : 1, original_request_id: isOriginal ? null : logId,
+            router_key_id: routerKeyId,
+          });
+        } else if (attempt.statusCode !== UPSTREAM_SUCCESS) {
+          insertRequestLog(db, {
+            id: attemptLogId, api_type: apiType, model: clientModel, provider_id: provider.id,
+            status_code: attempt.statusCode, latency_ms: attempt.latencyMs,
+            is_stream: isStream ? 1 : 0, error_message: null,
+            created_at: new Date().toISOString(), request_body: reqBodyStr,
+            response_body: attempt.responseBody, client_request: clientReq, upstream_request: upstreamReqBase,
+            upstream_response: JSON.stringify({ statusCode: attempt.statusCode, body: attempt.responseBody }),
+            client_response: JSON.stringify({ statusCode: attempt.statusCode, body: attempt.responseBody }),
+            is_retry: isOriginal ? 0 : 1, original_request_id: isOriginal ? null : logId,
+            router_key_id: routerKeyId,
+          });
+        } else {
+          const h = isStream
+            ? ((r as StreamProxyResult).upstreamResponseHeaders ?? {})
+            : ((r as ProxyResult).headers);
+          insertSuccessLog(db, apiType, attemptLogId, clientModel, provider, isStream, startTime,
+            reqBodyStr, clientReq, upstreamReqBase, r.statusCode, attempt.responseBody, h, h,
+            !isOriginal, isOriginal ? null : logId, routerKeyId);
+          lastSuccessLogId = attemptLogId;
+        }
       }
-    } catch { request.log.warn("Invalid allowed_models JSON, allowing all models"); }
-  }
 
-  const provider = getProviderById(db, resolved.provider_id);
-  if (!provider || !provider.is_active) {
-    const e = errors.providerUnavailable();
-    return reply.status(e.statusCode).send(e.body);
-  }
-  if (provider.api_type !== apiType) {
-    const e = errors.providerTypeMismatch();
-    return reply.status(e.statusCode).send(e.body);
-  }
-
-  body.model = resolved.backend_model;
-  const apiKey = decrypt(provider.api_key, getSetting(db, "encryption_key")!);
-  const isStream = body.stream === true;
-
-  // 允许调用方在发送代理请求前修改 body（如 openai 的 stream_options 注入）
-  options?.beforeSendProxy?.(body, isStream);
-
-  const reqBodyStr = JSON.stringify(body);
-  const cliHdrs: RawHeaders = request.headers as RawHeaders;
-  const clientReq = JSON.stringify({ headers: cliHdrs, body: originalBody });
-
-  const retryConfig = buildRetryConfig(retryMaxAttempts, retryBaseDelayMs, matcher);
-  const upstreamReqBase = JSON.stringify({ url: `${provider.base_url}${upstreamPath}`, headers: buildUpstreamHeaders(cliHdrs, apiKey, Buffer.byteLength(reqBodyStr)), body: reqBodyStr });
-
-  try {
-    const { result: r, attempts } = isStream
-      ? await retryableCall(
-          () => {
-            const metricsTransform = new SSEMetricsTransform(apiType, startTime);
-            return proxyStream(provider, apiKey, body, cliHdrs, reply, streamTimeoutMs, upstreamPath, metricsTransform);
-          },
-          retryConfig,
-          reply,
-        )
-      : await retryableCall(
-          () => proxyNonStream(provider, apiKey, body, cliHdrs, upstreamPath),
-          retryConfig,
-          reply,
-        );
-
-    // 记录所有尝试的日志
-    let lastSuccessLogId = logId;
-    for (const attempt of attempts) {
-      const isOriginal = attempt.attemptIndex === 0;
-      const attemptLogId = isOriginal ? logId : randomUUID();
-
-      if (attempt.error) {
-        insertRequestLog(db, {
-          id: attemptLogId, api_type: apiType, model: clientModel, provider_id: provider.id,
-          status_code: HTTP_BAD_GATEWAY, latency_ms: attempt.latencyMs,
-          is_stream: isStream ? 1 : 0, error_message: attempt.error,
-          created_at: new Date().toISOString(), request_body: reqBodyStr,
-          client_request: clientReq, upstream_request: upstreamReqBase,
-          is_retry: isOriginal ? 0 : 1, original_request_id: isOriginal ? null : logId,
-          router_key_id: routerKeyId,
-        });
-      } else if (attempt.statusCode !== UPSTREAM_SUCCESS) {
-        insertRequestLog(db, {
-          id: attemptLogId, api_type: apiType, model: clientModel, provider_id: provider.id,
-          status_code: attempt.statusCode, latency_ms: attempt.latencyMs,
-          is_stream: isStream ? 1 : 0, error_message: null,
-          created_at: new Date().toISOString(), request_body: reqBodyStr,
-          response_body: attempt.responseBody, client_request: clientReq, upstream_request: upstreamReqBase,
-          upstream_response: JSON.stringify({ statusCode: attempt.statusCode, body: attempt.responseBody }),
-          client_response: JSON.stringify({ statusCode: attempt.statusCode, body: attempt.responseBody }),
-          is_retry: isOriginal ? 0 : 1, original_request_id: isOriginal ? null : logId,
-          router_key_id: routerKeyId,
-        });
-      } else {
-        const h = isStream
-          ? ((r as StreamProxyResult).upstreamResponseHeaders ?? {})
-          : ((r as ProxyResult).headers);
-        insertSuccessLog(db, apiType, attemptLogId, clientModel, provider, isStream, startTime,
-          reqBodyStr, clientReq, upstreamReqBase, r.statusCode, attempt.responseBody, h, h,
-          !isOriginal, isOriginal ? null : logId, routerKeyId);
-        lastSuccessLogId = attemptLogId;
+      // --- Failover 检查 ---
+      if (isFailover && r.statusCode >= FAILOVER_FAIL_THRESHOLD && !reply.raw.headersSent) {
+        excludeTargets.push(resolved);
+        continue;
       }
-    }
 
-    // 将最终结果发送给客户端
-    if (isStream) {
-      if (r.statusCode !== UPSTREAM_SUCCESS) {
-        for (const [k, v] of Object.entries((r as StreamProxyResult).upstreamResponseHeaders ?? {})) reply.header(k, v);
-        reply.status(r.statusCode).send((r as StreamProxyResult).responseBody);
-      }
-    } else {
-      const pr = r as ProxyResult;
-      for (const [k, v] of Object.entries(pr.headers)) reply.header(k, v);
-      return reply.status(pr.statusCode).send(pr.body);
-    }
-
-    // 仅对最终成功请求采集 metrics
-    if (r.statusCode === UPSTREAM_SUCCESS) {
+      // 发送响应
       if (isStream) {
-        const streamResult = r as StreamProxyResult;
-        if (streamResult.metricsResult) {
-          try { insertMetrics(db, { ...streamResult.metricsResult, request_log_id: lastSuccessLogId, provider_id: provider.id, backend_model: resolved.backend_model, api_type: apiType }); }
-          catch (err) { request.log.error({ err }, "Failed to insert metrics"); }
+        if (r.statusCode !== UPSTREAM_SUCCESS) {
+          for (const [k, v] of Object.entries((r as StreamProxyResult).upstreamResponseHeaders ?? {})) reply.header(k, v);
+          reply.status(r.statusCode).send((r as StreamProxyResult).responseBody);
         }
       } else {
-        try {
-          const mr = MetricsExtractor.fromNonStreamResponse(apiType, (r as ProxyResult).body);
-          if (mr) insertMetrics(db, { ...mr, request_log_id: lastSuccessLogId, provider_id: provider.id, backend_model: resolved.backend_model, api_type: apiType });
-        } catch (err) { request.log.error({ err }, "Failed to insert metrics"); }
+        const pr = r as ProxyResult;
+        for (const [k, v] of Object.entries(pr.headers)) reply.header(k, v);
+        return reply.status(pr.statusCode).send(pr.body);
       }
+
+      // metrics 采集
+      if (r.statusCode === UPSTREAM_SUCCESS) {
+        if (isStream) {
+          const streamResult = r as StreamProxyResult;
+          if (streamResult.metricsResult) {
+            try { insertMetrics(db, { ...streamResult.metricsResult, request_log_id: lastSuccessLogId, provider_id: provider.id, backend_model: resolved.backend_model, api_type: apiType }); }
+            catch (err) { request.log.error({ err }, "Failed to insert metrics"); }
+          }
+        } else {
+          try {
+            const mr = MetricsExtractor.fromNonStreamResponse(apiType, (r as ProxyResult).body);
+            if (mr) insertMetrics(db, { ...mr, request_log_id: lastSuccessLogId, provider_id: provider.id, backend_model: resolved.backend_model, api_type: apiType });
+          } catch (err) { request.log.error({ err }, "Failed to insert metrics"); }
+        }
+      }
+      return reply;
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      const sentH = buildUpstreamHeaders(cliHdrs, apiKey, Buffer.byteLength(reqBodyStr));
+      const upstreamReq = JSON.stringify({ url: `${provider.base_url}${upstreamPath}`, headers: sentH, body: reqBodyStr });
+      insertRequestLog(db, {
+        id: logId, api_type: apiType, model: clientModel, provider_id: provider.id,
+        status_code: HTTP_BAD_GATEWAY, latency_ms: Date.now() - startTime,
+        is_stream: isStream ? 1 : 0, error_message: errMsg || "Upstream connection failed",
+        created_at: new Date().toISOString(), request_body: reqBodyStr,
+        client_request: clientReq, upstream_request: upstreamReq,
+        router_key_id: routerKeyId,
+      });
+
+      // --- Failover 检查（异常路径）---
+      if (isFailover && !reply.raw.headersSent) {
+        excludeTargets.push(resolved);
+        continue;
+      }
+
+      const e = errors.upstreamConnectionFailed();
+      return reply.status(e.statusCode).send(e.body);
     }
-    return reply;
-  } catch (err: unknown) {
-    const errMsg = err instanceof Error ? err.message : String(err);
-    const sentH = buildUpstreamHeaders(cliHdrs, apiKey, Buffer.byteLength(reqBodyStr));
-    const upstreamReq = JSON.stringify({ url: `${provider.base_url}${upstreamPath}`, headers: sentH, body: reqBodyStr });
-    insertRequestLog(db, {
-      id: logId, api_type: apiType, model: clientModel, provider_id: provider.id,
-      status_code: HTTP_BAD_GATEWAY, latency_ms: Date.now() - startTime,
-      is_stream: isStream ? 1 : 0, error_message: errMsg || "Upstream connection failed",
-      created_at: new Date().toISOString(), request_body: reqBodyStr,
-      client_request: clientReq, upstream_request: upstreamReq,
-      router_key_id: routerKeyId,
-    });
-    const e = errors.upstreamConnectionFailed();
-    return reply.status(e.statusCode).send(e.body);
   }
 }

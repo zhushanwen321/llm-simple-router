@@ -1,5 +1,8 @@
 export const STRATEGY_NAMES = {
   SCHEDULED: "scheduled",
+  ROUND_ROBIN: "round-robin",
+  RANDOM: "random",
+  FAILOVER: "failover",
 } as const;
 
 export interface Target {
@@ -9,8 +12,9 @@ export interface Target {
 
 export interface ResolveContext {
   now: Date;
+  excludeTargets?: Target[];
 }
 
 export interface MappingStrategy {
-  select(rule: unknown, context: ResolveContext): Target | undefined;
+  select(rule: unknown, context: ResolveContext, clientModel?: string): Target | undefined;
 }
