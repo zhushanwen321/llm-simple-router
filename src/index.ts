@@ -2,9 +2,23 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
+import { randomUUID } from "crypto";
 import Fastify, { FastifyInstance } from "fastify";
+import { insertRequestLog } from "./db/logs.js";
 
 const HTTP_NOT_FOUND = 404;
+
+// 代理路由路径 → api_type，用于在全局 hook/errorHandler 中识别代理请求
+const PROXY_API_TYPES: Record<string, string> = {
+  "/v1/chat/completions": "openai",
+  "/v1/messages": "anthropic",
+  "/v1/models": "openai",
+};
+
+function getProxyApiType(url: string): string | null {
+  const path = url.split("?")[0];
+  return PROXY_API_TYPES[path] ?? null;
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -40,9 +54,22 @@ export async function buildApp(
     db = initDatabase(config.DB_PATH);
   }
 
+  const isDev = process.env.NODE_ENV !== "production";
+
   const app = Fastify({
     logger: {
       level: config.LOG_LEVEL,
+      ...(isDev
+        ? {
+            transport: {
+              target: "pino-pretty",
+              options: {
+                translateTime: "SYS:yyyy-mm-dd HH:MM:ss.l",
+                ignore: "pid,hostname",
+              },
+            },
+          }
+        : {}),
     },
     // 统一 schema validation 错误格式为 { error: { message } }
     ajv: {
@@ -62,10 +89,30 @@ export async function buildApp(
     return new Error(message);
   });
 
-  // 统一 schema validation 错误响应格式
-  app.setErrorHandler((error: Error, _request, reply) => {
+  // 统一 schema validation 错误响应格式，代理路由的错误也记录到 request_logs
+  app.setErrorHandler((error: Error, request, reply) => {
     const fastifyError = error as Error & { statusCode?: number; validation?: unknown[] };
     const status = fastifyError.statusCode ?? 500;
+
+    const proxyApiType = getProxyApiType(request.url);
+    if (proxyApiType) {
+      request.log.error({ statusCode: status, err: error }, `Proxy request error: ${fastifyError.message}`);
+      const body = request.body as Record<string, unknown> | undefined;
+      insertRequestLog(db, {
+        id: randomUUID(),
+        api_type: proxyApiType,
+        model: (body?.model as string) || null,
+        provider_id: null,
+        status_code: status,
+        latency_ms: 0,
+        is_stream: 0,
+        error_message: fastifyError.message,
+        created_at: new Date().toISOString(),
+        client_request: JSON.stringify({ headers: request.headers }),
+        router_key_id: request.routerKey?.id ?? null,
+      });
+    }
+
     if (status === 400 && fastifyError.validation) {
       return reply.code(400).send({ error: { message: fastifyError.message } });
     }
