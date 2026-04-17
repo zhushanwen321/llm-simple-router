@@ -16,8 +16,6 @@ let cachedConfig: Config | null = null;
 
 function getDefaultDbPath(): string {
   if (process.env.DB_PATH) return process.env.DB_PATH;
-  const localPath = "./data/router.db";
-  if (existsSync(localPath)) return localPath;
   return join(homedir(), ".llm-simple-router", "router.db");
 }
 
