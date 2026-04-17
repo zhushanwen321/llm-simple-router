@@ -31,7 +31,7 @@ cp .env.example .env
 |------|------|--------|
 | `ADMIN_PASSWORD` | 管理后台登录密码 | 必填 |
 | `ENCRYPTION_KEY` | API Key 加密密钥（64字符 hex） | 必填 |
-| `PORT` | 服务端口 | 3000 |
+| `PORT` | 服务端口 | 9981 |
 | `DB_PATH` | SQLite 数据库路径 | ./data/router.db |
 | `LOG_LEVEL` | 日志级别 | info |
 
@@ -47,7 +47,7 @@ npm run dev
 cd frontend && npm run dev
 ```
 
-- 后端：http://localhost:3000
+- 后端：http://localhost:9981
 - 前端：http://localhost:5173/admin/
 - API 代理：前端开发服务器自动将 `/admin/api/*` 代理到后端
 
@@ -68,7 +68,7 @@ cp src/db/migrations/*.sql dist/db/migrations/
 FRONTEND_DIST=./frontend/dist npm start
 ```
 
-访问 http://localhost:3000/admin/
+访问 http://localhost:9981/admin/
 
 ### Docker 模式
 
@@ -76,7 +76,7 @@ FRONTEND_DIST=./frontend/dist npm start
 docker compose up -d
 ```
 
-访问 http://localhost:3000/admin/
+访问 http://localhost:9981/admin/
 
 ## 使用
 
@@ -88,13 +88,13 @@ docker compose up -d
 
 ```bash
 # OpenAI 格式
-curl http://localhost:3000/v1/chat/completions \
+curl http://localhost:9981/v1/chat/completions \
   -H "Authorization: Bearer <your-router-key>" \
   -H "Content-Type: application/json" \
   -d '{"model":"gpt-4","messages":[{"role":"user","content":"Hello"}]}'
 
 # Anthropic 格式
-curl http://localhost:3000/v1/messages \
+curl http://localhost:9981/v1/messages \
   -H "Authorization: Bearer <your-router-key>" \
   -H "anthropic-version: 2023-06-01" \
   -H "Content-Type: application/json" \

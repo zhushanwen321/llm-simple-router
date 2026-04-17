@@ -17,7 +17,7 @@ npm run build
 mkdir -p dist/db/migrations && cp src/db/migrations/*.sql dist/db/migrations/
 FRONTEND_DIST=./frontend/dist npm start
 
-# 前端开发（自动代理 /admin/api 到后端 :3000）
+# 前端开发（自动代理 /admin/api 到后端 :9981）
 cd frontend && npm run dev
 
 # 前端构建
@@ -69,7 +69,7 @@ docker compose up -d
 ## 环境变量
 
 必需：`ADMIN_PASSWORD`、`ENCRYPTION_KEY`（64字符 hex）、`JWT_SECRET`（64字符 hex）
-可选：`PORT`（默认 3000）、`DB_PATH`、`LOG_LEVEL`、`STREAM_TIMEOUT_MS`（默认 30000）
+可选：`PORT`（默认 9981）、`DB_PATH`、`LOG_LEVEL`、`STREAM_TIMEOUT_MS`
 参考 `.env.example`
 
 ## MCP Tools: code-review-graph
@@ -107,3 +107,20 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 | `<label>` | `<Label>` |
 
 组件安装：`cd frontend && npx shadcn-vue@latest add <component>`
+
+## npm 发布流程
+
+项目已发布到 npm（`llm-simple-router`），用户可通过 `npx llm-simple-router` 或 `npm install -g llm-simple-router` 使用。
+
+### 入口文件
+
+- `src/cli.ts` — npm bin 入口（带 shebang），无条件调用 `main()` 启动服务器
+- `src/index.ts` — 库入口，导出 `buildApp` 和 `main`；开发时 `tsx src/index.ts` 仍可直接运行
+- 两者分离是因为 npm 通过 wrapper 脚本调用时 `process.argv[1]` 不以 `index.js` 结尾
+
+### 版本与发布规则
+
+- **合并 PR 到 main 不需要更新版本号**，多个 PR 可以积攒后统一发布
+- **发布流程**：更新 `package.json` 的 `version` → 推送到 main → 在 GitHub 创建 Release → CI 自动 `npm publish`
+- **构建命令**：`npm run build:full`（tsc + 复制 migrations + 构建前端）；`prepublishOnly` 会自动执行前端构建
+- npm 不允许重复发布同一版本号，发布前必须 bump version

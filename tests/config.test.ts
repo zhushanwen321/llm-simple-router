@@ -39,7 +39,7 @@ describe("getConfig", () => {
     const config = getConfig();
 
     expect(config.ADMIN_PASSWORD).toBe("admin123");
-    expect(config.PORT).toBe(3000);
+    expect(config.PORT).toBe(9981);
     expect(config.DB_PATH).toBe("./data/router.db");
     expect(config.LOG_LEVEL).toBe("info");
     expect(config.TZ).toBe("Asia/Shanghai");

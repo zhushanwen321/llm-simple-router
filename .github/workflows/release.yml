@@ -19,7 +19,7 @@ jobs:
           cache: npm
 
       - run: npm ci
-      - run: npm run build
+      - run: npm run build:full
 
       # 复制运行时所需文件到打包目录
       - name: Prepare dist archive
@@ -27,6 +27,7 @@ jobs:
           mkdir -p package/dist/db/migrations package/frontend-dist
           cp -r dist/ package/dist/
           cp -r src/db/migrations/ package/dist/db/migrations/
+          cp -r frontend-dist/ package/frontend-dist/
           cp package.json package/
           cp package-lock.json package/
           cp .env.example package/
@@ -62,3 +63,9 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           files: llm-simple-router-linux-x64.tar.gz
+
+      # npm publish
+      - name: Publish to npm
+        run: |
+          npm config set //registry.npmjs.org/:_authToken ${{ secrets.NPM_TOKEN }}
+          npm publish --access public

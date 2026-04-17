@@ -114,3 +114,6 @@ __pycache__/
 .mcp.json
 .playwright-mcp/
 .superpowers/
+
+# Build output
+frontend-dist/

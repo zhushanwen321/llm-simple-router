@@ -12,7 +12,7 @@ function makeConfig() {
     ADMIN_PASSWORD,
     JWT_SECRET,
     ENCRYPTION_KEY: TEST_ENCRYPTION_KEY,
-    PORT: 3000,
+    PORT: 9981,
     DB_PATH: ":memory:",
     LOG_LEVEL: "silent",
     TZ: "Asia/Shanghai",

@@ -49,6 +49,6 @@ COPY --from=builder /app/src/db/migrations/ dist/db/migrations/
 # 复制前端编译产物
 COPY --from=frontend-builder /app/frontend/dist frontend-dist/
 
-EXPOSE 3000
+EXPOSE 9981
 
 CMD ["node", "dist/index.js"]
