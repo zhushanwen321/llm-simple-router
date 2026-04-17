@@ -341,7 +341,9 @@ async function copySection(key: SectionKey) {
     await navigator.clipboard.writeText(getSectionRaw(key))
     copiedSection.value = key
     setTimeout(() => { copiedSection.value = null }, 2000) // eslint-disable-line no-magic-numbers
-  } catch { /* ignore */ }
+  } catch {
+    toast.error('复制失败')
+  }
 }
 
 function asApiType(t: string): 'openai' | 'anthropic' {
