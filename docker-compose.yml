@@ -6,7 +6,6 @@ services:
     ports:
       - "${PORT:-3000}:3000"
     environment:
-      - ROUTER_API_KEY=${ROUTER_API_KEY}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - JWT_SECRET=${JWT_SECRET}

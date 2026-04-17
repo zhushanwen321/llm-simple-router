@@ -18,7 +18,6 @@ const API_KEY = "sk-integration-test";
 
 function makeTestConfig() {
   return {
-    ROUTER_API_KEY: API_KEY,
     ADMIN_PASSWORD: "admin123",
     JWT_SECRET: "test-jwt-secret-for-testing",
     ENCRYPTION_KEY: TEST_ENCRYPTION_KEY,
@@ -62,7 +61,6 @@ describe("Integration tests", () => {
   let close: () => Promise<void>;
 
   beforeEach(async () => {
-    process.env.ROUTER_API_KEY = API_KEY;
     process.env.ADMIN_PASSWORD = "admin123";
     process.env.ENCRYPTION_KEY = TEST_ENCRYPTION_KEY;
     process.env.LOG_LEVEL = "silent";
@@ -265,7 +263,6 @@ describe("Integration tests", () => {
     await close();
     await closeServer(mockOpenAI.server);
     await closeServer(mockAnthropic.server);
-    delete process.env.ROUTER_API_KEY;
     delete process.env.ADMIN_PASSWORD;
     delete process.env.ENCRYPTION_KEY;
     delete process.env.LOG_LEVEL;

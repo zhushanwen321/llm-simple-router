@@ -80,8 +80,10 @@
   --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
 
   /* === z-index === */
-  --z-dropdown: 50;
+  /* dropdown/select/tooltip 需高于 modal，因为这些组件经常在 Dialog 内使用
+     且通过 Portal 渲染到 body 下，z-index 直接与 modal 比较 */
   --z-modal: 100;
+  --z-dropdown: 150;
   --z-toast: 200;
 }
 

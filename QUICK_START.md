@@ -29,7 +29,6 @@ cp .env.example .env
 
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
-| `ROUTER_API_KEY` | API 代理认证密钥 | 必填 |
 | `ADMIN_PASSWORD` | 管理后台登录密码 | 必填 |
 | `ENCRYPTION_KEY` | API Key 加密密钥（64字符 hex） | 必填 |
 | `PORT` | 服务端口 | 3000 |
@@ -85,18 +84,18 @@ docker compose up -d
 2. 输入 `.env` 中配置的 `ADMIN_PASSWORD` 登录
 3. 在「后端服务」页面添加 LLM 服务商（OpenAI / Anthropic）
 4. 在「模型映射」页面配置客户端模型名到后端模型名的映射
-5. 使用 `ROUTER_API_KEY` 作为 Bearer Token 调用代理 API：
+5. 使用管理后台创建的 Router Key 作为 Bearer Token 调用代理 API：
 
 ```bash
 # OpenAI 格式
 curl http://localhost:3000/v1/chat/completions \
-  -H "Authorization: Bearer sk-router-change-me" \
+  -H "Authorization: Bearer <your-router-key>" \
   -H "Content-Type: application/json" \
   -d '{"model":"gpt-4","messages":[{"role":"user","content":"Hello"}]}'
 
 # Anthropic 格式
 curl http://localhost:3000/v1/messages \
-  -H "Authorization: Bearer sk-router-change-me" \
+  -H "Authorization: Bearer <your-router-key>" \
   -H "anthropic-version: 2023-06-01" \
   -H "Content-Type: application/json" \
   -d '{"model":"claude-3","messages":[{"role":"user","content":"Hello"}],"max_tokens":100}'

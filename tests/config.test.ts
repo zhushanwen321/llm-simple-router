@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach } from "vitest";
 
 describe("getConfig", () => {
   beforeEach(() => {
-    delete process.env.ROUTER_API_KEY;
     delete process.env.ADMIN_PASSWORD;
     delete process.env.ENCRYPTION_KEY;
     delete process.env.JWT_SECRET;
@@ -15,7 +14,7 @@ describe("getConfig", () => {
     delete process.env.RETRY_BASE_DELAY_MS;
   });
 
-  it("should throw when required env vars (except ROUTER_API_KEY) are missing", async () => {
+  it("should throw when required env vars are missing", async () => {
     const mod = await import("../src/config.js?t=" + Date.now());
     const { getConfig, resetConfig } = mod;
 
@@ -28,23 +27,7 @@ describe("getConfig", () => {
     expect(() => getConfig()).toThrow("ADMIN_PASSWORD");
   });
 
-  it("should not throw when ROUTER_API_KEY is missing", async () => {
-    const mod = await import("../src/config.js?t=" + Date.now());
-    const { getConfig, resetConfig } = mod;
-
-    delete process.env.ROUTER_API_KEY;
-    process.env.ADMIN_PASSWORD = "admin123";
-    process.env.ENCRYPTION_KEY = "0".repeat(64);
-    process.env.JWT_SECRET = "0".repeat(64);
-
-    resetConfig();
-
-    const config = getConfig();
-    expect(config.ROUTER_API_KEY).toBe("");
-  });
-
   it("should return config with defaults when required vars are set", async () => {
-    process.env.ROUTER_API_KEY = "sk-test-key";
     process.env.ADMIN_PASSWORD = "admin123";
     process.env.ENCRYPTION_KEY = "0".repeat(64);
     process.env.JWT_SECRET = "0".repeat(64);
@@ -55,7 +38,6 @@ describe("getConfig", () => {
 
     const config = getConfig();
 
-    expect(config.ROUTER_API_KEY).toBe("sk-test-key");
     expect(config.ADMIN_PASSWORD).toBe("admin123");
     expect(config.PORT).toBe(3000);
     expect(config.DB_PATH).toBe("./data/router.db");
@@ -67,7 +49,6 @@ describe("getConfig", () => {
   });
 
   it("should parse PORT as number", async () => {
-    process.env.ROUTER_API_KEY = "sk-test-key";
     process.env.ADMIN_PASSWORD = "admin123";
     process.env.ENCRYPTION_KEY = "0".repeat(64);
     process.env.JWT_SECRET = "0".repeat(64);
@@ -82,7 +63,6 @@ describe("getConfig", () => {
   });
 
   it("should return cached config on subsequent calls", async () => {
-    process.env.ROUTER_API_KEY = "sk-cached";
     process.env.ADMIN_PASSWORD = "pw";
     process.env.ENCRYPTION_KEY = "a".repeat(64);
     process.env.JWT_SECRET = "a".repeat(64);
@@ -92,9 +72,9 @@ describe("getConfig", () => {
     resetConfig();
 
     const config1 = getConfig();
-    process.env.ROUTER_API_KEY = "different";
+    process.env.ADMIN_PASSWORD = "different";
     const config2 = getConfig();
     expect(config1).toBe(config2);
-    expect(config2.ROUTER_API_KEY).toBe("sk-cached");
+    expect(config2.ADMIN_PASSWORD).toBe("pw");
   });
 });
