@@ -8,7 +8,7 @@ const HTTP_NOT_FOUND = 404;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-import { getConfig, Config } from "./config.js";
+import { getConfig, getBaseConfig, loadSettingsToConfig, Config } from "./config.js";
 import { initDatabase, seedDefaultRules } from "./db/index.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { openaiProxy } from "./proxy/openai.js";
@@ -30,7 +30,7 @@ export async function buildApp(
   db: Database.Database;
   close: () => Promise<void>;
 }> {
-  const config = options?.config ?? getConfig();
+  const config = options?.config ?? getBaseConfig();
 
   // 允许外部传入已初始化的 DB（测试用），否则自行创建
   let db: Database.Database;
@@ -38,6 +38,8 @@ export async function buildApp(
     db = options.db;
   } else {
     db = initDatabase(config.DB_PATH);
+    // 从 settings 表加载密钥（零配置场景）
+    loadSettingsToConfig(db);
   }
 
   const app = Fastify({
@@ -77,7 +79,7 @@ export async function buildApp(
   const matcher = new RetryRuleMatcher();
   matcher.load(db);
 
-  app.register(authMiddleware, { db });
+  app.register(authMiddleware, { db, config });
   app.register(openaiProxy, {
     db,
     encryptionKey: config.ENCRYPTION_KEY,

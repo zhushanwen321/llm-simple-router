@@ -23,8 +23,8 @@ interface AdminRoutesOptions {
 export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (app, options, done) => {
   // Setup 路由不需要 auth
   app.register(adminSetupRoutes, { db: options.db });
-  app.register(adminAuthPlugin, { adminPassword: options.adminPassword, jwtSecret: options.jwtSecret });
-  app.register(adminLoginRoutes, { adminPassword: options.adminPassword, jwtSecret: options.jwtSecret });
+  app.register(adminAuthPlugin, { adminPassword: options.adminPassword, jwtSecret: options.jwtSecret, db: options.db });
+  app.register(adminLoginRoutes, { adminPassword: options.adminPassword, jwtSecret: options.jwtSecret, db: options.db });
   app.register(adminProviderRoutes, { db: options.db, encryptionKey: options.encryptionKey });
   app.register(adminMappingRoutes, { db: options.db });
   app.register(adminGroupRoutes, { db: options.db });

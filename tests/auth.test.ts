@@ -15,7 +15,7 @@ function buildTestApp() {
   ).run("test-id", "Test Key", TEST_KEY_HASH, TEST_KEY.slice(0, 8));
 
   const app = Fastify();
-  app.register(authMiddleware, { db });
+  app.register(authMiddleware, { db, config: { needsSetup: false } as any });
 
   app.get("/health", async () => ({ status: "ok" }));
   app.get("/admin/dashboard", async () => ({ page: "admin" }));

@@ -51,7 +51,7 @@ function createApp() {
   ).run("test-router-key", "Test Key", API_KEY_HASH, API_KEY.slice(0, 8));
 
   const app = Fastify();
-  app.register(authMiddleware, { db });
+  app.register(authMiddleware, { db, config: { needsSetup: false } as any });
   app.register(openaiProxy, {
     db,
     encryptionKey: TEST_ENCRYPTION_KEY,
