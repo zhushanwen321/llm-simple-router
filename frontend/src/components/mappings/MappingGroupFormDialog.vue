@@ -18,66 +18,21 @@
               <SelectValue placeholder="选择策略" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="scheduled">scheduled</SelectItem>
+              <SelectItem value="scheduled">定时切换 (scheduled)</SelectItem>
+              <SelectItem value="round-robin">轮询 (round-robin)</SelectItem>
+              <SelectItem value="random">随机 (random)</SelectItem>
+              <SelectItem value="failover">故障转移 (failover)</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
-        <div class="border rounded-lg p-3 space-y-3">
-          <div class="text-sm font-medium text-foreground">默认目标</div>
-          <div class="flex gap-3">
-            <div class="flex-1">
-              <Label class="block text-xs text-muted-foreground mb-1">供应商</Label>
-              <Select :model-value="form.default.provider_id" @update:model-value="onDefaultProviderChange">
-                <SelectTrigger>
-                  <SelectValue placeholder="选择供应商" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem v-for="p in providers" :key="p.id" :value="p.id">{{ p.name }}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div class="flex-1">
-              <Label class="block text-xs text-muted-foreground mb-1">后端模型</Label>
-              <Select v-model="form.default.backend_model" :disabled="defaultModels.length === 0">
-                <SelectTrigger>
-                  <SelectValue :placeholder="defaultModels.length === 0 ? '暂无可用模型' : '选择后端模型'" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem v-for="m in defaultModels" :key="m" :value="m">{{ m }}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </div>
-
-        <div class="border rounded-lg p-3 space-y-3">
-          <div class="flex items-center justify-between">
-            <div class="text-sm font-medium text-foreground">时间窗口</div>
-            <Button type="button" variant="outline" size="sm" @click="emit('addWindow')">添加窗口</Button>
-          </div>
-          <div
-            v-for="(w, idx) in form.windows"
-            :key="idx"
-            class="border rounded-md p-2 space-y-2"
-          >
-            <div class="flex items-end gap-2">
-              <div class="w-24">
-                <Label class="block text-xs text-muted-foreground mb-1">开始</Label>
-                <Input v-model="w.start" type="text" placeholder="HH:MM" required />
-              </div>
-              <span class="text-muted-foreground pb-1.5">-</span>
-              <div class="w-24">
-                <Label class="block text-xs text-muted-foreground mb-1">结束</Label>
-                <Input v-model="w.end" type="text" placeholder="HH:MM" required />
-              </div>
-              <div class="flex-1" />
-              <Button type="button" variant="ghost" size="sm" class="text-destructive shrink-0" @click="emit('removeWindow', idx)">删除</Button>
-            </div>
-            <div class="flex gap-2">
+        <template v-if="form.strategy === 'scheduled'">
+          <div class="border rounded-lg p-3 space-y-3">
+            <div class="text-sm font-medium text-foreground">默认目标</div>
+            <div class="flex gap-3">
               <div class="flex-1">
                 <Label class="block text-xs text-muted-foreground mb-1">供应商</Label>
-                <Select :model-value="w.target.provider_id" @update:model-value="onWindowProviderChange(idx, $event)">
+                <Select :model-value="form.default.provider_id" @update:model-value="onDefaultProviderChange">
                   <SelectTrigger>
                     <SelectValue placeholder="选择供应商" />
                   </SelectTrigger>
@@ -88,18 +43,107 @@
               </div>
               <div class="flex-1">
                 <Label class="block text-xs text-muted-foreground mb-1">后端模型</Label>
-                <Select v-model="w.target.backend_model" :disabled="getWindowModels(idx).length === 0">
+                <Select v-model="form.default.backend_model" :disabled="defaultModels.length === 0">
                   <SelectTrigger>
-                    <SelectValue :placeholder="getWindowModels(idx).length === 0 ? '暂无可用模型' : '选择后端模型'" />
+                    <SelectValue :placeholder="defaultModels.length === 0 ? '暂无可用模型' : '选择后端模型'" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem v-for="m in getWindowModels(idx)" :key="m" :value="m">{{ m }}</SelectItem>
+                    <SelectItem v-for="m in defaultModels" :key="m" :value="m">{{ m }}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
           </div>
-          <div v-if="form.windows.length === 0" class="text-sm text-muted-foreground">暂无窗口</div>
+
+          <div class="border rounded-lg p-3 space-y-3">
+            <div class="flex items-center justify-between">
+              <div class="text-sm font-medium text-foreground">时间窗口</div>
+              <Button type="button" variant="outline" size="sm" @click="emit('addWindow')">添加窗口</Button>
+            </div>
+            <div
+              v-for="(w, idx) in form.windows"
+              :key="idx"
+              class="border rounded-md p-2 space-y-2"
+            >
+              <div class="flex items-end gap-2">
+                <div class="w-24">
+                  <Label class="block text-xs text-muted-foreground mb-1">开始</Label>
+                  <Input v-model="w.start" type="text" placeholder="HH:MM" required />
+                </div>
+                <span class="text-muted-foreground pb-1.5">-</span>
+                <div class="w-24">
+                  <Label class="block text-xs text-muted-foreground mb-1">结束</Label>
+                  <Input v-model="w.end" type="text" placeholder="HH:MM" required />
+                </div>
+                <div class="flex-1" />
+                <Button type="button" variant="ghost" size="sm" class="text-destructive shrink-0" @click="emit('removeWindow', idx)">删除</Button>
+              </div>
+              <div class="flex gap-2">
+                <div class="flex-1">
+                  <Label class="block text-xs text-muted-foreground mb-1">供应商</Label>
+                  <Select :model-value="w.target.provider_id" @update:model-value="onWindowProviderChange(idx, $event)">
+                    <SelectTrigger>
+                      <SelectValue placeholder="选择供应商" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem v-for="p in providers" :key="p.id" :value="p.id">{{ p.name }}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div class="flex-1">
+                  <Label class="block text-xs text-muted-foreground mb-1">后端模型</Label>
+                  <Select v-model="w.target.backend_model" :disabled="getWindowModels(idx).length === 0">
+                    <SelectTrigger>
+                      <SelectValue :placeholder="getWindowModels(idx).length === 0 ? '暂无可用模型' : '选择后端模型'" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem v-for="m in getWindowModels(idx)" :key="m" :value="m">{{ m }}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+            <div v-if="form.windows.length === 0" class="text-sm text-muted-foreground">暂无窗口</div>
+          </div>
+        </template>
+
+        <div v-else class="border rounded-lg p-3 space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="text-sm font-medium text-foreground">目标列表</div>
+            <Button type="button" variant="outline" size="sm" @click="emit('addTarget')">添加目标</Button>
+          </div>
+          <div v-for="(t, idx) in form.targets" :key="idx" class="border rounded-md p-2 space-y-2">
+            <div class="flex items-center gap-2">
+              <div class="flex-1">
+                <Label class="block text-xs text-muted-foreground mb-1">供应商</Label>
+                <Select :model-value="t.provider_id" @update:model-value="onTargetProviderChange(idx, $event)">
+                  <SelectTrigger>
+                    <SelectValue placeholder="选择供应商" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem v-for="p in providers" :key="p.id" :value="p.id">{{ p.name }}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div class="flex-1">
+                <Label class="block text-xs text-muted-foreground mb-1">后端模型</Label>
+                <Select v-model="t.backend_model" :disabled="getTargetModels(idx).length === 0">
+                  <SelectTrigger>
+                    <SelectValue :placeholder="getTargetModels(idx).length === 0 ? '暂无可用模型' : '选择后端模型'" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem v-for="m in getTargetModels(idx)" :key="m" :value="m">{{ m }}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div v-if="form.strategy === 'failover'" class="flex flex-col gap-1">
+                <Button type="button" variant="ghost" size="sm" :disabled="idx === 0" @click="emit('moveTargetUp', idx)">↑</Button>
+                <Button type="button" variant="ghost" size="sm" :disabled="idx === form.targets.length - 1" @click="emit('moveTargetDown', idx)">↓</Button>
+              </div>
+              <Button type="button" variant="ghost" size="sm" class="text-destructive shrink-0" @click="emit('removeTarget', idx)">删除</Button>
+            </div>
+          </div>
+          <div v-if="form.targets.length === 0" class="text-sm text-muted-foreground">暂无目标</div>
         </div>
 
         <DialogFooter>
@@ -139,6 +183,7 @@ interface FormData {
   strategy: string
   default: { backend_model: string; provider_id: string }
   windows: RuleWindow[]
+  targets: { backend_model: string; provider_id: string }[]
 }
 
 const props = defineProps<{
@@ -154,6 +199,10 @@ const emit = defineEmits<{
   (e: 'save'): void
   (e: 'addWindow'): void
   (e: 'removeWindow', idx: number): void
+  (e: 'addTarget'): void
+  (e: 'removeTarget', idx: number): void
+  (e: 'moveTargetUp', idx: number): void
+  (e: 'moveTargetDown', idx: number): void
 }>()
 
 const defaultModels = computed(() =>
@@ -182,6 +231,20 @@ function onWindowProviderChange(idx: number, value: AcceptableValue) {
   const models = props.providerModels.get(value) || []
   // eslint-disable-next-line vue/no-mutating-props
   props.form.windows[idx].target.backend_model = models[0] || ''
+}
+
+function getTargetModels(idx: number): string[] {
+  const providerId = props.form.targets[idx]?.provider_id
+  return providerId ? (props.providerModels.get(providerId) || []) : []
+}
+
+function onTargetProviderChange(idx: number, value: AcceptableValue) {
+  if (typeof value !== 'string') return
+  // eslint-disable-next-line vue/no-mutating-props
+  props.form.targets[idx].provider_id = value
+  const models = props.providerModels.get(value) || []
+  // eslint-disable-next-line vue/no-mutating-props
+  props.form.targets[idx].backend_model = models[0] || ''
 }
 
 function handleSave() {
