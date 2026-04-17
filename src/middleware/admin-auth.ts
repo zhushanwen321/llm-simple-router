@@ -15,6 +15,12 @@ interface AdminAuthOptions {
 
 const HTTP_UNAUTHORIZED = 401;
 
+// 零配置场景下 options 在注册时为空字符串，setup 完成后存入 DB。
+// 运行时从 DB 读取最新值，环境变量优先。
+function resolveJwtSecret(options: AdminAuthOptions): string {
+  return options.jwtSecret || getSetting(options.db, "jwt_secret") || "";
+}
+
 const adminAuthRaw: FastifyPluginCallback<AdminAuthOptions> = (app, options, done) => {
   app.register(cookie);
 
@@ -31,8 +37,8 @@ const adminAuthRaw: FastifyPluginCallback<AdminAuthOptions> = (app, options, don
     if (!path.startsWith("/admin/api/")) return;
 
     // 未初始化时，除了 setup 以外的 API 返回 needsSetup
-    // 环境变量提供了所有 secrets 则视为已初始化
-    const envReady = options.adminPassword && options.jwtSecret;
+    const secret = resolveJwtSecret(options);
+    const envReady = options.adminPassword && secret;
     if (!envReady && !isInitialized(options.db)) {
       return reply.code(HTTP_UNAUTHORIZED).send({ error: { message: "Not initialized", needsSetup: true } });
     }
@@ -44,7 +50,7 @@ const adminAuthRaw: FastifyPluginCallback<AdminAuthOptions> = (app, options, don
     }
 
     try {
-      jwt.verify(token, options.jwtSecret);
+      jwt.verify(token, secret);
     } catch (err: unknown) {
       request.log.debug({ err }, "invalid JWT token");
       reply.code(HTTP_UNAUTHORIZED).send({ error: { message: "Invalid or expired token" } });
@@ -82,7 +88,8 @@ export const adminLoginRoutes: FastifyPluginCallback<AdminAuthOptions> = (app, o
       }
     }
 
-    const token = jwt.sign({ role: "admin" }, options.jwtSecret, { expiresIn: TOKEN_EXPIRY_SECONDS });
+    const secret = resolveJwtSecret(options);
+    const token = jwt.sign({ role: "admin" }, secret, { expiresIn: TOKEN_EXPIRY_SECONDS });
     reply.setCookie("admin_token", token, {
       path: "/admin",
       httpOnly: true,
