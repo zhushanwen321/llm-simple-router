@@ -4,59 +4,11 @@ import { createServer, Server, IncomingMessage, ServerResponse } from "http";
 import Database from "better-sqlite3";
 import { openaiProxy } from "../src/proxy/openai.js";
 import { encrypt } from "../src/utils/crypto.js";
+import { initDatabase } from "../src/db/index.js";
+import { setSetting } from "../src/db/settings.js";
 
 const TEST_ENCRYPTION_KEY =
   "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-
-// 创建内存数据库并执行建表
-function createTestDb(): Database.Database {
-  const db = new Database(":memory:");
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS migrations (
-      name TEXT PRIMARY KEY,
-      applied_at TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS providers (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      api_type TEXT NOT NULL CHECK(api_type IN ('openai', 'anthropic')),
-      base_url TEXT NOT NULL,
-      api_key TEXT NOT NULL,
-      is_active INTEGER NOT NULL DEFAULT 1,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS model_mappings (
-      id TEXT PRIMARY KEY,
-      client_model TEXT NOT NULL UNIQUE,
-      backend_model TEXT NOT NULL,
-      provider_id TEXT NOT NULL,
-      is_active INTEGER NOT NULL DEFAULT 1,
-      created_at TEXT NOT NULL,
-      FOREIGN KEY (provider_id) REFERENCES providers(id)
-    );
-    CREATE TABLE IF NOT EXISTS request_logs (
-      id TEXT PRIMARY KEY,
-      api_type TEXT NOT NULL,
-      model TEXT,
-      provider_id TEXT,
-      status_code INTEGER,
-      latency_ms INTEGER,
-      is_stream INTEGER,
-      error_message TEXT,
-      created_at TEXT NOT NULL,
-      request_body TEXT,
-      response_body TEXT,
-      client_request TEXT,
-      upstream_request TEXT,
-      upstream_response TEXT,
-      client_response TEXT,
-      is_retry INTEGER NOT NULL DEFAULT 0,
-      original_request_id TEXT
-    );
-  `);
-  return db;
-}
 
 // 启动 mock 后端 HTTP 服务器
 function createMockBackend(
@@ -119,7 +71,8 @@ describe("GET /v1/models proxy", () => {
   let db: Database.Database;
 
   beforeEach(() => {
-    db = createTestDb();
+    db = initDatabase(":memory:");
+    setSetting(db, "encryption_key", TEST_ENCRYPTION_KEY);
   });
 
   afterEach(async () => {
@@ -158,7 +111,6 @@ describe("GET /v1/models proxy", () => {
     app = Fastify();
     app.register(openaiProxy, {
       db,
-      encryptionKey: TEST_ENCRYPTION_KEY,
       streamTimeoutMs: 5000,
       retryMaxAttempts: 0,
       retryBaseDelayMs: 0,
@@ -183,7 +135,6 @@ describe("GET /v1/models proxy", () => {
     app = Fastify();
     app.register(openaiProxy, {
       db,
-      encryptionKey: TEST_ENCRYPTION_KEY,
       streamTimeoutMs: 5000,
       retryMaxAttempts: 0,
       retryBaseDelayMs: 0,
@@ -206,7 +157,6 @@ describe("GET /v1/models proxy", () => {
     app = Fastify();
     app.register(openaiProxy, {
       db,
-      encryptionKey: TEST_ENCRYPTION_KEY,
       streamTimeoutMs: 5000,
       retryMaxAttempts: 0,
       retryBaseDelayMs: 0,
@@ -228,7 +178,6 @@ describe("GET /v1/models proxy", () => {
     app = Fastify();
     app.register(openaiProxy, {
       db,
-      encryptionKey: TEST_ENCRYPTION_KEY,
       streamTimeoutMs: 5000,
       retryMaxAttempts: 0,
       retryBaseDelayMs: 0,

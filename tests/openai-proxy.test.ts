@@ -3,6 +3,7 @@ import Fastify, { FastifyInstance } from "fastify";
 import { createServer, Server, IncomingMessage, ServerResponse } from "http";
 import Database from "better-sqlite3";
 import { initDatabase } from "../src/db/index.js";
+import { setSetting } from "../src/db/settings.js";
 import { encrypt } from "../src/utils/crypto.js";
 import { openaiProxy } from "../src/proxy/openai.js";
 
@@ -38,7 +39,6 @@ function buildTestApp(mockDb: Database.Database): FastifyInstance {
 
   app.register(openaiProxy, {
     db: mockDb,
-    encryptionKey: TEST_ENCRYPTION_KEY,
     streamTimeoutMs: 5000,
     retryMaxAttempts: 0,
     retryBaseDelayMs: 0,
@@ -148,6 +148,7 @@ describe("OpenAI proxy", () => {
 
   beforeEach(() => {
     mockDb = initDatabase(":memory:");
+    setSetting(mockDb, "encryption_key", TEST_ENCRYPTION_KEY);
   });
 
   afterEach(async () => {

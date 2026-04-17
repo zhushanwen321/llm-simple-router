@@ -30,7 +30,7 @@ export async function buildApp(
   db: Database.Database;
   close: () => Promise<void>;
 }> {
-  const config = options?.config ?? getConfig();
+  const config = options?.config ?? getBaseConfig();
 
   // 允许外部传入已初始化的 DB（测试用），否则自行创建
   let db: Database.Database;
@@ -80,7 +80,6 @@ export async function buildApp(
   app.register(authMiddleware, { db });
   app.register(openaiProxy, {
     db,
-    encryptionKey: config.ENCRYPTION_KEY,
     streamTimeoutMs: config.STREAM_TIMEOUT_MS,
     retryMaxAttempts: config.RETRY_MAX_ATTEMPTS,
     retryBaseDelayMs: config.RETRY_BASE_DELAY_MS,
@@ -88,20 +87,13 @@ export async function buildApp(
   });
   app.register(anthropicProxy, {
     db,
-    encryptionKey: config.ENCRYPTION_KEY,
     streamTimeoutMs: config.STREAM_TIMEOUT_MS,
     retryMaxAttempts: config.RETRY_MAX_ATTEMPTS,
     retryBaseDelayMs: config.RETRY_BASE_DELAY_MS,
     matcher,
   });
 
-  app.register(adminRoutes, {
-    db,
-    adminPassword: config.ADMIN_PASSWORD,
-    jwtSecret: config.JWT_SECRET,
-    encryptionKey: config.ENCRYPTION_KEY,
-    matcher,
-  });
+  app.register(adminRoutes, { db, matcher });
 
   // 前端静态文件服务（生产环境）
   const frontendDist = path.resolve(
@@ -144,6 +136,9 @@ export async function buildApp(
     },
   };
 }
+
+// index.ts 自身也需要 getBaseConfig，避免循环依赖
+import { getBaseConfig } from "./config.js";
 
 export async function main() {
   const { app } = await buildApp();

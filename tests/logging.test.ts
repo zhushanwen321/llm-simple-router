@@ -13,6 +13,7 @@ import { anthropicProxy } from "../src/proxy/anthropic.js";
 import { authMiddleware } from "../src/middleware/auth.js";
 import { encrypt } from "../src/utils/crypto.js";
 import { initDatabase } from "../src/db/index.js";
+import { setSetting } from "../src/db/settings.js";
 
 const API_KEY = "sk-test-router";
 const API_KEY_HASH = createHash("sha256").update(API_KEY).digest("hex");
@@ -44,6 +45,8 @@ function closeServer(server: Server): Promise<void> {
 
 function createApp() {
   const db = initDatabase(":memory:");
+  setSetting(db, "encryption_key", TEST_ENCRYPTION_KEY);
+  setSetting(db, "initialized", "true");
 
   // 插入测试用的 router key，使 auth middleware 能通过认证
   db.prepare(
@@ -54,14 +57,12 @@ function createApp() {
   app.register(authMiddleware, { db });
   app.register(openaiProxy, {
     db,
-    encryptionKey: TEST_ENCRYPTION_KEY,
     streamTimeoutMs: 5000,
     retryMaxAttempts: 0,
     retryBaseDelayMs: 0,
   });
   app.register(anthropicProxy, {
     db,
-    encryptionKey: TEST_ENCRYPTION_KEY,
     streamTimeoutMs: 5000,
     retryMaxAttempts: 0,
     retryBaseDelayMs: 0,

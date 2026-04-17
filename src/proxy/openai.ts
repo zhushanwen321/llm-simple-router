@@ -2,6 +2,7 @@ import type { FastifyPluginCallback, FastifyReply } from "fastify";
 import Database from "better-sqlite3";
 import fp from "fastify-plugin";
 import { getActiveProviders } from "../db/index.js";
+import { getSetting } from "../db/settings.js";
 import { decrypt } from "../utils/crypto.js";
 import {
   proxyGetRequest,
@@ -16,7 +17,6 @@ import { RetryRuleMatcher } from "./retry-rules.js";
 
 export interface OpenaiProxyOptions {
   db: Database.Database;
-  encryptionKey: string;
   streamTimeoutMs: number;
   retryMaxAttempts: number;
   retryBaseDelayMs: number;
@@ -56,10 +56,10 @@ function sendError(reply: FastifyReply, e: ProxyErrorResponse) {
 }
 
 const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, done) => {
-  const { db, encryptionKey, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher } = opts;
+  const { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher } = opts;
 
   app.post(CHAT_COMPLETIONS_PATH, async (request, reply) => {
-    const deps: ProxyHandlerDeps = { db, encryptionKey, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher };
+    const deps: ProxyHandlerDeps = { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher };
     return handleProxyPost(request, reply, "openai", CHAT_COMPLETIONS_PATH, openaiErrors, deps, {
       beforeSendProxy: (body, isStream) => {
         if (isStream && !body.stream_options) {
@@ -76,7 +76,7 @@ const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, do
       body: { error: { message: "No active OpenAI provider configured", type: "invalid_request_error", code: "no_provider" } },
     });
     const provider = providers[0];
-    const apiKey = decrypt(provider.api_key, encryptionKey);
+    const apiKey = decrypt(provider.api_key, getSetting(db, "encryption_key")!);
     const cliHdrs: RawHeaders = request.headers as RawHeaders;
     try {
       const result = await proxyGetRequest(provider, apiKey, cliHdrs, MODELS_PATH);

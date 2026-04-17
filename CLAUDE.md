@@ -68,7 +68,7 @@ docker compose up -d
 
 ## 环境变量
 
-必需：`ADMIN_PASSWORD`、`ENCRYPTION_KEY`（64字符 hex）、`JWT_SECRET`（64字符 hex）
+所有 secrets（管理员密码、加密密钥、JWT 密钥）通过首次启动的 Setup 页面设置，存入 DB settings 表，无需环境变量。
 可选：`PORT`（默认 9981）、`DB_PATH`、`LOG_LEVEL`、`STREAM_TIMEOUT_MS`
 参考 `.env.example`
 

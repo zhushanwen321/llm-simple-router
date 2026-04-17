@@ -7,6 +7,7 @@ import Database from "better-sqlite3";
 import type { Provider } from "../db/index.js";
 import { getProviderById, insertRequestLog, insertMetrics } from "../db/index.js";
 import { decrypt } from "../utils/crypto.js";
+import { getSetting } from "../db/settings.js";
 import { SSEMetricsTransform } from "../metrics/sse-metrics-transform.js";
 import { MetricsExtractor } from "../metrics/metrics-extractor.js";
 import type { MetricsResult } from "../metrics/metrics-extractor.js";
@@ -384,7 +385,6 @@ export interface ProxyErrorFormatter {
 
 export interface ProxyHandlerDeps {
   db: Database.Database;
-  encryptionKey: string;
   streamTimeoutMs: number;
   retryMaxAttempts: number;
   retryBaseDelayMs: number;
@@ -408,7 +408,7 @@ export async function handleProxyPost(
     beforeSendProxy?: (body: Record<string, unknown>, isStream: boolean) => void;
   },
 ): Promise<FastifyReply> {
-  const { db, encryptionKey, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher } = deps;
+  const { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher } = deps;
 
   request.raw.socket.on("error", (err) => request.log.debug({ err }, "client socket error"));
   const startTime = Date.now();
@@ -446,7 +446,7 @@ export async function handleProxyPost(
   }
 
   body.model = resolved.backend_model;
-  const apiKey = decrypt(provider.api_key, encryptionKey);
+  const apiKey = decrypt(provider.api_key, getSetting(db, "encryption_key")!);
   const isStream = body.stream === true;
 
   // 允许调用方在发送代理请求前修改 body（如 openai 的 stream_options 注入）

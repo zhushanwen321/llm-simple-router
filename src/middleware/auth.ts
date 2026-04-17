@@ -2,6 +2,7 @@ import { FastifyPluginCallback, FastifyReply } from "fastify";
 import { createHash } from "crypto";
 import fp from "fastify-plugin";
 import Database from "better-sqlite3";
+import { isInitialized } from "../db/settings.js";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -45,6 +46,12 @@ const authMiddlewareRaw: FastifyPluginCallback<{ db: Database.Database }> = (
   app.addHook("onRequest", async (request, reply) => {
     if (shouldSkipAuth(request.url)) {
       return;
+    }
+
+    // 未初始化时代理层不可用
+    if (!isInitialized(options.db)) {
+      reply.code(503).send({ error: { message: "Service not initialized" } });
+      return reply;
     }
 
     const authHeader = request.headers.authorization;

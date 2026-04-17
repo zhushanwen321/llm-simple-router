@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import Fastify, { type FastifyInstance } from "fastify";
 import { createHash } from "crypto";
 import { initDatabase } from "../src/db/index.js";
+import { setSetting } from "../src/db/settings.js";
 import { authMiddleware } from "../src/middleware/auth.js";
 import Database from "better-sqlite3";
 
@@ -10,6 +11,7 @@ const TEST_KEY_HASH = createHash("sha256").update(TEST_KEY).digest("hex");
 
 function buildTestApp() {
   const db = initDatabase(":memory:");
+  setSetting(db, "initialized", "true");
   db.prepare(
     "INSERT INTO router_keys (id, name, key_hash, key_prefix) VALUES (?, ?, ?, ?)"
   ).run("test-id", "Test Key", TEST_KEY_HASH, TEST_KEY.slice(0, 8));

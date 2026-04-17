@@ -7,6 +7,7 @@ import {
   getAllRouterKeys, getRouterKeyById, createRouterKey, updateRouterKey, deleteRouterKey, getAvailableModels,
 } from "../db/index.js";
 import type { RouterKey } from "../db/index.js";
+import { getSetting } from "../db/settings.js";
 
 const HTTP_CREATED = 201;
 const HTTP_NOT_FOUND = 404;
@@ -26,18 +27,18 @@ const UpdateRouterKeySchema = Type.Object({
 
 interface RouterKeyRoutesOptions {
   db: Database.Database;
-  encryptionKey: string;
 }
 
-function generateRouterKey(encryptionKey: string): { key: string; hash: string; prefix: string; encrypted: string } {
+function generateRouterKey(db: Database.Database): { key: string; hash: string; prefix: string; encrypted: string } {
   const key = `sk-router-${randomBytes(KEY_RANDOM_BYTES).toString("hex")}`;
   const hash = createHash("sha256").update(key).digest("hex");
   const prefix = key.slice(0, KEY_PREFIX_LENGTH);
-  const encrypted = encrypt(key, encryptionKey);
+  const encrypted = encrypt(key, getSetting(db, "encryption_key")!);
   return { key, hash, prefix, encrypted };
 }
 
-function toPublicRouterKey(rk: RouterKey, encryptionKey: string) {
+function toPublicRouterKey(rk: RouterKey, db: Database.Database) {
+  const encryptionKey = getSetting(db, "encryption_key")!;
   return {
     id: rk.id,
     name: rk.name,
@@ -51,16 +52,16 @@ function toPublicRouterKey(rk: RouterKey, encryptionKey: string) {
 }
 
 export const adminRouterKeyRoutes: FastifyPluginCallback<RouterKeyRoutesOptions> = (app, options, done) => {
-  const { db, encryptionKey } = options;
+  const { db } = options;
 
   app.get("/admin/api/router-keys", async (_request, reply) => {
     const keys = getAllRouterKeys(db);
-    return reply.send(keys.map((rk) => toPublicRouterKey(rk, encryptionKey)));
+    return reply.send(keys.map((rk) => toPublicRouterKey(rk, db)));
   });
 
   app.post("/admin/api/router-keys", { schema: { body: CreateRouterKeySchema } }, async (request, reply) => {
     const body = request.body as Static<typeof CreateRouterKeySchema>;
-    const { key, hash, prefix, encrypted } = generateRouterKey(encryptionKey);
+    const { key, hash, prefix, encrypted } = generateRouterKey(db);
     const allowedModels = body.allowed_models ? JSON.stringify(body.allowed_models) : null;
     const id = createRouterKey(db, { name: body.name, key_hash: hash, key_prefix: prefix, key_encrypted: encrypted, allowed_models: allowedModels });
     return reply.code(HTTP_CREATED).send({

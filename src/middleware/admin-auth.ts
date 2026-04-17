@@ -2,11 +2,12 @@ import { FastifyPluginCallback } from "fastify";
 import fp from "fastify-plugin";
 import cookie from "@fastify/cookie";
 import jwt from "jsonwebtoken";
-import { timingSafeEqual } from "crypto";
+import Database from "better-sqlite3";
+import { isInitialized, getSetting } from "../db/settings.js";
+import { verifyPassword } from "../utils/password.js";
 
 interface AdminAuthOptions {
-  adminPassword: string;
-  jwtSecret: string;
+  db: Database.Database;
 }
 
 const HTTP_UNAUTHORIZED = 401;
@@ -16,8 +17,19 @@ const adminAuthRaw: FastifyPluginCallback<AdminAuthOptions> = (app, options, don
 
   app.addHook("onRequest", async (request, reply) => {
     const path = request.url.split("?")[0];
-    if (!path.startsWith("/admin/api/") || path === "/admin/api/login" || path === "/admin/api/logout") {
-      return;
+
+    // Setup API 不需要 auth
+    if (path.startsWith("/admin/api/setup/")) return;
+
+    // Login/logout 不需要 auth
+    if (path === "/admin/api/login" || path === "/admin/api/logout") return;
+
+    // 非 admin API 路径跳过
+    if (!path.startsWith("/admin/api/")) return;
+
+    // 未初始化时返回 needsSetup
+    if (!isInitialized(options.db)) {
+      return reply.code(HTTP_UNAUTHORIZED).send({ error: { message: "Not initialized", needsSetup: true } });
     }
 
     const token = request.cookies["admin_token"];
@@ -26,8 +38,9 @@ const adminAuthRaw: FastifyPluginCallback<AdminAuthOptions> = (app, options, don
       return reply;
     }
 
+    const secret = getSetting(options.db, "jwt_secret");
     try {
-      jwt.verify(token, options.jwtSecret);
+      jwt.verify(token, secret ?? "");
     } catch (err: unknown) {
       request.log.debug({ err }, "invalid JWT token");
       reply.code(HTTP_UNAUTHORIZED).send({ error: { message: "Invalid or expired token" } });
@@ -48,13 +61,15 @@ export const adminLoginRoutes: FastifyPluginCallback<AdminAuthOptions> = (app, o
     if (!password) {
       return reply.code(HTTP_UNAUTHORIZED).send({ error: { message: "Invalid password" } });
     }
-    const passwordBuf = Buffer.from(password);
-    const keyBuf = Buffer.from(options.adminPassword);
-    if (passwordBuf.length !== keyBuf.length || !timingSafeEqual(passwordBuf, keyBuf)) {
+
+    // DB 模式：scrypt hash 验证
+    const hash = getSetting(options.db, "admin_password_hash");
+    if (!hash || !verifyPassword(password, hash)) {
       return reply.code(HTTP_UNAUTHORIZED).send({ error: { message: "Invalid password" } });
     }
 
-    const token = jwt.sign({ role: "admin" }, options.jwtSecret, { expiresIn: TOKEN_EXPIRY_SECONDS });
+    const secret = getSetting(options.db, "jwt_secret");
+    const token = jwt.sign({ role: "admin" }, secret!, { expiresIn: TOKEN_EXPIRY_SECONDS });
     reply.setCookie("admin_token", token, {
       path: "/admin",
       httpOnly: true,

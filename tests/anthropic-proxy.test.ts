@@ -5,6 +5,7 @@ import Database from "better-sqlite3";
 import { encrypt } from "../src/utils/crypto.js";
 import { anthropicProxy } from "../src/proxy/anthropic.js";
 import { initDatabase } from "../src/db/index.js";
+import { setSetting } from "../src/db/settings.js";
 
 const TEST_ENCRYPTION_KEY =
   "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
@@ -36,7 +37,6 @@ function buildTestApp(mockDb: Database.Database): FastifyInstance {
 
   app.register(anthropicProxy, {
     db: mockDb,
-    encryptionKey: TEST_ENCRYPTION_KEY,
     streamTimeoutMs: 5000,
     retryMaxAttempts: 0,
     retryBaseDelayMs: 0,
@@ -177,6 +177,7 @@ describe("Anthropic proxy", () => {
 
   beforeEach(() => {
     mockDb = initDatabase(":memory:");
+    setSetting(mockDb, "encryption_key", TEST_ENCRYPTION_KEY);
   });
 
   afterEach(async () => {
