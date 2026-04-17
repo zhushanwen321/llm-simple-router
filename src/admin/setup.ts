@@ -3,7 +3,6 @@ import Database from "better-sqlite3";
 import { randomBytes } from "node:crypto";
 import { getSetting, setSetting, isInitialized } from "../db/settings.js";
 import { hashPassword } from "../utils/password.js";
-import { loadSettingsToConfig, getConfig } from "../config.js";
 
 interface SetupOptions {
   db: Database.Database;
@@ -18,7 +17,7 @@ export const adminSetupRoutes: FastifyPluginCallback<SetupOptions> = (app, optio
 
   app.post("/admin/api/setup/initialize", async (request, reply) => {
     const { password } = request.body as { password?: string };
-    if (!password || password.length < 6) {
+    if (!password || password.length < 6) { // eslint-disable-line no-magic-numbers
       return reply.code(400).send({ error: { message: "Password must be at least 6 characters" } });
     }
 
@@ -38,8 +37,6 @@ export const adminSetupRoutes: FastifyPluginCallback<SetupOptions> = (app, optio
       return reply.code(409).send({ error: { message: "Already initialized" } });
     }
 
-    // 刷新运行时配置
-    loadSettingsToConfig(db);
     return { success: true };
   });
 

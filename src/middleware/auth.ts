@@ -2,7 +2,7 @@ import { FastifyPluginCallback, FastifyReply } from "fastify";
 import { createHash } from "crypto";
 import fp from "fastify-plugin";
 import Database from "better-sqlite3";
-import { Config } from "../config.js";
+import { isInitialized } from "../db/settings.js";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -34,7 +34,7 @@ function unauthorizedReply(reply: FastifyReply): void {
   });
 }
 
-const authMiddlewareRaw: FastifyPluginCallback<{ db: Database.Database; config: Config }> = (
+const authMiddlewareRaw: FastifyPluginCallback<{ db: Database.Database }> = (
   app,
   options,
   done
@@ -48,8 +48,8 @@ const authMiddlewareRaw: FastifyPluginCallback<{ db: Database.Database; config: 
       return;
     }
 
-    // Setup 模式下代理层不可用
-    if (options.config.needsSetup) {
+    // 未初始化时代理层不可用
+    if (!isInitialized(options.db)) {
       reply.code(503).send({ error: { message: "Service not initialized" } });
       return reply;
     }

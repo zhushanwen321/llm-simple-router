@@ -2,24 +2,15 @@ import { FastifyPluginCallback } from "fastify";
 import fp from "fastify-plugin";
 import cookie from "@fastify/cookie";
 import jwt from "jsonwebtoken";
-import { timingSafeEqual } from "crypto";
 import Database from "better-sqlite3";
 import { isInitialized, getSetting } from "../db/settings.js";
 import { verifyPassword } from "../utils/password.js";
 
 interface AdminAuthOptions {
-  adminPassword: string;
-  jwtSecret: string;
   db: Database.Database;
 }
 
 const HTTP_UNAUTHORIZED = 401;
-
-// 零配置场景下 options 在注册时为空字符串，setup 完成后存入 DB。
-// 运行时从 DB 读取最新值，环境变量优先。
-function resolveJwtSecret(options: AdminAuthOptions): string {
-  return options.jwtSecret || getSetting(options.db, "jwt_secret") || "";
-}
 
 const adminAuthRaw: FastifyPluginCallback<AdminAuthOptions> = (app, options, done) => {
   app.register(cookie);
@@ -36,10 +27,8 @@ const adminAuthRaw: FastifyPluginCallback<AdminAuthOptions> = (app, options, don
     // 非 admin API 路径跳过
     if (!path.startsWith("/admin/api/")) return;
 
-    // 未初始化时，除了 setup 以外的 API 返回 needsSetup
-    const secret = resolveJwtSecret(options);
-    const envReady = options.adminPassword && secret;
-    if (!envReady && !isInitialized(options.db)) {
+    // 未初始化时返回 needsSetup
+    if (!isInitialized(options.db)) {
       return reply.code(HTTP_UNAUTHORIZED).send({ error: { message: "Not initialized", needsSetup: true } });
     }
 
@@ -49,8 +38,9 @@ const adminAuthRaw: FastifyPluginCallback<AdminAuthOptions> = (app, options, don
       return reply;
     }
 
+    const secret = getSetting(options.db, "jwt_secret");
     try {
-      jwt.verify(token, secret);
+      jwt.verify(token, secret ?? "");
     } catch (err: unknown) {
       request.log.debug({ err }, "invalid JWT token");
       reply.code(HTTP_UNAUTHORIZED).send({ error: { message: "Invalid or expired token" } });
@@ -72,24 +62,14 @@ export const adminLoginRoutes: FastifyPluginCallback<AdminAuthOptions> = (app, o
       return reply.code(HTTP_UNAUTHORIZED).send({ error: { message: "Invalid password" } });
     }
 
-    // 环境变量/配置模式：明文 timing-safe 对比（非 __DB_AUTH__ 占位值）
-    const configuredPassword = options.adminPassword;
-    if (configuredPassword && configuredPassword !== "__DB_AUTH__") {
-      const passwordBuf = Buffer.from(password);
-      const keyBuf = Buffer.from(configuredPassword);
-      if (passwordBuf.length !== keyBuf.length || !timingSafeEqual(passwordBuf, keyBuf)) {
-        return reply.code(HTTP_UNAUTHORIZED).send({ error: { message: "Invalid password" } });
-      }
-    } else {
-      // DB 模式：scrypt hash 验证
-      const hash = getSetting(options.db, "admin_password_hash");
-      if (!hash || !verifyPassword(password, hash)) {
-        return reply.code(HTTP_UNAUTHORIZED).send({ error: { message: "Invalid password" } });
-      }
+    // DB 模式：scrypt hash 验证
+    const hash = getSetting(options.db, "admin_password_hash");
+    if (!hash || !verifyPassword(password, hash)) {
+      return reply.code(HTTP_UNAUTHORIZED).send({ error: { message: "Invalid password" } });
     }
 
-    const secret = resolveJwtSecret(options);
-    const token = jwt.sign({ role: "admin" }, secret, { expiresIn: TOKEN_EXPIRY_SECONDS });
+    const secret = getSetting(options.db, "jwt_secret");
+    const token = jwt.sign({ role: "admin" }, secret!, { expiresIn: TOKEN_EXPIRY_SECONDS });
     reply.setCookie("admin_token", token, {
       path: "/admin",
       httpOnly: true,

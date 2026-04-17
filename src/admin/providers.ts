@@ -4,6 +4,7 @@ import { Type, Static } from "@sinclair/typebox";
 import type { Provider } from "../db/index.js";
 import { getAllProviders, getProviderById, createProvider, updateProvider, deleteProvider, getAllMappingGroups } from "../db/index.js";
 import { encrypt } from "../utils/crypto.js";
+import { getSetting } from "../db/settings.js";
 import { HTTP_CREATED, HTTP_NOT_FOUND, HTTP_CONFLICT } from "./constants.js";
 
 const API_KEY_PREVIEW_MIN_LEN = 8;
@@ -29,7 +30,6 @@ const UpdateProviderSchema = Type.Object({
 
 interface ProviderRoutesOptions {
   db: Database.Database;
-  encryptionKey: string;
 }
 
 function computeApiKeyPreview(apiKey: string): string {
@@ -38,7 +38,7 @@ function computeApiKeyPreview(apiKey: string): string {
 }
 
 export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> = (app, options, done) => {
-  const { db, encryptionKey } = options;
+  const { db } = options;
 
   app.get("/admin/api/providers", async (_request, reply) => {
     const providers = getAllProviders(db);
@@ -57,7 +57,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
 
   app.post("/admin/api/providers", { schema: { body: CreateProviderSchema } }, async (request, reply) => {
     const body = request.body as Static<typeof CreateProviderSchema>;
-    const encryptedKey = encrypt(body.api_key, encryptionKey);
+    const encryptedKey = encrypt(body.api_key, getSetting(db, "encryption_key")!);
     const apiKeyPreview = computeApiKeyPreview(body.api_key);
     const id = createProvider(db, {
       name: body.name,
@@ -85,7 +85,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     if (body.is_active !== undefined) fields.is_active = body.is_active;
     if (body.models !== undefined) fields.models = JSON.stringify(body.models);
     if (body.api_key) {
-      fields.api_key = encrypt(body.api_key, encryptionKey);
+      fields.api_key = encrypt(body.api_key, getSetting(db, "encryption_key")!);
       fields.api_key_preview = computeApiKeyPreview(body.api_key);
     }
     updateProvider(db, id, fields);

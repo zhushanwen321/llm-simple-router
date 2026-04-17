@@ -2,16 +2,13 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { FastifyInstance } from "fastify";
 import { buildApp } from "../src/index.js";
 import { initDatabase } from "../src/db/index.js";
+import { setSetting } from "../src/db/settings.js";
+import { hashPassword } from "../src/utils/password.js";
 
 const TEST_ENCRYPTION_KEY = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-const ADMIN_PASSWORD = "test-admin-pass";
-const JWT_SECRET = "test-jwt-secret-for-testing";
 
 function makeConfig() {
   return {
-    ADMIN_PASSWORD,
-    JWT_SECRET,
-    ENCRYPTION_KEY: TEST_ENCRYPTION_KEY,
     PORT: 9981,
     DB_PATH: ":memory:",
     LOG_LEVEL: "silent",
@@ -19,7 +16,6 @@ function makeConfig() {
     STREAM_TIMEOUT_MS: 5000,
     RETRY_MAX_ATTEMPTS: 0,
     RETRY_BASE_DELAY_MS: 0,
-    needsSetup: false,
   };
 }
 
@@ -27,10 +23,17 @@ async function login(app: FastifyInstance): Promise<string> {
   const res = await app.inject({
     method: "POST",
     url: "/admin/api/login",
-    payload: { password: ADMIN_PASSWORD },
+    payload: { password: "test-admin-pass" },
   });
   const match = (res.headers["set-cookie"] as string).match(/admin_token=([^;]+)/);
   return `admin_token=${match![1]}`;
+}
+
+function seedSettings(db: ReturnType<typeof initDatabase>) {
+  setSetting(db, "encryption_key", TEST_ENCRYPTION_KEY);
+  setSetting(db, "jwt_secret", "test-jwt-secret-for-testing");
+  setSetting(db, "admin_password_hash", hashPassword("test-admin-pass"));
+  setSetting(db, "initialized", "true");
 }
 
 function insertTestLogs(db: ReturnType<typeof initDatabase>) {
@@ -63,6 +66,7 @@ describe("Logs API", () => {
   beforeEach(async () => {
     db = initDatabase(":memory:");
     insertTestLogs(db);
+    seedSettings(db);
     const result = await buildApp({ config: makeConfig() as any, db });
     app = result.app;
     close = result.close;
@@ -127,6 +131,7 @@ describe("Stats API", () => {
   beforeEach(async () => {
     db = initDatabase(":memory:");
     insertTestLogs(db);
+    seedSettings(db);
     const result = await buildApp({ config: makeConfig() as any, db });
     app = result.app;
     close = result.close;
@@ -153,6 +158,7 @@ describe("Stats API", () => {
 
   it("GET stats with empty database", async () => {
     const emptyDb = initDatabase(":memory:");
+    seedSettings(emptyDb);
     const result = await buildApp({ config: makeConfig() as any, db: emptyDb });
     const emptyApp = result.app;
     const emptyClose = result.close;

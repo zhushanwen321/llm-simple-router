@@ -8,7 +8,7 @@ const HTTP_NOT_FOUND = 404;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-import { getConfig, getBaseConfig, loadSettingsToConfig, Config } from "./config.js";
+import { getConfig, Config } from "./config.js";
 import { initDatabase, seedDefaultRules } from "./db/index.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { openaiProxy } from "./proxy/openai.js";
@@ -38,8 +38,6 @@ export async function buildApp(
     db = options.db;
   } else {
     db = initDatabase(config.DB_PATH);
-    // 从 settings 表加载密钥（零配置场景）
-    loadSettingsToConfig(db);
   }
 
   const app = Fastify({
@@ -79,10 +77,9 @@ export async function buildApp(
   const matcher = new RetryRuleMatcher();
   matcher.load(db);
 
-  app.register(authMiddleware, { db, config });
+  app.register(authMiddleware, { db });
   app.register(openaiProxy, {
     db,
-    encryptionKey: config.ENCRYPTION_KEY,
     streamTimeoutMs: config.STREAM_TIMEOUT_MS,
     retryMaxAttempts: config.RETRY_MAX_ATTEMPTS,
     retryBaseDelayMs: config.RETRY_BASE_DELAY_MS,
@@ -90,20 +87,13 @@ export async function buildApp(
   });
   app.register(anthropicProxy, {
     db,
-    encryptionKey: config.ENCRYPTION_KEY,
     streamTimeoutMs: config.STREAM_TIMEOUT_MS,
     retryMaxAttempts: config.RETRY_MAX_ATTEMPTS,
     retryBaseDelayMs: config.RETRY_BASE_DELAY_MS,
     matcher,
   });
 
-  app.register(adminRoutes, {
-    db,
-    adminPassword: config.ADMIN_PASSWORD,
-    jwtSecret: config.JWT_SECRET,
-    encryptionKey: config.ENCRYPTION_KEY,
-    matcher,
-  });
+  app.register(adminRoutes, { db, matcher });
 
   // 前端静态文件服务（生产环境）
   const frontendDist = path.resolve(
@@ -146,6 +136,9 @@ export async function buildApp(
     },
   };
 }
+
+// index.ts 自身也需要 getBaseConfig，避免循环依赖
+import { getBaseConfig } from "./config.js";
 
 export async function main() {
   const { app } = await buildApp();
