@@ -34,7 +34,7 @@ export interface RetryStrategy {
 
 export class FixedIntervalStrategy implements RetryStrategy {
   constructor(private delayMs: number) {}
-  getDelay(): number { return this.delayMs; }
+  getDelay(_attempt: number): number { return this.delayMs; }
 }
 
 export class ExponentialBackoffStrategy implements RetryStrategy {

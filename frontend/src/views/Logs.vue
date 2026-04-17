@@ -143,8 +143,17 @@
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent>
+              <div class="flex items-center justify-between px-4 py-2 border-b sticky top-0 z-10 bg-background">
+                <div class="inline-flex h-8 items-center gap-1 rounded-md bg-muted p-1">
+                  <Button variant="ghost" size="xs" :class="sectionModes.client_request === 'structured' ? 'bg-background shadow' : ''" @click="sectionModes.client_request = 'structured'">结构化</Button>
+                  <Button variant="ghost" size="xs" :class="sectionModes.client_request === 'raw' ? 'bg-background shadow' : ''" @click="sectionModes.client_request = 'raw'">原始 JSON</Button>
+                </div>
+                <Button variant="ghost" size="xs" class="h-auto py-1" @click="copySection('client_request')">
+                  {{ copiedSection === 'client_request' ? '已复制' : '复制' }}
+                </Button>
+              </div>
               <div class="p-4">
-                <LogRequestViewer :raw="detailData.client_request || detailData.request_body || '{}'" :api-type="asApiType(detailData.api_type)" />
+                <LogRequestViewer :raw="detailData.client_request || detailData.request_body || '{}'" :api-type="asApiType(detailData.api_type)" :mode="sectionModes.client_request" />
               </div>
             </CollapsibleContent>
           </Collapsible>
@@ -158,8 +167,17 @@
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent>
+              <div class="flex items-center justify-between px-4 py-2 border-b sticky top-0 z-10 bg-background">
+                <div class="inline-flex h-8 items-center gap-1 rounded-md bg-muted p-1">
+                  <Button variant="ghost" size="xs" :class="sectionModes.upstream_request === 'structured' ? 'bg-background shadow' : ''" @click="sectionModes.upstream_request = 'structured'">结构化</Button>
+                  <Button variant="ghost" size="xs" :class="sectionModes.upstream_request === 'raw' ? 'bg-background shadow' : ''" @click="sectionModes.upstream_request = 'raw'">原始 JSON</Button>
+                </div>
+                <Button variant="ghost" size="xs" class="h-auto py-1" @click="copySection('upstream_request')">
+                  {{ copiedSection === 'upstream_request' ? '已复制' : '复制' }}
+                </Button>
+              </div>
               <div class="p-4">
-                <LogRequestViewer :raw="detailData.upstream_request" :api-type="asApiType(detailData.api_type)" :show-url="true" />
+                <LogRequestViewer :raw="detailData.upstream_request" :api-type="asApiType(detailData.api_type)" :show-url="true" :mode="sectionModes.upstream_request" />
               </div>
             </CollapsibleContent>
           </Collapsible>
@@ -173,8 +191,17 @@
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent>
+              <div class="flex items-center justify-between px-4 py-2 border-b sticky top-0 z-10 bg-background">
+                <div class="inline-flex h-8 items-center gap-1 rounded-md bg-muted p-1">
+                  <Button variant="ghost" size="xs" :class="sectionModes.upstream_response === 'structured' ? 'bg-background shadow' : ''" @click="sectionModes.upstream_response = 'structured'">结构化</Button>
+                  <Button variant="ghost" size="xs" :class="sectionModes.upstream_response === 'raw' ? 'bg-background shadow' : ''" @click="sectionModes.upstream_response = 'raw'">{{ detailData.is_stream ? '原始 SSE 文本' : '原始 JSON' }}</Button>
+                </div>
+                <Button variant="ghost" size="xs" class="h-auto py-1" @click="copySection('upstream_response')">
+                  {{ copiedSection === 'upstream_response' ? '已复制' : '复制' }}
+                </Button>
+              </div>
               <div class="p-4">
-                <LogResponseViewer :raw="detailData.upstream_response || detailData.response_body || '{}'" :api-type="asApiType(detailData.api_type)" :is-stream="!!detailData.is_stream" />
+                <LogResponseViewer :raw="detailData.upstream_response || detailData.response_body || '{}'" :api-type="asApiType(detailData.api_type)" :is-stream="!!detailData.is_stream" :mode="sectionModes.upstream_response" />
               </div>
             </CollapsibleContent>
           </Collapsible>
@@ -188,8 +215,17 @@
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent>
+              <div class="flex items-center justify-between px-4 py-2 border-b sticky top-0 z-10 bg-background">
+                <div class="inline-flex h-8 items-center gap-1 rounded-md bg-muted p-1">
+                  <Button variant="ghost" size="xs" :class="sectionModes.client_response === 'structured' ? 'bg-background shadow' : ''" @click="sectionModes.client_response = 'structured'">结构化</Button>
+                  <Button variant="ghost" size="xs" :class="sectionModes.client_response === 'raw' ? 'bg-background shadow' : ''" @click="sectionModes.client_response = 'raw'">{{ detailData.is_stream ? '原始 SSE 文本' : '原始 JSON' }}</Button>
+                </div>
+                <Button variant="ghost" size="xs" class="h-auto py-1" @click="copySection('client_response')">
+                  {{ copiedSection === 'client_response' ? '已复制' : '复制' }}
+                </Button>
+              </div>
               <div class="p-4">
-                <LogResponseViewer :raw="detailData.client_response" :api-type="asApiType(detailData.api_type)" :is-stream="!!detailData.is_stream" />
+                <LogResponseViewer :raw="detailData.client_response" :api-type="asApiType(detailData.api_type)" :is-stream="!!detailData.is_stream" :mode="sectionModes.client_response" />
               </div>
             </CollapsibleContent>
           </Collapsible>
@@ -224,7 +260,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
 import { api } from '@/api/client'
 import { Button } from '@/components/ui/button'
@@ -280,6 +316,34 @@ const upstreamRequestOpen = ref(false)
 const responseOpen = ref(false)
 const clientResponseOpen = ref(false)
 
+type SectionKey = 'client_request' | 'upstream_request' | 'upstream_response' | 'client_response'
+const sectionModes = reactive<Record<SectionKey, 'structured' | 'raw'>>({
+  client_request: 'structured',
+  upstream_request: 'structured',
+  upstream_response: 'structured',
+  client_response: 'structured',
+})
+const copiedSection = ref<SectionKey | null>(null)
+
+function getSectionRaw(key: SectionKey): string {
+  if (!detailData.value) return '{}'
+  const map: Record<SectionKey, string> = {
+    client_request: detailData.value.client_request || detailData.value.request_body || '{}',
+    upstream_request: detailData.value.upstream_request || '{}',
+    upstream_response: detailData.value.upstream_response || detailData.value.response_body || '{}',
+    client_response: detailData.value.client_response || '{}',
+  }
+  return map[key]
+}
+
+async function copySection(key: SectionKey) {
+  try {
+    await navigator.clipboard.writeText(getSectionRaw(key))
+    copiedSection.value = key
+    setTimeout(() => { copiedSection.value = null }, 2000) // eslint-disable-line no-magic-numbers
+  } catch { /* ignore */ }
+}
+
 function asApiType(t: string): 'openai' | 'anthropic' {
   return t === 'openai' ? 'openai' : 'anthropic'
 }
@@ -292,6 +356,10 @@ async function openDetail(id: string) {
   upstreamRequestOpen.value = false
   responseOpen.value = false
   clientResponseOpen.value = false
+  sectionModes.client_request = 'structured'
+  sectionModes.upstream_request = 'structured'
+  sectionModes.upstream_response = 'structured'
+  sectionModes.client_response = 'structured'
   try {
     const res = await api.getLogDetail(id)
     detailData.value = res.data
