@@ -166,6 +166,37 @@ export function insertSuccessLog(
   });
 }
 
+/** Log a request rejected before reaching upstream */
+function insertRejectedLog(
+  db: Database.Database,
+  logId: string,
+  apiType: string,
+  model: string,
+  statusCode: number,
+  errorMessage: string,
+  startTime: number,
+  isStream: boolean,
+  routerKeyId: string | null,
+  originalBody: Record<string, unknown>,
+  clientHeaders: RawHeaders,
+  providerId?: string | null,
+): void {
+  insertRequestLog(db, {
+    id: logId,
+    api_type: apiType,
+    model,
+    provider_id: providerId ?? null,
+    status_code: statusCode,
+    latency_ms: Date.now() - startTime,
+    is_stream: isStream ? 1 : 0,
+    error_message: errorMessage,
+    created_at: new Date().toISOString(),
+    request_body: JSON.stringify(originalBody),
+    client_request: JSON.stringify({ headers: clientHeaders, body: originalBody }),
+    router_key_id: routerKeyId,
+  });
+}
+
 // ---------- Non-stream proxy ----------
 
 export function proxyNonStream(
@@ -431,6 +462,8 @@ export async function handleProxyPost(
     const routerKeyId = request.routerKey?.id ?? null;
     const body = request.body as Record<string, unknown>;
     const originalBody = JSON.parse(JSON.stringify(body));
+    const isStream = body.stream === true;
+    const cliHdrs: RawHeaders = request.headers as RawHeaders;
 
     const resolved = resolveMapping(db, clientModel, { now: new Date(), excludeTargets });
     if (!resolved) {
@@ -439,6 +472,8 @@ export async function handleProxyPost(
         return reply;
       }
       const e = errors.modelNotFound(clientModel);
+      insertRejectedLog(db, logId, apiType, clientModel, e.statusCode,
+        `No mapping found for model '${clientModel}'`, startTime, isStream, routerKeyId, originalBody, cliHdrs);
       return reply.status(e.statusCode).send(e.body);
     }
 
@@ -450,6 +485,9 @@ export async function handleProxyPost(
           const models: string[] = JSON.parse(allowedModels);
           if (models.length > 0 && !models.includes(resolved.backend_model)) {
             const e = errors.modelNotAllowed(resolved.backend_model);
+            insertRejectedLog(db, logId, apiType, clientModel, e.statusCode,
+              `Model '${resolved.backend_model}' not allowed for this API key`,
+              startTime, isStream, routerKeyId, originalBody, cliHdrs, resolved.provider_id);
             return reply.status(e.statusCode).send(e.body);
           }
         } catch { request.log.warn("Invalid allowed_models JSON, allowing all models"); }
@@ -459,22 +497,26 @@ export async function handleProxyPost(
     const provider = getProviderById(db, resolved.provider_id);
     if (!provider || !provider.is_active) {
       const e = errors.providerUnavailable();
+      insertRejectedLog(db, logId, apiType, clientModel, e.statusCode,
+        `Provider '${resolved.provider_id}' unavailable or inactive`,
+        startTime, isStream, routerKeyId, originalBody, cliHdrs, resolved.provider_id);
       return reply.status(e.statusCode).send(e.body);
     }
     if (provider.api_type !== apiType) {
       const e = errors.providerTypeMismatch();
+      insertRejectedLog(db, logId, apiType, clientModel, e.statusCode,
+        `Provider API type mismatch: expected '${apiType}', got '${provider.api_type}'`,
+        startTime, isStream, routerKeyId, originalBody, cliHdrs, resolved.provider_id);
       return reply.status(e.statusCode).send(e.body);
     }
 
     body.model = resolved.backend_model;
     const apiKey = decrypt(provider.api_key, getSetting(db, "encryption_key")!);
-    const isStream = body.stream === true;
 
     // 允许调用方在发送代理请求前修改 body（如 openai 的 stream_options 注入）
     options?.beforeSendProxy?.(body, isStream);
 
     const reqBodyStr = JSON.stringify(body);
-    const cliHdrs: RawHeaders = request.headers as RawHeaders;
     const clientReq = JSON.stringify({ headers: cliHdrs, body: originalBody });
     const retryConfig = buildRetryConfig(retryMaxAttempts, retryBaseDelayMs, matcher);
     const upstreamReqBase = JSON.stringify({ url: `${provider.base_url}${upstreamPath}`, headers: buildUpstreamHeaders(cliHdrs, apiKey, Buffer.byteLength(reqBodyStr)), body: reqBodyStr });

@@ -1,8 +1,9 @@
-import { FastifyPluginCallback, FastifyReply } from "fastify";
-import { createHash } from "crypto";
+import { FastifyPluginCallback, FastifyReply, FastifyRequest } from "fastify";
+import { createHash, randomUUID } from "crypto";
 import fp from "fastify-plugin";
 import Database from "better-sqlite3";
 import { isInitialized } from "../db/settings.js";
+import { insertRequestLog } from "../db/logs.js";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -34,6 +35,39 @@ function unauthorizedReply(reply: FastifyReply): void {
   });
 }
 
+// 代理路由路径 → api_type 映射，用于记录被认证拒绝的请求
+const PROXY_API_TYPES: Record<string, string> = {
+  "/v1/chat/completions": "openai",
+  "/v1/messages": "anthropic",
+  "/v1/models": "openai",
+};
+
+function getProxyApiType(url: string): string | null {
+  const path = url.split("?")[0];
+  return PROXY_API_TYPES[path] ?? null;
+}
+
+function logRejectedAuth(
+  db: Database.Database,
+  apiType: string,
+  statusCode: number,
+  errorMessage: string,
+  request: FastifyRequest,
+): void {
+  insertRequestLog(db, {
+    id: randomUUID(),
+    api_type: apiType,
+    model: null,
+    provider_id: null,
+    status_code: statusCode,
+    latency_ms: 0,
+    is_stream: 0,
+    error_message: errorMessage,
+    created_at: new Date().toISOString(),
+    client_request: JSON.stringify({ headers: request.headers }),
+  });
+}
+
 const authMiddlewareRaw: FastifyPluginCallback<{ db: Database.Database }> = (
   app,
   options,
@@ -48,14 +82,30 @@ const authMiddlewareRaw: FastifyPluginCallback<{ db: Database.Database }> = (
       return;
     }
 
+    const proxyApiType = getProxyApiType(request.url);
+
+    // 代理请求一到达就记录技术日志
+    if (proxyApiType) {
+      request.log.info(
+        { method: request.method, url: request.url, ip: request.ip },
+        `Proxy request received [${proxyApiType}]`,
+      );
+    }
+
     // 未初始化时代理层不可用
     if (!isInitialized(options.db)) {
+      if (proxyApiType) {
+        logRejectedAuth(options.db, proxyApiType, 503, "Service not initialized", request);
+      }
       reply.code(503).send({ error: { message: "Service not initialized" } });
       return reply;
     }
 
     const authHeader = request.headers.authorization;
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      if (proxyApiType) {
+        logRejectedAuth(options.db, proxyApiType, 401, "Invalid API key", request);
+      }
       unauthorizedReply(reply);
       return reply;
     }
@@ -64,6 +114,9 @@ const authMiddlewareRaw: FastifyPluginCallback<{ db: Database.Database }> = (
     const hash = createHash("sha256").update(token).digest("hex");
     const row = stmt.get(hash) as RouterKeyRow | undefined;
     if (!row) {
+      if (proxyApiType) {
+        logRejectedAuth(options.db, proxyApiType, 401, "Invalid API key", request);
+      }
       unauthorizedReply(reply);
       return reply;
     }
