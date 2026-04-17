@@ -55,6 +55,8 @@ export interface GetProxyResult {
 // ---------- Constants ----------
 
 export const UPSTREAM_SUCCESS = 200;
+// failover 判断上游请求失败的 HTTP 状态码阈值
+const FAILOVER_FAIL_THRESHOLD = 400;
 const HTTPS_DEFAULT_PORT = 443;
 const HTTP_DEFAULT_PORT = 80;
 const UPSTREAM_BAD_GATEWAY = 502;
@@ -533,7 +535,7 @@ export async function handleProxyPost(
       }
 
       // --- Failover 检查 ---
-      if (isFailover && r.statusCode >= 400 && !reply.raw.headersSent) {
+      if (isFailover && r.statusCode >= FAILOVER_FAIL_THRESHOLD && !reply.raw.headersSent) {
         excludeTargets.push(resolved);
         continue;
       }
