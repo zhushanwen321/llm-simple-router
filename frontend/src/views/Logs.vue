@@ -123,36 +123,50 @@
               </Button>
             </span>
           </div>
-          <!-- 有四阶段数据：使用新组件 -->
-          <template v-if="detailData.client_request">
-            <LogDetailFlow
-              v-if="viewState === 'timeline'"
-              :log="detailData"
-              :mode="globalMode"
-              @select-stage="selectedStage = $event; viewState = 'detail'"
-              @update:mode="globalMode = $event"
-            />
-            <LogStageDetail
-              v-else
-              :log="detailData"
-              :stage="selectedStage"
-              :mode="globalMode"
-              @back="viewState = 'timeline'"
-              @select-stage="selectedStage = $event"
-              @update:mode="globalMode = $event"
-            />
-          </template>
-          <!-- 旧日志兼容（无四阶段数据） -->
-          <template v-else>
-            <div v-if="detailData.request_body">
-              <LogRequestViewer :raw="detailData.request_body" :api-type="asApiType(detailData.api_type)" />
-            </div>
-            <div v-if="detailData.response_body">
-              <LogResponseViewer :raw="detailData.response_body" :api-type="asApiType(detailData.api_type)" :is-stream="!!detailData.is_stream" />
-            </div>
-          </template>
-          <Card v-if="detailData.error_message" class="mt-4 bg-danger-light ring-danger/20">
-            <CardContent class="py-3 text-sm text-danger-dark">{{ detailData.error_message }}</CardContent>
+
+          <!-- 基本信息 -->
+          <div class="bg-muted/50 rounded-md p-3 text-sm grid grid-cols-3 gap-2">
+            <div><span class="text-muted-foreground">类型:</span> <Badge :variant="detailData.api_type === 'openai' ? 'default' : 'secondary'" class="text-xs">{{ detailData.api_type }}</Badge></div>
+            <div><span class="text-muted-foreground">模型:</span> <span class="font-medium font-mono">{{ detailData.model || '-' }}</span></div>
+            <div><span class="text-muted-foreground">状态码:</span> <Badge :variant="(detailData.status_code ?? 0) < 400 ? 'default' : 'destructive'" class="text-xs">{{ detailData.status_code || '-' }}</Badge></div>
+            <div><span class="text-muted-foreground">延迟:</span> <span class="font-medium">{{ detailData.latency_ms ? detailData.latency_ms + 'ms' : '-' }}</span></div>
+            <div><span class="text-muted-foreground">流式:</span> <span class="font-medium">{{ detailData.is_stream ? 'Yes' : 'No' }}</span></div>
+            <div><span class="text-muted-foreground">时间:</span> <span class="font-medium">{{ formatTime(detailData.created_at) }}</span></div>
+          </div>
+
+          <!-- 客户端原始请求 -->
+          <Collapsible v-model:open="requestOpen" class="border rounded-md">
+            <CollapsibleTrigger as-child>
+              <Button variant="ghost" class="w-full px-4 py-3 text-left text-sm font-medium text-foreground bg-muted/50 hover:bg-muted rounded-none rounded-t-md flex items-center gap-2">
+                <span class="text-xs transition-transform" :class="requestOpen ? 'rotate-0' : '-rotate-90'">&#9660;</span>
+                客户端原始请求
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div class="p-4">
+                <LogRequestViewer :raw="detailData.client_request || detailData.request_body || '{}'" :api-type="asApiType(detailData.api_type)" />
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+
+          <!-- LLM API 返回的原始响应 -->
+          <Collapsible v-model:open="responseOpen" class="border rounded-md">
+            <CollapsibleTrigger as-child>
+              <Button variant="ghost" class="w-full px-4 py-3 text-left text-sm font-medium text-foreground bg-muted/50 hover:bg-muted rounded-none rounded-t-md flex items-center gap-2">
+                <span class="text-xs transition-transform" :class="responseOpen ? 'rotate-0' : '-rotate-90'">&#9660;</span>
+                LLM API 返回的原始响应
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div class="p-4">
+                <LogResponseViewer :raw="detailData.upstream_response || detailData.response_body || '{}'" :api-type="asApiType(detailData.api_type)" :is-stream="!!detailData.is_stream" />
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+
+          <!-- 错误信息 -->
+          <Card v-if="detailData.error_message" class="bg-destructive/10 ring-destructive/20">
+            <CardContent class="py-3 text-sm text-destructive">{{ detailData.error_message }}</CardContent>
           </Card>
         </template>
         <div v-else class="py-8 text-center text-muted-foreground">未找到日志</div>
@@ -191,12 +205,10 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogScrollContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Skeleton } from '@/components/ui/skeleton'
-import LogRequestViewer from '@/components/logs/LogRequestViewer.vue'
-import LogResponseViewer from '@/components/logs/LogResponseViewer.vue'
-import LogDetailFlow from '@/components/logs/LogDetailFlow.vue'
-import LogStageDetail from '@/components/logs/LogStageDetail.vue'
-import type { StageKey } from '@/components/logs/logColors'
+import LogRequestViewer from '@/components/log-viewer/LogRequestViewer.vue'
+import LogResponseViewer from '@/components/log-viewer/LogResponseViewer.vue'
 
 interface LogEntry {
   id: string
@@ -233,9 +245,8 @@ const showDetail = ref(false)
 const detailLoading = ref(false)
 const detailData = ref<LogEntry | null>(null)
 
-const viewState = ref<'timeline' | 'detail'>('timeline')
-const selectedStage = ref<StageKey>('client_req')
-const globalMode = ref<'structured' | 'raw'>('structured')
+const requestOpen = ref(true)
+const responseOpen = ref(false)
 
 function asApiType(t: string): 'openai' | 'anthropic' {
   return t === 'openai' ? 'openai' : 'anthropic'
@@ -245,8 +256,8 @@ async function openDetail(id: string) {
   showDetail.value = true
   detailLoading.value = true
   detailData.value = null
-  viewState.value = 'timeline'
-  globalMode.value = 'structured'
+  requestOpen.value = true
+  responseOpen.value = false
   try {
     const res = await api.getLogDetail(id)
     detailData.value = res.data

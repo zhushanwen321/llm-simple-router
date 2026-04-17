@@ -17,18 +17,13 @@
       </template>
       <template v-else>
         <!-- Claude Code context card -->
-        <Card v-if="isClaudeCode" class="border-border bg-info-light">
-          <CardHeader class="pb-2">
-            <div class="flex items-center gap-2">
-              <span class="text-sm font-semibold text-info-dark dark:text-info">Claude Code 请求</span>
-              <Badge variant="secondary">{{ claudeMode }}</Badge>
-            </div>
-          </CardHeader>
-          <CardContent class="flex flex-wrap gap-3 text-sm text-info-dark dark:text-info">
-            <div v-if="thinkingBudget != null">Thinking budget: {{ thinkingBudget }}</div>
-            <div v-if="toolsCount != null">Tools: {{ toolsCount }}</div>
-          </CardContent>
-        </Card>
+        <InfoBanner
+          v-if="isClaudeCode"
+          icon="CC"
+          title="Claude Code 请求"
+          :subtitle="`user-agent: ${claudeMode}`"
+          :details="claudeCodeDetails"
+        />
 
         <!-- URL -->
         <div v-if="showUrl && parsed.url" class="text-xs text-muted-foreground break-all">
@@ -37,10 +32,10 @@
 
         <!-- Parameter badges -->
         <div class="flex flex-wrap gap-2">
-          <Badge v-if="(parsed.body as Record<string, unknown>)?.model" variant="outline">model: {{ String((parsed.body as Record<string, unknown>).model) }}</Badge>
-          <Badge v-if="(parsed.body as Record<string, unknown>)?.stream != null" variant="outline">stream: {{ String((parsed.body as Record<string, unknown>).stream) }}</Badge>
-          <Badge v-if="(parsed.body as Record<string, unknown>)?.max_tokens != null" variant="outline">max_tokens: {{ String((parsed.body as Record<string, unknown>).max_tokens) }}</Badge>
-          <Badge v-if="(parsed.body as Record<string, unknown>)?.thinking != null" variant="outline">thinking</Badge>
+          <StatPill v-if="(parsed.body as Record<string, unknown>)?.model" label="model" :value="String((parsed.body as Record<string, unknown>).model)" :highlight="true" />
+          <StatPill v-if="(parsed.body as Record<string, unknown>)?.stream != null" label="stream" :value="String((parsed.body as Record<string, unknown>).stream)" />
+          <StatPill v-if="(parsed.body as Record<string, unknown>)?.max_tokens != null" label="max_tokens" :value="String((parsed.body as Record<string, unknown>).max_tokens)" />
+          <TagPill v-if="(parsed.body as Record<string, unknown>)?.thinking != null" label="thinking" />
         </div>
 
         <!-- Headers -->
@@ -115,7 +110,7 @@
         <div v-if="toolNames.length">
           <div class="text-xs font-medium text-muted-foreground mb-1">Tools</div>
           <div class="flex flex-wrap gap-1">
-            <Badge v-for="name in displayedToolNames" :key="name" variant="secondary">{{ name }}</Badge>
+            <TagPill v-for="name in displayedToolNames" :key="name" :label="name" />
             <Button v-if="toolNames.length > 8" variant="ghost" size="xs" class="px-1 h-5" @click="toolsExpanded = !toolsExpanded">
               {{ toolsExpanded ? '收起' : `+${toolNames.length - 8}` }}
             </Button>
@@ -164,6 +159,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import JsonCopyBlock from './JsonCopyBlock.vue'
+import StatPill from './StatPill.vue'
+import TagPill from './TagPill.vue'
 import { roleClass, tagClass } from './logColors'
 import { extractBlocks } from './requestBlockParser'
 import type { MsgBlock } from './requestBlockParser'
@@ -247,6 +244,13 @@ const thinkingBudget = computed(() => {
 const toolsCount = computed(() => {
   const tools = body.value.tools as unknown[] | undefined
   return Array.isArray(tools) ? tools.length : undefined
+})
+
+const claudeCodeDetails = computed(() => {
+  const parts: string[] = []
+  if (thinkingBudget.value != null) parts.push(`thinking: ${thinkingBudget.value} tokens`)
+  if (toolsCount.value != null) parts.push(`tools: ${toolsCount.value} 个`)
+  return parts
 })
 
 const messages = computed<MsgBlock[]>(() => {
