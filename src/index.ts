@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
@@ -144,7 +145,7 @@ export async function buildApp(
   };
 }
 
-async function main() {
+export async function main() {
   const { app } = await buildApp();
   const config = getConfig();
 
@@ -157,6 +158,7 @@ async function main() {
   }
 }
 
+// 开发时直接运行 tsx src/index.ts 仍可启动
 const isMainModule = process.argv[1]?.endsWith("index.js") || process.argv[1]?.endsWith("index.ts");
 if (isMainModule) {
   main();

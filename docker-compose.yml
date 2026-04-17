@@ -4,7 +4,7 @@ services:
   router:
     build: .
     ports:
-      - "${PORT:-3000}:3000"
+      - "${PORT:-9981}:9981"
     environment:
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}

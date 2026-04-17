@@ -33,7 +33,7 @@ export function getConfig(): Config {
     ADMIN_PASSWORD: process.env.ADMIN_PASSWORD!,
     ENCRYPTION_KEY: process.env.ENCRYPTION_KEY!,
     JWT_SECRET: process.env.JWT_SECRET!,
-    PORT: parseInt(process.env.PORT || "3000", 10),
+    PORT: parseInt(process.env.PORT || "9981", 10),
     DB_PATH: process.env.DB_PATH || "./data/router.db",
     LOG_LEVEL: process.env.LOG_LEVEL || "info",
     TZ: process.env.TZ || "Asia/Shanghai",

@@ -1,10 +1,43 @@
 {
   "name": "llm-simple-router",
-  "version": "0.1.0",
+  "version": "0.1.1",
+  "description": "LLM API proxy router with OpenAI/Anthropic support, model mapping, retry strategies, and admin dashboard",
+  "license": "MIT",
+  "author": "ZZzzswszzZZ",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zhushanwen321/llm-simple-router.git"
+  },
+  "homepage": "https://github.com/zhushanwen321/llm-simple-router#readme",
+  "bugs": {
+    "url": "https://github.com/zhushanwen321/llm-simple-router/issues"
+  },
+  "keywords": [
+    "llm",
+    "openai",
+    "anthropic",
+    "proxy",
+    "router",
+    "api-gateway"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "bin": {
+    "llm-simple-router": "./dist/cli.js"
+  },
+  "files": [
+    "dist/",
+    "frontend-dist/",
+    ".env.example",
+    "LICENSE"
+  ],
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
+    "build:full": "tsc && node scripts/build.mjs",
+    "prepublishOnly": "node scripts/build.mjs",
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",

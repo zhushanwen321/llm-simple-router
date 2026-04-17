@@ -21,7 +21,7 @@ function makeTestConfig() {
     ADMIN_PASSWORD: "admin123",
     JWT_SECRET: "test-jwt-secret-for-testing",
     ENCRYPTION_KEY: TEST_ENCRYPTION_KEY,
-    PORT: 3000,
+    PORT: 9981,
     DB_PATH: ":memory:",
     LOG_LEVEL: "silent",
     TZ: "Asia/Shanghai",
