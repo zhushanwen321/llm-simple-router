@@ -98,7 +98,7 @@
             <Input v-model.number="form.max_delay_ms" type="number" :min="100" required />
           </div>
           <div class="flex items-center gap-2">
-            <Checkbox :checked="form.is_active" @update:checked="(val: boolean) => form.is_active = val" id="rule-active" />
+            <Checkbox v-model="form.is_active" id="rule-active" />
             <Label for="rule-active" class="text-sm text-foreground">启用</Label>
           </div>
           <DialogFooter>

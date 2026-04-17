@@ -108,11 +108,16 @@ export default {
           'message-delta': 'var(--color-sse-message-delta)',
           'message-stop': 'var(--color-sse-message-stop)',
         },
+        overlay: {
+          DEFAULT: 'var(--color-overlay)',
+          light: 'var(--color-overlay-light)',
+        },
       },
       borderRadius: {
-        lg: 'var(--radius)',
-        md: 'calc(var(--radius) - 2px)',
-        sm: 'calc(var(--radius) - 4px)',
+        sm: 'var(--radius-sm)',
+        md: 'var(--radius-md)',
+        lg: 'var(--radius-lg)',
+        xl: 'var(--radius-xl)',
       },
       fontFamily: {
         sans: ['var(--font-sans)'],
@@ -123,6 +128,10 @@ export default {
         card: 'var(--shadow-card)',
         elevated: 'var(--shadow-elevated)',
         focus: 'var(--shadow-focus)',
+      },
+      transitionDuration: {
+        fast: 'var(--duration-fast)',
+        normal: 'var(--duration-normal)',
       },
       zIndex: {
         dropdown: 'var(--z-dropdown)',

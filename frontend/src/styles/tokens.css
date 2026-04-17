@@ -65,6 +65,10 @@
   /* === 圆角 === */
   --radius-pill: 9999px;
 
+  /* === Overlay === */
+  --color-overlay-light: oklch(0 0 0 / 10%);
+  --color-overlay: oklch(0 0 0 / 80%);
+
   /* === 阴影 === */
   --shadow-card: 0 1px 3px oklch(0 0 0 / 0.1);
   --shadow-elevated: 0 4px 12px oklch(0 0 0 / 0.12);

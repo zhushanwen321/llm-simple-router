@@ -81,8 +81,8 @@
                 class="flex items-center gap-2 cursor-pointer text-sm font-normal"
               >
                 <Checkbox
-                  :checked="form.allowed_models.includes(model)"
-                  @update:checked="(val: boolean) => { if (val && !form.allowed_models.includes(model)) form.allowed_models.push(model); else if (!val) { const idx = form.allowed_models.indexOf(model); if (idx >= 0) form.allowed_models.splice(idx, 1) } }"
+                  :model-value="form.allowed_models.includes(model)"
+                  @update:model-value="(val: boolean | 'indeterminate') => { if (val && val !== 'indeterminate' && !form.allowed_models.includes(model)) form.allowed_models.push(model); else if (!val) { const idx = form.allowed_models.indexOf(model); if (idx >= 0) form.allowed_models.splice(idx, 1) } }"
                 />
                 <span class="font-mono text-xs">{{ model }}</span>
               </Label>
@@ -98,7 +98,7 @@
             </div>
           </div>
           <div v-if="editingId" class="flex items-center gap-2">
-            <Checkbox :checked="form.is_active" @update:checked="(val: boolean) => form.is_active = val" id="key-active" />
+            <Checkbox v-model="form.is_active" id="key-active" />
             <Label for="key-active" class="text-sm text-foreground">启用</Label>
           </div>
           <DialogFooter>

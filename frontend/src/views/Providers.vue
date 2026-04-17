@@ -93,7 +93,7 @@
             <Input v-model="modelInput" placeholder="输入模型名称，按 Enter 添加" @keydown.enter.prevent="addModel" />
           </div>
           <div class="flex items-center gap-2">
-            <Checkbox :checked="form.is_active" @update:checked="(val: boolean) => form.is_active = val" id="svc-active" />
+            <Checkbox v-model="form.is_active" id="svc-active" />
             <Label for="svc-active" class="text-sm text-foreground">启用</Label>
           </div>
           <DialogFooter>
