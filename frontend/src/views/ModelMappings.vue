@@ -11,7 +11,7 @@
     </div>
 
     <div class="space-y-4">
-      <Card v-for="g in groupsWithParsedRule" :key="g.id" class="bg-white">
+      <Card v-for="g in groupsWithParsedRule" :key="g.id">
         <Collapsible :default-open="false">
           <CardHeader class="flex flex-row items-center justify-between gap-4">
             <div class="flex items-center gap-3">
@@ -45,9 +45,9 @@
                     class="flex items-center gap-2 text-sm"
                   >
                     <span class="font-mono text-xs bg-muted px-2 py-0.5 rounded">{{ w.start }} - {{ w.end }}</span>
-                    <span class="font-mono">{{ w.backend_model }}</span>
+                    <span class="font-mono">{{ w.target.backend_model }}</span>
                     <span class="text-muted-foreground">/</span>
-                    <span>{{ providerNameMap.get(w.provider_id) || w.provider_id }}</span>
+                    <span>{{ providerNameMap.get(w.target.provider_id) || w.target.provider_id }}</span>
                   </div>
                 </div>
                 <div v-else class="text-sm text-muted-foreground">无时间窗口</div>
@@ -57,7 +57,7 @@
         </Collapsible>
       </Card>
 
-      <div v-if="groups.length === 0" class="text-center text-muted-foreground py-12 bg-white rounded-xl border">
+      <div v-if="groups.length === 0" class="text-center text-muted-foreground py-12 bg-card rounded-xl border">
         暂无映射分组
       </div>
     </div>

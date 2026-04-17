@@ -1,6 +1,7 @@
 <template>
   <div class="relative">
     <Button
+      v-if="!hideCopyButton"
       variant="outline"
       size="sm"
       class="absolute top-2 right-2 h-7 text-xs"
@@ -16,7 +17,7 @@
 import { ref } from 'vue'
 import { Button } from '@/components/ui/button'
 
-const props = defineProps<{ content: string }>()
+const props = defineProps<{ content: string; hideCopyButton?: boolean }>()
 const COPIED_FEEDBACK_MS = 1500
 
 const copied = ref(false)

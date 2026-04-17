@@ -16,6 +16,10 @@ const CreateRetryRuleSchema = Type.Object({
   status_code: Type.Number({ minimum: 100, maximum: 599 }),
   body_pattern: Type.String({ minLength: 1 }),
   is_active: Type.Optional(Type.Number()),
+  retry_strategy: Type.Optional(Type.Union([Type.Literal("fixed"), Type.Literal("exponential")])),
+  retry_delay_ms: Type.Optional(Type.Number({ minimum: 100 })),
+  max_retries: Type.Optional(Type.Number({ minimum: 0, maximum: 100 })),
+  max_delay_ms: Type.Optional(Type.Number({ minimum: 100 })),
 });
 
 const UpdateRetryRuleSchema = Type.Object({
@@ -23,6 +27,10 @@ const UpdateRetryRuleSchema = Type.Object({
   status_code: Type.Optional(Type.Number({ minimum: 100, maximum: 599 })),
   body_pattern: Type.Optional(Type.String({ minLength: 1 })),
   is_active: Type.Optional(Type.Number()),
+  retry_strategy: Type.Optional(Type.Union([Type.Literal("fixed"), Type.Literal("exponential")])),
+  retry_delay_ms: Type.Optional(Type.Number({ minimum: 100 })),
+  max_retries: Type.Optional(Type.Number({ minimum: 0, maximum: 100 })),
+  max_delay_ms: Type.Optional(Type.Number({ minimum: 100 })),
 });
 
 interface RetryRuleRoutesOptions {
@@ -62,6 +70,10 @@ export const adminRetryRuleRoutes: FastifyPluginCallback<RetryRuleRoutesOptions>
       status_code: body.status_code,
       body_pattern: body.body_pattern,
       is_active: body.is_active ?? 1,
+      retry_strategy: body.retry_strategy ?? "exponential",
+      retry_delay_ms: body.retry_delay_ms ?? 5000,
+      max_retries: body.max_retries ?? 10,
+      max_delay_ms: body.max_delay_ms ?? 60000,
     });
     refreshMatcher(matcher, db);
     return reply.code(HTTP_CREATED).send({ id });
@@ -70,7 +82,7 @@ export const adminRetryRuleRoutes: FastifyPluginCallback<RetryRuleRoutesOptions>
   app.put("/admin/api/retry-rules/:id", { schema: { body: UpdateRetryRuleSchema } }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const body = request.body as Static<typeof UpdateRetryRuleSchema>;
-    const fields: Partial<Pick<RetryRule, "name" | "status_code" | "body_pattern" | "is_active">> = {};
+    const fields: Partial<Pick<RetryRule, "name" | "status_code" | "body_pattern" | "is_active" | "retry_strategy" | "retry_delay_ms" | "max_retries" | "max_delay_ms">> = {};
     if (body.name !== undefined) fields.name = body.name;
     if (body.status_code !== undefined) fields.status_code = body.status_code;
     if (body.body_pattern !== undefined) {
@@ -81,6 +93,10 @@ export const adminRetryRuleRoutes: FastifyPluginCallback<RetryRuleRoutesOptions>
       fields.body_pattern = body.body_pattern;
     }
     if (body.is_active !== undefined) fields.is_active = body.is_active;
+    if (body.retry_strategy !== undefined) fields.retry_strategy = body.retry_strategy;
+    if (body.retry_delay_ms !== undefined) fields.retry_delay_ms = body.retry_delay_ms;
+    if (body.max_retries !== undefined) fields.max_retries = body.max_retries;
+    if (body.max_delay_ms !== undefined) fields.max_delay_ms = body.max_delay_ms;
     updateRetryRule(db, id, fields);
     refreshMatcher(matcher, db);
     return reply.send({ success: true });

@@ -1,10 +1,14 @@
 <template>
   <Tabs :default-value="mode ?? 'structured'" :model-value="mode" class="w-full">
-    <div v-if="!mode" class="mb-2">
+    <!-- 粘性控制栏：结构化/原始切换 + 复制 -->
+    <div v-if="!mode" class="flex items-center justify-between py-2 border-b mb-2 sticky top-0 z-10 bg-background">
       <TabsList>
         <TabsTrigger value="structured">结构化</TabsTrigger>
         <TabsTrigger value="raw">{{ isStream ? '原始 SSE 文本' : '原始 JSON' }}</TabsTrigger>
       </TabsList>
+      <Button variant="ghost" size="xs" class="h-auto py-1" @click="copyRaw">
+        {{ copied ? '已复制' : '复制' }}
+      </Button>
     </div>
 
     <TabsContent value="structured" class="space-y-3">
@@ -48,9 +52,9 @@
         <template v-if="!isStream">
           <template v-if="apiType === 'openai'">
             <div class="flex flex-wrap gap-2">
-              <Badge v-if="parsedBody.id" variant="outline">id: {{ String(parsedBody.id) }}</Badge>
-              <Badge v-if="parsedBody.model" variant="outline">model: {{ String(parsedBody.model) }}</Badge>
-              <Badge v-if="parsedBody.system_fingerprint" variant="outline">fingerprint: {{ String(parsedBody.system_fingerprint) }}</Badge>
+              <StatPill v-if="parsedBody.id" label="id" :value="String(parsedBody.id)" />
+              <StatPill v-if="parsedBody.model" label="model" :value="String(parsedBody.model)" :highlight="true" />
+              <StatPill v-if="parsedBody.system_fingerprint" label="fingerprint" :value="String(parsedBody.system_fingerprint)" />
             </div>
             <div v-if="openaiChoices.length" class="space-y-2">
               <div class="text-xs font-medium text-muted-foreground">Choices</div>
@@ -65,7 +69,7 @@
                       <Button variant="ghost" size="xs" class="px-0 h-auto text-xs">内容</Button>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
-                      <pre class="mt-1 whitespace-pre-wrap break-all text-xs bg-background rounded p-2 border">{{ choice.content }}</pre>
+                      <pre class="mt-1 whitespace-pre-wrap break-all text-xs bg-muted rounded-md p-2 border">{{ choice.content }}</pre>
                     </CollapsibleContent>
                   </Collapsible>
                 </CardContent>
@@ -101,10 +105,10 @@
 
           <template v-if="apiType === 'anthropic'">
             <div class="flex flex-wrap gap-2">
-              <Badge v-if="parsedBody.id" variant="outline">id: {{ String(parsedBody.id) }}</Badge>
-              <Badge v-if="parsedBody.type" variant="outline">type: {{ String(parsedBody.type) }}</Badge>
-              <Badge v-if="parsedBody.model" variant="outline">model: {{ String(parsedBody.model) }}</Badge>
-              <Badge v-if="parsedBody.stop_reason" variant="outline">stop_reason: {{ String(parsedBody.stop_reason) }}</Badge>
+              <StatPill v-if="parsedBody.id" label="id" :value="String(parsedBody.id)" />
+              <StatPill v-if="parsedBody.type" label="type" :value="String(parsedBody.type)" />
+              <StatPill v-if="parsedBody.model" label="model" :value="String(parsedBody.model)" :highlight="true" />
+              <StatPill v-if="parsedBody.stop_reason" label="stop_reason" :value="String(parsedBody.stop_reason)" />
             </div>
             <div v-if="anthropicContentBlocks.length" class="space-y-2">
               <div class="text-xs font-medium text-muted-foreground">Content</div>
@@ -145,8 +149,8 @@
         <template v-else>
           <div class="space-y-3">
             <div class="flex gap-1">
-              <Button variant="ghost" :class="streamTab === 'assembled' ? 'bg-secondary' : ''" size="xs" class="h-auto px-2 py-1 text-xs" @click="streamTab = 'assembled'">完整响应</Button>
-              <Button variant="ghost" :class="streamTab === 'raw-events' ? 'bg-secondary' : ''" size="xs" class="h-auto px-2 py-1 text-xs" @click="streamTab = 'raw-events'">原始事件流</Button>
+              <Button variant="ghost" :class="streamTab === 'assembled' ? 'bg-secondary' : ''" size="xs" class="h-auto py-1" @click="streamTab = 'assembled'">完整响应</Button>
+              <Button variant="ghost" :class="streamTab === 'raw-events' ? 'bg-secondary' : ''" size="xs" class="h-auto py-1" @click="streamTab = 'raw-events'">原始事件流</Button>
             </div>
 
             <!-- 完整响应 -->
@@ -154,9 +158,9 @@
               <!-- Anthropic SSE 组装 -->
               <template v-if="apiType === 'anthropic'">
                 <div class="flex flex-wrap gap-2">
-                  <Badge v-if="sseMeta.id" variant="outline">id: {{ sseMeta.id }}</Badge>
-                  <Badge v-if="sseMeta.model" variant="outline">model: {{ sseMeta.model }}</Badge>
-                  <Badge variant="outline">input: {{ sseMeta.inputTokens }}</Badge>
+                  <StatPill v-if="sseMeta.id" label="id" :value="sseMeta.id" />
+                  <StatPill v-if="sseMeta.model" label="model" :value="sseMeta.model" :highlight="true" />
+                  <StatPill label="input" :value="String(sseMeta.inputTokens)" />
                 </div>
                 <div v-for="(blk, idx) in assembledBlocks" :key="idx" :class="['rounded-md border p-3', blockBorderClass(blk.type)]">
                   <div class="flex items-center gap-2 mb-2">
@@ -165,26 +169,26 @@
                     <span v-if="blk.toolName" class="text-xs font-mono">{{ blk.toolName }}</span>
                   </div>
                   <template v-if="blk.content.length > 500 && !expandedBlock[idx]">
-                    <pre class="whitespace-pre-wrap break-all text-sm">{{ blk.content.slice(0, 500) }}...</pre>
+                    <pre class="whitespace-pre-wrap break-all text-sm bg-muted rounded-md p-3 border">{{ blk.content.slice(0, 500) }}...</pre>
                     <Button variant="link" size="xs" class="px-0" @click="expandedBlock[idx] = true">展开全部</Button>
                   </template>
-                  <pre v-else class="whitespace-pre-wrap break-all text-sm max-h-[40vh] overflow-auto">{{ blk.content }}</pre>
+                  <pre v-else class="whitespace-pre-wrap break-all text-sm bg-muted rounded-md p-3 border max-h-[40vh] overflow-auto">{{ blk.content }}</pre>
                 </div>
-                <div class="flex gap-2 text-xs text-muted-foreground">
-                  <span>stop_reason: {{ sseMeta.stopReason || '-' }}</span>
-                  <span>output_tokens: {{ sseMeta.outputTokens || '-' }}</span>
+                <div class="flex flex-wrap gap-2">
+                  <StatPill label="stop_reason" :value="sseMeta.stopReason || '-'" />
+                  <StatPill label="output_tokens" :value="String(sseMeta.outputTokens || '-')" />
                 </div>
               </template>
 
               <!-- OpenAI SSE 组装 -->
               <template v-if="apiType === 'openai' && openaiAssembled">
                 <div class="flex flex-wrap gap-2">
-                  <Badge v-if="openaiAssembled.role" variant="outline">role: {{ openaiAssembled.role }}</Badge>
-                  <Badge variant="outline">{{ openaiAssembled.contentEventCount }} 个 content delta</Badge>
-                  <Badge v-if="openaiAssembled.finishReason" variant="outline">finish: {{ openaiAssembled.finishReason }}</Badge>
+                  <StatPill v-if="openaiAssembled.role" label="role" :value="openaiAssembled.role" />
+                  <StatPill label="content delta" :value="String(openaiAssembled.contentEventCount)" />
+                  <StatPill v-if="openaiAssembled.finishReason" label="finish" :value="openaiAssembled.finishReason" />
                 </div>
                 <div :class="['rounded-md border p-3', blockBorderClass('text')]">
-                  <pre class="whitespace-pre-wrap break-all text-sm max-h-[40vh] overflow-auto">{{ openaiAssembled.content }}</pre>
+                  <pre class="whitespace-pre-wrap break-all text-sm bg-muted rounded-md p-3 max-h-[40vh] overflow-auto">{{ openaiAssembled.content }}</pre>
                 </div>
                 <div v-if="openaiAssembled.usage" class="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <Card class="bg-muted/40"><CardContent class="py-2 px-3 text-xs">
@@ -238,25 +242,27 @@
                 </div>
               </template>
               <template v-if="apiType === 'anthropic'">
-                <div v-if="anthropicMessageStart" class="text-sm">
-                  <span class="text-muted-foreground">message_start:</span> id={{ anthropicMessageStart.id }} model={{ anthropicMessageStart.model }} input_tokens={{ anthropicMessageStart.input_tokens }}
-                </div>
-                <div v-if="anthropicContentBlockStarts.length" class="space-y-1">
-                  <div v-for="(item, idx) in anthropicContentBlockStarts" :key="idx" class="text-sm">
-                    <span class="text-muted-foreground">content_block_start[{{ item.index }}]:</span> {{ item.type }}
-                  </div>
-                </div>
-                <div v-if="anthropicDeltaGroups.length" class="space-y-1">
-                  <div v-for="(group, idx) in anthropicDeltaGroups" :key="idx" class="text-sm">
-                    <Badge variant="outline">{{ group.deltaType }}</Badge>
-                    <span class="ml-2">keep {{ group.kept }} 个</span>
-                    <span v-if="group.folded > 0" class="text-muted-foreground ml-2">+{{ group.folded }} 个 {{ group.deltaType }} 事件已折叠 ({{ group.foldedChars }} 字符)</span>
-                  </div>
-                </div>
-                <div v-if="anthropicMessageDelta" class="text-sm bg-warning-light rounded p-2">
-                  <span class="text-muted-foreground">message_delta:</span> output_tokens={{ anthropicMessageDelta.output_tokens }} stop_reason={{ anthropicMessageDelta.stop_reason }}
-                </div>
-                <div v-if="anthropicMessageStop" class="text-sm text-muted-foreground">流结束</div>
+                <SseEventLine v-if="anthropicMessageStart"
+                  event-type="message_start"
+                  :summary="`id=${anthropicMessageStart.id} model=${anthropicMessageStart.model} input_tokens=${anthropicMessageStart.input_tokens}`"
+                />
+                <SseEventLine v-for="(item, idx) in anthropicContentBlockStarts" :key="'cbs-' + idx"
+                  event-type="content_block_start"
+                  :summary="`[${item.index}] ${item.type}`"
+                />
+                <SseEventLine v-for="(group, idx) in anthropicDeltaGroups" :key="'dg-' + idx"
+                  event-type="content_block_delta"
+                  :summary="`${group.deltaType} · keep ${group.kept} 个${group.folded > 0 ? ` +${group.folded} 个已折叠 (${group.foldedChars} 字符)` : ''}`"
+                />
+                <SseEventLine v-if="anthropicMessageDelta"
+                  event-type="message_delta"
+                  :summary="`output_tokens=${anthropicMessageDelta.output_tokens} stop_reason=${anthropicMessageDelta.stop_reason}`"
+                  :highlight="true"
+                />
+                <SseEventLine v-if="anthropicMessageStop"
+                  event-type="message_stop"
+                  summary="流结束"
+                />
               </template>
             </template>
           </div>
@@ -265,7 +271,7 @@
     </TabsContent>
 
     <TabsContent value="raw">
-      <JsonCopyBlock :content="raw" />
+      <JsonCopyBlock :content="raw" hide-copy-button />
     </TabsContent>
   </Tabs>
 </template>
@@ -279,6 +285,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import JsonCopyBlock from './JsonCopyBlock.vue'
+import StatPill from './StatPill.vue'
+import SseEventLine from './SseEventLine.vue'
 import { blockClass, blockBorderClass } from './logColors'
 import { useSSEParsing } from './useSSEParsing'
 
@@ -377,4 +385,13 @@ const {
 
 const expandedBlock = reactive<Record<number, boolean>>({})
 const streamTab = ref<'assembled' | 'raw-events'>('assembled')
+const copied = ref(false)
+
+async function copyRaw() {
+  try {
+    await navigator.clipboard.writeText(props.raw)
+    copied.value = true
+    setTimeout(() => { copied.value = false }, 2000) // eslint-disable-line no-magic-numbers
+  } catch { copied.value = false }
+}
 </script>

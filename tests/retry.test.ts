@@ -1,15 +1,24 @@
 import { describe, it, expect } from "vitest";
-import { isRetryableResult, isRetryableThrow, retryableCall } from "../src/proxy/retry.js";
+import { isRetryableResult, isRetryableThrow, retryableCall, FixedIntervalStrategy, ExponentialBackoffStrategy, createStrategy } from "../src/proxy/retry.js";
 import type { RetryConfig } from "../src/proxy/retry.js";
 import { RetryRuleMatcher } from "../src/proxy/retry-rules.js";
+import type { RetryRule } from "../src/db/retry-rules.js";
 import type { ProxyResult } from "../src/proxy/proxy-core.js";
+
+function makeDefaultRule(overrides: Partial<RetryRule> = {}): RetryRule {
+  return {
+    id: "0", name: "default", status_code: 0, body_pattern: ".*", is_active: 1, created_at: "",
+    retry_strategy: "exponential", retry_delay_ms: 10, max_retries: 2, max_delay_ms: 60000,
+    ...overrides,
+  };
+}
 
 // 模拟 DB 规则加载后的 matcher（429/503 通配 + 400 特定模式）
 function createMatcherWithDefaults(): RetryRuleMatcher {
   const matcher = new RetryRuleMatcher();
   matcher["cache"] = new Map([
-    [429, [/^.*$/]],
-    [503, [/^.*$/]],
+    [429, [{ rule: makeDefaultRule({ status_code: 429 }), pattern: /^.*$/ }]],
+    [503, [{ rule: makeDefaultRule({ status_code: 503 }), pattern: /^.*$/ }]],
   ]);
   return matcher;
 }
@@ -35,14 +44,14 @@ describe("isRetryableResult", () => {
 
   it("returns true for 400 when ruleMatcher matches", () => {
     const matcher = new RetryRuleMatcher();
-    matcher["cache"] = new Map([[400, [/请稍后重试/]]]);
+    matcher["cache"] = new Map([[400, [{ rule: makeDefaultRule({ status_code: 400 }), pattern: /请稍后重试/ }]]]);
     const config: RetryConfig = { maxRetries: 2, baseDelayMs: 10, ruleMatcher: matcher };
     expect(isRetryableResult(400, JSON.stringify({ error: { code: "9999", message: "网络错误，请稍后重试" } }), config)).toBe(true);
   });
 
   it("returns false for 400 when ruleMatcher does not match", () => {
     const matcher = new RetryRuleMatcher();
-    matcher["cache"] = new Map([[400, [/请稍后重试/]]]);
+    matcher["cache"] = new Map([[400, [{ rule: makeDefaultRule({ status_code: 400 }), pattern: /请稍后重试/ }]]]);
     const config: RetryConfig = { maxRetries: 2, baseDelayMs: 10, ruleMatcher: matcher };
     expect(isRetryableResult(400, JSON.stringify({ error: { code: "1211", message: "模型不存在" } }), config)).toBe(false);
   });
@@ -111,9 +120,97 @@ describe("retryableCall", () => {
   });
 
   it("respects maxRetries=0", async () => {
-    const config = { ...DEFAULT_CONFIG, maxRetries: 0 };
+    const config: RetryConfig = { maxRetries: 0, baseDelayMs: 1 };
     const { result, attempts } = await retryableCall(() => Promise.resolve(mockResult(429, "rate limited")), config);
     expect(result.statusCode).toBe(429);
     expect(attempts).toHaveLength(1);
+  });
+
+  it("uses per-rule max_retries from matched rule", async () => {
+    const matcher = new RetryRuleMatcher();
+    const rule = {
+      id: "test", name: "limited", status_code: 429, body_pattern: ".*", is_active: 1, created_at: "",
+      retry_strategy: "fixed" as const, retry_delay_ms: 1, max_retries: 2, max_delay_ms: 60000,
+    };
+    matcher["cache"] = new Map([[429, [{ rule, pattern: /^.*$/ }]]]);
+    const config: RetryConfig = { maxRetries: 99, baseDelayMs: 1, ruleMatcher: matcher };
+
+    const { attempts } = await retryableCall(() => Promise.resolve(mockResult(429, "rate limited")), config);
+    expect(attempts).toHaveLength(3);
+  });
+
+  it("does not retry when no rule matches", async () => {
+    const matcher = new RetryRuleMatcher();
+    const config: RetryConfig = { maxRetries: 99, baseDelayMs: 1, ruleMatcher: matcher };
+
+    const { result, attempts } = await retryableCall(() => Promise.resolve(mockResult(429, "rate limited")), config);
+    expect(result.statusCode).toBe(429);
+    expect(attempts).toHaveLength(1);
+  });
+
+  it("respects max_retries=0 from rule", async () => {
+    const matcher = new RetryRuleMatcher();
+    const rule = {
+      id: "test", name: "no-retry", status_code: 429, body_pattern: ".*", is_active: 1, created_at: "",
+      retry_strategy: "fixed" as const, retry_delay_ms: 1, max_retries: 0, max_delay_ms: 60000,
+    };
+    matcher["cache"] = new Map([[429, [{ rule, pattern: /^.*$/ }]]]);
+    const config: RetryConfig = { maxRetries: 99, baseDelayMs: 1, ruleMatcher: matcher };
+
+    const { result, attempts } = await retryableCall(() => Promise.resolve(mockResult(429, "rate limited")), config);
+    expect(result.statusCode).toBe(429);
+    expect(attempts).toHaveLength(1);
+  });
+});
+
+describe("RetryStrategy", () => {
+  it("FixedIntervalStrategy returns constant delay", () => {
+    const s = new FixedIntervalStrategy(5000);
+    expect(s.getDelay(0)).toBe(5000);
+    expect(s.getDelay(1)).toBe(5000);
+    expect(s.getDelay(5)).toBe(5000);
+  });
+
+  it("ExponentialBackoffStrategy doubles and caps", () => {
+    const s = new ExponentialBackoffStrategy(5000, 60000);
+    expect(s.getDelay(0)).toBe(5000);
+    expect(s.getDelay(1)).toBe(10000);
+    expect(s.getDelay(2)).toBe(20000);
+    expect(s.getDelay(3)).toBe(40000);
+    expect(s.getDelay(4)).toBe(60000);
+  });
+
+  it("createStrategy returns correct type", () => {
+    expect(createStrategy({ retry_strategy: "fixed", retry_delay_ms: 3000, max_delay_ms: 60000 })).toBeInstanceOf(FixedIntervalStrategy);
+    expect(createStrategy({ retry_strategy: "exponential", retry_delay_ms: 3000, max_delay_ms: 60000 })).toBeInstanceOf(ExponentialBackoffStrategy);
+    expect(createStrategy({ retry_strategy: "linear", retry_delay_ms: 3000, max_delay_ms: 60000 })).toBeInstanceOf(ExponentialBackoffStrategy);
+  });
+});
+
+describe("RetryRuleMatcher.match()", () => {
+  it("returns matched rule with strategy fields", () => {
+    const matcher = new RetryRuleMatcher();
+    const rule: RetryRule = {
+      id: "1", name: "test", status_code: 429, body_pattern: ".*", is_active: 1, created_at: "",
+      retry_strategy: "fixed", retry_delay_ms: 3000, max_retries: 5, max_delay_ms: 30000,
+    };
+    matcher["cache"] = new Map([[429, [{ rule, pattern: /^.*$/ }]]]);
+    expect(matcher.match(429, "rate limited")).toEqual(rule);
+  });
+
+  it("returns null when no match", () => {
+    const matcher = new RetryRuleMatcher();
+    expect(matcher.match(200, "ok")).toBeNull();
+  });
+
+  it("test() delegates to match()", () => {
+    const matcher = new RetryRuleMatcher();
+    const rule: RetryRule = {
+      id: "1", name: "test", status_code: 429, body_pattern: ".*", is_active: 1, created_at: "",
+      retry_strategy: "exponential", retry_delay_ms: 5000, max_retries: 10, max_delay_ms: 60000,
+    };
+    matcher["cache"] = new Map([[429, [{ rule, pattern: /^.*$/ }]]]);
+    expect(matcher.test(429, "any")).toBe(true);
+    expect(matcher.test(200, "ok")).toBe(false);
   });
 });

@@ -118,6 +118,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+import type { AcceptableValue } from 'reka-ui'
 
 interface Provider {
   id: string
@@ -164,18 +165,21 @@ function getWindowModels(idx: number): string[] {
   return providerId ? (props.providerModels.get(providerId) || []) : []
 }
 
-function onDefaultProviderChange(providerId: string) {
+// Select @update:model-value emit 出 AcceptableValue（含 null），需要类型收窄
+function onDefaultProviderChange(value: AcceptableValue) {
+  if (typeof value !== 'string') return
   // eslint-disable-next-line vue/no-mutating-props
-  props.form.default.provider_id = providerId
-  const models = props.providerModels.get(providerId) || []
+  props.form.default.provider_id = value
+  const models = props.providerModels.get(value) || []
   // eslint-disable-next-line vue/no-mutating-props
   props.form.default.backend_model = models[0] || ''
 }
 
-function onWindowProviderChange(idx: number, providerId: string) {
+function onWindowProviderChange(idx: number, value: AcceptableValue) {
+  if (typeof value !== 'string') return
   // eslint-disable-next-line vue/no-mutating-props
-  props.form.windows[idx].target.provider_id = providerId
-  const models = props.providerModels.get(providerId) || []
+  props.form.windows[idx].target.provider_id = value
+  const models = props.providerModels.get(value) || []
   // eslint-disable-next-line vue/no-mutating-props
   props.form.windows[idx].target.backend_model = models[0] || ''
 }

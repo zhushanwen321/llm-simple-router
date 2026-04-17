@@ -1,5 +1,17 @@
 /* === 状态色 === */
 :root {
+  /* === 品牌色（Teal · hue 175） === */
+  --color-teal-50:  oklch(0.97 0.02 175);
+  --color-teal-100: oklch(0.93 0.04 175);
+  --color-teal-200: oklch(0.87 0.07 175);
+  --color-teal-300: oklch(0.78 0.10 175);
+  --color-teal-400: oklch(0.68 0.13 175);
+  --color-teal-500: oklch(0.58 0.14 175);
+  --color-teal-600: oklch(0.48 0.12 175);
+  --color-teal-700: oklch(0.40 0.10 175);
+  --color-teal-800: oklch(0.32 0.08 175);
+  --color-teal-900: oklch(0.25 0.06 175);
+
   --color-success: oklch(0.65 0.17 150);
   --color-success-light: oklch(0.92 0.05 150);
   --color-success-dark: oklch(0.45 0.15 150);
@@ -21,6 +33,28 @@
   --color-text-secondary: var(--muted-foreground);
   --color-text-tertiary: oklch(0.65 0 0);
 
+  /* === 角色色 === */
+  --color-role-user:        oklch(0.78 0.10 175);
+  --color-role-user-bg:     oklch(0.97 0.02 175);
+  --color-role-assistant:   oklch(0.65 0.14 260);
+  --color-role-assistant-bg:oklch(0.93 0.04 260);
+  --color-role-tool:        oklch(0.65 0.14 30);
+  --color-role-tool-bg:     oklch(0.94 0.04 30);
+  --color-role-thinking:    oklch(0.58 0.12 290);
+  --color-role-thinking-bg: oklch(0.91 0.03 290);
+
+  /* === SSE 事件色 === */
+  --color-sse-message-start:       oklch(0.68 0.13 175);
+  --color-sse-content-block-start: oklch(0.58 0.14 175);
+  --color-sse-content-block-delta: oklch(0.48 0.12 175);
+  --color-sse-message-delta:       oklch(0.40 0.10 175);
+  --color-sse-message-stop:        oklch(0.65 0.17 150);
+
+  /* === 紧凑间距（高密度布局） === */
+  --spacing-dense-xs: 0.25rem;
+  --spacing-dense-sm: 0.375rem;
+  --spacing-dense-md: 0.5rem;
+
   /* === 间距 === */
   --spacing-page: 1.5rem;
   --spacing-section: 1.25rem;
@@ -31,10 +65,14 @@
   /* === 圆角 === */
   --radius-pill: 9999px;
 
+  /* === Overlay === */
+  --color-overlay-light: oklch(0 0 0 / 10%);
+  --color-overlay: oklch(0 0 0 / 80%);
+
   /* === 阴影 === */
   --shadow-card: 0 1px 3px oklch(0 0 0 / 0.1);
   --shadow-elevated: 0 4px 12px oklch(0 0 0 / 0.12);
-  --shadow-focus: 0 0 0 2px oklch(0.62 0.18 250);
+  --shadow-focus: 0 0 0 2px oklch(0.58 0.14 175);
 
   /* === 动画 === */
   --duration-fast: 150ms;
@@ -56,4 +94,12 @@
   /* 语义色通过 var() 引用 shadcn 变量，暗色模式自动跟随 shadcn .dark 覆盖 */
   --color-bg-sidebar: oklch(0.145 0 0);
   --color-text-tertiary: oklch(0.556 0 0);
+  --color-role-user-bg:     oklch(0.28 0.04 175);
+  --color-role-user:        oklch(0.72 0.08 175);
+  --color-role-assistant-bg:oklch(0.25 0.05 260);
+  --color-role-assistant:   oklch(0.60 0.10 260);
+  --color-role-tool-bg:     oklch(0.25 0.05 30);
+  --color-role-tool:        oklch(0.60 0.10 30);
+  --color-role-thinking-bg: oklch(0.23 0.04 290);
+  --color-role-thinking:    oklch(0.55 0.09 290);
 }

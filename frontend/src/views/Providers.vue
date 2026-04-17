@@ -9,7 +9,7 @@
       </Button>
     </div>
 
-    <div class="bg-white rounded-lg border overflow-hidden">
+    <div class="bg-card rounded-lg border overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow class="bg-muted">
@@ -93,7 +93,7 @@
             <Input v-model="modelInput" placeholder="输入模型名称，按 Enter 添加" @keydown.enter.prevent="addModel" />
           </div>
           <div class="flex items-center gap-2">
-            <input v-model="form.is_active" type="checkbox" id="svc-active" class="rounded" />
+            <Checkbox v-model="form.is_active" id="svc-active" />
             <Label for="svc-active" class="text-sm text-foreground">启用</Label>
           </div>
           <DialogFooter>
@@ -132,6 +132,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from '@/components/ui/alert-dialog'
+import { Checkbox } from '@/components/ui/checkbox'
 
 interface Provider {
   id: string

@@ -26,12 +26,34 @@ export interface RetryResult<T> {
 
 export type ProxyFn<T = ProxyResult | StreamProxyResult> = () => Promise<T>;
 
+// ---------- Strategy Pattern ----------
+
+export interface RetryStrategy {
+  getDelay(attempt: number): number;
+}
+
+export class FixedIntervalStrategy implements RetryStrategy {
+  constructor(private delayMs: number) {}
+  getDelay(_attempt: number): number { return this.delayMs; }
+}
+
+export class ExponentialBackoffStrategy implements RetryStrategy {
+  constructor(private baseMs: number, private capMs: number) {}
+  getDelay(attempt: number): number {
+    return Math.min(this.baseMs * 2 ** attempt, this.capMs);
+  }
+}
+
+export function createStrategy(rule: { retry_strategy: string; retry_delay_ms: number; max_delay_ms: number }): RetryStrategy {
+  if (rule.retry_strategy === "fixed") return new FixedIntervalStrategy(rule.retry_delay_ms);
+  return new ExponentialBackoffStrategy(rule.retry_delay_ms, rule.max_delay_ms);
+}
+
 // ---------- Constants ----------
 
 const RETRYABLE_THROW_CODES = new Set(["ETIMEDOUT", "ECONNRESET", "ECONNREFUSED"]);
 const HTTP_BAD_REQUEST = 400;
 const HTTP_TOO_MANY_REQUESTS = 429;
-const BACKOFF_BASE = 2;
 const MS_PER_SECOND = 1000;
 
 // ---------- Shared helpers ----------
@@ -64,11 +86,6 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function getBackoffMs(baseDelayMs: number, attempt: number): number {
-  // 指数退避：baseDelay * 2^attempt
-  return baseDelayMs * BACKOFF_BASE ** attempt;
-}
-
 function parseRetryAfter(headers: Record<string, string> | undefined): number | null {
   if (!headers) return null;
   const val = headers["retry-after"] ?? headers["Retry-After"];
@@ -94,7 +111,7 @@ export async function retryableCall<T extends ProxyResult | StreamProxyResult>(
 ): Promise<RetryResult<T>> {
   const attempts: Attempt[] = [];
 
-  for (let attempt = 0; attempt <= config.maxRetries; attempt++) {
+  for (let attempt = 0; ; attempt++) {
     const start = Date.now();
 
     try {
@@ -110,21 +127,20 @@ export async function retryableCall<T extends ProxyResult | StreamProxyResult>(
         responseBody: body,
       });
 
-      if (result.statusCode < HTTP_BAD_REQUEST || !isRetryableResult(result.statusCode, body ?? undefined, config)) {
-        return { result, attempts };
-      }
+      if (result.statusCode < HTTP_BAD_REQUEST) return { result, attempts };
 
-      if (attempt === config.maxRetries) {
-        return { result, attempts };
-      }
+      // 通过 matcher 获取匹配规则（含策略参数）
+      const matchedRule = body ? config.ruleMatcher?.match(result.statusCode, body) ?? null : null;
+      if (!matchedRule) return { result, attempts };
 
-      if (reply && (reply.raw.writableFinished || reply.raw.headersSent)) {
-        return { result, attempts };
-      }
+      const maxAttempts = matchedRule.max_retries;
+      if (attempt >= maxAttempts) return { result, attempts };
+      if (reply && (reply.raw.writableFinished || reply.raw.headersSent)) return { result, attempts };
 
+      const strategy = createStrategy(matchedRule);
       const headers = extractHeaders(result);
       const retryAfterMs = result.statusCode === HTTP_TOO_MANY_REQUESTS ? parseRetryAfter(headers) : null;
-      const delay = retryAfterMs ?? getBackoffMs(config.baseDelayMs, attempt);
+      const delay = Math.max(strategy.getDelay(attempt), retryAfterMs ?? 0);
       await sleep(delay);
     } catch (err: unknown) {
       const elapsed = Date.now() - start;
@@ -139,12 +155,10 @@ export async function retryableCall<T extends ProxyResult | StreamProxyResult>(
       });
 
       if (!isRetryableThrow(err)) throw err;
-      if (attempt === config.maxRetries) throw err;
+      if (attempt >= config.maxRetries) throw err;
       if (reply && (reply.raw.writableFinished || reply.raw.headersSent)) throw err;
 
       await sleep(config.baseDelayMs);
     }
   }
-
-  throw new Error("retryableCall: unreachable");
 }

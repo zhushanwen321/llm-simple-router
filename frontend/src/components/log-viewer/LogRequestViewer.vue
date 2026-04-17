@@ -1,12 +1,12 @@
 <template>
   <Tabs :default-value="mode ?? 'structured'" :model-value="mode" class="w-full">
-    <!-- 外部控制模式时不渲染内部控制栏 -->
-    <div v-if="!mode" class="flex items-center justify-between py-2 border-b mb-2">
+    <!-- 粘性控制栏：结构化/原始JSON 切换 + 复制 -->
+    <div v-if="!mode" class="flex items-center justify-between py-2 border-b mb-2 sticky top-0 z-10 bg-background">
       <TabsList>
         <TabsTrigger value="structured">结构化</TabsTrigger>
         <TabsTrigger value="raw">原始 JSON</TabsTrigger>
       </TabsList>
-      <Button variant="ghost" size="xs" class="h-auto px-2 py-1 text-xs" @click="copyRaw">
+      <Button variant="ghost" size="xs" class="h-auto py-1" @click="copyRaw">
         {{ copied ? '已复制' : '复制 JSON' }}
       </Button>
     </div>
@@ -17,18 +17,13 @@
       </template>
       <template v-else>
         <!-- Claude Code context card -->
-        <Card v-if="isClaudeCode" class="border-border bg-info-light">
-          <CardHeader class="pb-2">
-            <div class="flex items-center gap-2">
-              <span class="text-sm font-semibold text-info-dark dark:text-info">Claude Code 请求</span>
-              <Badge variant="secondary">{{ claudeMode }}</Badge>
-            </div>
-          </CardHeader>
-          <CardContent class="flex flex-wrap gap-3 text-sm text-info-dark dark:text-info">
-            <div v-if="thinkingBudget != null">Thinking budget: {{ thinkingBudget }}</div>
-            <div v-if="toolsCount != null">Tools: {{ toolsCount }}</div>
-          </CardContent>
-        </Card>
+        <InfoBanner
+          v-if="isClaudeCode"
+          icon="CC"
+          title="Claude Code 请求"
+          :subtitle="`user-agent: ${claudeMode}`"
+          :details="claudeCodeDetails"
+        />
 
         <!-- URL -->
         <div v-if="showUrl && parsed.url" class="text-xs text-muted-foreground break-all">
@@ -37,16 +32,16 @@
 
         <!-- Parameter badges -->
         <div class="flex flex-wrap gap-2">
-          <Badge v-if="(parsed.body as Record<string, unknown>)?.model" variant="outline">model: {{ String((parsed.body as Record<string, unknown>).model) }}</Badge>
-          <Badge v-if="(parsed.body as Record<string, unknown>)?.stream != null" variant="outline">stream: {{ String((parsed.body as Record<string, unknown>).stream) }}</Badge>
-          <Badge v-if="(parsed.body as Record<string, unknown>)?.max_tokens != null" variant="outline">max_tokens: {{ String((parsed.body as Record<string, unknown>).max_tokens) }}</Badge>
-          <Badge v-if="(parsed.body as Record<string, unknown>)?.thinking != null" variant="outline">thinking</Badge>
+          <StatPill v-if="(parsed.body as Record<string, unknown>)?.model" label="model" :value="String((parsed.body as Record<string, unknown>).model)" :highlight="true" />
+          <StatPill v-if="(parsed.body as Record<string, unknown>)?.stream != null" label="stream" :value="String((parsed.body as Record<string, unknown>).stream)" />
+          <StatPill v-if="(parsed.body as Record<string, unknown>)?.max_tokens != null" label="max_tokens" :value="String((parsed.body as Record<string, unknown>).max_tokens)" />
+          <TagPill v-if="(parsed.body as Record<string, unknown>)?.thinking != null" label="thinking" />
         </div>
 
         <!-- Headers -->
         <Collapsible v-model:open="headersOpen">
           <CollapsibleTrigger as-child>
-            <Button variant="ghost" size="xs" class="px-0 h-auto text-xs">
+            <Button variant="ghost" size="xs" class="px-0 h-auto">
               Headers ({{ headerEntries.length }} 个)
             </Button>
           </CollapsibleTrigger>
@@ -84,7 +79,7 @@
                 <div v-if="block.type === 'text'">
                   <div v-if="block.text.length > 120 && !expanded[`${idx}-${bidx}`]" class="text-sm">
                     {{ block.text.slice(0, 120) }}
-                    <Button variant="link" size="xs" class="px-0 h-auto text-xs" @click="expanded[`${idx}-${bidx}`] = true">展开</Button>
+                    <Button variant="link" size="xs" class="px-0 h-auto" @click="expanded[`${idx}-${bidx}`] = true">展开</Button>
                   </div>
                   <div v-else class="text-sm whitespace-pre-wrap break-all">{{ block.text }}</div>
                 </div>
@@ -92,13 +87,13 @@
                 <div v-else-if="block.text" class="text-xs text-muted-foreground">
                   <Collapsible>
                     <CollapsibleTrigger as-child>
-                      <Button variant="ghost" size="xs" class="px-0 h-auto text-xs">
+                      <Button variant="ghost" size="xs" class="px-0 h-auto">
                         <Badge :class="tagClass(block.type)" class="mr-1">{{ block.label || block.type }}</Badge>
                         {{ formatSize(block.text) }}
                       </Button>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
-                      <pre class="mt-1 whitespace-pre-wrap break-all text-[11px] bg-background rounded p-2 border">{{ block.text }}</pre>
+                      <pre class="mt-1 whitespace-pre-wrap break-all text-[11px] bg-muted rounded-md p-2 border">{{ block.text }}</pre>
                     </CollapsibleContent>
                   </Collapsible>
                 </div>
@@ -115,8 +110,8 @@
         <div v-if="toolNames.length">
           <div class="text-xs font-medium text-muted-foreground mb-1">Tools</div>
           <div class="flex flex-wrap gap-1">
-            <Badge v-for="name in displayedToolNames" :key="name" variant="secondary">{{ name }}</Badge>
-            <Button v-if="toolNames.length > 8" variant="ghost" size="xs" class="px-1 h-5 text-xs" @click="toolsExpanded = !toolsExpanded">
+            <TagPill v-for="name in displayedToolNames" :key="name" :label="name" />
+            <Button v-if="toolNames.length > 8" variant="ghost" size="xs" class="px-1 h-5" @click="toolsExpanded = !toolsExpanded">
               {{ toolsExpanded ? '收起' : `+${toolNames.length - 8}` }}
             </Button>
           </div>
@@ -138,7 +133,7 @@
         <!-- Other fields -->
         <Collapsible v-if="otherFieldsKeys.length">
           <CollapsibleTrigger as-child>
-            <Button variant="ghost" size="xs" class="px-0 h-auto text-xs">
+            <Button variant="ghost" size="xs" class="px-0 h-auto">
               其他字段
             </Button>
           </CollapsibleTrigger>
@@ -150,7 +145,7 @@
     </TabsContent>
 
     <TabsContent value="raw">
-      <JsonCopyBlock :content="raw" />
+      <JsonCopyBlock :content="raw" hide-copy-button />
     </TabsContent>
   </Tabs>
 </template>
@@ -164,6 +159,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import JsonCopyBlock from './JsonCopyBlock.vue'
+import StatPill from './StatPill.vue'
+import TagPill from './TagPill.vue'
 import { roleClass, tagClass } from './logColors'
 import { extractBlocks } from './requestBlockParser'
 import type { MsgBlock } from './requestBlockParser'
@@ -247,6 +244,13 @@ const thinkingBudget = computed(() => {
 const toolsCount = computed(() => {
   const tools = body.value.tools as unknown[] | undefined
   return Array.isArray(tools) ? tools.length : undefined
+})
+
+const claudeCodeDetails = computed(() => {
+  const parts: string[] = []
+  if (thinkingBudget.value != null) parts.push(`thinking: ${thinkingBudget.value} tokens`)
+  if (toolsCount.value != null) parts.push(`tools: ${toolsCount.value} 个`)
+  return parts
 })
 
 const messages = computed<MsgBlock[]>(() => {
