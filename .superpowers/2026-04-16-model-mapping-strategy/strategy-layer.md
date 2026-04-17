@@ -31,22 +31,26 @@ interface TargetsRule {
 
 - 内存状态：`Map<string, number>`（clientModel → lastIndex）
 - `select(rule, context)`：
-  1. 从 targets 中过滤掉 excludeTargets
-  2. 取 (lastIndex + 1) % filteredTargets.length
-  3. 更新内存 index
+  1. 从 targets 中过滤掉 excludeTargets 得到 filteredTargets
+  2. 如果 filteredTargets 为空，返回 undefined
+  3. 取 (lastIndex + 1) % filteredTargets.length
+  4. 更新内存 index 为新位置
+  5. 返回 filteredTargets[index]
+- **index 语义**：lastIndex 基于 filteredTargets 数组的位置，每次 select 成功（返回非 undefined）才推进
 - 重启后 index 归零
 
 ## RandomStrategy
 
 - `select(rule, context)`：
   1. 从 targets 中过滤掉 excludeTargets
-  2. Math.random() 选一个
+  2. 如果为空，返回 undefined
+  3. Math.random() 选一个
 
 ## FailoverStrategy
 
 - `select(rule, context)`：
-  1. 返回第一个不在 excludeTargets 中的 target
-  2. 即 targets[0] → 失败 → exclude → targets[1] → ...
+  1. 遍历 targets，返回第一个不在 excludeTargets 中的 target
+  2. 无匹配时返回 undefined
 
 ## 注册
 

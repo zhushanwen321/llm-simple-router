@@ -2,7 +2,11 @@
 
 ## validateRule 扩展
 
-在 `src/admin/groups.ts` 的 `validateRule` 函数中，为三种新策略增加验证：
+在 `src/admin/groups.ts` 的 `validateRule` 函数中：
+
+### 策略名白名单校验（优先）
+
+首先检查 `strategy` 是否在 `STRATEGY_NAMES` 的值集合中，对未知策略名返回错误。
 
 ### round-robin / random
 
@@ -14,7 +18,6 @@
 ### failover
 
 - 同上，但 targets 至少 2 个元素
-- 因为故障转移需要至少一个备选
 
 ## 无需新 migration
 

@@ -26,7 +26,16 @@
 - 新的 provider（从 resolveMapping 获取新的 provider_id）
 - 新的 body.model（resolved.backend_model）
 - 新的 apiKey（解密新 provider 的 api_key）
-- 正常记录日志（is_retry = 1）
+- 日志中 is_retry = 1（语义为"重试请求"，不区分同 provider 重试和跨 provider 故障转移）
+
+## 流式请求限制
+
+failover 循环**仅在 response headers 发送前**生效。一旦 proxyStream 开始向客户端写入 headers 或 pipe 数据，无法切换 target。
+
+具体实现：
+- 在 failover 循环入口检查 `reply.raw.headersSent`
+- 流式请求如果 headers 已发送，直接返回当前结果，不再尝试下一个 target
+- 这意味着流式请求的 failover 仅在连接建立失败、上游返回错误且未开始流式传输时生效
 
 ## 限制
 

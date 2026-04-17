@@ -17,8 +17,8 @@ scheduled / round-robin / random / failover
 ### targets 列表组件
 
 每个 target 项：
-- Select: 供应商
-- Select: 后端模型（联动供应商的 models 列表）
+- Select: 供应商（数据来源：`api.getProviders()` 返回的 providers 列表）
+- Select: 后端模型（联动供应商的 models 字段，数据来源：provider.models JSON 数组，已在 migration 012 中添加）
 - 删除按钮
 
 failover 额外：上移/下移按钮
