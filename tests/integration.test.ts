@@ -11,6 +11,8 @@ import { createHash } from "crypto";
 import { buildApp } from "../src/index.js";
 import { encrypt } from "../src/utils/crypto.js";
 import { initDatabase } from "../src/db/index.js";
+import { setSetting } from "../src/db/settings.js";
+import { hashPassword } from "../src/utils/password.js";
 
 const TEST_ENCRYPTION_KEY =
   "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
@@ -18,9 +20,6 @@ const API_KEY = "sk-integration-test";
 
 function makeTestConfig() {
   return {
-    ADMIN_PASSWORD: "admin123",
-    JWT_SECRET: "test-jwt-secret-for-testing",
-    ENCRYPTION_KEY: TEST_ENCRYPTION_KEY,
     PORT: 9981,
     DB_PATH: ":memory:",
     LOG_LEVEL: "silent",
@@ -61,11 +60,13 @@ describe("Integration tests", () => {
   let close: () => Promise<void>;
 
   beforeEach(async () => {
-    process.env.ADMIN_PASSWORD = "admin123";
-    process.env.ENCRYPTION_KEY = TEST_ENCRYPTION_KEY;
-    process.env.LOG_LEVEL = "silent";
-
     db = initDatabase(":memory:");
+
+    // seed auth/settings so buildApp can read them from DB
+    setSetting(db, "encryption_key", TEST_ENCRYPTION_KEY);
+    setSetting(db, "jwt_secret", "test-jwt-secret-for-testing");
+    setSetting(db, "admin_password_hash", hashPassword("admin123"));
+    setSetting(db, "initialized", "true");
 
     // Mock OpenAI 后端
     mockOpenAI = await createMockBackend((req, res) => {
@@ -263,9 +264,6 @@ describe("Integration tests", () => {
     await close();
     await closeServer(mockOpenAI.server);
     await closeServer(mockAnthropic.server);
-    delete process.env.ADMIN_PASSWORD;
-    delete process.env.ENCRYPTION_KEY;
-    delete process.env.LOG_LEVEL;
   });
 
   const AUTH_HEADER = { authorization: `Bearer ${API_KEY}` };

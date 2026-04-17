@@ -11,7 +11,6 @@ import { RetryRuleMatcher } from "./retry-rules.js";
 
 export interface AnthropicProxyOptions {
   db: Database.Database;
-  encryptionKey: string;
   streamTimeoutMs: number;
   retryMaxAttempts: number;
   retryBaseDelayMs: number;
@@ -44,10 +43,10 @@ const anthropicErrors: ProxyErrorFormatter = {
 };
 
 const anthropicProxyRaw: FastifyPluginCallback<AnthropicProxyOptions> = (app, opts, done) => {
-  const { db, encryptionKey, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher } = opts;
+  const { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher } = opts;
 
   app.post(MESSAGES_PATH, async (request, reply) => {
-    const deps: ProxyHandlerDeps = { db, encryptionKey, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher };
+    const deps: ProxyHandlerDeps = { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher };
     return handleProxyPost(request, reply, "anthropic", MESSAGES_PATH, anthropicErrors, deps);
   });
 

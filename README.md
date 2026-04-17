@@ -90,19 +90,13 @@ alias clodedev='ANTHROPIC_AUTH_TOKEN="<your-router-key>" ANTHROPIC_BASE_URL="htt
 ## 快速开始
 
 ```bash
-# 配置环境变量
-cd xxx/llm-simple-router
-cp .env.example .env
-# 编辑 .env，全用默认也能启动
-nano .env
-
-# 直接用npx启动
+# 一行命令启动
 npx llm-simple-router
 # 访问 http://localhost:9981/admin
-
+# 首次访问会进入 Setup 页面设置管理员密码
 ```
 
-生成随机密钥：`openssl rand -hex 32`
+无需任何环境变量。数据默认存储在 `~/.llm-simple-router/`。
 
 ## Docker 部署
 
@@ -112,15 +106,14 @@ docker compose up -d
 
 ## 环境变量
 
+所有密钥（管理员密码、加密密钥、JWT 密钥）通过首次启动的 Setup 页面设置，无需环境变量。
+
 | 变量 | 必需 | 默认值 | 说明 |
 |------|------|--------|------|
-| `ADMIN_PASSWORD` | Yes | -- | 管理后台密码 |
-| `ENCRYPTION_KEY` | Yes | -- | AES-256-GCM 密钥（64字符 hex） |
-| `JWT_SECRET` | Yes | -- | JWT 签名密钥（64字符 hex） |
 | `PORT` | No | `9981` | 服务端口 |
-| `DB_PATH` | No | `./data/router.db` | SQLite 数据库路径 |
+| `DB_PATH` | No | `~/.llm-simple-router/router.db` | SQLite 数据库路径 |
 | `LOG_LEVEL` | No | `info` | 日志级别 |
-| `TZ` | No | -- | 时区设置 |
+| `TZ` | No | `Asia/Shanghai` | 时区设置 |
 | `STREAM_TIMEOUT_MS` | No | `3000000` | 流式代理空闲超时（ms） |
 | `RETRY_MAX_ATTEMPTS` | No | `3` | 最大重试次数 |
 | `RETRY_BASE_DELAY_MS` | No | `1000` | 重试基础延迟（ms） |

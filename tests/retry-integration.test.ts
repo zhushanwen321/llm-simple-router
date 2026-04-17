@@ -5,6 +5,7 @@ import Database from "better-sqlite3";
 import { encrypt } from "../src/utils/crypto.js";
 import { anthropicProxy } from "../src/proxy/anthropic.js";
 import { initDatabase } from "../src/db/index.js";
+import { setSetting } from "../src/db/settings.js";
 import { retryableCall, buildRetryConfig } from "../src/proxy/retry.js";
 import { RetryRuleMatcher } from "../src/proxy/retry-rules.js";
 import type { ProxyResult } from "../src/proxy/proxy-core.js";
@@ -99,6 +100,7 @@ describe("Retry integration", () => {
     });
 
     db = initDatabase(":memory:");
+    setSetting(db, "encryption_key", TEST_KEY);
     setupProvider(db, `http://127.0.0.1:${port}`);
     db.prepare(
       "INSERT INTO retry_rules (id, name, status_code, body_pattern, is_active, created_at, retry_strategy, retry_delay_ms, max_retries, max_delay_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
@@ -108,7 +110,6 @@ describe("Retry integration", () => {
     app = Fastify();
     app.register(anthropicProxy, {
       db,
-      encryptionKey: TEST_KEY,
       streamTimeoutMs: 5000,
       retryMaxAttempts: 2,
       retryBaseDelayMs: 10,
@@ -154,6 +155,7 @@ describe("Retry integration", () => {
     });
 
     db = initDatabase(":memory:");
+    setSetting(db, "encryption_key", TEST_KEY);
     setupProvider(db, `http://127.0.0.1:${port}`);
     db.prepare(
       "INSERT INTO retry_rules (id, name, status_code, body_pattern, is_active, created_at, retry_strategy, retry_delay_ms, max_retries, max_delay_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
@@ -163,7 +165,6 @@ describe("Retry integration", () => {
     app = Fastify();
     app.register(anthropicProxy, {
       db,
-      encryptionKey: TEST_KEY,
       streamTimeoutMs: 5000,
       retryMaxAttempts: 1,
       retryBaseDelayMs: 10,
@@ -253,11 +254,11 @@ describe("Retry integration", () => {
     });
 
     db = initDatabase(":memory:");
+    setSetting(db, "encryption_key", TEST_KEY);
     setupProvider(db, `http://127.0.0.1:${port}`);
     app = Fastify();
     app.register(anthropicProxy, {
       db,
-      encryptionKey: TEST_KEY,
       streamTimeoutMs: 5000,
       retryMaxAttempts: 2,
       retryBaseDelayMs: 10,

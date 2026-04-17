@@ -1,0 +1,44 @@
+import { FastifyPluginCallback } from "fastify";
+import Database from "better-sqlite3";
+import { randomBytes } from "node:crypto";
+import { getSetting, setSetting, isInitialized } from "../db/settings.js";
+import { hashPassword } from "../utils/password.js";
+
+interface SetupOptions {
+  db: Database.Database;
+}
+
+export const adminSetupRoutes: FastifyPluginCallback<SetupOptions> = (app, options, done) => {
+  const { db } = options;
+
+  app.get("/admin/api/setup/status", async () => {
+    return { initialized: isInitialized(db) };
+  });
+
+  app.post("/admin/api/setup/initialize", async (request, reply) => {
+    const { password } = request.body as { password?: string };
+    if (!password || password.length < 6) { // eslint-disable-line no-magic-numbers
+      return reply.code(400).send({ error: { message: "Password must be at least 6 characters" } });
+    }
+
+    // 事务中原子检查防竞态
+    const alreadyInitialized = db.transaction(() => {
+      if (isInitialized(db)) return true;
+      const encryptionKey = randomBytes(32).toString("hex");
+      const jwtSecret = randomBytes(32).toString("hex");
+      setSetting(db, "admin_password_hash", hashPassword(password));
+      setSetting(db, "encryption_key", encryptionKey);
+      setSetting(db, "jwt_secret", jwtSecret);
+      setSetting(db, "initialized", "true");
+      return false;
+    })();
+
+    if (alreadyInitialized) {
+      return reply.code(409).send({ error: { message: "Already initialized" } });
+    }
+
+    return { success: true };
+  });
+
+  done();
+};

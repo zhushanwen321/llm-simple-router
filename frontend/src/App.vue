@@ -20,8 +20,11 @@ const router = useRouter()
 const route = useRoute()
 const isAuthenticated = ref(false)
 
+// 不需要认证的页面
+const publicPages = ['/login', '/setup']
+
 async function checkAuth() {
-  if (route.path === '/login') {
+  if (publicPages.includes(route.path)) {
     isAuthenticated.value = false
     return
   }
