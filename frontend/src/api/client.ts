@@ -10,7 +10,11 @@ client.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) { // eslint-disable-line no-magic-numbers
-      router.push('/login')
+      if (error.response.data?.needsSetup) {
+        router.push('/setup')
+      } else {
+        router.push('/login')
+      }
     }
     return Promise.reject(error)
   }
@@ -92,6 +96,9 @@ async function request<T>(method: 'get' | 'post' | 'put' | 'delete', url: string
 export const api = {
   login: (password: string) => client.post(API.LOGIN, { password }),
   logout: () => client.post(API.LOGOUT),
+
+  getSetupStatus: () => request<{ initialized: boolean }>('get', '/setup/status'),
+  initializeSetup: (password: string) => request<{ success: boolean }>('post', '/setup/initialize', { password }),
 
   getProviders: () => request<unknown[]>('get', API.PROVIDERS),
   createProvider: (data: ProviderPayload) => request<{ id: string }>('post', API.PROVIDERS, data),
