@@ -149,6 +149,21 @@
             </CollapsibleContent>
           </Collapsible>
 
+          <!-- Router→LLM API 请求 -->
+          <Collapsible v-if="detailData.upstream_request" v-model:open="upstreamRequestOpen" class="border rounded-md">
+            <CollapsibleTrigger as-child>
+              <Button variant="ghost" class="w-full px-4 py-3 text-left text-sm font-medium text-foreground bg-muted/50 hover:bg-muted rounded-none rounded-t-md flex items-center gap-2">
+                <span class="text-xs transition-transform" :class="upstreamRequestOpen ? 'rotate-0' : '-rotate-90'">&#9660;</span>
+                Router → LLM API 请求
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div class="p-4">
+                <LogRequestViewer :raw="detailData.upstream_request" :api-type="asApiType(detailData.api_type)" :show-url="true" />
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+
           <!-- LLM API 返回的原始响应 -->
           <Collapsible v-model:open="responseOpen" class="border rounded-md">
             <CollapsibleTrigger as-child>
@@ -160,6 +175,21 @@
             <CollapsibleContent>
               <div class="p-4">
                 <LogResponseViewer :raw="detailData.upstream_response || detailData.response_body || '{}'" :api-type="asApiType(detailData.api_type)" :is-stream="!!detailData.is_stream" />
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+
+          <!-- Router→客户端响应 -->
+          <Collapsible v-if="detailData.client_response" v-model:open="clientResponseOpen" class="border rounded-md">
+            <CollapsibleTrigger as-child>
+              <Button variant="ghost" class="w-full px-4 py-3 text-left text-sm font-medium text-foreground bg-muted/50 hover:bg-muted rounded-none rounded-t-md flex items-center gap-2">
+                <span class="text-xs transition-transform" :class="clientResponseOpen ? 'rotate-0' : '-rotate-90'">&#9660;</span>
+                Router → 客户端响应
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div class="p-4">
+                <LogResponseViewer :raw="detailData.client_response" :api-type="asApiType(detailData.api_type)" :is-stream="!!detailData.is_stream" />
               </div>
             </CollapsibleContent>
           </Collapsible>
@@ -246,7 +276,9 @@ const detailLoading = ref(false)
 const detailData = ref<LogEntry | null>(null)
 
 const requestOpen = ref(true)
+const upstreamRequestOpen = ref(false)
 const responseOpen = ref(false)
+const clientResponseOpen = ref(false)
 
 function asApiType(t: string): 'openai' | 'anthropic' {
   return t === 'openai' ? 'openai' : 'anthropic'
@@ -257,7 +289,9 @@ async function openDetail(id: string) {
   detailLoading.value = true
   detailData.value = null
   requestOpen.value = true
+  upstreamRequestOpen.value = false
   responseOpen.value = false
+  clientResponseOpen.value = false
   try {
     const res = await api.getLogDetail(id)
     detailData.value = res.data

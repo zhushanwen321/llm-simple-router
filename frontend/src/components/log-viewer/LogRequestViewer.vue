@@ -1,7 +1,7 @@
 <template>
   <Tabs :default-value="mode ?? 'structured'" :model-value="mode" class="w-full">
-    <!-- 外部控制模式时不渲染内部控制栏 -->
-    <div v-if="!mode" class="flex items-center justify-between py-2 border-b mb-2">
+    <!-- 粘性控制栏：结构化/原始JSON 切换 + 复制 -->
+    <div v-if="!mode" class="flex items-center justify-between py-2 border-b mb-2 sticky top-0 z-10 bg-background">
       <TabsList>
         <TabsTrigger value="structured">结构化</TabsTrigger>
         <TabsTrigger value="raw">原始 JSON</TabsTrigger>
@@ -145,7 +145,7 @@
     </TabsContent>
 
     <TabsContent value="raw">
-      <JsonCopyBlock :content="raw" />
+      <JsonCopyBlock :content="raw" hide-copy-button />
     </TabsContent>
   </Tabs>
 </template>

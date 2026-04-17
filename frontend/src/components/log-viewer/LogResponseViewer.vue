@@ -1,10 +1,14 @@
 <template>
   <Tabs :default-value="mode ?? 'structured'" :model-value="mode" class="w-full">
-    <div v-if="!mode" class="mb-2">
+    <!-- 粘性控制栏：结构化/原始切换 + 复制 -->
+    <div v-if="!mode" class="flex items-center justify-between py-2 border-b mb-2 sticky top-0 z-10 bg-background">
       <TabsList>
         <TabsTrigger value="structured">结构化</TabsTrigger>
         <TabsTrigger value="raw">{{ isStream ? '原始 SSE 文本' : '原始 JSON' }}</TabsTrigger>
       </TabsList>
+      <Button variant="ghost" size="xs" class="h-auto py-1" @click="copyRaw">
+        {{ copied ? '已复制' : '复制' }}
+      </Button>
     </div>
 
     <TabsContent value="structured" class="space-y-3">
@@ -267,7 +271,7 @@
     </TabsContent>
 
     <TabsContent value="raw">
-      <JsonCopyBlock :content="raw" />
+      <JsonCopyBlock :content="raw" hide-copy-button />
     </TabsContent>
   </Tabs>
 </template>
@@ -381,4 +385,13 @@ const {
 
 const expandedBlock = reactive<Record<number, boolean>>({})
 const streamTab = ref<'assembled' | 'raw-events'>('assembled')
+const copied = ref(false)
+
+async function copyRaw() {
+  try {
+    await navigator.clipboard.writeText(props.raw)
+    copied.value = true
+    setTimeout(() => { copied.value = false }, 2000) // eslint-disable-line no-magic-numbers
+  } catch { copied.value = false }
+}
 </script>
