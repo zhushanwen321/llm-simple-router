@@ -61,7 +61,7 @@ export interface ResolveContext {
 }
 
 export interface MappingStrategy {
-  select(rule: unknown, context: ResolveContext): Target | undefined;
+  select(rule: unknown, context: ResolveContext, clientModel?: string): Target | undefined;
 }
 ```
 
@@ -583,7 +583,7 @@ const STRATEGIES: Record<string, import("./strategy/types.js").MappingStrategy> 
 // resolveMapping 函数保持不变
 ```
 
-同时需要给 `resolveMapping` 添加 `clientModel` 参数传递给 `strategy.select()`（RoundRobinStrategy 需要用 clientModel 维护 index）：
+同时修改 `resolveMapping` 传递 `clientModel` 给 `strategy.select()`（Task 1 已扩展 MappingStrategy 接口添加可选 `clientModel` 参数）：
 
 ```typescript
 export function resolveMapping(
@@ -600,12 +600,11 @@ export function resolveMapping(
   const strategy = STRATEGIES[group.strategy];
   if (!strategy) return null;
 
-  // RoundRobinStrategy 的 select 签名支持可选的 clientModel 参数
-  return (strategy as any).select(rule, context, clientModel) ?? null;
+  return strategy.select(rule, context, clientModel) ?? null;
 }
 ```
 
-> 注意：这里用 `as any` 是因为 `MappingStrategy` 接口的 `select` 只定义了两个参数。如果 RoundRobinStrategy 的第三个参数 `clientModel` 需要更正式地支持，应扩展 `MappingStrategy` 接口。但考虑到只有 RoundRobinStrategy 需要这个参数，用可选参数 + `as any` 是合理的临时方案。实现时可以选择扩展接口。
+> 注意：`clientModel` 参数在 Task 1 中已加入 `MappingStrategy` 接口，所有策略的 `select` 方法都接受可选的第三参数。`ScheduledStrategy`、`RandomStrategy`、`FailoverStrategy` 忽略该参数，只有 `RoundRobinStrategy` 使用它来维护独立的轮询 index。
 
 - [ ] **Step 4: Run test to verify it passes**
 
@@ -799,21 +798,22 @@ git commit -m "feat(admin): validate round-robin, random, failover rules with st
 
 这是最复杂的改动。需要在 `handleProxyPost` 中增加 failover 循环。
 
-- [ ] **Step 1: 理解改动范围**
+- [ ] **Step 1: 新增 import**
 
-当前 `handleProxyPost` 流程（`src/proxy/proxy-core.ts:400-560`）：
-1. resolveMapping → 获取 target
-2. getProviderById → 获取 provider
-3. retryableCall → 执行 proxy 请求（含重试）
-4. 记录日志、返回结果
+在 `src/proxy/proxy-core.ts` 顶部添加：
 
-Failover 需要在外层增加循环：当结果失败且策略为 failover 时，排除当前 target 重新 resolve。
+```typescript
+import { getMappingGroup } from "../db/index.js";
+import type { Target } from "./strategy/types.js";
+```
 
-- [ ] **Step 2: 提取 proxy 执行逻辑为内部函数**
+- [ ] **Step 2: 重构 handleProxyPost**
 
-将 `handleProxyPost` 中从 `resolveMapping` 到 `return reply` 的逻辑重构为一个 `executeProxyWithTarget` 内部函数（或直接用循环），减少嵌套。
+将现有的 `handleProxyPost` 函数（约 400-560 行）重构为带 failover 循环的版本。
 
-推荐方式：在 `handleProxyPost` 中用 `while` 循环 + `excludeTargets` 数组：
+核心思路：将 resolveMapping → provider 获取 → proxy 请求 → 日志记录包裹在一个 `while(true)` 循环中。成功时 return，失败时检查是否需要 failover。
+
+具体实现：
 
 ```typescript
 export async function handleProxyPost(
@@ -828,60 +828,125 @@ export async function handleProxyPost(
   const { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher } = deps;
 
   request.raw.socket.on("error", (err) => request.log.debug({ err }, "client socket error"));
-  const startTime = Date.now();
-  const logId = randomUUID();
-  const routerKeyId = request.routerKey?.id ?? null;
-  const body = request.body as Record<string, unknown>;
-  const originalBody = JSON.parse(JSON.stringify(body));
-  const clientModel = (body.model as string) || "unknown";
+  const clientModel = ((request.body as Record<string, unknown>).model as string) || "unknown";
 
-  // --- Failover 循环 ---
+  // 查询分组策略（只查一次）
+  const group = getMappingGroup(db, clientModel);
+  const isFailover = group?.strategy === "failover";
   const excludeTargets: Target[] = [];
-  let isFailover = false;
 
   while (true) {
+    const startTime = Date.now();
+    const logId = randomUUID();
+    const routerKeyId = request.routerKey?.id ?? null;
+    const body = request.body as Record<string, unknown>;
+    const originalBody = JSON.parse(JSON.stringify(body));
+
     const resolved = resolveMapping(db, clientModel, { now: new Date(), excludeTargets });
     if (!resolved) {
       if (isFailover && excludeTargets.length > 0) {
-        // 所有 failover target 都已尝试，返回最后一次的错误（已经在上一轮发送了 reply）
-        // 这种情况不应该发生，因为上一轮已经 return 了
-        break;
+        // 所有 failover target 都已尝试，reply 已在上一轮发送
+        return reply;
       }
       const e = errors.modelNotFound(clientModel);
       return reply.status(e.statusCode).send(e.body);
     }
 
-    // 检查 failover 策略（仅在第一次 resolve 时检查）
-    if (excludeTargets.length === 0) {
-      const group = getMappingGroup(db, clientModel);
-      isFailover = group?.strategy === "failover";
+    const provider = getProviderById(db, resolved.provider_id);
+    if (!provider || !provider.is_active) {
+      const e = errors.providerUnavailable();
+      return reply.status(e.statusCode).send(e.body);
+    }
+    if (provider.api_type !== apiType) {
+      const e = errors.providerTypeMismatch();
+      return reply.status(e.statusCode).send(e.body);
     }
 
-    // ... 原有的 provider 校验、proxy 请求、日志记录逻辑 ...
-    // ... 将整个 try/catch 块放在这里 ...
+    body.model = resolved.backend_model;
+    const apiKey = decrypt(provider.api_key, getSetting(db, "encryption_key")!);
+    const isStream = body.stream === true;
+    options?.beforeSendProxy?.(body, isStream);
 
-    // 在 try 块成功返回后，如果结果不是成功且是 failover：
-    // 在 catch 或 非 2xx 时：检查是否需要 failover
-    // 具体实现见步骤 3
+    const reqBodyStr = JSON.stringify(body);
+    const cliHdrs: RawHeaders = request.headers as RawHeaders;
+    const clientReq = JSON.stringify({ headers: cliHdrs, body: originalBody });
+    const retryConfig = buildRetryConfig(retryMaxAttempts, retryBaseDelayMs, matcher);
+    const upstreamReqBase = JSON.stringify({ url: `${provider.base_url}${upstreamPath}`, headers: buildUpstreamHeaders(cliHdrs, apiKey, Buffer.byteLength(reqBodyStr)), body: reqBodyStr });
+
+    try {
+      const { result: r, attempts } = isStream
+        ? await retryableCall(() => { const mt = new SSEMetricsTransform(apiType, startTime); return proxyStream(provider, apiKey, body, cliHdrs, reply, streamTimeoutMs, upstreamPath, mt); }, retryConfig, reply)
+        : await retryableCall(() => proxyNonStream(provider, apiKey, body, cliHdrs, upstreamPath), retryConfig, reply);
+
+      // 记录所有尝试的日志（同现有逻辑）
+      let lastSuccessLogId = logId;
+      for (const attempt of attempts) {
+        const isOriginal = attempt.attemptIndex === 0;
+        const attemptLogId = isOriginal ? logId : randomUUID();
+        if (attempt.error) {
+          insertRequestLog(db, { id: attemptLogId, api_type: apiType, model: clientModel, provider_id: provider.id, status_code: HTTP_BAD_GATEWAY, latency_ms: attempt.latencyMs, is_stream: isStream ? 1 : 0, error_message: attempt.error, created_at: new Date().toISOString(), request_body: reqBodyStr, client_request: clientReq, upstream_request: upstreamReqBase, is_retry: isOriginal ? 0 : 1, original_request_id: isOriginal ? null : logId, router_key_id: routerKeyId });
+        } else if (attempt.statusCode !== UPSTREAM_SUCCESS) {
+          insertRequestLog(db, { id: attemptLogId, api_type: apiType, model: clientModel, provider_id: provider.id, status_code: attempt.statusCode, latency_ms: attempt.latencyMs, is_stream: isStream ? 1 : 0, error_message: null, created_at: new Date().toISOString(), request_body: reqBodyStr, response_body: attempt.responseBody, client_request: clientReq, upstream_request: upstreamReqBase, upstream_response: JSON.stringify({ statusCode: attempt.statusCode, body: attempt.responseBody }), client_response: JSON.stringify({ statusCode: attempt.statusCode, body: attempt.responseBody }), is_retry: isOriginal ? 0 : 1, original_request_id: isOriginal ? null : logId, router_key_id: routerKeyId });
+        } else {
+          const h = isStream ? ((r as StreamProxyResult).upstreamResponseHeaders ?? {}) : ((r as ProxyResult).headers);
+          insertSuccessLog(db, apiType, attemptLogId, clientModel, provider, isStream, startTime, reqBodyStr, clientReq, upstreamReqBase, r.statusCode, attempt.responseBody, h, h, !isOriginal, isOriginal ? null : logId, routerKeyId);
+          lastSuccessLogId = attemptLogId;
+        }
+      }
+
+      // --- Failover 检查 ---
+      // 如果最终状态码不是 2xx，且是 failover 策略，且 headers 未发送
+      const finalStatus = r.statusCode;
+      if (isFailover && finalStatus >= 400 && !reply.raw.headersSent) {
+        excludeTargets.push(resolved);
+        continue; // 尝试下一个 target
+      }
+
+      // 非 failover 或成功：发送响应
+      if (isStream) {
+        if (r.statusCode !== UPSTREAM_SUCCESS) {
+          for (const [k, v] of Object.entries((r as StreamProxyResult).upstreamResponseHeaders ?? {})) reply.header(k, v);
+          reply.status(r.statusCode).send((r as StreamProxyResult).responseBody);
+        }
+      } else {
+        const pr = r as ProxyResult;
+        for (const [k, v] of Object.entries(pr.headers)) reply.header(k, v);
+        return reply.status(pr.statusCode).send(pr.body);
+      }
+
+      if (r.statusCode === UPSTREAM_SUCCESS) {
+        if (isStream) {
+          const sr = r as StreamProxyResult;
+          if (sr.metricsResult) { try { insertMetrics(db, { ...sr.metricsResult, request_log_id: lastSuccessLogId, provider_id: provider.id, backend_model: resolved.backend_model, api_type: apiType }); } catch (err) { request.log.error({ err }, "Failed to insert metrics"); } }
+        } else {
+          try { const mr = MetricsExtractor.fromNonStreamResponse(apiType, (r as ProxyResult).body); if (mr) insertMetrics(db, { ...mr, request_log_id: lastSuccessLogId, provider_id: provider.id, backend_model: resolved.backend_model, api_type: apiType }); } catch (err) { request.log.error({ err }, "Failed to insert metrics"); }
+        }
+      }
+      return reply;
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      const sentH = buildUpstreamHeaders(cliHdrs, apiKey, Buffer.byteLength(reqBodyStr));
+      const upstreamReq = JSON.stringify({ url: `${provider.base_url}${upstreamPath}`, headers: sentH, body: reqBodyStr });
+      insertRequestLog(db, { id: logId, api_type: apiType, model: clientModel, provider_id: provider.id, status_code: HTTP_BAD_GATEWAY, latency_ms: Date.now() - startTime, is_stream: isStream ? 1 : 0, error_message: errMsg || "Upstream connection failed", created_at: new Date().toISOString(), request_body: reqBodyStr, client_request: clientReq, upstream_request: upstreamReq, router_key_id: routerKeyId });
+
+      // --- Failover 检查（异常路径）---
+      if (isFailover && !reply.raw.headersSent) {
+        excludeTargets.push(resolved);
+        continue; // 尝试下一个 target
+      }
+
+      const e = errors.upstreamConnectionFailed();
+      return reply.status(e.statusCode).send(e.body);
+    }
   }
 }
 ```
 
-> 注意：这是一个复杂重构，实现时需要仔细处理。关键是确保：
-> 1. 非 failover 策略走原有路径（无循环）
-> 2. failover 仅在 headers 未发送时重试
-> 3. 每次重试使用新的 provider/model/apiKey
-> 4. 所有日志正常记录
-
-- [ ] **Step 3: 实现完整的 failover 循环**
-
-核心改动逻辑：
-- 将原有 `resolveMapping` → `proxy` → `log` → `return` 包裹在 `while(true)` 循环中
-- 每次循环开始时 `resolveMapping(db, clientModel, { now, excludeTargets })`
-- 在 `retryableCall` 返回后，检查是否需要 failover：
-  - 非 failover 策略：直接 break/return（与原逻辑相同）
-  - failover + 失败 + headers 未发送：将当前 target 加入 excludeTargets，continue
-  - failover + 成功 或 headers 已发送：break/return
+> **关键设计决策：**
+> - `group` 只在循环外查一次（不变）
+> - `startTime`、`logId`、`body` 在每次循环内重新初始化（每次 target 尝试独立）
+> - 白名单校验移到 `resolveMapping` 之前（首次循环外已处理，但后续 target 也需要检查——不过因为白名单校验的是 clientModel 而非 backend_model，所以只需校验一次）
+> - failover 检查条件：`isFailover && (statusCode >= 400 || exception) && !reply.raw.headersSent`
 
 - [ ] **Step 4: Run 全部 proxy 测试**
 
@@ -971,7 +1036,21 @@ interface FormData {
 }
 ```
 
-更新 `DEFAULT_FORM` 和 emits（增加 `addTarget`, `removeTarget`, `moveTargetUp`, `moveTargetDown`）。
+更新 `DEFAULT_FORM` 增加 `targets` 字段：
+
+```typescript
+const DEFAULT_FORM = {
+  client_model: '',
+  strategy: 'scheduled',
+  default: { backend_model: '', provider_id: '' },
+  windows: [] as RuleWindow[],
+  targets: [] as { backend_model: string; provider_id: string }[],
+}
+```
+
+更新 emits（增加 `addTarget`, `removeTarget`, `moveTargetUp`, `moveTargetDown`）。
+
+同时更新 `MappingGroupFormDialog.vue` 的 `props.form` 类型（加 `targets` 字段）。
 
 - [ ] **Step 4: 更新 ModelMappings.vue 中的展示逻辑**
 
@@ -992,6 +1071,94 @@ interface FormData {
     <span>{{ providerNameMap.get(t.provider_id) || t.provider_id }}</span>
   </div>
 </div>
+```
+
+- [ ] **Step 4b: 更新 ModelMappings.vue 中的事件监听和 handler**
+
+在 `<MappingGroupFormDialog>` 标签上添加新的事件监听：
+
+```html
+<MappingGroupFormDialog
+  v-model:open="dialogOpen"
+  :editing-id="editingId"
+  :form="form"
+  :providers="providersList"
+  :provider-models="providerModelsMap"
+  @save="handleSave"
+  @add-window="addWindow"
+  @remove-window="removeWindow"
+  @add-target="addTarget"
+  @remove-target="removeTarget"
+  @move-target-up="moveTargetUp"
+  @move-target-down="moveTargetDown"
+/>
+```
+
+添加对应的 handler 函数：
+
+```typescript
+function addTarget() {
+  const firstProviderId = providersList.value[0]?.id || ''
+  const firstModels = providerModelsMap.value.get(firstProviderId) || []
+  form.value.targets.push({ backend_model: firstModels[0] || '', provider_id: firstProviderId })
+}
+
+function removeTarget(idx: number) {
+  form.value.targets.splice(idx, 1)
+}
+
+function moveTargetUp(idx: number) {
+  if (idx <= 0) return
+  const targets = form.value.targets
+  ;[targets[idx - 1], targets[idx]] = [targets[idx], targets[idx - 1]]
+}
+
+function moveTargetDown(idx: number) {
+  const targets = form.value.targets
+  if (idx >= targets.length - 1) return
+  ;[targets[idx], targets[idx + 1]] = [targets[idx + 1], targets[idx]]
+}
+```
+
+- [ ] **Step 4c: 更新 openEdit 解析 targets 格式的 rule**
+
+修改 `ModelMappings.vue` 中的 `openEdit` 函数，支持解析 targets 格式的 rule：
+
+```typescript
+function openEdit(g: MappingGroup & { parsedRule?: Rule & { targets?: { backend_model: string; provider_id: string }[] } }) {
+  editingId.value = g.id
+  let rule: any = {}
+  try { rule = JSON.parse(g.rule) } catch { /* format error */ }
+
+  if (g.strategy === 'scheduled') {
+    form.value = {
+      ...DEFAULT_FORM,
+      client_model: g.client_model,
+      strategy: g.strategy,
+      default: {
+        backend_model: rule.default?.backend_model || '',
+        provider_id: rule.default?.provider_id || providersList.value[0]?.id || '',
+      },
+      windows: rule.windows ? JSON.parse(JSON.stringify(rule.windows)) : [],
+    }
+  } else {
+    // round-robin / random / failover
+    const firstProviderId = providersList.value[0]?.id || ''
+    const firstModels = providerModelsMap.value.get(firstProviderId) || []
+    form.value = {
+      ...DEFAULT_FORM,
+      client_model: g.client_model,
+      strategy: g.strategy,
+      targets: Array.isArray(rule.targets)
+        ? rule.targets.map((t: any) => ({
+            backend_model: t.backend_model || '',
+            provider_id: t.provider_id || firstProviderId,
+          }))
+        : [{ backend_model: firstModels[0] || '', provider_id: firstProviderId }],
+    }
+  }
+  dialogOpen.value = true
+}
 ```
 
 - [ ] **Step 5: 更新 handleSave 中的 rule 构造**
