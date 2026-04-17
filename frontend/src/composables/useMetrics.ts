@@ -100,14 +100,14 @@ export function useMetrics() {
 
       const hasAny = ttftOk?.length || tpsOk?.length || inputTokensOk?.length || outputTokensOk?.length || cacheHitTokensOk?.length || cacheRateOk?.length
 
-      ttftData.value = hasAny ? toDataset('TTFT (ms)', CHART_COLORS.blue, CHART_COLORS.blueFillLight, false, ttftFilled) : null
-      tpsData.value = hasAny ? toDataset('TPS', CHART_COLORS.purple, CHART_COLORS.purpleFill, false, tpsFilled) : null
+      ttftData.value = hasAny ? toDataset('TTFT (ms)', CHART_COLORS.teal, CHART_COLORS.tealFillLight, false, ttftFilled) : null
+      tpsData.value = hasAny ? toDataset('TPS', CHART_COLORS.indigo, CHART_COLORS.indigoFill, false, tpsFilled) : null
       tokensData.value = hasAny ? {
         labels: inputTokensFilled.labels,
         datasets: [
-          { label: 'Input Tokens', data: inputTokensFilled.values, borderColor: CHART_COLORS.blue, backgroundColor: CHART_COLORS.blueFill, fill: true, tension: 0.4, pointRadius: 0 },
-          { label: 'Output Tokens', data: outputTokensFilled.values, borderColor: CHART_COLORS.purple, backgroundColor: CHART_COLORS.purpleFill, fill: true, tension: 0.4, pointRadius: 0 },
-          { label: 'Cache Hit Tokens', data: cacheHitTokensFilled.values, borderColor: CHART_COLORS.green, backgroundColor: CHART_COLORS.greenFill, fill: true, tension: 0.4, pointRadius: 0 },
+          { label: 'Input Tokens', data: inputTokensFilled.values, borderColor: CHART_COLORS.teal, backgroundColor: CHART_COLORS.tealFill, fill: true, tension: 0.4, pointRadius: 0 },
+          { label: 'Output Tokens', data: outputTokensFilled.values, borderColor: CHART_COLORS.indigo, backgroundColor: CHART_COLORS.indigoFill, fill: true, tension: 0.4, pointRadius: 0 },
+          { label: 'Cache Hit Tokens', data: cacheHitTokensFilled.values, borderColor: CHART_COLORS.green, backgroundColor: CHART_COLORS.tealFillLight, fill: true, tension: 0.4, pointRadius: 0 },
         ],
       } : null
       cacheRateData.value = hasAny ? toDataset('Cache Hit Rate', CHART_COLORS.amber, CHART_COLORS.amberFill, false, {

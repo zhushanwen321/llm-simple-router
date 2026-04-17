@@ -1,14 +1,13 @@
 /** Chart.js 等不支持 CSS 变量的场景使用的颜色常量 */
 export const CHART_COLORS = {
-  blue: 'oklch(0.62 0.18 250)',
-  purple: 'oklch(0.55 0.2 290)',
+  teal: 'oklch(0.58 0.14 175)',
+  tealFill: 'oklch(0.58 0.14 175 / 0.3)',
+  tealFillLight: 'oklch(0.58 0.14 175 / 0.1)',
+  indigo: 'oklch(0.65 0.14 260)',
+  indigoFill: 'oklch(0.65 0.14 260 / 0.3)',
   green: 'oklch(0.65 0.17 150)',
   amber: 'oklch(0.78 0.16 80)',
-  blueFill: 'oklch(0.62 0.18 250 / 0.3)',
-  purpleFill: 'oklch(0.55 0.2 290 / 0.3)',
-  greenFill: 'oklch(0.65 0.17 150 / 0.3)',
   amberFill: 'oklch(0.78 0.16 80 / 0.1)',
-  blueFillLight: 'oklch(0.62 0.18 250 / 0.1)',
 } as const
 
 /** 状态色映射（CSS 变量形式，用于动态样式） */
