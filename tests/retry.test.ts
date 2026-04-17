@@ -120,7 +120,43 @@ describe("retryableCall", () => {
   });
 
   it("respects maxRetries=0", async () => {
-    const config = { ...DEFAULT_CONFIG, maxRetries: 0 };
+    const config: RetryConfig = { maxRetries: 0, baseDelayMs: 1 };
+    const { result, attempts } = await retryableCall(() => Promise.resolve(mockResult(429, "rate limited")), config);
+    expect(result.statusCode).toBe(429);
+    expect(attempts).toHaveLength(1);
+  });
+
+  it("uses per-rule max_retries from matched rule", async () => {
+    const matcher = new RetryRuleMatcher();
+    const rule = {
+      id: "test", name: "limited", status_code: 429, body_pattern: ".*", is_active: 1, created_at: "",
+      retry_strategy: "fixed" as const, retry_delay_ms: 1, max_retries: 2, max_delay_ms: 60000,
+    };
+    matcher["cache"] = new Map([[429, [{ rule, pattern: /^.*$/ }]]]);
+    const config: RetryConfig = { maxRetries: 99, baseDelayMs: 1, ruleMatcher: matcher };
+
+    const { attempts } = await retryableCall(() => Promise.resolve(mockResult(429, "rate limited")), config);
+    expect(attempts).toHaveLength(3);
+  });
+
+  it("does not retry when no rule matches", async () => {
+    const matcher = new RetryRuleMatcher();
+    const config: RetryConfig = { maxRetries: 99, baseDelayMs: 1, ruleMatcher: matcher };
+
+    const { result, attempts } = await retryableCall(() => Promise.resolve(mockResult(429, "rate limited")), config);
+    expect(result.statusCode).toBe(429);
+    expect(attempts).toHaveLength(1);
+  });
+
+  it("respects max_retries=0 from rule", async () => {
+    const matcher = new RetryRuleMatcher();
+    const rule = {
+      id: "test", name: "no-retry", status_code: 429, body_pattern: ".*", is_active: 1, created_at: "",
+      retry_strategy: "fixed" as const, retry_delay_ms: 1, max_retries: 0, max_delay_ms: 60000,
+    };
+    matcher["cache"] = new Map([[429, [{ rule, pattern: /^.*$/ }]]]);
+    const config: RetryConfig = { maxRetries: 99, baseDelayMs: 1, ruleMatcher: matcher };
+
     const { result, attempts } = await retryableCall(() => Promise.resolve(mockResult(429, "rate limited")), config);
     expect(result.statusCode).toBe(429);
     expect(attempts).toHaveLength(1);

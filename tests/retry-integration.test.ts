@@ -101,8 +101,8 @@ describe("Retry integration", () => {
     db = initDatabase(":memory:");
     setupProvider(db, `http://127.0.0.1:${port}`);
     db.prepare(
-      "INSERT INTO retry_rules (id, name, status_code, body_pattern, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?)"
-    ).run("rr-429", "429 rule", 429, ".*", 1, new Date().toISOString());
+      "INSERT INTO retry_rules (id, name, status_code, body_pattern, is_active, created_at, retry_strategy, retry_delay_ms, max_retries, max_delay_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    ).run("rr-429", "429 rule", 429, ".*", 1, new Date().toISOString(), "exponential", 10, 2, 60000);
     const matcher = new RetryRuleMatcher();
     matcher.load(db);
     app = Fastify();
@@ -156,8 +156,8 @@ describe("Retry integration", () => {
     db = initDatabase(":memory:");
     setupProvider(db, `http://127.0.0.1:${port}`);
     db.prepare(
-      "INSERT INTO retry_rules (id, name, status_code, body_pattern, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?)"
-    ).run("rr-429", "429 rule", 429, ".*", 1, new Date().toISOString());
+      "INSERT INTO retry_rules (id, name, status_code, body_pattern, is_active, created_at, retry_strategy, retry_delay_ms, max_retries, max_delay_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    ).run("rr-429", "429 rule", 429, ".*", 1, new Date().toISOString(), "exponential", 10, 1, 60000);
     const matcher = new RetryRuleMatcher();
     matcher.load(db);
     app = Fastify();
@@ -199,8 +199,8 @@ describe("Retry integration", () => {
   it("retries on 400 with retryable error body and succeeds on second attempt", async () => {
     db = initDatabase(":memory:");
     db.prepare(
-      "INSERT INTO retry_rules (id, name, status_code, body_pattern, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?)"
-    ).run("rr-1", "zai-400", 400, "请稍后重试", 1, new Date().toISOString());
+      "INSERT INTO retry_rules (id, name, status_code, body_pattern, is_active, created_at, retry_strategy, retry_delay_ms, max_retries, max_delay_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    ).run("rr-1", "zai-400", 400, "请稍后重试", 1, new Date().toISOString(), "exponential", 10, 2, 60000);
 
     const matcher = new RetryRuleMatcher();
     matcher.load(db);
