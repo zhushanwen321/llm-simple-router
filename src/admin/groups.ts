@@ -54,7 +54,7 @@ async function validateRule(
   strategy: string,
   ruleJson: string
 ): Promise<string | undefined> {
-  const VALID_STRATEGIES = new Set(Object.values(STRATEGY_NAMES));
+  const VALID_STRATEGIES: Set<string> = new Set(Object.values(STRATEGY_NAMES));
   if (!VALID_STRATEGIES.has(strategy)) {
     return `Unknown strategy '${strategy}'. Valid: ${[...VALID_STRATEGIES].join(", ")}`;
   }
