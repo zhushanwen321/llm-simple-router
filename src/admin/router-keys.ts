@@ -14,6 +14,13 @@ const HTTP_NOT_FOUND = 404;
 const KEY_RANDOM_BYTES = 32;
 const KEY_PREFIX_LENGTH = 8;
 
+/** 归一化 allowed_models：null/空数组/仅含空字符串 → null（允许所有模型） */
+function normalizeAllowedModels(val: string[] | null | undefined): string | null {
+  if (!val) return null;
+  const filtered = val.filter((m) => m.trim() !== "");
+  return filtered.length > 0 ? JSON.stringify(filtered) : null;
+}
+
 const CreateRouterKeySchema = Type.Object({
   name: Type.String({ minLength: 1 }),
   allowed_models: Type.Optional(Type.Union([Type.Array(Type.String()), Type.Null()])),
@@ -62,7 +69,7 @@ export const adminRouterKeyRoutes: FastifyPluginCallback<RouterKeyRoutesOptions>
   app.post("/admin/api/router-keys", { schema: { body: CreateRouterKeySchema } }, async (request, reply) => {
     const body = request.body as Static<typeof CreateRouterKeySchema>;
     const { key, hash, prefix, encrypted } = generateRouterKey(db);
-    const allowedModels = body.allowed_models ? JSON.stringify(body.allowed_models) : null;
+    const allowedModels = normalizeAllowedModels(body.allowed_models);
     const id = createRouterKey(db, { name: body.name, key_hash: hash, key_prefix: prefix, key_encrypted: encrypted, allowed_models: allowedModels });
     return reply.code(HTTP_CREATED).send({
       id,
@@ -84,7 +91,7 @@ export const adminRouterKeyRoutes: FastifyPluginCallback<RouterKeyRoutesOptions>
     const body = request.body as Static<typeof UpdateRouterKeySchema>;
     const fields: Partial<Pick<RouterKey, 'name' | 'allowed_models' | 'is_active'>> = {};
     if (body.name !== undefined) fields.name = body.name;
-    if (body.allowed_models !== undefined) fields.allowed_models = JSON.stringify(body.allowed_models);
+    if (body.allowed_models !== undefined) fields.allowed_models = normalizeAllowedModels(body.allowed_models);
     if (body.is_active !== undefined) fields.is_active = body.is_active;
     updateRouterKey(db, id, fields);
     return reply.send({ success: true });

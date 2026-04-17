@@ -482,7 +482,7 @@ export async function handleProxyPost(
       const allowedModels = request.routerKey?.allowed_models;
       if (allowedModels) {
         try {
-          const models: string[] = JSON.parse(allowedModels);
+          const models: string[] = JSON.parse(allowedModels).filter((m: string) => m.trim() !== "");
           if (models.length > 0 && !models.includes(resolved.backend_model)) {
             const e = errors.modelNotAllowed(resolved.backend_model);
             insertRejectedLog(db, logId, apiType, clientModel, e.statusCode,
