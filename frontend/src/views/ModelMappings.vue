@@ -203,8 +203,11 @@ function openCreate() {
   const firstProviderId = providersList.value[0]?.id || ''
   const firstModels = providerModelsMap.value.get(firstProviderId) || []
   form.value = {
-    ...DEFAULT_FORM,
+    client_model: '',
+    strategy: 'scheduled',
     default: { backend_model: firstModels[0] || '', provider_id: firstProviderId },
+    windows: [],
+    targets: [],
   }
   dialogOpen.value = true
 }
