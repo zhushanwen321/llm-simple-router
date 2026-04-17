@@ -61,11 +61,11 @@ export function deleteRetryRule(db: Database.Database, id: string): void {
 // ---------- Default seed rules ----------
 
 const DEFAULT_RULES: Omit<RetryRule, "id" | "created_at">[] = [
-  { name: "429 Too Many Requests", status_code: 429, body_pattern: ".*", is_active: 1 },
-  { name: "503 Service Unavailable", status_code: 503, body_pattern: ".*", is_active: 1 },
-  { name: 'ZAI 网络错误 (code 1234)', status_code: 400, body_pattern: '"type"\\s*:\\s*"error".*"code"\\s*:\\s*"1234"', is_active: 1 },
-  { name: 'ZAI 临时不可用', status_code: 400, body_pattern: '"type"\\s*:\\s*"error".*请稍后重试', is_active: 1 },
-  { name: 'ZAI 操作失败 (code 500)', status_code: 400, body_pattern: '"type"\\s*:\\s*"error".*"code"\\s*:\\s*"500"', is_active: 1 },
+  { name: "429 Too Many Requests", status_code: 429, body_pattern: ".*", is_active: 1, retry_strategy: "exponential", retry_delay_ms: 5000, max_retries: 10, max_delay_ms: 60000 },
+  { name: "503 Service Unavailable", status_code: 503, body_pattern: ".*", is_active: 1, retry_strategy: "exponential", retry_delay_ms: 5000, max_retries: 10, max_delay_ms: 60000 },
+  { name: 'ZAI 网络错误 (code 1234)', status_code: 400, body_pattern: '"type"\\s*:\\s*"error".*"code"\\s*:\\s*"1234"', is_active: 1, retry_strategy: "exponential", retry_delay_ms: 5000, max_retries: 10, max_delay_ms: 60000 },
+  { name: 'ZAI 临时不可用', status_code: 400, body_pattern: '"type"\\s*:\\s*"error".*请稍后重试', is_active: 1, retry_strategy: "exponential", retry_delay_ms: 5000, max_retries: 10, max_delay_ms: 60000 },
+  { name: 'ZAI 操作失败 (code 500)', status_code: 400, body_pattern: '"type"\\s*:\\s*"error".*"code"\\s*:\\s*"500"', is_active: 1, retry_strategy: "exponential", retry_delay_ms: 5000, max_retries: 10, max_delay_ms: 60000 },
 ];
 
 /**
@@ -77,9 +77,11 @@ export function seedDefaultRules(db: Database.Database): void {
   if (count > 0) return;
   const now = new Date().toISOString();
   const insert = db.prepare(
-    `INSERT INTO retry_rules (id, name, status_code, body_pattern, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO retry_rules (id, name, status_code, body_pattern, is_active, created_at, retry_strategy, retry_delay_ms, max_retries, max_delay_ms)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
   for (const rule of DEFAULT_RULES) {
-    insert.run(randomUUID(), rule.name, rule.status_code, rule.body_pattern, rule.is_active, now);
+    insert.run(randomUUID(), rule.name, rule.status_code, rule.body_pattern, rule.is_active, now,
+      rule.retry_strategy, rule.retry_delay_ms, rule.max_retries, rule.max_delay_ms);
   }
 }
