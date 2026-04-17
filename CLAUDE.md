@@ -68,7 +68,7 @@ docker compose up -d
 
 ## 环境变量
 
-必需：`ROUTER_API_KEY`、`ADMIN_PASSWORD`、`ENCRYPTION_KEY`（64字符 hex）
+必需：`ADMIN_PASSWORD`、`ENCRYPTION_KEY`（64字符 hex）、`JWT_SECRET`（64字符 hex）
 可选：`PORT`（默认 3000）、`DB_PATH`、`LOG_LEVEL`、`STREAM_TIMEOUT_MS`（默认 30000）
 参考 `.env.example`
 
