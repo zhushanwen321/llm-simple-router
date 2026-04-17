@@ -113,3 +113,5 @@ export type { MetricsSummaryRow, MetricsTimeseriesRow, MetricsPeriod, MetricsMet
 
 export { getStats } from "./stats.js";
 export type { Stats, StatsPeriod } from "./stats.js";
+
+export { getSetting, setSetting, isInitialized } from "./settings.js";
