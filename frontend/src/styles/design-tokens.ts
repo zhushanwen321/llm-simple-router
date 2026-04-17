@@ -18,3 +18,20 @@ export const STATUS_COLORS = {
   warning: { bg: 'var(--color-warning-light)', text: 'var(--color-warning-dark)' },
   info: { bg: 'var(--color-info-light)', text: 'var(--color-info-dark)' },
 } as const
+
+/** 角色色映射（Tailwind utility class 场景使用变量，JS 动态场景用此常量） */
+export const ROLE_COLORS = {
+  user:        { bg: 'var(--color-role-user-bg)',     text: 'var(--color-role-user)' },
+  assistant:   { bg: 'var(--color-role-assistant-bg)', text: 'var(--color-role-assistant)' },
+  tool:        { bg: 'var(--color-role-tool-bg)',     text: 'var(--color-role-tool)' },
+  thinking:    { bg: 'var(--color-role-thinking-bg)', text: 'var(--color-role-thinking)' },
+} as const
+
+/** SSE 事件色映射 */
+export const SSE_COLORS = {
+  'message-start':       'var(--color-sse-message-start)',
+  'content-block-start': 'var(--color-sse-content-block-start)',
+  'content-block-delta': 'var(--color-sse-content-block-delta)',
+  'message-delta':       'var(--color-sse-message-delta)',
+  'message-stop':        'var(--color-sse-message-stop)',
+} as const
