@@ -90,11 +90,16 @@ alias clodedev='ANTHROPIC_AUTH_TOKEN="<your-router-key>" ANTHROPIC_BASE_URL="htt
 ## 快速开始
 
 ```bash
-npm install
+# 配置环境变量
+cd xxx/llm-simple-router
 cp .env.example .env
-# 编辑 .env，设置 ADMIN_PASSWORD、ENCRYPTION_KEY、JWT_SECRET
-npm run dev
+# 编辑 .env，全用默认也能启动
+nano .env
+
+# 直接用npx启动
+npx llm-simple-router
 # 访问 http://localhost:9981/admin
+
 ```
 
 生成随机密钥：`openssl rand -hex 32`
