@@ -26,6 +26,29 @@ export interface RetryResult<T> {
 
 export type ProxyFn<T = ProxyResult | StreamProxyResult> = () => Promise<T>;
 
+// ---------- Strategy Pattern ----------
+
+export interface RetryStrategy {
+  getDelay(attempt: number): number;
+}
+
+export class FixedIntervalStrategy implements RetryStrategy {
+  constructor(private delayMs: number) {}
+  getDelay(): number { return this.delayMs; }
+}
+
+export class ExponentialBackoffStrategy implements RetryStrategy {
+  constructor(private baseMs: number, private capMs: number) {}
+  getDelay(attempt: number): number {
+    return Math.min(this.baseMs * 2 ** attempt, this.capMs);
+  }
+}
+
+export function createStrategy(rule: { retry_strategy: string; retry_delay_ms: number; max_delay_ms: number }): RetryStrategy {
+  if (rule.retry_strategy === "fixed") return new FixedIntervalStrategy(rule.retry_delay_ms);
+  return new ExponentialBackoffStrategy(rule.retry_delay_ms, rule.max_delay_ms);
+}
+
 // ---------- Constants ----------
 
 const RETRYABLE_THROW_CODES = new Set(["ETIMEDOUT", "ECONNRESET", "ECONNREFUSED"]);
