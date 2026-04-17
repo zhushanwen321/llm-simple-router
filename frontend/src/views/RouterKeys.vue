@@ -8,7 +8,7 @@
       </Button>
     </div>
 
-    <div class="bg-white rounded-lg border overflow-hidden">
+    <div class="bg-card rounded-lg border overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow class="bg-muted">

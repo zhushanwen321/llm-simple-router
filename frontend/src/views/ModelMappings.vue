@@ -11,7 +11,7 @@
     </div>
 
     <div class="space-y-4">
-      <Card v-for="g in groupsWithParsedRule" :key="g.id" class="bg-white">
+      <Card v-for="g in groupsWithParsedRule" :key="g.id">
         <Collapsible :default-open="false">
           <CardHeader class="flex flex-row items-center justify-between gap-4">
             <div class="flex items-center gap-3">
@@ -57,7 +57,7 @@
         </Collapsible>
       </Card>
 
-      <div v-if="groups.length === 0" class="text-center text-muted-foreground py-12 bg-white rounded-xl border">
+      <div v-if="groups.length === 0" class="text-center text-muted-foreground py-12 bg-card rounded-xl border">
         暂无映射分组
       </div>
     </div>
