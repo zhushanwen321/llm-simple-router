@@ -298,8 +298,8 @@ git commit -m "feat(ui): add tooltip, separator, scroll-area, avatar, switch com
 ## Task 5: 自定义基础组件（TagPill + StatPill）
 
 **Files:**
-- Create: `frontend/src/components/log/TagPill.vue`
-- Create: `frontend/src/components/log/StatPill.vue`
+- Create: `frontend/src/components/log-viewer/TagPill.vue`
+- Create: `frontend/src/components/log-viewer/StatPill.vue`
 
 - [ ] **Step 1: 创建 TagPill**
 
@@ -358,7 +358,7 @@ import StatPill from '@/components/log/StatPill.vue'
 - [ ] **Step 4: Commit**
 
 ```bash
-git add frontend/src/components/log/
+git add frontend/src/components/log-viewer/
 git commit -m "feat(components): add TagPill and StatPill for log detail view"
 ```
 
@@ -367,9 +367,9 @@ git commit -m "feat(components): add TagPill and StatPill for log detail view"
 ## Task 6: 自定义日志组件（MessageRow + SseEventLine + InfoBanner）
 
 **Files:**
-- Create: `frontend/src/components/log/MessageRow.vue`
-- Create: `frontend/src/components/log/SseEventLine.vue`
-- Create: `frontend/src/components/log/InfoBanner.vue`
+- Create: `frontend/src/components/log-viewer/MessageRow.vue`
+- Create: `frontend/src/components/log-viewer/SseEventLine.vue`
+- Create: `frontend/src/components/log-viewer/InfoBanner.vue`
 
 - [ ] **Step 1: 创建 MessageRow**
 
@@ -481,7 +481,7 @@ Expected: 构建成功。
 - [ ] **Step 5: Commit**
 
 ```bash
-git add frontend/src/components/log/
+git add frontend/src/components/log-viewer/
 git commit -m "feat(components): add MessageRow, SseEventLine, InfoBanner for log detail"
 ```
 
@@ -633,7 +633,68 @@ Expected: 后端构建和测试正常，前端改动不影响后端。
 
 ---
 
+## Task 11: 日志详情 Modal 重构
+
+**Files:**
+- Modify: `frontend/src/views/Logs.vue` — 重构日志详情 Dialog 内容布局
+- Rename: `frontend/src/components/logs/` → `frontend/src/components/log-viewer/`（与新增组件统一目录）
+- Modify: `frontend/src/components/log-viewer/LogStageDetail.vue` — 替换为新的折叠模式
+- Keep: `frontend/src/components/log-viewer/LogRequestViewer.vue` — 保留解析逻辑，更新样式
+- Keep: `frontend/src/components/log-viewer/LogResponseViewer.vue` — 保留解析逻辑，更新 SSE 事件展示
+- Use: `frontend/src/components/log-viewer/MessageRow.vue`, `SseEventLine.vue`, `InfoBanner.vue`, `TagPill.vue`, `StatPill.vue`
+
+将当前的「时间线 + 阶段钻取」模式改为参考 mockup 的「单页折叠」模式。
+
+**目标布局（参考 `.superpowers/mockup-log-viewer.html`）：**
+
+1. **基本信息区**（始终可见）：类型、模型、状态码、延迟、流式、时间
+2. **Claude Code 标识横幅**（条件显示）：使用 InfoBanner 组件
+3. **客户端原始请求**（折叠面板）：使用 Collapsible，内部 tabs（结构化/原始 JSON）
+   - 结构化视图：StatPill（参数标签）、Headers（折叠）、Messages（MessageRow 列表）、System、Tools（TagPill 列表）
+4. **LLM API 返回的原始响应**（折叠面板）：使用 Collapsible，内部 tabs（结构化/原始 SSE 文本）
+   - 结构化视图：StatPill（状态+usage）、SSE 事件列表（SseEventLine）
+
+**关键原则：**
+- 保留现有的 LogRequestViewer / LogResponseViewer 解析逻辑（JSON parse、SSE parse、block extraction 等）
+- 只改变布局组装方式：从 LogDetailFlow + LogStageDetail 的两级导航改为单页折叠
+- LogRequestViewer / LogResponseViewer 的 `mode` prop 仍由父组件控制
+- 新增的 MessageRow / SseEventLine 等组件在日志数据量大的场景使用，基础 Badge 展示保留给小数据量
+
+- [ ] **Step 1: 读取 mockup 和现有组件，确认重构范围**
+
+Read: `.superpowers/mockup-log-viewer.html`、`Logs.vue`、`LogDetailFlow.vue`、`LogStageDetail.vue`
+
+- [ ] **Step 2: 重构 Logs.vue 中日志详情 Dialog**
+
+将当前的 LogDetailFlow + LogStageDetail 两级导航替换为折叠面板布局。
+
+- [ ] **Step 3: 更新 LogRequestViewer 的 Claude Code 标识区域**
+
+将现有的 Card 样式 Claude Code 标识替换为 InfoBanner 组件。将参数 Badge 替换为 StatPill。
+
+- [ ] **Step 4: 更新 LogResponseViewer 的 SSE 事件展示**
+
+将 Anthropic 原始事件流中的行级展示替换为 SseEventLine 组件。将 status/usage Badge 替换为 StatPill。
+
+- [ ] **Step 5: 验证**
+
+Run: `cd frontend && npm run build`
+启动 dev server，打开日志详情 Modal，确认：
+- 基本信息区正确显示
+- Claude Code 请求正确触发 InfoBanner
+- 客户端请求/服务端响应折叠面板可展开
+- 结构化/原始 tabs 正常切换
+- 暗色模式下显示正确
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add frontend/src/
+git commit -m "feat(logs): redesign log detail modal with accordion layout and new design system components"
+```
+
+---
+
 ## 后续任务（本次不实施）
 
-- 日志详情 Modal 重构：参考 mockup 将时间线+阶段钻取模式改为单页折叠模式，集成 MessageRow / SseEventLine / InfoBanner / TagPill / StatPill 组件
 - Login 页面品牌化：引入 teal 品牌色增强视觉识别
