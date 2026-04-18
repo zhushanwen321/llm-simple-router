@@ -36,6 +36,7 @@ describe("request_metrics migration and insertMetrics", () => {
     expect(rows[8].name).toBe("009_add_request_logs_indexes.sql");
     expect(rows[9].name).toBe("010_add_key_encrypted.sql");
     expect(rows[10].name).toBe("011_create_mapping_groups.sql");
+    expect(rows[15].name).toBe("016_create_session_model_tables.sql");
   });
 
   it("should create indexes", () => {
