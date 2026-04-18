@@ -35,6 +35,7 @@ const API = {
   METRICS_TIMESERIES: '/metrics/timeseries',
   ROUTER_KEYS: '/router-keys',
   MODELS_AVAILABLE: '/models/available',
+  PROXY_ENHANCEMENT: '/proxy-enhancement',
 } as const
 
 // --- Payload types ---
@@ -145,4 +146,9 @@ export const api = {
   updateRetryRule: (id: string, data: RetryRulePayload) =>
     client.put(`${API.RETRY_RULES}/${id}`, data),
   deleteRetryRule: (id: string) => client.delete(`${API.RETRY_RULES}/${id}`),
+
+  getProxyEnhancement: () =>
+    request<{ claude_code_enabled: boolean }>('get', API.PROXY_ENHANCEMENT),
+  updateProxyEnhancement: (data: { claude_code_enabled: boolean }) =>
+    request<{ success: boolean }>('put', API.PROXY_ENHANCEMENT, data),
 }
