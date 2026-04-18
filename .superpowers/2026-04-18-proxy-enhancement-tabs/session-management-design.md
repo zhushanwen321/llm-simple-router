@@ -13,9 +13,11 @@
 
 ## 数据库设计
 
+迁移文件：`src/db/migrations/016_create_session_model_tables.sql`
+
 ### session_model_states 表
 
-存储每个 session 当前的模型配置状态。
+存储每个 session 当前的模型配置状态。`id` 使用 `randomUUID()` 生成。
 
 ```sql
 CREATE TABLE IF NOT EXISTS session_model_states (
@@ -34,7 +36,7 @@ CREATE INDEX idx_sms_router_key ON session_model_states(router_key_id);
 
 ### session_model_history 表
 
-记录每次模型切换的审计日志。
+记录每次模型切换的审计日志。`id` 使用 `randomUUID()` 生成。
 
 ```sql
 CREATE TABLE IF NOT EXISTS session_model_history (
@@ -52,34 +54,94 @@ CREATE INDEX idx_smh_session ON session_model_history(router_key_id, session_id)
 
 `trigger_type` 取值：`directive`（内联指令）、`command`（交互命令）、`manual_clear`（手动清除）。
 
+### 关于 null 处理
+
+`router_key_id` 和 `session_id` 均为 `NOT NULL`。当请求未携带 `x-claude-code-session-id` header 时，不写入数据库，仅使用内存 Map（key 为 `routerKeyId`），保持与当前行为一致。只有携带 session header 的请求才走持久化路径。
+
 ## 后端设计
+
+### session-id 提取链路
+
+1. `proxy-core.ts` 的 `handleProxyPost()` 从 `request.headers` 提取 `x-claude-code-session-id`
+2. 作为新参数传递给 `applyEnhancement(db, request, clientModel, sessionId)`
+3. `applyEnhancement()` 将 `sessionId` 透传给 `modelState.set(routerKeyId, model, sessionId)`
+
+调用点更新：
+- `src/proxy/proxy-core.ts` — 提取 header，传递 sessionId
+- `src/proxy/enhancement-handler.ts` — 函数签名增加 sessionId 参数
+- `src/proxy/model-state.ts` — 接口改为接受 sessionId
 
 ### ModelStateManager 改造
 
-- **复合键**：从 `routerKeyId` 改为 `(routerKeyId, sessionId)` 元组
-- **双写策略**：`set()` 同时写入内存 Map 和数据库（UPSERT states + INSERT history）
-- **冷启动 fallback**：`get()` miss 时从数据库读取
-- **清除**：`delete()` 同时清理内存和数据库，并写入 `manual_clear` 历史记录
+内存 Map 的 key 格式：`routerKeyId` 或 `routerKeyId:sessionId`（sessionId 存在时）。
 
-### session-id 提取
-
-在 `applyEnhancement()` 中从 request headers 提取 `x-claude-code-session-id`，传递给 `ModelStateManager`。
+- **set(routerKeyId, model, sessionId?)**:
+  - 内存：key 为 `sessionId ? `${routerKeyId}:${sessionId}` : routerKeyId`
+  - 数据库：仅当 sessionId 存在时执行 `db.transaction()` 包裹的 UPSERT states + INSERT history
+  - DB 失败时不回滚内存（better-sqlite3 同步操作极少失败，且内存状态优先保证请求正常响应）
+- **get(routerKeyId, sessionId?)**:
+  - 内存 key 同上
+  - 内存 miss 时，若 sessionId 存在则查数据库，命中后回填内存
+- **delete(routerKeyId, sessionId)**:
+  - 同时清理内存和数据库（DELETE states + INSERT manual_clear history），包裹在 `db.transaction()` 中
 
 ### API 端点
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | `/admin/api/session-states` | 所有活跃 session 列表，关联 router_keys 表 |
+| GET | `/admin/api/session-states` | 所有活跃 session 列表 |
 | GET | `/admin/api/session-states/:keyId/:sessionId/history` | 某个 session 的切换历史 |
 | DELETE | `/admin/api/session-states/:keyId/:sessionId` | 清除 session 模型配置 |
 
+### API 响应结构
+
+**GET /admin/api/session-states**
+
+```ts
+interface SessionState {
+  id: string;
+  router_key_id: string;
+  router_key_name: string;        // 关联 router_keys.name
+  session_id: string;
+  current_model: string;
+  original_model: string | null;
+  last_active_at: string;
+  created_at: string;
+}
+// 响应: SessionState[]
+```
+
+**GET .../history**
+
+```ts
+interface SessionHistoryEntry {
+  id: string;
+  old_model: string | null;
+  new_model: string;
+  trigger_type: 'directive' | 'command' | 'manual_clear';
+  created_at: string;
+}
+// 响应: SessionHistoryEntry[]，按 created_at DESC 排序，不分页
+```
+
+**DELETE ...**
+
+```ts
+// 响应: { success: boolean }
+```
+
 ## 前端设计
+
+### Tab 值定义
+
+- `"claude-code"` — Claude Code Tab（默认激活）
+- `"opencode"` — OpenCode Tab
 
 ### 页面结构
 
 ```
 代理增强页面
-├── Tabs（Claude Code / OpenCode）
+├── Tabs default="claude-code"
 │   ├── TabsContent "claude-code"
 │   │   ├── 现有开关 + 使用说明（不变）
 │   │   └── Card "活跃 Session"
@@ -94,6 +156,12 @@ CREATE INDEX idx_smh_session ON session_model_history(router_key_id, session_id)
 - 列：密钥名称 | Session ID（前 8 位 + Tooltip）| 当前模型 | 原始模型 | 最后活跃 | 操作
 - 操作：查看历史（展开行）/ 清除配置（AlertDialog 确认）
 - 历史展开后按时间倒序显示切换时间线
+
+### 数据刷新策略
+
+- 页面加载时获取一次
+- 手动点击刷新按钮重新获取
+- 清除 session 后自动刷新列表
 
 ### 新增文件
 
