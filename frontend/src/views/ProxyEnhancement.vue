@@ -1,25 +1,25 @@
 <template>
   <div class="p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-semibold text-foreground">代理增强</h2>
+      <Button :disabled="saving" @click="handleSave">
+        <span v-if="saving" class="flex items-center gap-1">
+          <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          保存中...
+        </span>
+        <span v-else>保存</span>
+      </Button>
+    </div>
+
     <Tabs default-value="claude-code">
       <TabsList>
         <TabsTrigger value="claude-code">Claude Code</TabsTrigger>
         <TabsTrigger value="opencode">OpenCode</TabsTrigger>
       </TabsList>
       <TabsContent value="claude-code">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="text-lg font-semibold text-foreground">代理增强</h2>
-          <Button :disabled="saving" @click="handleSave">
-            <span v-if="saving" class="flex items-center gap-1">
-              <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              保存中...
-            </span>
-            <span v-else>保存</span>
-          </Button>
-        </div>
-
         <Card>
           <CardHeader>
             <CardTitle>Claude Code 动态模型切换</CardTitle>
@@ -28,10 +28,14 @@
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div class="flex items-center gap-2">
-              <Checkbox v-model="claudeCodeEnabled" id="claude-code-toggle" :disabled="loading" />
+            <div class="flex items-center gap-3">
+              <Switch
+                id="claude-code-toggle"
+                :checked="claudeCodeEnabled"
+                @update:checked="claudeCodeEnabled = $event"
+              />
               <Label for="claude-code-toggle">
-                {{ loading ? '加载中...' : (claudeCodeEnabled ? '已启用' : '已禁用') }}
+                {{ claudeCodeEnabled ? '已启用' : '已禁用' }}
               </Label>
             </div>
           </CardContent>
@@ -123,7 +127,7 @@ import { toast } from 'vue-sonner'
 import { api } from '@/api/client'
 import type { SessionState, SessionHistoryEntry } from '@/api/client'
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
+import { Switch } from '@/components/ui/switch'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
@@ -132,7 +136,6 @@ import SessionTable from '@/components/proxy-enhancement/SessionTable.vue'
 
 const claudeCodeEnabled = ref(false)
 const saving = ref(false)
-const loading = ref(true)
 const instructionsOpen = ref(false)
 
 const sessions = ref<SessionState[]>([])
@@ -140,15 +143,12 @@ const sessionsLoading = ref(false)
 const sessionHistoryMap = ref<Record<string, SessionHistoryEntry[]>>({})
 
 async function loadConfig() {
-  loading.value = true
   try {
     const data = await api.getProxyEnhancement()
     claudeCodeEnabled.value = data.claude_code_enabled
   } catch (e) {
     console.error('Failed to load proxy enhancement config:', e)
     toast.error('加载配置失败')
-  } finally {
-    loading.value = false
   }
 }
 
