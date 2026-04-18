@@ -133,8 +133,30 @@ export async function handleProxyPost(
   request.raw.socket.on("error", (err) => request.log.debug({ err }, "client socket error"));
   const clientModel = ((request.body as Record<string, unknown>).model as string) || "unknown";
 
-  // 代理增强：指令解析 + 模型替换
-  const { effectiveModel, originalModel } = applyEnhancement(db, request, clientModel);
+  // 代理增强：指令解析 + 模型替换 + 命令拦截
+  const sessionId = (request.headers as RawHeaders)["x-claude-code-session-id"] as string | undefined;
+  const { effectiveModel, originalModel, interceptResponse } = applyEnhancement(db, request, clientModel, sessionId);
+
+  // 命令拦截（如 select-model）：直接返回，不转发上游
+  if (interceptResponse) {
+    const logId = randomUUID();
+    const isStream = (request.body as Record<string, unknown>).stream === true;
+    const interceptRespBody = JSON.stringify(interceptResponse.body);
+    insertRequestLog(db, {
+      id: logId, api_type: apiType, model: clientModel, provider_id: "router",
+      status_code: interceptResponse.statusCode, latency_ms: 0,
+      is_stream: isStream ? 1 : 0, error_message: null,
+      created_at: new Date().toISOString(),
+      request_body: JSON.stringify(request.body),
+      response_body: interceptRespBody,
+      client_request: JSON.stringify({ headers: request.headers as RawHeaders, body: request.body }),
+      upstream_request: interceptResponse.meta ? JSON.stringify(interceptResponse.meta) : null,
+      client_response: JSON.stringify({ statusCode: interceptResponse.statusCode, body: interceptRespBody }),
+      is_retry: 0, original_request_id: null,
+      router_key_id: request.routerKey?.id ?? null, original_model: null,
+    });
+    return reply.status(interceptResponse.statusCode).send(interceptResponse.body);
+  }
 
   // 查询分组策略（只查一次）
   const group = getMappingGroup(db, effectiveModel);
