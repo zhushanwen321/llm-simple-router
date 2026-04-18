@@ -105,7 +105,7 @@ vite.config.ts.timestamp-*
 .vite/
 
 # Project specific
-data/
+/data/
 *.db
 __pycache__/
 .DS_Store
@@ -117,3 +117,6 @@ __pycache__/
 
 # Build output
 frontend-dist/
+
+# Personal scripts
+.scripts/
