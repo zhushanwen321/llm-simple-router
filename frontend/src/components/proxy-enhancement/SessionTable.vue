@@ -45,7 +45,7 @@
                 variant="ghost"
                 size="sm"
                 class="text-destructive hover:text-destructive"
-                @click="clearingSession = session"
+                @click="openClearDialog(session)"
               >
                 清除
               </Button>
@@ -76,7 +76,7 @@
     </TableBody>
   </Table>
 
-  <AlertDialog :open="!!clearingSession" @update:open="clearingSession = null">
+  <AlertDialog :open="showClearDialog" @update:open="showClearDialog = $event">
     <AlertDialogContent>
       <AlertDialogHeader>
         <AlertDialogTitle>确认清除 Session</AlertDialogTitle>
@@ -85,7 +85,7 @@
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
-        <AlertDialogCancel @click="clearingSession = null">取消</AlertDialogCancel>
+        <AlertDialogCancel>取消</AlertDialogCancel>
         <AlertDialogAction @click="handleClear">确认清除</AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>
@@ -115,12 +115,18 @@ const emit = defineEmits<{
   viewHistory: [session: SessionState]
 }>()
 
-const clearingSession = ref<SessionState | null>(null)
+const showClearDialog = ref(false)
+const sessionToClear = ref<SessionState | null>(null)
+
+function openClearDialog(session: SessionState) {
+  sessionToClear.value = session
+  showClearDialog.value = true
+}
 
 function handleClear() {
-  if (clearingSession.value) {
-    emit('clear', clearingSession.value)
-    clearingSession.value = null
+  if (sessionToClear.value) {
+    emit('clear', sessionToClear.value)
+    sessionToClear.value = null
   }
 }
 
