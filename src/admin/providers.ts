@@ -3,12 +3,9 @@ import Database from "better-sqlite3";
 import { Type, Static } from "@sinclair/typebox";
 import type { Provider } from "../db/index.js";
 import { getAllProviders, getProviderById, createProvider, updateProvider, deleteProvider, getAllMappingGroups } from "../db/index.js";
-import { encrypt } from "../utils/crypto.js";
+import { encrypt, decrypt } from "../utils/crypto.js";
 import { getSetting } from "../db/settings.js";
 import { HTTP_CREATED, HTTP_NOT_FOUND, HTTP_CONFLICT } from "./constants.js";
-
-const API_KEY_PREVIEW_MIN_LEN = 8;
-const API_KEY_PREVIEW_PREFIX_LEN = 4;
 
 const CreateProviderSchema = Type.Object({
   name: Type.String({ minLength: 1 }),
@@ -32,22 +29,18 @@ interface ProviderRoutesOptions {
   db: Database.Database;
 }
 
-function computeApiKeyPreview(apiKey: string): string {
-  if (apiKey.length <= API_KEY_PREVIEW_MIN_LEN) return "****";
-  return `${apiKey.slice(0, API_KEY_PREVIEW_PREFIX_LEN)}...${apiKey.slice(-API_KEY_PREVIEW_PREFIX_LEN)}`;
-}
-
 export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> = (app, options, done) => {
   const { db } = options;
 
   app.get("/admin/api/providers", async (_request, reply) => {
+    const encryptionKey = getSetting(db, "encryption_key")!;
     const providers = getAllProviders(db);
     return reply.send(providers.map((s) => ({
       id: s.id,
       name: s.name,
       api_type: s.api_type,
       base_url: s.base_url,
-      api_key_preview: s.api_key_preview || "****",
+      api_key: s.api_key ? decrypt(s.api_key, encryptionKey) : "",
       models: JSON.parse(s.models || "[]"),
       is_active: s.is_active,
       created_at: s.created_at,
@@ -58,13 +51,12 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
   app.post("/admin/api/providers", { schema: { body: CreateProviderSchema } }, async (request, reply) => {
     const body = request.body as Static<typeof CreateProviderSchema>;
     const encryptedKey = encrypt(body.api_key, getSetting(db, "encryption_key")!);
-    const apiKeyPreview = computeApiKeyPreview(body.api_key);
     const id = createProvider(db, {
       name: body.name,
       api_type: body.api_type,
       base_url: body.base_url,
       api_key: encryptedKey,
-      api_key_preview: apiKeyPreview,
+      api_key_preview: body.api_key.length > 8 ? `${body.api_key.slice(0, 4)}...${body.api_key.slice(-4)}` : "****",
       models: JSON.stringify(body.models ?? []),
       is_active: body.is_active ?? 1,
     });
@@ -86,7 +78,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     if (body.models !== undefined) fields.models = JSON.stringify(body.models);
     if (body.api_key) {
       fields.api_key = encrypt(body.api_key, getSetting(db, "encryption_key")!);
-      fields.api_key_preview = computeApiKeyPreview(body.api_key);
+      fields.api_key_preview = body.api_key.length > 8 ? `${body.api_key.slice(0, 4)}...${body.api_key.slice(-4)}` : "****";
     }
     updateProvider(db, id, fields);
     return reply.send({ success: true });

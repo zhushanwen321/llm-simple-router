@@ -110,23 +110,6 @@
       </DialogContent>
     </Dialog>
 
-    <!-- Show Key Dialog (after creation) -->
-    <Dialog v-model:open="showKeyDialog">
-      <DialogContent class="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>密钥创建成功</DialogTitle>
-        </DialogHeader>
-        <div class="space-y-3">
-          <p class="text-sm text-muted-foreground">请立即保存此密钥，关闭后将无法再次查看完整密钥。</p>
-          <div class="bg-muted rounded-md p-3 font-mono text-sm break-all select-all">{{ createdKey }}</div>
-          <Button variant="outline" size="sm" @click="dialogCopy(createdKey)">{{ dialogCopied ? '已复制' : '复制密钥' }}</Button>
-        </div>
-        <DialogFooter>
-          <Button @click="showKeyDialog = false">我已保存密钥</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-
     <!-- Delete Confirm AlertDialog -->
     <AlertDialog :open="!!deleteTarget" @update:open="(val) => { if (!val) deleteTarget = null }">
       <AlertDialogContent>
@@ -176,9 +159,6 @@ const editingId = ref<string | null>(null)
 const deleteTarget = ref<RouterKey | null>(null)
 const form = ref({ ...DEFAULT_FORM, allowed_models: [] as string[] })
 
-const showKeyDialog = ref(false)
-const createdKey = ref('')
-const { copied: dialogCopied, copy: dialogCopy } = useClipboard()
 const { copied: tableCopied, copy: tableCopy } = useClipboard()
 
 function formatDate(dateStr: string): string {
@@ -240,11 +220,7 @@ async function handleSave() {
     if (editingId.value) {
       await api.updateRouterKey(editingId.value, buildUpdatePayload())
     } else {
-      const res = await api.createRouterKey(buildCreatePayload())
-      if (res.data?.key) {
-        createdKey.value = res.data.key
-        showKeyDialog.value = true
-      }
+      await api.createRouterKey(buildCreatePayload())
     }
     dialogOpen.value = false
     await loadData()
