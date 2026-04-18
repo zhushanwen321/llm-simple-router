@@ -28,14 +28,12 @@ class PluginRegistry {
   }
 
   // 动态加载远程插件
-  // 使用 fetch 获取 JS 文本后通过 import(URL) 加载，避免 Vite 静态分析限制
+  // 后端通过 Content-Type: application/javascript serve 插件文件
+  // 前端直接用 import(url) 加载运行时 URL，Vite 不会参与分析
   async loadPlugin(pluginId: string) {
     const url = `/admin/api/plugins/${pluginId}/client-assets/index.js`;
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`Failed to load plugin ${pluginId}`);
-    const blob = await response.blob();
-    const mod = await import(URL.createObjectURL(blob));
-    if (mod.default?.parseResponse) {
+    const mod = await import(/* @vite-ignore */ url);
+    if (mod.default?.renderComponent) {
       this.register(mod.default);
     }
   }
@@ -49,79 +47,99 @@ git add frontend/src/components/log-viewer/PluginRegistry.ts
 git commit -m "feat: add frontend PluginRegistry"
 ```
 
-## Task 9: Built-in SSE Log Parser Plugin
+## Task 9: Built-in SSE Log Viewer Plugin
 
 **Files:**
+- Create: `frontend/src/components/log-viewer/BuiltInLogViewer.vue`
 - Create: `frontend/src/components/log-viewer/BuiltInSseParser.ts`
 
-- [ ] **Step 1: Extract SSE parsing to plugin**
+- [ ] **Step 1: Extract LogResponseViewer template to component**
 
-将 `useSSEParsing.ts` 的解析逻辑提取为 `ClientPluginModule`：
-- `parseResponse(body, apiType, isStream)` — 解析 SSE/JSON 响应
-- `renderComponent` — 可选，返回结构化展示的 Vue 组件
+将当前 `LogResponseViewer.vue` 的模板和 `useSSEParsing` 逻辑提取为独立的 `BuiltInLogViewer.vue` 组件。该组件内部继续使用 `useSSEParsing` 的所有细粒度 computed 属性，对外暴露统一的 props 接口：
+```ts
+interface LogViewerProps {
+  body: string;
+  apiType: 'openai' | 'anthropic';
+  isStream: boolean;
+}
+```
 
-保留 `useSSEParsing.ts` 的 computed 逻辑，但通过 PluginRegistry 注册。
+- [ ] **Step 2: Register as built-in plugin**
 
-- [ ] **Step 2: Register as built-in**
+`BuiltInSseParser.ts` 导出 `ClientPluginModule`：
+```ts
+export const builtInSseParser: ClientPluginModule = {
+  renderComponent: BuiltInLogViewer,
+};
+```
 
-在应用初始化时注册：
+应用初始化时注册：
 ```ts
 import { PluginRegistry } from './PluginRegistry';
 import { builtInSseParser } from './BuiltInSseParser';
 
 const registry = new PluginRegistry();
-registry.register(builtInSseParser, true); // true = built-in
+registry.register(builtInSseParser, true);
 ```
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add frontend/src/components/log-viewer/BuiltInSseParser.ts
-git commit -m "feat: extract SSE parser to built-in frontend plugin"
+git add frontend/src/components/log-viewer/BuiltInLogViewer.vue frontend/src/components/log-viewer/BuiltInSseParser.ts
+git commit -m "feat: extract built-in log viewer to plugin component"
 ```
 
-## Task 10: Refactor Log Viewers
+## Task 10: Refactor LogResponseViewer as Dispatcher
 
 **Files:**
 - Modify: `frontend/src/components/log-viewer/LogResponseViewer.vue`
 - Modify: `frontend/src/components/log-viewer/LogRequestViewer.vue`
 
-- [ ] **Step 1: Modify LogResponseViewer**
+- [ ] **Step 1: Simplify LogResponseViewer to dispatcher**
 
-改造策略：内置 SSE 解析插件保持 `useSSEParsing` 的细粒度 computed API，将其包装为 `ClientPluginModule` 注册。模板继续使用 `openaiAssembled`、`assembledBlocks` 等属性。第三方插件通过 `renderComponent` 提供完全自定义的渲染。
+`LogResponseViewer.vue` 不再包含具体解析和渲染逻辑，只负责插件分发：
 
-```ts
-// 改为
-import { useSSEParsing } from './useSSEParsing'; // 内置解析保留
-import { getPluginRegistry } from './PluginRegistry';
-
-const registry = getPluginRegistry();
-
-// 先尝试第三方插件
-const pluginParsed = computed(() => registry.parseResponse(body.value, apiType, isStream));
-const pluginComponent = computed(() => registry.getRenderComponent(body.value, apiType, isStream));
-
-// 内置解析（fallback）
-const { openaiAssembled, assembledBlocks, sseMeta } = useSSEParsing(body, isStream, apiType);
-```
-
-模板中：
 ```vue
-<!-- 第三方插件提供自定义渲染 -->
-<component v-if="pluginComponent" :is="pluginComponent" :data="pluginParsed" />
-
-<!-- 内置渲染（保持现有模板不变） -->
-<template v-else>
-  <template v-if="apiType === 'openai'">...现有模板...</template>
-  <template v-else-if="apiType === 'anthropic'">...现有模板...</template>
+<template>
+  <component 
+    v-if="matchedPlugin?.renderComponent" 
+    :is="matchedPlugin.renderComponent" 
+    :body="body" 
+    :apiType="apiType" 
+    :isStream="isStream" 
+  />
+  <BuiltInLogViewer 
+    v-else 
+    :body="body" 
+    :apiType="apiType" 
+    :isStream="isStream" 
+  />
 </template>
 ```
 
-**关键点：** 内置解析逻辑保持不动，仅增加第三方插件的覆盖分支。这样改动最小，向后兼容。
+```ts
+import { getPluginRegistry } from './PluginRegistry';
+const registry = getPluginRegistry();
+const matchedPlugin = computed(() => registry.matchPlugin(body.value, apiType, isStream));
+```
 
-- [ ] **Step 2: Modify LogRequestViewer**
+`PluginRegistry.matchPlugin` 按优先级尝试匹配插件，返回第一个匹配的插件或 null。
 
-同样的模式，使用 `registry.parseRequest()` 替代硬编码解析。
+- [ ] **Step 2: Simplify LogRequestViewer**
+
+同样模式：提取 `BuiltInRequestViewer.vue`，`LogRequestViewer.vue` 简化为分发器。
+
+- [ ] **Step 3: Verify日志详情页正常工作**
+
+Run: `cd frontend && npm run dev`
+Expected: 日志详情页结构化展示功能不变
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add frontend/src/components/log-viewer/LogResponseViewer.vue frontend/src/components/log-viewer/LogRequestViewer.vue frontend/src/components/log-viewer/BuiltInLogViewer.vue
+git commit -m "refactor: simplify log viewers to plugin dispatchers"
+```
 
 - [ ] **Step 3: Verify日志详情页正常工作**
 

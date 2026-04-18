@@ -110,6 +110,8 @@ function pluginIdFromRepoUrl(repoUrl: string): string {
 ```
 插件安装目录：`data/plugins/{plugin-id}/`
 
+**冲突检测：** 如果 pluginId 已存在但 repoUrl 不同，报错并要求用户先卸载旧插件。
+
 方法：
 - `install(repoUrl)` — git ls-remote 验证 → clone → 读取 manifest → npm install --production → 写入 DB
 - `uninstall(pluginId)` — 先 disable → rm -rf 目录 → 删除 DB 记录
@@ -194,11 +196,12 @@ if (interceptResult) {
 在 failover 循环结束后添加：
 ```ts
 // ④ afterResponse — 循环结束后执行一次
-// 注意：流式场景下响应已发送给客户端，afterResponse 仅用于后处理（日志增强）
-const responseForHook = isStream
+// 注意：流式场景下响应已发送给客户端，afterResponse 仅用于后处理（日志增强），
+// response 参数是只读快照，不可修改实际响应
+const responseSnapshot: ProxyResult = isStream
   ? { statusCode: streamResult.statusCode, metricsResult: streamResult.metricsResult }
   : { statusCode: proxyResult.statusCode, body: proxyResult.body, headers: proxyResult.headers };
-await pluginEngine.runAfterResponse(afterCtx, responseForHook);
+await pluginEngine.runAfterResponse(afterCtx, responseSnapshot);
 ```
 
 - [ ] **Step 2: Register PluginEngine in buildApp**
@@ -215,20 +218,22 @@ git add src/proxy/proxy-core.ts src/index.ts
 git commit -m "feat: integrate PluginEngine hooks into proxy flow"
 ```
 
-## Task 7: Migrate enhancement-handler to Built-in Plugin
+## Task 7: Implement Built-in Proxy Enhancement Plugin
 
-**前置条件：** `enhancement-handler.ts` 当前在 `feat+dynamic-model-switch` worktree 分支（`.claude/worktrees/feat+dynamic-model-switch/src/proxy/enhancement-handler.ts`），尚未合并到 main。本任务需在该分支合并后执行，或在 worktree 上执行。
+**说明：** 代理增强功能当前在 `feat+dynamic-model-switch` worktree 分支开发（`enhancement-handler.ts`）。本任务根据该分支的代码逻辑实现为内置插件。若该分支已合并，则基于合并后的代码提取；若未合并，则从零实现相同功能。
 
 **Files:**
 - Create: `src/plugins/internal/claude-code-enhancer.ts`
-- Modify: `src/proxy/proxy-core.ts` — 移除旧 applyEnhancement 调用
+- Modify: `src/proxy/proxy-core.ts` — 移除旧的增强逻辑调用（如果存在）
 
-- [ ] **Step 1: Extract enhancement logic to plugin**
+- [ ] **Step 1: Implement enhancement as plugin**
 
-将 `enhancement-handler.ts` 的 `applyEnhancement()` 逻辑提取为 `ServerPluginModule`：
+实现 `ServerPluginModule`：
 - `beforeProxy` — 解析指令、清理消息、模型替换
 - `intercept` — select-model 命令拦截
 - `afterResponse` — 注入 model info tag（非流式场景）
+
+参考 worktree 分支代码：`.claude/worktrees/feat+dynamic-model-switch/src/proxy/enhancement-handler.ts`
 
 - [ ] **Step 2: Register as built-in plugin**
 
