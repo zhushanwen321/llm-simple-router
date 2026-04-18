@@ -59,8 +59,8 @@ export function parseDirective(
   let isCommandMessage = false;
 
   const reInline = /\$SELECT-MODEL=([a-zA-Z0-9._:-]+)/g;
-  const reHtmlComment = /<!--\s*router:model=([a-zA-Z0-9._\/:-]+)\s*-->/g;
-  const reCommand = /<!--\s*router:command=(\S+(?:\s+\S+)?)\s*-->/g;
+  const reModelTag = /\[router-model:\s*([a-zA-Z0-9._\/:-]+)\s*\]/g;
+  const reCommand = /\[router-command:\s*(\S+(?:\s+\S+)?)\s*\]/g;
 
   for (const block of content) {
     if (!block || typeof block !== "object") continue;
@@ -82,10 +82,10 @@ export function parseDirective(
       text = text.replace(reInline, "").trim();
     }
 
-    const commentMatch = reHtmlComment.exec(text);
-    if (commentMatch && isValidModelName(commentMatch[1])) {
-      modelName = commentMatch[1];
-      text = text.replace(reHtmlComment, "").trim();
+    const modelTagMatch = reModelTag.exec(text);
+    if (modelTagMatch && isValidModelName(modelTagMatch[1])) {
+      modelName = modelTagMatch[1];
+      text = text.replace(reModelTag, "").trim();
     }
 
     b.text = text;

@@ -2,7 +2,7 @@ import { randomUUID } from "crypto";
 import type { FastifyRequest } from "fastify";
 import Database from "better-sqlite3";
 import { getSetting } from "../db/settings.js";
-import { getAllMappingGroups, getAllModelMappings } from "../db/index.js";
+import { getActiveProviderModels, resolveByProviderModel } from "../db/index.js";
 import { resolveMapping } from "./mapping-resolver.js";
 import { parseDirective } from "./directive-parser.js";
 import { modelState } from "./model-state.js";
@@ -22,6 +22,16 @@ export interface EnhancementResult {
 }
 
 const MODEL_INFO_TAG_TYPE = "model-info";
+
+/**
+ * 解析 "provider_name/backend_model" 格式，返回对应的 client_model。
+ * provider_name 只允许 [a-zA-Z0-9_-]，/ 作为分隔符。
+ */
+function resolveProviderModel(db: Database.Database, providerSlashModel: string): string | null {
+  const match = /^([a-zA-Z0-9_-]+)\/(.+)$/.exec(providerSlashModel);
+  if (!match) return null;
+  return resolveByProviderModel(db, match[1], match[2]);
+}
 
 /**
  * 在代理转发前应用代理增强逻辑（指令解析 + 会话记忆 + 模型替换 + 命令拦截）。
@@ -61,16 +71,17 @@ export function applyEnhancement(
 
     // 带参数：设置模型并返回确认
     if (arg && arg !== "") {
-      const resolved = resolveMapping(db, arg, { now: new Date() });
-      if (resolved) {
+      const resolvedClientModel = resolveProviderModel(db, arg);
+      if (resolvedClientModel) {
+        // 存储 provider_name/backend_model 格式，便于回显；同时传入 client_model 用于记录原始模型
         modelState.set(routerKeyId, arg, sessionId, clientModel, "command");
       }
       return {
-        effectiveModel: clientModel,
+        effectiveModel: resolvedClientModel ?? clientModel,
         originalModel: null,
         interceptResponse: {
-          ...buildSelectModelResponse(db, routerKeyId, request.routerKey?.allowed_models, resolved ? arg : undefined),
-          meta: { action: resolved ? "模型选择" : "模型选择失败", detail: arg },
+          ...buildSelectModelResponse(db, request.routerKey?.allowed_models ?? null, resolvedClientModel ? arg : undefined),
+          meta: { action: resolvedClientModel ? "模型选择" : "模型选择失败", detail: arg },
         },
       };
     }
@@ -80,14 +91,14 @@ export function applyEnhancement(
       effectiveModel: clientModel,
       originalModel: null,
       interceptResponse: {
-        ...buildSelectModelResponse(db, routerKeyId, request.routerKey?.allowed_models),
+        ...buildSelectModelResponse(db, request.routerKey?.allowed_models ?? null),
         meta: { action: "模型列表" },
       },
     };
   }
 
   if (directive.modelName) {
-    // 内联模型指令 → resolveMapping 验证
+    // 内联模型指令 → resolveMapping 验证（client_model 格式）
     const resolvedDirective = resolveMapping(db, directive.modelName, { now: new Date() });
     if (resolvedDirective) {
       modelState.set(request.routerKey?.id ?? null, directive.modelName, sessionId, clientModel, "directive");
@@ -101,6 +112,12 @@ export function applyEnhancement(
   // 无指令 → 查询会话记忆
   const remembered = modelState.get(request.routerKey?.id ?? null, sessionId);
   if (remembered) {
+    // 优先尝试 provider_name/backend_model 格式（select-model 命令存储）
+    const providerResolved = resolveProviderModel(db, remembered);
+    if (providerResolved) {
+      return { effectiveModel: providerResolved, originalModel: clientModel, interceptResponse: null };
+    }
+    // 回退到 client_model 格式（内联指令存储）
     const resolvedRemembered = resolveMapping(db, remembered, { now: new Date() });
     if (resolvedRemembered) {
       return { effectiveModel: remembered, originalModel: clientModel, interceptResponse: null };
@@ -110,26 +127,15 @@ export function applyEnhancement(
   return nullResult;
 }
 
-/** 查询所有可用的 client_model 并构造 Anthropic 格式响应 */
+/** 查询所有可用的 provider_model 并构造 Anthropic 格式响应 */
 function buildSelectModelResponse(
   db: Database.Database,
-  _routerKeyId: string | null,
-  allowedModelsRaw?: string | null,
+  allowedModelsRaw: string | null | undefined,
   selectedModel?: string | null,
 ): InterceptResponse {
-  // mapping_groups 是路由的核心数据源，model_mappings 是可选的辅助映射
-  const groups = getAllMappingGroups(db);
-  const allMappings = getAllModelMappings(db);
-  const activeMappingModels = new Set(
-    allMappings.filter(m => m.is_active).map(m => m.client_model),
-  );
-  // 合并去重：有分组的（可路由）+ 活跃的辅助映射
-  const models = [...new Set([
-    ...groups.map(g => g.client_model),
-    ...activeMappingModels,
-  ])];
+  const providerModels = getActiveProviderModels(db);
 
-  // 按 allowed_models 过滤
+  // 按 allowed_models 过滤（allowed_models 存储的是 client_model 列表）
   let allowedSet: Set<string> | null = null;
   if (allowedModelsRaw) {
     try {
@@ -137,18 +143,31 @@ function buildSelectModelResponse(
       if (parsed.length > 0) allowedSet = new Set(parsed);
     } catch { /* 忽略解析失败 */ }
   }
-  const filtered = allowedSet ? models.filter(m => allowedSet!.has(m)) : models;
+  const filtered = allowedSet
+    ? providerModels.filter(m => allowedSet!.has(m.client_model))
+    : providerModels;
 
-  // 构造文本
-  let text: string;
-  if (selectedModel) {
-    // 带参数调用：返回选择确认
-    text = `已选择模型: ${selectedModel}`;
-  } else if (filtered.length > 0) {
-    text = filtered.map((m, i) => `${i + 1}. ${m}`).join("\n");
-  } else {
-    text = "（无可用模型）";
+  // 去重并格式化为 "provider_name/backend_model"
+  const seen = new Set<string>();
+  const displayModels: string[] = [];
+  for (const m of filtered) {
+    const key = `${m.provider_name}/${m.backend_model}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      displayModels.push(key);
+    }
   }
+
+  // 构造文本（用 <router-response> 包裹，使 response-cleaner 能过滤历史消息）
+  let inner: string;
+  if (selectedModel) {
+    inner = `已选择模型: ${selectedModel}`;
+  } else if (displayModels.length > 0) {
+    inner = displayModels.map((m, i) => `${i + 1}. ${m}`).join("\n");
+  } else {
+    inner = "（无可用模型）";
+  }
+  const text = `<router-response type="${selectedModel ? "model-selected" : "model-list"}">${inner}</router-response>`;
 
   const body = {
     id: `msg-${randomUUID()}`,

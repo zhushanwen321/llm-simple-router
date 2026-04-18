@@ -57,7 +57,7 @@ describe("Mapping CRUD", () => {
       url: "/admin/api/providers",
       headers: { cookie, "content-type": "application/json" },
       payload: {
-        name: "Test Provider",
+        name: "Test-Provider",
         api_type: "openai",
         base_url: "https://api.openai.com",
         api_key: "sk-test-abc123xyz",

@@ -75,8 +75,10 @@ export {
   createMappingGroup,
   updateMappingGroup,
   deleteMappingGroup,
+  getActiveProviderModels,
+  resolveByProviderModel,
 } from "./mappings.js";
-export type { ModelMapping, MappingGroup } from "./mappings.js";
+export type { ModelMapping, MappingGroup, ProviderModelEntry } from "./mappings.js";
 
 export {
   getActiveRetryRules,

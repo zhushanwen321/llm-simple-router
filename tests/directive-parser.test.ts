@@ -16,27 +16,27 @@ describe("parseDirective", () => {
     expect(cleaned).not.toContain("$SELECT-MODEL");
   });
 
-  it("解析 HTML 注释指令", () => {
+  it("解析 [router-model] 标签指令", () => {
     const result = parseDirective(
-      baseBody("hello <!-- router:model=deepseek-v3 -->")
+      baseBody("hello [router-model: deepseek-v3]")
     );
     expect(result.modelName).toBe("deepseek-v3");
     const cleaned = result.cleanedBody.messages![0].content[0].text;
-    expect(cleaned).not.toContain("router:model");
+    expect(cleaned).not.toContain("router-model");
     expect(cleaned).toContain("hello");
   });
 
-  it("解析 router:command 指令", () => {
+  it("解析 [router-command] 指令", () => {
     const result = parseDirective(
-      baseBody("<!-- router:command=select-model -->")
+      baseBody("[router-command: select-model]")
     );
     expect(result.command).toBe("select-model");
     expect(result.isCommandMessage).toBe(true);
   });
 
-  it("解析 router:command 带参数", () => {
+  it("解析 [router-command] 带参数", () => {
     const result = parseDirective(
-      baseBody("<!-- router:command=select-model A -->")
+      baseBody("[router-command: select-model A]")
     );
     expect(result.command).toBe("select-model A");
     expect(result.isCommandMessage).toBe(true);

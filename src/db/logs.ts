@@ -137,6 +137,7 @@ export function getRequestLogs(
     .prepare(
       `SELECT rl.id, rl.api_type, rl.model, rl.provider_id, rl.status_code, rl.latency_ms,
               rl.is_stream, rl.error_message, rl.created_at, rl.is_retry, rl.original_request_id, rl.original_model,
+              CASE WHEN rl.provider_id = 'router' THEN rl.upstream_request ELSE NULL END AS upstream_request,
               rm.backend_model, COALESCE(p.name, rl.provider_id) AS provider_name
        FROM request_logs rl
        LEFT JOIN request_metrics rm ON rm.request_log_id = rl.id
