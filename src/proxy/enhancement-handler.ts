@@ -73,17 +73,23 @@ export function applyEnhancement(
     // 带参数：设置模型并返回确认
     if (arg && arg !== "") {
       const resolvedClientModel = resolveProviderModel(db, arg);
-      if (resolvedClientModel) {
-        // 存储 provider_name/backend_model 格式，便于回显；同时传入 client_model 用于记录原始模型
-        modelState.set(routerKeyId, arg, sessionId, clientModel, "command");
+      if (!resolvedClientModel) {
+        return {
+          effectiveModel: clientModel,
+          originalModel: null,
+          interceptResponse: {
+            ...buildTextResponse("error", `未找到模型: ${arg}`),
+            meta: { action: "模型选择失败", detail: arg },
+          },
+        };
       }
+      modelState.set(routerKeyId, arg, sessionId, clientModel, "command");
       return {
-        // 保留 provider_name/backend_model 格式，resolveMapping 会直接解析
-        effectiveModel: resolvedClientModel ? arg : clientModel,
+        effectiveModel: arg,
         originalModel: null,
         interceptResponse: {
-          ...buildSelectModelResponse(db, request.routerKey?.allowed_models ?? null, resolvedClientModel ? arg : undefined),
-          meta: { action: resolvedClientModel ? "模型选择" : "模型选择失败", detail: arg },
+          ...buildSelectModelResponse(db, request.routerKey?.allowed_models ?? null, arg),
+          meta: { action: "模型选择", detail: arg },
         },
       };
     }
@@ -130,12 +136,28 @@ export function applyEnhancement(
   return nullResult;
 }
 
-/** 查询所有可用的 provider_model 并构造 Anthropic 格式响应 */
+/** 构造 Anthropic 格式的 router 文本响应 */
+function buildTextResponse(type: string, inner: string): Omit<InterceptResponse, "meta"> {
+  const text = `<router-response type="${type}">${inner}</router-response>`;
+  const body = {
+    id: `msg-${randomUUID()}`,
+    type: "message",
+    role: "assistant",
+    content: [{ type: "text", text }],
+    model: "router",
+    stop_reason: "end_turn",
+    stop_sequence: null,
+    usage: { input_tokens: 0, output_tokens: 0 },
+  };
+  return { statusCode: 200, body };
+}
+
+/** 查询所有可用的 provider_model 并构造响应 */
 function buildSelectModelResponse(
   db: Database.Database,
   allowedModelsRaw: string | null | undefined,
   selectedModel?: string | null,
-): InterceptResponse {
+): Omit<InterceptResponse, "meta"> {
   const providerModels = getActiveProviderModels(db);
 
   // 按 allowed_models 过滤（allowed_models 存储的是 client_model 列表）
@@ -161,29 +183,20 @@ function buildSelectModelResponse(
     }
   }
 
-  // 构造文本（用 <router-response> 包裹，使 response-cleaner 能过滤历史消息）
   let inner: string;
+  let responseType: string;
   if (selectedModel) {
     inner = `已选择模型: ${selectedModel}`;
+    responseType = "model-selected";
   } else if (displayModels.length > 0) {
     inner = displayModels.map((m, i) => `${i + 1}. ${m}`).join("\n");
+    responseType = "model-list";
   } else {
     inner = "（无可用模型）";
+    responseType = "model-list";
   }
-  const text = `<router-response type="${selectedModel ? "model-selected" : "model-list"}">${inner}</router-response>`;
 
-  const body = {
-    id: `msg-${randomUUID()}`,
-    type: "message",
-    role: "assistant",
-    content: [{ type: "text", text }],
-    model: "router",
-    stop_reason: "end_turn",
-    stop_sequence: null,
-    usage: { input_tokens: 0, output_tokens: 0 },
-  };
-
-  return { statusCode: 200, body };
+  return buildTextResponse(responseType, inner);
 }
 
 /** 生成注入到非流式响应中的模型信息标签 */
