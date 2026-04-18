@@ -21,6 +21,7 @@ export interface RequestLog {
   client_response: string | null;
   is_retry: number;
   original_request_id: string | null;
+  original_model: string | null;
 }
 
 /** 列表查询扩展字段：JOIN request_metrics + providers 获得 */
@@ -86,18 +87,19 @@ export function insertRequestLog(
     is_retry?: number;
     original_request_id?: string | null;
     router_key_id?: string | null;
+    original_model?: string | null;
   },
 ): void {
   db.prepare(
-    `INSERT INTO request_logs (id, api_type, model, provider_id, status_code, latency_ms, is_stream, error_message, created_at, request_body, response_body, client_request, upstream_request, upstream_response, client_response, is_retry, original_request_id, router_key_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO request_logs (id, api_type, model, provider_id, status_code, latency_ms, is_stream, error_message, created_at, request_body, response_body, client_request, upstream_request, upstream_response, client_response, is_retry, original_request_id, router_key_id, original_model)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     log.id, log.api_type, log.model, log.provider_id, log.status_code,
     log.latency_ms, log.is_stream, log.error_message, log.created_at,
     log.request_body ?? null, log.response_body ?? null,
     log.client_request ?? null, log.upstream_request ?? null,
     log.upstream_response ?? null, log.client_response ?? null,
-    log.is_retry ?? 0, log.original_request_id ?? null, log.router_key_id ?? null,
+    log.is_retry ?? 0, log.original_request_id ?? null, log.router_key_id ?? null, log.original_model ?? null,
   );
 }
 
@@ -132,7 +134,7 @@ export function getRequestLogs(
   const data = db
     .prepare(
       `SELECT rl.id, rl.api_type, rl.model, rl.provider_id, rl.status_code, rl.latency_ms,
-              rl.is_stream, rl.error_message, rl.created_at, rl.is_retry, rl.original_request_id,
+              rl.is_stream, rl.error_message, rl.created_at, rl.is_retry, rl.original_request_id, rl.original_model,
               rm.backend_model, COALESCE(p.name, rl.provider_id) AS provider_name
        FROM request_logs rl
        LEFT JOIN request_metrics rm ON rm.request_log_id = rl.id
