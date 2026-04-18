@@ -1,6 +1,11 @@
 import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
 import { getSetting, setSetting } from "../db/settings.js";
+import {
+  getSessionStates,
+  getSessionHistory,
+} from "../db/session-states.js";
+import { modelState } from "../proxy/model-state.js";
 
 interface ProxyEnhancementOptions {
   db: Database.Database;
@@ -32,6 +37,29 @@ export const adminProxyEnhancementRoutes: FastifyPluginCallback<ProxyEnhancement
     setSetting(db, "proxy_enhancement", JSON.stringify(config));
     return reply.send({ success: true });
   });
+
+  app.get("/admin/api/session-states", async (_req, reply) => {
+    const states = getSessionStates(db);
+    return reply.send(states);
+  });
+
+  app.get<{ Params: { keyId: string; sessionId: string } }>(
+    "/admin/api/session-states/:keyId/:sessionId/history",
+    async (req, reply) => {
+      const { keyId, sessionId } = req.params;
+      const history = getSessionHistory(db, keyId, sessionId);
+      return reply.send(history);
+    },
+  );
+
+  app.delete<{ Params: { keyId: string; sessionId: string } }>(
+    "/admin/api/session-states/:keyId/:sessionId",
+    async (req, reply) => {
+      const { keyId, sessionId } = req.params;
+      modelState.delete(keyId, sessionId);
+      return reply.send({ success: true });
+    },
+  );
 
   done();
 };
