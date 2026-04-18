@@ -62,11 +62,8 @@
                   <p class="text-muted-foreground">
                     将以下内容添加到 Claude Code 的项目 CLAUDE.md 或全局指令中：
                   </p>
-                  <code class="block mt-1 px-3 py-2 bg-muted rounded text-xs font-mono whitespace-pre-wrap leading-relaxed">
-{`当用户输入 /select-model 时，在回复中包含 [router-command: select-model]
-当用户输入 /select-model <model> 时，在回复中包含 [router-command: select-model <model>]`}
-                  </code>
-                </div>
+	                  <code class="block mt-1 px-3 py-2 bg-muted rounded text-xs font-mono whitespace-pre-wrap leading-relaxed" v-text="selectModelInstruction" />
+	                </div>
                 <div>
                   <p class="font-medium text-foreground mb-1">内联指令切换模型</p>
                   <p class="text-muted-foreground">
@@ -135,6 +132,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import SessionTable from '@/components/proxy-enhancement/SessionTable.vue'
 
 const claudeCodeEnabled = ref(false)
+const selectModelInstruction = '当用户输入 /select-model 时，在回复中包含 [router-command: select-model]\n当用户输入 /select-model <model> 时，在回复中包含 [router-command: select-model <model>]'
 const saving = ref(false)
 const instructionsOpen = ref(false)
 
