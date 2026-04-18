@@ -59,7 +59,10 @@
             <TableCell>
               <Badge :variant="log.api_type === 'openai' ? 'default' : 'secondary'">{{ log.api_type }}</Badge>
             </TableCell>
-            <TableCell class="font-mono text-xs">{{ log.model || '-' }}</TableCell>
+            <TableCell class="font-mono text-xs">
+              {{ log.model || '-' }}
+              <Badge v-if="log.original_model" variant="secondary" class="ml-1 text-xs">已替换</Badge>
+            </TableCell>
             <TableCell class="text-xs">
               <template v-if="log.backend_model || log.provider_name">
                 <span class="font-mono">{{ log.backend_model || '-' }}</span>
@@ -128,6 +131,7 @@
           <div class="bg-muted/50 rounded-md p-3 text-sm grid grid-cols-3 gap-2">
             <div><span class="text-muted-foreground">类型:</span> <Badge :variant="detailData.api_type === 'openai' ? 'default' : 'secondary'" class="text-xs">{{ detailData.api_type }}</Badge></div>
             <div><span class="text-muted-foreground">模型:</span> <span class="font-medium font-mono">{{ detailData.model || '-' }}</span></div>
+            <div v-if="detailData.original_model" class="col-span-3"><span class="text-muted-foreground">模型替换:</span> <span class="font-mono text-xs">{{ detailData.original_model }} → {{ detailData.backend_model || detailData.model }}</span></div>
             <div><span class="text-muted-foreground">状态码:</span> <Badge :variant="(detailData.status_code ?? 0) < 400 ? 'default' : 'destructive'" class="text-xs">{{ detailData.status_code || '-' }}</Badge></div>
             <div><span class="text-muted-foreground">延迟:</span> <span class="font-medium">{{ detailData.latency_ms ? detailData.latency_ms + 'ms' : '-' }}</span></div>
             <div><span class="text-muted-foreground">流式:</span> <span class="font-medium">{{ detailData.is_stream ? 'Yes' : 'No' }}</span></div>
@@ -295,6 +299,7 @@ interface LogEntry {
   client_response: string | null
   is_retry: number
   original_request_id: string | null
+  original_model: string | null
   backend_model: string | null
   provider_name: string | null
 }
