@@ -50,6 +50,16 @@ interface ProxyBeforeContext {
   clientModel: string;
   apiType: 'openai' | 'anthropic';
   sessionId?: string;
+  routerKeyId?: string | null;
+}
+
+interface ProxyBeforeResult {
+  /** 插件修改后的 body（用于替换原始请求体） */
+  body?: Record<string, unknown>;
+  /** 插件修改后的模型名（用于替换 clientModel） */
+  effectiveModel?: string;
+  /** 原始模型名（用于日志和注入 model-info tag） */
+  originalModel?: string | null;
 }
 
 interface ProxyAfterContext {
@@ -70,7 +80,7 @@ interface ProxyInterceptResult {
 interface ServerPluginModule {
   init?(ctx: PluginContext): void | Promise<void>;
   destroy?(): void | Promise<void>;
-  beforeProxy?(ctx: ProxyBeforeContext): ProxyBeforeContext | null;
+  beforeProxy?(ctx: ProxyBeforeContext): ProxyBeforeResult | null;
   intercept?(ctx: ProxyBeforeContext): ProxyInterceptResult | null;
   // 流式场景下仅用于后处理（日志增强等），不可修改已发送的响应
   afterResponse?(ctx: ProxyAfterContext, response: ProxyResult): ProxyResult;

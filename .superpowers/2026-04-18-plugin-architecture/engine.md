@@ -62,7 +62,7 @@ class PluginEngine {
   disable(pluginId: string): Promise<void>;
 
   // Hook 执行
-  runBeforeProxy(ctx: ProxyBeforeContext): Promise<ProxyBeforeContext>;
+  runBeforeProxy(ctx: ProxyBeforeContext): Promise<ProxyBeforeResult>;
   runIntercept(ctx: ProxyBeforeContext): Promise<ProxyInterceptResult | null>;
   runAfterResponse(ctx, response): Promise<ProxyResult>;
 
@@ -92,6 +92,6 @@ handleProxyPost()
 ## Hook 执行顺序
 
 多个插件注册同一扩展点时，按 enable 时间顺序执行（先启用先执行）。
-`beforeProxy`：链式传递 context，每个插件可修改并传给下一个。
+`beforeProxy`：链式执行，每个插件返回 `ProxyBeforeResult`（body/effectiveModel/originalModel），结果合并传给下一个插件和后续 intercept。
 `intercept`：第一个返回非 null 结果的插件胜出，后续不再执行。
 `afterResponse`：链式传递 response。
