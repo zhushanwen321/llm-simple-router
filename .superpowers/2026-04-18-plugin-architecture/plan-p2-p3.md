@@ -28,8 +28,13 @@ class PluginRegistry {
   }
 
   // 动态加载远程插件
+  // 使用 fetch 获取 JS 文本后通过 import(URL) 加载，避免 Vite 静态分析限制
   async loadPlugin(pluginId: string) {
-    const mod = await import(`/admin/api/plugins/${pluginId}/client-assets/index.js`);
+    const url = `/admin/api/plugins/${pluginId}/client-assets/index.js`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Failed to load plugin ${pluginId}`);
+    const blob = await response.blob();
+    const mod = await import(URL.createObjectURL(blob));
     if (mod.default?.parseResponse) {
       this.register(mod.default);
     }
@@ -83,29 +88,36 @@ git commit -m "feat: extract SSE parser to built-in frontend plugin"
 
 - [ ] **Step 1: Modify LogResponseViewer**
 
-将硬编码的 SSE 解析逻辑替换为 PluginRegistry 调用：
+改造策略：内置 SSE 解析插件保持 `useSSEParsing` 的细粒度 computed API，将其包装为 `ClientPluginModule` 注册。模板继续使用 `openaiAssembled`、`assembledBlocks` 等属性。第三方插件通过 `renderComponent` 提供完全自定义的渲染。
 
 ```ts
-// 当前
-import { useSSEParsing } from './useSSEParsing';
-const { openaiAssembled, assembledBlocks } = useSSEParsing(body, isStream, apiType);
-
 // 改为
+import { useSSEParsing } from './useSSEParsing'; // 内置解析保留
 import { getPluginRegistry } from './PluginRegistry';
+
 const registry = getPluginRegistry();
-const parsed = computed(() => registry.parseResponse(body.value, apiType, isStream));
+
+// 先尝试第三方插件
+const pluginParsed = computed(() => registry.parseResponse(body.value, apiType, isStream));
+const pluginComponent = computed(() => registry.getRenderComponent(body.value, apiType, isStream));
+
+// 内置解析（fallback）
+const { openaiAssembled, assembledBlocks, sseMeta } = useSSEParsing(body, isStream, apiType);
 ```
 
 模板中：
 ```vue
-<!-- 当前硬编码 -->
-<template v-if="apiType === 'openai'">...</template>
-<template v-else-if="apiType === 'anthropic'">...</template>
+<!-- 第三方插件提供自定义渲染 -->
+<component v-if="pluginComponent" :is="pluginComponent" :data="pluginParsed" />
 
-<!-- 改为插件驱动 -->
-<component v-if="parsed?.renderComponent" :is="parsed.renderComponent" :data="parsed" />
-<template v-else> <!-- fallback 到内置渲染 --> </template>
+<!-- 内置渲染（保持现有模板不变） -->
+<template v-else>
+  <template v-if="apiType === 'openai'">...现有模板...</template>
+  <template v-else-if="apiType === 'anthropic'">...现有模板...</template>
+</template>
 ```
+
+**关键点：** 内置解析逻辑保持不动，仅增加第三方插件的覆盖分支。这样改动最小，向后兼容。
 
 - [ ] **Step 2: Modify LogRequestViewer**
 

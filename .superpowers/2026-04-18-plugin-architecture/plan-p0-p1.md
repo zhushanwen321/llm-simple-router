@@ -99,6 +99,17 @@ git commit -m "feat: add PluginEngine core"
 
 - [ ] **Step 2: Implement PluginManager**
 
+**目录命名规则：**
+```ts
+function pluginIdFromRepoUrl(repoUrl: string): string {
+  // 从 URL 提取仓库名，如 https://github.com/user/my-plugin.git → my-plugin
+  const basename = repoUrl.split('/').pop()?.replace(/\.git$/, '') ?? '';
+  // 校验与 manifest.name 一致性
+  return basename;
+}
+```
+插件安装目录：`data/plugins/{plugin-id}/`
+
 方法：
 - `install(repoUrl)` — git ls-remote 验证 → clone → 读取 manifest → npm install --production → 写入 DB
 - `uninstall(pluginId)` — 先 disable → rm -rf 目录 → 删除 DB 记录
@@ -183,7 +194,11 @@ if (interceptResult) {
 在 failover 循环结束后添加：
 ```ts
 // ④ afterResponse — 循环结束后执行一次
-await pluginEngine.runAfterResponse(afterCtx, response);
+// 注意：流式场景下响应已发送给客户端，afterResponse 仅用于后处理（日志增强）
+const responseForHook = isStream
+  ? { statusCode: streamResult.statusCode, metricsResult: streamResult.metricsResult }
+  : { statusCode: proxyResult.statusCode, body: proxyResult.body, headers: proxyResult.headers };
+await pluginEngine.runAfterResponse(afterCtx, responseForHook);
 ```
 
 - [ ] **Step 2: Register PluginEngine in buildApp**
@@ -201,6 +216,8 @@ git commit -m "feat: integrate PluginEngine hooks into proxy flow"
 ```
 
 ## Task 7: Migrate enhancement-handler to Built-in Plugin
+
+**前置条件：** `enhancement-handler.ts` 当前在 `feat+dynamic-model-switch` worktree 分支（`.claude/worktrees/feat+dynamic-model-switch/src/proxy/enhancement-handler.ts`），尚未合并到 main。本任务需在该分支合并后执行，或在 worktree 上执行。
 
 **Files:**
 - Create: `src/plugins/internal/claude-code-enhancer.ts`
