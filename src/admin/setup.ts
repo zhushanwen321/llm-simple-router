@@ -1,6 +1,7 @@
 import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
 import { randomBytes } from "node:crypto";
+import jwt from "jsonwebtoken";
 import { getSetting, setSetting, isInitialized } from "../db/settings.js";
 import { hashPassword } from "../utils/password.js";
 
@@ -36,6 +37,18 @@ export const adminSetupRoutes: FastifyPluginCallback<SetupOptions> = (app, optio
     if (alreadyInitialized) {
       return reply.code(409).send({ error: { message: "Already initialized" } });
     }
+
+    // 自动登录：签发 JWT
+    const TOKEN_EXPIRY_SECONDS = 172800; // 48 hours，与 admin-auth 保持一致
+    const secret = getSetting(db, "jwt_secret");
+    const token = jwt.sign({ role: "admin" }, secret!, { expiresIn: TOKEN_EXPIRY_SECONDS });
+    reply.setCookie("admin_token", token, {
+      path: "/admin",
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: TOKEN_EXPIRY_SECONDS,
+    });
 
     return { success: true };
   });

@@ -58,6 +58,29 @@
           <DialogTitle>{{ editingId ? '编辑供应商' : '添加供应商' }}</DialogTitle>
         </DialogHeader>
         <form @submit.prevent="handleSave" class="space-y-3">
+          <!-- 快速配置 -->
+          <div class="rounded-md border bg-muted/40 p-3 space-y-2">
+            <div class="text-xs font-medium text-muted-foreground">快速配置</div>
+            <div class="flex gap-2">
+              <Select v-model="presetGroup" @update:model-value="onGroupChange">
+                <SelectTrigger class="flex-1">
+                  <SelectValue placeholder="选择供应商" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem v-for="g in PROVIDER_PRESETS" :key="g.group" :value="g.group">{{ g.group }}</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select v-model="presetPlan" @update:model-value="onPresetChange" :disabled="!presetGroup">
+                <SelectTrigger class="flex-1">
+                  <SelectValue placeholder="选择套餐" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem v-for="p in availablePlans" :key="p.plan" :value="p.plan">{{ p.plan }}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
           <div>
             <Label class="block text-sm font-medium text-foreground mb-1">名称</Label>
             <Input v-model="form.name" type="text" required />
@@ -90,7 +113,10 @@
                 <Button type="button" variant="ghost" size="icon" class="h-4 w-4 rounded-full hover:bg-muted p-0 text-xs leading-none" @click="removeModel(i)">&times;</Button>
               </Badge>
             </div>
-            <Input v-model="modelInput" placeholder="输入模型名称，按 Enter 添加" @keydown.enter.prevent="addModel" />
+            <div class="flex gap-2">
+              <Input v-model="modelInput" placeholder="输入模型名称，多个用逗号分隔" @keydown.enter.prevent="addModel" class="flex-1" />
+              <Button type="button" variant="outline" size="sm" @click="addModel" :disabled="!modelInput.trim()">添加</Button>
+            </div>
           </div>
           <div class="flex items-center gap-2">
             <Checkbox v-model="form.is_active" id="svc-active" />
@@ -121,9 +147,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
 import { api } from '@/api/client'
+import { PROVIDER_PRESETS } from '@/data/provider-presets'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -153,6 +180,28 @@ const editingId = ref<string | null>(null)
 const deleteTarget = ref<Provider | null>(null)
 const form = ref({ ...DEFAULT_FORM })
 
+// 预设级联状态
+const presetGroup = ref('')
+const presetPlan = ref('')
+
+const availablePlans = computed(() => {
+  if (!presetGroup.value) return []
+  return PROVIDER_PRESETS.find(g => g.group === presetGroup.value)?.presets ?? []
+})
+
+function onGroupChange() {
+  presetPlan.value = ''
+}
+
+function onPresetChange() {
+  const preset = availablePlans.value.find(p => p.plan === presetPlan.value)
+  if (!preset) return
+  form.value.name = preset.presetName
+  form.value.api_type = preset.apiType
+  form.value.base_url = preset.baseUrl
+  form.value.models = [...preset.models]
+}
+
 async function loadProviders() {
   try {
     const data = await api.getProviders()
@@ -164,9 +213,13 @@ async function loadProviders() {
 }
 
 function addModel() {
-  const name = modelInput.value.trim()
-  if (name && !form.value.models.includes(name)) {
-    form.value.models.push(name)
+  const input = modelInput.value.trim()
+  if (!input) return
+  const names = input.split(/[,，]/).map(s => s.trim()).filter(Boolean)
+  for (const name of names) {
+    if (!form.value.models.includes(name)) {
+      form.value.models.push(name)
+    }
   }
   modelInput.value = ''
 }
@@ -179,6 +232,8 @@ function openCreate() {
   editingId.value = null
   form.value = { name: '', api_type: 'openai', base_url: '', api_key: '', models: [], is_active: true }
   modelInput.value = ''
+  presetGroup.value = ''
+  presetPlan.value = ''
   dialogOpen.value = true
 }
 
@@ -186,6 +241,8 @@ function openEdit(p: Provider) {
   editingId.value = p.id
   form.value = { name: p.name, api_type: p.api_type, base_url: p.base_url, api_key: '', models: [...(p.models || [])], is_active: !!p.is_active }
   modelInput.value = ''
+  presetGroup.value = ''
+  presetPlan.value = ''
   dialogOpen.value = true
 }
 

@@ -77,7 +77,7 @@ async function handleSetup() {
   loading.value = true
   try {
     await api.initializeSetup(password.value)
-    router.push('/login')
+    router.push('/admin/dashboard')
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (e: any) {
     error.value = e.response?.data?.error?.message || '设置失败'

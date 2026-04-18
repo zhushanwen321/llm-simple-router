@@ -278,6 +278,7 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
+import { useClipboard } from '@/composables/useClipboard'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
@@ -385,13 +386,9 @@ const {
 
 const expandedBlock = reactive<Record<number, boolean>>({})
 const streamTab = ref<'assembled' | 'raw-events'>('assembled')
-const copied = ref(false)
+const { copied, copy: clipboardCopy } = useClipboard()
 
 async function copyRaw() {
-  try {
-    await navigator.clipboard.writeText(props.raw)
-    copied.value = true
-    setTimeout(() => { copied.value = false }, 2000) // eslint-disable-line no-magic-numbers
-  } catch { copied.value = false }
+  await clipboardCopy(props.raw)
 }
 </script>

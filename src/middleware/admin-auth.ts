@@ -54,7 +54,7 @@ const adminAuthRaw: FastifyPluginCallback<AdminAuthOptions> = (app, options, don
 export const adminAuthPlugin = fp(adminAuthRaw, { name: "admin-auth" });
 
 export const adminLoginRoutes: FastifyPluginCallback<AdminAuthOptions> = (app, options, done) => {
-  const TOKEN_EXPIRY_SECONDS = 86400;
+  const TOKEN_EXPIRY_SECONDS = 172800; // 48 hours
 
   app.post("/admin/api/login", async (request, reply) => {
     const { password } = request.body as { password?: string };

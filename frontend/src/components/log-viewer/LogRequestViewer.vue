@@ -152,6 +152,7 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
+import { useClipboard } from '@/composables/useClipboard'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
@@ -176,7 +177,7 @@ const props = defineProps<{
 const headersOpen = ref(false)
 const expanded = reactive<Record<string, boolean>>({})
 const toolsExpanded = ref(false)
-const copied = ref(false)
+const { copied, copy: clipboardCopy } = useClipboard()
 
 const parsed = computed<Record<string, unknown>>(() => {
   try {
@@ -196,11 +197,7 @@ const parseError = computed(() => {
 })
 
 async function copyRaw() {
-  try {
-    await navigator.clipboard.writeText(props.raw)
-    copied.value = true
-    setTimeout(() => { copied.value = false }, 2000) // eslint-disable-line no-magic-numbers
-  } catch { copied.value = false }
+  await clipboardCopy(props.raw)
 }
 
 const headerEntries = computed(() => {
