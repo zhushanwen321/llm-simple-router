@@ -78,7 +78,8 @@ export function applyEnhancement(
         modelState.set(routerKeyId, arg, sessionId, clientModel, "command");
       }
       return {
-        effectiveModel: resolvedClientModel ?? clientModel,
+        // 保留 provider_name/backend_model 格式，resolveMapping 会直接解析
+        effectiveModel: resolvedClientModel ? arg : clientModel,
         originalModel: null,
         interceptResponse: {
           ...buildSelectModelResponse(db, request.routerKey?.allowed_models ?? null, resolvedClientModel ? arg : undefined),
@@ -114,9 +115,10 @@ export function applyEnhancement(
   const remembered = modelState.get(request.routerKey?.id ?? null, sessionId);
   if (remembered) {
     // 优先尝试 provider_name/backend_model 格式（select-model 命令存储）
+    // 直接保留该格式，resolveMapping 会解析出 provider + model
     const providerResolved = resolveProviderModel(db, remembered);
     if (providerResolved) {
-      return { effectiveModel: providerResolved, originalModel: clientModel, interceptResponse: null };
+      return { effectiveModel: remembered, originalModel: clientModel, interceptResponse: null };
     }
     // 回退到 client_model 格式（内联指令存储）
     const resolvedRemembered = resolveMapping(db, remembered, { now: new Date() });

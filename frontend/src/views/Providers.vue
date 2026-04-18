@@ -259,8 +259,14 @@ function buildPayload(): { name: string; api_type: string; base_url: string; api
 }
 
 async function handleSave() {
+  const name = form.value.name.trim()
+  if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
+    toast.error('名称仅允许英文大小写字母、数字、横线和下划线')
+    return
+  }
   try {
     const payload = buildPayload()
+    payload.name = name
     if (editingId.value) {
       await api.updateProvider(editingId.value, payload)
     } else {
