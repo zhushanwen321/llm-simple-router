@@ -7,9 +7,17 @@
   → 验证可达性（git ls-remote）
   → git clone 到 data/plugins/{plugin-name}/
   → 读取 manifest.json，校验必要字段
-  → npm install --production
+  → npm install --production（信任模型，参见安全声明）
   → 写入 DB plugins 表（status='installed'）
+  → 失败时：回滚 clone 目录，不写入 DB
 ```
+
+安全声明：第一阶段为信任模型，插件可执行任意代码。
+用户自行承担插件安全风险。后续阶段考虑沙箱隔离。
+
+## 更新流程
+
+P0 不支持热更新。用户需要 uninstall + 重新 install 来更新插件版本。
 
 ## 加载流程
 
@@ -20,15 +28,16 @@
   → 调用 module.init(ctx)
   → 按 manifest.extensions 注册 hook
   → 更新 DB status='enabled'
+  → init 失败：status='error'，记录 error_message
 ```
 
-前端通过 `/admin/api/plugins/:name/client-assets/*` 获取入口文件，动态 import 加载。
+前端通过 `/admin/api/plugins/:id/client-assets/*` 获取入口文件，动态 import 加载。
 
 ## 数据库表
 
 ```sql
 CREATE TABLE IF NOT EXISTS plugins (
-  id TEXT PRIMARY KEY,
+  id TEXT PRIMARY KEY,        -- 即 manifest.name
   version TEXT NOT NULL,
   repo_url TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'installed',
@@ -36,8 +45,9 @@ CREATE TABLE IF NOT EXISTS plugins (
   manifest TEXT NOT NULL,
   installed_at TEXT NOT NULL,
   enabled_at TEXT,
+  updated_at TEXT,
   error_message TEXT,
-  settings TEXT
+  settings TEXT               -- 插件私有配置 JSON
 );
 ```
 
@@ -58,6 +68,7 @@ class PluginEngine {
 
   // 启动恢复
   restorePlugins(): Promise<void>;
+  // 恢复失败策略：单个插件 init 失败标记 error，不影响其他插件和启动
 }
 ```
 
@@ -65,16 +76,18 @@ class PluginEngine {
 
 ```
 handleProxyPost()
-  ① pluginEngine.runBeforeProxy(ctx)
+  ① pluginEngine.runBeforeProxy(ctx)     ← 在 failover 循环之前执行一次
   ② interceptResult = pluginEngine.runIntercept(ctx)
-     → 拦截：直接返回
-     → 未拦截：正常代理转发
-  ③ pluginEngine.runAfterResponse(ctx, response)
+     → 拦截：直接返回，跳过整个 failover 循环
+     → 未拦截：进入 failover 循环
+  ③ [failover 循环 + retryableCall]      ← 插件不参与每次重试
+  ④ pluginEngine.runAfterResponse(ctx, response)  ← 循环结束后执行一次
   → 返回客户端
 ```
 
-现有 `applyEnhancement()` 迁移为内置插件 `@internal/claude-code-enhancer`，
-调用点替换为 Plugin Engine 的 hook 执行。
+关键决策：`beforeProxy` 和 `intercept` 在 failover 循环外执行一次，
+确保插件不会在每个 failover 尝试中重复执行。
+`afterResponse` 在循环结束后执行，仅用于后处理（如日志增强）。
 
 ## Hook 执行顺序
 

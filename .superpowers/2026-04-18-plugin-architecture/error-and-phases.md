@@ -29,4 +29,21 @@
 | P3 | Plugins 管理页面 UI | 管理界面 |
 | P4 | 示例插件模板 + 开发文档 | 生态基础 |
 
+## 内置插件迁移兼容性（P1）
+
+### `@internal/claude-code-enhancer`
+
+将现有的 `applyEnhancement()` 逻辑迁移为内置插件，兼容性策略：
+
+- **行为不变**：默认启用，用户无需任何操作即可保持现有功能
+- **自动注册**：`buildApp()` 启动时检查 plugins 表，若不存在则自动插入内置插件记录（status='enabled'）
+- **init 失败策略**：内置插件 init 失败不阻止启动，但 log.error 并降级（使用旧逻辑路径作为兜底）
+- **可禁用**：用户可在管理后台禁用，禁用后 enhancement-handler 逻辑不执行
+
+### `@internal/sse-log-parser`
+
+将 `useSSEParsing.ts` 迁移为内置插件，策略同上。前端默认加载，禁用后 fallback 到原始 JSON 展示。
+
+## 实施顺序
+
 每阶段独立可交付。P0-P1 后端优先，P2-P3 前端跟进，P4 收尾。

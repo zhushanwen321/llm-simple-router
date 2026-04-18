@@ -39,7 +39,7 @@ my-plugin/
 
 ```ts
 interface PluginContext {
-  db: Database.Database;
+  db: Database.Database;          // 信任模型：直接暴露，第一阶段无沙箱
   logger: FastifyLoggerInstance;
   getSetting(key: string): string | null;
 }
@@ -50,6 +50,15 @@ interface ProxyBeforeContext {
   clientModel: string;
   apiType: 'openai' | 'anthropic';
   sessionId?: string;
+}
+
+interface ProxyAfterContext {
+  request: FastifyRequest;
+  apiType: 'openai' | 'anthropic';
+  clientModel: string;
+  providerId: string;
+  statusCode: number;
+  isStream: boolean;
 }
 
 interface ProxyInterceptResult {
@@ -63,6 +72,7 @@ interface ServerPluginModule {
   destroy?(): void | Promise<void>;
   beforeProxy?(ctx: ProxyBeforeContext): ProxyBeforeContext | null;
   intercept?(ctx: ProxyBeforeContext): ProxyInterceptResult | null;
+  // 流式场景下仅用于后处理（日志增强等），不可修改已发送的响应
   afterResponse?(ctx: ProxyAfterContext, response: ProxyResult): ProxyResult;
 }
 ```
@@ -70,11 +80,38 @@ interface ServerPluginModule {
 ## 前端接口
 
 ```ts
+interface ParsedRequest {
+  apiType: string;
+  model: string;
+  messages?: Array<{ role: string; content: string }>;
+  [key: string]: unknown;
+}
+
+interface ParsedResponse {
+  apiType: string;
+  statusCode: number;
+  model?: string;
+  usage?: Record<string, number>;
+  content?: string;
+  [key: string]: unknown;
+}
+
 interface ClientPluginModule {
   parseRequest?(body: string, apiType: string): ParsedRequest | null;
   parseResponse?(body: string, apiType: string, isStream: boolean): ParsedResponse | null;
-  renderComponent?: Component;
+  renderComponent?: Component;  // Vue 3 组件，必须与宿主 Vue 版本兼容
 }
 ```
 
 前端通过动态 `import()` 加载，后端通过 Admin API 提供静态文件服务。
+
+## 构建约束
+
+**后端插件：**
+- 产物为 CommonJS 或 ESM，Node.js 直接 require/import
+- 禁止使用 native 模块（如 better-sqlite3），避免与宿主冲突
+
+**前端插件：**
+- Vue / Vue Router 等宿主依赖必须标记为 external（peerDependency）
+- 产物为 ESM，支持动态 import
+- Vite 构建时通过 `build.rollupOptions.external` 排除宿主依赖

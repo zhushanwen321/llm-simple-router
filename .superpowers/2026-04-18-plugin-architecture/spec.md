@@ -32,7 +32,7 @@ status: approved
 ## 生命周期
 
 ```
-register(仓库地址) → install(git clone + npm i) → enable(加载到内存)
+install(仓库地址, git clone + npm i) → enable(加载到内存)
 → disable(从内存卸载) → uninstall(删除文件)
 ```
 
