@@ -7,6 +7,10 @@ import { encrypt, decrypt } from "../utils/crypto.js";
 import { getSetting } from "../db/settings.js";
 import { HTTP_CREATED, HTTP_NOT_FOUND, HTTP_CONFLICT } from "./constants.js";
 
+const API_KEY_PREVIEW_MIN_LEN = 8;
+const API_KEY_PREVIEW_PREFIX_LEN = 4;
+const PROVIDER_NAME_RE = /^[a-zA-Z0-9_-]+$/;
+
 const CreateProviderSchema = Type.Object({
   name: Type.String({ minLength: 1 }),
   api_type: Type.Union([Type.Literal("openai"), Type.Literal("anthropic")]),
@@ -50,6 +54,9 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
 
   app.post("/admin/api/providers", { schema: { body: CreateProviderSchema } }, async (request, reply) => {
     const body = request.body as Static<typeof CreateProviderSchema>;
+    if (!PROVIDER_NAME_RE.test(body.name)) {
+      return reply.status(400).send({ error: { message: "Provider 名称仅允许英文大小写字母、数字、横线和下划线" } });
+    }
     const encryptedKey = encrypt(body.api_key, getSetting(db, "encryption_key")!);
     const id = createProvider(db, {
       name: body.name,
@@ -70,6 +77,9 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
       return reply.code(HTTP_NOT_FOUND).send({ error: { message: "Provider not found" } });
     }
     const body = request.body as Static<typeof UpdateProviderSchema>;
+    if (body.name !== undefined && !PROVIDER_NAME_RE.test(body.name)) {
+      return reply.status(400).send({ error: { message: "Provider 名称仅允许英文大小写字母、数字、横线和下划线" } });
+    }
     const fields: Partial<Pick<Provider, 'name' | 'api_type' | 'base_url' | 'api_key' | 'api_key_preview' | 'models' | 'is_active'>> = {};
     if (body.name !== undefined) fields.name = body.name;
     if (body.api_type !== undefined) fields.api_type = body.api_type;

@@ -45,6 +45,7 @@ import {
   ArrowLeftRight,
   KeyRound,
   RefreshCcw,
+  Sparkles,
   FileText,
   LogOut,
 } from 'lucide-vue-next'
@@ -64,6 +65,7 @@ const navItems: NavItem[] = [
   { path: '/mappings', label: '模型映射', icon: ArrowLeftRight },
   { path: '/router-keys', label: 'API 密钥', icon: KeyRound },
   { path: '/retry-rules', label: '重试规则', icon: RefreshCcw },
+  { path: '/proxy-enhancement', label: '代理增强', icon: Sparkles },
   { path: '/logs', label: '请求日志', icon: FileText },
 ]
 

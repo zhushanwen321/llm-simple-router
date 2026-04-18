@@ -112,8 +112,11 @@
             </div>
             <div v-if="anthropicContentBlocks.length" class="space-y-2">
               <div class="text-xs font-medium text-muted-foreground">Content</div>
-              <div class="flex flex-wrap gap-2">
-                <Badge v-for="(block, idx) in anthropicContentBlocks" :key="idx" :class="blockClass(block.type)">{{ block.type }}</Badge>
+              <div v-for="(block, idx) in anthropicContentBlocks" :key="idx" class="rounded-md border p-3">
+                <div class="flex items-center gap-2 mb-2">
+                  <Badge :class="blockClass(block.type)">{{ block.type }}</Badge>
+                  <span v-if="block.text" class="text-sm">{{ block.text }}</span>
+                </div>
               </div>
             </div>
             <div v-if="anthropicUsage" class="grid grid-cols-2 sm:grid-cols-4 gap-2">

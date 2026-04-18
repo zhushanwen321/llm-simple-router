@@ -75,8 +75,10 @@ export {
   createMappingGroup,
   updateMappingGroup,
   deleteMappingGroup,
+  getActiveProviderModels,
+  resolveByProviderModel,
 } from "./mappings.js";
-export type { ModelMapping, MappingGroup } from "./mappings.js";
+export type { ModelMapping, MappingGroup, ProviderModelEntry } from "./mappings.js";
 
 export {
   getActiveRetryRules,
@@ -115,3 +117,13 @@ export { getStats } from "./stats.js";
 export type { Stats, StatsPeriod } from "./stats.js";
 
 export { getSetting, setSetting, isInitialized } from "./settings.js";
+
+export {
+  getSessionStates,
+  getSessionState,
+  getSessionHistory,
+  upsertSessionState,
+  insertSessionHistory,
+  deleteSessionState,
+} from "./session-states.js";
+export type { SessionModelState, SessionModelHistory, UpsertSessionStateInput, InsertSessionHistoryInput } from "./session-states.js";

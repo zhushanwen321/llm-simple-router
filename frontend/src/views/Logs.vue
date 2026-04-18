@@ -59,9 +59,15 @@
             <TableCell>
               <Badge :variant="log.api_type === 'openai' ? 'default' : 'secondary'">{{ log.api_type }}</Badge>
             </TableCell>
-            <TableCell class="font-mono text-xs">{{ log.model || '-' }}</TableCell>
+            <TableCell class="font-mono text-xs">
+              {{ log.model || '-' }}
+              <Badge v-if="log.original_model" variant="secondary" class="ml-1 text-xs">已替换</Badge>
+            </TableCell>
             <TableCell class="text-xs">
-              <template v-if="log.backend_model || log.provider_name">
+              <template v-if="log.provider_id === 'router'">
+                <Badge variant="secondary" class="text-[10px] px-1 py-0">代理增强：{{ enhancementLabel(log.upstream_request) }}</Badge>
+              </template>
+              <template v-else-if="log.backend_model || log.provider_name">
                 <span class="font-mono">{{ log.backend_model || '-' }}</span>
                 <span class="text-muted-foreground"> @ </span>
                 <Badge variant="outline" class="text-[10px] px-1 py-0">{{ log.provider_name || log.provider_id || '-' }}</Badge>
@@ -103,6 +109,7 @@
       <DialogScrollContent class="max-w-4xl max-h-[85vh]">
         <DialogHeader>
           <DialogTitle class="flex items-center gap-2">请求详情 <span v-if="detailData" class="font-mono text-xs text-muted-foreground font-normal select-all">{{ detailData.id }}</span></DialogTitle>
+          <DialogDescription class="sr-only">请求日志详情</DialogDescription>
         </DialogHeader>
         <!-- 骨架屏加载状态 -->
         <template v-if="detailLoading">
@@ -128,6 +135,7 @@
           <div class="bg-muted/50 rounded-md p-3 text-sm grid grid-cols-3 gap-2">
             <div><span class="text-muted-foreground">类型:</span> <Badge :variant="detailData.api_type === 'openai' ? 'default' : 'secondary'" class="text-xs">{{ detailData.api_type }}</Badge></div>
             <div><span class="text-muted-foreground">模型:</span> <span class="font-medium font-mono">{{ detailData.model || '-' }}</span></div>
+            <div v-if="detailData.original_model" class="col-span-3"><span class="text-muted-foreground">模型替换:</span> <span class="font-mono text-xs">{{ detailData.original_model }} → {{ detailData.backend_model || detailData.model }}</span></div>
             <div><span class="text-muted-foreground">状态码:</span> <Badge :variant="(detailData.status_code ?? 0) < 400 ? 'default' : 'destructive'" class="text-xs">{{ detailData.status_code || '-' }}</Badge></div>
             <div><span class="text-muted-foreground">延迟:</span> <span class="font-medium">{{ detailData.latency_ms ? detailData.latency_ms + 'ms' : '-' }}</span></div>
             <div><span class="text-muted-foreground">流式:</span> <span class="font-medium">{{ detailData.is_stream ? 'Yes' : 'No' }}</span></div>
@@ -153,13 +161,13 @@
                 </Button>
               </div>
               <div class="p-4">
-                <LogRequestViewer :raw="detailData.client_request || detailData.request_body || '{}'" :api-type="asApiType(detailData.api_type)" :mode="sectionModes.client_request" />
+                <LogRequestViewer :raw="getClientRequestRaw(detailData)" :api-type="asApiType(detailData.api_type)" :mode="sectionModes.client_request" />
               </div>
             </CollapsibleContent>
           </Collapsible>
 
           <!-- Router→LLM API 请求 -->
-          <Collapsible v-if="detailData.upstream_request" v-model:open="upstreamRequestOpen" class="border rounded-md">
+          <Collapsible v-if="detailData.upstream_request && !isIntercepted(detailData)" v-model:open="upstreamRequestOpen" class="border rounded-md">
             <CollapsibleTrigger as-child>
               <Button variant="ghost" class="w-full px-4 py-3 text-left text-sm font-medium text-foreground bg-muted/50 hover:bg-muted rounded-none rounded-t-md flex items-center gap-2">
                 <span class="text-xs transition-transform" :class="upstreamRequestOpen ? 'rotate-0' : '-rotate-90'">&#9660;</span>
@@ -182,8 +190,8 @@
             </CollapsibleContent>
           </Collapsible>
 
-          <!-- LLM API 返回的原始响应 -->
-          <Collapsible v-model:open="responseOpen" class="border rounded-md">
+          <!-- LLM API 返回的原始响应（拦截请求无上游调用，隐藏此栏） -->
+          <Collapsible v-if="!isIntercepted(detailData)" v-model:open="responseOpen" class="border rounded-md">
             <CollapsibleTrigger as-child>
               <Button variant="ghost" class="w-full px-4 py-3 text-left text-sm font-medium text-foreground bg-muted/50 hover:bg-muted rounded-none rounded-t-md flex items-center gap-2">
                 <span class="text-xs transition-transform" :class="responseOpen ? 'rotate-0' : '-rotate-90'">&#9660;</span>
@@ -207,7 +215,7 @@
           </Collapsible>
 
           <!-- Router→客户端响应 -->
-          <Collapsible v-if="detailData.client_response" v-model:open="clientResponseOpen" class="border rounded-md">
+          <Collapsible v-if="getClientResponseRaw(detailData)" v-model:open="clientResponseOpen" class="border rounded-md">
             <CollapsibleTrigger as-child>
               <Button variant="ghost" class="w-full px-4 py-3 text-left text-sm font-medium text-foreground bg-muted/50 hover:bg-muted rounded-none rounded-t-md flex items-center gap-2">
                 <span class="text-xs transition-transform" :class="clientResponseOpen ? 'rotate-0' : '-rotate-90'">&#9660;</span>
@@ -225,7 +233,7 @@
                 </Button>
               </div>
               <div class="p-4">
-                <LogResponseViewer :raw="detailData.client_response" :api-type="asApiType(detailData.api_type)" :is-stream="!!detailData.is_stream" :mode="sectionModes.client_response" />
+                <LogResponseViewer :raw="getClientResponseRaw(detailData)" :api-type="asApiType(detailData.api_type)" :is-stream="!!detailData.is_stream" :mode="sectionModes.client_response" />
               </div>
             </CollapsibleContent>
           </Collapsible>
@@ -271,7 +279,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
-import { Dialog, DialogContent, DialogScrollContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogScrollContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Skeleton } from '@/components/ui/skeleton'
 import LogRequestViewer from '@/components/log-viewer/LogRequestViewer.vue'
@@ -295,6 +303,7 @@ interface LogEntry {
   client_response: string | null
   is_retry: number
   original_request_id: string | null
+  original_model: string | null
   backend_model: string | null
   provider_name: string | null
 }
@@ -330,10 +339,10 @@ const { copy: clipboardCopy } = useClipboard()
 function getSectionRaw(key: SectionKey): string {
   if (!detailData.value) return '{}'
   const map: Record<SectionKey, string> = {
-    client_request: detailData.value.client_request || detailData.value.request_body || '{}',
+    client_request: getClientRequestRaw(detailData.value),
     upstream_request: detailData.value.upstream_request || '{}',
     upstream_response: detailData.value.upstream_response || detailData.value.response_body || '{}',
-    client_response: detailData.value.client_response || '{}',
+    client_response: getClientResponseRaw(detailData.value),
   }
   return map[key]
 }
@@ -350,6 +359,44 @@ async function copySection(key: SectionKey) {
 
 function asApiType(t: string): 'openai' | 'anthropic' {
   return t === 'openai' ? 'openai' : 'anthropic'
+}
+
+function enhancementLabel(raw: string | null): string {
+  if (!raw) return '未知'
+  try {
+    const meta = JSON.parse(raw)
+    if (meta.action) {
+      return meta.detail ? `${meta.action}: ${meta.detail}` : meta.action
+    }
+  } catch { /* ignore */ }
+  return '未知'
+}
+
+function isIntercepted(log: LogEntry): boolean {
+  return log.provider_id === 'router'
+}
+
+/** 组装客户端请求数据：当 client_request 缺少 body 时从 request_body 补充 */
+function getClientRequestRaw(detail: LogEntry): string {
+  if (!detail.client_request) return detail.request_body || '{}'
+  try {
+    const cr = JSON.parse(detail.client_request)
+    if (cr.body != null) return detail.client_request
+    if (detail.request_body) {
+      try { cr.body = JSON.parse(detail.request_body) } catch { cr.body = detail.request_body }
+      return JSON.stringify(cr)
+    }
+  } catch { /* 解析失败则原样返回 */ }
+  return detail.client_request
+}
+
+/** 组装客户端响应数据：client_response 为空时从 response_body 构造 */
+function getClientResponseRaw(detail: LogEntry): string {
+  if (detail.client_response) return detail.client_response
+  if (detail.response_body) {
+    return JSON.stringify({ statusCode: detail.status_code, body: detail.response_body })
+  }
+  return ''
 }
 
 async function openDetail(id: string) {

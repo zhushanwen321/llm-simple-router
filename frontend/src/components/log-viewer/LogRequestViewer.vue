@@ -163,6 +163,7 @@ import JsonCopyBlock from './JsonCopyBlock.vue'
 import StatPill from './StatPill.vue'
 import TagPill from './TagPill.vue'
 import { roleClass, tagClass } from './logColors'
+import InfoBanner from './InfoBanner.vue'
 import { extractBlocks } from './requestBlockParser'
 import type { MsgBlock } from './requestBlockParser'
 

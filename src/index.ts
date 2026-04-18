@@ -29,6 +29,7 @@ import { openaiProxy } from "./proxy/openai.js";
 import { anthropicProxy } from "./proxy/anthropic.js";
 import { adminRoutes } from "./admin/routes.js";
 import { RetryRuleMatcher } from "./proxy/retry-rules.js";
+import { modelState } from "./proxy/model-state.js";
 import fastifyStatic from "@fastify/static";
 import Database from "better-sqlite3";
 
@@ -121,6 +122,9 @@ export async function buildApp(
 
   // 首次启动时插入默认重试规则（表为空时）
   seedDefaultRules(db);
+
+  // 注入 DB 到 modelState 单例，启用会话级持久化
+  modelState.init(db);
   const matcher = new RetryRuleMatcher();
   matcher.load(db);
 

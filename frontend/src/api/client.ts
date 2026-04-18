@@ -35,6 +35,8 @@ const API = {
   METRICS_TIMESERIES: '/metrics/timeseries',
   ROUTER_KEYS: '/router-keys',
   MODELS_AVAILABLE: '/models/available',
+  PROXY_ENHANCEMENT: '/proxy-enhancement',
+  SESSION_STATES: '/session-states',
 } as const
 
 // --- Payload types ---
@@ -77,6 +79,25 @@ interface RetryRulePayload {
   status_code: number
   body_pattern: string
   is_active?: number
+}
+
+export interface SessionState {
+  id: string
+  router_key_id: string
+  router_key_name: string
+  session_id: string
+  current_model: string
+  original_model: string | null
+  last_active_at: string
+  created_at: string
+}
+
+export interface SessionHistoryEntry {
+  id: string
+  old_model: string | null
+  new_model: string
+  trigger_type: 'directive' | 'command' | 'manual_clear'
+  created_at: string
 }
 
 // --- Typed request helper ---
@@ -145,4 +166,15 @@ export const api = {
   updateRetryRule: (id: string, data: RetryRulePayload) =>
     client.put(`${API.RETRY_RULES}/${id}`, data),
   deleteRetryRule: (id: string) => client.delete(`${API.RETRY_RULES}/${id}`),
+
+  getProxyEnhancement: () =>
+    request<{ claude_code_enabled: boolean }>('get', API.PROXY_ENHANCEMENT),
+  updateProxyEnhancement: (data: { claude_code_enabled: boolean }) =>
+    request<{ success: boolean }>('put', API.PROXY_ENHANCEMENT, data),
+
+  getSessionStates: () => request<SessionState[]>('get', API.SESSION_STATES),
+  getSessionHistory: (keyId: string, sessionId: string) =>
+    request<SessionHistoryEntry[]>('get', `${API.SESSION_STATES}/${keyId}/${encodeURIComponent(sessionId)}/history`),
+  deleteSessionState: (keyId: string, sessionId: string) =>
+    request<{ success: boolean }>('delete', `${API.SESSION_STATES}/${keyId}/${encodeURIComponent(sessionId)}`),
 }

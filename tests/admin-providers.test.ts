@@ -130,7 +130,7 @@ describe("Provider CRUD", () => {
       url: "/admin/api/providers",
       headers: { cookie, "content-type": "application/json" },
       payload: {
-        name: "Test OpenAI",
+        name: "Test-OpenAI",
         api_type: "openai",
         base_url: "https://api.openai.com",
         api_key: "sk-test-abc123xyz",
@@ -140,13 +140,13 @@ describe("Provider CRUD", () => {
     expect(res.json().id).toBeDefined();
   });
 
-  it("GET returns services with api_key_preview instead of raw api_key", async () => {
+  it("GET returns services with decrypted api_key", async () => {
     await app.inject({
       method: "POST",
       url: "/admin/api/providers",
       headers: { cookie, "content-type": "application/json" },
       payload: {
-        name: "Test OpenAI",
+        name: "Test-OpenAI",
         api_type: "openai",
         base_url: "https://api.openai.com",
         api_key: "sk-test-abc123xyz",
@@ -161,8 +161,8 @@ describe("Provider CRUD", () => {
     expect(res.statusCode).toBe(200);
     const services = res.json();
     expect(services.length).toBe(1);
-    expect(services[0].api_key_preview).toBe("sk-t...3xyz");
-    expect(services[0].api_key).toBeUndefined();
+    expect(services[0].api_key).toBe("sk-test-abc123xyz");
+    expect(services[0].api_key_preview).toBeUndefined();
   });
 
   it("PUT updates service", async () => {
@@ -171,7 +171,7 @@ describe("Provider CRUD", () => {
       url: "/admin/api/providers",
       headers: { cookie, "content-type": "application/json" },
       payload: {
-        name: "Test OpenAI",
+        name: "Test-OpenAI",
         api_type: "openai",
         base_url: "https://api.openai.com",
         api_key: "sk-test-key123",
@@ -183,7 +183,7 @@ describe("Provider CRUD", () => {
       method: "PUT",
       url: `/admin/api/providers/${id}`,
       headers: { cookie, "content-type": "application/json" },
-      payload: { name: "Updated Name" },
+      payload: { name: "Updated-Name" },
     });
     expect(updateRes.statusCode).toBe(200);
 
@@ -192,7 +192,7 @@ describe("Provider CRUD", () => {
       url: "/admin/api/providers",
       headers: { cookie },
     });
-    expect(getRes.json()[0].name).toBe("Updated Name");
+    expect(getRes.json()[0].name).toBe("Updated-Name");
   });
 
   it("DELETE removes service", async () => {
@@ -201,7 +201,7 @@ describe("Provider CRUD", () => {
       url: "/admin/api/providers",
       headers: { cookie, "content-type": "application/json" },
       payload: {
-        name: "Test OpenAI",
+        name: "Test-OpenAI",
         api_type: "openai",
         base_url: "https://api.openai.com",
         api_key: "sk-test-key456",
@@ -232,5 +232,21 @@ describe("Provider CRUD", () => {
       payload: { name: "NoKey" },
     });
     expect(res.statusCode).toBe(400);
+  });
+
+  it("POST rejects provider name with spaces", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/api/providers",
+      headers: { cookie, "content-type": "application/json" },
+      payload: {
+        name: "Invalid Name",
+        api_type: "openai",
+        base_url: "https://api.openai.com",
+        api_key: "sk-test",
+      },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error.message).toContain("英文大小写字母");
   });
 });

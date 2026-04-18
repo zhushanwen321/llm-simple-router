@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { initDatabase } from "../src/db/index.js";
+import { initDatabase, getSessionStates, getSessionHistory, upsertSessionState, insertSessionHistory, deleteSessionState } from "../src/db/index.js";
 import Database from "better-sqlite3";
 
 describe("initDatabase", () => {
@@ -39,7 +39,7 @@ describe("initDatabase", () => {
       .prepare("SELECT name FROM migrations")
       .all() as { name: string }[];
 
-    expect(rows.length).toBe(14);
+    expect(rows.length).toBe(16);
     expect(rows[0].name).toBe("001_init.sql");
     expect(rows[1].name).toBe("002_add_request_response_body.sql");
     expect(rows[2].name).toBe("003_add_full_request_chain_log.sql");
@@ -136,5 +136,95 @@ describe("initDatabase", () => {
          VALUES (?, ?, ?, ?, ?, ?)`
       ).run("map-2", "gpt-4", "gpt-4o", "svc-1", 1, now)
     ).toThrow();
+  });
+});
+
+describe("session states", () => {
+  let db: Database.Database;
+
+  afterEach(() => {
+    if (db) db.close();
+  });
+
+  function setupDb(): Database.Database {
+    db = initDatabase(":memory:");
+    const now = new Date().toISOString();
+    db.prepare(
+      `INSERT INTO providers (id, name, api_type, base_url, api_key, is_active, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run("prov-1", "Test", "openai", "https://api.openai.com", "key", 1, now, now);
+    db.prepare(
+      `INSERT INTO router_keys (id, name, key_hash, key_prefix, key_encrypted, is_active, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run("rk-1", "Test Key", "hash1", "sk-", "enc", 1, now, now);
+    return db;
+  }
+
+  it("should create session state and query it back", () => {
+    const database = setupDb();
+    upsertSessionState(database, {
+      router_key_id: "rk-1",
+      session_id: "sess-001",
+      current_model: "claude-sonnet-4-20250514",
+      original_model: "claude-sonnet-4-20250514",
+    });
+
+    const states = getSessionStates(database);
+    expect(states).toHaveLength(1);
+    expect(states[0].session_id).toBe("sess-001");
+    expect(states[0].current_model).toBe("claude-sonnet-4-20250514");
+    expect(states[0].router_key_name).toBe("Test Key");
+  });
+
+  it("should upsert update existing state", () => {
+    const database = setupDb();
+    upsertSessionState(database, {
+      router_key_id: "rk-1",
+      session_id: "sess-001",
+      current_model: "claude-sonnet-4-20250514",
+      original_model: "claude-sonnet-4-20250514",
+    });
+
+    upsertSessionState(database, {
+      router_key_id: "rk-1",
+      session_id: "sess-001",
+      current_model: "claude-opus-4-20250514",
+      original_model: "claude-sonnet-4-20250514",
+    });
+
+    const states = getSessionStates(database);
+    expect(states).toHaveLength(1);
+    expect(states[0].current_model).toBe("claude-opus-4-20250514");
+  });
+
+  it("should insert and query history", () => {
+    const database = setupDb();
+    insertSessionHistory(database, {
+      router_key_id: "rk-1",
+      session_id: "sess-001",
+      old_model: "claude-sonnet-4-20250514",
+      new_model: "claude-opus-4-20250514",
+      trigger_type: "directive",
+    });
+
+    const history = getSessionHistory(database, "rk-1", "sess-001");
+    expect(history).toHaveLength(1);
+    expect(history[0].old_model).toBe("claude-sonnet-4-20250514");
+    expect(history[0].new_model).toBe("claude-opus-4-20250514");
+    expect(history[0].trigger_type).toBe("directive");
+  });
+
+  it("should delete session state", () => {
+    const database = setupDb();
+    upsertSessionState(database, {
+      router_key_id: "rk-1",
+      session_id: "sess-001",
+      current_model: "claude-sonnet-4-20250514",
+      original_model: "claude-sonnet-4-20250514",
+    });
+
+    deleteSessionState(database, "rk-1", "sess-001");
+    const states = getSessionStates(database);
+    expect(states).toHaveLength(0);
   });
 });

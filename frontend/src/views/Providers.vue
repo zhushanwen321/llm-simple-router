@@ -102,8 +102,8 @@
             <Input v-model="form.base_url" type="url" required />
           </div>
           <div>
-            <Label class="block text-sm font-medium text-foreground mb-1">API Key {{ editingId ? '(留空不修改)' : '' }}</Label>
-            <Input v-model="form.api_key" :type="editingId ? 'password' : 'text'" :required="!editingId" />
+            <Label class="block text-sm font-medium text-foreground mb-1">API Key</Label>
+            <Input v-model="form.api_key" type="text" required />
           </div>
           <div>
             <Label class="block text-sm font-medium text-foreground mb-1">可用模型</Label>
@@ -239,7 +239,7 @@ function openCreate() {
 
 function openEdit(p: Provider) {
   editingId.value = p.id
-  form.value = { name: p.name, api_type: p.api_type, base_url: p.base_url, api_key: '', models: [...(p.models || [])], is_active: !!p.is_active }
+  form.value = { name: p.name, api_type: p.api_type, base_url: p.base_url, api_key: p.api_key, models: [...(p.models || [])], is_active: !!p.is_active }
   modelInput.value = ''
   presetGroup.value = ''
   presetPlan.value = ''
@@ -259,8 +259,14 @@ function buildPayload(): { name: string; api_type: string; base_url: string; api
 }
 
 async function handleSave() {
+  const name = form.value.name.trim()
+  if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
+    toast.error('名称仅允许英文大小写字母、数字、横线和下划线')
+    return
+  }
   try {
     const payload = buildPayload()
+    payload.name = name
     if (editingId.value) {
       await api.updateProvider(editingId.value, payload)
     } else {

@@ -44,6 +44,12 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: '/proxy-enhancement',
+      name: 'proxy-enhancement',
+      component: () => import('@/views/ProxyEnhancement.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
       path: '/logs',
       name: 'logs',
       component: () => import('@/views/Logs.vue'),
