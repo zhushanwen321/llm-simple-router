@@ -90,7 +90,10 @@
                 <Button type="button" variant="ghost" size="icon" class="h-4 w-4 rounded-full hover:bg-muted p-0 text-xs leading-none" @click="removeModel(i)">&times;</Button>
               </Badge>
             </div>
-            <Input v-model="modelInput" placeholder="输入模型名称，按 Enter 添加" @keydown.enter.prevent="addModel" />
+            <div class="flex gap-2">
+              <Input v-model="modelInput" placeholder="输入模型名称，多个用逗号分隔" @keydown.enter.prevent="addModel" class="flex-1" />
+              <Button type="button" variant="outline" size="sm" @click="addModel" :disabled="!modelInput.trim()">添加</Button>
+            </div>
           </div>
           <div class="flex items-center gap-2">
             <Checkbox v-model="form.is_active" id="svc-active" />
@@ -164,9 +167,13 @@ async function loadProviders() {
 }
 
 function addModel() {
-  const name = modelInput.value.trim()
-  if (name && !form.value.models.includes(name)) {
-    form.value.models.push(name)
+  const input = modelInput.value.trim()
+  if (!input) return
+  const names = input.split(/[,，]/).map(s => s.trim()).filter(Boolean)
+  for (const name of names) {
+    if (!form.value.models.includes(name)) {
+      form.value.models.push(name)
+    }
   }
   modelInput.value = ''
 }

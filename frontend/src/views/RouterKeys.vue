@@ -1,3 +1,4 @@
+<!-- eslint-disable vue/multi-word-component-names -->
 <template>
   <div class="p-6">
     <div class="flex items-center justify-between mb-4">
@@ -26,8 +27,8 @@
             <TableCell>
               <div class="flex items-center gap-1">
                 <span class="font-mono text-xs text-muted-foreground">{{ k.key }}</span>
-                <Button variant="ghost" size="sm" class="h-6 w-6 p-0" @click="copyKeyOf(k.id, k.key)">
-                  <svg v-if="copiedId !== k.id" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <Button variant="ghost" size="sm" class="h-6 w-6 p-0" @click="tableCopy(k.key)">
+                  <svg v-if="!tableCopied" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
                   </svg>
                   <svg v-else class="w-3.5 h-3.5 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -118,7 +119,7 @@
         <div class="space-y-3">
           <p class="text-sm text-muted-foreground">请立即保存此密钥，关闭后将无法再次查看完整密钥。</p>
           <div class="bg-muted rounded-md p-3 font-mono text-sm break-all select-all">{{ createdKey }}</div>
-          <Button variant="outline" size="sm" @click="copyKey">{{ copied ? '已复制' : '复制密钥' }}</Button>
+          <Button variant="outline" size="sm" @click="dialogCopy(createdKey)">{{ dialogCopied ? '已复制' : '复制密钥' }}</Button>
         </div>
         <DialogFooter>
           <Button @click="showKeyDialog = false">我已保存密钥</Button>
@@ -146,6 +147,7 @@
 import { ref, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
 import { api } from '@/api/client'
+import { useClipboard } from '@/composables/useClipboard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -166,7 +168,6 @@ interface RouterKey {
 }
 
 const DEFAULT_FORM = { name: '', allowed_models: [] as string[], is_active: true }
-const COPY_FEEDBACK_MS = 2000
 
 const keys = ref<RouterKey[]>([])
 const availableModels = ref<string[]>([])
@@ -177,8 +178,8 @@ const form = ref({ ...DEFAULT_FORM, allowed_models: [] as string[] })
 
 const showKeyDialog = ref(false)
 const createdKey = ref('')
-const copied = ref(false)
-const copiedId = ref('')
+const { copied: dialogCopied, copy: dialogCopy } = useClipboard()
+const { copied: tableCopied, copy: tableCopy } = useClipboard()
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleString('zh-CN')
@@ -267,28 +268,6 @@ async function handleDelete() {
   } catch (e) {
     console.error('Failed to delete router key:', e)
     toast.error('删除密钥失败')
-  }
-}
-
-async function copyKey() {
-  try {
-    await navigator.clipboard.writeText(createdKey.value)
-    copied.value = true
-    setTimeout(() => { copied.value = false }, COPY_FEEDBACK_MS)
-  } catch (e) {
-    console.error('Failed to copy key:', e)
-    toast.error('复制失败')
-  }
-}
-
-async function copyKeyOf(id: string, key: string) {
-  try {
-    await navigator.clipboard.writeText(key)
-    copiedId.value = id
-    setTimeout(() => { copiedId.value = '' }, COPY_FEEDBACK_MS)
-  } catch (e) {
-    console.error('Failed to copy key:', e)
-    toast.error('复制失败')
   }
 }
 
