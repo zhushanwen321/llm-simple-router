@@ -1,4 +1,7 @@
-const TTL_MS = 24 * 60 * 60 * 1000;
+const HOUR_MS = 3600_000;
+// 会话记忆在 24 小时后过期（滑动窗口）
+const TTL_HOURS = 24;
+const TTL_MS = TTL_HOURS * HOUR_MS;
 
 interface StateEntry {
   model: string;

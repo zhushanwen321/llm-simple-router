@@ -1,413 +1,31 @@
 import { randomUUID } from "crypto";
-import { request as httpRequestFn, IncomingMessage } from "http";
-import { request as httpsRequestFn } from "https";
-import { PassThrough } from "stream";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import Database from "better-sqlite3";
 import type { Provider } from "../db/index.js";
 import { getProviderById, insertRequestLog, insertMetrics } from "../db/index.js";
 import { decrypt } from "../utils/crypto.js";
 import { getSetting } from "../db/settings.js";
-import { SSEMetricsTransform } from "../metrics/sse-metrics-transform.js";
 import { MetricsExtractor } from "../metrics/metrics-extractor.js";
-import type { MetricsResult } from "../metrics/metrics-extractor.js";
 import { getMappingGroup } from "../db/index.js";
 import { resolveMapping } from "./mapping-resolver.js";
 import { retryableCall, buildRetryConfig } from "./retry.js";
 import type { RetryRuleMatcher } from "./retry-rules.js";
 import type { Target } from "./strategy/types.js";
-import { parseDirective } from "./directive-parser.js";
-import { modelState } from "./model-state.js";
-import { cleanRouterResponses } from "./response-cleaner.js";
+import { SSEMetricsTransform } from "../metrics/sse-metrics-transform.js";
+import {
+  proxyNonStream as upstreamNonStream,
+  proxyStream as upstreamStream,
+  proxyGetRequest as upstreamGet,
+  type ProxyResult,
+  type StreamProxyResult,
+  type GetProxyResult,
+} from "./upstream-call.js";
+import { insertSuccessLog, insertRejectedLog } from "./log-helpers.js";
+import { applyEnhancement, buildModelInfoTag } from "./enhancement-handler.js";
 
 // ---------- Types ----------
 
 export type RawHeaders = Record<string, string | string[] | undefined>;
-
-export interface UpstreamRequestOptions {
-  hostname: string;
-  port: number;
-  path: string;
-  method: string;
-  headers: Record<string, string>;
-}
-
-export interface ProxyResult {
-  statusCode: number;
-  body: string;
-  headers: Record<string, string>;
-  sentHeaders: Record<string, string>;
-  sentBody: string;
-}
-
-export interface StreamProxyResult {
-  statusCode: number;
-  responseBody?: string;
-  upstreamResponseHeaders?: Record<string, string>;
-  sentHeaders?: Record<string, string>;
-  /** 流结束时从 SSEMetricsTransform 采集的指标，仅当传入了 metricsTransform 时存在 */
-  metricsResult?: MetricsResult;
-}
-
-export interface GetProxyResult {
-  statusCode: number;
-  body: string;
-  headers: Record<string, string>;
-}
-
-// ---------- Constants ----------
-
-export const UPSTREAM_SUCCESS = 200;
-// failover 判断上游请求失败的 HTTP 状态码阈值
-const FAILOVER_FAIL_THRESHOLD = 400;
-const HTTPS_DEFAULT_PORT = 443;
-const HTTP_DEFAULT_PORT = 80;
-const UPSTREAM_BAD_GATEWAY = 502;
-
-// ---------- Header utilities ----------
-
-export const SKIP_UPSTREAM = new Set([
-  "host",
-  "content-length",
-  "accept-encoding",
-  "authorization",
-  "connection",
-  "keep-alive",
-  "transfer-encoding",
-  "upgrade",
-]);
-
-export const SKIP_DOWNSTREAM = new Set([
-  "content-length",
-  "transfer-encoding",
-  "connection",
-  "keep-alive",
-]);
-
-export function selectHeaders(
-  raw: RawHeaders,
-  skip: Set<string>
-): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const [key, value] of Object.entries(raw)) {
-    if (value == null || skip.has(key.toLowerCase())) continue;
-    out[key] = Array.isArray(value) ? value.join(", ") : value;
-  }
-  return out;
-}
-
-// 当前两个 provider 都使用 Bearer token（commit eaa4f7d 将 Anthropic 从 x-api-key 改为 Bearer）
-// 如果未来需要支持其他鉴权方式，需要参数化 header 构造
-/** 构建发往上游的请求 headers：过滤客户端 headers + 注入后端 API key */
-export function buildUpstreamHeaders(
-  clientHeaders: RawHeaders,
-  apiKey: string,
-  payloadBytes?: number
-): Record<string, string> {
-  const headers = selectHeaders(clientHeaders, SKIP_UPSTREAM);
-  headers["Authorization"] = `Bearer ${apiKey}`;
-  if (payloadBytes !== undefined) {
-    headers["Content-Type"] = "application/json";
-    headers["Content-Length"] = String(payloadBytes);
-  }
-  return headers;
-}
-
-// ---------- Request utilities ----------
-
-/** 根据 URL scheme 选择 http 或 https 模块 */
-export function createUpstreamRequest(url: URL, options: UpstreamRequestOptions) {
-  return url.protocol === "https:" ? httpsRequestFn(options) : httpRequestFn(options);
-}
-
-/** 从 URL + headers 构造 Node.js http.request 所需的 options */
-export function buildRequestOptions(
-  url: URL,
-  headers: Record<string, string>,
-  method = "POST"
-): UpstreamRequestOptions {
-  return {
-    hostname: url.hostname,
-    port: Number(url.port) || (url.protocol === "https:" ? HTTPS_DEFAULT_PORT : HTTP_DEFAULT_PORT),
-    path: url.pathname,
-    method,
-    headers,
-  };
-}
-
-// ---------- Logging ----------
-
-/** 插入成功请求日志，供 openai/anthropic 插件共享 */
-export function insertSuccessLog(
-  db: Database.Database,
-  apiType: string,
-  logId: string,
-  model: string,
-  provider: Provider,
-  isStream: boolean,
-  startTime: number,
-  reqBody: string,
-  clientReq: string,
-  upstreamReq: string,
-  status: number,
-  respBody: string | null,
-  upHdrs: Record<string, string>,
-  cliHdrs: Record<string, string>,
-  isRetry: boolean = false, originalRequestId: string | null = null,
-  routerKeyId: string | null = null,
-  originalModel: string | null = null,
-) {
-  insertRequestLog(db, {
-    id: logId, api_type: apiType, model, provider_id: provider.id,
-    status_code: status, latency_ms: Date.now() - startTime,
-    is_stream: isStream ? 1 : 0, error_message: null,
-    created_at: new Date().toISOString(), request_body: reqBody,
-    response_body: respBody, client_request: clientReq, upstream_request: upstreamReq,
-    upstream_response: JSON.stringify({ statusCode: status, headers: upHdrs, body: respBody }),
-    client_response: JSON.stringify({ statusCode: status, headers: cliHdrs, body: respBody }),
-    is_retry: isRetry ? 1 : 0, original_request_id: originalRequestId,
-    router_key_id: routerKeyId, original_model: originalModel,
-  });
-}
-
-/** Log a request rejected before reaching upstream */
-function insertRejectedLog(
-  db: Database.Database,
-  logId: string,
-  apiType: string,
-  model: string,
-  statusCode: number,
-  errorMessage: string,
-  startTime: number,
-  isStream: boolean,
-  routerKeyId: string | null,
-  originalBody: Record<string, unknown>,
-  clientHeaders: RawHeaders,
-  providerId?: string | null,
-  originalModel: string | null = null,
-): void {
-  insertRequestLog(db, {
-    id: logId,
-    api_type: apiType,
-    model,
-    provider_id: providerId ?? null,
-    status_code: statusCode,
-    latency_ms: Date.now() - startTime,
-    is_stream: isStream ? 1 : 0,
-    error_message: errorMessage,
-    created_at: new Date().toISOString(),
-    request_body: JSON.stringify(originalBody),
-    client_request: JSON.stringify({ headers: clientHeaders, body: originalBody }),
-    router_key_id: routerKeyId,
-    original_model: originalModel,
-  });
-}
-
-export function proxyNonStream(
-  backend: Provider,
-  apiKey: string,
-  body: Record<string, unknown>,
-  clientHeaders: RawHeaders,
-  upstreamPath: string
-): Promise<ProxyResult> {
-  return new Promise((resolve, reject) => {
-    const url = new URL(`${backend.base_url}${upstreamPath}`);
-    const payload = JSON.stringify(body);
-    const upstreamHeaders = buildUpstreamHeaders(clientHeaders, apiKey, Buffer.byteLength(payload));
-    const options = buildRequestOptions(url, upstreamHeaders);
-
-    const req = createUpstreamRequest(url, options);
-    req.on("response", (res: IncomingMessage) => {
-      const chunks: Buffer[] = [];
-      res.on("data", (chunk: Buffer) => chunks.push(chunk));
-      res.on("end", () => {
-        resolve({
-          statusCode: res.statusCode || UPSTREAM_BAD_GATEWAY,
-          body: Buffer.concat(chunks).toString("utf-8"),
-          headers: selectHeaders(res.headers as RawHeaders, SKIP_DOWNSTREAM),
-          sentHeaders: { ...upstreamHeaders },
-          sentBody: payload,
-        });
-      });
-    });
-    req.on("error", (err) => reject(err));
-    req.write(payload);
-    req.end();
-  });
-}
-
-// ---------- Stream proxy (SSE) ----------
-
-export function proxyStream(
-  backend: Provider,
-  apiKey: string,
-  body: Record<string, unknown>,
-  clientHeaders: RawHeaders,
-  reply: FastifyReply,
-  timeoutMs: number,
-  upstreamPath: string,
-  metricsTransform?: SSEMetricsTransform
-): Promise<StreamProxyResult> {
-  return new Promise((resolve, reject) => {
-    const url = new URL(`${backend.base_url}${upstreamPath}`);
-    const payload = JSON.stringify(body);
-    const upstreamHeaders = buildUpstreamHeaders(clientHeaders, apiKey, Buffer.byteLength(payload));
-    const options = buildRequestOptions(url, upstreamHeaders);
-
-    const upstreamReq = createUpstreamRequest(url, options);
-    upstreamReq.on("response", (upstreamRes: IncomingMessage) => {
-      const statusCode = upstreamRes.statusCode || UPSTREAM_BAD_GATEWAY;
-
-      if (statusCode !== UPSTREAM_SUCCESS) {
-        // 非200路径：仅返回错误信息，不操作 reply
-        const chunks: Buffer[] = [];
-        upstreamRes.on("data", (chunk: Buffer) => chunks.push(chunk));
-        upstreamRes.on("end", () => {
-          const errorBody = Buffer.concat(chunks).toString("utf-8");
-          resolve({
-            statusCode,
-            responseBody: errorBody,
-            upstreamResponseHeaders: selectHeaders(upstreamRes.headers as RawHeaders, SKIP_DOWNSTREAM),
-            sentHeaders: upstreamHeaders,
-          });
-        });
-        return;
-      }
-
-      const sseHeaders = selectHeaders(upstreamRes.headers as RawHeaders, SKIP_DOWNSTREAM);
-      sseHeaders["Content-Type"] = "text/event-stream";
-      sseHeaders["Cache-Control"] = "no-cache";
-      sseHeaders["Connection"] = "keep-alive";
-      reply.raw.writeHead(statusCode, sseHeaders);
-
-      const passThrough = new PassThrough();
-      if (metricsTransform) {
-        // 管道: upstreamRes → metricsTransform → passThrough → reply.raw
-        metricsTransform.pipe(passThrough).pipe(reply.raw);
-      } else {
-        passThrough.pipe(reply.raw);
-      }
-
-      // 管道入口：有 metricsTransform 时写入它，否则直接写 passThrough
-      const pipeEntry = metricsTransform ?? passThrough;
-
-      const captureChunks: Buffer[] = [];
-      let idleTimer: NodeJS.Timeout | null = null;
-      let resolved = false;
-
-      function cleanup() {
-        if (idleTimer) clearTimeout(idleTimer);
-        idleTimer = null;
-        if (!passThrough.destroyed) passThrough.destroy();
-        if (metricsTransform && !metricsTransform.destroyed) metricsTransform.destroy();
-        if (!upstreamRes.destroyed) upstreamRes.destroy();
-      }
-
-      /** 从 metricsTransform 中提取指标，供 resolve 时附带 */
-      function collectMetrics(isComplete: boolean): MetricsResult | undefined {
-        if (!metricsTransform) return undefined;
-        const result = metricsTransform.getExtractor().getMetrics();
-        if (!isComplete) {
-          return { ...result, is_complete: 0 };
-        }
-        return result;
-      }
-
-      reply.raw.on("close", () => {
-        if (!resolved) {
-          cleanup();
-          resolve({ statusCode, responseBody: undefined, upstreamResponseHeaders: sseHeaders, sentHeaders: upstreamHeaders, metricsResult: collectMetrics(false) });
-        }
-      });
-
-      passThrough.on("error", () => {
-        cleanup();
-        if (!resolved) {
-          resolved = true;
-          resolve({ statusCode, responseBody: undefined, upstreamResponseHeaders: sseHeaders, sentHeaders: upstreamHeaders, metricsResult: collectMetrics(false) });
-        }
-      });
-
-      function resetIdleTimer() {
-        if (idleTimer) clearTimeout(idleTimer);
-        idleTimer = setTimeout(() => {
-          cleanup();
-          if (!resolved) {
-            resolved = true;
-            resolve({ statusCode, responseBody: undefined, upstreamResponseHeaders: sseHeaders, sentHeaders: upstreamHeaders, metricsResult: collectMetrics(false) });
-          }
-        }, timeoutMs);
-      }
-
-      resetIdleTimer();
-
-      upstreamRes.on("data", (chunk: Buffer) => {
-        if (resolved) return;
-        resetIdleTimer();
-        pipeEntry.write(chunk);
-        captureChunks.push(chunk);
-      });
-
-      upstreamRes.on("end", () => {
-        if (resolved) return;
-        resolved = true;
-        if (idleTimer) clearTimeout(idleTimer);
-        pipeEntry.end();
-        reply.raw.end();
-        resolve({
-          statusCode,
-          responseBody: Buffer.concat(captureChunks).toString("utf-8"),
-          upstreamResponseHeaders: sseHeaders,
-          sentHeaders: upstreamHeaders,
-          metricsResult: collectMetrics(true),
-        });
-      });
-
-      upstreamRes.on("error", (err) => {
-        if (resolved) return;
-        resolved = true;
-        cleanup();
-        reject(err);
-      });
-    });
-
-    upstreamReq.on("error", (err) => reject(err));
-    upstreamReq.write(payload);
-    upstreamReq.end();
-  });
-}
-
-// ---------- GET proxy ----------
-
-export function proxyGetRequest(
-  backend: Provider,
-  apiKey: string,
-  clientHeaders: RawHeaders,
-  upstreamPath: string
-): Promise<GetProxyResult> {
-  return new Promise((resolve, reject) => {
-    const url = new URL(`${backend.base_url}${upstreamPath}`);
-    const headers = buildUpstreamHeaders(clientHeaders, apiKey);
-    const options = buildRequestOptions(url, headers, "GET");
-
-    const req = createUpstreamRequest(url, options);
-    req.on("response", (res: IncomingMessage) => {
-      const chunks: Buffer[] = [];
-      res.on("data", (chunk: Buffer) => chunks.push(chunk));
-      res.on("end", () => {
-        resolve({
-          statusCode: res.statusCode || UPSTREAM_BAD_GATEWAY,
-          body: Buffer.concat(chunks).toString("utf-8"),
-          headers: selectHeaders(res.headers as RawHeaders, SKIP_DOWNSTREAM),
-        });
-      });
-    });
-    req.on("error", (err) => reject(err));
-    req.end();
-  });
-}
-
-// ---------- Shared proxy handler ----------
 
 export interface ProxyErrorResponse {
   statusCode: number;
@@ -430,12 +48,72 @@ export interface ProxyHandlerDeps {
   matcher?: RetryRuleMatcher;
 }
 
+// Re-export upstream types for external consumers
+export type { ProxyResult, StreamProxyResult, GetProxyResult };
+
+// ---------- Constants ----------
+
+const UPSTREAM_SUCCESS = 200;
+const FAILOVER_FAIL_THRESHOLD = 400;
+
+// ---------- Header utilities ----------
+
+export const SKIP_UPSTREAM = new Set([
+  "host",
+  "content-length",
+  "accept-encoding",
+  "authorization",
+  "connection",
+  "keep-alive",
+  "transfer-encoding",
+  "upgrade",
+]);
+
+export function selectHeaders(
+  raw: RawHeaders,
+  skip: Set<string>
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (value == null || skip.has(key.toLowerCase())) continue;
+    out[key] = Array.isArray(value) ? value.join(", ") : value;
+  }
+  return out;
+}
+
+// 当前两个 provider 都使用 Bearer token
+// 如果未来需要支持其他鉴权方式，需要参数化 header 构造
+export function buildUpstreamHeaders(
+  clientHeaders: RawHeaders,
+  apiKey: string,
+  payloadBytes?: number
+): Record<string, string> {
+  const headers = selectHeaders(clientHeaders, SKIP_UPSTREAM);
+  headers["Authorization"] = `Bearer ${apiKey}`;
+  if (payloadBytes !== undefined) {
+    headers["Content-Type"] = "application/json";
+    headers["Content-Length"] = String(payloadBytes);
+  }
+  return headers;
+}
+
+// ---------- GET proxy (thin wrapper) ----------
+
+export function proxyGetRequest(
+  backend: Provider,
+  apiKey: string,
+  clientHeaders: RawHeaders,
+  upstreamPath: string
+): Promise<GetProxyResult> {
+  return upstreamGet(backend, apiKey, clientHeaders, upstreamPath, buildUpstreamHeaders);
+}
+
+// ---------- Shared proxy handler ----------
+
 const HTTP_BAD_GATEWAY = 502;
 
 /**
- * 共享 POST handler，参数化 apiType/errorFormat/upstreamPath 等差异，
- * 消除 openai.ts / anthropic.ts 中约 120 行重复代码。
- *
+ * 共享 POST handler，参数化 apiType/errorFormat/upstreamPath 等差异。
  * 当分组策略为 failover 时，在 while 循环中依次尝试不同 target，
  * 直到成功（或 headers 已发送）才返回。
  */
@@ -455,43 +133,8 @@ export async function handleProxyPost(
   request.raw.socket.on("error", (err) => request.log.debug({ err }, "client socket error"));
   const clientModel = ((request.body as Record<string, unknown>).model as string) || "unknown";
 
-  // --- 代理增强：指令解析 + 模型替换 ---
-  let originalModel: string | null = null;
-  let effectiveModel = clientModel;
-
-  const enhancementRaw = getSetting(db, "proxy_enhancement");
-  let enhancement: { claude_code_enabled?: boolean } | null = null;
-  try { enhancement = enhancementRaw ? JSON.parse(enhancementRaw) : null; } catch { /* ignore */ }
-  const enhancementEnabled = enhancement?.claude_code_enabled === true;
-
-  if (enhancementEnabled) {
-    // 清理历史消息中的 <router-response> 标签
-    const cleaned = cleanRouterResponses(request.body as Record<string, unknown>);
-    (request.body as Record<string, unknown>).messages = cleaned.messages;
-
-    const directive = parseDirective(request.body as Record<string, unknown>);
-
-    if (directive.modelName) {
-      // 内联模型指令 → resolveMapping 验证
-      const resolvedDirective = resolveMapping(db, directive.modelName, { now: new Date() });
-      if (resolvedDirective) {
-        originalModel = clientModel;
-        effectiveModel = directive.modelName;
-        modelState.set(request.routerKey?.id ?? null, directive.modelName);
-        (request.body as Record<string, unknown>).messages = directive.cleanedBody.messages;
-      }
-    } else {
-      // 无指令 → 查询会话记忆
-      const remembered = modelState.get(request.routerKey?.id ?? null);
-      if (remembered) {
-        const resolvedRemembered = resolveMapping(db, remembered, { now: new Date() });
-        if (resolvedRemembered) {
-          originalModel = clientModel;
-          effectiveModel = remembered;
-        }
-      }
-    }
-  }
+  // 代理增强：指令解析 + 模型替换
+  const { effectiveModel, originalModel } = applyEnhancement(db, request, clientModel);
 
   // 查询分组策略（只查一次）
   const group = getMappingGroup(db, effectiveModel);
@@ -510,16 +153,16 @@ export async function handleProxyPost(
     const resolved = resolveMapping(db, effectiveModel, { now: new Date(), excludeTargets });
     if (!resolved) {
       if (isFailover && excludeTargets.length > 0) {
-        // 所有 failover target 都已尝试，reply 已在上一轮发送
         return reply;
       }
       const e = errors.modelNotFound(effectiveModel);
-      insertRejectedLog(db, logId, apiType, effectiveModel, e.statusCode,
-        `No mapping found for model '${effectiveModel}'`, startTime, isStream, routerKeyId, originalBody, cliHdrs, undefined, originalModel);
+      insertRejectedLog({ db, logId, apiType, model: effectiveModel, statusCode: e.statusCode,
+        errorMessage: `No mapping found for model '${effectiveModel}'`, startTime, isStream,
+        routerKeyId, originalBody, clientHeaders: cliHdrs, originalModel });
       return reply.status(e.statusCode).send(e.body);
     }
 
-    // 白名单校验（只在首次循环检查，allowed_models 基于 clientModel 而非 backend_model）
+    // 白名单校验
     if (excludeTargets.length === 0) {
       const allowedModels = request.routerKey?.allowed_models;
       if (allowedModels) {
@@ -527,35 +170,37 @@ export async function handleProxyPost(
           const models: string[] = JSON.parse(allowedModels).filter((m: string) => m.trim() !== "");
           if (models.length > 0 && !models.includes(resolved.backend_model)) {
             const e = errors.modelNotAllowed(resolved.backend_model);
-            insertRejectedLog(db, logId, apiType, effectiveModel, e.statusCode,
-              `Model '${resolved.backend_model}' not allowed for this API key`,
-              startTime, isStream, routerKeyId, originalBody, cliHdrs, resolved.provider_id, originalModel);
+            insertRejectedLog({ db, logId, apiType, model: effectiveModel, statusCode: e.statusCode,
+              errorMessage: `Model '${resolved.backend_model}' not allowed for this API key`,
+              startTime, isStream, routerKeyId, originalBody, clientHeaders: cliHdrs,
+              providerId: resolved.provider_id, originalModel });
             return reply.status(e.statusCode).send(e.body);
           }
-        } catch { request.log.warn("Invalid allowed_models JSON, allowing all models"); }
+        } catch { request.log.warn({ allowedModels: allowedModels?.slice(0, 80) }, "Invalid allowed_models JSON, allowing all models"); } // eslint-disable-line no-magic-numbers
       }
     }
 
     const provider = getProviderById(db, resolved.provider_id);
     if (!provider || !provider.is_active) {
       const e = errors.providerUnavailable();
-      insertRejectedLog(db, logId, apiType, effectiveModel, e.statusCode,
-        `Provider '${resolved.provider_id}' unavailable or inactive`,
-        startTime, isStream, routerKeyId, originalBody, cliHdrs, resolved.provider_id, originalModel);
+      insertRejectedLog({ db, logId, apiType, model: effectiveModel, statusCode: e.statusCode,
+        errorMessage: `Provider '${resolved.provider_id}' unavailable or inactive`,
+        startTime, isStream, routerKeyId, originalBody, clientHeaders: cliHdrs,
+        providerId: resolved.provider_id, originalModel });
       return reply.status(e.statusCode).send(e.body);
     }
     if (provider.api_type !== apiType) {
       const e = errors.providerTypeMismatch();
-      insertRejectedLog(db, logId, apiType, effectiveModel, e.statusCode,
-        `Provider API type mismatch: expected '${apiType}', got '${provider.api_type}'`,
-        startTime, isStream, routerKeyId, originalBody, cliHdrs, resolved.provider_id, originalModel);
+      insertRejectedLog({ db, logId, apiType, model: effectiveModel, statusCode: e.statusCode,
+        errorMessage: `Provider API type mismatch: expected '${apiType}', got '${provider.api_type}'`,
+        startTime, isStream, routerKeyId, originalBody, clientHeaders: cliHdrs,
+        providerId: resolved.provider_id, originalModel });
       return reply.status(e.statusCode).send(e.body);
     }
 
     body.model = resolved.backend_model;
     const apiKey = decrypt(provider.api_key, getSetting(db, "encryption_key")!);
 
-    // 允许调用方在发送代理请求前修改 body（如 openai 的 stream_options 注入）
     options?.beforeSendProxy?.(body, isStream);
 
     const reqBodyStr = JSON.stringify(body);
@@ -568,13 +213,13 @@ export async function handleProxyPost(
         ? await retryableCall(
             () => {
               const metricsTransform = new SSEMetricsTransform(apiType, startTime);
-              return proxyStream(provider, apiKey, body, cliHdrs, reply, streamTimeoutMs, upstreamPath, metricsTransform);
+              return upstreamStream(provider, apiKey, body, cliHdrs, reply, streamTimeoutMs, upstreamPath, buildUpstreamHeaders, metricsTransform);
             },
             retryConfig,
             reply,
           )
         : await retryableCall(
-            () => proxyNonStream(provider, apiKey, body, cliHdrs, upstreamPath),
+            () => upstreamNonStream(provider, apiKey, body, cliHdrs, upstreamPath, buildUpstreamHeaders),
             retryConfig,
             reply,
           );
@@ -611,9 +256,11 @@ export async function handleProxyPost(
           const h = isStream
             ? ((r as StreamProxyResult).upstreamResponseHeaders ?? {})
             : ((r as ProxyResult).headers);
-          insertSuccessLog(db, apiType, attemptLogId, effectiveModel, provider, isStream, startTime,
-            reqBodyStr, clientReq, upstreamReqBase, r.statusCode, attempt.responseBody, h, h,
-            !isOriginal, isOriginal ? null : logId, routerKeyId, originalModel);
+          insertSuccessLog(db, { apiType, model: effectiveModel, provider, isStream, startTime,
+            reqBody: reqBodyStr, clientReq, upstreamReq: upstreamReqBase, id: attemptLogId,
+            status: r.statusCode, respBody: attempt.responseBody, upHdrs: h, cliHdrs: h,
+            isRetry: !isOriginal, originalRequestId: isOriginal ? null : logId,
+            routerKeyId, originalModel });
           lastSuccessLogId = attemptLogId;
         }
       }
@@ -637,10 +284,10 @@ export async function handleProxyPost(
           try {
             const bodyObj = JSON.parse(pr.body as string);
             if (bodyObj.content?.[0]?.text) {
-              bodyObj.content[0].text += `\n\n<router-response type="model-info">当前模型: ${effectiveModel}</router-response>`;
+              bodyObj.content[0].text += `\n\n${buildModelInfoTag(effectiveModel)}`;
               pr.body = JSON.stringify(bodyObj);
             }
-          } catch { /* non-JSON response, skip */ }
+          } catch { request.log.debug("Failed to inject model-info tag into non-JSON response"); }
         }
         for (const [k, v] of Object.entries(pr.headers)) reply.header(k, v);
         return reply.status(pr.statusCode).send(pr.body);

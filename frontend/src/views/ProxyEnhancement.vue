@@ -22,14 +22,10 @@
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div class="flex items-center gap-3">
-          <Switch
-            id="claude-code-toggle"
-            :checked="claudeCodeEnabled"
-            @update:checked="claudeCodeEnabled = $event"
-          />
+        <div class="flex items-center gap-2">
+          <Checkbox v-model="claudeCodeEnabled" id="claude-code-toggle" :disabled="loading" />
           <Label for="claude-code-toggle">
-            {{ claudeCodeEnabled ? '已启用' : '已禁用' }}
+            {{ loading ? '加载中...' : (claudeCodeEnabled ? '已启用' : '已禁用') }}
           </Label>
         </div>
       </CardContent>
@@ -91,22 +87,26 @@ import { ref, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
 import { api } from '@/api/client'
 import { Button } from '@/components/ui/button'
-import { Switch } from '@/components/ui/switch'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
 
 const claudeCodeEnabled = ref(false)
 const saving = ref(false)
+const loading = ref(true)
 const instructionsOpen = ref(false)
 
 async function loadConfig() {
+  loading.value = true
   try {
     const data = await api.getProxyEnhancement()
     claudeCodeEnabled.value = data.claude_code_enabled
   } catch (e) {
     console.error('Failed to load proxy enhancement config:', e)
     toast.error('加载配置失败')
+  } finally {
+    loading.value = false
   }
 }
 

@@ -66,29 +66,31 @@ export type MetricsInsert = {
 
 // --- request_logs ---
 
+export interface RequestLogInsert {
+  id: string;
+  api_type: string;
+  model: string | null;
+  provider_id: string | null;
+  status_code: number | null;
+  latency_ms: number | null;
+  is_stream: number;
+  error_message: string | null;
+  created_at: string;
+  request_body?: string | null;
+  response_body?: string | null;
+  client_request?: string | null;
+  upstream_request?: string | null;
+  upstream_response?: string | null;
+  client_response?: string | null;
+  is_retry?: number;
+  original_request_id?: string | null;
+  router_key_id?: string | null;
+  original_model?: string | null;
+}
+
 export function insertRequestLog(
   db: Database.Database,
-  log: {
-    id: string;
-    api_type: string;
-    model: string | null;
-    provider_id: string | null;
-    status_code: number | null;
-    latency_ms: number | null;
-    is_stream: number;
-    error_message: string | null;
-    created_at: string;
-    request_body?: string | null;
-    response_body?: string | null;
-    client_request?: string | null;
-    upstream_request?: string | null;
-    upstream_response?: string | null;
-    client_response?: string | null;
-    is_retry?: number;
-    original_request_id?: string | null;
-    router_key_id?: string | null;
-    original_model?: string | null;
-  },
+  log: RequestLogInsert,
 ): void {
   db.prepare(
     `INSERT INTO request_logs (id, api_type, model, provider_id, status_code, latency_ms, is_stream, error_message, created_at, request_body, response_body, client_request, upstream_request, upstream_response, client_response, is_retry, original_request_id, router_key_id, original_model)

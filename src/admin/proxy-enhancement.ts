@@ -13,7 +13,7 @@ interface ProxyEnhancementConfig {
 export const adminProxyEnhancementRoutes: FastifyPluginCallback<ProxyEnhancementOptions> = (app, options, done) => {
   const { db } = options;
 
-  app.get("/proxy-enhancement", async (_req, reply) => {
+  app.get("/admin/api/proxy-enhancement", async (_req, reply) => {
     const raw = getSetting(db, "proxy_enhancement");
     const config: ProxyEnhancementConfig = raw
       ? JSON.parse(raw)
@@ -21,10 +21,13 @@ export const adminProxyEnhancementRoutes: FastifyPluginCallback<ProxyEnhancement
     return reply.send(config);
   });
 
-  app.put("/proxy-enhancement", async (req, reply) => {
-    const body = req.body as { claude_code_enabled?: boolean };
+  app.put("/admin/api/proxy-enhancement", async (req, reply) => {
+    const body = req.body as Record<string, unknown>;
+    if (typeof body.claude_code_enabled !== "boolean") {
+      return reply.status(400).send({ error: "claude_code_enabled must be a boolean" }); // eslint-disable-line no-magic-numbers
+    }
     const config: ProxyEnhancementConfig = {
-      claude_code_enabled: body.claude_code_enabled ?? false,
+      claude_code_enabled: body.claude_code_enabled,
     };
     setSetting(db, "proxy_enhancement", JSON.stringify(config));
     return reply.send({ success: true });
