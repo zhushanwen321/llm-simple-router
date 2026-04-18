@@ -233,7 +233,7 @@ git commit -m "feat: integrate PluginEngine hooks into proxy flow"
 - `intercept` — select-model 命令拦截
 - `afterResponse` — 注入 model info tag（非流式场景）
 
-参考 worktree 分支代码：`.claude/worktrees/feat+dynamic-model-switch/src/proxy/enhancement-handler.ts`
+参考 worktree 分支代码：`.claude/worktrees/feat+dynamic-model-switch/src/proxy/enhancement-handler.ts`（若 worktree 不存在则从零实现相同功能）
 
 - [ ] **Step 2: Register as built-in plugin**
 

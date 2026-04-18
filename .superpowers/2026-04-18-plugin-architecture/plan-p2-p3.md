@@ -18,13 +18,12 @@ class PluginRegistry {
     else this.parsers.push(parser);
   }
 
-  // 按优先级尝试解析，返回第一个匹配的结果
-  parseResponse(body: string, apiType: string, isStream: boolean): ParsedResponse | null {
+  // 按优先级尝试匹配插件，返回第一个匹配的插件对象
+  matchPlugin(body: string, apiType: string, isStream: boolean): LogParser | null {
     for (const parser of this.parsers) {
-      const result = parser.parseResponse?.(body, apiType, isStream);
-      if (result) return result;
+      if (parser.canRender?.(body, apiType, isStream)) return parser;
     }
-    return this.builtIn?.parseResponse?.(body, apiType, isStream) ?? null;
+    return this.builtIn;
   }
 
   // 动态加载远程插件
@@ -55,7 +54,7 @@ git commit -m "feat: add frontend PluginRegistry"
 
 - [ ] **Step 1: Extract LogResponseViewer template to component**
 
-将当前 `LogResponseViewer.vue` 的模板和 `useSSEParsing` 逻辑提取为独立的 `BuiltInLogViewer.vue` 组件。该组件内部继续使用 `useSSEParsing` 的所有细粒度 computed 属性，对外暴露统一的 props 接口：
+`BuiltInLogViewer.vue` 是一个 Vue 组件，内部调用 `useSSEParsing()` composable（保持所有细粒度 computed 属性不变），对外暴露统一的 props 接口：
 ```ts
 interface LogViewerProps {
   body: string;
@@ -139,18 +138,6 @@ Expected: 日志详情页结构化展示功能不变
 ```bash
 git add frontend/src/components/log-viewer/LogResponseViewer.vue frontend/src/components/log-viewer/LogRequestViewer.vue frontend/src/components/log-viewer/BuiltInLogViewer.vue
 git commit -m "refactor: simplify log viewers to plugin dispatchers"
-```
-
-- [ ] **Step 3: Verify日志详情页正常工作**
-
-Run: `cd frontend && npm run dev`
-Expected: 日志详情页结构化展示功能不变
-
-- [ ] **Step 4: Commit**
-
-```bash
-git add frontend/src/components/log-viewer/LogResponseViewer.vue frontend/src/components/log-viewer/LogRequestViewer.vue
-git commit -m "refactor: use PluginRegistry in log viewers"
 ```
 
 ## Task 11: Plugins Management Page
