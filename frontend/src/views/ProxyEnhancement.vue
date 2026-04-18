@@ -31,8 +31,7 @@
             <div class="flex items-center gap-3">
               <Switch
                 id="claude-code-toggle"
-                :checked="claudeCodeEnabled"
-                @update:checked="claudeCodeEnabled = $event"
+                v-model="claudeCodeEnabled"
               />
               <Label for="claude-code-toggle">
                 {{ claudeCodeEnabled ? '已启用' : '已禁用' }}
