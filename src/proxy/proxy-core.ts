@@ -16,6 +16,9 @@ import { resolveMapping } from "./mapping-resolver.js";
 import { retryableCall, buildRetryConfig } from "./retry.js";
 import type { RetryRuleMatcher } from "./retry-rules.js";
 import type { Target } from "./strategy/types.js";
+import { parseDirective } from "./directive-parser.js";
+import { modelState } from "./model-state.js";
+import { cleanRouterResponses } from "./response-cleaner.js";
 
 // ---------- Types ----------
 
@@ -152,6 +155,7 @@ export function insertSuccessLog(
   cliHdrs: Record<string, string>,
   isRetry: boolean = false, originalRequestId: string | null = null,
   routerKeyId: string | null = null,
+  originalModel: string | null = null,
 ) {
   insertRequestLog(db, {
     id: logId, api_type: apiType, model, provider_id: provider.id,
@@ -162,7 +166,7 @@ export function insertSuccessLog(
     upstream_response: JSON.stringify({ statusCode: status, headers: upHdrs, body: respBody }),
     client_response: JSON.stringify({ statusCode: status, headers: cliHdrs, body: respBody }),
     is_retry: isRetry ? 1 : 0, original_request_id: originalRequestId,
-    router_key_id: routerKeyId,
+    router_key_id: routerKeyId, original_model: originalModel,
   });
 }
 
@@ -451,8 +455,46 @@ export async function handleProxyPost(
   request.raw.socket.on("error", (err) => request.log.debug({ err }, "client socket error"));
   const clientModel = ((request.body as Record<string, unknown>).model as string) || "unknown";
 
+  // --- 代理增强：指令解析 + 模型替换 ---
+  let originalModel: string | null = null;
+  let effectiveModel = clientModel;
+
+  const enhancementRaw = getSetting(db, "proxy_enhancement");
+  let enhancement: { claude_code_enabled?: boolean } | null = null;
+  try { enhancement = enhancementRaw ? JSON.parse(enhancementRaw) : null; } catch { /* ignore */ }
+  const enhancementEnabled = enhancement?.claude_code_enabled === true;
+
+  if (enhancementEnabled) {
+    // 清理历史消息中的 <router-response> 标签
+    const cleaned = cleanRouterResponses(request.body as Record<string, unknown>);
+    (request.body as Record<string, unknown>).messages = cleaned.messages;
+
+    const directive = parseDirective(request.body as Record<string, unknown>);
+
+    if (directive.modelName) {
+      // 内联模型指令 → resolveMapping 验证
+      const resolvedDirective = resolveMapping(db, directive.modelName, { now: new Date() });
+      if (resolvedDirective) {
+        originalModel = clientModel;
+        effectiveModel = directive.modelName;
+        modelState.set(request.routerKey?.id ?? null, directive.modelName);
+        (request.body as Record<string, unknown>).messages = directive.cleanedBody.messages;
+      }
+    } else {
+      // 无指令 → 查询会话记忆
+      const remembered = modelState.get(request.routerKey?.id ?? null);
+      if (remembered) {
+        const resolvedRemembered = resolveMapping(db, remembered, { now: new Date() });
+        if (resolvedRemembered) {
+          originalModel = clientModel;
+          effectiveModel = remembered;
+        }
+      }
+    }
+  }
+
   // 查询分组策略（只查一次）
-  const group = getMappingGroup(db, clientModel);
+  const group = getMappingGroup(db, effectiveModel);
   const isFailover = group?.strategy === "failover";
   const excludeTargets: Target[] = [];
 
@@ -465,15 +507,15 @@ export async function handleProxyPost(
     const isStream = body.stream === true;
     const cliHdrs: RawHeaders = request.headers as RawHeaders;
 
-    const resolved = resolveMapping(db, clientModel, { now: new Date(), excludeTargets });
+    const resolved = resolveMapping(db, effectiveModel, { now: new Date(), excludeTargets });
     if (!resolved) {
       if (isFailover && excludeTargets.length > 0) {
         // 所有 failover target 都已尝试，reply 已在上一轮发送
         return reply;
       }
-      const e = errors.modelNotFound(clientModel);
-      insertRejectedLog(db, logId, apiType, clientModel, e.statusCode,
-        `No mapping found for model '${clientModel}'`, startTime, isStream, routerKeyId, originalBody, cliHdrs);
+      const e = errors.modelNotFound(effectiveModel);
+      insertRejectedLog(db, logId, apiType, effectiveModel, e.statusCode,
+        `No mapping found for model '${effectiveModel}'`, startTime, isStream, routerKeyId, originalBody, cliHdrs);
       return reply.status(e.statusCode).send(e.body);
     }
 
@@ -485,7 +527,7 @@ export async function handleProxyPost(
           const models: string[] = JSON.parse(allowedModels).filter((m: string) => m.trim() !== "");
           if (models.length > 0 && !models.includes(resolved.backend_model)) {
             const e = errors.modelNotAllowed(resolved.backend_model);
-            insertRejectedLog(db, logId, apiType, clientModel, e.statusCode,
+            insertRejectedLog(db, logId, apiType, effectiveModel, e.statusCode,
               `Model '${resolved.backend_model}' not allowed for this API key`,
               startTime, isStream, routerKeyId, originalBody, cliHdrs, resolved.provider_id);
             return reply.status(e.statusCode).send(e.body);
@@ -497,14 +539,14 @@ export async function handleProxyPost(
     const provider = getProviderById(db, resolved.provider_id);
     if (!provider || !provider.is_active) {
       const e = errors.providerUnavailable();
-      insertRejectedLog(db, logId, apiType, clientModel, e.statusCode,
+      insertRejectedLog(db, logId, apiType, effectiveModel, e.statusCode,
         `Provider '${resolved.provider_id}' unavailable or inactive`,
         startTime, isStream, routerKeyId, originalBody, cliHdrs, resolved.provider_id);
       return reply.status(e.statusCode).send(e.body);
     }
     if (provider.api_type !== apiType) {
       const e = errors.providerTypeMismatch();
-      insertRejectedLog(db, logId, apiType, clientModel, e.statusCode,
+      insertRejectedLog(db, logId, apiType, effectiveModel, e.statusCode,
         `Provider API type mismatch: expected '${apiType}', got '${provider.api_type}'`,
         startTime, isStream, routerKeyId, originalBody, cliHdrs, resolved.provider_id);
       return reply.status(e.statusCode).send(e.body);
@@ -545,17 +587,17 @@ export async function handleProxyPost(
 
         if (attempt.error) {
           insertRequestLog(db, {
-            id: attemptLogId, api_type: apiType, model: clientModel, provider_id: provider.id,
+            id: attemptLogId, api_type: apiType, model: effectiveModel, provider_id: provider.id,
             status_code: HTTP_BAD_GATEWAY, latency_ms: attempt.latencyMs,
             is_stream: isStream ? 1 : 0, error_message: attempt.error,
             created_at: new Date().toISOString(), request_body: reqBodyStr,
             client_request: clientReq, upstream_request: upstreamReqBase,
             is_retry: isOriginal ? 0 : 1, original_request_id: isOriginal ? null : logId,
-            router_key_id: routerKeyId,
+            router_key_id: routerKeyId, original_model: originalModel,
           });
         } else if (attempt.statusCode !== UPSTREAM_SUCCESS) {
           insertRequestLog(db, {
-            id: attemptLogId, api_type: apiType, model: clientModel, provider_id: provider.id,
+            id: attemptLogId, api_type: apiType, model: effectiveModel, provider_id: provider.id,
             status_code: attempt.statusCode, latency_ms: attempt.latencyMs,
             is_stream: isStream ? 1 : 0, error_message: null,
             created_at: new Date().toISOString(), request_body: reqBodyStr,
@@ -563,15 +605,15 @@ export async function handleProxyPost(
             upstream_response: JSON.stringify({ statusCode: attempt.statusCode, body: attempt.responseBody }),
             client_response: JSON.stringify({ statusCode: attempt.statusCode, body: attempt.responseBody }),
             is_retry: isOriginal ? 0 : 1, original_request_id: isOriginal ? null : logId,
-            router_key_id: routerKeyId,
+            router_key_id: routerKeyId, original_model: originalModel,
           });
         } else {
           const h = isStream
             ? ((r as StreamProxyResult).upstreamResponseHeaders ?? {})
             : ((r as ProxyResult).headers);
-          insertSuccessLog(db, apiType, attemptLogId, clientModel, provider, isStream, startTime,
+          insertSuccessLog(db, apiType, attemptLogId, effectiveModel, provider, isStream, startTime,
             reqBodyStr, clientReq, upstreamReqBase, r.statusCode, attempt.responseBody, h, h,
-            !isOriginal, isOriginal ? null : logId, routerKeyId);
+            !isOriginal, isOriginal ? null : logId, routerKeyId, originalModel);
           lastSuccessLogId = attemptLogId;
         }
       }
@@ -590,6 +632,16 @@ export async function handleProxyPost(
         }
       } else {
         const pr = r as ProxyResult;
+        // 非流式响应：模型替换时注入 router-response 标签
+        if (originalModel && pr.statusCode === UPSTREAM_SUCCESS) {
+          try {
+            const bodyObj = JSON.parse(pr.body as string);
+            if (bodyObj.content?.[0]?.text) {
+              bodyObj.content[0].text += `\n\n<router-response type="model-info">当前模型: ${effectiveModel}</router-response>`;
+              pr.body = JSON.stringify(bodyObj);
+            }
+          } catch { /* non-JSON response, skip */ }
+        }
         for (const [k, v] of Object.entries(pr.headers)) reply.header(k, v);
         return reply.status(pr.statusCode).send(pr.body);
       }
@@ -615,12 +667,12 @@ export async function handleProxyPost(
       const sentH = buildUpstreamHeaders(cliHdrs, apiKey, Buffer.byteLength(reqBodyStr));
       const upstreamReq = JSON.stringify({ url: `${provider.base_url}${upstreamPath}`, headers: sentH, body: reqBodyStr });
       insertRequestLog(db, {
-        id: logId, api_type: apiType, model: clientModel, provider_id: provider.id,
+        id: logId, api_type: apiType, model: effectiveModel, provider_id: provider.id,
         status_code: HTTP_BAD_GATEWAY, latency_ms: Date.now() - startTime,
         is_stream: isStream ? 1 : 0, error_message: errMsg || "Upstream connection failed",
         created_at: new Date().toISOString(), request_body: reqBodyStr,
         client_request: clientReq, upstream_request: upstreamReq,
-        router_key_id: routerKeyId,
+        router_key_id: routerKeyId, original_model: originalModel,
       });
 
       // --- Failover 检查（异常路径）---
