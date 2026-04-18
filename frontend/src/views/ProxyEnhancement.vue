@@ -58,21 +58,22 @@
             <Card>
               <CardContent class="pt-6 space-y-4 text-sm">
                 <div>
+                  <p class="font-medium text-foreground mb-1">配置方法</p>
+                  <p class="text-muted-foreground">
+                    将以下内容添加到 Claude Code 的项目 CLAUDE.md 或全局指令中：
+                  </p>
+                  <code class="block mt-1 px-3 py-2 bg-muted rounded text-xs font-mono whitespace-pre-wrap leading-relaxed">
+{`当用户输入 /select-model 时，在回复中包含 [router-command: select-model]
+当用户输入 /select-model <model> 时，在回复中包含 [router-command: select-model <model>]`}
+                  </code>
+                </div>
+                <div>
                   <p class="font-medium text-foreground mb-1">内联指令切换模型</p>
                   <p class="text-muted-foreground">
                     在消息开头添加指令，单次切换使用的模型：
                   </p>
                   <code class="block mt-1 px-3 py-2 bg-muted rounded text-xs font-mono">
                     $SELECT-MODEL=claude-sonnet-4-20250514 你的问题内容
-                  </code>
-                </div>
-                <div>
-                  <p class="font-medium text-foreground mb-1">交互式选择模型</p>
-                  <p class="text-muted-foreground">
-                    发送命令进入交互式模型选择：
-                  </p>
-                  <code class="block mt-1 px-3 py-2 bg-muted rounded text-xs font-mono">
-                    /select-model
                   </code>
                 </div>
                 <div>
