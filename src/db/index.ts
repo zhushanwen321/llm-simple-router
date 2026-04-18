@@ -115,3 +115,13 @@ export { getStats } from "./stats.js";
 export type { Stats, StatsPeriod } from "./stats.js";
 
 export { getSetting, setSetting, isInitialized } from "./settings.js";
+
+export {
+  getSessionStates,
+  getSessionState,
+  getSessionHistory,
+  upsertSessionState,
+  insertSessionHistory,
+  deleteSessionState,
+} from "./session-states.js";
+export type { SessionModelState, SessionModelHistory, UpsertSessionStateInput, InsertSessionHistoryInput } from "./session-states.js";
