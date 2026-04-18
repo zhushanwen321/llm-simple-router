@@ -184,6 +184,7 @@ function insertRejectedLog(
   originalBody: Record<string, unknown>,
   clientHeaders: RawHeaders,
   providerId?: string | null,
+  originalModel: string | null = null,
 ): void {
   insertRequestLog(db, {
     id: logId,
@@ -198,10 +199,9 @@ function insertRejectedLog(
     request_body: JSON.stringify(originalBody),
     client_request: JSON.stringify({ headers: clientHeaders, body: originalBody }),
     router_key_id: routerKeyId,
+    original_model: originalModel,
   });
 }
-
-// ---------- Non-stream proxy ----------
 
 export function proxyNonStream(
   backend: Provider,
@@ -515,7 +515,7 @@ export async function handleProxyPost(
       }
       const e = errors.modelNotFound(effectiveModel);
       insertRejectedLog(db, logId, apiType, effectiveModel, e.statusCode,
-        `No mapping found for model '${effectiveModel}'`, startTime, isStream, routerKeyId, originalBody, cliHdrs);
+        `No mapping found for model '${effectiveModel}'`, startTime, isStream, routerKeyId, originalBody, cliHdrs, undefined, originalModel);
       return reply.status(e.statusCode).send(e.body);
     }
 
@@ -529,7 +529,7 @@ export async function handleProxyPost(
             const e = errors.modelNotAllowed(resolved.backend_model);
             insertRejectedLog(db, logId, apiType, effectiveModel, e.statusCode,
               `Model '${resolved.backend_model}' not allowed for this API key`,
-              startTime, isStream, routerKeyId, originalBody, cliHdrs, resolved.provider_id);
+              startTime, isStream, routerKeyId, originalBody, cliHdrs, resolved.provider_id, originalModel);
             return reply.status(e.statusCode).send(e.body);
           }
         } catch { request.log.warn("Invalid allowed_models JSON, allowing all models"); }
@@ -541,14 +541,14 @@ export async function handleProxyPost(
       const e = errors.providerUnavailable();
       insertRejectedLog(db, logId, apiType, effectiveModel, e.statusCode,
         `Provider '${resolved.provider_id}' unavailable or inactive`,
-        startTime, isStream, routerKeyId, originalBody, cliHdrs, resolved.provider_id);
+        startTime, isStream, routerKeyId, originalBody, cliHdrs, resolved.provider_id, originalModel);
       return reply.status(e.statusCode).send(e.body);
     }
     if (provider.api_type !== apiType) {
       const e = errors.providerTypeMismatch();
       insertRejectedLog(db, logId, apiType, effectiveModel, e.statusCode,
         `Provider API type mismatch: expected '${apiType}', got '${provider.api_type}'`,
-        startTime, isStream, routerKeyId, originalBody, cliHdrs, resolved.provider_id);
+        startTime, isStream, routerKeyId, originalBody, cliHdrs, resolved.provider_id, originalModel);
       return reply.status(e.statusCode).send(e.body);
     }
 
