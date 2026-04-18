@@ -118,83 +118,83 @@ export function deleteMappingGroup(db: Database.Database, id: string): void {
 export interface ProviderModelEntry {
   provider_name: string;
   backend_model: string;
-  client_model: string;
 }
 
-/** 从 mapping_groups 的 rule JSON 提取所有 target，JOIN providers 获取名称 */
+/** 从 providers.models 获取所有可用模型 */
 export function getActiveProviderModels(db: Database.Database): ProviderModelEntry[] {
-  const groups = db.prepare("SELECT client_model, rule FROM mapping_groups").all() as { client_model: string; rule: string }[];
-  const providers = db.prepare("SELECT id, name FROM providers").all() as { id: string; name: string }[];
-  const providerMap = new Map(providers.map(p => [p.id, p.name]));
-
+  const providers = db.prepare("SELECT name, models, is_active FROM providers WHERE is_active = 1").all() as { name: string; models: string; is_active: number }[];
   const results: ProviderModelEntry[] = [];
-  for (const g of groups) {
+  for (const p of providers) {
     try {
-      const rule = JSON.parse(g.rule);
-      // 提取所有 Target（支持 scheduled/round-robin/random/failover 策略格式）
-      const targets = extractTargets(rule);
-      for (const t of targets) {
-        const providerName = providerMap.get(t.provider_id);
-        if (providerName) {
-          results.push({ provider_name: providerName, backend_model: t.backend_model, client_model: g.client_model });
-        }
+      const models: string[] = JSON.parse(p.models);
+      for (const m of models) {
+        results.push({ provider_name: p.name, backend_model: m });
       }
-    } catch { /* 忽略解析失败的 rule */ }
+    } catch { /* 忽略解析失败 */ }
   }
   return results;
 }
 
-/** 根据 "provider_name/backend_model" 从 mapping_groups 的 rule 中解析出 client_model */
+// --- 从 mapping_groups rule JSON 中提取 target 条目 ---
+
+interface TargetEntry {
+  backend_model: string;
+  provider_id: string;
+}
+
+function isTargetLike(obj: unknown): obj is TargetEntry {
+  return typeof obj === "object" && obj !== null &&
+    typeof (obj as Record<string, unknown>).backend_model === "string" &&
+    typeof (obj as Record<string, unknown>).provider_id === "string";
+}
+
+function extractTargets(rule: Record<string, unknown>): TargetEntry[] {
+  const results: TargetEntry[] = [];
+  if (isTargetLike(rule.default)) results.push(rule.default);
+  if (Array.isArray(rule.targets)) {
+    for (const t of rule.targets) {
+      if (isTargetLike(t)) results.push(t);
+    }
+  }
+  if (Array.isArray(rule.windows)) {
+    for (const w of rule.windows) {
+      if (w && typeof w === "object" && isTargetLike((w as Record<string, unknown>).target)) {
+        results.push((w as Record<string, unknown>).target as TargetEntry);
+      }
+    }
+  }
+  return results;
+}
+
+/**
+ * 根据 "provider_name/backend_model" 验证模型是否存在于 provider 配置中。
+ * 同时尝试从 mapping_groups 中找到对应的 client_model 用于路由。
+ * 如果找不到 mapping，返回 backend_model 本身（由 proxy-core 兜底处理）。
+ */
 export function resolveByProviderModel(
   db: Database.Database,
   providerName: string,
   backendModel: string,
-): string | null {
-  const providerRow = db.prepare("SELECT id FROM providers WHERE name = ?").get(providerName) as { id: string } | undefined;
+): { client_model: string; provider_id: string; backend_model: string } | null {
+  const providerRow = db.prepare("SELECT id, models FROM providers WHERE name = ? AND is_active = 1").get(providerName) as { id: string; models: string } | undefined;
   if (!providerRow) return null;
+  try {
+    const models: string[] = JSON.parse(providerRow.models);
+    if (!models.includes(backendModel)) return null;
+  } catch { return null; }
 
+  // 尝试从 mapping_groups 找到包含此 provider+backend_model 的 client_model
   const groups = db.prepare("SELECT client_model, rule FROM mapping_groups").all() as { client_model: string; rule: string }[];
   for (const g of groups) {
     try {
       const rule = JSON.parse(g.rule);
       const targets = extractTargets(rule);
-      if (targets.some(t => t.provider_id === providerRow.id && t.backend_model === backendModel)) {
-        return g.client_model;
+      const match = targets.find(t => t.provider_id === providerRow.id && t.backend_model === backendModel);
+      if (match) {
+        return { client_model: g.client_model, provider_id: providerRow.id, backend_model: backendModel };
       }
     } catch { /* continue */ }
   }
-  return null;
-}
-
-interface Target { provider_id: string; backend_model: string }
-
-/** 从 rule JSON 中提取所有 Target（覆盖各策略格式） */
-function extractTargets(rule: unknown): Target[] {
-  const targets: Target[] = [];
-  if (typeof rule !== "object" || rule === null) return targets;
-  const r = rule as Record<string, unknown>;
-
-  // targets-based 策略（round-robin/random/failover）: { targets: [...] }
-  if (Array.isArray(r.targets)) {
-    for (const t of r.targets) {
-      if (isTargetLike(t)) targets.push(t as Target);
-    }
-  }
-
-  // scheduled 策略: { default: Target, windows: [{ target: Target }] }
-  if (r.default && isTargetLike(r.default)) targets.push(r.default as Target);
-  if (Array.isArray(r.windows)) {
-    for (const w of r.windows) {
-      if (w && typeof w === "object" && "target" in w && isTargetLike((w as Record<string, unknown>).target)) {
-        targets.push((w as Record<string, unknown>).target as Target);
-      }
-    }
-  }
-  return targets;
-}
-
-function isTargetLike(v: unknown): v is Target {
-  return typeof v === "object" && v !== null &&
-    "provider_id" in v && typeof (v as Target).provider_id === "string" &&
-    "backend_model" in v && typeof (v as Target).backend_model === "string";
+  // provider 有这个模型但没有 mapping group，直接返回 provider 维度信息
+  return { client_model: backendModel, provider_id: providerRow.id, backend_model: backendModel };
 }

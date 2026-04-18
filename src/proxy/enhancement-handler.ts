@@ -30,7 +30,8 @@ const MODEL_INFO_TAG_TYPE = "model-info";
 function resolveProviderModel(db: Database.Database, providerSlashModel: string): string | null {
   const match = /^([a-zA-Z0-9_-]+)\/(.+)$/.exec(providerSlashModel);
   if (!match) return null;
-  return resolveByProviderModel(db, match[1], match[2]);
+  const resolved = resolveByProviderModel(db, match[1], match[2]);
+  return resolved?.client_model ?? null;
 }
 
 /**
@@ -144,7 +145,7 @@ function buildSelectModelResponse(
     } catch { /* 忽略解析失败 */ }
   }
   const filtered = allowedSet
-    ? providerModels.filter(m => allowedSet!.has(m.client_model))
+    ? providerModels.filter(m => allowedSet!.has(m.backend_model))
     : providerModels;
 
   // 去重并格式化为 "provider_name/backend_model"
