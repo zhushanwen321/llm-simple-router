@@ -263,6 +263,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
 import { api } from '@/api/client'
+import { useClipboard } from '@/composables/useClipboard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -324,6 +325,7 @@ const sectionModes = reactive<Record<SectionKey, 'structured' | 'raw'>>({
   client_response: 'structured',
 })
 const copiedSection = ref<SectionKey | null>(null)
+const { copy: clipboardCopy } = useClipboard()
 
 function getSectionRaw(key: SectionKey): string {
   if (!detailData.value) return '{}'
@@ -337,11 +339,11 @@ function getSectionRaw(key: SectionKey): string {
 }
 
 async function copySection(key: SectionKey) {
-  try {
-    await navigator.clipboard.writeText(getSectionRaw(key))
+  const ok = await clipboardCopy(getSectionRaw(key))
+  if (ok) {
     copiedSection.value = key
     setTimeout(() => { copiedSection.value = null }, 2000) // eslint-disable-line no-magic-numbers
-  } catch {
+  } else {
     toast.error('复制失败')
   }
 }

@@ -14,17 +14,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { useClipboard } from '@/composables/useClipboard'
 import { Button } from '@/components/ui/button'
 
 const props = defineProps<{ content: string; hideCopyButton?: boolean }>()
-const COPIED_FEEDBACK_MS = 1500
 
-const copied = ref(false)
+const { copied, copy } = useClipboard()
 
 async function handleCopy() {
-  await navigator.clipboard.writeText(props.content)
-  copied.value = true
-  setTimeout(() => { copied.value = false }, COPIED_FEEDBACK_MS)
+  await copy(props.content)
 }
 </script>
