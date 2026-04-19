@@ -56,31 +56,61 @@
           </CollapsibleTrigger>
           <CollapsibleContent class="mt-2">
             <Card>
-              <CardContent class="pt-6 space-y-4 text-sm">
+              <CardContent class="space-y-4 text-sm">
                 <div>
-                  <p class="font-medium text-foreground mb-1">配置方法</p>
-                  <p class="text-muted-foreground">
+                  <p class="font-medium text-foreground mb-1 leading-relaxed">配置方法</p>
+                  <p class="text-muted-foreground leading-relaxed">
                     创建一个 Claude Code 的 Command ，内容是 
                   </p>
 	                  <code class="block mt-1 px-3 py-2 bg-muted rounded text-xs font-mono whitespace-pre-wrap leading-relaxed" v-text="selectModelInstruction" />
-	                </div>
+                </div>
                 <div>
-                  <p class="font-medium text-foreground mb-1">内联指令切换模型</p>
-                  <p class="text-muted-foreground">
-                    在消息开头添加指令，单次切换使用的模型：
+                  <p class="text-muted-foreground leading-relaxed">
+                    Command 可以是项目级或者全局级
                   </p>
-                  <code class="block mt-1 px-3 py-2 bg-muted rounded text-xs font-mono">
-                    $SELECT-MODEL=claude-sonnet-4-20250514 你的问题内容
+                  <code class="block mt-1 px-3 py-2 bg-muted rounded text-xs font-mono whitespace-pre-wrap leading-relaxed">
+                    # 项目级 Command <br />
+                    .claude/commands/select-model.md
+                  </code>
+                  <code class="block mt-1 px-3 py-2 bg-muted rounded text-xs font-mono whitespace-pre-wrap leading-relaxed">
+                    # 全局级 Command <br />
+                    ~/.claude/commands/select-model.md
                   </code>
                 </div>
                 <div>
-                  <p class="font-medium text-foreground mb-1">恢复默认模型</p>
-                  <p class="text-muted-foreground">
-                    切回路由默认映射的模型：
-                  </p>
-                  <code class="block mt-1 px-3 py-2 bg-muted rounded text-xs font-mono">
-                    $SELECT-MODEL=default
-                  </code>
+                  <p class="font-medium text-foreground mb-1 leading-relaxed">使用方法</p>
+                  <div>
+                    <p class="text-muted-foreground leading-relaxed">
+                      在 Claude Code 中查看可用模型
+                    </p>
+                    <code class="block mt-1 px-3 py-2 bg-muted rounded text-xs font-mono whitespace-pre-wrap leading-relaxed">
+                      # 输入命令  <br />
+                      /select-model
+                    </code>
+                    <code class="block mt-1 px-3 py-2 bg-muted rounded text-xs font-mono whitespace-pre-wrap leading-relaxed">
+                      # 得到结果是你在供应商配置的 provider/model 列表 <br />
+                      1. zai-coding-plan/glm-5 <br />
+                      2. zai-coding-plan/glm-5.1 <br />
+                      3. zai-coding-plan/glm-5-turbo <br />
+                      4. kimi-coding-plan/kimi-for-coding <br />
+                    </code>
+                  </div>
+                  <div>
+                    <p class="text-muted-foreground leading-relaxed">
+                      在Claude Code 中选择模型
+                    </p>
+                    <code class="block mt-1 px-3 py-2 bg-muted rounded text-xs font-mono whitespace-pre-wrap leading-relaxed">
+                      # 输入命令 <br />
+                      /select-model zai-coding-plan/glm-5.1
+                    </code>
+                    <code class="block mt-1 px-3 py-2 bg-muted rounded text-xs font-mono whitespace-pre-wrap leading-relaxed">
+                      # 得到结果 <br />
+                      已选择模型: zai-coding-plan/glm-5.1
+                    </code>
+                    <p class="text-muted-foreground leading-relaxed">
+                      之后可以在 活跃 Session 中查看模型设置情况。在 请求日志 页面查看请求是否已经路由到了已选择模型。
+                    </p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
