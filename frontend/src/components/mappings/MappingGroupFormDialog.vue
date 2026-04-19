@@ -78,7 +78,7 @@
                 <div class="flex-1" />
                 <Button type="button" variant="ghost" size="sm" class="text-destructive shrink-0" @click="emit('removeWindow', idx)">删除</Button>
               </div>
-              <div class="flex gap-2">
+              <div class="flex gap-3">
                 <div class="flex-1">
                   <Label class="block text-xs text-muted-foreground mb-1">供应商</Label>
                   <Select :model-value="w.target.provider_id" @update:model-value="onWindowProviderChange(idx, $event)">
@@ -113,7 +113,7 @@
             <Button type="button" variant="outline" size="sm" @click="emit('addTarget')">添加目标</Button>
           </div>
           <div v-for="(t, idx) in form.targets" :key="idx" class="border rounded-md p-2 space-y-2">
-            <div class="flex items-center gap-2">
+            <div class="flex gap-3">
               <div class="flex-1">
                 <Label class="block text-xs text-muted-foreground mb-1">供应商</Label>
                 <Select :model-value="t.provider_id" @update:model-value="onTargetProviderChange(idx, $event)">
@@ -136,10 +136,10 @@
                   </SelectContent>
                 </Select>
               </div>
-              <div v-if="form.strategy === 'failover'" class="flex flex-col gap-1">
-                <Button type="button" variant="ghost" size="sm" :disabled="idx === 0" @click="emit('moveTargetUp', idx)">↑</Button>
-                <Button type="button" variant="ghost" size="sm" :disabled="idx === form.targets.length - 1" @click="emit('moveTargetDown', idx)">↓</Button>
-              </div>
+            </div>
+            <div class="flex justify-end gap-1">
+              <Button v-if="form.strategy === 'failover'" type="button" variant="ghost" size="sm" :disabled="idx === 0" @click="emit('moveTargetUp', idx)">↑</Button>
+              <Button v-if="form.strategy === 'failover'" type="button" variant="ghost" size="sm" :disabled="idx === form.targets.length - 1" @click="emit('moveTargetDown', idx)">↓</Button>
               <Button type="button" variant="ghost" size="sm" class="text-destructive shrink-0" @click="emit('removeTarget', idx)">删除</Button>
             </div>
           </div>
