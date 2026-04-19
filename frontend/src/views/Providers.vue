@@ -26,7 +26,7 @@
           <TableRow v-for="p in providers" :key="p.id" :class="{ 'opacity-60': !p.is_active }">
             <TableCell class="font-medium">{{ p.name }}</TableCell>
             <TableCell>
-              <Badge :variant="p.api_type === 'openai' ? 'default' : 'secondary'">{{ p.api_type }}</Badge>
+              <Badge variant="secondary">{{ p.api_type }}</Badge>
             </TableCell>
             <TableCell class="text-muted-foreground">{{ p.base_url }}</TableCell>
             <TableCell class="text-muted-foreground font-mono text-xs">{{ p.api_key }}</TableCell>
@@ -84,18 +84,6 @@
           <div>
             <Label class="block text-sm font-medium text-foreground mb-1">名称</Label>
             <Input v-model="form.name" type="text" required />
-          </div>
-          <div>
-            <Label class="block text-sm font-medium text-foreground mb-1">类型</Label>
-            <Select v-model="form.api_type">
-              <SelectTrigger>
-                <SelectValue placeholder="选择类型" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="openai">OpenAI</SelectItem>
-                <SelectItem value="anthropic">Anthropic</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
           <div>
             <Label class="block text-sm font-medium text-foreground mb-1">Base URL</Label>
@@ -171,7 +159,7 @@ interface Provider {
   is_active: number
 }
 
-const DEFAULT_FORM = { name: '', api_type: 'openai', base_url: '', api_key: '', models: [] as string[], is_active: true }
+const DEFAULT_FORM = { name: '', api_type: 'anthropic', base_url: '', api_key: '', models: [] as string[], is_active: true }
 const modelInput = ref('')
 
 const providers = ref<Provider[]>([])
@@ -197,7 +185,7 @@ function onPresetChange() {
   const preset = availablePlans.value.find(p => p.plan === presetPlan.value)
   if (!preset) return
   form.value.name = preset.presetName
-  form.value.api_type = preset.apiType
+  form.value.api_type = 'anthropic'
   form.value.base_url = preset.baseUrl
   form.value.models = [...preset.models]
 }
@@ -230,7 +218,7 @@ function removeModel(index: number) {
 
 function openCreate() {
   editingId.value = null
-  form.value = { name: '', api_type: 'openai', base_url: '', api_key: '', models: [], is_active: true }
+  form.value = { name: '', api_type: 'anthropic', base_url: '', api_key: '', models: [], is_active: true }
   modelInput.value = ''
   presetGroup.value = ''
   presetPlan.value = ''
@@ -239,7 +227,7 @@ function openCreate() {
 
 function openEdit(p: Provider) {
   editingId.value = p.id
-  form.value = { name: p.name, api_type: p.api_type, base_url: p.base_url, api_key: p.api_key, models: [...(p.models || [])], is_active: !!p.is_active }
+  form.value = { name: p.name, api_type: 'anthropic', base_url: p.base_url, api_key: p.api_key, models: [...(p.models || [])], is_active: !!p.is_active }
   modelInput.value = ''
   presetGroup.value = ''
   presetPlan.value = ''
@@ -249,7 +237,7 @@ function openEdit(p: Provider) {
 function buildPayload(): { name: string; api_type: string; base_url: string; api_key?: string; models: string[]; is_active: number } {
   const payload: { name: string; api_type: string; base_url: string; api_key?: string; models: string[]; is_active: number } = {
     name: form.value.name,
-    api_type: form.value.api_type,
+    api_type: 'anthropic',
     base_url: form.value.base_url,
     models: form.value.models,
     is_active: form.value.is_active ? 1 : 0,
