@@ -23,6 +23,7 @@ import {
 import { insertSuccessLog, insertRejectedLog } from "./log-helpers.js";
 import { applyEnhancement, buildModelInfoTag } from "./enhancement-handler.js";
 import { ProviderSemaphoreManager, SemaphoreQueueFullError, SemaphoreTimeoutError } from "./semaphore.js";
+import type { RequestTracker } from "../monitor/request-tracker.js";
 
 // ---------- Types ----------
 
@@ -50,6 +51,7 @@ export interface ProxyHandlerDeps {
   retryBaseDelayMs: number;
   matcher?: RetryRuleMatcher;
   semaphoreManager?: ProviderSemaphoreManager;
+  tracker?: RequestTracker;
 }
 
 // Re-export upstream types for external consumers
@@ -224,6 +226,12 @@ export async function handleProxyPost(
       return reply.status(e.statusCode).send(e.body);
     }
 
+    deps.tracker?.start({
+      id: logId, apiType, model: effectiveModel, providerId: provider.id,
+      providerName: provider.name, isStream, startTime, status: "pending",
+      retryCount: 0, attempts: [], clientIp: request.ip,
+    });
+
     body.model = resolved.backend_model;
     const apiKey = decrypt(provider.api_key, getSetting(db, "encryption_key")!);
 
@@ -253,10 +261,12 @@ export async function handleProxyPost(
         if (err instanceof DOMException && err.name === "AbortError") return reply;
         if (err instanceof SemaphoreQueueFullError) {
           const e = errors.concurrencyQueueFull(provider.id);
+          deps.tracker?.complete(logId, { status: "failed", statusCode: e.statusCode });
           return reply.status(e.statusCode).send(e.body);
         }
         if (err instanceof SemaphoreTimeoutError) {
           const e = errors.concurrencyTimeout(provider.id, err.timeoutMs);
+          deps.tracker?.complete(logId, { status: "failed", statusCode: e.statusCode });
           return reply.status(e.statusCode).send(e.body);
         }
         throw err;
@@ -267,7 +277,19 @@ export async function handleProxyPost(
       const { result: r, attempts } = isStream
         ? await retryableCall(
             () => {
-              const metricsTransform = new SSEMetricsTransform(apiType, startTime);
+              const metricsTransform = new SSEMetricsTransform(apiType, startTime, {
+                onMetrics: (m) => {
+                  deps.tracker?.update(logId, {
+                    streamMetrics: {
+                      inputTokens: m.input_tokens,
+                      outputTokens: m.output_tokens,
+                      ttftMs: m.ttft_ms,
+                      stopReason: m.stop_reason,
+                      isComplete: m.is_complete === 1,
+                    },
+                  });
+                },
+              });
               return upstreamStream(provider, apiKey, body, cliHdrs, reply, streamTimeoutMs, upstreamPath, buildUpstreamHeaders, metricsTransform);
             },
             retryConfig,
@@ -278,6 +300,18 @@ export async function handleProxyPost(
             retryConfig,
             reply,
           );
+
+      const trackerAttempts = attempts.map(a => ({
+        statusCode: a.statusCode ?? null,
+        error: a.error ?? null,
+        latencyMs: a.latencyMs,
+        providerId: provider.id,
+      }));
+      deps.tracker?.update(logId, {
+        retryCount: Math.max(0, attempts.length - 1),
+        attempts: trackerAttempts,
+        providerId: provider.id,
+      });
 
       // 记录所有尝试的日志
       let lastSuccessLogId = logId;
@@ -322,6 +356,7 @@ export async function handleProxyPost(
 
       // --- Failover 检查 ---
       if (isFailover && r.statusCode >= FAILOVER_FAIL_THRESHOLD && !reply.raw.headersSent) {
+        deps.tracker?.complete(logId, { status: "failed", statusCode: r.statusCode });
         releaseSemaphore();
         excludeTargets.push(resolved);
         continue;
@@ -365,6 +400,7 @@ export async function handleProxyPost(
           } catch (err) { request.log.error({ err }, "Failed to insert metrics"); }
         }
       }
+      deps.tracker?.complete(logId, { status: r.statusCode < 400 ? "completed" : "failed", statusCode: r.statusCode });
       releaseSemaphore();
       return reply;
     } catch (err: unknown) {
@@ -382,12 +418,14 @@ export async function handleProxyPost(
 
       // --- Failover 检查（异常路径）---
       if (isFailover && !reply.raw.headersSent) {
+        deps.tracker?.complete(logId, { status: "failed" });
         releaseSemaphore();
         excludeTargets.push(resolved);
         continue;
       }
 
       const e = errors.upstreamConnectionFailed();
+      deps.tracker?.complete(logId, { status: "failed", statusCode: HTTP_BAD_GATEWAY });
       releaseSemaphore();
       return reply.status(e.statusCode).send(e.body);
     }
