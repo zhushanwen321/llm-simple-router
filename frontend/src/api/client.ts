@@ -46,7 +46,7 @@ const API = {
 
 // --- Payload types ---
 
-interface ProviderPayload {
+export interface ProviderPayload {
   name: string
   api_type: string
   base_url: string

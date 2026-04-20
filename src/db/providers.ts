@@ -18,6 +18,12 @@ export interface Provider {
   updated_at: string;
 }
 
+export const PROVIDER_CONCURRENCY_DEFAULTS = {
+  max_concurrency: 0,
+  queue_timeout_ms: 0,
+  max_queue_size: 100,
+} as const;
+
 const PROVIDER_FIELDS = new Set([
   "name", "api_type", "base_url", "api_key", "api_key_preview", "models", "is_active", "max_concurrency", "queue_timeout_ms", "max_queue_size",
 ]);
@@ -64,9 +70,9 @@ export function createProvider(
     provider.api_key, provider.api_key_preview ?? null,
     provider.models ?? "[]",
     provider.is_active ?? 1,
-    provider.max_concurrency ?? 0,
-    provider.queue_timeout_ms ?? 0,
-    provider.max_queue_size ?? 100,
+    provider.max_concurrency ?? PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency,
+    provider.queue_timeout_ms ?? PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms,
+    provider.max_queue_size ?? PROVIDER_CONCURRENCY_DEFAULTS.max_queue_size,
     now, now,
   );
   return id;

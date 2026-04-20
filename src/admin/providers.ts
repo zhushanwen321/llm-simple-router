@@ -2,7 +2,7 @@ import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
 import { Type, Static } from "@sinclair/typebox";
 import type { Provider } from "../db/index.js";
-import { getAllProviders, getProviderById, createProvider, updateProvider, deleteProvider, getAllMappingGroups } from "../db/index.js";
+import { getAllProviders, getProviderById, createProvider, updateProvider, deleteProvider, getAllMappingGroups, PROVIDER_CONCURRENCY_DEFAULTS } from "../db/index.js";
 import { encrypt, decrypt } from "../utils/crypto.js";
 import { getSetting } from "../db/settings.js";
 import { ProviderSemaphoreManager } from "../proxy/semaphore.js";
@@ -17,9 +17,9 @@ const CreateProviderSchema = Type.Object({
   api_key: Type.String({ minLength: 1 }),
   models: Type.Optional(Type.Array(Type.String())),
   is_active: Type.Optional(Type.Number()),
-  max_concurrency: Type.Optional(Type.Number({ minimum: 0 })),
-  queue_timeout_ms: Type.Optional(Type.Number({ minimum: 0 })),
-  max_queue_size: Type.Optional(Type.Number({ minimum: 1 })),
+  max_concurrency: Type.Optional(Type.Integer({ minimum: 0 })),
+  queue_timeout_ms: Type.Optional(Type.Integer({ minimum: 0 })),
+  max_queue_size: Type.Optional(Type.Integer({ minimum: 1 })),
 });
 
 const UpdateProviderSchema = Type.Object({
@@ -29,9 +29,9 @@ const UpdateProviderSchema = Type.Object({
   api_key: Type.Optional(Type.String({ minLength: 1 })),
   models: Type.Optional(Type.Array(Type.String())),
   is_active: Type.Optional(Type.Number()),
-  max_concurrency: Type.Optional(Type.Number({ minimum: 0 })),
-  queue_timeout_ms: Type.Optional(Type.Number({ minimum: 0 })),
-  max_queue_size: Type.Optional(Type.Number({ minimum: 1 })),
+  max_concurrency: Type.Optional(Type.Integer({ minimum: 0 })),
+  queue_timeout_ms: Type.Optional(Type.Integer({ minimum: 0 })),
+  max_queue_size: Type.Optional(Type.Integer({ minimum: 1 })),
 });
 
 interface ProviderRoutesOptions {
@@ -76,14 +76,14 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
       api_key_preview: body.api_key.length > 8 ? `${body.api_key.slice(0, 4)}...${body.api_key.slice(-4)}` : "****",
       models: JSON.stringify(body.models ?? []),
       is_active: body.is_active ?? 1,
-      max_concurrency: body.max_concurrency ?? 0,
-      queue_timeout_ms: body.queue_timeout_ms ?? 0,
-      max_queue_size: body.max_queue_size ?? 100,
+      max_concurrency: body.max_concurrency ?? PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency,
+      queue_timeout_ms: body.queue_timeout_ms ?? PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms,
+      max_queue_size: body.max_queue_size ?? PROVIDER_CONCURRENCY_DEFAULTS.max_queue_size,
     });
     semaphoreManager?.updateConfig(id, {
-      maxConcurrency: body.max_concurrency ?? 0,
-      queueTimeoutMs: body.queue_timeout_ms ?? 0,
-      maxQueueSize: body.max_queue_size ?? 100,
+      maxConcurrency: body.max_concurrency ?? PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency,
+      queueTimeoutMs: body.queue_timeout_ms ?? PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms,
+      maxQueueSize: body.max_queue_size ?? PROVIDER_CONCURRENCY_DEFAULTS.max_queue_size,
     });
     return reply.code(HTTP_CREATED).send({ id });
   });

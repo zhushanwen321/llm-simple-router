@@ -116,9 +116,19 @@
               <Switch v-model:checked="concurrencyEnabled" id="concurrency-switch" />
               <Label for="concurrency-switch" class="text-sm text-foreground">并发控制</Label>
             </div>
-            <div v-if="concurrencyEnabled" class="mt-2">
-              <Label class="block text-sm font-medium text-foreground mb-1">最大并发数</Label>
-              <Input v-model.number="form.max_concurrency" type="number" min="1" max="100" placeholder="3" />
+            <div v-if="concurrencyEnabled" class="mt-2 space-y-2">
+              <div>
+                <Label class="block text-sm font-medium text-foreground mb-1">最大并发数</Label>
+                <Input v-model.number="form.max_concurrency" type="number" min="1" :max="MAX_CONCURRENCY" placeholder="3" />
+              </div>
+              <div>
+                <Label class="block text-sm font-medium text-foreground mb-1">队列超时 (ms)</Label>
+                <Input v-model.number="form.queue_timeout_ms" type="number" min="0" placeholder="0 = 无限等待" />
+              </div>
+              <div>
+                <Label class="block text-sm font-medium text-foreground mb-1">最大队列长度</Label>
+                <Input v-model.number="form.max_queue_size" type="number" min="1" :max="MAX_QUEUE_SIZE" :placeholder="DEFAULT_QUEUE_SIZE" />
+              </div>
             </div>
           </div>
           <div class="flex items-center gap-2">
@@ -152,7 +162,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
-import { api } from '@/api/client'
+import { api, type ProviderPayload } from '@/api/client'
 import { PROVIDER_PRESETS } from '@/data/provider-presets'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -174,10 +184,15 @@ interface Provider {
   models: string[]
   is_active: number
   max_concurrency: number
+  queue_timeout_ms: number
+  max_queue_size: number
 }
 
 const DEFAULT_CONCURRENCY = 3
-const DEFAULT_FORM = { name: '', api_type: 'anthropic', base_url: '', api_key: '', models: [] as string[], is_active: true, max_concurrency: DEFAULT_CONCURRENCY }
+const DEFAULT_QUEUE_SIZE = 100
+const MAX_CONCURRENCY = 100
+const MAX_QUEUE_SIZE = 1000
+const DEFAULT_FORM = { name: '', api_type: 'anthropic', base_url: '', api_key: '', models: [] as string[], is_active: true, max_concurrency: DEFAULT_CONCURRENCY, queue_timeout_ms: 0, max_queue_size: DEFAULT_QUEUE_SIZE }
 const modelInput = ref('')
 
 const providers = ref<Provider[]>([])
@@ -247,7 +262,7 @@ function openCreate() {
 
 function openEdit(p: Provider) {
   editingId.value = p.id
-  form.value = { name: p.name, api_type: 'anthropic', base_url: p.base_url, api_key: p.api_key, models: [...(p.models || [])], is_active: !!p.is_active, max_concurrency: p.max_concurrency ?? DEFAULT_CONCURRENCY }
+  form.value = { name: p.name, api_type: 'anthropic', base_url: p.base_url, api_key: p.api_key, models: [...(p.models || [])], is_active: !!p.is_active, max_concurrency: p.max_concurrency ?? DEFAULT_CONCURRENCY, queue_timeout_ms: p.queue_timeout_ms ?? 0, max_queue_size: p.max_queue_size ?? DEFAULT_QUEUE_SIZE }
   concurrencyEnabled.value = (p.max_concurrency ?? 0) > 0
   modelInput.value = ''
   presetGroup.value = ''
@@ -255,14 +270,18 @@ function openEdit(p: Provider) {
   dialogOpen.value = true
 }
 
-function buildPayload(): { name: string; api_type: string; base_url: string; api_key?: string; models: string[]; is_active: number; max_concurrency: number } {
-  const payload: { name: string; api_type: string; base_url: string; api_key?: string; models: string[]; is_active: number; max_concurrency: number } = {
+type ProviderFormPayload = Pick<ProviderPayload, 'name' | 'api_type' | 'base_url' | 'models' | 'is_active' | 'max_concurrency' | 'queue_timeout_ms' | 'max_queue_size'> & { api_key?: string }
+
+function buildPayload(): ProviderFormPayload {
+  const payload: ProviderFormPayload = {
     name: form.value.name,
     api_type: 'anthropic',
     base_url: form.value.base_url,
     models: form.value.models,
     is_active: form.value.is_active ? 1 : 0,
     max_concurrency: concurrencyEnabled.value ? form.value.max_concurrency : 0,
+    queue_timeout_ms: concurrencyEnabled.value ? form.value.queue_timeout_ms : 0,
+    max_queue_size: concurrencyEnabled.value ? form.value.max_queue_size : DEFAULT_QUEUE_SIZE,
   }
   if (form.value.api_key) payload.api_key = form.value.api_key
   return payload
