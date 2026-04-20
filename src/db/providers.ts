@@ -11,12 +11,15 @@ export interface Provider {
   api_key_preview?: string;
   models: string; // JSON 数组文本
   is_active: number;
+  max_concurrency: number;
+  queue_timeout_ms: number;
+  max_queue_size: number;
   created_at: string;
   updated_at: string;
 }
 
 const PROVIDER_FIELDS = new Set([
-  "name", "api_type", "base_url", "api_key", "api_key_preview", "models", "is_active",
+  "name", "api_type", "base_url", "api_key", "api_key_preview", "models", "is_active", "max_concurrency", "queue_timeout_ms", "max_queue_size",
 ]);
 
 export function getActiveProviders(
@@ -46,18 +49,25 @@ export function createProvider(
     api_key_preview?: string;
     models?: string;
     is_active?: number;
+    max_concurrency?: number;
+    queue_timeout_ms?: number;
+    max_queue_size?: number;
   },
 ): string {
   const id = randomUUID();
   const now = new Date().toISOString();
   db.prepare(
-    `INSERT INTO providers (id, name, api_type, base_url, api_key, api_key_preview, models, is_active, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO providers (id, name, api_type, base_url, api_key, api_key_preview, models, is_active, max_concurrency, queue_timeout_ms, max_queue_size, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     id, provider.name, provider.api_type, provider.base_url,
     provider.api_key, provider.api_key_preview ?? null,
     provider.models ?? "[]",
-    provider.is_active ?? 1, now, now,
+    provider.is_active ?? 1,
+    provider.max_concurrency ?? 0,
+    provider.queue_timeout_ms ?? 0,
+    provider.max_queue_size ?? 100,
+    now, now,
   );
   return id;
 }
@@ -65,7 +75,7 @@ export function createProvider(
 export function updateProvider(
   db: Database.Database,
   id: string,
-  fields: Partial<Pick<Provider, "name" | "api_type" | "base_url" | "api_key" | "api_key_preview" | "is_active">>,
+  fields: Partial<Pick<Provider, "name" | "api_type" | "base_url" | "api_key" | "api_key_preview" | "is_active" | "max_concurrency" | "queue_timeout_ms" | "max_queue_size">>,
 ): void {
   buildUpdateQuery(db, "providers", id, fields, PROVIDER_FIELDS, { updatedAt: true });
 }
