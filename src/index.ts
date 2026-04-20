@@ -29,6 +29,9 @@ import { openaiProxy } from "./proxy/openai.js";
 import { anthropicProxy } from "./proxy/anthropic.js";
 import { adminRoutes } from "./admin/routes.js";
 import { RetryRuleMatcher } from "./proxy/retry-rules.js";
+import { ProviderSemaphoreManager } from "./proxy/semaphore.js";
+import { RequestTracker } from "./monitor/request-tracker.js";
+import { getAllProviders } from "./db/index.js";
 import { modelState } from "./proxy/model-state.js";
 import fastifyStatic from "@fastify/static";
 import Database from "better-sqlite3";
@@ -128,6 +131,21 @@ export async function buildApp(
   const matcher = new RetryRuleMatcher();
   matcher.load(db);
 
+  const semaphoreManager = new ProviderSemaphoreManager();
+  const tracker = new RequestTracker({ semaphoreManager });
+  tracker.startPushInterval();
+
+  // 填充 provider 并发配置缓存
+  const allProviders = getAllProviders(db);
+  for (const p of allProviders) {
+    tracker.updateProviderConfig(p.id, {
+      name: p.name,
+      maxConcurrency: p.max_concurrency ?? 0,
+      queueTimeoutMs: p.queue_timeout_ms ?? 5000,
+      maxQueueSize: p.max_queue_size ?? 100,
+    });
+  }
+
   app.register(authMiddleware, { db });
   app.register(openaiProxy, {
     db,
@@ -135,6 +153,8 @@ export async function buildApp(
     retryMaxAttempts: config.RETRY_MAX_ATTEMPTS,
     retryBaseDelayMs: config.RETRY_BASE_DELAY_MS,
     matcher,
+    semaphoreManager,
+    tracker,
   });
   app.register(anthropicProxy, {
     db,
@@ -142,9 +162,11 @@ export async function buildApp(
     retryMaxAttempts: config.RETRY_MAX_ATTEMPTS,
     retryBaseDelayMs: config.RETRY_BASE_DELAY_MS,
     matcher,
+    semaphoreManager,
+    tracker,
   });
 
-  app.register(adminRoutes, { db, matcher });
+  app.register(adminRoutes, { db, matcher, tracker });
 
   // 前端静态文件服务（生产环境）
   const frontendDist = path.resolve(
@@ -182,6 +204,7 @@ export async function buildApp(
     app,
     db,
     close: async () => {
+      tracker.stopPushInterval();
       await app.close();
       db.close();
     },
