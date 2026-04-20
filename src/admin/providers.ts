@@ -8,8 +8,6 @@ import { getSetting } from "../db/settings.js";
 import { ProviderSemaphoreManager } from "../proxy/semaphore.js";
 import { HTTP_CREATED, HTTP_NOT_FOUND, HTTP_CONFLICT } from "./constants.js";
 
-const API_KEY_PREVIEW_MIN_LEN = 8;
-const API_KEY_PREVIEW_PREFIX_LEN = 4;
 const PROVIDER_NAME_RE = /^[a-zA-Z0-9_-]+$/;
 
 const CreateProviderSchema = Type.Object({

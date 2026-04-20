@@ -68,8 +68,8 @@ function insertMockBackend(
   const encryptedKey = encrypt("sk-backend-key", TEST_ENCRYPTION_KEY);
   mockDb
     .prepare(
-      `INSERT INTO providers (id, name, api_type, base_url, api_key, is_active, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO providers (id, name, api_type, base_url, api_key, is_active, max_concurrency, queue_timeout_ms, max_queue_size, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       "svc-openai",
@@ -78,6 +78,9 @@ function insertMockBackend(
       baseUrl,
       encryptedKey,
       1,
+      0,
+      0,
+      100,
       now,
       now
     );

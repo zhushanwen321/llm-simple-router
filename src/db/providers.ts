@@ -75,7 +75,7 @@ export function createProvider(
 export function updateProvider(
   db: Database.Database,
   id: string,
-  fields: Partial<Pick<Provider, "name" | "api_type" | "base_url" | "api_key" | "api_key_preview" | "is_active" | "max_concurrency" | "queue_timeout_ms" | "max_queue_size">>,
+  fields: Partial<Pick<Provider, "name" | "api_type" | "base_url" | "api_key" | "api_key_preview" | "models" | "is_active" | "max_concurrency" | "queue_timeout_ms" | "max_queue_size">>,
 ): void {
   buildUpdateQuery(db, "providers", id, fields, PROVIDER_FIELDS, { updatedAt: true });
 }
