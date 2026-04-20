@@ -113,7 +113,7 @@
           </div>
           <div>
             <div class="flex items-center gap-2 mb-1">
-              <Switch v-model:checked="concurrencyEnabled" id="concurrency-switch" />
+              <Switch v-model="concurrencyEnabled" id="concurrency-switch" />
               <Label for="concurrency-switch" class="text-sm text-foreground">并发控制</Label>
             </div>
             <div v-if="concurrencyEnabled" class="mt-2 space-y-2">
@@ -189,10 +189,11 @@ interface Provider {
 }
 
 const DEFAULT_CONCURRENCY = 3
-const DEFAULT_QUEUE_SIZE = 100
+const DEFAULT_QUEUE_TIMEOUT_MS = 120_000
+const DEFAULT_QUEUE_SIZE = 10
 const MAX_CONCURRENCY = 100
 const MAX_QUEUE_SIZE = 1000
-const DEFAULT_FORM = { name: '', api_type: 'anthropic', base_url: '', api_key: '', models: [] as string[], is_active: true, max_concurrency: DEFAULT_CONCURRENCY, queue_timeout_ms: 0, max_queue_size: DEFAULT_QUEUE_SIZE }
+const DEFAULT_FORM = { name: '', api_type: 'anthropic', base_url: '', api_key: '', models: [] as string[], is_active: true, max_concurrency: DEFAULT_CONCURRENCY, queue_timeout_ms: DEFAULT_QUEUE_TIMEOUT_MS, max_queue_size: DEFAULT_QUEUE_SIZE }
 const modelInput = ref('')
 
 const providers = ref<Provider[]>([])
@@ -253,7 +254,7 @@ function removeModel(index: number) {
 function openCreate() {
   editingId.value = null
   form.value = { ...DEFAULT_FORM }
-  concurrencyEnabled.value = false
+  concurrencyEnabled.value = true
   modelInput.value = ''
   presetGroup.value = ''
   presetPlan.value = ''
@@ -262,7 +263,7 @@ function openCreate() {
 
 function openEdit(p: Provider) {
   editingId.value = p.id
-  form.value = { name: p.name, api_type: 'anthropic', base_url: p.base_url, api_key: p.api_key, models: [...(p.models || [])], is_active: !!p.is_active, max_concurrency: p.max_concurrency ?? DEFAULT_CONCURRENCY, queue_timeout_ms: p.queue_timeout_ms ?? 0, max_queue_size: p.max_queue_size ?? DEFAULT_QUEUE_SIZE }
+  form.value = { name: p.name, api_type: 'anthropic', base_url: p.base_url, api_key: p.api_key, models: [...(p.models || [])], is_active: !!p.is_active, max_concurrency: p.max_concurrency ?? DEFAULT_CONCURRENCY, queue_timeout_ms: p.queue_timeout_ms ?? DEFAULT_QUEUE_TIMEOUT_MS, max_queue_size: p.max_queue_size ?? DEFAULT_QUEUE_SIZE }
   concurrencyEnabled.value = (p.max_concurrency ?? 0) > 0
   modelInput.value = ''
   presetGroup.value = ''
