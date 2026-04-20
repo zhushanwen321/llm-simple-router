@@ -5,6 +5,7 @@ import type { Provider } from "../db/index.js";
 import { getAllProviders, getProviderById, createProvider, updateProvider, deleteProvider, getAllMappingGroups } from "../db/index.js";
 import { encrypt, decrypt } from "../utils/crypto.js";
 import { getSetting } from "../db/settings.js";
+import { ProviderSemaphoreManager } from "../proxy/semaphore.js";
 import { HTTP_CREATED, HTTP_NOT_FOUND, HTTP_CONFLICT } from "./constants.js";
 
 const API_KEY_PREVIEW_MIN_LEN = 8;
@@ -18,6 +19,9 @@ const CreateProviderSchema = Type.Object({
   api_key: Type.String({ minLength: 1 }),
   models: Type.Optional(Type.Array(Type.String())),
   is_active: Type.Optional(Type.Number()),
+  max_concurrency: Type.Optional(Type.Number({ minimum: 0 })),
+  queue_timeout_ms: Type.Optional(Type.Number({ minimum: 0 })),
+  max_queue_size: Type.Optional(Type.Number({ minimum: 1 })),
 });
 
 const UpdateProviderSchema = Type.Object({
@@ -27,14 +31,18 @@ const UpdateProviderSchema = Type.Object({
   api_key: Type.Optional(Type.String({ minLength: 1 })),
   models: Type.Optional(Type.Array(Type.String())),
   is_active: Type.Optional(Type.Number()),
+  max_concurrency: Type.Optional(Type.Number({ minimum: 0 })),
+  queue_timeout_ms: Type.Optional(Type.Number({ minimum: 0 })),
+  max_queue_size: Type.Optional(Type.Number({ minimum: 1 })),
 });
 
 interface ProviderRoutesOptions {
   db: Database.Database;
+  semaphoreManager?: ProviderSemaphoreManager;
 }
 
 export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> = (app, options, done) => {
-  const { db } = options;
+  const { db, semaphoreManager } = options;
 
   app.get("/admin/api/providers", async (_request, reply) => {
     const encryptionKey = getSetting(db, "encryption_key")!;
@@ -47,6 +55,10 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
       api_key: s.api_key ? decrypt(s.api_key, encryptionKey) : "",
       models: JSON.parse(s.models || "[]"),
       is_active: s.is_active,
+      max_concurrency: s.max_concurrency,
+      queue_timeout_ms: s.queue_timeout_ms,
+      max_queue_size: s.max_queue_size,
+      concurrency_status: semaphoreManager?.getStatus(s.id) ?? { active: 0, queued: 0 },
       created_at: s.created_at,
       updated_at: s.updated_at,
     })));
@@ -66,6 +78,14 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
       api_key_preview: body.api_key.length > 8 ? `${body.api_key.slice(0, 4)}...${body.api_key.slice(-4)}` : "****",
       models: JSON.stringify(body.models ?? []),
       is_active: body.is_active ?? 1,
+      max_concurrency: body.max_concurrency ?? 0,
+      queue_timeout_ms: body.queue_timeout_ms ?? 0,
+      max_queue_size: body.max_queue_size ?? 100,
+    });
+    semaphoreManager?.updateConfig(id, {
+      maxConcurrency: body.max_concurrency ?? 0,
+      queueTimeoutMs: body.queue_timeout_ms ?? 0,
+      maxQueueSize: body.max_queue_size ?? 100,
     });
     return reply.code(HTTP_CREATED).send({ id });
   });
@@ -80,17 +100,28 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     if (body.name !== undefined && !PROVIDER_NAME_RE.test(body.name)) {
       return reply.status(400).send({ error: { message: "Provider 名称仅允许英文大小写字母、数字、横线和下划线" } });
     }
-    const fields: Partial<Pick<Provider, 'name' | 'api_type' | 'base_url' | 'api_key' | 'api_key_preview' | 'models' | 'is_active'>> = {};
+    const fields: Partial<Pick<Provider, 'name' | 'api_type' | 'base_url' | 'api_key' | 'api_key_preview' | 'models' | 'is_active' | 'max_concurrency' | 'queue_timeout_ms' | 'max_queue_size'>> = {};
     if (body.name !== undefined) fields.name = body.name;
     if (body.api_type !== undefined) fields.api_type = body.api_type;
     if (body.base_url !== undefined) fields.base_url = body.base_url;
     if (body.is_active !== undefined) fields.is_active = body.is_active;
     if (body.models !== undefined) fields.models = JSON.stringify(body.models);
+    if (body.max_concurrency !== undefined) fields.max_concurrency = body.max_concurrency;
+    if (body.queue_timeout_ms !== undefined) fields.queue_timeout_ms = body.queue_timeout_ms;
+    if (body.max_queue_size !== undefined) fields.max_queue_size = body.max_queue_size;
     if (body.api_key) {
       fields.api_key = encrypt(body.api_key, getSetting(db, "encryption_key")!);
       fields.api_key_preview = body.api_key.length > 8 ? `${body.api_key.slice(0, 4)}...${body.api_key.slice(-4)}` : "****";
     }
     updateProvider(db, id, fields);
+    if (body.max_concurrency !== undefined || body.queue_timeout_ms !== undefined || body.max_queue_size !== undefined) {
+      const updated = getProviderById(db, id)!;
+      semaphoreManager?.updateConfig(id, {
+        maxConcurrency: updated.max_concurrency,
+        queueTimeoutMs: updated.queue_timeout_ms,
+        maxQueueSize: updated.max_queue_size,
+      });
+    }
     return reply.send({ success: true });
   });
 
@@ -107,6 +138,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
       } catch { /* rule format invalid, skip */ }
     }
     deleteProvider(db, id);
+    semaphoreManager?.remove(id);
     return reply.send({ success: true });
   });
 
