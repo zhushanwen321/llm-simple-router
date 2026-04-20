@@ -1,6 +1,8 @@
 import { FastifyPluginCallback } from "fastify";
 import type { RequestTracker } from "../monitor/request-tracker.js";
 
+const HTTP_OK = 200;
+
 interface MonitorRoutesOptions {
   tracker?: RequestTracker;
 }
@@ -14,12 +16,13 @@ export const adminMonitorRoutes: FastifyPluginCallback<MonitorRoutesOptions> = (
   }
 
   app.get("/admin/api/monitor/active", async () => tracker.getActive());
+  app.get("/admin/api/monitor/recent", async () => tracker.getRecent());
   app.get("/admin/api/monitor/stats", async () => tracker.getStats());
   app.get("/admin/api/monitor/concurrency", async () => tracker.getConcurrency());
   app.get("/admin/api/monitor/runtime", async () => tracker.getRuntime());
 
   app.get("/admin/api/monitor/stream", (request, reply) => {
-    reply.raw.writeHead(200, {
+    reply.raw.writeHead(HTTP_OK, {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
       Connection: "keep-alive",

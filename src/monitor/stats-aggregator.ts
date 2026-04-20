@@ -57,6 +57,10 @@ function emptyAccumulator(): ProviderAccumulator {
 const TOP_ERRORS_LIMIT = 5;
 
 const DEFAULT_CAPACITY = 1000;
+const HTTP_SUCCESS_RANGE_MIN = 200;
+const HTTP_SUCCESS_RANGE_MAX = 400;
+const PERCENTILE_P50 = 0.5;
+const PERCENTILE_P99 = 0.99;
 
 export class StatsAggregator {
   private latencyBuffer: RingBuffer;
@@ -90,7 +94,7 @@ export class StatsAggregator {
       (this.byStatusCode.get(statusCode) ?? 0) + 1,
     );
 
-    if (statusCode >= 200 && statusCode < 400) {
+    if (statusCode >= HTTP_SUCCESS_RANGE_MIN && statusCode < HTTP_SUCCESS_RANGE_MAX) {
       this.successCount++;
     } else {
       this.errorCount++;
@@ -106,7 +110,7 @@ export class StatsAggregator {
       this.providers.set(providerId, acc);
     }
     acc.totalRequests++;
-    if (statusCode >= 200 && statusCode < 400) {
+    if (statusCode >= HTTP_SUCCESS_RANGE_MIN && statusCode < HTTP_SUCCESS_RANGE_MAX) {
       acc.successCount++;
     } else {
       acc.errorCount++;
@@ -138,8 +142,8 @@ export class StatsAggregator {
 
     const avgLatencyMs =
       count > 0 ? sorted.reduce((s, v) => s + v, 0) / count : 0;
-    const p50LatencyMs = count > 0 ? percentile(sorted, 0.5) : 0;
-    const p99LatencyMs = count > 0 ? percentile(sorted, 0.99) : 0;
+    const p50LatencyMs = count > 0 ? percentile(sorted, PERCENTILE_P50) : 0;
+    const p99LatencyMs = count > 0 ? percentile(sorted, PERCENTILE_P99) : 0;
 
     const byProvider: Record<string, ProviderStats> = {};
     for (const [id, acc] of this.providers) {

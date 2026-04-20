@@ -69,6 +69,13 @@
     <div v-if="request.clientIp" class="text-xs text-muted-foreground">
       IP: {{ request.clientIp }}
     </div>
+
+    <!-- 查看完整日志 -->
+    <div v-if="request.status === 'completed' || request.status === 'failed'" class="pt-2">
+      <Button variant="outline" size="sm" class="w-full" @click="$emit('viewDetail', request.id)">
+        查看完整日志
+      </Button>
+    </div>
   </div>
 </template>
 
@@ -76,6 +83,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 
 interface AttemptSnapshot {
   statusCode: number | null
@@ -110,6 +118,10 @@ interface ActiveRequest {
 
 const props = defineProps<{
   request: ActiveRequest | null
+}>()
+
+defineEmits<{
+  viewDetail: [id: string]
 }>()
 
 const elapsedText = computed(() => {

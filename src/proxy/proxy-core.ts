@@ -61,6 +61,8 @@ export type { ProxyResult, StreamProxyResult, GetProxyResult };
 
 const UPSTREAM_SUCCESS = 200;
 const FAILOVER_FAIL_THRESHOLD = 400;
+const STREAM_CONTENT_MAX_RAW = 8192;
+const STREAM_CONTENT_MAX_TEXT = 4096;
 
 // ---------- Header utilities ----------
 
@@ -230,6 +232,7 @@ function collectMetrics(
 // ---------- Shared proxy handler ----------
 
 const HTTP_BAD_GATEWAY = 502;
+const HTTP_BAD_REQUEST = 400;
 
 /**
  * 共享 POST handler，参数化 apiType/errorFormat/upstreamPath 等差异。
@@ -325,6 +328,7 @@ export async function handleProxyPost(
       providerName: provider.name, isStream, startTime, status: "pending",
       retryCount: 0, attempts: [], clientIp: request.ip,
     });
+    deps.tracker?.update(logId, { queued: true });
 
     body.model = resolved.backend_model;
     const apiKey = decrypt(provider.api_key, getSetting(db, "encryption_key")!);
@@ -351,6 +355,7 @@ export async function handleProxyPost(
       request.raw.on("close", () => ac.abort());
       try {
         await semaphoreManager.acquire(provider.id, ac.signal);
+        deps.tracker?.update(logId, { queued: false });
       } catch (err: unknown) {
         if (err instanceof DOMException && err.name === "AbortError") return reply;
         if (err instanceof SemaphoreQueueFullError) {
@@ -384,6 +389,9 @@ export async function handleProxyPost(
                       isComplete: m.is_complete === 1,
                     },
                   });
+                },
+                onChunk: (rawLine) => {
+                  deps.tracker?.appendStreamChunk(logId, rawLine, apiType, STREAM_CONTENT_MAX_RAW, STREAM_CONTENT_MAX_TEXT);
                 },
               });
               return upstreamStream(provider, apiKey, body, cliHdrs, reply, streamTimeoutMs, upstreamPath, buildUpstreamHeaders, metricsTransform);
@@ -448,7 +456,7 @@ export async function handleProxyPost(
       if (r.statusCode === UPSTREAM_SUCCESS) {
         collectMetrics(db, apiType, r, isStream, lastSuccessLogId, provider.id, resolved.backend_model, request);
       }
-      deps.tracker?.complete(logId, { status: r.statusCode < 400 ? "completed" : "failed", statusCode: r.statusCode });
+      deps.tracker?.complete(logId, { status: r.statusCode < HTTP_BAD_REQUEST ? "completed" : "failed", statusCode: r.statusCode });
       releaseSemaphore();
       return reply;
     } catch (err: unknown) {

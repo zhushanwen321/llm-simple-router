@@ -18,41 +18,101 @@
       :stream-count="streamCount"
     />
 
-    <!-- Middle: two-column layout -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-      <!-- Left: Active request list -->
-      <div class="lg:col-span-2">
-        <Card>
-          <CardHeader>
+    <!-- Middle: three-column layout -->
+    <div class="grid grid-cols-3 gap-4 mb-6">
+      <!-- 活跃请求 -->
+      <Card>
+        <CardHeader class="pb-2">
+          <div class="flex items-center justify-between">
             <CardTitle class="text-sm font-medium text-foreground">活跃请求</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ActiveRequestList
-              :requests="activeRequests"
-              :recent-completed="recentCompleted"
-              :selected-id="selectedRequestId"
-              @select="selectedRequestId = $event"
-            />
-          </CardContent>
-        </Card>
-      </div>
+            <Badge variant="secondary">{{ streamingRequests.length }}</Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <ScrollArea class="h-64">
+            <div v-if="streamingRequests.length === 0" class="text-sm text-muted-foreground py-2">
+              暂无活跃请求
+            </div>
+            <div
+              v-for="req in streamingRequests"
+              :key="req.id"
+              class="flex items-center gap-2 py-2 px-2 rounded cursor-pointer hover:bg-muted/50 transition-colors"
+              :class="{ 'bg-muted': selectedRequestId === req.id }"
+              @click="selectRequest(req.id)"
+            >
+              <Badge :variant="statusVariant(req.status)" class="shrink-0">
+                {{ statusLabel(req.status) }}
+              </Badge>
+              <span class="text-sm text-foreground truncate flex-1">{{ req.model }}</span>
+              <span class="text-xs text-muted-foreground shrink-0">{{ req.providerName }}</span>
+              <span class="text-xs text-muted-foreground shrink-0">{{ elapsed(req.startTime) }}s</span>
+              <Badge v-if="req.isStream" variant="outline" class="shrink-0 text-xs">SSE</Badge>
+            </div>
+          </ScrollArea>
+        </CardContent>
+      </Card>
 
-      <!-- Right: Request detail panel -->
-      <div>
-        <Card>
-          <CardHeader>
-            <CardTitle class="text-sm font-medium text-foreground">请求详情</CardTitle>
-          </CardHeader>
-          <CardContent class="space-y-4">
-            <RequestDetailPanel :request="selectedRequest" />
-            <StreamResponseViewer
-              v-if="selectedRequest"
-              :metrics="selectedRequest.streamMetrics ?? null"
-              :is-stream="selectedRequest.isStream"
-            />
-          </CardContent>
-        </Card>
-      </div>
+      <!-- 队列请求 -->
+      <Card>
+        <CardHeader class="pb-2">
+          <div class="flex items-center justify-between">
+            <CardTitle class="text-sm font-medium text-foreground">队列请求</CardTitle>
+            <Badge variant="secondary">{{ queuedRequests.length }}</Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <ScrollArea class="h-64">
+            <div v-if="queuedRequests.length === 0" class="text-sm text-muted-foreground py-2">
+              暂无排队请求
+            </div>
+            <div
+              v-for="req in queuedRequests"
+              :key="req.id"
+              class="flex items-center gap-2 py-2 px-2 rounded cursor-pointer hover:bg-muted/50 transition-colors"
+              :class="{ 'bg-muted': selectedRequestId === req.id }"
+              @click="selectRequest(req.id)"
+            >
+              <Badge variant="outline" class="shrink-0">
+                排队
+              </Badge>
+              <span class="text-sm text-foreground truncate flex-1">{{ req.model }}</span>
+              <span class="text-xs text-muted-foreground shrink-0">{{ req.providerName }}</span>
+              <span class="text-xs text-muted-foreground shrink-0">{{ elapsed(req.startTime) }}s</span>
+            </div>
+          </ScrollArea>
+        </CardContent>
+      </Card>
+
+      <!-- 已完成 -->
+      <Card>
+        <CardHeader class="pb-2">
+          <div class="flex items-center justify-between">
+            <CardTitle class="text-sm font-medium text-foreground">已完成</CardTitle>
+            <Badge variant="secondary">{{ recentCompleted.length }}</Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <ScrollArea class="h-64">
+            <div v-if="recentCompleted.length === 0" class="text-sm text-muted-foreground py-2">
+              暂无已完成请求
+            </div>
+            <div
+              v-for="req in recentCompleted"
+              :key="req.id"
+              class="flex items-center gap-2 py-1.5 px-2 rounded cursor-pointer opacity-60 hover:opacity-80 hover:bg-muted/50 transition-colors"
+              :class="{ 'bg-muted': selectedRequestId === req.id }"
+              @click="selectRequest(req.id)"
+            >
+              <Badge :variant="statusVariant(req.status)" class="shrink-0">
+                {{ statusLabel(req.status) }}
+              </Badge>
+              <span class="text-sm text-foreground truncate flex-1">{{ req.model }}</span>
+              <span class="text-xs text-muted-foreground shrink-0">{{ req.providerName }}</span>
+              <Badge v-if="req.isStream" variant="outline" class="shrink-0 text-xs">SSE</Badge>
+            </div>
+          </ScrollArea>
+        </CardContent>
+      </Card>
     </div>
 
     <!-- Provider Stats Table -->
@@ -94,22 +154,49 @@
         </CardContent>
       </Card>
     </div>
+
+    <!-- Request Detail Dialog -->
+    <Dialog v-model:open="requestDetailOpen">
+      <DialogScrollContent class="max-w-3xl max-h-[80vh]">
+        <DialogHeader>
+          <DialogTitle>请求详情</DialogTitle>
+        </DialogHeader>
+        <RequestDetailPanel :request="selectedRequest" @view-detail="openLogDetail" />
+        <StreamResponseViewer
+          v-if="selectedRequest"
+          :metrics="selectedRequest.streamMetrics ?? null"
+          :is-stream="selectedRequest.isStream"
+          :stream-content="selectedRequest.streamContent ?? undefined"
+        />
+      </DialogScrollContent>
+    </Dialog>
+
+    <!-- Log Detail Dialog -->
+    <LogDetailDialog ref="logDetailDialog" v-model:open="detailDialogOpen" />
   </div>
 </template>
 
+<!-- eslint-disable no-magic-numbers -->
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { api } from '@/api/client'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogHeader,
+  DialogScrollContent,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import MonitorHeader from '@/components/monitor/MonitorHeader.vue'
 import ConcurrencyPanel from '@/components/monitor/ConcurrencyPanel.vue'
 import RuntimePanel from '@/components/monitor/RuntimePanel.vue'
 import StatusCodePanel from '@/components/monitor/StatusCodePanel.vue'
-import ActiveRequestList from '@/components/monitor/ActiveRequestList.vue'
 import RequestDetailPanel from '@/components/monitor/RequestDetailPanel.vue'
 import StreamResponseViewer from '@/components/monitor/StreamResponseViewer.vue'
 import ProviderStatsTable from '@/components/monitor/ProviderStatsTable.vue'
+import LogDetailDialog from '@/components/monitor/LogDetailDialog.vue'
 
 // --- Type definitions (matching backend src/monitor/types.ts) ---
 
@@ -140,6 +227,13 @@ interface ActiveRequest {
   retryCount: number
   attempts: AttemptSnapshot[]
   streamMetrics?: StreamMetricsSnapshot
+  queued?: boolean
+  streamContent?: {
+    rawChunks: string
+    textContent: string
+    totalChars: number
+    blocks?: Array<{ type: 'thinking' | 'text' | 'tool_use'; content: string }>
+  }
   clientIp?: string
   completedAt?: number
 }
@@ -191,12 +285,21 @@ const RECENT_COMPLETED_MAX = 200
 const activeRequests = ref<ActiveRequest[]>([])
 const recentCompleted = ref<ActiveRequest[]>([])
 const selectedRequestId = ref<string | null>(null)
+const requestDetailOpen = ref(false)
 const stats = ref<StatsSnapshot | null>(null)
 const concurrency = ref<ProviderConcurrencySnapshot[]>([])
 const runtime = ref<RuntimeMetrics | null>(null)
 const connected = ref(false)
 
 const streamCount = computed(() => activeRequests.value.filter((r) => r.isStream).length)
+
+const streamingRequests = computed(() => activeRequests.value.filter((r) => !r.queued))
+const queuedRequests = computed(() => activeRequests.value.filter((r) => r.queued === true))
+
+function selectRequest(id: string) {
+  selectedRequestId.value = id
+  requestDetailOpen.value = true
+}
 
 const selectedRequest = computed(() => {
   if (!selectedRequestId.value) return null
@@ -206,6 +309,41 @@ const selectedRequest = computed(() => {
     null
   )
 })
+
+// --- Log detail dialog ---
+
+const detailDialogOpen = ref(false)
+const logDetailDialog = ref<InstanceType<typeof LogDetailDialog> | null>(null)
+
+function openLogDetail(id: string) {
+  requestDetailOpen.value = false
+  detailDialogOpen.value = true
+  logDetailDialog.value?.load(id)
+}
+
+// --- Helper functions ---
+
+function statusVariant(status: string): 'default' | 'destructive' | 'secondary' | 'outline' {
+  switch (status) {
+    case 'pending': return 'default'
+    case 'failed': return 'destructive'
+    case 'completed': return 'secondary'
+    default: return 'outline'
+  }
+}
+
+function statusLabel(status: string): string {
+  switch (status) {
+    case 'pending': return '进行中'
+    case 'failed': return '失败'
+    case 'completed': return '完成'
+    default: return status
+  }
+}
+
+function elapsed(startTime: number): string {
+  return ((Date.now() - startTime) / 1000).toFixed(1)
+}
 
 // --- SSE connection ---
 
@@ -292,8 +430,9 @@ function disconnectSSE() {
 
 async function loadInitialData() {
   try {
-    const [active, statsData, concurrencyData, runtimeData] = await Promise.allSettled([
+    const [active, recent, statsData, concurrencyData, runtimeData] = await Promise.allSettled([
       api.getMonitorActive(),
+      api.getMonitorRecent(),
       api.getMonitorStats(),
       api.getMonitorConcurrency(),
       api.getMonitorRuntime(),
@@ -301,6 +440,9 @@ async function loadInitialData() {
 
     if (active.status === 'fulfilled') {
       activeRequests.value = active.value as ActiveRequest[]
+    }
+    if (recent.status === 'fulfilled') {
+      recentCompleted.value = recent.value as ActiveRequest[]
     }
     if (statsData.status === 'fulfilled') {
       stats.value = statsData.value as StatsSnapshot

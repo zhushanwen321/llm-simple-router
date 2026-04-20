@@ -61,6 +61,6 @@ export default [
     rules: tasteRules,
   },
   {
-    ignores: ['node_modules/**', 'dist/**', '*.d.ts', '**/*.generated.*', '**/*.test.ts', '**/*.spec.ts'],
+    ignores: ['node_modules/**', 'dist/**', 'frontend-dist/**', 'frontend/dist/**', 'frontend/node_modules/**', 'frontend/.vite/**', '*.d.ts', '**/*.generated.*', '**/*.test.ts', '**/*.spec.ts'],
   },
 ];

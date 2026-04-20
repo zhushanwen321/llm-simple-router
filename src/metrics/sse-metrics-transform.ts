@@ -3,9 +3,13 @@ import { SSEParser } from "./sse-parser.js";
 import { MetricsExtractor } from "./metrics-extractor.js";
 import type { MetricsResult } from "./metrics-extractor.js";
 
+const DEFAULT_THROTTLE_MS = 5000;
+
 export interface MetricsTransformOptions {
   /** 每次处理 SSE 事件后触发的回调，附带当前指标快照 */
   onMetrics?: (metrics: MetricsResult) => void;
+  /** 每收到一个 SSE data 行时触发，传入原始文本行 */
+  onChunk?: (rawLine: string) => void;
   /** 回调节流间隔（毫秒），默认 5000 */
   throttleMs?: number;
 }
@@ -20,6 +24,7 @@ export class SSEMetricsTransform extends Transform {
   private parser: SSEParser;
   private extractor: MetricsExtractor;
   private onMetrics?: (metrics: MetricsResult) => void;
+  private onChunk?: (rawLine: string) => void;
   private throttleMs: number;
   private lastCallbackTime: number = 0;
   private flushed = false;
@@ -33,13 +38,19 @@ export class SSEMetricsTransform extends Transform {
     this.parser = new SSEParser();
     this.extractor = new MetricsExtractor(apiType, requestStartTime);
     this.onMetrics = options?.onMetrics;
-    this.throttleMs = options?.throttleMs ?? 5000;
+    this.onChunk = options?.onChunk;
+    this.throttleMs = options?.throttleMs ?? DEFAULT_THROTTLE_MS;
   }
 
   _transform(chunk: Buffer, _encoding: BufferEncoding, callback: TransformCallback): void {
-    const events = this.parser.feed(chunk.toString("utf-8"));
+    const text = chunk.toString("utf-8");
+    const events = this.parser.feed(text);
     for (const event of events) {
       this.extractor.processEvent(event);
+      // 将解析后的事件还原为 SSE data 行格式传给 onChunk
+      if (event.data != null && this.onChunk) {
+        this.onChunk(`data: ${event.data}`);
+      }
     }
     this.emitMetricsIfReady();
     callback(null, chunk);

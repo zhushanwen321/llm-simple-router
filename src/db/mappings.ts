@@ -130,7 +130,7 @@ export function getActiveProviderModels(db: Database.Database): ProviderModelEnt
       for (const m of models) {
         results.push({ provider_name: p.name, backend_model: m });
       }
-    } catch { /* 忽略解析失败 */ }
+    } catch { continue }
   }
   return results;
 }
@@ -181,7 +181,7 @@ export function resolveByProviderModel(
   try {
     const models: string[] = JSON.parse(providerRow.models);
     if (!models.includes(backendModel)) return null;
-  } catch { return null; }
+  } catch { return null }
 
   // 尝试从 mapping_groups 找到包含此 provider+backend_model 的 client_model
   const groups = db.prepare("SELECT client_model, rule FROM mapping_groups").all() as { client_model: string; rule: string }[];
@@ -193,7 +193,7 @@ export function resolveByProviderModel(
       if (match) {
         return { client_model: g.client_model, provider_id: providerRow.id, backend_model: backendModel };
       }
-    } catch { /* continue */ }
+    } catch { continue }
   }
   // provider 有这个模型但没有 mapping group，直接返回 provider 维度信息
   return { client_model: backendModel, provider_id: providerRow.id, backend_model: backendModel };

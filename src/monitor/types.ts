@@ -1,3 +1,18 @@
+export interface ContentBlock {
+  type: 'thinking' | 'text' | 'tool_use'
+  content: string
+}
+
+export interface StreamContentSnapshot {
+  /** 最近的原始 SSE 文本，环形缓冲区（最多 ~8KB） */
+  rawChunks: string;
+  /** 从 SSE 事件中提取并拼接的文本内容（最多 ~4KB） */
+  textContent: string;
+  /** 累计接收的流字符数 */
+  totalChars: number;
+  blocks?: ContentBlock[];
+}
+
 export interface ActiveRequest {
   id: string;
   apiType: "openai" | "anthropic";
@@ -5,11 +20,13 @@ export interface ActiveRequest {
   providerId: string;
   providerName: string;
   isStream: boolean;
+  queued?: boolean;
   startTime: number;
   status: "pending" | "completed" | "failed";
   retryCount: number;
   attempts: AttemptSnapshot[];
   streamMetrics?: StreamMetricsSnapshot;
+  streamContent?: StreamContentSnapshot;
   clientIp?: string;
   completedAt?: number;
 }

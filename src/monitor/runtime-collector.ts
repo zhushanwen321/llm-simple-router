@@ -1,6 +1,9 @@
 import { performance } from "node:perf_hooks";
 import type { RuntimeMetrics } from "./types.js";
 
+const MS_PER_SECOND = 1000;
+const NS_PER_MS = 1e6;
+
 export class RuntimeCollector {
   private histogram?: { enable(): void; disable(): void; mean: number };
 
@@ -23,7 +26,7 @@ export class RuntimeCollector {
   /** Collect a single runtime metrics snapshot */
   collect(): RuntimeMetrics {
     return {
-      uptimeMs: process.uptime() * 1000,
+      uptimeMs: process.uptime() * MS_PER_SECOND,
       memoryUsage: process.memoryUsage(),
       activeHandles: process._getActiveHandles().length,
       activeRequests: process._getActiveRequests().length,
@@ -36,6 +39,6 @@ export class RuntimeCollector {
       return 0;
     }
     // mean is in nanoseconds; convert to milliseconds
-    return this.histogram.mean / 1e6;
+    return this.histogram.mean / NS_PER_MS;
   }
 }

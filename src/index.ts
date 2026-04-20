@@ -7,6 +7,10 @@ import Fastify, { FastifyInstance } from "fastify";
 import { insertRequestLog } from "./db/logs.js";
 
 const HTTP_NOT_FOUND = 404;
+const HTTP_INTERNAL_ERROR = 500;
+const HTTP_BAD_REQUEST = 400;
+const PROVIDER_DEFAULT_QUEUE_TIMEOUT_MS = 5000;
+const PROVIDER_DEFAULT_MAX_QUEUE_SIZE = 100;
 
 // 代理路由路径 → api_type，用于在全局 hook/errorHandler 中识别代理请求
 const PROXY_API_TYPES: Record<string, string> = {
@@ -95,7 +99,7 @@ export async function buildApp(
   // 统一 schema validation 错误响应格式，代理路由的错误也记录到 request_logs
   app.setErrorHandler((error: Error, request, reply) => {
     const fastifyError = error as Error & { statusCode?: number; validation?: unknown[] };
-    const status = fastifyError.statusCode ?? 500;
+    const status = fastifyError.statusCode ?? HTTP_INTERNAL_ERROR;
 
     const proxyApiType = getProxyApiType(request.url);
     if (proxyApiType) {
@@ -116,8 +120,8 @@ export async function buildApp(
       });
     }
 
-    if (status === 400 && fastifyError.validation) {
-      return reply.code(400).send({ error: { message: fastifyError.message } });
+    if (status === HTTP_BAD_REQUEST && fastifyError.validation) {
+      return reply.code(HTTP_BAD_REQUEST).send({ error: { message: fastifyError.message } });
     }
     return reply.code(status).send({ error: { message: fastifyError.message } });
   });
@@ -147,8 +151,8 @@ export async function buildApp(
     tracker.updateProviderConfig(p.id, {
       name: p.name,
       maxConcurrency: p.max_concurrency ?? 0,
-      queueTimeoutMs: p.queue_timeout_ms ?? 5000,
-      maxQueueSize: p.max_queue_size ?? 100,
+      queueTimeoutMs: p.queue_timeout_ms ?? PROVIDER_DEFAULT_QUEUE_TIMEOUT_MS,
+      maxQueueSize: p.max_queue_size ?? PROVIDER_DEFAULT_MAX_QUEUE_SIZE,
     });
   }
 

@@ -4,13 +4,75 @@ import { RuntimeCollector } from "./runtime-collector.js";
 import type { ProviderSemaphoreManager } from "../proxy/semaphore.js";
 import type {
   ActiveRequest,
+  ContentBlock,
   ProviderConcurrencySnapshot,
   RuntimeMetrics,
   StatsSnapshot,
 } from "./types.js";
 
+// --- Stream content extraction ---
+
+interface StreamExtraction {
+  text: string
+  block?: { index: number; type: ContentBlock['type']; content: string } | null
+}
+
+function extractStreamText(line: string, apiType: "openai" | "anthropic"): StreamExtraction {
+  const empty: StreamExtraction = { text: '', block: null }
+  if (!line.startsWith(SSE_DATA_PREFIX)) return empty
+  const jsonStr = line.slice(SSE_DATA_PREFIX.length)
+  if (jsonStr === '[DONE]') return empty
+  let obj: Record<string, unknown>
+  try {
+    obj = JSON.parse(jsonStr) as Record<string, unknown>
+  } catch {
+    return empty
+  }
+
+  if (apiType === 'openai') {
+    const choices = obj.choices as Array<Record<string, unknown>> | undefined
+    const delta = choices?.[0]?.delta as Record<string, unknown> | undefined
+    const text = (delta?.content as string) ?? ''
+    return { text, block: text ? { index: 0, type: 'text', content: text } : null }
+  }
+
+  // Anthropic
+  const type = obj.type as string | undefined
+  const index = obj.index as number | undefined
+  const delta = obj.delta as Record<string, unknown> | undefined
+
+  if (type === 'content_block_start') {
+    const contentBlock = obj.content_block as Record<string, unknown> | undefined
+    const blockType = contentBlock?.type as string | undefined
+    if (blockType === 'thinking' || blockType === 'text' || blockType === 'tool_use') {
+      return { text: '', block: { index: index ?? 0, type: blockType, content: '' } }
+    }
+    return empty
+  }
+
+  if (type === 'content_block_delta' && delta) {
+    const deltaType = delta.type as string | undefined
+    if (deltaType === 'thinking_delta') {
+      const thinking = (delta.thinking as string) ?? ''
+      return { text: '', block: { index: index ?? 0, type: 'thinking', content: thinking } }
+    }
+    if (deltaType === 'text_delta') {
+      const text = (delta.text as string) ?? ''
+      return { text, block: { index: index ?? 0, type: 'text', content: text } }
+    }
+    if (deltaType === 'input_json_delta') {
+      const partialJson = (delta.partial_json as string) ?? ''
+      return { text: '', block: { index: index ?? 0, type: 'tool_use', content: partialJson } }
+    }
+  }
+
+  return empty
+}
+
+const SSE_DATA_PREFIX = "data: ";
+const RUNTIME_PUSH_TICK_INTERVAL = 2;
 const RECENT_COMPLETED_MAX = 200;
-const RECENT_TTL_MS = 5 * 60 * 1000;
+const RECENT_TTL_MS = 5 * 60 * 1000; // eslint-disable-line no-magic-numbers
 const PUSH_INTERVAL_MS = 5000;
 
 export class RequestTracker {
@@ -54,6 +116,65 @@ export class RequestTracker {
     const req = this.activeMap.get(id);
     if (!req) return;
     Object.assign(req, patch);
+  }
+
+  appendStreamChunk(
+    id: string,
+    rawLine: string,
+    apiType: "openai" | "anthropic",
+    maxRaw: number,
+    maxText: number,
+  ): void {
+    const req = this.activeMap.get(id);
+    if (!req) return;
+
+    if (!req.streamContent) {
+      req.streamContent = { rawChunks: "", textContent: "", totalChars: 0, blocks: [] }
+    }
+
+    const sc = req.streamContent;
+    sc.totalChars += rawLine.length;
+
+    // 环形缓冲区：超过限制时截断保留尾部
+    sc.rawChunks += rawLine + "\n";
+    if (sc.rawChunks.length > maxRaw) {
+      sc.rawChunks = sc.rawChunks.slice(-maxRaw);
+    }
+
+    // 初始化 blocks 数组
+    if (!sc.blocks) {
+      sc.blocks = []
+    }
+
+    const extracted = extractStreamText(rawLine, apiType)
+
+    // 拼接纯文本（text 和 text_delta）
+    if (extracted.text) {
+      sc.textContent += extracted.text
+      if (sc.textContent.length > maxText) {
+        sc.textContent = sc.textContent.slice(-maxText)
+      }
+    }
+
+    // 维护结构化内容块
+    if (extracted.block) {
+      const { index, type, content } = extracted.block
+      while (sc.blocks.length <= index) {
+        sc.blocks.push({ type: 'text', content: '' })
+      }
+      if (content === '' && type !== 'text') {
+        sc.blocks[index].type = type
+      } else if (content) {
+        sc.blocks[index].content += content
+        sc.blocks[index].type = type
+      }
+      const MAX_BLOCK_CONTENT = maxText
+      for (const block of sc.blocks) {
+        if (block.content.length > MAX_BLOCK_CONTENT) {
+          block.content = block.content.slice(-MAX_BLOCK_CONTENT)
+        }
+      }
+    }
   }
 
   complete(
@@ -167,7 +288,7 @@ export class RequestTracker {
       this.broadcast("stats_update", this.getStats());
 
       // Every 10s (every 2nd tick)
-      if (this.tickCount % 2 === 0) {
+      if (this.tickCount % RUNTIME_PUSH_TICK_INTERVAL === 0) {
         this.broadcast("runtime_update", this.getRuntime());
       }
     }, PUSH_INTERVAL_MS);

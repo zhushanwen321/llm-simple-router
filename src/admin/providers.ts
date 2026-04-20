@@ -6,7 +6,11 @@ import { getAllProviders, getProviderById, createProvider, updateProvider, delet
 import { encrypt, decrypt } from "../utils/crypto.js";
 import { getSetting } from "../db/settings.js";
 import { ProviderSemaphoreManager } from "../proxy/semaphore.js";
-import { HTTP_CREATED, HTTP_NOT_FOUND, HTTP_CONFLICT } from "./constants.js";
+import type { RequestTracker } from "../monitor/request-tracker.js";
+import { HTTP_CREATED, HTTP_NOT_FOUND, HTTP_CONFLICT, HTTP_BAD_REQUEST } from "./constants.js";
+
+const API_KEY_PREVIEW_MIN_LENGTH = 8;
+const API_KEY_PREVIEW_PREFIX_LEN = 4;
 
 const PROVIDER_NAME_RE = /^[a-zA-Z0-9_-]+$/;
 
@@ -37,10 +41,11 @@ const UpdateProviderSchema = Type.Object({
 interface ProviderRoutesOptions {
   db: Database.Database;
   semaphoreManager?: ProviderSemaphoreManager;
+  tracker?: RequestTracker;
 }
 
 export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> = (app, options, done) => {
-  const { db, semaphoreManager } = options;
+  const { db, semaphoreManager, tracker } = options;
 
   app.get("/admin/api/providers", async (_request, reply) => {
     const encryptionKey = getSetting(db, "encryption_key")!;
@@ -65,7 +70,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
   app.post("/admin/api/providers", { schema: { body: CreateProviderSchema } }, async (request, reply) => {
     const body = request.body as Static<typeof CreateProviderSchema>;
     if (!PROVIDER_NAME_RE.test(body.name)) {
-      return reply.status(400).send({ error: { message: "Provider 名称仅允许英文大小写字母、数字、横线和下划线" } });
+      return reply.status(HTTP_BAD_REQUEST).send({ error: { message: "Provider 名称仅允许英文大小写字母、数字、横线和下划线" } });
     }
     const encryptedKey = encrypt(body.api_key, getSetting(db, "encryption_key")!);
     const id = createProvider(db, {
@@ -73,7 +78,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
       api_type: body.api_type,
       base_url: body.base_url,
       api_key: encryptedKey,
-      api_key_preview: body.api_key.length > 8 ? `${body.api_key.slice(0, 4)}...${body.api_key.slice(-4)}` : "****",
+      api_key_preview: body.api_key.length > API_KEY_PREVIEW_MIN_LENGTH ? `${body.api_key.slice(0, API_KEY_PREVIEW_PREFIX_LEN)}...${body.api_key.slice(-API_KEY_PREVIEW_PREFIX_LEN)}` : "****",
       models: JSON.stringify(body.models ?? []),
       is_active: body.is_active ?? 1,
       max_concurrency: body.max_concurrency ?? PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency,
@@ -81,6 +86,12 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
       max_queue_size: body.max_queue_size ?? PROVIDER_CONCURRENCY_DEFAULTS.max_queue_size,
     });
     semaphoreManager?.updateConfig(id, {
+      maxConcurrency: body.max_concurrency ?? PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency,
+      queueTimeoutMs: body.queue_timeout_ms ?? PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms,
+      maxQueueSize: body.max_queue_size ?? PROVIDER_CONCURRENCY_DEFAULTS.max_queue_size,
+    });
+    tracker?.updateProviderConfig(id, {
+      name: body.name,
       maxConcurrency: body.max_concurrency ?? PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency,
       queueTimeoutMs: body.queue_timeout_ms ?? PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms,
       maxQueueSize: body.max_queue_size ?? PROVIDER_CONCURRENCY_DEFAULTS.max_queue_size,
@@ -96,7 +107,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     }
     const body = request.body as Static<typeof UpdateProviderSchema>;
     if (body.name !== undefined && !PROVIDER_NAME_RE.test(body.name)) {
-      return reply.status(400).send({ error: { message: "Provider 名称仅允许英文大小写字母、数字、横线和下划线" } });
+      return reply.status(HTTP_BAD_REQUEST).send({ error: { message: "Provider 名称仅允许英文大小写字母、数字、横线和下划线" } });
     }
     const fields: Partial<Pick<Provider, 'name' | 'api_type' | 'base_url' | 'api_key' | 'api_key_preview' | 'models' | 'is_active' | 'max_concurrency' | 'queue_timeout_ms' | 'max_queue_size'>> = {};
     if (body.name !== undefined) fields.name = body.name;
@@ -109,17 +120,23 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     if (body.max_queue_size !== undefined) fields.max_queue_size = body.max_queue_size;
     if (body.api_key) {
       fields.api_key = encrypt(body.api_key, getSetting(db, "encryption_key")!);
-      fields.api_key_preview = body.api_key.length > 8 ? `${body.api_key.slice(0, 4)}...${body.api_key.slice(-4)}` : "****";
+      fields.api_key_preview = body.api_key.length > API_KEY_PREVIEW_MIN_LENGTH ? `${body.api_key.slice(0, API_KEY_PREVIEW_PREFIX_LEN)}...${body.api_key.slice(-API_KEY_PREVIEW_PREFIX_LEN)}` : "****";
     }
     updateProvider(db, id, fields);
+    const updated = getProviderById(db, id)!;
     if (body.max_concurrency !== undefined || body.queue_timeout_ms !== undefined || body.max_queue_size !== undefined) {
-      const updated = getProviderById(db, id)!;
       semaphoreManager?.updateConfig(id, {
         maxConcurrency: updated.max_concurrency,
         queueTimeoutMs: updated.queue_timeout_ms,
         maxQueueSize: updated.max_queue_size,
       });
     }
+    tracker?.updateProviderConfig(id, {
+      name: body.name ?? existing.name,
+      maxConcurrency: updated.max_concurrency,
+      queueTimeoutMs: updated.queue_timeout_ms,
+      maxQueueSize: updated.max_queue_size,
+    });
     return reply.send({ success: true });
   });
 
@@ -130,13 +147,14 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
       try {
         const rule = JSON.parse(g.rule);
         const targets = [rule.default, ...(rule.windows || [])].filter(Boolean);
-        if (targets.some((t: any) => t.provider_id === id)) {
+        if (targets.some((t: { provider_id: string }) => t.provider_id === id)) {
           return reply.code(HTTP_CONFLICT).send({ error: { message: `Provider is referenced by mapping group '${g.client_model}'` } });
         }
-      } catch { /* rule format invalid, skip */ }
+      } catch { continue }
     }
     deleteProvider(db, id);
     semaphoreManager?.remove(id);
+    tracker?.removeProviderConfig(id);
     return reply.send({ success: true });
   });
 

@@ -28,7 +28,7 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (app, opti
   app.register(adminSetupRoutes, { db: options.db });
   app.register(adminAuthPlugin, { db: options.db });
   app.register(adminLoginRoutes, { db: options.db });
-  app.register(adminProviderRoutes, { db: options.db, semaphoreManager: options.semaphoreManager });
+  app.register(adminProviderRoutes, { db: options.db, semaphoreManager: options.semaphoreManager, tracker: options.tracker });
   app.register(adminMappingRoutes, { db: options.db });
   app.register(adminGroupRoutes, { db: options.db });
   app.register(adminRetryRuleRoutes, { db: options.db, matcher: options.matcher });

@@ -38,6 +38,7 @@ const API = {
   PROXY_ENHANCEMENT: '/proxy-enhancement',
   SESSION_STATES: '/session-states',
   MONITOR_ACTIVE: '/monitor/active',
+  MONITOR_RECENT: '/monitor/recent',
   MONITOR_STATS: '/monitor/stats',
   MONITOR_CONCURRENCY: '/monitor/concurrency',
   MONITOR_RUNTIME: '/monitor/runtime',
@@ -187,6 +188,7 @@ export const api = {
     request<{ success: boolean }>('delete', `${API.SESSION_STATES}/${keyId}/${encodeURIComponent(sessionId)}`),
 
   getMonitorActive: () => request<unknown[]>('get', API.MONITOR_ACTIVE),
+  getMonitorRecent: () => request<unknown[]>('get', API.MONITOR_RECENT),
   getMonitorStats: () => request<unknown>('get', API.MONITOR_STATS),
   getMonitorConcurrency: () => request<unknown[]>('get', API.MONITOR_CONCURRENCY),
   getMonitorRuntime: () => request<unknown>('get', API.MONITOR_RUNTIME),
