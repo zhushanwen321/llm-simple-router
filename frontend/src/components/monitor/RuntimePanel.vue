@@ -53,9 +53,17 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
+interface MemoryUsage {
+  rss: number
+  heapTotal: number
+  heapUsed: number
+  external: number
+  arrayBuffers: number
+}
+
 interface RuntimeMetrics {
   uptimeMs: number
-  memoryUsage: NodeJS.MemoryUsage
+  memoryUsage: MemoryUsage
   activeHandles: number
   activeRequests: number
   eventLoopDelayMs: number

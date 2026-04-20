@@ -178,7 +178,7 @@ interface StatsSnapshot {
 
 interface RuntimeMetrics {
   uptimeMs: number
-  memoryUsage: NodeJS.MemoryUsage
+  memoryUsage: { rss: number; heapTotal: number; heapUsed: number; external: number; arrayBuffers: number }
   activeHandles: number
   activeRequests: number
   eventLoopDelayMs: number
