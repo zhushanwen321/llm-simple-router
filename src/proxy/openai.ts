@@ -14,6 +14,7 @@ import {
 } from "./proxy-core.js";
 
 import { RetryRuleMatcher } from "./retry-rules.js";
+import { ProviderSemaphoreManager } from "./semaphore.js";
 
 export interface OpenaiProxyOptions {
   db: Database.Database;
@@ -21,6 +22,7 @@ export interface OpenaiProxyOptions {
   retryMaxAttempts: number;
   retryBaseDelayMs: number;
   matcher?: RetryRuleMatcher;
+  semaphoreManager?: ProviderSemaphoreManager;
 }
 
 const HTTP_NOT_FOUND = 404;
@@ -64,10 +66,10 @@ function sendError(reply: FastifyReply, e: ProxyErrorResponse) {
 }
 
 const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, done) => {
-  const { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher } = opts;
+  const { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher, semaphoreManager } = opts;
 
   app.post(CHAT_COMPLETIONS_PATH, async (request, reply) => {
-    const deps: ProxyHandlerDeps = { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher };
+    const deps: ProxyHandlerDeps = { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher, semaphoreManager };
     return handleProxyPost(request, reply, "openai", CHAT_COMPLETIONS_PATH, openaiErrors, deps, {
       beforeSendProxy: (body, isStream) => {
         if (isStream && !body.stream_options) {

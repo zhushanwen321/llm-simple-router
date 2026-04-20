@@ -22,6 +22,7 @@ import {
 } from "./upstream-call.js";
 import { insertSuccessLog, insertRejectedLog } from "./log-helpers.js";
 import { applyEnhancement, buildModelInfoTag } from "./enhancement-handler.js";
+import { ProviderSemaphoreManager, SemaphoreQueueFullError, SemaphoreTimeoutError } from "./semaphore.js";
 
 // ---------- Types ----------
 
@@ -48,6 +49,7 @@ export interface ProxyHandlerDeps {
   retryMaxAttempts: number;
   retryBaseDelayMs: number;
   matcher?: RetryRuleMatcher;
+  semaphoreManager?: ProviderSemaphoreManager;
 }
 
 // Re-export upstream types for external consumers
@@ -232,6 +234,35 @@ export async function handleProxyPost(
     const retryConfig = buildRetryConfig(retryMaxAttempts, retryBaseDelayMs, matcher);
     const upstreamReqBase = JSON.stringify({ url: `${provider.base_url}${upstreamPath}`, headers: buildUpstreamHeaders(cliHdrs, apiKey, Buffer.byteLength(reqBodyStr)), body: reqBodyStr });
 
+    // === Semaphore acquire ===
+    const semaphoreManager = deps.semaphoreManager;
+    let semaphoreReleased = false;
+    const releaseSemaphore = () => {
+      if (!semaphoreReleased) {
+        semaphoreReleased = true;
+        semaphoreManager?.release(provider.id);
+      }
+    };
+
+    if (semaphoreManager) {
+      const ac = new AbortController();
+      request.raw.on("close", () => ac.abort());
+      try {
+        await semaphoreManager.acquire(provider.id, ac.signal);
+      } catch (err: unknown) {
+        if (err instanceof DOMException && err.name === "AbortError") return reply;
+        if (err instanceof SemaphoreQueueFullError) {
+          const e = errors.concurrencyQueueFull(provider.id);
+          return reply.status(e.statusCode).send(e.body);
+        }
+        if (err instanceof SemaphoreTimeoutError) {
+          const e = errors.concurrencyTimeout(provider.id, err.timeoutMs);
+          return reply.status(e.statusCode).send(e.body);
+        }
+        throw err;
+      }
+    }
+
     try {
       const { result: r, attempts } = isStream
         ? await retryableCall(
@@ -291,6 +322,7 @@ export async function handleProxyPost(
 
       // --- Failover 检查 ---
       if (isFailover && r.statusCode >= FAILOVER_FAIL_THRESHOLD && !reply.raw.headersSent) {
+        releaseSemaphore();
         excludeTargets.push(resolved);
         continue;
       }
@@ -314,6 +346,7 @@ export async function handleProxyPost(
           } catch { request.log.debug("Failed to inject model-info tag into non-JSON response"); }
         }
         for (const [k, v] of Object.entries(pr.headers)) reply.header(k, v);
+        releaseSemaphore();
         return reply.status(pr.statusCode).send(pr.body);
       }
 
@@ -332,6 +365,7 @@ export async function handleProxyPost(
           } catch (err) { request.log.error({ err }, "Failed to insert metrics"); }
         }
       }
+      releaseSemaphore();
       return reply;
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : String(err);
@@ -348,11 +382,13 @@ export async function handleProxyPost(
 
       // --- Failover 检查（异常路径）---
       if (isFailover && !reply.raw.headersSent) {
+        releaseSemaphore();
         excludeTargets.push(resolved);
         continue;
       }
 
       const e = errors.upstreamConnectionFailed();
+      releaseSemaphore();
       return reply.status(e.statusCode).send(e.body);
     }
   }

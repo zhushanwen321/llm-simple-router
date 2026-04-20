@@ -8,6 +8,7 @@ import {
 } from "./proxy-core.js";
 
 import { RetryRuleMatcher } from "./retry-rules.js";
+import { ProviderSemaphoreManager } from "./semaphore.js";
 
 export interface AnthropicProxyOptions {
   db: Database.Database;
@@ -15,6 +16,7 @@ export interface AnthropicProxyOptions {
   retryMaxAttempts: number;
   retryBaseDelayMs: number;
   matcher?: RetryRuleMatcher;
+  semaphoreManager?: ProviderSemaphoreManager;
 }
 
 const MESSAGES_PATH = "/v1/messages";
@@ -51,10 +53,10 @@ const anthropicErrors: ProxyErrorFormatter = {
 };
 
 const anthropicProxyRaw: FastifyPluginCallback<AnthropicProxyOptions> = (app, opts, done) => {
-  const { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher } = opts;
+  const { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher, semaphoreManager } = opts;
 
   app.post(MESSAGES_PATH, async (request, reply) => {
-    const deps: ProxyHandlerDeps = { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher };
+    const deps: ProxyHandlerDeps = { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher, semaphoreManager };
     return handleProxyPost(request, reply, "anthropic", MESSAGES_PATH, anthropicErrors, deps);
   });
 
