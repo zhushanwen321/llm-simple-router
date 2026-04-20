@@ -84,6 +84,9 @@ export class RequestTracker {
 
     this.activeMap.delete(id);
     this.recentCompleted.unshift(completed);
+    if (this.recentCompleted.length > RECENT_COMPLETED_MAX) {
+      this.recentCompleted.length = RECENT_COMPLETED_MAX;
+    }
 
     this.broadcast("request_complete", completed);
   }
@@ -180,12 +183,9 @@ export class RequestTracker {
   broadcast(event: string, data: unknown): void {
     const msg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
     for (const client of this.clients) {
-      if (client.writableEnded) {
-        this.clients.delete(client);
-        continue;
-      }
-      const ok = client.write(msg);
-      if (!ok) {
+      try {
+        if (!client.writableEnded) client.write(msg);
+      } catch {
         this.clients.delete(client);
       }
     }

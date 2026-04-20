@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi, type Mock } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from "vitest";
 import type { ServerResponse } from "node:http";
 import { RequestTracker } from "../../src/monitor/request-tracker.js";
 import { ProviderSemaphoreManager } from "../../src/proxy/semaphore.js";

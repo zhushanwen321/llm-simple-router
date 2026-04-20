@@ -69,7 +69,7 @@ export class StatsAggregator {
   private providers: Map<string, ProviderAccumulator> = new Map();
 
   constructor(capacity = DEFAULT_CAPACITY) {
-    this.latencyBuffer = new RingBuffer(capacity);
+    this.latencyBuffer = new RingBuffer(Math.max(1, capacity));
   }
 
   recordLatency(ms: number): void {
