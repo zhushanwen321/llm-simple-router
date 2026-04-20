@@ -11,15 +11,12 @@
       </div>
     </div>
 
-    <!-- MonitorHeader will go here -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-      <Card v-for="n in 4" :key="n">
-        <CardContent class="p-4">
-          <p class="text-sm text-muted-foreground">--</p>
-          <p class="text-2xl font-bold text-foreground mt-1">--</p>
-        </CardContent>
-      </Card>
-    </div>
+    <!-- Overview cards -->
+    <MonitorHeader
+      :stats="stats"
+      :active-count="activeRequests.length"
+      :stream-count="streamCount"
+    />
 
     <!-- Middle: two-column layout -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
@@ -27,16 +24,15 @@
       <div class="lg:col-span-2">
         <Card>
           <CardHeader>
-            <CardTitle class="text-sm font-medium text-foreground">
-              活跃请求
-              <Badge variant="secondary" class="ml-2">{{ activeRequests.length }}</Badge>
-            </CardTitle>
+            <CardTitle class="text-sm font-medium text-foreground">活跃请求</CardTitle>
           </CardHeader>
           <CardContent>
-            <!-- ActiveRequestList will go here -->
-            <p class="text-sm text-muted-foreground">
-              {{ activeRequests.length > 0 ? `${activeRequests.length} 个活跃请求` : '暂无活跃请求' }}
-            </p>
+            <ActiveRequestList
+              :requests="activeRequests"
+              :recent-completed="recentCompleted"
+              :selected-id="selectedRequestId"
+              @select="selectedRequestId = $event"
+            />
           </CardContent>
         </Card>
       </div>
@@ -48,35 +44,55 @@
             <CardTitle class="text-sm font-medium text-foreground">请求详情</CardTitle>
           </CardHeader>
           <CardContent>
-            <!-- RequestDetailPanel will go here -->
-            <p class="text-sm text-muted-foreground">
-              {{ selectedRequestId ? `选中: ${selectedRequestId}` : '点击请求查看详情' }}
-            </p>
+            <RequestDetailPanel :request="selectedRequest" />
           </CardContent>
         </Card>
       </div>
     </div>
 
-    <!-- Bottom: Provider stats table -->
-    <Card>
-      <CardHeader>
-        <CardTitle class="text-sm font-medium text-foreground">服务提供方状态</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <!-- ProviderStatsTable will go here -->
-        <p class="text-sm text-muted-foreground">
-          {{ concurrency.length > 0 ? `${concurrency.length} 个服务提供方` : '暂无并发数据' }}
-        </p>
-      </CardContent>
-    </Card>
+    <!-- Bottom panels: Concurrency + Status codes + Runtime -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <Card>
+        <CardHeader>
+          <CardTitle class="text-sm font-medium text-foreground">并发度</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ConcurrencyPanel :providers="concurrency" />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle class="text-sm font-medium text-foreground">状态码分布</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <StatusCodePanel :by-status-code="stats?.byStatusCode ?? {}" />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle class="text-sm font-medium text-foreground">运行时</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <RuntimePanel :runtime="runtime" />
+        </CardContent>
+      </Card>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { api } from '@/api/client'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import MonitorHeader from '@/components/monitor/MonitorHeader.vue'
+import ConcurrencyPanel from '@/components/monitor/ConcurrencyPanel.vue'
+import RuntimePanel from '@/components/monitor/RuntimePanel.vue'
+import StatusCodePanel from '@/components/monitor/StatusCodePanel.vue'
+import ActiveRequestList from '@/components/monitor/ActiveRequestList.vue'
+import RequestDetailPanel from '@/components/monitor/RequestDetailPanel.vue'
 
 // --- Type definitions (matching backend src/monitor/types.ts) ---
 
@@ -162,6 +178,17 @@ const stats = ref<StatsSnapshot | null>(null)
 const concurrency = ref<ProviderConcurrencySnapshot[]>([])
 const runtime = ref<RuntimeMetrics | null>(null)
 const connected = ref(false)
+
+const streamCount = computed(() => activeRequests.value.filter((r) => r.isStream).length)
+
+const selectedRequest = computed(() => {
+  if (!selectedRequestId.value) return null
+  return (
+    activeRequests.value.find((r) => r.id === selectedRequestId.value) ??
+    recentCompleted.value.find((r) => r.id === selectedRequestId.value) ??
+    null
+  )
+})
 
 // --- SSE connection ---
 
@@ -269,7 +296,6 @@ async function loadInitialData() {
     }
   } catch (e) {
     console.error('Failed to load initial monitor data:', e)
-    // Initial load failure is non-critical; SSE will push updates once connected
     stats.value = null
     concurrency.value = []
     runtime.value = null
