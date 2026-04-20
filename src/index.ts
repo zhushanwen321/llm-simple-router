@@ -23,7 +23,7 @@ function getProxyApiType(url: string): string | null {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 import { getConfig, Config } from "./config.js";
-import { initDatabase, seedDefaultRules } from "./db/index.js";
+import { initDatabase, seedDefaultRules, getAllProviders } from "./db/index.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { openaiProxy } from "./proxy/openai.js";
 import { anthropicProxy } from "./proxy/anthropic.js";
@@ -31,7 +31,6 @@ import { adminRoutes } from "./admin/routes.js";
 import { RetryRuleMatcher } from "./proxy/retry-rules.js";
 import { ProviderSemaphoreManager } from "./proxy/semaphore.js";
 import { RequestTracker } from "./monitor/request-tracker.js";
-import { getAllProviders } from "./db/index.js";
 import { modelState } from "./proxy/model-state.js";
 import fastifyStatic from "@fastify/static";
 import Database from "better-sqlite3";
@@ -135,9 +134,16 @@ export async function buildApp(
   const tracker = new RequestTracker({ semaphoreManager });
   tracker.startPushInterval();
 
-  // 填充 provider 并发配置缓存
+  // 从 DB 读取已有 provider 的并发配置，初始化信号量管理器和 tracker
   const allProviders = getAllProviders(db);
   for (const p of allProviders) {
+    if (p.max_concurrency > 0) {
+      semaphoreManager.updateConfig(p.id, {
+        maxConcurrency: p.max_concurrency,
+        queueTimeoutMs: p.queue_timeout_ms,
+        maxQueueSize: p.max_queue_size,
+      });
+    }
     tracker.updateProviderConfig(p.id, {
       name: p.name,
       maxConcurrency: p.max_concurrency ?? 0,
@@ -166,7 +172,7 @@ export async function buildApp(
     tracker,
   });
 
-  app.register(adminRoutes, { db, matcher, tracker });
+  app.register(adminRoutes, { db, matcher, tracker, semaphoreManager });
 
   // 前端静态文件服务（生产环境）
   const frontendDist = path.resolve(
