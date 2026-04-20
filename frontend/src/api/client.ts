@@ -53,6 +53,9 @@ interface ProviderPayload {
   api_key?: string
   models?: string[]
   is_active: number
+  max_concurrency?: number
+  queue_timeout_ms?: number
+  max_queue_size?: number
 }
 
 interface MappingPayload {
