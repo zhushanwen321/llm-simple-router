@@ -18,6 +18,7 @@
             <TableHead class="text-muted-foreground">Base URL</TableHead>
             <TableHead class="text-muted-foreground">API Key</TableHead>
             <TableHead class="text-muted-foreground">模型</TableHead>
+            <TableHead class="text-muted-foreground">并发</TableHead>
             <TableHead class="text-muted-foreground">状态</TableHead>
             <TableHead class="text-right text-muted-foreground">操作</TableHead>
           </TableRow>
@@ -37,6 +38,10 @@
               </div>
             </TableCell>
             <TableCell>
+              <Badge v-if="p.max_concurrency > 0" variant="secondary">{{ p.max_concurrency }}</Badge>
+              <span v-else class="text-muted-foreground">-</span>
+            </TableCell>
+            <TableCell>
               <Badge :variant="p.is_active ? 'default' : 'secondary'">{{ p.is_active ? '启用' : '禁用' }}</Badge>
             </TableCell>
             <TableCell class="text-right">
@@ -45,7 +50,7 @@
             </TableCell>
           </TableRow>
           <TableRow v-if="providers.length === 0">
-            <TableCell colspan="7" class="text-center text-muted-foreground py-8">暂无供应商</TableCell>
+            <TableCell colspan="8" class="text-center text-muted-foreground py-8">暂无供应商</TableCell>
           </TableRow>
         </TableBody>
       </Table>
@@ -106,6 +111,16 @@
               <Button type="button" variant="outline" size="sm" @click="addModel" :disabled="!modelInput.trim()">添加</Button>
             </div>
           </div>
+          <div>
+            <div class="flex items-center gap-2 mb-1">
+              <Switch v-model:checked="concurrencyEnabled" id="concurrency-switch" />
+              <Label for="concurrency-switch" class="text-sm text-foreground">并发控制</Label>
+            </div>
+            <div v-if="concurrencyEnabled" class="mt-2">
+              <Label class="block text-sm font-medium text-foreground mb-1">最大并发数</Label>
+              <Input v-model.number="form.max_concurrency" type="number" min="1" max="100" placeholder="3" />
+            </div>
+          </div>
           <div class="flex items-center gap-2">
             <Checkbox v-model="form.is_active" id="svc-active" />
             <Label for="svc-active" class="text-sm text-foreground">启用</Label>
@@ -148,6 +163,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from '@/components/ui/alert-dialog'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Switch } from '@/components/ui/switch'
 
 interface Provider {
   id: string
@@ -157,9 +173,11 @@ interface Provider {
   api_key: string
   models: string[]
   is_active: number
+  max_concurrency: number
 }
 
-const DEFAULT_FORM = { name: '', api_type: 'anthropic', base_url: '', api_key: '', models: [] as string[], is_active: true }
+const DEFAULT_CONCURRENCY = 3
+const DEFAULT_FORM = { name: '', api_type: 'anthropic', base_url: '', api_key: '', models: [] as string[], is_active: true, max_concurrency: DEFAULT_CONCURRENCY }
 const modelInput = ref('')
 
 const providers = ref<Provider[]>([])
@@ -167,6 +185,7 @@ const dialogOpen = ref(false)
 const editingId = ref<string | null>(null)
 const deleteTarget = ref<Provider | null>(null)
 const form = ref({ ...DEFAULT_FORM })
+const concurrencyEnabled = ref(false)
 
 // 预设级联状态
 const presetGroup = ref('')
@@ -218,7 +237,8 @@ function removeModel(index: number) {
 
 function openCreate() {
   editingId.value = null
-  form.value = { name: '', api_type: 'anthropic', base_url: '', api_key: '', models: [], is_active: true }
+  form.value = { ...DEFAULT_FORM }
+  concurrencyEnabled.value = false
   modelInput.value = ''
   presetGroup.value = ''
   presetPlan.value = ''
@@ -227,20 +247,22 @@ function openCreate() {
 
 function openEdit(p: Provider) {
   editingId.value = p.id
-  form.value = { name: p.name, api_type: 'anthropic', base_url: p.base_url, api_key: p.api_key, models: [...(p.models || [])], is_active: !!p.is_active }
+  form.value = { name: p.name, api_type: 'anthropic', base_url: p.base_url, api_key: p.api_key, models: [...(p.models || [])], is_active: !!p.is_active, max_concurrency: p.max_concurrency ?? DEFAULT_CONCURRENCY }
+  concurrencyEnabled.value = (p.max_concurrency ?? 0) > 0
   modelInput.value = ''
   presetGroup.value = ''
   presetPlan.value = ''
   dialogOpen.value = true
 }
 
-function buildPayload(): { name: string; api_type: string; base_url: string; api_key?: string; models: string[]; is_active: number } {
-  const payload: { name: string; api_type: string; base_url: string; api_key?: string; models: string[]; is_active: number } = {
+function buildPayload(): { name: string; api_type: string; base_url: string; api_key?: string; models: string[]; is_active: number; max_concurrency: number } {
+  const payload: { name: string; api_type: string; base_url: string; api_key?: string; models: string[]; is_active: number; max_concurrency: number } = {
     name: form.value.name,
     api_type: 'anthropic',
     base_url: form.value.base_url,
     models: form.value.models,
     is_active: form.value.is_active ? 1 : 0,
+    max_concurrency: concurrencyEnabled.value ? form.value.max_concurrency : 0,
   }
   if (form.value.api_key) payload.api_key = form.value.api_key
   return payload
