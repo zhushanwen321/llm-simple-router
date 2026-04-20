@@ -38,6 +38,8 @@ export interface ProxyErrorFormatter {
   providerUnavailable(): ProxyErrorResponse;
   providerTypeMismatch(): ProxyErrorResponse;
   upstreamConnectionFailed(): ProxyErrorResponse;
+  concurrencyQueueFull(providerId: string): ProxyErrorResponse;
+  concurrencyTimeout(providerId: string, timeoutMs: number): ProxyErrorResponse;
 }
 
 export interface ProxyHandlerDeps {

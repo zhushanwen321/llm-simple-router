@@ -40,6 +40,14 @@ const anthropicErrors: ProxyErrorFormatter = {
     statusCode: 502,
     body: { type: "error", error: { type: "upstream_error", message: "Failed to connect to upstream service" } },
   }),
+  concurrencyQueueFull: (providerId) => ({
+    statusCode: 503,
+    body: { type: "error", error: { type: "api_error", message: `Provider '${providerId}' concurrency queue is full` } },
+  }),
+  concurrencyTimeout: (providerId, timeoutMs) => ({
+    statusCode: 504,
+    body: { type: "error", error: { type: "api_error", message: `Provider '${providerId}' concurrency wait timeout (${timeoutMs}ms)` } },
+  }),
 };
 
 const anthropicProxyRaw: FastifyPluginCallback<AnthropicProxyOptions> = (app, opts, done) => {

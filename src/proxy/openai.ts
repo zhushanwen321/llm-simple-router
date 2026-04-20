@@ -49,6 +49,14 @@ const openaiErrors: ProxyErrorFormatter = {
     statusCode: 502,
     body: { error: { message: "Failed to connect to upstream service", type: "upstream_error", code: "upstream_connection_failed" } },
   }),
+  concurrencyQueueFull: (providerId) => ({
+    statusCode: 503,
+    body: { error: { message: `Provider '${providerId}' concurrency queue is full`, type: "server_error", code: "concurrency_queue_full" } },
+  }),
+  concurrencyTimeout: (providerId, timeoutMs) => ({
+    statusCode: 504,
+    body: { error: { message: `Provider '${providerId}' concurrency wait timeout (${timeoutMs}ms)`, type: "server_error", code: "concurrency_timeout" } },
+  }),
 };
 
 function sendError(reply: FastifyReply, e: ProxyErrorResponse) {
