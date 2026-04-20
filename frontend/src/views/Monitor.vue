@@ -43,12 +43,27 @@
           <CardHeader>
             <CardTitle class="text-sm font-medium text-foreground">请求详情</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent class="space-y-4">
             <RequestDetailPanel :request="selectedRequest" />
+            <StreamResponseViewer
+              v-if="selectedRequest"
+              :metrics="selectedRequest.streamMetrics ?? null"
+              :is-stream="selectedRequest.isStream"
+            />
           </CardContent>
         </Card>
       </div>
     </div>
+
+    <!-- Provider Stats Table -->
+    <Card class="mb-4">
+      <CardHeader>
+        <CardTitle class="text-sm font-medium text-foreground">Provider 统计</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ProviderStatsTable :stats="stats" />
+      </CardContent>
+    </Card>
 
     <!-- Bottom panels: Concurrency + Status codes + Runtime -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -93,6 +108,8 @@ import RuntimePanel from '@/components/monitor/RuntimePanel.vue'
 import StatusCodePanel from '@/components/monitor/StatusCodePanel.vue'
 import ActiveRequestList from '@/components/monitor/ActiveRequestList.vue'
 import RequestDetailPanel from '@/components/monitor/RequestDetailPanel.vue'
+import StreamResponseViewer from '@/components/monitor/StreamResponseViewer.vue'
+import ProviderStatsTable from '@/components/monitor/ProviderStatsTable.vue'
 
 // --- Type definitions (matching backend src/monitor/types.ts) ---
 
