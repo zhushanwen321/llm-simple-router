@@ -166,7 +166,7 @@ function buildSelectModelResponse(
     try {
       const parsed: string[] = JSON.parse(allowedModelsRaw).filter((s: string) => s.trim() !== "");
       if (parsed.length > 0) allowedSet = new Set(parsed);
-    } catch { return providerModels }
+    } catch { return buildTextResponse("model-list", "（解析 allowed_models 失败）") }
   }
   const filtered = allowedSet
     ? providerModels.filter(m => allowedSet!.has(m.backend_model))

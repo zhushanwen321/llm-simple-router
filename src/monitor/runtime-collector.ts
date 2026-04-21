@@ -4,14 +4,24 @@ import type { RuntimeMetrics } from "./types.js";
 const MS_PER_SECOND = 1000;
 const NS_PER_MS = 1e6;
 
+// Node.js 内部 API，无正式类型声明
+type EventLoopHistogram = { enable(): void; disable(): void; mean: number };
+const perf = performance as unknown as Performance & {
+  monitorEventLoopDelay?(opts?: { resolution?: number }): EventLoopHistogram;
+};
+const proc = process as NodeJS.Process & {
+  _getActiveHandles(): object[];
+  _getActiveRequests(): object[];
+};
+
 export class RuntimeCollector {
   private histogram?: { enable(): void; disable(): void; mean: number };
 
   /** Start monitoring the event loop delay histogram */
   start(): void {
     if (this.histogram) return;
-    if (typeof performance.monitorEventLoopDelay !== "function") return;
-    this.histogram = performance.monitorEventLoopDelay({ resolution: 1 });
+    if (typeof perf.monitorEventLoopDelay !== "function") return;
+    this.histogram = perf.monitorEventLoopDelay({ resolution: 1 });
     this.histogram.enable();
   }
 
@@ -28,8 +38,8 @@ export class RuntimeCollector {
     return {
       uptimeMs: process.uptime() * MS_PER_SECOND,
       memoryUsage: process.memoryUsage(),
-      activeHandles: process._getActiveHandles().length,
-      activeRequests: process._getActiveRequests().length,
+      activeHandles: proc._getActiveHandles().length,
+      activeRequests: proc._getActiveRequests().length,
       eventLoopDelayMs: this.getEventLoopDelayMs(),
     };
   }
