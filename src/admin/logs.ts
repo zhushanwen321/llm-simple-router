@@ -1,7 +1,7 @@
 import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
 import { Type, Static } from "@sinclair/typebox";
-import { getRequestLogs, getRequestLogById, deleteLogsBefore } from "../db/index.js";
+import { getRequestLogs, getRequestLogById, getRequestLogChildren, deleteLogsBefore } from "../db/index.js";
 import { HTTP_NOT_FOUND } from "./constants.js";
 
 const LogQuerySchema = Type.Object({
@@ -44,6 +44,16 @@ export const adminLogRoutes: FastifyPluginCallback<LogRoutesOptions> = (app, opt
       return reply.code(HTTP_NOT_FOUND).send({ error: { message: "Log not found" } });
     }
     return reply.send(log);
+  });
+
+  app.get("/admin/api/logs/:id/children", async (request, reply) => {
+    const params = request.params as { id: string };
+    const parent = getRequestLogById(db, params.id);
+    if (!parent) {
+      return reply.code(HTTP_NOT_FOUND).send({ error: { message: "Log not found" } });
+    }
+    const children = getRequestLogChildren(db, params.id);
+    return reply.send(children);
   });
 
   app.delete("/admin/api/logs/before", { schema: { body: DeleteLogsBeforeSchema } }, async (request, reply) => {

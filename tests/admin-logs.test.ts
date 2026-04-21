@@ -187,3 +187,81 @@ describe("Stats API", () => {
     expect(res.statusCode).toBe(401);
   });
 });
+
+describe("Log children endpoint", () => {
+  let app: FastifyInstance;
+  let db: ReturnType<typeof initDatabase>;
+  let close: () => Promise<void>;
+  let cookie: string;
+
+  beforeEach(async () => {
+    db = initDatabase(":memory:");
+    seedSettings(db);
+
+    const now = new Date();
+    db.prepare(
+      `INSERT INTO request_logs (id, api_type, model, provider_id, status_code, latency_ms, is_stream, error_message, created_at, is_retry, is_failover, original_request_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run("root-1", "openai", "gpt-4", "prov-1", 500, 1000, 0, "server error", now.toISOString(), 0, 0, null);
+    db.prepare(
+      `INSERT INTO request_logs (id, api_type, model, provider_id, status_code, latency_ms, is_stream, error_message, created_at, is_retry, is_failover, original_request_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run("child-retry", "openai", "gpt-4", "prov-1", 200, 800, 0, null, new Date(now.getTime() + 50).toISOString(), 1, 0, "root-1");
+    db.prepare(
+      `INSERT INTO request_logs (id, api_type, model, provider_id, status_code, latency_ms, is_stream, error_message, created_at, is_retry, is_failover, original_request_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run("child-failover", "openai", "gpt-4", "prov-2", 200, 500, 0, null, new Date(now.getTime() + 100).toISOString(), 0, 1, "root-1");
+
+    const result = await buildApp({ config: makeConfig() as any, db });
+    app = result.app;
+    close = result.close;
+    cookie = await login(app);
+  });
+
+  afterEach(async () => {
+    await close();
+  });
+
+  it("returns children sorted by created_at ASC", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: "/admin/api/logs/root-1/children",
+      headers: { cookie },
+    });
+    expect(res.statusCode).toBe(200);
+    const children = res.json();
+    expect(children).toHaveLength(2);
+    expect(children[0].id).toBe("child-retry");
+    expect(children[1].id).toBe("child-failover");
+    expect(children[0].is_retry).toBe(1);
+    expect(children[1].is_failover).toBe(1);
+  });
+
+  it("returns empty array for a leaf request with no children", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: "/admin/api/logs/child-retry/children",
+      headers: { cookie },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual([]);
+  });
+
+  it("returns 404 for nonexistent parent", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: "/admin/api/logs/nonexistent-id/children",
+      headers: { cookie },
+    });
+    expect(res.statusCode).toBe(404);
+    expect(res.json().error.message).toBe("Log not found");
+  });
+
+  it("unauthenticated returns 401", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: "/admin/api/logs/root-1/children",
+    });
+    expect(res.statusCode).toBe(401);
+  });
+});
