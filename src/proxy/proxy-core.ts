@@ -328,7 +328,6 @@ export async function handleProxyPost(
       providerName: provider.name, isStream, startTime, status: "pending",
       retryCount: 0, attempts: [], clientIp: request.ip,
     });
-    deps.tracker?.update(logId, { queued: true });
 
     body.model = resolved.backend_model;
     const apiKey = decrypt(provider.api_key, getSetting(db, "encryption_key")!);
@@ -354,10 +353,15 @@ export async function handleProxyPost(
       const ac = new AbortController();
       request.raw.on("close", () => ac.abort());
       try {
-        await semaphoreManager.acquire(provider.id, ac.signal);
+        await semaphoreManager.acquire(provider.id, ac.signal, () => {
+          deps.tracker?.update(logId, { queued: true });
+        });
         deps.tracker?.update(logId, { queued: false });
       } catch (err: unknown) {
-        if (err instanceof DOMException && err.name === "AbortError") return reply;
+        if (err instanceof DOMException && err.name === "AbortError") {
+          deps.tracker?.complete(logId, { status: "failed" });
+          return reply;
+        }
         if (err instanceof SemaphoreQueueFullError) {
           request.log.warn({ providerId: provider.id }, "Concurrency queue full, rejecting request");
           const e = errors.concurrencyQueueFull(provider.id);
@@ -449,8 +453,7 @@ export async function handleProxyPost(
           } catch { request.log.debug("Failed to inject model-info tag into non-JSON response"); }
         }
         for (const [k, v] of Object.entries(pr.headers)) reply.header(k, v);
-        releaseSemaphore();
-        return reply.status(pr.statusCode).send(pr.body);
+        reply.status(pr.statusCode).send(pr.body);
       }
 
       if (r.statusCode === UPSTREAM_SUCCESS) {

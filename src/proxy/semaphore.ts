@@ -78,7 +78,7 @@ export class ProviderSemaphoreManager {
     }
   }
 
-  async acquire(providerId: string, signal?: AbortSignal): Promise<void> {
+  async acquire(providerId: string, signal?: AbortSignal, onQueued?: () => void): Promise<void> {
     const entry = this.getOrCreate(providerId);
     const { maxConcurrency, queueTimeoutMs, maxQueueSize } = entry.config;
 
@@ -92,6 +92,7 @@ export class ProviderSemaphoreManager {
       throw new SemaphoreQueueFullError(providerId);
     }
 
+    onQueued?.();
     return new Promise<void>((resolve, reject) => {
       const qe: QueueEntry = { resolve, reject, timer: null };
 
