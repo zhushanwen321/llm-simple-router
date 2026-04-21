@@ -27,19 +27,22 @@ const t3 = makeTarget({ backend_model: "gemini", provider_id: "p3" });
 // ---------- TransportResult factories ----------
 
 function makeSuccess(statusCode = 200, body = "ok"): TransportResult {
-  return { kind: "success", statusCode, body, headers: {} };
+  return { kind: "success", statusCode, body, headers: {}, sentHeaders: {}, sentBody: "" };
 }
 function makeStreamSuccess(statusCode = 200): TransportResult {
-  return { kind: "stream_success", statusCode };
+  return { kind: "stream_success", statusCode, sentHeaders: {} };
 }
 function makeStreamAbort(statusCode = 200): TransportResult {
-  return { kind: "stream_abort", statusCode };
+  return { kind: "stream_abort", statusCode, sentHeaders: {} };
 }
 function makeStreamError(statusCode = 429, body = "rate limited"): TransportResult {
-  return { kind: "stream_error", statusCode, body, headers: {} };
+  return { kind: "stream_error", statusCode, body, headers: {}, sentHeaders: {} };
 }
 function makeError(statusCode: number, body = "error"): TransportResult {
-  return { kind: "error", statusCode, body, headers: {} };
+  return { kind: "error", statusCode, body, headers: {}, sentHeaders: {}, sentBody: "" };
+}
+function makeThrow(message = "unknown error"): TransportResult {
+  return { kind: "throw", error: new Error(message) };
 }
 
 // ---------- Config factories ----------

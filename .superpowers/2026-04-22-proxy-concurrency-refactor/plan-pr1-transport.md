@@ -1,8 +1,14 @@
 # PR-1: TransportLayer 重构 - 详细实现计划
 
-> **执行方式:** 使用 superpowers:subagent-driven-development 或 superpowers:executing-plans
-> **Spec:** `.superpowers/2026-04-22-proxy-concurrency-refactor/spec.md`
-> **目标:** 用 `src/proxy/transport.ts` 替换 `src/proxy/upstream-call.ts`，引入 `TransportResult` discriminated union 和 StreamProxy 显式状态机
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** 用 `src/proxy/transport.ts` 替换 `src/proxy/upstream-call.ts`，引入 `TransportResult` discriminated union 和 StreamProxy 显式状态机
+
+**Architecture:** TransportLayer 封装非流式/流式/GET 三种上游调用，返回统一的 TransportResult（6 种 kind）。StreamProxy 是 5 状态显式状态机（BUFFERING/STREAMING/COMPLETED/EARLY_ERROR/ABORTED），通过 deferred resolve 绑定外层 Promise。PR-1 提供 compat wrapper 桥接旧 ProxyResult/StreamProxyResult 类型。
+
+**Tech Stack:** TypeScript, Node.js http/https, PassThrough stream, Vitest, vi.fn/vi.doMock
+
+**Spec:** `.superpowers/2026-04-22-proxy-concurrency-refactor/spec.md`
 
 ---
 
@@ -60,6 +66,13 @@ export type StreamState =
 - `stream_success` / `stream_error` / `stream_abort` 携带 `sentHeaders` 以便日志记录
 - `StreamState` 状态机枚举
 
+- [ ] **Commit**
+
+```bash
+git add src/proxy/types.ts
+git commit -m "feat: add shared types.ts with TransportResult and StreamState"
+```
+
 ## Step 2: 从 `proxy-logging.ts` 去除 `RawHeaders` 和 `UPSTREAM_SUCCESS` 定义，改为从 `types.ts` 导入
 
 - [ ] 修改 `src/proxy/proxy-logging.ts`：
@@ -74,6 +87,13 @@ import { UPSTREAM_SUCCESS, type RawHeaders } from "./types.js";
 // re-export 保持下游不中断
 export { UPSTREAM_SUCCESS } from "./types.js";
 export type { RawHeaders } from "./types.js";
+```
+
+- [ ] **Commit**
+
+```bash
+git add src/proxy/proxy-logging.ts
+git commit -m "refactor: migrate RawHeaders and UPSTREAM_SUCCESS to types.ts"
 ```
 
 ## Step 3: 修改 `proxy-core.ts` 从 `types.ts` 导入 `RawHeaders`
@@ -97,6 +117,13 @@ export type { RawHeaders } from "./types.js";
 ```
 
 验证：`npx tsc --noEmit` 确认无类型错误。
+
+- [ ] **Commit**
+
+```bash
+git add src/proxy/proxy-core.ts
+git commit -m "refactor: update proxy-core imports to use types.ts"
+```
 
 ## Step 4: 编写 `tests/transport.test.ts` 测试骨架
 
@@ -149,119 +176,85 @@ function createMockReplyRaw() {
 }
 ```
 
+- [ ] **Commit**
+
+```bash
+git add tests/transport.test.ts
+git commit -m "test: add transport test skeleton with mock factories"
+```
+
 ## Step 5: 编写非流式 transport 测试用例
 
 - [ ] 在 `tests/transport.test.ts` 中添加非流式测试：
 
+> 完整测试代码见 [plan-pr1-tests.md](./plan-pr1-tests.md) 「非流式测试」章节
+
 ```typescript
+// 骨架结构，完整断言见子文档
 describe("TransportLayer.callNonStream", () => {
-  it("returns success on 200 response", async () => {
-    // 模拟上游返回 200 + JSON body
-    // 断言 result.kind === "success"
-    // 断言 statusCode, body, headers 正确
-  });
-
-  it("returns error on 4xx/5xx response", async () => {
-    // 模拟上游返回 429
-    // 断言 result.kind === "error"
-    // 断言 statusCode, body 正确
-  });
-
-  it("returns throw on network error", async () => {
-    // 模拟 upstreamReq emit "error" 事件
-    // 断言 result.kind === "throw"
-    // 断言 result.error 是 Error 实例
-  });
+  it("returns success on 200 response", async () => { /* 见子文档 */ });
+  it("returns error on 4xx/5xx response", async () => { /* 见子文档 */ });
+  it("returns throw on network error", async () => { /* 见子文档 */ });
 });
 ```
 
 测试验证命令：`npx vitest run tests/transport.test.ts`（预期失败，因为 transport.ts 尚未实现）
 
+> 测试代码实现在执行时由子文档 plan-pr1-tests.md 生成，此处不单独 commit。
+
 ## Step 6: 编写流式 transport 测试用例 - 正常完成路径
 
 - [ ] 在 `tests/transport.test.ts` 中添加流式正常完成测试：
 
-```typescript
-describe("TransportLayer.callStream", () => {
-  it("returns stream_success on normal SSE completion", async () => {
-    // 1. mock upstreamRes statusCode = 200
-    // 2. emit "data" 事件发送 SSE chunks
-    // 3. emit "end" 事件
-    // 4. 断言 result.kind === "stream_success"
-    // 5. 断言 reply.raw.writeHead 被调用
-  });
+> 完整测试代码见 [plan-pr1-tests.md](./plan-pr1-tests.md) 「流式正常完成测试」章节
 
-  it("returns stream_success without early error checker", async () => {
-    // checkEarlyError = undefined，直接进入 STREAMING
-    // 断言 headersSent = true
-  });
+```typescript
+// 骨架结构，完整断言见子文档
+describe("TransportLayer.callStream", () => {
+  it("returns stream_success on normal SSE completion", async () => { /* 见子文档 */ });
+  it("returns stream_success without early error checker", async () => { /* 见子文档 */ });
 });
 ```
+
+> 测试代码实现在执行时由子文档 plan-pr1-tests.md 生成，此处不单独 commit。
 
 ## Step 7: 编写流式 transport 测试用例 - 早期错误和异常路径
 
 - [ ] 在 `tests/transport.test.ts` 中添加错误路径测试：
 
+> 完整测试代码见 [plan-pr1-tests.md](./plan-pr1-tests.md) 「流式错误路径测试」章节
+
 ```typescript
+// 骨架结构，完整断言见子文档
 describe("StreamProxy state machine - error paths", () => {
-  it("returns stream_error on upstream non-200 status", async () => {
-    // mock upstreamRes statusCode = 429
-    // 断言 result.kind === "stream_error"
-    // 断言 reply.raw.writeHead 未被调用（headers 没发出去）
-  });
-
-  it("returns stream_error when early error detected in buffer phase", async () => {
-    // checkEarlyError 返回 true
-    // 发送包含 \n\n 的数据
-    // 断言 result.kind === "stream_error"
-    // 断言 reply.raw.writeHead 未被调用
-  });
-
-  it("returns stream_abort when client disconnects during streaming", async () => {
-    // 进入 STREAMING 状态后
-    // 触发 reply.raw "close" 事件
-    // 断言 result.kind === "stream_abort"
-  });
-
-  it("returns throw on upstream network error", async () => {
-    // upstreamReq emit "error"
-    // 断言 result.kind === "throw"
-  });
-
-  it("transitions BUFFERING→STREAMING after receiving full event", async () => {
-    // checkEarlyError 返回 false
-    // 发送包含 \n\n 的数据
-    // 断言 reply.raw.writeHead 被调用（进入 STREAMING）
-  });
-
-  it("transitions BUFFERING→STREAMING when buffer exceeds limit", async () => {
-    // 发送超过 4096 字节但不含 \n\n 的数据
-    // 断言自动进入 STREAMING
-  });
+  it("returns stream_error on upstream non-200 status", async () => { /* 见子文档 */ });
+  it("returns stream_error when early error detected in buffer phase", async () => { /* 见子文档 */ });
+  it("returns stream_abort when client disconnects during streaming", async () => { /* 见子文档 */ });
+  it("returns throw on upstream network error", async () => { /* 见子文档 */ });
+  it("transitions BUFFERING→STREAMING after receiving full event", async () => { /* 见子文档 */ });
+  it("transitions BUFFERING→STREAMING when buffer exceeds limit", async () => { /* 见子文档 */ });
 });
 ```
+
+> 测试代码实现在执行时由子文档 plan-pr1-tests.md 生成，此处不单独 commit。
 
 ## Step 8: 编写流式 transport 测试用例 - close handler 注册一次
 
 - [ ] 在 `tests/transport.test.ts` 中添加：
 
-```typescript
-describe("StreamProxy close handler", () => {
-  it("registers reply.raw close handler only once", async () => {
-    // 调用 callStream
-    // 断言 reply.raw.on("close", ...) 只被调用一次
-    // 可通过 vi.fn() wrapper 检查
-  });
+> 完整测试代码见 [plan-pr1-tests.md](./plan-pr1-tests.md) 「close handler 测试」章节
 
-  it("terminal() prevents duplicate resolve", async () => {
-    // 先触发一个终态（如 upstream end → COMPLETED）
-    // 再触发 reply.raw close
-    // 断言 promise 只 resolve 一次（结果是 stream_success 而非 stream_abort）
-  });
+```typescript
+// 骨架结构，完整断言见子文档
+describe("StreamProxy close handler", () => {
+  it("registers reply.raw close handler only once", async () => { /* 见子文档 */ });
+  it("terminal() prevents duplicate resolve", async () => { /* 见子文档 */ });
 });
 ```
 
 全部测试写完后验证编译：`npx tsc --noEmit`
+
+> 测试代码实现在执行时由子文档 plan-pr1-tests.md 生成，此处不单独 commit。
 
 ## Step 9: 实现 `src/proxy/transport.ts` - 公共工具函数
 
@@ -326,6 +319,13 @@ function filterHeaders(raw: RawHeaders): Record<string, string> {
   }
   return out;
 }
+```
+
+- [ ] **Commit**
+
+```bash
+git add src/proxy/transport.ts
+git commit -m "feat: add transport.ts with upstream request utilities"
 ```
 
 ## Step 10: 实现 `callNonStream` - 非流式传输
@@ -399,6 +399,13 @@ export function callNonStream(
 
 验证：`npx vitest run tests/transport.test.ts` 确认非流式测试通过
 
+- [ ] **Commit**
+
+```bash
+git add src/proxy/transport.ts
+git commit -m "feat: add callNonStream non-streaming transport"
+```
+
 ## Step 11: 实现 `callGet` - GET 请求封装
 
 - [ ] 在 `src/proxy/transport.ts` 中添加 GET 方法：
@@ -442,6 +449,13 @@ export function callGet(
 
 注意：`callGet` 保持原 `proxyGetRequest` 的 throw-on-error 行为，因为 GET 路径（`/v1/models`）不在 retry/failover 循环内。
 
+- [ ] **Commit**
+
+```bash
+git add src/proxy/transport.ts
+git commit -m "feat: add callGet for GET proxy requests"
+```
+
 ## Step 12: 实现 StreamProxy 状态机 - 核心结构
 
 - [ ] 在 `src/proxy/transport.ts` 中添加 StreamProxy 类骨架：
@@ -452,7 +466,8 @@ type StreamTerminalKind = "stream_success" | "stream_error" | "stream_abort";
 class StreamProxy {
   private state: StreamState = "BUFFERING";
   private resolved = false;
-  private resolve!: (result: TransportResult) => void;
+  private resolveFn: ((result: TransportResult) => void) | null = null;
+  private pendingResult: TransportResult | null = null;
 
   private readonly bufferChunks: Buffer[] = [];
   private readonly captureChunks: Buffer[] = [];
@@ -472,17 +487,17 @@ class StreamProxy {
     private readonly metricsTransform: SSEMetricsTransform | undefined,
     private readonly checkEarlyError: ((data: string) => boolean) | undefined,
     private readonly timeoutMs: number,
-    private readonly promise: Promise<TransportResult>,
   ) {
     this.sseHeaders = filterHeaders(upstreamHeaders);
     this.sseHeaders["Content-Type"] = "text/event-stream";
     this.sseHeaders["Cache-Control"] = "no-cache";
     this.sseHeaders["Connection"] = "keep-alive";
     this.pipeEntry = metricsTransform ?? this.passThrough;
+  }
 
-    promise.then((r) => { this.resolve = r as never; });
-    // 上面的 then 回调会在 promise 构造同步 resolve 时不执行
-    // 所以用 setter 模式
+  bindResolve(resolve: (result: TransportResult) => void): void {
+    this.resolveFn = resolve;
+    if (this.pendingResult) resolve(this.pendingResult);
   }
 }
 ```
@@ -523,18 +538,32 @@ private terminal(kind: StreamTerminalKind, extra: Record<string, unknown> = {}):
     sentHeaders: this.upstreamHeaders,
   };
 
+  let result: TransportResult;
   switch (kind) {
     case "stream_success":
-      this.resolve({ kind: "stream_success", ...base, metrics: extra.metrics as MetricsResult | undefined });
+      result = { kind: "stream_success", ...base, metrics: extra.metrics as MetricsResult | undefined };
       break;
     case "stream_error":
-      this.resolve({ kind: "stream_error", ...base, body: extra.body as string, headers: this.sseHeaders });
+      result = { kind: "stream_error", ...base, body: extra.body as string, headers: this.sseHeaders };
       break;
     case "stream_abort":
-      this.resolve({ kind: "stream_abort", ...base, metrics: extra.metrics as MetricsResult | undefined });
+      result = { kind: "stream_abort", ...base, metrics: extra.metrics as MetricsResult | undefined };
       break;
   }
+
+  if (this.resolveFn) {
+    this.resolveFn(result);
+  } else {
+    this.pendingResult = result;
+  }
 }
+```
+
+- [ ] **Commit**
+
+```bash
+git add src/proxy/transport.ts
+git commit -m "feat: add StreamProxy state machine core with deferred resolve"
 ```
 
 ## Step 13: 实现 StreamProxy - cleanup、metrics、startStreaming
@@ -648,13 +677,21 @@ onEnd(): void {
 
 onUpstreamError(err: Error): void {
   if (this.resolved) return;
+  this.resolved = true;
   this.cleanup();
-  // upstream error 是 throw，不是 TransportResult kind
-  if (this.resolve) {
-    this.resolved = true;
-    this.resolve({ kind: "throw", error: err });
+  if (this.resolveFn) {
+    this.resolveFn({ kind: "throw", error: err });
+  } else {
+    this.pendingResult = { kind: "throw", error: err };
   }
 }
+```
+
+- [ ] **Commit**
+
+```bash
+git add src/proxy/transport.ts
+git commit -m "feat: add StreamProxy event handlers and cleanup"
 ```
 
 ## Step 15: 实现 `callStream` - 流式传输入口函数
@@ -713,12 +750,10 @@ export function callStream(
         metricsTransform,
         checkEarlyError,
         timeoutMs,
-        // 用 resolver 模式避免构造器中的 resolve 时序问题
       );
 
-      // 手动绑定 resolve
-      (proxy as any)._setResolve = (r: (result: TransportResult) => void) => resolve(r as any);
-      // 实际上用更简单的方式：
+      // deferred resolve：bindResolve 将外层 Promise 的 resolve 绑定到 StreamProxy
+      // 事件是异步的，所以 bindResolve 始终在 terminal() 之前被调用
       proxy.bindResolve(resolve);
 
       proxy.registerCloseHandler();
@@ -740,31 +775,15 @@ export function callStream(
 }
 ```
 
-注意：StreamProxy 的构造需要重新设计以避免 resolve 时序问题。实际实现时用一个 deferred promise 模式：
+注意：StreamProxy 使用 deferred resolve 模式。构造器不接收 Promise，而是在 callStream 中通过 `proxy.bindResolve(resolve)` 绑定外层 Promise 的 resolve。`terminal()` 通过 `resolveFn`/`pendingResult` 保证即使 bindResolve 前就到达终态也不会丢失结果（实际上不会发生，因为事件是异步的）。
 
-```typescript
-// 在 StreamProxy 构造中
-private resolveFn: ((result: TransportResult) => void) | null = null;
-private pendingResult: TransportResult | null = null;
+- [ ] **Commit**
 
-bindResolve(resolve: (result: TransportResult) => void): void {
-  this.resolveFn = resolve;
-  // 如果 terminal() 已经被调用（不太可能但防御性编程）
-  if (this.pendingResult) resolve(this.pendingResult);
-}
-
-private terminal(...): void {
-  if (this.resolved) return;
-  this.resolved = true;
-  this.cleanup();
-  const result = ...; // 构建 TransportResult
-  if (this.resolveFn) {
-    this.resolveFn(result);
-  } else {
-    this.pendingResult = result;
-  }
-}
+```bash
+git add src/proxy/transport.ts
+git commit -m "feat: add callStream entry point with StreamProxy integration"
 ```
+
 
 ## Step 16: 运行测试验证 StreamProxy 实现
 
@@ -819,6 +838,13 @@ export type { ProxyResult, StreamProxyResult, GetProxyResult };
 ```typescript
 export type { TransportResult } from "./types.js";
 export type { GetTransportResult } from "./transport.js";
+```
+
+- [ ] **Commit**
+
+```bash
+git add src/proxy/proxy-core.ts
+git commit -m "refactor: replace upstream-call imports with transport"
 ```
 
 ## Step 18: 适配 `proxy-core.ts` 中 handleProxyPost 的调用方式
@@ -939,6 +965,13 @@ export function proxyStreamCompat(
 }
 ```
 
+- [ ] **Commit**
+
+```bash
+git add src/proxy/transport.ts
+git commit -m "feat: add backward-compatible compat wrappers for PR-1 bridge"
+```
+
 ## Step 20: 更新 `proxy-core.ts` 使用 compat wrapper
 
 - [ ] 修改 `src/proxy/proxy-core.ts` 的导入和调用：
@@ -980,6 +1013,13 @@ export type { ProxyResult, StreamProxyResult } from "./transport.js";
 export type { GetTransportResult as GetProxyResult } from "./transport.js";
 ```
 
+- [ ] **Commit**
+
+```bash
+git add src/proxy/proxy-core.ts
+git commit -m "refactor: wire proxy-core to use transport compat wrappers"
+```
+
 ## Step 21: 更新 `proxy-logging.ts` 的类型导入
 
 - [ ] 修改 `src/proxy/proxy-logging.ts`：
@@ -992,6 +1032,13 @@ import type { ProxyResult, StreamProxyResult } from "./upstream-call.js";
 import type { ProxyResult, StreamProxyResult } from "./transport.js";
 ```
 
+- [ ] **Commit**
+
+```bash
+git add src/proxy/proxy-logging.ts
+git commit -m "refactor: update proxy-logging type imports to transport.js"
+```
+
 ## Step 22: 更新 `retry.ts` 的类型导入
 
 - [ ] 修改 `src/proxy/retry.ts`：
@@ -1002,6 +1049,13 @@ import type { ProxyResult, StreamProxyResult } from "./proxy-core.js";
 
 // 修改后：
 import type { ProxyResult, StreamProxyResult } from "./transport.js";
+```
+
+- [ ] **Commit**
+
+```bash
+git add src/proxy/retry.ts
+git commit -m "refactor: update retry.ts type imports to transport.js"
 ```
 
 ## Step 23: 删除 `src/proxy/upstream-call.ts`
@@ -1046,13 +1100,13 @@ npm run lint
 
 ### StreamProxy 构造时序
 
-StreamProxy 的 resolve 绑定不能在构造器中完成（因为 Promise executor 同步执行时 resolve 尚未可用）。使用 deferred 模式：
+StreamProxy 使用 deferred resolve 模式。构造器不接收 Promise，callStream 在创建 StreamProxy 后立即调用 `bindResolve(resolve)` 绑定外层 Promise 的 resolve。
 
 ```
-callStream 创建 Promise → new StreamProxy → StreamProxy.bindResolve(resolve) → 事件注册
+callStream 创建 Promise → new StreamProxy → proxy.bindResolve(resolve) → 事件注册
 ```
 
-`terminal()` 在 `bindResolve` 之前被调用的场景不存在（因为事件是异步的），但防御性编程保留 `pendingResult` 字段。
+`terminal()` 在 `bindResolve` 之前被调用的场景不存在（因为事件是异步的），但 `pendingResult` 字段提供防御性保证。
 
 ### 状态转换守卫
 

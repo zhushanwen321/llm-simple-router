@@ -1,8 +1,12 @@
 # PR-2: ResilienceLayer 重构 - 实现计划
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**目标:** 新建 `src/proxy/resilience.ts`，统一 retry + failover 决策引擎。
+**Goal:** 新建 `src/proxy/resilience.ts`，统一 retry + failover 决策引擎
+
+**Architecture:** ResilienceLayer 通过 decide() 方法实现 5 优先级状态驱动决策（stream_abort→success→throw→threshold error→rule match），execute() 方法管理 per-target 重试计数和 failover 排除列表。策略类（FixedInterval/ExponentialBackoff）从 retry.ts 迁移。
+
+**Tech Stack:** TypeScript, Vitest, vi.fn mock RetryRuleMatcher，不启动真实 HTTP 服务器
 
 **前置条件:** PR-1 已完成，`src/proxy/types.ts` 含 `TransportResult` 类型。
 

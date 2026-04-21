@@ -153,6 +153,8 @@ export class ResilienceLayer {
     }
 
     // Priority 4: statusCode >= failoverThreshold -> retry or failover
+    // 隐式假设：success/stream_success 的 statusCode < failoverThreshold 已在 Priority 2 处理
+    // 到达此处的 success/stream_success 极少见（如 Provider 返回 200 但 statusCode 被篡改）
     if (result.statusCode >= config.failoverThreshold) {
       const body = extractBody(result);
       const matchedRule = body && config.ruleMatcher
@@ -174,7 +176,7 @@ export class ResilienceLayer {
 
     // Priority 5: 其他响应（< failoverThreshold 的非成功） -> 仅当 rule 匹配才 retry
     const body = extractBody(result);
-    if (body && config.ruleMatcher?.test(result.statusCode, body)) {
+    if (body && config.ruleMatcher) {
       const matchedRule = config.ruleMatcher.match(result.statusCode, body);
       if (matchedRule && state.attemptCount < matchedRule.max_retries) {
         const strategy = createStrategy(matchedRule);

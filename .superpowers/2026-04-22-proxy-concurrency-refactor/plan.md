@@ -90,3 +90,15 @@ npx vitest run        # 每个 PR 完成后
 npm run lint          # 每个 PR 完成后
 npx tsc --noEmit      # 每个 PR 完成后
 ```
+
+---
+
+## 执行方式
+
+Plan complete. Two execution options:
+
+**1. Subagent-Driven (recommended)** - 每个 Task/Step 派发一个新 subagent，step 之间 review，快速迭代
+
+**2. Inline Execution** - 在当前 session 内使用 executing-plans 批量执行，带 checkpoint review
+
+启动执行前，先完成当前分支 `fix/semaphore-release-and-monitor` 合并到 main，然后从 main 创建 `refactor/proxy-concurrency` dev 分支（已完成），所有 PR 分支从 dev 创建。
