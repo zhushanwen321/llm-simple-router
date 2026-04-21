@@ -60,15 +60,18 @@
         <form @submit.prevent="handleSave" class="space-y-3">
           <div>
             <Label class="block text-sm font-medium text-foreground mb-1">名称</Label>
-            <Input v-model="form.name" type="text" required />
+            <Input v-model="form.name" type="text" required @input="delete errors.name" />
+            <p v-if="errors.name" class="text-sm text-destructive mt-1">{{ errors.name }}</p>
           </div>
           <div>
             <Label class="block text-sm font-medium text-foreground mb-1">HTTP 状态码</Label>
-            <Input v-model.number="form.status_code" type="number" required />
+            <Input v-model.number="form.status_code" type="number" required @input="delete errors.status_code" />
+            <p v-if="errors.status_code" class="text-sm text-destructive mt-1">{{ errors.status_code }}</p>
           </div>
           <div>
             <Label class="block text-sm font-medium text-foreground mb-1">响应体匹配</Label>
-            <Input v-model="form.body_pattern" type="text" placeholder="正则表达式，例如 .*rate_limit.*" required />
+            <Input v-model="form.body_pattern" type="text" placeholder="正则表达式，例如 .*rate_limit.*" required @input="delete errors.body_pattern" />
+            <p v-if="errors.body_pattern" class="text-sm text-destructive mt-1">{{ errors.body_pattern }}</p>
           </div>
           <!-- 重试策略 -->
           <div>
@@ -86,16 +89,19 @@
           <div class="grid grid-cols-2 gap-3">
             <div>
               <Label class="block text-sm font-medium text-foreground mb-1">{{ form.retry_strategy === 'fixed' ? '间隔时间 (ms)' : '初始延迟 (ms)' }}</Label>
-              <Input v-model.number="form.retry_delay_ms" type="number" :min="100" required />
+              <Input v-model.number="form.retry_delay_ms" type="number" :min="100" required @input="delete errors.retry_delay_ms" />
+              <p v-if="errors.retry_delay_ms" class="text-sm text-destructive mt-1">{{ errors.retry_delay_ms }}</p>
             </div>
             <div>
               <Label class="block text-sm font-medium text-foreground mb-1">最大重试次数</Label>
-              <Input v-model.number="form.max_retries" type="number" :min="0" :max="100" required />
+              <Input v-model.number="form.max_retries" type="number" :min="0" :max="100" required @input="delete errors.max_retries" />
+              <p v-if="errors.max_retries" class="text-sm text-destructive mt-1">{{ errors.max_retries }}</p>
             </div>
           </div>
           <div v-if="form.retry_strategy === 'exponential'">
             <Label class="block text-sm font-medium text-foreground mb-1">延迟上限 (ms)</Label>
-            <Input v-model.number="form.max_delay_ms" type="number" :min="100" required />
+            <Input v-model.number="form.max_delay_ms" type="number" :min="100" required @input="delete errors.max_delay_ms" />
+            <p v-if="errors.max_delay_ms" class="text-sm text-destructive mt-1">{{ errors.max_delay_ms }}</p>
           </div>
           <div class="flex items-center gap-2">
             <Checkbox v-model="form.is_active" id="rule-active" />
@@ -165,6 +171,39 @@ const dialogOpen = ref(false)
 const editingId = ref<string | null>(null)
 const deleteTarget = ref<RetryRule | null>(null)
 const form = ref({ ...DEFAULT_FORM })
+const errors = ref<Record<string, string>>({})
+
+const MIN_STATUS_CODE = 100
+const MAX_STATUS_CODE = 599
+const MIN_DELAY_MS = 100
+const MAX_RETRIES = 100
+
+function validate(): boolean {
+  const errs: Record<string, string> = {}
+  if (!form.value.name.trim()) errs.name = '请输入名称'
+
+  const sc = Number(form.value.status_code)
+  if (!Number.isInteger(sc) || sc < MIN_STATUS_CODE || sc > MAX_STATUS_CODE) errs.status_code = `范围 ${MIN_STATUS_CODE}-${MAX_STATUS_CODE}`
+
+  if (!form.value.body_pattern.trim()) errs.body_pattern = '请输入匹配规则'
+  else {
+    try { new RegExp(form.value.body_pattern) } catch { errs.body_pattern = '不是合法的正则表达式' }
+  }
+
+  const delay = Number(form.value.retry_delay_ms)
+  if (!delay || delay < MIN_DELAY_MS) errs.retry_delay_ms = `不能小于 ${MIN_DELAY_MS}ms`
+
+  const retries = Number(form.value.max_retries)
+  if (!Number.isInteger(retries) || retries < 0 || retries > MAX_RETRIES) errs.max_retries = `范围 0-${MAX_RETRIES}`
+
+  if (form.value.retry_strategy === 'exponential') {
+    const maxDelay = Number(form.value.max_delay_ms)
+    if (!maxDelay || maxDelay < MIN_DELAY_MS) errs.max_delay_ms = `不能小于 ${MIN_DELAY_MS}ms`
+  }
+
+  errors.value = errs
+  return Object.keys(errs).length === 0
+}
 
 async function loadData() {
   try {
@@ -179,6 +218,7 @@ async function loadData() {
 function openCreate() {
   editingId.value = null
   form.value = { ...DEFAULT_FORM }
+  errors.value = {}
   dialogOpen.value = true
 }
 
@@ -194,10 +234,12 @@ function openEdit(r: RetryRule) {
     max_retries: r.max_retries,
     max_delay_ms: r.max_delay_ms,
   }
+  errors.value = {}
   dialogOpen.value = true
 }
 
 async function handleSave() {
+  if (!validate()) return
   try {
     const payload = {
       name: form.value.name,
