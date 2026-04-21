@@ -1,6 +1,11 @@
 # 阶段0：构建前端
 FROM node:22-alpine AS frontend-builder
 
+WORKDIR /app
+
+# vite.config.ts 引用根目录 package.json 读取版本号
+COPY package.json package.json
+
 WORKDIR /app/frontend
 
 COPY frontend/package*.json ./
