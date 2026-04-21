@@ -157,17 +157,27 @@
 
     <!-- Request Detail Dialog -->
     <Dialog v-model:open="requestDetailOpen">
-      <DialogScrollContent class="max-w-3xl max-h-[80vh]">
+      <DialogScrollContent class="max-w-5xl max-h-[80vh]">
         <DialogHeader>
           <DialogTitle>请求详情</DialogTitle>
         </DialogHeader>
-        <RequestDetailPanel :request="selectedRequest" @view-detail="openLogDetail" />
-        <StreamResponseViewer
-          v-if="selectedRequest"
-          :metrics="selectedRequest.streamMetrics ?? null"
-          :is-stream="selectedRequest.isStream"
-          :stream-content="selectedRequest.streamContent ?? undefined"
-        />
+        <div v-if="selectedRequest" class="flex gap-4 min-h-0">
+          <!-- Left: metadata -->
+          <div class="w-[260px] shrink-0 overflow-y-auto pr-2 border-r">
+            <RequestDetailPanel :request="selectedRequest" @view-detail="openLogDetail" />
+          </div>
+          <!-- Right: response content with tabs -->
+          <div class="flex-1 min-w-0 overflow-y-auto">
+            <StreamResponseViewer
+              :metrics="selectedRequest.streamMetrics ?? null"
+              :is-stream="selectedRequest.isStream"
+              :stream-content="selectedRequest.streamContent ?? undefined"
+            />
+          </div>
+        </div>
+        <div v-else class="text-sm text-muted-foreground py-4 text-center">
+          点击请求查看详情
+        </div>
       </DialogScrollContent>
     </Dialog>
 
@@ -232,7 +242,7 @@ interface ActiveRequest {
     rawChunks: string
     textContent: string
     totalChars: number
-    blocks?: Array<{ type: 'thinking' | 'text' | 'tool_use'; content: string }>
+    blocks?: Array<{ type: 'thinking' | 'text' | 'tool_use'; content: string; name?: string }>
   }
   clientIp?: string
   completedAt?: number
@@ -360,7 +370,10 @@ function handleSSEMessage(event: MessageEvent) {
   switch (event.type) {
     case 'request_start': {
       const req = data as ActiveRequest
-      activeRequests.value.unshift(req)
+      // 防御 SSE 乱序：如果该请求已在 completed 中，不重复加入 active
+      if (!recentCompleted.value.some((r) => r.id === req.id)) {
+        activeRequests.value.unshift(req)
+      }
       break
     }
     case 'request_update': {

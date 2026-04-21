@@ -1,6 +1,7 @@
 export interface ContentBlock {
   type: 'thinking' | 'text' | 'tool_use'
   content: string
+  name?: string
 }
 
 export interface StreamContentSnapshot {

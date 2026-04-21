@@ -2,53 +2,74 @@
   <div v-if="!request" class="text-sm text-muted-foreground py-4 text-center">
     点击请求查看详情
   </div>
-  <div v-else class="space-y-4">
+  <div v-else class="space-y-3">
     <!-- Header -->
     <div class="flex items-center gap-2">
       <span class="font-medium text-foreground">{{ request.model }}</span>
       <Badge :variant="statusVariant(request.status)">
         {{ statusLabel(request.status) }}
       </Badge>
-      <span class="text-xs text-muted-foreground font-mono">
-        {{ request.id.slice(0, 8) }}
-      </span>
     </div>
+    <p class="text-xs text-muted-foreground font-mono">
+      {{ request.id.slice(0, 8) }}
+    </p>
 
     <!-- 指标网格 -->
-    <div class="grid grid-cols-2 gap-2 text-sm">
-      <div>
-        <p class="text-muted-foreground">API 类型</p>
-        <p class="font-medium text-foreground">{{ request.apiType.toUpperCase() }}</p>
+    <div class="space-y-1.5 text-sm">
+      <div class="flex justify-between">
+        <span class="text-muted-foreground">API 类型</span>
+        <span class="font-medium text-foreground">{{ request.apiType.toUpperCase() }}</span>
       </div>
-      <div>
-        <p class="text-muted-foreground">Provider</p>
-        <p class="font-medium text-foreground">{{ request.providerName }}</p>
+      <Separator />
+      <div class="flex justify-between">
+        <span class="text-muted-foreground">Provider</span>
+        <span class="font-medium text-foreground text-right max-w-[140px] truncate">{{ request.providerName }}</span>
       </div>
-      <div>
-        <p class="text-muted-foreground">耗时</p>
-        <p class="font-medium text-foreground">{{ elapsedText }}s</p>
+      <Separator />
+      <div class="flex justify-between">
+        <span class="text-muted-foreground">耗时</span>
+        <span class="font-medium text-foreground">{{ elapsedText }}s</span>
       </div>
-      <div>
-        <p class="text-muted-foreground">TTFT</p>
-        <p class="font-medium text-foreground">
+      <Separator />
+      <div class="flex justify-between">
+        <span class="text-muted-foreground">TTFT</span>
+        <span class="font-medium text-foreground">
           {{ request.streamMetrics?.ttftMs != null ? `${request.streamMetrics.ttftMs.toFixed(0)}ms` : '--' }}
-        </p>
+        </span>
       </div>
-      <div>
-        <p class="text-muted-foreground">Output Tokens</p>
-        <p class="font-medium text-foreground">
+      <Separator />
+      <div class="flex justify-between">
+        <span class="text-muted-foreground">Input Tokens</span>
+        <span class="font-medium text-foreground">{{ request.streamMetrics?.inputTokens ?? '--' }}</span>
+      </div>
+      <Separator />
+      <div class="flex justify-between">
+        <span class="text-muted-foreground">Output Tokens</span>
+        <span class="font-medium text-foreground">
           {{ request.streamMetrics?.outputTokens != null ? request.streamMetrics.outputTokens : '--' }}
-        </p>
+        </span>
       </div>
-      <div>
-        <p class="text-muted-foreground">速度</p>
-        <p class="font-medium text-foreground">{{ speedText }}</p>
+      <Separator />
+      <div class="flex justify-between">
+        <span class="text-muted-foreground">速度</span>
+        <span class="font-medium text-foreground">{{ speedText }}</span>
       </div>
+    </div>
+
+    <!-- 状态标签 -->
+    <div v-if="request.streamMetrics?.isComplete" class="flex items-center gap-1.5">
+      <Badge variant="secondary">已完成</Badge>
+      <Badge v-if="request.streamMetrics.stopReason" variant="outline">
+        {{ request.streamMetrics.stopReason }}
+      </Badge>
+    </div>
+    <div v-else-if="request.status === 'pending'" class="flex items-center gap-1.5">
+      <Badge>进行中</Badge>
     </div>
 
     <!-- 尝试历史 -->
     <div v-if="request.attempts.length > 0">
-      <p class="text-sm text-muted-foreground mb-1">尝试历史</p>
+      <p class="text-xs text-muted-foreground mb-1">尝试历史</p>
       <div class="space-y-1">
         <div
           v-for="(attempt, i) in request.attempts"
@@ -84,6 +105,7 @@
 import { computed } from 'vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Separator } from '@/components/ui/separator'
 
 interface AttemptSnapshot {
   statusCode: number | null

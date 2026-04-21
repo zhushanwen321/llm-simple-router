@@ -14,7 +14,7 @@ import type {
 
 interface StreamExtraction {
   text: string
-  block?: { index: number; type: ContentBlock['type']; content: string } | null
+  block?: { index: number; type: ContentBlock['type']; content: string; name?: string } | null
 }
 
 function extractStreamText(line: string, apiType: "openai" | "anthropic"): StreamExtraction {
@@ -44,8 +44,9 @@ function extractStreamText(line: string, apiType: "openai" | "anthropic"): Strea
   if (type === 'content_block_start') {
     const contentBlock = obj.content_block as Record<string, unknown> | undefined
     const blockType = contentBlock?.type as string | undefined
+    const name = blockType === 'tool_use' ? (contentBlock?.name as string | undefined) : undefined
     if (blockType === 'thinking' || blockType === 'text' || blockType === 'tool_use') {
-      return { text: '', block: { index: index ?? 0, type: blockType, content: '' } }
+      return { text: '', block: { index: index ?? 0, type: blockType, content: '', name } }
     }
     return empty
   }
@@ -73,6 +74,7 @@ const SSE_DATA_PREFIX = "data: ";
 const RUNTIME_PUSH_TICK_INTERVAL = 2;
 const RECENT_COMPLETED_MAX = 200;
 const RECENT_TTL_MS = 5 * 60 * 1000; // eslint-disable-line no-magic-numbers
+const ACTIVE_MAX_AGE_MS = 60 * 60 * 1000; // eslint-disable-line no-magic-numbers
 const PUSH_INTERVAL_MS = 5000;
 
 export class RequestTracker {
@@ -115,7 +117,12 @@ export class RequestTracker {
   update(id: string, patch: Partial<ActiveRequest>): void {
     const req = this.activeMap.get(id);
     if (!req) return;
+    const prevQueued = req.queued;
     Object.assign(req, patch);
+    // queued 状态变化时立即广播，让前端即时看到排队/取消排队
+    if (patch.queued !== undefined && patch.queued !== prevQueued) {
+      this.broadcast("request_update", this.getActive());
+    }
   }
 
   appendStreamChunk(
@@ -158,9 +165,12 @@ export class RequestTracker {
 
     // 维护结构化内容块
     if (extracted.block) {
-      const { index, type, content } = extracted.block
+      const { index, type, content, name } = extracted.block
       while (sc.blocks.length <= index) {
         sc.blocks.push({ type: 'text', content: '' })
+      }
+      if (name) {
+        sc.blocks[index].name = name
       }
       if (content === '' && type !== 'text') {
         sc.blocks[index].type = type
@@ -282,6 +292,7 @@ export class RequestTracker {
     this.pushTimer = setInterval(() => {
       this.tickCount++;
       this.cleanupRecent();
+      this.cleanupStaleActive();
 
       this.broadcast("request_update", this.getActive());
       this.broadcast("concurrency_update", this.getConcurrency());
@@ -348,5 +359,15 @@ export class RequestTracker {
       0,
       Math.min(i, RECENT_COMPLETED_MAX),
     );
+  }
+
+  /** 最终一致性兜底：清理异常残留的 active 条目 */
+  private cleanupStaleActive(): void {
+    const cutoff = Date.now() - ACTIVE_MAX_AGE_MS;
+    for (const [id, req] of this.activeMap) {
+      if (req.startTime < cutoff) {
+        this.activeMap.delete(id);
+      }
+    }
   }
 }
