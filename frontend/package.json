@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@tanstack/vue-table": "^8.21.3",
+    "@vee-validate/zod": "^4.15.1",
     "@vueuse/core": "^14.2.1",
     "axios": "^1.15.0",
     "chart.js": "^4.5.1",
@@ -21,10 +22,12 @@
     "shadcn-vue": "^2.6.2",
     "tailwind-merge": "^3.5.0",
     "tailwindcss-animate": "^1.0.7",
+    "vee-validate": "^4.15.1",
     "vue": "^3.5.32",
     "vue-chartjs": "^5.3.3",
     "vue-router": "^4.6.4",
-    "vue-sonner": "^2.0.9"
+    "vue-sonner": "^2.0.9",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/node": "^24.12.2",

@@ -9,7 +9,8 @@
       <form @submit.prevent="handleSave" class="space-y-4">
         <div>
           <Label class="block text-sm font-medium text-foreground mb-1">客户端模型</Label>
-          <Input v-model="form.client_model" type="text" required />
+          <Input v-model="form.client_model" type="text" required @input="delete errors.client_model" />
+          <p v-if="errors.client_model" class="text-sm text-destructive mt-1">{{ errors.client_model }}</p>
         </div>
         <div>
           <Label class="block text-sm font-medium text-foreground mb-1">策略</Label>
@@ -40,6 +41,7 @@
                     <SelectItem v-for="p in providers" :key="p.id" :value="p.id">{{ p.name }}</SelectItem>
                   </SelectContent>
                 </Select>
+                <p v-if="errors['default.provider_id']" class="text-sm text-destructive mt-1">{{ errors['default.provider_id'] }}</p>
               </div>
               <div class="flex-1">
                 <Label class="block text-xs text-muted-foreground mb-1">后端模型</Label>
@@ -51,6 +53,7 @@
                     <SelectItem v-for="m in defaultModels" :key="m" :value="m">{{ m }}</SelectItem>
                   </SelectContent>
                 </Select>
+                <p v-if="errors['default.backend_model']" class="text-sm text-destructive mt-1">{{ errors['default.backend_model'] }}</p>
               </div>
             </div>
           </div>
@@ -68,12 +71,14 @@
               <div class="flex items-end gap-2">
                 <div class="w-24">
                   <Label class="block text-xs text-muted-foreground mb-1">开始</Label>
-                  <Input v-model="w.start" type="text" placeholder="HH:MM" required />
+                  <Input v-model="w.start" type="text" placeholder="HH:MM" required @input="delete errors[`window.${idx}.start`]" />
+                  <p v-if="errors[`window.${idx}.start`]" class="text-sm text-destructive mt-1">{{ errors[`window.${idx}.start`] }}</p>
                 </div>
                 <span class="text-muted-foreground pb-1.5">-</span>
                 <div class="w-24">
                   <Label class="block text-xs text-muted-foreground mb-1">结束</Label>
-                  <Input v-model="w.end" type="text" placeholder="HH:MM" required />
+                  <Input v-model="w.end" type="text" placeholder="HH:MM" required @input="delete errors[`window.${idx}.end`]" />
+                  <p v-if="errors[`window.${idx}.end`]" class="text-sm text-destructive mt-1">{{ errors[`window.${idx}.end`] }}</p>
                 </div>
                 <div class="flex-1" />
                 <Button type="button" variant="ghost" size="sm" class="text-destructive shrink-0" @click="emit('removeWindow', idx)">删除</Button>
@@ -89,6 +94,7 @@
                       <SelectItem v-for="p in providers" :key="p.id" :value="p.id">{{ p.name }}</SelectItem>
                     </SelectContent>
                   </Select>
+                  <p v-if="errors[`window.${idx}.provider_id`]" class="text-sm text-destructive mt-1">{{ errors[`window.${idx}.provider_id`] }}</p>
                 </div>
                 <div class="flex-1">
                   <Label class="block text-xs text-muted-foreground mb-1">后端模型</Label>
@@ -100,6 +106,7 @@
                       <SelectItem v-for="m in getWindowModels(idx)" :key="m" :value="m">{{ m }}</SelectItem>
                     </SelectContent>
                   </Select>
+                  <p v-if="errors[`window.${idx}.backend_model`]" class="text-sm text-destructive mt-1">{{ errors[`window.${idx}.backend_model`] }}</p>
                 </div>
               </div>
             </div>
@@ -112,6 +119,7 @@
             <div class="text-sm font-medium text-foreground">目标列表</div>
             <Button type="button" variant="outline" size="sm" @click="emit('addTarget')">添加目标</Button>
           </div>
+          <p v-if="errors.targets" class="text-sm text-destructive">{{ errors.targets }}</p>
           <div v-for="(t, idx) in form.targets" :key="idx" class="border rounded-md p-2 space-y-2">
             <div class="flex gap-3">
               <div class="flex-1">
@@ -124,6 +132,7 @@
                     <SelectItem v-for="p in providers" :key="p.id" :value="p.id">{{ p.name }}</SelectItem>
                   </SelectContent>
                 </Select>
+                <p v-if="errors[`target.${idx}.provider_id`]" class="text-sm text-destructive mt-1">{{ errors[`target.${idx}.provider_id`] }}</p>
               </div>
               <div class="flex-1">
                 <Label class="block text-xs text-muted-foreground mb-1">后端模型</Label>
@@ -135,6 +144,7 @@
                     <SelectItem v-for="m in getTargetModels(idx)" :key="m" :value="m">{{ m }}</SelectItem>
                   </SelectContent>
                 </Select>
+                <p v-if="errors[`target.${idx}.backend_model`]" class="text-sm text-destructive mt-1">{{ errors[`target.${idx}.backend_model`] }}</p>
               </div>
             </div>
             <div class="flex justify-end gap-1">
@@ -156,7 +166,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -248,6 +258,38 @@ function onTargetProviderChange(idx: number, value: AcceptableValue) {
 }
 
 function handleSave() {
+  if (!validate()) return
   emit('save')
 }
+
+const TIME_REGEX = /^\d{2}:\d{2}$/
+const errors = ref<Record<string, string>>({})
+
+function validate(): boolean {
+  const errs: Record<string, string> = {}
+  if (!props.form.client_model.trim()) errs.client_model = '请输入客户端模型名称'
+
+  if (props.form.strategy === 'scheduled') {
+    if (!props.form.default.provider_id) errs['default.provider_id'] = '请选择供应商'
+    if (!props.form.default.backend_model) errs['default.backend_model'] = '请选择后端模型'
+    props.form.windows.forEach((w, i) => {
+      if (!TIME_REGEX.test(w.start)) errs[`window.${i}.start`] = '格式：HH:MM'
+      if (!TIME_REGEX.test(w.end)) errs[`window.${i}.end`] = '格式：HH:MM'
+      if (!w.target.provider_id) errs[`window.${i}.provider_id`] = '请选择供应商'
+      if (!w.target.backend_model) errs[`window.${i}.backend_model`] = '请选择后端模型'
+    })
+  } else {
+    if (props.form.targets.length === 0) errs.targets = '至少添加一个目标'
+    props.form.targets.forEach((t, i) => {
+      if (!t.provider_id) errs[`target.${i}.provider_id`] = '请选择供应商'
+      if (!t.backend_model) errs[`target.${i}.backend_model`] = '请选择后端模型'
+    })
+  }
+
+  errors.value = errs
+  return Object.keys(errs).length === 0
+}
+
+// dialog 打开时清除错误
+watch(() => props.open, (v) => { if (v) errors.value = {} })
 </script>

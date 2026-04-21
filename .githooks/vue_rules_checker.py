@@ -6,6 +6,7 @@
 2. 禁止使用 Emoji 图标（应使用 lucide-vue-next）
 3. 禁止编写自定义 CSS（应使用 Tailwind 工具类）
 4. <template> 行数上限 400 行，<script setup> 行数上限 300 行
+5. 禁止使用 Tab 缩进（仅允许 Space）
 
 用法：
   单文件: python3 vue_rules_checker.py <absolute_path> <relative_path>
@@ -181,7 +182,14 @@ def check_vue_file(content: str, relative_path: str) -> tuple[int, list[str]]:
             issues.append("    请使用 lucide-vue-next 图标组件替代")
             exit_code = 2
 
-    # 检查 2: 禁止自定义 CSS（style scoped 内部）
+    # 检查 2: 禁止 Tab 缩进
+    for i, line in enumerate(lines, 1):
+        if line != line.expandtabs():
+            issues.append(f"  [第{i}行] 禁止使用 Tab 缩进")
+            issues.append("    请使用 Space（2 空格）缩进替代")
+            exit_code = 2
+
+    # 检查 3: 禁止自定义 CSS（style scoped 内部）
     is_style_whitelisted = any(w in relative_path for w in STYLE_SCOPED_WHITELIST)
     in_style_section = False
     in_style_tag = False
@@ -229,7 +237,7 @@ def check_vue_file(content: str, relative_path: str) -> tuple[int, list[str]]:
             'transition' in stripped):
             continue
 
-    # 检查 3: <template> / <script setup> 行数上限
+    # 检查 4: <template> / <script setup> 行数上限
     template_lines = 0
     script_lines = 0
     in_template = False
@@ -271,7 +279,7 @@ def check_vue_file(content: str, relative_path: str) -> tuple[int, list[str]]:
         issues.append("    请提取 composable 或子组件拆分逻辑")
         exit_code = 2
 
-    # 检查 4: 组件使用规范
+    # 检查 5: 组件使用规范
     comp_exit, comp_issues = check_vue_component_usage(content, relative_path)
     if comp_exit > exit_code:
         exit_code = comp_exit
