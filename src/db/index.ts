@@ -97,8 +97,10 @@ export {
   getRequestLogById,
   deleteLogsBefore,
   insertMetrics,
+  getRequestLogChildren,
+  getRequestLogsGrouped,
 } from "./logs.js";
-export type { RequestLog, MetricsRow, MetricsInsert } from "./logs.js";
+export type { RequestLog, MetricsRow, MetricsInsert, RequestLogGroupedRow } from "./logs.js";
 
 export {
   getRouterKeyByHash,

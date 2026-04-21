@@ -139,7 +139,7 @@ function handleIntercept(
     client_request: JSON.stringify({ headers: request.headers as RawHeaders, body: request.body }),
     upstream_request: interceptResponse.meta ? JSON.stringify(interceptResponse.meta) : null,
     client_response: JSON.stringify({ statusCode: interceptResponse.statusCode, body: respBody }),
-    is_retry: 0, original_request_id: null,
+    is_retry: 0, is_failover: 0, original_request_id: null,
     router_key_id: request.routerKey?.id ?? null, original_model: null,
   });
   return reply.status(interceptResponse.statusCode).send(interceptResponse.body);
@@ -158,6 +158,8 @@ function logRetryAttempts(
     logId: string;
     routerKeyId: string | null;
     originalModel: string | null;
+    isFailoverIteration: boolean;
+    rootLogId: string;
   },
   attempts: Attempt[],
   result: ProxyResult | StreamProxyResult,
@@ -175,7 +177,9 @@ function logRetryAttempts(
         is_stream: params.isStream ? 1 : 0, error_message: attempt.error,
         created_at: new Date().toISOString(), request_body: params.reqBodyStr,
         client_request: params.clientReq, upstream_request: params.upstreamReqBase,
-        is_retry: isOriginal ? 0 : 1, original_request_id: isOriginal ? null : params.logId,
+        is_retry: isOriginal ? 0 : 1,
+        is_failover: (isOriginal && params.isFailoverIteration) ? 1 : 0,
+        original_request_id: isOriginal ? (params.isFailoverIteration ? params.rootLogId : null) : params.logId,
         router_key_id: params.routerKeyId, original_model: params.originalModel,
       });
     } else if (attempt.statusCode !== UPSTREAM_SUCCESS) {
@@ -187,7 +191,9 @@ function logRetryAttempts(
         response_body: attempt.responseBody, client_request: params.clientReq, upstream_request: params.upstreamReqBase,
         upstream_response: JSON.stringify({ statusCode: attempt.statusCode, body: attempt.responseBody }),
         client_response: JSON.stringify({ statusCode: attempt.statusCode, body: attempt.responseBody }),
-        is_retry: isOriginal ? 0 : 1, original_request_id: isOriginal ? null : params.logId,
+        is_retry: isOriginal ? 0 : 1,
+        is_failover: (isOriginal && params.isFailoverIteration) ? 1 : 0,
+        original_request_id: isOriginal ? (params.isFailoverIteration ? params.rootLogId : null) : params.logId,
         router_key_id: params.routerKeyId, original_model: params.originalModel,
       });
     } else {
@@ -197,7 +203,8 @@ function logRetryAttempts(
       insertSuccessLog(db, { apiType: params.apiType, model: params.model, provider: { id: params.providerId } as Provider, isStream: params.isStream, startTime,
         reqBody: params.reqBodyStr, clientReq: params.clientReq, upstreamReq: params.upstreamReqBase, id: attemptLogId,
         status: result.statusCode, respBody: attempt.responseBody, upHdrs: h, cliHdrs: h,
-        isRetry: !isOriginal, originalRequestId: isOriginal ? null : params.logId,
+        isRetry: !isOriginal, isFailover: !isOriginal ? false : params.isFailoverIteration,
+        originalRequestId: !isOriginal ? params.logId : (params.isFailoverIteration ? params.rootLogId : null),
         routerKeyId: params.routerKeyId, originalModel: params.originalModel });
       lastSuccessLogId = attemptLogId;
     }
@@ -215,18 +222,18 @@ function collectMetrics(
   backendModel: string,
   request: FastifyRequest,
 ) {
-  if (isStream) {
-    const streamResult = result as StreamProxyResult;
-    if (streamResult.metricsResult) {
-      try { insertMetrics(db, { ...streamResult.metricsResult, request_log_id: lastSuccessLogId, provider_id: providerId, backend_model: backendModel, api_type: apiType }); }
-      catch (err) { request.log.error({ err }, "Failed to insert metrics"); }
-    }
-  } else {
-    try {
+  const base = { request_log_id: lastSuccessLogId, provider_id: providerId, backend_model: backendModel, api_type: apiType };
+  try {
+    if (isStream) {
+      const mr = (result as StreamProxyResult).metricsResult;
+      if (mr) { insertMetrics(db, { ...base, ...mr }); return; }
+    } else {
       const mr = MetricsExtractor.fromNonStreamResponse(apiType, (result as ProxyResult).body);
-      if (mr) insertMetrics(db, { ...mr, request_log_id: lastSuccessLogId, provider_id: providerId, backend_model: backendModel, api_type: apiType });
-    } catch (err) { request.log.error({ err }, "Failed to insert metrics"); }
-  }
+      if (mr) { insertMetrics(db, { ...base, ...mr }); return; }
+    }
+    // 无法提取完整 metrics（失败请求），至少记录 backend_model
+    insertMetrics(db, base);
+  } catch (err) { request.log.error({ err }, "Failed to insert metrics"); }
 }
 
 // ---------- Shared proxy handler ----------
@@ -265,10 +272,13 @@ export async function handleProxyPost(
   const group = getMappingGroup(db, effectiveModel);
   const isFailover = group?.strategy === "failover";
   const excludeTargets: Target[] = [];
+  let rootLogId: string | null = null;
 
   while (true) {
     const startTime = Date.now();
     const logId = randomUUID();
+    if (rootLogId === null) rootLogId = logId;
+    const isFailoverIteration = rootLogId !== logId;
     const routerKeyId = request.routerKey?.id ?? null;
     const body = request.body as Record<string, unknown>;
     const originalBody = JSON.parse(JSON.stringify(body));
@@ -284,7 +294,8 @@ export async function handleProxyPost(
       const e = errors.modelNotFound(effectiveModel);
       insertRejectedLog({ db, logId, apiType, model: effectiveModel, statusCode: e.statusCode,
         errorMessage: `No mapping found for model '${effectiveModel}'`, startTime, isStream,
-        routerKeyId, originalBody, clientHeaders: cliHdrs, originalModel });
+        routerKeyId, originalBody, clientHeaders: cliHdrs, originalModel,
+        isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null });
       return reply.status(e.statusCode).send(e.body);
     }
 
@@ -299,7 +310,8 @@ export async function handleProxyPost(
             insertRejectedLog({ db, logId, apiType, model: effectiveModel, statusCode: e.statusCode,
               errorMessage: `Model '${resolved.backend_model}' not allowed for this API key`,
               startTime, isStream, routerKeyId, originalBody, clientHeaders: cliHdrs,
-              providerId: resolved.provider_id, originalModel });
+              providerId: resolved.provider_id, originalModel,
+              isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null });
             return reply.status(e.statusCode).send(e.body);
           }
         } catch { request.log.warn({ allowedModels: allowedModels?.slice(0, 80) }, "Invalid allowed_models JSON, allowing all models"); } // eslint-disable-line no-magic-numbers
@@ -312,7 +324,8 @@ export async function handleProxyPost(
       insertRejectedLog({ db, logId, apiType, model: effectiveModel, statusCode: e.statusCode,
         errorMessage: `Provider '${resolved.provider_id}' unavailable or inactive`,
         startTime, isStream, routerKeyId, originalBody, clientHeaders: cliHdrs,
-        providerId: resolved.provider_id, originalModel });
+        providerId: resolved.provider_id, originalModel,
+        isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null });
       return reply.status(e.statusCode).send(e.body);
     }
     if (provider.api_type !== apiType) {
@@ -320,7 +333,8 @@ export async function handleProxyPost(
       insertRejectedLog({ db, logId, apiType, model: effectiveModel, statusCode: e.statusCode,
         errorMessage: `Provider API type mismatch: expected '${apiType}', got '${provider.api_type}'`,
         startTime, isStream, routerKeyId, originalBody, clientHeaders: cliHdrs,
-        providerId: resolved.provider_id, originalModel });
+        providerId: resolved.provider_id, originalModel,
+        isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null });
       return reply.status(e.statusCode).send(e.body);
     }
 
@@ -383,6 +397,9 @@ export async function handleProxyPost(
 
     try {
       request.log.debug({ logId, providerId: provider.id, isStream, upstreamUrl: `${provider.base_url}${upstreamPath}`, action: "upstream_call" }, "Proxy: calling upstream");
+      const checkEarlyError = isStream && deps.matcher
+        ? (data: string) => deps.matcher!.test(200, data)
+        : undefined;
       const { result: r, attempts } = isStream
         ? await retryableCall(
           () => {
@@ -402,7 +419,7 @@ export async function handleProxyPost(
                 deps.tracker?.appendStreamChunk(logId, rawLine, apiType, STREAM_CONTENT_MAX_RAW, STREAM_CONTENT_MAX_TEXT);
               },
             });
-            return upstreamStream(provider, apiKey, body, cliHdrs, reply, streamTimeoutMs, upstreamPath, buildUpstreamHeaders, metricsTransform);
+            return upstreamStream(provider, apiKey, body, cliHdrs, reply, streamTimeoutMs, upstreamPath, buildUpstreamHeaders, metricsTransform, checkEarlyError);
           },
           retryConfig,
           reply,
@@ -429,6 +446,7 @@ export async function handleProxyPost(
       const lastSuccessLogId = logRetryAttempts(db, {
         apiType, model: effectiveModel, providerId: provider.id, isStream,
         reqBodyStr, clientReq, upstreamReqBase, logId, routerKeyId, originalModel,
+        isFailoverIteration, rootLogId: rootLogId!,
       }, attempts, r, startTime);
 
       // --- Failover 检查 ---
@@ -462,9 +480,7 @@ export async function handleProxyPost(
         reply.status(pr.statusCode).send(pr.body);
       }
 
-      if (r.statusCode === UPSTREAM_SUCCESS) {
-        collectMetrics(db, apiType, r, isStream, lastSuccessLogId, provider.id, resolved.backend_model, request);
-      }
+      collectMetrics(db, apiType, r, isStream, lastSuccessLogId, provider.id, resolved.backend_model, request);
       deps.tracker?.complete(logId, { status: r.statusCode < HTTP_BAD_REQUEST ? "completed" : "failed", statusCode: r.statusCode });
       request.log.debug({ logId, statusCode: r.statusCode, status: r.statusCode < HTTP_BAD_REQUEST ? "completed" : "failed", totalLatencyMs: Date.now() - startTime, action: "request_completed" }, "Proxy: request completed");
       releaseSemaphore();
@@ -480,6 +496,8 @@ export async function handleProxyPost(
         is_stream: isStream ? 1 : 0, error_message: errMsg || "Upstream connection failed",
         created_at: new Date().toISOString(), request_body: reqBodyStr,
         client_request: clientReq, upstream_request: upstreamReq,
+        is_failover: isFailoverIteration ? 1 : 0,
+        original_request_id: isFailoverIteration ? rootLogId : null,
         router_key_id: routerKeyId, original_model: originalModel,
       });
 
