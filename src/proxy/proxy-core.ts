@@ -288,9 +288,13 @@ export async function handleProxyPost(
     const resolved = resolveMapping(db, effectiveModel, { now: new Date(), excludeTargets });
     request.log.debug({ logId, model: effectiveModel, apiType, isStream, action: "resolve_mapping", resolved: !!resolved }, "Proxy: resolved model mapping");
     if (!resolved) {
-      // failover 场景下所有 target 都已尝试失败，返回最后一个 target 的错误
+      // failover 场景下所有 target 都已尝试失败，记录最终失败日志
       if (isFailover && excludeTargets.length > 0) {
         const e = errors.upstreamConnectionFailed();
+        insertRejectedLog({ db, logId, apiType, model: effectiveModel, statusCode: e.statusCode,
+          errorMessage: `All failover targets exhausted (${excludeTargets.length} attempted)`,
+          startTime, isStream, routerKeyId, originalBody, clientHeaders: cliHdrs, originalModel,
+          isFailover: true, originalRequestId: rootLogId });
         return reply.status(e.statusCode).send(e.body);
       }
       const e = errors.modelNotFound(effectiveModel);
@@ -448,7 +452,7 @@ export async function handleProxyPost(
       const lastSuccessLogId = logRetryAttempts(db, {
         apiType, model: effectiveModel, providerId: provider.id, isStream,
         reqBodyStr, clientReq, upstreamReqBase, logId, routerKeyId, originalModel,
-        isFailoverIteration, rootLogId: rootLogId!,
+        isFailoverIteration, rootLogId: rootLogId!, // 首次循环时已赋值，不为 null
       }, attempts, r, startTime);
 
       // --- Failover 检查 ---

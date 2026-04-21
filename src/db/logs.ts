@@ -67,6 +67,14 @@ export type MetricsInsert = {
 
 // --- request_logs ---
 
+/** 三处日志列表查询共享的 SELECT 列 + JOIN 子句 */
+const LOG_LIST_SELECT = `rl.id, rl.api_type, rl.model, rl.provider_id, rl.status_code, rl.latency_ms,
+            rl.is_stream, rl.error_message, rl.created_at, rl.is_retry, rl.is_failover, rl.original_request_id, rl.original_model,
+            CASE WHEN rl.provider_id = 'router' THEN rl.upstream_request ELSE NULL END AS upstream_request,
+            rm.backend_model, COALESCE(p.name, rl.provider_id) AS provider_name`;
+const LOG_LIST_JOIN = `LEFT JOIN request_metrics rm ON rm.request_log_id = rl.id
+     LEFT JOIN providers p ON p.id = rl.provider_id`;
+
 export interface RequestLogInsert {
   id: string;
   api_type: string;
@@ -137,13 +145,9 @@ export function getRequestLogs(
   const offset = (options.page - 1) * options.limit;
   const data = db
     .prepare(
-      `SELECT rl.id, rl.api_type, rl.model, rl.provider_id, rl.status_code, rl.latency_ms,
-              rl.is_stream, rl.error_message, rl.created_at, rl.is_retry, rl.is_failover, rl.original_request_id, rl.original_model,
-              CASE WHEN rl.provider_id = 'router' THEN rl.upstream_request ELSE NULL END AS upstream_request,
-              rm.backend_model, COALESCE(p.name, rl.provider_id) AS provider_name
+      `SELECT ${LOG_LIST_SELECT}
        FROM request_logs rl
-       LEFT JOIN request_metrics rm ON rm.request_log_id = rl.id
-       LEFT JOIN providers p ON p.id = rl.provider_id
+       ${LOG_LIST_JOIN}
        WHERE ${where} ORDER BY rl.created_at DESC LIMIT ? OFFSET ?`,
     )
     .all(...params, options.limit, offset) as RequestLogListRow[];
@@ -158,21 +162,18 @@ export function deleteLogsBefore(db: Database.Database, beforeDate: string): num
   return db.prepare("DELETE FROM request_logs WHERE created_at < ?").run(beforeDate).changes;
 }
 
-/** 查询某条日志的子请求（retry/failover 关联） */
+/** 查询某条日志的子请求（retry/failover 关联），上限 100 条 */
 export function getRequestLogChildren(
   db: Database.Database,
   parentId: string,
 ): RequestLogListRow[] {
   return db.prepare(
-    `SELECT rl.id, rl.api_type, rl.model, rl.provider_id, rl.status_code, rl.latency_ms,
-            rl.is_stream, rl.error_message, rl.created_at, rl.is_retry, rl.is_failover, rl.original_request_id, rl.original_model,
-            CASE WHEN rl.provider_id = 'router' THEN rl.upstream_request ELSE NULL END AS upstream_request,
-            rm.backend_model, COALESCE(p.name, rl.provider_id) AS provider_name
+    `SELECT ${LOG_LIST_SELECT}
      FROM request_logs rl
-     LEFT JOIN request_metrics rm ON rm.request_log_id = rl.id
-     LEFT JOIN providers p ON p.id = rl.provider_id
+     ${LOG_LIST_JOIN}
      WHERE rl.original_request_id = ?
-     ORDER BY rl.created_at ASC`,
+     ORDER BY rl.created_at ASC
+     LIMIT 100`,
   ).all(parentId) as RequestLogListRow[];
 }
 
@@ -211,14 +212,10 @@ export function getRequestLogsGrouped(
   const offset = (options.page - 1) * options.limit;
   const data = db
     .prepare(
-      `SELECT rl.id, rl.api_type, rl.model, rl.provider_id, rl.status_code, rl.latency_ms,
-              rl.is_stream, rl.error_message, rl.created_at, rl.is_retry, rl.is_failover, rl.original_request_id, rl.original_model,
-              CASE WHEN rl.provider_id = 'router' THEN rl.upstream_request ELSE NULL END AS upstream_request,
-              rm.backend_model, COALESCE(p.name, rl.provider_id) AS provider_name,
+      `SELECT ${LOG_LIST_SELECT},
               (SELECT COUNT(*) FROM request_logs c WHERE c.original_request_id = rl.id) AS child_count
        FROM request_logs rl
-       LEFT JOIN request_metrics rm ON rm.request_log_id = rl.id
-       LEFT JOIN providers p ON p.id = rl.provider_id
+       ${LOG_LIST_JOIN}
        WHERE ${where} ORDER BY rl.created_at DESC LIMIT ? OFFSET ?`,
     )
     .all(...params, options.limit, offset) as RequestLogGroupedRow[];

@@ -56,50 +56,12 @@
         </TableHeader>
         <TableBody>
           <template v-for="log in logs" :key="log.id">
-            <TableRow :class="{ 'bg-destructive/10': (log.status_code ?? 0) >= 400 }">
-              <TableCell class="w-10">
-                <Button v-if="(log as any).child_count > 0" variant="ghost" size="xs" @click="toggleExpand(log)">
-                  <span class="text-xs transition-transform" :class="expandedRows.has(log.id) ? '' : '-rotate-90'">&#9660;</span>
-                </Button>
-              </TableCell>
-              <TableCell class="font-mono text-xs text-muted-foreground" :title="log.id">{{ log.id.slice(0, 8) }}</TableCell>
-              <TableCell class="text-muted-foreground">{{ formatTime(log.created_at) }}</TableCell>
-              <TableCell>
-                <Badge :variant="log.api_type === 'openai' ? 'default' : 'secondary'">{{ log.api_type }}</Badge>
-              </TableCell>
-              <TableCell class="font-mono text-xs">
-                {{ log.model || '-' }}
-                <Badge v-if="log.original_model" variant="secondary" class="ml-1 text-xs">已替换</Badge>
-              </TableCell>
-              <TableCell class="text-xs">
-                <template v-if="log.provider_id === 'router'">
-                  <Badge variant="secondary" class="text-[10px] px-1 py-0">代理增强：{{ enhancementLabel(log.upstream_request) }}</Badge>
-                </template>
-                <template v-else-if="log.backend_model || log.provider_name">
-                  <span class="font-mono">{{ log.backend_model || '-' }}</span>
-                  <span class="text-muted-foreground"> @ </span>
-                  <Badge variant="outline" class="text-[10px] px-1 py-0">{{ log.provider_name || log.provider_id || '-' }}</Badge>
-                </template>
-                <span v-else class="text-muted-foreground">-</span>
-              </TableCell>
-              <TableCell>
-                <Badge :variant="(log.status_code ?? 0) < 400 ? 'default' : 'destructive'">{{ log.status_code || '-' }}</Badge>
-              </TableCell>
-              <TableCell>{{ log.latency_ms ? log.latency_ms + 'ms' : '-' }}</TableCell>
-              <TableCell>{{ log.is_stream ? 'Yes' : 'No' }}</TableCell>
-              <TableCell>
-                <Badge v-if="log.is_retry" variant="outline" class="text-warning-dark border-warning">重试</Badge>
-                <span v-else class="text-muted-foreground">-</span>
-              </TableCell>
-              <TableCell>
-                <Badge v-if="log.is_failover" variant="outline" class="text-orange-500 border-orange-400">故障转移</Badge>
-                <span v-else class="text-muted-foreground">-</span>
-              </TableCell>
-              <TableCell class="text-destructive text-xs">{{ log.error_message || '-' }}</TableCell>
-              <TableCell>
-                <Button variant="ghost" size="sm" @click="openLogDetail(log.id)">详情</Button>
-              </TableCell>
-            </TableRow>
+            <LogTableRow
+              :log="log"
+              :expanded="expandedRows.has(log.id)"
+              @toggle-expand="toggleExpand"
+              @open-detail="openLogDetail"
+            />
 
             <!-- Expanded child rows -->
             <template v-if="expandedRows.has(log.id)">
@@ -109,34 +71,13 @@
                 </TableCell>
               </TableRow>
               <template v-else-if="childLogs[log.id]?.length">
-                <TableRow v-for="child in childLogs[log.id]" :key="child.id" class="bg-muted/20">
-                  <TableCell class="w-10"><span class="ml-4 text-muted-foreground text-xs">└</span></TableCell>
-                  <TableCell class="font-mono text-xs text-muted-foreground" :title="child.id">{{ child.id.slice(0, 8) }}</TableCell>
-                  <TableCell class="text-muted-foreground">{{ formatTime(child.created_at) }}</TableCell>
-                  <TableCell><Badge :variant="child.api_type === 'openai' ? 'default' : 'secondary'">{{ child.api_type }}</Badge></TableCell>
-                  <TableCell class="font-mono text-xs">{{ child.model || '-' }}</TableCell>
-                  <TableCell class="text-xs">
-                    <template v-if="child.backend_model || child.provider_name">
-                      <span class="font-mono">{{ child.backend_model || '-' }}</span>
-                      <span class="text-muted-foreground"> @ </span>
-                      <Badge variant="outline" class="text-[10px] px-1 py-0">{{ child.provider_name || child.provider_id || '-' }}</Badge>
-                    </template>
-                    <span v-else class="text-muted-foreground">-</span>
-                  </TableCell>
-                  <TableCell><Badge :variant="(child.status_code ?? 0) < 400 ? 'default' : 'destructive'">{{ child.status_code || '-' }}</Badge></TableCell>
-                  <TableCell>{{ child.latency_ms ? child.latency_ms + 'ms' : '-' }}</TableCell>
-                  <TableCell>{{ child.is_stream ? 'Yes' : 'No' }}</TableCell>
-                  <TableCell>
-                    <Badge v-if="child.is_retry" variant="outline" class="text-warning-dark border-warning">重试</Badge>
-                    <span v-else class="text-muted-foreground">-</span>
-                  </TableCell>
-                  <TableCell>
-                    <Badge v-if="child.is_failover" variant="outline" class="text-orange-500 border-orange-400">故障转移</Badge>
-                    <span v-else class="text-muted-foreground">-</span>
-                  </TableCell>
-                  <TableCell class="text-destructive text-xs">{{ child.error_message || '-' }}</TableCell>
-                  <TableCell><Button variant="ghost" size="sm" @click="openLogDetail(child.id)">详情</Button></TableCell>
-                </TableRow>
+                <LogTableRow
+                  v-for="child in childLogs[log.id]"
+                  :key="child.id"
+                  :log="child"
+                  :is-child="true"
+                  @open-detail="openLogDetail"
+                />
               </template>
             </template>
           </template>
@@ -187,32 +128,13 @@ import { api } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import LogDetailDialog from '@/components/monitor/LogDetailDialog.vue'
-
-interface LogEntry {
-  id: string
-  api_type: string
-  model: string | null
-  provider_id: string | null
-  status_code: number | null
-  latency_ms: number | null
-  is_stream: number
-  error_message: string | null
-  created_at: string
-  is_retry: number
-  is_failover: number
-  original_request_id: string | null
-  original_model: string | null
-  upstream_request: string | null
-  backend_model: string | null
-  provider_name: string | null
-  child_count?: number
-}
+import LogTableRow from '@/components/logs/LogTableRow.vue'
+import type { LogEntry } from '@/components/logs/types'
 
 const logs = ref<LogEntry[]>([])
 const total = ref(0)
@@ -230,17 +152,6 @@ const childLoading = ref<Record<string, boolean>>({})
 const logDetailOpen = ref(false)
 const logDetailRef = ref<InstanceType<typeof LogDetailDialog> | null>(null)
 
-function enhancementLabel(raw: string | null): string {
-  if (!raw) return '未知'
-  try {
-    const meta = JSON.parse(raw)
-    if (meta.action) {
-      return meta.detail ? `${meta.action}: ${meta.detail}` : meta.action
-    }
-    return raw
-  } catch { return '未知' }
-}
-
 async function toggleExpand(log: LogEntry) {
   const id = log.id
   if (expandedRows.value.has(id)) {
@@ -252,7 +163,7 @@ async function toggleExpand(log: LogEntry) {
     childLoading.value[id] = true
     try {
       const res = await api.getLogChildren(id)
-      childLogs.value[id] = res.data
+      childLogs.value[id] = res.data.data
     } catch (e) {
       console.error('Failed to load child logs:', e)
       toast.error('加载子请求失败')
@@ -267,10 +178,6 @@ function openLogDetail(id: string) {
   logDetailRef.value?.load(id)
 }
 
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleString('zh-CN')
-}
-
 async function loadLogs() {
   try {
     const params: { page: number; limit: number; api_type?: string; router_key_id?: string; view?: string } = { page: page.value, limit: PAGE_SIZE, view: 'grouped' }
@@ -281,6 +188,7 @@ async function loadLogs() {
     total.value = res.data.total
     expandedRows.value.clear()
     childLogs.value = {}
+    childLoading.value = {}
   } catch (e) {
     console.error('Failed to load logs:', e)
     toast.error('加载日志失败')

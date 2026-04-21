@@ -10,7 +10,7 @@ const LogQuerySchema = Type.Object({
   api_type: Type.Optional(Type.String()),
   model: Type.Optional(Type.String()),
   router_key_id: Type.Optional(Type.String()),
-  view: Type.Optional(Type.String()),
+  view: Type.Optional(Type.Literal("grouped")),
 });
 
 const DeleteLogsBeforeSchema = Type.Object({
@@ -64,8 +64,8 @@ export const adminLogRoutes: FastifyPluginCallback<LogRoutesOptions> = (app, opt
     if (!parent) {
       return reply.code(HTTP_NOT_FOUND).send({ error: { message: "Log not found" } });
     }
-    const children = getRequestLogChildren(db, params.id);
-    return reply.send(children);
+    const rows = getRequestLogChildren(db, params.id);
+    return reply.send({ data: rows });
   });
 
   app.delete("/admin/api/logs/before", { schema: { body: DeleteLogsBeforeSchema } }, async (request, reply) => {

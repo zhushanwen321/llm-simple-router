@@ -140,7 +140,7 @@ export const api = {
   updateMapping: (id: string, data: MappingPayload) => client.put(`${API.MAPPINGS}/${id}`, data),
   deleteMapping: (id: string) => client.delete(`${API.MAPPINGS}/${id}`),
 
-  getLogs: (params: { page: number; limit: number; api_type?: string; router_key_id?: string }) =>
+  getLogs: (params: { page: number; limit: number; api_type?: string; router_key_id?: string; view?: string }) =>
     client.get(API.LOGS, { params }),
   getLogDetail: (id: string) => client.get(`${API.LOGS}/${id}`),
   getLogChildren: (id: string) => client.get(`${API.LOGS}/${id}/children`),

@@ -100,7 +100,7 @@ export {
   getRequestLogChildren,
   getRequestLogsGrouped,
 } from "./logs.js";
-export type { RequestLog, MetricsRow, MetricsInsert, RequestLogGroupedRow } from "./logs.js";
+export type { RequestLog, MetricsRow, MetricsInsert, RequestLogGroupedRow, RequestLogListRow } from "./logs.js";
 
 export {
   getRouterKeyByHash,
