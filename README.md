@@ -9,23 +9,18 @@
 
 个人使用 Claude Code 配合国产模型时的实际痛点：
 
-- **自动重试** — 国产模型限流、网络错误频繁，对可恢复错误（429/500/网络超时）自动指数退避重试
-- **多供应商模型映射** — 高峰期主模型不可用时，将 claude-opus 映射到 GLM，claude-sonnet 映射到 Kimi 等，低谷期再切回来
-- **多密钥隔离** — 为不同使用方分配独立密钥，按密钥筛选日志和性能指标
+- **自动重试** — 国产模型限流、网络错误频繁，对可恢复错误（429/400/网络超时）自动指数退避重试。默认已经针对智谱模型进行了配置，开箱即用。
+- **多供应商支持** — 支持智谱、Moonshot、Minimax、火山引擎、阿里云、腾讯云等，Coding Plan 选择后会自动填写，只需要配置 API Key。也可以完全自定义。
+- **模型分时段映射** — 可以每天分时段自动切换模型。以我自己使用体验来说，平时将 sonnet 映射到 glm-5.1 ，14-18点将 sonnet 映射到 kimi ，减少智谱高峰期限流错误和三倍消耗。
+- **并发队列等待** — 不同 Provider 可以配置并发数限制，超过限制的请求会进入队列等待。解决 Claude Code 多个subagent并行执行时经常触发限流失败的问题。不过需要配置 claude code 的 API_TIMEOUT_MS 为一个比较大的值。这个功能可以让使用 Claude Code 体验更好，但不能根本性解决限流问题。
+- **实时请求监控** — 实时监控活跃请求、队列情况，可以实时查看流式请求的输出并结构化展示（目前仅支持 Claude Code ）。
 
-## 功能
+## 其他功能
 
 | 功能 | 说明 |
 |------|------|
-| 模型映射 | 客户端模型名 -> 后端模型名 + 供应商，支持分组和优先级 |
-| 自动重试 | 429/500/网络错误自动重试，指数退避，可配置次数和间隔 |
-| 多供应商 | 配置多个后端供应商，按模型映射路由 |
-| 多密钥 (Router Keys) | 为不同使用方创建独立密钥，支持模型白名单 |
-| 流式代理 | 完整支持 SSE 流式和非流式请求 |
-| 供应商并发控制 | 按 Provider 维度限制并发数、队列长度和超时，防止单一供应商过载 |
-| 实时监控 | SSE 推送活跃请求、延迟热力图、Token 吞吐、运行时资源指标 |
-| 代理增强 (实验性) | 注入系统指令、会话记忆、模型锁定等增强功能 |
-| 管理后台 | Vue 3 + shadcn-vue Web UI，管理供应商、映射、密钥 |
+| 多密钥 | 为不同使用方创建独立密钥，支持模型白名单 |
+| 代理增强 (实验性) | 支持通过 Claude Code 发送select-model指令直接变更 router 的模型，不经过 LLM 请求（实验中，可能有bug） |
 | 请求日志 | 结构化展示完整四阶段链路（客户端请求/上游请求/上游响应/客户端响应），适配 Claude Code 请求格式 |
 | 性能指标 | TTFT、吞吐量、Token 用量、缓存命中率，支持按模型/密钥筛选 |
 
@@ -33,39 +28,58 @@
 
 ## 管理后台预览
 
-| Dashboard | Provider 管理 |
-|-----------|-------------|
-| ![Dashboard](docs/screenshot/dashboard.png) | ![Provider](docs/screenshot/provider.png) |
+| Provider 管理和并发控制 |
+|-----------|
+| ![Provider Concurrency](docs/screenshot/provider_concurrency.png) |
 
-| 供应商并发控制 | 实时监控 |
+| 实时监控 |
+|-----------------|
+| ![Monitor](docs/screenshot/monitor.png) |
+
+| 模型映射 |
+|---------|
+| ![Model Mapping](docs/screenshot/model_mapping.png) |
+
+| 重试规则 |
+|---------|
+| ![Retry](docs/screenshot/retry.png) |
+
+| Dashboard | 请求日志 |
 |--------------|---------|
-| ![Provider Concurrency](docs/screenshot/provider_concurrency.png) | ![Monitor](docs/screenshot/monitor.png) |
+| ![Dashboard](docs/screenshot/dashboard.png) | ![Logs](docs/screenshot/log.png) |
 
 | 代理增强 (实验性) |
 |-----------------|
 | ![Proxy Enhancement](docs/screenshot/proxy_enhance.png) |
 
-| 模型映射 | 重试规则 |
-|---------|--------|
-| ![Model Mapping](docs/screenshot/model_mapping.png) | ![Retry](docs/screenshot/retry.png) |
-
-| 请求日志 |
-|---------|
-| ![Logs](docs/screenshot/log.png) |
-
 ## 工作原理
 
 ```
-Claude Code -> Router (模型映射 + 自动重试) -> 智谱 GLM / Kimi / 其他供应商
+Claude Code -> Router (模型映射 + 自动重试 + 并发控制) -> 智谱 GLM / Kimi / 其他供应商
 ```
 
 Router 根据模型映射找到后端供应商 -> 转发请求 -> 自动重试失败请求 -> 记录日志和性能指标 -> 返回响应。
 
-## 典型使用场景
+## 快速开始
 
-### Claude Code 配置
+### npx 启动
+```bash
+# 一行命令启动
+npx llm-simple-router
+# 访问 http://localhost:9981/admin
+# 首次访问会进入 Setup 页面设置管理员密码
+```
 
-通过环境变量将 Claude Code 指向 Router：
+无需任何环境变量。数据默认存储在 `~/.llm-simple-router/`。
+
+### Docker 部署
+
+```bash
+docker compose up -d
+```
+### 创建 Router API 密钥
+
+在管理后台创建一个 API 密钥，原先 Claude Code 密钥替换为 Router 密钥。
 
 **方式一：shell alias（推荐）**
 
@@ -85,7 +99,9 @@ alias clodedev='ANTHROPIC_AUTH_TOKEN="<your-router-key>" ANTHROPIC_BASE_URL="htt
 }
 ```
 
-将 `<your-router-key>` 替换为管理后台中创建的 Router Key。
+### 管理后台配置 Provider
+
+Provider 支持快速配置，目前支持智谱、Moonshot、Minimax、火山引擎、阿里云、腾讯云等，Coding Plan 选择后会自动填写，只需要配置 API Key。
 
 ### 管理后台配置模型映射
 
@@ -96,24 +112,9 @@ alias clodedev='ANTHROPIC_AUTH_TOKEN="<your-router-key>" ANTHROPIC_BASE_URL="htt
 | sonnet | kimi-for-coding | Moonshot | 14:00-18:00 |
 | sonnet | glm-5-turbo | 智谱 | / |
 
-高峰期 GLM 3倍用量，且频繁超限时，将 sonnet 切到 Kimi；低谷期切回 GLM。
-
-## 快速开始
-
-```bash
-# 一行命令启动
-npx llm-simple-router
-# 访问 http://localhost:9981/admin
-# 首次访问会进入 Setup 页面设置管理员密码
-```
-
-无需任何环境变量。数据默认存储在 `~/.llm-simple-router/`。
-
-## Docker 部署
-
-```bash
-docker compose up -d
-```
+客户端模型是指 Claude Code 实际请求发出的模型名。
+如果你配置了 ANTHROPIC_MODEL 等变量，那应该以该变量为准。
+个人的配置：高峰期 GLM 3倍用量，且频繁超限时，将 sonnet 切到 Kimi；低谷期切回 GLM。
 
 ## 环境变量
 
