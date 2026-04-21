@@ -31,7 +31,6 @@ jobs:
           cp -r frontend-dist/ package/frontend-dist/
           cp package.json package/
           cp package-lock.json package/
-          cp .env.example package/
           cp README.md package/
           # 生产依赖安装
           cd package && npm ci --omit=dev && cd ..
