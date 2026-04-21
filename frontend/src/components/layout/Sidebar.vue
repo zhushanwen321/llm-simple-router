@@ -9,6 +9,7 @@
           </svg>
         </div>
         <span class="font-semibold text-sm">LLM Router</span>
+        <Badge variant="secondary" class="text-[10px] px-1.5 py-0 h-4 leading-none">v{{ appVersion }}</Badge>
       </div>
     </div>
     <nav class="flex-1 p-2 space-y-1">
@@ -52,6 +53,9 @@ import {
 } from 'lucide-vue-next'
 import { api } from '@/api/client'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+
+const appVersion = __APP_VERSION__
 
 interface NavItem {
   path: string
