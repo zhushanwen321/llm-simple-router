@@ -2,7 +2,6 @@ name: CI & Docker Build
 
 on:
   push:
-    branches: [main]
   pull_request:
     branches: [main]
 
@@ -24,7 +23,7 @@ jobs:
   docker:
     needs: test
     runs-on: ubuntu-latest
-    # PR 只构建不推送，main 分支才推送
+    # 只在 main 分支 push 时推送 Docker 镜像，其他分支仅验证构建
     if: github.event_name == 'push'
     permissions:
       contents: read
@@ -49,6 +48,6 @@ jobs:
       - uses: docker/build-push-action@v7
         with:
           context: .
-          push: true
+          push: ${{ github.ref == 'refs/heads/main' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
