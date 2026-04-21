@@ -30,6 +30,9 @@ export const tasteRules = {
   // 类型即契约
   '@typescript-eslint/no-explicit-any': 'error',
 
+  // 缩进：仅允许 space
+  'indent': ['warn', 2, { SwitchCase: 1 }],
+
   // 结构先于一切
   'max-lines': ['warn', { max: 500, skipBlankLines: true, skipComments: true }],
   'max-lines-per-function': ['warn', { max: 300, skipBlankLines: true, skipComments: true }],
