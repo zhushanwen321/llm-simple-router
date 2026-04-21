@@ -1,4 +1,4 @@
-import type { ProxyResult, StreamProxyResult } from "./proxy-core.js";
+import type { ProxyResult, StreamProxyResult } from "./transport.js";
 import type { FastifyReply } from "fastify";
 
 // ---------- Types ----------

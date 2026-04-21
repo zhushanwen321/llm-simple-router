@@ -2,6 +2,7 @@ import { request as httpRequestFn } from "http";
 import { request as httpsRequestFn } from "https";
 import { PassThrough } from "stream";
 import type { FastifyReply } from "fastify";
+import { UPSTREAM_SUCCESS } from "./types.js";
 import type { RawHeaders, StreamState, TransportResult } from "./types.js";
 import type { MetricsResult } from "../metrics/metrics-extractor.js";
 import type { SSEMetricsTransform } from "../metrics/sse-metrics-transform.js";
@@ -9,6 +10,7 @@ import type { SSEMetricsTransform } from "../metrics/sse-metrics-transform.js";
 // ---------- Constants ----------
 
 const UPSTREAM_BAD_GATEWAY = 502;
+const UPSTREAM_SUCCESS_RANGE = 100;
 const BUFFER_SIZE_LIMIT = 4096;
 const HTTPS_DEFAULT_PORT = 443;
 const HTTP_DEFAULT_PORT = 80;
@@ -109,7 +111,7 @@ export function callNonStream(
         const responseBody = Buffer.concat(chunks).toString("utf-8");
         const headers = filterHeaders(res.headers as RawHeaders);
 
-        if (statusCode >= 200 && statusCode < 300) {
+        if (statusCode >= UPSTREAM_SUCCESS && statusCode < UPSTREAM_SUCCESS + UPSTREAM_SUCCESS_RANGE) {
           resolve({
             kind: "success",
             statusCode,
@@ -364,9 +366,31 @@ class StreamProxy {
     if (this.state === "STREAMING") {
       this.transition("COMPLETED");
     }
+
+    // 正常完成时先 resolve Promise，再结束管道。
+    // 顺序很重要：resolve 让调用者（proxy-core）的 await 继续，
+    // 后续的 pipeEntry.end() → reply.raw.end() 确保响应数据完整发送。
+    // 如果先 end 再 resolve，Fastify inject 可能在 resolve 之前返回。
+    this.resolved = true;
+    const metrics = this.collectMetrics(true);
+    const result: TransportResult = {
+      kind: "stream_success",
+      statusCode: this.statusCode,
+      upstreamResponseHeaders: this.sseHeaders,
+      sentHeaders: this.sentUpstreamHeaders,
+      metrics,
+    };
+    if (this.resolveFn) {
+      this.resolveFn(result);
+    } else {
+      this.pendingResult = result;
+    }
+
     this.pipeEntry.end();
     if (this.headersSent) this.reply.raw.end();
-    this.terminal("stream_success", { metrics: this.collectMetrics(true) });
+
+    // 延迟清理，不阻塞 resolve 链路
+    setImmediate(() => this.cleanup());
   }
 
   onUpstreamError(err: Error): void {
@@ -384,6 +408,11 @@ class StreamProxy {
 
 // ---------- callStream ----------
 
+/**
+ * 调用流式上游请求。支持两种 resolve 方式：
+ * 1. 默认：返回 `Promise<TransportResult>`
+ * 2. 传入 `compatResolve`：在 terminal 时直接调用该函数，避免 `.then()` 微任务延迟
+ */
 export function callStream(
   backend: { base_url: string },
   apiKey: string,
@@ -395,8 +424,10 @@ export function callStream(
   buildHeaders: BuildHeadersFn,
   metricsTransform?: SSEMetricsTransform,
   checkEarlyError?: (bufferedData: string) => boolean,
+  compatResolve?: (result: TransportResult) => void,
 ): Promise<TransportResult> {
   return new Promise((resolve) => {
+    const effectiveResolve = compatResolve ?? resolve;
     const url = new URL(`${backend.base_url}${upstreamPath}`);
     const payload = JSON.stringify(body);
     const upstreamHeaders = buildHeaders(clientHeaders, apiKey, Buffer.byteLength(payload));
@@ -407,11 +438,11 @@ export function callStream(
     upstreamReq.on("response", (upstreamRes) => {
       const statusCode = upstreamRes.statusCode || UPSTREAM_BAD_GATEWAY;
 
-      if (statusCode !== 200) {
+      if (statusCode !== UPSTREAM_SUCCESS) {
         const chunks: Buffer[] = [];
         upstreamRes.on("data", (chunk: Buffer) => chunks.push(chunk));
         upstreamRes.on("end", () => {
-          resolve({
+          effectiveResolve({
             kind: "stream_error",
             statusCode,
             body: Buffer.concat(chunks).toString("utf-8"),
@@ -432,7 +463,7 @@ export function callStream(
         timeoutMs,
       );
 
-      proxy.bindResolve(resolve);
+      proxy.bindResolve(effectiveResolve);
       proxy.registerCloseHandler();
 
       // 无 early error checker 时直接开始流式传输
@@ -445,8 +476,79 @@ export function callStream(
       upstreamRes.on("error", (err: Error) => proxy.onUpstreamError(err));
     });
 
-    upstreamReq.on("error", (error) => resolve({ kind: "throw", error }));
+    upstreamReq.on("error", (error) => effectiveResolve({ kind: "throw", error }));
     upstreamReq.write(payload);
     upstreamReq.end();
+  });
+}
+
+// ---------- Backward-compatible wrappers (PR-1 only, removed in PR-2) ----------
+
+export interface ProxyResult {
+  statusCode: number;
+  body: string;
+  headers: Record<string, string>;
+  sentHeaders: Record<string, string>;
+  sentBody: string;
+}
+
+export interface StreamProxyResult {
+  statusCode: number;
+  responseBody?: string;
+  upstreamResponseHeaders?: Record<string, string>;
+  sentHeaders?: Record<string, string>;
+  metricsResult?: MetricsResult;
+  abnormalClose?: boolean;
+}
+
+export function proxyNonStreamCompat(
+  backend: { base_url: string },
+  apiKey: string,
+  body: Record<string, unknown>,
+  clientHeaders: RawHeaders,
+  upstreamPath: string,
+  buildHeaders: BuildHeadersFn,
+): Promise<ProxyResult> {
+  return callNonStream(backend, apiKey, body, clientHeaders, upstreamPath, buildHeaders)
+    .then((r) => {
+      if (r.kind === "throw") throw r.error;
+      return {
+        statusCode: r.statusCode,
+        body: "body" in r ? r.body : "",
+        headers: "headers" in r ? r.headers : {},
+        sentHeaders: r.sentHeaders,
+        sentBody: "sentBody" in r ? r.sentBody : "",
+      };
+    });
+}
+
+export function proxyStreamCompat(
+  backend: { base_url: string },
+  apiKey: string,
+  body: Record<string, unknown>,
+  clientHeaders: RawHeaders,
+  reply: FastifyReply,
+  timeoutMs: number,
+  upstreamPath: string,
+  buildHeaders: BuildHeadersFn,
+  metricsTransform?: SSEMetricsTransform,
+  checkEarlyError?: (bufferedData: string) => boolean,
+): Promise<StreamProxyResult> {
+  return new Promise((resolve, reject) => {
+    function onResult(r: TransportResult): void {
+      if (r.kind === "throw") { reject(r.error); return; }
+      const metrics = (r.kind === "stream_success" || r.kind === "stream_abort") ? r.metrics : undefined;
+      resolve({
+        statusCode: r.statusCode,
+        responseBody: r.kind === "stream_success" ? undefined : ("body" in r ? r.body : undefined),
+        upstreamResponseHeaders: ("upstreamResponseHeaders" in r ? r.upstreamResponseHeaders : undefined) ?? ("headers" in r ? r.headers : {}) ?? {},
+        sentHeaders: r.sentHeaders,
+        metricsResult: metrics ?? undefined,
+        abnormalClose: r.kind === "stream_abort",
+      });
+    }
+    // compatResolve 让 callStream 在 terminal 时直接调用 onResult，
+    // 而不是通过 .then() 微任务，确保 Fastify inject 时序正确。
+    callStream(backend, apiKey, body, clientHeaders, reply, timeoutMs, upstreamPath, buildHeaders, metricsTransform, checkEarlyError, onResult);
   });
 }

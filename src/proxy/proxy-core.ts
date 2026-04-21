@@ -12,13 +12,13 @@ import type { RetryRuleMatcher } from "./retry-rules.js";
 import type { Target } from "./strategy/types.js";
 import { SSEMetricsTransform } from "../metrics/sse-metrics-transform.js";
 import {
-  proxyNonStream as upstreamNonStream,
-  proxyStream as upstreamStream,
-  proxyGetRequest as upstreamGet,
+  proxyNonStreamCompat as upstreamNonStream,
+  proxyStreamCompat as upstreamStream,
+  callGet as upstreamGet,
   type ProxyResult,
   type StreamProxyResult,
-  type GetProxyResult,
-} from "./upstream-call.js";
+} from "./transport.js";
+import type { GetTransportResult } from "./transport.js";
 import { insertRejectedLog } from "./log-helpers.js";
 import { applyEnhancement, buildModelInfoTag } from "./enhancement-handler.js";
 import { ProviderSemaphoreManager, SemaphoreQueueFullError, SemaphoreTimeoutError } from "./semaphore.js";
@@ -58,7 +58,8 @@ export interface ProxyHandlerDeps {
 }
 
 // Re-export upstream types for external consumers
-export type { ProxyResult, StreamProxyResult, GetProxyResult };
+export type { ProxyResult, StreamProxyResult } from "./transport.js";
+export type { GetTransportResult as GetProxyResult } from "./transport.js";
 
 // ---------- Constants ----------
 
@@ -114,7 +115,7 @@ export function proxyGetRequest(
   apiKey: string,
   clientHeaders: RawHeaders,
   upstreamPath: string
-): Promise<GetProxyResult> {
+): Promise<GetTransportResult> {
   return upstreamGet(backend, apiKey, clientHeaders, upstreamPath, buildUpstreamHeaders);
 }
 

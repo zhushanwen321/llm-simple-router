@@ -5,7 +5,7 @@ import { insertRequestLog, insertMetrics } from "../db/index.js";
 import { insertSuccessLog, type FailoverContext } from "./log-helpers.js";
 import { MetricsExtractor } from "../metrics/metrics-extractor.js";
 import type { FastifyRequest } from "fastify";
-import type { ProxyResult, StreamProxyResult } from "./upstream-call.js";
+import type { ProxyResult, StreamProxyResult } from "./transport.js";
 import type { Attempt } from "./retry.js";
 // Re-export shared constants & types from types.ts (canonical home)
 export { UPSTREAM_SUCCESS } from "./types.js";
