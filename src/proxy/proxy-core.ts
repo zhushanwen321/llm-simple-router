@@ -288,8 +288,10 @@ export async function handleProxyPost(
     const resolved = resolveMapping(db, effectiveModel, { now: new Date(), excludeTargets });
     request.log.debug({ logId, model: effectiveModel, apiType, isStream, action: "resolve_mapping", resolved: !!resolved }, "Proxy: resolved model mapping");
     if (!resolved) {
+      // failover 场景下所有 target 都已尝试失败，返回最后一个 target 的错误
       if (isFailover && excludeTargets.length > 0) {
-        return reply;
+        const e = errors.upstreamConnectionFailed();
+        return reply.status(e.statusCode).send(e.body);
       }
       const e = errors.modelNotFound(effectiveModel);
       insertRejectedLog({ db, logId, apiType, model: effectiveModel, statusCode: e.statusCode,
