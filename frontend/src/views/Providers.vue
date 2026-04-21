@@ -30,7 +30,14 @@
               <Badge variant="secondary">{{ p.api_type }}</Badge>
             </TableCell>
             <TableCell class="text-muted-foreground">{{ p.base_url }}</TableCell>
-            <TableCell class="text-muted-foreground font-mono text-xs">{{ p.api_key }}</TableCell>
+            <TableCell>
+              <div class="flex items-center gap-1">
+                <span class="font-mono text-xs text-muted-foreground">{{ maskKey(p.api_key) }}</span>
+                <Button variant="ghost" size="sm" class="h-6 w-6 p-0" @click="copyKey(p.api_key, p.id)">
+                  <component :is="copiedId === p.id ? Check : Copy" class="w-3.5 h-3.5" :class="{ 'text-green-500': copiedId === p.id }" />
+                </Button>
+              </div>
+            </TableCell>
             <TableCell>
               <div class="flex flex-wrap gap-1">
                 <Badge v-for="m in (p.models || [])" :key="m" variant="secondary" class="text-xs">{{ m }}</Badge>
@@ -88,15 +95,18 @@
 
           <div>
             <Label class="block text-sm font-medium text-foreground mb-1">名称</Label>
-            <Input v-model="form.name" type="text" required />
+            <Input v-model="form.name" type="text" required @input="delete errors.name" />
+            <p v-if="errors.name" class="text-sm text-destructive mt-1">{{ errors.name }}</p>
           </div>
           <div>
             <Label class="block text-sm font-medium text-foreground mb-1">Base URL</Label>
-            <Input v-model="form.base_url" type="url" required />
+            <Input v-model="form.base_url" type="url" required @input="delete errors.base_url" />
+            <p v-if="errors.base_url" class="text-sm text-destructive mt-1">{{ errors.base_url }}</p>
           </div>
           <div>
             <Label class="block text-sm font-medium text-foreground mb-1">API Key</Label>
-            <Input v-model="form.api_key" type="text" required />
+            <Input v-model="form.api_key" type="text" :required="!editingId" :placeholder="editingId ? '留空则保持原密钥不变' : ''" @input="delete errors.api_key" />
+            <p v-if="errors.api_key" class="text-sm text-destructive mt-1">{{ errors.api_key }}</p>
           </div>
           <div>
             <Label class="block text-sm font-medium text-foreground mb-1">可用模型</Label>
@@ -119,15 +129,18 @@
             <div v-if="concurrencyEnabled" class="mt-2 space-y-2">
               <div>
                 <Label class="block text-sm font-medium text-foreground mb-1">最大并发数</Label>
-                <Input v-model.number="form.max_concurrency" type="number" min="1" :max="MAX_CONCURRENCY" placeholder="3" />
+                <Input v-model.number="form.max_concurrency" type="number" min="1" :max="MAX_CONCURRENCY" placeholder="3" @input="delete errors.max_concurrency" />
+                <p v-if="errors.max_concurrency" class="text-sm text-destructive mt-1">{{ errors.max_concurrency }}</p>
               </div>
               <div>
                 <Label class="block text-sm font-medium text-foreground mb-1">队列超时 (ms)</Label>
-                <Input v-model.number="form.queue_timeout_ms" type="number" min="0" placeholder="0 = 无限等待" />
+                <Input v-model.number="form.queue_timeout_ms" type="number" min="0" placeholder="0 = 无限等待" @input="delete errors.queue_timeout_ms" />
+                <p v-if="errors.queue_timeout_ms" class="text-sm text-destructive mt-1">{{ errors.queue_timeout_ms }}</p>
               </div>
               <div>
                 <Label class="block text-sm font-medium text-foreground mb-1">最大队列长度</Label>
-                <Input v-model.number="form.max_queue_size" type="number" min="1" :max="MAX_QUEUE_SIZE" :placeholder="DEFAULT_QUEUE_SIZE" />
+                <Input v-model.number="form.max_queue_size" type="number" min="1" :max="MAX_QUEUE_SIZE" :placeholder="DEFAULT_QUEUE_SIZE" @input="delete errors.max_queue_size" />
+                <p v-if="errors.max_queue_size" class="text-sm text-destructive mt-1">{{ errors.max_queue_size }}</p>
               </div>
             </div>
           </div>
@@ -162,6 +175,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
+import * as z from 'zod'
 import { api, type ProviderPayload } from '@/api/client'
 import { PROVIDER_PRESETS } from '@/data/provider-presets'
 import { Button } from '@/components/ui/button'
@@ -174,6 +188,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from '@/components/ui/alert-dialog'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Switch } from '@/components/ui/switch'
+import { Copy, Check } from 'lucide-vue-next'
 
 interface Provider {
   id: string
@@ -201,7 +216,51 @@ const dialogOpen = ref(false)
 const editingId = ref<string | null>(null)
 const deleteTarget = ref<Provider | null>(null)
 const form = ref({ ...DEFAULT_FORM })
+const errors = ref<Record<string, string>>({})
 const concurrencyEnabled = ref(false)
+const copiedId = ref<string | null>(null)
+
+const MASK_VISIBLE_LEN = 7
+const MASK_ASTERISK_COUNT = 7
+const COPY_FEEDBACK_MS = 2000
+
+const providerSchema = z.object({
+  name: z.string().min(1, '请输入名称').regex(/^[a-zA-Z0-9_-]+$/, '仅允许英文、数字、横线和下划线'),
+  base_url: z.string().min(1, '请输入 Base URL').url('请输入合法的 URL'),
+})
+
+function validate(): boolean {
+  const errs: Record<string, string> = {}
+  const result = providerSchema.safeParse({ name: form.value.name.trim(), base_url: form.value.base_url.trim() })
+  if (!result.success) {
+    for (const issue of result.error.issues) {
+      const field = issue.path[0] as string
+      if (!errs[field]) errs[field] = issue.message
+    }
+  }
+  if (!editingId.value && !form.value.api_key.trim()) errs.api_key = '请输入 API Key'
+  if (concurrencyEnabled.value) {
+    const mc = form.value.max_concurrency
+    if (!mc || mc < 1 || mc > MAX_CONCURRENCY) errs.max_concurrency = `范围 1-${MAX_CONCURRENCY}`
+    if (form.value.queue_timeout_ms < 0) errs.queue_timeout_ms = '不能为负数'
+    const qs = form.value.max_queue_size
+    if (!qs || qs < 1 || qs > MAX_QUEUE_SIZE) errs.max_queue_size = `范围 1-${MAX_QUEUE_SIZE}`
+  }
+  errors.value = errs
+  return Object.keys(errs).length === 0
+}
+
+function maskKey(key: string): string {
+  if (!key) return ''
+  const visible = key.slice(0, MASK_VISIBLE_LEN)
+  return visible + '*'.repeat(MASK_ASTERISK_COUNT)
+}
+
+async function copyKey(key: string, id: string) {
+  await navigator.clipboard.writeText(key)
+  copiedId.value = id
+  setTimeout(() => { copiedId.value = null }, COPY_FEEDBACK_MS)
+}
 
 // 预设级联状态
 const presetGroup = ref('')
@@ -213,7 +272,13 @@ const availablePlans = computed(() => {
 })
 
 function onGroupChange() {
-  presetPlan.value = ''
+  const plans = PROVIDER_PRESETS.find(g => g.group === presetGroup.value)?.presets
+  if (plans?.length) {
+    presetPlan.value = plans[0].plan
+    onPresetChange()
+  } else {
+    presetPlan.value = ''
+  }
 }
 
 function onPresetChange() {
@@ -258,16 +323,18 @@ function openCreate() {
   modelInput.value = ''
   presetGroup.value = ''
   presetPlan.value = ''
+  errors.value = {}
   dialogOpen.value = true
 }
 
 function openEdit(p: Provider) {
   editingId.value = p.id
-  form.value = { name: p.name, api_type: 'anthropic', base_url: p.base_url, api_key: p.api_key, models: [...(p.models || [])], is_active: !!p.is_active, max_concurrency: p.max_concurrency ?? DEFAULT_CONCURRENCY, queue_timeout_ms: p.queue_timeout_ms ?? DEFAULT_QUEUE_TIMEOUT_MS, max_queue_size: p.max_queue_size ?? DEFAULT_QUEUE_SIZE }
+  form.value = { name: p.name, api_type: 'anthropic', base_url: p.base_url, api_key: '', models: [...(p.models || [])], is_active: !!p.is_active, max_concurrency: p.max_concurrency ?? DEFAULT_CONCURRENCY, queue_timeout_ms: p.queue_timeout_ms ?? DEFAULT_QUEUE_TIMEOUT_MS, max_queue_size: p.max_queue_size ?? DEFAULT_QUEUE_SIZE }
   concurrencyEnabled.value = (p.max_concurrency ?? 0) > 0
   modelInput.value = ''
   presetGroup.value = ''
   presetPlan.value = ''
+  errors.value = {}
   dialogOpen.value = true
 }
 
@@ -289,14 +356,10 @@ function buildPayload(): ProviderFormPayload {
 }
 
 async function handleSave() {
-  const name = form.value.name.trim()
-  if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
-    toast.error('名称仅允许英文大小写字母、数字、横线和下划线')
-    return
-  }
+  if (!validate()) return
   try {
     const payload = buildPayload()
-    payload.name = name
+    payload.name = form.value.name.trim()
     if (editingId.value) {
       await api.updateProvider(editingId.value, payload)
     } else {

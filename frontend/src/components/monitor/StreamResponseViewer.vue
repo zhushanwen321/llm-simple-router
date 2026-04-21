@@ -6,7 +6,7 @@
   <div v-else-if="!streamContent" class="flex items-center justify-center h-full text-sm text-muted-foreground">
     等待流数据...
   </div>
-  <Tabs v-else :default-value="hasBlocks ? 'structured' : 'raw'" class="flex flex-col h-full">
+  <Tabs v-else default-value="structured" class="flex flex-col h-full">
     <TabsList class="w-fit">
       <TabsTrigger value="structured">响应内容</TabsTrigger>
       <TabsTrigger value="raw">原始 SSE</TabsTrigger>

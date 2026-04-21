@@ -22,6 +22,9 @@
 | 多供应商 | 配置多个后端供应商，按模型映射路由 |
 | 多密钥 (Router Keys) | 为不同使用方创建独立密钥，支持模型白名单 |
 | 流式代理 | 完整支持 SSE 流式和非流式请求 |
+| 供应商并发控制 | 按 Provider 维度限制并发数、队列长度和超时，防止单一供应商过载 |
+| 实时监控 | SSE 推送活跃请求、延迟热力图、Token 吞吐、运行时资源指标 |
+| 代理增强 (实验性) | 注入系统指令、会话记忆、模型锁定等增强功能 |
 | 管理后台 | Vue 3 + shadcn-vue Web UI，管理供应商、映射、密钥 |
 | 请求日志 | 结构化展示完整四阶段链路（客户端请求/上游请求/上游响应/客户端响应），适配 Claude Code 请求格式 |
 | 性能指标 | TTFT、吞吐量、Token 用量、缓存命中率，支持按模型/密钥筛选 |
@@ -33,6 +36,14 @@
 | Dashboard | Provider 管理 |
 |-----------|-------------|
 | ![Dashboard](docs/screenshot/dashboard.png) | ![Provider](docs/screenshot/provider.png) |
+
+| 供应商并发控制 | 实时监控 |
+|--------------|---------|
+| ![Provider Concurrency](docs/screenshot/provider_concurrency.png) | ![Monitor](docs/screenshot/monitor.png) |
+
+| 代理增强 (实验性) |
+|-----------------|
+| ![Proxy Enhancement](docs/screenshot/proxy_enhance.png) |
 
 | 模型映射 | 重试规则 |
 |---------|--------|

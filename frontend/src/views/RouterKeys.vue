@@ -26,7 +26,7 @@
             <TableCell class="font-medium">{{ k.name }}</TableCell>
             <TableCell>
               <div class="flex items-center gap-1">
-                <span class="font-mono text-xs text-muted-foreground">{{ k.key }}</span>
+                <span class="font-mono text-xs text-muted-foreground">{{ maskKey(k.key) }}</span>
                 <Button variant="ghost" size="sm" class="h-6 w-6 p-0" @click="tableCopy(k.key)">
                   <svg v-if="!tableCopied" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
@@ -70,7 +70,8 @@
         <form @submit.prevent="handleSave" class="space-y-4">
           <div>
             <Label class="block text-sm font-medium text-foreground mb-1">名称</Label>
-            <Input v-model="form.name" type="text" required placeholder="例如：生产环境" />
+            <Input v-model="form.name" type="text" required placeholder="例如：生产环境" @input="delete errors.name" />
+            <p v-if="errors.name" class="text-sm text-destructive mt-1">{{ errors.name }}</p>
           </div>
           <div>
             <Label class="block text-sm font-medium text-foreground mb-1">白名单模型</Label>
@@ -158,8 +159,14 @@ const dialogOpen = ref(false)
 const editingId = ref<string | null>(null)
 const deleteTarget = ref<RouterKey | null>(null)
 const form = ref({ ...DEFAULT_FORM, allowed_models: [] as string[] })
+const errors = ref<Record<string, string>>({})
 
 const { copied: tableCopied, copy: tableCopy } = useClipboard()
+
+function maskKey(key: string): string {
+  if (!key) return ''
+  return key.slice(0, 7) + '*'.repeat(7) // eslint-disable-line no-magic-numbers
+}
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleString('zh-CN')
@@ -187,6 +194,7 @@ async function loadData() {
 function openCreate() {
   editingId.value = null
   form.value = { ...DEFAULT_FORM, allowed_models: [] }
+  errors.value = {}
   dialogOpen.value = true
 }
 
@@ -197,6 +205,7 @@ function openEdit(k: RouterKey) {
     allowed_models: k.allowed_models ? [...k.allowed_models] : [],
     is_active: !!k.is_active,
   }
+  errors.value = {}
   dialogOpen.value = true
 }
 
@@ -216,6 +225,12 @@ function buildCreatePayload(): { name: string; allowed_models: string[] | null }
 }
 
 async function handleSave() {
+  const errs: Record<string, string> = {}
+  const name = form.value.name.trim()
+  if (!name) errs.name = '请输入名称'
+  errors.value = errs
+  if (Object.keys(errs).length > 0) return
+
   try {
     if (editingId.value) {
       await api.updateRouterKey(editingId.value, buildUpdatePayload())
