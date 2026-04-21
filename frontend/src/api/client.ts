@@ -1,5 +1,6 @@
 import axios from 'axios'
 import router from '@/router'
+import type { LogEntry } from '@/components/logs/types'
 
 const client = axios.create({
   baseURL: '/admin/api',
@@ -143,7 +144,7 @@ export const api = {
   getLogs: (params: { page: number; limit: number; api_type?: string; router_key_id?: string; view?: string }) =>
     client.get(API.LOGS, { params }),
   getLogDetail: (id: string) => client.get(`${API.LOGS}/${id}`),
-  getLogChildren: (id: string) => client.get(`${API.LOGS}/${id}/children`),
+  getLogChildren: (id: string) => request<{ data: LogEntry[] }>('get', `${API.LOGS}/${id}/children`),
   deleteLogsBefore: (before: string) =>
     client.delete(`${API.LOGS}/before`, { data: { before } }),
 

@@ -66,7 +66,7 @@
             <!-- Expanded child rows -->
             <template v-if="expandedRows.has(log.id)">
               <TableRow v-if="childLoading[log.id]">
-                <TableCell colspan="13" class="text-center py-2 pl-10">
+                <TableCell :colspan="TABLE_COL_COUNT" class="text-center py-2 pl-10">
                   <Skeleton class="h-4 w-32 mx-auto" />
                 </TableCell>
               </TableRow>
@@ -83,7 +83,7 @@
           </template>
 
           <TableRow v-if="logs.length === 0">
-            <TableCell colspan="13" class="text-center text-muted-foreground py-8">暂无日志</TableCell>
+            <TableCell :colspan="TABLE_COL_COUNT" class="text-center text-muted-foreground py-8">暂无日志</TableCell>
           </TableRow>
         </TableBody>
       </Table>
@@ -140,6 +140,7 @@ const logs = ref<LogEntry[]>([])
 const total = ref(0)
 const page = ref(1)
 const PAGE_SIZE = 20
+const TABLE_COL_COUNT = 13
 const filterType = ref('all')
 const filterRouterKey = ref('all')
 const routerKeys = ref<{ id: string; name: string }[]>([])
@@ -163,7 +164,7 @@ async function toggleExpand(log: LogEntry) {
     childLoading.value[id] = true
     try {
       const res = await api.getLogChildren(id)
-      childLogs.value[id] = res.data.data
+      childLogs.value[id] = res.data
     } catch (e) {
       console.error('Failed to load child logs:', e)
       toast.error('加载子请求失败')

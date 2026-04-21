@@ -4,6 +4,8 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { TableCell, TableRow } from '@/components/ui/table'
 import type { LogEntry } from '@/components/logs/types'
+import { PROVIDER_ID_ROUTER } from '@/components/logs/types'
+import { formatTime } from '@/utils/format'
 
 withDefaults(defineProps<{
   log: LogEntry
@@ -30,9 +32,6 @@ function enhancementLabel(raw: string | null): string {
   } catch { return '未知' }
 }
 
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleString('zh-CN')
-}
 </script>
 
 <template>
@@ -80,7 +79,7 @@ function formatTime(iso: string): string {
     </TableCell>
 
     <TableCell class="text-xs">
-      <template v-if="!isChild && log.provider_id === 'router'">
+      <template v-if="!isChild && log.provider_id === PROVIDER_ID_ROUTER">
         <Badge variant="secondary" class="text-[10px] px-1 py-0">
           代理增强：{{ enhancementLabel(log.upstream_request) }}
         </Badge>

@@ -17,6 +17,8 @@ const DeleteLogsBeforeSchema = Type.Object({
   before: Type.String({ minLength: 1 }),
 });
 
+const DEFAULT_LOG_VIEW = "flat";
+
 interface LogRoutesOptions {
   db: Database.Database;
 }
@@ -28,24 +30,19 @@ export const adminLogRoutes: FastifyPluginCallback<LogRoutesOptions> = (app, opt
     const query = request.query as Static<typeof LogQuerySchema>;
     const page = parseInt(query.page || "1", 10);
     const limit = parseInt(query.limit || "20", 10);
-    const view = query.view || "flat";
-    if (view === "grouped") {
-      const result = getRequestLogsGrouped(db, {
-        page,
-        limit,
-        api_type: query.api_type || undefined,
-        model: query.model || undefined,
-        router_key_id: query.router_key_id || undefined,
-      });
-      return reply.send({ ...result, page, limit });
-    }
-    const result = getRequestLogs(db, {
+    const view = query.view || DEFAULT_LOG_VIEW;
+
+    const listOptions = {
       page,
       limit,
       api_type: query.api_type || undefined,
       model: query.model || undefined,
       router_key_id: query.router_key_id || undefined,
-    });
+    };
+
+    const result = view === "grouped"
+      ? getRequestLogsGrouped(db, listOptions)
+      : getRequestLogs(db, listOptions);
     return reply.send({ ...result, page, limit });
   });
 

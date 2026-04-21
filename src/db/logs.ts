@@ -115,17 +115,17 @@ export function insertRequestLog(
   );
 }
 
-export function getRequestLogs(
-  db: Database.Database,
-  options: {
-    page: number;
-    limit: number;
-    api_type?: string;
-    model?: string;
-    router_key_id?: string;
-  },
-): { data: RequestLogListRow[]; total: number } {
-  let where = "1=1";
+type LogFilterOptions = {
+  api_type?: string;
+  model?: string;
+  router_key_id?: string;
+};
+
+function buildLogWhereClause(
+  options: LogFilterOptions,
+  baseCondition: string,
+): { where: string; params: unknown[] } {
+  let where = baseCondition;
   const params: unknown[] = [];
   if (options.api_type) {
     where += " AND rl.api_type = ?";
@@ -139,6 +139,20 @@ export function getRequestLogs(
     where += " AND rl.router_key_id = ?";
     params.push(options.router_key_id);
   }
+  return { where, params };
+}
+
+export function getRequestLogs(
+  db: Database.Database,
+  options: {
+    page: number;
+    limit: number;
+    api_type?: string;
+    model?: string;
+    router_key_id?: string;
+  },
+): { data: RequestLogListRow[]; total: number } {
+  const { where, params } = buildLogWhereClause(options, "1=1");
   const total = (
     db.prepare(`SELECT COUNT(*) as count FROM request_logs rl WHERE ${where}`).get(...params) as CountRow
   ).count;
@@ -192,20 +206,7 @@ export function getRequestLogsGrouped(
     router_key_id?: string;
   },
 ): { data: RequestLogGroupedRow[]; total: number } {
-  let where = "rl.original_request_id IS NULL";
-  const params: unknown[] = [];
-  if (options.api_type) {
-    where += " AND rl.api_type = ?";
-    params.push(options.api_type);
-  }
-  if (options.model) {
-    where += " AND rl.model LIKE ?";
-    params.push(`%${options.model}%`);
-  }
-  if (options.router_key_id) {
-    where += " AND rl.router_key_id = ?";
-    params.push(options.router_key_id);
-  }
+  const { where, params } = buildLogWhereClause(options, "rl.original_request_id IS NULL");
   const total = (
     db.prepare(`SELECT COUNT(*) as count FROM request_logs rl WHERE ${where}`).get(...params) as CountRow
   ).count;

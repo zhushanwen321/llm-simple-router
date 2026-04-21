@@ -193,6 +193,17 @@ export function proxyStream(
         return result;
       }
 
+      const makeResult = (
+        body: string,
+        metrics?: ReturnType<typeof collectMetrics>,
+      ) => ({
+        statusCode,
+        responseBody: body,
+        upstreamResponseHeaders: sseHeaders,
+        sentHeaders: upstreamHeaders,
+        ...(metrics ? { metricsResult: metrics } : {}),
+      });
+
       reply.raw.on("close", () => {
         if (!resolved) {
           cleanup();
@@ -231,16 +242,12 @@ export function proxyStream(
           const buf = Buffer.concat(bufferChunks);
           const text = buf.toString("utf-8");
           if (text.includes("\n\n")) {
-            if (checkEarlyError!(text)) {
+            const earlyChecker = checkEarlyError;
+            if (earlyChecker?.(text)) {
               // 检测到错误——不发 headers，直接 resolve（可重试）
               resolved = true;
               cleanup();
-              resolve({
-                statusCode,
-                responseBody: text,
-                upstreamResponseHeaders: sseHeaders,
-                sentHeaders: upstreamHeaders,
-              });
+              resolve(makeResult(text));
               return;
             }
             // 非错误——flush 缓冲，开始流式转发
@@ -265,12 +272,7 @@ export function proxyStream(
           const text = Buffer.concat(captureChunks).toString("utf-8");
           if (checkEarlyError(text)) {
             cleanup();
-            resolve({
-              statusCode,
-              responseBody: text,
-              upstreamResponseHeaders: sseHeaders,
-              sentHeaders: upstreamHeaders,
-            });
+            resolve(makeResult(text));
             return;
           }
           startStreaming();
@@ -278,13 +280,7 @@ export function proxyStream(
 
         pipeEntry.end();
         if (headersSent) reply.raw.end();
-        resolve({
-          statusCode,
-          responseBody: Buffer.concat(captureChunks).toString("utf-8"),
-          upstreamResponseHeaders: sseHeaders,
-          sentHeaders: upstreamHeaders,
-          metricsResult: collectMetrics(true),
-        });
+        resolve(makeResult(Buffer.concat(captureChunks).toString("utf-8"), collectMetrics(true)));
       });
 
       upstreamRes.on("error", (err) => {

@@ -54,7 +54,6 @@ export function createStrategy(rule: { retry_strategy: string; retry_delay_ms: n
 // ---------- Constants ----------
 
 const RETRYABLE_THROW_CODES = new Set(["ETIMEDOUT", "ECONNRESET", "ECONNREFUSED"]);
-const HTTP_BAD_REQUEST = 400;
 const HTTP_TOO_MANY_REQUESTS = 429;
 const MS_PER_SECOND = 1000;
 
@@ -132,9 +131,7 @@ export async function retryableCall<T extends ProxyResult | StreamProxyResult>(
       // 检查 body 是否匹配重试规则（对所有状态码，包括 200 + SSE 错误）
       const matchedRule = body ? config.ruleMatcher?.match(result.statusCode, body) ?? null : null;
 
-      // 无匹配规则且状态码正常 → 直接返回
-      if (!matchedRule && result.statusCode < HTTP_BAD_REQUEST) return { result, attempts };
-      // 有状态码错误但无匹配规则 → 直接返回
+      // 无匹配规则 → 直接返回
       if (!matchedRule) return { result, attempts };
 
       const maxAttempts = matchedRule.max_retries;

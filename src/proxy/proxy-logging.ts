@@ -1,0 +1,155 @@
+import { randomUUID } from "crypto";
+import Database from "better-sqlite3";
+import type { Provider } from "../db/index.js";
+import { insertRequestLog, insertMetrics } from "../db/index.js";
+import { insertSuccessLog, type FailoverContext } from "./log-helpers.js";
+import { MetricsExtractor } from "../metrics/metrics-extractor.js";
+import type { FastifyRequest } from "fastify";
+import type { ProxyResult, StreamProxyResult } from "./upstream-call.js";
+import type { Attempt } from "./retry.js";
+// ---------- Shared constants & types ----------
+
+export const UPSTREAM_SUCCESS = 200;
+export type RawHeaders = Record<string, string | string[] | undefined>;
+
+const HTTP_BAD_GATEWAY = 502;
+
+// ---------- Header sanitization ----------
+
+const AUTH_HEADER_RE = /^authorization$/i;
+
+/** 日志存储前脱敏 Authorization header，避免 API Key 被持久化 */
+export function sanitizeHeadersForLog(headers: Record<string, string>): Record<string, string> {
+  const sanitized: Record<string, string> = {};
+  for (const [key, value] of Object.entries(headers)) {
+    sanitized[key] = AUTH_HEADER_RE.test(key) ? value.replace(/(Bearer\s+)\S+/, "$1sk-***") : value;
+  }
+  return sanitized;
+}
+
+// ---------- Logging helpers (extracted from proxy-core) ----------
+
+export function handleIntercept(
+  db: Database.Database,
+  apiType: "openai" | "anthropic",
+  request: FastifyRequest,
+  reply: import("fastify").FastifyReply,
+  interceptResponse: { statusCode: number; body: unknown; meta?: unknown },
+  clientModel: string,
+): import("fastify").FastifyReply {
+  const logId = randomUUID();
+  const isStream = (request.body as Record<string, unknown>).stream === true;
+  const respBody = JSON.stringify(interceptResponse.body);
+  insertRequestLog(db, {
+    id: logId, api_type: apiType, model: clientModel, provider_id: "router",
+    status_code: interceptResponse.statusCode, latency_ms: 0,
+    is_stream: isStream ? 1 : 0, error_message: null,
+    created_at: new Date().toISOString(),
+    request_body: JSON.stringify(request.body),
+    response_body: respBody,
+    client_request: JSON.stringify({ headers: request.headers as RawHeaders, body: request.body }),
+    upstream_request: interceptResponse.meta ? JSON.stringify(interceptResponse.meta) : null,
+    client_response: JSON.stringify({ statusCode: interceptResponse.statusCode, body: respBody }),
+    is_retry: 0, is_failover: 0, original_request_id: null,
+    router_key_id: request.routerKey?.id ?? null, original_model: null,
+  });
+  return reply.status(interceptResponse.statusCode).send(interceptResponse.body);
+}
+
+export function logRetryAttempts(
+  db: Database.Database,
+  params: {
+    apiType: "openai" | "anthropic";
+    model: string;
+    providerId: string;
+    isStream: boolean;
+    reqBodyStr: string;
+    clientReq: string;
+    upstreamReqBase: string;
+    logId: string;
+    routerKeyId: string | null;
+    originalModel: string | null;
+    failover?: FailoverContext;
+  },
+  attempts: Attempt[],
+  result: ProxyResult | StreamProxyResult,
+  startTime: number,
+): string {
+  const isFailoverIteration = params.failover?.isFailoverIteration ?? false;
+  const rootLogId = params.failover?.rootLogId ?? params.logId;
+  let lastSuccessLogId = params.logId;
+  for (const attempt of attempts) {
+    const isOriginal = attempt.attemptIndex === 0;
+    const attemptLogId = isOriginal ? params.logId : randomUUID();
+
+    // 去重 failover 标记逻辑
+    const isFailoverLog = isOriginal && isFailoverIteration;
+    const parentId = isOriginal
+      ? (isFailoverIteration ? rootLogId : null)
+      : params.logId;
+
+    if (attempt.error) {
+      insertRequestLog(db, {
+        id: attemptLogId, api_type: params.apiType, model: params.model, provider_id: params.providerId,
+        status_code: HTTP_BAD_GATEWAY, latency_ms: attempt.latencyMs,
+        is_stream: params.isStream ? 1 : 0, error_message: attempt.error,
+        created_at: new Date().toISOString(), request_body: params.reqBodyStr,
+        client_request: params.clientReq, upstream_request: params.upstreamReqBase,
+        is_retry: isOriginal ? 0 : 1,
+        is_failover: isFailoverLog ? 1 : 0,
+        original_request_id: parentId,
+        router_key_id: params.routerKeyId, original_model: params.originalModel,
+      });
+    } else if (attempt.statusCode !== UPSTREAM_SUCCESS) {
+      insertRequestLog(db, {
+        id: attemptLogId, api_type: params.apiType, model: params.model, provider_id: params.providerId,
+        status_code: attempt.statusCode!, latency_ms: attempt.latencyMs,
+        is_stream: params.isStream ? 1 : 0, error_message: null,
+        created_at: new Date().toISOString(), request_body: params.reqBodyStr,
+        response_body: attempt.responseBody, client_request: params.clientReq, upstream_request: params.upstreamReqBase,
+        upstream_response: JSON.stringify({ statusCode: attempt.statusCode, body: attempt.responseBody }),
+        client_response: JSON.stringify({ statusCode: attempt.statusCode, body: attempt.responseBody }),
+        is_retry: isOriginal ? 0 : 1,
+        is_failover: isFailoverLog ? 1 : 0,
+        original_request_id: parentId,
+        router_key_id: params.routerKeyId, original_model: params.originalModel,
+      });
+    } else {
+      const h = params.isStream
+        ? ((result as StreamProxyResult).upstreamResponseHeaders ?? {})
+        : ((result as ProxyResult).headers);
+      insertSuccessLog(db, { apiType: params.apiType, model: params.model, provider: { id: params.providerId } as Provider, isStream: params.isStream, startTime,
+        reqBody: params.reqBodyStr, clientReq: params.clientReq, upstreamReq: params.upstreamReqBase, id: attemptLogId,
+        status: result.statusCode, respBody: attempt.responseBody, upHdrs: h, cliHdrs: h,
+        isRetry: !isOriginal, isFailover: isFailoverLog,
+        originalRequestId: parentId,
+        routerKeyId: params.routerKeyId, originalModel: params.originalModel });
+      lastSuccessLogId = attemptLogId;
+    }
+  }
+  return lastSuccessLogId;
+}
+
+export function collectMetrics(
+  db: Database.Database,
+  apiType: "openai" | "anthropic",
+  result: ProxyResult | StreamProxyResult,
+  isStream: boolean,
+  lastSuccessLogId: string,
+  providerId: string,
+  backendModel: string,
+  request: FastifyRequest,
+) {
+  const base = { request_log_id: lastSuccessLogId, provider_id: providerId, backend_model: backendModel, api_type: apiType };
+  try {
+    if (isStream) {
+      const mr = (result as StreamProxyResult).metricsResult;
+      if (mr) { insertMetrics(db, { ...base, ...mr }); return; }
+    } else {
+      const mr = MetricsExtractor.fromNonStreamResponse(apiType, (result as ProxyResult).body);
+      if (mr) { insertMetrics(db, { ...base, ...mr }); return; }
+    }
+    // 无法提取完整 metrics（失败请求），至少记录 backend_model
+    insertMetrics(db, base);
+  } catch (err) { request.log.error({ err }, "Failed to insert metrics"); }
+}

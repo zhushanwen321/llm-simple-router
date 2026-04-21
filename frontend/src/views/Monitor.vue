@@ -254,7 +254,10 @@ const selectedRequest = computed(() => {
 const nonStreamBody = ref<string | undefined>(undefined)
 const nonStreamBodyLoading = ref(false)
 
+const loadVersion = ref(0)
+
 async function loadNonStreamBody(requestId: string) {
+  const version = ++loadVersion.value
   const req = activeRequests.value.find((r) => r.id === requestId) ??
     recentCompleted.value.find((r) => r.id === requestId)
   // 仅对已完成的非流式请求加载
@@ -266,11 +269,16 @@ async function loadNonStreamBody(requestId: string) {
   nonStreamBody.value = undefined
   try {
     const log = await api.getLogDetail(requestId) as { response_body?: string }
+    if (version !== loadVersion.value) return  // 被新请求覆盖，丢弃旧结果
     nonStreamBody.value = log.response_body ?? undefined
-  } catch {
+  } catch (e) {
+    if (version !== loadVersion.value) return
+    console.warn('Failed to load non-stream body:', e)
     nonStreamBody.value = undefined
   } finally {
-    nonStreamBodyLoading.value = false
+    if (version === loadVersion.value) {
+      nonStreamBodyLoading.value = false
+    }
   }
 }
 

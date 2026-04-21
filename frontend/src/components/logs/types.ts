@@ -1,3 +1,5 @@
+export const PROVIDER_ID_ROUTER = 'router'
+
 export interface LogEntry {
   id: string
   api_type: string

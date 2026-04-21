@@ -3,7 +3,18 @@ import type { Provider } from "../db/index.js";
 import { insertRequestLog } from "../db/index.js";
 import type { RawHeaders } from "./proxy-core.js";
 
-export interface RequestLogParams {
+export interface FailoverContext {
+  isFailoverIteration: boolean;
+  rootLogId: string;
+}
+
+export interface LogRetryMeta {
+  isRetry?: boolean;
+  isFailover?: boolean;
+  originalRequestId?: string | null;
+}
+
+export interface RequestLogParams extends LogRetryMeta {
   id: string;
   apiType: string;
   model: string;
@@ -17,9 +28,6 @@ export interface RequestLogParams {
   respBody: string | null;
   upHdrs: Record<string, string>;
   cliHdrs: Record<string, string>;
-  isRetry?: boolean;
-  isFailover?: boolean;
-  originalRequestId?: string | null;
   routerKeyId?: string | null;
   originalModel?: string | null;
 }
@@ -46,7 +54,7 @@ export function insertSuccessLog(
   });
 }
 
-export interface RejectedLogParams {
+export interface RejectedLogParams extends LogRetryMeta {
   db: Database.Database;
   logId: string;
   apiType: string;
@@ -59,8 +67,6 @@ export interface RejectedLogParams {
   originalBody: Record<string, unknown>;
   clientHeaders: RawHeaders;
   providerId?: string | null;
-  isFailover?: boolean;
-  originalRequestId?: string | null;
   originalModel?: string | null;
 }
 
