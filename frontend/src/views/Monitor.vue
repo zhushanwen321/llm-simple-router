@@ -44,7 +44,7 @@
                 {{ statusLabel(req.status) }}
               </Badge>
               <span class="text-sm text-foreground truncate flex-1">{{ req.model }}</span>
-              <span class="text-xs text-muted-foreground shrink-0">{{ req.providerName }}</span>
+              <Badge variant="outline" class="shrink-0 text-xs">{{ req.providerName }}</Badge>
               <span class="text-xs text-muted-foreground shrink-0">{{ elapsed(req.startTime) }}s</span>
               <Badge v-if="req.isStream" variant="outline" class="shrink-0 text-xs">SSE</Badge>
             </div>
@@ -76,7 +76,7 @@
                 排队
               </Badge>
               <span class="text-sm text-foreground truncate flex-1">{{ req.model }}</span>
-              <span class="text-xs text-muted-foreground shrink-0">{{ req.providerName }}</span>
+              <Badge variant="outline" class="shrink-0 text-xs">{{ req.providerName }}</Badge>
               <span class="text-xs text-muted-foreground shrink-0">{{ elapsed(req.startTime) }}s</span>
             </div>
           </ScrollArea>
@@ -107,7 +107,7 @@
                 {{ statusLabel(req.status) }}
               </Badge>
               <span class="text-sm text-foreground truncate flex-1">{{ req.model }}</span>
-              <span class="text-xs text-muted-foreground shrink-0">{{ req.providerName }}</span>
+              <Badge variant="outline" class="shrink-0 text-xs">{{ req.providerName }}</Badge>
               <Badge v-if="req.isStream" variant="outline" class="shrink-0 text-xs">SSE</Badge>
             </div>
           </ScrollArea>
