@@ -44,6 +44,7 @@ const UPSTREAM_SUCCESS = 200;
 const UPSTREAM_BAD_GATEWAY = 502;
 const HTTPS_DEFAULT_PORT = 443;
 const HTTP_DEFAULT_PORT = 80;
+const BUFFER_SIZE_LIMIT = 4096;
 
 // ---------- Request utilities ----------
 
@@ -114,7 +115,8 @@ export function proxyStream(
   timeoutMs: number,
   upstreamPath: string,
   buildHeaders: (cliHdrs: RawHeaders, key: string, bytes?: number) => Record<string, string>,
-  metricsTransform?: SSEMetricsTransform
+  metricsTransform?: SSEMetricsTransform,
+  checkEarlyError?: (bufferedData: string) => boolean,
 ): Promise<StreamProxyResult> {
   return new Promise((resolve, reject) => {
     const url = new URL(`${backend.base_url}${upstreamPath}`);
@@ -145,20 +147,34 @@ export function proxyStream(
       sseHeaders["Content-Type"] = "text/event-stream";
       sseHeaders["Cache-Control"] = "no-cache";
       sseHeaders["Connection"] = "keep-alive";
-      reply.raw.writeHead(statusCode, sseHeaders);
+
+      let headersSent = false;
+      let bufferPhase = !!checkEarlyError;
+      const bufferChunks: Buffer[] = [];
 
       const passThrough = new PassThrough();
-      if (metricsTransform) {
-        metricsTransform.pipe(passThrough).pipe(reply.raw);
-      } else {
-        passThrough.pipe(reply.raw);
-      }
-
       const pipeEntry = metricsTransform ?? passThrough;
 
       const captureChunks: Buffer[] = [];
       let idleTimer: NodeJS.Timeout | null = null;
       let resolved = false;
+
+      function startStreaming() {
+        if (headersSent) return;
+        headersSent = true;
+        bufferPhase = false;
+        reply.raw.writeHead(statusCode, sseHeaders);
+        if (metricsTransform) {
+          metricsTransform.pipe(passThrough).pipe(reply.raw);
+        } else {
+          passThrough.pipe(reply.raw);
+        }
+        for (const c of bufferChunks) pipeEntry.write(c);
+        bufferChunks.length = 0;
+      }
+
+      // 无早期错误检测时，立即开始流式转发
+      if (!checkEarlyError) startStreaming();
 
       function cleanup() {
         if (idleTimer) clearTimeout(idleTimer);
@@ -208,16 +224,60 @@ export function proxyStream(
       upstreamRes.on("data", (chunk: Buffer) => {
         if (resolved) return;
         resetIdleTimer();
-        pipeEntry.write(chunk);
         captureChunks.push(chunk);
+
+        if (bufferPhase) {
+          bufferChunks.push(chunk);
+          const buf = Buffer.concat(bufferChunks);
+          const text = buf.toString("utf-8");
+          if (text.includes("\n\n")) {
+            if (checkEarlyError!(text)) {
+              // 检测到错误——不发 headers，直接 resolve（可重试）
+              resolved = true;
+              cleanup();
+              resolve({
+                statusCode,
+                responseBody: text,
+                upstreamResponseHeaders: sseHeaders,
+                sentHeaders: upstreamHeaders,
+              });
+              return;
+            }
+            // 非错误——flush 缓冲，开始流式转发
+            startStreaming();
+          } else if (buf.length >= BUFFER_SIZE_LIMIT) {
+            // 缓冲区超限仍未检测到 \n\n，放弃检测直接转发
+            startStreaming();
+          }
+          return;
+        }
+
+        pipeEntry.write(chunk);
       });
 
       upstreamRes.on("end", () => {
         if (resolved) return;
         resolved = true;
         if (idleTimer) clearTimeout(idleTimer);
+
+        // 如果还在缓冲阶段（流很短，没有 \n\n），也尝试检测错误
+        if (bufferPhase && checkEarlyError) {
+          const text = Buffer.concat(captureChunks).toString("utf-8");
+          if (checkEarlyError(text)) {
+            cleanup();
+            resolve({
+              statusCode,
+              responseBody: text,
+              upstreamResponseHeaders: sseHeaders,
+              sentHeaders: upstreamHeaders,
+            });
+            return;
+          }
+          startStreaming();
+        }
+
         pipeEntry.end();
-        reply.raw.end();
+        if (headersSent) reply.raw.end();
         resolve({
           statusCode,
           responseBody: Buffer.concat(captureChunks).toString("utf-8"),

@@ -129,10 +129,12 @@ export async function retryableCall<T extends ProxyResult | StreamProxyResult>(
         responseBody: body,
       });
 
-      if (result.statusCode < HTTP_BAD_REQUEST) return { result, attempts };
-
-      // 通过 matcher 获取匹配规则（含策略参数）
+      // 检查 body 是否匹配重试规则（对所有状态码，包括 200 + SSE 错误）
       const matchedRule = body ? config.ruleMatcher?.match(result.statusCode, body) ?? null : null;
+
+      // 无匹配规则且状态码正常 → 直接返回
+      if (!matchedRule && result.statusCode < HTTP_BAD_REQUEST) return { result, attempts };
+      // 有状态码错误但无匹配规则 → 直接返回
       if (!matchedRule) return { result, attempts };
 
       const maxAttempts = matchedRule.max_retries;
