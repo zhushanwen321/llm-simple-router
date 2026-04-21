@@ -143,6 +143,7 @@ export const api = {
   getLogs: (params: { page: number; limit: number; api_type?: string; router_key_id?: string }) =>
     client.get(API.LOGS, { params }),
   getLogDetail: (id: string) => client.get(`${API.LOGS}/${id}`),
+  getLogChildren: (id: string) => client.get(`${API.LOGS}/${id}/children`),
   deleteLogsBefore: (before: string) =>
     client.delete(`${API.LOGS}/before`, { data: { before } }),
 
