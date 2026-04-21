@@ -249,4 +249,57 @@ describe("Provider CRUD", () => {
     expect(res.statusCode).toBe(400);
     expect(res.json().error.message).toContain("英文大小写字母");
   });
+
+  it("POST creates provider with max_concurrency", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/api/providers",
+      headers: { cookie, "content-type": "application/json" },
+      payload: {
+        name: "Test-Concurrent",
+        api_type: "openai",
+        base_url: "https://api.openai.com",
+        api_key: "sk-test-abc123xyz",
+        max_concurrency: 5,
+      },
+    });
+    expect(res.statusCode).toBe(201);
+
+    const getRes = await app.inject({
+      method: "GET",
+      url: "/admin/api/providers",
+      headers: { cookie },
+    });
+    const providers = getRes.json();
+    expect(providers[0].max_concurrency).toBe(5);
+  });
+
+  it("PUT updates max_concurrency", async () => {
+    const createRes = await app.inject({
+      method: "POST",
+      url: "/admin/api/providers",
+      headers: { cookie, "content-type": "application/json" },
+      payload: {
+        name: "Test-Concurrent",
+        api_type: "openai",
+        base_url: "https://api.openai.com",
+        api_key: "sk-test-key789",
+      },
+    });
+    const id = createRes.json().id;
+
+    await app.inject({
+      method: "PUT",
+      url: `/admin/api/providers/${id}`,
+      headers: { cookie, "content-type": "application/json" },
+      payload: { max_concurrency: 3 },
+    });
+
+    const getRes = await app.inject({
+      method: "GET",
+      url: "/admin/api/providers",
+      headers: { cookie },
+    });
+    expect(getRes.json()[0].max_concurrency).toBe(3);
+  });
 });

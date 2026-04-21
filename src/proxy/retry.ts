@@ -34,13 +34,15 @@ export interface RetryStrategy {
 
 export class FixedIntervalStrategy implements RetryStrategy {
   constructor(private delayMs: number) {}
-  getDelay(_attempt: number): number { return this.delayMs; }
+  getDelay(): number { return this.delayMs; }
 }
+
+const EXPONENTIAL_BASE = 2;
 
 export class ExponentialBackoffStrategy implements RetryStrategy {
   constructor(private baseMs: number, private capMs: number) {}
   getDelay(attempt: number): number {
-    return Math.min(this.baseMs * 2 ** attempt, this.capMs);
+    return Math.min(this.baseMs * EXPONENTIAL_BASE ** attempt, this.capMs);
   }
 }
 

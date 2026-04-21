@@ -57,7 +57,7 @@ export function getAvailableModels(db: Database.Database): string[] {
   const rows = db.prepare("SELECT models FROM providers WHERE is_active = 1").all() as { models: string }[];
   const set = new Set<string>();
   for (const r of rows) {
-    try { JSON.parse(r.models || "[]").forEach((m: string) => set.add(m)); } catch { /* skip invalid JSON */ }
+    try { JSON.parse(r.models || "[]").forEach((m: string) => set.add(m)); } catch { continue }
   }
   return [...set].sort();
 }

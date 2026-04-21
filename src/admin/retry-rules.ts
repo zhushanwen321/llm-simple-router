@@ -11,6 +11,10 @@ import {
 import { RetryRuleMatcher } from "../proxy/retry-rules.js";
 import { HTTP_BAD_REQUEST, HTTP_CREATED } from "./constants.js";
 
+const DEFAULT_RETRY_DELAY_MS = 5000;
+const DEFAULT_MAX_RETRIES = 10;
+const DEFAULT_MAX_DELAY_MS = 60000;
+
 const CreateRetryRuleSchema = Type.Object({
   name: Type.String({ minLength: 1 }),
   status_code: Type.Number({ minimum: 100, maximum: 599 }),
@@ -71,9 +75,9 @@ export const adminRetryRuleRoutes: FastifyPluginCallback<RetryRuleRoutesOptions>
       body_pattern: body.body_pattern,
       is_active: body.is_active ?? 1,
       retry_strategy: body.retry_strategy ?? "exponential",
-      retry_delay_ms: body.retry_delay_ms ?? 5000,
-      max_retries: body.max_retries ?? 10,
-      max_delay_ms: body.max_delay_ms ?? 60000,
+      retry_delay_ms: body.retry_delay_ms ?? DEFAULT_RETRY_DELAY_MS,
+      max_retries: body.max_retries ?? DEFAULT_MAX_RETRIES,
+      max_delay_ms: body.max_delay_ms ?? DEFAULT_MAX_DELAY_MS,
     });
     refreshMatcher(matcher, db);
     return reply.code(HTTP_CREATED).send({ id });

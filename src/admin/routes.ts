@@ -11,11 +11,16 @@ import { adminMetricsRoutes } from "./metrics.js";
 import { adminProxyEnhancementRoutes } from "./proxy-enhancement.js";
 import { adminRouterKeyRoutes } from "./router-keys.js";
 import { adminSetupRoutes } from "./setup.js";
+import { adminMonitorRoutes } from "./monitor.js";
 import { RetryRuleMatcher } from "../proxy/retry-rules.js";
+import type { RequestTracker } from "../monitor/request-tracker.js";
+import { ProviderSemaphoreManager } from "../proxy/semaphore.js";
 
 interface AdminRoutesOptions {
   db: Database.Database;
   matcher: RetryRuleMatcher | null;
+  tracker?: RequestTracker;
+  semaphoreManager?: ProviderSemaphoreManager;
 }
 
 export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (app, options, done) => {
@@ -23,7 +28,7 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (app, opti
   app.register(adminSetupRoutes, { db: options.db });
   app.register(adminAuthPlugin, { db: options.db });
   app.register(adminLoginRoutes, { db: options.db });
-  app.register(adminProviderRoutes, { db: options.db });
+  app.register(adminProviderRoutes, { db: options.db, semaphoreManager: options.semaphoreManager, tracker: options.tracker });
   app.register(adminMappingRoutes, { db: options.db });
   app.register(adminGroupRoutes, { db: options.db });
   app.register(adminRetryRuleRoutes, { db: options.db, matcher: options.matcher });
@@ -32,5 +37,6 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (app, opti
   app.register(adminStatsRoutes, { db: options.db });
   app.register(adminMetricsRoutes, { db: options.db });
   app.register(adminProxyEnhancementRoutes, { db: options.db });
+  app.register(adminMonitorRoutes, { tracker: options.tracker });
   done();
 };

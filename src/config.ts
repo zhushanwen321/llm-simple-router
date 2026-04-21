@@ -1,5 +1,4 @@
 import { homedir } from "node:os";
-import { existsSync } from "node:fs";
 import { join } from "node:path";
 
 export interface Config {

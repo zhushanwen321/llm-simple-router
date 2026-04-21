@@ -36,7 +36,7 @@ export function resolveMapping(
         if (models.includes(backendModel)) {
           return { backend_model: backendModel, provider_id: provider.id };
         }
-      } catch { /* 忽略解析失败 */ }
+      } catch { return null }
     }
     // 明确的 provider/model 格式解析失败，不再 fallback 到 mapping group
     return null;
@@ -52,7 +52,7 @@ export function resolveMapping(
         if (models.includes(clientModel)) {
           return { backend_model: clientModel, provider_id: p.id };
         }
-      } catch { /* 忽略解析失败 */ }
+      } catch { break }
     }
     return null;
   }

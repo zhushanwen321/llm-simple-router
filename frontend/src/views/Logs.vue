@@ -368,8 +368,7 @@ function enhancementLabel(raw: string | null): string {
     if (meta.action) {
       return meta.detail ? `${meta.action}: ${meta.detail}` : meta.action
     }
-  } catch { /* ignore */ }
-  return '未知'
+  } catch { return '未知' }
 }
 
 function isIntercepted(log: LogEntry): boolean {
@@ -386,8 +385,7 @@ function getClientRequestRaw(detail: LogEntry): string {
       try { cr.body = JSON.parse(detail.request_body) } catch { cr.body = detail.request_body }
       return JSON.stringify(cr)
     }
-  } catch { /* 解析失败则原样返回 */ }
-  return detail.client_request
+  } catch { return detail.client_request }
 }
 
 /** 组装客户端响应数据：client_response 为空时从 response_body 构造 */

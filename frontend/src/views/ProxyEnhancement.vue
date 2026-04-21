@@ -1,7 +1,7 @@
 <template>
   <div class="p-6">
     <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-semibold text-foreground">代理增强</h2>
+      <h2 class="text-lg font-semibold text-foreground">代理增强（实验性）</h2>
       <Button :disabled="saving" @click="handleSave">
         <span v-if="saving" class="flex items-center gap-1">
           <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -24,7 +24,7 @@
           <CardHeader>
             <CardTitle>Claude Code 动态模型切换</CardTitle>
             <CardDescription>
-              启用后，Claude Code 客户端可在对话中通过指令动态切换后端模型，无需修改路由配置。
+              在 Claude Code 对话中通过 /select-model 命令动态切换后端模型。模型选择在当前会话内有效（24h），不影响路由配置。
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -60,57 +60,34 @@
                 <div>
                   <p class="font-medium text-foreground mb-1 leading-relaxed">配置方法</p>
                   <p class="text-muted-foreground leading-relaxed">
-                    创建一个 Claude Code 的 Command ，内容是 
-                  </p>
-	                  <code class="block mt-1 px-3 py-2 bg-muted rounded text-xs font-mono whitespace-pre-wrap leading-relaxed" v-text="selectModelInstruction" />
-                </div>
-                <div>
-                  <p class="text-muted-foreground leading-relaxed">
-                    Command 可以是项目级或者全局级
+                    在 Claude Code 项目级或全局级目录下创建 Command 文件：
                   </p>
                   <code class="block mt-1 px-3 py-2 bg-muted rounded text-xs font-mono whitespace-pre-wrap leading-relaxed">
-                    # 项目级 Command <br />
-                    .claude/commands/select-model.md
+                    # 项目级 .claude/commands/select-model.md<br />
+                    # 全局级 ~/.claude/commands/select-model.md
                   </code>
-                  <code class="block mt-1 px-3 py-2 bg-muted rounded text-xs font-mono whitespace-pre-wrap leading-relaxed">
-                    # 全局级 Command <br />
-                    ~/.claude/commands/select-model.md
-                  </code>
+                  <p class="text-muted-foreground leading-relaxed mt-2">
+                    文件内容：
+                  </p>
+                  <code class="block mt-1 px-3 py-2 bg-muted rounded text-xs font-mono whitespace-pre-wrap leading-relaxed" v-text="selectModelInstruction" />
                 </div>
                 <div>
                   <p class="font-medium text-foreground mb-1 leading-relaxed">使用方法</p>
-                  <div>
-                    <p class="text-muted-foreground leading-relaxed">
-                      在 Claude Code 中查看可用模型
-                    </p>
-                    <code class="block mt-1 px-3 py-2 bg-muted rounded text-xs font-mono whitespace-pre-wrap leading-relaxed">
-                      # 输入命令  <br />
-                      /select-model
-                    </code>
-                    <code class="block mt-1 px-3 py-2 bg-muted rounded text-xs font-mono whitespace-pre-wrap leading-relaxed">
-                      # 得到结果是你在供应商配置的 provider/model 列表 <br />
-                      1. zai-coding-plan/glm-5 <br />
-                      2. zai-coding-plan/glm-5.1 <br />
-                      3. zai-coding-plan/glm-5-turbo <br />
-                      4. kimi-coding-plan/kimi-for-coding <br />
-                    </code>
-                  </div>
-                  <div>
-                    <p class="text-muted-foreground leading-relaxed">
-                      在Claude Code 中选择模型
-                    </p>
-                    <code class="block mt-1 px-3 py-2 bg-muted rounded text-xs font-mono whitespace-pre-wrap leading-relaxed">
-                      # 输入命令 <br />
-                      /select-model zai-coding-plan/glm-5.1
-                    </code>
-                    <code class="block mt-1 px-3 py-2 bg-muted rounded text-xs font-mono whitespace-pre-wrap leading-relaxed">
-                      # 得到结果 <br />
-                      已选择模型: zai-coding-plan/glm-5.1
-                    </code>
-                    <p class="text-muted-foreground leading-relaxed">
-                      之后可以在 活跃 Session 中查看模型设置情况。在 请求日志 页面查看请求是否已经路由到了已选择模型。
-                    </p>
-                  </div>
+                  <p class="text-muted-foreground leading-relaxed">
+                    查看可用模型列表（格式为 provider_name/backend_model）：
+                  </p>
+                  <code class="block mt-1 px-3 py-2 bg-muted rounded text-xs font-mono whitespace-pre-wrap leading-relaxed">
+                    /select-model
+                  </code>
+                  <p class="text-muted-foreground leading-relaxed mt-2">
+                    选择模型并记住到当前会话：
+                  </p>
+                  <code class="block mt-1 px-3 py-2 bg-muted rounded text-xs font-mono whitespace-pre-wrap leading-relaxed">
+                    /select-model provider_name/backend_model
+                  </code>
+                  <p class="text-muted-foreground leading-relaxed mt-2">
+                    切换后在下方活跃 Session 表中确认状态，请求日志中可验证路由是否生效。
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -162,7 +139,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import SessionTable from '@/components/proxy-enhancement/SessionTable.vue'
 
 const claudeCodeEnabled = ref(false)
-const selectModelInstruction = '[router-command: select-model $ARGUMENTS]'
+const selectModelInstruction = '---\ndescription: 切换代理路由模型\n---\n\n[router-command: select-model $ARGUMENTS]'
 const saving = ref(false)
 const instructionsOpen = ref(true)
 

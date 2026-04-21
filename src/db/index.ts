@@ -60,6 +60,7 @@ export {
   createProvider,
   updateProvider,
   deleteProvider,
+  PROVIDER_CONCURRENCY_DEFAULTS,
 } from "./providers.js";
 export type { Provider } from "./providers.js";
 
