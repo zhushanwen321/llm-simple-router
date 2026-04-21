@@ -53,8 +53,9 @@ describe("TransportLayer.callNonStream", () => {
     vi.resetModules();
     mockReq = createMockUpstreamReq();
     vi.doMock("../src/proxy/transport.js", async () => {
-      const actual = await vi.importActual("../src/proxy/transport.js");
-      return { ...actual, createUpstreamRequest: () => mockReq };
+      const actual = await vi.importActual("../src/proxy/transport.js") as any;
+      actual._transportInternals.createUpstreamRequest = () => mockReq;
+      return actual;
     });
   });
 
@@ -148,8 +149,9 @@ describe("TransportLayer.callStream", () => {
     vi.resetModules();
     mockReq = createMockUpstreamReq();
     vi.doMock("../src/proxy/transport.js", async () => {
-      const actual = await vi.importActual("../src/proxy/transport.js");
-      return { ...actual, createUpstreamRequest: () => mockReq };
+      const actual = await vi.importActual("../src/proxy/transport.js") as any;
+      actual._transportInternals.createUpstreamRequest = () => mockReq;
+      return actual;
     });
   });
 
@@ -228,8 +230,9 @@ describe("StreamProxy state machine - error paths", () => {
     vi.resetModules();
     mockReq = createMockUpstreamReq();
     vi.doMock("../src/proxy/transport.js", async () => {
-      const actual = await vi.importActual("../src/proxy/transport.js");
-      return { ...actual, createUpstreamRequest: () => mockReq };
+      const actual = await vi.importActual("../src/proxy/transport.js") as any;
+      actual._transportInternals.createUpstreamRequest = () => mockReq;
+      return actual;
     });
   });
 
@@ -425,8 +428,9 @@ describe("StreamProxy close handler", () => {
     vi.resetModules();
     mockReq = createMockUpstreamReq();
     vi.doMock("../src/proxy/transport.js", async () => {
-      const actual = await vi.importActual("../src/proxy/transport.js");
-      return { ...actual, createUpstreamRequest: () => mockReq };
+      const actual = await vi.importActual("../src/proxy/transport.js") as any;
+      actual._transportInternals.createUpstreamRequest = () => mockReq;
+      return actual;
     });
   });
 
