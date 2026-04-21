@@ -50,19 +50,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Card, CardContent } from '@/components/ui/card'
-
-interface StatsSnapshot {
-  totalRequests: number
-  successCount: number
-  errorCount: number
-  retryCount: number
-  failoverCount: number
-  avgLatencyMs: number
-  p50LatencyMs: number
-  p99LatencyMs: number
-  byProvider: Record<string, unknown>
-  byStatusCode: Record<number, number>
-}
+import type { StatsSnapshot } from '@/types/monitor'
 
 const props = defineProps<{
   stats: StatsSnapshot | null

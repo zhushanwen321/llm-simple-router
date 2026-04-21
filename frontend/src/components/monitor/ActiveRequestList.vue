@@ -58,37 +58,7 @@
 <script setup lang="ts">
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
-
-interface AttemptSnapshot {
-  statusCode: number | null
-  error: string | null
-  latencyMs: number
-  providerId: string
-}
-
-interface StreamMetricsSnapshot {
-  inputTokens: number | null
-  outputTokens: number | null
-  ttftMs: number | null
-  stopReason: string | null
-  isComplete: boolean
-}
-
-interface ActiveRequest {
-  id: string
-  apiType: 'openai' | 'anthropic'
-  model: string
-  providerId: string
-  providerName: string
-  isStream: boolean
-  startTime: number
-  status: 'pending' | 'completed' | 'failed'
-  retryCount: number
-  attempts: AttemptSnapshot[]
-  streamMetrics?: StreamMetricsSnapshot
-  clientIp?: string
-  completedAt?: number
-}
+import type { ActiveRequest } from '@/types/monitor'
 
 defineProps<{
   requests: ActiveRequest[]
