@@ -237,9 +237,9 @@ function openEdit(g: MappingGroup & { parsedRule?: Rule }) {
       strategy: g.strategy,
       targets: Array.isArray(rule.targets)
         ? rule.targets.map((t: { backend_model: string; provider_id: string }) => ({
-            backend_model: t.backend_model || '',
-            provider_id: t.provider_id || firstProviderId,
-          }))
+          backend_model: t.backend_model || '',
+          provider_id: t.provider_id || firstProviderId,
+        }))
         : [{ backend_model: firstModels[0] || '', provider_id: firstProviderId }],
     }
   }

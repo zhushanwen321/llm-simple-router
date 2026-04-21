@@ -400,7 +400,7 @@ export async function handleProxyPost(
     try {
       request.log.debug({ logId, providerId: provider.id, isStream, upstreamUrl: `${provider.base_url}${upstreamPath}`, action: "upstream_call" }, "Proxy: calling upstream");
       const checkEarlyError = isStream && deps.matcher
-        ? (data: string) => deps.matcher!.test(200, data)
+        ? (data: string) => deps.matcher!.test(UPSTREAM_SUCCESS, data)
         : undefined;
       const { result: r, attempts } = isStream
         ? await retryableCall(

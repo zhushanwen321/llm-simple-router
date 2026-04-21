@@ -1,7 +1,7 @@
 import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
 import { Type, Static } from "@sinclair/typebox";
-import { getRequestLogs, getRequestLogById, getRequestLogChildren, deleteLogsBefore } from "../db/index.js";
+import { getRequestLogs, getRequestLogsGrouped, getRequestLogById, getRequestLogChildren, deleteLogsBefore } from "../db/index.js";
 import { HTTP_NOT_FOUND } from "./constants.js";
 
 const LogQuerySchema = Type.Object({
@@ -10,6 +10,7 @@ const LogQuerySchema = Type.Object({
   api_type: Type.Optional(Type.String()),
   model: Type.Optional(Type.String()),
   router_key_id: Type.Optional(Type.String()),
+  view: Type.Optional(Type.String()),
 });
 
 const DeleteLogsBeforeSchema = Type.Object({
@@ -27,6 +28,17 @@ export const adminLogRoutes: FastifyPluginCallback<LogRoutesOptions> = (app, opt
     const query = request.query as Static<typeof LogQuerySchema>;
     const page = parseInt(query.page || "1", 10);
     const limit = parseInt(query.limit || "20", 10);
+    const view = query.view || "flat";
+    if (view === "grouped") {
+      const result = getRequestLogsGrouped(db, {
+        page,
+        limit,
+        api_type: query.api_type || undefined,
+        model: query.model || undefined,
+        router_key_id: query.router_key_id || undefined,
+      });
+      return reply.send({ ...result, page, limit });
+    }
     const result = getRequestLogs(db, {
       page,
       limit,

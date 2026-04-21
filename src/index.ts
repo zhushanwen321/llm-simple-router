@@ -68,14 +68,14 @@ export async function buildApp(
       level: config.LOG_LEVEL,
       ...(isDev
         ? {
-            transport: {
-              target: "pino-pretty",
-              options: {
-                translateTime: "SYS:yyyy-mm-dd HH:MM:ss.l",
-                ignore: "pid,hostname",
-              },
+          transport: {
+            target: "pino-pretty",
+            options: {
+              translateTime: "SYS:yyyy-mm-dd HH:MM:ss.l",
+              ignore: "pid,hostname",
             },
-          }
+          },
+        }
         : {}),
     },
     // 统一 schema validation 错误格式为 { error: { message } }
