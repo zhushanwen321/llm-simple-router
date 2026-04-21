@@ -23,11 +23,12 @@ import { insertRejectedLog } from "./log-helpers.js";
 import { applyEnhancement, buildModelInfoTag } from "./enhancement-handler.js";
 import { ProviderSemaphoreManager, SemaphoreQueueFullError, SemaphoreTimeoutError } from "./semaphore.js";
 import type { RequestTracker } from "../monitor/request-tracker.js";
-import { logRetryAttempts, collectMetrics, handleIntercept, sanitizeHeadersForLog, UPSTREAM_SUCCESS, type RawHeaders } from "./proxy-logging.js";
+import { logRetryAttempts, collectMetrics, handleIntercept, sanitizeHeadersForLog } from "./proxy-logging.js";
+import { UPSTREAM_SUCCESS, type RawHeaders } from "./types.js";
 
 // Re-export for external consumers (openai.ts, anthropic.ts, etc.)
-export { UPSTREAM_SUCCESS } from "./proxy-logging.js";
-export type { RawHeaders } from "./proxy-logging.js";
+export { UPSTREAM_SUCCESS } from "./types.js";
+export type { RawHeaders } from "./types.js";
 
 // ---------- Types ----------
 

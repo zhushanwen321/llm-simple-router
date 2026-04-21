@@ -7,10 +7,13 @@ import { MetricsExtractor } from "../metrics/metrics-extractor.js";
 import type { FastifyRequest } from "fastify";
 import type { ProxyResult, StreamProxyResult } from "./upstream-call.js";
 import type { Attempt } from "./retry.js";
-// ---------- Shared constants & types ----------
+// Re-export shared constants & types from types.ts (canonical home)
+export { UPSTREAM_SUCCESS } from "./types.js";
+export type { RawHeaders } from "./types.js";
 
-export const UPSTREAM_SUCCESS = 200;
-export type RawHeaders = Record<string, string | string[] | undefined>;
+// Internal imports from types.ts
+import { UPSTREAM_SUCCESS } from "./types.js";
+import type { RawHeaders } from "./types.js";
 
 const HTTP_BAD_GATEWAY = 502;
 
