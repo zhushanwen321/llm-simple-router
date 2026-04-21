@@ -71,6 +71,7 @@ export interface StatsSnapshot {
 }
 
 export interface ProviderStats {
+  providerName: string;
   totalRequests: number;
   successCount: number;
   errorCount: number;

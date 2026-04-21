@@ -163,7 +163,7 @@ describe("RequestTracker", () => {
       const latency = recordLatencySpy.mock.calls[0][0] as number;
       expect(latency).toBeGreaterThanOrEqual(500);
 
-      expect(recordRequestSpy).toHaveBeenCalledWith("provider-1", 200, false, false);
+      expect(recordRequestSpy).toHaveBeenCalledWith("provider-1", "OpenAI", 200, false, false);
       expect(recordProviderLatencySpy).toHaveBeenCalledWith("provider-1", expect.any(Number));
     });
 
@@ -171,7 +171,7 @@ describe("RequestTracker", () => {
       tracker.start(createActiveRequest({ retryCount: 1 }));
       tracker.complete("req-1", { status: "completed", statusCode: 200 });
 
-      expect(recordRequestSpy).toHaveBeenCalledWith("provider-1", 200, true, false);
+      expect(recordRequestSpy).toHaveBeenCalledWith("provider-1", "OpenAI", 200, true, false);
     });
 
     it("broadcasts request_complete event", () => {
@@ -192,7 +192,7 @@ describe("RequestTracker", () => {
       tracker.start(createActiveRequest());
       tracker.complete("req-1", { status: "failed" });
 
-      expect(recordRequestSpy).toHaveBeenCalledWith("provider-1", 0, false, false);
+      expect(recordRequestSpy).toHaveBeenCalledWith("provider-1", "OpenAI", 0, false, false);
     });
   });
 

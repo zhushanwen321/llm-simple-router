@@ -71,6 +71,7 @@ export class StatsAggregator {
   private failoverCount = 0;
   private byStatusCode: Map<number, number> = new Map();
   private providers: Map<string, ProviderAccumulator> = new Map();
+  private providerNames: Map<string, string> = new Map();
 
   constructor(capacity = DEFAULT_CAPACITY) {
     this.latencyBuffer = new RingBuffer(Math.max(1, capacity));
@@ -82,11 +83,13 @@ export class StatsAggregator {
 
   recordRequest(
     providerId: string,
+    providerName: string,
     statusCode: number,
     isRetry: boolean,
     isFailover: boolean,
   ): void {
     this.totalRequests++;
+    this.providerNames.set(providerId, providerName);
 
     // Global status code counters
     this.byStatusCode.set(
@@ -153,6 +156,7 @@ export class StatsAggregator {
         .slice(0, TOP_ERRORS_LIMIT);
 
       byProvider[id] = {
+        providerName: this.providerNames.get(id) ?? id,
         totalRequests: acc.totalRequests,
         successCount: acc.successCount,
         errorCount: acc.errorCount,
@@ -193,6 +197,7 @@ export class StatsAggregator {
     this.failoverCount = 0;
     this.byStatusCode.clear();
     this.providers.clear();
+    this.providerNames.clear();
   }
 }
 

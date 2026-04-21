@@ -201,6 +201,7 @@ export class RequestTracker {
     this.statsAggregator.recordLatency(latency);
     this.statsAggregator.recordRequest(
       req.providerId,
+      req.providerName,
       statusCode,
       req.retryCount > 0,
       false,

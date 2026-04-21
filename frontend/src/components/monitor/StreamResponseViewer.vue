@@ -17,12 +17,13 @@
           <!-- Thinking: 可折叠，默认展开 -->
           <Collapsible
             v-if="block.type === 'thinking' && block.content"
-            v-model:open="thinkingOpen[i]"
+            :open="thinkingOpen[i] ?? true"
+            @update:open="thinkingOpen[i] = $event"
           >
             <div class="rounded-md border bg-card">
               <CollapsibleTrigger as-child>
                 <div class="flex items-center gap-1.5 px-2.5 py-1.5 cursor-pointer hover:bg-muted/50 rounded-t-md">
-                  <ChevronRight class="h-3 w-3 transition-transform" :class="{ 'rotate-90': thinkingOpen[i] }" />
+                  <ChevronRight class="h-3 w-3 transition-transform" :class="{ 'rotate-90': thinkingOpen[i] ?? true }" />
                   <Brain class="h-3.5 w-3.5 text-muted-foreground" />
                   <span class="text-xs font-medium">Thinking</span>
                   <span class="text-xs text-muted-foreground">({{ block.content.length }} 字符)</span>
@@ -46,11 +47,11 @@
             </div>
           </div>
           <!-- Tool Use: 可折叠，默认折叠但显示工具名 -->
-          <Collapsible v-else-if="block.type === 'tool_use'" v-model:open="toolOpen[i]">
+          <Collapsible v-else-if="block.type === 'tool_use'" :open="toolOpen[i] ?? false" @update:open="toolOpen[i] = $event">
             <div class="rounded-md border bg-card">
               <CollapsibleTrigger as-child>
                 <div class="flex items-center gap-1.5 px-2.5 py-1.5 cursor-pointer hover:bg-muted/50 rounded-t-md">
-                  <ChevronRight class="h-3 w-3 transition-transform" :class="{ 'rotate-90': toolOpen[i] }" />
+                  <ChevronRight class="h-3 w-3 transition-transform" :class="{ 'rotate-90': toolOpen[i] ?? false }" />
                   <Wrench class="h-3.5 w-3.5 text-muted-foreground" />
                   <span class="text-xs font-medium">Tool Use</span>
                   <Badge v-if="block.name" variant="outline" class="text-xs">{{ block.name }}</Badge>
@@ -144,23 +145,6 @@ const hasBlocks = computed(() => {
   const blocks = props.streamContent?.blocks
   return Boolean(blocks && blocks.length > 0 && blocks.some(b => b.type !== 'text' || b.content.length > 0))
 })
-
-// Thinking 默认展开，Tool Use 默认折叠
-watch(
-  () => props.streamContent?.blocks,
-  (blocks) => {
-    if (!blocks) return
-    for (let i = 0; i < blocks.length; i++) {
-      if (blocks[i].type === 'thinking' && thinkingOpen.value[i] === undefined) {
-        thinkingOpen.value[i] = true
-      }
-      if (blocks[i].type === 'tool_use' && toolOpen.value[i] === undefined) {
-        toolOpen.value[i] = false
-      }
-    }
-  },
-  { immediate: true, deep: true },
-)
 
 // 文本内容更新时自动滚到底部
 watch(

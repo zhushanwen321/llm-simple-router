@@ -18,7 +18,7 @@
       </TableRow>
     </TableHeader>
     <TableBody>
-      <TableRow v-for="entry in providerEntries" :key="entry.name">
+      <TableRow v-for="entry in providerEntries" :key="entry.id">
         <TableCell class="font-medium">{{ entry.name }}</TableCell>
         <TableCell class="text-right">{{ entry.stats.totalRequests }}</TableCell>
         <TableCell class="text-right">
@@ -60,6 +60,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 
 interface ProviderStats {
+  providerName: string
   totalRequests: number
   successCount: number
   errorCount: number
@@ -90,8 +91,9 @@ const providerEntries = computed(() => {
   if (!props.stats) return []
   return Object.entries(props.stats.byProvider)
     .filter(([k]) => typeof k === 'string')
-    .map(([name, s]) => ({
-      name,
+    .map(([id, s]) => ({
+      id,
+      name: s.providerName,
       stats: s,
       successRate: s.totalRequests > 0 ? (s.successCount / s.totalRequests) * 100 : 0,
       retryRate: s.totalRequests > 0 ? (s.retryCount / s.totalRequests) * 100 : 0,

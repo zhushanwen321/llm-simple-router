@@ -6,6 +6,7 @@
     <!-- Header -->
     <div class="flex items-center gap-2">
       <span class="font-medium text-foreground">{{ request.model }}</span>
+      <Badge v-if="request.isStream" variant="outline" class="text-xs">SSE</Badge>
       <Badge :variant="statusVariant(request.status)">
         {{ statusLabel(request.status) }}
       </Badge>

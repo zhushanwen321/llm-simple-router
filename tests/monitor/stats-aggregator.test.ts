@@ -71,10 +71,10 @@ describe("StatsAggregator", () => {
 
   describe("recordRequest", () => {
     it("counts totalRequests, success and error by statusCode", () => {
-      agg.recordRequest("p1", 200, false, false);
-      agg.recordRequest("p1", 200, false, false);
-      agg.recordRequest("p1", 500, false, false);
-      agg.recordRequest("p2", 200, false, false);
+      agg.recordRequest("p1", "Provider1", 200, false, false);
+      agg.recordRequest("p1", "Provider1", 200, false, false);
+      agg.recordRequest("p1", "Provider1", 500, false, false);
+      agg.recordRequest("p2", "Provider2", 200, false, false);
 
       const stats = agg.getStats();
       expect(stats.totalRequests).toBe(4);
@@ -85,9 +85,9 @@ describe("StatsAggregator", () => {
     });
 
     it("counts retries and failovers", () => {
-      agg.recordRequest("p1", 200, true, false);
-      agg.recordRequest("p1", 200, false, true);
-      agg.recordRequest("p1", 200, true, true);
+      agg.recordRequest("p1", "Provider1", 200, true, false);
+      agg.recordRequest("p1", "Provider1", 200, false, true);
+      agg.recordRequest("p1", "Provider1", 200, true, true);
 
       const stats = agg.getStats();
       expect(stats.retryCount).toBe(2);
@@ -97,22 +97,24 @@ describe("StatsAggregator", () => {
     it("builds byProvider with per-provider stats", () => {
       agg.recordLatency(100);
       agg.recordLatency(200);
-      agg.recordRequest("p1", 200, false, false);
-      agg.recordRequest("p1", 500, false, false);
-      agg.recordRequest("p2", 200, false, false);
+      agg.recordRequest("p1", "Provider1", 200, false, false);
+      agg.recordRequest("p1", "Provider1", 500, false, false);
+      agg.recordRequest("p2", "Provider2", 200, false, false);
 
       const stats = agg.getStats();
       expect(stats.byProvider["p1"].totalRequests).toBe(2);
+      expect(stats.byProvider["p1"].providerName).toBe("Provider1");
       expect(stats.byProvider["p1"].successCount).toBe(1);
       expect(stats.byProvider["p1"].errorCount).toBe(1);
       expect(stats.byProvider["p2"].totalRequests).toBe(1);
+      expect(stats.byProvider["p2"].providerName).toBe("Provider2");
       expect(stats.byProvider["p2"].successCount).toBe(1);
     });
 
     it("computes per-provider avgLatencyMs", () => {
-      agg.recordRequest("p1", 200, false, false);
+      agg.recordRequest("p1", "Provider1", 200, false, false);
       agg.recordProviderLatency("p1", 100);
-      agg.recordRequest("p1", 200, false, false);
+      agg.recordRequest("p1", "Provider1", 200, false, false);
       agg.recordProviderLatency("p1", 300);
 
       const stats = agg.getStats();
@@ -120,9 +122,9 @@ describe("StatsAggregator", () => {
     });
 
     it("tracks topErrors per provider", () => {
-      for (let i = 0; i < 5; i++) agg.recordRequest("p1", 500, false, false);
-      for (let i = 0; i < 3; i++) agg.recordRequest("p1", 429, false, false);
-      agg.recordRequest("p1", 503, false, false);
+      for (let i = 0; i < 5; i++) agg.recordRequest("p1", "Provider1", 500, false, false);
+      for (let i = 0; i < 3; i++) agg.recordRequest("p1", "Provider1", 429, false, false);
+      agg.recordRequest("p1", "Provider1", 503, false, false);
 
       const stats = agg.getStats();
       const errors = stats.byProvider["p1"].topErrors;
@@ -135,18 +137,18 @@ describe("StatsAggregator", () => {
       // 6 different error codes
       for (let code = 400; code < 406; code++) {
         // Higher codes get more occurrences
-        agg.recordRequest("p1", code, false, false);
+        agg.recordRequest("p1", "Provider1", code, false, false);
       }
-      agg.recordRequest("p1", 405, false, false);
+      agg.recordRequest("p1", "Provider1", 405, false, false);
 
       const stats = agg.getStats();
       expect(stats.byProvider["p1"].topErrors.length).toBeLessThanOrEqual(5);
     });
 
     it("counts per-provider retryCount", () => {
-      agg.recordRequest("p1", 200, true, false);
-      agg.recordRequest("p1", 200, true, false);
-      agg.recordRequest("p1", 200, false, false);
+      agg.recordRequest("p1", "Provider1", 200, true, false);
+      agg.recordRequest("p1", "Provider1", 200, true, false);
+      agg.recordRequest("p1", "Provider1", 200, false, false);
 
       const stats = agg.getStats();
       expect(stats.byProvider["p1"].retryCount).toBe(2);
@@ -156,8 +158,8 @@ describe("StatsAggregator", () => {
   describe("reset", () => {
     it("clears all data", () => {
       agg.recordLatency(100);
-      agg.recordRequest("p1", 200, false, false);
-      agg.recordRequest("p1", 500, true, false);
+      agg.recordRequest("p1", "Provider1", 200, false, false);
+      agg.recordRequest("p1", "Provider1", 500, true, false);
 
       agg.reset();
 
