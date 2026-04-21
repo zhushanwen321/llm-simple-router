@@ -1,4 +1,4 @@
-import { cpSync, existsSync } from "node:fs";
+import { cpSync, existsSync, rmSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,19 +14,18 @@ if (existsSync(migrationsSrc)) {
   console.log("Migrations copied to dist/db/migrations/");
 }
 
-// 前端构建产物不存在时才构建
+// 始终重新构建前端，避免发布时复用旧产物
 const frontendDist = resolve(root, "frontend-dist");
-if (!existsSync(frontendDist)) {
-  console.log("Building frontend...");
-  execSync("npm run build", {
-    cwd: resolve(root, "frontend"),
-    stdio: "inherit",
-  });
-  const frontendBuild = resolve(root, "frontend/dist");
-  if (existsSync(frontendBuild)) {
-    cpSync(frontendBuild, frontendDist, { recursive: true });
-    console.log("Frontend built and copied to frontend-dist/");
-  }
-} else {
-  console.log("frontend-dist/ already exists, skipping frontend build.");
+if (existsSync(frontendDist)) {
+  rmSync(frontendDist, { recursive: true });
+}
+console.log("Building frontend...");
+execSync("npm run build", {
+  cwd: resolve(root, "frontend"),
+  stdio: "inherit",
+});
+const frontendBuild = resolve(root, "frontend/dist");
+if (existsSync(frontendBuild)) {
+  cpSync(frontendBuild, frontendDist, { recursive: true });
+  console.log("Frontend built and copied to frontend-dist/");
 }
