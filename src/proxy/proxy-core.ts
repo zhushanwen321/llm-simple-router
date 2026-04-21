@@ -343,11 +343,12 @@ export async function handleProxyPost(
 
     // === Semaphore acquire ===
     const semaphoreManager = deps.semaphoreManager;
+    let acquireToken: { generation: number } | undefined;
     let semaphoreReleased = false;
     const releaseSemaphore = () => {
       if (!semaphoreReleased) {
         semaphoreReleased = true;
-        semaphoreManager?.release(provider.id, request.log);
+        if (acquireToken) semaphoreManager?.release(provider.id, acquireToken, request.log);
       }
     };
 
@@ -355,7 +356,7 @@ export async function handleProxyPost(
       const ac = new AbortController();
       request.raw.on("close", () => ac.abort());
       try {
-        await semaphoreManager.acquire(provider.id, ac.signal, () => {
+        acquireToken = await semaphoreManager.acquire(provider.id, ac.signal, () => {
           deps.tracker?.update(logId, { queued: true });
         }, request.log);
         deps.tracker?.update(logId, { queued: false });

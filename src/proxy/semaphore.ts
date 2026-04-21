@@ -33,11 +33,18 @@ interface SemaphoreEntry {
   config: ConcurrencyConfig;
   current: number;
   queue: QueueEntry[];
+  // 每次 updateConfig 重置 current 时递增，使旧请求的 release 失效
+  generation: number;
 }
 
 export interface SemaphoreLogger {
   debug(obj: Record<string, unknown>, msg: string): void;
   warn(obj: Record<string, unknown>, msg: string): void;
+}
+
+// acquire() 返回的令牌，调用方需传给 release()
+export interface AcquireToken {
+  readonly generation: number;
 }
 
 export class ProviderSemaphoreManager {
@@ -50,6 +57,7 @@ export class ProviderSemaphoreManager {
         config: { maxConcurrency: 0, queueTimeoutMs: 0, maxQueueSize: 0 },
         current: 0,
         queue: [],
+        generation: 0,
       };
       this.entries.set(providerId, entry);
     }
@@ -61,18 +69,17 @@ export class ProviderSemaphoreManager {
     entry.config = config;
 
     if (config.maxConcurrency === 0) {
-      // Admin disabled throttling — drain queue without counting, reset current
-      // because no tracking is needed when maxConcurrency=0
       while (entry.queue.length > 0) {
         const e = entry.queue.shift()!;
         if (e.timer) clearTimeout(e.timer);
         e.resolve();
       }
+      // 递增 generation，使当前所有持有旧 token 的 release() 调用失效
+      entry.generation++;
       entry.current = 0;
       return;
     }
 
-    // 修正因先前的 bug 导致的负数 current（从 maxConcurrency=0 切回正值时）
     if (entry.current < 0) entry.current = 0;
 
     while (
@@ -86,15 +93,15 @@ export class ProviderSemaphoreManager {
     }
   }
 
-  async acquire(providerId: string, signal?: AbortSignal, onQueued?: () => void, logger?: SemaphoreLogger): Promise<void> {
+  async acquire(providerId: string, signal?: AbortSignal, onQueued?: () => void, logger?: SemaphoreLogger): Promise<AcquireToken> {
     const entry = this.getOrCreate(providerId);
     const { maxConcurrency, queueTimeoutMs, maxQueueSize } = entry.config;
 
-    if (maxConcurrency === 0) return;
+    if (maxConcurrency === 0) return { generation: entry.generation };
     if (entry.current < maxConcurrency) {
       entry.current++;
       logger?.debug({ providerId, current: entry.current, maxConcurrency, action: "acquire_direct" }, "Semaphore: acquired directly");
-      return;
+      return { generation: entry.generation };
     }
 
     if (entry.queue.length >= maxQueueSize) {
@@ -104,11 +111,12 @@ export class ProviderSemaphoreManager {
 
     logger?.debug({ providerId, current: entry.current, maxConcurrency, queueLength: entry.queue.length, action: "acquire_queued" }, "Semaphore: entering wait queue");
     onQueued?.();
-    return new Promise<void>((resolve, reject) => {
+    return new Promise<AcquireToken>((resolve, reject) => {
+      const token = { generation: entry.generation };
       const qe: QueueEntry = {
         resolve: () => {
           logger?.debug({ providerId, current: entry.current, maxConcurrency, queueLength: entry.queue.length, action: "acquire_resolved" }, "Semaphore: left wait queue, acquired");
-          resolve();
+          resolve(token);
         },
         reject: (err: Error) => {
           logger?.debug({ providerId, action: "acquire_rejected_internal", error: err.message }, "Semaphore: wait queue entry rejected");
@@ -139,11 +147,16 @@ export class ProviderSemaphoreManager {
     });
   }
 
-  release(providerId: string, logger?: SemaphoreLogger): void {
+  release(providerId: string, token: AcquireToken, logger?: SemaphoreLogger): void {
     const entry = this.entries.get(providerId);
     if (!entry) return;
     // maxConcurrency=0 时 acquire 不计数，release 也不应递减
     if (entry.config.maxConcurrency === 0) return;
+    // generation 不匹配说明此请求在 updateConfig 重置前 acquire，其槽位已被回收
+    if (token.generation !== entry.generation) {
+      logger?.debug({ providerId, tokenGen: token.generation, currentGen: entry.generation, action: "release_stale" }, "Semaphore: stale token, skipping release");
+      return;
+    }
 
     if (entry.queue.length > 0) {
       const e = entry.queue.shift()!;
