@@ -46,12 +46,17 @@
 type TransportResult =
   | { kind: "success"; statusCode: number; body: string; headers: Record<string, string> }
   | { kind: "stream_success"; statusCode: number; metrics?: MetricsResult }
+  | { kind: "stream_error"; statusCode: number; body: string; headers: Record<string, string> }
   | { kind: "stream_abort"; statusCode: number }
   | { kind: "error"; statusCode: number; body: string; headers: Record<string, string> }
   | { kind: "throw"; error: Error };
 ```
 
-调用方通过 `kind` 字段判断结果类型，无需组合 statusCode + abnormalClose + responseBody。
+- `stream_success`：流正常完成（200），数据已通过 pipe 发送给客户端
+- `stream_error`：流式请求的上游返回非 200（如 429/500），body 为错误内容，需要发送给客户端
+- `stream_abort`：流传输中客户端断连或 pipe 错误，不可恢复
+- `error`：非流式请求的上游错误响应
+- `throw`：网络层异常（ETIMEDOUT/ECONNRESET 等）
 
 ### ResilienceDecision
 
@@ -119,7 +124,9 @@ async withSlot<T>(providerId, signal, onQueued, fn): Promise<T> {
 }
 ```
 
-一个请求只占一个槽位。Failover 切换 backend_model 但同 provider 时不重新 acquire。跨 provider failover 通过特定异常跳出 scope，由 orchestrator 重新进入。
+一个请求只占一个槽位。Failover 切换 backend_model 但同 provider 时不重新 acquire。跨 provider failover 由 ResilienceLayer 抛出 `ProviderSwitchNeeded` 异常跳出 scope，Orchestrator 捕获后用新 providerId 重新调用 `withSlot()`。`ProviderSwitchNeeded` 携带 `targetProviderId` 字段，Orchestrator 据此决定是否重新 acquire。
+
+约束：`semaphore.release()` 保证不抛异常（当前实现已满足：只做 dequeue 或 decrement，失败时 silent return）。
 
 ### TrackerScope
 
@@ -183,7 +190,7 @@ ProxyOrchestrator.handle()
 - 重写 `handleProxyPost` 为编排调用
 - 更新 `openai.ts`、`anthropic.ts` 适配新接口
 
-每个 PR 独立可发布，向后兼容。
+每个 PR 合并后代码可编译且测试通过，但不保证独立发布（PR 之间有删除旧文件的破坏性变更）。
 
 分支策略：从 main 创建 `refactor/proxy-concurrency` 作为 dev 分支，3 个 PR 依次合并到 dev，验证通过后 dev 合并到 main。
 
