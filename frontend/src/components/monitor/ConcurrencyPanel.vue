@@ -36,15 +36,7 @@
 
 <!-- eslint-disable no-magic-numbers -->
 <script setup lang="ts">
-interface ProviderConcurrencySnapshot {
-  providerId: string
-  providerName: string
-  maxConcurrency: number
-  active: number
-  queued: number
-  queueTimeoutMs: number
-  maxQueueSize: number
-}
+import type { ProviderConcurrencySnapshot } from '@/types/monitor'
 
 defineProps<{
   providers: ProviderConcurrencySnapshot[]

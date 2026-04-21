@@ -52,22 +52,7 @@
 <!-- eslint-disable no-magic-numbers -->
 <script setup lang="ts">
 import { computed } from 'vue'
-
-interface MemoryUsage {
-  rss: number
-  heapTotal: number
-  heapUsed: number
-  external: number
-  arrayBuffers: number
-}
-
-interface RuntimeMetrics {
-  uptimeMs: number
-  memoryUsage: MemoryUsage
-  activeHandles: number
-  activeRequests: number
-  eventLoopDelayMs: number
-}
+import type { RuntimeMetrics } from '@/types/monitor'
 
 const props = defineProps<{
   runtime: RuntimeMetrics | null

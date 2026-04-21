@@ -101,6 +101,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
 import { Badge } from '@/components/ui/badge'
+import type { StreamMetricsSnapshot, StreamContentSnapshot } from '@/types/monitor'
 import {
   Collapsible,
   CollapsibleContent,
@@ -108,27 +109,6 @@ import {
 } from '@/components/ui/collapsible'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Brain, ChevronRight, MessageSquare, Wrench } from 'lucide-vue-next'
-
-interface StreamMetricsSnapshot {
-  inputTokens: number | null
-  outputTokens: number | null
-  ttftMs: number | null
-  stopReason: string | null
-  isComplete: boolean
-}
-
-interface ContentBlock {
-  type: 'thinking' | 'text' | 'tool_use'
-  content: string
-  name?: string
-}
-
-interface StreamContentSnapshot {
-  rawChunks: string
-  textContent: string
-  totalChars: number
-  blocks?: ContentBlock[]
-}
 
 const props = defineProps<{
   metrics: StreamMetricsSnapshot | null

@@ -58,29 +58,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-
-interface ProviderStats {
-  providerName: string
-  totalRequests: number
-  successCount: number
-  errorCount: number
-  avgLatencyMs: number
-  retryCount: number
-  topErrors: Array<{ code: number; count: number }>
-}
-
-interface StatsSnapshot {
-  totalRequests: number
-  successCount: number
-  errorCount: number
-  retryCount: number
-  failoverCount: number
-  avgLatencyMs: number
-  p50LatencyMs: number
-  p99LatencyMs: number
-  byProvider: Record<string, ProviderStats>
-  byStatusCode: Record<number, number>
-}
+import type { StatsSnapshot } from '@/types/monitor'
 
 const props = defineProps<{
   stats: StatsSnapshot | null

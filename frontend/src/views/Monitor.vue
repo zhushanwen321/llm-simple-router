@@ -208,85 +208,12 @@ import StreamResponseViewer from '@/components/monitor/StreamResponseViewer.vue'
 import ProviderStatsTable from '@/components/monitor/ProviderStatsTable.vue'
 import LogDetailDialog from '@/components/monitor/LogDetailDialog.vue'
 
-// --- Type definitions (matching backend src/monitor/types.ts) ---
-
-interface AttemptSnapshot {
-  statusCode: number | null
-  error: string | null
-  latencyMs: number
-  providerId: string
-}
-
-interface StreamMetricsSnapshot {
-  inputTokens: number | null
-  outputTokens: number | null
-  ttftMs: number | null
-  stopReason: string | null
-  isComplete: boolean
-}
-
-interface ActiveRequest {
-  id: string
-  apiType: 'openai' | 'anthropic'
-  model: string
-  providerId: string
-  providerName: string
-  isStream: boolean
-  startTime: number
-  status: 'pending' | 'completed' | 'failed'
-  retryCount: number
-  attempts: AttemptSnapshot[]
-  streamMetrics?: StreamMetricsSnapshot
-  queued?: boolean
-  streamContent?: {
-    rawChunks: string
-    textContent: string
-    totalChars: number
-    blocks?: Array<{ type: 'thinking' | 'text' | 'tool_use'; content: string; name?: string }>
-  }
-  clientIp?: string
-  completedAt?: number
-}
-
-interface ProviderConcurrencySnapshot {
-  providerId: string
-  providerName: string
-  maxConcurrency: number
-  active: number
-  queued: number
-  queueTimeoutMs: number
-  maxQueueSize: number
-}
-
-interface ProviderStats {
-  totalRequests: number
-  successCount: number
-  errorCount: number
-  avgLatencyMs: number
-  retryCount: number
-  topErrors: Array<{ code: number; count: number }>
-}
-
-interface StatsSnapshot {
-  totalRequests: number
-  successCount: number
-  errorCount: number
-  retryCount: number
-  failoverCount: number
-  avgLatencyMs: number
-  p50LatencyMs: number
-  p99LatencyMs: number
-  byProvider: Record<string, ProviderStats>
-  byStatusCode: Record<number, number>
-}
-
-interface RuntimeMetrics {
-  uptimeMs: number
-  memoryUsage: { rss: number; heapTotal: number; heapUsed: number; external: number; arrayBuffers: number }
-  activeHandles: number
-  activeRequests: number
-  eventLoopDelayMs: number
-}
+import type {
+  ActiveRequest,
+  ProviderConcurrencySnapshot,
+  StatsSnapshot,
+  RuntimeMetrics,
+} from '@/types/monitor'
 
 // --- Reactive state ---
 
@@ -395,7 +322,7 @@ function handleSSEMessage(event: MessageEvent) {
       break
     }
     case 'stats_update': {
-      stats.value = data as unknown as StatsSnapshot
+      stats.value = data as StatsSnapshot
       break
     }
     case 'runtime_update': {
@@ -458,7 +385,7 @@ async function loadInitialData() {
       recentCompleted.value = recent.value as ActiveRequest[]
     }
     if (statsData.status === 'fulfilled') {
-      stats.value = statsData.value as unknown as StatsSnapshot
+      stats.value = statsData.value as StatsSnapshot
     }
     if (concurrencyData.status === 'fulfilled') {
       concurrency.value = concurrencyData.value as ProviderConcurrencySnapshot[]
