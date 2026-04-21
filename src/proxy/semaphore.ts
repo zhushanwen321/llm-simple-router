@@ -35,6 +35,11 @@ interface SemaphoreEntry {
   queue: QueueEntry[];
 }
 
+export interface SemaphoreLogger {
+  debug(obj: Record<string, unknown>, msg: string): void;
+  warn(obj: Record<string, unknown>, msg: string): void;
+}
+
 export class ProviderSemaphoreManager {
   private readonly entries = new Map<string, SemaphoreEntry>();
 
@@ -81,23 +86,36 @@ export class ProviderSemaphoreManager {
     }
   }
 
-  async acquire(providerId: string, signal?: AbortSignal, onQueued?: () => void): Promise<void> {
+  async acquire(providerId: string, signal?: AbortSignal, onQueued?: () => void, logger?: SemaphoreLogger): Promise<void> {
     const entry = this.getOrCreate(providerId);
     const { maxConcurrency, queueTimeoutMs, maxQueueSize } = entry.config;
 
     if (maxConcurrency === 0) return;
     if (entry.current < maxConcurrency) {
       entry.current++;
+      logger?.debug({ providerId, current: entry.current, maxConcurrency, action: "acquire_direct" }, "Semaphore: acquired directly");
       return;
     }
 
     if (entry.queue.length >= maxQueueSize) {
+      logger?.debug({ providerId, queueLength: entry.queue.length, maxQueueSize, action: "acquire_rejected" }, "Semaphore: queue full, rejecting");
       throw new SemaphoreQueueFullError(providerId);
     }
 
+    logger?.debug({ providerId, current: entry.current, maxConcurrency, queueLength: entry.queue.length, action: "acquire_queued" }, "Semaphore: entering wait queue");
     onQueued?.();
     return new Promise<void>((resolve, reject) => {
-      const qe: QueueEntry = { resolve, reject, timer: null };
+      const qe: QueueEntry = {
+        resolve: () => {
+          logger?.debug({ providerId, current: entry.current, maxConcurrency, queueLength: entry.queue.length, action: "acquire_resolved" }, "Semaphore: left wait queue, acquired");
+          resolve();
+        },
+        reject: (err: Error) => {
+          logger?.debug({ providerId, action: "acquire_rejected_internal", error: err.message }, "Semaphore: wait queue entry rejected");
+          reject(err);
+        },
+        timer: null,
+      };
 
       if (queueTimeoutMs > 0) {
         qe.timer = setTimeout(() => {
@@ -121,7 +139,7 @@ export class ProviderSemaphoreManager {
     });
   }
 
-  release(providerId: string): void {
+  release(providerId: string, logger?: SemaphoreLogger): void {
     const entry = this.entries.get(providerId);
     if (!entry) return;
     // maxConcurrency=0 时 acquire 不计数，release 也不应递减
@@ -129,10 +147,12 @@ export class ProviderSemaphoreManager {
 
     if (entry.queue.length > 0) {
       const e = entry.queue.shift()!;
+      logger?.debug({ providerId, current: entry.current, maxConcurrency: entry.config.maxConcurrency, queueRemaining: entry.queue.length, action: "release_dequeue" }, "Semaphore: released, dequeued next waiter");
       if (e.timer) clearTimeout(e.timer);
       e.resolve();
     } else {
       entry.current--;
+      logger?.debug({ providerId, current: entry.current, maxConcurrency: entry.config.maxConcurrency, action: "release_decrement" }, "Semaphore: released slot");
     }
   }
 

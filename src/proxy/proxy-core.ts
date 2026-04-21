@@ -276,6 +276,7 @@ export async function handleProxyPost(
     const cliHdrs: RawHeaders = request.headers as RawHeaders;
 
     const resolved = resolveMapping(db, effectiveModel, { now: new Date(), excludeTargets });
+    request.log.debug({ logId, model: effectiveModel, apiType, isStream, action: "resolve_mapping", resolved: !!resolved }, "Proxy: resolved model mapping");
     if (!resolved) {
       if (isFailover && excludeTargets.length > 0) {
         return reply;
@@ -328,6 +329,7 @@ export async function handleProxyPost(
       providerName: provider.name, isStream, startTime, status: "pending",
       retryCount: 0, attempts: [], clientIp: request.ip,
     });
+    request.log.debug({ logId, providerId: provider.id, providerName: provider.name, backendModel: resolved.backend_model, action: "request_started" }, "Proxy: request started in tracker");
 
     body.model = resolved.backend_model;
     const apiKey = decrypt(provider.api_key, getSetting(db, "encryption_key")!);
@@ -345,7 +347,7 @@ export async function handleProxyPost(
     const releaseSemaphore = () => {
       if (!semaphoreReleased) {
         semaphoreReleased = true;
-        semaphoreManager?.release(provider.id);
+        semaphoreManager?.release(provider.id, request.log);
       }
     };
 
@@ -355,7 +357,7 @@ export async function handleProxyPost(
       try {
         await semaphoreManager.acquire(provider.id, ac.signal, () => {
           deps.tracker?.update(logId, { queued: true });
-        });
+        }, request.log);
         deps.tracker?.update(logId, { queued: false });
       } catch (err: unknown) {
         if (err instanceof DOMException && err.name === "AbortError") {
@@ -379,35 +381,36 @@ export async function handleProxyPost(
     }
 
     try {
+      request.log.debug({ logId, providerId: provider.id, isStream, upstreamUrl: `${provider.base_url}${upstreamPath}`, action: "upstream_call" }, "Proxy: calling upstream");
       const { result: r, attempts } = isStream
         ? await retryableCall(
-            () => {
-              const metricsTransform = new SSEMetricsTransform(apiType, startTime, {
-                onMetrics: (m) => {
-                  deps.tracker?.update(logId, {
-                    streamMetrics: {
-                      inputTokens: m.input_tokens,
-                      outputTokens: m.output_tokens,
-                      ttftMs: m.ttft_ms,
-                      stopReason: m.stop_reason,
-                      isComplete: m.is_complete === 1,
-                    },
-                  });
-                },
-                onChunk: (rawLine) => {
-                  deps.tracker?.appendStreamChunk(logId, rawLine, apiType, STREAM_CONTENT_MAX_RAW, STREAM_CONTENT_MAX_TEXT);
-                },
-              });
-              return upstreamStream(provider, apiKey, body, cliHdrs, reply, streamTimeoutMs, upstreamPath, buildUpstreamHeaders, metricsTransform);
-            },
-            retryConfig,
-            reply,
-          )
+          () => {
+            const metricsTransform = new SSEMetricsTransform(apiType, startTime, {
+              onMetrics: (m) => {
+                deps.tracker?.update(logId, {
+                  streamMetrics: {
+                    inputTokens: m.input_tokens,
+                    outputTokens: m.output_tokens,
+                    ttftMs: m.ttft_ms,
+                    stopReason: m.stop_reason,
+                    isComplete: m.is_complete === 1,
+                  },
+                });
+              },
+              onChunk: (rawLine) => {
+                deps.tracker?.appendStreamChunk(logId, rawLine, apiType, STREAM_CONTENT_MAX_RAW, STREAM_CONTENT_MAX_TEXT);
+              },
+            });
+            return upstreamStream(provider, apiKey, body, cliHdrs, reply, streamTimeoutMs, upstreamPath, buildUpstreamHeaders, metricsTransform);
+          },
+          retryConfig,
+          reply,
+        )
         : await retryableCall(
-            () => upstreamNonStream(provider, apiKey, body, cliHdrs, upstreamPath, buildUpstreamHeaders),
-            retryConfig,
-            reply,
-          );
+          () => upstreamNonStream(provider, apiKey, body, cliHdrs, upstreamPath, buildUpstreamHeaders),
+          retryConfig,
+          reply,
+        );
 
       const trackerAttempts = attempts.map(a => ({
         statusCode: a.statusCode ?? null,
@@ -420,6 +423,7 @@ export async function handleProxyPost(
         attempts: trackerAttempts,
         providerId: provider.id,
       });
+      request.log.debug({ logId, statusCode: r.statusCode, attemptCount: attempts.length, latencyMs: Date.now() - startTime, action: "upstream_response" }, "Proxy: upstream responded");
 
       const lastSuccessLogId = logRetryAttempts(db, {
         apiType, model: effectiveModel, providerId: provider.id, isStream,
@@ -428,6 +432,7 @@ export async function handleProxyPost(
 
       // --- Failover 检查 ---
       if (isFailover && r.statusCode >= FAILOVER_FAIL_THRESHOLD && !reply.raw.headersSent) {
+        request.log.debug({ logId, statusCode: r.statusCode, excludedTargets: excludeTargets.length, action: "failover" }, "Proxy: failover triggered, trying next target");
         deps.tracker?.complete(logId, { status: "failed", statusCode: r.statusCode });
         releaseSemaphore();
         excludeTargets.push(resolved);
@@ -460,10 +465,12 @@ export async function handleProxyPost(
         collectMetrics(db, apiType, r, isStream, lastSuccessLogId, provider.id, resolved.backend_model, request);
       }
       deps.tracker?.complete(logId, { status: r.statusCode < HTTP_BAD_REQUEST ? "completed" : "failed", statusCode: r.statusCode });
+      request.log.debug({ logId, statusCode: r.statusCode, status: r.statusCode < HTTP_BAD_REQUEST ? "completed" : "failed", totalLatencyMs: Date.now() - startTime, action: "request_completed" }, "Proxy: request completed");
       releaseSemaphore();
       return reply;
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : String(err);
+      request.log.debug({ logId, error: errMsg, action: "upstream_error" }, "Proxy: upstream call threw error");
       const sentH = buildUpstreamHeaders(cliHdrs, apiKey, Buffer.byteLength(reqBodyStr));
       const upstreamReq = JSON.stringify({ url: `${provider.base_url}${upstreamPath}`, headers: sentH, body: reqBodyStr });
       insertRequestLog(db, {
@@ -477,6 +484,7 @@ export async function handleProxyPost(
 
       // --- Failover 检查（异常路径）---
       if (isFailover && !reply.raw.headersSent) {
+        request.log.debug({ logId, error: errMsg, excludedTargets: excludeTargets.length, action: "failover_error" }, "Proxy: failover on error, trying next target");
         deps.tracker?.complete(logId, { status: "failed" });
         releaseSemaphore();
         excludeTargets.push(resolved);
@@ -485,6 +493,7 @@ export async function handleProxyPost(
 
       const e = errors.upstreamConnectionFailed();
       deps.tracker?.complete(logId, { status: "failed", statusCode: HTTP_BAD_GATEWAY });
+      request.log.debug({ logId, statusCode: HTTP_BAD_GATEWAY, error: errMsg, action: "request_failed" }, "Proxy: request failed");
       releaseSemaphore();
       return reply.status(e.statusCode).send(e.body);
     }
