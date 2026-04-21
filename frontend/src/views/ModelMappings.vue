@@ -12,7 +12,7 @@
 
     <div class="space-y-4">
       <Card v-for="g in groupsWithParsedRule" :key="g.id">
-        <Collapsible :default-open="false">
+        <Collapsible :default-open="true">
           <CardHeader class="flex flex-row items-center justify-between gap-4">
             <div class="flex items-center gap-3">
               <CardTitle class="font-mono text-sm">{{ g.client_model }}</CardTitle>

@@ -17,6 +17,10 @@ export interface RetryRule {
 
 const RETRY_FIELDS = new Set(["name", "status_code", "body_pattern", "is_active", "retry_strategy", "retry_delay_ms", "max_retries", "max_delay_ms"]);
 
+const DEFAULT_RETRY_DELAY_MS = 5000;
+const DEFAULT_MAX_RETRIES = 10;
+const DEFAULT_MAX_DELAY_MS = 60000;
+
 export function getActiveRetryRules(db: Database.Database): RetryRule[] {
   return db
     .prepare("SELECT * FROM retry_rules WHERE is_active = 1 ORDER BY created_at DESC")
@@ -42,7 +46,7 @@ export function createRetryRule(
     `INSERT INTO retry_rules (id, name, status_code, body_pattern, is_active, created_at, retry_strategy, retry_delay_ms, max_retries, max_delay_ms)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(id, rule.name, rule.status_code, rule.body_pattern, rule.is_active ?? 1, now,
-    rule.retry_strategy ?? "exponential", rule.retry_delay_ms ?? 5000, rule.max_retries ?? 10, rule.max_delay_ms ?? 60000);
+    rule.retry_strategy ?? "exponential", rule.retry_delay_ms ?? DEFAULT_RETRY_DELAY_MS, rule.max_retries ?? DEFAULT_MAX_RETRIES, rule.max_delay_ms ?? DEFAULT_MAX_DELAY_MS);
   return id;
 }
 

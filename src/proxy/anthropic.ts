@@ -8,6 +8,8 @@ import {
 } from "./proxy-core.js";
 
 import { RetryRuleMatcher } from "./retry-rules.js";
+import { ProviderSemaphoreManager } from "./semaphore.js";
+import type { RequestTracker } from "../monitor/request-tracker.js";
 
 export interface AnthropicProxyOptions {
   db: Database.Database;
@@ -15,6 +17,8 @@ export interface AnthropicProxyOptions {
   retryMaxAttempts: number;
   retryBaseDelayMs: number;
   matcher?: RetryRuleMatcher;
+  semaphoreManager?: ProviderSemaphoreManager;
+  tracker?: RequestTracker;
 }
 
 const MESSAGES_PATH = "/v1/messages";
@@ -40,13 +44,21 @@ const anthropicErrors: ProxyErrorFormatter = {
     statusCode: 502,
     body: { type: "error", error: { type: "upstream_error", message: "Failed to connect to upstream service" } },
   }),
+  concurrencyQueueFull: (providerId) => ({
+    statusCode: 503,
+    body: { type: "error", error: { type: "api_error", message: `Provider '${providerId}' concurrency queue is full` } },
+  }),
+  concurrencyTimeout: (providerId, timeoutMs) => ({
+    statusCode: 504,
+    body: { type: "error", error: { type: "api_error", message: `Provider '${providerId}' concurrency wait timeout (${timeoutMs}ms)` } },
+  }),
 };
 
 const anthropicProxyRaw: FastifyPluginCallback<AnthropicProxyOptions> = (app, opts, done) => {
-  const { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher } = opts;
+  const { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher, semaphoreManager, tracker } = opts;
 
   app.post(MESSAGES_PATH, async (request, reply) => {
-    const deps: ProxyHandlerDeps = { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher };
+    const deps: ProxyHandlerDeps = { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher, semaphoreManager, tracker };
     return handleProxyPost(request, reply, "anthropic", MESSAGES_PATH, anthropicErrors, deps);
   });
 

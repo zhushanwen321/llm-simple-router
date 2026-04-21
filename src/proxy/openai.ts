@@ -14,6 +14,8 @@ import {
 } from "./proxy-core.js";
 
 import { RetryRuleMatcher } from "./retry-rules.js";
+import { ProviderSemaphoreManager } from "./semaphore.js";
+import type { RequestTracker } from "../monitor/request-tracker.js";
 
 export interface OpenaiProxyOptions {
   db: Database.Database;
@@ -21,6 +23,8 @@ export interface OpenaiProxyOptions {
   retryMaxAttempts: number;
   retryBaseDelayMs: number;
   matcher?: RetryRuleMatcher;
+  semaphoreManager?: ProviderSemaphoreManager;
+  tracker?: RequestTracker;
 }
 
 const HTTP_NOT_FOUND = 404;
@@ -49,6 +53,14 @@ const openaiErrors: ProxyErrorFormatter = {
     statusCode: 502,
     body: { error: { message: "Failed to connect to upstream service", type: "upstream_error", code: "upstream_connection_failed" } },
   }),
+  concurrencyQueueFull: (providerId) => ({
+    statusCode: 503,
+    body: { error: { message: `Provider '${providerId}' concurrency queue is full`, type: "server_error", code: "concurrency_queue_full" } },
+  }),
+  concurrencyTimeout: (providerId, timeoutMs) => ({
+    statusCode: 504,
+    body: { error: { message: `Provider '${providerId}' concurrency wait timeout (${timeoutMs}ms)`, type: "server_error", code: "concurrency_timeout" } },
+  }),
 };
 
 function sendError(reply: FastifyReply, e: ProxyErrorResponse) {
@@ -56,10 +68,10 @@ function sendError(reply: FastifyReply, e: ProxyErrorResponse) {
 }
 
 const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, done) => {
-  const { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher } = opts;
+  const { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher, semaphoreManager, tracker } = opts;
 
   app.post(CHAT_COMPLETIONS_PATH, async (request, reply) => {
-    const deps: ProxyHandlerDeps = { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher };
+    const deps: ProxyHandlerDeps = { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher, semaphoreManager, tracker };
     return handleProxyPost(request, reply, "openai", CHAT_COMPLETIONS_PATH, openaiErrors, deps, {
       beforeSendProxy: (body, isStream) => {
         if (isStream && !body.stream_options) {

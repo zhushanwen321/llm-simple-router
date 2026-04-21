@@ -7,6 +7,10 @@ import Fastify, { FastifyInstance } from "fastify";
 import { insertRequestLog } from "./db/logs.js";
 
 const HTTP_NOT_FOUND = 404;
+const HTTP_INTERNAL_ERROR = 500;
+const HTTP_BAD_REQUEST = 400;
+const PROVIDER_DEFAULT_QUEUE_TIMEOUT_MS = 5000;
+const PROVIDER_DEFAULT_MAX_QUEUE_SIZE = 100;
 
 // 代理路由路径 → api_type，用于在全局 hook/errorHandler 中识别代理请求
 const PROXY_API_TYPES: Record<string, string> = {
@@ -23,12 +27,14 @@ function getProxyApiType(url: string): string | null {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 import { getConfig, Config } from "./config.js";
-import { initDatabase, seedDefaultRules } from "./db/index.js";
+import { initDatabase, seedDefaultRules, getAllProviders } from "./db/index.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { openaiProxy } from "./proxy/openai.js";
 import { anthropicProxy } from "./proxy/anthropic.js";
 import { adminRoutes } from "./admin/routes.js";
 import { RetryRuleMatcher } from "./proxy/retry-rules.js";
+import { ProviderSemaphoreManager } from "./proxy/semaphore.js";
+import { RequestTracker } from "./monitor/request-tracker.js";
 import { modelState } from "./proxy/model-state.js";
 import fastifyStatic from "@fastify/static";
 import Database from "better-sqlite3";
@@ -93,7 +99,7 @@ export async function buildApp(
   // 统一 schema validation 错误响应格式，代理路由的错误也记录到 request_logs
   app.setErrorHandler((error: Error, request, reply) => {
     const fastifyError = error as Error & { statusCode?: number; validation?: unknown[] };
-    const status = fastifyError.statusCode ?? 500;
+    const status = fastifyError.statusCode ?? HTTP_INTERNAL_ERROR;
 
     const proxyApiType = getProxyApiType(request.url);
     if (proxyApiType) {
@@ -114,8 +120,8 @@ export async function buildApp(
       });
     }
 
-    if (status === 400 && fastifyError.validation) {
-      return reply.code(400).send({ error: { message: fastifyError.message } });
+    if (status === HTTP_BAD_REQUEST && fastifyError.validation) {
+      return reply.code(HTTP_BAD_REQUEST).send({ error: { message: fastifyError.message } });
     }
     return reply.code(status).send({ error: { message: fastifyError.message } });
   });
@@ -128,6 +134,28 @@ export async function buildApp(
   const matcher = new RetryRuleMatcher();
   matcher.load(db);
 
+  const semaphoreManager = new ProviderSemaphoreManager();
+  const tracker = new RequestTracker({ semaphoreManager });
+  tracker.startPushInterval();
+
+  // 从 DB 读取已有 provider 的并发配置，初始化信号量管理器和 tracker
+  const allProviders = getAllProviders(db);
+  for (const p of allProviders) {
+    if (p.max_concurrency > 0) {
+      semaphoreManager.updateConfig(p.id, {
+        maxConcurrency: p.max_concurrency,
+        queueTimeoutMs: p.queue_timeout_ms,
+        maxQueueSize: p.max_queue_size,
+      });
+    }
+    tracker.updateProviderConfig(p.id, {
+      name: p.name,
+      maxConcurrency: p.max_concurrency ?? 0,
+      queueTimeoutMs: p.queue_timeout_ms ?? PROVIDER_DEFAULT_QUEUE_TIMEOUT_MS,
+      maxQueueSize: p.max_queue_size ?? PROVIDER_DEFAULT_MAX_QUEUE_SIZE,
+    });
+  }
+
   app.register(authMiddleware, { db });
   app.register(openaiProxy, {
     db,
@@ -135,6 +163,8 @@ export async function buildApp(
     retryMaxAttempts: config.RETRY_MAX_ATTEMPTS,
     retryBaseDelayMs: config.RETRY_BASE_DELAY_MS,
     matcher,
+    semaphoreManager,
+    tracker,
   });
   app.register(anthropicProxy, {
     db,
@@ -142,9 +172,11 @@ export async function buildApp(
     retryMaxAttempts: config.RETRY_MAX_ATTEMPTS,
     retryBaseDelayMs: config.RETRY_BASE_DELAY_MS,
     matcher,
+    semaphoreManager,
+    tracker,
   });
 
-  app.register(adminRoutes, { db, matcher });
+  app.register(adminRoutes, { db, matcher, tracker, semaphoreManager });
 
   // 前端静态文件服务（生产环境）
   const frontendDist = path.resolve(
@@ -182,6 +214,7 @@ export async function buildApp(
     app,
     db,
     close: async () => {
+      tracker.stopPushInterval();
       await app.close();
       db.close();
     },

@@ -8,7 +8,7 @@ import { getSetting } from "../db/settings.js";
 import { MetricsExtractor } from "../metrics/metrics-extractor.js";
 import { getMappingGroup } from "../db/index.js";
 import { resolveMapping } from "./mapping-resolver.js";
-import { retryableCall, buildRetryConfig } from "./retry.js";
+import { retryableCall, buildRetryConfig, type Attempt } from "./retry.js";
 import type { RetryRuleMatcher } from "./retry-rules.js";
 import type { Target } from "./strategy/types.js";
 import { SSEMetricsTransform } from "../metrics/sse-metrics-transform.js";
@@ -22,6 +22,8 @@ import {
 } from "./upstream-call.js";
 import { insertSuccessLog, insertRejectedLog } from "./log-helpers.js";
 import { applyEnhancement, buildModelInfoTag } from "./enhancement-handler.js";
+import { ProviderSemaphoreManager, SemaphoreQueueFullError, SemaphoreTimeoutError } from "./semaphore.js";
+import type { RequestTracker } from "../monitor/request-tracker.js";
 
 // ---------- Types ----------
 
@@ -38,6 +40,8 @@ export interface ProxyErrorFormatter {
   providerUnavailable(): ProxyErrorResponse;
   providerTypeMismatch(): ProxyErrorResponse;
   upstreamConnectionFailed(): ProxyErrorResponse;
+  concurrencyQueueFull(providerId: string): ProxyErrorResponse;
+  concurrencyTimeout(providerId: string, timeoutMs: number): ProxyErrorResponse;
 }
 
 export interface ProxyHandlerDeps {
@@ -46,6 +50,8 @@ export interface ProxyHandlerDeps {
   retryMaxAttempts: number;
   retryBaseDelayMs: number;
   matcher?: RetryRuleMatcher;
+  semaphoreManager?: ProviderSemaphoreManager;
+  tracker?: RequestTracker;
 }
 
 // Re-export upstream types for external consumers
@@ -55,6 +61,8 @@ export type { ProxyResult, StreamProxyResult, GetProxyResult };
 
 const UPSTREAM_SUCCESS = 200;
 const FAILOVER_FAIL_THRESHOLD = 400;
+const STREAM_CONTENT_MAX_RAW = 8192;
+const STREAM_CONTENT_MAX_TEXT = 4096;
 
 // ---------- Header utilities ----------
 
@@ -108,9 +116,123 @@ export function proxyGetRequest(
   return upstreamGet(backend, apiKey, clientHeaders, upstreamPath, buildUpstreamHeaders);
 }
 
+// ---------- Helper functions for handleProxyPost ----------
+
+function handleIntercept(
+  db: Database.Database,
+  apiType: "openai" | "anthropic",
+  request: FastifyRequest,
+  reply: FastifyReply,
+  interceptResponse: { statusCode: number; body: unknown; meta?: unknown },
+  clientModel: string,
+): FastifyReply {
+  const logId = randomUUID();
+  const isStream = (request.body as Record<string, unknown>).stream === true;
+  const respBody = JSON.stringify(interceptResponse.body);
+  insertRequestLog(db, {
+    id: logId, api_type: apiType, model: clientModel, provider_id: "router",
+    status_code: interceptResponse.statusCode, latency_ms: 0,
+    is_stream: isStream ? 1 : 0, error_message: null,
+    created_at: new Date().toISOString(),
+    request_body: JSON.stringify(request.body),
+    response_body: respBody,
+    client_request: JSON.stringify({ headers: request.headers as RawHeaders, body: request.body }),
+    upstream_request: interceptResponse.meta ? JSON.stringify(interceptResponse.meta) : null,
+    client_response: JSON.stringify({ statusCode: interceptResponse.statusCode, body: respBody }),
+    is_retry: 0, original_request_id: null,
+    router_key_id: request.routerKey?.id ?? null, original_model: null,
+  });
+  return reply.status(interceptResponse.statusCode).send(interceptResponse.body);
+}
+
+function logRetryAttempts(
+  db: Database.Database,
+  params: {
+    apiType: "openai" | "anthropic";
+    model: string;
+    providerId: string;
+    isStream: boolean;
+    reqBodyStr: string;
+    clientReq: string;
+    upstreamReqBase: string;
+    logId: string;
+    routerKeyId: string | null;
+    originalModel: string | null;
+  },
+  attempts: Attempt[],
+  result: ProxyResult | StreamProxyResult,
+  startTime: number,
+): string {
+  let lastSuccessLogId = params.logId;
+  for (const attempt of attempts) {
+    const isOriginal = attempt.attemptIndex === 0;
+    const attemptLogId = isOriginal ? params.logId : randomUUID();
+
+    if (attempt.error) {
+      insertRequestLog(db, {
+        id: attemptLogId, api_type: params.apiType, model: params.model, provider_id: params.providerId,
+        status_code: HTTP_BAD_GATEWAY, latency_ms: attempt.latencyMs,
+        is_stream: params.isStream ? 1 : 0, error_message: attempt.error,
+        created_at: new Date().toISOString(), request_body: params.reqBodyStr,
+        client_request: params.clientReq, upstream_request: params.upstreamReqBase,
+        is_retry: isOriginal ? 0 : 1, original_request_id: isOriginal ? null : params.logId,
+        router_key_id: params.routerKeyId, original_model: params.originalModel,
+      });
+    } else if (attempt.statusCode !== UPSTREAM_SUCCESS) {
+      insertRequestLog(db, {
+        id: attemptLogId, api_type: params.apiType, model: params.model, provider_id: params.providerId,
+        status_code: attempt.statusCode!, latency_ms: attempt.latencyMs,
+        is_stream: params.isStream ? 1 : 0, error_message: null,
+        created_at: new Date().toISOString(), request_body: params.reqBodyStr,
+        response_body: attempt.responseBody, client_request: params.clientReq, upstream_request: params.upstreamReqBase,
+        upstream_response: JSON.stringify({ statusCode: attempt.statusCode, body: attempt.responseBody }),
+        client_response: JSON.stringify({ statusCode: attempt.statusCode, body: attempt.responseBody }),
+        is_retry: isOriginal ? 0 : 1, original_request_id: isOriginal ? null : params.logId,
+        router_key_id: params.routerKeyId, original_model: params.originalModel,
+      });
+    } else {
+      const h = params.isStream
+        ? ((result as StreamProxyResult).upstreamResponseHeaders ?? {})
+        : ((result as ProxyResult).headers);
+      insertSuccessLog(db, { apiType: params.apiType, model: params.model, provider: { id: params.providerId } as Provider, isStream: params.isStream, startTime,
+        reqBody: params.reqBodyStr, clientReq: params.clientReq, upstreamReq: params.upstreamReqBase, id: attemptLogId,
+        status: result.statusCode, respBody: attempt.responseBody, upHdrs: h, cliHdrs: h,
+        isRetry: !isOriginal, originalRequestId: isOriginal ? null : params.logId,
+        routerKeyId: params.routerKeyId, originalModel: params.originalModel });
+      lastSuccessLogId = attemptLogId;
+    }
+  }
+  return lastSuccessLogId;
+}
+
+function collectMetrics(
+  db: Database.Database,
+  apiType: "openai" | "anthropic",
+  result: ProxyResult | StreamProxyResult,
+  isStream: boolean,
+  lastSuccessLogId: string,
+  providerId: string,
+  backendModel: string,
+  request: FastifyRequest,
+) {
+  if (isStream) {
+    const streamResult = result as StreamProxyResult;
+    if (streamResult.metricsResult) {
+      try { insertMetrics(db, { ...streamResult.metricsResult, request_log_id: lastSuccessLogId, provider_id: providerId, backend_model: backendModel, api_type: apiType }); }
+      catch (err) { request.log.error({ err }, "Failed to insert metrics"); }
+    }
+  } else {
+    try {
+      const mr = MetricsExtractor.fromNonStreamResponse(apiType, (result as ProxyResult).body);
+      if (mr) insertMetrics(db, { ...mr, request_log_id: lastSuccessLogId, provider_id: providerId, backend_model: backendModel, api_type: apiType });
+    } catch (err) { request.log.error({ err }, "Failed to insert metrics"); }
+  }
+}
+
 // ---------- Shared proxy handler ----------
 
 const HTTP_BAD_GATEWAY = 502;
+const HTTP_BAD_REQUEST = 400;
 
 /**
  * 共享 POST handler，参数化 apiType/errorFormat/upstreamPath 等差异。
@@ -137,26 +259,7 @@ export async function handleProxyPost(
   const sessionId = (request.headers as RawHeaders)["x-claude-code-session-id"] as string | undefined;
   const { effectiveModel, originalModel, interceptResponse } = applyEnhancement(db, request, clientModel, sessionId);
 
-  // 命令拦截（如 select-model）：直接返回，不转发上游
-  if (interceptResponse) {
-    const logId = randomUUID();
-    const isStream = (request.body as Record<string, unknown>).stream === true;
-    const interceptRespBody = JSON.stringify(interceptResponse.body);
-    insertRequestLog(db, {
-      id: logId, api_type: apiType, model: clientModel, provider_id: "router",
-      status_code: interceptResponse.statusCode, latency_ms: 0,
-      is_stream: isStream ? 1 : 0, error_message: null,
-      created_at: new Date().toISOString(),
-      request_body: JSON.stringify(request.body),
-      response_body: interceptRespBody,
-      client_request: JSON.stringify({ headers: request.headers as RawHeaders, body: request.body }),
-      upstream_request: interceptResponse.meta ? JSON.stringify(interceptResponse.meta) : null,
-      client_response: JSON.stringify({ statusCode: interceptResponse.statusCode, body: interceptRespBody }),
-      is_retry: 0, original_request_id: null,
-      router_key_id: request.routerKey?.id ?? null, original_model: null,
-    });
-    return reply.status(interceptResponse.statusCode).send(interceptResponse.body);
-  }
+  if (interceptResponse) return handleIntercept(db, apiType, request, reply, interceptResponse, clientModel);
 
   // 查询分组策略（只查一次）
   const group = getMappingGroup(db, effectiveModel);
@@ -220,6 +323,12 @@ export async function handleProxyPost(
       return reply.status(e.statusCode).send(e.body);
     }
 
+    deps.tracker?.start({
+      id: logId, apiType, model: effectiveModel, providerId: provider.id,
+      providerName: provider.name, isStream, startTime, status: "pending",
+      retryCount: 0, attempts: [], clientIp: request.ip,
+    });
+
     body.model = resolved.backend_model;
     const apiKey = decrypt(provider.api_key, getSetting(db, "encryption_key")!);
 
@@ -230,11 +339,65 @@ export async function handleProxyPost(
     const retryConfig = buildRetryConfig(retryMaxAttempts, retryBaseDelayMs, matcher);
     const upstreamReqBase = JSON.stringify({ url: `${provider.base_url}${upstreamPath}`, headers: buildUpstreamHeaders(cliHdrs, apiKey, Buffer.byteLength(reqBodyStr)), body: reqBodyStr });
 
+    // === Semaphore acquire ===
+    const semaphoreManager = deps.semaphoreManager;
+    let semaphoreReleased = false;
+    const releaseSemaphore = () => {
+      if (!semaphoreReleased) {
+        semaphoreReleased = true;
+        semaphoreManager?.release(provider.id);
+      }
+    };
+
+    if (semaphoreManager) {
+      const ac = new AbortController();
+      request.raw.on("close", () => ac.abort());
+      try {
+        await semaphoreManager.acquire(provider.id, ac.signal, () => {
+          deps.tracker?.update(logId, { queued: true });
+        });
+        deps.tracker?.update(logId, { queued: false });
+      } catch (err: unknown) {
+        if (err instanceof DOMException && err.name === "AbortError") {
+          deps.tracker?.complete(logId, { status: "failed" });
+          return reply;
+        }
+        if (err instanceof SemaphoreQueueFullError) {
+          request.log.warn({ providerId: provider.id }, "Concurrency queue full, rejecting request");
+          const e = errors.concurrencyQueueFull(provider.id);
+          deps.tracker?.complete(logId, { status: "failed", statusCode: e.statusCode });
+          return reply.status(e.statusCode).send(e.body);
+        }
+        if (err instanceof SemaphoreTimeoutError) {
+          request.log.warn({ providerId: provider.id, timeoutMs: err.timeoutMs }, "Concurrency wait timed out");
+          const e = errors.concurrencyTimeout(provider.id, err.timeoutMs);
+          deps.tracker?.complete(logId, { status: "failed", statusCode: e.statusCode });
+          return reply.status(e.statusCode).send(e.body);
+        }
+        throw err;
+      }
+    }
+
     try {
       const { result: r, attempts } = isStream
         ? await retryableCall(
             () => {
-              const metricsTransform = new SSEMetricsTransform(apiType, startTime);
+              const metricsTransform = new SSEMetricsTransform(apiType, startTime, {
+                onMetrics: (m) => {
+                  deps.tracker?.update(logId, {
+                    streamMetrics: {
+                      inputTokens: m.input_tokens,
+                      outputTokens: m.output_tokens,
+                      ttftMs: m.ttft_ms,
+                      stopReason: m.stop_reason,
+                      isComplete: m.is_complete === 1,
+                    },
+                  });
+                },
+                onChunk: (rawLine) => {
+                  deps.tracker?.appendStreamChunk(logId, rawLine, apiType, STREAM_CONTENT_MAX_RAW, STREAM_CONTENT_MAX_TEXT);
+                },
+              });
               return upstreamStream(provider, apiKey, body, cliHdrs, reply, streamTimeoutMs, upstreamPath, buildUpstreamHeaders, metricsTransform);
             },
             retryConfig,
@@ -246,49 +409,27 @@ export async function handleProxyPost(
             reply,
           );
 
-      // 记录所有尝试的日志
-      let lastSuccessLogId = logId;
-      for (const attempt of attempts) {
-        const isOriginal = attempt.attemptIndex === 0;
-        const attemptLogId = isOriginal ? logId : randomUUID();
+      const trackerAttempts = attempts.map(a => ({
+        statusCode: a.statusCode ?? null,
+        error: a.error ?? null,
+        latencyMs: a.latencyMs,
+        providerId: provider.id,
+      }));
+      deps.tracker?.update(logId, {
+        retryCount: Math.max(0, attempts.length - 1),
+        attempts: trackerAttempts,
+        providerId: provider.id,
+      });
 
-        if (attempt.error) {
-          insertRequestLog(db, {
-            id: attemptLogId, api_type: apiType, model: effectiveModel, provider_id: provider.id,
-            status_code: HTTP_BAD_GATEWAY, latency_ms: attempt.latencyMs,
-            is_stream: isStream ? 1 : 0, error_message: attempt.error,
-            created_at: new Date().toISOString(), request_body: reqBodyStr,
-            client_request: clientReq, upstream_request: upstreamReqBase,
-            is_retry: isOriginal ? 0 : 1, original_request_id: isOriginal ? null : logId,
-            router_key_id: routerKeyId, original_model: originalModel,
-          });
-        } else if (attempt.statusCode !== UPSTREAM_SUCCESS) {
-          insertRequestLog(db, {
-            id: attemptLogId, api_type: apiType, model: effectiveModel, provider_id: provider.id,
-            status_code: attempt.statusCode, latency_ms: attempt.latencyMs,
-            is_stream: isStream ? 1 : 0, error_message: null,
-            created_at: new Date().toISOString(), request_body: reqBodyStr,
-            response_body: attempt.responseBody, client_request: clientReq, upstream_request: upstreamReqBase,
-            upstream_response: JSON.stringify({ statusCode: attempt.statusCode, body: attempt.responseBody }),
-            client_response: JSON.stringify({ statusCode: attempt.statusCode, body: attempt.responseBody }),
-            is_retry: isOriginal ? 0 : 1, original_request_id: isOriginal ? null : logId,
-            router_key_id: routerKeyId, original_model: originalModel,
-          });
-        } else {
-          const h = isStream
-            ? ((r as StreamProxyResult).upstreamResponseHeaders ?? {})
-            : ((r as ProxyResult).headers);
-          insertSuccessLog(db, { apiType, model: effectiveModel, provider, isStream, startTime,
-            reqBody: reqBodyStr, clientReq, upstreamReq: upstreamReqBase, id: attemptLogId,
-            status: r.statusCode, respBody: attempt.responseBody, upHdrs: h, cliHdrs: h,
-            isRetry: !isOriginal, originalRequestId: isOriginal ? null : logId,
-            routerKeyId, originalModel });
-          lastSuccessLogId = attemptLogId;
-        }
-      }
+      const lastSuccessLogId = logRetryAttempts(db, {
+        apiType, model: effectiveModel, providerId: provider.id, isStream,
+        reqBodyStr, clientReq, upstreamReqBase, logId, routerKeyId, originalModel,
+      }, attempts, r, startTime);
 
       // --- Failover 检查 ---
       if (isFailover && r.statusCode >= FAILOVER_FAIL_THRESHOLD && !reply.raw.headersSent) {
+        deps.tracker?.complete(logId, { status: "failed", statusCode: r.statusCode });
+        releaseSemaphore();
         excludeTargets.push(resolved);
         continue;
       }
@@ -312,24 +453,14 @@ export async function handleProxyPost(
           } catch { request.log.debug("Failed to inject model-info tag into non-JSON response"); }
         }
         for (const [k, v] of Object.entries(pr.headers)) reply.header(k, v);
-        return reply.status(pr.statusCode).send(pr.body);
+        reply.status(pr.statusCode).send(pr.body);
       }
 
-      // metrics 采集
       if (r.statusCode === UPSTREAM_SUCCESS) {
-        if (isStream) {
-          const streamResult = r as StreamProxyResult;
-          if (streamResult.metricsResult) {
-            try { insertMetrics(db, { ...streamResult.metricsResult, request_log_id: lastSuccessLogId, provider_id: provider.id, backend_model: resolved.backend_model, api_type: apiType }); }
-            catch (err) { request.log.error({ err }, "Failed to insert metrics"); }
-          }
-        } else {
-          try {
-            const mr = MetricsExtractor.fromNonStreamResponse(apiType, (r as ProxyResult).body);
-            if (mr) insertMetrics(db, { ...mr, request_log_id: lastSuccessLogId, provider_id: provider.id, backend_model: resolved.backend_model, api_type: apiType });
-          } catch (err) { request.log.error({ err }, "Failed to insert metrics"); }
-        }
+        collectMetrics(db, apiType, r, isStream, lastSuccessLogId, provider.id, resolved.backend_model, request);
       }
+      deps.tracker?.complete(logId, { status: r.statusCode < HTTP_BAD_REQUEST ? "completed" : "failed", statusCode: r.statusCode });
+      releaseSemaphore();
       return reply;
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : String(err);
@@ -346,11 +477,15 @@ export async function handleProxyPost(
 
       // --- Failover 检查（异常路径）---
       if (isFailover && !reply.raw.headersSent) {
+        deps.tracker?.complete(logId, { status: "failed" });
+        releaseSemaphore();
         excludeTargets.push(resolved);
         continue;
       }
 
       const e = errors.upstreamConnectionFailed();
+      deps.tracker?.complete(logId, { status: "failed", statusCode: HTTP_BAD_GATEWAY });
+      releaseSemaphore();
       return reply.status(e.statusCode).send(e.body);
     }
   }

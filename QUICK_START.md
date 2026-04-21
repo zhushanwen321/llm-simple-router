@@ -32,7 +32,7 @@ cp .env.example .env
 | `ADMIN_PASSWORD` | 管理后台登录密码 | 必填 |
 | `ENCRYPTION_KEY` | API Key 加密密钥（64字符 hex） | 必填 |
 | `PORT` | 服务端口 | 9981 |
-| `DB_PATH` | SQLite 数据库路径 | ./data/router.db |
+| `DB_PATH` | SQLite 数据库路径 | ~/.llm-simple-router/router.db |
 | `LOG_LEVEL` | 日志级别 | info |
 
 ## 启动

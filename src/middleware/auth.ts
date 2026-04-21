@@ -16,6 +16,7 @@ interface RouterKeyRow { id: string; name: string; allowed_models: string | null
 
 const SKIP_PATHS = ["/health", "/admin"];
 const HTTP_UNAUTHORIZED = 401;
+const HTTP_SERVICE_UNAVAILABLE = 503;
 const BEARER_PREFIX_LENGTH = "Bearer ".length;
 
 function shouldSkipAuth(url: string): boolean {
@@ -95,16 +96,16 @@ const authMiddlewareRaw: FastifyPluginCallback<{ db: Database.Database }> = (
     // 未初始化时代理层不可用
     if (!isInitialized(options.db)) {
       if (proxyApiType) {
-        logRejectedAuth(options.db, proxyApiType, 503, "Service not initialized", request);
+        logRejectedAuth(options.db, proxyApiType, HTTP_SERVICE_UNAVAILABLE, "Service not initialized", request);
       }
-      reply.code(503).send({ error: { message: "Service not initialized" } });
+      reply.code(HTTP_SERVICE_UNAVAILABLE).send({ error: { message: "Service not initialized" } });
       return reply;
     }
 
     const authHeader = request.headers.authorization;
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       if (proxyApiType) {
-        logRejectedAuth(options.db, proxyApiType, 401, "Invalid API key", request);
+        logRejectedAuth(options.db, proxyApiType, HTTP_UNAUTHORIZED, "Invalid API key", request);
       }
       unauthorizedReply(reply);
       return reply;
@@ -115,7 +116,7 @@ const authMiddlewareRaw: FastifyPluginCallback<{ db: Database.Database }> = (
     const row = stmt.get(hash) as RouterKeyRow | undefined;
     if (!row) {
       if (proxyApiType) {
-        logRejectedAuth(options.db, proxyApiType, 401, "Invalid API key", request);
+        logRejectedAuth(options.db, proxyApiType, HTTP_UNAUTHORIZED, "Invalid API key", request);
       }
       unauthorizedReply(reply);
       return reply;

@@ -47,6 +47,7 @@ import {
   RefreshCcw,
   Sparkles,
   FileText,
+  Activity,
   LogOut,
 } from 'lucide-vue-next'
 import { api } from '@/api/client'
@@ -65,7 +66,8 @@ const navItems: NavItem[] = [
   { path: '/mappings', label: '模型映射', icon: ArrowLeftRight },
   { path: '/router-keys', label: 'API 密钥', icon: KeyRound },
   { path: '/retry-rules', label: '重试规则', icon: RefreshCcw },
-  { path: '/proxy-enhancement', label: '代理增强', icon: Sparkles },
+  { path: '/proxy-enhancement', label: '代理增强（实验性）', icon: Sparkles },
+  { path: '/monitor', label: '实时监控', icon: Activity },
   { path: '/logs', label: '请求日志', icon: FileText },
 ]
 

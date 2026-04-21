@@ -4,12 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目概述
 
-LLM API 代理路由器。接收 OpenAI / Anthropic 格式的客户端请求，通过模型映射转发到配置的后端服务，支持流式（SSE）和非流式代理。管理后台（Vue 3 + shadcn-vue）提供后端服务管理、模型映射配置、请求日志查看等功能。
+LLM API 代理路由器。接收 OpenAI / Anthropic 格式的客户端请求，通过模型映射和路由策略转发到配置的后端 Provider，支持流式（SSE）和非流式代理。管理后台（Vue 3 + shadcn-vue）提供 Provider 管理、模型映射配置、重试规则、请求日志查看、实时监控等功能。
 
 ## 常用命令
 
 ```bash
-# 后端开发（热重载）
+# 后端开发（热重载，端口 9980）
 npm run dev
 
 # 后端构建 & 启动
@@ -17,16 +17,22 @@ npm run build
 mkdir -p dist/db/migrations && cp src/db/migrations/*.sql dist/db/migrations/
 FRONTEND_DIST=./frontend/dist npm start
 
-# 前端开发（自动代理 /admin/api 到后端 :9981）
+# 前端开发（自动代理 /admin/api 到后端 :9980）
 cd frontend && npm run dev
 
 # 前端构建
 cd frontend && npm run build
 
+# 完整构建（tsc + 复制 migrations + 构建前端）
+npm run build:full
+
 # 测试
-npm test              # 全部测试
-npx vitest run tests/auth.test.ts  # 单个测试文件
-npm run test:watch    # 监听模式
+npm test                              # 全部测试
+npx vitest run tests/auth.test.ts     # 单个测试文件
+npm run test:watch                    # 监听模式
+
+# Lint
+npm run lint                          # ESLint（零警告容忍）
 
 # Docker
 docker compose up -d
@@ -36,41 +42,182 @@ docker compose up -d
 
 ### 后端（Fastify + SQLite）
 
-- **入口** `src/index.ts` — `buildApp()` 组装所有插件，支持注入 `db`（测试用 in-memory）
-- **代理层** `src/proxy/openai.ts` / `anthropic.ts` — 各自是 Fastify 插件，包含非流式 `proxyNonStream()` 和流式 `proxyStream()` 两个代理函数。流式代理使用 `PassThrough` 管道 + 空闲超时，防止连接泄漏和 EPIPE 崩溃
-- **认证** `src/middleware/auth.ts` — 全局 `onRequest` hook，对非 `/health`、`/admin` 路径校验 Bearer token。`admin-auth.ts` 使用 JWT + Cookie 做管理后台认证
-- **数据库** `src/db/index.ts` — better-sqlite3，迁移文件在 `src/db/migrations/`，启动时自动执行。所有 CRUD 和查询函数都在此文件
-- **管理 API** `src/admin/` — 按 `routes.ts` → `services.ts` / `mappings.ts` / `logs.ts` / `stats.ts` 拆分
-- **加密** `src/utils/crypto.ts` — AES-256-GCM 加解密后端 API Key
+**入口层：**
+- `src/cli.ts` — npm bin 入口（带 shebang），无条件调用 `main()`
+- `src/index.ts` — 库入口，导出 `buildApp` 和 `main`。`buildApp()` 组装所有插件，支持注入 `db`（测试用 in-memory）
+- `src/config.ts` — 单例配置，惰性缓存
 
-### 请求流程
+**`buildApp()` 插件注册顺序：**
+```
+seedDefaultRules → ModelStateManager.init → RetryRuleMatcher.load
+→ ProviderSemaphoreManager → RequestTracker → 初始化所有 provider 并发配置
+→ authMiddleware → openaiProxy → anthropicProxy → adminRoutes → fastifyStatic
+```
 
+**代理层 `src/proxy/`：**
+
+| 文件 | 角色 |
+|------|------|
+| `proxy-core.ts` | 共享核心：`handleProxyPost()` 处理完整请求生命周期（增强→映射→信号量→上游调用→重试→failover→日志→指标） |
+| `openai.ts` | OpenAI 代理插件（`POST /v1/chat/completions`、`GET /v1/models`），注入 `stream_options` |
+| `anthropic.ts` | Anthropic 代理插件（`POST /v1/messages`），与 openai.ts 对称 |
+| `upstream-call.ts` | 底层上游 HTTP 调用：`proxyNonStream()`、`proxyStream()`（PassThrough 管道 + 空闲超时）、`proxyGetRequest()` |
+| `semaphore.ts` | Provider 级并发控制：基于 Promise 的等待队列，支持 AbortSignal 和超时 |
+| `retry.ts` | 重试执行器 `retryableCall()`：支持 fixed/exponential 策略，解析 Retry-After header |
+| `retry-rules.ts` | `RetryRuleMatcher`：从 DB 加载规则到内存，按 status_code 分组缓存 |
+| `enhancement-handler.ts` | 代理增强：指令解析、命令拦截、会话记忆 |
+| `directive-parser.ts` | 从 user 消息中提取 `$SELECT-MODEL` / `[router-model]` / `[router-command]` 标记 |
+| `model-state.ts` | `ModelStateManager` 单例：内存 + SQLite 双层缓存，24h 滑动窗口 |
+| `response-cleaner.ts` | 清理历史消息中的路由标签 |
+| `mapping-resolver.ts` | 将 client_model 解析为 `{ backend_model, provider_id }` |
+| `strategy/` | 四种路由策略：`scheduled`（定时）、`round-robin`（轮询）、`random`（随机）、`failover`（故障转移） |
+
+**请求处理流程（`handleProxyPost`）：**
 ```
-客户端 → auth middleware (Bearer token 校验)
-       → proxy handler (查找后端服务 → 模型映射 → 解密 API Key → 转发请求)
-       → 插入 request_logs（含完整请求链路：client_request / upstream_request / upstream_response / client_response）
-       → 响应客户端
+applyEnhancement（指令解析→历史清理→会话记忆→命令拦截）
+→ resolveMapping（查找 group→应用策略→白名单校验）
+→ 获取 Provider（校验 is_active、api_type）
+→ semaphoreManager.acquire（队列满→503，超时→504）
+→ 上游调用（带重试）
+→ 记录日志 + 采集指标
+→ Failover 检查（strategy=failover 时循环尝试下一个 target）
+→ semaphoreManager.release
 ```
+
+**认证 `src/middleware/`：**
+- `auth.ts` — 全局 `onRequest` hook，Bearer token → SHA256 哈希 → 查 `router_keys` 表。跳过 `/health`、`/admin`
+- `admin-auth.ts` — JWT + Cookie 认证。跳过 `/admin/api/setup/*`、`/admin/api/login`、`/admin/api/logout`
+
+**数据库 `src/db/`（better-sqlite3）：**
+- `index.ts` — `initDatabase()` 自动创建目录、执行 `src/db/migrations/*.sql`
+- 按领域拆分文件：`providers.ts`、`mappings.ts`、`logs.ts`、`metrics.ts`、`stats.ts`、`retry-rules.ts`、`router-keys.ts`、`settings.ts`、`session-states.ts`、`helpers.ts`
+- `helpers.ts` 提供 `buildUpdateQuery()`（白名单过滤安全字段的通用 UPDATE）和 `deleteById()`
+
+**数据表（17 个迁移，11 张表）：**
+
+| 表 | 核心用途 |
+|----|---------|
+| `providers` | 供应商（含并发控制字段：max_concurrency、queue_timeout_ms、max_queue_size） |
+| `model_mappings` | 旧版单映射（保留兼容） |
+| `mapping_groups` | 映射组（strategy: scheduled/round_robin/random/failover，rule 为 JSON） |
+| `retry_rules` | 重试规则（status_code + body_pattern 正则 + fixed/exponential 策略） |
+| `request_logs` | 请求日志（含完整链路：client_request/upstream_request/upstream_response/client_response） |
+| `request_metrics` | Token 统计（input/output/cache、ttft、tps、stop_reason） |
+| `router_keys` | 客户端密钥（SHA256 哈希存储 + AES 加密原文） |
+| `settings` | 系统设置（密码哈希、加密密钥、JWT 密钥、proxy_enhancement） |
+| `session_model_states` | 会话模型状态（router_key_id + session_id 联合唯一） |
+| `session_model_history` | 会话模型变更历史 |
+
+**监控层 `src/monitor/`：**
+- `request-tracker.ts` — `RequestTracker`：活跃请求 Map + 最近完成列表（200 条/5min TTL）+ SSE 广播（6 种事件）
+- `stats-aggregator.ts` — `StatsAggregator`：环形缓冲区（1000）存储延迟样本，计算 p50/p99
+- `runtime-collector.ts` — `RuntimeCollector`：采集内存、句柄、事件循环延迟
+
+**指标采集 `src/metrics/`：**
+- `sse-parser.ts` — 行缓冲 SSE 解析器，按 `\n\n` 边界切割事件
+- `metrics-extractor.ts` — 按 apiType 从 SSE 事件中提取 usage/TTFT/stop_reason
+- `sse-metrics-transform.ts` — Transform stream 旁路采集指标（不修改流经数据）
+
+**管理 API `src/admin/`：**
+- `routes.ts` 统一注册，按领域拆分：`providers.ts`、`mappings.ts`、`groups.ts`、`retry-rules.ts`、`logs.ts`、`stats.ts`、`metrics.ts`、`router-keys.ts`、`proxy-enhancement.ts`、`monitor.ts`
+- 所有 CRUD 端点在 `/admin/api/` 下，需 JWT 认证（setup/login 除外）
+- Provider 更新时同步刷新内存中的 SemaphoreManager 配置
+- RetryRule 更新时自动刷新 RetryRuleMatcher 内存缓存
+
+**工具 `src/utils/`：**
+- `crypto.ts` — AES-256-GCM 加解密（格式：`iv:authTag:ciphertext`）
+- `password.ts` — scrypt 密码哈希（格式：`salt:hash`）
 
 ### 前端（Vue 3 + shadcn-vue + Tailwind CSS）
 
-- 路由在 `frontend/src/router/index.ts`，所有管理页面在 `/admin/*` 下
-- API 客户端在 `frontend/src/api/client.ts`，使用 axios
-- 开发时 Vite 将 `/admin/api` 代理到后端；生产时前端构建产物由后端 `@fastify/static` 托管
-- 所有 UI 组件使用 **shadcn-vue**，禁止原生 HTML 表单元素（见下方规范）
+**技术栈：** Vue 3.5 + TypeScript + Vite 8 + Tailwind 3.4 + shadcn-vue 2.6 + Chart.js 4.5 + @tanstack/vue-table 8.21 + lucide-vue-next + vue-sonner
+
+**路由（`frontend/src/router/index.ts`）：**
+| 路径 | 视图 | 认证 |
+|------|------|------|
+| `/setup` | Setup.vue | 否 |
+| `/login` | Login.vue | 否 |
+| `/` | Dashboard.vue | 是 |
+| `/providers` | Providers.vue | 是 |
+| `/mappings` | ModelMappings.vue | 是 |
+| `/retry-rules` | RetryRules.vue | 是 |
+| `/router-keys` | RouterKeys.vue | 是 |
+| `/proxy-enhancement` | ProxyEnhancement.vue | 是 |
+| `/logs` | Logs.vue | 是 |
+| `/monitor` | Monitor.vue | 是 |
+
+**关键模式：**
+- 无 Pinia/Vuex：使用 composable（`useMetrics`、`useClipboard`）+ 组件本地 `ref`/`computed`
+- API 客户端（`frontend/src/api/client.ts`）：axios + Cookie 认证，401 自动跳登录，`request<T>()` 解包响应
+- Toast 错误处理：所有异步操作用 `vue-sonner` 的 `toast.error()`/`toast.success()`
+- 并行请求用 `Promise.allSettled`（不使用 `Promise.all`）
+- 设计令牌：oklch 色彩空间 + CSS 变量，支持亮/暗模式
+- SSE 实时通信：Monitor 页面用原生 `EventSource`，6 种事件类型驱动 UI
+- 开发时 Vite 将 `/admin/api` 代理到后端；生产时 `@fastify/static` 托管前端构建产物
+- 部署在 `/admin/` base path（`vite.config.ts: base: '/admin/'`）
 
 ### 关键设计决策
 
 - 代理使用原生 Node.js `http.request` 而非 axios，因为需要直接操作 SSE 流
 - `fastify-plugin (fp)` 包装代理插件以打破 Fastify 封装，使 hook 作用于全局
 - 数据库在 `initDatabase()` 时自动创建目录和执行迁移，无需手动建表
-- 测试中通过 `buildApp({ db: inMemoryDb })` 注入内存数据库，无需 mock
+- 测试中通过 `buildApp({ config, db })` 注入内存数据库，不做 DB 层 mock
+- SSE 流式代理使用 `PassThrough` 管道 + 空闲超时，防止连接泄漏和 EPIPE 崩溃
+- Failover 策略通过 `excludeTargets` 累积排除 + `while(true)` 循环实现
+- 信号量按 Provider 维度独立管理，基于 Promise 队列，支持 AbortSignal（客户端断连自动取消）
+- 指标采集通过 Transform stream 旁路实现，不修改业务数据流
 
 ## 环境变量
 
-所有 secrets（管理员密码、加密密钥、JWT 密钥）通过首次启动的 Setup 页面设置，存入 DB settings 表，无需环境变量。
-可选：`PORT`（默认 9981）、`DB_PATH`、`LOG_LEVEL`、`STREAM_TIMEOUT_MS`
-参考 `.env.example`
+所有 secrets 通过首次启动的 Setup 页面设置，存入 DB settings 表。
+可选环境变量：`PORT`（默认 9981）、`DB_PATH`（默认 `~/.llm-simple-router/router.db`）、`LOG_LEVEL`、`STREAM_TIMEOUT_MS`（默认 3000000）、`RETRY_MAX_ATTEMPTS`（默认 3）、`RETRY_BASE_DELAY_MS`（默认 1000）
+
+## 测试
+
+**框架：** Vitest 3.1.2，配置 `vitest.config.ts`（globals: true, environment: node）
+
+**测试模式：**
+- **组件测试**：`Fastify()` + `.register()` + `app.inject()` 模拟 HTTP 请求（不启动真实服务器）
+- **内存数据库**：`initDatabase(":memory:")` 创建 SQLite 内存库，测试间完全隔离
+- **Mock 后端**：`http.createServer()` 在随机端口模拟 OpenAI/Anthropic 响应
+- **集成测试**：`buildApp({ config, db })` 组装完整应用，RETRY_MAX_ATTEMPTS=0 禁用重试
+- **策略测试**：纯函数式，构造 Target/rule 对象验证 select() 返回值
+
+**辅助函数模式**（多文件重复定义）：`createMockBackend()`、`closeServer()`、`buildTestApp()`、`insertMockBackend()`、`insertModelMapping()`
+
+**覆盖范围（34 个测试文件）：** 加密、认证、数据库、配置、SSE 解析、指标提取、4 种路由策略、重试、并发信号量、代理转发（OpenAI/Anthropic）、Admin API（7 个 CRUD 测试）、监控
+
+## 代码质量工具
+
+### taste-lint 自定义 ESLint 插件
+
+项目内建 `taste-lint/` ESLint 插件（`eslint-plugin-taste`），5 条自定义规则：
+
+| 规则 | 级别 | 说明 |
+|------|------|------|
+| `taste/prefer-allsettled` | warn | 独立数据源用 `Promise.allSettled` |
+| `taste/no-silent-catch` | warn | catch 不能为空或仅 console |
+| `taste/no-unsafe-object-entries` | warn | `Object.entries()` 后拼 SQL/配置前必须白名单过滤 |
+| `taste/no-hardcoded-colors` | warn | 前端禁止 Tailwind 原始色名，必须用语义 token |
+| `taste/no-magic-spacing` | warn | 前端禁止任意值间距如 `p-[17px]` |
+
+基础规则：`no-explicit-any: error`、`max-lines: 500`、`max-lines-per-function: 300`、`no-magic-numbers: warn`、`no-eval: error`。测试文件被排除在 lint 之外。
+
+### Git Pre-commit Hook
+
+`.githooks/pre-commit` 通过 `npm prepare` 自动安装，两阶段检查：
+
+| 阶段 | 检查内容 | 跳过方式 |
+|------|---------|---------|
+| ESLint | `frontend/` 下变更的 `.vue`/`.ts` 文件 | `SKIP_FRONTEND_LINT=1` |
+| 代码规范 | `vue_rules_checker.py`（见下） | `SKIP_CODE_RULES_CHECK=1` |
+| 全部跳过 | — | `SKIP_ALL_CHECKS=1` |
+
+**vue_rules_checker.py 四项硬性规范：**
+- 原生 HTML 元素（button/input/select/dialog/label/table 等）→ 必须用 shadcn-vue 组件（`components/ui/` 豁免）
+- Emoji → 必须用 `lucide-vue-next` 图标
+- 自定义 CSS → `<style scoped>` 内只允许 `@apply`，禁止手写选择器（`@keyframes`/`animation`/`transition` 例外）
+- 行数上限 → `<template>` 400 行、`<script setup>` 300 行
 
 ## MCP Tools: code-review-graph
 
