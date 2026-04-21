@@ -395,7 +395,7 @@ function handleSSEMessage(event: MessageEvent) {
       break
     }
     case 'stats_update': {
-      stats.value = data as StatsSnapshot
+      stats.value = data as unknown as StatsSnapshot
       break
     }
     case 'runtime_update': {
@@ -458,7 +458,7 @@ async function loadInitialData() {
       recentCompleted.value = recent.value as ActiveRequest[]
     }
     if (statsData.status === 'fulfilled') {
-      stats.value = statsData.value as StatsSnapshot
+      stats.value = statsData.value as unknown as StatsSnapshot
     }
     if (concurrencyData.status === 'fulfilled') {
       concurrency.value = concurrencyData.value as ProviderConcurrencySnapshot[]
