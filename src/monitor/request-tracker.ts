@@ -77,10 +77,16 @@ const RECENT_TTL_MS = 5 * 60 * 1000; // eslint-disable-line no-magic-numbers
 const ACTIVE_MAX_AGE_MS = 60 * 60 * 1000; // eslint-disable-line no-magic-numbers
 const PUSH_INTERVAL_MS = 5000;
 
+export interface TrackerLogger {
+  debug(obj: Record<string, unknown>, msg: string): void;
+  warn(obj: Record<string, unknown>, msg: string): void;
+}
+
 export class RequestTracker {
   private activeMap = new Map<string, ActiveRequest>();
   private recentCompleted: ActiveRequest[] = [];
   private clients = new Set<ServerResponse>();
+  private logger?: TrackerLogger;
   private providerConfigCache = new Map<
     string,
     {
@@ -101,24 +107,31 @@ export class RequestTracker {
   constructor(deps?: {
     semaphoreManager?: ProviderSemaphoreManager;
     runtimeCollector?: RuntimeCollector;
+    logger?: TrackerLogger;
   }) {
     this.semaphoreManager = deps?.semaphoreManager;
     this.runtimeCollector = deps?.runtimeCollector ?? new RuntimeCollector();
     this.statsAggregator = new StatsAggregator();
+    this.logger = deps?.logger;
   }
 
   // --- Core methods ---
 
   start(req: ActiveRequest): void {
     this.activeMap.set(req.id, { ...req });
+    this.logger?.debug({ reqId: req.id, model: req.model, providerId: req.providerId, activeCount: this.activeMap.size }, "Tracker: start");
     this.broadcast("request_start", req);
   }
 
   update(id: string, patch: Partial<ActiveRequest>): void {
     const req = this.activeMap.get(id);
-    if (!req) return;
+    if (!req) {
+      this.logger?.warn({ reqId: id, patchKeys: Object.keys(patch) }, "Tracker: update called but request not in activeMap");
+      return;
+    }
     const prevQueued = req.queued;
     Object.assign(req, patch);
+    this.logger?.debug({ reqId: id, patchQueued: patch.queued, prevQueued, activeCount: this.activeMap.size }, "Tracker: update");
     // queued 状态变化时立即广播，让前端即时看到排队/取消排队
     if (patch.queued !== undefined && patch.queued !== prevQueued) {
       this.broadcast("request_update", this.getActive());
@@ -192,7 +205,10 @@ export class RequestTracker {
     result: { status: "completed" | "failed"; statusCode?: number },
   ): void {
     const req = this.activeMap.get(id);
-    if (!req) return;
+    if (!req) {
+      this.logger?.warn({ reqId: id, result }, "Tracker: complete called but request not in activeMap");
+      return;
+    }
 
     const now = Date.now();
     const latency = now - req.startTime;
@@ -220,6 +236,7 @@ export class RequestTracker {
       this.recentCompleted.length = RECENT_COMPLETED_MAX;
     }
 
+    this.logger?.debug({ reqId: id, status: result.status, statusCode, latency, activeCount: this.activeMap.size }, "Tracker: complete");
     this.broadcast("request_complete", completed);
   }
 
@@ -315,13 +332,24 @@ export class RequestTracker {
 
   broadcast(event: string, data: unknown): void {
     const msg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+    const clientCount = this.clients.size;
+    let sentCount = 0;
     for (const client of this.clients) {
       try {
-        if (!client.writableEnded) client.write(msg);
+        if (!client.writableEnded) {
+          client.write(msg);
+          sentCount++;
+        }
       } catch {
         this.clients.delete(client);
       }
     }
+    const summary = event === "request_update" ? `active=${(data as ActiveRequest[])?.length}`
+      : event === "concurrency_update" ? (data as ProviderConcurrencySnapshot[])?.map(p => `${p.providerName}=${p.active}/${p.maxConcurrency}q${p.queued}`).join(",")
+      : event === "request_start" ? `model=${(data as ActiveRequest)?.model}`
+      : event === "request_complete" ? `model=${(data as ActiveRequest)?.model} status=${(data as ActiveRequest)?.status}`
+      : "";
+    this.logger?.debug({ event, clientCount, sentCount, summary }, "Tracker: SSE broadcast");
   }
 
   // --- Provider config cache ---

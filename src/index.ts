@@ -135,7 +135,7 @@ export async function buildApp(
   matcher.load(db);
 
   const semaphoreManager = new ProviderSemaphoreManager();
-  const tracker = new RequestTracker({ semaphoreManager });
+  const tracker = new RequestTracker({ semaphoreManager, logger: app.log });
   tracker.startPushInterval();
 
   // 从 DB 读取已有 provider 的并发配置，初始化信号量管理器和 tracker

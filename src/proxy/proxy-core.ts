@@ -230,6 +230,7 @@ export async function handleProxyPost(
       id: logId, apiType, model: effectiveModel, providerId: provider.id,
       providerName: provider.name, isStream, startTime, status: "pending",
       retryCount: 0, attempts: [], clientIp: request.ip,
+      queued: false,
     });
     request.log.debug({ logId, providerId: provider.id, providerName: provider.name, backendModel: resolved.backend_model, action: "request_started" }, "Proxy: request started in tracker");
 
@@ -265,18 +266,21 @@ export async function handleProxyPost(
         deps.tracker?.update(logId, { queued: false });
       } catch (err: unknown) {
         if (err instanceof DOMException && err.name === "AbortError") {
+          releaseSemaphore();
           deps.tracker?.complete(logId, { status: "failed" });
           return reply;
         }
         if (err instanceof SemaphoreQueueFullError) {
           request.log.warn({ providerId: provider.id }, "Concurrency queue full, rejecting request");
           const e = errors.concurrencyQueueFull(provider.id);
+          deps.tracker?.update(logId, { queued: false });
           deps.tracker?.complete(logId, { status: "failed", statusCode: e.statusCode });
           return reply.status(e.statusCode).send(e.body);
         }
         if (err instanceof SemaphoreTimeoutError) {
           request.log.warn({ providerId: provider.id, timeoutMs: err.timeoutMs }, "Concurrency wait timed out");
           const e = errors.concurrencyTimeout(provider.id, err.timeoutMs);
+          deps.tracker?.update(logId, { queued: false });
           deps.tracker?.complete(logId, { status: "failed", statusCode: e.statusCode });
           return reply.status(e.statusCode).send(e.body);
         }
@@ -347,12 +351,30 @@ export async function handleProxyPost(
         continue;
       }
 
+      // --- 异常中断检查（客户端断连或 pipe 错误导致流未正常完成）---
+      const streamAbnormal = isStream && (r as StreamProxyResult).abnormalClose === true;
+      if (streamAbnormal) {
+        request.log.debug({ logId, statusCode: r.statusCode, action: "stream_abnormal_close" }, "Proxy: stream closed abnormally (client disconnect or pipe error)");
+        deps.tracker?.complete(logId, { status: "failed", statusCode: r.statusCode });
+        releaseSemaphore();
+        return reply;
+      }
+
       // 发送响应
       if (isStream) {
         if (r.statusCode !== UPSTREAM_SUCCESS) {
           for (const [k, v] of Object.entries((r as StreamProxyResult).upstreamResponseHeaders ?? {})) reply.header(k, v);
           reply.status(r.statusCode).send((r as StreamProxyResult).responseBody);
         }
+        const sr = r as StreamProxyResult;
+        request.log.debug({
+          logId, statusCode: r.statusCode,
+          hasBody: sr.responseBody !== undefined,
+          bodyLen: sr.responseBody?.length ?? 0,
+          headersSent: reply.raw.headersSent,
+          writableEnded: reply.raw.writableEnded,
+          action: "stream_result",
+        }, "Proxy: stream result diagnostics");
       } else {
         const pr = r as ProxyResult;
         // 非流式响应：模型替换时注入 router-response 标签

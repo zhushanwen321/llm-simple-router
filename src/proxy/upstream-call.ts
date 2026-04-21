@@ -30,6 +30,8 @@ export interface StreamProxyResult {
   upstreamResponseHeaders?: Record<string, string>;
   sentHeaders?: Record<string, string>;
   metricsResult?: MetricsResult;
+  /** true 表示流未正常结束就被中断（客户端断连或 pipe 错误） */
+  abnormalClose?: boolean;
 }
 
 export interface GetProxyResult {
@@ -204,10 +206,11 @@ export function proxyStream(
         ...(metrics ? { metricsResult: metrics } : {}),
       });
 
+      // 客户端断连时标记 abnormalClose，让调用方能区分正常完成和异常中断
       reply.raw.on("close", () => {
         if (!resolved) {
           cleanup();
-          resolve({ statusCode, responseBody: undefined, upstreamResponseHeaders: sseHeaders, sentHeaders: upstreamHeaders, metricsResult: collectMetrics(false) });
+          resolve({ statusCode, responseBody: undefined, upstreamResponseHeaders: sseHeaders, sentHeaders: upstreamHeaders, metricsResult: collectMetrics(false), abnormalClose: true });
         }
       });
 
@@ -215,7 +218,7 @@ export function proxyStream(
         cleanup();
         if (!resolved) {
           resolved = true;
-          resolve({ statusCode, responseBody: undefined, upstreamResponseHeaders: sseHeaders, sentHeaders: upstreamHeaders, metricsResult: collectMetrics(false) });
+          resolve({ statusCode, responseBody: undefined, upstreamResponseHeaders: sseHeaders, sentHeaders: upstreamHeaders, metricsResult: collectMetrics(false), abnormalClose: true });
         }
       });
 
