@@ -1,7 +1,21 @@
 <!-- eslint-disable vue/multi-word-component-names -->
 <template>
-  <div v-if="!isStream" class="flex items-center justify-center h-full text-sm text-muted-foreground">
-    非流式请求无实时内容
+  <div v-if="!isStream">
+    <div v-if="nonStreamBody" class="rounded-md border bg-card">
+      <div class="flex items-center gap-1.5 px-2.5 py-1.5 border-b">
+        <MessageSquare class="h-3.5 w-3.5 text-muted-foreground" />
+        <span class="text-xs font-medium">Response</span>
+      </div>
+      <div class="px-2.5 py-2">
+        <pre class="text-xs overflow-y-auto whitespace-pre-wrap break-words max-h-80"><code>{{ nonStreamBody }}</code></pre>
+      </div>
+    </div>
+    <div v-else-if="loadingBody" class="flex items-center justify-center h-full text-sm text-muted-foreground">
+      加载中...
+    </div>
+    <div v-else class="flex items-center justify-center h-full text-sm text-muted-foreground">
+      非流式请求无实时内容
+    </div>
   </div>
   <div v-else-if="!streamContent" class="flex items-center justify-center h-full text-sm text-muted-foreground">
     等待流数据...
@@ -114,6 +128,8 @@ const props = defineProps<{
   metrics: StreamMetricsSnapshot | null
   isStream: boolean
   streamContent?: StreamContentSnapshot
+  nonStreamBody?: string
+  loadingBody?: boolean
 }>()
 
 const textContentRef = ref<HTMLPreElement | null>(null)

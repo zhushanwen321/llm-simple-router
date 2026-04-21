@@ -172,6 +172,8 @@
               :metrics="selectedRequest.streamMetrics ?? null"
               :is-stream="selectedRequest.isStream"
               :stream-content="selectedRequest.streamContent ?? undefined"
+              :non-stream-body="nonStreamBody"
+              :loading-body="nonStreamBodyLoading"
             />
           </div>
         </div>
@@ -236,6 +238,7 @@ const queuedRequests = computed(() => activeRequests.value.filter((r) => r.queue
 function selectRequest(id: string) {
   selectedRequestId.value = id
   requestDetailOpen.value = true
+  loadNonStreamBody(id)
 }
 
 const selectedRequest = computed(() => {
@@ -246,6 +249,30 @@ const selectedRequest = computed(() => {
     null
   )
 })
+
+// 已完成非流式请求的响应体（按需从 API 加载）
+const nonStreamBody = ref<string | undefined>(undefined)
+const nonStreamBodyLoading = ref(false)
+
+async function loadNonStreamBody(requestId: string) {
+  const req = activeRequests.value.find((r) => r.id === requestId) ??
+    recentCompleted.value.find((r) => r.id === requestId)
+  // 仅对已完成的非流式请求加载
+  if (!req || req.isStream || req.status === 'pending') {
+    nonStreamBody.value = undefined
+    return
+  }
+  nonStreamBodyLoading.value = true
+  nonStreamBody.value = undefined
+  try {
+    const log = await api.getLogDetail(requestId) as { response_body?: string }
+    nonStreamBody.value = log.response_body ?? undefined
+  } catch {
+    nonStreamBody.value = undefined
+  } finally {
+    nonStreamBodyLoading.value = false
+  }
+}
 
 // --- Log detail dialog ---
 

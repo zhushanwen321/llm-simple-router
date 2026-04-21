@@ -67,6 +67,9 @@ export class ProviderSemaphoreManager {
       return;
     }
 
+    // 修正因先前的 bug 导致的负数 current（从 maxConcurrency=0 切回正值时）
+    if (entry.current < 0) entry.current = 0;
+
     while (
       entry.current < config.maxConcurrency &&
       entry.queue.length > 0
@@ -121,6 +124,8 @@ export class ProviderSemaphoreManager {
   release(providerId: string): void {
     const entry = this.entries.get(providerId);
     if (!entry) return;
+    // maxConcurrency=0 时 acquire 不计数，release 也不应递减
+    if (entry.config.maxConcurrency === 0) return;
 
     if (entry.queue.length > 0) {
       const e = entry.queue.shift()!;
