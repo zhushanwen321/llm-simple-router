@@ -368,6 +368,7 @@ function enhancementLabel(raw: string | null): string {
     if (meta.action) {
       return meta.detail ? `${meta.action}: ${meta.detail}` : meta.action
     }
+    return raw
   } catch { return '未知' }
 }
 
@@ -385,6 +386,7 @@ function getClientRequestRaw(detail: LogEntry): string {
       try { cr.body = JSON.parse(detail.request_body) } catch { cr.body = detail.request_body }
       return JSON.stringify(cr)
     }
+    return detail.client_request
   } catch { return detail.client_request }
 }
 
