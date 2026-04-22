@@ -19,8 +19,5 @@ export interface LogEntry {
   provider_name: string | null
   child_count?: number
   client_request: string | null
-  client_response: string | null
-  request_body: string | null
-  response_body: string | null
   upstream_response: string | null
 }

@@ -277,6 +277,8 @@ export const api = {
   getLogChildren: (id: string) => request<{ data: LogEntry[] }>('get', `${API.LOGS}/${id}/children`),
   deleteLogsBefore: (before: string) =>
     request<DeleteLogsResponse>('delete', `${API.LOGS}/before`, { before }),
+  getLogRetention: () => request<{ days: number }>('get', '/settings/log-retention'),
+  setLogRetention: (days: number) => request<{ days: number }>('put', '/settings/log-retention', { days }),
 
   getStats: (params?: { period?: string; router_key_id?: string }) =>
     request<StatsResponse>('get', API.STATS, undefined, { params }),
