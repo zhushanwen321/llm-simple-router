@@ -346,9 +346,9 @@ export class RequestTracker {
     }
     const summary = event === "request_update" ? `active=${(data as ActiveRequest[])?.length}`
       : event === "concurrency_update" ? (data as ProviderConcurrencySnapshot[])?.map(p => `${p.providerName}=${p.active}/${p.maxConcurrency}q${p.queued}`).join(",")
-      : event === "request_start" ? `model=${(data as ActiveRequest)?.model}`
-      : event === "request_complete" ? `model=${(data as ActiveRequest)?.model} status=${(data as ActiveRequest)?.status}`
-      : "";
+        : event === "request_start" ? `model=${(data as ActiveRequest)?.model}`
+          : event === "request_complete" ? `model=${(data as ActiveRequest)?.model} status=${(data as ActiveRequest)?.status}`
+            : "";
     this.logger?.debug({ event, clientCount, sentCount, summary }, "Tracker: SSE broadcast");
   }
 

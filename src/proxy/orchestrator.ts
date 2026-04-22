@@ -58,7 +58,7 @@ export class ProxyOrchestrator {
       ),
       (result) => this.extractTrackStatus(result),
     );
-    this.sendResponse(reply, result.result);
+    this.sendResponse(reply, result.result, ctx);
     return result;
   }
 
@@ -112,8 +112,12 @@ export class ProxyOrchestrator {
     );
   }
 
-  private sendResponse(reply: FastifyReply, result: TransportResult): void {
+  private sendResponse(reply: FastifyReply, result: TransportResult, ctx?: HandleContext): void {
     if (result.kind === "stream_success" || result.kind === "stream_abort" || result.kind === "throw") {
+      return;
+    }
+    // failover 场景下错误响应由外层 proxy-handler 控制，此处不发送
+    if (ctx?.isFailover && "statusCode" in result && result.statusCode >= (ctx.failoverThreshold ?? DEFAULT_FAILOVER_THRESHOLD)) {
       return;
     }
     if (result.headers) {

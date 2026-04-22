@@ -25,6 +25,8 @@ import type { RetryRuleMatcher } from "./retry-rules.js";
 import type { ProxyOrchestrator } from "./orchestrator.js";
 import type { ProxyErrorFormatter } from "./proxy-core.js";
 
+const HTTP_ERROR_THRESHOLD = 400;
+
 export interface RouteHandlerDeps {
   db: Database.Database;
   streamTimeoutMs: number;
@@ -205,6 +207,28 @@ export async function handleProxyRequest(
         resilienceResult.attempts, resilienceResult.result, startTime,
       );
       collectTransportMetrics(deps.db, apiType, resilienceResult.result, isStream, lastLogId, provider.id, resolved.backend_model, request);
+
+      // Failover: 单 provider 内重试已耗尽但仍失败，尝试下一个 target
+      if (isFailover && !reply.raw.headersSent) {
+        const tr = resilienceResult.result;
+        const failed = tr.kind === "throw"
+          || ("statusCode" in tr && tr.statusCode >= HTTP_ERROR_THRESHOLD);
+        if (failed) {
+          excludeTargets.push(resolved);
+          continue;
+        }
+      }
+
+      // orchestrator.sendResponse 对 throw/stream_success/stream_abort 不发送，
+      // 对非 failover 的 error/throw 需要由外层发送错误响应
+      if (!reply.raw.headersSent) {
+        const tr = resilienceResult.result;
+        if (tr.kind === "throw" || (tr.kind === "error" && tr.statusCode >= HTTP_ERROR_THRESHOLD)) {
+          const err = errors.upstreamConnectionFailed();
+          return reply.status(err.statusCode).send(err.body);
+        }
+      }
+
       return reply;
     } catch (e) {
       if (e instanceof ProviderSwitchNeeded) {

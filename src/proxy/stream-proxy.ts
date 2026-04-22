@@ -1,0 +1,324 @@
+import { PassThrough } from "stream";
+import type { FastifyReply } from "fastify";
+import { UPSTREAM_SUCCESS } from "./types.js";
+import type { RawHeaders, StreamState, TransportResult } from "./types.js";
+import type { MetricsResult } from "../metrics/metrics-extractor.js";
+import type { SSEMetricsTransform } from "../metrics/sse-metrics-transform.js";
+import {
+  _transportInternals,
+  buildRequestOptions,
+  type BuildHeadersFn,
+} from "./transport.js";
+
+const UPSTREAM_BAD_GATEWAY = 502;
+const BUFFER_SIZE_LIMIT = 4096;
+
+// ---------- Header filter (shared with transport.ts) ----------
+
+const SKIP_DOWNSTREAM = new Set([
+  "content-length",
+  "transfer-encoding",
+  "connection",
+  "keep-alive",
+]);
+
+function filterHeaders(raw: RawHeaders): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (value == null || SKIP_DOWNSTREAM.has(key.toLowerCase())) continue;
+    out[key] = Array.isArray(value) ? value.join(", ") : value;
+  }
+  return out;
+}
+
+// ---------- StreamProxy ----------
+
+type StreamTerminalKind = "stream_success" | "stream_error" | "stream_abort";
+
+class StreamProxy {
+  private state: StreamState = "BUFFERING";
+  private resolved = false;
+  private resolveFn: ((result: TransportResult) => void) | null = null;
+  private pendingResult: TransportResult | null = null;
+
+  private readonly bufferChunks: Buffer[] = [];
+  private readonly captureChunks: Buffer[] = [];
+  private idleTimer: NodeJS.Timeout | null = null;
+  private headersSent = false;
+  private closeHandlerRegistered = false;
+
+  private readonly sseHeaders: Record<string, string>;
+  private readonly passThrough = new PassThrough();
+  private readonly pipeEntry: PassThrough | SSEMetricsTransform;
+
+  constructor(
+    private readonly statusCode: number,
+    rawUpstreamHeaders: RawHeaders,
+    private readonly sentUpstreamHeaders: Record<string, string>,
+    private readonly reply: FastifyReply,
+    private readonly metricsTransform: SSEMetricsTransform | undefined,
+    private readonly checkEarlyError: ((data: string) => boolean) | undefined,
+    private readonly timeoutMs: number,
+  ) {
+    this.sseHeaders = filterHeaders(rawUpstreamHeaders);
+    this.sseHeaders["Content-Type"] = "text/event-stream";
+    this.sseHeaders["Cache-Control"] = "no-cache";
+    this.sseHeaders["Connection"] = "keep-alive";
+    this.pipeEntry = metricsTransform ?? this.passThrough;
+  }
+
+  bindResolve(resolve: (result: TransportResult) => void): void {
+    this.resolveFn = resolve;
+    if (this.pendingResult) resolve(this.pendingResult);
+  }
+
+  private transition(newState: StreamState): void {
+    const VALID: Record<StreamState, StreamState[]> = {
+      BUFFERING: ["STREAMING", "EARLY_ERROR"],
+      STREAMING: ["COMPLETED", "ABORTED"],
+      COMPLETED: [],
+      EARLY_ERROR: [],
+      ABORTED: [],
+    };
+    if (!VALID[this.state].includes(newState)) {
+      throw new Error(`Invalid state transition: ${this.state} → ${newState}`);
+    }
+    this.state = newState;
+  }
+
+  private terminal(kind: StreamTerminalKind, extra: Record<string, unknown> = {}): void {
+    if (this.resolved) return;
+    this.resolved = true;
+    this.cleanup();
+
+    const base = {
+      statusCode: this.statusCode,
+      upstreamResponseHeaders: this.sseHeaders,
+      sentHeaders: this.sentUpstreamHeaders,
+    };
+
+    let result: TransportResult;
+    switch (kind) {
+      case "stream_success":
+        result = { kind: "stream_success", ...base, metrics: extra.metrics as MetricsResult | undefined };
+        break;
+      case "stream_error":
+        result = { kind: "stream_error", ...base, body: extra.body as string, headers: this.sseHeaders };
+        break;
+      case "stream_abort":
+        result = { kind: "stream_abort", ...base, metrics: extra.metrics as MetricsResult | undefined };
+        break;
+    }
+
+    if (this.resolveFn) {
+      this.resolveFn(result);
+    } else {
+      this.pendingResult = result;
+    }
+  }
+
+  private cleanup(): void {
+    if (this.idleTimer) clearTimeout(this.idleTimer);
+    this.idleTimer = null;
+    if (!this.passThrough.destroyed) this.passThrough.destroy();
+    if (this.metricsTransform && !this.metricsTransform.destroyed) this.metricsTransform.destroy();
+  }
+
+  private collectMetrics(isComplete: boolean): MetricsResult | undefined {
+    if (!this.metricsTransform) return undefined;
+    const result = this.metricsTransform.getExtractor().getMetrics();
+    return isComplete ? result : { ...result, is_complete: 0 };
+  }
+
+  resetIdleTimer(): void {
+    if (this.idleTimer) clearTimeout(this.idleTimer);
+    this.idleTimer = setTimeout(() => {
+      if (this.resolved) return;
+      this.terminal("stream_abort", { metrics: this.collectMetrics(false) });
+    }, this.timeoutMs);
+  }
+
+  startStreaming(): void {
+    if (this.headersSent) return;
+    this.transition("STREAMING");
+    this.headersSent = true;
+    this.reply.raw.writeHead(this.statusCode, this.sseHeaders);
+    if (this.metricsTransform) {
+      this.metricsTransform.pipe(this.passThrough, { end: true });
+    }
+    // 手动转发而非 pipe，避免 Node.js 在 dest 上自动注册 close/finish handler
+    this.passThrough.on("data", (chunk: Buffer) => {
+      this.reply.raw.write(chunk);
+    });
+    // 不在 passThrough end 事件中调用 reply.raw.end()，
+    // 因为 onEnd() 统一管理响应结束时机，确保日志在 reply end 之前写入
+    for (const c of this.bufferChunks) this.pipeEntry.write(c);
+    this.bufferChunks.length = 0;
+  }
+
+  registerCloseHandler(): void {
+    if (this.closeHandlerRegistered) return;
+    this.closeHandlerRegistered = true;
+    this.reply.raw.on("close", () => {
+      if (this.resolved) return;
+      if (this.state === "BUFFERING" || this.state === "STREAMING") {
+        this.transition("ABORTED");
+      }
+      this.terminal("stream_abort", { metrics: this.collectMetrics(false) });
+    });
+  }
+
+  onData(chunk: Buffer): void {
+    if (this.resolved) return;
+    this.resetIdleTimer();
+    this.captureChunks.push(chunk);
+
+    if (this.state === "BUFFERING") {
+      this.bufferChunks.push(chunk);
+      const buf = Buffer.concat(this.bufferChunks);
+      const text = buf.toString("utf-8");
+      if (text.includes("\n\n")) {
+        if (this.checkEarlyError?.(text)) {
+          this.transition("EARLY_ERROR");
+          this.terminal("stream_error", { body: text });
+          return;
+        }
+        this.startStreaming();
+      } else if (buf.length >= BUFFER_SIZE_LIMIT) {
+        this.startStreaming();
+      }
+      return;
+    }
+
+    this.pipeEntry.write(chunk);
+  }
+
+  onEnd(): void {
+    if (this.resolved) return;
+    if (this.idleTimer) clearTimeout(this.idleTimer);
+
+    if (this.state === "BUFFERING" && this.checkEarlyError) {
+      const text = Buffer.concat(this.captureChunks).toString("utf-8");
+      if (this.checkEarlyError(text)) {
+        this.transition("EARLY_ERROR");
+        this.terminal("stream_error", { body: text });
+        return;
+      }
+      this.startStreaming();
+    }
+
+    if (this.state === "STREAMING") {
+      this.transition("COMPLETED");
+    }
+
+    // 正常完成时先 resolve Promise，让 handler 链路（日志写入等）在 microtask 中执行。
+    // reply.raw.end() 延迟到 setImmediate（macrotask），确保 microtask 先完成。
+    // light-my-request 监听 reply.raw 的 end 事件判定响应完成，
+    // 这保证了 inject() 返回时日志已经写入 DB。
+    this.resolved = true;
+    const metrics = this.collectMetrics(true);
+    const result: TransportResult = {
+      kind: "stream_success",
+      statusCode: this.statusCode,
+      upstreamResponseHeaders: this.sseHeaders,
+      sentHeaders: this.sentUpstreamHeaders,
+      metrics,
+    };
+
+    if (this.resolveFn) {
+      this.resolveFn(result);
+    } else {
+      this.pendingResult = result;
+    }
+
+    // 延迟结束管道和响应，确保 handler 的 microtask（日志记录等）先执行
+    setImmediate(() => {
+      this.pipeEntry.end();
+      if (this.headersSent) this.reply.raw.end();
+      this.cleanup();
+    });
+  }
+
+  onUpstreamError(err: Error): void {
+    if (this.resolved) return;
+    this.resolved = true;
+    this.cleanup();
+    const result: TransportResult = { kind: "throw", error: err };
+    if (this.resolveFn) {
+      this.resolveFn(result);
+    } else {
+      this.pendingResult = result;
+    }
+  }
+}
+
+// ---------- callStream ----------
+
+export function callStream(
+  backend: { base_url: string },
+  apiKey: string,
+  body: Record<string, unknown>,
+  clientHeaders: RawHeaders,
+  reply: FastifyReply,
+  timeoutMs: number,
+  upstreamPath: string,
+  buildHeaders: BuildHeadersFn,
+  metricsTransform?: SSEMetricsTransform,
+  checkEarlyError?: (bufferedData: string) => boolean,
+  compatResolve?: (result: TransportResult) => void,
+): Promise<TransportResult> {
+  return new Promise((resolve) => {
+    const effectiveResolve = compatResolve ?? resolve;
+    const url = new URL(`${backend.base_url}${upstreamPath}`);
+    const payload = JSON.stringify(body);
+    const upstreamHeaders = buildHeaders(clientHeaders, apiKey, Buffer.byteLength(payload));
+    const options = buildRequestOptions(url, upstreamHeaders);
+
+    const upstreamReq = _transportInternals.createUpstreamRequest(url, options);
+
+    upstreamReq.on("response", (upstreamRes) => {
+      const statusCode = upstreamRes.statusCode || UPSTREAM_BAD_GATEWAY;
+
+      if (statusCode !== UPSTREAM_SUCCESS) {
+        const chunks: Buffer[] = [];
+        upstreamRes.on("data", (chunk: Buffer) => chunks.push(chunk));
+        upstreamRes.on("end", () => {
+          effectiveResolve({
+            kind: "stream_error",
+            statusCode,
+            body: Buffer.concat(chunks).toString("utf-8"),
+            headers: filterHeaders(upstreamRes.headers as RawHeaders),
+            sentHeaders: upstreamHeaders,
+          });
+        });
+        return;
+      }
+
+      const proxy = new StreamProxy(
+        statusCode,
+        upstreamRes.headers as RawHeaders,
+        upstreamHeaders,
+        reply,
+        metricsTransform,
+        checkEarlyError,
+        timeoutMs,
+      );
+
+      proxy.bindResolve(effectiveResolve);
+      proxy.registerCloseHandler();
+
+      // 无 early error checker 时直接开始流式传输
+      if (!checkEarlyError) proxy.startStreaming();
+
+      proxy.resetIdleTimer();
+
+      upstreamRes.on("data", (chunk: Buffer) => proxy.onData(chunk));
+      upstreamRes.on("end", () => proxy.onEnd());
+      upstreamRes.on("error", (err: Error) => proxy.onUpstreamError(err));
+    });
+
+    upstreamReq.on("error", (error) => effectiveResolve({ kind: "throw", error }));
+    upstreamReq.write(payload);
+    upstreamReq.end();
+  });
+}

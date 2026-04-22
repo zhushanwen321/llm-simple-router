@@ -214,17 +214,19 @@ export class ResilienceLayer {
         transportResult = await fn(currentTarget);
       } catch (err: unknown) {
         const errMsg = err instanceof Error ? err.message : String(err);
-        allAttempts.push({
-          target: currentTarget, attemptIndex: globalAttemptIndex,
-          statusCode: null, error: errMsg,
-          latencyMs: Date.now() - start, responseBody: null,
-        });
         transportResult = { kind: "throw", error: err instanceof Error ? err : new Error(errMsg) };
       }
 
       lastResult = transportResult;
 
-      if (transportResult.kind !== "throw") {
+      if (transportResult.kind === "throw") {
+        const throwErr = transportResult.error;
+        allAttempts.push({
+          target: currentTarget, attemptIndex: globalAttemptIndex,
+          statusCode: null, error: throwErr instanceof Error ? throwErr.message : String(throwErr),
+          latencyMs: Date.now() - start, responseBody: null,
+        });
+      } else {
         allAttempts.push({
           target: currentTarget, attemptIndex: globalAttemptIndex,
           statusCode: transportResult.statusCode, error: null,
