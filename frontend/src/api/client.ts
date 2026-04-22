@@ -122,6 +122,10 @@ interface RetryRulePayload {
   status_code: number
   body_pattern: string
   is_active?: number
+  retry_strategy?: 'fixed' | 'exponential'
+  retry_delay_ms?: number
+  max_retries?: number
+  max_delay_ms?: number
 }
 
 export interface SessionState {
