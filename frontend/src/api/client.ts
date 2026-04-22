@@ -267,9 +267,9 @@ export const api = {
   getStats: (params?: { period?: string; router_key_id?: string }) =>
     request<StatsResponse>('get', API.STATS, undefined, { params }),
 
-  getMetricsSummary: (params: { period: string; provider_id?: string; backend_model?: string; router_key_id?: string }) =>
+  getMetricsSummary: (params: { period?: string; provider_id?: string; backend_model?: string; router_key_id?: string; start_time?: string; end_time?: string }) =>
     request<MetricsSummaryRow[]>('get', API.METRICS_SUMMARY, undefined, { params }),
-  getMetricsTimeseries: (params: { period: string; metric: string; provider_id?: string; backend_model?: string; router_key_id?: string }) =>
+  getMetricsTimeseries: (params: { period?: string; metric: string; provider_id?: string; backend_model?: string; router_key_id?: string; start_time?: string; end_time?: string }) =>
     request<TimeseriesRawRow[]>('get', API.METRICS_TIMESERIES, undefined, { params }),
 
   getRouterKeys: () => request<RouterKeyPublic[]>('get', API.ROUTER_KEYS),

@@ -16,13 +16,28 @@
             {{ p.label }}
           </Button>
         </div>
+        <div class="flex items-center gap-1">
+          <Input type="date" v-model="dateRange.start" class="w-36" />
+          <span class="text-muted-foreground text-sm">-</span>
+          <Input type="date" v-model="dateRange.end" class="w-36" />
+          <Button v-if="dateRange.start || dateRange.end" variant="ghost" size="sm" @click="clearDateRange">清除</Button>
+        </div>
+        <Select v-model="providerFilter">
+          <SelectTrigger class="w-40">
+            <SelectValue placeholder="全部供应商" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">全部供应商</SelectItem>
+            <SelectItem v-for="p in providers" :key="p.id" :value="p.id">{{ p.name }}</SelectItem>
+          </SelectContent>
+        </Select>
         <Select v-model="modelFilter">
           <SelectTrigger class="w-48">
             <SelectValue placeholder="全部模型" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">全部模型</SelectItem>
-            <SelectItem v-for="m in modelOptions" :key="m" :value="m">
+            <SelectItem v-for="m in filteredModelOptions" :key="m" :value="m">
               {{ m }}
             </SelectItem>
           </SelectContent>
@@ -186,6 +201,7 @@ import { Line } from 'vue-chartjs'
 import { api } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
@@ -215,15 +231,19 @@ const {
   period,
   modelFilter,
   routerKeyFilter: metricsKeyFilter,
+  providerFilter,
+  dateRange,
   loading,
   routerKeys,
-  modelOptions,
+  filteredModelOptions,
+  providers,
   ttftData,
   tpsData,
   tokensData,
   cacheRateData,
   summaryRows,
   noData,
+  clearDateRange,
 } = useMetrics()
 
 // --- 统一密钥筛选 ---
@@ -234,14 +254,20 @@ watch(dashboardKeyFilter, (v) => {
   loadStats()
 })
 
-// period 变化时也刷新 stats
-watch(period, () => {
+// period / dateRange 变化时也刷新 stats
+watch([period, dateRange], () => {
   loadStats()
-})
+}, { deep: true })
 
 async function loadStats() {
   try {
-    const params: { period?: string; router_key_id?: string } = { period: period.value }
+    const params: { period?: string; router_key_id?: string } = {}
+    if (dateRange.value.start && dateRange.value.end) {
+      // 日期范围模式下 stats API 暂不支持 start_time/end_time，仍用 period
+      params.period = period.value
+    } else {
+      params.period = period.value
+    }
     if (dashboardKeyFilter.value !== 'all') params.router_key_id = dashboardKeyFilter.value
     const res = await api.getStats(params)
     stats.value = res
