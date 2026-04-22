@@ -137,11 +137,12 @@ interface DeleteLogsResponse {
 interface RouterKeyPublic {
   id: string
   name: string
-  key_preview: string
-  key_suffix: string
-  is_active: number
+  key: string | null
+  key_prefix: string
   allowed_models: string[] | null
+  is_active: number
   created_at: string
+  updated_at: string
 }
 
 interface RetryRule {
@@ -150,10 +151,11 @@ interface RetryRule {
   status_code: number
   body_pattern: string
   is_active: number
-  retry_strategy: string
+  created_at: string
+  retry_strategy: "fixed" | "exponential"
   retry_delay_ms: number
   max_retries: number
-  created_at: string
+  max_delay_ms: number
 }
 
 interface TimeseriesRawRow {

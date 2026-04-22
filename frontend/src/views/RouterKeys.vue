@@ -144,7 +144,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 interface RouterKey {
   id: string
   name: string
-  key: string
+  key: string | null
   key_prefix: string
   allowed_models: string[] | null
   is_active: number
