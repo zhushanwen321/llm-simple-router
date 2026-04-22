@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { api } from '@/api/client'
 
 const router = createRouter({
   history: createWebHistory('/admin/'),
@@ -73,7 +74,6 @@ router.beforeEach(async (to, _from, next) => {
   if (setupChecked && isSetupInitialized) {
     if (to.meta.requiresAuth) {
       try {
-        const { api } = await import('@/api/client')
         await api.getStats()
         next()
       } catch {
@@ -87,7 +87,6 @@ router.beforeEach(async (to, _from, next) => {
 
   // 检查 setup 状态
   try {
-    const { api } = await import('@/api/client')
     const status = await api.getSetupStatus()
     setupChecked = true
     isSetupInitialized = status.initialized
