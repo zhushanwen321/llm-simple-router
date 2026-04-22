@@ -255,8 +255,8 @@ async function request<T>(
 // --- API ---
 
 export const api = {
-  login: (password: string) => client.post(API.LOGIN, { password }),
-  logout: () => client.post(API.LOGOUT),
+  login: (password: string) => request<void>('post', API.LOGIN, { password }),
+  logout: () => request<void>('post', API.LOGOUT),
 
   getSetupStatus: () => request<{ initialized: boolean }>('get', '/setup/status'),
   initializeSetup: (password: string) => request<{ success: boolean }>('post', '/setup/initialize', { password }),

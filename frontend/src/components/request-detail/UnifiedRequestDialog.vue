@@ -5,16 +5,16 @@
       <div class="h-[3px] w-full overflow-hidden">
         <div
           v-if="progressStatus === 'pending'"
-          class="h-full w-[40%] bg-green-500"
+          class="h-full w-[40%] progress-active"
           :style="{ animation: 'shimmer 1.5s infinite' }"
         />
         <div
           v-else-if="progressStatus === 'failed'"
-          class="h-full w-full bg-red-500"
+          class="h-full w-full progress-failed"
         />
         <div
           v-else
-          class="h-full w-full bg-green-500"
+          class="h-full w-full progress-active"
         />
       </div>
 

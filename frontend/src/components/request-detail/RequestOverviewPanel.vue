@@ -4,14 +4,14 @@
     <div class="flex flex-wrap items-center gap-1.5">
       <span class="font-mono text-[11px] font-semibold max-w-[130px] truncate">{{ overview.model }}</span>
 
-      <Badge v-if="statusColor === 'pending'" class="bg-yellow-100 text-yellow-800">
-        <span class="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse" />
+      <Badge v-if="statusColor === 'pending'" class="badge-pending">
+        <span class="w-1.5 h-1.5 rounded-full dot-pending animate-pulse" />
         进行中
       </Badge>
-      <Badge v-else-if="statusColor === 'error'" class="bg-red-100 text-red-800">
+      <Badge v-else-if="statusColor === 'error'" class="badge-error">
         {{ overview.statusCode ?? '--' }}
       </Badge>
-      <Badge v-else class="bg-green-100 text-green-800">
+      <Badge v-else class="badge-success">
         {{ overview.statusCode ?? '--' }}
       </Badge>
 
@@ -21,7 +21,7 @@
 
     <!-- Row 2: session (conditional) -->
     <div v-if="overview.sessionId" class="flex items-center gap-1.5">
-      <Badge class="bg-green-100 text-green-800">Claude Code</Badge>
+      <Badge class="badge-success">Claude Code</Badge>
       <span class="font-mono text-[11px] text-muted-foreground truncate">{{ overview.sessionId }}</span>
     </div>
 
@@ -41,7 +41,7 @@
       </div>
       <div class="bg-muted/50 rounded-md px-2 py-1.5 min-w-0">
         <div class="text-[10px] text-muted-foreground">Output Tokens</div>
-        <div class="text-sm font-semibold truncate" :class="isOutputPending ? 'text-green-600' : ''">{{ outputTokenText }}</div>
+        <div class="text-sm font-semibold truncate" :class="isOutputPending ? 'diff-added' : ''">{{ outputTokenText }}</div>
       </div>
       <div class="bg-muted/50 rounded-md px-2 py-1.5 min-w-0">
         <div class="text-[10px] text-muted-foreground">速度 (tok/s)</div>
@@ -65,7 +65,7 @@
         class="flex items-center gap-1 text-[11px]"
       >
         <span class="text-muted-foreground">#{{ i + 1 }}</span>
-        <span :class="isAttemptError(attempt.statusCode) ? 'text-red-600' : 'text-green-600'">
+        <span :class="isAttemptError(attempt.statusCode) ? 'diff-removed' : 'diff-added'">
           {{ attempt.statusCode ?? '--' }}
         </span>
         <span class="text-muted-foreground">{{ (attempt.latencyMs / MS_PER_SECOND).toFixed(1) }}s</span>

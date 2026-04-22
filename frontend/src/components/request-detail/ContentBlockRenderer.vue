@@ -2,11 +2,11 @@
   <!-- Text blocks are always open, no collapsible -->
   <div v-if="type === 'text'" class="rounded-md border bg-card">
     <div class="flex items-center gap-1.5 px-2.5 py-1.5 border-b">
-      <MessageSquare class="h-3.5 w-3.5 text-green-600" />
+      <MessageSquare class="h-3.5 w-3.5 diff-added" />
       <span class="text-xs font-medium">Reply</span>
     </div>
     <div class="px-2.5 py-2">
-      <pre class="text-xs overflow-y-auto whitespace-pre-wrap break-words max-h-60"><code>{{ content }}<span v-if="showCursor" class="inline-block w-1.5 h-3.5 bg-green-500 animate-pulse ml-0.5 align-text-bottom" /></code></pre>
+      <pre class="text-xs overflow-y-auto whitespace-pre-wrap break-words max-h-60"><code>{{ content }}<span v-if="showCursor" class="inline-block w-1.5 h-3.5 dot-success animate-pulse ml-0.5 align-text-bottom" /></code></pre>
     </div>
   </div>
 
@@ -51,18 +51,18 @@ const isOpen = ref(props.type === 'text' ? true : props.defaultOpen)
 
 const wrapperClass = computed(() => {
   switch (props.type) {
-    case 'thinking': return 'bg-amber-50 dark:bg-amber-950/30'
-    case 'tool_use': return 'bg-purple-50 dark:bg-purple-950/30'
-    case 'tool_result': return 'bg-blue-50 dark:bg-blue-950/30'
+    case 'thinking': return 'block-thinking'
+    case 'tool_use': return 'block-tool-use'
+    case 'tool_result': return 'block-tool-result'
     default: return 'bg-card'
   }
 })
 
 const contentClass = computed(() => {
   switch (props.type) {
-    case 'thinking': return 'bg-amber-100/50 dark:bg-amber-900/30 text-muted-foreground italic'
-    case 'tool_use': return 'bg-purple-100/50 dark:bg-purple-900/30'
-    case 'tool_result': return 'bg-blue-100/50 dark:bg-blue-900/30'
+    case 'thinking': return 'block-thinking-content italic'
+    case 'tool_use': return 'block-tool-use-content'
+    case 'tool_result': return 'block-tool-result-content'
     default: return 'bg-muted/50'
   }
 })
@@ -78,9 +78,9 @@ const headerIcon = computed(() => {
 
 const iconColorClass = computed(() => {
   switch (props.type) {
-    case 'thinking': return 'text-amber-600'
-    case 'tool_use': return 'text-purple-600'
-    case 'tool_result': return 'text-blue-600'
+    case 'thinking': return 'text-[var(--color-role-thinking)]'
+    case 'tool_use': return 'text-[var(--color-role-tool)]'
+    case 'tool_result': return 'text-[var(--color-role-user)]'
     default: return 'text-muted-foreground'
   }
 })

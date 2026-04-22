@@ -56,20 +56,20 @@
                 v-for="(msg, i) in messagesDiff"
                 :key="i"
                 class="rounded-md border px-2.5 py-1.5 text-[11px]"
-                :class="msg.modified ? 'bg-amber-50 border-amber-200' : 'bg-background'"
+                :class="msg.modified ? 'diff-modified' : 'bg-background'"
               >
                 <div class="flex items-center gap-1.5 mb-1">
                   <Badge
                     class="text-[9px] px-1.5 py-0"
-                    :class="msg.role === 'user' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'"
+                    :class="msg.role === 'user' ? 'badge-role-user' : 'badge-role-assistant'"
                   >
                     {{ msg.role }}
                   </Badge>
-                  <Badge v-if="msg.modified" class="bg-amber-100 text-amber-700 text-[9px] px-1.5 py-0">
+                  <Badge v-if="msg.modified" class="badge-role-thinking text-[9px] px-1.5 py-0">
                     已修改
                   </Badge>
                 </div>
-                <div v-if="msg.modified && msg.removedText" class="text-red-500 line-through mb-0.5">
+                <div v-if="msg.modified && msg.removedText" class="diff-removed line-through mb-0.5">
                   {{ msg.removedText }}
                 </div>
                 <div class="text-foreground">{{ msg.text }}</div>
@@ -83,8 +83,8 @@
               流选项注入
             </div>
             <div class="flex items-center gap-2 text-[11px]">
-              <Badge class="bg-green-100 text-green-700 text-[9px] px-1.5 py-0">注入</Badge>
-              <code class="font-mono text-green-700">{ "include_usage": true }</code>
+              <Badge class="badge-success text-[9px] px-1.5 py-0">注入</Badge>
+              <code class="font-mono diff-added">{ "include_usage": true }</code>
             </div>
           </div>
 
@@ -94,11 +94,11 @@
               认证替换
             </div>
             <div class="flex items-center gap-2 text-[11px]">
-              <span class="font-mono text-red-500 line-through">{{ authDiff.old }}</span>
+              <span class="font-mono diff-removed line-through">{{ authDiff.old }}</span>
               <Separator orientation="vertical" class="h-3" />
-              <span class="font-mono text-green-600 font-medium">{{ authDiff.new }}</span>
+              <span class="font-mono diff-added font-medium">{{ authDiff.new }}</span>
             </div>
-            <Badge class="mt-1 bg-amber-100 text-amber-700 text-[9px] px-1.5 py-0">已替换</Badge>
+            <Badge class="mt-1 badge-role-thinking text-[9px] px-1.5 py-0">已替换</Badge>
           </div>
         </div>
       </template>

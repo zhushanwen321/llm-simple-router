@@ -119,7 +119,7 @@
       <div class="flex gap-1">
         <Button variant="outline" size="sm" @click="prevPage" :disabled="page <= 1">上一页</Button>
         <span class="px-3 py-1 text-sm text-muted-foreground">第 {{ page }} 页</span>
-        <Button variant="outline" size="sm" @click="nextPage" :disabled="logs.length < PAGE_SIZE">下一页</Button>
+        <Button variant="outline" size="sm" @click="nextPage" :disabled="!hasMore">下一页</Button>
       </div>
     </div>
 
@@ -150,7 +150,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { onMounted, watch } from 'vue'
 import { toast } from 'vue-sonner'
 import { api } from '@/api/client'
 import { Button } from '@/components/ui/button'
@@ -162,68 +162,26 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Skeleton } from '@/components/ui/skeleton'
 import UnifiedRequestDialog from '@/components/request-detail/UnifiedRequestDialog.vue'
 import LogTableRow from '@/components/logs/LogTableRow.vue'
-import type { LogEntry } from '@/components/logs/types'
 import { useLogFilters } from '@/composables/useLogFilters'
+import { useLogs } from '@/composables/useLogs'
 
 const {
-  PERIODS,
-  period,
-  dateRange,
-  dateRangeError,
-  providerFilter,
-  modelFilter,
-  keyFilter,
-  providers,
-  routerKeys,
-  filteredModelOptions,
-  clearDateRange,
+  PERIODS, period, dateRange, dateRangeError,
+  providerFilter, modelFilter, keyFilter,
+  providers, routerKeys, filteredModelOptions, clearDateRange,
   buildFilterParams,
 } = useLogFilters()
 
-const logs = ref<LogEntry[]>([])
-const total = ref(0)
-const page = ref(1)
-const PAGE_SIZE = 20
 const TABLE_COL_COUNT = 13
-const showCleanup = ref(false)
-const cleanupDays = ref(30) // eslint-disable-line no-magic-numbers
+const PAGE_SIZE = 20
+const DEBOUNCE_MS = 300 // eslint-disable-line no-magic-numbers
 
-const expandedRows = ref<Set<string>>(new Set())
-const childLogs = ref<Record<string, LogEntry[]>>({})
-const childLoading = ref<Record<string, boolean>>({})
-const logDetailOpen = ref(false)
-const selectedLogEntry = ref<LogEntry | null>(null)
-
-async function toggleExpand(log: LogEntry) {
-  const id = log.id
-  if (expandedRows.value.has(id)) {
-    expandedRows.value.delete(id)
-    return
-  }
-  expandedRows.value.add(id)
-  if (!childLogs.value[id]) {
-    childLoading.value[id] = true
-    try {
-      const res = await api.getLogChildren(id)
-      childLogs.value[id] = res.data
-    } catch (e) {
-      console.error('Failed to load child logs:', e)
-      toast.error('加载子请求失败')
-    } finally {
-      childLoading.value[id] = false
-    }
-  }
-}
-
-async function openLogDetail(id: string) {
-  try {
-    selectedLogEntry.value = await api.getLogDetail(id)
-    logDetailOpen.value = true
-  } catch (e) {
-    console.error('Failed to load log detail:', e)
-    toast.error('加载日志详情失败')
-  }
-}
+const {
+  logs, total, page, hasMore,
+  cleanupDays, showCleanup, expandedRows, childLogs, childLoading,
+  logDetailOpen, selectedLogEntry,
+  handleCleanup, toggleExpand, openLogDetail,
+} = useLogs()
 
 async function loadLogs() {
   try {
@@ -257,22 +215,6 @@ function nextPage() {
   loadLogs()
 }
 
-async function handleCleanup() {
-  try {
-    const before = new Date(Date.now() - cleanupDays.value * 86400000).toISOString() // eslint-disable-line no-magic-numbers
-    const res = await api.deleteLogsBefore(before)
-    showCleanup.value = false
-    page.value = 1
-    await loadLogs()
-    toast.success(`已清理 ${res.deleted} 条日志`)
-  } catch (e) {
-    console.error('Failed to cleanup logs:', e)
-    toast.error('清理日志失败')
-  }
-}
-
- 
-const DEBOUNCE_MS = 300
 let filterTimer: ReturnType<typeof setTimeout> | null = null
 watch(
   [period, dateRange, providerFilter, modelFilter, keyFilter],
