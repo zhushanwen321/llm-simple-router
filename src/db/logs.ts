@@ -12,12 +12,9 @@ export interface RequestLog {
   is_stream: number;
   error_message: string | null;
   created_at: string;
-  request_body: string | null;
-  response_body: string | null;
   client_request: string | null;
   upstream_request: string | null;
   upstream_response: string | null;
-  client_response: string | null;
   is_retry: number;
   is_failover: number;
   original_request_id: string | null;
@@ -50,12 +47,9 @@ export interface RequestLogInsert {
   is_stream: number;
   error_message: string | null;
   created_at: string;
-  request_body?: string | null;
-  response_body?: string | null;
   client_request?: string | null;
   upstream_request?: string | null;
   upstream_response?: string | null;
-  client_response?: string | null;
   is_retry?: number;
   is_failover?: number;
   original_request_id?: string | null;
@@ -68,15 +62,17 @@ export function insertRequestLog(
   log: RequestLogInsert,
 ): void {
   db.prepare(
-    `INSERT INTO request_logs (id, api_type, model, provider_id, status_code, latency_ms, is_stream, error_message, created_at, request_body, response_body, client_request, upstream_request, upstream_response, client_response, is_retry, is_failover, original_request_id, router_key_id, original_model)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO request_logs (id, api_type, model, provider_id, status_code, latency_ms,
+      is_stream, error_message, created_at, client_request, upstream_request, upstream_response,
+      is_retry, is_failover, original_request_id, router_key_id, original_model)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     log.id, log.api_type, log.model, log.provider_id, log.status_code,
     log.latency_ms, log.is_stream, log.error_message, log.created_at,
-    log.request_body ?? null, log.response_body ?? null,
     log.client_request ?? null, log.upstream_request ?? null,
-    log.upstream_response ?? null, log.client_response ?? null,
-    log.is_retry ?? 0, log.is_failover ?? 0, log.original_request_id ?? null, log.router_key_id ?? null, log.original_model ?? null,
+    log.upstream_response ?? null,
+    log.is_retry ?? 0, log.is_failover ?? 0, log.original_request_id ?? null,
+    log.router_key_id ?? null, log.original_model ?? null,
   );
 }
 
