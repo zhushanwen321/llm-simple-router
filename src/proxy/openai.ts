@@ -4,15 +4,14 @@ import fp from "fastify-plugin";
 import { getActiveProviders } from "../db/index.js";
 import { getSetting } from "../db/settings.js";
 import { decrypt } from "../utils/crypto.js";
-import { proxyGetRequest, type RawHeaders, type ProxyErrorResponse, type ProxyErrorFormatter } from "./proxy-core.js";
+import { proxyGetRequest, createErrorFormatter, type RawHeaders, type ProxyErrorResponse } from "./proxy-core.js";
+import type { ErrorKind } from "./proxy-core.js";
 import { handleProxyRequest, type RouteHandlerDeps } from "./proxy-handler.js";
-import { ProxyOrchestrator } from "./orchestrator.js";
-import { SemaphoreScope } from "./scope.js";
-import { TrackerScope } from "./scope.js";
-import { ResilienceLayer } from "./resilience.js";
+import { createOrchestrator } from "./orchestrator.js";
 import { RetryRuleMatcher } from "./retry-rules.js";
 import { ProviderSemaphoreManager } from "./semaphore.js";
 import type { RequestTracker } from "../monitor/request-tracker.js";
+import { HTTP_NOT_FOUND, HTTP_BAD_GATEWAY } from "../constants.js";
 
 export interface OpenaiProxyOptions {
   db: Database.Database;
@@ -24,41 +23,22 @@ export interface OpenaiProxyOptions {
   tracker?: RequestTracker;
 }
 
-const HTTP_NOT_FOUND = 404;
-const HTTP_BAD_GATEWAY = 502;
 const CHAT_COMPLETIONS_PATH = "/v1/chat/completions";
 const MODELS_PATH = "/v1/models";
 
-const openaiErrors: ProxyErrorFormatter = {
-  modelNotFound: (model) => ({
-    statusCode: 404,
-    body: { error: { message: `Model '${model}' is not configured`, type: "invalid_request_error", code: "model_not_found" } },
-  }),
-  modelNotAllowed: (model) => ({
-    statusCode: 403,
-    body: { error: { message: `Model '${model}' is not allowed for this API key`, type: "invalid_request_error", code: "model_not_allowed" } },
-  }),
-  providerUnavailable: () => ({
-    statusCode: 503,
-    body: { error: { message: "Provider unavailable", type: "server_error", code: "provider_unavailable" } },
-  }),
-  providerTypeMismatch: () => ({
-    statusCode: 500,
-    body: { error: { message: "Provider type mismatch for this endpoint", type: "server_error", code: "provider_type_mismatch" } },
-  }),
-  upstreamConnectionFailed: () => ({
-    statusCode: 502,
-    body: { error: { message: "Failed to connect to upstream service", type: "upstream_error", code: "upstream_connection_failed" } },
-  }),
-  concurrencyQueueFull: (providerId) => ({
-    statusCode: 503,
-    body: { error: { message: `Provider '${providerId}' concurrency queue is full`, type: "server_error", code: "concurrency_queue_full" } },
-  }),
-  concurrencyTimeout: (providerId, timeoutMs) => ({
-    statusCode: 504,
-    body: { error: { message: `Provider '${providerId}' concurrency wait timeout (${timeoutMs}ms)`, type: "server_error", code: "concurrency_timeout" } },
-  }),
+const OPENAI_ERROR_META: Record<ErrorKind, { type: string; code: string }> = {
+  modelNotFound: { type: "invalid_request_error", code: "model_not_found" },
+  modelNotAllowed: { type: "invalid_request_error", code: "model_not_allowed" },
+  providerUnavailable: { type: "server_error", code: "provider_unavailable" },
+  providerTypeMismatch: { type: "server_error", code: "provider_type_mismatch" },
+  upstreamConnectionFailed: { type: "upstream_error", code: "upstream_connection_failed" },
+  concurrencyQueueFull: { type: "server_error", code: "concurrency_queue_full" },
+  concurrencyTimeout: { type: "server_error", code: "concurrency_timeout" },
 };
+
+const openaiErrors = createErrorFormatter(
+  (kind, message) => ({ error: { message, ...OPENAI_ERROR_META[kind] } }),
+);
 
 function sendError(reply: FastifyReply, e: ProxyErrorResponse) {
   return reply.status(e.statusCode).send(e.body);
@@ -67,12 +47,7 @@ function sendError(reply: FastifyReply, e: ProxyErrorResponse) {
 const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, done) => {
   const { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher, semaphoreManager, tracker } = opts;
 
-  const resilience = new ResilienceLayer();
-  const semaphoreScope = semaphoreManager ? new SemaphoreScope(semaphoreManager) : undefined;
-  const trackerScope = tracker ? new TrackerScope(tracker) : undefined;
-  const orchestrator = (semaphoreScope && trackerScope)
-    ? new ProxyOrchestrator({ semaphoreScope, trackerScope, resilience })
-    : undefined;
+  const orchestrator = createOrchestrator(semaphoreManager, tracker);
 
   app.post(CHAT_COMPLETIONS_PATH, async (request, reply) => {
     if (!orchestrator) return sendError(reply, openaiErrors.providerUnavailable());

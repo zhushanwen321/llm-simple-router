@@ -28,6 +28,53 @@ export interface ProxyErrorFormatter {
 export type { ProxyResult, StreamProxyResult } from "./transport.js";
 export type { GetTransportResult as GetProxyResult } from "./transport.js";
 
+// ---------- Error formatter factory ----------
+
+export type ErrorKind =
+  | "modelNotFound" | "modelNotAllowed" | "providerUnavailable"
+  | "providerTypeMismatch" | "upstreamConnectionFailed"
+  | "concurrencyQueueFull" | "concurrencyTimeout";
+
+/**
+ * 工厂函数，消除 openai/anthropic 错误格式化的重复代码。
+ * statusCode 和 message 两个 provider 完全一致，仅 body 格式不同，
+ * 由 formatBody 回调根据 kind 参数映射各自的 type/code 并组装 body。
+ */
+export function createErrorFormatter(
+  formatBody: (kind: ErrorKind, message: string) => Record<string, unknown>,
+): ProxyErrorFormatter {
+  return {
+    modelNotFound: (model) => ({
+      statusCode: 404,
+      body: formatBody("modelNotFound", `Model '${model}' is not configured`),
+    }),
+    modelNotAllowed: (model) => ({
+      statusCode: 403,
+      body: formatBody("modelNotAllowed", `Model '${model}' is not allowed for this API key`),
+    }),
+    providerUnavailable: () => ({
+      statusCode: 503,
+      body: formatBody("providerUnavailable", "Provider unavailable"),
+    }),
+    providerTypeMismatch: () => ({
+      statusCode: 500,
+      body: formatBody("providerTypeMismatch", "Provider type mismatch for this endpoint"),
+    }),
+    upstreamConnectionFailed: () => ({
+      statusCode: 502,
+      body: formatBody("upstreamConnectionFailed", "Failed to connect to upstream service"),
+    }),
+    concurrencyQueueFull: (providerId) => ({
+      statusCode: 503,
+      body: formatBody("concurrencyQueueFull", `Provider '${providerId}' concurrency queue is full`),
+    }),
+    concurrencyTimeout: (providerId, timeoutMs) => ({
+      statusCode: 504,
+      body: formatBody("concurrencyTimeout", `Provider '${providerId}' concurrency wait timeout (${timeoutMs}ms)`),
+    }),
+  };
+}
+
 // ---------- Header utilities ----------
 
 export const SKIP_UPSTREAM = new Set([

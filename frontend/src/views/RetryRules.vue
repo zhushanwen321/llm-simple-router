@@ -208,7 +208,7 @@ function validate(): boolean {
 async function loadData() {
   try {
     const res = await api.getRetryRules()
-    rules.value = res.data
+    rules.value = res
   } catch (e) {
     console.error('Failed to load retry rules:', e)
     toast.error('加载数据失败')

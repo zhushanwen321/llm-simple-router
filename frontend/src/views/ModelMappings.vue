@@ -104,45 +104,18 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
 import MappingGroupFormDialog from '@/components/mappings/MappingGroupFormDialog.vue'
 import MappingGroupDeleteDialog from '@/components/mappings/MappingGroupDeleteDialog.vue'
-
-interface MappingGroup {
-  id: string
-  client_model: string
-  strategy: string
-  rule: string
-  created_at: string
-}
-
-interface Provider {
-  id: string
-  name: string
-}
-
-interface RuleWindow {
-  start: string
-  end: string
-  target: {
-    backend_model: string
-    provider_id: string
-  }
-}
-
-interface Rule {
-  default?: { backend_model: string; provider_id: string }
-  windows?: RuleWindow[]
-  targets?: { backend_model: string; provider_id: string }[]
-}
+import type { MappingGroup, ProviderSummary, MappingTarget, RuleWindow, Rule } from '@/types/mapping'
 
 const DEFAULT_FORM = {
   client_model: '',
   strategy: 'scheduled',
   default: { backend_model: '', provider_id: '' },
   windows: [] as RuleWindow[],
-  targets: [] as { backend_model: string; provider_id: string }[],
+  targets: [] as MappingTarget[],
 }
 
 const groups = ref<MappingGroup[]>([])
-const providersList = ref<Provider[]>([])
+const providersList = ref<ProviderSummary[]>([])
 const dialogOpen = ref(false)
 const editingId = ref<string | null>(null)
 const deleteTarget = ref<MappingGroup | null>(null)
@@ -158,7 +131,7 @@ const providerNameMap = computed(() => {
 const providerModelsMap = computed(() => {
   const map = new Map<string, string[]>()
   for (const p of providersList.value) {
-    const models = (p as Provider & { models?: string[] }).models
+    const models = (p as ProviderSummary & { models?: string[] }).models
     if (Array.isArray(models) && models.length > 0) {
       map.set(p.id, [...models])
     }
@@ -186,12 +159,12 @@ async function loadData() {
     api.getProviders(),
   ])
   if (results[0].status === 'fulfilled') {
-    groups.value = results[0].value.data
+    groups.value = results[0].value
   } else {
     console.error('Failed to load groups:', results[0].reason)
   }
   if (results[1].status === 'fulfilled') {
-    providersList.value = results[1].value as Provider[]
+    providersList.value = results[1].value as ProviderSummary[]
   } else {
     console.error('Failed to load providers:', results[1].reason)
     toast.error('加载供应商失败')

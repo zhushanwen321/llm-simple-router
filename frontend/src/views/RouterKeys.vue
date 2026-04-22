@@ -183,8 +183,8 @@ async function loadData() {
       api.getRouterKeys(),
       api.getAvailableModels(),
     ])
-    if (keysRes.status === 'fulfilled') keys.value = keysRes.value.data
-    if (modelsRes.status === 'fulfilled') availableModels.value = modelsRes.value.data
+    if (keysRes.status === 'fulfilled') keys.value = keysRes.value
+    if (modelsRes.status === 'fulfilled') availableModels.value = modelsRes.value
   } catch (e) {
     console.error('Failed to load data:', e)
     toast.error('加载数据失败')

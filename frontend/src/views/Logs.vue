@@ -185,8 +185,8 @@ async function loadLogs() {
     if (filterType.value && filterType.value !== 'all') params.api_type = filterType.value
     if (filterRouterKey.value && filterRouterKey.value !== 'all') params.router_key_id = filterRouterKey.value
     const res = await api.getLogs(params)
-    logs.value = res.data.data
-    total.value = res.data.total
+    logs.value = res.data
+    total.value = res.total
     expandedRows.value.clear()
     childLogs.value = {}
     childLoading.value = {}
@@ -220,7 +220,7 @@ async function handleCleanup() {
     showCleanup.value = false
     page.value = 1
     await loadLogs()
-    toast.success(`已清理 ${res.data.deleted} 条日志`)
+    toast.success(`已清理 ${res.deleted} 条日志`)
   } catch (e) {
     console.error('Failed to cleanup logs:', e)
     toast.error('清理日志失败')
@@ -230,7 +230,7 @@ async function handleCleanup() {
 async function loadRouterKeys() {
   try {
     const res = await api.getRouterKeys()
-    routerKeys.value = res.data
+    routerKeys.value = res
   } catch (e) {
     console.error('Failed to load router keys:', e)
     toast.error('加载密钥列表失败')

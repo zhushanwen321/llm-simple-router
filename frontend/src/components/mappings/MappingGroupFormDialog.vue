@@ -173,34 +173,21 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import type { AcceptableValue } from 'reka-ui'
-
-interface Provider {
-  id: string
-  name: string
-}
-
-interface RuleWindow {
-  start: string
-  end: string
-  target: {
-    backend_model: string
-    provider_id: string
-  }
-}
+import type { ProviderSummary, RuleWindow, MappingTarget } from '@/types/mapping'
 
 interface FormData {
   client_model: string
   strategy: string
-  default: { backend_model: string; provider_id: string }
+  default: MappingTarget
   windows: RuleWindow[]
-  targets: { backend_model: string; provider_id: string }[]
+  targets: MappingTarget[]
 }
 
 const props = defineProps<{
   open: boolean
   editingId: string | null
   form: FormData
-  providers: Provider[]
+  providers: ProviderSummary[]
   providerModels: Map<string, string[]>
 }>()
 

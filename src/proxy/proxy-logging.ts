@@ -14,8 +14,7 @@ export type { RawHeaders } from "./types.js";
 // Internal imports from types.ts
 import { UPSTREAM_SUCCESS } from "./types.js";
 import type { RawHeaders } from "./types.js";
-
-const HTTP_BAD_GATEWAY = 502;
+import { HTTP_BAD_GATEWAY } from "../constants.js";
 
 // ---------- Header sanitization ----------
 

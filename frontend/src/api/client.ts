@@ -1,6 +1,13 @@
 import axios from 'axios'
 import router from '@/router'
 import type { LogEntry } from '@/components/logs/types'
+import type { Provider, MappingGroup } from '@/types/mapping'
+import type {
+  ActiveRequest,
+  StatsSnapshot,
+  ProviderConcurrencySnapshot,
+  RuntimeMetrics,
+} from '@/types/monitor'
 
 const client = axios.create({
   baseURL: '/admin/api',
@@ -110,15 +117,92 @@ export interface SessionHistoryEntry {
   created_at: string
 }
 
+// --- Response types ---
+
+interface LogsResponse {
+  data: LogEntry[]
+  total: number
+  page: number
+  limit: number
+}
+
+interface LogDetailResponse {
+  data: LogEntry
+}
+
+interface DeleteLogsResponse {
+  deleted: number
+}
+
+interface RouterKeyPublic {
+  id: string
+  name: string
+  key_preview: string
+  key_suffix: string
+  is_active: number
+  allowed_models: string[] | null
+  created_at: string
+}
+
+interface RetryRule {
+  id: string
+  name: string
+  status_code: number
+  body_pattern: string
+  is_active: number
+  retry_strategy: string
+  retry_delay_ms: number
+  max_retries: number
+  created_at: string
+}
+
+interface TimeseriesRawRow {
+  time_bucket: string
+  avg_value: number | null
+  count: number
+}
+
+interface MetricsSummaryRow {
+  provider_id: string
+  provider_name: string
+  backend_model: string
+  request_count: number
+  avg_ttft_ms: number | null
+  avg_tps: number | null
+  total_input_tokens: number
+  total_output_tokens: number
+  total_cache_hit_tokens: number
+  cache_hit_rate: number | null
+}
+
+interface StatsResponse {
+  totalRequests: number
+  successRate: number
+  avgTps: number
+  totalTokens: number
+}
+
 // --- Typed request helper ---
 // 解包 AxiosResponse.data，让调用方直接拿到类型化的响应体。
-// 适用于无参数 GET 和带 body 的 POST/PUT/DELETE。
-// 带查询参数的 GET（如 getStats）保持原样用 client.get(url, { params })。
 
-async function request<T>(method: 'get' | 'post' | 'put' | 'delete', url: string, data?: unknown): Promise<T> {
-  const res = method === 'get'
-    ? await client.get(url)
-    : await client.request({ method, url, data })
+interface RequestOptions {
+  params?: Record<string, unknown>
+}
+
+async function request<T>(
+  method: 'get' | 'post' | 'put' | 'delete',
+  url: string,
+  data?: unknown,
+  options?: RequestOptions,
+): Promise<T> {
+  let res
+  if (method === 'get') {
+    res = await client.get(url, { params: options?.params })
+  } else if (method === 'delete' && data) {
+    res = await client.delete(url, { data })
+  } else {
+    res = await client.request({ method, url, data, params: options?.params })
+  }
   return res.data as T
 }
 
@@ -131,52 +215,52 @@ export const api = {
   getSetupStatus: () => request<{ initialized: boolean }>('get', '/setup/status'),
   initializeSetup: (password: string) => request<{ success: boolean }>('post', '/setup/initialize', { password }),
 
-  getProviders: () => request<unknown[]>('get', API.PROVIDERS),
+  getProviders: () => request<Provider[]>('get', API.PROVIDERS),
   createProvider: (data: ProviderPayload) => request<{ id: string }>('post', API.PROVIDERS, data),
-  updateProvider: (id: string, data: Partial<ProviderPayload>) => client.put(`${API.PROVIDERS}/${id}`, data),
-  deleteProvider: (id: string) => client.delete(`${API.PROVIDERS}/${id}`),
+  updateProvider: (id: string, data: Partial<ProviderPayload>) => request<{ success: boolean }>('put', `${API.PROVIDERS}/${id}`, data),
+  deleteProvider: (id: string) => request<{ success: boolean }>('delete', `${API.PROVIDERS}/${id}`),
 
-  getMappings: () => client.get(API.MAPPINGS),
-  createMapping: (data: MappingPayload) => client.post(API.MAPPINGS, data),
-  updateMapping: (id: string, data: MappingPayload) => client.put(`${API.MAPPINGS}/${id}`, data),
-  deleteMapping: (id: string) => client.delete(`${API.MAPPINGS}/${id}`),
+  getMappings: () => request<unknown[]>('get', API.MAPPINGS),
+  createMapping: (data: MappingPayload) => request<{ id: string }>('post', API.MAPPINGS, data),
+  updateMapping: (id: string, data: MappingPayload) => request<{ success: boolean }>('put', `${API.MAPPINGS}/${id}`, data),
+  deleteMapping: (id: string) => request<{ success: boolean }>('delete', `${API.MAPPINGS}/${id}`),
 
   getLogs: (params: { page: number; limit: number; api_type?: string; router_key_id?: string; view?: string }) =>
-    client.get(API.LOGS, { params }),
-  getLogDetail: (id: string) => client.get(`${API.LOGS}/${id}`),
+    request<LogsResponse>('get', API.LOGS, undefined, { params }),
+  getLogDetail: (id: string) => request<LogDetailResponse>('get', `${API.LOGS}/${id}`),
   getLogChildren: (id: string) => request<{ data: LogEntry[] }>('get', `${API.LOGS}/${id}/children`),
   deleteLogsBefore: (before: string) =>
-    client.delete(`${API.LOGS}/before`, { data: { before } }),
+    request<DeleteLogsResponse>('delete', `${API.LOGS}/before`, { before }),
 
   getStats: (params?: { period?: string; router_key_id?: string }) =>
-    client.get(API.STATS, { params }),
+    request<StatsResponse>('get', API.STATS, undefined, { params }),
 
   getMetricsSummary: (params: { period: string; provider_id?: string; backend_model?: string; router_key_id?: string }) =>
-    client.get(API.METRICS_SUMMARY, { params }),
+    request<MetricsSummaryRow[]>('get', API.METRICS_SUMMARY, undefined, { params }),
   getMetricsTimeseries: (params: { period: string; metric: string; provider_id?: string; backend_model?: string; router_key_id?: string }) =>
-    client.get(API.METRICS_TIMESERIES, { params }),
+    request<TimeseriesRawRow[]>('get', API.METRICS_TIMESERIES, undefined, { params }),
 
-  getRouterKeys: () => client.get(API.ROUTER_KEYS),
+  getRouterKeys: () => request<RouterKeyPublic[]>('get', API.ROUTER_KEYS),
   createRouterKey: (data: RouterKeyCreatePayload) =>
-    client.post(API.ROUTER_KEYS, data),
+    request<{ id: string; name: string; key: string }>('post', API.ROUTER_KEYS, data),
   updateRouterKey: (id: string, data: RouterKeyUpdatePayload) =>
-    client.put(`${API.ROUTER_KEYS}/${id}`, data),
-  deleteRouterKey: (id: string) => client.delete(`${API.ROUTER_KEYS}/${id}`),
-  getAvailableModels: () => client.get(API.MODELS_AVAILABLE),
+    request<{ success: boolean }>('put', `${API.ROUTER_KEYS}/${id}`, data),
+  deleteRouterKey: (id: string) => request<{ success: boolean }>('delete', `${API.ROUTER_KEYS}/${id}`),
+  getAvailableModels: () => request<string[]>('get', API.MODELS_AVAILABLE),
 
-  getMappingGroups: () => client.get(API.MAPPING_GROUPS),
+  getMappingGroups: () => request<MappingGroup[]>('get', API.MAPPING_GROUPS),
   createMappingGroup: (data: MappingGroupPayload) =>
-    client.post(API.MAPPING_GROUPS, data),
+    request<{ id: string }>('post', API.MAPPING_GROUPS, data),
   updateMappingGroup: (id: string, data: MappingGroupPayload) =>
-    client.put(`${API.MAPPING_GROUPS}/${id}`, data),
-  deleteMappingGroup: (id: string) => client.delete(`${API.MAPPING_GROUPS}/${id}`),
+    request<{ success: boolean }>('put', `${API.MAPPING_GROUPS}/${id}`, data),
+  deleteMappingGroup: (id: string) => request<{ success: boolean }>('delete', `${API.MAPPING_GROUPS}/${id}`),
 
-  getRetryRules: () => client.get(API.RETRY_RULES),
+  getRetryRules: () => request<RetryRule[]>('get', API.RETRY_RULES),
   createRetryRule: (data: RetryRulePayload) =>
-    client.post(API.RETRY_RULES, data),
+    request<{ id: string }>('post', API.RETRY_RULES, data),
   updateRetryRule: (id: string, data: RetryRulePayload) =>
-    client.put(`${API.RETRY_RULES}/${id}`, data),
-  deleteRetryRule: (id: string) => client.delete(`${API.RETRY_RULES}/${id}`),
+    request<{ success: boolean }>('put', `${API.RETRY_RULES}/${id}`, data),
+  deleteRetryRule: (id: string) => request<{ success: boolean }>('delete', `${API.RETRY_RULES}/${id}`),
 
   getProxyEnhancement: () =>
     request<{ claude_code_enabled: boolean }>('get', API.PROXY_ENHANCEMENT),
@@ -189,9 +273,9 @@ export const api = {
   deleteSessionState: (keyId: string, sessionId: string) =>
     request<{ success: boolean }>('delete', `${API.SESSION_STATES}/${keyId}/${encodeURIComponent(sessionId)}`),
 
-  getMonitorActive: () => request<unknown[]>('get', API.MONITOR_ACTIVE),
-  getMonitorRecent: () => request<unknown[]>('get', API.MONITOR_RECENT),
-  getMonitorStats: () => request<unknown>('get', API.MONITOR_STATS),
-  getMonitorConcurrency: () => request<unknown[]>('get', API.MONITOR_CONCURRENCY),
-  getMonitorRuntime: () => request<unknown>('get', API.MONITOR_RUNTIME),
+  getMonitorActive: () => request<ActiveRequest[]>('get', API.MONITOR_ACTIVE),
+  getMonitorRecent: () => request<ActiveRequest[]>('get', API.MONITOR_RECENT),
+  getMonitorStats: () => request<StatsSnapshot>('get', API.MONITOR_STATS),
+  getMonitorConcurrency: () => request<ProviderConcurrencySnapshot[]>('get', API.MONITOR_CONCURRENCY),
+  getMonitorRuntime: () => request<RuntimeMetrics>('get', API.MONITOR_RUNTIME),
 }

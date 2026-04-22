@@ -2,10 +2,15 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import type { TransportResult } from "./types.js";
 import type { Target } from "./strategy/types.js";
 import type { ResilienceLayer, ResilienceResult, ResilienceConfig } from "./resilience.js";
+import { ResilienceLayer as ResilienceLayerClass } from "./resilience.js";
 import type { RetryRuleMatcher } from "./retry-rules.js";
 import type { SemaphoreScope } from "./scope.js";
+import { SemaphoreScope as SemaphoreScopeClass } from "./scope.js";
 import type { TrackerScope } from "./scope.js";
+import { TrackerScope as TrackerScopeClass } from "./scope.js";
 import type { ActiveRequest } from "../monitor/types.js";
+import type { ProviderSemaphoreManager } from "./semaphore.js";
+import type { RequestTracker } from "../monitor/request-tracker.js";
 
 const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_BASE_DELAY_MS = 1000;
@@ -31,6 +36,20 @@ export interface HandleContext {
   isFailover?: boolean;
   ruleMatcher?: RetryRuleMatcher;
   transportFn: (target: Target) => Promise<TransportResult>;
+}
+
+/**
+ * 工厂函数，消除 openai/anthropic 创建 orchestrator 的重复代码。
+ * 两个 provider 的创建逻辑完全一致。
+ */
+export function createOrchestrator(
+  semaphoreManager?: ProviderSemaphoreManager,
+  tracker?: RequestTracker,
+): ProxyOrchestrator | undefined {
+  const semaphoreScope = semaphoreManager ? new SemaphoreScopeClass(semaphoreManager) : undefined;
+  const trackerScope = tracker ? new TrackerScopeClass(tracker) : undefined;
+  if (!semaphoreScope || !trackerScope) return undefined;
+  return new ProxyOrchestrator({ semaphoreScope, trackerScope, resilience: new ResilienceLayerClass() });
 }
 
 export class ProxyOrchestrator {

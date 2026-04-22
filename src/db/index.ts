@@ -96,11 +96,10 @@ export {
   getRequestLogs,
   getRequestLogById,
   deleteLogsBefore,
-  insertMetrics,
   getRequestLogChildren,
   getRequestLogsGrouped,
 } from "./logs.js";
-export type { RequestLog, MetricsRow, MetricsInsert, RequestLogGroupedRow, RequestLogListRow } from "./logs.js";
+export type { RequestLog, RequestLogGroupedRow, RequestLogListRow } from "./logs.js";
 
 export {
   getRouterKeyByHash,
@@ -113,8 +112,8 @@ export {
 } from "./router-keys.js";
 export type { RouterKey } from "./router-keys.js";
 
-export { getMetricsSummary, getMetricsTimeseries } from "./metrics.js";
-export type { MetricsSummaryRow, MetricsTimeseriesRow, MetricsPeriod, MetricsMetric } from "./metrics.js";
+export { getMetricsSummary, getMetricsTimeseries, insertMetrics } from "./metrics.js";
+export type { MetricsSummaryRow, MetricsTimeseriesRow, MetricsPeriod, MetricsMetric, MetricsRow, MetricsInsert } from "./metrics.js";
 
 export { getStats } from "./stats.js";
 export type { Stats, StatsPeriod } from "./stats.js";

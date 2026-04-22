@@ -5,10 +5,8 @@ import { existsSync } from "node:fs";
 import { randomUUID } from "crypto";
 import Fastify, { FastifyInstance } from "fastify";
 import { insertRequestLog } from "./db/logs.js";
+import { HTTP_NOT_FOUND, HTTP_INTERNAL_ERROR, HTTP_BAD_REQUEST } from "./constants.js";
 
-const HTTP_NOT_FOUND = 404;
-const HTTP_INTERNAL_ERROR = 500;
-const HTTP_BAD_REQUEST = 400;
 const PROVIDER_DEFAULT_QUEUE_TIMEOUT_MS = 5000;
 const PROVIDER_DEFAULT_MAX_QUEUE_SIZE = 100;
 
@@ -198,7 +196,7 @@ export async function buildApp(
       ) {
         return reply.sendFile("index.html");
       }
-      reply.code(HTTP_NOT_FOUND).send({ error: "Not Found" });
+      reply.code(HTTP_NOT_FOUND).send({ error: { message: "Not Found" } });
     });
   } else {
     app.log.warn(
