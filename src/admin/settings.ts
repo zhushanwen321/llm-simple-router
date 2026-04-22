@@ -9,11 +9,11 @@ interface SettingsOptions {
 export const adminSettingsRoutes: FastifyPluginCallback<SettingsOptions> = (app, options, done) => {
   const { db } = options;
 
-  app.get("/settings/log-retention", async () => {
+  app.get("/admin/api/settings/log-retention", async () => {
     return { days: getLogRetentionDays(db) };
   });
 
-  app.put("/settings/log-retention", async (request) => {
+  app.put("/admin/api/settings/log-retention", async (request) => {
     const { days } = request.body as { days: number };
     if (!Number.isInteger(days) || days < 0 || days > 90) {
       throw { statusCode: 400, message: "days must be integer 0-90" };
