@@ -38,4 +38,9 @@ export class TrackerScope {
       throw e;
     }
   }
+
+  /** 通知 tracker 请求进入/离开信号量队列，触发前端即时广播 */
+  markQueued(id: string, queued: boolean): void {
+    this.tracker.update(id, { queued });
+  }
 }

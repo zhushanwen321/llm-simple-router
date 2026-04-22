@@ -19,6 +19,8 @@ export interface OrchestratorConfig {
   };
   clientModel: string;
   isStream: boolean;
+  /** 外部生成的 tracker ID，用于 tracker.appendStreamChunk / tracker.update 等回调匹配 */
+  trackerId?: string;
 }
 
 export interface HandleContext {
@@ -53,8 +55,17 @@ export class ProxyOrchestrator {
       () => this.deps.semaphoreScope.withSlot(
         config.provider.id,
         this.createAbortSignal(request),
-        () => { trackerReq.queued = true; },
-        () => this.executeResilience(config, ctx),
+        () => {
+          trackerReq.queued = true;
+          this.deps.trackerScope.markQueued(trackerReq.id, true);
+        },
+        () => {
+          if (trackerReq.queued) {
+            trackerReq.queued = false;
+            this.deps.trackerScope.markQueued(trackerReq.id, false);
+          }
+          return this.executeResilience(config, ctx);
+        },
       ),
       (result) => this.extractTrackStatus(result),
     );
@@ -68,7 +79,7 @@ export class ProxyOrchestrator {
     apiType: "openai" | "anthropic",
   ): ActiveRequest {
     return {
-      id: crypto.randomUUID(),
+      id: config.trackerId ?? crypto.randomUUID(),
       apiType,
       model: config.clientModel,
       providerId: config.provider.id,
