@@ -9,7 +9,7 @@ import type { ActiveRequest } from "../monitor/types.js";
 export interface OrchestratorConfig {
   resolved: Target;
   provider: {
-    id: string; name: string; is_active: boolean; api_type: string;
+    id: string; name: string; is_active: number; api_type: string;
     base_url: string; api_key: string;
   };
   clientModel: string;

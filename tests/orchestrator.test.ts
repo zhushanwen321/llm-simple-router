@@ -43,7 +43,7 @@ function createMockReply() {
 
 const defaultConfig = {
   resolved: { backend_model: "gpt-4", provider_id: "p1" },
-  provider: { id: "p1", name: "test", is_active: true, api_type: "openai", base_url: "http://localhost:8080", api_key: "enc:xxx" },
+  provider: { id: "p1", name: "test", is_active: 1, api_type: "openai", base_url: "http://localhost:8080", api_key: "enc:xxx" },
   clientModel: "gpt-4",
   isStream: false,
 };
