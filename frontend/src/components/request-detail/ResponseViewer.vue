@@ -35,8 +35,6 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-
-const JSON_INDENT = 2
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { FileJson, FileText } from 'lucide-vue-next'
@@ -44,6 +42,8 @@ import ContentBlockRenderer from './ContentBlockRenderer.vue'
 import type { DataSource } from './types'
 import type { ContentBlock, StreamContentSnapshot } from '@/types/monitor'
 import { useSSEParsing } from '@/components/log-viewer/useSSEParsing'
+
+const JSON_INDENT = 2
 
 const props = withDefaults(defineProps<{
   source: DataSource
@@ -75,8 +75,8 @@ const sseBodyForParsing = computed(() => {
 
 const { assembledBlocks } = useSSEParsing(
   sseBodyForParsing,
-  computed(() => props.isStream),
-  computed(() => props.apiType),
+  props.isStream,
+  props.apiType,
 )
 
 // Parse Anthropic content array into ContentBlock[]
@@ -93,25 +93,26 @@ function parseAnthropicContent(content: unknown[]): ContentBlock[] {
 
 // Parse OpenAI choices into ContentBlock[]
 function parseOpenAIChoices(choices: unknown[]): ContentBlock[] {
-  const blocks: ContentBlock[] = []
+  const result: ContentBlock[] = []
   for (const choice of choices) {
     const c = choice as Record<string, unknown>
     const msg = c.message as Record<string, unknown> | undefined
     if (!msg) continue
     const content = msg.content
     if (typeof content === 'string' && content) {
-      blocks.push({ type: 'text', content })
+      result.push({ type: 'text', content })
     } else if (Array.isArray(content)) {
       for (const part of content) {
         const p = part as Record<string, unknown>
-        if (p.type === 'text') blocks.push({ type: 'text', content: String(p.text ?? '') })
+        if (p.type === 'text') result.push({ type: 'text', content: String(p.text ?? '') })
         else if (p.type === 'tool_use' || p.type === 'function') {
-          blocks.push({ type: 'tool_use', content: JSON.stringify(p.function ?? p.input ?? {}, null, JSON_INDENT), name: String(p.name ?? p.function?.name ?? '') })
+          const fn = (p.function ?? p.input ?? {}) as Record<string, unknown>
+          result.push({ type: 'tool_use', content: JSON.stringify(fn, null, JSON_INDENT), name: String(p.name ?? (fn.name as string | undefined) ?? '') })
         }
       }
     }
   }
-  return blocks
+  return result
 }
 
 // Try direct JSON parse of history response body
@@ -121,12 +122,12 @@ function tryDirectParse(): ContentBlock[] {
   if (!raw) return []
 
   let data: unknown
-  try { data = JSON.parse(raw) } catch { return [] }
+  try { data = JSON.parse(raw) } catch { /* not valid JSON */ return [] }
 
   // If wrapped in { body: "..." }, unwrap
-  const obj = data as Record<string, unknown>
-  if (typeof obj.body === 'string') {
-    try { data = JSON.parse(obj.body) } catch { /* use outer data */ return undefined as unknown as void }
+  const outer = data as Record<string, unknown>
+  if (typeof outer.body === 'string') {
+    try { data = JSON.parse(outer.body) } catch { /* use outer data */ data = data }
   }
 
   const parsed = data as Record<string, unknown>
