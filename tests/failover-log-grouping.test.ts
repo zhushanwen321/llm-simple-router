@@ -9,6 +9,8 @@ import { authMiddleware } from "../src/middleware/auth.js";
 import { initDatabase } from "../src/db/index.js";
 import { setSetting } from "../src/db/settings.js";
 import { RetryRuleMatcher } from "../src/proxy/retry-rules.js";
+import { ProviderSemaphoreManager } from "../src/proxy/semaphore.js";
+import { RequestTracker } from "../src/monitor/request-tracker.js";
 
 const API_KEY = "sk-test-router";
 const API_KEY_HASH = createHash("sha256").update(API_KEY).digest("hex");
@@ -155,6 +157,8 @@ describe("Failover log grouping", () => {
       streamTimeoutMs: 5000,
       retryMaxAttempts: 0,
       retryBaseDelayMs: 0,
+      semaphoreManager: new ProviderSemaphoreManager(),
+      tracker: new RequestTracker({ semaphoreManager: new ProviderSemaphoreManager() }),
     });
 
     const resp = await app.inject({
@@ -249,6 +253,8 @@ describe("Failover log grouping", () => {
       streamTimeoutMs: 5000,
       retryMaxAttempts: 0,
       retryBaseDelayMs: 0,
+      semaphoreManager: new ProviderSemaphoreManager(),
+      tracker: new RequestTracker({ semaphoreManager: new ProviderSemaphoreManager() }),
     });
 
     const resp = await app.inject({
@@ -327,6 +333,8 @@ describe("Failover log grouping", () => {
       streamTimeoutMs: 5000,
       retryMaxAttempts: 0,
       retryBaseDelayMs: 0,
+      semaphoreManager: new ProviderSemaphoreManager(),
+      tracker: new RequestTracker({ semaphoreManager: new ProviderSemaphoreManager() }),
     });
 
     const resp = await app.inject({
@@ -415,6 +423,8 @@ describe("Failover log grouping", () => {
       retryMaxAttempts: 1,
       retryBaseDelayMs: 10,
       matcher,
+      semaphoreManager: new ProviderSemaphoreManager(),
+      tracker: new RequestTracker({ semaphoreManager: new ProviderSemaphoreManager() }),
     });
 
     const resp = await app.inject({

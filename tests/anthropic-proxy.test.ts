@@ -6,6 +6,8 @@ import { encrypt } from "../src/utils/crypto.js";
 import { anthropicProxy } from "../src/proxy/anthropic.js";
 import { initDatabase } from "../src/db/index.js";
 import { setSetting } from "../src/db/settings.js";
+import { ProviderSemaphoreManager } from "../src/proxy/semaphore.js";
+import { RequestTracker } from "../src/monitor/request-tracker.js";
 
 const TEST_ENCRYPTION_KEY =
   "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
@@ -34,12 +36,16 @@ function closeServer(server: Server): Promise<void> {
 
 function buildTestApp(mockDb: Database.Database): FastifyInstance {
   const app = Fastify();
+  const semaphoreManager = new ProviderSemaphoreManager();
+  const tracker = new RequestTracker({ semaphoreManager });
 
   app.register(anthropicProxy, {
     db: mockDb,
     streamTimeoutMs: 5000,
     retryMaxAttempts: 0,
     retryBaseDelayMs: 0,
+    semaphoreManager,
+    tracker,
   });
 
   return app;

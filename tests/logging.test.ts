@@ -14,6 +14,8 @@ import { authMiddleware } from "../src/middleware/auth.js";
 import { encrypt } from "../src/utils/crypto.js";
 import { initDatabase } from "../src/db/index.js";
 import { setSetting } from "../src/db/settings.js";
+import { ProviderSemaphoreManager } from "../src/proxy/semaphore.js";
+import { RequestTracker } from "../src/monitor/request-tracker.js";
 
 const API_KEY = "sk-test-router";
 const API_KEY_HASH = createHash("sha256").update(API_KEY).digest("hex");
@@ -54,18 +56,24 @@ function createApp() {
   ).run("test-router-key", "Test Key", API_KEY_HASH, API_KEY.slice(0, 8));
 
   const app = Fastify();
+  const semaphoreManager = new ProviderSemaphoreManager();
+  const tracker = new RequestTracker({ semaphoreManager });
   app.register(authMiddleware, { db });
   app.register(openaiProxy, {
     db,
     streamTimeoutMs: 5000,
     retryMaxAttempts: 0,
     retryBaseDelayMs: 0,
+    semaphoreManager,
+    tracker,
   });
   app.register(anthropicProxy, {
     db,
     streamTimeoutMs: 5000,
     retryMaxAttempts: 0,
     retryBaseDelayMs: 0,
+    semaphoreManager,
+    tracker,
   });
 
   return { app, db };
