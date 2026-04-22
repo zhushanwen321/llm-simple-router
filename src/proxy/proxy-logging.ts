@@ -47,11 +47,9 @@ export function handleIntercept(
     status_code: interceptResponse.statusCode, latency_ms: 0,
     is_stream: isStream ? 1 : 0, error_message: null,
     created_at: new Date().toISOString(),
-    request_body: JSON.stringify(request.body),
-    response_body: respBody,
     client_request: JSON.stringify({ headers: request.headers as RawHeaders, body: request.body }),
     upstream_request: interceptResponse.meta ? JSON.stringify(interceptResponse.meta) : null,
-    client_response: JSON.stringify({ statusCode: interceptResponse.statusCode, body: respBody }),
+    upstream_response: JSON.stringify({ statusCode: interceptResponse.statusCode, body: respBody }),
     is_retry: 0, is_failover: 0, original_request_id: null,
     router_key_id: request.routerKey?.id ?? null, original_model: null,
   });
@@ -67,7 +65,6 @@ export function logResilienceResult(
     model: string;
     providerId: string;
     isStream: boolean;
-    reqBodyStr: string;
     clientReq: string;
     upstreamReqBase: string;
     logId: string;
@@ -95,7 +92,7 @@ export function logResilienceResult(
         provider_id: attempt.target.provider_id,
         status_code: HTTP_BAD_GATEWAY, latency_ms: attempt.latencyMs,
         is_stream: params.isStream ? 1 : 0, error_message: attempt.error,
-        created_at: new Date().toISOString(), request_body: params.reqBodyStr,
+        created_at: new Date().toISOString(),
         client_request: params.clientReq, upstream_request: params.upstreamReqBase,
         is_retry: isOriginal ? 0 : 1, is_failover: isFailoverLog ? 1 : 0,
         original_request_id: parentId,
@@ -107,11 +104,9 @@ export function logResilienceResult(
         provider_id: attempt.target.provider_id,
         status_code: attempt.statusCode!, latency_ms: attempt.latencyMs,
         is_stream: params.isStream ? 1 : 0, error_message: null,
-        created_at: new Date().toISOString(), request_body: params.reqBodyStr,
-        response_body: attempt.responseBody,
+        created_at: new Date().toISOString(),
         client_request: params.clientReq, upstream_request: params.upstreamReqBase,
         upstream_response: JSON.stringify({ statusCode: attempt.statusCode, body: attempt.responseBody }),
-        client_response: JSON.stringify({ statusCode: attempt.statusCode, body: attempt.responseBody }),
         is_retry: isOriginal ? 0 : 1, is_failover: isFailoverLog ? 1 : 0,
         original_request_id: parentId,
         router_key_id: params.routerKeyId, original_model: params.originalModel,
@@ -124,7 +119,7 @@ export function logResilienceResult(
         apiType: params.apiType, model: params.model,
         provider: { id: attempt.target.provider_id } as Provider,
         isStream: params.isStream, startTime,
-        reqBody: params.reqBodyStr, clientReq: params.clientReq,
+        clientReq: params.clientReq,
         upstreamReq: params.upstreamReqBase, id: attemptLogId,
         status: attempt.statusCode!, respBody: attempt.responseBody,
         upHdrs, cliHdrs: upHdrs,

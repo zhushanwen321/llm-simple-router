@@ -36,6 +36,7 @@ import { ProviderSemaphoreManager } from "./proxy/semaphore.js";
 import { RequestTracker } from "./monitor/request-tracker.js";
 import { modelState } from "./proxy/model-state.js";
 import { UsageWindowTracker } from "./proxy/usage-window-tracker.js";
+import { scheduleLogCleanup } from "./db/log-cleaner.js";
 import fastifyStatic from "@fastify/static";
 import Database from "better-sqlite3";
 
@@ -214,11 +215,14 @@ export async function buildApp(
     return { status: "ok" };
   });
 
+  const logCleanup = scheduleLogCleanup(db, app.log);
+
   return {
     app,
     db,
     usageWindowTracker,
     close: async () => {
+      logCleanup.stop();
       tracker.stopPushInterval();
       await app.close();
       db.close();

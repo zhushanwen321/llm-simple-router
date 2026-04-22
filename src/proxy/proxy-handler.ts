@@ -201,7 +201,7 @@ export async function handleProxyRequest(
         deps.db,
         {
           apiType, model: effectiveModel, providerId: provider.id, isStream,
-          reqBodyStr, clientReq, upstreamReqBase, logId, routerKeyId, originalModel,
+          clientReq, upstreamReqBase, logId, routerKeyId, originalModel,
           failover: { isFailoverIteration, rootLogId: rootLogId! },
         },
         resilienceResult.attempts, resilienceResult.result, startTime,
@@ -264,7 +264,7 @@ export async function handleProxyRequest(
         id: logId, api_type: apiType, model: effectiveModel, provider_id: provider.id,
         status_code: 502, latency_ms: Date.now() - startTime, is_stream: isStream ? 1 : 0,
         error_message: errMsg || "Upstream connection failed", created_at: new Date().toISOString(),
-        request_body: reqBodyStr, client_request: clientReq, upstream_request: upstreamReqBase,
+        client_request: clientReq, upstream_request: upstreamReqBase,
         is_failover: isFailoverIteration ? 1 : 0, original_request_id: isFailoverIteration ? rootLogId : null,
         router_key_id: routerKeyId, original_model: originalModel,
       });
