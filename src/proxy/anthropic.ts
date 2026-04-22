@@ -1,12 +1,10 @@
 import Database from "better-sqlite3";
 import type { FastifyPluginCallback } from "fastify";
 import fp from "fastify-plugin";
-import {
-  handleProxyPost,
-  type ProxyHandlerDeps,
-  type ProxyErrorFormatter,
-} from "./proxy-core.js";
-
+import { createErrorFormatter } from "./proxy-core.js";
+import type { ErrorKind } from "./proxy-core.js";
+import { handleProxyRequest, type RouteHandlerDeps } from "./proxy-handler.js";
+import { createOrchestrator } from "./orchestrator.js";
 import { RetryRuleMatcher } from "./retry-rules.js";
 import { ProviderSemaphoreManager } from "./semaphore.js";
 import type { RequestTracker } from "../monitor/request-tracker.js";
@@ -23,43 +21,32 @@ export interface AnthropicProxyOptions {
 
 const MESSAGES_PATH = "/v1/messages";
 
-const anthropicErrors: ProxyErrorFormatter = {
-  modelNotFound: (model) => ({
-    statusCode: 404,
-    body: { type: "error", error: { type: "not_found_error", message: `Model '${model}' is not configured` } },
-  }),
-  modelNotAllowed: (model) => ({
-    statusCode: 403,
-    body: { type: "error", error: { type: "forbidden_error", message: `Model '${model}' is not allowed for this API key` } },
-  }),
-  providerUnavailable: () => ({
-    statusCode: 503,
-    body: { type: "error", error: { type: "api_error", message: "Provider unavailable" } },
-  }),
-  providerTypeMismatch: () => ({
-    statusCode: 500,
-    body: { type: "error", error: { type: "api_error", message: "Provider type mismatch for this endpoint" } },
-  }),
-  upstreamConnectionFailed: () => ({
-    statusCode: 502,
-    body: { type: "error", error: { type: "upstream_error", message: "Failed to connect to upstream service" } },
-  }),
-  concurrencyQueueFull: (providerId) => ({
-    statusCode: 503,
-    body: { type: "error", error: { type: "api_error", message: `Provider '${providerId}' concurrency queue is full` } },
-  }),
-  concurrencyTimeout: (providerId, timeoutMs) => ({
-    statusCode: 504,
-    body: { type: "error", error: { type: "api_error", message: `Provider '${providerId}' concurrency wait timeout (${timeoutMs}ms)` } },
-  }),
+const ANTHROPIC_ERROR_TYPE: Record<ErrorKind, string> = {
+  modelNotFound: "not_found_error",
+  modelNotAllowed: "forbidden_error",
+  providerUnavailable: "api_error",
+  providerTypeMismatch: "api_error",
+  upstreamConnectionFailed: "upstream_error",
+  concurrencyQueueFull: "api_error",
+  concurrencyTimeout: "api_error",
 };
+
+const anthropicErrors = createErrorFormatter(
+  (kind, message) => ({ type: "error", error: { type: ANTHROPIC_ERROR_TYPE[kind], message } }),
+);
 
 const anthropicProxyRaw: FastifyPluginCallback<AnthropicProxyOptions> = (app, opts, done) => {
   const { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher, semaphoreManager, tracker } = opts;
 
+  const orchestrator = createOrchestrator(semaphoreManager, tracker);
+
   app.post(MESSAGES_PATH, async (request, reply) => {
-    const deps: ProxyHandlerDeps = { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher, semaphoreManager, tracker };
-    return handleProxyPost(request, reply, "anthropic", MESSAGES_PATH, anthropicErrors, deps);
+    if (!orchestrator) {
+      const e = anthropicErrors.providerUnavailable();
+      return reply.status(e.statusCode).send(e.body);
+    }
+    const deps: RouteHandlerDeps = { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher, tracker, orchestrator };
+    return handleProxyRequest(request, reply, "anthropic", MESSAGES_PATH, anthropicErrors, deps);
   });
 
   done();

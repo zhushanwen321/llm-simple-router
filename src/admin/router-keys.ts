@@ -8,9 +8,8 @@ import {
 } from "../db/index.js";
 import type { RouterKey } from "../db/index.js";
 import { getSetting } from "../db/settings.js";
+import { HTTP_CREATED, HTTP_NOT_FOUND } from "./constants.js";
 
-const HTTP_CREATED = 201;
-const HTTP_NOT_FOUND = 404;
 const KEY_RANDOM_BYTES = 32;
 const KEY_PREFIX_LENGTH = 8;
 

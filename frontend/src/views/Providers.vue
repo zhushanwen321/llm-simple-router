@@ -177,6 +177,7 @@ import { ref, computed, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
 import * as z from 'zod'
 import { api, type ProviderPayload } from '@/api/client'
+import type { Provider } from '@/types/mapping'
 import { PROVIDER_PRESETS } from '@/data/provider-presets'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -189,19 +190,6 @@ import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, A
 import { Checkbox } from '@/components/ui/checkbox'
 import { Switch } from '@/components/ui/switch'
 import { Copy, Check } from 'lucide-vue-next'
-
-interface Provider {
-  id: string
-  name: string
-  api_type: string
-  base_url: string
-  api_key: string
-  models: string[]
-  is_active: number
-  max_concurrency: number
-  queue_timeout_ms: number
-  max_queue_size: number
-}
 
 const DEFAULT_CONCURRENCY = 3
 const DEFAULT_QUEUE_TIMEOUT_MS = 120_000
@@ -293,7 +281,7 @@ function onPresetChange() {
 async function loadProviders() {
   try {
     const data = await api.getProviders()
-    providers.value = data as Provider[]
+    providers.value = data
   } catch (e) {
     console.error('Failed to load providers:', e)
     toast.error('加载供应商失败')

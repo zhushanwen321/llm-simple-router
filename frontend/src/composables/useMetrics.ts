@@ -8,13 +8,15 @@ import { CHART_COLORS } from '@/styles/design-tokens'
 const PERCENT_MULTIPLIER = 100
 
 interface SummaryRow {
+  provider_id: string
+  provider_name: string
   backend_model: string
   request_count: number
   avg_ttft_ms: number | null
   avg_tps: number | null
-  total_input_tokens: number | null
-  total_output_tokens: number | null
-  total_cache_hit_tokens: number | null
+  total_input_tokens: number
+  total_output_tokens: number
+  total_cache_hit_tokens: number
   cache_hit_rate: number | null
 }
 
@@ -82,13 +84,13 @@ export function useMetrics() {
       const fulfilled = <T>(r: PromiseSettledResult<T>): r is PromiseFulfilledResult<T> => r.status === 'fulfilled'
       const p = period.value
 
-      const ttftOk = fulfilled(ttftRes) ? ttftRes.value.data : null
-      const tpsOk = fulfilled(tpsRes) ? tpsRes.value.data : null
-      const inputTokensOk = fulfilled(inputTokensRes) ? inputTokensRes.value.data : null
-      const outputTokensOk = fulfilled(outputTokensRes) ? outputTokensRes.value.data : null
-      const cacheHitTokensOk = fulfilled(cacheHitTokensRes) ? cacheHitTokensRes.value.data : null
-      const cacheRateOk = fulfilled(cacheRateRes) ? cacheRateRes.value.data : null
-      const summaryOk = fulfilled(summaryRes) ? summaryRes.value.data : null
+      const ttftOk = fulfilled(ttftRes) ? ttftRes.value : null
+      const tpsOk = fulfilled(tpsRes) ? tpsRes.value : null
+      const inputTokensOk = fulfilled(inputTokensRes) ? inputTokensRes.value : null
+      const outputTokensOk = fulfilled(outputTokensRes) ? outputTokensRes.value : null
+      const cacheHitTokensOk = fulfilled(cacheHitTokensRes) ? cacheHitTokensRes.value : null
+      const cacheRateOk = fulfilled(cacheRateRes) ? cacheRateRes.value : null
+      const summaryOk = fulfilled(summaryRes) ? summaryRes.value : null
 
       const emptyAxis = fillTimeseries([], p)
       const ttftFilled = ttftOk?.length ? fillTimeseries(ttftOk, p) : emptyAxis
@@ -128,7 +130,7 @@ export function useMetrics() {
   async function loadRouterKeys() {
     try {
       const res = await api.getRouterKeys()
-      routerKeys.value = res.data
+      routerKeys.value = res
     } catch (e) {
       console.error('Failed to load router keys:', e)
       toast.error('加载密钥列表失败')

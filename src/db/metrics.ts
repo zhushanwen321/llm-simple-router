@@ -1,7 +1,59 @@
 import Database from "better-sqlite3";
+import { randomUUID } from "crypto";
 
 export type MetricsPeriod = "1h" | "6h" | "24h" | "7d" | "30d";
 export type MetricsMetric = "ttft" | "tps" | "tokens" | "cache_rate" | "request_count" | "input_tokens" | "output_tokens" | "cache_hit_tokens";
+
+// --- request_metrics table types & CRUD ---
+
+export interface MetricsRow {
+  id: string;
+  request_log_id: string;
+  provider_id: string;
+  backend_model: string;
+  api_type: string;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  cache_creation_tokens: number | null;
+  cache_read_tokens: number | null;
+  ttft_ms: number | null;
+  total_duration_ms: number | null;
+  tokens_per_second: number | null;
+  stop_reason: string | null;
+  is_complete: number;
+  created_at: string;
+}
+
+export type MetricsInsert = {
+  request_log_id: string;
+  provider_id: string;
+  backend_model: string;
+  api_type: string;
+  input_tokens?: number | null;
+  output_tokens?: number | null;
+  cache_creation_tokens?: number | null;
+  cache_read_tokens?: number | null;
+  ttft_ms?: number | null;
+  total_duration_ms?: number | null;
+  tokens_per_second?: number | null;
+  stop_reason?: string | null;
+  is_complete?: number;
+};
+
+export function insertMetrics(db: Database.Database, m: MetricsInsert): string {
+  const id = randomUUID();
+  db.prepare(
+    `INSERT INTO request_metrics (id, request_log_id, provider_id, backend_model, api_type, input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, ttft_ms, total_duration_ms, tokens_per_second, stop_reason, is_complete)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    id, m.request_log_id, m.provider_id, m.backend_model, m.api_type,
+    m.input_tokens ?? null, m.output_tokens ?? null,
+    m.cache_creation_tokens ?? null, m.cache_read_tokens ?? null,
+    m.ttft_ms ?? null, m.total_duration_ms ?? null,
+    m.tokens_per_second ?? null, m.stop_reason ?? null, m.is_complete ?? 1,
+  );
+  return id;
+}
 
 const PERIOD_OFFSET: Record<MetricsPeriod, string> = {
   "1h": "-1 hours",

@@ -16,14 +16,7 @@
 <script setup lang="ts">
 import { Button } from '@/components/ui/button'
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from '@/components/ui/alert-dialog'
-
-interface MappingGroup {
-  id: string
-  client_model: string
-  strategy: string
-  rule: string
-  created_at: string
-}
+import type { MappingGroup } from '@/types/mapping'
 
 defineProps<{
   target: MappingGroup | null

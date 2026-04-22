@@ -5,10 +5,8 @@ import { existsSync } from "node:fs";
 import { randomUUID } from "crypto";
 import Fastify, { FastifyInstance } from "fastify";
 import { insertRequestLog } from "./db/logs.js";
+import { HTTP_NOT_FOUND, HTTP_INTERNAL_ERROR, HTTP_BAD_REQUEST } from "./constants.js";
 
-const HTTP_NOT_FOUND = 404;
-const HTTP_INTERNAL_ERROR = 500;
-const HTTP_BAD_REQUEST = 400;
 const PROVIDER_DEFAULT_QUEUE_TIMEOUT_MS = 5000;
 const PROVIDER_DEFAULT_MAX_QUEUE_SIZE = 100;
 
@@ -68,14 +66,14 @@ export async function buildApp(
       level: config.LOG_LEVEL,
       ...(isDev
         ? {
-            transport: {
-              target: "pino-pretty",
-              options: {
-                translateTime: "SYS:yyyy-mm-dd HH:MM:ss.l",
-                ignore: "pid,hostname",
-              },
+          transport: {
+            target: "pino-pretty",
+            options: {
+              translateTime: "SYS:yyyy-mm-dd HH:MM:ss.l",
+              ignore: "pid,hostname",
             },
-          }
+          },
+        }
         : {}),
     },
     // 统一 schema validation 错误格式为 { error: { message } }
@@ -135,7 +133,7 @@ export async function buildApp(
   matcher.load(db);
 
   const semaphoreManager = new ProviderSemaphoreManager();
-  const tracker = new RequestTracker({ semaphoreManager });
+  const tracker = new RequestTracker({ semaphoreManager, logger: app.log });
   tracker.startPushInterval();
 
   // 从 DB 读取已有 provider 的并发配置，初始化信号量管理器和 tracker
@@ -198,7 +196,7 @@ export async function buildApp(
       ) {
         return reply.sendFile("index.html");
       }
-      reply.code(HTTP_NOT_FOUND).send({ error: "Not Found" });
+      reply.code(HTTP_NOT_FOUND).send({ error: { message: "Not Found" } });
     });
   } else {
     app.log.warn(

@@ -6,6 +6,8 @@ import { initDatabase } from "../src/db/index.js";
 import { setSetting } from "../src/db/settings.js";
 import { encrypt } from "../src/utils/crypto.js";
 import { openaiProxy } from "../src/proxy/openai.js";
+import { ProviderSemaphoreManager } from "../src/proxy/semaphore.js";
+import { RequestTracker } from "../src/monitor/request-tracker.js";
 
 // 测试用 32 字节密钥（64 hex chars）
 const TEST_ENCRYPTION_KEY =
@@ -36,12 +38,16 @@ function closeServer(server: Server): Promise<void> {
 
 function buildTestApp(mockDb: Database.Database): FastifyInstance {
   const app = Fastify();
+  const semaphoreManager = new ProviderSemaphoreManager();
+  const tracker = new RequestTracker({ semaphoreManager });
 
   app.register(openaiProxy, {
     db: mockDb,
     streamTimeoutMs: 5000,
     retryMaxAttempts: 0,
     retryBaseDelayMs: 0,
+    semaphoreManager,
+    tracker,
   });
 
   return app;

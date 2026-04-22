@@ -7,6 +7,7 @@ import { setSetting } from "../src/db/settings.js";
 import { encrypt } from "../src/utils/crypto.js";
 import { openaiProxy } from "../src/proxy/openai.js";
 import { ProviderSemaphoreManager } from "../src/proxy/semaphore.js";
+import { RequestTracker } from "../src/monitor/request-tracker.js";
 
 const TEST_ENCRYPTION_KEY =
   "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
@@ -37,6 +38,7 @@ function buildTestApp(
   mockDb: Database.Database,
   semaphoreManager: ProviderSemaphoreManager
 ): FastifyInstance {
+  const tracker = new RequestTracker({ semaphoreManager });
   const app = Fastify();
   app.register(openaiProxy, {
     db: mockDb,
@@ -44,6 +46,7 @@ function buildTestApp(
     retryMaxAttempts: 0,
     retryBaseDelayMs: 0,
     semaphoreManager,
+    tracker,
   });
   return app;
 }

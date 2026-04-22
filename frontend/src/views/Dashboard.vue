@@ -244,7 +244,7 @@ async function loadStats() {
     const params: { period?: string; router_key_id?: string } = { period: period.value }
     if (dashboardKeyFilter.value !== 'all') params.router_key_id = dashboardKeyFilter.value
     const res = await api.getStats(params)
-    stats.value = res.data
+    stats.value = res
   } catch (e) {
     console.error('Failed to load stats:', e)
     stats.value = { totalRequests: 0, successRate: 0, avgTps: 0, totalTokens: 0 }

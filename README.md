@@ -60,6 +60,37 @@ Claude Code -> Router (模型映射 + 自动重试 + 并发控制) -> 智谱 GLM
 
 Router 根据模型映射找到后端供应商 -> 转发请求 -> 自动重试失败请求 -> 记录日志和性能指标 -> 返回响应。
 
+### 架构图
+
+**系统上下文**（[详细说明](docs/system-context.md)）：
+
+```mermaid
+graph LR
+    Clients["Claude Code / Cursor / 其他客户端"]
+    Admin["管理员"]
+    Router>"LLM Simple Router"]
+    Providers>"智谱 / Moonshot / OpenAI / Anthropic / ..."]
+
+    Clients -->|"API 请求<br/>Bearer Token"| Router
+    Admin -->|"管理后台<br/>/admin/"| Router
+    Router -->|"转发请求<br/>SSE 流式"| Providers
+```
+
+**请求处理流水线**（[详细说明](docs/request-pipeline.md)）：
+
+```mermaid
+flowchart LR
+    A[客户端请求] --> B[认证]
+    B --> C[模型映射<br/>+ 路由策略]
+    C --> D[并发排队]
+    D --> E[调用上游<br/>失败自动重试]
+    E --> F[记录日志<br/>+ 指标]
+    F --> G[返回响应]
+
+    E -.->|失败| C
+```
+Router 收到请求后：认证 → 按映射规则找到后端 Provider → 排队控制并发 → 转发到上游（失败自动重试，Failover 策略下会切换 Provider）→ 记录日志和指标 → 返回响应。
+
 ## 快速开始
 
 ### npx 启动

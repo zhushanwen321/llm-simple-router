@@ -95,6 +95,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import type { SessionState, SessionHistoryEntry } from '@/api/client'
+import { formatTime } from '@/utils/format'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -147,9 +148,5 @@ function relativeTime(iso: string): string {
   const hours = Math.floor(minutes / MINUTES_PER_HOUR)
   if (hours < HOURS_PER_DAY) return `${hours} 小时前`
   return `${Math.floor(hours / HOURS_PER_DAY)} 天前`
-}
-
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleString()
 }
 </script>

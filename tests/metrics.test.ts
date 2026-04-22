@@ -29,7 +29,7 @@ describe("request_metrics migration and insertMetrics", () => {
       .prepare("SELECT name FROM migrations")
       .all() as { name: string }[];
 
-    expect(rows).toHaveLength(17);
+    expect(rows).toHaveLength(18);
     expect(rows[5].name).toBe("006_create_request_metrics.sql");
     expect(rows[6].name).toBe("007_add_retry_fields.sql");
     expect(rows[7].name).toBe("008_create_router_keys.sql");
@@ -38,6 +38,7 @@ describe("request_metrics migration and insertMetrics", () => {
     expect(rows[10].name).toBe("011_create_mapping_groups.sql");
     expect(rows[15].name).toBe("016_create_session_model_tables.sql");
     expect(rows[16].name).toBe("017_add_provider_concurrency.sql");
+    expect(rows[17].name).toBe("018_add_failover_field.sql");
   });
 
   it("should create indexes", () => {
