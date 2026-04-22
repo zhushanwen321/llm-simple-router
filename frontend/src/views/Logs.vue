@@ -140,6 +140,26 @@
           <Label class="block text-sm font-medium text-foreground mb-1">保留最近天数</Label>
           <Input v-model.number="cleanupDays" type="number" :min="1" />
         </div>
+        <Separator />
+        <div class="space-y-3">
+          <div class="text-sm font-medium">自动清理设置</div>
+          <div class="flex items-center gap-3">
+            <Label class="whitespace-nowrap">保留天数</Label>
+            <Input
+              type="number"
+              v-model.number="retentionDays"
+              :min="0"
+              :max="90"
+              class="w-20"
+            />
+            <span class="text-xs text-muted-foreground">0 = 不自动清理</span>
+          </div>
+          <div class="flex justify-end">
+            <Button size="sm" @click="saveRetention" :disabled="retentionSaving">
+              保存设置
+            </Button>
+          </div>
+        </div>
         <DialogFooter>
           <Button variant="outline" @click="showCleanup = false">取消</Button>
           <Button variant="destructive" @click="handleCleanup">确认清理</Button>
@@ -150,7 +170,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, watch } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { toast } from 'vue-sonner'
 import { api } from '@/api/client'
 import { Button } from '@/components/ui/button'
@@ -160,6 +180,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Separator } from '@/components/ui/separator'
 import UnifiedRequestDialog from '@/components/request-detail/UnifiedRequestDialog.vue'
 import LogTableRow from '@/components/logs/LogTableRow.vue'
 import { useLogFilters } from '@/composables/useLogFilters'
@@ -215,6 +236,31 @@ function nextPage() {
   loadLogs()
 }
 
+const DEFAULT_RETENTION_DAYS = 3 // eslint-disable-line no-magic-numbers
+const retentionDays = ref(DEFAULT_RETENTION_DAYS)
+const retentionSaving = ref(false)
+
+async function saveRetention() {
+  retentionSaving.value = true
+  try {
+    await api.setLogRetention(retentionDays.value)
+    toast.success('保留天数已更新')
+  } catch {
+    toast.error('更新失败')
+  } finally {
+    retentionSaving.value = false
+  }
+}
+
+async function loadRetention() {
+  try {
+    const { days } = await api.getLogRetention()
+    retentionDays.value = days
+  } catch {
+    toast.error('加载保留天数失败，使用默认值')
+  }
+}
+
 let filterTimer: ReturnType<typeof setTimeout> | null = null
 watch(
   [period, dateRange, providerFilter, modelFilter, keyFilter],
@@ -226,5 +272,8 @@ watch(
   { deep: true },
 )
 
-onMounted(() => { loadLogs() })
+onMounted(() => {
+  loadLogs()
+  loadRetention()
+})
 </script>
