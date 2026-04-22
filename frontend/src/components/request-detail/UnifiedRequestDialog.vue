@@ -29,6 +29,13 @@
           <!-- Left: Overview Panel -->
           <RequestOverviewPanel :overview="overview" />
 
+          <!-- Error message banner -->
+          <div v-if="overview.errorMessage" class="px-3 pb-2">
+            <div class="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              {{ overview.errorMessage }}
+            </div>
+          </div>
+
           <!-- Right: Tabs -->
           <div class="flex-1 flex flex-col min-w-0 pl-3">
             <Tabs v-model="activeTab">
@@ -121,11 +128,11 @@ const progressStatus = computed(() => {
   return overview.value.status
 })
 
-watch(() => props.open, (isOpen) => {
+watch([() => props.open, () => props.logEntry], ([isOpen, logEntry]) => {
   if (!isOpen) return
   activeTab.value = 'response'
-  if (props.source === 'history' && props.logEntry) {
-    loadedOverview.value = fromLogEntry(props.logEntry)
+  if (props.source === 'history' && logEntry) {
+    loadedOverview.value = fromLogEntry(logEntry)
   }
 })
 </script>

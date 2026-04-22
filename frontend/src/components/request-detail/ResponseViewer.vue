@@ -148,9 +148,16 @@ function tryDirectParse(): ContentBlock[] {
 
 // Unified blocks computed
 const blocks = computed<ContentBlock[]>(() => {
-  // Realtime: use streamContent blocks directly
+  // Realtime: use streamContent blocks, fall back to responseBody for non-stream
   if (props.source === 'realtime') {
-    return props.streamContent?.blocks ?? []
+    const streamBlocks = props.streamContent?.blocks
+    if (streamBlocks && streamBlocks.length > 0) return streamBlocks
+    // Non-stream requests: responseBody carries the full response
+    if (props.responseBody) {
+      const direct = tryDirectParse()
+      if (direct.length > 0) return direct
+    }
+    return []
   }
 
   // History: try direct parse, fall back to SSE composable
@@ -167,7 +174,7 @@ const blocks = computed<ContentBlock[]>(() => {
 // Raw content for raw view
 const rawContent = computed(() => {
   if (props.source === 'realtime') {
-    return props.streamContent?.rawChunks ?? ''
+    return props.streamContent?.rawChunks || props.responseBody || ''
   }
   return props.responseBody || props.upstreamResponse || ''
 })
