@@ -138,6 +138,139 @@
         </Card>
       </div>
 
+      <!-- 套餐用量追踪 -->
+      <Card class="mb-6">
+        <CardHeader>
+          <CardTitle class="text-sm font-medium text-foreground">套餐用量追踪</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div v-if="usageError" class="text-sm text-destructive mb-3">{{ usageError }}</div>
+          <Tabs v-model="usageTab">
+            <TabsList>
+              <TabsTrigger value="windows">5小时窗口</TabsTrigger>
+              <TabsTrigger value="weekly">本周</TabsTrigger>
+              <TabsTrigger value="monthly">本月</TabsTrigger>
+            </TabsList>
+            <TabsContent value="windows">
+              <div v-if="usageLoading" class="text-center text-muted-foreground py-8">加载中...</div>
+              <div v-else-if="windowsData.length === 0" class="text-center text-muted-foreground py-8">暂无窗口数据</div>
+              <template v-else>
+                <div class="grid grid-cols-3 gap-4 mt-4 mb-4">
+                  <div class="rounded-md border p-3">
+                    <p class="text-sm text-muted-foreground">今日窗口</p>
+                    <p class="text-xl font-bold text-foreground">{{ windowsData.length }}</p>
+                  </div>
+                  <div class="rounded-md border p-3">
+                    <p class="text-sm text-muted-foreground">总请求数</p>
+                    <p class="text-xl font-bold text-foreground">{{ totalWindowRequests }}</p>
+                  </div>
+                  <div class="rounded-md border p-3">
+                    <p class="text-sm text-muted-foreground">总 Token</p>
+                    <p class="text-xl font-bold text-foreground">{{ totalWindowTokens }}</p>
+                  </div>
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>开始时间</TableHead>
+                      <TableHead>结束时间</TableHead>
+                      <TableHead>请求数</TableHead>
+                      <TableHead>输入 Tokens</TableHead>
+                      <TableHead>输出 Tokens</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow v-for="item in windowsData" :key="item.window.id">
+                      <TableCell class="text-sm">{{ formatUsageTime(item.window.start_time) }}</TableCell>
+                      <TableCell class="text-sm">{{ formatUsageTime(item.window.end_time) }}</TableCell>
+                      <TableCell>{{ item.usage.request_count }}</TableCell>
+                      <TableCell>{{ item.usage.total_input_tokens.toLocaleString() }}</TableCell>
+                      <TableCell>{{ item.usage.total_output_tokens.toLocaleString() }}</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </template>
+            </TabsContent>
+            <TabsContent value="weekly">
+              <div v-if="usageLoading" class="text-center text-muted-foreground py-8">加载中...</div>
+              <div v-else-if="weeklyData.length === 0" class="text-center text-muted-foreground py-8">暂无周数据</div>
+              <template v-else>
+                <div class="grid grid-cols-3 gap-4 mt-4 mb-4">
+                  <div class="rounded-md border p-3">
+                    <p class="text-sm text-muted-foreground">统计天数</p>
+                    <p class="text-xl font-bold text-foreground">{{ weeklyData.length }}</p>
+                  </div>
+                  <div class="rounded-md border p-3">
+                    <p class="text-sm text-muted-foreground">周总请求</p>
+                    <p class="text-xl font-bold text-foreground">{{ weeklyData.reduce((s, d) => s + d.request_count, 0) }}</p>
+                  </div>
+                  <div class="rounded-md border p-3">
+                    <p class="text-sm text-muted-foreground">周总 Token</p>
+                    <p class="text-xl font-bold text-foreground">{{ weeklyData.reduce((s, d) => s + d.total_input_tokens + d.total_output_tokens, 0).toLocaleString() }}</p>
+                  </div>
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>日期</TableHead>
+                      <TableHead>请求数</TableHead>
+                      <TableHead>输入 Tokens</TableHead>
+                      <TableHead>输出 Tokens</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow v-for="row in weeklyData" :key="row.date">
+                      <TableCell class="text-sm">{{ row.date }}</TableCell>
+                      <TableCell>{{ row.request_count }}</TableCell>
+                      <TableCell>{{ row.total_input_tokens.toLocaleString() }}</TableCell>
+                      <TableCell>{{ row.total_output_tokens.toLocaleString() }}</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </template>
+            </TabsContent>
+            <TabsContent value="monthly">
+              <div v-if="usageLoading" class="text-center text-muted-foreground py-8">加载中...</div>
+              <div v-else-if="monthlyData.length === 0" class="text-center text-muted-foreground py-8">暂无月数据</div>
+              <template v-else>
+                <div class="grid grid-cols-3 gap-4 mt-4 mb-4">
+                  <div class="rounded-md border p-3">
+                    <p class="text-sm text-muted-foreground">统计天数</p>
+                    <p class="text-xl font-bold text-foreground">{{ monthlyData.length }}</p>
+                  </div>
+                  <div class="rounded-md border p-3">
+                    <p class="text-sm text-muted-foreground">月总请求</p>
+                    <p class="text-xl font-bold text-foreground">{{ monthlyData.reduce((s, d) => s + d.request_count, 0) }}</p>
+                  </div>
+                  <div class="rounded-md border p-3">
+                    <p class="text-sm text-muted-foreground">月总 Token</p>
+                    <p class="text-xl font-bold text-foreground">{{ monthlyData.reduce((s, d) => s + d.total_input_tokens + d.total_output_tokens, 0).toLocaleString() }}</p>
+                  </div>
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>日期</TableHead>
+                      <TableHead>请求数</TableHead>
+                      <TableHead>输入 Tokens</TableHead>
+                      <TableHead>输出 Tokens</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow v-for="row in monthlyData" :key="row.date">
+                      <TableCell class="text-sm">{{ row.date }}</TableCell>
+                      <TableCell>{{ row.request_count }}</TableCell>
+                      <TableCell>{{ row.total_input_tokens.toLocaleString() }}</TableCell>
+                      <TableCell>{{ row.total_output_tokens.toLocaleString() }}</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </template>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+
       <!-- 模型对比表 -->
       <Card>
         <CardHeader>
@@ -185,7 +318,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -205,8 +338,10 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { lineOptions, stackedAreaOptions } from './metrics-helpers'
 import { useMetrics } from '@/composables/useMetrics'
+import { useUsage } from '@/composables/useUsage'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler)
 
@@ -279,5 +414,21 @@ async function loadStats() {
 
 onMounted(() => {
   loadStats()
+  fetchUsage()
 })
+
+// --- 套餐用量追踪 ---
+const { usageTab, windowsData, weeklyData, monthlyData, usageLoading, usageError, fetchUsage } = useUsage(dashboardKeyFilter)
+
+const totalWindowRequests = computed(() =>
+  windowsData.value.reduce((sum, w) => sum + w.usage.request_count, 0),
+)
+const totalWindowTokens = computed(() => {
+  const total = windowsData.value.reduce((sum, w) => sum + w.usage.total_input_tokens + w.usage.total_output_tokens, 0)
+  return total.toLocaleString()
+})
+
+function formatUsageTime(iso: string): string {
+  return new Date(iso).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+}
 </script>
