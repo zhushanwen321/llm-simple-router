@@ -51,9 +51,35 @@ const API = {
   MONITOR_CONCURRENCY: '/monitor/concurrency',
   MONITOR_RUNTIME: '/monitor/runtime',
   MONITOR_STREAM: '/monitor/stream',
+  RECOMMENDED_PROVIDERS: '/recommended/providers',
+  RECOMMENDED_RETRY_RULES: '/recommended/retry-rules',
+  RECOMMENDED_RELOAD: '/recommended/reload',
 } as const
 
 // --- Payload types ---
+
+export interface ProviderPreset {
+  plan: string
+  presetName: string
+  apiType: 'openai' | 'anthropic'
+  baseUrl: string
+  models: string[]
+}
+
+export interface ProviderGroup {
+  group: string
+  presets: ProviderPreset[]
+}
+
+export interface RecommendedRetryRule {
+  name: string
+  status_code: number
+  body_pattern: string
+  retry_strategy: 'fixed' | 'exponential'
+  retry_delay_ms: number
+  max_retries: number
+  max_delay_ms: number
+}
 
 export interface ProviderPayload {
   name: string
@@ -280,4 +306,10 @@ export const api = {
   getMonitorStats: () => request<StatsSnapshot>('get', API.MONITOR_STATS),
   getMonitorConcurrency: () => request<ProviderConcurrencySnapshot[]>('get', API.MONITOR_CONCURRENCY),
   getMonitorRuntime: () => request<RuntimeMetrics>('get', API.MONITOR_RUNTIME),
+
+  recommended: {
+    getProviders: () => request<ProviderGroup[]>('get', API.RECOMMENDED_PROVIDERS),
+    getRetryRules: () => request<RecommendedRetryRule[]>('get', API.RECOMMENDED_RETRY_RULES),
+    reload: () => request<{ ok: boolean }>('post', API.RECOMMENDED_RELOAD),
+  },
 }
