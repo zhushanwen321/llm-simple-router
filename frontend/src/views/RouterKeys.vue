@@ -27,7 +27,7 @@
             <TableCell>
               <div class="flex items-center gap-1">
                 <span class="font-mono text-xs text-muted-foreground">{{ maskKey(k.key) }}</span>
-                <Button variant="ghost" size="sm" class="h-6 w-6 p-0" @click="tableCopy(k.key)">
+                <Button variant="ghost" size="sm" class="h-6 w-6 p-0" @click="k.key && tableCopy(k.key)">
                   <svg v-if="!tableCopied" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
                   </svg>
@@ -163,7 +163,7 @@ const errors = ref<Record<string, string>>({})
 
 const { copied: tableCopied, copy: tableCopy } = useClipboard()
 
-function maskKey(key: string): string {
+function maskKey(key: string | null): string {
   if (!key) return ''
   return key.slice(0, 7) + '*'.repeat(7) // eslint-disable-line no-magic-numbers
 }
