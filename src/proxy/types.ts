@@ -57,6 +57,17 @@ export type TransportResult =
       error: Error;
     };
 
+/**
+ * 跨 provider failover 时由 ResilienceLayer 抛出，
+ * orchestrator 捕获后释放当前信号量并获取新 provider 的信号量。
+ */
+export class ProviderSwitchNeeded extends Error {
+  constructor(public readonly targetProviderId: string) {
+    super(`Provider switch needed: ${targetProviderId}`);
+    this.name = "ProviderSwitchNeeded";
+  }
+}
+
 /** 流式传输阶段状态 */
 export type StreamState =
   | "BUFFERING"
