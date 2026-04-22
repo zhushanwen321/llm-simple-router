@@ -122,7 +122,7 @@ export function logResilienceResult(
         clientReq: params.clientReq,
         upstreamReq: params.upstreamReqBase, id: attemptLogId,
         status: attempt.statusCode!, respBody: attempt.responseBody,
-        upHdrs, cliHdrs: upHdrs,
+        upHdrs,
         isRetry: !isOriginal, isFailover: isFailoverLog,
         originalRequestId: parentId,
         routerKeyId: params.routerKeyId, originalModel: params.originalModel,

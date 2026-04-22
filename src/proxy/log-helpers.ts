@@ -26,7 +26,6 @@ export interface RequestLogParams extends LogRetryMeta {
   status: number;
   respBody: string | null;
   upHdrs: Record<string, string>;
-  cliHdrs: Record<string, string>;
   routerKeyId?: string | null;
   originalModel?: string | null;
 }
@@ -37,7 +36,7 @@ export function insertSuccessLog(
   params: RequestLogParams,
 ): void {
   const { id: logId, apiType, model, provider, isStream, startTime,
-    clientReq, upstreamReq, status, respBody, upHdrs, cliHdrs,
+    clientReq, upstreamReq, status, respBody, upHdrs,
     isRetry = false, isFailover = false, originalRequestId = null, routerKeyId = null, originalModel = null } = params;
 
   insertRequestLog(db, {
