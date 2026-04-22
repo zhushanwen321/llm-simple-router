@@ -26,6 +26,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 import { getConfig, Config } from "./config.js";
 import { initDatabase, seedDefaultRules, getAllProviders } from "./db/index.js";
+import { loadRecommendedConfig } from "./config/recommended.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { openaiProxy } from "./proxy/openai.js";
 import { anthropicProxy } from "./proxy/anthropic.js";
@@ -123,6 +124,8 @@ export async function buildApp(
     }
     return reply.code(status).send({ error: { message: fastifyError.message } });
   });
+
+  loadRecommendedConfig();
 
   // 首次启动时插入默认重试规则（表为空时）
   seedDefaultRules(db);
