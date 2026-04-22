@@ -6,6 +6,8 @@ import { insertSuccessLog, type FailoverContext } from "./log-helpers.js";
 import { MetricsExtractor } from "../metrics/metrics-extractor.js";
 import type { FastifyRequest } from "fastify";
 import type { ProxyResult, StreamProxyResult } from "./transport.js";
+import type { ResilienceAttempt } from "./resilience.js";
+import type { TransportResult } from "./types.js";
 import type { Attempt } from "./retry.js";
 // Re-export shared constants & types from types.ts (canonical home)
 export { UPSTREAM_SUCCESS } from "./types.js";
@@ -152,7 +154,109 @@ export function collectMetrics(
       const mr = MetricsExtractor.fromNonStreamResponse(apiType, (result as ProxyResult).body);
       if (mr) { insertMetrics(db, { ...base, ...mr }); return; }
     }
-    // 无法提取完整 metrics（失败请求），至少记录 backend_model
+    // 无法提取完整 metrics（失败请求），记录 backend_model 但标记为未完成
+    insertMetrics(db, { ...base, is_complete: 0 });
+  } catch (err) { request.log.error({ err }, "Failed to insert metrics"); }
+}
+
+// ---------- New-architecture logging ----------
+
+export function logResilienceResult(
+  db: Database.Database,
+  params: {
+    apiType: "openai" | "anthropic";
+    model: string;
+    providerId: string;
+    isStream: boolean;
+    reqBodyStr: string;
+    clientReq: string;
+    upstreamReqBase: string;
+    logId: string;
+    routerKeyId: string | null;
+    originalModel: string | null;
+    failover?: FailoverContext;
+  },
+  attempts: ResilienceAttempt[],
+  result: TransportResult,
+  startTime: number,
+): string {
+  const isFailoverIteration = params.failover?.isFailoverIteration ?? false;
+  const rootLogId = params.failover?.rootLogId ?? params.logId;
+  let lastSuccessLogId = params.logId;
+
+  for (const attempt of attempts) {
+    const isOriginal = attempt.attemptIndex === 0;
+    const attemptLogId = isOriginal ? params.logId : randomUUID();
+    const isFailoverLog = isOriginal && isFailoverIteration;
+    const parentId = isOriginal ? (isFailoverIteration ? rootLogId : null) : params.logId;
+
+    if (attempt.error) {
+      insertRequestLog(db, {
+        id: attemptLogId, api_type: params.apiType, model: params.model,
+        provider_id: attempt.target.provider_id,
+        status_code: HTTP_BAD_GATEWAY, latency_ms: attempt.latencyMs,
+        is_stream: params.isStream ? 1 : 0, error_message: attempt.error,
+        created_at: new Date().toISOString(), request_body: params.reqBodyStr,
+        client_request: params.clientReq, upstream_request: params.upstreamReqBase,
+        is_retry: isOriginal ? 0 : 1, is_failover: isFailoverLog ? 1 : 0,
+        original_request_id: parentId,
+        router_key_id: params.routerKeyId, original_model: params.originalModel,
+      });
+    } else if (attempt.statusCode !== UPSTREAM_SUCCESS) {
+      insertRequestLog(db, {
+        id: attemptLogId, api_type: params.apiType, model: params.model,
+        provider_id: attempt.target.provider_id,
+        status_code: attempt.statusCode!, latency_ms: attempt.latencyMs,
+        is_stream: params.isStream ? 1 : 0, error_message: null,
+        created_at: new Date().toISOString(), request_body: params.reqBodyStr,
+        response_body: attempt.responseBody,
+        client_request: params.clientReq, upstream_request: params.upstreamReqBase,
+        upstream_response: JSON.stringify({ statusCode: attempt.statusCode, body: attempt.responseBody }),
+        client_response: JSON.stringify({ statusCode: attempt.statusCode, body: attempt.responseBody }),
+        is_retry: isOriginal ? 0 : 1, is_failover: isFailoverLog ? 1 : 0,
+        original_request_id: parentId,
+        router_key_id: params.routerKeyId, original_model: params.originalModel,
+      });
+    } else {
+      const upHdrs = (result.kind === "stream_success" || result.kind === "stream_abort")
+        ? (result.upstreamResponseHeaders ?? {})
+        : ("headers" in result ? result.headers : {});
+      insertSuccessLog(db, {
+        apiType: params.apiType, model: params.model,
+        provider: { id: attempt.target.provider_id } as Provider,
+        isStream: params.isStream, startTime,
+        reqBody: params.reqBodyStr, clientReq: params.clientReq,
+        upstreamReq: params.upstreamReqBase, id: attemptLogId,
+        status: attempt.statusCode!, respBody: attempt.responseBody,
+        upHdrs, cliHdrs: upHdrs,
+        isRetry: !isOriginal, isFailover: isFailoverLog,
+        originalRequestId: parentId,
+        routerKeyId: params.routerKeyId, originalModel: params.originalModel,
+      });
+      lastSuccessLogId = attemptLogId;
+    }
+  }
+  return lastSuccessLogId;
+}
+
+export function collectTransportMetrics(
+  db: Database.Database,
+  apiType: "openai" | "anthropic",
+  result: TransportResult,
+  isStream: boolean,
+  lastSuccessLogId: string,
+  providerId: string,
+  backendModel: string,
+  request: FastifyRequest,
+) {
+  const base = { request_log_id: lastSuccessLogId, provider_id: providerId, backend_model: backendModel, api_type: apiType };
+  try {
+    if (isStream && (result.kind === "stream_success" || result.kind === "stream_abort")) {
+      if (result.metrics) { insertMetrics(db, { ...base, ...result.metrics }); return; }
+    } else if (result.kind === "success") {
+      const mr = MetricsExtractor.fromNonStreamResponse(apiType, result.body);
+      if (mr) { insertMetrics(db, { ...base, ...mr }); return; }
+    }
     insertMetrics(db, base);
   } catch (err) { request.log.error({ err }, "Failed to insert metrics"); }
 }
