@@ -1,4 +1,4 @@
-import type { ProviderSemaphoreManager, AcquireToken } from "./semaphore.js";
+import type { ProviderSemaphoreManager } from "./semaphore.js";
 import type { RequestTracker } from "../monitor/request-tracker.js";
 import type { ActiveRequest } from "../monitor/types.js";
 
