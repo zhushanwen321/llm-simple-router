@@ -172,6 +172,8 @@
               :metrics="selectedRequest.streamMetrics ?? null"
               :is-stream="selectedRequest.isStream"
               :stream-content="selectedRequest.streamContent ?? undefined"
+              :non-stream-body="nonStreamBody"
+              :loading-body="nonStreamBodyLoading"
             />
           </div>
         </div>
@@ -186,10 +188,8 @@
   </div>
 </template>
 
-<!-- eslint-disable no-magic-numbers -->
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { api } from '@/api/client'
+import { ref, onMounted } from 'vue'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -207,45 +207,45 @@ import RequestDetailPanel from '@/components/monitor/RequestDetailPanel.vue'
 import StreamResponseViewer from '@/components/monitor/StreamResponseViewer.vue'
 import ProviderStatsTable from '@/components/monitor/ProviderStatsTable.vue'
 import LogDetailDialog from '@/components/monitor/LogDetailDialog.vue'
+import { useMonitorSSE } from '@/composables/useMonitorSSE'
+import { useMonitorData } from '@/composables/useMonitorData'
 
-import type {
-  ActiveRequest,
-  ProviderConcurrencySnapshot,
-  StatsSnapshot,
-  RuntimeMetrics,
-} from '@/types/monitor'
+// --- Data layer ---
+const {
+  activeRequests,
+  recentCompleted,
+  stats,
+  concurrency,
+  runtime,
+  connected,
+  streamCount,
+  streamingRequests,
+  queuedRequests,
+  selectedRequestId,
+  selectedRequest,
+  requestDetailOpen,
+  selectRequest,
+  nonStreamBody,
+  nonStreamBodyLoading,
+  handleSSEMessage,
+  handleSSEOpen,
+  handleSSEClose,
+  loadInitialData,
+} = useMonitorData()
 
-// --- Reactive state ---
-
-const RECENT_COMPLETED_MAX = 200
-
-const activeRequests = ref<ActiveRequest[]>([])
-const recentCompleted = ref<ActiveRequest[]>([])
-const selectedRequestId = ref<string | null>(null)
-const requestDetailOpen = ref(false)
-const stats = ref<StatsSnapshot | null>(null)
-const concurrency = ref<ProviderConcurrencySnapshot[]>([])
-const runtime = ref<RuntimeMetrics | null>(null)
-const connected = ref(false)
-
-const streamCount = computed(() => activeRequests.value.filter((r) => r.isStream).length)
-
-const streamingRequests = computed(() => activeRequests.value.filter((r) => !r.queued))
-const queuedRequests = computed(() => activeRequests.value.filter((r) => r.queued === true))
-
-function selectRequest(id: string) {
-  selectedRequestId.value = id
-  requestDetailOpen.value = true
-}
-
-const selectedRequest = computed(() => {
-  if (!selectedRequestId.value) return null
-  return (
-    activeRequests.value.find((r) => r.id === selectedRequestId.value) ??
-    recentCompleted.value.find((r) => r.id === selectedRequestId.value) ??
-    null
-  )
-})
+// --- SSE lifecycle (onOpen/onClose 驱动 connected 状态) ---
+const { connect } = useMonitorSSE(
+  '/admin/api/monitor/stream',
+  {
+    request_start: handleSSEMessage,
+    request_update: handleSSEMessage,
+    request_complete: handleSSEMessage,
+    concurrency_update: handleSSEMessage,
+    stats_update: handleSSEMessage,
+    runtime_update: handleSSEMessage,
+  },
+  { onOpen: handleSSEOpen, onClose: handleSSEClose },
+)
 
 // --- Log detail dialog ---
 
@@ -278,137 +278,16 @@ function statusLabel(status: string): string {
   }
 }
 
+const MS_PER_SECOND = 1000
+
 function elapsed(startTime: number): string {
-  return ((Date.now() - startTime) / 1000).toFixed(1)
-}
-
-// --- SSE connection ---
-
-let eventSource: EventSource | null = null
-
-function handleSSEMessage(event: MessageEvent) {
-  let data: unknown
-  try {
-    data = JSON.parse(event.data)
-  } catch {
-    return
-  }
-
-  switch (event.type) {
-    case 'request_start': {
-      const req = data as ActiveRequest
-      // 防御 SSE 乱序：如果该请求已在 completed 中，不重复加入 active
-      if (!recentCompleted.value.some((r) => r.id === req.id)) {
-        activeRequests.value.unshift(req)
-      }
-      break
-    }
-    case 'request_update': {
-      const updated = data as ActiveRequest[]
-      activeRequests.value = updated
-      break
-    }
-    case 'request_complete': {
-      const completed = data as ActiveRequest
-      activeRequests.value = activeRequests.value.filter((r) => r.id !== completed.id)
-      recentCompleted.value.unshift(completed)
-      if (recentCompleted.value.length > RECENT_COMPLETED_MAX) {
-        recentCompleted.value.length = RECENT_COMPLETED_MAX
-      }
-      break
-    }
-    case 'concurrency_update': {
-      concurrency.value = data as ProviderConcurrencySnapshot[]
-      break
-    }
-    case 'stats_update': {
-      stats.value = data as StatsSnapshot
-      break
-    }
-    case 'runtime_update': {
-      runtime.value = data as RuntimeMetrics
-      break
-    }
-  }
-}
-
-function connectSSE() {
-  eventSource = new EventSource('/admin/api/monitor/stream')
-
-  eventSource.onopen = () => {
-    connected.value = true
-  }
-
-  const eventTypes = [
-    'request_start',
-    'request_update',
-    'request_complete',
-    'concurrency_update',
-    'stats_update',
-    'runtime_update',
-  ]
-  for (const type of eventTypes) {
-    eventSource.addEventListener(type, handleSSEMessage)
-  }
-
-  eventSource.onerror = () => {
-    connected.value = false
-    eventSource?.close()
-    eventSource = null
-  }
-}
-
-function disconnectSSE() {
-  if (eventSource) {
-    eventSource.close()
-    eventSource = null
-  }
-  connected.value = false
-}
-
-// --- Initial data loading ---
-
-async function loadInitialData() {
-  try {
-    const [active, recent, statsData, concurrencyData, runtimeData] = await Promise.allSettled([
-      api.getMonitorActive(),
-      api.getMonitorRecent(),
-      api.getMonitorStats(),
-      api.getMonitorConcurrency(),
-      api.getMonitorRuntime(),
-    ])
-
-    if (active.status === 'fulfilled') {
-      activeRequests.value = active.value as ActiveRequest[]
-    }
-    if (recent.status === 'fulfilled') {
-      recentCompleted.value = recent.value as ActiveRequest[]
-    }
-    if (statsData.status === 'fulfilled') {
-      stats.value = statsData.value as StatsSnapshot
-    }
-    if (concurrencyData.status === 'fulfilled') {
-      concurrency.value = concurrencyData.value as ProviderConcurrencySnapshot[]
-    }
-    if (runtimeData.status === 'fulfilled') {
-      runtime.value = runtimeData.value as RuntimeMetrics
-    }
-  } catch (e) {
-    console.error('Failed to load initial monitor data:', e)
-    stats.value = null
-    concurrency.value = []
-    runtime.value = null
-  }
+  return ((Date.now() - startTime) / MS_PER_SECOND).toFixed(1)
 }
 
 // --- Lifecycle ---
 
 onMounted(async () => {
   await loadInitialData()
-  connectSSE()
-})
-
-onUnmounted(() => {
-  disconnectSSE()
+  connect()
 })
 </script>

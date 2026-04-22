@@ -187,3 +187,159 @@ describe("Stats API", () => {
     expect(res.statusCode).toBe(401);
   });
 });
+
+describe("Log children endpoint", () => {
+  let app: FastifyInstance;
+  let db: ReturnType<typeof initDatabase>;
+  let close: () => Promise<void>;
+  let cookie: string;
+
+  beforeEach(async () => {
+    db = initDatabase(":memory:");
+    seedSettings(db);
+
+    const now = new Date();
+    db.prepare(
+      `INSERT INTO request_logs (id, api_type, model, provider_id, status_code, latency_ms, is_stream, error_message, created_at, is_retry, is_failover, original_request_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run("root-1", "openai", "gpt-4", "prov-1", 500, 1000, 0, "server error", now.toISOString(), 0, 0, null);
+    db.prepare(
+      `INSERT INTO request_logs (id, api_type, model, provider_id, status_code, latency_ms, is_stream, error_message, created_at, is_retry, is_failover, original_request_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run("child-retry", "openai", "gpt-4", "prov-1", 200, 800, 0, null, new Date(now.getTime() + 50).toISOString(), 1, 0, "root-1");
+    db.prepare(
+      `INSERT INTO request_logs (id, api_type, model, provider_id, status_code, latency_ms, is_stream, error_message, created_at, is_retry, is_failover, original_request_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run("child-failover", "openai", "gpt-4", "prov-2", 200, 500, 0, null, new Date(now.getTime() + 100).toISOString(), 0, 1, "root-1");
+
+    const result = await buildApp({ config: makeConfig() as any, db });
+    app = result.app;
+    close = result.close;
+    cookie = await login(app);
+  });
+
+  afterEach(async () => {
+    await close();
+  });
+
+  it("returns children sorted by created_at ASC", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: "/admin/api/logs/root-1/children",
+      headers: { cookie },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.data).toHaveLength(2);
+    expect(body.data[0].id).toBe("child-retry");
+    expect(body.data[1].id).toBe("child-failover");
+    expect(body.data[0].is_retry).toBe(1);
+    expect(body.data[1].is_failover).toBe(1);
+  });
+
+  it("returns empty array for a leaf request with no children", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: "/admin/api/logs/child-retry/children",
+      headers: { cookie },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ data: [] });
+  });
+
+  it("returns 404 for nonexistent parent", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: "/admin/api/logs/nonexistent-id/children",
+      headers: { cookie },
+    });
+    expect(res.statusCode).toBe(404);
+    expect(res.json().error.message).toBe("Log not found");
+  });
+
+  it("unauthenticated returns 401", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: "/admin/api/logs/root-1/children",
+    });
+    expect(res.statusCode).toBe(401);
+  });
+});
+
+describe("Grouped logs view", () => {
+  let app: FastifyInstance;
+  let db: ReturnType<typeof initDatabase>;
+  let close: () => Promise<void>;
+  let cookie: string;
+
+  beforeEach(async () => {
+    db = initDatabase(":memory:");
+    seedSettings(db);
+
+    const now = new Date();
+    const stmt = db.prepare(
+      `INSERT INTO request_logs (id, api_type, model, provider_id, status_code, latency_ms, is_stream, error_message, created_at, is_retry, is_failover, original_request_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    );
+    // 根请求 1：有 2 个子请求
+    stmt.run("root-1", "openai", "gpt-4", "prov-1", 500, 1000, 0, "server error", now.toISOString(), 0, 0, null);
+    stmt.run("child-retry-1", "openai", "gpt-4", "prov-1", 200, 800, 0, null, new Date(now.getTime() + 50).toISOString(), 1, 0, "root-1");
+    stmt.run("child-failover-1", "openai", "gpt-4", "prov-2", 200, 500, 0, null, new Date(now.getTime() + 100).toISOString(), 0, 1, "root-1");
+
+    // 根请求 2：无子请求
+    stmt.run("root-2", "anthropic", "claude-3", "prov-3", 200, 300, 0, null, new Date(now.getTime() + 200).toISOString(), 0, 0, null);
+
+    const result = await buildApp({ config: makeConfig() as any, db });
+    app = result.app;
+    close = result.close;
+    cookie = await login(app);
+  });
+
+  afterEach(async () => {
+    await close();
+  });
+
+  it("returns only root requests with correct child_count", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: "/admin/api/logs?view=grouped",
+      headers: { cookie },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    // 只返回根请求（original_request_id IS NULL）
+    expect(body.data).toHaveLength(2);
+    expect(body.total).toBe(2);
+
+    // 按 created_at DESC 排序，root-2 在前
+    expect(body.data[0].id).toBe("root-2");
+    expect(body.data[0].child_count).toBe(0);
+
+    expect(body.data[1].id).toBe("root-1");
+    expect(body.data[1].child_count).toBe(2);
+  });
+
+  it("child requests do not appear in grouped view", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: "/admin/api/logs?view=grouped",
+      headers: { cookie },
+    });
+    const body = res.json();
+    const ids = body.data.map((l: any) => l.id);
+    expect(ids).not.toContain("child-retry-1");
+    expect(ids).not.toContain("child-failover-1");
+  });
+
+  it("grouped view supports api_type filter", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: "/admin/api/logs?view=grouped&api_type=openai",
+      headers: { cookie },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.data).toHaveLength(1);
+    expect(body.data[0].id).toBe("root-1");
+  });
+});

@@ -207,11 +207,11 @@ const headerEntries = computed(() => {
   return Object.entries(headers)
     .filter(([k]) => ALLOWED_HEADER_KEYS.has(k))
     .map(([k, v]) => {
-    if (k.toLowerCase() === 'authorization') {
-      return [k, 'Bearer sk-****'] as [string, string]
-    }
-    return [k, v] as [string, string]
-  })
+      if (k.toLowerCase() === 'authorization') {
+        return [k, 'Bearer sk-****'] as [string, string]
+      }
+      return [k, v] as [string, string]
+    })
 })
 
 const body = computed(() => {

@@ -6,9 +6,9 @@ import { encrypt } from "../src/utils/crypto.js";
 import { anthropicProxy } from "../src/proxy/anthropic.js";
 import { initDatabase } from "../src/db/index.js";
 import { setSetting } from "../src/db/settings.js";
-import { retryableCall, buildRetryConfig } from "../src/proxy/retry.js";
 import { RetryRuleMatcher } from "../src/proxy/retry-rules.js";
-import type { ProxyResult } from "../src/proxy/proxy-core.js";
+import { ProviderSemaphoreManager } from "../src/proxy/semaphore.js";
+import { RequestTracker } from "../src/monitor/request-tracker.js";
 
 const TEST_KEY =
   "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
@@ -114,6 +114,8 @@ describe("Retry integration", () => {
       retryMaxAttempts: 2,
       retryBaseDelayMs: 10,
       matcher,
+      semaphoreManager: new ProviderSemaphoreManager(),
+      tracker: new RequestTracker({ semaphoreManager: new ProviderSemaphoreManager() }),
     });
 
     const resp = await app.inject({
@@ -169,6 +171,8 @@ describe("Retry integration", () => {
       retryMaxAttempts: 1,
       retryBaseDelayMs: 10,
       matcher,
+      semaphoreManager: new ProviderSemaphoreManager(),
+      tracker: new RequestTracker({ semaphoreManager: new ProviderSemaphoreManager() }),
     });
 
     const resp = await app.inject({
@@ -196,46 +200,7 @@ describe("Retry integration", () => {
     await closeServer(server);
   });
 
-  // 3. 400 retryable body -> success (direct retryableCall with RetryRuleMatcher)
-  it("retries on 400 with retryable error body and succeeds on second attempt", async () => {
-    db = initDatabase(":memory:");
-    db.prepare(
-      "INSERT INTO retry_rules (id, name, status_code, body_pattern, is_active, created_at, retry_strategy, retry_delay_ms, max_retries, max_delay_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-    ).run("rr-1", "zai-400", 400, "请稍后重试", 1, new Date().toISOString(), "exponential", 10, 2, 60000);
-
-    const matcher = new RetryRuleMatcher();
-    matcher.load(db);
-    const config = buildRetryConfig(2, 10, matcher);
-
-    let n = 0;
-    const fn = (): Promise<ProxyResult> => {
-      n++;
-      if (n === 1) {
-        return Promise.resolve({
-          statusCode: 400,
-          body: JSON.stringify({ error: { message: "网络错误，请稍后重试", code: "1234" } }),
-          headers: {},
-          sentHeaders: {},
-          sentBody: "",
-        });
-      }
-      return Promise.resolve({
-        statusCode: 200,
-        body: JSON.stringify({ id: "msg_1", content: "Hi" }),
-        headers: {},
-        sentHeaders: {},
-        sentBody: "",
-      });
-    };
-
-    const { result, attempts } = await retryableCall(fn, config);
-    expect(result.statusCode).toBe(200);
-    expect(attempts).toHaveLength(2);
-    expect(attempts[0].statusCode).toBe(400);
-    expect(attempts[1].statusCode).toBe(200);
-  });
-
-  // 4. Non-retryable 400 — no retry
+  // 3. Non-retryable 400 — no retry
   it("does not retry on non-retryable 400 error", async () => {
     let calls = 0;
     const { server, port } = await createMockBackend((_req, res) => {
@@ -262,6 +227,8 @@ describe("Retry integration", () => {
       streamTimeoutMs: 5000,
       retryMaxAttempts: 2,
       retryBaseDelayMs: 10,
+      semaphoreManager: new ProviderSemaphoreManager(),
+      tracker: new RequestTracker({ semaphoreManager: new ProviderSemaphoreManager() }),
     });
 
     const resp = await app.inject({

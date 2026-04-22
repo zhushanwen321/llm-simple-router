@@ -3,7 +3,18 @@ import type { Provider } from "../db/index.js";
 import { insertRequestLog } from "../db/index.js";
 import type { RawHeaders } from "./proxy-core.js";
 
-export interface RequestLogParams {
+export interface FailoverContext {
+  isFailoverIteration: boolean;
+  rootLogId: string;
+}
+
+export interface LogRetryMeta {
+  isRetry?: boolean;
+  isFailover?: boolean;
+  originalRequestId?: string | null;
+}
+
+export interface RequestLogParams extends LogRetryMeta {
   id: string;
   apiType: string;
   model: string;
@@ -17,8 +28,6 @@ export interface RequestLogParams {
   respBody: string | null;
   upHdrs: Record<string, string>;
   cliHdrs: Record<string, string>;
-  isRetry?: boolean;
-  originalRequestId?: string | null;
   routerKeyId?: string | null;
   originalModel?: string | null;
 }
@@ -30,7 +39,7 @@ export function insertSuccessLog(
 ): void {
   const { id: logId, apiType, model, provider, isStream, startTime,
     reqBody, clientReq, upstreamReq, status, respBody, upHdrs, cliHdrs,
-    isRetry = false, originalRequestId = null, routerKeyId = null, originalModel = null } = params;
+    isRetry = false, isFailover = false, originalRequestId = null, routerKeyId = null, originalModel = null } = params;
 
   insertRequestLog(db, {
     id: logId, api_type: apiType, model, provider_id: provider.id,
@@ -40,12 +49,12 @@ export function insertSuccessLog(
     response_body: respBody, client_request: clientReq, upstream_request: upstreamReq,
     upstream_response: JSON.stringify({ statusCode: status, headers: upHdrs, body: respBody }),
     client_response: JSON.stringify({ statusCode: status, headers: cliHdrs, body: respBody }),
-    is_retry: isRetry ? 1 : 0, original_request_id: originalRequestId,
+    is_retry: isRetry ? 1 : 0, is_failover: isFailover ? 1 : 0, original_request_id: originalRequestId,
     router_key_id: routerKeyId, original_model: originalModel,
   });
 }
 
-export interface RejectedLogParams {
+export interface RejectedLogParams extends LogRetryMeta {
   db: Database.Database;
   logId: string;
   apiType: string;
@@ -65,7 +74,7 @@ export interface RejectedLogParams {
 export function insertRejectedLog(params: RejectedLogParams): void {
   const { db, logId, apiType, model, statusCode, errorMessage,
     startTime, isStream, routerKeyId, originalBody, clientHeaders,
-    providerId = null, originalModel = null } = params;
+    providerId = null, isFailover = false, originalRequestId = null, originalModel = null } = params;
 
   insertRequestLog(db, {
     id: logId,
@@ -79,6 +88,8 @@ export function insertRejectedLog(params: RejectedLogParams): void {
     created_at: new Date().toISOString(),
     request_body: JSON.stringify(originalBody),
     client_request: JSON.stringify({ headers: clientHeaders, body: originalBody }),
+    is_failover: isFailover ? 1 : 0,
+    original_request_id: originalRequestId,
     router_key_id: routerKeyId,
     original_model: originalModel,
   });
