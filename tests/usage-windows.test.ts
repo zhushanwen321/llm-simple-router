@@ -1,6 +1,10 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import Database from "better-sqlite3";
+import { FastifyInstance } from "fastify";
 import { initDatabase } from "../src/db/index.js";
+import { setSetting } from "../src/db/settings.js";
+import { hashPassword } from "../src/utils/password.js";
+import { buildApp } from "../src/index.js";
 import {
   insertWindow,
   getLatestWindow,
@@ -8,6 +12,37 @@ import {
   getWindowUsage,
 } from "../src/db/usage-windows.js";
 import { UsageWindowTracker } from "../src/proxy/usage-window-tracker.js";
+
+const TEST_ENCRYPTION_KEY = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
+function makeConfig() {
+  return {
+    PORT: 9981,
+    DB_PATH: ":memory:",
+    LOG_LEVEL: "silent",
+    TZ: "Asia/Shanghai",
+    STREAM_TIMEOUT_MS: 5000,
+    RETRY_MAX_ATTEMPTS: 0,
+    RETRY_BASE_DELAY_MS: 0,
+  };
+}
+
+function seedSettings(db: ReturnType<typeof initDatabase>) {
+  setSetting(db, "encryption_key", TEST_ENCRYPTION_KEY);
+  setSetting(db, "jwt_secret", "test-jwt-secret-for-testing");
+  setSetting(db, "admin_password_hash", hashPassword("test-admin-pass"));
+  setSetting(db, "initialized", "true");
+}
+
+async function login(app: FastifyInstance): Promise<string> {
+  const res = await app.inject({
+    method: "POST",
+    url: "/admin/api/login",
+    payload: { password: "test-admin-pass" },
+  });
+  const match = (res.headers["set-cookie"] as string).match(/admin_token=([^;]+)/);
+  return `admin_token=${match![1]}`;
+}
 
 describe("usage-windows DB layer", () => {
   let db: Database.Database;
@@ -233,5 +268,124 @@ describe("UsageWindowTracker", () => {
 
     const windows = database.prepare("SELECT * FROM usage_windows").all() as any[];
     expect(windows).toHaveLength(0);
+  });
+});
+
+describe("usage API endpoints", () => {
+  let app: FastifyInstance;
+  let db: ReturnType<typeof initDatabase>;
+  let close: () => Promise<void>;
+  let cookie: string;
+
+  beforeEach(async () => {
+    db = initDatabase(":memory:");
+    seedSettings(db);
+    const result = await buildApp({ config: makeConfig() as any, db });
+    app = result.app;
+    close = result.close;
+    cookie = await login(app);
+  });
+
+  afterEach(async () => {
+    await close();
+  });
+
+  it("GET /admin/api/usage/windows returns today's windows with usage", async () => {
+    const now = new Date();
+    const todayLocal = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    // 使用本地格式时间，确保在窗口范围内（ISO UTC 时间可能落在前一天导致字符串比较失败）
+    const nowLocal = `${todayLocal} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
+
+    db.prepare(
+      `INSERT INTO providers (id, name, api_type, base_url, api_key, is_active, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run("p-1", "Test", "openai", "https://api.openai.com", "key", 1, nowLocal, nowLocal);
+
+    insertWindow(db, {
+      id: "w-today",
+      router_key_id: null,
+      start_time: `${todayLocal} 00:00:00`,
+      end_time: `${todayLocal} 05:00:00`,
+    });
+
+    db.prepare(
+      `INSERT INTO request_logs (id, api_type, model, provider_id, status_code, latency_ms, is_stream, created_at, router_key_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run("log-1", "openai", "gpt-4", "p-1", 200, 100, 0, nowLocal, null);
+
+    db.prepare(
+      `INSERT INTO request_metrics (id, request_log_id, provider_id, backend_model, api_type, input_tokens, output_tokens, is_complete, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run("m-1", "log-1", "p-1", "gpt-4", "openai", 100, 50, 1, nowLocal);
+
+    const res = await app.inject({
+      method: "GET",
+      url: "/admin/api/usage/windows",
+      headers: { cookie },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(Array.isArray(body)).toBe(true);
+    expect(body.length).toBeGreaterThanOrEqual(1);
+    expect(body[0]).toHaveProperty("window");
+    expect(body[0]).toHaveProperty("usage");
+    expect(body[0].usage.request_count).toBe(1);
+    expect(body[0].usage.total_input_tokens).toBe(100);
+    expect(body[0].usage.total_output_tokens).toBe(50);
+  });
+
+  it("GET /admin/api/usage/windows supports router_key_id filter", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: "/admin/api/usage/windows?router_key_id=test-key",
+      headers: { cookie },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(Array.isArray(res.json())).toBe(true);
+  });
+
+  it("GET /admin/api/usage/weekly returns daily aggregation", async () => {
+    const now = new Date().toISOString();
+
+    db.prepare(
+      `INSERT INTO providers (id, name, api_type, base_url, api_key, is_active, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run("p-1", "Test", "openai", "https://api.openai.com", "key", 1, now, now);
+
+    db.prepare(
+      `INSERT INTO request_logs (id, api_type, model, provider_id, status_code, latency_ms, is_stream, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run("log-1", "openai", "gpt-4", "p-1", 200, 100, 0, now);
+
+    db.prepare(
+      `INSERT INTO request_metrics (id, request_log_id, provider_id, backend_model, api_type, input_tokens, output_tokens, is_complete, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run("m-1", "log-1", "p-1", "gpt-4", "openai", 200, 80, 1, now);
+
+    const res = await app.inject({
+      method: "GET",
+      url: "/admin/api/usage/weekly",
+      headers: { cookie },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(Array.isArray(body)).toBe(true);
+    expect(body.length).toBeGreaterThanOrEqual(1);
+    expect(body[0]).toHaveProperty("date");
+    expect(body[0]).toHaveProperty("request_count");
+    expect(body[0]).toHaveProperty("total_input_tokens");
+    expect(body[0]).toHaveProperty("total_output_tokens");
+  });
+
+  it("GET /admin/api/usage/monthly returns daily aggregation", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: "/admin/api/usage/monthly",
+      headers: { cookie },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(Array.isArray(res.json())).toBe(true);
   });
 });

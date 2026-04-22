@@ -54,6 +54,9 @@ const API = {
   RECOMMENDED_PROVIDERS: '/recommended/providers',
   RECOMMENDED_RETRY_RULES: '/recommended/retry-rules',
   RECOMMENDED_RELOAD: '/recommended/reload',
+  USAGE_WINDOWS: '/usage/windows',
+  USAGE_WEEKLY: '/usage/weekly',
+  USAGE_MONTHLY: '/usage/monthly',
 } as const
 
 // --- Payload types ---
@@ -214,6 +217,18 @@ interface StatsResponse {
   totalTokens: number
 }
 
+export interface UsageWindowWithUsage {
+  window: { id: string; router_key_id: string | null; start_time: string; end_time: string; created_at: string }
+  usage: { request_count: number; total_input_tokens: number; total_output_tokens: number }
+}
+
+export interface DailyUsage {
+  date: string
+  request_count: number
+  total_input_tokens: number
+  total_output_tokens: number
+}
+
 // --- Typed request helper ---
 // 解包 AxiosResponse.data，让调用方直接拿到类型化的响应体。
 
@@ -316,4 +331,11 @@ export const api = {
     getRetryRules: () => request<RecommendedRetryRule[]>('get', API.RECOMMENDED_RETRY_RULES),
     reload: () => request<{ ok: boolean }>('post', API.RECOMMENDED_RELOAD),
   },
+
+  getUsageWindows: (params?: { router_key_id?: string }) =>
+    request<UsageWindowWithUsage[]>('get', API.USAGE_WINDOWS, undefined, { params }),
+  getUsageWeekly: (params?: { router_key_id?: string }) =>
+    request<DailyUsage[]>('get', API.USAGE_WEEKLY, undefined, { params }),
+  getUsageMonthly: (params?: { router_key_id?: string }) =>
+    request<DailyUsage[]>('get', API.USAGE_MONTHLY, undefined, { params }),
 }
