@@ -2,9 +2,14 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import type { TransportResult } from "./types.js";
 import type { Target } from "./strategy/types.js";
 import type { ResilienceLayer, ResilienceResult, ResilienceConfig } from "./resilience.js";
+import type { RetryRuleMatcher } from "./retry-rules.js";
 import type { SemaphoreScope } from "./scope.js";
 import type { TrackerScope } from "./scope.js";
 import type { ActiveRequest } from "../monitor/types.js";
+
+const DEFAULT_MAX_RETRIES = 3;
+const DEFAULT_BASE_DELAY_MS = 1000;
+const DEFAULT_FAILOVER_THRESHOLD = 400;
 
 export interface OrchestratorConfig {
   resolved: Target;
@@ -22,6 +27,7 @@ export interface HandleContext {
   retryBaseDelayMs?: number;
   failoverThreshold?: number;
   isFailover?: boolean;
+  ruleMatcher?: RetryRuleMatcher;
   transportFn: (target: Target) => Promise<TransportResult>;
 }
 
@@ -93,10 +99,11 @@ export class ProxyOrchestrator {
   ): Promise<ResilienceResult> {
     if (!ctx?.transportFn) throw new Error("HandleContext.transportFn is required");
     const resilienceConfig: ResilienceConfig = {
-      maxRetries: ctx.retryMaxAttempts ?? 3,
-      baseDelayMs: ctx.retryBaseDelayMs ?? 1000,
-      failoverThreshold: ctx.failoverThreshold ?? 400,
+      maxRetries: ctx.retryMaxAttempts ?? DEFAULT_MAX_RETRIES,
+      baseDelayMs: ctx.retryBaseDelayMs ?? DEFAULT_BASE_DELAY_MS,
+      failoverThreshold: ctx.failoverThreshold ?? DEFAULT_FAILOVER_THRESHOLD,
       isFailover: ctx.isFailover ?? false,
+      ruleMatcher: ctx.ruleMatcher,
     };
     return this.deps.resilience.execute(
       () => [config.resolved],

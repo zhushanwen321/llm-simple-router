@@ -111,7 +111,7 @@ export async function handleProxyRequest(
             });
             return reply.status(e.statusCode).send(e.body);
           }
-        } catch { request.log.warn({ allowedModels: allowedModels?.slice(0, 80) }, "Invalid allowed_models JSON"); }
+        } catch { request.log.warn({ allowedModels: allowedModels?.slice(0, 80) }, "Invalid allowed_models JSON, allowing all models"); } // eslint-disable-line no-magic-numbers
       }
     }
 
@@ -150,6 +150,8 @@ export async function handleProxyRequest(
     });
 
     // transportFn 闭包捕获当前迭代的 provider/apiKey/headers/body/reply 上下文
+    // target 由 resilience 层传入但当前架构下 provider 已在闭包中确定
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const transportFn = async (_target: Target): Promise<TransportResult> => {
       if (isStream) {
         const metricsTransform = new SSEMetricsTransform(apiType, startTime, {
@@ -182,7 +184,7 @@ export async function handleProxyRequest(
             bodyObj.content[0].text += `\n\n${buildModelInfoTag(effectiveModel)}`;
             return { ...result, body: JSON.stringify(bodyObj) };
           }
-        } catch { /* ignore parse failure */ }
+        } catch { request.log.debug("Failed to inject model-info tag into non-JSON response"); }
       }
       return result;
     };
@@ -191,7 +193,7 @@ export async function handleProxyRequest(
       const resilienceResult = await deps.orchestrator.handle(
         request, reply, apiType,
         { resolved, provider, clientModel: effectiveModel, isStream },
-        { retryMaxAttempts: deps.retryMaxAttempts, retryBaseDelayMs: deps.retryBaseDelayMs, isFailover, transportFn },
+        { retryMaxAttempts: deps.retryMaxAttempts, retryBaseDelayMs: deps.retryBaseDelayMs, isFailover, ruleMatcher: deps.matcher, transportFn },
       );
       const lastLogId = logResilienceResult(
         deps.db,
