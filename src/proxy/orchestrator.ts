@@ -29,7 +29,7 @@ export class ProxyOrchestrator {
     request: FastifyRequest,
     reply: FastifyReply,
     apiType: "openai" | "anthropic",
-    upstreamPath: string,
+    _upstreamPath: string,
     errors: ProxyErrorFormatter,
     config: OrchestratorConfig,
   ): Promise<FastifyReply> {
