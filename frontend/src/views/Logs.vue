@@ -123,7 +123,12 @@
       </div>
     </div>
 
-    <LogDetailDialog ref="logDetailRef" v-model:open="logDetailOpen" />
+    <!-- Unified log detail dialog -->
+    <UnifiedRequestDialog
+      v-model:open="logDetailOpen"
+      source="history"
+      :log-entry="selectedLogEntry"
+    />
 
     <Dialog v-model:open="showCleanup">
       <DialogContent>
@@ -155,7 +160,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
-import LogDetailDialog from '@/components/monitor/LogDetailDialog.vue'
+import UnifiedRequestDialog from '@/components/request-detail/UnifiedRequestDialog.vue'
 import LogTableRow from '@/components/logs/LogTableRow.vue'
 import type { LogEntry } from '@/components/logs/types'
 import { useLogFilters } from '@/composables/useLogFilters'
@@ -187,7 +192,7 @@ const expandedRows = ref<Set<string>>(new Set())
 const childLogs = ref<Record<string, LogEntry[]>>({})
 const childLoading = ref<Record<string, boolean>>({})
 const logDetailOpen = ref(false)
-const logDetailRef = ref<InstanceType<typeof LogDetailDialog> | null>(null)
+const selectedLogEntry = ref<LogEntry | null>(null)
 
 async function toggleExpand(log: LogEntry) {
   const id = log.id
@@ -210,9 +215,15 @@ async function toggleExpand(log: LogEntry) {
   }
 }
 
-function openLogDetail(id: string) {
-  logDetailOpen.value = true
-  logDetailRef.value?.load(id)
+async function openLogDetail(id: string) {
+  try {
+    const res = await api.getLogDetail(id)
+    selectedLogEntry.value = res.data
+    logDetailOpen.value = true
+  } catch (e) {
+    console.error('Failed to load log detail:', e)
+    toast.error('加载日志详情失败')
+  }
 }
 
 async function loadLogs() {

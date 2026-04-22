@@ -155,58 +155,28 @@
       </Card>
     </div>
 
-    <!-- Request Detail Dialog -->
-    <Dialog v-model:open="requestDetailOpen">
-      <DialogScrollContent class="max-w-5xl max-h-[80vh]">
-        <DialogHeader>
-          <DialogTitle>请求详情</DialogTitle>
-        </DialogHeader>
-        <div v-if="selectedRequest" class="flex gap-4 min-h-0">
-          <!-- Left: metadata -->
-          <div class="w-[260px] shrink-0 overflow-y-auto pr-2 border-r">
-            <RequestDetailPanel :request="selectedRequest" @view-detail="openLogDetail" />
-          </div>
-          <!-- Right: response content with tabs -->
-          <div class="flex-1 min-w-0 overflow-y-auto">
-            <StreamResponseViewer
-              :metrics="selectedRequest.streamMetrics ?? null"
-              :is-stream="selectedRequest.isStream"
-              :stream-content="selectedRequest.streamContent ?? undefined"
-              :non-stream-body="nonStreamBody"
-              :loading-body="nonStreamBodyLoading"
-            />
-          </div>
-        </div>
-        <div v-else class="text-sm text-muted-foreground py-4 text-center">
-          点击请求查看详情
-        </div>
-      </DialogScrollContent>
-    </Dialog>
-
-    <!-- Log Detail Dialog -->
-    <LogDetailDialog ref="logDetailDialog" v-model:open="detailDialogOpen" />
+    <!-- Unified Request Detail Dialog -->
+    <UnifiedRequestDialog
+      v-model:open="requestDetailOpen"
+      source="realtime"
+      :request="selectedRequest"
+      :stream-content="selectedRequest?.streamContent"
+      :non-stream-body="nonStreamBody"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { onMounted } from 'vue'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  Dialog,
-  DialogHeader,
-  DialogScrollContent,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import MonitorHeader from '@/components/monitor/MonitorHeader.vue'
 import ConcurrencyPanel from '@/components/monitor/ConcurrencyPanel.vue'
 import RuntimePanel from '@/components/monitor/RuntimePanel.vue'
 import StatusCodePanel from '@/components/monitor/StatusCodePanel.vue'
-import RequestDetailPanel from '@/components/monitor/RequestDetailPanel.vue'
-import StreamResponseViewer from '@/components/monitor/StreamResponseViewer.vue'
 import ProviderStatsTable from '@/components/monitor/ProviderStatsTable.vue'
-import LogDetailDialog from '@/components/monitor/LogDetailDialog.vue'
+import UnifiedRequestDialog from '@/components/request-detail/UnifiedRequestDialog.vue'
 import { useMonitorSSE } from '@/composables/useMonitorSSE'
 import { useMonitorData } from '@/composables/useMonitorData'
 
@@ -226,7 +196,6 @@ const {
   requestDetailOpen,
   selectRequest,
   nonStreamBody,
-  nonStreamBodyLoading,
   handleSSEMessage,
   handleSSEOpen,
   handleSSEClose,
@@ -246,17 +215,6 @@ const { connect } = useMonitorSSE(
   },
   { onOpen: handleSSEOpen, onClose: handleSSEClose },
 )
-
-// --- Log detail dialog ---
-
-const detailDialogOpen = ref(false)
-const logDetailDialog = ref<InstanceType<typeof LogDetailDialog> | null>(null)
-
-function openLogDetail(id: string) {
-  requestDetailOpen.value = false
-  detailDialogOpen.value = true
-  logDetailDialog.value?.load(id)
-}
 
 // --- Helper functions ---
 
