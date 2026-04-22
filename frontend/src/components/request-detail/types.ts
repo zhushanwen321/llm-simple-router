@@ -87,6 +87,24 @@ export function fromActiveRequest(
   }
 }
 
+/**
+ * 从日志字段提取实际的响应 body。
+ * upstream_response 可能只是 {"statusCode":200, "body":null} 形式的 headers 元数据，
+ * 需要检测 body 字段是否存在真实内容。
+ */
+function extractResponseBody(responseBody: string | null, upstreamResponse: string | null): string | null {
+  if (responseBody) return responseBody
+  if (!upstreamResponse) return null
+  try {
+    const parsed = JSON.parse(upstreamResponse)
+    // headers 元数据包装格式：{ statusCode, headers, body }
+    if (typeof parsed.statusCode === 'number' && parsed.headers && !parsed.content && !parsed.choices) {
+      return typeof parsed.body === 'string' ? parsed.body : null
+    }
+    return upstreamResponse
+  } catch { return upstreamResponse }
+}
+
 export function fromLogEntry(entry: LogEntry): UnifiedRequestOverview {
   const inputTokens: number | null = null
   const outputTokens: number | null = null
@@ -122,7 +140,7 @@ export function fromLogEntry(entry: LogEntry): UnifiedRequestOverview {
     status: (entry.status_code ?? 0) >= HTTP_ERROR_THRESHOLD ? 'failed' : 'completed',
     clientRequest: entry.client_request,
     upstreamRequest: entry.upstream_request,
-    responseBody: entry.response_body ?? entry.upstream_response,
+    responseBody: extractResponseBody(entry.response_body, entry.upstream_response),
     upstreamResponse: entry.upstream_response,
     errorMessage: entry.error_message,
     createdAt: entry.created_at,

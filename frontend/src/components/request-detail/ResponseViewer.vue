@@ -23,6 +23,7 @@
         </div>
       </template>
       <p v-else-if="props.status === 'pending'" class="text-xs text-muted-foreground">等待响应数据...</p>
+      <p v-else-if="props.source === 'history' && props.isStream && !hasAnyResponseData" class="text-xs text-muted-foreground">流式响应内容未持久化存储</p>
       <p v-else class="text-xs text-muted-foreground">无响应内容</p>
     </div>
 
@@ -62,6 +63,8 @@ const props = withDefaults(defineProps<{
 })
 
 const showRaw = ref(false)
+
+const hasAnyResponseData = computed(() => !!(props.responseBody || props.upstreamResponse))
 
 // SSE composable must be called unconditionally; pass empty for realtime mode
 const sseBodyForParsing = computed(() => {
