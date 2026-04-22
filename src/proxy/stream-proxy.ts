@@ -1,6 +1,6 @@
 import { PassThrough } from "stream";
 import type { FastifyReply } from "fastify";
-import { UPSTREAM_SUCCESS } from "./types.js";
+import { UPSTREAM_SUCCESS, filterHeaders } from "./types.js";
 import type { RawHeaders, StreamState, TransportResult } from "./types.js";
 import type { MetricsResult } from "../metrics/metrics-extractor.js";
 import type { SSEMetricsTransform } from "../metrics/sse-metrics-transform.js";
@@ -12,24 +12,6 @@ import {
 
 const UPSTREAM_BAD_GATEWAY = 502;
 const BUFFER_SIZE_LIMIT = 4096;
-
-// ---------- Header filter (shared with transport.ts) ----------
-
-const SKIP_DOWNSTREAM = new Set([
-  "content-length",
-  "transfer-encoding",
-  "connection",
-  "keep-alive",
-]);
-
-function filterHeaders(raw: RawHeaders): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const [key, value] of Object.entries(raw)) {
-    if (value == null || SKIP_DOWNSTREAM.has(key.toLowerCase())) continue;
-    out[key] = Array.isArray(value) ? value.join(", ") : value;
-  }
-  return out;
-}
 
 // ---------- StreamProxy ----------
 
@@ -86,10 +68,9 @@ class StreamProxy {
     this.state = newState;
   }
 
-  private terminal(kind: StreamTerminalKind, extra: Record<string, unknown> = {}): void {
+  private terminal(kind: StreamTerminalKind, extra: Record<string, unknown> = {}, deferred = false): void {
     if (this.resolved) return;
     this.resolved = true;
-    this.cleanup();
 
     const base = {
       statusCode: this.statusCode,
@@ -110,10 +91,21 @@ class StreamProxy {
         break;
     }
 
-    if (this.resolveFn) {
-      this.resolveFn(result);
+    // deferred 模式：先 resolve 让 handler 链路（日志写入等）在 microtask 中执行，
+    // cleanup 由调用方在 setImmediate（macrotask）中处理。
+    if (deferred) {
+      if (this.resolveFn) {
+        this.resolveFn(result);
+      } else {
+        this.pendingResult = result;
+      }
     } else {
-      this.pendingResult = result;
+      this.cleanup();
+      if (this.resolveFn) {
+        this.resolveFn(result);
+      } else {
+        this.pendingResult = result;
+      }
     }
   }
 
@@ -211,27 +203,15 @@ class StreamProxy {
       this.transition("COMPLETED");
     }
 
-    // 正常完成时先 resolve Promise，让 handler 链路（日志写入等）在 microtask 中执行。
+    // 通过 terminal 的 deferred 模式统一 resolve：
+    // 先 resolve Promise，让 handler 链路（日志写入等）在 microtask 中执行。
     // reply.raw.end() 延迟到 setImmediate（macrotask），确保 microtask 先完成。
     // light-my-request 监听 reply.raw 的 end 事件判定响应完成，
     // 这保证了 inject() 返回时日志已经写入 DB。
-    this.resolved = true;
     const metrics = this.collectMetrics(true);
-    const result: TransportResult = {
-      kind: "stream_success",
-      statusCode: this.statusCode,
-      upstreamResponseHeaders: this.sseHeaders,
-      sentHeaders: this.sentUpstreamHeaders,
-      metrics,
-    };
+    this.terminal("stream_success", { metrics }, true);
 
-    if (this.resolveFn) {
-      this.resolveFn(result);
-    } else {
-      this.pendingResult = result;
-    }
-
-    // 延迟结束管道和响应，确保 handler 的 microtask（日志记录等）先执行
+    // 延迟结束管道和响应，属于 reply 层面操作，不属于 StreamProxy 状态管理
     setImmediate(() => {
       this.pipeEntry.end();
       if (this.headersSent) this.reply.raw.end();

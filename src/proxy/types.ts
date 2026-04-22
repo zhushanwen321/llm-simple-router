@@ -6,6 +6,23 @@ export const UPSTREAM_SUCCESS = 200;
 
 export type RawHeaders = Record<string, string | string[] | undefined>;
 
+/** 过滤掉不应转发给下游的 hop-by-hop headers */
+const SKIP_DOWNSTREAM = new Set([
+  "content-length",
+  "transfer-encoding",
+  "connection",
+  "keep-alive",
+]);
+
+export function filterHeaders(raw: RawHeaders): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (value == null || SKIP_DOWNSTREAM.has(key.toLowerCase())) continue;
+    out[key] = Array.isArray(value) ? value.join(", ") : value;
+  }
+  return out;
+}
+
 /**
  * 上游调用的传输层结果。
  * discriminated union，按 kind 区分 6 种情况：

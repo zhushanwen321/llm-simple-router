@@ -143,7 +143,7 @@ export class ProxyOrchestrator {
     result: ResilienceResult,
   ): { status: "completed" | "failed"; statusCode?: number } {
     const transport = result.result;
-    if (transport.kind === "success" || transport.kind === "stream_success") {
+    if (transport.kind === "success" || transport.kind === "stream_success" || transport.kind === "stream_abort") {
       return { status: "completed", statusCode: transport.statusCode };
     }
     if (transport.kind === "throw") {

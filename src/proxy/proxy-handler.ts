@@ -238,10 +238,24 @@ export async function handleProxyRequest(
       }
       if (e instanceof SemaphoreQueueFullError) {
         const err = errors.concurrencyQueueFull(provider.id);
+        insertRejectedLog({
+          db: deps.db, logId, apiType, model: effectiveModel, statusCode: err.statusCode,
+          errorMessage: `Concurrency queue full for provider '${provider.id}'`,
+          startTime, isStream, routerKeyId, originalBody, clientHeaders: cliHdrs,
+          providerId: provider.id, originalModel,
+          isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null,
+        });
         return reply.status(err.statusCode).send(err.body);
       }
       if (e instanceof SemaphoreTimeoutError) {
         const err = errors.concurrencyTimeout(provider.id, e.timeoutMs);
+        insertRejectedLog({
+          db: deps.db, logId, apiType, model: effectiveModel, statusCode: err.statusCode,
+          errorMessage: `Concurrency wait timeout for provider '${provider.id}' (${e.timeoutMs}ms)`,
+          startTime, isStream, routerKeyId, originalBody, clientHeaders: cliHdrs,
+          providerId: provider.id, originalModel,
+          isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null,
+        });
         return reply.status(err.statusCode).send(err.body);
       }
       const errMsg = e instanceof Error ? e.message : String(e);

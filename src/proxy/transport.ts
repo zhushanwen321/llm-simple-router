@@ -1,7 +1,7 @@
 import { request as httpRequestFn } from "http";
 import { request as httpsRequestFn } from "https";
 import type { FastifyReply } from "fastify";
-import { UPSTREAM_SUCCESS } from "./types.js";
+import { UPSTREAM_SUCCESS, filterHeaders } from "./types.js";
 import type { RawHeaders, TransportResult } from "./types.js";
 import type { MetricsResult } from "../metrics/metrics-extractor.js";
 import type { SSEMetricsTransform } from "../metrics/sse-metrics-transform.js";
@@ -16,13 +16,6 @@ const UPSTREAM_BAD_GATEWAY = 502;
 const UPSTREAM_SUCCESS_RANGE = 100;
 const HTTPS_DEFAULT_PORT = 443;
 const HTTP_DEFAULT_PORT = 80;
-
-const SKIP_DOWNSTREAM = new Set([
-  "content-length",
-  "transfer-encoding",
-  "connection",
-  "keep-alive",
-]);
 
 // ---------- Request utilities ----------
 
@@ -63,15 +56,6 @@ export function buildRequestOptions(
     method,
     headers,
   };
-}
-
-export function filterHeaders(raw: RawHeaders): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const [key, value] of Object.entries(raw)) {
-    if (value == null || SKIP_DOWNSTREAM.has(key.toLowerCase())) continue;
-    out[key] = Array.isArray(value) ? value.join(", ") : value;
-  }
-  return out;
 }
 
 // ---------- BuildHeaders type ----------
