@@ -1,4 +1,5 @@
 import type { RetryRuleMatcher } from "./retry-rules.js";
+import { ProviderSwitchNeeded } from "./types.js";
 import type { TransportResult } from "./types.js";
 import type { Target } from "./strategy/types.js";
 
@@ -248,6 +249,15 @@ export class ResilienceLayer {
         case "failover":
           excludedTargets.push(decision.excludeTarget);
           globalAttemptIndex++;
+          // 跨 provider failover 需要切换信号量，抛出异常让上层处理
+          const nextAvail = targets().filter(
+            t => !excludedTargets.some(e =>
+              e.backend_model === t.backend_model && e.provider_id === t.provider_id
+            ),
+          );
+          if (nextAvail.length > 0 && nextAvail[0].provider_id !== currentTarget.provider_id) {
+            throw new ProviderSwitchNeeded(nextAvail[0].provider_id);
+          }
           continue;
         case "abort":
           return { result: transportResult, attempts: allAttempts, excludedTargets };

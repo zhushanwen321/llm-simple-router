@@ -236,42 +236,48 @@ describe("ResilienceLayer.execute()", () => {
 
   it("failover：第一个 target 失败，切换到第二个", async () => {
     const layer = new ResilienceLayer();
+    const t1a = makeTarget({ backend_model: "gpt-4", provider_id: "p1" });
+    const t1b = makeTarget({ backend_model: "gpt-3.5", provider_id: "p1" });
     const fn = vi.fn()
       .mockResolvedValueOnce(makeError(500, "internal error"))
       .mockResolvedValueOnce(makeSuccess(200));
-    const targets = () => [t1, t2];
+    const targets = () => [t1a, t1b];
     const result = await layer.execute(targets, fn, failoverConfig());
     expect(result.result.kind).toBe("success");
-    expect(result.attempts[0].target).toEqual(t1);
-    expect(result.attempts[1].target).toEqual(t2);
-    expect(result.excludedTargets).toEqual([t1]);
+    expect(result.attempts[0].target).toEqual(t1a);
+    expect(result.attempts[1].target).toEqual(t1b);
+    expect(result.excludedTargets).toEqual([t1a]);
   });
 
   it("failover：所有 target 耗尽，返回最后一次失败", async () => {
     const layer = new ResilienceLayer();
+    const t1a = makeTarget({ backend_model: "gpt-4", provider_id: "p1" });
+    const t1b = makeTarget({ backend_model: "gpt-3.5", provider_id: "p1" });
     const fn = vi.fn()
       .mockResolvedValueOnce(makeError(500, "err1"))
       .mockResolvedValueOnce(makeError(503, "err2"));
-    const targets = () => [t1, t2];
+    const targets = () => [t1a, t1b];
     const result = await layer.execute(targets, fn, failoverConfig());
     expect(result.result.statusCode).toBe(503);
-    expect(result.excludedTargets).toEqual([t1, t2]);
+    expect(result.excludedTargets).toEqual([t1a, t1b]);
   });
 
-  it("failover + retry：t1 先重试 2 次再 failover 到 t2", async () => {
+  it("failover + retry：t1 先重试 2 次再 failover 到 t1b", async () => {
     const layer = new ResilienceLayer();
     const matcher = createMatcherWithDefaults();
+    const t1a = makeTarget({ backend_model: "gpt-4", provider_id: "p1" });
+    const t1b = makeTarget({ backend_model: "gpt-3.5", provider_id: "p1" });
     const fn = vi.fn()
       .mockResolvedValueOnce(makeError(429, "rate limited"))
       .mockResolvedValueOnce(makeError(429, "rate limited"))
       .mockResolvedValueOnce(makeError(429, "rate limited"))
       .mockResolvedValueOnce(makeSuccess(200));
-    const targets = () => [t1, t2];
+    const targets = () => [t1a, t1b];
     const result = await layer.execute(targets, fn, failoverConfig({ maxRetries: 2, ruleMatcher: matcher }));
     expect(result.result.kind).toBe("success");
     expect(result.attempts).toHaveLength(4);
-    expect(result.attempts.slice(0, 3).every(a => a.target === t1)).toBe(true);
-    expect(result.attempts[3].target).toEqual(t2);
+    expect(result.attempts.slice(0, 3).every(a => a.target === t1a)).toBe(true);
+    expect(result.attempts[3].target).toEqual(t1b);
   });
 
   it("stream_abort 立即中止，不重试", async () => {
@@ -285,11 +291,13 @@ describe("ResilienceLayer.execute()", () => {
 
   it("targets 懒加载：每次 failover 后重新获取", async () => {
     const layer = new ResilienceLayer();
+    const t1a = makeTarget({ backend_model: "gpt-4", provider_id: "p1" });
+    const t1b = makeTarget({ backend_model: "gpt-3.5", provider_id: "p1" });
     const fn = vi.fn()
       .mockResolvedValueOnce(makeError(500, "err"))
       .mockResolvedValueOnce(makeSuccess(200));
     let callCount = 0;
-    const targets = () => { callCount++; return callCount === 1 ? [t1, t2] : [t2]; };
+    const targets = () => { callCount++; return callCount === 1 ? [t1a, t1b] : [t1b]; };
     const result = await layer.execute(targets, fn, failoverConfig());
     expect(result.result.kind).toBe("success");
     expect(callCount).toBeGreaterThanOrEqual(2);
@@ -322,6 +330,17 @@ describe("ResilienceLayer.execute()", () => {
     const result = await layer.execute(targets, fn, failoverConfig());
     expect(result.result.statusCode).toBe(401);
     expect(result.attempts).toHaveLength(1);
+  });
+
+  it("cross-provider failover throws ProviderSwitchNeeded", async () => {
+    const layer = new ResilienceLayer();
+    const fn = vi.fn()
+      .mockResolvedValueOnce(makeError(500, "err"))
+      .mockResolvedValueOnce(makeSuccess(200));
+    const targets = () => [t1, t2];
+    await expect(
+      layer.execute(targets, fn, failoverConfig()),
+    ).rejects.toThrow("Provider switch needed: p2");
   });
 });
 
