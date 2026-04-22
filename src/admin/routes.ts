@@ -12,6 +12,7 @@ import { adminProxyEnhancementRoutes } from "./proxy-enhancement.js";
 import { adminRouterKeyRoutes } from "./router-keys.js";
 import { adminSetupRoutes } from "./setup.js";
 import { adminMonitorRoutes } from "./monitor.js";
+import { adminSettingsRoutes } from "./settings.js";
 import { adminRecommendedRoutes } from "./recommended.js";
 import { adminUsageRoutes } from "./usage.js";
 import { RetryRuleMatcher } from "../proxy/retry-rules.js";
@@ -40,6 +41,7 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (app, opti
   app.register(adminMetricsRoutes, { db: options.db });
   app.register(adminProxyEnhancementRoutes, { db: options.db });
   app.register(adminMonitorRoutes, { tracker: options.tracker });
+  app.register(adminSettingsRoutes, { db: options.db });
   app.register(adminRecommendedRoutes, { db: options.db });
   app.register(adminUsageRoutes, { db: options.db });
   done();
