@@ -1,5 +1,5 @@
 export interface ContentBlock {
-  type: 'thinking' | 'text' | 'tool_use'
+  type: 'thinking' | 'text' | 'tool_use' | 'tool_result'
   content: string
   name?: string
 }

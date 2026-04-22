@@ -89,7 +89,7 @@ function parseAnthropicContent(content: unknown[]): ContentBlock[] {
     if (b.type === 'thinking') return { type: 'thinking' as const, content: String(b.thinking ?? '') }
     if (b.type === 'text') return { type: 'text' as const, content: String(b.text ?? '') }
     if (b.type === 'tool_use') return { type: 'tool_use' as const, content: JSON.stringify(b.input ?? {}, null, JSON_INDENT), name: String(b.name ?? '') }
-    if (b.type === 'tool_result') return { type: 'tool_result' as 'tool_use', content: typeof b.content === 'string' ? b.content : JSON.stringify(b.content) }
+    if (b.type === 'tool_result') return { type: 'tool_result', content: typeof b.content === 'string' ? b.content : JSON.stringify(b.content) }
     return { type: 'text' as const, content: JSON.stringify(b) }
   })
 }
@@ -125,7 +125,7 @@ function tryDirectParse(): ContentBlock[] {
   if (!raw) return []
 
   let data: unknown
-  try { data = JSON.parse(raw) } catch { /* not valid JSON */ return [] }
+  try { data = JSON.parse(raw) } catch { /* 响应体不是合法 JSON，直接返回空数组 */ return [] }
 
   // If wrapped in { body: "..." }, unwrap
   const outer = data as Record<string, unknown>

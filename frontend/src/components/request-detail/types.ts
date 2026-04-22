@@ -106,6 +106,8 @@ function extractResponseBody(responseBody: string | null, upstreamResponse: stri
 }
 
 export function fromLogEntry(entry: LogEntry): UnifiedRequestOverview {
+  // TODO: LogEntry 当前未关联 request_metrics 表，input/output tokens 等字段暂为 null。
+  // 后续如需展示历史请求的完整指标，应联表查询 request_metrics。
   const inputTokens: number | null = null
   const outputTokens: number | null = null
   const ttftMs: number | null = null

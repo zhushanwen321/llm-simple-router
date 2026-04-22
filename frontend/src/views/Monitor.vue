@@ -179,6 +179,7 @@ import ProviderStatsTable from '@/components/monitor/ProviderStatsTable.vue'
 import UnifiedRequestDialog from '@/components/request-detail/UnifiedRequestDialog.vue'
 import { useMonitorSSE } from '@/composables/useMonitorSSE'
 import { useMonitorData } from '@/composables/useMonitorData'
+import { statusVariant, statusLabel } from '@/utils/status'
 
 // --- Data layer ---
 const {
@@ -217,24 +218,6 @@ const { connect } = useMonitorSSE(
 )
 
 // --- Helper functions ---
-
-function statusVariant(status: string): 'default' | 'destructive' | 'secondary' | 'outline' {
-  switch (status) {
-    case 'pending': return 'default'
-    case 'failed': return 'destructive'
-    case 'completed': return 'secondary'
-    default: return 'outline'
-  }
-}
-
-function statusLabel(status: string): string {
-  switch (status) {
-    case 'pending': return '进行中'
-    case 'failed': return '失败'
-    case 'completed': return '完成'
-    default: return status
-  }
-}
 
 const MS_PER_SECOND = 1000
 
