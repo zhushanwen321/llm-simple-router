@@ -90,16 +90,53 @@ export interface MetricsSummaryRow {
   cache_hit_rate: number | null;
 }
 
+// 时间跨度（秒）→ 桶大小（秒）的阶梯映射，与 BUCKET_SECONDS 保持对齐
+const BUCKET_THRESHOLDS = [
+  { maxSec: 3600, bucketSec: 60 },     // ≤1h: 1min
+  { maxSec: 21600, bucketSec: 300 },    // ≤6h: 5min
+  { maxSec: 86400, bucketSec: 900 },    // ≤1d: 15min
+  { maxSec: 604800, bucketSec: 3600 },  // ≤7d: 1h
+] as const;
+const FALLBACK_BUCKET_SEC = 14400;      // >7d: 4h
+
+function calculateBucketSeconds(startTime: string, endTime: string): number {
+  const ms = new Date(endTime).getTime() - new Date(startTime).getTime();
+  const sec = ms / MS_PER_SEC;
+  const match = BUCKET_THRESHOLDS.find((t) => sec <= t.maxSec);
+  return match ? match.bucketSec : FALLBACK_BUCKET_SEC;
+}
+
+function buildTimeCondition(
+  period: MetricsPeriod,
+  startTime?: string,
+  endTime?: string,
+): { timeWhere: string; timeParams: unknown[] } {
+  if (startTime && endTime) {
+    // request_metrics.created_at 用 datetime('now') 格式 (YYYY-MM-DD HH:MM:SS)，
+    // 前端传入 ISO 8601，需要转换格式以匹配字符串比较
+    return {
+      timeWhere: "rm.created_at >= datetime(?) AND rm.created_at < datetime(?)",
+      timeParams: [startTime, endTime],
+    };
+  }
+  return {
+    timeWhere: "rm.created_at >= datetime('now', ?)",
+    timeParams: [PERIOD_OFFSET[period]],
+  };
+}
+
 export function getMetricsSummary(
   db: Database.Database,
   period: MetricsPeriod,
   providerId?: string,
   backendModel?: string,
-  routerKeyId?: string
+  routerKeyId?: string,
+  startTime?: string,
+  endTime?: string,
 ): MetricsSummaryRow[] {
-  const offset = PERIOD_OFFSET[period];
-  const conditions = ["rm.is_complete = 1", "rm.created_at >= datetime('now', ?)"];
-  const params: unknown[] = [offset];
+  const { timeWhere, timeParams } = buildTimeCondition(period, startTime, endTime);
+  const conditions = ["rm.is_complete = 1", timeWhere];
+  const params: unknown[] = [...timeParams];
 
   if (providerId) { conditions.push("rm.provider_id = ?"); params.push(providerId); }
   if (backendModel) { conditions.push("rm.backend_model = ?"); params.push(backendModel); }
@@ -173,12 +210,16 @@ export function getMetricsTimeseries(
   metric: MetricsMetric,
   providerId?: string,
   backendModel?: string,
-  routerKeyId?: string
+  routerKeyId?: string,
+  startTime?: string,
+  endTime?: string,
 ): MetricsTimeseriesRow[] {
-  const offset = PERIOD_OFFSET[period];
-  const bucketSec = BUCKET_SECONDS[period];
-  const conditions = ["rm.is_complete = 1", "rm.created_at >= datetime('now', ?)"];
-  const params: unknown[] = [offset];
+  const bucketSec = (startTime && endTime)
+    ? calculateBucketSeconds(startTime, endTime)
+    : BUCKET_SECONDS[period];
+  const { timeWhere, timeParams } = buildTimeCondition(period, startTime, endTime);
+  const conditions = ["rm.is_complete = 1", timeWhere];
+  const params: unknown[] = [...timeParams];
 
   if (providerId) { conditions.push("rm.provider_id = ?"); params.push(providerId); }
   if (backendModel) { conditions.push("rm.backend_model = ?"); params.push(backendModel); }
