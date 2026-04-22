@@ -1,6 +1,6 @@
 <template>
   <Dialog :open="props.open" @update:open="emit('update:open', $event)">
-    <DialogContent class="max-w-6xl max-h-[85vh] p-0 overflow-hidden">
+    <DialogContent class="sm:max-w-6xl max-h-[85vh] p-0 overflow-hidden">
       <!-- Progress bar -->
       <div class="h-[3px] w-full overflow-hidden">
         <div
