@@ -247,4 +247,33 @@ describe("ProxyOrchestrator", () => {
     expect(reply.status).toHaveBeenCalledWith(429);
     expect(reply.send).toHaveBeenCalledWith("rate limited");
   });
+
+  // --- 场景 8: 信号量排队 onQueued 回调 ---
+
+  it("信号量排队时通过 withSlot 传递 onQueued 回调并更新 trackerReq", async () => {
+    const request = createMockRequest();
+    const reply = createMockReply();
+
+    let capturedOnQueued: (() => void) | undefined;
+    deps.semaphoreScope.withSlot = vi.fn((_providerId, _signal, onQueued, fn) => {
+      capturedOnQueued = onQueued;
+      return fn();
+    });
+    deps.trackerScope.track = vi.fn((_req, fn, _extractStatus) => fn());
+
+    const resilienceResult: ResilienceResult = {
+      result: successResult,
+      attempts: [{ target: { backend_model: "gpt-4", provider_id: "p1" }, attemptIndex: 0, statusCode: 200, error: null, latencyMs: 50, responseBody: null }],
+      excludedTargets: [],
+    };
+    deps.resilience.execute = vi.fn(() => Promise.resolve(resilienceResult));
+
+    await orchestrator.handle(
+      request, reply, "openai", "/v1/chat/completions", errors,
+      { resolved: { backend_model: "gpt-4", provider_id: "p1" }, provider: { id: "p1", name: "test", is_active: true, api_type: "openai", base_url: "http://localhost:8080", api_key: "enc:xxx" }, isStream: false },
+    );
+
+    expect(deps.semaphoreScope.withSlot).toHaveBeenCalledWith("p1", expect.anything(), expect.any(Function), expect.any(Function));
+    expect(capturedOnQueued).toBeDefined();
+  });
 });

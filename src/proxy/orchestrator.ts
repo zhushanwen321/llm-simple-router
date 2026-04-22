@@ -16,6 +16,15 @@ export interface OrchestratorConfig {
   isStream: boolean;
 }
 
+export interface HandleContext {
+  streamTimeoutMs?: number;
+  retryMaxAttempts?: number;
+  retryBaseDelayMs?: number;
+  failoverThreshold?: number;
+  isFailover?: boolean;
+  beforeSendProxy?: (body: Record<string, unknown>, isStream: boolean) => void;
+}
+
 export class ProxyOrchestrator {
   constructor(
     private deps: {
@@ -32,6 +41,7 @@ export class ProxyOrchestrator {
     _upstreamPath: string,
     errors: ProxyErrorFormatter,
     config: OrchestratorConfig,
+    ctx?: HandleContext,
   ): Promise<FastifyReply> {
     if (!config.resolved) {
       const err = errors.modelNotFound((request.body as any)?.model ?? "unknown");
@@ -56,7 +66,7 @@ export class ProxyOrchestrator {
         config.provider!.id,
         this.createAbortSignal(request),
         () => { trackerReq.queued = true; },
-        () => this.executeResilience(request, reply, config),
+        () => this.executeResilience(request, reply, config, ctx),
       ),
       (result) => this.extractTrackStatus(result),
     );
@@ -98,12 +108,13 @@ export class ProxyOrchestrator {
     request: FastifyRequest,
     reply: FastifyReply,
     config: OrchestratorConfig,
+    ctx?: HandleContext,
   ): Promise<ResilienceResult> {
     const resilienceConfig: ResilienceConfig = {
-      maxRetries: 3,
-      baseDelayMs: 1000,
-      failoverThreshold: 500,
-      isFailover: false,
+      maxRetries: ctx?.retryMaxAttempts ?? 3,
+      baseDelayMs: ctx?.retryBaseDelayMs ?? 1000,
+      failoverThreshold: ctx?.failoverThreshold ?? 400,
+      isFailover: ctx?.isFailover ?? false,
     };
 
     const result = await this.deps.resilience.execute(
