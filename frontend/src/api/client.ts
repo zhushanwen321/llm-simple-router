@@ -159,9 +159,8 @@ interface LogsResponse {
   limit: number
 }
 
-interface LogDetailResponse {
-  data: LogEntry
-}
+// 后端直接返回 log 对象，不包装
+type LogDetailResponse = LogEntry
 
 interface DeleteLogsResponse {
   deleted: number

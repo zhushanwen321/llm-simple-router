@@ -217,8 +217,7 @@ async function toggleExpand(log: LogEntry) {
 
 async function openLogDetail(id: string) {
   try {
-    const res = await api.getLogDetail(id)
-    selectedLogEntry.value = res.data
+    selectedLogEntry.value = await api.getLogDetail(id)
     logDetailOpen.value = true
   } catch (e) {
     console.error('Failed to load log detail:', e)

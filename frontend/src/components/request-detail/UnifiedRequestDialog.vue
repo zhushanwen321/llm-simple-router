@@ -20,6 +20,7 @@
 
       <DialogHeader class="px-4 pt-2 pb-0">
         <DialogTitle class="text-sm">请求详情</DialogTitle>
+        <DialogDescription class="sr-only">查看请求的响应内容和请求详情</DialogDescription>
       </DialogHeader>
 
       <!-- Main content area -->
@@ -76,6 +77,7 @@ import { ref, computed, watch } from 'vue'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
