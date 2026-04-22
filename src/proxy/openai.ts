@@ -4,15 +4,12 @@ import fp from "fastify-plugin";
 import { getActiveProviders } from "../db/index.js";
 import { getSetting } from "../db/settings.js";
 import { decrypt } from "../utils/crypto.js";
-import {
-  proxyGetRequest,
-  type RawHeaders,
-  handleProxyPost,
-  type ProxyHandlerDeps,
-  type ProxyErrorResponse,
-  type ProxyErrorFormatter,
-} from "./proxy-core.js";
-
+import { proxyGetRequest, type RawHeaders, type ProxyErrorResponse, type ProxyErrorFormatter } from "./proxy-core.js";
+import { handleProxyRequest, type RouteHandlerDeps } from "./proxy-handler.js";
+import { ProxyOrchestrator } from "./orchestrator.js";
+import { SemaphoreScope } from "./scope.js";
+import { TrackerScope } from "./scope.js";
+import { ResilienceLayer } from "./resilience.js";
 import { RetryRuleMatcher } from "./retry-rules.js";
 import { ProviderSemaphoreManager } from "./semaphore.js";
 import type { RequestTracker } from "../monitor/request-tracker.js";
@@ -70,9 +67,17 @@ function sendError(reply: FastifyReply, e: ProxyErrorResponse) {
 const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, done) => {
   const { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher, semaphoreManager, tracker } = opts;
 
+  const resilience = new ResilienceLayer();
+  const semaphoreScope = semaphoreManager ? new SemaphoreScope(semaphoreManager) : undefined;
+  const trackerScope = tracker ? new TrackerScope(tracker) : undefined;
+  const orchestrator = (semaphoreScope && trackerScope)
+    ? new ProxyOrchestrator({ semaphoreScope, trackerScope, resilience })
+    : undefined;
+
   app.post(CHAT_COMPLETIONS_PATH, async (request, reply) => {
-    const deps: ProxyHandlerDeps = { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher, semaphoreManager, tracker };
-    return handleProxyPost(request, reply, "openai", CHAT_COMPLETIONS_PATH, openaiErrors, deps, {
+    if (!orchestrator) return sendError(reply, openaiErrors.providerUnavailable());
+    const deps: RouteHandlerDeps = { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher, tracker, orchestrator };
+    return handleProxyRequest(request, reply, "openai", CHAT_COMPLETIONS_PATH, openaiErrors, deps, {
       beforeSendProxy: (body, isStream) => {
         if (isStream && !body.stream_options) {
           body.stream_options = { include_usage: true };

@@ -1,12 +1,12 @@
 import Database from "better-sqlite3";
 import type { FastifyPluginCallback } from "fastify";
 import fp from "fastify-plugin";
-import {
-  handleProxyPost,
-  type ProxyHandlerDeps,
-  type ProxyErrorFormatter,
-} from "./proxy-core.js";
-
+import type { ProxyErrorFormatter } from "./proxy-core.js";
+import { handleProxyRequest, type RouteHandlerDeps } from "./proxy-handler.js";
+import { ProxyOrchestrator } from "./orchestrator.js";
+import { SemaphoreScope } from "./scope.js";
+import { TrackerScope } from "./scope.js";
+import { ResilienceLayer } from "./resilience.js";
 import { RetryRuleMatcher } from "./retry-rules.js";
 import { ProviderSemaphoreManager } from "./semaphore.js";
 import type { RequestTracker } from "../monitor/request-tracker.js";
@@ -57,9 +57,20 @@ const anthropicErrors: ProxyErrorFormatter = {
 const anthropicProxyRaw: FastifyPluginCallback<AnthropicProxyOptions> = (app, opts, done) => {
   const { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher, semaphoreManager, tracker } = opts;
 
+  const resilience = new ResilienceLayer();
+  const semaphoreScope = semaphoreManager ? new SemaphoreScope(semaphoreManager) : undefined;
+  const trackerScope = tracker ? new TrackerScope(tracker) : undefined;
+  const orchestrator = (semaphoreScope && trackerScope)
+    ? new ProxyOrchestrator({ semaphoreScope, trackerScope, resilience })
+    : undefined;
+
   app.post(MESSAGES_PATH, async (request, reply) => {
-    const deps: ProxyHandlerDeps = { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher, semaphoreManager, tracker };
-    return handleProxyPost(request, reply, "anthropic", MESSAGES_PATH, anthropicErrors, deps);
+    if (!orchestrator) {
+      const e = anthropicErrors.providerUnavailable();
+      return reply.status(e.statusCode).send(e.body);
+    }
+    const deps: RouteHandlerDeps = { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher, tracker, orchestrator };
+    return handleProxyRequest(request, reply, "anthropic", MESSAGES_PATH, anthropicErrors, deps);
   });
 
   done();
