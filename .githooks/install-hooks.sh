@@ -42,6 +42,7 @@ cat > "$GIT_HOOKS_DIR/pre-commit" << 'HOOK_EOF'
 # 环境变量（跳过特定检查）：
 #   SKIP_ALL_CHECKS=1         - 跳过所有检查
 #   SKIP_FRONTEND_LINT=1      - 跳过前端 ESLint
+#   SKIP_TYPE_CHECK=1         - 跳过 vue-tsc 类型检查
 #   SKIP_CODE_RULES_CHECK=1   - 跳过自定义代码规范检查
 
 set -e
@@ -123,7 +124,37 @@ if [ -n "$FRONTEND_FILES" ]; then
 fi
 
 # ============================================================================
-# 2. 自定义代码规范检查（原生 HTML 元素、Emoji、自定义 CSS）
+# 2. 前端 vue-tsc 类型检查（与 CI 等价）
+# ============================================================================
+
+if [ -n "$FRONTEND_FILES" ]; then
+    print_section "[前端 vue-tsc 类型检查]"
+
+    if [ "$SKIP_TYPE_CHECK" != "1" ]; then
+        CHANGED_VUE_TS=$(echo "$FRONTEND_FILES" | grep -E "\.(vue|ts)$" || true)
+
+        if [ -n "$CHANGED_VUE_TS" ]; then
+            echo -e "${BLUE}[INFO] 清除增量缓存，执行全量类型检查...${NC}"
+
+            rm -rf frontend/node_modules/.tmp/tsconfig.app.tsbuildinfo 2>/dev/null || true
+
+            if ! (cd frontend && npx vue-tsc -b 2>&1); then
+                echo ""
+                echo -e "${RED}[ERROR] vue-tsc 类型检查失败${NC}"
+                exit 1
+            fi
+
+            echo -e "${GREEN}[OK] vue-tsc 类型检查通过${NC}"
+        else
+            echo -e "${GREEN}[OK] 无 .vue/.ts 文件变更${NC}"
+        fi
+    else
+        echo -e "${YELLOW}[SKIP] vue-tsc 类型检查已跳过${NC}"
+    fi
+fi
+
+# ============================================================================
+# 3. 自定义代码规范检查（原生 HTML 元素、Emoji、自定义 CSS）
 # ============================================================================
 
 print_section "[代码规范检查]"
@@ -173,6 +204,7 @@ echo ""
 echo -e "${CYAN}提示: 跳过检查的环境变量:${NC}"
 echo -e "  ${YELLOW}SKIP_ALL_CHECKS=1${NC}          - 跳过所有"
 echo -e "  ${YELLOW}SKIP_FRONTEND_LINT=1${NC}      - 跳过 ESLint"
+echo -e "  ${YELLOW}SKIP_TYPE_CHECK=1${NC}          - 跳过 vue-tsc"
 echo -e "  ${YELLOW}SKIP_CODE_RULES_CHECK=1${NC}   - 跳过代码规范"
 echo ""
 
@@ -195,6 +227,7 @@ echo -e "${BLUE}======================================${NC}"
 echo ""
 echo -e "${CYAN}已安装的检查项目:${NC}"
 echo -e "  ${GREEN}[+]${NC} 前端 ESLint 代码检查"
+echo -e "  ${GREEN}[+]${NC} vue-tsc 类型检查（全量，与 CI 等价）"
 echo -e "  ${GREEN}[+]${NC} Vue 组件规范检查（禁止原生 HTML、Emoji、自定义 CSS）"
 echo ""
 echo -e "${CYAN}Hook 脚本位置:${NC} .githooks/"
