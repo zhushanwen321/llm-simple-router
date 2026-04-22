@@ -4,15 +4,15 @@ import type { Target } from "./strategy/types.js";
 import type { ResilienceLayer, ResilienceResult, ResilienceConfig } from "./resilience.js";
 import type { SemaphoreScope } from "./scope.js";
 import type { TrackerScope } from "./scope.js";
-import type { ProxyErrorFormatter } from "./proxy-core.js";
 import type { ActiveRequest } from "../monitor/types.js";
 
 export interface OrchestratorConfig {
-  resolved: Target | null;
+  resolved: Target;
   provider: {
     id: string; name: string; is_active: boolean; api_type: string;
     base_url: string; api_key: string;
-  } | null;
+  };
+  clientModel: string;
   isStream: boolean;
 }
 
@@ -22,7 +22,7 @@ export interface HandleContext {
   retryBaseDelayMs?: number;
   failoverThreshold?: number;
   isFailover?: boolean;
-  beforeSendProxy?: (body: Record<string, unknown>, isStream: boolean) => void;
+  transportFn: (target: Target) => Promise<TransportResult>;
 }
 
 export class ProxyOrchestrator {
@@ -38,39 +38,22 @@ export class ProxyOrchestrator {
     request: FastifyRequest,
     reply: FastifyReply,
     apiType: "openai" | "anthropic",
-    _upstreamPath: string,
-    errors: ProxyErrorFormatter,
     config: OrchestratorConfig,
     ctx?: HandleContext,
-  ): Promise<FastifyReply> {
-    if (!config.resolved) {
-      const err = errors.modelNotFound((request.body as any)?.model ?? "unknown");
-      return reply.status(err.statusCode).send(err.body);
-    }
-
-    if (!config.provider || !config.provider.is_active) {
-      const err = errors.providerUnavailable();
-      return reply.status(err.statusCode).send(err.body);
-    }
-
-    if (config.provider.api_type !== apiType) {
-      const err = errors.providerTypeMismatch();
-      return reply.status(err.statusCode).send(err.body);
-    }
-
+  ): Promise<ResilienceResult> {
     const trackerReq = this.buildActiveRequest(request, config, apiType);
-
-    await this.deps.trackerScope.track<ResilienceResult>(
+    const result = await this.deps.trackerScope.track<ResilienceResult>(
       trackerReq,
       () => this.deps.semaphoreScope.withSlot(
-        config.provider!.id,
+        config.provider.id,
         this.createAbortSignal(request),
         () => { trackerReq.queued = true; },
-        () => this.executeResilience(request, reply, config, ctx),
+        () => this.executeResilience(config, ctx),
       ),
       (result) => this.extractTrackStatus(result),
     );
-    return reply;
+    this.sendResponse(reply, result.result);
+    return result;
   }
 
   private buildActiveRequest(
@@ -81,9 +64,9 @@ export class ProxyOrchestrator {
     return {
       id: crypto.randomUUID(),
       apiType,
-      model: (request.body as any)?.model ?? "unknown",
-      providerId: config.provider!.id,
-      providerName: config.provider!.name,
+      model: config.clientModel,
+      providerId: config.provider.id,
+      providerName: config.provider.name,
       isStream: config.isStream,
       queued: false,
       startTime: Date.now(),
@@ -105,68 +88,33 @@ export class ProxyOrchestrator {
   }
 
   private async executeResilience(
-    request: FastifyRequest,
-    reply: FastifyReply,
     config: OrchestratorConfig,
     ctx?: HandleContext,
   ): Promise<ResilienceResult> {
+    if (!ctx?.transportFn) throw new Error("HandleContext.transportFn is required");
     const resilienceConfig: ResilienceConfig = {
-      maxRetries: ctx?.retryMaxAttempts ?? 3,
-      baseDelayMs: ctx?.retryBaseDelayMs ?? 1000,
-      failoverThreshold: ctx?.failoverThreshold ?? 400,
-      isFailover: ctx?.isFailover ?? false,
+      maxRetries: ctx.retryMaxAttempts ?? 3,
+      baseDelayMs: ctx.retryBaseDelayMs ?? 1000,
+      failoverThreshold: ctx.failoverThreshold ?? 400,
+      isFailover: ctx.isFailover ?? false,
     };
-
-    const result = await this.deps.resilience.execute(
-      () => [config.resolved!],
-      async (target: Target) => this.callTransport(target, request, config),
+    return this.deps.resilience.execute(
+      () => [config.resolved],
+      ctx.transportFn,
       resilienceConfig,
     );
-
-    this.sendResponse(reply, result.result, config.isStream);
-    return result;
   }
 
-  private async callTransport(
-    target: Target,
-    _request: FastifyRequest,
-    _config: OrchestratorConfig,
-  ): Promise<TransportResult> {
-    void target;
-    throw new Error("callTransport not yet implemented");
-  }
-
-  private sendResponse(
-    reply: FastifyReply,
-    result: TransportResult,
-    isStream: boolean,
-  ): void {
-    if (result.kind === "stream_success" || result.kind === "stream_abort") {
+  private sendResponse(reply: FastifyReply, result: TransportResult): void {
+    if (result.kind === "stream_success" || result.kind === "stream_abort" || result.kind === "throw") {
       return;
     }
-
-    if (result.kind === "throw") {
-      return;
-    }
-
-    if (isStream && result.kind === "stream_error") {
-      if (result.headers) {
-        for (const [key, value] of Object.entries(result.headers)) {
-          reply.header(key, value);
-        }
+    if (result.headers) {
+      for (const [key, value] of Object.entries(result.headers)) {
+        reply.header(key, value);
       }
-      reply.status(result.statusCode).send(result.body);
-      return;
     }
-
-    if (result.kind === "success" || result.kind === "error") {
-      if (result.headers) {
-        for (const [key, value] of Object.entries(result.headers)) {
-          reply.header(key, value);
-        }
-      }
-      reply.status(result.statusCode).send(result.body);
-    }
+    reply.status(result.statusCode).send(result.body);
   }
 
   private extractTrackStatus(
@@ -176,9 +124,9 @@ export class ProxyOrchestrator {
     if (transport.kind === "success" || transport.kind === "stream_success") {
       return { status: "completed", statusCode: transport.statusCode };
     }
-    if ("statusCode" in transport) {
-      return { status: "failed", statusCode: transport.statusCode };
+    if (transport.kind === "throw") {
+      return { status: "failed" };
     }
-    return { status: "failed" };
+    return { status: "failed", statusCode: transport.statusCode };
   }
 }
