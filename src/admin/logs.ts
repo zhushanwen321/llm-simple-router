@@ -58,7 +58,7 @@ export const adminLogRoutes: FastifyPluginCallback<LogRoutesOptions> = (app, opt
     if (!log) {
       return reply.code(HTTP_NOT_FOUND).send({ error: { message: "Log not found" } });
     }
-    return reply.send({ data: log });
+    return reply.send(log);
   });
 
   app.get("/admin/api/logs/:id/children", async (request, reply) => {
@@ -68,7 +68,7 @@ export const adminLogRoutes: FastifyPluginCallback<LogRoutesOptions> = (app, opt
       return reply.code(HTTP_NOT_FOUND).send({ error: { message: "Log not found" } });
     }
     const rows = getRequestLogChildren(db, params.id);
-    return reply.send({ data: rows });
+    return reply.send(rows);
   });
 
   app.delete("/admin/api/logs/before", { schema: { body: DeleteLogsBeforeSchema } }, async (request, reply) => {

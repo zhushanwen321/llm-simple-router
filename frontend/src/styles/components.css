@@ -1,3 +1,32 @@
 @layer components {
-  /* 通用组件类 — 按需扩展 */
+  /* === 状态 Badge 颜色 === */
+  .badge-pending { background-color: var(--color-warning-light); color: var(--color-warning-dark); }
+  .badge-error { background-color: var(--color-danger-light); color: var(--color-danger-dark); }
+  .badge-success { background-color: var(--color-success-light); color: var(--color-success-dark); }
+
+  .dot-pending { background-color: var(--color-warning); }
+  .dot-success { background-color: var(--color-success); }
+
+  /* === 角色色 === */
+  .badge-role-user { background-color: var(--color-role-user-bg); color: var(--color-role-user); }
+  .badge-role-assistant { background-color: var(--color-role-assistant-bg); color: var(--color-role-assistant); }
+  .badge-role-tool { background-color: var(--color-role-tool-bg); color: var(--color-role-tool); }
+  .badge-role-thinking { background-color: var(--color-role-thinking-bg); color: var(--color-role-thinking); }
+
+  /* === 内容块背景 === */
+  .block-thinking { background-color: var(--color-role-thinking-bg); }
+  .block-tool-use { background-color: var(--color-role-tool-bg); }
+  .block-tool-result { background-color: var(--color-role-user-bg); }
+  .block-thinking-content { background-color: oklch(from var(--color-role-thinking-bg) l c h / 0.5); color: var(--muted-foreground); }
+  .block-tool-use-content { background-color: oklch(from var(--color-role-tool-bg) l c h / 0.5); }
+  .block-tool-result-content { background-color: oklch(from var(--color-role-user-bg) l c h / 0.5); }
+
+  /* === Diff 标记 === */
+  .diff-modified { background-color: var(--color-warning-light); border-color: var(--color-warning); }
+  .diff-removed { color: var(--color-danger); }
+  .diff-added { color: var(--color-success); }
+
+  /* === 进度条 === */
+  .progress-active { background-color: var(--color-success); }
+  .progress-failed { background-color: var(--color-danger); }
 }

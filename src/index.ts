@@ -25,7 +25,7 @@ function getProxyApiType(url: string): string | null {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 import { getConfig, Config } from "./config.js";
-import { initDatabase, getAllProviders } from "./db/index.js";
+import { initDatabase, getAllProviders, backfillMetricsFromRequestMetrics } from "./db/index.js";
 import { loadRecommendedConfig } from "./config/recommended.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { openaiProxy } from "./proxy/openai.js";
@@ -36,6 +36,7 @@ import { ProviderSemaphoreManager } from "./proxy/semaphore.js";
 import { RequestTracker } from "./monitor/request-tracker.js";
 import { modelState } from "./proxy/model-state.js";
 import { UsageWindowTracker } from "./proxy/usage-window-tracker.js";
+import { scheduleLogCleanup } from "./db/log-cleaner.js";
 import fastifyStatic from "@fastify/static";
 import Database from "better-sqlite3";
 
@@ -56,10 +57,12 @@ export async function buildApp(
 
   // 允许外部传入已初始化的 DB（测试用），否则自行创建
   let db: Database.Database;
+  let shouldBackfill = false;
   if (options?.db) {
     db = options.db;
   } else {
     db = initDatabase(config.DB_PATH);
+    shouldBackfill = true;
   }
 
   const isDev = process.env.NODE_ENV !== "production";
@@ -128,6 +131,14 @@ export async function buildApp(
   });
 
   loadRecommendedConfig();
+
+  // 启动时回填：补齐回退老版本期间缺失的 metrics 冗余列
+  if (shouldBackfill) {
+    const backfilled = backfillMetricsFromRequestMetrics(db);
+    if (backfilled > 0) {
+      app.log.info({ backfilled }, "Backfilled metrics from request_metrics");
+    }
+  }
 
   // 注入 DB 到 modelState 单例，启用会话级持久化
   modelState.init(db);
@@ -214,11 +225,14 @@ export async function buildApp(
     return { status: "ok" };
   });
 
+  const logCleanup = scheduleLogCleanup(db, app.log);
+
   return {
     app,
     db,
     usageWindowTracker,
     close: async () => {
+      logCleanup.stop();
       tracker.stopPushInterval();
       await app.close();
       db.close();

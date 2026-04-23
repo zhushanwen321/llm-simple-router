@@ -29,6 +29,7 @@ export interface ActiveRequest {
   streamMetrics?: StreamMetricsSnapshot;
   streamContent?: StreamContentSnapshot;
   clientIp?: string;
+  sessionId?: string;
   completedAt?: number;
 }
 
@@ -42,7 +43,9 @@ export interface AttemptSnapshot {
 export interface StreamMetricsSnapshot {
   inputTokens: number | null;
   outputTokens: number | null;
+  cacheReadTokens: number | null;
   ttftMs: number | null;
+  tokensPerSecond: number | null;
   stopReason: string | null;
   isComplete: boolean;
 }

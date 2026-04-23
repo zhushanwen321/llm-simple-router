@@ -159,9 +159,8 @@ interface LogsResponse {
   limit: number
 }
 
-interface LogDetailResponse {
-  data: LogEntry
-}
+// 后端直接返回 log 对象，不包装
+type LogDetailResponse = LogEntry
 
 interface DeleteLogsResponse {
   deleted: number
@@ -256,8 +255,8 @@ async function request<T>(
 // --- API ---
 
 export const api = {
-  login: (password: string) => client.post(API.LOGIN, { password }),
-  logout: () => client.post(API.LOGOUT),
+  login: (password: string) => request<void>('post', API.LOGIN, { password }),
+  logout: () => request<void>('post', API.LOGOUT),
 
   getSetupStatus: () => request<{ initialized: boolean }>('get', '/setup/status'),
   initializeSetup: (password: string) => request<{ success: boolean }>('post', '/setup/initialize', { password }),
@@ -275,9 +274,11 @@ export const api = {
   getLogs: (params: { page: number; limit: number; api_type?: string; router_key_id?: string; provider_id?: string; model?: string; start_time?: string; end_time?: string; view?: string }) =>
     request<LogsResponse>('get', API.LOGS, undefined, { params }),
   getLogDetail: (id: string) => request<LogDetailResponse>('get', `${API.LOGS}/${id}`),
-  getLogChildren: (id: string) => request<{ data: LogEntry[] }>('get', `${API.LOGS}/${id}/children`),
+  getLogChildren: (id: string) => request<LogEntry[]>('get', `${API.LOGS}/${id}/children`),
   deleteLogsBefore: (before: string) =>
     request<DeleteLogsResponse>('delete', `${API.LOGS}/before`, { before }),
+  getLogRetention: () => request<{ days: number }>('get', '/settings/log-retention'),
+  setLogRetention: (days: number) => request<{ days: number }>('put', '/settings/log-retention', { days }),
 
   getStats: (params?: { period?: string; router_key_id?: string }) =>
     request<StatsResponse>('get', API.STATS, undefined, { params }),

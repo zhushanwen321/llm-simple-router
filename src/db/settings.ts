@@ -12,3 +12,12 @@ export function setSetting(db: Database.Database, key: string, value: string): v
 export function isInitialized(db: Database.Database): boolean {
   return getSetting(db, "initialized") === "true";
 }
+
+export function getLogRetentionDays(db: Database.Database): number {
+  const val = getSetting(db, "log_retention_days");
+  return val ? parseInt(val, 10) : 3;
+}
+
+export function setLogRetentionDays(db: Database.Database, days: number): void {
+  setSetting(db, "log_retention_days", String(days));
+}

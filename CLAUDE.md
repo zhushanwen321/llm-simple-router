@@ -54,16 +54,23 @@ seedDefaultRules → ModelStateManager.init → RetryRuleMatcher.load
 → authMiddleware → openaiProxy → anthropicProxy → adminRoutes → fastifyStatic
 ```
 
-**代理层 `src/proxy/`：**
+**代理层 `src/proxy/`（三层架构：Handler → Orchestrator → Transport）：**
 
 | 文件 | 角色 |
 |------|------|
-| `proxy-core.ts` | 共享核心：`handleProxyPost()` 处理完整请求生命周期（增强→映射→信号量→上游调用→重试→failover→日志→指标） |
+| `proxy-handler.ts` | **Handler 层**：`handleProxyRequest()` — Fastify 路由回调，负责映射解析、header 构建、日志记录，调用 Orchestrator |
+| `orchestrator.ts` | **Orchestrator 层**：`ProxyOrchestrator` — 协调信号量、tracker、resilience 三大 scope，驱动重试/failover 循环 |
+| `resilience.ts` | 重试决策层（替代旧 `retry.ts`）：`ResilienceLayer` + fixed/exponential 策略，判断是否重试/failover |
+| `transport.ts` | **Transport 层**：底层 HTTP 调用 `callNonStream()`/`callGet()`，构建原始 `http.request` |
+| `stream-proxy.ts` | SSE 流式代理引擎：`StreamProxy` 类管理缓冲状态机 + `SSEMetricsTransform` 旁路采集 |
+| `scope.ts` | 信号量/追踪器 scope 包装：`SemaphoreScope`（acquire/release）+ `TrackerScope`（start/complete） |
+| `proxy-logging.ts` | 日志工具：header 脱敏、拦截日志、resilience 结果日志、transport 指标采集 |
+| `log-helpers.ts` | DB 日志插入：`insertSuccessLog()` / `insertRejectedLog()`，携带 failover/retry 元数据 |
+| `proxy-core.ts` | 共享工具：错误格式化工厂、上游 header 构建、GET 代理。Re-export `types.ts` 和 `transport.ts` 类型 |
+| `types.ts` | 代理层常量和类型：`UPSTREAM_SUCCESS`、`RawHeaders`、`TransportResult`、`ProviderSwitchNeeded` |
 | `openai.ts` | OpenAI 代理插件（`POST /v1/chat/completions`、`GET /v1/models`），注入 `stream_options` |
 | `anthropic.ts` | Anthropic 代理插件（`POST /v1/messages`），与 openai.ts 对称 |
-| `upstream-call.ts` | 底层上游 HTTP 调用：`proxyNonStream()`、`proxyStream()`（PassThrough 管道 + 空闲超时）、`proxyGetRequest()` |
 | `semaphore.ts` | Provider 级并发控制：基于 Promise 的等待队列，支持 AbortSignal 和超时 |
-| `retry.ts` | 重试执行器 `retryableCall()`：支持 fixed/exponential 策略，解析 Retry-After header |
 | `retry-rules.ts` | `RetryRuleMatcher`：从 DB 加载规则到内存，按 status_code 分组缓存 |
 | `enhancement-handler.ts` | 代理增强：指令解析、命令拦截、会话记忆 |
 | `directive-parser.ts` | 从 user 消息中提取 `$SELECT-MODEL` / `[router-model]` / `[router-command]` 标记 |
@@ -72,16 +79,16 @@ seedDefaultRules → ModelStateManager.init → RetryRuleMatcher.load
 | `mapping-resolver.ts` | 将 client_model 解析为 `{ backend_model, provider_id }` |
 | `strategy/` | 四种路由策略：`scheduled`（定时）、`round-robin`（轮询）、`random`（随机）、`failover`（故障转移） |
 
-**请求处理流程（`handleProxyPost`）：**
+**请求处理流程（三层调用链）：**
 ```
-applyEnhancement（指令解析→历史清理→会话记忆→命令拦截）
-→ resolveMapping（查找 group→应用策略→白名单校验）
-→ 获取 Provider（校验 is_active、api_type）
-→ semaphoreManager.acquire（队列满→503，超时→504）
-→ 上游调用（带重试）
-→ 记录日志 + 采集指标
-→ Failover 检查（strategy=failover 时循环尝试下一个 target）
-→ semaphoreManager.release
+Handler (proxy-handler.ts)
+  applyEnhancement → resolveMapping → buildHeaders
+  → orchestrator.execute()
+    → SemaphoreScope.acquire（队列满→503，超时→504）
+    → ResilienceLayer（transportFn 循环：重试/failover 决策）
+      → Transport (transport.ts / stream-proxy.ts)
+    → TrackerScope.complete
+  → insertSuccessLog + collectTransportMetrics
 ```
 
 **认证 `src/middleware/`：**
@@ -93,7 +100,7 @@ applyEnhancement（指令解析→历史清理→会话记忆→命令拦截）
 - 按领域拆分文件：`providers.ts`、`mappings.ts`、`logs.ts`、`metrics.ts`、`stats.ts`、`retry-rules.ts`、`router-keys.ts`、`settings.ts`、`session-states.ts`、`helpers.ts`
 - `helpers.ts` 提供 `buildUpdateQuery()`（白名单过滤安全字段的通用 UPDATE）和 `deleteById()`
 
-**数据表（17 个迁移，11 张表）：**
+**数据表（19 个迁移，11 张表）：**
 
 | 表 | 核心用途 |
 |----|---------|
@@ -147,7 +154,7 @@ applyEnhancement（指令解析→历史清理→会话记忆→命令拦截）
 | `/monitor` | Monitor.vue | 是 |
 
 **关键模式：**
-- 无 Pinia/Vuex：使用 composable（`useMetrics`、`useClipboard`）+ 组件本地 `ref`/`computed`
+- 无 Pinia/Vuex：使用 composable（`useMetrics`、`useClipboard`、`useLogs`、`useMonitorSSE`、`useMonitorData`）+ 组件本地 `ref`/`computed`
 - API 客户端（`frontend/src/api/client.ts`）：axios + Cookie 认证，401 自动跳登录，`request<T>()` 解包响应
 - Toast 错误处理：所有异步操作用 `vue-sonner` 的 `toast.error()`/`toast.success()`
 - 并行请求用 `Promise.allSettled`（不使用 `Promise.all`）
@@ -159,13 +166,13 @@ applyEnhancement（指令解析→历史清理→会话记忆→命令拦截）
 ### 关键设计决策
 
 - 代理使用原生 Node.js `http.request` 而非 axios，因为需要直接操作 SSE 流
+- 代理层采用三层架构：Handler（路由处理）→ Orchestrator（信号量/追踪器/resilience 协调）→ Transport（HTTP 调用），替代旧的单函数 `handleProxyPost()`
 - `fastify-plugin (fp)` 包装代理插件以打破 Fastify 封装，使 hook 作用于全局
 - 数据库在 `initDatabase()` 时自动创建目录和执行迁移，无需手动建表
 - 测试中通过 `buildApp({ config, db })` 注入内存数据库，不做 DB 层 mock
-- SSE 流式代理使用 `PassThrough` 管道 + 空闲超时，防止连接泄漏和 EPIPE 崩溃
-- Failover 策略通过 `excludeTargets` 累积排除 + `while(true)` 循环实现
+- SSE 流式代理使用 `StreamProxy` 状态机 + `SSEMetricsTransform` 旁路采集指标，不修改业务数据流
+- Resilience 层统一处理重试（fixed/exponential）和 failover 决策，替代旧 `retry.ts`
 - 信号量按 Provider 维度独立管理，基于 Promise 队列，支持 AbortSignal（客户端断连自动取消）
-- 指标采集通过 Transform stream 旁路实现，不修改业务数据流
 
 ## 环境变量
 
@@ -185,7 +192,7 @@ applyEnhancement（指令解析→历史清理→会话记忆→命令拦截）
 
 **辅助函数模式**（多文件重复定义）：`createMockBackend()`、`closeServer()`、`buildTestApp()`、`insertMockBackend()`、`insertModelMapping()`
 
-**覆盖范围（34 个测试文件）：** 加密、认证、数据库、配置、SSE 解析、指标提取、4 种路由策略、重试、并发信号量、代理转发（OpenAI/Anthropic）、Admin API（7 个 CRUD 测试）、监控
+**覆盖范围（40 个测试文件）：** 加密、认证、数据库、配置、SSE 解析、指标提取、4 种路由策略、resilience 重试、并发信号量、代理转发（OpenAI/Anthropic）、Admin API（7 个 CRUD 测试）、监控、日志清理
 
 ## 代码质量工具
 

@@ -1,0 +1,144 @@
+<template>
+  <div class="w-[280px] border-r pr-3 flex-shrink-0 overflow-y-auto space-y-3">
+    <!-- Row 1: model @ provider -->
+    <div class="flex items-baseline gap-1 min-w-0">
+      <span class="font-mono text-[11px] font-semibold truncate min-w-0">{{ overview.model }}</span>
+      <span v-if="overview.providerName" class="text-[10px] text-muted-foreground flex-shrink-0">@ {{ overview.providerName }}</span>
+    </div>
+
+    <!-- Row 2: status + SSE + apiType -->
+    <div class="flex items-center gap-1.5">
+      <Badge v-if="statusColor === 'pending'" class="badge-pending">
+        <span class="w-1.5 h-1.5 rounded-full dot-pending animate-pulse" />
+        进行中
+      </Badge>
+      <Badge v-else-if="statusColor === 'error'" class="badge-error">
+        {{ overview.statusCode ?? '失败' }}
+      </Badge>
+      <Badge v-else class="badge-success">
+        <span class="w-1.5 h-1.5 rounded-full dot-success" />
+        已完成
+      </Badge>
+
+      <Badge variant="outline">{{ overview.isStream ? 'SSE' : '非流式' }}</Badge>
+      <Badge variant="outline">{{ overview.apiType }}</Badge>
+    </div>
+
+    <!-- Row 3: session (conditional) -->
+    <div v-if="overview.sessionId" class="flex items-center gap-1.5">
+      <Badge variant="secondary" class="text-[10px]">Session</Badge>
+      <span class="font-mono text-[11px] text-muted-foreground truncate">{{ overview.sessionId.slice(0, 8) }}</span>
+    </div>
+
+    <!-- Metrics grid -->
+    <div class="grid grid-cols-2 gap-1.5">
+      <div class="bg-muted/50 rounded-md px-2 py-1.5 min-w-0">
+        <div class="text-[10px] text-muted-foreground">延迟</div>
+        <div class="text-sm font-semibold truncate">{{ latencyText }}</div>
+      </div>
+      <div class="bg-muted/50 rounded-md px-2 py-1.5 min-w-0">
+        <div class="text-[10px] text-muted-foreground">TTFT</div>
+        <div class="text-sm font-semibold truncate">{{ overview.ttftMs != null ? `${overview.ttftMs}ms` : '--' }}</div>
+      </div>
+      <div class="bg-muted/50 rounded-md px-2 py-1.5 min-w-0">
+        <div class="text-[10px] text-muted-foreground">Input Tokens</div>
+        <div class="text-sm font-semibold truncate">{{ overview.inputTokens != null ? overview.inputTokens : '--' }}</div>
+      </div>
+      <div class="bg-muted/50 rounded-md px-2 py-1.5 min-w-0">
+        <div class="text-[10px] text-muted-foreground">Output Tokens</div>
+        <div class="text-sm font-semibold truncate" :class="isOutputPending ? 'diff-added' : ''">{{ outputTokenText }}</div>
+      </div>
+      <div class="bg-muted/50 rounded-md px-2 py-1.5 min-w-0">
+        <div class="text-[10px] text-muted-foreground">速度 (tok/s)</div>
+        <div class="text-sm font-semibold truncate">{{ speedText }}</div>
+      </div>
+      <div class="bg-muted/50 rounded-md px-2 py-1.5 min-w-0">
+        <div class="text-[10px] text-muted-foreground">Cache Read</div>
+        <div class="text-sm font-semibold truncate">{{ overview.cacheReadTokens != null ? overview.cacheReadTokens : '--' }}</div>
+      </div>
+    </div>
+
+    <Separator />
+
+    <!-- Attempt history -->
+    <div class="space-y-1.5">
+      <span class="text-[10px] text-muted-foreground uppercase tracking-wider">尝试历史</span>
+      <div v-if="overview.attempts.length === 0" class="text-[11px] text-muted-foreground">无重试</div>
+      <div
+        v-for="(attempt, i) in overview.attempts"
+        :key="i"
+        class="flex items-center gap-1 text-[11px]"
+      >
+        <span class="text-muted-foreground">#{{ i + 1 }}</span>
+        <span :class="isAttemptError(attempt.statusCode) ? 'diff-removed' : 'diff-added'">
+          {{ attempt.statusCode ?? '--' }}
+        </span>
+        <span class="text-muted-foreground">{{ (attempt.latencyMs / MS_PER_SECOND).toFixed(1) }}s</span>
+      </div>
+    </div>
+
+    <Separator />
+
+    <!-- Metadata -->
+    <div class="space-y-1">
+      <div v-if="overview.statusCode != null" class="flex items-center justify-between text-[11px]">
+        <span class="text-muted-foreground">状态码</span>
+        <span class="font-mono">{{ overview.statusCode }}</span>
+      </div>
+      <div v-if="overview.clientIp" class="flex items-center justify-between text-[11px]">
+        <span class="text-muted-foreground">Client IP</span>
+        <span class="font-mono truncate max-w-[160px]">{{ overview.clientIp }}</span>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed } from 'vue'
+import type { UnifiedRequestOverview } from './types'
+import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
+
+const MS_PER_SECOND = 1000
+const HTTP_ERROR_THRESHOLD = 400
+
+const props = defineProps<{ overview: UnifiedRequestOverview }>()
+
+const statusColor = computed(() => {
+  if (props.overview.status === 'pending') return 'pending'
+  const code = props.overview.statusCode
+  if (props.overview.status === 'failed' || (code != null && code >= HTTP_ERROR_THRESHOLD)) return 'error'
+  return 'success'
+})
+
+const isOutputPending = computed(
+  () => props.overview.status === 'pending' && props.overview.outputTokens != null,
+)
+
+const outputTokenText = computed(() => {
+  const val = props.overview.outputTokens
+  if (val == null) return '--'
+  return isOutputPending.value ? `+${val}` : String(val)
+})
+
+const latencyText = computed(() => {
+  if (props.overview.status === 'pending' && props.overview.latencyMs == null) return '...'
+  if (props.overview.latencyMs == null) return '--'
+  return `${(props.overview.latencyMs / MS_PER_SECOND).toFixed(1)}s`
+})
+
+const speedText = computed(() => {
+  if (props.overview.tokensPerSecond != null) {
+    return `${props.overview.tokensPerSecond.toFixed(1)}`
+  }
+  const { outputTokens, latencyMs } = props.overview
+  if (outputTokens && latencyMs) {
+    return `${((outputTokens / latencyMs) * MS_PER_SECOND).toFixed(1)}`
+  }
+  return '--'
+})
+
+function isAttemptError(statusCode: number | null): boolean {
+  return statusCode != null && statusCode >= HTTP_ERROR_THRESHOLD
+}
+</script>
