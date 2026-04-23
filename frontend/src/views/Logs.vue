@@ -194,49 +194,17 @@ const {
 } = useLogFilters()
 
 const TABLE_COL_COUNT = 13
-const PAGE_SIZE = 20
-const DEBOUNCE_MS = 300 // eslint-disable-line no-magic-numbers
+const DEBOUNCE_MS = 300
 
 const {
   logs, total, page, hasMore,
   cleanupDays, showCleanup, expandedRows, childLogs, childLoading,
   logDetailOpen, selectedLogEntry,
+  loadLogs, prevPage, nextPage,
   handleCleanup, toggleExpand, openLogDetail,
 } = useLogs()
 
-async function loadLogs() {
-  try {
-    const filterParams = buildFilterParams()
-    const res = await api.getLogs({
-      page: page.value,
-      limit: PAGE_SIZE,
-      view: 'grouped',
-      ...filterParams,
-    })
-    logs.value = res.data
-    total.value = res.total
-    expandedRows.value.clear()
-    childLogs.value = {}
-    childLoading.value = {}
-  } catch (e) {
-    console.error('Failed to load logs:', e)
-    toast.error('加载日志失败')
-  }
-}
-
-function prevPage() {
-  if (page.value > 1) {
-    page.value--
-    loadLogs()
-  }
-}
-
-function nextPage() {
-  page.value++
-  loadLogs()
-}
-
-const DEFAULT_RETENTION_DAYS = 3 // eslint-disable-line no-magic-numbers
+const DEFAULT_RETENTION_DAYS = 3
 const retentionDays = ref(DEFAULT_RETENTION_DAYS)
 const retentionSaving = ref(false)
 
@@ -267,13 +235,13 @@ watch(
   () => {
     page.value = 1
     if (filterTimer) clearTimeout(filterTimer)
-    filterTimer = setTimeout(() => loadLogs(), DEBOUNCE_MS)
+    filterTimer = setTimeout(() => loadLogs(buildFilterParams()), DEBOUNCE_MS)
   },
   { deep: true },
 )
 
 onMounted(() => {
-  loadLogs()
+  loadLogs(buildFilterParams())
   loadRetention()
 })
 </script>

@@ -255,8 +255,8 @@ async function request<T>(
 // --- API ---
 
 export const api = {
-  login: (password: string) => request<void>('post', API.LOGIN, { password }),
-  logout: () => request<void>('post', API.LOGOUT),
+  login: (password: string) => request<{ success: boolean }>('post', API.LOGIN, { password }),
+  logout: () => request<{ success: boolean }>('post', API.LOGOUT),
 
   getSetupStatus: () => request<{ initialized: boolean }>('get', '/setup/status'),
   initializeSetup: (password: string) => request<{ success: boolean }>('post', '/setup/initialize', { password }),
@@ -266,6 +266,7 @@ export const api = {
   updateProvider: (id: string, data: Partial<ProviderPayload>) => request<{ success: boolean }>('put', `${API.PROVIDERS}/${id}`, data),
   deleteProvider: (id: string) => request<{ success: boolean }>('delete', `${API.PROVIDERS}/${id}`),
 
+  // TODO: 定义 Mapping 响应类型替换 unknown[]
   getMappings: () => request<unknown[]>('get', API.MAPPINGS),
   createMapping: (data: MappingPayload) => request<{ id: string }>('post', API.MAPPINGS, data),
   updateMapping: (id: string, data: MappingPayload) => request<{ success: boolean }>('put', `${API.MAPPINGS}/${id}`, data),

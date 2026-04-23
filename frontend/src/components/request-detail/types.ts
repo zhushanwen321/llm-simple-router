@@ -3,8 +3,8 @@ import type { LogEntry } from '@/components/logs/types'
 
 export type DataSource = 'realtime' | 'history'
 
-const MS_PER_SECOND = 1000
-const HTTP_ERROR_THRESHOLD = 400
+export const MS_PER_SECOND = 1000
+export const HTTP_ERROR_THRESHOLD = 400
 
 export interface UnifiedRequestOverview {
   id: string
@@ -126,7 +126,7 @@ export function fromLogEntry(entry: LogEntry): UnifiedRequestOverview {
     originalModel: entry.original_model,
     statusCode: entry.status_code,
     isStream: !!entry.is_stream,
-    apiType: entry.api_type as 'openai' | 'anthropic',
+    apiType: entry.api_type === 'openai' || entry.api_type === 'anthropic' ? entry.api_type : 'openai',
     providerName: entry.provider_name,
     clientIp: undefined,
     sessionId: null,

@@ -28,7 +28,7 @@
 
       <!-- Main content area -->
       <template v-if="overview">
-        <div class="flex gap-0 px-4 pb-4" style="height: calc(85vh - 80px)">
+        <div class="flex gap-0 px-4 pb-4 h-[calc(85vh-80px)]">
           <!-- Left: Overview Panel -->
           <RequestOverviewPanel :overview="overview" />
 
@@ -72,7 +72,7 @@
 
       <!-- Empty state -->
       <template v-else>
-        <div class="flex items-center justify-center" style="height: calc(85vh - 80px)">
+        <div class="flex items-center justify-center h-[calc(85vh-80px)]">
           <p class="text-sm text-muted-foreground">
             {{ props.source === 'realtime' ? '加载中...' : '无选中请求' }}
           </p>

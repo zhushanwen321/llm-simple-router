@@ -101,8 +101,9 @@ const blocks = computed<ContentBlock[]>(() => {
     return [{ type: 'text' as const, content: props.responseBody }]
   }
 
+  const validTypes = ['thinking', 'text', 'tool_use', 'tool_result'] as const
   return assembledBlocks.value.map(b => ({
-    type: (['thinking', 'text', 'tool_use'].includes(b.type) ? b.type : 'text') as ContentBlock['type'],
+    type: validTypes.includes(b.type as typeof validTypes[number]) ? b.type as ContentBlock['type'] : 'text' as const,
     content: b.content,
     ...(b.toolName ? { name: b.toolName } : {}),
   }))
