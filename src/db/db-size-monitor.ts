@@ -21,7 +21,14 @@ export interface SizeThresholds {
 }
 
 export function collectDbSizeInfo(db: Database.Database, dbPath: string): DbSizeInfo {
-  const totalBytes = dbPath === ":memory:" ? 0 : statSync(dbPath).size;
+  let totalBytes = 0;
+  if (dbPath !== ":memory:") {
+    try {
+      totalBytes = statSync(dbPath).size;
+    } catch {
+      // DB 文件可能尚未创建（CI 内存测试、首次启动等）
+    }
+  }
   const logTableBytes = estimateLogTableSize(db);
   const logCount = getLogCount(db);
   const info: DbSizeInfo = {
