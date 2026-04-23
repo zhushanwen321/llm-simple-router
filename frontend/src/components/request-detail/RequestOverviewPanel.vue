@@ -3,7 +3,7 @@
     <!-- Row 1: model @ provider -->
     <div class="flex items-baseline gap-1 min-w-0">
       <span class="font-mono text-[11px] font-semibold truncate min-w-0">{{ overview.model }}</span>
-      <span v-if="overview.providerName" class="text-[10px] text-muted-foreground flex-shrink-0">@ {{ overview.providerName }}</span>
+      <span class="text-[10px] text-muted-foreground flex-shrink-0">@ {{ overview.providerName || 'unknown' }}</span>
     </div>
 
     <!-- Row 2: status + SSE + apiType -->

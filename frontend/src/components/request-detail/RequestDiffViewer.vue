@@ -29,8 +29,11 @@
 
       <!-- Structured view -->
       <template v-else>
-        <div v-if="!upstreamParsed" class="text-[11px] text-muted-foreground py-4 text-center">
+        <div v-if="!upstreamParsed && !clientParsed" class="text-[11px] text-muted-foreground py-4 text-center">
           No request data available
+        </div>
+        <div v-if="!upstreamParsed && clientParsed" class="text-[11px] text-muted-foreground py-2 text-center">
+          请求进行中，上游请求内容将在完成后显示
         </div>
 
         <div v-else class="space-y-4">

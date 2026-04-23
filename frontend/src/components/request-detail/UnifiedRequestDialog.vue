@@ -62,7 +62,7 @@
               </div>
 
               <!-- Request diff tab -->
-              <div v-if="activeTab === 'request'" class="flex-1 overflow-y-auto mt-2">
+              <div v-if="activeTab === 'request'" class="flex-1 min-h-0 mt-2">
                 <RequestDiffViewer :overview="overview" />
               </div>
             </Tabs>
