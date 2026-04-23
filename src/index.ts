@@ -38,7 +38,6 @@ import { modelState } from "./proxy/model-state.js";
 import { UsageWindowTracker } from "./proxy/usage-window-tracker.js";
 import { scheduleLogCleanup } from "./db/log-cleaner.js";
 import { scheduleDbSizeMonitor } from "./db/db-size-monitor.js";
-import { getDbMaxSizeMb, getLogTableMaxSizeMb } from "./db/settings.js";
 import fastifyStatic from "@fastify/static";
 import Database from "better-sqlite3";
 
@@ -230,8 +229,6 @@ export async function buildApp(
   const logCleanup = scheduleLogCleanup(db, app.log);
 
   const dbSizeMonitor = scheduleDbSizeMonitor(db, config.DB_PATH, {
-    dbMaxSizeMb: getDbMaxSizeMb(db),
-    logTableMaxSizeMb: getLogTableMaxSizeMb(db),
     log: app.log,
   });
 

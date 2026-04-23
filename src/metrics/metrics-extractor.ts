@@ -152,7 +152,7 @@ export class MetricsExtractor {
       const msg = parsed as AnthropicMessageDelta;
       this.outputTokens = msg.usage?.output_tokens ?? null;
       // 第三方 Anthropic 兼容 API（如 OpenRouter、智谱）可能将 input_tokens 放在 message_delta 而非 message_start
-      if (!this.inputTokens && msg.usage?.input_tokens) {
+      if (this.inputTokens === null && msg.usage?.input_tokens) {
         this.inputTokens = msg.usage.input_tokens;
       }
       this.stopReason = msg.delta?.stop_reason ?? null;

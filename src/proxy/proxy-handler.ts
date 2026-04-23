@@ -19,6 +19,7 @@ import { UPSTREAM_SUCCESS, ProviderSwitchNeeded } from "./types.js";
 import type { RawHeaders, TransportResult } from "./types.js";
 import { SSEMetricsTransform } from "../metrics/sse-metrics-transform.js";
 import { MetricsExtractor } from "../metrics/metrics-extractor.js";
+import type { MetricsResult } from "../metrics/metrics-extractor.js";
 import { updateLogStreamContent } from "../db/index.js";
 import { callNonStream, callStream } from "./transport.js";
 import { insertRejectedLog } from "./log-helpers.js";
@@ -39,8 +40,20 @@ export interface RouteHandlerDeps {
   orchestrator: ProxyOrchestrator;
 }
 
-const STREAM_CONTENT_MAX_RAW = 8192;
-const STREAM_CONTENT_MAX_TEXT = 4096;
+const STREAM_CONTENT_MAX_RAW = 131072;
+const STREAM_CONTENT_MAX_TEXT = 65536;
+
+function toStreamMetrics(m: MetricsResult) {
+  return {
+    inputTokens: m.input_tokens,
+    outputTokens: m.output_tokens,
+    cacheReadTokens: m.cache_read_tokens,
+    ttftMs: m.ttft_ms,
+    tokensPerSecond: m.tokens_per_second,
+    stopReason: m.stop_reason,
+    isComplete: m.is_complete === 1,
+  };
+}
 
 export async function handleProxyRequest(
   request: FastifyRequest,
@@ -160,14 +173,7 @@ export async function handleProxyRequest(
       if (isStream) {
         const metricsTransform = new SSEMetricsTransform(apiType, startTime, {
           onMetrics: (m) => {
-            deps.tracker?.update(logId, {
-              streamMetrics: {
-                inputTokens: m.input_tokens, outputTokens: m.output_tokens,
-                cacheReadTokens: m.cache_read_tokens,
-                ttftMs: m.ttft_ms, tokensPerSecond: m.tokens_per_second,
-                stopReason: m.stop_reason, isComplete: m.is_complete === 1,
-              },
-            });
+            deps.tracker?.update(logId, { streamMetrics: toStreamMetrics(m) });
           },
           onChunk: (rawLine) => {
             deps.tracker?.appendStreamChunk(logId, rawLine, apiType, STREAM_CONTENT_MAX_RAW, STREAM_CONTENT_MAX_TEXT);
@@ -176,24 +182,21 @@ export async function handleProxyRequest(
         const checkEarlyError = deps.matcher
           ? (data: string) => deps.matcher!.test(UPSTREAM_SUCCESS, data)
           : undefined;
-        return callStream(
+        const streamResult = await callStream(
           provider, apiKey, body, cliHdrs, reply, deps.streamTimeoutMs,
           upstreamPath, buildUpstreamHeaders, metricsTransform, checkEarlyError,
         );
+        const m = (streamResult.kind === "stream_success" || streamResult.kind === "stream_abort")
+          ? streamResult.metrics : undefined;
+        if (m) deps.tracker?.update(logId, { streamMetrics: toStreamMetrics(m) });
+        return streamResult;
       }
       const result = await callNonStream(provider, apiKey, body, cliHdrs, upstreamPath, buildUpstreamHeaders);
       // 非流式请求：从响应体提取指标并更新 tracker
       if (result.kind === "success") {
         const mr = MetricsExtractor.fromNonStreamResponse(apiType, result.body);
         if (mr) {
-          deps.tracker?.update(logId, {
-            streamMetrics: {
-              inputTokens: mr.input_tokens, outputTokens: mr.output_tokens,
-              cacheReadTokens: mr.cache_read_tokens,
-              ttftMs: mr.ttft_ms, tokensPerSecond: mr.tokens_per_second,
-              stopReason: mr.stop_reason, isComplete: mr.is_complete === 1,
-            },
-          });
+          deps.tracker?.update(logId, { streamMetrics: toStreamMetrics(mr) });
         }
       }
       // 非流式响应注入模型信息标签（模型映射场景）
@@ -227,8 +230,9 @@ export async function handleProxyRequest(
       collectTransportMetrics(deps.db, apiType, resilienceResult.result, isStream, lastLogId, provider.id, resolved.backend_model, request);
 
       // 流式请求：将 tracker 中累积的文本内容持久化到日志
+      // 注意：tracker 在原 logId 下累积内容，但 logResilienceResult 可能因重试生成新 lastLogId
       if (isStream && deps.tracker) {
-        const req = deps.tracker.get(lastLogId);
+        const req = deps.tracker.get(logId);
         const text = req?.streamContent?.textContent;
         if (text) updateLogStreamContent(deps.db, lastLogId, text);
       }

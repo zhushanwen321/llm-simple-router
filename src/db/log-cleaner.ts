@@ -36,8 +36,8 @@ export function scheduleLogCleanup(
     }
   };
 
-  // 启动时立即执行一次
-  doCleanup();
+  // 推迟到下一个事件循环 tick，避免阻塞服务器启动
+  setTimeout(doCleanup, 0);
 
   // 定时执行
   timer = setInterval(doCleanup, CLEANUP_INTERVAL_MS);

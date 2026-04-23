@@ -130,8 +130,10 @@ export function useMonitorData() {
           logDetailData.value = {
             clientRequest: trackerReq.clientRequest ?? undefined,
           }
-        } catch {
-          // 请求可能刚完成从 tracker 移除，回退到 DB 查询
+        } catch (e: unknown) {
+          // 仅在 tracker 中请求不存在(404)时回退到 DB 查询
+          const status = (e as { response?: { status?: number } })?.response?.status
+          if (status !== 404) throw e // eslint-disable-line no-magic-numbers
           if (version !== loadVersion.value) return
           const log = await api.getLogDetail(requestId)
           if (version !== loadVersion.value) return

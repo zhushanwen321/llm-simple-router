@@ -61,8 +61,6 @@ export function scheduleDbSizeMonitor(
   dbPath: string,
   options: {
     intervalMs?: number;
-    dbMaxSizeMb?: number;
-    logTableMaxSizeMb?: number;
     log: { info: (msg: string) => void };
   },
 ): DbSizeMonitorHandle {
@@ -74,9 +72,10 @@ export function scheduleDbSizeMonitor(
     if (running) return;
     running = true;
     try {
+      // 每次检查时从 DB 读取最新阈值，而非使用启动时的缓存值
       const thresholds: SizeThresholds = {
-        dbMaxSizeMb: options.dbMaxSizeMb ?? getDbMaxSizeMb(db),
-        logTableMaxSizeMb: options.logTableMaxSizeMb ?? getLogTableMaxSizeMb(db),
+        dbMaxSizeMb: getDbMaxSizeMb(db),
+        logTableMaxSizeMb: getLogTableMaxSizeMb(db),
       };
       const deleted = runSizeBasedCleanup(db, dbPath, thresholds);
       if (deleted > 0) options.log.info(`Size-based cleanup: deleted ${deleted} log records`);

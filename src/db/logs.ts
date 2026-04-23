@@ -238,21 +238,33 @@ export function estimateLogTableSize(db: Database.Database): number {
   return row.size;
 }
 
-/** 删除最旧的日志，保留 keepCount 条，返回实际删除条数 */
+const DELETE_BATCH_SIZE = 1000;
+
+/** 删除最旧的日志，保留 keepCount 条，返回实际删除条数。分批删除避免长时间锁表 */
 export function deleteOldestLogs(db: Database.Database, keepCount: number): number {
   const total = (db.prepare("SELECT count(*) as c FROM request_logs").get() as { c: number }).c;
   const toDelete = Math.max(0, total - keepCount);
   if (toDelete === 0) return 0;
-  const result = db.prepare(`
+
+  let totalDeleted = 0;
+  const stmt = db.prepare(`
     DELETE FROM request_logs
-    WHERE id IN (
-      SELECT id FROM request_logs ORDER BY created_at ASC LIMIT ?
+    WHERE rowid IN (
+      SELECT rowid FROM request_logs ORDER BY created_at ASC LIMIT ?
     )
-  `).run(toDelete);
-  if (result.changes > 0) {
+  `);
+
+  while (totalDeleted < toDelete) {
+    const batchSize = Math.min(DELETE_BATCH_SIZE, toDelete - totalDeleted);
+    const result = stmt.run(batchSize);
+    totalDeleted += result.changes;
+    if (result.changes < batchSize) break;
+  }
+
+  if (totalDeleted > 0) {
     db.pragma("incremental_vacuum");
   }
-  return result.changes;
+  return totalDeleted;
 }
 
 /** 获取 request_logs 总行数 */

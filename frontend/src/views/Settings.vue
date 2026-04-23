@@ -1,4 +1,3 @@
-<!-- eslint-disable no-magic-numbers -->
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
@@ -14,21 +13,39 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Download, Upload, HardDrive } from 'lucide-vue-next'
 
+const BYTES_PER_MB = 1_048_576
+const KB_BASE = 1024
+const PERCENT_MAX = 100
+const JSON_INDENT = 2
+const DATE_SLICE_END = 10
+
+const RETENTION_MIN = 0
+const RETENTION_MAX = 90
+const SIZE_MB_MIN = 1
+const DEFAULT_RETENTION_DAYS = 3
+const DEFAULT_DB_MAX_SIZE_MB = 1024
+const DEFAULT_LOG_TABLE_MAX_SIZE_MB = 800
+
 const dbSizeInfo = ref<DbSizeInfoResponse | null>(null)
-const retentionDays = ref(3)
-const dbMaxSizeMb = ref(1024)
-const logTableMaxSizeMb = ref(800)
+const retentionDays = ref(DEFAULT_RETENTION_DAYS)
+const dbMaxSizeMb = ref(DEFAULT_DB_MAX_SIZE_MB)
+const logTableMaxSizeMb = ref(DEFAULT_LOG_TABLE_MAX_SIZE_MB)
 const loading = ref(false)
 const importing = ref(false)
 const importResult = ref<Record<string, number> | null>(null)
 const showImportDialog = ref(false)
 const pendingImportData = ref<ConfigExportResponse | null>(null)
+const fileInput = ref<HTMLInputElement>()
+
+const retentionError = ref('')
+const dbMaxSizeError = ref('')
+const logTableMaxSizeError = ref('')
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B'
   const units = ['B', 'KB', 'MB', 'GB']
-  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
-  return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(KB_BASE)), units.length - 1)
+  return `${(bytes / Math.pow(KB_BASE, i)).toFixed(1)} ${units[i]}`
 }
 
 async function loadSettings() {
@@ -51,7 +68,22 @@ async function loadSettings() {
   }
 }
 
+function validateRetention(): boolean {
+  retentionError.value = ''
+  const val = retentionDays.value
+  if (!Number.isInteger(val)) {
+    retentionError.value = '请输入整数'
+    return false
+  }
+  if (val < RETENTION_MIN || val > RETENTION_MAX) {
+    retentionError.value = `请输入 ${RETENTION_MIN}-${RETENTION_MAX} 之间的整数`
+    return false
+  }
+  return true
+}
+
 async function saveRetention() {
+  if (!validateRetention()) return
   try {
     const result = await api.setLogRetention(retentionDays.value)
     retentionDays.value = result.days
@@ -62,7 +94,27 @@ async function saveRetention() {
   }
 }
 
+function validateThresholds(): boolean {
+  dbMaxSizeError.value = ''
+  logTableMaxSizeError.value = ''
+  let valid = true
+  if (!Number.isFinite(dbMaxSizeMb.value) || dbMaxSizeMb.value < SIZE_MB_MIN) {
+    dbMaxSizeError.value = `请输入不小于 ${SIZE_MB_MIN} 的数值`
+    valid = false
+  }
+  if (!Number.isFinite(logTableMaxSizeMb.value) || logTableMaxSizeMb.value < SIZE_MB_MIN) {
+    logTableMaxSizeError.value = `请输入不小于 ${SIZE_MB_MIN} 的数值`
+    valid = false
+  }
+  if (valid && logTableMaxSizeMb.value > dbMaxSizeMb.value) {
+    logTableMaxSizeError.value = '日志表上限不应超过数据库上限'
+    valid = false
+  }
+  return valid
+}
+
 async function saveThresholds() {
+  if (!validateThresholds()) return
   try {
     const result = await api.setDbSizeThresholds({
       dbMaxSizeMb: dbMaxSizeMb.value,
@@ -81,11 +133,11 @@ async function saveThresholds() {
 async function handleExport() {
   try {
     const data = await api.exportConfig()
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const blob = new Blob([JSON.stringify(data, null, JSON_INDENT)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `router-config-${new Date().toISOString().slice(0, 10)}.json`
+    a.download = `router-config-${new Date().toISOString().slice(0, DATE_SLICE_END)}.json`
     a.click()
     URL.revokeObjectURL(url)
     toast.success('配置已导出')
@@ -153,10 +205,12 @@ onMounted(loadSettings)
             id="retention-days"
             v-model.number="retentionDays"
             type="number"
-            :min="0"
-            :max="90"
+            :min="RETENTION_MIN"
+            :max="RETENTION_MAX"
             class="w-32"
+            @input="retentionError = ''"
           />
+          <p v-if="retentionError" class="text-sm text-destructive mt-1">{{ retentionError }}</p>
         </div>
         <Button size="sm" :disabled="loading" @click="saveRetention">保存</Button>
       </div>
@@ -179,7 +233,7 @@ onMounted(loadSettings)
             </span>
           </div>
           <Progress
-            :model-value="Math.min(100, (dbSizeInfo.totalBytes / (dbMaxSizeMb * 1048576)) * 100)"
+            :model-value="Math.min(PERCENT_MAX, (dbSizeInfo.totalBytes / (dbMaxSizeMb * BYTES_PER_MB)) * PERCENT_MAX)"
           />
         </div>
 
@@ -191,7 +245,7 @@ onMounted(loadSettings)
             </span>
           </div>
           <Progress
-            :model-value="Math.min(100, (dbSizeInfo.logTableBytes / (logTableMaxSizeMb * 1048576)) * 100)"
+            :model-value="Math.min(PERCENT_MAX, (dbSizeInfo.logTableBytes / (logTableMaxSizeMb * BYTES_PER_MB)) * PERCENT_MAX)"
           />
         </div>
 
@@ -203,11 +257,13 @@ onMounted(loadSettings)
       <div class="grid grid-cols-2 gap-4 pt-3 border-t">
         <div class="space-y-1">
           <Label for="db-max-size">数据库大小上限 (MB)</Label>
-          <Input id="db-max-size" v-model.number="dbMaxSizeMb" type="number" :min="1" />
+          <Input id="db-max-size" v-model.number="dbMaxSizeMb" type="number" :min="SIZE_MB_MIN" @input="dbMaxSizeError = ''" />
+          <p v-if="dbMaxSizeError" class="text-sm text-destructive mt-1">{{ dbMaxSizeError }}</p>
         </div>
         <div class="space-y-1">
           <Label for="log-max-size">日志表大小上限 (MB)</Label>
-          <Input id="log-max-size" v-model.number="logTableMaxSizeMb" type="number" :min="1" />
+          <Input id="log-max-size" v-model.number="logTableMaxSizeMb" type="number" :min="SIZE_MB_MIN" @input="logTableMaxSizeError = ''" />
+          <p v-if="logTableMaxSizeError" class="text-sm text-destructive mt-1">{{ logTableMaxSizeError }}</p>
         </div>
       </div>
       <Button size="sm" :disabled="loading" @click="saveThresholds">保存阈值</Button>
@@ -224,13 +280,11 @@ onMounted(loadSettings)
           导出配置
         </Button>
 
-        <label>
-          <Button variant="outline" size="sm" as="span" :disabled="loading">
-            <Upload class="mr-2 h-4 w-4" />
-            导入配置
-          </Button>
-          <input type="file" accept=".json" class="hidden" @change="handleFileSelect" />
-        </label>
+        <Button variant="outline" size="sm" :disabled="loading" @click="fileInput?.click()">
+          <Upload class="mr-2 h-4 w-4" />
+          导入配置
+        </Button>
+        <input ref="fileInput" type="file" accept=".json" class="hidden" @change="handleFileSelect" />
       </div>
 
       <div v-if="importResult" class="text-sm space-y-1 p-3 bg-muted rounded-md">
