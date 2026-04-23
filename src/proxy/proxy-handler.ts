@@ -58,7 +58,7 @@ export async function handleProxyRequest(
   const sessionId = (request.headers as RawHeaders)["x-claude-code-session-id"] as string | undefined;
   const { effectiveModel, originalModel, interceptResponse } = applyEnhancement(deps.db, request, clientModel, sessionId);
 
-  if (interceptResponse) return handleIntercept(deps.db, apiType, request, reply, interceptResponse, clientModel);
+  if (interceptResponse) return handleIntercept(deps.db, apiType, request, reply, interceptResponse, clientModel, sessionId);
 
   const group = getMappingGroup(deps.db, effectiveModel);
   const isFailover = group?.strategy === "failover";
@@ -86,7 +86,7 @@ export async function handleProxyRequest(
           db: deps.db, logId, apiType, model: effectiveModel, statusCode: e.statusCode,
           errorMessage: `All failover targets exhausted (${excludeTargets.length} attempted)`,
           startTime, isStream, routerKeyId, originalBody, clientHeaders: cliHdrs, originalModel,
-          isFailover: true, originalRequestId: rootLogId,
+          isFailover: true, originalRequestId: rootLogId, sessionId,
         });
         return reply.status(e.statusCode).send(e.body);
       }
@@ -95,7 +95,7 @@ export async function handleProxyRequest(
         db: deps.db, logId, apiType, model: effectiveModel, statusCode: e.statusCode,
         errorMessage: `No mapping found for model '${effectiveModel}'`, startTime, isStream,
         routerKeyId, originalBody, clientHeaders: cliHdrs, originalModel,
-        isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null,
+        isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null, sessionId,
       });
       return reply.status(e.statusCode).send(e.body);
     }
@@ -111,7 +111,7 @@ export async function handleProxyRequest(
               db: deps.db, logId, apiType, model: effectiveModel, statusCode: e.statusCode,
               errorMessage: `Model '${resolved.backend_model}' not allowed`, startTime, isStream, routerKeyId,
               originalBody, clientHeaders: cliHdrs, providerId: resolved.provider_id, originalModel,
-              isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null,
+              isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null, sessionId,
             });
             return reply.status(e.statusCode).send(e.body);
           }
@@ -126,7 +126,7 @@ export async function handleProxyRequest(
         db: deps.db, logId, apiType, model: effectiveModel, statusCode: e.statusCode,
         errorMessage: `Provider '${resolved.provider_id}' unavailable`, startTime, isStream, routerKeyId,
         originalBody, clientHeaders: cliHdrs, providerId: resolved.provider_id, originalModel,
-        isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null,
+        isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null, sessionId,
       });
       return reply.status(e.statusCode).send(e.body);
     }
@@ -136,7 +136,7 @@ export async function handleProxyRequest(
         db: deps.db, logId, apiType, model: effectiveModel, statusCode: e.statusCode,
         errorMessage: `API type mismatch: expected '${apiType}'`, startTime, isStream, routerKeyId,
         originalBody, clientHeaders: cliHdrs, providerId: resolved.provider_id, originalModel,
-        isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null,
+        isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null, sessionId,
       });
       return reply.status(e.statusCode).send(e.body);
     }
@@ -219,7 +219,7 @@ export async function handleProxyRequest(
         deps.db,
         {
           apiType, model: effectiveModel, providerId: provider.id, isStream,
-          clientReq, upstreamReqBase, logId, routerKeyId, originalModel,
+          clientReq, upstreamReqBase, logId, routerKeyId, originalModel, sessionId,
           failover: { isFailoverIteration, rootLogId: rootLogId! },
         },
         resilienceResult.attempts, resilienceResult.result, startTime,
@@ -268,7 +268,7 @@ export async function handleProxyRequest(
           errorMessage: `Concurrency queue full for provider '${provider.id}'`,
           startTime, isStream, routerKeyId, originalBody, clientHeaders: cliHdrs,
           providerId: provider.id, originalModel,
-          isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null,
+          isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null, sessionId,
         });
         return reply.status(err.statusCode).send(err.body);
       }
@@ -279,7 +279,7 @@ export async function handleProxyRequest(
           errorMessage: `Concurrency wait timeout for provider '${provider.id}' (${e.timeoutMs}ms)`,
           startTime, isStream, routerKeyId, originalBody, clientHeaders: cliHdrs,
           providerId: provider.id, originalModel,
-          isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null,
+          isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null, sessionId,
         });
         return reply.status(err.statusCode).send(err.body);
       }
@@ -292,6 +292,7 @@ export async function handleProxyRequest(
         client_request: clientReq, upstream_request: upstreamReqBase,
         is_failover: isFailoverIteration ? 1 : 0, original_request_id: isFailoverIteration ? rootLogId : null,
         router_key_id: routerKeyId, original_model: originalModel,
+        session_id: sessionId,
       });
       const err = errors.upstreamConnectionFailed();
       return reply.status(err.statusCode).send(err.body);

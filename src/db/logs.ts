@@ -43,7 +43,7 @@ const LOG_LIST_SELECT = `rl.id, rl.api_type, rl.model, rl.provider_id, rl.status
             rl.is_stream, rl.error_message, rl.created_at, rl.is_retry, rl.is_failover, rl.original_request_id, rl.original_model,
             CASE WHEN rl.provider_id = 'router' THEN rl.upstream_request ELSE NULL END AS upstream_request,
             rl.input_tokens, rl.output_tokens, rl.cache_read_tokens, rl.ttft_ms, rl.tokens_per_second, rl.stop_reason,
-            rl.backend_model, rl.metrics_complete,
+            rl.backend_model, rl.metrics_complete, rl.session_id,
             COALESCE(p.name, rl.provider_id) AS provider_name`;
 const LOG_LIST_JOIN = `LEFT JOIN providers p ON p.id = rl.provider_id`;
 
@@ -65,6 +65,7 @@ export interface RequestLogInsert {
   original_request_id?: string | null;
   router_key_id?: string | null;
   original_model?: string | null;
+  session_id?: string | null;
 }
 
 export function insertRequestLog(
@@ -74,8 +75,8 @@ export function insertRequestLog(
   db.prepare(
     `INSERT INTO request_logs (id, api_type, model, provider_id, status_code, latency_ms,
       is_stream, error_message, created_at, client_request, upstream_request, upstream_response,
-      is_retry, is_failover, original_request_id, router_key_id, original_model)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      is_retry, is_failover, original_request_id, router_key_id, original_model, session_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     log.id, log.api_type, log.model, log.provider_id, log.status_code,
     log.latency_ms, log.is_stream, log.error_message, log.created_at,
@@ -83,6 +84,7 @@ export function insertRequestLog(
     log.upstream_response ?? null,
     log.is_retry ?? 0, log.is_failover ?? 0, log.original_request_id ?? null,
     log.router_key_id ?? null, log.original_model ?? null,
+    log.session_id ?? null,
   );
 }
 
