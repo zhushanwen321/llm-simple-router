@@ -33,5 +33,12 @@ export const adminMonitorRoutes: FastifyPluginCallback<MonitorRoutesOptions> = (
     });
   });
 
+  app.get("/admin/api/monitor/request/:id", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const req = tracker.getRequestById(id);
+    if (!req) return reply.status(404).send({ error: "Not found" });
+    return req;
+  });
+
   done();
 };

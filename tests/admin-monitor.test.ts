@@ -139,4 +139,13 @@ describe("Admin Monitor API", () => {
       expect(res.statusCode).toBe(401);
     }
   });
+
+  it("GET /admin/api/monitor/request/:id returns 404 for unknown id", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: "/admin/api/monitor/request/nonexistent-id",
+      headers: { cookie },
+    });
+    expect(res.statusCode).toBe(404);
+  });
 });
