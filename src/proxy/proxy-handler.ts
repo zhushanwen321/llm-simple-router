@@ -43,6 +43,27 @@ export interface RouteHandlerDeps {
 const STREAM_CONTENT_MAX_RAW = 131072;
 const STREAM_CONTENT_MAX_TEXT = 65536;
 
+import type { ContentBlock } from "../monitor/types.js";
+
+/** 将 tracker blocks 序列化为前端 tryDirectParse 可解析的 JSON */
+function serializeBlocksForStorage(blocks: ContentBlock[] | undefined, apiType: "openai" | "anthropic"): string {
+  if (!blocks || blocks.length === 0) return "";
+  if (apiType === "anthropic") {
+    const content = blocks.map(b => {
+      if (b.type === "thinking") return { type: "thinking", thinking: b.content };
+      if (b.type === "tool_use") {
+        let input = {};
+        try { input = JSON.parse(b.content || "{}"); } catch { /* keep empty */ }
+        return { type: "tool_use", name: b.name ?? "", input };
+      }
+      return { type: "text", text: b.content };
+    });
+    return JSON.stringify({ content });
+  }
+  const text = blocks.filter(b => b.type === "text").map(b => b.content).join("");
+  return JSON.stringify({ choices: [{ message: { content: text } }] });
+}
+
 function toStreamMetrics(m: MetricsResult) {
   return {
     inputTokens: m.input_tokens,
@@ -229,12 +250,12 @@ export async function handleProxyRequest(
       );
       collectTransportMetrics(deps.db, apiType, resilienceResult.result, isStream, lastLogId, provider.id, resolved.backend_model, request);
 
-      // 流式请求：将 tracker 中累积的文本内容持久化到日志
-      // 注意：tracker 在原 logId 下累积内容，但 logResilienceResult 可能因重试生成新 lastLogId
+      // 流式请求：将 tracker 中累积的内容持久化到日志
+      // 优先写 textContent（纯文本），若为空但 blocks 存在则序列化为 JSON
       if (isStream && deps.tracker) {
-        const req = deps.tracker.get(logId);
-        const text = req?.streamContent?.textContent;
-        if (text) updateLogStreamContent(deps.db, lastLogId, text);
+        const sc = deps.tracker.get(logId)?.streamContent;
+        const content = sc?.textContent || serializeBlocksForStorage(sc?.blocks, apiType);
+        if (content) updateLogStreamContent(deps.db, lastLogId, content);
       }
 
       // Failover: 单 provider 内重试已耗尽但仍失败，尝试下一个 target

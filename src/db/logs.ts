@@ -160,8 +160,12 @@ export function getRequestLogs(
   return { data, total };
 }
 
-export function getRequestLogById(db: Database.Database, id: string): RequestLog | undefined {
-  return db.prepare("SELECT * FROM request_logs WHERE id = ?").get(id) as RequestLog | undefined;
+export function getRequestLogById(db: Database.Database, id: string): RequestLogListRow | undefined {
+  return db.prepare(
+    `SELECT rl.*, COALESCE(p.name, rl.provider_id) AS provider_name
+     FROM request_logs rl LEFT JOIN providers p ON p.id = rl.provider_id
+     WHERE rl.id = ?`,
+  ).get(id) as RequestLogListRow | undefined;
 }
 
 type MetricsUpdate = {
