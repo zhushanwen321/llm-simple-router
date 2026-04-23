@@ -3,7 +3,6 @@
 import { ref, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
 import { api, type DbSizeInfoResponse, type ConfigExportResponse } from '@/api/client'
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -140,117 +139,107 @@ onMounted(loadSettings)
 </script>
 
 <template>
-  <div class="space-y-6">
-    <h1 class="text-2xl font-bold">系统设置</h1>
+  <div class="p-6 space-y-6">
+    <h2 class="text-lg font-semibold text-foreground">系统设置</h2>
 
     <!-- Log Retention -->
-    <Card>
-      <CardHeader>
-        <CardTitle>日志保留策略</CardTitle>
-        <CardDescription>超过保留天数的日志将被自动清理</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div class="flex items-end gap-4">
-          <div class="space-y-2">
-            <Label for="retention-days">保留天数</Label>
-            <Input
-              id="retention-days"
-              v-model.number="retentionDays"
-              type="number"
-              :min="0"
-              :max="90"
-              class="w-32"
-            />
-          </div>
-          <Button :disabled="loading" @click="saveRetention">保存</Button>
+    <div class="bg-card rounded-lg border p-4 space-y-3">
+      <h3 class="font-medium text-sm text-foreground">日志保留策略</h3>
+      <p class="text-sm text-muted-foreground">超过保留天数的日志将被自动清理</p>
+      <div class="flex items-end gap-4">
+        <div class="space-y-1">
+          <Label for="retention-days">保留天数</Label>
+          <Input
+            id="retention-days"
+            v-model.number="retentionDays"
+            type="number"
+            :min="0"
+            :max="90"
+            class="w-32"
+          />
         </div>
-      </CardContent>
-    </Card>
+        <Button size="sm" :disabled="loading" @click="saveRetention">保存</Button>
+      </div>
+    </div>
 
     <!-- Storage Management -->
-    <Card>
-      <CardHeader>
-        <CardTitle class="flex items-center gap-2">
-          <HardDrive class="h-5 w-5" />
-          存储管理
-        </CardTitle>
-        <CardDescription>监控数据库大小并配置自动清理阈值</CardDescription>
-      </CardHeader>
-      <CardContent class="space-y-6">
-        <template v-if="dbSizeInfo">
-          <div class="space-y-2">
-            <div class="flex justify-between text-sm">
-              <span>数据库总大小</span>
-              <span class="text-muted-foreground">
-                {{ formatBytes(dbSizeInfo.totalBytes) }} / {{ dbMaxSizeMb }} MB
-              </span>
-            </div>
-            <Progress
-              :model-value="Math.min(100, (dbSizeInfo.totalBytes / (dbMaxSizeMb * 1048576)) * 100)"
-            />
-          </div>
+    <div class="bg-card rounded-lg border p-4 space-y-4">
+      <h3 class="font-medium text-sm text-foreground flex items-center gap-2">
+        <HardDrive class="h-4 w-4" />
+        存储管理
+      </h3>
+      <p class="text-sm text-muted-foreground">监控数据库大小并配置自动清理阈值</p>
 
-          <div class="space-y-2">
-            <div class="flex justify-between text-sm">
-              <span>请求日志大小 ({{ dbSizeInfo.logCount }} 条)</span>
-              <span class="text-muted-foreground">
-                {{ formatBytes(dbSizeInfo.logTableBytes) }} / {{ logTableMaxSizeMb }} MB
-              </span>
-            </div>
-            <Progress
-              :model-value="Math.min(100, (dbSizeInfo.logTableBytes / (logTableMaxSizeMb * 1048576)) * 100)"
-            />
+      <template v-if="dbSizeInfo">
+        <div class="space-y-1">
+          <div class="flex justify-between text-sm">
+            <span>数据库总大小</span>
+            <span class="text-muted-foreground">
+              {{ formatBytes(dbSizeInfo.totalBytes) }} / {{ dbMaxSizeMb }} MB
+            </span>
           </div>
-
-          <p v-if="dbSizeInfo.lastChecked" class="text-xs text-muted-foreground">
-            上次检查：{{ dbSizeInfo.lastChecked }}
-          </p>
-        </template>
-
-        <div class="grid grid-cols-2 gap-4 pt-4 border-t">
-          <div class="space-y-2">
-            <Label for="db-max-size">数据库大小上限 (MB)</Label>
-            <Input id="db-max-size" v-model.number="dbMaxSizeMb" type="number" :min="1" />
-          </div>
-          <div class="space-y-2">
-            <Label for="log-max-size">日志表大小上限 (MB)</Label>
-            <Input id="log-max-size" v-model.number="logTableMaxSizeMb" type="number" :min="1" />
-          </div>
+          <Progress
+            :model-value="Math.min(100, (dbSizeInfo.totalBytes / (dbMaxSizeMb * 1048576)) * 100)"
+          />
         </div>
-        <Button :disabled="loading" @click="saveThresholds">保存阈值</Button>
-      </CardContent>
-    </Card>
+
+        <div class="space-y-1">
+          <div class="flex justify-between text-sm">
+            <span>请求日志大小 ({{ dbSizeInfo.logCount }} 条)</span>
+            <span class="text-muted-foreground">
+              {{ formatBytes(dbSizeInfo.logTableBytes) }} / {{ logTableMaxSizeMb }} MB
+            </span>
+          </div>
+          <Progress
+            :model-value="Math.min(100, (dbSizeInfo.logTableBytes / (logTableMaxSizeMb * 1048576)) * 100)"
+          />
+        </div>
+
+        <p v-if="dbSizeInfo.lastChecked" class="text-xs text-muted-foreground">
+          上次检查：{{ dbSizeInfo.lastChecked }}
+        </p>
+      </template>
+
+      <div class="grid grid-cols-2 gap-4 pt-3 border-t">
+        <div class="space-y-1">
+          <Label for="db-max-size">数据库大小上限 (MB)</Label>
+          <Input id="db-max-size" v-model.number="dbMaxSizeMb" type="number" :min="1" />
+        </div>
+        <div class="space-y-1">
+          <Label for="log-max-size">日志表大小上限 (MB)</Label>
+          <Input id="log-max-size" v-model.number="logTableMaxSizeMb" type="number" :min="1" />
+        </div>
+      </div>
+      <Button size="sm" :disabled="loading" @click="saveThresholds">保存阈值</Button>
+    </div>
 
     <!-- Config Import/Export -->
-    <Card>
-      <CardHeader>
-        <CardTitle>配置导入导出</CardTitle>
-        <CardDescription>导出当前配置或从文件恢复</CardDescription>
-      </CardHeader>
-      <CardContent class="space-y-4">
-        <div class="flex gap-3">
-          <Button variant="outline" :disabled="loading" @click="handleExport">
-            <Download class="mr-2 h-4 w-4" />
-            导出配置
+    <div class="bg-card rounded-lg border p-4 space-y-3">
+      <h3 class="font-medium text-sm text-foreground">配置导入导出</h3>
+      <p class="text-sm text-muted-foreground">导出当前配置或从文件恢复</p>
+
+      <div class="flex gap-3">
+        <Button variant="outline" size="sm" :disabled="loading" @click="handleExport">
+          <Download class="mr-2 h-4 w-4" />
+          导出配置
+        </Button>
+
+        <label>
+          <Button variant="outline" size="sm" as="span" :disabled="loading">
+            <Upload class="mr-2 h-4 w-4" />
+            导入配置
           </Button>
+          <input type="file" accept=".json" class="hidden" @change="handleFileSelect" />
+        </label>
+      </div>
 
-          <label>
-            <Button variant="outline" as="span" :disabled="loading">
-              <Upload class="mr-2 h-4 w-4" />
-              导入配置
-            </Button>
-            <input type="file" accept=".json" class="hidden" @change="handleFileSelect" />
-          </label>
-        </div>
-
-        <div v-if="importResult" class="text-sm space-y-1 p-3 bg-muted rounded-md">
-          <p class="font-medium">导入完成：</p>
-          <p v-for="(count, table) in importResult" :key="table">
-            {{ table }}: {{ count }} 条
-          </p>
-        </div>
-      </CardContent>
-    </Card>
+      <div v-if="importResult" class="text-sm space-y-1 p-3 bg-muted rounded-md">
+        <p class="font-medium">导入完成：</p>
+        <p v-for="(count, table) in importResult" :key="table">
+          {{ table }}: {{ count }} 条
+        </p>
+      </div>
+    </div>
 
     <!-- Import confirmation dialog -->
     <AlertDialog v-model:open="showImportDialog">
