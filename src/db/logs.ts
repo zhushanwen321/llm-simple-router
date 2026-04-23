@@ -28,6 +28,7 @@ export interface RequestLog {
   backend_model: string | null;
   metrics_complete: number;
   stream_text_content: string | null;
+  session_id: string | null;
 }
 
 /** 列表查询扩展字段：JOIN providers 获得 provider_name */
