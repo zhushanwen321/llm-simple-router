@@ -58,6 +58,10 @@ const API = {
   USAGE_WINDOWS: '/usage/windows',
   USAGE_WEEKLY: '/usage/weekly',
   USAGE_MONTHLY: '/usage/monthly',
+  SETTINGS_DB_SIZE: '/settings/db-size',
+  SETTINGS_DB_SIZE_THRESHOLDS: '/settings/db-size-thresholds',
+  SETTINGS_EXPORT: '/settings/export',
+  SETTINGS_IMPORT: '/settings/import',
 } as const
 
 // --- Payload types ---
@@ -229,6 +233,23 @@ export interface DailyUsage {
   total_output_tokens: number
 }
 
+export interface DbSizeInfoResponse {
+  totalBytes: number;
+  logTableBytes: number;
+  logCount: number;
+  lastChecked: string | null;
+  thresholds: {
+    dbMaxSizeMb: number;
+    logTableMaxSizeMb: number;
+  };
+}
+
+export interface ConfigExportResponse {
+  version: number;
+  exportedAt: string;
+  data: Record<string, unknown[]>;
+}
+
 // --- Typed request helper ---
 // 解包 AxiosResponse.data，让调用方直接拿到类型化的响应体。
 
@@ -342,4 +363,10 @@ export const api = {
     request<DailyUsage[]>('get', API.USAGE_WEEKLY, undefined, { params }),
   getUsageMonthly: (params?: { router_key_id?: string }) =>
     request<DailyUsage[]>('get', API.USAGE_MONTHLY, undefined, { params }),
+
+  getDbSizeInfo: () => request<DbSizeInfoResponse>('get', API.SETTINGS_DB_SIZE),
+  setDbSizeThresholds: (data: { dbMaxSizeMb?: number; logTableMaxSizeMb?: number }) =>
+    request<{ dbMaxSizeMb: number; logTableMaxSizeMb: number }>('put', API.SETTINGS_DB_SIZE_THRESHOLDS, data),
+  exportConfig: () => request<ConfigExportResponse>('get', API.SETTINGS_EXPORT),
+  importConfig: (data: ConfigExportResponse) => request<Record<string, number>>('post', API.SETTINGS_IMPORT, data),
 }
