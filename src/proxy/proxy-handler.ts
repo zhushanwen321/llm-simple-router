@@ -251,10 +251,14 @@ export async function handleProxyRequest(
       collectTransportMetrics(deps.db, apiType, resilienceResult.result, isStream, lastLogId, provider.id, resolved.backend_model, request);
 
       // 流式请求：将 tracker 中累积的内容持久化到日志
-      // 优先写 textContent（纯文本），若为空但 blocks 存在则序列化为 JSON
+      // blocks 含非 text 类型时（thinking/tool_use）必须序列化为 JSON 以保留结构
       if (isStream && deps.tracker) {
         const sc = deps.tracker.get(logId)?.streamContent;
-        const content = sc?.textContent || serializeBlocksForStorage(sc?.blocks, apiType);
+        const blocks = sc?.blocks;
+        const hasStructured = blocks && blocks.length > 0 && blocks.some(b => b.type !== "text");
+        const content = hasStructured
+          ? serializeBlocksForStorage(blocks, apiType)
+          : (sc?.textContent || "");
         if (content) updateLogStreamContent(deps.db, lastLogId, content);
       }
 
