@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { api } from '@/api/client'
 import type {
   ActiveRequest,
@@ -104,30 +104,49 @@ export function useMonitorData() {
     }
   }
 
-  // --- Non-stream body loading ---
+  // --- Log detail loading (non-stream body + request diff data) ---
 
-  const nonStreamBody = ref<string | undefined>(undefined)
+  const logDetailData = ref<{ responseBody?: string; clientRequest?: string; upstreamRequest?: string } | null>(null)
   const nonStreamBodyLoading = ref(false)
   const loadVersion = ref(0)
 
-  async function loadNonStreamBody(requestId: string) {
+  async function loadLogDetail(requestId: string) {
     const version = ++loadVersion.value
     const req = activeRequests.value.find((r) => r.id === requestId) ??
       recentCompleted.value.find((r) => r.id === requestId)
-    if (!req || req.isStream || req.status === 'pending') {
-      nonStreamBody.value = undefined
+    if (!req) {
+      logDetailData.value = null
       return
     }
+    logDetailData.value = null
+    // 活跃请求暂无日志数据（日志在请求处理完成后才写入 DB）
+    if (req.status === 'pending') return
+
     nonStreamBodyLoading.value = true
-    nonStreamBody.value = undefined
     try {
-      const log = await api.getLogDetail(requestId) as { response_body?: string }
+      const log = await api.getLogDetail(requestId)
       if (version !== loadVersion.value) return
-      nonStreamBody.value = log.response_body ?? undefined
+      // 从 upstream_response 提取 body（兼容 {statusCode, headers, body} 包装格式）
+      // 非流式请求的响应体在日志中，流式请求的响应体通过 SSE 实时推送
+      let responseBody: string | undefined
+      if (!req.isStream) {
+        const raw = log.upstream_response
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw)
+            responseBody = (typeof parsed.body === 'string' ? parsed.body : raw) ?? undefined
+          } catch { responseBody = raw }
+        }
+      }
+      logDetailData.value = {
+        responseBody,
+        clientRequest: log.client_request ?? undefined,
+        upstreamRequest: log.upstream_request ?? undefined,
+      }
     } catch (e) {
       if (version !== loadVersion.value) return
-      console.warn('Failed to load non-stream body:', e)
-      nonStreamBody.value = undefined
+      console.warn('Failed to load log detail:', e)
+      logDetailData.value = null
     } finally {
       if (version === loadVersion.value) {
         nonStreamBodyLoading.value = false
@@ -143,7 +162,7 @@ export function useMonitorData() {
   function selectRequest(id: string) {
     selectedRequestId.value = id
     requestDetailOpen.value = true
-    loadNonStreamBody(id)
+    loadLogDetail(id)
   }
 
   const selectedRequest = computed(() => {
@@ -153,6 +172,13 @@ export function useMonitorData() {
       recentCompleted.value.find((r) => r.id === selectedRequestId.value) ??
       null
     )
+  })
+
+  // 请求从 pending 变为 completed 时，自动重新加载日志详情
+  watch(() => selectedRequest.value?.status, (newStatus, oldStatus) => {
+    if (oldStatus === 'pending' && (newStatus === 'completed' || newStatus === 'failed')) {
+      loadLogDetail(selectedRequestId.value!)
+    }
   })
 
   return {
@@ -171,8 +197,8 @@ export function useMonitorData() {
     selectedRequest,
     requestDetailOpen,
     selectRequest,
-    // Non-stream body
-    nonStreamBody,
+    // Log detail data
+    logDetailData,
     nonStreamBodyLoading,
     // SSE handlers (for useMonitorSSE)
     handleSSEMessage,

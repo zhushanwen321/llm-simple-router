@@ -230,11 +230,11 @@ describe("Log children endpoint", () => {
     });
     expect(res.statusCode).toBe(200);
     const body = res.json();
-    expect(body.data).toHaveLength(2);
-    expect(body.data[0].id).toBe("child-retry");
-    expect(body.data[1].id).toBe("child-failover");
-    expect(body.data[0].is_retry).toBe(1);
-    expect(body.data[1].is_failover).toBe(1);
+    expect(body).toHaveLength(2);
+    expect(body[0].id).toBe("child-retry");
+    expect(body[1].id).toBe("child-failover");
+    expect(body[0].is_retry).toBe(1);
+    expect(body[1].is_failover).toBe(1);
   });
 
   it("returns empty array for a leaf request with no children", async () => {
@@ -244,7 +244,7 @@ describe("Log children endpoint", () => {
       headers: { cookie },
     });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ data: [] });
+    expect(res.json()).toEqual([]);
   });
 
   it("returns 404 for nonexistent parent", async () => {

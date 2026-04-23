@@ -18,6 +18,8 @@ import { buildUpstreamHeaders } from "./proxy-core.js";
 import { UPSTREAM_SUCCESS, ProviderSwitchNeeded } from "./types.js";
 import type { RawHeaders, TransportResult } from "./types.js";
 import { SSEMetricsTransform } from "../metrics/sse-metrics-transform.js";
+import { MetricsExtractor } from "../metrics/metrics-extractor.js";
+import { updateLogStreamContent } from "../db/index.js";
 import { callNonStream, callStream } from "./transport.js";
 import { insertRejectedLog } from "./log-helpers.js";
 import type { Target } from "./strategy/types.js";
@@ -161,7 +163,9 @@ export async function handleProxyRequest(
             deps.tracker?.update(logId, {
               streamMetrics: {
                 inputTokens: m.input_tokens, outputTokens: m.output_tokens,
-                ttftMs: m.ttft_ms, stopReason: m.stop_reason, isComplete: m.is_complete === 1,
+                cacheReadTokens: m.cache_read_tokens,
+                ttftMs: m.ttft_ms, tokensPerSecond: m.tokens_per_second,
+                stopReason: m.stop_reason, isComplete: m.is_complete === 1,
               },
             });
           },
@@ -178,6 +182,20 @@ export async function handleProxyRequest(
         );
       }
       const result = await callNonStream(provider, apiKey, body, cliHdrs, upstreamPath, buildUpstreamHeaders);
+      // 非流式请求：从响应体提取指标并更新 tracker
+      if (result.kind === "success") {
+        const mr = MetricsExtractor.fromNonStreamResponse(apiType, result.body);
+        if (mr) {
+          deps.tracker?.update(logId, {
+            streamMetrics: {
+              inputTokens: mr.input_tokens, outputTokens: mr.output_tokens,
+              cacheReadTokens: mr.cache_read_tokens,
+              ttftMs: mr.ttft_ms, tokensPerSecond: mr.tokens_per_second,
+              stopReason: mr.stop_reason, isComplete: mr.is_complete === 1,
+            },
+          });
+        }
+      }
       // 非流式响应注入模型信息标签（模型映射场景）
       if (originalModel && result.kind === "success" && result.statusCode === UPSTREAM_SUCCESS) {
         try {
@@ -194,19 +212,26 @@ export async function handleProxyRequest(
     try {
       const resilienceResult = await deps.orchestrator.handle(
         request, reply, apiType,
-        { resolved, provider, clientModel: effectiveModel, isStream, trackerId: logId },
+        { resolved, provider, clientModel: effectiveModel, isStream, trackerId: logId, sessionId },
         { retryMaxAttempts: deps.retryMaxAttempts, retryBaseDelayMs: deps.retryBaseDelayMs, isFailover, ruleMatcher: deps.matcher, transportFn },
       );
       const lastLogId = logResilienceResult(
         deps.db,
         {
           apiType, model: effectiveModel, providerId: provider.id, isStream,
-          reqBodyStr, clientReq, upstreamReqBase, logId, routerKeyId, originalModel,
+          clientReq, upstreamReqBase, logId, routerKeyId, originalModel,
           failover: { isFailoverIteration, rootLogId: rootLogId! },
         },
         resilienceResult.attempts, resilienceResult.result, startTime,
       );
       collectTransportMetrics(deps.db, apiType, resilienceResult.result, isStream, lastLogId, provider.id, resolved.backend_model, request);
+
+      // 流式请求：将 tracker 中累积的文本内容持久化到日志
+      if (isStream && deps.tracker) {
+        const req = deps.tracker.get(lastLogId);
+        const text = req?.streamContent?.textContent;
+        if (text) updateLogStreamContent(deps.db, lastLogId, text);
+      }
 
       // Failover: 单 provider 内重试已耗尽但仍失败，尝试下一个 target
       if (isFailover && !reply.raw.headersSent) {
@@ -264,7 +289,7 @@ export async function handleProxyRequest(
         id: logId, api_type: apiType, model: effectiveModel, provider_id: provider.id,
         status_code: 502, latency_ms: Date.now() - startTime, is_stream: isStream ? 1 : 0,
         error_message: errMsg || "Upstream connection failed", created_at: new Date().toISOString(),
-        request_body: reqBodyStr, client_request: clientReq, upstream_request: upstreamReqBase,
+        client_request: clientReq, upstream_request: upstreamReqBase,
         is_failover: isFailoverIteration ? 1 : 0, original_request_id: isFailoverIteration ? rootLogId : null,
         router_key_id: routerKeyId, original_model: originalModel,
       });

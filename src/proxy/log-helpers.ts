@@ -21,13 +21,11 @@ export interface RequestLogParams extends LogRetryMeta {
   provider: Provider;
   isStream: boolean;
   startTime: number;
-  reqBody: string;
   clientReq: string;
   upstreamReq: string;
   status: number;
   respBody: string | null;
   upHdrs: Record<string, string>;
-  cliHdrs: Record<string, string>;
   routerKeyId?: string | null;
   originalModel?: string | null;
 }
@@ -38,17 +36,16 @@ export function insertSuccessLog(
   params: RequestLogParams,
 ): void {
   const { id: logId, apiType, model, provider, isStream, startTime,
-    reqBody, clientReq, upstreamReq, status, respBody, upHdrs, cliHdrs,
+    clientReq, upstreamReq, status, respBody, upHdrs,
     isRetry = false, isFailover = false, originalRequestId = null, routerKeyId = null, originalModel = null } = params;
 
   insertRequestLog(db, {
     id: logId, api_type: apiType, model, provider_id: provider.id,
     status_code: status, latency_ms: Date.now() - startTime,
     is_stream: isStream ? 1 : 0, error_message: null,
-    created_at: new Date().toISOString(), request_body: reqBody,
-    response_body: respBody, client_request: clientReq, upstream_request: upstreamReq,
+    created_at: new Date().toISOString(),
+    client_request: clientReq, upstream_request: upstreamReq,
     upstream_response: JSON.stringify({ statusCode: status, headers: upHdrs, body: respBody }),
-    client_response: JSON.stringify({ statusCode: status, headers: cliHdrs, body: respBody }),
     is_retry: isRetry ? 1 : 0, is_failover: isFailover ? 1 : 0, original_request_id: originalRequestId,
     router_key_id: routerKeyId, original_model: originalModel,
   });
@@ -86,7 +83,6 @@ export function insertRejectedLog(params: RejectedLogParams): void {
     is_stream: isStream ? 1 : 0,
     error_message: errorMessage,
     created_at: new Date().toISOString(),
-    request_body: JSON.stringify(originalBody),
     client_request: JSON.stringify({ headers: clientHeaders, body: originalBody }),
     is_failover: isFailover ? 1 : 0,
     original_request_id: originalRequestId,
