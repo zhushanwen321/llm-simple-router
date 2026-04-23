@@ -20,6 +20,7 @@ export function initDatabase(dbPath: string): Database.Database {
 
   const db = new Database(dbPath);
   db.pragma("journal_mode = WAL");
+  db.pragma("auto_vacuum = INCREMENTAL");
   db.pragma("foreign_keys = ON");
 
   db.exec(`
