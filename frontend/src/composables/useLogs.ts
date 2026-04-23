@@ -10,10 +10,9 @@ export function useLogs() {
   const logs = ref<LogEntry[]>([])
   const total = ref(0)
   const page = ref(1)
-  const filterType = ref('all')
-  const filterRouterKey = ref('all')
-  const routerKeys = ref<{ id: string; name: string }[]>([])
-  const cleanupDays = ref(30) // eslint-disable-line no-magic-numbers
+  const filterParams = ref<Record<string, string>>({})
+  const DEFAULT_CLEANUP_DAYS = 30
+  const cleanupDays = ref(DEFAULT_CLEANUP_DAYS)
   const showCleanup = ref(false)
 
   const expandedRows = ref<Set<string>>(new Set())
@@ -24,12 +23,11 @@ export function useLogs() {
 
   const hasMore = computed(() => logs.value.length >= PAGE_SIZE)
 
-  async function loadLogs() {
+  /** 加载日志列表。传入 params 会更新内部 filter 状态供 prevPage/nextPage 复用 */
+  async function loadLogs(params?: Record<string, string>) {
+    if (params) filterParams.value = params
     try {
-      const params: { page: number; limit: number; api_type?: string; router_key_id?: string; view?: string } = { page: page.value, limit: PAGE_SIZE, view: 'grouped' }
-      if (filterType.value && filterType.value !== 'all') params.api_type = filterType.value
-      if (filterRouterKey.value && filterRouterKey.value !== 'all') params.router_key_id = filterRouterKey.value
-      const res = await api.getLogs(params)
+      const res = await api.getLogs({ page: page.value, limit: PAGE_SIZE, view: 'grouped', ...filterParams.value })
       logs.value = res.data
       total.value = res.total
       expandedRows.value.clear()
@@ -39,11 +37,6 @@ export function useLogs() {
       console.error('Failed to load logs:', e)
       toast.error('加载日志失败')
     }
-  }
-
-  function handleFilterChange() {
-    page.value = 1
-    loadLogs()
   }
 
   function prevPage() {
@@ -69,16 +62,6 @@ export function useLogs() {
     } catch (e) {
       console.error('Failed to cleanup logs:', e)
       toast.error('清理日志失败')
-    }
-  }
-
-  async function loadRouterKeys() {
-    try {
-      const res = await api.getRouterKeys()
-      routerKeys.value = res
-    } catch (e) {
-      console.error('Failed to load router keys:', e)
-      toast.error('加载密钥列表失败')
     }
   }
 
@@ -112,16 +95,12 @@ export function useLogs() {
     }
   }
 
-  function init() {
-    loadRouterKeys()
-    loadLogs()
-  }
-
   return {
-    logs, total, page, filterType, filterRouterKey, routerKeys,
+    PAGE_SIZE,
+    logs, total, page, hasMore,
     cleanupDays, showCleanup, expandedRows, childLogs, childLoading,
-    logDetailOpen, selectedLogEntry, hasMore,
-    loadLogs, handleFilterChange, prevPage, nextPage,
-    handleCleanup, toggleExpand, openLogDetail, init,
+    logDetailOpen, selectedLogEntry,
+    loadLogs, prevPage, nextPage,
+    handleCleanup, toggleExpand, openLogDetail,
   }
 }
