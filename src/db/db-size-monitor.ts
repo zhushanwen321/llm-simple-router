@@ -86,6 +86,8 @@ export function scheduleDbSizeMonitor(
       };
       const deleted = runSizeBasedCleanup(db, dbPath, thresholds);
       if (deleted > 0) options.log.info(`Size-based cleanup: deleted ${deleted} log records`);
+    } catch {
+      // DB 可能已关闭（测试清理、进程关闭等），静默忽略
     } finally {
       running = false;
     }

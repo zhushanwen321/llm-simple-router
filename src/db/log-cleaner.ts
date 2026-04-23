@@ -23,7 +23,8 @@ export function scheduleLogCleanup(
   log: { info: (msg: string) => void },
 ): LogCleanupHandle {
   let cleaning = false;
-  let timer: ReturnType<typeof setInterval> | null = null;
+  let initialTimer: ReturnType<typeof setTimeout> | null = null;
+  let intervalTimer: ReturnType<typeof setInterval> | null = null;
 
   const doCleanup = () => {
     if (cleaning) return;
@@ -31,20 +32,23 @@ export function scheduleLogCleanup(
     try {
       const deleted = runLogCleanup(db);
       if (deleted > 0) log.info(`Log cleanup: deleted ${deleted} records`);
+    } catch {
+      // DB 可能已关闭（测试清理、进程关闭等），静默忽略
     } finally {
       cleaning = false;
     }
   };
 
   // 推迟到下一个事件循环 tick，避免阻塞服务器启动
-  setTimeout(doCleanup, 0);
+  initialTimer = setTimeout(doCleanup, 0);
 
   // 定时执行
-  timer = setInterval(doCleanup, CLEANUP_INTERVAL_MS);
+  intervalTimer = setInterval(doCleanup, CLEANUP_INTERVAL_MS);
 
   return {
     stop: () => {
-      if (timer) { clearInterval(timer); timer = null; }
+      if (initialTimer) { clearTimeout(initialTimer); initialTimer = null; }
+      if (intervalTimer) { clearInterval(intervalTimer); intervalTimer = null; }
     },
   };
 }
