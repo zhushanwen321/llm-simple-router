@@ -121,9 +121,17 @@ export function useMonitorData() {
     nonStreamBodyLoading.value = true
     nonStreamBody.value = undefined
     try {
-      const log = await api.getLogDetail(requestId) as { response_body?: string }
+      const log = await api.getLogDetail(requestId) as { upstream_response?: string }
       if (version !== loadVersion.value) return
-      nonStreamBody.value = log.response_body ?? undefined
+      // 从 upstream_response 提取 body（兼容 {statusCode, headers, body} 包装格式）
+      const raw = log.upstream_response
+      if (!raw) { nonStreamBody.value = undefined }
+      else {
+        try {
+          const parsed = JSON.parse(raw)
+          nonStreamBody.value = (typeof parsed.body === 'string' ? parsed.body : raw) ?? undefined
+        } catch { nonStreamBody.value = raw }
+      }
     } catch (e) {
       if (version !== loadVersion.value) return
       console.warn('Failed to load non-stream body:', e)
