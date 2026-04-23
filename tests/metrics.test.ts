@@ -40,8 +40,8 @@ describe("request_metrics migration and insertMetrics", () => {
     expect(rows[16].name).toBe("017_add_provider_concurrency.sql");
     expect(rows[17].name).toBe("018_add_failover_field.sql");
     expect(rows[18].name).toBe("019_create_usage_windows.sql");
-    expect(rows[19].name).toBe("019_drop_log_redundancy.sql");
-    expect(rows[20].name).toBe("020_merge_metrics_columns.sql");
+    expect(rows[19].name).toBe("020_drop_log_redundancy.sql");
+    expect(rows[20].name).toBe("021_merge_metrics_columns.sql");
   });
 
   it("should create indexes", () => {

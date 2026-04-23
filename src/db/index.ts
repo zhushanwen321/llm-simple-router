@@ -8,12 +8,19 @@ const __dirname = dirname(__filename);
 
 const MIGRATIONS_DIR = join(__dirname, "migrations");
 
+const MIGRATION_RENAMES: Record<string, string> = {
+  "019_drop_log_redundancy.sql": "020_drop_log_redundancy.sql",
+  "020_merge_metrics_columns.sql": "021_merge_metrics_columns.sql",
+};
+
 export function initDatabase(dbPath: string): Database.Database {
   if (dbPath !== ":memory:") {
     mkdirSync(dirname(dbPath), { recursive: true });
   }
 
   const db = new Database(dbPath);
+  db.pragma("journal_mode = WAL");
+  db.pragma("foreign_keys = ON");
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS migrations (
@@ -28,6 +35,15 @@ export function initDatabase(dbPath: string): Database.Database {
     ).map((r) => r.name),
   );
 
+  // 将已应用的旧文件名更新为新文件名，避免重命名后重复执行
+  for (const [oldName, newName] of Object.entries(MIGRATION_RENAMES)) {
+    if (applied.has(oldName) && !applied.has(newName)) {
+      db.prepare("UPDATE migrations SET name = ? WHERE name = ?").run(newName, oldName);
+      applied.delete(oldName);
+      applied.add(newName);
+    }
+  }
+
   const files = readdirSync(MIGRATIONS_DIR)
     .filter((f) => f.endsWith(".sql"))
     .sort();
@@ -37,15 +53,17 @@ export function initDatabase(dbPath: string): Database.Database {
 
     try {
       const sql = readFileSync(join(MIGRATIONS_DIR, file), "utf-8");
-      db.exec(sql);
+      db.transaction(() => {
+        db.exec(sql);
+        db.prepare("INSERT INTO migrations (name, applied_at) VALUES (?, ?)").run(
+          file,
+          new Date().toISOString(),
+        );
+      })();
     } catch (err) {
       console.error(`Failed to apply migration ${file}:`, err);
       throw err;
     }
-    db.prepare("INSERT INTO migrations (name, applied_at) VALUES (?, ?)").run(
-      file,
-      new Date().toISOString(),
-    );
   }
 
   return db;

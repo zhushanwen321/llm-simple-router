@@ -92,8 +92,7 @@ export function useLogs() {
     if (!childLogs.value[id]) {
       childLoading.value[id] = true
       try {
-        const res = await api.getLogChildren(id)
-        childLogs.value[id] = res.data
+        childLogs.value[id] = await api.getLogChildren(id)
       } catch (e) {
         console.error('Failed to load child logs:', e)
         toast.error('加载子请求失败')
