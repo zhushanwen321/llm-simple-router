@@ -212,7 +212,11 @@ export function backfillMetricsFromRequestMetrics(db: Database.Database): number
 }
 
 export function deleteLogsBefore(db: Database.Database, beforeDate: string): number {
-  return db.prepare("DELETE FROM request_logs WHERE created_at < ?").run(beforeDate).changes;
+  const changes = db.prepare("DELETE FROM request_logs WHERE created_at < ?").run(beforeDate).changes;
+  if (changes > 0) {
+    db.pragma("incremental_vacuum(100)");
+  }
+  return changes;
 }
 
 /** 查询某条日志的子请求（retry/failover 关联），上限 100 条 */
