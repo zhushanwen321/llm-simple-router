@@ -96,11 +96,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { UnifiedRequestOverview } from './types'
+import { MS_PER_SECOND, HTTP_ERROR_THRESHOLD } from './types'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-
-const MS_PER_SECOND = 1000
-const HTTP_ERROR_THRESHOLD = 400
 
 const props = defineProps<{ overview: UnifiedRequestOverview }>()
 

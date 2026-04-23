@@ -150,8 +150,9 @@ interface ParsedRequest {
 function parseRequest(raw: string | null): ParsedRequest | null {
   if (!raw) return null
   try {
-    const parsed = JSON.parse(raw) as Record<string, unknown>
-    const headers = (parsed.headers ?? {}) as Record<string, string>
+    const parsed = JSON.parse(raw)
+    if (typeof parsed !== 'object' || parsed === null) return null
+    const headers = (typeof parsed.headers === 'object' && parsed.headers !== null ? parsed.headers : {}) as Record<string, string>
     let body = parsed.body
     if (typeof body === 'string') {
       // eslint-disable-next-line taste/no-silent-catch -- body 可能是普通字符串
@@ -168,8 +169,8 @@ function extractText(msg: Record<string, unknown>): string {
   if (typeof content === 'string') return content
   if (Array.isArray(content)) {
     return content
-      .filter((b: unknown) => typeof b === 'object' && b !== null && 'text' in (b as Record<string, unknown>))
-      .map((b: unknown) => (b as Record<string, unknown>).text as string)
+      .filter((b: unknown): b is Record<string, unknown> => typeof b === 'object' && b !== null && 'text' in b)
+      .map(b => typeof b.text === 'string' ? b.text : '')
       .join('')
   }
   return String(content ?? '')
