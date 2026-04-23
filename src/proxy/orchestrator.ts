@@ -26,6 +26,8 @@ export interface OrchestratorConfig {
   isStream: boolean;
   /** 外部生成的 tracker ID，用于 tracker.appendStreamChunk / tracker.update 等回调匹配 */
   trackerId?: string;
+  /** Claude Code 的 session ID，从 x-claude-code-session-id 请求头获取 */
+  sessionId?: string;
 }
 
 export interface HandleContext {
@@ -110,6 +112,7 @@ export class ProxyOrchestrator {
       retryCount: 0,
       attempts: [],
       clientIp: request.ip,
+      sessionId: config.sessionId,
     };
   }
 

@@ -194,7 +194,7 @@ export async function handleProxyRequest(
     try {
       const resilienceResult = await deps.orchestrator.handle(
         request, reply, apiType,
-        { resolved, provider, clientModel: effectiveModel, isStream, trackerId: logId },
+        { resolved, provider, clientModel: effectiveModel, isStream, trackerId: logId, sessionId },
         { retryMaxAttempts: deps.retryMaxAttempts, retryBaseDelayMs: deps.retryBaseDelayMs, isFailover, ruleMatcher: deps.matcher, transportFn },
       );
       const lastLogId = logResilienceResult(

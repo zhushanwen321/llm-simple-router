@@ -9,10 +9,11 @@
         进行中
       </Badge>
       <Badge v-else-if="statusColor === 'error'" class="badge-error">
-        {{ overview.statusCode ?? '--' }}
+        {{ overview.statusCode ?? '失败' }}
       </Badge>
       <Badge v-else class="badge-success">
-        {{ overview.statusCode ?? '--' }}
+        <span class="w-1.5 h-1.5 rounded-full dot-success" />
+        已完成
       </Badge>
 
       <Badge variant="outline">{{ overview.isStream ? 'SSE' : '非流式' }}</Badge>
@@ -21,8 +22,8 @@
 
     <!-- Row 2: session (conditional) -->
     <div v-if="overview.sessionId" class="flex items-center gap-1.5">
-      <Badge class="badge-success">Claude Code</Badge>
-      <span class="font-mono text-[11px] text-muted-foreground truncate">{{ overview.sessionId }}</span>
+      <Badge variant="secondary" class="text-[10px]">Session</Badge>
+      <span class="font-mono text-[11px] text-muted-foreground truncate">{{ overview.sessionId.slice(0, 8) }}</span>
     </div>
 
     <!-- Metrics grid -->
@@ -76,9 +77,9 @@
 
     <!-- Metadata -->
     <div class="space-y-1">
-      <div class="flex items-center justify-between text-[11px]">
-        <span class="text-muted-foreground">ID</span>
-        <span class="font-mono truncate max-w-[140px]">{{ overview.id.slice(0, 8) }}</span>
+      <div v-if="overview.statusCode != null" class="flex items-center justify-between text-[11px]">
+        <span class="text-muted-foreground">状态码</span>
+        <span class="font-mono">{{ overview.statusCode }}</span>
       </div>
       <div v-if="overview.providerName" class="flex items-center justify-between text-[11px]">
         <span class="text-muted-foreground">Provider</span>

@@ -61,7 +61,7 @@ export function fromActiveRequest(
     apiType: req.apiType,
     providerName: req.providerName,
     clientIp: req.clientIp,
-    sessionId: null,
+    sessionId: req.sessionId ?? null,
     latencyMs: req.completedAt ? req.completedAt - req.startTime : null,
     ttftMs: m?.ttftMs ?? null,
     inputTokens: m?.inputTokens ?? null,

@@ -161,7 +161,7 @@
       source="realtime"
       :request="selectedRequest"
       :stream-content="selectedRequest?.streamContent"
-      :non-stream-body="nonStreamBody"
+      :log-detail-data="logDetailData"
     />
   </div>
 </template>
@@ -196,7 +196,7 @@ const {
   selectedRequest,
   requestDetailOpen,
   selectRequest,
-  nonStreamBody,
+  logDetailData,
   handleSSEMessage,
   handleSSEOpen,
   handleSSEClose,

@@ -19,8 +19,11 @@
       </div>
 
       <DialogHeader class="px-4 pt-2 pb-0">
-        <DialogTitle class="text-sm">请求详情</DialogTitle>
-        <DialogDescription class="sr-only">查看请求的响应内容和请求详情</DialogDescription>
+        <DialogTitle class="text-sm flex items-center gap-2">
+          请求详情
+          <span v-if="overview" class="font-mono text-[11px] text-muted-foreground">{{ overview.id.slice(0, 8) }}</span>
+        </DialogTitle>
+        <DialogDescription class="sr-only">查看请求的响应内容和请求内容</DialogDescription>
       </DialogHeader>
 
       <!-- Main content area -->
@@ -41,7 +44,7 @@
             <Tabs v-model="activeTab">
               <TabsList>
                 <TabsTrigger value="response">响应内容</TabsTrigger>
-                <TabsTrigger value="request">请求详情</TabsTrigger>
+                <TabsTrigger value="request">请求内容</TabsTrigger>
               </TabsList>
 
               <!-- Response tab -->
@@ -51,7 +54,7 @@
                   :api-type="overview.apiType"
                   :is-stream="overview.isStream"
                   :stream-content="props.streamContent"
-                  :non-stream-body="props.nonStreamBody"
+                  :non-stream-body="logDetailData?.responseBody"
                   :response-body="overview.responseBody"
                   :upstream-response="overview.upstreamResponse"
                   :status="overview.status"
@@ -103,7 +106,7 @@ const props = defineProps<{
   // Realtime mode
   request?: ActiveRequest | null
   streamContent?: StreamContentSnapshot | null
-  nonStreamBody?: string | null
+  logDetailData?: { responseBody?: string; clientRequest?: string; upstreamRequest?: string } | null
   // History mode
   logEntry?: LogEntry | null
 }>()
@@ -118,7 +121,13 @@ const loadedOverview = ref<UnifiedRequestOverview | null>(null)
 const overview = computed<UnifiedRequestOverview | null>(() => {
   if (props.source === 'realtime') {
     if (!props.request) return null
-    return fromActiveRequest(props.request, props.nonStreamBody)
+    const base = fromActiveRequest(props.request, props.logDetailData?.responseBody)
+    // 将日志详情中的 clientRequest/upstreamRequest 合并进 overview
+    if (props.logDetailData) {
+      if (props.logDetailData.clientRequest) base.clientRequest = props.logDetailData.clientRequest
+      if (props.logDetailData.upstreamRequest) base.upstreamRequest = props.logDetailData.upstreamRequest
+    }
+    return base
   }
   return loadedOverview.value
 })

@@ -29,6 +29,7 @@ export interface ActiveRequest {
   streamMetrics?: StreamMetricsSnapshot;
   streamContent?: StreamContentSnapshot;
   clientIp?: string;
+  sessionId?: string;
   completedAt?: number;
 }
 
