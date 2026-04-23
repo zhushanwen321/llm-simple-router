@@ -161,7 +161,9 @@ export async function handleProxyRequest(
             deps.tracker?.update(logId, {
               streamMetrics: {
                 inputTokens: m.input_tokens, outputTokens: m.output_tokens,
-                ttftMs: m.ttft_ms, stopReason: m.stop_reason, isComplete: m.is_complete === 1,
+                cacheReadTokens: m.cache_read_tokens,
+                ttftMs: m.ttft_ms, tokensPerSecond: m.tokens_per_second,
+                stopReason: m.stop_reason, isComplete: m.is_complete === 1,
               },
             });
           },

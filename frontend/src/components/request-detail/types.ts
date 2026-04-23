@@ -45,8 +45,8 @@ export function fromActiveRequest(
     : undefined
   const m = req.streamMetrics
 
-  let tokensPerSecond: number | null = null
-  if (m && m.outputTokens && m.ttftMs && req.completedAt) {
+  let tokensPerSecond = m?.tokensPerSecond ?? null
+  if (!tokensPerSecond && m && m.outputTokens && m.ttftMs && req.completedAt) {
     const outputTime = (req.completedAt - req.startTime - m.ttftMs) / MS_PER_SECOND
     if (outputTime > 0) tokensPerSecond = m.outputTokens / outputTime
   }
@@ -67,7 +67,7 @@ export function fromActiveRequest(
     inputTokens: m?.inputTokens ?? null,
     outputTokens: m?.outputTokens ?? null,
     tokensPerSecond,
-    cacheReadTokens: null,
+    cacheReadTokens: m?.cacheReadTokens ?? null,
     cacheWriteTokens: null,
     stopReason: m?.stopReason ?? null,
     isComplete: m?.isComplete ?? false,
