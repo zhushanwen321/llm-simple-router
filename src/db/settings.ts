@@ -22,3 +22,24 @@ export function getLogRetentionDays(db: Database.Database): number {
 export function setLogRetentionDays(db: Database.Database, days: number): void {
   setSetting(db, "log_retention_days", String(days));
 }
+
+const DEFAULT_DB_MAX_SIZE_MB = 1024;
+const DEFAULT_LOG_TABLE_MAX_SIZE_MB = 800;
+
+export function getDbMaxSizeMb(db: Database.Database): number {
+  const val = getSetting(db, "db_max_size_mb");
+  return val ? parseInt(val, 10) : DEFAULT_DB_MAX_SIZE_MB;
+}
+
+export function setDbMaxSizeMb(db: Database.Database, mb: number): void {
+  setSetting(db, "db_max_size_mb", String(mb));
+}
+
+export function getLogTableMaxSizeMb(db: Database.Database): number {
+  const val = getSetting(db, "log_table_max_size_mb");
+  return val ? parseInt(val, 10) : DEFAULT_LOG_TABLE_MAX_SIZE_MB;
+}
+
+export function setLogTableMaxSizeMb(db: Database.Database, mb: number): void {
+  setSetting(db, "log_table_max_size_mb", String(mb));
+}
