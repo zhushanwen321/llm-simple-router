@@ -15,7 +15,8 @@ export function isInitialized(db: Database.Database): boolean {
 
 export function getLogRetentionDays(db: Database.Database): number {
   const val = getSetting(db, "log_retention_days");
-  return val ? parseInt(val, 10) : 3;
+  const DEFAULT_LOG_RETENTION_DAYS = 3;
+  return val ? parseInt(val, 10) : DEFAULT_LOG_RETENTION_DAYS;
 }
 
 export function setLogRetentionDays(db: Database.Database, days: number): void {

@@ -15,7 +15,8 @@ export const adminSettingsRoutes: FastifyPluginCallback<SettingsOptions> = (app,
 
   app.put("/admin/api/settings/log-retention", async (request) => {
     const { days } = request.body as { days: number };
-    if (!Number.isInteger(days) || days < 0 || days > 90) {
+    const MAX_LOG_RETENTION_DAYS = 90;
+    if (!Number.isInteger(days) || days < 0 || days > MAX_LOG_RETENTION_DAYS) {
       throw { statusCode: 400, message: "days must be integer 0-90" };
     }
     setLogRetentionDays(db, days);

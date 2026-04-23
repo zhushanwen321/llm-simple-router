@@ -1,5 +1,6 @@
 import { FastifyPluginCallback } from "fastify";
 import type { RequestTracker } from "../monitor/request-tracker.js";
+import { HTTP_NOT_FOUND } from "./constants.js";
 
 const HTTP_OK = 200;
 
@@ -36,7 +37,7 @@ export const adminMonitorRoutes: FastifyPluginCallback<MonitorRoutesOptions> = (
   app.get("/admin/api/monitor/request/:id", async (request, reply) => {
     const { id } = request.params as { id: string };
     const req = tracker.getRequestById(id);
-    if (!req) return reply.status(404).send({ error: "Not found" });
+    if (!req) return reply.status(HTTP_NOT_FOUND).send({ error: "Not found" });
     return req;
   });
 

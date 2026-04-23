@@ -279,9 +279,10 @@ export class RequestTracker {
     // full data available on-demand via getRequestById / API endpoint
     let payload = data;
     if (event === "request_update" && Array.isArray(data)) {
-      payload = data.map(req => {
-        const { clientRequest: _, ...rest } = req as ActiveRequest;
-        return rest;
+      payload = data.map((req: ActiveRequest) => {
+        const copy = { ...req };
+        delete copy.clientRequest;
+        return copy;
       });
     }
     const msg = `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
