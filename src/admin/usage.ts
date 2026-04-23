@@ -2,6 +2,7 @@ import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
 import { Type } from "@sinclair/typebox";
 import { getWindowsInRange, getWindowUsage } from "../db/usage-windows.js";
+import { toSqliteDatetime } from "../utils/datetime.js";
 
 interface UsageRoutesOptions {
   db: Database.Database;
@@ -10,12 +11,6 @@ interface UsageRoutesOptions {
 const UsageQuerySchema = Type.Object({
   router_key_id: Type.Optional(Type.String()),
 });
-
-/** Date → SQLite datetime 文本（YYYY-MM-DD HH:MM:SS） */
-function toSqliteDatetime(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-}
 
 interface DailyUsageRow {
   date: string;

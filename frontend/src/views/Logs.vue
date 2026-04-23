@@ -3,36 +3,62 @@
   <div class="p-6">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-lg font-semibold text-foreground">请求日志</h2>
-      <div class="flex items-center gap-2">
-        <Select v-model="filterType" @update:model-value="handleFilterChange">
-          <SelectTrigger class="w-[140px]">
-            <SelectValue placeholder="全部类型" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">全部类型</SelectItem>
-            <SelectItem value="openai">OpenAI</SelectItem>
-            <SelectItem value="anthropic">Anthropic</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select v-model="filterRouterKey" @update:model-value="handleFilterChange">
-          <SelectTrigger class="w-48">
-            <SelectValue placeholder="全部密钥" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">全部密钥</SelectItem>
-            <SelectItem v-for="rk in routerKeys" :key="rk.id" :value="rk.id">
-              {{ rk.name }}
-            </SelectItem>
-          </SelectContent>
-        </Select>
+      <Button
+        variant="outline"
+        class="text-destructive border-destructive hover:bg-destructive/10"
+        @click="showCleanup = true"
+      >
+        清理日志
+      </Button>
+    </div>
+
+    <!-- 筛选栏 -->
+    <div class="flex flex-wrap items-center gap-2 mb-4">
+      <div class="flex gap-1">
         <Button
-          variant="outline"
-          class="text-destructive border-destructive hover:bg-destructive/10"
-          @click="showCleanup = true"
+          v-for="p in PERIODS"
+          :key="p.value"
+          :variant="period === p.value ? 'default' : 'ghost'"
+          size="sm"
+          @click="period = p.value"
         >
-          清理日志
+          {{ p.label }}
         </Button>
       </div>
+      <div class="flex items-center gap-1">
+        <Input type="datetime-local" v-model="dateRange.start" class="w-44" />
+        <span class="text-muted-foreground text-sm">-</span>
+        <Input type="datetime-local" v-model="dateRange.end" class="w-44" />
+        <Button v-if="dateRange.start || dateRange.end" variant="ghost" size="sm" @click="clearDateRange">清除</Button>
+        <span v-if="dateRangeError" class="text-xs text-destructive whitespace-nowrap">{{ dateRangeError }}</span>
+      </div>
+      <Select v-model="providerFilter">
+        <SelectTrigger class="w-28 truncate">
+          <SelectValue placeholder="全部供应商" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">全部供应商</SelectItem>
+          <SelectItem v-for="p in providers" :key="p.id" :value="p.id">{{ p.name }}</SelectItem>
+        </SelectContent>
+      </Select>
+      <Select v-model="modelFilter">
+        <SelectTrigger class="w-32 truncate">
+          <SelectValue placeholder="全部模型" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">全部模型</SelectItem>
+          <SelectItem v-for="m in filteredModelOptions" :key="m" :value="m">{{ m }}</SelectItem>
+        </SelectContent>
+      </Select>
+      <Select v-model="keyFilter">
+        <SelectTrigger class="w-32 truncate">
+          <SelectValue placeholder="全部密钥" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">全部密钥</SelectItem>
+          <SelectItem v-for="rk in routerKeys" :key="rk.id" :value="rk.id">{{ rk.name }}</SelectItem>
+        </SelectContent>
+      </Select>
     </div>
 
     <div class="bg-card rounded-lg border overflow-hidden">
@@ -63,7 +89,6 @@
               @open-detail="openLogDetail"
             />
 
-            <!-- Expanded child rows -->
             <template v-if="expandedRows.has(log.id)">
               <TableRow v-if="childLoading[log.id]">
                 <TableCell :colspan="TABLE_COL_COUNT" class="text-center py-2 pl-10">
@@ -98,10 +123,8 @@
       </div>
     </div>
 
-    <!-- Shared log detail dialog -->
     <LogDetailDialog ref="logDetailRef" v-model:open="logDetailOpen" />
 
-    <!-- Cleanup Dialog -->
     <Dialog v-model:open="showCleanup">
       <DialogContent>
         <DialogHeader>
@@ -122,7 +145,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
 import { api } from '@/api/client'
 import { Button } from '@/components/ui/button'
@@ -135,15 +158,28 @@ import { Skeleton } from '@/components/ui/skeleton'
 import LogDetailDialog from '@/components/monitor/LogDetailDialog.vue'
 import LogTableRow from '@/components/logs/LogTableRow.vue'
 import type { LogEntry } from '@/components/logs/types'
+import { useLogFilters } from '@/composables/useLogFilters'
+
+const {
+  PERIODS,
+  period,
+  dateRange,
+  dateRangeError,
+  providerFilter,
+  modelFilter,
+  keyFilter,
+  providers,
+  routerKeys,
+  filteredModelOptions,
+  clearDateRange,
+  buildFilterParams,
+} = useLogFilters()
 
 const logs = ref<LogEntry[]>([])
 const total = ref(0)
 const page = ref(1)
 const PAGE_SIZE = 20
 const TABLE_COL_COUNT = 13
-const filterType = ref('all')
-const filterRouterKey = ref('all')
-const routerKeys = ref<{ id: string; name: string }[]>([])
 const showCleanup = ref(false)
 const cleanupDays = ref(30) // eslint-disable-line no-magic-numbers
 
@@ -181,10 +217,13 @@ function openLogDetail(id: string) {
 
 async function loadLogs() {
   try {
-    const params: { page: number; limit: number; api_type?: string; router_key_id?: string; view?: string } = { page: page.value, limit: PAGE_SIZE, view: 'grouped' }
-    if (filterType.value && filterType.value !== 'all') params.api_type = filterType.value
-    if (filterRouterKey.value && filterRouterKey.value !== 'all') params.router_key_id = filterRouterKey.value
-    const res = await api.getLogs(params)
+    const filterParams = buildFilterParams()
+    const res = await api.getLogs({
+      page: page.value,
+      limit: PAGE_SIZE,
+      view: 'grouped',
+      ...filterParams,
+    })
     logs.value = res.data
     total.value = res.total
     expandedRows.value.clear()
@@ -194,11 +233,6 @@ async function loadLogs() {
     console.error('Failed to load logs:', e)
     toast.error('加载日志失败')
   }
-}
-
-function handleFilterChange() {
-  page.value = 1
-  loadLogs()
 }
 
 function prevPage() {
@@ -227,18 +261,18 @@ async function handleCleanup() {
   }
 }
 
-async function loadRouterKeys() {
-  try {
-    const res = await api.getRouterKeys()
-    routerKeys.value = res
-  } catch (e) {
-    console.error('Failed to load router keys:', e)
-    toast.error('加载密钥列表失败')
-  }
-}
+ 
+const DEBOUNCE_MS = 300
+let filterTimer: ReturnType<typeof setTimeout> | null = null
+watch(
+  [period, dateRange, providerFilter, modelFilter, keyFilter],
+  () => {
+    page.value = 1
+    if (filterTimer) clearTimeout(filterTimer)
+    filterTimer = setTimeout(() => loadLogs(), DEBOUNCE_MS)
+  },
+  { deep: true },
+)
 
-onMounted(() => {
-  loadRouterKeys()
-  loadLogs()
-})
+onMounted(() => { loadLogs() })
 </script>

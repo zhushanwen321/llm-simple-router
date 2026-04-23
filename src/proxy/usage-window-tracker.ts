@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import { randomUUID } from "crypto";
 import { getLatestWindow, insertWindow } from "../db/usage-windows.js";
+import { toSqliteDatetime, parseSqliteDatetime as parseDate } from "../utils/datetime.js";
 
 // eslint-disable-next-line no-magic-numbers
 const WINDOW_DURATION_MS = 5 * 3600_000;
@@ -86,17 +87,4 @@ function truncateToMinute(date: Date): Date {
   const d = new Date(date);
   d.setSeconds(0, 0);
   return d;
-}
-
-/** Date → SQLite datetime 格式 (YYYY-MM-DD HH:MM:SS) */
-function toSqliteDatetime(date: Date): string {
-  return date.toISOString().replace("T", " ").replace(/\.\d{3}Z$/, "");
-}
-
-/** 兼容 ISO 和 SQLite datetime 格式的日期解析 */
-function parseDate(s: string): Date {
-  // ISO 格式已包含时区信息，直接解析
-  if (s.includes("T")) return new Date(s);
-  // SQLite datetime 格式 (YYYY-MM-DD HH:MM:SS) 视为 UTC
-  return new Date(s + "Z");
 }

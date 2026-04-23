@@ -4,6 +4,7 @@ const SEC_PER_MINUTE = 60
 const SEC_PER_HOUR = 3600
 const SEC_PER_DAY = 86400
 const MS_PER_SEC = 1000
+const HOURS_5 = 5
 const HOURS_6 = 6
 const DAYS_7 = 7
 const DAYS_30 = 30
@@ -13,6 +14,7 @@ const HOURS_4 = 4
 const TICK_PADDING = 2
 const PERIOD_TOTAL_SEC: Record<string, number> = {
   '1h': SEC_PER_HOUR,
+  '5h': SEC_PER_HOUR * HOURS_5,
   '6h': SEC_PER_HOUR * HOURS_6,
   '24h': SEC_PER_DAY,
   '7d': SEC_PER_DAY * DAYS_7,
@@ -21,6 +23,7 @@ const PERIOD_TOTAL_SEC: Record<string, number> = {
 
 const BUCKET_SEC: Record<string, number> = {
   '1h': SEC_PER_MINUTE,
+  '5h': SEC_PER_MINUTE * MINUTES_5,
   '6h': SEC_PER_MINUTE * MINUTES_5,
   '24h': SEC_PER_MINUTE * MINUTES_15,
   '7d': SEC_PER_HOUR,
@@ -30,6 +33,7 @@ const BUCKET_SEC: Record<string, number> = {
 const DEFAULT_BUCKET_SEC = SEC_PER_MINUTE * MINUTES_15
 const DEFAULT_TOTAL_SEC = SEC_PER_DAY
 const TARGET_TICKS = 12
+const MIN_TICKS = 4
 
 function formatLabel(date: Date, periodStr: string): string {
   if (periodStr === '7d' || periodStr === '30d') {
@@ -86,12 +90,13 @@ export function fillTimeseries(
 
 function tickIndices(total: number): Set<number> {
   const result = new Set<number>()
-  if (total <= TARGET_TICKS) {
+  const target = Math.max(MIN_TICKS, Math.min(TARGET_TICKS, total))
+  if (total <= target) {
     for (let i = 0; i < total; i++) result.add(i)
     return result
   }
-  for (let i = 0; i < TARGET_TICKS; i++) {
-    result.add(Math.round(i * (total - 1) / (TARGET_TICKS - 1)))
+  for (let i = 0; i < target; i++) {
+    result.add(Math.round(i * (total - 1) / (target - 1)))
   }
   result.add(total - 1)
   return result

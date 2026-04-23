@@ -22,7 +22,7 @@ interface SummaryRow {
 }
 
 export function useMetrics() {
-  const period = ref('24h')
+  const period = ref('5h')
   const modelFilter = ref('all')
   const routerKeyFilter = ref('all')
   const providerFilter = ref('all')
@@ -38,7 +38,7 @@ export function useMetrics() {
   const cacheRateData = ref<ChartData<'line'> | null>(null)
   const summaryRows = ref<SummaryRow[]>([])
 
-  const hasDateRange = computed(() => dateRange.value.start && dateRange.value.end)
+  const hasDateRange = computed(() => dateRange.value.start && dateRange.value.end && dateRange.value.start < dateRange.value.end)
 
   const filteredModelOptions = computed(() => {
     if (providerFilter.value === 'all') return modelOptions.value
@@ -54,15 +54,17 @@ export function useMetrics() {
   })
 
   function toIsoStart(dateStr: string): string {
+    if (dateStr.includes('T')) return `${dateStr}:00.000Z`
     return `${dateStr}T00:00:00.000Z`
   }
 
   function toIsoEnd(dateStr: string): string {
+    if (dateStr.includes('T')) return `${dateStr}:59.999Z`
     return `${dateStr}T23:59:59.999Z`
   }
 
-  function buildTimeseriesParams(metric: string) {
-    const params: { period?: string; metric: string; backend_model?: string; router_key_id?: string; provider_id?: string; start_time?: string; end_time?: string } = { metric }
+  function buildFilterParams(): { period?: string; backend_model?: string; router_key_id?: string; provider_id?: string; start_time?: string; end_time?: string } {
+    const params: ReturnType<typeof buildFilterParams> = {}
     if (hasDateRange.value) {
       params.start_time = toIsoStart(dateRange.value.start)
       params.end_time = toIsoEnd(dateRange.value.end)
@@ -75,18 +77,12 @@ export function useMetrics() {
     return params
   }
 
+  function buildTimeseriesParams(metric: string) {
+    return { ...buildFilterParams(), metric }
+  }
+
   function buildSummaryParams() {
-    const params: { period?: string; backend_model?: string; router_key_id?: string; provider_id?: string; start_time?: string; end_time?: string } = {}
-    if (hasDateRange.value) {
-      params.start_time = toIsoStart(dateRange.value.start)
-      params.end_time = toIsoEnd(dateRange.value.end)
-    } else {
-      params.period = period.value
-    }
-    if (modelFilter.value !== 'all') params.backend_model = modelFilter.value
-    if (routerKeyFilter.value !== 'all') params.router_key_id = routerKeyFilter.value
-    if (providerFilter.value !== 'all') params.provider_id = providerFilter.value
-    return params
+    return buildFilterParams()
   }
 
   function toDataset(label: string, color: string, bgColor: string, filled: boolean, data: { labels: string[]; values: number[] }) {
@@ -198,12 +194,19 @@ export function useMetrics() {
     fetchMetrics()
   })
 
+  const dateRangeError = computed(() => {
+    const { start, end } = dateRange.value
+    if (!start || !end) return ''
+    return start >= end ? '结束时间须晚于开始时间' : ''
+  })
+
   return {
     period,
     modelFilter,
     routerKeyFilter,
     providerFilter,
     dateRange,
+    dateRangeError,
     loading,
     routerKeys,
     modelOptions,

@@ -5,7 +5,7 @@ import { getMetricsSummary, getMetricsTimeseries } from "../db/index.js";
 import type { MetricsPeriod, MetricsMetric } from "../db/metrics.js";
 
 const PeriodEnum = Type.Union([
-  Type.Literal("1h"), Type.Literal("6h"), Type.Literal("24h"),
+  Type.Literal("1h"), Type.Literal("5h"), Type.Literal("6h"), Type.Literal("24h"),
   Type.Literal("7d"), Type.Literal("30d"),
 ]);
 

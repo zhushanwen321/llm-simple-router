@@ -84,6 +84,9 @@ type LogFilterOptions = {
   api_type?: string;
   model?: string;
   router_key_id?: string;
+  provider_id?: string;
+  start_time?: string;
+  end_time?: string;
 };
 
 function buildLogWhereClause(
@@ -104,6 +107,18 @@ function buildLogWhereClause(
     where += " AND rl.router_key_id = ?";
     params.push(options.router_key_id);
   }
+  if (options.provider_id) {
+    where += " AND rl.provider_id = ?";
+    params.push(options.provider_id);
+  }
+  if (options.start_time) {
+    where += " AND rl.created_at >= ?";
+    params.push(options.start_time);
+  }
+  if (options.end_time) {
+    where += " AND rl.created_at <= ?";
+    params.push(options.end_time);
+  }
   return { where, params };
 }
 
@@ -115,6 +130,9 @@ export function getRequestLogs(
     api_type?: string;
     model?: string;
     router_key_id?: string;
+    provider_id?: string;
+    start_time?: string;
+    end_time?: string;
   },
 ): { data: RequestLogListRow[]; total: number } {
   const { where, params } = buildLogWhereClause(options, "1=1");
@@ -169,6 +187,9 @@ export function getRequestLogsGrouped(
     api_type?: string;
     model?: string;
     router_key_id?: string;
+    provider_id?: string;
+    start_time?: string;
+    end_time?: string;
   },
 ): { data: RequestLogGroupedRow[]; total: number } {
   const { where, params } = buildLogWhereClause(options, "rl.original_request_id IS NULL");

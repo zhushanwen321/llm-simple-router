@@ -346,7 +346,7 @@ describe("usage API endpoints", () => {
   });
 
   it("GET /admin/api/usage/weekly returns daily aggregation", async () => {
-    const now = new Date().toISOString();
+    const now = new Date(Date.now() - 1000).toISOString().replace("T", " ").replace(/\.\d{3}Z$/, "");
 
     db.prepare(
       `INSERT INTO providers (id, name, api_type, base_url, api_key, is_active, created_at, updated_at)

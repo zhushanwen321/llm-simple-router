@@ -144,7 +144,7 @@
           <CardContent>
             <div class="flex items-center justify-between mb-3">
               <div class="flex items-center gap-2">
-                <Checkbox :checked="recAllChecked" @update:checked="toggleRecAll" />
+                <Checkbox :model-value="recAllChecked" @update:model-value="toggleRecAll" />
                 <span class="text-sm text-muted-foreground">全选</span>
               </div>
               <Button size="sm" :disabled="recSelected.size === 0" @click="addRecRules">
@@ -164,12 +164,12 @@
               <TableBody>
                 <TableRow v-for="rule in recommendedRules" :key="rule.name">
                   <TableCell>
-                    <Checkbox :checked="recSelected.has(rule.name)" @update:checked="() => toggleRec(rule.name)" />
+                    <Checkbox :model-value="recSelected.has(rule.name)" @update:model-value="() => toggleRec(rule.name)" />
                   </TableCell>
                   <TableCell>{{ rule.name }}</TableCell>
                   <TableCell>{{ rule.status_code }}</TableCell>
                   <TableCell class="font-mono text-xs max-w-[200px] truncate">{{ rule.body_pattern }}</TableCell>
-                  <TableCell>{{ rule.retry_strategy }}</TableCell>
+                  <TableCell>{{ rule.retry_strategy === 'fixed' ? '固定间隔' : '指数退避' }}</TableCell>
                 </TableRow>
               </TableBody>
             </Table>
@@ -354,8 +354,8 @@ function toggleRec(name: string) {
   recSelected.value = s
 }
 
-function toggleRecAll(checked: boolean) {
-  recSelected.value = checked ? new Set(recommendedRules.value.map(r => r.name)) : new Set()
+function toggleRecAll(checked: boolean | string) {
+  recSelected.value = checked === true ? new Set(recommendedRules.value.map(r => r.name)) : new Set()
 }
 
 async function addRecRules() {

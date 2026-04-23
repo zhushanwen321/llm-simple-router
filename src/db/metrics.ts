@@ -1,7 +1,7 @@
 import Database from "better-sqlite3";
 import { randomUUID } from "crypto";
 
-export type MetricsPeriod = "1h" | "6h" | "24h" | "7d" | "30d";
+export type MetricsPeriod = "1h" | "5h" | "6h" | "24h" | "7d" | "30d";
 export type MetricsMetric = "ttft" | "tps" | "tokens" | "cache_rate" | "request_count" | "input_tokens" | "output_tokens" | "cache_hit_tokens";
 
 // --- request_metrics table types & CRUD ---
@@ -57,6 +57,7 @@ export function insertMetrics(db: Database.Database, m: MetricsInsert): string {
 
 const PERIOD_OFFSET: Record<MetricsPeriod, string> = {
   "1h": "-1 hours",
+  "5h": "-5 hours",
   "6h": "-6 hours",
   "24h": "-1 day",
   "7d": "-7 days",
@@ -65,6 +66,7 @@ const PERIOD_OFFSET: Record<MetricsPeriod, string> = {
 
 const BUCKET_SECONDS: Record<MetricsPeriod, number> = {
   "1h": 60,
+  "5h": 300,
   "6h": 300,
   "24h": 900,
   "7d": 3600,
@@ -137,53 +139,28 @@ export function getMetricsSummary(
   const { timeWhere, timeParams } = buildTimeCondition(period, startTime, endTime);
   const conditions = ["rm.is_complete = 1", timeWhere];
   const params: unknown[] = [...timeParams];
+  const joins = ["LEFT JOIN providers p ON p.id = rm.provider_id"];
 
   if (providerId) { conditions.push("rm.provider_id = ?"); params.push(providerId); }
   if (backendModel) { conditions.push("rm.backend_model = ?"); params.push(backendModel); }
-
-  const joins = "LEFT JOIN providers p ON p.id = rm.provider_id";
   if (routerKeyId) {
+    joins.push("LEFT JOIN request_logs rl ON rl.id = rm.request_log_id");
     conditions.push("rl.router_key_id = ?");
     params.push(routerKeyId);
-    return db.prepare(`
-      SELECT
-        rm.provider_id, COALESCE(p.name, rm.provider_id) AS provider_name, rm.backend_model,
-        COUNT(*) AS request_count, AVG(rm.ttft_ms) AS avg_ttft_ms, NULL AS p50_ttft_ms, NULL AS p95_ttft_ms,
-        AVG(rm.tokens_per_second) AS avg_tps,
-        COALESCE(SUM(rm.input_tokens), 0) AS total_input_tokens, COALESCE(SUM(rm.output_tokens), 0) AS total_output_tokens,
-        COALESCE(SUM(rm.cache_read_tokens), 0) AS total_cache_hit_tokens,
-        CASE WHEN SUM(rm.input_tokens) > 0 THEN SUM(rm.cache_read_tokens) * 1.0 / SUM(rm.input_tokens) ELSE NULL END AS cache_hit_rate
-      FROM request_metrics rm
-      LEFT JOIN providers p ON p.id = rm.provider_id
-      LEFT JOIN request_logs rl ON rl.id = rm.request_log_id
-      WHERE ${conditions.join(" AND ")}
-      GROUP BY rm.provider_id, rm.backend_model ORDER BY request_count DESC
-    `).all(...params) as MetricsSummaryRow[];
   }
 
-  const where = conditions.join(" AND ");
   return db.prepare(`
     SELECT
-      rm.provider_id,
-      COALESCE(p.name, rm.provider_id) AS provider_name,
-      rm.backend_model,
-      COUNT(*) AS request_count,
-      AVG(rm.ttft_ms) AS avg_ttft_ms,
-      NULL AS p50_ttft_ms,
-      NULL AS p95_ttft_ms,
+      rm.provider_id, COALESCE(p.name, rm.provider_id) AS provider_name, rm.backend_model,
+      COUNT(*) AS request_count, AVG(rm.ttft_ms) AS avg_ttft_ms, NULL AS p50_ttft_ms, NULL AS p95_ttft_ms,
       AVG(rm.tokens_per_second) AS avg_tps,
-      COALESCE(SUM(rm.input_tokens), 0) AS total_input_tokens,
-      COALESCE(SUM(rm.output_tokens), 0) AS total_output_tokens,
+      COALESCE(SUM(rm.input_tokens), 0) AS total_input_tokens, COALESCE(SUM(rm.output_tokens), 0) AS total_output_tokens,
       COALESCE(SUM(rm.cache_read_tokens), 0) AS total_cache_hit_tokens,
-      CASE WHEN SUM(rm.input_tokens) > 0
-        THEN SUM(rm.cache_read_tokens) * 1.0 / SUM(rm.input_tokens)
-        ELSE NULL
-      END AS cache_hit_rate
+      CASE WHEN SUM(rm.input_tokens) > 0 THEN SUM(rm.cache_read_tokens) * 1.0 / SUM(rm.input_tokens) ELSE NULL END AS cache_hit_rate
     FROM request_metrics rm
-    ${joins}
-    WHERE ${where}
-    GROUP BY rm.provider_id, rm.backend_model
-    ORDER BY request_count DESC
+    ${joins.join(" ")}
+    WHERE ${conditions.join(" AND ")}
+    GROUP BY rm.provider_id, rm.backend_model ORDER BY request_count DESC
   `).all(...params) as MetricsSummaryRow[];
 }
 
