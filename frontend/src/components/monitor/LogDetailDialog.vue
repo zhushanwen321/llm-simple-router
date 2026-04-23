@@ -3,6 +3,7 @@
     <DialogScrollContent class="max-w-4xl max-h-[85vh]">
       <DialogHeader>
         <DialogTitle>请求详情 <span v-if="data" class="font-mono text-xs text-muted-foreground font-normal select-all">{{ data.id.slice(0, 8) }}</span></DialogTitle>
+        <DialogDescription class="sr-only">请求日志详情</DialogDescription>
       </DialogHeader>
       <template v-if="loading">
         <div class="space-y-3 py-4">
@@ -86,7 +87,7 @@ import { toast } from 'vue-sonner'
 import { api } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Dialog, DialogScrollContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogScrollContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Skeleton } from '@/components/ui/skeleton'
 import LogRequestViewer from '@/components/log-viewer/LogRequestViewer.vue'

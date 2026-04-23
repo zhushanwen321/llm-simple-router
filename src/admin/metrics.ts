@@ -5,7 +5,7 @@ import { getMetricsSummary, getMetricsTimeseries } from "../db/index.js";
 import type { MetricsPeriod, MetricsMetric } from "../db/metrics.js";
 
 const PeriodEnum = Type.Union([
-  Type.Literal("1h"), Type.Literal("6h"), Type.Literal("24h"),
+  Type.Literal("1h"), Type.Literal("5h"), Type.Literal("6h"), Type.Literal("24h"),
   Type.Literal("7d"), Type.Literal("30d"),
 ]);
 
@@ -21,6 +21,8 @@ const SummaryQuerySchema = Type.Object({
   provider_id: Type.Optional(Type.String()),
   backend_model: Type.Optional(Type.String()),
   router_key_id: Type.Optional(Type.String()),
+  start_time: Type.Optional(Type.String()),
+  end_time: Type.Optional(Type.String()),
 });
 
 const TimeseriesQuerySchema = Type.Object({
@@ -29,6 +31,8 @@ const TimeseriesQuerySchema = Type.Object({
   provider_id: Type.Optional(Type.String()),
   backend_model: Type.Optional(Type.String()),
   router_key_id: Type.Optional(Type.String()),
+  start_time: Type.Optional(Type.String()),
+  end_time: Type.Optional(Type.String()),
 });
 
 interface MetricsRoutesOptions {
@@ -39,7 +43,7 @@ export const adminMetricsRoutes: FastifyPluginCallback<MetricsRoutesOptions> = (
   app.get("/admin/api/metrics/summary", { schema: { querystring: SummaryQuerySchema } }, async (request, reply) => {
     const query = request.query as Static<typeof SummaryQuerySchema>;
     const period = (query.period ?? "24h") as MetricsPeriod;
-    const summary = getMetricsSummary(options.db, period, query.provider_id, query.backend_model, query.router_key_id);
+    const summary = getMetricsSummary(options.db, period, query.provider_id, query.backend_model, query.router_key_id, query.start_time, query.end_time);
     return reply.send(summary);
   });
 
@@ -47,7 +51,7 @@ export const adminMetricsRoutes: FastifyPluginCallback<MetricsRoutesOptions> = (
     const query = request.query as Static<typeof TimeseriesQuerySchema>;
     const period = (query.period ?? "24h") as MetricsPeriod;
     const metric = query.metric as MetricsMetric;
-    const timeseries = getMetricsTimeseries(options.db, period, metric, query.provider_id, query.backend_model, query.router_key_id);
+    const timeseries = getMetricsTimeseries(options.db, period, metric, query.provider_id, query.backend_model, query.router_key_id, query.start_time, query.end_time);
     return reply.send(timeseries);
   });
 

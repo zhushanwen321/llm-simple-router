@@ -10,6 +10,9 @@ const LogQuerySchema = Type.Object({
   api_type: Type.Optional(Type.String()),
   model: Type.Optional(Type.String()),
   router_key_id: Type.Optional(Type.String()),
+  provider_id: Type.Optional(Type.String()),
+  start_time: Type.Optional(Type.String()),
+  end_time: Type.Optional(Type.String()),
   view: Type.Optional(Type.Literal("grouped")),
 });
 
@@ -38,6 +41,9 @@ export const adminLogRoutes: FastifyPluginCallback<LogRoutesOptions> = (app, opt
       api_type: query.api_type || undefined,
       model: query.model || undefined,
       router_key_id: query.router_key_id || undefined,
+      provider_id: query.provider_id || undefined,
+      start_time: query.start_time || undefined,
+      end_time: query.end_time || undefined,
     };
 
     const result = view === "grouped"
@@ -52,7 +58,7 @@ export const adminLogRoutes: FastifyPluginCallback<LogRoutesOptions> = (app, opt
     if (!log) {
       return reply.code(HTTP_NOT_FOUND).send({ error: { message: "Log not found" } });
     }
-    return reply.send(log);
+    return reply.send({ data: log });
   });
 
   app.get("/admin/api/logs/:id/children", async (request, reply) => {

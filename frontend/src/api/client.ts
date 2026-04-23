@@ -51,9 +51,38 @@ const API = {
   MONITOR_CONCURRENCY: '/monitor/concurrency',
   MONITOR_RUNTIME: '/monitor/runtime',
   MONITOR_STREAM: '/monitor/stream',
+  RECOMMENDED_PROVIDERS: '/recommended/providers',
+  RECOMMENDED_RETRY_RULES: '/recommended/retry-rules',
+  RECOMMENDED_RELOAD: '/recommended/reload',
+  USAGE_WINDOWS: '/usage/windows',
+  USAGE_WEEKLY: '/usage/weekly',
+  USAGE_MONTHLY: '/usage/monthly',
 } as const
 
 // --- Payload types ---
+
+export interface ProviderPreset {
+  plan: string
+  presetName: string
+  apiType: 'openai' | 'anthropic'
+  baseUrl: string
+  models: string[]
+}
+
+export interface ProviderGroup {
+  group: string
+  presets: ProviderPreset[]
+}
+
+export interface RecommendedRetryRule {
+  name: string
+  status_code: number
+  body_pattern: string
+  retry_strategy: 'fixed' | 'exponential'
+  retry_delay_ms: number
+  max_retries: number
+  max_delay_ms: number
+}
 
 export interface ProviderPayload {
   name: string
@@ -96,6 +125,10 @@ interface RetryRulePayload {
   status_code: number
   body_pattern: string
   is_active?: number
+  retry_strategy?: 'fixed' | 'exponential'
+  retry_delay_ms?: number
+  max_retries?: number
+  max_delay_ms?: number
 }
 
 export interface SessionState {
@@ -184,6 +217,18 @@ interface StatsResponse {
   totalTokens: number
 }
 
+export interface UsageWindowWithUsage {
+  window: { id: string; router_key_id: string | null; start_time: string; end_time: string; created_at: string }
+  usage: { request_count: number; total_input_tokens: number; total_output_tokens: number }
+}
+
+export interface DailyUsage {
+  date: string
+  request_count: number
+  total_input_tokens: number
+  total_output_tokens: number
+}
+
 // --- Typed request helper ---
 // 解包 AxiosResponse.data，让调用方直接拿到类型化的响应体。
 
@@ -227,7 +272,7 @@ export const api = {
   updateMapping: (id: string, data: MappingPayload) => request<{ success: boolean }>('put', `${API.MAPPINGS}/${id}`, data),
   deleteMapping: (id: string) => request<{ success: boolean }>('delete', `${API.MAPPINGS}/${id}`),
 
-  getLogs: (params: { page: number; limit: number; api_type?: string; router_key_id?: string; view?: string }) =>
+  getLogs: (params: { page: number; limit: number; api_type?: string; router_key_id?: string; provider_id?: string; model?: string; start_time?: string; end_time?: string; view?: string }) =>
     request<LogsResponse>('get', API.LOGS, undefined, { params }),
   getLogDetail: (id: string) => request<LogDetailResponse>('get', `${API.LOGS}/${id}`),
   getLogChildren: (id: string) => request<{ data: LogEntry[] }>('get', `${API.LOGS}/${id}/children`),
@@ -237,9 +282,9 @@ export const api = {
   getStats: (params?: { period?: string; router_key_id?: string }) =>
     request<StatsResponse>('get', API.STATS, undefined, { params }),
 
-  getMetricsSummary: (params: { period: string; provider_id?: string; backend_model?: string; router_key_id?: string }) =>
+  getMetricsSummary: (params: { period?: string; provider_id?: string; backend_model?: string; router_key_id?: string; start_time?: string; end_time?: string }) =>
     request<MetricsSummaryRow[]>('get', API.METRICS_SUMMARY, undefined, { params }),
-  getMetricsTimeseries: (params: { period: string; metric: string; provider_id?: string; backend_model?: string; router_key_id?: string }) =>
+  getMetricsTimeseries: (params: { period?: string; metric: string; provider_id?: string; backend_model?: string; router_key_id?: string; start_time?: string; end_time?: string }) =>
     request<TimeseriesRawRow[]>('get', API.METRICS_TIMESERIES, undefined, { params }),
 
   getRouterKeys: () => request<RouterKeyPublic[]>('get', API.ROUTER_KEYS),
@@ -280,4 +325,17 @@ export const api = {
   getMonitorStats: () => request<StatsSnapshot>('get', API.MONITOR_STATS),
   getMonitorConcurrency: () => request<ProviderConcurrencySnapshot[]>('get', API.MONITOR_CONCURRENCY),
   getMonitorRuntime: () => request<RuntimeMetrics>('get', API.MONITOR_RUNTIME),
+
+  recommended: {
+    getProviders: () => request<ProviderGroup[]>('get', API.RECOMMENDED_PROVIDERS),
+    getRetryRules: () => request<RecommendedRetryRule[]>('get', API.RECOMMENDED_RETRY_RULES),
+    reload: () => request<{ ok: boolean }>('post', API.RECOMMENDED_RELOAD),
+  },
+
+  getUsageWindows: (params?: { router_key_id?: string }) =>
+    request<UsageWindowWithUsage[]>('get', API.USAGE_WINDOWS, undefined, { params }),
+  getUsageWeekly: (params?: { router_key_id?: string }) =>
+    request<DailyUsage[]>('get', API.USAGE_WEEKLY, undefined, { params }),
+  getUsageMonthly: (params?: { router_key_id?: string }) =>
+    request<DailyUsage[]>('get', API.USAGE_MONTHLY, undefined, { params }),
 }

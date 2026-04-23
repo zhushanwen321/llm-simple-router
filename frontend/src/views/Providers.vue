@@ -79,7 +79,7 @@
                   <SelectValue placeholder="选择供应商" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem v-for="g in PROVIDER_PRESETS" :key="g.group" :value="g.group">{{ g.group }}</SelectItem>
+                  <SelectItem v-for="g in providerPresets" :key="g.group" :value="g.group">{{ g.group }}</SelectItem>
                 </SelectContent>
               </Select>
               <Select v-model="presetPlan" @update:model-value="onPresetChange" :disabled="!presetGroup">
@@ -176,9 +176,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
 import * as z from 'zod'
-import { api, type ProviderPayload } from '@/api/client'
+import { api, type ProviderPayload, type ProviderGroup } from '@/api/client'
 import type { Provider } from '@/types/mapping'
-import { PROVIDER_PRESETS } from '@/data/provider-presets'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -200,6 +199,7 @@ const DEFAULT_FORM = { name: '', api_type: 'anthropic', base_url: '', api_key: '
 const modelInput = ref('')
 
 const providers = ref<Provider[]>([])
+const providerPresets = ref<ProviderGroup[]>([])
 const dialogOpen = ref(false)
 const editingId = ref<string | null>(null)
 const deleteTarget = ref<Provider | null>(null)
@@ -256,11 +256,11 @@ const presetPlan = ref('')
 
 const availablePlans = computed(() => {
   if (!presetGroup.value) return []
-  return PROVIDER_PRESETS.find(g => g.group === presetGroup.value)?.presets ?? []
+  return providerPresets.value.find(g => g.group === presetGroup.value)?.presets ?? []
 })
 
 function onGroupChange() {
-  const plans = PROVIDER_PRESETS.find(g => g.group === presetGroup.value)?.presets
+  const plans = providerPresets.value.find(g => g.group === presetGroup.value)?.presets
   if (plans?.length) {
     presetPlan.value = plans[0].plan
     onPresetChange()
@@ -379,5 +379,8 @@ async function handleDelete() {
   }
 }
 
-onMounted(loadProviders)
+onMounted(async () => {
+  try { providerPresets.value = await api.recommended.getProviders() } catch { providerPresets.value = [] }
+  await loadProviders()
+})
 </script>

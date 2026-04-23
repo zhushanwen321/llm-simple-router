@@ -25,7 +25,8 @@ function getProxyApiType(url: string): string | null {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 import { getConfig, Config } from "./config.js";
-import { initDatabase, seedDefaultRules, getAllProviders } from "./db/index.js";
+import { initDatabase, getAllProviders } from "./db/index.js";
+import { loadRecommendedConfig } from "./config/recommended.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { openaiProxy } from "./proxy/openai.js";
 import { anthropicProxy } from "./proxy/anthropic.js";
@@ -34,6 +35,7 @@ import { RetryRuleMatcher } from "./proxy/retry-rules.js";
 import { ProviderSemaphoreManager } from "./proxy/semaphore.js";
 import { RequestTracker } from "./monitor/request-tracker.js";
 import { modelState } from "./proxy/model-state.js";
+import { UsageWindowTracker } from "./proxy/usage-window-tracker.js";
 import fastifyStatic from "@fastify/static";
 import Database from "better-sqlite3";
 
@@ -47,6 +49,7 @@ export async function buildApp(
 ): Promise<{
   app: FastifyInstance;
   db: Database.Database;
+  usageWindowTracker: UsageWindowTracker;
   close: () => Promise<void>;
 }> {
   const config = options?.config ?? getBaseConfig();
@@ -124,8 +127,7 @@ export async function buildApp(
     return reply.code(status).send({ error: { message: fastifyError.message } });
   });
 
-  // 首次启动时插入默认重试规则（表为空时）
-  seedDefaultRules(db);
+  loadRecommendedConfig();
 
   // 注入 DB 到 modelState 单例，启用会话级持久化
   modelState.init(db);
@@ -135,6 +137,10 @@ export async function buildApp(
   const semaphoreManager = new ProviderSemaphoreManager();
   const tracker = new RequestTracker({ semaphoreManager, logger: app.log });
   tracker.startPushInterval();
+
+  // 5h 用量窗口追踪器，启动时自动补齐缺失窗口
+  const usageWindowTracker = new UsageWindowTracker(db);
+  usageWindowTracker.reconcileOnStartup();
 
   // 从 DB 读取已有 provider 的并发配置，初始化信号量管理器和 tracker
   const allProviders = getAllProviders(db);
@@ -211,6 +217,7 @@ export async function buildApp(
   return {
     app,
     db,
+    usageWindowTracker,
     close: async () => {
       tracker.stopPushInterval();
       await app.close();

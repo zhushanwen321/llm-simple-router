@@ -1,5 +1,5 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { initDatabase, insertMetrics, insertRequestLog } from "../src/db/index.js";
+import { describe, it, expect, afterEach, beforeEach } from "vitest";
+import { initDatabase, insertMetrics, insertRequestLog, getMetricsSummary, getMetricsTimeseries } from "../src/db/index.js";
 import Database from "better-sqlite3";
 
 describe("request_metrics migration and insertMetrics", () => {
@@ -29,7 +29,7 @@ describe("request_metrics migration and insertMetrics", () => {
       .prepare("SELECT name FROM migrations")
       .all() as { name: string }[];
 
-    expect(rows).toHaveLength(18);
+    expect(rows).toHaveLength(19);
     expect(rows[5].name).toBe("006_create_request_metrics.sql");
     expect(rows[6].name).toBe("007_add_retry_fields.sql");
     expect(rows[7].name).toBe("008_create_router_keys.sql");
@@ -215,5 +215,102 @@ describe("request_metrics migration and insertMetrics", () => {
       .all(logId) as any[];
 
     expect(metrics).toHaveLength(0);
+  });
+});
+
+function seedMetricsRow(db: Database.Database, logId: string, opts?: { provider_id?: string; backend_model?: string }) {
+  insertRequestLog(db, {
+    id: logId,
+    api_type: "openai",
+    model: "gpt-4",
+    provider_id: opts?.provider_id ?? "provider-1",
+    status_code: 200,
+    latency_ms: 500,
+    is_stream: 1,
+    error_message: null,
+    created_at: new Date().toISOString(),
+  });
+
+  insertMetrics(db, {
+    request_log_id: logId,
+    provider_id: opts?.provider_id ?? "provider-1",
+    backend_model: opts?.backend_model ?? "gpt-4-turbo",
+    api_type: "openai",
+    input_tokens: 100,
+    output_tokens: 50,
+    cache_creation_tokens: 10,
+    cache_read_tokens: 20,
+    ttft_ms: 200,
+    total_duration_ms: 500,
+    tokens_per_second: 100.0,
+    stop_reason: "stop",
+    is_complete: 1,
+  });
+}
+
+describe("metrics with absolute time range", () => {
+  let db: Database.Database;
+
+  beforeEach(() => {
+    db = initDatabase(":memory:");
+  });
+
+  afterEach(() => {
+    db.close();
+  });
+
+  it("summary supports start_time/end_time parameters", () => {
+    const now = new Date();
+    const start = new Date(now.getTime() - 2 * 3600_000).toISOString();
+    const end = new Date(now.getTime() + 60_000).toISOString();
+
+    seedMetricsRow(db, "log-abs-1");
+
+    const result = getMetricsSummary(db, "24h", undefined, undefined, undefined, start, end);
+    expect(Array.isArray(result)).toBe(true);
+    expect(result).toHaveLength(1);
+  });
+
+  it("summary with start_time excludes data outside range", () => {
+    // 使用未来的 start_time，所有当前数据都应被排除
+    const futureStart = new Date(Date.now() + 86400_000).toISOString();
+    const futureEnd = new Date(Date.now() + 2 * 86400_000).toISOString();
+
+    seedMetricsRow(db, "log-exclude");
+
+    const result = getMetricsSummary(db, "24h", undefined, undefined, undefined, futureStart, futureEnd);
+    expect(result).toHaveLength(0);
+  });
+
+  it("timeseries supports start_time/end_time parameters", () => {
+    const now = new Date();
+    const start = new Date(now.getTime() - 2 * 3600_000).toISOString();
+    const end = new Date(now.getTime() + 60_000).toISOString();
+
+    seedMetricsRow(db, "log-ts-1");
+
+    const result = getMetricsTimeseries(db, "24h", "tps", undefined, undefined, undefined, start, end);
+    expect(Array.isArray(result)).toBe(true);
+    expect(result).toHaveLength(1);
+  });
+
+  it("timeseries auto-calculates bucket size from time range", () => {
+    const now = new Date();
+    // 30min range => 60s buckets
+    const start = new Date(now.getTime() - 30 * 60_000).toISOString();
+    const end = new Date(now.getTime() + 60_000).toISOString();
+
+    seedMetricsRow(db, "log-bucket-1");
+
+    const result = getMetricsTimeseries(db, "24h", "request_count", undefined, undefined, undefined, start, end);
+    expect(result).toHaveLength(1);
+    expect(result[0].count).toBe(1);
+  });
+
+  it("falls back to period when start_time/end_time are omitted", () => {
+    seedMetricsRow(db, "log-fallback");
+
+    const result = getMetricsSummary(db, "24h");
+    expect(result).toHaveLength(1);
   });
 });

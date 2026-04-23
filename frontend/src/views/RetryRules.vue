@@ -128,22 +128,74 @@
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+
+    <!-- 推荐重试规则 -->
+    <Card v-if="recommendedRules.length > 0" class="mt-6">
+      <Collapsible v-model:open="recOpen">
+        <CollapsibleTrigger as-child>
+          <CardHeader class="cursor-pointer hover:bg-muted/50 transition-colors">
+            <div class="flex items-center justify-between">
+              <CardTitle class="text-sm font-medium">推荐重试规则 ({{ recommendedRules.length }})</CardTitle>
+              <ChevronDown class="h-4 w-4 text-muted-foreground transition-transform" :class="{ 'rotate-180': recOpen }" />
+            </div>
+          </CardHeader>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <CardContent>
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center gap-2">
+                <Checkbox :model-value="recAllChecked" @update:model-value="toggleRecAll" />
+                <span class="text-sm text-muted-foreground">全选</span>
+              </div>
+              <Button size="sm" :disabled="recSelected.size === 0" @click="addRecRules">
+                添加选中 ({{ recSelected.size }})
+              </Button>
+            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead class="w-10"></TableHead>
+                  <TableHead>名称</TableHead>
+                  <TableHead>状态码</TableHead>
+                  <TableHead>匹配模式</TableHead>
+                  <TableHead>策略</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                <TableRow v-for="rule in recommendedRules" :key="rule.name">
+                  <TableCell>
+                    <Checkbox :model-value="recSelected.has(rule.name)" @update:model-value="() => toggleRec(rule.name)" />
+                  </TableCell>
+                  <TableCell>{{ rule.name }}</TableCell>
+                  <TableCell>{{ rule.status_code }}</TableCell>
+                  <TableCell class="font-mono text-xs max-w-[200px] truncate">{{ rule.body_pattern }}</TableCell>
+                  <TableCell>{{ rule.retry_strategy === 'fixed' ? '固定间隔' : '指数退避' }}</TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </CardContent>
+        </CollapsibleContent>
+      </Collapsible>
+    </Card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
-import { api } from '@/api/client'
+import { api, type RecommendedRetryRule } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from '@/components/ui/alert-dialog'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { ChevronDown } from 'lucide-vue-next'
 
 interface RetryRule {
   id: string
@@ -281,5 +333,49 @@ async function handleDelete() {
   }
 }
 
-onMounted(loadData)
+// 推荐规则
+const recOpen = ref(false)
+const recommendedRules = ref<RecommendedRetryRule[]>([])
+const recSelected = ref(new Set<string>())
+
+const recAllChecked = computed(() =>
+  recommendedRules.value.length > 0 && recSelected.value.size === recommendedRules.value.length
+)
+
+async function loadRecommended() {
+  try {
+    recommendedRules.value = await api.recommended.getRetryRules()
+  } catch { recommendedRules.value = [] }
+}
+
+function toggleRec(name: string) {
+  const s = new Set(recSelected.value)
+  if (s.has(name)) { s.delete(name) } else { s.add(name) }
+  recSelected.value = s
+}
+
+function toggleRecAll(checked: boolean | string) {
+  recSelected.value = checked === true ? new Set(recommendedRules.value.map(r => r.name)) : new Set()
+}
+
+async function addRecRules() {
+  const toAdd = recommendedRules.value.filter(r => recSelected.value.has(r.name))
+  for (const rule of toAdd) {
+    await api.createRetryRule({
+      name: rule.name,
+      status_code: rule.status_code,
+      body_pattern: rule.body_pattern,
+      is_active: 1,
+      retry_strategy: rule.retry_strategy,
+      retry_delay_ms: rule.retry_delay_ms,
+      max_retries: rule.max_retries,
+      max_delay_ms: rule.max_delay_ms,
+    })
+  }
+  toast.success(`已添加 ${toAdd.length} 条规则`)
+  recSelected.value = new Set()
+  await Promise.allSettled([loadRecommended(), loadData()])
+}
+
+onMounted(() => { loadData(); loadRecommended() })
 </script>

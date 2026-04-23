@@ -87,7 +87,6 @@ export {
   createRetryRule,
   updateRetryRule,
   deleteRetryRule,
-  seedDefaultRules,
 } from "./retry-rules.js";
 export type { RetryRule } from "./retry-rules.js";
 
@@ -129,3 +128,11 @@ export {
   deleteSessionState,
 } from "./session-states.js";
 export type { SessionModelState, SessionModelHistory, UpsertSessionStateInput, InsertSessionHistoryInput } from "./session-states.js";
+
+export {
+  insertWindow,
+  getLatestWindow,
+  getWindowsInRange,
+  getWindowUsage,
+} from "./usage-windows.js";
+export type { UsageWindow, WindowUsage } from "./usage-windows.js";
