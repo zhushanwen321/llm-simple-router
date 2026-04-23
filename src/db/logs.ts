@@ -222,16 +222,19 @@ export function deleteLogsBefore(db: Database.Database, beforeDate: string): num
   return changes;
 }
 
+/** 每行元数据（数字列+索引）的估算字节数 */
+const ROW_METADATA_BYTES = 500;
+
 /** 估算 request_logs 表占用字节数 */
 export function estimateLogTableSize(db: Database.Database): number {
   const row = db.prepare(`
     SELECT COALESCE(SUM(
-      length(client_request) + length(upstream_request) +
-      length(upstream_response) + length(stream_text_content) +
-      length(error_message) + 500
+      COALESCE(length(client_request), 0) + COALESCE(length(upstream_request), 0) +
+      COALESCE(length(upstream_response), 0) + COALESCE(length(stream_text_content), 0) +
+      COALESCE(length(error_message), 0) + ?
     ), 0) as size
     FROM request_logs
-  `).get() as { size: number };
+  `).get(ROW_METADATA_BYTES) as { size: number };
   return row.size;
 }
 

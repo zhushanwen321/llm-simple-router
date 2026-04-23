@@ -1,0 +1,96 @@
+import { statSync } from "fs";
+import Database from "better-sqlite3";
+import { setSetting, getDbMaxSizeMb, getLogTableMaxSizeMb } from "./settings.js";
+import { estimateLogTableSize, deleteOldestLogs, getLogCount } from "./logs.js";
+
+const BYTES_PER_MB = 1_048_576;
+const DEFAULT_INTERVAL_MS = 1_800_000; // 30 分钟
+const CLEANUP_TARGET_RATIO = 0.8;
+const DEFAULT_ROW_BYTES = 500;
+
+export interface DbSizeInfo {
+  totalBytes: number;
+  logTableBytes: number;
+  logCount: number;
+  lastChecked: string;
+}
+
+export interface SizeThresholds {
+  dbMaxSizeMb: number;
+  logTableMaxSizeMb: number;
+}
+
+export function collectDbSizeInfo(db: Database.Database, dbPath: string): DbSizeInfo {
+  const totalBytes = dbPath === ":memory:" ? 0 : statSync(dbPath).size;
+  const logTableBytes = estimateLogTableSize(db);
+  const logCount = getLogCount(db);
+  const info: DbSizeInfo = {
+    totalBytes,
+    logTableBytes,
+    logCount,
+    lastChecked: new Date().toISOString(),
+  };
+  setSetting(db, "db_size_info", JSON.stringify(info));
+  return info;
+}
+
+export function runSizeBasedCleanup(
+  db: Database.Database,
+  dbPath: string,
+  thresholds: SizeThresholds,
+): number {
+  const info = collectDbSizeInfo(db, dbPath);
+  const logOverThreshold = info.logTableBytes > thresholds.logTableMaxSizeMb * BYTES_PER_MB;
+  const dbOverThreshold = info.totalBytes > thresholds.dbMaxSizeMb * BYTES_PER_MB;
+
+  if (!logOverThreshold && !dbOverThreshold) return 0;
+
+  const targetBytes = thresholds.logTableMaxSizeMb * BYTES_PER_MB * CLEANUP_TARGET_RATIO;
+  const avgRowBytes = info.logCount > 0 ? info.logTableBytes / info.logCount : DEFAULT_ROW_BYTES;
+  const keepCount = Math.max(0, Math.floor(targetBytes / avgRowBytes));
+
+  return deleteOldestLogs(db, keepCount);
+}
+
+export interface DbSizeMonitorHandle {
+  stop: () => void;
+}
+
+export function scheduleDbSizeMonitor(
+  db: Database.Database,
+  dbPath: string,
+  options: {
+    intervalMs?: number;
+    dbMaxSizeMb?: number;
+    logTableMaxSizeMb?: number;
+    log: { info: (msg: string) => void };
+  },
+): DbSizeMonitorHandle {
+  const intervalMs = options.intervalMs ?? DEFAULT_INTERVAL_MS;
+  let running = false;
+  let timer: ReturnType<typeof setInterval> | null = null;
+
+  const doCheck = () => {
+    if (running) return;
+    running = true;
+    try {
+      const thresholds: SizeThresholds = {
+        dbMaxSizeMb: options.dbMaxSizeMb ?? getDbMaxSizeMb(db),
+        logTableMaxSizeMb: options.logTableMaxSizeMb ?? getLogTableMaxSizeMb(db),
+      };
+      const deleted = runSizeBasedCleanup(db, dbPath, thresholds);
+      if (deleted > 0) options.log.info(`Size-based cleanup: deleted ${deleted} log records`);
+    } finally {
+      running = false;
+    }
+  };
+
+  collectDbSizeInfo(db, dbPath);
+
+  timer = setInterval(doCheck, intervalMs);
+  return {
+    stop: () => {
+      if (timer) { clearInterval(timer); timer = null; }
+    },
+  };
+}
