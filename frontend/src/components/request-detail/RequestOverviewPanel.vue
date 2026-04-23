@@ -1,9 +1,13 @@
 <template>
-  <div class="w-[240px] border-r pr-3 flex-shrink-0 overflow-y-auto space-y-3">
-    <!-- Row 1: model + status + stream + api type -->
-    <div class="flex flex-wrap items-center gap-1.5">
-      <span class="font-mono text-[11px] font-semibold max-w-[130px] truncate">{{ overview.model }}</span>
+  <div class="w-[280px] border-r pr-3 flex-shrink-0 overflow-y-auto space-y-3">
+    <!-- Row 1: model @ provider -->
+    <div class="flex items-baseline gap-1">
+      <span class="font-mono text-[11px] font-semibold truncate">{{ overview.model }}</span>
+      <span v-if="overview.providerName" class="text-[10px] text-muted-foreground truncate">@ {{ overview.providerName }}</span>
+    </div>
 
+    <!-- Row 2: status + SSE + apiType -->
+    <div class="flex items-center gap-1.5">
       <Badge v-if="statusColor === 'pending'" class="badge-pending">
         <span class="w-1.5 h-1.5 rounded-full dot-pending animate-pulse" />
         进行中
@@ -20,7 +24,7 @@
       <Badge variant="outline">{{ overview.apiType }}</Badge>
     </div>
 
-    <!-- Row 2: session (conditional) -->
+    <!-- Row 3: session (conditional) -->
     <div v-if="overview.sessionId" class="flex items-center gap-1.5">
       <Badge variant="secondary" class="text-[10px]">Session</Badge>
       <span class="font-mono text-[11px] text-muted-foreground truncate">{{ overview.sessionId.slice(0, 8) }}</span>
@@ -81,13 +85,9 @@
         <span class="text-muted-foreground">状态码</span>
         <span class="font-mono">{{ overview.statusCode }}</span>
       </div>
-      <div v-if="overview.providerName" class="flex items-center justify-between text-[11px]">
-        <span class="text-muted-foreground">Provider</span>
-        <span class="font-mono truncate max-w-[140px]">{{ overview.providerName }}</span>
-      </div>
       <div v-if="overview.clientIp" class="flex items-center justify-between text-[11px]">
         <span class="text-muted-foreground">Client IP</span>
-        <span class="font-mono truncate max-w-[140px]">{{ overview.clientIp }}</span>
+        <span class="font-mono truncate max-w-[160px]">{{ overview.clientIp }}</span>
       </div>
     </div>
   </div>

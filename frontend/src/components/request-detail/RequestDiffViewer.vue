@@ -27,10 +27,10 @@
         </div>
       </template>
 
-      <!-- Structured diff view -->
+      <!-- Structured view -->
       <template v-else>
-        <div v-if="!hasDiff" class="text-[11px] text-muted-foreground py-4 text-center">
-          暂无请求详情数据
+        <div v-if="!upstreamParsed" class="text-[11px] text-muted-foreground py-4 text-center">
+          暂无请求内容数据
         </div>
 
         <div v-else class="space-y-4">
@@ -46,14 +46,22 @@
             </div>
           </div>
 
-          <!-- Messages diff -->
-          <div v-if="messagesDiff.length > 0">
+          <!-- System prompt -->
+          <div v-if="systemPrompt">
             <div class="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1">
-              消息变更
+              System
             </div>
-            <div class="space-y-2">
+            <pre class="text-[11px] bg-muted/50 rounded-md px-2.5 py-2 overflow-y-auto whitespace-pre-wrap break-words max-h-40">{{ systemPrompt }}</pre>
+          </div>
+
+          <!-- Messages -->
+          <div v-if="messages.length > 0">
+            <div class="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1">
+              消息 ({{ messages.length }})
+            </div>
+            <div class="space-y-1.5">
               <div
-                v-for="(msg, i) in messagesDiff"
+                v-for="(msg, i) in messages"
                 :key="i"
                 class="rounded-md border px-2.5 py-1.5 text-[11px]"
                 :class="msg.modified ? 'diff-modified' : 'bg-background'"
@@ -61,7 +69,7 @@
                 <div class="flex items-center gap-1.5 mb-1">
                   <Badge
                     class="text-[9px] px-1.5 py-0"
-                    :class="msg.role === 'user' ? 'badge-role-user' : 'badge-role-assistant'"
+                    :class="msg.role === 'user' ? 'badge-role-user' : msg.role === 'assistant' ? 'badge-role-assistant' : 'badge-role-thinking'"
                   >
                     {{ msg.role }}
                   </Badge>
@@ -73,6 +81,22 @@
                   {{ msg.removedText }}
                 </div>
                 <div class="text-foreground">{{ msg.text }}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tools -->
+          <div v-if="tools.length > 0">
+            <div class="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1">
+              Tools ({{ tools.length }})
+            </div>
+            <div class="space-y-1">
+              <div
+                v-for="(tool, i) in tools"
+                :key="i"
+                class="rounded-md border bg-background px-2.5 py-1.5 text-[11px]"
+              >
+                <Badge class="text-[9px] px-1.5 py-0 badge-role-tool">{{ tool.name }}</Badge>
               </div>
             </div>
           </div>
@@ -98,7 +122,6 @@
               <Separator orientation="vertical" class="h-3" />
               <span class="font-mono diff-added font-medium">{{ authDiff.new }}</span>
             </div>
-            <Badge class="mt-1 badge-role-thinking text-[9px] px-1.5 py-0">已替换</Badge>
           </div>
         </div>
       </template>
@@ -131,8 +154,8 @@ function parseRequest(raw: string | null): ParsedRequest | null {
     const headers = (parsed.headers ?? {}) as Record<string, string>
     let body = parsed.body
     if (typeof body === 'string') {
-      // eslint-disable-next-line taste/no-silent-catch -- body 可能是普通字符串，保持原样即可
-      try { body = JSON.parse(body) } catch { /* non-JSON body, keep as-is */ }
+      // eslint-disable-next-line taste/no-silent-catch -- body 可能是普通字符串
+      try { body = JSON.parse(body) } catch { /* non-JSON body */ }
     }
     return { headers, body: (body ?? {}) as Record<string, unknown> }
   } catch {
@@ -172,8 +195,6 @@ function getHeader(headers: Record<string, string>, name: string): string | unde
 const clientParsed = computed(() => parseRequest(props.overview.clientRequest))
 const upstreamParsed = computed(() => parseRequest(props.overview.upstreamRequest))
 
-const hasDiff = computed(() => clientParsed.value != null || upstreamParsed.value != null)
-
 const modelDiff = computed(() => {
   const clientModel = clientParsed.value?.body?.model as string | undefined
   const upstreamModel = upstreamParsed.value?.body?.model as string | undefined
@@ -181,40 +202,72 @@ const modelDiff = computed(() => {
   return { hasDiff, from: clientModel ?? '', to: upstreamModel ?? '' }
 })
 
-interface MessageDiff {
+const systemPrompt = computed(() => {
+  const body = upstreamParsed.value?.body
+  if (!body) return null
+  const sys = body.system
+  if (typeof sys === 'string') return sys
+  // Anthropic 格式：system 可能是 [{ type: 'text', text: '...' }]
+  if (Array.isArray(sys)) {
+    return sys
+      .filter((s: unknown) => typeof s === 'object' && s !== null && 'text' in (s as Record<string, unknown>))
+      .map((s: unknown) => (s as Record<string, unknown>).text as string)
+      .join('\n')
+  }
+  // OpenAI 格式：messages 中 role=system 的第一条
+  const msgs = body.messages as Record<string, unknown>[] | undefined
+  if (Array.isArray(msgs)) {
+    const sysMsg = msgs.find(m => m.role === 'system')
+    if (sysMsg) return extractText(sysMsg)
+  }
+  return null
+})
+
+interface MessageView {
   role: string
   text: string
   removedText: string | null
   modified: boolean
 }
 
-const messagesDiff = computed<MessageDiff[]>(() => {
-  const clientMsgs = (clientParsed.value?.body?.messages ?? []) as Record<string, unknown>[]
+const messages = computed<MessageView[]>(() => {
   const upstreamMsgs = (upstreamParsed.value?.body?.messages ?? []) as Record<string, unknown>[]
+  const clientMsgs = (clientParsed.value?.body?.messages ?? []) as Record<string, unknown>[]
   if (upstreamMsgs.length === 0) return []
 
-  const result: MessageDiff[] = []
-  let anyModified = false
-
+  const result: MessageView[] = []
   for (let i = 0; i < upstreamMsgs.length; i++) {
     const upstreamMsg = upstreamMsgs[i]
-    const clientMsg = clientMsgs[i]
+    const role = String(upstreamMsg.role ?? 'unknown')
+    // 跳过 system 消息（已在 System 区展示）
+    if (role === 'system') continue
     const upstreamText = extractText(upstreamMsg)
+    const clientMsg = clientMsgs[i]
     const clientText = clientMsg ? extractText(clientMsg) : null
     const isModified = clientText !== null && upstreamText !== clientText
 
-    if (isModified) anyModified = true
-
     result.push({
-      role: String(upstreamMsg.role ?? 'unknown'),
+      role,
       text: upstreamText,
       removedText: isModified ? clientText : null,
       modified: isModified,
     })
   }
+  return result
+})
 
-  // Only show when there are actual differences
-  return anyModified ? result : []
+interface ToolView {
+  name: string
+}
+
+const tools = computed<ToolView[]>(() => {
+  const body = upstreamParsed.value?.body
+  if (!body) return []
+  const rawTools = body.tools as Record<string, unknown>[] | undefined
+  if (!Array.isArray(rawTools)) return []
+  return rawTools
+    .filter(t => typeof t?.name === 'string')
+    .map(t => ({ name: t.name as string }))
 })
 
 const streamOptionsInjected = computed(() => {
