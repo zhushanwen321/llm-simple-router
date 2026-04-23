@@ -51,6 +51,7 @@ const API = {
   MONITOR_CONCURRENCY: '/monitor/concurrency',
   MONITOR_RUNTIME: '/monitor/runtime',
   MONITOR_STREAM: '/monitor/stream',
+  MONITOR_REQUEST: '/monitor/request',
   RECOMMENDED_PROVIDERS: '/recommended/providers',
   RECOMMENDED_RETRY_RULES: '/recommended/retry-rules',
   RECOMMENDED_RELOAD: '/recommended/reload',
@@ -325,6 +326,7 @@ export const api = {
   getMonitorActive: () => request<ActiveRequest[]>('get', API.MONITOR_ACTIVE),
   getMonitorRecent: () => request<ActiveRequest[]>('get', API.MONITOR_RECENT),
   getMonitorStats: () => request<StatsSnapshot>('get', API.MONITOR_STATS),
+  getMonitorRequest: (id: string) => request<ActiveRequest>('get', `${API.MONITOR_REQUEST}/${id}`),
   getMonitorConcurrency: () => request<ProviderConcurrencySnapshot[]>('get', API.MONITOR_CONCURRENCY),
   getMonitorRuntime: () => request<RuntimeMetrics>('get', API.MONITOR_RUNTIME),
 
