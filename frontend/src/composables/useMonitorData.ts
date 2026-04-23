@@ -124,10 +124,20 @@ export function useMonitorData() {
     try {
       // Pending 请求：从 tracker 内存获取 clientRequest（日志尚未写入 DB）
       if (req.status === 'pending') {
-        const trackerReq = await api.getMonitorRequest(requestId)
-        if (version !== loadVersion.value) return
-        logDetailData.value = {
-          clientRequest: trackerReq.clientRequest ?? undefined,
+        try {
+          const trackerReq = await api.getMonitorRequest(requestId)
+          if (version !== loadVersion.value) return
+          logDetailData.value = {
+            clientRequest: trackerReq.clientRequest ?? undefined,
+          }
+        } catch {
+          // 请求可能刚完成从 tracker 移除，回退到 DB 查询
+          if (version !== loadVersion.value) return
+          const log = await api.getLogDetail(requestId)
+          if (version !== loadVersion.value) return
+          logDetailData.value = log.client_request
+            ? { clientRequest: log.client_request }
+            : null
         }
         return
       }

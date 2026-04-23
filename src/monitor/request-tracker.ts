@@ -200,7 +200,7 @@ export class RequestTracker {
 
   /** Public alias for API endpoint use — returns full request data including clientRequest */
   getRequestById(id: string): ActiveRequest | undefined {
-    return this.activeMap.get(id) ?? this.recentCompleted.find((r) => r.id === id);
+    return this.get(id);
   }
 
   // --- Stats / monitoring ---
@@ -275,8 +275,8 @@ export class RequestTracker {
   }
 
   broadcast(event: string, data: unknown): void {
-    // Strip clientRequest from periodic broadcasts to reduce bandwidth;
-    // full data available on-demand via getRequestById / API endpoint
+    // Strip clientRequest from broadcasts to reduce bandwidth;
+    // full data available on-demand via API endpoint
     let payload = data;
     if (event === "request_update" && Array.isArray(data)) {
       payload = data.map((req: ActiveRequest) => {
@@ -284,6 +284,10 @@ export class RequestTracker {
         delete copy.clientRequest;
         return copy;
       });
+    } else if (event === "request_complete" && data && typeof data === "object") {
+      const copy = { ...(data as ActiveRequest) };
+      delete copy.clientRequest;
+      payload = copy;
     }
     const msg = `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
     const clientCount = this.clients.size;

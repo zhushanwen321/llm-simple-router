@@ -217,7 +217,7 @@ export function backfillMetricsFromRequestMetrics(db: Database.Database): number
 export function deleteLogsBefore(db: Database.Database, beforeDate: string): number {
   const changes = db.prepare("DELETE FROM request_logs WHERE created_at < ?").run(beforeDate).changes;
   if (changes > 0) {
-    db.pragma("incremental_vacuum(100)");
+    db.pragma("incremental_vacuum");
   }
   return changes;
 }
@@ -250,7 +250,7 @@ export function deleteOldestLogs(db: Database.Database, keepCount: number): numb
     )
   `).run(toDelete);
   if (result.changes > 0) {
-    db.pragma("incremental_vacuum(100)");
+    db.pragma("incremental_vacuum");
   }
   return result.changes;
 }
