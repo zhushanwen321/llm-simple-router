@@ -166,6 +166,19 @@
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <!-- Cleanup result dialog -->
+    <AlertDialog v-model:open="showCleanupResult">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>清理完成</AlertDialogTitle>
+          <AlertDialogDescription>已删除 {{ cleanupResult }} 条日志。</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogAction @click="showCleanupResult = false">确定</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </div>
 </template>
 
@@ -179,6 +192,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction } from '@/components/ui/alert-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Separator } from '@/components/ui/separator'
 import UnifiedRequestDialog from '@/components/request-detail/UnifiedRequestDialog.vue'
@@ -198,7 +212,8 @@ const DEBOUNCE_MS = 300
 
 const {
   logs, total, page, hasMore,
-  cleanupDays, showCleanup, expandedRows, childLogs, childLoading,
+  cleanupDays, showCleanup, cleanupResult, showCleanupResult,
+  expandedRows, childLogs, childLoading,
   logDetailOpen, selectedLogEntry,
   loadLogs, prevPage, nextPage,
   handleCleanup, toggleExpand, openLogDetail,
