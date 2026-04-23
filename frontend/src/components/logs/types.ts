@@ -20,4 +20,12 @@ export interface LogEntry {
   child_count?: number
   client_request: string | null
   upstream_response: string | null
+  input_tokens: number | null
+  output_tokens: number | null
+  cache_read_tokens: number | null
+  ttft_ms: number | null
+  tokens_per_second: number | null
+  stop_reason: string | null
+  metrics_complete: number
+  stream_text_content: string | null
 }

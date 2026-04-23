@@ -1,26 +1,26 @@
 <template>
-  <div class="flex flex-col h-full">
-    <div class="flex justify-end mb-1">
+  <div class="flex flex-col min-h-0 h-full">
+    <div class="flex justify-end mb-1 flex-shrink-0">
       <Button variant="outline" size="xs" class="gap-1" @click="showRaw = !showRaw">
         <FileJson v-if="showRaw" class="size-3" />
         <FileText v-else class="size-3" />
-        {{ showRaw ? '结构化' : '原始 JSON' }}
+        {{ showRaw ? 'Structured' : 'Raw JSON' }}
       </Button>
     </div>
 
-    <ScrollArea class="flex-1">
+    <ScrollArea class="flex-1 min-h-0">
       <!-- Raw JSON view -->
       <template v-if="showRaw">
         <div class="space-y-3">
           <div>
             <div class="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1">
-              客户端请求
+              Client Request
             </div>
             <JsonCopyBlock :content="overview.clientRequest ?? '{}'" />
           </div>
           <div>
             <div class="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1">
-              上游请求
+              Upstream Request
             </div>
             <JsonCopyBlock :content="overview.upstreamRequest ?? '{}'" />
           </div>
@@ -30,14 +30,14 @@
       <!-- Structured view -->
       <template v-else>
         <div v-if="!upstreamParsed" class="text-[11px] text-muted-foreground py-4 text-center">
-          暂无请求内容数据
+          No request data available
         </div>
 
         <div v-else class="space-y-4">
           <!-- Model mapping -->
           <div v-if="modelDiff.hasDiff">
             <div class="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1">
-              模型映射
+              Model Mapping
             </div>
             <div class="flex items-center gap-2 text-[11px]">
               <span class="font-mono text-muted-foreground">{{ modelDiff.from }}</span>
@@ -57,7 +57,7 @@
           <!-- Messages -->
           <div v-if="messages.length > 0">
             <div class="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1">
-              消息 ({{ messages.length }})
+              Messages ({{ messages.length }})
             </div>
             <div class="space-y-1.5">
               <div
@@ -74,13 +74,13 @@
                     {{ msg.role }}
                   </Badge>
                   <Badge v-if="msg.modified" class="badge-role-thinking text-[9px] px-1.5 py-0">
-                    已修改
+                    Modified
                   </Badge>
                 </div>
                 <div v-if="msg.modified && msg.removedText" class="diff-removed line-through mb-0.5">
                   {{ msg.removedText }}
                 </div>
-                <div class="text-foreground">{{ msg.text }}</div>
+                <div class="text-foreground overflow-y-auto max-h-40">{{ msg.text }}</div>
               </div>
             </div>
           </div>
@@ -104,10 +104,10 @@
           <!-- stream_options injection -->
           <div v-if="streamOptionsInjected">
             <div class="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1">
-              流选项注入
+              Stream Options
             </div>
             <div class="flex items-center gap-2 text-[11px]">
-              <Badge class="badge-success text-[9px] px-1.5 py-0">注入</Badge>
+              <Badge class="badge-success text-[9px] px-1.5 py-0">Injected</Badge>
               <code class="font-mono diff-added">{ "include_usage": true }</code>
             </div>
           </div>
@@ -115,7 +115,7 @@
           <!-- Authorization replacement -->
           <div v-if="authDiff.hasDiff">
             <div class="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1">
-              认证替换
+              Auth Replacement
             </div>
             <div class="flex items-center gap-2 text-[11px]">
               <span class="font-mono diff-removed line-through">{{ authDiff.old }}</span>

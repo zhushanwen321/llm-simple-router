@@ -97,6 +97,9 @@ export {
   deleteLogsBefore,
   getRequestLogChildren,
   getRequestLogsGrouped,
+  updateLogMetrics,
+  updateLogStreamContent,
+  backfillMetricsFromRequestMetrics,
 } from "./logs.js";
 export type { RequestLog, RequestLogGroupedRow, RequestLogListRow } from "./logs.js";
 

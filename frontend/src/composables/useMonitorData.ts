@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { api } from '@/api/client'
 import type {
   ActiveRequest,
@@ -172,6 +172,13 @@ export function useMonitorData() {
       recentCompleted.value.find((r) => r.id === selectedRequestId.value) ??
       null
     )
+  })
+
+  // 请求从 pending 变为 completed 时，自动重新加载日志详情
+  watch(() => selectedRequest.value?.status, (newStatus, oldStatus) => {
+    if (oldStatus === 'pending' && (newStatus === 'completed' || newStatus === 'failed')) {
+      loadLogDetail(selectedRequestId.value!)
+    }
   })
 
   return {

@@ -105,17 +105,19 @@ function extractResponseBody(upstreamResponse: string | null): string | null {
 }
 
 export function fromLogEntry(entry: LogEntry): UnifiedRequestOverview {
-  // TODO: LogEntry 当前未关联 request_metrics 表，input/output tokens 等字段暂为 null。
-  // 后续如需展示历史请求的完整指标，应联表查询 request_metrics。
-  const inputTokens: number | null = null
-  const outputTokens: number | null = null
-  const ttftMs: number | null = null
+  const inputTokens = entry.input_tokens ?? null
+  const outputTokens = entry.output_tokens ?? null
+  const ttftMs = entry.ttft_ms ?? null
 
-  let tokensPerSecond: number | null = null
-  if (entry.latency_ms && outputTokens && ttftMs) {
+  let tokensPerSecond = entry.tokens_per_second ?? null
+  if (!tokensPerSecond && outputTokens && ttftMs && entry.latency_ms) {
     const outputTime = (entry.latency_ms - ttftMs) / MS_PER_SECOND
     if (outputTime > 0) tokensPerSecond = outputTokens / outputTime
   }
+
+  // 非流式：从 upstream_response.body 提取完整 JSON 响应
+  // 流式：upstream_response.body 为 null，回退到 stream_text_content（纯文本）
+  const responseBody = extractResponseBody(entry.upstream_response) ?? entry.stream_text_content ?? null
 
   return {
     id: entry.id,
@@ -133,15 +135,15 @@ export function fromLogEntry(entry: LogEntry): UnifiedRequestOverview {
     inputTokens,
     outputTokens,
     tokensPerSecond,
-    cacheReadTokens: null,
+    cacheReadTokens: entry.cache_read_tokens ?? null,
     cacheWriteTokens: null,
-    stopReason: null,
-    isComplete: true,
+    stopReason: entry.stop_reason ?? null,
+    isComplete: !!entry.metrics_complete,
     attempts: [],
     status: (entry.status_code ?? 0) >= HTTP_ERROR_THRESHOLD ? 'failed' : 'completed',
     clientRequest: entry.client_request,
     upstreamRequest: entry.upstream_request,
-    responseBody: extractResponseBody(entry.upstream_response),
+    responseBody,
     upstreamResponse: entry.upstream_response,
     errorMessage: entry.error_message,
     createdAt: entry.created_at,

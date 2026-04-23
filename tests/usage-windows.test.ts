@@ -305,7 +305,7 @@ describe("usage API endpoints", () => {
       id: "w-today",
       router_key_id: null,
       start_time: `${todayLocal} 00:00:00`,
-      end_time: `${todayLocal} 05:00:00`,
+      end_time: `${todayLocal} 23:59:59`,
     });
 
     db.prepare(

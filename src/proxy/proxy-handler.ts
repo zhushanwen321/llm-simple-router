@@ -18,6 +18,8 @@ import { buildUpstreamHeaders } from "./proxy-core.js";
 import { UPSTREAM_SUCCESS, ProviderSwitchNeeded } from "./types.js";
 import type { RawHeaders, TransportResult } from "./types.js";
 import { SSEMetricsTransform } from "../metrics/sse-metrics-transform.js";
+import { MetricsExtractor } from "../metrics/metrics-extractor.js";
+import { updateLogStreamContent } from "../db/index.js";
 import { callNonStream, callStream } from "./transport.js";
 import { insertRejectedLog } from "./log-helpers.js";
 import type { Target } from "./strategy/types.js";
@@ -180,6 +182,20 @@ export async function handleProxyRequest(
         );
       }
       const result = await callNonStream(provider, apiKey, body, cliHdrs, upstreamPath, buildUpstreamHeaders);
+      // 非流式请求：从响应体提取指标并更新 tracker
+      if (result.kind === "success") {
+        const mr = MetricsExtractor.fromNonStreamResponse(apiType, result.body);
+        if (mr) {
+          deps.tracker?.update(logId, {
+            streamMetrics: {
+              inputTokens: mr.input_tokens, outputTokens: mr.output_tokens,
+              cacheReadTokens: mr.cache_read_tokens,
+              ttftMs: mr.ttft_ms, tokensPerSecond: mr.tokens_per_second,
+              stopReason: mr.stop_reason, isComplete: mr.is_complete === 1,
+            },
+          });
+        }
+      }
       // 非流式响应注入模型信息标签（模型映射场景）
       if (originalModel && result.kind === "success" && result.statusCode === UPSTREAM_SUCCESS) {
         try {
@@ -209,6 +225,13 @@ export async function handleProxyRequest(
         resilienceResult.attempts, resilienceResult.result, startTime,
       );
       collectTransportMetrics(deps.db, apiType, resilienceResult.result, isStream, lastLogId, provider.id, resolved.backend_model, request);
+
+      // 流式请求：将 tracker 中累积的文本内容持久化到日志
+      if (isStream && deps.tracker) {
+        const req = deps.tracker.get(lastLogId);
+        const text = req?.streamContent?.textContent;
+        if (text) updateLogStreamContent(deps.db, lastLogId, text);
+      }
 
       // Failover: 单 provider 内重试已耗尽但仍失败，尝试下一个 target
       if (isFailover && !reply.raw.headersSent) {

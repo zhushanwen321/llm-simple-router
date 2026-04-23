@@ -96,6 +96,11 @@ const blocks = computed<ContentBlock[]>(() => {
   const direct = tryDirectParse(props.responseBody ?? null, props.upstreamResponse ?? null, props.apiType)
   if (direct.length > 0) return direct
 
+  // 流式请求的纯文本回退：responseBody 不是 JSON 时，直接作为 text block 展示
+  if (props.responseBody && props.responseBody.trim().length > 0) {
+    return [{ type: 'text' as const, content: props.responseBody }]
+  }
+
   return assembledBlocks.value.map(b => ({
     type: (['thinking', 'text', 'tool_use'].includes(b.type) ? b.type : 'text') as ContentBlock['type'],
     content: b.content,

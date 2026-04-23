@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import Database from "better-sqlite3";
 import type { Provider } from "../db/index.js";
-import { insertRequestLog, insertMetrics } from "../db/index.js";
+import { insertRequestLog, insertMetrics, updateLogMetrics } from "../db/index.js";
 import { insertSuccessLog, type FailoverContext } from "./log-helpers.js";
 import { MetricsExtractor } from "../metrics/metrics-extractor.js";
 import type { FastifyRequest } from "fastify";
@@ -146,10 +146,18 @@ export function collectTransportMetrics(
   const base = { request_log_id: lastSuccessLogId, provider_id: providerId, backend_model: backendModel, api_type: apiType };
   try {
     if (isStream && (result.kind === "stream_success" || result.kind === "stream_abort")) {
-      if (result.metrics) { insertMetrics(db, { ...base, ...result.metrics }); return; }
+      if (result.metrics) {
+        insertMetrics(db, { ...base, ...result.metrics });
+        updateLogMetrics(db, lastSuccessLogId, result.metrics);
+        return;
+      }
     } else if (result.kind === "success") {
       const mr = MetricsExtractor.fromNonStreamResponse(apiType, result.body);
-      if (mr) { insertMetrics(db, { ...base, ...mr }); return; }
+      if (mr) {
+        insertMetrics(db, { ...base, ...mr });
+        updateLogMetrics(db, lastSuccessLogId, mr);
+        return;
+      }
     }
     // 无法提取完整 metrics 的 fallback，标记为未完成
     insertMetrics(db, { ...base, is_complete: 0 });
