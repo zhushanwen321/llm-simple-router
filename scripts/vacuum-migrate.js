@@ -27,7 +27,8 @@ if (auto_vacuum === 2) {
 }
 
 const [{ page_count: beforePages }] = db.pragma("page_count");
-console.log(`Pages before VACUUM: ${beforePages}`);
+const [{ page_size: pageSize }] = db.pragma("page_size");
+console.log(`Pages before VACUUM: ${beforePages} (page size: ${pageSize})`);
 console.log("Running VACUUM (this may take several minutes for large databases)...");
 
 const start = Date.now();
@@ -36,7 +37,7 @@ const elapsed = ((Date.now() - start) / 1000).toFixed(1);
 
 const [{ page_count: afterPages }] = db.pragma("page_count");
 console.log(`Pages after VACUUM: ${afterPages}`);
-console.log(`Freed ${beforePages - afterPages} pages (~${((beforePages - afterPages) * 4096 / 1024 / 1024).toFixed(1)} MB)`);
+console.log(`Freed ${beforePages - afterPages} pages (~${((beforePages - afterPages) * pageSize / 1024 / 1024).toFixed(1)} MB)`);
 console.log(`Completed in ${elapsed}s`);
 
 db.close();
