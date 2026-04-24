@@ -1,5 +1,3 @@
-import type { FastifyReply } from "fastify";
-
 // HTTP 状态码统一从 src/constants.ts 导入，避免重复定义
 export {
   HTTP_BAD_REQUEST,
@@ -11,7 +9,3 @@ export {
   HTTP_BAD_GATEWAY,
   HTTP_SERVICE_UNAVAILABLE,
 } from "../constants.js";
-
-export function sendErrorResponse(reply: FastifyReply, statusCode: number, message: string) {
-  return reply.code(statusCode).send({ error: { message } });
-}
