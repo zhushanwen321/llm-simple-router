@@ -39,12 +39,14 @@ import { UsageWindowTracker } from "./proxy/usage-window-tracker.js";
 import { scheduleLogCleanup } from "./db/log-cleaner.js";
 import { scheduleDbSizeMonitor } from "./db/db-size-monitor.js";
 import { startUpgradeChecker, stopUpgradeChecker } from "./admin/upgrade.js";
+import { CheckerOptions } from "./upgrade/checker.js";
 import fastifyStatic from "@fastify/static";
 import Database from "better-sqlite3";
 
 export interface AppOptions {
   config?: Config;
   db?: Database.Database;
+  upgradeCheckerOptions?: CheckerOptions;
 }
 
 export async function buildApp(
@@ -133,7 +135,7 @@ export async function buildApp(
   });
 
   loadRecommendedConfig();
-  startUpgradeChecker();
+  startUpgradeChecker(options?.upgradeCheckerOptions);
 
   // 启动时回填：补齐回退老版本期间缺失的 metrics 冗余列
   if (shouldBackfill) {
