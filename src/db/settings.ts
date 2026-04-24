@@ -43,3 +43,12 @@ export function getLogTableMaxSizeMb(db: Database.Database): number {
 export function setLogTableMaxSizeMb(db: Database.Database, mb: number): void {
   setSetting(db, "log_table_max_size_mb", String(mb));
 }
+
+export function getConfigSyncSource(db: Database.Database): "github" | "gitee" {
+  const val = getSetting(db, "config_sync_source");
+  return val === "gitee" ? "gitee" : "github";
+}
+
+export function setConfigSyncSource(db: Database.Database, source: "github" | "gitee"): void {
+  setSetting(db, "config_sync_source", source);
+}
