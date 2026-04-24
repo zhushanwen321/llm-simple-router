@@ -6,6 +6,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 LLM API 代理路由器。接收 OpenAI / Anthropic 格式的客户端请求，通过模型映射和路由策略转发到配置的后端 Provider，支持流式（SSE）和非流式代理。管理后台（Vue 3 + shadcn-vue）提供 Provider 管理、模型映射配置、重试规则、请求日志查看、实时监控等功能。
 
+## 分支策略
+
+- `main` — 可发布分支，始终保持稳定可发布状态
+- `develop` — 常驻开发/集成分支，所有功能分支的合并目标
+
+**流程：** 功能分支 → PR 合并到 `develop`（集成测试）→ PR 从 `develop` 合并到 `main`（发布）
+
+功能分支应基于 `develop` 创建，命名规范：`feat/xxx`、`fix/xxx`、`refactor/xxx`、`chore/xxx`
+
 ## 常用命令
 
 ```bash
