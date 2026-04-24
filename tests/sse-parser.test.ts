@@ -195,6 +195,17 @@ describe("SSEParser", () => {
     expect(events[1].data).toBe("second");
   });
 
+  it("should handle \\r\\n split across chunk boundary", () => {
+    const parser = new SSEParser();
+    // 第一个 chunk 以 \r 结尾，第二个 chunk 以 \n\r\n 开头
+    const e1 = parser.feed("data: first\r");
+    expect(e1).toHaveLength(0);
+    const e2 = parser.feed("\n\r\ndata: second\r\n\r\n");
+    expect(e2).toHaveLength(2);
+    expect(e2[0].data).toBe("first");
+    expect(e2[1].data).toBe("second");
+  });
+
   it("should handle chunk boundary splitting in the middle of \\n\\n", () => {
     const parser = new SSEParser();
     // 第一次 feed 只有 "data: first\n"，没有 \n\n，不会产生事件
