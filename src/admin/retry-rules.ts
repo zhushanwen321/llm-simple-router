@@ -11,6 +11,7 @@ import {
 } from "../db/index.js";
 import { RetryRuleMatcher } from "../proxy/retry-rules.js";
 import { HTTP_BAD_REQUEST, HTTP_CREATED, HTTP_NOT_FOUND } from "./constants.js";
+import { API_CODE, apiError } from "./api-response.js";
 
 const DEFAULT_RETRY_DELAY_MS = 5000;
 const DEFAULT_MAX_RETRIES = 10;
@@ -68,7 +69,7 @@ export const adminRetryRuleRoutes: FastifyPluginCallback<RetryRuleRoutesOptions>
     const body = request.body as Static<typeof CreateRetryRuleSchema>;
     const regexError = validateBodyPattern(body.body_pattern);
     if (regexError) {
-      return reply.code(HTTP_BAD_REQUEST).send({ error: { message: regexError } });
+      return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.INVALID_REGEX, regexError));
     }
     const id = createRetryRule(db, {
       name: body.name,
@@ -93,7 +94,7 @@ export const adminRetryRuleRoutes: FastifyPluginCallback<RetryRuleRoutesOptions>
     if (body.body_pattern !== undefined) {
       const regexError = validateBodyPattern(body.body_pattern);
       if (regexError) {
-        return reply.code(HTTP_BAD_REQUEST).send({ error: { message: regexError } });
+        return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.INVALID_REGEX, regexError));
       }
       fields.body_pattern = body.body_pattern;
     }
@@ -110,7 +111,7 @@ export const adminRetryRuleRoutes: FastifyPluginCallback<RetryRuleRoutesOptions>
   app.delete("/admin/api/retry-rules/:id", async (request, reply) => {
     const { id } = request.params as { id: string };
     const existing = getRetryRuleById(db, id);
-    if (!existing) return reply.code(HTTP_NOT_FOUND).send({ error: { message: "Retry rule not found" } });
+    if (!existing) return reply.code(HTTP_NOT_FOUND).send(apiError(API_CODE.NOT_FOUND, "Retry rule not found"));
     deleteRetryRule(db, id);
     refreshMatcher(matcher, db);
     return reply.send({ success: true });

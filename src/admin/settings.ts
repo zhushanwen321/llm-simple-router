@@ -7,6 +7,7 @@ import {
   getSetting,
 } from "../db/settings.js";
 import { HTTP_BAD_REQUEST } from "./constants.js";
+import { API_CODE, apiError } from "./api-response.js";
 
 interface SettingsOptions {
   db: Database.Database;
@@ -23,7 +24,7 @@ export const adminSettingsRoutes: FastifyPluginCallback<SettingsOptions> = (app,
     const { days } = request.body as { days: number };
     const MAX_LOG_RETENTION_DAYS = 90;
     if (!Number.isInteger(days) || days < 0 || days > MAX_LOG_RETENTION_DAYS) {
-      return reply.code(HTTP_BAD_REQUEST).send({ error: { message: "days must be integer 0-90" } });
+      return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.BAD_REQUEST, "days must be integer 0-90"));
     }
     setLogRetentionDays(db, days);
     return { days };
@@ -49,13 +50,13 @@ export const adminSettingsRoutes: FastifyPluginCallback<SettingsOptions> = (app,
     const body = request.body as { dbMaxSizeMb?: number; logTableMaxSizeMb?: number };
     if (body.dbMaxSizeMb !== undefined) {
       if (!Number.isFinite(body.dbMaxSizeMb) || body.dbMaxSizeMb < 1) {
-        return reply.code(HTTP_BAD_REQUEST).send({ error: { message: "dbMaxSizeMb must be a positive number" } });
+        return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.BAD_REQUEST, "dbMaxSizeMb must be a positive number"));
       }
       setDbMaxSizeMb(db, Math.round(body.dbMaxSizeMb));
     }
     if (body.logTableMaxSizeMb !== undefined) {
       if (!Number.isFinite(body.logTableMaxSizeMb) || body.logTableMaxSizeMb < 1) {
-        return reply.code(HTTP_BAD_REQUEST).send({ error: { message: "logTableMaxSizeMb must be a positive number" } });
+        return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.BAD_REQUEST, "logTableMaxSizeMb must be a positive number"));
       }
       setLogTableMaxSizeMb(db, Math.round(body.logTableMaxSizeMb));
     }

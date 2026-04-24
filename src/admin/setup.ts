@@ -5,6 +5,7 @@ import jwt from "jsonwebtoken";
 import { getSetting, setSetting, isInitialized } from "../db/settings.js";
 import { hashPassword } from "../utils/password.js";
 import { HTTP_BAD_REQUEST, HTTP_CONFLICT } from "./constants.js";
+import { API_CODE, apiError } from "./api-response.js";
 
 const CRYPTO_BYTES_LENGTH = 32;
 const MIN_PASSWORD_LENGTH = 6;
@@ -23,7 +24,7 @@ export const adminSetupRoutes: FastifyPluginCallback<SetupOptions> = (app, optio
   app.post("/admin/api/setup/initialize", async (request, reply) => {
     const { password } = request.body as { password?: string };
     if (!password || password.length < MIN_PASSWORD_LENGTH) {
-      return reply.code(HTTP_BAD_REQUEST).send({ error: { message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` } });
+      return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.VALIDATION_FAILED, `Password must be at least ${MIN_PASSWORD_LENGTH} characters`));
     }
 
     // 事务中原子检查防竞态
@@ -39,7 +40,7 @@ export const adminSetupRoutes: FastifyPluginCallback<SetupOptions> = (app, optio
     })();
 
     if (alreadyInitialized) {
-      return reply.code(HTTP_CONFLICT).send({ error: { message: "Already initialized" } });
+      return reply.code(HTTP_CONFLICT).send(apiError(API_CODE.ALREADY_INITIALIZED, "Already initialized"));
     }
 
     // 自动登录：签发 JWT

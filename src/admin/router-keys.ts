@@ -9,6 +9,7 @@ import {
 import type { RouterKey } from "../db/index.js";
 import { getSetting } from "../db/settings.js";
 import { HTTP_CREATED, HTTP_NOT_FOUND } from "./constants.js";
+import { API_CODE, apiError } from "./api-response.js";
 
 const KEY_RANDOM_BYTES = 32;
 const KEY_PREFIX_LENGTH = 8;
@@ -85,7 +86,7 @@ export const adminRouterKeyRoutes: FastifyPluginCallback<RouterKeyRoutesOptions>
     const { id } = request.params as { id: string };
     const existing = getRouterKeyById(db, id);
     if (!existing) {
-      return reply.code(HTTP_NOT_FOUND).send({ error: { message: "Router key not found" } });
+      return reply.code(HTTP_NOT_FOUND).send(apiError(API_CODE.NOT_FOUND, "Router key not found"));
     }
     const body = request.body as Static<typeof UpdateRouterKeySchema>;
     const fields: Partial<Pick<RouterKey, 'name' | 'allowed_models' | 'is_active'>> = {};
@@ -99,7 +100,7 @@ export const adminRouterKeyRoutes: FastifyPluginCallback<RouterKeyRoutesOptions>
   app.delete("/admin/api/router-keys/:id", async (request, reply) => {
     const { id } = request.params as { id: string };
     const existing = getRouterKeyById(db, id);
-    if (!existing) return reply.code(HTTP_NOT_FOUND).send({ error: { message: "Router key not found" } });
+    if (!existing) return reply.code(HTTP_NOT_FOUND).send(apiError(API_CODE.NOT_FOUND, "Router key not found"));
     deleteRouterKey(db, id);
     return reply.send({ success: true });
   });
