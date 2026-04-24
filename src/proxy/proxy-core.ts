@@ -24,10 +24,6 @@ export interface ProxyErrorFormatter {
   concurrencyTimeout(providerId: string, timeoutMs: number): ProxyErrorResponse;
 }
 
-// Re-export upstream types for external consumers
-export type { ProxyResult, StreamProxyResult } from "./transport.js";
-export type { GetTransportResult as GetProxyResult } from "./transport.js";
-
 // ---------- Error formatter factory ----------
 
 export type ErrorKind =
