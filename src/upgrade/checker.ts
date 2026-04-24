@@ -32,6 +32,25 @@ const DEFAULT_NPM_REGISTRY = 'https://registry.npmjs.org/llm-simple-router'
 const DEFAULT_GITHUB_CONFIG_BASE = 'https://raw.githubusercontent.com/zhushanwen321/llm-simple-router/main/config'
 const CHECK_TIMEOUT_MS = 5000
 
+export async function fetchJson(url: string): Promise<unknown> {
+  const mod = url.startsWith('https') ? https : http
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('timeout')), CHECK_TIMEOUT_MS)
+    mod.get(url, (res) => {
+      let data = ''
+      res.on('data', (chunk: Buffer) => { data += chunk })
+      res.on('end', () => {
+        clearTimeout(timer)
+        try { resolve(JSON.parse(data)) }
+        catch { reject(new Error('invalid json')) }
+      })
+    }).on('error', (err) => {
+      clearTimeout(timer)
+      reject(err)
+    })
+  })
+}
+
 export function createUpgradeChecker(options?: CheckerOptions) {
   const npmRegistryUrl = options?.npmRegistryUrl ?? DEFAULT_NPM_REGISTRY
   const configBaseUrl = options?.configBaseUrl ?? DEFAULT_GITHUB_CONFIG_BASE
@@ -48,25 +67,6 @@ export function createUpgradeChecker(options?: CheckerOptions) {
     retryRuleChanges: 0,
   }
   let lastCheckedAt: string | null = null
-
-  async function fetchJson(url: string): Promise<unknown> {
-    const mod = url.startsWith('https') ? https : http
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('timeout')), CHECK_TIMEOUT_MS)
-      mod.get(url, (res) => {
-        let data = ''
-        res.on('data', (chunk: Buffer) => { data += chunk })
-        res.on('end', () => {
-          clearTimeout(timer)
-          try { resolve(JSON.parse(data)) }
-          catch { reject(new Error('invalid json')) }
-        })
-      }).on('error', (err) => {
-        clearTimeout(timer)
-        reject(err)
-      })
-    })
-  }
 
   function loadLocalJson(filename: string): unknown {
     const filePath = path.join(configDir, filename)
@@ -88,22 +88,27 @@ export function createUpgradeChecker(options?: CheckerOptions) {
         latestVersion: latest,
       }
     } catch {
-      // 静默失败
+      process.stderr.write('[upgrade] failed to check npm version\n')
     }
   }
 
   async function checkConfig(sourceOverride?: string): Promise<void> {
     try {
       const base = sourceOverride ?? configBaseUrl
-      const [remoteProviders, remoteRules] = await Promise.all([
+      const [providersResult, rulesResult] = await Promise.allSettled([
         fetchJson(`${base}/recommended-providers.json`),
         fetchJson(`${base}/recommended-retry-rules.json`),
       ])
+      const remoteProviders = providersResult.status === 'fulfilled' ? providersResult.value : null
+      const remoteRules = rulesResult.status === 'fulfilled' ? rulesResult.value : null
+      if (!remoteProviders && !remoteRules) {
+        throw new Error('both providers and rules fetch failed')
+      }
       const localProviders = loadLocalJson('recommended-providers.json')
       const localRules = loadLocalJson('recommended-retry-rules.json')
 
-      const providersChanged = JSON.stringify(remoteProviders) !== JSON.stringify(localProviders)
-      const rulesChanged = JSON.stringify(remoteRules) !== JSON.stringify(localRules)
+      const providersChanged = remoteProviders !== null && JSON.stringify(remoteProviders) !== JSON.stringify(localProviders)
+      const rulesChanged = remoteRules !== null && JSON.stringify(remoteRules) !== JSON.stringify(localRules)
 
       configStatus = {
         hasUpdate: providersChanged || rulesChanged,
@@ -111,12 +116,12 @@ export function createUpgradeChecker(options?: CheckerOptions) {
         retryRuleChanges: rulesChanged ? 1 : 0,
       }
     } catch {
-      // 静默失败
+      process.stderr.write('[upgrade] failed to check config update\n')
     }
   }
 
   async function check(sourceOverride?: string): Promise<void> {
-    await Promise.all([checkNpm(), checkConfig(sourceOverride)])
+    await Promise.allSettled([checkNpm(), checkConfig(sourceOverride)])
     lastCheckedAt = new Date().toISOString()
   }
 
