@@ -160,3 +160,29 @@ describe('UpgradeChecker', () => {
     expect(status.config.hasUpdate).toBe(false)
   })
 })
+
+import Database from 'better-sqlite3'
+import { initDatabase } from '../src/db/index.js'
+
+describe('config sync source settings', () => {
+  let db: Database.Database
+
+  beforeEach(() => {
+    db = initDatabase(':memory:')
+  })
+
+  afterEach(() => {
+    db.close()
+  })
+
+  it('defaults to github when not set', async () => {
+    const { getConfigSyncSource } = await import('../src/db/settings')
+    expect(getConfigSyncSource(db)).toBe('github')
+  })
+
+  it('persists and reads gitee preference', async () => {
+    const { setConfigSyncSource, getConfigSyncSource } = await import('../src/db/settings')
+    setConfigSyncSource(db, 'gitee')
+    expect(getConfigSyncSource(db)).toBe('gitee')
+  })
+})
