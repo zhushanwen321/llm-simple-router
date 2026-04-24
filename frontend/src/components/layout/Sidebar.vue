@@ -39,9 +39,9 @@
               >
                 {{ isUpgrading ? '升级中...' : '一键升级' }}
               </Button>
-              <div v-else class="text-xs text-amber-600 bg-amber-50 p-2 rounded">
+              <div v-else class="text-xs text-warning bg-warning-light p-2 rounded">
                 检测到 {{ upgradeStatus.deployment === 'docker' ? 'Docker' : '未知' }} 部署，请手动更新：
-                <code class="block mt-1 text-[10px] bg-amber-100 p-1 rounded">docker pull ghcr.io/zhushanwen321/llm-simple-router:latest</code>
+                <code class="block mt-1 text-warning bg-warning-dark/10 p-1 rounded">docker pull ghcr.io/zhushanwen321/llm-simple-router:latest</code>
               </div>
             </div>
             <!-- 配置同步 -->

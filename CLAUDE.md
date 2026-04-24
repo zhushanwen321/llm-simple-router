@@ -177,7 +177,7 @@ Handler (proxy-handler.ts)
 ## 环境变量
 
 所有 secrets 通过首次启动的 Setup 页面设置，存入 DB settings 表。
-可选环境变量：`PORT`（默认 9981）、`DB_PATH`（默认 `~/.llm-simple-router/router.db`）、`LOG_LEVEL`、`STREAM_TIMEOUT_MS`（默认 3000000）、`RETRY_MAX_ATTEMPTS`（默认 3）、`RETRY_BASE_DELAY_MS`（默认 1000）
+可选环境变量：`PORT`（默认 9981）、`DB_PATH`（默认 `~/.llm-simple-router/router.db`）、`LOG_LEVEL`、`STREAM_TIMEOUT_MS`（默认 3000000）、`RETRY_BASE_DELAY_MS`（默认 1000）
 
 ## 测试
 
@@ -187,7 +187,7 @@ Handler (proxy-handler.ts)
 - **组件测试**：`Fastify()` + `.register()` + `app.inject()` 模拟 HTTP 请求（不启动真实服务器）
 - **内存数据库**：`initDatabase(":memory:")` 创建 SQLite 内存库，测试间完全隔离
 - **Mock 后端**：`http.createServer()` 在随机端口模拟 OpenAI/Anthropic 响应
-- **集成测试**：`buildApp({ config, db })` 组装完整应用，RETRY_MAX_ATTEMPTS=0 禁用重试
+- **集成测试**：`buildApp({ config, db })` 组装完整应用
 - **策略测试**：纯函数式，构造 Target/rule 对象验证 select() 返回值
 
 **辅助函数模式**（多文件重复定义）：`createMockBackend()`、`closeServer()`、`buildTestApp()`、`insertMockBackend()`、`insertModelMapping()`

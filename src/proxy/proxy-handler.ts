@@ -228,6 +228,8 @@ export async function handleProxyRequest(
         }
       }
 
+      // orchestrator.sendResponse 对 throw/stream_success/stream_abort 不发送，
+      // 对 failover 场景的错误也不发送——这些情况需要外层 proxy-handler 处理
       if (!reply.raw.headersSent) {
         const tr = resilienceResult.result;
         if (tr.kind === "throw" || (tr.kind === "error" && tr.statusCode >= HTTP_ERROR_THRESHOLD)) {
