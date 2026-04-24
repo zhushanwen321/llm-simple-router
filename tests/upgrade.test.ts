@@ -163,6 +163,10 @@ describe('UpgradeChecker', () => {
 
 import Database from 'better-sqlite3'
 import { initDatabase } from '../src/db/index.js'
+import { setSetting } from '../src/db/settings.js'
+import { hashPassword } from '../src/utils/password.js'
+import { buildApp } from '../src/index.js'
+import type { FastifyInstance } from 'fastify'
 
 describe('config sync source settings', () => {
   let db: Database.Database
@@ -184,5 +188,83 @@ describe('config sync source settings', () => {
     const { setConfigSyncSource, getConfigSyncSource } = await import('../src/db/settings')
     setConfigSyncSource(db, 'gitee')
     expect(getConfigSyncSource(db)).toBe('gitee')
+  })
+})
+
+function seedAuth(db: Database.Database) {
+  setSetting(db, 'encryption_key', '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef')
+  setSetting(db, 'jwt_secret', 'test-jwt-secret')
+  setSetting(db, 'admin_password_hash', hashPassword('test-pass'))
+  setSetting(db, 'initialized', 'true')
+}
+
+async function adminLogin(app: FastifyInstance): Promise<string> {
+  const res = await app.inject({
+    method: 'POST',
+    url: '/admin/api/login',
+    payload: { password: 'test-pass' },
+  })
+  const setCookie = res.headers['set-cookie'] as string
+  const match = setCookie.match(/admin_token=([^;]+)/)
+  return `admin_token=${match![1]}`
+}
+
+describe('upgrade API endpoints', () => {
+  let app: FastifyInstance
+  let db: Database.Database
+  let cookie: string
+  let close: () => Promise<void>
+
+  beforeEach(async () => {
+    db = initDatabase(':memory:')
+    seedAuth(db)
+    const result = await buildApp({ db })
+    app = result.app
+    close = result.close
+    cookie = await adminLogin(app)
+  })
+
+  afterEach(async () => {
+    await close()
+  })
+
+  it('GET /upgrade/status returns upgrade status', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/admin/api/upgrade/status',
+      headers: { cookie },
+    })
+    expect(res.statusCode).toBe(200)
+    const body = JSON.parse(res.body)
+    expect(body).toHaveProperty('npm')
+    expect(body).toHaveProperty('config')
+    expect(body).toHaveProperty('deployment')
+    expect(body).toHaveProperty('syncSource')
+    expect(body).toHaveProperty('lastCheckedAt')
+  })
+
+  it('POST /upgrade/check triggers immediate check', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/admin/api/upgrade/check',
+      headers: { cookie },
+    })
+    expect(res.statusCode).toBe(200)
+  }, 15_000)
+
+  it('PUT /upgrade/sync-source updates preference', async () => {
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/admin/api/upgrade/sync-source',
+      headers: { cookie },
+      payload: { source: 'gitee' },
+    })
+    expect(res.statusCode).toBe(200)
+    const status = await app.inject({
+      method: 'GET',
+      url: '/admin/api/upgrade/status',
+      headers: { cookie },
+    })
+    expect(JSON.parse(status.body).syncSource).toBe('gitee')
   })
 })
