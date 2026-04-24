@@ -196,7 +196,7 @@ async function handleCheckNow() {
   try {
     await api.triggerUpgradeCheck()
     await loadUpgradeStatus()
-  } catch { toast.error('检查失败') }
+  } catch (e: unknown) { toast.error((e as { apiMessage?: string }).apiMessage || '检查失败') }
 }
 
 async function handleUpgrade() {
@@ -209,8 +209,7 @@ async function handleUpgrade() {
     showRestartConfirm.value = true
     await loadUpgradeStatus()
   } catch (e: unknown) {
-    const err = e as { response?: { data?: { error?: { message?: string } } } }
-    toast.error(err.response?.data?.error?.message || '升级失败')
+    toast.error((e as { apiMessage?: string }).apiMessage || '升级失败')
   } finally {
     isUpgrading.value = false
   }
@@ -224,8 +223,7 @@ async function handleSync() {
     toast.success('配置同步成功')
     await loadUpgradeStatus()
   } catch (e: unknown) {
-    const err = e as { response?: { data?: { error?: { message?: string } } } }
-    toast.error(err.response?.data?.error?.message || '同步失败')
+    toast.error((e as { apiMessage?: string }).apiMessage || '同步失败')
   } finally {
     isSyncing.value = false
   }
@@ -236,7 +234,7 @@ async function handleSourceChange(val: AcceptableValue) {
   try {
     await api.setSyncSource(val as 'github' | 'gitee')
     await loadUpgradeStatus()
-  } catch { toast.error('保存失败') }
+  } catch (e: unknown) { toast.error((e as { apiMessage?: string }).apiMessage || '保存失败') }
 }
 
 const updateCount = computed(() => {
