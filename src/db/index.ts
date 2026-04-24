@@ -20,6 +20,7 @@ export function initDatabase(dbPath: string): Database.Database {
 
   const db = new Database(dbPath);
   db.pragma("journal_mode = WAL");
+  db.pragma("auto_vacuum = INCREMENTAL");
   db.pragma("foreign_keys = ON");
 
   db.exec(`
@@ -118,6 +119,9 @@ export {
   updateLogMetrics,
   updateLogStreamContent,
   backfillMetricsFromRequestMetrics,
+  estimateLogTableSize,
+  deleteOldestLogs,
+  getLogCount,
 } from "./logs.js";
 export type { RequestLog, RequestLogGroupedRow, RequestLogListRow } from "./logs.js";
 
@@ -139,6 +143,10 @@ export { getStats } from "./stats.js";
 export type { Stats, StatsPeriod } from "./stats.js";
 
 export { getSetting, setSetting, isInitialized } from "./settings.js";
+export {
+  getDbMaxSizeMb, setDbMaxSizeMb,
+  getLogTableMaxSizeMb, setLogTableMaxSizeMb,
+} from "./settings.js";
 
 export {
   getSessionStates,
@@ -157,3 +165,10 @@ export {
   getWindowUsage,
 } from "./usage-windows.js";
 export type { UsageWindow, WindowUsage } from "./usage-windows.js";
+
+export {
+  collectDbSizeInfo,
+  runSizeBasedCleanup,
+  scheduleDbSizeMonitor,
+} from "./db-size-monitor.js";
+export type { DbSizeInfo, SizeThresholds, DbSizeMonitorHandle } from "./db-size-monitor.js";

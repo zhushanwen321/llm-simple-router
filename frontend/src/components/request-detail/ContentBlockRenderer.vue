@@ -6,7 +6,7 @@
       <span class="text-xs font-medium">Reply</span>
     </div>
     <div class="px-2.5 py-2">
-      <pre class="text-xs overflow-y-auto whitespace-pre-wrap break-words max-h-60"><code>{{ content }}<span v-if="showCursor" class="inline-block w-1.5 h-3.5 dot-success animate-pulse ml-0.5 align-text-bottom" /></code></pre>
+      <pre class="text-xs overflow-y-auto whitespace-pre-wrap break-words"><code>{{ content }}<span v-if="showCursor" class="inline-block w-1.5 h-3.5 dot-success animate-pulse ml-0.5 align-text-bottom" /></code></pre>
     </div>
   </div>
 
@@ -23,7 +23,7 @@
     </CollapsibleTrigger>
     <CollapsibleContent>
       <div class="px-2.5 pb-2">
-        <pre class="text-xs rounded p-2 overflow-y-auto whitespace-pre-wrap break-words max-h-60" :class="contentClass"><code>{{ content || placeholder }}</code></pre>
+        <pre class="text-xs rounded p-2 overflow-y-auto whitespace-pre-wrap break-words" :class="contentClass"><code>{{ content || placeholder }}</code></pre>
       </div>
     </CollapsibleContent>
   </Collapsible>

@@ -51,6 +51,9 @@ export function useLogs() {
     loadLogs()
   }
 
+  const cleanupResult = ref<number | null>(null)
+  const showCleanupResult = ref(false)
+
   async function handleCleanup() {
     try {
       const before = new Date(Date.now() - cleanupDays.value * MS_PER_DAY).toISOString()
@@ -58,7 +61,8 @@ export function useLogs() {
       showCleanup.value = false
       page.value = 1
       await loadLogs()
-      toast.success(`已清理 ${res.deleted} 条日志`)
+      cleanupResult.value = res.deleted
+      showCleanupResult.value = true
     } catch (e) {
       console.error('Failed to cleanup logs:', e)
       toast.error('清理日志失败')
@@ -100,6 +104,7 @@ export function useLogs() {
     logs, total, page, hasMore,
     cleanupDays, showCleanup, expandedRows, childLogs, childLoading,
     logDetailOpen, selectedLogEntry,
+    cleanupResult, showCleanupResult,
     loadLogs, prevPage, nextPage,
     handleCleanup, toggleExpand, openLogDetail,
   }

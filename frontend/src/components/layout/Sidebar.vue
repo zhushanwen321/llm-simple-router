@@ -49,6 +49,7 @@ import {
   Sparkles,
   FileText,
   Activity,
+  Settings,
   LogOut,
 } from 'lucide-vue-next'
 import { api } from '@/api/client'
@@ -73,6 +74,7 @@ const navItems: NavItem[] = [
   { path: '/proxy-enhancement', label: '代理增强（实验性）', icon: Sparkles },
   { path: '/monitor', label: '实时监控', icon: Activity },
   { path: '/logs', label: '请求日志', icon: FileText },
+  { path: '/settings', label: '系统设置', icon: Settings },
 ]
 
 const route = useRoute()

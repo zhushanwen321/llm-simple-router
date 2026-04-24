@@ -27,6 +27,7 @@ export interface ActiveRequest {
   streamContent?: StreamContentSnapshot
   clientIp?: string
   sessionId?: string
+  clientRequest?: string
   completedAt?: number
 }
 

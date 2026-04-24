@@ -60,56 +60,105 @@ npx llm-simple-router
 
 ### 3. 配置模型映射
 
-管理后台 > 模型映射页面。示例配置：
+管理后台 > 模型映射页面。
+
+**核心概念：** 客户端请求携带模型名 A，Router 根据映射规则将其替换为后端 Provider 支持的模型名 B，然后转发请求：
+
+```
+Claude Code (模型 A) → Router (A → B) → Provider API (模型 B)
+```
+
+只需在映射表中配置「客户端模型 = A，后端模型 = B，选择供应商」即可。
+
+#### Claude Code 默认模型名
+
+Claude Code 未设置环境变量时，默认使用以下模型名：`opus`、`sonnet`、`haiku`。如果后端是智谱 Coding Plan，映射配置如下：
 
 | 客户端模型 | 后端模型 | 供应商 | 时间窗口 |
 |-----------|---------|--------|---------|
-| sonnet | glm-5.1 | 智谱 | 全天 |
-| sonnet | kimi-for-coding | Moonshot | 14:00-18:00 |
+| opus | glm-5.1 | 智谱 Coding Plan | 全天 |
+| sonnet | glm-5.1 | 智谱 Coding Plan | 全天 |
+| haiku | glm-5-turbo | 智谱 Coding Plan | 全天 |
 
-客户端模型是指 Claude Code 实际请求的模型名（由 `ANTHROPIC_MODEL` 等环境变量决定）。
+也可以利用分时段功能实现高峰期自动切换：
+
+| 客户端模型 | 后端模型 | 供应商 | 时间窗口 |
+|-----------|---------|--------|---------|
+| sonnet | glm-5.1 | 智谱 Coding Plan | 00:00-14:00 |
+| sonnet | kimi-for-coding | Moonshot | 14:00-18:00 |
+| sonnet | glm-5.1 | 智谱 Coding Plan | 18:00-24:00 |
 
 ### 4. 配置 Claude Code
 
-在管理后台创建 Router API 密钥，然后选择一种方式配置：
+在管理后台创建 Router API 密钥，然后选择一种方式配置。**两种方式只需选其一。**
 
 **方式一：shell alias（推荐）**
+
+最小配置，Claude Code 使用默认模型名（opus / sonnet / haiku），Router 通过映射表转换为后端模型：
 
 ```bash
 alias clode='\
 export ANTHROPIC_AUTH_TOKEN="<your-router-key>" && \
 export ANTHROPIC_BASE_URL="http://127.0.0.1:9981" && \
-export ANTHROPIC_MODEL="<your-default-model>" && \
-export ANTHROPIC_DEFAULT_OPUS_MODEL="<your-opus-model>" && \
-export ANTHROPIC_DEFAULT_SONNET_MODEL="<your-sonnet-model>" && \
-export ANTHROPIC_DEFAULT_HAIKU_MODEL="<your-haiku-model>" && \
-export ANTHROPIC_SMALL_FAST_MODEL="<your-fast-model>" && \
 claude'
 ```
 
+也可以通过环境变量直接指定模型名，绕过 Router 映射：
+
+```bash
+alias clode='\
+export ANTHROPIC_AUTH_TOKEN="sk-router-xxxxxxxx" && \
+export ANTHROPIC_BASE_URL="http://192.168.1.111:9981" && \
+export ANTHROPIC_MODEL="glm-5" && \
+export ANTHROPIC_DEFAULT_OPUS_MODEL="glm-5.1" && \
+export ANTHROPIC_DEFAULT_SONNET_MODEL="glm-5" && \
+export ANTHROPIC_DEFAULT_HAIKU_MODEL="glm-5-turbo" && \
+export ANTHROPIC_SMALL_FAST_MODEL="glm-5-turbo" && \
+claude'
+```
+
+> 调试时可加参数：`claude --dangerously-skip-permissions --verbose --debug`，或设置 `export DEBUG=claude:*` 查看详细日志。
+
 **方式二：~/.claude/settings.json**
+
+在 `~/.claude/settings.json` 的 `env` 字段中配置，效果与 export 环境变量相同：
+
+最小配置：
 
 ```json
 {
   "env": {
     "ANTHROPIC_AUTH_TOKEN": "<your-router-key>",
-    "ANTHROPIC_BASE_URL": "http://127.0.0.1:9981",
-    "ANTHROPIC_MODEL": "<your-default-model>",
-    "ANTHROPIC_DEFAULT_OPUS_MODEL": "<your-opus-model>",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "<your-sonnet-model>",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "<your-haiku-model>",
-    "ANTHROPIC_SMALL_FAST_MODEL": "<your-fast-model>"
+    "ANTHROPIC_BASE_URL": "http://127.0.0.1:9981"
   }
 }
 ```
 
+覆盖模型名：
+
+```json
+{
+  "env": {
+    "ANTHROPIC_AUTH_TOKEN": "sk-router-xxxxxxxx",
+    "ANTHROPIC_BASE_URL": "http://192.168.1.111:9981",
+    "ANTHROPIC_MODEL": "glm-5",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "glm-5.1",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "glm-5",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "glm-5-turbo",
+    "ANTHROPIC_SMALL_FAST_MODEL": "glm-5-turbo"
+  }
+}
+```
+
+> settings.json 中的环境变量对所有项目生效。如果只想对当前项目生效，可放在 `.claude/settings.json`（项目根目录下）。
+
 ### 5. 使用
 
 ```bash
-# 方式一用户直接用 alias
+# 方式一（shell alias）
 clode
 
-# 方式二用户正常启动 claude
+# 方式二（settings.json）
 claude
 ```
 

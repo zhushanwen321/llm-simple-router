@@ -39,7 +39,7 @@ describe("initDatabase", () => {
       .prepare("SELECT name FROM migrations")
       .all() as { name: string }[];
 
-    expect(rows.length).toBe(21);
+    expect(rows.length).toBe(22);
     expect(rows[0].name).toBe("001_init.sql");
     expect(rows[1].name).toBe("002_add_request_response_body.sql");
     expect(rows[2].name).toBe("003_add_full_request_chain_log.sql");
@@ -114,6 +114,19 @@ describe("initDatabase", () => {
       .get("map-1") as any;
     expect(row.client_model).toBe("gpt-4");
     expect(row.backend_model).toBe("gpt-4-turbo");
+  });
+
+  it("creates request_logs with session_id column", () => {
+    db = initDatabase(":memory:");
+    const info = db.pragma("table_info(request_logs)") as { name: string }[];
+    const columnNames = info.map(c => c.name);
+    expect(columnNames).toContain("session_id");
+  });
+
+  it("sets auto_vacuum to INCREMENTAL (2)", () => {
+    db = initDatabase(":memory:");
+    const [{ auto_vacuum }] = db.pragma("auto_vacuum") as { auto_vacuum: number }[];
+    expect(auto_vacuum).toBe(2);
   });
 
   it("should enforce UNIQUE on client_model", () => {

@@ -25,6 +25,11 @@ export class ModelStateManager {
     this.db = db;
   }
 
+  /** 清空所有内存缓存（导入配置后调用） */
+  clearAll(): void {
+    this.store.clear();
+  }
+
   /** 构造内存 Map 的 key：有 sessionId 时用复合键 */
   buildKey(routerKeyId: string | null, sessionId?: string): string {
     if (sessionId) {

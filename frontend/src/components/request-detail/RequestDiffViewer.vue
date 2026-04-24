@@ -29,8 +29,11 @@
 
       <!-- Structured view -->
       <template v-else>
-        <div v-if="!upstreamParsed" class="text-[11px] text-muted-foreground py-4 text-center">
+        <div v-if="!upstreamParsed && !clientParsed" class="text-[11px] text-muted-foreground py-4 text-center">
           No request data available
+        </div>
+        <div v-if="!upstreamParsed && clientParsed" class="text-[11px] text-muted-foreground py-2 text-center">
+          请求进行中，上游请求内容将在完成后显示
         </div>
 
         <div v-else class="space-y-4">
@@ -51,7 +54,7 @@
             <div class="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1">
               System
             </div>
-            <pre class="text-[11px] bg-muted/50 rounded-md px-2.5 py-2 overflow-y-auto whitespace-pre-wrap break-words max-h-40">{{ systemPrompt }}</pre>
+            <pre class="text-[11px] bg-muted/50 rounded-md border px-2.5 py-2 overflow-y-auto whitespace-pre-wrap break-words max-h-40">{{ systemPrompt }}</pre>
           </div>
 
           <!-- Messages -->
@@ -68,19 +71,26 @@
               >
                 <div class="flex items-center gap-1.5 mb-1">
                   <Badge
-                    class="text-[9px] px-1.5 py-0"
-                    :class="msg.role === 'user' ? 'badge-role-user' : msg.role === 'assistant' ? 'badge-role-assistant' : 'badge-role-thinking'"
+                    variant="outline"
+                    class="text-[9px] px-1.5 py-0 border-transparent"
+                    :class="msg.role === 'user' ? 'bg-role-user-bg text-role-user' : msg.role === 'assistant' ? 'bg-role-assistant-bg text-role-assistant' : 'bg-role-thinking-bg text-role-thinking'"
                   >
                     {{ msg.role }}
                   </Badge>
-                  <Badge v-if="msg.modified" class="badge-role-thinking text-[9px] px-1.5 py-0">
+                  <Badge v-if="msg.modified" variant="outline" class="bg-role-thinking-bg text-role-thinking text-[9px] px-1.5 py-0 border-transparent">
                     Modified
                   </Badge>
+                  <span v-if="msg.toolCalls.length > 0" class="text-[9px] text-muted-foreground">
+                    &rarr; {{ msg.toolCalls.join(', ') }}
+                  </span>
                 </div>
                 <div v-if="msg.modified && msg.removedText" class="diff-removed line-through mb-0.5">
                   {{ msg.removedText }}
                 </div>
-                <div class="text-foreground overflow-y-auto max-h-40">{{ msg.text }}</div>
+                <div v-if="msg.text" class="text-foreground overflow-y-auto max-h-40">{{ msg.text }}</div>
+                <div v-else-if="msg.toolResultCount > 0" class="text-muted-foreground text-[10px]">
+                  {{ msg.toolResultCount }} tool result(s)
+                </div>
               </div>
             </div>
           </div>
@@ -91,13 +101,32 @@
               Tools ({{ tools.length }})
             </div>
             <div class="space-y-1">
-              <div
-                v-for="(tool, i) in tools"
-                :key="i"
-                class="rounded-md border bg-background px-2.5 py-1.5 text-[11px]"
-              >
-                <Badge class="text-[9px] px-1.5 py-0 badge-role-tool">{{ tool.name }}</Badge>
-              </div>
+              <template v-for="(row, rowIdx) in toolRows" :key="rowIdx">
+                <div class="grid grid-cols-5 gap-1">
+                  <div
+                    v-for="(tool, colIdx) in row.tools"
+                    :key="colIdx"
+                    class="cursor-pointer rounded-md border px-1.5 py-1 text-[10px] truncate text-center transition-colors"
+                    :class="expandedToolIdx === row.startIdx + colIdx ? 'bg-role-tool-bg text-role-tool border-role-tool' : 'bg-background hover:bg-muted'"
+                    :title="tool.name"
+                    @click="expandedToolIdx = expandedToolIdx === row.startIdx + colIdx ? -1 : row.startIdx + colIdx"
+                  >
+                    {{ tool.name }}
+                  </div>
+                </div>
+                <div
+                  v-if="expandedToolIdx >= row.startIdx && expandedToolIdx < row.startIdx + row.tools.length"
+                  class="rounded-md border bg-background p-2.5"
+                >
+                  <div class="flex items-center gap-2 mb-1">
+                    <span class="text-[11px] font-semibold font-mono">{{ tools[expandedToolIdx].name }}</span>
+                  </div>
+                  <p v-if="tools[expandedToolIdx].description" class="text-[11px] text-muted-foreground">{{ tools[expandedToolIdx].description }}</p>
+                  <div v-if="tools[expandedToolIdx].params.length > 0" class="mt-1 flex flex-wrap gap-1">
+                    <Badge v-for="p in tools[expandedToolIdx].params" :key="p" variant="outline" class="text-[9px] px-1 py-0">{{ p }}</Badge>
+                  </div>
+                </div>
+              </template>
             </div>
           </div>
 
@@ -107,7 +136,7 @@
               Stream Options
             </div>
             <div class="flex items-center gap-2 text-[11px]">
-              <Badge class="badge-success text-[9px] px-1.5 py-0">Injected</Badge>
+              <Badge variant="outline" class="bg-success-light text-success-dark text-[9px] px-1.5 py-0 border-transparent">Injected</Badge>
               <code class="font-mono diff-added">{ "include_usage": true }</code>
             </div>
           </div>
@@ -229,6 +258,8 @@ interface MessageView {
   text: string
   removedText: string | null
   modified: boolean
+  toolCalls: string[]
+  toolResultCount: number
 }
 
 const messages = computed<MessageView[]>(() => {
@@ -240,18 +271,30 @@ const messages = computed<MessageView[]>(() => {
   for (let i = 0; i < upstreamMsgs.length; i++) {
     const upstreamMsg = upstreamMsgs[i]
     const role = String(upstreamMsg.role ?? 'unknown')
-    // 跳过 system 消息（已在 System 区展示）
     if (role === 'system') continue
+
     const upstreamText = extractText(upstreamMsg)
     const clientMsg = clientMsgs[i]
     const clientText = clientMsg ? extractText(clientMsg) : null
     const isModified = clientText !== null && upstreamText !== clientText
+
+    const content = upstreamMsg.content
+    const blocks = Array.isArray(content) ? content : []
+    const toolCalls = blocks
+      .filter((b: unknown) => typeof b === 'object' && b !== null && (b as Record<string, unknown>).type === 'tool_use')
+      .map((b: unknown) => (b as Record<string, unknown>).name as string)
+      .filter(Boolean)
+    const toolResultCount = blocks
+      .filter((b: unknown) => typeof b === 'object' && b !== null && (b as Record<string, unknown>).type === 'tool_result')
+      .length
 
     result.push({
       role,
       text: upstreamText,
       removedText: isModified ? clientText : null,
       modified: isModified,
+      toolCalls,
+      toolResultCount,
     })
   }
   return result
@@ -259,7 +302,21 @@ const messages = computed<MessageView[]>(() => {
 
 interface ToolView {
   name: string
+  description: string
+  params: string[]
 }
+
+const expandedToolIdx = ref(-1)
+
+const TOOLS_PER_ROW = 5
+
+const toolRows = computed(() => {
+  const rows: { tools: ToolView[]; startIdx: number }[] = []
+  for (let i = 0; i < tools.value.length; i += TOOLS_PER_ROW) {
+    rows.push({ tools: tools.value.slice(i, i + TOOLS_PER_ROW), startIdx: i })
+  }
+  return rows
+})
 
 const tools = computed<ToolView[]>(() => {
   const body = upstreamParsed.value?.body
@@ -268,7 +325,13 @@ const tools = computed<ToolView[]>(() => {
   if (!Array.isArray(rawTools)) return []
   return rawTools
     .filter(t => typeof t?.name === 'string')
-    .map(t => ({ name: t.name as string }))
+    .map(t => {
+      const desc = typeof t.description === 'string' ? t.description : ''
+      const schema = t.input_schema as Record<string, unknown> | undefined
+      const props = schema?.properties as Record<string, unknown> | undefined
+      const params = props ? Object.keys(props) : []
+      return { name: t.name as string, description: desc, params }
+    })
 })
 
 const streamOptionsInjected = computed(() => {

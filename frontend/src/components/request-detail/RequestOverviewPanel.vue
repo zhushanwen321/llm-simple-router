@@ -3,20 +3,20 @@
     <!-- Row 1: model @ provider -->
     <div class="flex items-baseline gap-1 min-w-0">
       <span class="font-mono text-[11px] font-semibold truncate min-w-0">{{ overview.model }}</span>
-      <span v-if="overview.providerName" class="text-[10px] text-muted-foreground flex-shrink-0">@ {{ overview.providerName }}</span>
+      <span class="text-[10px] text-muted-foreground flex-shrink-0">@ {{ overview.providerName || 'unknown' }}</span>
     </div>
 
     <!-- Row 2: status + SSE + apiType -->
     <div class="flex items-center gap-1.5">
-      <Badge v-if="statusColor === 'pending'" class="badge-pending">
-        <span class="w-1.5 h-1.5 rounded-full dot-pending animate-pulse" />
+      <Badge v-if="statusColor === 'pending'" variant="outline" class="border-warning/30 bg-warning-light text-warning-dark">
+        <span class="w-1.5 h-1.5 rounded-full bg-warning animate-pulse" />
         进行中
       </Badge>
-      <Badge v-else-if="statusColor === 'error'" class="badge-error">
+      <Badge v-else-if="statusColor === 'error'" variant="outline" class="border-danger/30 bg-danger-light text-danger-dark">
         {{ overview.statusCode ?? '失败' }}
       </Badge>
-      <Badge v-else class="badge-success">
-        <span class="w-1.5 h-1.5 rounded-full dot-success" />
+      <Badge v-else variant="outline" class="border-success/30 bg-success-light text-success-dark">
+        <span class="w-1.5 h-1.5 rounded-full bg-success" />
         已完成
       </Badge>
 

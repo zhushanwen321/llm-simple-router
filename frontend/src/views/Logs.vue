@@ -166,25 +166,38 @@
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <!-- Cleanup result dialog -->
+    <AlertDialog v-model:open="showCleanupResult">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>清理完成</AlertDialogTitle>
+          <AlertDialogDescription>已删除 {{ cleanupResult }} 条日志。</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogAction @click="showCleanupResult = false">确定</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
-import { toast } from 'vue-sonner'
-import { api } from '@/api/client'
+import { onMounted, watch } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction } from '@/components/ui/alert-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Separator } from '@/components/ui/separator'
 import UnifiedRequestDialog from '@/components/request-detail/UnifiedRequestDialog.vue'
 import LogTableRow from '@/components/logs/LogTableRow.vue'
 import { useLogFilters } from '@/composables/useLogFilters'
 import { useLogs } from '@/composables/useLogs'
+import { useLogRetention } from '@/composables/useLogRetention'
 
 const {
   PERIODS, period, dateRange, dateRangeError,
@@ -198,36 +211,14 @@ const DEBOUNCE_MS = 300
 
 const {
   logs, total, page, hasMore,
-  cleanupDays, showCleanup, expandedRows, childLogs, childLoading,
+  cleanupDays, showCleanup, cleanupResult, showCleanupResult,
+  expandedRows, childLogs, childLoading,
   logDetailOpen, selectedLogEntry,
   loadLogs, prevPage, nextPage,
   handleCleanup, toggleExpand, openLogDetail,
 } = useLogs()
 
-const DEFAULT_RETENTION_DAYS = 3
-const retentionDays = ref(DEFAULT_RETENTION_DAYS)
-const retentionSaving = ref(false)
-
-async function saveRetention() {
-  retentionSaving.value = true
-  try {
-    await api.setLogRetention(retentionDays.value)
-    toast.success('保留天数已更新')
-  } catch {
-    toast.error('更新失败')
-  } finally {
-    retentionSaving.value = false
-  }
-}
-
-async function loadRetention() {
-  try {
-    const { days } = await api.getLogRetention()
-    retentionDays.value = days
-  } catch {
-    toast.error('加载保留天数失败，使用默认值')
-  }
-}
+const { retentionDays, retentionSaving, saveRetention, loadRetention } = useLogRetention()
 
 let filterTimer: ReturnType<typeof setTimeout> | null = null
 watch(
