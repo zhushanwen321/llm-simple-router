@@ -52,7 +52,7 @@ export function resolveMapping(
         if (models.includes(clientModel)) {
           return { backend_model: clientModel, provider_id: p.id };
         }
-      } catch { break }
+      } catch { continue }
     }
     return null;
   }
