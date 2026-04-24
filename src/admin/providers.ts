@@ -142,6 +142,10 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
 
   app.delete("/admin/api/providers/:id", async (request, reply) => {
     const { id } = request.params as { id: string };
+    const existing = getProviderById(db, id);
+    if (!existing) {
+      return reply.code(HTTP_NOT_FOUND).send({ error: { message: "Provider not found" } });
+    }
     const groups = getAllMappingGroups(db);
     for (const g of groups) {
       try {

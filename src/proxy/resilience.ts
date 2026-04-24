@@ -12,7 +12,8 @@ export interface RetryStrategy {
 
 export class FixedIntervalStrategy implements RetryStrategy {
   constructor(private delayMs: number) {}
-  getDelay(): number { return this.delayMs; }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  getDelay(_attempt: number): number { return this.delayMs; }
 }
 
 const EXPONENTIAL_BASE = 2;
@@ -34,7 +35,6 @@ export function createStrategy(
 // ---------- Resilience types ----------
 
 export interface ResilienceConfig {
-  maxRetries: number;
   baseDelayMs: number;
   failoverThreshold: number;
   ruleMatcher?: RetryRuleMatcher;
@@ -72,6 +72,7 @@ export interface ResilienceState {
 
 const RETRYABLE_THROW_CODES = new Set(["ETIMEDOUT", "ECONNRESET", "ECONNREFUSED"]);
 const HTTP_TOO_MANY_REQUESTS = 429;
+const DEFAULT_THROW_MAX_RETRIES = 3;
 
 // ---------- Internal helpers ----------
 
@@ -130,7 +131,7 @@ export class ResilienceLayer {
       if (!isRetryableThrow(result.error)) {
         return { action: "abort", reason: result.error.message };
       }
-      if (state.attemptCount < config.maxRetries) {
+      if (state.attemptCount < DEFAULT_THROW_MAX_RETRIES) {
         return { action: "retry", delayMs: config.baseDelayMs };
       }
       return config.isFailover
@@ -145,8 +146,7 @@ export class ResilienceLayer {
         ? config.ruleMatcher.match(result.statusCode, body)
         : null;
 
-      const effectiveMaxRetries = Math.min(matchedRule?.max_retries ?? 0, config.maxRetries);
-      if (matchedRule && state.attemptCount < effectiveMaxRetries) {
+      if (matchedRule && state.attemptCount < matchedRule.max_retries) {
         const strategy = createStrategy(matchedRule);
         const headers = extractHeaders(result);
         const retryAfterMs = result.statusCode === HTTP_TOO_MANY_REQUESTS
@@ -163,8 +163,7 @@ export class ResilienceLayer {
     const body = extractBody(result);
     if (body && config.ruleMatcher) {
       const matchedRule = config.ruleMatcher.match(result.statusCode, body);
-      const effectiveMaxRetries = Math.min(matchedRule?.max_retries ?? 0, config.maxRetries);
-      if (matchedRule && state.attemptCount < effectiveMaxRetries) {
+      if (matchedRule && state.attemptCount < matchedRule.max_retries) {
         const strategy = createStrategy(matchedRule);
         return { action: "retry", delayMs: strategy.getDelay(state.attemptCount) };
       }

@@ -145,11 +145,11 @@ describe("ProxyOrchestrator", () => {
     deps.resilience.execute = vi.fn(() => Promise.resolve(successResilienceResult()));
     await orchestrator.handle(
       createMockRequest(), createMockReply(), "openai", defaultConfig,
-      { transportFn: vi.fn(), retryMaxAttempts: 5, retryBaseDelayMs: 2000, failoverThreshold: 500, isFailover: true },
+      { transportFn: vi.fn(), retryBaseDelayMs: 2000, failoverThreshold: 500, isFailover: true },
     );
     expect(deps.resilience.execute).toHaveBeenCalledWith(
       expect.any(Function), expect.any(Function),
-      { maxRetries: 5, baseDelayMs: 2000, failoverThreshold: 500, isFailover: true },
+      { baseDelayMs: 2000, failoverThreshold: 500, isFailover: true },
     );
   });
 

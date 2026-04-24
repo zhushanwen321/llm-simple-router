@@ -42,7 +42,6 @@ function buildTestApp(mockDb: Database.Database): FastifyInstance {
   app.register(anthropicProxy, {
     db: mockDb,
     streamTimeoutMs: 5000,
-    retryMaxAttempts: 0,
     retryBaseDelayMs: 0,
     semaphoreManager,
     tracker,

@@ -12,7 +12,6 @@ import type { ActiveRequest } from "../monitor/types.js";
 import type { ProviderSemaphoreManager } from "./semaphore.js";
 import type { RequestTracker } from "../monitor/request-tracker.js";
 
-const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_BASE_DELAY_MS = 1000;
 const DEFAULT_FAILOVER_THRESHOLD = 400;
 
@@ -34,7 +33,6 @@ export interface OrchestratorConfig {
 
 export interface HandleContext {
   streamTimeoutMs?: number;
-  retryMaxAttempts?: number;
   retryBaseDelayMs?: number;
   failoverThreshold?: number;
   isFailover?: boolean;
@@ -135,7 +133,6 @@ export class ProxyOrchestrator {
   ): Promise<ResilienceResult> {
     if (!ctx?.transportFn) throw new Error("HandleContext.transportFn is required");
     const resilienceConfig: ResilienceConfig = {
-      maxRetries: ctx.retryMaxAttempts ?? DEFAULT_MAX_RETRIES,
       baseDelayMs: ctx.retryBaseDelayMs ?? DEFAULT_BASE_DELAY_MS,
       failoverThreshold: ctx.failoverThreshold ?? DEFAULT_FAILOVER_THRESHOLD,
       isFailover: ctx.isFailover ?? false,

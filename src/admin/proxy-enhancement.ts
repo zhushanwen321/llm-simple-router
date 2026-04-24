@@ -6,6 +6,11 @@ import { getSetting, setSetting } from "../db/settings.js";
 const UpdateProxyEnhancementSchema = Type.Object({
   claude_code_enabled: Type.Boolean(),
 });
+
+const SessionParamsSchema = Type.Object({
+  keyId: Type.String(),
+  sessionId: Type.String(),
+});
 import {
   getSessionStates,
   getSessionHistory,
@@ -45,19 +50,21 @@ export const adminProxyEnhancementRoutes: FastifyPluginCallback<ProxyEnhancement
     return reply.send(states);
   });
 
-  app.get<{ Params: { keyId: string; sessionId: string } }>(
+  app.get(
     "/admin/api/session-states/:keyId/:sessionId/history",
+    { schema: { params: SessionParamsSchema } },
     async (req, reply) => {
-      const { keyId, sessionId } = req.params;
+      const { keyId, sessionId } = req.params as { keyId: string; sessionId: string };
       const history = getSessionHistory(db, keyId, sessionId);
       return reply.send(history);
     },
   );
 
-  app.delete<{ Params: { keyId: string; sessionId: string } }>(
+  app.delete(
     "/admin/api/session-states/:keyId/:sessionId",
+    { schema: { params: SessionParamsSchema } },
     async (req, reply) => {
-      const { keyId, sessionId } = req.params;
+      const { keyId, sessionId } = req.params as { keyId: string; sessionId: string };
       modelState.delete(keyId, sessionId);
       return reply.send({ success: true });
     },

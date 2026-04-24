@@ -168,7 +168,6 @@ export async function buildApp(
   app.register(openaiProxy, {
     db,
     streamTimeoutMs: config.STREAM_TIMEOUT_MS,
-    retryMaxAttempts: config.RETRY_MAX_ATTEMPTS,
     retryBaseDelayMs: config.RETRY_BASE_DELAY_MS,
     matcher,
     semaphoreManager,
@@ -178,7 +177,6 @@ export async function buildApp(
   app.register(anthropicProxy, {
     db,
     streamTimeoutMs: config.STREAM_TIMEOUT_MS,
-    retryMaxAttempts: config.RETRY_MAX_ATTEMPTS,
     retryBaseDelayMs: config.RETRY_BASE_DELAY_MS,
     matcher,
     semaphoreManager,

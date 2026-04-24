@@ -68,7 +68,7 @@ function createReply() {
 function createDeps(overrides = {}) {
   return {
     db: {} as any,
-    streamTimeoutMs: 30000, retryMaxAttempts: 3, retryBaseDelayMs: 1000,
+    streamTimeoutMs: 30000, retryBaseDelayMs: 1000,
     matcher: undefined, tracker: undefined,
     orchestrator: { handle: vi.fn() } as any,
     ...overrides,

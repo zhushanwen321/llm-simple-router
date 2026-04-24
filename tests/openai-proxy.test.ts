@@ -8,7 +8,7 @@ import { encrypt } from "../src/utils/crypto.js";
 import { openaiProxy } from "../src/proxy/openai.js";
 import { ProviderSemaphoreManager } from "../src/proxy/semaphore.js";
 import { RequestTracker } from "../src/monitor/request-tracker.js";
-import { createMockBackend, MockBackend } from "./helpers/mock-backend.js";
+import { createMockBackend } from "./helpers/mock-backend.js";
 import { TEST_ENCRYPTION_KEY } from "./helpers/test-setup.js";
 
 function closeServer(server: Server): Promise<void> {
@@ -25,7 +25,6 @@ function buildTestApp(mockDb: Database.Database): FastifyInstance {
   app.register(openaiProxy, {
     db: mockDb,
     streamTimeoutMs: 5000,
-    retryMaxAttempts: 0,
     retryBaseDelayMs: 0,
     semaphoreManager,
     tracker,
@@ -145,7 +144,7 @@ describe("OpenAI proxy", () => {
 
   // 1. 非流式请求透传
   it("should proxy non-stream request and return response", async () => {
-    const { server: backendServer, port, close } = await createMockBackend(
+    const { port, close } = await createMockBackend(
       (req, res) => {
         let body = "";
         req.on("data", (chunk) => (body += chunk));

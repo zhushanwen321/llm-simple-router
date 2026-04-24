@@ -13,7 +13,6 @@ import type { UsageWindowTracker } from "./usage-window-tracker.js";
 export interface AnthropicProxyOptions {
   db: Database.Database;
   streamTimeoutMs: number;
-  retryMaxAttempts: number;
   retryBaseDelayMs: number;
   matcher?: RetryRuleMatcher;
   semaphoreManager?: ProviderSemaphoreManager;
@@ -38,7 +37,7 @@ const anthropicErrors = createErrorFormatter(
 );
 
 const anthropicProxyRaw: FastifyPluginCallback<AnthropicProxyOptions> = (app, opts, done) => {
-  const { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher, semaphoreManager, tracker, usageWindowTracker } = opts;
+  const { db, streamTimeoutMs, retryBaseDelayMs, matcher, semaphoreManager, tracker, usageWindowTracker } = opts;
 
   const orchestrator = createOrchestrator(semaphoreManager, tracker);
 
@@ -47,7 +46,7 @@ const anthropicProxyRaw: FastifyPluginCallback<AnthropicProxyOptions> = (app, op
       const e = anthropicErrors.providerUnavailable();
       return reply.code(e.statusCode).send(e.body);
     }
-    const deps: RouteHandlerDeps = { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher, tracker, orchestrator, usageWindowTracker };
+    const deps: RouteHandlerDeps = { db, streamTimeoutMs, retryBaseDelayMs, matcher, tracker, orchestrator, usageWindowTracker };
     return handleProxyRequest(request, reply, "anthropic", MESSAGES_PATH, anthropicErrors, deps);
   });
 

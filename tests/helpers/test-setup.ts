@@ -1,6 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import type { ReturnType } from "vitest";
-import { initDatabase } from "../../src/db/index.js";
+import Database from "better-sqlite3";
 import { setSetting } from "../../src/db/settings.js";
 import { hashPassword } from "../../src/utils/password.js";
 
@@ -14,12 +13,11 @@ export function makeConfig() {
     LOG_LEVEL: "silent" as const,
     TZ: "Asia/Shanghai",
     STREAM_TIMEOUT_MS: 5000,
-    RETRY_MAX_ATTEMPTS: 0,
     RETRY_BASE_DELAY_MS: 0,
   };
 }
 
-export function seedSettings(db: ReturnType<typeof initDatabase>) {
+export function seedSettings(db: Database.Database) {
   setSetting(db, "encryption_key", TEST_ENCRYPTION_KEY);
   setSetting(db, "jwt_secret", "test-jwt-secret-for-testing");
   setSetting(db, "admin_password_hash", hashPassword("test-admin-pass"));

@@ -7,7 +7,6 @@ export interface Config {
   LOG_LEVEL: string;
   TZ: string;
   STREAM_TIMEOUT_MS: number;
-  RETRY_MAX_ATTEMPTS: number;
   RETRY_BASE_DELAY_MS: number;
 }
 
@@ -31,7 +30,6 @@ export function getBaseConfig(): Config {
     LOG_LEVEL: process.env.LOG_LEVEL || "info",
     TZ: process.env.TZ || "Asia/Shanghai",
     STREAM_TIMEOUT_MS: parseInt(process.env.STREAM_TIMEOUT_MS || "3000000", 10),
-    RETRY_MAX_ATTEMPTS: parseInt(process.env.RETRY_MAX_ATTEMPTS || "3", 10),
     RETRY_BASE_DELAY_MS: parseInt(process.env.RETRY_BASE_DELAY_MS || "1000", 10),
   };
   return cachedConfig;

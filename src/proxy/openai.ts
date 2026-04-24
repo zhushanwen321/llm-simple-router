@@ -18,7 +18,6 @@ import { HTTP_NOT_FOUND, HTTP_BAD_GATEWAY } from "../constants.js";
 export interface OpenaiProxyOptions {
   db: Database.Database;
   streamTimeoutMs: number;
-  retryMaxAttempts: number;
   retryBaseDelayMs: number;
   matcher?: RetryRuleMatcher;
   semaphoreManager?: ProviderSemaphoreManager;
@@ -48,13 +47,13 @@ function sendError(reply: FastifyReply, e: ProxyErrorResponse) {
 }
 
 const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, done) => {
-  const { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher, semaphoreManager, tracker, usageWindowTracker } = opts;
+  const { db, streamTimeoutMs, retryBaseDelayMs, matcher, semaphoreManager, tracker, usageWindowTracker } = opts;
 
   const orchestrator = createOrchestrator(semaphoreManager, tracker);
 
   app.post(CHAT_COMPLETIONS_PATH, async (request, reply) => {
     if (!orchestrator) return sendError(reply, openaiErrors.providerUnavailable());
-    const deps: RouteHandlerDeps = { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher, tracker, orchestrator, usageWindowTracker };
+    const deps: RouteHandlerDeps = { db, streamTimeoutMs, retryBaseDelayMs, matcher, tracker, orchestrator, usageWindowTracker };
     return handleProxyRequest(request, reply, "openai", CHAT_COMPLETIONS_PATH, openaiErrors, deps, {
       beforeSendProxy: (body, isStream) => {
         if (isStream && !body.stream_options) {
