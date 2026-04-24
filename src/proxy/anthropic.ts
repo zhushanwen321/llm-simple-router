@@ -8,6 +8,7 @@ import { createOrchestrator } from "./orchestrator.js";
 import { RetryRuleMatcher } from "./retry-rules.js";
 import { ProviderSemaphoreManager } from "./semaphore.js";
 import type { RequestTracker } from "../monitor/request-tracker.js";
+import type { UsageWindowTracker } from "./usage-window-tracker.js";
 
 export interface AnthropicProxyOptions {
   db: Database.Database;
@@ -17,6 +18,7 @@ export interface AnthropicProxyOptions {
   matcher?: RetryRuleMatcher;
   semaphoreManager?: ProviderSemaphoreManager;
   tracker?: RequestTracker;
+  usageWindowTracker?: UsageWindowTracker;
 }
 
 const MESSAGES_PATH = "/v1/messages";
@@ -36,7 +38,7 @@ const anthropicErrors = createErrorFormatter(
 );
 
 const anthropicProxyRaw: FastifyPluginCallback<AnthropicProxyOptions> = (app, opts, done) => {
-  const { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher, semaphoreManager, tracker } = opts;
+  const { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher, semaphoreManager, tracker, usageWindowTracker } = opts;
 
   const orchestrator = createOrchestrator(semaphoreManager, tracker);
 
@@ -45,7 +47,7 @@ const anthropicProxyRaw: FastifyPluginCallback<AnthropicProxyOptions> = (app, op
       const e = anthropicErrors.providerUnavailable();
       return reply.code(e.statusCode).send(e.body);
     }
-    const deps: RouteHandlerDeps = { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher, tracker, orchestrator };
+    const deps: RouteHandlerDeps = { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher, tracker, orchestrator, usageWindowTracker };
     return handleProxyRequest(request, reply, "anthropic", MESSAGES_PATH, anthropicErrors, deps);
   });
 

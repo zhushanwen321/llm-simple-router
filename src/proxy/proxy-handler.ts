@@ -130,6 +130,7 @@ export interface RouteHandlerDeps {
   matcher?: RetryRuleMatcher;
   tracker?: RequestTracker;
   orchestrator: ProxyOrchestrator;
+  usageWindowTracker?: import("./usage-window-tracker.js").UsageWindowTracker;
 }
 
 const STREAM_CONTENT_MAX_RAW = 131072;
@@ -276,6 +277,10 @@ export async function handleProxyRequest(
         resilienceResult.attempts, resilienceResult.result, startTime,
       );
       collectTransportMetrics(deps.db, apiType, resilienceResult.result, isStream, lastLogId, provider.id, resolved.backend_model, request);
+
+      const tr = resilienceResult.result;
+      const succeeded = tr.kind === "success" || tr.kind === "stream_success" || tr.kind === "stream_abort";
+      if (succeeded) deps.usageWindowTracker?.recordRequest(routerKeyId ?? undefined);
 
       if (isStream && deps.tracker) {
         const sc = deps.tracker.get(logId)?.streamContent;

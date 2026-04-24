@@ -12,6 +12,7 @@ import { createOrchestrator } from "./orchestrator.js";
 import { RetryRuleMatcher } from "./retry-rules.js";
 import { ProviderSemaphoreManager } from "./semaphore.js";
 import type { RequestTracker } from "../monitor/request-tracker.js";
+import type { UsageWindowTracker } from "./usage-window-tracker.js";
 import { HTTP_NOT_FOUND, HTTP_BAD_GATEWAY } from "../constants.js";
 
 export interface OpenaiProxyOptions {
@@ -22,6 +23,7 @@ export interface OpenaiProxyOptions {
   matcher?: RetryRuleMatcher;
   semaphoreManager?: ProviderSemaphoreManager;
   tracker?: RequestTracker;
+  usageWindowTracker?: UsageWindowTracker;
 }
 
 const CHAT_COMPLETIONS_PATH = "/v1/chat/completions";
@@ -46,13 +48,13 @@ function sendError(reply: FastifyReply, e: ProxyErrorResponse) {
 }
 
 const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, done) => {
-  const { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher, semaphoreManager, tracker } = opts;
+  const { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher, semaphoreManager, tracker, usageWindowTracker } = opts;
 
   const orchestrator = createOrchestrator(semaphoreManager, tracker);
 
   app.post(CHAT_COMPLETIONS_PATH, async (request, reply) => {
     if (!orchestrator) return sendError(reply, openaiErrors.providerUnavailable());
-    const deps: RouteHandlerDeps = { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher, tracker, orchestrator };
+    const deps: RouteHandlerDeps = { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher, tracker, orchestrator, usageWindowTracker };
     return handleProxyRequest(request, reply, "openai", CHAT_COMPLETIONS_PATH, openaiErrors, deps, {
       beforeSendProxy: (body, isStream) => {
         if (isStream && !body.stream_options) {

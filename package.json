@@ -30,6 +30,7 @@
   "files": [
     "dist/",
     "frontend-dist/",
+    "config/",
     ".env.example",
     "LICENSE"
   ],

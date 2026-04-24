@@ -169,6 +169,7 @@ export async function buildApp(
     matcher,
     semaphoreManager,
     tracker,
+    usageWindowTracker,
   });
   app.register(anthropicProxy, {
     db,
@@ -178,6 +179,7 @@ export async function buildApp(
     matcher,
     semaphoreManager,
     tracker,
+    usageWindowTracker,
   });
 
   app.register(adminRoutes, { db, matcher, tracker, semaphoreManager });
