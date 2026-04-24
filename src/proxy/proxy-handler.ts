@@ -27,6 +27,7 @@ import type { Target } from "./strategy/types.js";
 import type { RetryRuleMatcher } from "./retry-rules.js";
 import type { ProxyOrchestrator } from "./orchestrator.js";
 import type { ProxyErrorFormatter, ProxyErrorResponse } from "./proxy-core.js";
+import { DEFAULT_MAX_RAW as STREAM_CONTENT_MAX_RAW, DEFAULT_MAX_TEXT as STREAM_CONTENT_MAX_TEXT } from "../monitor/stream-content-accumulator.js";
 
 const HTTP_ERROR_THRESHOLD = 400;
 
@@ -132,9 +133,6 @@ export interface RouteHandlerDeps {
   orchestrator: ProxyOrchestrator;
   usageWindowTracker?: import("./usage-window-tracker.js").UsageWindowTracker;
 }
-
-const STREAM_CONTENT_MAX_RAW = 131072;
-const STREAM_CONTENT_MAX_TEXT = 65536;
 
 import type { ContentBlock } from "../monitor/types.js";
 

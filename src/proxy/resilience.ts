@@ -1,3 +1,4 @@
+import { MS_PER_SECOND } from "../constants.js";
 import type { RetryRuleMatcher } from "./retry-rules.js";
 import { ProviderSwitchNeeded } from "./types.js";
 import type { TransportResult } from "./types.js";
@@ -71,7 +72,6 @@ export interface ResilienceState {
 
 const RETRYABLE_THROW_CODES = new Set(["ETIMEDOUT", "ECONNRESET", "ECONNREFUSED"]);
 const HTTP_TOO_MANY_REQUESTS = 429;
-const MS_PER_SECOND = 1000;
 
 // ---------- Internal helpers ----------
 

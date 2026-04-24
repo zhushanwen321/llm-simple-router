@@ -30,13 +30,6 @@ export const _transportInternals = {
   },
 };
 
-export function createUpstreamRequest(
-  url: URL,
-  options: UpstreamRequestOptions,
-) {
-  return _transportInternals.createUpstreamRequest(url, options);
-}
-
 export function buildRequestOptions(
   url: URL,
   headers: Record<string, string>,

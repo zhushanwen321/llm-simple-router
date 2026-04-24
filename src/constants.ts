@@ -19,3 +19,5 @@ export function getProxyApiType(url: string): string | null {
   const path = url.split("?")[0];
   return PROXY_API_TYPES[path] ?? null;
 }
+
+export const MS_PER_SECOND = 1000;

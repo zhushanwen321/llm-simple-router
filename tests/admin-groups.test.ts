@@ -2,39 +2,12 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { FastifyInstance } from "fastify";
 import { buildApp } from "../src/index.js";
 import { initDatabase } from "../src/db/index.js";
-import { setSetting } from "../src/db/settings.js";
-import { hashPassword } from "../src/utils/password.js";
-
-const TEST_ENCRYPTION_KEY = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-
-function makeConfig() {
-  return {
-    PORT: 9981,
-    DB_PATH: ":memory:",
-    LOG_LEVEL: "silent",
-    TZ: "Asia/Shanghai",
-    STREAM_TIMEOUT_MS: 5000,
-    RETRY_MAX_ATTEMPTS: 0,
-    RETRY_BASE_DELAY_MS: 0,
-  };
-}
-
-async function login(app: FastifyInstance): Promise<string> {
-  const res = await app.inject({
-    method: "POST",
-    url: "/admin/api/login",
-    payload: { password: "test-admin-pass" },
-  });
-  const match = (res.headers["set-cookie"] as string).match(/admin_token=([^;]+)/);
-  return `admin_token=${match![1]}`;
-}
-
-function seedSettings(db: ReturnType<typeof initDatabase>) {
-  setSetting(db, "encryption_key", TEST_ENCRYPTION_KEY);
-  setSetting(db, "jwt_secret", "test-jwt-secret-for-testing");
-  setSetting(db, "admin_password_hash", hashPassword("test-admin-pass"));
-  setSetting(db, "initialized", "true");
-}
+import {
+  TEST_ENCRYPTION_KEY,
+  makeConfig,
+  seedSettings,
+  login,
+} from "./helpers/test-setup.js";
 
 describe("Mapping Group CRUD", () => {
   let app: FastifyInstance;
