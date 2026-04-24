@@ -87,6 +87,7 @@ interface TransportFnParams {
 }
 
 function buildTransportFn(p: TransportFnParams): (target: Target) => Promise<TransportResult> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   return async (_target: Target) => {
     if (p.isStream) {
       const metricsTransform = new SSEMetricsTransform(p.apiType, p.startTime, {
