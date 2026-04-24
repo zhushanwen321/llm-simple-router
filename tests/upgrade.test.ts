@@ -46,3 +46,14 @@ describe('detectDeployment', () => {
     expect(detectDeployment()).toBe('unknown')
   })
 })
+
+describe('getInstalledVersion', () => {
+  it('reads version from package.json', async () => {
+    // Restore real node:fs after previous tests mock it
+    const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs')
+    vi.doMock('node:fs', () => actualFs)
+    const { getInstalledVersion } = await import('../src/upgrade/version')
+    const version = getInstalledVersion()
+    expect(version).toMatch(/^\d+\.\d+\.\d+$/)
+  })
+})
