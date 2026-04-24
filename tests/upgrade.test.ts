@@ -268,3 +268,41 @@ describe('upgrade API endpoints', () => {
     expect(JSON.parse(status.body).syncSource).toBe('gitee')
   })
 })
+
+describe('upgrade integration', () => {
+  it('full status flow with deployment detection', async () => {
+    const db = initDatabase(':memory:')
+    seedAuth(db)
+    const { app, close } = await buildApp({ db })
+    const cookie = await adminLogin(app)
+
+    // 获取状态
+    const statusRes = await app.inject({
+      method: 'GET',
+      url: '/admin/api/upgrade/status',
+      headers: { cookie },
+    })
+    expect(statusRes.statusCode).toBe(200)
+    const status = JSON.parse(statusRes.body)
+    expect(['npm', 'docker', 'unknown']).toContain(status.deployment)
+
+    // 手动触发检查
+    const checkRes = await app.inject({
+      method: 'POST',
+      url: '/admin/api/upgrade/check',
+      headers: { cookie },
+    })
+    expect(checkRes.statusCode).toBe(200)
+
+    // 检查后状态更新
+    const afterRes = await app.inject({
+      method: 'GET',
+      url: '/admin/api/upgrade/status',
+      headers: { cookie },
+    })
+    const after = JSON.parse(afterRes.body)
+    expect(after.lastCheckedAt).not.toBeNull()
+
+    await close()
+  })
+})
