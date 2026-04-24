@@ -170,6 +170,9 @@ describe("Mapping Group CRUD", () => {
       },
     });
     expect(res.statusCode).toBe(400);
+    const body = res.json()
+    expect(body.code).toBe(40001)
+    expect(body.data).toBeNull()
   });
 
   it("POST missing default returns 400", async () => {
@@ -184,6 +187,9 @@ describe("Mapping Group CRUD", () => {
       },
     });
     expect(res.statusCode).toBe(400);
+    const body = res.json()
+    expect(body.code).toBe(40001)
+    expect(body.data).toBeNull()
   });
 
   it("POST with non-existent provider_id returns 400", async () => {
@@ -201,6 +207,9 @@ describe("Mapping Group CRUD", () => {
       },
     });
     expect(res.statusCode).toBe(400);
+    const body = res.json()
+    expect(body.code).toBe(40001)
+    expect(body.data).toBeNull()
   });
 
   it("POST duplicate client_model returns 409", async () => {
@@ -225,6 +234,9 @@ describe("Mapping Group CRUD", () => {
       payload,
     });
     expect(res.statusCode).toBe(409);
+    const body = res.json()
+    expect(body.code).toBe(40901)
+    expect(body.data).toBeNull()
   });
 
   it("unauthenticated access returns 401", async () => {
@@ -233,6 +245,9 @@ describe("Mapping Group CRUD", () => {
       url: "/admin/api/mapping-groups",
     });
     expect(res.statusCode).toBe(401);
+    const body = res.json()
+    expect(body.code).toBe(40102)
+    expect(body.data).toBeNull()
   });
 
   it("POST creates round-robin group", async () => {
@@ -307,6 +322,9 @@ describe("Mapping Group CRUD", () => {
       },
     });
     expect(res.statusCode).toBe(400);
+    const body = res.json()
+    expect(body.code).toBe(40001)
+    expect(body.data).toBeNull()
   });
 
   it("POST round-robin with empty targets returns 400", async () => {
@@ -321,6 +339,9 @@ describe("Mapping Group CRUD", () => {
       },
     });
     expect(res.statusCode).toBe(400);
+    const body = res.json()
+    expect(body.code).toBe(40001)
+    expect(body.data).toBeNull()
   });
 
   it("POST with unknown strategy returns 400", async () => {
@@ -335,5 +356,8 @@ describe("Mapping Group CRUD", () => {
       },
     });
     expect(res.statusCode).toBe(400);
+    const body = res.json()
+    expect(body.code).toBe(40001)
+    expect(body.data).toBeNull()
   });
 });

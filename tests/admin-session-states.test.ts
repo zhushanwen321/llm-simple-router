@@ -136,5 +136,8 @@ describe("Admin Session States", () => {
       url: "/admin/api/session-states",
     });
     expect(res.statusCode).toBe(401);
+    const body = res.json()
+    expect(body.code).toBe(40102)
+    expect(body.data).toBeNull()
   });
 });

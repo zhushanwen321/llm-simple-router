@@ -153,6 +153,9 @@ describe("Config Import/Export API", () => {
         headers: { cookie, "content-type": "application/json" },
       });
       expect(res.statusCode).toBe(400);
+      const body = res.json()
+      expect(body.code).toBe(40001)
+      expect(body.data).toBeNull()
     });
 
     it("rejects wrong version", async () => {
@@ -163,6 +166,9 @@ describe("Config Import/Export API", () => {
         headers: { cookie, "content-type": "application/json" },
       });
       expect(res.statusCode).toBe(400);
+      const body = res.json()
+      expect(body.code).toBe(40001)
+      expect(body.data).toBeNull()
     });
 
     it("rejects missing data field", async () => {
@@ -173,6 +179,9 @@ describe("Config Import/Export API", () => {
         headers: { cookie, "content-type": "application/json" },
       });
       expect(res.statusCode).toBe(400);
+      const body = res.json()
+      expect(body.code).toBe(40001)
+      expect(body.data).toBeNull()
     });
 
     it("re-encrypts provider api_key with local key on import", async () => {

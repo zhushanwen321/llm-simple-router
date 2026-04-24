@@ -142,6 +142,9 @@ describe("Retry Rule CRUD", () => {
       },
     });
     expect(res.statusCode).toBe(400);
+    const body = res.json()
+    expect(body.code).toBe(40003)
+    expect(body.data).toBeNull()
   });
 
   it("PUT invalid regex returns 400", async () => {
@@ -164,6 +167,9 @@ describe("Retry Rule CRUD", () => {
       payload: { body_pattern: "[bad" },
     });
     expect(res.statusCode).toBe(400);
+    const body = res.json()
+    expect(body.code).toBe(40003)
+    expect(body.data).toBeNull()
   });
 
   it("matcher refreshes after create", async () => {
@@ -192,5 +198,8 @@ describe("Retry Rule CRUD", () => {
       url: "/admin/api/retry-rules",
     });
     expect(res.statusCode).toBe(401);
+    const body = res.json()
+    expect(body.code).toBe(40102)
+    expect(body.data).toBeNull()
   });
 });

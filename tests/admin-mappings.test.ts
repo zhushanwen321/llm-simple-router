@@ -164,6 +164,9 @@ describe("Mapping CRUD", () => {
       },
     });
     expect(res.statusCode).toBe(409);
+    const body = res.json()
+    expect(body.code).toBe(40901)
+    expect(body.data).toBeNull()
   });
 
   it("POST with non-existent provider_id returns 400", async () => {
@@ -178,6 +181,9 @@ describe("Mapping CRUD", () => {
       },
     });
     expect(res.statusCode).toBe(400);
+    const body = res.json()
+    expect(body.code).toBe(40401)
+    expect(body.data).toBeNull()
   });
 
   it("unauthenticated access returns 401", async () => {
@@ -186,5 +192,8 @@ describe("Mapping CRUD", () => {
       url: "/admin/api/mappings",
     });
     expect(res.statusCode).toBe(401);
+    const body = res.json()
+    expect(body.code).toBe(40102)
+    expect(body.data).toBeNull()
   });
 });

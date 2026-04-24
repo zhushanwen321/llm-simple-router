@@ -32,21 +32,28 @@ describe("Admin Auth", () => {
     expect(res.headers["set-cookie"]).toContain("admin_token");
   });
 
-  it("login with wrong password returns 401", async () => {
+  it("login with wrong password returns 401 with WRONG_PASSWORD code", async () => {
     const res = await app.inject({
       method: "POST",
       url: "/admin/api/login",
       payload: { password: "wrong" },
     });
     expect(res.statusCode).toBe(401);
+    const body = res.json()
+    expect(body.code).toBe(40101)
+    expect(body.message).toContain('password')
+    expect(body.data).toBeNull()
   });
 
-  it("unauthenticated CRUD returns 401", async () => {
+  it("unauthenticated CRUD returns 401 with TOKEN_INVALID code", async () => {
     const res = await app.inject({
       method: "GET",
       url: "/admin/api/providers",
     });
     expect(res.statusCode).toBe(401);
+    const body = res.json()
+    expect(body.code).toBe(40102)
+    expect(body.data).toBeNull()
   });
 
   it("logout clears cookie", async () => {
@@ -197,6 +204,9 @@ describe("Provider CRUD", () => {
       payload: { name: "NoKey" },
     });
     expect(res.statusCode).toBe(400);
+    const body = res.json()
+    expect(body.code).toBe(40001)
+    expect(body.data).toBeNull()
   });
 
   it("POST rejects provider name with spaces", async () => {
@@ -212,7 +222,10 @@ describe("Provider CRUD", () => {
       },
     });
     expect(res.statusCode).toBe(400);
-    expect(res.json().message).toContain("英文大小写字母");
+    const body = res.json()
+    expect(body.code).toBe(40002)
+    expect(body.message).toContain("英文大小写字母");
+    expect(body.data).toBeNull()
   });
 
   it("POST creates provider with max_concurrency", async () => {

@@ -59,6 +59,9 @@ describe("Admin Settings API", () => {
       headers: { cookie },
     });
     expect(res.statusCode).toBe(400);
+    const body = res.json()
+    expect(body.code).toBe(40001)
+    expect(body.data).toBeNull()
   });
 
   it("PUT rejects invalid days (> 90)", async () => {
@@ -69,6 +72,9 @@ describe("Admin Settings API", () => {
       headers: { cookie },
     });
     expect(res.statusCode).toBe(400);
+    const body = res.json()
+    expect(body.code).toBe(40001)
+    expect(body.data).toBeNull()
   });
 
   it("PUT accepts 0 (disable auto cleanup)", async () => {
@@ -113,5 +119,8 @@ describe("Admin Settings API", () => {
       headers: { cookie },
     });
     expect(res.statusCode).toBe(400);
+    const body = res.json()
+    expect(body.code).toBe(40001)
+    expect(body.data).toBeNull()
   });
 });

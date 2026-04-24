@@ -118,6 +118,9 @@ describe("Logs API", () => {
       url: "/admin/api/logs",
     });
     expect(res.statusCode).toBe(401);
+    const body = res.json()
+    expect(body.code).toBe(40102)
+    expect(body.data).toBeNull()
   });
 });
 
@@ -184,6 +187,9 @@ describe("Stats API", () => {
       url: "/admin/api/stats",
     });
     expect(res.statusCode).toBe(401);
+    const body = res.json()
+    expect(body.code).toBe(40102)
+    expect(body.data).toBeNull()
   });
 });
 
@@ -262,6 +268,9 @@ describe("Log children endpoint", () => {
       url: "/admin/api/logs/root-1/children",
     });
     expect(res.statusCode).toBe(401);
+    const body = res.json()
+    expect(body.code).toBe(40102)
+    expect(body.data).toBeNull()
   });
 });
 

@@ -124,6 +124,9 @@ describe("Admin Monitor API", () => {
       url: "/admin/api/monitor/stream",
     });
     expect(res.statusCode).toBe(401);
+    const body = res.json()
+    expect(body.code).toBe(40102)
+    expect(body.data).toBeNull()
   });
 
   it("monitor endpoints require authentication", async () => {
@@ -136,6 +139,9 @@ describe("Admin Monitor API", () => {
     for (const url of endpoints) {
       const res = await app.inject({ method: "GET", url });
       expect(res.statusCode).toBe(401);
+      const body = res.json()
+      expect(body.code).toBe(40102)
+      expect(body.data).toBeNull()
     }
   });
 
