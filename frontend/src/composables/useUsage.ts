@@ -21,8 +21,8 @@ export function useUsage(keyFilter: Ref<string>) {
       } else {
         monthlyData.value = await api.getUsageMonthly(params)
       }
-    } catch {
-      usageError.value = '加载用量数据失败'
+    } catch (e: unknown) {
+      usageError.value = (e as { apiMessage?: string }).apiMessage || '加载用量数据失败'
     } finally {
       usageLoading.value = false
     }
