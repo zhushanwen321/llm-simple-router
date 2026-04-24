@@ -5,22 +5,10 @@ import { existsSync } from "node:fs";
 import { randomUUID } from "crypto";
 import Fastify, { FastifyInstance } from "fastify";
 import { insertRequestLog } from "./db/logs.js";
-import { HTTP_NOT_FOUND, HTTP_INTERNAL_ERROR, HTTP_BAD_REQUEST } from "./constants.js";
+import { HTTP_NOT_FOUND, HTTP_INTERNAL_ERROR, HTTP_BAD_REQUEST, getProxyApiType } from "./constants.js";
 
 const PROVIDER_DEFAULT_QUEUE_TIMEOUT_MS = 5000;
 const PROVIDER_DEFAULT_MAX_QUEUE_SIZE = 100;
-
-// 代理路由路径 → api_type，用于在全局 hook/errorHandler 中识别代理请求
-const PROXY_API_TYPES: Record<string, string> = {
-  "/v1/chat/completions": "openai",
-  "/v1/messages": "anthropic",
-  "/v1/models": "openai",
-};
-
-function getProxyApiType(url: string): string | null {
-  const path = url.split("?")[0];
-  return PROXY_API_TYPES[path] ?? null;
-}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

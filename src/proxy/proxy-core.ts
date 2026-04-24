@@ -3,10 +3,6 @@ import { callGet as upstreamGet } from "./transport.js";
 import type { GetTransportResult } from "./transport.js";
 import type { RawHeaders } from "./types.js";
 
-// Re-export for external consumers (openai.ts, anthropic.ts, etc.)
-export { UPSTREAM_SUCCESS } from "./types.js";
-export type { RawHeaders } from "./types.js";
-
 // ---------- Types ----------
 
 export interface ProxyErrorResponse {
