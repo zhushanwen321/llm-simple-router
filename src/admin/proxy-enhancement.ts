@@ -1,6 +1,11 @@
 import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
+import { Type, Static } from "@sinclair/typebox";
 import { getSetting, setSetting } from "../db/settings.js";
+
+const UpdateProxyEnhancementSchema = Type.Object({
+  claude_code_enabled: Type.Boolean(),
+});
 import {
   getSessionStates,
   getSessionHistory,
@@ -26,11 +31,8 @@ export const adminProxyEnhancementRoutes: FastifyPluginCallback<ProxyEnhancement
     return reply.send(config);
   });
 
-  app.put("/admin/api/proxy-enhancement", async (req, reply) => {
-    const body = req.body as Record<string, unknown>;
-    if (typeof body.claude_code_enabled !== "boolean") {
-      return reply.status(400).send({ error: "claude_code_enabled must be a boolean" }); // eslint-disable-line no-magic-numbers
-    }
+  app.put("/admin/api/proxy-enhancement", { schema: { body: UpdateProxyEnhancementSchema } }, async (req, reply) => {
+    const body = req.body as Static<typeof UpdateProxyEnhancementSchema>;
     const config: ProxyEnhancementConfig = {
       claude_code_enabled: body.claude_code_enabled,
     };

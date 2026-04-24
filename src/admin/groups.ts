@@ -11,7 +11,7 @@ import {
   getMappingGroupById,
 } from "../db/index.js";
 import { STRATEGY_NAMES } from "../proxy/strategy/types.js";
-import { HTTP_BAD_REQUEST, HTTP_CREATED, HTTP_CONFLICT } from "./constants.js";
+import { HTTP_BAD_REQUEST, HTTP_CREATED, HTTP_CONFLICT, HTTP_NOT_FOUND } from "./constants.js";
 
 const MIN_FAILOVER_TARGETS = 2;
 
@@ -174,6 +174,8 @@ export const adminGroupRoutes: FastifyPluginCallback<GroupRoutesOptions> = (app,
 
   app.delete("/admin/api/mapping-groups/:id", async (request, reply) => {
     const { id } = request.params as { id: string };
+    const existing = getMappingGroupById(db, id);
+    if (!existing) return reply.code(HTTP_NOT_FOUND).send({ error: { message: "Mapping group not found" } });
     deleteMappingGroup(db, id);
     return reply.send({ success: true });
   });

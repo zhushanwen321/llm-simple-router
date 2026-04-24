@@ -103,6 +103,7 @@ export type { ModelMapping, MappingGroup, ProviderModelEntry } from "./mappings.
 export {
   getActiveRetryRules,
   getAllRetryRules,
+  getRetryRuleById,
   createRetryRule,
   updateRetryRule,
   deleteRetryRule,

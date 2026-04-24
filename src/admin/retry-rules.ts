@@ -4,12 +4,13 @@ import { Type, Static } from "@sinclair/typebox";
 import type { RetryRule } from "../db/index.js";
 import {
   getAllRetryRules,
+  getRetryRuleById,
   createRetryRule,
   updateRetryRule,
   deleteRetryRule,
 } from "../db/index.js";
 import { RetryRuleMatcher } from "../proxy/retry-rules.js";
-import { HTTP_BAD_REQUEST, HTTP_CREATED } from "./constants.js";
+import { HTTP_BAD_REQUEST, HTTP_CREATED, HTTP_NOT_FOUND } from "./constants.js";
 
 const DEFAULT_RETRY_DELAY_MS = 5000;
 const DEFAULT_MAX_RETRIES = 10;
@@ -108,6 +109,8 @@ export const adminRetryRuleRoutes: FastifyPluginCallback<RetryRuleRoutesOptions>
 
   app.delete("/admin/api/retry-rules/:id", async (request, reply) => {
     const { id } = request.params as { id: string };
+    const existing = getRetryRuleById(db, id);
+    if (!existing) return reply.code(HTTP_NOT_FOUND).send({ error: { message: "Retry rule not found" } });
     deleteRetryRule(db, id);
     refreshMatcher(matcher, db);
     return reply.send({ success: true });

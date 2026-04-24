@@ -70,7 +70,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
   app.post("/admin/api/providers", { schema: { body: CreateProviderSchema } }, async (request, reply) => {
     const body = request.body as Static<typeof CreateProviderSchema>;
     if (!PROVIDER_NAME_RE.test(body.name)) {
-      return reply.status(HTTP_BAD_REQUEST).send({ error: { message: "Provider 名称仅允许英文大小写字母、数字、横线和下划线" } });
+      return reply.code(HTTP_BAD_REQUEST).send({ error: { message: "Provider 名称仅允许英文大小写字母、数字、横线和下划线" } });
     }
     const encryptedKey = encrypt(body.api_key, getSetting(db, "encryption_key")!);
     const id = createProvider(db, {
@@ -107,7 +107,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     }
     const body = request.body as Static<typeof UpdateProviderSchema>;
     if (body.name !== undefined && !PROVIDER_NAME_RE.test(body.name)) {
-      return reply.status(HTTP_BAD_REQUEST).send({ error: { message: "Provider 名称仅允许英文大小写字母、数字、横线和下划线" } });
+      return reply.code(HTTP_BAD_REQUEST).send({ error: { message: "Provider 名称仅允许英文大小写字母、数字、横线和下划线" } });
     }
     const fields: Partial<Pick<Provider, 'name' | 'api_type' | 'base_url' | 'api_key' | 'api_key_preview' | 'models' | 'is_active' | 'max_concurrency' | 'queue_timeout_ms' | 'max_queue_size'>> = {};
     if (body.name !== undefined) fields.name = body.name;

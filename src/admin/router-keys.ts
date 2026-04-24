@@ -98,6 +98,8 @@ export const adminRouterKeyRoutes: FastifyPluginCallback<RouterKeyRoutesOptions>
 
   app.delete("/admin/api/router-keys/:id", async (request, reply) => {
     const { id } = request.params as { id: string };
+    const existing = getRouterKeyById(db, id);
+    if (!existing) return reply.code(HTTP_NOT_FOUND).send({ error: { message: "Router key not found" } });
     deleteRouterKey(db, id);
     return reply.send({ success: true });
   });

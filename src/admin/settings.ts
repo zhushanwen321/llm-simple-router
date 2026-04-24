@@ -6,6 +6,7 @@ import {
   getLogTableMaxSizeMb, setLogTableMaxSizeMb,
   getSetting,
 } from "../db/settings.js";
+import { HTTP_BAD_REQUEST } from "./constants.js";
 
 interface SettingsOptions {
   db: Database.Database;
@@ -18,11 +19,11 @@ export const adminSettingsRoutes: FastifyPluginCallback<SettingsOptions> = (app,
     return { days: getLogRetentionDays(db) };
   });
 
-  app.put("/admin/api/settings/log-retention", async (request) => {
+  app.put("/admin/api/settings/log-retention", async (request, reply) => {
     const { days } = request.body as { days: number };
     const MAX_LOG_RETENTION_DAYS = 90;
     if (!Number.isInteger(days) || days < 0 || days > MAX_LOG_RETENTION_DAYS) {
-      throw { statusCode: 400, message: "days must be integer 0-90" };
+      return reply.code(HTTP_BAD_REQUEST).send({ error: { message: "days must be integer 0-90" } });
     }
     setLogRetentionDays(db, days);
     return { days };
@@ -44,17 +45,17 @@ export const adminSettingsRoutes: FastifyPluginCallback<SettingsOptions> = (app,
     };
   });
 
-  app.put("/admin/api/settings/db-size-thresholds", async (request) => {
+  app.put("/admin/api/settings/db-size-thresholds", async (request, reply) => {
     const body = request.body as { dbMaxSizeMb?: number; logTableMaxSizeMb?: number };
     if (body.dbMaxSizeMb !== undefined) {
       if (!Number.isFinite(body.dbMaxSizeMb) || body.dbMaxSizeMb < 1) {
-        throw { statusCode: 400, message: "dbMaxSizeMb must be a positive number" };
+        return reply.code(HTTP_BAD_REQUEST).send({ error: { message: "dbMaxSizeMb must be a positive number" } });
       }
       setDbMaxSizeMb(db, Math.round(body.dbMaxSizeMb));
     }
     if (body.logTableMaxSizeMb !== undefined) {
       if (!Number.isFinite(body.logTableMaxSizeMb) || body.logTableMaxSizeMb < 1) {
-        throw { statusCode: 400, message: "logTableMaxSizeMb must be a positive number" };
+        return reply.code(HTTP_BAD_REQUEST).send({ error: { message: "logTableMaxSizeMb must be a positive number" } });
       }
       setLogTableMaxSizeMb(db, Math.round(body.logTableMaxSizeMb));
     }
