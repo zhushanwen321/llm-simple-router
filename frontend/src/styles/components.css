@@ -1,17 +1,8 @@
 @layer components {
-  /* === 状态 Badge 颜色 === */
-  .badge-pending { background-color: var(--color-warning-light); color: var(--color-warning-dark); }
-  .badge-error { background-color: var(--color-danger-light); color: var(--color-danger-dark); }
-  .badge-success { background-color: var(--color-success-light); color: var(--color-success-dark); }
-
-  .dot-pending { background-color: var(--color-warning); }
+  /* === 状态色（仅用于非 Badge 元素） === */
   .dot-success { background-color: var(--color-success); }
 
-  /* === 角色色 === */
-  .badge-role-user { background-color: var(--color-role-user-bg); color: var(--color-role-user); }
-  .badge-role-assistant { background-color: var(--color-role-assistant-bg); color: var(--color-role-assistant); }
-  .badge-role-tool { background-color: var(--color-role-tool-bg); color: var(--color-role-tool); }
-  .badge-role-thinking { background-color: var(--color-role-thinking-bg); color: var(--color-role-thinking); }
+  /* === 角色色（已迁移至 Tailwind utility classes） === */
 
   /* === 内容块背景 === */
   .block-thinking { background-color: var(--color-role-thinking-bg); }

@@ -119,15 +119,35 @@ export function useMonitorData() {
       return
     }
     logDetailData.value = null
-    // 活跃请求暂无日志数据（日志在请求处理完成后才写入 DB）
-    if (req.status === 'pending') return
 
     nonStreamBodyLoading.value = true
     try {
+      // Pending 请求：从 tracker 内存获取 clientRequest（日志尚未写入 DB）
+      if (req.status === 'pending') {
+        try {
+          const trackerReq = await api.getMonitorRequest(requestId)
+          if (version !== loadVersion.value) return
+          logDetailData.value = {
+            clientRequest: trackerReq.clientRequest ?? undefined,
+          }
+        } catch (e: unknown) {
+          // 仅在 tracker 中请求不存在(404)时回退到 DB 查询
+          const status = (e as { response?: { status?: number } })?.response?.status
+          if (status !== 404) throw e // eslint-disable-line no-magic-numbers
+          if (version !== loadVersion.value) return
+          const log = await api.getLogDetail(requestId)
+          if (version !== loadVersion.value) return
+          logDetailData.value = log.client_request
+            ? { clientRequest: log.client_request }
+            : null
+        }
+        return
+      }
+
+      // 已完成请求：从 DB 获取完整日志
       const log = await api.getLogDetail(requestId)
       if (version !== loadVersion.value) return
       // 从 upstream_response 提取 body（兼容 {statusCode, headers, body} 包装格式）
-      // 非流式请求的响应体在日志中，流式请求的响应体通过 SSE 实时推送
       let responseBody: string | undefined
       if (!req.isStream) {
         const raw = log.upstream_response

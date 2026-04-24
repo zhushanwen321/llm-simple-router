@@ -19,6 +19,7 @@ import { UPSTREAM_SUCCESS, ProviderSwitchNeeded } from "./types.js";
 import type { RawHeaders, TransportResult } from "./types.js";
 import { SSEMetricsTransform } from "../metrics/sse-metrics-transform.js";
 import { MetricsExtractor } from "../metrics/metrics-extractor.js";
+import type { MetricsResult } from "../metrics/metrics-extractor.js";
 import { updateLogStreamContent } from "../db/index.js";
 import { callNonStream, callStream } from "./transport.js";
 import { insertRejectedLog } from "./log-helpers.js";
@@ -39,8 +40,41 @@ export interface RouteHandlerDeps {
   orchestrator: ProxyOrchestrator;
 }
 
-const STREAM_CONTENT_MAX_RAW = 8192;
-const STREAM_CONTENT_MAX_TEXT = 4096;
+const STREAM_CONTENT_MAX_RAW = 131072;
+const STREAM_CONTENT_MAX_TEXT = 65536;
+
+import type { ContentBlock } from "../monitor/types.js";
+
+/** 将 tracker blocks 序列化为前端 tryDirectParse 可解析的 JSON */
+function serializeBlocksForStorage(blocks: ContentBlock[] | undefined, apiType: "openai" | "anthropic"): string {
+  if (!blocks || blocks.length === 0) return "";
+  if (apiType === "anthropic") {
+    const content = blocks.map(b => {
+      if (b.type === "thinking") return { type: "thinking", thinking: b.content };
+      if (b.type === "tool_use") {
+        let input = {};
+        try { input = JSON.parse(b.content || "{}"); } catch { /* eslint-disable-line taste/no-silent-catch -- tool_use content 非合法 JSON 时保留空对象 */ }
+        return { type: "tool_use", name: b.name ?? "", input };
+      }
+      return { type: "text", text: b.content };
+    });
+    return JSON.stringify({ content });
+  }
+  const text = blocks.filter(b => b.type === "text").map(b => b.content).join("");
+  return JSON.stringify({ choices: [{ message: { content: text } }] });
+}
+
+function toStreamMetrics(m: MetricsResult) {
+  return {
+    inputTokens: m.input_tokens,
+    outputTokens: m.output_tokens,
+    cacheReadTokens: m.cache_read_tokens,
+    ttftMs: m.ttft_ms,
+    tokensPerSecond: m.tokens_per_second,
+    stopReason: m.stop_reason,
+    isComplete: m.is_complete === 1,
+  };
+}
 
 export async function handleProxyRequest(
   request: FastifyRequest,
@@ -58,7 +92,7 @@ export async function handleProxyRequest(
   const sessionId = (request.headers as RawHeaders)["x-claude-code-session-id"] as string | undefined;
   const { effectiveModel, originalModel, interceptResponse } = applyEnhancement(deps.db, request, clientModel, sessionId);
 
-  if (interceptResponse) return handleIntercept(deps.db, apiType, request, reply, interceptResponse, clientModel);
+  if (interceptResponse) return handleIntercept(deps.db, apiType, request, reply, interceptResponse, clientModel, sessionId);
 
   const group = getMappingGroup(deps.db, effectiveModel);
   const isFailover = group?.strategy === "failover";
@@ -86,7 +120,7 @@ export async function handleProxyRequest(
           db: deps.db, logId, apiType, model: effectiveModel, statusCode: e.statusCode,
           errorMessage: `All failover targets exhausted (${excludeTargets.length} attempted)`,
           startTime, isStream, routerKeyId, originalBody, clientHeaders: cliHdrs, originalModel,
-          isFailover: true, originalRequestId: rootLogId,
+          isFailover: true, originalRequestId: rootLogId, sessionId,
         });
         return reply.status(e.statusCode).send(e.body);
       }
@@ -95,7 +129,7 @@ export async function handleProxyRequest(
         db: deps.db, logId, apiType, model: effectiveModel, statusCode: e.statusCode,
         errorMessage: `No mapping found for model '${effectiveModel}'`, startTime, isStream,
         routerKeyId, originalBody, clientHeaders: cliHdrs, originalModel,
-        isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null,
+        isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null, sessionId,
       });
       return reply.status(e.statusCode).send(e.body);
     }
@@ -111,7 +145,7 @@ export async function handleProxyRequest(
               db: deps.db, logId, apiType, model: effectiveModel, statusCode: e.statusCode,
               errorMessage: `Model '${resolved.backend_model}' not allowed`, startTime, isStream, routerKeyId,
               originalBody, clientHeaders: cliHdrs, providerId: resolved.provider_id, originalModel,
-              isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null,
+              isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null, sessionId,
             });
             return reply.status(e.statusCode).send(e.body);
           }
@@ -126,7 +160,7 @@ export async function handleProxyRequest(
         db: deps.db, logId, apiType, model: effectiveModel, statusCode: e.statusCode,
         errorMessage: `Provider '${resolved.provider_id}' unavailable`, startTime, isStream, routerKeyId,
         originalBody, clientHeaders: cliHdrs, providerId: resolved.provider_id, originalModel,
-        isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null,
+        isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null, sessionId,
       });
       return reply.status(e.statusCode).send(e.body);
     }
@@ -136,7 +170,7 @@ export async function handleProxyRequest(
         db: deps.db, logId, apiType, model: effectiveModel, statusCode: e.statusCode,
         errorMessage: `API type mismatch: expected '${apiType}'`, startTime, isStream, routerKeyId,
         originalBody, clientHeaders: cliHdrs, providerId: resolved.provider_id, originalModel,
-        isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null,
+        isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null, sessionId,
       });
       return reply.status(e.statusCode).send(e.body);
     }
@@ -160,14 +194,7 @@ export async function handleProxyRequest(
       if (isStream) {
         const metricsTransform = new SSEMetricsTransform(apiType, startTime, {
           onMetrics: (m) => {
-            deps.tracker?.update(logId, {
-              streamMetrics: {
-                inputTokens: m.input_tokens, outputTokens: m.output_tokens,
-                cacheReadTokens: m.cache_read_tokens,
-                ttftMs: m.ttft_ms, tokensPerSecond: m.tokens_per_second,
-                stopReason: m.stop_reason, isComplete: m.is_complete === 1,
-              },
-            });
+            deps.tracker?.update(logId, { streamMetrics: toStreamMetrics(m) });
           },
           onChunk: (rawLine) => {
             deps.tracker?.appendStreamChunk(logId, rawLine, apiType, STREAM_CONTENT_MAX_RAW, STREAM_CONTENT_MAX_TEXT);
@@ -176,24 +203,21 @@ export async function handleProxyRequest(
         const checkEarlyError = deps.matcher
           ? (data: string) => deps.matcher!.test(UPSTREAM_SUCCESS, data)
           : undefined;
-        return callStream(
+        const streamResult = await callStream(
           provider, apiKey, body, cliHdrs, reply, deps.streamTimeoutMs,
           upstreamPath, buildUpstreamHeaders, metricsTransform, checkEarlyError,
         );
+        const m = (streamResult.kind === "stream_success" || streamResult.kind === "stream_abort")
+          ? streamResult.metrics : undefined;
+        if (m) deps.tracker?.update(logId, { streamMetrics: toStreamMetrics(m) });
+        return streamResult;
       }
       const result = await callNonStream(provider, apiKey, body, cliHdrs, upstreamPath, buildUpstreamHeaders);
       // 非流式请求：从响应体提取指标并更新 tracker
       if (result.kind === "success") {
         const mr = MetricsExtractor.fromNonStreamResponse(apiType, result.body);
         if (mr) {
-          deps.tracker?.update(logId, {
-            streamMetrics: {
-              inputTokens: mr.input_tokens, outputTokens: mr.output_tokens,
-              cacheReadTokens: mr.cache_read_tokens,
-              ttftMs: mr.ttft_ms, tokensPerSecond: mr.tokens_per_second,
-              stopReason: mr.stop_reason, isComplete: mr.is_complete === 1,
-            },
-          });
+          deps.tracker?.update(logId, { streamMetrics: toStreamMetrics(mr) });
         }
       }
       // 非流式响应注入模型信息标签（模型映射场景）
@@ -212,25 +236,31 @@ export async function handleProxyRequest(
     try {
       const resilienceResult = await deps.orchestrator.handle(
         request, reply, apiType,
-        { resolved, provider, clientModel: effectiveModel, isStream, trackerId: logId, sessionId },
+        { resolved, provider, clientModel: effectiveModel, isStream, trackerId: logId, sessionId, clientRequest: clientReq },
         { retryMaxAttempts: deps.retryMaxAttempts, retryBaseDelayMs: deps.retryBaseDelayMs, isFailover, ruleMatcher: deps.matcher, transportFn },
       );
       const lastLogId = logResilienceResult(
         deps.db,
         {
           apiType, model: effectiveModel, providerId: provider.id, isStream,
-          clientReq, upstreamReqBase, logId, routerKeyId, originalModel,
+          clientReq, upstreamReqBase, logId, routerKeyId, originalModel, sessionId,
           failover: { isFailoverIteration, rootLogId: rootLogId! },
         },
         resilienceResult.attempts, resilienceResult.result, startTime,
       );
       collectTransportMetrics(deps.db, apiType, resilienceResult.result, isStream, lastLogId, provider.id, resolved.backend_model, request);
 
-      // 流式请求：将 tracker 中累积的文本内容持久化到日志
+      // 流式请求：将 tracker 中累积的内容持久化到日志
+      // blocks 含非 text 类型时（thinking/tool_use）必须序列化为 JSON 以保留结构
+      // 注意：tracker 在原 logId 下累积内容，lastLogId 可能因 resilience 重试而指向不同记录
       if (isStream && deps.tracker) {
-        const req = deps.tracker.get(lastLogId);
-        const text = req?.streamContent?.textContent;
-        if (text) updateLogStreamContent(deps.db, lastLogId, text);
+        const sc = deps.tracker.get(logId)?.streamContent;
+        const blocks = sc?.blocks;
+        const hasStructured = blocks && blocks.length > 0 && blocks.some(b => b.type !== "text");
+        const content = hasStructured
+          ? serializeBlocksForStorage(blocks, apiType)
+          : (sc?.textContent || "");
+        if (content) updateLogStreamContent(deps.db, lastLogId, content);
       }
 
       // Failover: 单 provider 内重试已耗尽但仍失败，尝试下一个 target
@@ -268,7 +298,7 @@ export async function handleProxyRequest(
           errorMessage: `Concurrency queue full for provider '${provider.id}'`,
           startTime, isStream, routerKeyId, originalBody, clientHeaders: cliHdrs,
           providerId: provider.id, originalModel,
-          isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null,
+          isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null, sessionId,
         });
         return reply.status(err.statusCode).send(err.body);
       }
@@ -279,7 +309,7 @@ export async function handleProxyRequest(
           errorMessage: `Concurrency wait timeout for provider '${provider.id}' (${e.timeoutMs}ms)`,
           startTime, isStream, routerKeyId, originalBody, clientHeaders: cliHdrs,
           providerId: provider.id, originalModel,
-          isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null,
+          isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null, sessionId,
         });
         return reply.status(err.statusCode).send(err.body);
       }
@@ -292,6 +322,7 @@ export async function handleProxyRequest(
         client_request: clientReq, upstream_request: upstreamReqBase,
         is_failover: isFailoverIteration ? 1 : 0, original_request_id: isFailoverIteration ? rootLogId : null,
         router_key_id: routerKeyId, original_model: originalModel,
+        session_id: sessionId,
       });
       const err = errors.upstreamConnectionFailed();
       return reply.status(err.statusCode).send(err.body);

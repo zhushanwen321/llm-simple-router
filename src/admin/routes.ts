@@ -15,6 +15,7 @@ import { adminMonitorRoutes } from "./monitor.js";
 import { adminSettingsRoutes } from "./settings.js";
 import { adminRecommendedRoutes } from "./recommended.js";
 import { adminUsageRoutes } from "./usage.js";
+import { adminImportExportRoutes } from "./settings-import-export.js";
 import { RetryRuleMatcher } from "../proxy/retry-rules.js";
 import type { RequestTracker } from "../monitor/request-tracker.js";
 import { ProviderSemaphoreManager } from "../proxy/semaphore.js";
@@ -42,6 +43,7 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (app, opti
   app.register(adminProxyEnhancementRoutes, { db: options.db });
   app.register(adminMonitorRoutes, { tracker: options.tracker });
   app.register(adminSettingsRoutes, { db: options.db });
+  app.register(adminImportExportRoutes, { db: options.db, matcher: options.matcher, semaphoreManager: options.semaphoreManager });
   app.register(adminRecommendedRoutes, { db: options.db });
   app.register(adminUsageRoutes, { db: options.db });
   done();

@@ -129,7 +129,7 @@ export function fromLogEntry(entry: LogEntry): UnifiedRequestOverview {
     apiType: entry.api_type === 'openai' || entry.api_type === 'anthropic' ? entry.api_type : 'openai',
     providerName: entry.provider_name,
     clientIp: undefined,
-    sessionId: null,
+    sessionId: entry.session_id ?? null,
     latencyMs: entry.latency_ms,
     ttftMs,
     inputTokens,

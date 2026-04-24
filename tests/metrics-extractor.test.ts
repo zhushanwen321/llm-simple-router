@@ -141,6 +141,79 @@ describe("MetricsExtractor - Anthropic streaming", () => {
     expect(metrics.ttft_ms).not.toBeNull();
   });
 
+  it("should fallback input_tokens from message_delta when message_start has no usage (third-party compatible API)", () => {
+    const extractor = new MetricsExtractor("anthropic", MOCK_NOW);
+
+    // message_start 不带 usage（第三方 API 可能如此）
+    extractor.processEvent(
+      makeEvent("message_start", JSON.stringify({
+        type: "message_start",
+        message: {},
+      })),
+    );
+
+    expect(extractor.getMetrics().input_tokens).toBeNull();
+
+    // content_block_delta 触发 TTFT
+    vi.advanceTimersByTime(100);
+    extractor.processEvent(
+      makeEvent("content_block_delta", JSON.stringify({
+        type: "content_block_delta",
+        delta: { type: "text_delta", text: "Hi" },
+      })),
+    );
+
+    // message_delta 同时携带 output_tokens 和 input_tokens（OpenRouter/智谱 模式）
+    vi.advanceTimersByTime(200);
+    extractor.processEvent(
+      makeEvent("message_delta", JSON.stringify({
+        type: "message_delta",
+        delta: { stop_reason: "end_turn" },
+        usage: { output_tokens: 30, input_tokens: 500 },
+      })),
+    );
+
+    extractor.processEvent(
+      makeEvent("message_stop", JSON.stringify({ type: "message_stop" })),
+    );
+
+    const metrics = extractor.getMetrics();
+    expect(metrics.input_tokens).toBe(500);
+    expect(metrics.output_tokens).toBe(30);
+    expect(metrics.stop_reason).toBe("end_turn");
+    expect(metrics.is_complete).toBe(1);
+  });
+
+  it("should not override input_tokens from message_start when message_delta also has input_tokens", () => {
+    const extractor = new MetricsExtractor("anthropic", MOCK_NOW);
+
+    extractor.processEvent(
+      makeEvent("message_start", JSON.stringify({
+        type: "message_start",
+        message: { usage: { input_tokens: 800 } },
+      })),
+    );
+
+    vi.advanceTimersByTime(100);
+    extractor.processEvent(
+      makeEvent("content_block_delta", JSON.stringify({
+        type: "content_block_delta",
+        delta: { type: "text_delta", text: "Hi" },
+      })),
+    );
+
+    extractor.processEvent(
+      makeEvent("message_delta", JSON.stringify({
+        type: "message_delta",
+        delta: { stop_reason: "end_turn" },
+        usage: { output_tokens: 20, input_tokens: 999 },
+      })),
+    );
+
+    // message_start 的值优先，不被 message_delta 覆盖
+    expect(extractor.getMetrics().input_tokens).toBe(800);
+  });
+
   it("should set ttft_ms=null when stream interrupted before any content", () => {
     const extractor = new MetricsExtractor("anthropic", MOCK_NOW);
 

@@ -41,8 +41,8 @@
 
           <!-- Right: Tabs -->
           <div class="flex-1 flex flex-col min-w-0 pl-3">
-            <Tabs v-model="activeTab">
-              <TabsList>
+            <Tabs v-model="activeTab" class="flex-1 flex flex-col min-h-0">
+              <TabsList class="flex-shrink-0">
                 <TabsTrigger value="response">响应内容</TabsTrigger>
                 <TabsTrigger value="request">请求内容</TabsTrigger>
               </TabsList>
@@ -62,7 +62,7 @@
               </div>
 
               <!-- Request diff tab -->
-              <div v-if="activeTab === 'request'" class="flex-1 overflow-y-auto mt-2">
+              <div v-if="activeTab === 'request'" class="flex-1 min-h-0 mt-2">
                 <RequestDiffViewer :overview="overview" />
               </div>
             </Tabs>

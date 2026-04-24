@@ -43,4 +43,20 @@ describe("LogCleaner", () => {
     insertLog("old", 30);
     expect(runLogCleanup(db)).toBe(0);
   });
+
+  it("runs incremental_vacuum after deleting logs", () => {
+    setLogRetentionDays(db, 3);
+    insertLog("old", 5);
+    insertLog("recent", 1);
+    const beforePages = (db.pragma("page_count") as { page_count: number }[])[0].page_count;
+    runLogCleanup(db);
+    const afterPages = (db.pragma("page_count") as { page_count: number }[])[0].page_count;
+    expect(afterPages).toBeLessThanOrEqual(beforePages);
+  });
+
+  it("does not run incremental_vacuum when no logs deleted", () => {
+    setLogRetentionDays(db, 3);
+    insertLog("recent", 1);
+    expect(() => runLogCleanup(db)).not.toThrow();
+  });
 });

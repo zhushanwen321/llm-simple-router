@@ -28,4 +28,5 @@ export interface LogEntry {
   stop_reason: string | null
   metrics_complete: number
   stream_text_content: string | null
+  session_id: string | null
 }

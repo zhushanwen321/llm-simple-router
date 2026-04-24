@@ -38,6 +38,7 @@ export function handleIntercept(
   reply: import("fastify").FastifyReply,
   interceptResponse: { statusCode: number; body: unknown; meta?: unknown },
   clientModel: string,
+  sessionId?: string,
 ): import("fastify").FastifyReply {
   const logId = randomUUID();
   const isStream = (request.body as Record<string, unknown>).stream === true;
@@ -52,6 +53,7 @@ export function handleIntercept(
     upstream_response: JSON.stringify({ statusCode: interceptResponse.statusCode, body: respBody }),
     is_retry: 0, is_failover: 0, original_request_id: null,
     router_key_id: request.routerKey?.id ?? null, original_model: null,
+    session_id: sessionId,
   });
   return reply.status(interceptResponse.statusCode).send(interceptResponse.body);
 }
@@ -70,6 +72,7 @@ export function logResilienceResult(
     logId: string;
     routerKeyId: string | null;
     originalModel: string | null;
+    sessionId?: string | null;
     failover?: FailoverContext;
   },
   attempts: ResilienceAttempt[],
@@ -97,6 +100,7 @@ export function logResilienceResult(
         is_retry: isOriginal ? 0 : 1, is_failover: isFailoverLog ? 1 : 0,
         original_request_id: parentId,
         router_key_id: params.routerKeyId, original_model: params.originalModel,
+        session_id: params.sessionId,
       });
     } else if (attempt.statusCode !== UPSTREAM_SUCCESS) {
       insertRequestLog(db, {
@@ -110,6 +114,7 @@ export function logResilienceResult(
         is_retry: isOriginal ? 0 : 1, is_failover: isFailoverLog ? 1 : 0,
         original_request_id: parentId,
         router_key_id: params.routerKeyId, original_model: params.originalModel,
+        session_id: params.sessionId,
       });
     } else {
       const upHdrs = (result.kind === "stream_success" || result.kind === "stream_abort")
@@ -126,6 +131,7 @@ export function logResilienceResult(
         isRetry: !isOriginal, isFailover: isFailoverLog,
         originalRequestId: parentId,
         routerKeyId: params.routerKeyId, originalModel: params.originalModel,
+        sessionId: params.sessionId,
       });
       lastSuccessLogId = attemptLogId;
     }

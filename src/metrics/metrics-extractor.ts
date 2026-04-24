@@ -33,7 +33,7 @@ interface AnthropicContentBlockDelta {
 interface AnthropicMessageDelta {
   type: string;
   delta?: { stop_reason?: string };
-  usage?: { output_tokens?: number };
+  usage?: { output_tokens?: number; input_tokens?: number };
 }
 
 interface OpenAIChoice {
@@ -151,6 +151,10 @@ export class MetricsExtractor {
     } else if (type === "message_delta") {
       const msg = parsed as AnthropicMessageDelta;
       this.outputTokens = msg.usage?.output_tokens ?? null;
+      // 第三方 Anthropic 兼容 API（如 OpenRouter、智谱）可能将 input_tokens 放在 message_delta 而非 message_start
+      if (this.inputTokens === null && msg.usage?.input_tokens) {
+        this.inputTokens = msg.usage.input_tokens;
+      }
       this.stopReason = msg.delta?.stop_reason ?? null;
       this.streamEndTime = Date.now();
     } else if (type === "message_stop") {

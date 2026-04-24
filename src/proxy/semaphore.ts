@@ -185,4 +185,15 @@ export class ProviderSemaphoreManager {
     }
     this.entries.delete(providerId);
   }
+
+  /** 清除所有 provider 的信号量配置（导入配置后调用） */
+  removeAll(): void {
+    for (const [, entry] of this.entries) {
+      for (const e of entry.queue) {
+        if (e.timer) clearTimeout(e.timer);
+        e.reject(new Error("Provider removed"));
+      }
+    }
+    this.entries.clear();
+  }
 }

@@ -28,6 +28,8 @@ export interface OrchestratorConfig {
   trackerId?: string;
   /** Claude Code 的 session ID，从 x-claude-code-session-id 请求头获取 */
   sessionId?: string;
+  /** 客户端请求的 JSON 字符串（headers + body），用于 Monitor 实时查看 */
+  clientRequest?: string;
 }
 
 export interface HandleContext {
@@ -113,6 +115,7 @@ export class ProxyOrchestrator {
       attempts: [],
       clientIp: request.ip,
       sessionId: config.sessionId,
+      clientRequest: config.clientRequest,
     };
   }
 

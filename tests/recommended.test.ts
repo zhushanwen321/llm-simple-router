@@ -76,17 +76,19 @@ describe('recommended API endpoints', () => {
   let app: FastifyInstance
   let db: Database.Database
   let cookie: string
+  let close: () => Promise<void>
 
   beforeEach(async () => {
     db = initDatabase(':memory:')
     seedAuthSettings(db)
     const result = await buildApp({ db })
     app = result.app
+    close = result.close
     cookie = await login(app)
   })
 
   afterEach(async () => {
-    await app.close()
+    await close()
   })
 
   it('GET /recommended/providers returns preset list', async () => {

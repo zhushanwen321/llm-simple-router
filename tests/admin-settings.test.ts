@@ -113,4 +113,37 @@ describe("Admin Settings API", () => {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ days: 0 });
   });
+
+  it("GET /settings/db-size returns defaults", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: "/admin/api/settings/db-size",
+      headers: { cookie },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.thresholds.dbMaxSizeMb).toBe(1024);
+    expect(body.thresholds.logTableMaxSizeMb).toBe(800);
+  });
+
+  it("PUT /settings/db-size-thresholds updates values", async () => {
+    const putRes = await app.inject({
+      method: "PUT",
+      url: "/admin/api/settings/db-size-thresholds",
+      payload: { dbMaxSizeMb: 2048, logTableMaxSizeMb: 1600 },
+      headers: { cookie },
+    });
+    expect(putRes.statusCode).toBe(200);
+    expect(putRes.json()).toEqual({ dbMaxSizeMb: 2048, logTableMaxSizeMb: 1600 });
+  });
+
+  it("PUT /settings/db-size-thresholds rejects invalid values", async () => {
+    const res = await app.inject({
+      method: "PUT",
+      url: "/admin/api/settings/db-size-thresholds",
+      payload: { dbMaxSizeMb: -1 },
+      headers: { cookie },
+    });
+    expect(res.statusCode).toBe(400);
+  });
 });

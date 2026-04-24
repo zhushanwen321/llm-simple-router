@@ -28,6 +28,7 @@ export interface RequestLog {
   backend_model: string | null;
   metrics_complete: number;
   stream_text_content: string | null;
+  session_id: string | null;
 }
 
 /** 列表查询扩展字段：JOIN providers 获得 provider_name */
@@ -43,7 +44,7 @@ const LOG_LIST_SELECT = `rl.id, rl.api_type, rl.model, rl.provider_id, rl.status
             rl.is_stream, rl.error_message, rl.created_at, rl.is_retry, rl.is_failover, rl.original_request_id, rl.original_model,
             CASE WHEN rl.provider_id = 'router' THEN rl.upstream_request ELSE NULL END AS upstream_request,
             rl.input_tokens, rl.output_tokens, rl.cache_read_tokens, rl.ttft_ms, rl.tokens_per_second, rl.stop_reason,
-            rl.backend_model, rl.metrics_complete,
+            rl.backend_model, rl.metrics_complete, rl.session_id,
             COALESCE(p.name, rl.provider_id) AS provider_name`;
 const LOG_LIST_JOIN = `LEFT JOIN providers p ON p.id = rl.provider_id`;
 
@@ -65,6 +66,7 @@ export interface RequestLogInsert {
   original_request_id?: string | null;
   router_key_id?: string | null;
   original_model?: string | null;
+  session_id?: string | null;
 }
 
 export function insertRequestLog(
@@ -74,8 +76,8 @@ export function insertRequestLog(
   db.prepare(
     `INSERT INTO request_logs (id, api_type, model, provider_id, status_code, latency_ms,
       is_stream, error_message, created_at, client_request, upstream_request, upstream_response,
-      is_retry, is_failover, original_request_id, router_key_id, original_model)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      is_retry, is_failover, original_request_id, router_key_id, original_model, session_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     log.id, log.api_type, log.model, log.provider_id, log.status_code,
     log.latency_ms, log.is_stream, log.error_message, log.created_at,
@@ -83,6 +85,7 @@ export function insertRequestLog(
     log.upstream_response ?? null,
     log.is_retry ?? 0, log.is_failover ?? 0, log.original_request_id ?? null,
     log.router_key_id ?? null, log.original_model ?? null,
+    log.session_id ?? null,
   );
 }
 
@@ -157,8 +160,12 @@ export function getRequestLogs(
   return { data, total };
 }
 
-export function getRequestLogById(db: Database.Database, id: string): RequestLog | undefined {
-  return db.prepare("SELECT * FROM request_logs WHERE id = ?").get(id) as RequestLog | undefined;
+export function getRequestLogById(db: Database.Database, id: string): RequestLogListRow | undefined {
+  return db.prepare(
+    `SELECT rl.*, COALESCE(p.name, rl.provider_id) AS provider_name
+     FROM request_logs rl LEFT JOIN providers p ON p.id = rl.provider_id
+     WHERE rl.id = ?`,
+  ).get(id) as RequestLogListRow | undefined;
 }
 
 type MetricsUpdate = {
@@ -212,7 +219,61 @@ export function backfillMetricsFromRequestMetrics(db: Database.Database): number
 }
 
 export function deleteLogsBefore(db: Database.Database, beforeDate: string): number {
-  return db.prepare("DELETE FROM request_logs WHERE created_at < ?").run(beforeDate).changes;
+  const changes = db.prepare("DELETE FROM request_logs WHERE created_at < ?").run(beforeDate).changes;
+  if (changes > 0) {
+    db.pragma("incremental_vacuum");
+  }
+  return changes;
+}
+
+/** 每行元数据（数字列+索引）的估算字节数 */
+const ROW_METADATA_BYTES = 500;
+
+/** 估算 request_logs 表占用字节数 */
+export function estimateLogTableSize(db: Database.Database): number {
+  const row = db.prepare(`
+    SELECT COALESCE(SUM(
+      COALESCE(length(client_request), 0) + COALESCE(length(upstream_request), 0) +
+      COALESCE(length(upstream_response), 0) + COALESCE(length(stream_text_content), 0) +
+      COALESCE(length(error_message), 0) + ?
+    ), 0) as size
+    FROM request_logs
+  `).get(ROW_METADATA_BYTES) as { size: number };
+  return row.size;
+}
+
+const DELETE_BATCH_SIZE = 1000;
+
+/** 删除最旧的日志，保留 keepCount 条，返回实际删除条数。分批删除避免长时间锁表 */
+export function deleteOldestLogs(db: Database.Database, keepCount: number): number {
+  const total = (db.prepare("SELECT count(*) as c FROM request_logs").get() as { c: number }).c;
+  const toDelete = Math.max(0, total - keepCount);
+  if (toDelete === 0) return 0;
+
+  let totalDeleted = 0;
+  const stmt = db.prepare(`
+    DELETE FROM request_logs
+    WHERE rowid IN (
+      SELECT rowid FROM request_logs ORDER BY created_at ASC LIMIT ?
+    )
+  `);
+
+  while (totalDeleted < toDelete) {
+    const batchSize = Math.min(DELETE_BATCH_SIZE, toDelete - totalDeleted);
+    const result = stmt.run(batchSize);
+    totalDeleted += result.changes;
+    if (result.changes < batchSize) break;
+  }
+
+  if (totalDeleted > 0) {
+    db.pragma("incremental_vacuum");
+  }
+  return totalDeleted;
+}
+
+/** 获取 request_logs 总行数 */
+export function getLogCount(db: Database.Database): number {
+  return (db.prepare("SELECT count(*) as c FROM request_logs").get() as { c: number }).c;
 }
 
 /** 查询某条日志的子请求（retry/failover 关联），上限 100 条 */
