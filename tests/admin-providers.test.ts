@@ -28,7 +28,7 @@ describe("Admin Auth", () => {
       payload: { password: "test-admin-pass" },
     });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ success: true });
+    expect(res.json().data).toEqual({ success: true });
     expect(res.headers["set-cookie"]).toContain("admin_token");
   });
 
@@ -86,7 +86,7 @@ describe("Provider CRUD", () => {
       headers: { cookie },
     });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual([]);
+    expect(res.json().data).toEqual([]);
   });
 
   it("POST creates service successfully", async () => {
@@ -102,7 +102,7 @@ describe("Provider CRUD", () => {
       },
     });
     expect(res.statusCode).toBe(201);
-    expect(res.json().id).toBeDefined();
+    expect(res.json().data.id).toBeDefined();
   });
 
   it("GET returns services with decrypted api_key", async () => {
@@ -124,7 +124,7 @@ describe("Provider CRUD", () => {
       headers: { cookie },
     });
     expect(res.statusCode).toBe(200);
-    const services = res.json();
+    const services = res.json().data;
     expect(services.length).toBe(1);
     expect(services[0].api_key).toBe("sk-test-abc123xyz");
     expect(services[0].api_key_preview).toBeUndefined();
@@ -142,7 +142,7 @@ describe("Provider CRUD", () => {
         api_key: "sk-test-key123",
       },
     });
-    const id = createRes.json().id;
+    const id = createRes.json().data.id;
 
     const updateRes = await app.inject({
       method: "PUT",
@@ -157,7 +157,7 @@ describe("Provider CRUD", () => {
       url: "/admin/api/providers",
       headers: { cookie },
     });
-    expect(getRes.json()[0].name).toBe("Updated-Name");
+    expect(getRes.json().data[0].name).toBe("Updated-Name");
   });
 
   it("DELETE removes service", async () => {
@@ -172,7 +172,7 @@ describe("Provider CRUD", () => {
         api_key: "sk-test-key456",
       },
     });
-    const id = createRes.json().id;
+    const id = createRes.json().data.id;
 
     const delRes = await app.inject({
       method: "DELETE",
@@ -186,7 +186,7 @@ describe("Provider CRUD", () => {
       url: "/admin/api/providers",
       headers: { cookie },
     });
-    expect(getRes.json()).toEqual([]);
+    expect(getRes.json().data).toEqual([]);
   });
 
   it("POST with missing required field returns 400", async () => {
@@ -212,7 +212,7 @@ describe("Provider CRUD", () => {
       },
     });
     expect(res.statusCode).toBe(400);
-    expect(res.json().error.message).toContain("英文大小写字母");
+    expect(res.json().message).toContain("英文大小写字母");
   });
 
   it("POST creates provider with max_concurrency", async () => {
@@ -235,7 +235,7 @@ describe("Provider CRUD", () => {
       url: "/admin/api/providers",
       headers: { cookie },
     });
-    const providers = getRes.json();
+    const providers = getRes.json().data;
     expect(providers[0].max_concurrency).toBe(5);
   });
 
@@ -251,7 +251,7 @@ describe("Provider CRUD", () => {
         api_key: "sk-test-key789",
       },
     });
-    const id = createRes.json().id;
+    const id = createRes.json().data.id;
 
     await app.inject({
       method: "PUT",
@@ -265,6 +265,6 @@ describe("Provider CRUD", () => {
       url: "/admin/api/providers",
       headers: { cookie },
     });
-    expect(getRes.json()[0].max_concurrency).toBe(3);
+    expect(getRes.json().data[0].max_concurrency).toBe(3);
   });
 });

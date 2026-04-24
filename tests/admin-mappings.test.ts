@@ -31,7 +31,7 @@ describe("Mapping CRUD", () => {
         api_key: "sk-test-abc123xyz",
       },
     });
-    providerId = res.json().id;
+    providerId = res.json().data.id;
   });
 
   afterEach(async () => {
@@ -45,7 +45,7 @@ describe("Mapping CRUD", () => {
       headers: { cookie },
     });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual([]);
+    expect(res.json().data).toEqual([]);
   });
 
   it("POST creates mapping", async () => {
@@ -60,7 +60,7 @@ describe("Mapping CRUD", () => {
       },
     });
     expect(res.statusCode).toBe(201);
-    expect(res.json().id).toBeDefined();
+    expect(res.json().data.id).toBeDefined();
   });
 
   it("GET returns mappings", async () => {
@@ -81,8 +81,8 @@ describe("Mapping CRUD", () => {
       headers: { cookie },
     });
     expect(res.statusCode).toBe(200);
-    expect(res.json().length).toBe(1);
-    expect(res.json()[0].client_model).toBe("gpt-4");
+    expect(res.json().data.length).toBe(1);
+    expect(res.json().data[0].client_model).toBe("gpt-4");
   });
 
   it("PUT updates mapping", async () => {
@@ -96,7 +96,7 @@ describe("Mapping CRUD", () => {
         provider_id: providerId,
       },
     });
-    const id = createRes.json().id;
+    const id = createRes.json().data.id;
 
     await app.inject({
       method: "PUT",
@@ -110,7 +110,7 @@ describe("Mapping CRUD", () => {
       url: "/admin/api/mappings",
       headers: { cookie },
     });
-    expect(getRes.json()[0].backend_model).toBe("gpt-4o");
+    expect(getRes.json().data[0].backend_model).toBe("gpt-4o");
   });
 
   it("DELETE removes mapping", async () => {
@@ -124,7 +124,7 @@ describe("Mapping CRUD", () => {
         provider_id: providerId,
       },
     });
-    const id = createRes.json().id;
+    const id = createRes.json().data.id;
 
     const delRes = await app.inject({
       method: "DELETE",
@@ -138,7 +138,7 @@ describe("Mapping CRUD", () => {
       url: "/admin/api/mappings",
       headers: { cookie },
     });
-    expect(getRes.json()).toEqual([]);
+    expect(getRes.json().data).toEqual([]);
   });
 
   it("POST duplicate client_model returns 409", async () => {

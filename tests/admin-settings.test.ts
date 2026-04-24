@@ -30,7 +30,7 @@ describe("Admin Settings API", () => {
       headers: { cookie },
     });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ days: 3 });
+    expect(res.json().data).toEqual({ days: 3 });
   });
 
   it("PUT /settings/log-retention updates value", async () => {
@@ -41,14 +41,14 @@ describe("Admin Settings API", () => {
       headers: { cookie },
     });
     expect(putRes.statusCode).toBe(200);
-    expect(putRes.json()).toEqual({ days: 7 });
+    expect(putRes.json().data).toEqual({ days: 7 });
 
     const getRes = await app.inject({
       method: "GET",
       url: "/admin/api/settings/log-retention",
       headers: { cookie },
     });
-    expect(getRes.json()).toEqual({ days: 7 });
+    expect(getRes.json().data).toEqual({ days: 7 });
   });
 
   it("PUT rejects invalid days (negative)", async () => {
@@ -79,7 +79,7 @@ describe("Admin Settings API", () => {
       headers: { cookie },
     });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ days: 0 });
+    expect(res.json().data).toEqual({ days: 0 });
   });
 
   it("GET /settings/db-size returns defaults", async () => {
@@ -89,7 +89,7 @@ describe("Admin Settings API", () => {
       headers: { cookie },
     });
     expect(res.statusCode).toBe(200);
-    const body = res.json();
+    const body = res.json().data;
     expect(body.thresholds.dbMaxSizeMb).toBe(1024);
     expect(body.thresholds.logTableMaxSizeMb).toBe(800);
   });
@@ -102,7 +102,7 @@ describe("Admin Settings API", () => {
       headers: { cookie },
     });
     expect(putRes.statusCode).toBe(200);
-    expect(putRes.json()).toEqual({ dbMaxSizeMb: 2048, logTableMaxSizeMb: 1600 });
+    expect(putRes.json().data).toEqual({ dbMaxSizeMb: 2048, logTableMaxSizeMb: 1600 });
   });
 
   it("PUT /settings/db-size-thresholds rejects invalid values", async () => {

@@ -31,7 +31,7 @@ describe("Retry Rule CRUD", () => {
       headers: { cookie },
     });
     expect(res.statusCode).toBe(200);
-    const rules = res.json();
+    const rules = res.json().data;
     expect(rules.length).toBe(0);
   });
 
@@ -47,7 +47,7 @@ describe("Retry Rule CRUD", () => {
       },
     });
     expect(res.statusCode).toBe(201);
-    expect(res.json().id).toBeDefined();
+    expect(res.json().data.id).toBeDefined();
   });
 
   it("GET returns retry rules including created one", async () => {
@@ -68,7 +68,7 @@ describe("Retry Rule CRUD", () => {
       headers: { cookie },
     });
     expect(res.statusCode).toBe(200);
-    const rules = res.json();
+    const rules = res.json().data;
     expect(rules.some((r: any) => r.name === "rate-limit")).toBe(true);
   });
 
@@ -83,7 +83,7 @@ describe("Retry Rule CRUD", () => {
         body_pattern: "rate limit",
       },
     });
-    const id = createRes.json().id;
+    const id = createRes.json().data.id;
 
     await app.inject({
       method: "PUT",
@@ -97,7 +97,7 @@ describe("Retry Rule CRUD", () => {
       url: "/admin/api/retry-rules",
       headers: { cookie },
     });
-    const rules = getRes.json();
+    const rules = getRes.json().data;
     expect(rules[0].body_pattern).toBe("too many requests");
   });
 
@@ -112,7 +112,7 @@ describe("Retry Rule CRUD", () => {
         body_pattern: "rate limit",
       },
     });
-    const id = createRes.json().id;
+    const id = createRes.json().data.id;
 
     const delRes = await app.inject({
       method: "DELETE",
@@ -126,7 +126,7 @@ describe("Retry Rule CRUD", () => {
       url: "/admin/api/retry-rules",
       headers: { cookie },
     });
-    const rules = getRes.json();
+    const rules = getRes.json().data;
     expect(rules.some((r: any) => r.name === "rate-limit")).toBe(false);
   });
 
@@ -155,7 +155,7 @@ describe("Retry Rule CRUD", () => {
         body_pattern: "error",
       },
     });
-    const id = createRes.json().id;
+    const id = createRes.json().data.id;
 
     const res = await app.inject({
       method: "PUT",

@@ -66,7 +66,7 @@ describe("Config Import/Export API", () => {
       });
       expect(res.statusCode).toBe(200);
       expect(res.headers["content-disposition"]).toContain("router-config-");
-      const body = res.json();
+      const body = res.json().data;
       expect(body.version).toBe(1);
       expect(body.exportedAt).toBeTruthy();
       expect(body.data).toHaveProperty("providers");
@@ -79,7 +79,7 @@ describe("Config Import/Export API", () => {
         url: "/admin/api/settings/export",
         headers: { cookie },
       });
-      const body = res.json();
+      const body = res.json().data;
       expect(body.data).not.toHaveProperty("request_logs");
       expect(body.data).not.toHaveProperty("request_metrics");
     });
@@ -96,7 +96,7 @@ describe("Config Import/Export API", () => {
         url: "/admin/api/settings/export",
         headers: { cookie },
       });
-      const body = res.json();
+      const body = res.json().data;
       const provider = body.data.providers.find((p: any) => p.id === "test-p-id");
       expect(provider.api_key).toBe(plainApiKey);
     });
@@ -115,7 +115,7 @@ describe("Config Import/Export API", () => {
         url: "/admin/api/settings/export",
         headers: { cookie },
       });
-      const body = res.json();
+      const body = res.json().data;
       const rk = body.data.router_keys.find((k: any) => k.id === "test-rk-id");
       expect(rk.key).toBe(plainKey);
       expect(rk).not.toHaveProperty("key_encrypted");
@@ -131,7 +131,7 @@ describe("Config Import/Export API", () => {
         url: "/admin/api/settings/export",
         headers: { cookie },
       });
-      const exportData = exportRes.json();
+      const exportData = exportRes.json().data;
 
       const importRes = await app.inject({
         method: "POST",
@@ -140,7 +140,7 @@ describe("Config Import/Export API", () => {
         headers: { cookie, "content-type": "application/json" },
       });
       expect(importRes.statusCode).toBe(200);
-      const result = importRes.json();
+      const result = importRes.json().data;
       expect(result).toHaveProperty("providers");
       expect(result).toHaveProperty("settings");
     });
@@ -234,7 +234,7 @@ describe("Config Import/Export API", () => {
         url: "/admin/api/settings/export",
         headers: { cookie },
       });
-      const exportData = exportRes.json();
+      const exportData = exportRes.json().data;
       // 篡改导出数据中的密码和 JWT 密钥
       exportData.data.settings = exportData.data.settings.map((s: any) =>
         s.key === "admin_password_hash"
@@ -266,7 +266,7 @@ describe("Config Import/Export API", () => {
         url: "/admin/api/settings/export",
         headers: { cookie },
       });
-      const exportData = exportRes.json();
+      const exportData = exportRes.json().data;
       // 修改非受保护配置项
       exportData.data.settings = exportData.data.settings.map((s: any) =>
         s.key === "log_retention_days" ? { ...s, value: "7" } : s,
@@ -285,7 +285,7 @@ describe("Config Import/Export API", () => {
         url: "/admin/api/settings/export",
         headers: { cookie },
       });
-      const reExportData = reExportRes.json();
+      const reExportData = reExportRes.json().data;
       const logRetention = reExportData.data.settings.find((s: any) => s.key === "log_retention_days");
       expect(logRetention.value).toBe("7");
     });

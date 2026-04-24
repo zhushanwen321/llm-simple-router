@@ -65,7 +65,7 @@ describe("Admin Monitor API", () => {
       headers: { cookie },
     });
     expect(res.statusCode).toBe(200);
-    expect(Array.isArray(res.json())).toBe(true);
+    expect(Array.isArray(res.json().data)).toBe(true);
   });
 
   it("GET /admin/api/monitor/stats returns StatsSnapshot", async () => {
@@ -75,7 +75,7 @@ describe("Admin Monitor API", () => {
       headers: { cookie },
     });
     expect(res.statusCode).toBe(200);
-    const body = res.json();
+    const body = res.json().data;
     expect(body).toHaveProperty("totalRequests");
     expect(body).toHaveProperty("successCount");
     expect(body).toHaveProperty("errorCount");
@@ -93,7 +93,7 @@ describe("Admin Monitor API", () => {
       headers: { cookie },
     });
     expect(res.statusCode).toBe(200);
-    expect(Array.isArray(res.json())).toBe(true);
+    expect(Array.isArray(res.json().data)).toBe(true);
   });
 
   it("GET /admin/api/monitor/runtime returns RuntimeMetrics", async () => {
@@ -103,7 +103,7 @@ describe("Admin Monitor API", () => {
       headers: { cookie },
     });
     expect(res.statusCode).toBe(200);
-    const body = res.json();
+    const body = res.json().data;
     expect(body).toHaveProperty("uptimeMs");
     expect(body).toHaveProperty("memoryUsage");
     expect(body).toHaveProperty("activeHandles");
