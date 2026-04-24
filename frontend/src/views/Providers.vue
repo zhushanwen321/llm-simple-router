@@ -356,9 +356,10 @@ async function handleSave() {
     }
     dialogOpen.value = false
     await loadProviders()
-  } catch (e) {
+  } catch (e: unknown) {
     console.error('Failed to save provider:', e)
-    toast.error('保存供应商失败')
+    const msg = (e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message
+    toast.error(msg || '保存供应商失败')
   }
 }
 

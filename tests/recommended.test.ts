@@ -117,7 +117,7 @@ describe('recommended API endpoints', () => {
     expect(res.json()).toEqual({ ok: true })
   })
 
-  it('providers endpoint filters out existing DB providers by presetName', async () => {
+  it('providers endpoint returns all presets regardless of existing DB providers', async () => {
     db.prepare(
       `INSERT INTO providers (id, name, api_type, base_url, api_key, api_key_preview, models, is_active, max_concurrency, queue_timeout_ms, max_queue_size, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -127,7 +127,8 @@ describe('recommended API endpoints', () => {
     const body = res.json()
     const zhipuGroup = body.find((g: any) => g.group === '智谱')
     expect(zhipuGroup).toBeDefined()
-    expect(zhipuGroup.presets.every((p: any) => p.presetName !== 'zhipu')).toBe(true)
+    // All presets should be returned, including ones with existing names
+    expect(zhipuGroup.presets.some((p: any) => p.presetName === 'zhipu')).toBe(true)
     expect(zhipuGroup.presets.some((p: any) => p.presetName === 'zhipu-coding-plan')).toBe(true)
   })
 

@@ -72,6 +72,10 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     if (!PROVIDER_NAME_RE.test(body.name)) {
       return reply.code(HTTP_BAD_REQUEST).send({ error: { message: "Provider 名称仅允许英文大小写字母、数字、横线和下划线" } });
     }
+    const existing = db.prepare("SELECT id FROM providers WHERE name = ?").get(body.name) as { id: string } | undefined;
+    if (existing) {
+      return reply.code(HTTP_CONFLICT).send({ error: { message: `Provider 名称 '${body.name}' 已存在` } });
+    }
     const encryptedKey = encrypt(body.api_key, getSetting(db, "encryption_key")!);
     const id = createProvider(db, {
       name: body.name,
