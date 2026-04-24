@@ -5,7 +5,7 @@ import { getMappingGroup, getProviderById, insertRequestLog } from "../db/index.
 import { decrypt } from "../utils/crypto.js";
 import { getSetting } from "../db/settings.js";
 import { resolveMapping } from "./mapping-resolver.js";
-import { applyEnhancement } from "./enhancement-handler.js";
+import { applyEnhancement } from "./enhancement/enhancement-handler.js";
 import { SemaphoreQueueFullError, SemaphoreTimeoutError } from "./semaphore.js";
 import type { RequestTracker } from "../monitor/request-tracker.js";
 import {
@@ -26,6 +26,23 @@ import type { ProxyErrorFormatter, ProxyErrorResponse } from "./proxy-core.js";
 import { buildTransportFn } from "./transport-fn.js";
 
 const HTTP_ERROR_THRESHOLD = 400;
+
+// ---------- Failover loop context ----------
+
+interface FailoverContext {
+  request: FastifyRequest;
+  reply: FastifyReply;
+  apiType: "openai" | "anthropic";
+  upstreamPath: string;
+  errors: ProxyErrorFormatter;
+  deps: RouteHandlerDeps;
+  options?: { beforeSendProxy?: (body: Record<string, unknown>, isStream: boolean) => void };
+  effectiveModel: string;
+  originalModel: string | null;
+  isFailover: boolean;
+  originalBody: Record<string, unknown>;
+  sessionId: string | undefined;
+}
 
 // ---------- Helpers ----------
 
@@ -95,6 +112,8 @@ function serializeBlocksForStorage(blocks: ContentBlock[] | undefined, apiType: 
   return JSON.stringify({ choices: [{ message: { content: text } }] });
 }
 
+// ---------- Main entry ----------
+
 export async function handleProxyRequest(
   request: FastifyRequest,
   reply: FastifyReply,
@@ -114,9 +133,20 @@ export async function handleProxyRequest(
   if (interceptResponse) return handleIntercept(deps.db, apiType, request, reply, interceptResponse, clientModel, sessionId);
 
   const group = getMappingGroup(deps.db, effectiveModel);
-  const isFailover = group?.strategy === "failover";
+  return executeFailoverLoop({
+    request, reply, apiType, upstreamPath, errors, deps, options,
+    effectiveModel, originalModel,
+    isFailover: group?.strategy === "failover",
+    originalBody: JSON.parse(JSON.stringify(request.body as Record<string, unknown>)),
+    sessionId,
+  });
+}
+
+// ---------- Failover loop ----------
+
+async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> {
+  const { request, reply, apiType, upstreamPath, errors, deps, options, effectiveModel, originalModel, isFailover, originalBody, sessionId } = ctx;
   const excludeTargets: Target[] = [];
-  const originalBody = JSON.parse(JSON.stringify(request.body as Record<string, unknown>));
   let rootLogId: string | null = null;
 
   while (true) {

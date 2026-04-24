@@ -41,6 +41,8 @@ export interface ResilienceConfig {
   isFailover: boolean;
   /** DB 规则 max_retries 的全局安全阀，防止单规则配置导致过多重试 */
   globalRetryCap?: number;
+  /** 全局迭代上限，防止极端配置导致 while(true) 循环过多 */
+  iterationCap?: number;
 }
 
 export interface ResilienceAttempt {
@@ -76,6 +78,7 @@ const RETRYABLE_THROW_CODES = new Set(["ETIMEDOUT", "ECONNRESET", "ECONNREFUSED"
 const HTTP_TOO_MANY_REQUESTS = 429;
 const DEFAULT_THROW_MAX_RETRIES = 3;
 const DEFAULT_RETRY_CAP = 3;
+const DEFAULT_ITERATION_CAP = 50;
 
 // ---------- Internal helpers ----------
 
@@ -193,6 +196,14 @@ export class ResilienceLayer {
     };
 
     while (true) {
+      if (globalAttemptIndex >= (config.iterationCap ?? DEFAULT_ITERATION_CAP)) {
+        return {
+          result: lastResult ?? { kind: "error" as const, statusCode: 502, body: "Iteration cap exceeded", headers: {}, sentHeaders: {}, sentBody: "" },
+          attempts: allAttempts,
+          excludedTargets,
+        };
+      }
+
       const available = targets().filter(
         t => !excludedTargets.some(e =>
           e.backend_model === t.backend_model && e.provider_id === t.provider_id

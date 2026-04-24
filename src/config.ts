@@ -35,6 +35,7 @@ export function getBaseConfig(): Config {
   return cachedConfig;
 }
 
+/** @deprecated Use getBaseConfig directly */
 export function getConfig(): Config {
   return getBaseConfig();
 }
