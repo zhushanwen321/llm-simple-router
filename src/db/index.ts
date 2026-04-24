@@ -76,6 +76,8 @@ export {
   getActiveProviders,
   getAllProviders,
   getProviderById,
+  getActiveProviderByName,
+  getActiveProvidersWithModels,
   createProvider,
   updateProvider,
   deleteProvider,

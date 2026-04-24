@@ -5,7 +5,7 @@ import { ScheduledStrategy } from "./strategy/scheduled.js";
 import { RoundRobinStrategy } from "./strategy/round-robin.js";
 import { RandomStrategy } from "./strategy/random.js";
 import { FailoverStrategy } from "./strategy/failover.js";
-import { getMappingGroup } from "../db/index.js";
+import { getMappingGroup, getActiveProviderByName, getActiveProvidersWithModels } from "../db/index.js";
 
 // 策略注册表：key 为数据库中 mapping_groups.strategy 字段的值。
 // 新增策略时：
@@ -29,7 +29,7 @@ export function resolveMapping(
   if (slashMatch) {
     const providerName = slashMatch[1];
     const backendModel = slashMatch[2];
-    const provider = db.prepare("SELECT id, models FROM providers WHERE name = ? AND is_active = 1").get(providerName) as { id: string; models: string } | undefined;
+    const provider = getActiveProviderByName(db, providerName);
     if (provider) {
       try {
         const models: string[] = JSON.parse(provider.models);
@@ -45,7 +45,7 @@ export function resolveMapping(
   const group = getMappingGroup(db, clientModel);
   if (!group) {
     // Fallback: 没有 mapping group 时，直接查 provider 的 models 字段
-    const providers = db.prepare("SELECT id, models FROM providers WHERE is_active = 1").all() as { id: string; models: string }[];
+    const providers = getActiveProvidersWithModels(db);
     for (const p of providers) {
       try {
         const models: string[] = JSON.parse(p.models);
