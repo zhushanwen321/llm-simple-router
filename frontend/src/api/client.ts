@@ -62,6 +62,11 @@ const API = {
   SETTINGS_DB_SIZE_THRESHOLDS: '/settings/db-size-thresholds',
   SETTINGS_EXPORT: '/settings/export',
   SETTINGS_IMPORT: '/settings/import',
+  UPGRADE_STATUS: '/upgrade/status',
+  UPGRADE_CHECK: '/upgrade/check',
+  UPGRADE_EXECUTE: '/upgrade/execute',
+  UPGRADE_SYNC_CONFIG: '/upgrade/sync-config',
+  UPGRADE_SYNC_SOURCE: '/upgrade/sync-source',
 } as const
 
 // --- Payload types ---
@@ -250,6 +255,22 @@ export interface ConfigExportResponse {
   data: Record<string, unknown[]>;
 }
 
+export interface UpgradeStatus {
+  npm: {
+    hasUpdate: boolean
+    currentVersion: string
+    latestVersion: string | null
+  }
+  config: {
+    hasUpdate: boolean
+    providerChanges: number
+    retryRuleChanges: number
+  }
+  deployment: 'npm' | 'docker' | 'unknown'
+  syncSource: 'github' | 'gitee'
+  lastCheckedAt: string | null
+}
+
 // --- Typed request helper ---
 // 解包 AxiosResponse.data，让调用方直接拿到类型化的响应体。
 
@@ -369,4 +390,10 @@ export const api = {
     request<{ dbMaxSizeMb: number; logTableMaxSizeMb: number }>('put', API.SETTINGS_DB_SIZE_THRESHOLDS, data),
   exportConfig: () => request<ConfigExportResponse>('get', API.SETTINGS_EXPORT),
   importConfig: (data: ConfigExportResponse) => request<Record<string, number>>('post', API.SETTINGS_IMPORT, data),
+
+  getUpgradeStatus: () => request<UpgradeStatus>('get', API.UPGRADE_STATUS),
+  triggerUpgradeCheck: () => request<{ ok: boolean }>('post', API.UPGRADE_CHECK),
+  executeUpgrade: (version: string) => request<{ ok: boolean; version: string }>('post', API.UPGRADE_EXECUTE, { version }),
+  syncConfig: (source: 'github' | 'gitee') => request<{ ok: boolean }>('post', API.UPGRADE_SYNC_CONFIG, { source }),
+  setSyncSource: (source: 'github' | 'gitee') => request<{ ok: boolean }>('put', API.UPGRADE_SYNC_SOURCE, { source }),
 }
