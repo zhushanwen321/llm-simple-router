@@ -25,8 +25,7 @@ export function collectDbSizeInfo(db: Database.Database, dbPath: string): DbSize
   if (dbPath !== ":memory:") {
     try {
       totalBytes = statSync(dbPath).size;
-    } catch {
-      // DB 文件可能尚未创建（CI 内存测试、首次启动等）
+    } catch { // eslint-disable-line taste/no-silent-catch -- DB 文件可能尚未创建（CI 内存测试、首次启动等）
     }
   }
   const logTableBytes = estimateLogTableSize(db);
@@ -73,7 +72,8 @@ export function scheduleDbSizeMonitor(
 ): DbSizeMonitorHandle {
   const intervalMs = options.intervalMs ?? DEFAULT_INTERVAL_MS;
   let running = false;
-  let timer: ReturnType<typeof setInterval> | null = null;
+  let initialTimer: ReturnType<typeof setTimeout> | null = null;
+  let intervalTimer: ReturnType<typeof setInterval> | null = null;
 
   const doCheck = () => {
     if (running) return;
@@ -86,19 +86,22 @@ export function scheduleDbSizeMonitor(
       };
       const deleted = runSizeBasedCleanup(db, dbPath, thresholds);
       if (deleted > 0) options.log.info(`Size-based cleanup: deleted ${deleted} log records`);
-    } catch {
-      // DB 可能已关闭（测试清理、进程关闭等），静默忽略
+    } catch (e) {
+      // DB 可能已关闭（测试清理、进程关闭等）
+      options.log.info(`Size monitor check skipped: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       running = false;
     }
   };
 
-  collectDbSizeInfo(db, dbPath);
+  // 推迟到下一个事件循环 tick，避免阻塞服务器启动（与 log-cleaner 保持一致）
+  initialTimer = setTimeout(doCheck, 0);
 
-  timer = setInterval(doCheck, intervalMs);
+  intervalTimer = setInterval(doCheck, intervalMs);
   return {
     stop: () => {
-      if (timer) { clearInterval(timer); timer = null; }
+      if (initialTimer) { clearTimeout(initialTimer); initialTimer = null; }
+      if (intervalTimer) { clearInterval(intervalTimer); intervalTimer = null; }
     },
   };
 }

@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { FastifyInstance } from "fastify";
+import { createHash } from "crypto";
 import { buildApp } from "../src/index.js";
 import { initDatabase } from "../src/db/index.js";
 import { setSetting } from "../src/db/settings.js";
 import { hashPassword } from "../src/utils/password.js";
+import { encrypt, decrypt } from "../src/utils/crypto.js";
 
 const TEST_ENCRYPTION_KEY = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
@@ -82,6 +84,45 @@ describe("Config Import/Export API", () => {
       expect(body.data).not.toHaveProperty("request_logs");
       expect(body.data).not.toHaveProperty("request_metrics");
     });
+
+    it("decrypts provider api_key to plaintext", async () => {
+      const plainApiKey = "sk-test-plaintext-key-12345";
+      const encryptedApiKey = encrypt(plainApiKey, TEST_ENCRYPTION_KEY);
+      db.prepare(
+        "INSERT INTO providers (id, name, api_type, base_url, api_key, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+      ).run("test-p-id", "Test Provider", "openai", "https://api.test.com", encryptedApiKey, 1, new Date().toISOString(), new Date().toISOString());
+
+      const res = await app.inject({
+        method: "GET",
+        url: "/admin/api/settings/export",
+        headers: { cookie },
+      });
+      const body = res.json();
+      const provider = body.data.providers.find((p: any) => p.id === "test-p-id");
+      expect(provider.api_key).toBe(plainApiKey);
+    });
+
+    it("decrypts router_keys and replaces key_encrypted with plaintext key", async () => {
+      const plainKey = "sk-router-testkey1234567890abcdef";
+      const keyEncrypted = encrypt(plainKey, TEST_ENCRYPTION_KEY);
+      const keyHash = createHash("sha256").update(plainKey).digest("hex");
+      const keyPrefix = plainKey.slice(0, 8);
+      db.prepare(
+        "INSERT INTO router_keys (id, name, key_hash, key_prefix, key_encrypted, is_active) VALUES (?, ?, ?, ?, ?, ?)"
+      ).run("test-rk-id", "Test Key", keyHash, keyPrefix, keyEncrypted, 1);
+
+      const res = await app.inject({
+        method: "GET",
+        url: "/admin/api/settings/export",
+        headers: { cookie },
+      });
+      const body = res.json();
+      const rk = body.data.router_keys.find((k: any) => k.id === "test-rk-id");
+      expect(rk.key).toBe(plainKey);
+      expect(rk).not.toHaveProperty("key_encrypted");
+      expect(rk).not.toHaveProperty("key_hash");
+      expect(rk).not.toHaveProperty("key_prefix");
+    });
   });
 
   describe("POST /admin/api/settings/import", () => {
@@ -133,6 +174,59 @@ describe("Config Import/Export API", () => {
         headers: { cookie, "content-type": "application/json" },
       });
       expect(res.statusCode).toBe(400);
+    });
+
+    it("re-encrypts provider api_key with local key on import", async () => {
+      const plainApiKey = "sk-import-test-key";
+      const now = new Date().toISOString();
+      const exportData = {
+        version: 1,
+        data: {
+          providers: [{
+            id: "import-p-id", name: "Import Provider", api_type: "openai",
+            base_url: "https://api.test.com", api_key: plainApiKey,
+            is_active: 1, created_at: now, updated_at: now,
+          }],
+        },
+      };
+
+      await app.inject({
+        method: "POST",
+        url: "/admin/api/settings/import",
+        payload: exportData,
+        headers: { cookie, "content-type": "application/json" },
+      });
+
+      const row = db.prepare("SELECT api_key FROM providers WHERE id = ?").get("import-p-id") as { api_key: string };
+      expect(row.api_key).not.toBe(plainApiKey);
+      expect(decrypt(row.api_key, TEST_ENCRYPTION_KEY)).toBe(plainApiKey);
+    });
+
+    it("re-encrypts router_key from plaintext key on import", async () => {
+      const plainKey = "sk-router-import-key-abcdef";
+      const now = new Date().toISOString();
+      const exportData = {
+        version: 1,
+        data: {
+          router_keys: [{
+            id: "import-rk-id", name: "Import Key", key: plainKey, is_active: 1,
+            allowed_models: null, created_at: now, updated_at: now,
+          }],
+        },
+      };
+
+      await app.inject({
+        method: "POST",
+        url: "/admin/api/settings/import",
+        payload: exportData,
+        headers: { cookie, "content-type": "application/json" },
+      });
+
+      const row = db.prepare("SELECT * FROM router_keys WHERE id = ?").get("import-rk-id") as Record<string, any>;
+      expect(row.key_encrypted).toBeTruthy();
+      expect(decrypt(row.key_encrypted, TEST_ENCRYPTION_KEY)).toBe(plainKey);
+      expect(row.key_hash).toBe(createHash("sha256").update(plainKey).digest("hex"));
+      expect(row.key_prefix).toBe(plainKey.slice(0, 8));
     });
 
     it("preserves local admin_password_hash and jwt_secret on import", async () => {

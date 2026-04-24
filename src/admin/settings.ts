@@ -29,8 +29,12 @@ export const adminSettingsRoutes: FastifyPluginCallback<SettingsOptions> = (app,
   });
 
   app.get("/admin/api/settings/db-size", async () => {
+    const DEFAULT_SIZE_INFO = { totalBytes: 0, logTableBytes: 0, logCount: 0, lastChecked: null };
     const raw = getSetting(db, "db_size_info");
-    const sizeInfo = raw ? JSON.parse(raw) : { totalBytes: 0, logTableBytes: 0, logCount: 0, lastChecked: null };
+    let sizeInfo = DEFAULT_SIZE_INFO;
+    if (raw) {
+      try { sizeInfo = JSON.parse(raw); } catch { /* eslint-disable-line taste/no-silent-catch -- 损坏的缓存值，回退默认 */ }
+    }
     return {
       ...sizeInfo,
       thresholds: {

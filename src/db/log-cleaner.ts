@@ -32,8 +32,9 @@ export function scheduleLogCleanup(
     try {
       const deleted = runLogCleanup(db);
       if (deleted > 0) log.info(`Log cleanup: deleted ${deleted} records`);
-    } catch {
-      // DB 可能已关闭（测试清理、进程关闭等），静默忽略
+    } catch (e) {
+      // DB 可能已关闭（测试清理、进程关闭等）
+      log.info(`Log cleanup skipped: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       cleaning = false;
     }

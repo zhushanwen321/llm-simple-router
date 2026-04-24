@@ -53,7 +53,7 @@ function serializeBlocksForStorage(blocks: ContentBlock[] | undefined, apiType: 
       if (b.type === "thinking") return { type: "thinking", thinking: b.content };
       if (b.type === "tool_use") {
         let input = {};
-        try { input = JSON.parse(b.content || "{}"); } catch { /* keep empty */ }
+        try { input = JSON.parse(b.content || "{}"); } catch { /* eslint-disable-line taste/no-silent-catch -- tool_use content 非合法 JSON 时保留空对象 */ }
         return { type: "tool_use", name: b.name ?? "", input };
       }
       return { type: "text", text: b.content };
@@ -252,6 +252,7 @@ export async function handleProxyRequest(
 
       // 流式请求：将 tracker 中累积的内容持久化到日志
       // blocks 含非 text 类型时（thinking/tool_use）必须序列化为 JSON 以保留结构
+      // 注意：tracker 在原 logId 下累积内容，lastLogId 可能因 resilience 重试而指向不同记录
       if (isStream && deps.tracker) {
         const sc = deps.tracker.get(logId)?.streamContent;
         const blocks = sc?.blocks;

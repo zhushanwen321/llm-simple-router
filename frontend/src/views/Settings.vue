@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
 import { api, type DbSizeInfoResponse, type ConfigExportResponse } from '@/api/client'
+import { useLogRetention } from '@/composables/useLogRetention'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -22,12 +23,12 @@ const DATE_SLICE_END = 10
 const RETENTION_MIN = 0
 const RETENTION_MAX = 90
 const SIZE_MB_MIN = 1
-const DEFAULT_RETENTION_DAYS = 3
 const DEFAULT_DB_MAX_SIZE_MB = 1024
 const DEFAULT_LOG_TABLE_MAX_SIZE_MB = 800
 
+const { retentionDays, saveRetention } = useLogRetention()
+
 const dbSizeInfo = ref<DbSizeInfoResponse | null>(null)
-const retentionDays = ref(DEFAULT_RETENTION_DAYS)
 const dbMaxSizeMb = ref(DEFAULT_DB_MAX_SIZE_MB)
 const logTableMaxSizeMb = ref(DEFAULT_LOG_TABLE_MAX_SIZE_MB)
 const loading = ref(false)
@@ -82,16 +83,9 @@ function validateRetention(): boolean {
   return true
 }
 
-async function saveRetention() {
+async function handleSaveRetention() {
   if (!validateRetention()) return
-  try {
-    const result = await api.setLogRetention(retentionDays.value)
-    retentionDays.value = result.days
-    toast.success('日志保留天数已更新')
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } catch (e: any) {
-    toast.error(e.response?.data?.error?.message || '更新失败')
-  }
+  await saveRetention()
 }
 
 function validateThresholds(): boolean {
@@ -212,7 +206,7 @@ onMounted(loadSettings)
           />
           <p v-if="retentionError" class="text-sm text-destructive mt-1">{{ retentionError }}</p>
         </div>
-        <Button size="sm" :disabled="loading" @click="saveRetention">保存</Button>
+        <Button size="sm" :disabled="loading" @click="handleSaveRetention">保存</Button>
       </div>
     </div>
 

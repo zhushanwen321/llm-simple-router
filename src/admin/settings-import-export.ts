@@ -1,8 +1,11 @@
 import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
+import { createHash } from "crypto";
 import { RetryRuleMatcher } from "../proxy/retry-rules.js";
 import { ProviderSemaphoreManager } from "../proxy/semaphore.js";
 import { getAllProviders, PROVIDER_CONCURRENCY_DEFAULTS } from "../db/index.js";
+import { encrypt, decrypt } from "../utils/crypto.js";
+import { getSetting } from "../db/settings.js";
 import { modelState } from "../proxy/model-state.js";
 
 interface ImportExportOptions {
@@ -27,14 +30,35 @@ const EXPORT_VERSION = 1;
 
 const ISO_DATE_LENGTH = 10;
 const BAD_REQUEST = 400;
+const KEY_PREFIX_LENGTH = 8;
 
 export const adminImportExportRoutes: FastifyPluginCallback<ImportExportOptions> = (app, options, done) => {
   const { db, matcher, semaphoreManager } = options;
 
   app.get("/admin/api/settings/export", async (_request, reply) => {
+    const encryptionKey = getSetting(db, "encryption_key");
     const data: Record<string, unknown[]> = {};
     for (const table of CONFIG_TABLES) {
       data[table] = db.prepare(`SELECT * FROM ${table}`).all();
+    }
+
+    // 导出时解密敏感字段，确保跨实例可移植
+    if (encryptionKey) {
+      for (const row of (data.providers || []) as Record<string, unknown>[]) {
+        if (typeof row.api_key === "string" && row.api_key) {
+          try { row.api_key = decrypt(row.api_key, encryptionKey); } catch { /* eslint-disable-line taste/no-silent-catch -- 无法解密则保留原值 */ }
+        }
+      }
+      for (const row of (data.router_keys || []) as Record<string, unknown>[]) {
+        if (typeof row.key_encrypted === "string") {
+          try {
+            row.key = decrypt(row.key_encrypted, encryptionKey);
+            delete row.key_encrypted;
+            delete row.key_hash;
+            delete row.key_prefix;
+          } catch { /* eslint-disable-line taste/no-silent-catch -- 无法解密则保留加密数据 */ }
+        }
+      }
     }
 
     const date = new Date().toISOString().slice(0, ISO_DATE_LENGTH);
@@ -49,15 +73,33 @@ export const adminImportExportRoutes: FastifyPluginCallback<ImportExportOptions>
 
   app.post("/admin/api/settings/import", async (request, reply) => {
     const body = request.body as { version?: number; data?: Record<string, unknown[]> };
-    if (!body.version || body.version !== EXPORT_VERSION) {
+    if (typeof body.version !== "number" || body.version !== EXPORT_VERSION) {
       return reply.code(BAD_REQUEST).send({ error: { message: `Unsupported version. Expected ${EXPORT_VERSION}.` } });
     }
-    if (!body.data) {
-      return reply.code(BAD_REQUEST).send({ error: { message: "Missing data field" } });
+    if (!body.data || typeof body.data !== "object") {
+      return reply.code(BAD_REQUEST).send({ error: { message: "Missing or invalid data field" } });
     }
 
     const counts: Record<string, number> = {};
     const importData = body.data;
+    const encryptionKey = getSetting(db, "encryption_key");
+
+    // 导入时用本地密钥重新加密敏感字段
+    if (encryptionKey) {
+      for (const row of (importData.providers || []) as Record<string, unknown>[]) {
+        if (typeof row.api_key === "string" && row.api_key) {
+          row.api_key = encrypt(row.api_key, encryptionKey);
+        }
+      }
+      for (const row of (importData.router_keys || []) as Record<string, unknown>[]) {
+        if (typeof row.key === "string") {
+          row.key_hash = createHash("sha256").update(row.key).digest("hex");
+          row.key_prefix = row.key.slice(0, KEY_PREFIX_LENGTH);
+          row.key_encrypted = encrypt(row.key, encryptionKey);
+          delete row.key;
+        }
+      }
+    }
 
     db.transaction(() => {
       // 临时关闭外键检查，避免删除顺序导致约束冲突

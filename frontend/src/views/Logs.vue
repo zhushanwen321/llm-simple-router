@@ -183,9 +183,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
-import { toast } from 'vue-sonner'
-import { api } from '@/api/client'
+import { onMounted, watch } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -199,6 +197,7 @@ import UnifiedRequestDialog from '@/components/request-detail/UnifiedRequestDial
 import LogTableRow from '@/components/logs/LogTableRow.vue'
 import { useLogFilters } from '@/composables/useLogFilters'
 import { useLogs } from '@/composables/useLogs'
+import { useLogRetention } from '@/composables/useLogRetention'
 
 const {
   PERIODS, period, dateRange, dateRangeError,
@@ -219,30 +218,7 @@ const {
   handleCleanup, toggleExpand, openLogDetail,
 } = useLogs()
 
-const DEFAULT_RETENTION_DAYS = 3
-const retentionDays = ref(DEFAULT_RETENTION_DAYS)
-const retentionSaving = ref(false)
-
-async function saveRetention() {
-  retentionSaving.value = true
-  try {
-    await api.setLogRetention(retentionDays.value)
-    toast.success('保留天数已更新')
-  } catch {
-    toast.error('更新失败')
-  } finally {
-    retentionSaving.value = false
-  }
-}
-
-async function loadRetention() {
-  try {
-    const { days } = await api.getLogRetention()
-    retentionDays.value = days
-  } catch {
-    toast.error('加载保留天数失败，使用默认值')
-  }
-}
+const { retentionDays, retentionSaving, saveRetention, loadRetention } = useLogRetention()
 
 let filterTimer: ReturnType<typeof setTimeout> | null = null
 watch(
