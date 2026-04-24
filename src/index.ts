@@ -38,6 +38,7 @@ import { modelState } from "./proxy/model-state.js";
 import { UsageWindowTracker } from "./proxy/usage-window-tracker.js";
 import { scheduleLogCleanup } from "./db/log-cleaner.js";
 import { scheduleDbSizeMonitor } from "./db/db-size-monitor.js";
+import { startUpgradeChecker, stopUpgradeChecker } from "./admin/upgrade.js";
 import fastifyStatic from "@fastify/static";
 import Database from "better-sqlite3";
 
@@ -132,6 +133,7 @@ export async function buildApp(
   });
 
   loadRecommendedConfig();
+  startUpgradeChecker();
 
   // 启动时回填：补齐回退老版本期间缺失的 metrics 冗余列
   if (shouldBackfill) {
@@ -237,6 +239,7 @@ export async function buildApp(
     db,
     usageWindowTracker,
     close: async () => {
+      stopUpgradeChecker();
       logCleanup.stop();
       dbSizeMonitor.stop();
       tracker.stopPushInterval();
