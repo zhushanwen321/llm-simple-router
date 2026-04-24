@@ -2,8 +2,6 @@ import { request as httpRequestFn } from "http";
 import { request as httpsRequestFn } from "https";
 import { UPSTREAM_SUCCESS, filterHeaders } from "./types.js";
 import type { RawHeaders, TransportResult } from "./types.js";
-import { callStream } from "./stream-proxy.js";
-
 // Re-export callStream from stream-proxy.ts for external consumers
 export { callStream } from "./stream-proxy.js";
 
