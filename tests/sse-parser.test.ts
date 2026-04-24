@@ -179,6 +179,22 @@ describe("SSEParser", () => {
     expect(events[3].event).toBe("message_stop");
   });
 
+  it("should handle CRLF (\\r\\n) line endings per SSE spec", () => {
+    const parser = new SSEParser();
+    const events = parser.feed("data: hello\r\n\r\ndata: world\r\n\r\n");
+    expect(events).toHaveLength(2);
+    expect(events[0].data).toBe("hello");
+    expect(events[1].data).toBe("world");
+  });
+
+  it("should handle mixed CRLF and LF line endings", () => {
+    const parser = new SSEParser();
+    const events = parser.feed("data: first\r\n\r\ndata: second\n\n");
+    expect(events).toHaveLength(2);
+    expect(events[0].data).toBe("first");
+    expect(events[1].data).toBe("second");
+  });
+
   it("should handle chunk boundary splitting in the middle of \\n\\n", () => {
     const parser = new SSEParser();
     // 第一次 feed 只有 "data: first\n"，没有 \n\n，不会产生事件
