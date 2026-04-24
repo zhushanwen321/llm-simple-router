@@ -26,9 +26,100 @@ import { insertRejectedLog } from "./log-helpers.js";
 import type { Target } from "./strategy/types.js";
 import type { RetryRuleMatcher } from "./retry-rules.js";
 import type { ProxyOrchestrator } from "./orchestrator.js";
-import type { ProxyErrorFormatter } from "./proxy-core.js";
+import type { ProxyErrorFormatter, ProxyErrorResponse } from "./proxy-core.js";
 
 const HTTP_ERROR_THRESHOLD = 400;
+
+// ---------- Helpers ----------
+
+interface RejectParams {
+  db: Database.Database;
+  logId: string;
+  apiType: "openai" | "anthropic";
+  model: string;
+  startTime: number;
+  isStream: boolean;
+  routerKeyId: string | null;
+  originalBody: Record<string, unknown>;
+  clientHeaders: RawHeaders;
+  originalModel: string | null;
+  isFailover: boolean;
+  originalRequestId: string | null;
+  sessionId: string | undefined;
+}
+
+function rejectAndReply(
+  reply: FastifyReply,
+  params: RejectParams,
+  error: ProxyErrorResponse,
+  errorMessage: string,
+  providerId?: string,
+): FastifyReply {
+  insertRejectedLog({
+    db: params.db, logId: params.logId, apiType: params.apiType, model: params.model,
+    statusCode: error.statusCode, errorMessage, startTime: params.startTime,
+    isStream: params.isStream, routerKeyId: params.routerKeyId,
+    originalBody: params.originalBody, clientHeaders: params.clientHeaders,
+    providerId, originalModel: params.originalModel,
+    isFailover: params.isFailover, originalRequestId: params.originalRequestId,
+    sessionId: params.sessionId,
+  });
+  return reply.code(error.statusCode).send(error.body);
+}
+
+interface TransportFnParams {
+  provider: NonNullable<ReturnType<typeof getProviderById>>;
+  apiKey: string;
+  body: Record<string, unknown>;
+  cliHdrs: RawHeaders;
+  reply: FastifyReply;
+  upstreamPath: string;
+  apiType: "openai" | "anthropic";
+  isStream: boolean;
+  startTime: number;
+  logId: string;
+  effectiveModel: string;
+  originalModel: string | null;
+  streamTimeoutMs: number;
+  tracker?: RequestTracker;
+  matcher?: RetryRuleMatcher;
+  request: FastifyRequest;
+}
+
+function buildTransportFn(p: TransportFnParams): (target: Target) => Promise<TransportResult> {
+  return async (_target: Target) => {
+    if (p.isStream) {
+      const metricsTransform = new SSEMetricsTransform(p.apiType, p.startTime, {
+        onMetrics: (m) => { p.tracker?.update(p.logId, { streamMetrics: toStreamMetrics(m) }); },
+        onChunk: (rawLine) => { p.tracker?.appendStreamChunk(p.logId, rawLine, p.apiType, STREAM_CONTENT_MAX_RAW, STREAM_CONTENT_MAX_TEXT); },
+      });
+      const checkEarlyError = p.matcher ? (data: string) => p.matcher!.test(UPSTREAM_SUCCESS, data) : undefined;
+      const streamResult = await callStream(
+        p.provider, p.apiKey, p.body, p.cliHdrs, p.reply, p.streamTimeoutMs,
+        p.upstreamPath, buildUpstreamHeaders, metricsTransform, checkEarlyError,
+      );
+      const m = (streamResult.kind === "stream_success" || streamResult.kind === "stream_abort")
+        ? streamResult.metrics : undefined;
+      if (m) p.tracker?.update(p.logId, { streamMetrics: toStreamMetrics(m) });
+      return streamResult;
+    }
+    const result = await callNonStream(p.provider, p.apiKey, p.body, p.cliHdrs, p.upstreamPath, buildUpstreamHeaders);
+    if (result.kind === "success") {
+      const mr = MetricsExtractor.fromNonStreamResponse(p.apiType, result.body);
+      if (mr) p.tracker?.update(p.logId, { streamMetrics: toStreamMetrics(mr) });
+    }
+    if (p.originalModel && result.kind === "success" && result.statusCode === UPSTREAM_SUCCESS) {
+      try {
+        const bodyObj = JSON.parse(result.body);
+        if (bodyObj.content?.[0]?.text) {
+          bodyObj.content[0].text += `\n\n${buildModelInfoTag(p.effectiveModel)}`;
+          return { ...result, body: JSON.stringify(bodyObj) };
+        }
+      } catch { p.request.log.debug("Failed to inject model-info tag into non-JSON response"); }
+    }
+    return result;
+  };
+}
 
 export interface RouteHandlerDeps {
   db: Database.Database;
@@ -110,28 +201,21 @@ export async function handleProxyRequest(
     const isStream = body.stream === true;
     const cliHdrs: RawHeaders = request.headers as RawHeaders;
 
+    const rCtx: RejectParams = {
+      db: deps.db, logId, apiType, model: effectiveModel,
+      startTime, isStream, routerKeyId, originalBody, clientHeaders: cliHdrs, originalModel,
+      isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null, sessionId,
+    };
+
     const resolved = resolveMapping(deps.db, effectiveModel, { now: new Date(), excludeTargets });
     request.log.debug({ logId, model: effectiveModel, apiType, isStream, action: "resolve_mapping", resolved: !!resolved });
 
     if (!resolved) {
       if (isFailover && excludeTargets.length > 0) {
-        const e = errors.upstreamConnectionFailed();
-        insertRejectedLog({
-          db: deps.db, logId, apiType, model: effectiveModel, statusCode: e.statusCode,
-          errorMessage: `All failover targets exhausted (${excludeTargets.length} attempted)`,
-          startTime, isStream, routerKeyId, originalBody, clientHeaders: cliHdrs, originalModel,
-          isFailover: true, originalRequestId: rootLogId, sessionId,
-        });
-        return reply.status(e.statusCode).send(e.body);
+        return rejectAndReply(reply, { ...rCtx, isFailover: true, originalRequestId: rootLogId },
+          errors.upstreamConnectionFailed(), `All failover targets exhausted (${excludeTargets.length} attempted)`);
       }
-      const e = errors.modelNotFound(effectiveModel);
-      insertRejectedLog({
-        db: deps.db, logId, apiType, model: effectiveModel, statusCode: e.statusCode,
-        errorMessage: `No mapping found for model '${effectiveModel}'`, startTime, isStream,
-        routerKeyId, originalBody, clientHeaders: cliHdrs, originalModel,
-        isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null, sessionId,
-      });
-      return reply.status(e.statusCode).send(e.body);
+      return rejectAndReply(reply, rCtx, errors.modelNotFound(effectiveModel), `No mapping found for model '${effectiveModel}'`);
     }
 
     if (excludeTargets.length === 0) {
@@ -140,14 +224,8 @@ export async function handleProxyRequest(
         try {
           const models: string[] = JSON.parse(allowedModels).filter((m: string) => m.trim() !== "");
           if (models.length > 0 && !models.includes(resolved.backend_model)) {
-            const e = errors.modelNotAllowed(resolved.backend_model);
-            insertRejectedLog({
-              db: deps.db, logId, apiType, model: effectiveModel, statusCode: e.statusCode,
-              errorMessage: `Model '${resolved.backend_model}' not allowed`, startTime, isStream, routerKeyId,
-              originalBody, clientHeaders: cliHdrs, providerId: resolved.provider_id, originalModel,
-              isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null, sessionId,
-            });
-            return reply.status(e.statusCode).send(e.body);
+            return rejectAndReply(reply, rCtx, errors.modelNotAllowed(resolved.backend_model),
+              `Model '${resolved.backend_model}' not allowed`, resolved.provider_id);
           }
         } catch { request.log.warn({ allowedModels: allowedModels?.slice(0, 80) }, "Invalid allowed_models JSON, allowing all models"); } // eslint-disable-line no-magic-numbers
       }
@@ -155,24 +233,12 @@ export async function handleProxyRequest(
 
     const provider = getProviderById(deps.db, resolved.provider_id);
     if (!provider || !provider.is_active) {
-      const e = errors.providerUnavailable();
-      insertRejectedLog({
-        db: deps.db, logId, apiType, model: effectiveModel, statusCode: e.statusCode,
-        errorMessage: `Provider '${resolved.provider_id}' unavailable`, startTime, isStream, routerKeyId,
-        originalBody, clientHeaders: cliHdrs, providerId: resolved.provider_id, originalModel,
-        isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null, sessionId,
-      });
-      return reply.status(e.statusCode).send(e.body);
+      return rejectAndReply(reply, rCtx, errors.providerUnavailable(),
+        `Provider '${resolved.provider_id}' unavailable`, resolved.provider_id);
     }
     if (provider.api_type !== apiType) {
-      const e = errors.providerTypeMismatch();
-      insertRejectedLog({
-        db: deps.db, logId, apiType, model: effectiveModel, statusCode: e.statusCode,
-        errorMessage: `API type mismatch: expected '${apiType}'`, startTime, isStream, routerKeyId,
-        originalBody, clientHeaders: cliHdrs, providerId: resolved.provider_id, originalModel,
-        isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null, sessionId,
-      });
-      return reply.status(e.statusCode).send(e.body);
+      return rejectAndReply(reply, rCtx, errors.providerTypeMismatch(),
+        `API type mismatch: expected '${apiType}'`, resolved.provider_id);
     }
 
     body.model = resolved.backend_model;
@@ -187,51 +253,11 @@ export async function handleProxyRequest(
       body: reqBodyStr,
     });
 
-    // transportFn 闭包捕获当前迭代的 provider/apiKey/headers/body/reply 上下文
-    // target 由 resilience 层传入但当前架构下 provider 已在闭包中确定
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const transportFn = async (_target: Target): Promise<TransportResult> => {
-      if (isStream) {
-        const metricsTransform = new SSEMetricsTransform(apiType, startTime, {
-          onMetrics: (m) => {
-            deps.tracker?.update(logId, { streamMetrics: toStreamMetrics(m) });
-          },
-          onChunk: (rawLine) => {
-            deps.tracker?.appendStreamChunk(logId, rawLine, apiType, STREAM_CONTENT_MAX_RAW, STREAM_CONTENT_MAX_TEXT);
-          },
-        });
-        const checkEarlyError = deps.matcher
-          ? (data: string) => deps.matcher!.test(UPSTREAM_SUCCESS, data)
-          : undefined;
-        const streamResult = await callStream(
-          provider, apiKey, body, cliHdrs, reply, deps.streamTimeoutMs,
-          upstreamPath, buildUpstreamHeaders, metricsTransform, checkEarlyError,
-        );
-        const m = (streamResult.kind === "stream_success" || streamResult.kind === "stream_abort")
-          ? streamResult.metrics : undefined;
-        if (m) deps.tracker?.update(logId, { streamMetrics: toStreamMetrics(m) });
-        return streamResult;
-      }
-      const result = await callNonStream(provider, apiKey, body, cliHdrs, upstreamPath, buildUpstreamHeaders);
-      // 非流式请求：从响应体提取指标并更新 tracker
-      if (result.kind === "success") {
-        const mr = MetricsExtractor.fromNonStreamResponse(apiType, result.body);
-        if (mr) {
-          deps.tracker?.update(logId, { streamMetrics: toStreamMetrics(mr) });
-        }
-      }
-      // 非流式响应注入模型信息标签（模型映射场景）
-      if (originalModel && result.kind === "success" && result.statusCode === UPSTREAM_SUCCESS) {
-        try {
-          const bodyObj = JSON.parse(result.body);
-          if (bodyObj.content?.[0]?.text) {
-            bodyObj.content[0].text += `\n\n${buildModelInfoTag(effectiveModel)}`;
-            return { ...result, body: JSON.stringify(bodyObj) };
-          }
-        } catch { request.log.debug("Failed to inject model-info tag into non-JSON response"); }
-      }
-      return result;
-    };
+    const transportFn = buildTransportFn({
+      provider, apiKey, body, cliHdrs, reply, upstreamPath, apiType,
+      isStream, startTime, logId, effectiveModel, originalModel,
+      streamTimeoutMs: deps.streamTimeoutMs, tracker: deps.tracker, matcher: deps.matcher, request,
+    });
 
     try {
       const resilienceResult = await deps.orchestrator.handle(
@@ -250,9 +276,6 @@ export async function handleProxyRequest(
       );
       collectTransportMetrics(deps.db, apiType, resilienceResult.result, isStream, lastLogId, provider.id, resolved.backend_model, request);
 
-      // 流式请求：将 tracker 中累积的内容持久化到日志
-      // blocks 含非 text 类型时（thinking/tool_use）必须序列化为 JSON 以保留结构
-      // 注意：tracker 在原 logId 下累积内容，lastLogId 可能因 resilience 重试而指向不同记录
       if (isStream && deps.tracker) {
         const sc = deps.tracker.get(logId)?.streamContent;
         const blocks = sc?.blocks;
@@ -263,7 +286,6 @@ export async function handleProxyRequest(
         if (content) updateLogStreamContent(deps.db, lastLogId, content);
       }
 
-      // Failover: 单 provider 内重试已耗尽但仍失败，尝试下一个 target
       if (isFailover && !reply.raw.headersSent) {
         const tr = resilienceResult.result;
         const failed = tr.kind === "throw"
@@ -274,13 +296,11 @@ export async function handleProxyRequest(
         }
       }
 
-      // orchestrator.sendResponse 对 throw/stream_success/stream_abort 不发送，
-      // 对非 failover 的 error/throw 需要由外层发送错误响应
       if (!reply.raw.headersSent) {
         const tr = resilienceResult.result;
         if (tr.kind === "throw" || (tr.kind === "error" && tr.statusCode >= HTTP_ERROR_THRESHOLD)) {
           const err = errors.upstreamConnectionFailed();
-          return reply.status(err.statusCode).send(err.body);
+          return reply.code(err.statusCode).send(err.body);
         }
       }
 
@@ -292,26 +312,12 @@ export async function handleProxyRequest(
         continue;
       }
       if (e instanceof SemaphoreQueueFullError) {
-        const err = errors.concurrencyQueueFull(provider.id);
-        insertRejectedLog({
-          db: deps.db, logId, apiType, model: effectiveModel, statusCode: err.statusCode,
-          errorMessage: `Concurrency queue full for provider '${provider.id}'`,
-          startTime, isStream, routerKeyId, originalBody, clientHeaders: cliHdrs,
-          providerId: provider.id, originalModel,
-          isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null, sessionId,
-        });
-        return reply.status(err.statusCode).send(err.body);
+        return rejectAndReply(reply, rCtx, errors.concurrencyQueueFull(provider.id),
+          `Concurrency queue full for provider '${provider.id}'`, provider.id);
       }
       if (e instanceof SemaphoreTimeoutError) {
-        const err = errors.concurrencyTimeout(provider.id, e.timeoutMs);
-        insertRejectedLog({
-          db: deps.db, logId, apiType, model: effectiveModel, statusCode: err.statusCode,
-          errorMessage: `Concurrency wait timeout for provider '${provider.id}' (${e.timeoutMs}ms)`,
-          startTime, isStream, routerKeyId, originalBody, clientHeaders: cliHdrs,
-          providerId: provider.id, originalModel,
-          isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null, sessionId,
-        });
-        return reply.status(err.statusCode).send(err.body);
+        return rejectAndReply(reply, rCtx, errors.concurrencyTimeout(provider.id, e.timeoutMs),
+          `Concurrency wait timeout for provider '${provider.id}' (${e.timeoutMs}ms)`, provider.id);
       }
       const errMsg = e instanceof Error ? e.message : String(e);
       request.log.debug({ logId, error: errMsg, action: "upstream_error" });
@@ -325,7 +331,7 @@ export async function handleProxyRequest(
         session_id: sessionId,
       });
       const err = errors.upstreamConnectionFailed();
-      return reply.status(err.statusCode).send(err.body);
+      return reply.code(err.statusCode).send(err.body);
     }
   }
 }

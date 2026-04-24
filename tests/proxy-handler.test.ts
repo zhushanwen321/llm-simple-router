@@ -60,7 +60,7 @@ function createRequest(overrides = {}) {
 
 function createReply() {
   return {
-    status: vi.fn().mockReturnThis(), send: vi.fn().mockReturnThis(), header: vi.fn().mockReturnThis(),
+    code: vi.fn().mockReturnThis(), status: vi.fn().mockReturnThis(), send: vi.fn().mockReturnThis(), header: vi.fn().mockReturnThis(),
     raw: { headersSent: false, writableEnded: false },
   } as any;
 }
@@ -92,7 +92,7 @@ describe("handleProxyRequest", () => {
     const reply = createReply();
     await handleProxyRequest(createRequest(), reply, "openai", "/v1/chat/completions", errors, deps);
     expect(insertRejectedLog).toHaveBeenCalled();
-    expect(reply.status).toHaveBeenCalledWith(404);
+    expect(reply.code).toHaveBeenCalledWith(404);
     expect(deps.orchestrator.handle).not.toHaveBeenCalled();
   });
 
@@ -102,7 +102,7 @@ describe("handleProxyRequest", () => {
     const deps = createDeps();
     const reply = createReply();
     await handleProxyRequest(createRequest(), reply, "openai", "/v1/chat/completions", errors, deps);
-    expect(reply.status).toHaveBeenCalledWith(503);
+    expect(reply.code).toHaveBeenCalledWith(503);
   });
 
   it("API type 不匹配时返回 500", async () => {
@@ -111,7 +111,7 @@ describe("handleProxyRequest", () => {
     const deps = createDeps();
     const reply = createReply();
     await handleProxyRequest(createRequest(), reply, "openai", "/v1/chat/completions", errors, deps);
-    expect(reply.status).toHaveBeenCalledWith(500);
+    expect(reply.code).toHaveBeenCalledWith(500);
   });
 
   it("正常请求调用 orchestrator 并记录日志", async () => {
@@ -156,7 +156,7 @@ describe("handleProxyRequest", () => {
     deps.orchestrator.handle = vi.fn().mockRejectedValue(new SemaphoreQueueFullError("p1"));
     const reply = createReply();
     await handleProxyRequest(createRequest(), reply, "openai", "/v1/chat/completions", errors, deps);
-    expect(reply.status).toHaveBeenCalledWith(503);
+    expect(reply.code).toHaveBeenCalledWith(503);
   });
 
   it("SemaphoreTimeoutError 返回 504", async () => {
@@ -166,6 +166,6 @@ describe("handleProxyRequest", () => {
     deps.orchestrator.handle = vi.fn().mockRejectedValue(new SemaphoreTimeoutError("p1", 5000));
     const reply = createReply();
     await handleProxyRequest(createRequest(), reply, "openai", "/v1/chat/completions", errors, deps);
-    expect(reply.status).toHaveBeenCalledWith(504);
+    expect(reply.code).toHaveBeenCalledWith(504);
   });
 });
