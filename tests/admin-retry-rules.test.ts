@@ -3,12 +3,7 @@ import { FastifyInstance } from "fastify";
 import { buildApp } from "../src/index.js";
 import { initDatabase } from "../src/db/index.js";
 import { RetryRuleMatcher } from "../src/proxy/retry-rules.js";
-import {
-  TEST_ENCRYPTION_KEY,
-  makeConfig,
-  seedSettings,
-  login,
-} from "./helpers/test-setup.js";
+import { makeConfig, seedSettings, login } from "./helpers/test-setup.js";
 
 describe("Retry Rule CRUD", () => {
   let app: FastifyInstance;

@@ -2,12 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { FastifyInstance } from "fastify";
 import { buildApp } from "../src/index.js";
 import { initDatabase } from "../src/db/index.js";
-import {
-  TEST_ENCRYPTION_KEY,
-  makeConfig,
-  seedSettings,
-  login,
-} from "./helpers/test-setup.js";
+import { makeConfig, seedSettings, login } from "./helpers/test-setup.js";
 
 describe("Mapping Group CRUD", () => {
   let app: FastifyInstance;
