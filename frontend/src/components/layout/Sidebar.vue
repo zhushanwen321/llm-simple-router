@@ -13,21 +13,24 @@
             <Button variant="ghost" class="flex items-center gap-2 px-0 h-auto">
               <span class="font-semibold text-sm">LLM Router</span>
               <Badge variant="secondary" class="text-[10px] px-1.5 py-0 h-4 leading-none">v{{ appVersion }}</Badge>
-              <span
+              <Badge
                 v-if="updateCount > 0"
-                class="text-[10px] px-1.5 h-4 leading-none rounded-full bg-red-500 text-white font-semibold flex items-center justify-center"
-              >{{ updateCount }}</span>
+                variant="destructive"
+                class="text-[10px] px-1.5 h-4 leading-none bg-destructive text-destructive-foreground font-semibold"
+              >{{ updateCount }}</Badge>
             </Button>
           </PopoverTrigger>
           <PopoverContent side="right" align="start" class="w-80 p-0">
             <!-- 版本升级 -->
             <div v-if="upgradeStatus?.npm.hasUpdate" class="p-3 border-b border-border">
               <div class="flex items-center gap-2 mb-2">
-                <div class="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center text-white text-[10px]">&#8593;</div>
+                <div class="w-4 h-4 rounded-full bg-primary flex items-center justify-center text-primary-foreground">
+                <ArrowUpRight class="w-3 h-3" />
+              </div>
                 <span class="text-sm font-medium">新版本可用</span>
               </div>
               <p class="text-xs text-muted-foreground mb-2">
-                {{ upgradeStatus.npm.currentVersion }} → <span class="text-green-600 font-medium">{{ upgradeStatus.npm.latestVersion }}</span>
+                {{ upgradeStatus.npm.currentVersion }} → <span class="text-primary font-medium">{{ upgradeStatus.npm.latestVersion }}</span>
               </p>
               <Button
                 v-if="upgradeStatus.deployment === 'npm'"
@@ -44,7 +47,9 @@
             <!-- 配置同步 -->
             <div v-if="upgradeStatus?.config.hasUpdate" class="p-3 border-b border-border">
               <div class="flex items-center gap-2 mb-2">
-                <div class="w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center text-white text-[10px]">&#8635;</div>
+                <div class="w-4 h-4 rounded-full bg-primary flex items-center justify-center text-primary-foreground">
+                <RefreshCw class="w-3 h-3" />
+              </div>
                 <span class="text-sm font-medium">推荐配置已更新</span>
               </div>
               <p class="text-xs text-muted-foreground mb-2">
@@ -73,7 +78,7 @@
             <!-- 底部 -->
             <div class="px-3 py-2 flex justify-between items-center text-xs text-muted-foreground">
               <span>{{ upgradeStatus?.lastCheckedAt ? `检查于 ${new Date(upgradeStatus.lastCheckedAt).toLocaleTimeString()}` : '未检查' }}</span>
-              <Button variant="link" class="text-blue-500 h-auto p-0" @click="handleCheckNow">立即检查</Button>
+              <Button variant="link" class="text-primary h-auto p-0" @click="handleCheckNow">立即检查</Button>
             </div>
           </PopoverContent>
         </Popover>
@@ -129,7 +134,7 @@
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel @click="showRestartConfirm = false">稍后重启</AlertDialogCancel>
-          <AlertDialogAction @click="showRestartConfirm = false">立即重启</AlertDialogAction>
+          <AlertDialogAction @click="handleRestart">立即重启</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -140,6 +145,8 @@
 import { type Component, ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
+  ArrowUpRight,
+  RefreshCw,
   LayoutDashboard,
   Server,
   ArrowLeftRight,
@@ -274,6 +281,10 @@ const router = useRouter()
 function isActive(path: string): boolean {
   if (path === '/') return route.path === '/'
   return route.path.startsWith(path)
+}
+
+function handleRestart() {
+  window.location.reload()
 }
 
 async function handleLogout() {
