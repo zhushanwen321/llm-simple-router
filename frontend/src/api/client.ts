@@ -9,6 +9,14 @@ import type {
   RuntimeMetrics,
 } from '@/types/monitor'
 
+// 扩展 AxiosError 类型，附加后端错误信息
+declare module 'axios' {
+  interface AxiosError {
+    apiMessage?: string
+    apiCode?: number
+  }
+}
+
 const client = axios.create({
   baseURL: '/admin/api',
   withCredentials: true,
@@ -18,12 +26,16 @@ client.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) { // eslint-disable-line no-magic-numbers
-      if (error.response.data?.needsSetup) {
+      if (error.response.data?.code === 40103) { // eslint-disable-line no-magic-numbers -- NOT_INITIALIZED
         router.push('/setup')
       } else {
         router.push('/login')
       }
     }
+    // 附加后端错误消息到 error 对象，方便 View 层统一提取
+    const body = error.response?.data
+    error.apiMessage = body?.message || ''
+    error.apiCode = body?.code || 0
     return Promise.reject(error)
   }
 )
@@ -292,7 +304,9 @@ async function request<T>(
   } else {
     res = await client.request({ method, url, data, params: options?.params })
   }
-  return res.data as T
+  // 解包信封：后端返回 {code:0, message:"ok", data:T}
+  const body = res.data as { code: number; message: string; data: T }
+  return body.data
 }
 
 // --- API ---
