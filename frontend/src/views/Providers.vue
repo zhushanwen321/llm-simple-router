@@ -282,9 +282,9 @@ async function loadProviders() {
   try {
     const data = await api.getProviders()
     providers.value = data
-  } catch (e) {
+  } catch (e: unknown) {
     console.error('Failed to load providers:', e)
-    toast.error('加载供应商失败')
+    toast.error((e as { apiMessage?: string }).apiMessage || '加载供应商失败')
   }
 }
 
@@ -358,8 +358,7 @@ async function handleSave() {
     await loadProviders()
   } catch (e: unknown) {
     console.error('Failed to save provider:', e)
-    const msg = (e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message
-    toast.error(msg || '保存供应商失败')
+    toast.error((e as { apiMessage?: string }).apiMessage || '保存供应商失败')
   }
 }
 
@@ -374,9 +373,9 @@ async function handleDelete() {
   try {
     await api.deleteProvider(target.id)
     await loadProviders()
-  } catch (e) {
+  } catch (e: unknown) {
     console.error('Failed to delete provider:', e)
-    toast.error('删除供应商失败')
+    toast.error((e as { apiMessage?: string }).apiMessage || '删除供应商失败')
   }
 }
 

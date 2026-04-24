@@ -167,7 +167,7 @@ async function loadData() {
     providersList.value = results[1].value as ProviderSummary[]
   } else {
     console.error('Failed to load providers:', results[1].reason)
-    toast.error('加载供应商失败')
+    toast.error((results[1].reason as { apiMessage?: string })?.apiMessage || '加载供应商失败')
   }
 }
 
@@ -283,9 +283,9 @@ async function handleSave() {
     }
     dialogOpen.value = false
     await loadData()
-  } catch (e) {
+  } catch (e: unknown) {
     console.error('Failed to save mapping group:', e)
-    toast.error('保存分组失败')
+    toast.error((e as { apiMessage?: string }).apiMessage || '保存分组失败')
   }
 }
 
@@ -296,9 +296,9 @@ async function handleDelete() {
   try {
     await api.deleteMappingGroup(target.id)
     await loadData()
-  } catch (e) {
+  } catch (e: unknown) {
     console.error('Failed to delete mapping group:', e)
-    toast.error('删除分组失败')
+    toast.error((e as { apiMessage?: string }).apiMessage || '删除分组失败')
   }
 }
 

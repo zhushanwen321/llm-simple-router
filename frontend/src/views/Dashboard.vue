@@ -315,9 +315,9 @@ async function loadStats() {
     if (dashboardKeyFilter.value !== 'all') params.router_key_id = dashboardKeyFilter.value
     const res = await api.getStats(params)
     stats.value = res
-  } catch (e) {
+  } catch (e: unknown) {
     console.error('Failed to load stats:', e)
-    toast.error('加载统计数据失败')
+    toast.error((e as { apiMessage?: string }).apiMessage || '加载统计数据失败')
     stats.value = { totalRequests: 0, successRate: 0, avgTps: 0, totalTokens: 0 }
   }
 }
