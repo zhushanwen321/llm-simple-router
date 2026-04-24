@@ -43,7 +43,7 @@ const anthropicProxyRaw: FastifyPluginCallback<AnthropicProxyOptions> = (app, op
   app.post(MESSAGES_PATH, async (request, reply) => {
     if (!orchestrator) {
       const e = anthropicErrors.providerUnavailable();
-      return reply.status(e.statusCode).send(e.body);
+      return reply.code(e.statusCode).send(e.body);
     }
     const deps: RouteHandlerDeps = { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher, tracker, orchestrator };
     return handleProxyRequest(request, reply, "anthropic", MESSAGES_PATH, anthropicErrors, deps);

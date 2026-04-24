@@ -42,7 +42,7 @@ const openaiErrors = createErrorFormatter(
 );
 
 function sendError(reply: FastifyReply, e: ProxyErrorResponse) {
-  return reply.status(e.statusCode).send(e.body);
+  return reply.code(e.statusCode).send(e.body);
 }
 
 const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, done) => {
@@ -74,7 +74,7 @@ const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, do
     try {
       const result = await proxyGetRequest(provider, apiKey, cliHdrs, MODELS_PATH);
       for (const [k, v] of Object.entries(result.headers)) reply.header(k, v);
-      return reply.status(result.statusCode).send(result.body);
+      return reply.code(result.statusCode).send(result.body);
     } catch (err: unknown) {
       request.log.error({ err: err instanceof Error ? err.message : String(err) }, "Failed to reach OpenAI backend for /v1/models");
       return sendError(reply, {

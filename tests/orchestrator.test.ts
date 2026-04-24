@@ -34,6 +34,7 @@ function createMockRequest(overrides = {}) {
 
 function createMockReply() {
   return {
+    code: vi.fn().mockReturnThis(),
     status: vi.fn().mockReturnThis(),
     send: vi.fn().mockReturnThis(),
     header: vi.fn().mockReturnThis(),
@@ -77,10 +78,10 @@ describe("ProxyOrchestrator", () => {
     expect(result).toEqual(successResilienceResult());
     expect(deps.semaphoreScope.withSlot).toHaveBeenCalledWith("p1", expect.anything(), expect.any(Function), expect.any(Function));
     expect(deps.resilience.execute).toHaveBeenCalled();
-    expect(reply.status).toHaveBeenCalledWith(200);
+    expect(reply.code).toHaveBeenCalledWith(200);
   });
 
-  it("stream_success 不调用 reply.status/send", async () => {
+  it("stream_success 不调用 reply.code/send", async () => {
     setupMocks(deps);
     const streamResult: TransportResult = { kind: "stream_success", statusCode: 200, sentHeaders: {} };
     deps.resilience.execute = vi.fn(() => Promise.resolve(successResilienceResult({ result: streamResult })));
@@ -89,25 +90,25 @@ describe("ProxyOrchestrator", () => {
       createMockRequest({ body: { model: "gpt-4", stream: true } }), reply, "openai",
       { ...defaultConfig, isStream: true }, { transportFn: vi.fn() },
     );
-    expect(reply.status).not.toHaveBeenCalled();
+    expect(reply.code).not.toHaveBeenCalled();
   });
 
-  it("stream_abort 不调用 reply.status/send", async () => {
+  it("stream_abort 不调用 reply.code/send", async () => {
     setupMocks(deps);
     const abortResult: TransportResult = { kind: "stream_abort", statusCode: 200, sentHeaders: {} };
     deps.resilience.execute = vi.fn(() => Promise.resolve(successResilienceResult({ result: abortResult })));
     const reply = createMockReply();
     await orchestrator.handle(createMockRequest(), reply, "openai", defaultConfig, { transportFn: vi.fn() });
-    expect(reply.status).not.toHaveBeenCalled();
+    expect(reply.code).not.toHaveBeenCalled();
   });
 
-  it("throw kind 不调用 reply.status/send", async () => {
+  it("throw kind 不调用 reply.code/send", async () => {
     setupMocks(deps);
     const throwResult: TransportResult = { kind: "throw", error: new Error("connection failed") };
     deps.resilience.execute = vi.fn(() => Promise.resolve(successResilienceResult({ result: throwResult })));
     const reply = createMockReply();
     await orchestrator.handle(createMockRequest(), reply, "openai", defaultConfig, { transportFn: vi.fn() });
-    expect(reply.status).not.toHaveBeenCalled();
+    expect(reply.code).not.toHaveBeenCalled();
   });
 
   it("stream_error 时发送错误响应", async () => {
@@ -116,7 +117,7 @@ describe("ProxyOrchestrator", () => {
     deps.resilience.execute = vi.fn(() => Promise.resolve(successResilienceResult({ result: errResult })));
     const reply = createMockReply();
     await orchestrator.handle(createMockRequest(), reply, "openai", defaultConfig, { transportFn: vi.fn() });
-    expect(reply.status).toHaveBeenCalledWith(429);
+    expect(reply.code).toHaveBeenCalledWith(429);
     expect(reply.send).toHaveBeenCalledWith("rate limited");
   });
 
@@ -126,7 +127,7 @@ describe("ProxyOrchestrator", () => {
     deps.resilience.execute = vi.fn(() => Promise.resolve(successResilienceResult({ result: errResult })));
     const reply = createMockReply();
     await orchestrator.handle(createMockRequest(), reply, "openai", defaultConfig, { transportFn: vi.fn() });
-    expect(reply.status).toHaveBeenCalledWith(500);
+    expect(reply.code).toHaveBeenCalledWith(500);
     expect(reply.send).toHaveBeenCalledWith("internal error");
   });
 

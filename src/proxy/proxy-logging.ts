@@ -52,7 +52,7 @@ export function handleIntercept(
     router_key_id: request.routerKey?.id ?? null, original_model: null,
     session_id: sessionId,
   });
-  return reply.status(interceptResponse.statusCode).send(interceptResponse.body);
+  return reply.code(interceptResponse.statusCode).send(interceptResponse.body);
 }
 
 // ---------- New-architecture logging ----------

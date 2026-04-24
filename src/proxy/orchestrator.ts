@@ -161,7 +161,7 @@ export class ProxyOrchestrator {
         reply.header(key, value);
       }
     }
-    reply.status(result.statusCode).send(result.body);
+    reply.code(result.statusCode).send(result.body);
   }
 
   private extractTrackStatus(
