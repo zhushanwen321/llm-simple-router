@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { lookupContextWindow, parseModels, MODEL_CONTEXT_WINDOWS, DEFAULT_CONTEXT_WINDOW, COMPACT_THRESHOLD } from '../src/config/model-context'
+import { lookupContextWindow, parseModels, buildModelInfoList, MODEL_CONTEXT_WINDOWS, DEFAULT_CONTEXT_WINDOW, COMPACT_THRESHOLD } from '../src/config/model-context'
 
 describe('model-context', () => {
   it('lookupContextWindow returns known value', () => {
@@ -11,22 +11,28 @@ describe('model-context', () => {
     expect(lookupContextWindow('unknown-model')).toBe(DEFAULT_CONTEXT_WINDOW)
   })
 
-  it('parseModels handles old string[] format', () => {
+  it('parseModels handles string[] format', () => {
     const result = parseModels('["glm-5","unknown"]')
-    expect(result).toEqual([
-      { name: 'glm-5', context_window: 200000 },
-      { name: 'unknown', context_window: 200000 },
-    ])
+    expect(result).toEqual(['glm-5', 'unknown'])
   })
 
-  it('parseModels handles new object[] format', () => {
+  it('parseModels normalizes object[] to string[]', () => {
     const result = parseModels('[{"name":"glm-5","context_window":128000}]')
-    expect(result).toEqual([{ name: 'glm-5', context_window: 128000 }])
+    expect(result).toEqual(['glm-5'])
   })
 
   it('parseModels handles empty', () => {
     expect(parseModels('[]')).toEqual([])
     expect(parseModels('')).toEqual([])
+  })
+
+  it('buildModelInfoList enriches names with overrides and defaults', () => {
+    const overrides = new Map([['glm-5', 999000]])
+    const result = buildModelInfoList(['glm-5', 'unknown'], overrides)
+    expect(result).toEqual([
+      { name: 'glm-5', context_window: 999000 },
+      { name: 'unknown', context_window: 200000 },
+    ])
   })
 
   it('COMPACT_THRESHOLD is 1M', () => {

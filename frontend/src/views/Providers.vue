@@ -290,9 +290,10 @@ function onPresetChange() {
   form.value.name = preset.presetName
   form.value.api_type = preset.apiType
   form.value.base_url = preset.baseUrl
-  form.value.models = preset.models.map(m =>
-    typeof m === 'string' ? { name: m, context_window: DEFAULT_CONTEXT_WINDOW } : { name: m.name, context_window: m.context_window ?? DEFAULT_CONTEXT_WINDOW }
-  )
+  form.value.models = preset.models.map(name => ({
+    name,
+    context_window: DEFAULT_CONTEXT_WINDOW,
+  }))
 }
 
 async function loadProviders() {

@@ -6,7 +6,7 @@ export interface ProviderPreset {
   presetName: string
   apiType: 'openai' | 'anthropic'
   baseUrl: string
-  models: Array<string | { name: string; context_window?: number }>
+  models: string[]
 }
 
 export interface ProviderGroup {
