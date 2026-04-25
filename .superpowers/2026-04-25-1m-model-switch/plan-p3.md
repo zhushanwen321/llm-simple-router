@@ -34,8 +34,9 @@ export interface SelectedValue {
 
 ```vue
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { onClickOutside } from '@vueuse/core'
+import { ChevronDown, ChevronRight } from 'lucide-vue-next'
 import type { ProviderGroup, ModelOption, SelectedValue } from './cascading-types'
 
 const props = defineProps<{
@@ -105,7 +106,7 @@ onMounted(() => {
     <div
       v-if="open"
       ref="dropdownRef"
-      class="absolute z-50 mt-1 min-w-[220px] rounded-md border bg-popover
+      class="absolute z-50 mt-1 min-w-56 rounded-md border bg-popover
         text-popover-foreground shadow-md"
     >
       <div class="py-1">
@@ -123,7 +124,7 @@ onMounted(() => {
           <!-- 二级模型列表 -->
           <div
             v-if="activeProviderId === group.provider.id"
-            class="absolute left-full top-0 ml-1 min-w-[180px] rounded-md border
+            class="absolute left-full top-0 ml-1 min-w-48 rounded-md border
               bg-popover text-popover-foreground shadow-md py-1"
           >
             <div
@@ -186,6 +187,24 @@ const providerGroups = computed<ProviderGroup[]>(() =>
 ```
 
 将 `providerGroups` 作为 prop 传递给 `MappingGroupFormDialog`。
+
+同时构建 `contextWindowMap` 供溢出过滤使用：
+
+```typescript
+const contextWindowMap = computed(() => {
+  const map = new Map<string, number>()
+  for (const p of providers.value) {
+    for (const m of p.models ?? []) {
+      if (m.context_window != null) {
+        map.set(`${p.id}:${m.name}`, m.context_window)
+      }
+    }
+  }
+  return map
+})
+```
+
+将 `providerGroups` 和 `contextWindowMap` 都作为 prop 传递给 `MappingGroupFormDialog`。
 
 ### Step 2: 重构 dialog 模板
 
