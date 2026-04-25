@@ -354,7 +354,7 @@ function buildPayload(): ProviderFormPayload {
     name: form.value.name,
     api_type: form.value.api_type,
     base_url: form.value.base_url,
-    models: form.value.models,
+    models: form.value.models.map(m => ({ name: m.name, context_window: m.context_window ?? undefined })),
     is_active: form.value.is_active ? 1 : 0,
     max_concurrency: concurrencyEnabled.value ? form.value.max_concurrency : 0,
     queue_timeout_ms: concurrencyEnabled.value ? form.value.queue_timeout_ms : 0,
