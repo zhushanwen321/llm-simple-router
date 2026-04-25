@@ -400,7 +400,12 @@ async function handleDelete() {
 }
 
 onMounted(async () => {
-  try { providerPresets.value = await api.recommended.getProviders() } catch { providerPresets.value = []; console.error('Failed to load provider presets') }
-  await loadProviders()
+  const [presetsResult] = await Promise.allSettled([api.recommended.getProviders(), loadProviders()])
+  if (presetsResult.status === 'fulfilled') {
+    providerPresets.value = presetsResult.value
+  } else {
+    providerPresets.value = []
+    console.error('Failed to load provider presets:', presetsResult.reason)
+  }
 })
 </script>

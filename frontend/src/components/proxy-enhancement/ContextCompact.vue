@@ -8,7 +8,11 @@
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div class="flex items-center gap-3">
+        <div v-if="loading" class="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 class="w-4 h-4 animate-spin" />
+          加载中...
+        </div>
+        <div v-else class="flex items-center gap-3">
           <Switch id="context-compact-toggle" v-model="enabled" />
           <Label for="context-compact-toggle">
             {{ enabled ? '已启用' : '已禁用' }}
@@ -146,6 +150,7 @@ import { Textarea } from '@/components/ui/textarea'
 
 const enabled = ref(false)
 const saving = ref(false)
+const loading = ref(true)
 const instructionsOpen = ref(false)
 const selectedProviderId = ref<string | undefined>(undefined)
 const selectedModel = ref<string | undefined>(undefined)
@@ -237,5 +242,6 @@ async function handleSave() {
 
 onMounted(async () => {
   await Promise.allSettled([loadConfig(), loadCompactModels()])
+  loading.value = false
 })
 </script>
