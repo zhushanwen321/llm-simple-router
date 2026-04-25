@@ -1,3 +1,9 @@
+/** 模型信息（含上下文窗口大小） */
+export interface ModelInfo {
+  name: string
+  context_window: number | null
+}
+
 /** 映射组（列表项，rule 为 JSON 字符串） */
 export interface MappingGroup {
   id: string
@@ -14,7 +20,7 @@ export interface Provider {
   api_type: string
   base_url: string
   api_key: string
-  models: string[]
+  models: ModelInfo[]
   is_active: number
   max_concurrency: number
   queue_timeout_ms: number
