@@ -24,6 +24,7 @@ import type { RetryRuleMatcher } from "./retry-rules.js";
 import type { ProxyOrchestrator } from "./orchestrator.js";
 import type { ProxyErrorFormatter, ProxyErrorResponse } from "./proxy-core.js";
 import { buildTransportFn } from "./transport-fn.js";
+import { parseModels, COMPACT_THRESHOLD } from "../config/model-context.js";
 
 const HTTP_ERROR_THRESHOLD = 400;
 
@@ -165,7 +166,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
       isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null, sessionId,
     };
 
-    const resolved = resolveMapping(deps.db, effectiveModel, { now: new Date(), excludeTargets });
+    let resolved = resolveMapping(deps.db, effectiveModel, { now: new Date(), excludeTargets });
     request.log.debug({ logId, model: effectiveModel, apiType, isStream, action: "resolve_mapping", resolved: !!resolved });
 
     if (!resolved) {
@@ -189,7 +190,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
       }
     }
 
-    const provider = getProviderById(deps.db, resolved.provider_id);
+    let provider = getProviderById(deps.db, resolved.provider_id);
     if (!provider || !provider.is_active) {
       return rejectAndReply(reply, rCtx, errors.providerUnavailable(),
         `Provider '${resolved.provider_id}' unavailable`, resolved.provider_id);
@@ -200,6 +201,38 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
     }
 
     body.model = resolved.backend_model;
+
+    // --- 1M Context Compact ---
+    const compactConfig = getCompactConfig(deps.db);
+    if (compactConfig) {
+      if (isCompactRequest(body.messages as unknown[])) {
+        // compact 请求 -> 重定向到 1M 模型
+        const compactProvider = compactConfig.compact_provider_id
+          ? getProviderById(deps.db, compactConfig.compact_provider_id)
+          : undefined;
+        if (compactProvider && compactConfig.compact_model) {
+          request.log.info({ from: resolved.backend_model, to: compactConfig.compact_model }, "redirecting compact request to 1M model");
+          resolved = { backend_model: compactConfig.compact_model, provider_id: compactProvider.id };
+          provider = compactProvider;
+          body.model = compactConfig.compact_model;
+          if (compactConfig.custom_prompt_enabled && compactConfig.custom_prompt) {
+            body.messages = replaceCompactPrompt(body.messages as unknown[], compactConfig.custom_prompt);
+          }
+        }
+      } else {
+        // 普通请求 -> 检查上下文超限（仅对 context_window < 1M 的模型检查）
+        const modelCtx = getModelContextWindow(deps.db, resolved.provider_id, resolved.backend_model);
+        if (modelCtx && modelCtx < COMPACT_THRESHOLD) {
+          const estimated = estimateTokens(body);
+          if (estimated > modelCtx) {
+            request.log.info({ model: resolved.backend_model, estimated, limit: modelCtx }, "context overflow detected");
+            return rejectAndReply(reply, rCtx, errors.promptTooLong(),
+              `Context overflow: ${estimated} tokens > ${modelCtx} limit`, resolved.provider_id);
+          }
+        }
+      }
+    }
+
     const apiKey = decrypt(provider.api_key, getSetting(deps.db, "encryption_key")!);
     options?.beforeSendProxy?.(body, isStream);
 
@@ -298,4 +331,60 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
       return reply.code(err.statusCode).send(err.body);
     }
   }
+}
+
+// --- 1M Context Compact helpers ---
+
+interface CompactConfig {
+  context_compact_enabled: boolean;
+  compact_provider_id: string | null;
+  compact_model: string | null;
+  custom_prompt_enabled: boolean;
+  custom_prompt: string | null;
+}
+
+const COMPACT_MARKERS = [
+  "CRITICAL: Respond with TEXT ONLY",
+  "Your task is to create a detailed summary of the conversation so far",
+];
+
+function isCompactRequest(messages: unknown[]): boolean {
+  if (!Array.isArray(messages) || messages.length === 0) return false;
+  const last = messages[messages.length - 1] as Record<string, unknown> | undefined;
+  if (!last) return false;
+  const text = typeof last.content === "string" ? last.content : JSON.stringify(last.content ?? "");
+  return COMPACT_MARKERS.some(marker => text.includes(marker));
+}
+
+// 使用 o200k_base (GPT-4o) BPE tokenizer 做精确 token 计数
+// 不同模型 tokenizer 有差异，但作为溢出检测安全网已足够
+import { countTokens } from "gpt-tokenizer";
+
+function estimateTokens(body: Record<string, unknown>): number {
+  return countTokens(JSON.stringify(body));
+}
+
+function getCompactConfig(db: Database.Database): CompactConfig | null {
+  const raw = getSetting(db, "proxy_enhancement");
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed.context_compact_enabled ? (parsed as CompactConfig) : null;
+  } catch { /* eslint-disable-line taste/no-silent-catch -- proxy_enhancement 配置无效时静默降级 */ }
+  return null;
+}
+
+function getModelContextWindow(db: Database.Database, providerId: string, modelName: string): number | null {
+  const prov = getProviderById(db, providerId);
+  if (!prov) return null;
+  const models = parseModels(prov.models || "[]");
+  const found = models.find(m => m.name === modelName);
+  return found?.context_window ?? null;
+}
+
+function replaceCompactPrompt(messages: unknown[], customPrompt: string): unknown[] {
+  if (!Array.isArray(messages) || messages.length === 0) return messages;
+  const last = { ...(messages[messages.length - 1] as Record<string, unknown>) };
+  last.content = customPrompt;
+  return [...messages.slice(0, -1), last];
 }

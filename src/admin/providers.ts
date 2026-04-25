@@ -9,6 +9,7 @@ import { ProviderSemaphoreManager } from "../proxy/semaphore.js";
 import type { RequestTracker } from "../monitor/request-tracker.js";
 import { HTTP_CREATED, HTTP_NOT_FOUND, HTTP_CONFLICT, HTTP_BAD_REQUEST } from "./constants.js";
 import { API_CODE, apiError } from "./api-response.js";
+import { parseModels } from "../config/model-context.js";
 
 const API_KEY_PREVIEW_MIN_LENGTH = 8;
 const API_KEY_PREVIEW_PREFIX_LEN = 4;
@@ -20,7 +21,10 @@ const CreateProviderSchema = Type.Object({
   api_type: Type.Union([Type.Literal("openai"), Type.Literal("anthropic")]),
   base_url: Type.String({ minLength: 1 }),
   api_key: Type.String({ minLength: 1 }),
-  models: Type.Optional(Type.Array(Type.String())),
+  models: Type.Optional(Type.Array(Type.Union([
+    Type.String(),
+    Type.Object({ name: Type.String(), context_window: Type.Optional(Type.Number()) })
+  ]))),
   is_active: Type.Optional(Type.Number()),
   max_concurrency: Type.Optional(Type.Integer({ minimum: 0 })),
   queue_timeout_ms: Type.Optional(Type.Integer({ minimum: 0 })),
@@ -32,7 +36,10 @@ const UpdateProviderSchema = Type.Object({
   api_type: Type.Optional(Type.Union([Type.Literal("openai"), Type.Literal("anthropic")])),
   base_url: Type.Optional(Type.String({ minLength: 1 })),
   api_key: Type.Optional(Type.String({ minLength: 1 })),
-  models: Type.Optional(Type.Array(Type.String())),
+  models: Type.Optional(Type.Array(Type.Union([
+    Type.String(),
+    Type.Object({ name: Type.String(), context_window: Type.Optional(Type.Number()) })
+  ]))),
   is_active: Type.Optional(Type.Number()),
   max_concurrency: Type.Optional(Type.Integer({ minimum: 0 })),
   queue_timeout_ms: Type.Optional(Type.Integer({ minimum: 0 })),
@@ -57,7 +64,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
       api_type: s.api_type,
       base_url: s.base_url,
       api_key: s.api_key ? decrypt(s.api_key, encryptionKey) : "",
-      models: JSON.parse(s.models || "[]"),
+      models: parseModels(s.models || "[]"),
       is_active: s.is_active,
       max_concurrency: s.max_concurrency,
       queue_timeout_ms: s.queue_timeout_ms,
@@ -84,7 +91,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
       base_url: body.base_url,
       api_key: encryptedKey,
       api_key_preview: body.api_key.length > API_KEY_PREVIEW_MIN_LENGTH ? `${body.api_key.slice(0, API_KEY_PREVIEW_PREFIX_LEN)}...${body.api_key.slice(-API_KEY_PREVIEW_PREFIX_LEN)}` : "****",
-      models: JSON.stringify(body.models ?? []),
+      models: JSON.stringify((body.models ?? []).map((m: string | { name: string; context_window?: number }) => typeof m === 'string' ? { name: m } : m)),
       is_active: body.is_active ?? 1,
       max_concurrency: body.max_concurrency ?? PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency,
       queue_timeout_ms: body.queue_timeout_ms ?? PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms,
@@ -119,7 +126,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     if (body.api_type !== undefined) fields.api_type = body.api_type;
     if (body.base_url !== undefined) fields.base_url = body.base_url;
     if (body.is_active !== undefined) fields.is_active = body.is_active;
-    if (body.models !== undefined) fields.models = JSON.stringify(body.models);
+    if (body.models !== undefined) fields.models = JSON.stringify(body.models.map((m: string | { name: string; context_window?: number }) => typeof m === 'string' ? { name: m } : m));
     if (body.max_concurrency !== undefined) fields.max_concurrency = body.max_concurrency;
     if (body.queue_timeout_ms !== undefined) fields.queue_timeout_ms = body.queue_timeout_ms;
     if (body.max_queue_size !== undefined) fields.max_queue_size = body.max_queue_size;

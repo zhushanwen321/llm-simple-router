@@ -40,7 +40,10 @@
             </TableCell>
             <TableCell>
               <div class="flex flex-wrap gap-1">
-                <Badge v-for="m in (p.models || [])" :key="m" variant="secondary" class="text-xs">{{ m }}</Badge>
+                <Badge v-for="m in (p.models || [])" :key="m.name" variant="secondary" class="text-xs">
+                  {{ m.name }}
+                  <span v-if="m.context_window" class="ml-1 text-muted-foreground">({{ formatContextWindow(m.context_window) }})</span>
+                </Badge>
                 <span v-if="!p.models?.length" class="text-muted-foreground text-xs">-</span>
               </div>
             </TableCell>
@@ -112,12 +115,14 @@
             <Label class="block text-sm font-medium text-foreground mb-1">可用模型</Label>
             <div class="flex flex-wrap gap-1.5 mb-1.5">
               <Badge v-for="(m, i) in form.models" :key="i" variant="secondary" class="gap-1 pr-1">
-                {{ m }}
+                {{ m.name }}
+                <span class="text-muted-foreground">({{ formatContextWindow(m.context_window ?? DEFAULT_CONTEXT_WINDOW) }})</span>
                 <Button type="button" variant="ghost" size="icon" class="h-4 w-4 rounded-full hover:bg-muted p-0 text-xs leading-none" @click="removeModel(i)">&times;</Button>
               </Badge>
             </div>
             <div class="flex gap-2">
               <Input v-model="modelInput" placeholder="输入模型名称，多个用逗号分隔" @keydown.enter.prevent="addModel" class="flex-1" />
+              <Input v-model.number="modelContextWindow" type="number" placeholder="上下文窗口 (tokens)" class="w-40" />
               <Button type="button" variant="outline" size="sm" @click="addModel" :disabled="!modelInput.trim()">添加</Button>
             </div>
           </div>
@@ -177,7 +182,7 @@ import { ref, computed, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
 import * as z from 'zod'
 import { api, type ProviderPayload, type ProviderGroup } from '@/api/client'
-import type { Provider } from '@/types/mapping'
+import type { Provider, ModelInfo } from '@/types/mapping'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -195,8 +200,12 @@ const DEFAULT_QUEUE_TIMEOUT_MS = 120_000
 const DEFAULT_QUEUE_SIZE = 10
 const MAX_CONCURRENCY = 100
 const MAX_QUEUE_SIZE = 1000
-const DEFAULT_FORM = { name: '', api_type: 'anthropic', base_url: '', api_key: '', models: [] as string[], is_active: true, max_concurrency: DEFAULT_CONCURRENCY, queue_timeout_ms: DEFAULT_QUEUE_TIMEOUT_MS, max_queue_size: DEFAULT_QUEUE_SIZE }
+const DEFAULT_CONTEXT_WINDOW = 200_000
+const CONTEXT_K = 1000
+const CONTEXT_M = 1_000_000
+const DEFAULT_FORM = { name: '', api_type: 'anthropic', base_url: '', api_key: '', models: [] as ModelInfo[], is_active: true, max_concurrency: DEFAULT_CONCURRENCY, queue_timeout_ms: DEFAULT_QUEUE_TIMEOUT_MS, max_queue_size: DEFAULT_QUEUE_SIZE }
 const modelInput = ref('')
+const modelContextWindow = ref(DEFAULT_CONTEXT_WINDOW)
 
 const providers = ref<Provider[]>([])
 const providerPresets = ref<ProviderGroup[]>([])
@@ -244,6 +253,12 @@ function maskKey(key: string): string {
   return visible + '*'.repeat(MASK_ASTERISK_COUNT)
 }
 
+function formatContextWindow(tokens: number): string {
+  if (tokens >= CONTEXT_M) return `${tokens / CONTEXT_M}M`
+  if (tokens >= CONTEXT_K) return `${tokens / CONTEXT_K}K`
+  return String(tokens)
+}
+
 async function copyKey(key: string, id: string) {
   await navigator.clipboard.writeText(key)
   copiedId.value = id
@@ -275,7 +290,9 @@ function onPresetChange() {
   form.value.name = preset.presetName
   form.value.api_type = preset.apiType
   form.value.base_url = preset.baseUrl
-  form.value.models = [...preset.models]
+  form.value.models = preset.models.map(m =>
+    typeof m === 'string' ? { name: m, context_window: DEFAULT_CONTEXT_WINDOW } : { name: m.name, context_window: m.context_window ?? DEFAULT_CONTEXT_WINDOW }
+  )
 }
 
 async function loadProviders() {
@@ -293,11 +310,12 @@ function addModel() {
   if (!input) return
   const names = input.split(/[,，]/).map(s => s.trim()).filter(Boolean)
   for (const name of names) {
-    if (!form.value.models.includes(name)) {
-      form.value.models.push(name)
+    if (!form.value.models.some(m => m.name === name)) {
+      form.value.models.push({ name, context_window: modelContextWindow.value || DEFAULT_CONTEXT_WINDOW })
     }
   }
   modelInput.value = ''
+  modelContextWindow.value = DEFAULT_CONTEXT_WINDOW
 }
 
 function removeModel(index: number) {
@@ -306,9 +324,10 @@ function removeModel(index: number) {
 
 function openCreate() {
   editingId.value = null
-  form.value = { ...DEFAULT_FORM }
+  form.value = { ...DEFAULT_FORM, models: [] }
   concurrencyEnabled.value = true
   modelInput.value = ''
+  modelContextWindow.value = DEFAULT_CONTEXT_WINDOW
   presetGroup.value = ''
   presetPlan.value = ''
   errors.value = {}
@@ -317,9 +336,10 @@ function openCreate() {
 
 function openEdit(p: Provider) {
   editingId.value = p.id
-  form.value = { name: p.name, api_type: p.api_type, base_url: p.base_url, api_key: '', models: [...(p.models || [])], is_active: !!p.is_active, max_concurrency: p.max_concurrency ?? DEFAULT_CONCURRENCY, queue_timeout_ms: p.queue_timeout_ms ?? DEFAULT_QUEUE_TIMEOUT_MS, max_queue_size: p.max_queue_size ?? DEFAULT_QUEUE_SIZE }
+  form.value = { name: p.name, api_type: p.api_type, base_url: p.base_url, api_key: '', models: (p.models || []).map(m => ({ name: m.name, context_window: m.context_window ?? DEFAULT_CONTEXT_WINDOW })), is_active: !!p.is_active, max_concurrency: p.max_concurrency ?? DEFAULT_CONCURRENCY, queue_timeout_ms: p.queue_timeout_ms ?? DEFAULT_QUEUE_TIMEOUT_MS, max_queue_size: p.max_queue_size ?? DEFAULT_QUEUE_SIZE }
   concurrencyEnabled.value = (p.max_concurrency ?? 0) > 0
   modelInput.value = ''
+  modelContextWindow.value = DEFAULT_CONTEXT_WINDOW
   presetGroup.value = ''
   presetPlan.value = ''
   errors.value = {}

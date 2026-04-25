@@ -88,7 +88,7 @@ export interface ProviderPreset {
   presetName: string
   apiType: 'openai' | 'anthropic'
   baseUrl: string
-  models: string[]
+  models: Array<string | { name: string; context_window?: number }>
 }
 
 export interface ProviderGroup {
@@ -111,7 +111,7 @@ export interface ProviderPayload {
   api_type: string
   base_url: string
   api_key?: string
-  models?: string[]
+  models?: Array<string | { name: string; context_window?: number }>
   is_active: number
   max_concurrency?: number
   queue_timeout_ms?: number
@@ -369,9 +369,11 @@ export const api = {
   deleteRetryRule: (id: string) => request<{ success: boolean }>('delete', `${API.RETRY_RULES}/${id}`),
 
   getProxyEnhancement: () =>
-    request<{ claude_code_enabled: boolean }>('get', API.PROXY_ENHANCEMENT),
-  updateProxyEnhancement: (data: { claude_code_enabled: boolean }) =>
+    request<Record<string, unknown>>('get', API.PROXY_ENHANCEMENT),
+  updateProxyEnhancement: (data: Record<string, unknown>) =>
     request<{ success: boolean }>('put', API.PROXY_ENHANCEMENT, data),
+  getCompactModels: () =>
+    request<Array<{ provider_id: string; provider_name: string; model: string; context_window: number }>>('get', `${API.PROXY_ENHANCEMENT}/compact-models`),
 
   getSessionStates: () => request<SessionState[]>('get', API.SESSION_STATES),
   getSessionHistory: (keyId: string, sessionId: string) =>
