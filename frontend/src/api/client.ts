@@ -267,6 +267,23 @@ export interface ConfigExportResponse {
   data: Record<string, unknown[]>;
 }
 
+export interface ProxyEnhancementConfig {
+  claude_code_enabled: boolean
+  context_compact_enabled: boolean
+  compact_provider_id: string | null
+  compact_model: string | null
+  custom_prompt_enabled: boolean
+  custom_prompt: string | null
+  default_compact_prompt: string
+}
+
+export interface CompactModelEntry {
+  provider_id: string
+  provider_name: string
+  model: string
+  context_window: number
+}
+
 export interface UpgradeStatus {
   npm: {
     hasUpdate: boolean
@@ -369,11 +386,11 @@ export const api = {
   deleteRetryRule: (id: string) => request<{ success: boolean }>('delete', `${API.RETRY_RULES}/${id}`),
 
   getProxyEnhancement: () =>
-    request<Record<string, unknown>>('get', API.PROXY_ENHANCEMENT),
-  updateProxyEnhancement: (data: Record<string, unknown>) =>
+    request<ProxyEnhancementConfig>('get', API.PROXY_ENHANCEMENT),
+  updateProxyEnhancement: (data: ProxyEnhancementConfig) =>
     request<{ success: boolean }>('put', API.PROXY_ENHANCEMENT, data),
   getCompactModels: () =>
-    request<Array<{ provider_id: string; provider_name: string; model: string; context_window: number }>>('get', `${API.PROXY_ENHANCEMENT}/compact-models`),
+    request<CompactModelEntry[]>('get', `${API.PROXY_ENHANCEMENT}/compact-models`),
 
   getSessionStates: () => request<SessionState[]>('get', API.SESSION_STATES),
   getSessionHistory: (keyId: string, sessionId: string) =>

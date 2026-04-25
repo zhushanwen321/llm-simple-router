@@ -9,8 +9,10 @@ export interface TimeRange {
   endTime: string;
 }
 
-// 5 小时窗口，与 usage-windows 的默认窗口时长对齐
-const WINDOW_DURATION_MS = 5 * 3600_000;
+const WINDOW_HOURS = 5
+const MS_PER_HOUR = 3600_000
+// 与 usage-windows 的默认窗口时长对齐
+const WINDOW_DURATION_MS = WINDOW_HOURS * MS_PER_HOUR
 
 export function resolveTimeRange(
   period: DashboardPeriod,
@@ -47,8 +49,10 @@ export function resolveTimeRange(
 export function getMonday(date: Date): Date {
   const d = new Date(date);
   const day = d.getDay();
-  // 周日 getDay()=0，需要回退到上周一
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  // 周日 getDay()=0，需要回退到上周一；+1 将周日=0 映射到周一=1 基准
+  const SUNDAY_OFFSET = -6;
+  const MONDAY_BASE = 1;
+  const diff = d.getDate() - day + (day === 0 ? SUNDAY_OFFSET : MONDAY_BASE);
   d.setDate(diff);
   return d;
 }

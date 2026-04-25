@@ -134,7 +134,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
-import { api } from '@/api/client'
+import { api, type CompactModelEntry } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { ChevronDown, Loader2 } from 'lucide-vue-next'
@@ -143,13 +143,6 @@ import { Label } from '@/components/ui/label'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-
-interface CompactModelEntry {
-  provider_id: string
-  provider_name: string
-  model: string
-  context_window: number
-}
 
 const enabled = ref(false)
 const saving = ref(false)
@@ -242,8 +235,7 @@ async function handleSave() {
   }
 }
 
-onMounted(() => {
-  loadConfig()
-  loadCompactModels()
+onMounted(async () => {
+  await Promise.allSettled([loadConfig(), loadCompactModels()])
 })
 </script>

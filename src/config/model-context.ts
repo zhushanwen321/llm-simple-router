@@ -91,15 +91,19 @@ export function lookupContextWindow(modelName: string): number {
 
 export function parseModels(raw: string): ModelInfo[] {
   if (!raw) return []
-  const parsed = JSON.parse(raw)
-  if (!Array.isArray(parsed) || parsed.length === 0) return []
-  if (typeof parsed[0] === 'string') {
-    return (parsed as string[]).map(name => ({
-      name,
-      context_window: MODEL_CONTEXT_WINDOWS[name] ?? DEFAULT_CONTEXT_WINDOW,
-    }))
+  try {
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed) || parsed.length === 0) return []
+    if (typeof parsed[0] === 'string') {
+      return (parsed as string[]).map(name => ({
+        name,
+        context_window: MODEL_CONTEXT_WINDOWS[name] ?? DEFAULT_CONTEXT_WINDOW,
+      }))
+    }
+    return parsed as ModelInfo[]
+  } catch {
+    return []
   }
-  return parsed as ModelInfo[]
 }
 
 export function serializeModels(models: ModelInfo[]): string {
