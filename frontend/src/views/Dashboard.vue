@@ -233,7 +233,7 @@ import {
   Filler,
 } from 'chart.js'
 import { Line } from 'vue-chartjs'
-import { api } from '@/api/client'
+import { api, getApiMessage } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -334,7 +334,7 @@ async function loadStats() {
     stats.value = res
   } catch (e: unknown) {
     console.error('Failed to load stats:', e)
-    toast.error((e as { apiMessage?: string }).apiMessage || '加载统计数据失败')
+    toast.error(getApiMessage(e, '加载统计数据失败'))
     stats.value = { totalRequests: 0, successRate: 0, avgTps: 0, totalTokens: 0 }
   }
 }

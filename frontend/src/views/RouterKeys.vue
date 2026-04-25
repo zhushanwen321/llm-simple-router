@@ -130,7 +130,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
-import { api } from '@/api/client'
+import { api, getApiMessage } from '@/api/client'
 import { formatTime } from '@/utils/format'
 import { useClipboard } from '@/composables/useClipboard'
 import { Button } from '@/components/ui/button'
@@ -188,7 +188,7 @@ async function loadData() {
     if (modelsRes.status === 'fulfilled') availableModels.value = modelsRes.value
   } catch (e: unknown) {
     console.error('Failed to load data:', e)
-    toast.error((e as { apiMessage?: string }).apiMessage || '加载数据失败')
+    toast.error(getApiMessage(e, '加载数据失败'))
   }
 }
 
@@ -242,7 +242,7 @@ async function handleSave() {
     await loadData()
   } catch (e: unknown) {
     console.error('Failed to save router key:', e)
-    toast.error((e as { apiMessage?: string }).apiMessage || '保存密钥失败')
+    toast.error(getApiMessage(e, '保存密钥失败'))
   }
 }
 
@@ -259,7 +259,7 @@ async function handleDelete() {
     await loadData()
   } catch (e: unknown) {
     console.error('Failed to delete router key:', e)
-    toast.error((e as { apiMessage?: string }).apiMessage || '删除密钥失败')
+    toast.error(getApiMessage(e, '删除密钥失败'))
   }
 }
 

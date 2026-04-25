@@ -1,7 +1,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
 import type { ChartData } from 'chart.js'
-import { api } from '@/api/client'
+import { api, getApiMessage } from '@/api/client'
 import { fillTimeseries } from '@/views/metrics-helpers'
 import { CHART_COLORS } from '@/styles/design-tokens'
 import type { Provider } from '@/types/mapping'
@@ -153,7 +153,7 @@ export function useMetrics() {
       modelOptions.value = [...new Set(summaryRows.value.map((r: SummaryRow) => r.backend_model))]
     } catch (e: unknown) {
       console.error('Failed to load metrics:', e)
-      toast.error((e as { apiMessage?: string }).apiMessage || '加载性能指标失败')
+      toast.error(getApiMessage(e, '加载性能指标失败'))
     } finally {
       loading.value = false
     }
@@ -165,7 +165,7 @@ export function useMetrics() {
       routerKeys.value = res
     } catch (e: unknown) {
       console.error('Failed to load router keys:', e)
-      toast.error((e as { apiMessage?: string }).apiMessage || '加载密钥列表失败')
+      toast.error(getApiMessage(e, '加载密钥列表失败'))
     }
   }
 
@@ -174,7 +174,7 @@ export function useMetrics() {
       providers.value = await api.getProviders()
     } catch (e: unknown) {
       console.error('Failed to load providers:', e)
-      toast.error((e as { apiMessage?: string }).apiMessage || '加载供应商列表失败')
+      toast.error(getApiMessage(e, '加载供应商列表失败'))
     }
   }
 

@@ -40,6 +40,11 @@ client.interceptors.response.use(
   }
 )
 
+/** 从 AxiosError 提取后端错误消息，无则返回 fallback */
+export function getApiMessage(error: unknown, fallback: string): string {
+  return (error as { apiMessage?: string }).apiMessage || fallback
+}
+
 // --- API endpoint constants ---
 
 const API = {

@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import type { FastifyRequest } from "fastify";
 import Database from "better-sqlite3";
-import { getSetting } from "../../db/settings.js";
+import { loadEnhancementConfig } from "../enhancement-config.js";
 import { getActiveProviderModels, resolveByProviderModel } from "../../db/index.js";
 import { resolveMapping } from "../mapping-resolver.js";
 import { parseDirective, parseToolResult, TOOL_USE_ID_PREFIX } from "./directive-parser.js";
@@ -85,15 +85,9 @@ export function applyEnhancement(
 ): EnhancementResult {
   const nullResult: EnhancementResult = { effectiveModel: clientModel, originalModel: null, interceptResponse: null };
 
-  const enhancementRaw = getSetting(db, "proxy_enhancement");
-  let enhancement: { claude_code_enabled?: boolean } | null = null;
-  try {
-    enhancement = enhancementRaw ? JSON.parse(enhancementRaw) : null;
-  } catch {
-    request.log.warn("Invalid proxy_enhancement JSON, feature disabled");
-  }
+  const enhancement = loadEnhancementConfig(db);
 
-  if (enhancement?.claude_code_enabled !== true) {
+  if (!enhancement.claude_code_enabled) {
     return nullResult;
   }
 

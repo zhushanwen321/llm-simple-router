@@ -138,7 +138,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
-import { api, type CompactModelEntry } from '@/api/client'
+import { api, getApiMessage, type CompactModelEntry } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { ChevronDown, Loader2 } from 'lucide-vue-next'
@@ -193,7 +193,7 @@ async function loadConfig() {
     defaultPrompt.value = data.default_compact_prompt ?? ''
   } catch (e: unknown) {
     console.error('Failed to load context compact config:', e)
-    toast.error((e as { apiMessage?: string }).apiMessage || '加载配置失败')
+    toast.error(getApiMessage(e, '加载配置失败'))
   }
 }
 
@@ -202,7 +202,7 @@ async function loadCompactModels() {
     compactModels.value = await api.getCompactModels()
   } catch (e: unknown) {
     console.error('Failed to load compact models:', e)
-    toast.error((e as { apiMessage?: string }).apiMessage || '加载压缩模型列表失败')
+    toast.error(getApiMessage(e, '加载压缩模型列表失败'))
   }
 }
 
@@ -234,7 +234,7 @@ async function handleSave() {
     toast.success('保存成功')
   } catch (e: unknown) {
     console.error('Failed to save context compact config:', e)
-    toast.error((e as { apiMessage?: string }).apiMessage || '保存失败')
+    toast.error(getApiMessage(e, '保存失败'))
   } finally {
     saving.value = false
   }

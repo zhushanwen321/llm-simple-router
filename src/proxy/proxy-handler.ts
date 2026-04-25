@@ -25,13 +25,11 @@ import type { ProxyOrchestrator } from "./orchestrator.js";
 import type { ProxyErrorFormatter, ProxyErrorResponse } from "./proxy-core.js";
 import { buildTransportFn } from "./transport-fn.js";
 import {
-  isCompactRequest,
   estimateTokens,
-  getCompactConfig,
   getModelContextWindow,
-  replaceCompactPrompt,
-  COMPACT_THRESHOLD,
+  applyCompactRedirect,
 } from "./compact.js";
+import { loadEnhancementConfig } from "./enhancement-config.js";
 
 const HTTP_ERROR_THRESHOLD = 400;
 
@@ -194,7 +192,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
   const { request, reply, apiType, upstreamPath, errors, deps, options, effectiveModel, originalModel, isFailover, originalBody, sessionId } = ctx;
   const excludeTargets: Target[] = [];
   let rootLogId: string | null = null;
-  const compactConfig = getCompactConfig(deps.db);
+  const compactConfig = loadEnhancementConfig(deps.db);
 
   while (true) {
     const startTime = Date.now();
@@ -249,37 +247,19 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
     body.model = resolved.backend_model;
 
     // --- 1M Context Compact ---
-    if (compactConfig) {
-      if (isCompactRequest(body.messages as unknown[])) {
-        // compact 请求 -> 重定向到 1M 模型
-        const compactProvider = compactConfig.compact_provider_id
-          ? getProviderById(deps.db, compactConfig.compact_provider_id)
-          : undefined;
-        if (compactProvider && compactConfig.compact_model) {
-          if (compactProvider.api_type !== apiType) {
-            request.log.warn({ expected: apiType, got: compactProvider.api_type }, "compact provider api_type mismatch, skipping redirect");
-          } else {
-            request.log.info({ from: resolved.backend_model, to: compactConfig.compact_model }, "redirecting compact request to 1M model");
-            resolved = { backend_model: compactConfig.compact_model, provider_id: compactProvider.id };
-            provider = compactProvider;
-            body.model = compactConfig.compact_model;
-            if (compactConfig.custom_prompt_enabled && compactConfig.custom_prompt) {
-              body.messages = replaceCompactPrompt(body.messages as unknown[], compactConfig.custom_prompt);
-            }
-          }
-        }
-      } else {
-        // 普通请求 -> 检查上下文超限（仅对 context_window < 1M 的模型检查）
-        const modelCtx = getModelContextWindow(deps.db, resolved.provider_id, resolved.backend_model);
-        if (modelCtx && modelCtx < COMPACT_THRESHOLD) {
-          const estimated = estimateTokens(body);
-          if (estimated > modelCtx) {
-            request.log.info({ model: resolved.backend_model, estimated, limit: modelCtx }, "context overflow detected");
-            return rejectAndReply(reply, rCtx, errors.promptTooLong(),
-              `Context overflow: ${estimated} tokens > ${modelCtx} limit`, resolved.provider_id);
-          }
-        }
-      }
+    const compactResult = applyCompactRedirect({
+      db: deps.db, config: compactConfig, apiType, body, resolved, log: request.log,
+    });
+    if (compactResult === "overflow") {
+      const modelCtx = getModelContextWindow(deps.db, resolved.provider_id, resolved.backend_model);
+      return rejectAndReply(reply, rCtx, errors.promptTooLong(),
+        `Context overflow: ${estimateTokens(body)} tokens > ${modelCtx} limit`, resolved.provider_id);
+    }
+    if (compactResult) {
+      resolved = compactResult.resolved;
+      provider = compactResult.provider;
+      body.model = compactResult.model;
+      body.messages = compactResult.messages;
     }
 
     patchMissingThinkingBlocks(body, provider.base_url);

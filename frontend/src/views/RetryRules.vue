@@ -183,7 +183,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
-import { api, type RecommendedRetryRule } from '@/api/client'
+import { api, getApiMessage, type RecommendedRetryRule } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -263,7 +263,7 @@ async function loadData() {
     rules.value = res
   } catch (e: unknown) {
     console.error('Failed to load retry rules:', e)
-    toast.error((e as { apiMessage?: string }).apiMessage || '加载数据失败')
+    toast.error(getApiMessage(e, '加载数据失败'))
   }
 }
 
@@ -312,7 +312,7 @@ async function handleSave() {
     await loadData()
   } catch (e: unknown) {
     console.error('Failed to save retry rule:', e)
-    toast.error((e as { apiMessage?: string }).apiMessage || '保存规则失败')
+    toast.error(getApiMessage(e, '保存规则失败'))
   }
 }
 
@@ -329,7 +329,7 @@ async function handleDelete() {
     await loadData()
   } catch (e: unknown) {
     console.error('Failed to delete retry rule:', e)
-    toast.error((e as { apiMessage?: string }).apiMessage || '删除规则失败')
+    toast.error(getApiMessage(e, '删除规则失败'))
   }
 }
 

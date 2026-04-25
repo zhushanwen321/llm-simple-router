@@ -118,7 +118,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
-import { api } from '@/api/client'
+import { api, getApiMessage } from '@/api/client'
 import type { SessionState, SessionHistoryEntry } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
@@ -145,7 +145,7 @@ async function loadConfig() {
     claudeCodeEnabled.value = data.claude_code_enabled
   } catch (e: unknown) {
     console.error('Failed to load proxy enhancement config:', e)
-    toast.error((e as { apiMessage?: string }).apiMessage || '加载配置失败')
+    toast.error(getApiMessage(e, '加载配置失败'))
   }
 }
 
@@ -165,7 +165,7 @@ async function handleSave() {
     toast.success('保存成功')
   } catch (e: unknown) {
     console.error('Failed to save proxy enhancement config:', e)
-    toast.error((e as { apiMessage?: string }).apiMessage || '保存失败')
+    toast.error(getApiMessage(e, '保存失败'))
   } finally {
     saving.value = false
   }
@@ -177,7 +177,7 @@ async function loadSessions() {
     sessions.value = await api.getSessionStates()
   } catch (e: unknown) {
     console.error('Failed to load sessions:', e)
-    toast.error((e as { apiMessage?: string }).apiMessage || '加载 Session 列表失败')
+    toast.error(getApiMessage(e, '加载 Session 列表失败'))
   } finally {
     sessionsLoading.value = false
   }
@@ -190,7 +190,7 @@ async function handleClearSession(session: SessionState) {
     loadSessions()
   } catch (e: unknown) {
     console.error('Failed to clear session:', e)
-    toast.error((e as { apiMessage?: string }).apiMessage || '清除 Session 失败')
+    toast.error(getApiMessage(e, '清除 Session 失败'))
   }
 }
 
@@ -205,7 +205,7 @@ async function handleViewHistory(session: SessionState) {
     sessionHistoryMap.value[key] = history
   } catch (e: unknown) {
     console.error('Failed to load history:', e)
-    toast.error((e as { apiMessage?: string }).apiMessage || '加载历史记录失败')
+    toast.error(getApiMessage(e, '加载历史记录失败'))
   }
 }
 

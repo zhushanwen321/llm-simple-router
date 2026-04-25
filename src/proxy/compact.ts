@@ -1,16 +1,11 @@
 import Database from "better-sqlite3";
 import { countTokens } from "gpt-tokenizer";
-import { getSetting } from "../db/settings.js";
+import type { EnhancementConfig } from "./enhancement-config.js";
 import { lookupContextWindow, COMPACT_THRESHOLD } from "../config/model-context.js";
 import { getModelContextWindowOverride } from "../db/model-info.js";
-
-export interface CompactConfig {
-  context_compact_enabled: boolean;
-  compact_provider_id: string | null;
-  compact_model: string | null;
-  custom_prompt_enabled: boolean;
-  custom_prompt: string | null;
-}
+import { getProviderById } from "../db/index.js";
+import type { Provider } from "../db/providers.js";
+import type { FastifyRequest } from "fastify";
 
 // Claude Code compact prompt 一定以 NO_TOOLS_PREAMBLE 开头，且 content 是纯字符串（非数组）
 const COMPACT_PREAMBLE = "CRITICAL: Respond with TEXT ONLY";
@@ -70,16 +65,6 @@ export function estimateTokens(body: Record<string, unknown>): number {
   return countTokens(JSON.stringify(cleaned)) + imageCount * ESTIMATED_TOKENS_PER_IMAGE;
 }
 
-export function getCompactConfig(db: Database.Database): CompactConfig | null {
-  const raw = getSetting(db, "proxy_enhancement");
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw);
-    return parsed.context_compact_enabled ? (parsed as CompactConfig) : null;
-  } catch { /* eslint-disable-line taste/no-silent-catch -- proxy_enhancement 配置无效时静默降级 */ }
-  return null;
-}
-
 export function getModelContextWindow(db: Database.Database, providerId: string, modelName: string): number | null {
   const override = getModelContextWindowOverride(db, providerId, modelName);
   return override ?? lookupContextWindow(modelName);
@@ -90,6 +75,65 @@ export function replaceCompactPrompt(messages: unknown[], customPrompt: string):
   const last = { ...(messages[messages.length - 1] as Record<string, unknown>) };
   last.content = customPrompt;
   return [...messages.slice(0, -1), last];
+}
+
+export interface CompactRedirect {
+  resolved: { backend_model: string; provider_id: string };
+  provider: Provider;
+  model: string;
+  messages: unknown[];
+}
+
+/**
+ * 处理 1M Context Compact 分支逻辑：
+ * - compact 请求 -> 重定向到 1M 模型
+ * - 普通请求 -> 检查上下文超限
+ * 返回 null 表示无需特殊处理（继续正常流程）。
+ */
+export function applyCompactRedirect(params: {
+  db: Database.Database;
+  config: EnhancementConfig;
+  apiType: "openai" | "anthropic";
+  body: Record<string, unknown>;
+  resolved: { backend_model: string; provider_id: string };
+  log: FastifyRequest["log"];
+}): CompactRedirect | "overflow" | null {
+  const { db, config, apiType, body, resolved, log } = params;
+
+  if (!config.context_compact_enabled) return null;
+
+  if (isCompactRequest(body.messages as unknown[])) {
+    const compactProvider = config.compact_provider_id
+      ? getProviderById(db, config.compact_provider_id)
+      : undefined;
+    if (compactProvider && config.compact_model) {
+      if (compactProvider.api_type !== apiType) {
+        log.warn({ expected: apiType, got: compactProvider.api_type }, "compact provider api_type mismatch, skipping redirect");
+      } else {
+        log.info({ from: resolved.backend_model, to: config.compact_model }, "redirecting compact request to 1M model");
+        return {
+          resolved: { backend_model: config.compact_model, provider_id: compactProvider.id },
+          provider: compactProvider,
+          model: config.compact_model,
+          messages: config.custom_prompt_enabled && config.custom_prompt
+            ? replaceCompactPrompt(body.messages as unknown[], config.custom_prompt)
+            : (body.messages as unknown[]),
+        };
+      }
+    }
+    return null;
+  }
+
+  // 普通请求 -> 检查上下文超限（仅对 context_window < 1M 的模型检查）
+  const modelCtx = getModelContextWindow(db, resolved.provider_id, resolved.backend_model);
+  if (modelCtx && modelCtx < COMPACT_THRESHOLD) {
+    const estimated = estimateTokens(body);
+    if (estimated > modelCtx) {
+      log.info({ model: resolved.backend_model, estimated, limit: modelCtx }, "context overflow detected");
+      return "overflow";
+    }
+  }
+  return null;
 }
 
 export { COMPACT_THRESHOLD };
