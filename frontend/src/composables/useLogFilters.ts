@@ -82,18 +82,18 @@ export function useLogFilters() {
   async function loadProviders() {
     try {
       providers.value = await api.getProviders()
-    } catch (e) {
+    } catch (e: unknown) {
       console.error('Failed to load providers:', e)
-      toast.error('加载供应商列表失败')
+      toast.error((e as { apiMessage?: string }).apiMessage || '加载供应商列表失败')
     }
   }
 
   async function loadRouterKeys() {
     try {
       routerKeys.value = await api.getRouterKeys()
-    } catch (e) {
+    } catch (e: unknown) {
       console.error('Failed to load router keys:', e)
-      toast.error('加载密钥列表失败')
+      toast.error((e as { apiMessage?: string }).apiMessage || '加载密钥列表失败')
     }
   }
 

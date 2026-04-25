@@ -43,7 +43,6 @@ function buildTestApp(
   app.register(openaiProxy, {
     db: mockDb,
     streamTimeoutMs: 5000,
-    retryMaxAttempts: 0,
     retryBaseDelayMs: 0,
     semaphoreManager,
     tracker,

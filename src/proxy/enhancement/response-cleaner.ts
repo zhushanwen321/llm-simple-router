@@ -1,3 +1,5 @@
+import { TOOL_USE_ID_PREFIX } from "./directive-parser.js";
+
 const RE_ROUTER_RESPONSE = /<router-response[^>]*>[\s\S]*?<\/router-response>/g;
 const RE_COMMAND = /\[router-command:/;
 
@@ -29,9 +31,24 @@ export function cleanRouterResponses(body: Record<string, unknown>): Record<stri
           if (RE_COMMAND.test(b.text)) return false;
         }
       }
+      // 清理 router synthetic AskUserQuestion 的 tool_result 回调
+      const toolResultBlocks = blocks.filter(
+        (b) => b && typeof b === "object" && (b as { type?: string }).type === "tool_result"
+          && typeof (b as { tool_use_id?: string }).tool_use_id === "string"
+          && (b as { tool_use_id?: string }).tool_use_id!.startsWith(TOOL_USE_ID_PREFIX),
+      );
+      if (toolResultBlocks.length > 0 && toolResultBlocks.length === blocks.length) return false;
     }
     if (msg.role === "assistant") {
       const blocks = Array.isArray(msg.content) ? msg.content : [msg.content];
+      // 清理 router synthetic AskUserQuestion 的 tool_use 消息
+      const toolUseBlocks = blocks.filter(
+        (b) => b && typeof b === "object" && (b as { type?: string }).type === "tool_use"
+          && (b as { name?: string }).name === "AskUserQuestion"
+          && typeof (b as { id?: string }).id === "string"
+          && (b as { id?: string }).id!.startsWith(TOOL_USE_ID_PREFIX),
+      );
+      if (toolUseBlocks.length > 0 && toolUseBlocks.length === blocks.length) return false;
       const texts = blocks
         .filter((b): b is { type: string; text: string } => b?.type === "text" && typeof b.text === "string")
         .map((b) => b.text);

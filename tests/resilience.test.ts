@@ -13,7 +13,6 @@ function makeTarget(overrides: Partial<Target> = {}): Target {
 }
 const t1 = makeTarget({ backend_model: "gpt-4", provider_id: "p1" });
 const t2 = makeTarget({ backend_model: "claude-3", provider_id: "p2" });
-const t3 = makeTarget({ backend_model: "gemini", provider_id: "p3" });
 
 // ---------- TransportResult factories ----------
 
@@ -32,14 +31,11 @@ function makeStreamError(statusCode = 429, body = "rate limited"): TransportResu
 function makeError(statusCode: number, body = "error"): TransportResult {
   return { kind: "error", statusCode, body, headers: {}, sentHeaders: {}, sentBody: "" };
 }
-function makeThrow(message = "unknown error"): TransportResult {
-  return { kind: "throw", error: new Error(message) };
-}
 
 // ---------- Config factories ----------
 
 function defaultConfig(overrides: Partial<ResilienceConfig> = {}): ResilienceConfig {
-  return { maxRetries: 2, baseDelayMs: 1, failoverThreshold: 400, isFailover: false, ...overrides };
+  return { baseDelayMs: 1, failoverThreshold: 400, isFailover: false, ...overrides };
 }
 function failoverConfig(overrides: Partial<ResilienceConfig> = {}): ResilienceConfig {
   return defaultConfig({ isFailover: true, ...overrides });
@@ -94,7 +90,7 @@ describe("ResilienceLayer.decide()", () => {
     const err = new Error("timeout") as NodeJS.ErrnoException;
     err.code = "ETIMEDOUT";
     const state = { attemptCount: 0, currentTarget: t1, excludedTargets: [] };
-    const decision = layer.decide({ kind: "throw", error: err }, state, defaultConfig({ maxRetries: 2 }));
+    const decision = layer.decide({ kind: "throw", error: err }, state, defaultConfig());
     expect(decision.action).toBe("retry");
     if (decision.action === "retry") expect(decision.delayMs).toBe(1);
   });
@@ -103,8 +99,8 @@ describe("ResilienceLayer.decide()", () => {
     const layer = new ResilienceLayer();
     const err = new Error("timeout") as NodeJS.ErrnoException;
     err.code = "ETIMEDOUT";
-    const state = { attemptCount: 2, currentTarget: t1, excludedTargets: [] };
-    const decision = layer.decide({ kind: "throw", error: err }, state, defaultConfig({ maxRetries: 1, isFailover: false }));
+    const state = { attemptCount: 3, currentTarget: t1, excludedTargets: [] };
+    const decision = layer.decide({ kind: "throw", error: err }, state, defaultConfig({ isFailover: false }));
     expect(decision.action).toBe("abort");
   });
 
@@ -112,8 +108,8 @@ describe("ResilienceLayer.decide()", () => {
     const layer = new ResilienceLayer();
     const err = new Error("timeout") as NodeJS.ErrnoException;
     err.code = "ETIMEDOUT";
-    const state = { attemptCount: 2, currentTarget: t1, excludedTargets: [] };
-    const decision = layer.decide({ kind: "throw", error: err }, state, failoverConfig({ maxRetries: 1 }));
+    const state = { attemptCount: 3, currentTarget: t1, excludedTargets: [] };
+    const decision = layer.decide({ kind: "throw", error: err }, state, failoverConfig());
     expect(decision.action).toBe("failover");
     if (decision.action === "failover") expect(decision.excludeTarget).toEqual(t1);
   });
@@ -121,7 +117,7 @@ describe("ResilienceLayer.decide()", () => {
   it("throw + non-retryable error -> abort", () => {
     const layer = new ResilienceLayer();
     const state = { attemptCount: 0, currentTarget: t1, excludedTargets: [] };
-    const decision = layer.decide({ kind: "throw", error: new Error("fatal") }, state, defaultConfig({ maxRetries: 5 }));
+    const decision = layer.decide({ kind: "throw", error: new Error("fatal") }, state, defaultConfig());
     expect(decision.action).toBe("abort");
   });
 
@@ -129,7 +125,7 @@ describe("ResilienceLayer.decide()", () => {
     const layer = new ResilienceLayer();
     const matcher = createMatcherWithDefaults();
     const state = { attemptCount: 0, currentTarget: t1, excludedTargets: [] };
-    const decision = layer.decide(makeError(429, "rate limited"), state, defaultConfig({ maxRetries: 2, ruleMatcher: matcher }));
+    const decision = layer.decide(makeError(429, "rate limited"), state, defaultConfig({ ruleMatcher: matcher }));
     expect(decision.action).toBe("retry");
   });
 
@@ -137,7 +133,7 @@ describe("ResilienceLayer.decide()", () => {
     const layer = new ResilienceLayer();
     const matcher = createMatcherWithDefaults();
     const state = { attemptCount: 2, currentTarget: t1, excludedTargets: [] };
-    const decision = layer.decide(makeError(429, "rate limited"), state, failoverConfig({ maxRetries: 1, ruleMatcher: matcher }));
+    const decision = layer.decide(makeError(429, "rate limited"), state, failoverConfig({ ruleMatcher: matcher }));
     expect(decision.action).toBe("failover");
   });
 
@@ -159,7 +155,7 @@ describe("ResilienceLayer.decide()", () => {
     const layer = new ResilienceLayer();
     const matcher = createMatcherWithDefaults();
     const state = { attemptCount: 0, currentTarget: t1, excludedTargets: [] };
-    const decision = layer.decide(makeStreamError(429, "rate limited"), state, defaultConfig({ maxRetries: 2, ruleMatcher: matcher }));
+    const decision = layer.decide(makeStreamError(429, "rate limited"), state, defaultConfig({ ruleMatcher: matcher }));
     expect(decision.action).toBe("retry");
   });
 
@@ -172,7 +168,7 @@ describe("ResilienceLayer.decide()", () => {
         max_retries: 2, max_delay_ms: 100 }, pattern: /请稍后/ }]],
     ]);
     const state = { attemptCount: 0, currentTarget: t1, excludedTargets: [] };
-    const decision = layer.decide(makeError(400, "网络错误请稍后重试"), state, defaultConfig({ maxRetries: 2, ruleMatcher: matcher }));
+    const decision = layer.decide(makeError(400, "网络错误请稍后重试"), state, defaultConfig({ ruleMatcher: matcher }));
     expect(decision.action).toBe("retry");
   });
 
@@ -206,7 +202,7 @@ describe("ResilienceLayer.execute()", () => {
       .mockResolvedValueOnce(makeError(429, "rate limited"))
       .mockResolvedValueOnce(makeSuccess(200));
     const targets = () => [t1];
-    const result = await layer.execute(targets, fn, defaultConfig({ maxRetries: 2, ruleMatcher: matcher }));
+    const result = await layer.execute(targets, fn, defaultConfig({ ruleMatcher: matcher }));
     expect(result.result.kind).toBe("success");
     expect(result.attempts).toHaveLength(2);
   });
@@ -216,8 +212,8 @@ describe("ResilienceLayer.execute()", () => {
     const matcher = createMatcherWithDefaults();
     const fn = vi.fn().mockResolvedValue(makeError(429, "rate limited"));
     const targets = () => [t1];
-    const result = await layer.execute(targets, fn, defaultConfig({ maxRetries: 2, ruleMatcher: matcher }));
-    expect(result.result.statusCode).toBe(429);
+    const result = await layer.execute(targets, fn, defaultConfig({ ruleMatcher: matcher }));
+    expect((result.result as { statusCode: number }).statusCode).toBe(429);
     expect(result.attempts).toHaveLength(3);
   });
 
@@ -227,7 +223,7 @@ describe("ResilienceLayer.execute()", () => {
     err.code = "ETIMEDOUT";
     const fn = vi.fn().mockRejectedValueOnce(err).mockResolvedValueOnce(makeSuccess(200));
     const targets = () => [t1];
-    const result = await layer.execute(targets, fn, defaultConfig({ maxRetries: 2 }));
+    const result = await layer.execute(targets, fn, defaultConfig());
     expect(result.result.kind).toBe("success");
     expect(result.attempts).toHaveLength(2);
     expect(result.attempts[0].statusCode).toBeNull();
@@ -258,7 +254,7 @@ describe("ResilienceLayer.execute()", () => {
       .mockResolvedValueOnce(makeError(503, "err2"));
     const targets = () => [t1a, t1b];
     const result = await layer.execute(targets, fn, failoverConfig());
-    expect(result.result.statusCode).toBe(503);
+    expect((result.result as { statusCode: number }).statusCode).toBe(503);
     expect(result.excludedTargets).toEqual([t1a, t1b]);
   });
 
@@ -273,7 +269,7 @@ describe("ResilienceLayer.execute()", () => {
       .mockResolvedValueOnce(makeError(429, "rate limited"))
       .mockResolvedValueOnce(makeSuccess(200));
     const targets = () => [t1a, t1b];
-    const result = await layer.execute(targets, fn, failoverConfig({ maxRetries: 2, ruleMatcher: matcher }));
+    const result = await layer.execute(targets, fn, failoverConfig({ ruleMatcher: matcher }));
     expect(result.result.kind).toBe("success");
     expect(result.attempts).toHaveLength(4);
     expect(result.attempts.slice(0, 3).every(a => a.target === t1a)).toBe(true);
@@ -303,13 +299,20 @@ describe("ResilienceLayer.execute()", () => {
     expect(callCount).toBeGreaterThanOrEqual(2);
   });
 
-  it("maxRetries=0 不重试", async () => {
+  it("rule max_retries=0 不重试", async () => {
     const layer = new ResilienceLayer();
-    const matcher = createMatcherWithDefaults();
+    const matcher = new RetryRuleMatcher();
+    matcher["cache"] = new Map([
+      [429, [{ rule: {
+        id: "r0", name: "no retry", status_code: 429, body_pattern: ".*",
+        is_active: 1, created_at: "", retry_strategy: "fixed", retry_delay_ms: 1,
+        max_retries: 0, max_delay_ms: 100,
+      }, pattern: /^.*$/ }]],
+    ]);
     const fn = vi.fn().mockResolvedValue(makeError(429, "rate limited"));
     const targets = () => [t1];
-    const result = await layer.execute(targets, fn, defaultConfig({ maxRetries: 0, ruleMatcher: matcher }));
-    expect(result.result.statusCode).toBe(429);
+    const result = await layer.execute(targets, fn, defaultConfig({ ruleMatcher: matcher }));
+    expect((result.result as { statusCode: number }).statusCode).toBe(429);
     expect(result.attempts).toHaveLength(1);
   });
 
@@ -318,7 +321,7 @@ describe("ResilienceLayer.execute()", () => {
     const fn = vi.fn().mockResolvedValue(makeError(500, "internal error"));
     const targets = () => [t1, t2];
     const result = await layer.execute(targets, fn, defaultConfig());
-    expect(result.result.statusCode).toBe(500);
+    expect((result.result as { statusCode: number }).statusCode).toBe(500);
     expect(result.attempts).toHaveLength(1);
     expect(result.excludedTargets).toHaveLength(0);
   });
@@ -328,7 +331,7 @@ describe("ResilienceLayer.execute()", () => {
     const fn = vi.fn().mockResolvedValue(makeError(401, "unauthorized"));
     const targets = () => [t1];
     const result = await layer.execute(targets, fn, failoverConfig());
-    expect(result.result.statusCode).toBe(401);
+    expect((result.result as { statusCode: number }).statusCode).toBe(401);
     expect(result.attempts).toHaveLength(1);
   });
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { cleanRouterResponses } from "../src/proxy/response-cleaner.js";
+import { cleanRouterResponses } from "../src/proxy/enhancement/response-cleaner.js";
 
 describe("cleanRouterResponses", () => {
   it("移除 <router-response> 标签及其内容", () => {

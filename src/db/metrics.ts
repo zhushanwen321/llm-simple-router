@@ -1,5 +1,6 @@
 import Database from "better-sqlite3";
 import { randomUUID } from "crypto";
+import { MS_PER_SECOND } from "../constants.js";
 
 export type MetricsPeriod = "1h" | "5h" | "6h" | "24h" | "7d" | "30d";
 export type MetricsMetric = "ttft" | "tps" | "tokens" | "cache_rate" | "request_count" | "input_tokens" | "output_tokens" | "cache_hit_tokens";
@@ -74,7 +75,6 @@ const BUCKET_SECONDS: Record<MetricsPeriod, number> = {
 };
 
 // unix epoch 秒转毫秒的乘数
-const MS_PER_SEC = 1000;
 
 export interface MetricsSummaryRow {
   provider_id: string;
@@ -103,7 +103,7 @@ const FALLBACK_BUCKET_SEC = 14400;      // >7d: 4h
 
 function calculateBucketSeconds(startTime: string, endTime: string): number {
   const ms = new Date(endTime).getTime() - new Date(startTime).getTime();
-  const sec = ms / MS_PER_SEC;
+  const sec = ms / MS_PER_SECOND;
   const match = BUCKET_THRESHOLDS.find((t) => sec <= t.maxSec);
   return match ? match.bucketSec : FALLBACK_BUCKET_SEC;
 }
@@ -219,7 +219,7 @@ export function getMetricsTimeseries(
   `).all(bucketSec, bucketSec, ...params) as { bucket_key: number; avg_value: number | null; count: number }[];
 
   return rows.map((r) => ({
-    time_bucket: new Date(r.bucket_key * MS_PER_SEC).toISOString(),
+    time_bucket: new Date(r.bucket_key * MS_PER_SECOND).toISOString(),
     avg_value: r.avg_value,
     count: r.count,
   }));

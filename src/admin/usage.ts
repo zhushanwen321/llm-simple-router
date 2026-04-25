@@ -2,7 +2,7 @@ import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
 import { Type } from "@sinclair/typebox";
 import { getWindowsInRange, getWindowUsage } from "../db/usage-windows.js";
-import { toSqliteDatetime } from "../utils/datetime.js";
+import { resolveTimeRange } from "../utils/time-range.js";
 
 interface UsageRoutesOptions {
   db: Database.Database;
@@ -19,27 +19,18 @@ interface DailyUsageRow {
   total_output_tokens: number;
 }
 
-function getMonday(date: Date): Date {
-  const d = new Date(date);
-  const day = d.getDay();
-  // 周日 getDay()=0，需要回退到上周一；其余日期减到周一
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // eslint-disable-line no-magic-numbers
-  d.setDate(diff);
-  return d;
-}
-
 function getDailyUsage(
   db: Database.Database,
-  start: Date,
-  end: Date,
+  startTime: string,
+  endTime: string,
   routerKeyId?: string,
 ): DailyUsageRow[] {
   const routerKeyFilter = routerKeyId
     ? " AND rl.router_key_id = ?"
     : "";
   const params = routerKeyId
-    ? [toSqliteDatetime(start), toSqliteDatetime(end), routerKeyId]
-    : [toSqliteDatetime(start), toSqliteDatetime(end)];
+    ? [startTime, endTime, routerKeyId]
+    : [startTime, endTime];
 
   return db.prepare(`
     SELECT
@@ -63,13 +54,9 @@ export const adminUsageRoutes: FastifyPluginCallback<UsageRoutesOptions> = (app,
 
   app.get("/admin/api/usage/windows", { schema: { querystring: UsageQuerySchema } }, async (request) => {
     const query = request.query as { router_key_id?: string };
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    const windows = getWindowsInRange(db, toSqliteDatetime(today), toSqliteDatetime(tomorrow), query.router_key_id);
-
+    const range = resolveTimeRange("window", db, query.router_key_id);
+    const windows = getWindowsInRange(db, range.startTime, range.endTime, query.router_key_id);
+    if (windows.length === 0) return [];
     return windows.map(w => ({
       window: w,
       usage: getWindowUsage(db, w.start_time, w.end_time, query.router_key_id),
@@ -78,17 +65,14 @@ export const adminUsageRoutes: FastifyPluginCallback<UsageRoutesOptions> = (app,
 
   app.get("/admin/api/usage/weekly", { schema: { querystring: UsageQuerySchema } }, async (request) => {
     const query = request.query as { router_key_id?: string };
-    const now = new Date();
-    const monday = getMonday(now);
-    monday.setHours(0, 0, 0, 0);
-    return getDailyUsage(db, monday, now, query.router_key_id);
+    const range = resolveTimeRange("weekly", db, query.router_key_id);
+    return getDailyUsage(db, range.startTime, range.endTime, query.router_key_id);
   });
 
   app.get("/admin/api/usage/monthly", { schema: { querystring: UsageQuerySchema } }, async (request) => {
     const query = request.query as { router_key_id?: string };
-    const now = new Date();
-    const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    return getDailyUsage(db, firstOfMonth, now, query.router_key_id);
+    const range = resolveTimeRange("monthly", db, query.router_key_id);
+    return getDailyUsage(db, range.startTime, range.endTime, query.router_key_id);
   });
 
   done();

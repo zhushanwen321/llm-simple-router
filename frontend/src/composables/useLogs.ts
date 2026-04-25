@@ -33,9 +33,9 @@ export function useLogs() {
       expandedRows.value.clear()
       childLogs.value = {}
       childLoading.value = {}
-    } catch (e) {
+    } catch (e: unknown) {
       console.error('Failed to load logs:', e)
-      toast.error('加载日志失败')
+      toast.error((e as { apiMessage?: string }).apiMessage || '加载日志失败')
     }
   }
 
@@ -63,9 +63,9 @@ export function useLogs() {
       await loadLogs()
       cleanupResult.value = res.deleted
       showCleanupResult.value = true
-    } catch (e) {
+    } catch (e: unknown) {
       console.error('Failed to cleanup logs:', e)
-      toast.error('清理日志失败')
+      toast.error((e as { apiMessage?: string }).apiMessage || '清理日志失败')
     }
   }
 
@@ -80,9 +80,9 @@ export function useLogs() {
       childLoading.value[id] = true
       try {
         childLogs.value[id] = await api.getLogChildren(id)
-      } catch (e) {
+      } catch (e: unknown) {
         console.error('Failed to load child logs:', e)
-        toast.error('加载子请求失败')
+        toast.error((e as { apiMessage?: string }).apiMessage || '加载子请求失败')
       } finally {
         childLoading.value[id] = false
       }
@@ -93,9 +93,9 @@ export function useLogs() {
     try {
       selectedLogEntry.value = await api.getLogDetail(id)
       logDetailOpen.value = true
-    } catch (e) {
+    } catch (e: unknown) {
       console.error('Failed to load log detail:', e)
-      toast.error('加载日志详情失败')
+      toast.error((e as { apiMessage?: string }).apiMessage || '加载日志详情失败')
     }
   }
 

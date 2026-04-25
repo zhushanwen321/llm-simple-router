@@ -155,7 +155,6 @@ describe("Failover log grouping", () => {
     app.register(openaiProxy, {
       db,
       streamTimeoutMs: 5000,
-      retryMaxAttempts: 0,
       retryBaseDelayMs: 0,
       semaphoreManager: new ProviderSemaphoreManager(),
       tracker: new RequestTracker({ semaphoreManager: new ProviderSemaphoreManager() }),
@@ -251,7 +250,6 @@ describe("Failover log grouping", () => {
     app.register(openaiProxy, {
       db,
       streamTimeoutMs: 5000,
-      retryMaxAttempts: 0,
       retryBaseDelayMs: 0,
       semaphoreManager: new ProviderSemaphoreManager(),
       tracker: new RequestTracker({ semaphoreManager: new ProviderSemaphoreManager() }),
@@ -331,7 +329,6 @@ describe("Failover log grouping", () => {
     app.register(openaiProxy, {
       db,
       streamTimeoutMs: 5000,
-      retryMaxAttempts: 0,
       retryBaseDelayMs: 0,
       semaphoreManager: new ProviderSemaphoreManager(),
       tracker: new RequestTracker({ semaphoreManager: new ProviderSemaphoreManager() }),
@@ -420,7 +417,6 @@ describe("Failover log grouping", () => {
     app.register(openaiProxy, {
       db,
       streamTimeoutMs: 5000,
-      retryMaxAttempts: 1,
       retryBaseDelayMs: 10,
       matcher,
       semaphoreManager: new ProviderSemaphoreManager(),

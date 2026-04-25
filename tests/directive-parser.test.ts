@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseDirective } from "../src/proxy/directive-parser.js";
+import { parseDirective } from "../src/proxy/enhancement/directive-parser.js";
 
 describe("parseDirective", () => {
   const baseBody = (text: string) => ({

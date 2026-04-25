@@ -2,7 +2,8 @@
   {
     "group": "DeepSeek",
     "presets": [
-      { "plan": "API", "presetName": "deepseek", "apiType": "openai", "baseUrl": "https://api.deepseek.com", "models": ["deepseek-chat", "deepseek-reasoner"] }
+      { "plan": "Anthropic", "presetName": "deepseek", "apiType": "anthropic", "baseUrl": "https://api.deepseek.com/anthropic", "models": ["deepseek-chat", "deepseek-reasoner"] },
+      { "plan": "OpenAI", "presetName": "deepseek-openai", "apiType": "openai", "baseUrl": "https://api.deepseek.com", "models": ["deepseek-chat", "deepseek-reasoner"] }
     ]
   },
   {

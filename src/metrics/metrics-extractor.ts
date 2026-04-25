@@ -1,3 +1,4 @@
+import { MS_PER_SECOND } from "../constants.js";
 import type { SSEEvent } from "./sse-parser.js";
 
 export interface MetricsResult {
@@ -11,8 +12,6 @@ export interface MetricsResult {
   stop_reason: string | null;
   is_complete: number;
 }
-
-const MS_PER_SECOND = 1000;
 
 interface AnthropicMessageStart {
   type: string;

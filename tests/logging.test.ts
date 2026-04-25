@@ -62,7 +62,6 @@ function createApp() {
   app.register(openaiProxy, {
     db,
     streamTimeoutMs: 5000,
-    retryMaxAttempts: 0,
     retryBaseDelayMs: 0,
     semaphoreManager,
     tracker,
@@ -70,7 +69,6 @@ function createApp() {
   app.register(anthropicProxy, {
     db,
     streamTimeoutMs: 5000,
-    retryMaxAttempts: 0,
     retryBaseDelayMs: 0,
     semaphoreManager,
     tracker,
@@ -316,9 +314,10 @@ describe("Request logging", () => {
       });
 
       const logs = getRequestLogs(db);
-      expect(logs.length).toBe(1);
-      expect(logs[0].status_code).toBe(502);
-      expect(logs[0].error_message).toBeTruthy();
+      // DEFAULT_THROW_MAX_RETRIES=3 → 1 initial + 3 retries = 4 attempts, each logged
+      expect(logs.length).toBe(4);
+      expect(logs[logs.length - 1].status_code).toBe(502);
+      expect(logs[logs.length - 1].error_message).toBeTruthy();
     } finally {
       await app.close();
       db.close();

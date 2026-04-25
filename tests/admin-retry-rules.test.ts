@@ -3,39 +3,7 @@ import { FastifyInstance } from "fastify";
 import { buildApp } from "../src/index.js";
 import { initDatabase } from "../src/db/index.js";
 import { RetryRuleMatcher } from "../src/proxy/retry-rules.js";
-import { setSetting } from "../src/db/settings.js";
-import { hashPassword } from "../src/utils/password.js";
-
-const TEST_ENCRYPTION_KEY = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-
-function makeConfig() {
-  return {
-    PORT: 9981,
-    DB_PATH: ":memory:",
-    LOG_LEVEL: "silent",
-    TZ: "Asia/Shanghai",
-    STREAM_TIMEOUT_MS: 5000,
-    RETRY_MAX_ATTEMPTS: 0,
-    RETRY_BASE_DELAY_MS: 0,
-  };
-}
-
-async function login(app: FastifyInstance): Promise<string> {
-  const res = await app.inject({
-    method: "POST",
-    url: "/admin/api/login",
-    payload: { password: "test-admin-pass" },
-  });
-  const match = (res.headers["set-cookie"] as string).match(/admin_token=([^;]+)/);
-  return `admin_token=${match![1]}`;
-}
-
-function seedSettings(db: ReturnType<typeof initDatabase>) {
-  setSetting(db, "encryption_key", TEST_ENCRYPTION_KEY);
-  setSetting(db, "jwt_secret", "test-jwt-secret-for-testing");
-  setSetting(db, "admin_password_hash", hashPassword("test-admin-pass"));
-  setSetting(db, "initialized", "true");
-}
+import { makeConfig, seedSettings, login } from "./helpers/test-setup.js";
 
 describe("Retry Rule CRUD", () => {
   let app: FastifyInstance;
@@ -63,7 +31,7 @@ describe("Retry Rule CRUD", () => {
       headers: { cookie },
     });
     expect(res.statusCode).toBe(200);
-    const rules = res.json();
+    const rules = res.json().data;
     expect(rules.length).toBe(0);
   });
 
@@ -79,7 +47,7 @@ describe("Retry Rule CRUD", () => {
       },
     });
     expect(res.statusCode).toBe(201);
-    expect(res.json().id).toBeDefined();
+    expect(res.json().data.id).toBeDefined();
   });
 
   it("GET returns retry rules including created one", async () => {
@@ -100,7 +68,7 @@ describe("Retry Rule CRUD", () => {
       headers: { cookie },
     });
     expect(res.statusCode).toBe(200);
-    const rules = res.json();
+    const rules = res.json().data;
     expect(rules.some((r: any) => r.name === "rate-limit")).toBe(true);
   });
 
@@ -115,7 +83,7 @@ describe("Retry Rule CRUD", () => {
         body_pattern: "rate limit",
       },
     });
-    const id = createRes.json().id;
+    const id = createRes.json().data.id;
 
     await app.inject({
       method: "PUT",
@@ -129,7 +97,7 @@ describe("Retry Rule CRUD", () => {
       url: "/admin/api/retry-rules",
       headers: { cookie },
     });
-    const rules = getRes.json();
+    const rules = getRes.json().data;
     expect(rules[0].body_pattern).toBe("too many requests");
   });
 
@@ -144,7 +112,7 @@ describe("Retry Rule CRUD", () => {
         body_pattern: "rate limit",
       },
     });
-    const id = createRes.json().id;
+    const id = createRes.json().data.id;
 
     const delRes = await app.inject({
       method: "DELETE",
@@ -158,7 +126,7 @@ describe("Retry Rule CRUD", () => {
       url: "/admin/api/retry-rules",
       headers: { cookie },
     });
-    const rules = getRes.json();
+    const rules = getRes.json().data;
     expect(rules.some((r: any) => r.name === "rate-limit")).toBe(false);
   });
 
@@ -174,6 +142,9 @@ describe("Retry Rule CRUD", () => {
       },
     });
     expect(res.statusCode).toBe(400);
+    const body = res.json()
+    expect(body.code).toBe(40003)
+    expect(body.data).toBeNull()
   });
 
   it("PUT invalid regex returns 400", async () => {
@@ -187,7 +158,7 @@ describe("Retry Rule CRUD", () => {
         body_pattern: "error",
       },
     });
-    const id = createRes.json().id;
+    const id = createRes.json().data.id;
 
     const res = await app.inject({
       method: "PUT",
@@ -196,6 +167,9 @@ describe("Retry Rule CRUD", () => {
       payload: { body_pattern: "[bad" },
     });
     expect(res.statusCode).toBe(400);
+    const body = res.json()
+    expect(body.code).toBe(40003)
+    expect(body.data).toBeNull()
   });
 
   it("matcher refreshes after create", async () => {
@@ -224,5 +198,8 @@ describe("Retry Rule CRUD", () => {
       url: "/admin/api/retry-rules",
     });
     expect(res.statusCode).toBe(401);
+    const body = res.json()
+    expect(body.code).toBe(40102)
+    expect(body.data).toBeNull()
   });
 });

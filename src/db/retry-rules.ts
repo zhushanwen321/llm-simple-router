@@ -62,3 +62,7 @@ export function deleteRetryRule(db: Database.Database, id: string): void {
   deleteById(db, "retry_rules", id);
 }
 
+export function getRetryRuleById(db: Database.Database, id: string): RetryRule | undefined {
+  return db.prepare("SELECT * FROM retry_rules WHERE id = ?").get(id) as RetryRule | undefined;
+}
+

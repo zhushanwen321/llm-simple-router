@@ -1,7 +1,5 @@
 import Database from "better-sqlite3";
 
-export type StatsPeriod = "1h" | "6h" | "24h" | "7d" | "30d";
-
 export interface Stats {
   totalRequests: number;
   successRate: number;
@@ -16,20 +14,22 @@ interface StatsRow {
   total_tokens: number;
 }
 
-const PERIOD_OFFSET: Record<StatsPeriod, string> = {
-  "1h": "-1 hours",
-  "6h": "-6 hours",
-  "24h": "-1 day",
-  "7d": "-7 days",
-  "30d": "-30 days",
-};
-
-export function getStats(db: Database.Database, period: StatsPeriod, routerKeyId?: string): Stats {
-  const offset = PERIOD_OFFSET[period];
-
-  const conditions = ["rm.is_complete = 1", "rm.created_at >= datetime('now', ?)"];
-  const params: unknown[] = [offset];
-  if (routerKeyId) { conditions.push("rl.router_key_id = ?"); params.push(routerKeyId); }
+export function getStats(
+  db: Database.Database,
+  startTime: string,
+  endTime: string,
+  routerKeyId?: string,
+): Stats {
+  const conditions = [
+    "rm.is_complete = 1",
+    "rm.created_at >= datetime(?)",
+    "rm.created_at < datetime(?)",
+  ];
+  const params: unknown[] = [startTime, endTime];
+  if (routerKeyId) {
+    conditions.push("rl.router_key_id = ?");
+    params.push(routerKeyId);
+  }
   const where = conditions.join(" AND ");
 
   const row = db.prepare(`

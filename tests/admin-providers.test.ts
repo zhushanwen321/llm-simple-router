@@ -2,42 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { FastifyInstance } from "fastify";
 import { buildApp } from "../src/index.js";
 import { initDatabase } from "../src/db/index.js";
-import { setSetting } from "../src/db/settings.js";
-import { hashPassword } from "../src/utils/password.js";
-
-const TEST_ENCRYPTION_KEY = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-
-function makeConfig() {
-  return {
-    PORT: 9981,
-    DB_PATH: ":memory:",
-    LOG_LEVEL: "silent",
-    TZ: "Asia/Shanghai",
-    STREAM_TIMEOUT_MS: 5000,
-    RETRY_MAX_ATTEMPTS: 0,
-    RETRY_BASE_DELAY_MS: 0,
-  };
-}
-
-async function login(app: FastifyInstance): Promise<string> {
-  const res = await app.inject({
-    method: "POST",
-    url: "/admin/api/login",
-    payload: { password: "test-admin-pass" },
-  });
-  const setCookie = res.headers["set-cookie"];
-  expect(setCookie).toBeDefined();
-  const match = (setCookie as string).match(/admin_token=([^;]+)/);
-  expect(match).toBeTruthy();
-  return `admin_token=${match![1]}`;
-}
-
-function seedSettings(db: ReturnType<typeof initDatabase>) {
-  setSetting(db, "encryption_key", TEST_ENCRYPTION_KEY);
-  setSetting(db, "jwt_secret", "test-jwt-secret-for-testing");
-  setSetting(db, "admin_password_hash", hashPassword("test-admin-pass"));
-  setSetting(db, "initialized", "true");
-}
+import { makeConfig, seedSettings, login } from "./helpers/test-setup.js";
 
 describe("Admin Auth", () => {
   let app: FastifyInstance;
@@ -63,25 +28,32 @@ describe("Admin Auth", () => {
       payload: { password: "test-admin-pass" },
     });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ success: true });
+    expect(res.json().data).toEqual({ success: true });
     expect(res.headers["set-cookie"]).toContain("admin_token");
   });
 
-  it("login with wrong password returns 401", async () => {
+  it("login with wrong password returns 401 with WRONG_PASSWORD code", async () => {
     const res = await app.inject({
       method: "POST",
       url: "/admin/api/login",
       payload: { password: "wrong" },
     });
     expect(res.statusCode).toBe(401);
+    const body = res.json()
+    expect(body.code).toBe(40101)
+    expect(body.message).toContain('password')
+    expect(body.data).toBeNull()
   });
 
-  it("unauthenticated CRUD returns 401", async () => {
+  it("unauthenticated CRUD returns 401 with TOKEN_INVALID code", async () => {
     const res = await app.inject({
       method: "GET",
       url: "/admin/api/providers",
     });
     expect(res.statusCode).toBe(401);
+    const body = res.json()
+    expect(body.code).toBe(40102)
+    expect(body.data).toBeNull()
   });
 
   it("logout clears cookie", async () => {
@@ -121,7 +93,7 @@ describe("Provider CRUD", () => {
       headers: { cookie },
     });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual([]);
+    expect(res.json().data).toEqual([]);
   });
 
   it("POST creates service successfully", async () => {
@@ -137,7 +109,7 @@ describe("Provider CRUD", () => {
       },
     });
     expect(res.statusCode).toBe(201);
-    expect(res.json().id).toBeDefined();
+    expect(res.json().data.id).toBeDefined();
   });
 
   it("GET returns services with decrypted api_key", async () => {
@@ -159,7 +131,7 @@ describe("Provider CRUD", () => {
       headers: { cookie },
     });
     expect(res.statusCode).toBe(200);
-    const services = res.json();
+    const services = res.json().data;
     expect(services.length).toBe(1);
     expect(services[0].api_key).toBe("sk-test-abc123xyz");
     expect(services[0].api_key_preview).toBeUndefined();
@@ -177,7 +149,7 @@ describe("Provider CRUD", () => {
         api_key: "sk-test-key123",
       },
     });
-    const id = createRes.json().id;
+    const id = createRes.json().data.id;
 
     const updateRes = await app.inject({
       method: "PUT",
@@ -192,7 +164,7 @@ describe("Provider CRUD", () => {
       url: "/admin/api/providers",
       headers: { cookie },
     });
-    expect(getRes.json()[0].name).toBe("Updated-Name");
+    expect(getRes.json().data[0].name).toBe("Updated-Name");
   });
 
   it("DELETE removes service", async () => {
@@ -207,7 +179,7 @@ describe("Provider CRUD", () => {
         api_key: "sk-test-key456",
       },
     });
-    const id = createRes.json().id;
+    const id = createRes.json().data.id;
 
     const delRes = await app.inject({
       method: "DELETE",
@@ -221,7 +193,7 @@ describe("Provider CRUD", () => {
       url: "/admin/api/providers",
       headers: { cookie },
     });
-    expect(getRes.json()).toEqual([]);
+    expect(getRes.json().data).toEqual([]);
   });
 
   it("POST with missing required field returns 400", async () => {
@@ -232,6 +204,9 @@ describe("Provider CRUD", () => {
       payload: { name: "NoKey" },
     });
     expect(res.statusCode).toBe(400);
+    const body = res.json()
+    expect(body.code).toBe(40001)
+    expect(body.data).toBeNull()
   });
 
   it("POST rejects provider name with spaces", async () => {
@@ -247,7 +222,10 @@ describe("Provider CRUD", () => {
       },
     });
     expect(res.statusCode).toBe(400);
-    expect(res.json().error.message).toContain("英文大小写字母");
+    const body = res.json()
+    expect(body.code).toBe(40002)
+    expect(body.message).toContain("英文大小写字母");
+    expect(body.data).toBeNull()
   });
 
   it("POST creates provider with max_concurrency", async () => {
@@ -270,7 +248,7 @@ describe("Provider CRUD", () => {
       url: "/admin/api/providers",
       headers: { cookie },
     });
-    const providers = getRes.json();
+    const providers = getRes.json().data;
     expect(providers[0].max_concurrency).toBe(5);
   });
 
@@ -286,7 +264,7 @@ describe("Provider CRUD", () => {
         api_key: "sk-test-key789",
       },
     });
-    const id = createRes.json().id;
+    const id = createRes.json().data.id;
 
     await app.inject({
       method: "PUT",
@@ -300,6 +278,6 @@ describe("Provider CRUD", () => {
       url: "/admin/api/providers",
       headers: { cookie },
     });
-    expect(getRes.json()[0].max_concurrency).toBe(3);
+    expect(getRes.json().data[0].max_concurrency).toBe(3);
   });
 });

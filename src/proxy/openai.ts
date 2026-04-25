@@ -4,23 +4,25 @@ import fp from "fastify-plugin";
 import { getActiveProviders } from "../db/index.js";
 import { getSetting } from "../db/settings.js";
 import { decrypt } from "../utils/crypto.js";
-import { proxyGetRequest, createErrorFormatter, type RawHeaders, type ProxyErrorResponse } from "./proxy-core.js";
+import { proxyGetRequest, createErrorFormatter, type ProxyErrorResponse } from "./proxy-core.js";
 import type { ErrorKind } from "./proxy-core.js";
+import type { RawHeaders } from "./types.js";
 import { handleProxyRequest, type RouteHandlerDeps } from "./proxy-handler.js";
 import { createOrchestrator } from "./orchestrator.js";
 import { RetryRuleMatcher } from "./retry-rules.js";
 import { ProviderSemaphoreManager } from "./semaphore.js";
 import type { RequestTracker } from "../monitor/request-tracker.js";
+import type { UsageWindowTracker } from "./usage-window-tracker.js";
 import { HTTP_NOT_FOUND, HTTP_BAD_GATEWAY } from "../constants.js";
 
 export interface OpenaiProxyOptions {
   db: Database.Database;
   streamTimeoutMs: number;
-  retryMaxAttempts: number;
   retryBaseDelayMs: number;
   matcher?: RetryRuleMatcher;
   semaphoreManager?: ProviderSemaphoreManager;
   tracker?: RequestTracker;
+  usageWindowTracker?: UsageWindowTracker;
 }
 
 const CHAT_COMPLETIONS_PATH = "/v1/chat/completions";
@@ -41,17 +43,17 @@ const openaiErrors = createErrorFormatter(
 );
 
 function sendError(reply: FastifyReply, e: ProxyErrorResponse) {
-  return reply.status(e.statusCode).send(e.body);
+  return reply.code(e.statusCode).send(e.body);
 }
 
 const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, done) => {
-  const { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher, semaphoreManager, tracker } = opts;
+  const { db, streamTimeoutMs, retryBaseDelayMs, matcher, semaphoreManager, tracker, usageWindowTracker } = opts;
 
   const orchestrator = createOrchestrator(semaphoreManager, tracker);
 
   app.post(CHAT_COMPLETIONS_PATH, async (request, reply) => {
     if (!orchestrator) return sendError(reply, openaiErrors.providerUnavailable());
-    const deps: RouteHandlerDeps = { db, streamTimeoutMs, retryMaxAttempts, retryBaseDelayMs, matcher, tracker, orchestrator };
+    const deps: RouteHandlerDeps = { db, streamTimeoutMs, retryBaseDelayMs, matcher, tracker, orchestrator, usageWindowTracker };
     return handleProxyRequest(request, reply, "openai", CHAT_COMPLETIONS_PATH, openaiErrors, deps, {
       beforeSendProxy: (body, isStream) => {
         if (isStream && !body.stream_options) {
@@ -73,7 +75,7 @@ const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, do
     try {
       const result = await proxyGetRequest(provider, apiKey, cliHdrs, MODELS_PATH);
       for (const [k, v] of Object.entries(result.headers)) reply.header(k, v);
-      return reply.status(result.statusCode).send(result.body);
+      return reply.code(result.statusCode).send(result.body);
     } catch (err: unknown) {
       request.log.error({ err: err instanceof Error ? err.message : String(err) }, "Failed to reach OpenAI backend for /v1/models");
       return sendError(reply, {

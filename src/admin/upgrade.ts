@@ -8,6 +8,7 @@ import { execSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { HTTP_BAD_REQUEST, HTTP_INTERNAL_ERROR } from '../constants.js'
+import { API_CODE, apiError } from './api-response.js'
 
 const GITHUB_CONFIG_BASE = 'https://raw.githubusercontent.com/zhushanwen321/llm-simple-router/main/config'
 const GITEE_CONFIG_BASE = 'https://gitee.com/zzzzswszzzz/llm-simple-router/raw/main/config'
@@ -61,7 +62,7 @@ export const adminUpgradeRoutes: FastifyPluginCallback<UpgradeRoutesOptions> = (
   app.put('/admin/api/upgrade/sync-source', async (req, reply) => {
     const { source } = req.body as { source: 'github' | 'gitee' }
     if (source !== 'github' && source !== 'gitee') {
-      return reply.code(HTTP_BAD_REQUEST).send({ error: { message: 'source must be github or gitee' } })
+      return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.BAD_REQUEST, 'source must be github or gitee'))
     }
     setConfigSyncSource(db, source)
     return reply.send({ ok: true })
@@ -70,14 +71,14 @@ export const adminUpgradeRoutes: FastifyPluginCallback<UpgradeRoutesOptions> = (
   app.post('/admin/api/upgrade/execute', async (req, reply) => {
     const deployment = detectDeployment()
     if (deployment !== 'npm') {
-      return reply.code(HTTP_BAD_REQUEST).send({ error: { message: '仅支持 npm 全局安装模式下自动升级' } })
+      return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.BAD_REQUEST, '仅支持 npm 全局安装模式下自动升级'))
     }
     const { version } = req.body as { version: string }
     if (!version) {
-      return reply.code(HTTP_BAD_REQUEST).send({ error: { message: 'version is required' } })
+      return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.BAD_REQUEST, 'version is required'))
     }
     if (!/^\d+\.\d+\.\d+$/.test(version)) {
-      return reply.code(HTTP_BAD_REQUEST).send({ error: { message: '无效版本号格式' } })
+      return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.BAD_REQUEST, '无效版本号格式'))
     }
     try {
       execSync(`npm install -g llm-simple-router@${version}`, {
@@ -87,14 +88,14 @@ export const adminUpgradeRoutes: FastifyPluginCallback<UpgradeRoutesOptions> = (
       return reply.send({ ok: true, version })
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
-      return reply.code(HTTP_INTERNAL_ERROR).send({ error: { message: `升级失败: ${msg}` } })
+      return reply.code(HTTP_INTERNAL_ERROR).send(apiError(API_CODE.INTERNAL_ERROR, `升级失败: ${msg}`))
     }
   })
 
   app.post('/admin/api/upgrade/sync-config', async (req, reply) => {
     const { source } = req.body as { source: 'github' | 'gitee' }
     if (source !== 'github' && source !== 'gitee') {
-      return reply.code(HTTP_BAD_REQUEST).send({ error: { message: 'source must be github or gitee' } })
+      return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.BAD_REQUEST, 'source must be github or gitee'))
     }
     const base = getConfigBaseUrl(source)
     const configDir = path.resolve(process.cwd(), 'config')
@@ -118,7 +119,7 @@ export const adminUpgradeRoutes: FastifyPluginCallback<UpgradeRoutesOptions> = (
       return reply.send({ ok: true })
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
-      return reply.code(HTTP_INTERNAL_ERROR).send({ error: { message: `同步失败: ${msg}` } })
+      return reply.code(HTTP_INTERNAL_ERROR).send(apiError(API_CODE.INTERNAL_ERROR, `同步失败: ${msg}`))
     }
   })
 

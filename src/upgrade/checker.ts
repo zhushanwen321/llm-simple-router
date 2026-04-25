@@ -32,11 +32,26 @@ const DEFAULT_NPM_REGISTRY = 'https://registry.npmjs.org/llm-simple-router'
 const DEFAULT_GITHUB_CONFIG_BASE = 'https://raw.githubusercontent.com/zhushanwen321/llm-simple-router/main/config'
 const CHECK_TIMEOUT_MS = 5000
 
-export async function fetchJson(url: string): Promise<unknown> {
+const MAX_REDIRECTS = 5;
+
+export async function fetchJson(url: string, redirects = 0): Promise<unknown> {
+  if (redirects > MAX_REDIRECTS) throw new Error('too many redirects')
   const mod = url.startsWith('https') ? https : http
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('timeout')), CHECK_TIMEOUT_MS)
     mod.get(url, (res) => {
+      if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        clearTimeout(timer)
+        res.resume()
+        fetchJson(res.headers.location, redirects + 1).then(resolve, reject)
+        return
+      }
+      if (res.statusCode && (res.statusCode < 200 || res.statusCode >= 300)) {
+        clearTimeout(timer)
+        res.resume()
+        reject(new Error(`HTTP ${res.statusCode}`))
+        return
+      }
       let data = ''
       res.on('data', (chunk: Buffer) => { data += chunk })
       res.on('end', () => {

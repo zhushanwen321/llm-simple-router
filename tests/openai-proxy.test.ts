@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import Fastify, { FastifyInstance } from "fastify";
-import { createServer, Server, IncomingMessage, ServerResponse } from "http";
+import { Server } from "http";
 import Database from "better-sqlite3";
 import { initDatabase } from "../src/db/index.js";
 import { setSetting } from "../src/db/settings.js";
@@ -8,27 +8,8 @@ import { encrypt } from "../src/utils/crypto.js";
 import { openaiProxy } from "../src/proxy/openai.js";
 import { ProviderSemaphoreManager } from "../src/proxy/semaphore.js";
 import { RequestTracker } from "../src/monitor/request-tracker.js";
-
-// 测试用 32 字节密钥（64 hex chars）
-const TEST_ENCRYPTION_KEY =
-  "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-
-// 启动一个 mock 后端 HTTP 服务器，使用动态端口
-function createMockBackend(
-  handler: (req: IncomingMessage, res: ServerResponse) => void
-): Promise<{ server: Server; port: number }> {
-  return new Promise((resolve, reject) => {
-    const server = createServer(handler);
-    server.listen(0, () => {
-      const addr = server.address();
-      if (addr && typeof addr === "object") {
-        resolve({ server, port: addr.port });
-      } else {
-        reject(new Error("Failed to get server address"));
-      }
-    });
-  });
-}
+import { createMockBackend } from "./helpers/mock-backend.js";
+import { TEST_ENCRYPTION_KEY } from "./helpers/test-setup.js";
 
 function closeServer(server: Server): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -44,7 +25,6 @@ function buildTestApp(mockDb: Database.Database): FastifyInstance {
   app.register(openaiProxy, {
     db: mockDb,
     streamTimeoutMs: 5000,
-    retryMaxAttempts: 0,
     retryBaseDelayMs: 0,
     semaphoreManager,
     tracker,
@@ -164,7 +144,7 @@ describe("OpenAI proxy", () => {
 
   // 1. 非流式请求透传
   it("should proxy non-stream request and return response", async () => {
-    const { server: backendServer, port } = await createMockBackend(
+    const { port, close } = await createMockBackend(
       (req, res) => {
         let body = "";
         req.on("data", (chunk) => (body += chunk));
@@ -190,12 +170,12 @@ describe("OpenAI proxy", () => {
     expect(json.object).toBe("chat.completion");
     expect(json.choices[0].message.content).toBe("Hello!");
 
-    await closeServer(backendServer);
+    await close();
   });
 
   // 2. SSE 流式透传
   it("should proxy SSE stream request and forward chunks", async () => {
-    const { server: backendServer, port } = await createMockBackend(
+    const { port, close } = await createMockBackend(
       (req, res) => {
         let body = "";
         req.on("data", (chunk) => (body += chunk));
@@ -237,14 +217,14 @@ describe("OpenAI proxy", () => {
     // 验证 [DONE] 结束标记
     expect(responseBody).toContain("data: [DONE]");
 
-    await closeServer(backendServer);
+    await close();
   });
 
   // 3. 模型映射替换
   it("should replace model name when mapping exists", async () => {
     let receivedBody: string = "";
 
-    const { server: backendServer, port } = await createMockBackend(
+    const { port, close } = await createMockBackend(
       (req, res) => {
         let body = "";
         req.on("data", (chunk) => (body += chunk));
@@ -269,7 +249,7 @@ describe("OpenAI proxy", () => {
     const parsed = JSON.parse(receivedBody);
     expect(parsed.model).toBe("gpt-4-turbo");
 
-    await closeServer(backendServer);
+    await close();
   });
 
   // 4. 模型无映射 - 返回 404

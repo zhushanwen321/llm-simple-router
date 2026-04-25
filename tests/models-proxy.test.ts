@@ -82,7 +82,7 @@ describe("GET /v1/models proxy", () => {
 
   it("should proxy GET /v1/models to backend and return JSON response", async () => {
     const { server: backendServer, port } = await createMockBackend(
-      (req, res) => {
+      (_req, res) => {
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(
           JSON.stringify({
@@ -112,7 +112,6 @@ describe("GET /v1/models proxy", () => {
     app.register(openaiProxy, {
       db,
       streamTimeoutMs: 5000,
-      retryMaxAttempts: 0,
       retryBaseDelayMs: 0,
     });
 
@@ -136,7 +135,6 @@ describe("GET /v1/models proxy", () => {
     app.register(openaiProxy, {
       db,
       streamTimeoutMs: 5000,
-      retryMaxAttempts: 0,
       retryBaseDelayMs: 0,
     });
 
@@ -158,7 +156,6 @@ describe("GET /v1/models proxy", () => {
     app.register(openaiProxy, {
       db,
       streamTimeoutMs: 5000,
-      retryMaxAttempts: 0,
       retryBaseDelayMs: 0,
     });
 
@@ -179,7 +176,6 @@ describe("GET /v1/models proxy", () => {
     app.register(openaiProxy, {
       db,
       streamTimeoutMs: 5000,
-      retryMaxAttempts: 0,
       retryBaseDelayMs: 0,
     });
 

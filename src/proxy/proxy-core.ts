@@ -3,10 +3,6 @@ import { callGet as upstreamGet } from "./transport.js";
 import type { GetTransportResult } from "./transport.js";
 import type { RawHeaders } from "./types.js";
 
-// Re-export for external consumers (openai.ts, anthropic.ts, etc.)
-export { UPSTREAM_SUCCESS } from "./types.js";
-export type { RawHeaders } from "./types.js";
-
 // ---------- Types ----------
 
 export interface ProxyErrorResponse {
@@ -23,10 +19,6 @@ export interface ProxyErrorFormatter {
   concurrencyQueueFull(providerId: string): ProxyErrorResponse;
   concurrencyTimeout(providerId: string, timeoutMs: number): ProxyErrorResponse;
 }
-
-// Re-export upstream types for external consumers
-export type { ProxyResult, StreamProxyResult } from "./transport.js";
-export type { GetTransportResult as GetProxyResult } from "./transport.js";
 
 // ---------- Error formatter factory ----------
 

@@ -1,4 +1,5 @@
 import type { MappingStrategy, ResolveContext, Target } from "./types.js";
+import { isTarget } from "./targets-rule.js";
 
 interface TimeWindow {
   start: string;
@@ -9,17 +10,6 @@ interface TimeWindow {
 interface ScheduledRule {
   default?: Target;
   windows?: TimeWindow[];
-}
-
-function isTarget(value: unknown): value is Target {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "backend_model" in value &&
-    typeof (value as Target).backend_model === "string" &&
-    "provider_id" in value &&
-    typeof (value as Target).provider_id === "string"
-  );
 }
 
 function isTimeWindow(value: unknown): value is TimeWindow {

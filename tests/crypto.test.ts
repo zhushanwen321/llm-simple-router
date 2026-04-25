@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { encrypt, decrypt } from "../src/utils/crypto.js";
+import { hashPassword, verifyPassword } from "../src/utils/password.js";
 
 const KEY = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
@@ -57,5 +58,29 @@ describe("crypto", () => {
     const encrypted = encrypt(plaintext, KEY);
     const decrypted = decrypt(encrypted, KEY);
     expect(decrypted).toBe(plaintext);
+  });
+});
+
+describe("password", () => {
+  it("should verify correct password", () => {
+    const stored = hashPassword("my-secret");
+    expect(verifyPassword("my-secret", stored)).toBe(true);
+  });
+
+  it("should reject wrong password", () => {
+    const stored = hashPassword("my-secret");
+    expect(verifyPassword("wrong-password", stored)).toBe(false);
+  });
+
+  it("should reject malformed hash", () => {
+    expect(verifyPassword("test", "no-colon")).toBe(false);
+    expect(verifyPassword("test", "")).toBe(false);
+    expect(verifyPassword("test", "onlysalt")).toBe(false);
+  });
+
+  it("should handle unicode password", () => {
+    const stored = hashPassword("密码测试🔑");
+    expect(verifyPassword("密码测试🔑", stored)).toBe(true);
+    expect(verifyPassword("密码测试❌", stored)).toBe(false);
   });
 });

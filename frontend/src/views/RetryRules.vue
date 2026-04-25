@@ -261,9 +261,9 @@ async function loadData() {
   try {
     const res = await api.getRetryRules()
     rules.value = res
-  } catch (e) {
+  } catch (e: unknown) {
     console.error('Failed to load retry rules:', e)
-    toast.error('加载数据失败')
+    toast.error((e as { apiMessage?: string }).apiMessage || '加载数据失败')
   }
 }
 
@@ -310,9 +310,9 @@ async function handleSave() {
     }
     dialogOpen.value = false
     await loadData()
-  } catch (e) {
+  } catch (e: unknown) {
     console.error('Failed to save retry rule:', e)
-    toast.error('保存规则失败')
+    toast.error((e as { apiMessage?: string }).apiMessage || '保存规则失败')
   }
 }
 
@@ -327,9 +327,9 @@ async function handleDelete() {
   try {
     await api.deleteRetryRule(target.id)
     await loadData()
-  } catch (e) {
+  } catch (e: unknown) {
     console.error('Failed to delete retry rule:', e)
-    toast.error('删除规则失败')
+    toast.error((e as { apiMessage?: string }).apiMessage || '删除规则失败')
   }
 }
 

@@ -5,6 +5,7 @@ import jwt from "jsonwebtoken";
 import Database from "better-sqlite3";
 import { isInitialized, getSetting } from "../db/settings.js";
 import { verifyPassword } from "../utils/password.js";
+import { API_CODE, apiError } from "../admin/api-response.js";
 
 interface AdminAuthOptions {
   db: Database.Database;
@@ -29,12 +30,12 @@ const adminAuthRaw: FastifyPluginCallback<AdminAuthOptions> = (app, options, don
 
     // 未初始化时返回 needsSetup
     if (!isInitialized(options.db)) {
-      return reply.code(HTTP_UNAUTHORIZED).send({ error: { message: "Not initialized", needsSetup: true } });
+      return reply.code(HTTP_UNAUTHORIZED).send(apiError(API_CODE.NOT_INITIALIZED, "Not initialized"));
     }
 
     const token = request.cookies["admin_token"];
     if (!token) {
-      reply.code(HTTP_UNAUTHORIZED).send({ error: { message: "Not authenticated" } });
+      reply.code(HTTP_UNAUTHORIZED).send(apiError(API_CODE.TOKEN_INVALID, "Not authenticated"));
       return reply;
     }
 
@@ -43,7 +44,7 @@ const adminAuthRaw: FastifyPluginCallback<AdminAuthOptions> = (app, options, don
       jwt.verify(token, secret ?? "");
     } catch (err: unknown) {
       request.log.debug({ err }, "invalid JWT token");
-      reply.code(HTTP_UNAUTHORIZED).send({ error: { message: "Invalid or expired token" } });
+      reply.code(HTTP_UNAUTHORIZED).send(apiError(API_CODE.TOKEN_INVALID, "Invalid or expired token"));
       return reply;
     }
   });
@@ -59,13 +60,13 @@ export const adminLoginRoutes: FastifyPluginCallback<AdminAuthOptions> = (app, o
   app.post("/admin/api/login", async (request, reply) => {
     const { password } = request.body as { password?: string };
     if (!password) {
-      return reply.code(HTTP_UNAUTHORIZED).send({ error: { message: "Invalid password" } });
+      return reply.code(HTTP_UNAUTHORIZED).send(apiError(API_CODE.WRONG_PASSWORD, "Invalid password"));
     }
 
     // DB 模式：scrypt hash 验证
     const hash = getSetting(options.db, "admin_password_hash");
     if (!hash || !verifyPassword(password, hash)) {
-      return reply.code(HTTP_UNAUTHORIZED).send({ error: { message: "Invalid password" } });
+      return reply.code(HTTP_UNAUTHORIZED).send(apiError(API_CODE.WRONG_PASSWORD, "Invalid password"));
     }
 
     const secret = getSetting(options.db, "jwt_secret");

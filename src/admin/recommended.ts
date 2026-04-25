@@ -10,20 +10,7 @@ export const adminRecommendedRoutes: FastifyPluginCallback<RecommendedRoutesOpti
   const { db } = options
 
   app.get("/admin/api/recommended/providers", async (_req, reply) => {
-    const groups = getRecommendedProviders()
-
-    const existing = new Set<string>(
-      (db.prepare("SELECT name FROM providers").all() as { name: string }[]).map((r) => r.name),
-    )
-
-    const filtered = groups
-      .map((g) => ({
-        ...g,
-        presets: g.presets.filter((p) => !existing.has(p.presetName)),
-      }))
-      .filter((g) => g.presets.length > 0)
-
-    return reply.send(filtered)
+    return reply.send(getRecommendedProviders())
   })
 
   app.get("/admin/api/recommended/retry-rules", async (_req, reply) => {

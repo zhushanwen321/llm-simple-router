@@ -22,7 +22,6 @@ function makeConfig() {
     LOG_LEVEL: "silent",
     TZ: "Asia/Shanghai",
     STREAM_TIMEOUT_MS: 5000,
-    RETRY_MAX_ATTEMPTS: 0,
     RETRY_BASE_DELAY_MS: 0,
   };
 }
@@ -325,7 +324,7 @@ describe("usage API endpoints", () => {
     });
 
     expect(res.statusCode).toBe(200);
-    const body = res.json();
+    const body = res.json().data;
     expect(Array.isArray(body)).toBe(true);
     expect(body.length).toBeGreaterThanOrEqual(1);
     expect(body[0]).toHaveProperty("window");
@@ -342,7 +341,7 @@ describe("usage API endpoints", () => {
       headers: { cookie },
     });
     expect(res.statusCode).toBe(200);
-    expect(Array.isArray(res.json())).toBe(true);
+    expect(Array.isArray(res.json().data)).toBe(true);
   });
 
   it("GET /admin/api/usage/weekly returns daily aggregation", async () => {
@@ -370,7 +369,7 @@ describe("usage API endpoints", () => {
     });
 
     expect(res.statusCode).toBe(200);
-    const body = res.json();
+    const body = res.json().data;
     expect(Array.isArray(body)).toBe(true);
     expect(body.length).toBeGreaterThanOrEqual(1);
     expect(body[0]).toHaveProperty("date");
@@ -386,6 +385,6 @@ describe("usage API endpoints", () => {
       headers: { cookie },
     });
     expect(res.statusCode).toBe(200);
-    expect(Array.isArray(res.json())).toBe(true);
+    expect(Array.isArray(res.json().data)).toBe(true);
   });
 });

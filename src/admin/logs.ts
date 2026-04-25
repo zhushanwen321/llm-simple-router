@@ -3,6 +3,7 @@ import Database from "better-sqlite3";
 import { Type, Static } from "@sinclair/typebox";
 import { getRequestLogs, getRequestLogsGrouped, getRequestLogById, getRequestLogChildren, deleteLogsBefore } from "../db/index.js";
 import { HTTP_NOT_FOUND } from "./constants.js";
+import { API_CODE, apiError } from "./api-response.js";
 
 const LogQuerySchema = Type.Object({
   page: Type.Optional(Type.String()),
@@ -56,7 +57,7 @@ export const adminLogRoutes: FastifyPluginCallback<LogRoutesOptions> = (app, opt
     const params = request.params as { id: string };
     const log = getRequestLogById(db, params.id);
     if (!log) {
-      return reply.code(HTTP_NOT_FOUND).send({ error: { message: "Log not found" } });
+      return reply.code(HTTP_NOT_FOUND).send(apiError(API_CODE.NOT_FOUND, "Log not found"));
     }
     return reply.send(log);
   });
@@ -65,7 +66,7 @@ export const adminLogRoutes: FastifyPluginCallback<LogRoutesOptions> = (app, opt
     const params = request.params as { id: string };
     const parent = getRequestLogById(db, params.id);
     if (!parent) {
-      return reply.code(HTTP_NOT_FOUND).send({ error: { message: "Log not found" } });
+      return reply.code(HTTP_NOT_FOUND).send(apiError(API_CODE.NOT_FOUND, "Log not found"));
     }
     const rows = getRequestLogChildren(db, params.id);
     return reply.send(rows);

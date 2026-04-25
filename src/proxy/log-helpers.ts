@@ -1,7 +1,7 @@
 import Database from "better-sqlite3";
 import type { Provider } from "../db/index.js";
 import { insertRequestLog } from "../db/index.js";
-import type { RawHeaders } from "./proxy-core.js";
+import type { RawHeaders } from "./types.js";
 
 export interface FailoverContext {
   isFailoverIteration: boolean;
