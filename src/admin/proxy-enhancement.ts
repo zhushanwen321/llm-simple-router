@@ -31,7 +31,7 @@ Structure your response as follows:
 9. **Optional Next Step**: Suggested next action based on the most recent conversation
 </summary>
 
-REMINDER: Do NOT call any tools. Respond with plain text only — an <analysis> block followed by a <summary> block. Tool calls will be rejected and will you fail the task.`;
+REMINDER: Do NOT call any tools. Respond with plain text only — an <analysis> block followed by a <summary> block. Tool calls will be rejected and you will fail the task.`;
 
 const UpdateProxyEnhancementSchema = Type.Object({
   claude_code_enabled: Type.Boolean(),
