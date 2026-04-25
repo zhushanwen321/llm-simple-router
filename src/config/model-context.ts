@@ -83,7 +83,7 @@ export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
 }
 
 export const DEFAULT_CONTEXT_WINDOW = 200000
-export const COMPACT_THRESHOLD = 1000000
+export const OVERFLOW_THRESHOLD = 1000000
 
 export function lookupContextWindow(modelName: string): number {
   return MODEL_CONTEXT_WINDOWS[modelName] ?? DEFAULT_CONTEXT_WINDOW
