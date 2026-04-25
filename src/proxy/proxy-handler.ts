@@ -24,12 +24,7 @@ import type { RetryRuleMatcher } from "./retry-rules.js";
 import type { ProxyOrchestrator } from "./orchestrator.js";
 import type { ProxyErrorFormatter, ProxyErrorResponse } from "./proxy-core.js";
 import { buildTransportFn } from "./transport-fn.js";
-import {
-  estimateTokens,
-  getModelContextWindow,
-  applyCompactRedirect,
-} from "./compact.js";
-import { loadEnhancementConfig } from "./enhancement-config.js";
+import { applyOverflowRedirect } from "./overflow.js";
 
 const HTTP_ERROR_THRESHOLD = 400;
 
@@ -192,8 +187,6 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
   const { request, reply, apiType, upstreamPath, errors, deps, options, effectiveModel, originalModel, isFailover, originalBody, sessionId } = ctx;
   const excludeTargets: Target[] = [];
   let rootLogId: string | null = null;
-  const compactConfig = loadEnhancementConfig(deps.db);
-
   while (true) {
     const startTime = Date.now();
     const logId = randomUUID();
@@ -246,20 +239,15 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
 
     body.model = resolved.backend_model;
 
-    // --- 1M Context Compact ---
-    const compactResult = applyCompactRedirect({
-      db: deps.db, config: compactConfig, apiType, body, resolved, log: request.log,
-    });
-    if (compactResult === "overflow") {
-      const modelCtx = getModelContextWindow(deps.db, resolved.provider_id, resolved.backend_model);
-      return rejectAndReply(reply, rCtx, errors.promptTooLong(),
-        `Context overflow: ${estimateTokens(body)} tokens > ${modelCtx} limit`, resolved.provider_id);
-    }
-    if (compactResult) {
-      resolved = compactResult.resolved;
-      provider = compactResult.provider;
-      body.model = compactResult.model;
-      body.messages = compactResult.messages;
+    // --- 溢出重定向：上下文超出时切换到更大模型 ---
+    const overflowResult = applyOverflowRedirect(resolved, deps.db, body);
+    if (overflowResult) {
+      const overflowProvider = getProviderById(deps.db, overflowResult.provider_id);
+      if (overflowProvider && overflowProvider.is_active && overflowProvider.api_type === apiType) {
+        resolved = { ...resolved, provider_id: overflowResult.provider_id, backend_model: overflowResult.backend_model };
+        provider = overflowProvider;
+        body.model = overflowResult.backend_model;
+      }
     }
 
     patchMissingThinkingBlocks(body, provider.base_url);
