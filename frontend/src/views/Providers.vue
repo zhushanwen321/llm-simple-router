@@ -273,7 +273,7 @@ function onPresetChange() {
   const preset = availablePlans.value.find(p => p.plan === presetPlan.value)
   if (!preset) return
   form.value.name = preset.presetName
-  form.value.api_type = 'anthropic'
+  form.value.api_type = preset.apiType
   form.value.base_url = preset.baseUrl
   form.value.models = [...preset.models]
 }
@@ -317,7 +317,7 @@ function openCreate() {
 
 function openEdit(p: Provider) {
   editingId.value = p.id
-  form.value = { name: p.name, api_type: 'anthropic', base_url: p.base_url, api_key: '', models: [...(p.models || [])], is_active: !!p.is_active, max_concurrency: p.max_concurrency ?? DEFAULT_CONCURRENCY, queue_timeout_ms: p.queue_timeout_ms ?? DEFAULT_QUEUE_TIMEOUT_MS, max_queue_size: p.max_queue_size ?? DEFAULT_QUEUE_SIZE }
+  form.value = { name: p.name, api_type: p.api_type, base_url: p.base_url, api_key: '', models: [...(p.models || [])], is_active: !!p.is_active, max_concurrency: p.max_concurrency ?? DEFAULT_CONCURRENCY, queue_timeout_ms: p.queue_timeout_ms ?? DEFAULT_QUEUE_TIMEOUT_MS, max_queue_size: p.max_queue_size ?? DEFAULT_QUEUE_SIZE }
   concurrencyEnabled.value = (p.max_concurrency ?? 0) > 0
   modelInput.value = ''
   presetGroup.value = ''
@@ -331,7 +331,7 @@ type ProviderFormPayload = Pick<ProviderPayload, 'name' | 'api_type' | 'base_url
 function buildPayload(): ProviderFormPayload {
   const payload: ProviderFormPayload = {
     name: form.value.name,
-    api_type: 'anthropic',
+    api_type: form.value.api_type,
     base_url: form.value.base_url,
     models: form.value.models,
     is_active: form.value.is_active ? 1 : 0,
