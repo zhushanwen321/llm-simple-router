@@ -356,7 +356,7 @@ function isCompactRequest(messages: unknown[]): boolean {
   return COMPACT_MARKERS.some(marker => text.includes(marker));
 }
 
-// token 估算：约 3 字符 = 1 token
+// 保守估算：整个 body 而非仅 messages，宁可多估提前触发压缩
 const CHARS_PER_TOKEN = 3;
 
 function estimateTokens(body: Record<string, unknown>): number {
