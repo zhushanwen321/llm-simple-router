@@ -94,6 +94,6 @@ export function getActiveProviderByName(db: Database.Database, name: string): { 
   return db.prepare("SELECT id, models FROM providers WHERE name = ? AND is_active = 1").get(name) as { id: string; models: string } | undefined;
 }
 
-export function getActiveProvidersWithModels(db: Database.Database): { id: string; models: string }[] {
-  return db.prepare("SELECT id, models FROM providers WHERE is_active = 1").all() as { id: string; models: string }[];
+export function getActiveProvidersWithModels(db: Database.Database): { id: string; name: string; models: string }[] {
+  return db.prepare("SELECT id, name, models FROM providers WHERE is_active = 1").all() as { id: string; name: string; models: string }[];
 }
