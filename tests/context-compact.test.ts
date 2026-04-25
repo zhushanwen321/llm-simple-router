@@ -80,15 +80,6 @@ function closeServer(server: Server): Promise<void> {
   });
 }
 
-// ---------- 单元测试：helper 函数 ----------
-
-describe("isCompactRequest + estimateTokens (unit)", () => {
-  // 通过 proxy-handler 内部导出不可直接测，此处通过集成测试覆盖
-  it("placeholder — helpers are tested via integration below", () => {
-    expect(true).toBe(true);
-  });
-});
-
 // ---------- 集成测试：compact 请求重定向 ----------
 
 describe("context compact integration", () => {
