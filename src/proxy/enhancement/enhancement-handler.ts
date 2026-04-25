@@ -22,6 +22,9 @@ export interface EnhancementResult {
 }
 
 const MODEL_INFO_TAG_TYPE = "model-info";
+const MAX_OPTIONS_PER_QUESTION = 4;
+const MAX_QUESTION_GROUPS = 4;
+const MAX_DISPLAY_MODELS = 16;
 
 /**
  * 解析 "provider_name/backend_model" 格式，返回对应的 client_model。
@@ -55,7 +58,7 @@ function buildDisplayModels(
     try {
       const parsed: string[] = JSON.parse(allowedModelsRaw).filter((s: string) => s.trim() !== "");
       if (parsed.length > 0) allowedSet = new Set(parsed);
-    } catch { /* 解析失败时不做过滤 */ }
+    } catch { /* eslint-disable-line taste/no-silent-catch -- JSON.parse 解析失败时不做过滤，属于预期降级 */ }
   }
   const filtered = allowedSet
     ? providerModels.filter(m => allowedSet!.has(m.backend_model))
@@ -265,7 +268,7 @@ function buildSelectModelResponse(
 
 /** 将模型列表分块为 AskUserQuestion 的 questions（每组 2-4 个选项，最多 4 组） */
 function buildModelQuestions(models: string[]): unknown[] {
-  if (models.length <= 4) {
+  if (models.length <= MAX_OPTIONS_PER_QUESTION) {
     const options = models.map(m => {
       const sep = m.indexOf("/");
       const provider = sep > 0 ? m.substring(0, sep) : "";
@@ -282,8 +285,8 @@ function buildModelQuestions(models: string[]): unknown[] {
     }];
   }
 
-  // 均匀分配到最多 4 个 question，每个 2-4 个选项
-  const numChunks = Math.min(4, Math.ceil(models.length / 4));
+  // 均匀分配到最多 MAX_QUESTION_GROUPS 个 question，每个 2-4 个选项
+  const numChunks = Math.min(MAX_QUESTION_GROUPS, Math.ceil(models.length / MAX_OPTIONS_PER_QUESTION));
   const chunks: string[][] = Array.from({ length: numChunks }, () => []);
   for (let i = 0; i < models.length; i++) {
     chunks[i % numChunks].push(models[i]);
@@ -303,7 +306,7 @@ function buildModelQuestions(models: string[]): unknown[] {
 
 /** 构造 AskUserQuestion synthetic tool_use 响应 */
 function buildAskUserQuestionResponse(displayModels: string[]): Omit<InterceptResponse, "meta"> {
-  const capped = displayModels.slice(0, 16);
+  const capped = displayModels.slice(0, MAX_DISPLAY_MODELS);
   const questions = buildModelQuestions(capped);
   const toolUseId = `${TOOL_USE_ID_PREFIX}${randomUUID()}`;
 

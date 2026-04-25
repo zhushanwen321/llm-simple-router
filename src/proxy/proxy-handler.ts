@@ -387,17 +387,14 @@ interface CompactConfig {
   custom_prompt: string | null;
 }
 
-const COMPACT_MARKERS = [
-  "CRITICAL: Respond with TEXT ONLY",
-  "Your task is to create a detailed summary of the conversation so far",
-];
+// Claude Code compact prompt 一定以 NO_TOOLS_PREAMBLE 开头，且 content 是纯字符串（非数组）
+const COMPACT_PREAMBLE = "CRITICAL: Respond with TEXT ONLY";
 
 function isCompactRequest(messages: unknown[]): boolean {
   if (!Array.isArray(messages) || messages.length === 0) return false;
   const last = messages[messages.length - 1] as Record<string, unknown> | undefined;
-  if (!last) return false;
-  const text = typeof last.content === "string" ? last.content : JSON.stringify(last.content ?? "");
-  return COMPACT_MARKERS.some(marker => text.includes(marker));
+  if (!last || last.role !== "user") return false;
+  return typeof last.content === "string" && last.content.startsWith(COMPACT_PREAMBLE);
 }
 
 function estimateTokens(body: Record<string, unknown>): number {
