@@ -13,6 +13,24 @@ import { parseModels, buildModelInfoList } from "../config/model-context.js";
 import { getModelInfoForProvider, setModelInfoForProvider, deleteAllModelInfoForProvider } from "../db/model-info.js";
 
 const API_KEY_PREVIEW_MIN_LENGTH = 8;
+
+type ModelInput = string | { name: string; context_window?: number };
+
+interface ModelOverride {
+  name: string;
+  context_window: number;
+}
+
+function extractModelOverrides(models: ModelInput[]): {
+  names: string[];
+  overrides: ModelOverride[];
+} {
+  const names = models.map(m => typeof m === "string" ? m : m.name);
+  const overrides = models.filter(
+    (m): m is ModelOverride => typeof m !== "string" && m.context_window != null,
+  );
+  return { names, overrides };
+}
 const API_KEY_PREVIEW_PREFIX_LEN = 4;
 
 const PROVIDER_NAME_RE = /^[a-zA-Z0-9_-]+$/;
@@ -92,10 +110,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
       return reply.code(HTTP_CONFLICT).send(apiError(API_CODE.CONFLICT_NAME, `Provider 名称 '${body.name}' 已存在`));
     }
     const encryptedKey = encrypt(body.api_key, getSetting(db, "encryption_key")!);
-    const inputModels = (body.models ?? []) as Array<string | { name: string; context_window?: number }>;
-    const normalizedModels = inputModels.map((m: string | { name: string; context_window?: number }) => typeof m === 'string' ? m : m.name);
-    const contextOverrides = inputModels
-      .filter((m): m is { name: string; context_window: number } => typeof m !== 'string' && m.context_window != null);
+    const { names: normalizedModels, overrides: contextOverrides } = extractModelOverrides((body.models ?? []) as ModelInput[]);
     const id = createProvider(db, {
       name: body.name,
       api_type: body.api_type,
@@ -141,13 +156,10 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     if (body.base_url !== undefined) fields.base_url = body.base_url;
     if (body.is_active !== undefined) fields.is_active = body.is_active;
     if (body.models !== undefined) {
-      const inputModels = body.models as Array<string | { name: string; context_window?: number }>;
-      const normalizedModels = inputModels.map((m: string | { name: string; context_window?: number }) => typeof m === 'string' ? m : m.name);
-      const contextOverrides = inputModels
-        .filter((m): m is { name: string; context_window: number } => typeof m !== 'string' && m.context_window != null);
-      fields.models = JSON.stringify(normalizedModels);
-      if (contextOverrides.length > 0) {
-        setModelInfoForProvider(db, id, contextOverrides.map(o => ({ model_name: o.name, context_window: o.context_window })));
+      const { names, overrides } = extractModelOverrides(body.models as ModelInput[]);
+      fields.models = JSON.stringify(names);
+      if (overrides.length > 0) {
+        setModelInfoForProvider(db, id, overrides.map(o => ({ model_name: o.name, context_window: o.context_window })));
       } else {
         deleteAllModelInfoForProvider(db, id);
       }
