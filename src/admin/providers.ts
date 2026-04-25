@@ -91,7 +91,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
       base_url: body.base_url,
       api_key: encryptedKey,
       api_key_preview: body.api_key.length > API_KEY_PREVIEW_MIN_LENGTH ? `${body.api_key.slice(0, API_KEY_PREVIEW_PREFIX_LEN)}...${body.api_key.slice(-API_KEY_PREVIEW_PREFIX_LEN)}` : "****",
-      models: JSON.stringify((body.models ?? []).map((m: any) => typeof m === 'string' ? { name: m } : m)),
+      models: JSON.stringify((body.models ?? []).map((m: string | { name: string; context_window?: number }) => typeof m === 'string' ? { name: m } : m)),
       is_active: body.is_active ?? 1,
       max_concurrency: body.max_concurrency ?? PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency,
       queue_timeout_ms: body.queue_timeout_ms ?? PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms,
@@ -126,7 +126,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     if (body.api_type !== undefined) fields.api_type = body.api_type;
     if (body.base_url !== undefined) fields.base_url = body.base_url;
     if (body.is_active !== undefined) fields.is_active = body.is_active;
-    if (body.models !== undefined) fields.models = JSON.stringify(body.models.map((m: any) => typeof m === 'string' ? { name: m } : m));
+    if (body.models !== undefined) fields.models = JSON.stringify(body.models.map((m: string | { name: string; context_window?: number }) => typeof m === 'string' ? { name: m } : m));
     if (body.max_concurrency !== undefined) fields.max_concurrency = body.max_concurrency;
     if (body.queue_timeout_ms !== undefined) fields.queue_timeout_ms = body.queue_timeout_ms;
     if (body.max_queue_size !== undefined) fields.max_queue_size = body.max_queue_size;
