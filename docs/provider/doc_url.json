@@ -1,114 +1,310 @@
 {
-  "DeepSeek": {
-    "provider-api": {
-      "doc_url": "https://api-docs.deepseek.com/",
-      "pricing_url": "https://api-docs.deepseek.com/quick_start/pricing",
-      "note": "仅 API 模式；baseUrl: https://api.deepseek.com (OpenAI 格式) / https://api.deepseek.com/anthropic (Anthropic 格式)；deepseek-chat/deepseek-reasoner 将废弃，对应 deepseek-v4-flash/deepseek-v4-pro"
-    }
-  },
-  "百度千帆": {
-    "provider-api": {
-      "doc_url": "https://cloud.baidu.com/doc/WENXINWORKSHOP/s/7ltgucw50",
-      "pricing_url": "https://cloud.baidu.com/doc/WENXINWORKSHOP/s/Slfmc9dds",
-      "note": "仅 API 模式；baseUrl: https://qianfan.baidubce.com/v2；支持 OpenAI 兼容格式"
-    }
-  },
-  "科大讯飞": {
-    "provider-api": {
-      "doc_url": "https://www.xfyun.cn/doc/spark/%E6%8E%A5%E5%8F%A3%E8%AF%B4%E6%98%8E.html",
-      "pricing_url": "https://www.xfyun.cn/doc/spark/%E6%8E%A5%E5%8F%A3%E8%AF%B4%E6%98%8E.html",
-      "note": "仅 API 模式；baseUrl: https://spark-api-open.xf-yun.com/v1；支持 OpenAI 兼容格式"
-    }
-  },
-  "硅基流动": {
-    "provider-api": {
-      "doc_url": "https://docs.siliconflow.cn/",
-      "pricing_url": "https://siliconflow.cn/pricing",
-      "note": "仅 API 模式；baseUrl: https://api.siliconflow.cn/v1；聚合多家开源模型"
-    }
-  },
-  "智谱": {
-    "provider-api": {
-      "doc_url": "https://open.bigmodel.cn/dev/api",
-      "pricing_url": "https://open.bigmodel.cn/pricing",
-      "note": "API 模式 (OpenAI 格式)；baseUrl: https://open.bigmodel.cn/api/paas/v4"
+  "deepseek": {
+    "group": "DeepSeek",
+    "plan": "Anthropic",
+    "apiType": "anthropic",
+    "baseUrl": "https://api.deepseek.com/anthropic",
+    "urls": {
+      "overview": "https://api-docs.deepseek.com/",
+      "models": "https://api-docs.deepseek.com/quick_start/pricing",
+      "api_reference": "https://api-docs.deepseek.com/api/create-chat-completion",
+      "pricing": "https://api-docs.deepseek.com/quick_start/pricing",
+      "integration": null,
+      "changelog": null
     },
-    "provider-coding-plan": {
-      "doc_url": "https://open.bigmodel.cn/dev/api/anthropic",
-      "pricing_url": "https://open.bigmodel.cn/pricing",
-      "note": "Coding Plan (Anthropic 格式)；baseUrl: https://open.bigmodel.cn/api/anthropic；面向编码场景，模型如 glm-5.1/glm-5/glm-4.7"
-    }
+    "pages": [],
+    "note": "deepseek-chat/reasoner 将于 2026/07/24 废弃，对应 deepseek-v4-flash/v4-pro"
   },
-  "KIMI": {
-    "provider-api": {
-      "doc_url": "https://platform.moonshot.cn/docs",
-      "pricing_url": "https://platform.moonshot.cn/docs/pricing/chat",
-      "note": "API 模式 (OpenAI 格式)；baseUrl: https://api.moonshot.cn；模型如 kimi-k2.6/kimi-k2.5/moonshot-v1-128k"
+  "deepseek-openai": {
+    "group": "DeepSeek",
+    "plan": "OpenAI",
+    "apiType": "openai",
+    "baseUrl": "https://api.deepseek.com",
+    "urls": {
+      "overview": "https://api-docs.deepseek.com/",
+      "models": "https://api-docs.deepseek.com/quick_start/pricing",
+      "api_reference": "https://api-docs.deepseek.com/api/create-chat-completion",
+      "pricing": "https://api-docs.deepseek.com/quick_start/pricing",
+      "integration": null,
+      "changelog": null
     },
-    "provider-coding-plan": {
-      "doc_url": "https://platform.moonshot.cn/docs/coding",
-      "pricing_url": "https://platform.moonshot.cn/docs/pricing/chat",
-      "note": "Coding Plan (Anthropic 格式)；baseUrl: https://api.kimi.com/coding；面向编码场景，模型如 kimi-for-coding/kimi-k2.5"
-    }
+    "pages": [],
+    "note": "OpenAI 兼容格式接入"
   },
-  "Minimax": {
-    "provider-api": {
-      "doc_url": "https://platform.minimaxi.com/docs/guides/models-intro",
-      "pricing_url": "https://platform.minimaxi.com/docs/pricing/overview",
-      "note": "API 模式 (OpenAI 格式)；baseUrl: https://api.minimax.chat；模型如 MiniMax-M2.7/M2.5/M2.1"
+  "qianfan": {
+    "group": "百度千帆",
+    "plan": "API",
+    "apiType": "openai",
+    "baseUrl": "https://qianfan.baidubce.com/v2",
+    "urls": {
+      "overview": "https://cloud.baidu.com/doc/WENXINWORKSHOP/s/7ltgucw50",
+      "models": "https://cloud.baidu.com/doc/qianfan/s/rmh4stp0j",
+      "api_reference": "https://cloud.baidu.com/doc/WENXINWORKSHOP/s/7ltgucw50",
+      "pricing": "https://cloud.baidu.com/doc/WENXINWORKSHOP/s/Slfmc9dds",
+      "integration": null,
+      "changelog": null
     },
-    "provider-token-plan": {
-      "doc_url": "https://platform.minimaxi.com/docs/pricing/overview",
-      "pricing_url": "https://platform.minimaxi.com/subscribe/token-plan",
-      "note": "Token Plan (Anthropic 格式)；baseUrl: https://api.minimaxi.com/anthropic；按 Token 计费，模型如 MiniMax-M2.7"
-    }
+    "pages": [],
+    "note": "OpenAI 兼容格式；当前配置模型几乎全部过时（ernie-4.0/3.5 系列），应更新为 ernie-5.0/4.5-turbo 系列"
   },
-  "火山引擎": {
-    "provider-api": {
-      "doc_url": "https://www.volcengine.com/docs/82379/1099455",
-      "pricing_url": "https://www.volcengine.com/docs/82379/1099455",
-      "note": "API 模式 (OpenAI 格式)；baseUrl: https://ark.cn-beijing.volces.com/api/v3；模型如 doubao-seed 系列"
+  "iflytek-spark": {
+    "group": "科大讯飞",
+    "plan": "API",
+    "apiType": "openai",
+    "baseUrl": "https://spark-api-open.xf-yun.com/v1",
+    "urls": {
+      "overview": "https://www.xfyun.cn/doc/spark/%E6%8E%A5%E5%8F%A3%E8%AF%B4%E6%98%8E.html",
+      "models": "https://www.xfyun.cn/doc/spark/%E6%8E%A5%E5%8F%A3%E8%AF%B4%E6%98%8E.html",
+      "api_reference": "https://www.xfyun.cn/doc/spark/%E6%8E%A5%E5%8F%A3%E8%AF%B4%E6%98%8E.html",
+      "pricing": "https://www.xfyun.cn/doc/spark/%E6%8E%A5%E5%8F%A3%E8%AF%B4%E6%98%8E.html",
+      "integration": null,
+      "changelog": null
     },
-    "provider-coding-plan": {
-      "doc_url": "https://www.volcengine.com/docs/82379/1399568",
-      "pricing_url": "https://www.volcengine.com/docs/82379/1399568",
-      "note": "Coding Plan (Anthropic 格式)；baseUrl: https://ark.cn-beijing.volces.com/api/compatible；聚合多模型如 ark-code/doubao-seed/kimi-k2.5"
-    }
+    "pages": [],
+    "note": "HTTP API 仅 6 个 domain 参数；Max 套餐将于 2026/03 下线，升级为 Ultra"
   },
-  "阿里云": {
-    "provider-api": {
-      "doc_url": "https://help.aliyun.com/zh/model-studio/",
-      "pricing_url": "https://help.aliyun.com/zh/model-studio/models",
-      "note": "API 模式 (OpenAI 兼容)；baseUrl: https://dashscope.aliyuncs.com/compatible-mode；百炼 Model Studio 平台"
+  "siliconflow": {
+    "group": "硅基流动",
+    "plan": "API",
+    "apiType": "openai",
+    "baseUrl": "https://api.siliconflow.cn/v1",
+    "urls": {
+      "overview": "https://docs.siliconflow.cn/",
+      "models": "https://docs.siliconflow.cn/api-reference/models",
+      "api_reference": "https://docs.siliconflow.cn/api-reference/chat-completions/chat-completions",
+      "pricing": "https://siliconflow.cn/pricing",
+      "integration": null,
+      "changelog": null
     },
-    "provider-coding-plan": {
-      "doc_url": "https://help.aliyun.com/zh/model-studio/qwen-api-reference/",
-      "pricing_url": "https://help.aliyun.com/zh/model-studio/models",
-      "note": "Coding Plan (Anthropic 格式)；baseUrl: https://coding.dashscope.aliyuncs.com/apps/anthropic；聚合多模型如 qwen3-coder/kimi-k2.5/glm-5"
-    }
+    "pages": [],
+    "note": "聚合多家开源模型；模型列表通过动态加载的模型广场展示"
   },
-  "腾讯云": {
-    "provider-api": {
-      "doc_url": "https://cloud.tencent.com/document/product/1729",
-      "pricing_url": "https://cloud.tencent.com/document/product/1729/111033",
-      "note": "API 模式 (OpenAI 格式)；baseUrl: https://api.hunyuan.cloud.tencent.com；混元大模型系列"
+  "zhipu": {
+    "group": "智谱",
+    "plan": "API",
+    "apiType": "openai",
+    "baseUrl": "https://open.bigmodel.cn/api/paas/v4",
+    "urls": {
+      "overview": "https://open.bigmodel.cn/dev/api",
+      "models": "https://open.bigmodel.cn/dev/api",
+      "api_reference": "https://open.bigmodel.cn/dev/api",
+      "pricing": "https://open.bigmodel.cn/pricing",
+      "integration": null,
+      "changelog": null
     },
-    "provider-coding-plan": {
-      "doc_url": "https://cloud.tencent.com/document/product/1729/111033",
-      "pricing_url": "https://cloud.tencent.com/document/product/1729/111033",
-      "note": "Coding Plan (Anthropic 格式)；baseUrl: https://api.lkeap.cloud.tencent.com/coding/anthropic；聚合多模型如 tc-code/hunyuan-2.0"
-    }
+    "pages": [],
+    "note": "OpenAI 兼容格式"
   },
-  "阶跃星辰": {
-    "provider-api": {
-      "doc_url": "https://platform.stepfun.com/docs",
-      "pricing_url": "https://platform.stepfun.com/docs",
-      "note": "API 模式 (OpenAI 格式)；baseUrl: https://api.stepfun.com；模型如 step-3.5-flash/step-3/step-2"
+  "zhipu-coding-plan": {
+    "group": "智谱",
+    "plan": "Coding Plan",
+    "apiType": "anthropic",
+    "baseUrl": "https://open.bigmodel.cn/api/anthropic",
+    "urls": {
+      "overview": "https://open.bigmodel.cn/dev/api/anthropic",
+      "models": "https://open.bigmodel.cn/dev/api/anthropic",
+      "api_reference": "https://open.bigmodel.cn/dev/api/anthropic",
+      "pricing": "https://open.bigmodel.cn/pricing",
+      "integration": null,
+      "changelog": null
     },
-    "provider-coding-plan": {
-      "doc_url": "https://platform.stepfun.com/docs",
-      "pricing_url": "https://platform.stepfun.com/docs",
-      "note": "Step Plan (Anthropic 格式)；baseUrl: https://api.stepfun.com/step_plan；面向编码场景，模型如 step-3.5-flash 系列"
-    }
+    "pages": [],
+    "note": "Coding Plan (Anthropic 格式)；面向编码场景"
+  },
+  "kimi": {
+    "group": "KIMI",
+    "plan": "API",
+    "apiType": "openai",
+    "baseUrl": "https://api.moonshot.cn",
+    "urls": {
+      "overview": "https://platform.moonshot.cn/docs",
+      "models": "https://platform.moonshot.cn/docs/models",
+      "api_reference": "https://platform.moonshot.cn/docs/api/chat",
+      "pricing": "https://platform.moonshot.cn/docs/pricing/chat",
+      "integration": null,
+      "changelog": null
+    },
+    "pages": [],
+    "note": "kimi-k2 系列将于 2026/05/25 下线"
+  },
+  "kimi-coding-plan": {
+    "group": "KIMI",
+    "plan": "Coding Plan",
+    "apiType": "anthropic",
+    "baseUrl": "https://api.kimi.com/coding",
+    "urls": {
+      "overview": "https://platform.moonshot.cn/docs/coding",
+      "models": "https://platform.moonshot.cn/docs/coding",
+      "api_reference": "https://platform.moonshot.cn/docs/coding",
+      "pricing": "https://platform.moonshot.cn/docs/pricing/chat",
+      "integration": null,
+      "changelog": null
+    },
+    "pages": [],
+    "note": "Coding Plan (Anthropic 格式)；面向编码场景"
+  },
+  "minimax": {
+    "group": "Minimax",
+    "plan": "API",
+    "apiType": "openai",
+    "baseUrl": "https://api.minimax.chat",
+    "urls": {
+      "overview": "https://platform.minimaxi.com/docs/guides/models-intro",
+      "models": "https://platform.minimaxi.com/docs/guides/models-intro",
+      "api_reference": "https://platform.minimaxi.com/docs/api-reference/api-overview",
+      "pricing": "https://platform.minimaxi.com/docs/pricing/overview",
+      "integration": null,
+      "changelog": null
+    },
+    "pages": [],
+    "note": "OpenAI 兼容格式；M2.1/M2 已标记为历史模型"
+  },
+  "minimax-token-plan": {
+    "group": "Minimax",
+    "plan": "Token Plan",
+    "apiType": "anthropic",
+    "baseUrl": "https://api.minimaxi.com/anthropic",
+    "urls": {
+      "overview": "https://platform.minimaxi.com/docs/guides/models-intro",
+      "models": null,
+      "api_reference": "https://platform.minimaxi.com/docs/api-reference/api-overview",
+      "pricing": "https://platform.minimaxi.com/docs/pricing/overview",
+      "integration": null,
+      "changelog": null
+    },
+    "pages": [
+      { "id": "token-plan-intro", "url": "https://platform.minimaxi.com/docs/token-plan/intro", "purpose": "plan-overview" },
+      { "id": "token-plan-claude-code", "url": "https://platform.minimaxi.com/docs/token-plan/claude-code", "purpose": "integration" },
+      { "id": "token-plan-quickstart", "url": "https://platform.minimaxi.com/docs/token-plan/quickstart", "purpose": "models-list" }
+    ],
+    "note": "Token Plan (Anthropic 格式)；按 Token 计费；highspeed 版本模型需从 quickstart 页获取"
+  },
+  "volcengine": {
+    "group": "火山引擎",
+    "plan": "API",
+    "apiType": "openai",
+    "baseUrl": "https://ark.cn-beijing.volces.com/api/v3",
+    "urls": {
+      "overview": "https://www.volcengine.com/docs/82379/1099455",
+      "models": "https://www.volcengine.com/docs/82379/1099455",
+      "api_reference": "https://www.volcengine.com/docs/82379/1099455",
+      "pricing": "https://www.volcengine.com/docs/82379/1099455",
+      "integration": null,
+      "changelog": null
+    },
+    "pages": [],
+    "note": "OpenAI 兼容格式；doubao-seed 系列"
+  },
+  "volcengine-coding-plan": {
+    "group": "火山引擎",
+    "plan": "Coding Plan",
+    "apiType": "anthropic",
+    "baseUrl": "https://ark.cn-beijing.volces.com/api/compatible",
+    "urls": {
+      "overview": "https://www.volcengine.com/docs/82379/1399568",
+      "models": "https://www.volcengine.com/docs/82379/1399568",
+      "api_reference": "https://www.volcengine.com/docs/82379/1399568",
+      "pricing": "https://www.volcengine.com/docs/82379/1399568",
+      "integration": null,
+      "changelog": null
+    },
+    "pages": [],
+    "note": "Coding Plan (Anthropic 格式)；聚合 ark-code/doubao-seed/kimi-k2.5/glm 等模型"
+  },
+  "aliyun": {
+    "group": "阿里云",
+    "plan": "API",
+    "apiType": "openai",
+    "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode",
+    "urls": {
+      "overview": "https://help.aliyun.com/zh/model-studio/",
+      "models": "https://help.aliyun.com/zh/model-studio/models",
+      "api_reference": "https://help.aliyun.com/zh/model-studio/developer-reference/use-qwen-by-calling-api",
+      "pricing": "https://help.aliyun.com/zh/model-studio/models",
+      "integration": null,
+      "changelog": null
+    },
+    "pages": [],
+    "note": "百炼 Model Studio；OpenAI 兼容格式"
+  },
+  "aliyun-coding-plan": {
+    "group": "阿里云",
+    "plan": "Coding Plan",
+    "apiType": "anthropic",
+    "baseUrl": "https://coding.dashscope.aliyuncs.com/apps/anthropic",
+    "urls": {
+      "overview": "https://help.aliyun.com/zh/model-studio/coding-plan",
+      "models": "https://help.aliyun.com/zh/model-studio/coding-plan",
+      "api_reference": "https://help.aliyun.com/zh/model-studio/coding-plan",
+      "pricing": "https://help.aliyun.com/zh/model-studio/coding-plan",
+      "integration": null,
+      "changelog": null
+    },
+    "pages": [],
+    "note": "Coding Plan (Anthropic 格式)；聚合 qwen3-coder/kimi-k2.5/glm-5 等"
+  },
+  "tencent": {
+    "group": "腾讯云",
+    "plan": "API",
+    "apiType": "openai",
+    "baseUrl": "https://api.hunyuan.cloud.tencent.com",
+    "urls": {
+      "overview": "https://cloud.tencent.com/document/product/1729",
+      "models": "https://cloud.tencent.com/document/product/1729",
+      "api_reference": "https://cloud.tencent.com/document/product/1729",
+      "pricing": "https://cloud.tencent.com/document/product/1729/111033",
+      "integration": null,
+      "changelog": null
+    },
+    "pages": [],
+    "note": "混元大模型系列；OpenAI 兼容格式"
+  },
+  "tencent-coding-plan": {
+    "group": "腾讯云",
+    "plan": "Coding Plan",
+    "apiType": "anthropic",
+    "baseUrl": "https://api.lkeap.cloud.tencent.com/coding/anthropic",
+    "urls": {
+      "overview": "https://cloud.tencent.com/document/product/1772/128947",
+      "models": "https://cloud.tencent.com/document/product/1772/128947",
+      "api_reference": "https://cloud.tencent.com/document/product/1772/128947",
+      "pricing": "https://cloud.tencent.com/document/product/1772/128947",
+      "integration": null,
+      "changelog": null
+    },
+    "pages": [],
+    "note": "Coding Plan (Anthropic 格式)；hunyuan-t1/turbos 标注即将下线"
+  },
+  "stepfun": {
+    "group": "阶跃星辰",
+    "plan": "API",
+    "apiType": "openai",
+    "baseUrl": "https://api.stepfun.com",
+    "urls": {
+      "overview": "https://platform.stepfun.com/docs/zh/guides/models",
+      "models": "https://platform.stepfun.com/docs/zh/guides/models",
+      "api_reference": "https://platform.stepfun.com/docs/zh/api/chat-completion",
+      "pricing": "https://platform.stepfun.com/docs/zh/guides/models",
+      "integration": null,
+      "changelog": null
+    },
+    "pages": [],
+    "note": "OpenAI 兼容格式"
+  },
+  "stepfun-step-plan": {
+    "group": "阶跃星辰",
+    "plan": "Step Plan",
+    "apiType": "anthropic",
+    "baseUrl": "https://api.stepfun.com/step_plan",
+    "urls": {
+      "overview": "https://platform.stepfun.com/docs/zh/guides/models",
+      "models": "https://platform.stepfun.com/docs/zh/guides/models",
+      "api_reference": "https://platform.stepfun.com/docs/zh/guides/models",
+      "pricing": "https://platform.stepfun.com/docs/zh/guides/models",
+      "integration": null,
+      "changelog": null
+    },
+    "pages": [],
+    "note": "Step Plan (Anthropic 格式)；面向编码场景"
   }
 }
