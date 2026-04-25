@@ -37,6 +37,8 @@ export interface ProviderSummary {
 export interface MappingTarget {
   backend_model: string
   provider_id: string
+  overflow_provider_id?: string
+  overflow_model?: string
 }
 
 /** 定时策略的时间窗口 */
