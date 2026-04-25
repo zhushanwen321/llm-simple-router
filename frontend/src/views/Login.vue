@@ -57,9 +57,8 @@ async function handleLogin() {
   try {
     await api.login(password.value)
     router.push('/')
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } catch (e: any) {
-    error.value = e.response?.data?.error?.message || '登录失败'
+  } catch (e: unknown) {
+    error.value = (e as { apiMessage?: string }).apiMessage || '登录失败'
   } finally {
     loading.value = false
   }

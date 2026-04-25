@@ -1,6 +1,16 @@
 import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
+import { Type, Static } from "@sinclair/typebox";
 import { getSetting, setSetting } from "../db/settings.js";
+
+const UpdateProxyEnhancementSchema = Type.Object({
+  claude_code_enabled: Type.Boolean(),
+});
+
+const SessionParamsSchema = Type.Object({
+  keyId: Type.String(),
+  sessionId: Type.String(),
+});
 import {
   getSessionStates,
   getSessionHistory,
@@ -26,11 +36,8 @@ export const adminProxyEnhancementRoutes: FastifyPluginCallback<ProxyEnhancement
     return reply.send(config);
   });
 
-  app.put("/admin/api/proxy-enhancement", async (req, reply) => {
-    const body = req.body as Record<string, unknown>;
-    if (typeof body.claude_code_enabled !== "boolean") {
-      return reply.status(400).send({ error: "claude_code_enabled must be a boolean" }); // eslint-disable-line no-magic-numbers
-    }
+  app.put("/admin/api/proxy-enhancement", { schema: { body: UpdateProxyEnhancementSchema } }, async (req, reply) => {
+    const body = req.body as Static<typeof UpdateProxyEnhancementSchema>;
     const config: ProxyEnhancementConfig = {
       claude_code_enabled: body.claude_code_enabled,
     };
@@ -43,19 +50,21 @@ export const adminProxyEnhancementRoutes: FastifyPluginCallback<ProxyEnhancement
     return reply.send(states);
   });
 
-  app.get<{ Params: { keyId: string; sessionId: string } }>(
+  app.get(
     "/admin/api/session-states/:keyId/:sessionId/history",
+    { schema: { params: SessionParamsSchema } },
     async (req, reply) => {
-      const { keyId, sessionId } = req.params;
+      const { keyId, sessionId } = req.params as { keyId: string; sessionId: string };
       const history = getSessionHistory(db, keyId, sessionId);
       return reply.send(history);
     },
   );
 
-  app.delete<{ Params: { keyId: string; sessionId: string } }>(
+  app.delete(
     "/admin/api/session-states/:keyId/:sessionId",
+    { schema: { params: SessionParamsSchema } },
     async (req, reply) => {
-      const { keyId, sessionId } = req.params;
+      const { keyId, sessionId } = req.params as { keyId: string; sessionId: string };
       modelState.delete(keyId, sessionId);
       return reply.send({ success: true });
     },

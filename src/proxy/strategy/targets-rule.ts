@@ -20,3 +20,12 @@ export function isTargetsRule(value: unknown): value is TargetsRule {
   const r = value as TargetsRule;
   return Array.isArray(r.targets) && r.targets.every(isTarget);
 }
+
+export function filterExcluded(targets: Target[], excludeTargets?: Target[]): Target[] {
+  if (!excludeTargets || excludeTargets.length === 0) return targets;
+  return targets.filter(
+    (t) => !excludeTargets.some(
+      (e) => e.backend_model === t.backend_model && e.provider_id === t.provider_id,
+    ),
+  );
+}

@@ -111,7 +111,6 @@ describe("Retry integration", () => {
     app.register(anthropicProxy, {
       db,
       streamTimeoutMs: 5000,
-      retryMaxAttempts: 2,
       retryBaseDelayMs: 10,
       matcher,
       semaphoreManager: new ProviderSemaphoreManager(),
@@ -168,7 +167,6 @@ describe("Retry integration", () => {
     app.register(anthropicProxy, {
       db,
       streamTimeoutMs: 5000,
-      retryMaxAttempts: 1,
       retryBaseDelayMs: 10,
       matcher,
       semaphoreManager: new ProviderSemaphoreManager(),
@@ -225,7 +223,6 @@ describe("Retry integration", () => {
     app.register(anthropicProxy, {
       db,
       streamTimeoutMs: 5000,
-      retryMaxAttempts: 2,
       retryBaseDelayMs: 10,
       semaphoreManager: new ProviderSemaphoreManager(),
       tracker: new RequestTracker({ semaphoreManager: new ProviderSemaphoreManager() }),

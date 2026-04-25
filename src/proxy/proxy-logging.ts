@@ -7,9 +7,6 @@ import { MetricsExtractor } from "../metrics/metrics-extractor.js";
 import type { FastifyRequest } from "fastify";
 import type { ResilienceAttempt } from "./resilience.js";
 import type { TransportResult } from "./types.js";
-// Re-export shared constants & types from types.ts (canonical home)
-export { UPSTREAM_SUCCESS } from "./types.js";
-export type { RawHeaders } from "./types.js";
 
 // Internal imports from types.ts
 import { UPSTREAM_SUCCESS } from "./types.js";
@@ -55,7 +52,7 @@ export function handleIntercept(
     router_key_id: request.routerKey?.id ?? null, original_model: null,
     session_id: sessionId,
   });
-  return reply.status(interceptResponse.statusCode).send(interceptResponse.body);
+  return reply.code(interceptResponse.statusCode).send(interceptResponse.body);
 }
 
 // ---------- New-architecture logging ----------

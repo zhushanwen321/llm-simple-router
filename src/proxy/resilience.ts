@@ -1,3 +1,4 @@
+import { MS_PER_SECOND } from "../constants.js";
 import type { RetryRuleMatcher } from "./retry-rules.js";
 import { ProviderSwitchNeeded } from "./types.js";
 import type { TransportResult } from "./types.js";
@@ -11,7 +12,8 @@ export interface RetryStrategy {
 
 export class FixedIntervalStrategy implements RetryStrategy {
   constructor(private delayMs: number) {}
-  getDelay(): number { return this.delayMs; }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  getDelay(_attempt: number): number { return this.delayMs; }
 }
 
 const EXPONENTIAL_BASE = 2;
@@ -33,11 +35,14 @@ export function createStrategy(
 // ---------- Resilience types ----------
 
 export interface ResilienceConfig {
-  maxRetries: number;
   baseDelayMs: number;
   failoverThreshold: number;
   ruleMatcher?: RetryRuleMatcher;
   isFailover: boolean;
+  /** DB 规则 max_retries 的全局安全阀，防止单规则配置导致过多重试 */
+  globalRetryCap?: number;
+  /** 全局迭代上限，防止极端配置导致 while(true) 循环过多 */
+  iterationCap?: number;
 }
 
 export interface ResilienceAttempt {
@@ -71,7 +76,9 @@ export interface ResilienceState {
 
 const RETRYABLE_THROW_CODES = new Set(["ETIMEDOUT", "ECONNRESET", "ECONNREFUSED"]);
 const HTTP_TOO_MANY_REQUESTS = 429;
-const MS_PER_SECOND = 1000;
+const DEFAULT_THROW_MAX_RETRIES = 3;
+const DEFAULT_RETRY_CAP = 3;
+const DEFAULT_ITERATION_CAP = 50;
 
 // ---------- Internal helpers ----------
 
@@ -130,7 +137,7 @@ export class ResilienceLayer {
       if (!isRetryableThrow(result.error)) {
         return { action: "abort", reason: result.error.message };
       }
-      if (state.attemptCount < config.maxRetries) {
+      if (state.attemptCount < DEFAULT_THROW_MAX_RETRIES) {
         return { action: "retry", delayMs: config.baseDelayMs };
       }
       return config.isFailover
@@ -145,8 +152,7 @@ export class ResilienceLayer {
         ? config.ruleMatcher.match(result.statusCode, body)
         : null;
 
-      const effectiveMaxRetries = Math.min(matchedRule?.max_retries ?? 0, config.maxRetries);
-      if (matchedRule && state.attemptCount < effectiveMaxRetries) {
+      if (matchedRule && state.attemptCount < Math.min(matchedRule.max_retries, config.globalRetryCap ?? DEFAULT_RETRY_CAP)) {
         const strategy = createStrategy(matchedRule);
         const headers = extractHeaders(result);
         const retryAfterMs = result.statusCode === HTTP_TOO_MANY_REQUESTS
@@ -163,8 +169,7 @@ export class ResilienceLayer {
     const body = extractBody(result);
     if (body && config.ruleMatcher) {
       const matchedRule = config.ruleMatcher.match(result.statusCode, body);
-      const effectiveMaxRetries = Math.min(matchedRule?.max_retries ?? 0, config.maxRetries);
-      if (matchedRule && state.attemptCount < effectiveMaxRetries) {
+      if (matchedRule && state.attemptCount < Math.min(matchedRule.max_retries, config.globalRetryCap ?? DEFAULT_RETRY_CAP)) {
         const strategy = createStrategy(matchedRule);
         return { action: "retry", delayMs: strategy.getDelay(state.attemptCount) };
       }
@@ -191,6 +196,14 @@ export class ResilienceLayer {
     };
 
     while (true) {
+      if (globalAttemptIndex >= (config.iterationCap ?? DEFAULT_ITERATION_CAP)) {
+        return {
+          result: lastResult ?? { kind: "error" as const, statusCode: 502, body: "Iteration cap exceeded", headers: {}, sentHeaders: {}, sentBody: "" },
+          attempts: allAttempts,
+          excludedTargets,
+        };
+      }
+
       const available = targets().filter(
         t => !excludedTargets.some(e =>
           e.backend_model === t.backend_model && e.provider_id === t.provider_id

@@ -118,9 +118,8 @@ async function saveThresholds() {
     logTableMaxSizeMb.value = result.logTableMaxSizeMb
     toast.success('存储阈值已更新')
     await loadSettings()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } catch (e: any) {
-    toast.error(e.response?.data?.error?.message || '更新失败')
+  } catch (e: unknown) {
+    toast.error((e as { apiMessage?: string }).apiMessage || '更新失败')
   }
 }
 
@@ -135,9 +134,8 @@ async function handleExport() {
     a.click()
     URL.revokeObjectURL(url)
     toast.success('配置已导出')
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } catch (e: any) {
-    toast.error(e.response?.data?.error?.message || '导出失败')
+  } catch (e: unknown) {
+    toast.error((e as { apiMessage?: string }).apiMessage || '导出失败')
   }
 }
 
@@ -172,9 +170,8 @@ async function confirmImport() {
     showImportDialog.value = false
     toast.success('配置已导入')
     await loadSettings()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } catch (e: any) {
-    toast.error(e.response?.data?.error?.message || '导入失败')
+  } catch (e: unknown) {
+    toast.error((e as { apiMessage?: string }).apiMessage || '导入失败')
   } finally {
     importing.value = false
     pendingImportData.value = null

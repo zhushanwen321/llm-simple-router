@@ -1,5 +1,7 @@
 import Database from "better-sqlite3";
 import { randomUUID } from "crypto";
+import { isTarget } from "../proxy/strategy/targets-rule.js";
+import type { Target } from "../proxy/strategy/types.js";
 import { buildUpdateQuery, deleteById } from "./helpers.js";
 
 export interface ModelMapping {
@@ -137,29 +139,18 @@ export function getActiveProviderModels(db: Database.Database): ProviderModelEnt
 
 // --- 从 mapping_groups rule JSON 中提取 target 条目 ---
 
-interface TargetEntry {
-  backend_model: string;
-  provider_id: string;
-}
-
-function isTargetLike(obj: unknown): obj is TargetEntry {
-  return typeof obj === "object" && obj !== null &&
-    typeof (obj as Record<string, unknown>).backend_model === "string" &&
-    typeof (obj as Record<string, unknown>).provider_id === "string";
-}
-
-function extractTargets(rule: Record<string, unknown>): TargetEntry[] {
-  const results: TargetEntry[] = [];
-  if (isTargetLike(rule.default)) results.push(rule.default);
+function extractTargets(rule: Record<string, unknown>): Target[] {
+  const results: Target[] = [];
+  if (isTarget(rule.default)) results.push(rule.default);
   if (Array.isArray(rule.targets)) {
     for (const t of rule.targets) {
-      if (isTargetLike(t)) results.push(t);
+      if (isTarget(t)) results.push(t);
     }
   }
   if (Array.isArray(rule.windows)) {
     for (const w of rule.windows) {
-      if (w && typeof w === "object" && isTargetLike((w as Record<string, unknown>).target)) {
-        results.push((w as Record<string, unknown>).target as TargetEntry);
+      if (w && typeof w === "object" && isTarget((w as Record<string, unknown>).target)) {
+        results.push((w as Record<string, unknown>).target as Target);
       }
     }
   }

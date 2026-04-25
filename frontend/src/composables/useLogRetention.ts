@@ -14,8 +14,8 @@ export function useLogRetention() {
       const result = await api.setLogRetention(retentionDays.value)
       retentionDays.value = result.days
       toast.success('日志保留天数已更新')
-    } catch {
-      toast.error('更新保留天数失败')
+    } catch (e: unknown) {
+      toast.error((e as { apiMessage?: string }).apiMessage || '更新保留天数失败')
     } finally {
       retentionSaving.value = false
     }
@@ -25,8 +25,8 @@ export function useLogRetention() {
     try {
       const { days } = await api.getLogRetention()
       retentionDays.value = days
-    } catch {
-      toast.error('加载保留天数失败，使用默认值')
+    } catch (e: unknown) {
+      toast.error((e as { apiMessage?: string }).apiMessage || '加载保留天数失败，使用默认值')
     }
   }
 

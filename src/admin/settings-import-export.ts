@@ -7,6 +7,7 @@ import { getAllProviders, PROVIDER_CONCURRENCY_DEFAULTS } from "../db/index.js";
 import { encrypt, decrypt } from "../utils/crypto.js";
 import { getSetting } from "../db/settings.js";
 import { modelState } from "../proxy/model-state.js";
+import { API_CODE, apiError } from "./api-response.js";
 
 interface ImportExportOptions {
   db: Database.Database;
@@ -74,10 +75,10 @@ export const adminImportExportRoutes: FastifyPluginCallback<ImportExportOptions>
   app.post("/admin/api/settings/import", async (request, reply) => {
     const body = request.body as { version?: number; data?: Record<string, unknown[]> };
     if (typeof body.version !== "number" || body.version !== EXPORT_VERSION) {
-      return reply.code(BAD_REQUEST).send({ error: { message: `Unsupported version. Expected ${EXPORT_VERSION}.` } });
+      return reply.code(BAD_REQUEST).send(apiError(API_CODE.BAD_REQUEST, `Unsupported version. Expected ${EXPORT_VERSION}.`));
     }
     if (!body.data || typeof body.data !== "object") {
-      return reply.code(BAD_REQUEST).send({ error: { message: "Missing or invalid data field" } });
+      return reply.code(BAD_REQUEST).send(apiError(API_CODE.BAD_REQUEST, "Missing or invalid data field"));
     }
 
     const counts: Record<string, number> = {};

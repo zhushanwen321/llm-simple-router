@@ -22,7 +22,7 @@ interface SummaryRow {
 }
 
 export function useMetrics() {
-  const period = ref('5h')
+  const period = ref('window')
   const modelFilter = ref('all')
   const routerKeyFilter = ref('all')
   const providerFilter = ref('all')
@@ -114,7 +114,7 @@ export function useMetrics() {
       ])
 
       const fulfilled = <T>(r: PromiseSettledResult<T>): r is PromiseFulfilledResult<T> => r.status === 'fulfilled'
-      const p = hasDateRange.value ? '30d' : period.value
+      const p = hasDateRange.value ? 'monthly' : period.value
 
       const ttftOk = fulfilled(ttftRes) ? ttftRes.value : null
       const tpsOk = fulfilled(tpsRes) ? tpsRes.value : null
@@ -151,9 +151,9 @@ export function useMetrics() {
 
       summaryRows.value = Array.isArray(summaryOk) ? summaryOk : []
       modelOptions.value = [...new Set(summaryRows.value.map((r: SummaryRow) => r.backend_model))]
-    } catch (e) {
+    } catch (e: unknown) {
       console.error('Failed to load metrics:', e)
-      toast.error('加载性能指标失败')
+      toast.error((e as { apiMessage?: string }).apiMessage || '加载性能指标失败')
     } finally {
       loading.value = false
     }
@@ -163,18 +163,18 @@ export function useMetrics() {
     try {
       const res = await api.getRouterKeys()
       routerKeys.value = res
-    } catch (e) {
+    } catch (e: unknown) {
       console.error('Failed to load router keys:', e)
-      toast.error('加载密钥列表失败')
+      toast.error((e as { apiMessage?: string }).apiMessage || '加载密钥列表失败')
     }
   }
 
   async function loadProviders() {
     try {
       providers.value = await api.getProviders()
-    } catch (e) {
+    } catch (e: unknown) {
       console.error('Failed to load providers:', e)
-      toast.error('加载供应商列表失败')
+      toast.error((e as { apiMessage?: string }).apiMessage || '加载供应商列表失败')
     }
   }
 
