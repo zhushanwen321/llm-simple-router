@@ -8,6 +8,7 @@
 - Modify: `src/proxy/enhancement-config.ts`
 - Modify: `src/admin/proxy-enhancement.ts`
 - Modify: `src/config/model-context.ts`
+- Check: `src/proxy/enhancement/enhancement-handler.ts`（使用 `loadEnhancementConfig`，需确认兼容）
 
 ---
 

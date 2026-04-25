@@ -250,7 +250,9 @@ import { applyOverflowRedirect } from "./overflow.js"
 
 ### Step 2: 替换溢出处理逻辑
 
-替换（约 line 250-263）的 compact 处理代码：
+替换（约 line 250-263）的 compact 处理代码。
+
+**注意：** 实现 subagent 需要先读 proxy-handler.ts 确认 `provider` 变量的加载方式。当前 handler 在 compact 检查前已通过 mapping resolution 获取了 `provider`（完整 Provider 对象）。溢出重定向需要类似方式加载溢出 provider。查找 `getProviderById` 或从内存缓存中获取。
 
 ```typescript
 // 删除旧代码：
@@ -261,7 +263,9 @@ import { applyOverflowRedirect } from "./overflow.js"
 // 替换为：
 const overflowResult = applyOverflowRedirect(resolved, deps.db, body)
 if (overflowResult) {
-  const overflowProvider = deps.providers.find(p => p.id === overflowResult.provider_id)
+  // 按现有 handler 加载 provider 的方式加载溢出 provider
+  // 可能是 getProviderById(db, overflowResult.provider_id) 或从缓存查找
+  const overflowProvider = loadProvider(overflowResult.provider_id)
   if (overflowProvider) {
     resolved = overflowResult
     provider = overflowProvider
@@ -269,8 +273,6 @@ if (overflowResult) {
   }
 }
 ```
-
-### Step 3: 移除 loadEnhancementConfig 调用
 
 删除（约 line 195）的 `const compactConfig = loadEnhancementConfig(deps.db)` 及其导入（如果仅用于 compact）。
 
@@ -300,18 +302,22 @@ git commit -m "refactor: replace compact redirect with overflow model switching"
 - 溢出模型通过 Target 的 `overflow_provider_id`/`overflow_model` 字段配置
 - 不再返回 400 错误，而是透明切换模型
 
+**注意：** 参照现有 `context-compact.test.ts` 的 `buildTestApp` 模式（仅注册 `openaiProxy` + `ProviderSemaphoreManager` + `RequestTracker`），不使用 `buildApp`（避免需要 auth）。
+
 ```typescript
 // tests/overflow-redirect.test.ts
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import Database from 'better-sqlite3'
 import http from 'node:http'
+import Fastify from 'fastify'
 import { initDatabase } from '../src/db/index.js'
 import { encrypt } from '../src/utils/crypto.js'
 import { setSetting } from '../src/db/settings.js'
 import { TEST_ENCRYPTION_KEY } from './helpers/test-setup.js'
 import { createMockBackend, closeServer } from './helpers/mock-backend.js'
-import { buildApp } from '../src/index.js'
-import type { FastifyInstance } from 'fastify'
+import { openaiProxy } from '../src/proxy/openai.js'
+import { ProviderSemaphoreManager } from '../src/proxy/semaphore.js'
+import { RequestTracker } from '../src/monitor/request-tracker.js'
 
 function insertProvider(db: Database.Database, id: string, baseUrl: string, models: string[], contextWindows: Map<string, number>) {
   db.prepare('INSERT INTO providers (id, name, api_type, base_url, api_key, models, is_active) VALUES (?,?,?,?,?,?,?)')
@@ -328,9 +334,17 @@ function insertMappingGroup(db: Database.Database, clientModel: string, target: 
     .run('mg1', clientModel, 'scheduled', rule)
 }
 
+function buildTestApp(db: Database.Database) {
+  const app = Fastify()
+  const semaphore = new ProviderSemaphoreManager()
+  const tracker = new RequestTracker()
+  app.register(openaiProxy, { db, semaphore, tracker })
+  return app
+}
+
 describe('Overflow model redirect', () => {
   let db: Database.Database
-  let app: FastifyInstance
+  let app: ReturnType<typeof buildTestApp>
   let defaultBackend: { server: http.Server; port: number }
   let overflowBackend: { server: http.Server; port: number }
 
@@ -352,7 +366,7 @@ describe('Overflow model redirect', () => {
     insertProvider(db, 'p-overflow', `http://localhost:${overflowBackend.port}`, ['deepseek-v4'],
       new Map([['deepseek-v4', 1000000]]))
 
-    app = buildApp({ config: { port: 9981, dbPath: ':memory:', logLevel: 'silent' }, db })
+    app = buildTestApp(db)
   })
 
   afterEach(async () => {
