@@ -141,7 +141,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
 import { api } from '@/api/client'
 import { Button } from '@/components/ui/button'
@@ -215,6 +215,13 @@ async function loadCompactModels() {
     toast.error((e as { apiMessage?: string }).apiMessage || '加载压缩模型列表失败')
   }
 }
+
+// 开启自定义提示词时，若内容为空则自动填充默认提示词
+watch(customPromptEnabled, (enabled) => {
+  if (enabled && !customPrompt.value && defaultPrompt.value) {
+    customPrompt.value = defaultPrompt.value
+  }
+})
 
 function resetPrompt() {
   customPrompt.value = defaultPrompt.value
