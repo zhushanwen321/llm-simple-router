@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import Database from "better-sqlite3";
 import { getLatestWindow, insertWindow } from "../db/usage-windows.js";
 import { toSqliteDatetime, parseSqliteDatetime } from "./datetime.js";
@@ -66,7 +67,7 @@ function createAndReturnWindow(
   start.setMinutes(0, 0, 0);
   const end = new Date(start.getTime() + WINDOW_DURATION_MS);
   insertWindow(db, {
-    id: "",
+    id: randomUUID(),
     router_key_id: routerKeyId ?? null,
     start_time: toSqliteDatetime(start),
     end_time: toSqliteDatetime(end),

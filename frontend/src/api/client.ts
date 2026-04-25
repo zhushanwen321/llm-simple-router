@@ -74,6 +74,9 @@ const API = {
   SETTINGS_DB_SIZE_THRESHOLDS: '/settings/db-size-thresholds',
   SETTINGS_EXPORT: '/settings/export',
   SETTINGS_IMPORT: '/settings/import',
+  SETUP_STATUS: '/setup/status',
+  SETUP_INITIALIZE: '/setup/initialize',
+  SETTINGS_LOG_RETENTION: '/settings/log-retention',
   UPGRADE_STATUS: '/upgrade/status',
   UPGRADE_CHECK: '/upgrade/check',
   UPGRADE_EXECUTE: '/upgrade/execute',
@@ -332,8 +335,8 @@ export const api = {
   login: (password: string) => request<{ success: boolean }>('post', API.LOGIN, { password }),
   logout: () => request<{ success: boolean }>('post', API.LOGOUT),
 
-  getSetupStatus: () => request<{ initialized: boolean }>('get', '/setup/status'),
-  initializeSetup: (password: string) => request<{ success: boolean }>('post', '/setup/initialize', { password }),
+  getSetupStatus: () => request<{ initialized: boolean }>('get', API.SETUP_STATUS),
+  initializeSetup: (password: string) => request<{ success: boolean }>('post', API.SETUP_INITIALIZE, { password }),
 
   getProviders: () => request<Provider[]>('get', API.PROVIDERS),
   createProvider: (data: ProviderPayload) => request<{ id: string }>('post', API.PROVIDERS, data),
@@ -352,8 +355,8 @@ export const api = {
   getLogChildren: (id: string) => request<LogEntry[]>('get', `${API.LOGS}/${id}/children`),
   deleteLogsBefore: (before: string) =>
     request<DeleteLogsResponse>('delete', `${API.LOGS}/before`, { before }),
-  getLogRetention: () => request<{ days: number }>('get', '/settings/log-retention'),
-  setLogRetention: (days: number) => request<{ days: number }>('put', '/settings/log-retention', { days }),
+  getLogRetention: () => request<{ days: number }>('get', API.SETTINGS_LOG_RETENTION),
+  setLogRetention: (days: number) => request<{ days: number }>('put', API.SETTINGS_LOG_RETENTION, { days }),
 
   getStats: (params?: { period?: string; start_time?: string; end_time?: string; router_key_id?: string }) =>
     request<StatsResponse>('get', API.STATS, undefined, { params }),
