@@ -122,6 +122,7 @@ export const adminImportExportRoutes: FastifyPluginCallback<ImportExportOptions>
           (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map((c) => c.name)
         );
 
+        let inserted = 0;
         for (const row of rows) {
           const entries = Object.entries(row as Record<string, unknown>).filter(([k]) => validCols.has(k));
           if (entries.length === 0) continue;
@@ -135,8 +136,9 @@ export const adminImportExportRoutes: FastifyPluginCallback<ImportExportOptions>
           const cols = entries.map(([k]) => k).join(", ");
           const vals = entries.map(() => "?").join(", ");
           db.prepare(`INSERT INTO ${table} (${cols}) VALUES (${vals})`).run(...entries.map(([, v]) => v));
+          inserted++;
         }
-        counts[table] = rows.length;
+        counts[table] = inserted;
       }
 
       // 恢复受保护配置

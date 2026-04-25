@@ -170,7 +170,11 @@ export class RequestTracker {
     };
 
     this.activeMap.delete(id);
-    this.recentCompleted.unshift(completed);
+
+    // 入 recentCompleted 前剥离 clientRequest 以控制内存占用，
+    // 完整数据通过 getRequestById 从 activeMap 获取（此时已移除则不可用）
+    const { clientRequest: _, ...slimCompleted } = completed;
+    this.recentCompleted.unshift(slimCompleted as ActiveRequest);
     if (this.recentCompleted.length > RECENT_COMPLETED_MAX) {
       this.recentCompleted.length = RECENT_COMPLETED_MAX;
     }
