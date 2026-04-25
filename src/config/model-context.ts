@@ -89,23 +89,25 @@ export function lookupContextWindow(modelName: string): number {
   return MODEL_CONTEXT_WINDOWS[modelName] ?? DEFAULT_CONTEXT_WINDOW
 }
 
-export function parseModels(raw: string): ModelInfo[] {
+export function parseModels(raw: string): string[] {
   if (!raw) return []
   try {
     const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed) || parsed.length === 0) return []
-    if (typeof parsed[0] === 'string') {
-      return (parsed as string[]).map(name => ({
-        name,
-        context_window: MODEL_CONTEXT_WINDOWS[name] ?? DEFAULT_CONTEXT_WINDOW,
-      }))
-    }
-    return parsed as ModelInfo[]
+    if (!Array.isArray(parsed)) return []
+    return parsed.map((item: unknown) =>
+      typeof item === 'string' ? item : (item as { name?: string })?.name ?? ''
+    ).filter(Boolean)
   } catch {
     return []
   }
 }
 
-export function serializeModels(models: ModelInfo[]): string {
-  return JSON.stringify(models)
+export function buildModelInfoList(
+  modelNames: string[],
+  overrides: Map<string, number>,
+): ModelInfo[] {
+  return modelNames.map(name => ({
+    name,
+    context_window: overrides.get(name) ?? lookupContextWindow(name),
+  }))
 }

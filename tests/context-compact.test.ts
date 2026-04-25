@@ -28,6 +28,7 @@ function insertProvider(
   baseUrl: string,
   apiType = "openai",
   models: string = "[]",
+  contextWindows: Record<string, number> = {},
 ) {
   const now = new Date().toISOString();
   const encryptedKey = encrypt("sk-backend-key", TEST_ENCRYPTION_KEY);
@@ -35,6 +36,13 @@ function insertProvider(
     `INSERT INTO providers (id, name, api_type, base_url, api_key, is_active, models, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(id, `Provider-${id}`, apiType, baseUrl, encryptedKey, 1, models, now, now);
+
+  const stmt = db.prepare(
+    "INSERT INTO provider_model_info (provider_id, model_name, context_window) VALUES (?, ?, ?)",
+  );
+  for (const [modelName, ctx] of Object.entries(contextWindows)) {
+    stmt.run(id, modelName, ctx);
+  }
 }
 
 function insertMapping(
@@ -110,7 +118,7 @@ describe("context compact integration", () => {
 
     // 10k context window — 远大于小消息
     insertProvider(db, "svc-main", `http://127.0.0.1:${port}`, "openai",
-      JSON.stringify([{ name: "small-model", context_window: 10000 }]));
+      JSON.stringify(["small-model"]), { "small-model": 10000 });
     insertMapping(db, "small-model", "small-model", "svc-main");
 
     setCompactConfig(db, {
@@ -146,7 +154,7 @@ describe("context compact integration", () => {
 
     // 非常小的 context window（100 tokens）
     insertProvider(db, "svc-main", `http://127.0.0.1:${port}`, "openai",
-      JSON.stringify([{ name: "tiny-model", context_window: 100 }]));
+      JSON.stringify(["tiny-model"]), { "tiny-model": 100 });
     insertMapping(db, "tiny-model", "tiny-model", "svc-main");
 
     setCompactConfig(db, {
@@ -191,7 +199,7 @@ describe("context compact integration", () => {
 
     // 1M context window
     insertProvider(db, "svc-big", `http://127.0.0.1:${port}`, "openai",
-      JSON.stringify([{ name: "big-model", context_window: 2000000 }]));
+      JSON.stringify(["big-model"]), { "big-model": 2000000 });
     insertMapping(db, "big-model", "big-model", "svc-big");
 
     setCompactConfig(db, {
@@ -244,9 +252,9 @@ describe("context compact integration", () => {
     });
 
     insertProvider(db, "svc-main", `http://127.0.0.1:${mainPort}`, "openai",
-      JSON.stringify([{ name: "small-model", context_window: 10000 }]));
+      JSON.stringify(["small-model"]), { "small-model": 10000 });
     insertProvider(db, "svc-compact", `http://127.0.0.1:${compactPort}`, "openai",
-      JSON.stringify([{ name: "1m-model", context_window: 1000000 }]));
+      JSON.stringify(["1m-model"]), { "1m-model": 1000000 });
     insertMapping(db, "small-model", "small-model", "svc-main");
 
     setCompactConfig(db, {
@@ -306,9 +314,9 @@ describe("context compact integration", () => {
     });
 
     insertProvider(db, "svc-main", `http://127.0.0.1:${mainPort}`, "openai",
-      JSON.stringify([{ name: "small-model", context_window: 10000 }]));
+      JSON.stringify(["small-model"]), { "small-model": 10000 });
     insertProvider(db, "svc-compact", `http://127.0.0.1:${compactPort}`, "openai",
-      JSON.stringify([{ name: "1m-model", context_window: 1000000 }]));
+      JSON.stringify(["1m-model"]), { "1m-model": 1000000 });
     insertMapping(db, "small-model", "small-model", "svc-main");
 
     setCompactConfig(db, {
@@ -328,7 +336,7 @@ describe("context compact integration", () => {
         model: "small-model",
         messages: [
           { role: "user", content: "normal message" },
-          { role: "user", content: "Your task is to create a detailed summary of the conversation so far. Please do this." },
+          { role: "user", content: "CRITICAL: Respond with TEXT ONLY. Do NOT call any tools. Your task is to create a detailed summary of the conversation so far." },
         ],
       },
     });
@@ -356,7 +364,7 @@ describe("context compact integration", () => {
     });
 
     insertProvider(db, "svc-main", `http://127.0.0.1:${port}`, "openai",
-      JSON.stringify([{ name: "tiny-model", context_window: 100 }]));
+      JSON.stringify(["tiny-model"]), { "tiny-model": 100 });
     insertMapping(db, "tiny-model", "tiny-model", "svc-main");
 
     // compact 功能关闭
@@ -397,7 +405,7 @@ describe("context compact integration", () => {
     });
 
     insertProvider(db, "svc-main", `http://127.0.0.1:${port}`, "openai",
-      JSON.stringify([{ name: "small-model", context_window: 1000000 }]));
+      JSON.stringify(["small-model"]), { "small-model": 1000000 });
     insertMapping(db, "small-model", "small-model", "svc-main");
 
     // compact 功能开启但没有配置 compact_provider_id

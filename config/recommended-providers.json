@@ -7,20 +7,14 @@
         "presetName": "deepseek",
         "apiType": "anthropic",
         "baseUrl": "https://api.deepseek.com/anthropic",
-        "models": [
-          {"name": "deepseek-chat", "context_window": 128000},
-          {"name": "deepseek-reasoner", "context_window": 128000}
-        ]
+        "models": ["deepseek-chat", "deepseek-reasoner"]
       },
       {
         "plan": "OpenAI",
         "presetName": "deepseek-openai",
         "apiType": "openai",
         "baseUrl": "https://api.deepseek.com",
-        "models": [
-          {"name": "deepseek-chat", "context_window": 128000},
-          {"name": "deepseek-reasoner", "context_window": 128000}
-        ]
+        "models": ["deepseek-chat", "deepseek-reasoner"]
       }
     ]
   },
@@ -33,14 +27,14 @@
         "apiType": "openai",
         "baseUrl": "https://qianfan.baidubce.com/v2",
         "models": [
-          {"name": "ernie-4.0-8k", "context_window": 8000},
-          {"name": "ernie-4.0-turbo-8k", "context_window": 8000},
-          {"name": "ernie-3.5-8k", "context_window": 8000},
-          {"name": "ernie-speed-8k", "context_window": 8000},
-          {"name": "ernie-lite-8k", "context_window": 8000},
-          {"name": "ernie-x1-32k-preview", "context_window": 32000},
-          {"name": "deepseek-v3", "context_window": 128000},
-          {"name": "deepseek-r1", "context_window": 128000}
+          "ernie-4.0-8k",
+          "ernie-4.0-turbo-8k",
+          "ernie-3.5-8k",
+          "ernie-speed-8k",
+          "ernie-lite-8k",
+          "ernie-x1-32k-preview",
+          "deepseek-v3",
+          "deepseek-r1"
         ]
       }
     ]
@@ -54,12 +48,12 @@
         "apiType": "openai",
         "baseUrl": "https://spark-api-open.xf-yun.com/v1",
         "models": [
-          {"name": "4.0Ultra", "context_window": 32000},
-          {"name": "generalv3.5", "context_window": 8000},
-          {"name": "max-32k", "context_window": 32000},
-          {"name": "generalv3", "context_window": 8000},
-          {"name": "pro-128k", "context_window": 128000},
-          {"name": "lite", "context_window": 8000}
+          "4.0Ultra",
+          "generalv3.5",
+          "max-32k",
+          "generalv3",
+          "pro-128k",
+          "lite"
         ]
       }
     ]
@@ -73,13 +67,13 @@
         "apiType": "openai",
         "baseUrl": "https://api.siliconflow.cn/v1",
         "models": [
-          {"name": "deepseek-ai/DeepSeek-V3.2-Exp", "context_window": 160000},
-          {"name": "deepseek-ai/DeepSeek-R1", "context_window": 128000},
-          {"name": "Qwen/Qwen3-8B", "context_window": 128000},
-          {"name": "Qwen/Qwen2.5-72B-Instruct", "context_window": 128000},
-          {"name": "Qwen/Qwen2.5-Coder-32B-Instruct", "context_window": 128000},
-          {"name": "moonshotai/Kimi-K2-Instruct", "context_window": 128000},
-          {"name": "moonshotai/Kimi-K2.5", "context_window": 256000}
+          "deepseek-ai/DeepSeek-V3.2-Exp",
+          "deepseek-ai/DeepSeek-R1",
+          "Qwen/Qwen3-8B",
+          "Qwen/Qwen2.5-72B-Instruct",
+          "Qwen/Qwen2.5-Coder-32B-Instruct",
+          "moonshotai/Kimi-K2-Instruct",
+          "moonshotai/Kimi-K2.5"
         ]
       }
     ]
@@ -92,12 +86,7 @@
         "presetName": "zhipu-coding-plan",
         "apiType": "anthropic",
         "baseUrl": "https://open.bigmodel.cn/api/anthropic",
-        "models": [
-          {"name": "glm-5.1", "context_window": 200000},
-          {"name": "glm-5", "context_window": 200000},
-          {"name": "glm-4.7", "context_window": 200000},
-          {"name": "glm-4.5-air", "context_window": 128000}
-        ]
+        "models": ["glm-5.1", "glm-5", "glm-4.7", "glm-4.5-air"]
       },
       {
         "plan": "API",
@@ -105,12 +94,12 @@
         "apiType": "openai",
         "baseUrl": "https://open.bigmodel.cn/api/paas/v4",
         "models": [
-          {"name": "glm-5.1", "context_window": 200000},
-          {"name": "glm-5", "context_window": 200000},
-          {"name": "glm-5-turbo", "context_window": 200000},
-          {"name": "glm-4.7", "context_window": 200000},
-          {"name": "glm-4.7-flash", "context_window": 200000},
-          {"name": "glm-4.6", "context_window": 200000}
+          "glm-5.1",
+          "glm-5",
+          "glm-5-turbo",
+          "glm-4.7",
+          "glm-4.7-flash",
+          "glm-4.6"
         ]
       }
     ]
@@ -123,10 +112,7 @@
         "presetName": "kimi-coding-plan",
         "apiType": "anthropic",
         "baseUrl": "https://api.kimi.com/coding",
-        "models": [
-          {"name": "kimi-for-coding", "context_window": 256000},
-          {"name": "kimi-k2.5", "context_window": 256000}
-        ]
+        "models": ["kimi-for-coding", "kimi-k2.5"]
       },
       {
         "plan": "API",
@@ -134,11 +120,11 @@
         "apiType": "openai",
         "baseUrl": "https://api.moonshot.cn",
         "models": [
-          {"name": "kimi-k2.6", "context_window": 256000},
-          {"name": "kimi-k2.5", "context_window": 256000},
-          {"name": "kimi-k2-turbo-preview", "context_window": 256000},
-          {"name": "kimi-k2-thinking", "context_window": 256000},
-          {"name": "moonshot-v1-128k", "context_window": 128000}
+          "kimi-k2.6",
+          "kimi-k2.5",
+          "kimi-k2-turbo-preview",
+          "kimi-k2-thinking",
+          "moonshot-v1-128k"
         ]
       }
     ]
@@ -151,9 +137,7 @@
         "presetName": "minimax-token-plan",
         "apiType": "anthropic",
         "baseUrl": "https://api.minimaxi.com/anthropic",
-        "models": [
-          {"name": "MiniMax-M2.7", "context_window": 200000}
-        ]
+        "models": ["MiniMax-M2.7"]
       },
       {
         "plan": "API",
@@ -161,12 +145,12 @@
         "apiType": "openai",
         "baseUrl": "https://api.minimax.chat",
         "models": [
-          {"name": "MiniMax-M2.7", "context_window": 200000},
-          {"name": "MiniMax-M2.7-highspeed", "context_window": 200000},
-          {"name": "MiniMax-M2.5", "context_window": 200000},
-          {"name": "MiniMax-M2.5-highspeed", "context_window": 200000},
-          {"name": "MiniMax-M2.1", "context_window": 200000},
-          {"name": "MiniMax-M2", "context_window": 200000}
+          "MiniMax-M2.7",
+          "MiniMax-M2.7-highspeed",
+          "MiniMax-M2.5",
+          "MiniMax-M2.5-highspeed",
+          "MiniMax-M2.1",
+          "MiniMax-M2"
         ]
       }
     ]
@@ -180,11 +164,11 @@
         "apiType": "anthropic",
         "baseUrl": "https://ark.cn-beijing.volces.com/api/compatible",
         "models": [
-          {"name": "ark-code-latest", "context_window": 256000},
-          {"name": "doubao-seed-2.0-code", "context_window": 256000},
-          {"name": "kimi-k2.5", "context_window": 256000},
-          {"name": "glm-4.7", "context_window": 200000},
-          {"name": "deepseek-v3.2", "context_window": 200000}
+          "ark-code-latest",
+          "doubao-seed-2.0-code",
+          "kimi-k2.5",
+          "glm-4.7",
+          "deepseek-v3.2"
         ]
       },
       {
@@ -193,9 +177,9 @@
         "apiType": "openai",
         "baseUrl": "https://ark.cn-beijing.volces.com/api/v3",
         "models": [
-          {"name": "doubao-seed-2-0-pro-260215", "context_window": 256000},
-          {"name": "doubao-seed-1-8-251228", "context_window": 256000},
-          {"name": "doubao-seed-code-preview-251028", "context_window": 256000}
+          "doubao-seed-2-0-pro-260215",
+          "doubao-seed-1-8-251228",
+          "doubao-seed-code-preview-251028"
         ]
       }
     ]
@@ -209,12 +193,12 @@
         "apiType": "anthropic",
         "baseUrl": "https://coding.dashscope.aliyuncs.com/apps/anthropic",
         "models": [
-          {"name": "qwen3.6-plus", "context_window": 1000000},
-          {"name": "qwen3-coder-next", "context_window": 256000},
-          {"name": "qwen3-coder-plus", "context_window": 1000000},
-          {"name": "kimi-k2.5", "context_window": 256000},
-          {"name": "glm-5", "context_window": 200000},
-          {"name": "MiniMax-M2.5", "context_window": 200000}
+          "qwen3.6-plus",
+          "qwen3-coder-next",
+          "qwen3-coder-plus",
+          "kimi-k2.5",
+          "glm-5",
+          "MiniMax-M2.5"
         ]
       },
       {
@@ -223,12 +207,12 @@
         "apiType": "openai",
         "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode",
         "models": [
-          {"name": "qwen3.6-plus", "context_window": 1000000},
-          {"name": "qwen3.5-plus", "context_window": 1000000},
-          {"name": "qwen3-max", "context_window": 256000},
-          {"name": "qwen3.5-flash", "context_window": 1000000},
-          {"name": "qwen3-coder-plus", "context_window": 1000000},
-          {"name": "qwen3-coder-next", "context_window": 256000}
+          "qwen3.6-plus",
+          "qwen3.5-plus",
+          "qwen3-max",
+          "qwen3.5-flash",
+          "qwen3-coder-plus",
+          "qwen3-coder-next"
         ]
       }
     ]
@@ -242,13 +226,13 @@
         "apiType": "anthropic",
         "baseUrl": "https://api.lkeap.cloud.tencent.com/coding/anthropic",
         "models": [
-          {"name": "tc-code-latest", "context_window": 256000},
-          {"name": "hunyuan-2.0-instruct", "context_window": 128000},
-          {"name": "hunyuan-2.0-thinking", "context_window": 128000},
-          {"name": "hunyuan-turbos", "context_window": 32000},
-          {"name": "hunyuan-t1", "context_window": 32000},
-          {"name": "glm-5", "context_window": 200000},
-          {"name": "kimi-k2.5", "context_window": 256000}
+          "tc-code-latest",
+          "hunyuan-2.0-instruct",
+          "hunyuan-2.0-thinking",
+          "hunyuan-turbos",
+          "hunyuan-t1",
+          "glm-5",
+          "kimi-k2.5"
         ]
       },
       {
@@ -257,11 +241,11 @@
         "apiType": "openai",
         "baseUrl": "https://api.hunyuan.cloud.tencent.com",
         "models": [
-          {"name": "hunyuan-2.0-thinking", "context_window": 128000},
-          {"name": "hunyuan-2.0-instruct", "context_window": 128000},
-          {"name": "hunyuan-t1-latest", "context_window": 200000},
-          {"name": "hunyuan-a13b", "context_window": 256000},
-          {"name": "hunyuan-turbos-latest", "context_window": 200000}
+          "hunyuan-2.0-thinking",
+          "hunyuan-2.0-instruct",
+          "hunyuan-t1-latest",
+          "hunyuan-a13b",
+          "hunyuan-turbos-latest"
         ]
       }
     ]
@@ -274,10 +258,7 @@
         "presetName": "stepfun-step-plan",
         "apiType": "anthropic",
         "baseUrl": "https://api.stepfun.com/step_plan",
-        "models": [
-          {"name": "step-3.5-flash-2603", "context_window": 256000},
-          {"name": "step-3.5-flash", "context_window": 256000}
-        ]
+        "models": ["step-3.5-flash-2603", "step-3.5-flash"]
       },
       {
         "plan": "API",
@@ -285,12 +266,12 @@
         "apiType": "openai",
         "baseUrl": "https://api.stepfun.com",
         "models": [
-          {"name": "step-3.5-flash", "context_window": 256000},
-          {"name": "step-3", "context_window": 64000},
-          {"name": "step-2-mini", "context_window": 200000},
-          {"name": "step-2-16k", "context_window": 16000},
-          {"name": "step-1-8k", "context_window": 8000},
-          {"name": "step-1-32k", "context_window": 32000}
+          "step-3.5-flash",
+          "step-3",
+          "step-2-mini",
+          "step-2-16k",
+          "step-1-8k",
+          "step-1-32k"
         ]
       }
     ]

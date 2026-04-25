@@ -2,9 +2,10 @@ import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
 import { Type, Static } from "@sinclair/typebox";
 import { getSetting, setSetting } from "../db/settings.js";
-import { parseModels, COMPACT_THRESHOLD } from "../config/model-context.js";
+import { parseModels, lookupContextWindow, COMPACT_THRESHOLD } from "../config/model-context.js";
 import { DEFAULT_COMPACT_PROMPT } from "../config/compact-prompt.js";
 import { getActiveProvidersWithModels } from "../db/index.js";
+import { getAllModelInfo } from "../db/model-info.js";
 
 const UpdateProxyEnhancementSchema = Type.Object({
   claude_code_enabled: Type.Boolean(),
@@ -72,12 +73,16 @@ export const adminProxyEnhancementRoutes: FastifyPluginCallback<ProxyEnhancement
 
   app.get("/admin/api/proxy-enhancement/compact-models", async (_request, reply) => {
     const providers = getActiveProvidersWithModels(db);
+    const allOverrides = new Map(
+      getAllModelInfo(db).map(m => [`${m.provider_id}:${m.model_name}`, m.context_window]),
+    );
     const result: Array<{ provider_id: string; provider_name: string; model: string; context_window: number }> = [];
     for (const p of providers) {
-      const models = parseModels(p.models);
-      for (const m of models) {
-        if (m.context_window && m.context_window >= COMPACT_THRESHOLD) {
-          result.push({ provider_id: p.id, provider_name: p.name, model: m.name, context_window: m.context_window });
+      const modelNames = parseModels(p.models);
+      for (const name of modelNames) {
+        const ctx = allOverrides.get(`${p.id}:${name}`) ?? lookupContextWindow(name);
+        if (ctx >= COMPACT_THRESHOLD) {
+          result.push({ provider_id: p.id, provider_name: p.name, model: name, context_window: ctx });
         }
       }
     }

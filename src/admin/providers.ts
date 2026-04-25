@@ -9,7 +9,8 @@ import { ProviderSemaphoreManager } from "../proxy/semaphore.js";
 import type { RequestTracker } from "../monitor/request-tracker.js";
 import { HTTP_CREATED, HTTP_NOT_FOUND, HTTP_CONFLICT, HTTP_BAD_REQUEST } from "./constants.js";
 import { API_CODE, apiError } from "./api-response.js";
-import { parseModels } from "../config/model-context.js";
+import { parseModels, buildModelInfoList } from "../config/model-context.js";
+import { getModelInfoForProvider, setModelInfoForProvider, deleteAllModelInfoForProvider } from "../db/model-info.js";
 
 const API_KEY_PREVIEW_MIN_LENGTH = 8;
 const API_KEY_PREVIEW_PREFIX_LEN = 4;
@@ -58,21 +59,27 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
   app.get("/admin/api/providers", async (_request, reply) => {
     const encryptionKey = getSetting(db, "encryption_key")!;
     const providers = getAllProviders(db);
-    return reply.send(providers.map((s) => ({
-      id: s.id,
-      name: s.name,
-      api_type: s.api_type,
-      base_url: s.base_url,
-      api_key: s.api_key ? decrypt(s.api_key, encryptionKey) : "",
-      models: parseModels(s.models || "[]"),
-      is_active: s.is_active,
-      max_concurrency: s.max_concurrency,
-      queue_timeout_ms: s.queue_timeout_ms,
-      max_queue_size: s.max_queue_size,
-      concurrency_status: semaphoreManager?.getStatus(s.id) ?? { active: 0, queued: 0 },
-      created_at: s.created_at,
-      updated_at: s.updated_at,
-    })));
+    return reply.send(providers.map((s) => {
+      const modelNames = parseModels(s.models || "[]");
+      const overrides = new Map(
+        getModelInfoForProvider(db, s.id).map(m => [m.model_name, m.context_window]),
+      );
+      return {
+        id: s.id,
+        name: s.name,
+        api_type: s.api_type,
+        base_url: s.base_url,
+        api_key: s.api_key ? decrypt(s.api_key, encryptionKey) : "",
+        models: buildModelInfoList(modelNames, overrides),
+        is_active: s.is_active,
+        max_concurrency: s.max_concurrency,
+        queue_timeout_ms: s.queue_timeout_ms,
+        max_queue_size: s.max_queue_size,
+        concurrency_status: semaphoreManager?.getStatus(s.id) ?? { active: 0, queued: 0 },
+        created_at: s.created_at,
+        updated_at: s.updated_at,
+      };
+    }));
   });
 
   app.post("/admin/api/providers", { schema: { body: CreateProviderSchema } }, async (request, reply) => {
@@ -85,18 +92,25 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
       return reply.code(HTTP_CONFLICT).send(apiError(API_CODE.CONFLICT_NAME, `Provider 名称 '${body.name}' 已存在`));
     }
     const encryptedKey = encrypt(body.api_key, getSetting(db, "encryption_key")!);
+    const inputModels = (body.models ?? []) as Array<string | { name: string; context_window?: number }>;
+    const normalizedModels = inputModels.map((m: string | { name: string; context_window?: number }) => typeof m === 'string' ? m : m.name);
+    const contextOverrides = inputModels
+      .filter((m): m is { name: string; context_window: number } => typeof m !== 'string' && m.context_window != null);
     const id = createProvider(db, {
       name: body.name,
       api_type: body.api_type,
       base_url: body.base_url,
       api_key: encryptedKey,
       api_key_preview: body.api_key.length > API_KEY_PREVIEW_MIN_LENGTH ? `${body.api_key.slice(0, API_KEY_PREVIEW_PREFIX_LEN)}...${body.api_key.slice(-API_KEY_PREVIEW_PREFIX_LEN)}` : "****",
-      models: JSON.stringify((body.models ?? []).map((m: string | { name: string; context_window?: number }) => typeof m === 'string' ? { name: m } : m)),
+      models: JSON.stringify(normalizedModels),
       is_active: body.is_active ?? 1,
       max_concurrency: body.max_concurrency ?? PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency,
       queue_timeout_ms: body.queue_timeout_ms ?? PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms,
       max_queue_size: body.max_queue_size ?? PROVIDER_CONCURRENCY_DEFAULTS.max_queue_size,
     });
+    if (contextOverrides.length > 0) {
+      setModelInfoForProvider(db, id, contextOverrides.map(o => ({ model_name: o.name, context_window: o.context_window })));
+    }
     semaphoreManager?.updateConfig(id, {
       maxConcurrency: body.max_concurrency ?? PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency,
       queueTimeoutMs: body.queue_timeout_ms ?? PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms,
@@ -126,7 +140,18 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     if (body.api_type !== undefined) fields.api_type = body.api_type;
     if (body.base_url !== undefined) fields.base_url = body.base_url;
     if (body.is_active !== undefined) fields.is_active = body.is_active;
-    if (body.models !== undefined) fields.models = JSON.stringify(body.models.map((m: string | { name: string; context_window?: number }) => typeof m === 'string' ? { name: m } : m));
+    if (body.models !== undefined) {
+      const inputModels = body.models as Array<string | { name: string; context_window?: number }>;
+      const normalizedModels = inputModels.map((m: string | { name: string; context_window?: number }) => typeof m === 'string' ? m : m.name);
+      const contextOverrides = inputModels
+        .filter((m): m is { name: string; context_window: number } => typeof m !== 'string' && m.context_window != null);
+      fields.models = JSON.stringify(normalizedModels);
+      if (contextOverrides.length > 0) {
+        setModelInfoForProvider(db, id, contextOverrides.map(o => ({ model_name: o.name, context_window: o.context_window })));
+      } else {
+        deleteAllModelInfoForProvider(db, id);
+      }
+    }
     if (body.max_concurrency !== undefined) fields.max_concurrency = body.max_concurrency;
     if (body.queue_timeout_ms !== undefined) fields.queue_timeout_ms = body.queue_timeout_ms;
     if (body.max_queue_size !== undefined) fields.max_queue_size = body.max_queue_size;

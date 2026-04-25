@@ -170,6 +170,15 @@ export {
 export type { UsageWindow, WindowUsage } from "./usage-windows.js";
 
 export {
+  getModelContextWindowOverride,
+  getModelInfoForProvider,
+  setModelInfoForProvider,
+  deleteAllModelInfoForProvider,
+  getAllModelInfo,
+} from "./model-info.js";
+export type { ProviderModelInfo } from "./model-info.js";
+
+export {
   collectDbSizeInfo,
   runSizeBasedCleanup,
   scheduleDbSizeMonitor,
