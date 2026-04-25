@@ -18,6 +18,7 @@ import { buildUpstreamHeaders } from "./proxy-core.js";
 import { ProviderSwitchNeeded } from "./types.js";
 import type { RawHeaders } from "./types.js";
 import { updateLogStreamContent } from "../db/index.js";
+import { countTokens } from "gpt-tokenizer";
 import { insertRejectedLog } from "./log-helpers.js";
 import type { Target } from "./strategy/types.js";
 import type { RetryRuleMatcher } from "./retry-rules.js";
@@ -359,10 +360,6 @@ function isCompactRequest(messages: unknown[]): boolean {
   const text = typeof last.content === "string" ? last.content : JSON.stringify(last.content ?? "");
   return COMPACT_MARKERS.some(marker => text.includes(marker));
 }
-
-// 使用 o200k_base (GPT-4o) BPE tokenizer 做精确 token 计数
-// 不同模型 tokenizer 有差异，但作为溢出检测安全网已足够
-import { countTokens } from "gpt-tokenizer";
 
 function estimateTokens(body: Record<string, unknown>): number {
   return countTokens(JSON.stringify(body));
