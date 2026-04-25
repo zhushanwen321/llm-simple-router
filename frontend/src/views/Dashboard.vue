@@ -60,45 +60,43 @@
       </CardHeader>
       <CardContent>
         <div v-if="usageError" class="text-sm text-destructive mb-3">{{ usageError }}</div>
-        <div v-if="usageLoading" class="text-center text-muted-foreground py-8">加载中...</div>
+        <div v-else-if="usageLoading" class="text-center text-muted-foreground py-8">加载中...</div>
+        <div v-else-if="period === 'window' && windowsData.length === 0" class="text-center text-muted-foreground py-8">暂无窗口数据</div>
         <template v-else-if="period === 'window'">
-          <div v-if="windowsData.length === 0" class="text-center text-muted-foreground py-8">暂无窗口数据</div>
-          <template v-else>
-            <div class="grid grid-cols-3 gap-4 mb-4">
-              <div class="rounded-md border p-3">
-                <p class="text-sm text-muted-foreground">当前窗口</p>
-                <p class="text-xl font-bold text-foreground">{{ windowsData.length }}</p>
-              </div>
-              <div class="rounded-md border p-3">
-                <p class="text-sm text-muted-foreground">总请求数</p>
-                <p class="text-xl font-bold text-foreground">{{ totalWindowRequests }}</p>
-              </div>
-              <div class="rounded-md border p-3">
-                <p class="text-sm text-muted-foreground">总 Token</p>
-                <p class="text-xl font-bold text-foreground">{{ totalWindowTokens }}</p>
-              </div>
+          <div class="grid grid-cols-3 gap-4 mb-4">
+            <div class="rounded-md border p-3">
+              <p class="text-sm text-muted-foreground">当前窗口</p>
+              <p class="text-xl font-bold text-foreground">{{ windowsData.length }}</p>
             </div>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>开始时间</TableHead>
-                  <TableHead>结束时间</TableHead>
-                  <TableHead>请求数</TableHead>
-                  <TableHead>输入 Tokens</TableHead>
-                  <TableHead>输出 Tokens</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <TableRow v-for="item in windowsData" :key="item.window.id">
-                  <TableCell class="text-sm">{{ formatUsageTime(item.window.start_time) }}</TableCell>
-                  <TableCell class="text-sm">{{ formatUsageTime(item.window.end_time) }}</TableCell>
-                  <TableCell>{{ item.usage.request_count }}</TableCell>
-                  <TableCell>{{ item.usage.total_input_tokens.toLocaleString() }}</TableCell>
-                  <TableCell>{{ item.usage.total_output_tokens.toLocaleString() }}</TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </template>
+            <div class="rounded-md border p-3">
+              <p class="text-sm text-muted-foreground">总请求数</p>
+              <p class="text-xl font-bold text-foreground">{{ totalWindowRequests }}</p>
+            </div>
+            <div class="rounded-md border p-3">
+              <p class="text-sm text-muted-foreground">总 Token</p>
+              <p class="text-xl font-bold text-foreground">{{ totalWindowTokens }}</p>
+            </div>
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>开始时间</TableHead>
+                <TableHead>结束时间</TableHead>
+                <TableHead>请求数</TableHead>
+                <TableHead>输入 Tokens</TableHead>
+                <TableHead>输出 Tokens</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow v-for="item in windowsData" :key="item.window.id">
+                <TableCell class="text-sm">{{ formatUsageTime(item.window.start_time) }}</TableCell>
+                <TableCell class="text-sm">{{ formatUsageTime(item.window.end_time) }}</TableCell>
+                <TableCell>{{ item.usage.request_count }}</TableCell>
+                <TableCell>{{ item.usage.total_input_tokens.toLocaleString() }}</TableCell>
+                <TableCell>{{ item.usage.total_output_tokens.toLocaleString() }}</TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
         </template>
         <DailyUsageTable v-else-if="period === 'weekly'"
           :data="weeklyData" :loading="usageLoading" empty-text="暂无周数据" total-label="周总请求" token-label="周总 Token" />
@@ -359,3 +357,4 @@ onMounted(() => {
   loadStats()
   fetchUsage()
 })
+</script>
