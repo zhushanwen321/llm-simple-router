@@ -60,7 +60,13 @@ export async function buildApp(
 
   const isDev = process.env.NODE_ENV !== "production";
 
+  const MAX_BODY_SIZE_MB = 50;
+  const KB = 1024;
+  const MB = KB * KB;
+
   const app = Fastify({
+    // Claude Code 图片请求含 base64 编码，单张可达数十 MB
+    bodyLimit: MAX_BODY_SIZE_MB * MB,
     logger: {
       level: config.LOG_LEVEL,
       ...(isDev
