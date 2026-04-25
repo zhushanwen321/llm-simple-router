@@ -37,7 +37,7 @@ export function useLogFilters() {
     if (providerFilter.value === 'all') return modelOptions.value
     const provider = providers.value.find((p) => p.id === providerFilter.value)
     if (!provider) return modelOptions.value
-    const providerModels = new Set(provider.models)
+    const providerModels = new Set(provider.models.map(m => m.name))
     return modelOptions.value.filter((m) => providerModels.has(m))
   })
 
