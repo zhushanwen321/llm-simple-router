@@ -1,6 +1,6 @@
 import Database from "better-sqlite3";
-import { getLatestWindow } from "../db/usage-windows.js";
-import { toSqliteDatetime } from "./datetime.js";
+import { getLatestWindow, insertWindow } from "../db/usage-windows.js";
+import { toSqliteDatetime, parseSqliteDatetime } from "./datetime.js";
 
 export type DashboardPeriod = "window" | "weekly" | "monthly";
 
@@ -23,13 +23,11 @@ export function resolveTimeRange(
     case "window": {
       const latest = getLatestWindow(db, routerKeyId);
       if (!latest) {
-        // 无窗口数据时回退到当前小时的 5h 区间
-        const start = new Date(now);
-        start.setMinutes(0, 0, 0);
-        return {
-          startTime: toSqliteDatetime(start),
-          endTime: toSqliteDatetime(new Date(start.getTime() + WINDOW_DURATION_MS)),
-        };
+        return createAndReturnWindow(db, now, routerKeyId);
+      }
+      // 最新窗口已过期（无请求触发新窗口创建），主动补齐
+      if (now > parseSqliteDatetime(latest.end_time)) {
+        return createAndReturnWindow(db, now, routerKeyId);
       }
       return { startTime: latest.start_time, endTime: latest.end_time };
     }
@@ -53,4 +51,21 @@ export function getMonday(date: Date): Date {
   const diff = d.getDate() - day + (day === 0 ? -6 : 1);
   d.setDate(diff);
   return d;
+}
+
+function createAndReturnWindow(
+  db: Database.Database,
+  now: Date,
+  routerKeyId?: string,
+): TimeRange {
+  const start = new Date(now);
+  start.setMinutes(0, 0, 0);
+  const end = new Date(start.getTime() + WINDOW_DURATION_MS);
+  insertWindow(db, {
+    id: "",
+    router_key_id: routerKeyId ?? null,
+    start_time: toSqliteDatetime(start),
+    end_time: toSqliteDatetime(end),
+  });
+  return { startTime: toSqliteDatetime(start), endTime: toSqliteDatetime(end) };
 }

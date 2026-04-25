@@ -356,11 +356,12 @@ function isCompactRequest(messages: unknown[]): boolean {
   return COMPACT_MARKERS.some(marker => text.includes(marker));
 }
 
-// 保守估算：整个 body 而非仅 messages，宁可多估提前触发压缩
-const CHARS_PER_TOKEN = 3;
+// 使用 o200k_base (GPT-4o) BPE tokenizer 做精确 token 计数
+// 不同模型 tokenizer 有差异，但作为溢出检测安全网已足够
+import { countTokens } from "gpt-tokenizer";
 
 function estimateTokens(body: Record<string, unknown>): number {
-  return Math.ceil(JSON.stringify(body).length / CHARS_PER_TOKEN);
+  return countTokens(JSON.stringify(body));
 }
 
 function getCompactConfig(db: Database.Database): CompactConfig | null {
