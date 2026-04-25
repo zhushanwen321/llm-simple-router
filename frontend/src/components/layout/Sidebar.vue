@@ -77,7 +77,7 @@
             </div>
             <!-- 底部 -->
             <div class="px-3 py-2 flex justify-between items-center text-xs text-muted-foreground">
-              <span>{{ upgradeStatus?.lastCheckedAt ? `检查于 ${new Date(upgradeStatus.lastCheckedAt).toLocaleTimeString()}` : '未检查' }}</span>
+              <span>{{ upgradeStatus?.lastCheckedAt ? `检查于 ${parseUtc(upgradeStatus.lastCheckedAt).toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai' })}` : '未检查' }}</span>
               <Button variant="link" class="text-primary h-auto p-0" @click="handleCheckNow">立即检查</Button>
             </div>
           </PopoverContent>
@@ -143,6 +143,7 @@
 
 <script setup lang="ts">
 import { type Component, ref, onMounted, onUnmounted, computed } from 'vue'
+import { parseUtc } from '@/utils/format'
 import { useRoute, useRouter } from 'vue-router'
 import {
   ArrowUpRight,
