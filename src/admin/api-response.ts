@@ -24,11 +24,16 @@ export const API_CODE = {
 } as const
 
 /** HTTP status → 默认 API_CODE 映射（errorHandler 兜底用） */
+const STATUS_BAD_REQUEST = 400;
+const STATUS_UNAUTHORIZED = 401;
+const STATUS_NOT_FOUND = 404;
+const STATUS_CONFLICT = 409;
+
 export function statusToApiCode(status: number): number {
-  if (status === 400) return API_CODE.BAD_REQUEST
-  if (status === 401) return API_CODE.TOKEN_INVALID
-  if (status === 404) return API_CODE.NOT_FOUND
-  if (status === 409) return API_CODE.CONFLICT_NAME
+  if (status === STATUS_BAD_REQUEST) return API_CODE.BAD_REQUEST
+  if (status === STATUS_UNAUTHORIZED) return API_CODE.TOKEN_INVALID
+  if (status === STATUS_NOT_FOUND) return API_CODE.NOT_FOUND
+  if (status === STATUS_CONFLICT) return API_CODE.CONFLICT_NAME
   return API_CODE.INTERNAL_ERROR
 }
 
