@@ -14,12 +14,12 @@
       </Button>
     </div>
 
-    <Tabs default-value="claude-code">
+    <Tabs default-value="dynamic-model">
       <TabsList>
-        <TabsTrigger value="claude-code">Claude Code</TabsTrigger>
-        <TabsTrigger value="opencode">OpenCode</TabsTrigger>
+        <TabsTrigger value="dynamic-model">动态模型切换</TabsTrigger>
+        <TabsTrigger value="context-compact">1M 上下文压缩</TabsTrigger>
       </TabsList>
-      <TabsContent value="claude-code">
+      <TabsContent value="dynamic-model">
         <Card>
           <CardHeader>
             <CardTitle>Claude Code 动态模型切换</CardTitle>
@@ -116,10 +116,8 @@
           </CardContent>
         </Card>
       </TabsContent>
-      <TabsContent value="opencode">
-        <div class="flex flex-col items-center justify-center py-16 text-muted-foreground">
-          <p class="text-lg">暂未支持 OpenCode 增强</p>
-        </div>
+      <TabsContent value="context-compact">
+        <ContextCompact />
       </TabsContent>
     </Tabs>
   </div>
@@ -137,6 +135,7 @@ import { Label } from '@/components/ui/label'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import SessionTable from '@/components/proxy-enhancement/SessionTable.vue'
+import ContextCompact from '@/components/proxy-enhancement/ContextCompact.vue'
 
 const claudeCodeEnabled = ref(false)
 const selectModelInstruction = '---\ndescription: 切换代理路由模型\n---\n\n[router-command: select-model $ARGUMENTS]'
@@ -160,7 +159,16 @@ async function loadConfig() {
 async function handleSave() {
   saving.value = true
   try {
-    await api.updateProxyEnhancement({ claude_code_enabled: claudeCodeEnabled.value })
+    // PUT 请求需要发送完整配置，先读取最新数据以保留其他 tab 的设置
+    const current = await api.getProxyEnhancement()
+    await api.updateProxyEnhancement({
+      claude_code_enabled: claudeCodeEnabled.value,
+      context_compact_enabled: current.context_compact_enabled,
+      compact_provider_id: current.compact_provider_id,
+      compact_model: current.compact_model,
+      custom_prompt_enabled: current.custom_prompt_enabled,
+      custom_prompt: current.custom_prompt,
+    })
     toast.success('保存成功')
   } catch (e: unknown) {
     console.error('Failed to save proxy enhancement config:', e)
