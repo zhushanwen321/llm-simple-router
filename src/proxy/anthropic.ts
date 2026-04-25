@@ -30,6 +30,7 @@ const ANTHROPIC_ERROR_TYPE: Record<ErrorKind, string> = {
   upstreamConnectionFailed: "upstream_error",
   concurrencyQueueFull: "api_error",
   concurrencyTimeout: "api_error",
+  promptTooLong: "invalid_request_error",
 };
 
 const anthropicErrors = createErrorFormatter(
