@@ -22,13 +22,7 @@
       <CollapsibleTrigger as-child>
         <Button variant="ghost" class="w-full justify-between">
           <span>使用说明</span>
-          <svg
-            class="w-4 h-4 transition-transform"
-            :class="{ 'rotate-180': instructionsOpen }"
-            fill="none" stroke="currentColor" viewBox="0 0 24 24"
-          >
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-          </svg>
+          <ChevronDown class="w-4 h-4 transition-transform" :class="{ 'rotate-180': instructionsOpen }" />
         </Button>
       </CollapsibleTrigger>
       <CollapsibleContent class="mt-2">
@@ -128,10 +122,7 @@
     <div class="flex justify-end">
       <Button :disabled="saving" @click="handleSave">
         <span v-if="saving" class="flex items-center gap-1">
-          <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-          </svg>
+          <Loader2 class="w-4 h-4 animate-spin" />
           保存中...
         </span>
         <span v-else>保存</span>
@@ -146,6 +137,7 @@ import { toast } from 'vue-sonner'
 import { api } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
+import { ChevronDown, Loader2 } from 'lucide-vue-next'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'

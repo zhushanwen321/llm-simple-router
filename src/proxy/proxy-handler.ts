@@ -149,6 +149,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
   const { request, reply, apiType, upstreamPath, errors, deps, options, effectiveModel, originalModel, isFailover, originalBody, sessionId } = ctx;
   const excludeTargets: Target[] = [];
   let rootLogId: string | null = null;
+  const compactConfig = getCompactConfig(deps.db);
 
   while (true) {
     const startTime = Date.now();
@@ -203,7 +204,6 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
     body.model = resolved.backend_model;
 
     // --- 1M Context Compact ---
-    const compactConfig = getCompactConfig(deps.db);
     if (compactConfig) {
       if (isCompactRequest(body.messages as unknown[])) {
         // compact 请求 -> 重定向到 1M 模型
@@ -211,12 +211,16 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
           ? getProviderById(deps.db, compactConfig.compact_provider_id)
           : undefined;
         if (compactProvider && compactConfig.compact_model) {
-          request.log.info({ from: resolved.backend_model, to: compactConfig.compact_model }, "redirecting compact request to 1M model");
-          resolved = { backend_model: compactConfig.compact_model, provider_id: compactProvider.id };
-          provider = compactProvider;
-          body.model = compactConfig.compact_model;
-          if (compactConfig.custom_prompt_enabled && compactConfig.custom_prompt) {
-            body.messages = replaceCompactPrompt(body.messages as unknown[], compactConfig.custom_prompt);
+          if (compactProvider.api_type !== apiType) {
+            request.log.warn({ expected: apiType, got: compactProvider.api_type }, "compact provider api_type mismatch, skipping redirect");
+          } else {
+            request.log.info({ from: resolved.backend_model, to: compactConfig.compact_model }, "redirecting compact request to 1M model");
+            resolved = { backend_model: compactConfig.compact_model, provider_id: compactProvider.id };
+            provider = compactProvider;
+            body.model = compactConfig.compact_model;
+            if (compactConfig.custom_prompt_enabled && compactConfig.custom_prompt) {
+              body.messages = replaceCompactPrompt(body.messages as unknown[], compactConfig.custom_prompt);
+            }
           }
         }
       } else {
