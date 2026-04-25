@@ -8,6 +8,7 @@ import { getSetting } from "../db/settings.js";
 import { ProviderSemaphoreManager } from "../proxy/semaphore.js";
 import type { RequestTracker } from "../monitor/request-tracker.js";
 import { HTTP_CREATED, HTTP_NOT_FOUND, HTTP_CONFLICT, HTTP_BAD_REQUEST } from "./constants.js";
+import { API_CODE, apiError } from "./api-response.js";
 
 const API_KEY_PREVIEW_MIN_LENGTH = 8;
 const API_KEY_PREVIEW_PREFIX_LEN = 4;
@@ -70,7 +71,11 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
   app.post("/admin/api/providers", { schema: { body: CreateProviderSchema } }, async (request, reply) => {
     const body = request.body as Static<typeof CreateProviderSchema>;
     if (!PROVIDER_NAME_RE.test(body.name)) {
-      return reply.status(HTTP_BAD_REQUEST).send({ error: { message: "Provider 名称仅允许英文大小写字母、数字、横线和下划线" } });
+      return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.VALIDATION_FAILED, "Provider 名称仅允许英文大小写字母、数字、横线和下划线"));
+    }
+    const existing = db.prepare("SELECT id FROM providers WHERE name = ?").get(body.name) as { id: string } | undefined;
+    if (existing) {
+      return reply.code(HTTP_CONFLICT).send(apiError(API_CODE.CONFLICT_NAME, `Provider 名称 '${body.name}' 已存在`));
     }
     const encryptedKey = encrypt(body.api_key, getSetting(db, "encryption_key")!);
     const id = createProvider(db, {
@@ -103,11 +108,11 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     const { id } = request.params as { id: string };
     const existing = getProviderById(db, id);
     if (!existing) {
-      return reply.code(HTTP_NOT_FOUND).send({ error: { message: "Provider not found" } });
+      return reply.code(HTTP_NOT_FOUND).send(apiError(API_CODE.NOT_FOUND, "Provider not found"));
     }
     const body = request.body as Static<typeof UpdateProviderSchema>;
     if (body.name !== undefined && !PROVIDER_NAME_RE.test(body.name)) {
-      return reply.status(HTTP_BAD_REQUEST).send({ error: { message: "Provider 名称仅允许英文大小写字母、数字、横线和下划线" } });
+      return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.VALIDATION_FAILED, "Provider 名称仅允许英文大小写字母、数字、横线和下划线"));
     }
     const fields: Partial<Pick<Provider, 'name' | 'api_type' | 'base_url' | 'api_key' | 'api_key_preview' | 'models' | 'is_active' | 'max_concurrency' | 'queue_timeout_ms' | 'max_queue_size'>> = {};
     if (body.name !== undefined) fields.name = body.name;
@@ -142,13 +147,17 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
 
   app.delete("/admin/api/providers/:id", async (request, reply) => {
     const { id } = request.params as { id: string };
+    const existing = getProviderById(db, id);
+    if (!existing) {
+      return reply.code(HTTP_NOT_FOUND).send(apiError(API_CODE.NOT_FOUND, "Provider not found"));
+    }
     const groups = getAllMappingGroups(db);
     for (const g of groups) {
       try {
         const rule = JSON.parse(g.rule);
         const targets = [rule.default, ...(rule.windows || [])].filter(Boolean);
         if (targets.some((t: { provider_id: string }) => t.provider_id === id)) {
-          return reply.code(HTTP_CONFLICT).send({ error: { message: `Provider is referenced by mapping group '${g.client_model}'` } });
+          return reply.code(HTTP_CONFLICT).send(apiError(API_CODE.CONFLICT_REFERENCED, `Provider is referenced by mapping group '${g.client_model}'`));
         }
       } catch { continue }
     }

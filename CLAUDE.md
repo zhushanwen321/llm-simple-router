@@ -6,6 +6,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 LLM API 代理路由器。接收 OpenAI / Anthropic 格式的客户端请求，通过模型映射和路由策略转发到配置的后端 Provider，支持流式（SSE）和非流式代理。管理后台（Vue 3 + shadcn-vue）提供 Provider 管理、模型映射配置、重试规则、请求日志查看、实时监控等功能。
 
+## 分支策略
+
+- `main` — 可发布分支，始终保持稳定可发布状态
+- `develop` — 常驻开发/集成分支，所有功能分支的合并目标
+
+**流程：** 功能分支 → PR 合并到 `develop`（集成测试）→ PR 从 `develop` 合并到 `main`（发布）
+
+功能分支应基于 `develop` 创建，命名规范：`feat/xxx`、`fix/xxx`、`refactor/xxx`、`chore/xxx`
+
 ## 常用命令
 
 ```bash
@@ -177,7 +186,7 @@ Handler (proxy-handler.ts)
 ## 环境变量
 
 所有 secrets 通过首次启动的 Setup 页面设置，存入 DB settings 表。
-可选环境变量：`PORT`（默认 9981）、`DB_PATH`（默认 `~/.llm-simple-router/router.db`）、`LOG_LEVEL`、`STREAM_TIMEOUT_MS`（默认 3000000）、`RETRY_MAX_ATTEMPTS`（默认 3）、`RETRY_BASE_DELAY_MS`（默认 1000）
+可选环境变量：`PORT`（默认 9981）、`DB_PATH`（默认 `~/.llm-simple-router/router.db`）、`LOG_LEVEL`、`STREAM_TIMEOUT_MS`（默认 3000000）、`RETRY_BASE_DELAY_MS`（默认 1000）
 
 ## 测试
 
@@ -187,7 +196,7 @@ Handler (proxy-handler.ts)
 - **组件测试**：`Fastify()` + `.register()` + `app.inject()` 模拟 HTTP 请求（不启动真实服务器）
 - **内存数据库**：`initDatabase(":memory:")` 创建 SQLite 内存库，测试间完全隔离
 - **Mock 后端**：`http.createServer()` 在随机端口模拟 OpenAI/Anthropic 响应
-- **集成测试**：`buildApp({ config, db })` 组装完整应用，RETRY_MAX_ATTEMPTS=0 禁用重试
+- **集成测试**：`buildApp({ config, db })` 组装完整应用
 - **策略测试**：纯函数式，构造 Target/rule 对象验证 select() 返回值
 
 **辅助函数模式**（多文件重复定义）：`createMockBackend()`、`closeServer()`、`buildTestApp()`、`insertMockBackend()`、`insertModelMapping()`

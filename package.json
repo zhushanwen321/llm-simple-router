@@ -1,6 +1,6 @@
 {
   "name": "llm-simple-router",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "LLM API proxy router with OpenAI/Anthropic support, model mapping, retry strategies, and admin dashboard",
   "license": "MIT",
   "author": "ZZzzswszzZZ",
@@ -30,6 +30,7 @@
   "files": [
     "dist/",
     "frontend-dist/",
+    "config/",
     ".env.example",
     "LICENSE"
   ],

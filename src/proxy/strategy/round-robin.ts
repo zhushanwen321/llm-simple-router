@@ -1,5 +1,5 @@
 import type { MappingStrategy, ResolveContext, Target } from "./types.js";
-import { isTargetsRule } from "./targets-rule.js";
+import { isTargetsRule, filterExcluded } from "./targets-rule.js";
 
 export class RoundRobinStrategy implements MappingStrategy {
   private indexMap = new Map<string, number>();
@@ -8,12 +8,7 @@ export class RoundRobinStrategy implements MappingStrategy {
     if (!isTargetsRule(rule)) return undefined;
 
     const key = clientModel ?? JSON.stringify(rule);
-    const filtered = rule.targets.filter(
-      (t) =>
-        !context.excludeTargets?.some(
-          (e) => e.backend_model === t.backend_model && e.provider_id === t.provider_id,
-        ),
-    );
+    const filtered = filterExcluded(rule.targets, context.excludeTargets);
     if (filtered.length === 0) return undefined;
 
     const lastIndex = this.indexMap.get(key) ?? -1;

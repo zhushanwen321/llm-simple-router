@@ -151,9 +151,9 @@ async function loadConfig() {
   try {
     const data = await api.getProxyEnhancement()
     claudeCodeEnabled.value = data.claude_code_enabled
-  } catch (e) {
+  } catch (e: unknown) {
     console.error('Failed to load proxy enhancement config:', e)
-    toast.error('加载配置失败')
+    toast.error((e as { apiMessage?: string }).apiMessage || '加载配置失败')
   }
 }
 
@@ -162,9 +162,9 @@ async function handleSave() {
   try {
     await api.updateProxyEnhancement({ claude_code_enabled: claudeCodeEnabled.value })
     toast.success('保存成功')
-  } catch (e) {
+  } catch (e: unknown) {
     console.error('Failed to save proxy enhancement config:', e)
-    toast.error('保存失败')
+    toast.error((e as { apiMessage?: string }).apiMessage || '保存失败')
   } finally {
     saving.value = false
   }
@@ -174,9 +174,9 @@ async function loadSessions() {
   sessionsLoading.value = true
   try {
     sessions.value = await api.getSessionStates()
-  } catch (e) {
+  } catch (e: unknown) {
     console.error('Failed to load sessions:', e)
-    toast.error('加载 Session 列表失败')
+    toast.error((e as { apiMessage?: string }).apiMessage || '加载 Session 列表失败')
   } finally {
     sessionsLoading.value = false
   }
@@ -187,9 +187,9 @@ async function handleClearSession(session: SessionState) {
     await api.deleteSessionState(session.router_key_id, session.session_id)
     toast.success('Session 已清除')
     loadSessions()
-  } catch (e) {
+  } catch (e: unknown) {
     console.error('Failed to clear session:', e)
-    toast.error('清除 Session 失败')
+    toast.error((e as { apiMessage?: string }).apiMessage || '清除 Session 失败')
   }
 }
 
@@ -202,9 +202,9 @@ async function handleViewHistory(session: SessionState) {
   try {
     const history = await api.getSessionHistory(session.router_key_id, session.session_id)
     sessionHistoryMap.value[key] = history
-  } catch (e) {
+  } catch (e: unknown) {
     console.error('Failed to load history:', e)
-    toast.error('加载历史记录失败')
+    toast.error((e as { apiMessage?: string }).apiMessage || '加载历史记录失败')
   }
 }
 

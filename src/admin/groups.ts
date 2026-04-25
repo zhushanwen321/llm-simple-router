@@ -11,7 +11,8 @@ import {
   getMappingGroupById,
 } from "../db/index.js";
 import { STRATEGY_NAMES } from "../proxy/strategy/types.js";
-import { HTTP_BAD_REQUEST, HTTP_CREATED, HTTP_CONFLICT } from "./constants.js";
+import { HTTP_BAD_REQUEST, HTTP_CREATED, HTTP_CONFLICT, HTTP_NOT_FOUND } from "./constants.js";
+import { API_CODE, apiError } from "./api-response.js";
 
 const MIN_FAILOVER_TARGETS = 2;
 
@@ -129,7 +130,7 @@ export const adminGroupRoutes: FastifyPluginCallback<GroupRoutesOptions> = (app,
     const body = request.body as Static<typeof CreateGroupSchema>;
     const validationError = await validateRule(db, body.strategy, body.rule);
     if (validationError) {
-      return reply.code(HTTP_BAD_REQUEST).send({ error: { message: validationError } });
+      return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.BAD_REQUEST, validationError));
     }
     try {
       const id = createMappingGroup(db, {
@@ -140,7 +141,7 @@ export const adminGroupRoutes: FastifyPluginCallback<GroupRoutesOptions> = (app,
       return reply.code(HTTP_CREATED).send({ id });
     } catch (err: unknown) {
       if (err instanceof Error && err.message.includes("UNIQUE constraint")) {
-        return reply.code(HTTP_CONFLICT).send({ error: { message: "client_model already exists" } });
+        return reply.code(HTTP_CONFLICT).send(apiError(API_CODE.CONFLICT_NAME, "client_model already exists"));
       }
       throw err;
     }
@@ -158,7 +159,7 @@ export const adminGroupRoutes: FastifyPluginCallback<GroupRoutesOptions> = (app,
     const ruleJson = body.rule ?? findGroupRule(db, id);
     const validationError = await validateRule(db, strategy, ruleJson);
     if (validationError) {
-      return reply.code(HTTP_BAD_REQUEST).send({ error: { message: validationError } });
+      return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.BAD_REQUEST, validationError));
     }
 
     try {
@@ -166,7 +167,7 @@ export const adminGroupRoutes: FastifyPluginCallback<GroupRoutesOptions> = (app,
       return reply.send({ success: true });
     } catch (err: unknown) {
       if (err instanceof Error && err.message.includes("UNIQUE constraint")) {
-        return reply.code(HTTP_CONFLICT).send({ error: { message: "client_model already exists" } });
+        return reply.code(HTTP_CONFLICT).send(apiError(API_CODE.CONFLICT_NAME, "client_model already exists"));
       }
       throw err;
     }
@@ -174,6 +175,8 @@ export const adminGroupRoutes: FastifyPluginCallback<GroupRoutesOptions> = (app,
 
   app.delete("/admin/api/mapping-groups/:id", async (request, reply) => {
     const { id } = request.params as { id: string };
+    const existing = getMappingGroupById(db, id);
+    if (!existing) return reply.code(HTTP_NOT_FOUND).send(apiError(API_CODE.NOT_FOUND, "Mapping group not found"));
     deleteMappingGroup(db, id);
     return reply.send({ success: true });
   });

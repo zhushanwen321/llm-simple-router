@@ -1,7 +1,6 @@
 import { performance } from "node:perf_hooks";
+import { MS_PER_SECOND } from "../constants.js";
 import type { RuntimeMetrics } from "./types.js";
-
-const MS_PER_SECOND = 1000;
 const NS_PER_MS = 1e6;
 
 // Node.js 内部 API，无正式类型声明

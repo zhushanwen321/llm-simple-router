@@ -16,7 +16,7 @@ export function detectDeployment(): DeploymentType {
     cachedDeployment = 'npm'
     return cachedDeployment
   } catch {
-    cachedDeployment = 'unknown'
-    return cachedDeployment
+    // 不缓存 unknown，下次调用时重试检测
+    return 'unknown'
   }
 }

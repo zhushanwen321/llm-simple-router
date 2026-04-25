@@ -239,7 +239,7 @@ describe('upgrade API endpoints', () => {
       headers: { cookie },
     })
     expect(res.statusCode).toBe(200)
-    const body = JSON.parse(res.body)
+    const body = res.json().data
     expect(body).toHaveProperty('npm')
     expect(body).toHaveProperty('config')
     expect(body).toHaveProperty('deployment')
@@ -269,7 +269,7 @@ describe('upgrade API endpoints', () => {
       url: '/admin/api/upgrade/status',
       headers: { cookie },
     })
-    expect(JSON.parse(status.body).syncSource).toBe('gitee')
+    expect(status.json().data.syncSource).toBe('gitee')
   })
 })
 
@@ -304,7 +304,7 @@ describe('upgrade integration', () => {
       headers: { cookie },
     })
     expect(statusRes.statusCode).toBe(200)
-    const status = JSON.parse(statusRes.body)
+    const status = statusRes.json().data
     expect(['npm', 'docker', 'unknown']).toContain(status.deployment)
 
     // 手动触发检查
@@ -321,7 +321,7 @@ describe('upgrade integration', () => {
       url: '/admin/api/upgrade/status',
       headers: { cookie },
     })
-    const after = JSON.parse(afterRes.body)
+    const after = afterRes.json().data
     expect(after.lastCheckedAt).not.toBeNull()
 
     await close()

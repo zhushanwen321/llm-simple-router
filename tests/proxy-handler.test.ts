@@ -15,7 +15,7 @@ vi.mock("../src/db/index.js", () => ({
 vi.mock("../src/utils/crypto.js", () => ({ decrypt: vi.fn(() => "sk-test") }));
 vi.mock("../src/db/settings.js", () => ({ getSetting: vi.fn(() => "enc-key") }));
 vi.mock("../src/proxy/mapping-resolver.js", () => ({ resolveMapping: vi.fn(() => null) }));
-vi.mock("../src/proxy/enhancement-handler.js", () => ({
+vi.mock("../src/proxy/enhancement/enhancement-handler.js", () => ({
   applyEnhancement: vi.fn(() => ({ effectiveModel: "gpt-4", originalModel: null, interceptResponse: null })),
   buildModelInfoTag: vi.fn(() => "<router-response>...</router-response>"),
 }));
@@ -33,7 +33,7 @@ vi.mock("../src/proxy/transport.js", () => ({
 
 import { getProviderById } from "../src/db/index.js";
 import { resolveMapping } from "../src/proxy/mapping-resolver.js";
-import { applyEnhancement } from "../src/proxy/enhancement-handler.js";
+import { applyEnhancement } from "../src/proxy/enhancement/enhancement-handler.js";
 import { logResilienceResult, collectTransportMetrics, handleIntercept } from "../src/proxy/proxy-logging.js";
 import { insertRejectedLog } from "../src/proxy/log-helpers.js";
 
@@ -60,7 +60,7 @@ function createRequest(overrides = {}) {
 
 function createReply() {
   return {
-    status: vi.fn().mockReturnThis(), send: vi.fn().mockReturnThis(), header: vi.fn().mockReturnThis(),
+    code: vi.fn().mockReturnThis(), status: vi.fn().mockReturnThis(), send: vi.fn().mockReturnThis(), header: vi.fn().mockReturnThis(),
     raw: { headersSent: false, writableEnded: false },
   } as any;
 }
@@ -68,7 +68,7 @@ function createReply() {
 function createDeps(overrides = {}) {
   return {
     db: {} as any,
-    streamTimeoutMs: 30000, retryMaxAttempts: 3, retryBaseDelayMs: 1000,
+    streamTimeoutMs: 30000, retryBaseDelayMs: 1000,
     matcher: undefined, tracker: undefined,
     orchestrator: { handle: vi.fn() } as any,
     ...overrides,
@@ -92,7 +92,7 @@ describe("handleProxyRequest", () => {
     const reply = createReply();
     await handleProxyRequest(createRequest(), reply, "openai", "/v1/chat/completions", errors, deps);
     expect(insertRejectedLog).toHaveBeenCalled();
-    expect(reply.status).toHaveBeenCalledWith(404);
+    expect(reply.code).toHaveBeenCalledWith(404);
     expect(deps.orchestrator.handle).not.toHaveBeenCalled();
   });
 
@@ -102,7 +102,7 @@ describe("handleProxyRequest", () => {
     const deps = createDeps();
     const reply = createReply();
     await handleProxyRequest(createRequest(), reply, "openai", "/v1/chat/completions", errors, deps);
-    expect(reply.status).toHaveBeenCalledWith(503);
+    expect(reply.code).toHaveBeenCalledWith(503);
   });
 
   it("API type 不匹配时返回 500", async () => {
@@ -111,7 +111,7 @@ describe("handleProxyRequest", () => {
     const deps = createDeps();
     const reply = createReply();
     await handleProxyRequest(createRequest(), reply, "openai", "/v1/chat/completions", errors, deps);
-    expect(reply.status).toHaveBeenCalledWith(500);
+    expect(reply.code).toHaveBeenCalledWith(500);
   });
 
   it("正常请求调用 orchestrator 并记录日志", async () => {
@@ -156,7 +156,7 @@ describe("handleProxyRequest", () => {
     deps.orchestrator.handle = vi.fn().mockRejectedValue(new SemaphoreQueueFullError("p1"));
     const reply = createReply();
     await handleProxyRequest(createRequest(), reply, "openai", "/v1/chat/completions", errors, deps);
-    expect(reply.status).toHaveBeenCalledWith(503);
+    expect(reply.code).toHaveBeenCalledWith(503);
   });
 
   it("SemaphoreTimeoutError 返回 504", async () => {
@@ -166,6 +166,6 @@ describe("handleProxyRequest", () => {
     deps.orchestrator.handle = vi.fn().mockRejectedValue(new SemaphoreTimeoutError("p1", 5000));
     const reply = createReply();
     await handleProxyRequest(createRequest(), reply, "openai", "/v1/chat/completions", errors, deps);
-    expect(reply.status).toHaveBeenCalledWith(504);
+    expect(reply.code).toHaveBeenCalledWith(504);
   });
 });

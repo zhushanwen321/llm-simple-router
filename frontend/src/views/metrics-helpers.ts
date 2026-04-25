@@ -19,6 +19,9 @@ const PERIOD_TOTAL_SEC: Record<string, number> = {
   '24h': SEC_PER_DAY,
   '7d': SEC_PER_DAY * DAYS_7,
   '30d': SEC_PER_DAY * DAYS_30,
+  'window': SEC_PER_HOUR * HOURS_5,
+  'weekly': SEC_PER_DAY * DAYS_7,
+  'monthly': SEC_PER_DAY * DAYS_30,
 }
 
 const BUCKET_SEC: Record<string, number> = {
@@ -28,6 +31,9 @@ const BUCKET_SEC: Record<string, number> = {
   '24h': SEC_PER_MINUTE * MINUTES_15,
   '7d': SEC_PER_HOUR,
   '30d': SEC_PER_HOUR * HOURS_4,
+  'window': SEC_PER_MINUTE * MINUTES_5,
+  'weekly': SEC_PER_HOUR,
+  'monthly': SEC_PER_HOUR * HOURS_4,
 }
 
 const DEFAULT_BUCKET_SEC = SEC_PER_MINUTE * MINUTES_15
@@ -36,7 +42,7 @@ const TARGET_TICKS = 12
 const MIN_TICKS = 4
 
 function formatLabel(date: Date, periodStr: string): string {
-  if (periodStr === '7d' || periodStr === '30d') {
+  if (['7d', '30d', 'weekly', 'monthly'].includes(periodStr)) {
     const month = date.getMonth() + 1
     const day = date.getDate()
     const hours = String(date.getHours()).padStart(TICK_PADDING, '0')

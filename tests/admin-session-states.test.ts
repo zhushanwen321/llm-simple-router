@@ -15,7 +15,6 @@ function makeConfig() {
     LOG_LEVEL: "silent",
     TZ: "Asia/Shanghai",
     STREAM_TIMEOUT_MS: 5000,
-    RETRY_MAX_ATTEMPTS: 0,
     RETRY_BASE_DELAY_MS: 0,
   };
 }
@@ -63,7 +62,7 @@ describe("Admin Session States", () => {
       payload: { name: "Test Router Key" },
     });
     expect(res.statusCode).toBe(201);
-    routerKeyId = res.json().id;
+    routerKeyId = res.json().data.id;
 
     // 直接用 DB 函数写入 session state 数据
     upsertSessionState(db, {
@@ -92,7 +91,7 @@ describe("Admin Session States", () => {
       headers: { cookie },
     });
     expect(res.statusCode).toBe(200);
-    const states = res.json();
+    const states = res.json().data;
     expect(states).toHaveLength(1);
     expect(states[0].router_key_name).toBe("Test Router Key");
     expect(states[0].session_id).toBe("sess-001");
@@ -106,7 +105,7 @@ describe("Admin Session States", () => {
       headers: { cookie },
     });
     expect(res.statusCode).toBe(200);
-    const history = res.json();
+    const history = res.json().data;
     expect(history).toHaveLength(1);
     expect(history[0].old_model).toBe("claude-sonnet-4-20250514");
     expect(history[0].new_model).toBe("claude-opus-4-20250514");
@@ -120,7 +119,7 @@ describe("Admin Session States", () => {
       headers: { cookie },
     });
     expect(delRes.statusCode).toBe(200);
-    expect(delRes.json()).toEqual({ success: true });
+    expect(delRes.json().data).toEqual({ success: true });
 
     // 验证 session state 已被删除
     const getRes = await app.inject({
@@ -128,7 +127,7 @@ describe("Admin Session States", () => {
       url: "/admin/api/session-states",
       headers: { cookie },
     });
-    expect(getRes.json()).toHaveLength(0);
+    expect(getRes.json().data).toHaveLength(0);
   });
 
   it("unauthenticated access returns 401", async () => {
@@ -137,5 +136,8 @@ describe("Admin Session States", () => {
       url: "/admin/api/session-states",
     });
     expect(res.statusCode).toBe(401);
+    const body = res.json()
+    expect(body.code).toBe(40102)
+    expect(body.data).toBeNull()
   });
 });

@@ -1,7 +1,7 @@
 import type { ServerResponse } from "node:http";
 import { StatsAggregator } from "./stats-aggregator.js";
 import { RuntimeCollector } from "./runtime-collector.js";
-import { extractStreamText } from "./stream-extractor.js";
+import { StreamContentAccumulator } from "./stream-content-accumulator.js";
 import type { ProviderSemaphoreManager } from "../proxy/semaphore.js";
 import type {
   ActiveRequest,
@@ -37,6 +37,7 @@ export class RequestTracker {
   >();
   private pushTimer: ReturnType<typeof setInterval> | null = null;
   private tickCount = 0;
+  private streamAccumulators = new Map<string, StreamContentAccumulator>();
 
   /** Visible for testing */
   readonly statsAggregator: StatsAggregator;
@@ -87,56 +88,13 @@ export class RequestTracker {
     const req = this.activeMap.get(id);
     if (!req) return;
 
-    if (!req.streamContent) {
-      req.streamContent = { rawChunks: "", textContent: "", totalChars: 0, blocks: [] }
+    let acc = this.streamAccumulators.get(id);
+    if (!acc) {
+      acc = new StreamContentAccumulator(maxRaw, maxText);
+      this.streamAccumulators.set(id, acc);
     }
-
-    const sc = req.streamContent;
-    sc.totalChars += rawLine.length;
-
-    // 环形缓冲区：超过限制时截断保留尾部
-    sc.rawChunks += rawLine + "\n";
-    if (sc.rawChunks.length > maxRaw) {
-      sc.rawChunks = sc.rawChunks.slice(-maxRaw);
-    }
-
-    // 初始化 blocks 数组
-    if (!sc.blocks) {
-      sc.blocks = []
-    }
-
-    const extracted = extractStreamText(rawLine, apiType)
-
-    // 拼接纯文本（text 和 text_delta）
-    if (extracted.text) {
-      sc.textContent += extracted.text
-      if (sc.textContent.length > maxText) {
-        sc.textContent = sc.textContent.slice(-maxText)
-      }
-    }
-
-    // 维护结构化内容块
-    if (extracted.block) {
-      const { index, type, content, name } = extracted.block
-      while (sc.blocks.length <= index) {
-        sc.blocks.push({ type: 'text', content: '' })
-      }
-      if (name) {
-        sc.blocks[index].name = name
-      }
-      if (content === '' && type !== 'text') {
-        sc.blocks[index].type = type
-      } else if (content) {
-        sc.blocks[index].content += content
-        sc.blocks[index].type = type
-      }
-      const MAX_BLOCK_CONTENT = maxText
-      for (const block of sc.blocks) {
-        if (block.content.length > MAX_BLOCK_CONTENT) {
-          block.content = block.content.slice(-MAX_BLOCK_CONTENT)
-        }
-      }
-    }
+    acc.append(rawLine, apiType);
+    req.streamContent = acc.getSnapshot();
   }
 
   complete(
@@ -170,6 +128,7 @@ export class RequestTracker {
     };
 
     this.activeMap.delete(id);
+    this.streamAccumulators.delete(id);
     this.recentCompleted.unshift(completed);
     if (this.recentCompleted.length > RECENT_COMPLETED_MAX) {
       this.recentCompleted.length = RECENT_COMPLETED_MAX;
