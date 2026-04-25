@@ -159,8 +159,8 @@ describe("context compact integration", () => {
 
     app = buildTestApp(db);
 
-    // 构造一个足够大的 payload 使得 JSON.stringify(body).length / 3 > 100
-    const bigContent = "A".repeat(500);
+    // 构造足够大的 payload，确保 BPE token 计数超过 100 的 context window
+    const bigContent = "A".repeat(1000);
     const res = await app.inject({
       method: "POST",
       url: "/v1/chat/completions",
