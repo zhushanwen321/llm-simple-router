@@ -131,6 +131,7 @@
 import { ref, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
 import { api } from '@/api/client'
+import { formatTime } from '@/utils/format'
 import { useClipboard } from '@/composables/useClipboard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -169,7 +170,7 @@ function maskKey(key: string | null): string {
 }
 
 function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleString('zh-CN')
+  return formatTime(dateStr)
 }
 
 function removeModel(model: string) {

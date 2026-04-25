@@ -245,6 +245,7 @@ import { lineOptions, stackedAreaOptions } from './metrics-helpers'
 import { useMetrics } from '@/composables/useMetrics'
 import { useUsage } from '@/composables/useUsage'
 import DailyUsageTable from '@/components/dashboard/DailyUsageTable.vue'
+import { formatTimeShort } from '@/utils/format'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, ChartTooltip, Legend, Filler)
 
@@ -350,7 +351,7 @@ const totalWindowTokens = computed(() => {
 })
 
 function formatUsageTime(iso: string): string {
-  return new Date(iso).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+  return formatTimeShort(iso)
 }
 
 onMounted(() => {
