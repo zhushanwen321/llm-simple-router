@@ -369,8 +369,8 @@ export const api = {
   deleteRetryRule: (id: string) => request<{ success: boolean }>('delete', `${API.RETRY_RULES}/${id}`),
 
   getProxyEnhancement: () =>
-    request<any>('get', API.PROXY_ENHANCEMENT),
-  updateProxyEnhancement: (data: any) =>
+    request<Record<string, unknown>>('get', API.PROXY_ENHANCEMENT),
+  updateProxyEnhancement: (data: Record<string, unknown>) =>
     request<{ success: boolean }>('put', API.PROXY_ENHANCEMENT, data),
   getCompactModels: () =>
     request<Array<{ provider_id: string; provider_name: string; model: string; context_window: number }>>('get', `${API.PROXY_ENHANCEMENT}/compact-models`),
