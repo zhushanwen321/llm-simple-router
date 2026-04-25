@@ -76,7 +76,8 @@
       :editing-id="editingId"
       :form="form"
       :providers="providersList"
-      :provider-models="providerModelsMap"
+      :provider-groups="providerGroups"
+      :context-window-map="contextWindowMap"
       @save="handleSave"
       @add-window="addWindow"
       @remove-window="removeWindow"
@@ -104,18 +105,25 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
 import MappingGroupFormDialog from '@/components/mappings/MappingGroupFormDialog.vue'
 import MappingGroupDeleteDialog from '@/components/mappings/MappingGroupDeleteDialog.vue'
-import type { MappingGroup, ProviderSummary, MappingTarget, RuleWindow, Rule } from '@/types/mapping'
+import type { MappingGroup, Provider, MappingTarget, RuleWindow, Rule } from '@/types/mapping'
+import type { ProviderGroup } from '@/components/mappings/cascading-types'
 
-const DEFAULT_FORM = {
+const DEFAULT_FORM: {
+  client_model: string
+  strategy: string
+  default: MappingTarget
+  windows: RuleWindow[]
+  targets: MappingTarget[]
+} = {
   client_model: '',
   strategy: 'scheduled',
   default: { backend_model: '', provider_id: '' },
-  windows: [] as RuleWindow[],
-  targets: [] as MappingTarget[],
+  windows: [],
+  targets: [],
 }
 
 const groups = ref<MappingGroup[]>([])
-const providersList = ref<ProviderSummary[]>([])
+const providersList = ref<Provider[]>([])
 const dialogOpen = ref(false)
 const editingId = ref<string | null>(null)
 const deleteTarget = ref<MappingGroup | null>(null)
@@ -127,13 +135,23 @@ const providerNameMap = computed(() => {
   return map
 })
 
-// 从供应商的 models 字段获取可用模型列表
-const providerModelsMap = computed(() => {
-  const map = new Map<string, string[]>()
+const providerGroups = computed<ProviderGroup[]>(() =>
+  providersList.value.map(p => ({
+    provider: { id: p.id, name: p.name },
+    models: (p.models ?? []).map(m => ({
+      name: m.name,
+      contextWindow: m.context_window ?? 200000,
+    })),
+  }))
+)
+
+const contextWindowMap = computed(() => {
+  const map = new Map<string, number>()
   for (const p of providersList.value) {
-    const models = (p as ProviderSummary & { models?: string[] }).models
-    if (Array.isArray(models) && models.length > 0) {
-      map.set(p.id, [...models])
+    for (const m of p.models ?? []) {
+      if (m.context_window != null) {
+        map.set(`${p.id}:${m.name}`, m.context_window)
+      }
     }
   }
   return map
@@ -164,21 +182,25 @@ async function loadData() {
     console.error('Failed to load groups:', results[0].reason)
   }
   if (results[1].status === 'fulfilled') {
-    providersList.value = results[1].value as ProviderSummary[]
+    providersList.value = results[1].value as Provider[]
   } else {
     console.error('Failed to load providers:', results[1].reason)
     toast.error(getApiMessage(results[1].reason, '加载供应商失败'))
   }
 }
 
+function getFirstModel(providerId: string): string {
+  const p = providersList.value.find(x => x.id === providerId)
+  return p?.models?.[0]?.name || ''
+}
+
 function openCreate() {
   editingId.value = null
   const firstProviderId = providersList.value[0]?.id || ''
-  const firstModels = providerModelsMap.value.get(firstProviderId) || []
   form.value = {
     client_model: '',
     strategy: 'scheduled',
-    default: { backend_model: firstModels[0] || '', provider_id: firstProviderId },
+    default: { backend_model: getFirstModel(firstProviderId), provider_id: firstProviderId },
     windows: [],
     targets: [],
   }
@@ -198,22 +220,25 @@ function openEdit(g: MappingGroup & { parsedRule?: Rule }) {
       default: {
         backend_model: rule.default?.backend_model || '',
         provider_id: rule.default?.provider_id || providersList.value[0]?.id || '',
+        overflow_provider_id: rule.default?.overflow_provider_id,
+        overflow_model: rule.default?.overflow_model,
       },
       windows: rule.windows ? JSON.parse(JSON.stringify(rule.windows)) : [],
     }
   } else {
     const firstProviderId = providersList.value[0]?.id || ''
-    const firstModels = providerModelsMap.value.get(firstProviderId) || []
     form.value = {
       ...DEFAULT_FORM,
       client_model: g.client_model,
       strategy: g.strategy,
       targets: Array.isArray(rule.targets)
-        ? rule.targets.map((t: { backend_model: string; provider_id: string }) => ({
+        ? rule.targets.map((t: MappingTarget) => ({
           backend_model: t.backend_model || '',
           provider_id: t.provider_id || firstProviderId,
+          overflow_provider_id: t.overflow_provider_id,
+          overflow_model: t.overflow_model,
         }))
-        : [{ backend_model: firstModels[0] || '', provider_id: firstProviderId }],
+        : [{ backend_model: getFirstModel(firstProviderId), provider_id: firstProviderId }],
     }
   }
   dialogOpen.value = true
@@ -221,12 +246,11 @@ function openEdit(g: MappingGroup & { parsedRule?: Rule }) {
 
 function addWindow() {
   const firstProviderId = providersList.value[0]?.id || ''
-  const firstModels = providerModelsMap.value.get(firstProviderId) || []
   form.value.windows.push({
     start: '',
     end: '',
     target: {
-      backend_model: firstModels[0] || '',
+      backend_model: getFirstModel(firstProviderId),
       provider_id: firstProviderId,
     },
   })
@@ -238,8 +262,7 @@ function removeWindow(idx: number) {
 
 function addTarget() {
   const firstProviderId = providersList.value[0]?.id || ''
-  const firstModels = providerModelsMap.value.get(firstProviderId) || []
-  form.value.targets.push({ backend_model: firstModels[0] || '', provider_id: firstProviderId })
+  form.value.targets.push({ backend_model: getFirstModel(firstProviderId), provider_id: firstProviderId })
 }
 
 function removeTarget(idx: number) {

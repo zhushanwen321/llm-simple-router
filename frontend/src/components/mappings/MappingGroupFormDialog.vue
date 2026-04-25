@@ -1,7 +1,7 @@
 <!-- eslint-disable vue/no-mutating-props -- form is a reactive object managed by parent component -->
 <template>
   <Dialog :open="open" @update:open="emit('update:open', $event)">
-    <DialogContent class="max-w-2xl">
+    <DialogContent class="max-w-2xl max-h-[85vh] overflow-y-auto">
       <DialogHeader>
         <DialogTitle>{{ editingId ? '编辑分组' : '添加分组' }}</DialogTitle>
         <DialogDescription>配置客户端模型到后端供应商模型的映射规则</DialogDescription>
@@ -32,29 +32,39 @@
             <div class="text-sm font-medium text-foreground">默认目标</div>
             <div class="flex gap-3">
               <div class="flex-1">
-                <Label class="block text-xs text-muted-foreground mb-1">供应商</Label>
-                <Select :model-value="form.default.provider_id" @update:model-value="onDefaultProviderChange">
-                  <SelectTrigger>
-                    <SelectValue placeholder="选择供应商" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem v-for="p in providers" :key="p.id" :value="p.id">{{ p.name }}</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p v-if="errors['default.provider_id']" class="text-sm text-destructive mt-1">{{ errors['default.provider_id'] }}</p>
+                <div class="text-xs text-muted-foreground mb-1">默认模型</div>
+                <CascadingModelSelect
+                  :providers="providerGroups"
+                  :model-value="{ provider_id: form.default.provider_id, model: form.default.backend_model }"
+                  placeholder="选择模型..."
+                  @update:model-value="(v: SelectedValue) => { form.default.provider_id = v.provider_id; form.default.backend_model = v.model }"
+                />
+                <p v-if="errors['default.provider_id'] || errors['default.backend_model']" class="text-sm text-destructive mt-1">
+                  {{ errors['default.provider_id'] || errors['default.backend_model'] }}
+                </p>
               </div>
               <div class="flex-1">
-                <Label class="block text-xs text-muted-foreground mb-1">后端模型</Label>
-                <Select v-model="form.default.backend_model" :disabled="defaultModels.length === 0">
-                  <SelectTrigger>
-                    <SelectValue :placeholder="defaultModels.length === 0 ? '暂无可用模型' : '选择后端模型'" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem v-for="m in defaultModels" :key="m" :value="m">{{ m }}</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p v-if="errors['default.backend_model']" class="text-sm text-destructive mt-1">{{ errors['default.backend_model'] }}</p>
+                <div class="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                  溢出模型（可选）
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger as-child>
+                        <HelpCircle class="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent>上下文超过默认模型限制时自动切换到此模型</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+                <CascadingModelSelect
+                  :providers="overflowGroupsFor('default')"
+                  :model-value="form.default.overflow_provider_id && form.default.overflow_model ? { provider_id: form.default.overflow_provider_id, model: form.default.overflow_model } : undefined"
+                  placeholder="点击选择模型..."
+                  @update:model-value="(v: SelectedValue | undefined) => onOverflowSelect('default', v)"
+                />
               </div>
+            </div>
+            <div v-if="overflowHintFor('default')" class="text-xs text-primary">
+              {{ overflowHintFor('default') }}
             </div>
           </div>
 
@@ -85,29 +95,39 @@
               </div>
               <div class="flex gap-3">
                 <div class="flex-1">
-                  <Label class="block text-xs text-muted-foreground mb-1">供应商</Label>
-                  <Select :model-value="w.target.provider_id" @update:model-value="onWindowProviderChange(idx, $event)">
-                    <SelectTrigger>
-                      <SelectValue placeholder="选择供应商" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem v-for="p in providers" :key="p.id" :value="p.id">{{ p.name }}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p v-if="errors[`window.${idx}.provider_id`]" class="text-sm text-destructive mt-1">{{ errors[`window.${idx}.provider_id`] }}</p>
+                  <div class="text-xs text-muted-foreground mb-1">窗口模型</div>
+                  <CascadingModelSelect
+                    :providers="providerGroups"
+                    :model-value="{ provider_id: w.target.provider_id, model: w.target.backend_model }"
+                    placeholder="选择模型..."
+                    @update:model-value="(v: SelectedValue) => { w.target.provider_id = v.provider_id; w.target.backend_model = v.model }"
+                  />
+                  <p v-if="errors[`window.${idx}.provider_id`] || errors[`window.${idx}.backend_model`]" class="text-sm text-destructive mt-1">
+                    {{ errors[`window.${idx}.provider_id`] || errors[`window.${idx}.backend_model`] }}
+                  </p>
                 </div>
                 <div class="flex-1">
-                  <Label class="block text-xs text-muted-foreground mb-1">后端模型</Label>
-                  <Select v-model="w.target.backend_model" :disabled="getWindowModels(idx).length === 0">
-                    <SelectTrigger>
-                      <SelectValue :placeholder="getWindowModels(idx).length === 0 ? '暂无可用模型' : '选择后端模型'" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem v-for="m in getWindowModels(idx)" :key="m" :value="m">{{ m }}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p v-if="errors[`window.${idx}.backend_model`]" class="text-sm text-destructive mt-1">{{ errors[`window.${idx}.backend_model`] }}</p>
+                  <div class="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                    溢出模型（可选）
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger as-child>
+                          <HelpCircle class="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent>上下文超过窗口模型限制时自动切换到此模型</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                  <CascadingModelSelect
+                    :providers="overflowGroupsFor(`window.${idx}`)"
+                    :model-value="w.target.overflow_provider_id && w.target.overflow_model ? { provider_id: w.target.overflow_provider_id, model: w.target.overflow_model } : undefined"
+                    placeholder="点击选择模型..."
+                    @update:model-value="(v: SelectedValue | undefined) => onOverflowSelect(`window.${idx}`, v)"
+                  />
                 </div>
+              </div>
+              <div v-if="overflowHintFor(`window.${idx}`)" class="text-xs text-primary">
+                {{ overflowHintFor(`window.${idx}`) }}
               </div>
             </div>
             <div v-if="form.windows.length === 0" class="text-sm text-muted-foreground">暂无窗口</div>
@@ -123,33 +143,47 @@
           <div v-for="(t, idx) in form.targets" :key="idx" class="border rounded-md p-2 space-y-2">
             <div class="flex gap-3">
               <div class="flex-1">
-                <Label class="block text-xs text-muted-foreground mb-1">供应商</Label>
-                <Select :model-value="t.provider_id" @update:model-value="onTargetProviderChange(idx, $event)">
-                  <SelectTrigger>
-                    <SelectValue placeholder="选择供应商" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem v-for="p in providers" :key="p.id" :value="p.id">{{ p.name }}</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p v-if="errors[`target.${idx}.provider_id`]" class="text-sm text-destructive mt-1">{{ errors[`target.${idx}.provider_id`] }}</p>
+                <div class="text-xs text-muted-foreground mb-1">模型</div>
+                <CascadingModelSelect
+                  :providers="providerGroups"
+                  :model-value="{ provider_id: t.provider_id, model: t.backend_model }"
+                  placeholder="选择模型..."
+                  @update:model-value="(v: SelectedValue) => { t.provider_id = v.provider_id; t.backend_model = v.model }"
+                />
+                <p v-if="errors[`target.${idx}.provider_id`] || errors[`target.${idx}.backend_model`]" class="text-sm text-destructive mt-1">
+                  {{ errors[`target.${idx}.provider_id`] || errors[`target.${idx}.backend_model`] }}
+                </p>
               </div>
               <div class="flex-1">
-                <Label class="block text-xs text-muted-foreground mb-1">后端模型</Label>
-                <Select v-model="t.backend_model" :disabled="getTargetModels(idx).length === 0">
-                  <SelectTrigger>
-                    <SelectValue :placeholder="getTargetModels(idx).length === 0 ? '暂无可用模型' : '选择后端模型'" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem v-for="m in getTargetModels(idx)" :key="m" :value="m">{{ m }}</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p v-if="errors[`target.${idx}.backend_model`]" class="text-sm text-destructive mt-1">{{ errors[`target.${idx}.backend_model`] }}</p>
+                <div class="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                  溢出模型（可选）
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger as-child>
+                        <HelpCircle class="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent>上下文超过目标模型限制时自动切换到此模型</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+                <CascadingModelSelect
+                  :providers="overflowGroupsFor(`target.${idx}`)"
+                  :model-value="t.overflow_provider_id && t.overflow_model ? { provider_id: t.overflow_provider_id, model: t.overflow_model } : undefined"
+                  placeholder="点击选择模型..."
+                  @update:model-value="(v: SelectedValue | undefined) => onOverflowSelect(`target.${idx}`, v)"
+                />
               </div>
             </div>
+            <div v-if="overflowHintFor(`target.${idx}`)" class="text-xs text-primary">
+              {{ overflowHintFor(`target.${idx}`) }}
+            </div>
             <div class="flex justify-end gap-1">
-              <Button v-if="form.strategy === 'failover'" type="button" variant="ghost" size="sm" :disabled="idx === 0" @click="emit('moveTargetUp', idx)">↑</Button>
-              <Button v-if="form.strategy === 'failover'" type="button" variant="ghost" size="sm" :disabled="idx === form.targets.length - 1" @click="emit('moveTargetDown', idx)">↓</Button>
+              <Button v-if="form.strategy === 'failover'" type="button" variant="ghost" size="sm" :disabled="idx === 0" @click="emit('moveTargetUp', idx)">
+                <ArrowUp class="w-4 h-4" />
+              </Button>
+              <Button v-if="form.strategy === 'failover'" type="button" variant="ghost" size="sm" :disabled="idx === form.targets.length - 1" @click="emit('moveTargetDown', idx)">
+                <ArrowDown class="w-4 h-4" />
+              </Button>
               <Button type="button" variant="ghost" size="sm" class="text-destructive shrink-0" @click="emit('removeTarget', idx)">删除</Button>
             </div>
           </div>
@@ -166,13 +200,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { ref, watch } from 'vue'
+import { ArrowUp, ArrowDown, HelpCircle } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
-import type { AcceptableValue } from 'reka-ui'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import CascadingModelSelect from '@/components/mappings/CascadingModelSelect.vue'
+import type { SelectedValue, ProviderGroup } from '@/components/mappings/cascading-types'
 import type { ProviderSummary, RuleWindow, MappingTarget } from '@/types/mapping'
 
 interface FormData {
@@ -188,7 +225,8 @@ const props = defineProps<{
   editingId: string | null
   form: FormData
   providers: ProviderSummary[]
-  providerModels: Map<string, string[]>
+  providerGroups: ProviderGroup[]
+  contextWindowMap: Map<string, number>
 }>()
 
 const emit = defineEmits<{
@@ -202,46 +240,52 @@ const emit = defineEmits<{
   (e: 'moveTargetDown', idx: number): void
 }>()
 
-const defaultModels = computed(() =>
-  props.providerModels.get(props.form.default.provider_id) || []
-)
-
-function getWindowModels(idx: number): string[] {
-  const providerId = props.form.windows[idx]?.target?.provider_id
-  return providerId ? (props.providerModels.get(providerId) || []) : []
+function getTargetByKey(key: string): MappingTarget | undefined {
+  if (key === 'default') return props.form.default
+  if (key.startsWith('window.')) {
+    const idx = Number(key.split('.')[1])
+    return props.form.windows[idx]?.target
+  }
+  if (key.startsWith('target.')) {
+    const idx = Number(key.split('.')[1])
+    return props.form.targets[idx]
+  }
+  return undefined
 }
 
-// Select @update:model-value emit 出 AcceptableValue（含 null），需要类型收窄
-function onDefaultProviderChange(value: AcceptableValue) {
-  if (typeof value !== 'string') return
-  // eslint-disable-next-line vue/no-mutating-props
-  props.form.default.provider_id = value
-  const models = props.providerModels.get(value) || []
-  // eslint-disable-next-line vue/no-mutating-props
-  props.form.default.backend_model = models[0] || ''
+function getContextWindow(target: MappingTarget): number {
+  const key = `${target.provider_id}:${target.backend_model}`
+  return props.contextWindowMap.get(key) ?? 200000
 }
 
-function onWindowProviderChange(idx: number, value: AcceptableValue) {
-  if (typeof value !== 'string') return
-  // eslint-disable-next-line vue/no-mutating-props
-  props.form.windows[idx].target.provider_id = value
-  const models = props.providerModels.get(value) || []
-  // eslint-disable-next-line vue/no-mutating-props
-  props.form.windows[idx].target.backend_model = models[0] || ''
+function overflowGroupsFor(targetKey: string): ProviderGroup[] {
+  const target = getTargetByKey(targetKey)
+  if (!target?.backend_model) return props.providerGroups
+  const cw = getContextWindow(target)
+  return props.providerGroups
+    .map(g => ({ ...g, models: g.models.filter(m => m.contextWindow >= cw) }))
+    .filter(g => g.models.length > 0)
 }
 
-function getTargetModels(idx: number): string[] {
-  const providerId = props.form.targets[idx]?.provider_id
-  return providerId ? (props.providerModels.get(providerId) || []) : []
+function overflowHintFor(targetKey: string): string {
+  const target = getTargetByKey(targetKey)
+  if (!target?.overflow_provider_id || !target?.overflow_model) return ''
+  const cw = getContextWindow(target)
+  if (cw >= 1000000) return '当前模型上下文 >= 1M，无需配置溢出模型'
+  const cwStr = cw >= 1000 ? `${cw / 1000}K` : `${cw}`
+  return `上下文超过 ${target.backend_model} 限制 (${cwStr}) 时自动切换到 ${target.overflow_model}`
 }
 
-function onTargetProviderChange(idx: number, value: AcceptableValue) {
-  if (typeof value !== 'string') return
-  // eslint-disable-next-line vue/no-mutating-props
-  props.form.targets[idx].provider_id = value
-  const models = props.providerModels.get(value) || []
-  // eslint-disable-next-line vue/no-mutating-props
-  props.form.targets[idx].backend_model = models[0] || ''
+function onOverflowSelect(targetKey: string, val: SelectedValue | undefined) {
+  const target = getTargetByKey(targetKey)
+  if (!target) return
+  if (val) {
+    target.overflow_provider_id = val.provider_id
+    target.overflow_model = val.model
+  } else {
+    target.overflow_provider_id = undefined
+    target.overflow_model = undefined
+  }
 }
 
 function handleSave() {
@@ -257,19 +301,19 @@ function validate(): boolean {
   if (!props.form.client_model.trim()) errs.client_model = '请输入客户端模型名称'
 
   if (props.form.strategy === 'scheduled') {
-    if (!props.form.default.provider_id) errs['default.provider_id'] = '请选择供应商'
-    if (!props.form.default.backend_model) errs['default.backend_model'] = '请选择后端模型'
+    if (!props.form.default.provider_id) errs['default.provider_id'] = '请选择模型'
+    if (!props.form.default.backend_model) errs['default.backend_model'] = '请选择模型'
     props.form.windows.forEach((w, i) => {
       if (!TIME_REGEX.test(w.start)) errs[`window.${i}.start`] = '格式：HH:MM'
       if (!TIME_REGEX.test(w.end)) errs[`window.${i}.end`] = '格式：HH:MM'
-      if (!w.target.provider_id) errs[`window.${i}.provider_id`] = '请选择供应商'
-      if (!w.target.backend_model) errs[`window.${i}.backend_model`] = '请选择后端模型'
+      if (!w.target.provider_id) errs[`window.${i}.provider_id`] = '请选择模型'
+      if (!w.target.backend_model) errs[`window.${i}.backend_model`] = '请选择模型'
     })
   } else {
     if (props.form.targets.length === 0) errs.targets = '至少添加一个目标'
     props.form.targets.forEach((t, i) => {
-      if (!t.provider_id) errs[`target.${i}.provider_id`] = '请选择供应商'
-      if (!t.backend_model) errs[`target.${i}.backend_model`] = '请选择后端模型'
+      if (!t.provider_id) errs[`target.${i}.provider_id`] = '请选择模型'
+      if (!t.backend_model) errs[`target.${i}.backend_model`] = '请选择模型'
     })
   }
 
@@ -277,6 +321,5 @@ function validate(): boolean {
   return Object.keys(errs).length === 0
 }
 
-// dialog 打开时清除错误
 watch(() => props.open, (v) => { if (v) errors.value = {} })
 </script>
