@@ -1,6 +1,6 @@
 import { ref, computed, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
-import { api } from '@/api/client'
+import { api, getApiMessage } from '@/api/client'
 import type { Provider } from '@/types/mapping'
 
 const PERIODS = [
@@ -84,7 +84,7 @@ export function useLogFilters() {
       providers.value = await api.getProviders()
     } catch (e: unknown) {
       console.error('Failed to load providers:', e)
-      toast.error((e as { apiMessage?: string }).apiMessage || '加载供应商列表失败')
+      toast.error(getApiMessage(e, '加载供应商列表失败'))
     }
   }
 
@@ -93,7 +93,7 @@ export function useLogFilters() {
       routerKeys.value = await api.getRouterKeys()
     } catch (e: unknown) {
       console.error('Failed to load router keys:', e)
-      toast.error((e as { apiMessage?: string }).apiMessage || '加载密钥列表失败')
+      toast.error(getApiMessage(e, '加载密钥列表失败'))
     }
   }
 

@@ -181,7 +181,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
 import * as z from 'zod'
-import { api, type ProviderPayload, type ProviderGroup } from '@/api/client'
+import { api, getApiMessage, type ProviderPayload, type ProviderGroup } from '@/api/client'
 import type { Provider, ModelInfo } from '@/types/mapping'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -302,7 +302,7 @@ async function loadProviders() {
     providers.value = data
   } catch (e: unknown) {
     console.error('Failed to load providers:', e)
-    toast.error((e as { apiMessage?: string }).apiMessage || '加载供应商失败')
+    toast.error(getApiMessage(e, '加载供应商失败'))
   }
 }
 
@@ -379,7 +379,7 @@ async function handleSave() {
     await loadProviders()
   } catch (e: unknown) {
     console.error('Failed to save provider:', e)
-    toast.error((e as { apiMessage?: string }).apiMessage || '保存供应商失败')
+    toast.error(getApiMessage(e, '保存供应商失败'))
   }
 }
 
@@ -396,7 +396,7 @@ async function handleDelete() {
     await loadProviders()
   } catch (e: unknown) {
     console.error('Failed to delete provider:', e)
-    toast.error((e as { apiMessage?: string }).apiMessage || '删除供应商失败')
+    toast.error(getApiMessage(e, '删除供应商失败'))
   }
 }
 

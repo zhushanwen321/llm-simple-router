@@ -97,7 +97,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
-import { api } from '@/api/client'
+import { api, getApiMessage } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
@@ -167,7 +167,7 @@ async function loadData() {
     providersList.value = results[1].value as ProviderSummary[]
   } else {
     console.error('Failed to load providers:', results[1].reason)
-    toast.error((results[1].reason as { apiMessage?: string })?.apiMessage || '加载供应商失败')
+    toast.error(getApiMessage(results[1].reason, '加载供应商失败'))
   }
 }
 
@@ -285,7 +285,7 @@ async function handleSave() {
     await loadData()
   } catch (e: unknown) {
     console.error('Failed to save mapping group:', e)
-    toast.error((e as { apiMessage?: string }).apiMessage || '保存分组失败')
+    toast.error(getApiMessage(e, '保存分组失败'))
   }
 }
 
@@ -298,7 +298,7 @@ async function handleDelete() {
     await loadData()
   } catch (e: unknown) {
     console.error('Failed to delete mapping group:', e)
-    toast.error((e as { apiMessage?: string }).apiMessage || '删除分组失败')
+    toast.error(getApiMessage(e, '删除分组失败'))
   }
 }
 

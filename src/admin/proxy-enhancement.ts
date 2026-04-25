@@ -1,7 +1,8 @@
 import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
 import { Type, Static } from "@sinclair/typebox";
-import { getSetting, setSetting } from "../db/settings.js";
+import { setSetting } from "../db/settings.js";
+import { loadEnhancementConfig } from "../proxy/enhancement-config.js";
 import { parseModels, lookupContextWindow, COMPACT_THRESHOLD } from "../config/model-context.js";
 import { DEFAULT_COMPACT_PROMPT } from "../config/compact-prompt.js";
 import { getActiveProvidersWithModels } from "../db/index.js";
@@ -43,16 +44,14 @@ export const adminProxyEnhancementRoutes: FastifyPluginCallback<ProxyEnhancement
   const { db } = options;
 
   app.get("/admin/api/proxy-enhancement", async (_request, reply) => {
-    const raw = getSetting(db, "proxy_enhancement");
-    const parsed = raw ? JSON.parse(raw) : {};
-    const config = typeof parsed === "object" && parsed !== null ? parsed : {};
+    const config = loadEnhancementConfig(db);
     return reply.send({
-      claude_code_enabled: config.claude_code_enabled ?? false,
-      context_compact_enabled: config.context_compact_enabled ?? false,
-      compact_provider_id: config.compact_provider_id ?? null,
-      compact_model: config.compact_model ?? null,
-      custom_prompt_enabled: config.custom_prompt_enabled ?? false,
-      custom_prompt: config.custom_prompt ?? null,
+      claude_code_enabled: config.claude_code_enabled,
+      context_compact_enabled: config.context_compact_enabled,
+      compact_provider_id: config.compact_provider_id,
+      compact_model: config.compact_model,
+      custom_prompt_enabled: config.custom_prompt_enabled,
+      custom_prompt: config.custom_prompt,
       default_compact_prompt: DEFAULT_COMPACT_PROMPT,
     });
   });
