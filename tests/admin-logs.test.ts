@@ -145,9 +145,12 @@ describe("Stats API", () => {
   });
 
   it("GET stats returns correct aggregate", async () => {
+    const now = new Date();
+    const startTime = new Date(now.getTime() - 86400000).toISOString().replace("T", " ").replace(/\.\d{3}Z$/, "");
+    const endTime = new Date(now.getTime() + 86400000).toISOString().replace("T", " ").replace(/\.\d{3}Z$/, "");
     const res = await app.inject({
       method: "GET",
-      url: "/admin/api/stats",
+      url: `/admin/api/stats?start_time=${encodeURIComponent(startTime)}&end_time=${encodeURIComponent(endTime)}`,
       headers: { cookie },
     });
     expect(res.statusCode).toBe(200);

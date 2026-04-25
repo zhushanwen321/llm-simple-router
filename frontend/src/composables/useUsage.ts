@@ -1,8 +1,7 @@
 import { ref, watch, type Ref } from 'vue'
 import { api, type UsageWindowWithUsage, type DailyUsage } from '@/api/client'
 
-export function useUsage(keyFilter: Ref<string>) {
-  const usageTab = ref('windows')
+export function useUsage(keyFilter: Ref<string>, period: Ref<string>) {
   const windowsData = ref<UsageWindowWithUsage[]>([])
   const weeklyData = ref<DailyUsage[]>([])
   const monthlyData = ref<DailyUsage[]>([])
@@ -14,11 +13,11 @@ export function useUsage(keyFilter: Ref<string>) {
     usageError.value = ''
     const params = keyFilter.value !== 'all' ? { router_key_id: keyFilter.value } : {}
     try {
-      if (usageTab.value === 'windows') {
+      if (period.value === 'window') {
         windowsData.value = await api.getUsageWindows(params)
-      } else if (usageTab.value === 'weekly') {
+      } else if (period.value === 'weekly') {
         weeklyData.value = await api.getUsageWeekly(params)
-      } else {
+      } else if (period.value === 'monthly') {
         monthlyData.value = await api.getUsageMonthly(params)
       }
     } catch (e: unknown) {
@@ -28,8 +27,8 @@ export function useUsage(keyFilter: Ref<string>) {
     }
   }
 
-  watch(usageTab, fetchUsage)
+  watch(period, fetchUsage)
   watch(keyFilter, fetchUsage)
 
-  return { usageTab, windowsData, weeklyData, monthlyData, usageLoading, usageError, fetchUsage }
+  return { windowsData, weeklyData, monthlyData, usageLoading, usageError, fetchUsage }
 }

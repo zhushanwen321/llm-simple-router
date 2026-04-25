@@ -22,7 +22,7 @@ interface SummaryRow {
 }
 
 export function useMetrics() {
-  const period = ref('5h')
+  const period = ref('window')
   const modelFilter = ref('all')
   const routerKeyFilter = ref('all')
   const providerFilter = ref('all')
@@ -114,7 +114,7 @@ export function useMetrics() {
       ])
 
       const fulfilled = <T>(r: PromiseSettledResult<T>): r is PromiseFulfilledResult<T> => r.status === 'fulfilled'
-      const p = hasDateRange.value ? '30d' : period.value
+      const p = hasDateRange.value ? 'monthly' : period.value
 
       const ttftOk = fulfilled(ttftRes) ? ttftRes.value : null
       const tpsOk = fulfilled(tpsRes) ? tpsRes.value : null
