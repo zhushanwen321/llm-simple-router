@@ -88,7 +88,7 @@ export interface ProviderPreset {
   presetName: string
   apiType: 'openai' | 'anthropic'
   baseUrl: string
-  models: string[]
+  models: Array<string | { name: string; context_window?: number }>
 }
 
 export interface ProviderGroup {
@@ -111,7 +111,7 @@ export interface ProviderPayload {
   api_type: string
   base_url: string
   api_key?: string
-  models?: string[]
+  models?: Array<string | { name: string; context_window?: number }>
   is_active: number
   max_concurrency?: number
   queue_timeout_ms?: number
