@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { lookupContextWindow, parseModels, buildModelInfoList, MODEL_CONTEXT_WINDOWS, DEFAULT_CONTEXT_WINDOW, COMPACT_THRESHOLD } from '../src/config/model-context'
+import { lookupContextWindow, parseModels, buildModelInfoList, MODEL_CONTEXT_WINDOWS, DEFAULT_CONTEXT_WINDOW, OVERFLOW_THRESHOLD } from '../src/config/model-context'
 
 describe('model-context', () => {
   it('lookupContextWindow returns known value', () => {
@@ -35,13 +35,13 @@ describe('model-context', () => {
     ])
   })
 
-  it('COMPACT_THRESHOLD is 1M', () => {
-    expect(COMPACT_THRESHOLD).toBe(1000000)
+  it('OVERFLOW_THRESHOLD is 1M', () => {
+    expect(OVERFLOW_THRESHOLD).toBe(1000000)
   })
 
   it('has models with 1M context', () => {
     const millionModels = Object.entries(MODEL_CONTEXT_WINDOWS)
-      .filter(([, v]) => v >= COMPACT_THRESHOLD)
+      .filter(([, v]) => v >= OVERFLOW_THRESHOLD)
     expect(millionModels.length).toBeGreaterThan(0)
   })
 })
