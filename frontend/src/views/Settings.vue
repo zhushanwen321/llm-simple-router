@@ -22,15 +22,18 @@ const KB_BASE = 1024
 const PERCENT_MAX = 100
 const JSON_INDENT = 2
 const DATE_SLICE_END = 10
+const RETENTION_MIN = 0
+const RETENTION_MAX = 90
 const SIZE_MB_MIN = 1
 const DEFAULT_DB_MAX_SIZE_MB = 1024
 const DEFAULT_LOG_TABLE_MAX_SIZE_MB = 800
 
 const retentionSchema = toTypedSchema(z.object({
-  days: z.number().int('请输入整数').min(0, '请输入 0-90 之间的整数').max(90, '请输入 0-90 之间的整数'),
+  days: z.number().int('请输入整数').min(RETENTION_MIN, `请输入 ${RETENTION_MIN}-${RETENTION_MAX} 之间的整数`).max(RETENTION_MAX, `请输入 ${RETENTION_MIN}-${RETENTION_MAX} 之间的整数`),
 }))
-const { values: retentionValues, handleSubmit: handleRetentionSubmit } = useForm({
+const { handleSubmit: handleRetentionSubmit, setValues: setRetentionValues } = useForm({
   validationSchema: retentionSchema,
+  initialValues: { days: 3 },
 })
 
 const thresholdSchema = toTypedSchema(z.object({
@@ -40,8 +43,9 @@ const thresholdSchema = toTypedSchema(z.object({
   message: '日志表上限不应超过数据库上限',
   path: ['logTableMaxSizeMb'],
 }))
-const { handleSubmit: handleThresholdSubmit } = useForm({
+const { handleSubmit: handleThresholdSubmit, setValues: setThresholdValues } = useForm({
   validationSchema: thresholdSchema,
+  initialValues: { dbMaxSizeMb: DEFAULT_DB_MAX_SIZE_MB, logTableMaxSizeMb: DEFAULT_LOG_TABLE_MAX_SIZE_MB },
 })
 
 const { retentionDays, saveRetention } = useLogRetention()
@@ -74,16 +78,19 @@ async function loadSettings() {
       dbSizeInfo.value = sizeInfo.value
       dbMaxSizeMb.value = sizeInfo.value.thresholds.dbMaxSizeMb
       logTableMaxSizeMb.value = sizeInfo.value.thresholds.logTableMaxSizeMb
+      setThresholdValues({ dbMaxSizeMb: sizeInfo.value.thresholds.dbMaxSizeMb, logTableMaxSizeMb: sizeInfo.value.thresholds.logTableMaxSizeMb })
     }
     if (retention.status === 'fulfilled') {
       retentionDays.value = retention.value.days
+      setRetentionValues({ days: retention.value.days })
     }
   } finally {
     loading.value = false
   }
 }
 
-const onSaveRetention = handleRetentionSubmit(async (_values) => {
+const onSaveRetention = handleRetentionSubmit(async (values) => {
+  retentionDays.value = values.days
   await saveRetention()
 })
 
