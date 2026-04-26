@@ -4,6 +4,7 @@ import { randomUUID } from "crypto";
 export interface UsageWindow {
   id: string;
   router_key_id: string | null;
+  provider_id: string | null;
   start_time: string;
   end_time: string;
   created_at: string;
@@ -21,19 +22,33 @@ export function insertWindow(
 ): string {
   const id = w.id || randomUUID();
   db.prepare(
-    "INSERT INTO usage_windows (id, router_key_id, start_time, end_time) VALUES (?, ?, ?, ?)",
-  ).run(id, w.router_key_id ?? null, w.start_time, w.end_time);
+    "INSERT INTO usage_windows (id, router_key_id, provider_id, start_time, end_time) VALUES (?, ?, ?, ?, ?)",
+  ).run(id, w.router_key_id ?? null, w.provider_id ?? null, w.start_time, w.end_time);
   return id;
 }
 
 export function getLatestWindow(
   db: Database.Database,
   routerKeyId?: string,
+  providerId?: string,
 ): UsageWindow | null {
-  const sql = routerKeyId
-    ? "SELECT * FROM usage_windows WHERE router_key_id = ? ORDER BY start_time DESC LIMIT 1"
-    : "SELECT * FROM usage_windows ORDER BY start_time DESC LIMIT 1";
-  const params = routerKeyId ? [routerKeyId] : [];
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+
+  if (routerKeyId) {
+    conditions.push("router_key_id = ?");
+    params.push(routerKeyId);
+  } else {
+    conditions.push("router_key_id IS NULL");
+  }
+  if (providerId) {
+    conditions.push("provider_id = ?");
+    params.push(providerId);
+  } else {
+    conditions.push("provider_id IS NULL");
+  }
+
+  const sql = `SELECT * FROM usage_windows WHERE ${conditions.join(" AND ")} ORDER BY start_time DESC LIMIT 1`;
   return db.prepare(sql).get(...params) as UsageWindow | null ?? null;
 }
 
@@ -43,15 +58,23 @@ export function getWindowsInRange(
   start: string,
   end: string,
   routerKeyId?: string,
+  providerId?: string,
 ): UsageWindow[] {
+  const conditions = ["start_time < ?", "end_time > ?"];
+  const params: unknown[] = [end, start];
+
   if (routerKeyId) {
-    return db.prepare(
-      "SELECT * FROM usage_windows WHERE start_time < ? AND end_time > ? AND router_key_id = ? ORDER BY start_time ASC",
-    ).all(end, start, routerKeyId) as UsageWindow[];
+    conditions.push("router_key_id = ?");
+    params.push(routerKeyId);
   }
+  if (providerId) {
+    conditions.push("provider_id = ?");
+    params.push(providerId);
+  }
+
   return db.prepare(
-    "SELECT * FROM usage_windows WHERE start_time < ? AND end_time > ? ORDER BY start_time ASC",
-  ).all(end, start) as UsageWindow[];
+    `SELECT * FROM usage_windows WHERE ${conditions.join(" AND ")} ORDER BY start_time ASC`,
+  ).all(...params) as UsageWindow[];
 }
 
 /** 聚合指定时间窗口内的请求计数和 token 用量 */

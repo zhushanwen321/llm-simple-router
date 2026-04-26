@@ -260,7 +260,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
 
       const tr = resilienceResult.result;
       const succeeded = tr.kind === "success" || tr.kind === "stream_success" || tr.kind === "stream_abort";
-      if (succeeded) deps.usageWindowTracker?.recordRequest(routerKeyId ?? undefined);
+      if (succeeded) deps.usageWindowTracker?.recordRequest(provider.id, routerKeyId ?? undefined);
 
       if (isStream && deps.tracker) {
         const sc = deps.tracker.get(logId)?.streamContent;

@@ -10,14 +10,15 @@ export class UsageWindowTracker {
   constructor(private db: Database.Database) {}
 
   /** 请求成功后调用，按需创建新窗口 */
-  recordRequest(routerKeyId?: string): void {
+  recordRequest(providerId: string, routerKeyId?: string): void {
     const now = new Date();
-    const latest = getLatestWindow(this.db, routerKeyId);
+    const latest = getLatestWindow(this.db, routerKeyId, providerId);
     if (!latest || now > parseDate(latest.end_time)) {
       const startTime = truncateToMinute(now);
       insertWindow(this.db, {
         id: randomUUID(),
         router_key_id: routerKeyId ?? null,
+        provider_id: providerId,
         start_time: toSqliteDatetime(startTime),
         end_time: toSqliteDatetime(new Date(startTime.getTime() + WINDOW_DURATION_MS)),
       });
@@ -47,6 +48,7 @@ export class UsageWindowTracker {
       insertWindow(this.db, {
         id: randomUUID(),
         router_key_id: null,
+        provider_id: null,
         start_time: toSqliteDatetime(truncated),
         end_time: toSqliteDatetime(new Date(truncated.getTime() + WINDOW_DURATION_MS)),
       });
@@ -75,6 +77,7 @@ export class UsageWindowTracker {
       insertWindow(this.db, {
         id: randomUUID(),
         router_key_id: null,
+        provider_id: null,
         start_time: toSqliteDatetime(windowStart),
         end_time: toSqliteDatetime(windowEnd),
       });

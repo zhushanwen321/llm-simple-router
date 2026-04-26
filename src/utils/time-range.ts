@@ -19,18 +19,19 @@ export function resolveTimeRange(
   period: DashboardPeriod,
   db: Database.Database,
   routerKeyId?: string,
+  providerId?: string,
 ): TimeRange {
   const now = new Date();
 
   switch (period) {
     case "window": {
-      const latest = getLatestWindow(db, routerKeyId);
+      const latest = getLatestWindow(db, routerKeyId, providerId);
       if (!latest) {
-        return createAndReturnWindow(db, now, routerKeyId);
+        return createAndReturnWindow(db, now, routerKeyId, providerId);
       }
       // 最新窗口已过期（无请求触发新窗口创建），主动补齐
       if (now > parseSqliteDatetime(latest.end_time)) {
-        return createAndReturnWindow(db, now, routerKeyId);
+        return createAndReturnWindow(db, now, routerKeyId, providerId);
       }
       return { startTime: latest.start_time, endTime: latest.end_time };
     }
@@ -62,6 +63,7 @@ function createAndReturnWindow(
   db: Database.Database,
   now: Date,
   routerKeyId?: string,
+  providerId?: string,
 ): TimeRange {
   const start = new Date(now);
   start.setMinutes(0, 0, 0);
@@ -69,6 +71,7 @@ function createAndReturnWindow(
   insertWindow(db, {
     id: randomUUID(),
     router_key_id: routerKeyId ?? null,
+    provider_id: providerId ?? null,
     start_time: toSqliteDatetime(start),
     end_time: toSqliteDatetime(end),
   });
