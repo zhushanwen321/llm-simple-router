@@ -8,7 +8,6 @@ export interface ModelInfo {
 export interface MappingGroup {
   id: string
   client_model: string
-  strategy: string
   rule: string
   is_active: number
   created_at: string
@@ -42,16 +41,7 @@ export interface MappingTarget {
   overflow_model?: string
 }
 
-/** 定时策略的时间窗口 */
-export interface RuleWindow {
-  start: string
-  end: string
-  target: MappingTarget
-}
-
 /** 映射组 rule 字段解析后的结构 */
 export interface Rule {
-  default?: MappingTarget
-  windows?: RuleWindow[]
   targets?: MappingTarget[]
 }
