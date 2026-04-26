@@ -13,6 +13,7 @@ import {
 import type { MappingGroup } from "../db/index.js";
 import { STRATEGY_NAMES } from "../proxy/strategy/types.js";
 import { HTTP_BAD_REQUEST, HTTP_CREATED, HTTP_NOT_FOUND, HTTP_CONFLICT } from "./constants.js";
+import { API_CODE, apiError } from "./api-response.js";
 
 const CreateMappingSchema = Type.Object({
   client_model: Type.String({ minLength: 1 }),
@@ -78,7 +79,7 @@ export const adminMappingRoutes: FastifyPluginCallback<MappingRoutesOptions> = (
     const body = request.body as Static<typeof CreateMappingSchema>;
     const provider = getProviderById(db, body.provider_id);
     if (!provider) {
-      return reply.code(HTTP_BAD_REQUEST).send({ error: { message: "provider_id not found" } });
+      return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.NOT_FOUND, "provider_id not found"));
     }
     try {
       const id = createMappingGroup(db, {
@@ -92,7 +93,7 @@ export const adminMappingRoutes: FastifyPluginCallback<MappingRoutesOptions> = (
       return reply.code(HTTP_CREATED).send({ id });
     } catch (err: unknown) {
       if (err instanceof Error && err.message.includes("UNIQUE constraint")) {
-        return reply.code(HTTP_CONFLICT).send({ error: { message: "client_model already exists" } });
+        return reply.code(HTTP_CONFLICT).send(apiError(API_CODE.CONFLICT_NAME, "client_model already exists"));
       }
       throw err;
     }
@@ -102,7 +103,7 @@ export const adminMappingRoutes: FastifyPluginCallback<MappingRoutesOptions> = (
     const { id } = request.params as { id: string };
     const group = findGroupByIdOrClientModel(db, id);
     if (!group) {
-      return reply.code(HTTP_NOT_FOUND).send({ error: { message: "Mapping not found" } });
+      return reply.code(HTTP_NOT_FOUND).send(apiError(API_CODE.NOT_FOUND, "Mapping not found"));
     }
     const body = request.body as Static<typeof UpdateMappingSchema>;
 
@@ -117,7 +118,7 @@ export const adminMappingRoutes: FastifyPluginCallback<MappingRoutesOptions> = (
     if (body.provider_id !== undefined) {
       const provider = getProviderById(db, body.provider_id);
       if (!provider) {
-        return reply.code(HTTP_BAD_REQUEST).send({ error: { message: "provider_id not found" } });
+        return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.NOT_FOUND, "provider_id not found"));
       }
       defaultTarget.provider_id = body.provider_id;
     }
@@ -133,7 +134,7 @@ export const adminMappingRoutes: FastifyPluginCallback<MappingRoutesOptions> = (
       return reply.send({ success: true });
     } catch (err: unknown) {
       if (err instanceof Error && err.message.includes("UNIQUE constraint")) {
-        return reply.code(HTTP_CONFLICT).send({ error: { message: "client_model already exists" } });
+        return reply.code(HTTP_CONFLICT).send(apiError(API_CODE.CONFLICT_NAME, "client_model already exists"));
       }
       throw err;
     }
@@ -143,7 +144,7 @@ export const adminMappingRoutes: FastifyPluginCallback<MappingRoutesOptions> = (
     const { id } = request.params as { id: string };
     const group = findGroupByIdOrClientModel(db, id);
     if (!group) {
-      return reply.code(HTTP_NOT_FOUND).send({ error: { message: "Mapping not found" } });
+      return reply.code(HTTP_NOT_FOUND).send(apiError(API_CODE.NOT_FOUND, "Mapping not found"));
     }
     deleteMappingGroup(db, group.id);
     return reply.send({ success: true });

@@ -5,22 +5,11 @@ import { existsSync } from "node:fs";
 import { randomUUID } from "crypto";
 import Fastify, { FastifyInstance } from "fastify";
 import { insertRequestLog } from "./db/logs.js";
-import { HTTP_NOT_FOUND, HTTP_INTERNAL_ERROR, HTTP_BAD_REQUEST } from "./constants.js";
+import { HTTP_NOT_FOUND, HTTP_INTERNAL_ERROR, getProxyApiType } from "./constants.js";
+import { API_CODE, ApiResponse, apiError, isAdminApiResponse, statusToApiCode } from "./admin/api-response.js";
 
 const PROVIDER_DEFAULT_QUEUE_TIMEOUT_MS = 5000;
 const PROVIDER_DEFAULT_MAX_QUEUE_SIZE = 100;
-
-// 代理路由路径 → api_type，用于在全局 hook/errorHandler 中识别代理请求
-const PROXY_API_TYPES: Record<string, string> = {
-  "/v1/chat/completions": "openai",
-  "/v1/messages": "anthropic",
-  "/v1/models": "openai",
-};
-
-function getProxyApiType(url: string): string | null {
-  const path = url.split("?")[0];
-  return PROXY_API_TYPES[path] ?? null;
-}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -44,6 +33,7 @@ import Database from "better-sqlite3";
 export interface AppOptions {
   config?: Config;
   db?: Database.Database;
+  upgradeCheckerOptions?: CheckerOptions;
 }
 
 export async function buildApp(
@@ -68,7 +58,13 @@ export async function buildApp(
 
   const isDev = process.env.NODE_ENV !== "production";
 
+  const MAX_BODY_SIZE_MB = 50;
+  const KB = 1024;
+  const MB = KB * KB;
+
   const app = Fastify({
+    // Claude Code 图片请求含 base64 编码，单张可达数十 MB
+    bodyLimit: MAX_BODY_SIZE_MB * MB,
     logger: {
       level: config.LOG_LEVEL,
       ...(isDev
@@ -101,37 +97,74 @@ export async function buildApp(
     return new Error(message);
   });
 
-  // 统一 schema validation 错误响应格式，代理路由的错误也记录到 request_logs
+  // 记录请求到达时间，供全局错误处理计算延迟
+  app.addHook("onRequest", (request, _reply, done) => {
+    (request as unknown as { receivedAt: number }).receivedAt = Date.now();
+    done();
+  });
+
+  // 统一错误处理：代理路由保持 {error:{message}}，Admin API 使用信封格式
   app.setErrorHandler((error: Error, request, reply) => {
     const fastifyError = error as Error & { statusCode?: number; validation?: unknown[] };
     const status = fastifyError.statusCode ?? HTTP_INTERNAL_ERROR;
 
-    const proxyApiType = getProxyApiType(request.url);
-    if (proxyApiType) {
-      request.log.error({ statusCode: status, err: error }, `Proxy request error: ${fastifyError.message}`);
-      const body = request.body as Record<string, unknown> | undefined;
-      insertRequestLog(db, {
-        id: randomUUID(),
-        api_type: proxyApiType,
-        model: (body?.model as string) || null,
-        provider_id: null,
-        status_code: status,
-        latency_ms: 0,
-        is_stream: 0,
-        error_message: fastifyError.message,
-        created_at: new Date().toISOString(),
-        client_request: JSON.stringify({ headers: request.headers }),
-        router_key_id: request.routerKey?.id ?? null,
-      });
+    // 代理路由保持原有格式，并记录到 request_logs
+    if (!isAdminApiResponse(request.url)) {
+      const proxyApiType = getProxyApiType(request.url);
+      if (proxyApiType) {
+        request.log.error({ statusCode: status, err: error }, `Proxy request error: ${fastifyError.message}`);
+        const body = request.body as Record<string, unknown> | undefined;
+        const receivedAt = (request as unknown as { receivedAt?: number }).receivedAt;
+        const latencyMs = receivedAt ? Date.now() - receivedAt : 0;
+        insertRequestLog(db, {
+          id: randomUUID(),
+          api_type: proxyApiType,
+          model: (body?.model as string) || null,
+          provider_id: null,
+          status_code: status,
+          latency_ms: latencyMs,
+          is_stream: body?.stream === true ? 1 : 0,
+          error_message: fastifyError.message,
+          created_at: new Date().toISOString(),
+          client_request: JSON.stringify({ headers: request.headers, ...(body ? { body } : {}) }),
+          router_key_id: request.routerKey?.id ?? null,
+        });
+      }
+      return reply.code(status).send({ error: { message: fastifyError.message } });
     }
 
-    if (status === HTTP_BAD_REQUEST && fastifyError.validation) {
-      return reply.code(HTTP_BAD_REQUEST).send({ error: { message: fastifyError.message } });
-    }
-    return reply.code(status).send({ error: { message: fastifyError.message } });
+    // Admin API — 统一信封错误格式
+    const code = statusToApiCode(status);
+    return reply.code(status).send(apiError(code, fastifyError.message));
   });
 
+  // onSend hook：自动包装 Admin API 成功响应为信封格式
+  app.addHook('onSend', async (request, reply, payload) => {
+    if (!isAdminApiResponse(request.url, reply.getHeader('content-type') as string | undefined)) {
+      return payload
+    }
+
+    // 已是错误信封（errorHandler 已包装）或已是信封格式 — 跳过
+    if (typeof payload === 'string') {
+      try {
+        const parsed = JSON.parse(payload)
+        if ('code' in parsed) return payload // errorHandler 或路由已手动包装
+      } catch {
+        return payload
+      }
+    }
+
+    // 包装成功响应
+    const wrapped: ApiResponse<unknown> = {
+      code: API_CODE.SUCCESS,
+      message: 'ok',
+      data: typeof payload === 'string' ? JSON.parse(payload) : payload,
+    }
+    return JSON.stringify(wrapped)
+  })
+
   loadRecommendedConfig();
+  startUpgradeChecker(options?.upgradeCheckerOptions);
 
   // 启动时回填：补齐回退老版本期间缺失的 metrics 冗余列
   if (shouldBackfill) {
@@ -176,20 +209,20 @@ export async function buildApp(
   app.register(openaiProxy, {
     db,
     streamTimeoutMs: config.STREAM_TIMEOUT_MS,
-    retryMaxAttempts: config.RETRY_MAX_ATTEMPTS,
     retryBaseDelayMs: config.RETRY_BASE_DELAY_MS,
     matcher,
     semaphoreManager,
     tracker,
+    usageWindowTracker,
   });
   app.register(anthropicProxy, {
     db,
     streamTimeoutMs: config.STREAM_TIMEOUT_MS,
-    retryMaxAttempts: config.RETRY_MAX_ATTEMPTS,
     retryBaseDelayMs: config.RETRY_BASE_DELAY_MS,
     matcher,
     semaphoreManager,
     tracker,
+    usageWindowTracker,
   });
 
   app.register(adminRoutes, { db, matcher, tracker, semaphoreManager });
@@ -237,6 +270,7 @@ export async function buildApp(
     db,
     usageWindowTracker,
     close: async () => {
+      stopUpgradeChecker();
       logCleanup.stop();
       dbSizeMonitor.stop();
       tracker.stopPushInterval();

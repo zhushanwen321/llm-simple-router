@@ -1,4 +1,5 @@
 import type { ChartOptions } from 'chart.js'
+import { parseUtc, formatTimeHM, formatTimeMDH } from '@/utils/format'
 
 const SEC_PER_MINUTE = 60
 const SEC_PER_HOUR = 3600
@@ -11,7 +12,6 @@ const DAYS_30 = 30
 const MINUTES_5 = 5
 const MINUTES_15 = 15
 const HOURS_4 = 4
-const TICK_PADDING = 2
 const PERIOD_TOTAL_SEC: Record<string, number> = {
   '1h': SEC_PER_HOUR,
   '5h': SEC_PER_HOUR * HOURS_5,
@@ -19,6 +19,9 @@ const PERIOD_TOTAL_SEC: Record<string, number> = {
   '24h': SEC_PER_DAY,
   '7d': SEC_PER_DAY * DAYS_7,
   '30d': SEC_PER_DAY * DAYS_30,
+  'window': SEC_PER_HOUR * HOURS_5,
+  'weekly': SEC_PER_DAY * DAYS_7,
+  'monthly': SEC_PER_DAY * DAYS_30,
 }
 
 const BUCKET_SEC: Record<string, number> = {
@@ -28,6 +31,9 @@ const BUCKET_SEC: Record<string, number> = {
   '24h': SEC_PER_MINUTE * MINUTES_15,
   '7d': SEC_PER_HOUR,
   '30d': SEC_PER_HOUR * HOURS_4,
+  'window': SEC_PER_MINUTE * MINUTES_5,
+  'weekly': SEC_PER_HOUR,
+  'monthly': SEC_PER_HOUR * HOURS_4,
 }
 
 const DEFAULT_BUCKET_SEC = SEC_PER_MINUTE * MINUTES_15
@@ -35,14 +41,10 @@ const DEFAULT_TOTAL_SEC = SEC_PER_DAY
 const TARGET_TICKS = 12
 const MIN_TICKS = 4
 
+const LONG_PERIODS = new Set(['7d', '30d', 'weekly', 'monthly'])
+
 function formatLabel(date: Date, periodStr: string): string {
-  if (periodStr === '7d' || periodStr === '30d') {
-    const month = date.getMonth() + 1
-    const day = date.getDate()
-    const hours = String(date.getHours()).padStart(TICK_PADDING, '0')
-    return `${month}/${day} ${hours}:00`
-  }
-  return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+  return LONG_PERIODS.has(periodStr) ? formatTimeMDH(date) : formatTimeHM(date)
 }
 
 interface TimeseriesRawRow {
@@ -69,7 +71,7 @@ export function fillTimeseries(
 
   const byKey = new Map<number, TimeseriesRawRow>()
   for (const r of raw) {
-    const d = new Date(r.time_bucket)
+    const d = parseUtc(r.time_bucket)
     const key = Math.floor(d.getTime() / bMs)
     byKey.set(key, r)
   }

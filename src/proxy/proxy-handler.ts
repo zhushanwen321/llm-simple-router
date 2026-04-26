@@ -5,7 +5,7 @@ import { getMappingGroup, getProviderById, insertRequestLog } from "../db/index.
 import { decrypt } from "../utils/crypto.js";
 import { getSetting } from "../db/settings.js";
 import { resolveMapping } from "./mapping-resolver.js";
-import { applyEnhancement, buildModelInfoTag } from "./enhancement-handler.js";
+import { applyEnhancement } from "./enhancement/enhancement-handler.js";
 import { SemaphoreQueueFullError, SemaphoreTimeoutError } from "./semaphore.js";
 import type { RequestTracker } from "../monitor/request-tracker.js";
 import {
@@ -26,18 +26,77 @@ import { insertRejectedLog } from "./log-helpers.js";
 import type { Target } from "./strategy/types.js";
 import type { RetryRuleMatcher } from "./retry-rules.js";
 import type { ProxyOrchestrator } from "./orchestrator.js";
-import type { ProxyErrorFormatter } from "./proxy-core.js";
+import type { ProxyErrorFormatter, ProxyErrorResponse } from "./proxy-core.js";
+import { buildTransportFn } from "./transport-fn.js";
+import { applyOverflowRedirect } from "./overflow.js";
+import { applyProviderPatches } from "./patch/index.js";
 
 const HTTP_ERROR_THRESHOLD = 400;
+const MAX_LOG_FIELD_LENGTH = 80;
+const UPSTREAM_ERROR_STATUS = 502;
+
+// ---------- Failover loop context ----------
+
+interface FailoverContext {
+  request: FastifyRequest;
+  reply: FastifyReply;
+  apiType: "openai" | "anthropic";
+  upstreamPath: string;
+  errors: ProxyErrorFormatter;
+  deps: RouteHandlerDeps;
+  options?: { beforeSendProxy?: (body: Record<string, unknown>, isStream: boolean) => void };
+  effectiveModel: string;
+  originalModel: string | null;
+  isFailover: boolean;
+  originalBody: Record<string, unknown>;
+  sessionId: string | undefined;
+}
+
+// ---------- Helpers ----------
+
+interface RejectParams {
+  db: Database.Database;
+  logId: string;
+  apiType: "openai" | "anthropic";
+  model: string;
+  startTime: number;
+  isStream: boolean;
+  routerKeyId: string | null;
+  originalBody: Record<string, unknown>;
+  clientHeaders: RawHeaders;
+  originalModel: string | null;
+  isFailover: boolean;
+  originalRequestId: string | null;
+  sessionId: string | undefined;
+}
+
+function rejectAndReply(
+  reply: FastifyReply,
+  params: RejectParams,
+  error: ProxyErrorResponse,
+  errorMessage: string,
+  providerId?: string,
+): FastifyReply {
+  insertRejectedLog({
+    db: params.db, logId: params.logId, apiType: params.apiType, model: params.model,
+    statusCode: error.statusCode, errorMessage, startTime: params.startTime,
+    isStream: params.isStream, routerKeyId: params.routerKeyId,
+    originalBody: params.originalBody, clientHeaders: params.clientHeaders,
+    providerId, originalModel: params.originalModel,
+    isFailover: params.isFailover, originalRequestId: params.originalRequestId,
+    sessionId: params.sessionId,
+  });
+  return reply.code(error.statusCode).send(error.body);
+}
 
 export interface RouteHandlerDeps {
   db: Database.Database;
   streamTimeoutMs: number;
-  retryMaxAttempts: number;
   retryBaseDelayMs: number;
   matcher?: RetryRuleMatcher;
   tracker?: RequestTracker;
   orchestrator: ProxyOrchestrator;
+  usageWindowTracker?: import("./usage-window-tracker.js").UsageWindowTracker;
 }
 
 const STREAM_CONTENT_MAX_RAW = 131072;
@@ -95,11 +154,21 @@ export async function handleProxyRequest(
   if (interceptResponse) return handleIntercept(deps.db, apiType, request, reply, interceptResponse, clientModel, sessionId);
 
   const group = getMappingGroup(deps.db, effectiveModel);
-  const isFailover = group?.strategy === "failover";
-  const excludeTargets: Target[] = [];
-  const originalBody = JSON.parse(JSON.stringify(request.body as Record<string, unknown>));
-  let rootLogId: string | null = null;
+  return executeFailoverLoop({
+    request, reply, apiType, upstreamPath, errors, deps, options,
+    effectiveModel, originalModel,
+    isFailover: group?.strategy === "failover",
+    originalBody: JSON.parse(JSON.stringify(request.body as Record<string, unknown>)),
+    sessionId,
+  });
+}
 
+// ---------- Failover loop ----------
+
+async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> {
+  const { request, reply, apiType, upstreamPath, errors, deps, options, effectiveModel, originalModel, isFailover, originalBody, sessionId } = ctx;
+  const excludeTargets: Target[] = [];
+  let rootLogId: string | null = null;
   while (true) {
     const startTime = Date.now();
     const logId = randomUUID();
@@ -110,7 +179,13 @@ export async function handleProxyRequest(
     const isStream = body.stream === true;
     const cliHdrs: RawHeaders = request.headers as RawHeaders;
 
-    const resolved = resolveMapping(deps.db, effectiveModel, { now: new Date(), excludeTargets });
+    const rCtx: RejectParams = {
+      db: deps.db, logId, apiType, model: effectiveModel,
+      startTime, isStream, routerKeyId, originalBody, clientHeaders: cliHdrs, originalModel,
+      isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null, sessionId,
+    };
+
+    let resolved = resolveMapping(deps.db, effectiveModel, { now: new Date(), excludeTargets });
     request.log.debug({ logId, model: effectiveModel, apiType, isStream, action: "resolve_mapping", resolved: !!resolved });
 
     if (!resolved) {
@@ -149,11 +224,11 @@ export async function handleProxyRequest(
             });
             return reply.status(e.statusCode).send(e.body);
           }
-        } catch { request.log.warn({ allowedModels: allowedModels?.slice(0, 80) }, "Invalid allowed_models JSON, allowing all models"); } // eslint-disable-line no-magic-numbers
+        } catch { request.log.warn({ allowedModels: allowedModels?.slice(0, MAX_LOG_FIELD_LENGTH) }, "Invalid allowed_models JSON, allowing all models"); }
       }
     }
 
-    const provider = getProviderById(deps.db, resolved.provider_id);
+    let provider = getProviderById(deps.db, resolved.provider_id);
     if (!provider || !provider.is_active) {
       const e = errors.providerUnavailable();
       insertRejectedLog({
@@ -176,14 +251,27 @@ export async function handleProxyRequest(
     }
 
     body.model = resolved.backend_model;
+
+    // --- 溢出重定向：上下文超出时切换到更大模型 ---
+    const overflowResult = applyOverflowRedirect(resolved, deps.db, body);
+    if (overflowResult) {
+      const overflowProvider = getProviderById(deps.db, overflowResult.provider_id);
+      if (overflowProvider && overflowProvider.is_active && overflowProvider.api_type === apiType) {
+        resolved = { ...resolved, provider_id: overflowResult.provider_id, backend_model: overflowResult.backend_model };
+        provider = overflowProvider;
+        body.model = overflowResult.backend_model;
+      }
+    }
+
+    applyProviderPatches(body, provider);
     const apiKey = decrypt(provider.api_key, getSetting(deps.db, "encryption_key")!);
     options?.beforeSendProxy?.(body, isStream);
 
     const reqBodyStr = JSON.stringify(body);
     const clientReq = JSON.stringify({ headers: cliHdrs, body: originalBody });
     const upstreamReqBase = JSON.stringify({
-      url: `${provider.base_url}${upstreamPath}`,
-      headers: sanitizeHeadersForLog(buildUpstreamHeaders(cliHdrs, apiKey, Buffer.byteLength(reqBodyStr))),
+      url: buildUpstreamUrl(provider.base_url, upstreamPath),
+      headers: sanitizeHeadersForLog(buildUpstreamHeaders(cliHdrs, apiKey, Buffer.byteLength(reqBodyStr), apiType)),
       body: reqBodyStr,
     });
 
@@ -263,7 +351,6 @@ export async function handleProxyRequest(
         if (content) updateLogStreamContent(deps.db, lastLogId, content);
       }
 
-      // Failover: 单 provider 内重试已耗尽但仍失败，尝试下一个 target
       if (isFailover && !reply.raw.headersSent) {
         const tr = resilienceResult.result;
         const failed = tr.kind === "throw"
@@ -275,18 +362,32 @@ export async function handleProxyRequest(
       }
 
       // orchestrator.sendResponse 对 throw/stream_success/stream_abort 不发送，
-      // 对非 failover 的 error/throw 需要由外层发送错误响应
+      // 对 failover 场景的错误也不发送——这些情况需要外层 proxy-handler 处理
       if (!reply.raw.headersSent) {
         const tr = resilienceResult.result;
         if (tr.kind === "throw" || (tr.kind === "error" && tr.statusCode >= HTTP_ERROR_THRESHOLD)) {
           const err = errors.upstreamConnectionFailed();
-          return reply.status(err.statusCode).send(err.body);
+          updateLogClientStatus(deps.db, lastLogId, err.statusCode);
+          return reply.code(err.statusCode).send(err.body);
         }
       }
 
       return reply;
     } catch (e) {
       if (e instanceof ProviderSwitchNeeded) {
+        // 跨 provider failover：resilience 层携带了 attempts 数据，补写失败日志
+        if (e.attempts && e.attempts.length > 0) {
+          const fakeResult = e.lastResult ?? { kind: "throw" as const, error: new Error("provider switch") };
+          logResilienceResult(
+            deps.db,
+            {
+              apiType, model: effectiveModel, providerId: provider.id, isStream,
+              clientReq, upstreamReqBase, logId, routerKeyId, originalModel, sessionId,
+              failover: { isFailoverIteration, rootLogId: rootLogId! },
+            },
+            e.attempts, fakeResult, startTime,
+          );
+        }
         request.log.debug({ logId, action: "provider_switch", targetProviderId: e.targetProviderId });
         excludeTargets.push(resolved);
         continue;
@@ -317,7 +418,7 @@ export async function handleProxyRequest(
       request.log.debug({ logId, error: errMsg, action: "upstream_error" });
       insertRequestLog(deps.db, {
         id: logId, api_type: apiType, model: effectiveModel, provider_id: provider.id,
-        status_code: 502, latency_ms: Date.now() - startTime, is_stream: isStream ? 1 : 0,
+        status_code: UPSTREAM_ERROR_STATUS, latency_ms: Date.now() - startTime, is_stream: isStream ? 1 : 0,
         error_message: errMsg || "Upstream connection failed", created_at: new Date().toISOString(),
         client_request: clientReq, upstream_request: upstreamReqBase,
         is_failover: isFailoverIteration ? 1 : 0, original_request_id: isFailoverIteration ? rootLogId : null,
@@ -325,7 +426,7 @@ export async function handleProxyRequest(
         session_id: sessionId,
       });
       const err = errors.upstreamConnectionFailed();
-      return reply.status(err.statusCode).send(err.body);
+      return reply.code(err.statusCode).send(err.body);
     }
   }
 }

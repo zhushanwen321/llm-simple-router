@@ -105,6 +105,19 @@ describe("resolveMapping", () => {
     expect(result).toEqual({ backend_model: "gpt-4", provider_id: "p1" });
   });
 
+  it("fallback: skips provider with invalid models JSON and tries next", () => {
+    // 第一个 provider 的 models 是非法 JSON，第二个 provider 包含目标模型
+    // break 行为会在第一个 provider 出错时终止循环（返回 null）
+    // continue 行为会跳过第一个，找到第二个 provider
+    db.prepare("INSERT INTO providers (id, name, api_type, base_url, api_key, models, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .run("bad-p", "bad-provider", "openai", "https://bad.example.com", "sk-bad", "not-json", 1, new Date().toISOString(), new Date().toISOString());
+    db.prepare("INSERT INTO providers (id, name, api_type, base_url, api_key, models, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .run("good-p", "good-provider", "openai", "https://good.example.com", "sk-good", JSON.stringify(["gpt-4o", "target-model"]), 1, new Date().toISOString(), new Date().toISOString());
+
+    const result = resolveMapping(db, "target-model", { now: new Date() });
+    expect(result).toEqual({ backend_model: "target-model", provider_id: "good-p" });
+  });
+
   it("resolves failover with excludeTargets", () => {
     const rule = JSON.stringify({
       targets: [

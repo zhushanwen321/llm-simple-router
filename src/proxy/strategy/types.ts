@@ -8,6 +8,8 @@ export const STRATEGY_NAMES = {
 export interface Target {
   backend_model: string;
   provider_id: string;
+  overflow_provider_id?: string;
+  overflow_model?: string;
 }
 
 export interface ResolveContext {

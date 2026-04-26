@@ -94,7 +94,7 @@ describe('recommended API endpoints', () => {
   it('GET /recommended/providers returns preset list', async () => {
     const res = await app.inject({ method: 'GET', url: '/admin/api/recommended/providers', headers: { cookie } })
     expect(res.statusCode).toBe(200)
-    const body = res.json()
+    const body = res.json().data
     expect(Array.isArray(body)).toBe(true)
     expect(body.length).toBeGreaterThan(0)
     expect(body[0]).toHaveProperty('group')
@@ -104,7 +104,7 @@ describe('recommended API endpoints', () => {
   it('GET /recommended/retry-rules returns rules list (excluding seeded)', async () => {
     const res = await app.inject({ method: 'GET', url: '/admin/api/recommended/retry-rules', headers: { cookie } })
     expect(res.statusCode).toBe(200)
-    const body = res.json()
+    const body = res.json().data
     expect(Array.isArray(body)).toBe(true)
     // buildApp seeds default rules, so all recommended rules may already exist in DB
     // Each item that IS returned should have a 'name' property
@@ -114,20 +114,21 @@ describe('recommended API endpoints', () => {
   it('POST /recommended/reload returns ok', async () => {
     const res = await app.inject({ method: 'POST', url: '/admin/api/recommended/reload', headers: { cookie } })
     expect(res.statusCode).toBe(200)
-    expect(res.json()).toEqual({ ok: true })
+    expect(res.json().data).toEqual({ ok: true })
   })
 
-  it('providers endpoint filters out existing DB providers by presetName', async () => {
+  it('providers endpoint returns all presets regardless of existing DB providers', async () => {
     db.prepare(
       `INSERT INTO providers (id, name, api_type, base_url, api_key, api_key_preview, models, is_active, max_concurrency, queue_timeout_ms, max_queue_size, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run('test-id', 'zhipu', 'openai', 'https://example.com', 'encrypted', 'zhi...iew', '[]', 1, 0, 0, 100, new Date().toISOString(), new Date().toISOString())
 
     const res = await app.inject({ method: 'GET', url: '/admin/api/recommended/providers', headers: { cookie } })
-    const body = res.json()
+    const body = res.json().data
     const zhipuGroup = body.find((g: any) => g.group === '智谱')
     expect(zhipuGroup).toBeDefined()
-    expect(zhipuGroup.presets.every((p: any) => p.presetName !== 'zhipu')).toBe(true)
+    // All presets should be returned, including ones with existing names
+    expect(zhipuGroup.presets.some((p: any) => p.presetName === 'zhipu')).toBe(true)
     expect(zhipuGroup.presets.some((p: any) => p.presetName === 'zhipu-coding-plan')).toBe(true)
   })
 
@@ -142,7 +143,7 @@ describe('recommended API endpoints', () => {
     db.prepare('DELETE FROM retry_rules WHERE name != ?').run('Custom Test Rule')
 
     const res = await app.inject({ method: 'GET', url: '/admin/api/recommended/retry-rules', headers: { cookie } })
-    const body = res.json()
+    const body = res.json().data
     // Seeded rules are gone so recommended rules should appear now
     expect(body.length).toBeGreaterThan(0)
     // The custom rule is not a recommended rule, so it won't appear in output

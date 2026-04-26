@@ -3,10 +3,6 @@ import { callGet as upstreamGet } from "./transport.js";
 import type { GetTransportResult } from "./transport.js";
 import type { RawHeaders } from "./types.js";
 
-// Re-export for external consumers (openai.ts, anthropic.ts, etc.)
-export { UPSTREAM_SUCCESS } from "./types.js";
-export type { RawHeaders } from "./types.js";
-
 // ---------- Types ----------
 
 export interface ProxyErrorResponse {
@@ -22,18 +18,15 @@ export interface ProxyErrorFormatter {
   upstreamConnectionFailed(): ProxyErrorResponse;
   concurrencyQueueFull(providerId: string): ProxyErrorResponse;
   concurrencyTimeout(providerId: string, timeoutMs: number): ProxyErrorResponse;
+  promptTooLong(): ProxyErrorResponse;
 }
-
-// Re-export upstream types for external consumers
-export type { ProxyResult, StreamProxyResult } from "./transport.js";
-export type { GetTransportResult as GetProxyResult } from "./transport.js";
 
 // ---------- Error formatter factory ----------
 
 export type ErrorKind =
   | "modelNotFound" | "modelNotAllowed" | "providerUnavailable"
   | "providerTypeMismatch" | "upstreamConnectionFailed"
-  | "concurrencyQueueFull" | "concurrencyTimeout";
+  | "concurrencyQueueFull" | "concurrencyTimeout" | "promptTooLong";
 
 /**
  * 工厂函数，消除 openai/anthropic 错误格式化的重复代码。
@@ -72,7 +65,24 @@ export function createErrorFormatter(
       statusCode: 504,
       body: formatBody("concurrencyTimeout", `Provider '${providerId}' concurrency wait timeout (${timeoutMs}ms)`),
     }),
+    promptTooLong: () => ({
+      statusCode: 400,
+      body: formatBody("promptTooLong", "Prompt is too long: the input tokens exceed the model context window limit."),
+    }),
   };
+}
+
+// ---------- URL utilities ----------
+
+/**
+ * 拼接上游 URL，自动处理 base_url 已包含 API 路径的情况。
+ * 用户可能将 base_url 配置为 `https://host/v1/messages`，
+ * 此时不应再追加 upstreamPath（`/v1/messages`），否则路径重复。
+ */
+export function buildUpstreamUrl(baseUrl: string, upstreamPath: string): string {
+  const normalized = baseUrl.replace(/\/+$/, "");
+  if (normalized.endsWith(upstreamPath)) return normalized;
+  return `${normalized}${upstreamPath}`;
 }
 
 // ---------- Header utilities ----------
@@ -82,6 +92,7 @@ export const SKIP_UPSTREAM = new Set([
   "content-length",
   "accept-encoding",
   "authorization",
+  "x-api-key",
   "connection",
   "keep-alive",
   "transfer-encoding",
@@ -103,10 +114,15 @@ export function selectHeaders(
 export function buildUpstreamHeaders(
   clientHeaders: RawHeaders,
   apiKey: string,
-  payloadBytes?: number
+  payloadBytes?: number,
+  apiType?: "openai" | "anthropic"
 ): Record<string, string> {
   const headers = selectHeaders(clientHeaders, SKIP_UPSTREAM);
-  headers["Authorization"] = `Bearer ${apiKey}`;
+  if (apiType === "anthropic") {
+    headers["x-api-key"] = apiKey;
+  } else {
+    headers["Authorization"] = `Bearer ${apiKey}`;
+  }
   if (payloadBytes !== undefined) {
     headers["Content-Type"] = "application/json";
     headers["Content-Length"] = String(payloadBytes);

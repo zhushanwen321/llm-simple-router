@@ -1,6 +1,6 @@
 import { ref, computed, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
-import { api } from '@/api/client'
+import { api, getApiMessage } from '@/api/client'
 import type { Provider } from '@/types/mapping'
 
 const PERIODS = [
@@ -37,7 +37,7 @@ export function useLogFilters() {
     if (providerFilter.value === 'all') return modelOptions.value
     const provider = providers.value.find((p) => p.id === providerFilter.value)
     if (!provider) return modelOptions.value
-    const providerModels = new Set(provider.models)
+    const providerModels = new Set(provider.models.map(m => m.name))
     return modelOptions.value.filter((m) => providerModels.has(m))
   })
 
@@ -82,18 +82,18 @@ export function useLogFilters() {
   async function loadProviders() {
     try {
       providers.value = await api.getProviders()
-    } catch (e) {
+    } catch (e: unknown) {
       console.error('Failed to load providers:', e)
-      toast.error('加载供应商列表失败')
+      toast.error(getApiMessage(e, '加载供应商列表失败'))
     }
   }
 
   async function loadRouterKeys() {
     try {
       routerKeys.value = await api.getRouterKeys()
-    } catch (e) {
+    } catch (e: unknown) {
       console.error('Failed to load router keys:', e)
-      toast.error('加载密钥列表失败')
+      toast.error(getApiMessage(e, '加载密钥列表失败'))
     }
   }
 

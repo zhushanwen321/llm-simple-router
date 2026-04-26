@@ -46,5 +46,6 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (app, opti
   app.register(adminImportExportRoutes, { db: options.db, matcher: options.matcher, semaphoreManager: options.semaphoreManager });
   app.register(adminRecommendedRoutes, { db: options.db });
   app.register(adminUsageRoutes, { db: options.db });
+  app.register(adminUpgradeRoutes, { db: options.db });
   done();
 };

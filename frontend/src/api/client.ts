@@ -9,6 +9,14 @@ import type {
   RuntimeMetrics,
 } from '@/types/monitor'
 
+// 扩展 AxiosError 类型，附加后端错误信息
+declare module 'axios' {
+  interface AxiosError {
+    apiMessage?: string
+    apiCode?: number
+  }
+}
+
 const client = axios.create({
   baseURL: '/admin/api',
   withCredentials: true,
@@ -18,15 +26,24 @@ client.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) { // eslint-disable-line no-magic-numbers
-      if (error.response.data?.needsSetup) {
+      if (error.response.data?.code === 40103) { // eslint-disable-line no-magic-numbers -- NOT_INITIALIZED
         router.push('/setup')
       } else {
         router.push('/login')
       }
     }
+    // 附加后端错误消息到 error 对象，方便 View 层统一提取
+    const body = error.response?.data
+    error.apiMessage = body?.message || ''
+    error.apiCode = body?.code || 0
     return Promise.reject(error)
   }
 )
+
+/** 从 AxiosError 提取后端错误消息，无则返回 fallback */
+export function getApiMessage(error: unknown, fallback: string): string {
+  return (error as { apiMessage?: string }).apiMessage || fallback
+}
 
 // --- API endpoint constants ---
 
@@ -94,7 +111,7 @@ export interface ProviderPayload {
   api_type: string
   base_url: string
   api_key?: string
-  models?: string[]
+  models?: Array<string | { name: string; context_window?: number }>
   is_active: number
   max_concurrency?: number
   queue_timeout_ms?: number
@@ -271,7 +288,9 @@ async function request<T>(
   } else {
     res = await client.request({ method, url, data, params: options?.params })
   }
-  return res.data as T
+  // 解包信封：后端返回 {code:0, message:"ok", data:T}
+  const body = res.data as { code: number; message: string; data: T }
+  return body.data
 }
 
 // --- API ---
@@ -280,13 +299,14 @@ export const api = {
   login: (password: string) => request<{ success: boolean }>('post', API.LOGIN, { password }),
   logout: () => request<{ success: boolean }>('post', API.LOGOUT),
 
-  getSetupStatus: () => request<{ initialized: boolean }>('get', '/setup/status'),
-  initializeSetup: (password: string) => request<{ success: boolean }>('post', '/setup/initialize', { password }),
+  getSetupStatus: () => request<{ initialized: boolean }>('get', API.SETUP_STATUS),
+  initializeSetup: (password: string) => request<{ success: boolean }>('post', API.SETUP_INITIALIZE, { password }),
 
   getProviders: () => request<Provider[]>('get', API.PROVIDERS),
   createProvider: (data: ProviderPayload) => request<{ id: string }>('post', API.PROVIDERS, data),
-  updateProvider: (id: string, data: Partial<ProviderPayload>) => request<{ success: boolean }>('put', `${API.PROVIDERS}/${id}`, data),
+  updateProvider: (id: string, data: Partial<ProviderPayload>) => request<{ success: boolean; cascadedGroups: Array<{ id: string; client_model: string; disabled: boolean }> }>('put', `${API.PROVIDERS}/${id}`, data),
   deleteProvider: (id: string) => request<{ success: boolean }>('delete', `${API.PROVIDERS}/${id}`),
+  getProviderDependencies: (id: string) => request<{ references: string[] }>('get', `${API.PROVIDERS}/${id}/dependencies`),
 
   // TODO: 定义 Mapping 响应类型替换 unknown[]
   getMappings: () => request<unknown[]>('get', API.MAPPINGS),
@@ -300,10 +320,10 @@ export const api = {
   getLogChildren: (id: string) => request<LogEntry[]>('get', `${API.LOGS}/${id}/children`),
   deleteLogsBefore: (before: string) =>
     request<DeleteLogsResponse>('delete', `${API.LOGS}/before`, { before }),
-  getLogRetention: () => request<{ days: number }>('get', '/settings/log-retention'),
-  setLogRetention: (days: number) => request<{ days: number }>('put', '/settings/log-retention', { days }),
+  getLogRetention: () => request<{ days: number }>('get', API.SETTINGS_LOG_RETENTION),
+  setLogRetention: (days: number) => request<{ days: number }>('put', API.SETTINGS_LOG_RETENTION, { days }),
 
-  getStats: (params?: { period?: string; router_key_id?: string }) =>
+  getStats: (params?: { period?: string; start_time?: string; end_time?: string; router_key_id?: string }) =>
     request<StatsResponse>('get', API.STATS, undefined, { params }),
 
   getMetricsSummary: (params: { period?: string; provider_id?: string; backend_model?: string; router_key_id?: string; start_time?: string; end_time?: string }) =>
@@ -325,6 +345,7 @@ export const api = {
   updateMappingGroup: (id: string, data: MappingGroupPayload) =>
     request<{ success: boolean }>('put', `${API.MAPPING_GROUPS}/${id}`, data),
   deleteMappingGroup: (id: string) => request<{ success: boolean }>('delete', `${API.MAPPING_GROUPS}/${id}`),
+  toggleMappingGroup: (id: string) => request<{ success: boolean; is_active: number }>('post', `${API.MAPPING_GROUPS}/${id}/toggle`),
 
   getRetryRules: () => request<RetryRule[]>('get', API.RETRY_RULES),
   createRetryRule: (data: RetryRulePayload) =>
@@ -334,8 +355,8 @@ export const api = {
   deleteRetryRule: (id: string) => request<{ success: boolean }>('delete', `${API.RETRY_RULES}/${id}`),
 
   getProxyEnhancement: () =>
-    request<{ claude_code_enabled: boolean }>('get', API.PROXY_ENHANCEMENT),
-  updateProxyEnhancement: (data: { claude_code_enabled: boolean }) =>
+    request<ProxyEnhancementConfig>('get', API.PROXY_ENHANCEMENT),
+  updateProxyEnhancement: (data: ProxyEnhancementConfig) =>
     request<{ success: boolean }>('put', API.PROXY_ENHANCEMENT, data),
 
   getSessionStates: () => request<SessionState[]>('get', API.SESSION_STATES),

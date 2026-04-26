@@ -1,7 +1,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
 import type { ChartData } from 'chart.js'
-import { api } from '@/api/client'
+import { api, getApiMessage } from '@/api/client'
 import { fillTimeseries } from '@/views/metrics-helpers'
 import { CHART_COLORS } from '@/styles/design-tokens'
 import type { Provider } from '@/types/mapping'
@@ -22,7 +22,7 @@ interface SummaryRow {
 }
 
 export function useMetrics() {
-  const period = ref('5h')
+  const period = ref('window')
   const modelFilter = ref('all')
   const routerKeyFilter = ref('all')
   const providerFilter = ref('all')
@@ -44,7 +44,7 @@ export function useMetrics() {
     if (providerFilter.value === 'all') return modelOptions.value
     const provider = providers.value.find((p) => p.id === providerFilter.value)
     if (!provider) return modelOptions.value
-    const providerModels = new Set(provider.models)
+    const providerModels = new Set(provider.models.map(m => m.name))
     return modelOptions.value.filter((m) => providerModels.has(m))
   })
 
@@ -114,7 +114,7 @@ export function useMetrics() {
       ])
 
       const fulfilled = <T>(r: PromiseSettledResult<T>): r is PromiseFulfilledResult<T> => r.status === 'fulfilled'
-      const p = hasDateRange.value ? '30d' : period.value
+      const p = hasDateRange.value ? 'monthly' : period.value
 
       const ttftOk = fulfilled(ttftRes) ? ttftRes.value : null
       const tpsOk = fulfilled(tpsRes) ? tpsRes.value : null
@@ -151,9 +151,9 @@ export function useMetrics() {
 
       summaryRows.value = Array.isArray(summaryOk) ? summaryOk : []
       modelOptions.value = [...new Set(summaryRows.value.map((r: SummaryRow) => r.backend_model))]
-    } catch (e) {
+    } catch (e: unknown) {
       console.error('Failed to load metrics:', e)
-      toast.error('加载性能指标失败')
+      toast.error(getApiMessage(e, '加载性能指标失败'))
     } finally {
       loading.value = false
     }
@@ -163,18 +163,18 @@ export function useMetrics() {
     try {
       const res = await api.getRouterKeys()
       routerKeys.value = res
-    } catch (e) {
+    } catch (e: unknown) {
       console.error('Failed to load router keys:', e)
-      toast.error('加载密钥列表失败')
+      toast.error(getApiMessage(e, '加载密钥列表失败'))
     }
   }
 
   async function loadProviders() {
     try {
       providers.value = await api.getProviders()
-    } catch (e) {
+    } catch (e: unknown) {
       console.error('Failed to load providers:', e)
-      toast.error('加载供应商列表失败')
+      toast.error(getApiMessage(e, '加载供应商列表失败'))
     }
   }
 

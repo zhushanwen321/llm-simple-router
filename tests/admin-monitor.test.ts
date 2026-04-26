@@ -15,7 +15,6 @@ function makeConfig() {
     LOG_LEVEL: "silent",
     TZ: "Asia/Shanghai",
     STREAM_TIMEOUT_MS: 5000,
-    RETRY_MAX_ATTEMPTS: 0,
     RETRY_BASE_DELAY_MS: 0,
   };
 }
@@ -66,7 +65,7 @@ describe("Admin Monitor API", () => {
       headers: { cookie },
     });
     expect(res.statusCode).toBe(200);
-    expect(Array.isArray(res.json())).toBe(true);
+    expect(Array.isArray(res.json().data)).toBe(true);
   });
 
   it("GET /admin/api/monitor/stats returns StatsSnapshot", async () => {
@@ -76,7 +75,7 @@ describe("Admin Monitor API", () => {
       headers: { cookie },
     });
     expect(res.statusCode).toBe(200);
-    const body = res.json();
+    const body = res.json().data;
     expect(body).toHaveProperty("totalRequests");
     expect(body).toHaveProperty("successCount");
     expect(body).toHaveProperty("errorCount");
@@ -94,7 +93,7 @@ describe("Admin Monitor API", () => {
       headers: { cookie },
     });
     expect(res.statusCode).toBe(200);
-    expect(Array.isArray(res.json())).toBe(true);
+    expect(Array.isArray(res.json().data)).toBe(true);
   });
 
   it("GET /admin/api/monitor/runtime returns RuntimeMetrics", async () => {
@@ -104,7 +103,7 @@ describe("Admin Monitor API", () => {
       headers: { cookie },
     });
     expect(res.statusCode).toBe(200);
-    const body = res.json();
+    const body = res.json().data;
     expect(body).toHaveProperty("uptimeMs");
     expect(body).toHaveProperty("memoryUsage");
     expect(body).toHaveProperty("activeHandles");
@@ -125,6 +124,9 @@ describe("Admin Monitor API", () => {
       url: "/admin/api/monitor/stream",
     });
     expect(res.statusCode).toBe(401);
+    const body = res.json()
+    expect(body.code).toBe(40102)
+    expect(body.data).toBeNull()
   });
 
   it("monitor endpoints require authentication", async () => {
@@ -137,6 +139,9 @@ describe("Admin Monitor API", () => {
     for (const url of endpoints) {
       const res = await app.inject({ method: "GET", url });
       expect(res.statusCode).toBe(401);
+      const body = res.json()
+      expect(body.code).toBe(40102)
+      expect(body.data).toBeNull()
     }
   });
 

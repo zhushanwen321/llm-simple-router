@@ -76,6 +76,8 @@ export {
   getActiveProviders,
   getAllProviders,
   getProviderById,
+  getActiveProviderByName,
+  getActiveProvidersWithModels,
   createProvider,
   updateProvider,
   deleteProvider,
@@ -103,6 +105,7 @@ export type { ModelMapping, MappingGroup, ProviderModelEntry } from "./mappings.
 export {
   getActiveRetryRules,
   getAllRetryRules,
+  getRetryRuleById,
   createRetryRule,
   updateRetryRule,
   deleteRetryRule,
@@ -118,6 +121,7 @@ export {
   getRequestLogsGrouped,
   updateLogMetrics,
   updateLogStreamContent,
+  updateLogClientStatus,
   backfillMetricsFromRequestMetrics,
   estimateLogTableSize,
   deleteOldestLogs,
@@ -140,7 +144,7 @@ export { getMetricsSummary, getMetricsTimeseries, insertMetrics } from "./metric
 export type { MetricsSummaryRow, MetricsTimeseriesRow, MetricsPeriod, MetricsMetric, MetricsRow, MetricsInsert } from "./metrics.js";
 
 export { getStats } from "./stats.js";
-export type { Stats, StatsPeriod } from "./stats.js";
+export type { Stats } from "./stats.js";
 
 export { getSetting, setSetting, isInitialized } from "./settings.js";
 export {

@@ -1,12 +1,8 @@
 import { request as httpRequestFn } from "http";
 import { request as httpsRequestFn } from "https";
-import type { FastifyReply } from "fastify";
 import { UPSTREAM_SUCCESS, filterHeaders } from "./types.js";
+import { buildUpstreamUrl } from "./proxy-core.js";
 import type { RawHeaders, TransportResult } from "./types.js";
-import type { MetricsResult } from "../metrics/metrics-extractor.js";
-import type { SSEMetricsTransform } from "../metrics/sse-metrics-transform.js";
-import { callStream } from "./stream-proxy.js";
-
 // Re-export callStream from stream-proxy.ts for external consumers
 export { callStream } from "./stream-proxy.js";
 
@@ -34,13 +30,6 @@ export const _transportInternals = {
       : httpRequestFn(options);
   },
 };
-
-export function createUpstreamRequest(
-  url: URL,
-  options: UpstreamRequestOptions,
-) {
-  return _transportInternals.createUpstreamRequest(url, options);
-}
 
 export function buildRequestOptions(
   url: URL,
@@ -77,7 +66,7 @@ export function callNonStream(
   buildHeaders: BuildHeadersFn,
 ): Promise<TransportResult> {
   return new Promise((resolve) => {
-    const url = new URL(`${backend.base_url}${upstreamPath}`);
+    const url = new URL(buildUpstreamUrl(backend.base_url, upstreamPath));
     const payload = JSON.stringify(body);
     const upstreamHeaders = buildHeaders(
       clientHeaders,
@@ -140,7 +129,7 @@ export function callGet(
   buildHeaders: (cliHdrs: RawHeaders, key: string) => Record<string, string>,
 ): Promise<GetTransportResult> {
   return new Promise((resolve, reject) => {
-    const url = new URL(`${backend.base_url}${upstreamPath}`);
+    const url = new URL(buildUpstreamUrl(backend.base_url, upstreamPath));
     const headers = buildHeaders(clientHeaders, apiKey);
     const options = buildRequestOptions(url, headers, "GET");
 
@@ -158,74 +147,5 @@ export function callGet(
     });
     req.on("error", (err) => reject(err));
     req.end();
-  });
-}
-
-// ---------- Backward-compatible wrappers ----------
-
-export interface ProxyResult {
-  statusCode: number;
-  body: string;
-  headers: Record<string, string>;
-  sentHeaders: Record<string, string>;
-  sentBody: string;
-}
-
-export interface StreamProxyResult {
-  statusCode: number;
-  responseBody?: string;
-  upstreamResponseHeaders?: Record<string, string>;
-  sentHeaders?: Record<string, string>;
-  metricsResult?: MetricsResult;
-  abnormalClose?: boolean;
-}
-
-export function proxyNonStreamCompat(
-  backend: { base_url: string },
-  apiKey: string,
-  body: Record<string, unknown>,
-  clientHeaders: RawHeaders,
-  upstreamPath: string,
-  buildHeaders: BuildHeadersFn,
-): Promise<ProxyResult> {
-  return callNonStream(backend, apiKey, body, clientHeaders, upstreamPath, buildHeaders)
-    .then((r) => {
-      if (r.kind === "throw") throw r.error;
-      return {
-        statusCode: r.statusCode,
-        body: "body" in r ? r.body : "",
-        headers: "headers" in r ? r.headers : {},
-        sentHeaders: r.sentHeaders,
-        sentBody: "sentBody" in r ? r.sentBody : "",
-      };
-    });
-}
-
-export function proxyStreamCompat(
-  backend: { base_url: string },
-  apiKey: string,
-  body: Record<string, unknown>,
-  clientHeaders: RawHeaders,
-  reply: FastifyReply,
-  timeoutMs: number,
-  upstreamPath: string,
-  buildHeaders: BuildHeadersFn,
-  metricsTransform?: SSEMetricsTransform,
-  checkEarlyError?: (bufferedData: string) => boolean,
-): Promise<StreamProxyResult> {
-  return new Promise((resolve, reject) => {
-    function onResult(r: TransportResult): void {
-      if (r.kind === "throw") { reject(r.error); return; }
-      const metrics = (r.kind === "stream_success" || r.kind === "stream_abort") ? r.metrics : undefined;
-      resolve({
-        statusCode: r.statusCode,
-        responseBody: r.kind === "stream_success" ? undefined : ("body" in r ? r.body : undefined),
-        upstreamResponseHeaders: ("upstreamResponseHeaders" in r ? r.upstreamResponseHeaders : undefined) ?? ("headers" in r ? r.headers : {}) ?? {},
-        sentHeaders: r.sentHeaders,
-        metricsResult: metrics ?? undefined,
-        abnormalClose: r.kind === "stream_abort",
-      });
-    }
-    callStream(backend, apiKey, body, clientHeaders, reply, timeoutMs, upstreamPath, buildHeaders, metricsTransform, checkEarlyError, onResult);
   });
 }

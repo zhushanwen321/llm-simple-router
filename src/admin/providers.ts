@@ -2,14 +2,117 @@ import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
 import { Type, Static } from "@sinclair/typebox";
 import type { Provider } from "../db/index.js";
-import { getAllProviders, getProviderById, createProvider, updateProvider, deleteProvider, getAllMappingGroups, PROVIDER_CONCURRENCY_DEFAULTS } from "../db/index.js";
+import { getAllProviders, getProviderById, createProvider, updateProvider, deleteProvider, getAllMappingGroups, getAllModelMappings, updateMappingGroup, PROVIDER_CONCURRENCY_DEFAULTS } from "../db/index.js";
 import { encrypt, decrypt } from "../utils/crypto.js";
 import { getSetting } from "../db/settings.js";
 import { ProviderSemaphoreManager } from "../proxy/semaphore.js";
 import type { RequestTracker } from "../monitor/request-tracker.js";
 import { HTTP_CREATED, HTTP_NOT_FOUND, HTTP_CONFLICT, HTTP_BAD_REQUEST } from "./constants.js";
+import { API_CODE, apiError } from "./api-response.js";
+import { parseModels, buildModelInfoList } from "../config/model-context.js";
+import { getModelInfoForProvider, setModelInfoForProvider, deleteAllModelInfoForProvider } from "../db/model-info.js";
 
 const API_KEY_PREVIEW_MIN_LENGTH = 8;
+
+interface CascadeResult {
+  updatedGroups: Array<{ id: string; client_model: string; disabled: boolean }>;
+}
+
+function cascadeProviderDisable(db: Database.Database, providerId: string): CascadeResult {
+  const result: CascadeResult = { updatedGroups: [] };
+  const groups = getAllMappingGroups(db);
+
+  for (const g of groups) {
+    if (!g.is_active) continue;
+
+    let rule: Record<string, unknown>;
+    try {
+      rule = JSON.parse(g.rule) as Record<string, unknown>;
+    } catch { continue }
+
+    let modified = false;
+    let shouldDisable = false;
+
+    if (g.strategy === "scheduled") {
+      const def = rule.default as Record<string, string> | undefined;
+      if (def) {
+        if (def.provider_id === providerId) {
+          shouldDisable = true;
+          modified = true;
+        }
+        if (def.overflow_provider_id === providerId) {
+          delete def.overflow_provider_id;
+          delete def.overflow_model;
+          modified = true;
+        }
+      }
+
+      const windows = rule.windows as Array<{ start: string; end: string; target: Record<string, string> }> | undefined;
+      if (Array.isArray(windows)) {
+        const filtered = windows.filter((w) => {
+          if (w.target?.provider_id === providerId) {
+            modified = true;
+            return false;
+          }
+          if (w.target?.overflow_provider_id === providerId) {
+            delete w.target.overflow_provider_id;
+            delete w.target.overflow_model;
+            modified = true;
+          }
+          return true;
+        });
+        rule.windows = filtered;
+      }
+    } else {
+      const targets = rule.targets as Array<Record<string, string>> | undefined;
+      if (Array.isArray(targets)) {
+        const filtered = targets.filter((t) => {
+          if (t.provider_id === providerId) {
+            modified = true;
+            return false;
+          }
+          if (t.overflow_provider_id === providerId) {
+            delete t.overflow_provider_id;
+            delete t.overflow_model;
+            modified = true;
+          }
+          return true;
+        });
+        rule.targets = filtered;
+        if (filtered.length === 0 && modified) {
+          shouldDisable = true;
+        }
+      }
+    }
+
+    if (modified) {
+      const fields: { rule: string; is_active?: number } = { rule: JSON.stringify(rule) };
+      if (shouldDisable) fields.is_active = 0;
+      updateMappingGroup(db, g.id, fields);
+      result.updatedGroups.push({ id: g.id, client_model: g.client_model, disabled: shouldDisable });
+    }
+  }
+
+  return result;
+}
+
+type ModelInput = string | { name: string; context_window?: number };
+
+interface ModelOverride {
+  name: string;
+  context_window: number;
+}
+
+function extractModelOverrides(models: ModelInput[]): {
+  names: string[];
+  overrides: ModelOverride[];
+} {
+  const names = models.map(m => typeof m === "string" ? m : m.name);
+  const overrides = models.filter(
+    (m): m is ModelOverride => typeof m !== "string" && m.context_window != null,
+  );
+  return { names, overrides };
+}
 const API_KEY_PREVIEW_PREFIX_LEN = 4;
 
 const PROVIDER_NAME_RE = /^[a-zA-Z0-9_-]+$/;
@@ -19,7 +122,10 @@ const CreateProviderSchema = Type.Object({
   api_type: Type.Union([Type.Literal("openai"), Type.Literal("anthropic")]),
   base_url: Type.String({ minLength: 1 }),
   api_key: Type.String({ minLength: 1 }),
-  models: Type.Optional(Type.Array(Type.String())),
+  models: Type.Optional(Type.Array(Type.Union([
+    Type.String(),
+    Type.Object({ name: Type.String(), context_window: Type.Optional(Type.Number()) })
+  ]))),
   is_active: Type.Optional(Type.Number()),
   max_concurrency: Type.Optional(Type.Integer({ minimum: 0 })),
   queue_timeout_ms: Type.Optional(Type.Integer({ minimum: 0 })),
@@ -31,7 +137,10 @@ const UpdateProviderSchema = Type.Object({
   api_type: Type.Optional(Type.Union([Type.Literal("openai"), Type.Literal("anthropic")])),
   base_url: Type.Optional(Type.String({ minLength: 1 })),
   api_key: Type.Optional(Type.String({ minLength: 1 })),
-  models: Type.Optional(Type.Array(Type.String())),
+  models: Type.Optional(Type.Array(Type.Union([
+    Type.String(),
+    Type.Object({ name: Type.String(), context_window: Type.Optional(Type.Number()) })
+  ]))),
   is_active: Type.Optional(Type.Number()),
   max_concurrency: Type.Optional(Type.Integer({ minimum: 0 })),
   queue_timeout_ms: Type.Optional(Type.Integer({ minimum: 0 })),
@@ -50,41 +159,55 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
   app.get("/admin/api/providers", async (_request, reply) => {
     const encryptionKey = getSetting(db, "encryption_key")!;
     const providers = getAllProviders(db);
-    return reply.send(providers.map((s) => ({
-      id: s.id,
-      name: s.name,
-      api_type: s.api_type,
-      base_url: s.base_url,
-      api_key: s.api_key ? decrypt(s.api_key, encryptionKey) : "",
-      models: JSON.parse(s.models || "[]"),
-      is_active: s.is_active,
-      max_concurrency: s.max_concurrency,
-      queue_timeout_ms: s.queue_timeout_ms,
-      max_queue_size: s.max_queue_size,
-      concurrency_status: semaphoreManager?.getStatus(s.id) ?? { active: 0, queued: 0 },
-      created_at: s.created_at,
-      updated_at: s.updated_at,
-    })));
+    return reply.send(providers.map((s) => {
+      const modelNames = parseModels(s.models || "[]");
+      const overrides = new Map(
+        getModelInfoForProvider(db, s.id).map(m => [m.model_name, m.context_window]),
+      );
+      return {
+        id: s.id,
+        name: s.name,
+        api_type: s.api_type,
+        base_url: s.base_url,
+        api_key: s.api_key ? decrypt(s.api_key, encryptionKey) : "",
+        models: buildModelInfoList(modelNames, overrides),
+        is_active: s.is_active,
+        max_concurrency: s.max_concurrency,
+        queue_timeout_ms: s.queue_timeout_ms,
+        max_queue_size: s.max_queue_size,
+        concurrency_status: semaphoreManager?.getStatus(s.id) ?? { active: 0, queued: 0 },
+        created_at: s.created_at,
+        updated_at: s.updated_at,
+      };
+    }));
   });
 
   app.post("/admin/api/providers", { schema: { body: CreateProviderSchema } }, async (request, reply) => {
     const body = request.body as Static<typeof CreateProviderSchema>;
     if (!PROVIDER_NAME_RE.test(body.name)) {
-      return reply.status(HTTP_BAD_REQUEST).send({ error: { message: "Provider 名称仅允许英文大小写字母、数字、横线和下划线" } });
+      return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.VALIDATION_FAILED, "Provider 名称仅允许英文大小写字母、数字、横线和下划线"));
+    }
+    const existing = db.prepare("SELECT id FROM providers WHERE name = ?").get(body.name) as { id: string } | undefined;
+    if (existing) {
+      return reply.code(HTTP_CONFLICT).send(apiError(API_CODE.CONFLICT_NAME, `Provider 名称 '${body.name}' 已存在`));
     }
     const encryptedKey = encrypt(body.api_key, getSetting(db, "encryption_key")!);
+    const { names: normalizedModels, overrides: contextOverrides } = extractModelOverrides((body.models ?? []) as ModelInput[]);
     const id = createProvider(db, {
       name: body.name,
       api_type: body.api_type,
       base_url: body.base_url,
       api_key: encryptedKey,
       api_key_preview: body.api_key.length > API_KEY_PREVIEW_MIN_LENGTH ? `${body.api_key.slice(0, API_KEY_PREVIEW_PREFIX_LEN)}...${body.api_key.slice(-API_KEY_PREVIEW_PREFIX_LEN)}` : "****",
-      models: JSON.stringify(body.models ?? []),
+      models: JSON.stringify(normalizedModels),
       is_active: body.is_active ?? 1,
       max_concurrency: body.max_concurrency ?? PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency,
       queue_timeout_ms: body.queue_timeout_ms ?? PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms,
       max_queue_size: body.max_queue_size ?? PROVIDER_CONCURRENCY_DEFAULTS.max_queue_size,
     });
+    if (contextOverrides.length > 0) {
+      setModelInfoForProvider(db, id, contextOverrides.map(o => ({ model_name: o.name, context_window: o.context_window })));
+    }
     semaphoreManager?.updateConfig(id, {
       maxConcurrency: body.max_concurrency ?? PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency,
       queueTimeoutMs: body.queue_timeout_ms ?? PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms,
@@ -103,18 +226,26 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     const { id } = request.params as { id: string };
     const existing = getProviderById(db, id);
     if (!existing) {
-      return reply.code(HTTP_NOT_FOUND).send({ error: { message: "Provider not found" } });
+      return reply.code(HTTP_NOT_FOUND).send(apiError(API_CODE.NOT_FOUND, "Provider not found"));
     }
     const body = request.body as Static<typeof UpdateProviderSchema>;
     if (body.name !== undefined && !PROVIDER_NAME_RE.test(body.name)) {
-      return reply.status(HTTP_BAD_REQUEST).send({ error: { message: "Provider 名称仅允许英文大小写字母、数字、横线和下划线" } });
+      return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.VALIDATION_FAILED, "Provider 名称仅允许英文大小写字母、数字、横线和下划线"));
     }
     const fields: Partial<Pick<Provider, 'name' | 'api_type' | 'base_url' | 'api_key' | 'api_key_preview' | 'models' | 'is_active' | 'max_concurrency' | 'queue_timeout_ms' | 'max_queue_size'>> = {};
     if (body.name !== undefined) fields.name = body.name;
     if (body.api_type !== undefined) fields.api_type = body.api_type;
     if (body.base_url !== undefined) fields.base_url = body.base_url;
     if (body.is_active !== undefined) fields.is_active = body.is_active;
-    if (body.models !== undefined) fields.models = JSON.stringify(body.models);
+    if (body.models !== undefined) {
+      const { names, overrides } = extractModelOverrides(body.models as ModelInput[]);
+      fields.models = JSON.stringify(names);
+      if (overrides.length > 0) {
+        setModelInfoForProvider(db, id, overrides.map(o => ({ model_name: o.name, context_window: o.context_window })));
+      } else {
+        deleteAllModelInfoForProvider(db, id);
+      }
+    }
     if (body.max_concurrency !== undefined) fields.max_concurrency = body.max_concurrency;
     if (body.queue_timeout_ms !== undefined) fields.queue_timeout_ms = body.queue_timeout_ms;
     if (body.max_queue_size !== undefined) fields.max_queue_size = body.max_queue_size;
@@ -124,6 +255,12 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     }
     updateProvider(db, id, fields);
     const updated = getProviderById(db, id)!;
+
+    let cascade: CascadeResult | undefined;
+    if (existing.is_active === 1 && body.is_active === 0) {
+      cascade = cascadeProviderDisable(db, id);
+    }
+
     if (body.max_concurrency !== undefined || body.queue_timeout_ms !== undefined || body.max_queue_size !== undefined) {
       semaphoreManager?.updateConfig(id, {
         maxConcurrency: updated.max_concurrency,
@@ -137,18 +274,80 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
       queueTimeoutMs: updated.queue_timeout_ms,
       maxQueueSize: updated.max_queue_size,
     });
-    return reply.send({ success: true });
+    return reply.send({ success: true, cascadedGroups: cascade?.updatedGroups ?? [] });
+  });
+
+  app.get("/admin/api/providers/:id/dependencies", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const existing = getProviderById(db, id);
+    if (!existing) {
+      return reply.code(HTTP_NOT_FOUND).send(apiError(API_CODE.NOT_FOUND, "Provider not found"));
+    }
+
+    const references: string[] = [];
+
+    const groups = getAllMappingGroups(db);
+    for (const g of groups) {
+      if (!g.is_active) continue;
+      const refs: string[] = [];
+      try {
+        const rule = JSON.parse(g.rule);
+        if (rule.default?.provider_id === id) {
+          refs.push(`默认模型 (${rule.default.backend_model})`);
+        }
+        if (rule.default?.overflow_provider_id === id) {
+          refs.push(`默认溢出模型 (${rule.default.overflow_model || "-"})`);
+        }
+        if (Array.isArray(rule.windows)) {
+          for (const w of rule.windows) {
+            if (w.target?.provider_id === id) {
+              refs.push(`时间窗口 ${w.start}-${w.end} (${w.target.backend_model})`);
+            }
+            if (w.target?.overflow_provider_id === id) {
+              refs.push(`时间窗口 ${w.start}-${w.end} 溢出 (${w.target.overflow_model || "-"})`);
+            }
+          }
+        }
+        if (Array.isArray(rule.targets)) {
+          for (let i = 0; i < rule.targets.length; i++) {
+            const t = rule.targets[i];
+            if (t.provider_id === id) {
+              refs.push(`目标 ${i + 1} (${t.backend_model})`);
+            }
+            if (t.overflow_provider_id === id) {
+              refs.push(`目标 ${i + 1} 溢出 (${t.overflow_model || "-"})`);
+            }
+          }
+        }
+      } catch { continue }
+      for (const ref of refs) {
+        references.push(`映射分组「${g.client_model}」: ${ref}`);
+      }
+    }
+
+    const mappings = getAllModelMappings(db);
+    for (const m of mappings) {
+      if (m.provider_id === id) {
+        references.push(`旧版映射「${m.client_model}」→ ${m.backend_model}`);
+      }
+    }
+
+    return reply.send({ references });
   });
 
   app.delete("/admin/api/providers/:id", async (request, reply) => {
     const { id } = request.params as { id: string };
+    const existing = getProviderById(db, id);
+    if (!existing) {
+      return reply.code(HTTP_NOT_FOUND).send(apiError(API_CODE.NOT_FOUND, "Provider not found"));
+    }
     const groups = getAllMappingGroups(db);
     for (const g of groups) {
       try {
         const rule = JSON.parse(g.rule);
         const targets = [rule.default, ...(rule.windows || [])].filter(Boolean);
         if (targets.some((t: { provider_id: string }) => t.provider_id === id)) {
-          return reply.code(HTTP_CONFLICT).send({ error: { message: `Provider is referenced by mapping group '${g.client_model}'` } });
+          return reply.code(HTTP_CONFLICT).send(apiError(API_CODE.CONFLICT_REFERENCED, `Provider is referenced by mapping group '${g.client_model}'`));
         }
       } catch { continue }
     }

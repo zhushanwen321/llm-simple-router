@@ -18,7 +18,7 @@ export const adminSettingsRoutes: FastifyPluginCallback<SettingsOptions> = (app,
     return { days: getLogRetentionDays(db) };
   });
 
-  app.put("/admin/api/settings/log-retention", async (request) => {
+  app.put("/admin/api/settings/log-retention", async (request, reply) => {
     const { days } = request.body as { days: number };
     const MAX_LOG_RETENTION_DAYS = 90;
     if (!Number.isInteger(days) || days < 0 || days > MAX_LOG_RETENTION_DAYS) {

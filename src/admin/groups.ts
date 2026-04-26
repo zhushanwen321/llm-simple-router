@@ -11,7 +11,8 @@ import {
   getMappingGroupById,
 } from "../db/index.js";
 import { STRATEGY_NAMES } from "../proxy/strategy/types.js";
-import { HTTP_BAD_REQUEST, HTTP_CREATED, HTTP_CONFLICT } from "./constants.js";
+import { HTTP_BAD_REQUEST, HTTP_CREATED, HTTP_CONFLICT, HTTP_NOT_FOUND } from "./constants.js";
+import { API_CODE, apiError } from "./api-response.js";
 
 const MIN_FAILOVER_TARGETS = 2;
 
@@ -36,6 +37,8 @@ type ScheduledRuleDefault = TargetInput;
 interface TargetInput {
   backend_model?: string;
   provider_id?: string;
+  overflow_provider_id?: string;
+  overflow_model?: string;
 }
 
 interface ScheduledRuleWindow {
@@ -47,6 +50,24 @@ interface ScheduledRuleWindow {
 interface ScheduledRule {
   default?: ScheduledRuleDefault;
   windows?: ScheduledRuleWindow[];
+}
+
+function validateOverflow(db: Database.Database, target: TargetInput, label: string): string | undefined {
+  const hasOverflowProvider = !!target.overflow_provider_id;
+  const hasOverflowModel = !!target.overflow_model;
+  if (hasOverflowProvider && !hasOverflowModel) {
+    return `${label}: overflow_provider_id requires overflow_model`;
+  }
+  if (hasOverflowModel && !hasOverflowProvider) {
+    return `${label}: overflow_model requires overflow_provider_id`;
+  }
+  if (hasOverflowProvider) {
+    const p = getProviderById(db, target.overflow_provider_id!);
+    if (!p) {
+      return `${label}: overflow_provider_id '${target.overflow_provider_id}' not found`;
+    }
+  }
+  return undefined;
 }
 
 async function validateRule(
@@ -75,6 +96,8 @@ async function validateRule(
     if (!defaultProvider) {
       return `provider_id '${r.default.provider_id}' not found`;
     }
+    const overflowErr = validateOverflow(db, r.default, "rule.default");
+    if (overflowErr) return overflowErr;
 
     if (r.windows !== undefined && !Array.isArray(r.windows)) {
       return "rule.windows must be an array";
@@ -89,6 +112,8 @@ async function validateRule(
         if (!p) {
           return `window[${i}] provider_id '${w.target.provider_id}' not found`;
         }
+        const wOverflowErr = validateOverflow(db, w.target, `window[${i}]`);
+        if (wOverflowErr) return wOverflowErr;
       }
     }
   }
@@ -111,6 +136,8 @@ async function validateRule(
       if (!p) {
         return `targets[${i}] provider_id '${t.provider_id}' not found`;
       }
+      const overflowErr = validateOverflow(db, t, `targets[${i}]`);
+      if (overflowErr) return overflowErr;
     }
   }
 
@@ -129,7 +156,7 @@ export const adminGroupRoutes: FastifyPluginCallback<GroupRoutesOptions> = (app,
     const body = request.body as Static<typeof CreateGroupSchema>;
     const validationError = await validateRule(db, body.strategy, body.rule);
     if (validationError) {
-      return reply.code(HTTP_BAD_REQUEST).send({ error: { message: validationError } });
+      return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.BAD_REQUEST, validationError));
     }
     try {
       const id = createMappingGroup(db, {
@@ -140,7 +167,7 @@ export const adminGroupRoutes: FastifyPluginCallback<GroupRoutesOptions> = (app,
       return reply.code(HTTP_CREATED).send({ id });
     } catch (err: unknown) {
       if (err instanceof Error && err.message.includes("UNIQUE constraint")) {
-        return reply.code(HTTP_CONFLICT).send({ error: { message: "client_model already exists" } });
+        return reply.code(HTTP_CONFLICT).send(apiError(API_CODE.CONFLICT_NAME, "client_model already exists"));
       }
       throw err;
     }
@@ -158,7 +185,7 @@ export const adminGroupRoutes: FastifyPluginCallback<GroupRoutesOptions> = (app,
     const ruleJson = body.rule ?? findGroupRule(db, id);
     const validationError = await validateRule(db, strategy, ruleJson);
     if (validationError) {
-      return reply.code(HTTP_BAD_REQUEST).send({ error: { message: validationError } });
+      return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.BAD_REQUEST, validationError));
     }
 
     try {
@@ -166,7 +193,7 @@ export const adminGroupRoutes: FastifyPluginCallback<GroupRoutesOptions> = (app,
       return reply.send({ success: true });
     } catch (err: unknown) {
       if (err instanceof Error && err.message.includes("UNIQUE constraint")) {
-        return reply.code(HTTP_CONFLICT).send({ error: { message: "client_model already exists" } });
+        return reply.code(HTTP_CONFLICT).send(apiError(API_CODE.CONFLICT_NAME, "client_model already exists"));
       }
       throw err;
     }
@@ -174,8 +201,19 @@ export const adminGroupRoutes: FastifyPluginCallback<GroupRoutesOptions> = (app,
 
   app.delete("/admin/api/mapping-groups/:id", async (request, reply) => {
     const { id } = request.params as { id: string };
+    const existing = getMappingGroupById(db, id);
+    if (!existing) return reply.code(HTTP_NOT_FOUND).send(apiError(API_CODE.NOT_FOUND, "Mapping group not found"));
     deleteMappingGroup(db, id);
     return reply.send({ success: true });
+  });
+
+  app.post("/admin/api/mapping-groups/:id/toggle", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const existing = getMappingGroupById(db, id);
+    if (!existing) return reply.code(HTTP_NOT_FOUND).send(apiError(API_CODE.NOT_FOUND, "Mapping group not found"));
+    const newActive = existing.is_active ? 0 : 1;
+    updateMappingGroup(db, id, { is_active: newActive });
+    return reply.send({ success: true, is_active: newActive });
   });
 
   done();

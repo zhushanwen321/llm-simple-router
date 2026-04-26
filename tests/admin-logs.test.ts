@@ -14,7 +14,6 @@ function makeConfig() {
     LOG_LEVEL: "silent",
     TZ: "Asia/Shanghai",
     STREAM_TIMEOUT_MS: 5000,
-    RETRY_MAX_ATTEMPTS: 0,
     RETRY_BASE_DELAY_MS: 0,
   };
 }
@@ -84,7 +83,7 @@ describe("Logs API", () => {
       headers: { cookie },
     });
     expect(res.statusCode).toBe(200);
-    const body = res.json();
+    const body = res.json().data;
     expect(body.data.length).toBe(4);
     expect(body.total).toBe(4);
     expect(body.page).toBe(1);
@@ -98,7 +97,7 @@ describe("Logs API", () => {
       headers: { cookie },
     });
     expect(res.statusCode).toBe(200);
-    const body = res.json();
+    const body = res.json().data;
     expect(body.data.every((l: any) => l.api_type === "openai")).toBe(true);
   });
 
@@ -110,7 +109,7 @@ describe("Logs API", () => {
       payload: { before: new Date().toISOString() },
     });
     expect(res.statusCode).toBe(200);
-    expect(res.json().deleted).toBe(4);
+    expect(res.json().data.deleted).toBe(4);
   });
 
   it("unauthenticated returns 401", async () => {
@@ -119,6 +118,9 @@ describe("Logs API", () => {
       url: "/admin/api/logs",
     });
     expect(res.statusCode).toBe(401);
+    const body = res.json()
+    expect(body.code).toBe(40102)
+    expect(body.data).toBeNull()
   });
 });
 
@@ -143,13 +145,16 @@ describe("Stats API", () => {
   });
 
   it("GET stats returns correct aggregate", async () => {
+    const now = new Date();
+    const startTime = new Date(now.getTime() - 86400000).toISOString().replace("T", " ").replace(/\.\d{3}Z$/, "");
+    const endTime = new Date(now.getTime() + 86400000).toISOString().replace("T", " ").replace(/\.\d{3}Z$/, "");
     const res = await app.inject({
       method: "GET",
-      url: "/admin/api/stats",
+      url: `/admin/api/stats?start_time=${encodeURIComponent(startTime)}&end_time=${encodeURIComponent(endTime)}`,
       headers: { cookie },
     });
     expect(res.statusCode).toBe(200);
-    const stats = res.json();
+    const stats = res.json().data;
     expect(stats.totalRequests).toBe(2); // only log-1, log-2 have metrics
     expect(stats.successRate).toBe(1); // both have status 200
     expect(stats.avgTps).toBeGreaterThanOrEqual(0);
@@ -170,7 +175,7 @@ describe("Stats API", () => {
       headers: { cookie: emptyCookie },
     });
     expect(res.statusCode).toBe(200);
-    const stats = res.json();
+    const stats = res.json().data;
     expect(stats.totalRequests).toBe(0);
     expect(stats.successRate).toBe(0);
     expect(stats.avgTps).toBe(0);
@@ -185,6 +190,9 @@ describe("Stats API", () => {
       url: "/admin/api/stats",
     });
     expect(res.statusCode).toBe(401);
+    const body = res.json()
+    expect(body.code).toBe(40102)
+    expect(body.data).toBeNull()
   });
 });
 
@@ -229,7 +237,7 @@ describe("Log children endpoint", () => {
       headers: { cookie },
     });
     expect(res.statusCode).toBe(200);
-    const body = res.json();
+    const body = res.json().data;
     expect(body).toHaveLength(2);
     expect(body[0].id).toBe("child-retry");
     expect(body[1].id).toBe("child-failover");
@@ -244,7 +252,7 @@ describe("Log children endpoint", () => {
       headers: { cookie },
     });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual([]);
+    expect(res.json().data).toEqual([]);
   });
 
   it("returns 404 for nonexistent parent", async () => {
@@ -254,7 +262,7 @@ describe("Log children endpoint", () => {
       headers: { cookie },
     });
     expect(res.statusCode).toBe(404);
-    expect(res.json().error.message).toBe("Log not found");
+    expect(res.json().message).toBe("Log not found");
   });
 
   it("unauthenticated returns 401", async () => {
@@ -263,6 +271,9 @@ describe("Log children endpoint", () => {
       url: "/admin/api/logs/root-1/children",
     });
     expect(res.statusCode).toBe(401);
+    const body = res.json()
+    expect(body.code).toBe(40102)
+    expect(body.data).toBeNull()
   });
 });
 
@@ -306,7 +317,7 @@ describe("Grouped logs view", () => {
       headers: { cookie },
     });
     expect(res.statusCode).toBe(200);
-    const body = res.json();
+    const body = res.json().data;
     // 只返回根请求（original_request_id IS NULL）
     expect(body.data).toHaveLength(2);
     expect(body.total).toBe(2);
@@ -325,7 +336,7 @@ describe("Grouped logs view", () => {
       url: "/admin/api/logs?view=grouped",
       headers: { cookie },
     });
-    const body = res.json();
+    const body = res.json().data;
     const ids = body.data.map((l: any) => l.id);
     expect(ids).not.toContain("child-retry-1");
     expect(ids).not.toContain("child-failover-1");
@@ -338,7 +349,7 @@ describe("Grouped logs view", () => {
       headers: { cookie },
     });
     expect(res.statusCode).toBe(200);
-    const body = res.json();
+    const body = res.json().data;
     expect(body.data).toHaveLength(1);
     expect(body.data[0].id).toBe("root-1");
   });

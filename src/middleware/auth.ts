@@ -4,6 +4,7 @@ import fp from "fastify-plugin";
 import Database from "better-sqlite3";
 import { isInitialized } from "../db/settings.js";
 import { insertRequestLog } from "../db/logs.js";
+import { getProxyApiType } from "../constants.js";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -36,18 +37,6 @@ function unauthorizedReply(reply: FastifyReply): void {
   });
 }
 
-// 代理路由路径 → api_type 映射，用于记录被认证拒绝的请求
-const PROXY_API_TYPES: Record<string, string> = {
-  "/v1/chat/completions": "openai",
-  "/v1/messages": "anthropic",
-  "/v1/models": "openai",
-};
-
-function getProxyApiType(url: string): string | null {
-  const path = url.split("?")[0];
-  return PROXY_API_TYPES[path] ?? null;
-}
-
 function logRejectedAuth(
   db: Database.Database,
   apiType: string,
@@ -65,7 +54,7 @@ function logRejectedAuth(
     is_stream: 0,
     error_message: errorMessage,
     created_at: new Date().toISOString(),
-    client_request: JSON.stringify({ headers: request.headers }),
+    client_request: JSON.stringify({ method: request.method, ip: request.ip, headers: request.headers }),
   });
 }
 

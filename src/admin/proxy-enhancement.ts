@@ -1,6 +1,17 @@
 import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
-import { getSetting, setSetting } from "../db/settings.js";
+import { Type, Static } from "@sinclair/typebox";
+import { setSetting } from "../db/settings.js";
+import { loadEnhancementConfig } from "../proxy/enhancement-config.js";
+
+const UpdateProxyEnhancementSchema = Type.Object({
+  claude_code_enabled: Type.Boolean(),
+});
+
+const SessionParamsSchema = Type.Object({
+  keyId: Type.String(),
+  sessionId: Type.String(),
+});
 import {
   getSessionStates,
   getSessionHistory,
@@ -11,27 +22,19 @@ interface ProxyEnhancementOptions {
   db: Database.Database;
 }
 
-interface ProxyEnhancementConfig {
-  claude_code_enabled: boolean;
-}
-
 export const adminProxyEnhancementRoutes: FastifyPluginCallback<ProxyEnhancementOptions> = (app, options, done) => {
   const { db } = options;
 
-  app.get("/admin/api/proxy-enhancement", async (_req, reply) => {
-    const raw = getSetting(db, "proxy_enhancement");
-    const config: ProxyEnhancementConfig = raw
-      ? JSON.parse(raw)
-      : { claude_code_enabled: false };
-    return reply.send(config);
+  app.get("/admin/api/proxy-enhancement", async (_request, reply) => {
+    const config = loadEnhancementConfig(db);
+    return reply.send({
+      claude_code_enabled: config.claude_code_enabled,
+    });
   });
 
-  app.put("/admin/api/proxy-enhancement", async (req, reply) => {
-    const body = req.body as Record<string, unknown>;
-    if (typeof body.claude_code_enabled !== "boolean") {
-      return reply.status(400).send({ error: "claude_code_enabled must be a boolean" }); // eslint-disable-line no-magic-numbers
-    }
-    const config: ProxyEnhancementConfig = {
+  app.put("/admin/api/proxy-enhancement", { schema: { body: UpdateProxyEnhancementSchema } }, async (request, reply) => {
+    const body = request.body as Static<typeof UpdateProxyEnhancementSchema>;
+    const config = {
       claude_code_enabled: body.claude_code_enabled,
     };
     setSetting(db, "proxy_enhancement", JSON.stringify(config));
@@ -43,19 +46,21 @@ export const adminProxyEnhancementRoutes: FastifyPluginCallback<ProxyEnhancement
     return reply.send(states);
   });
 
-  app.get<{ Params: { keyId: string; sessionId: string } }>(
+  app.get(
     "/admin/api/session-states/:keyId/:sessionId/history",
+    { schema: { params: SessionParamsSchema } },
     async (req, reply) => {
-      const { keyId, sessionId } = req.params;
+      const { keyId, sessionId } = req.params as { keyId: string; sessionId: string };
       const history = getSessionHistory(db, keyId, sessionId);
       return reply.send(history);
     },
   );
 
-  app.delete<{ Params: { keyId: string; sessionId: string } }>(
+  app.delete(
     "/admin/api/session-states/:keyId/:sessionId",
+    { schema: { params: SessionParamsSchema } },
     async (req, reply) => {
-      const { keyId, sessionId } = req.params;
+      const { keyId, sessionId } = req.params as { keyId: string; sessionId: string };
       modelState.delete(keyId, sessionId);
       return reply.send({ success: true });
     },

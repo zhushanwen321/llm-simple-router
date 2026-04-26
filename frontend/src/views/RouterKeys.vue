@@ -130,7 +130,8 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
-import { api } from '@/api/client'
+import { api, getApiMessage } from '@/api/client'
+import { formatTime } from '@/utils/format'
 import { useClipboard } from '@/composables/useClipboard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -169,7 +170,7 @@ function maskKey(key: string | null): string {
 }
 
 function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleString('zh-CN')
+  return formatTime(dateStr)
 }
 
 function removeModel(model: string) {
@@ -185,9 +186,9 @@ async function loadData() {
     ])
     if (keysRes.status === 'fulfilled') keys.value = keysRes.value
     if (modelsRes.status === 'fulfilled') availableModels.value = modelsRes.value
-  } catch (e) {
+  } catch (e: unknown) {
     console.error('Failed to load data:', e)
-    toast.error('加载数据失败')
+    toast.error(getApiMessage(e, '加载数据失败'))
   }
 }
 
@@ -239,9 +240,9 @@ async function handleSave() {
     }
     dialogOpen.value = false
     await loadData()
-  } catch (e) {
+  } catch (e: unknown) {
     console.error('Failed to save router key:', e)
-    toast.error('保存密钥失败')
+    toast.error(getApiMessage(e, '保存密钥失败'))
   }
 }
 
@@ -256,9 +257,9 @@ async function handleDelete() {
   try {
     await api.deleteRouterKey(target.id)
     await loadData()
-  } catch (e) {
+  } catch (e: unknown) {
     console.error('Failed to delete router key:', e)
-    toast.error('删除密钥失败')
+    toast.error(getApiMessage(e, '删除密钥失败'))
   }
 }
 
