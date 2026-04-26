@@ -138,6 +138,8 @@ import MappingGroupDeleteDialog from '@/components/mappings/MappingGroupDeleteDi
 import type { MappingGroup, Provider, MappingTarget, RuleWindow, Rule } from '@/types/mapping'
 import type { ProviderGroup } from '@/components/mappings/cascading-types'
 
+const DEFAULT_CONTEXT_WINDOW = 200_000
+
 const DEFAULT_FORM: {
   client_model: string
   strategy: string
