@@ -30,6 +30,8 @@ export type MetricsInsert = {
   provider_id: string;
   backend_model: string;
   api_type: string;
+  router_key_id?: string | null;
+  status_code?: number | null;
   input_tokens?: number | null;
   output_tokens?: number | null;
   cache_creation_tokens?: number | null;
@@ -44,10 +46,11 @@ export type MetricsInsert = {
 export function insertMetrics(db: Database.Database, m: MetricsInsert): string {
   const id = randomUUID();
   db.prepare(
-    `INSERT INTO request_metrics (id, request_log_id, provider_id, backend_model, api_type, input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, ttft_ms, total_duration_ms, tokens_per_second, stop_reason, is_complete)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO request_metrics (id, request_log_id, provider_id, backend_model, api_type, router_key_id, status_code, input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, ttft_ms, total_duration_ms, tokens_per_second, stop_reason, is_complete)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     id, m.request_log_id, m.provider_id, m.backend_model, m.api_type,
+    m.router_key_id ?? null, m.status_code ?? null,
     m.input_tokens ?? null, m.output_tokens ?? null,
     m.cache_creation_tokens ?? null, m.cache_read_tokens ?? null,
     m.ttft_ms ?? null, m.total_duration_ms ?? null,

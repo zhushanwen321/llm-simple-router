@@ -165,8 +165,13 @@ export function collectTransportMetrics(
   providerId: string,
   backendModel: string,
   request: FastifyRequest,
+  routerKeyId?: string | null,
+  statusCode?: number | null,
 ) {
-  const base = { request_log_id: lastSuccessLogId, provider_id: providerId, backend_model: backendModel, api_type: apiType };
+  const base = {
+    request_log_id: lastSuccessLogId, provider_id: providerId, backend_model: backendModel, api_type: apiType,
+    router_key_id: routerKeyId ?? null, status_code: statusCode ?? null,
+  };
   try {
     if (isStream && (result.kind === "stream_success" || result.kind === "stream_abort")) {
       if (result.metrics) {
