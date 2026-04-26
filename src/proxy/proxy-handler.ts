@@ -4,7 +4,7 @@ import Database from "better-sqlite3";
 import { getMappingGroup, getProviderById, insertRequestLog } from "../db/index.js";
 import { decrypt } from "../utils/crypto.js";
 import { getSetting } from "../db/settings.js";
-import { resolveMapping } from "./mapping-resolver.js";
+import { resolveMapping, countGroupTargets } from "./mapping-resolver.js";
 import { applyEnhancement } from "./enhancement/enhancement-handler.js";
 import { SemaphoreQueueFullError, SemaphoreTimeoutError } from "./semaphore.js";
 import type { RequestTracker } from "../monitor/request-tracker.js";
@@ -17,9 +17,9 @@ import {
 import { buildUpstreamHeaders, buildUpstreamUrl } from "./proxy-core.js";
 import { ProviderSwitchNeeded } from "./types.js";
 import type { RawHeaders } from "./types.js";
+import type { Target } from "./strategy/types.js";
 import { updateLogStreamContent, updateLogClientStatus } from "../db/index.js";
 import { insertRejectedLog } from "./log-helpers.js";
-import type { Target } from "./strategy/types.js";
 import type { RetryRuleMatcher } from "./retry-rules.js";
 import type { ProxyOrchestrator } from "./orchestrator.js";
 import type { ProxyErrorFormatter, ProxyErrorResponse } from "./proxy-core.js";
@@ -137,10 +137,11 @@ export async function handleProxyRequest(
   if (interceptResponse) return handleIntercept(deps.db, apiType, request, reply, interceptResponse, clientModel, sessionId);
 
   const group = getMappingGroup(deps.db, effectiveModel);
+  // targets 数量 > 1 时启用 failover 循环
+  const isFailover = group ? countGroupTargets(group.rule) > 1 : false;
   return executeFailoverLoop({
     request, reply, apiType, upstreamPath, errors, deps, options,
-    effectiveModel, originalModel,
-    isFailover: group?.strategy === "failover",
+    effectiveModel, originalModel, isFailover,
     originalBody: JSON.parse(JSON.stringify(request.body as Record<string, unknown>)),
     sessionId,
   });
@@ -168,16 +169,20 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
       isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null, sessionId,
     };
 
-    let resolved = resolveMapping(deps.db, effectiveModel, { now: new Date(), excludeTargets });
-    request.log.debug({ logId, model: effectiveModel, apiType, isStream, action: "resolve_mapping", resolved: !!resolved });
+    const resolveResult = resolveMapping(deps.db, effectiveModel, { now: new Date(), excludeTargets });
+    request.log.debug({ logId, model: effectiveModel, apiType, isStream, action: "resolve_mapping", resolved: !!resolveResult });
 
-    if (!resolved) {
+    if (!resolveResult) {
       if (isFailover && excludeTargets.length > 0) {
         return rejectAndReply(reply, { ...rCtx, isFailover: true, originalRequestId: rootLogId },
           errors.upstreamConnectionFailed(), `All failover targets exhausted (${excludeTargets.length} attempted)`);
       }
       return rejectAndReply(reply, rCtx, errors.modelNotFound(effectiveModel), `No mapping found for model '${effectiveModel}'`);
     }
+
+    // Task 4 会将 concurrencyOverride 传递给 orchestrator
+    const _concurrencyOverride = resolveResult.concurrency_override;
+    let resolved = resolveResult.target;
 
     if (excludeTargets.length === 0) {
       const allowedModels = request.routerKey?.allowed_models;
