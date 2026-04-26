@@ -33,55 +33,23 @@ function cascadeProviderDisable(db: Database.Database, providerId: string): Casc
     let modified = false;
     let shouldDisable = false;
 
-    if (g.strategy === "scheduled") {
-      const def = rule.default as Record<string, string> | undefined;
-      if (def) {
-        if (def.provider_id === providerId) {
-          shouldDisable = true;
+    const targets = rule.targets as Array<Record<string, string>> | undefined;
+    if (Array.isArray(targets)) {
+      const filtered = targets.filter((t) => {
+        if (t.provider_id === providerId) {
+          modified = true;
+          return false;
+        }
+        if (t.overflow_provider_id === providerId) {
+          delete t.overflow_provider_id;
+          delete t.overflow_model;
           modified = true;
         }
-        if (def.overflow_provider_id === providerId) {
-          delete def.overflow_provider_id;
-          delete def.overflow_model;
-          modified = true;
-        }
-      }
-
-      const windows = rule.windows as Array<{ start: string; end: string; target: Record<string, string> }> | undefined;
-      if (Array.isArray(windows)) {
-        const filtered = windows.filter((w) => {
-          if (w.target?.provider_id === providerId) {
-            modified = true;
-            return false;
-          }
-          if (w.target?.overflow_provider_id === providerId) {
-            delete w.target.overflow_provider_id;
-            delete w.target.overflow_model;
-            modified = true;
-          }
-          return true;
-        });
-        rule.windows = filtered;
-      }
-    } else {
-      const targets = rule.targets as Array<Record<string, string>> | undefined;
-      if (Array.isArray(targets)) {
-        const filtered = targets.filter((t) => {
-          if (t.provider_id === providerId) {
-            modified = true;
-            return false;
-          }
-          if (t.overflow_provider_id === providerId) {
-            delete t.overflow_provider_id;
-            delete t.overflow_model;
-            modified = true;
-          }
-          return true;
-        });
-        rule.targets = filtered;
-        if (filtered.length === 0 && modified) {
-          shouldDisable = true;
-        }
+        return true;
+      });
+      rule.targets = filtered;
+      if (filtered.length === 0 && modified) {
+        shouldDisable = true;
       }
     }
 
