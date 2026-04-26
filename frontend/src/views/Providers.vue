@@ -122,7 +122,14 @@
             </div>
             <div class="flex gap-2">
               <Input v-model="modelInput" placeholder="输入模型名称，多个用逗号分隔" @keydown.enter.prevent="addModel" class="flex-1" />
-              <Input v-model.number="modelContextWindow" type="number" placeholder="上下文窗口 (tokens)" class="w-40" />
+              <Select v-model="contextWindowSelect">
+                <SelectTrigger class="w-28">
+                  <SelectValue placeholder="上下文" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem v-for="opt in CONTEXT_WINDOW_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</SelectItem>
+                </SelectContent>
+              </Select>
               <Button type="button" variant="outline" size="sm" @click="addModel" :disabled="!modelInput.trim()">添加</Button>
             </div>
           </div>
@@ -200,12 +207,27 @@ const DEFAULT_QUEUE_TIMEOUT_MS = 120_000
 const DEFAULT_QUEUE_SIZE = 10
 const MAX_CONCURRENCY = 100
 const MAX_QUEUE_SIZE = 1000
-const DEFAULT_CONTEXT_WINDOW = 200_000
 const CONTEXT_K = 1000
 const CONTEXT_M = 1_000_000
+const DEFAULT_CONTEXT_WINDOW = 200_000
+const CONTEXT_WINDOW_OPTIONS = [
+  { label: '8K', value: '8000' },
+  { label: '16K', value: '16000' },
+  { label: '32K', value: '32000' },
+  { label: '64K', value: '64000' },
+  { label: '128K', value: '128000' },
+  { label: '160K', value: '160000' },
+  { label: '200K', value: '200000' },
+  { label: '256K', value: '256000' },
+  { label: '1M', value: '1000000' },
+] as const
 const DEFAULT_FORM = { name: '', api_type: 'anthropic', base_url: '', api_key: '', models: [] as ModelInfo[], is_active: true, max_concurrency: DEFAULT_CONCURRENCY, queue_timeout_ms: DEFAULT_QUEUE_TIMEOUT_MS, max_queue_size: DEFAULT_QUEUE_SIZE }
 const modelInput = ref('')
 const modelContextWindow = ref(DEFAULT_CONTEXT_WINDOW)
+const contextWindowSelect = computed({
+  get: () => String(modelContextWindow.value),
+  set: (val: string) => { modelContextWindow.value = Number(val) },
+})
 
 const providers = ref<Provider[]>([])
 const providerPresets = ref<ProviderGroup[]>([])
