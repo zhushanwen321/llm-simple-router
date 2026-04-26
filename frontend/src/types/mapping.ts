@@ -10,6 +10,7 @@ export interface MappingGroup {
   client_model: string
   strategy: string
   rule: string
+  is_active: number
   created_at: string
 }
 

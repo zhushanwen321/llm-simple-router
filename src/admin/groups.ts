@@ -181,6 +181,15 @@ export const adminGroupRoutes: FastifyPluginCallback<GroupRoutesOptions> = (app,
     return reply.send({ success: true });
   });
 
+  app.post("/admin/api/mapping-groups/:id/toggle", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const existing = getMappingGroupById(db, id);
+    if (!existing) return reply.code(HTTP_NOT_FOUND).send(apiError(API_CODE.NOT_FOUND, "Mapping group not found"));
+    const newActive = existing.is_active ? 0 : 1;
+    updateMappingGroup(db, id, { is_active: newActive });
+    return reply.send({ success: true, is_active: newActive });
+  });
+
   done();
 };
 

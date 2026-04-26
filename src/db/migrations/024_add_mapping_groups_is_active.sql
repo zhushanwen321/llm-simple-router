@@ -1,0 +1,1 @@
+ALTER TABLE mapping_groups ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1;
