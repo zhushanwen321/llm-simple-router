@@ -372,6 +372,7 @@ export const api = {
   updateMappingGroup: (id: string, data: MappingGroupPayload) =>
     request<{ success: boolean }>('put', `${API.MAPPING_GROUPS}/${id}`, data),
   deleteMappingGroup: (id: string) => request<{ success: boolean }>('delete', `${API.MAPPING_GROUPS}/${id}`),
+  toggleMappingGroup: (id: string) => request<{ success: boolean; is_active: number }>('post', `${API.MAPPING_GROUPS}/${id}/toggle`),
 
   getRetryRules: () => request<RetryRule[]>('get', API.RETRY_RULES),
   createRetryRule: (data: RetryRulePayload) =>

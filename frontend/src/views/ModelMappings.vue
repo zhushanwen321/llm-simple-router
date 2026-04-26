@@ -11,14 +11,16 @@
     </div>
 
     <div class="space-y-4">
-      <Card v-for="g in groupsWithParsedRule" :key="g.id">
+      <Card v-for="g in groupsWithParsedRule" :key="g.id" :class="{ 'opacity-60': !g.is_active }">
         <Collapsible :default-open="true">
           <CardHeader class="flex flex-row items-center justify-between gap-4">
             <div class="flex items-center gap-3">
               <CardTitle class="font-mono text-sm">{{ g.client_model }}</CardTitle>
               <Badge variant="secondary">{{ g.strategy }}</Badge>
+              <Badge :variant="g.is_active ? 'default' : 'outline'">{{ g.is_active ? '启用' : '禁用' }}</Badge>
             </div>
             <div class="flex items-center gap-2">
+              <Switch :checked="!!g.is_active" @update:checked="confirmToggle(g)" />
               <CollapsibleTrigger as-child>
                 <Button variant="ghost" size="sm">
                   展开
@@ -92,6 +94,19 @@
       @confirm="handleDelete"
       @cancel="deleteTarget = null"
     />
+
+    <AlertDialog :open="!!toggleTarget" @update:open="(val: boolean) => { if (!val) toggleTarget = null }">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>确认{{ toggleTarget?.is_active ? '禁用' : '启用' }}</AlertDialogTitle>
+          <AlertDialogDescription>确定要{{ toggleTarget?.is_active ? '禁用' : '启用' }}映射「{{ toggleTarget?.client_model }}」吗？</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>取消</AlertDialogCancel>
+          <AlertDialogAction @click="handleToggle">确认</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </div>
 </template>
 
@@ -103,6 +118,8 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
+import { Switch } from '@/components/ui/switch'
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog'
 import MappingGroupFormDialog from '@/components/mappings/MappingGroupFormDialog.vue'
 import MappingGroupDeleteDialog from '@/components/mappings/MappingGroupDeleteDialog.vue'
 import type { MappingGroup, Provider, MappingTarget, RuleWindow, Rule } from '@/types/mapping'
@@ -127,6 +144,7 @@ const providersList = ref<Provider[]>([])
 const dialogOpen = ref(false)
 const editingId = ref<string | null>(null)
 const deleteTarget = ref<MappingGroup | null>(null)
+const toggleTarget = ref<MappingGroup | null>(null)
 const form = ref({ ...DEFAULT_FORM })
 
 const providerNameMap = computed(() => {
@@ -322,6 +340,23 @@ async function handleDelete() {
   } catch (e: unknown) {
     console.error('Failed to delete mapping group:', e)
     toast.error(getApiMessage(e, '删除分组失败'))
+  }
+}
+
+function confirmToggle(g: MappingGroup) {
+  toggleTarget.value = g
+}
+
+async function handleToggle() {
+  const target = toggleTarget.value
+  if (!target) return
+  toggleTarget.value = null
+  try {
+    await api.toggleMappingGroup(target.id)
+    await loadData()
+  } catch (e: unknown) {
+    console.error('Failed to toggle mapping group:', e)
+    toast.error(getApiMessage(e, '切换状态失败'))
   }
 }
 
