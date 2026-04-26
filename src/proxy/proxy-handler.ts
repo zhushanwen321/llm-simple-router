@@ -16,7 +16,7 @@ import {
 } from "./proxy-logging.js";
 import { buildUpstreamHeaders, buildUpstreamUrl } from "./proxy-core.js";
 import { ProviderSwitchNeeded } from "./types.js";
-import type { RawHeaders } from "./types.js";
+import type { RawHeaders, TransportResult } from "./types.js";
 import { updateLogStreamContent, updateLogClientStatus } from "../db/index.js";
 import { insertRejectedLog } from "./log-helpers.js";
 import type { Target } from "./strategy/types.js";
