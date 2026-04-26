@@ -223,7 +223,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
     const clientReq = JSON.stringify({ headers: cliHdrs, body: originalBody });
     const upstreamReqBase = JSON.stringify({
       url: buildUpstreamUrl(provider.base_url, upstreamPath),
-      headers: sanitizeHeadersForLog(buildUpstreamHeaders(cliHdrs, apiKey, Buffer.byteLength(reqBodyStr))),
+      headers: sanitizeHeadersForLog(buildUpstreamHeaders(cliHdrs, apiKey, Buffer.byteLength(reqBodyStr), apiType)),
       body: reqBodyStr,
     });
 
