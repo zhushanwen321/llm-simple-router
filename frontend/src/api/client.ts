@@ -247,7 +247,7 @@ interface StatsResponse {
 }
 
 export interface UsageWindowWithUsage {
-  window: { id: string; router_key_id: string | null; start_time: string; end_time: string; created_at: string }
+  window: { id: string; router_key_id: string | null; provider_id: string | null; start_time: string; end_time: string; created_at: string }
   usage: { request_count: number; total_input_tokens: number; total_output_tokens: number }
 }
 
@@ -406,7 +406,7 @@ export const api = {
     reload: () => request<{ ok: boolean }>('post', API.RECOMMENDED_RELOAD),
   },
 
-  getUsageWindows: (params?: { router_key_id?: string }) =>
+  getUsageWindows: (params?: { router_key_id?: string; provider_id?: string }) =>
     request<UsageWindowWithUsage[]>('get', API.USAGE_WINDOWS, undefined, { params }),
   getUsageWeekly: (params?: { router_key_id?: string }) =>
     request<DailyUsage[]>('get', API.USAGE_WEEKLY, undefined, { params }),
