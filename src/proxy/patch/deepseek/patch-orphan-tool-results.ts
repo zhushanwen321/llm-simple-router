@@ -9,6 +9,7 @@ type ContentBlock = Record<string, unknown>;
  * 2. 移除 tool_use_id 不在集合中的 tool_result 块
  * 3. 移除清空后的空 user 消息
  * 4. 合并相邻的 user 消息（Anthropic API 不允许连续 user 消息）
+ * 5. 合并相邻的 assistant 消息（同理）
  */
 export function patchOrphanToolResults(
   body: Record<string, unknown>,
@@ -60,9 +61,16 @@ export function patchOrphanToolResults(
   }
 
   // Step 4: 合并相邻的 user 消息
+  mergeConsecutive(messages, "user");
+
+  // Step 5: 合并相邻的 assistant 消息（删除空 user 消息后可能产生）
+  mergeConsecutive(messages, "assistant");
+}
+
+function mergeConsecutive(messages: Array<{ role: string; content: unknown }>, role: string): void {
   let i = 1;
   while (i < messages.length) {
-    if (messages[i].role === "user" && messages[i - 1].role === "user") {
+    if (messages[i].role === role && messages[i - 1].role === role) {
       const prev = messages[i - 1];
       const curr = messages[i];
       const prevContent = normalizeToArray(prev.content);

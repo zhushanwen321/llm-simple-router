@@ -134,6 +134,26 @@ describe("patchOrphanToolResults", () => {
     expect(() => patchOrphanToolResults(body)).not.toThrow();
   });
 
+  it("删除空 user 后合并连续 assistant 消息", () => {
+    const body = {
+      messages: [
+        { role: "assistant", content: [{ type: "tool_use", id: "call_1", name: "R", input: {} }] },
+        { role: "user", content: [{ type: "tool_result", tool_use_id: "orphan_1", content: "x" }] },
+        { role: "assistant", content: [{ type: "text", text: "response" }] },
+        { role: "user", content: "next" },
+      ],
+    };
+    patchOrphanToolResults(body);
+    // orphan_1 被移除 → 空 user 被删除 → 两个 assistant 合并
+    expect(body.messages).toHaveLength(2);
+    expect(body.messages[0].role).toBe("assistant");
+    expect(body.messages[1].role).toBe("user");
+    const merged = body.messages[0].content as unknown[];
+    expect(merged).toHaveLength(2);
+    expect((merged[0] as Record<string, unknown>).type).toBe("tool_use");
+    expect((merged[1] as Record<string, unknown>).type).toBe("text");
+  });
+
   it("大规模孤儿场景（模拟 70+ 孤儿）", () => {
     const messages: unknown[] = [
       { role: "user", content: "start" },
@@ -197,7 +217,7 @@ describe("applyProviderPatches", () => {
         { role: "user", content: [{ type: "tool_result", tool_use_id: "call_ghost", content: "x" }] },
       ],
     };
-    applyProviderPatches(body, { base_url: "https://api.deepseek.com/anthropic", api_type: "anthropic", name: "deepseek" });
+    applyProviderPatches(body, { base_url: "https://api.deepseek.com/anthropic" });
     // thinking patch 应该已添加 thinking block
     const assistant = body.messages[0] as { content: unknown[] };
     expect((assistant.content[0] as { type: string }).type).toBe("thinking");
@@ -210,7 +230,7 @@ describe("applyProviderPatches", () => {
       ],
     };
     const original = JSON.stringify(body);
-    applyProviderPatches(body, { base_url: "https://open.bigmodel.cn/api/anthropic", api_type: "anthropic", name: "zhipu" });
+    applyProviderPatches(body, { base_url: "https://open.bigmodel.cn/api/anthropic" });
     expect(JSON.stringify(body)).toBe(original);
   });
 });
