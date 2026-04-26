@@ -220,13 +220,22 @@ export function applyEnhancement(
             },
           };
         }
-        // 单 provider 且模型过多 → 回退到文本列表
+        // 单 provider 且模型过多 → AskUserQuestion 显示前 6 个 + 文本列出剩余
+        const capped = displayModels.slice(0, MODELS_PER_GROUP * 2);
+        const questions = buildModelQuestions(capped);
+        const payload = buildAskUserQuestionPayload(questions, false);
+        if (displayModels.length > capped.length) {
+          const extra = displayModels.slice(capped.length).map((m, i) => `${capped.length + i + 1}. ${m}`).join("\n");
+          const textBlock = { type: "text" as const, text: `更多模型:\n${extra}\n\n可输入 /select-model provider/model 选择` };
+          const body = payload.body as Record<string, unknown>;
+          body.content = [textBlock, ...(body.content as unknown[])];
+        }
         return {
           effectiveModel: clientModel,
           originalModel: null,
           interceptResponse: {
-            ...buildSelectModelResponse(db, request.routerKey?.allowed_models ?? null),
-            meta: { action: "模型列表(文本)" },
+            ...payload,
+            meta: { action: "模型列表(AskUserQuestion)" },
           },
         };
       }
