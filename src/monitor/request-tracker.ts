@@ -195,9 +195,26 @@ export class RequestTracker {
 
   addClient(res: ServerResponse): void {
     this.clients.add(res);
+    // 连接时立即推送当前活跃请求，让新客户端看到页面加载前已存在的请求
+    this.sendInitialSnapshot(res);
     res.on("close", () => {
       this.clients.delete(res);
     });
+  }
+
+  /** 向单个客户端发送当前活跃请求快照 */
+  private sendInitialSnapshot(res: ServerResponse): void {
+    const active = this.getActive().map((req) => {
+      const copy = { ...req };
+      delete copy.clientRequest;
+      return copy;
+    });
+    const msg = `event: request_update\ndata: ${JSON.stringify(active)}\n\n`;
+    try {
+      if (!res.writableEnded) res.write(msg);
+    } catch {
+      this.clients.delete(res);
+    }
   }
 
   removeClient(res: ServerResponse): void {
