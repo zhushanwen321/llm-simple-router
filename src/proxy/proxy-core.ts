@@ -72,6 +72,19 @@ export function createErrorFormatter(
   };
 }
 
+// ---------- URL utilities ----------
+
+/**
+ * 拼接上游 URL，自动处理 base_url 已包含 API 路径的情况。
+ * 用户可能将 base_url 配置为 `https://host/v1/messages`，
+ * 此时不应再追加 upstreamPath（`/v1/messages`），否则路径重复。
+ */
+export function buildUpstreamUrl(baseUrl: string, upstreamPath: string): string {
+  const normalized = baseUrl.replace(/\/+$/, "");
+  if (normalized.endsWith(upstreamPath)) return normalized;
+  return `${normalized}${upstreamPath}`;
+}
+
 // ---------- Header utilities ----------
 
 export const SKIP_UPSTREAM = new Set([

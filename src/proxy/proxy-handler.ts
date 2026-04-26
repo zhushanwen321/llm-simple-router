@@ -14,7 +14,7 @@ import {
   handleIntercept,
   sanitizeHeadersForLog,
 } from "./proxy-logging.js";
-import { buildUpstreamHeaders } from "./proxy-core.js";
+import { buildUpstreamHeaders, buildUpstreamUrl } from "./proxy-core.js";
 import { ProviderSwitchNeeded } from "./types.js";
 import type { RawHeaders } from "./types.js";
 import { updateLogStreamContent } from "../db/index.js";
@@ -222,7 +222,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
     const reqBodyStr = JSON.stringify(body);
     const clientReq = JSON.stringify({ headers: cliHdrs, body: originalBody });
     const upstreamReqBase = JSON.stringify({
-      url: `${provider.base_url}${upstreamPath}`,
+      url: buildUpstreamUrl(provider.base_url, upstreamPath),
       headers: sanitizeHeadersForLog(buildUpstreamHeaders(cliHdrs, apiKey, Buffer.byteLength(reqBodyStr))),
       body: reqBodyStr,
     });
