@@ -60,22 +60,30 @@ export function getWindowUsage(
   startTime: string,
   endTime: string,
   routerKeyId?: string,
+  providerId?: string,
 ): WindowUsage {
-  const baseSql = `
+  const conditions = [
+    "rm.is_complete = 1",
+    "rm.created_at >= datetime(?)",
+    "rm.created_at < datetime(?)",
+  ];
+  const params: unknown[] = [startTime, endTime];
+
+  if (routerKeyId) {
+    conditions.push("rm.router_key_id = ?");
+    params.push(routerKeyId);
+  }
+  if (providerId) {
+    conditions.push("rm.provider_id = ?");
+    params.push(providerId);
+  }
+
+  return db.prepare(`
     SELECT
       COUNT(*) AS request_count,
       COALESCE(SUM(rm.input_tokens), 0) AS total_input_tokens,
       COALESCE(SUM(rm.output_tokens), 0) AS total_output_tokens
     FROM request_metrics rm
-    JOIN request_logs rl ON rl.id = rm.request_log_id
-    WHERE rm.is_complete = 1
-      AND rm.created_at >= datetime(?)
-      AND rm.created_at < datetime(?)`;
-
-  if (routerKeyId) {
-    return db.prepare(
-      `${baseSql} AND rl.router_key_id = ?`,
-    ).get(startTime, endTime, routerKeyId) as WindowUsage;
-  }
-  return db.prepare(baseSql).get(startTime, endTime) as WindowUsage;
+    WHERE ${conditions.join(" AND ")}
+  `).get(...params) as WindowUsage;
 }
