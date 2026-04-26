@@ -72,7 +72,7 @@ function toggleOpen() {
     <!-- Dropdown -->
     <div
       v-if="open"
-      class="absolute z-50 mt-1 min-w-full"
+      class="absolute z-[9999] mt-1 min-w-full"
     >
       <!-- Level 1: Provider list -->
       <div class="rounded-md border bg-popover p-1 text-popover-foreground shadow-md">
