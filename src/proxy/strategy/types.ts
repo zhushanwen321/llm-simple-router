@@ -1,10 +1,3 @@
-export const STRATEGY_NAMES = {
-  SCHEDULED: "scheduled",
-  ROUND_ROBIN: "round-robin",
-  RANDOM: "random",
-  FAILOVER: "failover",
-} as const;
-
 export interface Target {
   backend_model: string;
   provider_id: string;
@@ -17,6 +10,13 @@ export interface ResolveContext {
   excludeTargets?: Target[];
 }
 
-export interface MappingStrategy {
-  select(rule: unknown, context: ResolveContext, clientModel?: string): Target | undefined;
+export interface ConcurrencyOverride {
+  max_concurrency?: number;
+  queue_timeout_ms?: number;
+  max_queue_size?: number;
+}
+
+export interface ResolveResult {
+  target: Target;
+  concurrency_override?: ConcurrencyOverride;
 }

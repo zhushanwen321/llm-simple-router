@@ -180,6 +180,18 @@ export {
 export type { ProviderModelInfo } from "./model-info.js";
 
 export {
+  getSchedulesByGroup,
+  getActiveSchedulesForGroup,
+  getScheduleById,
+  getAllSchedules,
+  createSchedule,
+  updateSchedule,
+  deleteSchedule,
+  deleteSchedulesByGroup,
+} from "./schedules.js";
+export type { Schedule, ConcurrencyOverride } from "./schedules.js";
+
+export {
   collectDbSizeInfo,
   runSizeBasedCleanup,
   scheduleDbSizeMonitor,

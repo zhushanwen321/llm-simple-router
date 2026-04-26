@@ -1,6 +1,5 @@
 import Database from "better-sqlite3";
 import { randomUUID } from "crypto";
-import { isTarget } from "../proxy/strategy/targets-rule.js";
 import type { Target } from "../proxy/strategy/types.js";
 import { buildUpdateQuery, deleteById } from "./helpers.js";
 
@@ -16,14 +15,13 @@ export interface ModelMapping {
 export interface MappingGroup {
   id: string;
   client_model: string;
-  strategy: string;
   rule: string;
   is_active: number;
   created_at: string;
 }
 
 const MAPPING_FIELDS = new Set(["client_model", "backend_model", "provider_id", "is_active"]);
-const GROUP_FIELDS = new Set(["client_model", "strategy", "rule", "is_active"]);
+const GROUP_FIELDS = new Set(["client_model", "rule", "is_active"]);
 
 // --- ModelMapping CRUD ---
 
@@ -93,21 +91,21 @@ export function getAllMappingGroups(db: Database.Database): MappingGroup[] {
 
 export function createMappingGroup(
   db: Database.Database,
-  mapping: { client_model: string; strategy: string; rule: string },
+  mapping: { client_model: string; rule: string },
 ): string {
   const id = randomUUID();
   const now = new Date().toISOString();
   db.prepare(
-    `INSERT INTO mapping_groups (id, client_model, strategy, rule, created_at)
-     VALUES (?, ?, ?, ?, ?)`,
-  ).run(id, mapping.client_model, mapping.strategy, mapping.rule, now);
+    `INSERT INTO mapping_groups (id, client_model, rule, created_at)
+     VALUES (?, ?, ?, ?)`,
+  ).run(id, mapping.client_model, mapping.rule, now);
   return id;
 }
 
 export function updateMappingGroup(
   db: Database.Database,
   id: string,
-  fields: Partial<Pick<MappingGroup, "client_model" | "strategy" | "rule" | "is_active">>,
+  fields: Partial<Pick<MappingGroup, "client_model" | "rule" | "is_active">>,
 ): void {
   buildUpdateQuery(db, "mapping_groups", id, fields, GROUP_FIELDS);
 }
@@ -138,6 +136,19 @@ export function getActiveProviderModels(db: Database.Database): ProviderModelEnt
   return results;
 }
 
+// --- 内联 Target 类型守卫（原 targets-rule.ts 已删除） ---
+
+function isTarget(value: unknown): value is Target {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "backend_model" in value &&
+    typeof (value as Target).backend_model === "string" &&
+    "provider_id" in value &&
+    typeof (value as Target).provider_id === "string"
+  );
+}
+
 // --- 从 mapping_groups rule JSON 中提取 target 条目 ---
 
 function extractTargets(rule: Record<string, unknown>): Target[] {
@@ -161,7 +172,6 @@ function extractTargets(rule: Record<string, unknown>): Target[] {
 /**
  * 根据 "provider_name/backend_model" 验证模型是否存在于 provider 配置中。
  * 同时尝试从 mapping_groups 中找到对应的 client_model 用于路由。
- * 如果找不到 mapping，返回 backend_model 本身（由 proxy-core 兜底处理）。
  */
 export function resolveByProviderModel(
   db: Database.Database,
