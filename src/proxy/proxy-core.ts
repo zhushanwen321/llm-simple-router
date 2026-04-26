@@ -92,6 +92,7 @@ export const SKIP_UPSTREAM = new Set([
   "content-length",
   "accept-encoding",
   "authorization",
+  "x-api-key",
   "connection",
   "keep-alive",
   "transfer-encoding",
@@ -113,10 +114,15 @@ export function selectHeaders(
 export function buildUpstreamHeaders(
   clientHeaders: RawHeaders,
   apiKey: string,
-  payloadBytes?: number
+  payloadBytes?: number,
+  apiType?: "openai" | "anthropic"
 ): Record<string, string> {
   const headers = selectHeaders(clientHeaders, SKIP_UPSTREAM);
-  headers["Authorization"] = `Bearer ${apiKey}`;
+  if (apiType === "anthropic") {
+    headers["x-api-key"] = apiKey;
+  } else {
+    headers["Authorization"] = `Bearer ${apiKey}`;
+  }
   if (payloadBytes !== undefined) {
     headers["Content-Type"] = "application/json";
     headers["Content-Length"] = String(payloadBytes);
