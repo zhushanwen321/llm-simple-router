@@ -1,7 +1,7 @@
 <!-- eslint-disable vue/no-mutating-props -- form is a reactive object managed by parent component -->
 <template>
   <Dialog :open="open" @update:open="emit('update:open', $event)">
-    <DialogContent class="max-w-2xl max-h-[85vh] overflow-y-auto">
+    <DialogContent class="max-w-4xl max-h-[85vh] overflow-y-auto">
       <DialogHeader>
         <DialogTitle>{{ editingId ? '编辑分组' : '添加分组' }}</DialogTitle>
         <DialogDescription>配置客户端模型到后端供应商模型的映射规则</DialogDescription>
