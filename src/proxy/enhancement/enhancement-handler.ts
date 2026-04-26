@@ -24,9 +24,7 @@ export interface EnhancementResult {
 const MODEL_INFO_TAG_TYPE = "model-info";
 const SKIP_LABEL = "不选择";
 const TWO_STEP_THRESHOLD = 9;
-const MODELS_PER_QUESTION = 3;
-const MAX_QUESTIONS = 4;
-const MAX_DISPLAY_MODELS = MODELS_PER_QUESTION * MAX_QUESTIONS;
+const MODELS_PER_GROUP = 3;
 
 /**
  * 解析 "provider_name/backend_model" 格式，返回对应的 client_model。
@@ -222,9 +220,18 @@ export function applyEnhancement(
             },
           };
         }
+        // 单 provider 且模型过多 → 回退到文本列表
+        return {
+          effectiveModel: clientModel,
+          originalModel: null,
+          interceptResponse: {
+            ...buildSelectModelResponse(db, request.routerKey?.allowed_models ?? null),
+            meta: { action: "模型列表(文本)" },
+          },
+        };
       }
-      // 直接列出所有模型（< TWO_STEP_THRESHOLD 或单 provider）
-      const questions = buildModelQuestions(displayModels.slice(0, MAX_DISPLAY_MODELS));
+      // < TWO_STEP_THRESHOLD → AskUserQuestion 2 组
+      const questions = buildModelQuestions(displayModels);
       return {
         effectiveModel: clientModel,
         originalModel: null,
@@ -340,26 +347,35 @@ function buildSelectModelResponse(
   return buildTextResponse(responseType, inner);
 }
 
-/** 将模型列表分块为 AskUserQuestion 的 questions（每组 ≤3 个模型 + 1 个"不选择"，最多 4 组） */
+/** 将模型列表分成最多 2 组 AskUserQuestion（每组 ≤3 个模型 + 1 个"不选择"） */
 function buildModelQuestions(models: string[]): unknown[] {
-  const chunks: string[][] = [];
-  for (let i = 0; i < models.length && chunks.length < MAX_QUESTIONS; i += MODELS_PER_QUESTION) {
-    chunks.push(models.slice(i, i + MODELS_PER_QUESTION));
-  }
-
-  return chunks.map((chunk, idx) => {
-    const options = chunk.map(m => {
+  if (models.length <= MODELS_PER_GROUP) {
+    const options = models.map(m => {
       const sep = m.indexOf("/");
       const provider = sep > 0 ? m.substring(0, sep) : "";
       return { label: m, description: provider || "模型" };
     });
     options.push({ label: SKIP_LABEL, description: "不切换模型" });
+    return [{
+      question: "请选择要使用的模型",
+      header: "模型选择",
+      options,
+      multiSelect: false,
+    }];
+  }
 
+  const g1 = models.slice(0, MODELS_PER_GROUP);
+  const g2 = models.slice(MODELS_PER_GROUP, MODELS_PER_GROUP * 2);
+  return [g1, g2].map((group, idx) => {
+    const options = group.map(m => {
+      const sep = m.indexOf("/");
+      const provider = sep > 0 ? m.substring(0, sep) : "";
+      return { label: m, description: provider || "模型" };
+    });
+    options.push({ label: SKIP_LABEL, description: "不切换模型" });
     return {
-      question: chunks.length === 1
-        ? "请选择要使用的模型"
-        : `请选择要使用的模型（第${idx + 1}组）`,
-      header: idx === 0 ? "模型选择" : `更多模型(${idx + 1})`,
+      question: `请选择要使用的模型（第${idx + 1}组）`,
+      header: idx === 0 ? "模型选择" : "更多模型",
       options,
       multiSelect: false,
     };
