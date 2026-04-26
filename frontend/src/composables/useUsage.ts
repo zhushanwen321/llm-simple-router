@@ -1,5 +1,5 @@
 import { ref, watch, type Ref } from 'vue'
-import { api, type UsageWindowWithUsage, type DailyUsage } from '@/api/client'
+import { api, getApiMessage, type UsageWindowWithUsage, type DailyUsage } from '@/api/client'
 
 export function useUsage(keyFilter: Ref<string>, period: Ref<string>) {
   const windowsData = ref<UsageWindowWithUsage[]>([])

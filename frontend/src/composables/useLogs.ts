@@ -1,6 +1,6 @@
 import { ref, computed } from 'vue'
 import { toast } from 'vue-sonner'
-import { api } from '@/api/client'
+import { api, getApiMessage } from '@/api/client'
 import type { LogEntry } from '@/components/logs/types'
 
 const PAGE_SIZE = 20

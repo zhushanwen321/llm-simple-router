@@ -26,6 +26,62 @@ import type { ProxyErrorFormatter, ProxyErrorResponse } from "./proxy-core.js";
 import { buildTransportFn } from "./transport-fn.js";
 
 const HTTP_ERROR_THRESHOLD = 400;
+const MAX_LOG_FIELD_LENGTH = 80;
+const UPSTREAM_ERROR_STATUS = 502;
+
+// ---------- Failover loop context ----------
+
+interface FailoverContext {
+  request: FastifyRequest;
+  reply: FastifyReply;
+  apiType: "openai" | "anthropic";
+  upstreamPath: string;
+  errors: ProxyErrorFormatter;
+  deps: RouteHandlerDeps;
+  options?: { beforeSendProxy?: (body: Record<string, unknown>, isStream: boolean) => void };
+  effectiveModel: string;
+  originalModel: string | null;
+  isFailover: boolean;
+  originalBody: Record<string, unknown>;
+  sessionId: string | undefined;
+}
+
+// ---------- Helpers ----------
+
+interface RejectParams {
+  db: Database.Database;
+  logId: string;
+  apiType: "openai" | "anthropic";
+  model: string;
+  startTime: number;
+  isStream: boolean;
+  routerKeyId: string | null;
+  originalBody: Record<string, unknown>;
+  clientHeaders: RawHeaders;
+  originalModel: string | null;
+  isFailover: boolean;
+  originalRequestId: string | null;
+  sessionId: string | undefined;
+}
+
+function rejectAndReply(
+  reply: FastifyReply,
+  params: RejectParams,
+  error: ProxyErrorResponse,
+  errorMessage: string,
+  providerId?: string,
+): FastifyReply {
+  insertRejectedLog({
+    db: params.db, logId: params.logId, apiType: params.apiType, model: params.model,
+    statusCode: error.statusCode, errorMessage, startTime: params.startTime,
+    isStream: params.isStream, routerKeyId: params.routerKeyId,
+    originalBody: params.originalBody, clientHeaders: params.clientHeaders,
+    providerId, originalModel: params.originalModel,
+    isFailover: params.isFailover, originalRequestId: params.originalRequestId,
+    sessionId: params.sessionId,
+  });
+  return reply.code(error.statusCode).send(error.body);
+}
 
 // ---------- Failover loop context ----------
 
@@ -149,6 +205,12 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
   const excludeTargets: Target[] = [];
   let rootLogId: string | null = null;
 
+// ---------- Failover loop ----------
+
+async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> {
+  const { request, reply, apiType, upstreamPath, errors, deps, options, effectiveModel, originalModel, isFailover, originalBody, sessionId } = ctx;
+  const excludeTargets: Target[] = [];
+  let rootLogId: string | null = null;
   while (true) {
     const startTime = Date.now();
     const logId = randomUUID();
@@ -185,11 +247,11 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
             return rejectAndReply(reply, rCtx, errors.modelNotAllowed(resolved.backend_model),
               `Model '${resolved.backend_model}' not allowed`, resolved.provider_id);
           }
-        } catch { request.log.warn({ allowedModels: allowedModels?.slice(0, 80) }, "Invalid allowed_models JSON, allowing all models"); } // eslint-disable-line no-magic-numbers
+        } catch { request.log.warn({ allowedModels: allowedModels?.slice(0, MAX_LOG_FIELD_LENGTH) }, "Invalid allowed_models JSON, allowing all models"); }
       }
     }
 
-    const provider = getProviderById(deps.db, resolved.provider_id);
+    let provider = getProviderById(deps.db, resolved.provider_id);
     if (!provider || !provider.is_active) {
       return rejectAndReply(reply, rCtx, errors.providerUnavailable(),
         `Provider '${resolved.provider_id}' unavailable`, resolved.provider_id);
@@ -200,14 +262,27 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
     }
 
     body.model = resolved.backend_model;
+
+    // --- 溢出重定向：上下文超出时切换到更大模型 ---
+    const overflowResult = applyOverflowRedirect(resolved, deps.db, body);
+    if (overflowResult) {
+      const overflowProvider = getProviderById(deps.db, overflowResult.provider_id);
+      if (overflowProvider && overflowProvider.is_active && overflowProvider.api_type === apiType) {
+        resolved = { ...resolved, provider_id: overflowResult.provider_id, backend_model: overflowResult.backend_model };
+        provider = overflowProvider;
+        body.model = overflowResult.backend_model;
+      }
+    }
+
+    applyProviderPatches(body, provider);
     const apiKey = decrypt(provider.api_key, getSetting(deps.db, "encryption_key")!);
     options?.beforeSendProxy?.(body, isStream);
 
     const reqBodyStr = JSON.stringify(body);
     const clientReq = JSON.stringify({ headers: cliHdrs, body: originalBody });
     const upstreamReqBase = JSON.stringify({
-      url: `${provider.base_url}${upstreamPath}`,
-      headers: sanitizeHeadersForLog(buildUpstreamHeaders(cliHdrs, apiKey, Buffer.byteLength(reqBodyStr))),
+      url: buildUpstreamUrl(provider.base_url, upstreamPath),
+      headers: sanitizeHeadersForLog(buildUpstreamHeaders(cliHdrs, apiKey, Buffer.byteLength(reqBodyStr), apiType)),
       body: reqBodyStr,
     });
 
@@ -271,6 +346,19 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
       return reply;
     } catch (e) {
       if (e instanceof ProviderSwitchNeeded) {
+        // 跨 provider failover：resilience 层携带了 attempts 数据，补写失败日志
+        if (e.attempts && e.attempts.length > 0) {
+          const fakeResult = e.lastResult ?? { kind: "throw" as const, error: new Error("provider switch") };
+          logResilienceResult(
+            deps.db,
+            {
+              apiType, model: effectiveModel, providerId: provider.id, isStream,
+              clientReq, upstreamReqBase, logId, routerKeyId, originalModel, sessionId,
+              failover: { isFailoverIteration, rootLogId: rootLogId! },
+            },
+            e.attempts, fakeResult, startTime,
+          );
+        }
         request.log.debug({ logId, action: "provider_switch", targetProviderId: e.targetProviderId });
         excludeTargets.push(resolved);
         continue;
@@ -287,7 +375,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
       request.log.debug({ logId, error: errMsg, action: "upstream_error" });
       insertRequestLog(deps.db, {
         id: logId, api_type: apiType, model: effectiveModel, provider_id: provider.id,
-        status_code: 502, latency_ms: Date.now() - startTime, is_stream: isStream ? 1 : 0,
+        status_code: UPSTREAM_ERROR_STATUS, latency_ms: Date.now() - startTime, is_stream: isStream ? 1 : 0,
         error_message: errMsg || "Upstream connection failed", created_at: new Date().toISOString(),
         client_request: clientReq, upstream_request: upstreamReqBase,
         is_failover: isFailoverIteration ? 1 : 0, original_request_id: isFailoverIteration ? rootLogId : null,

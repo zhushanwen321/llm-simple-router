@@ -121,6 +121,7 @@ export {
   getRequestLogsGrouped,
   updateLogMetrics,
   updateLogStreamContent,
+  updateLogClientStatus,
   backfillMetricsFromRequestMetrics,
   estimateLogTableSize,
   deleteOldestLogs,
@@ -168,6 +169,15 @@ export {
   getWindowUsage,
 } from "./usage-windows.js";
 export type { UsageWindow, WindowUsage } from "./usage-windows.js";
+
+export {
+  getModelContextWindowOverride,
+  getModelInfoForProvider,
+  setModelInfoForProvider,
+  deleteAllModelInfoForProvider,
+  getAllModelInfo,
+} from "./model-info.js";
+export type { ProviderModelInfo } from "./model-info.js";
 
 export {
   collectDbSizeInfo,

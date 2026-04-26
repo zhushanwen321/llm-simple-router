@@ -1,25 +1,12 @@
 <template>
   <div class="p-6">
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-semibold text-foreground">代理增强（实验性）</h2>
-      <Button :disabled="saving" @click="handleSave">
-        <span v-if="saving" class="flex items-center gap-1">
-          <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-          </svg>
-          保存中...
-        </span>
-        <span v-else>保存</span>
-      </Button>
-    </div>
+    <h2 class="text-lg font-semibold text-foreground mb-4">代理增强（实验性）</h2>
 
-    <Tabs default-value="claude-code">
+    <Tabs default-value="dynamic-model">
       <TabsList>
-        <TabsTrigger value="claude-code">Claude Code</TabsTrigger>
-        <TabsTrigger value="opencode">OpenCode</TabsTrigger>
+        <TabsTrigger value="dynamic-model">动态模型切换</TabsTrigger>
       </TabsList>
-      <TabsContent value="claude-code">
+      <TabsContent value="dynamic-model">
         <Card>
           <CardHeader>
             <CardTitle>Claude Code 动态模型切换</CardTitle>
@@ -40,18 +27,22 @@
           </CardContent>
         </Card>
 
+        <div class="flex justify-end mt-4">
+          <Button :disabled="saving" @click="handleSave">
+            <span v-if="saving" class="flex items-center gap-1">
+              <Loader2 class="w-4 h-4 animate-spin" />
+              保存中...
+            </span>
+            <span v-else>保存</span>
+          </Button>
+        </div>
+
         <!-- 使用说明 -->
         <Collapsible v-model:open="instructionsOpen" class="mt-4">
           <CollapsibleTrigger as-child>
             <Button variant="ghost" class="w-full justify-between">
               <span>使用说明</span>
-              <svg
-                class="w-4 h-4 transition-transform"
-                :class="{ 'rotate-180': instructionsOpen }"
-                fill="none" stroke="currentColor" viewBox="0 0 24 24"
-              >
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-              </svg>
+              <ChevronDown class="w-4 h-4 transition-transform" :class="{ 'rotate-180': instructionsOpen }" />
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent class="mt-2">
@@ -116,11 +107,6 @@
           </CardContent>
         </Card>
       </TabsContent>
-      <TabsContent value="opencode">
-        <div class="flex flex-col items-center justify-center py-16 text-muted-foreground">
-          <p class="text-lg">暂未支持 OpenCode 增强</p>
-        </div>
-      </TabsContent>
     </Tabs>
   </div>
 </template>
@@ -128,10 +114,11 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
-import { api } from '@/api/client'
+import { api, getApiMessage } from '@/api/client'
 import type { SessionState, SessionHistoryEntry } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
+import { ChevronDown, Loader2 } from 'lucide-vue-next'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
@@ -160,7 +147,9 @@ async function loadConfig() {
 async function handleSave() {
   saving.value = true
   try {
-    await api.updateProxyEnhancement({ claude_code_enabled: claudeCodeEnabled.value })
+    await api.updateProxyEnhancement({
+      claude_code_enabled: claudeCodeEnabled.value,
+    })
     toast.success('保存成功')
   } catch (e: unknown) {
     console.error('Failed to save proxy enhancement config:', e)

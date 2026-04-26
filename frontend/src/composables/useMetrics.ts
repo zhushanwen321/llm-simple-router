@@ -1,7 +1,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
 import type { ChartData } from 'chart.js'
-import { api } from '@/api/client'
+import { api, getApiMessage } from '@/api/client'
 import { fillTimeseries } from '@/views/metrics-helpers'
 import { CHART_COLORS } from '@/styles/design-tokens'
 import type { Provider } from '@/types/mapping'
@@ -44,7 +44,7 @@ export function useMetrics() {
     if (providerFilter.value === 'all') return modelOptions.value
     const provider = providers.value.find((p) => p.id === providerFilter.value)
     if (!provider) return modelOptions.value
-    const providerModels = new Set(provider.models)
+    const providerModels = new Set(provider.models.map(m => m.name))
     return modelOptions.value.filter((m) => providerModels.has(m))
   })
 

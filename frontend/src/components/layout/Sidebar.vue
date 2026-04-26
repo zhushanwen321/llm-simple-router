@@ -158,7 +158,7 @@ import {
   Settings,
   LogOut,
 } from 'lucide-vue-next'
-import { api } from '@/api/client'
+import { api, getApiMessage } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'

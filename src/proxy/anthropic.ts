@@ -1,6 +1,8 @@
 import Database from "better-sqlite3";
 import type { FastifyPluginCallback } from "fastify";
+import { randomUUID } from "crypto";
 import fp from "fastify-plugin";
+import { insertRequestLog } from "../db/index.js";
 import { createErrorFormatter } from "./proxy-core.js";
 import type { ErrorKind } from "./proxy-core.js";
 import { handleProxyRequest, type RouteHandlerDeps } from "./proxy-handler.js";
@@ -30,6 +32,7 @@ const ANTHROPIC_ERROR_TYPE: Record<ErrorKind, string> = {
   upstreamConnectionFailed: "upstream_error",
   concurrencyQueueFull: "api_error",
   concurrencyTimeout: "api_error",
+  promptTooLong: "invalid_request_error",
 };
 
 const anthropicErrors = createErrorFormatter(
@@ -43,6 +46,15 @@ const anthropicProxyRaw: FastifyPluginCallback<AnthropicProxyOptions> = (app, op
 
   app.post(MESSAGES_PATH, async (request, reply) => {
     if (!orchestrator) {
+      const body = request.body as Record<string, unknown> | undefined;
+      insertRequestLog(db, {
+        id: randomUUID(), api_type: "anthropic", model: (body?.model as string) || null,
+        provider_id: null, status_code: HTTP_BAD_GATEWAY, latency_ms: 0, is_stream: 0,
+        error_message: "Orchestrator not available (missing semaphore or tracker)",
+        created_at: new Date().toISOString(),
+        client_request: JSON.stringify({ headers: request.headers }),
+        router_key_id: request.routerKey?.id ?? null,
+      });
       const e = anthropicErrors.providerUnavailable();
       return reply.code(e.statusCode).send(e.body);
     }

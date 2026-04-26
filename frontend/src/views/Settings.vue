@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
-import { api, type DbSizeInfoResponse, type ConfigExportResponse } from '@/api/client'
+import { api, getApiMessage, type DbSizeInfoResponse, type ConfigExportResponse } from '@/api/client'
 import { useLogRetention } from '@/composables/useLogRetention'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'

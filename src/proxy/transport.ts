@@ -1,6 +1,7 @@
 import { request as httpRequestFn } from "http";
 import { request as httpsRequestFn } from "https";
 import { UPSTREAM_SUCCESS, filterHeaders } from "./types.js";
+import { buildUpstreamUrl } from "./proxy-core.js";
 import type { RawHeaders, TransportResult } from "./types.js";
 // Re-export callStream from stream-proxy.ts for external consumers
 export { callStream } from "./stream-proxy.js";
@@ -65,7 +66,7 @@ export function callNonStream(
   buildHeaders: BuildHeadersFn,
 ): Promise<TransportResult> {
   return new Promise((resolve) => {
-    const url = new URL(`${backend.base_url}${upstreamPath}`);
+    const url = new URL(buildUpstreamUrl(backend.base_url, upstreamPath));
     const payload = JSON.stringify(body);
     const upstreamHeaders = buildHeaders(
       clientHeaders,
@@ -128,7 +129,7 @@ export function callGet(
   buildHeaders: (cliHdrs: RawHeaders, key: string) => Record<string, string>,
 ): Promise<GetTransportResult> {
   return new Promise((resolve, reject) => {
-    const url = new URL(`${backend.base_url}${upstreamPath}`);
+    const url = new URL(buildUpstreamUrl(backend.base_url, upstreamPath));
     const headers = buildHeaders(clientHeaders, apiKey);
     const options = buildRequestOptions(url, headers, "GET");
 
