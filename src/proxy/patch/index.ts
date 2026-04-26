@@ -2,8 +2,6 @@ import { applyDeepSeekPatches } from "./deepseek/index.js";
 
 interface ProviderInfo {
   base_url: string;
-  api_type: string;
-  name: string;
 }
 
 /**
