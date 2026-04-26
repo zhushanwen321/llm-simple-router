@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { toast } from 'vue-sonner'
-import { api } from '@/api/client'
+import { api, getApiMessage } from '@/api/client'
 
 const DEFAULT_RETENTION_DAYS = 3
 
@@ -15,7 +15,7 @@ export function useLogRetention() {
       retentionDays.value = result.days
       toast.success('日志保留天数已更新')
     } catch (e: unknown) {
-      toast.error((e as { apiMessage?: string }).apiMessage || '更新保留天数失败')
+      toast.error(getApiMessage(e, '更新保留天数失败'))
     } finally {
       retentionSaving.value = false
     }
@@ -26,7 +26,7 @@ export function useLogRetention() {
       const { days } = await api.getLogRetention()
       retentionDays.value = days
     } catch (e: unknown) {
-      toast.error((e as { apiMessage?: string }).apiMessage || '加载保留天数失败，使用默认值')
+      toast.error(getApiMessage(e, '加载保留天数失败，使用默认值'))
     }
   }
 

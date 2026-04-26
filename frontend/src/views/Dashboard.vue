@@ -233,7 +233,7 @@ import {
   Filler,
 } from 'chart.js'
 import { Line } from 'vue-chartjs'
-import { api } from '@/api/client'
+import { api, getApiMessage } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -245,6 +245,7 @@ import { lineOptions, stackedAreaOptions } from './metrics-helpers'
 import { useMetrics } from '@/composables/useMetrics'
 import { useUsage } from '@/composables/useUsage'
 import DailyUsageTable from '@/components/dashboard/DailyUsageTable.vue'
+import { formatTimeShort } from '@/utils/format'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, ChartTooltip, Legend, Filler)
 
@@ -333,7 +334,7 @@ async function loadStats() {
     stats.value = res
   } catch (e: unknown) {
     console.error('Failed to load stats:', e)
-    toast.error((e as { apiMessage?: string }).apiMessage || '加载统计数据失败')
+    toast.error(getApiMessage(e, '加载统计数据失败'))
     stats.value = { totalRequests: 0, successRate: 0, avgTps: 0, totalTokens: 0 }
   }
 }
@@ -350,7 +351,7 @@ const totalWindowTokens = computed(() => {
 })
 
 function formatUsageTime(iso: string): string {
-  return new Date(iso).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+  return formatTimeShort(iso)
 }
 
 onMounted(() => {

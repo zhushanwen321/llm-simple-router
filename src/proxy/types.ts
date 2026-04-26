@@ -79,7 +79,11 @@ export type TransportResult =
  * orchestrator 捕获后释放当前信号量并获取新 provider 的信号量。
  */
 export class ProviderSwitchNeeded extends Error {
-  constructor(public readonly targetProviderId: string) {
+  constructor(
+    public readonly targetProviderId: string,
+    public readonly attempts?: import("./resilience.js").ResilienceAttempt[],
+    public readonly lastResult?: TransportResult,
+  ) {
     super(`Provider switch needed: ${targetProviderId}`);
     this.name = "ProviderSwitchNeeded";
   }

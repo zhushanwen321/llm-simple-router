@@ -1,5 +1,5 @@
 import { ref, watch, type Ref } from 'vue'
-import { api, type UsageWindowWithUsage, type DailyUsage } from '@/api/client'
+import { api, getApiMessage, type UsageWindowWithUsage, type DailyUsage } from '@/api/client'
 
 export function useUsage(keyFilter: Ref<string>, period: Ref<string>) {
   const windowsData = ref<UsageWindowWithUsage[]>([])
@@ -21,7 +21,7 @@ export function useUsage(keyFilter: Ref<string>, period: Ref<string>) {
         monthlyData.value = await api.getUsageMonthly(params)
       }
     } catch (e: unknown) {
-      usageError.value = (e as { apiMessage?: string }).apiMessage || '加载用量数据失败'
+      usageError.value = getApiMessage(e, '加载用量数据失败')
     } finally {
       usageLoading.value = false
     }

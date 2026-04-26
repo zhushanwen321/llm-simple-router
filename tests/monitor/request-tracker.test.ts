@@ -264,6 +264,39 @@ describe("RequestTracker", () => {
     });
   });
 
+  describe("addClient() initial snapshot", () => {
+    it("sends current active requests on connect", () => {
+      tracker.start(createActiveRequest({ id: "existing-1" }));
+
+      const { res, writes } = createMockResponse();
+      tracker.addClient(res);
+
+      const msg = writes.join("");
+      expect(msg).toContain("event: request_update");
+      expect(msg).toContain("existing-1");
+      // 不应包含 clientRequest（已被剥离）
+      expect(msg).not.toContain("clientRequest");
+    });
+
+    it("sends empty array when no active requests", () => {
+      const { res, writes } = createMockResponse();
+      tracker.addClient(res);
+
+      const msg = writes.join("");
+      expect(msg).toContain("event: request_update");
+      expect(msg).toContain("data: []");
+    });
+
+    it("does not send snapshot when writableEnded=true", () => {
+      const { res, writes } = createMockResponse();
+      (res as unknown as { writableEnded: boolean }).writableEnded = true;
+
+      tracker.addClient(res);
+
+      expect(writes).toHaveLength(0);
+    });
+  });
+
   describe("broadcast()", () => {
     it("writes SSE message to all clients", () => {
       const { res: res1, writes: writes1 } = createMockResponse();
@@ -271,6 +304,9 @@ describe("RequestTracker", () => {
 
       tracker.addClient(res1);
       tracker.addClient(res2);
+      // addClient 现在会发送初始快照，清空以单独测试 broadcast
+      writes1.length = 0;
+      writes2.length = 0;
 
       tracker.broadcast("test_event", { hello: "world" });
 

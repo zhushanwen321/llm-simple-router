@@ -31,6 +31,9 @@ export interface CheckerOptions {
 const DEFAULT_NPM_REGISTRY = 'https://registry.npmjs.org/llm-simple-router'
 const DEFAULT_GITHUB_CONFIG_BASE = 'https://raw.githubusercontent.com/zhushanwen321/llm-simple-router/main/config'
 const CHECK_TIMEOUT_MS = 5000
+const HTTP_STATUS_REDIRECT_LOWER = 300
+const HTTP_STATUS_REDIRECT_UPPER = 400
+const HTTP_STATUS_OK_LOWER = 200
 
 const MAX_REDIRECTS = 5;
 
@@ -40,13 +43,13 @@ export async function fetchJson(url: string, redirects = 0): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('timeout')), CHECK_TIMEOUT_MS)
     mod.get(url, (res) => {
-      if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+      if (res.statusCode && res.statusCode >= HTTP_STATUS_REDIRECT_LOWER && res.statusCode < HTTP_STATUS_REDIRECT_UPPER && res.headers.location) {
         clearTimeout(timer)
         res.resume()
         fetchJson(res.headers.location, redirects + 1).then(resolve, reject)
         return
       }
-      if (res.statusCode && (res.statusCode < 200 || res.statusCode >= 300)) {
+      if (res.statusCode && (res.statusCode < HTTP_STATUS_OK_LOWER || res.statusCode >= HTTP_STATUS_REDIRECT_LOWER)) {
         clearTimeout(timer)
         res.resume()
         reject(new Error(`HTTP ${res.statusCode}`))

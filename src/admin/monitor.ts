@@ -24,6 +24,8 @@ export const adminMonitorRoutes: FastifyPluginCallback<MonitorRoutesOptions> = (
   app.get("/admin/api/monitor/runtime", async () => tracker.getRuntime());
 
   app.get("/admin/api/monitor/stream", (request, reply) => {
+    // hijack() 让 Fastify 完全放弃响应管理，避免 onSend hook 向 SSE 流注入信封 JSON
+    reply.hijack();
     reply.raw.writeHead(HTTP_OK, {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",

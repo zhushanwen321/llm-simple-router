@@ -48,7 +48,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { api } from '@/api/client'
+import { api, getApiMessage } from '@/api/client'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -79,7 +79,7 @@ async function handleSetup() {
     await api.initializeSetup(password.value)
     router.push('/admin/dashboard')
   } catch (e: unknown) {
-    error.value = (e as { apiMessage?: string }).apiMessage || '设置失败'
+    error.value = getApiMessage(e, '设置失败')
   } finally {
     loading.value = false
   }

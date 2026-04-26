@@ -45,6 +45,8 @@ export interface TransportFnParams {
 }
 
 export function buildTransportFn(p: TransportFnParams): (target: Target) => Promise<TransportResult> {
+  const buildHeaders = (cliHdrs: RawHeaders, key: string, bytes?: number) =>
+    buildUpstreamHeaders(cliHdrs, key, bytes, p.apiType);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   return async (_target: Target) => {
     if (p.isStream) {
@@ -55,14 +57,14 @@ export function buildTransportFn(p: TransportFnParams): (target: Target) => Prom
       const checkEarlyError = p.matcher ? (data: string) => p.matcher!.test(UPSTREAM_SUCCESS, data) : undefined;
       const streamResult = await callStream(
         p.provider, p.apiKey, p.body, p.cliHdrs, p.reply, p.streamTimeoutMs,
-        p.upstreamPath, buildUpstreamHeaders, metricsTransform, checkEarlyError,
+        p.upstreamPath, buildHeaders, metricsTransform, checkEarlyError,
       );
       const m = (streamResult.kind === "stream_success" || streamResult.kind === "stream_abort")
         ? streamResult.metrics : undefined;
       if (m) p.tracker?.update(p.logId, { streamMetrics: toStreamMetrics(m) });
       return streamResult;
     }
-    const result = await callNonStream(p.provider, p.apiKey, p.body, p.cliHdrs, p.upstreamPath, buildUpstreamHeaders);
+    const result = await callNonStream(p.provider, p.apiKey, p.body, p.cliHdrs, p.upstreamPath, buildHeaders);
     if (result.kind === "success") {
       const mr = MetricsExtractor.fromNonStreamResponse(p.apiType, result.body);
       if (mr) p.tracker?.update(p.logId, { streamMetrics: toStreamMetrics(mr) });

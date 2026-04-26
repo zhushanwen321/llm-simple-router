@@ -54,7 +54,7 @@ function logRejectedAuth(
     is_stream: 0,
     error_message: errorMessage,
     created_at: new Date().toISOString(),
-    client_request: JSON.stringify({ headers: request.headers }),
+    client_request: JSON.stringify({ method: request.method, ip: request.ip, headers: request.headers }),
   });
 }
 

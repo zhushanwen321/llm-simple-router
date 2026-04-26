@@ -1,6 +1,7 @@
+import { randomUUID } from "crypto";
 import Database from "better-sqlite3";
-import { getLatestWindow } from "../db/usage-windows.js";
-import { toSqliteDatetime } from "./datetime.js";
+import { getLatestWindow, insertWindow } from "../db/usage-windows.js";
+import { toSqliteDatetime, parseSqliteDatetime } from "./datetime.js";
 
 export type DashboardPeriod = "window" | "weekly" | "monthly";
 
@@ -9,8 +10,10 @@ export interface TimeRange {
   endTime: string;
 }
 
-// 5 小时窗口，与 usage-windows 的默认窗口时长对齐
-const WINDOW_DURATION_MS = 5 * 3600_000;
+const WINDOW_HOURS = 5
+const MS_PER_HOUR = 3600_000
+// 与 usage-windows 的默认窗口时长对齐
+const WINDOW_DURATION_MS = WINDOW_HOURS * MS_PER_HOUR
 
 export function resolveTimeRange(
   period: DashboardPeriod,
@@ -23,13 +26,11 @@ export function resolveTimeRange(
     case "window": {
       const latest = getLatestWindow(db, routerKeyId);
       if (!latest) {
-        // 无窗口数据时回退到当前小时的 5h 区间
-        const start = new Date(now);
-        start.setMinutes(0, 0, 0);
-        return {
-          startTime: toSqliteDatetime(start),
-          endTime: toSqliteDatetime(new Date(start.getTime() + WINDOW_DURATION_MS)),
-        };
+        return createAndReturnWindow(db, now, routerKeyId);
+      }
+      // 最新窗口已过期（无请求触发新窗口创建），主动补齐
+      if (now > parseSqliteDatetime(latest.end_time)) {
+        return createAndReturnWindow(db, now, routerKeyId);
       }
       return { startTime: latest.start_time, endTime: latest.end_time };
     }
@@ -49,8 +50,27 @@ export function resolveTimeRange(
 export function getMonday(date: Date): Date {
   const d = new Date(date);
   const day = d.getDay();
-  // 周日 getDay()=0，需要回退到上周一
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  // 周日 getDay()=0，需要回退到上周一；+1 将周日=0 映射到周一=1 基准
+  const SUNDAY_OFFSET = -6;
+  const MONDAY_BASE = 1;
+  const diff = d.getDate() - day + (day === 0 ? SUNDAY_OFFSET : MONDAY_BASE);
   d.setDate(diff);
   return d;
+}
+
+function createAndReturnWindow(
+  db: Database.Database,
+  now: Date,
+  routerKeyId?: string,
+): TimeRange {
+  const start = new Date(now);
+  start.setMinutes(0, 0, 0);
+  const end = new Date(start.getTime() + WINDOW_DURATION_MS);
+  insertWindow(db, {
+    id: randomUUID(),
+    router_key_id: routerKeyId ?? null,
+    start_time: toSqliteDatetime(start),
+    end_time: toSqliteDatetime(end),
+  });
+  return { startTime: toSqliteDatetime(start), endTime: toSqliteDatetime(end) };
 }

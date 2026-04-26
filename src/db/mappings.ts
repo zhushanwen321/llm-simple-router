@@ -18,11 +18,12 @@ export interface MappingGroup {
   client_model: string;
   strategy: string;
   rule: string;
+  is_active: number;
   created_at: string;
 }
 
 const MAPPING_FIELDS = new Set(["client_model", "backend_model", "provider_id", "is_active"]);
-const GROUP_FIELDS = new Set(["client_model", "strategy", "rule"]);
+const GROUP_FIELDS = new Set(["client_model", "strategy", "rule", "is_active"]);
 
 // --- ModelMapping CRUD ---
 
@@ -71,7 +72,7 @@ export function getMappingGroup(
   clientModel: string,
 ): MappingGroup | undefined {
   return db
-    .prepare("SELECT * FROM mapping_groups WHERE client_model = ?")
+    .prepare("SELECT * FROM mapping_groups WHERE client_model = ? AND is_active = 1")
     .get(clientModel) as MappingGroup | undefined;
 }
 
@@ -106,7 +107,7 @@ export function createMappingGroup(
 export function updateMappingGroup(
   db: Database.Database,
   id: string,
-  fields: Partial<Pick<MappingGroup, "client_model" | "strategy" | "rule">>,
+  fields: Partial<Pick<MappingGroup, "client_model" | "strategy" | "rule" | "is_active">>,
 ): void {
   buildUpdateQuery(db, "mapping_groups", id, fields, GROUP_FIELDS);
 }
