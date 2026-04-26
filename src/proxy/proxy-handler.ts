@@ -387,3 +387,4 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
     }
   }
 }
+
