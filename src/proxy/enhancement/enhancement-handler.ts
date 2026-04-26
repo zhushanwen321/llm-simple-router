@@ -210,12 +210,12 @@ export function applyEnhancement(
       if (displayModels.length >= TWO_STEP_THRESHOLD) {
         const providers = getUniqueProviders(displayModels);
         if (providers.length >= 2) {
-          const question = buildProviderQuestion(providers);
+          const providerQs = buildProviderQuestions(providers);
           return {
             effectiveModel: clientModel,
             originalModel: null,
             interceptResponse: {
-              ...buildAskUserQuestionPayload([question], true),
+              ...buildAskUserQuestionPayload(providerQs, true),
               meta: { action: "Provider列表(AskUserQuestion)" },
             },
           };
@@ -391,16 +391,34 @@ function buildModelQuestions(models: string[]): unknown[] {
   });
 }
 
-/** 构建 provider 选择的 AskUserQuestion question（两步式第一步） */
-function buildProviderQuestion(providers: string[]): unknown {
-  const options = providers.map(p => ({ label: p, description: `${p} 的模型` }));
-  options.push({ label: SKIP_LABEL, description: "不切换模型" });
-  return {
-    question: "请先选择模型提供商",
-    header: "Provider",
-    options,
-    multiSelect: false,
-  };
+/** 构建 provider 选择的 AskUserQuestion questions（两步式第一步，每组 ≤3 个 provider + "不选择"） */
+function buildProviderQuestions(providers: string[]): unknown[] {
+  if (providers.length <= 3) {
+    const options = providers.map(p => ({ label: p, description: `${p} 的模型` }));
+    options.push({ label: SKIP_LABEL, description: "不切换模型" });
+    return [{
+      question: "请先选择模型提供商",
+      header: "Provider",
+      options,
+      multiSelect: false,
+    }];
+  }
+  const chunks: string[][] = [];
+  for (let i = 0; i < providers.length && chunks.length < 4; i += 3) {
+    chunks.push(providers.slice(i, i + 3));
+  }
+  return chunks.map((chunk, idx) => {
+    const options = chunk.map(p => ({ label: p, description: `${p} 的模型` }));
+    options.push({ label: SKIP_LABEL, description: "不切换模型" });
+    return {
+      question: chunks.length === 1
+        ? "请先选择模型提供商"
+        : `请选择模型提供商（第${idx + 1}组）`,
+      header: idx === 0 ? "Provider" : `Provider(${idx + 1})`,
+      options,
+      multiSelect: false,
+    };
+  });
 }
 
 /** 构造 AskUserQuestion synthetic tool_use 响应（isProvider=true 用 provider 前缀） */
