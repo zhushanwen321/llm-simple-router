@@ -63,7 +63,7 @@ function toggleOpen() {
       :class="{ 'ring-2 ring-ring ring-offset-2': open }"
       @click="toggleOpen"
     >
-      <span :class="displayText ? 'text-foreground' : 'text-muted-foreground'">
+      <span class="truncate" :class="displayText ? 'text-foreground' : 'text-muted-foreground'">
         {{ displayText || placeholder }}
       </span>
       <ChevronDown class="h-4 w-4 shrink-0 opacity-50" />
@@ -72,10 +72,10 @@ function toggleOpen() {
     <!-- Dropdown -->
     <div
       v-if="open"
-      class="absolute z-50 mt-1"
+      class="absolute z-50 mt-1 min-w-full"
     >
       <!-- Level 1: Provider list -->
-      <div class="min-w-56 rounded-md border bg-popover p-1 text-popover-foreground shadow-md">
+      <div class="rounded-md border bg-popover p-1 text-popover-foreground shadow-md">
         <div
           v-for="group in providers"
           :key="group.provider.id"
@@ -84,13 +84,13 @@ function toggleOpen() {
           @mouseenter="hoveredProviderId = group.provider.id"
           @click.stop
         >
-          <span class="truncate">{{ group.provider.name }}</span>
+          <span class="truncate max-w-40">{{ group.provider.name }}</span>
           <ChevronRight class="ml-1 h-4 w-4 shrink-0 opacity-50" />
 
           <!-- Level 2: Model list -->
           <div
             v-if="hoveredProviderId === group.provider.id && getFilteredModels(group).length > 0"
-            class="absolute left-full top-0 min-w-48 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+            class="absolute left-full top-0 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
           >
             <div
               v-for="model in getFilteredModels(group)"
