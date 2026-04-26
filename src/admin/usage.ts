@@ -25,12 +25,17 @@ function getDailyUsage(
   endTime: string,
   routerKeyId?: string,
 ): DailyUsageRow[] {
-  const routerKeyFilter = routerKeyId
-    ? " AND rl.router_key_id = ?"
-    : "";
-  const params = routerKeyId
-    ? [startTime, endTime, routerKeyId]
-    : [startTime, endTime];
+  const conditions = [
+    "rm.is_complete = 1",
+    "rm.created_at >= datetime(?)",
+    "rm.created_at < datetime(?)",
+  ];
+  const params: unknown[] = [startTime, endTime];
+
+  if (routerKeyId) {
+    conditions.push("rm.router_key_id = ?");
+    params.push(routerKeyId);
+  }
 
   return db.prepare(`
     SELECT
@@ -39,11 +44,7 @@ function getDailyUsage(
       COALESCE(SUM(rm.input_tokens), 0) AS total_input_tokens,
       COALESCE(SUM(rm.output_tokens), 0) AS total_output_tokens
     FROM request_metrics rm
-    JOIN request_logs rl ON rl.id = rm.request_log_id
-    WHERE rm.is_complete = 1
-      AND rm.created_at >= datetime(?)
-      AND rm.created_at < datetime(?)
-      ${routerKeyFilter}
+    WHERE ${conditions.join(" AND ")}
     GROUP BY date(rm.created_at)
     ORDER BY date ASC
   `).all(...params) as DailyUsageRow[];

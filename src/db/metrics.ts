@@ -147,8 +147,7 @@ export function getMetricsSummary(
   if (providerId) { conditions.push("rm.provider_id = ?"); params.push(providerId); }
   if (backendModel) { conditions.push("rm.backend_model = ?"); params.push(backendModel); }
   if (routerKeyId) {
-    joins.push("LEFT JOIN request_logs rl ON rl.id = rm.request_log_id");
-    conditions.push("rl.router_key_id = ?");
+    conditions.push("rm.router_key_id = ?");
     params.push(routerKeyId);
   }
 
@@ -203,11 +202,10 @@ export function getMetricsTimeseries(
 
   if (providerId) { conditions.push("rm.provider_id = ?"); params.push(providerId); }
   if (backendModel) { conditions.push("rm.backend_model = ?"); params.push(backendModel); }
-  if (routerKeyId) { conditions.push("rl.router_key_id = ?"); params.push(routerKeyId); }
+  if (routerKeyId) { conditions.push("rm.router_key_id = ?"); params.push(routerKeyId); }
 
   const where = conditions.join(" AND ");
   const expr = METRIC_EXPR[metric];
-  const joinClause = routerKeyId ? "LEFT JOIN request_logs rl ON rl.id = rm.request_log_id" : "";
 
   const rows = db.prepare(`
     SELECT
@@ -215,7 +213,6 @@ export function getMetricsTimeseries(
       ${expr} AS avg_value,
       COUNT(*) AS count
     FROM request_metrics rm
-    ${joinClause}
     WHERE ${where}
     GROUP BY bucket_key
     ORDER BY bucket_key ASC

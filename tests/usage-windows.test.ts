@@ -188,14 +188,14 @@ describe("usage-windows DB layer", () => {
     ).run("log-2", "openai", "gpt-4", "p-1", 200, 100, 0, now, "rk-2");
 
     database.prepare(
-      `INSERT INTO request_metrics (id, request_log_id, provider_id, backend_model, api_type, input_tokens, output_tokens, is_complete, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run("m-1", "log-1", "p-1", "gpt-4", "openai", 100, 50, 1, now);
+      `INSERT INTO request_metrics (id, request_log_id, provider_id, backend_model, api_type, router_key_id, status_code, input_tokens, output_tokens, is_complete, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run("m-1", "log-1", "p-1", "gpt-4", "openai", "rk-1", 200, 100, 50, 1, now);
 
     database.prepare(
-      `INSERT INTO request_metrics (id, request_log_id, provider_id, backend_model, api_type, input_tokens, output_tokens, is_complete, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run("m-2", "log-2", "p-1", "gpt-4", "openai", 200, 80, 1, now);
+      `INSERT INTO request_metrics (id, request_log_id, provider_id, backend_model, api_type, router_key_id, status_code, input_tokens, output_tokens, is_complete, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run("m-2", "log-2", "p-1", "gpt-4", "openai", "rk-2", 200, 200, 80, 1, now);
 
     const usage = getWindowUsage(database, "2026-04-01 00:00:00", "2026-12-31 23:59:59", "rk-1");
     expect(usage.request_count).toBe(1);

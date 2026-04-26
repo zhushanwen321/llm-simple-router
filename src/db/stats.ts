@@ -27,7 +27,7 @@ export function getStats(
   ];
   const params: unknown[] = [startTime, endTime];
   if (routerKeyId) {
-    conditions.push("rl.router_key_id = ?");
+    conditions.push("rm.router_key_id = ?");
     params.push(routerKeyId);
   }
   const where = conditions.join(" AND ");
@@ -35,11 +35,10 @@ export function getStats(
   const row = db.prepare(`
     SELECT
       COUNT(*) AS total_requests,
-      SUM(CASE WHEN rl.status_code >= 200 AND rl.status_code < 300 THEN 1 ELSE 0 END) AS success_count,
+      SUM(CASE WHEN rm.status_code >= 200 AND rm.status_code < 300 THEN 1 ELSE 0 END) AS success_count,
       AVG(rm.tokens_per_second) AS avg_tps,
       COALESCE(SUM(rm.input_tokens), 0) + COALESCE(SUM(rm.output_tokens), 0) AS total_tokens
     FROM request_metrics rm
-    JOIN request_logs rl ON rl.id = rm.request_log_id
     WHERE ${where}
   `).get(...params) as StatsRow;
 
