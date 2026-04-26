@@ -10,6 +10,7 @@ interface UsageRoutesOptions {
 
 const UsageQuerySchema = Type.Object({
   router_key_id: Type.Optional(Type.String()),
+  provider_id: Type.Optional(Type.String()),
 });
 
 interface DailyUsageRow {
@@ -24,6 +25,7 @@ function getDailyUsage(
   startTime: string,
   endTime: string,
   routerKeyId?: string,
+  providerId?: string,
 ): DailyUsageRow[] {
   const conditions = [
     "rm.is_complete = 1",
@@ -35,6 +37,10 @@ function getDailyUsage(
   if (routerKeyId) {
     conditions.push("rm.router_key_id = ?");
     params.push(routerKeyId);
+  }
+  if (providerId) {
+    conditions.push("rm.provider_id = ?");
+    params.push(providerId);
   }
 
   return db.prepare(`
@@ -54,26 +60,26 @@ export const adminUsageRoutes: FastifyPluginCallback<UsageRoutesOptions> = (app,
   const { db } = options;
 
   app.get("/admin/api/usage/windows", { schema: { querystring: UsageQuerySchema } }, async (request) => {
-    const query = request.query as { router_key_id?: string };
+    const query = request.query as { router_key_id?: string; provider_id?: string };
     const range = resolveTimeRange("window", db, query.router_key_id);
-    const windows = getWindowsInRange(db, range.startTime, range.endTime, query.router_key_id);
+    const windows = getWindowsInRange(db, range.startTime, range.endTime, query.router_key_id, query.provider_id);
     if (windows.length === 0) return [];
     return windows.map(w => ({
       window: w,
-      usage: getWindowUsage(db, w.start_time, w.end_time, query.router_key_id),
+      usage: getWindowUsage(db, w.start_time, w.end_time, query.router_key_id, query.provider_id),
     }));
   });
 
   app.get("/admin/api/usage/weekly", { schema: { querystring: UsageQuerySchema } }, async (request) => {
-    const query = request.query as { router_key_id?: string };
+    const query = request.query as { router_key_id?: string; provider_id?: string };
     const range = resolveTimeRange("weekly", db, query.router_key_id);
-    return getDailyUsage(db, range.startTime, range.endTime, query.router_key_id);
+    return getDailyUsage(db, range.startTime, range.endTime, query.router_key_id, query.provider_id);
   });
 
   app.get("/admin/api/usage/monthly", { schema: { querystring: UsageQuerySchema } }, async (request) => {
-    const query = request.query as { router_key_id?: string };
+    const query = request.query as { router_key_id?: string; provider_id?: string };
     const range = resolveTimeRange("monthly", db, query.router_key_id);
-    return getDailyUsage(db, range.startTime, range.endTime, query.router_key_id);
+    return getDailyUsage(db, range.startTime, range.endTime, query.router_key_id, query.provider_id);
   });
 
   done();
