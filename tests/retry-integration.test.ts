@@ -48,13 +48,13 @@ function setupProvider(db: Database.Database, baseUrl: string) {
      VALUES (?, ?, ?, ?, ?, ?)`
   ).run("map-sonnet", "sonnet", "mock-model", "svc-anthropic", 1, now);
   db.prepare(
-    `INSERT INTO mapping_groups (id, client_model, strategy, rule, created_at)
+    `INSERT INTO mapping_groups (id, client_model, rule, is_active, created_at)
      VALUES (?, ?, ?, ?, ?)`
   ).run(
     "mg-sonnet",
     "sonnet",
-    "scheduled",
-    JSON.stringify({ default: { backend_model: "mock-model", provider_id: "svc-anthropic" } }),
+    JSON.stringify({ targets: [{ backend_model: "mock-model", provider_id: "svc-anthropic" }] }),
+    1,
     now
   );
 }

@@ -90,18 +90,18 @@ function setupFailoverGroup(
   );
 
   db.prepare(
-    `INSERT INTO mapping_groups (id, client_model, strategy, rule, created_at)
+    `INSERT INTO mapping_groups (id, client_model, rule, is_active, created_at)
      VALUES (?, ?, ?, ?, ?)`
   ).run(
     "mg-failover",
     "gpt-4",
-    "failover",
     JSON.stringify({
       targets: [
         { backend_model: "gpt-4", provider_id: "prov-primary" },
         { backend_model: "gpt-4", provider_id: "prov-fallback" },
       ],
     }),
+    1,
     now
   );
 

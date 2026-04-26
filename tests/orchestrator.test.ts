@@ -76,7 +76,7 @@ describe("ProxyOrchestrator", () => {
       createMockRequest(), reply, "openai", defaultConfig, { transportFn: vi.fn() },
     );
     expect(result).toEqual(successResilienceResult());
-    expect(deps.semaphoreScope.withSlot).toHaveBeenCalledWith("p1", expect.anything(), expect.any(Function), expect.any(Function));
+    expect(deps.semaphoreScope.withSlot).toHaveBeenCalledWith("p1", expect.anything(), expect.any(Function), expect.any(Function), undefined);
     expect(deps.resilience.execute).toHaveBeenCalled();
     expect(reply.code).toHaveBeenCalledWith(200);
   });

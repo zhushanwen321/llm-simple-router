@@ -14,7 +14,10 @@ vi.mock("../src/db/index.js", () => ({
 
 vi.mock("../src/utils/crypto.js", () => ({ decrypt: vi.fn(() => "sk-test") }));
 vi.mock("../src/db/settings.js", () => ({ getSetting: vi.fn(() => "enc-key") }));
-vi.mock("../src/proxy/mapping-resolver.js", () => ({ resolveMapping: vi.fn(() => null) }));
+vi.mock("../src/proxy/mapping-resolver.js", () => ({
+  resolveMapping: vi.fn(() => null),
+  countGroupTargets: vi.fn(() => 1),
+}));
 vi.mock("../src/proxy/enhancement/enhancement-handler.js", () => ({
   applyEnhancement: vi.fn(() => ({ effectiveModel: "gpt-4", originalModel: null, interceptResponse: null })),
   buildModelInfoTag: vi.fn(() => "<router-response>...</router-response>"),
@@ -97,7 +100,7 @@ describe("handleProxyRequest", () => {
   });
 
   it("Provider 不可用时返回 503", async () => {
-    vi.mocked(resolveMapping).mockReturnValue({ backend_model: "gpt-4", provider_id: "p1" });
+    vi.mocked(resolveMapping).mockReturnValue({ target: { backend_model: "gpt-4", provider_id: "p1" } });
     vi.mocked(getProviderById).mockReturnValue({ ...activeProvider, is_active: 0 });
     const deps = createDeps();
     const reply = createReply();
@@ -106,7 +109,7 @@ describe("handleProxyRequest", () => {
   });
 
   it("API type 不匹配时返回 500", async () => {
-    vi.mocked(resolveMapping).mockReturnValue({ backend_model: "gpt-4", provider_id: "p1" });
+    vi.mocked(resolveMapping).mockReturnValue({ target: { backend_model: "gpt-4", provider_id: "p1" } });
     vi.mocked(getProviderById).mockReturnValue({ ...activeProvider, api_type: "anthropic" as const });
     const deps = createDeps();
     const reply = createReply();
@@ -115,7 +118,7 @@ describe("handleProxyRequest", () => {
   });
 
   it("正常请求调用 orchestrator 并记录日志", async () => {
-    vi.mocked(resolveMapping).mockReturnValue({ backend_model: "gpt-4", provider_id: "p1" });
+    vi.mocked(resolveMapping).mockReturnValue({ target: { backend_model: "gpt-4", provider_id: "p1" } });
     vi.mocked(getProviderById).mockReturnValue(activeProvider);
     const deps = createDeps();
     deps.orchestrator.handle = vi.fn().mockResolvedValue(successResilienceResult);
@@ -128,8 +131,8 @@ describe("handleProxyRequest", () => {
 
   it("ProviderSwitchNeeded 触发 failover 循环", async () => {
     vi.mocked(resolveMapping)
-      .mockReturnValueOnce({ backend_model: "gpt-4", provider_id: "p1" })
-      .mockReturnValueOnce({ backend_model: "gpt-4", provider_id: "p2" });
+      .mockReturnValueOnce({ target: { backend_model: "gpt-4", provider_id: "p1" } })
+      .mockReturnValueOnce({ target: { backend_model: "gpt-4", provider_id: "p2" } });
     vi.mocked(getProviderById)
       .mockReturnValueOnce(activeProvider)
       .mockReturnValueOnce({ ...activeProvider, id: "p2" });
@@ -150,7 +153,7 @@ describe("handleProxyRequest", () => {
   });
 
   it("SemaphoreQueueFullError 返回 503", async () => {
-    vi.mocked(resolveMapping).mockReturnValue({ backend_model: "gpt-4", provider_id: "p1" });
+    vi.mocked(resolveMapping).mockReturnValue({ target: { backend_model: "gpt-4", provider_id: "p1" } });
     vi.mocked(getProviderById).mockReturnValue(activeProvider);
     const deps = createDeps();
     deps.orchestrator.handle = vi.fn().mockRejectedValue(new SemaphoreQueueFullError("p1"));
@@ -160,7 +163,7 @@ describe("handleProxyRequest", () => {
   });
 
   it("SemaphoreTimeoutError 返回 504", async () => {
-    vi.mocked(resolveMapping).mockReturnValue({ backend_model: "gpt-4", provider_id: "p1" });
+    vi.mocked(resolveMapping).mockReturnValue({ target: { backend_model: "gpt-4", provider_id: "p1" } });
     vi.mocked(getProviderById).mockReturnValue(activeProvider);
     const deps = createDeps();
     deps.orchestrator.handle = vi.fn().mockRejectedValue(new SemaphoreTimeoutError("p1", 5000));
