@@ -115,11 +115,22 @@
     </div>
 
     <div class="flex items-center justify-between mt-4">
-      <p class="text-sm text-muted-foreground">共 {{ total }} 条</p>
-      <div class="flex gap-1">
-        <Button variant="outline" size="sm" @click="prevPage" :disabled="page <= 1">上一页</Button>
-        <span class="px-3 py-1 text-sm text-muted-foreground">第 {{ page }} 页</span>
-        <Button variant="outline" size="sm" @click="nextPage" :disabled="!hasMore">下一页</Button>
+      <p class="text-sm text-muted-foreground">共 {{ total }} 条，第 {{ page }} / {{ totalPages }} 页</p>
+      <div class="flex items-center gap-1">
+        <Button variant="outline" size="sm" @click="goToPage(1)" :disabled="page <= 1">首页</Button>
+        <Button variant="outline" size="sm" @click="goToPage(page - 1)" :disabled="page <= 1">上一页</Button>
+        <template v-for="item in pageNumbers" :key="item">
+          <span v-if="item === '...'" class="px-2 text-sm text-muted-foreground">...</span>
+          <Button
+            v-else
+            :variant="item === page ? 'default' : 'outline'"
+            size="sm"
+            class="min-w-8"
+            @click="goToPage(item)"
+          >{{ item }}</Button>
+        </template>
+        <Button variant="outline" size="sm" @click="goToPage(page + 1)" :disabled="page >= totalPages">下一页</Button>
+        <Button variant="outline" size="sm" @click="goToPage(totalPages)" :disabled="page >= totalPages">末页</Button>
       </div>
     </div>
 
@@ -183,7 +194,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, watch } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -210,13 +221,30 @@ const TABLE_COL_COUNT = 13
 const DEBOUNCE_MS = 300
 
 const {
-  logs, total, page, hasMore,
+  logs, total, page, totalPages,
   cleanupDays, showCleanup, cleanupResult, showCleanupResult,
   expandedRows, childLogs, childLoading,
   logDetailOpen, selectedLogEntry,
-  loadLogs, prevPage, nextPage,
+  loadLogs, goToPage,
   handleCleanup, toggleExpand, openLogDetail,
 } = useLogs()
+
+const pageNumbers = computed(() => {
+  const tp = totalPages.value
+  const current = page.value
+  if (tp <= 7) return Array.from({ length: tp }, (_, i) => i + 1)
+
+  const pages: (number | '...')[] = [1]
+  const start = Math.max(2, current - 2)
+  const end = Math.min(tp - 1, current + 2)
+
+  if (start > 2) pages.push('...')
+  for (let i = start; i <= end; i++) pages.push(i)
+  if (end < tp - 1) pages.push('...')
+  pages.push(tp)
+
+  return pages
+})
 
 const { retentionDays, retentionSaving, saveRetention, loadRetention } = useLogRetention()
 

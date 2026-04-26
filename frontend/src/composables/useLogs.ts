@@ -21,9 +21,9 @@ export function useLogs() {
   const logDetailOpen = ref(false)
   const selectedLogEntry = ref<LogEntry | null>(null)
 
-  const hasMore = computed(() => logs.value.length >= PAGE_SIZE)
+  const totalPages = computed(() => Math.ceil(total.value / PAGE_SIZE))
 
-  /** 加载日志列表。传入 params 会更新内部 filter 状态供 prevPage/nextPage 复用 */
+  /** 加载日志列表。传入 params 会更新内部 filter 状态供 goToPage 复用 */
   async function loadLogs(params?: Record<string, string>) {
     if (params) filterParams.value = params
     try {
@@ -39,16 +39,11 @@ export function useLogs() {
     }
   }
 
-  function prevPage() {
-    if (page.value > 1) {
-      page.value--
+  function goToPage(p: number) {
+    if (p >= 1 && p <= totalPages.value && p !== page.value) {
+      page.value = p
       loadLogs()
     }
-  }
-
-  function nextPage() {
-    page.value++
-    loadLogs()
   }
 
   const cleanupResult = ref<number | null>(null)
@@ -101,11 +96,11 @@ export function useLogs() {
 
   return {
     PAGE_SIZE,
-    logs, total, page, hasMore,
+    logs, total, page, totalPages,
     cleanupDays, showCleanup, expandedRows, childLogs, childLoading,
     logDetailOpen, selectedLogEntry,
     cleanupResult, showCleanupResult,
-    loadLogs, prevPage, nextPage,
+    loadLogs, goToPage,
     handleCleanup, toggleExpand, openLogDetail,
   }
 }
