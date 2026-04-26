@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
-import { api, type DbSizeInfoResponse, type ConfigExportResponse } from '@/api/client'
+import { api, getApiMessage, type DbSizeInfoResponse, type ConfigExportResponse } from '@/api/client'
 import { useLogRetention } from '@/composables/useLogRetention'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -119,7 +119,7 @@ async function saveThresholds() {
     toast.success('存储阈值已更新')
     await loadSettings()
   } catch (e: unknown) {
-    toast.error((e as { apiMessage?: string }).apiMessage || '更新失败')
+    toast.error(getApiMessage(e, '更新失败'))
   }
 }
 
@@ -135,7 +135,7 @@ async function handleExport() {
     URL.revokeObjectURL(url)
     toast.success('配置已导出')
   } catch (e: unknown) {
-    toast.error((e as { apiMessage?: string }).apiMessage || '导出失败')
+    toast.error(getApiMessage(e, '导出失败'))
   }
 }
 
@@ -171,7 +171,7 @@ async function confirmImport() {
     toast.success('配置已导入')
     await loadSettings()
   } catch (e: unknown) {
-    toast.error((e as { apiMessage?: string }).apiMessage || '导入失败')
+    toast.error(getApiMessage(e, '导入失败'))
   } finally {
     importing.value = false
     pendingImportData.value = null

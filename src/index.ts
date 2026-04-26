@@ -60,7 +60,13 @@ export async function buildApp(
 
   const isDev = process.env.NODE_ENV !== "production";
 
+  const MAX_BODY_SIZE_MB = 50;
+  const KB = 1024;
+  const MB = KB * KB;
+
   const app = Fastify({
+    // Claude Code 图片请求含 base64 编码，单张可达数十 MB
+    bodyLimit: MAX_BODY_SIZE_MB * MB,
     logger: {
       level: config.LOG_LEVEL,
       ...(isDev
@@ -93,6 +99,12 @@ export async function buildApp(
     return new Error(message);
   });
 
+  // 记录请求到达时间，供全局错误处理计算延迟
+  app.addHook("onRequest", (request, _reply, done) => {
+    (request as unknown as { receivedAt: number }).receivedAt = Date.now();
+    done();
+  });
+
   // 统一错误处理：代理路由保持 {error:{message}}，Admin API 使用信封格式
   app.setErrorHandler((error: Error, request, reply) => {
     const fastifyError = error as Error & { statusCode?: number; validation?: unknown[] };
@@ -104,17 +116,19 @@ export async function buildApp(
       if (proxyApiType) {
         request.log.error({ statusCode: status, err: error }, `Proxy request error: ${fastifyError.message}`);
         const body = request.body as Record<string, unknown> | undefined;
+        const receivedAt = (request as unknown as { receivedAt?: number }).receivedAt;
+        const latencyMs = receivedAt ? Date.now() - receivedAt : 0;
         insertRequestLog(db, {
           id: randomUUID(),
           api_type: proxyApiType,
           model: (body?.model as string) || null,
           provider_id: null,
           status_code: status,
-          latency_ms: 0,
-          is_stream: 0,
+          latency_ms: latencyMs,
+          is_stream: body?.stream === true ? 1 : 0,
           error_message: fastifyError.message,
           created_at: new Date().toISOString(),
-          client_request: JSON.stringify({ headers: request.headers }),
+          client_request: JSON.stringify({ headers: request.headers, ...(body ? { body } : {}) }),
           router_key_id: request.routerKey?.id ?? null,
         });
       }

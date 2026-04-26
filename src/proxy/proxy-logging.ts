@@ -86,7 +86,24 @@ export function logResilienceResult(
     const isFailoverLog = isOriginal && isFailoverIteration;
     const parentId = isOriginal ? (isFailoverIteration ? rootLogId : null) : params.logId;
 
-    if (attempt.error) {
+    // stream_error + statusCode 200: 上游返回 200 但 body 包含错误内容（如 early error detection）
+    // 非 200 的 stream_error（如上游 429/500）走下方的正常错误路径
+    if (attempt.resultKind === "stream_error" && attempt.statusCode === UPSTREAM_SUCCESS) {
+      insertRequestLog(db, {
+        id: attemptLogId, api_type: params.apiType, model: params.model,
+        provider_id: attempt.target.provider_id,
+        status_code: HTTP_BAD_GATEWAY, latency_ms: attempt.latencyMs,
+        is_stream: params.isStream ? 1 : 0,
+        error_message: "stream_error: upstream returned 200 but body contains error",
+        created_at: new Date().toISOString(),
+        client_request: params.clientReq, upstream_request: params.upstreamReqBase,
+        upstream_response: JSON.stringify({ statusCode: attempt.statusCode, headers: attempt.responseHeaders, body: attempt.responseBody }),
+        is_retry: isOriginal ? 0 : 1, is_failover: isFailoverLog ? 1 : 0,
+        original_request_id: parentId,
+        router_key_id: params.routerKeyId, original_model: params.originalModel,
+        session_id: params.sessionId,
+      });
+    } else if (attempt.error) {
       insertRequestLog(db, {
         id: attemptLogId, api_type: params.apiType, model: params.model,
         provider_id: attempt.target.provider_id,
@@ -94,6 +111,9 @@ export function logResilienceResult(
         is_stream: params.isStream ? 1 : 0, error_message: attempt.error,
         created_at: new Date().toISOString(),
         client_request: params.clientReq, upstream_request: params.upstreamReqBase,
+        upstream_response: attempt.responseHeaders
+          ? JSON.stringify({ statusCode: HTTP_BAD_GATEWAY, headers: attempt.responseHeaders, error: attempt.error })
+          : null,
         is_retry: isOriginal ? 0 : 1, is_failover: isFailoverLog ? 1 : 0,
         original_request_id: parentId,
         router_key_id: params.routerKeyId, original_model: params.originalModel,
@@ -107,7 +127,7 @@ export function logResilienceResult(
         is_stream: params.isStream ? 1 : 0, error_message: null,
         created_at: new Date().toISOString(),
         client_request: params.clientReq, upstream_request: params.upstreamReqBase,
-        upstream_response: JSON.stringify({ statusCode: attempt.statusCode, body: attempt.responseBody }),
+        upstream_response: JSON.stringify({ statusCode: attempt.statusCode, headers: attempt.responseHeaders, body: attempt.responseBody }),
         is_retry: isOriginal ? 0 : 1, is_failover: isFailoverLog ? 1 : 0,
         original_request_id: parentId,
         router_key_id: params.routerKeyId, original_model: params.originalModel,

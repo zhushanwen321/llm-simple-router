@@ -52,6 +52,10 @@ export interface ResilienceAttempt {
   error: string | null;
   latencyMs: number;
   responseBody: string | null;
+  /** 上游响应 headers（throw 和 stream_success/stream_abort 时为 null） */
+  responseHeaders: Record<string, string> | null;
+  /** TransportResult.kind，用于区分 stream_error 等特殊类型 */
+  resultKind: TransportResult["kind"];
 }
 
 export interface ResilienceResult {
@@ -122,6 +126,11 @@ export class ResilienceLayer {
     // stream_abort -> 不可恢复
     if (result.kind === "stream_abort") {
       return { action: "abort", reason: "stream_abort" };
+    }
+
+    // stream_error + statusCode < failoverThreshold -> 上游返回 200 但 body 包含错误内容（early error），不可恢复
+    if (result.kind === "stream_error" && result.statusCode < config.failoverThreshold) {
+      return { action: "abort", reason: "stream_error" };
     }
 
     // success + statusCode < failoverThreshold -> done
@@ -238,12 +247,15 @@ export class ResilienceLayer {
           target: currentTarget, attemptIndex: globalAttemptIndex,
           statusCode: null, error: throwErr instanceof Error ? throwErr.message : String(throwErr),
           latencyMs: Date.now() - start, responseBody: null,
+          responseHeaders: null, resultKind: transportResult.kind,
         });
       } else {
         allAttempts.push({
           target: currentTarget, attemptIndex: globalAttemptIndex,
           statusCode: transportResult.statusCode, error: null,
           latencyMs: Date.now() - start, responseBody: extractBody(transportResult),
+          responseHeaders: extractHeaders(transportResult) ?? null,
+          resultKind: transportResult.kind,
         });
       }
 
@@ -271,7 +283,7 @@ export class ResilienceLayer {
             ),
           );
           if (nextAvail.length > 0 && nextAvail[0].provider_id !== currentTarget.provider_id) {
-            throw new ProviderSwitchNeeded(nextAvail[0].provider_id);
+            throw new ProviderSwitchNeeded(nextAvail[0].provider_id, [...allAttempts], transportResult);
           }
           continue;
         case "abort":

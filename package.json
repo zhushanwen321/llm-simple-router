@@ -1,6 +1,6 @@
 {
   "name": "llm-simple-router",
-  "version": "0.5.2",
+  "version": "0.5.4",
   "description": "LLM API proxy router with OpenAI/Anthropic support, model mapping, retry strategies, and admin dashboard",
   "license": "MIT",
   "author": "ZZzzswszzZZ",
@@ -55,6 +55,7 @@
     "dotenv": "^16.4.7",
     "fastify": "^5.3.3",
     "fastify-plugin": "^5.1.0",
+    "gpt-tokenizer": "^3.4.0",
     "jsonwebtoken": "^9.0.3",
     "pino": "^9.6.0",
     "pino-pretty": "^13.1.3"

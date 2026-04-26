@@ -40,7 +40,10 @@
             </TableCell>
             <TableCell>
               <div class="flex flex-wrap gap-1">
-                <Badge v-for="m in (p.models || [])" :key="m" variant="secondary" class="text-xs">{{ m }}</Badge>
+                <Badge v-for="m in (p.models || [])" :key="m.name" variant="secondary" class="text-xs">
+                  {{ m.name }}
+                  <span v-if="m.context_window" class="ml-1 text-muted-foreground">({{ formatContextWindow(m.context_window) }})</span>
+                </Badge>
                 <span v-if="!p.models?.length" class="text-muted-foreground text-xs">-</span>
               </div>
             </TableCell>
@@ -49,7 +52,20 @@
               <span v-else class="text-muted-foreground">-</span>
             </TableCell>
             <TableCell>
-              <Badge :variant="p.is_active ? 'default' : 'secondary'">{{ p.is_active ? '启用' : '禁用' }}</Badge>
+              <Button variant="ghost" size="sm" class="gap-1.5" @click="confirmToggle(p)">
+                <span
+                  class="relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors"
+                  :class="p.is_active ? 'bg-primary' : 'bg-input'"
+                >
+                  <span
+                    class="inline-block h-3 w-3 rounded-full bg-background shadow-sm transition-transform"
+                    :class="p.is_active ? 'translate-x-3.5' : 'translate-x-0.5'"
+                  />
+                </span>
+                <Badge :variant="p.is_active ? 'default' : 'secondary'">
+                  {{ p.is_active ? '启用' : '禁用' }}
+                </Badge>
+              </Button>
             </TableCell>
             <TableCell class="text-right">
               <Button variant="ghost" size="sm" @click="openEdit(p)" class="text-muted-foreground hover:text-primary mr-2">编辑</Button>
@@ -112,12 +128,21 @@
             <Label class="block text-sm font-medium text-foreground mb-1">可用模型</Label>
             <div class="flex flex-wrap gap-1.5 mb-1.5">
               <Badge v-for="(m, i) in form.models" :key="i" variant="secondary" class="gap-1 pr-1">
-                {{ m }}
+                {{ m.name }}
+                <span class="text-muted-foreground">({{ formatContextWindow(m.context_window ?? DEFAULT_CONTEXT_WINDOW) }})</span>
                 <Button type="button" variant="ghost" size="icon" class="h-4 w-4 rounded-full hover:bg-muted p-0 text-xs leading-none" @click="removeModel(i)">&times;</Button>
               </Badge>
             </div>
             <div class="flex gap-2">
               <Input v-model="modelInput" placeholder="输入模型名称，多个用逗号分隔" @keydown.enter.prevent="addModel" class="flex-1" />
+              <Select v-model="contextWindowSelect">
+                <SelectTrigger class="w-28">
+                  <SelectValue placeholder="上下文" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem v-for="opt in CONTEXT_WINDOW_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</SelectItem>
+                </SelectContent>
+              </Select>
               <Button type="button" variant="outline" size="sm" @click="addModel" :disabled="!modelInput.trim()">添加</Button>
             </div>
           </div>
@@ -144,10 +169,6 @@
               </div>
             </div>
           </div>
-          <div class="flex items-center gap-2">
-            <Checkbox v-model="form.is_active" id="svc-active" />
-            <Label for="svc-active" class="text-sm text-foreground">启用</Label>
-          </div>
           <DialogFooter>
             <Button type="button" variant="outline" @click="dialogOpen = false">取消</Button>
             <Button type="submit">保存</Button>
@@ -169,6 +190,26 @@
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+
+    <!-- Toggle Confirm AlertDialog -->
+    <AlertDialog :open="!!toggleTarget" @update:open="(val: boolean) => { if (!val) toggleTarget = null }">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>确认{{ toggleTarget?.is_active ? '禁用' : '启用' }}</AlertDialogTitle>
+          <AlertDialogDescription>
+            确定要{{ toggleTarget?.is_active ? '禁用' : '启用' }}供应商「{{ toggleTarget?.name }}」吗？
+            <div v-if="toggleDependencies.length" class="mt-2 space-y-1">
+              <div class="text-sm font-medium">以下映射分组正在使用此供应商：</div>
+              <div v-for="ref in toggleDependencies" :key="ref" class="text-destructive text-sm">{{ ref }}</div>
+            </div>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>取消</AlertDialogCancel>
+          <AlertDialogAction @click="handleToggle">确认</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </div>
 </template>
 
@@ -176,8 +217,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
 import * as z from 'zod'
-import { api, type ProviderPayload, type ProviderGroup } from '@/api/client'
-import type { Provider } from '@/types/mapping'
+import { api, getApiMessage, type ProviderPayload, type ProviderGroup } from '@/api/client'
+import type { Provider, ModelInfo } from '@/types/mapping'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -185,8 +226,7 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from '@/components/ui/alert-dialog'
-import { Checkbox } from '@/components/ui/checkbox'
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog'
 import { Switch } from '@/components/ui/switch'
 import { Copy, Check } from 'lucide-vue-next'
 
@@ -195,14 +235,37 @@ const DEFAULT_QUEUE_TIMEOUT_MS = 120_000
 const DEFAULT_QUEUE_SIZE = 10
 const MAX_CONCURRENCY = 100
 const MAX_QUEUE_SIZE = 1000
-const DEFAULT_FORM = { name: '', api_type: 'anthropic', base_url: '', api_key: '', models: [] as string[], is_active: true, max_concurrency: DEFAULT_CONCURRENCY, queue_timeout_ms: DEFAULT_QUEUE_TIMEOUT_MS, max_queue_size: DEFAULT_QUEUE_SIZE }
+const CONTEXT_K = 1000
+const CONTEXT_M = 1_000_000
+const DEFAULT_CONTEXT_WINDOW = 200_000
+const CONTEXT_WINDOW_OPTIONS = [
+  { label: '8K', value: '8000' },
+  { label: '16K', value: '16000' },
+  { label: '32K', value: '32000' },
+  { label: '64K', value: '64000' },
+  { label: '128K', value: '128000' },
+  { label: '160K', value: '160000' },
+  { label: '200K', value: '200000' },
+  { label: '256K', value: '256000' },
+  { label: '1M', value: '1000000' },
+] as const
+const DEFAULT_FORM = { name: '', api_type: 'anthropic', base_url: '', api_key: '', models: [] as ModelInfo[], is_active: true, max_concurrency: DEFAULT_CONCURRENCY, queue_timeout_ms: DEFAULT_QUEUE_TIMEOUT_MS, max_queue_size: DEFAULT_QUEUE_SIZE }
 const modelInput = ref('')
+const modelContextWindow = ref(DEFAULT_CONTEXT_WINDOW)
+const contextWindowSelect = computed({
+  get: () => String(modelContextWindow.value),
+  set: (val: string) => { modelContextWindow.value = Number(val) },
+})
 
 const providers = ref<Provider[]>([])
 const providerPresets = ref<ProviderGroup[]>([])
 const dialogOpen = ref(false)
 const editingId = ref<string | null>(null)
 const deleteTarget = ref<Provider | null>(null)
+const toggleTarget = ref<Provider | null>(null)
+const pendingToggleId = ref<string | null>(null)
+const pendingToggleActive = ref<boolean>(false)
+const toggleDependencies = ref<string[]>([])
 const form = ref({ ...DEFAULT_FORM })
 const errors = ref<Record<string, string>>({})
 const concurrencyEnabled = ref(false)
@@ -244,6 +307,12 @@ function maskKey(key: string): string {
   return visible + '*'.repeat(MASK_ASTERISK_COUNT)
 }
 
+function formatContextWindow(tokens: number): string {
+  if (tokens >= CONTEXT_M) return `${tokens / CONTEXT_M}M`
+  if (tokens >= CONTEXT_K) return `${tokens / CONTEXT_K}K`
+  return String(tokens)
+}
+
 async function copyKey(key: string, id: string) {
   await navigator.clipboard.writeText(key)
   copiedId.value = id
@@ -275,7 +344,10 @@ function onPresetChange() {
   form.value.name = preset.presetName
   form.value.api_type = preset.apiType
   form.value.base_url = preset.baseUrl
-  form.value.models = [...preset.models]
+  form.value.models = preset.models.map(name => ({
+    name,
+    context_window: DEFAULT_CONTEXT_WINDOW,
+  }))
 }
 
 async function loadProviders() {
@@ -284,7 +356,7 @@ async function loadProviders() {
     providers.value = data
   } catch (e: unknown) {
     console.error('Failed to load providers:', e)
-    toast.error((e as { apiMessage?: string }).apiMessage || '加载供应商失败')
+    toast.error(getApiMessage(e, '加载供应商失败'))
   }
 }
 
@@ -293,11 +365,12 @@ function addModel() {
   if (!input) return
   const names = input.split(/[,，]/).map(s => s.trim()).filter(Boolean)
   for (const name of names) {
-    if (!form.value.models.includes(name)) {
-      form.value.models.push(name)
+    if (!form.value.models.some(m => m.name === name)) {
+      form.value.models.push({ name, context_window: modelContextWindow.value || DEFAULT_CONTEXT_WINDOW })
     }
   }
   modelInput.value = ''
+  modelContextWindow.value = DEFAULT_CONTEXT_WINDOW
 }
 
 function removeModel(index: number) {
@@ -306,9 +379,10 @@ function removeModel(index: number) {
 
 function openCreate() {
   editingId.value = null
-  form.value = { ...DEFAULT_FORM }
+  form.value = { ...DEFAULT_FORM, models: [] }
   concurrencyEnabled.value = true
   modelInput.value = ''
+  modelContextWindow.value = DEFAULT_CONTEXT_WINDOW
   presetGroup.value = ''
   presetPlan.value = ''
   errors.value = {}
@@ -317,9 +391,10 @@ function openCreate() {
 
 function openEdit(p: Provider) {
   editingId.value = p.id
-  form.value = { name: p.name, api_type: p.api_type, base_url: p.base_url, api_key: '', models: [...(p.models || [])], is_active: !!p.is_active, max_concurrency: p.max_concurrency ?? DEFAULT_CONCURRENCY, queue_timeout_ms: p.queue_timeout_ms ?? DEFAULT_QUEUE_TIMEOUT_MS, max_queue_size: p.max_queue_size ?? DEFAULT_QUEUE_SIZE }
+  form.value = { name: p.name, api_type: p.api_type, base_url: p.base_url, api_key: '', models: (p.models || []).map(m => ({ name: m.name, context_window: m.context_window ?? DEFAULT_CONTEXT_WINDOW })), is_active: !!p.is_active, max_concurrency: p.max_concurrency ?? DEFAULT_CONCURRENCY, queue_timeout_ms: p.queue_timeout_ms ?? DEFAULT_QUEUE_TIMEOUT_MS, max_queue_size: p.max_queue_size ?? DEFAULT_QUEUE_SIZE }
   concurrencyEnabled.value = (p.max_concurrency ?? 0) > 0
   modelInput.value = ''
+  modelContextWindow.value = DEFAULT_CONTEXT_WINDOW
   presetGroup.value = ''
   presetPlan.value = ''
   errors.value = {}
@@ -333,7 +408,7 @@ function buildPayload(): ProviderFormPayload {
     name: form.value.name,
     api_type: form.value.api_type,
     base_url: form.value.base_url,
-    models: form.value.models,
+    models: form.value.models.map(m => ({ name: m.name, context_window: m.context_window ?? undefined })),
     is_active: form.value.is_active ? 1 : 0,
     max_concurrency: concurrencyEnabled.value ? form.value.max_concurrency : 0,
     queue_timeout_ms: concurrencyEnabled.value ? form.value.queue_timeout_ms : 0,
@@ -358,12 +433,48 @@ async function handleSave() {
     await loadProviders()
   } catch (e: unknown) {
     console.error('Failed to save provider:', e)
-    toast.error((e as { apiMessage?: string }).apiMessage || '保存供应商失败')
+    toast.error(getApiMessage(e, '保存供应商失败'))
   }
 }
 
 function confirmDelete(p: Provider) {
   deleteTarget.value = p
+}
+
+async function confirmToggle(p: Provider) {
+  toggleTarget.value = p
+  pendingToggleId.value = p.id
+  pendingToggleActive.value = !!p.is_active
+  toggleDependencies.value = []
+  if (p.is_active) {
+    try {
+      const result = await api.getProviderDependencies(p.id)
+      toggleDependencies.value = result.references
+    } catch { /* eslint-disable-line taste/no-silent-catch -- 依赖查询失败不阻塞 toggle 弹框 */ }
+  }
+}
+
+async function handleToggle() {
+  const id = pendingToggleId.value
+  if (!id) return
+  const wasActive = pendingToggleActive.value
+  toggleTarget.value = null
+  pendingToggleId.value = null
+  try {
+    const res = await api.updateProvider(id, { is_active: wasActive ? 0 : 1 })
+    if (res.cascadedGroups?.length) {
+      const disabled = res.cascadedGroups.filter((g: { disabled: boolean }) => g.disabled).length
+      const cleaned = res.cascadedGroups.length - disabled
+      const parts: string[] = []
+      if (cleaned > 0) parts.push(`清理 ${cleaned} 个分组的引用`)
+      if (disabled > 0) parts.push(`禁用 ${disabled} 个分组`)
+      toast.warning(`已自动${parts.join('、')}`)
+    }
+    await loadProviders()
+  } catch (e: unknown) {
+    console.error('Failed to toggle provider:', e)
+    toast.error(getApiMessage(e, '切换状态失败'))
+  }
 }
 
 async function handleDelete() {
@@ -375,12 +486,17 @@ async function handleDelete() {
     await loadProviders()
   } catch (e: unknown) {
     console.error('Failed to delete provider:', e)
-    toast.error((e as { apiMessage?: string }).apiMessage || '删除供应商失败')
+    toast.error(getApiMessage(e, '删除供应商失败'))
   }
 }
 
 onMounted(async () => {
-  try { providerPresets.value = await api.recommended.getProviders() } catch { providerPresets.value = [] }
-  await loadProviders()
+  const [presetsResult] = await Promise.allSettled([api.recommended.getProviders(), loadProviders()])
+  if (presetsResult.status === 'fulfilled') {
+    providerPresets.value = presetsResult.value
+  } else {
+    providerPresets.value = []
+    console.error('Failed to load provider presets:', presetsResult.reason)
+  }
 })
 </script>

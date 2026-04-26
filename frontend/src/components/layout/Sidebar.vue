@@ -77,7 +77,7 @@
             </div>
             <!-- 底部 -->
             <div class="px-3 py-2 flex justify-between items-center text-xs text-muted-foreground">
-              <span>{{ upgradeStatus?.lastCheckedAt ? `检查于 ${new Date(upgradeStatus.lastCheckedAt).toLocaleTimeString()}` : '未检查' }}</span>
+              <span>{{ upgradeStatus?.lastCheckedAt ? `检查于 ${parseUtc(upgradeStatus.lastCheckedAt).toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai' })}` : '未检查' }}</span>
               <Button variant="link" class="text-primary h-auto p-0" @click="handleCheckNow">立即检查</Button>
             </div>
           </PopoverContent>
@@ -143,6 +143,7 @@
 
 <script setup lang="ts">
 import { type Component, ref, onMounted, onUnmounted, computed } from 'vue'
+import { parseUtc } from '@/utils/format'
 import { useRoute, useRouter } from 'vue-router'
 import {
   ArrowUpRight,
@@ -158,7 +159,7 @@ import {
   Settings,
   LogOut,
 } from 'lucide-vue-next'
-import { api } from '@/api/client'
+import { api, getApiMessage } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -196,7 +197,7 @@ async function handleCheckNow() {
   try {
     await api.triggerUpgradeCheck()
     await loadUpgradeStatus()
-  } catch (e: unknown) { toast.error((e as { apiMessage?: string }).apiMessage || '检查失败') }
+  } catch (e: unknown) { toast.error(getApiMessage(e, '检查失败')) }
 }
 
 async function handleUpgrade() {
@@ -209,7 +210,7 @@ async function handleUpgrade() {
     showRestartConfirm.value = true
     await loadUpgradeStatus()
   } catch (e: unknown) {
-    toast.error((e as { apiMessage?: string }).apiMessage || '升级失败')
+    toast.error(getApiMessage(e, '升级失败'))
   } finally {
     isUpgrading.value = false
   }
@@ -223,7 +224,7 @@ async function handleSync() {
     toast.success('配置同步成功')
     await loadUpgradeStatus()
   } catch (e: unknown) {
-    toast.error((e as { apiMessage?: string }).apiMessage || '同步失败')
+    toast.error(getApiMessage(e, '同步失败'))
   } finally {
     isSyncing.value = false
   }
@@ -234,7 +235,7 @@ async function handleSourceChange(val: AcceptableValue) {
   try {
     await api.setSyncSource(val as 'github' | 'gitee')
     await loadUpgradeStatus()
-  } catch (e: unknown) { toast.error((e as { apiMessage?: string }).apiMessage || '保存失败') }
+  } catch (e: unknown) { toast.error(getApiMessage(e, '保存失败')) }
 }
 
 const updateCount = computed(() => {

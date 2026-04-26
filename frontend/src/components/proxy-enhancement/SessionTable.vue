@@ -95,7 +95,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import type { SessionState, SessionHistoryEntry } from '@/api/client'
-import { formatTime } from '@/utils/format'
+import { formatTime, parseUtc } from '@/utils/format'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -141,7 +141,7 @@ function shortId(id: string): string {
 }
 
 function relativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
+  const diff = Date.now() - parseUtc(iso).getTime()
   const minutes = Math.floor(diff / MS_PER_MINUTE)
   if (minutes < 1) return '刚刚'
   if (minutes < MINUTES_PER_HOUR) return `${minutes} 分钟前`

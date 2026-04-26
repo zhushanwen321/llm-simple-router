@@ -40,6 +40,11 @@ client.interceptors.response.use(
   }
 )
 
+/** 从 AxiosError 提取后端错误消息，无则返回 fallback */
+export function getApiMessage(error: unknown, fallback: string): string {
+  return (error as { apiMessage?: string }).apiMessage || fallback
+}
+
 // --- API endpoint constants ---
 
 const API = {
@@ -74,6 +79,9 @@ const API = {
   SETTINGS_DB_SIZE_THRESHOLDS: '/settings/db-size-thresholds',
   SETTINGS_EXPORT: '/settings/export',
   SETTINGS_IMPORT: '/settings/import',
+  SETUP_STATUS: '/setup/status',
+  SETUP_INITIALIZE: '/setup/initialize',
+  SETTINGS_LOG_RETENTION: '/settings/log-retention',
   UPGRADE_STATUS: '/upgrade/status',
   UPGRADE_CHECK: '/upgrade/check',
   UPGRADE_EXECUTE: '/upgrade/execute',
@@ -111,7 +119,7 @@ export interface ProviderPayload {
   api_type: string
   base_url: string
   api_key?: string
-  models?: string[]
+  models?: Array<string | { name: string; context_window?: number }>
   is_active: number
   max_concurrency?: number
   queue_timeout_ms?: number
@@ -267,6 +275,10 @@ export interface ConfigExportResponse {
   data: Record<string, unknown[]>;
 }
 
+export interface ProxyEnhancementConfig {
+  claude_code_enabled: boolean
+}
+
 export interface UpgradeStatus {
   npm: {
     hasUpdate: boolean
@@ -315,13 +327,14 @@ export const api = {
   login: (password: string) => request<{ success: boolean }>('post', API.LOGIN, { password }),
   logout: () => request<{ success: boolean }>('post', API.LOGOUT),
 
-  getSetupStatus: () => request<{ initialized: boolean }>('get', '/setup/status'),
-  initializeSetup: (password: string) => request<{ success: boolean }>('post', '/setup/initialize', { password }),
+  getSetupStatus: () => request<{ initialized: boolean }>('get', API.SETUP_STATUS),
+  initializeSetup: (password: string) => request<{ success: boolean }>('post', API.SETUP_INITIALIZE, { password }),
 
   getProviders: () => request<Provider[]>('get', API.PROVIDERS),
   createProvider: (data: ProviderPayload) => request<{ id: string }>('post', API.PROVIDERS, data),
-  updateProvider: (id: string, data: Partial<ProviderPayload>) => request<{ success: boolean }>('put', `${API.PROVIDERS}/${id}`, data),
+  updateProvider: (id: string, data: Partial<ProviderPayload>) => request<{ success: boolean; cascadedGroups: Array<{ id: string; client_model: string; disabled: boolean }> }>('put', `${API.PROVIDERS}/${id}`, data),
   deleteProvider: (id: string) => request<{ success: boolean }>('delete', `${API.PROVIDERS}/${id}`),
+  getProviderDependencies: (id: string) => request<{ references: string[] }>('get', `${API.PROVIDERS}/${id}/dependencies`),
 
   // TODO: 定义 Mapping 响应类型替换 unknown[]
   getMappings: () => request<unknown[]>('get', API.MAPPINGS),
@@ -335,8 +348,8 @@ export const api = {
   getLogChildren: (id: string) => request<LogEntry[]>('get', `${API.LOGS}/${id}/children`),
   deleteLogsBefore: (before: string) =>
     request<DeleteLogsResponse>('delete', `${API.LOGS}/before`, { before }),
-  getLogRetention: () => request<{ days: number }>('get', '/settings/log-retention'),
-  setLogRetention: (days: number) => request<{ days: number }>('put', '/settings/log-retention', { days }),
+  getLogRetention: () => request<{ days: number }>('get', API.SETTINGS_LOG_RETENTION),
+  setLogRetention: (days: number) => request<{ days: number }>('put', API.SETTINGS_LOG_RETENTION, { days }),
 
   getStats: (params?: { period?: string; start_time?: string; end_time?: string; router_key_id?: string }) =>
     request<StatsResponse>('get', API.STATS, undefined, { params }),
@@ -360,6 +373,7 @@ export const api = {
   updateMappingGroup: (id: string, data: MappingGroupPayload) =>
     request<{ success: boolean }>('put', `${API.MAPPING_GROUPS}/${id}`, data),
   deleteMappingGroup: (id: string) => request<{ success: boolean }>('delete', `${API.MAPPING_GROUPS}/${id}`),
+  toggleMappingGroup: (id: string) => request<{ success: boolean; is_active: number }>('post', `${API.MAPPING_GROUPS}/${id}/toggle`),
 
   getRetryRules: () => request<RetryRule[]>('get', API.RETRY_RULES),
   createRetryRule: (data: RetryRulePayload) =>
@@ -369,8 +383,8 @@ export const api = {
   deleteRetryRule: (id: string) => request<{ success: boolean }>('delete', `${API.RETRY_RULES}/${id}`),
 
   getProxyEnhancement: () =>
-    request<{ claude_code_enabled: boolean }>('get', API.PROXY_ENHANCEMENT),
-  updateProxyEnhancement: (data: { claude_code_enabled: boolean }) =>
+    request<ProxyEnhancementConfig>('get', API.PROXY_ENHANCEMENT),
+  updateProxyEnhancement: (data: ProxyEnhancementConfig) =>
     request<{ success: boolean }>('put', API.PROXY_ENHANCEMENT, data),
 
   getSessionStates: () => request<SessionState[]>('get', API.SESSION_STATES),

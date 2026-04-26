@@ -1,7 +1,8 @@
 import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
 import { Type, Static } from "@sinclair/typebox";
-import { getSetting, setSetting } from "../db/settings.js";
+import { setSetting } from "../db/settings.js";
+import { loadEnhancementConfig } from "../proxy/enhancement-config.js";
 
 const UpdateProxyEnhancementSchema = Type.Object({
   claude_code_enabled: Type.Boolean(),
@@ -21,24 +22,19 @@ interface ProxyEnhancementOptions {
   db: Database.Database;
 }
 
-interface ProxyEnhancementConfig {
-  claude_code_enabled: boolean;
-}
-
 export const adminProxyEnhancementRoutes: FastifyPluginCallback<ProxyEnhancementOptions> = (app, options, done) => {
   const { db } = options;
 
-  app.get("/admin/api/proxy-enhancement", async (_req, reply) => {
-    const raw = getSetting(db, "proxy_enhancement");
-    const config: ProxyEnhancementConfig = raw
-      ? JSON.parse(raw)
-      : { claude_code_enabled: false };
-    return reply.send(config);
+  app.get("/admin/api/proxy-enhancement", async (_request, reply) => {
+    const config = loadEnhancementConfig(db);
+    return reply.send({
+      claude_code_enabled: config.claude_code_enabled,
+    });
   });
 
-  app.put("/admin/api/proxy-enhancement", { schema: { body: UpdateProxyEnhancementSchema } }, async (req, reply) => {
-    const body = req.body as Static<typeof UpdateProxyEnhancementSchema>;
-    const config: ProxyEnhancementConfig = {
+  app.put("/admin/api/proxy-enhancement", { schema: { body: UpdateProxyEnhancementSchema } }, async (request, reply) => {
+    const body = request.body as Static<typeof UpdateProxyEnhancementSchema>;
+    const config = {
       claude_code_enabled: body.claude_code_enabled,
     };
     setSetting(db, "proxy_enhancement", JSON.stringify(config));

@@ -1,6 +1,7 @@
 import { PassThrough } from "stream";
 import type { FastifyReply } from "fastify";
 import { UPSTREAM_SUCCESS, filterHeaders } from "./types.js";
+import { buildUpstreamUrl } from "./proxy-core.js";
 import type { RawHeaders, StreamState, TransportResult } from "./types.js";
 import type { MetricsResult } from "../metrics/metrics-extractor.js";
 import type { SSEMetricsTransform } from "../metrics/sse-metrics-transform.js";
@@ -249,7 +250,7 @@ export function callStream(
 ): Promise<TransportResult> {
   return new Promise((resolve) => {
     const effectiveResolve = compatResolve ?? resolve;
-    const url = new URL(`${backend.base_url}${upstreamPath}`);
+    const url = new URL(buildUpstreamUrl(backend.base_url, upstreamPath));
     const payload = JSON.stringify(body);
     const upstreamHeaders = buildHeaders(clientHeaders, apiKey, Buffer.byteLength(payload));
     const options = buildRequestOptions(url, upstreamHeaders);
