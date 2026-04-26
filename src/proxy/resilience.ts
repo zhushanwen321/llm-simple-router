@@ -39,8 +39,6 @@ export interface ResilienceConfig {
   failoverThreshold: number;
   ruleMatcher?: RetryRuleMatcher;
   isFailover: boolean;
-  /** DB 规则 max_retries 的全局安全阀，防止单规则配置导致过多重试 */
-  globalRetryCap?: number;
   /** 全局迭代上限，防止极端配置导致 while(true) 循环过多 */
   iterationCap?: number;
 }
@@ -81,7 +79,6 @@ export interface ResilienceState {
 const RETRYABLE_THROW_CODES = new Set(["ETIMEDOUT", "ECONNRESET", "ECONNREFUSED"]);
 const HTTP_TOO_MANY_REQUESTS = 429;
 const DEFAULT_THROW_MAX_RETRIES = 3;
-const DEFAULT_RETRY_CAP = 3;
 const DEFAULT_ITERATION_CAP = 50;
 
 // ---------- Internal helpers ----------
@@ -161,7 +158,7 @@ export class ResilienceLayer {
         ? config.ruleMatcher.match(result.statusCode, body)
         : null;
 
-      if (matchedRule && state.attemptCount < Math.min(matchedRule.max_retries, config.globalRetryCap ?? DEFAULT_RETRY_CAP)) {
+      if (matchedRule && state.attemptCount < matchedRule.max_retries) {
         const strategy = createStrategy(matchedRule);
         const headers = extractHeaders(result);
         const retryAfterMs = result.statusCode === HTTP_TOO_MANY_REQUESTS
@@ -178,7 +175,7 @@ export class ResilienceLayer {
     const body = extractBody(result);
     if (body && config.ruleMatcher) {
       const matchedRule = config.ruleMatcher.match(result.statusCode, body);
-      if (matchedRule && state.attemptCount < Math.min(matchedRule.max_retries, config.globalRetryCap ?? DEFAULT_RETRY_CAP)) {
+      if (matchedRule && state.attemptCount < matchedRule.max_retries) {
         const strategy = createStrategy(matchedRule);
         return { action: "retry", delayMs: strategy.getDelay(state.attemptCount) };
       }
