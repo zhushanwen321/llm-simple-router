@@ -97,9 +97,16 @@ export function applyEnhancement(
     const routerKeyId = request.routerKey?.id ?? null;
     const nonSkipAnswers = toolResult.allAnswers.filter(a => a !== SKIP_LABEL);
 
-    // 所有回答都是"不选择" → 取消，不拦截
+    // 所有回答都是"不选择" → 取消
     if (nonSkipAnswers.length === 0) {
-      return nullResult;
+      return {
+        effectiveModel: clientModel,
+        originalModel: null,
+        interceptResponse: {
+          ...buildTextResponse("model-select-cancelled", "已取消选择"),
+          meta: { action: "取消模型选择" },
+        },
+      };
     }
 
     // 选择了多个 → 提示错误
