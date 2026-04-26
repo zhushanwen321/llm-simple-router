@@ -12,7 +12,14 @@ export function applyProviderPatches(
   body: Record<string, unknown>,
   provider: ProviderInfo,
 ): void {
-  if (provider.base_url.includes("deepseek")) {
+  if (needsDeepSeekPatch(body, provider)) {
     applyDeepSeekPatches(body);
   }
+}
+
+/** DeepSeek patch 触发条件：直连 DeepSeek，或经代理转发且模型名含 deepseek */
+function needsDeepSeekPatch(body: Record<string, unknown>, provider: ProviderInfo): boolean {
+  if (provider.base_url.includes("deepseek")) return true;
+  const model = (body.model as string) ?? "";
+  return model.includes("deepseek");
 }
