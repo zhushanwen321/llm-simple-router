@@ -180,8 +180,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
       return rejectAndReply(reply, rCtx, errors.modelNotFound(effectiveModel), `No mapping found for model '${effectiveModel}'`);
     }
 
-    // Task 4 会将 concurrencyOverride 传递给 orchestrator
-    const _concurrencyOverride = resolveResult.concurrency_override;
+    const concurrencyOverride = resolveResult.concurrency_override;
     let resolved = resolveResult.target;
 
     if (excludeTargets.length === 0) {
@@ -241,7 +240,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
     try {
       const resilienceResult = await deps.orchestrator.handle(
         request, reply, apiType,
-        { resolved, provider, clientModel: effectiveModel, isStream, trackerId: logId, sessionId, clientRequest: clientReq },
+        { resolved, provider, clientModel: effectiveModel, isStream, trackerId: logId, sessionId, clientRequest: clientReq, concurrencyOverride },
         { retryBaseDelayMs: deps.retryBaseDelayMs, isFailover, ruleMatcher: deps.matcher, transportFn },
       );
       const lastLogId = logResilienceResult(
