@@ -28,7 +28,6 @@ import { UsageWindowTracker } from "./proxy/usage-window-tracker.js";
 import { scheduleLogCleanup } from "./db/log-cleaner.js";
 import { scheduleDbSizeMonitor } from "./db/db-size-monitor.js";
 import { startUpgradeChecker, stopUpgradeChecker } from "./admin/upgrade.js";
-import { CheckerOptions } from "./upgrade/checker.js";
 import fastifyStatic from "@fastify/static";
 import Database from "better-sqlite3";
 
