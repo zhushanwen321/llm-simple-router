@@ -95,19 +95,26 @@ export function applyEnhancement(
   const toolResult = parseToolResult(request.body as Record<string, unknown>);
   if (toolResult.isRouterToolResult) {
     const routerKeyId = request.routerKey?.id ?? null;
-    const answer = findNonSkipAnswer(toolResult.allAnswers);
+    const nonSkipAnswers = toolResult.allAnswers.filter(a => a !== SKIP_LABEL);
 
-    // 所有回答都是"不选择" → 取消
-    if (!answer) {
+    // 所有回答都是"不选择" → 取消，不拦截
+    if (nonSkipAnswers.length === 0) {
+      return nullResult;
+    }
+
+    // 选择了多个 → 提示错误
+    if (nonSkipAnswers.length > 1) {
       return {
         effectiveModel: clientModel,
         originalModel: null,
         interceptResponse: {
-          ...buildTextResponse("model-select-cancelled", "已取消模型选择"),
-          meta: { action: "取消模型选择" },
+          ...buildTextResponse("model-select-error", "选择错误：只能选择一个模型或提供商，请重新输入 /select-model 选择"),
+          meta: { action: "选择错误" },
         },
       };
     }
+
+    const answer = nonSkipAnswers[0];
 
     // 两步式：用户选择了 provider → 返回该 provider 的模型列表
     if (toolResult.isProviderSelection) {
@@ -128,7 +135,7 @@ export function applyEnhancement(
         effectiveModel: clientModel,
         originalModel: null,
         interceptResponse: {
-          ...buildAskUserQuestionPayload(questions, false),
+          ...buildAskUserQuestionPayload(questions, false, providerModels),
           meta: { action: `模型列表(provider=${answer})` },
         },
       };
@@ -215,7 +222,7 @@ export function applyEnhancement(
             effectiveModel: clientModel,
             originalModel: null,
             interceptResponse: {
-              ...buildAskUserQuestionPayload(providerQs, true),
+              ...buildAskUserQuestionPayload(providerQs, true, displayModels),
               meta: { action: "Provider列表(AskUserQuestion)" },
             },
           };
@@ -327,11 +334,6 @@ function getModelsForProvider(models: string[], provider: string): string[] {
   return models.filter(m => m.startsWith(prefix));
 }
 
-/** 从多问题答案中提取第一个非"不选择"的回答 */
-function findNonSkipAnswer(answers: string[]): string | null {
-  return answers.find(a => a !== SKIP_LABEL) ?? null;
-}
-
 /** 查询所有可用的 provider_model 并构造文本列表响应 */
 function buildSelectModelResponse(
   db: Database.Database,
@@ -421,13 +423,27 @@ function buildProviderQuestions(providers: string[]): unknown[] {
   });
 }
 
-/** 构造 AskUserQuestion synthetic tool_use 响应（isProvider=true 用 provider 前缀） */
+/** 构造「文本列表 + AskUserQuestion」组合响应 */
 function buildAskUserQuestionPayload(
   questions: unknown[],
   isProvider: boolean,
+  allModels?: string[],
 ): Omit<InterceptResponse, "meta"> {
   const prefix = isProvider ? TOOL_USE_ID_PROVIDER_PREFIX : TOOL_USE_ID_PREFIX;
   const toolUseId = `${prefix}${randomUUID()}`;
+
+  const content: unknown[] = [];
+  // 先输出完整模型列表文本
+  if (allModels && allModels.length > 0) {
+    const list = allModels.map((m, i) => `${i + 1}. ${m}`).join("\n");
+    content.push({ type: "text", text: `可用模型列表:\n${list}` });
+  }
+  content.push({
+    type: "tool_use",
+    id: toolUseId,
+    name: "AskUserQuestion",
+    input: { questions },
+  });
 
   return {
     statusCode: 200,
@@ -435,12 +451,7 @@ function buildAskUserQuestionPayload(
       id: `msg-${randomUUID()}`,
       type: "message",
       role: "assistant",
-      content: [{
-        type: "tool_use",
-        id: toolUseId,
-        name: "AskUserQuestion",
-        input: { questions },
-      }],
+      content,
       model: "router",
       stop_reason: "tool_use",
       stop_sequence: null,

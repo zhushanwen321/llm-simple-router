@@ -138,12 +138,33 @@ export function parseToolResult(body: Record<string, unknown>): ToolResultParseR
     const isRouterToolResult = isProviderSelection || b.tool_use_id.startsWith(TOOL_USE_ID_PREFIX);
     if (!isRouterToolResult) continue;
 
-    const text = typeof b.content === "string" ? b.content : "";
+    // 支持 string 和 content blocks 数组两种格式
+    let text = "";
+    if (typeof b.content === "string") {
+      text = b.content;
+    } else if (Array.isArray(b.content)) {
+      text = (b.content as Array<Record<string, unknown>>)
+        .filter(c => c?.type === "text" && typeof c.text === "string")
+        .map(c => c.text as string)
+        .join("\n");
+    }
     const answers: string[] = [];
     let match: RegExpExecArray | null;
-    const re = /="([^"]+)"\./g;
+    // 宽松匹配：提取所有 ="answer" 对（Claude Code 格式: "question"="answer". ）
+    const re = /="([^"]+)"/g;
     while ((match = re.exec(text)) !== null) {
       answers.push(match[1]);
+    }
+    // Fallback: 尝试从 JSON {"question": "answer", ...} 提取
+    if (answers.length === 0 && text.startsWith("{")) {
+      try {
+        const parsed = JSON.parse(text);
+        if (typeof parsed === "object" && parsed !== null) {
+          for (const v of Object.values(parsed as Record<string, unknown>)) {
+            if (typeof v === "string") answers.push(v);
+          }
+        }
+      } catch { /* not JSON */ }
     }
     const selectedModel = answers.length > 0 ? answers[0] : null;
     return { isRouterToolResult: true, selectedModel, isProviderSelection, allAnswers: answers };

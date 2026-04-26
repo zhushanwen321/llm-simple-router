@@ -17,10 +17,22 @@
             <div class="flex items-center gap-3">
               <CardTitle class="font-mono text-sm">{{ g.client_model }}</CardTitle>
               <Badge variant="secondary">{{ g.strategy }}</Badge>
-              <Badge :variant="g.is_active ? 'default' : 'outline'">{{ g.is_active ? '启用' : '禁用' }}</Badge>
             </div>
-            <div class="flex items-center gap-2">
-              <Switch :checked="!!g.is_active" @update:checked="confirmToggle(g)" />
+            <div class="flex items-center gap-3">
+              <Button variant="ghost" size="sm" class="gap-1.5" @click="confirmToggle(g)">
+                <span
+                  class="relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors"
+                  :class="g.is_active ? 'bg-primary' : 'bg-input'"
+                >
+                  <span
+                    class="inline-block h-3 w-3 rounded-full bg-background shadow-sm transition-transform"
+                    :class="g.is_active ? 'translate-x-3.5' : 'translate-x-0.5'"
+                  />
+                </span>
+                <Badge :variant="g.is_active ? 'default' : 'secondary'">
+                  {{ g.is_active ? '启用' : '禁用' }}
+                </Badge>
+              </Button>
               <CollapsibleTrigger as-child>
                 <Button variant="ghost" size="sm">
                   展开
@@ -118,7 +130,6 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
-import { Switch } from '@/components/ui/switch'
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog'
 import MappingGroupFormDialog from '@/components/mappings/MappingGroupFormDialog.vue'
 import MappingGroupDeleteDialog from '@/components/mappings/MappingGroupDeleteDialog.vue'
@@ -343,16 +354,20 @@ async function handleDelete() {
   }
 }
 
+const pendingToggleId = ref<string | null>(null)
+
 function confirmToggle(g: MappingGroup) {
   toggleTarget.value = g
+  pendingToggleId.value = g.id
 }
 
 async function handleToggle() {
-  const target = toggleTarget.value
-  if (!target) return
+  const id = pendingToggleId.value
+  if (!id) return
   toggleTarget.value = null
+  pendingToggleId.value = null
   try {
-    await api.toggleMappingGroup(target.id)
+    await api.toggleMappingGroup(id)
     await loadData()
   } catch (e: unknown) {
     console.error('Failed to toggle mapping group:', e)
