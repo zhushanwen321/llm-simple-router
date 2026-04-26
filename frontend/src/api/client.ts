@@ -332,8 +332,9 @@ export const api = {
 
   getProviders: () => request<Provider[]>('get', API.PROVIDERS),
   createProvider: (data: ProviderPayload) => request<{ id: string }>('post', API.PROVIDERS, data),
-  updateProvider: (id: string, data: Partial<ProviderPayload>) => request<{ success: boolean }>('put', `${API.PROVIDERS}/${id}`, data),
+  updateProvider: (id: string, data: Partial<ProviderPayload>) => request<{ success: boolean; cascadedGroups: Array<{ id: string; client_model: string; disabled: boolean }> }>('put', `${API.PROVIDERS}/${id}`, data),
   deleteProvider: (id: string) => request<{ success: boolean }>('delete', `${API.PROVIDERS}/${id}`),
+  getProviderDependencies: (id: string) => request<{ references: string[] }>('get', `${API.PROVIDERS}/${id}/dependencies`),
 
   // TODO: 定义 Mapping 响应类型替换 unknown[]
   getMappings: () => request<unknown[]>('get', API.MAPPINGS),

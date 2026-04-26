@@ -37,7 +37,8 @@ describe('applyOverflowRedirect', () => {
       provider_id: 'p1', backend_model: 'glm-5',
       overflow_provider_id: 'p2', overflow_model: 'deepseek-v4',
     }
-    const longContent = 'a'.repeat(700000)
+    // 'a' 字符 BPE 压缩率高（~0.125 tokens/char），需要更多字符才能超 200K
+    const longContent = 'a'.repeat(2000000)
     const body = { messages: [{ role: 'user', content: longContent }] }
     const result = applyOverflowRedirect(target, db, body)
     expect(result).toEqual({
@@ -51,7 +52,7 @@ describe('applyOverflowRedirect', () => {
       provider_id: 'p1', backend_model: 'glm-5',
       overflow_provider_id: 'p2',
     }
-    const longContent = 'a'.repeat(700000)
+    const longContent = 'a'.repeat(2000000)
     const body = { messages: [{ role: 'user', content: longContent }] }
     expect(applyOverflowRedirect(target, db, body)).toBeNull()
   })

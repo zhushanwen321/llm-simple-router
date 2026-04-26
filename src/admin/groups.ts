@@ -37,6 +37,8 @@ type ScheduledRuleDefault = TargetInput;
 interface TargetInput {
   backend_model?: string;
   provider_id?: string;
+  overflow_provider_id?: string;
+  overflow_model?: string;
 }
 
 interface ScheduledRuleWindow {
@@ -48,6 +50,24 @@ interface ScheduledRuleWindow {
 interface ScheduledRule {
   default?: ScheduledRuleDefault;
   windows?: ScheduledRuleWindow[];
+}
+
+function validateOverflow(db: Database.Database, target: TargetInput, label: string): string | undefined {
+  const hasOverflowProvider = !!target.overflow_provider_id;
+  const hasOverflowModel = !!target.overflow_model;
+  if (hasOverflowProvider && !hasOverflowModel) {
+    return `${label}: overflow_provider_id requires overflow_model`;
+  }
+  if (hasOverflowModel && !hasOverflowProvider) {
+    return `${label}: overflow_model requires overflow_provider_id`;
+  }
+  if (hasOverflowProvider) {
+    const p = getProviderById(db, target.overflow_provider_id!);
+    if (!p) {
+      return `${label}: overflow_provider_id '${target.overflow_provider_id}' not found`;
+    }
+  }
+  return undefined;
 }
 
 async function validateRule(
@@ -76,6 +96,8 @@ async function validateRule(
     if (!defaultProvider) {
       return `provider_id '${r.default.provider_id}' not found`;
     }
+    const overflowErr = validateOverflow(db, r.default, "rule.default");
+    if (overflowErr) return overflowErr;
 
     if (r.windows !== undefined && !Array.isArray(r.windows)) {
       return "rule.windows must be an array";
@@ -90,6 +112,8 @@ async function validateRule(
         if (!p) {
           return `window[${i}] provider_id '${w.target.provider_id}' not found`;
         }
+        const wOverflowErr = validateOverflow(db, w.target, `window[${i}]`);
+        if (wOverflowErr) return wOverflowErr;
       }
     }
   }
@@ -112,6 +136,8 @@ async function validateRule(
       if (!p) {
         return `targets[${i}] provider_id '${t.provider_id}' not found`;
       }
+      const overflowErr = validateOverflow(db, t, `targets[${i}]`);
+      if (overflowErr) return overflowErr;
     }
   }
 

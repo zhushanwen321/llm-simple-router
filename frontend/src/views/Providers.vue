@@ -52,7 +52,20 @@
               <span v-else class="text-muted-foreground">-</span>
             </TableCell>
             <TableCell>
-              <Badge :variant="p.is_active ? 'default' : 'secondary'">{{ p.is_active ? '启用' : '禁用' }}</Badge>
+              <Button variant="ghost" size="sm" class="gap-1.5" @click="confirmToggle(p)">
+                <span
+                  class="relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors"
+                  :class="p.is_active ? 'bg-primary' : 'bg-input'"
+                >
+                  <span
+                    class="inline-block h-3 w-3 rounded-full bg-background shadow-sm transition-transform"
+                    :class="p.is_active ? 'translate-x-3.5' : 'translate-x-0.5'"
+                  />
+                </span>
+                <Badge :variant="p.is_active ? 'default' : 'secondary'">
+                  {{ p.is_active ? '启用' : '禁用' }}
+                </Badge>
+              </Button>
             </TableCell>
             <TableCell class="text-right">
               <Button variant="ghost" size="sm" @click="openEdit(p)" class="text-muted-foreground hover:text-primary mr-2">编辑</Button>
@@ -156,10 +169,6 @@
               </div>
             </div>
           </div>
-          <div class="flex items-center gap-2">
-            <Checkbox v-model="form.is_active" id="svc-active" />
-            <Label for="svc-active" class="text-sm text-foreground">启用</Label>
-          </div>
           <DialogFooter>
             <Button type="button" variant="outline" @click="dialogOpen = false">取消</Button>
             <Button type="submit">保存</Button>
@@ -181,6 +190,26 @@
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+
+    <!-- Toggle Confirm AlertDialog -->
+    <AlertDialog :open="!!toggleTarget" @update:open="(val: boolean) => { if (!val) toggleTarget = null }">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>确认{{ toggleTarget?.is_active ? '禁用' : '启用' }}</AlertDialogTitle>
+          <AlertDialogDescription>
+            确定要{{ toggleTarget?.is_active ? '禁用' : '启用' }}供应商「{{ toggleTarget?.name }}」吗？
+            <div v-if="toggleDependencies.length" class="mt-2 space-y-1">
+              <div class="text-sm font-medium">以下映射分组正在使用此供应商：</div>
+              <div v-for="ref in toggleDependencies" :key="ref" class="text-destructive text-sm">{{ ref }}</div>
+            </div>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>取消</AlertDialogCancel>
+          <AlertDialogAction @click="handleToggle">确认</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </div>
 </template>
 
@@ -197,8 +226,7 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from '@/components/ui/alert-dialog'
-import { Checkbox } from '@/components/ui/checkbox'
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog'
 import { Switch } from '@/components/ui/switch'
 import { Copy, Check } from 'lucide-vue-next'
 
@@ -234,6 +262,10 @@ const providerPresets = ref<ProviderGroup[]>([])
 const dialogOpen = ref(false)
 const editingId = ref<string | null>(null)
 const deleteTarget = ref<Provider | null>(null)
+const toggleTarget = ref<Provider | null>(null)
+const pendingToggleId = ref<string | null>(null)
+const pendingToggleActive = ref<boolean>(false)
+const toggleDependencies = ref<string[]>([])
 const form = ref({ ...DEFAULT_FORM })
 const errors = ref<Record<string, string>>({})
 const concurrencyEnabled = ref(false)
@@ -407,6 +439,42 @@ async function handleSave() {
 
 function confirmDelete(p: Provider) {
   deleteTarget.value = p
+}
+
+async function confirmToggle(p: Provider) {
+  toggleTarget.value = p
+  pendingToggleId.value = p.id
+  pendingToggleActive.value = !!p.is_active
+  toggleDependencies.value = []
+  if (p.is_active) {
+    try {
+      const result = await api.getProviderDependencies(p.id)
+      toggleDependencies.value = result.references
+    } catch { /* eslint-disable-line taste/no-silent-catch -- 依赖查询失败不阻塞 toggle 弹框 */ }
+  }
+}
+
+async function handleToggle() {
+  const id = pendingToggleId.value
+  if (!id) return
+  const wasActive = pendingToggleActive.value
+  toggleTarget.value = null
+  pendingToggleId.value = null
+  try {
+    const res = await api.updateProvider(id, { is_active: wasActive ? 0 : 1 })
+    if (res.cascadedGroups?.length) {
+      const disabled = res.cascadedGroups.filter((g: { disabled: boolean }) => g.disabled).length
+      const cleaned = res.cascadedGroups.length - disabled
+      const parts: string[] = []
+      if (cleaned > 0) parts.push(`清理 ${cleaned} 个分组的引用`)
+      if (disabled > 0) parts.push(`禁用 ${disabled} 个分组`)
+      toast.warning(`已自动${parts.join('、')}`)
+    }
+    await loadProviders()
+  } catch (e: unknown) {
+    console.error('Failed to toggle provider:', e)
+    toast.error(getApiMessage(e, '切换状态失败'))
+  }
 }
 
 async function handleDelete() {

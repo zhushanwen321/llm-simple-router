@@ -2,7 +2,7 @@ import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
 import { Type, Static } from "@sinclair/typebox";
 import type { Provider } from "../db/index.js";
-import { getAllProviders, getProviderById, createProvider, updateProvider, deleteProvider, getAllMappingGroups, PROVIDER_CONCURRENCY_DEFAULTS } from "../db/index.js";
+import { getAllProviders, getProviderById, createProvider, updateProvider, deleteProvider, getAllMappingGroups, getAllModelMappings, updateMappingGroup, PROVIDER_CONCURRENCY_DEFAULTS } from "../db/index.js";
 import { encrypt, decrypt } from "../utils/crypto.js";
 import { getSetting } from "../db/settings.js";
 import { ProviderSemaphoreManager } from "../proxy/semaphore.js";
@@ -13,6 +13,88 @@ import { parseModels, buildModelInfoList } from "../config/model-context.js";
 import { getModelInfoForProvider, setModelInfoForProvider, deleteAllModelInfoForProvider } from "../db/model-info.js";
 
 const API_KEY_PREVIEW_MIN_LENGTH = 8;
+
+interface CascadeResult {
+  updatedGroups: Array<{ id: string; client_model: string; disabled: boolean }>;
+}
+
+function cascadeProviderDisable(db: Database.Database, providerId: string): CascadeResult {
+  const result: CascadeResult = { updatedGroups: [] };
+  const groups = getAllMappingGroups(db);
+
+  for (const g of groups) {
+    if (!g.is_active) continue;
+
+    let rule: Record<string, unknown>;
+    try {
+      rule = JSON.parse(g.rule) as Record<string, unknown>;
+    } catch { continue }
+
+    let modified = false;
+    let shouldDisable = false;
+
+    if (g.strategy === "scheduled") {
+      const def = rule.default as Record<string, string> | undefined;
+      if (def) {
+        if (def.provider_id === providerId) {
+          shouldDisable = true;
+          modified = true;
+        }
+        if (def.overflow_provider_id === providerId) {
+          delete def.overflow_provider_id;
+          delete def.overflow_model;
+          modified = true;
+        }
+      }
+
+      const windows = rule.windows as Array<{ start: string; end: string; target: Record<string, string> }> | undefined;
+      if (Array.isArray(windows)) {
+        const filtered = windows.filter((w) => {
+          if (w.target?.provider_id === providerId) {
+            modified = true;
+            return false;
+          }
+          if (w.target?.overflow_provider_id === providerId) {
+            delete w.target.overflow_provider_id;
+            delete w.target.overflow_model;
+            modified = true;
+          }
+          return true;
+        });
+        rule.windows = filtered;
+      }
+    } else {
+      const targets = rule.targets as Array<Record<string, string>> | undefined;
+      if (Array.isArray(targets)) {
+        const filtered = targets.filter((t) => {
+          if (t.provider_id === providerId) {
+            modified = true;
+            return false;
+          }
+          if (t.overflow_provider_id === providerId) {
+            delete t.overflow_provider_id;
+            delete t.overflow_model;
+            modified = true;
+          }
+          return true;
+        });
+        rule.targets = filtered;
+        if (filtered.length === 0 && modified) {
+          shouldDisable = true;
+        }
+      }
+    }
+
+    if (modified) {
+      const fields: { rule: string; is_active?: number } = { rule: JSON.stringify(rule) };
+      if (shouldDisable) fields.is_active = 0;
+      updateMappingGroup(db, g.id, fields);
+      result.updatedGroups.push({ id: g.id, client_model: g.client_model, disabled: shouldDisable });
+    }
+  }
+
+  return result;
+}
 
 type ModelInput = string | { name: string; context_window?: number };
 
@@ -173,6 +255,12 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     }
     updateProvider(db, id, fields);
     const updated = getProviderById(db, id)!;
+
+    let cascade: CascadeResult | undefined;
+    if (existing.is_active === 1 && body.is_active === 0) {
+      cascade = cascadeProviderDisable(db, id);
+    }
+
     if (body.max_concurrency !== undefined || body.queue_timeout_ms !== undefined || body.max_queue_size !== undefined) {
       semaphoreManager?.updateConfig(id, {
         maxConcurrency: updated.max_concurrency,
@@ -186,7 +274,65 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
       queueTimeoutMs: updated.queue_timeout_ms,
       maxQueueSize: updated.max_queue_size,
     });
-    return reply.send({ success: true });
+    return reply.send({ success: true, cascadedGroups: cascade?.updatedGroups ?? [] });
+  });
+
+  app.get("/admin/api/providers/:id/dependencies", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const existing = getProviderById(db, id);
+    if (!existing) {
+      return reply.code(HTTP_NOT_FOUND).send(apiError(API_CODE.NOT_FOUND, "Provider not found"));
+    }
+
+    const references: string[] = [];
+
+    const groups = getAllMappingGroups(db);
+    for (const g of groups) {
+      if (!g.is_active) continue;
+      const refs: string[] = [];
+      try {
+        const rule = JSON.parse(g.rule);
+        if (rule.default?.provider_id === id) {
+          refs.push(`默认模型 (${rule.default.backend_model})`);
+        }
+        if (rule.default?.overflow_provider_id === id) {
+          refs.push(`默认溢出模型 (${rule.default.overflow_model || "-"})`);
+        }
+        if (Array.isArray(rule.windows)) {
+          for (const w of rule.windows) {
+            if (w.target?.provider_id === id) {
+              refs.push(`时间窗口 ${w.start}-${w.end} (${w.target.backend_model})`);
+            }
+            if (w.target?.overflow_provider_id === id) {
+              refs.push(`时间窗口 ${w.start}-${w.end} 溢出 (${w.target.overflow_model || "-"})`);
+            }
+          }
+        }
+        if (Array.isArray(rule.targets)) {
+          for (let i = 0; i < rule.targets.length; i++) {
+            const t = rule.targets[i];
+            if (t.provider_id === id) {
+              refs.push(`目标 ${i + 1} (${t.backend_model})`);
+            }
+            if (t.overflow_provider_id === id) {
+              refs.push(`目标 ${i + 1} 溢出 (${t.overflow_model || "-"})`);
+            }
+          }
+        }
+      } catch { continue }
+      for (const ref of refs) {
+        references.push(`映射分组「${g.client_model}」: ${ref}`);
+      }
+    }
+
+    const mappings = getAllModelMappings(db);
+    for (const m of mappings) {
+      if (m.provider_id === id) {
+        references.push(`旧版映射「${m.client_model}」→ ${m.backend_model}`);
+      }
+    }
+
+    return reply.send({ references });
   });
 
   app.delete("/admin/api/providers/:id", async (request, reply) => {

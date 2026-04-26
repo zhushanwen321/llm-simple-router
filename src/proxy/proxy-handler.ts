@@ -25,44 +25,9 @@ import type { ProxyOrchestrator } from "./orchestrator.js";
 import type { ProxyErrorFormatter, ProxyErrorResponse } from "./proxy-core.js";
 import { buildTransportFn } from "./transport-fn.js";
 import { applyOverflowRedirect } from "./overflow.js";
+import { applyProviderPatches } from "./patch/index.js";
 
 const HTTP_ERROR_THRESHOLD = 400;
-
-/**
- * DeepSeek 等 provider 的 thinking 协议实现不完整：
- * 开启 thinking 模式后部分轮次（tool_use/纯文本）不返回 thinking block，
- * 但后续请求又要求历史 assistant 消息必须携带 thinking block。
- * DeepSeek 甚至在不传 thinking 参数时也从历史推断并启用 thinking 模式。
- * 在 content 数组开头补一个空 thinking block 以绕过上游校验。
- */
-function patchMissingThinkingBlocks(
-  body: Record<string, unknown>,
-  providerBaseUrl: string,
-): void {
-  if (!body.messages || !providerBaseUrl.includes("deepseek")) return;
-
-  const messages = body.messages as Array<{ role: string; content: unknown }>;
-
-  // DeepSeek 可能在不传 thinking 参数时也启用 thinking 模式（从历史推断），
-  // 所以只要历史中存在任何 thinking block，就视为 thinking 模式激活。
-  const thinkingActive = !!body.thinking || messages.some(
-    (msg) => msg.role === "assistant" && Array.isArray(msg.content)
-      && (msg.content as Array<Record<string, unknown>>).some(
-        (b) => b && typeof b === "object" && b.type === "thinking",
-      ),
-  );
-  if (!thinkingActive) return;
-
-  for (const msg of messages) {
-    if (msg.role !== "assistant" || !Array.isArray(msg.content)) continue;
-    const hasThinking = (msg.content as Array<Record<string, unknown>>).some(
-      (b) => b && typeof b === "object" && b.type === "thinking",
-    );
-    if (!hasThinking) {
-      (msg.content as Array<Record<string, unknown>>).unshift({ type: "thinking", thinking: "", signature: "" });
-    }
-  }
-}
 const MAX_LOG_FIELD_LENGTH = 80;
 const UPSTREAM_ERROR_STATUS = 502;
 
@@ -250,7 +215,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
       }
     }
 
-    patchMissingThinkingBlocks(body, provider.base_url);
+    applyProviderPatches(body, provider);
     const apiKey = decrypt(provider.api_key, getSetting(deps.db, "encryption_key")!);
     options?.beforeSendProxy?.(body, isStream);
 
