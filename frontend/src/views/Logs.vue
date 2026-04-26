@@ -219,6 +219,10 @@ const {
 
 const TABLE_COL_COUNT = 13
 const DEBOUNCE_MS = 300
+const MAX_PAGE_BUTTONS = 7
+const PAGE_NEIGHBORS = 2
+const FIRST_PAGE = 1
+const FIRST_PAGE = 1
 
 const {
   logs, total, page, totalPages,
@@ -232,15 +236,15 @@ const {
 const pageNumbers = computed(() => {
   const tp = totalPages.value
   const current = page.value
-  if (tp <= 7) return Array.from({ length: tp }, (_, i) => i + 1)
+  if (tp <= MAX_PAGE_BUTTONS) return Array.from({ length: tp }, (_, i) => i + 1)
 
-  const pages: (number | '...')[] = [1]
-  const start = Math.max(2, current - 2)
-  const end = Math.min(tp - 1, current + 2)
+  const pages: (number | '...')[] = [FIRST_PAGE]
+  const start = Math.max(FIRST_PAGE + 1, current - PAGE_NEIGHBORS)
+  const end = Math.min(tp - FIRST_PAGE, current + PAGE_NEIGHBORS)
 
-  if (start > 2) pages.push('...')
+  if (start > FIRST_PAGE + PAGE_NEIGHBORS) pages.push('...')
   for (let i = start; i <= end; i++) pages.push(i)
-  if (end < tp - 1) pages.push('...')
+  if (end < tp - PAGE_NEIGHBORS) pages.push('...')
   pages.push(tp)
 
   return pages

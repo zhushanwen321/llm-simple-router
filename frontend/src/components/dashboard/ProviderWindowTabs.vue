@@ -55,11 +55,12 @@ const grouped = computed(() => {
 
 // 按 token 总量降序排列的 provider_id 列表
 const providerIds = computed(() => {
-  const entries = Object.entries(grouped.value).map(([pid, items]) => ({
+  const keys = Object.keys(grouped.value)
+  const sorted = keys.map((pid) => ({
     pid,
-    tokens: items.reduce((s, w) => s + w.usage.total_input_tokens + w.usage.total_output_tokens, 0),
+    tokens: grouped.value[pid].reduce((s, w) => s + w.usage.total_input_tokens + w.usage.total_output_tokens, 0),
   }))
-  return entries.sort((a, b) => b.tokens - a.tokens).map((e) => e.pid)
+  return sorted.sort((a, b) => b.tokens - a.tokens).map((e) => e.pid)
 })
 
 const allTotalRequests = computed(() =>
