@@ -121,6 +121,7 @@ export {
   getRequestLogsGrouped,
   updateLogMetrics,
   updateLogStreamContent,
+  updateLogClientStatus,
   backfillMetricsFromRequestMetrics,
   estimateLogTableSize,
   deleteOldestLogs,

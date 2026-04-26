@@ -17,7 +17,7 @@ import {
 import { buildUpstreamHeaders, buildUpstreamUrl } from "./proxy-core.js";
 import { ProviderSwitchNeeded } from "./types.js";
 import type { RawHeaders } from "./types.js";
-import { updateLogStreamContent } from "../db/index.js";
+import { updateLogStreamContent, updateLogClientStatus } from "../db/index.js";
 import { insertRejectedLog } from "./log-helpers.js";
 import type { Target } from "./strategy/types.js";
 import type { RetryRuleMatcher } from "./retry-rules.js";
@@ -280,6 +280,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
         const tr = resilienceResult.result;
         if (tr.kind === "throw" || (tr.kind === "error" && tr.statusCode >= HTTP_ERROR_THRESHOLD)) {
           const err = errors.upstreamConnectionFailed();
+          updateLogClientStatus(deps.db, lastLogId, err.statusCode);
           return reply.code(err.statusCode).send(err.body);
         }
       }
@@ -287,6 +288,19 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
       return reply;
     } catch (e) {
       if (e instanceof ProviderSwitchNeeded) {
+        // 跨 provider failover：resilience 层携带了 attempts 数据，补写失败日志
+        if (e.attempts && e.attempts.length > 0) {
+          const fakeResult = e.lastResult ?? { kind: "throw" as const, error: new Error("provider switch") };
+          logResilienceResult(
+            deps.db,
+            {
+              apiType, model: effectiveModel, providerId: provider.id, isStream,
+              clientReq, upstreamReqBase, logId, routerKeyId, originalModel, sessionId,
+              failover: { isFailoverIteration, rootLogId: rootLogId! },
+            },
+            e.attempts, fakeResult, startTime,
+          );
+        }
         request.log.debug({ logId, action: "provider_switch", targetProviderId: e.targetProviderId });
         excludeTargets.push(resolved);
         continue;
