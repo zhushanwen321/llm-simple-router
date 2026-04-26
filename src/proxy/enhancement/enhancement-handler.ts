@@ -4,7 +4,7 @@ import Database from "better-sqlite3";
 import { loadEnhancementConfig } from "../enhancement-config.js";
 import { getActiveProviderModels, resolveByProviderModel } from "../../db/index.js";
 import { resolveMapping } from "../mapping-resolver.js";
-import { parseDirective, parseToolResult, TOOL_USE_ID_PREFIX } from "./directive-parser.js";
+import { parseDirective, parseToolResult, TOOL_USE_ID_PREFIX, TOOL_USE_ID_PROVIDER_PREFIX } from "./directive-parser.js";
 import { modelState } from "../model-state.js";
 import { cleanRouterResponses } from "./response-cleaner.js";
 
@@ -22,9 +22,11 @@ export interface EnhancementResult {
 }
 
 const MODEL_INFO_TAG_TYPE = "model-info";
-const MAX_OPTIONS_PER_QUESTION = 4;
-const MAX_QUESTION_GROUPS = 4;
-const MAX_DISPLAY_MODELS = 16;
+const SKIP_LABEL = "不选择";
+const TWO_STEP_THRESHOLD = 9;
+const MODELS_PER_QUESTION = 3;
+const MAX_QUESTIONS = 4;
+const MAX_DISPLAY_MODELS = MODELS_PER_QUESTION * MAX_QUESTIONS;
 
 /**
  * 解析 "provider_name/backend_model" 格式，返回对应的 client_model。
@@ -91,34 +93,70 @@ export function applyEnhancement(
     return nullResult;
   }
 
-  // 检测 AskUserQuestion 的 tool_result 回调（用户在 UI 上选择了模型）
+  // 检测 AskUserQuestion 的 tool_result 回调（用户在 UI 上选择了模型或 provider）
   const toolResult = parseToolResult(request.body as Record<string, unknown>);
   if (toolResult.isRouterToolResult) {
     const routerKeyId = request.routerKey?.id ?? null;
-    if (toolResult.selectedModel) {
-      const resolvedClientModel = resolveProviderModel(db, toolResult.selectedModel);
-      if (resolvedClientModel) {
-        modelState.set(routerKeyId, toolResult.selectedModel, sessionId, clientModel, "command");
-        return {
-          effectiveModel: toolResult.selectedModel,
-          originalModel: null,
-          interceptResponse: {
-            ...buildTextResponse("model-selected", `已选择模型: ${toolResult.selectedModel}`),
-            meta: { action: "模型选择", detail: toolResult.selectedModel },
-          },
-        };
-      }
+    const answer = findNonSkipAnswer(toolResult.allAnswers);
+
+    // 所有回答都是"不选择" → 取消
+    if (!answer) {
       return {
         effectiveModel: clientModel,
         originalModel: null,
         interceptResponse: {
-          ...buildTextResponse("error", `未找到模型: ${toolResult.selectedModel}`),
-          meta: { action: "模型选择失败", detail: toolResult.selectedModel },
+          ...buildTextResponse("model-select-cancelled", "已取消模型选择"),
+          meta: { action: "取消模型选择" },
         },
       };
     }
-    // tool_result 匹配前缀但无法提取模型名，降级处理
-    return nullResult;
+
+    // 两步式：用户选择了 provider → 返回该 provider 的模型列表
+    if (toolResult.isProviderSelection) {
+      const allModels = buildDisplayModels(db, request.routerKey?.allowed_models ?? null);
+      const providerModels = getModelsForProvider(allModels, answer);
+      if (providerModels.length === 0) {
+        return {
+          effectiveModel: clientModel,
+          originalModel: null,
+          interceptResponse: {
+            ...buildTextResponse("error", `未找到 provider: ${answer}`),
+            meta: { action: "模型选择失败", detail: answer },
+          },
+        };
+      }
+      const questions = buildModelQuestions(providerModels);
+      return {
+        effectiveModel: clientModel,
+        originalModel: null,
+        interceptResponse: {
+          ...buildAskUserQuestionPayload(questions, false),
+          meta: { action: `模型列表(provider=${answer})` },
+        },
+      };
+    }
+
+    // 模型选择（直接或两步式第二步）
+    const resolvedClientModel = resolveProviderModel(db, answer);
+    if (resolvedClientModel) {
+      modelState.set(routerKeyId, answer, sessionId, clientModel, "command");
+      return {
+        effectiveModel: answer,
+        originalModel: null,
+        interceptResponse: {
+          ...buildTextResponse("model-selected", `已选择模型: ${answer}`),
+          meta: { action: "模型选择", detail: answer },
+        },
+      };
+    }
+    return {
+      effectiveModel: clientModel,
+      originalModel: null,
+      interceptResponse: {
+        ...buildTextResponse("error", `未找到模型: ${answer}`),
+        meta: { action: "模型选择失败", detail: answer },
+      },
+    };
   }
 
   // 清理历史消息中的 <router-response> 标签
@@ -170,11 +208,28 @@ export function applyEnhancement(
           },
         };
       }
+      // >= TWO_STEP_THRESHOLD 且多个 provider → 两步式：先选 provider
+      if (displayModels.length >= TWO_STEP_THRESHOLD) {
+        const providers = getUniqueProviders(displayModels);
+        if (providers.length >= 2) {
+          const question = buildProviderQuestion(providers);
+          return {
+            effectiveModel: clientModel,
+            originalModel: null,
+            interceptResponse: {
+              ...buildAskUserQuestionPayload([question], true),
+              meta: { action: "Provider列表(AskUserQuestion)" },
+            },
+          };
+        }
+      }
+      // 直接列出所有模型（< TWO_STEP_THRESHOLD 或单 provider）
+      const questions = buildModelQuestions(displayModels.slice(0, MAX_DISPLAY_MODELS));
       return {
         effectiveModel: clientModel,
         originalModel: null,
         interceptResponse: {
-          ...buildAskUserQuestionResponse(displayModels),
+          ...buildAskUserQuestionPayload(questions, false),
           meta: { action: "模型列表(AskUserQuestion)" },
         },
       };
@@ -236,6 +291,31 @@ function buildTextResponse(type: string, inner: string): Omit<InterceptResponse,
   return { statusCode: 200, body };
 }
 
+/** 从 "provider/model" 列表中提取去重的 provider 名称 */
+function getUniqueProviders(models: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const m of models) {
+    const sep = m.indexOf("/");
+    if (sep > 0) {
+      const p = m.substring(0, sep);
+      if (!seen.has(p)) { seen.add(p); result.push(p); }
+    }
+  }
+  return result;
+}
+
+/** 按 provider 筛选模型列表 */
+function getModelsForProvider(models: string[], provider: string): string[] {
+  const prefix = provider + "/";
+  return models.filter(m => m.startsWith(prefix));
+}
+
+/** 从多问题答案中提取第一个非"不选择"的回答 */
+function findNonSkipAnswer(answers: string[]): string | null {
+  return answers.find(a => a !== SKIP_LABEL) ?? null;
+}
+
 /** 查询所有可用的 provider_model 并构造文本列表响应 */
 function buildSelectModelResponse(
   db: Database.Database,
@@ -260,49 +340,51 @@ function buildSelectModelResponse(
   return buildTextResponse(responseType, inner);
 }
 
-/** 将模型列表分块为 AskUserQuestion 的 questions（每组 2-4 个选项，最多 4 组） */
+/** 将模型列表分块为 AskUserQuestion 的 questions（每组 ≤3 个模型 + 1 个"不选择"，最多 4 组） */
 function buildModelQuestions(models: string[]): unknown[] {
-  if (models.length <= MAX_OPTIONS_PER_QUESTION) {
-    const options = models.map(m => {
+  const chunks: string[][] = [];
+  for (let i = 0; i < models.length && chunks.length < MAX_QUESTIONS; i += MODELS_PER_QUESTION) {
+    chunks.push(models.slice(i, i + MODELS_PER_QUESTION));
+  }
+
+  return chunks.map((chunk, idx) => {
+    const options = chunk.map(m => {
       const sep = m.indexOf("/");
       const provider = sep > 0 ? m.substring(0, sep) : "";
       return { label: m, description: provider || "模型" };
     });
-    if (options.length === 1) {
-      options.push({ label: "保持当前", description: "不切换模型" });
-    }
-    return [{
-      question: "请选择要使用的模型",
-      header: "模型选择",
+    options.push({ label: SKIP_LABEL, description: "不切换模型" });
+
+    return {
+      question: chunks.length === 1
+        ? "请选择要使用的模型"
+        : `请选择要使用的模型（第${idx + 1}组）`,
+      header: idx === 0 ? "模型选择" : `更多模型(${idx + 1})`,
       options,
       multiSelect: false,
-    }];
-  }
-
-  // 均匀分配到最多 MAX_QUESTION_GROUPS 个 question，每个 2-4 个选项
-  const numChunks = Math.min(MAX_QUESTION_GROUPS, Math.ceil(models.length / MAX_OPTIONS_PER_QUESTION));
-  const chunks: string[][] = Array.from({ length: numChunks }, () => []);
-  for (let i = 0; i < models.length; i++) {
-    chunks[i % numChunks].push(models[i]);
-  }
-
-  return chunks.map((chunk, idx) => ({
-    question: "请选择要使用的模型",
-    header: idx === 0 ? "模型选择" : "更多模型",
-    options: chunk.map(m => {
-      const sep = m.indexOf("/");
-      const provider = sep > 0 ? m.substring(0, sep) : "";
-      return { label: m, description: provider || "模型" };
-    }),
-    multiSelect: false,
-  }));
+    };
+  });
 }
 
-/** 构造 AskUserQuestion synthetic tool_use 响应 */
-function buildAskUserQuestionResponse(displayModels: string[]): Omit<InterceptResponse, "meta"> {
-  const capped = displayModels.slice(0, MAX_DISPLAY_MODELS);
-  const questions = buildModelQuestions(capped);
-  const toolUseId = `${TOOL_USE_ID_PREFIX}${randomUUID()}`;
+/** 构建 provider 选择的 AskUserQuestion question（两步式第一步） */
+function buildProviderQuestion(providers: string[]): unknown {
+  const options = providers.map(p => ({ label: p, description: `${p} 的模型` }));
+  options.push({ label: SKIP_LABEL, description: "不切换模型" });
+  return {
+    question: "请先选择模型提供商",
+    header: "Provider",
+    options,
+    multiSelect: false,
+  };
+}
+
+/** 构造 AskUserQuestion synthetic tool_use 响应（isProvider=true 用 provider 前缀） */
+function buildAskUserQuestionPayload(
+  questions: unknown[],
+  isProvider: boolean,
+): Omit<InterceptResponse, "meta"> {
+  const prefix = isProvider ? TOOL_USE_ID_PROVIDER_PREFIX : TOOL_USE_ID_PREFIX;
+  const toolUseId = `${prefix}${randomUUID()}`;
 
   return {
     statusCode: 200,
