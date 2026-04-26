@@ -10,77 +10,80 @@
       </Button>
     </div>
 
-    <div class="space-y-4">
+    <div class="grid grid-cols-3 gap-4">
       <Card v-for="g in groupsWithParsedRule" :key="g.id" :class="{ 'opacity-60': !g.is_active }">
-        <Collapsible :default-open="true">
-          <CardHeader class="flex flex-row items-center justify-between gap-4">
-            <div class="flex items-center gap-3">
-              <CardTitle class="font-mono text-sm">{{ g.client_model }}</CardTitle>
-              <Badge variant="secondary">{{ g.strategy }}</Badge>
-            </div>
-            <div class="flex items-center gap-3">
-              <Button variant="ghost" size="sm" class="gap-1.5" @click="confirmToggle(g)">
+        <CardHeader class="flex flex-row items-center justify-between gap-2 pb-2">
+          <div class="flex items-center gap-2 min-w-0">
+            <CardTitle class="font-mono text-sm truncate">{{ g.client_model }}</CardTitle>
+            <Badge variant="secondary">{{ g.strategy }}</Badge>
+          </div>
+          <div class="flex items-center gap-1 shrink-0">
+            <Button variant="ghost" size="sm" class="gap-1" @click="confirmToggle(g)">
+              <span
+                class="relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors"
+                :class="g.is_active ? 'bg-primary' : 'bg-input'"
+              >
                 <span
-                  class="relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors"
-                  :class="g.is_active ? 'bg-primary' : 'bg-input'"
-                >
-                  <span
-                    class="inline-block h-3 w-3 rounded-full bg-background shadow-sm transition-transform"
-                    :class="g.is_active ? 'translate-x-3.5' : 'translate-x-0.5'"
-                  />
-                </span>
-                <Badge :variant="g.is_active ? 'default' : 'secondary'">
-                  {{ g.is_active ? '启用' : '禁用' }}
-                </Badge>
-              </Button>
-              <CollapsibleTrigger as-child>
-                <Button variant="ghost" size="sm">
-                  展开
-                </Button>
-              </CollapsibleTrigger>
-              <Button variant="ghost" size="sm" @click="openEdit(g)">编辑</Button>
-              <Button variant="ghost" size="sm" class="text-destructive hover:text-destructive" @click="deleteTarget = g">删除</Button>
+                  class="inline-block h-3 w-3 rounded-full bg-background shadow-sm transition-transform"
+                  :class="g.is_active ? 'translate-x-3.5' : 'translate-x-0.5'"
+                />
+              </span>
+            </Button>
+            <Button variant="ghost" size="sm" @click="openEdit(g)">编辑</Button>
+            <Button variant="ghost" size="sm" class="text-destructive hover:text-destructive" @click="deleteTarget = g">删除</Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <!-- scheduled: 默认模型 + 时间窗口 -->
+          <div v-if="g.strategy === 'scheduled'" class="space-y-1.5 text-sm">
+            <div class="flex items-center gap-1.5">
+              <span class="font-mono">{{ g.parsedRule.default?.backend_model || '-' }}</span>
+              <span class="text-muted-foreground">/</span>
+              <span class="text-muted-foreground">{{ providerNameMap.get(g.parsedRule.default?.provider_id || '') || '-' }}</span>
+              <template v-if="g.parsedRule.default?.overflow_model">
+                <span class="text-muted-foreground">→</span>
+                <span class="font-mono text-primary">{{ g.parsedRule.default.overflow_model }}</span>
+              </template>
             </div>
-          </CardHeader>
-          <CollapsibleContent>
-            <CardContent>
-              <div v-if="g.strategy === 'scheduled'" class="space-y-3">
-                <div class="flex items-center gap-2 text-sm">
-                  <span class="text-muted-foreground">默认模型:</span>
-                  <span class="font-mono">{{ g.parsedRule.default?.backend_model || '-' }}</span>
-                  <span class="text-muted-foreground">/</span>
-                  <span>{{ providerNameMap.get(g.parsedRule.default?.provider_id || '') || '-' }}</span>
-                </div>
-                <div v-if="g.parsedRule.windows?.length" class="space-y-2">
-                  <div class="text-sm text-muted-foreground">时间窗口</div>
-                  <div
-                    v-for="(w, idx) in g.parsedRule.windows"
-                    :key="idx"
-                    class="flex items-center gap-2 text-sm"
-                  >
-                    <span class="font-mono text-xs bg-muted px-2 py-0.5 rounded">{{ w.start }} - {{ w.end }}</span>
-                    <span class="font-mono">{{ w.target.backend_model }}</span>
-                    <span class="text-muted-foreground">/</span>
-                    <span>{{ providerNameMap.get(w.target.provider_id) || w.target.provider_id }}</span>
-                  </div>
-                </div>
-                <div v-else class="text-sm text-muted-foreground">无时间窗口</div>
+            <div v-if="g.parsedRule.windows?.length" class="space-y-1">
+              <div
+                v-for="(w, idx) in g.parsedRule.windows.slice(0, 3)"
+                :key="idx"
+                class="flex items-center gap-1.5 text-xs"
+              >
+                <span class="font-mono bg-muted px-1.5 py-0.5 rounded">{{ w.start }}-{{ w.end }}</span>
+                <span class="font-mono">{{ w.target.backend_model }}</span>
+                <span class="text-muted-foreground">/</span>
+                <span class="text-muted-foreground">{{ providerNameMap.get(w.target.provider_id) || w.target.provider_id }}</span>
+                <template v-if="w.target.overflow_model">
+                  <span class="text-muted-foreground">→</span>
+                  <span class="font-mono text-primary">{{ w.target.overflow_model }}</span>
+                </template>
               </div>
-              <div v-else class="space-y-2">
-                <div v-for="(t, idx) in (g.parsedRule.targets || [])" :key="idx" class="flex items-center gap-2 text-sm">
-                  <span v-if="g.strategy === 'failover'" class="text-muted-foreground text-xs">{{ idx + 1 }}.</span>
-                  <span class="font-mono">{{ t.backend_model }}</span>
-                  <span class="text-muted-foreground">/</span>
-                  <span>{{ providerNameMap.get(t.provider_id) || t.provider_id }}</span>
-                </div>
-                <div v-if="!(g.parsedRule.targets || []).length" class="text-sm text-muted-foreground">无目标</div>
+              <div v-if="g.parsedRule.windows.length > 3" class="text-xs text-muted-foreground">
+                +{{ g.parsedRule.windows.length - 3 }} 个窗口...
               </div>
-            </CardContent>
-          </CollapsibleContent>
-        </Collapsible>
+            </div>
+            <div v-else class="text-xs text-muted-foreground">无时间窗口</div>
+          </div>
+          <!-- round-robin / random / failover: 目标列表 -->
+          <div v-else class="space-y-1.5 text-sm">
+            <div v-for="(t, idx) in (g.parsedRule.targets || [])" :key="idx" class="flex items-center gap-1.5">
+              <span v-if="g.strategy === 'failover'" class="text-muted-foreground text-xs w-4">{{ idx + 1 }}.</span>
+              <span class="font-mono">{{ t.backend_model }}</span>
+              <span class="text-muted-foreground">/</span>
+              <span class="text-muted-foreground">{{ providerNameMap.get(t.provider_id) || t.provider_id }}</span>
+              <template v-if="t.overflow_model">
+                <span class="text-muted-foreground">→</span>
+                <span class="font-mono text-primary">{{ t.overflow_model }}</span>
+              </template>
+            </div>
+            <div v-if="!(g.parsedRule.targets || []).length" class="text-xs text-muted-foreground">无目标</div>
+          </div>
+        </CardContent>
       </Card>
 
-      <div v-if="groups.length === 0" class="text-center text-muted-foreground py-12 bg-card rounded-xl border">
+      <div v-if="groups.length === 0" class="col-span-3 text-center text-muted-foreground py-12 bg-card rounded-xl border">
         暂无映射分组
       </div>
     </div>
@@ -129,7 +132,6 @@ import { api, getApiMessage } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog'
 import MappingGroupFormDialog from '@/components/mappings/MappingGroupFormDialog.vue'
 import MappingGroupDeleteDialog from '@/components/mappings/MappingGroupDeleteDialog.vue'
@@ -169,7 +171,7 @@ const providerGroups = computed<ProviderGroup[]>(() =>
     provider: { id: p.id, name: p.name },
     models: (p.models ?? []).map(m => ({
       name: m.name,
-      contextWindow: m.context_window ?? 200000,
+      contextWindow: m.context_window ?? DEFAULT_CONTEXT_WINDOW,
     })),
   }))
 )
