@@ -5,10 +5,13 @@ export interface ModelInfo {
 
 export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
   // DeepSeek
-  "deepseek-chat": 128000,
-  "deepseek-reasoner": 128000,
-  "deepseek-v3": 128000,
-  "deepseek-r1": 128000,
+  "deepseek-chat": 1000000,
+  "deepseek-reasoner": 1000000,
+  "deepseek-v3": 1000000,
+  "deepseek-r1": 1000000,
+  "deepseek-v4-flash": 1000000,
+  "deepseek-v4-pro": 1000000,
+  "deepseek-v3.2": 128000,
   // 智谱
   "glm-5.1": 200000,
   "glm-5": 200000,
@@ -73,7 +76,7 @@ export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
   "step-1-8k": 8000,
   "step-1-32k": 32000,
   // 硅基流动
-  "deepseek-ai/DeepSeek-V3.2-Exp": 160000,
+  "deepseek-ai/DeepSeek-V3.2-Exp": 128000,
   "deepseek-ai/DeepSeek-R1": 128000,
   "Qwen/Qwen3-8B": 128000,
   "Qwen/Qwen2.5-72B-Instruct": 128000,
