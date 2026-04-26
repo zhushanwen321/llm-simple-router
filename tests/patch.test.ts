@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { patchMissingThinkingBlocks } from "../src/proxy/patch/deepseek/patch-thinking-blocks.js";
 import { patchOrphanToolResults } from "../src/proxy/patch/deepseek/patch-orphan-tool-results.js";
-import { patchToolsFormat } from "../src/proxy/patch/deepseek/patch-tools-format.js";
 import { applyProviderPatches } from "../src/proxy/patch/index.js";
 
 describe("patchMissingThinkingBlocks", () => {
@@ -209,64 +208,6 @@ describe("patchOrphanToolResults", () => {
   });
 });
 
-describe("patchToolsFormat", () => {
-  it("将 Anthropic 格式 tools 转换为 OpenAI 格式", () => {
-    const body = {
-      tools: [
-        { name: "read_file", description: "Read a file", input_schema: { type: "object", properties: { path: { type: "string" } } } },
-        { name: "write_file", description: "Write a file", input_schema: { type: "object" } },
-      ],
-    };
-    patchToolsFormat(body);
-    expect(body.tools).toEqual([
-      { type: "function", function: { name: "read_file", description: "Read a file", parameters: { type: "object", properties: { path: { type: "string" } } } } },
-      { type: "function", function: { name: "write_file", description: "Write a file", parameters: { type: "object" } } },
-    ]);
-  });
-
-  it("跳过已是 OpenAI 格式的 tools", () => {
-    const body = {
-      tools: [{ type: "function", function: { name: "read_file", parameters: { type: "object" } } }],
-    };
-    patchToolsFormat(body);
-    expect(body.tools).toEqual([{ type: "function", function: { name: "read_file", parameters: { type: "object" } } }]);
-  });
-
-  it("处理缺少可选字段的 tool", () => {
-    const body = { tools: [{ name: "minimal_tool" }] };
-    patchToolsFormat(body);
-    expect(body.tools).toEqual([{ type: "function", function: { name: "minimal_tool" } }]);
-  });
-
-  it("无 tools 时不修改", () => {
-    const body = { messages: [] };
-    patchToolsFormat(body);
-    expect(body).toEqual({ messages: [] });
-  });
-
-  it("空 tools 数组时不修改", () => {
-    const body = { tools: [] };
-    patchToolsFormat(body);
-    expect(body.tools).toEqual([]);
-  });
-
-  it("混合格式时只转换 Anthropic 格式的", () => {
-    const body = {
-      tools: [
-        { name: "anthropic_tool", description: "A", input_schema: { type: "object" } },
-        { type: "function", function: { name: "openai_tool", parameters: { type: "object" } } },
-        { name: "another_anthropic" },
-      ],
-    };
-    patchToolsFormat(body);
-    expect(body.tools).toEqual([
-      { type: "function", function: { name: "anthropic_tool", description: "A", parameters: { type: "object" } } },
-      { type: "function", function: { name: "openai_tool", parameters: { type: "object" } } },
-      { type: "function", function: { name: "another_anthropic" } },
-    ]);
-  });
-});
-
 describe("applyProviderPatches", () => {
   it("DeepSeek provider 时触发补丁", () => {
     const body = {
@@ -291,18 +232,5 @@ describe("applyProviderPatches", () => {
     const original = JSON.stringify(body);
     applyProviderPatches(body, { base_url: "https://open.bigmodel.cn/api/anthropic" });
     expect(JSON.stringify(body)).toBe(original);
-  });
-
-  it("deepseek 模型通过非 deepseek provider 时也触发 tools 转换", () => {
-    const body = {
-      model: "deepseek-v4-flash",
-      tools: [{ name: "read_file", description: "Read", input_schema: { type: "object" } }],
-      messages: [{ role: "user", content: "hi" }],
-    };
-    applyProviderPatches(body, { base_url: "https://opencode.ai/zen/go" });
-    expect((body.tools as unknown[])[0]).toEqual({
-      type: "function",
-      function: { name: "read_file", description: "Read", parameters: { type: "object" } },
-    });
   });
 });
