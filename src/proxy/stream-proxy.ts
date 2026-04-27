@@ -61,7 +61,7 @@ class StreamProxy {
 
   private transition(newState: StreamState): void {
     const VALID: Record<StreamState, StreamState[]> = {
-      BUFFERING: ["STREAMING", "EARLY_ERROR"],
+      BUFFERING: ["STREAMING", "EARLY_ERROR", "ABORTED"],
       STREAMING: ["COMPLETED", "ABORTED"],
       COMPLETED: [],
       EARLY_ERROR: [],
