@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import Database from "better-sqlite3";
-import { resolveMapping, countGroupTargets } from "../src/proxy/mapping-resolver.js";
+import { resolveMapping } from "../src/proxy/mapping-resolver.js";
 import { initDatabase } from "../src/db/index.js";
 
 describe("resolveMapping", () => {
@@ -195,27 +195,5 @@ describe("resolveMapping", () => {
 
     const result = resolveMapping(db, "target-model", { now: new Date() });
     expect(result?.target).toEqual({ backend_model: "target-model", provider_id: "good-p" });
-  });
-
-  // --- countGroupTargets ---
-
-  describe("countGroupTargets", () => {
-    it("counts targets in rule JSON", () => {
-      const rule = JSON.stringify({
-        targets: [
-          { backend_model: "gpt-4", provider_id: "p1" },
-          { backend_model: "claude-3", provider_id: "p2" },
-        ],
-      });
-      expect(countGroupTargets(rule)).toBe(2);
-    });
-
-    it("returns 0 for invalid JSON", () => {
-      expect(countGroupTargets("not-json")).toBe(0);
-    });
-
-    it("returns 0 when no targets array", () => {
-      expect(countGroupTargets("{}")).toBe(0);
-    });
   });
 });

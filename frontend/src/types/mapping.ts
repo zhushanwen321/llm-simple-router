@@ -1,3 +1,15 @@
+/** 旧版单模型映射（列表项响应） */
+export interface ModelMapping {
+  id: string
+  client_model: string
+  backend_model: string
+  provider_id: string
+  provider_name?: string
+  api_type?: string
+  is_active: number
+  created_at: string
+}
+
 /** 模型信息（含上下文窗口大小） */
 export interface ModelInfo {
   name: string

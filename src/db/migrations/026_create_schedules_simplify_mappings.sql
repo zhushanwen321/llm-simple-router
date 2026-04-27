@@ -1,9 +1,9 @@
--- Migration 026: 创建 schedules 表，简化 mapping_groups 表结构
+-- Migration 026: 创建 schedules 表，简化 mapping_groups rule 格式
 -- 变更概要：
 --   1. 创建 schedules 表（周循环调度层）
 --   2. 迁移 scheduled 策略的 windows 数据到 schedules
 --   3. 统一 mapping_groups.rule 为 { targets: [...] } 格式
---   4. 删除 strategy 列（SQLite 重建表）
+--   4. 保留 strategy 列（兼容旧代码），默认 'scheduled'
 
 -- ============================================================
 -- Step 1: 创建 schedules 表
@@ -55,38 +55,9 @@ FROM mapping_groups mg, json_each(json_extract(mg.rule, '$.windows')) AS win
 WHERE mg.strategy = 'scheduled';
 
 -- ============================================================
--- Step 3: 创建 mapping_groups_new（去掉 strategy 列）
+-- Step 3: 更新 rule 格式（in-place，不重建表以保留 strategy 列）
 -- ============================================================
-CREATE TABLE IF NOT EXISTS mapping_groups_new (
-  id TEXT PRIMARY KEY,
-  client_model TEXT NOT NULL UNIQUE,
-  rule TEXT NOT NULL,
-  is_active INTEGER NOT NULL DEFAULT 1,
-  created_at TEXT NOT NULL
-);
-
--- ============================================================
--- Step 4: 迁移数据到新表，同时统一 rule 格式
--- ============================================================
--- 三种情况：
---   scheduled: rule 从 { default, windows } 简化为 { targets: [default] }
---   failover/round-robin/random: rule 已经是 { targets: [...] }，保持不变
-INSERT INTO mapping_groups_new (id, client_model, rule, is_active, created_at)
-SELECT
-  id,
-  client_model,
-  CASE
-    WHEN strategy = 'scheduled' THEN
-      json_object('targets', json_array(json_extract(rule, '$.default')))
-    ELSE
-      rule
-  END AS rule,
-  is_active,
-  created_at
-FROM mapping_groups;
-
--- ============================================================
--- Step 5: 替换旧表
--- ============================================================
-DROP TABLE mapping_groups;
-ALTER TABLE mapping_groups_new RENAME TO mapping_groups;
+-- scheduled: rule 从 { default, windows } 简化为 { targets: [default] }
+-- failover/round-robin/random: rule 已经是 { targets: [...] }，保持不变
+UPDATE mapping_groups SET rule = json_object('targets', json_array(json_extract(rule, '$.default')))
+WHERE strategy = 'scheduled';

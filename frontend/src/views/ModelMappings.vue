@@ -99,8 +99,7 @@ import MappingGroupFormDialog from '@/components/mappings/MappingGroupFormDialog
 import MappingGroupDeleteDialog from '@/components/mappings/MappingGroupDeleteDialog.vue'
 import type { MappingGroup, Provider, MappingTarget, Rule } from '@/types/mapping'
 import type { ProviderGroup } from '@/components/mappings/cascading-types'
-
-const DEFAULT_CONTEXT_WINDOW = 200_000
+import { DEFAULT_CONTEXT_WINDOW } from '@/constants'
 
 interface FormData {
   client_model: string
@@ -154,9 +153,8 @@ const groupsWithParsedRule = computed(() =>
     let parsedRule: Rule = {}
     try {
       parsedRule = JSON.parse(g.rule) as Rule
-    // eslint-disable-next-line taste/no-silent-catch -- computed 中无法传播异常，使用空默认值
-    } catch {
-      // rule 格式异常时使用空默认值
+    } catch (e) {
+      console.warn('Failed to parse mapping group rule JSON:', e)
     }
     return { ...g, parsedRule }
   })
@@ -198,7 +196,7 @@ function openCreate() {
 function openEdit(g: MappingGroup & { parsedRule?: Rule }) {
   editingId.value = g.id
   let rule: Rule = {}
-  try { rule = JSON.parse(g.rule) } catch { /* eslint-disable-line taste/no-silent-catch -- 格式异常时使用空默认值 */ }
+  try { rule = JSON.parse(g.rule) } catch (e) { console.warn('Failed to parse rule JSON:', e) }
 
   const firstProviderId = providersList.value[0]?.id || ''
   form.value = {

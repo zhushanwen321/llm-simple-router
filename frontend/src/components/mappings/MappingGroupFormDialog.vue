@@ -89,6 +89,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import CascadingModelSelect from '@/components/mappings/CascadingModelSelect.vue'
 import type { SelectedValue, ProviderGroup } from '@/components/mappings/cascading-types'
 import type { ProviderSummary, MappingTarget } from '@/types/mapping'
+import { DEFAULT_CONTEXT_WINDOW, LARGE_CONTEXT_THRESHOLD } from '@/constants'
 
 interface FormData {
   client_model: string
@@ -119,7 +120,7 @@ function getTargetByKey(idx: number): MappingTarget | undefined {
 
 function getContextWindow(target: MappingTarget): number {
   const key = `${target.provider_id}:${target.backend_model}`
-  return props.contextWindowMap.get(key) ?? 200000
+  return props.contextWindowMap.get(key) ?? DEFAULT_CONTEXT_WINDOW
 }
 
 function overflowGroupsFor(idx: number): ProviderGroup[] {
@@ -135,7 +136,7 @@ function overflowHintFor(idx: number): string {
   const target = getTargetByKey(idx)
   if (!target?.overflow_provider_id || !target?.overflow_model) return ''
   const cw = getContextWindow(target)
-  if (cw >= 1000000) return '当前模型上下文 >= 1M，无需配置溢出模型'
+  if (cw >= LARGE_CONTEXT_THRESHOLD) return '当前模型上下文 >= 1M，无需配置溢出模型'
   const cwStr = cw >= 1000 ? `${cw / 1000}K` : `${cw}`
   return `上下文超过 ${target.backend_model} 限制 (${cwStr}) 时自动切换到 ${target.overflow_model}`
 }

@@ -16,7 +16,6 @@ vi.mock("../src/utils/crypto.js", () => ({ decrypt: vi.fn(() => "sk-test") }));
 vi.mock("../src/db/settings.js", () => ({ getSetting: vi.fn(() => "enc-key") }));
 vi.mock("../src/proxy/mapping-resolver.js", () => ({
   resolveMapping: vi.fn(() => null),
-  countGroupTargets: vi.fn(() => 1),
 }));
 vi.mock("../src/proxy/enhancement/enhancement-handler.js", () => ({
   applyEnhancement: vi.fn(() => ({ effectiveModel: "gpt-4", originalModel: null, interceptResponse: null })),

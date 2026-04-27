@@ -69,14 +69,16 @@ function filterExcluded(targets: Target[], excludeTargets: Target[] | undefined)
 
 // ---------- Schedule matching ----------
 
+const ALL_WEEK_DAYS = [0, 1, 2, 3, 4, 5, 6] as const;
+
 /** 将 week JSON 字符串解析为 dayOfWeek 数字集合 (0=Sun ~ 6=Sat) */
 function parseWeekDays(weekJson: string): Set<number> {
   try {
     const arr = JSON.parse(weekJson);
-    if (!Array.isArray(arr)) return new Set([0, 1, 2, 3, 4, 5, 6]);
+    if (!Array.isArray(arr)) return new Set(ALL_WEEK_DAYS);
     return new Set(arr.filter((d: unknown) => typeof d === "number"));
   } catch {
-    return new Set([0, 1, 2, 3, 4, 5, 6]);
+    return new Set(ALL_WEEK_DAYS);
   }
 }
 
@@ -181,15 +183,4 @@ export function resolveMapping(
     concurrency_override: concurrencyOverride,
     targetCount: activeTargets.length,
   };
-}
-
-// ---------- Exported helpers (used by proxy-handler) ----------
-
-/** 解析 mapping group rule 中的 targets 数量，用于判断是否启用 failover */
-export function countGroupTargets(ruleJson: string): number {
-  try {
-    return parseTargets(JSON.parse(ruleJson)).length;
-  } catch {
-    return 0;
-  }
 }

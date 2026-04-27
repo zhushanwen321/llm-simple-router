@@ -17,12 +17,6 @@ export interface Schedule {
   updated_at: string;
 }
 
-export interface ConcurrencyOverride {
-  max_concurrency?: number;
-  queue_timeout_ms?: number;
-  max_queue_size?: number;
-}
-
 const SCHEDULE_FIELDS = new Set([
   "mapping_group_id", "name", "enabled", "week",
   "start_hour", "end_hour", "mapping_rule", "concurrency_rule", "priority",

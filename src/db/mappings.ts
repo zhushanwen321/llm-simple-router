@@ -15,13 +15,14 @@ export interface ModelMapping {
 export interface MappingGroup {
   id: string;
   client_model: string;
+  strategy: string;
   rule: string;
   is_active: number;
   created_at: string;
 }
 
 const MAPPING_FIELDS = new Set(["client_model", "backend_model", "provider_id", "is_active"]);
-const GROUP_FIELDS = new Set(["client_model", "rule", "is_active"]);
+const GROUP_FIELDS = new Set(["client_model", "strategy", "rule", "is_active"]);
 
 // --- ModelMapping CRUD ---
 
@@ -96,8 +97,8 @@ export function createMappingGroup(
   const id = randomUUID();
   const now = new Date().toISOString();
   db.prepare(
-    `INSERT INTO mapping_groups (id, client_model, rule, created_at)
-     VALUES (?, ?, ?, ?)`,
+    `INSERT INTO mapping_groups (id, client_model, strategy, rule, created_at)
+     VALUES (?, ?, 'scheduled', ?, ?)`,
   ).run(id, mapping.client_model, mapping.rule, now);
   return id;
 }
@@ -105,7 +106,7 @@ export function createMappingGroup(
 export function updateMappingGroup(
   db: Database.Database,
   id: string,
-  fields: Partial<Pick<MappingGroup, "client_model" | "rule" | "is_active">>,
+  fields: Partial<Pick<MappingGroup, "client_model" | "strategy" | "rule" | "is_active">>,
 ): void {
   buildUpdateQuery(db, "mapping_groups", id, fields, GROUP_FIELDS);
 }

@@ -161,16 +161,12 @@ export const adminScheduleRoutes: FastifyPluginCallback<ScheduleRoutesOptions> =
       return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.BAD_REQUEST, "start_hour must be < end_hour"));
     }
 
-    const fields: Partial<Pick<import("../db/schedules.js").Schedule,
-      "name" | "enabled" | "week" | "start_hour" | "end_hour" | "mapping_rule" | "concurrency_rule" | "priority">> = {};
-    if (body.name !== undefined) fields.name = body.name;
-    if (body.enabled !== undefined) fields.enabled = body.enabled;
-    if (body.week !== undefined) fields.week = body.week;
-    if (body.start_hour !== undefined) fields.start_hour = body.start_hour;
-    if (body.end_hour !== undefined) fields.end_hour = body.end_hour;
-    if (body.mapping_rule !== undefined) fields.mapping_rule = body.mapping_rule;
-    if (body.concurrency_rule !== undefined) fields.concurrency_rule = body.concurrency_rule;
-    if (body.priority !== undefined) fields.priority = body.priority;
+    const fields: Record<string, unknown> = {};
+    const UPDATE_FIELDS = ["name", "enabled", "week", "start_hour", "end_hour", "mapping_rule", "concurrency_rule", "priority"] as const;
+    const bodyObj = body as Record<string, unknown>;
+    for (const key of UPDATE_FIELDS) {
+      if (bodyObj[key] !== undefined) fields[key] = bodyObj[key];
+    }
 
     updateSchedule(db, id, fields);
     return reply.send({ success: true });

@@ -1,7 +1,7 @@
 import axios from 'axios'
 import router from '@/router'
 import type { LogEntry } from '@/components/logs/types'
-import type { Provider, MappingGroup } from '@/types/mapping'
+import type { Provider, MappingGroup, ModelMapping } from '@/types/mapping'
 import type { Schedule, SchedulePayload } from '@/types/schedule'
 import type {
   ActiveRequest,
@@ -338,8 +338,7 @@ export const api = {
   deleteProvider: (id: string) => request<{ success: boolean }>('delete', `${API.PROVIDERS}/${id}`),
   getProviderDependencies: (id: string) => request<{ references: string[] }>('get', `${API.PROVIDERS}/${id}/dependencies`),
 
-  // TODO: 定义 Mapping 响应类型替换 unknown[]
-  getMappings: () => request<unknown[]>('get', API.MAPPINGS),
+  getMappings: () => request<ModelMapping[]>('get', API.MAPPINGS),
   createMapping: (data: MappingPayload) => request<{ id: string }>('post', API.MAPPINGS, data),
   updateMapping: (id: string, data: MappingPayload) => request<{ success: boolean }>('put', `${API.MAPPINGS}/${id}`, data),
   deleteMapping: (id: string) => request<{ success: boolean }>('delete', `${API.MAPPINGS}/${id}`),

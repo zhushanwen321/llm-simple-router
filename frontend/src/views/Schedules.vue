@@ -9,6 +9,11 @@
       </div>
     </div>
 
+    <div v-if="loading" class="flex items-center justify-center py-16 text-muted-foreground text-sm">
+      Loading...
+    </div>
+
+    <template v-if="!loading">
     <!-- 映射组选择器 -->
     <div class="mb-4">
       <Label class="block text-sm font-medium text-foreground mb-2">选择映射组</Label>
@@ -327,6 +332,7 @@ const DEFAULT_FORM = (): ScheduleForm => ({
   max_queue_size: undefined,
 })
 
+const loading = ref(false)
 const groups = ref<MappingGroup[]>([])
 const providers = ref<Provider[]>([])
 const schedules = ref<Schedule[]>([])
@@ -355,7 +361,7 @@ const { handleSubmit } = useForm({
 
 function parseWeek(weekStr: string): string[] {
   let arr: number[] = []
-  try { arr = JSON.parse(weekStr) } catch { return [] }
+  try { arr = JSON.parse(weekStr) } catch (e) { console.warn('Failed to parse week JSON:', e); return [] }
   return arr.map(d => WEEK_LABELS[d] ?? String(d))
 }
 
@@ -422,10 +428,10 @@ function openEdit(s: Schedule) {
   try {
     const rule = JSON.parse(s.mapping_rule) as { targets?: TargetForm[] }
     if (rule.targets?.length) targets = rule.targets
-  } catch { /* eslint-disable-line taste/no-silent-catch */ }
+  } catch (e) { console.warn('Failed to parse mapping_rule JSON:', e) }
 
   let week: number[] = [1, 2, 3, 4, 5]
-  try { week = JSON.parse(s.week) } catch { /* eslint-disable-line taste/no-silent-catch */ }
+  try { week = JSON.parse(s.week) } catch (e) { console.warn('Failed to parse week JSON:', e) }
 
   let max_concurrency: number | undefined
   let queue_timeout_ms: number | undefined
@@ -436,7 +442,7 @@ function openEdit(s: Schedule) {
       max_concurrency = cr.max_concurrency
       queue_timeout_ms = cr.queue_timeout_ms
       max_queue_size = cr.max_queue_size
-    } catch { /* eslint-disable-line taste/no-silent-catch */ }
+    } catch (e) { console.warn('Failed to parse concurrency_rule JSON:', e) }
   }
 
   form.value = {
@@ -510,7 +516,9 @@ async function handleDelete() {
   }
 }
 
-onMounted(() => {
-  Promise.allSettled([loadGroups(), loadProviders()])
+onMounted(async () => {
+  loading.value = true
+  await Promise.allSettled([loadGroups(), loadProviders()])
+  loading.value = false
 })
 </script>
