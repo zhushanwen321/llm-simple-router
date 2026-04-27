@@ -37,8 +37,7 @@ interface ProviderAccumulator {
   successCount: number;
   errorCount: number;
   retryCount: number;
-  latencySum: number;
-  latencyCount: number;
+  latencyBuffer: RingBuffer;
   errorsByCode: Map<number, number>;
 }
 
@@ -48,8 +47,7 @@ function emptyAccumulator(): ProviderAccumulator {
     successCount: 0,
     errorCount: 0,
     retryCount: 0,
-    latencySum: 0,
-    latencyCount: 0,
+    latencyBuffer: new RingBuffer(PROVIDER_LATENCY_CAPACITY),
     errorsByCode: new Map(),
   };
 }
@@ -57,6 +55,7 @@ function emptyAccumulator(): ProviderAccumulator {
 const TOP_ERRORS_LIMIT = 5;
 
 const DEFAULT_CAPACITY = 1000;
+const PROVIDER_LATENCY_CAPACITY = 200;
 const HTTP_SUCCESS_RANGE_MIN = 200;
 const HTTP_SUCCESS_RANGE_MAX = 400;
 const PERCENTILE_P50 = 0.5;
@@ -135,8 +134,7 @@ export class StatsAggregator {
       acc = emptyAccumulator();
       this.providers.set(providerId, acc);
     }
-    acc.latencySum += ms;
-    acc.latencyCount++;
+    acc.latencyBuffer.push(ms);
   }
 
   getStats(): StatsSnapshot {
@@ -160,10 +158,7 @@ export class StatsAggregator {
         totalRequests: acc.totalRequests,
         successCount: acc.successCount,
         errorCount: acc.errorCount,
-        avgLatencyMs:
-          acc.latencyCount > 0
-            ? acc.latencySum / acc.latencyCount
-            : 0,
+        avgLatencyMs: avgFromBuffer(acc.latencyBuffer),
         retryCount: acc.retryCount,
         topErrors,
       };
@@ -205,4 +200,9 @@ export class StatsAggregator {
 function percentile(sorted: number[], p: number): number {
   const idx = Math.ceil(p * sorted.length) - 1;
   return sorted[Math.max(0, Math.min(idx, sorted.length - 1))];
+}
+
+function avgFromBuffer(buf: RingBuffer): number {
+  const sorted = buf.sorted();
+  return sorted.length > 0 ? sorted.reduce((s, v) => s + v, 0) / sorted.length : 0;
 }

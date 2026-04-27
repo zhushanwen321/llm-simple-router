@@ -109,6 +109,7 @@
               <span class="text-sm text-foreground truncate flex-1">{{ req.model }}</span>
               <Badge variant="outline" class="shrink-0 text-xs">{{ req.providerName }}</Badge>
               <Badge v-if="req.isStream" variant="outline" class="shrink-0 text-xs">SSE</Badge>
+              <span class="text-xs text-muted-foreground shrink-0">{{ duration(req) }}</span>
             </div>
           </ScrollArea>
         </CardContent>
@@ -167,7 +168,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -220,9 +221,16 @@ const { connect } = useMonitorSSE(
 // --- Helper functions ---
 
 const MS_PER_SECOND = 1000
+const now = ref(Date.now())
+let tickTimer: ReturnType<typeof setInterval> | null = null
 
 function elapsed(startTime: number): string {
-  return ((Date.now() - startTime) / MS_PER_SECOND).toFixed(1)
+  return ((now.value - startTime) / MS_PER_SECOND).toFixed(1)
+}
+
+function duration(req: { completedAt?: number; startTime: number }): string {
+  if (!req.completedAt) return '--'
+  return ((req.completedAt - req.startTime) / MS_PER_SECOND).toFixed(1) + 's'
 }
 
 // --- Lifecycle ---
@@ -230,5 +238,10 @@ function elapsed(startTime: number): string {
 onMounted(async () => {
   await loadInitialData()
   connect()
+  tickTimer = setInterval(() => { now.value = Date.now() }, MS_PER_SECOND)
+})
+
+onUnmounted(() => {
+  if (tickTimer) { clearInterval(tickTimer); tickTimer = null }
 })
 </script>
