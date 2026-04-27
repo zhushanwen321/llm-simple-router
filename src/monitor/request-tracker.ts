@@ -250,6 +250,7 @@ export class RequestTracker {
     if (this.pushTimer) {
       clearInterval(this.pushTimer);
       this.pushTimer = null;
+      this.runtimeCollector.stop();
     }
     this.runtimeCollector.stop();
   }

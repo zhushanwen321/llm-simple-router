@@ -55,7 +55,20 @@ export function initDatabase(dbPath: string): Database.Database {
     try {
       const sql = readFileSync(join(MIGRATIONS_DIR, file), "utf-8");
       db.transaction(() => {
-        db.exec(sql);
+        // 逐条执行 SQL 语句，容忍 "duplicate column name" 错误
+        // 用于 027_ensure_strategy_column 等幂等迁移
+        const statements = sql.split(";").map(s => s.trim()).filter(s => s.length > 0);
+        for (const stmt of statements) {
+          try {
+            db.exec(stmt + ";");
+          } catch (stmtErr: unknown) {
+            if (stmtErr instanceof Error && stmtErr.message.includes("duplicate column name")) {
+              // 列已存在，安全跳过
+              continue;
+            }
+            throw stmtErr;
+          }
+        }
         db.prepare("INSERT INTO migrations (name, applied_at) VALUES (?, ?)").run(
           file,
           new Date().toISOString(),
@@ -86,11 +99,6 @@ export {
 export type { Provider } from "./providers.js";
 
 export {
-  getModelMapping,
-  getAllModelMappings,
-  createModelMapping,
-  updateModelMapping,
-  deleteModelMapping,
   getMappingGroup,
   getMappingGroupById,
   getAllMappingGroups,
@@ -100,7 +108,7 @@ export {
   getActiveProviderModels,
   resolveByProviderModel,
 } from "./mappings.js";
-export type { ModelMapping, MappingGroup, ProviderModelEntry } from "./mappings.js";
+export type { MappingGroup, ProviderModelEntry } from "./mappings.js";
 
 export {
   getActiveRetryRules,
@@ -178,6 +186,18 @@ export {
   getAllModelInfo,
 } from "./model-info.js";
 export type { ProviderModelInfo } from "./model-info.js";
+
+export {
+  getSchedulesByGroup,
+  getActiveSchedulesForGroup,
+  getScheduleById,
+  getAllSchedules,
+  createSchedule,
+  updateSchedule,
+  deleteSchedule,
+  deleteSchedulesByGroup,
+} from "./schedules.js";
+export type { Schedule } from "./schedules.js";
 
 export {
   collectDbSizeInfo,

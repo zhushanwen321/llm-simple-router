@@ -34,6 +34,7 @@ export interface UnifiedRequestOverview {
   upstreamResponse: string | null
   errorMessage: string | null
   createdAt: string | null
+  inputTokensEstimated: boolean
 }
 
 export function fromActiveRequest(
@@ -84,6 +85,7 @@ export function fromActiveRequest(
     upstreamResponse: null,
     errorMessage: null,
     createdAt: null,
+    inputTokensEstimated: false,
   }
 }
 
@@ -147,5 +149,6 @@ export function fromLogEntry(entry: LogEntry): UnifiedRequestOverview {
     upstreamResponse: entry.upstream_response,
     errorMessage: entry.error_message,
     createdAt: entry.created_at,
+    inputTokensEstimated: entry.input_tokens_estimated === 1,
   }
 }

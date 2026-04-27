@@ -1,17 +1,7 @@
 import Database from "better-sqlite3";
 import { randomUUID } from "crypto";
-import { isTarget } from "../proxy/strategy/targets-rule.js";
 import type { Target } from "../proxy/strategy/types.js";
 import { buildUpdateQuery, deleteById } from "./helpers.js";
-
-export interface ModelMapping {
-  id: string;
-  client_model: string;
-  backend_model: string;
-  provider_id: string;
-  is_active: number;
-  created_at: string;
-}
 
 export interface MappingGroup {
   id: string;
@@ -22,48 +12,7 @@ export interface MappingGroup {
   created_at: string;
 }
 
-const MAPPING_FIELDS = new Set(["client_model", "backend_model", "provider_id", "is_active"]);
 const GROUP_FIELDS = new Set(["client_model", "strategy", "rule", "is_active"]);
-
-// --- ModelMapping CRUD ---
-
-export function getModelMapping(
-  db: Database.Database,
-  clientModel: string,
-): ModelMapping | undefined {
-  return db
-    .prepare("SELECT * FROM model_mappings WHERE client_model = ? AND is_active = 1")
-    .get(clientModel) as ModelMapping | undefined;
-}
-
-export function getAllModelMappings(db: Database.Database): ModelMapping[] {
-  return db.prepare("SELECT * FROM model_mappings ORDER BY created_at DESC").all() as ModelMapping[];
-}
-
-export function createModelMapping(
-  db: Database.Database,
-  mapping: { client_model: string; backend_model: string; provider_id: string; is_active?: number },
-): string {
-  const id = randomUUID();
-  const now = new Date().toISOString();
-  db.prepare(
-    `INSERT INTO model_mappings (id, client_model, backend_model, provider_id, is_active, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-  ).run(id, mapping.client_model, mapping.backend_model, mapping.provider_id, mapping.is_active ?? 1, now);
-  return id;
-}
-
-export function updateModelMapping(
-  db: Database.Database,
-  id: string,
-  fields: Partial<Pick<ModelMapping, "client_model" | "backend_model" | "provider_id" | "is_active">>,
-): void {
-  buildUpdateQuery(db, "model_mappings", id, fields, MAPPING_FIELDS);
-}
-
-export function deleteModelMapping(db: Database.Database, id: string): void {
-  deleteById(db, "model_mappings", id);
-}
 
 // --- MappingGroups CRUD ---
 
@@ -93,14 +42,14 @@ export function getAllMappingGroups(db: Database.Database): MappingGroup[] {
 
 export function createMappingGroup(
   db: Database.Database,
-  mapping: { client_model: string; strategy: string; rule: string },
+  mapping: { client_model: string; rule: string },
 ): string {
   const id = randomUUID();
   const now = new Date().toISOString();
   db.prepare(
     `INSERT INTO mapping_groups (id, client_model, strategy, rule, created_at)
-     VALUES (?, ?, ?, ?, ?)`,
-  ).run(id, mapping.client_model, mapping.strategy, mapping.rule, now);
+     VALUES (?, ?, 'scheduled', ?, ?)`,
+  ).run(id, mapping.client_model, mapping.rule, now);
   return id;
 }
 
@@ -138,22 +87,34 @@ export function getActiveProviderModels(db: Database.Database): ProviderModelEnt
   return results;
 }
 
-// --- 从 mapping_groups rule JSON 中提取 target 条目 ---
+// --- 内联 Target 类型守卫（原 targets-rule.ts 已删除） ---
 
+function isTarget(value: unknown): value is Target {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "backend_model" in value &&
+    typeof (value as Target).backend_model === "string" &&
+    "provider_id" in value &&
+    typeof (value as Target).provider_id === "string"
+  );
+}
+
+// --- 从 mapping_groups rule JSON 中提取 target 条目 ---
+// 主格式为 { targets: [...] }，向后兼容旧 { default: {...} }。
+// 与 mapping-resolver.ts 中 parseTargets 保持逻辑一致。
 function extractTargets(rule: Record<string, unknown>): Target[] {
   const results: Target[] = [];
-  if (isTarget(rule.default)) results.push(rule.default);
   if (Array.isArray(rule.targets)) {
     for (const t of rule.targets) {
       if (isTarget(t)) results.push(t);
     }
   }
-  if (Array.isArray(rule.windows)) {
-    for (const w of rule.windows) {
-      if (w && typeof w === "object" && isTarget((w as Record<string, unknown>).target)) {
-        results.push((w as Record<string, unknown>).target as Target);
-      }
-    }
+  // 兼容旧格式 { default: {...} }（向后兼容 migration 026 前数据）
+  // eslint-disable-next-line taste/no-deprecated-rule-format
+  if (results.length === 0 && isTarget(rule.default)) {
+    // eslint-disable-next-line taste/no-deprecated-rule-format
+    results.push(rule.default);
   }
   return results;
 }
@@ -161,7 +122,6 @@ function extractTargets(rule: Record<string, unknown>): Target[] {
 /**
  * 根据 "provider_name/backend_model" 验证模型是否存在于 provider 配置中。
  * 同时尝试从 mapping_groups 中找到对应的 client_model 用于路由。
- * 如果找不到 mapping，返回 backend_model 本身（由 proxy-core 兜底处理）。
  */
 export function resolveByProviderModel(
   db: Database.Database,

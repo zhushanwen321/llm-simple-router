@@ -219,6 +219,7 @@ import { toast } from 'vue-sonner'
 import * as z from 'zod'
 import { api, getApiMessage, type ProviderPayload, type ProviderGroup } from '@/api/client'
 import type { Provider, ModelInfo } from '@/types/mapping'
+import { DEFAULT_CONTEXT_WINDOW } from '@/constants'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -237,7 +238,6 @@ const MAX_CONCURRENCY = 100
 const MAX_QUEUE_SIZE = 1000
 const CONTEXT_K = 1000
 const CONTEXT_M = 1_000_000
-const DEFAULT_CONTEXT_WINDOW = 200_000
 const CONTEXT_WINDOW_OPTIONS = [
   { label: '8K', value: '8000' },
   { label: '16K', value: '16000' },

@@ -4,6 +4,7 @@ import type { Provider } from "../db/index.js";
 import { insertRequestLog, insertMetrics, updateLogMetrics } from "../db/index.js";
 import { insertSuccessLog, type FailoverContext } from "./log-helpers.js";
 import { MetricsExtractor } from "../metrics/metrics-extractor.js";
+import { estimateInputTokens } from "../utils/token-counter.js";
 import type { FastifyRequest } from "fastify";
 import type { ResilienceAttempt } from "./resilience.js";
 import type { TransportResult } from "./types.js";
@@ -175,13 +176,22 @@ export function collectTransportMetrics(
   try {
     if (isStream && (result.kind === "stream_success" || result.kind === "stream_abort")) {
       if (result.metrics) {
-        insertMetrics(db, { ...base, ...result.metrics });
-        updateLogMetrics(db, lastSuccessLogId, result.metrics);
+        const metrics = { ...result.metrics };
+        if (!metrics.input_tokens && request.body) {
+          metrics.input_tokens = estimateInputTokens(request.body as Record<string, unknown>);
+          metrics.input_tokens_estimated = 1;
+        }
+        insertMetrics(db, { ...base, ...metrics });
+        updateLogMetrics(db, lastSuccessLogId, metrics);
         return;
       }
     } else if (result.kind === "success") {
       const mr = MetricsExtractor.fromNonStreamResponse(apiType, result.body);
       if (mr) {
+        if (!mr.input_tokens && request.body) {
+          mr.input_tokens = estimateInputTokens(request.body as Record<string, unknown>);
+          mr.input_tokens_estimated = 1;
+        }
         insertMetrics(db, { ...base, ...mr });
         updateLogMetrics(db, lastSuccessLogId, mr);
         return;

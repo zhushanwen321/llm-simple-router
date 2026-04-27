@@ -33,7 +33,7 @@
     <!-- Metrics grid -->
     <div class="grid grid-cols-2 gap-1.5">
       <div class="bg-muted/50 rounded-md px-2 py-1.5 min-w-0">
-        <div class="text-[10px] text-muted-foreground">延迟</div>
+        <div class="text-[10px] text-muted-foreground">耗时</div>
         <div class="text-sm font-semibold truncate">{{ latencyText }}</div>
       </div>
       <div class="bg-muted/50 rounded-md px-2 py-1.5 min-w-0">
@@ -41,7 +41,7 @@
         <div class="text-sm font-semibold truncate">{{ overview.ttftMs != null ? `${overview.ttftMs}ms` : '--' }}</div>
       </div>
       <div class="bg-muted/50 rounded-md px-2 py-1.5 min-w-0">
-        <div class="text-[10px] text-muted-foreground">Input Tokens</div>
+        <div class="text-[10px] text-muted-foreground">{{ overview.inputTokensEstimated ? 'Est Input Tokens' : 'Input Tokens' }}</div>
         <div class="text-sm font-semibold truncate">{{ overview.inputTokens != null ? overview.inputTokens : '--' }}</div>
       </div>
       <div class="bg-muted/50 rounded-md px-2 py-1.5 min-w-0">

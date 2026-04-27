@@ -1,7 +1,8 @@
 import axios from 'axios'
 import router from '@/router'
 import type { LogEntry } from '@/components/logs/types'
-import type { Provider, MappingGroup } from '@/types/mapping'
+import type { Provider, MappingGroup, ModelMapping } from '@/types/mapping'
+import type { Schedule, SchedulePayload } from '@/types/schedule'
 import type {
   ActiveRequest,
   StatsSnapshot,
@@ -82,6 +83,8 @@ const API = {
   SETUP_STATUS: '/setup/status',
   SETUP_INITIALIZE: '/setup/initialize',
   SETTINGS_LOG_RETENTION: '/settings/log-retention',
+  SCHEDULES: '/schedules',
+  SCHEDULES_BY_GROUP: '/schedules/group',
   UPGRADE_STATUS: '/upgrade/status',
   UPGRADE_CHECK: '/upgrade/check',
   UPGRADE_EXECUTE: '/upgrade/execute',
@@ -146,8 +149,7 @@ interface RouterKeyUpdatePayload {
 
 interface MappingGroupPayload {
   client_model: string
-  strategy: string
-  rule: string  // JSON string
+  rule: string  // JSON string: { targets: MappingTarget[] }
 }
 
 interface RetryRulePayload {
@@ -339,8 +341,7 @@ export const api = {
   deleteProvider: (id: string) => request<{ success: boolean }>('delete', `${API.PROVIDERS}/${id}`),
   getProviderDependencies: (id: string) => request<{ references: string[] }>('get', `${API.PROVIDERS}/${id}/dependencies`),
 
-  // TODO: 定义 Mapping 响应类型替换 unknown[]
-  getMappings: () => request<unknown[]>('get', API.MAPPINGS),
+  getMappings: () => request<ModelMapping[]>('get', API.MAPPINGS),
   createMapping: (data: MappingPayload) => request<{ id: string }>('post', API.MAPPINGS, data),
   updateMapping: (id: string, data: MappingPayload) => request<{ success: boolean }>('put', `${API.MAPPINGS}/${id}`, data),
   deleteMapping: (id: string) => request<{ success: boolean }>('delete', `${API.MAPPINGS}/${id}`),
@@ -384,6 +385,14 @@ export const api = {
   updateRetryRule: (id: string, data: RetryRulePayload) =>
     request<{ success: boolean }>('put', `${API.RETRY_RULES}/${id}`, data),
   deleteRetryRule: (id: string) => request<{ success: boolean }>('delete', `${API.RETRY_RULES}/${id}`),
+
+  getSchedules: () => request<Schedule[]>('get', API.SCHEDULES),
+  getSchedulesByGroup: (groupId: string) => request<Schedule[]>('get', `${API.SCHEDULES_BY_GROUP}/${groupId}`),
+  createSchedule: (data: SchedulePayload) => request<{ id: string }>('post', API.SCHEDULES, data),
+  updateSchedule: (id: string, data: Partial<SchedulePayload>) =>
+    request<{ success: boolean }>('put', `${API.SCHEDULES}/${id}`, data),
+  deleteSchedule: (id: string) => request<{ success: boolean }>('delete', `${API.SCHEDULES}/${id}`),
+  toggleSchedule: (id: string) => request<{ success: boolean; enabled: number }>('post', `${API.SCHEDULES}/${id}/toggle`),
 
   getProxyEnhancement: () =>
     request<ProxyEnhancementConfig>('get', API.PROXY_ENHANCEMENT),

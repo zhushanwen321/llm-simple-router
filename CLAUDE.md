@@ -142,6 +142,8 @@ Handler (proxy-handler.ts)
 **工具 `src/utils/`：**
 - `crypto.ts` — AES-256-GCM 加解密（格式：`iv:authTag:ciphertext`）
 - `password.ts` — scrypt 密码哈希（格式：`salt:hash`）
+- `token-counter.ts` — 统一 token 计数工具，基于 `gpt-tokenizer`（o200k_base）。
+  提供 `countTokens(text)`（长文本采样外推）和 `estimateInputTokens(body)`（从请求体提取文本并计数）。
 
 ### 前端（Vue 3 + shadcn-vue + Tailwind CSS）
 
@@ -181,6 +183,9 @@ Handler (proxy-handler.ts)
 - SSE 流式代理使用 `StreamProxy` 状态机 + `SSEMetricsTransform` 旁路采集指标，不修改业务数据流
 - Resilience 层统一处理重试（fixed/exponential）和 failover 决策，替代旧 `retry.ts`
 - 信号量按 Provider 维度独立管理，基于 Promise 队列，支持 AbortSignal（客户端断连自动取消）
+- **token 计数统一使用 `gpt-tokenizer`（o200k_base）**：禁止用字符长度估算 token 数。当 API 未返回 `input_tokens`（如部分第三方模型）时，`collectTransportMetrics()` 自动回退到 `estimateInputTokens()` 从请求体计数。
+  相关文件：`src/utils/token-counter.ts`（共享工具）、`src/proxy/overflow.ts`（请求 token 估算溢出）、`src/metrics/metrics-extractor.ts`（thinking 模型 text-only TPS 计算）。
+  长文本（>4000 字符）采用采样外推策略避免性能问题。
 
 ## 环境变量
 

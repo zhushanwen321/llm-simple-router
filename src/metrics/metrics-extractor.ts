@@ -1,4 +1,5 @@
 import { MS_PER_SECOND } from "../constants.js";
+import { encode } from "gpt-tokenizer";
 import type { SSEEvent } from "./sse-parser.js";
 
 export interface MetricsResult {
@@ -26,7 +27,7 @@ interface AnthropicMessageStart {
 
 interface AnthropicContentBlockDelta {
   type: string;
-  delta?: { type: string };
+  delta?: { type: string; text?: string; thinking?: string };
 }
 
 interface AnthropicMessageDelta {
@@ -61,6 +62,11 @@ export class MetricsExtractor {
   private firstContentReceived = false;
   private complete = false;
 
+  // Thinking model tracking: separate thinking vs text content for accurate TPS
+  private hasThinkingContent = false;
+  private textContentBuffer = "";
+  private textStreamStartTime: number | null = null;
+
   constructor(
     private apiType: "openai" | "anthropic",
     private requestStartTime: number,
@@ -86,10 +92,24 @@ export class MetricsExtractor {
       this.outputTokens !== null
     ) {
       totalDurationMs = this.streamEndTime - this.streamStartTime;
-      if (totalDurationMs > 0) {
+
+      if (this.textContentBuffer.length > 0 && this.textStreamStartTime !== null) {
+        // Use gpt-tokenizer to count actual text-only tokens from the
+        // streamed text content for accurate TPS. This handles both:
+        // 1. Thinking models with thinking_delta events (output_tokens = thinking + text)
+        // 2. Thinking models WITHOUT thinking_delta (e.g. Zhipu: server-side thinking,
+        //    output_tokens inflated but no thinking_delta events to detect)
+        const textTokens = encode(this.textContentBuffer).length;
+        const textDurationMs = this.streamEndTime - this.textStreamStartTime;
+        if (textTokens > 0 && textDurationMs > 0) {
+          tokensPerSecond = textTokens / (textDurationMs / MS_PER_SECOND);
+        }
+      } else if (!this.hasThinkingContent && totalDurationMs > 0) {
+        // Non-thinking model without text content collected: use API output_tokens
         tokensPerSecond =
           this.outputTokens / (totalDurationMs / MS_PER_SECOND);
       }
+      // Thinking model with no text output → TPS remains null
     }
 
     return {
@@ -146,6 +166,19 @@ export class MetricsExtractor {
       if (!this.firstContentReceived) {
         this.firstContentReceived = true;
         this.ttftMs = Date.now() - this.requestStartTime;
+      }
+
+      // 区分 thinking vs text 内容：gpt-tokenizer 精确统计 text tokens
+      const delta = (parsed as AnthropicContentBlockDelta).delta;
+      if (delta?.type === "thinking_delta") {
+        this.hasThinkingContent = true;
+      } else if (delta?.type === "text_delta") {
+        if (this.textStreamStartTime === null) {
+          this.textStreamStartTime = Date.now();
+        }
+        if (delta.text) {
+          this.textContentBuffer += delta.text;
+        }
       }
     } else if (type === "message_delta") {
       const msg = parsed as AnthropicMessageDelta;

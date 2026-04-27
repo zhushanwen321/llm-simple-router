@@ -114,14 +114,14 @@ function insertModelMapping(
     .run("map-1", clientModel, backendModel, "svc-openai", 1, now);
   mockDb
     .prepare(
-      `INSERT INTO mapping_groups (id, client_model, strategy, rule, created_at)
+      `INSERT INTO mapping_groups (id, client_model, rule, is_active, created_at)
        VALUES (?, ?, ?, ?, ?)`
     )
     .run(
       "mg-1",
       clientModel,
-      "scheduled",
-      JSON.stringify({ default: { backend_model: backendModel, provider_id: "svc-openai" } }),
+      JSON.stringify({ targets: [{ backend_model: backendModel, provider_id: "svc-openai" }] }),
+      1,
       now
     );
 }
