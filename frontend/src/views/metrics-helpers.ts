@@ -39,7 +39,7 @@ const BUCKET_SEC: Record<string, number> = {
 const DEFAULT_BUCKET_SEC = SEC_PER_MINUTE * MINUTES_15
 const DEFAULT_TOTAL_SEC = SEC_PER_DAY
 const TARGET_TICKS = 12
-const MIN_TICKS = 4
+const MIN_TICKS = 5
 
 const LONG_PERIODS = new Set(['7d', '30d', 'weekly', 'monthly'])
 

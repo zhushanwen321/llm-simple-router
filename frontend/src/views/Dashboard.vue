@@ -42,7 +42,7 @@
     <!-- 模型 + 密钥筛选 -->
     <div class="flex items-center gap-3 mb-4">
       <Select v-model="modelFilter">
-        <SelectTrigger class="w-32">
+        <SelectTrigger class="w-44">
           <SelectValue placeholder="全部模型" />
         </SelectTrigger>
         <SelectContent>
@@ -51,7 +51,7 @@
         </SelectContent>
       </Select>
       <Select v-model="keyFilter">
-        <SelectTrigger class="w-36">
+        <SelectTrigger class="w-48">
           <SelectValue placeholder="全部密钥" />
         </SelectTrigger>
         <SelectContent>
