@@ -10,23 +10,25 @@ export interface MetricsResult {
   cache_creation_tokens: number | null;
   cache_read_tokens: number | null;
   ttft_ms: number | null;
+  /** T6 - T0: proxy end-to-end streaming duration */
   total_duration_ms: number | null;
   /** @deprecated Use total_tps instead */
   tokens_per_second: number | null;
   stop_reason: string | null;
   is_complete: number;
   input_tokens_estimated?: number;
-  // --- TPS breakdown (Task 2) ---
+  // --- Two-phase TPS: thinking / non-thinking ---
   thinking_tokens: number | null;
+  /** T3 - T0: request start to last thinking delta */
+  thinking_duration_ms: number | null;
+  thinking_tps: number | null;
+  /** T6 - T3 (thinking) or T6 - T0 (non-thinking) */
+  non_thinking_duration_ms: number | null;
+  non_thinking_tps: number | null;
+  total_tps: number | null;
+  // --- Content counts (for analysis, not TPS) ---
   text_tokens: number | null;
   tool_use_tokens: number | null;
-  thinking_duration_ms: number | null;
-  text_duration_ms: number | null;
-  tool_use_duration_ms: number | null;
-  thinking_tps: number | null;
-  text_tps: number | null;
-  tool_use_tps: number | null;
-  total_tps: number | null;
 }
 
 interface AnthropicMessageStart {
@@ -107,54 +109,56 @@ export class MetricsExtractor {
     let totalDurationMs: number | null = null;
     let totalTps: number | null = null;
     let thinkingTps: number | null = null;
-    let textTps: number | null = null;
-    let toolUseTps: number | null = null;
+    let nonThinkingTps: number | null = null;
     let thinkingTokens: number | null = null;
+    let nonThinkingDurationMs: number | null = null;
+    let thinkingDurationMs: number | null = null;
     let textTokens: number | null = null;
     let toolUseTokens: number | null = null;
-    let thinkingDurationMs: number | null = null;
-    let textDurationMs: number | null = null;
-    let toolUseDurationMs: number | null = null;
+    const hasThinking = this.thinkingContentBuffer.length > 0;
 
     if (
-      this.streamStartTime !== null &&
       this.streamEndTime !== null &&
       this.outputTokens !== null
     ) {
-      totalDurationMs = this.streamEndTime - this.streamStartTime;
-
-      // total_tps: API output_tokens / total_duration (end-to-end)
+      // total_duration: T6 - T0 (proxy end-to-end, not just stream window)
+      totalDurationMs = this.streamEndTime - this.requestStartTime;
       if (totalDurationMs > 0) {
         totalTps = this.outputTokens / (totalDurationMs / MS_PER_SECOND);
       }
 
-      // thinking_tps
-      if (this.thinkingContentBuffer.length > 0) {
+      if (hasThinking) {
         thinkingTokens = encode(this.thinkingContentBuffer).length;
-        if (this.thinkingStreamStartTime !== null && this.thinkingStreamEndTime !== null) {
-          thinkingDurationMs = this.thinkingStreamEndTime - this.thinkingStreamStartTime;
+
+        // thinking_duration: T3 - T0 (includes network RTT + generation)
+        if (this.thinkingStreamEndTime !== null) {
+          thinkingDurationMs = this.thinkingStreamEndTime - this.requestStartTime;
           if (thinkingDurationMs > 0) {
             thinkingTps = thinkingTokens / (thinkingDurationMs / MS_PER_SECOND);
           }
+
+          // non_thinking_duration: T6 - T3
+          nonThinkingDurationMs = this.streamEndTime - this.thinkingStreamEndTime;
+        }
+      } else {
+        // non_thinking_duration: T6 - T0 (entire request duration)
+        nonThinkingDurationMs = totalDurationMs;
+      }
+
+      // non_thinking_tps
+      if (nonThinkingDurationMs !== null && nonThinkingDurationMs > 0) {
+        const nonThinkingTokens = this.outputTokens - (thinkingTokens ?? 0);
+        if (nonThinkingTokens > 0) {
+          nonThinkingTps = nonThinkingTokens / (nonThinkingDurationMs / MS_PER_SECOND);
         }
       }
 
-      // text_tps
-      if (this.textContentBuffer.length > 0 && this.textStreamStartTime !== null) {
+      // content token counts (for analysis only)
+      if (this.textContentBuffer.length > 0) {
         textTokens = encode(this.textContentBuffer).length;
-        textDurationMs = this.streamEndTime - this.textStreamStartTime;
-        if (textDurationMs > 0) {
-          textTps = textTokens / (textDurationMs / MS_PER_SECOND);
-        }
       }
-
-      // tool_use_tps
-      if (this.toolUseContentBuffer.length > 0 && this.toolUseStreamStartTime !== null) {
+      if (this.toolUseContentBuffer.length > 0) {
         toolUseTokens = encode(this.toolUseContentBuffer).length;
-        toolUseDurationMs = this.streamEndTime - this.toolUseStreamStartTime;
-        if (toolUseDurationMs > 0) {
-          toolUseTps = toolUseTokens / (toolUseDurationMs / MS_PER_SECOND);
-        }
       }
     }
 
@@ -169,15 +173,13 @@ export class MetricsExtractor {
       stop_reason: this.stopReason,
       is_complete: this.complete ? 1 : 0,
       thinking_tokens: thinkingTokens,
+      thinking_duration_ms: thinkingDurationMs,
+      thinking_tps: thinkingTps,
+      non_thinking_duration_ms: nonThinkingDurationMs,
+      non_thinking_tps: nonThinkingTps,
+      total_tps: totalTps,
       text_tokens: textTokens,
       tool_use_tokens: toolUseTokens,
-      thinking_duration_ms: thinkingDurationMs,
-      text_duration_ms: textDurationMs,
-      tool_use_duration_ms: toolUseDurationMs,
-      thinking_tps: thinkingTps,
-      text_tps: textTps,
-      tool_use_tps: toolUseTps,
-      total_tps: totalTps,
     };
   }
 
@@ -318,15 +320,13 @@ export class MetricsExtractor {
 
 const NULL_TPS_BREAKDOWN = {
   thinking_tokens: null as number | null,
+  thinking_duration_ms: null as number | null,
+  thinking_tps: null as number | null,
+  non_thinking_duration_ms: null as number | null,
+  non_thinking_tps: null as number | null,
+  total_tps: null as number | null,
   text_tokens: null as number | null,
   tool_use_tokens: null as number | null,
-  thinking_duration_ms: null as number | null,
-  text_duration_ms: null as number | null,
-  tool_use_duration_ms: null as number | null,
-  thinking_tps: null as number | null,
-  text_tps: null as number | null,
-  tool_use_tps: null as number | null,
-  total_tps: null as number | null,
 };
 
 function extractOpenAINonStream(parsed: Record<string, unknown>): MetricsResult {

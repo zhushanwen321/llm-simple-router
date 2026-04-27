@@ -3,7 +3,7 @@ import { randomUUID } from "crypto";
 import { MS_PER_SECOND } from "../constants.js";
 
 export type MetricsPeriod = "1h" | "5h" | "6h" | "24h" | "7d" | "30d";
-export type MetricsMetric = "ttft" | "tps" | "text_tps" | "thinking_tps" | "tool_use_tps" | "total_tps" | "tokens" | "cache_rate" | "request_count" | "input_tokens" | "output_tokens" | "cache_hit_tokens";
+export type MetricsMetric = "ttft" | "tps" | "text_tps" | "thinking_tps" | "tool_use_tps" | "non_thinking_tps" | "total_tps" | "tokens" | "cache_rate" | "request_count" | "input_tokens" | "output_tokens" | "cache_hit_tokens";
 
 // --- request_metrics table types & CRUD ---
 
@@ -47,11 +47,9 @@ export type MetricsInsert = {
   text_tokens?: number | null;
   tool_use_tokens?: number | null;
   thinking_duration_ms?: number | null;
-  text_duration_ms?: number | null;
-  tool_use_duration_ms?: number | null;
+  non_thinking_duration_ms?: number | null;
   thinking_tps?: number | null;
-  text_tps?: number | null;
-  tool_use_tps?: number | null;
+  non_thinking_tps?: number | null;
   total_tps?: number | null;
 };
 
@@ -60,9 +58,9 @@ export function insertMetrics(db: Database.Database, m: MetricsInsert): string {
   db.prepare(
     `INSERT INTO request_metrics (id, request_log_id, provider_id, backend_model, api_type, router_key_id, status_code,
        input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, ttft_ms, total_duration_ms, tokens_per_second, stop_reason, is_complete, input_tokens_estimated,
-       thinking_tokens, text_tokens, tool_use_tokens, thinking_duration_ms, text_duration_ms, tool_use_duration_ms,
-       thinking_tps, text_tps, tool_use_tps, total_tps)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       thinking_tokens, text_tokens, tool_use_tokens, thinking_duration_ms,
+       thinking_tps, total_tps, non_thinking_duration_ms, non_thinking_tps)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     id, m.request_log_id, m.provider_id, m.backend_model, m.api_type,
     m.router_key_id ?? null, m.status_code ?? null,
@@ -72,8 +70,9 @@ export function insertMetrics(db: Database.Database, m: MetricsInsert): string {
     m.tokens_per_second ?? null, m.stop_reason ?? null, m.is_complete ?? 1,
     m.input_tokens_estimated ?? 0,
     m.thinking_tokens ?? null, m.text_tokens ?? null, m.tool_use_tokens ?? null,
-    m.thinking_duration_ms ?? null, m.text_duration_ms ?? null, m.tool_use_duration_ms ?? null,
-    m.thinking_tps ?? null, m.text_tps ?? null, m.tool_use_tps ?? null, m.total_tps ?? null,
+    m.thinking_duration_ms ?? null,
+    m.thinking_tps ?? null, m.total_tps ?? null,
+    m.non_thinking_duration_ms ?? null, m.non_thinking_tps ?? null,
   );
   return id;
 }
@@ -162,7 +161,7 @@ export function getMetricsSummary(
     SELECT
       rm.provider_id, COALESCE(p.name, rm.provider_id) AS provider_name, rm.backend_model,
       COUNT(*) AS request_count, AVG(rm.ttft_ms) AS avg_ttft_ms, NULL AS p50_ttft_ms, NULL AS p95_ttft_ms,
-      AVG(rm.total_tps) AS avg_tps,
+      CASE WHEN SUM(rm.total_duration_ms) > 0 THEN CAST(SUM(rm.output_tokens) AS REAL) * 1000.0 / SUM(rm.total_duration_ms) ELSE NULL END AS avg_tps,
       COALESCE(SUM(rm.input_tokens), 0) AS total_input_tokens, COALESCE(SUM(rm.output_tokens), 0) AS total_output_tokens,
       COALESCE(SUM(rm.cache_read_tokens), 0) AS total_cache_hit_tokens,
       CASE WHEN SUM(rm.input_tokens) > 0 THEN SUM(rm.cache_read_tokens) * 1.0 / SUM(rm.input_tokens) ELSE NULL END AS cache_hit_rate
@@ -181,11 +180,12 @@ export interface MetricsTimeseriesRow {
 
 const METRIC_EXPR: Record<MetricsMetric, string> = {
   ttft: "AVG(rm.ttft_ms)",
-  tps: "AVG(COALESCE(rm.total_tps, rm.tokens_per_second))",
+  tps: "CASE WHEN SUM(rm.total_duration_ms) > 0 THEN CAST(SUM(rm.output_tokens) AS REAL) * 1000.0 / SUM(rm.total_duration_ms) ELSE NULL END",
   text_tps: "AVG(rm.text_tps)",
   thinking_tps: "AVG(rm.thinking_tps)",
   tool_use_tps: "AVG(rm.tool_use_tps)",
-  total_tps: "AVG(rm.total_tps)",
+  non_thinking_tps: "AVG(rm.non_thinking_tps)",
+  total_tps: "CASE WHEN SUM(rm.total_duration_ms) > 0 THEN CAST(SUM(rm.output_tokens) AS REAL) * 1000.0 / SUM(rm.total_duration_ms) ELSE NULL END",
   tokens: "SUM(rm.output_tokens)",
   cache_rate: "CASE WHEN SUM(rm.input_tokens) > 0 THEN SUM(rm.cache_read_tokens) * 1.0 / SUM(rm.input_tokens) ELSE NULL END",
   request_count: "COUNT(*)",

@@ -22,17 +22,16 @@ function toStreamMetrics(m: MetricsResult) {
     tokensPerSecond: m.tokens_per_second,
     stopReason: m.stop_reason,
     isComplete: m.is_complete === 1,
-    // TPS breakdown
+    // Two-phase TPS breakdown
     thinkingTokens: m.thinking_tokens,
+    thinkingDurationMs: m.thinking_duration_ms,
+    thinkingTps: m.thinking_tps,
+    nonThinkingDurationMs: m.non_thinking_duration_ms,
+    nonThinkingTps: m.non_thinking_tps,
+    totalTps: m.total_tps,
+    // Content counts (for analysis)
     textTokens: m.text_tokens,
     toolUseTokens: m.tool_use_tokens,
-    thinkingDurationMs: m.thinking_duration_ms,
-    textDurationMs: m.text_duration_ms,
-    toolUseDurationMs: m.tool_use_duration_ms,
-    thinkingTps: m.thinking_tps,
-    textTps: m.text_tps,
-    toolUseTps: m.tool_use_tps,
-    totalTps: m.total_tps,
   };
 }
 
