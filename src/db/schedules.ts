@@ -19,18 +19,18 @@ export interface Schedule {
 
 const SCHEDULE_FIELDS = new Set([
   "mapping_group_id", "name", "enabled", "week",
-  "start_hour", "end_hour", "mapping_rule", "concurrency_rule", "priority",
+  "start_hour", "end_hour", "mapping_rule", "concurrency_rule",
 ]);
 
 export function getSchedulesByGroup(db: Database.Database, mappingGroupId: string): Schedule[] {
   return db
-    .prepare("SELECT * FROM schedules WHERE mapping_group_id = ? ORDER BY priority DESC, created_at ASC")
+    .prepare("SELECT * FROM schedules WHERE mapping_group_id = ? ORDER BY created_at ASC")
     .all(mappingGroupId) as Schedule[];
 }
 
 export function getActiveSchedulesForGroup(db: Database.Database, mappingGroupId: string): Schedule[] {
   return db
-    .prepare("SELECT * FROM schedules WHERE mapping_group_id = ? AND enabled = 1 ORDER BY priority DESC, created_at ASC")
+    .prepare("SELECT * FROM schedules WHERE mapping_group_id = ? AND enabled = 1 ORDER BY created_at ASC")
     .all(mappingGroupId) as Schedule[];
 }
 
@@ -52,19 +52,18 @@ export function createSchedule(
     end_hour: number;
     mapping_rule: string;
     concurrency_rule?: string;
-    priority?: number;
   },
 ): string {
   const id = randomUUID();
   const now = new Date().toISOString();
   db.prepare(
     `INSERT INTO schedules (id, mapping_group_id, name, enabled, week, start_hour, end_hour, mapping_rule, concurrency_rule, priority, created_at, updated_at)
-     VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?, 0, ?, ?)`,
   ).run(
     id, data.mapping_group_id, data.name,
     data.week, data.start_hour, data.end_hour,
     data.mapping_rule, data.concurrency_rule ?? null,
-    data.priority ?? 0, now, now,
+    now, now,
   );
   return id;
 }
@@ -72,7 +71,7 @@ export function createSchedule(
 export function updateSchedule(
   db: Database.Database,
   id: string,
-  fields: Partial<Pick<Schedule, "name" | "enabled" | "week" | "start_hour" | "end_hour" | "mapping_rule" | "concurrency_rule" | "priority">>,
+  fields: Partial<Pick<Schedule, "name" | "enabled" | "week" | "start_hour" | "end_hour" | "mapping_rule" | "concurrency_rule">>,
 ): void {
   const now = new Date().toISOString();
   buildUpdateQuery(db, "schedules", id, fields as Record<string, unknown>, SCHEDULE_FIELDS);

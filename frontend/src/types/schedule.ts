@@ -21,5 +21,4 @@ export interface SchedulePayload {
   end_hour: number
   mapping_rule: string
   concurrency_rule?: string | null
-  priority?: number
 }

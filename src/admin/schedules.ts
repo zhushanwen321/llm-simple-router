@@ -21,7 +21,6 @@ const CreateScheduleSchema = Type.Object({
   end_hour: Type.Number({ minimum: 1, maximum: 24 }),
   mapping_rule: Type.String(),
   concurrency_rule: Type.Optional(Type.String()),
-  priority: Type.Optional(Type.Number()),
 });
 
 const UpdateScheduleSchema = Type.Object({
@@ -32,7 +31,6 @@ const UpdateScheduleSchema = Type.Object({
   end_hour: Type.Optional(Type.Number({ minimum: 1, maximum: 24 })),
   mapping_rule: Type.Optional(Type.String()),
   concurrency_rule: Type.Optional(Type.String()),
-  priority: Type.Optional(Type.Number()),
 });
 
 function validateMappingRule(db: Database.Database, ruleJson: string): string | undefined {
@@ -72,6 +70,44 @@ function validateMappingRule(db: Database.Database, ruleJson: string): string | 
     }
   }
   return undefined;
+}
+
+/** 解析 week JSON 为数字数组，失败返回 null */
+function parseWeekSafe(weekJson: string): number[] | null {
+  try {
+    const arr = JSON.parse(weekJson);
+    if (!Array.isArray(arr) || !arr.every((d: unknown) => typeof d === "number" && d >= 0 && d <= 6)) return null;
+    return arr;
+  } catch { return null; }
+}
+
+/** 检查同组 schedules 是否与 [startHour, endHour) 时段重叠（按星期交集判断） */
+function checkOverlap(
+  db: Database.Database,
+  groupId: string,
+  excludeId: string | undefined,
+  weekDays: number[],
+  startHour: number,
+  endHour: number,
+): string | undefined {
+  const existing = getSchedulesByGroup(db, groupId);
+  for (const s of existing) {
+    if (excludeId && s.id === excludeId) continue;
+    const sWeek = parseWeekSafe(s.week);
+    if (!sWeek) continue;
+    // 星期有交集 AND 时段有交集 才算重叠
+    const weekOverlap = weekDays.some(d => sWeek.includes(d));
+    const timeOverlap = startHour < s.end_hour && endHour > s.start_hour;
+    if (weekOverlap && timeOverlap) {
+      const days = weekDays.map(d => ["周日","周一","周二","周三","周四","周五","周六"][d]).join("、");
+      return `时段与「${s.name}」重叠 (${days} ${formatHour(startHour)}-${formatHour(endHour)} vs ${formatHour(s.start_hour)}-${formatHour(s.end_hour)})`;
+    }
+  }
+  return undefined;
+}
+
+function formatHour(h: number): string {
+  return String(h).padStart(2, "0") + ":00";
 }
 
 interface ScheduleRoutesOptions {
@@ -115,13 +151,14 @@ export const adminScheduleRoutes: FastifyPluginCallback<ScheduleRoutesOptions> =
       return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.BAD_REQUEST, "start_hour must be < end_hour"));
     }
 
-    try {
-      const weekArr: unknown = JSON.parse(body.week);
-      if (!Array.isArray(weekArr) || !weekArr.every((d: unknown) => typeof d === "number" && d >= 0 && d <= 6)) {
-        return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.BAD_REQUEST, "week must be array of 0-6"));
-      }
-    } catch {
-      return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.BAD_REQUEST, "Invalid week JSON"));
+    const weekDays = parseWeekSafe(body.week);
+    if (!weekDays) {
+      return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.BAD_REQUEST, "week must be array of 0-6"));
+    }
+
+    const overlapErr = checkOverlap(db, body.mapping_group_id, undefined, weekDays, body.start_hour, body.end_hour);
+    if (overlapErr) {
+      return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.BAD_REQUEST, overlapErr));
     }
 
     const id = createSchedule(db, {
@@ -132,7 +169,6 @@ export const adminScheduleRoutes: FastifyPluginCallback<ScheduleRoutesOptions> =
       end_hour: body.end_hour,
       mapping_rule: body.mapping_rule,
       concurrency_rule: body.concurrency_rule,
-      priority: body.priority ?? 0,
     });
     return reply.code(HTTP_CREATED).send({ id });
   });
@@ -161,8 +197,20 @@ export const adminScheduleRoutes: FastifyPluginCallback<ScheduleRoutesOptions> =
       return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.BAD_REQUEST, "start_hour must be < end_hour"));
     }
 
+    // 时段重叠校验（仅在 week 或 start/end 有变更时）
+    if (body.week !== undefined || body.start_hour !== undefined || body.end_hour !== undefined) {
+      const weekDays = parseWeekSafe(body.week ?? existing.week);
+      if (!weekDays) {
+        return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.BAD_REQUEST, "week must be array of 0-6"));
+      }
+      const overlapErr = checkOverlap(db, existing.mapping_group_id, id, weekDays, startH, endH);
+      if (overlapErr) {
+        return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.BAD_REQUEST, overlapErr));
+      }
+    }
+
     const fields: Record<string, unknown> = {};
-    const UPDATE_FIELDS = ["name", "enabled", "week", "start_hour", "end_hour", "mapping_rule", "concurrency_rule", "priority"] as const;
+    const UPDATE_FIELDS = ["name", "enabled", "week", "start_hour", "end_hour", "mapping_rule", "concurrency_rule"] as const;
     const bodyObj = body as Record<string, unknown>;
     for (const key of UPDATE_FIELDS) {
       if (bodyObj[key] !== undefined) fields[key] = bodyObj[key];

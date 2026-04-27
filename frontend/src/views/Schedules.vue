@@ -47,7 +47,6 @@
               <TableHead class="text-muted-foreground">状态</TableHead>
               <TableHead class="text-muted-foreground">星期</TableHead>
               <TableHead class="text-muted-foreground">时间段</TableHead>
-              <TableHead class="text-muted-foreground">优先级</TableHead>
               <TableHead class="text-right text-muted-foreground">操作</TableHead>
             </TableRow>
           </TableHeader>
@@ -72,7 +71,6 @@
               <TableCell class="font-mono text-sm">
                 {{ formatHour(s.start_hour) }}-{{ formatHour(s.end_hour) }}
               </TableCell>
-              <TableCell>{{ s.priority }}</TableCell>
               <TableCell class="text-right">
                 <div class="flex items-center justify-end gap-1">
                   <Button variant="ghost" size="sm" @click="handleToggle(s)">
@@ -84,7 +82,7 @@
               </TableCell>
             </TableRow>
             <TableRow v-if="schedules.length === 0">
-              <TableCell colspan="6" class="text-center text-muted-foreground py-8">
+              <TableCell colspan="5" class="text-center text-muted-foreground py-8">
                 暂无调度规则，点击「新建调度」添加
               </TableCell>
             </TableRow>
@@ -105,127 +103,90 @@
         </DialogHeader>
         <form @submit.prevent="handleSave" class="space-y-4">
           <!-- 名称 -->
-          <FormField v-slot="{ componentField }" name="name">
-            <FormItem>
-              <FormLabel>名称</FormLabel>
-              <FormControl><Input v-bind="componentField" placeholder="例如：工作日白天" /></FormControl>
-              <FormMessage />
-            </FormItem>
-          </FormField>
+          <div>
+            <Label class="block text-sm font-medium text-foreground mb-1">名称</Label>
+            <Input v-model="form.name" placeholder="例如：工作日白天" @input="delete errors.name" />
+            <p v-if="errors.name" class="text-sm text-destructive mt-1">{{ errors.name }}</p>
+          </div>
 
           <!-- 星期选择 -->
-          <FormField v-slot="{ componentField }" name="week">
-            <FormItem>
-              <FormLabel>适用星期</FormLabel>
-              <FormControl>
-                <div class="flex flex-wrap gap-2">
-                  <Button
-                    v-for="(label, idx) in WEEK_LABELS"
-                    :key="idx"
-                    type="button"
-                    :variant="componentField.modelValue.includes(idx) ? 'default' : 'outline'"
-                    size="sm"
-                    @click="toggleWeekDay(idx)"
-                  >{{ label }}</Button>
-                </div>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          </FormField>
+          <div>
+            <Label class="block text-sm font-medium text-foreground mb-1">适用星期</Label>
+            <div class="flex flex-wrap gap-2">
+              <Button
+                v-for="(label, idx) in WEEK_LABELS"
+                :key="idx"
+                type="button"
+                :variant="(form.week ?? []).includes(idx) ? 'default' : 'outline'"
+                size="sm"
+                @click="toggleWeekDay(idx)"
+              >{{ label }}</Button>
+            </div>
+            <p v-if="errors.week" class="text-sm text-destructive mt-1">{{ errors.week }}</p>
+          </div>
 
           <!-- 时间段 -->
           <div class="grid grid-cols-2 gap-4">
-            <FormField v-slot="{ componentField }" name="start_hour">
-              <FormItem>
-                <FormLabel>开始时间</FormLabel>
-                <Select v-model="componentField.modelValue" @update:model-value="(v: unknown) => form.start_hour = Number(v)">
-                  <FormControl>
-                    <SelectTrigger><SelectValue placeholder="选择小时" /></SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem v-for="h in 24" :key="h - 1" :value="h - 1">
-                      {{ String(h - 1).padStart(2, '0') }}:00
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            </FormField>
+            <div>
+              <Label class="text-sm font-medium text-foreground mb-1 block">开始时间</Label>
+              <Select v-model="form.start_hour" @update:model-value="(v: unknown) => { form.start_hour = Number(v); delete errors.time }">
+                <SelectTrigger><SelectValue placeholder="选择小时" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem v-for="h in 24" :key="h - 1" :value="h - 1">
+                    {{ String(h - 1).padStart(2, '0') }}:00
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-            <FormField v-slot="{ componentField }" name="end_hour">
-              <FormItem>
-                <FormLabel>结束时间</FormLabel>
-                <Select v-model="componentField.modelValue" @update:model-value="(v: unknown) => form.end_hour = Number(v)">
-                  <FormControl>
-                    <SelectTrigger><SelectValue placeholder="选择小时" /></SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem v-for="h in 24" :key="h" :value="h">
-                      {{ String(h).padStart(2, '0') }}:00
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            </FormField>
+            <div>
+              <Label class="text-sm font-medium text-foreground mb-1 block">结束时间</Label>
+              <Select v-model="form.end_hour" @update:model-value="(v: unknown) => { form.end_hour = Number(v); delete errors.time }">
+                <SelectTrigger><SelectValue placeholder="选择小时" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem v-for="h in 24" :key="h" :value="h">
+                    {{ String(h).padStart(2, '0') }}:00
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
+          <p v-if="errors.time" class="text-sm text-destructive">{{ errors.time }}</p>
 
           <!-- 映射目标列表 -->
-          <FormField v-slot="{}" name="targets">
-            <FormItem>
-              <FormLabel>映射目标</FormLabel>
-              <FormControl>
-                <div class="space-y-2">
-                  <div
-                    v-for="(t, idx) in form.targets"
-                    :key="idx"
-                    class="flex items-center gap-2"
-                  >
-                    <Input
-                      v-model="t.backend_model"
-                      placeholder="后端模型名称"
-                      class="flex-1"
-                    />
-                    <Select v-model="t.provider_id" @update:model-value="(v: unknown) => t.provider_id = String(v)">
-                      <SelectTrigger class="w-40">
-                        <SelectValue placeholder="选择供应商" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem v-for="p in providers" :key="p.id" :value="p.id">
-                          {{ p.name }}
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      :disabled="form.targets.length <= 1"
-                      @click="removeTarget(idx)"
-                    >
-                      <Trash2 class="w-4 h-4" />
-                    </Button>
-                  </div>
-                  <Button type="button" variant="outline" size="sm" @click="addTarget">
-                    <Plus class="w-3 h-3 mr-1" />
-                    添加目标
-                  </Button>
+          <div>
+            <Label class="block text-sm font-medium text-foreground mb-1">映射目标</Label>
+            <div class="space-y-2">
+              <div
+                v-for="(t, idx) in form.targets"
+                :key="idx"
+                class="flex items-center gap-2"
+              >
+                <div class="flex-1">
+                  <CascadingModelSelect
+                    :providers="providerGroups"
+                    :model-value="t.provider_id && t.backend_model ? { provider_id: t.provider_id, model: t.backend_model } : undefined"
+                    placeholder="选择模型..."
+                    @update:model-value="(v: SelectedValue) => { t.provider_id = v.provider_id; t.backend_model = v.model; delete errors.targets }"
+                  />
                 </div>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          </FormField>
-
-          <!-- 优先级 -->
-          <FormField v-slot="{ componentField }" name="priority">
-            <FormItem>
-              <FormLabel>优先级</FormLabel>
-              <FormControl>
-                <Input v-bind="componentField" type="number" :min="0" :max="100" />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          </FormField>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  :disabled="form.targets.length <= 1"
+                  @click="removeTarget(idx)"
+                >
+                  <Trash2 class="w-4 h-4" />
+                </Button>
+              </div>
+              <Button type="button" variant="outline" size="sm" @click="addTarget">
+                <Plus class="w-3 h-3 mr-1" />
+                添加目标
+              </Button>
+            </div>
+            <p v-if="errors.targets" class="text-sm text-destructive mt-1">{{ errors.targets }}</p>
+          </div>
 
           <!-- 并发配置（折叠面板） -->
           <Collapsible v-model:open="concurrencyOpen">
@@ -276,15 +237,12 @@
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useForm } from 'vee-validate'
-import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
-import { toTypedSchema } from '@vee-validate/zod'
-import { z } from 'zod'
+import { ref, computed, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
 import { Plus, Trash2, ChevronDown } from 'lucide-vue-next'
 import { api, getApiMessage } from '@/api/client'
@@ -298,6 +256,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from '@/components/ui/alert-dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import CascadingModelSelect from '@/components/mappings/CascadingModelSelect.vue'
+import type { SelectedValue, ProviderGroup } from '@/components/mappings/cascading-types'
+import { DEFAULT_CONTEXT_WINDOW } from '@/constants'
 import type { Schedule } from '@/types/schedule'
 import type { MappingGroup, Provider } from '@/types/mapping'
 
@@ -314,7 +275,6 @@ interface ScheduleForm {
   start_hour: number
   end_hour: number
   targets: TargetForm[]
-  priority: number
   max_concurrency: number | undefined
   queue_timeout_ms: number | undefined
   max_queue_size: number | undefined
@@ -326,7 +286,6 @@ const DEFAULT_FORM = (): ScheduleForm => ({
   start_hour: 0,
   end_hour: 24,
   targets: [{ backend_model: '', provider_id: '' }],
-  priority: 0,
   max_concurrency: undefined,
   queue_timeout_ms: undefined,
   max_queue_size: undefined,
@@ -342,22 +301,7 @@ const editingId = ref<string | null>(null)
 const deleteTarget = ref<Schedule | null>(null)
 const form = ref<ScheduleForm>(DEFAULT_FORM())
 const concurrencyOpen = ref(false)
-
-const scheduleSchema = toTypedSchema(z.object({
-  name: z.string().min(1, '请输入名称'),
-  week: z.array(z.number()).min(1, '至少选择一天'),
-  start_hour: z.number().int().min(0).max(23),
-  end_hour: z.number().int().min(1).max(24),
-  targets: z.array(z.object({
-    backend_model: z.string().min(1, '请输入模型名称'),
-    provider_id: z.string().min(1, '请选择供应商'),
-  })).min(1, '至少添加一个目标'),
-  priority: z.number().int().min(0).max(100),
-}))
-
-const { handleSubmit } = useForm({
-  validationSchema: scheduleSchema,
-})
+const errors = ref<Record<string, string>>({})
 
 function parseWeek(weekStr: string): string[] {
   let arr: number[] = []
@@ -385,6 +329,16 @@ async function loadProviders() {
   }
 }
 
+const providerGroups = computed<ProviderGroup[]>(() =>
+  providers.value.map(p => ({
+    provider: { id: p.id, name: p.name },
+    models: (p.models ?? []).map(m => ({
+      name: m.name,
+      contextWindow: m.context_window ?? DEFAULT_CONTEXT_WINDOW,
+    })),
+  })),
+)
+
 async function loadSchedules() {
   if (!selectedGroupId.value) { schedules.value = []; return }
   try {
@@ -405,6 +359,7 @@ function toggleWeekDay(day: number) {
   } else {
     form.value.week.push(day)
   }
+  delete errors.value.week
 }
 
 function addTarget() {
@@ -419,11 +374,13 @@ function openCreate() {
   editingId.value = null
   form.value = DEFAULT_FORM()
   concurrencyOpen.value = false
+  errors.value = {}
   dialogOpen.value = true
 }
 
 function openEdit(s: Schedule) {
   editingId.value = s.id
+  errors.value = {}
   let targets: TargetForm[] = [{ backend_model: '', provider_id: '' }]
   try {
     const rule = JSON.parse(s.mapping_rule) as { targets?: TargetForm[] }
@@ -451,7 +408,6 @@ function openEdit(s: Schedule) {
     start_hour: s.start_hour,
     end_hour: s.end_hour,
     targets,
-    priority: s.priority,
     max_concurrency,
     queue_timeout_ms,
     max_queue_size,
@@ -460,7 +416,29 @@ function openEdit(s: Schedule) {
   dialogOpen.value = true
 }
 
-const handleSave = handleSubmit(async () => {
+function validate(): boolean {
+  const errs: Record<string, string> = {}
+  if (!form.value.name.trim()) errs.name = '请输入名称'
+  if (form.value.week.length === 0) errs.week = '至少选择一天'
+  if (form.value.start_hour >= form.value.end_hour) errs.time = '开始时间必须小于结束时间'
+
+  let targetErr = ''
+  for (let i = 0; i < form.value.targets.length; i++) {
+    const t = form.value.targets[i]
+    if (!t.provider_id || !t.backend_model) {
+      targetErr = '每个目标必须选择模型'
+      break
+    }
+  }
+  if (targetErr) errs.targets = targetErr
+
+  errors.value = errs
+  return Object.keys(errs).length === 0
+}
+
+async function handleSave() {
+  if (!validate()) return
+
   try {
     const mappingRule = JSON.stringify({ targets: form.value.targets })
     const hasConcurrency = form.value.max_concurrency || form.value.queue_timeout_ms || form.value.max_queue_size
@@ -472,7 +450,7 @@ const handleSave = handleSubmit(async () => {
       })
       : null
 
-    const payload = {
+    const payload: Record<string, unknown> = {
       mapping_group_id: selectedGroupId.value,
       name: form.value.name,
       week: JSON.stringify(form.value.week),
@@ -480,20 +458,19 @@ const handleSave = handleSubmit(async () => {
       end_hour: form.value.end_hour,
       mapping_rule: mappingRule,
       concurrency_rule: concurrencyRule,
-      priority: form.value.priority,
     }
 
     if (editingId.value) {
       await api.updateSchedule(editingId.value, payload)
     } else {
-      await api.createSchedule(payload)
+      await api.createSchedule(payload as Parameters<typeof api.createSchedule>[0])
     }
     dialogOpen.value = false
     await loadSchedules()
   } catch (e: unknown) {
     toast.error(getApiMessage(e, '保存调度失败'))
   }
-})
+}
 
 async function handleToggle(s: Schedule) {
   try {

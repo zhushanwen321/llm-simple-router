@@ -59,5 +59,6 @@ WHERE mg.strategy = 'scheduled';
 -- ============================================================
 -- scheduled: rule 从 { default, windows } 简化为 { targets: [default] }
 -- failover/round-robin/random: rule 已经是 { targets: [...] }，保持不变
+-- 安全过滤：只处理仍有 $.default 的旧格式，避免覆盖已存在的 {targets} 格式
 UPDATE mapping_groups SET rule = json_object('targets', json_array(json_extract(rule, '$.default')))
-WHERE strategy = 'scheduled';
+WHERE strategy = 'scheduled' AND json_extract(rule, '$.default') IS NOT NULL;

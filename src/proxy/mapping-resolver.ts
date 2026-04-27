@@ -98,8 +98,8 @@ function scheduleMatchesNow(schedule: Schedule, now: Date): boolean {
 }
 
 /**
- * 在已启用的 schedules 中找到优先级最高且匹配当前时间的。
- * schedules 已按 priority DESC 排序，所以第一个匹配的即可。
+ * 在已启用的 schedules 中找到第一个匹配当前时间的。
+ * 由于写入时已校验时段不重叠，至多一个匹配。
  */
 function findMatchingSchedule(schedules: Schedule[], now: Date): Schedule | undefined {
   for (const schedule of schedules) {

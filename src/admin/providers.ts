@@ -2,7 +2,7 @@ import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
 import { Type, Static } from "@sinclair/typebox";
 import type { Provider } from "../db/index.js";
-import { getAllProviders, getProviderById, createProvider, updateProvider, deleteProvider, getAllMappingGroups, getAllModelMappings, updateMappingGroup, PROVIDER_CONCURRENCY_DEFAULTS } from "../db/index.js";
+import { getAllProviders, getProviderById, createProvider, updateProvider, deleteProvider, getAllMappingGroups, updateMappingGroup, PROVIDER_CONCURRENCY_DEFAULTS } from "../db/index.js";
 import { encrypt, decrypt } from "../utils/crypto.js";
 import { getSetting } from "../db/settings.js";
 import { ProviderSemaphoreManager } from "../proxy/semaphore.js";
@@ -293,13 +293,6 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
       }
     }
 
-    const mappings = getAllModelMappings(db);
-    for (const m of mappings) {
-      if (m.provider_id === id) {
-        references.push(`旧版映射「${m.client_model}」→ ${m.backend_model}`);
-      }
-    }
-
     return reply.send({ references });
   });
 
@@ -313,8 +306,13 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     for (const g of groups) {
       try {
         const rule = JSON.parse(g.rule);
-        const targets = [rule.default, ...(rule.windows || [])].filter(Boolean);
-        if (targets.some((t: { provider_id: string }) => t.provider_id === id)) {
+        const candidates: Array<{ provider_id?: string }> = [];
+        // 旧格式 backups
+        if (rule.default) candidates.push(rule.default);
+        if (Array.isArray(rule.windows)) candidates.push(...rule.windows.map((w: Record<string, unknown>) => w.target as { provider_id?: string } | undefined).filter(Boolean));
+        // 新格式
+        if (Array.isArray(rule.targets)) candidates.push(...rule.targets);
+        if (candidates.some((c) => c?.provider_id === id)) {
           return reply.code(HTTP_CONFLICT).send(apiError(API_CODE.CONFLICT_REFERENCED, `Provider is referenced by mapping group '${g.client_model}'`));
         }
       } catch { continue }

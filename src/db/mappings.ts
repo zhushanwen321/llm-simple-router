@@ -3,15 +3,6 @@ import { randomUUID } from "crypto";
 import type { Target } from "../proxy/strategy/types.js";
 import { buildUpdateQuery, deleteById } from "./helpers.js";
 
-export interface ModelMapping {
-  id: string;
-  client_model: string;
-  backend_model: string;
-  provider_id: string;
-  is_active: number;
-  created_at: string;
-}
-
 export interface MappingGroup {
   id: string;
   client_model: string;
@@ -21,48 +12,7 @@ export interface MappingGroup {
   created_at: string;
 }
 
-const MAPPING_FIELDS = new Set(["client_model", "backend_model", "provider_id", "is_active"]);
 const GROUP_FIELDS = new Set(["client_model", "strategy", "rule", "is_active"]);
-
-// --- ModelMapping CRUD ---
-
-export function getModelMapping(
-  db: Database.Database,
-  clientModel: string,
-): ModelMapping | undefined {
-  return db
-    .prepare("SELECT * FROM model_mappings WHERE client_model = ? AND is_active = 1")
-    .get(clientModel) as ModelMapping | undefined;
-}
-
-export function getAllModelMappings(db: Database.Database): ModelMapping[] {
-  return db.prepare("SELECT * FROM model_mappings ORDER BY created_at DESC").all() as ModelMapping[];
-}
-
-export function createModelMapping(
-  db: Database.Database,
-  mapping: { client_model: string; backend_model: string; provider_id: string; is_active?: number },
-): string {
-  const id = randomUUID();
-  const now = new Date().toISOString();
-  db.prepare(
-    `INSERT INTO model_mappings (id, client_model, backend_model, provider_id, is_active, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-  ).run(id, mapping.client_model, mapping.backend_model, mapping.provider_id, mapping.is_active ?? 1, now);
-  return id;
-}
-
-export function updateModelMapping(
-  db: Database.Database,
-  id: string,
-  fields: Partial<Pick<ModelMapping, "client_model" | "backend_model" | "provider_id" | "is_active">>,
-): void {
-  buildUpdateQuery(db, "model_mappings", id, fields, MAPPING_FIELDS);
-}
-
-export function deleteModelMapping(db: Database.Database, id: string): void {
-  deleteById(db, "model_mappings", id);
-}
 
 // --- MappingGroups CRUD ---
 
@@ -151,7 +101,8 @@ function isTarget(value: unknown): value is Target {
 }
 
 // --- 从 mapping_groups rule JSON 中提取 target 条目 ---
-
+// rule.default / rule.windows 为 migration 026 前旧格式的向后兼容检查，
+// 正常情况（026 已执行）下仅 rule.targets 生效。
 function extractTargets(rule: Record<string, unknown>): Target[] {
   const results: Target[] = [];
   if (isTarget(rule.default)) results.push(rule.default);

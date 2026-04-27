@@ -99,11 +99,6 @@ export {
 export type { Provider } from "./providers.js";
 
 export {
-  getModelMapping,
-  getAllModelMappings,
-  createModelMapping,
-  updateModelMapping,
-  deleteModelMapping,
   getMappingGroup,
   getMappingGroupById,
   getAllMappingGroups,
@@ -113,7 +108,7 @@ export {
   getActiveProviderModels,
   resolveByProviderModel,
 } from "./mappings.js";
-export type { ModelMapping, MappingGroup, ProviderModelEntry } from "./mappings.js";
+export type { MappingGroup, ProviderModelEntry } from "./mappings.js";
 
 export {
   getActiveRetryRules,
