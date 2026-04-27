@@ -41,7 +41,7 @@ export const adminStatsRoutes: FastifyPluginCallback<StatsRoutesOptions> = (app,
     }
 
     const stats = getStats(options.db, startTime, endTime, query.router_key_id, query.provider_id);
-    return reply.send(stats);
+    return reply.send({ ...stats, startTime, endTime });
   });
 
   done();

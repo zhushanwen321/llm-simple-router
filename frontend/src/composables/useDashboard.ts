@@ -13,6 +13,8 @@ export interface DashboardStats {
   avgTps: number
   totalInputTokens: number
   totalOutputTokens: number
+  startTime: string | null
+  endTime: string | null
 }
 
 function toIsoStart(dateStr: string): string {
@@ -46,14 +48,24 @@ export function useDashboard() {
   // --- Filters ---
   const modelFilter = ref('all')
   const keyFilter = ref('all')
-  const modelOptions = ref<string[]>([])
+  const allModelOptions = ref<string[]>([])
   const keyOptions = ref<{ id: string; name: string }[]>([])
+
+  const modelOptions = computed(() => {
+    if (selectedProvider.value) {
+      const provider = providers.value.find((p) => p.id === selectedProvider.value)
+      if (provider) {
+        const providerModels = new Set(provider.models.map((m) => m.name))
+        return allModelOptions.value.filter((m) => providerModels.has(m))
+      }
+    }
+    return allModelOptions.value
+  })
 
   // --- Time range text ---
   const timeRangeText = computed(() => {
-    if (periodTab.value === 'custom') return '—'
-    const start = apiStartTime.value
-    const end = apiEndTime.value
+    const start = stats.value.startTime
+    const end = stats.value.endTime
     if (!start || !end) return '—'
     try {
       return `${formatTimeShort(start)} ~ ${formatTimeShort(end)}`
@@ -114,6 +126,7 @@ export function useDashboard() {
   const stats = ref<DashboardStats>({
     totalRequests: 0, successRate: 0, avgTps: 0,
     totalInputTokens: 0, totalOutputTokens: 0,
+    startTime: null, endTime: null,
   })
   const tpsChartData = ref<ChartData<'line'> | null>(null)
   const inputTokensChartData = ref<ChartData<'line'> | null>(null)
@@ -159,7 +172,7 @@ export function useDashboard() {
         api.getAvailableModels(),
         api.getRouterKeys(),
       ])
-      if (models.status === 'fulfilled') modelOptions.value = models.value
+      if (models.status === 'fulfilled') allModelOptions.value = models.value
       if (keys.status === 'fulfilled') keyOptions.value = keys.value
     } catch (e: unknown) {
       console.error('Failed to load options:', e)
@@ -251,6 +264,13 @@ export function useDashboard() {
     if (periodTab.value !== 'custom') {
       customStart.value = ''
       customEnd.value = ''
+    }
+  })
+
+  // 切换 provider 时，如果当前模型不在新 provider 下，重置为 all
+  watch(selectedProvider, () => {
+    if (modelFilter.value !== 'all' && !modelOptions.value.includes(modelFilter.value)) {
+      modelFilter.value = 'all'
     }
   })
 

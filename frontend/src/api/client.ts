@@ -243,7 +243,10 @@ interface StatsResponse {
   totalRequests: number
   successRate: number
   avgTps: number
-  totalTokens: number
+  totalInputTokens: number
+  totalOutputTokens: number
+  startTime: string
+  endTime: string
 }
 
 export interface UsageWindowWithUsage {
