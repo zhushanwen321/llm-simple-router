@@ -109,8 +109,8 @@ export function useDashboard() {
     return periodTab.value as 'window' | 'weekly' | 'monthly'
   })
 
-  function tsParams(metric: string): Record<string, string> {
-    const p: Record<string, string> = { metric }
+  function tsParams(metric: string) {
+    const p: { period?: string; metric: string; provider_id?: string; backend_model?: string; router_key_id?: string; start_time?: string; end_time?: string } = { metric }
     if (periodTab.value !== 'custom') {
       p.period = periodTab.value
     } else if (apiStartTime.value && apiEndTime.value) {
@@ -230,7 +230,6 @@ export function useDashboard() {
       if (fulfilled(statsRes)) stats.value = statsRes.value
 
       const period = timeseriesPeriod.value
-      const emptyAxis = fillTimeseries([], period)
 
       if (fulfilled(tpsRes) && tpsRes.value.length > 0) {
         const filled = fillTimeseries(tpsRes.value, period)
