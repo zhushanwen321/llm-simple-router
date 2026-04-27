@@ -45,7 +45,7 @@
     "docker:build": "docker build -t llm-simple-router .",
     "docker:run": "docker compose up -d",
     "lint": "eslint . --max-warnings=0",
-    "prepare": "[ -d .git ] && [ -d .githooks ] && cd .githooks && ./install-hooks.sh || true"
+    "prepare": "([ -d .git ] || [ -f .git ]) && [ -d .githooks ] && cd .githooks && ./install-hooks.sh || true"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",

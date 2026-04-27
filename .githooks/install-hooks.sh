@@ -17,7 +17,14 @@ NC='\033[0m'
 # 获取项目根目录
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-GIT_HOOKS_DIR="$PROJECT_ROOT/.git/hooks"
+
+# 兼容 git worktree（.git 可能是文件）
+if [ -f "$PROJECT_ROOT/.git" ]; then
+    GIT_DIR=$(git -C "$PROJECT_ROOT" rev-parse --git-dir)
+    GIT_HOOKS_DIR="$GIT_DIR/hooks"
+else
+    GIT_HOOKS_DIR="$PROJECT_ROOT/.git/hooks"
+fi
 
 echo -e "${BLUE}======================================${NC}"
 echo -e "${BLUE}Git Hooks 安装脚本${NC}"
@@ -25,8 +32,8 @@ echo -e "${BLUE}======================================${NC}"
 echo ""
 
 # 检查是否在 git 仓库中
-if [ ! -d "$PROJECT_ROOT/.git" ]; then
-    echo -e "${RED}[ERROR] 未找到 .git 目录${NC}"
+if ! git -C "$PROJECT_ROOT" rev-parse --git-dir >/dev/null 2>&1; then
+    echo -e "${RED}[ERROR] 未在 Git 仓库中${NC}"
     exit 1
 fi
 
