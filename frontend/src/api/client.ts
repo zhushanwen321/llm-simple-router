@@ -354,7 +354,7 @@ export const api = {
   getLogRetention: () => request<{ days: number }>('get', API.SETTINGS_LOG_RETENTION),
   setLogRetention: (days: number) => request<{ days: number }>('put', API.SETTINGS_LOG_RETENTION, { days }),
 
-  getStats: (params?: { period?: string; start_time?: string; end_time?: string; router_key_id?: string }) =>
+  getStats: (params?: { period?: string; start_time?: string; end_time?: string; router_key_id?: string; provider_id?: string; backend_model?: string }) =>
     request<StatsResponse>('get', API.STATS, undefined, { params }),
 
   getMetricsSummary: (params: { period?: string; provider_id?: string; backend_model?: string; router_key_id?: string; start_time?: string; end_time?: string }) =>

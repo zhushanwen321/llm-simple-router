@@ -97,6 +97,7 @@ export function useDashboard() {
       p.end_time = apiEndTime.value
     }
     if (selectedProvider.value) p.provider_id = selectedProvider.value
+    if (modelFilter.value !== 'all') p.backend_model = modelFilter.value
     if (keyFilter.value !== 'all') p.router_key_id = keyFilter.value
     return p
   })

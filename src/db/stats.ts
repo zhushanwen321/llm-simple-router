@@ -22,6 +22,7 @@ export function getStats(
   endTime: string,
   routerKeyId?: string,
   providerId?: string,
+  backendModel?: string,
 ): Stats {
   const conditions = [
     "rm.is_complete = 1",
@@ -36,6 +37,10 @@ export function getStats(
   if (providerId) {
     conditions.push("rm.provider_id = ?");
     params.push(providerId);
+  }
+  if (backendModel) {
+    conditions.push("rm.backend_model = ?");
+    params.push(backendModel);
   }
   const where = conditions.join(" AND ");
 
