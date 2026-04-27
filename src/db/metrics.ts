@@ -199,7 +199,7 @@ export function getMetricsTimeseries(
 
   const rows = db.prepare(`
     SELECT
-      (unixepoch(rm.created_at) / ?) * ? AS bucket_key,
+      (unixepoch(rm.created_at) / CAST(? AS INTEGER)) * CAST(? AS INTEGER) AS bucket_key,
       ${expr} AS avg_value,
       COUNT(*) AS count
     FROM request_metrics rm
