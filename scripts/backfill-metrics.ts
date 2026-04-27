@@ -12,7 +12,12 @@ const MS_PER_SECOND = 1000;
 function parseClientRequest(raw: string | null): Record<string, unknown> | null {
   if (!raw) return null;
   try {
-    return JSON.parse(raw) as Record<string, unknown>;
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    // client_request 存储格式: { headers: {...}, body: { messages: [...] } }
+    if (parsed.body && typeof parsed.body === "object") {
+      return parsed.body as Record<string, unknown>;
+    }
+    return parsed;
   } catch {
     return null;
   }
@@ -70,6 +75,33 @@ function extractAllText(body: Record<string, unknown>): string {
     }
   }
   return parts.join(" ");
+}
+
+/** 从 stream_text_content（完整 Anthropic/OpenAI 响应 JSON）中提取纯文本内容 */
+function extractTextFromStreamContent(raw: string | null): string {
+  if (!raw) return "";
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    // OpenAI 格式: { choices: [{ message: { content: "..." } }] }
+    const choices = parsed.choices as Array<Record<string, unknown>> | undefined;
+    if (choices && choices.length > 0) {
+      const msg = choices[0].message as Record<string, unknown> | undefined;
+      if (msg && typeof msg.content === "string") return msg.content;
+      const delta = choices[0].delta as Record<string, unknown> | undefined;
+      if (delta && typeof delta.content === "string") return delta.content;
+    }
+    // Anthropic 格式: { content: [{ type: "text", text: "..." }, { type: "tool_use", ... }] }
+    const content = parsed.content as Array<Record<string, unknown>> | undefined;
+    if (Array.isArray(content)) {
+      return content
+        .filter(b => b.type === "text" && typeof b.text === "string")
+        .map(b => b.text as string)
+        .join(" ");
+    }
+    return "";
+  } catch {
+    return "";
+  }
 }
 
 interface LogRow {
@@ -145,7 +177,7 @@ function main(): void {
       AND stream_text_content IS NOT NULL
       AND ttft_ms IS NOT NULL
       AND latency_ms IS NOT NULL
-      AND latency_ms > ttft_ms
+      AND latency_ms >= ttft_ms
   `).all() as LogRow[];
 
   console.log(`Found ${tpsCandidates.length} streaming records with text content`);
@@ -160,8 +192,18 @@ function main(): void {
 
   const txTps = db.transaction(() => {
     for (const row of tpsCandidates) {
-      const text = row.stream_text_content;
-      if (!text) continue;
+      const text = extractTextFromStreamContent(row.stream_text_content);
+
+      if (!text) {
+        // tool_use-only response, no visible text output → TPS is meaningless
+        if (row.tokens_per_second !== null) {
+          updateTpsLog.run(null, row.id);
+          updateTpsMetrics.run(null, row.id);
+          tpsUpdated++;
+        }
+        continue;
+      }
+
       const textTokens = countTokens(text);
       if (textTokens === 0) continue;
       const textDurationMs = row.latency_ms - row.ttft_ms;
