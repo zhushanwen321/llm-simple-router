@@ -14,6 +14,7 @@ const LogQuerySchema = Type.Object({
   provider_id: Type.Optional(Type.String()),
   start_time: Type.Optional(Type.String()),
   end_time: Type.Optional(Type.String()),
+  status_code: Type.Optional(Type.String()),
   view: Type.Optional(Type.Literal("grouped")),
 });
 
@@ -45,6 +46,7 @@ export const adminLogRoutes: FastifyPluginCallback<LogRoutesOptions> = (app, opt
       provider_id: query.provider_id || undefined,
       start_time: query.start_time || undefined,
       end_time: query.end_time || undefined,
+      status_code: query.status_code || undefined,
     };
 
     const result = view === "grouped"

@@ -29,8 +29,18 @@
         <Input type="datetime-local" v-model="dateRange.start" class="w-44" />
         <span class="text-muted-foreground text-sm">-</span>
         <Input type="datetime-local" v-model="dateRange.end" class="w-44" />
-        <Button v-if="dateRange.start || dateRange.end" variant="ghost" size="sm" @click="clearDateRange">清除</Button>
-        <span v-if="dateRangeError" class="text-xs text-destructive whitespace-nowrap">{{ dateRangeError }}</span>
+        <Button
+          v-if="dateRange.start || dateRange.end"
+          variant="ghost"
+          size="sm"
+          @click="clearDateRange"
+          >清除</Button
+        >
+        <span
+          v-if="dateRangeError"
+          class="text-xs text-destructive whitespace-nowrap"
+          >{{ dateRangeError }}</span
+        >
       </div>
       <Select v-model="providerFilter">
         <SelectTrigger class="w-28 truncate">
@@ -38,7 +48,9 @@
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">全部供应商</SelectItem>
-          <SelectItem v-for="p in providers" :key="p.id" :value="p.id">{{ p.name }}</SelectItem>
+          <SelectItem v-for="p in providers" :key="p.id" :value="p.id">{{
+            p.name
+          }}</SelectItem>
         </SelectContent>
       </Select>
       <Select v-model="modelFilter">
@@ -47,7 +59,9 @@
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">全部模型</SelectItem>
-          <SelectItem v-for="m in filteredModelOptions" :key="m" :value="m">{{ m }}</SelectItem>
+          <SelectItem v-for="m in filteredModelOptions" :key="m" :value="m">{{
+            m
+          }}</SelectItem>
         </SelectContent>
       </Select>
       <Select v-model="keyFilter">
@@ -56,7 +70,19 @@
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">全部密钥</SelectItem>
-          <SelectItem v-for="rk in routerKeys" :key="rk.id" :value="rk.id">{{ rk.name }}</SelectItem>
+          <SelectItem v-for="rk in routerKeys" :key="rk.id" :value="rk.id">{{
+            rk.name
+          }}</SelectItem>
+        </SelectContent>
+      </Select>
+      <Select v-model="statusFilter">
+        <SelectTrigger class="w-28 truncate">
+          <SelectValue placeholder="全部状态" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">全部状态</SelectItem>
+          <SelectItem value="200">200</SelectItem>
+          <SelectItem value="non200">非 200</SelectItem>
         </SelectContent>
       </Select>
     </div>
@@ -91,7 +117,10 @@
 
             <template v-if="expandedRows.has(log.id)">
               <TableRow v-if="childLoading[log.id]">
-                <TableCell :colspan="TABLE_COL_COUNT" class="text-center py-2 pl-10">
+                <TableCell
+                  :colspan="TABLE_COL_COUNT"
+                  class="text-center py-2 pl-10"
+                >
                   <Skeleton class="h-4 w-32 mx-auto" />
                 </TableCell>
               </TableRow>
@@ -108,29 +137,62 @@
           </template>
 
           <TableRow v-if="logs.length === 0">
-            <TableCell :colspan="TABLE_COL_COUNT" class="text-center text-muted-foreground py-8">暂无日志</TableCell>
+            <TableCell
+              :colspan="TABLE_COL_COUNT"
+              class="text-center text-muted-foreground py-8"
+              >暂无日志</TableCell
+            >
           </TableRow>
         </TableBody>
       </Table>
     </div>
 
     <div class="flex items-center justify-between mt-4">
-      <p class="text-sm text-muted-foreground">共 {{ total }} 条，第 {{ page }} / {{ totalPages }} 页</p>
+      <p class="text-sm text-muted-foreground">
+        共 {{ total }} 条，第 {{ page }} / {{ totalPages }} 页
+      </p>
       <div class="flex items-center gap-1">
-        <Button variant="outline" size="sm" @click="goToPage(1)" :disabled="page <= 1">首页</Button>
-        <Button variant="outline" size="sm" @click="goToPage(page - 1)" :disabled="page <= 1">上一页</Button>
+        <Button
+          variant="outline"
+          size="sm"
+          @click="goToPage(1)"
+          :disabled="page <= 1"
+          >首页</Button
+        >
+        <Button
+          variant="outline"
+          size="sm"
+          @click="goToPage(page - 1)"
+          :disabled="page <= 1"
+          >上一页</Button
+        >
         <template v-for="item in pageNumbers" :key="item">
-          <span v-if="item === '...'" class="px-2 text-sm text-muted-foreground">...</span>
+          <span v-if="item === '...'" class="px-2 text-sm text-muted-foreground"
+            >...</span
+          >
           <Button
             v-else
             :variant="item === page ? 'default' : 'outline'"
             size="sm"
             class="min-w-8"
             @click="goToPage(item)"
-          >{{ item }}</Button>
+            >{{ item }}</Button
+          >
         </template>
-        <Button variant="outline" size="sm" @click="goToPage(page + 1)" :disabled="page >= totalPages">下一页</Button>
-        <Button variant="outline" size="sm" @click="goToPage(totalPages)" :disabled="page >= totalPages">末页</Button>
+        <Button
+          variant="outline"
+          size="sm"
+          @click="goToPage(page + 1)"
+          :disabled="page >= totalPages"
+          >下一页</Button
+        >
+        <Button
+          variant="outline"
+          size="sm"
+          @click="goToPage(totalPages)"
+          :disabled="page >= totalPages"
+          >末页</Button
+        >
       </div>
     </div>
 
@@ -148,7 +210,9 @@
         </DialogHeader>
         <p class="text-sm text-muted-foreground">删除指定天数之前的日志</p>
         <div class="mb-4">
-          <Label class="block text-sm font-medium text-foreground mb-1">保留最近天数</Label>
+          <Label class="block text-sm font-medium text-foreground mb-1"
+            >保留最近天数</Label
+          >
           <Input v-model.number="cleanupDays" type="number" :min="1" />
         </div>
         <Separator />
@@ -166,7 +230,11 @@
             <span class="text-xs text-muted-foreground">0 = 不自动清理</span>
           </div>
           <div class="flex justify-end">
-            <Button size="sm" @click="saveRetention" :disabled="retentionSaving">
+            <Button
+              size="sm"
+              @click="saveRetention"
+              :disabled="retentionSaving"
+            >
               保存设置
             </Button>
           </div>
@@ -183,10 +251,14 @@
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>清理完成</AlertDialogTitle>
-          <AlertDialogDescription>已删除 {{ cleanupResult }} 条日志。</AlertDialogDescription>
+          <AlertDialogDescription
+            >已删除 {{ cleanupResult }} 条日志。</AlertDialogDescription
+          >
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogAction @click="showCleanupResult = false">确定</AlertDialogAction>
+          <AlertDialogAction @click="showCleanupResult = false"
+            >确定</AlertDialogAction
+          >
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -194,76 +266,126 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, watch } from 'vue'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction } from '@/components/ui/alert-dialog'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Separator } from '@/components/ui/separator'
-import UnifiedRequestDialog from '@/components/request-detail/UnifiedRequestDialog.vue'
-import LogTableRow from '@/components/logs/LogTableRow.vue'
-import { useLogFilters } from '@/composables/useLogFilters'
-import { useLogs } from '@/composables/useLogs'
-import { useLogRetention } from '@/composables/useLogRetention'
+import { computed, onMounted, watch } from "vue";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
+import UnifiedRequestDialog from "@/components/request-detail/UnifiedRequestDialog.vue";
+import LogTableRow from "@/components/logs/LogTableRow.vue";
+import { useLogFilters } from "@/composables/useLogFilters";
+import { useLogs } from "@/composables/useLogs";
+import { useLogRetention } from "@/composables/useLogRetention";
 
 const {
-  PERIODS, period, dateRange, dateRangeError,
-  providerFilter, modelFilter, keyFilter,
-  providers, routerKeys, filteredModelOptions, clearDateRange,
+  PERIODS,
+  period,
+  dateRange,
+  dateRangeError,
+  providerFilter,
+  modelFilter,
+  keyFilter,
+  statusFilter,
+  providers,
+  routerKeys,
+  filteredModelOptions,
+  clearDateRange,
   buildFilterParams,
-} = useLogFilters()
+} = useLogFilters();
 
-const TABLE_COL_COUNT = 13
-const DEBOUNCE_MS = 300
-const MAX_PAGE_BUTTONS = 7
-const PAGE_NEIGHBORS = 2
-const FIRST_PAGE = 1
+const TABLE_COL_COUNT = 13;
+const DEBOUNCE_MS = 300;
+const MAX_PAGE_BUTTONS = 7;
+const PAGE_NEIGHBORS = 2;
+const FIRST_PAGE = 1;
 
 const {
-  logs, total, page, totalPages,
-  cleanupDays, showCleanup, cleanupResult, showCleanupResult,
-  expandedRows, childLogs, childLoading,
-  logDetailOpen, selectedLogEntry,
-  loadLogs, goToPage,
-  handleCleanup, toggleExpand, openLogDetail,
-} = useLogs()
+  logs,
+  total,
+  page,
+  totalPages,
+  cleanupDays,
+  showCleanup,
+  cleanupResult,
+  showCleanupResult,
+  expandedRows,
+  childLogs,
+  childLoading,
+  logDetailOpen,
+  selectedLogEntry,
+  loadLogs,
+  goToPage,
+  handleCleanup,
+  toggleExpand,
+  openLogDetail,
+} = useLogs();
 
 const pageNumbers = computed(() => {
-  const tp = totalPages.value
-  const current = page.value
-  if (tp <= MAX_PAGE_BUTTONS) return Array.from({ length: tp }, (_, i) => i + 1)
+  const tp = totalPages.value;
+  const current = page.value;
+  if (tp <= MAX_PAGE_BUTTONS)
+    return Array.from({ length: tp }, (_, i) => i + 1);
 
-  const pages: (number | '...')[] = [FIRST_PAGE]
-  const start = Math.max(FIRST_PAGE + 1, current - PAGE_NEIGHBORS)
-  const end = Math.min(tp - FIRST_PAGE, current + PAGE_NEIGHBORS)
+  const pages: (number | "...")[] = [FIRST_PAGE];
+  const start = Math.max(FIRST_PAGE + 1, current - PAGE_NEIGHBORS);
+  const end = Math.min(tp - FIRST_PAGE, current + PAGE_NEIGHBORS);
 
-  if (start > FIRST_PAGE + PAGE_NEIGHBORS) pages.push('...')
-  for (let i = start; i <= end; i++) pages.push(i)
-  if (end < tp - PAGE_NEIGHBORS) pages.push('...')
-  pages.push(tp)
+  if (start > FIRST_PAGE + PAGE_NEIGHBORS) pages.push("...");
+  for (let i = start; i <= end; i++) pages.push(i);
+  if (end < tp - PAGE_NEIGHBORS) pages.push("...");
+  pages.push(tp);
 
-  return pages
-})
+  return pages;
+});
 
-const { retentionDays, retentionSaving, saveRetention, loadRetention } = useLogRetention()
+const { retentionDays, retentionSaving, saveRetention, loadRetention } =
+  useLogRetention();
 
-let filterTimer: ReturnType<typeof setTimeout> | null = null
+let filterTimer: ReturnType<typeof setTimeout> | null = null;
 watch(
-  [period, dateRange, providerFilter, modelFilter, keyFilter],
+  [period, dateRange, providerFilter, modelFilter, keyFilter, statusFilter],
   () => {
-    page.value = 1
-    if (filterTimer) clearTimeout(filterTimer)
-    filterTimer = setTimeout(() => loadLogs(buildFilterParams()), DEBOUNCE_MS)
+    page.value = 1;
+    if (filterTimer) clearTimeout(filterTimer);
+    filterTimer = setTimeout(() => loadLogs(buildFilterParams()), DEBOUNCE_MS);
   },
   { deep: true },
-)
+);
 
 onMounted(() => {
-  loadLogs(buildFilterParams())
-  loadRetention()
-})
+  loadLogs(buildFilterParams());
+  loadRetention();
+});
 </script>

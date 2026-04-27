@@ -99,6 +99,7 @@ type LogFilterOptions = {
   provider_id?: string;
   start_time?: string;
   end_time?: string;
+  status_code?: string;
 };
 
 function buildLogWhereClause(
@@ -130,6 +131,13 @@ function buildLogWhereClause(
   if (options.end_time) {
     where += " AND rl.created_at <= ?";
     params.push(options.end_time);
+  }
+  if (options.status_code) {
+    if (options.status_code === "200") {
+      where += " AND rl.status_code = 200";
+    } else if (options.status_code === "non200") {
+      where += " AND (rl.status_code IS NULL OR rl.status_code != 200)";
+    }
   }
   return { where, params };
 }
