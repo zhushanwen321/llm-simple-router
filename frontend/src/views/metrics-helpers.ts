@@ -1,5 +1,5 @@
 import type { ChartOptions } from 'chart.js'
-import { parseUtc, formatTimeHM, formatTimeMDH } from '@/utils/format'
+import { parseUtc, formatTimeHM } from '@/utils/format'
 
 const SEC_PER_MINUTE = 60
 const SEC_PER_HOUR = 3600
@@ -12,6 +12,9 @@ const DAYS_30 = 30
 const MINUTES_5 = 5
 const MINUTES_15 = 15
 const HOURS_4 = 4
+const DAY_MS = SEC_PER_DAY * MS_PER_SEC
+const DAY_TICK_THRESHOLD = 4
+
 const PERIOD_TOTAL_SEC: Record<string, number> = {
   '1h': SEC_PER_HOUR,
   '5h': SEC_PER_HOUR * HOURS_5,
@@ -38,14 +41,8 @@ const BUCKET_SEC: Record<string, number> = {
 
 const DEFAULT_BUCKET_SEC = SEC_PER_MINUTE * MINUTES_15
 const DEFAULT_TOTAL_SEC = SEC_PER_DAY
-const TARGET_TICKS = 12
-const MIN_TICKS = 5
-
+const TICK_COUNT = 5
 const LONG_PERIODS = new Set(['7d', '30d', 'weekly', 'monthly'])
-
-function formatLabel(date: Date, periodStr: string): string {
-  return LONG_PERIODS.has(periodStr) ? formatTimeMDH(date) : formatTimeHM(date)
-}
 
 interface TimeseriesRawRow {
   time_bucket: string
@@ -57,17 +54,44 @@ function bucketMs(bucketSec: number): number {
   return bucketSec * MS_PER_SEC
 }
 
+/** 根据时间跨度选择标签格式：短区间用 HH:mm，长区间用 M/D */
+function pickLabelFormat(periodStr: string, firstTs?: number, lastTs?: number): 'time' | 'day' {
+  // 优先根据实际时间区间判断
+  if (firstTs != null && lastTs != null) {
+    return (lastTs - firstTs) > DAY_TICK_THRESHOLD * DAY_MS ? 'day' : 'time'
+  }
+  // 无实际区间时，用 periodStr 推断
+  return LONG_PERIODS.has(periodStr) ? 'day' : 'time'
+}
+
+function makeLabel(date: Date, fmt: 'time' | 'day'): string {
+  return fmt === 'day' ? `${date.getMonth() + 1}/${date.getDate()}` : formatTimeHM(date)
+}
+
 export function fillTimeseries(
   raw: TimeseriesRawRow[],
   periodStr: string,
+  timeRange?: { startTime: string; endTime: string },
 ): { labels: string[]; values: number[] } {
   const bucketSec = BUCKET_SEC[periodStr] ?? DEFAULT_BUCKET_SEC
-  const totalSec = PERIOD_TOTAL_SEC[periodStr] ?? DEFAULT_TOTAL_SEC
-  const now = new Date()
   const bMs = bucketMs(bucketSec)
-  const nowBucket = Math.floor(now.getTime() / bMs) * bMs
-  const startBucket = nowBucket - totalSec * MS_PER_SEC
-  const totalBuckets = Math.round(totalSec / bucketSec)
+
+  // Determine the actual time range from provided timeRange or fallback to period-based calculation
+  let startMs: number
+  let endMs: number
+  if (timeRange) {
+    startMs = Math.floor(parseUtc(timeRange.startTime).getTime() / bMs) * bMs
+    endMs = Math.ceil(parseUtc(timeRange.endTime).getTime() / bMs) * bMs
+  } else {
+    const totalSec = PERIOD_TOTAL_SEC[periodStr] ?? DEFAULT_TOTAL_SEC
+    const now = new Date()
+    const nowBucket = Math.floor(now.getTime() / bMs) * bMs
+    startMs = nowBucket - totalSec * MS_PER_SEC
+    endMs = nowBucket
+  }
+
+  const totalBuckets = Math.round((endMs - startMs) / bMs)
+  const labelFmt = pickLabelFormat(periodStr, startMs, endMs)
 
   const byKey = new Map<number, TimeseriesRawRow>()
   for (const r of raw) {
@@ -80,9 +104,8 @@ export function fillTimeseries(
   const values: number[] = []
 
   for (let i = 0; i <= totalBuckets; i++) {
-    const ts = startBucket + i * bMs
-    const date = new Date(ts)
-    labels.push(formatLabel(date, periodStr))
+    const ts = startMs + i * bMs
+    labels.push(makeLabel(new Date(ts), labelFmt))
     const row = byKey.get(Math.floor(ts / bMs))
     values.push(row && row.avg_value != null ? row.avg_value : 0)
   }
@@ -92,15 +115,14 @@ export function fillTimeseries(
 
 function tickIndices(total: number): Set<number> {
   const result = new Set<number>()
-  const target = Math.max(MIN_TICKS, Math.min(TARGET_TICKS, total))
-  if (total <= target) {
+  if (total <= TICK_COUNT) {
     for (let i = 0; i < total; i++) result.add(i)
     return result
   }
-  for (let i = 0; i < target; i++) {
-    result.add(Math.round(i * (total - 1) / (target - 1)))
+  // Always show exactly TICK_COUNT evenly spaced ticks (including first and last)
+  for (let i = 0; i < TICK_COUNT; i++) {
+    result.add(Math.round(i * (total - 1) / (TICK_COUNT - 1)))
   }
-  result.add(total - 1)
   return result
 }
 
@@ -129,7 +151,7 @@ export function lineOptions(unit: string, labels: string[]): ChartOptions<'line'
       x: {
         display: true,
         grid: { display: false },
-        ticks: { maxRotation: 0, callback: makeXTickCallback(ticks) },
+        ticks: { maxRotation: 0, autoSkip: false, callback: makeXTickCallback(ticks) },
       },
       y: { display: true, beginAtZero: true },
     },
@@ -147,7 +169,7 @@ export function stackedAreaOptions(labels: string[]): ChartOptions<'line'> {
       x: {
         stacked: true,
         grid: { display: false },
-        ticks: { maxRotation: 0, callback: makeXTickCallback(ticks) },
+        ticks: { maxRotation: 0, autoSkip: false, callback: makeXTickCallback(ticks) },
       },
       y: { stacked: true, beginAtZero: true },
     },
