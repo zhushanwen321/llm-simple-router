@@ -3,9 +3,12 @@
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { TableCell, TableRow } from '@/components/ui/table'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { CheckIcon, CopyIcon } from 'lucide-vue-next'
 import type { LogEntry } from '@/components/logs/types'
 import { PROVIDER_ID_ROUTER } from '@/components/logs/types'
 import { formatTime } from '@/utils/format'
+import { useClipboard } from '@/composables/useClipboard'
 
 withDefaults(defineProps<{
   log: LogEntry
@@ -20,6 +23,8 @@ const emit = defineEmits<{
   toggleExpand: [log: LogEntry]
   openDetail: [id: string]
 }>()
+
+const { copied, copy } = useClipboard()
 
 function enhancementLabel(raw: string | null): string {
   if (!raw) return '未知'
@@ -59,7 +64,27 @@ function enhancementLabel(raw: string | null): string {
     <TableCell
       class="font-mono text-xs text-muted-foreground"
       :title="log.id"
-    >{{ log.id.slice(0, 8) }}</TableCell>
+    >
+      <span class="inline-flex items-center gap-1">
+        {{ log.id.slice(0, 8) }}
+        <TooltipProvider>
+          <Tooltip :delay-duration="300">
+            <TooltipTrigger as-child>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                class="shrink-0"
+                @click.stop="copy(log.id)"
+              >
+                <CheckIcon v-if="copied" class="size-3 text-green-500" />
+                <CopyIcon v-else class="size-3" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>复制完整 ID</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </span>
+    </TableCell>
 
     <TableCell class="text-muted-foreground">{{ formatTime(log.created_at) }}</TableCell>
 

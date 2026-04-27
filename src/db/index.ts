@@ -11,6 +11,12 @@ const MIGRATIONS_DIR = join(__dirname, "migrations");
 const MIGRATION_RENAMES: Record<string, string> = {
   "019_drop_log_redundancy.sql": "020_drop_log_redundancy.sql",
   "020_merge_metrics_columns.sql": "021_merge_metrics_columns.sql",
+  // 026 metrics 独立化拆分后重新编号，避免双 026
+  "026_metrics_independent.sql": "027_metrics_independent.sql",
+  "027_ensure_strategy_column.sql": "028_ensure_strategy_column.sql",
+  "028_convert_old_rule_format.sql": "029_convert_old_rule_format.sql",
+  "029_add_input_tokens_estimated.sql": "030_add_input_tokens_estimated.sql",
+  "030_add_tps_breakdown.sql": "031_add_tps_breakdown.sql",
 };
 
 export function initDatabase(dbPath: string): Database.Database {
@@ -55,7 +61,29 @@ export function initDatabase(dbPath: string): Database.Database {
     try {
       const sql = readFileSync(join(MIGRATIONS_DIR, file), "utf-8");
       db.transaction(() => {
-        db.exec(sql);
+        // 逐条执行 SQL 语句，对 ALTER TABLE ADD COLUMN 自动跳过已存在的列
+        const statements = sql.split(";").map(s => s.trim()).filter(s => s.length > 0);
+        for (const stmt of statements) {
+          try {
+            // 检测 ALTER TABLE ADD COLUMN，若列已存在则跳过
+            const alterMatch = /^ALTER\s+TABLE\s+(\S+)\s+ADD\s+COLUMN\s+(\S+)/is.exec(stmt);
+            if (alterMatch) {
+              const tableName = alterMatch[1];
+              const columnName = alterMatch[2];
+              const cols = db.pragma(`table_info(${tableName})`) as Array<{ name: string }>;
+              if (cols.some(c => c.name === columnName)) {
+                continue;
+              }
+            }
+            db.exec(stmt + ";");
+          } catch (stmtErr: unknown) {
+            // 兼容旧逻辑：仍容忍 "duplicate column name" 错误
+            if (stmtErr instanceof Error && stmtErr.message.includes("duplicate column name")) {
+              continue;
+            }
+            throw stmtErr;
+          }
+        }
         db.prepare("INSERT INTO migrations (name, applied_at) VALUES (?, ?)").run(
           file,
           new Date().toISOString(),
@@ -86,11 +114,6 @@ export {
 export type { Provider } from "./providers.js";
 
 export {
-  getModelMapping,
-  getAllModelMappings,
-  createModelMapping,
-  updateModelMapping,
-  deleteModelMapping,
   getMappingGroup,
   getMappingGroupById,
   getAllMappingGroups,
@@ -100,7 +123,7 @@ export {
   getActiveProviderModels,
   resolveByProviderModel,
 } from "./mappings.js";
-export type { ModelMapping, MappingGroup, ProviderModelEntry } from "./mappings.js";
+export type { MappingGroup, ProviderModelEntry } from "./mappings.js";
 
 export {
   getActiveRetryRules,
@@ -178,6 +201,18 @@ export {
   getAllModelInfo,
 } from "./model-info.js";
 export type { ProviderModelInfo } from "./model-info.js";
+
+export {
+  getSchedulesByGroup,
+  getActiveSchedulesForGroup,
+  getScheduleById,
+  getAllSchedules,
+  createSchedule,
+  updateSchedule,
+  deleteSchedule,
+  deleteSchedulesByGroup,
+} from "./schedules.js";
+export type { Schedule } from "./schedules.js";
 
 export {
   collectDbSizeInfo,

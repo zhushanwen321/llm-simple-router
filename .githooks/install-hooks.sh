@@ -48,6 +48,7 @@ cat > "$GIT_HOOKS_DIR/pre-commit" << 'HOOK_EOF'
 #
 # 环境变量（跳过特定检查）：
 #   SKIP_ALL_CHECKS=1         - 跳过所有检查
+#   SKIP_FORMAT=1             - 跳过 Prettier 格式化
 #   SKIP_FRONTEND_LINT=1      - 跳过前端 ESLint
 #   SKIP_TYPE_CHECK=1         - 跳过 vue-tsc 类型检查
 #   SKIP_CODE_RULES_CHECK=1   - 跳过自定义代码规范检查
@@ -84,6 +85,41 @@ fi
 # 获取变更文件
 STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACMR)
 FRONTEND_FILES=$(echo "$STAGED_FILES" | grep "^frontend/" || true)
+BACKEND_FILES=$(echo "$STAGED_FILES" | grep -E "^src/.*\.ts$" || true)
+
+# ============================================================================
+# 0. Prettier 格式化（自动修复）
+# ============================================================================
+
+FORMAT_FILES=""
+if [ -n "$FRONTEND_FILES" ]; then
+    FORMAT_FILES="$FORMAT_FILES $(echo "$FRONTEND_FILES" | grep -E '\.(vue|ts|css)$' || true)"
+fi
+if [ -n "$BACKEND_FILES" ]; then
+    FORMAT_FILES="$FORMAT_FILES $BACKEND_FILES"
+fi
+FORMAT_FILES=$(echo "$FORMAT_FILES" | xargs)
+
+if [ -n "$FORMAT_FILES" ]; then
+    print_section "[Prettier 格式化]"
+
+    if [ "$SKIP_FORMAT" != "1" ]; then
+        echo -e "${BLUE}[INFO] 运行 Prettier 格式化...${NC}"
+
+        npx prettier --write $FORMAT_FILES 2>/dev/null
+
+        FIXED_FILES=$(git diff --name-only --diff-filter=M | grep -E '\.(vue|ts|css)$' || true)
+        if [ -n "$FIXED_FILES" ]; then
+            echo -e "${BLUE}[INFO] Prettier 格式化了以下文件:${NC}"
+            echo "$FIXED_FILES" | sed 's/^/  - /'
+            git add $FIXED_FILES
+        else
+            echo -e "${GREEN}[OK] 所有文件格式正确${NC}"
+        fi
+    else
+        echo -e "${YELLOW}[SKIP] Prettier 格式化已跳过${NC}"
+    fi
+fi
 
 # ============================================================================
 # 1. 前端 ESLint 检查
@@ -210,6 +246,7 @@ echo -e "${GREEN}代码质量检查全部通过！${NC}"
 echo ""
 echo -e "${CYAN}提示: 跳过检查的环境变量:${NC}"
 echo -e "  ${YELLOW}SKIP_ALL_CHECKS=1${NC}          - 跳过所有"
+echo -e "  ${YELLOW}SKIP_FORMAT=1${NC}             - 跳过 Prettier"
 echo -e "  ${YELLOW}SKIP_FRONTEND_LINT=1${NC}      - 跳过 ESLint"
 echo -e "  ${YELLOW}SKIP_TYPE_CHECK=1${NC}          - 跳过 vue-tsc"
 echo -e "  ${YELLOW}SKIP_CODE_RULES_CHECK=1${NC}   - 跳过代码规范"
@@ -233,6 +270,7 @@ echo -e "${GREEN}[安装完成]${NC}"
 echo -e "${BLUE}======================================${NC}"
 echo ""
 echo -e "${CYAN}已安装的检查项目:${NC}"
+echo -e "  ${GREEN}[+]${NC} Prettier 格式化（自动修复）"
 echo -e "  ${GREEN}[+]${NC} 前端 ESLint 代码检查"
 echo -e "  ${GREEN}[+]${NC} vue-tsc 类型检查（全量，与 CI 等价）"
 echo -e "  ${GREEN}[+]${NC} Vue 组件规范检查（禁止原生 HTML、Emoji、自定义 CSS）"

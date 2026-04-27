@@ -48,7 +48,7 @@ export function getStats(
     SELECT
       COUNT(*) AS total_requests,
       SUM(CASE WHEN rm.status_code >= 200 AND rm.status_code < 300 THEN 1 ELSE 0 END) AS success_count,
-      AVG(rm.tokens_per_second) AS avg_tps,
+      CASE WHEN SUM(rm.total_duration_ms) > 0 THEN CAST(SUM(rm.output_tokens) AS REAL) * 1000.0 / SUM(rm.total_duration_ms) ELSE NULL END AS avg_tps,
       COALESCE(SUM(rm.input_tokens), 0) AS total_input_tokens,
       COALESCE(SUM(rm.output_tokens), 0) AS total_output_tokens
     FROM request_metrics rm

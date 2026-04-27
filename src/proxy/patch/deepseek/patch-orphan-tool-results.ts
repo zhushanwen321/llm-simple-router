@@ -28,8 +28,6 @@ export function patchOrphanToolResults(
       }
     }
   }
-  if (knownToolUseIds.size === 0) return;
-
   // Step 2: 移除孤儿 tool_result 块
   let removedAny = false;
   for (const msg of messages) {

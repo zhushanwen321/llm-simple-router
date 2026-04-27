@@ -1,3 +1,15 @@
+/** 旧版单模型映射（列表项响应） */
+export interface ModelMapping {
+  id: string
+  client_model: string
+  backend_model: string
+  provider_id: string
+  provider_name?: string
+  api_type?: string
+  is_active: number
+  created_at: string
+}
+
 /** 模型信息（含上下文窗口大小） */
 export interface ModelInfo {
   name: string
@@ -8,7 +20,6 @@ export interface ModelInfo {
 export interface MappingGroup {
   id: string
   client_model: string
-  strategy: string
   rule: string
   is_active: number
   created_at: string
@@ -42,16 +53,7 @@ export interface MappingTarget {
   overflow_model?: string
 }
 
-/** 定时策略的时间窗口 */
-export interface RuleWindow {
-  start: string
-  end: string
-  target: MappingTarget
-}
-
 /** 映射组 rule 字段解析后的结构 */
 export interface Rule {
-  default?: MappingTarget
-  windows?: RuleWindow[]
   targets?: MappingTarget[]
 }

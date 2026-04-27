@@ -158,6 +158,7 @@ import {
   Activity,
   Settings,
   LogOut,
+  CalendarClock,
 } from 'lucide-vue-next'
 import { api, getApiMessage } from '@/api/client'
 import { Button } from '@/components/ui/button'
@@ -266,6 +267,7 @@ const navItems: NavItem[] = [
   { path: '/', label: '仪表盘', icon: LayoutDashboard },
   { path: '/providers', label: '供应商', icon: Server },
   { path: '/mappings', label: '模型映射', icon: ArrowLeftRight },
+  { path: '/schedules', label: '调度管理', icon: CalendarClock },
   { path: '/router-keys', label: 'API 密钥', icon: KeyRound },
   { path: '/retry-rules', label: '重试规则', icon: RefreshCcw },
   { path: '/proxy-enhancement', label: '代理增强（实验性）', icon: Sparkles },

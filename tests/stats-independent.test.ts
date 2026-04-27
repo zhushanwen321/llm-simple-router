@@ -42,17 +42,17 @@ describe("Stats independent of request_logs", () => {
 
     // 插入 request_metrics，携带 router_key_id 和 status_code
     database.prepare(
-      `INSERT INTO request_metrics (id, request_log_id, provider_id, backend_model, api_type, router_key_id, status_code, input_tokens, output_tokens, tokens_per_second, is_complete, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run("m-1", "log-1", "p-1", "gpt-4", "openai", "rk-1", 200, 100, 200, 30, 1, now);
+      `INSERT INTO request_metrics (id, request_log_id, provider_id, backend_model, api_type, router_key_id, status_code, input_tokens, output_tokens, total_duration_ms, tokens_per_second, is_complete, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run("m-1", "log-1", "p-1", "gpt-4", "openai", "rk-1", 200, 100, 200, 6667, 30, 1, now);
 
-    // 验证统计正确
+    // 验证统计正确 (avgTps = SUM(output_tokens)*1000/SUM(total_duration_ms) = 200*1000/6667 ≈ 30)
     const statsBefore = getStats(database, startTime, endTime, "rk-1");
     expect(statsBefore.totalRequests).toBe(1);
     expect(statsBefore.successRate).toBe(1);
     expect(statsBefore.totalInputTokens).toBe(100);
     expect(statsBefore.totalOutputTokens).toBe(200);
-    expect(statsBefore.avgTps).toBe(30);
+    expect(Math.round(statsBefore.avgTps)).toBe(30);
 
     // 删除 request_logs 中的记录
     database.prepare("DELETE FROM request_logs WHERE id = ?").run("log-1");
@@ -63,7 +63,7 @@ describe("Stats independent of request_logs", () => {
     expect(statsAfter.successRate).toBe(1);
     expect(statsAfter.totalInputTokens).toBe(100);
     expect(statsAfter.totalOutputTokens).toBe(200);
-    expect(statsAfter.avgTps).toBe(30);
+    expect(Math.round(statsAfter.avgTps)).toBe(30);
   });
 
   it("getStats successRate distinguishes 2xx from 5xx", () => {

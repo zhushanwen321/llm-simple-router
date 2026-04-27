@@ -22,6 +22,16 @@ function toStreamMetrics(m: MetricsResult) {
     tokensPerSecond: m.tokens_per_second,
     stopReason: m.stop_reason,
     isComplete: m.is_complete === 1,
+    // Two-phase TPS breakdown
+    thinkingTokens: m.thinking_tokens,
+    thinkingDurationMs: m.thinking_duration_ms,
+    thinkingTps: m.thinking_tps,
+    nonThinkingDurationMs: m.non_thinking_duration_ms,
+    nonThinkingTps: m.non_thinking_tps,
+    totalTps: m.total_tps,
+    // Content counts (for analysis)
+    textTokens: m.text_tokens,
+    toolUseTokens: m.tool_use_tokens,
   };
 }
 

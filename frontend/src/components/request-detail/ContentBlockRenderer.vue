@@ -6,7 +6,7 @@
       <span class="text-xs font-medium">Reply</span>
     </div>
     <div class="px-2.5 py-2">
-      <pre class="text-xs overflow-y-auto whitespace-pre-wrap break-words"><code>{{ content }}<span v-if="showCursor" class="inline-block w-1.5 h-3.5 dot-success animate-pulse ml-0.5 align-text-bottom" /></code></pre>
+      <pre ref="contentRef" class="text-xs overflow-y-auto whitespace-pre-wrap break-words" style="max-height: 300px"><code>{{ content }}<span v-if="showCursor" class="inline-block w-1.5 h-3.5 dot-success animate-pulse ml-0.5 align-text-bottom" /></code></pre>
     </div>
   </div>
 
@@ -23,14 +23,14 @@
     </CollapsibleTrigger>
     <CollapsibleContent>
       <div class="px-2.5 pb-2">
-        <pre class="text-xs rounded p-2 overflow-y-auto whitespace-pre-wrap break-words" :class="contentClass"><code>{{ content || placeholder }}</code></pre>
+        <pre ref="contentRef" class="text-xs rounded p-2 overflow-y-auto whitespace-pre-wrap break-words" style="max-height: 300px" :class="contentClass"><code>{{ content || placeholder }}</code></pre>
       </div>
     </CollapsibleContent>
   </Collapsible>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Badge } from '@/components/ui/badge'
 import { Brain, ChevronDown, CheckCircle, MessageSquare, Wrench } from 'lucide-vue-next'
@@ -41,13 +41,16 @@ const props = withDefaults(defineProps<{
   name?: string
   defaultOpen?: boolean
   showCursor?: boolean
+  autoScroll?: boolean
 }>(), {
   name: undefined,
   defaultOpen: true,
   showCursor: false,
+  autoScroll: false,
 })
 
 const isOpen = ref(props.type === 'text' ? true : props.defaultOpen)
+const contentRef = ref<HTMLElement | null>(null)
 
 const wrapperClass = computed(() => {
   switch (props.type) {
@@ -98,5 +101,14 @@ const placeholder = computed(() => {
   if (props.type === 'tool_use') return '(等待数据...)'
   if (props.type === 'tool_result') return '(无返回数据)'
   return ''
+})
+
+// Auto-scroll: when autoScroll is on and content grows, scroll <pre> to bottom
+watch(() => props.content, () => {
+  if (!props.autoScroll) return
+  nextTick(() => {
+    const el = contentRef.value
+    if (el) el.scrollTop = el.scrollHeight
+  })
 })
 </script>

@@ -1,4 +1,5 @@
 import type { ProviderSemaphoreManager } from "./semaphore.js";
+import type { ConcurrencyOverride } from "./strategy/types.js";
 import type { RequestTracker } from "../monitor/request-tracker.js";
 import type { ActiveRequest, AttemptSnapshot } from "../monitor/types.js";
 
@@ -10,8 +11,9 @@ export class SemaphoreScope {
     signal: AbortSignal,
     onQueued: () => void,
     fn: () => Promise<T>,
+    concurrencyOverride?: ConcurrencyOverride,
   ): Promise<T> {
-    const token = await this.manager.acquire(providerId, signal, onQueued);
+    const token = await this.manager.acquire(providerId, signal, onQueued, undefined, concurrencyOverride);
     try {
       return await fn();
     } finally {

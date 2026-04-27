@@ -1,6 +1,6 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { TransportResult } from "./types.js";
-import type { Target } from "./strategy/types.js";
+import type { Target, ConcurrencyOverride } from "./strategy/types.js";
 import type { ResilienceLayer, ResilienceResult, ResilienceConfig } from "./resilience.js";
 import { ResilienceLayer as ResilienceLayerClass } from "./resilience.js";
 import type { RetryRuleMatcher } from "./retry-rules.js";
@@ -29,6 +29,8 @@ export interface OrchestratorConfig {
   sessionId?: string;
   /** 客户端请求的 JSON 字符串（headers + body），用于 Monitor 实时查看 */
   clientRequest?: string;
+  /** Schedule 层的并发覆盖配置，覆盖 Provider 默认并发限制 */
+  concurrencyOverride?: ConcurrencyOverride;
 }
 
 export interface HandleContext {
@@ -87,6 +89,7 @@ export class ProxyOrchestrator {
           }
           return this.executeResilience(config, ctx);
         },
+        config.concurrencyOverride,
       ),
       (result) => this.extractTrackStatus(result),
       (result) => result.attempts.map(a => ({

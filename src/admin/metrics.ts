@@ -16,8 +16,9 @@ const DashboardPeriodEnum = Type.Union([
 const PeriodEnum = Type.Union([LegacyPeriodEnum, DashboardPeriodEnum]);
 
 const MetricEnum = Type.Union([
-  Type.Literal("ttft"), Type.Literal("tps"), Type.Literal("tokens"),
-  Type.Literal("cache_rate"), Type.Literal("request_count"),
+  Type.Literal("ttft"), Type.Literal("tps"), Type.Literal("text_tps"),
+  Type.Literal("thinking_tps"), Type.Literal("tool_use_tps"), Type.Literal("total_tps"),
+  Type.Literal("tokens"), Type.Literal("cache_rate"), Type.Literal("request_count"),
   Type.Literal("input_tokens"), Type.Literal("output_tokens"),
   Type.Literal("cache_hit_tokens"),
 ]);

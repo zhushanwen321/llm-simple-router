@@ -11,7 +11,6 @@ import {
   getMappingGroup,
 } from "../db/index.js";
 import type { MappingGroup } from "../db/index.js";
-import { STRATEGY_NAMES } from "../proxy/strategy/types.js";
 import { HTTP_BAD_REQUEST, HTTP_CREATED, HTTP_NOT_FOUND, HTTP_CONFLICT } from "./constants.js";
 import { API_CODE, apiError } from "./api-response.js";
 
@@ -47,13 +46,13 @@ function toLegacy(group: { id: string; client_model: string; rule: string; creat
   } catch {
     return null;
   }
-  const defaultTarget = (rule as Record<string, unknown>)?.default as Record<string, string> | undefined;
-  if (!defaultTarget) return null;
+  const targets = (rule as Record<string, unknown>)?.targets as Record<string, string>[] | undefined;
+  if (!targets || targets.length === 0) return null;
   return {
     id: group.id,
     client_model: group.client_model,
-    backend_model: defaultTarget.backend_model ?? "",
-    provider_id: defaultTarget.provider_id ?? "",
+    backend_model: targets[0].backend_model ?? "",
+    provider_id: targets[0].provider_id ?? "",
     is_active: 1,
     created_at: group.created_at,
   };
@@ -84,10 +83,8 @@ export const adminMappingRoutes: FastifyPluginCallback<MappingRoutesOptions> = (
     try {
       const id = createMappingGroup(db, {
         client_model: body.client_model,
-        strategy: STRATEGY_NAMES.SCHEDULED,
         rule: JSON.stringify({
-          default: { backend_model: body.backend_model, provider_id: body.provider_id },
-          windows: [],
+          targets: [{ backend_model: body.backend_model, provider_id: body.provider_id }],
         }),
       });
       return reply.code(HTTP_CREATED).send({ id });
@@ -111,18 +108,24 @@ export const adminMappingRoutes: FastifyPluginCallback<MappingRoutesOptions> = (
     try {
       rule = JSON.parse(group.rule);
     } catch {
-      rule = { default: {}, windows: [] };
+      rule = { targets: [{}] };
     }
-    const defaultTarget = { ...(rule.default as Record<string, string> || {}) };
-    if (body.backend_model !== undefined) defaultTarget.backend_model = body.backend_model;
+    const targets = (rule.targets as Record<string, string>[]) || [];
+    const firstTarget = { ...(targets[0] || {}) };
+    if (body.backend_model !== undefined) firstTarget.backend_model = body.backend_model;
     if (body.provider_id !== undefined) {
       const provider = getProviderById(db, body.provider_id);
       if (!provider) {
         return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.NOT_FOUND, "provider_id not found"));
       }
-      defaultTarget.provider_id = body.provider_id;
+      firstTarget.provider_id = body.provider_id;
     }
-    rule.default = defaultTarget;
+    if (targets.length > 0) {
+      targets[0] = firstTarget;
+    } else {
+      targets.push(firstTarget);
+    }
+    rule.targets = targets;
 
     const fields: { client_model?: string; rule: string } = {
       rule: JSON.stringify(rule),

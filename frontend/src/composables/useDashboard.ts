@@ -220,7 +220,7 @@ export function useDashboard() {
     try {
       const [statsRes, tpsRes, inputRes, outputRes] = await Promise.allSettled([
         api.getStats(statsParams.value),
-        api.getMetricsTimeseries(tsParams('tps')),
+        api.getMetricsTimeseries(tsParams('total_tps')),
         api.getMetricsTimeseries(tsParams('input_tokens')),
         api.getMetricsTimeseries(tsParams('output_tokens')),
       ])
@@ -230,23 +230,26 @@ export function useDashboard() {
       if (fulfilled(statsRes)) stats.value = statsRes.value
 
       const period = timeseriesPeriod.value
+      const timeRange = stats.value.startTime && stats.value.endTime
+        ? { startTime: stats.value.startTime, endTime: stats.value.endTime }
+        : undefined
 
       if (fulfilled(tpsRes) && tpsRes.value.length > 0) {
-        const filled = fillTimeseries(tpsRes.value, period)
+        const filled = fillTimeseries(tpsRes.value, period, timeRange)
         tpsChartData.value = toChartData(filled, 'Token 输出速度 (t/s)', CHART_COLORS.indigo)
       } else {
         tpsChartData.value = null
       }
 
       if (fulfilled(inputRes) && inputRes.value.length > 0) {
-        const filled = fillTimeseries(inputRes.value, period)
+        const filled = fillTimeseries(inputRes.value, period, timeRange)
         inputTokensChartData.value = toChartData(filled, 'Token 输入总量', CHART_COLORS.teal)
       } else {
         inputTokensChartData.value = null
       }
 
       if (fulfilled(outputRes) && outputRes.value.length > 0) {
-        const filled = fillTimeseries(outputRes.value, period)
+        const filled = fillTimeseries(outputRes.value, period, timeRange)
         outputTokensChartData.value = toChartData(filled, 'Token 输出总量', CHART_COLORS.green)
       } else {
         outputTokensChartData.value = null

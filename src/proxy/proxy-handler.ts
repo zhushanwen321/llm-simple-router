@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import Database from "better-sqlite3";
-import { getMappingGroup, getProviderById, insertRequestLog } from "../db/index.js";
+import { getProviderById, insertRequestLog } from "../db/index.js";
 import { decrypt } from "../utils/crypto.js";
 import { getSetting } from "../db/settings.js";
 import { resolveMapping } from "./mapping-resolver.js";
@@ -17,9 +17,9 @@ import {
 import { buildUpstreamHeaders, buildUpstreamUrl } from "./proxy-core.js";
 import { ProviderSwitchNeeded } from "./types.js";
 import type { RawHeaders, TransportResult } from "./types.js";
+import type { Target } from "./strategy/types.js";
 import { updateLogStreamContent, updateLogClientStatus } from "../db/index.js";
 import { insertRejectedLog } from "./log-helpers.js";
-import type { Target } from "./strategy/types.js";
 import type { RetryRuleMatcher } from "./retry-rules.js";
 import type { ProxyOrchestrator } from "./orchestrator.js";
 import type { ProxyErrorFormatter, ProxyErrorResponse } from "./proxy-core.js";
@@ -51,7 +51,6 @@ interface FailoverContext {
   options?: { beforeSendProxy?: (body: Record<string, unknown>, isStream: boolean) => void };
   effectiveModel: string;
   originalModel: string | null;
-  isFailover: boolean;
   originalBody: Record<string, unknown>;
   sessionId: string | undefined;
 }
@@ -144,11 +143,9 @@ export async function handleProxyRequest(
 
   if (interceptResponse) return handleIntercept(deps.db, apiType, request, reply, interceptResponse, clientModel, sessionId);
 
-  const group = getMappingGroup(deps.db, effectiveModel);
   return executeFailoverLoop({
     request, reply, apiType, upstreamPath, errors, deps, options,
     effectiveModel, originalModel,
-    isFailover: group?.strategy === "failover",
     originalBody: JSON.parse(JSON.stringify(request.body as Record<string, unknown>)),
     sessionId,
   });
@@ -157,7 +154,7 @@ export async function handleProxyRequest(
 // ---------- Failover loop ----------
 
 async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> {
-  const { request, reply, apiType, upstreamPath, errors, deps, options, effectiveModel, originalModel, isFailover, originalBody, sessionId } = ctx;
+  const { request, reply, apiType, upstreamPath, errors, deps, options, effectiveModel, originalModel, originalBody, sessionId } = ctx;
   const excludeTargets: Target[] = [];
   let rootLogId: string | null = null;
   while (true) {
@@ -176,16 +173,21 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
       isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null, sessionId,
     };
 
-    let resolved = resolveMapping(deps.db, effectiveModel, { now: new Date(), excludeTargets });
-    request.log.debug({ logId, model: effectiveModel, apiType, isStream, action: "resolve_mapping", resolved: !!resolved });
+    const resolveResult = resolveMapping(deps.db, effectiveModel, { now: new Date(), excludeTargets });
+    request.log.debug({ logId, model: effectiveModel, apiType, isStream, action: "resolve_mapping", resolved: !!resolveResult });
 
-    if (!resolved) {
-      if (isFailover && excludeTargets.length > 0) {
+    if (!resolveResult) {
+      if (excludeTargets.length > 0) {
         return rejectAndReply(reply, { ...rCtx, isFailover: true, originalRequestId: rootLogId },
           errors.upstreamConnectionFailed(), `All failover targets exhausted (${excludeTargets.length} attempted)`);
       }
       return rejectAndReply(reply, rCtx, errors.modelNotFound(effectiveModel), `No mapping found for model '${effectiveModel}'`);
     }
+
+    const concurrencyOverride = resolveResult.concurrency_override;
+    let resolved = resolveResult.target;
+    // 活跃 targets（schedule 或 base）数量 > 1 时启用 failover
+    const isFailover = resolveResult.targetCount > 1;
 
     if (excludeTargets.length === 0) {
       const allowedModels = request.routerKey?.allowed_models;
@@ -244,7 +246,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
     try {
       const resilienceResult = await deps.orchestrator.handle(
         request, reply, apiType,
-        { resolved, provider, clientModel: effectiveModel, isStream, trackerId: logId, sessionId, clientRequest: clientReq },
+        { resolved, provider, clientModel: effectiveModel, isStream, trackerId: logId, sessionId, clientRequest: clientReq, concurrencyOverride },
         { retryBaseDelayMs: deps.retryBaseDelayMs, isFailover, ruleMatcher: deps.matcher, transportFn },
       );
       const lastLogId = logResilienceResult(

@@ -16,6 +16,7 @@ const RECENT_COMPLETED_MAX = 200;
 const RECENT_TTL_MS = 5 * 60 * 1000; // eslint-disable-line no-magic-numbers
 const ACTIVE_MAX_AGE_MS = 60 * 60 * 1000; // eslint-disable-line no-magic-numbers
 const PUSH_INTERVAL_MS = 5000;
+const STREAM_CONTENT_PUSH_MS = 500;
 
 export interface TrackerLogger {
   debug(obj: Record<string, unknown>, msg: string): void;
@@ -39,6 +40,8 @@ export class RequestTracker {
   private pushTimer: ReturnType<typeof setInterval> | null = null;
   private tickCount = 0;
   private streamAccumulators = new Map<string, StreamContentAccumulator>();
+  private streamContentPending = new Set<string>();
+  private streamContentTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** Visible for testing */
   readonly statsAggregator: StatsAggregator;
@@ -62,6 +65,32 @@ export class RequestTracker {
     this.activeMap.set(req.id, { ...req });
     this.logger?.debug({ reqId: req.id, model: req.model, providerId: req.providerId, activeCount: this.activeMap.size }, "Tracker: start");
     this.broadcast("request_start", req);
+  }
+
+  /** 轻量级节流推送：流式内容变更后 500ms 内批量广播 */
+  private scheduleStreamContentPush(id: string): void {
+    this.streamContentPending.add(id);
+    if (!this.streamContentTimer) {
+      this.streamContentTimer = setTimeout(() => this.flushStreamContentPush(), STREAM_CONTENT_PUSH_MS);
+    }
+  }
+
+  private flushStreamContentPush(): void {
+    this.streamContentTimer = null;
+    if (this.streamContentPending.size === 0) return;
+
+    const updates: Array<{ id: string; streamContent: unknown; streamMetrics: unknown }> = [];
+    for (const id of this.streamContentPending) {
+      const req = this.activeMap.get(id);
+      if (req) {
+        updates.push({ id, streamContent: req.streamContent ?? null, streamMetrics: req.streamMetrics ?? null });
+      }
+    }
+    this.streamContentPending.clear();
+
+    if (updates.length > 0) {
+      this.broadcast("stream_content_update", updates);
+    }
   }
 
   update(id: string, patch: Partial<ActiveRequest>): void {
@@ -96,6 +125,7 @@ export class RequestTracker {
     }
     acc.append(rawLine, apiType);
     req.streamContent = acc.getSnapshot();
+    this.scheduleStreamContentPush(id);
   }
 
   complete(
@@ -129,6 +159,7 @@ export class RequestTracker {
       attempts: result.attempts ?? req.attempts,
     };
 
+    this.streamContentPending.delete(id);
     this.activeMap.delete(id);
     this.streamAccumulators.delete(id);
     this.recentCompleted.unshift(completed);
@@ -251,6 +282,11 @@ export class RequestTracker {
       clearInterval(this.pushTimer);
       this.pushTimer = null;
     }
+    if (this.streamContentTimer) {
+      clearTimeout(this.streamContentTimer);
+      this.streamContentTimer = null;
+    }
+    this.streamContentPending.clear();
     this.runtimeCollector.stop();
   }
 

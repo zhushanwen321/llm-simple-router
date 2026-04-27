@@ -1,5 +1,22 @@
 <template>
-  <div class="w-[280px] border-r pr-3 flex-shrink-0 overflow-y-auto space-y-3">
+  <div class="space-y-3">
+    <!-- Toggle: structured / raw -->
+    <div class="flex items-center justify-between">
+      <span class="text-xs font-medium text-muted-foreground">请求概览</span>
+      <Button size="sm" variant="outline" class="h-6 gap-1 text-xs" @click="showRaw = !showRaw">
+        <component :is="showRaw ? FileText : FileJson" class="h-3 w-3" />
+        {{ showRaw ? '结构化' : '原始数据' }}
+      </Button>
+    </div>
+
+    <!-- Raw JSON view: upstream response metadata (headers + response body minus content) -->
+    <ScrollArea v-if="showRaw" class="rounded-md border flex-1">
+      <pre class="p-3 text-[11px] whitespace-pre-wrap break-words">{{ responseMetadataJson }}</pre>
+    </ScrollArea>
+
+    <!-- Structured view (below) -->
+    <template v-if="!showRaw">
+
     <!-- Row 1: model @ provider -->
     <div class="flex items-baseline gap-1 min-w-0">
       <span class="font-mono text-[11px] font-semibold truncate min-w-0">{{ overview.model }}</span>
@@ -33,7 +50,7 @@
     <!-- Metrics grid -->
     <div class="grid grid-cols-2 gap-1.5">
       <div class="bg-muted/50 rounded-md px-2 py-1.5 min-w-0">
-        <div class="text-[10px] text-muted-foreground">延迟</div>
+        <div class="text-[10px] text-muted-foreground">耗时</div>
         <div class="text-sm font-semibold truncate">{{ latencyText }}</div>
       </div>
       <div class="bg-muted/50 rounded-md px-2 py-1.5 min-w-0">
@@ -41,7 +58,7 @@
         <div class="text-sm font-semibold truncate">{{ overview.ttftMs != null ? `${overview.ttftMs}ms` : '--' }}</div>
       </div>
       <div class="bg-muted/50 rounded-md px-2 py-1.5 min-w-0">
-        <div class="text-[10px] text-muted-foreground">Input Tokens</div>
+        <div class="text-[10px] text-muted-foreground">{{ overview.inputTokensEstimated ? 'Est Input Tokens' : 'Input Tokens' }}</div>
         <div class="text-sm font-semibold truncate">{{ overview.inputTokens != null ? overview.inputTokens : '--' }}</div>
       </div>
       <div class="bg-muted/50 rounded-md px-2 py-1.5 min-w-0">
@@ -90,17 +107,43 @@
         <span class="font-mono truncate max-w-[160px]">{{ overview.clientIp }}</span>
       </div>
     </div>
+
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import type { UnifiedRequestOverview } from './types'
 import { MS_PER_SECOND, HTTP_ERROR_THRESHOLD } from './types'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { FileJson, FileText } from 'lucide-vue-next'
 import { Separator } from '@/components/ui/separator'
+import { extractResponseMetadata } from './upstream-merge'
 
 const props = defineProps<{ overview: UnifiedRequestOverview }>()
+
+const showRaw = ref(false)
+
+const responseMetadataJson = computed(() => {
+  const result = extractResponseMetadata(
+    props.overview.upstreamResponse,
+    props.overview.responseBody,
+  )
+  return result || JSON.stringify({
+    latencyMs: props.overview.latencyMs,
+    ttftMs: props.overview.ttftMs,
+    inputTokens: props.overview.inputTokens,
+    outputTokens: props.overview.outputTokens,
+    tokensPerSecond: props.overview.tokensPerSecond,
+    cacheReadTokens: props.overview.cacheReadTokens,
+    cacheWriteTokens: props.overview.cacheWriteTokens,
+    stopReason: props.overview.stopReason,
+    statusCode: props.overview.statusCode,
+  }, null, 2)
+})
 
 const statusColor = computed(() => {
   if (props.overview.status === 'pending') return 'pending'

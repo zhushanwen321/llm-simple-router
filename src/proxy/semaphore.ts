@@ -93,9 +93,17 @@ export class ProviderSemaphoreManager {
     }
   }
 
-  async acquire(providerId: string, signal?: AbortSignal, onQueued?: () => void, logger?: SemaphoreLogger): Promise<AcquireToken> {
+  async acquire(
+    providerId: string,
+    signal?: AbortSignal,
+    onQueued?: () => void,
+    logger?: SemaphoreLogger,
+    override?: { max_concurrency?: number; queue_timeout_ms?: number; max_queue_size?: number },
+  ): Promise<AcquireToken> {
     const entry = this.getOrCreate(providerId);
-    const { maxConcurrency, queueTimeoutMs, maxQueueSize } = entry.config;
+    const maxConcurrency = override?.max_concurrency ?? entry.config.maxConcurrency;
+    const queueTimeoutMs = Math.max(0, override?.queue_timeout_ms ?? entry.config.queueTimeoutMs);
+    const maxQueueSize = Math.max(0, override?.max_queue_size ?? entry.config.maxQueueSize);
 
     if (maxConcurrency === 0) return { generation: entry.generation };
     if (entry.current < maxConcurrency) {

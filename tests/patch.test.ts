@@ -106,7 +106,7 @@ describe("patchOrphanToolResults", () => {
     expect(merged[1]).toEqual({ type: "text", text: "follow-up" });
   });
 
-  it("无 tool_use 时不修改", () => {
+  it("修复：无 tool_use 时清理孤儿 tool_result 并删除空 user 消息", () => {
     const body = {
       messages: [
         { role: "user", content: [{ type: "text", text: "hi" }] },
@@ -115,7 +115,38 @@ describe("patchOrphanToolResults", () => {
       ],
     };
     patchOrphanToolResults(body);
-    expect(body.messages).toHaveLength(3);
+    // 孤儿 tool_result 被移除后空 user 被删除
+    expect(body.messages).toHaveLength(2);
+    expect(body.messages[0].role).toBe("user");
+    expect(body.messages[1].role).toBe("assistant");
+  });
+
+  it("无 tool_result 时不影响无 assistant 的消息", () => {
+    const body = {
+      messages: [
+        { role: "user", content: [{ type: "text", text: "hi" }] },
+        { role: "assistant", content: [{ type: "text", text: "hello" }] },
+      ],
+    };
+    const original = JSON.stringify(body);
+    patchOrphanToolResults(body);
+    expect(JSON.stringify(body)).toBe(original);
+  });
+
+  it("修复：整个 assistant 消息被截断后清理剩余 tool_result 块", () => {
+    const body = {
+      messages: [
+        { role: "user", content: [{ type: "text", text: "first query" }] },
+        { role: "user", content: [
+          { type: "tool_result", tool_use_id: "call_orphan_1", content: "result1" },
+          { type: "tool_result", tool_use_id: "call_orphan_2", content: "result2" },
+        ] },
+      ],
+    };
+    patchOrphanToolResults(body);
+    // 所有 tool_result 都是孤儿，user 变空后被删除
+    expect(body.messages).toHaveLength(1);
+    expect(body.messages[0].role).toBe("user");
   });
 
   it("无孤儿时不修改", () => {
