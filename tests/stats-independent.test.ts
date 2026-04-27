@@ -50,7 +50,8 @@ describe("Stats independent of request_logs", () => {
     const statsBefore = getStats(database, startTime, endTime, "rk-1");
     expect(statsBefore.totalRequests).toBe(1);
     expect(statsBefore.successRate).toBe(1);
-    expect(statsBefore.totalTokens).toBe(300);
+    expect(statsBefore.totalInputTokens).toBe(100);
+    expect(statsBefore.totalOutputTokens).toBe(200);
     expect(statsBefore.avgTps).toBe(30);
 
     // 删除 request_logs 中的记录
@@ -60,7 +61,8 @@ describe("Stats independent of request_logs", () => {
     const statsAfter = getStats(database, startTime, endTime, "rk-1");
     expect(statsAfter.totalRequests).toBe(1);
     expect(statsAfter.successRate).toBe(1);
-    expect(statsAfter.totalTokens).toBe(300);
+    expect(statsAfter.totalInputTokens).toBe(100);
+    expect(statsAfter.totalOutputTokens).toBe(200);
     expect(statsAfter.avgTps).toBe(30);
   });
 

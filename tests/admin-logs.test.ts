@@ -158,7 +158,8 @@ describe("Stats API", () => {
     expect(stats.totalRequests).toBe(2); // only log-1, log-2 have metrics
     expect(stats.successRate).toBe(1); // both have status 200
     expect(stats.avgTps).toBeGreaterThanOrEqual(0);
-    expect(stats.totalTokens).toBeGreaterThanOrEqual(0);
+    expect(stats.totalInputTokens).toBeGreaterThanOrEqual(0);
+    expect(stats.totalOutputTokens).toBeGreaterThanOrEqual(0);
   });
 
   it("GET stats with empty database", async () => {
@@ -179,7 +180,8 @@ describe("Stats API", () => {
     expect(stats.totalRequests).toBe(0);
     expect(stats.successRate).toBe(0);
     expect(stats.avgTps).toBe(0);
-    expect(stats.totalTokens).toBe(0);
+    expect(stats.totalInputTokens).toBe(0);
+    expect(stats.totalOutputTokens).toBe(0);
 
     await emptyClose();
   });
