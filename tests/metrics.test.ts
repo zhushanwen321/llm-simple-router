@@ -29,7 +29,7 @@ describe("request_metrics migration and insertMetrics", () => {
       .prepare("SELECT name FROM migrations")
       .all() as { name: string }[];
 
-    expect(rows).toHaveLength(25);
+    expect(rows).toHaveLength(26);
     expect(rows[5].name).toBe("006_create_request_metrics.sql");
     expect(rows[6].name).toBe("007_add_retry_fields.sql");
     expect(rows[7].name).toBe("008_create_router_keys.sql");
@@ -186,10 +186,10 @@ describe("request_metrics migration and insertMetrics", () => {
     ).toThrow();
   });
 
-  it("should enforce FK constraint - cascade delete on request_logs", () => {
+  it("should set request_log_id to NULL when request_log is deleted", () => {
     db = initDatabase(":memory:");
 
-    const logId = "log-cascade-1";
+    const logId = "log-setnull-1";
     insertRequestLog(db, {
       id: logId,
       api_type: "openai",
@@ -210,14 +210,15 @@ describe("request_metrics migration and insertMetrics", () => {
       is_complete: 1,
     });
 
-    // 删除 request_log，metrics 应该被级联删除
+    // 删除 request_log，metrics 的 request_log_id 应被置为 NULL
     db!.prepare("DELETE FROM request_logs WHERE id = ?").run(logId);
 
     const metrics = db!
-      .prepare("SELECT * FROM request_metrics WHERE request_log_id = ?")
-      .all(logId) as any[];
+      .prepare("SELECT * FROM request_metrics WHERE provider_id = ?")
+      .all("provider-1") as any[];
 
-    expect(metrics).toHaveLength(0);
+    expect(metrics).toHaveLength(1);
+    expect(metrics[0].request_log_id).toBeNull();
   });
 });
 

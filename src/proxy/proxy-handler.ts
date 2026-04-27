@@ -16,7 +16,7 @@ import {
 } from "./proxy-logging.js";
 import { buildUpstreamHeaders, buildUpstreamUrl } from "./proxy-core.js";
 import { ProviderSwitchNeeded } from "./types.js";
-import type { RawHeaders } from "./types.js";
+import type { RawHeaders, TransportResult } from "./types.js";
 import { updateLogStreamContent, updateLogClientStatus } from "../db/index.js";
 import { insertRejectedLog } from "./log-helpers.js";
 import type { Target } from "./strategy/types.js";
@@ -30,6 +30,14 @@ import { applyProviderPatches } from "./patch/index.js";
 const HTTP_ERROR_THRESHOLD = 400;
 const MAX_LOG_FIELD_LENGTH = 80;
 const UPSTREAM_ERROR_STATUS = 502;
+
+/** 从 TransportResult 中提取最终 HTTP status code */
+function getTransportStatusCode(result: TransportResult): number | null {
+  if (result.kind === "success" || result.kind === "error" || result.kind === "stream_error") return result.statusCode;
+  if (result.kind === "stream_success" || result.kind === "stream_abort") return result.statusCode;
+  // kind === "throw"：无 HTTP 状态码
+  return null;
+}
 
 // ---------- Failover loop context ----------
 
@@ -248,11 +256,11 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
         },
         resilienceResult.attempts, resilienceResult.result, startTime,
       );
-      collectTransportMetrics(deps.db, apiType, resilienceResult.result, isStream, lastLogId, provider.id, resolved.backend_model, request);
+      collectTransportMetrics(deps.db, apiType, resilienceResult.result, isStream, lastLogId, provider.id, resolved.backend_model, request, routerKeyId, getTransportStatusCode(resilienceResult.result));
 
       const tr = resilienceResult.result;
       const succeeded = tr.kind === "success" || tr.kind === "stream_success" || tr.kind === "stream_abort";
-      if (succeeded) deps.usageWindowTracker?.recordRequest(routerKeyId ?? undefined);
+      if (succeeded) deps.usageWindowTracker?.recordRequest(provider.id, routerKeyId ?? undefined);
 
       if (isStream && deps.tracker) {
         const sc = deps.tracker.get(logId)?.streamContent;

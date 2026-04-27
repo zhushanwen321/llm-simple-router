@@ -30,6 +30,8 @@ export type MetricsInsert = {
   provider_id: string;
   backend_model: string;
   api_type: string;
+  router_key_id?: string | null;
+  status_code?: number | null;
   input_tokens?: number | null;
   output_tokens?: number | null;
   cache_creation_tokens?: number | null;
@@ -44,10 +46,11 @@ export type MetricsInsert = {
 export function insertMetrics(db: Database.Database, m: MetricsInsert): string {
   const id = randomUUID();
   db.prepare(
-    `INSERT INTO request_metrics (id, request_log_id, provider_id, backend_model, api_type, input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, ttft_ms, total_duration_ms, tokens_per_second, stop_reason, is_complete)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO request_metrics (id, request_log_id, provider_id, backend_model, api_type, router_key_id, status_code, input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, ttft_ms, total_duration_ms, tokens_per_second, stop_reason, is_complete)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     id, m.request_log_id, m.provider_id, m.backend_model, m.api_type,
+    m.router_key_id ?? null, m.status_code ?? null,
     m.input_tokens ?? null, m.output_tokens ?? null,
     m.cache_creation_tokens ?? null, m.cache_read_tokens ?? null,
     m.ttft_ms ?? null, m.total_duration_ms ?? null,
@@ -144,8 +147,7 @@ export function getMetricsSummary(
   if (providerId) { conditions.push("rm.provider_id = ?"); params.push(providerId); }
   if (backendModel) { conditions.push("rm.backend_model = ?"); params.push(backendModel); }
   if (routerKeyId) {
-    joins.push("LEFT JOIN request_logs rl ON rl.id = rm.request_log_id");
-    conditions.push("rl.router_key_id = ?");
+    conditions.push("rm.router_key_id = ?");
     params.push(routerKeyId);
   }
 
@@ -200,11 +202,10 @@ export function getMetricsTimeseries(
 
   if (providerId) { conditions.push("rm.provider_id = ?"); params.push(providerId); }
   if (backendModel) { conditions.push("rm.backend_model = ?"); params.push(backendModel); }
-  if (routerKeyId) { conditions.push("rl.router_key_id = ?"); params.push(routerKeyId); }
+  if (routerKeyId) { conditions.push("rm.router_key_id = ?"); params.push(routerKeyId); }
 
   const where = conditions.join(" AND ");
   const expr = METRIC_EXPR[metric];
-  const joinClause = routerKeyId ? "LEFT JOIN request_logs rl ON rl.id = rm.request_log_id" : "";
 
   const rows = db.prepare(`
     SELECT
@@ -212,7 +213,6 @@ export function getMetricsTimeseries(
       ${expr} AS avg_value,
       COUNT(*) AS count
     FROM request_metrics rm
-    ${joinClause}
     WHERE ${where}
     GROUP BY bucket_key
     ORDER BY bucket_key ASC

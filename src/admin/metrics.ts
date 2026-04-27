@@ -51,13 +51,14 @@ function resolveMetricsTime(
   query: { period?: string; start_time?: string; end_time?: string },
   db: Database.Database,
   routerKeyId?: string,
+  providerId?: string,
 ): { startTime?: string; endTime?: string; legacyPeriod: string } {
   if (query.start_time && query.end_time) {
     return { startTime: query.start_time, endTime: query.end_time, legacyPeriod: "30d" };
   }
   const period = query.period ?? "weekly";
   if (DASHBOARD_PERIODS.has(period)) {
-    const range = resolveTimeRange(period as DashboardPeriod, db, routerKeyId);
+    const range = resolveTimeRange(period as DashboardPeriod, db, routerKeyId, providerId);
     return { startTime: range.startTime, endTime: range.endTime, legacyPeriod: "5h" };
   }
   return { legacyPeriod: period };
@@ -68,7 +69,7 @@ export const adminMetricsRoutes: FastifyPluginCallback<MetricsRoutesOptions> = (
 
   app.get("/admin/api/metrics/summary", { schema: { querystring: SummaryQuerySchema } }, async (request, reply) => {
     const query = request.query as Static<typeof SummaryQuerySchema>;
-    const { startTime, endTime, legacyPeriod } = resolveMetricsTime(query, db, query.router_key_id);
+    const { startTime, endTime, legacyPeriod } = resolveMetricsTime(query, db, query.router_key_id, query.provider_id);
     const summary = getMetricsSummary(db, legacyPeriod as MetricsPeriod, query.provider_id, query.backend_model, query.router_key_id, startTime, endTime);
     return reply.send(summary);
   });
@@ -76,7 +77,7 @@ export const adminMetricsRoutes: FastifyPluginCallback<MetricsRoutesOptions> = (
   app.get("/admin/api/metrics/timeseries", { schema: { querystring: TimeseriesQuerySchema } }, async (request, reply) => {
     const query = request.query as Static<typeof TimeseriesQuerySchema>;
     const metric = query.metric as MetricsMetric;
-    const { startTime, endTime, legacyPeriod } = resolveMetricsTime(query, db, query.router_key_id);
+    const { startTime, endTime, legacyPeriod } = resolveMetricsTime(query, db, query.router_key_id, query.provider_id);
     const timeseries = getMetricsTimeseries(db, legacyPeriod as MetricsPeriod, metric, query.provider_id, query.backend_model, query.router_key_id, startTime, endTime);
     return reply.send(timeseries);
   });

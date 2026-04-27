@@ -243,11 +243,14 @@ interface StatsResponse {
   totalRequests: number
   successRate: number
   avgTps: number
-  totalTokens: number
+  totalInputTokens: number
+  totalOutputTokens: number
+  startTime: string
+  endTime: string
 }
 
 export interface UsageWindowWithUsage {
-  window: { id: string; router_key_id: string | null; start_time: string; end_time: string; created_at: string }
+  window: { id: string; router_key_id: string | null; provider_id: string | null; provider_name: string | null; start_time: string; end_time: string; created_at: string }
   usage: { request_count: number; total_input_tokens: number; total_output_tokens: number }
 }
 
@@ -351,7 +354,7 @@ export const api = {
   getLogRetention: () => request<{ days: number }>('get', API.SETTINGS_LOG_RETENTION),
   setLogRetention: (days: number) => request<{ days: number }>('put', API.SETTINGS_LOG_RETENTION, { days }),
 
-  getStats: (params?: { period?: string; start_time?: string; end_time?: string; router_key_id?: string }) =>
+  getStats: (params?: { period?: string; start_time?: string; end_time?: string; router_key_id?: string; provider_id?: string; backend_model?: string }) =>
     request<StatsResponse>('get', API.STATS, undefined, { params }),
 
   getMetricsSummary: (params: { period?: string; provider_id?: string; backend_model?: string; router_key_id?: string; start_time?: string; end_time?: string }) =>
@@ -406,7 +409,7 @@ export const api = {
     reload: () => request<{ ok: boolean }>('post', API.RECOMMENDED_RELOAD),
   },
 
-  getUsageWindows: (params?: { router_key_id?: string }) =>
+  getUsageWindows: (params?: { router_key_id?: string; provider_id?: string }) =>
     request<UsageWindowWithUsage[]>('get', API.USAGE_WINDOWS, undefined, { params }),
   getUsageWeekly: (params?: { router_key_id?: string }) =>
     request<DailyUsage[]>('get', API.USAGE_WEEKLY, undefined, { params }),
