@@ -125,8 +125,21 @@ export class ResilienceLayer {
       return { action: "abort", reason: "stream_abort" };
     }
 
-    // stream_error + statusCode < failoverThreshold -> 上游返回 200 但 body 包含错误内容（early error），不可恢复
+    // stream_error + statusCode < failoverThreshold -> 上游返回 200 但 body 包含错误内容（early error）
+    // 先检查 retry rules 是否匹配，匹配则重试，否则不可恢复
     if (result.kind === "stream_error" && result.statusCode < config.failoverThreshold) {
+      const body = extractBody(result);
+      if (body && config.ruleMatcher) {
+        const matchedRule = config.ruleMatcher.match(result.statusCode, body);
+        if (matchedRule && state.attemptCount < matchedRule.max_retries) {
+          const strategy = createStrategy(matchedRule);
+          return { action: "retry", delayMs: strategy.getDelay(state.attemptCount) };
+        }
+      }
+      // failover 模式下，即使 stream_error 也可以尝试切换 provider
+      if (config.isFailover) {
+        return { action: "failover", excludeTarget: state.currentTarget };
+      }
       return { action: "abort", reason: "stream_error" };
     }
 
