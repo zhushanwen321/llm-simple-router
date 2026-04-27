@@ -177,7 +177,7 @@ export function collectTransportMetrics(
     if (isStream && (result.kind === "stream_success" || result.kind === "stream_abort")) {
       if (result.metrics) {
         const metrics = { ...result.metrics };
-        if (metrics.input_tokens == null && request.body) {
+        if (!metrics.input_tokens && request.body) {
           metrics.input_tokens = estimateInputTokens(request.body as Record<string, unknown>);
           metrics.input_tokens_estimated = 1;
         }
@@ -188,7 +188,7 @@ export function collectTransportMetrics(
     } else if (result.kind === "success") {
       const mr = MetricsExtractor.fromNonStreamResponse(apiType, result.body);
       if (mr) {
-        if (mr.input_tokens == null && request.body) {
+        if (!mr.input_tokens && request.body) {
           mr.input_tokens = estimateInputTokens(request.body as Record<string, unknown>);
           mr.input_tokens_estimated = 1;
         }
