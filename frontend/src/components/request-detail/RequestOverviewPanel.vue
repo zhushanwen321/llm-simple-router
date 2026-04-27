@@ -1,5 +1,5 @@
 <template>
-  <div class="w-[280px] border-r pr-3 flex-shrink-0 overflow-y-auto space-y-3">
+  <div class="space-y-3">
     <!-- Toggle: structured / raw -->
     <div class="flex items-center justify-between">
       <span class="text-xs font-medium text-muted-foreground">请求概览</span>
@@ -10,7 +10,7 @@
     </div>
 
     <!-- Raw JSON view: upstream response metadata (headers + response body minus content) -->
-    <ScrollArea v-if="showRaw" class="max-h-[60vh] rounded-md border">
+    <ScrollArea v-if="showRaw" class="rounded-md border flex-1">
       <pre class="p-3 text-[11px] whitespace-pre-wrap break-words">{{ responseMetadataJson }}</pre>
     </ScrollArea>
 
@@ -121,83 +121,29 @@ import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { FileJson, FileText } from 'lucide-vue-next'
 import { Separator } from '@/components/ui/separator'
+import { extractResponseMetadata } from './upstream-merge'
 
 const props = defineProps<{ overview: UnifiedRequestOverview }>()
 
 const showRaw = ref(false)
 
-/** Content keys to strip from LLM response body for the metadata view */
-const CONTENT_KEYS: ReadonlySet<string> = new Set([
-  // OpenAI
-  'choices',
-  // Anthropic
-  'content',
-])
-
-/**
- * Extract metadata from upstream response:
- * - Parse the wrapper { statusCode, headers, body } from upstreamResponse
- * - From body, strip content fields (choices/content) to show only metadata
- * - Combine into a clean metadata object
- */
 const responseMetadataJson = computed(() => {
-  const raw = props.overview.upstreamResponse
-  if (!raw) {
-    // Fallback: no upstream_response, show overview metrics as JSON
-    return JSON.stringify({
-      latencyMs: props.overview.latencyMs,
-      ttftMs: props.overview.ttftMs,
-      inputTokens: props.overview.inputTokens,
-      outputTokens: props.overview.outputTokens,
-      tokensPerSecond: props.overview.tokensPerSecond,
-      cacheReadTokens: props.overview.cacheReadTokens,
-      cacheWriteTokens: props.overview.cacheWriteTokens,
-      stopReason: props.overview.stopReason,
-      statusCode: props.overview.statusCode,
-    }, null, 2)
-  }
-
-  try {
-    const parsed = JSON.parse(raw)
-
-    // Check if it's the wrapper format: { statusCode, headers, body }
-    if (typeof parsed.statusCode === 'number' && (parsed.headers || parsed.body !== undefined)) {
-      const result: Record<string, unknown> = {
-        statusCode: parsed.statusCode,
-      }
-      if (parsed.headers) {
-        result.headers = parsed.headers
-      }
-      // Parse body and strip content fields
-      if (parsed.body) {
-        const bodyStr = typeof parsed.body === 'string' ? parsed.body : JSON.stringify(parsed.body)
-        try {
-          const bodyObj = JSON.parse(bodyStr)
-          result.body = stripContentFields(bodyObj)
-        } catch {
-          // body is not JSON (e.g. SSE text), keep as-is
-          result.body = parsed.body
-        }
-      }
-      return JSON.stringify(result, null, 2)
-    }
-
-    // Not a wrapper, it IS the LLM response body directly — strip content
-    return JSON.stringify(stripContentFields(parsed), null, 2)
-  } catch {
-    return raw
-  }
+  const result = extractResponseMetadata(
+    props.overview.upstreamResponse,
+    props.overview.responseBody,
+  )
+  return result || JSON.stringify({
+    latencyMs: props.overview.latencyMs,
+    ttftMs: props.overview.ttftMs,
+    inputTokens: props.overview.inputTokens,
+    outputTokens: props.overview.outputTokens,
+    tokensPerSecond: props.overview.tokensPerSecond,
+    cacheReadTokens: props.overview.cacheReadTokens,
+    cacheWriteTokens: props.overview.cacheWriteTokens,
+    stopReason: props.overview.stopReason,
+    statusCode: props.overview.statusCode,
+  }, null, 2)
 })
-
-function stripContentFields(obj: Record<string, unknown>): Record<string, unknown> {
-  const result: Record<string, unknown> = {}
-  for (const [key, value] of Object.entries(obj)) {
-    if (!CONTENT_KEYS.has(key)) {
-      result[key] = value
-    }
-  }
-  return result
-}
 
 const statusColor = computed(() => {
   if (props.overview.status === 'pending') return 'pending'

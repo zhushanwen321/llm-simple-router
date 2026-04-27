@@ -1,6 +1,6 @@
 <template>
-  <div class="flex flex-col gap-2">
-    <div class="flex items-center justify-between">
+  <div class="flex flex-col gap-2 min-h-0 flex-1">
+    <div class="flex items-center justify-between flex-shrink-0">
       <span class="text-xs font-medium text-muted-foreground">响应内容</span>
       <Button size="sm" variant="outline" class="h-6 gap-1 text-xs" @click="showRaw = !showRaw">
         <component :is="showRaw ? FileText : FileJson" class="h-3 w-3" />
@@ -9,7 +9,7 @@
     </div>
 
     <!-- Structured view -->
-    <div v-if="!showRaw">
+    <div v-if="!showRaw" class="flex-1 min-h-0 overflow-y-auto">
       <template v-if="blocks.length > 0">
         <div class="flex flex-col gap-2">
           <ContentBlockRenderer
@@ -28,7 +28,7 @@
     </div>
 
     <!-- Raw view -->
-    <ScrollArea v-else class="max-h-96 rounded-md border">
+    <ScrollArea v-else class="flex-1 min-h-0 rounded-md border">
       <pre class="p-3 text-[11px] whitespace-pre-wrap break-words">{{ rawContent }}</pre>
     </ScrollArea>
   </div>
@@ -44,6 +44,7 @@ import { tryDirectParse } from './response-parser'
 import type { DataSource } from './types'
 import type { ContentBlock, StreamContentSnapshot } from '@/types/monitor'
 import { useSSEParsing } from '@/components/log-viewer/useSSEParsing'
+import { mergeUpstreamData } from './upstream-merge'
 
 const props = withDefaults(defineProps<{
   source: DataSource
@@ -109,11 +110,11 @@ const blocks = computed<ContentBlock[]>(() => {
   }))
 })
 
-// Raw content for raw view: prefer full upstreamResponse (with headers) for history mode
+// Raw content for raw view: merge upstreamResponse (headers) with responseBody (stream_text_content)
 const rawContent = computed(() => {
   if (props.source === 'realtime') {
     return props.streamContent?.rawChunks || props.responseBody || ''
   }
-  return props.upstreamResponse || props.responseBody || ''
+  return mergeUpstreamData(props.upstreamResponse ?? null, props.responseBody ?? null)
 })
 </script>

@@ -1,6 +1,6 @@
 <template>
   <Dialog :open="props.open" @update:open="emit('update:open', $event)">
-    <DialogContent class="sm:max-w-6xl max-h-[85vh] p-0 overflow-hidden">
+    <DialogContent class="sm:max-w-6xl max-h-[85vh] p-0 overflow-hidden flex flex-col">
       <!-- Progress bar -->
       <div class="h-[3px] w-full overflow-hidden">
         <div
@@ -28,9 +28,11 @@
 
       <!-- Main content area -->
       <template v-if="overview">
-        <div class="flex gap-0 px-4 pb-4 h-[calc(85vh-80px)]">
+        <div class="flex gap-0 px-4 pb-4 min-h-0 h-[calc(85vh-80px)]">
           <!-- Left: Overview Panel -->
-          <RequestOverviewPanel :overview="overview" />
+          <div class="w-[280px] border-r pr-3 flex-shrink-0 overflow-y-auto min-h-0">
+            <RequestOverviewPanel :overview="overview" />
+          </div>
 
           <!-- Error message banner -->
           <div v-if="overview.errorMessage" class="px-3 pb-2">
@@ -40,7 +42,7 @@
           </div>
 
           <!-- Right: Tabs -->
-          <div class="flex-1 flex flex-col min-w-0 pl-3">
+          <div class="flex-1 flex flex-col min-w-0 min-h-0 pl-3">
             <Tabs v-model="activeTab" class="flex-1 flex flex-col min-h-0">
               <TabsList class="flex-shrink-0">
                 <TabsTrigger value="response">响应内容</TabsTrigger>
@@ -48,7 +50,7 @@
               </TabsList>
 
               <!-- Response tab -->
-              <div v-if="activeTab === 'response'" class="flex-1 overflow-y-auto mt-2">
+              <div v-if="activeTab === 'response'" class="flex-1 min-h-0 overflow-y-auto mt-2">
                 <ResponseViewer
                   :source="props.source"
                   :api-type="overview.apiType"
