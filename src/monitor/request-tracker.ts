@@ -226,6 +226,7 @@ export class RequestTracker {
   startPushInterval(): void {
     if (this.pushTimer) return;
     this.tickCount = 0;
+    this.runtimeCollector.start();
 
     this.pushTimer = setInterval(() => {
       this.tickCount++;
@@ -247,6 +248,7 @@ export class RequestTracker {
     if (this.pushTimer) {
       clearInterval(this.pushTimer);
       this.pushTimer = null;
+      this.runtimeCollector.stop();
     }
   }
 
