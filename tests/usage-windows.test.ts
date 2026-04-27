@@ -60,6 +60,7 @@ describe("usage-windows DB layer", () => {
     const id = insertWindow(database, {
       id: "w-1",
       router_key_id: null,
+      provider_id: null,
       start_time: "2026-04-22 10:00:00",
       end_time: "2026-04-22 15:00:00",
     });
@@ -76,12 +77,14 @@ describe("usage-windows DB layer", () => {
     insertWindow(database, {
       id: "w-1",
       router_key_id: null,
+      provider_id: null,
       start_time: "2026-04-22 10:00:00",
       end_time: "2026-04-22 15:00:00",
     });
     insertWindow(database, {
       id: "w-2",
       router_key_id: null,
+      provider_id: null,
       start_time: "2026-04-22 16:00:00",
       end_time: "2026-04-22 21:00:00",
     });
@@ -96,12 +99,14 @@ describe("usage-windows DB layer", () => {
     insertWindow(database, {
       id: "w-1",
       router_key_id: "rk-1",
+      provider_id: null,
       start_time: "2026-04-22 10:00:00",
       end_time: "2026-04-22 15:00:00",
     });
     insertWindow(database, {
       id: "w-2",
       router_key_id: "rk-2",
+      provider_id: null,
       start_time: "2026-04-22 16:00:00",
       end_time: "2026-04-22 21:00:00",
     });
@@ -116,12 +121,14 @@ describe("usage-windows DB layer", () => {
     insertWindow(database, {
       id: "w-1",
       router_key_id: null,
+      provider_id: null,
       start_time: "2026-04-22 10:00:00",
       end_time: "2026-04-22 15:00:00",
     });
     insertWindow(database, {
       id: "w-2",
       router_key_id: null,
+      provider_id: null,
       start_time: "2026-04-22 16:00:00",
       end_time: "2026-04-22 21:00:00",
     });
@@ -375,6 +382,7 @@ describe("usage API endpoints", () => {
     insertWindow(db, {
       id: "w-today",
       router_key_id: null,
+      provider_id: "p-1",
       start_time: `${todayLocal} 00:00:00`,
       end_time: `${todayLocal} 23:59:59`,
     });

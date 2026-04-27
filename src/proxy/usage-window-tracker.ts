@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import { randomUUID } from "crypto";
 import { getLatestWindow, insertWindow } from "../db/usage-windows.js";
+import { getAllProviders } from "../db/providers.js";
 import { toSqliteDatetime, parseSqliteDatetime as parseDate } from "../utils/datetime.js";
 
 // eslint-disable-next-line no-magic-numbers
@@ -25,48 +26,42 @@ export class UsageWindowTracker {
     }
   }
 
-  /** 启动时补齐因宕机/重启而缺失的窗口 */
+  /** 启动时按活跃 provider 补齐缺失的窗口 */
   reconcileOnStartup(): void {
-    const latest = getLatestWindow(this.db);
+    const providers = getAllProviders(this.db).filter((p) => p.is_active);
+    for (const provider of providers) {
+      this.reconcileProvider(provider.id);
+    }
+  }
 
-    // 查找 request_logs 中最新一条请求的时间
+  /** 为单个 provider 补齐窗口 */
+  private reconcileProvider(providerId: string): void {
+    const latest = getLatestWindow(this.db, undefined, providerId);
+
     const lastLog = this.db.prepare(
-      "SELECT created_at FROM request_logs ORDER BY created_at DESC LIMIT 1",
-    ).get() as { created_at: string } | undefined;
-
+      "SELECT created_at FROM request_logs WHERE provider_id = ? ORDER BY created_at DESC LIMIT 1",
+    ).get(providerId) as { created_at: string } | undefined;
     if (!lastLog) return;
 
     if (!latest) {
-      // 从未创建过窗口，但有请求记录，从最早请求创建初始窗口
       const firstLog = this.db.prepare(
-        "SELECT created_at FROM request_logs ORDER BY created_at ASC LIMIT 1",
-      ).get() as { created_at: string } | undefined;
+        "SELECT created_at FROM request_logs WHERE provider_id = ? ORDER BY created_at ASC LIMIT 1",
+      ).get(providerId) as { created_at: string } | undefined;
       if (!firstLog) return;
 
-      const start = parseDate(firstLog.created_at);
-      const truncated = truncateToMinute(start);
-      insertWindow(this.db, {
-        id: randomUUID(),
-        router_key_id: null,
-        provider_id: null,
-        start_time: toSqliteDatetime(truncated),
-        end_time: toSqliteDatetime(new Date(truncated.getTime() + WINDOW_DURATION_MS)),
-      });
-
-      // 继续补齐后续窗口
-      this.backfillWindows(truncated);
+      const truncated = truncateToMinute(parseDate(firstLog.created_at));
+      this.backfillProviderWindows(providerId, truncated);
       return;
     }
 
-    // 有窗口，检查 end_time 之后是否有请求
-    this.backfillWindows(parseDate(latest.end_time));
+    this.backfillProviderWindows(providerId, parseDate(latest.end_time));
   }
 
   /** 从 baseTime 开始，每 5h 一个窗口，直到覆盖 lastLogTime */
-  private backfillWindows(baseTime: Date): void {
+  private backfillProviderWindows(providerId: string, baseTime: Date): void {
     const lastLog = this.db.prepare(
-      "SELECT created_at FROM request_logs ORDER BY created_at DESC LIMIT 1",
-    ).get() as { created_at: string } | undefined;
+      "SELECT created_at FROM request_logs WHERE provider_id = ? ORDER BY created_at DESC LIMIT 1",
+    ).get(providerId) as { created_at: string } | undefined;
     if (!lastLog) return;
 
     const lastLogTime = parseDate(lastLog.created_at);
@@ -77,7 +72,7 @@ export class UsageWindowTracker {
       insertWindow(this.db, {
         id: randomUUID(),
         router_key_id: null,
-        provider_id: null,
+        provider_id: providerId,
         start_time: toSqliteDatetime(windowStart),
         end_time: toSqliteDatetime(windowEnd),
       });
