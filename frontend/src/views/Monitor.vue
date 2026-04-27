@@ -214,6 +214,7 @@ const { connect } = useMonitorSSE(
     concurrency_update: handleSSEMessage,
     stats_update: handleSSEMessage,
     runtime_update: handleSSEMessage,
+    stream_content_update: handleSSEMessage,
   },
   { onOpen: handleSSEOpen, onClose: handleSSEClose },
 )

@@ -5,6 +5,8 @@ import type {
   ProviderConcurrencySnapshot,
   StatsSnapshot,
   RuntimeMetrics,
+  StreamContentSnapshot,
+  StreamMetricsSnapshot,
 } from '@/types/monitor'
 
 const RECENT_COMPLETED_MAX = 200
@@ -62,6 +64,17 @@ export function useMonitorData() {
       }
       case 'stats_update': {
         stats.value = data as StatsSnapshot
+        break
+      }
+      case 'stream_content_update': {
+        const updates = data as Array<{ id: string; streamContent: StreamContentSnapshot | null; streamMetrics: StreamMetricsSnapshot | null }>
+        for (const update of updates) {
+          const req = activeRequests.value.find((r) => r.id === update.id)
+          if (req) {
+            if (update.streamContent) req.streamContent = update.streamContent
+            if (update.streamMetrics) req.streamMetrics = update.streamMetrics
+          }
+        }
         break
       }
       case 'runtime_update': {

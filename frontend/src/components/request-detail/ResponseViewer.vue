@@ -9,22 +9,35 @@
     </div>
 
     <!-- Structured view -->
-    <div v-if="!showRaw" class="flex-1 min-h-0 overflow-y-auto">
-      <template v-if="blocks.length > 0">
-        <div class="flex flex-col gap-2">
-          <ContentBlockRenderer
-            v-for="(block, i) in blocks"
-            :key="i"
-            :type="block.type"
-            :content="block.content"
-            :name="block.name"
-            :show-cursor="props.status === 'pending' && i === blocks.length - 1"
-          />
-        </div>
-      </template>
-      <p v-else-if="props.status === 'pending'" class="text-xs text-muted-foreground">等待响应数据...</p>
-      <p v-else-if="props.source === 'history' && props.isStream && !hasAnyResponseData" class="text-xs text-muted-foreground">流式响应内容未持久化存储</p>
-      <p v-else class="text-xs text-muted-foreground">无响应内容</p>
+    <div v-if="!showRaw" class="relative flex-1 min-h-0">
+      <div ref="structuredRef" class="flex-1 min-h-0 overflow-y-auto" @scroll="onStructuredScroll">
+        <template v-if="blocks.length > 0">
+          <div class="flex flex-col gap-2">
+            <ContentBlockRenderer
+              v-for="(block, i) in blocks"
+              :key="i"
+              :type="block.type"
+              :content="block.content"
+              :name="block.name"
+              :show-cursor="props.status === 'pending' && i === blocks.length - 1"
+              :auto-scroll="props.status === 'pending' && i === blocks.length - 1"
+            />
+          </div>
+        </template>
+        <p v-else-if="props.status === 'pending'" class="text-xs text-muted-foreground">等待响应数据...</p>
+        <p v-else-if="props.source === 'history' && props.isStream && !hasAnyResponseData" class="text-xs text-muted-foreground">流式响应内容未持久化存储</p>
+        <p v-else class="text-xs text-muted-foreground">无响应内容</p>
+      </div>
+      <!-- Scroll to bottom button -->
+      <Button
+        v-if="isUserScrolling"
+        variant="outline"
+        size="icon"
+        class="absolute bottom-2 right-2 h-7 w-7 rounded-full shadow-md opacity-80 hover:opacity-100"
+        @click="scrollToBottom"
+      >
+        <ArrowDown class="h-3.5 w-3.5" />
+      </Button>
     </div>
 
     <!-- Raw view -->
@@ -35,16 +48,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { FileJson, FileText } from 'lucide-vue-next'
+import { FileJson, FileText, ArrowDown } from 'lucide-vue-next'
 import ContentBlockRenderer from './ContentBlockRenderer.vue'
 import { tryDirectParse } from './response-parser'
 import type { DataSource } from './types'
 import type { ContentBlock, StreamContentSnapshot } from '@/types/monitor'
 import { useSSEParsing } from '@/components/log-viewer/useSSEParsing'
 import { mergeUpstreamData } from './upstream-merge'
+
+const structuredRef = ref<HTMLElement | null>(null)
 
 const props = withDefaults(defineProps<{
   source: DataSource
@@ -117,4 +132,25 @@ const rawContent = computed(() => {
   }
   return mergeUpstreamData(props.upstreamResponse ?? null, props.responseBody ?? null)
 })
+
+// --- Auto-scroll logic ---
+const isUserScrolling = ref(false)
+const SCROLL_THRESHOLD = 50
+
+function onStructuredScroll() {
+  const el = structuredRef.value
+  if (!el) return
+  const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+  isUserScrolling.value = distanceFromBottom > SCROLL_THRESHOLD
+}
+
+function scrollToBottom() {
+  const el = structuredRef.value
+  if (el) el.scrollTop = el.scrollHeight
+}
+
+watch(blocks, () => {
+  if (isUserScrolling.value) return
+  nextTick(() => scrollToBottom())
+}, { deep: true })
 </script>
