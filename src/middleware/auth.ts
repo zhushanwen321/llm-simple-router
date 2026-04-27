@@ -91,16 +91,25 @@ const authMiddlewareRaw: FastifyPluginCallback<{ db: Database.Database }> = (
       return reply;
     }
 
+    let token: string | undefined;
     const authHeader = request.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.slice(BEARER_PREFIX_LENGTH);
+    } else {
+      // Fallback: Anthropic SDK sends API key via x-api-key header
+      const apiKeyHeader = request.headers["x-api-key"] as string | undefined;
+      if (apiKeyHeader) {
+        token = apiKeyHeader;
+      }
+    }
+
+    if (!token) {
       if (proxyApiType) {
         logRejectedAuth(options.db, proxyApiType, HTTP_UNAUTHORIZED, "Invalid API key", request);
       }
       unauthorizedReply(reply);
       return reply;
     }
-
-    const token = authHeader.slice(BEARER_PREFIX_LENGTH);
     const hash = createHash("sha256").update(token).digest("hex");
     const row = stmt.get(hash) as RouterKeyRow | undefined;
     if (!row) {
