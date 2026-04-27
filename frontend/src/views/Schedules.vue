@@ -264,7 +264,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import CascadingModelSelect from '@/components/mappings/CascadingModelSelect.vue'
 import type { SelectedValue, ProviderGroup } from '@/components/mappings/cascading-types'
 import { DEFAULT_CONTEXT_WINDOW } from '@/constants'
-import type { Schedule } from '@/types/schedule'
+import type { Schedule, SchedulePayload } from '@/types/schedule'
 import type { MappingGroup, Provider } from '@/types/mapping'
 
 const WEEK_LABELS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
@@ -459,7 +459,7 @@ async function handleSave() {
       })
       : null
 
-    const payload: Record<string, unknown> = {
+    const payload: SchedulePayload = {
       mapping_group_id: selectedGroupId.value,
       name: form.value.name,
       week: JSON.stringify(form.value.week),
@@ -472,7 +472,7 @@ async function handleSave() {
     if (editingId.value) {
       await api.updateSchedule(editingId.value, payload)
     } else {
-      await api.createSchedule(payload as Parameters<typeof api.createSchedule>[0])
+      await api.createSchedule(payload)
     }
     dialogOpen.value = false
     await loadSchedules()

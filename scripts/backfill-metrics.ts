@@ -5,9 +5,11 @@
  */
 import { existsSync } from "fs";
 import Database from "better-sqlite3";
-import { countTokens } from "../src/utils/token-counter.js";
+import { countTokens, estimateInputTokens } from "../src/utils/token-counter.js";
 
 const MS_PER_SECOND = 1000;
+const PROGRESS_LOG_INTERVAL = 2000;
+const TPS_ROUND_PRECISION = 100;
 
 function parseClientRequest(raw: string | null): Record<string, unknown> | null {
   if (!raw) return null;
@@ -20,57 +22,6 @@ function parseClientRequest(raw: string | null): Record<string, unknown> | null 
   } catch {
     return null;
   }
-}
-
-type ContentBlock = { type: string; text?: string; content?: unknown; input?: unknown; thinking?: string };
-
-function extractTextFromContent(content: unknown): string {
-  if (typeof content === "string") return content;
-  if (!Array.isArray(content)) return "";
-  return content
-    .filter((block): block is ContentBlock =>
-      typeof block === "object" && block !== null && "type" in block
-    )
-    .map(block => {
-      if (block.type === "text" && typeof block.text === "string") return block.text;
-      if (block.type === "tool_result") {
-        if (typeof block.content === "string") return block.content;
-        if (Array.isArray(block.content)) return extractTextFromContent(block.content);
-      }
-      return "";
-    })
-    .join(" ");
-}
-
-function extractAllText(body: Record<string, unknown>): string {
-  const parts: string[] = [];
-  const messages = body.messages as Array<{ role?: string; content?: unknown }> | undefined;
-  if (Array.isArray(messages)) {
-    for (const msg of messages) {
-      parts.push(extractTextFromContent(msg.content));
-    }
-  }
-  if (typeof body.system === "string") {
-    parts.push(body.system);
-  } else if (Array.isArray(body.system)) {
-    parts.push(extractTextFromContent(body.system));
-  }
-  if (Array.isArray(body.tools)) {
-    for (const tool of body.tools) {
-      const t = tool as Record<string, unknown>;
-      const fn = t.function as Record<string, unknown> | undefined;
-      if (fn) {
-        parts.push((fn.name as string) ?? "");
-        parts.push((fn.description as string) ?? "");
-        if (fn.parameters) parts.push(JSON.stringify(fn.parameters));
-      } else if (t.name) {
-        parts.push(t.name as string);
-        if (t.description) parts.push(t.description as string);
-        if (t.input_schema) parts.push(JSON.stringify(t.input_schema));
-      }
-    }
-  }
-  return parts.join(" ");
 }
 
 /** 从 stream_text_content 中提取 thinking、text、tool_use 三类内容 */
@@ -178,8 +129,7 @@ function main(): void {
       for (const row of batch) {
         const body = parseClientRequest(row.client_request);
         if (!body) continue;
-        const allText = extractAllText(body);
-        const tokens = countTokens(allText);
+        const tokens = estimateInputTokens(body);
         if (tokens === 0) continue;
         updateInputLog.run(tokens, row.id);
         updateInputMetrics.run(tokens, row.id);
@@ -190,7 +140,7 @@ function main(): void {
 
     offset += batch.length;
     if (batch.length < BATCH_SIZE) break;
-    if (inputUpdated % 2000 === 0) {
+    if (inputUpdated % PROGRESS_LOG_INTERVAL === 0) {
       console.log(`  Progress: ${inputUpdated}/${inputCount} records updated...`);
     }
   }
@@ -245,14 +195,14 @@ function main(): void {
 
         let totalTps: number | null = null;
         if (outputTokens > 0 && totalDurationMs > 0) {
-          totalTps = Math.round(outputTokens / (totalDurationMs / MS_PER_SECOND) * 100) / 100;
+          totalTps = Math.round(outputTokens / (totalDurationMs / MS_PER_SECOND) * TPS_ROUND_PRECISION) / TPS_ROUND_PRECISION;
         }
 
         let textTps: number | null = null;
         if (textTokens && textTokens > 0) {
           const textDurationMs = totalDurationMs - row.ttft_ms!;
           if (textDurationMs > 0) {
-            textTps = Math.round(textTokens / (textDurationMs / MS_PER_SECOND) * 100) / 100;
+            textTps = Math.round(textTokens / (textDurationMs / MS_PER_SECOND) * TPS_ROUND_PRECISION) / TPS_ROUND_PRECISION;
           }
         }
 
@@ -275,7 +225,7 @@ function main(): void {
 
     offset += batch.length;
     if (batch.length < BATCH_SIZE) break;
-    if (tpsUpdated % 2000 === 0) {
+    if (tpsUpdated % PROGRESS_LOG_INTERVAL === 0) {
       console.log(`  Progress: ${tpsUpdated}/${tpsCount} records updated...`);
     }
   }
