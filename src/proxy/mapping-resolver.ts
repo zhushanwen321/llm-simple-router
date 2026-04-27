@@ -28,6 +28,10 @@ function parseTargets(ruleJson: unknown): Target[] {
       if (isTarget(t)) targets.push(t);
     }
   }
+  // 兼容 migration 026 前旧格式 { default, windows }
+  if (targets.length === 0 && isTarget(rule.default)) {
+    targets.push(rule.default);
+  }
   return targets;
 }
 

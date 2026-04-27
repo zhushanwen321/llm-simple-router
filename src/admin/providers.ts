@@ -33,6 +33,11 @@ function cascadeProviderDisable(db: Database.Database, providerId: string): Casc
     let modified = false;
     let shouldDisable = false;
 
+    // 归一化旧格式 { default, windows } → { targets }
+    if (!Array.isArray(rule.targets) && typeof rule.default === "object" && rule.default !== null) {
+      rule.targets = [rule.default];
+    }
+
     const targets = rule.targets as Array<Record<string, string>> | undefined;
     if (Array.isArray(targets)) {
       const filtered = targets.filter((t) => {

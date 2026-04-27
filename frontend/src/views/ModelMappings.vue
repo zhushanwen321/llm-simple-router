@@ -148,11 +148,17 @@ const contextWindowMap = computed(() => {
 })
 
 // 预解析 rule，避免模板中重复调用
+// 兼容 migration 026 前旧格式 { default, windows } → 归一化为 { targets }  
 const groupsWithParsedRule = computed(() =>
   groups.value.map((g) => {
     let parsedRule: Rule = {}
     try {
-      parsedRule = JSON.parse(g.rule) as Rule
+      const rule = JSON.parse(g.rule)
+      if (rule.default && !rule.targets) {
+        parsedRule = { targets: [rule.default] }
+      } else {
+        parsedRule = rule
+      }
     } catch (e) {
       console.warn('Failed to parse mapping group rule JSON:', e)
     }

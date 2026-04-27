@@ -102,6 +102,11 @@
           <DialogTitle>{{ editingId ? '编辑调度' : '新建调度' }}</DialogTitle>
         </DialogHeader>
         <form @submit.prevent="handleSave" class="space-y-4">
+          <!-- API 错误提示 -->
+          <div v-if="formError" class="bg-destructive/10 border border-destructive/30 rounded-md px-3 py-2 text-sm text-destructive">
+            {{ formError }}
+          </div>
+
           <!-- 名称 -->
           <div>
             <Label class="block text-sm font-medium text-foreground mb-1">名称</Label>
@@ -302,6 +307,7 @@ const deleteTarget = ref<Schedule | null>(null)
 const form = ref<ScheduleForm>(DEFAULT_FORM())
 const concurrencyOpen = ref(false)
 const errors = ref<Record<string, string>>({})
+const formError = ref('')
 
 function parseWeek(weekStr: string): string[] {
   let arr: number[] = []
@@ -375,12 +381,14 @@ function openCreate() {
   form.value = DEFAULT_FORM()
   concurrencyOpen.value = false
   errors.value = {}
+  formError.value = ''
   dialogOpen.value = true
 }
 
 function openEdit(s: Schedule) {
   editingId.value = s.id
   errors.value = {}
+  formError.value = ''
   let targets: TargetForm[] = [{ backend_model: '', provider_id: '' }]
   try {
     const rule = JSON.parse(s.mapping_rule) as { targets?: TargetForm[] }
@@ -468,7 +476,7 @@ async function handleSave() {
     dialogOpen.value = false
     await loadSchedules()
   } catch (e: unknown) {
-    toast.error(getApiMessage(e, '保存调度失败'))
+    formError.value = getApiMessage(e, '保存调度失败')
   }
 }
 
