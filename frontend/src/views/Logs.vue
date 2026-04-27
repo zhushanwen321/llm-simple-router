@@ -222,7 +222,6 @@ const DEBOUNCE_MS = 300
 const MAX_PAGE_BUTTONS = 7
 const PAGE_NEIGHBORS = 2
 const FIRST_PAGE = 1
-const FIRST_PAGE = 1
 
 const {
   logs, total, page, totalPages,
