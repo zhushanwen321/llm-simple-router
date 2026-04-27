@@ -10,18 +10,24 @@
     <!-- 全部 -->
     <TabsContent value="all">
       <div class="grid grid-cols-3 gap-4 mt-4 mb-4">
-        <div class="rounded-md border p-3">
-          <p class="text-sm text-muted-foreground">当前窗口</p>
-          <p class="text-xl font-bold text-foreground">{{ windowsData.length }}</p>
-        </div>
-        <div class="rounded-md border p-3">
-          <p class="text-sm text-muted-foreground">总请求数</p>
-          <p class="text-xl font-bold text-foreground">{{ allTotalRequests }}</p>
-        </div>
-        <div class="rounded-md border p-3">
-          <p class="text-sm text-muted-foreground">总 Token</p>
-          <p class="text-xl font-bold text-foreground">{{ allTotalTokens }}</p>
-        </div>
+        <Card>
+          <CardContent class="p-3">
+            <p class="text-sm text-muted-foreground">当前窗口</p>
+            <p class="text-xl font-bold text-foreground">{{ windowsData.length }}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent class="p-3">
+            <p class="text-sm text-muted-foreground">总请求数</p>
+            <p class="text-xl font-bold text-foreground">{{ allTotalRequests }}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent class="p-3">
+            <p class="text-sm text-muted-foreground">总 Token</p>
+            <p class="text-xl font-bold text-foreground">{{ allTotalTokens }}</p>
+          </CardContent>
+        </Card>
       </div>
       <WindowTable :items="windowsData" />
     </TabsContent>
@@ -36,6 +42,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Card, CardContent } from '@/components/ui/card'
 import WindowTable from '@/components/dashboard/WindowTable.vue'
 import type { UsageWindowWithUsage } from '@/api/client'
 
