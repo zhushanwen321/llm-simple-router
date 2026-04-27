@@ -17,22 +17,28 @@ describe("resolveTimeRange", () => {
     return db;
   }
 
-  it("weekly 返回本周一 00:00 到 now", () => {
+  it("weekly 返回本周一 00:00 到周日 23:59:59", () => {
     const { startTime, endTime } = resolveTimeRange("weekly", setupDb());
     const start = parseSqliteDatetime(startTime);
     const end = parseSqliteDatetime(endTime);
     expect(start.getDay()).toBe(1);
     expect(start.getHours()).toBe(0);
     expect(start.getMinutes()).toBe(0);
-    expect(end.getTime()).toBeLessThanOrEqual(Date.now());
+    expect(end.getDay()).toBe(0);
+    expect(end.getHours()).toBe(23);
+    expect(end.getMinutes()).toBe(59);
     expect(end.getTime()).toBeGreaterThan(start.getTime());
   });
 
-  it("monthly 返回本月1日 00:00 到 now", () => {
-    const { startTime } = resolveTimeRange("monthly", setupDb());
+  it("monthly 返回本月1日 00:00 到月末 23:59:59", () => {
+    const { startTime, endTime } = resolveTimeRange("monthly", setupDb());
     const start = parseSqliteDatetime(startTime);
+    const end = parseSqliteDatetime(endTime);
     expect(start.getDate()).toBe(1);
     expect(start.getHours()).toBe(0);
+    expect(end.getHours()).toBe(23);
+    expect(end.getMinutes()).toBe(59);
+    expect(end.getTime()).toBeGreaterThan(start.getTime());
   });
 
   it("window 无窗口数据时回退到 5h 区间", () => {
