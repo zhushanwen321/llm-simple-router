@@ -5,6 +5,7 @@ import { StreamContentAccumulator } from "./stream-content-accumulator.js";
 import type { ProviderSemaphoreManager } from "../proxy/semaphore.js";
 import type {
   ActiveRequest,
+  AttemptSnapshot,
   ProviderConcurrencySnapshot,
   RuntimeMetrics,
   StatsSnapshot,
@@ -99,7 +100,7 @@ export class RequestTracker {
 
   complete(
     id: string,
-    result: { status: "completed" | "failed"; statusCode?: number },
+    result: { status: "completed" | "failed"; statusCode?: number; attempts?: AttemptSnapshot[] },
   ): void {
     const req = this.activeMap.get(id);
     if (!req) {
@@ -125,6 +126,7 @@ export class RequestTracker {
       ...req,
       status: result.status,
       completedAt: now,
+      attempts: result.attempts ?? req.attempts,
     };
 
     this.activeMap.delete(id);
@@ -226,6 +228,7 @@ export class RequestTracker {
   startPushInterval(): void {
     if (this.pushTimer) return;
     this.tickCount = 0;
+    this.runtimeCollector.start();
 
     this.pushTimer = setInterval(() => {
       this.tickCount++;
@@ -248,6 +251,7 @@ export class RequestTracker {
       clearInterval(this.pushTimer);
       this.pushTimer = null;
     }
+    this.runtimeCollector.stop();
   }
 
   broadcast(event: string, data: unknown): void {

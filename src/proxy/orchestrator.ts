@@ -89,6 +89,12 @@ export class ProxyOrchestrator {
         },
       ),
       (result) => this.extractTrackStatus(result),
+      (result) => result.attempts.map(a => ({
+        statusCode: a.statusCode,
+        error: a.error,
+        latencyMs: a.latencyMs,
+        providerId: a.target.provider_id,
+      })),
     );
     this.sendResponse(reply, result.result, ctx);
     return result;
