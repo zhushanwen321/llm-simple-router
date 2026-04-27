@@ -1,7 +1,7 @@
 /**
  * 一键回填历史请求日志和 metrics 数据：
  * 1. input_tokens 为 null/0 时，从 client_request 使用 gpt-tokenizer 估算并标记为 estimated
- * 2. 流式响应有 stream_text_content 时，重新计算 TPS（tokenizer 精确统计 text-only tokens）
+ * 2. 流式响应有 stream_text_content 时，计算四指标 TPS（thinking_tps, text_tps, tool_use_tps, total_tps）
  */
 import { existsSync } from "fs";
 import Database from "better-sqlite3";
@@ -13,7 +13,6 @@ function parseClientRequest(raw: string | null): Record<string, unknown> | null 
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw) as Record<string, unknown>;
-    // client_request 存储格式: { headers: {...}, body: { messages: [...] } }
     if (parsed.body && typeof parsed.body === "object") {
       return parsed.body as Record<string, unknown>;
     }
@@ -23,7 +22,7 @@ function parseClientRequest(raw: string | null): Record<string, unknown> | null 
   }
 }
 
-type ContentBlock = { type: string; text?: string; content?: unknown; input?: unknown };
+type ContentBlock = { type: string; text?: string; content?: unknown; input?: unknown; thinking?: string };
 
 function extractTextFromContent(content: unknown): string {
   if (typeof content === "string") return content;
@@ -37,9 +36,6 @@ function extractTextFromContent(content: unknown): string {
       if (block.type === "tool_result") {
         if (typeof block.content === "string") return block.content;
         if (Array.isArray(block.content)) return extractTextFromContent(block.content);
-      }
-      if (block.type === "tool_use" && typeof block.input === "object" && block.input !== null) {
-        return JSON.stringify(block.input);
       }
       return "";
     })
@@ -77,32 +73,42 @@ function extractAllText(body: Record<string, unknown>): string {
   return parts.join(" ");
 }
 
-/** 从 stream_text_content（完整 Anthropic/OpenAI 响应 JSON）中提取纯文本内容 */
-function extractTextFromStreamContent(raw: string | null): string {
-  if (!raw) return "";
-  // 纯文本格式（无 JSON 包装）：直接返回全部内容
-  if (!raw.trim().startsWith("{")) return raw;
+/** 从 stream_text_content 中提取 thinking、text、tool_use 三类内容 */
+function extractStreamBreakdown(raw: string | null): {
+  thinking: string; text: string; toolUse: string;
+} {
+  if (!raw) return { thinking: "", text: "", toolUse: "" };
+  // 纯文本格式（无 JSON 包装）：全部视为 text
+  if (!raw.trim().startsWith("{")) return { thinking: "", text: raw, toolUse: "" };
   try {
     const parsed = JSON.parse(raw) as Record<string, unknown>;
-    // OpenAI 格式: { choices: [{ message: { content: "..." } }] }
+    const content = parsed.content as Array<Record<string, unknown>> | undefined;
+    if (Array.isArray(content)) {
+      let thinking = "";
+      let text = "";
+      let toolUse = "";
+      for (const block of content) {
+        if (block.type === "thinking" && typeof block.thinking === "string") {
+          thinking += block.thinking;
+        } else if (block.type === "text" && typeof block.text === "string") {
+          text += block.text;
+        } else if (block.type === "tool_use") {
+          toolUse += JSON.stringify(block.input ?? {});
+        }
+      }
+      return { thinking, text, toolUse };
+    }
+    // OpenAI 格式
     const choices = parsed.choices as Array<Record<string, unknown>> | undefined;
     if (choices && choices.length > 0) {
       const msg = choices[0].message as Record<string, unknown> | undefined;
-      if (msg && typeof msg.content === "string") return msg.content;
-      const delta = choices[0].delta as Record<string, unknown> | undefined;
-      if (delta && typeof delta.content === "string") return delta.content;
+      if (msg && typeof msg.content === "string") {
+        return { thinking: "", text: msg.content, toolUse: "" };
+      }
     }
-    // Anthropic 格式: { content: [{ type: "text", text: "..." }, { type: "tool_use", ... }] }
-    const content = parsed.content as Array<Record<string, unknown>> | undefined;
-    if (Array.isArray(content)) {
-      return content
-        .filter(b => b.type === "text" && typeof b.text === "string")
-        .map(b => b.text as string)
-        .join(" ");
-    }
-    return "";
+    return { thinking: "", text: "", toolUse: "" };
   } catch {
-    return "";
+    return { thinking: "", text: "", toolUse: "" };
   }
 }
 
@@ -170,8 +176,8 @@ function main(): void {
   txInput();
   console.log(`Updated ${inputUpdated} records`);
 
-  // 2. Backfill TPS for streaming records with text content
-  console.log("\n=== Backfilling tokens_per_second ===");
+  // 2. Backfill TPS breakdown for streaming records
+  console.log("\n=== Backfilling TPS breakdown ===");
   const tpsCandidates = db.prepare(`
     SELECT id, stream_text_content, output_tokens, tokens_per_second, ttft_ms, latency_ms, is_stream, metrics_complete
     FROM request_logs
@@ -185,39 +191,51 @@ function main(): void {
   console.log(`Found ${tpsCandidates.length} streaming records with text content`);
 
   let tpsUpdated = 0;
-  const updateTpsLog = db.prepare(
-    "UPDATE request_logs SET tokens_per_second = ? WHERE id = ?"
-  );
-  const updateTpsMetrics = db.prepare(
-    "UPDATE request_metrics SET tokens_per_second = ? WHERE request_log_id = ?"
-  );
+  const updateTpsMetrics = db.prepare(`
+    UPDATE request_metrics SET
+      tokens_per_second = ?,
+      thinking_tokens = ?, text_tokens = ?, tool_use_tokens = ?,
+      thinking_tps = ?, text_tps = ?, tool_use_tps = ?, total_tps = ?
+    WHERE request_log_id = ?
+  `);
 
   const txTps = db.transaction(() => {
     for (const row of tpsCandidates) {
-      const text = extractTextFromStreamContent(row.stream_text_content);
+      const { thinking, text, toolUse } = extractStreamBreakdown(row.stream_text_content);
 
-      if (!text) {
-        // tool_use-only response, no visible text output → TPS is meaningless
-        if (row.tokens_per_second !== null) {
-          updateTpsLog.run(null, row.id);
-          updateTpsMetrics.run(null, row.id);
-          tpsUpdated++;
-        }
-        continue;
+      const thinkingTokens = thinking ? countTokens(thinking) : null;
+      const textTokens = text ? countTokens(text) : null;
+      const toolUseTokens = toolUse ? countTokens(toolUse) : null;
+
+      const totalDurationMs = row.latency_ms;
+      const outputTokens = row.output_tokens ?? 0;
+
+      // total_tps = output_tokens / total_duration (end-to-end)
+      let totalTps: number | null = null;
+      if (outputTokens > 0 && totalDurationMs > 0) {
+        totalTps = Math.round(outputTokens / (totalDurationMs / MS_PER_SECOND) * 100) / 100;
       }
 
-      const textTokens = countTokens(text);
-      if (textTokens === 0) continue;
-      const textDurationMs = row.latency_ms - row.ttft_ms;
-      if (textDurationMs <= 0) continue;
-      const tps = textTokens / (textDurationMs / MS_PER_SECOND);
+      // text_tps (best estimate from backfill: text_tokens / (latency - ttft))
+      let textTps: number | null = null;
+      if (textTokens && textTokens > 0) {
+        const textDurationMs = totalDurationMs - row.ttft_ms!;
+        if (textDurationMs > 0) {
+          textTps = Math.round(textTokens / (textDurationMs / MS_PER_SECOND) * 100) / 100;
+        }
+      }
 
-      // Only update if different to avoid unnecessary writes
-      const oldTps = row.tokens_per_second;
-      if (oldTps !== null && Math.abs(oldTps - tps) < 0.01) continue;
+      // thinking_tps and tool_use_tps: can't accurately calculate from stored data
+      // (we don't have per-phase timing), set to null
 
-      updateTpsLog.run(Math.round(tps * 100) / 100, row.id);
-      updateTpsMetrics.run(Math.round(tps * 100) / 100, row.id);
+      const tokensPerSecond = totalTps;
+
+      updateTpsMetrics.run(
+        tokensPerSecond,
+        thinkingTokens, textTokens, toolUseTokens,
+        null, textTps, null, totalTps,
+        row.id,
+      );
       tpsUpdated++;
     }
   });

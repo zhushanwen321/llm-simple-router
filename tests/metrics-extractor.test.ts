@@ -91,12 +91,19 @@ describe("MetricsExtractor - Anthropic streaming", () => {
     // total = 500
     expect(metrics.total_duration_ms).toBe(500);
 
+    // tokens_per_second = total_tps = output_tokens / total_duration
+    // = 42 / 0.5 = 84
+    expect(metrics.tokens_per_second).toBeCloseTo(84, 0);
+    expect(metrics.total_tps).toBeCloseTo(84, 0);
+
+    // text_tps = text_tokens / text_duration
     // text_delta "Hello" + " world" = "Hello world" = 2 tokens (o200k_base)
     // textStreamStartTime at first text_delta = MOCK_NOW + 200
     // streamEndTime at message_delta = MOCK_NOW + 500
     // textDurationMs = 300ms
-    // tokens_per_second = 2 / 0.3 = 6.67
-    expect(metrics.tokens_per_second).toBeCloseTo(6.67, 1);
+    // text_tps = 2 / 0.3 = 6.67
+    expect(metrics.text_tps).toBeCloseTo(6.67, 1);
+    expect(metrics.thinking_tps).toBeNull();
   });
 
   it("should handle thinking_delta for TTFT", () => {
@@ -191,13 +198,18 @@ describe("MetricsExtractor - Anthropic streaming", () => {
       // streamEndTime = MOCK_NOW + 2000 (message_delta)
       expect(metrics.total_duration_ms).toBe(2000);
 
-      // 关键验证: TPS 基于 text-only tokens（gpt-tokenizer 精确计数）
+      // tokens_per_second = total_tps = output_tokens / total_duration
+      // = 3500 / 2.0 = 1750
+      expect(metrics.tokens_per_second).toBeCloseTo(1750, 0);
+
+      // text_tps = text_tokens / text_duration
       // text = "Hello world, this is a test." = 8 tokens (o200k_base)
-      // text_duration = (MOCK_NOW + 2000) - (MOCK_NOW + 1500) = 500ms
-      // TPS = 8 / 0.5 = 16
-      //
-      // 对比未修复时: TPS = 3500 / 2 = 1750 (严重虚高)
-      expect(metrics.tokens_per_second).toBeCloseTo(16, 1);
+      // text_duration = 500ms
+      // text_tps = 8 / 0.5 = 16
+      expect(metrics.text_tps).toBeCloseTo(16, 1);
+
+      // thinking_tps: 所有 thinking_delta 在同一 tick 处理 → duration=0 → null
+      expect(metrics.thinking_tps).toBeNull();
     });
 
     it("should use original TPS formula when no thinking content is present", () => {
@@ -225,10 +237,16 @@ describe("MetricsExtractor - Anthropic streaming", () => {
 
       const metrics = extractor.getMetrics();
 
-      // 无 thinking 内容但有 text_delta 内容，走 tokenizer
+    // tokens_per_second = total_tps = output_tokens / total_duration
+      // = 42 / 0.5 = 84
+      expect(metrics.tokens_per_second).toBeCloseTo(84, 0);
+      expect(metrics.total_tps).toBeCloseTo(84, 0);
+
+      // text_tps = text_tokens / text_duration
       // text = "Hello world" = 2 tokens, textDuration = 300ms
-      // tokens_per_second = 2 / 0.3 = 6.67
-      expect(metrics.tokens_per_second).toBeCloseTo(6.67, 1);
+      // text_tps = 2 / 0.3 = 6.67
+      expect(metrics.text_tps).toBeCloseTo(6.67, 1);
+      expect(metrics.thinking_tps).toBeNull();
     });
 
     it("should handle thinking-only model with no text output (TPS = null)", () => {
@@ -252,9 +270,13 @@ describe("MetricsExtractor - Anthropic streaming", () => {
         usage: { output_tokens: 100 },
       })));
 
-      // 有 thinking 但无 text content，TPS 应为 null
+      // 有 thinking 但无 text content → text_tps = null
+      // 单个 thinking_delta → thinkingStreamStartTime == thinkingStreamEndTime → duration = 0 → thinking_tps = null
       const metrics = extractor.getMetrics();
-      expect(metrics.tokens_per_second).toBeNull();
+      expect(metrics.tokens_per_second).not.toBeNull(); // = total_tps
+      expect(metrics.total_tps).not.toBeNull();
+      expect(metrics.text_tps).toBeNull();
+      expect(metrics.thinking_tps).toBeNull(); // duration=0, can't calculate
     });
   });
 

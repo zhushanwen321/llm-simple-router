@@ -9,9 +9,22 @@ export interface MetricsResult {
   cache_read_tokens: number | null;
   ttft_ms: number | null;
   total_duration_ms: number | null;
+  /** @deprecated Use total_tps instead */
   tokens_per_second: number | null;
   stop_reason: string | null;
   is_complete: number;
+  input_tokens_estimated?: number;
+  // --- TPS breakdown (Task 2) ---
+  thinking_tokens: number | null;
+  text_tokens: number | null;
+  tool_use_tokens: number | null;
+  thinking_duration_ms: number | null;
+  text_duration_ms: number | null;
+  tool_use_duration_ms: number | null;
+  thinking_tps: number | null;
+  text_tps: number | null;
+  tool_use_tps: number | null;
+  total_tps: number | null;
 }
 
 interface AnthropicMessageStart {
@@ -62,10 +75,16 @@ export class MetricsExtractor {
   private firstContentReceived = false;
   private complete = false;
 
-  // Thinking model tracking: separate thinking vs text content for accurate TPS
-  private hasThinkingContent = false;
+  // --- Phase content buffers + timing ---
+  private thinkingContentBuffer = "";
+  private thinkingStreamStartTime: number | null = null;
+  private thinkingStreamEndTime: number | null = null;
+
   private textContentBuffer = "";
   private textStreamStartTime: number | null = null;
+
+  private toolUseContentBuffer = "";
+  private toolUseStreamStartTime: number | null = null;
 
   constructor(
     private apiType: "openai" | "anthropic",
@@ -84,7 +103,16 @@ export class MetricsExtractor {
 
   getMetrics(): MetricsResult {
     let totalDurationMs: number | null = null;
-    let tokensPerSecond: number | null = null;
+    let totalTps: number | null = null;
+    let thinkingTps: number | null = null;
+    let textTps: number | null = null;
+    let toolUseTps: number | null = null;
+    let thinkingTokens: number | null = null;
+    let textTokens: number | null = null;
+    let toolUseTokens: number | null = null;
+    let thinkingDurationMs: number | null = null;
+    let textDurationMs: number | null = null;
+    let toolUseDurationMs: number | null = null;
 
     if (
       this.streamStartTime !== null &&
@@ -93,23 +121,39 @@ export class MetricsExtractor {
     ) {
       totalDurationMs = this.streamEndTime - this.streamStartTime;
 
-      if (this.textContentBuffer.length > 0 && this.textStreamStartTime !== null) {
-        // Use gpt-tokenizer to count actual text-only tokens from the
-        // streamed text content for accurate TPS. This handles both:
-        // 1. Thinking models with thinking_delta events (output_tokens = thinking + text)
-        // 2. Thinking models WITHOUT thinking_delta (e.g. Zhipu: server-side thinking,
-        //    output_tokens inflated but no thinking_delta events to detect)
-        const textTokens = encode(this.textContentBuffer).length;
-        const textDurationMs = this.streamEndTime - this.textStreamStartTime;
-        if (textTokens > 0 && textDurationMs > 0) {
-          tokensPerSecond = textTokens / (textDurationMs / MS_PER_SECOND);
-        }
-      } else if (!this.hasThinkingContent && totalDurationMs > 0) {
-        // Non-thinking model without text content collected: use API output_tokens
-        tokensPerSecond =
-          this.outputTokens / (totalDurationMs / MS_PER_SECOND);
+      // total_tps: API output_tokens / total_duration (end-to-end)
+      if (totalDurationMs > 0) {
+        totalTps = this.outputTokens / (totalDurationMs / MS_PER_SECOND);
       }
-      // Thinking model with no text output → TPS remains null
+
+      // thinking_tps
+      if (this.thinkingContentBuffer.length > 0) {
+        thinkingTokens = encode(this.thinkingContentBuffer).length;
+        if (this.thinkingStreamStartTime !== null && this.thinkingStreamEndTime !== null) {
+          thinkingDurationMs = this.thinkingStreamEndTime - this.thinkingStreamStartTime;
+          if (thinkingDurationMs > 0) {
+            thinkingTps = thinkingTokens / (thinkingDurationMs / MS_PER_SECOND);
+          }
+        }
+      }
+
+      // text_tps
+      if (this.textContentBuffer.length > 0 && this.textStreamStartTime !== null) {
+        textTokens = encode(this.textContentBuffer).length;
+        textDurationMs = this.streamEndTime - this.textStreamStartTime;
+        if (textDurationMs > 0) {
+          textTps = textTokens / (textDurationMs / MS_PER_SECOND);
+        }
+      }
+
+      // tool_use_tps
+      if (this.toolUseContentBuffer.length > 0 && this.toolUseStreamStartTime !== null) {
+        toolUseTokens = encode(this.toolUseContentBuffer).length;
+        toolUseDurationMs = this.streamEndTime - this.toolUseStreamStartTime;
+        if (toolUseDurationMs > 0) {
+          toolUseTps = toolUseTokens / (toolUseDurationMs / MS_PER_SECOND);
+        }
+      }
     }
 
     return {
@@ -119,9 +163,19 @@ export class MetricsExtractor {
       cache_read_tokens: this.cacheReadTokens,
       ttft_ms: this.ttftMs,
       total_duration_ms: totalDurationMs,
-      tokens_per_second: tokensPerSecond,
+      tokens_per_second: totalTps,
       stop_reason: this.stopReason,
       is_complete: this.complete ? 1 : 0,
+      thinking_tokens: thinkingTokens,
+      text_tokens: textTokens,
+      tool_use_tokens: toolUseTokens,
+      thinking_duration_ms: thinkingDurationMs,
+      text_duration_ms: textDurationMs,
+      tool_use_duration_ms: toolUseDurationMs,
+      thinking_tps: thinkingTps,
+      text_tps: textTps,
+      tool_use_tps: toolUseTps,
+      total_tps: totalTps,
     };
   }
 
@@ -162,16 +216,21 @@ export class MetricsExtractor {
       }
       this.streamStartTime = Date.now();
     } else if (type === "content_block_delta") {
-      // 首次收到内容时记录 TTFT（不管是 thinking_delta 还是 text_delta）
       if (!this.firstContentReceived) {
         this.firstContentReceived = true;
         this.ttftMs = Date.now() - this.requestStartTime;
       }
 
-      // 区分 thinking vs text 内容：gpt-tokenizer 精确统计 text tokens
       const delta = (parsed as AnthropicContentBlockDelta).delta;
       if (delta?.type === "thinking_delta") {
-        this.hasThinkingContent = true;
+        if (this.thinkingStreamStartTime === null) {
+          this.thinkingStreamStartTime = Date.now();
+        }
+        const thinking = delta.thinking ?? "";
+        if (thinking) {
+          this.thinkingContentBuffer += thinking;
+          this.thinkingStreamEndTime = Date.now();
+        }
       } else if (delta?.type === "text_delta") {
         if (this.textStreamStartTime === null) {
           this.textStreamStartTime = Date.now();
@@ -179,11 +238,17 @@ export class MetricsExtractor {
         if (delta.text) {
           this.textContentBuffer += delta.text;
         }
+      } else if (delta?.type === "input_json_delta") {
+        if (this.toolUseStreamStartTime === null) {
+          this.toolUseStreamStartTime = Date.now();
+        }
+        if (delta.partial_json) {
+          this.toolUseContentBuffer += delta.partial_json;
+        }
       }
     } else if (type === "message_delta") {
       const msg = parsed as AnthropicMessageDelta;
       this.outputTokens = msg.usage?.output_tokens ?? null;
-      // 第三方 Anthropic 兼容 API（如 OpenRouter、智谱）可能将 input_tokens 放在 message_delta 而非 message_start
       if (this.inputTokens === null && msg.usage?.input_tokens) {
         this.inputTokens = msg.usage.input_tokens;
       }
@@ -195,7 +260,6 @@ export class MetricsExtractor {
   }
 
   private processOpenAIEvent(event: SSEEvent): void {
-    // SSEParser 通常会拦截 [DONE]，但以防直接传入
     if (event.data === "[DONE]") {
       this.complete = true;
       return;
@@ -213,7 +277,6 @@ export class MetricsExtractor {
       const choice = choices[0];
       const delta = choice.delta;
 
-      // 跳过只有 role 的 chunk，不视为内容
       if (
         !this.firstContentReceived &&
         delta &&
@@ -222,6 +285,11 @@ export class MetricsExtractor {
       ) {
         this.firstContentReceived = true;
         this.ttftMs = Date.now() - this.requestStartTime;
+        this.textStreamStartTime = Date.now();
+      }
+
+      if (delta?.content) {
+        this.textContentBuffer += delta.content;
       }
 
       if (choice.finish_reason) {
@@ -230,14 +298,12 @@ export class MetricsExtractor {
       }
     }
 
-    // usage 通常在最后一个 chunk 中
     if (parsed.usage) {
       this.inputTokens = parsed.usage.prompt_tokens ?? null;
       this.outputTokens = parsed.usage.completion_tokens ?? null;
       this.cacheReadTokens =
         parsed.usage.prompt_tokens_details?.cached_tokens ?? null;
 
-      // usage chunk 标志流结束，确保 duration 可计算
       if (this.streamStartTime === null) {
         this.streamStartTime = this.requestStartTime;
       }
@@ -247,6 +313,19 @@ export class MetricsExtractor {
     }
   }
 }
+
+const NULL_TPS_BREAKDOWN = {
+  thinking_tokens: null as number | null,
+  text_tokens: null as number | null,
+  tool_use_tokens: null as number | null,
+  thinking_duration_ms: null as number | null,
+  text_duration_ms: null as number | null,
+  tool_use_duration_ms: null as number | null,
+  thinking_tps: null as number | null,
+  text_tps: null as number | null,
+  tool_use_tps: null as number | null,
+  total_tps: null as number | null,
+};
 
 function extractOpenAINonStream(parsed: Record<string, unknown>): MetricsResult {
   const usage = parsed.usage as Record<string, unknown> | undefined;
@@ -265,6 +344,7 @@ function extractOpenAINonStream(parsed: Record<string, unknown>): MetricsResult 
     tokens_per_second: null,
     stop_reason: stopReason,
     is_complete: 1,
+    ...NULL_TPS_BREAKDOWN,
   };
 }
 
@@ -281,5 +361,6 @@ function extractAnthropicNonStream(parsed: Record<string, unknown>): MetricsResu
     tokens_per_second: null,
     stop_reason: (parsed.stop_reason as string) ?? null,
     is_complete: 1,
+    ...NULL_TPS_BREAKDOWN,
   };
 }

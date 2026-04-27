@@ -49,6 +49,17 @@ export interface StreamMetricsSnapshot {
   tokensPerSecond: number | null;
   stopReason: string | null;
   isComplete: boolean;
+  // TPS breakdown
+  thinkingTokens: number | null;
+  textTokens: number | null;
+  toolUseTokens: number | null;
+  thinkingDurationMs: number | null;
+  textDurationMs: number | null;
+  toolUseDurationMs: number | null;
+  thinkingTps: number | null;
+  textTps: number | null;
+  toolUseTps: number | null;
+  totalTps: number | null;
 }
 
 export interface ProviderConcurrencySnapshot {

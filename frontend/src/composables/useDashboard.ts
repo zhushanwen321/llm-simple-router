@@ -220,7 +220,7 @@ export function useDashboard() {
     try {
       const [statsRes, tpsRes, inputRes, outputRes] = await Promise.allSettled([
         api.getStats(statsParams.value),
-        api.getMetricsTimeseries(tsParams('tps')),
+        api.getMetricsTimeseries(tsParams('total_tps')),
         api.getMetricsTimeseries(tsParams('input_tokens')),
         api.getMetricsTimeseries(tsParams('output_tokens')),
       ])
