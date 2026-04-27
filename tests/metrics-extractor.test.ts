@@ -116,6 +116,142 @@ describe("MetricsExtractor - Anthropic streaming", () => {
     expect(extractor.getMetrics().ttft_ms).toBe(150);
   });
 
+  describe("thinking model TPS correction", () => {
+    it("should calculate TPS from text-only tokens for thinking models", () => {
+      // 模拟 zhipu-coding-plan 场景：大量 thinking tokens + 少量 text tokens
+      const requestStart = MOCK_NOW - 500;
+      const extractor = new MetricsExtractor("anthropic", requestStart);
+
+      // message_start
+      extractor.processEvent(makeEvent("message_start", JSON.stringify({
+        type: "message_start",
+        message: { usage: { input_tokens: 1000 } },
+      })));
+
+      // thinking 阶段（10 个 thinking_delta，共 600 字符）
+      vi.advanceTimersByTime(500);
+      for (let i = 0; i < 10; i++) {
+        extractor.processEvent(makeEvent("content_block_delta", JSON.stringify({
+          type: "content_block_delta",
+          delta: { type: "thinking_delta", thinking: "Let me analyze this problem carefully." },
+        })));
+      }
+
+      // text 阶段（5 个 text_delta，共 25 字符）
+      vi.advanceTimersByTime(1000);
+      extractor.processEvent(makeEvent("content_block_delta", JSON.stringify({
+        type: "content_block_delta",
+        delta: { type: "text_delta", text: "Hello" },
+      })));
+      extractor.processEvent(makeEvent("content_block_delta", JSON.stringify({
+        type: "content_block_delta",
+        delta: { type: "text_delta", text: " world" },
+      })));
+      extractor.processEvent(makeEvent("content_block_delta", JSON.stringify({
+        type: "content_block_delta",
+        delta: { type: "text_delta", text: ", this" },
+      })));
+      extractor.processEvent(makeEvent("content_block_delta", JSON.stringify({
+        type: "content_block_delta",
+        delta: { type: "text_delta", text: " is a" },
+      })));
+      extractor.processEvent(makeEvent("content_block_delta", JSON.stringify({
+        type: "content_block_delta",
+        delta: { type: "text_delta", text: " test." },
+      })));
+
+      // message_delta: API 报告 output_tokens 包含 thinking + text 总量
+      // 假设 thinking: 3000 tokens, text: 500 tokens, total: 3500
+      vi.advanceTimersByTime(500);
+      extractor.processEvent(makeEvent("message_delta", JSON.stringify({
+        type: "message_delta",
+        delta: { stop_reason: "end_turn" },
+        usage: { output_tokens: 3500 },
+      })));
+      extractor.processEvent(makeEvent("message_stop", JSON.stringify({ type: "message_stop" })));
+
+      const metrics = extractor.getMetrics();
+
+      // 基础指标不变
+      expect(metrics.input_tokens).toBe(1000);
+      expect(metrics.output_tokens).toBe(3500); // API 报告的总 tokens
+      expect(metrics.stop_reason).toBe("end_turn");
+      expect(metrics.is_complete).toBe(1);
+
+      // TTFT 从第一个 content_block_delta (thinking) 开始
+      // requestStart = MOCK_NOW - 500, first delta at MOCK_NOW + 500 => 1000ms
+      expect(metrics.ttft_ms).toBe(1000);
+
+      // total_duration_ms 仍然是全量时间: message_start 到 message_delta
+      // streamStartTime = MOCK_NOW (message_start)
+      // streamEndTime = MOCK_NOW + 2000 (message_delta)
+      expect(metrics.total_duration_ms).toBe(2000);
+
+      // 关键验证: TPS 基于 text-only tokens（gpt-tokenizer 精确计数）
+      // text = "Hello world, this is a test." = 8 tokens (o200k_base)
+      // text_duration = (MOCK_NOW + 2000) - (MOCK_NOW + 1500) = 500ms
+      // TPS = 8 / 0.5 = 16
+      //
+      // 对比未修复时: TPS = 3500 / 2 = 1750 (严重虚高)
+      expect(metrics.tokens_per_second).toBeCloseTo(16, 1);
+    });
+
+    it("should use original TPS formula when no thinking content is present", () => {
+      const requestStart = MOCK_NOW - 500;
+      const extractor = new MetricsExtractor("anthropic", requestStart);
+
+      extractor.processEvent(makeEvent("message_start", JSON.stringify({
+        type: "message_start",
+        message: { usage: { input_tokens: 100 } },
+      })));
+
+      vi.advanceTimersByTime(200);
+      extractor.processEvent(makeEvent("content_block_delta", JSON.stringify({
+        type: "content_block_delta",
+        delta: { type: "text_delta", text: "Hello world" },
+      })));
+
+      vi.advanceTimersByTime(300);
+      extractor.processEvent(makeEvent("message_delta", JSON.stringify({
+        type: "message_delta",
+        delta: { stop_reason: "end_turn" },
+        usage: { output_tokens: 42 },
+      })));
+      extractor.processEvent(makeEvent("message_stop", JSON.stringify({ type: "message_stop" })));
+
+      const metrics = extractor.getMetrics();
+
+      // 无 thinking 内容，使用原始公式: 42 / (500/1000) = 84
+      expect(metrics.tokens_per_second).toBe(84);
+    });
+
+    it("should handle thinking-only model with no text output (TPS = null)", () => {
+      const extractor = new MetricsExtractor("anthropic", MOCK_NOW);
+
+      extractor.processEvent(makeEvent("message_start", JSON.stringify({
+        type: "message_start",
+        message: { usage: { input_tokens: 100 } },
+      })));
+
+      vi.advanceTimersByTime(200);
+      extractor.processEvent(makeEvent("content_block_delta", JSON.stringify({
+        type: "content_block_delta",
+        delta: { type: "thinking_delta", thinking: "Thinking only" },
+      })));
+
+      vi.advanceTimersByTime(300);
+      extractor.processEvent(makeEvent("message_delta", JSON.stringify({
+        type: "message_delta",
+        delta: { stop_reason: "end_turn" },
+        usage: { output_tokens: 100 },
+      })));
+
+      // 有 thinking 但无 text content，TPS 应为 null
+      const metrics = extractor.getMetrics();
+      expect(metrics.tokens_per_second).toBeNull();
+    });
+  });
+
   it("should set is_complete=0 and output_tokens=null when stream interrupted before message_delta", () => {
     const extractor = new MetricsExtractor("anthropic", MOCK_NOW);
 

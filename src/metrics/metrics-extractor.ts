@@ -1,4 +1,5 @@
 import { MS_PER_SECOND } from "../constants.js";
+import { encode } from "gpt-tokenizer";
 import type { SSEEvent } from "./sse-parser.js";
 
 export interface MetricsResult {
@@ -26,7 +27,7 @@ interface AnthropicMessageStart {
 
 interface AnthropicContentBlockDelta {
   type: string;
-  delta?: { type: string };
+  delta?: { type: string; text?: string; thinking?: string };
 }
 
 interface AnthropicMessageDelta {
@@ -61,6 +62,11 @@ export class MetricsExtractor {
   private firstContentReceived = false;
   private complete = false;
 
+  // Thinking model tracking: separate thinking vs text content for accurate TPS
+  private hasThinkingContent = false;
+  private textContentBuffer = "";
+  private textStreamStartTime: number | null = null;
+
   constructor(
     private apiType: "openai" | "anthropic",
     private requestStartTime: number,
@@ -86,7 +92,20 @@ export class MetricsExtractor {
       this.outputTokens !== null
     ) {
       totalDurationMs = this.streamEndTime - this.streamStartTime;
-      if (totalDurationMs > 0) {
+
+      if (this.hasThinkingContent) {
+        // Thinking model: output_tokens includes thinking + text tokens.
+        // Use gpt-tokenizer to count actual text-only tokens from the
+        // streamed text content, avoiding chars-to-token estimation errors.
+        if (this.textContentBuffer.length > 0 && this.textStreamStartTime !== null) {
+          const textTokens = encode(this.textContentBuffer).length;
+          const textDurationMs = this.streamEndTime - this.textStreamStartTime;
+          if (textTokens > 0 && textDurationMs > 0) {
+            tokensPerSecond = textTokens / (textDurationMs / MS_PER_SECOND);
+          }
+        }
+        // No text content → TPS remains null (can't measure visible output speed)
+      } else if (totalDurationMs > 0) {
         tokensPerSecond =
           this.outputTokens / (totalDurationMs / MS_PER_SECOND);
       }
@@ -146,6 +165,19 @@ export class MetricsExtractor {
       if (!this.firstContentReceived) {
         this.firstContentReceived = true;
         this.ttftMs = Date.now() - this.requestStartTime;
+      }
+
+      // 区分 thinking vs text 内容：gpt-tokenizer 精确统计 text tokens
+      const delta = (parsed as AnthropicContentBlockDelta).delta;
+      if (delta?.type === "thinking_delta") {
+        this.hasThinkingContent = true;
+      } else if (delta?.type === "text_delta") {
+        if (this.textStreamStartTime === null) {
+          this.textStreamStartTime = Date.now();
+        }
+        if (delta.text) {
+          this.textContentBuffer += delta.text;
+        }
       }
     } else if (type === "message_delta") {
       const msg = parsed as AnthropicMessageDelta;

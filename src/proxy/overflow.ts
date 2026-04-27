@@ -1,5 +1,5 @@
 import Database from "better-sqlite3";
-import { encode } from "gpt-tokenizer";
+import { countTokens } from "../utils/token-counter.js";
 import { getModelContextWindowOverride } from "../db/model-info.js";
 import { lookupContextWindow } from "../config/model-context.js";
 import type { Target } from "./strategy/types.js";
@@ -12,9 +12,6 @@ const FORMAT_OVERHEAD_RATIO = 1.3;
 // 上下文窗口使用阈值：当估算 token 超过上下文窗口的 90% 时即触发溢出，
 // 留出余量覆盖不同模型 tokenizer 差异和难以精确估算的格式开销
 const CONTEXT_WINDOW_USAGE_THRESHOLD = 0.9;
-
-// 采样编码的最大字符数：对大文本只编码样本再外推，避免 BPE 全量编码耗时过长
-const SAMPLE_SIZE = 4000;
 
 type ContentBlock = { type: string; text?: string; content?: unknown; input?: unknown };
 
@@ -89,19 +86,6 @@ function countImageBlocks(obj: unknown): number {
     return Object.values(r).reduce((sum: number, v) => sum + countImageBlocks(v), 0);
   }
   return 0;
-}
-
-/**
- * 使用 gpt-tokenizer (o200k_base) 估算 token 数。
- * 对长文本采用采样策略：只编码前 SAMPLE_SIZE 个字符，按比率外推。
- */
-function countTokens(text: string): number {
-  if (text.length === 0) return 0;
-  if (text.length <= SAMPLE_SIZE) return encode(text).length;
-
-  const sample = text.slice(0, SAMPLE_SIZE);
-  const sampleTokens = encode(sample).length;
-  return Math.ceil((sampleTokens / sample.length) * text.length);
 }
 
 /**
