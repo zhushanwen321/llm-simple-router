@@ -38,11 +38,16 @@ export function resolveTimeRange(
     case "weekly": {
       const monday = getMonday(now);
       monday.setHours(0, 0, 0, 0);
-      return { startTime: toSqliteDatetime(monday), endTime: toSqliteDatetime(now) };
+      const sunday = new Date(monday);
+      sunday.setDate(sunday.getDate() + 6);
+      sunday.setHours(23, 59, 59, 999);
+      return { startTime: toSqliteDatetime(monday), endTime: toSqliteDatetime(sunday) };
     }
     case "monthly": {
       const first = new Date(now.getFullYear(), now.getMonth(), 1);
-      return { startTime: toSqliteDatetime(first), endTime: toSqliteDatetime(now) };
+      const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      last.setHours(23, 59, 59, 999);
+      return { startTime: toSqliteDatetime(first), endTime: toSqliteDatetime(last) };
     }
   }
 }
