@@ -23,8 +23,18 @@
           <span
             v-if="overview"
             class="font-mono text-[11px] text-muted-foreground"
-            >{{ overview.id.slice(0, 8) }}</span
+            >{{ overview.id }}</span
           >
+          <Button
+            v-if="overview"
+            variant="ghost"
+            size="icon-xs"
+            class="shrink-0"
+            @click="handleCopyId"
+          >
+            <CheckIcon v-if="copied" class="size-3 text-green-500" />
+            <CopyIcon v-else class="size-3" />
+          </Button>
         </DialogTitle>
         <DialogDescription class="sr-only"
           >查看请求的响应内容和请求内容</DialogDescription
@@ -104,6 +114,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { CheckIcon, CopyIcon } from "lucide-vue-next";
+import { useClipboard } from "@/composables/useClipboard";
 import RequestOverviewPanel from "./RequestOverviewPanel.vue";
 import ResponseViewer from "./ResponseViewer.vue";
 import RequestDiffViewer from "./RequestDiffViewer.vue";
@@ -111,6 +124,12 @@ import type { DataSource, UnifiedRequestOverview } from "./types";
 import { fromActiveRequest, fromLogEntry } from "./types";
 import type { ActiveRequest, StreamContentSnapshot } from "@/types/monitor";
 import type { LogEntry } from "@/components/logs/types";
+
+const { copied, copy } = useClipboard();
+
+function handleCopyId() {
+  if (overview.value) copy(overview.value.id);
+}
 
 const props = defineProps<{
   open: boolean;
