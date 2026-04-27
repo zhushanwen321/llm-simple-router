@@ -1,4 +1,5 @@
--- Metrics 独立化：request_metrics 增加路由维度列，解除级联删除依赖
+-- Migration 026 (metrics): Metrics 独立化：request_metrics 增加路由维度列，解除级联删除依赖
+-- 注意：与 026_create_schedules_simplify_mappings.sql 同编号，按字母序在其后执行。两者操作不同表，互不影响。
 -- usage_windows 增加 provider_id 支持按 provider 维度追踪使用量
 
 -- 1. 重建 request_metrics：CASCADE -> SET NULL，同时新增 router_key_id / status_code
