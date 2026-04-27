@@ -504,6 +504,10 @@ async function handleDelete() {
 onMounted(async () => {
   loading.value = true
   await Promise.allSettled([loadGroups(), loadProviders()])
+  if (groups.value.length > 0) {
+    selectedGroupId.value = groups.value[0].id
+    await loadSchedules()
+  }
   loading.value = false
 })
 </script>
