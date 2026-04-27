@@ -1,10 +1,10 @@
 import { randomUUID } from "crypto";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import Database from "better-sqlite3";
-import { getMappingGroup, getProviderById, insertRequestLog } from "../db/index.js";
+import { getProviderById, insertRequestLog } from "../db/index.js";
 import { decrypt } from "../utils/crypto.js";
 import { getSetting } from "../db/settings.js";
-import { resolveMapping, countGroupTargets } from "./mapping-resolver.js";
+import { resolveMapping } from "./mapping-resolver.js";
 import { applyEnhancement } from "./enhancement/enhancement-handler.js";
 import { SemaphoreQueueFullError, SemaphoreTimeoutError } from "./semaphore.js";
 import type { RequestTracker } from "../monitor/request-tracker.js";
@@ -43,7 +43,6 @@ interface FailoverContext {
   options?: { beforeSendProxy?: (body: Record<string, unknown>, isStream: boolean) => void };
   effectiveModel: string;
   originalModel: string | null;
-  isFailover: boolean;
   originalBody: Record<string, unknown>;
   sessionId: string | undefined;
 }
@@ -136,12 +135,9 @@ export async function handleProxyRequest(
 
   if (interceptResponse) return handleIntercept(deps.db, apiType, request, reply, interceptResponse, clientModel, sessionId);
 
-  const group = getMappingGroup(deps.db, effectiveModel);
-  // targets 数量 > 1 时启用 failover 循环
-  const isFailover = group ? countGroupTargets(group.rule) > 1 : false;
   return executeFailoverLoop({
     request, reply, apiType, upstreamPath, errors, deps, options,
-    effectiveModel, originalModel, isFailover,
+    effectiveModel, originalModel,
     originalBody: JSON.parse(JSON.stringify(request.body as Record<string, unknown>)),
     sessionId,
   });
@@ -150,7 +146,7 @@ export async function handleProxyRequest(
 // ---------- Failover loop ----------
 
 async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> {
-  const { request, reply, apiType, upstreamPath, errors, deps, options, effectiveModel, originalModel, isFailover, originalBody, sessionId } = ctx;
+  const { request, reply, apiType, upstreamPath, errors, deps, options, effectiveModel, originalModel, originalBody, sessionId } = ctx;
   const excludeTargets: Target[] = [];
   let rootLogId: string | null = null;
   while (true) {
@@ -173,7 +169,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
     request.log.debug({ logId, model: effectiveModel, apiType, isStream, action: "resolve_mapping", resolved: !!resolveResult });
 
     if (!resolveResult) {
-      if (isFailover && excludeTargets.length > 0) {
+      if (excludeTargets.length > 0) {
         return rejectAndReply(reply, { ...rCtx, isFailover: true, originalRequestId: rootLogId },
           errors.upstreamConnectionFailed(), `All failover targets exhausted (${excludeTargets.length} attempted)`);
       }
@@ -182,6 +178,8 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
 
     const concurrencyOverride = resolveResult.concurrency_override;
     let resolved = resolveResult.target;
+    // 活跃 targets（schedule 或 base）数量 > 1 时启用 failover
+    const isFailover = resolveResult.targetCount > 1;
 
     if (excludeTargets.length === 0) {
       const allowedModels = request.routerKey?.allowed_models;

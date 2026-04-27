@@ -123,7 +123,7 @@ export function resolveMapping(
       try {
         const models: string[] = JSON.parse(provider.models);
         if (models.includes(backendModel)) {
-          return { target: { backend_model: backendModel, provider_id: provider.id } };
+          return { target: { backend_model: backendModel, provider_id: provider.id }, targetCount: 1 };
         }
       } catch { return null }
     }
@@ -139,7 +139,7 @@ export function resolveMapping(
       try {
         const models: string[] = JSON.parse(p.models);
         if (models.includes(clientModel)) {
-          return { target: { backend_model: clientModel, provider_id: p.id } };
+          return { target: { backend_model: clientModel, provider_id: p.id }, targetCount: 1 };
         }
       } catch { continue }
     }
@@ -179,6 +179,7 @@ export function resolveMapping(
   return {
     target: filtered[0],
     concurrency_override: concurrencyOverride,
+    targetCount: activeTargets.length,
   };
 }
 
