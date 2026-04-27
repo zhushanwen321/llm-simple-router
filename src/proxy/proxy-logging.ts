@@ -179,6 +179,7 @@ export function collectTransportMetrics(
         const metrics = { ...result.metrics };
         if (metrics.input_tokens == null && request.body) {
           metrics.input_tokens = estimateInputTokens(request.body as Record<string, unknown>);
+          metrics.input_tokens_estimated = 1;
         }
         insertMetrics(db, { ...base, ...metrics });
         updateLogMetrics(db, lastSuccessLogId, metrics);
@@ -189,6 +190,7 @@ export function collectTransportMetrics(
       if (mr) {
         if (mr.input_tokens == null && request.body) {
           mr.input_tokens = estimateInputTokens(request.body as Record<string, unknown>);
+          mr.input_tokens_estimated = 1;
         }
         insertMetrics(db, { ...base, ...mr });
         updateLogMetrics(db, lastSuccessLogId, mr);

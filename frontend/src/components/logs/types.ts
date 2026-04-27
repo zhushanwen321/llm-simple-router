@@ -29,4 +29,5 @@ export interface LogEntry {
   metrics_complete: number
   stream_text_content: string | null
   session_id: string | null
+  input_tokens_estimated: number | null
 }
