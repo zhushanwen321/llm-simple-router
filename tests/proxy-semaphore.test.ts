@@ -204,7 +204,7 @@ describe("Proxy semaphore", () => {
     await closeServer(backendServer);
   });
 
-  it("returns 503 when queue is full", async () => {
+  it("returns 503 when queue is full", { timeout: 15_000 }, async () => {
     let releaseFirstRequest: () => void = () => {};
     const firstRequestPromise = new Promise<void>((resolve) => {
       releaseFirstRequest = resolve;

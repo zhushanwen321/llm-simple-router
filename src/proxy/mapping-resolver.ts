@@ -164,6 +164,12 @@ export function resolveMapping(
   }
   if (baseTargets.length === 0) return null;
 
+  // 3.5 检测已废弃的策略类型并记录 warning
+  const deprecatedStrategies = ["round_robin", "random"];
+  if (deprecatedStrategies.includes(group.strategy)) {
+    console.warn(`[mapping-resolver] mapping_group '${group.client_model}' uses deprecated strategy '${group.strategy}'. This strategy has been removed and only the first target will be selected. Please migrate to schedules.`);
+  }
+
   // 4. 查询匹配的 schedule
   const schedules = getActiveSchedulesForGroup(db, group.id);
   const matchedSchedule = findMatchingSchedule(schedules, context.now);

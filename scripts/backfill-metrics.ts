@@ -137,6 +137,8 @@ function main(): void {
     process.exit(1);
   }
 
+  const BATCH_SIZE = 500; // 每批处理 500 行，避免大库 OOM
+
   const db = new Database(dbPath);
   db.pragma("journal_mode = WAL");
 
@@ -144,14 +146,11 @@ function main(): void {
 
   // 1. Backfill input_tokens
   console.log("\n=== Backfilling input_tokens ===");
-  const inputCandidates = db.prepare(`
-    SELECT id, client_request, input_tokens, metrics_complete
-    FROM request_logs
+  const inputCount = (db.prepare(`SELECT COUNT(*) as cnt FROM request_logs
     WHERE (input_tokens IS NULL OR input_tokens = 0)
-      AND client_request IS NOT NULL
-  `).all() as Pick<LogRow, "id" | "client_request" | "input_tokens" | "metrics_complete">[];
+      AND client_request IS NOT NULL`).get() as { cnt: number }).cnt;
 
-  console.log(`Found ${inputCandidates.length} records with missing input_tokens`);
+  console.log(`Found ${inputCount} records with missing input_tokens`);
 
   let inputUpdated = 0;
   const updateInputLog = db.prepare(
@@ -161,34 +160,52 @@ function main(): void {
     "UPDATE request_metrics SET input_tokens = ?, input_tokens_estimated = 1 WHERE request_log_id = ?"
   );
 
-  const txInput = db.transaction(() => {
-    for (const row of inputCandidates) {
-      const body = parseClientRequest(row.client_request);
-      if (!body) continue;
-      const allText = extractAllText(body);
-      const tokens = countTokens(allText);
-      if (tokens === 0) continue;
-      updateInputLog.run(tokens, row.id);
-      updateInputMetrics.run(tokens, row.id);
-      inputUpdated++;
+  // 分批读取处理，避免一次性加载全部行导致 OOM
+  const inputStmt = db.prepare(`
+    SELECT id, client_request, input_tokens, metrics_complete
+    FROM request_logs
+    WHERE (input_tokens IS NULL OR input_tokens = 0)
+      AND client_request IS NOT NULL
+    LIMIT ? OFFSET ?
+  `);
+
+  let offset = 0;
+  while (true) {
+    const batch = inputStmt.all(BATCH_SIZE, offset) as Pick<LogRow, "id" | "client_request" | "input_tokens" | "metrics_complete">[];
+    if (batch.length === 0) break;
+
+    const txBatch = db.transaction(() => {
+      for (const row of batch) {
+        const body = parseClientRequest(row.client_request);
+        if (!body) continue;
+        const allText = extractAllText(body);
+        const tokens = countTokens(allText);
+        if (tokens === 0) continue;
+        updateInputLog.run(tokens, row.id);
+        updateInputMetrics.run(tokens, row.id);
+        inputUpdated++;
+      }
+    });
+    txBatch();
+
+    offset += batch.length;
+    if (batch.length < BATCH_SIZE) break;
+    if (inputUpdated % 2000 === 0) {
+      console.log(`  Progress: ${inputUpdated}/${inputCount} records updated...`);
     }
-  });
-  txInput();
+  }
   console.log(`Updated ${inputUpdated} records`);
 
   // 2. Backfill TPS breakdown for streaming records
   console.log("\n=== Backfilling TPS breakdown ===");
-  const tpsCandidates = db.prepare(`
-    SELECT id, stream_text_content, output_tokens, tokens_per_second, ttft_ms, latency_ms, is_stream, metrics_complete
-    FROM request_logs
+  const tpsCount = (db.prepare(`SELECT COUNT(*) as cnt FROM request_logs
     WHERE is_stream = 1
       AND stream_text_content IS NOT NULL
       AND ttft_ms IS NOT NULL
       AND latency_ms IS NOT NULL
-      AND latency_ms >= ttft_ms
-  `).all() as LogRow[];
+      AND latency_ms >= ttft_ms`).get() as { cnt: number }).cnt;
 
-  console.log(`Found ${tpsCandidates.length} streaming records with text content`);
+  console.log(`Found ${tpsCount} streaming records with text content`);
 
   let tpsUpdated = 0;
   const updateTpsMetrics = db.prepare(`
@@ -199,47 +216,69 @@ function main(): void {
     WHERE request_log_id = ?
   `);
 
-  const txTps = db.transaction(() => {
-    for (const row of tpsCandidates) {
-      const { thinking, text, toolUse } = extractStreamBreakdown(row.stream_text_content);
+  const tpsStmt = db.prepare(`
+    SELECT id, stream_text_content, output_tokens, tokens_per_second, ttft_ms, latency_ms, is_stream, metrics_complete
+    FROM request_logs
+    WHERE is_stream = 1
+      AND stream_text_content IS NOT NULL
+      AND ttft_ms IS NOT NULL
+      AND latency_ms IS NOT NULL
+      AND latency_ms >= ttft_ms
+    LIMIT ? OFFSET ?
+  `);
 
-      const thinkingTokens = thinking ? countTokens(thinking) : null;
-      const textTokens = text ? countTokens(text) : null;
-      const toolUseTokens = toolUse ? countTokens(toolUse) : null;
+  offset = 0;
+  while (true) {
+    const batch = tpsStmt.all(BATCH_SIZE, offset) as LogRow[];
+    if (batch.length === 0) break;
 
-      const totalDurationMs = row.latency_ms;
-      const outputTokens = row.output_tokens ?? 0;
+    const txBatch = db.transaction(() => {
+      for (const row of batch) {
+        const { thinking, text, toolUse } = extractStreamBreakdown(row.stream_text_content);
 
-      // total_tps = output_tokens / total_duration (end-to-end)
-      let totalTps: number | null = null;
-      if (outputTokens > 0 && totalDurationMs > 0) {
-        totalTps = Math.round(outputTokens / (totalDurationMs / MS_PER_SECOND) * 100) / 100;
-      }
+        const thinkingTokens = thinking ? countTokens(thinking) : null;
+        const textTokens = text ? countTokens(text) : null;
+        const toolUseTokens = toolUse ? countTokens(toolUse) : null;
 
-      // text_tps (best estimate from backfill: text_tokens / (latency - ttft))
-      let textTps: number | null = null;
-      if (textTokens && textTokens > 0) {
-        const textDurationMs = totalDurationMs - row.ttft_ms!;
-        if (textDurationMs > 0) {
-          textTps = Math.round(textTokens / (textDurationMs / MS_PER_SECOND) * 100) / 100;
+        const totalDurationMs = row.latency_ms;
+        const outputTokens = row.output_tokens ?? 0;
+
+        let totalTps: number | null = null;
+        if (outputTokens > 0 && totalDurationMs > 0) {
+          totalTps = Math.round(outputTokens / (totalDurationMs / MS_PER_SECOND) * 100) / 100;
         }
+
+        let textTps: number | null = null;
+        if (textTokens && textTokens > 0) {
+          const textDurationMs = totalDurationMs - row.ttft_ms!;
+          if (textDurationMs > 0) {
+            textTps = Math.round(textTokens / (textDurationMs / MS_PER_SECOND) * 100) / 100;
+          }
+        }
+
+        // thinking_tps and tool_use_tps are null because historical data lacks per-phase timing
+        // (streaming events were not individually timestamped). Only newly processed requests
+        // (with SSEMetricsTransform) will have accurate per-phase TPS breakdowns.
+        // Frontend should display "--" for null values in backfilled records.
+        const tokensPerSecond = totalTps;
+
+        updateTpsMetrics.run(
+          tokensPerSecond,
+          thinkingTokens, textTokens, toolUseTokens,
+          null, textTps, null, totalTps,
+          row.id,
+        );
+        tpsUpdated++;
       }
+    });
+    txBatch();
 
-      // thinking_tps and tool_use_tps: can't accurately calculate from stored data
-      // (we don't have per-phase timing), set to null
-
-      const tokensPerSecond = totalTps;
-
-      updateTpsMetrics.run(
-        tokensPerSecond,
-        thinkingTokens, textTokens, toolUseTokens,
-        null, textTps, null, totalTps,
-        row.id,
-      );
-      tpsUpdated++;
+    offset += batch.length;
+    if (batch.length < BATCH_SIZE) break;
+    if (tpsUpdated % 2000 === 0) {
+      console.log(`  Progress: ${tpsUpdated}/${tpsCount} records updated...`);
     }
-  });
-  txTps();
+  }
   console.log(`Updated ${tpsUpdated} records`);
 
   console.log("\n=== Backfill complete ===");

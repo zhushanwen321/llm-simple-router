@@ -40,7 +40,7 @@ interface AnthropicMessageStart {
 
 interface AnthropicContentBlockDelta {
   type: string;
-  delta?: { type: string; text?: string; thinking?: string };
+  delta?: { type: string; text?: string; thinking?: string; partial_json?: string };
 }
 
 interface AnthropicMessageDelta {

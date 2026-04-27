@@ -181,7 +181,7 @@ export interface MetricsTimeseriesRow {
 
 const METRIC_EXPR: Record<MetricsMetric, string> = {
   ttft: "AVG(rm.ttft_ms)",
-  tps: "AVG(rm.tokens_per_second)",
+  tps: "AVG(COALESCE(rm.total_tps, rm.tokens_per_second))",
   text_tps: "AVG(rm.text_tps)",
   thinking_tps: "AVG(rm.thinking_tps)",
   tool_use_tps: "AVG(rm.tool_use_tps)",
