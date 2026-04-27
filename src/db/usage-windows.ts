@@ -52,7 +52,7 @@ export function getLatestWindow(
   return db.prepare(sql).get(...params) as UsageWindow | null ?? null;
 }
 
-/** 返回与 [start, end) 区间有重叠的窗口 */
+/** 返回与 [start, end) 区间有重叠的窗口。可选参数不传表示不过滤该维度（与 getLatestWindow 的 IS NULL 语义不同） */
 export function getWindowsInRange(
   db: Database.Database,
   start: string,

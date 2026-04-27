@@ -11,8 +11,8 @@
     </TableHeader>
     <TableBody>
       <TableRow v-for="item in items" :key="item.window.id">
-        <TableCell class="text-sm">{{ formatUsageTime(item.window.start_time) }}</TableCell>
-        <TableCell class="text-sm">{{ formatUsageTime(item.window.end_time) }}</TableCell>
+        <TableCell class="text-sm">{{ formatTimeShort(item.window.start_time) }}</TableCell>
+        <TableCell class="text-sm">{{ formatTimeShort(item.window.end_time) }}</TableCell>
         <TableCell>{{ item.usage.request_count }}</TableCell>
         <TableCell>{{ item.usage.total_input_tokens.toLocaleString() }}</TableCell>
         <TableCell>{{ item.usage.total_output_tokens.toLocaleString() }}</TableCell>
@@ -29,8 +29,4 @@ import type { UsageWindowWithUsage } from '@/api/client'
 defineProps<{
   items: UsageWindowWithUsage[]
 }>()
-
-function formatUsageTime(iso: string): string {
-  return formatTimeShort(iso)
-}
 </script>
