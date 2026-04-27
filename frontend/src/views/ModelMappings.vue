@@ -33,7 +33,8 @@
           </div>
         </CardHeader>
         <CardContent>
-          <!-- 故障转移标识 -->\n          <div v-if="(g.parsedRule.targets || []).length > 1" class="mb-2">
+          <!-- 故障转移标识 -->
+          <div v-if="(g.parsedRule.targets || []).length > 1" class="mb-2">
             <span class="inline-flex items-center rounded-full bg-orange-100 dark:bg-orange-900/30 px-2 py-0.5 text-xs font-medium text-orange-700 dark:text-orange-300">
               故障转移 · {{ g.parsedRule.targets.length }} 级
             </span>
