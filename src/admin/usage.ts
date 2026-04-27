@@ -2,6 +2,7 @@ import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
 import { Type } from "@sinclair/typebox";
 import { getWindowsInRange, getWindowUsage } from "../db/usage-windows.js";
+import { getProviderById } from "../db/providers.js";
 import { resolveTimeRange } from "../utils/time-range.js";
 
 interface UsageRoutesOptions {
@@ -56,17 +57,33 @@ function getDailyUsage(
   `).all(...params) as DailyUsageRow[];
 }
 
+function resolveProviderName(db: Database.Database, providerId: string | null): string | null {
+  if (!providerId) return null;
+  return getProviderById(db, providerId)?.name ?? null;
+}
+
 export const adminUsageRoutes: FastifyPluginCallback<UsageRoutesOptions> = (app, options, done) => {
   const { db } = options;
 
   app.get("/admin/api/usage/windows", { schema: { querystring: UsageQuerySchema } }, async (request) => {
     const query = request.query as { router_key_id?: string; provider_id?: string };
-    const range = resolveTimeRange("window", db, query.router_key_id);
-    const windows = getWindowsInRange(db, range.startTime, range.endTime, query.router_key_id, query.provider_id);
-    if (windows.length === 0) return [];
-    return windows.map(w => ({
-      window: w,
-      usage: getWindowUsage(db, w.start_time, w.end_time, query.router_key_id, query.provider_id),
+
+    if (query.provider_id) {
+      const range = resolveTimeRange("window", db, query.router_key_id, query.provider_id);
+      const windows = getWindowsInRange(db, range.startTime, range.endTime, query.router_key_id, query.provider_id);
+      if (windows.length === 0) return [];
+      return windows.map(w => ({
+        window: { ...w, provider_name: resolveProviderName(db, w.provider_id) },
+        usage: getWindowUsage(db, w.start_time, w.end_time, query.router_key_id, query.provider_id),
+      }));
+    }
+
+    const allWindows = getWindowsInRange(db, "1970-01-01", "2099-12-31", query.router_key_id)
+      .filter((w) => w.provider_id !== null);
+    if (allWindows.length === 0) return [];
+    return allWindows.map(w => ({
+      window: { ...w, provider_name: resolveProviderName(db, w.provider_id) },
+      usage: getWindowUsage(db, w.start_time, w.end_time, query.router_key_id),
     }));
   });
 

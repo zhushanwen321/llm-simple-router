@@ -247,7 +247,7 @@ interface StatsResponse {
 }
 
 export interface UsageWindowWithUsage {
-  window: { id: string; router_key_id: string | null; provider_id: string | null; start_time: string; end_time: string; created_at: string }
+  window: { id: string; router_key_id: string | null; provider_id: string | null; provider_name: string | null; start_time: string; end_time: string; created_at: string }
   usage: { request_count: number; total_input_tokens: number; total_output_tokens: number }
 }
 
