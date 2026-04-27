@@ -102,8 +102,8 @@ export class ProviderSemaphoreManager {
   ): Promise<AcquireToken> {
     const entry = this.getOrCreate(providerId);
     const maxConcurrency = override?.max_concurrency ?? entry.config.maxConcurrency;
-    const queueTimeoutMs = override?.queue_timeout_ms ?? entry.config.queueTimeoutMs;
-    const maxQueueSize = override?.max_queue_size ?? entry.config.maxQueueSize;
+    const queueTimeoutMs = Math.max(0, override?.queue_timeout_ms ?? entry.config.queueTimeoutMs);
+    const maxQueueSize = Math.max(0, override?.max_queue_size ?? entry.config.maxQueueSize);
 
     if (maxConcurrency === 0) return { generation: entry.generation };
     if (entry.current < maxConcurrency) {

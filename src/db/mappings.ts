@@ -101,22 +101,20 @@ function isTarget(value: unknown): value is Target {
 }
 
 // --- 从 mapping_groups rule JSON 中提取 target 条目 ---
-// rule.default / rule.windows 为 migration 026 前旧格式的向后兼容检查，
-// 正常情况（026 已执行）下仅 rule.targets 生效。
+// 主格式为 { targets: [...] }，向后兼容旧 { default: {...} }。
+// 与 mapping-resolver.ts 中 parseTargets 保持逻辑一致。
 function extractTargets(rule: Record<string, unknown>): Target[] {
   const results: Target[] = [];
-  if (isTarget(rule.default)) results.push(rule.default);
   if (Array.isArray(rule.targets)) {
     for (const t of rule.targets) {
       if (isTarget(t)) results.push(t);
     }
   }
-  if (Array.isArray(rule.windows)) {
-    for (const w of rule.windows) {
-      if (w && typeof w === "object" && isTarget((w as Record<string, unknown>).target)) {
-        results.push((w as Record<string, unknown>).target as Target);
-      }
-    }
+  // 兼容旧格式 { default: {...} }（向后兼容 migration 026 前数据）
+  // eslint-disable-next-line taste/no-deprecated-rule-format
+  if (results.length === 0 && isTarget(rule.default)) {
+    // eslint-disable-next-line taste/no-deprecated-rule-format
+    results.push(rule.default);
   }
   return results;
 }

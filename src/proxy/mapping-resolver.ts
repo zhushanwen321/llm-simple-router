@@ -28,8 +28,10 @@ function parseTargets(ruleJson: unknown): Target[] {
       if (isTarget(t)) targets.push(t);
     }
   }
-  // 兼容 migration 026 前旧格式 { default, windows }
+  // 兼容旧格式 { default, windows }（向后兼容 migration 026 前数据）
+  // eslint-disable-next-line taste/no-deprecated-rule-format
   if (targets.length === 0 && isTarget(rule.default)) {
+    // eslint-disable-next-line taste/no-deprecated-rule-format
     targets.push(rule.default);
   }
   return targets;
@@ -52,9 +54,9 @@ function parseConcurrencyRule(concurrencyRule: string | null): ConcurrencyOverri
     const parsed = JSON.parse(concurrencyRule);
     if (typeof parsed !== "object" || parsed === null) return undefined;
     const override: ConcurrencyOverride = {};
-    if (typeof parsed.max_concurrency === "number") override.max_concurrency = parsed.max_concurrency;
-    if (typeof parsed.queue_timeout_ms === "number") override.queue_timeout_ms = parsed.queue_timeout_ms;
-    if (typeof parsed.max_queue_size === "number") override.max_queue_size = parsed.max_queue_size;
+    if (typeof parsed.max_concurrency === "number" && parsed.max_concurrency >= 1) override.max_concurrency = parsed.max_concurrency;
+    if (typeof parsed.queue_timeout_ms === "number" && parsed.queue_timeout_ms >= 0) override.queue_timeout_ms = parsed.queue_timeout_ms;
+    if (typeof parsed.max_queue_size === "number" && parsed.max_queue_size >= 0) override.max_queue_size = parsed.max_queue_size;
     return Object.keys(override).length > 0 ? override : undefined;
   } catch {
     return undefined;

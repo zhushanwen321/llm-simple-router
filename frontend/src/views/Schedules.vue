@@ -445,6 +445,7 @@ function validate(): boolean {
 }
 
 async function handleSave() {
+  formError.value = ''
   if (!validate()) return
 
   try {

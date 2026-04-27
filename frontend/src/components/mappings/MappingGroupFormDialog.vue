@@ -15,11 +15,19 @@
 
         <div class="border rounded-lg p-3 space-y-3">
           <div class="flex items-center justify-between">
-            <div class="text-sm font-medium text-foreground">目标列表</div>
-            <Button type="button" variant="outline" size="sm" @click="emit('addTarget')">添加目标</Button>
+            <div class="flex items-center gap-2">
+              <span class="text-sm font-medium text-foreground">故障转移链</span>
+              <span v-if="form.targets.length > 1" class="inline-flex items-center rounded-full bg-orange-100 dark:bg-orange-900/30 px-2 py-0.5 text-xs font-medium text-orange-700 dark:text-orange-300">
+                已启用
+              </span>
+              <span v-else class="text-xs text-muted-foreground">添加多个目标启用故障转移</span>
+            </div>
+            <Button type="button" variant="outline" size="sm" @click="emit('addTarget')">添加备选</Button>
           </div>
           <p v-if="errors.targets" class="text-sm text-destructive">{{ errors.targets }}</p>
+          <p class="text-xs text-muted-foreground">请求按顺序依次尝试，当前一个目标失败时自动切换到下一个</p>
           <div v-for="(t, idx) in form.targets" :key="idx" class="border rounded-md p-2 space-y-2">
+            <div class="text-xs font-medium" :class="idx === 0 ? 'text-primary' : 'text-muted-foreground'">{{ idx === 0 ? '首选' : `备选 ${idx}` }}</div>
             <div class="flex gap-3">
               <div class="flex-1">
                 <div class="text-xs text-muted-foreground mb-1">模型</div>
@@ -65,8 +73,14 @@
               </Button>
               <Button type="button" variant="ghost" size="sm" class="text-destructive shrink-0" @click="emit('removeTarget', idx)">删除</Button>
             </div>
+            <div v-if="idx < form.targets.length - 1" class="flex justify-center pt-1">
+              <div class="flex items-center gap-1 text-xs text-muted-foreground">
+                <ChevronDown class="w-3.5 h-3.5" />
+                <span>失败时自动切换</span>
+                <ChevronDown class="w-3.5 h-3.5" />
+              </div>
+            </div>
           </div>
-          <div v-if="form.targets.length === 0" class="text-sm text-muted-foreground">暂无目标</div>
         </div>
 
         <DialogFooter>
@@ -80,7 +94,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { ArrowUp, ArrowDown, HelpCircle } from 'lucide-vue-next'
+import { ArrowUp, ArrowDown, ChevronDown, HelpCircle } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'

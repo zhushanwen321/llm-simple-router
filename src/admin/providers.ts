@@ -33,8 +33,10 @@ function cascadeProviderDisable(db: Database.Database, providerId: string): Casc
     let modified = false;
     let shouldDisable = false;
 
-    // 归一化旧格式 { default, windows } → { targets }
+    // 归一化旧格式 { default, windows } → { targets }（向后兼容 migration 026 前数据）
+    // eslint-disable-next-line taste/no-deprecated-rule-format
     if (!Array.isArray(rule.targets) && typeof rule.default === "object" && rule.default !== null) {
+      // eslint-disable-next-line taste/no-deprecated-rule-format
       rule.targets = [rule.default];
     }
 
@@ -265,22 +267,6 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
       const refs: string[] = [];
       try {
         const rule = JSON.parse(g.rule);
-        if (rule.default?.provider_id === id) {
-          refs.push(`默认模型 (${rule.default.backend_model})`);
-        }
-        if (rule.default?.overflow_provider_id === id) {
-          refs.push(`默认溢出模型 (${rule.default.overflow_model || "-"})`);
-        }
-        if (Array.isArray(rule.windows)) {
-          for (const w of rule.windows) {
-            if (w.target?.provider_id === id) {
-              refs.push(`时间窗口 ${w.start}-${w.end} (${w.target.backend_model})`);
-            }
-            if (w.target?.overflow_provider_id === id) {
-              refs.push(`时间窗口 ${w.start}-${w.end} 溢出 (${w.target.overflow_model || "-"})`);
-            }
-          }
-        }
         if (Array.isArray(rule.targets)) {
           for (let i = 0; i < rule.targets.length; i++) {
             const t = rule.targets[i];
@@ -311,13 +297,8 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     for (const g of groups) {
       try {
         const rule = JSON.parse(g.rule);
-        const candidates: Array<{ provider_id?: string }> = [];
-        // 旧格式 backups
-        if (rule.default) candidates.push(rule.default);
-        if (Array.isArray(rule.windows)) candidates.push(...rule.windows.map((w: Record<string, unknown>) => w.target as { provider_id?: string } | undefined).filter(Boolean));
-        // 新格式
-        if (Array.isArray(rule.targets)) candidates.push(...rule.targets);
-        if (candidates.some((c) => c?.provider_id === id)) {
+        const targets = Array.isArray(rule.targets) ? rule.targets : [];
+        if (targets.some((t: Record<string, unknown>) => t?.provider_id === id)) {
           return reply.code(HTTP_CONFLICT).send(apiError(API_CODE.CONFLICT_REFERENCED, `Provider is referenced by mapping group '${g.client_model}'`));
         }
       } catch { continue }

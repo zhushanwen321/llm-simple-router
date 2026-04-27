@@ -33,15 +33,28 @@
           </div>
         </CardHeader>
         <CardContent>
-          <div class="space-y-1.5 text-sm">
-            <div v-for="(t, idx) in (g.parsedRule.targets || [])" :key="idx" class="flex items-center gap-1.5">
-              <span class="font-mono">{{ t.backend_model }}</span>
-              <span class="text-muted-foreground">/</span>
-              <span class="text-muted-foreground">{{ providerNameMap.get(t.provider_id) || t.provider_id }}</span>
-              <template v-if="t.overflow_model">
-                <span class="text-muted-foreground">→</span>
-                <span class="font-mono text-primary">{{ t.overflow_model }}</span>
-              </template>
+          <!-- 故障转移标识 -->\n          <div v-if="(g.parsedRule.targets || []).length > 1" class="mb-2">
+            <span class="inline-flex items-center rounded-full bg-orange-100 dark:bg-orange-900/30 px-2 py-0.5 text-xs font-medium text-orange-700 dark:text-orange-300">
+              故障转移 · {{ g.parsedRule.targets.length }} 级
+            </span>
+          </div>
+          <!-- 目标列表 -->
+          <div class="space-y-1 text-sm">
+            <div v-for="(t, idx) in (g.parsedRule.targets || [])" :key="idx">
+              <div class="flex items-center gap-1.5">
+                <span class="text-xs shrink-0" :class="idx === 0 ? 'text-primary font-medium' : 'text-muted-foreground'">{{ idx === 0 ? '首选' : `备${idx}` }}</span>
+                <span class="font-mono">{{ t.backend_model }}</span>
+                <span class="text-muted-foreground">/</span>
+                <span class="text-muted-foreground truncate">{{ providerNameMap.get(t.provider_id) || t.provider_id }}</span>
+                <template v-if="t.overflow_model">
+                  <span class="text-muted-foreground">→</span>
+                  <span class="font-mono text-primary truncate">{{ t.overflow_model }}</span>
+                </template>
+              </div>
+              <div v-if="idx < (g.parsedRule.targets || []).length - 1" class="flex items-center gap-1 pl-4 text-xs text-muted-foreground">
+                <span class="w-3 border-t border-muted-foreground/30"></span>
+                <span>失败时切换</span>
+              </div>
             </div>
             <div v-if="!(g.parsedRule.targets || []).length" class="text-xs text-muted-foreground">无目标</div>
           </div>
