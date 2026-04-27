@@ -93,22 +93,23 @@ export class MetricsExtractor {
     ) {
       totalDurationMs = this.streamEndTime - this.streamStartTime;
 
-      if (this.hasThinkingContent) {
-        // Thinking model: output_tokens includes thinking + text tokens.
+      if (this.textContentBuffer.length > 0 && this.textStreamStartTime !== null) {
         // Use gpt-tokenizer to count actual text-only tokens from the
-        // streamed text content, avoiding chars-to-token estimation errors.
-        if (this.textContentBuffer.length > 0 && this.textStreamStartTime !== null) {
-          const textTokens = encode(this.textContentBuffer).length;
-          const textDurationMs = this.streamEndTime - this.textStreamStartTime;
-          if (textTokens > 0 && textDurationMs > 0) {
-            tokensPerSecond = textTokens / (textDurationMs / MS_PER_SECOND);
-          }
+        // streamed text content for accurate TPS. This handles both:
+        // 1. Thinking models with thinking_delta events (output_tokens = thinking + text)
+        // 2. Thinking models WITHOUT thinking_delta (e.g. Zhipu: server-side thinking,
+        //    output_tokens inflated but no thinking_delta events to detect)
+        const textTokens = encode(this.textContentBuffer).length;
+        const textDurationMs = this.streamEndTime - this.textStreamStartTime;
+        if (textTokens > 0 && textDurationMs > 0) {
+          tokensPerSecond = textTokens / (textDurationMs / MS_PER_SECOND);
         }
-        // No text content → TPS remains null (can't measure visible output speed)
-      } else if (totalDurationMs > 0) {
+      } else if (!this.hasThinkingContent && totalDurationMs > 0) {
+        // Non-thinking model without text content collected: use API output_tokens
         tokensPerSecond =
           this.outputTokens / (totalDurationMs / MS_PER_SECOND);
       }
+      // Thinking model with no text output → TPS remains null
     }
 
     return {

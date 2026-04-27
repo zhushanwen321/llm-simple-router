@@ -91,8 +91,12 @@ describe("MetricsExtractor - Anthropic streaming", () => {
     // total = 500
     expect(metrics.total_duration_ms).toBe(500);
 
-    // tokens_per_second = 42 / (500/1000) = 84
-    expect(metrics.tokens_per_second).toBe(84);
+    // text_delta "Hello" + " world" = "Hello world" = 2 tokens (o200k_base)
+    // textStreamStartTime at first text_delta = MOCK_NOW + 200
+    // streamEndTime at message_delta = MOCK_NOW + 500
+    // textDurationMs = 300ms
+    // tokens_per_second = 2 / 0.3 = 6.67
+    expect(metrics.tokens_per_second).toBeCloseTo(6.67, 1);
   });
 
   it("should handle thinking_delta for TTFT", () => {
@@ -221,8 +225,10 @@ describe("MetricsExtractor - Anthropic streaming", () => {
 
       const metrics = extractor.getMetrics();
 
-      // 无 thinking 内容，使用原始公式: 42 / (500/1000) = 84
-      expect(metrics.tokens_per_second).toBe(84);
+      // 无 thinking 内容但有 text_delta 内容，走 tokenizer
+      // text = "Hello world" = 2 tokens, textDuration = 300ms
+      // tokens_per_second = 2 / 0.3 = 6.67
+      expect(metrics.tokens_per_second).toBeCloseTo(6.67, 1);
     });
 
     it("should handle thinking-only model with no text output (TPS = null)", () => {
