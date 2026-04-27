@@ -9,9 +9,9 @@
       </Button>
     </div>
 
-    <!-- Raw JSON view -->
+    <!-- Raw JSON view: upstream response metadata (headers + response body minus content) -->
     <ScrollArea v-if="showRaw" class="max-h-[60vh] rounded-md border">
-      <pre class="p-3 text-[11px] whitespace-pre-wrap break-words">{{ rawOverviewJson }}</pre>
+      <pre class="p-3 text-[11px] whitespace-pre-wrap break-words">{{ responseMetadataJson }}</pre>
     </ScrollArea>
 
     <!-- Structured view (below) -->
@@ -126,9 +126,78 @@ const props = defineProps<{ overview: UnifiedRequestOverview }>()
 
 const showRaw = ref(false)
 
-const rawOverviewJson = computed(() => {
-  return JSON.stringify(props.overview, null, 2)
+/** Content keys to strip from LLM response body for the metadata view */
+const CONTENT_KEYS: ReadonlySet<string> = new Set([
+  // OpenAI
+  'choices',
+  // Anthropic
+  'content',
+])
+
+/**
+ * Extract metadata from upstream response:
+ * - Parse the wrapper { statusCode, headers, body } from upstreamResponse
+ * - From body, strip content fields (choices/content) to show only metadata
+ * - Combine into a clean metadata object
+ */
+const responseMetadataJson = computed(() => {
+  const raw = props.overview.upstreamResponse
+  if (!raw) {
+    // Fallback: no upstream_response, show overview metrics as JSON
+    return JSON.stringify({
+      latencyMs: props.overview.latencyMs,
+      ttftMs: props.overview.ttftMs,
+      inputTokens: props.overview.inputTokens,
+      outputTokens: props.overview.outputTokens,
+      tokensPerSecond: props.overview.tokensPerSecond,
+      cacheReadTokens: props.overview.cacheReadTokens,
+      cacheWriteTokens: props.overview.cacheWriteTokens,
+      stopReason: props.overview.stopReason,
+      statusCode: props.overview.statusCode,
+    }, null, 2)
+  }
+
+  try {
+    const parsed = JSON.parse(raw)
+
+    // Check if it's the wrapper format: { statusCode, headers, body }
+    if (typeof parsed.statusCode === 'number' && (parsed.headers || parsed.body !== undefined)) {
+      const result: Record<string, unknown> = {
+        statusCode: parsed.statusCode,
+      }
+      if (parsed.headers) {
+        result.headers = parsed.headers
+      }
+      // Parse body and strip content fields
+      if (parsed.body) {
+        const bodyStr = typeof parsed.body === 'string' ? parsed.body : JSON.stringify(parsed.body)
+        try {
+          const bodyObj = JSON.parse(bodyStr)
+          result.body = stripContentFields(bodyObj)
+        } catch {
+          // body is not JSON (e.g. SSE text), keep as-is
+          result.body = parsed.body
+        }
+      }
+      return JSON.stringify(result, null, 2)
+    }
+
+    // Not a wrapper, it IS the LLM response body directly — strip content
+    return JSON.stringify(stripContentFields(parsed), null, 2)
+  } catch {
+    return raw
+  }
 })
+
+function stripContentFields(obj: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(obj)) {
+    if (!CONTENT_KEYS.has(key)) {
+      result[key] = value
+    }
+  }
+  return result
+}
 
 const statusColor = computed(() => {
   if (props.overview.status === 'pending') return 'pending'

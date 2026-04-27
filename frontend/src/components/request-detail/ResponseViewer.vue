@@ -109,11 +109,11 @@ const blocks = computed<ContentBlock[]>(() => {
   }))
 })
 
-// Raw content for raw view
+// Raw content for raw view: prefer full upstreamResponse (with headers) for history mode
 const rawContent = computed(() => {
   if (props.source === 'realtime') {
     return props.streamContent?.rawChunks || props.responseBody || ''
   }
-  return props.responseBody || props.upstreamResponse || ''
+  return props.upstreamResponse || props.responseBody || ''
 })
 </script>

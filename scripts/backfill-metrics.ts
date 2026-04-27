@@ -80,6 +80,8 @@ function extractAllText(body: Record<string, unknown>): string {
 /** 从 stream_text_content（完整 Anthropic/OpenAI 响应 JSON）中提取纯文本内容 */
 function extractTextFromStreamContent(raw: string | null): string {
   if (!raw) return "";
+  // 纯文本格式（无 JSON 包装）：直接返回全部内容
+  if (!raw.trim().startsWith("{")) return raw;
   try {
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     // OpenAI 格式: { choices: [{ message: { content: "..." } }] }
