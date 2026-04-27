@@ -1,46 +1,27 @@
 import type { ChartOptions } from 'chart.js'
 import { parseUtc, formatTimeHM } from '@/utils/format'
 
-const SEC_PER_MINUTE = 60
-const SEC_PER_HOUR = 3600
-const SEC_PER_DAY = 86400
 const MS_PER_SEC = 1000
-const HOURS_5 = 5
-const HOURS_6 = 6
-const DAYS_7 = 7
-const DAYS_30 = 30
-const MINUTES_5 = 5
-const MINUTES_15 = 15
-const HOURS_4 = 4
-const DAY_MS = SEC_PER_DAY * MS_PER_SEC
+const DAY_MS = 86400 * MS_PER_SEC
 const DAY_TICK_THRESHOLD = 4
 
 const PERIOD_TOTAL_SEC: Record<string, number> = {
-  '1h': SEC_PER_HOUR,
-  '5h': SEC_PER_HOUR * HOURS_5,
-  '6h': SEC_PER_HOUR * HOURS_6,
-  '24h': SEC_PER_DAY,
-  '7d': SEC_PER_DAY * DAYS_7,
-  '30d': SEC_PER_DAY * DAYS_30,
-  'window': SEC_PER_HOUR * HOURS_5,
-  'weekly': SEC_PER_DAY * DAYS_7,
-  'monthly': SEC_PER_DAY * DAYS_30,
+  '1h': 3600,
+  '5h': 18000,
+  '6h': 21600,
+  '24h': 86400,
+  '7d': 604800,
+  '30d': 2592000,
+  'window': 18000,
+  'weekly': 604800,
+  'monthly': 2592000,
 }
 
-const BUCKET_SEC: Record<string, number> = {
-  '1h': SEC_PER_MINUTE,
-  '5h': SEC_PER_MINUTE * MINUTES_5,
-  '6h': SEC_PER_MINUTE * MINUTES_5,
-  '24h': SEC_PER_MINUTE * MINUTES_15,
-  '7d': SEC_PER_HOUR,
-  '30d': SEC_PER_HOUR * HOURS_4,
-  'window': SEC_PER_MINUTE * MINUTES_5,
-  'weekly': SEC_PER_HOUR,
-  'monthly': SEC_PER_HOUR * HOURS_4,
+function calcBucketSec(totalSec: number): number {
+  return Math.max(60, Math.round(totalSec / 10))
 }
 
-const DEFAULT_BUCKET_SEC = SEC_PER_MINUTE * MINUTES_15
-const DEFAULT_TOTAL_SEC = SEC_PER_DAY
+const DEFAULT_TOTAL_SEC = 86400
 const TICK_COUNT = 5
 const LONG_PERIODS = new Set(['7d', '30d', 'weekly', 'monthly'])
 
@@ -73,7 +54,8 @@ export function fillTimeseries(
   periodStr: string,
   timeRange?: { startTime: string; endTime: string },
 ): { labels: string[]; values: number[] } {
-  const bucketSec = BUCKET_SEC[periodStr] ?? DEFAULT_BUCKET_SEC
+  const totalSec = PERIOD_TOTAL_SEC[periodStr] ?? DEFAULT_TOTAL_SEC
+  const bucketSec = calcBucketSec(timeRange ? ((parseUtc(timeRange.endTime).getTime() - parseUtc(timeRange.startTime).getTime()) / MS_PER_SEC) : totalSec)
   const bMs = bucketMs(bucketSec)
 
   // Determine the actual time range from provided timeRange or fallback to period-based calculation

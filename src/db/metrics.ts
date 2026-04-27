@@ -70,16 +70,10 @@ const PERIOD_OFFSET: Record<MetricsPeriod, string> = {
   "30d": "-30 days",
 };
 
-const BUCKET_SECONDS: Record<MetricsPeriod, number> = {
-  "1h": 60,
-  "5h": 300,
-  "6h": 300,
-  "24h": 900,
-  "7d": 3600,
-  "30d": 14400,
-};
-
-// unix epoch 秒转毫秒的乘数
+// 精确 10 个数据点：总秒数 / 10，最小 60 秒避免过细
+function calcBucketSec(totalSec: number): number {
+  return Math.max(60, Math.round(totalSec / 10));
+}
 
 export interface MetricsSummaryRow {
   provider_id: string;
@@ -97,21 +91,15 @@ export interface MetricsSummaryRow {
   cache_hit_rate: number | null;
 }
 
-// 时间跨度（秒）→ 桶大小（秒）的阶梯映射，与 BUCKET_SECONDS 保持对齐
-const BUCKET_THRESHOLDS = [
-  { maxSec: 3600, bucketSec: 60 },     // ≤1h: 1min
-  { maxSec: 21600, bucketSec: 300 },    // ≤6h: 5min
-  { maxSec: 86400, bucketSec: 900 },    // ≤1d: 15min
-  { maxSec: 604800, bucketSec: 3600 },  // ≤7d: 1h
-] as const;
-const FALLBACK_BUCKET_SEC = 14400;      // >7d: 4h
-
-function calculateBucketSeconds(startTime: string, endTime: string): number {
-  const ms = new Date(endTime).getTime() - new Date(startTime).getTime();
-  const sec = ms / MS_PER_SECOND;
-  const match = BUCKET_THRESHOLDS.find((t) => sec <= t.maxSec);
-  return match ? match.bucketSec : FALLBACK_BUCKET_SEC;
-}
+// 预设周期总秒数（与 PERIOD_OFFSET 对应）
+const PERIOD_TOTAL_SEC: Record<MetricsPeriod, number> = {
+  "1h": 3600,
+  "5h": 18000,
+  "6h": 21600,
+  "24h": 86400,
+  "7d": 604800,
+  "30d": 2592000,
+};
 
 function buildTimeCondition(
   period: MetricsPeriod,
@@ -196,8 +184,8 @@ export function getMetricsTimeseries(
   endTime?: string,
 ): MetricsTimeseriesRow[] {
   const bucketSec = (startTime && endTime)
-    ? calculateBucketSeconds(startTime, endTime)
-    : BUCKET_SECONDS[period];
+    ? calcBucketSec((new Date(endTime).getTime() - new Date(startTime).getTime()) / MS_PER_SECOND)
+    : calcBucketSec(PERIOD_TOTAL_SEC[period]);
   const { timeWhere, timeParams } = buildTimeCondition(period, startTime, endTime);
   const conditions = ["rm.is_complete = 1", timeWhere];
   const params: unknown[] = [...timeParams];
