@@ -14,6 +14,7 @@ const StatsQuerySchema = Type.Object({
   start_time: Type.Optional(Type.String()),
   end_time: Type.Optional(Type.String()),
   router_key_id: Type.Optional(Type.String()),
+  provider_id: Type.Optional(Type.String()),
 });
 
 interface StatsRoutesOptions {
@@ -39,7 +40,7 @@ export const adminStatsRoutes: FastifyPluginCallback<StatsRoutesOptions> = (app,
       endTime = range.endTime;
     }
 
-    const stats = getStats(options.db, startTime, endTime, query.router_key_id);
+    const stats = getStats(options.db, startTime, endTime, query.router_key_id, query.provider_id);
     return reply.send(stats);
   });
 
