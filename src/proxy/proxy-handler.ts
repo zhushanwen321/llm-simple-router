@@ -25,6 +25,7 @@ import type { RetryRuleMatcher } from "./retry-rules.js";
 import type { ProxyOrchestrator } from "./orchestrator.js";
 import type { ProxyErrorFormatter, ProxyErrorResponse } from "./proxy-core.js";
 import { ToolLoopGuard } from "./loop-prevention/tool-loop-guard.js";
+import { TOOL_USE_ID_PREFIX, TOOL_USE_ID_PROVIDER_PREFIX } from "./enhancement/directive-parser.js";
 import { buildTransportFn } from "./transport-fn.js";
 import { applyOverflowRedirect } from "./overflow.js";
 import { applyProviderPatches } from "./patch/index.js";
@@ -399,17 +400,22 @@ function extractLastToolUse(body: Record<string, unknown>): import("./loop-preve
     if (msg.role === "assistant") {
       const content = msg.content;
       if (Array.isArray(content)) {
-        for (const block of content) {
-          if ((block as Record<string, unknown>).type === "tool_use") {
-            const b = block as Record<string, unknown>;
-            const inputStr = JSON.stringify(b.input ?? {});
-            return {
-              toolName: b.name as string,
-              inputHash: simpleHash(inputStr),
-              inputText: inputStr,
-              timestamp: Date.now(),
-            };
+        // 从后往前遍历，找到第一个非 router 合成的 tool_use
+        for (let j = content.length - 1; j >= 0; j--) {
+          const block = content[j] as Record<string, unknown>;
+          if (block.type !== "tool_use") continue;
+          // 跳过 router 生成的 synthetic tool_use（如 AskUserQuestion 的模型选择）
+          const id = block.id as string | undefined;
+          if (id && (id.startsWith(TOOL_USE_ID_PREFIX) || id.startsWith(TOOL_USE_ID_PROVIDER_PREFIX))) {
+            continue;
           }
+          const inputStr = JSON.stringify(block.input ?? {});
+          return {
+            toolName: block.name as string,
+            inputHash: simpleHash(inputStr),
+            inputText: inputStr,
+            timestamp: Date.now(),
+          };
         }
       }
     }
