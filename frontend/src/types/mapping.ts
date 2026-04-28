@@ -58,3 +58,14 @@ export interface MappingTarget {
 export interface Rule {
   targets?: MappingTarget[]
 }
+
+/** Provider 转换规则 */
+export interface TransformRule {
+  provider_id: string
+  inject_headers: Record<string, string> | null
+  request_defaults: Record<string, unknown> | null
+  drop_fields: string[] | null
+  field_overrides: Record<string, unknown> | null
+  plugin_name: string | null
+  is_active: number
+}
