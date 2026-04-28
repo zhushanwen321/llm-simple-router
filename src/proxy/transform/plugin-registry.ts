@@ -1,0 +1,126 @@
+import type Database from "better-sqlite3";
+import { existsSync, mkdirSync, readdirSync } from "fs";
+import { join, resolve } from "path";
+import type { TransformPlugin, RequestTransformContext, ResponseTransformContext } from "./plugin-types.js";
+import { pluginMatches } from "./plugin-types.js";
+import { getAllActiveRules, type TransformRules } from "../../db/transform-rules.js";
+
+export class PluginRegistry {
+  private plugins: TransformPlugin[] = [];
+  private rulesCache: Map<string, TransformRules> = new Map();
+
+  registerPlugin(plugin: TransformPlugin): void {
+    this.plugins.push(plugin);
+  }
+
+  loadFromDB(db: Database.Database): void {
+    const rules = getAllActiveRules(db);
+    this.rulesCache.clear();
+    for (const rule of rules) {
+      this.rulesCache.set(rule.provider_id, rule);
+      this.plugins.push(this.ruleToPlugin(rule));
+    }
+  }
+
+  scanPluginsDir(dir: string): string[] {
+    const resolvedDir = resolve(dir);
+    const loaded: string[] = [];
+    if (!existsSync(resolvedDir)) {
+      mkdirSync(resolvedDir, { recursive: true });
+      return loaded;
+    }
+    const files = readdirSync(resolvedDir).filter(
+      (f) => f.endsWith(".js") || f.endsWith(".mjs"),
+    );
+    for (const file of files) {
+      const filePath = join(resolvedDir, file);
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        delete require.cache[require.resolve(filePath)];
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const mod = require(filePath);
+        const plugin: TransformPlugin = mod.default || mod;
+        if (!plugin.name) {
+          continue;
+        }
+        this.plugins.push(plugin);
+        loaded.push(`${plugin.name} (${file})`);
+      } catch {
+        // skip failed plugin
+      }
+    }
+    return loaded;
+  }
+
+  getMatchingPlugins(
+    provider: { id: string; name: string; api_type: string },
+  ): TransformPlugin[] {
+    return this.plugins.filter((p) => pluginMatches(p, provider));
+  }
+
+  applyBeforeRequest(ctx: RequestTransformContext): void {
+    for (const p of this.getMatchingPlugins(ctx.provider)) {
+      p.beforeRequestTransform?.(ctx);
+    }
+  }
+
+  applyAfterRequest(ctx: RequestTransformContext): void {
+    for (const p of this.getMatchingPlugins(ctx.provider)) {
+      p.afterRequestTransform?.(ctx);
+    }
+  }
+
+  applyBeforeResponse(ctx: ResponseTransformContext): void {
+    for (const p of this.getMatchingPlugins(ctx.provider)) {
+      p.beforeResponseTransform?.(ctx);
+    }
+  }
+
+  applyAfterResponse(ctx: ResponseTransformContext): void {
+    for (const p of this.getMatchingPlugins(ctx.provider)) {
+      p.afterResponseTransform?.(ctx);
+    }
+  }
+
+  reload(
+    db: Database.Database,
+    pluginsDir: string,
+  ): { loadedPlugins: string[]; rulesCount: number } {
+    this.plugins = [];
+    this.rulesCache.clear();
+    this.loadFromDB(db);
+    const loadedPlugins = this.scanPluginsDir(pluginsDir);
+    return { loadedPlugins, rulesCount: this.rulesCache.size };
+  }
+
+  private ruleToPlugin(rule: TransformRules): TransformPlugin {
+    return {
+      name: `declarative:${rule.provider_id}`,
+      match: { providerId: rule.provider_id },
+      afterRequestTransform(ctx: RequestTransformContext): void {
+        if (rule.request_defaults) {
+          for (const [key, val] of Object.entries(rule.request_defaults)) {
+            if (ctx.body[key] === undefined) ctx.body[key] = val;
+          }
+        }
+        if (rule.drop_fields) {
+          for (const field of rule.drop_fields) {
+            delete ctx.body[field];
+          }
+        }
+        if (rule.field_overrides) {
+          for (const [key, val] of Object.entries(rule.field_overrides)) {
+            ctx.body[key] = val;
+          }
+        }
+      },
+      afterResponseTransform(ctx: ResponseTransformContext): void {
+        if (rule.field_overrides) {
+          for (const [key, val] of Object.entries(rule.field_overrides)) {
+            ctx.response[key] = val;
+          }
+        }
+      },
+    };
+  }
+}
