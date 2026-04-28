@@ -212,6 +212,8 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
   const config = getConfig();
   const excludeTargets: Target[] = [];
   let rootLogId: string | null = null;
+  // TransformCoordinator 无状态，只需创建一次
+  const coordinator = new TransformCoordinator();
   while (true) {
     const startTime = Date.now();
     const logId = randomUUID();
@@ -270,7 +272,6 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
         `Provider '${resolved.provider_id}' unavailable`, resolved.provider_id);
     }
     // 格式转换：apiType 不匹配时转换请求体和路径
-    const coordinator = new TransformCoordinator();
     const needsTransform = coordinator.needsTransform(apiType, provider.api_type);
     let effectiveApiType = apiType;
     let effectiveUpstreamPath = upstreamPath;
