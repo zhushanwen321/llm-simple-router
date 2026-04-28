@@ -21,6 +21,7 @@ export interface AnthropicProxyOptions {
   semaphoreManager?: ProviderSemaphoreManager;
   tracker?: RequestTracker;
   usageWindowTracker?: UsageWindowTracker;
+  sessionTracker?: import("./loop-prevention/session-tracker.js").SessionTracker;
 }
 
 const MESSAGES_PATH = "/v1/messages";
@@ -41,7 +42,7 @@ const anthropicErrors = createErrorFormatter(
 );
 
 const anthropicProxyRaw: FastifyPluginCallback<AnthropicProxyOptions> = (app, opts, done) => {
-  const { db, streamTimeoutMs, retryBaseDelayMs, matcher, semaphoreManager, tracker, usageWindowTracker } = opts;
+  const { db, streamTimeoutMs, retryBaseDelayMs, matcher, semaphoreManager, tracker, usageWindowTracker, sessionTracker } = opts;
 
   const orchestrator = createOrchestrator(semaphoreManager, tracker);
 
@@ -59,7 +60,7 @@ const anthropicProxyRaw: FastifyPluginCallback<AnthropicProxyOptions> = (app, op
       const e = anthropicErrors.providerUnavailable();
       return reply.code(e.statusCode).send(e.body);
     }
-    const deps: RouteHandlerDeps = { db, streamTimeoutMs, retryBaseDelayMs, matcher, tracker, orchestrator, usageWindowTracker };
+    const deps: RouteHandlerDeps = { db, streamTimeoutMs, retryBaseDelayMs, matcher, tracker, orchestrator, usageWindowTracker, sessionTracker };
     return handleProxyRequest(request, reply, "anthropic", MESSAGES_PATH, anthropicErrors, deps);
   });
 

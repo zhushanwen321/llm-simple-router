@@ -93,6 +93,7 @@ export interface RouteHandlerDeps {
   tracker?: RequestTracker;
   orchestrator: ProxyOrchestrator;
   usageWindowTracker?: import("./usage-window-tracker.js").UsageWindowTracker;
+  sessionTracker?: import("./loop-prevention/session-tracker.js").SessionTracker;
 }
 
 import type { ContentBlock } from "../monitor/types.js";
@@ -133,6 +134,46 @@ export async function handleProxyRequest(
   const clientModel = ((request.body as Record<string, unknown>).model as string) || "unknown";
   const sessionId = (request.headers as RawHeaders)["x-claude-code-session-id"] as string | undefined;
   const { effectiveModel, originalModel, interceptResponse } = applyEnhancement(deps.db, request, clientModel, sessionId);
+
+  // --- 工具调用循环检测 ---
+  if (deps.sessionTracker && sessionId) {
+    const routerKeyId = (request.routerKey as { id?: string } | undefined)?.id ?? null;
+    const sessionKey = routerKeyId ? `${routerKeyId}:${sessionId}` : sessionId;
+    const lastToolUse = extractLastToolUse(request.body as Record<string, unknown>);
+    if (lastToolUse) {
+      const { ToolLoopGuard } = await import("./loop-prevention/tool-loop-guard.js");
+      const toolGuard = new ToolLoopGuard(deps.sessionTracker, {
+        enabled: true,
+        minConsecutiveCount: 3,
+        detectorConfig: { n: 6, windowSize: 500, repeatThreshold: 5 },
+      });
+      const checkResult = toolGuard.check(sessionKey, lastToolUse);
+      if (checkResult.detected) {
+        const loopCount = deps.sessionTracker.getLoopCount(sessionKey);
+        if (loopCount === 1) {
+          // 层级 1：透明重试 — 注入中断提示词
+          toolGuard.injectLoopBreakPrompt(request.body as Record<string, unknown>, apiType, lastToolUse.toolName);
+          request.log.warn({ sessionId, toolName: lastToolUse.toolName, loopCount },
+            "Tool call loop detected, injecting break prompt");
+        } else if (loopCount === 2) {
+          // 层级 2：优雅中断
+          return reply.code(422).send({
+            error: {
+              type: "tool_call_loop_detected",
+              message: `检测到工具调用循环（连续重复调用 "${lastToolUse.toolName}"）。请求已中断。`,
+              suggestion: "请回顾对话历史，停止重复调用工具，直接告知用户当前的进展和遇到的问题。",
+            },
+          });
+        } else {
+          // 层级 3：直接断开
+          request.log.warn({ sessionId, toolName: lastToolUse.toolName, loopCount },
+            "Tool call loop detected, hard disconnecting");
+          reply.raw.destroy();
+          return reply;
+        }
+      }
+    }
+  }
 
   if (interceptResponse) return handleIntercept(deps.db, apiType, request, reply, interceptResponse, clientModel, sessionId);
 
@@ -328,4 +369,40 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
       return reply.code(err.statusCode).send(err.body);
     }
   }
+}
+
+function extractLastToolUse(body: Record<string, unknown>): import("./loop-prevention/types.js").ToolCallRecord | null {
+  const messages = body.messages as Array<Record<string, unknown>> | undefined;
+  if (!messages) return null;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    if (msg.role === "assistant") {
+      const content = msg.content;
+      if (Array.isArray(content)) {
+        for (const block of content) {
+          if ((block as Record<string, unknown>).type === "tool_use") {
+            const b = block as Record<string, unknown>;
+            const inputStr = JSON.stringify(b.input ?? {});
+            return {
+              toolName: b.name as string,
+              inputHash: simpleHash(inputStr),
+              inputText: inputStr,
+              timestamp: Date.now(),
+            };
+          }
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function simpleHash(s: string): string {
+  let hash = 0;
+  for (let i = 0; i < s.length; i++) {
+    const char = s.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash |= 0;
+  }
+  return String(hash);
 }
