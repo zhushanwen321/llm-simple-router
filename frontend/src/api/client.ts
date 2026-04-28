@@ -569,4 +569,6 @@ export const api = {
     request<{ success: boolean }>("put", `${API.TRANSFORM_RULES}/${providerId}`, data),
   deleteTransformRules: (providerId: string) =>
     request<{ success: boolean }>("delete", `${API.TRANSFORM_RULES}/${providerId}`),
+  reloadTransformRules: () =>
+    request<{ loadedPlugins: string[]; rulesCount: number }>("post", `${API.TRANSFORM_RULES}/reload`),
 };

@@ -3,10 +3,16 @@
   <div class="p-6">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-lg font-semibold text-foreground">供应商</h2>
-      <Button @click="openCreate" class="flex items-center gap-1">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-        添加供应商
-      </Button>
+      <div class="flex items-center gap-2">
+        <Button variant="outline" size="sm" @click="handleReload" :disabled="reloading">
+          <RotateCw class="w-4 h-4 mr-1" :class="{ 'animate-spin': reloading }" />
+          重载插件
+        </Button>
+        <Button @click="openCreate" class="flex items-center gap-1">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          添加供应商
+        </Button>
+      </div>
     </div>
     <div class="bg-card rounded-lg border overflow-hidden">
       <Table>
@@ -250,9 +256,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog'
 import { Switch } from '@/components/ui/switch'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { ChevronDown } from 'lucide-vue-next'
+import { ChevronDown, RotateCw, Copy, Check } from 'lucide-vue-next'
 import { useTransformRules } from '@/composables/useTransformRules'
-import { Copy, Check } from 'lucide-vue-next'
 const DEFAULT_CONCURRENCY = 3
 const DEFAULT_CONCURRENCY_AUTO = 10
 const DEFAULT_QUEUE_TIMEOUT_MS = 120_000
@@ -296,9 +301,8 @@ const concurrencyMode = ref<ConcurrencyMode>('auto')
 const transformOpen = ref(false)
 const { transformForm, loadTransformRules, saveTransformRules, handleDeleteTransformRules } = useTransformRules()
 const copiedId = ref<string | null>(null)
-const MASK_VISIBLE_LEN = 7
-const MASK_ASTERISK_COUNT = 7
-const COPY_FEEDBACK_MS = 2000
+const reloading = ref(false)
+const MASK_VISIBLE_LEN = 7, MASK_ASTERISK_COUNT = 7, COPY_FEEDBACK_MS = 2000
 const providerSchema = z.object({
   name: z.string().min(1, '请输入名称').regex(/^[a-zA-Z0-9_-]+$/, '仅允许英文、数字、横线和下划线'),
   base_url: z.string().min(1, '请输入 Base URL').url('请输入合法的 URL'),
@@ -338,9 +342,7 @@ async function copyKey(key: string, id: string) {
   copiedId.value = id
   setTimeout(() => { copiedId.value = null }, COPY_FEEDBACK_MS)
 }
-// 预设级联状态
-const presetGroup = ref('')
-const presetPlan = ref('')
+const presetGroup = ref(''), presetPlan = ref('')
 const availablePlans = computed(() => {
   if (!presetGroup.value) return []
   return providerPresets.value.find(g => g.group === presetGroup.value)?.presets ?? []
@@ -428,7 +430,6 @@ function openEdit(p: Provider) {
   presetPlan.value = ''
   errors.value = {}
   dialogOpen.value = true
-  // Load transform rules
   loadTransformRules(p.id)
 }
 
@@ -514,6 +515,17 @@ async function handleDelete() {
   } catch (e: unknown) {
     console.error('Failed to delete provider:', e)
     toast.error(getApiMessage(e, '删除供应商失败'))
+  }
+}
+async function handleReload() {
+  reloading.value = true
+  try {
+    const result = await api.reloadTransformRules()
+    toast.success(`插件重载完成：${result.loadedPlugins.length} 个插件，${result.rulesCount} 条规则`)
+  } catch (e: unknown) {
+    toast.error(getApiMessage(e, '重载失败'))
+  } finally {
+    reloading.value = false
   }
 }
 onMounted(async () => {
