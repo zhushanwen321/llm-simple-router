@@ -88,6 +88,7 @@ export function buildTransportFn(p: TransportFnParams): (target: Target) => Prom
       const metricsTransform = new SSEMetricsTransform(p.apiType, p.startTime, {
         onMetrics: (m) => { p.tracker?.update(p.logId, { streamMetrics: toStreamMetrics(m) }); },
         onChunk: (rawLine) => { p.tracker?.appendStreamChunk(p.logId, rawLine, p.apiType, STREAM_CONTENT_MAX_RAW, STREAM_CONTENT_MAX_TEXT); },
+        onContentDelta: streamLoopGuard ? (text) => streamLoopGuard.feed(text) : undefined,
       });
       const checkEarlyError = p.matcher ? (data: string) => p.matcher!.test(UPSTREAM_SUCCESS, data) : undefined;
       const streamResult = await callStream(

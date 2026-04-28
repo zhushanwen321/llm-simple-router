@@ -10,6 +10,8 @@ export interface MetricsTransformOptions {
   onMetrics?: (metrics: MetricsResult) => void;
   /** 每收到一个 SSE data 行时触发，传入原始文本行 */
   onChunk?: (rawLine: string) => void;
+  /** 每次提取到内容文本（thinking / text / tool JSON delta）时触发，用于流式循环检测 */
+  onContentDelta?: (text: string) => void;
   /** 回调节流间隔（毫秒），默认 5000 */
   throttleMs?: number;
 }
@@ -23,8 +25,10 @@ export interface MetricsTransformOptions {
 export class SSEMetricsTransform extends Transform {
   private parser: SSEParser;
   private extractor: MetricsExtractor;
+  private readonly apiType: "openai" | "anthropic";
   private onMetrics?: (metrics: MetricsResult) => void;
   private onChunk?: (rawLine: string) => void;
+  private onContentDelta?: (text: string) => void;
   private throttleMs: number;
   private lastCallbackTime: number = 0;
   private flushed = false;
@@ -35,10 +39,12 @@ export class SSEMetricsTransform extends Transform {
     options?: MetricsTransformOptions,
   ) {
     super();
+    this.apiType = apiType;
     this.parser = new SSEParser();
     this.extractor = new MetricsExtractor(apiType, requestStartTime);
     this.onMetrics = options?.onMetrics;
     this.onChunk = options?.onChunk;
+    this.onContentDelta = options?.onContentDelta;
     this.throttleMs = options?.throttleMs ?? DEFAULT_THROTTLE_MS;
   }
 
@@ -47,7 +53,7 @@ export class SSEMetricsTransform extends Transform {
     const events = this.parser.feed(text);
     for (const event of events) {
       this.extractor.processEvent(event);
-      // 将解析后的事件还原为 SSE data 行格式传给 onChunk
+      this.emitContentDelta(event);
       if (event.data != null && this.onChunk) {
         this.onChunk(`data: ${event.data}`);
       }
@@ -60,6 +66,7 @@ export class SSEMetricsTransform extends Transform {
     const events = this.parser.flush();
     for (const event of events) {
       this.extractor.processEvent(event);
+      this.emitContentDelta(event);
     }
     // flush 无条件推送最终状态，确保消费者能拿到完整指标
     if (this.onMetrics && !this.flushed) {
@@ -72,6 +79,38 @@ export class SSEMetricsTransform extends Transform {
 
   getExtractor(): MetricsExtractor {
     return this.extractor;
+  }
+
+  /** 提取 SSE 事件中的内容文本，触发 onContentDelta 回调 */
+  private emitContentDelta(event: { data?: string }): void {
+    if (!this.onContentDelta || !event.data) return;
+    const delta = this.extractContentDelta(event.data);
+    if (delta) this.onContentDelta(delta);
+  }
+
+  /**
+   * 从 SSE data 字段中提取实际内容文本（thinking / text / tool JSON delta）。
+   * 忽略框架事件（message_start、ping 等），仅返回模型输出的内容。
+   */
+  private extractContentDelta(data: string): string | undefined {
+    try {
+      const parsed: Record<string, unknown> = JSON.parse(data);
+      if (this.apiType === "anthropic") {
+        if (parsed.type !== "content_block_delta" || typeof parsed.delta !== "object" || !parsed.delta) return undefined;
+        const delta = parsed.delta as Record<string, unknown>;
+        if (delta.type === "thinking_delta" && typeof delta.thinking === "string") return delta.thinking;
+        if (delta.type === "text_delta" && typeof delta.text === "string") return delta.text;
+        if (delta.type === "input_json_delta" && typeof delta.partial_json === "string") return delta.partial_json;
+      } else {
+        const choices = parsed.choices;
+        if (!Array.isArray(choices) || choices.length === 0) return undefined;
+        const first = choices[0] as Record<string, unknown>;
+        if (typeof first.delta !== "object" || !first.delta) return undefined;
+        const delta = first.delta as Record<string, unknown>;
+        if (typeof delta.content === "string") return delta.content;
+      }
+    } catch { /* 非 JSON 数据行，跳过 */ }
+    return undefined;
   }
 
   /** 节流逻辑：首次或距上次回调超过 throttleMs 时触发 */

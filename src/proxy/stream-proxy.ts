@@ -222,12 +222,11 @@ class StreamProxy {
     }
 
     this.pipeEntry.write(chunk);
-    if (this.loopGuard) {
-      this.loopGuard.feed(chunk.toString("utf-8"));
-      if (this.loopGuard.isTriggered()) {
-        this.terminal("stream_abort", { metrics: this.collectMetrics(false) });
-        return;
-      }
+    // loopGuard 由 SSEMetricsTransform 的 onContentDelta 回调驱动，
+    // 此处仅检查是否已触发（触发后终止流）
+    if (this.loopGuard?.isTriggered()) {
+      this.terminal("stream_abort", { metrics: this.collectMetrics(false) });
+      return;
     }
   }
 
