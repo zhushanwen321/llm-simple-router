@@ -1,6 +1,5 @@
 import { randomUUID } from "crypto";
 import { mapFinishReasonToStopReason, mapStopReasonToFinishReason, mapUsageOA2Ant, mapUsageAnt2OA } from "./usage-mapper.js";
-import { convertMessagesAnt2OA } from "./message-mapper.js";
 
 // ---------- Non-streaming response: OpenAI → Anthropic ----------
 

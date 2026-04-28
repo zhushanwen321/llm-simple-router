@@ -1,6 +1,6 @@
 import type { Transform } from "stream";
-import { transformRequestBody, openaiToAnthropicRequest, anthropicToOpenAIRequest } from "./request-transform.js";
-import { transformResponseBody, openaiResponseToAnthropic, anthropicResponseToOpenAI, transformErrorResponse } from "./response-transform.js";
+import { transformRequestBody } from "./request-transform.js";
+import { transformResponseBody, transformErrorResponse } from "./response-transform.js";
 import { OpenAIToAnthropicTransform, AnthropicToOpenAITransform } from "./stream-transform.js";
 
 export class TransformCoordinator {
@@ -15,13 +15,7 @@ export class TransformCoordinator {
     model: string,
   ): { body: Record<string, unknown>; upstreamPath: string } {
     const upstreamPath = providerApiType === "openai" ? "/v1/chat/completions" : "/v1/messages";
-    if (!this.needsTransform(entryApiType, providerApiType)) {
-      return { body, upstreamPath };
-    }
-    const transformed = entryApiType === "openai"
-      ? openaiToAnthropicRequest(body)
-      : anthropicToOpenAIRequest(body);
-    return { body: transformed, upstreamPath };
+    return { body: transformRequestBody(body, entryApiType, providerApiType, model), upstreamPath };
   }
 
   transformResponse(bodyStr: string, sourceApiType: string, targetApiType: string): string {
