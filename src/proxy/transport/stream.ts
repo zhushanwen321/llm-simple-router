@@ -111,7 +111,7 @@ class StreamProxy {
     } else {
       // stream_abort 且 headers 已发送时，必须 end reply 避免客户端挂起
       if (kind === "stream_abort" && this.headersSent) {
-        try { this.reply.raw.end(); } catch { /* reply may already be destroyed */ }
+        try { this.reply.raw.end(); } catch { console.warn("[stream-proxy] reply.raw.end() failed, likely already destroyed"); }
       }
       this.cleanup();
       if (this.resolveFn) {

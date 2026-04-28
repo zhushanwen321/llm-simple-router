@@ -1,4 +1,4 @@
-import { randomUUID } from "crypto";
+import { generateMsgId, generateChatcmplId, MS_PER_SECOND } from "./id-utils.js";
 import { mapFinishReasonToStopReason, mapStopReasonToFinishReason, mapUsageOA2Ant, mapUsageAnt2OA } from "./usage-mapper.js";
 
 // ---------- Non-streaming response: OpenAI → Anthropic ----------
@@ -21,14 +21,14 @@ export function openaiResponseToAnthropic(bodyStr: string): string {
   if (msg?.tool_calls) {
     for (const tc of msg.tool_calls) {
       let input: Record<string, unknown> = {};
-      try { input = JSON.parse(tc.function.arguments); } catch { /* keep empty */ }
+      try { input = JSON.parse(tc.function.arguments); } catch { console.warn("[response-transform] Failed to parse tool arguments, keeping empty"); }
       content.push({ type: "tool_use", id: tc.id, name: tc.function.name, input });
     }
   }
   if (content.length === 0) content.push({ type: "text", text: "" });
 
   return JSON.stringify({
-    id: `msg_${randomUUID().slice(0, 24)}`,
+    id: generateMsgId(),
     type: "message",
     role: "assistant",
     content,
@@ -61,9 +61,9 @@ export function anthropicResponseToOpenAI(bodyStr: string): string {
   }
 
   return JSON.stringify({
-    id: ant.id ?? `chatcmpl-${randomUUID().slice(0, 24)}`,
+    id: ant.id ?? generateChatcmplId(),
     object: "chat.completion",
-    created: Math.floor(Date.now() / 1000),
+    created: Math.floor(Date.now() / MS_PER_SECOND),
     model: ant.model,
     choices: [{ index: 0, message, finish_reason: mapStopReasonToFinishReason(ant.stop_reason ?? "end_turn") }],
     usage: mapUsageAnt2OA(ant.usage),

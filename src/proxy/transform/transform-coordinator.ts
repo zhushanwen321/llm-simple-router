@@ -1,7 +1,8 @@
 import type { Transform } from "stream";
 import { transformRequestBody } from "./request-transform.js";
 import { transformResponseBody, transformErrorResponse } from "./response-transform.js";
-import { OpenAIToAnthropicTransform, AnthropicToOpenAITransform } from "./stream-transform.js";
+import { OpenAIToAnthropicTransform } from "./stream-oa2ant.js";
+import { AnthropicToOpenAITransform } from "./stream-ant2oa.js";
 
 export class TransformCoordinator {
   needsTransform(entryApiType: string, providerApiType: string): boolean {

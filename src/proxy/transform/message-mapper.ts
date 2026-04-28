@@ -61,7 +61,7 @@ export function convertMessagesOA2Ant(
         for (const tc of toolCalls) {
           const fn = tc.function as Record<string, unknown>;
           let input: Record<string, unknown> = {};
-          try { input = JSON.parse(String(fn.arguments ?? "{}")); } catch { /* keep empty */ }
+          try { input = JSON.parse(String(fn.arguments ?? "{}")); } catch { console.warn("[message-mapper] Failed to parse tool_call arguments, keeping empty"); }
           blocks.push({ type: "tool_use", id: String(tc.id), name: String(fn.name), input });
         }
       }

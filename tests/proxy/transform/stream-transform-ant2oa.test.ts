@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { AnthropicToOpenAITransform } from "../../../src/proxy/transform/stream-transform.js";
+import { AnthropicToOpenAITransform } from "../../../src/proxy/transform/stream-ant2oa.js";
 
 function collectOutput(transform: NodeJS.ReadWriteStream): Promise<string> {
   return new Promise((resolve) => {

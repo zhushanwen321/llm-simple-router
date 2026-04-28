@@ -34,7 +34,6 @@ export class PluginRegistry {
     for (const file of files) {
       const filePath = join(resolvedDir, file);
       try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
         delete require.cache[require.resolve(filePath)];
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const mod = require(filePath);
@@ -44,8 +43,8 @@ export class PluginRegistry {
         }
         this.plugins.push(plugin);
         loaded.push(`${plugin.name} (${file})`);
-      } catch {
-        // skip failed plugin
+      } catch (err) {
+        console.error(`[plugin-registry] Failed to load plugin from ${file}:`, err);
       }
     }
     return loaded;
