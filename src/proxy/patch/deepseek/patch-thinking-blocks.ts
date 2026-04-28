@@ -22,11 +22,21 @@ export function patchMissingThinkingBlocks(
 
   for (const msg of messages) {
     if (msg.role !== "assistant" || !Array.isArray(msg.content)) continue;
-    const hasThinking = (msg.content as Array<Record<string, unknown>>).some(
+    const blocks = msg.content as Array<Record<string, unknown>>;
+    const hasThinking = blocks.some(
       (b) => b && typeof b === "object" && b.type === "thinking",
     );
-    if (!hasThinking) {
-      (msg.content as Array<Record<string, unknown>>).unshift({ type: "thinking", thinking: "", signature: "" });
-    }
+    if (hasThinking) continue;
+
+    // 跳过包含 tool_use 的消息：DeepSeek 思考模式激活时所有含 tool_use
+    // 的响应必定同时包含 thinking 块。此处缺失 thinking 的消息来自非
+    // DeepSeek 源，插入空 thinking（thinking:"" + signature:""）会让
+    // DeepSeek 因签名无效而忽略其中的 tool_use 块，导致无限工具调用循环。
+    const hasToolUse = blocks.some(
+      (b) => b && typeof b === "object" && b.type === "tool_use",
+    );
+    if (hasToolUse) continue;
+
+    blocks.unshift({ type: "thinking", thinking: "", signature: "" });
   }
 }

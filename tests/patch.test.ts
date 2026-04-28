@@ -43,6 +43,33 @@ describe("patchMissingThinkingBlocks", () => {
     expect((assistant.content[0] as { type: string }).type).toBe("thinking");
   });
 
+  it("包含 tool_use 的消息不添加 thinking（防止无限循环）", () => {
+    const body = {
+      thinking: { type: "enabled", budget_tokens: 10000 },
+      messages: [
+        { role: "user", content: "do something" },
+        { role: "assistant", content: [
+          { type: "tool_use", id: "call_1", name: "Read", input: {} },
+        ] },
+        { role: "user", content: [
+          { type: "tool_result", tool_use_id: "call_1", content: "ok" },
+        ] },
+        { role: "assistant", content: [
+          { type: "text", text: "done" },
+        ] },
+      ],
+    };
+    patchMissingThinkingBlocks(body);
+    // tool_use 消息不应被修改
+    const toolUseMsg = body.messages[1] as { content: unknown[] };
+    expect(toolUseMsg.content).toHaveLength(1);
+    expect((toolUseMsg.content[0] as { type: string }).type).toBe("tool_use");
+    // 但纯文本消息仍应添加 thinking
+    const textMsg = body.messages[3] as { content: unknown[] };
+    expect(textMsg.content).toHaveLength(2);
+    expect((textMsg.content[0] as { type: string }).type).toBe("thinking");
+  });
+
   it("无 messages 时安全返回", () => {
     const body = {};
     expect(() => patchMissingThinkingBlocks(body)).not.toThrow();
