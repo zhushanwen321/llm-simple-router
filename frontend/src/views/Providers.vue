@@ -415,6 +415,7 @@ function openCreate() {
 }
 function openEdit(p: Provider) {
   editingId.value = p.id
+<<<<<<< HEAD
   const mc = p.max_concurrency ?? 0
   if (mc === 0) {
     concurrencyMode.value = 'none'
@@ -427,7 +428,7 @@ function openEdit(p: Provider) {
   modelInput.value = ''
   modelContextWindow.value = DEFAULT_CONTEXT_WINDOW
   presetGroup.value = ''
-  presetPlan.value = ''
+  presetPlan.value = ' (fix: resolve remaining lint errors)
   errors.value = {}
   dialogOpen.value = true
   loadTransformRules(p.id)

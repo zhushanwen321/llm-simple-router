@@ -140,11 +140,10 @@ export function convertMessagesAnt2OA(
       if (!content || !Array.isArray(content)) continue;
       const textBlocks = content.filter(b => b.type === "text");
       const toolBlocks = content.filter(b => b.type === "tool_use");
-      const thinkingBlocks = content.filter(b => b.type === "thinking");
 
       const oaiMsg: Record<string, unknown> = { role: "assistant" };
 
-      // thinking blocks → 暂时忽略（请求方向不转换 thinking 历史）
+      // thinking blocks intentionally skipped (request direction does not convert thinking history)
       // text → content
       if (textBlocks.length > 0) {
         oaiMsg.content = textBlocks.map(b => b.text ?? "").join("");
