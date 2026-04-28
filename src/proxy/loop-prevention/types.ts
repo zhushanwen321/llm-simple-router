@@ -29,7 +29,7 @@ export interface LoopPreventionConfig {
 }
 
 export const DEFAULT_LOOP_PREVENTION_CONFIG: LoopPreventionConfig = {
-  enabled: true,
+  enabled: false,
   stream: {
     enabled: true,
     detectorConfig: { n: 6, windowSize: 1000, repeatThreshold: 10 },

@@ -5,6 +5,7 @@ import { buildUpstreamUrl } from "./proxy-core.js";
 import type { RawHeaders, StreamState, TransportResult } from "./types.js";
 import type { MetricsResult } from "../metrics/metrics-extractor.js";
 import type { SSEMetricsTransform } from "../metrics/sse-metrics-transform.js";
+import type { StreamLoopGuard } from "./loop-prevention/stream-loop-guard.js";
 import {
   _transportInternals,
   buildRequestOptions,
@@ -42,6 +43,7 @@ class StreamProxy {
     private readonly metricsTransform: SSEMetricsTransform | undefined,
     private readonly checkEarlyError: ((data: string) => boolean) | undefined,
     private readonly timeoutMs: number,
+    private readonly loopGuard: StreamLoopGuard | undefined,
   ) {
     this.sseHeaders = filterHeaders(rawUpstreamHeaders);
     this.sseHeaders["Content-Type"] = "text/event-stream";
@@ -184,6 +186,13 @@ class StreamProxy {
     }
 
     this.pipeEntry.write(chunk);
+    if (this.loopGuard) {
+      this.loopGuard.feed(chunk.toString("utf-8"));
+      if (this.loopGuard.isTriggered()) {
+        this.terminal("stream_abort", { metrics: this.collectMetrics(false) });
+        return;
+      }
+    }
   }
 
   onEnd(): void {
@@ -247,6 +256,7 @@ export function callStream(
   metricsTransform?: SSEMetricsTransform,
   checkEarlyError?: (bufferedData: string) => boolean,
   compatResolve?: (result: TransportResult) => void,
+  loopGuard?: StreamLoopGuard,
 ): Promise<TransportResult> {
   return new Promise((resolve) => {
     const effectiveResolve = compatResolve ?? resolve;
@@ -283,6 +293,7 @@ export function callStream(
         metricsTransform,
         checkEarlyError,
         timeoutMs,
+        loopGuard,
       );
 
       proxy.bindResolve(effectiveResolve);
