@@ -172,7 +172,7 @@ describe("patchNonDeepSeekToolMessages", () => {
 });
 
 describe("patchOrphanToolResults", () => {
-  it("移除没有对应 tool_use 的 tool_result 块", () => {
+  it("将孤儿 tool_result 转为 text，保留有匹配的 tool_result", () => {
     const body = {
       messages: [
         { role: "assistant", content: [{ type: "tool_use", id: "call_1", name: "Read", input: {} }] },
@@ -184,8 +184,14 @@ describe("patchOrphanToolResults", () => {
     };
     patchOrphanToolResults(body);
     const userMsg = body.messages[1] as { content: unknown[] };
-    expect(userMsg.content).toHaveLength(1);
+    expect(userMsg.content).toHaveLength(2);
     expect((userMsg.content[0] as { tool_use_id: string }).tool_use_id).toBe("call_1");
+    // 孤儿转为 text 块
+    const converted = userMsg.content[1] as { type: string; text: string };
+    expect(converted.type).toBe("text");
+    const parsed = JSON.parse(converted.text);
+    expect(parsed.type).toBe("tool_result");
+    expect(parsed.tool_use_id).toBe("call_orphan");
   });
 
   it("保留有匹配 tool_use 的 tool_result", () => {
@@ -206,7 +212,7 @@ describe("patchOrphanToolResults", () => {
     expect(userMsg.content).toHaveLength(2);
   });
 
-  it("移除清空后的空 user 消息并合并相邻 user", () => {
+  it("将孤儿转为 text 后合并相邻 user 消息", () => {
     const body = {
       messages: [
         { role: "assistant", content: [{ type: "tool_use", id: "call_1", name: "R", input: {} }] },
@@ -218,17 +224,18 @@ describe("patchOrphanToolResults", () => {
       ],
     };
     patchOrphanToolResults(body);
-    // call_orphan 被移除，msg[1] 非空但和 msg[2] 连续 → 合并为一条 user
+    // call_orphan 转为 text，msg[1] 和 msg[2] 连续 user → 合并
     expect(body.messages).toHaveLength(2);
     expect(body.messages[0].role).toBe("assistant");
     expect(body.messages[1].role).toBe("user");
     const merged = body.messages[1].content as unknown[];
-    expect(merged).toHaveLength(2);
+    expect(merged).toHaveLength(3);
     expect(merged[0]).toEqual({ type: "tool_result", tool_use_id: "call_1", content: "ok" });
-    expect(merged[1]).toEqual({ type: "text", text: "follow-up" });
+    expect((merged[1] as { type: string }).type).toBe("text"); // converted orphan
+    expect(merged[2]).toEqual({ type: "text", text: "follow-up" });
   });
 
-  it("修复：无 tool_use 时清理孤儿 tool_result 并删除空 user 消息", () => {
+  it("修复：无 tool_use 时孤儿 tool_result 转为 text 保留", () => {
     const body = {
       messages: [
         { role: "user", content: [{ type: "text", text: "hi" }] },
@@ -237,10 +244,13 @@ describe("patchOrphanToolResults", () => {
       ],
     };
     patchOrphanToolResults(body);
-    // 孤儿 tool_result 被移除后空 user 被删除
-    expect(body.messages).toHaveLength(2);
-    expect(body.messages[0].role).toBe("user");
-    expect(body.messages[1].role).toBe("assistant");
+    // 孤儿 tool_result 转为 text，user 消息保留
+    expect(body.messages).toHaveLength(3);
+    const lastUser = body.messages[2] as { content: unknown[] };
+    expect((lastUser.content[0] as { type: string }).type).toBe("text");
+    const parsed = JSON.parse((lastUser.content[0] as { text: string }).text);
+    expect(parsed.type).toBe("tool_result");
+    expect(parsed.tool_use_id).toBe("call_ghost");
   });
 
   it("无 tool_result 时不影响无 assistant 的消息", () => {
@@ -255,7 +265,7 @@ describe("patchOrphanToolResults", () => {
     expect(JSON.stringify(body)).toBe(original);
   });
 
-  it("修复：整个 assistant 消息被截断后清理剩余 tool_result 块", () => {
+  it("修复：整个 assistant 消息被截断后，孤儿 tool_result 转为 text 并合并", () => {
     const body = {
       messages: [
         { role: "user", content: [{ type: "text", text: "first query" }] },
@@ -266,9 +276,18 @@ describe("patchOrphanToolResults", () => {
       ],
     };
     patchOrphanToolResults(body);
-    // 所有 tool_result 都是孤儿，user 变空后被删除
+    // 所有 tool_result 都是孤儿 → 转为 text，连续 user → 合并为一条
     expect(body.messages).toHaveLength(1);
     expect(body.messages[0].role).toBe("user");
+    const merged = body.messages[0].content as unknown[];
+    // first query + 2 个转为 text 的 tool_result
+    expect(merged).toHaveLength(3);
+    expect((merged[0] as { type: string }).type).toBe("text");
+    expect((merged[0] as { text: string }).text).toBe("first query");
+    expect((merged[1] as { type: string }).type).toBe("text");
+    expect((merged[2] as { type: string }).type).toBe("text");
+    const parsed1 = JSON.parse((merged[1] as { text: string }).text);
+    expect(parsed1.tool_use_id).toBe("call_orphan_1");
   });
 
   it("无孤儿时不修改", () => {
@@ -287,7 +306,7 @@ describe("patchOrphanToolResults", () => {
     expect(() => patchOrphanToolResults(body)).not.toThrow();
   });
 
-  it("删除空 user 后合并连续 assistant 消息", () => {
+  it("孤儿转为 text 后不影响非连续 assistant 消息的合并", () => {
     const body = {
       messages: [
         { role: "assistant", content: [{ type: "tool_use", id: "call_1", name: "R", input: {} }] },
@@ -297,17 +316,17 @@ describe("patchOrphanToolResults", () => {
       ],
     };
     patchOrphanToolResults(body);
-    // orphan_1 被移除 → 空 user 被删除 → 两个 assistant 合并
-    expect(body.messages).toHaveLength(2);
+    // orphan_1 转为 text，user 非空不删除，两个 assistant 不合并
+    expect(body.messages).toHaveLength(4);
     expect(body.messages[0].role).toBe("assistant");
     expect(body.messages[1].role).toBe("user");
-    const merged = body.messages[0].content as unknown[];
-    expect(merged).toHaveLength(2);
-    expect((merged[0] as Record<string, unknown>).type).toBe("tool_use");
-    expect((merged[1] as Record<string, unknown>).type).toBe("text");
+    const userMsg = body.messages[1].content as unknown[];
+    expect((userMsg[0] as { type: string }).type).toBe("text");
+    const parsed = JSON.parse((userMsg[0] as { text: string }).text);
+    expect(parsed.tool_use_id).toBe("orphan_1");
   });
 
-  it("大规模孤儿场景（模拟 70+ 孤儿）", () => {
+  it("大规模孤儿场景（模拟 70+ 孤儿，转为 text）", () => {
     const messages: unknown[] = [
       { role: "user", content: "start" },
     ];
@@ -335,10 +354,8 @@ describe("patchOrphanToolResults", () => {
     const body = { messages };
     patchOrphanToolResults(body);
 
-    // 70 个孤儿消息应被删除，只保留正常配对 + start + final
-    // final 会与最后一个正常的 tool_result user 合并（如果相邻）
     const result = body.messages as unknown[];
-    // 验证没有孤儿残留
+    // 验证剩余的 tool_result 都有匹配的 tool_use
     const allToolUseIds = new Set<string>();
     for (const msg of result) {
       const m = msg as { role: string; content: unknown[] };
@@ -358,6 +375,8 @@ describe("patchOrphanToolResults", () => {
         }
       }
     }
+    // 孤儿转为 text 后连续 user 合并，消息数远少于原始 132 条
+    expect(result.length).toBeLessThan(70);
   });
 });
 
