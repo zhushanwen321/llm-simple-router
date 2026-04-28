@@ -33,8 +33,8 @@ export function patchNonDeepSeekToolMessages(
     );
     const hasValidSignature =
       thinkingBlock &&
-      typeof (thinkingBlock as Record<string, unknown>).signature === "string" &&
-      (thinkingBlock as Record<string, unknown>).signature !== "";
+      typeof thinkingBlock.signature === "string" &&
+      thinkingBlock.signature !== "";
 
     // 有合法 signature → DeepSeek 原生，不动
     if (hasValidSignature) continue;
