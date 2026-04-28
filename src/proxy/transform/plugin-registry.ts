@@ -1,5 +1,5 @@
 import type Database from "better-sqlite3";
-import { existsSync, mkdirSync, readdirSync } from "fs";
+import { existsSync, readdirSync } from "fs";
 import { join, resolve } from "path";
 import type { TransformPlugin, RequestTransformContext, ResponseTransformContext } from "./plugin-types.js";
 import { pluginMatches } from "./plugin-types.js";
@@ -26,7 +26,6 @@ export class PluginRegistry {
     const resolvedDir = resolve(dir);
     const loaded: string[] = [];
     if (!existsSync(resolvedDir)) {
-      mkdirSync(resolvedDir, { recursive: true });
       return loaded;
     }
     const files = readdirSync(resolvedDir).filter(
