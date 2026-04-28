@@ -157,6 +157,10 @@ export class ResilienceLayer {
 
     // throw -> 网络异常
     if (result.kind === "throw") {
+      // headers 已发送给客户端时不能 retry/failover
+      if (result.headersSent) {
+        return { action: "abort", reason: "throw_headers_sent" };
+      }
       if (!isRetryableThrow(result.error)) {
         return { action: "abort", reason: result.error.message };
       }

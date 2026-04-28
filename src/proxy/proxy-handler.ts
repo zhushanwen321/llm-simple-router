@@ -136,7 +136,11 @@ export async function handleProxyRequest(
     beforeSendProxy?: (body: Record<string, unknown>, isStream: boolean) => void;
   },
 ): Promise<FastifyReply> {
-  request.raw.socket.on("error", (err) => request.log.debug({ err }, "client socket error"));
+  const socketErrorHandler = (err: Error) => request.log.debug({ err }, "client socket error");
+  request.raw.socket.on("error", socketErrorHandler);
+  reply.raw.on("close", () => {
+    request.raw.socket.removeListener("error", socketErrorHandler);
+  });
   const clientModel = ((request.body as Record<string, unknown>).model as string) || "unknown";
   const sessionId = (request.headers as RawHeaders)["x-claude-code-session-id"] as string | undefined;
   const { effectiveModel, originalModel, interceptResponse } = applyEnhancement(deps.db, request, clientModel, sessionId);

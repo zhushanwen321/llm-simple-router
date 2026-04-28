@@ -63,7 +63,7 @@ function createRequest(overrides = {}) {
 function createReply() {
   return {
     code: vi.fn().mockReturnThis(), status: vi.fn().mockReturnThis(), send: vi.fn().mockReturnThis(), header: vi.fn().mockReturnThis(),
-    raw: { headersSent: false, writableEnded: false },
+    raw: { headersSent: false, writableEnded: false, on: vi.fn(), removeListener: vi.fn() },
   } as any;
 }
 
