@@ -323,12 +323,23 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
     });
 
     const formatTransform = needsTransform ? coordinator.createFormatTransform(apiType, provider.api_type, resolved.backend_model) : undefined;
+    const responseTransform = needsTransform ? (bodyStr: string): string => {
+      try {
+        const parsed = JSON.parse(bodyStr);
+        if (parsed.type === "error" || parsed.error) {
+          return coordinator.transformErrorResponse(bodyStr, provider.api_type, apiType);
+        }
+        return coordinator.transformResponse(bodyStr, provider.api_type, apiType);
+      } catch {
+        return bodyStr;
+      }
+    } : undefined;
 
     const transportFn = buildTransportFn({
       provider, apiKey, body: patchedBody, cliHdrs, reply, upstreamPath: effectiveUpstreamPath, apiType: effectiveApiType,
       isStream, startTime, logId, effectiveModel, originalModel,
-      streamTimeoutMs: config.STREAM_TIMEOUT_MS, tracker, matcher, request,
-      streamLoopEnabled, formatTransform,
+      streamTimeoutMs: deps.streamTimeoutMs, tracker: deps.tracker, matcher: deps.matcher, request,
+      streamLoopEnabled, formatTransform, responseTransform,
     });
 
     const pipelineSnapshot = iterationSnapshot.toJSON();
@@ -354,16 +365,8 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
 
       const tr = resilienceResult.result;
       const succeeded = tr.kind === "success" || tr.kind === "stream_success" || tr.kind === "stream_abort";
-      // 非流式跨格式响应转换
-      if (needsTransform && tr.kind === "success" && tr.statusCode === 200 && tr.body) {
-        tr.body = coordinator.transformResponse(tr.body, provider.api_type, apiType);
-      }
-      // 非流式跨格式错误转换
-      if (needsTransform && (tr.kind === "error" || tr.kind === "stream_error") && tr.body) {
-        tr.body = coordinator.transformErrorResponse(tr.body, provider.api_type, apiType);
-      }
 
-      if (succeeded) usageWindowTracker?.recordRequest(provider.id, routerKeyId ?? undefined);
+      if (succeeded) deps.usageWindowTracker?.recordRequest(provider.id, routerKeyId ?? undefined);
 
       if (isStream && tracker) {
         const sc = tracker.get(logId)?.streamContent;

@@ -60,6 +60,7 @@ export interface TransportFnParams {
   request: FastifyRequest;
   streamLoopEnabled: boolean;
   formatTransform?: import("stream").Transform;
+  responseTransform?: (body: string) => string;
 }
 
 export function buildTransportFn(p: TransportFnParams): (target: Target) => Promise<TransportResult> {
@@ -108,6 +109,13 @@ export function buildTransportFn(p: TransportFnParams): (target: Target) => Prom
           return { ...result, body: JSON.stringify(bodyObj) };
         }
       } catch { p.request.log.debug("Failed to inject model-info tag into non-JSON response"); }
+    }
+    // Apply format transformation to non-stream responses before they're sent to client
+    if (p.responseTransform && result.kind === "success" && result.statusCode === 200 && result.body) {
+      return { ...result, body: p.responseTransform(result.body) };
+    }
+    if (p.responseTransform && (result.kind === "error" || result.kind === "stream_error") && result.body) {
+      return { ...result, body: p.responseTransform(result.body) };
     }
     return result;
   };
