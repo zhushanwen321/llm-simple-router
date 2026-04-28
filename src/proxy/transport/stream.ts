@@ -125,6 +125,7 @@ class StreamProxy {
   private cleanup(): void {
     if (this.idleTimer) clearTimeout(this.idleTimer);
     this.idleTimer = null;
+    if (this.formatTransform && !this.formatTransform.destroyed) this.formatTransform.destroy();
     if (!this.passThrough.destroyed) this.passThrough.destroy();
     if (this.metricsTransform && !this.metricsTransform.destroyed) this.metricsTransform.destroy();
   }

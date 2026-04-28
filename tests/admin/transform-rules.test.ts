@@ -72,4 +72,13 @@ describe("Transform Rules Admin API", () => {
     const res = await app.inject({ method: "GET", url: "/admin/api/transform-rules/prov-1" });
     expect(res.statusCode).toBe(401);
   });
+
+  it("POST reload returns success response", async () => {
+    const res = await app.inject({ method: "POST", url: "/admin/api/transform-rules/reload", headers: { cookie } });
+    expect(res.statusCode).toBe(200);
+    const json = res.json();
+    expect(json.code).toBe(0);
+    expect(json.data.loadedPlugins).toEqual([]);
+    expect(json.data.rulesCount).toBe(0);
+  });
 });

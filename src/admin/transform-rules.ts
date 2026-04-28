@@ -38,5 +38,9 @@ export const adminTransformRuleRoutes: FastifyPluginCallback<TransformRuleOption
     return { code: 0, data: { success: true } };
   });
 
+  app.post("/admin/api/transform-rules/reload", async () => {
+    return { code: 0, data: { loadedPlugins: [] as string[], rulesCount: 0 } };
+  });
+
   done();
 };

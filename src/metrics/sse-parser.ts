@@ -13,6 +13,11 @@ export class SSEParser {
   private buffer = "";
   isDone = false;
 
+  /** 当前未解析缓冲区长度，子类可据此做内存保护 */
+  get bufferLength(): number {
+    return this.buffer.length;
+  }
+
   feed(chunk: string): SSEEvent[] {
     if (this.isDone) return [];
     this.buffer += chunk;

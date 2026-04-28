@@ -96,10 +96,17 @@ export function buildTransportFn(p: TransportFnParams): (target: Target) => Prom
       if (m) p.tracker?.update(p.logId, { streamMetrics: toStreamMetrics(m) });
       return streamResult;
     }
-    const result = await callNonStream(p.provider, p.apiKey, p.body, p.cliHdrs, p.upstreamPath, buildHeaders);
+    let result = await callNonStream(p.provider, p.apiKey, p.body, p.cliHdrs, p.upstreamPath, buildHeaders);
     if (result.kind === "success") {
       const mr = MetricsExtractor.fromNonStreamResponse(p.apiType, result.body);
       if (mr) p.tracker?.update(p.logId, { streamMetrics: toStreamMetrics(mr) });
+    }
+    // Apply format transformation first (e.g. Anthropic→OpenAI), then inject model-info tag
+    if (p.responseTransform && result.kind === "success" && result.statusCode === 200 && result.body) {
+      result = { ...result, body: p.responseTransform(result.body) };
+    }
+    if (p.responseTransform && (result.kind === "error" || result.kind === "stream_error") && result.body) {
+      result = { ...result, body: p.responseTransform(result.body) };
     }
     if (p.originalModel && result.kind === "success" && result.statusCode === UPSTREAM_SUCCESS) {
       try {
@@ -109,13 +116,6 @@ export function buildTransportFn(p: TransportFnParams): (target: Target) => Prom
           return { ...result, body: JSON.stringify(bodyObj) };
         }
       } catch { p.request.log.debug("Failed to inject model-info tag into non-JSON response"); }
-    }
-    // Apply format transformation to non-stream responses before they're sent to client
-    if (p.responseTransform && result.kind === "success" && result.statusCode === 200 && result.body) {
-      return { ...result, body: p.responseTransform(result.body) };
-    }
-    if (p.responseTransform && (result.kind === "error" || result.kind === "stream_error") && result.body) {
-      return { ...result, body: p.responseTransform(result.body) };
     }
     return result;
   };
