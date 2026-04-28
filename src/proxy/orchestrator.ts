@@ -158,6 +158,10 @@ export class ProxyOrchestrator {
     if (result.kind === "stream_success" || result.kind === "stream_abort" || result.kind === "throw") {
       return;
     }
+    // stream_error 且 headers 已发送：StreamProxy 已处理响应，无需再次写入
+    if (result.kind === "stream_error" && result.headersSent) {
+      return;
+    }
     // failover 场景下错误响应由外层 proxy-handler 控制，此处不发送
     if (ctx?.isFailover && "statusCode" in result && result.statusCode >= (ctx.failoverThreshold ?? DEFAULT_FAILOVER_THRESHOLD)) {
       return;

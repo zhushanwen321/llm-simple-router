@@ -136,7 +136,11 @@ export async function handleProxyRequest(
     beforeSendProxy?: (body: Record<string, unknown>, isStream: boolean) => void;
   },
 ): Promise<FastifyReply> {
-  request.raw.socket.on("error", (err) => request.log.debug({ err }, "client socket error"));
+  const socketErrorHandler = (err: Error) => request.log.debug({ err }, "client socket error");
+  request.raw.socket.on("error", socketErrorHandler);
+  reply.raw.on("close", () => {
+    request.raw.socket.removeListener("error", socketErrorHandler);
+  });
   const clientModel = ((request.body as Record<string, unknown>).model as string) || "unknown";
   const sessionId = (request.headers as RawHeaders)["x-claude-code-session-id"] as string | undefined;
   const { effectiveModel, originalModel, interceptResponse } = applyEnhancement(deps.db, request, clientModel, sessionId);
@@ -298,6 +302,10 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
       return reply;
     } catch (e) {
       if (e instanceof ProviderSwitchNeeded) {
+        // headers 已发送给客户端时不能 failover，直接返回
+        if (reply.raw.headersSent) {
+          return reply;
+        }
         // 跨 provider failover：resilience 层携带了 attempts 数据，补写失败日志
         if (e.attempts && e.attempts.length > 0) {
           const fakeResult = e.lastResult ?? { kind: "throw" as const, error: new Error("provider switch") };

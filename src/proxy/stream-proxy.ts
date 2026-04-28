@@ -89,7 +89,7 @@ class StreamProxy {
         result = { kind: "stream_success", ...base, metrics: extra.metrics as MetricsResult | undefined };
         break;
       case "stream_error":
-        result = { kind: "stream_error", ...base, body: extra.body as string, headers: this.sseHeaders };
+        result = { kind: "stream_error", ...base, body: extra.body as string, headers: this.sseHeaders, headersSent: this.headersSent || undefined };
         break;
       case "stream_abort":
         result = { kind: "stream_abort", ...base, metrics: extra.metrics as MetricsResult | undefined };
@@ -105,6 +105,10 @@ class StreamProxy {
         this.pendingResult = result;
       }
     } else {
+      // stream_abort 且 headers 已发送时，必须 end reply 避免客户端挂起
+      if (kind === "stream_abort" && this.headersSent) {
+        try { this.reply.raw.end(); } catch { /* reply may already be destroyed */ }
+      }
       this.cleanup();
       if (this.resolveFn) {
         this.resolveFn(result);
@@ -137,6 +141,13 @@ class StreamProxy {
 
   startStreaming(): void {
     if (this.headersSent) return;
+    if (this.reply.raw.headersSent) {
+      // headers 已由其他代码路径（如前一次 retry 的 StreamProxy）发送，
+      // 仅更新状态机避免 BUFFERING 阶段的重复逻辑
+      this.transition("STREAMING");
+      this.headersSent = true;
+      return;
+    }
     this.transition("STREAMING");
     this.headersSent = true;
     this.reply.raw.writeHead(this.statusCode, this.sseHeaders);
@@ -200,7 +211,6 @@ class StreamProxy {
         if (this.checkEarlyError(body)) {
           this.terminal("stream_error", { body });
           // headers 已发送：必须结束 reply 避免 client hang
-          // headers 未发送：terminal 已处理，无需额外操作
           if (this.headersSent) {
             setImmediate(() => this.reply.raw.end());
           }
@@ -250,7 +260,7 @@ class StreamProxy {
     if (this.resolved) return;
     this.resolved = true;
     this.cleanup();
-    const result: TransportResult = { kind: "throw", error: err };
+    const result: TransportResult = { kind: "throw", error: err, headersSent: this.headersSent };
     if (this.resolveFn) {
       this.resolveFn(result);
     } else {

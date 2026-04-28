@@ -128,6 +128,10 @@ export class ResilienceLayer {
     // stream_error + statusCode < failoverThreshold -> 上游返回 200 但 body 包含错误内容（early error）
     // 先检查 retry rules 是否匹配，匹配则重试，否则不可恢复
     if (result.kind === "stream_error" && result.statusCode < config.failoverThreshold) {
+      // headers 已发送给客户端时不能 retry/failover，只能 abort
+      if (result.headersSent) {
+        return { action: "abort", reason: "stream_error_headers_sent" };
+      }
       const body = extractBody(result);
       if (body && config.ruleMatcher) {
         const matchedRule = config.ruleMatcher.match(result.statusCode, body);
@@ -153,6 +157,10 @@ export class ResilienceLayer {
 
     // throw -> 网络异常
     if (result.kind === "throw") {
+      // headers 已发送给客户端时不能 retry/failover
+      if (result.headersSent) {
+        return { action: "abort", reason: "throw_headers_sent" };
+      }
       if (!isRetryableThrow(result.error)) {
         return { action: "abort", reason: result.error.message };
       }
