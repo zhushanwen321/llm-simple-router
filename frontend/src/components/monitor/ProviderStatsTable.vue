@@ -12,7 +12,6 @@
         <TableHead class="text-right">请求数</TableHead>
         <TableHead class="text-right">成功率</TableHead>
         <TableHead class="text-right">平均延迟</TableHead>
-        <TableHead class="text-right">P99 延迟</TableHead>
         <TableHead class="text-right">重试率</TableHead>
         <TableHead>Top Errors</TableHead>
       </TableRow>
@@ -27,7 +26,6 @@
           </span>
         </TableCell>
         <TableCell class="text-right">{{ entry.stats.avgLatencyMs.toFixed(0) }}ms</TableCell>
-        <TableCell class="text-right">{{ entry.p99Latency }}</TableCell>
         <TableCell class="text-right">
           <span :class="entry.retryRate > 10 ? 'text-yellow-600' : ''">
             {{ entry.retryRate.toFixed(1) }}%
@@ -75,7 +73,6 @@ const providerEntries = computed(() => {
       stats: s,
       successRate: s.totalRequests > 0 ? (s.successCount / s.totalRequests) * 100 : 0,
       retryRate: s.totalRequests > 0 ? (s.retryCount / s.totalRequests) * 100 : 0,
-      p99Latency: props.stats!.p99LatencyMs.toFixed(0) + 'ms',
     }))
 })
 </script>

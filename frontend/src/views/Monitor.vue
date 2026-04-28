@@ -47,6 +47,17 @@
               <Badge variant="outline" class="shrink-0 text-xs">{{ req.providerName }}</Badge>
               <span class="text-xs text-muted-foreground shrink-0">{{ elapsed(req.startTime) }}s</span>
               <Badge v-if="req.isStream" variant="outline" class="shrink-0 text-xs">SSE</Badge>
+              <TooltipProvider :delay-duration="300">
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <Button variant="ghost" size="icon-xs" class="shrink-0" @click.stop="copy(req.id)">
+                      <CheckIcon v-if="copied" class="size-3 text-green-500" />
+                      <CopyIcon v-else class="size-3" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>复制 ID</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
           </ScrollArea>
         </CardContent>
@@ -78,6 +89,17 @@
               <span class="text-sm text-foreground truncate flex-1">{{ req.model }}</span>
               <Badge variant="outline" class="shrink-0 text-xs">{{ req.providerName }}</Badge>
               <span class="text-xs text-muted-foreground shrink-0">{{ elapsed(req.startTime) }}s</span>
+              <TooltipProvider :delay-duration="300">
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <Button variant="ghost" size="icon-xs" class="shrink-0" @click.stop="copy(req.id)">
+                      <CheckIcon v-if="copied" class="size-3 text-green-500" />
+                      <CopyIcon v-else class="size-3" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>复制 ID</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
           </ScrollArea>
         </CardContent>
@@ -109,6 +131,18 @@
               <span class="text-sm text-foreground truncate flex-1">{{ req.model }}</span>
               <Badge variant="outline" class="shrink-0 text-xs">{{ req.providerName }}</Badge>
               <Badge v-if="req.isStream" variant="outline" class="shrink-0 text-xs">SSE</Badge>
+              <span class="text-xs text-muted-foreground shrink-0">{{ duration(req) }}</span>
+              <TooltipProvider :delay-duration="300">
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <Button variant="ghost" size="icon-xs" class="shrink-0" @click.stop="copy(req.id)">
+                      <CheckIcon v-if="copied" class="size-3 text-green-500" />
+                      <CopyIcon v-else class="size-3" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>复制 ID</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
           </ScrollArea>
         </CardContent>
@@ -167,10 +201,13 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { CheckIcon, CopyIcon } from 'lucide-vue-next'
 import MonitorHeader from '@/components/monitor/MonitorHeader.vue'
 import ConcurrencyPanel from '@/components/monitor/ConcurrencyPanel.vue'
 import RuntimePanel from '@/components/monitor/RuntimePanel.vue'
@@ -179,6 +216,7 @@ import ProviderStatsTable from '@/components/monitor/ProviderStatsTable.vue'
 import UnifiedRequestDialog from '@/components/request-detail/UnifiedRequestDialog.vue'
 import { useMonitorSSE } from '@/composables/useMonitorSSE'
 import { useMonitorData } from '@/composables/useMonitorData'
+import { useClipboard } from '@/composables/useClipboard'
 import { statusVariant, statusLabel } from '@/utils/status'
 
 // --- Data layer ---
@@ -213,16 +251,26 @@ const { connect } = useMonitorSSE(
     concurrency_update: handleSSEMessage,
     stats_update: handleSSEMessage,
     runtime_update: handleSSEMessage,
+    stream_content_update: handleSSEMessage,
   },
   { onOpen: handleSSEOpen, onClose: handleSSEClose },
 )
 
+const { copied, copy } = useClipboard()
+
 // --- Helper functions ---
 
 const MS_PER_SECOND = 1000
+const now = ref(Date.now())
+let tickTimer: ReturnType<typeof setInterval> | null = null
 
 function elapsed(startTime: number): string {
-  return ((Date.now() - startTime) / MS_PER_SECOND).toFixed(1)
+  return ((now.value - startTime) / MS_PER_SECOND).toFixed(1)
+}
+
+function duration(req: { completedAt?: number; startTime: number }): string {
+  if (!req.completedAt) return '--'
+  return ((req.completedAt - req.startTime) / MS_PER_SECOND).toFixed(1) + 's'
 }
 
 // --- Lifecycle ---
@@ -230,5 +278,10 @@ function elapsed(startTime: number): string {
 onMounted(async () => {
   await loadInitialData()
   connect()
+  tickTimer = setInterval(() => { now.value = Date.now() }, MS_PER_SECOND)
+})
+
+onUnmounted(() => {
+  if (tickTimer) { clearInterval(tickTimer); tickTimer = null }
 })
 </script>

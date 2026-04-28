@@ -39,8 +39,6 @@ export interface ResilienceConfig {
   failoverThreshold: number;
   ruleMatcher?: RetryRuleMatcher;
   isFailover: boolean;
-  /** DB 规则 max_retries 的全局安全阀，防止单规则配置导致过多重试 */
-  globalRetryCap?: number;
   /** 全局迭代上限，防止极端配置导致 while(true) 循环过多 */
   iterationCap?: number;
 }
@@ -81,7 +79,6 @@ export interface ResilienceState {
 const RETRYABLE_THROW_CODES = new Set(["ETIMEDOUT", "ECONNRESET", "ECONNREFUSED"]);
 const HTTP_TOO_MANY_REQUESTS = 429;
 const DEFAULT_THROW_MAX_RETRIES = 3;
-const DEFAULT_RETRY_CAP = 3;
 const DEFAULT_ITERATION_CAP = 50;
 
 // ---------- Internal helpers ----------
@@ -128,8 +125,25 @@ export class ResilienceLayer {
       return { action: "abort", reason: "stream_abort" };
     }
 
-    // stream_error + statusCode < failoverThreshold -> 上游返回 200 但 body 包含错误内容（early error），不可恢复
+    // stream_error + statusCode < failoverThreshold -> 上游返回 200 但 body 包含错误内容（early error）
+    // 先检查 retry rules 是否匹配，匹配则重试，否则不可恢复
     if (result.kind === "stream_error" && result.statusCode < config.failoverThreshold) {
+      // headers 已发送给客户端时不能 retry/failover，只能 abort
+      if (result.headersSent) {
+        return { action: "abort", reason: "stream_error_headers_sent" };
+      }
+      const body = extractBody(result);
+      if (body && config.ruleMatcher) {
+        const matchedRule = config.ruleMatcher.match(result.statusCode, body);
+        if (matchedRule && state.attemptCount < matchedRule.max_retries) {
+          const strategy = createStrategy(matchedRule);
+          return { action: "retry", delayMs: strategy.getDelay(state.attemptCount) };
+        }
+      }
+      // failover 模式下，即使 stream_error 也可以尝试切换 provider
+      if (config.isFailover) {
+        return { action: "failover", excludeTarget: state.currentTarget };
+      }
       return { action: "abort", reason: "stream_error" };
     }
 
@@ -143,6 +157,10 @@ export class ResilienceLayer {
 
     // throw -> 网络异常
     if (result.kind === "throw") {
+      // headers 已发送给客户端时不能 retry/failover
+      if (result.headersSent) {
+        return { action: "abort", reason: "throw_headers_sent" };
+      }
       if (!isRetryableThrow(result.error)) {
         return { action: "abort", reason: result.error.message };
       }
@@ -161,7 +179,7 @@ export class ResilienceLayer {
         ? config.ruleMatcher.match(result.statusCode, body)
         : null;
 
-      if (matchedRule && state.attemptCount < Math.min(matchedRule.max_retries, config.globalRetryCap ?? DEFAULT_RETRY_CAP)) {
+      if (matchedRule && state.attemptCount < matchedRule.max_retries) {
         const strategy = createStrategy(matchedRule);
         const headers = extractHeaders(result);
         const retryAfterMs = result.statusCode === HTTP_TOO_MANY_REQUESTS
@@ -178,7 +196,7 @@ export class ResilienceLayer {
     const body = extractBody(result);
     if (body && config.ruleMatcher) {
       const matchedRule = config.ruleMatcher.match(result.statusCode, body);
-      if (matchedRule && state.attemptCount < Math.min(matchedRule.max_retries, config.globalRetryCap ?? DEFAULT_RETRY_CAP)) {
+      if (matchedRule && state.attemptCount < matchedRule.max_retries) {
         const strategy = createStrategy(matchedRule);
         return { action: "retry", delayMs: strategy.getDelay(state.attemptCount) };
       }

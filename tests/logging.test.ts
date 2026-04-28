@@ -99,13 +99,13 @@ function insertOpenAIBackend(db: Database.Database, port: number) {
      VALUES (?, ?, ?, ?, ?, ?)`
   ).run("map-o1", "gpt-4", "gpt-4-turbo", "svc-o1", 1, now);
   db.prepare(
-    `INSERT INTO mapping_groups (id, client_model, strategy, rule, created_at)
+    `INSERT INTO mapping_groups (id, client_model, rule, is_active, created_at)
      VALUES (?, ?, ?, ?, ?)`
   ).run(
     "mg-o1",
     "gpt-4",
-    "scheduled",
-    JSON.stringify({ default: { backend_model: "gpt-4-turbo", provider_id: "svc-o1" } }),
+    JSON.stringify({ targets: [{ backend_model: "gpt-4-turbo", provider_id: "svc-o1" }] }),
+    1,
     now
   );
 }
@@ -132,13 +132,13 @@ function insertAnthropicBackend(db: Database.Database, port: number) {
      VALUES (?, ?, ?, ?, ?, ?)`
   ).run("map-a1", "claude-3-sonnet", "claude-3-sonnet", "svc-a1", 1, now);
   db.prepare(
-    `INSERT INTO mapping_groups (id, client_model, strategy, rule, created_at)
+    `INSERT INTO mapping_groups (id, client_model, rule, is_active, created_at)
      VALUES (?, ?, ?, ?, ?)`
   ).run(
     "mg-a1",
     "claude-3-sonnet",
-    "scheduled",
-    JSON.stringify({ default: { backend_model: "claude-3-sonnet", provider_id: "svc-a1" } }),
+    JSON.stringify({ targets: [{ backend_model: "claude-3-sonnet", provider_id: "svc-a1" }] }),
+    1,
     now
   );
 }
@@ -290,13 +290,13 @@ describe("Request logging", () => {
          VALUES (?, ?, ?, ?, ?, ?)`
       ).run("map-bad", "gpt-4", "gpt-4-turbo", "svc-bad", 1, now);
       db.prepare(
-        `INSERT INTO mapping_groups (id, client_model, strategy, rule, created_at)
+        `INSERT INTO mapping_groups (id, client_model, rule, is_active, created_at)
          VALUES (?, ?, ?, ?, ?)`
       ).run(
         "mg-bad",
         "gpt-4",
-        "scheduled",
-        JSON.stringify({ default: { backend_model: "gpt-4-turbo", provider_id: "svc-bad" } }),
+        JSON.stringify({ targets: [{ backend_model: "gpt-4-turbo", provider_id: "svc-bad" }] }),
+        1,
         now
       );
 

@@ -60,6 +60,7 @@ describe("usage-windows DB layer", () => {
     const id = insertWindow(database, {
       id: "w-1",
       router_key_id: null,
+      provider_id: null,
       start_time: "2026-04-22 10:00:00",
       end_time: "2026-04-22 15:00:00",
     });
@@ -76,12 +77,14 @@ describe("usage-windows DB layer", () => {
     insertWindow(database, {
       id: "w-1",
       router_key_id: null,
+      provider_id: null,
       start_time: "2026-04-22 10:00:00",
       end_time: "2026-04-22 15:00:00",
     });
     insertWindow(database, {
       id: "w-2",
       router_key_id: null,
+      provider_id: null,
       start_time: "2026-04-22 16:00:00",
       end_time: "2026-04-22 21:00:00",
     });
@@ -96,12 +99,14 @@ describe("usage-windows DB layer", () => {
     insertWindow(database, {
       id: "w-1",
       router_key_id: "rk-1",
+      provider_id: null,
       start_time: "2026-04-22 10:00:00",
       end_time: "2026-04-22 15:00:00",
     });
     insertWindow(database, {
       id: "w-2",
       router_key_id: "rk-2",
+      provider_id: null,
       start_time: "2026-04-22 16:00:00",
       end_time: "2026-04-22 21:00:00",
     });
@@ -116,12 +121,14 @@ describe("usage-windows DB layer", () => {
     insertWindow(database, {
       id: "w-1",
       router_key_id: null,
+      provider_id: null,
       start_time: "2026-04-22 10:00:00",
       end_time: "2026-04-22 15:00:00",
     });
     insertWindow(database, {
       id: "w-2",
       router_key_id: null,
+      provider_id: null,
       start_time: "2026-04-22 16:00:00",
       end_time: "2026-04-22 21:00:00",
     });
@@ -188,14 +195,14 @@ describe("usage-windows DB layer", () => {
     ).run("log-2", "openai", "gpt-4", "p-1", 200, 100, 0, now, "rk-2");
 
     database.prepare(
-      `INSERT INTO request_metrics (id, request_log_id, provider_id, backend_model, api_type, input_tokens, output_tokens, is_complete, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run("m-1", "log-1", "p-1", "gpt-4", "openai", 100, 50, 1, now);
+      `INSERT INTO request_metrics (id, request_log_id, provider_id, backend_model, api_type, router_key_id, status_code, input_tokens, output_tokens, is_complete, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run("m-1", "log-1", "p-1", "gpt-4", "openai", "rk-1", 200, 100, 50, 1, now);
 
     database.prepare(
-      `INSERT INTO request_metrics (id, request_log_id, provider_id, backend_model, api_type, input_tokens, output_tokens, is_complete, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run("m-2", "log-2", "p-1", "gpt-4", "openai", 200, 80, 1, now);
+      `INSERT INTO request_metrics (id, request_log_id, provider_id, backend_model, api_type, router_key_id, status_code, input_tokens, output_tokens, is_complete, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run("m-2", "log-2", "p-1", "gpt-4", "openai", "rk-2", 200, 200, 80, 1, now);
 
     const usage = getWindowUsage(database, "2026-04-01 00:00:00", "2026-12-31 23:59:59", "rk-1");
     expect(usage.request_count).toBe(1);
@@ -219,19 +226,20 @@ describe("UsageWindowTracker", () => {
     const database = setupDb();
     const tracker = new UsageWindowTracker(database);
 
-    tracker.recordRequest("rk-1");
+    tracker.recordRequest("p-1", "rk-1");
 
     const windows = database.prepare("SELECT * FROM usage_windows").all() as any[];
     expect(windows).toHaveLength(1);
     expect(windows[0].router_key_id).toBe("rk-1");
+    expect(windows[0].provider_id).toBe("p-1");
   });
 
   it("recordRequest does not create new window within active window", () => {
     const database = setupDb();
     const tracker = new UsageWindowTracker(database);
 
-    tracker.recordRequest("rk-1");
-    tracker.recordRequest("rk-1");
+    tracker.recordRequest("p-1", "rk-1");
+    tracker.recordRequest("p-1", "rk-1");
 
     const windows = database.prepare("SELECT * FROM usage_windows").all() as any[];
     expect(windows).toHaveLength(1);
@@ -268,6 +276,77 @@ describe("UsageWindowTracker", () => {
     const windows = database.prepare("SELECT * FROM usage_windows").all() as any[];
     expect(windows).toHaveLength(0);
   });
+
+  it("recordRequest creates per-provider windows independently", () => {
+    const database = setupDb();
+    const tracker = new UsageWindowTracker(database);
+
+    tracker.recordRequest("p-1");
+    tracker.recordRequest("p-2");
+
+    const windows = database.prepare("SELECT * FROM usage_windows ORDER BY provider_id ASC").all() as any[];
+    expect(windows).toHaveLength(2);
+    expect(windows[0].provider_id).toBe("p-1");
+    expect(windows[1].provider_id).toBe("p-2");
+  });
+
+  it("getLatestWindow filters by provider_id", () => {
+    const database = setupDb();
+    insertWindow(database, {
+      id: "w-1",
+      router_key_id: null,
+      provider_id: "p-1",
+      start_time: "2026-04-22 10:00:00",
+      end_time: "2026-04-22 15:00:00",
+    });
+    insertWindow(database, {
+      id: "w-2",
+      router_key_id: null,
+      provider_id: "p-2",
+      start_time: "2026-04-22 16:00:00",
+      end_time: "2026-04-22 21:00:00",
+    });
+
+    // p-1 的最新窗口是 w-1
+    const latestP1 = getLatestWindow(database, undefined, "p-1");
+    expect(latestP1).not.toBeNull();
+    expect(latestP1!.id).toBe("w-1");
+
+    // p-2 的最新窗口是 w-2
+    const latestP2 = getLatestWindow(database, undefined, "p-2");
+    expect(latestP2).not.toBeNull();
+    expect(latestP2!.id).toBe("w-2");
+
+    // 无 provider 时（全局窗口），不应找到任何带 provider_id 的窗口
+    const globalLatest = getLatestWindow(database);
+    expect(globalLatest).toBeNull();
+  });
+
+  it("getWindowsInRange filters by provider_id", () => {
+    const database = setupDb();
+    insertWindow(database, {
+      id: "w-1",
+      router_key_id: null,
+      provider_id: "p-1",
+      start_time: "2026-04-22 10:00:00",
+      end_time: "2026-04-22 15:00:00",
+    });
+    insertWindow(database, {
+      id: "w-2",
+      router_key_id: null,
+      provider_id: "p-2",
+      start_time: "2026-04-22 10:00:00",
+      end_time: "2026-04-22 15:00:00",
+    });
+
+    const p1Windows = getWindowsInRange(database, "2026-04-22 09:00:00", "2026-04-22 16:00:00", undefined, "p-1");
+    expect(p1Windows).toHaveLength(1);
+    expect(p1Windows[0].id).toBe("w-1");
+
+    const p2Windows = getWindowsInRange(database, "2026-04-22 09:00:00", "2026-04-22 16:00:00", undefined, "p-2");
+    expect(p2Windows).toHaveLength(1);
+    expect(p2Windows[0].id).toBe("w-2");
+  });
 });
 
 describe("usage API endpoints", () => {
@@ -303,6 +382,7 @@ describe("usage API endpoints", () => {
     insertWindow(db, {
       id: "w-today",
       router_key_id: null,
+      provider_id: "p-1",
       start_time: `${todayLocal} 00:00:00`,
       end_time: `${todayLocal} 23:59:59`,
     });

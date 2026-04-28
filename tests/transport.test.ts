@@ -496,3 +496,253 @@ describe("StreamProxy close handler", () => {
     expect(result.kind).toBe("stream_success");
   });
 });
+
+// ============================================================
+// Mid-stream SSE error detection (STREAMING 阶段 error 检测)
+// ============================================================
+
+describe("StreamProxy mid-stream SSE error detection", () => {
+  let mockReq: ReturnType<typeof createMockUpstreamReq>;
+  let mockReplyRaw: ReturnType<typeof createMockReplyRaw>;
+
+  function createMockReply() {
+    mockReplyRaw = createMockReplyRaw();
+    return { raw: mockReplyRaw } as any;
+  }
+
+  beforeEach(() => {
+    vi.resetModules();
+    mockReq = createMockUpstreamReq();
+    vi.doMock("../src/proxy/transport.js", async () => {
+      const actual = await vi.importActual("../src/proxy/transport.js") as any;
+      actual._transportInternals.createUpstreamRequest = () => mockReq;
+      return actual;
+    });
+  });
+
+  it("detects mid-stream SSE error event after normal data", async () => {
+    const { callStream } = await import("../src/proxy/transport.js");
+    const reply = createMockReply();
+
+    const checkEarlyError = vi.fn((data: string) =>
+      /"error".*"code"\s*:\s*"1234"/.test(data),
+    );
+
+    const resultPromise = callStream(
+      { base_url: "http://localhost:9000" }, "sk-test", { model: "gpt-4", stream: true },
+      {}, reply, 30000, "/v1/chat/completions",
+      (_h, key) => ({ Authorization: `Bearer ${key}` }), undefined, checkEarlyError,
+    );
+
+    const mockRes = createMockUpstreamRes({ statusCode: 200 });
+    mockReq.emit("response", mockRes);
+    await tick();
+
+    // 第一个正常 SSE event（触发 BUFFERING → STREAMING）
+    mockRes.emit("data", Buffer.from('data: {"content":"Hello"}\n\n'));
+    await tick();
+    expect(mockReplyRaw.writeHead).toHaveBeenCalledWith(200, expect.any(Object));
+
+    // 第二个 chunk 是 SSE error event
+    mockRes.emit("data", Buffer.from('event: error\ndata: {"error":{"code":"1234","message":"网络错误"}}\n\n'));
+    await tick();
+
+    const result = await resultPromise;
+    expect(result.kind).toBe("stream_error");
+    if (result.kind !== "stream_error") return;
+    expect(result.statusCode).toBe(200);
+    expect(result.body).toContain("1234");
+    expect(mockReplyRaw.end).toHaveBeenCalled();
+  });
+
+  it("does not trigger false positive for normal content", async () => {
+    const { callStream } = await import("../src/proxy/transport.js");
+    const reply = createMockReply();
+
+    const checkEarlyError = vi.fn((data: string) =>
+      /"error".*"code"\s*:\s*"1234"/.test(data),
+    );
+
+    const resultPromise = callStream(
+      { base_url: "http://localhost:9000" }, "sk-test", { model: "gpt-4", stream: true },
+      {}, reply, 30000, "/v1/chat/completions",
+      (_h, key) => ({ Authorization: `Bearer ${key}` }), undefined, checkEarlyError,
+    );
+
+    const mockRes = createMockUpstreamRes({ statusCode: 200 });
+    mockReq.emit("response", mockRes);
+    await tick();
+
+    mockRes.emit("data", Buffer.from('data: {"content":"Error handling is important"}\n\n'));
+    mockRes.emit("data", Buffer.from('data: {"content":"No problem here"}\n\n'));
+    mockRes.emit("end");
+
+    const result = await resultPromise;
+    expect(result.kind).toBe("stream_success");
+  });
+
+  it("detects error across chunk boundaries", async () => {
+    const { callStream } = await import("../src/proxy/transport.js");
+    const reply = createMockReply();
+
+    const checkEarlyError = vi.fn((data: string) =>
+      /"error".*"code"\s*:\s*"1234"/.test(data),
+    );
+
+    const resultPromise = callStream(
+      { base_url: "http://localhost:9000" }, "sk-test", { model: "gpt-4", stream: true },
+      {}, reply, 30000, "/v1/chat/completions",
+      (_h, key) => ({ Authorization: `Bearer ${key}` }), undefined, checkEarlyError,
+    );
+
+    const mockRes = createMockUpstreamRes({ statusCode: 200 });
+    mockReq.emit("response", mockRes);
+    await tick();
+
+    mockRes.emit("data", Buffer.from('data: {"content":"Hello"}\n\n'));
+    await tick();
+
+    // Error event 被拆分为两个 chunk
+    mockRes.emit("data", Buffer.from('event: erro'));
+    mockRes.emit("data", Buffer.from('r\ndata: {"error":{"code":"1234","message":"网络错误"}}\n\n'));
+    await tick();
+
+    const result = await resultPromise;
+    expect(result.kind).toBe("stream_error");
+  });
+});
+
+// ============================================================
+// Mid-stream SSE error detection (STREAMING 阶段 error 检测)
+// ============================================================
+
+describe("StreamProxy mid-stream SSE error detection", () => {
+  let mockReq: ReturnType<typeof createMockUpstreamReq>;
+  let mockReplyRaw: ReturnType<typeof createMockReplyRaw>;
+
+  function createMockReply() {
+    mockReplyRaw = createMockReplyRaw();
+    return { raw: mockReplyRaw } as any;
+  }
+
+  beforeEach(() => {
+    vi.resetModules();
+    mockReq = createMockUpstreamReq();
+    vi.doMock("../src/proxy/transport.js", async () => {
+      const actual = await vi.importActual("../src/proxy/transport.js") as any;
+      actual._transportInternals.createUpstreamRequest = () => mockReq;
+      return actual;
+    });
+  });
+
+  it("detects mid-stream SSE error event after normal data", async () => {
+    const { callStream } = await import("../src/proxy/transport.js");
+    const reply = createMockReply();
+
+    const checkEarlyError = vi.fn((data: string) =>
+      /"error".*"code"\s*:\s*"1234"/.test(data),
+    );
+
+    const resultPromise = callStream(
+      { base_url: "http://localhost:9000" },
+      "sk-test",
+      { model: "gpt-4", stream: true },
+      {},
+      reply,
+      30000,
+      "/v1/chat/completions",
+      (_h, key) => ({ Authorization: `Bearer ${key}` }),
+      undefined,
+      checkEarlyError,
+    );
+
+    const mockRes = createMockUpstreamRes({ statusCode: 200 });
+    mockReq.emit("response", mockRes);
+
+    await tick();
+    mockRes.emit("data", Buffer.from('data: {"content":"Hello"}\n\n'));
+    await tick();
+
+    expect(mockReplyRaw.writeHead).toHaveBeenCalledWith(200, expect.any(Object));
+
+    mockRes.emit("data", Buffer.from('event: error\ndata: {"error":{"code":"1234","message":"网络错误"}}\n\n'));
+    await tick();
+
+    const result = await resultPromise;
+    expect(result.kind).toBe("stream_error");
+    if (result.kind !== "stream_error") return;
+    expect(result.statusCode).toBe(200);
+    expect(result.body).toContain("1234");
+    expect(mockReplyRaw.end).toHaveBeenCalled();
+  });
+
+  it("does not trigger false positive for normal content", async () => {
+    const { callStream } = await import("../src/proxy/transport.js");
+    const reply = createMockReply();
+
+    const checkEarlyError = vi.fn((data: string) =>
+      /"error".*"code"\s*:\s*"1234"/.test(data),
+    );
+
+    const resultPromise = callStream(
+      { base_url: "http://localhost:9000" },
+      "sk-test",
+      { model: "gpt-4", stream: true },
+      {},
+      reply,
+      30000,
+      "/v1/chat/completions",
+      (_h, key) => ({ Authorization: `Bearer ${key}` }),
+      undefined,
+      checkEarlyError,
+    );
+
+    const mockRes = createMockUpstreamRes({ statusCode: 200 });
+    mockReq.emit("response", mockRes);
+
+    await tick();
+    mockRes.emit("data", Buffer.from('data: {"content":"Error handling is important"}\n\n'));
+    await tick();
+    mockRes.emit("data", Buffer.from('data: {"content":"No error here"}\n\n'));
+    mockRes.emit("end");
+
+    const result = await resultPromise;
+    expect(result.kind).toBe("stream_success");
+  });
+
+  it("detects error across chunk boundaries", async () => {
+    const { callStream } = await import("../src/proxy/transport.js");
+    const reply = createMockReply();
+
+    const checkEarlyError = vi.fn((data: string) =>
+      /"error".*"code"\s*:\s*"1234"/.test(data),
+    );
+
+    const resultPromise = callStream(
+      { base_url: "http://localhost:9000" },
+      "sk-test",
+      { model: "gpt-4", stream: true },
+      {},
+      reply,
+      30000,
+      "/v1/chat/completions",
+      (_h, key) => ({ Authorization: `Bearer ${key}` }),
+      undefined,
+      checkEarlyError,
+    );
+
+    const mockRes = createMockUpstreamRes({ statusCode: 200 });
+    mockReq.emit("response", mockRes);
+
+    await tick();
+    mockRes.emit("data", Buffer.from('data: {"content":"Hello"}\n\n'));
+    await tick();
+
+    mockRes.emit("data", Buffer.from('event: erro'));
+    mockRes.emit("data", Buffer.from('r\ndata: {"error":{"code":"1234","message":"网络错误"}}\n\n'));
+    await tick();
+
+    const result = await resultPromise;
+    expect(result.kind).toBe("stream_error");
+  });
+});

@@ -233,13 +233,13 @@ describe("Integration tests", () => {
        VALUES (?, ?, ?, ?, ?, ?)`
     ).run("map-gpt4", "gpt-4", "gpt-4", "svc-openai", 1, now);
     db.prepare(
-      `INSERT INTO mapping_groups (id, client_model, strategy, rule, created_at)
+      `INSERT INTO mapping_groups (id, client_model, rule, is_active, created_at)
        VALUES (?, ?, ?, ?, ?)`
     ).run(
       "mg-gpt4",
       "gpt-4",
-      "scheduled",
-      JSON.stringify({ default: { backend_model: "gpt-4", provider_id: "svc-openai" } }),
+      JSON.stringify({ targets: [{ backend_model: "gpt-4", provider_id: "svc-openai" }] }),
+      1,
       now
     );
 
@@ -248,13 +248,13 @@ describe("Integration tests", () => {
        VALUES (?, ?, ?, ?, ?, ?)`
     ).run("map-claude3", "claude-3-sonnet", "claude-3-sonnet", "svc-anthropic", 1, now);
     db.prepare(
-      `INSERT INTO mapping_groups (id, client_model, strategy, rule, created_at)
+      `INSERT INTO mapping_groups (id, client_model, rule, is_active, created_at)
        VALUES (?, ?, ?, ?, ?)`
     ).run(
       "mg-claude3",
       "claude-3-sonnet",
-      "scheduled",
-      JSON.stringify({ default: { backend_model: "claude-3-sonnet", provider_id: "svc-anthropic" } }),
+      JSON.stringify({ targets: [{ backend_model: "claude-3-sonnet", provider_id: "svc-anthropic" }] }),
+      1,
       now
     );
   });
@@ -349,13 +349,13 @@ describe("Integration tests", () => {
        VALUES (?, ?, ?, ?, ?, ?)`
     ).run("map-test", "gpt-4-mapped", "gpt-4-turbo", "svc-openai", 1, now);
     db.prepare(
-      `INSERT INTO mapping_groups (id, client_model, strategy, rule, created_at)
+      `INSERT INTO mapping_groups (id, client_model, rule, is_active, created_at)
        VALUES (?, ?, ?, ?, ?)`
     ).run(
       "mg-test",
       "gpt-4-mapped",
-      "scheduled",
-      JSON.stringify({ default: { backend_model: "gpt-4-turbo", provider_id: "svc-openai" } }),
+      JSON.stringify({ targets: [{ backend_model: "gpt-4-turbo", provider_id: "svc-openai" }] }),
+      1,
       now
     );
 

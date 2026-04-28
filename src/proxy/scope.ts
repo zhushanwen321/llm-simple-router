@@ -1,6 +1,7 @@
 import type { ProviderSemaphoreManager } from "./semaphore.js";
+import type { ConcurrencyOverride } from "./strategy/types.js";
 import type { RequestTracker } from "../monitor/request-tracker.js";
-import type { ActiveRequest } from "../monitor/types.js";
+import type { ActiveRequest, AttemptSnapshot } from "../monitor/types.js";
 
 export class SemaphoreScope {
   constructor(private manager: ProviderSemaphoreManager) {}
@@ -10,8 +11,9 @@ export class SemaphoreScope {
     signal: AbortSignal,
     onQueued: () => void,
     fn: () => Promise<T>,
+    concurrencyOverride?: ConcurrencyOverride,
   ): Promise<T> {
-    const token = await this.manager.acquire(providerId, signal, onQueued);
+    const token = await this.manager.acquire(providerId, signal, onQueued, undefined, concurrencyOverride);
     try {
       return await fn();
     } finally {
@@ -27,11 +29,14 @@ export class TrackerScope {
     req: ActiveRequest,
     fn: () => Promise<T>,
     extractStatus: (result: T) => { status: "completed" | "failed"; statusCode?: number },
+    extractAttempts?: (result: T) => AttemptSnapshot[],
   ): Promise<T> {
     this.tracker.start(req);
     try {
       const result = await fn();
-      this.tracker.complete(req.id, extractStatus(result));
+      const status = extractStatus(result);
+      const attempts = extractAttempts ? extractAttempts(result) : undefined;
+      this.tracker.complete(req.id, { ...status, attempts });
       return result;
     } catch (e) {
       this.tracker.complete(req.id, { status: "failed" });

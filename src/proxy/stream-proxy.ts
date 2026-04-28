@@ -35,6 +35,10 @@ class StreamProxy {
   private readonly passThrough = new PassThrough();
   private readonly pipeEntry: PassThrough | SSEMetricsTransform;
 
+  // 流式阶段 SSE error 扫描缓冲（跨 chunk 边界匹配）
+  private sseScanBuffer = "";
+  private static readonly SSE_SCAN_MAX = 8192;
+
   constructor(
     private readonly statusCode: number,
     rawUpstreamHeaders: RawHeaders,
@@ -59,7 +63,7 @@ class StreamProxy {
 
   private transition(newState: StreamState): void {
     const VALID: Record<StreamState, StreamState[]> = {
-      BUFFERING: ["STREAMING", "EARLY_ERROR"],
+      BUFFERING: ["STREAMING", "EARLY_ERROR", "ABORTED"],
       STREAMING: ["COMPLETED", "ABORTED"],
       COMPLETED: [],
       EARLY_ERROR: [],
@@ -87,7 +91,7 @@ class StreamProxy {
         result = { kind: "stream_success", ...base, metrics: extra.metrics as MetricsResult | undefined };
         break;
       case "stream_error":
-        result = { kind: "stream_error", ...base, body: extra.body as string, headers: this.sseHeaders };
+        result = { kind: "stream_error", ...base, body: extra.body as string, headers: this.sseHeaders, headersSent: this.headersSent || undefined };
         break;
       case "stream_abort":
         result = { kind: "stream_abort", ...base, metrics: extra.metrics as MetricsResult | undefined };
@@ -103,6 +107,10 @@ class StreamProxy {
         this.pendingResult = result;
       }
     } else {
+      // stream_abort 且 headers 已发送时，必须 end reply 避免客户端挂起
+      if (kind === "stream_abort" && this.headersSent) {
+        try { this.reply.raw.end(); } catch { /* reply may already be destroyed */ }
+      }
       this.cleanup();
       if (this.resolveFn) {
         this.resolveFn(result);
@@ -135,6 +143,13 @@ class StreamProxy {
 
   startStreaming(): void {
     if (this.headersSent) return;
+    if (this.reply.raw.headersSent) {
+      // headers 已由其他代码路径（如前一次 retry 的 StreamProxy）发送，
+      // 仅更新状态机避免 BUFFERING 阶段的重复逻辑
+      this.transition("STREAMING");
+      this.headersSent = true;
+      return;
+    }
     this.transition("STREAMING");
     this.headersSent = true;
     this.reply.raw.writeHead(this.statusCode, this.sseHeaders);
@@ -185,6 +200,27 @@ class StreamProxy {
       return;
     }
 
+    // STREAMING 阶段：扫描 SSE error event（处理跨 chunk 边界）
+    if (this.state === "STREAMING" && this.checkEarlyError) {
+      this.sseScanBuffer += chunk.toString("utf-8");
+      // 保留最近 SSE_SCAN_MAX 字符，避免无限增长
+      if (this.sseScanBuffer.length > StreamProxy.SSE_SCAN_MAX) {
+        this.sseScanBuffer = this.sseScanBuffer.slice(-StreamProxy.SSE_SCAN_MAX);
+      }
+      // 快速启发式：只在扫描窗口出现 SSE error 标记时才执行正则匹配
+      if (this.sseScanBuffer.includes("event: error") || this.sseScanBuffer.includes('"type":"error"')) {
+        const body = Buffer.concat(this.captureChunks).toString("utf-8");
+        if (this.checkEarlyError(body)) {
+          this.terminal("stream_error", { body });
+          // headers 已发送：必须结束 reply 避免 client hang
+          if (this.headersSent) {
+            setImmediate(() => this.reply.raw.end());
+          }
+          return;
+        }
+      }
+    }
+
     this.pipeEntry.write(chunk);
     if (this.loopGuard) {
       this.loopGuard.feed(chunk.toString("utf-8"));
@@ -233,7 +269,7 @@ class StreamProxy {
     if (this.resolved) return;
     this.resolved = true;
     this.cleanup();
-    const result: TransportResult = { kind: "throw", error: err };
+    const result: TransportResult = { kind: "throw", error: err, headersSent: this.headersSent };
     if (this.resolveFn) {
       this.resolveFn(result);
     } else {

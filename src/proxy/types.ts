@@ -53,6 +53,8 @@ export type TransportResult =
       body: string;
       headers: Record<string, string>;
       sentHeaders: Record<string, string>;
+      /** 响应 headers 是否已发送给客户端。mid-stream 检测到错误时为 true */
+      headersSent?: boolean;
     }
   | {
       kind: "stream_abort";
@@ -72,6 +74,8 @@ export type TransportResult =
   | {
       kind: "throw";
       error: Error;
+      /** 响应 headers 是否已发送给客户端。stream 阶段 throw 时为 true */
+      headersSent?: boolean;
     };
 
 /**

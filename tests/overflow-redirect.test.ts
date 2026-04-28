@@ -40,11 +40,11 @@ function insertMappingGroup(
   target: Record<string, string>,
 ) {
   const now = new Date().toISOString();
-  const rule = JSON.stringify({ default: target, windows: [] });
+  const rule = JSON.stringify({ targets: [target] });
   db.prepare(
-    `INSERT INTO mapping_groups (id, client_model, strategy, rule, created_at)
+    `INSERT INTO mapping_groups (id, client_model, rule, is_active, created_at)
      VALUES (?, ?, ?, ?, ?)`,
-  ).run(id, clientModel, "scheduled", rule, now);
+  ).run(id, clientModel, rule, 1, now);
 }
 
 function buildTestApp(db: Database.Database): FastifyInstance {

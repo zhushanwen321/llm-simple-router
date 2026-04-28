@@ -45,7 +45,7 @@ const LOG_LIST_SELECT = `rl.id, rl.api_type, rl.model, rl.provider_id, rl.status
             rl.is_stream, rl.error_message, rl.created_at, rl.is_retry, rl.is_failover, rl.original_request_id, rl.original_model,
             CASE WHEN rl.provider_id = 'router' THEN rl.upstream_request ELSE NULL END AS upstream_request,
             rl.input_tokens, rl.output_tokens, rl.cache_read_tokens, rl.ttft_ms, rl.tokens_per_second, rl.stop_reason,
-            rl.backend_model, rl.metrics_complete, rl.session_id,
+            rl.backend_model, rl.metrics_complete, rl.session_id, rl.input_tokens_estimated,
             COALESCE(p.name, rl.provider_id) AS provider_name`;
 const LOG_LIST_JOIN = `LEFT JOIN providers p ON p.id = rl.provider_id`;
 
@@ -99,6 +99,7 @@ type LogFilterOptions = {
   provider_id?: string;
   start_time?: string;
   end_time?: string;
+  status_code?: string;
 };
 
 function buildLogWhereClause(
@@ -130,6 +131,13 @@ function buildLogWhereClause(
   if (options.end_time) {
     where += " AND rl.created_at <= ?";
     params.push(options.end_time);
+  }
+  if (options.status_code) {
+    if (options.status_code === "200") {
+      where += " AND rl.status_code = 200";
+    } else if (options.status_code === "non200") {
+      where += " AND (rl.status_code IS NULL OR rl.status_code != 200)";
+    }
   }
   return { where, params };
 }
@@ -179,6 +187,7 @@ type MetricsUpdate = {
   tokens_per_second?: number | null;
   stop_reason?: string | null;
   is_complete?: number;
+  input_tokens_estimated?: number;
 };
 
 /** 双写：collectTransportMetrics 写 request_metrics 的同时，更新 request_logs 的冗余列 */
@@ -188,12 +197,12 @@ export function updateLogMetrics(db: Database.Database, logId: string, m: Metric
        input_tokens = ?, output_tokens = ?, cache_read_tokens = ?,
        ttft_ms = ?, tokens_per_second = ?, stop_reason = ?,
        backend_model = (SELECT backend_model FROM request_metrics WHERE request_log_id = ?),
-       metrics_complete = ?
+       metrics_complete = ?, input_tokens_estimated = ?
      WHERE id = ?`,
   ).run(
     m.input_tokens ?? null, m.output_tokens ?? null, m.cache_read_tokens ?? null,
     m.ttft_ms ?? null, m.tokens_per_second ?? null, m.stop_reason ?? null,
-    logId, m.is_complete ?? 1, logId,
+    logId, m.is_complete ?? 1, m.input_tokens_estimated ?? 0, logId,
   );
 }
 
@@ -219,7 +228,8 @@ export function backfillMetricsFromRequestMetrics(db: Database.Database): number
       tokens_per_second = rm.tokens_per_second,
       stop_reason = rm.stop_reason,
       backend_model = rm.backend_model,
-      metrics_complete = rm.is_complete
+      metrics_complete = rm.is_complete,
+      input_tokens_estimated = rm.input_tokens_estimated
     FROM request_metrics rm
     WHERE rm.request_log_id = request_logs.id
       AND request_logs.metrics_complete = 0
