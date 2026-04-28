@@ -1,4 +1,3 @@
-import { openaiToAnthropicRequest, anthropicToOpenAIRequest, transformRequestBody } from "./request-transform.js";
 import { convertMessagesOA2Ant, convertMessagesAnt2OA } from "./message-mapper.js";
 import { convertToolsOA2Ant, convertToolsAnt2OA, mapToolChoiceOA2Ant, mapToolChoiceAnt2OA } from "./tool-mapper.js";
 import { mapReasoningToThinking, mapThinkingToReasoning } from "./thinking-mapper.js";
@@ -69,7 +68,7 @@ export function openaiToAnthropicRequest(body: Record<string, unknown>): Record<
   if (body.reasoning) {
     const thinking = mapReasoningToThinking(body.reasoning as Record<string, unknown>);
     result.thinking = thinking;
-    if (thinking.budget_tokens && (result.max_tokens as number) < thinking.budget_tokens) {
+    if (thinking.budget_tokens && (result.max_tokens as number) < (thinking.budget_tokens as number)) {
       result.max_tokens = thinking.budget_tokens;
     }
   }

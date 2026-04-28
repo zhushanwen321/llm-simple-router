@@ -108,6 +108,7 @@ export interface RouteHandlerDeps {
 import { getConfig } from "../../config/index.js";
 import type { ServiceContainer } from "../../core/container.js";
 import { SERVICE_KEYS } from "../../core/container.js";
+import { TransformCoordinator } from "../transform/transform-coordinator.js";
 
 // ---------- Main entry ----------
 
@@ -268,9 +269,18 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
       return rejectAndReply(reply, rCtx, errors.providerUnavailable(),
         `Provider '${resolved.provider_id}' unavailable`, resolved.provider_id);
     }
-    if (provider.api_type !== apiType) {
-      return rejectAndReply(reply, rCtx, errors.providerTypeMismatch(),
-        `API type mismatch: expected '${apiType}'`, resolved.provider_id);
+    // 格式转换：apiType 不匹配时转换请求体和路径
+    const coordinator = new TransformCoordinator();
+    const needsTransform = coordinator.needsTransform(apiType, provider.api_type);
+    let effectiveApiType = apiType;
+    let effectiveUpstreamPath = upstreamPath;
+
+    if (needsTransform) {
+      const transformed = coordinator.transformRequest(currentBody, apiType, provider.api_type, resolved.backend_model);
+      // 用转换后的结果替换 currentBody
+      currentBody = transformed.body as Record<string, unknown>;
+      effectiveUpstreamPath = transformed.upstreamPath;
+      effectiveApiType = provider.api_type;
     }
 
     // routing — 创建新对象而非 in-place mutation
@@ -307,16 +317,18 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
     const reqBodyStr = JSON.stringify(patchedBody);
     const clientReq = JSON.stringify({ headers: cliHdrs, body: rawBody });
     const upstreamReqBase = JSON.stringify({
-      url: buildUpstreamUrl(provider.base_url, upstreamPath),
-      headers: sanitizeHeadersForLog(buildUpstreamHeaders(cliHdrs, apiKey, Buffer.byteLength(reqBodyStr), apiType)),
+      url: buildUpstreamUrl(provider.base_url, effectiveUpstreamPath),
+      headers: sanitizeHeadersForLog(buildUpstreamHeaders(cliHdrs, apiKey, Buffer.byteLength(reqBodyStr), effectiveApiType)),
       body: reqBodyStr,
     });
 
+    const formatTransform = needsTransform ? coordinator.createFormatTransform(apiType, provider.api_type, resolved.backend_model) : undefined;
+
     const transportFn = buildTransportFn({
-      provider, apiKey, body: patchedBody, cliHdrs, reply, upstreamPath, apiType,
+      provider, apiKey, body: patchedBody, cliHdrs, reply, upstreamPath: effectiveUpstreamPath, apiType: effectiveApiType,
       isStream, startTime, logId, effectiveModel, originalModel,
       streamTimeoutMs: config.STREAM_TIMEOUT_MS, tracker, matcher, request,
-      streamLoopEnabled,
+      streamLoopEnabled, formatTransform,
     });
 
     const pipelineSnapshot = iterationSnapshot.toJSON();
@@ -342,6 +354,15 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
 
       const tr = resilienceResult.result;
       const succeeded = tr.kind === "success" || tr.kind === "stream_success" || tr.kind === "stream_abort";
+      // 非流式跨格式响应转换
+      if (needsTransform && tr.kind === "success" && tr.statusCode === 200 && tr.body) {
+        tr.body = coordinator.transformResponse(tr.body, provider.api_type, apiType);
+      }
+      // 非流式跨格式错误转换
+      if (needsTransform && (tr.kind === "error" || tr.kind === "stream_error") && tr.body) {
+        tr.body = coordinator.transformErrorResponse(tr.body, provider.api_type, apiType);
+      }
+
       if (succeeded) usageWindowTracker?.recordRequest(provider.id, routerKeyId ?? undefined);
 
       if (isStream && tracker) {

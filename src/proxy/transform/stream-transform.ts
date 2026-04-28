@@ -97,16 +97,18 @@ class OpenAIToAnthropicTransform extends FormatStreamTransform {
     try { chunk = JSON.parse(event.data!); } catch { return; }
 
     // Usage chunk（可能在 finish_reason 之后单独到达）
-    if (chunk.usage && !chunk.choices?.length) {
-      this.inputTokens = chunk.usage.prompt_tokens ?? this.inputTokens;
-      this.outputTokens = chunk.usage.completion_tokens ?? this.outputTokens;
+    if (chunk.usage && !(Array.isArray(chunk.choices) && chunk.choices.length > 0)) {
+      const usage = chunk.usage as Record<string, number>;
+      this.inputTokens = usage.prompt_tokens ?? this.inputTokens;
+      this.outputTokens = usage.completion_tokens ?? this.outputTokens;
       if (this.pendingStopReason !== null) {
         this.emitStopSequence();
       }
       return;
     }
 
-    const choice = chunk.choices?.[0] as Record<string, unknown> | undefined;
+    const choices = chunk.choices as Array<Record<string, unknown>> | undefined;
+    const choice = choices?.[0];
     if (!choice) return;
 
     const delta = choice.delta as Record<string, unknown> | undefined;

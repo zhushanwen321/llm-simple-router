@@ -59,6 +59,7 @@ export interface TransportFnParams {
   matcher?: RetryRuleMatcher;
   request: FastifyRequest;
   streamLoopEnabled: boolean;
+  formatTransform?: import("stream").Transform;
 }
 
 export function buildTransportFn(p: TransportFnParams): (target: Target) => Promise<TransportResult> {
@@ -87,7 +88,7 @@ export function buildTransportFn(p: TransportFnParams): (target: Target) => Prom
       const checkEarlyError = p.matcher ? (data: string) => p.matcher!.test(UPSTREAM_SUCCESS, data) : undefined;
       const streamResult = await callStream(
         p.provider, p.apiKey, p.body, p.cliHdrs, p.reply, p.streamTimeoutMs,
-        p.upstreamPath, buildHeaders, metricsTransform, checkEarlyError, undefined, streamLoopGuard,
+        p.upstreamPath, buildHeaders, metricsTransform, checkEarlyError, undefined, streamLoopGuard, p.formatTransform,
       );
       const m = (streamResult.kind === "stream_success" || streamResult.kind === "stream_abort")
         ? streamResult.metrics : undefined;

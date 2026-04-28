@@ -1,4 +1,4 @@
-import { PassThrough } from "stream";
+import { PassThrough, Transform } from "stream";
 import type { FastifyReply } from "fastify";
 import { UPSTREAM_SUCCESS, filterHeaders } from "../types.js";
 import { buildUpstreamUrl } from "../proxy-core.js";
@@ -33,6 +33,7 @@ class StreamProxy {
   private readonly sseHeaders: Record<string, string>;
   private readonly passThrough = new PassThrough();
   private readonly pipeEntry: PassThrough | SSEMetricsTransform;
+  private readonly formatTransform: Transform | undefined;
 
   // 流式阶段 SSE error 扫描缓冲（跨 chunk 边界匹配）
   private sseScanBuffer = "";
@@ -47,7 +48,9 @@ class StreamProxy {
     private readonly checkEarlyError: ((data: string) => boolean) | undefined,
     private readonly timeoutMs: number,
     private readonly loopGuard: StreamLoopGuard | undefined,
+    formatTransform?: Transform,
   ) {
+    this.formatTransform = formatTransform;
     this.sseHeaders = filterHeaders(rawUpstreamHeaders);
     this.sseHeaders["Content-Type"] = "text/event-stream";
     this.sseHeaders["Cache-Control"] = "no-cache";
@@ -153,7 +156,10 @@ class StreamProxy {
     this.headersSent = true;
     this.reply.raw.writeHead(this.statusCode, this.sseHeaders);
     if (this.metricsTransform) {
-      this.metricsTransform.pipe(this.passThrough, { end: true });
+      this.metricsTransform.pipe(this.formatTransform ?? this.passThrough, { end: true });
+    }
+    if (this.formatTransform) {
+      this.formatTransform.pipe(this.passThrough, { end: true });
     }
     // 手动转发而非 pipe，避免 Node.js 在 dest 上自动注册 close/finish handler
     this.passThrough.on("data", (chunk: Buffer) => {
@@ -301,6 +307,7 @@ export function callStream(
   checkEarlyError?: (bufferedData: string) => boolean,
   compatResolve?: (result: TransportResult) => void,
   loopGuard?: StreamLoopGuard,
+  formatTransform?: import("stream").Transform,
 ): Promise<TransportResult> {
   return new Promise((resolve) => {
     const effectiveResolve = compatResolve ?? resolve;
@@ -337,7 +344,7 @@ export function callStream(
         metricsTransform,
         checkEarlyError,
         timeoutMs,
-        loopGuard,
+        loopGuard, formatTransform,
       );
 
       proxy.bindResolve(effectiveResolve);

@@ -19,8 +19,8 @@ export class TransformCoordinator {
       return { body, upstreamPath };
     }
     const transformed = entryApiType === "openai"
-      ? openaiToAnthropicRequest(body, model)
-      : anthropicToOpenAIRequest(body, model);
+      ? openaiToAnthropicRequest(body)
+      : anthropicToOpenAIRequest(body);
     return { body: transformed, upstreamPath };
   }
 
@@ -38,7 +38,8 @@ export class TransformCoordinator {
     model: string,
   ): Transform | undefined {
     if (!this.needsTransform(entryApiType, providerApiType)) return undefined;
-    // source=provider格式, target=客户端格式
+    // 上游=provider格式, 客户端=entry格式
+    // OA provider + Ant client → OpenAIToAnthropicTransform
     if (providerApiType === "openai" && entryApiType === "anthropic") {
       return new OpenAIToAnthropicTransform(model);
     }
