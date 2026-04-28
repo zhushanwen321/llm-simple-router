@@ -89,7 +89,7 @@ class StreamProxy {
         result = { kind: "stream_success", ...base, metrics: extra.metrics as MetricsResult | undefined };
         break;
       case "stream_error":
-        result = { kind: "stream_error", ...base, body: extra.body as string, headers: this.sseHeaders };
+        result = { kind: "stream_error", ...base, body: extra.body as string, headers: this.sseHeaders, headersSent: extra.headersSent as boolean | undefined };
         break;
       case "stream_abort":
         result = { kind: "stream_abort", ...base, metrics: extra.metrics as MetricsResult | undefined };
@@ -198,9 +198,8 @@ class StreamProxy {
       if (this.sseScanBuffer.includes("event: error") || this.sseScanBuffer.includes('"type":"error"')) {
         const body = Buffer.concat(this.captureChunks).toString("utf-8");
         if (this.checkEarlyError(body)) {
-          this.terminal("stream_error", { body });
+          this.terminal("stream_error", { body, headersSent: true });
           // headers 已发送：必须结束 reply 避免 client hang
-          // headers 未发送：terminal 已处理，无需额外操作
           if (this.headersSent) {
             setImmediate(() => this.reply.raw.end());
           }

@@ -298,6 +298,10 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
       return reply;
     } catch (e) {
       if (e instanceof ProviderSwitchNeeded) {
+        // headers 已发送给客户端时不能 failover，直接返回
+        if (reply.raw.headersSent) {
+          return reply;
+        }
         // 跨 provider failover：resilience 层携带了 attempts 数据，补写失败日志
         if (e.attempts && e.attempts.length > 0) {
           const fakeResult = e.lastResult ?? { kind: "throw" as const, error: new Error("provider switch") };
