@@ -21,9 +21,9 @@ export class ToolLoopGuard {
     const history = this.tracker.recordAndGetHistory(sessionKey, toolCall);
 
     // 第一层：筛选同名的 tool_name 记录
+    // 未达阈值时不重置 loopCount，保留跨请求升级到层级 2/3 的可能性
     const sameNameRecords = history.filter(r => r.toolName === toolCall.toolName);
     if (sameNameRecords.length < this.config.minConsecutiveCount) {
-      this.tracker.resetLoopCount(sessionKey);
       return { detected: false };
     }
 

@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import Database from "better-sqlite3";
+import { HTTP_UNPROCESSABLE_ENTITY } from "../constants.js";
 import { getMappingGroup, getProviderById, insertRequestLog } from "../db/index.js";
 import { decrypt } from "../utils/crypto.js";
 import { getSetting } from "../db/settings.js";
@@ -157,7 +158,7 @@ export async function handleProxyRequest(
             "Tool call loop detected, injecting break prompt");
         } else if (loopCount === 2) {
           // 层级 2：优雅中断
-          return reply.code(422).send({
+          return reply.code(HTTP_UNPROCESSABLE_ENTITY).send({
             error: {
               type: "tool_call_loop_detected",
               message: `检测到工具调用循环（连续重复调用 "${lastToolUse.toolName}"）。请求已中断。`,

@@ -54,7 +54,7 @@ describe("ToolLoopGuard", () => {
     expect(tracker.getLoopCount("s1")).toBe(7);
   });
 
-  it("resets loop count when normal request passes", () => {
+  it("preserves loop count across mixed tool names", () => {
     const tracker = new SessionTracker(trackerConfig);
     const guard = new ToolLoopGuard(tracker, guardConfig);
     // 使用内部有重复的输入触发检测
@@ -63,9 +63,9 @@ describe("ToolLoopGuard", () => {
       guard.check("s1", { toolName: "write_file", inputHash: "a", inputText: input, timestamp: i });
     }
     expect(tracker.getLoopCount("s1")).toBe(1);
-    // 不同工具名，sameNameRecords 不足 minConsecutiveCount，重置 loopCount
+    // 不同工具名不会重置 loopCount，保留升级到层级 2/3 的可能性
     guard.check("s1", { toolName: "read_file", inputHash: "b", inputText: '{"p":"b"}', timestamp: 10 });
-    expect(tracker.getLoopCount("s1")).toBe(0);
+    expect(tracker.getLoopCount("s1")).toBe(1);
   });
 
   it("injects loop break prompt for anthropic format", () => {

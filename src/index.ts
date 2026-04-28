@@ -194,7 +194,12 @@ export async function buildApp(
 
   const loopConfig = config.LOOP_PREVENTION ?? DEFAULT_LOOP_PREVENTION_CONFIG;
   const sessionTracker = new SessionTracker(loopConfig.sessionTracker);
-  setLoopPreventionConfig({ ...loopConfig, enabled: true });
+  // buildApp() 默认启用循环预防。
+  // 用户可通过环境变量 LOOP_PREVENTION='{"enabled":false}' 关闭。
+  // 直接注册插件的测试不使用 buildApp()，不受此影响。
+  setLoopPreventionConfig(process.env.LOOP_PREVENTION
+    ? loopConfig
+    : { ...loopConfig, enabled: true });
 
   // 从 DB 读取已有 provider 的并发配置，初始化信号量管理器和 tracker
   const allProviders = getAllProviders(db);

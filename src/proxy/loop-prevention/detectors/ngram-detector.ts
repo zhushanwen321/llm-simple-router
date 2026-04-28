@@ -26,9 +26,9 @@ export class NGramLoopDetector implements LoopDetector {
         }
       }
       if (this.window.length > this.config.windowSize) {
-        const removed = this.window.shift()!;
+        const leaving = this.window.slice(0, this.config.n).join("");
+        this.window.shift();
         if (this.window.length >= this.config.n) {
-          const leaving = this.window.slice(-this.config.n).join("");
           const c = this.ngramCounts.get(leaving);
           if (c && c > 1) this.ngramCounts.set(leaving, c - 1);
           else this.ngramCounts.delete(leaving);
