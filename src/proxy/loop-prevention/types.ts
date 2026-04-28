@@ -28,6 +28,7 @@ export interface LoopPreventionConfig {
   sessionTracker: SessionTrackerConfig;
 }
 
+/* eslint-disable no-magic-numbers -- DEFAULT 配置值本身就是语义化命名 */
 export const DEFAULT_LOOP_PREVENTION_CONFIG: LoopPreventionConfig = {
   enabled: false,
   stream: {

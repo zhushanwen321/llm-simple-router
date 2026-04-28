@@ -3,15 +3,12 @@ import type { StreamLoopGuardConfig } from "./types.js";
 
 export class StreamLoopGuard {
   private triggered = false;
-  private detector: LoopDetector;
 
   constructor(
     private readonly config: StreamLoopGuardConfig,
-    detector: LoopDetector,
+    private readonly detector: LoopDetector,
     private readonly onLoopDetected: (reason: string) => void,
-  ) {
-    this.detector = detector;
-  }
+  ) {}
 
   feed(text: string): void {
     if (this.triggered) return;

@@ -24,6 +24,7 @@ import type { Target } from "./strategy/types.js";
 import type { RetryRuleMatcher } from "./retry-rules.js";
 import type { ProxyOrchestrator } from "./orchestrator.js";
 import type { ProxyErrorFormatter, ProxyErrorResponse } from "./proxy-core.js";
+import { ToolLoopGuard } from "./loop-prevention/tool-loop-guard.js";
 import { buildTransportFn } from "./transport-fn.js";
 import { applyOverflowRedirect } from "./overflow.js";
 import { applyProviderPatches } from "./patch/index.js";
@@ -31,6 +32,7 @@ import { applyProviderPatches } from "./patch/index.js";
 const HTTP_ERROR_THRESHOLD = 400;
 const MAX_LOG_FIELD_LENGTH = 80;
 const UPSTREAM_ERROR_STATUS = 502;
+const TIER2_LOOP_THRESHOLD = 2;
 
 // ---------- Failover loop context ----------
 
@@ -142,7 +144,6 @@ export async function handleProxyRequest(
     const sessionKey = routerKeyId ? `${routerKeyId}:${sessionId}` : sessionId;
     const lastToolUse = extractLastToolUse(request.body as Record<string, unknown>);
     if (lastToolUse) {
-      const { ToolLoopGuard } = await import("./loop-prevention/tool-loop-guard.js");
       const toolGuard = new ToolLoopGuard(deps.sessionTracker, {
         enabled: true,
         minConsecutiveCount: 3,
@@ -156,7 +157,7 @@ export async function handleProxyRequest(
           toolGuard.injectLoopBreakPrompt(request.body as Record<string, unknown>, apiType, lastToolUse.toolName);
           request.log.warn({ sessionId, toolName: lastToolUse.toolName, loopCount },
             "Tool call loop detected, injecting break prompt");
-        } else if (loopCount === 2) {
+        } else if (loopCount === TIER2_LOOP_THRESHOLD) {
           // 层级 2：优雅中断
           return reply.code(HTTP_UNPROCESSABLE_ENTITY).send({
             error: {
@@ -399,10 +400,11 @@ function extractLastToolUse(body: Record<string, unknown>): import("./loop-preve
 }
 
 function simpleHash(s: string): string {
+  const HASH_SHIFT = 5;
   let hash = 0;
   for (let i = 0; i < s.length; i++) {
     const char = s.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
+    hash = ((hash << HASH_SHIFT) - hash) + char;
     hash |= 0;
   }
   return String(hash);
