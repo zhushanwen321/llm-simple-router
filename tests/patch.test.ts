@@ -1,78 +1,173 @@
 import { describe, it, expect } from "vitest";
-import { patchMissingThinkingBlocks } from "../src/proxy/patch/deepseek/patch-thinking-blocks.js";
+import { patchNonDeepSeekToolMessages } from "../src/proxy/patch/deepseek/patch-thinking-blocks.js";
 import { patchOrphanToolResults } from "../src/proxy/patch/deepseek/patch-orphan-tool-results.js";
 import { applyProviderPatches } from "../src/proxy/patch/index.js";
 
-describe("patchMissingThinkingBlocks", () => {
-  it("为缺少 thinking 的 assistant 消息添加空 thinking block", () => {
+describe("patchNonDeepSeekToolMessages", () => {
+  it("将缺 thinking 的 assistant tool_use 转为 text", () => {
     const body = {
       messages: [
-        { role: "assistant", content: [{ type: "thinking", thinking: "h", signature: "s" }] },
-        { role: "user", content: "ok" },
-        { role: "assistant", content: [{ type: "text", text: "hi" }] },
+        { role: "user", content: "分析代码" },
+        {
+          role: "assistant",
+          content: [
+            { type: "tool_use", id: "call_1", name: "read", input: { path: "/a" } },
+          ],
+        },
+        {
+          role: "user",
+          content: [
+            { type: "tool_result", tool_use_id: "call_1", content: "file content" },
+          ],
+        },
       ],
     };
-    patchMissingThinkingBlocks(body);
-    const lastAssistant = body.messages[2] as { content: unknown[] };
-    expect(lastAssistant.content[0]).toEqual({ type: "thinking", thinking: "", signature: "" });
-    expect(lastAssistant.content[1]).toEqual({ type: "text", text: "hi" });
+    patchNonDeepSeekToolMessages(body);
+
+    const assistant = body.messages[1] as { content: unknown[] };
+    expect(assistant.content).toHaveLength(1);
+    const block = assistant.content[0] as { type: string; text: string };
+    expect(block.type).toBe("text");
+    const parsed = JSON.parse(block.text);
+    expect(parsed.type).toBe("tool_use");
+    expect(parsed.id).toBe("call_1");
+    expect(parsed.name).toBe("read");
+
+    const user = body.messages[2] as { content: unknown[] };
+    expect(user.content).toHaveLength(1);
+    const userBlock = user.content[0] as { type: string; text: string };
+    expect(userBlock.type).toBe("text");
+    const userParsed = JSON.parse(userBlock.text);
+    expect(userParsed.type).toBe("tool_result");
+    expect(userParsed.tool_use_id).toBe("call_1");
   });
 
-  it("thinking 未激活时不修改", () => {
+  it("保留有合法 signature 的 DeepSeek 原生消息不动", () => {
+    const body = {
+      messages: [
+        { role: "user", content: "查天气" },
+        {
+          role: "assistant",
+          content: [
+            { type: "thinking", thinking: "推理中", signature: "uuid-1234" },
+            { type: "tool_use", id: "call_2", name: "get_weather", input: { city: "北京" } },
+          ],
+        },
+        {
+          role: "user",
+          content: [
+            { type: "tool_result", tool_use_id: "call_2", content: "晴" },
+          ],
+        },
+      ],
+    };
+    patchNonDeepSeekToolMessages(body);
+
+    const assistant = body.messages[1] as { content: unknown[] };
+    expect(assistant.content).toHaveLength(2);
+    expect((assistant.content[0] as { type: string }).type).toBe("thinking");
+    expect((assistant.content[1] as { type: string }).type).toBe("tool_use");
+
+    const user = body.messages[2] as { content: unknown[] };
+    expect(user.content).toHaveLength(1);
+    expect((user.content[0] as { type: string }).type).toBe("tool_result");
+  });
+
+  it("signature 为空视为非 DeepSeek 消息，转换 tool_use", () => {
     const body = {
       messages: [
         { role: "user", content: "hi" },
-        { role: "assistant", content: [{ type: "text", text: "hello" }] },
+        {
+          role: "assistant",
+          content: [
+            { type: "thinking", thinking: "", signature: "" },
+            { type: "tool_use", id: "call_3", name: "read", input: {} },
+          ],
+        },
+        {
+          role: "user",
+          content: [
+            { type: "tool_result", tool_use_id: "call_3", content: "ok" },
+          ],
+        },
       ],
     };
-    patchMissingThinkingBlocks(body);
+    patchNonDeepSeekToolMessages(body);
+
     const assistant = body.messages[1] as { content: unknown[] };
-    expect(assistant.content).toHaveLength(1);
+    // thinking 保留，tool_use 转为 text
+    const types = (assistant.content as Array<{ type: string }>).map(b => b.type);
+    expect(types).toContain("thinking");
+    expect(types).toContain("text");
+    expect(types).not.toContain("tool_use");
   });
 
-  it("body.thinking 为 true 时视为激活", () => {
+  it("同时含 text 和 tool_use（无 thinking），text 保留 tool_use 转为 text", () => {
     const body = {
-      thinking: { type: "enabled", budget_tokens: 10000 },
       messages: [
-        { role: "assistant", content: [{ type: "text", text: "hi" }] },
+        { role: "user", content: "hi" },
+        {
+          role: "assistant",
+          content: [
+            { type: "text", text: "我来帮你查" },
+            { type: "tool_use", id: "call_4", name: "read", input: {} },
+          ],
+        },
+        {
+          role: "user",
+          content: [
+            { type: "tool_result", tool_use_id: "call_4", content: "ok" },
+          ],
+        },
       ],
     };
-    patchMissingThinkingBlocks(body);
-    const assistant = body.messages[0] as { content: unknown[] };
+    patchNonDeepSeekToolMessages(body);
+
+    const assistant = body.messages[1] as { content: unknown[] };
     expect(assistant.content).toHaveLength(2);
-    expect((assistant.content[0] as { type: string }).type).toBe("thinking");
+    expect((assistant.content[0] as { type: string }).type).toBe("text");
+    expect((assistant.content[1] as { type: string }).type).toBe("text");
+    // 第二个 text 是序列化的 tool_use
+    const parsed = JSON.parse((assistant.content[1] as { text: string }).text);
+    expect(parsed.type).toBe("tool_use");
   });
 
-  it("包含 tool_use 的消息不添加 thinking（防止无限循环）", () => {
+  it("只有不匹配的 tool_result 保留原样，不影响不相关的 user 消息", () => {
     const body = {
-      thinking: { type: "enabled", budget_tokens: 10000 },
       messages: [
-        { role: "user", content: "do something" },
-        { role: "assistant", content: [
-          { type: "tool_use", id: "call_1", name: "Read", input: {} },
-        ] },
-        { role: "user", content: [
-          { type: "tool_result", tool_use_id: "call_1", content: "ok" },
-        ] },
-        { role: "assistant", content: [
-          { type: "text", text: "done" },
-        ] },
+        {
+          role: "assistant",
+          content: [
+            { type: "tool_use", id: "call_a", name: "A", input: {} },
+          ],
+        },
+        {
+          role: "user",
+          content: [
+            { type: "tool_result", tool_use_id: "call_b", content: "unrelated" },
+          ],
+        },
       ],
     };
-    patchMissingThinkingBlocks(body);
-    // tool_use 消息不应被修改
-    const toolUseMsg = body.messages[1] as { content: unknown[] };
-    expect(toolUseMsg.content).toHaveLength(1);
-    expect((toolUseMsg.content[0] as { type: string }).type).toBe("tool_use");
-    // 但纯文本消息仍应添加 thinking
-    const textMsg = body.messages[3] as { content: unknown[] };
-    expect(textMsg.content).toHaveLength(2);
-    expect((textMsg.content[0] as { type: string }).type).toBe("thinking");
+    patchNonDeepSeekToolMessages(body);
+
+    // assistant 的 tool_use 被转换
+    const assistant = body.messages[0] as { content: unknown[] };
+    expect((assistant.content[0] as { type: string }).type).toBe("text");
+
+    // user 的 tool_result 不匹配 call_a → 保留
+    const user = body.messages[1] as { content: unknown[] };
+    expect((user.content[0] as { type: string }).type).toBe("tool_result");
   });
 
   it("无 messages 时安全返回", () => {
-    const body = {};
-    expect(() => patchMissingThinkingBlocks(body)).not.toThrow();
+    const body: Record<string, unknown> = {};
+    expect(() => patchNonDeepSeekToolMessages(body)).not.toThrow();
+  });
+
+  it("空 messages 时安全返回", () => {
+    const body = { messages: [] };
+    expect(() => patchNonDeepSeekToolMessages(body)).not.toThrow();
   });
 });
 
@@ -267,24 +362,45 @@ describe("patchOrphanToolResults", () => {
 });
 
 describe("applyProviderPatches", () => {
-  it("DeepSeek provider 时触发补丁", () => {
+  it("DeepSeek provider 时将非 DeepSeek 的 tool_use 转为 text", () => {
     const body = {
-      thinking: { type: "enabled" },
       messages: [
-        { role: "assistant", content: [{ type: "text", text: "hi" }] },
-        { role: "user", content: [{ type: "tool_result", tool_use_id: "call_ghost", content: "x" }] },
+        { role: "user", content: "hi" },
+        {
+          role: "assistant",
+          content: [
+            { type: "tool_use", id: "call_1", name: "read", input: {} },
+          ],
+        },
+        {
+          role: "user",
+          content: [
+            { type: "tool_result", tool_use_id: "call_1", content: "ok" },
+          ],
+        },
       ],
     };
     applyProviderPatches(body, { base_url: "https://api.deepseek.com/anthropic" });
-    // thinking patch 应该已添加 thinking block
-    const assistant = body.messages[0] as { content: unknown[] };
-    expect((assistant.content[0] as { type: string }).type).toBe("thinking");
+    const assistant = body.messages[1] as { content: unknown[] };
+    expect((assistant.content[0] as { type: string }).type).toBe("text");
   });
 
   it("非 DeepSeek provider 时不修改", () => {
     const body = {
       messages: [
-        { role: "assistant", content: [{ type: "text", text: "hi" }] },
+        { role: "user", content: "hi" },
+        {
+          role: "assistant",
+          content: [
+            { type: "tool_use", id: "call_1", name: "read", input: {} },
+          ],
+        },
+        {
+          role: "user",
+          content: [
+            { type: "tool_result", tool_use_id: "call_1", content: "ok" },
+          ],
+        },
       ],
     };
     const original = JSON.stringify(body);
