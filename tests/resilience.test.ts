@@ -176,6 +176,23 @@ describe("ResilienceLayer.decide()", () => {
     expect(decision.action).toBe("retry");
   });
 
+  it("stream_error + statusCode < threshold + rule matches + isFailover -> retry (not failover)", () => {
+    const layer = new ResilienceLayer();
+    const matcher = new RetryRuleMatcher();
+    matcher["cache"] = new Map([
+      [200, [{ rule: { id: "r1", name: "SSE error 1234", status_code: 200, body_pattern: '"code"\\s*:\\s*"1234"',
+        is_active: 1, created_at: "", retry_strategy: "fixed", retry_delay_ms: 1,
+        max_retries: 2, max_delay_ms: 100 }, pattern: /"code"\s*:\s*"1234"/ }]],
+    ]);
+    const state = { attemptCount: 0, currentTarget: t1, excludedTargets: [] };
+    const decision = layer.decide(
+      makeStreamError(200, '{"error":{"code":"1234","message":"网络错误"}}'),
+      state,
+      failoverConfig({ ruleMatcher: matcher }),
+    );
+    expect(decision.action).toBe("retry");
+  });
+
   it("stream_error + statusCode < threshold + rule matches + exhausted + failover -> failover", () => {
     const layer = new ResilienceLayer();
     const matcher = new RetryRuleMatcher();
