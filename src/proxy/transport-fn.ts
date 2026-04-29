@@ -10,7 +10,6 @@ import type { RawHeaders, TransportResult } from "./types.js";
 import type { Target } from "./strategy/types.js";
 import type { RequestTracker } from "../monitor/request-tracker.js";
 import type { RetryRuleMatcher } from "./retry-rules.js";
-import { buildModelInfoTag } from "./enhancement/enhancement-handler.js";
 import { DEFAULT_MAX_RAW as STREAM_CONTENT_MAX_RAW, DEFAULT_MAX_TEXT as STREAM_CONTENT_MAX_TEXT } from "../monitor/stream-content-accumulator.js";
 
 function toStreamMetrics(m: MetricsResult) {
@@ -78,15 +77,6 @@ export function buildTransportFn(p: TransportFnParams): (target: Target) => Prom
     if (result.kind === "success") {
       const mr = MetricsExtractor.fromNonStreamResponse(p.apiType, result.body);
       if (mr) p.tracker?.update(p.logId, { streamMetrics: toStreamMetrics(mr) });
-    }
-    if (p.originalModel && result.kind === "success" && result.statusCode === UPSTREAM_SUCCESS) {
-      try {
-        const bodyObj = JSON.parse(result.body);
-        if (bodyObj.content?.[0]?.text) {
-          bodyObj.content[0].text += `\n\n${buildModelInfoTag(p.effectiveModel)}`;
-          return { ...result, body: JSON.stringify(bodyObj) };
-        }
-      } catch { p.request.log.debug("Failed to inject model-info tag into non-JSON response"); }
     }
     return result;
   };
