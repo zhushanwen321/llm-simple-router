@@ -1,17 +1,21 @@
 import { applyDeepSeekPatches } from "./deepseek/index.js";
+import { patchRouterSyntheticToolCalls } from "./router-cleanup.js";
 
 interface ProviderInfo {
   base_url: string;
 }
 
 /**
- * 根据 provider 信息分发到对应的补丁逻辑。
- * 每个补丁直接修改 body，不返回新对象。
+ * 通用消息补丁入口。
+ * 执行顺序：
+ * 1. 清理 router 合成的 tool_use/tool_result（通用，所有 provider）
+ * 2. Provider-specific patches（如 DeepSeek thinking 校验）
  */
 export function applyProviderPatches(
   body: Record<string, unknown>,
   provider: ProviderInfo,
 ): void {
+  patchRouterSyntheticToolCalls(body);
   if (needsDeepSeekPatch(body, provider)) {
     applyDeepSeekPatches(body);
   }

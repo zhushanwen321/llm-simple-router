@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { patchNonDeepSeekToolMessages } from "../src/proxy/patch/deepseek/patch-thinking-blocks.js";
 import { patchOrphanToolResults } from "../src/proxy/patch/deepseek/patch-orphan-tool-results.js";
+import { patchRouterSyntheticToolCalls } from "../src/proxy/patch/router-cleanup.js";
 import { applyProviderPatches } from "../src/proxy/patch/index.js";
 
 describe("patchNonDeepSeekToolMessages", () => {
@@ -168,6 +169,135 @@ describe("patchNonDeepSeekToolMessages", () => {
   it("空 messages 时安全返回", () => {
     const body = { messages: [] };
     expect(() => patchNonDeepSeekToolMessages(body)).not.toThrow();
+  });
+});
+
+describe("patchRouterSyntheticToolCalls", () => {
+  it("移除 router 合成的 tool_use 和对应 tool_result", () => {
+    const body = {
+      messages: [
+        { role: "user", content: "hi" },
+        {
+          role: "assistant",
+          content: [
+            { type: "text", text: "可用模型列表:\n1. deepseek/chat" },
+            { type: "tool_use", id: "toolu_router_abc", name: "AskUserQuestion", input: { questions: [] } },
+          ],
+        },
+        {
+          role: "user",
+          content: [
+            { type: "tool_result", tool_use_id: "toolu_router_abc", content: "selected" },
+          ],
+        },
+      ],
+    };
+    patchRouterSyntheticToolCalls(body);
+    // assistant 只剩 text 块，user tool_result 被移除
+    const assistant = body.messages[1] as { content: unknown[] };
+    expect(assistant.content).toHaveLength(1);
+    expect((assistant.content[0] as { type: string }).type).toBe("text");
+    // 空 user 消息被移除，只有 2 条消息
+    expect(body.messages).toHaveLength(2);
+  });
+
+  it("assistant 只含 router tool_use 时整条消息被移除", () => {
+    const body = {
+      messages: [
+        { role: "user", content: "hi" },
+        {
+          role: "assistant",
+          content: [
+            { type: "tool_use", id: "toolu_router_xyz", name: "AskUserQuestion", input: {} },
+          ],
+        },
+        {
+          role: "user",
+          content: [
+            { type: "tool_result", tool_use_id: "toolu_router_xyz", content: "ok" },
+          ],
+        },
+        { role: "user", content: "next query" },
+      ],
+    };
+    patchRouterSyntheticToolCalls(body);
+    // 空 assistant 和空 user 被移除，连续 user 合并
+    expect(body.messages).toHaveLength(1);
+    expect(body.messages[0].role).toBe("user");
+    const merged = body.messages[0].content as unknown[];
+    expect(merged).toHaveLength(2);
+  });
+
+  it("provider 前缀 toolu_router_prov_ 也被移除", () => {
+    const body = {
+      messages: [
+        { role: "user", content: "hi" },
+        {
+          role: "assistant",
+          content: [
+            { type: "tool_use", id: "toolu_router_prov_123", name: "AskUserQuestion", input: {} },
+          ],
+        },
+        {
+          role: "user",
+          content: [
+            { type: "tool_result", tool_use_id: "toolu_router_prov_123", content: "x" },
+          ],
+        },
+      ],
+    };
+    patchRouterSyntheticToolCalls(body);
+    expect(body.messages).toHaveLength(1);
+    expect(body.messages[0].role).toBe("user");
+  });
+
+  it("保留非 router 的 tool_use 和 tool_result", () => {
+    const body = {
+      messages: [
+        { role: "user", content: "hi" },
+        {
+          role: "assistant",
+          content: [
+            { type: "tool_use", id: "call_real", name: "read", input: {} },
+            { type: "tool_use", id: "toolu_router_abc", name: "AskUserQuestion", input: {} },
+          ],
+        },
+        {
+          role: "user",
+          content: [
+            { type: "tool_result", tool_use_id: "call_real", content: "data" },
+            { type: "tool_result", tool_use_id: "toolu_router_abc", content: "selected" },
+          ],
+        },
+      ],
+    };
+    patchRouterSyntheticToolCalls(body);
+    const assistant = body.messages[1] as { content: unknown[] };
+    expect(assistant.content).toHaveLength(1);
+    expect((assistant.content[0] as { type: string }).type).toBe("tool_use");
+    expect((assistant.content[0] as { id: string }).id).toBe("call_real");
+
+    const user = body.messages[2] as { content: unknown[] };
+    expect(user.content).toHaveLength(1);
+    expect((user.content[0] as { type: string }).type).toBe("tool_result");
+  });
+
+  it("无 router 合成时不修改", () => {
+    const body = {
+      messages: [
+        { role: "user", content: "hi" },
+        { role: "assistant", content: [{ type: "tool_use", id: "call_1", name: "read", input: {} }] },
+        { role: "user", content: [{ type: "tool_result", tool_use_id: "call_1", content: "ok" }] },
+      ],
+    };
+    const original = JSON.stringify(body);
+    patchRouterSyntheticToolCalls(body);
+    expect(JSON.stringify(body)).toBe(original);
+  });
+
+  it("空 messages 时安全返回", () => {
+    const body = { messages: [] };
+    expect(() => patchRouterSyntheticToolCalls(body)).not.toThrow();
   });
 });
 
