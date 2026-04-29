@@ -66,6 +66,9 @@ export interface ProviderConcurrencySnapshot {
   queued: number
   queueTimeoutMs: number
   maxQueueSize: number
+  adaptiveEnabled?: boolean
+  adaptiveLimit?: number
+  adaptiveProbeActive?: boolean
 }
 
 export interface ProviderStats {

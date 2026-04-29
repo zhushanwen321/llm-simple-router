@@ -11,7 +11,11 @@
       <div class="flex items-center justify-between text-sm">
         <span class="font-medium text-foreground">{{ provider.providerName }}</span>
         <span class="text-muted-foreground">
-          <template v-if="provider.maxConcurrency === 0">未限制</template>
+          <template v-if="provider.adaptiveEnabled">
+            {{ provider.active }} / {{ provider.adaptiveLimit ?? provider.maxConcurrency }}
+            <span class="text-xs">(自适应)</span>
+          </template>
+          <template v-else-if="provider.maxConcurrency === 0">未限制</template>
           <template v-else>{{ provider.active }} / {{ provider.maxConcurrency }}</template>
         </span>
       </div>
