@@ -1,8 +1,6 @@
 // src/core/types.ts
 // 被多个目录（proxy, db, monitor, admin）共享的类型定义
 
-import type { MetricsResult } from "../metrics/metrics-extractor.js";
-
 // ========== 来自原 proxy/strategy/types.ts ==========
 
 export interface Target {
@@ -32,26 +30,38 @@ export interface ResolveResult {
 
 // ========== 来自原 proxy/types.ts 公共部分 ==========
 
-export const UPSTREAM_SUCCESS = 200;
+// ========== 来自原 metrics/metrics-extractor.ts ==========
+
+export interface MetricsResult {
+  input_tokens: number | null;
+  output_tokens: number | null;
+  cache_creation_tokens: number | null;
+  cache_read_tokens: number | null;
+  ttft_ms: number | null;
+  /** T6 - T0: proxy end-to-end streaming duration */
+  total_duration_ms: number | null;
+  /** @deprecated Use total_tps instead */
+  tokens_per_second: number | null;
+  stop_reason: string | null;
+  is_complete: number;
+  input_tokens_estimated?: number;
+  // --- Two-phase TPS: thinking / non-thinking ---
+  thinking_tokens: number | null;
+  /** T3 - T0: request start to last thinking delta */
+  thinking_duration_ms: number | null;
+  thinking_tps: number | null;
+  /** T6 - T3 (thinking) or T6 - T0 (non-thinking) */
+  non_thinking_duration_ms: number | null;
+  non_thinking_tps: number | null;
+  total_tps: number | null;
+  // --- Content counts (for analysis, not TPS) ---
+  text_tokens: number | null;
+  tool_use_tokens: number | null;
+}
+
+// ========== 来自原 proxy/types.ts 公共部分 ==========
 
 export type RawHeaders = Record<string, string | string[] | undefined>;
-
-/** 过滤掉不应转发给下游的 hop-by-hop headers */
-const SKIP_DOWNSTREAM = new Set([
-  "content-length",
-  "transfer-encoding",
-  "connection",
-  "keep-alive",
-]);
-
-export function filterHeaders(raw: RawHeaders): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const [key, value] of Object.entries(raw)) {
-    if (value == null || SKIP_DOWNSTREAM.has(key.toLowerCase())) continue;
-    out[key] = Array.isArray(value) ? value.join(", ") : value;
-  }
-  return out;
-}
 
 export type TransportResult =
   | {
@@ -97,6 +107,20 @@ export type TransportResult =
       error: Error;
       headersSent?: boolean;
     };
+
+/** 单次 resilience 尝试的记录 */
+export interface ResilienceAttempt {
+  target: Target;
+  attemptIndex: number;
+  statusCode: number | null;
+  error: string | null;
+  latencyMs: number;
+  responseBody: string | null;
+  /** 上游响应 headers（throw 和 stream_success/stream_abort 时为 null） */
+  responseHeaders: Record<string, string> | null;
+  /** TransportResult.kind，用于区分 stream_error 等特殊类型 */
+  resultKind: TransportResult["kind"];
+}
 
 /** 流式传输阶段状态 */
 export type StreamState =

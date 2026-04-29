@@ -3,7 +3,7 @@ import { getProviderById } from "../../db/index.js";
 import { callNonStream, callStream } from "./http.js";
 import { SSEMetricsTransform } from "../../metrics/sse-metrics-transform.js";
 import { MetricsExtractor } from "../../metrics/metrics-extractor.js";
-import type { MetricsResult } from "../../metrics/metrics-extractor.js";
+import type { MetricsResult } from "../types.js";
 import { buildUpstreamHeaders } from "../proxy-core.js";
 import { StreamLoopGuard } from "../loop-prevention/stream-loop-guard.js";
 import { NGramLoopDetector } from "../loop-prevention/detectors/ngram-detector.js";

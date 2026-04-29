@@ -1,7 +1,7 @@
 import { Transform, TransformCallback } from "stream";
 import { SSEParser } from "./sse-parser.js";
 import { MetricsExtractor } from "./metrics-extractor.js";
-import type { MetricsResult } from "./metrics-extractor.js";
+import type { MetricsResult } from "../core/types.js";
 
 const DEFAULT_THROTTLE_MS = 5000;
 

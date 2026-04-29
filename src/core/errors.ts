@@ -1,7 +1,7 @@
 // src/core/errors.ts
 // 被多目录共享的错误类型（从 proxy/semaphore.ts 和 proxy/types.ts 移出）
 
-import type { TransportResult } from "./types.js";
+import type { TransportResult, ResilienceAttempt } from "./types.js";
 
 /**
  * Provider 并发队列已满时抛出。
@@ -35,7 +35,7 @@ export class SemaphoreTimeoutError extends Error {
 export class ProviderSwitchNeeded extends Error {
   constructor(
     public readonly targetProviderId: string,
-    public readonly attempts?: import("../proxy/orchestration/resilience.js").ResilienceAttempt[],
+    public readonly attempts?: ResilienceAttempt[],
     public readonly lastResult?: TransportResult,
   ) {
     super(`Provider switch needed: ${targetProviderId}`);

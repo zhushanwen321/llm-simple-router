@@ -20,8 +20,7 @@ export class ServiceContainer {
 
   /** 获取服务实例。首次调用时执行工厂并缓存。 */
   resolve<T>(key: string): T {
-    const cached = this.cache.get(key);
-    if (cached !== undefined) return cached as T;
+    if (this.cache.has(key)) return this.cache.get(key) as T;
 
     const factory = this.factories.get(key);
     if (!factory) throw new Error(`Service not registered: "${key}"`);

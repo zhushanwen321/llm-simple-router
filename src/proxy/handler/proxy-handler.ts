@@ -147,11 +147,10 @@ export async function handleProxyRequest(
   });
   const clientModel = ((request.body as Record<string, unknown>).model as string) || "unknown";
   const sessionId = (request.headers as RawHeaders)["x-claude-code-session-id"] as string | undefined;
+  const sessionTracker = deps.container.resolve<import("../loop-prevention/session-tracker.js").SessionTracker>("sessionTracker");
   const enhancementConfig = loadEnhancementConfig(deps.db);
   const { effectiveModel, originalModel, interceptResponse } = applyEnhancement(deps.db, request, clientModel, sessionId, enhancementConfig);
 
-  // --- 工具调用循环检测（受 proxy_enhancement 配置控制） ---
-  const sessionTracker = deps.container.resolve<import("../loop-prevention/session-tracker.js").SessionTracker>("sessionTracker");
   if (enhancementConfig.tool_call_loop_enabled && sessionTracker && sessionId) {
     const routerKeyId = (request.routerKey as { id?: string } | undefined)?.id ?? null;
     const sessionKey = routerKeyId ? `${routerKeyId}:${sessionId}` : sessionId;
@@ -205,6 +204,10 @@ export async function handleProxyRequest(
 
 async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> {
   const { request, reply, apiType, upstreamPath, errors, deps, options, effectiveModel, originalModel, originalBody, sessionId, streamLoopEnabled } = ctx;
+  const tracker = deps.container.resolve<RequestTracker>("tracker");
+  const matcher = deps.container.resolve<RetryRuleMatcher>("matcher");
+  const usageWindowTracker = deps.container.resolve<import("../routing/usage-window-tracker.js").UsageWindowTracker>("usageWindowTracker");
+  const config = getConfig();
   const excludeTargets: Target[] = [];
   let rootLogId: string | null = null;
   while (true) {
@@ -290,7 +293,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
     const transportFn = buildTransportFn({
       provider, apiKey, body, cliHdrs, reply, upstreamPath, apiType,
       isStream, startTime, logId, effectiveModel, originalModel,
-      streamTimeoutMs: getConfig().STREAM_TIMEOUT_MS, tracker: deps.container.resolve<RequestTracker>("tracker"), matcher: deps.container.resolve<RetryRuleMatcher>("matcher"), request,
+      streamTimeoutMs: config.STREAM_TIMEOUT_MS, tracker, matcher, request,
       streamLoopEnabled,
     });
 
@@ -298,7 +301,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
       const resilienceResult = await deps.orchestrator.handle(
         request, reply, apiType,
         { resolved, provider, clientModel: effectiveModel, isStream, trackerId: logId, sessionId, clientRequest: clientReq, concurrencyOverride },
-        { retryBaseDelayMs: getConfig().RETRY_BASE_DELAY_MS, isFailover, ruleMatcher: deps.container.resolve<RetryRuleMatcher>("matcher"), transportFn },
+        { retryBaseDelayMs: config.RETRY_BASE_DELAY_MS, isFailover, ruleMatcher: matcher, transportFn },
       );
       const lastLogId = logResilienceResult(
         deps.db,
@@ -313,9 +316,8 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
 
       const tr = resilienceResult.result;
       const succeeded = tr.kind === "success" || tr.kind === "stream_success" || tr.kind === "stream_abort";
-      if (succeeded) deps.container.resolve<import("../routing/usage-window-tracker.js").UsageWindowTracker>("usageWindowTracker")?.recordRequest(provider.id, routerKeyId ?? undefined);
+      if (succeeded) usageWindowTracker?.recordRequest(provider.id, routerKeyId ?? undefined);
 
-      const tracker = deps.container.resolve<RequestTracker>("tracker");
       if (isStream && tracker) {
         const sc = tracker.get(logId)?.streamContent;
         const blocks = sc?.blocks;
