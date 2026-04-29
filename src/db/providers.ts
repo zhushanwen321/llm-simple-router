@@ -14,6 +14,8 @@ export interface Provider {
   max_concurrency: number;
   queue_timeout_ms: number;
   max_queue_size: number;
+  adaptive_enabled: number;
+  adaptive_min: number;
   created_at: string;
   updated_at: string;
 }
@@ -25,7 +27,7 @@ export const PROVIDER_CONCURRENCY_DEFAULTS = {
 } as const;
 
 const PROVIDER_FIELDS = new Set([
-  "name", "api_type", "base_url", "api_key", "api_key_preview", "models", "is_active", "max_concurrency", "queue_timeout_ms", "max_queue_size",
+  "name", "api_type", "base_url", "api_key", "api_key_preview", "models", "is_active", "max_concurrency", "queue_timeout_ms", "max_queue_size", "adaptive_enabled", "adaptive_min",
 ]);
 
 export function getActiveProviders(
@@ -81,7 +83,7 @@ export function createProvider(
 export function updateProvider(
   db: Database.Database,
   id: string,
-  fields: Partial<Pick<Provider, "name" | "api_type" | "base_url" | "api_key" | "api_key_preview" | "models" | "is_active" | "max_concurrency" | "queue_timeout_ms" | "max_queue_size">>,
+  fields: Partial<Pick<Provider, "name" | "api_type" | "base_url" | "api_key" | "api_key_preview" | "models" | "is_active" | "max_concurrency" | "queue_timeout_ms" | "max_queue_size" | "adaptive_enabled" | "adaptive_min">>,
 ): void {
   buildUpdateQuery(db, "providers", id, fields, PROVIDER_FIELDS, { updatedAt: true });
 }
