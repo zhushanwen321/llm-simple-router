@@ -208,7 +208,7 @@ export function applyEnhancement(
   const cleaned = cleanRouterResponses(body);
   const cleanedMessages = (cleaned.messages as unknown[])?.length ?? 0;
   const tagsStripped = originalMessages - cleanedMessages;
-  let currentBody: Record<string, unknown> = { ...body, messages: cleaned.messages };
+  const currentBody: Record<string, unknown> = { ...body, messages: cleaned.messages };
 
   const directive = parseDirective(currentBody);
 

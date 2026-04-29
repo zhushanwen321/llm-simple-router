@@ -516,22 +516,6 @@ pipeline_snapshot?: string | null;
 
 值为 `log.pipeline_snapshot ?? null`。
 
-新增 `updateLogPipelineSnapshot` 函数（用于 response_transform stage 的延迟写入）：
-
-```typescript
-export function updateLogPipelineSnapshot(db: Database.Database, logId: string, snapshot: string): void {
-  db.prepare("UPDATE request_logs SET pipeline_snapshot = ? WHERE id = ?").run(snapshot, logId);
-}
-```
-
-新增 `updateLogPipelineSnapshot` 函数（用于 response_transform 追加到已写入的日志）：
-
-```typescript
-export function updateLogPipelineSnapshot(db: Database.Database, logId: string, snapshot: string): void {
-  db.prepare("UPDATE request_logs SET pipeline_snapshot = ? WHERE id = ?").run(snapshot, logId);
-}
-```
-
 新增 `updateLogPipelineSnapshot` 函数（用于 response_transform stage 的后置更新）：
 
 ```typescript

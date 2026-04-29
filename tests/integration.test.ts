@@ -13,6 +13,7 @@ import { encrypt } from "../src/utils/crypto.js";
 import { initDatabase } from "../src/db/index.js";
 import { setSetting } from "../src/db/settings.js";
 import { hashPassword } from "../src/utils/password.js";
+import { DEFAULT_LOOP_PREVENTION_CONFIG } from "../src/proxy/loop-prevention/types.js";
 
 const TEST_ENCRYPTION_KEY =
   "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
@@ -26,6 +27,7 @@ function makeTestConfig() {
     TZ: "Asia/Shanghai",
     STREAM_TIMEOUT_MS: 5000,
     RETRY_BASE_DELAY_MS: 0,
+    LOOP_PREVENTION: { ...DEFAULT_LOOP_PREVENTION_CONFIG, enabled: false },
   };
 }
 
@@ -472,7 +474,6 @@ describe("Integration tests", () => {
       expect(row.pipeline_snapshot).not.toBeNull();
 
       const stages = JSON.parse(row.pipeline_snapshot);
-      const stageNames = stages.map((s: any) => s.stage);
 
       // enhancement — 始终存在
       const enh = stages.find((s: any) => s.stage === "enhancement");

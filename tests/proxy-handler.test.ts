@@ -59,6 +59,7 @@ const errors: ProxyErrorFormatter = {
   upstreamConnectionFailed: () => ({ statusCode: 502, body: { error: { message: "Upstream failed" } } }),
   concurrencyQueueFull: (id) => ({ statusCode: 503, body: { error: { message: `Queue full: ${id}` } } }),
   concurrencyTimeout: (id, ms) => ({ statusCode: 504, body: { error: { message: `Timeout: ${id} ${ms}ms` } } }),
+  promptTooLong: () => ({ statusCode: 400, body: { error: { message: "Prompt too long" } } }),
 };
 
 function createRequest(overrides = {}) {
@@ -91,7 +92,7 @@ function createDeps(overrides = {}) {
 
 const successResilienceResult: ResilienceResult = {
   result: { kind: "success" as const, statusCode: 200, body: '{"choices":[]}', headers: {}, sentHeaders: {}, sentBody: "" },
-  attempts: [{ target: { backend_model: "gpt-4", provider_id: "p1" }, attemptIndex: 0, statusCode: 200, error: null, latencyMs: 50, responseBody: null }],
+  attempts: [{ target: { backend_model: "gpt-4", provider_id: "p1" }, attemptIndex: 0, statusCode: 200, error: null, latencyMs: 50, responseBody: null, responseHeaders: {}, resultKind: "success" as const }],
   excludedTargets: [],
 };
 

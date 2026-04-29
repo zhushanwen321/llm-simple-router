@@ -249,7 +249,8 @@ describe("applyProviderPatches", () => {
       ],
     };
     const { body: result } = applyProviderPatches(body, { base_url: "https://api.deepseek.com/anthropic" });
-    const assistant = result.messages[1] as { content: unknown[] };
+    const messages = result.messages as Array<{ role: string; content: Array<{ type: string }> }>;
+    const assistant = messages[1];
     expect((assistant.content[0] as { type: string }).type).toBe("text");
   });
 
