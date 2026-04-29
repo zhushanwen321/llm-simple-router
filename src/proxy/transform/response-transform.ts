@@ -1,5 +1,6 @@
 import { generateMsgId, generateChatcmplId, MS_PER_SECOND } from "./id-utils.js";
 import { mapFinishReasonToStopReason, mapStopReasonToFinishReason, mapUsageOA2Ant, mapUsageAnt2OA } from "./usage-mapper.js";
+import { extractAnthropicMeta } from "./provider-meta.js";
 
 // ---------- Non-streaming response: OpenAI → Anthropic ----------
 
@@ -60,14 +61,22 @@ export function anthropicResponseToOpenAI(bodyStr: string): string {
     }));
   }
 
-  return JSON.stringify({
+  // preserve Anthropic-specific fields that would be lost in conversion
+  const antMeta = extractAnthropicMeta(ant);
+
+  const result: Record<string, unknown> = {
     id: ant.id ?? generateChatcmplId(),
     object: "chat.completion",
     created: Math.floor(Date.now() / MS_PER_SECOND),
     model: ant.model,
     choices: [{ index: 0, message, finish_reason: mapStopReasonToFinishReason(ant.stop_reason ?? "end_turn") }],
     usage: mapUsageAnt2OA(ant.usage),
-  });
+  };
+  if (antMeta) {
+    result.provider_meta = { anthropic: antMeta };
+  }
+
+  return JSON.stringify(result);
 }
 
 // ---------- Entry point ----------

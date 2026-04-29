@@ -53,6 +53,10 @@ export function convertMessagesOA2Ant(
       raw.push({ role: "user", content: normalizeToTextBlocks(m.content) });
     } else if (m.role === "assistant") {
       const blocks: AnthropicContentBlock[] = [];
+      // reasoning_content → thinking block (before text)
+      if (m.reasoning_content) {
+        blocks.push({ type: "thinking", thinking: String(m.reasoning_content) });
+      }
       // text content (skip null/undefined/empty string)
       if (m.content != null && m.content !== "") {
         blocks.push(...normalizeToTextBlocks(m.content));

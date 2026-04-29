@@ -183,3 +183,63 @@ describe("transformRequestBody", () => {
     expect(result.stream_options).toEqual({ include_usage: true });
   });
 });
+
+describe("openaiToAnthropicRequest — provider_meta", () => {
+  it("strips provider_meta from request body", () => {
+    const result = openaiToAnthropicRequest({
+      model: "gpt-4",
+      messages: [{ role: "user", content: "hi" }],
+      provider_meta: { anthropic: { cache_usage: { cache_read_input_tokens: 100 } } },
+    });
+    expect(result.provider_meta).toBeUndefined();
+    expect(result.model).toBe("gpt-4");
+  });
+
+  it("restores thinking_signatures to assistant message thinking blocks", () => {
+    const result = openaiToAnthropicRequest({
+      model: "gpt-4",
+      messages: [
+        { role: "user", content: "solve" },
+        { role: "assistant", content: null, reasoning_content: "thinking..." },
+      ],
+      provider_meta: {
+        anthropic: { thinking_signatures: [{ index: 0, signature: "sig_abc" }] },
+      },
+    });
+    const assistantMsg = (result.messages as Array<Record<string, unknown>>).find(
+      (m) => m.role === "assistant",
+    );
+    const thinkingBlock = (assistantMsg?.content as Array<Record<string, unknown>>)?.find(
+      (b) => b.type === "thinking",
+    );
+    expect(thinkingBlock?.signature).toBe("sig_abc");
+  });
+
+  it("restores redacted_thinking blocks before assistant content", () => {
+    const redacted = { type: "redacted_thinking", data: "blob" };
+    const result = openaiToAnthropicRequest({
+      model: "gpt-4",
+      messages: [
+        { role: "user", content: "hi" },
+        { role: "assistant", content: "answer" },
+      ],
+      provider_meta: { anthropic: { redacted_thinking: [redacted] } },
+    });
+    const assistantMsg = (result.messages as Array<Record<string, unknown>>).find(
+      (m) => m.role === "assistant",
+    );
+    const content = assistantMsg?.content as Array<Record<string, unknown>>;
+    expect(content[0].type).toBe("redacted_thinking");
+  });
+
+  it("does not warn about provider_meta as dropped field", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    openaiToAnthropicRequest({
+      model: "gpt-4",
+      messages: [],
+      provider_meta: { anthropic: {} },
+    });
+    expect(warnSpy).not.toHaveBeenCalledWith(expect.stringContaining("provider_meta"));
+    warnSpy.mockRestore();
+  });
+});

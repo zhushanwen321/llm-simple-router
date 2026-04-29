@@ -1,5 +1,6 @@
 import { BaseSSETransform } from "./stream-transform-base.js";
 import { generateChatcmplId } from "./id-utils.js";
+import type { AnthropicProviderMeta } from "./provider-meta.js";
 
 export class AnthropicToOpenAITransform extends BaseSSETransform {
   private chatcmplId = generateChatcmplId();
@@ -9,6 +10,12 @@ export class AnthropicToOpenAITransform extends BaseSSETransform {
   private finishReasonEmitted = false;
   private currentToolCallIndex = 0;
   private blockToToolCallIndex: Map<number, number> = new Map();
+  // track content block types for PSF capture
+  private contentBlockTypes: Map<number, string> = new Map();
+  private contentBlockSignatures: Map<number, string> = new Map();
+  // PSF accumulation for streaming
+  private thinkingSignatures: Array<{ index: number; signature: string }> = [];
+  private cacheUsage: AnthropicProviderMeta["cache_usage"];
 
   protected processEvent(event: { event?: string; data?: string }): void {
     let data: Record<string, unknown>;
@@ -19,6 +26,13 @@ export class AnthropicToOpenAITransform extends BaseSSETransform {
         const msg = data.message as Record<string, unknown> | undefined;
         const usage = msg?.usage as Record<string, unknown> | undefined;
         this.inputTokens = (usage?.input_tokens as number) ?? 0;
+        // capture cache usage from initial usage
+        if (usage?.cache_read_input_tokens != null || usage?.cache_creation_input_tokens != null) {
+          this.cacheUsage = {
+            cache_read_input_tokens: usage.cache_read_input_tokens as number | undefined,
+            cache_creation_input_tokens: usage.cache_creation_input_tokens as number | undefined,
+          };
+        }
         break;
       }
 
@@ -26,6 +40,12 @@ export class AnthropicToOpenAITransform extends BaseSSETransform {
         const block = data.content_block as Record<string, unknown>;
         const blockType = block?.type as string;
         const blockIdx = (data.index as number) ?? 0;
+
+        // track block type for PSF capture at content_block_stop
+        this.contentBlockTypes.set(blockIdx, blockType);
+        if (blockType === "thinking" && block.signature) {
+          this.contentBlockSignatures.set(blockIdx, block.signature as string);
+        }
 
         if (this.firstContentBlock) {
           this.pushOpenAISSE({
@@ -91,6 +111,17 @@ export class AnthropicToOpenAITransform extends BaseSSETransform {
       }
 
       case "content_block_stop": {
+        const blockIdx = (data.index as number) ?? 0;
+        // capture thinking signature from completed block
+        const sig = this.contentBlockSignatures.get(blockIdx);
+        if (sig && this.contentBlockTypes.get(blockIdx) === "thinking") {
+          this.thinkingSignatures.push({ index: blockIdx, signature: sig });
+        }
+        // Anthropic may also send signature in content_block_stop's content_block field
+        const stopBlock = data.content_block as Record<string, unknown> | undefined;
+        if (stopBlock?.type === "thinking" && stopBlock.signature && !sig) {
+          this.thinkingSignatures.push({ index: blockIdx, signature: stopBlock.signature as string });
+        }
         break;
       }
 
@@ -104,9 +135,9 @@ export class AnthropicToOpenAITransform extends BaseSSETransform {
           this.finishReasonEmitted = true;
           const fr = stopReason === "end_turn" ? "stop"
             : stopReason === "max_tokens" ? "length"
-            : stopReason === "stop_sequence" ? "stop"
-            : stopReason === "tool_use" ? "tool_calls"
-            : "stop";
+              : stopReason === "stop_sequence" ? "stop"
+                : stopReason === "tool_use" ? "tool_calls"
+                  : "stop";
           this.pushOpenAISSE({
             id: this.chatcmplId, object: "chat.completion.chunk",
             choices: [{ index: 0, delta: {}, finish_reason: fr }],
@@ -116,6 +147,14 @@ export class AnthropicToOpenAITransform extends BaseSSETransform {
       }
 
       case "message_stop": {
+        // emit PSF as custom message_meta event before final usage
+        if (this.thinkingSignatures.length > 0 || this.cacheUsage) {
+          const meta: AnthropicProviderMeta = {};
+          if (this.thinkingSignatures.length > 0) meta.thinking_signatures = this.thinkingSignatures;
+          if (this.cacheUsage) meta.cache_usage = this.cacheUsage;
+          this.push(`event: message_meta\ndata: ${JSON.stringify({ provider_meta: { anthropic: meta } })}\n\n`);
+        }
+
         this.pushOpenAISSE({
           id: this.chatcmplId, object: "chat.completion.chunk",
           choices: [],

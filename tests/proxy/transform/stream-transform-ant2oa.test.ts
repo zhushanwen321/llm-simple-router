@@ -113,4 +113,53 @@ describe("AnthropicToOpenAITransform", () => {
     expect(result).toContain('"name":"fn1"');
     expect(result).toContain('"name":"fn2"');
   });
+
+  it("emits message_meta with thinking signature", async () => {
+    const t = new AnthropicToOpenAITransform("claude-3");
+    const output = collectOutput(t);
+    t.write('event: message_start\ndata: {"type":"message_start","message":{"id":"msg_6","role":"assistant","content":[],"usage":{"input_tokens":10}}}\n\n');
+    t.write('event: content_block_start\ndata: {"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":"","signature":"sig_abc"}}\n\n');
+    t.write('event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"hmm"}}\n\n');
+    t.write('event: content_block_stop\ndata: {"type":"content_block_stop","index":0}\n\n');
+    t.write('event: content_block_start\ndata: {"type":"content_block_start","index":1,"content_block":{"type":"text","text":""}}\n\n');
+    t.write('event: content_block_delta\ndata: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"answer"}}\n\n');
+    t.write('event: content_block_stop\ndata: {"type":"content_block_stop","index":1}\n\n');
+    t.write('event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":5}}\n\n');
+    t.write('event: message_stop\ndata: {"type":"message_stop"}\n\n');
+    t.end();
+    const result = await output;
+    expect(result).toContain("event: message_meta");
+    expect(result).toContain('"thinking_signatures"');
+    expect(result).toContain('"signature":"sig_abc"');
+  });
+
+  it("emits message_meta with cache usage", async () => {
+    const t = new AnthropicToOpenAITransform("claude-3");
+    const output = collectOutput(t);
+    t.write('event: message_start\ndata: {"type":"message_start","message":{"id":"msg_7","role":"assistant","content":[],"usage":{"input_tokens":10,"cache_read_input_tokens":100,"cache_creation_input_tokens":50}}}\n\n');
+    t.write('event: content_block_start\ndata: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}\n\n');
+    t.write('event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"hi"}}\n\n');
+    t.write('event: content_block_stop\ndata: {"type":"content_block_stop","index":0}\n\n');
+    t.write('event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":5}}\n\n');
+    t.write('event: message_stop\ndata: {"type":"message_stop"}\n\n');
+    t.end();
+    const result = await output;
+    expect(result).toContain("event: message_meta");
+    expect(result).toContain('"cache_read_input_tokens":100');
+    expect(result).toContain('"cache_creation_input_tokens":50');
+  });
+
+  it("no message_meta when no PSF present", async () => {
+    const t = new AnthropicToOpenAITransform("claude-3");
+    const output = collectOutput(t);
+    t.write('event: message_start\ndata: {"type":"message_start","message":{"id":"msg_8","role":"assistant","content":[],"usage":{"input_tokens":10}}}\n\n');
+    t.write('event: content_block_start\ndata: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}\n\n');
+    t.write('event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"hi"}}\n\n');
+    t.write('event: content_block_stop\ndata: {"type":"content_block_stop","index":0}\n\n');
+    t.write('event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":5}}\n\n');
+    t.write('event: message_stop\ndata: {"type":"message_stop"}\n\n');
+    t.end();
+    const result = await output;
+    expect(result).not.toContain("event: message_meta");
+  });
 });

@@ -109,6 +109,40 @@ describe("anthropicResponseToOpenAI", () => {
     expect(result.choices[0].message.reasoning_content).toBe("Let me think...");
     expect(result.choices[0].message.content).toBe("The answer is 42");
   });
+
+  it("preserves thinking signature in provider_meta", () => {
+    const antWithSig = JSON.stringify({
+      id: "msg_sig", model: "claude-3", role: "assistant",
+      content: [
+        { type: "thinking", thinking: "hmm", signature: "sig_abc" },
+        { type: "text", text: "answer" },
+      ],
+      stop_reason: "end_turn", usage: { input_tokens: 10, output_tokens: 5 },
+    });
+    const result = JSON.parse(anthropicResponseToOpenAI(antWithSig));
+    expect(result.provider_meta.anthropic.thinking_signatures).toEqual([
+      { index: 0, signature: "sig_abc" },
+    ]);
+  });
+
+  it("preserves cache usage in provider_meta", () => {
+    const antWithCache = JSON.stringify({
+      id: "msg_cache", model: "claude-3", role: "assistant",
+      content: [{ type: "text", text: "hi" }],
+      stop_reason: "end_turn",
+      usage: { input_tokens: 10, output_tokens: 5, cache_read_input_tokens: 100, cache_creation_input_tokens: 50 },
+    });
+    const result = JSON.parse(anthropicResponseToOpenAI(antWithCache));
+    expect(result.provider_meta.anthropic.cache_usage).toEqual({
+      cache_read_input_tokens: 100,
+      cache_creation_input_tokens: 50,
+    });
+  });
+
+  it("no provider_meta when no PSF present", () => {
+    const result = JSON.parse(anthropicResponseToOpenAI(ANT_SUCCESS));
+    expect(result.provider_meta).toBeUndefined();
+  });
 });
 
 describe("transformResponseBody", () => {
