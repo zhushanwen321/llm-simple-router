@@ -211,7 +211,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
     if (rootLogId === null) rootLogId = logId;
     const isFailoverIteration = rootLogId !== logId;
     const routerKeyId = request.routerKey?.id ?? null;
-    const body = request.body as Record<string, unknown>;
+    let body = request.body as Record<string, unknown>;
     const isStream = body.stream === true;
     const cliHdrs: RawHeaders = request.headers as RawHeaders;
 
@@ -273,7 +273,8 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
       }
     }
 
-    applyProviderPatches(body, provider);
+    const patchResult = applyProviderPatches(body, provider);
+    body = patchResult.body;
     const apiKey = decrypt(provider.api_key, getSetting(deps.db, "encryption_key")!);
     options?.beforeSendProxy?.(body, isStream);
 

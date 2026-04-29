@@ -511,30 +511,7 @@ describe("patchOrphanToolResults", () => {
 });
 
 describe("applyProviderPatches", () => {
-  it("DeepSeek provider 时将非 DeepSeek 的 tool_use 转为 text", () => {
-    const body = {
-      messages: [
-        { role: "user", content: "hi" },
-        {
-          role: "assistant",
-          content: [
-            { type: "tool_use", id: "call_1", name: "read", input: {} },
-          ],
-        },
-        {
-          role: "user",
-          content: [
-            { type: "tool_result", tool_use_id: "call_1", content: "ok" },
-          ],
-        },
-      ],
-    };
-    applyProviderPatches(body, { base_url: "https://api.deepseek.com/anthropic" });
-    const assistant = body.messages[1] as { content: unknown[] };
-    expect((assistant.content[0] as { type: string }).type).toBe("text");
-  });
-
-  it("非 DeepSeek provider 时不修改", () => {
+  it("返回 { body, meta } 结构，不修改原始 body", () => {
     const body = {
       messages: [
         { role: "user", content: "hi" },
@@ -553,7 +530,61 @@ describe("applyProviderPatches", () => {
       ],
     };
     const original = JSON.stringify(body);
-    applyProviderPatches(body, { base_url: "https://open.bigmodel.cn/api/anthropic" });
+    const result = applyProviderPatches(body, { base_url: "https://api.deepseek.com/anthropic" });
+    // 原始 body 不变
     expect(JSON.stringify(body)).toBe(original);
+    // 返回结构正确
+    expect(result).toHaveProperty("body");
+    expect(result).toHaveProperty("meta");
+    expect(result.meta).toHaveProperty("types");
+  });
+
+  it("DeepSeek provider 触发 patch，meta.types 含 deepseek_tool_use_to_text", () => {
+    const body = {
+      messages: [
+        { role: "user", content: "hi" },
+        {
+          role: "assistant",
+          content: [
+            { type: "tool_use", id: "call_1", name: "read", input: {} },
+          ],
+        },
+        {
+          role: "user",
+          content: [
+            { type: "tool_result", tool_use_id: "call_1", content: "ok" },
+          ],
+        },
+      ],
+    };
+    const result = applyProviderPatches(body, { base_url: "https://api.deepseek.com/anthropic" });
+    expect(result.meta.types).toContain("deepseek_tool_use_to_text");
+    // 返回的 body 中 tool_use 被转为 text
+    const assistant = result.body.messages[1] as { content: unknown[] };
+    expect((assistant.content[0] as { type: string }).type).toBe("text");
+  });
+
+  it("非 DeepSeek provider 返回相同 body 引用且 meta.types 为空", () => {
+    const body = {
+      messages: [
+        { role: "user", content: "hi" },
+        {
+          role: "assistant",
+          content: [
+            { type: "tool_use", id: "call_1", name: "read", input: {} },
+          ],
+        },
+        {
+          role: "user",
+          content: [
+            { type: "tool_result", tool_use_id: "call_1", content: "ok" },
+          ],
+        },
+      ],
+    };
+    const result = applyProviderPatches(body, { base_url: "https://open.bigmodel.cn/api/anthropic" });
+    expect(result.meta.types).toHaveLength(0);
+    // 非深寻求景下 body 被克隆（router cleanup），内容一致但不是同一引用
+    expect(JSON.stringify(result.body)).toBe(JSON.stringify(body));
   });
 });
