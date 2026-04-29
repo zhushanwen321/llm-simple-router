@@ -1,4 +1,4 @@
-import { randomUUID } from "crypto";
+import { randomUUID, createHash } from "crypto";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import Database from "better-sqlite3";
 import { HTTP_UNPROCESSABLE_ENTITY } from "../constants.js";
@@ -28,10 +28,14 @@ import { applyOverflowRedirect } from "./overflow.js";
 import { applyProviderPatches } from "./patch/index.js";
 import { PipelineSnapshot, type StageRecord } from "./pipeline-snapshot.js";
 import { maybeInjectModelInfoTag } from "./response-transform.js";
+import { ToolLoopGuard } from "./loop-prevention/tool-loop-guard.js";
+import type { SessionTracker } from "./loop-prevention/session-tracker.js";
+import type { ToolCallRecord } from "./loop-prevention/types.js";
 
 const HTTP_ERROR_THRESHOLD = 400;
 const MAX_LOG_FIELD_LENGTH = 80;
 const UPSTREAM_ERROR_STATUS = 502;
+const TIER2_LOOP_THRESHOLD = 2;
 
 /** 从 TransportResult 中提取最终 HTTP status code */
 function getTransportStatusCode(result: TransportResult): number | null {
@@ -105,6 +109,7 @@ export interface RouteHandlerDeps {
   tracker?: RequestTracker;
   orchestrator: ProxyOrchestrator;
   usageWindowTracker?: import("./usage-window-tracker.js").UsageWindowTracker;
+  sessionTracker?: SessionTracker;
 }
 
 import type { ContentBlock } from "../monitor/types.js";
@@ -126,6 +131,35 @@ function serializeBlocksForStorage(blocks: ContentBlock[] | undefined, apiType: 
   }
   const text = blocks.filter(b => b.type === "text").map(b => b.content).join("");
   return JSON.stringify({ choices: [{ message: { content: text } }] });
+}
+
+/** 从请求体中提取最后一次工具调用记录 */
+function extractLastToolUse(body: Record<string, unknown>): ToolCallRecord | null {
+  const messages = body.messages as Array<{ role?: string; content?: Array<{ type?: string; id?: string; name?: string; input?: unknown }> }> | undefined;
+  if (!messages) return null;
+
+  // 从后往前找，找到最后一个 assistant 消息中的 tool_use
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    if (msg.role !== "assistant") continue;
+    const content = msg.content;
+    if (!Array.isArray(content)) continue;
+    for (let j = content.length - 1; j >= 0; j--) {
+      const block = content[j];
+      if (block.type === "tool_use") {
+        const inputText = JSON.stringify(block.input ?? {});
+        const inputHash = createHash("sha256").update(inputText).digest("hex").slice(0, 16);
+        return {
+          toolName: block.name ?? "unknown",
+          toolUseId: block.id,
+          inputHash,
+          inputText,
+          timestamp: Date.now(),
+        };
+      }
+    }
+  }
+  return null;
 }
 
 // ---------- Main entry ----------
@@ -150,7 +184,8 @@ export async function handleProxyRequest(
   const sessionId = (request.headers as RawHeaders)["x-claude-code-session-id"] as string | undefined;
 
   // 在所有加工之前捕获原始 body
-  const rawBody = JSON.parse(JSON.stringify(request.body as Record<string, unknown>));
+  const reqBody = request.body as Record<string, unknown> | undefined;
+  const rawBody = reqBody ? JSON.parse(JSON.stringify(reqBody)) : {};
   const snapshot = new PipelineSnapshot();
 
   // enhancement 阶段
@@ -301,7 +336,12 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
     const { body: patchedBody, meta: patchMeta } = applyProviderPatches(currentBody, provider);
     iterationSnapshot.add({ stage: "provider_patch", types: patchMeta.types });
 
-    const apiKey = decrypt(provider.api_key, getSetting(deps.db, "encryption_key")!);
+    const encryptionKey = getSetting(deps.db, "encryption_key");
+    if (!encryptionKey) {
+      return rejectAndReply(reply, rCtx, errors.providerUnavailable(),
+        `Encryption key not configured`, provider.id);
+    }
+    const apiKey = decrypt(provider.api_key, encryptionKey);
     options?.beforeSendProxy?.(patchedBody, isStream);
 
     // logging — 使用 rawBody 作为 client_request，patchedBody 作为 upstream_request

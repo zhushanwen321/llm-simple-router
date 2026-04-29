@@ -118,19 +118,23 @@ export async function buildApp(
         const body = request.body as Record<string, unknown> | undefined;
         const receivedAt = (request as unknown as { receivedAt?: number }).receivedAt;
         const latencyMs = receivedAt ? Date.now() - receivedAt : 0;
-        insertRequestLog(db, {
-          id: randomUUID(),
-          api_type: proxyApiType,
-          model: (body?.model as string) || null,
-          provider_id: null,
-          status_code: status,
-          latency_ms: latencyMs,
-          is_stream: body?.stream === true ? 1 : 0,
-          error_message: fastifyError.message,
-          created_at: new Date().toISOString(),
-          client_request: JSON.stringify({ headers: request.headers, ...(body ? { body } : {}) }),
-          router_key_id: request.routerKey?.id ?? null,
-        });
+        try {
+          insertRequestLog(db, {
+            id: randomUUID(),
+            api_type: proxyApiType,
+            model: (body?.model as string) || null,
+            provider_id: null,
+            status_code: status,
+            latency_ms: latencyMs,
+            is_stream: body?.stream === true ? 1 : 0,
+            error_message: fastifyError.message,
+            created_at: new Date().toISOString(),
+            client_request: JSON.stringify({ headers: request.headers, ...(body ? { body } : {}) }),
+            router_key_id: request.routerKey?.id ?? null,
+          });
+        } catch (logErr) {
+          request.log.error({ err: logErr }, "Failed to log proxy error to request_logs");
+        }
       }
       return reply.code(status).send({ error: { message: fastifyError.message } });
     }
@@ -286,8 +290,40 @@ export async function buildApp(
 import { getBaseConfig } from "./config.js";
 
 export async function main() {
-  const { app } = await buildApp();
+  const { app, db, close } = await buildApp();
   const config = getConfig();
+
+  // 全局兜底：防止未捕获异常导致进程崩溃
+  process.on("uncaughtException", (err) => {
+    try {
+      app.log.fatal({ err }, "Uncaught exception");
+    } catch {
+      console.error("FATAL: Uncaught exception:", err);
+    }
+    close().finally(() => process.exit(1));
+  });
+
+  process.on("unhandledRejection", (reason) => {
+    try {
+      app.log.error({ err: reason instanceof Error ? reason : new Error(String(reason)) }, "Unhandled rejection");
+    } catch {
+      console.error("Unhandled rejection:", reason);
+    }
+  });
+
+  // 优雅关闭：SIGTERM（systemd/docker stop）和 SIGINT（Ctrl+C）
+  const shutdown = async (signal: string) => {
+    try {
+      app.log.info(`Received ${signal}, shutting down gracefully...`);
+      await close();
+      app.log.info("Shutdown complete");
+    } catch (err) {
+      app.log.error({ err }, "Error during shutdown");
+    }
+    process.exit(0);
+  };
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
 
   try {
     await app.listen({ port: config.PORT, host: "0.0.0.0" });

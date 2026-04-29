@@ -250,8 +250,12 @@ describe("applyProviderPatches", () => {
     };
     const { body: result } = applyProviderPatches(body, { base_url: "https://api.deepseek.com/anthropic" });
     const messages = result.messages as Array<{ role: string; content: Array<{ type: string }> }>;
-    const assistant = messages[1];
-    expect((assistant.content[0] as { type: string }).type).toBe("text");
+    // patchMissingThinkingBlocks 给 assistant 的 content 开头注入 thinking block
+    // patchOrphanToolResults 移除没有对应 tool_use 的 tool_result，并清理空 user 消息
+    expect(messages).toHaveLength(1);
+    expect(messages[0].role).toBe("assistant");
+    expect(messages[0].content[0].type).toBe("thinking");
+    expect(messages[0].content[1].type).toBe("text");
   });
 
   it("非 DeepSeek provider 时不修改", () => {
