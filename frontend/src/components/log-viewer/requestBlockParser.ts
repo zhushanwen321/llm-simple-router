@@ -60,7 +60,7 @@ export function extractBlocks(content: unknown): Block[] {
       if (blockType === 'tool_use') {
         const name = String(block.name || '')
         const input = block.input ? JSON.stringify(block.input, null, JSON_INDENT) : ''
-        return [{ type: 'tool_use', text: input, label: name || undefined }]
+        return [{ type: 'tool_use', text: input || JSON.stringify(block, null, JSON_INDENT), label: name || undefined }]
       }
       if (blockType === 'tool_result') {
         const c = block.content
@@ -71,7 +71,7 @@ export function extractBlocks(content: unknown): Block[] {
             typeof b.text === 'string' ? b.text : JSON.stringify(b),
           ).join('\n')
         }
-        return [{ type: 'tool_result', text }]
+        return [{ type: 'tool_result', text: text || JSON.stringify(block, null, JSON_INDENT) }]
       }
       if (blockType === 'thinking') {
         return [{ type: 'thinking', text: String(block.thinking || '') }]

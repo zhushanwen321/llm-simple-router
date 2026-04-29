@@ -85,7 +85,7 @@
                 </div>
                 <!-- 有内容的标签块：可折叠 -->
                 <div v-else-if="block.text" class="text-xs text-muted-foreground">
-                  <Collapsible>
+                  <Collapsible v-model:open="expanded[`${idx}-${bidx}-c`]">
                     <CollapsibleTrigger as-child>
                       <Button variant="ghost" size="xs" class="px-0 h-auto">
                         <Badge :class="tagClass(block.type)" class="mr-1">{{ block.label || block.type }}</Badge>
