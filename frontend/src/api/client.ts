@@ -296,6 +296,8 @@ export interface ConfigExportResponse {
 
 export interface ProxyEnhancementConfig {
   claude_code_enabled: boolean;
+  tool_call_loop_enabled: boolean;
+  stream_loop_enabled: boolean;
 }
 
 export interface UpgradeStatus {
