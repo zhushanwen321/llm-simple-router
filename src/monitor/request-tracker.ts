@@ -2,11 +2,11 @@ import type { ServerResponse } from "node:http";
 import { StatsAggregator } from "./stats-aggregator.js";
 import { RuntimeCollector } from "./runtime-collector.js";
 import { StreamContentAccumulator } from "./stream-content-accumulator.js";
-import type { ProviderSemaphoreManager } from "../proxy/semaphore.js";
 import type { AdaptiveConcurrencyController } from "../proxy/adaptive-controller.js";
 import type {
   ActiveRequest,
   AttemptSnapshot,
+  ISemaphoreStatus,
   ProviderConcurrencySnapshot,
   RuntimeMetrics,
   StatsSnapshot,
@@ -47,11 +47,11 @@ export class RequestTracker {
   /** Visible for testing */
   readonly statsAggregator: StatsAggregator;
   readonly runtimeCollector: RuntimeCollector;
-  private readonly semaphoreManager?: ProviderSemaphoreManager;
+  private readonly semaphoreManager?: ISemaphoreStatus;
   private adaptiveController?: AdaptiveConcurrencyController;
 
   constructor(deps?: {
-    semaphoreManager?: ProviderSemaphoreManager;
+    semaphoreManager?: ISemaphoreStatus;
     runtimeCollector?: RuntimeCollector;
     logger?: TrackerLogger;
   }) {
