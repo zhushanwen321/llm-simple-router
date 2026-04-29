@@ -1,8 +1,7 @@
 import { generateMsgId, generateChatcmplId, MS_PER_SECOND } from "./id-utils.js";
 import { mapFinishReasonToStopReason, mapStopReasonToFinishReason, mapUsageOA2Ant, mapUsageAnt2OA } from "./usage-mapper.js";
 import { extractAnthropicMeta } from "./provider-meta.js";
-
-// ---------- Non-streaming response: OpenAI → Anthropic ----------
+import { parseToolArguments } from "./sanitize.js";
 
 export function openaiResponseToAnthropic(bodyStr: string): string {
   const oai = JSON.parse(bodyStr);
@@ -21,9 +20,7 @@ export function openaiResponseToAnthropic(bodyStr: string): string {
   // tool_calls → tool_use blocks
   if (msg?.tool_calls) {
     for (const tc of msg.tool_calls) {
-      let input: Record<string, unknown> = {};
-      // eslint-disable-next-line taste/no-silent-catch -- malformed args use empty object, not fatal
-      try { input = JSON.parse(tc.function.arguments); } catch { console.warn("[response-transform] Failed to parse tool arguments, keeping empty"); }
+      const input = parseToolArguments(tc.function.arguments);
       content.push({ type: "tool_use", id: tc.id, name: tc.function.name, input });
     }
   }
@@ -40,8 +37,6 @@ export function openaiResponseToAnthropic(bodyStr: string): string {
     usage: mapUsageOA2Ant(oai.usage),
   });
 }
-
-// ---------- Non-streaming response: Anthropic → OpenAI ----------
 
 export function anthropicResponseToOpenAI(bodyStr: string): string {
   const ant = JSON.parse(bodyStr);
@@ -80,16 +75,12 @@ export function anthropicResponseToOpenAI(bodyStr: string): string {
   return JSON.stringify(result);
 }
 
-// ---------- Entry point ----------
-
 export function transformResponseBody(bodyStr: string, sourceApiType: string, targetApiType: string): string {
   if (sourceApiType === targetApiType) return bodyStr;
   if (sourceApiType === "openai" && targetApiType === "anthropic") return openaiResponseToAnthropic(bodyStr);
   if (sourceApiType === "anthropic" && targetApiType === "openai") return anthropicResponseToOpenAI(bodyStr);
   return bodyStr;
 }
-
-// ---------- Error response ----------
 
 export function transformErrorResponse(bodyStr: string, sourceApiType: string, targetApiType: string): string {
   if (sourceApiType === targetApiType) return bodyStr;

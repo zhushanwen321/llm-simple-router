@@ -101,11 +101,8 @@ export function buildTransportFn(p: TransportFnParams): (target: Target) => Prom
       const mr = MetricsExtractor.fromNonStreamResponse(p.apiType, result.body);
       if (mr) p.tracker?.update(p.logId, { streamMetrics: toStreamMetrics(mr) });
     }
-    // Apply format transformation first (e.g. Anthropic→OpenAI), then inject model-info tag
-    if (p.responseTransform && result.kind === "success" && result.statusCode === UPSTREAM_SUCCESS && result.body) {
-      result = { ...result, body: p.responseTransform(result.body) };
-    }
-    if (p.responseTransform && (result.kind === "error" || result.kind === "stream_error") && result.body) {
+    // Apply format transformation (responseTransform handles both success and error internally)
+    if (p.responseTransform && result.body && (result.kind === "success" || result.kind === "error" || result.kind === "stream_error")) {
       result = { ...result, body: p.responseTransform(result.body) };
     }
     if (p.originalModel && result.kind === "success" && result.statusCode === UPSTREAM_SUCCESS) {

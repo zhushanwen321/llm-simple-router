@@ -1,9 +1,6 @@
 import { Transform, TransformCallback } from "stream";
 import { SafeSSEParser } from "../patch/safe-sse-parser.js";
 
-export { SafeSSEParser };
-export { generateMsgId, generateChatcmplId } from "./id-utils.js";
-
 export abstract class BaseSSETransform extends Transform {
   protected parser = new SafeSSEParser();
   protected done = false;

@@ -192,9 +192,9 @@ class StreamProxy {
   onData(chunk: Buffer): void {
     if (this.resolved) return;
     this.resetIdleTimer();
-    this.captureChunks.push(chunk);
 
     if (this.state === "BUFFERING") {
+      this.captureChunks.push(chunk);
       this.bufferChunks.push(chunk);
       const buf = Buffer.concat(this.bufferChunks);
       const text = buf.toString("utf-8");
@@ -220,9 +220,8 @@ class StreamProxy {
       }
       // 快速启发式：只在扫描窗口出现 SSE error 标记时才执行正则匹配
       if (this.sseScanBuffer.includes("event: error") || this.sseScanBuffer.includes('"type":"error"')) {
-        const body = Buffer.concat(this.captureChunks).toString("utf-8");
-        if (this.checkEarlyError(body)) {
-          this.terminal("stream_error", { body });
+        if (this.checkEarlyError(this.sseScanBuffer)) {
+          this.terminal("stream_error", { body: this.sseScanBuffer });
           // headers 已发送：必须结束 reply 避免 client hang
           if (this.headersSent) {
             setImmediate(() => {

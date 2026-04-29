@@ -3,10 +3,14 @@ export function sanitizeToolUseId(id: string): string {
   return sanitized || "toolu_unknown";
 }
 
+export function parseToolArguments(args: unknown): Record<string, unknown> {
+  try { return JSON.parse(String(args ?? "{}")); }
+  catch { console.warn("[transform] Failed to parse tool arguments, using empty object"); return {}; }
+}
+
 export function ensureNonEmptyContent(messages: unknown[]): void {
   for (const msg of messages) {
     const m = msg as Record<string, unknown>;
-    // assistant 的 null content 是正常的（仅有 tool_calls），跳过
     if (m.role === "assistant") continue;
     if (!m.content || m.content === "" ||
         (Array.isArray(m.content) && m.content.length === 0)) {

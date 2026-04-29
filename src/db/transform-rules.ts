@@ -12,16 +12,20 @@ export interface TransformRules {
   updated_at?: string;
 }
 
+const JSON_COLUMNS = ["inject_headers", "request_defaults", "drop_fields", "field_overrides"] as const;
+
+function parseJsonColumns(row: Record<string, unknown>): TransformRules {
+  const result = { ...row } as Record<string, unknown>;
+  for (const col of JSON_COLUMNS) {
+    if (result[col]) result[col] = JSON.parse(result[col] as string);
+  }
+  return result as unknown as TransformRules;
+}
+
 export function getTransformRule(db: Database.Database, providerId: string): TransformRules | null {
   const row = db.prepare("SELECT * FROM provider_transform_rules WHERE provider_id = ?").get(providerId) as Record<string, unknown> | undefined;
   if (!row) return null;
-  return {
-    ...row,
-    inject_headers: row.inject_headers ? JSON.parse(row.inject_headers as string) : null,
-    request_defaults: row.request_defaults ? JSON.parse(row.request_defaults as string) : null,
-    drop_fields: row.drop_fields ? JSON.parse(row.drop_fields as string) : null,
-    field_overrides: row.field_overrides ? JSON.parse(row.field_overrides as string) : null,
-  } as TransformRules;
+  return parseJsonColumns(row);
 }
 
 export function upsertTransformRule(db: Database.Database, providerId: string, rules: Partial<Omit<TransformRules, "provider_id">>): void {
@@ -61,11 +65,5 @@ export function deleteTransformRule(db: Database.Database, providerId: string): 
 
 export function getAllActiveRules(db: Database.Database): TransformRules[] {
   const rows = db.prepare("SELECT * FROM provider_transform_rules WHERE is_active = 1").all() as Record<string, unknown>[];
-  return rows.map(r => ({
-    ...r,
-    inject_headers: r.inject_headers ? JSON.parse(r.inject_headers as string) : null,
-    request_defaults: r.request_defaults ? JSON.parse(r.request_defaults as string) : null,
-    drop_fields: r.drop_fields ? JSON.parse(r.drop_fields as string) : null,
-    field_overrides: r.field_overrides ? JSON.parse(r.field_overrides as string) : null,
-  })) as TransformRules[];
+  return rows.map(parseJsonColumns);
 }

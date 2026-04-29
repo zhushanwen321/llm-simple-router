@@ -1,5 +1,5 @@
 import type { AnthropicContentBlock } from "./types.js";
-import { sanitizeToolUseId, ensureNonEmptyContent } from "./sanitize.js";
+import { sanitizeToolUseId, ensureNonEmptyContent, parseToolArguments } from "./sanitize.js";
 
 // ---------- extractSystemMessages ----------
 
@@ -66,9 +66,7 @@ export function convertMessagesOA2Ant(
       if (toolCalls) {
         for (const tc of toolCalls) {
           const fn = tc.function as Record<string, unknown>;
-          let input: Record<string, unknown> = {};
-          // eslint-disable-next-line taste/no-silent-catch -- malformed args use empty object, not fatal
-          try { input = JSON.parse(String(fn.arguments ?? "{}")); } catch { console.warn("[message-mapper] Failed to parse tool_call arguments, keeping empty"); }
+          const input = parseToolArguments(fn.arguments);
           blocks.push({ type: "tool_use", id: sanitizeToolUseId(String(tc.id)), name: String(fn.name), input });
         }
       }
