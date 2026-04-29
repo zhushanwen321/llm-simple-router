@@ -58,6 +58,7 @@ interface FailoverContext {
   originalModel: string | null;
   originalBody: Record<string, unknown>;
   sessionId: string | undefined;
+  streamLoopEnabled: boolean;
 }
 
 // ---------- Helpers ----------
@@ -149,10 +150,10 @@ export async function handleProxyRequest(
   });
   const clientModel = ((request.body as Record<string, unknown>).model as string) || "unknown";
   const sessionId = (request.headers as RawHeaders)["x-claude-code-session-id"] as string | undefined;
-  const { effectiveModel, originalModel, interceptResponse } = applyEnhancement(deps.db, request, clientModel, sessionId);
+  const enhancementConfig = loadEnhancementConfig(deps.db);
+  const { effectiveModel, originalModel, interceptResponse } = applyEnhancement(deps.db, request, clientModel, sessionId, enhancementConfig);
 
   // --- 工具调用循环检测（受 proxy_enhancement 配置控制） ---
-  const enhancementConfig = loadEnhancementConfig(deps.db);
   if (enhancementConfig.tool_call_loop_enabled && deps.sessionTracker && sessionId) {
     const routerKeyId = (request.routerKey as { id?: string } | undefined)?.id ?? null;
     const sessionKey = routerKeyId ? `${routerKeyId}:${sessionId}` : sessionId;
@@ -198,13 +199,14 @@ export async function handleProxyRequest(
     effectiveModel, originalModel,
     originalBody: JSON.parse(JSON.stringify(request.body as Record<string, unknown>)),
     sessionId,
+    streamLoopEnabled: enhancementConfig.stream_loop_enabled,
   });
 }
 
 // ---------- Failover loop ----------
 
 async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> {
-  const { request, reply, apiType, upstreamPath, errors, deps, options, effectiveModel, originalModel, originalBody, sessionId } = ctx;
+  const { request, reply, apiType, upstreamPath, errors, deps, options, effectiveModel, originalModel, originalBody, sessionId, streamLoopEnabled } = ctx;
   const excludeTargets: Target[] = [];
   let rootLogId: string | null = null;
   while (true) {
@@ -291,7 +293,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
       provider, apiKey, body, cliHdrs, reply, upstreamPath, apiType,
       isStream, startTime, logId, effectiveModel, originalModel,
       streamTimeoutMs: deps.streamTimeoutMs, tracker: deps.tracker, matcher: deps.matcher, request,
-      streamLoopEnabled: enhancementConfig.stream_loop_enabled,
+      streamLoopEnabled,
     });
 
     try {

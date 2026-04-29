@@ -15,6 +15,10 @@ import type { RetryRuleMatcher } from "./retry-rules.js";
 import { buildModelInfoTag } from "./enhancement/enhancement-handler.js";
 import { DEFAULT_MAX_RAW as STREAM_CONTENT_MAX_RAW, DEFAULT_MAX_TEXT as STREAM_CONTENT_MAX_TEXT } from "../monitor/stream-content-accumulator.js";
 
+const LOOP_DETECTOR_N = 6;
+const LOOP_DETECTOR_WINDOW_SIZE = 1000;
+const LOOP_DETECTOR_REPEAT_THRESHOLD = 10;
+
 function toStreamMetrics(m: MetricsResult) {
   return {
     inputTokens: m.input_tokens,
@@ -66,8 +70,8 @@ export function buildTransportFn(p: TransportFnParams): (target: Target) => Prom
       let streamLoopGuard: StreamLoopGuard | undefined;
       if (p.streamLoopEnabled) {
         streamLoopGuard = new StreamLoopGuard(
-          { enabled: true, detectorConfig: { n: 6, windowSize: 1000, repeatThreshold: 10 } },
-          new NGramLoopDetector({ n: 6, windowSize: 1000, repeatThreshold: 10 }),
+          { enabled: true, detectorConfig: { n: LOOP_DETECTOR_N, windowSize: LOOP_DETECTOR_WINDOW_SIZE, repeatThreshold: LOOP_DETECTOR_REPEAT_THRESHOLD } },
+          new NGramLoopDetector({ n: LOOP_DETECTOR_N, windowSize: LOOP_DETECTOR_WINDOW_SIZE, repeatThreshold: LOOP_DETECTOR_REPEAT_THRESHOLD }),
           (reason) => {
             p.request.log.warn({ logId: p.logId, reason }, "Stream loop detected, aborting");
           },
