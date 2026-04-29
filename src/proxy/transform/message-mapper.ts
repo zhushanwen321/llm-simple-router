@@ -1,4 +1,5 @@
 import type { AnthropicContentBlock } from "./types.js";
+import { sanitizeToolUseId, ensureNonEmptyContent } from "./sanitize.js";
 
 // ---------- extractSystemMessages ----------
 
@@ -40,6 +41,7 @@ interface AntMessage { role: string; content: AnthropicContentBlock[] }
 export function convertMessagesOA2Ant(
   messages: unknown[],
 ): { system?: string; messages: AntMessage[] } {
+  ensureNonEmptyContent(messages);
   const { systemParts, nonSystemMsgs } = extractSystemMessages(messages);
   const system = systemParts.length > 0 ? systemParts.join("\n") : undefined;
 
@@ -62,7 +64,7 @@ export function convertMessagesOA2Ant(
           const fn = tc.function as Record<string, unknown>;
           let input: Record<string, unknown> = {};
           try { input = JSON.parse(String(fn.arguments ?? "{}")); } catch { console.warn("[message-mapper] Failed to parse tool_call arguments, keeping empty"); }
-          blocks.push({ type: "tool_use", id: String(tc.id), name: String(fn.name), input });
+          blocks.push({ type: "tool_use", id: sanitizeToolUseId(String(tc.id)), name: String(fn.name), input });
         }
       }
       if (blocks.length === 0) blocks.push({ type: "text", text: "" });
@@ -71,7 +73,7 @@ export function convertMessagesOA2Ant(
       // role:"tool" → role:"user" + tool_result
       const toolResult: AnthropicContentBlock = {
         type: "tool_result",
-        tool_use_id: String(m.tool_call_id ?? ""),
+        tool_use_id: sanitizeToolUseId(String(m.tool_call_id ?? "")),
         content: String(m.content ?? ""),
       };
       // 尝试合并到前一条 user 消息（或已有的 tool result 序列）

@@ -129,6 +129,25 @@ describe("convertMessagesOA2Ant", () => {
     const content = (messages[0] as Record<string, unknown>).content as unknown[];
     expect(content[0]).toEqual({ type: "text", text: "Hello" });
   });
+
+  it("sanitizes tool_use_id with special characters", () => {
+    const msgs = [
+      { role: "assistant", content: null, tool_calls: [{ id: "call.123", type: "function", function: { name: "fn", arguments: "{}" } }] },
+      { role: "tool", tool_call_id: "call.456@val", content: "ok" },
+    ];
+    const { messages } = convertMessagesOA2Ant(msgs);
+    const assistantContent = (messages[1] as Record<string, unknown>).content as Array<Record<string, unknown>>;
+    expect(assistantContent[0].id).toBe("call_123");
+    const userContent = (messages[2] as Record<string, unknown>).content as Array<Record<string, unknown>>;
+    expect((userContent[0] as Record<string, unknown>).tool_use_id).toBe("call_456_val");
+  });
+
+  it("fills empty content with space placeholder", () => {
+    const msgs = [{ role: "user", content: "" }, { role: "assistant", content: "hi" }];
+    const { messages } = convertMessagesOA2Ant(msgs);
+    const userContent = (messages[0] as Record<string, unknown>).content;
+    expect(userContent).toEqual([{ type: "text", text: " " }]);
+  });
 });
 
 // ---------- convertMessagesAnt2OA ----------
