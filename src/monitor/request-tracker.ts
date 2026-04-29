@@ -3,6 +3,7 @@ import { StatsAggregator } from "./stats-aggregator.js";
 import { RuntimeCollector } from "./runtime-collector.js";
 import { StreamContentAccumulator } from "./stream-content-accumulator.js";
 import type { ProviderSemaphoreManager } from "../proxy/semaphore.js";
+import type { AdaptiveConcurrencyController } from "../proxy/adaptive-controller.js";
 import type {
   ActiveRequest,
   AttemptSnapshot,
@@ -47,6 +48,7 @@ export class RequestTracker {
   readonly statsAggregator: StatsAggregator;
   readonly runtimeCollector: RuntimeCollector;
   private readonly semaphoreManager?: ProviderSemaphoreManager;
+  private adaptiveController?: AdaptiveConcurrencyController;
 
   constructor(deps?: {
     semaphoreManager?: ProviderSemaphoreManager;
@@ -57,6 +59,10 @@ export class RequestTracker {
     this.runtimeCollector = deps?.runtimeCollector ?? new RuntimeCollector();
     this.statsAggregator = new StatsAggregator();
     this.logger = deps?.logger;
+  }
+
+  setAdaptiveController(ctrl: AdaptiveConcurrencyController): void {
+    this.adaptiveController = ctrl;
   }
 
   // --- Core methods ---
@@ -207,6 +213,7 @@ export class RequestTracker {
     const result: ProviderConcurrencySnapshot[] = [];
     for (const [providerId, config] of this.providerConfigCache) {
       const status = this.semaphoreManager.getStatus(providerId);
+      const adaptiveState = this.adaptiveController?.getStatus(providerId);
       result.push({
         providerId,
         providerName: config.name,
@@ -215,6 +222,8 @@ export class RequestTracker {
         queued: status.queued,
         queueTimeoutMs: config.queueTimeoutMs,
         maxQueueSize: config.maxQueueSize,
+        adaptiveEnabled: adaptiveState !== undefined,
+        adaptiveLimit: adaptiveState?.currentLimit,
       });
     }
     return result;

@@ -440,6 +440,8 @@ describe("RequestTracker", () => {
         queued: 0,
         queueTimeoutMs: 3000,
         maxQueueSize: 10,
+        adaptiveEnabled: false,
+        adaptiveLimit: undefined,
       });
     });
   });
