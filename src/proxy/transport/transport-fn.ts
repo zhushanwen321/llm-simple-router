@@ -102,7 +102,7 @@ export function buildTransportFn(p: TransportFnParams): (target: Target) => Prom
       if (mr) p.tracker?.update(p.logId, { streamMetrics: toStreamMetrics(mr) });
     }
     // Apply format transformation (responseTransform handles both success and error internally)
-    if (p.responseTransform && result.body && (result.kind === "success" || result.kind === "error" || result.kind === "stream_error")) {
+    if (p.responseTransform && "body" in result && result.body) {
       result = { ...result, body: p.responseTransform(result.body) };
     }
     if (p.originalModel && result.kind === "success" && result.statusCode === UPSTREAM_SUCCESS) {
