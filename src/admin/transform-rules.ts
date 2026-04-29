@@ -1,9 +1,11 @@
 import type { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
+import { resolve } from "path";
 import { getTransformRule, upsertTransformRule, deleteTransformRule, getAllActiveRules } from "../db/transform-rules.js";
 
 interface TransformRuleOptions {
   db: Database.Database;
+  pluginRegistry?: import("../proxy/transform/plugin-registry.js").PluginRegistry;
 }
 
 const ALLOWED_FIELDS = new Set([
@@ -39,6 +41,11 @@ export const adminTransformRuleRoutes: FastifyPluginCallback<TransformRuleOption
   });
 
   app.post("/admin/api/transform-rules/reload", async () => {
+    if (options.pluginRegistry) {
+      const pluginsDir = resolve(process.cwd(), "plugins/transform");
+      const result = options.pluginRegistry.reload(options.db, pluginsDir);
+      return { code: 0, message: "ok", data: result };
+    }
     const rules = getAllActiveRules(db);
     return { code: 0, message: "ok", data: { loadedPlugins: [] as string[], rulesCount: rules.length } };
   });

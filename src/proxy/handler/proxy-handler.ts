@@ -302,6 +302,18 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
       iterationSnapshot.add({ stage: "overflow", triggered: false });
     }
 
+    // 格式转换完成后，让 plugin 对 body 做最终调整（如 inject defaults / drop fields）
+    const pluginRegistry = deps.container.resolve<import("../transform/plugin-registry.js").PluginRegistry>(SERVICE_KEYS.pluginRegistry);
+    if (needsTransform && pluginRegistry) {
+      const pluginCtx: import("../transform/plugin-types.js").RequestTransformContext = {
+        body: currentBody,
+        sourceApiType: apiType,
+        targetApiType: provider.api_type as "openai" | "anthropic",
+        provider: { id: provider.id, name: provider.name, base_url: provider.base_url, api_type: provider.api_type },
+      };
+      pluginRegistry.applyAfterRequest(pluginCtx);
+    }
+
     // provider patches — 使用返回值
     const { body: patchedBody, meta: patchMeta } = applyProviderPatches(currentBody, provider);
     iterationSnapshot.add({ stage: "provider_patch", types: patchMeta.types });

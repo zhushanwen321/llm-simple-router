@@ -193,6 +193,7 @@
               <ChevronDown class="w-4 h-4 transition-transform" :class="transformOpen ? 'rotate-180' : ''" />
             </CollapsibleTrigger>
             <CollapsibleContent class="mt-3 space-y-3">
+              <div><Label class="text-xs text-muted-foreground">注入 Headers (JSON)</Label><Input v-model="transformForm.injectHeadersInput" placeholder='{"x-custom": "value"}' class="mt-1" /></div>
               <div><Label class="text-xs text-muted-foreground">丢弃字段（逗号分隔）</Label><Input v-model="transformForm.dropFieldsInput" placeholder="logprobs, frequency_penalty" class="mt-1" /></div>
               <div><Label class="text-xs text-muted-foreground">请求默认值 (JSON)</Label><Input v-model="transformForm.requestDefaultsInput" placeholder='{"max_tokens": 4096}' class="mt-1" /></div>
               <div class="flex gap-2"><Button type="button" variant="outline" size="sm" @click="saveTransformRules(editingId!)">保存规则</Button><Button type="button" variant="ghost" size="sm" @click="handleDeleteTransformRules(editingId!)" v-if="transformForm.exists">删除规则</Button></div>

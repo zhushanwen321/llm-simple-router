@@ -7,6 +7,7 @@ export const SERVICE_KEYS = {
   usageWindowTracker: "usageWindowTracker",
   sessionTracker: "sessionTracker",
   adaptiveController: "adaptiveController",
+  pluginRegistry: "pluginRegistry",
   logFileWriter: "logFileWriter",
 } as const;
 

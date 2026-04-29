@@ -511,4 +511,50 @@ describe("Integration: cross-format error handling", () => {
 
     expect(res.statusCode).toBe(502);
   });
+
+  it("OA→Ant stream mid-error converts to OpenAI error chunk", async () => {
+    const backend = await createMockBackend((req, res) => {
+      res.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      });
+      // Start normally with message_start
+      res.write(`data: ${JSON.stringify({
+        type: "message_start",
+        message: { id: "msg-err", model: "claude-3", role: "assistant", content: [], usage: { input_tokens: 5, output_tokens: 0 } },
+      })}\n\n`);
+      // Send a text block start
+      res.write(`data: ${JSON.stringify({
+        type: "content_block_start", index: 0, content_block: { type: "text", text: "" },
+      })}\n\n`);
+      // Send partial text
+      res.write(`data: ${JSON.stringify({
+        type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "Hello" },
+      })}\n\n`);
+      // Error mid-stream
+      res.write(`data: ${JSON.stringify({
+        type: "error", error: { type: "overloaded_error", message: "Server overloaded" },
+      })}\n\n`);
+      res.end();
+    });
+
+    insertProvider(db, "svc-ant", "anthropic", `http://127.0.0.1:${backend.port}`);
+    insertMapping(db, "claude-3", "claude-3", "svc-ant");
+    app = buildOAApp(db);
+
+    const res = await app.inject({
+      method: "POST", url: "/v1/chat/completions",
+      headers: { "content-type": "application/json" },
+      payload: { model: "claude-3", messages: [{ role: "user", content: "hi" }], stream: true, max_tokens: 100 },
+    });
+
+    // Stream started with 200, error delivered inside SSE
+    expect(res.statusCode).toBe(200);
+    // Should contain the partial text already sent
+    expect(res.body).toContain('"content":"Hello"');
+    // Should contain error information
+    expect(res.body).toContain("error");
+    await backend.close();
+  });
 });

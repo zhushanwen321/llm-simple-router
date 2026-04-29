@@ -30,6 +30,7 @@ interface AdminRoutesOptions {
   adaptiveController?: AdaptiveConcurrencyController;
   logFileWriter?: import("../storage/log-file-writer.js").LogFileWriter | null;
   logsDir?: string;
+  pluginRegistry?: import("../proxy/transform/plugin-registry.js").PluginRegistry;
 }
 
 export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (app, options, done) => {
@@ -53,6 +54,6 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (app, opti
   app.register(adminRecommendedRoutes, { db: options.db });
   app.register(adminUsageRoutes, { db: options.db });
   app.register(adminUpgradeRoutes, { db: options.db });
-  app.register(adminTransformRuleRoutes, { db: options.db });
+  app.register(adminTransformRuleRoutes, { db: options.db, pluginRegistry: options.pluginRegistry });
   done();
 };
