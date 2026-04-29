@@ -1,5 +1,6 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { TransportResult } from "./types.js";
+import { ProviderSwitchNeeded } from "./types.js";
 import type { Target, ConcurrencyOverride } from "./strategy/types.js";
 import type { ResilienceLayer, ResilienceResult, ResilienceConfig } from "./resilience.js";
 import { ResilienceLayer as ResilienceLayerClass } from "./resilience.js";
@@ -11,6 +12,7 @@ import { TrackerScope as TrackerScopeClass } from "./scope.js";
 import type { ActiveRequest } from "../monitor/types.js";
 import type { ProviderSemaphoreManager } from "./semaphore.js";
 import type { RequestTracker } from "../monitor/request-tracker.js";
+import type { AdaptiveConcurrencyController } from "./adaptive-controller.js";
 
 const DEFAULT_BASE_DELAY_MS = 1000;
 const DEFAULT_FAILOVER_THRESHOLD = 400;
@@ -49,11 +51,12 @@ export interface HandleContext {
 export function createOrchestrator(
   semaphoreManager?: ProviderSemaphoreManager,
   tracker?: RequestTracker,
+  adaptiveController?: AdaptiveConcurrencyController,
 ): ProxyOrchestrator | undefined {
   const semaphoreScope = semaphoreManager ? new SemaphoreScopeClass(semaphoreManager) : undefined;
   const trackerScope = tracker ? new TrackerScopeClass(tracker) : undefined;
   if (!semaphoreScope || !trackerScope) return undefined;
-  return new ProxyOrchestrator({ semaphoreScope, trackerScope, resilience: new ResilienceLayerClass() });
+  return new ProxyOrchestrator({ semaphoreScope, trackerScope, resilience: new ResilienceLayerClass(), adaptiveController });
 }
 
 export class ProxyOrchestrator {
@@ -62,6 +65,7 @@ export class ProxyOrchestrator {
       semaphoreScope: SemaphoreScope;
       trackerScope: TrackerScope;
       resilience: ResilienceLayer;
+      adaptiveController?: AdaptiveConcurrencyController;
     },
   ) {}
 
@@ -72,35 +76,47 @@ export class ProxyOrchestrator {
     config: OrchestratorConfig,
     ctx?: HandleContext,
   ): Promise<ResilienceResult> {
+    const providerId = config.provider.id;
     const trackerReq = this.buildActiveRequest(request, config, apiType);
-    const result = await this.deps.trackerScope.track<ResilienceResult>(
-      trackerReq,
-      () => this.deps.semaphoreScope.withSlot(
-        config.provider.id,
-        this.createAbortSignal(request),
-        () => {
-          trackerReq.queued = true;
-          this.deps.trackerScope.markQueued(trackerReq.id, true);
-        },
-        () => {
-          if (trackerReq.queued) {
-            trackerReq.queued = false;
-            this.deps.trackerScope.markQueued(trackerReq.id, false);
-          }
-          return this.executeResilience(config, ctx);
-        },
-        config.concurrencyOverride,
-      ),
-      (result) => this.extractTrackStatus(result),
-      (result) => result.attempts.map(a => ({
-        statusCode: a.statusCode,
-        error: a.error,
-        latencyMs: a.latencyMs,
-        providerId: a.target.provider_id,
-      })),
-    );
-    this.sendResponse(reply, result.result, ctx);
-    return result;
+    try {
+      const result = await this.deps.trackerScope.track<ResilienceResult>(
+        trackerReq,
+        () => this.deps.semaphoreScope.withSlot(
+          providerId,
+          this.createAbortSignal(request),
+          () => {
+            trackerReq.queued = true;
+            this.deps.trackerScope.markQueued(trackerReq.id, true);
+          },
+          () => {
+            if (trackerReq.queued) {
+              trackerReq.queued = false;
+              this.deps.trackerScope.markQueued(trackerReq.id, false);
+            }
+            return this.executeResilience(config, ctx);
+          },
+          config.concurrencyOverride,
+        ),
+        (result) => this.extractTrackStatus(result),
+        (result) => result.attempts.map(a => ({
+          statusCode: a.statusCode,
+          error: a.error,
+          latencyMs: a.latencyMs,
+          providerId: a.target.provider_id,
+        })),
+      );
+      const { status, statusCode } = this.extractTrackStatus(result);
+      this.deps.adaptiveController?.onRequestComplete(providerId, { success: status === "completed", statusCode });
+      this.sendResponse(reply, result.result, ctx);
+      return result;
+    } catch (e) {
+      if (e instanceof ProviderSwitchNeeded) {
+        const lastResult = e.lastResult;
+        const statusCode = lastResult && "statusCode" in lastResult ? lastResult.statusCode : undefined;
+        this.deps.adaptiveController?.onRequestComplete(providerId, { success: false, statusCode });
+      }
+      throw e;
+    }
   }
 
   private buildActiveRequest(

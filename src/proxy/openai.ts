@@ -14,6 +14,7 @@ import { RetryRuleMatcher } from "./retry-rules.js";
 import { ProviderSemaphoreManager } from "./semaphore.js";
 import type { RequestTracker } from "../monitor/request-tracker.js";
 import type { UsageWindowTracker } from "./usage-window-tracker.js";
+import type { AdaptiveConcurrencyController } from "./adaptive-controller.js";
 import { HTTP_NOT_FOUND, HTTP_BAD_GATEWAY } from "../constants.js";
 
 export interface OpenaiProxyOptions {
@@ -25,6 +26,7 @@ export interface OpenaiProxyOptions {
   tracker?: RequestTracker;
   usageWindowTracker?: UsageWindowTracker;
   sessionTracker?: import("./loop-prevention/session-tracker.js").SessionTracker;
+  adaptiveController?: AdaptiveConcurrencyController;
 }
 
 const CHAT_COMPLETIONS_PATH = "/v1/chat/completions";
@@ -50,9 +52,9 @@ function sendError(reply: FastifyReply, e: ProxyErrorResponse) {
 }
 
 const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, done) => {
-  const { db, streamTimeoutMs, retryBaseDelayMs, matcher, semaphoreManager, tracker, usageWindowTracker, sessionTracker } = opts;
+  const { db, streamTimeoutMs, retryBaseDelayMs, matcher, semaphoreManager, tracker, usageWindowTracker, sessionTracker, adaptiveController } = opts;
 
-  const orchestrator = createOrchestrator(semaphoreManager, tracker);
+  const orchestrator = createOrchestrator(semaphoreManager, tracker, adaptiveController);
 
   app.post(CHAT_COMPLETIONS_PATH, async (request, reply) => {
     if (!orchestrator) {
