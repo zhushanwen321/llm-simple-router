@@ -37,9 +37,19 @@ describe("ensureNonEmptyContent", () => {
     ensureNonEmptyContent(msgs);
     expect(msgs[0].content).toBe("hello");
   });
+  it("skips assistant null content (legitimate tool_calls-only)", () => {
+    const msgs = [{ role: "assistant", content: null }];
+    ensureNonEmptyContent(msgs);
+    expect(msgs[0].content).toBeNull();
+  });
   it("does not modify non-empty array content", () => {
     const msgs = [{ role: "user", content: [{ type: "text", text: "hi" }] }];
     ensureNonEmptyContent(msgs);
     expect(msgs[0].content).toEqual([{ type: "text", text: "hi" }]);
+  });
+  it("skips assistant null content (legitimate tool_calls-only message)", () => {
+    const msgs = [{ role: "assistant", content: null }];
+    ensureNonEmptyContent(msgs);
+    expect(msgs[0].content).toBeNull();
   });
 });
