@@ -26,10 +26,8 @@ const client = axios.create({
 client.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      // eslint-disable-line no-magic-numbers
-      if (error.response.data?.code === 40103) {
-        // eslint-disable-line no-magic-numbers -- NOT_INITIALIZED
+    if (error.response?.status === 401) { // eslint-disable-line no-magic-numbers
+      if (error.response.data?.code === 40103) { // eslint-disable-line no-magic-numbers
         router.push("/setup");
       } else {
         router.push("/login");

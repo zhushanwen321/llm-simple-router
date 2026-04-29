@@ -22,6 +22,7 @@ export function openaiResponseToAnthropic(bodyStr: string): string {
   if (msg?.tool_calls) {
     for (const tc of msg.tool_calls) {
       let input: Record<string, unknown> = {};
+      // eslint-disable-next-line taste/no-silent-catch -- malformed args use empty object, not fatal
       try { input = JSON.parse(tc.function.arguments); } catch { console.warn("[response-transform] Failed to parse tool arguments, keeping empty"); }
       content.push({ type: "tool_use", id: tc.id, name: tc.function.name, input });
     }

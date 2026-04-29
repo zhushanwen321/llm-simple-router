@@ -37,7 +37,7 @@ class StreamProxy {
 
   // 流式阶段 SSE error 扫描缓冲（跨 chunk 边界匹配）
   private sseScanBuffer = "";
-  private static readonly SSE_SCAN_MAX = 8192;
+  private static readonly SSE_SCAN_MAX = 8 * 1024; // eslint-disable-line no-magic-numbers -- 8KB scan buffer
 
   constructor(
     private readonly statusCode: number,
@@ -111,6 +111,7 @@ class StreamProxy {
     } else {
       // stream_abort 且 headers 已发送时，必须 end reply 避免客户端挂起
       if (kind === "stream_abort" && this.headersSent) {
+        // eslint-disable-next-line taste/no-silent-catch -- reply may already be destroyed, warn is sufficient
         try { this.reply.raw.end(); } catch { console.warn("[stream-proxy] reply.raw.end() failed, likely already destroyed"); }
       }
       this.cleanup();

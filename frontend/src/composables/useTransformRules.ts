@@ -21,7 +21,8 @@ export function useTransformRules() {
         transformForm.value.requestDefaultsInput = ''
         transformForm.value.exists = false
       }
-    } catch {
+    } catch (e) {
+      toast.error(getApiMessage(e, '加载转换规则失败'))
       transformForm.value.dropFieldsInput = ''
       transformForm.value.requestDefaultsInput = ''
       transformForm.value.exists = false

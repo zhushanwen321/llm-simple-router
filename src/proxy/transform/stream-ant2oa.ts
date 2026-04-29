@@ -1,5 +1,6 @@
 import { BaseSSETransform } from "./stream-transform-base.js";
 import { generateChatcmplId } from "./id-utils.js";
+import { mapStopReasonToFinishReason } from "./usage-mapper.js";
 import type { AnthropicProviderMeta } from "./provider-meta.js";
 
 export class AnthropicToOpenAITransform extends BaseSSETransform {
@@ -133,11 +134,7 @@ export class AnthropicToOpenAITransform extends BaseSSETransform {
         const stopReason = msgDelta?.stop_reason as string | undefined;
         if (stopReason && !this.finishReasonEmitted) {
           this.finishReasonEmitted = true;
-          const fr = stopReason === "end_turn" ? "stop"
-            : stopReason === "max_tokens" ? "length"
-              : stopReason === "stop_sequence" ? "stop"
-                : stopReason === "tool_use" ? "tool_calls"
-                  : "stop";
+          const fr = mapStopReasonToFinishReason(stopReason);
           this.pushOpenAISSE({
             id: this.chatcmplId, object: "chat.completion.chunk",
             choices: [{ index: 0, delta: {}, finish_reason: fr }],

@@ -1,3 +1,4 @@
+/* eslint-disable no-magic-numbers -- HTTP status codes are domain vocabulary for this classifier */
 export type ErrorCategory =
   | "authentication"
   | "permission"
@@ -22,11 +23,8 @@ export interface ClassifiedError {
 
 export function classifyError(statusCode: number, errorBody: string): ClassifiedError {
   let parsed: Record<string, unknown> = {};
-  try {
-    parsed = JSON.parse(errorBody);
-  } catch {
-    // non-JSON body — classify by status code only
-  }
+  // eslint-disable-next-line taste/no-silent-catch -- non-JSON body: classify by status code only
+  try { parsed = JSON.parse(errorBody); } catch { /* classify by status code only */ }
 
   // Anthropic wraps errors in { type: "error", error: { type, message } }
   // OpenAI uses { error: { type, code, message } } directly

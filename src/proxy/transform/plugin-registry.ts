@@ -43,6 +43,7 @@ export class PluginRegistry {
         }
         this.plugins.push(plugin);
         loaded.push(`${plugin.name} (${file})`);
+        // eslint-disable-next-line taste/no-silent-catch -- don't crash server for bad plugin
       } catch (err) {
         console.error(`[plugin-registry] Failed to load plugin from ${file}:`, err);
       }

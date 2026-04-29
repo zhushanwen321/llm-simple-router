@@ -16,7 +16,7 @@ export const adminTransformRuleRoutes: FastifyPluginCallback<TransformRuleOption
   app.get<{ Params: { providerId: string } }>("/admin/api/transform-rules/:providerId", async (req) => {
     const { providerId } = req.params;
     const rule = getTransformRule(db, providerId);
-    return { code: 0, data: rule };
+    return { code: 0, message: "ok", data: rule };
   });
 
   app.put<{ Params: { providerId: string }; Body: Record<string, unknown> }>(
@@ -28,19 +28,19 @@ export const adminTransformRuleRoutes: FastifyPluginCallback<TransformRuleOption
         if (ALLOWED_FIELDS.has(key)) updates[key] = val;
       }
       upsertTransformRule(db, providerId, updates);
-      return { code: 0, data: { success: true } };
+      return { code: 0, message: "ok", data: { success: true } };
     },
   );
 
   app.delete<{ Params: { providerId: string } }>("/admin/api/transform-rules/:providerId", async (req) => {
     const { providerId } = req.params;
     deleteTransformRule(db, providerId);
-    return { code: 0, data: { success: true } };
+    return { code: 0, message: "ok", data: { success: true } };
   });
 
   app.post("/admin/api/transform-rules/reload", async () => {
     const rules = getAllActiveRules(db);
-    return { code: 0, data: { loadedPlugins: [] as string[], rulesCount: rules.length } };
+    return { code: 0, message: "ok", data: { loadedPlugins: [] as string[], rulesCount: rules.length } };
   });
 
   done();
