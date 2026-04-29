@@ -1,7 +1,8 @@
 import { randomUUID } from "crypto";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import Database from "better-sqlite3";
-import { getProviderById, insertRequestLog } from "../db/index.js";
+import { HTTP_UNPROCESSABLE_ENTITY } from "../constants.js";
+import { getProviderById, insertRequestLog, updateLogPipelineSnapshot, updateLogStreamContent, updateLogClientStatus } from "../db/index.js";
 import { decrypt } from "../utils/crypto.js";
 import { getSetting } from "../db/settings.js";
 import { resolveMapping } from "./mapping-resolver.js";
@@ -18,7 +19,6 @@ import { buildUpstreamHeaders, buildUpstreamUrl } from "./proxy-core.js";
 import { ProviderSwitchNeeded } from "./types.js";
 import type { RawHeaders, TransportResult } from "./types.js";
 import type { Target } from "./strategy/types.js";
-import { updateLogStreamContent, updateLogClientStatus } from "../db/index.js";
 import { insertRejectedLog } from "./log-helpers.js";
 import type { RetryRuleMatcher } from "./retry-rules.js";
 import type { ProxyOrchestrator } from "./orchestrator.js";
@@ -26,6 +26,8 @@ import type { ProxyErrorFormatter, ProxyErrorResponse } from "./proxy-core.js";
 import { buildTransportFn } from "./transport-fn.js";
 import { applyOverflowRedirect } from "./overflow.js";
 import { applyProviderPatches } from "./patch/index.js";
+import { PipelineSnapshot, type StageRecord } from "./pipeline-snapshot.js";
+import { maybeInjectModelInfoTag } from "./response-transform.js";
 
 const HTTP_ERROR_THRESHOLD = 400;
 const MAX_LOG_FIELD_LENGTH = 80;
@@ -51,7 +53,9 @@ interface FailoverContext {
   options?: { beforeSendProxy?: (body: Record<string, unknown>, isStream: boolean) => void };
   effectiveModel: string;
   originalModel: string | null;
-  originalBody: Record<string, unknown>;
+  pipelineBody: Record<string, unknown>;
+  rawBody: Record<string, unknown>;
+  baseStages: StageRecord[];
   sessionId: string | undefined;
 }
 
@@ -71,6 +75,7 @@ interface RejectParams {
   isFailover: boolean;
   originalRequestId: string | null;
   sessionId: string | undefined;
+  pipelineSnapshot?: string;
 }
 
 function rejectAndReply(
@@ -87,7 +92,7 @@ function rejectAndReply(
     originalBody: params.originalBody, clientHeaders: params.clientHeaders,
     providerId, originalModel: params.originalModel,
     isFailover: params.isFailover, originalRequestId: params.originalRequestId,
-    sessionId: params.sessionId,
+    sessionId: params.sessionId, pipelineSnapshot: params.pipelineSnapshot,
   });
   return reply.code(error.statusCode).send(error.body);
 }
@@ -143,15 +148,23 @@ export async function handleProxyRequest(
   });
   const clientModel = ((request.body as Record<string, unknown>).model as string) || "unknown";
   const sessionId = (request.headers as RawHeaders)["x-claude-code-session-id"] as string | undefined;
-  const { body: _enhancedBody, effectiveModel, originalModel, interceptResponse, meta: _enhMeta } = applyEnhancement(
+
+  // 在所有加工之前捕获原始 body
+  const rawBody = JSON.parse(JSON.stringify(request.body as Record<string, unknown>));
+  const snapshot = new PipelineSnapshot();
+
+  // enhancement 阶段
+  const { body: enhancedBody, effectiveModel, originalModel, interceptResponse, meta: enhMeta } = applyEnhancement(
     deps.db, request.body as Record<string, unknown>, clientModel, sessionId, request.routerKey,
   );
+  snapshot.add({ stage: "enhancement", router_tags_stripped: enhMeta.router_tags_stripped, directive: enhMeta.directive });
 
-  // --- 工具调用循环检测 ---
+  // tool guard 阶段 — 使用 enhancedBody
+  let pipelineBody = enhancedBody;
   if (deps.sessionTracker && sessionId) {
     const routerKeyId = (request.routerKey as { id?: string } | undefined)?.id ?? null;
     const sessionKey = routerKeyId ? `${routerKeyId}:${sessionId}` : sessionId;
-    const lastToolUse = extractLastToolUse(request.body as Record<string, unknown>);
+    const lastToolUse = extractLastToolUse(enhancedBody);
     if (lastToolUse) {
       const toolGuard = new ToolLoopGuard(deps.sessionTracker, {
         enabled: true,
@@ -163,7 +176,8 @@ export async function handleProxyRequest(
         const loopCount = deps.sessionTracker.getLoopCount(sessionKey);
         if (loopCount === 1) {
           // 层级 1：透明重试 — 注入中断提示词
-          request.body = toolGuard.injectLoopBreakPrompt(request.body as Record<string, unknown>, apiType, lastToolUse.toolName);
+          pipelineBody = toolGuard.injectLoopBreakPrompt(enhancedBody, apiType, lastToolUse.toolName);
+          snapshot.add({ stage: "tool_guard", action: "inject_break_prompt", tool: lastToolUse.toolName });
           request.log.warn({ sessionId, toolName: lastToolUse.toolName, loopCount },
             "Tool call loop detected, injecting break prompt");
         } else if (loopCount === TIER2_LOOP_THRESHOLD) {
@@ -191,7 +205,9 @@ export async function handleProxyRequest(
   return executeFailoverLoop({
     request, reply, apiType, upstreamPath, errors, deps, options,
     effectiveModel, originalModel,
-    originalBody: JSON.parse(JSON.stringify(request.body as Record<string, unknown>)),
+    pipelineBody,
+    rawBody,
+    baseStages: snapshot.getStages() as StageRecord[],
     sessionId,
   });
 }
@@ -199,7 +215,7 @@ export async function handleProxyRequest(
 // ---------- Failover loop ----------
 
 async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> {
-  const { request, reply, apiType, upstreamPath, errors, deps, options, effectiveModel, originalModel, originalBody, sessionId } = ctx;
+  const { request, reply, apiType, upstreamPath, errors, deps, options, effectiveModel, originalModel, pipelineBody, rawBody, baseStages, sessionId } = ctx;
   const excludeTargets: Target[] = [];
   let rootLogId: string | null = null;
   while (true) {
@@ -208,14 +224,20 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
     if (rootLogId === null) rootLogId = logId;
     const isFailoverIteration = rootLogId !== logId;
     const routerKeyId = request.routerKey?.id ?? null;
-    const body = request.body as Record<string, unknown>;
-    const isStream = body.stream === true;
+
+    // 每次迭代从 pipelineBody 重新开始（不修改 pipelineBody）
+    let currentBody = JSON.parse(JSON.stringify(pipelineBody));
+    const isStream = currentBody.stream === true;
     const cliHdrs: RawHeaders = request.headers as RawHeaders;
+
+    // 构建 per-iteration snapshot
+    const iterationSnapshot = new PipelineSnapshot(baseStages);
 
     const rCtx: RejectParams = {
       db: deps.db, logId, apiType, model: effectiveModel,
-      startTime, isStream, routerKeyId, originalBody, clientHeaders: cliHdrs, originalModel,
+      startTime, isStream, routerKeyId, originalBody: rawBody, clientHeaders: cliHdrs, originalModel,
       isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null, sessionId,
+      pipelineSnapshot: iterationSnapshot.toJSON(),
     };
 
     const resolveResult = resolveMapping(deps.db, effectiveModel, { now: new Date(), excludeTargets });
@@ -257,25 +279,34 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
         `API type mismatch: expected '${apiType}'`, resolved.provider_id);
     }
 
-    body.model = resolved.backend_model;
+    // routing — 创建新对象而非 in-place mutation
+    currentBody = { ...currentBody, model: resolved.backend_model };
+    iterationSnapshot.add({ stage: "routing", client_model: effectiveModel, backend_model: resolved.backend_model, provider_id: resolved.provider_id, strategy: resolveResult.targetCount > 1 ? "failover" : "scheduled" });
 
     // --- 溢出重定向：上下文超出时切换到更大模型 ---
-    const overflowResult = applyOverflowRedirect(resolved, deps.db, body);
+    const overflowResult = applyOverflowRedirect(resolved, deps.db, currentBody);
     if (overflowResult) {
       const overflowProvider = getProviderById(deps.db, overflowResult.provider_id);
       if (overflowProvider && overflowProvider.is_active && overflowProvider.api_type === apiType) {
         resolved = { ...resolved, provider_id: overflowResult.provider_id, backend_model: overflowResult.backend_model };
         provider = overflowProvider;
-        body.model = overflowResult.backend_model;
+        currentBody = { ...currentBody, model: overflowResult.backend_model };
+        iterationSnapshot.add({ stage: "overflow", triggered: true, redirect_to: overflowResult.backend_model, redirect_provider: overflowResult.provider_id });
       }
+    } else {
+      iterationSnapshot.add({ stage: "overflow", triggered: false });
     }
 
-    applyProviderPatches(body, provider);
-    const apiKey = decrypt(provider.api_key, getSetting(deps.db, "encryption_key")!);
-    options?.beforeSendProxy?.(body, isStream);
+    // provider patches — 使用返回值
+    const { body: patchedBody, meta: patchMeta } = applyProviderPatches(currentBody, provider);
+    iterationSnapshot.add({ stage: "provider_patch", types: patchMeta.types });
 
-    const reqBodyStr = JSON.stringify(body);
-    const clientReq = JSON.stringify({ headers: cliHdrs, body: originalBody });
+    const apiKey = decrypt(provider.api_key, getSetting(deps.db, "encryption_key")!);
+    options?.beforeSendProxy?.(patchedBody, isStream);
+
+    // logging — 使用 rawBody 作为 client_request，patchedBody 作为 upstream_request
+    const reqBodyStr = JSON.stringify(patchedBody);
+    const clientReq = JSON.stringify({ headers: cliHdrs, body: rawBody });
     const upstreamReqBase = JSON.stringify({
       url: buildUpstreamUrl(provider.base_url, upstreamPath),
       headers: sanitizeHeadersForLog(buildUpstreamHeaders(cliHdrs, apiKey, Buffer.byteLength(reqBodyStr), apiType)),
@@ -283,10 +314,12 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
     });
 
     const transportFn = buildTransportFn({
-      provider, apiKey, body, cliHdrs, reply, upstreamPath, apiType,
+      provider, apiKey, body: patchedBody, cliHdrs, reply, upstreamPath, apiType,
       isStream, startTime, logId, effectiveModel, originalModel,
       streamTimeoutMs: deps.streamTimeoutMs, tracker: deps.tracker, matcher: deps.matcher, request,
     });
+
+    const pipelineSnapshot = iterationSnapshot.toJSON();
 
     try {
       const resilienceResult = await deps.orchestrator.handle(
@@ -300,6 +333,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
           apiType, model: effectiveModel, providerId: provider.id, isStream,
           clientReq, upstreamReqBase, logId, routerKeyId, originalModel, sessionId,
           failover: { isFailoverIteration, rootLogId: rootLogId! },
+          pipelineSnapshot,
         },
         resilienceResult.attempts, resilienceResult.result, startTime,
       );
@@ -333,6 +367,15 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
       // 对 failover 场景的错误也不发送——这些情况需要外层 proxy-handler 处理
       if (!reply.raw.headersSent) {
         const tr = resilienceResult.result;
+        if (tr.kind === "success") {
+          // response transform — 注入 model info tag
+          const { body: finalBody, meta: respMeta } = maybeInjectModelInfoTag(tr.body, originalModel, effectiveModel);
+          if (respMeta.model_info_tag_injected) {
+            iterationSnapshot.add({ stage: "response_transform", model_info_tag_injected: true });
+            updateLogPipelineSnapshot(deps.db, lastLogId, iterationSnapshot.toJSON());
+          }
+          return reply.code(tr.statusCode).send(finalBody);
+        }
         if (tr.kind === "throw" || (tr.kind === "error" && tr.statusCode >= HTTP_ERROR_THRESHOLD)) {
           const err = errors.upstreamConnectionFailed();
           updateLogClientStatus(deps.db, lastLogId, err.statusCode);
@@ -356,6 +399,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
               apiType, model: effectiveModel, providerId: provider.id, isStream,
               clientReq, upstreamReqBase, logId, routerKeyId, originalModel, sessionId,
               failover: { isFailoverIteration, rootLogId: rootLogId! },
+              pipelineSnapshot,
             },
             e.attempts, fakeResult, startTime,
           );
@@ -382,6 +426,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
         is_failover: isFailoverIteration ? 1 : 0, original_request_id: isFailoverIteration ? rootLogId : null,
         router_key_id: routerKeyId, original_model: originalModel,
         session_id: sessionId,
+        pipeline_snapshot: pipelineSnapshot,
       });
       const err = errors.upstreamConnectionFailed();
       return reply.code(err.statusCode).send(err.body);

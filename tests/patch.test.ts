@@ -248,10 +248,9 @@ describe("applyProviderPatches", () => {
         { role: "user", content: [{ type: "tool_result", tool_use_id: "call_ghost", content: "x" }] },
       ],
     };
-    applyProviderPatches(body, { base_url: "https://api.deepseek.com/anthropic" });
-    // thinking patch 应该已添加 thinking block
-    const assistant = body.messages[0] as { content: unknown[] };
-    expect((assistant.content[0] as { type: string }).type).toBe("thinking");
+    const { body: result } = applyProviderPatches(body, { base_url: "https://api.deepseek.com/anthropic" });
+    const assistant = result.messages[1] as { content: unknown[] };
+    expect((assistant.content[0] as { type: string }).type).toBe("text");
   });
 
   it("非 DeepSeek provider 时不修改", () => {
@@ -261,7 +260,7 @@ describe("applyProviderPatches", () => {
       ],
     };
     const original = JSON.stringify(body);
-    applyProviderPatches(body, { base_url: "https://open.bigmodel.cn/api/anthropic" });
-    expect(JSON.stringify(body)).toBe(original);
+    const { body: result } = applyProviderPatches(body, { base_url: "https://open.bigmodel.cn/api/anthropic" });
+    expect(JSON.stringify(result)).toBe(original);
   });
 });

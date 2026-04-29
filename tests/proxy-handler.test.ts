@@ -9,6 +9,9 @@ vi.mock("../src/db/index.js", () => ({
   getMappingGroup: vi.fn(() => undefined),
   getProviderById: vi.fn(() => null),
   insertRequestLog: vi.fn(),
+  updateLogPipelineSnapshot: vi.fn(),
+  updateLogStreamContent: vi.fn(),
+  updateLogClientStatus: vi.fn(),
   seedDefaultRules: vi.fn(),
 }));
 
@@ -18,7 +21,10 @@ vi.mock("../src/proxy/mapping-resolver.js", () => ({
   resolveMapping: vi.fn(() => null),
 }));
 vi.mock("../src/proxy/enhancement/enhancement-handler.js", () => ({
-  applyEnhancement: vi.fn(() => ({ effectiveModel: "gpt-4", originalModel: null, interceptResponse: null })),
+  applyEnhancement: vi.fn((...args: unknown[]) => {
+    const body = args[1] as Record<string, unknown>;
+    return { body, effectiveModel: (body.model as string) || "gpt-4", originalModel: null, interceptResponse: null, meta: { router_tags_stripped: 0, directive: null } };
+  }),
   buildModelInfoTag: vi.fn(() => "<router-response>...</router-response>"),
 }));
 vi.mock("../src/proxy/proxy-logging.js", () => ({
@@ -28,9 +34,15 @@ vi.mock("../src/proxy/proxy-logging.js", () => ({
   sanitizeHeadersForLog: vi.fn((h) => h),
 }));
 vi.mock("../src/proxy/log-helpers.js", () => ({ insertRejectedLog: vi.fn() }));
+vi.mock("../src/proxy/response-transform.js", () => ({
+  maybeInjectModelInfoTag: vi.fn((body: string) => ({ body, meta: { model_info_tag_injected: false } })),
+}));
 vi.mock("../src/proxy/transport.js", () => ({
   callNonStream: vi.fn(),
   callStream: vi.fn(),
+}));
+vi.mock("../src/proxy/patch/index.js", () => ({
+  applyProviderPatches: vi.fn((body: unknown) => ({ body, meta: { types: [] } })),
 }));
 
 import { getProviderById } from "../src/db/index.js";
@@ -144,7 +156,7 @@ describe("handleProxyRequest", () => {
   });
 
   it("拦截响应直接处理不进入 orchestrator", async () => {
-    vi.mocked(applyEnhancement).mockReturnValueOnce({ effectiveModel: "gpt-4", originalModel: null, interceptResponse: { statusCode: 200, body: "ok" } });
+    vi.mocked(applyEnhancement).mockReturnValueOnce({ body: { model: "gpt-4" }, effectiveModel: "gpt-4", originalModel: null, interceptResponse: { statusCode: 200, body: "ok" }, meta: { router_tags_stripped: 0, directive: null } });
     const deps = createDeps();
     await handleProxyRequest(createRequest(), createReply(), "openai", "/v1/chat/completions", errors, deps);
     expect(handleIntercept).toHaveBeenCalled();
