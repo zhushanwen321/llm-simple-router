@@ -143,7 +143,9 @@ export async function handleProxyRequest(
   });
   const clientModel = ((request.body as Record<string, unknown>).model as string) || "unknown";
   const sessionId = (request.headers as RawHeaders)["x-claude-code-session-id"] as string | undefined;
-  const { effectiveModel, originalModel, interceptResponse } = applyEnhancement(deps.db, request, clientModel, sessionId);
+  const { body: _enhancedBody, effectiveModel, originalModel, interceptResponse, meta: _enhMeta } = applyEnhancement(
+    deps.db, request.body as Record<string, unknown>, clientModel, sessionId, request.routerKey,
+  );
 
   // --- 工具调用循环检测 ---
   if (deps.sessionTracker && sessionId) {
