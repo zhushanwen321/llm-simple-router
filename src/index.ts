@@ -188,7 +188,7 @@ export async function buildApp(
   const tracker = new RequestTracker({ semaphoreManager, logger: app.log });
   tracker.startPushInterval();
 
-  const adaptiveController = new AdaptiveConcurrencyController(semaphoreManager);
+  const adaptiveController = new AdaptiveConcurrencyController(semaphoreManager, app.log);
   tracker.setAdaptiveController(adaptiveController);
 
   // 5h 用量窗口追踪器，启动时自动补齐缺失窗口

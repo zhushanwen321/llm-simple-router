@@ -106,6 +106,8 @@ const CreateProviderSchema = Type.Object({
   max_concurrency: Type.Optional(Type.Integer({ minimum: 0 })),
   queue_timeout_ms: Type.Optional(Type.Integer({ minimum: 0 })),
   max_queue_size: Type.Optional(Type.Integer({ minimum: 1 })),
+  adaptive_enabled: Type.Optional(Type.Integer({ minimum: 0, maximum: 1 })),
+  adaptive_min: Type.Optional(Type.Integer({ minimum: 1 })),
 });
 
 const UpdateProviderSchema = Type.Object({
@@ -174,6 +176,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     }
     const encryptedKey = encrypt(body.api_key, getSetting(db, "encryption_key")!);
     const { names: normalizedModels, overrides: contextOverrides } = extractModelOverrides((body.models ?? []) as ModelInput[]);
+    const isAdaptiveEnabled = body.adaptive_enabled ?? 0;
     const id = createProvider(db, {
       name: body.name,
       api_type: body.api_type,
@@ -185,6 +188,8 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
       max_concurrency: body.max_concurrency ?? PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency,
       queue_timeout_ms: body.queue_timeout_ms ?? PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms,
       max_queue_size: body.max_queue_size ?? PROVIDER_CONCURRENCY_DEFAULTS.max_queue_size,
+      adaptive_enabled: isAdaptiveEnabled,
+      adaptive_min: body.adaptive_min ?? 1,
     });
     if (contextOverrides.length > 0) {
       setModelInfoForProvider(db, id, contextOverrides.map(o => ({ model_name: o.name, context_window: o.context_window })));
@@ -193,6 +198,13 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
       maxConcurrency: body.max_concurrency ?? PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency,
       queueTimeoutMs: body.queue_timeout_ms ?? PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms,
       maxQueueSize: body.max_queue_size ?? PROVIDER_CONCURRENCY_DEFAULTS.max_queue_size,
+    });
+    adaptiveController?.syncProvider(id, {
+      adaptive_enabled: isAdaptiveEnabled,
+      adaptive_min: body.adaptive_min ?? 1,
+      max_concurrency: body.max_concurrency ?? PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency,
+      queue_timeout_ms: body.queue_timeout_ms ?? PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms,
+      max_queue_size: body.max_queue_size ?? PROVIDER_CONCURRENCY_DEFAULTS.max_queue_size,
     });
     tracker?.updateProviderConfig(id, {
       name: body.name,
@@ -251,7 +263,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
         maxQueueSize: updated.max_queue_size,
       });
     }
-    if (body.adaptive_enabled !== undefined || body.adaptive_min !== undefined || body.max_concurrency !== undefined) {
+    if (body.adaptive_enabled !== undefined || body.adaptive_min !== undefined || body.max_concurrency !== undefined || body.queue_timeout_ms !== undefined || body.max_queue_size !== undefined) {
       adaptiveController?.syncProvider(id, {
         adaptive_enabled: updated.adaptive_enabled,
         adaptive_min: updated.adaptive_min,

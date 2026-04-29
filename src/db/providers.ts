@@ -60,13 +60,15 @@ export function createProvider(
     max_concurrency?: number;
     queue_timeout_ms?: number;
     max_queue_size?: number;
+    adaptive_enabled?: number;
+    adaptive_min?: number;
   },
 ): string {
   const id = randomUUID();
   const now = new Date().toISOString();
   db.prepare(
-    `INSERT INTO providers (id, name, api_type, base_url, api_key, api_key_preview, models, is_active, max_concurrency, queue_timeout_ms, max_queue_size, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO providers (id, name, api_type, base_url, api_key, api_key_preview, models, is_active, max_concurrency, queue_timeout_ms, max_queue_size, adaptive_enabled, adaptive_min, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     id, provider.name, provider.api_type, provider.base_url,
     provider.api_key, provider.api_key_preview ?? null,
@@ -75,6 +77,8 @@ export function createProvider(
     provider.max_concurrency ?? PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency,
     provider.queue_timeout_ms ?? PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms,
     provider.max_queue_size ?? PROVIDER_CONCURRENCY_DEFAULTS.max_queue_size,
+    provider.adaptive_enabled ?? 0,
+    provider.adaptive_min ?? 1,
     now, now,
   );
   return id;

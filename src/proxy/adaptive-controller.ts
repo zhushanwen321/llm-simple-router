@@ -17,6 +17,8 @@ const SUCCESS_THRESHOLD = 3;
 const FAILURE_THRESHOLD = 3;
 const DECREASE_STEP = 2;
 const COOLDOWN_MS = 30_000;
+const RATE_LIMIT_STATUS = 429;
+const HALF_DIVISOR = 2;
 
 interface AdaptiveEntry {
   state: AdaptiveState;
@@ -34,10 +36,18 @@ export interface ProviderAdaptiveConfig {
   max_queue_size: number;
 }
 
+export interface ControllerLogger {
+  debug(obj: Record<string, unknown>, msg: string): void;
+  warn(obj: Record<string, unknown>, msg: string): void;
+}
+
 export class AdaptiveConcurrencyController {
   private readonly entries = new Map<string, AdaptiveEntry>();
 
-  constructor(private semaphoreManager: ProviderSemaphoreManager) {}
+  constructor(
+    private semaphoreManager: ProviderSemaphoreManager,
+    private logger?: ControllerLogger,
+  ) {}
 
   init(providerId: string, config: { min: number; max: number }, semParams: { queueTimeoutMs: number; maxQueueSize: number }): void {
     this.entries.set(providerId, {
@@ -93,6 +103,12 @@ export class AdaptiveConcurrencyController {
       }
     } else {
       this.remove(providerId);
+      // 禁用自适应后恢复信号量到原始 max_concurrency
+      this.semaphoreManager.updateConfig(providerId, {
+        maxConcurrency: p.max_concurrency,
+        queueTimeoutMs: p.queue_timeout_ms,
+        maxQueueSize: p.max_queue_size,
+      });
     }
   }
 
@@ -100,16 +116,17 @@ export class AdaptiveConcurrencyController {
     const s = entry.state;
     s.consecutiveSuccesses++;
     s.consecutiveFailures = 0;
-    // 冷却期内只累加计数，不触发调整；过期后累积的成功计数可能立即触发 probe
     if (Date.now() < s.cooldownUntil) return;
 
     if (s.consecutiveSuccesses >= SUCCESS_THRESHOLD) {
       if (!s.probeActive) {
         s.probeActive = true;
         s.consecutiveSuccesses = 0;
+        this.logger?.debug({ providerId, currentLimit: s.currentLimit, action: "probe_open" }, "Adaptive: probe window opened");
       } else {
         s.currentLimit = Math.min(s.currentLimit + 1, entry.max);
         s.consecutiveSuccesses = 0;
+        this.logger?.debug({ providerId, currentLimit: s.currentLimit, max: entry.max, action: "limit_increased" }, "Adaptive: limit increased by 1");
       }
       this.syncToSemaphore(providerId);
     }
@@ -120,17 +137,21 @@ export class AdaptiveConcurrencyController {
     s.consecutiveFailures++;
     s.consecutiveSuccesses = 0;
 
-    if (statusCode === 429) {
-      s.currentLimit = Math.max(Math.floor(s.currentLimit / 2), entry.min);
+    if (statusCode === RATE_LIMIT_STATUS) {
+      const prevLimit = s.currentLimit;
+      s.currentLimit = Math.max(Math.floor(s.currentLimit / HALF_DIVISOR), entry.min);
       s.probeActive = false;
       s.cooldownUntil = Date.now() + COOLDOWN_MS;
       s.consecutiveFailures = 0;
       this.syncToSemaphore(providerId);
+      this.logger?.warn({ providerId, prevLimit, newLimit: s.currentLimit, cooldownMs: COOLDOWN_MS, action: "rate_limit_backoff" }, "Adaptive: 429 rate limit, halved concurrency and entered cooldown");
     } else if (s.consecutiveFailures >= FAILURE_THRESHOLD) {
+      const prevLimit = s.currentLimit;
       s.currentLimit = Math.max(s.currentLimit - DECREASE_STEP, entry.min);
       s.probeActive = false;
       s.consecutiveFailures = 0;
       this.syncToSemaphore(providerId);
+      this.logger?.warn({ providerId, prevLimit, newLimit: s.currentLimit, action: "failure_backoff" }, "Adaptive: sustained failures, decreased concurrency");
     }
   }
 
