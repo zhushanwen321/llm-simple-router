@@ -47,6 +47,7 @@ function buildTestApp(
   container.register("matcher", () => undefined);
   container.register("usageWindowTracker", () => undefined);
   container.register("sessionTracker", () => undefined);
+  container.register("adaptiveController", () => undefined);
   const app = Fastify();
   app.register(openaiProxy, { db: mockDb, container });
   return app;

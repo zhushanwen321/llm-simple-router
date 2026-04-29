@@ -46,6 +46,7 @@ function buildTestApp(mockDb: Database.Database): FastifyInstance {
   container.register("matcher", () => undefined);
   container.register("usageWindowTracker", () => undefined);
   container.register("sessionTracker", () => undefined);
+  container.register("adaptiveController", () => undefined);
 
   app.register(anthropicProxy, { db: mockDb, container });
 

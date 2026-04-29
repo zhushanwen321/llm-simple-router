@@ -66,6 +66,7 @@ function createApp() {
   container.register("matcher", () => undefined);
   container.register("usageWindowTracker", () => undefined);
   container.register("sessionTracker", () => undefined);
+  container.register("adaptiveController", () => undefined);
   app.register(authMiddleware, { db });
   app.register(openaiProxy, { db: db, container });
   app.register(anthropicProxy, { db: db, container });

@@ -113,6 +113,7 @@ describe("Retry integration", () => {
     container.register("tracker", (c) => new RequestTracker({ semaphoreManager: c.resolve("semaphoreManager") }));
     container.register("usageWindowTracker", () => undefined);
     container.register("sessionTracker", () => undefined);
+    container.register("adaptiveController", () => undefined);
     container.register("semaphoreManager", () => new ProviderSemaphoreManager());
     matcher.load(db);
     app = Fastify();
@@ -169,6 +170,7 @@ describe("Retry integration", () => {
     container.register("tracker", (c) => new RequestTracker({ semaphoreManager: c.resolve("semaphoreManager") }));
     container.register("usageWindowTracker", () => undefined);
     container.register("sessionTracker", () => undefined);
+    container.register("adaptiveController", () => undefined);
     container.register("semaphoreManager", () => new ProviderSemaphoreManager());
     app = Fastify();
     app.register(anthropicProxy, { db: db, container });
@@ -225,6 +227,7 @@ describe("Retry integration", () => {
     container.register("matcher", () => undefined);
     container.register("usageWindowTracker", () => undefined);
     container.register("sessionTracker", () => undefined);
+    container.register("adaptiveController", () => undefined);
     app = Fastify();
     app.register(anthropicProxy, { db: db, container });
 

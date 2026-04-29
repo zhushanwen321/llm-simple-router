@@ -117,6 +117,7 @@ describe("GET /v1/models proxy", () => {
     container.register("matcher", () => undefined);
     container.register("usageWindowTracker", () => undefined);
     container.register("sessionTracker", () => undefined);
+    container.register("adaptiveController", () => undefined);
     app.register(openaiProxy, { db: db, container });
 
     const response = await app.inject({
@@ -142,6 +143,7 @@ describe("GET /v1/models proxy", () => {
     container.register("matcher", () => undefined);
     container.register("usageWindowTracker", () => undefined);
     container.register("sessionTracker", () => undefined);
+    container.register("adaptiveController", () => undefined);
     app.register(openaiProxy, { db: db, container });
 
     const response = await app.inject({
@@ -165,6 +167,7 @@ describe("GET /v1/models proxy", () => {
     container.register("matcher", () => undefined);
     container.register("usageWindowTracker", () => undefined);
     container.register("sessionTracker", () => undefined);
+    container.register("adaptiveController", () => undefined);
     app.register(openaiProxy, { db: db, container });
 
     const response = await app.inject({
@@ -187,6 +190,7 @@ describe("GET /v1/models proxy", () => {
     container.register("matcher", () => undefined);
     container.register("usageWindowTracker", () => undefined);
     container.register("sessionTracker", () => undefined);
+    container.register("adaptiveController", () => undefined);
     app.register(openaiProxy, { db: db, container });
 
     const response = await app.inject({

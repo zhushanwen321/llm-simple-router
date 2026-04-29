@@ -158,6 +158,7 @@ describe("Failover log grouping", () => {
     container.register("matcher", () => undefined);
     container.register("usageWindowTracker", () => undefined);
     container.register("sessionTracker", () => undefined);
+    container.register("adaptiveController", () => undefined);
     app = Fastify();
     app.register(authMiddleware, { db });
     app.register(openaiProxy, { db: db, container });
@@ -253,6 +254,7 @@ describe("Failover log grouping", () => {
     container.register("matcher", () => undefined);
     container.register("usageWindowTracker", () => undefined);
     container.register("sessionTracker", () => undefined);
+    container.register("adaptiveController", () => undefined);
     app = Fastify();
     app.register(authMiddleware, { db });
     app.register(openaiProxy, { db: db, container });
@@ -332,6 +334,7 @@ describe("Failover log grouping", () => {
     container.register("matcher", () => undefined);
     container.register("usageWindowTracker", () => undefined);
     container.register("sessionTracker", () => undefined);
+    container.register("adaptiveController", () => undefined);
     app = Fastify();
     app.register(authMiddleware, { db });
     app.register(openaiProxy, { db: db, container });
@@ -417,6 +420,7 @@ describe("Failover log grouping", () => {
     container.register("tracker", (c) => new RequestTracker({ semaphoreManager: c.resolve("semaphoreManager") }));
     container.register("usageWindowTracker", () => undefined);
     container.register("sessionTracker", () => undefined);
+    container.register("adaptiveController", () => undefined);
     container.register("semaphoreManager", () => new ProviderSemaphoreManager());
     matcher.load(db);
     app = Fastify();

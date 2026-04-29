@@ -75,6 +75,7 @@ function createDeps(overrides = {}) {
   container.register("tracker", () => undefined);
   container.register("usageWindowTracker", () => ({ recordRequest: vi.fn() }));
   container.register("sessionTracker", () => undefined);
+  container.register("adaptiveController", () => undefined);
   container.register("semaphoreManager", () => undefined);
   return {
     db: {} as any,
