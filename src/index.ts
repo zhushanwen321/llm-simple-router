@@ -13,7 +13,7 @@ const PROVIDER_DEFAULT_MAX_QUEUE_SIZE = 100;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-import { getConfig, Config } from "./config.js";
+import { getConfig, Config } from "./config/index.js";
 import { initDatabase, getAllProviders, backfillMetricsFromRequestMetrics } from "./db/index.js";
 import { loadRecommendedConfig } from "./config/recommended.js";
 import { authMiddleware } from "./middleware/auth.js";
@@ -316,7 +316,7 @@ export async function buildApp(
 }
 
 // index.ts 自身也需要 getBaseConfig，避免循环依赖
-import { getBaseConfig } from "./config.js";
+import { getBaseConfig } from "./config/index.js";
 
 export async function main() {
   const { app } = await buildApp();
