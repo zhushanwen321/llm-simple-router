@@ -20,9 +20,10 @@ const COOLDOWN_MS = 30_000;
 const RATE_LIMIT_STATUS = 429;
 const HALF_DIVISOR = 2;
 
+const ADAPTIVE_MIN = 1;
+
 interface AdaptiveEntry {
   state: AdaptiveState;
-  min: number;
   max: number;
   queueTimeoutMs: number;
   maxQueueSize: number;
@@ -30,7 +31,6 @@ interface AdaptiveEntry {
 
 export interface ProviderAdaptiveConfig {
   adaptive_enabled: number;
-  adaptive_min: number;
   max_concurrency: number;
   queue_timeout_ms: number;
   max_queue_size: number;
@@ -49,16 +49,15 @@ export class AdaptiveConcurrencyController {
     private logger?: ControllerLogger,
   ) {}
 
-  init(providerId: string, config: { min: number; max: number }, semParams: { queueTimeoutMs: number; maxQueueSize: number }): void {
+  init(providerId: string, config: { max: number }, semParams: { queueTimeoutMs: number; maxQueueSize: number }): void {
     this.entries.set(providerId, {
       state: {
-        currentLimit: config.min,
+        currentLimit: ADAPTIVE_MIN,
         probeActive: false,
         consecutiveSuccesses: 0,
         consecutiveFailures: 0,
         cooldownUntil: 0,
       },
-      min: config.min,
       max: config.max,
       queueTimeoutMs: semParams.queueTimeoutMs,
       maxQueueSize: semParams.maxQueueSize,
@@ -88,16 +87,15 @@ export class AdaptiveConcurrencyController {
     if (p.adaptive_enabled) {
       const existing = this.entries.get(providerId);
       if (existing) {
-        existing.min = p.adaptive_min;
         existing.max = p.max_concurrency;
         existing.queueTimeoutMs = p.queue_timeout_ms;
         existing.maxQueueSize = p.max_queue_size;
         existing.state.currentLimit = Math.min(
-          Math.max(existing.state.currentLimit, existing.min), existing.max,
+          Math.max(existing.state.currentLimit, ADAPTIVE_MIN), existing.max,
         );
         this.syncToSemaphore(providerId);
       } else {
-        this.init(providerId, { min: p.adaptive_min, max: p.max_concurrency }, {
+        this.init(providerId, { max: p.max_concurrency }, {
           queueTimeoutMs: p.queue_timeout_ms, maxQueueSize: p.max_queue_size,
         });
       }
@@ -139,7 +137,7 @@ export class AdaptiveConcurrencyController {
 
     if (statusCode === RATE_LIMIT_STATUS) {
       const prevLimit = s.currentLimit;
-      s.currentLimit = Math.max(Math.floor(s.currentLimit / HALF_DIVISOR), entry.min);
+      s.currentLimit = Math.max(Math.floor(s.currentLimit / HALF_DIVISOR), ADAPTIVE_MIN);
       s.probeActive = false;
       s.cooldownUntil = Date.now() + COOLDOWN_MS;
       s.consecutiveFailures = 0;
@@ -147,7 +145,7 @@ export class AdaptiveConcurrencyController {
       this.logger?.warn({ providerId, prevLimit, newLimit: s.currentLimit, cooldownMs: COOLDOWN_MS, action: "rate_limit_backoff" }, "Adaptive: 429 rate limit, halved concurrency and entered cooldown");
     } else if (s.consecutiveFailures >= FAILURE_THRESHOLD) {
       const prevLimit = s.currentLimit;
-      s.currentLimit = Math.max(s.currentLimit - DECREASE_STEP, entry.min);
+      s.currentLimit = Math.max(s.currentLimit - DECREASE_STEP, ADAPTIVE_MIN);
       s.probeActive = false;
       s.consecutiveFailures = 0;
       this.syncToSemaphore(providerId);
@@ -160,8 +158,8 @@ export class AdaptiveConcurrencyController {
     if (!entry) return;
     // probeActive 时额外加 1 个探针槽位，但不超过 max
     const effectiveLimit = entry.state.probeActive
-      ? Math.min(entry.state.currentLimit + 1, entry.max)
-      : entry.state.currentLimit;
+      ? Math.min(Math.max(entry.state.currentLimit + 1, ADAPTIVE_MIN), entry.max)
+      : Math.max(entry.state.currentLimit, ADAPTIVE_MIN);
     this.semaphoreManager.updateConfig(providerId, {
       maxConcurrency: effectiveLimit,
       queueTimeoutMs: entry.queueTimeoutMs,

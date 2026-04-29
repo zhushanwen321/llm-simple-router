@@ -130,7 +130,6 @@ export interface ProviderPayload {
   queue_timeout_ms?: number;
   max_queue_size?: number;
   adaptive_enabled?: number;
-  adaptive_min?: number;
 }
 
 interface MappingPayload {

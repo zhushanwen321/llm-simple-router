@@ -202,7 +202,7 @@ export async function buildApp(
   const allProviders = getAllProviders(db);
   for (const p of allProviders) {
     if (p.adaptive_enabled) {
-      adaptiveController.init(p.id, { min: p.adaptive_min, max: p.max_concurrency }, {
+      adaptiveController.init(p.id, { max: p.max_concurrency }, {
         queueTimeoutMs: p.queue_timeout_ms,
         maxQueueSize: p.max_queue_size,
       });

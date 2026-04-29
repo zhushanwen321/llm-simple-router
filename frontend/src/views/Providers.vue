@@ -177,15 +177,8 @@
                   <Label for="adaptive-switch" class="text-sm text-foreground">自适应并发</Label>
                 </div>
                 <p v-if="form.adaptive_enabled" class="text-xs text-muted-foreground mb-2">
-                  从 {{ form.adaptive_min || 1 }} 开始自动调整，上限为 {{ form.max_concurrency || '-' }}
+                  从 1 开始自动调整，上限为 {{ form.max_concurrency || '-' }}
                 </p>
-                <div v-if="form.adaptive_enabled" class="space-y-2">
-                  <div>
-                    <Label class="block text-sm font-medium text-foreground mb-1">自适应下限</Label>
-                    <Input v-model.number="form.adaptive_min" type="number" min="1" :max="form.max_concurrency || 100" placeholder="1" @input="delete errors.adaptive_min" />
-                    <p v-if="errors.adaptive_min" class="text-sm text-destructive mt-1">{{ errors.adaptive_min }}</p>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
@@ -269,7 +262,7 @@ const CONTEXT_WINDOW_OPTIONS = [
   { label: '256K', value: '256000' },
   { label: '1M', value: '1000000' },
 ] as const
-const DEFAULT_FORM = { name: '', api_type: 'anthropic', base_url: '', api_key: '', models: [] as ModelInfo[], is_active: true, max_concurrency: DEFAULT_CONCURRENCY, queue_timeout_ms: DEFAULT_QUEUE_TIMEOUT_MS, max_queue_size: DEFAULT_QUEUE_SIZE, adaptive_enabled: false, adaptive_min: 1 }
+const DEFAULT_FORM = { name: '', api_type: 'anthropic', base_url: '', api_key: '', models: [] as ModelInfo[], is_active: true, max_concurrency: DEFAULT_CONCURRENCY, queue_timeout_ms: DEFAULT_QUEUE_TIMEOUT_MS, max_queue_size: DEFAULT_QUEUE_SIZE, adaptive_enabled: false }
 const modelInput = ref('')
 const modelContextWindow = ref(DEFAULT_CONTEXT_WINDOW)
 const contextWindowSelect = computed({
@@ -316,11 +309,6 @@ function validate(): boolean {
     if (form.value.queue_timeout_ms < 0) errs.queue_timeout_ms = '不能为负数'
     const qs = form.value.max_queue_size
     if (!qs || qs < 1 || qs > MAX_QUEUE_SIZE) errs.max_queue_size = `范围 1-${MAX_QUEUE_SIZE}`
-    if (form.value.adaptive_enabled) {
-      const min = form.value.adaptive_min
-      if (!min || min < 1) errs.adaptive_min = '最小为 1'
-      if (min > form.value.max_concurrency) errs.adaptive_min = '不能超过上限 ' + form.value.max_concurrency
-    }
   }
   errors.value = errs
   return Object.keys(errs).length === 0
@@ -416,7 +404,7 @@ function openCreate() {
 
 function openEdit(p: Provider) {
   editingId.value = p.id
-  form.value = { name: p.name, api_type: p.api_type, base_url: p.base_url, api_key: '', models: (p.models || []).map(m => ({ name: m.name, context_window: m.context_window ?? DEFAULT_CONTEXT_WINDOW })), is_active: !!p.is_active, max_concurrency: p.max_concurrency ?? DEFAULT_CONCURRENCY, queue_timeout_ms: p.queue_timeout_ms ?? DEFAULT_QUEUE_TIMEOUT_MS, max_queue_size: p.max_queue_size ?? DEFAULT_QUEUE_SIZE, adaptive_enabled: !!p.adaptive_enabled, adaptive_min: p.adaptive_min || 1 }
+  form.value = { name: p.name, api_type: p.api_type, base_url: p.base_url, api_key: '', models: (p.models || []).map(m => ({ name: m.name, context_window: m.context_window ?? DEFAULT_CONTEXT_WINDOW })), is_active: !!p.is_active, max_concurrency: p.max_concurrency ?? DEFAULT_CONCURRENCY, queue_timeout_ms: p.queue_timeout_ms ?? DEFAULT_QUEUE_TIMEOUT_MS, max_queue_size: p.max_queue_size ?? DEFAULT_QUEUE_SIZE, adaptive_enabled: !!p.adaptive_enabled }
   concurrencyEnabled.value = (p.max_concurrency ?? 0) > 0
   modelInput.value = ''
   modelContextWindow.value = DEFAULT_CONTEXT_WINDOW
@@ -426,7 +414,7 @@ function openEdit(p: Provider) {
   dialogOpen.value = true
 }
 
-type ProviderFormPayload = Pick<ProviderPayload, 'name' | 'api_type' | 'base_url' | 'models' | 'is_active' | 'max_concurrency' | 'queue_timeout_ms' | 'max_queue_size' | 'adaptive_enabled' | 'adaptive_min'> & { api_key?: string }
+type ProviderFormPayload = Pick<ProviderPayload, 'name' | 'api_type' | 'base_url' | 'models' | 'is_active' | 'max_concurrency' | 'queue_timeout_ms' | 'max_queue_size' | 'adaptive_enabled'> & { api_key?: string }
 
 function buildPayload(): ProviderFormPayload {
   const payload: ProviderFormPayload = {
@@ -439,7 +427,6 @@ function buildPayload(): ProviderFormPayload {
     queue_timeout_ms: concurrencyEnabled.value ? form.value.queue_timeout_ms : 0,
     max_queue_size: concurrencyEnabled.value ? form.value.max_queue_size : DEFAULT_QUEUE_SIZE,
     adaptive_enabled: concurrencyEnabled.value && form.value.adaptive_enabled ? 1 : 0,
-    adaptive_min: concurrencyEnabled.value && form.value.adaptive_enabled ? form.value.adaptive_min : 1,
   }
   if (form.value.api_key) payload.api_key = form.value.api_key
   return payload

@@ -38,7 +38,6 @@ export interface Provider {
   queue_timeout_ms: number
   max_queue_size: number
   adaptive_enabled: number
-  adaptive_min: number
 }
 
 /** Provider 精简信息（映射配置、下拉选择等场景使用） */

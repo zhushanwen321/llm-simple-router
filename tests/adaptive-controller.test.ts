@@ -22,19 +22,20 @@ describe("AdaptiveConcurrencyController", () => {
   });
 
   describe("init", () => {
-    it("starts at adaptive_min", () => {
-      ctrl.init("p1", { min: 3, max: 20 }, { queueTimeoutMs: 5000, maxQueueSize: 10 });
-      expect(ctrl.getStatus("p1")!.currentLimit).toBe(3);
+    it("starts at ADAPTIVE_MIN (1)", () => {
+      ctrl.init("p1", { max: 20 }, { queueTimeoutMs: 5000, maxQueueSize: 10 });
+      expect(ctrl.getStatus("p1")!.currentLimit).toBe(1);
       expect(ctrl.getStatus("p1")!.probeActive).toBe(false);
       expect(sem.updateConfig).toHaveBeenCalledWith("p1", {
-        maxConcurrency: 3, queueTimeoutMs: 5000, maxQueueSize: 10,
+        maxConcurrency: 1, queueTimeoutMs: 5000, maxQueueSize: 10,
       });
     });
   });
 
   describe("success transitions", () => {
     beforeEach(() => {
-      ctrl.init("p1", { min: 3, max: 20 }, { queueTimeoutMs: 0, maxQueueSize: 0 });
+      ctrl.init("p1", { max: 20 }, { queueTimeoutMs: 0, maxQueueSize: 0 });
+      ctrl["entries"].get("p1")!.state.currentLimit = 3;
       sem.updateConfig.mockClear();
     });
 
@@ -48,9 +49,9 @@ describe("AdaptiveConcurrencyController", () => {
     });
 
     it("increases limit after 3 more successes with probe active", () => {
-      for (let i = 0; i < 3; i++) ctrl.onRequestComplete("p1", { success: true });
+      for (let i = 0; i < 3; i++) ctrl.onRequestComplete("p1", { success: true }); // open probe
       sem.updateConfig.mockClear();
-      for (let i = 0; i < 3; i++) ctrl.onRequestComplete("p1", { success: true });
+      for (let i = 0; i < 3; i++) ctrl.onRequestComplete("p1", { success: true }); // confirm
       expect(ctrl.getStatus("p1")!.currentLimit).toBe(4);
       expect(ctrl.getStatus("p1")!.probeActive).toBe(true);
       expect(sem.updateConfig).toHaveBeenLastCalledWith("p1", {
@@ -59,11 +60,12 @@ describe("AdaptiveConcurrencyController", () => {
     });
 
     it("does not exceed hard max", () => {
-      ctrl.init("p1", { min: 3, max: 4 }, { queueTimeoutMs: 0, maxQueueSize: 0 });
-      for (let i = 0; i < 3; i++) ctrl.onRequestComplete("p1", { success: true });
-      for (let i = 0; i < 3; i++) ctrl.onRequestComplete("p1", { success: true });
+      ctrl.init("p1", { max: 4 }, { queueTimeoutMs: 0, maxQueueSize: 0 });
+      ctrl["entries"].get("p1")!.state.currentLimit = 3;
+      for (let i = 0; i < 3; i++) ctrl.onRequestComplete("p1", { success: true }); // open probe
+      for (let i = 0; i < 3; i++) ctrl.onRequestComplete("p1", { success: true }); // increase to 4
       sem.updateConfig.mockClear();
-      for (let i = 0; i < 3; i++) ctrl.onRequestComplete("p1", { success: true });
+      for (let i = 0; i < 3; i++) ctrl.onRequestComplete("p1", { success: true }); // try but capped
       expect(ctrl.getStatus("p1")!.currentLimit).toBe(4);
       expect(sem.updateConfig).toHaveBeenLastCalledWith("p1", {
         maxConcurrency: 4, queueTimeoutMs: 0, maxQueueSize: 0,
@@ -80,7 +82,7 @@ describe("AdaptiveConcurrencyController", () => {
 
   describe("429 handling", () => {
     beforeEach(() => {
-      ctrl.init("p1", { min: 2, max: 20 }, { queueTimeoutMs: 0, maxQueueSize: 0 });
+      ctrl.init("p1", { max: 20 }, { queueTimeoutMs: 0, maxQueueSize: 0 });
       ctrl["entries"].get("p1")!.state.currentLimit = 8;
       sem.updateConfig.mockClear();
     });
@@ -103,16 +105,16 @@ describe("AdaptiveConcurrencyController", () => {
       expect(ctrl.getStatus("p1")!.consecutiveSuccesses).toBe(3);
     });
 
-    it("respects hard min", () => {
+    it("respects hard min of 1", () => {
       ctrl["entries"].get("p1")!.state.currentLimit = 3;
       ctrl.onRequestComplete("p1", { success: false, statusCode: 429 });
-      expect(ctrl.getStatus("p1")!.currentLimit).toBe(2);
+      expect(ctrl.getStatus("p1")!.currentLimit).toBe(1);
     });
   });
 
   describe("non-429 failures", () => {
     beforeEach(() => {
-      ctrl.init("p1", { min: 1, max: 20 }, { queueTimeoutMs: 0, maxQueueSize: 0 });
+      ctrl.init("p1", { max: 20 }, { queueTimeoutMs: 0, maxQueueSize: 0 });
       ctrl["entries"].get("p1")!.state.currentLimit = 6;
       sem.updateConfig.mockClear();
     });
@@ -131,7 +133,7 @@ describe("AdaptiveConcurrencyController", () => {
       expect(ctrl.getStatus("p1")!.currentLimit).toBe(6);
     });
 
-    it("respects hard min", () => {
+    it("respects hard min of 1", () => {
       ctrl["entries"].get("p1")!.state.currentLimit = 2;
       for (let i = 0; i < 3; i++) ctrl.onRequestComplete("p1", { success: false, statusCode: 500 });
       expect(ctrl.getStatus("p1")!.currentLimit).toBe(1);
@@ -141,7 +143,7 @@ describe("AdaptiveConcurrencyController", () => {
   describe("cooldown expiry", () => {
     it("resumes after cooldown", () => {
       vi.useFakeTimers();
-      ctrl.init("p1", { min: 2, max: 20 }, { queueTimeoutMs: 0, maxQueueSize: 0 });
+      ctrl.init("p1", { max: 20 }, { queueTimeoutMs: 0, maxQueueSize: 0 });
       ctrl["entries"].get("p1")!.state.currentLimit = 4;
       ctrl.onRequestComplete("p1", { success: false, statusCode: 429 });
       expect(ctrl.getStatus("p1")!.currentLimit).toBe(2);
@@ -154,43 +156,43 @@ describe("AdaptiveConcurrencyController", () => {
 
   describe("remove / re-init", () => {
     it("cleans up on remove", () => {
-      ctrl.init("p1", { min: 3, max: 20 }, { queueTimeoutMs: 0, maxQueueSize: 0 });
+      ctrl.init("p1", { max: 20 }, { queueTimeoutMs: 0, maxQueueSize: 0 });
       ctrl.remove("p1");
       expect(ctrl.getStatus("p1")).toBeUndefined();
     });
 
     it("re-inits from scratch", () => {
-      ctrl.init("p1", { min: 3, max: 20 }, { queueTimeoutMs: 0, maxQueueSize: 0 });
+      ctrl.init("p1", { max: 20 }, { queueTimeoutMs: 0, maxQueueSize: 0 });
       ctrl["entries"].get("p1")!.state.currentLimit = 6;
       ctrl.remove("p1");
-      ctrl.init("p1", { min: 3, max: 20 }, { queueTimeoutMs: 0, maxQueueSize: 0 });
-      expect(ctrl.getStatus("p1")!.currentLimit).toBe(3);
+      ctrl.init("p1", { max: 20 }, { queueTimeoutMs: 0, maxQueueSize: 0 });
+      expect(ctrl.getStatus("p1")!.currentLimit).toBe(1);
     });
   });
 
   describe("syncProvider", () => {
     it("initializes on enable", () => {
       ctrl.syncProvider("p1", {
-        adaptive_enabled: 1, adaptive_min: 3, max_concurrency: 20,
+        adaptive_enabled: 1, max_concurrency: 20,
         queue_timeout_ms: 5000, max_queue_size: 10,
       });
-      expect(ctrl.getStatus("p1")!.currentLimit).toBe(3);
+      expect(ctrl.getStatus("p1")!.currentLimit).toBe(1);
     });
 
     it("removes on disable", () => {
-      ctrl.init("p1", { min: 3, max: 20 }, { queueTimeoutMs: 0, maxQueueSize: 0 });
+      ctrl.init("p1", { max: 20 }, { queueTimeoutMs: 0, maxQueueSize: 0 });
       ctrl.syncProvider("p1", {
-        adaptive_enabled: 0, adaptive_min: 1, max_concurrency: 20,
+        adaptive_enabled: 0, max_concurrency: 20,
         queue_timeout_ms: 0, max_queue_size: 0,
       });
       expect(ctrl.getStatus("p1")).toBeUndefined();
     });
 
-    it("clamps current limit when bounds change", () => {
-      ctrl.init("p1", { min: 3, max: 20 }, { queueTimeoutMs: 0, maxQueueSize: 0 });
+    it("clamps current limit when max_concurrency decreases", () => {
+      ctrl.init("p1", { max: 20 }, { queueTimeoutMs: 0, maxQueueSize: 0 });
       ctrl["entries"].get("p1")!.state.currentLimit = 10;
       ctrl.syncProvider("p1", {
-        adaptive_enabled: 1, adaptive_min: 3, max_concurrency: 5,
+        adaptive_enabled: 1, max_concurrency: 5,
         queue_timeout_ms: 0, max_queue_size: 0,
       });
       expect(ctrl.getStatus("p1")!.currentLimit).toBe(5);
