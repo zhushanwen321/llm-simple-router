@@ -35,6 +35,7 @@ import { scheduleDbSizeMonitor } from "./db/db-size-monitor.js";
 import { startUpgradeChecker, stopUpgradeChecker } from "./admin/upgrade.js";
 import { CheckerOptions } from "./upgrade/checker.js";
 import fastifyStatic from "@fastify/static";
+import { ServiceContainer } from "./core/container.js";
 import Database from "better-sqlite3";
 
 export interface AppOptions {
@@ -181,24 +182,40 @@ export async function buildApp(
     }
   }
 
+  const container = new ServiceContainer();
+  container.register("db", () => db);
+  container.register("matcher", (c) => { const m = new RetryRuleMatcher(); m.load(c.resolve("db")); return m; });
+  container.register("semaphoreManager", () => new ProviderSemaphoreManager());
+  container.register("tracker", (c) => {
+    const t = new RequestTracker({ semaphoreManager: c.resolve("semaphoreManager"), logger: app.log });
+    t.startPushInterval();
+    return t;
+  });
+  container.register("usageWindowTracker", (c) => {
+    const uwt = new UsageWindowTracker(c.resolve("db"));
+    uwt.reconcileOnStartup();
+    return uwt;
+  });
+  container.register("sessionTracker", () => new SessionTracker(DEFAULT_LOOP_PREVENTION_CONFIG.sessionTracker));
+
   // 注入 DB 到 modelState 单例，启用会话级持久化
   modelState.init(db);
-  const matcher = new RetryRuleMatcher();
-  matcher.load(db);
 
-  const semaphoreManager = new ProviderSemaphoreManager();
-  const tracker = new RequestTracker({ semaphoreManager, logger: app.log });
-  tracker.startPushInterval();
+  // 注册 AdaptiveConcurrencyController（依赖已注册的 semaphoreManager）
+  container.register("adaptiveController", (c) => {
+    const ac = new AdaptiveConcurrencyController(c.resolve("semaphoreManager"), app.log);
+    return ac;
+  });
 
-  const adaptiveController = new AdaptiveConcurrencyController(semaphoreManager, app.log);
+  // 从容器解析所有服务
+  const matcher = container.resolve<RetryRuleMatcher>("matcher");
+  const semaphoreManager = container.resolve<ProviderSemaphoreManager>("semaphoreManager");
+  const tracker = container.resolve<RequestTracker>("tracker");
+  const usageWindowTracker = container.resolve<UsageWindowTracker>("usageWindowTracker");
+  const adaptiveController = container.resolve<AdaptiveConcurrencyController>("adaptiveController");
+
+  // Wire adaptive controller to tracker
   tracker.setAdaptiveController(adaptiveController);
-
-  // 5h 用量窗口追踪器，启动时自动补齐缺失窗口
-  const usageWindowTracker = new UsageWindowTracker(db);
-  usageWindowTracker.reconcileOnStartup();
-
-  // Session tracker（工具调用循环检测用），始终创建但检测受 proxy_enhancement 配置控制
-  const sessionTracker = new SessionTracker(DEFAULT_LOOP_PREVENTION_CONFIG.sessionTracker);
 
   // 从 DB 读取已有 provider 的并发配置，初始化信号量管理器和 tracker
   const allProviders = getAllProviders(db);
@@ -224,28 +241,8 @@ export async function buildApp(
   }
 
   app.register(authMiddleware, { db });
-  app.register(openaiProxy, {
-    db,
-    streamTimeoutMs: config.STREAM_TIMEOUT_MS,
-    retryBaseDelayMs: config.RETRY_BASE_DELAY_MS,
-    matcher,
-    semaphoreManager,
-    tracker,
-    usageWindowTracker,
-    sessionTracker,
-    adaptiveController,
-  });
-  app.register(anthropicProxy, {
-    db,
-    streamTimeoutMs: config.STREAM_TIMEOUT_MS,
-    retryBaseDelayMs: config.RETRY_BASE_DELAY_MS,
-    matcher,
-    semaphoreManager,
-    tracker,
-    usageWindowTracker,
-    sessionTracker,
-    adaptiveController,
-  });
+  app.register(openaiProxy, { db, container });
+  app.register(anthropicProxy, { db, container });
 
   // StateRegistry — Admin 层通过此接口触发 proxy 层状态刷新，消除 admin→proxy 依赖
   const stateRegistry: StateRegistry = {
@@ -308,6 +305,7 @@ export async function buildApp(
       logCleanup.stop();
       dbSizeMonitor.stop();
       tracker.stopPushInterval();
+      const sessionTracker = container.resolve<SessionTracker>("sessionTracker");
       sessionTracker.stop();
       await app.close();
       db.close();

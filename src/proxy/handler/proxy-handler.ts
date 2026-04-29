@@ -100,16 +100,13 @@ function rejectAndReply(
 
 export interface RouteHandlerDeps {
   db: Database.Database;
-  streamTimeoutMs: number;
-  retryBaseDelayMs: number;
-  matcher?: RetryRuleMatcher;
-  tracker?: RequestTracker;
   orchestrator: ProxyOrchestrator;
-  usageWindowTracker?: import("../routing/usage-window-tracker.js").UsageWindowTracker;
-  sessionTracker?: import("../loop-prevention/session-tracker.js").SessionTracker;
+  container: ServiceContainer;
 }
 
 import type { ContentBlock } from "../../monitor/types.js";
+import { getConfig } from "../../config/index.js";
+import type { ServiceContainer } from "../../core/container.js";
 
 /** 将 tracker blocks 序列化为前端 tryDirectParse 可解析的 JSON */
 function serializeBlocksForStorage(blocks: ContentBlock[] | undefined, apiType: "openai" | "anthropic"): string {
@@ -154,19 +151,20 @@ export async function handleProxyRequest(
   const { effectiveModel, originalModel, interceptResponse } = applyEnhancement(deps.db, request, clientModel, sessionId, enhancementConfig);
 
   // --- 工具调用循环检测（受 proxy_enhancement 配置控制） ---
-  if (enhancementConfig.tool_call_loop_enabled && deps.sessionTracker && sessionId) {
+  const sessionTracker = deps.container.resolve<import("../loop-prevention/session-tracker.js").SessionTracker>("sessionTracker");
+  if (enhancementConfig.tool_call_loop_enabled && sessionTracker && sessionId) {
     const routerKeyId = (request.routerKey as { id?: string } | undefined)?.id ?? null;
     const sessionKey = routerKeyId ? `${routerKeyId}:${sessionId}` : sessionId;
     const lastToolUse = extractLastToolUse(request.body as Record<string, unknown>);
     if (lastToolUse) {
-      const toolGuard = new ToolLoopGuard(deps.sessionTracker, {
+      const toolGuard = new ToolLoopGuard(sessionTracker, {
         enabled: true,
         minConsecutiveCount: 3,
         detectorConfig: { n: 6, windowSize: 500, repeatThreshold: 5 },
       });
       const checkResult = toolGuard.check(sessionKey, lastToolUse);
       if (checkResult.detected) {
-        const loopCount = deps.sessionTracker.getLoopCount(sessionKey);
+        const loopCount = sessionTracker.getLoopCount(sessionKey);
         if (loopCount === 1) {
           // 层级 1：透明重试 — 注入中断提示词
           toolGuard.injectLoopBreakPrompt(request.body as Record<string, unknown>, apiType, lastToolUse.toolName);
@@ -292,7 +290,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
     const transportFn = buildTransportFn({
       provider, apiKey, body, cliHdrs, reply, upstreamPath, apiType,
       isStream, startTime, logId, effectiveModel, originalModel,
-      streamTimeoutMs: deps.streamTimeoutMs, tracker: deps.tracker, matcher: deps.matcher, request,
+      streamTimeoutMs: getConfig().STREAM_TIMEOUT_MS, tracker: deps.container.resolve<RequestTracker>("tracker"), matcher: deps.container.resolve<RetryRuleMatcher>("matcher"), request,
       streamLoopEnabled,
     });
 
@@ -300,7 +298,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
       const resilienceResult = await deps.orchestrator.handle(
         request, reply, apiType,
         { resolved, provider, clientModel: effectiveModel, isStream, trackerId: logId, sessionId, clientRequest: clientReq, concurrencyOverride },
-        { retryBaseDelayMs: deps.retryBaseDelayMs, isFailover, ruleMatcher: deps.matcher, transportFn },
+        { retryBaseDelayMs: getConfig().RETRY_BASE_DELAY_MS, isFailover, ruleMatcher: deps.container.resolve<RetryRuleMatcher>("matcher"), transportFn },
       );
       const lastLogId = logResilienceResult(
         deps.db,
@@ -315,10 +313,11 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
 
       const tr = resilienceResult.result;
       const succeeded = tr.kind === "success" || tr.kind === "stream_success" || tr.kind === "stream_abort";
-      if (succeeded) deps.usageWindowTracker?.recordRequest(provider.id, routerKeyId ?? undefined);
+      if (succeeded) deps.container.resolve<import("../routing/usage-window-tracker.js").UsageWindowTracker>("usageWindowTracker")?.recordRequest(provider.id, routerKeyId ?? undefined);
 
-      if (isStream && deps.tracker) {
-        const sc = deps.tracker.get(logId)?.streamContent;
+      const tracker = deps.container.resolve<RequestTracker>("tracker");
+      if (isStream && tracker) {
+        const sc = tracker.get(logId)?.streamContent;
         const blocks = sc?.blocks;
         const hasStructured = blocks && blocks.length > 0 && blocks.some(b => b.type !== "text");
         const content = hasStructured

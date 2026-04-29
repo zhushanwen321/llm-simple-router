@@ -16,14 +16,7 @@ import { HTTP_BAD_GATEWAY } from "../../core/constants.js";
 
 export interface AnthropicProxyOptions {
   db: Database.Database;
-  streamTimeoutMs: number;
-  retryBaseDelayMs: number;
-  matcher?: RetryRuleMatcher;
-  semaphoreManager?: ProviderSemaphoreManager;
-  tracker?: RequestTracker;
-  usageWindowTracker?: UsageWindowTracker;
-  sessionTracker?: import("../loop-prevention/session-tracker.js").SessionTracker;
-  adaptiveController?: AdaptiveConcurrencyController;
+  container: import("../../core/container.js").ServiceContainer;
 }
 
 const MESSAGES_PATH = "/v1/messages";
@@ -44,9 +37,13 @@ const anthropicErrors = createErrorFormatter(
 );
 
 const anthropicProxyRaw: FastifyPluginCallback<AnthropicProxyOptions> = (app, opts, done) => {
-  const { db, streamTimeoutMs, retryBaseDelayMs, matcher, semaphoreManager, tracker, usageWindowTracker, sessionTracker, adaptiveController } = opts;
+  const { db, container } = opts;
 
-  const orchestrator = createOrchestrator(semaphoreManager, tracker, adaptiveController);
+  const orchestrator = createOrchestrator(
+    container.resolve<ProviderSemaphoreManager>("semaphoreManager"),
+    container.resolve<RequestTracker>("tracker"),
+    container.resolve<AdaptiveConcurrencyController>("adaptiveController"),
+  );
 
   app.post(MESSAGES_PATH, async (request, reply) => {
     if (!orchestrator) {
@@ -62,7 +59,7 @@ const anthropicProxyRaw: FastifyPluginCallback<AnthropicProxyOptions> = (app, op
       const e = anthropicErrors.providerUnavailable();
       return reply.code(e.statusCode).send(e.body);
     }
-    const deps: RouteHandlerDeps = { db, streamTimeoutMs, retryBaseDelayMs, matcher, tracker, orchestrator, usageWindowTracker, sessionTracker };
+    const deps: RouteHandlerDeps = { db, orchestrator, container };
     return handleProxyRequest(request, reply, "anthropic", MESSAGES_PATH, anthropicErrors, deps);
   });
 

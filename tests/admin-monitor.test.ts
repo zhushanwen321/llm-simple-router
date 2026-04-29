@@ -4,6 +4,8 @@ import { buildApp } from "../src/index.js";
 import { initDatabase } from "../src/db/index.js";
 import { setSetting } from "../src/db/settings.js";
 import { hashPassword } from "../src/utils/password.js";
+import { ServiceContainer } from "../src/core/container.js";
+
 
 const TEST_ENCRYPTION_KEY =
   "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";

@@ -9,6 +9,8 @@ import { ProviderSemaphoreManager } from "../src/proxy/orchestration/semaphore.j
 import { RequestTracker } from "../src/monitor/request-tracker.js";
 import { createMockBackend } from "./helpers/mock-backend.js";
 import { TEST_ENCRYPTION_KEY } from "./helpers/test-setup.js";
+import { ServiceContainer } from "../src/core/container.js";
+
 
 function insertProvider(
   db: Database.Database,
@@ -51,13 +53,13 @@ function buildTestApp(db: Database.Database): FastifyInstance {
   const app = Fastify();
   const semaphoreManager = new ProviderSemaphoreManager();
   const tracker = new RequestTracker({ semaphoreManager });
-  app.register(openaiProxy, {
-    db,
-    streamTimeoutMs: 5000,
-    retryBaseDelayMs: 0,
-    semaphoreManager,
-    tracker,
-  });
+  const container = new ServiceContainer();
+  container.register("semaphoreManager", () => semaphoreManager);
+  container.register("tracker", () => tracker);
+  container.register("matcher", () => undefined);
+  container.register("usageWindowTracker", () => undefined);
+  container.register("sessionTracker", () => undefined);
+  app.register(openaiProxy, { db: db, container });
   return app;
 }
 

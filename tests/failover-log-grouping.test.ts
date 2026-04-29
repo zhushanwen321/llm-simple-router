@@ -11,6 +11,8 @@ import { setSetting } from "../src/db/settings.js";
 import { RetryRuleMatcher } from "../src/proxy/orchestration/retry-rules.js";
 import { ProviderSemaphoreManager } from "../src/proxy/orchestration/semaphore.js";
 import { RequestTracker } from "../src/monitor/request-tracker.js";
+import { ServiceContainer } from "../src/core/container.js";
+
 
 const API_KEY = "sk-test-router";
 const API_KEY_HASH = createHash("sha256").update(API_KEY).digest("hex");
@@ -150,15 +152,15 @@ describe("Failover log grouping", () => {
       `http://127.0.0.1:${fallbackPort}`
     );
 
+    const container = new ServiceContainer();
+    container.register("semaphoreManager", () => new ProviderSemaphoreManager());
+    container.register("tracker", (c) => new RequestTracker({ semaphoreManager: c.resolve("semaphoreManager") }));
+    container.register("matcher", () => undefined);
+    container.register("usageWindowTracker", () => undefined);
+    container.register("sessionTracker", () => undefined);
     app = Fastify();
     app.register(authMiddleware, { db });
-    app.register(openaiProxy, {
-      db,
-      streamTimeoutMs: 5000,
-      retryBaseDelayMs: 0,
-      semaphoreManager: new ProviderSemaphoreManager(),
-      tracker: new RequestTracker({ semaphoreManager: new ProviderSemaphoreManager() }),
-    });
+    app.register(openaiProxy, { db: db, container });
 
     const resp = await app.inject({
       method: "POST",
@@ -245,15 +247,15 @@ describe("Failover log grouping", () => {
       `http://127.0.0.1:${fallbackPort}`
     );
 
+    const container = new ServiceContainer();
+    container.register("semaphoreManager", () => new ProviderSemaphoreManager());
+    container.register("tracker", (c) => new RequestTracker({ semaphoreManager: c.resolve("semaphoreManager") }));
+    container.register("matcher", () => undefined);
+    container.register("usageWindowTracker", () => undefined);
+    container.register("sessionTracker", () => undefined);
     app = Fastify();
     app.register(authMiddleware, { db });
-    app.register(openaiProxy, {
-      db,
-      streamTimeoutMs: 5000,
-      retryBaseDelayMs: 0,
-      semaphoreManager: new ProviderSemaphoreManager(),
-      tracker: new RequestTracker({ semaphoreManager: new ProviderSemaphoreManager() }),
-    });
+    app.register(openaiProxy, { db: db, container });
 
     const resp = await app.inject({
       method: "POST",
@@ -324,15 +326,15 @@ describe("Failover log grouping", () => {
       `http://127.0.0.1:${fallbackPort}`
     );
 
+    const container = new ServiceContainer();
+    container.register("semaphoreManager", () => new ProviderSemaphoreManager());
+    container.register("tracker", (c) => new RequestTracker({ semaphoreManager: c.resolve("semaphoreManager") }));
+    container.register("matcher", () => undefined);
+    container.register("usageWindowTracker", () => undefined);
+    container.register("sessionTracker", () => undefined);
     app = Fastify();
     app.register(authMiddleware, { db });
-    app.register(openaiProxy, {
-      db,
-      streamTimeoutMs: 5000,
-      retryBaseDelayMs: 0,
-      semaphoreManager: new ProviderSemaphoreManager(),
-      tracker: new RequestTracker({ semaphoreManager: new ProviderSemaphoreManager() }),
-    });
+    app.register(openaiProxy, { db: db, container });
 
     const resp = await app.inject({
       method: "POST",
@@ -410,18 +412,16 @@ describe("Failover log grouping", () => {
     ).run("rr-429", "429 rule", 429, ".*", 1, new Date().toISOString(), "exponential", 10, 1, 60000);
 
     const matcher = new RetryRuleMatcher();
+    const container = new ServiceContainer();
+    container.register("matcher", () => matcher);
+    container.register("tracker", (c) => new RequestTracker({ semaphoreManager: c.resolve("semaphoreManager") }));
+    container.register("usageWindowTracker", () => undefined);
+    container.register("sessionTracker", () => undefined);
+    container.register("semaphoreManager", () => new ProviderSemaphoreManager());
     matcher.load(db);
-
     app = Fastify();
     app.register(authMiddleware, { db });
-    app.register(openaiProxy, {
-      db,
-      streamTimeoutMs: 5000,
-      retryBaseDelayMs: 10,
-      matcher,
-      semaphoreManager: new ProviderSemaphoreManager(),
-      tracker: new RequestTracker({ semaphoreManager: new ProviderSemaphoreManager() }),
-    });
+    app.register(openaiProxy, { db: db, container });
 
     const resp = await app.inject({
       method: "POST",

@@ -8,6 +8,8 @@ import { initDatabase } from "../src/db/index.js";
 import { setSetting } from "../src/db/settings.js";
 import { ProviderSemaphoreManager } from "../src/proxy/orchestration/semaphore.js";
 import { RequestTracker } from "../src/monitor/request-tracker.js";
+import { ServiceContainer } from "../src/core/container.js";
+
 
 const TEST_ENCRYPTION_KEY =
   "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
@@ -38,14 +40,14 @@ function buildTestApp(mockDb: Database.Database): FastifyInstance {
   const app = Fastify();
   const semaphoreManager = new ProviderSemaphoreManager();
   const tracker = new RequestTracker({ semaphoreManager });
+  const container = new ServiceContainer();
+  container.register("semaphoreManager", () => semaphoreManager);
+  container.register("tracker", () => tracker);
+  container.register("matcher", () => undefined);
+  container.register("usageWindowTracker", () => undefined);
+  container.register("sessionTracker", () => undefined);
 
-  app.register(anthropicProxy, {
-    db: mockDb,
-    streamTimeoutMs: 5000,
-    retryBaseDelayMs: 0,
-    semaphoreManager,
-    tracker,
-  });
+  app.register(anthropicProxy, { db: mockDb, container });
 
   return app;
 }

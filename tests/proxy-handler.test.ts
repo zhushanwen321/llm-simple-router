@@ -38,6 +38,8 @@ import { resolveMapping } from "../src/proxy/routing/mapping-resolver.js";
 import { applyEnhancement } from "../src/proxy/enhancement/enhancement-handler.js";
 import { logResilienceResult, collectTransportMetrics, handleIntercept } from "../src/proxy/proxy-logging.js";
 import { insertRejectedLog } from "../src/proxy/log-helpers.js";
+import { ServiceContainer } from "../src/core/container.js";
+
 
 const errors: ProxyErrorFormatter = {
   modelNotFound: (m) => ({ statusCode: 404, body: { error: { message: `Model '${m}' not found` } } }),
@@ -68,11 +70,16 @@ function createReply() {
 }
 
 function createDeps(overrides = {}) {
+  const container = new ServiceContainer();
+  container.register("matcher", () => undefined);
+  container.register("tracker", () => undefined);
+  container.register("usageWindowTracker", () => ({ recordRequest: vi.fn() }));
+  container.register("sessionTracker", () => undefined);
+  container.register("semaphoreManager", () => undefined);
   return {
     db: {} as any,
-    streamTimeoutMs: 30000, retryBaseDelayMs: 1000,
-    matcher: undefined, tracker: undefined,
     orchestrator: { handle: vi.fn() } as any,
+    container,
     ...overrides,
   };
 }

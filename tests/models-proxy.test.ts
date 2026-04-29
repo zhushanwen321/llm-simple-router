@@ -6,6 +6,8 @@ import { openaiProxy } from "../src/proxy/handler/openai.js";
 import { encrypt } from "../src/utils/crypto.js";
 import { initDatabase } from "../src/db/index.js";
 import { setSetting } from "../src/db/settings.js";
+import { ServiceContainer } from "../src/core/container.js";
+
 
 const TEST_ENCRYPTION_KEY =
   "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
@@ -109,11 +111,13 @@ describe("GET /v1/models proxy", () => {
     insertProvider(db, port);
 
     app = Fastify();
-    app.register(openaiProxy, {
-      db,
-      streamTimeoutMs: 5000,
-      retryBaseDelayMs: 0,
-    });
+    const container = new ServiceContainer();
+    container.register("semaphoreManager", () => undefined);
+    container.register("tracker", () => undefined);
+    container.register("matcher", () => undefined);
+    container.register("usageWindowTracker", () => undefined);
+    container.register("sessionTracker", () => undefined);
+    app.register(openaiProxy, { db: db, container });
 
     const response = await app.inject({
       method: "GET",
@@ -132,11 +136,13 @@ describe("GET /v1/models proxy", () => {
 
   it("should return 404 when no active openai backend exists", async () => {
     app = Fastify();
-    app.register(openaiProxy, {
-      db,
-      streamTimeoutMs: 5000,
-      retryBaseDelayMs: 0,
-    });
+    const container = new ServiceContainer();
+    container.register("semaphoreManager", () => undefined);
+    container.register("tracker", () => undefined);
+    container.register("matcher", () => undefined);
+    container.register("usageWindowTracker", () => undefined);
+    container.register("sessionTracker", () => undefined);
+    app.register(openaiProxy, { db: db, container });
 
     const response = await app.inject({
       method: "GET",
@@ -153,11 +159,13 @@ describe("GET /v1/models proxy", () => {
     insertProvider(db, 1);
 
     app = Fastify();
-    app.register(openaiProxy, {
-      db,
-      streamTimeoutMs: 5000,
-      retryBaseDelayMs: 0,
-    });
+    const container = new ServiceContainer();
+    container.register("semaphoreManager", () => undefined);
+    container.register("tracker", () => undefined);
+    container.register("matcher", () => undefined);
+    container.register("usageWindowTracker", () => undefined);
+    container.register("sessionTracker", () => undefined);
+    app.register(openaiProxy, { db: db, container });
 
     const response = await app.inject({
       method: "GET",
@@ -173,11 +181,13 @@ describe("GET /v1/models proxy", () => {
     insertProvider(db, 9999, { is_active: 0 });
 
     app = Fastify();
-    app.register(openaiProxy, {
-      db,
-      streamTimeoutMs: 5000,
-      retryBaseDelayMs: 0,
-    });
+    const container = new ServiceContainer();
+    container.register("semaphoreManager", () => undefined);
+    container.register("tracker", () => undefined);
+    container.register("matcher", () => undefined);
+    container.register("usageWindowTracker", () => undefined);
+    container.register("sessionTracker", () => undefined);
+    app.register(openaiProxy, { db: db, container });
 
     const response = await app.inject({
       method: "GET",
