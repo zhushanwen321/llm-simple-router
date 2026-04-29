@@ -6,6 +6,5 @@
   { "name": "ZAI 操作失败 (code 500)", "status_code": 400, "body_pattern": "\"type\"\\s*:\\s*\"error\".*\"code\"\\s*:\\s*\"500\"", "retry_strategy": "exponential", "retry_delay_ms": 5000, "max_retries": 10, "max_delay_ms": 60000 },
   { "name": "ZAI 速率限制 (HTTP 200, code 1302)", "status_code": 200, "body_pattern": "\"error\".*\"code\"\\s*:\\s*\"1302\"", "retry_strategy": "exponential", "retry_delay_ms": 5000, "max_retries": 10, "max_delay_ms": 60000 },
   { "name": "ZAI SSE 错误 (HTTP 200, code 500)", "status_code": 200, "body_pattern": "\"error\".*\"code\"\\s*:\\s*\"500\"", "retry_strategy": "exponential", "retry_delay_ms": 5000, "max_retries": 10, "max_delay_ms": 60000 },
-  { "name": "ZAI SSE 错误 (HTTP 200, code 1234)", "status_code": 200, "body_pattern": "\"error\".*\"code\"\\s*:\\s*\"1234\"", "retry_strategy": "exponential", "retry_delay_ms": 5000, "max_retries": 10, "max_delay_ms": 60000 },
-  { "name": "ZAI 过载限流 (HTTP 200, code 1305)", "status_code": 200, "body_pattern": "\"error\".*\"code\"\\s*:\\s*\"1305\"", "retry_strategy": "exponential", "retry_delay_ms": 5000, "max_retries": 10, "max_delay_ms": 60000 }
+  { "name": "ZAI SSE 错误 (HTTP 200, code 1234)", "status_code": 200, "body_pattern": "\"error\".*\"code\"\\s*:\\s*\"1234\"", "retry_strategy": "exponential", "retry_delay_ms": 5000, "max_retries": 10, "max_delay_ms": 60000 }
 ]

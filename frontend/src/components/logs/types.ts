@@ -30,5 +30,4 @@ export interface LogEntry {
   stream_text_content: string | null
   session_id: string | null
   input_tokens_estimated: number | null
-  pipeline_snapshot: string | null
 }

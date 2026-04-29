@@ -88,33 +88,6 @@
                 <RequestDiffViewer :overview="overview" />
               </div>
             </Tabs>
-
-            <!-- Pipeline Snapshot -->
-            <div
-              v-if="overview.pipelineSnapshot"
-              class="mt-3 border-t pt-3 flex-shrink-0"
-            >
-              <div class="text-sm font-medium text-foreground mb-2">
-                处理管线
-              </div>
-              <div class="space-y-1">
-                <div
-                  v-for="(stage, i) in parsePipelineSnapshot(overview.pipelineSnapshot)"
-                  :key="i"
-                  class="flex items-start gap-2 text-sm"
-                >
-                  <Badge
-                    :variant="stageBadgeVariant(stage.stage)"
-                    class="shrink-0 text-xs"
-                  >
-                    {{ stageLabel(stage.stage) }}
-                  </Badge>
-                  <span class="text-muted-foreground">{{
-                    stageDescription(stage)
-                  }}</span>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </template>
@@ -142,7 +115,6 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { CheckIcon, CopyIcon } from "lucide-vue-next";
 import { useClipboard } from "@/composables/useClipboard";
 import RequestOverviewPanel from "./RequestOverviewPanel.vue";
@@ -204,73 +176,6 @@ const progressStatus = computed(() => {
   if (!overview.value) return "pending";
   return overview.value.status;
 });
-
-// --- Pipeline Snapshot helpers ---
-
-interface PipelineStage {
-  stage: string;
-  [key: string]: unknown;
-}
-
-const STAGE_LABELS: Record<string, string> = {
-  enhancement: "增强处理",
-  tool_guard: "循环防护",
-  routing: "路由",
-  overflow: "溢出转移",
-  provider_patch: "供应商补丁",
-  response_transform: "响应变换",
-};
-
-const STAGE_VARIANTS: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
-  enhancement: "secondary",
-  tool_guard: "destructive",
-  routing: "default",
-  overflow: "outline",
-  provider_patch: "secondary",
-  response_transform: "secondary",
-};
-
-function parsePipelineSnapshot(json: string): PipelineStage[] {
-  try {
-    const arr = JSON.parse(json);
-    return Array.isArray(arr) ? arr : [];
-  } catch {
-    return [];
-  }
-}
-
-function stageLabel(stage: string): string {
-  return STAGE_LABELS[stage] ?? stage;
-}
-
-function stageBadgeVariant(stage: string): "default" | "secondary" | "outline" | "destructive" {
-  return STAGE_VARIANTS[stage] ?? "outline";
-}
-
-function stageDescription(s: PipelineStage): string {
-  switch (s.stage) {
-    case "enhancement": {
-      const parts: string[] = [];
-      if (s.router_tags_stripped) parts.push(`剥离 ${s.router_tags_stripped} 个路由标签`);
-      if (s.directive) parts.push(`指令: ${(s.directive as { type: string }).type} → ${(s.directive as { value: string }).value}`);
-      return parts.join("，") || "无变更";
-    }
-    case "tool_guard":
-      return `${s.action} (${s.tool})`;
-    case "routing":
-      return `${s.client_model} → ${s.backend_model} (${s.provider_id}, ${s.strategy})`;
-    case "overflow":
-      return s.triggered
-        ? `已转移至 ${s.redirect_to ?? "未知"}${s.redirect_provider ? ` (${s.redirect_provider})` : ""}`
-        : "未触发";
-    case "provider_patch":
-      return `应用 ${(s.types as string[])?.length ?? 0} 个补丁`;
-    case "response_transform":
-      return s.model_info_tag_injected ? "已注入模型信息标签" : "无变换";
-    default:
-      return JSON.stringify(s);
-  }
-}
 
 watch([() => props.open, () => props.logEntry], ([isOpen, logEntry]) => {
   if (!isOpen) return;
