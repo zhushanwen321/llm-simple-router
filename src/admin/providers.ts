@@ -6,6 +6,7 @@ import { getAllProviders, getProviderById, createProvider, updateProvider, delet
 import { encrypt, decrypt } from "../utils/crypto.js";
 import { getSetting } from "../db/settings.js";
 import { ProviderSemaphoreManager } from "../proxy/semaphore.js";
+import type { AdaptiveConcurrencyController } from "../proxy/adaptive-controller.js";
 import type { RequestTracker } from "../monitor/request-tracker.js";
 import { HTTP_CREATED, HTTP_NOT_FOUND, HTTP_CONFLICT, HTTP_BAD_REQUEST } from "./constants.js";
 import { API_CODE, apiError } from "./api-response.js";
@@ -105,6 +106,7 @@ const CreateProviderSchema = Type.Object({
   max_concurrency: Type.Optional(Type.Integer({ minimum: 0 })),
   queue_timeout_ms: Type.Optional(Type.Integer({ minimum: 0 })),
   max_queue_size: Type.Optional(Type.Integer({ minimum: 1 })),
+  adaptive_enabled: Type.Optional(Type.Integer({ minimum: 0, maximum: 1 })),
 });
 
 const UpdateProviderSchema = Type.Object({
@@ -120,16 +122,18 @@ const UpdateProviderSchema = Type.Object({
   max_concurrency: Type.Optional(Type.Integer({ minimum: 0 })),
   queue_timeout_ms: Type.Optional(Type.Integer({ minimum: 0 })),
   max_queue_size: Type.Optional(Type.Integer({ minimum: 1 })),
+  adaptive_enabled: Type.Optional(Type.Integer({ minimum: 0, maximum: 1 })),
 });
 
 interface ProviderRoutesOptions {
   db: Database.Database;
   semaphoreManager?: ProviderSemaphoreManager;
   tracker?: RequestTracker;
+  adaptiveController?: AdaptiveConcurrencyController;
 }
 
 export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> = (app, options, done) => {
-  const { db, semaphoreManager, tracker } = options;
+  const { db, semaphoreManager, tracker, adaptiveController } = options;
 
   app.get("/admin/api/providers", async (_request, reply) => {
     const encryptionKey = getSetting(db, "encryption_key")!;
@@ -150,6 +154,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
         max_concurrency: s.max_concurrency,
         queue_timeout_ms: s.queue_timeout_ms,
         max_queue_size: s.max_queue_size,
+        adaptive_enabled: s.adaptive_enabled,
         concurrency_status: semaphoreManager?.getStatus(s.id) ?? { active: 0, queued: 0 },
         created_at: s.created_at,
         updated_at: s.updated_at,
@@ -168,6 +173,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     }
     const encryptedKey = encrypt(body.api_key, getSetting(db, "encryption_key")!);
     const { names: normalizedModels, overrides: contextOverrides } = extractModelOverrides((body.models ?? []) as ModelInput[]);
+    const isAdaptiveEnabled = body.adaptive_enabled ?? 0;
     const id = createProvider(db, {
       name: body.name,
       api_type: body.api_type,
@@ -179,6 +185,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
       max_concurrency: body.max_concurrency ?? PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency,
       queue_timeout_ms: body.queue_timeout_ms ?? PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms,
       max_queue_size: body.max_queue_size ?? PROVIDER_CONCURRENCY_DEFAULTS.max_queue_size,
+      adaptive_enabled: isAdaptiveEnabled,
     });
     if (contextOverrides.length > 0) {
       setModelInfoForProvider(db, id, contextOverrides.map(o => ({ model_name: o.name, context_window: o.context_window })));
@@ -187,6 +194,12 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
       maxConcurrency: body.max_concurrency ?? PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency,
       queueTimeoutMs: body.queue_timeout_ms ?? PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms,
       maxQueueSize: body.max_queue_size ?? PROVIDER_CONCURRENCY_DEFAULTS.max_queue_size,
+    });
+    adaptiveController?.syncProvider(id, {
+      adaptive_enabled: isAdaptiveEnabled,
+      max_concurrency: body.max_concurrency ?? PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency,
+      queue_timeout_ms: body.queue_timeout_ms ?? PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms,
+      max_queue_size: body.max_queue_size ?? PROVIDER_CONCURRENCY_DEFAULTS.max_queue_size,
     });
     tracker?.updateProviderConfig(id, {
       name: body.name,
@@ -207,7 +220,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     if (body.name !== undefined && !PROVIDER_NAME_RE.test(body.name)) {
       return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.VALIDATION_FAILED, "Provider 名称仅允许英文大小写字母、数字、横线和下划线"));
     }
-    const fields: Partial<Pick<Provider, 'name' | 'api_type' | 'base_url' | 'api_key' | 'api_key_preview' | 'models' | 'is_active' | 'max_concurrency' | 'queue_timeout_ms' | 'max_queue_size'>> = {};
+    const fields: Partial<Pick<Provider, 'name' | 'api_type' | 'base_url' | 'api_key' | 'api_key_preview' | 'models' | 'is_active' | 'max_concurrency' | 'queue_timeout_ms' | 'max_queue_size' | 'adaptive_enabled'>> = {};
     if (body.name !== undefined) fields.name = body.name;
     if (body.api_type !== undefined) fields.api_type = body.api_type;
     if (body.base_url !== undefined) fields.base_url = body.base_url;
@@ -224,6 +237,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     if (body.max_concurrency !== undefined) fields.max_concurrency = body.max_concurrency;
     if (body.queue_timeout_ms !== undefined) fields.queue_timeout_ms = body.queue_timeout_ms;
     if (body.max_queue_size !== undefined) fields.max_queue_size = body.max_queue_size;
+    if (body.adaptive_enabled !== undefined) fields.adaptive_enabled = body.adaptive_enabled;
     if (body.api_key) {
       fields.api_key = encrypt(body.api_key, getSetting(db, "encryption_key")!);
       fields.api_key_preview = body.api_key.length > API_KEY_PREVIEW_MIN_LENGTH ? `${body.api_key.slice(0, API_KEY_PREVIEW_PREFIX_LEN)}...${body.api_key.slice(-API_KEY_PREVIEW_PREFIX_LEN)}` : "****";
@@ -241,6 +255,14 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
         maxConcurrency: updated.max_concurrency,
         queueTimeoutMs: updated.queue_timeout_ms,
         maxQueueSize: updated.max_queue_size,
+      });
+    }
+    if (body.adaptive_enabled !== undefined || body.max_concurrency !== undefined || body.queue_timeout_ms !== undefined || body.max_queue_size !== undefined) {
+      adaptiveController?.syncProvider(id, {
+        adaptive_enabled: updated.adaptive_enabled,
+        max_concurrency: updated.max_concurrency,
+        queue_timeout_ms: updated.queue_timeout_ms,
+        max_queue_size: updated.max_queue_size,
       });
     }
     tracker?.updateProviderConfig(id, {
@@ -305,8 +327,16 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     }
     deleteProvider(db, id);
     semaphoreManager?.remove(id);
+    adaptiveController?.remove(id);
     tracker?.removeProviderConfig(id);
     return reply.send({ success: true });
+  });
+
+  app.get("/admin/api/providers/:id/adaptive-status", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const status = adaptiveController?.getStatus(id);
+    if (!status) return reply.code(HTTP_NOT_FOUND).send({ error: "Not found or adaptive not enabled" });
+    return status;
   });
 
   done();

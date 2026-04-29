@@ -22,6 +22,7 @@ import { anthropicProxy } from "./proxy/anthropic.js";
 import { adminRoutes } from "./admin/routes.js";
 import { RetryRuleMatcher } from "./proxy/retry-rules.js";
 import { ProviderSemaphoreManager } from "./proxy/semaphore.js";
+import { AdaptiveConcurrencyController } from "./proxy/adaptive-controller.js";
 import { RequestTracker } from "./monitor/request-tracker.js";
 import { modelState } from "./proxy/model-state.js";
 import { UsageWindowTracker } from "./proxy/usage-window-tracker.js";
@@ -187,6 +188,9 @@ export async function buildApp(
   const tracker = new RequestTracker({ semaphoreManager, logger: app.log });
   tracker.startPushInterval();
 
+  const adaptiveController = new AdaptiveConcurrencyController(semaphoreManager, app.log);
+  tracker.setAdaptiveController(adaptiveController);
+
   // 5h 用量窗口追踪器，启动时自动补齐缺失窗口
   const usageWindowTracker = new UsageWindowTracker(db);
   usageWindowTracker.reconcileOnStartup();
@@ -197,7 +201,12 @@ export async function buildApp(
   // 从 DB 读取已有 provider 的并发配置，初始化信号量管理器和 tracker
   const allProviders = getAllProviders(db);
   for (const p of allProviders) {
-    if (p.max_concurrency > 0) {
+    if (p.adaptive_enabled) {
+      adaptiveController.init(p.id, { max: p.max_concurrency }, {
+        queueTimeoutMs: p.queue_timeout_ms,
+        maxQueueSize: p.max_queue_size,
+      });
+    } else if (p.max_concurrency > 0) {
       semaphoreManager.updateConfig(p.id, {
         maxConcurrency: p.max_concurrency,
         queueTimeoutMs: p.queue_timeout_ms,
@@ -222,6 +231,7 @@ export async function buildApp(
     tracker,
     usageWindowTracker,
     sessionTracker,
+    adaptiveController,
   });
   app.register(anthropicProxy, {
     db,
@@ -232,9 +242,10 @@ export async function buildApp(
     tracker,
     usageWindowTracker,
     sessionTracker,
+    adaptiveController,
   });
 
-  app.register(adminRoutes, { db, matcher, tracker, semaphoreManager });
+  app.register(adminRoutes, { db, matcher, tracker, semaphoreManager, adaptiveController });
 
   // 前端静态文件服务（生产环境）
   const frontendDist = path.resolve(

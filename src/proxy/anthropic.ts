@@ -11,6 +11,7 @@ import { RetryRuleMatcher } from "./retry-rules.js";
 import { ProviderSemaphoreManager } from "./semaphore.js";
 import type { RequestTracker } from "../monitor/request-tracker.js";
 import type { UsageWindowTracker } from "./usage-window-tracker.js";
+import type { AdaptiveConcurrencyController } from "./adaptive-controller.js";
 import { HTTP_BAD_GATEWAY } from "../constants.js";
 
 export interface AnthropicProxyOptions {
@@ -22,6 +23,7 @@ export interface AnthropicProxyOptions {
   tracker?: RequestTracker;
   usageWindowTracker?: UsageWindowTracker;
   sessionTracker?: import("./loop-prevention/session-tracker.js").SessionTracker;
+  adaptiveController?: AdaptiveConcurrencyController;
 }
 
 const MESSAGES_PATH = "/v1/messages";
@@ -42,9 +44,9 @@ const anthropicErrors = createErrorFormatter(
 );
 
 const anthropicProxyRaw: FastifyPluginCallback<AnthropicProxyOptions> = (app, opts, done) => {
-  const { db, streamTimeoutMs, retryBaseDelayMs, matcher, semaphoreManager, tracker, usageWindowTracker, sessionTracker } = opts;
+  const { db, streamTimeoutMs, retryBaseDelayMs, matcher, semaphoreManager, tracker, usageWindowTracker, sessionTracker, adaptiveController } = opts;
 
-  const orchestrator = createOrchestrator(semaphoreManager, tracker);
+  const orchestrator = createOrchestrator(semaphoreManager, tracker, adaptiveController);
 
   app.post(MESSAGES_PATH, async (request, reply) => {
     if (!orchestrator) {
