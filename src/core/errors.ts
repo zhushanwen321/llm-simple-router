@@ -1,8 +1,11 @@
 // src/core/errors.ts
-// 被多目录共享的错误类型
+// 被多目录共享的错误类型（从 proxy/semaphore.ts 和 proxy/types.ts 移出）
 
 import type { TransportResult } from "./types.js";
 
+/**
+ * Provider 并发队列已满时抛出。
+ */
 export class SemaphoreQueueFullError extends Error {
   constructor(public readonly providerId: string) {
     super(`Provider '${providerId}' concurrency queue is full`);
@@ -10,6 +13,9 @@ export class SemaphoreQueueFullError extends Error {
   }
 }
 
+/**
+ * Provider 并发等待超时时抛出。
+ */
 export class SemaphoreTimeoutError extends Error {
   constructor(
     public readonly providerId: string,
@@ -22,6 +28,10 @@ export class SemaphoreTimeoutError extends Error {
   }
 }
 
+/**
+ * 跨 provider failover 时由 ResilienceLayer 抛出，
+ * orchestrator 捕获后释放当前信号量并获取新 provider 的信号量。
+ */
 export class ProviderSwitchNeeded extends Error {
   constructor(
     public readonly targetProviderId: string,

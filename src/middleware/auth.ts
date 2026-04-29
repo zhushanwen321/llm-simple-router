@@ -4,7 +4,7 @@ import fp from "fastify-plugin";
 import Database from "better-sqlite3";
 import { isInitialized } from "../db/settings.js";
 import { insertRequestLog } from "../db/logs.js";
-import { getProxyApiType } from "../constants.js";
+import { getProxyApiType } from "../core/constants.js";
 
 declare module "fastify" {
   interface FastifyRequest {

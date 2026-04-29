@@ -5,7 +5,7 @@ import { existsSync } from "node:fs";
 import { randomUUID } from "crypto";
 import Fastify, { FastifyInstance } from "fastify";
 import { insertRequestLog } from "./db/logs.js";
-import { HTTP_NOT_FOUND, HTTP_INTERNAL_ERROR, getProxyApiType } from "./constants.js";
+import { HTTP_NOT_FOUND, HTTP_INTERNAL_ERROR, getProxyApiType } from "./core/constants.js";
 import { API_CODE, ApiResponse, apiError, isAdminApiResponse, statusToApiCode } from "./admin/api-response.js";
 
 const PROVIDER_DEFAULT_QUEUE_TIMEOUT_MS = 5000;

@@ -12,7 +12,7 @@ import { ProviderSemaphoreManager } from "./semaphore.js";
 import type { RequestTracker } from "../monitor/request-tracker.js";
 import type { UsageWindowTracker } from "./usage-window-tracker.js";
 import type { AdaptiveConcurrencyController } from "./adaptive-controller.js";
-import { HTTP_BAD_GATEWAY } from "../constants.js";
+import { HTTP_BAD_GATEWAY } from "../core/constants.js";
 
 export interface AnthropicProxyOptions {
   db: Database.Database;

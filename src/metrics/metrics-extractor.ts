@@ -1,6 +1,6 @@
 // TODO: 当文件超过 400 行时拆分为 metrics-streaming.ts（流式事件处理 + TPS 计算）和 metrics-extractor.ts（非流式 + 类型）
 
-import { MS_PER_SECOND } from "../constants.js";
+import { MS_PER_SECOND } from "../core/constants.js";
 import { encode } from "gpt-tokenizer";
 import type { SSEEvent } from "./sse-parser.js";
 

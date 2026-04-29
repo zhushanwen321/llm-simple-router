@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import Database from "better-sqlite3";
-import { HTTP_UNPROCESSABLE_ENTITY } from "../constants.js";
+import { HTTP_UNPROCESSABLE_ENTITY } from "../core/constants.js";
 import { getProviderById, insertRequestLog } from "../db/index.js";
 import { decrypt } from "../utils/crypto.js";
 import { getSetting } from "../db/settings.js";

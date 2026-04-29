@@ -1,3 +1,6 @@
+// src/core/types.ts
+// 被多个目录（proxy, db, monitor, admin）共享的类型定义
+
 import type { MetricsResult } from "../metrics/metrics-extractor.js";
 
 // ========== 来自原 proxy/strategy/types.ts ==========
