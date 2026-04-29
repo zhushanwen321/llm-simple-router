@@ -26,8 +26,16 @@ interface AdaptiveEntry {
   maxQueueSize: number;
 }
 
+export interface ProviderAdaptiveConfig {
+  adaptive_enabled: number;
+  adaptive_min: number;
+  max_concurrency: number;
+  queue_timeout_ms: number;
+  max_queue_size: number;
+}
+
 export class AdaptiveConcurrencyController {
-  readonly entries = new Map<string, AdaptiveEntry>();
+  private readonly entries = new Map<string, AdaptiveEntry>();
 
   constructor(private semaphoreManager: ProviderSemaphoreManager) {}
 
@@ -66,10 +74,7 @@ export class AdaptiveConcurrencyController {
     return this.entries.get(providerId)?.state;
   }
 
-  syncProvider(providerId: string, p: {
-    adaptive_enabled: number; adaptive_min: number; max_concurrency: number;
-    queue_timeout_ms: number; max_queue_size: number;
-  }): void {
+  syncProvider(providerId: string, p: ProviderAdaptiveConfig): void {
     if (p.adaptive_enabled) {
       const existing = this.entries.get(providerId);
       if (existing) {
@@ -95,6 +100,7 @@ export class AdaptiveConcurrencyController {
     const s = entry.state;
     s.consecutiveSuccesses++;
     s.consecutiveFailures = 0;
+    // 冷却期内只累加计数，不触发调整；过期后累积的成功计数可能立即触发 probe
     if (Date.now() < s.cooldownUntil) return;
 
     if (s.consecutiveSuccesses >= SUCCESS_THRESHOLD) {
