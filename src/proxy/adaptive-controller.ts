@@ -50,10 +50,11 @@ export class AdaptiveConcurrencyController {
   ) {}
 
   init(providerId: string, config: { max: number }, semParams: { queueTimeoutMs: number; maxQueueSize: number }): void {
+    const initialLimit = config.max;
     this.entries.set(providerId, {
       state: {
-        currentLimit: ADAPTIVE_MIN,
-        probeActive: false,
+        currentLimit: initialLimit,
+        probeActive: true,
         consecutiveSuccesses: 0,
         consecutiveFailures: 0,
         cooldownUntil: 0,
@@ -131,6 +132,15 @@ export class AdaptiveConcurrencyController {
   }
 
   private transitionFailure(providerId: string, entry: AdaptiveEntry, statusCode?: number): void {
+    // 只对明确的并发相关错误做退避：
+    // - 429: 限流
+    // - 5xx: 服务端错误（可能过载）
+    // - undefined: 网络异常
+    // 2xx（如 upstream 200 body 含 error）和 4xx（客户端错误）不是并发问题，不触发退避
+    if (statusCode !== undefined && statusCode !== RATE_LIMIT_STATUS && statusCode < 500) {
+      return;
+    }
+
     const s = entry.state;
     s.consecutiveFailures++;
     s.consecutiveSuccesses = 0;
