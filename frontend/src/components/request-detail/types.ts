@@ -40,6 +40,7 @@ export interface UnifiedRequestOverview {
   errorMessage: string | null;
   createdAt: string | null;
   inputTokensEstimated: boolean;
+  pipelineSnapshot: string | null;
 }
 
 export function fromActiveRequest(
@@ -92,6 +93,7 @@ export function fromActiveRequest(
     errorMessage: null,
     createdAt: null,
     inputTokensEstimated: false,
+    pipelineSnapshot: null,
   };
 }
 
@@ -184,5 +186,6 @@ export function fromLogEntry(entry: LogEntry): UnifiedRequestOverview {
       : entry.error_message,
     createdAt: entry.created_at,
     inputTokensEstimated: entry.input_tokens_estimated === 1,
+    pipelineSnapshot: entry.pipeline_snapshot ?? null,
   };
 }
