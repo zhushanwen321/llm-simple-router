@@ -25,6 +25,9 @@ import { ProviderSemaphoreManager } from "./proxy/semaphore.js";
 import { RequestTracker } from "./monitor/request-tracker.js";
 import { modelState } from "./proxy/model-state.js";
 import { UsageWindowTracker } from "./proxy/usage-window-tracker.js";
+import { SessionTracker } from "./proxy/loop-prevention/session-tracker.js";
+import { DEFAULT_LOOP_PREVENTION_CONFIG } from "./proxy/loop-prevention/types.js";
+import { setLoopPreventionConfig } from "./proxy/transport-fn.js";
 import { scheduleLogCleanup } from "./db/log-cleaner.js";
 import { scheduleDbSizeMonitor } from "./db/db-size-monitor.js";
 import { startUpgradeChecker, stopUpgradeChecker } from "./admin/upgrade.js";
@@ -189,6 +192,15 @@ export async function buildApp(
   const usageWindowTracker = new UsageWindowTracker(db);
   usageWindowTracker.reconcileOnStartup();
 
+  const loopConfig = config.LOOP_PREVENTION ?? DEFAULT_LOOP_PREVENTION_CONFIG;
+  const sessionTracker = new SessionTracker(loopConfig.sessionTracker);
+  // buildApp() 默认启用循环预防。
+  // 用户可通过环境变量 LOOP_PREVENTION='{"enabled":false}' 关闭。
+  // 直接注册插件的测试不使用 buildApp()，不受此影响。
+  setLoopPreventionConfig(process.env.LOOP_PREVENTION
+    ? loopConfig
+    : { ...loopConfig, enabled: true });
+
   // 从 DB 读取已有 provider 的并发配置，初始化信号量管理器和 tracker
   const allProviders = getAllProviders(db);
   for (const p of allProviders) {
@@ -216,6 +228,7 @@ export async function buildApp(
     semaphoreManager,
     tracker,
     usageWindowTracker,
+    sessionTracker,
   });
   app.register(anthropicProxy, {
     db,
@@ -225,6 +238,7 @@ export async function buildApp(
     semaphoreManager,
     tracker,
     usageWindowTracker,
+    sessionTracker,
   });
 
   app.register(adminRoutes, { db, matcher, tracker, semaphoreManager });
@@ -276,6 +290,7 @@ export async function buildApp(
       logCleanup.stop();
       dbSizeMonitor.stop();
       tracker.stopPushInterval();
+      sessionTracker.stop();
       await app.close();
       db.close();
     },

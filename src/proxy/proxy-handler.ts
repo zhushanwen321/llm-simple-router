@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import Database from "better-sqlite3";
+import { HTTP_UNPROCESSABLE_ENTITY } from "../constants.js";
 import { getProviderById, insertRequestLog } from "../db/index.js";
 import { decrypt } from "../utils/crypto.js";
 import { getSetting } from "../db/settings.js";
@@ -23,6 +24,8 @@ import { insertRejectedLog } from "./log-helpers.js";
 import type { RetryRuleMatcher } from "./retry-rules.js";
 import type { ProxyOrchestrator } from "./orchestrator.js";
 import type { ProxyErrorFormatter, ProxyErrorResponse } from "./proxy-core.js";
+import { ToolLoopGuard } from "./loop-prevention/tool-loop-guard.js";
+import { TOOL_USE_ID_PREFIX, TOOL_USE_ID_PROVIDER_PREFIX } from "./enhancement/directive-parser.js";
 import { buildTransportFn } from "./transport-fn.js";
 import { applyOverflowRedirect } from "./overflow.js";
 import { applyProviderPatches } from "./patch/index.js";
@@ -30,6 +33,7 @@ import { applyProviderPatches } from "./patch/index.js";
 const HTTP_ERROR_THRESHOLD = 400;
 const MAX_LOG_FIELD_LENGTH = 80;
 const UPSTREAM_ERROR_STATUS = 502;
+const TIER2_LOOP_THRESHOLD = 2;
 
 /** 从 TransportResult 中提取最终 HTTP status code */
 function getTransportStatusCode(result: TransportResult): number | null {
@@ -100,6 +104,7 @@ export interface RouteHandlerDeps {
   tracker?: RequestTracker;
   orchestrator: ProxyOrchestrator;
   usageWindowTracker?: import("./usage-window-tracker.js").UsageWindowTracker;
+  sessionTracker?: import("./loop-prevention/session-tracker.js").SessionTracker;
 }
 
 import type { ContentBlock } from "../monitor/types.js";
@@ -145,6 +150,45 @@ export async function handleProxyRequest(
   const sessionId = (request.headers as RawHeaders)["x-claude-code-session-id"] as string | undefined;
   const { effectiveModel, originalModel, interceptResponse } = applyEnhancement(deps.db, request, clientModel, sessionId);
 
+  // --- 工具调用循环检测 ---
+  if (deps.sessionTracker && sessionId) {
+    const routerKeyId = (request.routerKey as { id?: string } | undefined)?.id ?? null;
+    const sessionKey = routerKeyId ? `${routerKeyId}:${sessionId}` : sessionId;
+    const lastToolUse = extractLastToolUse(request.body as Record<string, unknown>);
+    if (lastToolUse) {
+      const toolGuard = new ToolLoopGuard(deps.sessionTracker, {
+        enabled: true,
+        minConsecutiveCount: 3,
+        detectorConfig: { n: 6, windowSize: 500, repeatThreshold: 5 },
+      });
+      const checkResult = toolGuard.check(sessionKey, lastToolUse);
+      if (checkResult.detected) {
+        const loopCount = deps.sessionTracker.getLoopCount(sessionKey);
+        if (loopCount === 1) {
+          // 层级 1：透明重试 — 注入中断提示词
+          toolGuard.injectLoopBreakPrompt(request.body as Record<string, unknown>, apiType, lastToolUse.toolName);
+          request.log.warn({ sessionId, toolName: lastToolUse.toolName, loopCount },
+            "Tool call loop detected, injecting break prompt");
+        } else if (loopCount === TIER2_LOOP_THRESHOLD) {
+          // 层级 2：优雅中断
+          return reply.code(HTTP_UNPROCESSABLE_ENTITY).send({
+            error: {
+              type: "tool_call_loop_detected",
+              message: `检测到工具调用循环（连续重复调用 "${lastToolUse.toolName}"）。请求已中断。`,
+              suggestion: "请回顾对话历史，停止重复调用工具，直接告知用户当前的进展和遇到的问题。",
+            },
+          });
+        } else {
+          // 层级 3：直接断开
+          request.log.warn({ sessionId, toolName: lastToolUse.toolName, loopCount },
+            "Tool call loop detected, hard disconnecting");
+          reply.raw.destroy();
+          return reply;
+        }
+      }
+    }
+  }
+
   if (interceptResponse) return handleIntercept(deps.db, apiType, request, reply, interceptResponse, clientModel, sessionId);
 
   return executeFailoverLoop({
@@ -167,7 +211,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
     if (rootLogId === null) rootLogId = logId;
     const isFailoverIteration = rootLogId !== logId;
     const routerKeyId = request.routerKey?.id ?? null;
-    const body = request.body as Record<string, unknown>;
+    let body = request.body as Record<string, unknown>;
     const isStream = body.stream === true;
     const cliHdrs: RawHeaders = request.headers as RawHeaders;
 
@@ -229,7 +273,8 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
       }
     }
 
-    applyProviderPatches(body, provider);
+    const patchResult = applyProviderPatches(body, provider);
+    body = patchResult.body;
     const apiKey = decrypt(provider.api_key, getSetting(deps.db, "encryption_key")!);
     options?.beforeSendProxy?.(body, isStream);
 
@@ -346,4 +391,47 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
       return reply.code(err.statusCode).send(err.body);
     }
   }
+}
+
+function extractLastToolUse(body: Record<string, unknown>): import("./loop-prevention/types.js").ToolCallRecord | null {
+  const messages = body.messages as Array<Record<string, unknown>> | undefined;
+  if (!messages) return null;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    if (msg.role === "assistant") {
+      const content = msg.content;
+      if (Array.isArray(content)) {
+        // 从后往前遍历，找到第一个非 router 合成的 tool_use
+        for (let j = content.length - 1; j >= 0; j--) {
+          const block = content[j] as Record<string, unknown>;
+          if (block.type !== "tool_use") continue;
+          // 跳过 router 生成的 synthetic tool_use（如 AskUserQuestion 的模型选择）
+          const id = block.id as string | undefined;
+          if (id && (id.startsWith(TOOL_USE_ID_PREFIX) || id.startsWith(TOOL_USE_ID_PROVIDER_PREFIX))) {
+            continue;
+          }
+          const inputStr = JSON.stringify(block.input ?? {});
+          return {
+            toolName: block.name as string,
+            toolUseId: typeof block.id === "string" ? block.id : undefined,
+            inputHash: simpleHash(inputStr),
+            inputText: inputStr,
+            timestamp: Date.now(),
+          };
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function simpleHash(s: string): string {
+  const HASH_SHIFT = 5;
+  let hash = 0;
+  for (let i = 0; i < s.length; i++) {
+    const char = s.charCodeAt(i);
+    hash = ((hash << HASH_SHIFT) - hash) + char;
+    hash |= 0;
+  }
+  return String(hash);
 }

@@ -24,6 +24,7 @@ export interface OpenaiProxyOptions {
   semaphoreManager?: ProviderSemaphoreManager;
   tracker?: RequestTracker;
   usageWindowTracker?: UsageWindowTracker;
+  sessionTracker?: import("./loop-prevention/session-tracker.js").SessionTracker;
 }
 
 const CHAT_COMPLETIONS_PATH = "/v1/chat/completions";
@@ -49,7 +50,7 @@ function sendError(reply: FastifyReply, e: ProxyErrorResponse) {
 }
 
 const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, done) => {
-  const { db, streamTimeoutMs, retryBaseDelayMs, matcher, semaphoreManager, tracker, usageWindowTracker } = opts;
+  const { db, streamTimeoutMs, retryBaseDelayMs, matcher, semaphoreManager, tracker, usageWindowTracker, sessionTracker } = opts;
 
   const orchestrator = createOrchestrator(semaphoreManager, tracker);
 
@@ -66,7 +67,7 @@ const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, do
       });
       return sendError(reply, openaiErrors.providerUnavailable());
     }
-    const deps: RouteHandlerDeps = { db, streamTimeoutMs, retryBaseDelayMs, matcher, tracker, orchestrator, usageWindowTracker };
+    const deps: RouteHandlerDeps = { db, streamTimeoutMs, retryBaseDelayMs, matcher, tracker, orchestrator, usageWindowTracker, sessionTracker };
     return handleProxyRequest(request, reply, "openai", CHAT_COMPLETIONS_PATH, openaiErrors, deps, {
       beforeSendProxy: (body, isStream) => {
         if (isStream && !body.stream_options) {

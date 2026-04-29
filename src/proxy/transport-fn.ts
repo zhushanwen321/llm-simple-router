@@ -5,6 +5,10 @@ import { SSEMetricsTransform } from "../metrics/sse-metrics-transform.js";
 import { MetricsExtractor } from "../metrics/metrics-extractor.js";
 import type { MetricsResult } from "../metrics/metrics-extractor.js";
 import { buildUpstreamHeaders } from "./proxy-core.js";
+import { StreamLoopGuard } from "./loop-prevention/stream-loop-guard.js";
+import { NGramLoopDetector } from "./loop-prevention/detectors/ngram-detector.js";
+import { DEFAULT_LOOP_PREVENTION_CONFIG } from "./loop-prevention/types.js";
+import type { LoopPreventionConfig } from "./loop-prevention/types.js";
 import { UPSTREAM_SUCCESS } from "./types.js";
 import type { RawHeaders, TransportResult } from "./types.js";
 import type { Target } from "./strategy/types.js";
@@ -35,6 +39,16 @@ function toStreamMetrics(m: MetricsResult) {
   };
 }
 
+let _loopConfig: LoopPreventionConfig | undefined;
+
+export function setLoopPreventionConfig(config: LoopPreventionConfig): void {
+  _loopConfig = config;
+}
+
+function getLoopPreventionConfig(): LoopPreventionConfig {
+  return _loopConfig ?? DEFAULT_LOOP_PREVENTION_CONFIG;
+}
+
 export interface TransportFnParams {
   provider: NonNullable<ReturnType<typeof getProviderById>>;
   apiKey: string;
@@ -60,14 +74,26 @@ export function buildTransportFn(p: TransportFnParams): (target: Target) => Prom
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   return async (_target: Target) => {
     if (p.isStream) {
+      const loopPreventionConfig = getLoopPreventionConfig();
+      let streamLoopGuard: StreamLoopGuard | undefined;
+      if (loopPreventionConfig.enabled && loopPreventionConfig.stream.enabled) {
+        streamLoopGuard = new StreamLoopGuard(
+          loopPreventionConfig.stream,
+          new NGramLoopDetector(loopPreventionConfig.stream.detectorConfig),
+          (reason) => {
+            p.request.log.warn({ logId: p.logId, reason }, "Stream loop detected, aborting");
+          },
+        );
+      }
       const metricsTransform = new SSEMetricsTransform(p.apiType, p.startTime, {
         onMetrics: (m) => { p.tracker?.update(p.logId, { streamMetrics: toStreamMetrics(m) }); },
         onChunk: (rawLine) => { p.tracker?.appendStreamChunk(p.logId, rawLine, p.apiType, STREAM_CONTENT_MAX_RAW, STREAM_CONTENT_MAX_TEXT); },
+        onContentDelta: streamLoopGuard ? (text) => streamLoopGuard.feed(text) : undefined,
       });
       const checkEarlyError = p.matcher ? (data: string) => p.matcher!.test(UPSTREAM_SUCCESS, data) : undefined;
       const streamResult = await callStream(
         p.provider, p.apiKey, p.body, p.cliHdrs, p.reply, p.streamTimeoutMs,
-        p.upstreamPath, buildHeaders, metricsTransform, checkEarlyError,
+        p.upstreamPath, buildHeaders, metricsTransform, checkEarlyError, undefined, streamLoopGuard,
       );
       const m = (streamResult.kind === "stream_success" || streamResult.kind === "stream_abort")
         ? streamResult.metrics : undefined;

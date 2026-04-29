@@ -126,4 +126,64 @@ describe("SSEMetricsTransform", () => {
     transform.write(openaiChunk("c"));
     expect(onMetrics).toHaveBeenCalledTimes(2);
   });
+
+  describe("onContentDelta", () => {
+    it("fires for OpenAI text content", () => {
+      const onContentDelta = vi.fn();
+      const transform = new SSEMetricsTransform("openai", 999_000, { onContentDelta });
+      transform.write(openaiChunk("Hello world"));
+      expect(onContentDelta).toHaveBeenCalledTimes(1);
+      expect(onContentDelta).toHaveBeenCalledWith("Hello world");
+    });
+
+    it("does NOT fire for OpenAI chunks without content", () => {
+      const onContentDelta = vi.fn();
+      const transform = new SSEMetricsTransform("openai", 999_000, { onContentDelta });
+      const obj = { choices: [{ delta: { role: "assistant" } }] };
+      transform.write(`data: ${JSON.stringify(obj)}\n\n`);
+      expect(onContentDelta).not.toHaveBeenCalled();
+    });
+
+    it("fires for Anthropic text_delta content", () => {
+      const onContentDelta = vi.fn();
+      const transform = new SSEMetricsTransform("anthropic", 999_000, { onContentDelta });
+      const event = { type: "content_block_delta", delta: { type: "text_delta", text: "Hello" } };
+      transform.write(`event: content_block_delta\ndata: ${JSON.stringify(event)}\n\n`);
+      expect(onContentDelta).toHaveBeenCalledTimes(1);
+      expect(onContentDelta).toHaveBeenCalledWith("Hello");
+    });
+
+    it("fires for Anthropic thinking_delta content", () => {
+      const onContentDelta = vi.fn();
+      const transform = new SSEMetricsTransform("anthropic", 999_000, { onContentDelta });
+      const event = { type: "content_block_delta", delta: { type: "thinking_delta", thinking: "Let me think..." } };
+      transform.write(`event: content_block_delta\ndata: ${JSON.stringify(event)}\n\n`);
+      expect(onContentDelta).toHaveBeenCalledTimes(1);
+      expect(onContentDelta).toHaveBeenCalledWith("Let me think...");
+    });
+
+    it("fires for Anthropic input_json_delta content", () => {
+      const onContentDelta = vi.fn();
+      const transform = new SSEMetricsTransform("anthropic", 999_000, { onContentDelta });
+      const event = { type: "content_block_delta", delta: { type: "input_json_delta", partial_json: '{"command": "ls' } };
+      transform.write(`event: content_block_delta\ndata: ${JSON.stringify(event)}\n\n`);
+      expect(onContentDelta).toHaveBeenCalledTimes(1);
+      expect(onContentDelta).toHaveBeenCalledWith('{"command": "ls');
+    });
+
+    it("does NOT fire for Anthropic message_start event", () => {
+      const onContentDelta = vi.fn();
+      const transform = new SSEMetricsTransform("anthropic", 999_000, { onContentDelta });
+      const event = { type: "message_start", message: { usage: { input_tokens: 100 } } };
+      transform.write(`event: message_start\ndata: ${JSON.stringify(event)}\n\n`);
+      expect(onContentDelta).not.toHaveBeenCalled();
+    });
+
+    it("does not fire when onContentDelta is not provided", () => {
+      const transform = new SSEMetricsTransform("openai", 999_000);
+      transform.write(openaiChunk("Hello"));
+      transform.end();
+      // 不应抛出异常
+    });
+  });
 });
