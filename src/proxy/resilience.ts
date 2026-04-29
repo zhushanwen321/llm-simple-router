@@ -2,7 +2,7 @@ import { MS_PER_SECOND } from "../core/constants.js";
 import type { RetryRuleMatcher } from "./retry-rules.js";
 import { ProviderSwitchNeeded } from "./types.js";
 import type { TransportResult } from "./types.js";
-import type { Target } from "./strategy/types.js";
+import type { Target } from "../core/types.js";
 
 // ---------- Strategy Pattern ----------
 

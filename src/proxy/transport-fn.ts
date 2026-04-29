@@ -9,7 +9,7 @@ import { StreamLoopGuard } from "./loop-prevention/stream-loop-guard.js";
 import { NGramLoopDetector } from "./loop-prevention/detectors/ngram-detector.js";
 import { UPSTREAM_SUCCESS } from "./types.js";
 import type { RawHeaders, TransportResult } from "./types.js";
-import type { Target } from "./strategy/types.js";
+import type { Target } from "../core/types.js";
 import type { RequestTracker } from "../monitor/request-tracker.js";
 import type { RetryRuleMatcher } from "./retry-rules.js";
 import { buildModelInfoTag } from "./enhancement/enhancement-handler.js";
