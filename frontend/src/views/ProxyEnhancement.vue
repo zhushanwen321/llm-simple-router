@@ -5,6 +5,7 @@
     <Tabs default-value="dynamic-model">
       <TabsList>
         <TabsTrigger value="dynamic-model">动态模型切换</TabsTrigger>
+        <TabsTrigger value="loop-detection">循环输出检测</TabsTrigger>
       </TabsList>
       <TabsContent value="dynamic-model">
         <Card>
@@ -107,6 +108,57 @@
           </CardContent>
         </Card>
       </TabsContent>
+      <TabsContent value="loop-detection">
+        <Card>
+          <CardHeader>
+            <CardTitle>工具调用循环检测</CardTitle>
+            <CardDescription>
+              检测模型重复调用同一工具的行为，超过阈值时自动中断请求或注入提示词。
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div class="flex items-center gap-3">
+              <Switch
+                id="tool-call-loop-toggle"
+                v-model="toolCallLoopEnabled"
+              />
+              <Label for="tool-call-loop-toggle">
+                {{ toolCallLoopEnabled ? '已启用' : '已禁用' }}
+              </Label>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card class="mt-4">
+          <CardHeader>
+            <CardTitle>SSE 输出内容循环检测</CardTitle>
+            <CardDescription>
+              检测流式输出中内容重复循环（N-gram 模式），超过阈值时自动中断流。
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div class="flex items-center gap-3">
+              <Switch
+                id="stream-loop-toggle"
+                v-model="streamLoopEnabled"
+              />
+              <Label for="stream-loop-toggle">
+                {{ streamLoopEnabled ? '已启用' : '已禁用' }}
+              </Label>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div class="flex justify-end mt-4">
+          <Button :disabled="saving" @click="handleSave">
+            <span v-if="saving" class="flex items-center gap-1">
+              <Loader2 class="w-4 h-4 animate-spin" />
+              保存中...
+            </span>
+            <span v-else>保存</span>
+          </Button>
+        </div>
+      </TabsContent>
     </Tabs>
   </div>
 </template>
@@ -126,6 +178,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import SessionTable from '@/components/proxy-enhancement/SessionTable.vue'
 
 const claudeCodeEnabled = ref(false)
+const toolCallLoopEnabled = ref(false)
+const streamLoopEnabled = ref(false)
 const selectModelInstruction = '---\ndescription: 切换代理路由模型\n---\n\n[router-command: select-model $ARGUMENTS]'
 const saving = ref(false)
 const instructionsOpen = ref(true)
@@ -138,6 +192,8 @@ async function loadConfig() {
   try {
     const data = await api.getProxyEnhancement()
     claudeCodeEnabled.value = data.claude_code_enabled
+    toolCallLoopEnabled.value = data.tool_call_loop_enabled
+    streamLoopEnabled.value = data.stream_loop_enabled
   } catch (e: unknown) {
     console.error('Failed to load proxy enhancement config:', e)
     toast.error(getApiMessage(e, '加载配置失败'))
@@ -149,6 +205,8 @@ async function handleSave() {
   try {
     await api.updateProxyEnhancement({
       claude_code_enabled: claudeCodeEnabled.value,
+      tool_call_loop_enabled: toolCallLoopEnabled.value,
+      stream_loop_enabled: streamLoopEnabled.value,
     })
     toast.success('保存成功')
   } catch (e: unknown) {

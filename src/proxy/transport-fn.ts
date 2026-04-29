@@ -7,8 +7,6 @@ import type { MetricsResult } from "../metrics/metrics-extractor.js";
 import { buildUpstreamHeaders } from "./proxy-core.js";
 import { StreamLoopGuard } from "./loop-prevention/stream-loop-guard.js";
 import { NGramLoopDetector } from "./loop-prevention/detectors/ngram-detector.js";
-import { DEFAULT_LOOP_PREVENTION_CONFIG } from "./loop-prevention/types.js";
-import type { LoopPreventionConfig } from "./loop-prevention/types.js";
 import { UPSTREAM_SUCCESS } from "./types.js";
 import type { RawHeaders, TransportResult } from "./types.js";
 import type { Target } from "./strategy/types.js";
@@ -16,6 +14,10 @@ import type { RequestTracker } from "../monitor/request-tracker.js";
 import type { RetryRuleMatcher } from "./retry-rules.js";
 import { buildModelInfoTag } from "./enhancement/enhancement-handler.js";
 import { DEFAULT_MAX_RAW as STREAM_CONTENT_MAX_RAW, DEFAULT_MAX_TEXT as STREAM_CONTENT_MAX_TEXT } from "../monitor/stream-content-accumulator.js";
+
+const LOOP_DETECTOR_N = 6;
+const LOOP_DETECTOR_WINDOW_SIZE = 1000;
+const LOOP_DETECTOR_REPEAT_THRESHOLD = 10;
 
 function toStreamMetrics(m: MetricsResult) {
   return {
@@ -39,16 +41,6 @@ function toStreamMetrics(m: MetricsResult) {
   };
 }
 
-let _loopConfig: LoopPreventionConfig | undefined;
-
-export function setLoopPreventionConfig(config: LoopPreventionConfig): void {
-  _loopConfig = config;
-}
-
-function getLoopPreventionConfig(): LoopPreventionConfig {
-  return _loopConfig ?? DEFAULT_LOOP_PREVENTION_CONFIG;
-}
-
 export interface TransportFnParams {
   provider: NonNullable<ReturnType<typeof getProviderById>>;
   apiKey: string;
@@ -66,6 +58,7 @@ export interface TransportFnParams {
   tracker?: RequestTracker;
   matcher?: RetryRuleMatcher;
   request: FastifyRequest;
+  streamLoopEnabled: boolean;
 }
 
 export function buildTransportFn(p: TransportFnParams): (target: Target) => Promise<TransportResult> {
@@ -74,12 +67,11 @@ export function buildTransportFn(p: TransportFnParams): (target: Target) => Prom
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   return async (_target: Target) => {
     if (p.isStream) {
-      const loopPreventionConfig = getLoopPreventionConfig();
       let streamLoopGuard: StreamLoopGuard | undefined;
-      if (loopPreventionConfig.enabled && loopPreventionConfig.stream.enabled) {
+      if (p.streamLoopEnabled) {
         streamLoopGuard = new StreamLoopGuard(
-          loopPreventionConfig.stream,
-          new NGramLoopDetector(loopPreventionConfig.stream.detectorConfig),
+          { enabled: true, detectorConfig: { n: LOOP_DETECTOR_N, windowSize: LOOP_DETECTOR_WINDOW_SIZE, repeatThreshold: LOOP_DETECTOR_REPEAT_THRESHOLD } },
+          new NGramLoopDetector({ n: LOOP_DETECTOR_N, windowSize: LOOP_DETECTOR_WINDOW_SIZE, repeatThreshold: LOOP_DETECTOR_REPEAT_THRESHOLD }),
           (reason) => {
             p.request.log.warn({ logId: p.logId, reason }, "Stream loop detected, aborting");
           },

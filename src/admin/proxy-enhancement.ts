@@ -6,6 +6,8 @@ import { loadEnhancementConfig } from "../proxy/enhancement-config.js";
 
 const UpdateProxyEnhancementSchema = Type.Object({
   claude_code_enabled: Type.Boolean(),
+  tool_call_loop_enabled: Type.Boolean(),
+  stream_loop_enabled: Type.Boolean(),
 });
 
 const SessionParamsSchema = Type.Object({
@@ -29,6 +31,8 @@ export const adminProxyEnhancementRoutes: FastifyPluginCallback<ProxyEnhancement
     const config = loadEnhancementConfig(db);
     return reply.send({
       claude_code_enabled: config.claude_code_enabled,
+      tool_call_loop_enabled: config.tool_call_loop_enabled,
+      stream_loop_enabled: config.stream_loop_enabled,
     });
   });
 
@@ -36,6 +40,8 @@ export const adminProxyEnhancementRoutes: FastifyPluginCallback<ProxyEnhancement
     const body = request.body as Static<typeof UpdateProxyEnhancementSchema>;
     const config = {
       claude_code_enabled: body.claude_code_enabled,
+      tool_call_loop_enabled: body.tool_call_loop_enabled,
+      stream_loop_enabled: body.stream_loop_enabled,
     };
     setSetting(db, "proxy_enhancement", JSON.stringify(config));
     return reply.send({ success: true });

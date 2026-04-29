@@ -88,20 +88,8 @@
                   {{ msg.removedText }}
                 </div>
                 <div v-if="msg.text" class="text-foreground overflow-y-auto max-h-40">{{ msg.text }}</div>
-                <div v-if="msg.toolBlocks.length > 0" class="mt-1 space-y-0.5">
-                  <Collapsible v-for="(tb, tbi) in msg.toolBlocks" :key="tbi" v-model:open="toolExpanded[`${i}-${tbi}`]">
-                    <CollapsibleTrigger as-child>
-                      <Button variant="ghost" size="xs" class="px-0 h-auto text-[10px]">
-                        <Badge variant="outline" class="text-[9px] px-1.5 py-0 border-transparent mr-1" :class="tb.type === 'tool_use' ? 'bg-role-tool-bg text-role-tool' : 'bg-role-user-bg text-role-user'">
-                          {{ tb.type === 'tool_use' ? tb.name || 'tool_use' : 'tool_result' }}
-                        </Badge>
-                        {{ fmtSize(tb.content) }}
-                      </Button>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <pre class="mt-0.5 whitespace-pre-wrap break-all text-[10px] bg-muted/50 rounded p-1.5 border max-h-60 overflow-y-auto">{{ tb.content }}</pre>
-                    </CollapsibleContent>
-                  </Collapsible>
+                <div v-else-if="msg.toolResultCount > 0" class="text-muted-foreground text-[10px]">
+                  {{ msg.toolResultCount }} tool result(s)
                 </div>
               </div>
             </div>
@@ -171,11 +159,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { FileJson, FileText } from 'lucide-vue-next'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import JsonCopyBlock from '@/components/log-viewer/JsonCopyBlock.vue'
@@ -183,16 +170,6 @@ import type { UnifiedRequestOverview } from './types'
 
 const props = defineProps<{ overview: UnifiedRequestOverview }>()
 const showRaw = ref(false)
-const toolExpanded = reactive<Record<string, boolean>>({})
-
-const BYTES_PER_KB = 1024
-const JSON_INDENT = 2
-
-function fmtSize(text: string): string {
-  const bytes = new TextEncoder().encode(text).length
-  if (bytes < BYTES_PER_KB) return `${bytes}B`
-  return `${(bytes / BYTES_PER_KB).toFixed(1)}KB`
-}
 
 interface ParsedRequest {
   headers: Record<string, string>
@@ -276,12 +253,6 @@ const systemPrompt = computed(() => {
   return null
 })
 
-interface ToolBlockDetail {
-  type: 'tool_use' | 'tool_result'
-  name?: string
-  content: string
-}
-
 interface MessageView {
   role: string
   text: string
@@ -289,7 +260,6 @@ interface MessageView {
   modified: boolean
   toolCalls: string[]
   toolResultCount: number
-  toolBlocks: ToolBlockDetail[]
 }
 
 const messages = computed<MessageView[]>(() => {
@@ -318,29 +288,6 @@ const messages = computed<MessageView[]>(() => {
       .filter((b: unknown) => typeof b === 'object' && b !== null && (b as Record<string, unknown>).type === 'tool_result')
       .length
 
-    const toolBlocks: ToolBlockDetail[] = blocks
-      .filter((b: unknown): b is Record<string, unknown> =>
-        typeof b === 'object' && b !== null
-        && ((b as Record<string, unknown>).type === 'tool_use' || (b as Record<string, unknown>).type === 'tool_result'))
-      .map((b: Record<string, unknown>) => {
-        if (b.type === 'tool_use') {
-          return {
-            type: 'tool_use' as const,
-            name: String(b.name || ''),
-            content: b.input ? JSON.stringify(b.input, null, JSON_INDENT) : JSON.stringify(b, null, JSON_INDENT),
-          }
-        }
-        const c = b.content
-        let text = ''
-        if (typeof c === 'string') text = c
-        else if (Array.isArray(c)) {
-          text = c.map((x: Record<string, unknown>) =>
-            typeof x.text === 'string' ? x.text : JSON.stringify(x),
-          ).join('\n')
-        }
-        return { type: 'tool_result' as const, content: text || JSON.stringify(b, null, JSON_INDENT) }
-      })
-
     result.push({
       role,
       text: upstreamText,
@@ -348,7 +295,6 @@ const messages = computed<MessageView[]>(() => {
       modified: isModified,
       toolCalls,
       toolResultCount,
-      toolBlocks,
     })
   }
   return result

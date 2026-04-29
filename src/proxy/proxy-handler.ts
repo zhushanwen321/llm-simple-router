@@ -29,6 +29,7 @@ import { TOOL_USE_ID_PREFIX, TOOL_USE_ID_PROVIDER_PREFIX } from "./enhancement/d
 import { buildTransportFn } from "./transport-fn.js";
 import { applyOverflowRedirect } from "./overflow.js";
 import { applyProviderPatches } from "./patch/index.js";
+import { loadEnhancementConfig } from "./enhancement-config.js";
 
 const HTTP_ERROR_THRESHOLD = 400;
 const MAX_LOG_FIELD_LENGTH = 80;
@@ -57,6 +58,7 @@ interface FailoverContext {
   originalModel: string | null;
   originalBody: Record<string, unknown>;
   sessionId: string | undefined;
+  streamLoopEnabled: boolean;
 }
 
 // ---------- Helpers ----------
@@ -148,10 +150,11 @@ export async function handleProxyRequest(
   });
   const clientModel = ((request.body as Record<string, unknown>).model as string) || "unknown";
   const sessionId = (request.headers as RawHeaders)["x-claude-code-session-id"] as string | undefined;
-  const { effectiveModel, originalModel, interceptResponse } = applyEnhancement(deps.db, request, clientModel, sessionId);
+  const enhancementConfig = loadEnhancementConfig(deps.db);
+  const { effectiveModel, originalModel, interceptResponse } = applyEnhancement(deps.db, request, clientModel, sessionId, enhancementConfig);
 
-  // --- 工具调用循环检测 ---
-  if (deps.sessionTracker && sessionId) {
+  // --- 工具调用循环检测（受 proxy_enhancement 配置控制） ---
+  if (enhancementConfig.tool_call_loop_enabled && deps.sessionTracker && sessionId) {
     const routerKeyId = (request.routerKey as { id?: string } | undefined)?.id ?? null;
     const sessionKey = routerKeyId ? `${routerKeyId}:${sessionId}` : sessionId;
     const lastToolUse = extractLastToolUse(request.body as Record<string, unknown>);
@@ -196,13 +199,14 @@ export async function handleProxyRequest(
     effectiveModel, originalModel,
     originalBody: JSON.parse(JSON.stringify(request.body as Record<string, unknown>)),
     sessionId,
+    streamLoopEnabled: enhancementConfig.stream_loop_enabled,
   });
 }
 
 // ---------- Failover loop ----------
 
 async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> {
-  const { request, reply, apiType, upstreamPath, errors, deps, options, effectiveModel, originalModel, originalBody, sessionId } = ctx;
+  const { request, reply, apiType, upstreamPath, errors, deps, options, effectiveModel, originalModel, originalBody, sessionId, streamLoopEnabled } = ctx;
   const excludeTargets: Target[] = [];
   let rootLogId: string | null = null;
   while (true) {
@@ -211,7 +215,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
     if (rootLogId === null) rootLogId = logId;
     const isFailoverIteration = rootLogId !== logId;
     const routerKeyId = request.routerKey?.id ?? null;
-    let body = request.body as Record<string, unknown>;
+    const body = request.body as Record<string, unknown>;
     const isStream = body.stream === true;
     const cliHdrs: RawHeaders = request.headers as RawHeaders;
 
@@ -273,8 +277,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
       }
     }
 
-    const patchResult = applyProviderPatches(body, provider);
-    body = patchResult.body;
+    applyProviderPatches(body, provider);
     const apiKey = decrypt(provider.api_key, getSetting(deps.db, "encryption_key")!);
     options?.beforeSendProxy?.(body, isStream);
 
@@ -290,6 +293,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
       provider, apiKey, body, cliHdrs, reply, upstreamPath, apiType,
       isStream, startTime, logId, effectiveModel, originalModel,
       streamTimeoutMs: deps.streamTimeoutMs, tracker: deps.tracker, matcher: deps.matcher, request,
+      streamLoopEnabled,
     });
 
     try {
@@ -401,11 +405,9 @@ function extractLastToolUse(body: Record<string, unknown>): import("./loop-preve
     if (msg.role === "assistant") {
       const content = msg.content;
       if (Array.isArray(content)) {
-        // 从后往前遍历，找到第一个非 router 合成的 tool_use
         for (let j = content.length - 1; j >= 0; j--) {
           const block = content[j] as Record<string, unknown>;
           if (block.type !== "tool_use") continue;
-          // 跳过 router 生成的 synthetic tool_use（如 AskUserQuestion 的模型选择）
           const id = block.id as string | undefined;
           if (id && (id.startsWith(TOOL_USE_ID_PREFIX) || id.startsWith(TOOL_USE_ID_PROVIDER_PREFIX))) {
             continue;

@@ -68,7 +68,6 @@ export class SSEMetricsTransform extends Transform {
       this.extractor.processEvent(event);
       this.emitContentDelta(event);
     }
-    // flush 无条件推送最终状态，确保消费者能拿到完整指标
     if (this.onMetrics && !this.flushed) {
       this.flushed = true;
       this.lastCallbackTime = Date.now();
@@ -81,7 +80,7 @@ export class SSEMetricsTransform extends Transform {
     return this.extractor;
   }
 
-  /** 提取 SSE 事件中的内容文本，触发 onContentDelta 回调 */
+  /** 从 SSE 事件中提取内容文本，触发 onContentDelta 回调 */
   private emitContentDelta(event: { data?: string }): void {
     if (!this.onContentDelta || !event.data) return;
     const delta = this.extractContentDelta(event.data);

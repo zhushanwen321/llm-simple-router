@@ -48,6 +48,11 @@ describe("Loop prevention integration", () => {
     setSetting(db, "jwt_secret", "test-jwt-secret");
     setSetting(db, "admin_password_hash", hashPassword("admin123"));
     setSetting(db, "initialized", "true");
+    setSetting(db, "proxy_enhancement", JSON.stringify({
+      claude_code_enabled: false,
+      tool_call_loop_enabled: true,
+      stream_loop_enabled: false,
+    }));
 
     mockOpenAI = await createMockBackend((req, res) => {
       if (req.method === "POST" && req.url === "/v1/chat/completions") {
