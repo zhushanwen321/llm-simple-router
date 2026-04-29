@@ -2,17 +2,17 @@ import Database from "better-sqlite3";
 import type { FastifyPluginCallback } from "fastify";
 import { randomUUID } from "crypto";
 import fp from "fastify-plugin";
-import { insertRequestLog } from "../db/index.js";
-import { createErrorFormatter } from "./proxy-core.js";
-import type { ErrorKind } from "./proxy-core.js";
+import { insertRequestLog } from "../../db/index.js";
+import { createErrorFormatter } from "../proxy-core.js";
+import type { ErrorKind } from "../proxy-core.js";
 import { handleProxyRequest, type RouteHandlerDeps } from "./proxy-handler.js";
-import { createOrchestrator } from "./orchestration/orchestrator.js";
-import { RetryRuleMatcher } from "./orchestration/retry-rules.js";
-import { ProviderSemaphoreManager } from "./orchestration/semaphore.js";
-import type { RequestTracker } from "../monitor/request-tracker.js";
-import type { UsageWindowTracker } from "./routing/usage-window-tracker.js";
-import type { AdaptiveConcurrencyController } from "./adaptive-controller.js";
-import { HTTP_BAD_GATEWAY } from "../core/constants.js";
+import { createOrchestrator } from "../orchestration/orchestrator.js";
+import { RetryRuleMatcher } from "../orchestration/retry-rules.js";
+import { ProviderSemaphoreManager } from "../orchestration/semaphore.js";
+import type { RequestTracker } from "../../monitor/request-tracker.js";
+import type { UsageWindowTracker } from "../routing/usage-window-tracker.js";
+import type { AdaptiveConcurrencyController } from "../adaptive-controller.js";
+import { HTTP_BAD_GATEWAY } from "../../core/constants.js";
 
 export interface AnthropicProxyOptions {
   db: Database.Database;
@@ -22,7 +22,7 @@ export interface AnthropicProxyOptions {
   semaphoreManager?: ProviderSemaphoreManager;
   tracker?: RequestTracker;
   usageWindowTracker?: UsageWindowTracker;
-  sessionTracker?: import("./loop-prevention/session-tracker.js").SessionTracker;
+  sessionTracker?: import("../loop-prevention/session-tracker.js").SessionTracker;
   adaptiveController?: AdaptiveConcurrencyController;
 }
 

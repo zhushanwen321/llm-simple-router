@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { handleProxyRequest } from "../src/proxy/proxy-handler.js";
+import { handleProxyRequest } from "../src/proxy/handler/proxy-handler.js";
 import type { ProxyErrorFormatter } from "../src/proxy/proxy-core.js";
 import type { ResilienceResult } from "../src/proxy/orchestration/resilience.js";
 import { ProviderSwitchNeeded } from "../src/proxy/types.js";

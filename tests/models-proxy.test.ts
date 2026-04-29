@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import Fastify, { FastifyInstance } from "fastify";
 import { createServer, Server, IncomingMessage, ServerResponse } from "http";
 import Database from "better-sqlite3";
-import { openaiProxy } from "../src/proxy/openai.js";
+import { openaiProxy } from "../src/proxy/handler/openai.js";
 import { encrypt } from "../src/utils/crypto.js";
 import { initDatabase } from "../src/db/index.js";
 import { setSetting } from "../src/db/settings.js";

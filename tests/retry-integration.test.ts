@@ -3,7 +3,7 @@ import Fastify, { FastifyInstance } from "fastify";
 import { createServer, Server, IncomingMessage, ServerResponse } from "http";
 import Database from "better-sqlite3";
 import { encrypt } from "../src/utils/crypto.js";
-import { anthropicProxy } from "../src/proxy/anthropic.js";
+import { anthropicProxy } from "../src/proxy/handler/anthropic.js";
 import { initDatabase } from "../src/db/index.js";
 import { setSetting } from "../src/db/settings.js";
 import { RetryRuleMatcher } from "../src/proxy/orchestration/retry-rules.js";

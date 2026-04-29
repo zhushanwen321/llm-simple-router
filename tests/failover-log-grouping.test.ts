@@ -4,7 +4,7 @@ import { createServer, Server, IncomingMessage, ServerResponse } from "http";
 import Database from "better-sqlite3";
 import { createHash } from "crypto";
 import { encrypt } from "../src/utils/crypto.js";
-import { openaiProxy } from "../src/proxy/openai.js";
+import { openaiProxy } from "../src/proxy/handler/openai.js";
 import { authMiddleware } from "../src/middleware/auth.js";
 import { initDatabase } from "../src/db/index.js";
 import { setSetting } from "../src/db/settings.js";

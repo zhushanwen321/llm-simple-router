@@ -8,8 +8,8 @@ import {
 } from "http";
 import Database from "better-sqlite3";
 import { createHash } from "crypto";
-import { openaiProxy } from "../src/proxy/openai.js";
-import { anthropicProxy } from "../src/proxy/anthropic.js";
+import { openaiProxy } from "../src/proxy/handler/openai.js";
+import { anthropicProxy } from "../src/proxy/handler/anthropic.js";
 import { authMiddleware } from "../src/middleware/auth.js";
 import { encrypt } from "../src/utils/crypto.js";
 import { initDatabase } from "../src/db/index.js";

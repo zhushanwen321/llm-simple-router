@@ -1,35 +1,35 @@
 import { randomUUID } from "crypto";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import Database from "better-sqlite3";
-import { HTTP_UNPROCESSABLE_ENTITY } from "../core/constants.js";
-import { getProviderById, insertRequestLog } from "../db/index.js";
-import { decrypt } from "../utils/crypto.js";
-import { getSetting } from "../db/settings.js";
-import { resolveMapping } from "./routing/mapping-resolver.js";
-import { applyEnhancement } from "./enhancement/enhancement-handler.js";
-import { SemaphoreQueueFullError, SemaphoreTimeoutError } from "./orchestration/semaphore.js";
-import type { RequestTracker } from "../monitor/request-tracker.js";
+import { HTTP_UNPROCESSABLE_ENTITY } from "../../core/constants.js";
+import { getProviderById, insertRequestLog } from "../../db/index.js";
+import { decrypt } from "../../utils/crypto.js";
+import { getSetting } from "../../db/settings.js";
+import { resolveMapping } from "../routing/mapping-resolver.js";
+import { applyEnhancement } from "../enhancement/enhancement-handler.js";
+import { SemaphoreQueueFullError, SemaphoreTimeoutError } from "../orchestration/semaphore.js";
+import type { RequestTracker } from "../../monitor/request-tracker.js";
 import {
   logResilienceResult,
   collectTransportMetrics,
   handleIntercept,
   sanitizeHeadersForLog,
-} from "./proxy-logging.js";
-import { buildUpstreamHeaders, buildUpstreamUrl } from "./proxy-core.js";
-import { ProviderSwitchNeeded } from "./types.js";
-import type { RawHeaders, TransportResult } from "./types.js";
-import type { Target } from "../core/types.js";
-import { updateLogStreamContent, updateLogClientStatus } from "../db/index.js";
-import { insertRejectedLog } from "./log-helpers.js";
-import type { RetryRuleMatcher } from "./orchestration/retry-rules.js";
-import type { ProxyOrchestrator } from "./orchestration/orchestrator.js";
-import type { ProxyErrorFormatter, ProxyErrorResponse } from "./proxy-core.js";
-import { ToolLoopGuard } from "./loop-prevention/tool-loop-guard.js";
-import { TOOL_USE_ID_PREFIX, TOOL_USE_ID_PROVIDER_PREFIX } from "./enhancement/directive-parser.js";
-import { buildTransportFn } from "./transport/transport-fn.js";
-import { applyOverflowRedirect } from "./routing/overflow.js";
-import { applyProviderPatches } from "./patch/index.js";
-import { loadEnhancementConfig } from "./routing/enhancement-config.js";
+} from "../proxy-logging.js";
+import { buildUpstreamHeaders, buildUpstreamUrl } from "../proxy-core.js";
+import { ProviderSwitchNeeded } from "../types.js";
+import type { RawHeaders, TransportResult } from "../types.js";
+import type { Target } from "../../core/types.js";
+import { updateLogStreamContent, updateLogClientStatus } from "../../db/index.js";
+import { insertRejectedLog } from "../log-helpers.js";
+import type { RetryRuleMatcher } from "../orchestration/retry-rules.js";
+import type { ProxyOrchestrator } from "../orchestration/orchestrator.js";
+import type { ProxyErrorFormatter, ProxyErrorResponse } from "../proxy-core.js";
+import { ToolLoopGuard } from "../loop-prevention/tool-loop-guard.js";
+import { TOOL_USE_ID_PREFIX, TOOL_USE_ID_PROVIDER_PREFIX } from "../enhancement/directive-parser.js";
+import { buildTransportFn } from "../transport/transport-fn.js";
+import { applyOverflowRedirect } from "../routing/overflow.js";
+import { applyProviderPatches } from "../patch/index.js";
+import { loadEnhancementConfig } from "../routing/enhancement-config.js";
 
 const HTTP_ERROR_THRESHOLD = 400;
 const MAX_LOG_FIELD_LENGTH = 80;
@@ -105,11 +105,11 @@ export interface RouteHandlerDeps {
   matcher?: RetryRuleMatcher;
   tracker?: RequestTracker;
   orchestrator: ProxyOrchestrator;
-  usageWindowTracker?: import("./routing/usage-window-tracker.js").UsageWindowTracker;
-  sessionTracker?: import("./loop-prevention/session-tracker.js").SessionTracker;
+  usageWindowTracker?: import("../routing/usage-window-tracker.js").UsageWindowTracker;
+  sessionTracker?: import("../loop-prevention/session-tracker.js").SessionTracker;
 }
 
-import type { ContentBlock } from "../monitor/types.js";
+import type { ContentBlock } from "../../monitor/types.js";
 
 /** 将 tracker blocks 序列化为前端 tryDirectParse 可解析的 JSON */
 function serializeBlocksForStorage(blocks: ContentBlock[] | undefined, apiType: "openai" | "anthropic"): string {
@@ -397,7 +397,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
   }
 }
 
-function extractLastToolUse(body: Record<string, unknown>): import("./loop-prevention/types.js").ToolCallRecord | null {
+function extractLastToolUse(body: Record<string, unknown>): import("../loop-prevention/types.js").ToolCallRecord | null {
   const messages = body.messages as Array<Record<string, unknown>> | undefined;
   if (!messages) return null;
   for (let i = messages.length - 1; i >= 0; i--) {

@@ -5,7 +5,7 @@ import Database from "better-sqlite3";
 import { initDatabase } from "../src/db/index.js";
 import { setSetting } from "../src/db/settings.js";
 import { encrypt } from "../src/utils/crypto.js";
-import { openaiProxy } from "../src/proxy/openai.js";
+import { openaiProxy } from "../src/proxy/handler/openai.js";
 import { ProviderSemaphoreManager } from "../src/proxy/orchestration/semaphore.js";
 import { RequestTracker } from "../src/monitor/request-tracker.js";
 import { createMockBackend } from "./helpers/mock-backend.js";
