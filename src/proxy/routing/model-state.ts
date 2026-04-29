@@ -4,7 +4,7 @@ import {
   getSessionState,
   deleteSessionState,
   insertSessionHistory,
-} from "../db/session-states.js";
+} from "../../db/session-states.js";
 
 // 会话记忆在 24 小时后过期（滑动窗口）
 const HOUR_MS = 3600_000;

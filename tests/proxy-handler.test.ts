@@ -14,7 +14,7 @@ vi.mock("../src/db/index.js", () => ({
 
 vi.mock("../src/utils/crypto.js", () => ({ decrypt: vi.fn(() => "sk-test") }));
 vi.mock("../src/db/settings.js", () => ({ getSetting: vi.fn(() => "enc-key") }));
-vi.mock("../src/proxy/mapping-resolver.js", () => ({
+vi.mock("../src/proxy/routing/mapping-resolver.js", () => ({
   resolveMapping: vi.fn(() => null),
 }));
 vi.mock("../src/proxy/enhancement/enhancement-handler.js", () => ({
@@ -28,13 +28,13 @@ vi.mock("../src/proxy/proxy-logging.js", () => ({
   sanitizeHeadersForLog: vi.fn((h) => h),
 }));
 vi.mock("../src/proxy/log-helpers.js", () => ({ insertRejectedLog: vi.fn() }));
-vi.mock("../src/proxy/transport.js", () => ({
+vi.mock("../src/proxy/transport/http.js", () => ({
   callNonStream: vi.fn(),
   callStream: vi.fn(),
 }));
 
 import { getProviderById } from "../src/db/index.js";
-import { resolveMapping } from "../src/proxy/mapping-resolver.js";
+import { resolveMapping } from "../src/proxy/routing/mapping-resolver.js";
 import { applyEnhancement } from "../src/proxy/enhancement/enhancement-handler.js";
 import { logResilienceResult, collectTransportMetrics, handleIntercept } from "../src/proxy/proxy-logging.js";
 import { insertRejectedLog } from "../src/proxy/log-helpers.js";

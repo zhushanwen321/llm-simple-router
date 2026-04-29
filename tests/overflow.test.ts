@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import Database from 'better-sqlite3'
 import { initDatabase } from '../src/db/index.js'
 import { seedSettings } from './helpers/test-setup.js'
-import { applyOverflowRedirect, estimateTokens } from '../src/proxy/overflow.js'
+import { applyOverflowRedirect, estimateTokens } from '../src/proxy/routing/overflow.js'
 import type { Target } from '../src/proxy/strategy/types.js'
 
 describe('applyOverflowRedirect', () => {

@@ -5,7 +5,7 @@ import { HTTP_UNPROCESSABLE_ENTITY } from "../core/constants.js";
 import { getProviderById, insertRequestLog } from "../db/index.js";
 import { decrypt } from "../utils/crypto.js";
 import { getSetting } from "../db/settings.js";
-import { resolveMapping } from "./mapping-resolver.js";
+import { resolveMapping } from "./routing/mapping-resolver.js";
 import { applyEnhancement } from "./enhancement/enhancement-handler.js";
 import { SemaphoreQueueFullError, SemaphoreTimeoutError } from "./orchestration/semaphore.js";
 import type { RequestTracker } from "../monitor/request-tracker.js";
@@ -27,9 +27,9 @@ import type { ProxyErrorFormatter, ProxyErrorResponse } from "./proxy-core.js";
 import { ToolLoopGuard } from "./loop-prevention/tool-loop-guard.js";
 import { TOOL_USE_ID_PREFIX, TOOL_USE_ID_PROVIDER_PREFIX } from "./enhancement/directive-parser.js";
 import { buildTransportFn } from "./transport/transport-fn.js";
-import { applyOverflowRedirect } from "./overflow.js";
+import { applyOverflowRedirect } from "./routing/overflow.js";
 import { applyProviderPatches } from "./patch/index.js";
-import { loadEnhancementConfig } from "./enhancement-config.js";
+import { loadEnhancementConfig } from "./routing/enhancement-config.js";
 
 const HTTP_ERROR_THRESHOLD = 400;
 const MAX_LOG_FIELD_LENGTH = 80;
@@ -105,7 +105,7 @@ export interface RouteHandlerDeps {
   matcher?: RetryRuleMatcher;
   tracker?: RequestTracker;
   orchestrator: ProxyOrchestrator;
-  usageWindowTracker?: import("./usage-window-tracker.js").UsageWindowTracker;
+  usageWindowTracker?: import("./routing/usage-window-tracker.js").UsageWindowTracker;
   sessionTracker?: import("./loop-prevention/session-tracker.js").SessionTracker;
 }
 

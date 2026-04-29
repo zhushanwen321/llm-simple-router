@@ -1,11 +1,11 @@
 import { randomUUID } from "crypto";
 import type { FastifyRequest } from "fastify";
 import Database from "better-sqlite3";
-import { loadEnhancementConfig, type EnhancementConfig } from "../enhancement-config.js";
+import { loadEnhancementConfig, type EnhancementConfig } from "../routing/enhancement-config.js";
 import { getActiveProviderModels, resolveByProviderModel } from "../../db/index.js";
-import { resolveMapping } from "../mapping-resolver.js";
+import { resolveMapping } from "../routing/mapping-resolver.js";
 import { parseDirective, parseToolResult, TOOL_USE_ID_PREFIX, TOOL_USE_ID_PROVIDER_PREFIX } from "./directive-parser.js";
-import { modelState } from "../model-state.js";
+import { modelState } from "../routing/model-state.js";
 import { cleanRouterResponses } from "./response-cleaner.js";
 
 export interface InterceptResponse {

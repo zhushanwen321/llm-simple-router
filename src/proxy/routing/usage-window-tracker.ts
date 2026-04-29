@@ -1,8 +1,8 @@
 import Database from "better-sqlite3";
 import { randomUUID } from "crypto";
-import { getLatestWindow, insertWindow } from "../db/usage-windows.js";
-import { getAllProviders } from "../db/providers.js";
-import { toSqliteDatetime, parseSqliteDatetime as parseDate } from "../utils/datetime.js";
+import { getLatestWindow, insertWindow } from "../../db/usage-windows.js";
+import { getAllProviders } from "../../db/providers.js";
+import { toSqliteDatetime, parseSqliteDatetime as parseDate } from "../../utils/datetime.js";
 
 // eslint-disable-next-line no-magic-numbers
 const WINDOW_DURATION_MS = 5 * 3600_000;
