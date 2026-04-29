@@ -153,10 +153,9 @@
               <Label for="concurrency-switch" class="text-sm text-foreground">并发控制</Label>
             </div>
             <div v-if="concurrencyEnabled" class="mt-2 space-y-2">
-              <div>
-                <Label class="block text-sm font-medium text-foreground mb-1">
-                  {{ form.adaptive_enabled ? '自适应上限' : '最大并发数' }}
-                </Label>
+              <!-- 非自适应时显示固定并发数 -->
+              <div v-if="!form.adaptive_enabled">
+                <Label class="block text-sm font-medium text-foreground mb-1">最大并发数</Label>
                 <Input v-model.number="form.max_concurrency" type="number" min="1" :max="MAX_CONCURRENCY" placeholder="3" @input="delete errors.max_concurrency" />
                 <p v-if="errors.max_concurrency" class="text-sm text-destructive mt-1">{{ errors.max_concurrency }}</p>
               </div>
@@ -176,9 +175,14 @@
                   <Switch v-model="form.adaptive_enabled" id="adaptive-switch" />
                   <Label for="adaptive-switch" class="text-sm text-foreground">自适应并发</Label>
                 </div>
-                <p v-if="form.adaptive_enabled" class="text-xs text-muted-foreground mb-2">
-                  从 1 开始自动调整，上限为 {{ form.max_concurrency || '-' }}
-                </p>
+                <div v-if="form.adaptive_enabled" class="mt-2 space-y-2">
+                  <p class="text-xs text-muted-foreground">最低并发度为 1</p>
+                  <div>
+                    <Label class="block text-sm font-medium text-foreground mb-1">自适应上限</Label>
+                    <Input v-model.number="form.max_concurrency" type="number" min="1" :max="MAX_CONCURRENCY" placeholder="3" @input="delete errors.max_concurrency" />
+                    <p v-if="errors.max_concurrency" class="text-sm text-destructive mt-1">{{ errors.max_concurrency }}</p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
