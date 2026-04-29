@@ -7,6 +7,7 @@ const OA_KNOWN_FIELDS = new Set([
   "model", "messages", "max_completion_tokens", "max_tokens",
   "stop", "temperature", "top_p", "stream", "tools", "tool_choice",
   "parallel_tool_calls", "reasoning", "user", "n", "stream_options",
+  "response_format",
 ]);
 
 const ANT_KNOWN_FIELDS = new Set([
@@ -76,6 +77,11 @@ export function openaiToAnthropicRequest(body: Record<string, unknown>): Record<
   // user → metadata
   if (body.user) {
     result.metadata = { user_id: body.user };
+  }
+
+  // response_format — Anthropic doesn't support JSON mode
+  if (body.response_format) {
+    console.warn(`[request-transform] response_format is not supported by Anthropic API, dropping: ${JSON.stringify(body.response_format)}`);
   }
 
   logDroppedFields(body, OA_KNOWN_FIELDS, "OA→Ant");

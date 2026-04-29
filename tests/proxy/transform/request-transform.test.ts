@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { openaiToAnthropicRequest, anthropicToOpenAIRequest, transformRequestBody } from "../../../src/proxy/transform/request-transform.js";
 
 describe("openaiToAnthropicRequest", () => {
@@ -80,6 +80,35 @@ describe("openaiToAnthropicRequest", () => {
   it("maps user to metadata.user_id", () => {
     const result = openaiToAnthropicRequest({ model: "gpt-4", messages: [], user: "user123" });
     expect(result.metadata).toEqual({ user_id: "user123" });
+  });
+
+  it("drops response_format json_object and warns", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const result = openaiToAnthropicRequest({
+      model: "gpt-4", messages: [],
+      response_format: { type: "json_object" },
+    });
+    expect(result.response_format).toBeUndefined();
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("response_format"));
+    warnSpy.mockRestore();
+  });
+
+  it("drops response_format json_schema and warns", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const result = openaiToAnthropicRequest({
+      model: "gpt-4", messages: [],
+      response_format: { type: "json_schema", json_schema: { name: "test", schema: {} } },
+    });
+    expect(result.response_format).toBeUndefined();
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("response_format"));
+    warnSpy.mockRestore();
+  });
+
+  it("does not warn when response_format is absent", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    openaiToAnthropicRequest({ model: "gpt-4", messages: [] });
+    expect(warnSpy).not.toHaveBeenCalledWith(expect.stringContaining("response_format"));
+    warnSpy.mockRestore();
   });
 });
 
