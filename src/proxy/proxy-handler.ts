@@ -26,7 +26,7 @@ import type { ProxyOrchestrator } from "./orchestrator.js";
 import type { ProxyErrorFormatter, ProxyErrorResponse } from "./proxy-core.js";
 import { ToolLoopGuard } from "./loop-prevention/tool-loop-guard.js";
 import { TOOL_USE_ID_PREFIX, TOOL_USE_ID_PROVIDER_PREFIX } from "./enhancement/directive-parser.js";
-import { buildTransportFn } from "./transport-fn.js";
+import { buildTransportFn } from "./transport/transport-fn.js";
 import { applyOverflowRedirect } from "./overflow.js";
 import { applyProviderPatches } from "./patch/index.js";
 import { loadEnhancementConfig } from "./enhancement-config.js";
