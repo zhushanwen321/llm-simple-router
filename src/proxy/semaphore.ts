@@ -1,21 +1,5 @@
-export class SemaphoreQueueFullError extends Error {
-  constructor(public readonly providerId: string) {
-    super(`Provider '${providerId}' concurrency queue is full`);
-    this.name = "SemaphoreQueueFullError";
-  }
-}
-
-export class SemaphoreTimeoutError extends Error {
-  constructor(
-    public readonly providerId: string,
-    public readonly timeoutMs: number,
-  ) {
-    super(
-      `Provider '${providerId}' concurrency wait timeout (${timeoutMs}ms)`,
-    );
-    this.name = "SemaphoreTimeoutError";
-  }
-}
+import { SemaphoreQueueFullError, SemaphoreTimeoutError } from "../core/errors.js";
+export { SemaphoreQueueFullError, SemaphoreTimeoutError };
 
 interface ConcurrencyConfig {
   maxConcurrency: number;
