@@ -413,6 +413,7 @@ function extractLastToolUse(body: Record<string, unknown>): import("./loop-preve
           const inputStr = JSON.stringify(block.input ?? {});
           return {
             toolName: block.name as string,
+            toolUseId: typeof block.id === "string" ? block.id : undefined,
             inputHash: simpleHash(inputStr),
             inputText: inputStr,
             timestamp: Date.now(),

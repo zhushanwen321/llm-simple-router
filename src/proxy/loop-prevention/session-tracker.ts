@@ -36,6 +36,10 @@ export class SessionTracker {
       }
       session.lastAccessTime = Date.now();
     }
+    // 同一 tool_use 不重复记录（模型切换、重试等场景会复用历史）
+    if (record.toolUseId && session.toolCalls.some(r => r.toolUseId === record.toolUseId)) {
+      return session.toolCalls;
+    }
     session.toolCalls.push(record);
     if (session.toolCalls.length > this.config.maxToolCallRecords) {
       session.toolCalls = session.toolCalls.slice(-this.config.maxToolCallRecords);

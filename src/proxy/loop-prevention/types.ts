@@ -49,6 +49,7 @@ export const DEFAULT_LOOP_PREVENTION_CONFIG: LoopPreventionConfig = {
 
 export interface ToolCallRecord {
   toolName: string;
+  toolUseId?: string;
   inputHash: string;
   inputText: string;
   timestamp: number;

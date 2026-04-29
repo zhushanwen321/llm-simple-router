@@ -89,13 +89,13 @@ describe("Loop prevention integration", () => {
 
   const authHeader: Record<string, string> = { authorization: `Bearer ${API_KEY}`, "content-type": "application/json" };
 
-  function toolUseBody(toolName: string, input: Record<string, unknown>) {
+  function toolUseBody(toolName: string, input: Record<string, unknown>, callId = "call_1") {
     return {
       model: "gpt-loop-test",
       stream: false,
       messages: [
         { role: "user", content: "do something" },
-        { role: "assistant", content: [{ type: "tool_use", id: "call_1", name: toolName, input }] },
+        { role: "assistant", content: [{ type: "tool_use", id: callId, name: toolName, input }] },
       ],
     };
   }
@@ -115,7 +115,7 @@ describe("Loop prevention integration", () => {
     for (let i = 0; i < 2; i++) {
       const res = await app.inject({
         method: "POST", url: "/v1/chat/completions", headers,
-        payload: toolUseBody("read_file", LOOP_INPUT),
+        payload: toolUseBody("read_file", LOOP_INPUT, `call_init_${i}`),
       });
       expect(res.statusCode).toBe(200);
     }
@@ -127,7 +127,7 @@ describe("Loop prevention integration", () => {
     for (let i = 0; i < 3; i++) {
       const res = await app.inject({
         method: "POST", url: "/v1/chat/completions", headers,
-        payload: toolUseBody("read_file", LOOP_INPUT),
+        payload: toolUseBody("read_file", LOOP_INPUT, `call_t1_${i}`),
       });
       expect(res.statusCode).toBe(200);
     }
@@ -137,10 +137,10 @@ describe("Loop prevention integration", () => {
     const headers = { ...authHeader, "x-claude-code-session-id": "sess-tier2" };
     // 3 次 -> 第 3 次触发 loopCount=1 (tier 1, 注入 break prompt, 仍转发)
     for (let i = 0; i < 3; i++) {
-      await app.inject({ method: "POST", url: "/v1/chat/completions", headers, payload: toolUseBody("read_file", LOOP_INPUT) });
+      await app.inject({ method: "POST", url: "/v1/chat/completions", headers, payload: toolUseBody("read_file", LOOP_INPUT, `call_t2_${i}`) });
     }
     // 第 4 次 -> loopCount=2 (tier 2, 422)
-    const res = await app.inject({ method: "POST", url: "/v1/chat/completions", headers, payload: toolUseBody("read_file", LOOP_INPUT) });
+    const res = await app.inject({ method: "POST", url: "/v1/chat/completions", headers, payload: toolUseBody("read_file", LOOP_INPUT, "call_t2_3") });
     expect(res.statusCode).toBe(422);
     const body = JSON.parse(res.body);
     expect(body.error?.type).toBe("tool_call_loop_detected");
@@ -151,7 +151,7 @@ describe("Loop prevention integration", () => {
     for (let i = 0; i < 5; i++) {
       const res = await app.inject({
         method: "POST", url: "/v1/chat/completions", headers,
-        payload: toolUseBody("read_file", VARYING_INPUTS[i]),
+        payload: toolUseBody("read_file", VARYING_INPUTS[i], `call_vary_${i}`),
       });
       expect(res.statusCode).toBe(200);
     }
@@ -159,13 +159,25 @@ describe("Loop prevention integration", () => {
 
   it("detects loop with same tool name and repetitive input", async () => {
     const headers = { ...authHeader, "x-claude-code-session-id": "sess-same" };
-    // 3 次重复输入 -> 触发 detection
+    // 3 次重复输入（不同 ID）-> 触发 detection
     for (let i = 0; i < 3; i++) {
-      await app.inject({ method: "POST", url: "/v1/chat/completions", headers, payload: toolUseBody("read_file", LOOP_INPUT) });
+      await app.inject({ method: "POST", url: "/v1/chat/completions", headers, payload: toolUseBody("read_file", LOOP_INPUT, `call_same_${i}`) });
     }
     // 第 4 次 -> 再次触发，但这次传入不同输入不影响 detector（它看所有 history）
-    const res = await app.inject({ method: "POST", url: "/v1/chat/completions", headers, payload: toolUseBody("read_file", VARYING_INPUTS[0]) });
+    const res = await app.inject({ method: "POST", url: "/v1/chat/completions", headers, payload: toolUseBody("read_file", VARYING_INPUTS[0], "call_same_4") });
     // 仍因 history 中的重复记录而触发，循环升级
     expect(res.statusCode).toBe(422);
+  });
+
+  it("does not false-positive when history reuses same tool_use ID (model switch)", async () => {
+    const headers = { ...authHeader, "x-claude-code-session-id": "sess-dedup" };
+    // 同一 tool_use ID 反复出现在请求历史中（模型切换、重试场景）
+    for (let i = 0; i < 5; i++) {
+      const res = await app.inject({
+        method: "POST", url: "/v1/chat/completions", headers,
+        payload: toolUseBody("read_file", LOOP_INPUT, "call_dedup_fixed"),
+      });
+      expect(res.statusCode).toBe(200);
+    }
   });
 });
