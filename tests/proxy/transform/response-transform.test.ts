@@ -5,6 +5,7 @@ import {
   transformResponseBody,
   transformErrorResponse,
 } from "../../../src/proxy/transform/response-transform.js";
+import { classifyError } from "../../../src/proxy/transform/error-classifier.js";
 
 const OA_SUCCESS = JSON.stringify({
   id: "chatcmpl-1", model: "gpt-4",
@@ -147,5 +148,17 @@ describe("transformErrorResponse", () => {
   it("returns body unchanged when same apiType", () => {
     const body = '{"error":{"message":"x"}}';
     expect(transformErrorResponse(body, "openai", "openai")).toBe(body);
+  });
+});
+
+describe("classifyError integration with error transform", () => {
+  it("classifies transformed Anthropic error", () => {
+    const antError = JSON.stringify({ type: "error", error: { type: "authentication_error", message: "Bad key" } });
+    const classified = classifyError(401, antError);
+    expect(classified.category).toBe("authentication");
+    expect(classified.retryable).toBe(false);
+    // Error format unchanged by transformErrorResponse
+    const transformed = JSON.parse(transformErrorResponse(antError, "anthropic", "openai"));
+    expect(transformed.error.message).toBe("Bad key");
   });
 });
