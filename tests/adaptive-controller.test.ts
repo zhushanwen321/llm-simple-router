@@ -22,12 +22,13 @@ describe("AdaptiveConcurrencyController", () => {
   });
 
   describe("init", () => {
-    it("starts at ADAPTIVE_MIN (1)", () => {
+    it("starts at max (optimistic start)", () => {
       ctrl.init("p1", { max: 20 }, { queueTimeoutMs: 5000, maxQueueSize: 10 });
-      expect(ctrl.getStatus("p1")!.currentLimit).toBe(1);
-      expect(ctrl.getStatus("p1")!.probeActive).toBe(false);
+      expect(ctrl.getStatus("p1")!.currentLimit).toBe(20);
+      expect(ctrl.getStatus("p1")!.probeActive).toBe(true);
+      // probeActive: effectiveLimit = min(20 + 1, 20) = 20
       expect(sem.updateConfig).toHaveBeenCalledWith("p1", {
-        maxConcurrency: 1, queueTimeoutMs: 5000, maxQueueSize: 10,
+        maxConcurrency: 20, queueTimeoutMs: 5000, maxQueueSize: 10,
       });
     });
   });
@@ -35,7 +36,9 @@ describe("AdaptiveConcurrencyController", () => {
   describe("success transitions", () => {
     beforeEach(() => {
       ctrl.init("p1", { max: 20 }, { queueTimeoutMs: 0, maxQueueSize: 0 });
+      // 模拟 adaptive 已经过 backoff 降到 currentLimit=3, probeActive=false
       ctrl["entries"].get("p1")!.state.currentLimit = 3;
+      ctrl["entries"].get("p1")!.state.probeActive = false;
       sem.updateConfig.mockClear();
     });
 
@@ -73,7 +76,7 @@ describe("AdaptiveConcurrencyController", () => {
     });
 
     it("resets failure counter on success", () => {
-      ctrl.onRequestComplete("p1", { success: false });
+      ctrl.onRequestComplete("p1", { success: false, statusCode: 500 });
       ctrl.onRequestComplete("p1", { success: true });
       expect(ctrl.getStatus("p1")!.consecutiveFailures).toBe(0);
       expect(ctrl.getStatus("p1")!.consecutiveSuccesses).toBe(1);
@@ -112,14 +115,14 @@ describe("AdaptiveConcurrencyController", () => {
     });
   });
 
-  describe("non-429 failures", () => {
+  describe("non-429 failures (5xx)", () => {
     beforeEach(() => {
       ctrl.init("p1", { max: 20 }, { queueTimeoutMs: 0, maxQueueSize: 0 });
       ctrl["entries"].get("p1")!.state.currentLimit = 6;
       sem.updateConfig.mockClear();
     });
 
-    it("decreases by 2 after 3 consecutive failures", () => {
+    it("decreases by 2 after 3 consecutive 5xx failures", () => {
       for (let i = 0; i < 3; i++) ctrl.onRequestComplete("p1", { success: false, statusCode: 500 });
       expect(ctrl.getStatus("p1")!.currentLimit).toBe(4);
       expect(ctrl.getStatus("p1")!.probeActive).toBe(false);
@@ -137,6 +140,49 @@ describe("AdaptiveConcurrencyController", () => {
       ctrl["entries"].get("p1")!.state.currentLimit = 2;
       for (let i = 0; i < 3; i++) ctrl.onRequestComplete("p1", { success: false, statusCode: 500 });
       expect(ctrl.getStatus("p1")!.currentLimit).toBe(1);
+    });
+
+    it("decreases on 502, 503, 504", () => {
+      ctrl.onRequestComplete("p1", { success: false, statusCode: 502 });
+      ctrl.onRequestComplete("p1", { success: false, statusCode: 503 });
+      ctrl.onRequestComplete("p1", { success: false, statusCode: 504 });
+      expect(ctrl.getStatus("p1")!.currentLimit).toBe(4);
+    });
+
+    it("decreases on network error (undefined statusCode)", () => {
+      for (let i = 0; i < 3; i++) ctrl.onRequestComplete("p1", { success: false });
+      expect(ctrl.getStatus("p1")!.currentLimit).toBe(4);
+    });
+  });
+
+  describe("non-concurrency failures (2xx/4xx)", () => {
+    beforeEach(() => {
+      ctrl.init("p1", { max: 20 }, { queueTimeoutMs: 0, maxQueueSize: 0 });
+      ctrl["entries"].get("p1")!.state.currentLimit = 6;
+      sem.updateConfig.mockClear();
+    });
+
+    it("ignores stream_error with upstream 200 (body error)", () => {
+      for (let i = 0; i < 5; i++) ctrl.onRequestComplete("p1", { success: false, statusCode: 200 });
+      expect(ctrl.getStatus("p1")!.currentLimit).toBe(6);
+      expect(ctrl.getStatus("p1")!.consecutiveFailures).toBe(0);
+    });
+
+    it("ignores 4xx client errors", () => {
+      ctrl.onRequestComplete("p1", { success: false, statusCode: 400 });
+      ctrl.onRequestComplete("p1", { success: false, statusCode: 401 });
+      ctrl.onRequestComplete("p1", { success: false, statusCode: 403 });
+      ctrl.onRequestComplete("p1", { success: false, statusCode: 404 });
+      expect(ctrl.getStatus("p1")!.currentLimit).toBe(6);
+      expect(ctrl.getStatus("p1")!.consecutiveFailures).toBe(0);
+    });
+
+    it("does not reset success counter on 2xx/4xx failures", () => {
+      ctrl.onRequestComplete("p1", { success: true });
+      ctrl.onRequestComplete("p1", { success: true });
+      ctrl.onRequestComplete("p1", { success: false, statusCode: 200 });
+      expect(ctrl.getStatus("p1")!.consecutiveSuccesses).toBe(2); // not reset
+      expect(ctrl.getStatus("p1")!.consecutiveFailures).toBe(0); // not incremented
     });
   });
 
@@ -161,22 +207,24 @@ describe("AdaptiveConcurrencyController", () => {
       expect(ctrl.getStatus("p1")).toBeUndefined();
     });
 
-    it("re-inits from scratch", () => {
+    it("re-inits from scratch at max", () => {
       ctrl.init("p1", { max: 20 }, { queueTimeoutMs: 0, maxQueueSize: 0 });
       ctrl["entries"].get("p1")!.state.currentLimit = 6;
       ctrl.remove("p1");
       ctrl.init("p1", { max: 20 }, { queueTimeoutMs: 0, maxQueueSize: 0 });
-      expect(ctrl.getStatus("p1")!.currentLimit).toBe(1);
+      expect(ctrl.getStatus("p1")!.currentLimit).toBe(20);
+      expect(ctrl.getStatus("p1")!.probeActive).toBe(true);
     });
   });
 
   describe("syncProvider", () => {
-    it("initializes on enable", () => {
+    it("initializes on enable at max", () => {
       ctrl.syncProvider("p1", {
         adaptive_enabled: 1, max_concurrency: 20,
         queue_timeout_ms: 5000, max_queue_size: 10,
       });
-      expect(ctrl.getStatus("p1")!.currentLimit).toBe(1);
+      expect(ctrl.getStatus("p1")!.currentLimit).toBe(20);
+      expect(ctrl.getStatus("p1")!.probeActive).toBe(true);
     });
 
     it("removes on disable", () => {
