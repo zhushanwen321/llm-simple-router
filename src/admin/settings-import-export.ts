@@ -1,18 +1,15 @@
 import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
 import { createHash } from "crypto";
-import { RetryRuleMatcher } from "../proxy/retry-rules.js";
-import { ProviderSemaphoreManager } from "../proxy/semaphore.js";
+import type { StateRegistry } from "../core/registry.js";
 import { getAllProviders, PROVIDER_CONCURRENCY_DEFAULTS } from "../db/index.js";
 import { encrypt, decrypt } from "../utils/crypto.js";
 import { getSetting } from "../db/settings.js";
-import { modelState } from "../proxy/model-state.js";
 import { API_CODE, apiError } from "./api-response.js";
 
 interface ImportExportOptions {
   db: Database.Database;
-  matcher: RetryRuleMatcher | null;
-  semaphoreManager?: ProviderSemaphoreManager;
+  stateRegistry: StateRegistry;
 }
 
 const CONFIG_TABLES = [
@@ -34,7 +31,7 @@ const BAD_REQUEST = 400;
 const KEY_PREFIX_LENGTH = 8;
 
 export const adminImportExportRoutes: FastifyPluginCallback<ImportExportOptions> = (app, options, done) => {
-  const { db, matcher, semaphoreManager } = options;
+  const { db, stateRegistry } = options;
 
   app.get("/admin/api/settings/export", async (_request, reply) => {
     const encryptionKey = getSetting(db, "encryption_key");
@@ -151,23 +148,21 @@ export const adminImportExportRoutes: FastifyPluginCallback<ImportExportOptions>
     })();
 
     // 导入成功后刷新内存缓存
-    if (matcher) matcher.load(db);
+    stateRegistry.refreshRetryRules();
 
-    if (semaphoreManager) {
-      // 清除旧的 semaphore 配置，按导入后的 providers 表重建
-      semaphoreManager.removeAll();
-      const providers = getAllProviders(db);
-      for (const p of providers) {
-        semaphoreManager.updateConfig(p.id, {
-          maxConcurrency: p.max_concurrency ?? PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency,
-          queueTimeoutMs: p.queue_timeout_ms ?? PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms,
-          maxQueueSize: p.max_queue_size ?? PROVIDER_CONCURRENCY_DEFAULTS.max_queue_size,
-        });
-      }
+    // 清除旧的 semaphore 配置，按导入后的 providers 表重建
+    stateRegistry.removeAllProviders();
+    const providers = getAllProviders(db);
+    for (const p of providers) {
+      stateRegistry.updateProviderConcurrency(p.id, {
+        maxConcurrency: p.max_concurrency ?? PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency,
+        queueTimeoutMs: p.queue_timeout_ms ?? PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms,
+        maxQueueSize: p.max_queue_size ?? PROVIDER_CONCURRENCY_DEFAULTS.max_queue_size,
+      });
     }
 
     // session_model_states 已通过 DB 导入，内存缓存会在读取时自然回填
-    modelState.clearAll();
+    stateRegistry.clearModelState();
 
     return reply.send(counts);
   });

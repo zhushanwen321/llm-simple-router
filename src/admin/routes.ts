@@ -18,16 +18,14 @@ import { adminUsageRoutes } from "./usage.js";
 import { adminUpgradeRoutes } from "./upgrade.js";
 import { adminImportExportRoutes } from "./settings-import-export.js";
 import { adminScheduleRoutes } from "./schedules.js";
-import { RetryRuleMatcher } from "../proxy/retry-rules.js";
+import type { StateRegistry } from "../core/registry.js";
 import type { RequestTracker } from "../monitor/request-tracker.js";
-import { ProviderSemaphoreManager } from "../proxy/semaphore.js";
 import type { AdaptiveConcurrencyController } from "../proxy/adaptive-controller.js";
 
 interface AdminRoutesOptions {
   db: Database.Database;
-  matcher: RetryRuleMatcher | null;
+  stateRegistry: StateRegistry;
   tracker?: RequestTracker;
-  semaphoreManager?: ProviderSemaphoreManager;
   adaptiveController?: AdaptiveConcurrencyController;
 }
 
@@ -36,19 +34,19 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (app, opti
   app.register(adminSetupRoutes, { db: options.db });
   app.register(adminAuthPlugin, { db: options.db });
   app.register(adminLoginRoutes, { db: options.db });
-  app.register(adminProviderRoutes, { db: options.db, semaphoreManager: options.semaphoreManager, tracker: options.tracker, adaptiveController: options.adaptiveController });
+  app.register(adminProviderRoutes, { db: options.db, stateRegistry: options.stateRegistry, tracker: options.tracker, adaptiveController: options.adaptiveController });
   app.register(adminMappingRoutes, { db: options.db });
   app.register(adminGroupRoutes, { db: options.db });
   app.register(adminScheduleRoutes, { db: options.db });
-  app.register(adminRetryRuleRoutes, { db: options.db, matcher: options.matcher });
+  app.register(adminRetryRuleRoutes, { db: options.db, stateRegistry: options.stateRegistry });
   app.register(adminLogRoutes, { db: options.db });
   app.register(adminRouterKeyRoutes, { db: options.db });
   app.register(adminStatsRoutes, { db: options.db });
   app.register(adminMetricsRoutes, { db: options.db });
-  app.register(adminProxyEnhancementRoutes, { db: options.db });
+  app.register(adminProxyEnhancementRoutes, { db: options.db, stateRegistry: options.stateRegistry });
   app.register(adminMonitorRoutes, { tracker: options.tracker });
   app.register(adminSettingsRoutes, { db: options.db });
-  app.register(adminImportExportRoutes, { db: options.db, matcher: options.matcher, semaphoreManager: options.semaphoreManager });
+  app.register(adminImportExportRoutes, { db: options.db, stateRegistry: options.stateRegistry });
   app.register(adminRecommendedRoutes, { db: options.db });
   app.register(adminUsageRoutes, { db: options.db });
   app.register(adminUpgradeRoutes, { db: options.db });

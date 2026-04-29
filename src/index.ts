@@ -23,6 +23,8 @@ import { adminRoutes } from "./admin/routes.js";
 import { RetryRuleMatcher } from "./proxy/retry-rules.js";
 import { ProviderSemaphoreManager } from "./proxy/semaphore.js";
 import { AdaptiveConcurrencyController } from "./proxy/adaptive-controller.js";
+import { loadEnhancementConfig } from "./proxy/enhancement-config.js";
+import type { StateRegistry } from "./core/registry.js";
 import { RequestTracker } from "./monitor/request-tracker.js";
 import { modelState } from "./proxy/model-state.js";
 import { UsageWindowTracker } from "./proxy/usage-window-tracker.js";
@@ -245,7 +247,19 @@ export async function buildApp(
     adaptiveController,
   });
 
-  app.register(adminRoutes, { db, matcher, tracker, semaphoreManager, adaptiveController });
+  // StateRegistry — Admin 层通过此接口触发 proxy 层状态刷新，消除 admin→proxy 依赖
+  const stateRegistry: StateRegistry = {
+    refreshRetryRules: () => matcher.load(db),
+    updateProviderConcurrency: (providerId, cfg) => semaphoreManager.updateConfig(providerId, cfg),
+    removeProvider: (providerId) => semaphoreManager.remove(providerId),
+    removeAllProviders: () => semaphoreManager.removeAll(),
+    getProviderStatus: (providerId) => semaphoreManager.getStatus(providerId),
+    clearModelState: () => modelState.clearAll(),
+    deleteModelState: (keyId, sessionId) => modelState.delete(keyId, sessionId),
+    getEnhancementConfig: () => loadEnhancementConfig(db),
+  };
+
+  app.register(adminRoutes, { db, stateRegistry, tracker, adaptiveController });
 
   // 前端静态文件服务（生产环境）
   const frontendDist = path.resolve(

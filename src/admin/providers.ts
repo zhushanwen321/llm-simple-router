@@ -5,7 +5,7 @@ import type { Provider } from "../db/index.js";
 import { getAllProviders, getProviderById, createProvider, updateProvider, deleteProvider, getAllMappingGroups, updateMappingGroup, PROVIDER_CONCURRENCY_DEFAULTS } from "../db/index.js";
 import { encrypt, decrypt } from "../utils/crypto.js";
 import { getSetting } from "../db/settings.js";
-import { ProviderSemaphoreManager } from "../proxy/semaphore.js";
+import type { StateRegistry } from "../core/registry.js";
 import type { AdaptiveConcurrencyController } from "../proxy/adaptive-controller.js";
 import type { RequestTracker } from "../monitor/request-tracker.js";
 import { HTTP_CREATED, HTTP_NOT_FOUND, HTTP_CONFLICT, HTTP_BAD_REQUEST } from "./constants.js";
@@ -127,13 +127,13 @@ const UpdateProviderSchema = Type.Object({
 
 interface ProviderRoutesOptions {
   db: Database.Database;
-  semaphoreManager?: ProviderSemaphoreManager;
+  stateRegistry?: StateRegistry;
   tracker?: RequestTracker;
   adaptiveController?: AdaptiveConcurrencyController;
 }
 
 export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> = (app, options, done) => {
-  const { db, semaphoreManager, tracker, adaptiveController } = options;
+  const { db, stateRegistry, tracker, adaptiveController } = options;
 
   app.get("/admin/api/providers", async (_request, reply) => {
     const encryptionKey = getSetting(db, "encryption_key")!;
@@ -155,7 +155,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
         queue_timeout_ms: s.queue_timeout_ms,
         max_queue_size: s.max_queue_size,
         adaptive_enabled: s.adaptive_enabled,
-        concurrency_status: semaphoreManager?.getStatus(s.id) ?? { active: 0, queued: 0 },
+        concurrency_status: stateRegistry?.getProviderStatus(s.id) ?? { active: 0, queued: 0 },
         created_at: s.created_at,
         updated_at: s.updated_at,
       };
@@ -190,7 +190,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     if (contextOverrides.length > 0) {
       setModelInfoForProvider(db, id, contextOverrides.map(o => ({ model_name: o.name, context_window: o.context_window })));
     }
-    semaphoreManager?.updateConfig(id, {
+    stateRegistry?.updateProviderConcurrency(id, {
       maxConcurrency: body.max_concurrency ?? PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency,
       queueTimeoutMs: body.queue_timeout_ms ?? PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms,
       maxQueueSize: body.max_queue_size ?? PROVIDER_CONCURRENCY_DEFAULTS.max_queue_size,
@@ -251,7 +251,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     }
 
     if (body.max_concurrency !== undefined || body.queue_timeout_ms !== undefined || body.max_queue_size !== undefined) {
-      semaphoreManager?.updateConfig(id, {
+      stateRegistry?.updateProviderConcurrency(id, {
         maxConcurrency: updated.max_concurrency,
         queueTimeoutMs: updated.queue_timeout_ms,
         maxQueueSize: updated.max_queue_size,
@@ -326,7 +326,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
       } catch { continue }
     }
     deleteProvider(db, id);
-    semaphoreManager?.remove(id);
+    stateRegistry?.removeProvider(id);
     adaptiveController?.remove(id);
     tracker?.removeProviderConfig(id);
     return reply.send({ success: true });
