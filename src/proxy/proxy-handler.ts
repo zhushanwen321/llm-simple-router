@@ -200,7 +200,7 @@ export async function handleProxyRequest(
     }
   }
 
-  if (interceptResponse) return handleIntercept(deps.db, apiType, request, reply, interceptResponse, clientModel, sessionId);
+  if (interceptResponse) return handleIntercept(deps.db, apiType, request, reply, interceptResponse, clientModel, sessionId, snapshot.toJSON());
 
   return executeFailoverLoop({
     request, reply, apiType, upstreamPath, errors, deps, options,

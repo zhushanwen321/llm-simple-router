@@ -37,6 +37,7 @@ export function handleIntercept(
   interceptResponse: { statusCode: number; body: unknown; meta?: unknown },
   clientModel: string,
   sessionId?: string,
+  pipelineSnapshot?: string,
 ): import("fastify").FastifyReply {
   const logId = randomUUID();
   const isStream = (request.body as Record<string, unknown>).stream === true;
@@ -52,7 +53,7 @@ export function handleIntercept(
     is_retry: 0, is_failover: 0, original_request_id: null,
     router_key_id: request.routerKey?.id ?? null, original_model: null,
     session_id: sessionId,
-    pipeline_snapshot: null,
+    pipeline_snapshot: pipelineSnapshot ?? null,
   });
   return reply.code(interceptResponse.statusCode).send(interceptResponse.body);
 }
