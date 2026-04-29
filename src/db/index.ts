@@ -149,6 +149,7 @@ export {
   estimateLogTableSize,
   deleteOldestLogs,
   getLogCount,
+  updateLogPipelineSnapshot,
 } from "./logs.js";
 export type { RequestLog, RequestLogGroupedRow, RequestLogListRow } from "./logs.js";
 

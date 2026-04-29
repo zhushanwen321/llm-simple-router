@@ -69,6 +69,7 @@ export interface RequestLogInsert {
   original_model?: string | null;
   session_id?: string | null;
   client_status_code?: number | null;
+  pipeline_snapshot?: string | null;
 }
 
 export function insertRequestLog(
@@ -78,8 +79,8 @@ export function insertRequestLog(
   db.prepare(
     `INSERT INTO request_logs (id, api_type, model, provider_id, status_code, client_status_code, latency_ms,
       is_stream, error_message, created_at, client_request, upstream_request, upstream_response,
-      is_retry, is_failover, original_request_id, router_key_id, original_model, session_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      is_retry, is_failover, original_request_id, router_key_id, original_model, session_id, pipeline_snapshot)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     log.id, log.api_type, log.model, log.provider_id, log.status_code,
     log.client_status_code ?? null,
@@ -89,6 +90,7 @@ export function insertRequestLog(
     log.is_retry ?? 0, log.is_failover ?? 0, log.original_request_id ?? null,
     log.router_key_id ?? null, log.original_model ?? null,
     log.session_id ?? null,
+    log.pipeline_snapshot ?? null,
   );
 }
 
@@ -342,4 +344,9 @@ export function getRequestLogsGrouped(
     )
     .all(...params, options.limit, offset) as RequestLogGroupedRow[];
   return { data, total };
+}
+
+/** 后续 pipeline 阶段完成后，回写 snapshot 到已有日志 */
+export function updateLogPipelineSnapshot(db: Database.Database, logId: string, snapshot: string): void {
+  db.prepare("UPDATE request_logs SET pipeline_snapshot = ? WHERE id = ?").run(snapshot, logId);
 }

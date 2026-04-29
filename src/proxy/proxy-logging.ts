@@ -52,6 +52,7 @@ export function handleIntercept(
     is_retry: 0, is_failover: 0, original_request_id: null,
     router_key_id: request.routerKey?.id ?? null, original_model: null,
     session_id: sessionId,
+    pipeline_snapshot: null,
   });
   return reply.code(interceptResponse.statusCode).send(interceptResponse.body);
 }
@@ -71,6 +72,7 @@ export function logResilienceResult(
     routerKeyId: string | null;
     originalModel: string | null;
     sessionId?: string | null;
+    pipelineSnapshot?: string;
     failover?: FailoverContext;
   },
   attempts: ResilienceAttempt[],
@@ -103,6 +105,7 @@ export function logResilienceResult(
         original_request_id: parentId,
         router_key_id: params.routerKeyId, original_model: params.originalModel,
         session_id: params.sessionId,
+        pipeline_snapshot: params.pipelineSnapshot ?? null,
       });
     } else if (attempt.error) {
       insertRequestLog(db, {
@@ -119,6 +122,7 @@ export function logResilienceResult(
         original_request_id: parentId,
         router_key_id: params.routerKeyId, original_model: params.originalModel,
         session_id: params.sessionId,
+        pipeline_snapshot: params.pipelineSnapshot ?? null,
       });
     } else if (attempt.statusCode !== UPSTREAM_SUCCESS) {
       insertRequestLog(db, {
@@ -133,6 +137,7 @@ export function logResilienceResult(
         original_request_id: parentId,
         router_key_id: params.routerKeyId, original_model: params.originalModel,
         session_id: params.sessionId,
+        pipeline_snapshot: params.pipelineSnapshot ?? null,
       });
     } else {
       const upHdrs = (result.kind === "stream_success" || result.kind === "stream_abort")
@@ -150,6 +155,7 @@ export function logResilienceResult(
         originalRequestId: parentId,
         routerKeyId: params.routerKeyId, originalModel: params.originalModel,
         sessionId: params.sessionId,
+        pipelineSnapshot: params.pipelineSnapshot,
       });
       lastSuccessLogId = attemptLogId;
     }
