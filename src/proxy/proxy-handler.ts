@@ -145,6 +145,45 @@ export async function handleProxyRequest(
   const sessionId = (request.headers as RawHeaders)["x-claude-code-session-id"] as string | undefined;
   const { effectiveModel, originalModel, interceptResponse } = applyEnhancement(deps.db, request, clientModel, sessionId);
 
+  // --- 工具调用循环检测 ---
+  if (deps.sessionTracker && sessionId) {
+    const routerKeyId = (request.routerKey as { id?: string } | undefined)?.id ?? null;
+    const sessionKey = routerKeyId ? `${routerKeyId}:${sessionId}` : sessionId;
+    const lastToolUse = extractLastToolUse(request.body as Record<string, unknown>);
+    if (lastToolUse) {
+      const toolGuard = new ToolLoopGuard(deps.sessionTracker, {
+        enabled: true,
+        minConsecutiveCount: 3,
+        detectorConfig: { n: 6, windowSize: 500, repeatThreshold: 5 },
+      });
+      const checkResult = toolGuard.check(sessionKey, lastToolUse);
+      if (checkResult.detected) {
+        const loopCount = deps.sessionTracker.getLoopCount(sessionKey);
+        if (loopCount === 1) {
+          // 层级 1：透明重试 — 注入中断提示词
+          request.body = toolGuard.injectLoopBreakPrompt(request.body as Record<string, unknown>, apiType, lastToolUse.toolName);
+          request.log.warn({ sessionId, toolName: lastToolUse.toolName, loopCount },
+            "Tool call loop detected, injecting break prompt");
+        } else if (loopCount === TIER2_LOOP_THRESHOLD) {
+          // 层级 2：优雅中断
+          return reply.code(HTTP_UNPROCESSABLE_ENTITY).send({
+            error: {
+              type: "tool_call_loop_detected",
+              message: `检测到工具调用循环（连续重复调用 "${lastToolUse.toolName}"）。请求已中断。`,
+              suggestion: "请回顾对话历史，停止重复调用工具，直接告知用户当前的进展和遇到的问题。",
+            },
+          });
+        } else {
+          // 层级 3：直接断开
+          request.log.warn({ sessionId, toolName: lastToolUse.toolName, loopCount },
+            "Tool call loop detected, hard disconnecting");
+          reply.raw.destroy();
+          return reply;
+        }
+      }
+    }
+  }
+
   if (interceptResponse) return handleIntercept(deps.db, apiType, request, reply, interceptResponse, clientModel, sessionId);
 
   return executeFailoverLoop({
