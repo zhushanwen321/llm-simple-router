@@ -6,7 +6,7 @@ import { insertSuccessLog, type FailoverContext } from "./log-helpers.js";
 import { MetricsExtractor } from "../metrics/metrics-extractor.js";
 import { estimateInputTokens } from "../utils/token-counter.js";
 import type { FastifyRequest } from "fastify";
-import type { ResilienceAttempt } from "./resilience.js";
+import type { ResilienceAttempt } from "./orchestration/resilience.js";
 import type { TransportResult } from "./types.js";
 
 // Internal imports from types.ts

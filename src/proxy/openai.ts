@@ -9,9 +9,9 @@ import { proxyGetRequest, createErrorFormatter, type ProxyErrorResponse } from "
 import type { ErrorKind } from "./proxy-core.js";
 import type { RawHeaders } from "./types.js";
 import { handleProxyRequest, type RouteHandlerDeps } from "./proxy-handler.js";
-import { createOrchestrator } from "./orchestrator.js";
-import { RetryRuleMatcher } from "./retry-rules.js";
-import { ProviderSemaphoreManager } from "./semaphore.js";
+import { createOrchestrator } from "./orchestration/orchestrator.js";
+import { RetryRuleMatcher } from "./orchestration/retry-rules.js";
+import { ProviderSemaphoreManager } from "./orchestration/semaphore.js";
 import type { RequestTracker } from "../monitor/request-tracker.js";
 import type { UsageWindowTracker } from "./usage-window-tracker.js";
 import type { AdaptiveConcurrencyController } from "./adaptive-controller.js";

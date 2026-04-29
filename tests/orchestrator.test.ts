@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { ProxyOrchestrator } from "../src/proxy/orchestrator.js";
+import { ProxyOrchestrator } from "../src/proxy/orchestration/orchestrator.js";
 import type { TransportResult } from "../src/proxy/types.js";
-import type { ResilienceResult } from "../src/proxy/resilience.js";
-import type { SemaphoreScope } from "../src/proxy/scope.js";
-import type { TrackerScope } from "../src/proxy/scope.js";
+import type { ResilienceResult } from "../src/proxy/orchestration/resilience.js";
+import type { SemaphoreScope } from "../src/proxy/orchestration/scope.js";
+import type { TrackerScope } from "../src/proxy/orchestration/scope.js";
 import { ProviderSwitchNeeded } from "../src/proxy/types.js";
 
 function createMockDeps() {

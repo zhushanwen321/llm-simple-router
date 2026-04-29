@@ -8,8 +8,8 @@ import { openaiProxy } from "../src/proxy/openai.js";
 import { authMiddleware } from "../src/middleware/auth.js";
 import { initDatabase } from "../src/db/index.js";
 import { setSetting } from "../src/db/settings.js";
-import { RetryRuleMatcher } from "../src/proxy/retry-rules.js";
-import { ProviderSemaphoreManager } from "../src/proxy/semaphore.js";
+import { RetryRuleMatcher } from "../src/proxy/orchestration/retry-rules.js";
+import { ProviderSemaphoreManager } from "../src/proxy/orchestration/semaphore.js";
 import { RequestTracker } from "../src/monitor/request-tracker.js";
 
 const API_KEY = "sk-test-router";

@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { handleProxyRequest } from "../src/proxy/proxy-handler.js";
 import type { ProxyErrorFormatter } from "../src/proxy/proxy-core.js";
-import type { ResilienceResult } from "../src/proxy/resilience.js";
+import type { ResilienceResult } from "../src/proxy/orchestration/resilience.js";
 import { ProviderSwitchNeeded } from "../src/proxy/types.js";
-import { SemaphoreQueueFullError, SemaphoreTimeoutError } from "../src/proxy/semaphore.js";
+import { SemaphoreQueueFullError, SemaphoreTimeoutError } from "../src/proxy/orchestration/semaphore.js";
 
 vi.mock("../src/db/index.js", () => ({
   getMappingGroup: vi.fn(() => undefined),

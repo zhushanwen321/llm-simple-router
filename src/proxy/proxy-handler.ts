@@ -7,7 +7,7 @@ import { decrypt } from "../utils/crypto.js";
 import { getSetting } from "../db/settings.js";
 import { resolveMapping } from "./mapping-resolver.js";
 import { applyEnhancement } from "./enhancement/enhancement-handler.js";
-import { SemaphoreQueueFullError, SemaphoreTimeoutError } from "./semaphore.js";
+import { SemaphoreQueueFullError, SemaphoreTimeoutError } from "./orchestration/semaphore.js";
 import type { RequestTracker } from "../monitor/request-tracker.js";
 import {
   logResilienceResult,
@@ -21,8 +21,8 @@ import type { RawHeaders, TransportResult } from "./types.js";
 import type { Target } from "../core/types.js";
 import { updateLogStreamContent, updateLogClientStatus } from "../db/index.js";
 import { insertRejectedLog } from "./log-helpers.js";
-import type { RetryRuleMatcher } from "./retry-rules.js";
-import type { ProxyOrchestrator } from "./orchestrator.js";
+import type { RetryRuleMatcher } from "./orchestration/retry-rules.js";
+import type { ProxyOrchestrator } from "./orchestration/orchestrator.js";
 import type { ProxyErrorFormatter, ProxyErrorResponse } from "./proxy-core.js";
 import { ToolLoopGuard } from "./loop-prevention/tool-loop-guard.js";
 import { TOOL_USE_ID_PREFIX, TOOL_USE_ID_PROVIDER_PREFIX } from "./enhancement/directive-parser.js";

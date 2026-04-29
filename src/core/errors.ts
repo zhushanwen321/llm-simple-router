@@ -35,7 +35,7 @@ export class SemaphoreTimeoutError extends Error {
 export class ProviderSwitchNeeded extends Error {
   constructor(
     public readonly targetProviderId: string,
-    public readonly attempts?: import("../proxy/resilience.js").ResilienceAttempt[],
+    public readonly attempts?: import("../proxy/orchestration/resilience.js").ResilienceAttempt[],
     public readonly lastResult?: TransportResult,
   ) {
     super(`Provider switch needed: ${targetProviderId}`);

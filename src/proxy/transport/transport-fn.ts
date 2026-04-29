@@ -11,7 +11,7 @@ import { UPSTREAM_SUCCESS } from "../types.js";
 import type { RawHeaders, TransportResult } from "../types.js";
 import type { Target } from "../../core/types.js";
 import type { RequestTracker } from "../../monitor/request-tracker.js";
-import type { RetryRuleMatcher } from "../retry-rules.js";
+import type { RetryRuleMatcher } from "../orchestration/retry-rules.js";
 import { buildModelInfoTag } from "../enhancement/enhancement-handler.js";
 import { DEFAULT_MAX_RAW as STREAM_CONTENT_MAX_RAW, DEFAULT_MAX_TEXT as STREAM_CONTENT_MAX_TEXT } from "../../monitor/stream-content-accumulator.js";
 

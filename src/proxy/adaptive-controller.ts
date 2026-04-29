@@ -1,4 +1,4 @@
-import type { ProviderSemaphoreManager } from "./semaphore.js";
+import type { ProviderSemaphoreManager } from "./orchestration/semaphore.js";
 
 export interface AdaptiveState {
   currentLimit: number;

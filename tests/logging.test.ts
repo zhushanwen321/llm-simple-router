@@ -14,7 +14,7 @@ import { authMiddleware } from "../src/middleware/auth.js";
 import { encrypt } from "../src/utils/crypto.js";
 import { initDatabase } from "../src/db/index.js";
 import { setSetting } from "../src/db/settings.js";
-import { ProviderSemaphoreManager } from "../src/proxy/semaphore.js";
+import { ProviderSemaphoreManager } from "../src/proxy/orchestration/semaphore.js";
 import { RequestTracker } from "../src/monitor/request-tracker.js";
 
 const API_KEY = "sk-test-router";

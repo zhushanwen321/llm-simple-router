@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { FastifyInstance } from "fastify";
 import { buildApp } from "../src/index.js";
 import { initDatabase } from "../src/db/index.js";
-import { RetryRuleMatcher } from "../src/proxy/retry-rules.js";
+import { RetryRuleMatcher } from "../src/proxy/orchestration/retry-rules.js";
 import { makeConfig, seedSettings, login } from "./helpers/test-setup.js";
 
 describe("Retry Rule CRUD", () => {

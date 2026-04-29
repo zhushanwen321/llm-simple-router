@@ -6,8 +6,8 @@ import { encrypt } from "../src/utils/crypto.js";
 import { anthropicProxy } from "../src/proxy/anthropic.js";
 import { initDatabase } from "../src/db/index.js";
 import { setSetting } from "../src/db/settings.js";
-import { RetryRuleMatcher } from "../src/proxy/retry-rules.js";
-import { ProviderSemaphoreManager } from "../src/proxy/semaphore.js";
+import { RetryRuleMatcher } from "../src/proxy/orchestration/retry-rules.js";
+import { ProviderSemaphoreManager } from "../src/proxy/orchestration/semaphore.js";
 import { RequestTracker } from "../src/monitor/request-tracker.js";
 
 const TEST_KEY =

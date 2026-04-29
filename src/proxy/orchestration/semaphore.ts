@@ -1,4 +1,4 @@
-import { SemaphoreQueueFullError, SemaphoreTimeoutError } from "../core/errors.js";
+import { SemaphoreQueueFullError, SemaphoreTimeoutError } from "../../core/errors.js";
 export { SemaphoreQueueFullError, SemaphoreTimeoutError };
 
 interface ConcurrencyConfig {
