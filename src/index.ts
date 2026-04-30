@@ -284,7 +284,11 @@ export async function buildApp(
     },
   };
 
-  app.register(adminRoutes, { db, stateRegistry, tracker, adaptiveController, logFileWriter, logsDir });
+  // Late-bound close ref — close 函数在 adminRoutes 注册之后才定义，
+  // 但 restart API 需要在运行时调用它
+  const closeRef = { fn: async () => {} };
+
+  app.register(adminRoutes, { db, stateRegistry, tracker, adaptiveController, logFileWriter, logsDir, closeFn: () => closeRef.fn() });
 
   // 前端静态文件服务（生产环境）
   const frontendDist = path.resolve(
@@ -350,6 +354,9 @@ export async function buildApp(
       await prevClose();
     };
   }
+
+  // 将最终版 close 函数绑定到 late-bound ref（供 restart API 运行时调用）
+  closeRef.fn = close;
 
   return {
     app,
