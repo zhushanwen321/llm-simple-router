@@ -1,35 +1,9 @@
 // TODO: 当文件超过 400 行时拆分为 metrics-streaming.ts（流式事件处理 + TPS 计算）和 metrics-extractor.ts（非流式 + 类型）
 
-import { MS_PER_SECOND } from "../constants.js";
+import { MS_PER_SECOND } from "../core/constants.js";
+import type { MetricsResult } from "../core/types.js";
 import { encode } from "gpt-tokenizer";
 import type { SSEEvent } from "./sse-parser.js";
-
-export interface MetricsResult {
-  input_tokens: number | null;
-  output_tokens: number | null;
-  cache_creation_tokens: number | null;
-  cache_read_tokens: number | null;
-  ttft_ms: number | null;
-  /** T6 - T0: proxy end-to-end streaming duration */
-  total_duration_ms: number | null;
-  /** @deprecated Use total_tps instead */
-  tokens_per_second: number | null;
-  stop_reason: string | null;
-  is_complete: number;
-  input_tokens_estimated?: number;
-  // --- Two-phase TPS: thinking / non-thinking ---
-  thinking_tokens: number | null;
-  /** T3 - T0: request start to last thinking delta */
-  thinking_duration_ms: number | null;
-  thinking_tps: number | null;
-  /** T6 - T3 (thinking) or T6 - T0 (non-thinking) */
-  non_thinking_duration_ms: number | null;
-  non_thinking_tps: number | null;
-  total_tps: number | null;
-  // --- Content counts (for analysis, not TPS) ---
-  text_tokens: number | null;
-  tool_use_tokens: number | null;
-}
 
 interface AnthropicMessageStart {
   type: string;

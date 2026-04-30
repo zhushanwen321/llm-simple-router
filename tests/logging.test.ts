@@ -8,14 +8,16 @@ import {
 } from "http";
 import Database from "better-sqlite3";
 import { createHash } from "crypto";
-import { openaiProxy } from "../src/proxy/openai.js";
-import { anthropicProxy } from "../src/proxy/anthropic.js";
+import { openaiProxy } from "../src/proxy/handler/openai.js";
+import { anthropicProxy } from "../src/proxy/handler/anthropic.js";
 import { authMiddleware } from "../src/middleware/auth.js";
 import { encrypt } from "../src/utils/crypto.js";
 import { initDatabase } from "../src/db/index.js";
 import { setSetting } from "../src/db/settings.js";
-import { ProviderSemaphoreManager } from "../src/proxy/semaphore.js";
+import { ProviderSemaphoreManager } from "../src/proxy/orchestration/semaphore.js";
 import { RequestTracker } from "../src/monitor/request-tracker.js";
+import { ServiceContainer } from "../src/core/container.js";
+
 
 const API_KEY = "sk-test-router";
 const API_KEY_HASH = createHash("sha256").update(API_KEY).digest("hex");
@@ -58,21 +60,16 @@ function createApp() {
   const app = Fastify();
   const semaphoreManager = new ProviderSemaphoreManager();
   const tracker = new RequestTracker({ semaphoreManager });
+  const container = new ServiceContainer();
+  container.register("semaphoreManager", () => semaphoreManager);
+  container.register("tracker", () => tracker);
+  container.register("matcher", () => undefined);
+  container.register("usageWindowTracker", () => undefined);
+  container.register("sessionTracker", () => undefined);
+  container.register("adaptiveController", () => undefined);
   app.register(authMiddleware, { db });
-  app.register(openaiProxy, {
-    db,
-    streamTimeoutMs: 5000,
-    retryBaseDelayMs: 0,
-    semaphoreManager,
-    tracker,
-  });
-  app.register(anthropicProxy, {
-    db,
-    streamTimeoutMs: 5000,
-    retryBaseDelayMs: 0,
-    semaphoreManager,
-    tracker,
-  });
+  app.register(openaiProxy, { db: db, container });
+  app.register(anthropicProxy, { db: db, container });
 
   return { app, db };
 }

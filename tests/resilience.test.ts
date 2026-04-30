@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
 import type { Target } from "../src/proxy/strategy/types.js";
 import type { TransportResult } from "../src/proxy/types.js";
-import type { ResilienceConfig } from "../src/proxy/resilience.js";
-import { ResilienceLayer, FixedIntervalStrategy, ExponentialBackoffStrategy, createStrategy } from "../src/proxy/resilience.js";
-import { RetryRuleMatcher } from "../src/proxy/retry-rules.js";
+import type { ResilienceConfig } from "../src/proxy/orchestration/resilience.js";
+import { ResilienceLayer, FixedIntervalStrategy, ExponentialBackoffStrategy, createStrategy } from "../src/proxy/orchestration/resilience.js";
+import { RetryRuleMatcher } from "../src/proxy/orchestration/retry-rules.js";
 import type { RetryRule } from "../src/db/retry-rules.js";
 
 // ---------- Targets ----------

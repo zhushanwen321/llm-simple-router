@@ -1,8 +1,0 @@
-{"type":"server-started","port":51868,"host":"127.0.0.1","url_host":"localhost","url":"http://localhost:51868","screen_dir":"/Users/zhushanwen/Code/llm-simple-router/.superpowers/brainstorm/63270-1776350892"}
-{"type":"screen-added","file":"/Users/zhushanwen/Code/llm-simple-router/.superpowers/brainstorm/63270-1776350892/current-vs-timeline.html"}
-{"type":"screen-added","file":"/Users/zhushanwen/Code/llm-simple-router/.superpowers/brainstorm/63270-1776350892/fullarea-replace.html"}
-{"type":"screen-added","file":"/Users/zhushanwen/Code/llm-simple-router/.superpowers/brainstorm/63270-1776350892/detail-request-view.html"}
-{"type":"screen-added","file":"/Users/zhushanwen/Code/llm-simple-router/.superpowers/brainstorm/63270-1776350892/message-structure-detail.html"}
-{"type":"screen-added","file":"/Users/zhushanwen/Code/llm-simple-router/.superpowers/brainstorm/63270-1776350892/response-view.html"}
-{"type":"screen-added","file":"/Users/zhushanwen/Code/llm-simple-router/.superpowers/brainstorm/63270-1776350892/waiting.html"}
-{"type":"server-stopped","reason":"owner process exited"}

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { ModelStateManager } from "../src/proxy/model-state.js";
+import { ModelStateManager } from "../src/proxy/routing/model-state.js";
 
 describe("ModelStateManager", () => {
   let mgr: ModelStateManager;

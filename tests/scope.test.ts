@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-import { SemaphoreScope, TrackerScope } from "../src/proxy/scope.js";
-import { ProviderSemaphoreManager } from "../src/proxy/semaphore.js";
+import { SemaphoreScope, TrackerScope } from "../src/proxy/orchestration/scope.js";
+import { ProviderSemaphoreManager } from "../src/proxy/orchestration/semaphore.js";
 import { RequestTracker } from "../src/monitor/request-tracker.js";
 import type { ActiveRequest } from "../src/monitor/types.js";
 

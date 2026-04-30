@@ -52,8 +52,22 @@ docker compose up -d
 
 **入口层：**
 - `src/cli.ts` — npm bin 入口（带 shebang），无条件调用 `main()`
-- `src/index.ts` — 库入口，导出 `buildApp` 和 `main`。`buildApp()` 组装所有插件，支持注入 `db`（测试用 in-memory）
-- `src/config.ts` — 单例配置，惰性缓存
+- `src/index.ts` — 库入口，导出 `buildApp` 和 `main`。`buildApp()` 组装所有插件，支持注入 `db`（测试用 in-memory）。使用 `ServiceContainer` 管理依赖
+- `src/config/index.ts` — 单例配置，惰性缓存
+
+**核心层 `src/core/`：**
+- `core/types.ts` — 共享类型：`Target`、`MappingGroup`、`RetryStrategy` 等
+- `core/constants.ts` — 共享常量：HTTP 状态码、API 类型判断
+- `core/errors.ts` — 共享错误：`ProviderSwitchNeeded` 及其 `ResilienceAttempt` 类型
+- `core/registry.ts` — `StateRegistry` 接口（admin→proxy 解耦）
+- `core/container.ts` — 轻量 DI 容器（`ServiceContainer`），懒加载单例工厂
+
+**核心层 `src/core/`：**
+- `types.ts` — 共享类型：`Target`（映射目标）、`MappingStrategy` 等
+- `constants.ts` — 共享常量：HTTP 状态码、API 类型工具函数
+- `errors.ts` — 共享错误类型：`ProviderSwitchNeeded`、`ResilienceAttempt`
+- `registry.ts` — `StateRegistry` 接口：admin→proxy 状态刷新的解耦边界
+- `container.ts` — 轻量 DI 容器：懒加载单例工厂注册表
 
 **`buildApp()` 插件注册顺序：**
 ```
@@ -62,39 +76,45 @@ seedDefaultRules → ModelStateManager.init → RetryRuleMatcher.load
 → authMiddleware → openaiProxy → anthropicProxy → adminRoutes → fastifyStatic
 ```
 
-**代理层 `src/proxy/`（三层架构：Handler → Orchestrator → Transport）：**
+**代理层 `src/proxy/`（四层架构：Handler → Orchestration → Routing → Transport）：**
 
 | 文件 | 角色 |
 |------|------|
-| `proxy-handler.ts` | **Handler 层**：`handleProxyRequest()` — Fastify 路由回调，负责映射解析、header 构建、日志记录，调用 Orchestrator |
-| `orchestrator.ts` | **Orchestrator 层**：`ProxyOrchestrator` — 协调信号量、tracker、resilience 三大 scope，驱动重试/failover 循环 |
-| `resilience.ts` | 重试决策层（替代旧 `retry.ts`）：`ResilienceLayer` + fixed/exponential 策略，判断是否重试/failover |
-| `transport.ts` | **Transport 层**：底层 HTTP 调用 `callNonStream()`/`callGet()`，构建原始 `http.request` |
-| `stream-proxy.ts` | SSE 流式代理引擎：`StreamProxy` 类管理缓冲状态机 + `SSEMetricsTransform` 旁路采集 |
-| `scope.ts` | 信号量/追踪器 scope 包装：`SemaphoreScope`（acquire/release）+ `TrackerScope`（start/complete） |
+| `handler/proxy-handler.ts` | **Handler 层**：`handleProxyRequest()` — Fastify 路由回调，负责映射解析、header 构建、日志记录，调用 Orchestrator |
+| `handler/openai.ts` | OpenAI 代理插件（`POST /v1/chat/completions`、`GET /v1/models`），注入 `stream_options` |
+| `handler/anthropic.ts` | Anthropic 代理插件（`POST /v1/messages`），与 openai.ts 对称 |
+| `orchestration/orchestrator.ts` | **Orchestration 层**：`ProxyOrchestrator` — 协调信号量、tracker、resilience 三大 scope，驱动重试/failover 循环 |
+| `orchestration/resilience.ts` | 重试决策层：`ResilienceLayer` + fixed/exponential 策略，判断是否重试/failover |
+| `orchestration/semaphore.ts` | Provider 级并发控制：基于 Promise 的等待队列，支持 AbortSignal 和超时 |
+| `orchestration/scope.ts` | 信号量/追踪器 scope 包装：`SemaphoreScope`（acquire/release）+ `TrackerScope`（start/complete） |
+| `orchestration/retry-rules.ts` | `RetryRuleMatcher`：从 DB 加载规则到内存，按 status_code 分组缓存 |
+| `routing/mapping-resolver.ts` | **Routing 层**：将 client_model 解析为 `{ backend_model, provider_id }` |
+| `routing/model-state.ts` | `ModelStateManager` 单例：内存 + SQLite 双层缓存，24h 滑动窗口 |
+| `routing/overflow.ts` | 溢出重定向：上下文超出时切换到更大模型 |
+| `routing/usage-window-tracker.ts` | 5h 用量窗口追踪，启动时自动补齐缺失窗口 |
+| `routing/enhancement-config.ts` | 加载代理增强配置（DB settings） |
+| `transport/http.ts` | **Transport 层**：底层 HTTP 调用 `callNonStream()`/`callGet()`，构建原始 `http.request` |
+| `transport/stream.ts` | SSE 流式代理引擎：`StreamProxy` 类管理缓冲状态机 + `SSEMetricsTransform` 旁路采集 |
+| `transport/transport-fn.ts` | 构建传输函数闭包，桥接 handler 参数和 transport 层 |
+| `proxy-core.ts` | 共享工具：错误格式化工厂、上游 header 构建、GET 代理、URL 拼接 |
+| `types.ts` | 代理层类型 re-export hub（实际类型定义在 `core/types.ts`） |
 | `proxy-logging.ts` | 日志工具：header 脱敏、拦截日志、resilience 结果日志、transport 指标采集 |
-| `log-helpers.ts` | DB 日志插入：`insertSuccessLog()` / `insertRejectedLog()`，携带 failover/retry 元数据 |
-| `proxy-core.ts` | 共享工具：错误格式化工厂、上游 header 构建、GET 代理。Re-export `types.ts` 和 `transport.ts` 类型 |
-| `types.ts` | 代理层常量和类型：`UPSTREAM_SUCCESS`、`RawHeaders`、`TransportResult`、`ProviderSwitchNeeded` |
-| `openai.ts` | OpenAI 代理插件（`POST /v1/chat/completions`、`GET /v1/models`），注入 `stream_options` |
-| `anthropic.ts` | Anthropic 代理插件（`POST /v1/messages`），与 openai.ts 对称 |
-| `semaphore.ts` | Provider 级并发控制：基于 Promise 的等待队列，支持 AbortSignal 和超时 |
-| `retry-rules.ts` | `RetryRuleMatcher`：从 DB 加载规则到内存，按 status_code 分组缓存 |
-| `enhancement-handler.ts` | 代理增强：指令解析、命令拦截、会话记忆 |
-| `directive-parser.ts` | 从 user 消息中提取 `$SELECT-MODEL` / `[router-model]` / `[router-command]` 标记 |
-| `model-state.ts` | `ModelStateManager` 单例：内存 + SQLite 双层缓存，24h 滑动窗口 |
-| `response-cleaner.ts` | 清理历史消息中的路由标签 |
-| `mapping-resolver.ts` | 将 client_model 解析为 `{ backend_model, provider_id }` |
+| `log-helpers.ts` | DB 日志插入：`insertRejectedLog()`，携带 failover/retry 元数据 |
+| `enhancement/enhancement-handler.ts` | 代理增强：指令解析、命令拦截、会话记忆 |
+| `enhancement/directive-parser.ts` | 从 user 消息中提取 `$SELECT-MODEL` / `[router-model]` / `[router-command]` 标记 |
+| `enhancement/response-cleaner.ts` | 清理历史消息中的路由标签 |
+| `loop-prevention/` | 工具调用循环检测 + 流式循环检测（N-gram） |
+| `patch/` | 上游响应修补（DeepSeek 等） |
 | `strategy/` | 四种路由策略：`scheduled`（定时）、`round-robin`（轮询）、`random`（随机）、`failover`（故障转移） |
 
-**请求处理流程（三层调用链）：**
+**请求处理流程（四层调用链）：**
 ```
-Handler (proxy-handler.ts)
+Handler (handler/proxy-handler.ts)
   applyEnhancement → resolveMapping → buildHeaders
   → orchestrator.execute()
     → SemaphoreScope.acquire（队列满→503，超时→504）
     → ResilienceLayer（transportFn 循环：重试/failover 决策）
-      → Transport (transport.ts / stream-proxy.ts)
+      → Transport (transport/http.ts / transport/stream.ts)
     → TrackerScope.complete
   → insertSuccessLog + collectTransportMetrics
 ```
@@ -184,7 +204,7 @@ Handler (proxy-handler.ts)
 - Resilience 层统一处理重试（fixed/exponential）和 failover 决策，替代旧 `retry.ts`
 - 信号量按 Provider 维度独立管理，基于 Promise 队列，支持 AbortSignal（客户端断连自动取消）
 - **token 计数统一使用 `gpt-tokenizer`（o200k_base）**：禁止用字符长度估算 token 数。当 API 未返回 `input_tokens`（如部分第三方模型）时，`collectTransportMetrics()` 自动回退到 `estimateInputTokens()` 从请求体计数。
-  相关文件：`src/utils/token-counter.ts`（共享工具）、`src/proxy/overflow.ts`（请求 token 估算溢出）、`src/metrics/metrics-extractor.ts`（thinking 模型 text-only TPS 计算）。
+  相关文件：`src/utils/token-counter.ts`（共享工具）、`src/proxy/routing/overflow.ts`（请求 token 估算溢出）、`src/metrics/metrics-extractor.ts`（thinking 模型 text-only TPS 计算）。
   长文本（>4000 字符）采用采样外推策略避免性能问题。
 
 ## 环境变量

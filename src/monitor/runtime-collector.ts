@@ -1,5 +1,5 @@
 import { performance } from "node:perf_hooks";
-import { MS_PER_SECOND } from "../constants.js";
+import { MS_PER_SECOND } from "../core/constants.js";
 import type { RuntimeMetrics } from "./types.js";
 const NS_PER_MS = 1e6;
 

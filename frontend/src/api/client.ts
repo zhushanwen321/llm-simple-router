@@ -129,6 +129,7 @@ export interface ProviderPayload {
   max_concurrency?: number;
   queue_timeout_ms?: number;
   max_queue_size?: number;
+  adaptive_enabled?: number;
 }
 
 interface MappingPayload {
@@ -296,6 +297,8 @@ export interface ConfigExportResponse {
 
 export interface ProxyEnhancementConfig {
   claude_code_enabled: boolean;
+  tool_call_loop_enabled: boolean;
+  stream_loop_enabled: boolean;
 }
 
 export interface UpgradeStatus {

@@ -48,7 +48,8 @@
               </div>
             </TableCell>
             <TableCell>
-              <Badge v-if="p.max_concurrency > 0" variant="secondary">{{ p.max_concurrency }}</Badge>
+              <Badge v-if="p.adaptive_enabled" variant="outline">自适应</Badge>
+              <Badge v-else-if="p.max_concurrency > 0" variant="secondary">{{ p.max_concurrency }}</Badge>
               <span v-else class="text-muted-foreground">-</span>
             </TableCell>
             <TableCell>
@@ -146,26 +147,39 @@
               <Button type="button" variant="outline" size="sm" @click="addModel" :disabled="!modelInput.trim()">添加</Button>
             </div>
           </div>
-          <div>
-            <div class="flex items-center gap-2 mb-1">
-              <Switch v-model="concurrencyEnabled" id="concurrency-switch" />
-              <Label for="concurrency-switch" class="text-sm text-foreground">并发控制</Label>
-            </div>
-            <div v-if="concurrencyEnabled" class="mt-2 space-y-2">
+          <!-- 并发控制 -->
+          <div class="border-t pt-4 mt-4">
+            <div class="text-sm font-medium text-foreground mb-3">并发控制</div>
+            <div class="space-y-3">
               <div>
-                <Label class="block text-sm font-medium text-foreground mb-1">最大并发数</Label>
-                <Input v-model.number="form.max_concurrency" type="number" min="1" :max="MAX_CONCURRENCY" placeholder="3" @input="delete errors.max_concurrency" />
-                <p v-if="errors.max_concurrency" class="text-sm text-destructive mt-1">{{ errors.max_concurrency }}</p>
+                <Label class="block text-sm font-medium text-foreground mb-1">模式</Label>
+                <Select v-model="concurrencyMode" @update:model-value="(v: unknown) => onConcurrencyModeChange(v as 'auto' | 'manual' | 'none')">
+                  <SelectTrigger>
+                    <SelectValue placeholder="选择模式" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="auto">自动（自适应）</SelectItem>
+                    <SelectItem value="manual">手动</SelectItem>
+                    <SelectItem value="none">无</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <div>
-                <Label class="block text-sm font-medium text-foreground mb-1">队列超时 (ms)</Label>
-                <Input v-model.number="form.queue_timeout_ms" type="number" min="0" placeholder="0 = 无限等待" @input="delete errors.queue_timeout_ms" />
-                <p v-if="errors.queue_timeout_ms" class="text-sm text-destructive mt-1">{{ errors.queue_timeout_ms }}</p>
-              </div>
-              <div>
-                <Label class="block text-sm font-medium text-foreground mb-1">最大队列长度</Label>
-                <Input v-model.number="form.max_queue_size" type="number" min="1" :max="MAX_QUEUE_SIZE" :placeholder="DEFAULT_QUEUE_SIZE" @input="delete errors.max_queue_size" />
-                <p v-if="errors.max_queue_size" class="text-sm text-destructive mt-1">{{ errors.max_queue_size }}</p>
+              <div v-if="concurrencyMode !== 'none'" class="space-y-2">
+                <div>
+                  <Label class="block text-sm font-medium text-foreground mb-1">最大并发度</Label>
+                  <Input v-model.number="form.max_concurrency" type="number" min="1" :max="MAX_CONCURRENCY" :placeholder="concurrencyMode === 'auto' ? '10' : '3'" @input="delete errors.max_concurrency" />
+                  <p v-if="errors.max_concurrency" class="text-sm text-destructive mt-1">{{ errors.max_concurrency }}</p>
+                </div>
+                <div>
+                  <Label class="block text-sm font-medium text-foreground mb-1">队列超时 (ms)</Label>
+                  <Input v-model.number="form.queue_timeout_ms" type="number" min="0" placeholder="0 = 无限等待" @input="delete errors.queue_timeout_ms" />
+                  <p v-if="errors.queue_timeout_ms" class="text-sm text-destructive mt-1">{{ errors.queue_timeout_ms }}</p>
+                </div>
+                <div>
+                  <Label class="block text-sm font-medium text-foreground mb-1">最大队列长度</Label>
+                  <Input v-model.number="form.max_queue_size" type="number" min="1" :max="MAX_QUEUE_SIZE" :placeholder="DEFAULT_QUEUE_SIZE" @input="delete errors.max_queue_size" />
+                  <p v-if="errors.max_queue_size" class="text-sm text-destructive mt-1">{{ errors.max_queue_size }}</p>
+                </div>
               </div>
             </div>
           </div>
@@ -228,10 +242,10 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog'
-import { Switch } from '@/components/ui/switch'
 import { Copy, Check } from 'lucide-vue-next'
 
 const DEFAULT_CONCURRENCY = 3
+const DEFAULT_CONCURRENCY_AUTO = 10
 const DEFAULT_QUEUE_TIMEOUT_MS = 120_000
 const DEFAULT_QUEUE_SIZE = 10
 const MAX_CONCURRENCY = 100
@@ -249,7 +263,7 @@ const CONTEXT_WINDOW_OPTIONS = [
   { label: '256K', value: '256000' },
   { label: '1M', value: '1000000' },
 ] as const
-const DEFAULT_FORM = { name: '', api_type: 'anthropic', base_url: '', api_key: '', models: [] as ModelInfo[], is_active: true, max_concurrency: DEFAULT_CONCURRENCY, queue_timeout_ms: DEFAULT_QUEUE_TIMEOUT_MS, max_queue_size: DEFAULT_QUEUE_SIZE }
+const DEFAULT_FORM = { name: '', api_type: 'anthropic', base_url: '', api_key: '', models: [] as ModelInfo[], is_active: true, max_concurrency: DEFAULT_CONCURRENCY_AUTO, queue_timeout_ms: DEFAULT_QUEUE_TIMEOUT_MS, max_queue_size: DEFAULT_QUEUE_SIZE, adaptive_enabled: true }
 const modelInput = ref('')
 const modelContextWindow = ref(DEFAULT_CONTEXT_WINDOW)
 const contextWindowSelect = computed({
@@ -268,7 +282,8 @@ const pendingToggleActive = ref<boolean>(false)
 const toggleDependencies = ref<string[]>([])
 const form = ref({ ...DEFAULT_FORM })
 const errors = ref<Record<string, string>>({})
-const concurrencyEnabled = ref(false)
+type ConcurrencyMode = 'auto' | 'manual' | 'none'
+const concurrencyMode = ref<ConcurrencyMode>('auto')
 const copiedId = ref<string | null>(null)
 
 const MASK_VISIBLE_LEN = 7
@@ -290,7 +305,7 @@ function validate(): boolean {
     }
   }
   if (!editingId.value && !form.value.api_key.trim()) errs.api_key = '请输入 API Key'
-  if (concurrencyEnabled.value) {
+  if (concurrencyMode.value !== 'none') {
     const mc = form.value.max_concurrency
     if (!mc || mc < 1 || mc > MAX_CONCURRENCY) errs.max_concurrency = `范围 1-${MAX_CONCURRENCY}`
     if (form.value.queue_timeout_ms < 0) errs.queue_timeout_ms = '不能为负数'
@@ -377,10 +392,20 @@ function removeModel(index: number) {
   form.value.models.splice(index, 1)
 }
 
+function onConcurrencyModeChange(mode: ConcurrencyMode) {
+  if (mode === 'auto') {
+    if (!form.value.max_concurrency || form.value.max_concurrency < 1) form.value.max_concurrency = DEFAULT_CONCURRENCY_AUTO
+    form.value.adaptive_enabled = true
+  } else if (mode === 'manual') {
+    if (!form.value.max_concurrency || form.value.max_concurrency < 1) form.value.max_concurrency = DEFAULT_CONCURRENCY
+    form.value.adaptive_enabled = false
+  }
+}
+
 function openCreate() {
   editingId.value = null
   form.value = { ...DEFAULT_FORM, models: [] }
-  concurrencyEnabled.value = true
+  concurrencyMode.value = 'auto'
   modelInput.value = ''
   modelContextWindow.value = DEFAULT_CONTEXT_WINDOW
   presetGroup.value = ''
@@ -391,8 +416,15 @@ function openCreate() {
 
 function openEdit(p: Provider) {
   editingId.value = p.id
-  form.value = { name: p.name, api_type: p.api_type, base_url: p.base_url, api_key: '', models: (p.models || []).map(m => ({ name: m.name, context_window: m.context_window ?? DEFAULT_CONTEXT_WINDOW })), is_active: !!p.is_active, max_concurrency: p.max_concurrency ?? DEFAULT_CONCURRENCY, queue_timeout_ms: p.queue_timeout_ms ?? DEFAULT_QUEUE_TIMEOUT_MS, max_queue_size: p.max_queue_size ?? DEFAULT_QUEUE_SIZE }
-  concurrencyEnabled.value = (p.max_concurrency ?? 0) > 0
+  const mc = p.max_concurrency ?? 0
+  if (mc === 0) {
+    concurrencyMode.value = 'none'
+  } else if (p.adaptive_enabled) {
+    concurrencyMode.value = 'auto'
+  } else {
+    concurrencyMode.value = 'manual'
+  }
+  form.value = { name: p.name, api_type: p.api_type, base_url: p.base_url, api_key: '', models: (p.models || []).map(m => ({ name: m.name, context_window: m.context_window ?? DEFAULT_CONTEXT_WINDOW })), is_active: !!p.is_active, max_concurrency: concurrencyMode.value === 'none' ? DEFAULT_CONCURRENCY_AUTO : mc, queue_timeout_ms: p.queue_timeout_ms ?? DEFAULT_QUEUE_TIMEOUT_MS, max_queue_size: p.max_queue_size ?? DEFAULT_QUEUE_SIZE, adaptive_enabled: concurrencyMode.value === 'auto' }
   modelInput.value = ''
   modelContextWindow.value = DEFAULT_CONTEXT_WINDOW
   presetGroup.value = ''
@@ -401,7 +433,7 @@ function openEdit(p: Provider) {
   dialogOpen.value = true
 }
 
-type ProviderFormPayload = Pick<ProviderPayload, 'name' | 'api_type' | 'base_url' | 'models' | 'is_active' | 'max_concurrency' | 'queue_timeout_ms' | 'max_queue_size'> & { api_key?: string }
+type ProviderFormPayload = Pick<ProviderPayload, 'name' | 'api_type' | 'base_url' | 'models' | 'is_active' | 'max_concurrency' | 'queue_timeout_ms' | 'max_queue_size' | 'adaptive_enabled'> & { api_key?: string }
 
 function buildPayload(): ProviderFormPayload {
   const payload: ProviderFormPayload = {
@@ -410,9 +442,10 @@ function buildPayload(): ProviderFormPayload {
     base_url: form.value.base_url,
     models: form.value.models.map(m => ({ name: m.name, context_window: m.context_window ?? undefined })),
     is_active: form.value.is_active ? 1 : 0,
-    max_concurrency: concurrencyEnabled.value ? form.value.max_concurrency : 0,
-    queue_timeout_ms: concurrencyEnabled.value ? form.value.queue_timeout_ms : 0,
-    max_queue_size: concurrencyEnabled.value ? form.value.max_queue_size : DEFAULT_QUEUE_SIZE,
+    max_concurrency: concurrencyMode.value === 'none' ? 0 : form.value.max_concurrency,
+    queue_timeout_ms: concurrencyMode.value === 'none' ? 0 : form.value.queue_timeout_ms,
+    max_queue_size: concurrencyMode.value === 'none' ? DEFAULT_QUEUE_SIZE : form.value.max_queue_size,
+    adaptive_enabled: concurrencyMode.value === 'auto' ? 1 : 0,
   }
   if (form.value.api_key) payload.api_key = form.value.api_key
   return payload

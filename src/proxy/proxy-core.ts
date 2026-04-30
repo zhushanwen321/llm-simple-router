@@ -1,6 +1,6 @@
 import type { Provider } from "../db/index.js";
-import { callGet as upstreamGet } from "./transport.js";
-import type { GetTransportResult } from "./transport.js";
+import { callGet as upstreamGet } from "./transport/http.js";
+import type { GetTransportResult } from "./transport/http.js";
 import type { RawHeaders } from "./types.js";
 
 // ---------- Types ----------

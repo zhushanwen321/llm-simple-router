@@ -1,30 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { handleProxyRequest } from "../src/proxy/proxy-handler.js";
+import { handleProxyRequest } from "../src/proxy/handler/proxy-handler.js";
 import type { ProxyErrorFormatter } from "../src/proxy/proxy-core.js";
-import type { ResilienceResult } from "../src/proxy/resilience.js";
+import type { ResilienceResult } from "../src/proxy/orchestration/resilience.js";
 import { ProviderSwitchNeeded } from "../src/proxy/types.js";
-import { SemaphoreQueueFullError, SemaphoreTimeoutError } from "../src/proxy/semaphore.js";
+import { SemaphoreQueueFullError, SemaphoreTimeoutError } from "../src/proxy/orchestration/semaphore.js";
 
 vi.mock("../src/db/index.js", () => ({
   getMappingGroup: vi.fn(() => undefined),
   getProviderById: vi.fn(() => null),
   insertRequestLog: vi.fn(),
-  updateLogPipelineSnapshot: vi.fn(),
-  updateLogStreamContent: vi.fn(),
-  updateLogClientStatus: vi.fn(),
   seedDefaultRules: vi.fn(),
 }));
 
 vi.mock("../src/utils/crypto.js", () => ({ decrypt: vi.fn(() => "sk-test") }));
 vi.mock("../src/db/settings.js", () => ({ getSetting: vi.fn(() => "enc-key") }));
-vi.mock("../src/proxy/mapping-resolver.js", () => ({
+vi.mock("../src/proxy/routing/mapping-resolver.js", () => ({
   resolveMapping: vi.fn(() => null),
 }));
 vi.mock("../src/proxy/enhancement/enhancement-handler.js", () => ({
-  applyEnhancement: vi.fn((...args: unknown[]) => {
-    const body = args[1] as Record<string, unknown>;
-    return { body, effectiveModel: (body.model as string) || "gpt-4", originalModel: null, interceptResponse: null, meta: { router_tags_stripped: 0, directive: null } };
-  }),
+  applyEnhancement: vi.fn(() => ({ effectiveModel: "gpt-4", originalModel: null, interceptResponse: null })),
   buildModelInfoTag: vi.fn(() => "<router-response>...</router-response>"),
 }));
 vi.mock("../src/proxy/proxy-logging.js", () => ({
@@ -34,22 +28,18 @@ vi.mock("../src/proxy/proxy-logging.js", () => ({
   sanitizeHeadersForLog: vi.fn((h) => h),
 }));
 vi.mock("../src/proxy/log-helpers.js", () => ({ insertRejectedLog: vi.fn() }));
-vi.mock("../src/proxy/response-transform.js", () => ({
-  maybeInjectModelInfoTag: vi.fn((body: string) => ({ body, meta: { model_info_tag_injected: false } })),
-}));
-vi.mock("../src/proxy/transport.js", () => ({
+vi.mock("../src/proxy/transport/http.js", () => ({
   callNonStream: vi.fn(),
   callStream: vi.fn(),
 }));
-vi.mock("../src/proxy/patch/index.js", () => ({
-  applyProviderPatches: vi.fn((body: unknown) => ({ body, meta: { types: [] } })),
-}));
 
 import { getProviderById } from "../src/db/index.js";
-import { resolveMapping } from "../src/proxy/mapping-resolver.js";
+import { resolveMapping } from "../src/proxy/routing/mapping-resolver.js";
 import { applyEnhancement } from "../src/proxy/enhancement/enhancement-handler.js";
 import { logResilienceResult, collectTransportMetrics, handleIntercept } from "../src/proxy/proxy-logging.js";
 import { insertRejectedLog } from "../src/proxy/log-helpers.js";
+import { ServiceContainer } from "../src/core/container.js";
+
 
 const errors: ProxyErrorFormatter = {
   modelNotFound: (m) => ({ statusCode: 404, body: { error: { message: `Model '${m}' not found` } } }),
@@ -59,7 +49,6 @@ const errors: ProxyErrorFormatter = {
   upstreamConnectionFailed: () => ({ statusCode: 502, body: { error: { message: "Upstream failed" } } }),
   concurrencyQueueFull: (id) => ({ statusCode: 503, body: { error: { message: `Queue full: ${id}` } } }),
   concurrencyTimeout: (id, ms) => ({ statusCode: 504, body: { error: { message: `Timeout: ${id} ${ms}ms` } } }),
-  promptTooLong: () => ({ statusCode: 400, body: { error: { message: "Prompt too long" } } }),
 };
 
 function createRequest(overrides = {}) {
@@ -81,18 +70,24 @@ function createReply() {
 }
 
 function createDeps(overrides = {}) {
+  const container = new ServiceContainer();
+  container.register("matcher", () => undefined);
+  container.register("tracker", () => undefined);
+  container.register("usageWindowTracker", () => ({ recordRequest: vi.fn() }));
+  container.register("sessionTracker", () => undefined);
+  container.register("adaptiveController", () => undefined);
+  container.register("semaphoreManager", () => undefined);
   return {
     db: {} as any,
-    streamTimeoutMs: 30000, retryBaseDelayMs: 1000,
-    matcher: undefined, tracker: undefined,
     orchestrator: { handle: vi.fn() } as any,
+    container,
     ...overrides,
   };
 }
 
 const successResilienceResult: ResilienceResult = {
   result: { kind: "success" as const, statusCode: 200, body: '{"choices":[]}', headers: {}, sentHeaders: {}, sentBody: "" },
-  attempts: [{ target: { backend_model: "gpt-4", provider_id: "p1" }, attemptIndex: 0, statusCode: 200, error: null, latencyMs: 50, responseBody: null, responseHeaders: {}, resultKind: "success" as const }],
+  attempts: [{ target: { backend_model: "gpt-4", provider_id: "p1" }, attemptIndex: 0, statusCode: 200, error: null, latencyMs: 50, responseBody: null }],
   excludedTargets: [],
 };
 
@@ -157,7 +152,7 @@ describe("handleProxyRequest", () => {
   });
 
   it("拦截响应直接处理不进入 orchestrator", async () => {
-    vi.mocked(applyEnhancement).mockReturnValueOnce({ body: { model: "gpt-4" }, effectiveModel: "gpt-4", originalModel: null, interceptResponse: { statusCode: 200, body: "ok" }, meta: { router_tags_stripped: 0, directive: null } });
+    vi.mocked(applyEnhancement).mockReturnValueOnce({ effectiveModel: "gpt-4", originalModel: null, interceptResponse: { statusCode: 200, body: "ok" } });
     const deps = createDeps();
     await handleProxyRequest(createRequest(), createReply(), "openai", "/v1/chat/completions", errors, deps);
     expect(handleIntercept).toHaveBeenCalled();

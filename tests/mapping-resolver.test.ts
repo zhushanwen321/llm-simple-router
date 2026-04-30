@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import Database from "better-sqlite3";
-import { resolveMapping } from "../src/proxy/mapping-resolver.js";
+import { resolveMapping } from "../src/proxy/routing/mapping-resolver.js";
 import { initDatabase } from "../src/db/index.js";
 
 describe("resolveMapping", () => {

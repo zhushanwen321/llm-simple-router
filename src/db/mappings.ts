@@ -1,6 +1,6 @@
 import Database from "better-sqlite3";
 import { randomUUID } from "crypto";
-import type { Target } from "../proxy/strategy/types.js";
+import type { Target } from "../core/types.js";
 import { buildUpdateQuery, deleteById } from "./helpers.js";
 
 export interface MappingGroup {

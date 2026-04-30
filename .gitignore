@@ -120,3 +120,4 @@ frontend-dist/
 
 # Personal scripts
 .scripts/
+.tracers/

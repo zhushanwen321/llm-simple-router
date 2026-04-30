@@ -1,10 +1,10 @@
 import { randomUUID } from "crypto";
 import Database from "better-sqlite3";
-import { loadEnhancementConfig } from "../enhancement-config.js";
+import { loadEnhancementConfig, type EnhancementConfig } from "../routing/enhancement-config.js";
 import { getActiveProviderModels, resolveByProviderModel } from "../../db/index.js";
-import { resolveMapping } from "../mapping-resolver.js";
+import { resolveMapping } from "../routing/mapping-resolver.js";
 import { parseDirective, parseToolResult, TOOL_USE_ID_PREFIX, TOOL_USE_ID_PROVIDER_PREFIX } from "./directive-parser.js";
-import { modelState } from "../model-state.js";
+import { modelState } from "../routing/model-state.js";
 import { cleanRouterResponses } from "./response-cleaner.js";
 
 export interface InterceptResponse {
@@ -100,12 +100,13 @@ export function applyEnhancement(
   clientModel: string,
   sessionId: string | undefined,
   routerKey: RouterKeyInfo | undefined,
+  enhancementConfig?: EnhancementConfig,
 ): EnhancementResult {
   const earlyReturn: EnhancementResult = {
     body, effectiveModel: clientModel, originalModel: null, interceptResponse: null, meta: EMPTY_META,
   };
 
-  const enhancement = loadEnhancementConfig(db);
+  const enhancement = enhancementConfig ?? loadEnhancementConfig(db);
 
   if (!enhancement.claude_code_enabled) {
     return earlyReturn;

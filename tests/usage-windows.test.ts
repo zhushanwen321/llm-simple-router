@@ -11,7 +11,7 @@ import {
   getWindowsInRange,
   getWindowUsage,
 } from "../src/db/usage-windows.js";
-import { UsageWindowTracker } from "../src/proxy/usage-window-tracker.js";
+import { UsageWindowTracker } from "../src/proxy/routing/usage-window-tracker.js";
 
 const TEST_ENCRYPTION_KEY = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 

@@ -6,13 +6,13 @@ import { insertSuccessLog, type FailoverContext } from "./log-helpers.js";
 import { MetricsExtractor } from "../metrics/metrics-extractor.js";
 import { estimateInputTokens } from "../utils/token-counter.js";
 import type { FastifyRequest } from "fastify";
-import type { ResilienceAttempt } from "./resilience.js";
+import type { ResilienceAttempt } from "../core/types.js";
 import type { TransportResult } from "./types.js";
 
 // Internal imports from types.ts
 import { UPSTREAM_SUCCESS } from "./types.js";
 import type { RawHeaders } from "./types.js";
-import { HTTP_BAD_GATEWAY } from "../constants.js";
+import { HTTP_BAD_GATEWAY } from "../core/constants.js";
 
 // ---------- Header sanitization ----------
 

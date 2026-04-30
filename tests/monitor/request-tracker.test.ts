@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from "vitest";
 import type { ServerResponse } from "node:http";
 import { RequestTracker } from "../../src/monitor/request-tracker.js";
-import { ProviderSemaphoreManager } from "../../src/proxy/semaphore.js";
+import { ProviderSemaphoreManager } from "../../src/proxy/orchestration/semaphore.js";
 import type { ActiveRequest } from "../../src/monitor/types.js";
 
 // --- Mocks ---
@@ -440,6 +440,8 @@ describe("RequestTracker", () => {
         queued: 0,
         queueTimeoutMs: 3000,
         maxQueueSize: 10,
+        adaptiveEnabled: false,
+        adaptiveLimit: undefined,
       });
     });
   });

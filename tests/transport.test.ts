@@ -52,15 +52,15 @@ describe("TransportLayer.callNonStream", () => {
   beforeEach(() => {
     vi.resetModules();
     mockReq = createMockUpstreamReq();
-    vi.doMock("../src/proxy/transport.js", async () => {
-      const actual = await vi.importActual("../src/proxy/transport.js") as any;
+    vi.doMock("../src/proxy/transport/http.js", async () => {
+      const actual = await vi.importActual("../src/proxy/transport/http.js") as any;
       actual._transportInternals.createUpstreamRequest = () => mockReq;
       return actual;
     });
   });
 
   it("returns success on 200 response", async () => {
-    const { callNonStream } = await import("../src/proxy/transport.js");
+    const { callNonStream } = await import("../src/proxy/transport/http.js");
     const resultPromise = callNonStream(
       { base_url: "http://localhost:9000" },
       "sk-test",
@@ -87,7 +87,7 @@ describe("TransportLayer.callNonStream", () => {
   });
 
   it("returns error on 4xx/5xx response", async () => {
-    const { callNonStream } = await import("../src/proxy/transport.js");
+    const { callNonStream } = await import("../src/proxy/transport/http.js");
     const resultPromise = callNonStream(
       { base_url: "http://localhost:9000" },
       "sk-test",
@@ -112,7 +112,7 @@ describe("TransportLayer.callNonStream", () => {
   });
 
   it("returns throw on network error", async () => {
-    const { callNonStream } = await import("../src/proxy/transport.js");
+    const { callNonStream } = await import("../src/proxy/transport/http.js");
     const resultPromise = callNonStream(
       { base_url: "http://localhost:9000" },
       "sk-test",
@@ -148,15 +148,15 @@ describe("TransportLayer.callStream", () => {
   beforeEach(() => {
     vi.resetModules();
     mockReq = createMockUpstreamReq();
-    vi.doMock("../src/proxy/transport.js", async () => {
-      const actual = await vi.importActual("../src/proxy/transport.js") as any;
+    vi.doMock("../src/proxy/transport/http.js", async () => {
+      const actual = await vi.importActual("../src/proxy/transport/http.js") as any;
       actual._transportInternals.createUpstreamRequest = () => mockReq;
       return actual;
     });
   });
 
   it("returns stream_success on normal SSE completion", async () => {
-    const { callStream } = await import("../src/proxy/transport.js");
+    const { callStream } = await import("../src/proxy/transport/http.js");
     const reply = createMockReply();
 
     const resultPromise = callStream(
@@ -183,7 +183,7 @@ describe("TransportLayer.callStream", () => {
   });
 
   it("returns stream_success without early error checker", async () => {
-    const { callStream } = await import("../src/proxy/transport.js");
+    const { callStream } = await import("../src/proxy/transport/http.js");
     const reply = createMockReply();
 
     const resultPromise = callStream(
@@ -229,15 +229,15 @@ describe("StreamProxy state machine - error paths", () => {
   beforeEach(() => {
     vi.resetModules();
     mockReq = createMockUpstreamReq();
-    vi.doMock("../src/proxy/transport.js", async () => {
-      const actual = await vi.importActual("../src/proxy/transport.js") as any;
+    vi.doMock("../src/proxy/transport/http.js", async () => {
+      const actual = await vi.importActual("../src/proxy/transport/http.js") as any;
       actual._transportInternals.createUpstreamRequest = () => mockReq;
       return actual;
     });
   });
 
   it("returns stream_error on upstream non-200 status", async () => {
-    const { callStream } = await import("../src/proxy/transport.js");
+    const { callStream } = await import("../src/proxy/transport/http.js");
     const reply = createMockReply();
 
     const resultPromise = callStream(
@@ -266,7 +266,7 @@ describe("StreamProxy state machine - error paths", () => {
   });
 
   it("returns stream_error when early error detected in buffer phase", async () => {
-    const { callStream } = await import("../src/proxy/transport.js");
+    const { callStream } = await import("../src/proxy/transport/http.js");
     const reply = createMockReply();
 
     const checkEarlyError = vi.fn().mockReturnValue(true);
@@ -296,7 +296,7 @@ describe("StreamProxy state machine - error paths", () => {
   });
 
   it("returns stream_abort when client disconnects during streaming", async () => {
-    const { callStream } = await import("../src/proxy/transport.js");
+    const { callStream } = await import("../src/proxy/transport/http.js");
     const reply = createMockReply();
 
     const resultPromise = callStream(
@@ -322,7 +322,7 @@ describe("StreamProxy state machine - error paths", () => {
   });
 
   it("returns throw on upstream network error", async () => {
-    const { callStream } = await import("../src/proxy/transport.js");
+    const { callStream } = await import("../src/proxy/transport/http.js");
     const reply = createMockReply();
 
     const resultPromise = callStream(
@@ -346,7 +346,7 @@ describe("StreamProxy state machine - error paths", () => {
   });
 
   it("transitions BUFFERING→STREAMING after receiving full event", async () => {
-    const { callStream } = await import("../src/proxy/transport.js");
+    const { callStream } = await import("../src/proxy/transport/http.js");
     const reply = createMockReply();
 
     const checkEarlyError = vi.fn().mockReturnValue(false);
@@ -378,7 +378,7 @@ describe("StreamProxy state machine - error paths", () => {
   });
 
   it("transitions BUFFERING→STREAMING when buffer exceeds limit", async () => {
-    const { callStream } = await import("../src/proxy/transport.js");
+    const { callStream } = await import("../src/proxy/transport/http.js");
     const reply = createMockReply();
 
     const checkEarlyError = vi.fn().mockReturnValue(false);
@@ -427,15 +427,15 @@ describe("StreamProxy close handler", () => {
   beforeEach(() => {
     vi.resetModules();
     mockReq = createMockUpstreamReq();
-    vi.doMock("../src/proxy/transport.js", async () => {
-      const actual = await vi.importActual("../src/proxy/transport.js") as any;
+    vi.doMock("../src/proxy/transport/http.js", async () => {
+      const actual = await vi.importActual("../src/proxy/transport/http.js") as any;
       actual._transportInternals.createUpstreamRequest = () => mockReq;
       return actual;
     });
   });
 
   it("registers reply.raw close handler only once", async () => {
-    const { callStream } = await import("../src/proxy/transport.js");
+    const { callStream } = await import("../src/proxy/transport/http.js");
     const reply = createMockReply();
 
     const onSpy = vi.fn((event: string, handler: () => void) => {
@@ -468,7 +468,7 @@ describe("StreamProxy close handler", () => {
   });
 
   it("terminal() prevents duplicate resolve", async () => {
-    const { callStream } = await import("../src/proxy/transport.js");
+    const { callStream } = await import("../src/proxy/transport/http.js");
     const reply = createMockReply();
 
     const resultPromise = callStream(
@@ -513,15 +513,15 @@ describe("StreamProxy mid-stream SSE error detection", () => {
   beforeEach(() => {
     vi.resetModules();
     mockReq = createMockUpstreamReq();
-    vi.doMock("../src/proxy/transport.js", async () => {
-      const actual = await vi.importActual("../src/proxy/transport.js") as any;
+    vi.doMock("../src/proxy/transport/http.js", async () => {
+      const actual = await vi.importActual("../src/proxy/transport/http.js") as any;
       actual._transportInternals.createUpstreamRequest = () => mockReq;
       return actual;
     });
   });
 
   it("detects mid-stream SSE error event after normal data", async () => {
-    const { callStream } = await import("../src/proxy/transport.js");
+    const { callStream } = await import("../src/proxy/transport/http.js");
     const reply = createMockReply();
 
     const checkEarlyError = vi.fn((data: string) =>
@@ -556,7 +556,7 @@ describe("StreamProxy mid-stream SSE error detection", () => {
   });
 
   it("does not trigger false positive for normal content", async () => {
-    const { callStream } = await import("../src/proxy/transport.js");
+    const { callStream } = await import("../src/proxy/transport/http.js");
     const reply = createMockReply();
 
     const checkEarlyError = vi.fn((data: string) =>
@@ -582,7 +582,7 @@ describe("StreamProxy mid-stream SSE error detection", () => {
   });
 
   it("detects error across chunk boundaries", async () => {
-    const { callStream } = await import("../src/proxy/transport.js");
+    const { callStream } = await import("../src/proxy/transport/http.js");
     const reply = createMockReply();
 
     const checkEarlyError = vi.fn((data: string) =>
@@ -628,15 +628,15 @@ describe("StreamProxy mid-stream SSE error detection", () => {
   beforeEach(() => {
     vi.resetModules();
     mockReq = createMockUpstreamReq();
-    vi.doMock("../src/proxy/transport.js", async () => {
-      const actual = await vi.importActual("../src/proxy/transport.js") as any;
+    vi.doMock("../src/proxy/transport/http.js", async () => {
+      const actual = await vi.importActual("../src/proxy/transport/http.js") as any;
       actual._transportInternals.createUpstreamRequest = () => mockReq;
       return actual;
     });
   });
 
   it("detects mid-stream SSE error event after normal data", async () => {
-    const { callStream } = await import("../src/proxy/transport.js");
+    const { callStream } = await import("../src/proxy/transport/http.js");
     const reply = createMockReply();
 
     const checkEarlyError = vi.fn((data: string) =>
@@ -677,7 +677,7 @@ describe("StreamProxy mid-stream SSE error detection", () => {
   });
 
   it("does not trigger false positive for normal content", async () => {
-    const { callStream } = await import("../src/proxy/transport.js");
+    const { callStream } = await import("../src/proxy/transport/http.js");
     const reply = createMockReply();
 
     const checkEarlyError = vi.fn((data: string) =>
@@ -711,7 +711,7 @@ describe("StreamProxy mid-stream SSE error detection", () => {
   });
 
   it("detects error across chunk boundaries", async () => {
-    const { callStream } = await import("../src/proxy/transport.js");
+    const { callStream } = await import("../src/proxy/transport/http.js");
     const reply = createMockReply();
 
     const checkEarlyError = vi.fn((data: string) =>
