@@ -281,6 +281,7 @@ export interface DailyUsage {
 export interface DbSizeInfoResponse {
   totalBytes: number;
   logTableBytes: number;
+  logFileBytes: number;
   logCount: number;
   lastChecked: string | null;
   thresholds: {
