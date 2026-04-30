@@ -61,11 +61,14 @@ export interface TransportFnParams {
   streamLoopEnabled: boolean;
   formatTransform?: import("stream").Transform;
   responseTransform?: (body: string) => string;
+  injectedHeaders?: Record<string, string>;
 }
 
 export function buildTransportFn(p: TransportFnParams): (target: Target) => Promise<TransportResult> {
-  const buildHeaders = (cliHdrs: RawHeaders, key: string, bytes?: number) =>
-    buildUpstreamHeaders(cliHdrs, key, bytes, p.apiType);
+  const buildHeaders = (cliHdrs: RawHeaders, key: string, bytes?: number) => {
+    const base = buildUpstreamHeaders(cliHdrs, key, bytes, p.apiType);
+    return p.injectedHeaders ? { ...base, ...p.injectedHeaders } : base;
+  };
   // _target 未使用 — resilience 层始终传入当前 resolved target；
   // 跨 target failover 由外层 executeFailoverLoop 的 ProviderSwitchNeeded 处理
   // eslint-disable-next-line @typescript-eslint/no-unused-vars

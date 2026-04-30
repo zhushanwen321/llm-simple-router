@@ -1,9 +1,12 @@
+import { createRequire } from "module";
 import type Database from "better-sqlite3";
 import { existsSync, readdirSync } from "fs";
 import { join, resolve } from "path";
 import type { TransformPlugin, RequestTransformContext, ResponseTransformContext } from "./plugin-types.js";
 import { pluginMatches } from "./plugin-types.js";
 import { getAllActiveRules, type TransformRules } from "../../db/transform-rules.js";
+
+const esmRequire = createRequire(import.meta.url);
 
 export class PluginRegistry {
   private plugins: TransformPlugin[] = [];
@@ -34,9 +37,8 @@ export class PluginRegistry {
     for (const file of files) {
       const filePath = join(resolvedDir, file);
       try {
-        delete require.cache[require.resolve(filePath)];
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const mod = require(filePath);
+        delete esmRequire.cache[esmRequire.resolve(filePath)];
+        const mod = esmRequire(filePath);
         const plugin: TransformPlugin = mod.default || mod;
         if (!plugin.name) {
           continue;
@@ -59,25 +61,41 @@ export class PluginRegistry {
 
   applyBeforeRequest(ctx: RequestTransformContext): void {
     for (const p of this.getMatchingPlugins(ctx.provider)) {
-      p.beforeRequestTransform?.(ctx);
+      try {
+        p.beforeRequestTransform?.(ctx);
+      } catch (err) {
+        console.error(`[plugin-registry] Plugin "${p.name}" beforeRequestTransform error:`, err);
+      }
     }
   }
 
   applyAfterRequest(ctx: RequestTransformContext): void {
     for (const p of this.getMatchingPlugins(ctx.provider)) {
-      p.afterRequestTransform?.(ctx);
+      try {
+        p.afterRequestTransform?.(ctx);
+      } catch (err) {
+        console.error(`[plugin-registry] Plugin "${p.name}" afterRequestTransform error:`, err);
+      }
     }
   }
 
   applyBeforeResponse(ctx: ResponseTransformContext): void {
     for (const p of this.getMatchingPlugins(ctx.provider)) {
-      p.beforeResponseTransform?.(ctx);
+      try {
+        p.beforeResponseTransform?.(ctx);
+      } catch (err) {
+        console.error(`[plugin-registry] Plugin "${p.name}" beforeResponseTransform error:`, err);
+      }
     }
   }
 
   applyAfterResponse(ctx: ResponseTransformContext): void {
     for (const p of this.getMatchingPlugins(ctx.provider)) {
-      p.afterResponseTransform?.(ctx);
+      try {
+        p.afterResponseTransform?.(ctx);
+      } catch (err) {
+        console.error(`[plugin-registry] Plugin "${p.name}" afterResponseTransform error:`, err);
+      }
     }
   }
 
@@ -110,6 +128,11 @@ export class PluginRegistry {
         if (rule.field_overrides) {
           for (const [key, val] of Object.entries(rule.field_overrides)) {
             ctx.body[key] = val;
+          }
+        }
+        if (rule.inject_headers) {
+          for (const [key, val] of Object.entries(rule.inject_headers)) {
+            ctx.headers[key] = val;
           }
         }
       },

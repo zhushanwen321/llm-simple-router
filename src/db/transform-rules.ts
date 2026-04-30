@@ -17,7 +17,13 @@ const JSON_COLUMNS = ["inject_headers", "request_defaults", "drop_fields", "fiel
 function parseJsonColumns(row: Record<string, unknown>): TransformRules {
   const result = { ...row } as Record<string, unknown>;
   for (const col of JSON_COLUMNS) {
-    if (result[col]) result[col] = JSON.parse(result[col] as string);
+    if (result[col]) {
+      try {
+        result[col] = JSON.parse(result[col] as string);
+      } catch {
+        console.error(`[transform-rules] Failed to parse JSON column "${col}", keeping raw value`);
+      }
+    }
   }
   return result as unknown as TransformRules;
 }

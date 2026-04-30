@@ -271,6 +271,16 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
       return rejectAndReply(reply, rCtx, errors.providerUnavailable(),
         `Provider '${resolved.provider_id}' unavailable`, resolved.provider_id);
     }
+    // --- 溢出重定向：上下文超出时切换到更大模型（必须在 transform 之前，确保使用正确的 api_type） ---
+    const overflowResult = applyOverflowRedirect(resolved, deps.db, body);
+    if (overflowResult) {
+      const overflowProvider = getProviderById(deps.db, overflowResult.provider_id);
+      if (overflowProvider && overflowProvider.is_active) {
+        resolved = { ...resolved, provider_id: overflowResult.provider_id, backend_model: overflowResult.backend_model };
+        provider = overflowProvider;
+      }
+    }
+
     // 格式转换：apiType 不匹配时转换请求体和路径
     const needsTransform = coordinator.needsTransform(apiType, provider.api_type);
     let effectiveApiType = apiType;
@@ -302,16 +312,20 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
       iterationSnapshot.add({ stage: "overflow", triggered: false });
     }
 
-    // 格式转换完成后，让 plugin 对 body 做最终调整（如 inject defaults / drop fields）
+    // Plugin 调整 body 和 headers（不受 needsTransform 限制，inject_headers 等同格式也需要）
+    let injectedHeaders: Record<string, string> = {};
     const pluginRegistry = deps.container.resolve<import("../transform/plugin-registry.js").PluginRegistry>(SERVICE_KEYS.pluginRegistry);
-    if (needsTransform && pluginRegistry) {
+    if (pluginRegistry) {
       const pluginCtx: import("../transform/plugin-types.js").RequestTransformContext = {
         body: currentBody,
+        headers: {},
         sourceApiType: apiType,
         targetApiType: provider.api_type as "openai" | "anthropic",
         provider: { id: provider.id, name: provider.name, base_url: provider.base_url, api_type: provider.api_type },
       };
+      pluginRegistry.applyBeforeRequest(pluginCtx);
       pluginRegistry.applyAfterRequest(pluginCtx);
+      injectedHeaders = pluginCtx.headers;
     }
 
     // provider patches — 使用返回值
@@ -336,14 +350,33 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
     });
 
     const formatTransform = needsTransform ? coordinator.createFormatTransform(apiType, provider.api_type, resolved.backend_model) : undefined;
+    if (formatTransform) {
+      formatTransform.on("warning", (err) => request.log.warn({ err, logId }, "formatTransform warning"));
+    }
     const responseTransform = needsTransform ? (bodyStr: string): string => {
       try {
         const parsed = JSON.parse(bodyStr);
         if (parsed.type === "error" || parsed.error) {
           return coordinator.transformErrorResponse(bodyStr, provider.api_type, apiType);
         }
-        return coordinator.transformResponse(bodyStr, provider.api_type, apiType);
-      } catch {
+        let transformed = coordinator.transformResponse(bodyStr, provider.api_type, apiType);
+        if (deps.pluginRegistry && !isStream) {
+          try {
+            const respObj = JSON.parse(transformed);
+            const respCtx: import("./transform/plugin-types.js").ResponseTransformContext = {
+              response: respObj,
+              sourceApiType: provider.api_type as "openai" | "anthropic",
+              targetApiType: apiType,
+              provider: { id: provider.id, name: provider.name, base_url: provider.base_url, api_type: provider.api_type },
+            };
+            deps.pluginRegistry.applyBeforeResponse(respCtx);
+            deps.pluginRegistry.applyAfterResponse(respCtx);
+            transformed = JSON.stringify(respCtx.response);
+          } catch { /* response hooks best-effort */ }
+        }
+        return transformed;
+      } catch (err) {
+        request.log.error({ err }, "responseTransform failed");
         return bodyStr;
       }
     } : undefined;
@@ -352,7 +385,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
       provider, apiKey, body: patchedBody, cliHdrs, reply, upstreamPath: effectiveUpstreamPath, apiType: effectiveApiType,
       isStream, startTime, logId, effectiveModel, originalModel,
       streamTimeoutMs: deps.streamTimeoutMs, tracker: deps.tracker, matcher: deps.matcher, request,
-      streamLoopEnabled, formatTransform, responseTransform,
+      streamLoopEnabled, formatTransform, responseTransform, injectedHeaders,
     });
 
     const pipelineSnapshot = iterationSnapshot.toJSON();

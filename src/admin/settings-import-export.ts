@@ -2,6 +2,8 @@ import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
 import { createHash } from "crypto";
 import type { StateRegistry } from "../core/registry.js";
+import { resolve } from "path";
+import { getAllProviders, PROVIDER_CONCURRENCY_DEFAULTS } from "../db/index.js";
 import { encrypt, decrypt } from "../utils/crypto.js";
 import { getSetting } from "../db/settings.js";
 import { API_CODE, apiError } from "./api-response.js";
@@ -9,6 +11,7 @@ import { API_CODE, apiError } from "./api-response.js";
 interface ImportExportOptions {
   db: Database.Database;
   stateRegistry: StateRegistry;
+  pluginRegistry?: import("../proxy/transform/plugin-registry.js").PluginRegistry;
 }
 
 const CONFIG_TABLES = [
@@ -21,6 +24,7 @@ const CONFIG_TABLES = [
   "schedules",
   "provider_model_info",
   "session_model_history",
+  "provider_transform_rules",
 ];
 
 // settings 表按 key 列的值过滤，不覆盖本地安全敏感配置
@@ -156,6 +160,12 @@ export const adminImportExportRoutes: FastifyPluginCallback<ImportExportOptions>
     stateRegistry.removeAllProviders();
     stateRegistry.clearModelState();
     stateRegistry.reinitializeProviders();
+
+    // 刷新 transform plugin 缓存（从 DB 重新加载规则 + 扫描插件目录）
+    if (options.pluginRegistry) {
+      const pluginsDir = resolve(process.cwd(), "plugins/transform");
+      options.pluginRegistry.reload(options.db, pluginsDir);
+    }
 
     return reply.send(counts);
   });

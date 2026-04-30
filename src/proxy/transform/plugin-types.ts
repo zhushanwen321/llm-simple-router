@@ -11,6 +11,7 @@ export interface PluginMatch {
 
 export interface RequestTransformContext {
   body: Record<string, unknown>;
+  headers: Record<string, string>;
   sourceApiType: "openai" | "anthropic";
   targetApiType: "openai" | "anthropic";
   provider: { id: string; name: string; base_url: string; api_type: string };

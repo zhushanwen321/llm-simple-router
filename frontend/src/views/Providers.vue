@@ -255,7 +255,6 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog'
-import { Switch } from '@/components/ui/switch'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { ChevronDown, RotateCw, Copy, Check } from 'lucide-vue-next'
 import { useTransformRules } from '@/composables/useTransformRules'
@@ -416,7 +415,6 @@ function openCreate() {
 }
 function openEdit(p: Provider) {
   editingId.value = p.id
-<<<<<<< HEAD
   const mc = p.max_concurrency ?? 0
   if (mc === 0) {
     concurrencyMode.value = 'none'
@@ -429,7 +427,7 @@ function openEdit(p: Provider) {
   modelInput.value = ''
   modelContextWindow.value = DEFAULT_CONTEXT_WINDOW
   presetGroup.value = ''
-  presetPlan.value = ' (fix: resolve remaining lint errors)
+  presetPlan.value = ''
   errors.value = {}
   dialogOpen.value = true
   loadTransformRules(p.id)

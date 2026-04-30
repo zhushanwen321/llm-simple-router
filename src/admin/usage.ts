@@ -2,7 +2,7 @@ import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
 import { Type } from "@sinclair/typebox";
 import { getWindowsInRange, getWindowUsage } from "../db/usage-windows.js";
-import { getProviderById } from "../db/providers.js";
+import { getProviderById } from "../db/index.js";
 import { resolveTimeRange } from "../utils/time-range.js";
 
 interface UsageRoutesOptions {

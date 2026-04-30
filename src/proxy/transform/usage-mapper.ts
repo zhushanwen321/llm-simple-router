@@ -46,6 +46,6 @@ export function mapUsageAnt2OA(u: Record<string, unknown> | undefined): Record<s
     prompt_tokens: input,
     completion_tokens: output,
     total_tokens: input + output,
-    prompt_tokens_details: { cached_tokens: u.cache_read_input_tokens ?? 0 },
+    prompt_tokens_details: { cached_tokens: u.cache_read_input_tokens ?? 0, cached_write_tokens: u.cache_creation_input_tokens ?? 0 },
   };
 }
