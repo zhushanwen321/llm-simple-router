@@ -1,4 +1,4 @@
-import { randomUUID, createHash } from "crypto";
+import { randomUUID } from "crypto";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import Database from "better-sqlite3";
 import { HTTP_UNPROCESSABLE_ENTITY } from "../../core/constants.js";
@@ -17,7 +17,7 @@ import {
 } from "../proxy-logging.js";
 import { buildUpstreamHeaders, buildUpstreamUrl } from "../proxy-core.js";
 import { ProviderSwitchNeeded } from "../types.js";
-import type { RawHeaders, TransportResult } from "../types.js";
+import type { RawHeaders } from "../types.js";
 import type { Target } from "../../core/types.js";
 import { insertRejectedLog } from "../log-helpers.js";
 import type { RetryRuleMatcher } from "../orchestration/retry-rules.js";
@@ -29,22 +29,13 @@ import { applyOverflowRedirect } from "../routing/overflow.js";
 import { applyProviderPatches } from "../patch/index.js";
 import { PipelineSnapshot, type StageRecord } from "../pipeline-snapshot.js";
 import { maybeInjectModelInfoTag } from "../response-transform.js";
-import type { ToolCallRecord } from "../loop-prevention/types.js";
 import { loadEnhancementConfig } from "../routing/enhancement-config.js";
+import { getTransportStatusCode, serializeBlocksForStorage, extractLastToolUse } from "./proxy-handler-utils.js";
 
 const HTTP_ERROR_THRESHOLD = 400;
 const MAX_LOG_FIELD_LENGTH = 80;
 const UPSTREAM_ERROR_STATUS = 502;
 const TIER2_LOOP_THRESHOLD = 2;
-const HASH_DIGEST_LENGTH = 16;
-
-/** 从 TransportResult 中提取最终 HTTP status code */
-function getTransportStatusCode(result: TransportResult): number | null {
-  if (result.kind === "success" || result.kind === "error" || result.kind === "stream_error") return result.statusCode;
-  if (result.kind === "stream_success" || result.kind === "stream_abort") return result.statusCode;
-  // kind === "throw"：无 HTTP 状态码
-  return null;
-}
 
 // ---------- Failover loop context ----------
 
@@ -114,58 +105,9 @@ export interface RouteHandlerDeps {
   container: ServiceContainer;
 }
 
-import type { ContentBlock } from "../../monitor/types.js";
 import { getConfig } from "../../config/index.js";
 import type { ServiceContainer } from "../../core/container.js";
 import { SERVICE_KEYS } from "../../core/container.js";
-
-/** 将 tracker blocks 序列化为前端 tryDirectParse 可解析的 JSON */
-function serializeBlocksForStorage(blocks: ContentBlock[] | undefined, apiType: "openai" | "anthropic"): string {
-  if (!blocks || blocks.length === 0) return "";
-  if (apiType === "anthropic") {
-    const content = blocks.map(b => {
-      if (b.type === "thinking") return { type: "thinking", thinking: b.content };
-      if (b.type === "tool_use") {
-        let input = {};
-        try { input = JSON.parse(b.content || "{}"); } catch { /* eslint-disable-line taste/no-silent-catch -- tool_use content 非合法 JSON 时保留空对象 */ }
-        return { type: "tool_use", name: b.name ?? "", input };
-      }
-      return { type: "text", text: b.content };
-    });
-    return JSON.stringify({ content });
-  }
-  const text = blocks.filter(b => b.type === "text").map(b => b.content).join("");
-  return JSON.stringify({ choices: [{ message: { content: text } }] });
-}
-
-/** 从请求体中提取最后一次工具调用记录 */
-function extractLastToolUse(body: Record<string, unknown>): ToolCallRecord | null {
-  const messages = body.messages as Array<{ role?: string; content?: Array<{ type?: string; id?: string; name?: string; input?: unknown }> }> | undefined;
-  if (!messages) return null;
-
-  // 从后往前找，找到最后一个 assistant 消息中的 tool_use
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const msg = messages[i];
-    if (msg.role !== "assistant") continue;
-    const content = msg.content;
-    if (!Array.isArray(content)) continue;
-    for (let j = content.length - 1; j >= 0; j--) {
-      const block = content[j];
-      if (block.type === "tool_use") {
-        const inputText = JSON.stringify(block.input ?? {});
-        const inputHash = createHash("sha256").update(inputText).digest("hex").slice(0, HASH_DIGEST_LENGTH);
-        return {
-          toolName: block.name ?? "unknown",
-          toolUseId: block.id,
-          inputHash,
-          inputText,
-          timestamp: Date.now(),
-        };
-      }
-    }
-  }
-  return null;
-}
 
 // ---------- Main entry ----------
 
