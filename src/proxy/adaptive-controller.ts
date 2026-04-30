@@ -71,6 +71,11 @@ export class AdaptiveConcurrencyController {
     this.entries.delete(providerId);
   }
 
+  /** 清除所有 provider 的自适应并发状态（导入配置后重建前调用） */
+  removeAll(): void {
+    this.entries.clear();
+  }
+
   onRequestComplete(providerId: string, result: AdaptiveResult): void {
     const entry = this.entries.get(providerId);
     if (!entry) return;

@@ -14,6 +14,7 @@ import { ProviderSemaphoreManager } from "../orchestration/semaphore.js";
 import type { RequestTracker } from "../../monitor/request-tracker.js";
 import type { AdaptiveConcurrencyController } from "../adaptive-controller.js";
 import { HTTP_NOT_FOUND, HTTP_BAD_GATEWAY } from "../../core/constants.js";
+import { SERVICE_KEYS } from "../../core/container.js";
 
 export interface OpenaiProxyOptions {
   db: Database.Database;
@@ -46,9 +47,9 @@ const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, do
   const { db, container } = opts;
 
   const orchestrator = createOrchestrator(
-    container.resolve<ProviderSemaphoreManager>("semaphoreManager"),
-    container.resolve<RequestTracker>("tracker"),
-    container.resolve<AdaptiveConcurrencyController>("adaptiveController"),
+    container.resolve<ProviderSemaphoreManager>(SERVICE_KEYS.semaphoreManager),
+    container.resolve<RequestTracker>(SERVICE_KEYS.tracker),
+    container.resolve<AdaptiveConcurrencyController>(SERVICE_KEYS.adaptiveController),
   );
 
   app.post(CHAT_COMPLETIONS_PATH, async (request, reply) => {

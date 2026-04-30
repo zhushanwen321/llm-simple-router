@@ -189,7 +189,7 @@ export async function buildApp(
     if (typeof payload === 'string') {
       try {
         const parsed = JSON.parse(payload)
-        if ('code' in parsed) return payload // errorHandler 或路由已手动包装
+        if (parsed !== null && typeof parsed === 'object' && 'code' in parsed) return payload // errorHandler 或路由已手动包装
         // 复用已解析结果，避免二次 JSON.parse
         const wrapped: ApiResponse<unknown> = {
           code: API_CODE.SUCCESS,
@@ -271,7 +271,10 @@ export async function buildApp(
     syncAdaptiveProvider: (providerId, cfg) => adaptiveController.syncProvider(providerId, cfg),
     removeAdaptiveProvider: (providerId) => adaptiveController.remove(providerId),
     getAdaptiveStatus: (providerId) => adaptiveController.getStatus(providerId),
-    reinitializeProviders: () => initializeProviderState(db, semaphoreManager, adaptiveController, tracker),
+    reinitializeProviders: () => {
+      adaptiveController.removeAll();
+      initializeProviderState(db, semaphoreManager, adaptiveController, tracker);
+    },
   };
 
   app.register(adminRoutes, { db, stateRegistry, tracker, adaptiveController });

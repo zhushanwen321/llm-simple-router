@@ -30,6 +30,8 @@ export interface AcquireToken {
 
 export class ProviderSemaphoreManager {
   private readonly entries = new Map<string, SemaphoreEntry>();
+  /** 全局 generation 计数器 — 每次 getOrCreate 分配唯一值，避免 disable+re-enable 后旧 token 匹配新条目 */
+  private nextGeneration = 0;
 
   private getOrCreate(providerId: string): SemaphoreEntry {
     let entry = this.entries.get(providerId);
@@ -38,7 +40,7 @@ export class ProviderSemaphoreManager {
         config: { maxConcurrency: 0, queueTimeoutMs: 0, maxQueueSize: 0 },
         current: 0,
         queue: [],
-        generation: 0,
+        generation: ++this.nextGeneration,
       };
       this.entries.set(providerId, entry);
     }
@@ -55,8 +57,8 @@ export class ProviderSemaphoreManager {
         if (e.timer) clearTimeout(e.timer);
         e.resolve();
       }
-      // 递增 generation，使当前所有持有旧 token 的 release() 调用失效
-      entry.generation++;
+      // 递增 generation（全局唯一），使当前所有持有旧 token 的 release() 调用失效
+      entry.generation = ++this.nextGeneration;
       entry.current = 0;
       return;
     }

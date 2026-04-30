@@ -257,34 +257,27 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     }
 
     // 重新启用时重建信号量和自适应并发
-    if (existing.is_active === 0 && body.is_active === 1) {
-      stateRegistry?.updateProviderConcurrency(id, {
-        maxConcurrency: updated.max_concurrency,
-        queueTimeoutMs: updated.queue_timeout_ms,
-        maxQueueSize: updated.max_queue_size,
-      });
-      adaptiveController?.syncProvider(id, {
-        adaptive_enabled: updated.adaptive_enabled,
-        max_concurrency: updated.max_concurrency,
-        queue_timeout_ms: updated.queue_timeout_ms,
-        max_queue_size: updated.max_queue_size,
-      });
-    }
+    const concurrencyChanged = body.max_concurrency !== undefined || body.queue_timeout_ms !== undefined || body.max_queue_size !== undefined;
+    const adaptiveChanged = body.adaptive_enabled !== undefined;
+    const reenabled = existing.is_active === 0 && body.is_active === 1;
+    const needsSync = concurrencyChanged || adaptiveChanged || reenabled;
 
-    if (body.max_concurrency !== undefined || body.queue_timeout_ms !== undefined || body.max_queue_size !== undefined) {
-      stateRegistry?.updateProviderConcurrency(id, {
-        maxConcurrency: updated.max_concurrency,
-        queueTimeoutMs: updated.queue_timeout_ms,
-        maxQueueSize: updated.max_queue_size,
-      });
-    }
-    if (body.adaptive_enabled !== undefined || body.max_concurrency !== undefined || body.queue_timeout_ms !== undefined || body.max_queue_size !== undefined) {
+    if (needsSync) {
+      // adaptive 同步：syncProvider 内部根据 adaptive_enabled 决定是 init+syncToSemaphore 还是 remove+updateConfig
       adaptiveController?.syncProvider(id, {
         adaptive_enabled: updated.adaptive_enabled,
         max_concurrency: updated.max_concurrency,
         queue_timeout_ms: updated.queue_timeout_ms,
         max_queue_size: updated.max_queue_size,
       });
+      // 非 adaptive 模式下手动同步信号量（adaptive 启用时由 syncProvider 内部管理）
+      if (!updated.adaptive_enabled) {
+        stateRegistry?.updateProviderConcurrency(id, {
+          maxConcurrency: updated.max_concurrency,
+          queueTimeoutMs: updated.queue_timeout_ms,
+          maxQueueSize: updated.max_queue_size,
+        });
+      }
     }
     tracker?.updateProviderConfig(id, {
       name: body.name ?? existing.name,

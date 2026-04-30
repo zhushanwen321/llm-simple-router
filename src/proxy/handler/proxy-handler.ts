@@ -107,6 +107,7 @@ export interface RouteHandlerDeps {
 import type { ContentBlock } from "../../monitor/types.js";
 import { getConfig } from "../../config/index.js";
 import type { ServiceContainer } from "../../core/container.js";
+import { SERVICE_KEYS } from "../../core/container.js";
 
 /** 将 tracker blocks 序列化为前端 tryDirectParse 可解析的 JSON */
 function serializeBlocksForStorage(blocks: ContentBlock[] | undefined, apiType: "openai" | "anthropic"): string {
@@ -147,7 +148,7 @@ export async function handleProxyRequest(
   });
   const clientModel = ((request.body as Record<string, unknown>).model as string) || "unknown";
   const sessionId = (request.headers as RawHeaders)["x-claude-code-session-id"] as string | undefined;
-  const sessionTracker = deps.container.resolve<import("../loop-prevention/session-tracker.js").SessionTracker>("sessionTracker");
+  const sessionTracker = deps.container.resolve<import("../loop-prevention/session-tracker.js").SessionTracker>(SERVICE_KEYS.sessionTracker);
   const enhancementConfig = loadEnhancementConfig(deps.db);
   const { effectiveModel, originalModel, interceptResponse } = applyEnhancement(deps.db, request, clientModel, sessionId, enhancementConfig);
 
@@ -204,9 +205,9 @@ export async function handleProxyRequest(
 
 async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> {
   const { request, reply, apiType, upstreamPath, errors, deps, options, effectiveModel, originalModel, originalBody, sessionId, streamLoopEnabled } = ctx;
-  const tracker = deps.container.resolve<RequestTracker>("tracker");
-  const matcher = deps.container.resolve<RetryRuleMatcher>("matcher");
-  const usageWindowTracker = deps.container.resolve<import("../routing/usage-window-tracker.js").UsageWindowTracker>("usageWindowTracker");
+  const tracker = deps.container.resolve<RequestTracker>(SERVICE_KEYS.tracker);
+  const matcher = deps.container.resolve<RetryRuleMatcher>(SERVICE_KEYS.matcher);
+  const usageWindowTracker = deps.container.resolve<import("../routing/usage-window-tracker.js").UsageWindowTracker>(SERVICE_KEYS.usageWindowTracker);
   const config = getConfig();
   const excludeTargets: Target[] = [];
   let rootLogId: string | null = null;
