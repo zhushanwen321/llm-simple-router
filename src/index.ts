@@ -37,6 +37,10 @@ import { CheckerOptions } from "./upgrade/checker.js";
 import fastifyStatic from "@fastify/static";
 import { ServiceContainer, SERVICE_KEYS } from "./core/container.js";
 import Database from "better-sqlite3";
+import { LogFileWriter } from "./storage/log-file-writer.js";
+import { scheduleLogFileMaintenance } from "./storage/log-file-compressor.js";
+import { getDetailLogEnabled, getLogFileRetentionDays } from "./db/settings.js";
+import { dirname, join } from "node:path";
 
 export interface AppOptions {
   config?: Config;
@@ -226,6 +230,15 @@ export async function buildApp(
   });
   container.register(SERVICE_KEYS.sessionTracker, () => new SessionTracker(DEFAULT_LOOP_PREVENTION_CONFIG.sessionTracker));
 
+  // 文件日志写入器
+  const isMemoryDb = config.DB_PATH === ":memory:";
+  const logsDir = isMemoryDb ? "" : join(dirname(config.DB_PATH), "logs");
+  // :memory: 模式注册 null，避免 DB 日志记录被 isFileWriter 逻辑抑制
+  const logFileWriter = isMemoryDb
+    ? null
+    : new LogFileWriter(logsDir, { enabled: getDetailLogEnabled(db) });
+  container.register(SERVICE_KEYS.logFileWriter, () => logFileWriter);
+
   // 注入 DB 到 modelState 单例，启用会话级持久化
   modelState.init(db);
 
@@ -311,24 +324,41 @@ export async function buildApp(
     log: app.log,
   });
 
+  let close = async () => {
+    stopUpgradeChecker();
+    logCleanup.stop();
+    dbSizeMonitor.stop();
+    tracker.stopPushInterval();
+    modelState.clearAll();
+    semaphoreManager.removeAll();
+    const sessionTracker = container.resolve<SessionTracker>(SERVICE_KEYS.sessionTracker);
+    sessionTracker.stop();
+    await app.close();
+    db.close();
+  };
+
+  // 文件压缩和清理任务（仅非 :memory: 模式）
+  if (!isMemoryDb) {
+    const logFileMaintenance = scheduleLogFileMaintenance(logsDir, {
+      retentionDays: getLogFileRetentionDays(db),
+      log: app.log,
+    });
+    // 注册到 close
+    const prevClose = close;
+    close = async () => {
+      logFileMaintenance.stop();
+      await prevClose();
+    };
+  }
+
   return {
     app,
     db,
     usageWindowTracker,
-    close: async () => {
-      stopUpgradeChecker();
-      logCleanup.stop();
-      dbSizeMonitor.stop();
-      tracker.stopPushInterval();
-      modelState.clearAll();
-      semaphoreManager.removeAll();
-      const sessionTracker = container.resolve<SessionTracker>(SERVICE_KEYS.sessionTracker);
-      sessionTracker.stop();
-      await app.close();
-      db.close();
-    },
+    close,
   };
 }
+
 
 export async function main() {
   const { app, close } = await buildApp();

@@ -119,9 +119,6 @@ import { getConfig } from "../../config/index.js";
 import type { ServiceContainer } from "../../core/container.js";
 import { SERVICE_KEYS } from "../../core/container.js";
 
-// 临时定义，Task 7 会正式添加到 SERVICE_KEYS
-const LOG_FILE_WRITER_KEY = "logFileWriter";
-
 /** 将 tracker blocks 序列化为前端 tryDirectParse 可解析的 JSON */
 function serializeBlocksForStorage(blocks: ContentBlock[] | undefined, apiType: "openai" | "anthropic"): string {
   if (!blocks || blocks.length === 0) return "";
@@ -194,12 +191,7 @@ export async function handleProxyRequest(
 
   // 解析 matcher 和 logFileWriter，传递给日志相关调用
   const matcher = deps.container.resolve<RetryRuleMatcher>(SERVICE_KEYS.matcher);
-  let logFileWriter: import("../../storage/log-file-writer.js").LogFileWriter | null = null;
-  try {
-    logFileWriter = deps.container.resolve<import("../../storage/log-file-writer.js").LogFileWriter>(LOG_FILE_WRITER_KEY);
-  } catch {
-    logFileWriter = null;
-  }
+  const logFileWriter = deps.container.resolve<import("../../storage/log-file-writer.js").LogFileWriter>(SERVICE_KEYS.logFileWriter);
 
   // 在所有加工之前捕获原始 body
   const reqBody = request.body as Record<string, unknown> | undefined;

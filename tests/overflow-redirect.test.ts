@@ -9,7 +9,7 @@ import { ProviderSemaphoreManager } from "../src/proxy/orchestration/semaphore.j
 import { RequestTracker } from "../src/monitor/request-tracker.js";
 import { createMockBackend } from "./helpers/mock-backend.js";
 import { TEST_ENCRYPTION_KEY } from "./helpers/test-setup.js";
-import { ServiceContainer } from "../src/core/container.js";
+import { ServiceContainer, SERVICE_KEYS } from "../src/core/container.js";
 
 
 function insertProvider(
@@ -60,6 +60,7 @@ function buildTestApp(db: Database.Database): FastifyInstance {
   container.register("usageWindowTracker", () => undefined);
   container.register("sessionTracker", () => undefined);
   container.register("adaptiveController", () => undefined);
+    container.register(SERVICE_KEYS.logFileWriter, () => null);
   app.register(openaiProxy, { db: db, container });
   return app;
 }

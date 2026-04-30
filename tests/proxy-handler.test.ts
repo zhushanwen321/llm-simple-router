@@ -38,7 +38,7 @@ import { resolveMapping } from "../src/proxy/routing/mapping-resolver.js";
 import { applyEnhancement } from "../src/proxy/enhancement/enhancement-handler.js";
 import { logResilienceResult, collectTransportMetrics, handleIntercept } from "../src/proxy/proxy-logging.js";
 import { insertRejectedLog } from "../src/proxy/log-helpers.js";
-import { ServiceContainer } from "../src/core/container.js";
+import { ServiceContainer, SERVICE_KEYS } from "../src/core/container.js";
 
 
 const errors: ProxyErrorFormatter = {
@@ -77,6 +77,7 @@ function createDeps(overrides = {}) {
   container.register("sessionTracker", () => undefined);
   container.register("adaptiveController", () => undefined);
   container.register("semaphoreManager", () => undefined);
+  container.register(SERVICE_KEYS.logFileWriter, () => null);
   return {
     db: {} as any,
     orchestrator: { handle: vi.fn() } as any,

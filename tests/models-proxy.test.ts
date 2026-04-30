@@ -6,7 +6,7 @@ import { openaiProxy } from "../src/proxy/handler/openai.js";
 import { encrypt } from "../src/utils/crypto.js";
 import { initDatabase } from "../src/db/index.js";
 import { setSetting } from "../src/db/settings.js";
-import { ServiceContainer } from "../src/core/container.js";
+import { ServiceContainer, SERVICE_KEYS } from "../src/core/container.js";
 
 
 const TEST_ENCRYPTION_KEY =
@@ -118,6 +118,7 @@ describe("GET /v1/models proxy", () => {
     container.register("usageWindowTracker", () => undefined);
     container.register("sessionTracker", () => undefined);
     container.register("adaptiveController", () => undefined);
+    container.register(SERVICE_KEYS.logFileWriter, () => null);
     app.register(openaiProxy, { db: db, container });
 
     const response = await app.inject({
@@ -144,6 +145,7 @@ describe("GET /v1/models proxy", () => {
     container.register("usageWindowTracker", () => undefined);
     container.register("sessionTracker", () => undefined);
     container.register("adaptiveController", () => undefined);
+    container.register(SERVICE_KEYS.logFileWriter, () => null);
     app.register(openaiProxy, { db: db, container });
 
     const response = await app.inject({
@@ -168,6 +170,7 @@ describe("GET /v1/models proxy", () => {
     container.register("usageWindowTracker", () => undefined);
     container.register("sessionTracker", () => undefined);
     container.register("adaptiveController", () => undefined);
+    container.register(SERVICE_KEYS.logFileWriter, () => null);
     app.register(openaiProxy, { db: db, container });
 
     const response = await app.inject({
@@ -191,6 +194,7 @@ describe("GET /v1/models proxy", () => {
     container.register("usageWindowTracker", () => undefined);
     container.register("sessionTracker", () => undefined);
     container.register("adaptiveController", () => undefined);
+    container.register(SERVICE_KEYS.logFileWriter, () => null);
     app.register(openaiProxy, { db: db, container });
 
     const response = await app.inject({

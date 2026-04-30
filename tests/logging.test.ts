@@ -16,7 +16,7 @@ import { initDatabase } from "../src/db/index.js";
 import { setSetting } from "../src/db/settings.js";
 import { ProviderSemaphoreManager } from "../src/proxy/orchestration/semaphore.js";
 import { RequestTracker } from "../src/monitor/request-tracker.js";
-import { ServiceContainer } from "../src/core/container.js";
+import { ServiceContainer, SERVICE_KEYS } from "../src/core/container.js";
 
 
 const API_KEY = "sk-test-router";
@@ -67,6 +67,7 @@ function createApp() {
   container.register("usageWindowTracker", () => undefined);
   container.register("sessionTracker", () => undefined);
   container.register("adaptiveController", () => undefined);
+    container.register(SERVICE_KEYS.logFileWriter, () => null);
   app.register(authMiddleware, { db });
   app.register(openaiProxy, { db: db, container });
   app.register(anthropicProxy, { db: db, container });

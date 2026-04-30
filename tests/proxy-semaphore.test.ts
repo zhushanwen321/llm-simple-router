@@ -8,7 +8,7 @@ import { encrypt } from "../src/utils/crypto.js";
 import { openaiProxy } from "../src/proxy/handler/openai.js";
 import { ProviderSemaphoreManager } from "../src/proxy/orchestration/semaphore.js";
 import { RequestTracker } from "../src/monitor/request-tracker.js";
-import { ServiceContainer } from "../src/core/container.js";
+import { ServiceContainer, SERVICE_KEYS } from "../src/core/container.js";
 
 
 const TEST_ENCRYPTION_KEY =
@@ -48,6 +48,7 @@ function buildTestApp(
   container.register("usageWindowTracker", () => undefined);
   container.register("sessionTracker", () => undefined);
   container.register("adaptiveController", () => undefined);
+  container.register(SERVICE_KEYS.logFileWriter, () => null);
   const app = Fastify();
   app.register(openaiProxy, { db: mockDb, container });
   return app;
