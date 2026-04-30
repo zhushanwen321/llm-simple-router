@@ -284,8 +284,19 @@ function isActive(path: string): boolean {
   return route.path.startsWith(path)
 }
 
-function handleRestart() {
-  window.location.reload()
+async function handleRestart() {
+  try {
+    await api.restartServer()
+    toast.success('重启指令已发送，等待服务恢复...')
+    showRestartConfirm.value = false
+    // 等待服务重启完成（新进程启动需要几秒）
+    const RESTART_DELAY_MS = 5000
+    setTimeout(() => {
+      window.location.reload()
+    }, RESTART_DELAY_MS)
+  } catch (e: unknown) {
+    toast.error(getApiMessage(e, '重启失败'))
+  }
 }
 
 async function handleLogout() {

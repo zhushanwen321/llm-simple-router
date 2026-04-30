@@ -1,10 +1,10 @@
 import { FastifyPluginCallback } from 'fastify'
 import Database from 'better-sqlite3'
 import { getConfigSyncSource, setConfigSyncSource } from '../db/settings.js'
-import { detectDeployment } from '../upgrade/deployment.js'
+import { detectDeployment, hasProcessManager, resolveRestartBinPath, getRestartMethod } from '../upgrade/deployment.js'
 import { createUpgradeChecker, fetchJson, CheckerOptions } from '../upgrade/checker.js'
 import { reloadConfig } from '../config/recommended.js'
-import { execSync } from 'node:child_process'
+import { execSync, spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { HTTP_BAD_REQUEST, HTTP_INTERNAL_ERROR } from '../core/constants.js'
@@ -17,6 +17,7 @@ const JSON_INDENT = 2
 
 interface UpgradeRoutesOptions {
   db: Database.Database
+  closeFn: () => Promise<void>
 }
 
 // 模块级单例：checker 和定时器
@@ -49,7 +50,8 @@ export const adminUpgradeRoutes: FastifyPluginCallback<UpgradeRoutesOptions> = (
     const c = checker ?? createUpgradeChecker()
     const deployment = detectDeployment()
     const syncSource = getConfigSyncSource(db)
-    return reply.send({ ...c.getStatus(), deployment, syncSource })
+    const restartMethod = getRestartMethod()
+    return reply.send({ ...c.getStatus(), deployment, syncSource, restartMethod })
   })
 
   app.post('/admin/api/upgrade/check', async (_req, reply) => {
@@ -89,6 +91,44 @@ export const adminUpgradeRoutes: FastifyPluginCallback<UpgradeRoutesOptions> = (
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
       return reply.code(HTTP_INTERNAL_ERROR).send(apiError(API_CODE.INTERNAL_ERROR, `升级失败: ${msg}`))
+    }
+  })
+
+  app.post('/admin/api/upgrade/restart', async (req, reply) => {
+    const managed = hasProcessManager()
+    const method = getRestartMethod()
+
+    // 先回复客户端，再执行重启（否则客户端收不到响应）
+    reply.send({ ok: true, method })
+
+    // 给响应发送窗口
+    await new Promise((resolve) => setTimeout(resolve, 300)) // eslint-disable-line no-magic-numbers
+
+    try {
+      req.log.info({ method, managed }, 'Restarting server...')
+
+      // 优雅关闭（释放端口、等待活跃请求完成）
+      await options.closeFn()
+
+      if (!managed) {
+        // 无进程管理器（npx / 手动 node）：自 spawn 新进程
+        const binPath = resolveRestartBinPath()
+        const args = process.argv.slice(2) // eslint-disable-line no-magic-numbers
+        req.log.info({ binPath, args }, 'Spawning new process before exit')
+        const child = spawn(binPath, args, {
+          detached: true,
+          stdio: 'ignore',
+          env: { ...process.env },
+        })
+        child.unref()
+      }
+
+      req.log.info('Exiting current process')
+      process.exit(0)
+    } catch (err) {
+      // 重启失败时记录错误，保持服务运行
+      const msg = err instanceof Error ? err.message : String(err)
+      req.log.error({ err }, `Restart failed: ${msg}`)
     }
   })
 
