@@ -379,6 +379,11 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
 
     const pipelineSnapshot = iterationSnapshot.toJSON();
 
+    // 映射完成后立即推送 upstreamRequest 到 tracker，让前端实时可见
+    if (tracker) {
+      tracker.update(logId, { upstreamRequest: upstreamReqBase });
+    }
+
     try {
       const resilienceResult = await deps.orchestrator.handle(
         request, reply, apiType,

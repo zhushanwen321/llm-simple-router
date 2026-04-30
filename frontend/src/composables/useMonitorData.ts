@@ -142,6 +142,7 @@ export function useMonitorData() {
           if (version !== loadVersion.value) return
           logDetailData.value = {
             clientRequest: trackerReq.clientRequest ?? undefined,
+            upstreamRequest: trackerReq.upstreamRequest ?? undefined,
           }
         } catch (e: unknown) {
           // 仅在 tracker 中请求不存在(404)时回退到 DB 查询

@@ -1,7 +1,8 @@
-/** 日志文件按 10 分钟时间窗口切分 */
+/** JSONL 文件按每 10 分钟一个窗口切分 */
 export const WINDOW_MINUTES = 10;
-export const WINDOW_MS = WINDOW_MINUTES * 60 * 1000;
-export const DIGIT_PAD_WIDTH = 2;
+/** @deprecated Use WINDOW_MINUTES */
+export const LOG_WINDOW_MINUTES = WINDOW_MINUTES;
+export const TIME_PAD_WIDTH = 2;
 
 export interface LogFileEntry {
   id: string;
