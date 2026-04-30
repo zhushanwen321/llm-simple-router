@@ -20,8 +20,8 @@ export function applyProviderPatches(
   provider: ProviderInfo,
 ): { body: Record<string, unknown>; meta: ProviderPatchMeta } {
   const patches: string[] = [];
-  let patched: Record<string, unknown> | undefined;
   let cloned = false;
+  let patched: Record<string, unknown> | undefined;
 
   const ensureCloned = (): Record<string, unknown> => {
     if (!cloned) {
@@ -41,7 +41,7 @@ export function applyProviderPatches(
 
   // DeepSeek 特定补丁
   if (needsDeepSeekPatch(body, provider)) {
-    applyDeepSeekPatches(ensureCloned());
+    applyDeepSeekPatches(ensureCloned(), provider.api_type as "openai" | "anthropic");
     patches.push("deepseek");
   }
 

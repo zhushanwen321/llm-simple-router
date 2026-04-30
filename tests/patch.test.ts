@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { patchNonDeepSeekToolMessages } from "../src/proxy/patch/deepseek/patch-non-deepseek-tools.js";
-import { patchOrphanToolResults } from "../src/proxy/patch/deepseek/patch-orphan-tool-results.js";
+import { patchOrphanToolResultsOA } from "../src/proxy/patch/deepseek/patch-orphan-tool-results.js";
 import { applyProviderPatches } from "../src/proxy/patch/index.js";
 
 // ---------- patchNonDeepSeekToolMessages（方案 7，OpenAI 格式）----------
@@ -84,7 +84,7 @@ describe("patchOrphanToolResults", () => {
         { role: "user", content: "next" },
       ],
     };
-    patchOrphanToolResults(body);
+    patchOrphanToolResultsOA(body);
     // orphan tool removed, then consecutive users merged
     expect(body.messages).toHaveLength(1);
     expect(body.messages[0].role).toBe("user");
@@ -103,7 +103,7 @@ describe("patchOrphanToolResults", () => {
         { role: "tool", tool_call_id: "call_b", content: "result b" },
       ],
     };
-    patchOrphanToolResults(body);
+    patchOrphanToolResultsOA(body);
     expect(body.messages).toHaveLength(3);
   });
 
@@ -117,7 +117,7 @@ describe("patchOrphanToolResults", () => {
         { role: "user", content: "next" },
       ],
     };
-    patchOrphanToolResults(body);
+    patchOrphanToolResultsOA(body);
     const roles = (body.messages as Array<{ role: string }>).map(m => m.role);
     expect(roles).toEqual(["assistant", "tool", "assistant", "user"]);
   });
@@ -130,7 +130,7 @@ describe("patchOrphanToolResults", () => {
         { role: "user", content: "second" },
       ],
     };
-    patchOrphanToolResults(body);
+    patchOrphanToolResultsOA(body);
     expect(body.messages).toHaveLength(1);
     expect(body.messages[0].role).toBe("user");
     expect((body.messages[0].content as string)).toContain("first");
@@ -145,13 +145,13 @@ describe("patchOrphanToolResults", () => {
       ],
     };
     const original = JSON.stringify(body);
-    patchOrphanToolResults(body);
+    patchOrphanToolResultsOA(body);
     expect(JSON.stringify(body)).toBe(original);
   });
 
   it("空 messages 时安全返回", () => {
-    expect(() => patchOrphanToolResults({})).not.toThrow();
-    expect(() => patchOrphanToolResults({ messages: [] })).not.toThrow();
+    expect(() => patchOrphanToolResultsOA({})).not.toThrow();
+    expect(() => patchOrphanToolResultsOA({ messages: [] })).not.toThrow();
   });
 });
 

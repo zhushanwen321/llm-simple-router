@@ -1,7 +1,5 @@
 import { TOOL_USE_ID_PREFIX } from "../enhancement/directive-parser.js";
-
-type ContentBlock = Record<string, unknown>;
-type Message = { role: string; content: unknown };
+import { type Message, mergeConsecutive } from "./deepseek/utils.js";
 
 /**
  * 从消息中移除 router 注入的合成 tool_use/tool_result。
@@ -27,7 +25,7 @@ export function patchRouterSyntheticToolCalls(
 
   for (const msg of messages) {
     if (msg.role !== "assistant" || !Array.isArray(msg.content)) continue;
-    const blocks = msg.content as ContentBlock[];
+    const blocks = msg.content as Array<Record<string, unknown>>;
     const filtered = blocks.filter((block) => {
       if (
         block?.type === "tool_use" &&
@@ -47,7 +45,7 @@ export function patchRouterSyntheticToolCalls(
   // Step 2: 移除对应的 tool_result
   for (const msg of messages) {
     if (msg.role !== "user" || !Array.isArray(msg.content)) continue;
-    const blocks = msg.content as ContentBlock[];
+    const blocks = msg.content as Array<Record<string, unknown>>;
     const filtered = blocks.filter(
       (block) =>
         !(
@@ -72,27 +70,4 @@ export function patchRouterSyntheticToolCalls(
   // Step 4: 合并连续的同角色消息
   mergeConsecutive(messages, "user");
   mergeConsecutive(messages, "assistant");
-}
-
-function mergeConsecutive(messages: Message[], role: string): void {
-  let i = 1;
-  while (i < messages.length) {
-    if (messages[i].role === role && messages[i - 1].role === role) {
-      const prev = messages[i - 1];
-      const curr = messages[i];
-      prev.content = [
-        ...normalizeToArray(prev.content),
-        ...normalizeToArray(curr.content),
-      ];
-      messages.splice(i, 1);
-    } else {
-      i++;
-    }
-  }
-}
-
-function normalizeToArray(content: unknown): ContentBlock[] {
-  if (Array.isArray(content)) return content as ContentBlock[];
-  if (typeof content === "string") return [{ type: "text", text: content }];
-  return [{ type: "text", text: String(content ?? "") }];
 }

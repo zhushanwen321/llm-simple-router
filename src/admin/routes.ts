@@ -31,6 +31,7 @@ interface AdminRoutesOptions {
   logFileWriter?: import("../storage/log-file-writer.js").LogFileWriter | null;
   logsDir?: string;
   pluginRegistry?: import("../proxy/transform/plugin-registry.js").PluginRegistry;
+  closeFn?: () => Promise<void>;
 }
 
 export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (app, options, done) => {
@@ -53,7 +54,7 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (app, opti
   app.register(adminImportExportRoutes, { db: options.db, stateRegistry: options.stateRegistry, pluginRegistry: options.pluginRegistry });
   app.register(adminRecommendedRoutes, { db: options.db });
   app.register(adminUsageRoutes, { db: options.db });
-  app.register(adminUpgradeRoutes, { db: options.db });
+  app.register(adminUpgradeRoutes, { db: options.db, closeFn: options.closeFn ?? (async () => {}) });
   app.register(adminTransformRuleRoutes, { db: options.db, pluginRegistry: options.pluginRegistry });
   done();
 };

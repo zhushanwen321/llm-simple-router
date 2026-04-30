@@ -88,6 +88,7 @@ const API = {
   UPGRADE_STATUS: "/upgrade/status",
   UPGRADE_CHECK: "/upgrade/check",
   UPGRADE_EXECUTE: "/upgrade/execute",
+  UPGRADE_RESTART: "/upgrade/restart",
   UPGRADE_SYNC_CONFIG: "/upgrade/sync-config",
   UPGRADE_SYNC_SOURCE: "/upgrade/sync-source",
   TRANSFORM_RULES: "/transform-rules",
@@ -314,6 +315,7 @@ export interface UpgradeStatus {
   };
   deployment: "npm" | "docker" | "unknown";
   syncSource: "github" | "gitee";
+  restartMethod: "process_manager" | "self_spawn";
   lastCheckedAt: string | null;
 }
 
@@ -555,6 +557,8 @@ export const api = {
     request<{ ok: boolean; version: string }>("post", API.UPGRADE_EXECUTE, {
       version,
     }),
+  restartServer: () =>
+    request<{ ok: boolean; method: string }>("post", API.UPGRADE_RESTART),
   syncConfig: (source: "github" | "gitee") =>
     request<{ ok: boolean }>("post", API.UPGRADE_SYNC_CONFIG, { source }),
   setSyncSource: (source: "github" | "gitee") =>

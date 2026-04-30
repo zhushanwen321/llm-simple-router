@@ -170,6 +170,75 @@ docker compose up -d
 
 环境变量通过 Setup 页面设置，不需要 `.env` 文件。
 
+## 进程管理
+
+通过 Web UI 一键升级后，服务需要重启才能生效。推荐使用以下方式部署，确保进程崩溃或升级重启后自动恢复。
+
+### PM2（推荐）
+
+```bash
+# 安装 PM2
+npm install -g pm2
+
+# 全局安装 Router
+npm install -g llm-simple-router
+
+# 启动（PM2 自动重启崩溃的进程）
+pm2 start llm-simple-router --name llm-router
+
+# 查看日志
+pm2 logs llm-router
+
+# 设置开机自启
+pm2 startup
+pm2 save
+```
+
+升级流程：Web UI 一键升级 → 点击重启 → PM2 自动拉起新进程（< 1s 中断）。
+
+### systemd（Linux 服务器）
+
+创建服务文件 `/etc/systemd/system/llm-simple-router.service`：
+
+```ini
+[Unit]
+Description=LLM Simple Router
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/llm-simple-router
+Restart=always
+RestartSec=3
+Environment=PORT=9981
+Environment=LOG_LEVEL=info
+# 按需配置其他环境变量
+# Environment=DB_PATH=/var/lib/llm-simple-router/router.db
+
+[Install]
+WantedBy=multi-user.target
+```
+
+> **注意**：`ExecStart` 路径取决于 Node.js 安装方式。用 `which llm-simple-router` 确认实际路径。
+
+```bash
+# 启用并启动
+sudo systemctl enable llm-simple-router
+sudo systemctl start llm-simple-router
+
+# 查看状态和日志
+sudo systemctl status llm-simple-router
+journalctl -u llm-simple-router -f
+```
+
+升级流程：Web UI 一键升级 → 点击重启 → systemd 自动重启（< 1s 中断）。
+
+### npx / 手动启动
+
+无需额外配置。Web UI 升级并点击重启后，Router 会自动 spawn 新进程并退出旧进程。短暂中断约 1-2 秒。
+
+> **注意**：如果直接 `Ctrl+C` 或终端关闭，服务不会自动恢复。建议生产环境使用 PM2 或 systemd。
+
 ## 工作原理
 
 ```
