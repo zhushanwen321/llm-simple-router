@@ -2,6 +2,8 @@ import { randomUUID } from "crypto";
 import Database from "better-sqlite3";
 import type { Provider } from "../db/index.js";
 import { insertRequestLog, insertMetrics, updateLogMetrics } from "../db/index.js";
+import type { LogWriteContext } from "../db/logs.js";
+import type { LogFileWriter } from "../storage/log-file-writer.js";
 import { insertSuccessLog, type FailoverContext } from "./log-helpers.js";
 import { MetricsExtractor } from "../metrics/metrics-extractor.js";
 import { estimateInputTokens } from "../utils/token-counter.js";
@@ -38,10 +40,15 @@ export function handleIntercept(
   clientModel: string,
   sessionId?: string,
   pipelineSnapshot?: string,
+  matcher?: { test: (statusCode: number, body: string) => boolean } | null,
+  logFileWriter?: LogFileWriter | null,
 ): import("fastify").FastifyReply {
   const logId = randomUUID();
   const isStream = (request.body as Record<string, unknown>).stream === true;
   const respBody = JSON.stringify(interceptResponse.body);
+  const writeContext: LogWriteContext | undefined = (matcher || logFileWriter) ? {
+    matcher, logFileWriter, responseBody: respBody,
+  } : undefined;
   insertRequestLog(db, {
     id: logId, api_type: apiType, model: clientModel, provider_id: "router",
     status_code: interceptResponse.statusCode, latency_ms: 0,
@@ -54,7 +61,7 @@ export function handleIntercept(
     router_key_id: request.routerKey?.id ?? null, original_model: null,
     session_id: sessionId,
     pipeline_snapshot: pipelineSnapshot ?? null,
-  });
+  }, writeContext);
   return reply.code(interceptResponse.statusCode).send(interceptResponse.body);
 }
 
@@ -75,6 +82,8 @@ export function logResilienceResult(
     sessionId?: string | null;
     pipelineSnapshot?: string;
     failover?: FailoverContext;
+    matcher?: { test: (statusCode: number, body: string) => boolean } | null;
+    logFileWriter?: LogFileWriter | null;
   },
   attempts: ResilienceAttempt[],
   result: TransportResult,
@@ -89,6 +98,13 @@ export function logResilienceResult(
     const attemptLogId = isOriginal ? params.logId : randomUUID();
     const isFailoverLog = isOriginal && isFailoverIteration;
     const parentId = isOriginal ? (isFailoverIteration ? rootLogId : null) : params.logId;
+
+    // 构建 writeContext（所有路径共享，error/stream_error 路径 status >= 400 所以 preserveDetail=true，但文件写入仍需执行）
+    const attemptWriteContext: LogWriteContext | undefined = (params.matcher || params.logFileWriter) ? {
+      matcher: params.matcher,
+      logFileWriter: params.logFileWriter,
+      responseBody: attempt.responseBody,
+    } : undefined;
 
     // stream_error + statusCode 200: 上游返回 200 但 body 包含错误内容（如 early error detection）
     // 非 200 的 stream_error（如上游 429/500）走下方的正常错误路径
@@ -107,7 +123,7 @@ export function logResilienceResult(
         router_key_id: params.routerKeyId, original_model: params.originalModel,
         session_id: params.sessionId,
         pipeline_snapshot: params.pipelineSnapshot ?? null,
-      });
+      }, attemptWriteContext);
     } else if (attempt.error) {
       insertRequestLog(db, {
         id: attemptLogId, api_type: params.apiType, model: params.model,
@@ -124,7 +140,7 @@ export function logResilienceResult(
         router_key_id: params.routerKeyId, original_model: params.originalModel,
         session_id: params.sessionId,
         pipeline_snapshot: params.pipelineSnapshot ?? null,
-      });
+      }, attemptWriteContext);
     } else if (attempt.statusCode !== UPSTREAM_SUCCESS) {
       insertRequestLog(db, {
         id: attemptLogId, api_type: params.apiType, model: params.model,
@@ -139,7 +155,7 @@ export function logResilienceResult(
         router_key_id: params.routerKeyId, original_model: params.originalModel,
         session_id: params.sessionId,
         pipeline_snapshot: params.pipelineSnapshot ?? null,
-      });
+      }, attemptWriteContext);
     } else {
       const upHdrs = (result.kind === "stream_success" || result.kind === "stream_abort")
         ? (result.upstreamResponseHeaders ?? {})
@@ -157,6 +173,8 @@ export function logResilienceResult(
         routerKeyId: params.routerKeyId, originalModel: params.originalModel,
         sessionId: params.sessionId,
         pipelineSnapshot: params.pipelineSnapshot,
+        matcher: params.matcher,
+        logFileWriter: params.logFileWriter,
       });
       lastSuccessLogId = attemptLogId;
     }

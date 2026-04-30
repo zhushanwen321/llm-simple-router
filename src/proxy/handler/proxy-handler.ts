@@ -24,13 +24,11 @@ import type { RetryRuleMatcher } from "../orchestration/retry-rules.js";
 import type { ProxyOrchestrator } from "../orchestration/orchestrator.js";
 import type { ProxyErrorFormatter, ProxyErrorResponse } from "../proxy-core.js";
 import { ToolLoopGuard } from "../loop-prevention/tool-loop-guard.js";
-import { TOOL_USE_ID_PREFIX, TOOL_USE_ID_PROVIDER_PREFIX } from "../enhancement/directive-parser.js";
 import { buildTransportFn } from "../transport/transport-fn.js";
 import { applyOverflowRedirect } from "../routing/overflow.js";
 import { applyProviderPatches } from "../patch/index.js";
 import { PipelineSnapshot, type StageRecord } from "../pipeline-snapshot.js";
 import { maybeInjectModelInfoTag } from "../response-transform.js";
-import type { SessionTracker } from "../loop-prevention/session-tracker.js";
 import type { ToolCallRecord } from "../loop-prevention/types.js";
 import { loadEnhancementConfig } from "../routing/enhancement-config.js";
 
@@ -38,6 +36,7 @@ const HTTP_ERROR_THRESHOLD = 400;
 const MAX_LOG_FIELD_LENGTH = 80;
 const UPSTREAM_ERROR_STATUS = 502;
 const TIER2_LOOP_THRESHOLD = 2;
+const HASH_DIGEST_LENGTH = 16;
 
 /** 从 TransportResult 中提取最终 HTTP status code */
 function getTransportStatusCode(result: TransportResult): number | null {
@@ -64,6 +63,8 @@ interface FailoverContext {
   baseStages: StageRecord[];
   sessionId: string | undefined;
   streamLoopEnabled: boolean;
+  matcher?: RetryRuleMatcher;
+  logFileWriter?: import("../../storage/log-file-writer.js").LogFileWriter | null;
 }
 
 // ---------- Helpers ----------
@@ -83,6 +84,8 @@ interface RejectParams {
   originalRequestId: string | null;
   sessionId: string | undefined;
   pipelineSnapshot?: string;
+  matcher?: RetryRuleMatcher;
+  logFileWriter?: import("../../storage/log-file-writer.js").LogFileWriter | null;
 }
 
 function rejectAndReply(
@@ -100,6 +103,7 @@ function rejectAndReply(
     providerId, originalModel: params.originalModel,
     isFailover: params.isFailover, originalRequestId: params.originalRequestId,
     sessionId: params.sessionId, pipelineSnapshot: params.pipelineSnapshot,
+    matcher: params.matcher, logFileWriter: params.logFileWriter,
   });
   return reply.code(error.statusCode).send(error.body);
 }
@@ -108,13 +112,15 @@ export interface RouteHandlerDeps {
   db: Database.Database;
   orchestrator: ProxyOrchestrator;
   container: ServiceContainer;
-  sessionTracker?: import("../loop-prevention/session-tracker.js").SessionTracker;
 }
 
 import type { ContentBlock } from "../../monitor/types.js";
 import { getConfig } from "../../config/index.js";
 import type { ServiceContainer } from "../../core/container.js";
 import { SERVICE_KEYS } from "../../core/container.js";
+
+// 临时定义，Task 7 会正式添加到 SERVICE_KEYS
+const LOG_FILE_WRITER_KEY = "logFileWriter";
 
 /** 将 tracker blocks 序列化为前端 tryDirectParse 可解析的 JSON */
 function serializeBlocksForStorage(blocks: ContentBlock[] | undefined, apiType: "openai" | "anthropic"): string {
@@ -150,7 +156,7 @@ function extractLastToolUse(body: Record<string, unknown>): ToolCallRecord | nul
       const block = content[j];
       if (block.type === "tool_use") {
         const inputText = JSON.stringify(block.input ?? {});
-        const inputHash = createHash("sha256").update(inputText).digest("hex").slice(0, 16);
+        const inputHash = createHash("sha256").update(inputText).digest("hex").slice(0, HASH_DIGEST_LENGTH);
         return {
           toolName: block.name ?? "unknown",
           toolUseId: block.id,
@@ -184,43 +190,15 @@ export async function handleProxyRequest(
   });
   const clientModel = ((request.body as Record<string, unknown>).model as string) || "unknown";
   const sessionId = (request.headers as RawHeaders)["x-claude-code-session-id"] as string | undefined;
-  const sessionTracker = deps.container.resolve<import("../loop-prevention/session-tracker.js").SessionTracker>(SERVICE_KEYS.sessionTracker);
   const enhancementConfig = loadEnhancementConfig(deps.db);
-  const { effectiveModel, originalModel, interceptResponse } = applyEnhancement(deps.db, request, clientModel, sessionId, enhancementConfig);
 
-  if (enhancementConfig.tool_call_loop_enabled && sessionTracker && sessionId) {
-    const routerKeyId = (request.routerKey as { id?: string } | undefined)?.id ?? null;
-    const sessionKey = routerKeyId ? `${routerKeyId}:${sessionId}` : sessionId;
-    const lastToolUse = extractLastToolUse(request.body as Record<string, unknown>);
-    if (lastToolUse) {
-      const toolGuard = new ToolLoopGuard(sessionTracker, {
-        enabled: true,
-        minConsecutiveCount: 3,
-        detectorConfig: { n: 6, windowSize: 500, repeatThreshold: 5 },
-      });
-      const checkResult = toolGuard.check(sessionKey, lastToolUse);
-      if (checkResult.detected) {
-        const loopCount = sessionTracker.getLoopCount(sessionKey);
-        if (loopCount === 1) {
-          toolGuard.injectLoopBreakPrompt(request.body as Record<string, unknown>, apiType, lastToolUse.toolName);
-          request.log.warn({ sessionId, toolName: lastToolUse.toolName, loopCount },
-            "Tool call loop detected, injecting break prompt");
-        } else if (loopCount === TIER2_LOOP_THRESHOLD) {
-          return reply.code(HTTP_UNPROCESSABLE_ENTITY).send({
-            error: {
-              type: "tool_call_loop_detected",
-              message: `检测到工具调用循环（连续重复调用 "${lastToolUse.toolName}"）。请求已中断。`,
-              suggestion: "请回顾对话历史，停止重复调用工具，直接告知用户当前的进展和遇到的问题。",
-            },
-          });
-        } else {
-          request.log.warn({ sessionId, toolName: lastToolUse.toolName, loopCount },
-            "Tool call loop detected, hard disconnecting");
-          reply.raw.destroy();
-          return reply;
-        }
-      }
-    }
+  // 解析 matcher 和 logFileWriter，传递给日志相关调用
+  const matcher = deps.container.resolve<RetryRuleMatcher>(SERVICE_KEYS.matcher);
+  let logFileWriter: import("../../storage/log-file-writer.js").LogFileWriter | null = null;
+  try {
+    logFileWriter = deps.container.resolve<import("../../storage/log-file-writer.js").LogFileWriter>(LOG_FILE_WRITER_KEY);
+  } catch {
+    logFileWriter = null;
   }
 
   // 在所有加工之前捕获原始 body
@@ -236,19 +214,20 @@ export async function handleProxyRequest(
 
   // tool guard 阶段 — 使用 enhancedBody
   let pipelineBody = enhancedBody;
-  if (deps.sessionTracker && sessionId) {
+  const sessionTracker = deps.container.resolve<import("../loop-prevention/session-tracker.js").SessionTracker>(SERVICE_KEYS.sessionTracker);
+  if (enhancementConfig.tool_call_loop_enabled && sessionTracker && sessionId) {
     const routerKeyId = (request.routerKey as { id?: string } | undefined)?.id ?? null;
     const sessionKey = routerKeyId ? `${routerKeyId}:${sessionId}` : sessionId;
     const lastToolUse = extractLastToolUse(enhancedBody);
     if (lastToolUse) {
-      const toolGuard = new ToolLoopGuard(deps.sessionTracker, {
+      const toolGuard = new ToolLoopGuard(sessionTracker, {
         enabled: true,
         minConsecutiveCount: 3,
         detectorConfig: { n: 6, windowSize: 500, repeatThreshold: 5 },
       });
       const checkResult = toolGuard.check(sessionKey, lastToolUse);
       if (checkResult.detected) {
-        const loopCount = deps.sessionTracker.getLoopCount(sessionKey);
+        const loopCount = sessionTracker.getLoopCount(sessionKey);
         if (loopCount === 1) {
           // 层级 1：透明重试 — 注入中断提示词
           pipelineBody = toolGuard.injectLoopBreakPrompt(enhancedBody, apiType, lastToolUse.toolName);
@@ -275,7 +254,7 @@ export async function handleProxyRequest(
     }
   }
 
-  if (interceptResponse) return handleIntercept(deps.db, apiType, request, reply, interceptResponse, clientModel, sessionId, snapshot.toJSON());
+  if (interceptResponse) return handleIntercept(deps.db, apiType, request, reply, interceptResponse, clientModel, sessionId, snapshot.toJSON(), matcher, logFileWriter);
 
   return executeFailoverLoop({
     request, reply, apiType, upstreamPath, errors, deps, options,
@@ -285,15 +264,15 @@ export async function handleProxyRequest(
     baseStages: snapshot.getStages() as StageRecord[],
     sessionId,
     streamLoopEnabled: enhancementConfig.stream_loop_enabled,
+    matcher, logFileWriter,
   });
 }
 
 // ---------- Failover loop ----------
 
 async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> {
-  const { request, reply, apiType, upstreamPath, errors, deps, options, effectiveModel, originalModel, pipelineBody, rawBody, baseStages, sessionId, streamLoopEnabled } = ctx;
+  const { request, reply, apiType, upstreamPath, errors, deps, options, effectiveModel, originalModel, pipelineBody, rawBody, baseStages, sessionId, streamLoopEnabled, matcher, logFileWriter } = ctx;
   const tracker = deps.container.resolve<RequestTracker>(SERVICE_KEYS.tracker);
-  const matcher = deps.container.resolve<RetryRuleMatcher>(SERVICE_KEYS.matcher);
   const usageWindowTracker = deps.container.resolve<import("../routing/usage-window-tracker.js").UsageWindowTracker>(SERVICE_KEYS.usageWindowTracker);
   const config = getConfig();
   const excludeTargets: Target[] = [];
@@ -318,6 +297,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
       startTime, isStream, routerKeyId, originalBody: rawBody, clientHeaders: cliHdrs, originalModel,
       isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null, sessionId,
       pipelineSnapshot: iterationSnapshot.toJSON(),
+      matcher, logFileWriter,
     };
 
     const resolveResult = resolveMapping(deps.db, effectiveModel, { now: new Date(), excludeTargets });
@@ -420,6 +400,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
           clientReq, upstreamReqBase, logId, routerKeyId, originalModel, sessionId,
           failover: { isFailoverIteration, rootLogId: rootLogId! },
           pipelineSnapshot,
+          matcher, logFileWriter,
         },
         resilienceResult.attempts, resilienceResult.result, startTime,
       );
@@ -486,6 +467,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
               clientReq, upstreamReqBase, logId, routerKeyId, originalModel, sessionId,
               failover: { isFailoverIteration, rootLogId: rootLogId! },
               pipelineSnapshot,
+              matcher, logFileWriter,
             },
             e.attempts, fakeResult, startTime,
           );
@@ -513,50 +495,13 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
         router_key_id: routerKeyId, original_model: originalModel,
         session_id: sessionId,
         pipeline_snapshot: pipelineSnapshot,
-      });
+      }, (matcher || logFileWriter) ? {
+        matcher, logFileWriter, responseBody: null,
+      } : undefined);
       const err = errors.upstreamConnectionFailed();
       return reply.code(err.statusCode).send(err.body);
     }
   }
 }
 
-function extractLastToolUse(body: Record<string, unknown>): import("../loop-prevention/types.js").ToolCallRecord | null {
-  const messages = body.messages as Array<Record<string, unknown>> | undefined;
-  if (!messages) return null;
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const msg = messages[i];
-    if (msg.role === "assistant") {
-      const content = msg.content;
-      if (Array.isArray(content)) {
-        for (let j = content.length - 1; j >= 0; j--) {
-          const block = content[j] as Record<string, unknown>;
-          if (block.type !== "tool_use") continue;
-          const id = block.id as string | undefined;
-          if (id && (id.startsWith(TOOL_USE_ID_PREFIX) || id.startsWith(TOOL_USE_ID_PROVIDER_PREFIX))) {
-            continue;
-          }
-          const inputStr = JSON.stringify(block.input ?? {});
-          return {
-            toolName: block.name as string,
-            toolUseId: typeof block.id === "string" ? block.id : undefined,
-            inputHash: simpleHash(inputStr),
-            inputText: inputStr,
-            timestamp: Date.now(),
-          };
-        }
-      }
-    }
-  }
-  return null;
-}
 
-function simpleHash(s: string): string {
-  const HASH_SHIFT = 5;
-  let hash = 0;
-  for (let i = 0; i < s.length; i++) {
-    const char = s.charCodeAt(i);
-    hash = ((hash << HASH_SHIFT) - hash) + char;
-    hash |= 0;
-  }
-  return String(hash);
-}

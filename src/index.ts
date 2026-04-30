@@ -341,25 +341,29 @@ export async function buildApp(
 }
 
 export async function main() {
-  const { app, db, close } = await buildApp();
+  const { app, close } = await buildApp();
   const config = getConfig();
 
   // 全局兜底：防止未捕获异常导致进程崩溃
   process.on("uncaughtException", (err) => {
     try {
       app.log.fatal({ err }, "Uncaught exception");
+    /* eslint-disable taste/no-silent-catch -- app.log 可能已崩溃，console 是最后手段 */
     } catch {
       console.error("FATAL: Uncaught exception:", err);
     }
+    /* eslint-enable taste/no-silent-catch */
     close().finally(() => process.exit(1));
   });
 
   process.on("unhandledRejection", (reason) => {
     try {
       app.log.error({ err: reason instanceof Error ? reason : new Error(String(reason)) }, "Unhandled rejection");
+    /* eslint-disable taste/no-silent-catch -- app.log 可能已崩溃，console 是最后手段 */
     } catch {
       console.error("Unhandled rejection:", reason);
     }
+    /* eslint-enable taste/no-silent-catch */
   });
 
   // 优雅关闭：SIGTERM（systemd/docker stop）和 SIGINT（Ctrl+C）

@@ -18,7 +18,7 @@ vi.mock("../src/proxy/routing/mapping-resolver.js", () => ({
   resolveMapping: vi.fn(() => null),
 }));
 vi.mock("../src/proxy/enhancement/enhancement-handler.js", () => ({
-  applyEnhancement: vi.fn(() => ({ effectiveModel: "gpt-4", originalModel: null, interceptResponse: null })),
+  applyEnhancement: vi.fn(() => ({ body: { model: "gpt-4", stream: false, messages: [] }, effectiveModel: "gpt-4", originalModel: null, interceptResponse: null, meta: { router_tags_stripped: 0, directive: null } })),
   buildModelInfoTag: vi.fn(() => "<router-response>...</router-response>"),
 }));
 vi.mock("../src/proxy/proxy-logging.js", () => ({
@@ -152,7 +152,7 @@ describe("handleProxyRequest", () => {
   });
 
   it("拦截响应直接处理不进入 orchestrator", async () => {
-    vi.mocked(applyEnhancement).mockReturnValueOnce({ effectiveModel: "gpt-4", originalModel: null, interceptResponse: { statusCode: 200, body: "ok" } });
+    vi.mocked(applyEnhancement).mockReturnValueOnce({ body: { model: "gpt-4", stream: false, messages: [] }, effectiveModel: "gpt-4", originalModel: null, interceptResponse: { statusCode: 200, body: "ok" }, meta: { router_tags_stripped: 0, directive: null } });
     const deps = createDeps();
     await handleProxyRequest(createRequest(), createReply(), "openai", "/v1/chat/completions", errors, deps);
     expect(handleIntercept).toHaveBeenCalled();

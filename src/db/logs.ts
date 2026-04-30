@@ -1,4 +1,5 @@
 import Database from "better-sqlite3";
+import type { LogFileWriter } from "../storage/log-file-writer.js";
 
 type CountRow = { count: number };
 
@@ -72,10 +73,41 @@ export interface RequestLogInsert {
   pipeline_snapshot?: string | null;
 }
 
+export interface LogWriteContext {
+  /** RetryRuleMatcher 用于判定是否保留详情。null = 保守保留 */
+  matcher?: { test: (statusCode: number, body: string) => boolean } | null;
+  /** 文件写入器。null 或 undefined = 不写文件 */
+  logFileWriter?: LogFileWriter | null;
+  /** 上游响应 body（用于 matcher 匹配判定） */
+  responseBody?: string | null;
+}
+
 export function insertRequestLog(
   db: Database.Database,
   log: RequestLogInsert,
+  writeContext?: LogWriteContext,
 ): void {
+  // 文件写入：始终写入全文
+  if (writeContext?.logFileWriter) {
+    writeContext.logFileWriter.write({
+      id: log.id,
+      created_at: log.created_at,
+      api_type: log.api_type,
+      status_code: log.status_code,
+      client_request: log.client_request ?? null,
+      upstream_request: log.upstream_request ?? null,
+      upstream_response: log.upstream_response ?? null,
+      stream_text_content: null,
+      pipeline_snapshot: log.pipeline_snapshot ?? null,
+    });
+  }
+
+  // 详情保留判定
+  const preserveDetail = shouldPreserveDetailInternal(
+    log.status_code, writeContext?.responseBody ?? null, writeContext?.matcher ?? null,
+    !!writeContext?.logFileWriter,
+  );
+
   db.prepare(
     `INSERT INTO request_logs (id, api_type, model, provider_id, status_code, client_status_code, latency_ms,
       is_stream, error_message, created_at, client_request, upstream_request, upstream_response,
@@ -85,13 +117,30 @@ export function insertRequestLog(
     log.id, log.api_type, log.model, log.provider_id, log.status_code,
     log.client_status_code ?? null,
     log.latency_ms, log.is_stream, log.error_message, log.created_at,
-    log.client_request ?? null, log.upstream_request ?? null,
-    log.upstream_response ?? null,
+    preserveDetail ? (log.client_request ?? null) : null,
+    preserveDetail ? (log.upstream_request ?? null) : null,
+    preserveDetail ? (log.upstream_response ?? null) : null,
     log.is_retry ?? 0, log.is_failover ?? 0, log.original_request_id ?? null,
     log.router_key_id ?? null, log.original_model ?? null,
     log.session_id ?? null,
     log.pipeline_snapshot ?? null,
   );
+}
+
+const LOG_DETAIL_HTTP_ERROR_THRESHOLD = 400;
+
+function shouldPreserveDetailInternal(
+  statusCode: number | null,
+  responseBody: string | null,
+  matcher: { test: (statusCode: number, body: string) => boolean } | null,
+  hasFileWriter: boolean,
+): boolean {
+  // 文件写入器不存在时，保守保留 DB 全文（避免数据丢失）
+  if (!hasFileWriter) return true;
+  if (statusCode !== null && statusCode >= LOG_DETAIL_HTTP_ERROR_THRESHOLD) return true;
+  if (!matcher) return true;
+  if (responseBody && matcher.test(statusCode ?? 0, responseBody)) return true;
+  return false;
 }
 
 type LogFilterOptions = {
