@@ -1,4 +1,4 @@
-type ContentBlock = Record<string, unknown>;
+import { type ContentBlock, type Message, mergeConsecutive, mergeAssistantContent } from "./utils.js";
 
 /**
  * 修复孤儿 tool_result 块——Claude Code 的 context management 截断历史消息时
@@ -9,13 +9,15 @@ type ContentBlock = Record<string, unknown>;
  * 2. 移除 tool_use_id 不在集合中的 tool_result 块
  * 3. 移除清空后的空 user 消息
  * 4. 合并相邻的 user 消息（Anthropic API 不允许连续 user 消息）
- * 5. 合并相邻的 assistant 消息（同理）
+ * 5. 合并相邻的 assistant 消息（带 tool_use 去重）
+ * 6. 移除 content 为空数组的 assistant 消息
+ * 7. 最终合并连续同角色消息
  */
 export function patchOrphanToolResults(
   body: Record<string, unknown>,
 ): void {
   if (!body.messages) return;
-  const messages = body.messages as Array<{ role: string; content: unknown }>;
+  const messages = body.messages as Message[];
   if (!Array.isArray(messages) || messages.length === 0) return;
 
   // Step 1: 收集所有已知的 tool_use ID
@@ -61,28 +63,18 @@ export function patchOrphanToolResults(
   // Step 4: 合并相邻的 user 消息
   mergeConsecutive(messages, "user");
 
-  // Step 5: 合并相邻的 assistant 消息（删除空 user 消息后可能产生）
-  mergeConsecutive(messages, "assistant");
-}
+  // Step 5: 合并相邻的 assistant 消息（带 tool_use 去重）
+  mergeConsecutive(messages, "assistant", mergeAssistantContent);
 
-function mergeConsecutive(messages: Array<{ role: string; content: unknown }>, role: string): void {
-  let i = 1;
-  while (i < messages.length) {
-    if (messages[i].role === role && messages[i - 1].role === role) {
-      const prev = messages[i - 1];
-      const curr = messages[i];
-      const prevContent = normalizeToArray(prev.content);
-      const currContent = normalizeToArray(curr.content);
-      prev.content = [...prevContent, ...currContent];
+  // Step 6: 移除 content 为空数组的 assistant 消息
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    if (msg.role === "assistant" && Array.isArray(msg.content) && msg.content.length === 0) {
       messages.splice(i, 1);
-    } else {
-      i++;
     }
   }
-}
 
-function normalizeToArray(content: unknown): ContentBlock[] {
-  if (Array.isArray(content)) return content as ContentBlock[];
-  if (typeof content === "string") return [{ type: "text", text: content }];
-  return [{ type: "text", text: String(content ?? "") }];
+  // Step 7: 删除空 assistant 后可能产生连续同角色消息，再合并一次
+  mergeConsecutive(messages, "user");
+  mergeConsecutive(messages, "assistant", mergeAssistantContent);
 }

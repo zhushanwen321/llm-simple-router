@@ -2,6 +2,7 @@ import { applyDeepSeekPatches } from "./deepseek/index.js";
 
 interface ProviderInfo {
   base_url: string;
+  api_type: "openai" | "anthropic";
 }
 
 export interface ProviderPatchMeta {
@@ -18,7 +19,7 @@ export function applyProviderPatches(
 ): { body: Record<string, unknown>; meta: ProviderPatchMeta } {
   if (needsDeepSeekPatch(body, provider)) {
     const cloned = JSON.parse(JSON.stringify(body));
-    applyDeepSeekPatches(cloned);
+    applyDeepSeekPatches(cloned, provider.api_type);
     return { body: cloned, meta: { types: ["deepseek"] } };
   }
   return { body, meta: { types: [] } };
