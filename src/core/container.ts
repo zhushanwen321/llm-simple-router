@@ -1,11 +1,24 @@
+/** 服务键常量 — 避免魔法字符串，编译期类型保护 */
+export const SERVICE_KEYS = {
+  db: "db",
+  matcher: "matcher",
+  semaphoreManager: "semaphoreManager",
+  tracker: "tracker",
+  usageWindowTracker: "usageWindowTracker",
+  sessionTracker: "sessionTracker",
+  adaptiveController: "adaptiveController",
+} as const;
+
+export type ServiceKey = (typeof SERVICE_KEYS)[keyof typeof SERVICE_KEYS];
+
 /**
  * 轻量服务容器 — 懒加载单例工厂注册表。
  *
  * 用法：
  *   const c = new ServiceContainer();
- *   c.register("db", () => db);
- *   c.register("tracker", (c) => new RequestTracker(c.resolve("db")));
- *   const tracker = c.resolve<RequestTracker>("tracker");
+ *   c.register(SERVICE_KEYS.db, () => db);
+ *   c.register(SERVICE_KEYS.tracker, (c) => new RequestTracker(c.resolve(SERVICE_KEYS.db)));
+ *   const tracker = c.resolve<RequestTracker>(SERVICE_KEYS.tracker);
  *
  * 注册的工厂最多执行一次（惰性求值 + 缓存）。
  */

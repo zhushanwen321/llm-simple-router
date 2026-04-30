@@ -2,7 +2,6 @@ import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
 import { createHash } from "crypto";
 import type { StateRegistry } from "../core/registry.js";
-import { getAllProviders, PROVIDER_CONCURRENCY_DEFAULTS } from "../db/index.js";
 import { encrypt, decrypt } from "../utils/crypto.js";
 import { getSetting } from "../db/settings.js";
 import { API_CODE, apiError } from "./api-response.js";
@@ -19,6 +18,9 @@ const CONFIG_TABLES = [
   "router_keys",
   "settings",
   "session_model_states",
+  "schedules",
+  "provider_model_info",
+  "session_model_history",
 ];
 
 // settings 表按 key 列的值过滤，不覆盖本地安全敏感配置
@@ -150,19 +152,10 @@ export const adminImportExportRoutes: FastifyPluginCallback<ImportExportOptions>
     // 导入成功后刷新内存缓存
     stateRegistry.refreshRetryRules();
 
-    // 清除旧的 semaphore 配置，按导入后的 providers 表重建
+    // 清除旧的 semaphore/adaptive/tracker 配置，按导入后的 DB 数据全量重建
     stateRegistry.removeAllProviders();
-    const providers = getAllProviders(db);
-    for (const p of providers) {
-      stateRegistry.updateProviderConcurrency(p.id, {
-        maxConcurrency: p.max_concurrency ?? PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency,
-        queueTimeoutMs: p.queue_timeout_ms ?? PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms,
-        maxQueueSize: p.max_queue_size ?? PROVIDER_CONCURRENCY_DEFAULTS.max_queue_size,
-      });
-    }
-
-    // session_model_states 已通过 DB 导入，内存缓存会在读取时自然回填
     stateRegistry.clearModelState();
+    stateRegistry.reinitializeProviders();
 
     return reply.send(counts);
   });

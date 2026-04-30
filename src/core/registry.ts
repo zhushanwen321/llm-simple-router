@@ -1,16 +1,22 @@
 // src/core/registry.ts
 // Admin 层通过此接口触发 proxy 层状态刷新，消除 admin→proxy 直接依赖
 
-export interface ConcurrencyConfig {
-  maxConcurrency: number;
-  queueTimeoutMs: number;
-  maxQueueSize: number;
-}
+import type { ConcurrencyConfig } from "./types.js";
+
+export type { ConcurrencyConfig };
 
 export interface EnhancementConfig {
   claude_code_enabled: boolean;
   tool_call_loop_enabled: boolean;
   stream_loop_enabled: boolean;
+}
+
+/** Provider 自适应/手动并发配置（DB 字段） */
+export interface ProviderConcurrencyParams {
+  adaptive_enabled: number;
+  max_concurrency: number;
+  queue_timeout_ms: number;
+  max_queue_size: number;
 }
 
 export interface StateRegistry {
@@ -30,4 +36,12 @@ export interface StateRegistry {
   deleteModelState(keyId: string, sessionId: string): void;
   /** 读取 proxy enhancement 配置 */
   getEnhancementConfig(): EnhancementConfig;
+  /** 同步 provider 的自适应并发配置（AdaptiveConcurrencyController.syncProvider） */
+  syncAdaptiveProvider(providerId: string, params: ProviderConcurrencyParams): void;
+  /** 移除 provider 的自适应并发状态（AdaptiveConcurrencyController.remove） */
+  removeAdaptiveProvider(providerId: string): void;
+  /** 获取 provider 的自适应并发状态 */
+  getAdaptiveStatus(providerId: string): import("../proxy/adaptive-controller.js").AdaptiveState | undefined;
+  /** 从 DB 重新读取所有 provider 配置，重建信号量/adaptive/tracker 缓存（导入配置后调用） */
+  reinitializeProviders(): void;
 }

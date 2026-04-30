@@ -190,11 +190,14 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     if (contextOverrides.length > 0) {
       setModelInfoForProvider(db, id, contextOverrides.map(o => ({ model_name: o.name, context_window: o.context_window })));
     }
-    stateRegistry?.updateProviderConcurrency(id, {
-      maxConcurrency: body.max_concurrency ?? PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency,
-      queueTimeoutMs: body.queue_timeout_ms ?? PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms,
-      maxQueueSize: body.max_queue_size ?? PROVIDER_CONCURRENCY_DEFAULTS.max_queue_size,
-    });
+    // 当 adaptive 启用时，由 syncProvider 全权管理信号量（避免重复调用 updateConfig）
+    if (!isAdaptiveEnabled) {
+      stateRegistry?.updateProviderConcurrency(id, {
+        maxConcurrency: body.max_concurrency ?? PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency,
+        queueTimeoutMs: body.queue_timeout_ms ?? PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms,
+        maxQueueSize: body.max_queue_size ?? PROVIDER_CONCURRENCY_DEFAULTS.max_queue_size,
+      });
+    }
     adaptiveController?.syncProvider(id, {
       adaptive_enabled: isAdaptiveEnabled,
       max_concurrency: body.max_concurrency ?? PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency,
@@ -248,6 +251,24 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     let cascade: CascadeResult | undefined;
     if (existing.is_active === 1 && body.is_active === 0) {
       cascade = cascadeProviderDisable(db, id);
+      // 禁用时清理信号量和自适应并发，避免排队请求悬挂
+      stateRegistry?.removeProvider(id);
+      adaptiveController?.remove(id);
+    }
+
+    // 重新启用时重建信号量和自适应并发
+    if (existing.is_active === 0 && body.is_active === 1) {
+      stateRegistry?.updateProviderConcurrency(id, {
+        maxConcurrency: updated.max_concurrency,
+        queueTimeoutMs: updated.queue_timeout_ms,
+        maxQueueSize: updated.max_queue_size,
+      });
+      adaptiveController?.syncProvider(id, {
+        adaptive_enabled: updated.adaptive_enabled,
+        max_concurrency: updated.max_concurrency,
+        queue_timeout_ms: updated.queue_timeout_ms,
+        max_queue_size: updated.max_queue_size,
+      });
     }
 
     if (body.max_concurrency !== undefined || body.queue_timeout_ms !== undefined || body.max_queue_size !== undefined) {

@@ -13,7 +13,7 @@ const PROVIDER_DEFAULT_MAX_QUEUE_SIZE = 100;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-import { getConfig, Config } from "./config/index.js";
+import { getConfig, getBaseConfig, Config } from "./config/index.js";
 import { initDatabase, getAllProviders, backfillMetricsFromRequestMetrics } from "./db/index.js";
 import { loadRecommendedConfig } from "./config/recommended.js";
 import { authMiddleware } from "./middleware/auth.js";
@@ -35,13 +35,46 @@ import { scheduleDbSizeMonitor } from "./db/db-size-monitor.js";
 import { startUpgradeChecker, stopUpgradeChecker } from "./admin/upgrade.js";
 import { CheckerOptions } from "./upgrade/checker.js";
 import fastifyStatic from "@fastify/static";
-import { ServiceContainer } from "./core/container.js";
+import { ServiceContainer, SERVICE_KEYS } from "./core/container.js";
 import Database from "better-sqlite3";
 
 export interface AppOptions {
   config?: Config;
   db?: Database.Database;
   upgradeCheckerOptions?: CheckerOptions;
+}
+
+/**
+ * 共享初始化逻辑 — 启动时和导入配置后都需要调用。
+ * 从 DB 读取所有 provider，初始化信号量/自适应并发/tracker 缓存。
+ */
+export function initializeProviderState(
+  db: Database.Database,
+  semaphoreManager: ProviderSemaphoreManager,
+  adaptiveController: AdaptiveConcurrencyController,
+  tracker: RequestTracker,
+): void {
+  const allProviders = getAllProviders(db);
+  for (const p of allProviders) {
+    if (p.adaptive_enabled) {
+      adaptiveController.init(p.id, { max: p.max_concurrency }, {
+        queueTimeoutMs: p.queue_timeout_ms,
+        maxQueueSize: p.max_queue_size,
+      });
+    } else if (p.max_concurrency > 0) {
+      semaphoreManager.updateConfig(p.id, {
+        maxConcurrency: p.max_concurrency,
+        queueTimeoutMs: p.queue_timeout_ms,
+        maxQueueSize: p.max_queue_size,
+      });
+    }
+    tracker.updateProviderConfig(p.id, {
+      name: p.name,
+      maxConcurrency: p.max_concurrency ?? 0,
+      queueTimeoutMs: p.queue_timeout_ms ?? PROVIDER_DEFAULT_QUEUE_TIMEOUT_MS,
+      maxQueueSize: p.max_queue_size ?? PROVIDER_DEFAULT_MAX_QUEUE_SIZE,
+    });
+  }
 }
 
 export async function buildApp(
@@ -157,18 +190,19 @@ export async function buildApp(
       try {
         const parsed = JSON.parse(payload)
         if ('code' in parsed) return payload // errorHandler 或路由已手动包装
+        // 复用已解析结果，避免二次 JSON.parse
+        const wrapped: ApiResponse<unknown> = {
+          code: API_CODE.SUCCESS,
+          message: 'ok',
+          data: parsed,
+        }
+        return JSON.stringify(wrapped)
       } catch {
         return payload
       }
     }
 
-    // 包装成功响应
-    const wrapped: ApiResponse<unknown> = {
-      code: API_CODE.SUCCESS,
-      message: 'ok',
-      data: typeof payload === 'string' ? JSON.parse(payload) : payload,
-    }
-    return JSON.stringify(wrapped)
+    return payload
   })
 
   loadRecommendedConfig();
@@ -183,62 +217,42 @@ export async function buildApp(
   }
 
   const container = new ServiceContainer();
-  container.register("db", () => db);
-  container.register("matcher", (c) => { const m = new RetryRuleMatcher(); m.load(c.resolve("db")); return m; });
-  container.register("semaphoreManager", () => new ProviderSemaphoreManager());
-  container.register("tracker", (c) => {
-    const t = new RequestTracker({ semaphoreManager: c.resolve("semaphoreManager"), logger: app.log });
+  container.register(SERVICE_KEYS.db, () => db);
+  container.register(SERVICE_KEYS.matcher, (c) => { const m = new RetryRuleMatcher(); m.load(c.resolve(SERVICE_KEYS.db)); return m; });
+  container.register(SERVICE_KEYS.semaphoreManager, () => new ProviderSemaphoreManager());
+  container.register(SERVICE_KEYS.tracker, (c) => {
+    const t = new RequestTracker({ semaphoreManager: c.resolve(SERVICE_KEYS.semaphoreManager), logger: app.log });
     t.startPushInterval();
     return t;
   });
-  container.register("usageWindowTracker", (c) => {
-    const uwt = new UsageWindowTracker(c.resolve("db"));
+  container.register(SERVICE_KEYS.usageWindowTracker, (c) => {
+    const uwt = new UsageWindowTracker(c.resolve(SERVICE_KEYS.db));
     uwt.reconcileOnStartup();
     return uwt;
   });
-  container.register("sessionTracker", () => new SessionTracker(DEFAULT_LOOP_PREVENTION_CONFIG.sessionTracker));
+  container.register(SERVICE_KEYS.sessionTracker, () => new SessionTracker(DEFAULT_LOOP_PREVENTION_CONFIG.sessionTracker));
 
   // 注入 DB 到 modelState 单例，启用会话级持久化
   modelState.init(db);
 
   // 注册 AdaptiveConcurrencyController（依赖已注册的 semaphoreManager）
-  container.register("adaptiveController", (c) => {
-    const ac = new AdaptiveConcurrencyController(c.resolve("semaphoreManager"), app.log);
+  container.register(SERVICE_KEYS.adaptiveController, (c) => {
+    const ac = new AdaptiveConcurrencyController(c.resolve(SERVICE_KEYS.semaphoreManager), app.log);
     return ac;
   });
 
   // 从容器解析所有服务
-  const matcher = container.resolve<RetryRuleMatcher>("matcher");
-  const semaphoreManager = container.resolve<ProviderSemaphoreManager>("semaphoreManager");
-  const tracker = container.resolve<RequestTracker>("tracker");
-  const usageWindowTracker = container.resolve<UsageWindowTracker>("usageWindowTracker");
-  const adaptiveController = container.resolve<AdaptiveConcurrencyController>("adaptiveController");
+  const matcher = container.resolve<RetryRuleMatcher>(SERVICE_KEYS.matcher);
+  const semaphoreManager = container.resolve<ProviderSemaphoreManager>(SERVICE_KEYS.semaphoreManager);
+  const tracker = container.resolve<RequestTracker>(SERVICE_KEYS.tracker);
+  const usageWindowTracker = container.resolve<UsageWindowTracker>(SERVICE_KEYS.usageWindowTracker);
+  const adaptiveController = container.resolve<AdaptiveConcurrencyController>(SERVICE_KEYS.adaptiveController);
 
   // Wire adaptive controller to tracker
   tracker.setAdaptiveController(adaptiveController);
 
-  // 从 DB 读取已有 provider 的并发配置，初始化信号量管理器和 tracker
-  const allProviders = getAllProviders(db);
-  for (const p of allProviders) {
-    if (p.adaptive_enabled) {
-      adaptiveController.init(p.id, { max: p.max_concurrency }, {
-        queueTimeoutMs: p.queue_timeout_ms,
-        maxQueueSize: p.max_queue_size,
-      });
-    } else if (p.max_concurrency > 0) {
-      semaphoreManager.updateConfig(p.id, {
-        maxConcurrency: p.max_concurrency,
-        queueTimeoutMs: p.queue_timeout_ms,
-        maxQueueSize: p.max_queue_size,
-      });
-    }
-    tracker.updateProviderConfig(p.id, {
-      name: p.name,
-      maxConcurrency: p.max_concurrency ?? 0,
-      queueTimeoutMs: p.queue_timeout_ms ?? PROVIDER_DEFAULT_QUEUE_TIMEOUT_MS,
-      maxQueueSize: p.max_queue_size ?? PROVIDER_DEFAULT_MAX_QUEUE_SIZE,
-    });
-  }
+  // 从 DB 读取已有 provider 的并发配置，初始化信号量/adaptive/tracker（共享逻辑）
+  initializeProviderState(db, semaphoreManager, adaptiveController, tracker);
 
   app.register(authMiddleware, { db });
   app.register(openaiProxy, { db, container });
@@ -254,6 +268,10 @@ export async function buildApp(
     clearModelState: () => modelState.clearAll(),
     deleteModelState: (keyId, sessionId) => modelState.delete(keyId, sessionId),
     getEnhancementConfig: () => loadEnhancementConfig(db),
+    syncAdaptiveProvider: (providerId, cfg) => adaptiveController.syncProvider(providerId, cfg),
+    removeAdaptiveProvider: (providerId) => adaptiveController.remove(providerId),
+    getAdaptiveStatus: (providerId) => adaptiveController.getStatus(providerId),
+    reinitializeProviders: () => initializeProviderState(db, semaphoreManager, adaptiveController, tracker),
   };
 
   app.register(adminRoutes, { db, stateRegistry, tracker, adaptiveController });
@@ -305,16 +323,15 @@ export async function buildApp(
       logCleanup.stop();
       dbSizeMonitor.stop();
       tracker.stopPushInterval();
-      const sessionTracker = container.resolve<SessionTracker>("sessionTracker");
+      modelState.clearAll();
+      semaphoreManager.removeAll();
+      const sessionTracker = container.resolve<SessionTracker>(SERVICE_KEYS.sessionTracker);
       sessionTracker.stop();
       await app.close();
       db.close();
     },
   };
 }
-
-// index.ts 自身也需要 getBaseConfig，避免循环依赖
-import { getBaseConfig } from "./config/index.js";
 
 export async function main() {
   const { app } = await buildApp();

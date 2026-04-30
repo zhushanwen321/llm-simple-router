@@ -1,11 +1,6 @@
 import { SemaphoreQueueFullError, SemaphoreTimeoutError } from "../../core/errors.js";
 export { SemaphoreQueueFullError, SemaphoreTimeoutError };
-
-interface ConcurrencyConfig {
-  maxConcurrency: number;
-  queueTimeoutMs: number;
-  maxQueueSize: number;
-}
+import type { ConcurrencyConfig } from "../../core/types.js";
 
 interface QueueEntry {
   resolve: () => void;
@@ -29,6 +24,8 @@ export interface SemaphoreLogger {
 // acquire() 返回的令牌，调用方需传给 release()
 export interface AcquireToken {
   readonly generation: number;
+  /** acquire 时 maxConcurrency=0（不计数），release 时跳过递减 */
+  readonly bypassed: boolean;
 }
 
 export class ProviderSemaphoreManager {
@@ -89,11 +86,11 @@ export class ProviderSemaphoreManager {
     const queueTimeoutMs = Math.max(0, override?.queue_timeout_ms ?? entry.config.queueTimeoutMs);
     const maxQueueSize = Math.max(0, override?.max_queue_size ?? entry.config.maxQueueSize);
 
-    if (maxConcurrency === 0) return { generation: entry.generation };
+    if (maxConcurrency === 0) return { generation: entry.generation, bypassed: true };
     if (entry.current < maxConcurrency) {
       entry.current++;
       logger?.debug({ providerId, current: entry.current, maxConcurrency, action: "acquire_direct" }, "Semaphore: acquired directly");
-      return { generation: entry.generation };
+      return { generation: entry.generation, bypassed: false };
     }
 
     if (entry.queue.length >= maxQueueSize) {
@@ -104,7 +101,7 @@ export class ProviderSemaphoreManager {
     logger?.debug({ providerId, current: entry.current, maxConcurrency, queueLength: entry.queue.length, action: "acquire_queued" }, "Semaphore: entering wait queue");
     onQueued?.();
     return new Promise<AcquireToken>((resolve, reject) => {
-      const token = { generation: entry.generation };
+      const token = { generation: entry.generation, bypassed: false };
       const qe: QueueEntry = {
         resolve: () => {
           logger?.debug({ providerId, current: entry.current, maxConcurrency, queueLength: entry.queue.length, action: "acquire_resolved" }, "Semaphore: left wait queue, acquired");
@@ -142,8 +139,8 @@ export class ProviderSemaphoreManager {
   release(providerId: string, token: AcquireToken, logger?: SemaphoreLogger): void {
     const entry = this.entries.get(providerId);
     if (!entry) return;
-    // maxConcurrency=0 时 acquire 不计数，release 也不应递减
-    if (entry.config.maxConcurrency === 0) return;
+    // bypassed: acquire 时 maxConcurrency=0（不计数），release 跳过递减
+    if (token.bypassed) return;
     // generation 不匹配说明此请求在 updateConfig 重置前 acquire，其槽位已被回收
     if (token.generation !== entry.generation) {
       logger?.debug({ providerId, tokenGen: token.generation, currentGen: entry.generation, action: "release_stale" }, "Semaphore: stale token, skipping release");

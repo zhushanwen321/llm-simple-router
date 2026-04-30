@@ -15,6 +15,13 @@ export interface ResolveContext {
   excludeTargets?: Target[];
 }
 
+/** Provider 级并发控制配置（唯一来源，替代 semaphore.ts 和 registry.ts 中的重复定义） */
+export interface ConcurrencyConfig {
+  maxConcurrency: number;
+  queueTimeoutMs: number;
+  maxQueueSize: number;
+}
+
 export interface ConcurrencyOverride {
   max_concurrency?: number;
   queue_timeout_ms?: number;
