@@ -1,9 +1,11 @@
 import { readdirSync, readFileSync, writeFileSync, unlinkSync, rmSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { gzipSync } from "node:zlib";
-import { WINDOW_MINUTES, TIME_PAD_WIDTH } from "./types.js";
+import { WINDOW_MINUTES, TIME_PAD_WIDTH, ISO_DATE_LENGTH } from "./types.js";
 
-const COMPRESSION_INTERVAL_MS = WINDOW_MINUTES * 60 * 1000;
+const SECONDS_PER_MINUTE = 60;
+const MS_PER_SECOND = 1000;
+const COMPRESSION_INTERVAL_MS = WINDOW_MINUTES * SECONDS_PER_MINUTE * MS_PER_SECOND;
 
 /** 将已结束窗口的 .jsonl 文件压缩为 .jsonl.gz */
 export function compressFinishedFiles(baseDir: string, now: Date): number {
@@ -37,7 +39,8 @@ export function compressFinishedFiles(baseDir: string, now: Date): number {
           writeFileSync(filePath + ".gz", gzipped);
           unlinkSync(filePath);
           compressed++;
-        } catch (_err) {
+        // eslint-disable-next-line taste/no-silent-catch
+        } catch {
           // 文件可能正在被写入，跳过
         }
       }
@@ -52,7 +55,7 @@ export function cleanExpiredDirs(baseDir: string, retentionDays: number, now: Da
 
   const cutoff = new Date(now);
   cutoff.setUTCDate(cutoff.getUTCDate() - retentionDays);
-  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  const cutoffStr = cutoff.toISOString().slice(0, ISO_DATE_LENGTH);
 
   let deleted = 0;
   const dayDirs = readdirSync(baseDir, { withFileTypes: true })

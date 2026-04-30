@@ -24,10 +24,10 @@ export class LogFileWriter {
     if (!this.enabled) return;
 
     const date = new Date(entry.created_at);
-    const dateStr = date.toISOString().slice(0, 10);
-    const hour = date.getUTCHours().toString().padStart(2, "0");
+    const dateStr = date.toISOString().slice(0, ISO_DATE_LENGTH);
+    const hour = date.getUTCHours().toString().padStart(TIME_PAD_WIDTH, "0");
     const minute = Math.floor(date.getUTCMinutes() / WINDOW_MINUTES) * WINDOW_MINUTES;
-    const minuteStr = minute.toString().padStart(2, "0");
+    const minuteStr = minute.toString().padStart(TIME_PAD_WIDTH, "0");
     const fileName = `${hour}-${minuteStr}.jsonl`;
 
     const dayDir = join(this.baseDir, dateStr);
@@ -40,7 +40,8 @@ export class LogFileWriter {
 
     try {
       appendFileSync(filePath, line, "utf-8");
-    } catch (_err) {
+    // eslint-disable-next-line taste/no-silent-catch
+    } catch {
       // 文件写入是辅助通道，失败不影响主流程
     }
   }
@@ -54,10 +55,10 @@ export class LogFileWriter {
     if (!this.enabled) return null;
 
     const date = new Date(createdAt);
-    const dateStr = date.toISOString().slice(0, 10);
-    const hour = date.getUTCHours().toString().padStart(2, "0");
+    const dateStr = date.toISOString().slice(0, ISO_DATE_LENGTH);
+    const hour = date.getUTCHours().toString().padStart(TIME_PAD_WIDTH, "0");
     const minute = Math.floor(date.getUTCMinutes() / WINDOW_MINUTES) * WINDOW_MINUTES;
-    const minuteStr = minute.toString().padStart(2, "0");
+    const minuteStr = minute.toString().padStart(TIME_PAD_WIDTH, "0");
     const fileName = `${hour}-${minuteStr}.jsonl`;
     const dayDir = join(this.baseDir, dateStr);
 
@@ -101,6 +102,7 @@ export class LogFileWriter {
       try {
         const entry = JSON.parse(line) as LogFileEntry;
         if (entry.id === id) return entry;
+      // eslint-disable-next-line taste/no-silent-catch
       } catch {
         // 跳过损坏行
       }
