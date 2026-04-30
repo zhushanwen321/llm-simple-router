@@ -2,6 +2,7 @@ import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
 import { Type, Static } from "@sinclair/typebox";
 import { getRequestLogs, getRequestLogsGrouped, getRequestLogById, getRequestLogChildren, deleteLogsBefore } from "../db/index.js";
+import type { LogFileWriter } from "../storage/log-file-writer.js";
 import { HTTP_NOT_FOUND } from "./constants.js";
 import { API_CODE, apiError } from "./api-response.js";
 
@@ -26,10 +27,11 @@ const DEFAULT_LOG_VIEW = "flat";
 
 interface LogRoutesOptions {
   db: Database.Database;
+  logFileWriter?: LogFileWriter | null;
 }
 
 export const adminLogRoutes: FastifyPluginCallback<LogRoutesOptions> = (app, options, done) => {
-  const { db } = options;
+  const { db, logFileWriter } = options;
 
   app.get("/admin/api/logs", { schema: { querystring: LogQuerySchema } }, async (request, reply) => {
     const query = request.query as Static<typeof LogQuerySchema>;
@@ -61,6 +63,24 @@ export const adminLogRoutes: FastifyPluginCallback<LogRoutesOptions> = (app, opt
     if (!log) {
       return reply.code(HTTP_NOT_FOUND).send(apiError(API_CODE.NOT_FOUND, "Log not found"));
     }
+
+    // DB 字段为 null 时，从 JSONL 文件回填详情
+    const needsBackfill = log.client_request === null || log.upstream_request === null || log.upstream_response === null;
+    if (needsBackfill && logFileWriter && logFileWriter.isEnabled && log.created_at) {
+      const fileEntry = logFileWriter.read(log.id, log.created_at);
+      if (fileEntry) {
+        if (log.client_request === null && fileEntry.client_request !== null) {
+          log.client_request = fileEntry.client_request;
+        }
+        if (log.upstream_request === null && fileEntry.upstream_request !== null) {
+          log.upstream_request = fileEntry.upstream_request;
+        }
+        if (log.upstream_response === null && fileEntry.upstream_response !== null) {
+          log.upstream_response = fileEntry.upstream_response;
+        }
+      }
+    }
+
     return reply.send(log);
   });
 

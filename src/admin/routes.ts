@@ -27,6 +27,7 @@ interface AdminRoutesOptions {
   stateRegistry: StateRegistry;
   tracker?: RequestTracker;
   adaptiveController?: AdaptiveConcurrencyController;
+  logFileWriter?: import("../storage/log-file-writer.js").LogFileWriter | null;
 }
 
 export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (app, options, done) => {
@@ -39,7 +40,7 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (app, opti
   app.register(adminGroupRoutes, { db: options.db });
   app.register(adminScheduleRoutes, { db: options.db });
   app.register(adminRetryRuleRoutes, { db: options.db, stateRegistry: options.stateRegistry });
-  app.register(adminLogRoutes, { db: options.db });
+  app.register(adminLogRoutes, { db: options.db, logFileWriter: options.logFileWriter });
   app.register(adminRouterKeyRoutes, { db: options.db });
   app.register(adminStatsRoutes, { db: options.db });
   app.register(adminMetricsRoutes, { db: options.db });

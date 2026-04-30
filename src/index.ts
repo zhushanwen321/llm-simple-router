@@ -284,7 +284,7 @@ export async function buildApp(
     },
   };
 
-  app.register(adminRoutes, { db, stateRegistry, tracker, adaptiveController });
+  app.register(adminRoutes, { db, stateRegistry, tracker, adaptiveController, logFileWriter });
 
   // 前端静态文件服务（生产环境）
   const frontendDist = path.resolve(
