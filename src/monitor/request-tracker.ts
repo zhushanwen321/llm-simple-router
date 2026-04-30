@@ -244,13 +244,9 @@ export class RequestTracker {
     });
   }
 
-  /** 向单个客户端发送当前活跃请求快照 */
+  /** 向单个客户端发送当前活跃请求快照（保留 clientRequest 以便前端即时展示） */
   private sendInitialSnapshot(res: ServerResponse): void {
-    const active = this.getActive().map((req) => {
-      const copy = { ...req };
-      delete copy.clientRequest;
-      return copy;
-    });
+    const active = this.getActive();
     const msg = `event: request_update\ndata: ${JSON.stringify(active)}\n\n`;
     try {
       if (!res.writableEnded) res.write(msg);
@@ -300,16 +296,11 @@ export class RequestTracker {
   }
 
   broadcast(event: string, data: unknown): void {
-    // Strip clientRequest from broadcasts to reduce bandwidth;
-    // full data available on-demand via API endpoint
+    // request_update: 保留 clientRequest，前端 pending 请求需要即时展示内容
+    // request_start: 无需处理，已是原始数据
+    // request_complete: strip clientRequest（完成后从 DB 加载详情）
     let payload = data;
-    if (event === "request_update" && Array.isArray(data)) {
-      payload = data.map((req: ActiveRequest) => {
-        const copy = { ...req };
-        delete copy.clientRequest;
-        return copy;
-      });
-    } else if (event === "request_complete" && data && typeof data === "object") {
+    if (event === "request_complete" && data && typeof data === "object") {
       const copy = { ...(data as ActiveRequest) };
       delete copy.clientRequest;
       payload = copy;

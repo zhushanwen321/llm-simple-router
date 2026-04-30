@@ -14,7 +14,7 @@ const PROVIDER_DEFAULT_MAX_QUEUE_SIZE = 100;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 import { getConfig, getBaseConfig, Config } from "./config/index.js";
-import { initDatabase, getAllProviders, backfillMetricsFromRequestMetrics } from "./db/index.js";
+import { initDatabase, getAllProviders } from "./db/index.js";
 import { loadRecommendedConfig } from "./config/recommended.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { openaiProxy } from "./proxy/handler/openai.js";
@@ -37,6 +37,10 @@ import { CheckerOptions } from "./upgrade/checker.js";
 import fastifyStatic from "@fastify/static";
 import { ServiceContainer, SERVICE_KEYS } from "./core/container.js";
 import Database from "better-sqlite3";
+import { LogFileWriter } from "./storage/log-file-writer.js";
+import { scheduleLogFileMaintenance } from "./storage/log-file-compressor.js";
+import { getDetailLogEnabled, getLogFileRetentionDays } from "./db/settings.js";
+import { dirname, join } from "node:path";
 
 export interface AppOptions {
   config?: Config;
@@ -89,12 +93,10 @@ export async function buildApp(
 
   // 允许外部传入已初始化的 DB（测试用），否则自行创建
   let db: Database.Database;
-  let shouldBackfill = false;
   if (options?.db) {
     db = options.db;
   } else {
     db = initDatabase(config.DB_PATH);
-    shouldBackfill = true;
   }
 
   const isDev = process.env.NODE_ENV !== "production";
@@ -157,19 +159,23 @@ export async function buildApp(
         const body = request.body as Record<string, unknown> | undefined;
         const receivedAt = (request as unknown as { receivedAt?: number }).receivedAt;
         const latencyMs = receivedAt ? Date.now() - receivedAt : 0;
-        insertRequestLog(db, {
-          id: randomUUID(),
-          api_type: proxyApiType,
-          model: (body?.model as string) || null,
-          provider_id: null,
-          status_code: status,
-          latency_ms: latencyMs,
-          is_stream: body?.stream === true ? 1 : 0,
-          error_message: fastifyError.message,
-          created_at: new Date().toISOString(),
-          client_request: JSON.stringify({ headers: request.headers, ...(body ? { body } : {}) }),
-          router_key_id: request.routerKey?.id ?? null,
-        });
+        try {
+          insertRequestLog(db, {
+            id: randomUUID(),
+            api_type: proxyApiType,
+            model: (body?.model as string) || null,
+            provider_id: null,
+            status_code: status,
+            latency_ms: latencyMs,
+            is_stream: body?.stream === true ? 1 : 0,
+            error_message: fastifyError.message,
+            created_at: new Date().toISOString(),
+            client_request: JSON.stringify({ headers: request.headers, ...(body ? { body } : {}) }),
+            router_key_id: request.routerKey?.id ?? null,
+          });
+        } catch (logErr) {
+          request.log.error({ err: logErr }, "Failed to log proxy error to request_logs");
+        }
       }
       return reply.code(status).send({ error: { message: fastifyError.message } });
     }
@@ -208,14 +214,6 @@ export async function buildApp(
   loadRecommendedConfig();
   startUpgradeChecker(options?.upgradeCheckerOptions);
 
-  // 启动时回填：补齐回退老版本期间缺失的 metrics 冗余列
-  if (shouldBackfill) {
-    const backfilled = backfillMetricsFromRequestMetrics(db);
-    if (backfilled > 0) {
-      app.log.info({ backfilled }, "Backfilled metrics from request_metrics");
-    }
-  }
-
   const container = new ServiceContainer();
   container.register(SERVICE_KEYS.db, () => db);
   container.register(SERVICE_KEYS.matcher, (c) => { const m = new RetryRuleMatcher(); m.load(c.resolve(SERVICE_KEYS.db)); return m; });
@@ -231,6 +229,15 @@ export async function buildApp(
     return uwt;
   });
   container.register(SERVICE_KEYS.sessionTracker, () => new SessionTracker(DEFAULT_LOOP_PREVENTION_CONFIG.sessionTracker));
+
+  // 文件日志写入器
+  const isMemoryDb = config.DB_PATH === ":memory:";
+  const logsDir = isMemoryDb ? "" : join(dirname(config.DB_PATH), "logs");
+  // :memory: 模式注册 null，避免 DB 日志记录被 isFileWriter 逻辑抑制
+  const logFileWriter = isMemoryDb
+    ? null
+    : new LogFileWriter(logsDir, { enabled: getDetailLogEnabled(db) });
+  container.register(SERVICE_KEYS.logFileWriter, () => logFileWriter);
 
   // 注入 DB 到 modelState 单例，启用会话级持久化
   modelState.init(db);
@@ -277,7 +284,7 @@ export async function buildApp(
     },
   };
 
-  app.register(adminRoutes, { db, stateRegistry, tracker, adaptiveController });
+  app.register(adminRoutes, { db, stateRegistry, tracker, adaptiveController, logFileWriter, logsDir });
 
   // 前端静态文件服务（生产环境）
   const frontendDist = path.resolve(
@@ -317,28 +324,81 @@ export async function buildApp(
     log: app.log,
   });
 
+  let close = async () => {
+    stopUpgradeChecker();
+    logCleanup.stop();
+    dbSizeMonitor.stop();
+    tracker.stopPushInterval();
+    modelState.clearAll();
+    semaphoreManager.removeAll();
+    const sessionTracker = container.resolve<SessionTracker>(SERVICE_KEYS.sessionTracker);
+    sessionTracker.stop();
+    await app.close();
+    db.close();
+  };
+
+  // 文件压缩和清理任务（仅非 :memory: 模式）
+  if (!isMemoryDb) {
+    const logFileMaintenance = scheduleLogFileMaintenance(logsDir, {
+      retentionDays: getLogFileRetentionDays(db),
+      log: app.log,
+    });
+    // 注册到 close
+    const prevClose = close;
+    close = async () => {
+      logFileMaintenance.stop();
+      await prevClose();
+    };
+  }
+
   return {
     app,
     db,
     usageWindowTracker,
-    close: async () => {
-      stopUpgradeChecker();
-      logCleanup.stop();
-      dbSizeMonitor.stop();
-      tracker.stopPushInterval();
-      modelState.clearAll();
-      semaphoreManager.removeAll();
-      const sessionTracker = container.resolve<SessionTracker>(SERVICE_KEYS.sessionTracker);
-      sessionTracker.stop();
-      await app.close();
-      db.close();
-    },
+    close,
   };
 }
 
+
 export async function main() {
-  const { app } = await buildApp();
+  const { app, close } = await buildApp();
   const config = getConfig();
+
+  // 全局兜底：防止未捕获异常导致进程崩溃
+  process.on("uncaughtException", (err) => {
+    try {
+      app.log.fatal({ err }, "Uncaught exception");
+    /* eslint-disable taste/no-silent-catch -- app.log 可能已崩溃，console 是最后手段 */
+    } catch {
+      console.error("FATAL: Uncaught exception:", err);
+    }
+    /* eslint-enable taste/no-silent-catch */
+    close().finally(() => process.exit(1));
+  });
+
+  process.on("unhandledRejection", (reason) => {
+    try {
+      app.log.error({ err: reason instanceof Error ? reason : new Error(String(reason)) }, "Unhandled rejection");
+    /* eslint-disable taste/no-silent-catch -- app.log 可能已崩溃，console 是最后手段 */
+    } catch {
+      console.error("Unhandled rejection:", reason);
+    }
+    /* eslint-enable taste/no-silent-catch */
+  });
+
+  // 优雅关闭：SIGTERM（systemd/docker stop）和 SIGINT（Ctrl+C）
+  const shutdown = async (signal: string) => {
+    try {
+      app.log.info(`Received ${signal}, shutting down gracefully...`);
+      await close();
+      app.log.info("Shutdown complete");
+    } catch (err) {
+      app.log.error({ err }, "Error during shutdown");
+    }
+    process.exit(0);
+  };
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
 
   try {
     await app.listen({ port: config.PORT, host: "0.0.0.0" });

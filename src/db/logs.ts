@@ -1,4 +1,6 @@
 import Database from "better-sqlite3";
+import type { LogFileWriter } from "../storage/log-file-writer.js";
+import { shouldPreserveDetail, type RetryMatcher } from "../proxy/log-detail-policy.js";
 
 type CountRow = { count: number };
 
@@ -20,14 +22,6 @@ export interface RequestLog {
   is_failover: number;
   original_request_id: string | null;
   original_model: string | null;
-  input_tokens: number | null;
-  output_tokens: number | null;
-  cache_read_tokens: number | null;
-  ttft_ms: number | null;
-  tokens_per_second: number | null;
-  stop_reason: string | null;
-  backend_model: string | null;
-  metrics_complete: number;
   stream_text_content: string | null;
   session_id: string | null;
 }
@@ -40,14 +34,15 @@ export interface RequestLogListRow extends RequestLog {
 
 // --- request_logs ---
 
-/** 日志列表查询共享的 SELECT 列 + JOIN 子句（metrics 已冗余到 request_logs，无需 JOIN request_metrics） */
 const LOG_LIST_SELECT = `rl.id, rl.api_type, rl.model, rl.provider_id, rl.status_code, rl.client_status_code, rl.latency_ms,
             rl.is_stream, rl.error_message, rl.created_at, rl.is_retry, rl.is_failover, rl.original_request_id, rl.original_model,
             CASE WHEN rl.provider_id = 'router' THEN rl.upstream_request ELSE NULL END AS upstream_request,
-            rl.input_tokens, rl.output_tokens, rl.cache_read_tokens, rl.ttft_ms, rl.tokens_per_second, rl.stop_reason,
-            rl.backend_model, rl.metrics_complete, rl.session_id, rl.input_tokens_estimated,
+            rl.session_id, rl.pipeline_snapshot,
+            rm.input_tokens, rm.output_tokens, rm.cache_read_tokens, rm.ttft_ms,
+            rm.tokens_per_second, rm.stop_reason, rm.backend_model, rm.is_complete AS metrics_complete,
+            rm.input_tokens_estimated,
             COALESCE(p.name, rl.provider_id) AS provider_name`;
-const LOG_LIST_JOIN = `LEFT JOIN providers p ON p.id = rl.provider_id`;
+const LOG_LIST_JOIN = `LEFT JOIN providers p ON p.id = rl.provider_id LEFT JOIN request_metrics rm ON rm.request_log_id = rl.id`;
 
 export interface RequestLogInsert {
   id: string;
@@ -69,26 +64,57 @@ export interface RequestLogInsert {
   original_model?: string | null;
   session_id?: string | null;
   client_status_code?: number | null;
+  pipeline_snapshot?: string | null;
+}
+
+export interface LogWriteContext {
+  matcher?: RetryMatcher | null;
+  logFileWriter?: LogFileWriter | null;
+  responseBody?: string | null;
 }
 
 export function insertRequestLog(
   db: Database.Database,
   log: RequestLogInsert,
+  writeContext?: LogWriteContext,
 ): void {
+  // 文件写入：始终写入全文
+  if (writeContext?.logFileWriter) {
+    writeContext.logFileWriter.write({
+      id: log.id,
+      created_at: log.created_at,
+      api_type: log.api_type,
+      status_code: log.status_code,
+      client_request: log.client_request ?? null,
+      upstream_request: log.upstream_request ?? null,
+      upstream_response: log.upstream_response ?? null,
+      stream_text_content: null,
+      pipeline_snapshot: log.pipeline_snapshot ?? null,
+    });
+  }
+
+  // 详情保留判定
+  const preserveDetail = shouldPreserveDetail(
+    log.status_code, writeContext?.responseBody ?? null, writeContext?.matcher ?? null,
+    !!writeContext?.logFileWriter,
+  );
+
   db.prepare(
     `INSERT INTO request_logs (id, api_type, model, provider_id, status_code, client_status_code, latency_ms,
       is_stream, error_message, created_at, client_request, upstream_request, upstream_response,
-      is_retry, is_failover, original_request_id, router_key_id, original_model, session_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      is_retry, is_failover, original_request_id, router_key_id, original_model, session_id, pipeline_snapshot)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     log.id, log.api_type, log.model, log.provider_id, log.status_code,
     log.client_status_code ?? null,
     log.latency_ms, log.is_stream, log.error_message, log.created_at,
-    log.client_request ?? null, log.upstream_request ?? null,
-    log.upstream_response ?? null,
+    preserveDetail ? (log.client_request ?? null) : null,
+    preserveDetail ? (log.upstream_request ?? null) : null,
+    preserveDetail ? (log.upstream_response ?? null) : null,
     log.is_retry ?? 0, log.is_failover ?? 0, log.original_request_id ?? null,
     log.router_key_id ?? null, log.original_model ?? null,
     log.session_id ?? null,
+    log.pipeline_snapshot ?? null,
   );
 }
 
@@ -173,38 +199,18 @@ export function getRequestLogs(
 
 export function getRequestLogById(db: Database.Database, id: string): RequestLogListRow | undefined {
   return db.prepare(
-    `SELECT rl.*, COALESCE(p.name, rl.provider_id) AS provider_name
-     FROM request_logs rl LEFT JOIN providers p ON p.id = rl.provider_id
+    `SELECT rl.*, rm.input_tokens, rm.output_tokens, rm.cache_read_tokens, rm.ttft_ms,
+            rm.tokens_per_second, rm.stop_reason, rm.backend_model, rm.is_complete AS metrics_complete,
+            rm.input_tokens_estimated,
+            COALESCE(p.name, rl.provider_id) AS provider_name
+     FROM request_logs rl
+     LEFT JOIN providers p ON p.id = rl.provider_id
+     LEFT JOIN request_metrics rm ON rm.request_log_id = rl.id
      WHERE rl.id = ?`,
   ).get(id) as RequestLogListRow | undefined;
 }
 
-type MetricsUpdate = {
-  input_tokens?: number | null;
-  output_tokens?: number | null;
-  cache_read_tokens?: number | null;
-  ttft_ms?: number | null;
-  tokens_per_second?: number | null;
-  stop_reason?: string | null;
-  is_complete?: number;
-  input_tokens_estimated?: number;
-};
 
-/** 双写：collectTransportMetrics 写 request_metrics 的同时，更新 request_logs 的冗余列 */
-export function updateLogMetrics(db: Database.Database, logId: string, m: MetricsUpdate): void {
-  db.prepare(
-    `UPDATE request_logs SET
-       input_tokens = ?, output_tokens = ?, cache_read_tokens = ?,
-       ttft_ms = ?, tokens_per_second = ?, stop_reason = ?,
-       backend_model = (SELECT backend_model FROM request_metrics WHERE request_log_id = ?),
-       metrics_complete = ?, input_tokens_estimated = ?
-     WHERE id = ?`,
-  ).run(
-    m.input_tokens ?? null, m.output_tokens ?? null, m.cache_read_tokens ?? null,
-    m.ttft_ms ?? null, m.tokens_per_second ?? null, m.stop_reason ?? null,
-    logId, m.is_complete ?? 1, m.input_tokens_estimated ?? 0, logId,
-  );
-}
 
 /** 流式请求完成后，将 tracker 中累积的文本内容写入 request_logs */
 export function updateLogStreamContent(db: Database.Database, logId: string, textContent: string): void {
@@ -216,25 +222,7 @@ export function updateLogClientStatus(db: Database.Database, logId: string, clie
   db.prepare("UPDATE request_logs SET client_status_code = ? WHERE id = ?").run(clientStatusCode, logId);
 }
 
-/** 启动时回填：从 request_metrics 补齐 metrics_complete = 0 但实际有指标的行 */
-export function backfillMetricsFromRequestMetrics(db: Database.Database): number {
-  return db.prepare(`
-    UPDATE request_logs
-    SET
-      input_tokens = rm.input_tokens,
-      output_tokens = rm.output_tokens,
-      cache_read_tokens = rm.cache_read_tokens,
-      ttft_ms = rm.ttft_ms,
-      tokens_per_second = rm.tokens_per_second,
-      stop_reason = rm.stop_reason,
-      backend_model = rm.backend_model,
-      metrics_complete = rm.is_complete,
-      input_tokens_estimated = rm.input_tokens_estimated
-    FROM request_metrics rm
-    WHERE rm.request_log_id = request_logs.id
-      AND request_logs.metrics_complete = 0
-  `).run().changes;
-}
+
 
 export function deleteLogsBefore(db: Database.Database, beforeDate: string): number {
   const changes = db.prepare("DELETE FROM request_logs WHERE created_at < ?").run(beforeDate).changes;
@@ -253,7 +241,7 @@ export function estimateLogTableSize(db: Database.Database): number {
     SELECT COALESCE(SUM(
       COALESCE(length(client_request), 0) + COALESCE(length(upstream_request), 0) +
       COALESCE(length(upstream_response), 0) + COALESCE(length(stream_text_content), 0) +
-      COALESCE(length(error_message), 0) + ?
+      COALESCE(length(error_message), 0) + COALESCE(length(pipeline_snapshot), 0) + ?
     ), 0) as size
     FROM request_logs
   `).get(ROW_METADATA_BYTES) as { size: number };
@@ -342,4 +330,9 @@ export function getRequestLogsGrouped(
     )
     .all(...params, options.limit, offset) as RequestLogGroupedRow[];
   return { data, total };
+}
+
+/** 后续 pipeline 阶段完成后，回写 snapshot 到已有日志 */
+export function updateLogPipelineSnapshot(db: Database.Database, logId: string, snapshot: string): void {
+  db.prepare("UPDATE request_logs SET pipeline_snapshot = ? WHERE id = ?").run(snapshot, logId);
 }

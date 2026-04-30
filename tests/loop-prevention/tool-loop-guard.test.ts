@@ -72,8 +72,8 @@ describe("ToolLoopGuard", () => {
     const tracker = new SessionTracker(trackerConfig);
     const guard = new ToolLoopGuard(tracker, guardConfig);
     const body: Record<string, unknown> = { system: "原始提示词", messages: [] };
-    guard.injectLoopBreakPrompt(body, "anthropic", "write_file");
-    expect(body.system).toEqual([
+    const result = guard.injectLoopBreakPrompt(body, "anthropic", "write_file");
+    expect(result.system).toEqual([
       { type: "text", text: "原始提示词" },
       { type: "text", text: expect.stringContaining("write_file") },
     ]);
@@ -83,8 +83,8 @@ describe("ToolLoopGuard", () => {
     const tracker = new SessionTracker(trackerConfig);
     const guard = new ToolLoopGuard(tracker, guardConfig);
     const body: Record<string, unknown> = { messages: [{ role: "user", content: "hi" }] };
-    guard.injectLoopBreakPrompt(body, "openai", "write_file");
-    const messages = body.messages as Array<Record<string, unknown>>;
+    const result = guard.injectLoopBreakPrompt(body, "openai", "write_file");
+    const messages = result.messages as Array<Record<string, unknown>>;
     expect(messages[0].role).toBe("system");
     expect(messages[0].content as string).toContain("write_file");
   });

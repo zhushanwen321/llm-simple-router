@@ -52,3 +52,15 @@ export function getConfigSyncSource(db: Database.Database): "github" | "gitee" {
 export function setConfigSyncSource(db: Database.Database, source: "github" | "gitee"): void {
   setSetting(db, "config_sync_source", source);
 }
+
+export function getDetailLogEnabled(db: Database.Database): boolean {
+  const row = db.prepare("SELECT value FROM settings WHERE key = ?").get("detail_log_enabled") as { value: string } | undefined;
+  return row ? row.value !== "0" : true;
+}
+
+const DEFAULT_LOG_FILE_RETENTION_DAYS = 3;
+
+export function getLogFileRetentionDays(db: Database.Database): number {
+  const row = db.prepare("SELECT value FROM settings WHERE key = ?").get("log_file_retention_days") as { value: string } | undefined;
+  return row ? parseInt(row.value, 10) : DEFAULT_LOG_FILE_RETENTION_DAYS;
+}

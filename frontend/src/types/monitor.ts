@@ -28,6 +28,7 @@ export interface ActiveRequest {
   clientIp?: string
   sessionId?: string
   clientRequest?: string
+  upstreamRequest?: string
   completedAt?: number
 }
 

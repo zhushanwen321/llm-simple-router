@@ -42,27 +42,24 @@ export class ToolLoopGuard {
     return { detected: false };
   }
 
-  injectLoopBreakPrompt(body: Record<string, unknown>, apiType: "openai" | "anthropic", toolName: string): void {
-    const prompt = `你正在重复调用同一个工具 "${toolName}"。` +
-      `这很可能陷入了一个循环。请仔细回顾对话历史，` +
-      `分析之前调用该工具的结果，停止重复调用，` +
-      `改用其他方式完成任务或直接告知用户你遇到的问题。`;
+  injectLoopBreakPrompt(body: Record<string, unknown>, apiType: "openai" | "anthropic", toolName: string): Record<string, unknown> {
+    const cloned = JSON.parse(JSON.stringify(body));
+    const prompt = `[系统提醒] 检测到你可能陷入了反复调用 "${toolName}" 工具的循环。请停下来，总结当前进展，直接告知用户。`;
 
     if (apiType === "anthropic") {
-      const system = body.system;
+      const system = cloned.system;
       if (Array.isArray(system)) {
-        (system as Array<Record<string, unknown>>).push({ type: "text", text: prompt });
+        system.push({ type: "text", text: prompt });
       } else if (typeof system === "string") {
-        body.system = [{ type: "text", text: system }, { type: "text", text: prompt }];
+        cloned.system = [{ type: "text", text: system }, { type: "text", text: prompt }];
       } else {
-        body.system = [{ type: "text", text: prompt }];
+        cloned.system = [{ type: "text", text: prompt }];
       }
     } else {
-      // OpenAI: 在 messages 开头插入 system message
-      const messages = body.messages as Array<Record<string, unknown>> | undefined;
-      if (messages) {
-        messages.unshift({ role: "system", content: prompt });
-      }
+      const messages = (cloned.messages as unknown[]) ?? [];
+      messages.unshift({ role: "system", content: prompt });
+      cloned.messages = messages;
     }
+    return cloned;
   }
 }

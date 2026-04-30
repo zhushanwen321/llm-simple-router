@@ -70,7 +70,11 @@ export const adminLoginRoutes: FastifyPluginCallback<AdminAuthOptions> = (app, o
     }
 
     const secret = getSetting(options.db, "jwt_secret");
-    const token = jwt.sign({ role: "admin" }, secret!, { expiresIn: TOKEN_EXPIRY_SECONDS });
+    if (!secret) {
+      request.log.error("JWT secret not configured, cannot issue token");
+      return reply.code(HTTP_UNAUTHORIZED).send(apiError(API_CODE.TOKEN_INVALID, "JWT secret not configured"));
+    }
+    const token = jwt.sign({ role: "admin" }, secret, { expiresIn: TOKEN_EXPIRY_SECONDS });
     reply.setCookie("admin_token", token, {
       path: "/admin",
       httpOnly: true,

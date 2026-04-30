@@ -240,6 +240,15 @@ onMounted(loadSettings)
           />
         </div>
 
+        <div class="space-y-1">
+          <div class="flex justify-between text-sm">
+            <span>日志文件大小</span>
+            <span class="text-muted-foreground">
+              {{ formatBytes(dbSizeInfo.logFileBytes ?? 0) }}
+            </span>
+          </div>
+        </div>
+
         <p v-if="dbSizeInfo.lastChecked" class="text-xs text-muted-foreground">
           上次检查：{{ dbSizeInfo.lastChecked }}
         </p>

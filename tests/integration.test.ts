@@ -13,6 +13,7 @@ import { encrypt } from "../src/utils/crypto.js";
 import { initDatabase } from "../src/db/index.js";
 import { setSetting } from "../src/db/settings.js";
 import { hashPassword } from "../src/utils/password.js";
+import { DEFAULT_LOOP_PREVENTION_CONFIG } from "../src/proxy/loop-prevention/types.js";
 
 const TEST_ENCRYPTION_KEY =
   "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
@@ -26,6 +27,7 @@ function makeTestConfig() {
     TZ: "Asia/Shanghai",
     STREAM_TIMEOUT_MS: 5000,
     RETRY_BASE_DELAY_MS: 0,
+    LOOP_PREVENTION: { ...DEFAULT_LOOP_PREVENTION_CONFIG, enabled: false },
   };
 }
 
@@ -452,5 +454,123 @@ describe("Integration tests", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ status: "ok" });
+  });
+
+  describe("pipeline_snapshot 端到端", () => {
+    it("should record pipeline_snapshot with correct stages for non-stream request", async () => {
+      const response = await app.inject({
+        method: "POST",
+        url: "/v1/chat/completions",
+        headers: { ...AUTH_HEADER, "content-type": "application/json" },
+        payload: {
+          model: "gpt-4",
+          messages: [{ role: "user", content: "Hello" }],
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+
+      const row = db.prepare("SELECT pipeline_snapshot FROM request_logs").get() as any;
+      expect(row.pipeline_snapshot).not.toBeNull();
+
+      const stages = JSON.parse(row.pipeline_snapshot);
+
+      // enhancement — 始终存在
+      const enh = stages.find((s: any) => s.stage === "enhancement");
+      expect(enh).toBeDefined();
+      expect(enh.router_tags_stripped).toBe(0);
+      expect(enh.directive).toBeNull();
+
+      // routing — 始终存在
+      const routing = stages.find((s: any) => s.stage === "routing");
+      expect(routing).toBeDefined();
+      expect(routing.client_model).toBe("gpt-4");
+      expect(routing.backend_model).toBe("gpt-4");
+      expect(routing.provider_id).toBe("svc-openai");
+
+      // overflow — 始终存在（triggered: false）
+      const overflow = stages.find((s: any) => s.stage === "overflow");
+      expect(overflow).toBeDefined();
+      expect(overflow.triggered).toBe(false);
+
+      // provider_patch — 始终存在
+      const patch = stages.find((s: any) => s.stage === "provider_patch");
+      expect(patch).toBeDefined();
+      expect(patch.types).toEqual([]);
+
+      // response_transform — 普通场景下 originalModel 为 null，不会注入
+      const respTransform = stages.find((s: any) => s.stage === "response_transform");
+      expect(respTransform).toBeUndefined();
+    });
+
+    it("should preserve raw client_request before any processing", async () => {
+      const routerTag = '<router-response type="model-info">test</router-response>';
+      const response = await app.inject({
+        method: "POST",
+        url: "/v1/chat/completions",
+        headers: { ...AUTH_HEADER, "content-type": "application/json" },
+        payload: {
+          model: "gpt-4",
+          messages: [{ role: "user", content: `Previous ${routerTag} and current message` }],
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+
+      const row = db.prepare("SELECT client_request FROM request_logs").get() as any;
+      expect(row.client_request).not.toBeNull();
+
+      const parsed = JSON.parse(row.client_request);
+      // client_request 记录的是原始请求深拷贝，应保留 router-response 标签
+      expect(parsed.body.messages[0].content).toContain(routerTag);
+    });
+
+    it("should record upstream_response before model-info injection", async () => {
+      const response = await app.inject({
+        method: "POST",
+        url: "/v1/chat/completions",
+        headers: { ...AUTH_HEADER, "content-type": "application/json" },
+        payload: {
+          model: "gpt-4",
+          messages: [{ role: "user", content: "Hello" }],
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+
+      const row = db.prepare("SELECT upstream_response FROM request_logs").get() as any;
+      expect(row.upstream_response).not.toBeNull();
+
+      const parsed = JSON.parse(row.upstream_response);
+      // upstream_response 不含 model-info 标签（普通场景下不会注入）
+      const bodyStr = typeof parsed.body === "string" ? parsed.body : JSON.stringify(parsed.body);
+      expect(bodyStr).not.toContain('router-response type="model-info"');
+    });
+
+    it("should record pipeline_snapshot for stream request", async () => {
+      const response = await app.inject({
+        method: "POST",
+        url: "/v1/chat/completions",
+        headers: { ...AUTH_HEADER, "content-type": "application/json" },
+        payload: {
+          model: "gpt-4",
+          messages: [{ role: "user", content: "Hello" }],
+          stream: true,
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+
+      const row = db.prepare("SELECT pipeline_snapshot FROM request_logs").get() as any;
+      expect(row.pipeline_snapshot).not.toBeNull();
+
+      const stages = JSON.parse(row.pipeline_snapshot);
+      const stageNames = stages.map((s: any) => s.stage);
+
+      expect(stageNames).toContain("enhancement");
+      expect(stageNames).toContain("routing");
+      expect(stageNames).toContain("overflow");
+      expect(stageNames).toContain("provider_patch");
+    });
   });
 });

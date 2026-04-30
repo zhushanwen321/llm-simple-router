@@ -157,7 +157,11 @@ class StreamProxy {
     }
     // 手动转发而非 pipe，避免 Node.js 在 dest 上自动注册 close/finish handler
     this.passThrough.on("data", (chunk: Buffer) => {
-      this.reply.raw.write(chunk);
+      try {
+        this.reply.raw.write(chunk);
+      } catch {
+        // 客户端已断开，写已销毁的 socket 会抛出异常，可安全忽略
+      }
     });
     // 不在 passThrough end 事件中调用 reply.raw.end()，
     // 因为 onEnd() 统一管理响应结束时机，确保日志在 reply end 之前写入
@@ -213,7 +217,11 @@ class StreamProxy {
           this.terminal("stream_error", { body });
           // headers 已发送：必须结束 reply 避免 client hang
           if (this.headersSent) {
-            setImmediate(() => this.reply.raw.end());
+            setImmediate(() => {
+              try { this.reply.raw.end(); } catch {
+                // reply 可能已 destroyed，安全忽略
+              }
+            });
           }
           return;
         }
@@ -256,7 +264,11 @@ class StreamProxy {
     // 延迟结束管道和响应，属于 reply 层面操作，不属于 StreamProxy 状态管理
     setImmediate(() => {
       this.pipeEntry.end();
-      if (this.headersSent) this.reply.raw.end();
+      if (this.headersSent) {
+        try { this.reply.raw.end(); } catch {
+          // reply 可能已 destroyed，安全忽略
+        }
+      }
       this.cleanup();
     });
   }

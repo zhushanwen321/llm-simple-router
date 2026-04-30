@@ -1,3 +1,5 @@
+import { statSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
 import {
@@ -11,10 +13,11 @@ import { API_CODE, apiError } from "./api-response.js";
 
 interface SettingsOptions {
   db: Database.Database;
+  logsDir?: string;
 }
 
 export const adminSettingsRoutes: FastifyPluginCallback<SettingsOptions> = (app, options, done) => {
-  const { db } = options;
+  const { db, logsDir } = options;
 
   app.get("/admin/api/settings/log-retention", async () => {
     return { days: getLogRetentionDays(db) };
@@ -37,8 +40,17 @@ export const adminSettingsRoutes: FastifyPluginCallback<SettingsOptions> = (app,
     if (raw) {
       try { sizeInfo = JSON.parse(raw); } catch { /* eslint-disable-line taste/no-silent-catch -- 损坏的缓存值，回退默认 */ }
     }
+    // 计算日志文件目录大小
+    let logFileBytes = 0;
+    if (logsDir) {
+      try {
+        logFileBytes = calcDirSize(logsDir);
+      } catch { /* eslint-disable-line taste/no-silent-catch -- 目录可能不存在 */ }
+    }
+
     return {
       ...sizeInfo,
+      logFileBytes,
       thresholds: {
         dbMaxSizeMb: getDbMaxSizeMb(db),
         logTableMaxSizeMb: getLogTableMaxSizeMb(db),
@@ -68,3 +80,17 @@ export const adminSettingsRoutes: FastifyPluginCallback<SettingsOptions> = (app,
 
   done();
 };
+
+/** 递归计算目录下所有文件的总大小（字节） */
+function calcDirSize(dirPath: string): number {
+  let total = 0;
+  for (const entry of readdirSync(dirPath, { withFileTypes: true })) {
+    const fullPath = join(dirPath, entry.name);
+    if (entry.isDirectory()) {
+      total += calcDirSize(fullPath);
+    } else if (entry.isFile()) {
+      try { total += statSync(fullPath).size; } catch { /* 文件可能刚被删除 */ }
+    }
+  }
+  return total;
+}

@@ -8,7 +8,7 @@ import { initDatabase } from "../src/db/index.js";
 import { setSetting } from "../src/db/settings.js";
 import { ProviderSemaphoreManager } from "../src/proxy/orchestration/semaphore.js";
 import { RequestTracker } from "../src/monitor/request-tracker.js";
-import { ServiceContainer } from "../src/core/container.js";
+import { ServiceContainer, SERVICE_KEYS } from "../src/core/container.js";
 
 
 const TEST_ENCRYPTION_KEY =
@@ -47,6 +47,7 @@ function buildTestApp(mockDb: Database.Database): FastifyInstance {
   container.register("usageWindowTracker", () => undefined);
   container.register("sessionTracker", () => undefined);
   container.register("adaptiveController", () => undefined);
+  container.register(SERVICE_KEYS.logFileWriter, () => null);
 
   app.register(anthropicProxy, { db: mockDb, container });
 

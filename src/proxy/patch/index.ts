@@ -4,17 +4,24 @@ interface ProviderInfo {
   base_url: string;
 }
 
+export interface ProviderPatchMeta {
+  types: string[];
+}
+
 /**
  * 根据 provider 信息分发到对应的补丁逻辑。
- * 每个补丁直接修改 body，不返回新对象。
+ * 返回浅拷贝 body + 执行的补丁类型列表，不修改原始 body。
  */
 export function applyProviderPatches(
   body: Record<string, unknown>,
   provider: ProviderInfo,
-): void {
+): { body: Record<string, unknown>; meta: ProviderPatchMeta } {
   if (needsDeepSeekPatch(body, provider)) {
-    applyDeepSeekPatches(body);
+    const cloned = JSON.parse(JSON.stringify(body));
+    applyDeepSeekPatches(cloned);
+    return { body: cloned, meta: { types: ["deepseek"] } };
   }
+  return { body, meta: { types: [] } };
 }
 
 /** DeepSeek patch 触发条件：直连 DeepSeek，或经代理转发且模型名含 deepseek */
