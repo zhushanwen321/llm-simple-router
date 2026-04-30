@@ -1,16 +1,15 @@
 import { PassThrough } from "stream";
 import type { FastifyReply } from "fastify";
-import { UPSTREAM_SUCCESS, filterHeaders } from "./types.js";
-import { buildUpstreamUrl } from "./proxy-core.js";
-import type { RawHeaders, StreamState, TransportResult } from "./types.js";
-import type { MetricsResult } from "../metrics/metrics-extractor.js";
-import type { SSEMetricsTransform } from "../metrics/sse-metrics-transform.js";
-import type { StreamLoopGuard } from "./loop-prevention/stream-loop-guard.js";
+import { UPSTREAM_SUCCESS, filterHeaders } from "../types.js";
+import { buildUpstreamUrl } from "../proxy-core.js";
+import type { RawHeaders, StreamState, TransportResult, MetricsResult } from "../types.js";
+import type { SSEMetricsTransform } from "../../metrics/sse-metrics-transform.js";
+import type { StreamLoopGuard } from "../loop-prevention/stream-loop-guard.js";
 import {
   _transportInternals,
   buildRequestOptions,
   type BuildHeadersFn,
-} from "./transport.js";
+} from "./http.js";
 
 const UPSTREAM_BAD_GATEWAY = 502;
 const BUFFER_SIZE_LIMIT = 4096;

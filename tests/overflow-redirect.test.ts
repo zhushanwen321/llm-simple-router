@@ -4,11 +4,13 @@ import Database from "better-sqlite3";
 import { initDatabase } from "../src/db/index.js";
 import { setSetting } from "../src/db/settings.js";
 import { encrypt } from "../src/utils/crypto.js";
-import { openaiProxy } from "../src/proxy/openai.js";
-import { ProviderSemaphoreManager } from "../src/proxy/semaphore.js";
+import { openaiProxy } from "../src/proxy/handler/openai.js";
+import { ProviderSemaphoreManager } from "../src/proxy/orchestration/semaphore.js";
 import { RequestTracker } from "../src/monitor/request-tracker.js";
 import { createMockBackend } from "./helpers/mock-backend.js";
 import { TEST_ENCRYPTION_KEY } from "./helpers/test-setup.js";
+import { ServiceContainer } from "../src/core/container.js";
+
 
 function insertProvider(
   db: Database.Database,
@@ -51,13 +53,14 @@ function buildTestApp(db: Database.Database): FastifyInstance {
   const app = Fastify();
   const semaphoreManager = new ProviderSemaphoreManager();
   const tracker = new RequestTracker({ semaphoreManager });
-  app.register(openaiProxy, {
-    db,
-    streamTimeoutMs: 5000,
-    retryBaseDelayMs: 0,
-    semaphoreManager,
-    tracker,
-  });
+  const container = new ServiceContainer();
+  container.register("semaphoreManager", () => semaphoreManager);
+  container.register("tracker", () => tracker);
+  container.register("matcher", () => undefined);
+  container.register("usageWindowTracker", () => undefined);
+  container.register("sessionTracker", () => undefined);
+  container.register("adaptiveController", () => undefined);
+  app.register(openaiProxy, { db: db, container });
   return app;
 }
 

@@ -2,28 +2,20 @@ import Database from "better-sqlite3";
 import type { FastifyPluginCallback } from "fastify";
 import { randomUUID } from "crypto";
 import fp from "fastify-plugin";
-import { insertRequestLog } from "../db/index.js";
-import { createErrorFormatter } from "./proxy-core.js";
-import type { ErrorKind } from "./proxy-core.js";
+import { insertRequestLog } from "../../db/index.js";
+import { createErrorFormatter } from "../proxy-core.js";
+import type { ErrorKind } from "../proxy-core.js";
 import { handleProxyRequest, type RouteHandlerDeps } from "./proxy-handler.js";
-import { createOrchestrator } from "./orchestrator.js";
-import { RetryRuleMatcher } from "./retry-rules.js";
-import { ProviderSemaphoreManager } from "./semaphore.js";
-import type { RequestTracker } from "../monitor/request-tracker.js";
-import type { UsageWindowTracker } from "./usage-window-tracker.js";
-import type { AdaptiveConcurrencyController } from "./adaptive-controller.js";
-import { HTTP_BAD_GATEWAY } from "../constants.js";
+import { createOrchestrator } from "../orchestration/orchestrator.js";
+import { ProviderSemaphoreManager } from "../orchestration/semaphore.js";
+import type { RequestTracker } from "../../monitor/request-tracker.js";
+import type { AdaptiveConcurrencyController } from "../adaptive-controller.js";
+import { HTTP_BAD_GATEWAY } from "../../core/constants.js";
+import { SERVICE_KEYS } from "../../core/container.js";
 
 export interface AnthropicProxyOptions {
   db: Database.Database;
-  streamTimeoutMs: number;
-  retryBaseDelayMs: number;
-  matcher?: RetryRuleMatcher;
-  semaphoreManager?: ProviderSemaphoreManager;
-  tracker?: RequestTracker;
-  usageWindowTracker?: UsageWindowTracker;
-  sessionTracker?: import("./loop-prevention/session-tracker.js").SessionTracker;
-  adaptiveController?: AdaptiveConcurrencyController;
+  container: import("../../core/container.js").ServiceContainer;
 }
 
 const MESSAGES_PATH = "/v1/messages";
@@ -44,9 +36,13 @@ const anthropicErrors = createErrorFormatter(
 );
 
 const anthropicProxyRaw: FastifyPluginCallback<AnthropicProxyOptions> = (app, opts, done) => {
-  const { db, streamTimeoutMs, retryBaseDelayMs, matcher, semaphoreManager, tracker, usageWindowTracker, sessionTracker, adaptiveController } = opts;
+  const { db, container } = opts;
 
-  const orchestrator = createOrchestrator(semaphoreManager, tracker, adaptiveController);
+  const orchestrator = createOrchestrator(
+    container.resolve<ProviderSemaphoreManager>(SERVICE_KEYS.semaphoreManager),
+    container.resolve<RequestTracker>(SERVICE_KEYS.tracker),
+    container.resolve<AdaptiveConcurrencyController>(SERVICE_KEYS.adaptiveController),
+  );
 
   app.post(MESSAGES_PATH, async (request, reply) => {
     if (!orchestrator) {
@@ -62,7 +58,7 @@ const anthropicProxyRaw: FastifyPluginCallback<AnthropicProxyOptions> = (app, op
       const e = anthropicErrors.providerUnavailable();
       return reply.code(e.statusCode).send(e.body);
     }
-    const deps: RouteHandlerDeps = { db, streamTimeoutMs, retryBaseDelayMs, matcher, tracker, orchestrator, usageWindowTracker, sessionTracker };
+    const deps: RouteHandlerDeps = { db, orchestrator, container };
     return handleProxyRequest(request, reply, "anthropic", MESSAGES_PATH, anthropicErrors, deps);
   });
 

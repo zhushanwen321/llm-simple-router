@@ -1,7 +1,7 @@
 import type { ProviderSemaphoreManager } from "./semaphore.js";
-import type { ConcurrencyOverride } from "./strategy/types.js";
-import type { RequestTracker } from "../monitor/request-tracker.js";
-import type { ActiveRequest, AttemptSnapshot } from "../monitor/types.js";
+import type { ConcurrencyOverride } from "../../core/types.js";
+import type { RequestTracker } from "../../monitor/request-tracker.js";
+import type { ActiveRequest, AttemptSnapshot } from "../../monitor/types.js";
 
 export class SemaphoreScope {
   constructor(private manager: ProviderSemaphoreManager) {}

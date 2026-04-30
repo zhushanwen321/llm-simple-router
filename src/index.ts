@@ -5,7 +5,7 @@ import { existsSync } from "node:fs";
 import { randomUUID } from "crypto";
 import Fastify, { FastifyInstance } from "fastify";
 import { insertRequestLog } from "./db/logs.js";
-import { HTTP_NOT_FOUND, HTTP_INTERNAL_ERROR, getProxyApiType } from "./constants.js";
+import { HTTP_NOT_FOUND, HTTP_INTERNAL_ERROR, getProxyApiType } from "./core/constants.js";
 import { API_CODE, ApiResponse, apiError, isAdminApiResponse, statusToApiCode } from "./admin/api-response.js";
 
 const PROVIDER_DEFAULT_QUEUE_TIMEOUT_MS = 5000;
@@ -13,19 +13,21 @@ const PROVIDER_DEFAULT_MAX_QUEUE_SIZE = 100;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-import { getConfig, Config } from "./config.js";
+import { getConfig, getBaseConfig, Config } from "./config/index.js";
 import { initDatabase, getAllProviders, backfillMetricsFromRequestMetrics } from "./db/index.js";
 import { loadRecommendedConfig } from "./config/recommended.js";
 import { authMiddleware } from "./middleware/auth.js";
-import { openaiProxy } from "./proxy/openai.js";
-import { anthropicProxy } from "./proxy/anthropic.js";
+import { openaiProxy } from "./proxy/handler/openai.js";
+import { anthropicProxy } from "./proxy/handler/anthropic.js";
 import { adminRoutes } from "./admin/routes.js";
-import { RetryRuleMatcher } from "./proxy/retry-rules.js";
-import { ProviderSemaphoreManager } from "./proxy/semaphore.js";
+import { RetryRuleMatcher } from "./proxy/orchestration/retry-rules.js";
+import { ProviderSemaphoreManager } from "./proxy/orchestration/semaphore.js";
 import { AdaptiveConcurrencyController } from "./proxy/adaptive-controller.js";
+import { loadEnhancementConfig } from "./proxy/routing/enhancement-config.js";
+import type { StateRegistry } from "./core/registry.js";
 import { RequestTracker } from "./monitor/request-tracker.js";
-import { modelState } from "./proxy/model-state.js";
-import { UsageWindowTracker } from "./proxy/usage-window-tracker.js";
+import { modelState } from "./proxy/routing/model-state.js";
+import { UsageWindowTracker } from "./proxy/routing/usage-window-tracker.js";
 import { SessionTracker } from "./proxy/loop-prevention/session-tracker.js";
 import { DEFAULT_LOOP_PREVENTION_CONFIG } from "./proxy/loop-prevention/types.js";
 import { scheduleLogCleanup } from "./db/log-cleaner.js";
@@ -33,12 +35,46 @@ import { scheduleDbSizeMonitor } from "./db/db-size-monitor.js";
 import { startUpgradeChecker, stopUpgradeChecker } from "./admin/upgrade.js";
 import { CheckerOptions } from "./upgrade/checker.js";
 import fastifyStatic from "@fastify/static";
+import { ServiceContainer, SERVICE_KEYS } from "./core/container.js";
 import Database from "better-sqlite3";
 
 export interface AppOptions {
   config?: Config;
   db?: Database.Database;
   upgradeCheckerOptions?: CheckerOptions;
+}
+
+/**
+ * 共享初始化逻辑 — 启动时和导入配置后都需要调用。
+ * 从 DB 读取所有 provider，初始化信号量/自适应并发/tracker 缓存。
+ */
+export function initializeProviderState(
+  db: Database.Database,
+  semaphoreManager: ProviderSemaphoreManager,
+  adaptiveController: AdaptiveConcurrencyController,
+  tracker: RequestTracker,
+): void {
+  const allProviders = getAllProviders(db);
+  for (const p of allProviders) {
+    if (p.adaptive_enabled) {
+      adaptiveController.init(p.id, { max: p.max_concurrency }, {
+        queueTimeoutMs: p.queue_timeout_ms,
+        maxQueueSize: p.max_queue_size,
+      });
+    } else if (p.max_concurrency > 0) {
+      semaphoreManager.updateConfig(p.id, {
+        maxConcurrency: p.max_concurrency,
+        queueTimeoutMs: p.queue_timeout_ms,
+        maxQueueSize: p.max_queue_size,
+      });
+    }
+    tracker.updateProviderConfig(p.id, {
+      name: p.name,
+      maxConcurrency: p.max_concurrency ?? 0,
+      queueTimeoutMs: p.queue_timeout_ms ?? PROVIDER_DEFAULT_QUEUE_TIMEOUT_MS,
+      maxQueueSize: p.max_queue_size ?? PROVIDER_DEFAULT_MAX_QUEUE_SIZE,
+    });
+  }
 }
 
 export async function buildApp(
@@ -153,19 +189,20 @@ export async function buildApp(
     if (typeof payload === 'string') {
       try {
         const parsed = JSON.parse(payload)
-        if ('code' in parsed) return payload // errorHandler 或路由已手动包装
+        if (parsed !== null && typeof parsed === 'object' && 'code' in parsed) return payload // errorHandler 或路由已手动包装
+        // 复用已解析结果，避免二次 JSON.parse
+        const wrapped: ApiResponse<unknown> = {
+          code: API_CODE.SUCCESS,
+          message: 'ok',
+          data: parsed,
+        }
+        return JSON.stringify(wrapped)
       } catch {
         return payload
       }
     }
 
-    // 包装成功响应
-    const wrapped: ApiResponse<unknown> = {
-      code: API_CODE.SUCCESS,
-      message: 'ok',
-      data: typeof payload === 'string' ? JSON.parse(payload) : payload,
-    }
-    return JSON.stringify(wrapped)
+    return payload
   })
 
   loadRecommendedConfig();
@@ -179,73 +216,68 @@ export async function buildApp(
     }
   }
 
+  const container = new ServiceContainer();
+  container.register(SERVICE_KEYS.db, () => db);
+  container.register(SERVICE_KEYS.matcher, (c) => { const m = new RetryRuleMatcher(); m.load(c.resolve(SERVICE_KEYS.db)); return m; });
+  container.register(SERVICE_KEYS.semaphoreManager, () => new ProviderSemaphoreManager());
+  container.register(SERVICE_KEYS.tracker, (c) => {
+    const t = new RequestTracker({ semaphoreManager: c.resolve(SERVICE_KEYS.semaphoreManager), logger: app.log });
+    t.startPushInterval();
+    return t;
+  });
+  container.register(SERVICE_KEYS.usageWindowTracker, (c) => {
+    const uwt = new UsageWindowTracker(c.resolve(SERVICE_KEYS.db));
+    uwt.reconcileOnStartup();
+    return uwt;
+  });
+  container.register(SERVICE_KEYS.sessionTracker, () => new SessionTracker(DEFAULT_LOOP_PREVENTION_CONFIG.sessionTracker));
+
   // 注入 DB 到 modelState 单例，启用会话级持久化
   modelState.init(db);
-  const matcher = new RetryRuleMatcher();
-  matcher.load(db);
 
-  const semaphoreManager = new ProviderSemaphoreManager();
-  const tracker = new RequestTracker({ semaphoreManager, logger: app.log });
-  tracker.startPushInterval();
+  // 注册 AdaptiveConcurrencyController（依赖已注册的 semaphoreManager）
+  container.register(SERVICE_KEYS.adaptiveController, (c) => {
+    const ac = new AdaptiveConcurrencyController(c.resolve(SERVICE_KEYS.semaphoreManager), app.log);
+    return ac;
+  });
 
-  const adaptiveController = new AdaptiveConcurrencyController(semaphoreManager, app.log);
+  // 从容器解析所有服务
+  const matcher = container.resolve<RetryRuleMatcher>(SERVICE_KEYS.matcher);
+  const semaphoreManager = container.resolve<ProviderSemaphoreManager>(SERVICE_KEYS.semaphoreManager);
+  const tracker = container.resolve<RequestTracker>(SERVICE_KEYS.tracker);
+  const usageWindowTracker = container.resolve<UsageWindowTracker>(SERVICE_KEYS.usageWindowTracker);
+  const adaptiveController = container.resolve<AdaptiveConcurrencyController>(SERVICE_KEYS.adaptiveController);
+
+  // Wire adaptive controller to tracker
   tracker.setAdaptiveController(adaptiveController);
 
-  // 5h 用量窗口追踪器，启动时自动补齐缺失窗口
-  const usageWindowTracker = new UsageWindowTracker(db);
-  usageWindowTracker.reconcileOnStartup();
-
-  // Session tracker（工具调用循环检测用），始终创建但检测受 proxy_enhancement 配置控制
-  const sessionTracker = new SessionTracker(DEFAULT_LOOP_PREVENTION_CONFIG.sessionTracker);
-
-  // 从 DB 读取已有 provider 的并发配置，初始化信号量管理器和 tracker
-  const allProviders = getAllProviders(db);
-  for (const p of allProviders) {
-    if (p.adaptive_enabled) {
-      adaptiveController.init(p.id, { max: p.max_concurrency }, {
-        queueTimeoutMs: p.queue_timeout_ms,
-        maxQueueSize: p.max_queue_size,
-      });
-    } else if (p.max_concurrency > 0) {
-      semaphoreManager.updateConfig(p.id, {
-        maxConcurrency: p.max_concurrency,
-        queueTimeoutMs: p.queue_timeout_ms,
-        maxQueueSize: p.max_queue_size,
-      });
-    }
-    tracker.updateProviderConfig(p.id, {
-      name: p.name,
-      maxConcurrency: p.max_concurrency ?? 0,
-      queueTimeoutMs: p.queue_timeout_ms ?? PROVIDER_DEFAULT_QUEUE_TIMEOUT_MS,
-      maxQueueSize: p.max_queue_size ?? PROVIDER_DEFAULT_MAX_QUEUE_SIZE,
-    });
-  }
+  // 从 DB 读取已有 provider 的并发配置，初始化信号量/adaptive/tracker（共享逻辑）
+  initializeProviderState(db, semaphoreManager, adaptiveController, tracker);
 
   app.register(authMiddleware, { db });
-  app.register(openaiProxy, {
-    db,
-    streamTimeoutMs: config.STREAM_TIMEOUT_MS,
-    retryBaseDelayMs: config.RETRY_BASE_DELAY_MS,
-    matcher,
-    semaphoreManager,
-    tracker,
-    usageWindowTracker,
-    sessionTracker,
-    adaptiveController,
-  });
-  app.register(anthropicProxy, {
-    db,
-    streamTimeoutMs: config.STREAM_TIMEOUT_MS,
-    retryBaseDelayMs: config.RETRY_BASE_DELAY_MS,
-    matcher,
-    semaphoreManager,
-    tracker,
-    usageWindowTracker,
-    sessionTracker,
-    adaptiveController,
-  });
+  app.register(openaiProxy, { db, container });
+  app.register(anthropicProxy, { db, container });
 
-  app.register(adminRoutes, { db, matcher, tracker, semaphoreManager, adaptiveController });
+  // StateRegistry — Admin 层通过此接口触发 proxy 层状态刷新，消除 admin→proxy 依赖
+  const stateRegistry: StateRegistry = {
+    refreshRetryRules: () => matcher.load(db),
+    updateProviderConcurrency: (providerId, cfg) => semaphoreManager.updateConfig(providerId, cfg),
+    removeProvider: (providerId) => semaphoreManager.remove(providerId),
+    removeAllProviders: () => semaphoreManager.removeAll(),
+    getProviderStatus: (providerId) => semaphoreManager.getStatus(providerId),
+    clearModelState: () => modelState.clearAll(),
+    deleteModelState: (keyId, sessionId) => modelState.delete(keyId, sessionId),
+    getEnhancementConfig: () => loadEnhancementConfig(db),
+    syncAdaptiveProvider: (providerId, cfg) => adaptiveController.syncProvider(providerId, cfg),
+    removeAdaptiveProvider: (providerId) => adaptiveController.remove(providerId),
+    getAdaptiveStatus: (providerId) => adaptiveController.getStatus(providerId),
+    reinitializeProviders: () => {
+      adaptiveController.removeAll();
+      initializeProviderState(db, semaphoreManager, adaptiveController, tracker);
+    },
+  };
+
+  app.register(adminRoutes, { db, stateRegistry, tracker, adaptiveController });
 
   // 前端静态文件服务（生产环境）
   const frontendDist = path.resolve(
@@ -294,15 +326,15 @@ export async function buildApp(
       logCleanup.stop();
       dbSizeMonitor.stop();
       tracker.stopPushInterval();
+      modelState.clearAll();
+      semaphoreManager.removeAll();
+      const sessionTracker = container.resolve<SessionTracker>(SERVICE_KEYS.sessionTracker);
       sessionTracker.stop();
       await app.close();
       db.close();
     },
   };
 }
-
-// index.ts 自身也需要 getBaseConfig，避免循环依赖
-import { getBaseConfig } from "./config.js";
 
 export async function main() {
   const { app } = await buildApp();

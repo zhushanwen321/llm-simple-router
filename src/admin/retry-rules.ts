@@ -9,7 +9,7 @@ import {
   updateRetryRule,
   deleteRetryRule,
 } from "../db/index.js";
-import { RetryRuleMatcher } from "../proxy/retry-rules.js";
+import type { StateRegistry } from "../core/registry.js";
 import { HTTP_BAD_REQUEST, HTTP_CREATED, HTTP_NOT_FOUND } from "./constants.js";
 import { API_CODE, apiError } from "./api-response.js";
 
@@ -41,7 +41,7 @@ const UpdateRetryRuleSchema = Type.Object({
 
 interface RetryRuleRoutesOptions {
   db: Database.Database;
-  matcher: RetryRuleMatcher | null;
+  stateRegistry?: StateRegistry;
 }
 
 function validateBodyPattern(pattern: string): string | undefined {
@@ -53,12 +53,8 @@ function validateBodyPattern(pattern: string): string | undefined {
   }
 }
 
-function refreshMatcher(matcher: RetryRuleMatcher | null, db: Database.Database) {
-  if (matcher) matcher.load(db);
-}
-
 export const adminRetryRuleRoutes: FastifyPluginCallback<RetryRuleRoutesOptions> = (app, options, done) => {
-  const { db, matcher } = options;
+  const { db, stateRegistry } = options;
 
   app.get("/admin/api/retry-rules", async (_request, reply) => {
     const rules = getAllRetryRules(db);
@@ -81,7 +77,7 @@ export const adminRetryRuleRoutes: FastifyPluginCallback<RetryRuleRoutesOptions>
       max_retries: body.max_retries ?? DEFAULT_MAX_RETRIES,
       max_delay_ms: body.max_delay_ms ?? DEFAULT_MAX_DELAY_MS,
     });
-    refreshMatcher(matcher, db);
+    stateRegistry?.refreshRetryRules();
     return reply.code(HTTP_CREATED).send({ id });
   });
 
@@ -104,7 +100,7 @@ export const adminRetryRuleRoutes: FastifyPluginCallback<RetryRuleRoutesOptions>
     if (body.max_retries !== undefined) fields.max_retries = body.max_retries;
     if (body.max_delay_ms !== undefined) fields.max_delay_ms = body.max_delay_ms;
     updateRetryRule(db, id, fields);
-    refreshMatcher(matcher, db);
+    stateRegistry?.refreshRetryRules();
     return reply.send({ success: true });
   });
 
@@ -113,7 +109,7 @@ export const adminRetryRuleRoutes: FastifyPluginCallback<RetryRuleRoutesOptions>
     const existing = getRetryRuleById(db, id);
     if (!existing) return reply.code(HTTP_NOT_FOUND).send(apiError(API_CODE.NOT_FOUND, "Retry rule not found"));
     deleteRetryRule(db, id);
-    refreshMatcher(matcher, db);
+    stateRegistry?.refreshRetryRules();
     return reply.send({ success: true });
   });
 

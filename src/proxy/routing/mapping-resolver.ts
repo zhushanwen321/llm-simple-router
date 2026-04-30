@@ -1,7 +1,7 @@
 import Database from "better-sqlite3";
-import type { Target, ResolveContext, ResolveResult, ConcurrencyOverride } from "./strategy/types.js";
-import { getMappingGroup, getActiveProviderByName, getActiveProvidersWithModels, getActiveSchedulesForGroup } from "../db/index.js";
-import type { Schedule } from "../db/schedules.js";
+import type { Target, ResolveContext, ResolveResult, ConcurrencyOverride } from "../../core/types.js";
+import { getMappingGroup, getActiveProviderByName, getActiveProvidersWithModels, getActiveSchedulesForGroup } from "../../db/index.js";
+import type { Schedule } from "../../db/schedules.js";
 
 // ---------- Type guards ----------
 

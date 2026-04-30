@@ -1,35 +1,35 @@
 import { randomUUID } from "crypto";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import Database from "better-sqlite3";
-import { HTTP_UNPROCESSABLE_ENTITY } from "../constants.js";
-import { getProviderById, insertRequestLog } from "../db/index.js";
-import { decrypt } from "../utils/crypto.js";
-import { getSetting } from "../db/settings.js";
-import { resolveMapping } from "./mapping-resolver.js";
-import { applyEnhancement } from "./enhancement/enhancement-handler.js";
-import { SemaphoreQueueFullError, SemaphoreTimeoutError } from "./semaphore.js";
-import type { RequestTracker } from "../monitor/request-tracker.js";
+import { HTTP_UNPROCESSABLE_ENTITY } from "../../core/constants.js";
+import { getProviderById, insertRequestLog } from "../../db/index.js";
+import { decrypt } from "../../utils/crypto.js";
+import { getSetting } from "../../db/settings.js";
+import { resolveMapping } from "../routing/mapping-resolver.js";
+import { applyEnhancement } from "../enhancement/enhancement-handler.js";
+import { SemaphoreQueueFullError, SemaphoreTimeoutError } from "../orchestration/semaphore.js";
+import type { RequestTracker } from "../../monitor/request-tracker.js";
 import {
   logResilienceResult,
   collectTransportMetrics,
   handleIntercept,
   sanitizeHeadersForLog,
-} from "./proxy-logging.js";
-import { buildUpstreamHeaders, buildUpstreamUrl } from "./proxy-core.js";
-import { ProviderSwitchNeeded } from "./types.js";
-import type { RawHeaders, TransportResult } from "./types.js";
-import type { Target } from "./strategy/types.js";
-import { updateLogStreamContent, updateLogClientStatus } from "../db/index.js";
-import { insertRejectedLog } from "./log-helpers.js";
-import type { RetryRuleMatcher } from "./retry-rules.js";
-import type { ProxyOrchestrator } from "./orchestrator.js";
-import type { ProxyErrorFormatter, ProxyErrorResponse } from "./proxy-core.js";
-import { ToolLoopGuard } from "./loop-prevention/tool-loop-guard.js";
-import { TOOL_USE_ID_PREFIX, TOOL_USE_ID_PROVIDER_PREFIX } from "./enhancement/directive-parser.js";
-import { buildTransportFn } from "./transport-fn.js";
-import { applyOverflowRedirect } from "./overflow.js";
-import { applyProviderPatches } from "./patch/index.js";
-import { loadEnhancementConfig } from "./enhancement-config.js";
+} from "../proxy-logging.js";
+import { buildUpstreamHeaders, buildUpstreamUrl } from "../proxy-core.js";
+import { ProviderSwitchNeeded } from "../types.js";
+import type { RawHeaders, TransportResult } from "../types.js";
+import type { Target } from "../../core/types.js";
+import { updateLogStreamContent, updateLogClientStatus } from "../../db/index.js";
+import { insertRejectedLog } from "../log-helpers.js";
+import type { RetryRuleMatcher } from "../orchestration/retry-rules.js";
+import type { ProxyOrchestrator } from "../orchestration/orchestrator.js";
+import type { ProxyErrorFormatter, ProxyErrorResponse } from "../proxy-core.js";
+import { ToolLoopGuard } from "../loop-prevention/tool-loop-guard.js";
+import { TOOL_USE_ID_PREFIX, TOOL_USE_ID_PROVIDER_PREFIX } from "../enhancement/directive-parser.js";
+import { buildTransportFn } from "../transport/transport-fn.js";
+import { applyOverflowRedirect } from "../routing/overflow.js";
+import { applyProviderPatches } from "../patch/index.js";
+import { loadEnhancementConfig } from "../routing/enhancement-config.js";
 
 const HTTP_ERROR_THRESHOLD = 400;
 const MAX_LOG_FIELD_LENGTH = 80;
@@ -100,16 +100,14 @@ function rejectAndReply(
 
 export interface RouteHandlerDeps {
   db: Database.Database;
-  streamTimeoutMs: number;
-  retryBaseDelayMs: number;
-  matcher?: RetryRuleMatcher;
-  tracker?: RequestTracker;
   orchestrator: ProxyOrchestrator;
-  usageWindowTracker?: import("./usage-window-tracker.js").UsageWindowTracker;
-  sessionTracker?: import("./loop-prevention/session-tracker.js").SessionTracker;
+  container: ServiceContainer;
 }
 
-import type { ContentBlock } from "../monitor/types.js";
+import type { ContentBlock } from "../../monitor/types.js";
+import { getConfig } from "../../config/index.js";
+import type { ServiceContainer } from "../../core/container.js";
+import { SERVICE_KEYS } from "../../core/container.js";
 
 /** 将 tracker blocks 序列化为前端 tryDirectParse 可解析的 JSON */
 function serializeBlocksForStorage(blocks: ContentBlock[] | undefined, apiType: "openai" | "anthropic"): string {
@@ -150,23 +148,23 @@ export async function handleProxyRequest(
   });
   const clientModel = ((request.body as Record<string, unknown>).model as string) || "unknown";
   const sessionId = (request.headers as RawHeaders)["x-claude-code-session-id"] as string | undefined;
+  const sessionTracker = deps.container.resolve<import("../loop-prevention/session-tracker.js").SessionTracker>(SERVICE_KEYS.sessionTracker);
   const enhancementConfig = loadEnhancementConfig(deps.db);
   const { effectiveModel, originalModel, interceptResponse } = applyEnhancement(deps.db, request, clientModel, sessionId, enhancementConfig);
 
-  // --- 工具调用循环检测（受 proxy_enhancement 配置控制） ---
-  if (enhancementConfig.tool_call_loop_enabled && deps.sessionTracker && sessionId) {
+  if (enhancementConfig.tool_call_loop_enabled && sessionTracker && sessionId) {
     const routerKeyId = (request.routerKey as { id?: string } | undefined)?.id ?? null;
     const sessionKey = routerKeyId ? `${routerKeyId}:${sessionId}` : sessionId;
     const lastToolUse = extractLastToolUse(request.body as Record<string, unknown>);
     if (lastToolUse) {
-      const toolGuard = new ToolLoopGuard(deps.sessionTracker, {
+      const toolGuard = new ToolLoopGuard(sessionTracker, {
         enabled: true,
         minConsecutiveCount: 3,
         detectorConfig: { n: 6, windowSize: 500, repeatThreshold: 5 },
       });
       const checkResult = toolGuard.check(sessionKey, lastToolUse);
       if (checkResult.detected) {
-        const loopCount = deps.sessionTracker.getLoopCount(sessionKey);
+        const loopCount = sessionTracker.getLoopCount(sessionKey);
         if (loopCount === 1) {
           // 层级 1：透明重试 — 注入中断提示词
           toolGuard.injectLoopBreakPrompt(request.body as Record<string, unknown>, apiType, lastToolUse.toolName);
@@ -207,6 +205,10 @@ export async function handleProxyRequest(
 
 async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> {
   const { request, reply, apiType, upstreamPath, errors, deps, options, effectiveModel, originalModel, originalBody, sessionId, streamLoopEnabled } = ctx;
+  const tracker = deps.container.resolve<RequestTracker>(SERVICE_KEYS.tracker);
+  const matcher = deps.container.resolve<RetryRuleMatcher>(SERVICE_KEYS.matcher);
+  const usageWindowTracker = deps.container.resolve<import("../routing/usage-window-tracker.js").UsageWindowTracker>(SERVICE_KEYS.usageWindowTracker);
+  const config = getConfig();
   const excludeTargets: Target[] = [];
   let rootLogId: string | null = null;
   while (true) {
@@ -292,7 +294,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
     const transportFn = buildTransportFn({
       provider, apiKey, body, cliHdrs, reply, upstreamPath, apiType,
       isStream, startTime, logId, effectiveModel, originalModel,
-      streamTimeoutMs: deps.streamTimeoutMs, tracker: deps.tracker, matcher: deps.matcher, request,
+      streamTimeoutMs: config.STREAM_TIMEOUT_MS, tracker, matcher, request,
       streamLoopEnabled,
     });
 
@@ -300,7 +302,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
       const resilienceResult = await deps.orchestrator.handle(
         request, reply, apiType,
         { resolved, provider, clientModel: effectiveModel, isStream, trackerId: logId, sessionId, clientRequest: clientReq, concurrencyOverride },
-        { retryBaseDelayMs: deps.retryBaseDelayMs, isFailover, ruleMatcher: deps.matcher, transportFn },
+        { retryBaseDelayMs: config.RETRY_BASE_DELAY_MS, isFailover, ruleMatcher: matcher, transportFn },
       );
       const lastLogId = logResilienceResult(
         deps.db,
@@ -315,10 +317,10 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
 
       const tr = resilienceResult.result;
       const succeeded = tr.kind === "success" || tr.kind === "stream_success" || tr.kind === "stream_abort";
-      if (succeeded) deps.usageWindowTracker?.recordRequest(provider.id, routerKeyId ?? undefined);
+      if (succeeded) usageWindowTracker?.recordRequest(provider.id, routerKeyId ?? undefined);
 
-      if (isStream && deps.tracker) {
-        const sc = deps.tracker.get(logId)?.streamContent;
+      if (isStream && tracker) {
+        const sc = tracker.get(logId)?.streamContent;
         const blocks = sc?.blocks;
         const hasStructured = blocks && blocks.length > 0 && blocks.some(b => b.type !== "text");
         const content = hasStructured
@@ -397,7 +399,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
   }
 }
 
-function extractLastToolUse(body: Record<string, unknown>): import("./loop-prevention/types.js").ToolCallRecord | null {
+function extractLastToolUse(body: Record<string, unknown>): import("../loop-prevention/types.js").ToolCallRecord | null {
   const messages = body.messages as Array<Record<string, unknown>> | undefined;
   if (!messages) return null;
   for (let i = messages.length - 1; i >= 0; i--) {

@@ -1,5 +1,5 @@
 import Database from "better-sqlite3";
-import { getSetting } from "../db/settings.js";
+import { getSetting } from "../../db/settings.js";
 
 export interface EnhancementConfig {
   claude_code_enabled: boolean;

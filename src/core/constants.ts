@@ -1,3 +1,5 @@
+// src/core/constants.ts
+
 // HTTP 状态码常量 — 全局唯一来源
 export const HTTP_BAD_REQUEST = 400;
 export const HTTP_CREATED = 201;
@@ -22,3 +24,24 @@ export function getProxyApiType(url: string): string | null {
 }
 
 export const MS_PER_SECOND = 1000;
+
+// 上游成功状态码
+export const UPSTREAM_SUCCESS = 200;
+
+/** 过滤掉不应转发给下游的 hop-by-hop headers */
+const SKIP_DOWNSTREAM = new Set([
+  "content-length",
+  "transfer-encoding",
+  "connection",
+  "keep-alive",
+]);
+
+/** 过滤掉不应转发给下游的 hop-by-hop headers */
+export function filterHeaders(raw: import("./types.js").RawHeaders): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (value == null || SKIP_DOWNSTREAM.has(key.toLowerCase())) continue;
+    out[key] = Array.isArray(value) ? value.join(", ") : value;
+  }
+  return out;
+}

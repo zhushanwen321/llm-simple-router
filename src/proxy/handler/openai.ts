@@ -2,31 +2,23 @@ import type { FastifyPluginCallback, FastifyReply } from "fastify";
 import { randomUUID } from "crypto";
 import Database from "better-sqlite3";
 import fp from "fastify-plugin";
-import { getActiveProviders, insertRequestLog } from "../db/index.js";
-import { getSetting } from "../db/settings.js";
-import { decrypt } from "../utils/crypto.js";
-import { proxyGetRequest, createErrorFormatter, type ProxyErrorResponse } from "./proxy-core.js";
-import type { ErrorKind } from "./proxy-core.js";
-import type { RawHeaders } from "./types.js";
+import { getActiveProviders, insertRequestLog } from "../../db/index.js";
+import { getSetting } from "../../db/settings.js";
+import { decrypt } from "../../utils/crypto.js";
+import { proxyGetRequest, createErrorFormatter, type ProxyErrorResponse } from "../proxy-core.js";
+import type { ErrorKind } from "../proxy-core.js";
+import type { RawHeaders } from "../types.js";
 import { handleProxyRequest, type RouteHandlerDeps } from "./proxy-handler.js";
-import { createOrchestrator } from "./orchestrator.js";
-import { RetryRuleMatcher } from "./retry-rules.js";
-import { ProviderSemaphoreManager } from "./semaphore.js";
-import type { RequestTracker } from "../monitor/request-tracker.js";
-import type { UsageWindowTracker } from "./usage-window-tracker.js";
-import type { AdaptiveConcurrencyController } from "./adaptive-controller.js";
-import { HTTP_NOT_FOUND, HTTP_BAD_GATEWAY } from "../constants.js";
+import { createOrchestrator } from "../orchestration/orchestrator.js";
+import { ProviderSemaphoreManager } from "../orchestration/semaphore.js";
+import type { RequestTracker } from "../../monitor/request-tracker.js";
+import type { AdaptiveConcurrencyController } from "../adaptive-controller.js";
+import { HTTP_NOT_FOUND, HTTP_BAD_GATEWAY } from "../../core/constants.js";
+import { SERVICE_KEYS } from "../../core/container.js";
 
 export interface OpenaiProxyOptions {
   db: Database.Database;
-  streamTimeoutMs: number;
-  retryBaseDelayMs: number;
-  matcher?: RetryRuleMatcher;
-  semaphoreManager?: ProviderSemaphoreManager;
-  tracker?: RequestTracker;
-  usageWindowTracker?: UsageWindowTracker;
-  sessionTracker?: import("./loop-prevention/session-tracker.js").SessionTracker;
-  adaptiveController?: AdaptiveConcurrencyController;
+  container: import("../../core/container.js").ServiceContainer;
 }
 
 const CHAT_COMPLETIONS_PATH = "/v1/chat/completions";
@@ -52,9 +44,13 @@ function sendError(reply: FastifyReply, e: ProxyErrorResponse) {
 }
 
 const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, done) => {
-  const { db, streamTimeoutMs, retryBaseDelayMs, matcher, semaphoreManager, tracker, usageWindowTracker, sessionTracker, adaptiveController } = opts;
+  const { db, container } = opts;
 
-  const orchestrator = createOrchestrator(semaphoreManager, tracker, adaptiveController);
+  const orchestrator = createOrchestrator(
+    container.resolve<ProviderSemaphoreManager>(SERVICE_KEYS.semaphoreManager),
+    container.resolve<RequestTracker>(SERVICE_KEYS.tracker),
+    container.resolve<AdaptiveConcurrencyController>(SERVICE_KEYS.adaptiveController),
+  );
 
   app.post(CHAT_COMPLETIONS_PATH, async (request, reply) => {
     if (!orchestrator) {
@@ -69,7 +65,7 @@ const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, do
       });
       return sendError(reply, openaiErrors.providerUnavailable());
     }
-    const deps: RouteHandlerDeps = { db, streamTimeoutMs, retryBaseDelayMs, matcher, tracker, orchestrator, usageWindowTracker, sessionTracker };
+    const deps: RouteHandlerDeps = { db, orchestrator, container };
     return handleProxyRequest(request, reply, "openai", CHAT_COMPLETIONS_PATH, openaiErrors, deps, {
       beforeSendProxy: (body, isStream) => {
         if (isStream && !body.stream_options) {

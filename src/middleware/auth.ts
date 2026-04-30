@@ -4,7 +4,7 @@ import fp from "fastify-plugin";
 import Database from "better-sqlite3";
 import { isInitialized } from "../db/settings.js";
 import { insertRequestLog } from "../db/logs.js";
-import { getProxyApiType } from "../constants.js";
+import { getProxyApiType, HTTP_SERVICE_UNAVAILABLE } from "../core/constants.js";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -17,7 +17,6 @@ interface RouterKeyRow { id: string; name: string; allowed_models: string | null
 
 const SKIP_PATHS = ["/health", "/admin"];
 const HTTP_UNAUTHORIZED = 401;
-const HTTP_SERVICE_UNAVAILABLE = 503;
 const BEARER_PREFIX_LENGTH = "Bearer ".length;
 
 function shouldSkipAuth(url: string): boolean {

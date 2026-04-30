@@ -3,7 +3,7 @@ import {
   ProviderSemaphoreManager,
   SemaphoreQueueFullError,
   SemaphoreTimeoutError,
-} from "../src/proxy/semaphore.js";
+} from "../src/proxy/orchestration/semaphore.js";
 
 describe("ProviderSemaphoreManager", () => {
   let mgr: ProviderSemaphoreManager;

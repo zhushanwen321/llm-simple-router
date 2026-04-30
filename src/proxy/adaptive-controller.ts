@@ -1,4 +1,4 @@
-import type { ProviderSemaphoreManager } from "./semaphore.js";
+import type { ProviderSemaphoreManager } from "./orchestration/semaphore.js";
 
 export interface AdaptiveState {
   currentLimit: number;
@@ -66,8 +66,14 @@ export class AdaptiveConcurrencyController {
     this.syncToSemaphore(providerId);
   }
 
+  /** 移除 provider 的自适应并发状态。调用方还需调用 semaphoreManager.remove() 或 updateConfig() 清理信号量配置。 */
   remove(providerId: string): void {
     this.entries.delete(providerId);
+  }
+
+  /** 清除所有 provider 的自适应并发状态（导入配置后重建前调用） */
+  removeAll(): void {
+    this.entries.clear();
   }
 
   onRequestComplete(providerId: string, result: AdaptiveResult): void {

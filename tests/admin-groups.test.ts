@@ -3,6 +3,8 @@ import { FastifyInstance } from "fastify";
 import { buildApp } from "../src/index.js";
 import { initDatabase } from "../src/db/index.js";
 import { makeConfig, seedSettings, login } from "./helpers/test-setup.js";
+import { ServiceContainer } from "../src/core/container.js";
+
 
 const VALID_RULE = (providerId: string) => JSON.stringify({
   targets: [{ backend_model: "gpt-4-turbo", provider_id: providerId }],

@@ -96,6 +96,11 @@ export interface ProviderStats {
   topErrors: Array<{ code: number; count: number }>;
 }
 
+/** request-tracker 需要的信号量状态查询接口 */
+export interface ISemaphoreStatus {
+  getStatus(providerId: string): { active: number; queued: number };
+}
+
 export interface RuntimeMetrics {
   uptimeMs: number;
   memoryUsage: NodeJS.MemoryUsage;

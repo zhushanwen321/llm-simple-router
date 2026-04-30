@@ -7,7 +7,7 @@ import { reloadConfig } from '../config/recommended.js'
 import { execSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
-import { HTTP_BAD_REQUEST, HTTP_INTERNAL_ERROR } from '../constants.js'
+import { HTTP_BAD_REQUEST, HTTP_INTERNAL_ERROR } from '../core/constants.js'
 import { API_CODE, apiError } from './api-response.js'
 
 const GITHUB_CONFIG_BASE = 'https://raw.githubusercontent.com/zhushanwen321/llm-simple-router/main/config'

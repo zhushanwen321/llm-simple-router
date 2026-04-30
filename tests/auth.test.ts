@@ -5,6 +5,8 @@ import { initDatabase } from "../src/db/index.js";
 import { setSetting } from "../src/db/settings.js";
 import { authMiddleware } from "../src/middleware/auth.js";
 import Database from "better-sqlite3";
+import { ServiceContainer } from "../src/core/container.js";
+
 
 const TEST_KEY = "sk-router-test-key-1234567890";
 const TEST_KEY_HASH = createHash("sha256").update(TEST_KEY).digest("hex");

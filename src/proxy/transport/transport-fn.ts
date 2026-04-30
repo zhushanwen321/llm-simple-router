@@ -1,19 +1,19 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
-import { getProviderById } from "../db/index.js";
-import { callNonStream, callStream } from "./transport.js";
-import { SSEMetricsTransform } from "../metrics/sse-metrics-transform.js";
-import { MetricsExtractor } from "../metrics/metrics-extractor.js";
-import type { MetricsResult } from "../metrics/metrics-extractor.js";
-import { buildUpstreamHeaders } from "./proxy-core.js";
-import { StreamLoopGuard } from "./loop-prevention/stream-loop-guard.js";
-import { NGramLoopDetector } from "./loop-prevention/detectors/ngram-detector.js";
-import { UPSTREAM_SUCCESS } from "./types.js";
-import type { RawHeaders, TransportResult } from "./types.js";
-import type { Target } from "./strategy/types.js";
-import type { RequestTracker } from "../monitor/request-tracker.js";
-import type { RetryRuleMatcher } from "./retry-rules.js";
-import { buildModelInfoTag } from "./enhancement/enhancement-handler.js";
-import { DEFAULT_MAX_RAW as STREAM_CONTENT_MAX_RAW, DEFAULT_MAX_TEXT as STREAM_CONTENT_MAX_TEXT } from "../monitor/stream-content-accumulator.js";
+import { getProviderById } from "../../db/index.js";
+import { callNonStream, callStream } from "./http.js";
+import { SSEMetricsTransform } from "../../metrics/sse-metrics-transform.js";
+import { MetricsExtractor } from "../../metrics/metrics-extractor.js";
+import type { MetricsResult } from "../types.js";
+import { buildUpstreamHeaders } from "../proxy-core.js";
+import { StreamLoopGuard } from "../loop-prevention/stream-loop-guard.js";
+import { NGramLoopDetector } from "../loop-prevention/detectors/ngram-detector.js";
+import { UPSTREAM_SUCCESS } from "../types.js";
+import type { RawHeaders, TransportResult } from "../types.js";
+import type { Target } from "../../core/types.js";
+import type { RequestTracker } from "../../monitor/request-tracker.js";
+import type { RetryRuleMatcher } from "../orchestration/retry-rules.js";
+import { buildModelInfoTag } from "../enhancement/enhancement-handler.js";
+import { DEFAULT_MAX_RAW as STREAM_CONTENT_MAX_RAW, DEFAULT_MAX_TEXT as STREAM_CONTENT_MAX_TEXT } from "../../monitor/stream-content-accumulator.js";
 
 const LOOP_DETECTOR_N = 6;
 const LOOP_DETECTOR_WINDOW_SIZE = 1000;
@@ -64,6 +64,8 @@ export interface TransportFnParams {
 export function buildTransportFn(p: TransportFnParams): (target: Target) => Promise<TransportResult> {
   const buildHeaders = (cliHdrs: RawHeaders, key: string, bytes?: number) =>
     buildUpstreamHeaders(cliHdrs, key, bytes, p.apiType);
+  // _target 未使用 — resilience 层始终传入当前 resolved target；
+  // 跨 target failover 由外层 executeFailoverLoop 的 ProviderSwitchNeeded 处理
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   return async (_target: Target) => {
     if (p.isStream) {

@@ -1,8 +1,8 @@
 import Database from "better-sqlite3";
-import { countTokens } from "../utils/token-counter.js";
-import { getModelContextWindowOverride } from "../db/model-info.js";
-import { lookupContextWindow } from "../config/model-context.js";
-import type { Target } from "./strategy/types.js";
+import { countTokens } from "../../utils/token-counter.js";
+import { getModelContextWindowOverride } from "../../db/model-info.js";
+import { lookupContextWindow } from "../../config/model-context.js";
+import type { Target } from "../../core/types.js";
 
 const ESTIMATED_TOKENS_PER_IMAGE = 2000;
 

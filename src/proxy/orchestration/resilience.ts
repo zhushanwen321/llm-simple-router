@@ -1,8 +1,8 @@
-import { MS_PER_SECOND } from "../constants.js";
+import { MS_PER_SECOND } from "../../core/constants.js";
 import type { RetryRuleMatcher } from "./retry-rules.js";
-import { ProviderSwitchNeeded } from "./types.js";
-import type { TransportResult } from "./types.js";
-import type { Target } from "./strategy/types.js";
+import { ProviderSwitchNeeded } from "../types.js";
+import type { TransportResult } from "../types.js";
+import type { Target, ResilienceAttempt } from "../../core/types.js";
 
 // ---------- Strategy Pattern ----------
 
@@ -41,19 +41,6 @@ export interface ResilienceConfig {
   isFailover: boolean;
   /** 全局迭代上限，防止极端配置导致 while(true) 循环过多 */
   iterationCap?: number;
-}
-
-export interface ResilienceAttempt {
-  target: Target;
-  attemptIndex: number;
-  statusCode: number | null;
-  error: string | null;
-  latencyMs: number;
-  responseBody: string | null;
-  /** 上游响应 headers（throw 和 stream_success/stream_abort 时为 null） */
-  responseHeaders: Record<string, string> | null;
-  /** TransportResult.kind，用于区分 stream_error 等特殊类型 */
-  resultKind: TransportResult["kind"];
 }
 
 export interface ResilienceResult {

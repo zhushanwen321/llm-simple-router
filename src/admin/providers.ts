@@ -5,7 +5,7 @@ import type { Provider } from "../db/index.js";
 import { getAllProviders, getProviderById, createProvider, updateProvider, deleteProvider, getAllMappingGroups, updateMappingGroup, PROVIDER_CONCURRENCY_DEFAULTS } from "../db/index.js";
 import { encrypt, decrypt } from "../utils/crypto.js";
 import { getSetting } from "../db/settings.js";
-import { ProviderSemaphoreManager } from "../proxy/semaphore.js";
+import type { StateRegistry } from "../core/registry.js";
 import type { AdaptiveConcurrencyController } from "../proxy/adaptive-controller.js";
 import type { RequestTracker } from "../monitor/request-tracker.js";
 import { HTTP_CREATED, HTTP_NOT_FOUND, HTTP_CONFLICT, HTTP_BAD_REQUEST } from "./constants.js";
@@ -127,13 +127,13 @@ const UpdateProviderSchema = Type.Object({
 
 interface ProviderRoutesOptions {
   db: Database.Database;
-  semaphoreManager?: ProviderSemaphoreManager;
+  stateRegistry?: StateRegistry;
   tracker?: RequestTracker;
   adaptiveController?: AdaptiveConcurrencyController;
 }
 
 export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> = (app, options, done) => {
-  const { db, semaphoreManager, tracker, adaptiveController } = options;
+  const { db, stateRegistry, tracker, adaptiveController } = options;
 
   app.get("/admin/api/providers", async (_request, reply) => {
     const encryptionKey = getSetting(db, "encryption_key")!;
@@ -155,7 +155,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
         queue_timeout_ms: s.queue_timeout_ms,
         max_queue_size: s.max_queue_size,
         adaptive_enabled: s.adaptive_enabled,
-        concurrency_status: semaphoreManager?.getStatus(s.id) ?? { active: 0, queued: 0 },
+        concurrency_status: stateRegistry?.getProviderStatus(s.id) ?? { active: 0, queued: 0 },
         created_at: s.created_at,
         updated_at: s.updated_at,
       };
@@ -190,11 +190,14 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     if (contextOverrides.length > 0) {
       setModelInfoForProvider(db, id, contextOverrides.map(o => ({ model_name: o.name, context_window: o.context_window })));
     }
-    semaphoreManager?.updateConfig(id, {
-      maxConcurrency: body.max_concurrency ?? PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency,
-      queueTimeoutMs: body.queue_timeout_ms ?? PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms,
-      maxQueueSize: body.max_queue_size ?? PROVIDER_CONCURRENCY_DEFAULTS.max_queue_size,
-    });
+    // 当 adaptive 启用时，由 syncProvider 全权管理信号量（避免重复调用 updateConfig）
+    if (!isAdaptiveEnabled) {
+      stateRegistry?.updateProviderConcurrency(id, {
+        maxConcurrency: body.max_concurrency ?? PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency,
+        queueTimeoutMs: body.queue_timeout_ms ?? PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms,
+        maxQueueSize: body.max_queue_size ?? PROVIDER_CONCURRENCY_DEFAULTS.max_queue_size,
+      });
+    }
     adaptiveController?.syncProvider(id, {
       adaptive_enabled: isAdaptiveEnabled,
       max_concurrency: body.max_concurrency ?? PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency,
@@ -248,22 +251,33 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     let cascade: CascadeResult | undefined;
     if (existing.is_active === 1 && body.is_active === 0) {
       cascade = cascadeProviderDisable(db, id);
+      // 禁用时清理信号量和自适应并发，避免排队请求悬挂
+      stateRegistry?.removeProvider(id);
+      adaptiveController?.remove(id);
     }
 
-    if (body.max_concurrency !== undefined || body.queue_timeout_ms !== undefined || body.max_queue_size !== undefined) {
-      semaphoreManager?.updateConfig(id, {
-        maxConcurrency: updated.max_concurrency,
-        queueTimeoutMs: updated.queue_timeout_ms,
-        maxQueueSize: updated.max_queue_size,
-      });
-    }
-    if (body.adaptive_enabled !== undefined || body.max_concurrency !== undefined || body.queue_timeout_ms !== undefined || body.max_queue_size !== undefined) {
+    // 重新启用时重建信号量和自适应并发
+    const concurrencyChanged = body.max_concurrency !== undefined || body.queue_timeout_ms !== undefined || body.max_queue_size !== undefined;
+    const adaptiveChanged = body.adaptive_enabled !== undefined;
+    const reenabled = existing.is_active === 0 && body.is_active === 1;
+    const needsSync = concurrencyChanged || adaptiveChanged || reenabled;
+
+    if (needsSync) {
+      // adaptive 同步：syncProvider 内部根据 adaptive_enabled 决定是 init+syncToSemaphore 还是 remove+updateConfig
       adaptiveController?.syncProvider(id, {
         adaptive_enabled: updated.adaptive_enabled,
         max_concurrency: updated.max_concurrency,
         queue_timeout_ms: updated.queue_timeout_ms,
         max_queue_size: updated.max_queue_size,
       });
+      // 非 adaptive 模式下手动同步信号量（adaptive 启用时由 syncProvider 内部管理）
+      if (!updated.adaptive_enabled) {
+        stateRegistry?.updateProviderConcurrency(id, {
+          maxConcurrency: updated.max_concurrency,
+          queueTimeoutMs: updated.queue_timeout_ms,
+          maxQueueSize: updated.max_queue_size,
+        });
+      }
     }
     tracker?.updateProviderConfig(id, {
       name: body.name ?? existing.name,
@@ -326,7 +340,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
       } catch { continue }
     }
     deleteProvider(db, id);
-    semaphoreManager?.remove(id);
+    stateRegistry?.removeProvider(id);
     adaptiveController?.remove(id);
     tracker?.removeProviderConfig(id);
     return reply.send({ success: true });

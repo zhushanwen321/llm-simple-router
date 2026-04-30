@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import Database from "better-sqlite3";
 import { initDatabase } from "../src/db/index.js";
-import { RetryRuleMatcher } from "../src/proxy/retry-rules.js";
+import { RetryRuleMatcher } from "../src/proxy/orchestration/retry-rules.js";
 
 describe("RetryRuleMatcher", () => {
   let db: Database.Database;
