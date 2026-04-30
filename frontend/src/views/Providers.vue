@@ -119,6 +119,18 @@
             <p v-if="errors.name" class="text-sm text-destructive mt-1">{{ errors.name }}</p>
           </div>
           <div>
+            <Label class="block text-sm font-medium text-foreground mb-1">API 类型</Label>
+            <Select v-model="form.api_type">
+              <SelectTrigger>
+                <SelectValue placeholder="选择 API 类型" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="openai">OpenAI</SelectItem>
+                <SelectItem value="anthropic">Anthropic</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
             <Label class="block text-sm font-medium text-foreground mb-1">Base URL</Label>
             <Input v-model="form.base_url" type="url" required @input="delete errors.base_url" />
             <p v-if="errors.base_url" class="text-sm text-destructive mt-1">{{ errors.base_url }}</p>

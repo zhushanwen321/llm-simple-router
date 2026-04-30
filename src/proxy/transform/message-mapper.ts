@@ -10,7 +10,7 @@ export function extractSystemMessages(
   const nonSystemMsgs: unknown[] = [];
   for (const msg of messages) {
     const m = msg as Record<string, unknown>;
-    if (m.role === "system") {
+    if (m.role === "system" || m.role === "developer") {
       systemParts.push(String(m.content ?? ""));
     } else {
       nonSystemMsgs.push(msg);
@@ -165,7 +165,13 @@ export function convertMessagesAnt2OA(
 
       const oaiMsg: Record<string, unknown> = { role: "assistant" };
 
-      // thinking blocks intentionally skipped (request direction does not convert thinking history)
+      // thinking → reasoning_content（保留 DeepSeek 原生思考信息，
+      // 避免 A→O 转换后被 patchNonDeepSeekToolMessages 误判为非 DeepSeek 消息）
+      const thinkingBlocks = content.filter(b => b.type === "thinking");
+      if (thinkingBlocks.length > 0) {
+        oaiMsg.reasoning_content = thinkingBlocks.map(b => b.thinking ?? "").join("");
+      }
+
       // text → content
       if (textBlocks.length > 0) {
         oaiMsg.content = textBlocks.map(b => b.text ?? "").join("");
