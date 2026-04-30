@@ -290,10 +290,10 @@ async function handleRestart() {
     toast.success('重启指令已发送，等待服务恢复...')
     showRestartConfirm.value = false
     // 等待服务重启完成（新进程启动需要几秒）
-  const delay = 5000 // eslint-disable-line no-magic-numbers
+    const RESTART_DELAY_MS = 5000
     setTimeout(() => {
       window.location.reload()
-    }, delay)
+    }, RESTART_DELAY_MS)
   } catch (e: unknown) {
     toast.error(getApiMessage(e, '重启失败'))
   }

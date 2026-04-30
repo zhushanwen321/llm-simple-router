@@ -48,7 +48,10 @@ export function resolveRestartBinPath(): string {
       timeout: 3000,
     }).trim()
     if (bin) return bin
-  } catch { /* not found */ }
+  } catch {
+    // which 命令不可用或未安装全局包，fallback 到当前进程入口
+    return process.argv[1] ?? 'node'
+  }
   // fallback: 当前进程入口（PM2/systemd 场景下通常是正确的）
   return process.argv[1]
 }

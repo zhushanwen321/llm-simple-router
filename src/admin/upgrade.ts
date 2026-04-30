@@ -113,7 +113,7 @@ export const adminUpgradeRoutes: FastifyPluginCallback<UpgradeRoutesOptions> = (
       if (!managed) {
         // 无进程管理器（npx / 手动 node）：自 spawn 新进程
         const binPath = resolveRestartBinPath()
-        const args = process.argv.slice(2)
+        const args = process.argv.slice(2) // eslint-disable-line no-magic-numbers
         req.log.info({ binPath, args }, 'Spawning new process before exit')
         const child = spawn(binPath, args, {
           detached: true,
@@ -128,12 +128,7 @@ export const adminUpgradeRoutes: FastifyPluginCallback<UpgradeRoutesOptions> = (
     } catch (err) {
       // 重启失败时记录错误，保持服务运行
       const msg = err instanceof Error ? err.message : String(err)
-      try {
-        req.log.error({ err }, `Restart failed: ${msg}`)
-      } catch {
-        // eslint-disable-next-line no-console
-        console.error(`Restart failed: ${msg}`)
-      }
+      req.log.error({ err }, `Restart failed: ${msg}`)
     }
   })
 
