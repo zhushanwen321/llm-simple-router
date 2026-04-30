@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import Database from "better-sqlite3";
 import type { Provider } from "../db/index.js";
-import { insertRequestLog, insertMetrics, updateLogMetrics } from "../db/index.js";
+import { insertRequestLog, insertMetrics } from "../db/index.js";
 import type { LogWriteContext } from "../db/logs.js";
 import type { LogFileWriter } from "../storage/log-file-writer.js";
 import { insertSuccessLog, type FailoverContext } from "./log-helpers.js";
@@ -207,7 +207,6 @@ export function collectTransportMetrics(
           metrics.input_tokens_estimated = 1;
         }
         insertMetrics(db, { ...base, ...metrics });
-        updateLogMetrics(db, lastSuccessLogId, metrics);
         return;
       }
     } else if (result.kind === "success") {
@@ -218,7 +217,6 @@ export function collectTransportMetrics(
           mr.input_tokens_estimated = 1;
         }
         insertMetrics(db, { ...base, ...mr });
-        updateLogMetrics(db, lastSuccessLogId, mr);
         return;
       }
     }

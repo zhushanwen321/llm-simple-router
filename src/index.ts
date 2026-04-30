@@ -14,7 +14,7 @@ const PROVIDER_DEFAULT_MAX_QUEUE_SIZE = 100;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 import { getConfig, getBaseConfig, Config } from "./config/index.js";
-import { initDatabase, getAllProviders, backfillMetricsFromRequestMetrics } from "./db/index.js";
+import { initDatabase, getAllProviders } from "./db/index.js";
 import { loadRecommendedConfig } from "./config/recommended.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { openaiProxy } from "./proxy/handler/openai.js";
@@ -89,12 +89,10 @@ export async function buildApp(
 
   // 允许外部传入已初始化的 DB（测试用），否则自行创建
   let db: Database.Database;
-  let shouldBackfill = false;
   if (options?.db) {
     db = options.db;
   } else {
     db = initDatabase(config.DB_PATH);
-    shouldBackfill = true;
   }
 
   const isDev = process.env.NODE_ENV !== "production";
@@ -211,14 +209,6 @@ export async function buildApp(
 
   loadRecommendedConfig();
   startUpgradeChecker(options?.upgradeCheckerOptions);
-
-  // 启动时回填：补齐回退老版本期间缺失的 metrics 冗余列
-  if (shouldBackfill) {
-    const backfilled = backfillMetricsFromRequestMetrics(db);
-    if (backfilled > 0) {
-      app.log.info({ backfilled }, "Backfilled metrics from request_metrics");
-    }
-  }
 
   const container = new ServiceContainer();
   container.register(SERVICE_KEYS.db, () => db);
