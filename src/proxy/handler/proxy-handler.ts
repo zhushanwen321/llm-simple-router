@@ -272,12 +272,13 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
         `Provider '${resolved.provider_id}' unavailable`, resolved.provider_id);
     }
     // --- 溢出重定向：上下文超出时切换到更大模型（必须在 transform 之前，确保使用正确的 api_type） ---
-    const overflowResult = applyOverflowRedirect(resolved, deps.db, body);
+    const overflowResult = applyOverflowRedirect(resolved, deps.db, currentBody);
     if (overflowResult) {
       const overflowProvider = getProviderById(deps.db, overflowResult.provider_id);
       if (overflowProvider && overflowProvider.is_active) {
         resolved = { ...resolved, provider_id: overflowResult.provider_id, backend_model: overflowResult.backend_model };
         provider = overflowProvider;
+        currentBody = { ...currentBody, model: overflowResult.backend_model };
       }
     }
 
@@ -298,19 +299,8 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
     currentBody = { ...currentBody, model: resolved.backend_model };
     iterationSnapshot.add({ stage: "routing", client_model: effectiveModel, backend_model: resolved.backend_model, provider_id: resolved.provider_id, strategy: resolveResult.targetCount > 1 ? "failover" : "scheduled" });
 
-    // --- 溢出重定向：上下文超出时切换到更大模型 ---
-    const overflowResult = applyOverflowRedirect(resolved, deps.db, currentBody);
-    if (overflowResult) {
-      const overflowProvider = getProviderById(deps.db, overflowResult.provider_id);
-      if (overflowProvider && overflowProvider.is_active && overflowProvider.api_type === apiType) {
-        resolved = { ...resolved, provider_id: overflowResult.provider_id, backend_model: overflowResult.backend_model };
-        provider = overflowProvider;
-        currentBody = { ...currentBody, model: overflowResult.backend_model };
-        iterationSnapshot.add({ stage: "overflow", triggered: true, redirect_to: overflowResult.backend_model, redirect_provider: overflowResult.provider_id });
-      }
-    } else {
-      iterationSnapshot.add({ stage: "overflow", triggered: false });
-    }
+    // overflow redirect 已在 transform 之前完成，此处不再重复
+    iterationSnapshot.add({ stage: "overflow", triggered: overflowResult != null });
 
     // Plugin 调整 body 和 headers（不受 needsTransform 限制，inject_headers 等同格式也需要）
     let injectedHeaders: Record<string, string> = {};
@@ -360,17 +350,17 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
           return coordinator.transformErrorResponse(bodyStr, provider.api_type, apiType);
         }
         let transformed = coordinator.transformResponse(bodyStr, provider.api_type, apiType);
-        if (deps.pluginRegistry && !isStream) {
+        if (pluginRegistry && !isStream) {
           try {
             const respObj = JSON.parse(transformed);
-            const respCtx: import("./transform/plugin-types.js").ResponseTransformContext = {
+            const respCtx: import("../transform/plugin-types.js").ResponseTransformContext = {
               response: respObj,
               sourceApiType: provider.api_type as "openai" | "anthropic",
               targetApiType: apiType,
               provider: { id: provider.id, name: provider.name, base_url: provider.base_url, api_type: provider.api_type },
             };
-            deps.pluginRegistry.applyBeforeResponse(respCtx);
-            deps.pluginRegistry.applyAfterResponse(respCtx);
+            pluginRegistry.applyBeforeResponse(respCtx);
+            pluginRegistry.applyAfterResponse(respCtx);
             transformed = JSON.stringify(respCtx.response);
           } catch { /* response hooks best-effort */ }
         }
@@ -384,7 +374,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
     const transportFn = buildTransportFn({
       provider, apiKey, body: patchedBody, cliHdrs, reply, upstreamPath: effectiveUpstreamPath, apiType: effectiveApiType,
       isStream, startTime, logId, effectiveModel, originalModel,
-      streamTimeoutMs: deps.streamTimeoutMs, tracker: deps.tracker, matcher: deps.matcher, request,
+      streamTimeoutMs: config.STREAM_TIMEOUT_MS, tracker, matcher, request,
       streamLoopEnabled, formatTransform, responseTransform, injectedHeaders,
     });
 
@@ -412,7 +402,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
       const tr = resilienceResult.result;
       const succeeded = tr.kind === "success" || tr.kind === "stream_success" || tr.kind === "stream_abort";
 
-      if (succeeded) deps.usageWindowTracker?.recordRequest(provider.id, routerKeyId ?? undefined);
+      if (succeeded) usageWindowTracker?.recordRequest(provider.id, routerKeyId ?? undefined);
 
       if (isStream && tracker) {
         const sc = tracker.get(logId)?.streamContent;

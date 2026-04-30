@@ -6,11 +6,11 @@ import { createHash } from "crypto";
 import { initDatabase } from "../../../src/db/index.js";
 import { setSetting } from "../../../src/db/settings.js";
 import { encrypt } from "../../../src/utils/crypto.js";
-import { openaiProxy } from "../../../src/proxy/openai.js";
-import { anthropicProxy } from "../../../src/proxy/anthropic.js";
-import { ProviderSemaphoreManager } from "../../../src/proxy/semaphore.js";
+import { openaiProxy } from "../../../src/proxy/handler/openai.js";
+import { anthropicProxy } from "../../../src/proxy/handler/anthropic.js";
+import { ProviderSemaphoreManager } from "../../../src/proxy/orchestration/semaphore.js";
 import { RequestTracker } from "../../../src/monitor/request-tracker.js";
-import { RetryRuleMatcher } from "../../../src/proxy/retry-rules.js";
+import { ServiceContainer, SERVICE_KEYS } from "../../../src/core/container.js";
 import { createMockBackend } from "../../helpers/mock-backend.js";
 import { TEST_ENCRYPTION_KEY } from "../../helpers/test-setup.js";
 
@@ -20,8 +20,16 @@ function buildOAApp(db: Database.Database): FastifyInstance {
   const app = Fastify();
   const semaphoreManager = new ProviderSemaphoreManager();
   const tracker = new RequestTracker({ semaphoreManager });
-  const matcher = new RetryRuleMatcher(db);
-  app.register(openaiProxy, { db, streamTimeoutMs: 5000, retryBaseDelayMs: 0, semaphoreManager, tracker, matcher });
+  const container = new ServiceContainer();
+  container.register(SERVICE_KEYS.semaphoreManager, () => semaphoreManager);
+  container.register(SERVICE_KEYS.tracker, () => tracker);
+  container.register(SERVICE_KEYS.matcher, () => undefined);
+  container.register(SERVICE_KEYS.usageWindowTracker, () => undefined);
+  container.register(SERVICE_KEYS.sessionTracker, () => undefined);
+  container.register(SERVICE_KEYS.adaptiveController, () => undefined);
+  container.register(SERVICE_KEYS.logFileWriter, () => null);
+  container.register(SERVICE_KEYS.pluginRegistry, () => undefined);
+  app.register(openaiProxy, { db, container });
   return app;
 }
 
@@ -29,8 +37,16 @@ function buildAntApp(db: Database.Database): FastifyInstance {
   const app = Fastify();
   const semaphoreManager = new ProviderSemaphoreManager();
   const tracker = new RequestTracker({ semaphoreManager });
-  const matcher = new RetryRuleMatcher(db);
-  app.register(anthropicProxy, { db, streamTimeoutMs: 5000, retryBaseDelayMs: 0, semaphoreManager, tracker, matcher });
+  const container = new ServiceContainer();
+  container.register(SERVICE_KEYS.semaphoreManager, () => semaphoreManager);
+  container.register(SERVICE_KEYS.tracker, () => tracker);
+  container.register(SERVICE_KEYS.matcher, () => undefined);
+  container.register(SERVICE_KEYS.usageWindowTracker, () => undefined);
+  container.register(SERVICE_KEYS.sessionTracker, () => undefined);
+  container.register(SERVICE_KEYS.adaptiveController, () => undefined);
+  container.register(SERVICE_KEYS.logFileWriter, () => null);
+  container.register(SERVICE_KEYS.pluginRegistry, () => undefined);
+  app.register(anthropicProxy, { db, container });
   return app;
 }
 

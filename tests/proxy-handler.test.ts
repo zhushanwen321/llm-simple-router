@@ -78,6 +78,7 @@ function createDeps(overrides = {}) {
   container.register("adaptiveController", () => undefined);
   container.register("semaphoreManager", () => undefined);
   container.register(SERVICE_KEYS.logFileWriter, () => null);
+  container.register(SERVICE_KEYS.pluginRegistry, () => undefined);
   return {
     db: {} as any,
     orchestrator: { handle: vi.fn() } as any,
