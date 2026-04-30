@@ -1,8 +1,9 @@
 import { readdirSync, readFileSync, writeFileSync, unlinkSync, rmSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { gzipSync } from "node:zlib";
+import { WINDOW_MINUTES, TIME_PAD_WIDTH } from "./types.js";
 
-const COMPRESSION_INTERVAL_MS = 10 * 60 * 1000; // 10 分钟
+const COMPRESSION_INTERVAL_MS = WINDOW_MINUTES * 60 * 1000;
 
 /** 将已结束窗口的 .jsonl 文件压缩为 .jsonl.gz */
 export function compressFinishedFiles(baseDir: string, now: Date): number {
@@ -25,8 +26,8 @@ export function compressFinishedFiles(baseDir: string, now: Date): number {
       const fileHour = parseInt(match[1], 10);
       const fileMinute = parseInt(match[2], 10);
 
-      const windowEnd = new Date(`${dayDir.name}T${String(fileHour).padStart(2, "0")}:${String(fileMinute).padStart(2, "0")}:00Z`);
-      windowEnd.setUTCMinutes(windowEnd.getUTCMinutes() + 10);
+      const windowEnd = new Date(`${dayDir.name}T${String(fileHour).padStart(TIME_PAD_WIDTH, "0")}:${String(fileMinute).padStart(TIME_PAD_WIDTH, "0")}:00Z`);
+      windowEnd.setUTCMinutes(windowEnd.getUTCMinutes() + WINDOW_MINUTES);
 
       if (now >= windowEnd) {
         const filePath = join(dirPath, file);
@@ -36,7 +37,7 @@ export function compressFinishedFiles(baseDir: string, now: Date): number {
           writeFileSync(filePath + ".gz", gzipped);
           unlinkSync(filePath);
           compressed++;
-        } catch {
+        } catch (_err) {
           // 文件可能正在被写入，跳过
         }
       }

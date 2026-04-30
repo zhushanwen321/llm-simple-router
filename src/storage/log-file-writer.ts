@@ -1,7 +1,7 @@
 import { appendFileSync, mkdirSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
-import { type LogFileEntry, LOG_WINDOW_MINUTES } from "./types.js";
+import { type LogFileEntry, WINDOW_MINUTES, TIME_PAD_WIDTH, ISO_DATE_LENGTH } from "./types.js";
 
 export interface LogFileWriterOptions {
   enabled?: boolean;
@@ -26,7 +26,7 @@ export class LogFileWriter {
     const date = new Date(entry.created_at);
     const dateStr = date.toISOString().slice(0, 10);
     const hour = date.getUTCHours().toString().padStart(2, "0");
-    const minute = Math.floor(date.getUTCMinutes() / LOG_WINDOW_MINUTES) * LOG_WINDOW_MINUTES;
+    const minute = Math.floor(date.getUTCMinutes() / WINDOW_MINUTES) * WINDOW_MINUTES;
     const minuteStr = minute.toString().padStart(2, "0");
     const fileName = `${hour}-${minuteStr}.jsonl`;
 
@@ -40,7 +40,7 @@ export class LogFileWriter {
 
     try {
       appendFileSync(filePath, line, "utf-8");
-    } catch {
+    } catch (_err) {
       // 文件写入是辅助通道，失败不影响主流程
     }
   }
@@ -56,7 +56,7 @@ export class LogFileWriter {
     const date = new Date(createdAt);
     const dateStr = date.toISOString().slice(0, 10);
     const hour = date.getUTCHours().toString().padStart(2, "0");
-    const minute = Math.floor(date.getUTCMinutes() / LOG_WINDOW_MINUTES) * LOG_WINDOW_MINUTES;
+    const minute = Math.floor(date.getUTCMinutes() / WINDOW_MINUTES) * WINDOW_MINUTES;
     const minuteStr = minute.toString().padStart(2, "0");
     const fileName = `${hour}-${minuteStr}.jsonl`;
     const dayDir = join(this.baseDir, dateStr);

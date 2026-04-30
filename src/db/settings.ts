@@ -58,7 +58,9 @@ export function getDetailLogEnabled(db: Database.Database): boolean {
   return row ? row.value !== "0" : true;
 }
 
+const DEFAULT_LOG_FILE_RETENTION_DAYS = 3;
+
 export function getLogFileRetentionDays(db: Database.Database): number {
   const row = db.prepare("SELECT value FROM settings WHERE key = ?").get("log_file_retention_days") as { value: string } | undefined;
-  return row ? parseInt(row.value, 10) : 3;
+  return row ? parseInt(row.value, 10) : DEFAULT_LOG_FILE_RETENTION_DAYS;
 }

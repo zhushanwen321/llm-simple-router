@@ -31,6 +31,8 @@ export interface OrchestratorConfig {
   sessionId?: string;
   /** 客户端请求的 JSON 字符串（headers + body），用于 Monitor 实时查看 */
   clientRequest?: string;
+  /** 上游请求的 JSON 字符串（url + headers + body），用于 Monitor 实时查看 */
+  upstreamRequest?: string;
   /** Schedule 层的并发覆盖配置，覆盖 Provider 默认并发限制 */
   concurrencyOverride?: ConcurrencyOverride;
 }
@@ -139,6 +141,7 @@ export class ProxyOrchestrator {
       clientIp: request.ip,
       sessionId: config.sessionId,
       clientRequest: config.clientRequest,
+      upstreamRequest: config.upstreamRequest,
     };
   }
 
