@@ -30,4 +30,8 @@ describe("shouldPreserveDetail", () => {
   it("returns true when matcher is null (conservative fallback)", () => {
     expect(shouldPreserveDetail(200, "body", null)).toBe(true);
   });
+
+  it("returns true when hasFileWriter is false regardless of other conditions", () => {
+    expect(shouldPreserveDetail(200, "body", { test: () => false }, false)).toBe(true);
+  });
 });

@@ -3,6 +3,7 @@ import type { Provider } from "../db/index.js";
 import { insertRequestLog } from "../db/index.js";
 import type { LogWriteContext } from "../db/logs.js";
 import type { LogFileWriter } from "../storage/log-file-writer.js";
+import type { RetryMatcher } from "./log-detail-policy.js";
 import type { RawHeaders } from "./types.js";
 
 export interface FailoverContext {
@@ -32,7 +33,7 @@ export interface RequestLogParams extends LogRetryMeta {
   originalModel?: string | null;
   sessionId?: string | null;
   pipelineSnapshot?: string | null;
-  matcher?: { test: (statusCode: number, body: string) => boolean } | null;
+  matcher?: RetryMatcher | null;
   logFileWriter?: LogFileWriter | null;
 }
 
@@ -82,7 +83,7 @@ export interface RejectedLogParams extends LogRetryMeta {
   originalModel?: string | null;
   sessionId?: string | null;
   pipelineSnapshot?: string | null;
-  matcher?: { test: (statusCode: number, body: string) => boolean } | null;
+  matcher?: RetryMatcher | null;
   logFileWriter?: LogFileWriter | null;
 }
 

@@ -1,5 +1,6 @@
 import Database from "better-sqlite3";
 import type { LogFileWriter } from "../storage/log-file-writer.js";
+import { shouldPreserveDetail, type RetryMatcher } from "../proxy/log-detail-policy.js";
 
 type CountRow = { count: number };
 
@@ -67,11 +68,8 @@ export interface RequestLogInsert {
 }
 
 export interface LogWriteContext {
-  /** RetryRuleMatcher 用于判定是否保留详情。null = 保守保留 */
-  matcher?: { test: (statusCode: number, body: string) => boolean } | null;
-  /** 文件写入器。null 或 undefined = 不写文件 */
+  matcher?: RetryMatcher | null;
   logFileWriter?: LogFileWriter | null;
-  /** 上游响应 body（用于 matcher 匹配判定） */
   responseBody?: string | null;
 }
 
@@ -96,7 +94,7 @@ export function insertRequestLog(
   }
 
   // 详情保留判定
-  const preserveDetail = shouldPreserveDetailInternal(
+  const preserveDetail = shouldPreserveDetail(
     log.status_code, writeContext?.responseBody ?? null, writeContext?.matcher ?? null,
     !!writeContext?.logFileWriter,
   );
@@ -118,22 +116,6 @@ export function insertRequestLog(
     log.session_id ?? null,
     log.pipeline_snapshot ?? null,
   );
-}
-
-const LOG_DETAIL_HTTP_ERROR_THRESHOLD = 400;
-
-function shouldPreserveDetailInternal(
-  statusCode: number | null,
-  responseBody: string | null,
-  matcher: { test: (statusCode: number, body: string) => boolean } | null,
-  hasFileWriter: boolean,
-): boolean {
-  // 文件写入器不存在时，保守保留 DB 全文（避免数据丢失）
-  if (!hasFileWriter) return true;
-  if (statusCode !== null && statusCode >= LOG_DETAIL_HTTP_ERROR_THRESHOLD) return true;
-  if (!matcher) return true;
-  if (responseBody && matcher.test(statusCode ?? 0, responseBody)) return true;
-  return false;
 }
 
 type LogFilterOptions = {
