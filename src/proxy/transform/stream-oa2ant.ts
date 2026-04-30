@@ -22,18 +22,18 @@ export class OpenAIToAnthropicTransform extends BaseSSETransform {
   private finishReasonReceived = false;
 
   protected processEvent(event: { event?: string; data?: string }): void {
-    if (event.data === "[DONE]") {
-      this.handleDone();
-      return;
-    }
-
     let chunk: Record<string, unknown>;
     try { chunk = JSON.parse(event.data!); } catch (err) { this.emit("warning", err); return; }
 
-    if (chunk.usage && !(Array.isArray(chunk.choices) && chunk.choices.length > 0)) {
+    // P0 fix: always extract usage when present, even if choices are in the same chunk
+    if (chunk.usage) {
       const usage = chunk.usage as Record<string, number>;
       this.inputTokens = usage.prompt_tokens ?? this.inputTokens;
       this.outputTokens = usage.completion_tokens ?? this.outputTokens;
+    }
+
+    // Usage-only chunk (no choices) triggers stop sequence
+    if (chunk.usage && !(Array.isArray(chunk.choices) && chunk.choices.length > 0)) {
       if (this.pendingStopReason !== null) {
         this.emitStopSequence();
       }
@@ -154,6 +154,12 @@ export class OpenAIToAnthropicTransform extends BaseSSETransform {
       }
       this.activeToolCallIndex = idx;
       this.state = "tool_use";
+      // P1 fix: emit content_block_start for previously unseen tool call index
+      this.pushAnthropicSSE("content_block_start", {
+        type: "content_block_start", index: this.blockIndex,
+        content_block: { type: "tool_use", id: `tool_${idx}`, name: `tool_${idx}`, input: {} },
+      });
+      this.completedToolCallIndices.add(idx);
     }
 
     const args = fn?.arguments as string | undefined;
@@ -185,15 +191,6 @@ export class OpenAIToAnthropicTransform extends BaseSSETransform {
     this.pushAnthropicSSE("message_stop", { type: "message_stop" });
     this.hasSentMessageStop = true;
     this.pendingStopReason = null;
-  }
-
-  private handleDone(): void {
-    this.closeCurrentBlock();
-    if (this.pendingStopReason !== null || !this.hasSentMessageStop) {
-      if (this.pendingStopReason === null) this.pendingStopReason = "end_turn";
-      this.emitStopSequence();
-    }
-    this.done = true;
   }
 
   protected flushPendingData(): void {

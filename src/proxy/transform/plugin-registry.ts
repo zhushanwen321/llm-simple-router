@@ -136,12 +136,9 @@ export class PluginRegistry {
           }
         }
       },
-      afterResponseTransform(ctx: ResponseTransformContext): void {
-        if (rule.field_overrides) {
-          for (const [key, val] of Object.entries(rule.field_overrides)) {
-            ctx.response[key] = val;
-          }
-        }
+      afterResponseTransform(_ctx: ResponseTransformContext): void {
+        // field_overrides only applies to request direction;
+        // response should reflect actual upstream data, not override rules
       },
     };
   }

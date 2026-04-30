@@ -150,7 +150,7 @@ describe("Plugin Integration (T26)", () => {
       expect(ctxP2.body.temperature).toBe(0.9);
     });
 
-    it("response field_overrides applied via afterResponseTransform", () => {
+    it("field_overrides NOT applied to response (request-only)", () => {
       upsertTransformRule(db, "p1", {
         field_overrides: { model: "overridden-model" },
         is_active: 1,
@@ -160,7 +160,8 @@ describe("Plugin Integration (T26)", () => {
       const ctx = makeResponseCtx({ response: { model: "original", content: "hello" } });
       reg.applyAfterResponse(ctx);
 
-      expect(ctx.response.model).toBe("overridden-model");
+      // field_overrides should NOT override response — response reflects actual upstream data
+      expect(ctx.response.model).toBe("original");
       expect(ctx.response.content).toBe("hello");
     });
   });

@@ -26,7 +26,8 @@ export abstract class BaseSSETransform extends Transform {
       }
     } catch (err) {
       this.emit("warning", { event: "buffer_overflow", error: String(err) });
-      this.pushDone();
+      this.flushPendingData();
+      this.ensureTerminated();
     }
     callback();
   }

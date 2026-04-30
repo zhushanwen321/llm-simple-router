@@ -27,9 +27,26 @@ function normalizeToTextBlocks(content: unknown): AnthropicContentBlock[] {
     return [{ type: "text", text: content }];
   }
   if (Array.isArray(content)) {
-    return content
-      .filter((p: Record<string, unknown>) => p.type === "text" && p.text)
-      .map((p: Record<string, unknown>) => ({ type: "text" as const, text: String(p.text) }));
+    return (content as Array<Record<string, unknown>>).flatMap((p): AnthropicContentBlock[] => {
+      if (p.type === "text" && p.text) {
+        return [{ type: "text" as const, text: String(p.text) }];
+      }
+      // Convert OpenAI image_url to Anthropic image source
+      if (p.type === "image_url") {
+        const imageUrl = (p.image_url as { url: string })?.url;
+        if (imageUrl) {
+          if (imageUrl.startsWith("data:")) {
+            // base64 data URL → base64 source
+            const match = imageUrl.match(/^data:(image\/[^;]+);base64,(.+)$/);
+            if (match) {
+              return [{ type: "image" as const, source: { type: "base64", media_type: match[1], data: match[2] } }];
+            }
+          }
+          return [{ type: "image" as const, source: { type: "url", url: imageUrl } }];
+        }
+      }
+      return [];
+    });
   }
   return [];
 }
