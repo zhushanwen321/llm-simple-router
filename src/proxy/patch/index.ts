@@ -1,13 +1,15 @@
 import { applyDeepSeekPatches } from "./deepseek/index.js";
 
-interface ProviderInfo {
+export interface ProviderInfo {
   base_url: string;
-  api_type: "openai" | "anthropic";
+  api_type: string;
 }
 
 export interface ProviderPatchMeta {
   types: string[];
 }
+
+const OPENAI_ORIGIN_HOSTS = ["api.openai.com", "openai.com"];
 
 /**
  * 根据 provider 信息分发到对应的补丁逻辑。
@@ -17,12 +19,61 @@ export function applyProviderPatches(
   body: Record<string, unknown>,
   provider: ProviderInfo,
 ): { body: Record<string, unknown>; meta: ProviderPatchMeta } {
-  if (needsDeepSeekPatch(body, provider)) {
-    const cloned = JSON.parse(JSON.stringify(body));
-    applyDeepSeekPatches(cloned, provider.api_type);
-    return { body: cloned, meta: { types: ["deepseek"] } };
+  const patches: string[] = [];
+  let cloned = false;
+  let patched: Record<string, unknown> | undefined;
+
+  const ensureCloned = (): Record<string, unknown> => {
+    if (!cloned) {
+      patched = JSON.parse(JSON.stringify(body)) as Record<string, unknown>;
+      cloned = true;
+    }
+    return patched!;
+  };
+
+  // 通用补丁：OpenAI 兼容 provider（非 OpenAI 原生）不支持 developer role
+  if (provider.api_type === "openai" && !isOpenAIOrigin(provider.base_url)) {
+    if (hasDeveloperRole(body)) {
+      patchDeveloperRole(ensureCloned());
+      patches.push("developer_role");
+    }
   }
-  return { body, meta: { types: [] } };
+
+  // DeepSeek 特定补丁
+  if (needsDeepSeekPatch(body, provider)) {
+    applyDeepSeekPatches(ensureCloned(), provider.api_type as "openai" | "anthropic");
+    patches.push("deepseek");
+  }
+
+  return { body: patched ?? body, meta: { types: patches } };
+}
+
+/** 判断是否为 OpenAI 官方端点 */
+function isOpenAIOrigin(baseUrl: string): boolean {
+  try {
+    const host = new URL(baseUrl).hostname;
+    return OPENAI_ORIGIN_HOSTS.some(origin => host === origin || host.endsWith(`.${origin}`));
+  } catch {
+    return false;
+  }
+}
+
+/** 检查 messages 中是否包含 developer role */
+function hasDeveloperRole(body: Record<string, unknown>): boolean {
+  const messages = body.messages as Array<Record<string, unknown>> | undefined;
+  if (!messages) return false;
+  return messages.some(m => m.role === "developer");
+}
+
+/** 将 developer role 转换为 system */
+function patchDeveloperRole(body: Record<string, unknown>): void {
+  const messages = body.messages as Array<Record<string, unknown>> | undefined;
+  if (!messages) return;
+  for (const msg of messages) {
+    if (msg.role === "developer") {
+      msg.role = "system";
+    }
+  }
 }
 
 /** DeepSeek patch 触发条件：直连 DeepSeek，或经代理转发且模型名含 deepseek */

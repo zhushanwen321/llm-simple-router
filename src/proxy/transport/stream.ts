@@ -1,4 +1,4 @@
-import { PassThrough } from "stream";
+import { PassThrough, Transform } from "stream";
 import type { FastifyReply } from "fastify";
 import { UPSTREAM_SUCCESS, filterHeaders } from "../types.js";
 import { buildUpstreamUrl } from "../proxy-core.js";
@@ -33,10 +33,11 @@ class StreamProxy {
   private readonly sseHeaders: Record<string, string>;
   private readonly passThrough = new PassThrough();
   private readonly pipeEntry: PassThrough | SSEMetricsTransform;
+  private readonly formatTransform: Transform | undefined;
 
   // 流式阶段 SSE error 扫描缓冲（跨 chunk 边界匹配）
   private sseScanBuffer = "";
-  private static readonly SSE_SCAN_MAX = 8192;
+  private static readonly SSE_SCAN_MAX = 8 * 1024; // eslint-disable-line no-magic-numbers -- 8KB scan buffer
 
   constructor(
     private readonly statusCode: number,
@@ -47,7 +48,9 @@ class StreamProxy {
     private readonly checkEarlyError: ((data: string) => boolean) | undefined,
     private readonly timeoutMs: number,
     private readonly loopGuard: StreamLoopGuard | undefined,
+    formatTransform?: Transform,
   ) {
+    this.formatTransform = formatTransform;
     this.sseHeaders = filterHeaders(rawUpstreamHeaders);
     this.sseHeaders["Content-Type"] = "text/event-stream";
     this.sseHeaders["Cache-Control"] = "no-cache";
@@ -108,7 +111,8 @@ class StreamProxy {
     } else {
       // stream_abort 且 headers 已发送时，必须 end reply 避免客户端挂起
       if (kind === "stream_abort" && this.headersSent) {
-        try { this.reply.raw.end(); } catch { /* reply may already be destroyed */ }
+        // eslint-disable-next-line taste/no-silent-catch -- reply may already be destroyed, warn is sufficient
+        try { this.reply.raw.end(); } catch { console.warn("[stream-proxy] reply.raw.end() failed, likely already destroyed"); }
       }
       this.cleanup();
       if (this.resolveFn) {
@@ -122,6 +126,7 @@ class StreamProxy {
   private cleanup(): void {
     if (this.idleTimer) clearTimeout(this.idleTimer);
     this.idleTimer = null;
+    if (this.formatTransform && !this.formatTransform.destroyed) this.formatTransform.destroy();
     if (!this.passThrough.destroyed) this.passThrough.destroy();
     if (this.metricsTransform && !this.metricsTransform.destroyed) this.metricsTransform.destroy();
   }
@@ -153,7 +158,10 @@ class StreamProxy {
     this.headersSent = true;
     this.reply.raw.writeHead(this.statusCode, this.sseHeaders);
     if (this.metricsTransform) {
-      this.metricsTransform.pipe(this.passThrough, { end: true });
+      this.metricsTransform.pipe(this.formatTransform ?? this.passThrough, { end: true });
+    }
+    if (this.formatTransform) {
+      this.formatTransform.pipe(this.passThrough, { end: true });
     }
     // 手动转发而非 pipe，避免 Node.js 在 dest 上自动注册 close/finish handler
     this.passThrough.on("data", (chunk: Buffer) => {
@@ -184,9 +192,9 @@ class StreamProxy {
   onData(chunk: Buffer): void {
     if (this.resolved) return;
     this.resetIdleTimer();
-    this.captureChunks.push(chunk);
 
     if (this.state === "BUFFERING") {
+      this.captureChunks.push(chunk);
       this.bufferChunks.push(chunk);
       const buf = Buffer.concat(this.bufferChunks);
       const text = buf.toString("utf-8");
@@ -212,9 +220,8 @@ class StreamProxy {
       }
       // 快速启发式：只在扫描窗口出现 SSE error 标记时才执行正则匹配
       if (this.sseScanBuffer.includes("event: error") || this.sseScanBuffer.includes('"type":"error"')) {
-        const body = Buffer.concat(this.captureChunks).toString("utf-8");
-        if (this.checkEarlyError(body)) {
-          this.terminal("stream_error", { body });
+        if (this.checkEarlyError(this.sseScanBuffer)) {
+          this.terminal("stream_error", { body: this.sseScanBuffer });
           // headers 已发送：必须结束 reply 避免 client hang
           if (this.headersSent) {
             setImmediate(() => {
@@ -301,6 +308,7 @@ export function callStream(
   checkEarlyError?: (bufferedData: string) => boolean,
   compatResolve?: (result: TransportResult) => void,
   loopGuard?: StreamLoopGuard,
+  formatTransform?: import("stream").Transform,
 ): Promise<TransportResult> {
   return new Promise((resolve) => {
     const effectiveResolve = compatResolve ?? resolve;
@@ -337,7 +345,7 @@ export function callStream(
         metricsTransform,
         checkEarlyError,
         timeoutMs,
-        loopGuard,
+        loopGuard, formatTransform,
       );
 
       proxy.bindResolve(effectiveResolve);

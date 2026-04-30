@@ -300,7 +300,13 @@ export class RequestTracker {
     // request_start: 无需处理，已是原始数据
     // request_complete: strip clientRequest（完成后从 DB 加载详情）
     let payload = data;
-    if (event === "request_complete" && data && typeof data === "object") {
+    if (event === "request_update" && Array.isArray(data)) {
+      payload = data.map((req: ActiveRequest) => {
+        const copy = { ...req };
+        delete copy.clientRequest;
+        return copy;
+      });
+    } else if ((event === "request_complete" || event === "request_start") && data && typeof data === "object") {
       const copy = { ...(data as ActiveRequest) };
       delete copy.clientRequest;
       payload = copy;

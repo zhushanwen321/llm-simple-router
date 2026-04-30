@@ -1,4 +1,4 @@
-import type { FastifyPluginCallback, FastifyReply } from "fastify";
+import type { FastifyPluginCallback, FastifyReply, FastifyRequest } from "fastify";
 import { randomUUID } from "crypto";
 import Database from "better-sqlite3";
 import fp from "fastify-plugin";
@@ -23,6 +23,10 @@ export interface OpenaiProxyOptions {
 
 const CHAT_COMPLETIONS_PATH = "/v1/chat/completions";
 const MODELS_PATH = "/v1/models";
+
+/** OpenAI 兼容路径（不带 /v1 前缀），供部分客户端使用 */
+const CHAT_COMPLETIONS_COMPAT_PATH = "/chat/completions";
+const MODELS_COMPAT_PATH = "/models";
 
 const OPENAI_ERROR_META: Record<ErrorKind, { type: string; code: string }> = {
   modelNotFound: { type: "invalid_request_error", code: "model_not_found" },
@@ -52,7 +56,7 @@ const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, do
     container.resolve<AdaptiveConcurrencyController>(SERVICE_KEYS.adaptiveController),
   );
 
-  app.post(CHAT_COMPLETIONS_PATH, async (request, reply) => {
+  const handleChatCompletions = async (request: FastifyRequest, reply: FastifyReply) => {
     if (!orchestrator) {
       const body = request.body as Record<string, unknown> | undefined;
       insertRequestLog(db, {
@@ -73,9 +77,13 @@ const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, do
         }
       },
     });
-  });
+  };
 
-  app.get(MODELS_PATH, async (request, reply) => {
+  // 规范路径 + 兼容路径（不带 /v1 前缀）
+  app.post(CHAT_COMPLETIONS_PATH, handleChatCompletions);
+  app.post(CHAT_COMPLETIONS_COMPAT_PATH, handleChatCompletions);
+
+  const handleModels = async (request: FastifyRequest, reply: FastifyReply) => {
     const startTime = Date.now();
     const providers = getActiveProviders(db, "openai");
     if (providers.length === 0) {
@@ -121,7 +129,11 @@ const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, do
         body: { error: { message: "Failed to reach backend service", type: "server_error", code: "upstream_error" } },
       });
     }
-  });
+  };
+
+  // 规范路径 + 兼容路径
+  app.get(MODELS_PATH, handleModels);
+  app.get(MODELS_COMPAT_PATH, handleModels);
 
   done();
 };

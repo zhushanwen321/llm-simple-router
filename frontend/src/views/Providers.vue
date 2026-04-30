@@ -3,12 +3,17 @@
   <div class="p-6">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-lg font-semibold text-foreground">供应商</h2>
-      <Button @click="openCreate" class="flex items-center gap-1">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-        添加供应商
-      </Button>
+      <div class="flex items-center gap-2">
+        <Button variant="outline" size="sm" @click="handleReload" :disabled="reloading">
+          <RotateCw class="w-4 h-4 mr-1" :class="{ 'animate-spin': reloading }" />
+          重载插件
+        </Button>
+        <Button @click="openCreate" class="flex items-center gap-1">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          添加供应商
+        </Button>
+      </div>
     </div>
-
     <div class="bg-card rounded-lg border overflow-hidden">
       <Table>
         <TableHeader>
@@ -79,7 +84,6 @@
         </TableBody>
       </Table>
     </div>
-
     <!-- Create/Edit Dialog -->
     <Dialog v-model:open="dialogOpen">
       <DialogContent>
@@ -109,11 +113,22 @@
               </Select>
             </div>
           </div>
-
           <div>
             <Label class="block text-sm font-medium text-foreground mb-1">名称</Label>
             <Input v-model="form.name" type="text" required @input="delete errors.name" />
             <p v-if="errors.name" class="text-sm text-destructive mt-1">{{ errors.name }}</p>
+          </div>
+          <div>
+            <Label class="block text-sm font-medium text-foreground mb-1">API 类型</Label>
+            <Select v-model="form.api_type">
+              <SelectTrigger>
+                <SelectValue placeholder="选择 API 类型" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="openai">OpenAI</SelectItem>
+                <SelectItem value="anthropic">Anthropic</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div>
             <Label class="block text-sm font-medium text-foreground mb-1">Base URL</Label>
@@ -183,6 +198,19 @@
               </div>
             </div>
           </div>
+          <!-- 转换规则面板（仅在编辑现有 Provider 时显示） -->
+          <Collapsible v-if="editingId" v-model:open="transformOpen" class="border rounded-md p-3 mt-2">
+            <CollapsibleTrigger class="flex items-center justify-between w-full text-sm font-medium text-foreground">
+              转换规则
+              <ChevronDown class="w-4 h-4 transition-transform" :class="transformOpen ? 'rotate-180' : ''" />
+            </CollapsibleTrigger>
+            <CollapsibleContent class="mt-3 space-y-3">
+              <div><Label class="text-xs text-muted-foreground">注入 Headers (JSON)</Label><Input v-model="transformForm.injectHeadersInput" placeholder='{"x-custom": "value"}' class="mt-1" /></div>
+              <div><Label class="text-xs text-muted-foreground">丢弃字段（逗号分隔）</Label><Input v-model="transformForm.dropFieldsInput" placeholder="logprobs, frequency_penalty" class="mt-1" /></div>
+              <div><Label class="text-xs text-muted-foreground">请求默认值 (JSON)</Label><Input v-model="transformForm.requestDefaultsInput" placeholder='{"max_tokens": 4096}' class="mt-1" /></div>
+              <div class="flex gap-2"><Button type="button" variant="outline" size="sm" @click="saveTransformRules(editingId!)">保存规则</Button><Button type="button" variant="ghost" size="sm" @click="handleDeleteTransformRules(editingId!)" v-if="transformForm.exists">删除规则</Button></div>
+            </CollapsibleContent>
+          </Collapsible>
           <DialogFooter>
             <Button type="button" variant="outline" @click="dialogOpen = false">取消</Button>
             <Button type="submit">保存</Button>
@@ -190,7 +218,6 @@
         </form>
       </DialogContent>
     </Dialog>
-
     <!-- Delete Confirm AlertDialog -->
     <AlertDialog :open="!!deleteTarget" @update:open="(val) => { if (!val) deleteTarget = null }">
       <AlertDialogContent>
@@ -204,7 +231,6 @@
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
-
     <!-- Toggle Confirm AlertDialog -->
     <AlertDialog :open="!!toggleTarget" @update:open="(val: boolean) => { if (!val) toggleTarget = null }">
       <AlertDialogContent>
@@ -226,7 +252,6 @@
     </AlertDialog>
   </div>
 </template>
-
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
@@ -242,8 +267,9 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog'
-import { Copy, Check } from 'lucide-vue-next'
-
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { ChevronDown, RotateCw, Copy, Check } from 'lucide-vue-next'
+import { useTransformRules } from '@/composables/useTransformRules'
 const DEFAULT_CONCURRENCY = 3
 const DEFAULT_CONCURRENCY_AUTO = 10
 const DEFAULT_QUEUE_TIMEOUT_MS = 120_000
@@ -270,7 +296,6 @@ const contextWindowSelect = computed({
   get: () => String(modelContextWindow.value),
   set: (val: string) => { modelContextWindow.value = Number(val) },
 })
-
 const providers = ref<Provider[]>([])
 const providerPresets = ref<ProviderGroup[]>([])
 const dialogOpen = ref(false)
@@ -284,17 +309,16 @@ const form = ref({ ...DEFAULT_FORM })
 const errors = ref<Record<string, string>>({})
 type ConcurrencyMode = 'auto' | 'manual' | 'none'
 const concurrencyMode = ref<ConcurrencyMode>('auto')
+// Transform rules state
+const transformOpen = ref(false)
+const { transformForm, loadTransformRules, saveTransformRules, handleDeleteTransformRules } = useTransformRules()
 const copiedId = ref<string | null>(null)
-
-const MASK_VISIBLE_LEN = 7
-const MASK_ASTERISK_COUNT = 7
-const COPY_FEEDBACK_MS = 2000
-
+const reloading = ref(false)
+const MASK_VISIBLE_LEN = 7, MASK_ASTERISK_COUNT = 7, COPY_FEEDBACK_MS = 2000
 const providerSchema = z.object({
   name: z.string().min(1, '请输入名称').regex(/^[a-zA-Z0-9_-]+$/, '仅允许英文、数字、横线和下划线'),
   base_url: z.string().min(1, '请输入 Base URL').url('请输入合法的 URL'),
 })
-
 function validate(): boolean {
   const errs: Record<string, string> = {}
   const result = providerSchema.safeParse({ name: form.value.name.trim(), base_url: form.value.base_url.trim() })
@@ -315,34 +339,26 @@ function validate(): boolean {
   errors.value = errs
   return Object.keys(errs).length === 0
 }
-
 function maskKey(key: string): string {
   if (!key) return ''
   const visible = key.slice(0, MASK_VISIBLE_LEN)
   return visible + '*'.repeat(MASK_ASTERISK_COUNT)
 }
-
 function formatContextWindow(tokens: number): string {
   if (tokens >= CONTEXT_M) return `${tokens / CONTEXT_M}M`
   if (tokens >= CONTEXT_K) return `${tokens / CONTEXT_K}K`
   return String(tokens)
 }
-
 async function copyKey(key: string, id: string) {
   await navigator.clipboard.writeText(key)
   copiedId.value = id
   setTimeout(() => { copiedId.value = null }, COPY_FEEDBACK_MS)
 }
-
-// 预设级联状态
-const presetGroup = ref('')
-const presetPlan = ref('')
-
+const presetGroup = ref(''), presetPlan = ref('')
 const availablePlans = computed(() => {
   if (!presetGroup.value) return []
   return providerPresets.value.find(g => g.group === presetGroup.value)?.presets ?? []
 })
-
 function onGroupChange() {
   const plans = providerPresets.value.find(g => g.group === presetGroup.value)?.presets
   if (plans?.length) {
@@ -352,7 +368,6 @@ function onGroupChange() {
     presetPlan.value = ''
   }
 }
-
 function onPresetChange() {
   const preset = availablePlans.value.find(p => p.plan === presetPlan.value)
   if (!preset) return
@@ -364,7 +379,6 @@ function onPresetChange() {
     context_window: DEFAULT_CONTEXT_WINDOW,
   }))
 }
-
 async function loadProviders() {
   try {
     const data = await api.getProviders()
@@ -374,7 +388,6 @@ async function loadProviders() {
     toast.error(getApiMessage(e, '加载供应商失败'))
   }
 }
-
 function addModel() {
   const input = modelInput.value.trim()
   if (!input) return
@@ -387,7 +400,6 @@ function addModel() {
   modelInput.value = ''
   modelContextWindow.value = DEFAULT_CONTEXT_WINDOW
 }
-
 function removeModel(index: number) {
   form.value.models.splice(index, 1)
 }
@@ -413,7 +425,6 @@ function openCreate() {
   errors.value = {}
   dialogOpen.value = true
 }
-
 function openEdit(p: Provider) {
   editingId.value = p.id
   const mc = p.max_concurrency ?? 0
@@ -431,6 +442,7 @@ function openEdit(p: Provider) {
   presetPlan.value = ''
   errors.value = {}
   dialogOpen.value = true
+  loadTransformRules(p.id)
 }
 
 type ProviderFormPayload = Pick<ProviderPayload, 'name' | 'api_type' | 'base_url' | 'models' | 'is_active' | 'max_concurrency' | 'queue_timeout_ms' | 'max_queue_size' | 'adaptive_enabled'> & { api_key?: string }
@@ -450,7 +462,6 @@ function buildPayload(): ProviderFormPayload {
   if (form.value.api_key) payload.api_key = form.value.api_key
   return payload
 }
-
 async function handleSave() {
   if (!validate()) return
   try {
@@ -469,11 +480,9 @@ async function handleSave() {
     toast.error(getApiMessage(e, '保存供应商失败'))
   }
 }
-
 function confirmDelete(p: Provider) {
   deleteTarget.value = p
 }
-
 async function confirmToggle(p: Provider) {
   toggleTarget.value = p
   pendingToggleId.value = p.id
@@ -486,7 +495,6 @@ async function confirmToggle(p: Provider) {
     } catch { /* eslint-disable-line taste/no-silent-catch -- 依赖查询失败不阻塞 toggle 弹框 */ }
   }
 }
-
 async function handleToggle() {
   const id = pendingToggleId.value
   if (!id) return
@@ -509,7 +517,6 @@ async function handleToggle() {
     toast.error(getApiMessage(e, '切换状态失败'))
   }
 }
-
 async function handleDelete() {
   const target = deleteTarget.value
   if (!target) return
@@ -522,7 +529,17 @@ async function handleDelete() {
     toast.error(getApiMessage(e, '删除供应商失败'))
   }
 }
-
+async function handleReload() {
+  reloading.value = true
+  try {
+    const result = await api.reloadTransformRules()
+    toast.success(`插件重载完成：${result.loadedPlugins.length} 个插件，${result.rulesCount} 条规则`)
+  } catch (e: unknown) {
+    toast.error(getApiMessage(e, '重载失败'))
+  } finally {
+    reloading.value = false
+  }
+}
 onMounted(async () => {
   const [presetsResult] = await Promise.allSettled([api.recommended.getProviders(), loadProviders()])
   if (presetsResult.status === 'fulfilled') {

@@ -82,43 +82,33 @@ let setupChecked = false
 let isSetupInitialized = false
 
 router.beforeEach(async (to, _from, next) => {
-  // 已确认初始化，走正常 auth 流程
-  if (setupChecked && isSetupInitialized) {
-    if (to.meta.requiresAuth) {
-      try {
-        await api.getStats()
-        next()
-      } catch {
-        next('/login')
+  if (!setupChecked) {
+    try {
+      const status = await api.getSetupStatus()
+      setupChecked = true
+      isSetupInitialized = status.initialized
+      if (!status.initialized && to.name !== 'setup') {
+        next('/setup')
+        return
       }
-    } else {
+      if (status.initialized && to.name === 'setup') {
+        next('/login')
+        return
+      }
+    } catch {
       next()
+      return
     }
-    return
   }
 
-  // 检查 setup 状态
-  try {
-    const status = await api.getSetupStatus()
-    setupChecked = true
-    isSetupInitialized = status.initialized
-
-    if (!status.initialized && to.name !== 'setup') {
-      next('/setup')
-    } else if (status.initialized && to.name === 'setup') {
-      next('/login')
-    } else if (to.meta.requiresAuth) {
-      try {
-        await api.getStats()
-        next()
-      } catch {
-        next('/login')
-      }
-    } else {
+  if (to.meta.requiresAuth && isSetupInitialized) {
+    try {
+      await api.getStats()
       next()
+    } catch {
+      next('/login')
     }
-  } catch {
-    // API 不可达，放行让后续处理
+  } else {
     next()
   }
 })

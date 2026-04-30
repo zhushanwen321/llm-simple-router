@@ -18,13 +18,13 @@ import { HTTP_BAD_GATEWAY } from "../core/constants.js";
 
 // ---------- Header sanitization ----------
 
-const AUTH_HEADER_RE = /^authorization$/i;
+const SENSITIVE_HEADER_RE = /^(authorization|x-api-key)$/i;
 
-/** 日志存储前脱敏 Authorization header，避免 API Key 被持久化 */
+/** 日志存储前脱敏 Authorization / x-api-key header，避免 API Key 被持久化 */
 export function sanitizeHeadersForLog(headers: Record<string, string>): Record<string, string> {
   const sanitized: Record<string, string> = {};
   for (const [key, value] of Object.entries(headers)) {
-    sanitized[key] = AUTH_HEADER_RE.test(key) ? value.replace(/(Bearer\s+)\S+/, "$1sk-***") : value;
+    sanitized[key] = SENSITIVE_HEADER_RE.test(key) ? value.replace(/(Bearer\s+)\S+/, "$1sk-***") : value;
   }
   return sanitized;
 }

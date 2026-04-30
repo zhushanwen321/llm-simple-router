@@ -78,6 +78,7 @@ function createDeps(overrides = {}) {
   container.register("adaptiveController", () => undefined);
   container.register("semaphoreManager", () => undefined);
   container.register(SERVICE_KEYS.logFileWriter, () => null);
+  container.register(SERVICE_KEYS.pluginRegistry, () => undefined);
   return {
     db: {} as any,
     orchestrator: { handle: vi.fn() } as any,
@@ -116,13 +117,15 @@ describe("handleProxyRequest", () => {
     expect(reply.code).toHaveBeenCalledWith(503);
   });
 
-  it("API type 不匹配时返回 500", async () => {
+  it("API type 不匹配时进行格式转换并调用 orchestrator", async () => {
     vi.mocked(resolveMapping).mockReturnValue({ target: { backend_model: "gpt-4", provider_id: "p1" }, targetCount: 1 });
     vi.mocked(getProviderById).mockReturnValue({ ...activeProvider, api_type: "anthropic" as const });
     const deps = createDeps();
+    deps.orchestrator.handle = vi.fn().mockResolvedValue(successResilienceResult);
     const reply = createReply();
     await handleProxyRequest(createRequest(), reply, "openai", "/v1/chat/completions", errors, deps);
-    expect(reply.code).toHaveBeenCalledWith(500);
+    // 不应该返回错误，而是应该调用 orchestrator 进行转发（转换后）
+    expect(deps.orchestrator.handle).toHaveBeenCalledTimes(1);
   });
 
   it("正常请求调用 orchestrator 并记录日志", async () => {

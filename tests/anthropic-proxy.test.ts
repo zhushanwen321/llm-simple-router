@@ -48,6 +48,7 @@ function buildTestApp(mockDb: Database.Database): FastifyInstance {
   container.register("sessionTracker", () => undefined);
   container.register("adaptiveController", () => undefined);
   container.register(SERVICE_KEYS.logFileWriter, () => null);
+  container.register(SERVICE_KEYS.pluginRegistry, () => undefined);
 
   app.register(anthropicProxy, { db: mockDb, container });
 

@@ -41,7 +41,7 @@ export function cleanRouterResponses(body: Record<string, unknown>): Record<stri
     }
     if (msg.role === "assistant") {
       const blocks = Array.isArray(msg.content) ? msg.content : [msg.content];
-      // 清理 router synthetic AskUserQuestion 的 tool_use 消息
+      // 清理 router synthetic AskUserQuestion 的 tool_use 消息（Anthropic content blocks）
       const toolUseBlocks = blocks.filter(
         (b) => b && typeof b === "object" && (b as { type?: string }).type === "tool_use"
           && (b as { name?: string }).name === "AskUserQuestion"
@@ -49,12 +49,19 @@ export function cleanRouterResponses(body: Record<string, unknown>): Record<stri
           && (b as { id?: string }).id!.startsWith(TOOL_USE_ID_PREFIX),
       );
       if (toolUseBlocks.length > 0 && toolUseBlocks.length === blocks.length) return false;
-      const texts = blocks
-        .filter((b): b is { type: string; text: string } => b?.type === "text" && typeof b.text === "string")
-        .map((b) => b.text);
-      const combined = texts.join("");
+      // 提取文本：兼容 Anthropic content blocks 和 OpenAI 纯字符串
+      const textParts: string[] = [];
+      for (const b of blocks) {
+        if (typeof b === "string") {
+          textParts.push(b);
+        } else if (b && typeof b === "object" && b.type === "text" && typeof b.text === "string") {
+          textParts.push(b.text);
+        }
+      }
+      const combined = textParts.join("");
       const stripped = combined.replace(RE_ROUTER_RESPONSE, "").trim();
-      if (!stripped) return false;
+      // 有 tool_calls 的消息即使 text 为空也保留（OpenAI 格式）
+      if (!stripped && !(msg as Record<string, unknown>).tool_calls) return false;
     }
     return true;
   });

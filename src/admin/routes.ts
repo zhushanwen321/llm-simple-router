@@ -17,6 +17,7 @@ import { adminRecommendedRoutes } from "./recommended.js";
 import { adminUsageRoutes } from "./usage.js";
 import { adminUpgradeRoutes } from "./upgrade.js";
 import { adminImportExportRoutes } from "./settings-import-export.js";
+import { adminTransformRuleRoutes } from "./transform-rules.js";
 import { adminScheduleRoutes } from "./schedules.js";
 import type { StateRegistry } from "../core/registry.js";
 import type { RequestTracker } from "../monitor/request-tracker.js";
@@ -29,6 +30,7 @@ interface AdminRoutesOptions {
   adaptiveController?: AdaptiveConcurrencyController;
   logFileWriter?: import("../storage/log-file-writer.js").LogFileWriter | null;
   logsDir?: string;
+  pluginRegistry?: import("../proxy/transform/plugin-registry.js").PluginRegistry;
   closeFn?: () => Promise<void>;
 }
 
@@ -49,9 +51,10 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (app, opti
   app.register(adminProxyEnhancementRoutes, { db: options.db, stateRegistry: options.stateRegistry });
   app.register(adminMonitorRoutes, { tracker: options.tracker });
   app.register(adminSettingsRoutes, { db: options.db, logsDir: options.logsDir });
-  app.register(adminImportExportRoutes, { db: options.db, stateRegistry: options.stateRegistry });
+  app.register(adminImportExportRoutes, { db: options.db, stateRegistry: options.stateRegistry, pluginRegistry: options.pluginRegistry });
   app.register(adminRecommendedRoutes, { db: options.db });
   app.register(adminUsageRoutes, { db: options.db });
   app.register(adminUpgradeRoutes, { db: options.db, closeFn: options.closeFn ?? (async () => {}) });
+  app.register(adminTransformRuleRoutes, { db: options.db, pluginRegistry: options.pluginRegistry });
   done();
 };

@@ -120,6 +120,7 @@ export function buildUpstreamHeaders(
   const headers = selectHeaders(clientHeaders, SKIP_UPSTREAM);
   if (apiType === "anthropic") {
     headers["x-api-key"] = apiKey;
+    headers["anthropic-version"] ??= "2023-06-01";
   } else {
     headers["Authorization"] = `Bearer ${apiKey}`;
   }

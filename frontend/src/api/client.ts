@@ -1,7 +1,7 @@
 import axios from "axios";
 import router from "@/router";
 import type { LogEntry } from "@/components/logs/types";
-import type { Provider, MappingGroup, ModelMapping } from "@/types/mapping";
+import type { Provider, MappingGroup, ModelMapping, TransformRule } from "@/types/mapping";
 import type { Schedule, SchedulePayload } from "@/types/schedule";
 import type {
   ActiveRequest,
@@ -26,10 +26,8 @@ const client = axios.create({
 client.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      // eslint-disable-line no-magic-numbers
-      if (error.response.data?.code === 40103) {
-        // eslint-disable-line no-magic-numbers -- NOT_INITIALIZED
+    if (error.response?.status === 401) { // eslint-disable-line no-magic-numbers
+      if (error.response.data?.code === 40103) { // eslint-disable-line no-magic-numbers
         router.push("/setup");
       } else {
         router.push("/login");
@@ -93,6 +91,7 @@ const API = {
   UPGRADE_RESTART: "/upgrade/restart",
   UPGRADE_SYNC_CONFIG: "/upgrade/sync-config",
   UPGRADE_SYNC_SOURCE: "/upgrade/sync-source",
+  TRANSFORM_RULES: "/transform-rules",
 } as const;
 
 // --- Payload types ---
@@ -564,4 +563,14 @@ export const api = {
     request<{ ok: boolean }>("post", API.UPGRADE_SYNC_CONFIG, { source }),
   setSyncSource: (source: "github" | "gitee") =>
     request<{ ok: boolean }>("put", API.UPGRADE_SYNC_SOURCE, { source }),
+
+  // Transform Rules
+  getTransformRules: (providerId: string) =>
+    request<TransformRule | null>("get", `${API.TRANSFORM_RULES}/${providerId}`),
+  upsertTransformRules: (providerId: string, data: Partial<TransformRule>) =>
+    request<{ success: boolean }>("put", `${API.TRANSFORM_RULES}/${providerId}`, data),
+  deleteTransformRules: (providerId: string) =>
+    request<{ success: boolean }>("delete", `${API.TRANSFORM_RULES}/${providerId}`),
+  reloadTransformRules: () =>
+    request<{ loadedPlugins: string[]; rulesCount: number }>("post", `${API.TRANSFORM_RULES}/reload`),
 };

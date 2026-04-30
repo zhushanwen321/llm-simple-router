@@ -21,6 +21,7 @@ import { openaiProxy } from "./proxy/handler/openai.js";
 import { anthropicProxy } from "./proxy/handler/anthropic.js";
 import { adminRoutes } from "./admin/routes.js";
 import { RetryRuleMatcher } from "./proxy/orchestration/retry-rules.js";
+import { PluginRegistry } from "./proxy/transform/plugin-registry.js";
 import { ProviderSemaphoreManager } from "./proxy/orchestration/semaphore.js";
 import { AdaptiveConcurrencyController } from "./proxy/adaptive-controller.js";
 import { loadEnhancementConfig } from "./proxy/routing/enhancement-config.js";
@@ -248,6 +249,13 @@ export async function buildApp(
     return ac;
   });
 
+  // 注册 PluginRegistry（从 DB 和 plugins 目录加载转换插件）
+  const pluginRegistry = new PluginRegistry();
+  pluginRegistry.loadFromDB(db);
+  const pluginsDir = path.resolve(__dirname, "../plugins/transform");
+  pluginRegistry.scanPluginsDir(pluginsDir);
+  container.register(SERVICE_KEYS.pluginRegistry, () => pluginRegistry);
+
   // 从容器解析所有服务
   const matcher = container.resolve<RetryRuleMatcher>(SERVICE_KEYS.matcher);
   const semaphoreManager = container.resolve<ProviderSemaphoreManager>(SERVICE_KEYS.semaphoreManager);
@@ -288,7 +296,7 @@ export async function buildApp(
   // 但 restart API 需要在运行时调用它
   const closeRef = { fn: async () => {} };
 
-  app.register(adminRoutes, { db, stateRegistry, tracker, adaptiveController, logFileWriter, logsDir, closeFn: () => closeRef.fn() });
+  app.register(adminRoutes, { db, stateRegistry, tracker, adaptiveController, logFileWriter, logsDir, closeFn: () => closeRef.fn(), pluginRegistry });
 
   // 前端静态文件服务（生产环境）
   const frontendDist = path.resolve(

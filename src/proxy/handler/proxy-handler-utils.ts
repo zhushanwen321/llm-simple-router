@@ -2,6 +2,7 @@ import { createHash } from "crypto";
 import type { ContentBlock } from "../../monitor/types.js";
 import type { ToolCallRecord } from "../loop-prevention/types.js";
 import type { TransportResult } from "../types.js";
+import { parseToolArguments } from "../transform/sanitize.js";
 
 const HASH_DIGEST_LENGTH = 16;
 
@@ -19,10 +20,7 @@ export function serializeBlocksForStorage(blocks: ContentBlock[] | undefined, ap
     const content = blocks.map(b => {
       if (b.type === "thinking") return { type: "thinking", thinking: b.content };
       if (b.type === "tool_use") {
-        let input = {};
-        // eslint-disable-next-line taste/no-silent-catch
-        try { input = JSON.parse(b.content || "{}"); } catch { /* tool_use content 非合法 JSON 时保留空对象 */ }
-        return { type: "tool_use", name: b.name ?? "", input };
+        return { type: "tool_use", name: b.name ?? "", input: parseToolArguments(b.content) };
       }
       return { type: "text", text: b.content };
     });

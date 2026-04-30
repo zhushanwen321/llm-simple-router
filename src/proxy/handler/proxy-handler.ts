@@ -108,6 +108,7 @@ export interface RouteHandlerDeps {
 import { getConfig } from "../../config/index.js";
 import type { ServiceContainer } from "../../core/container.js";
 import { SERVICE_KEYS } from "../../core/container.js";
+import { TransformCoordinator } from "../transform/transform-coordinator.js";
 
 // ---------- Main entry ----------
 
@@ -211,6 +212,8 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
   const config = getConfig();
   const excludeTargets: Target[] = [];
   let rootLogId: string | null = null;
+  // TransformCoordinator 无状态，只需创建一次
+  const coordinator = new TransformCoordinator();
   while (true) {
     const startTime = Date.now();
     const logId = randomUUID();
@@ -268,27 +271,51 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
       return rejectAndReply(reply, rCtx, errors.providerUnavailable(),
         `Provider '${resolved.provider_id}' unavailable`, resolved.provider_id);
     }
-    if (provider.api_type !== apiType) {
-      return rejectAndReply(reply, rCtx, errors.providerTypeMismatch(),
-        `API type mismatch: expected '${apiType}'`, resolved.provider_id);
+    // --- 溢出重定向：上下文超出时切换到更大模型（必须在 transform 之前，确保使用正确的 api_type） ---
+    const overflowResult = applyOverflowRedirect(resolved, deps.db, currentBody);
+    if (overflowResult) {
+      const overflowProvider = getProviderById(deps.db, overflowResult.provider_id);
+      if (overflowProvider && overflowProvider.is_active) {
+        resolved = { ...resolved, provider_id: overflowResult.provider_id, backend_model: overflowResult.backend_model };
+        provider = overflowProvider;
+        currentBody = { ...currentBody, model: overflowResult.backend_model };
+      }
+    }
+
+    // 格式转换：apiType 不匹配时转换请求体和路径
+    const needsTransform = coordinator.needsTransform(apiType, provider.api_type);
+    let effectiveApiType = apiType;
+    let effectiveUpstreamPath = upstreamPath;
+
+    if (needsTransform) {
+      const transformed = coordinator.transformRequest(currentBody, apiType, provider.api_type, resolved.backend_model);
+      // 用转换后的结果替换 currentBody
+      currentBody = transformed.body as Record<string, unknown>;
+      effectiveUpstreamPath = transformed.upstreamPath;
+      effectiveApiType = provider.api_type;
     }
 
     // routing — 创建新对象而非 in-place mutation
     currentBody = { ...currentBody, model: resolved.backend_model };
     iterationSnapshot.add({ stage: "routing", client_model: effectiveModel, backend_model: resolved.backend_model, provider_id: resolved.provider_id, strategy: resolveResult.targetCount > 1 ? "failover" : "scheduled" });
 
-    // --- 溢出重定向：上下文超出时切换到更大模型 ---
-    const overflowResult = applyOverflowRedirect(resolved, deps.db, currentBody);
-    if (overflowResult) {
-      const overflowProvider = getProviderById(deps.db, overflowResult.provider_id);
-      if (overflowProvider && overflowProvider.is_active && overflowProvider.api_type === apiType) {
-        resolved = { ...resolved, provider_id: overflowResult.provider_id, backend_model: overflowResult.backend_model };
-        provider = overflowProvider;
-        currentBody = { ...currentBody, model: overflowResult.backend_model };
-        iterationSnapshot.add({ stage: "overflow", triggered: true, redirect_to: overflowResult.backend_model, redirect_provider: overflowResult.provider_id });
-      }
-    } else {
-      iterationSnapshot.add({ stage: "overflow", triggered: false });
+    // overflow redirect 已在 transform 之前完成，此处不再重复
+    iterationSnapshot.add({ stage: "overflow", triggered: overflowResult != null });
+
+    // Plugin 调整 body 和 headers（不受 needsTransform 限制，inject_headers 等同格式也需要）
+    let injectedHeaders: Record<string, string> = {};
+    const pluginRegistry = deps.container.resolve<import("../transform/plugin-registry.js").PluginRegistry>(SERVICE_KEYS.pluginRegistry);
+    if (pluginRegistry) {
+      const pluginCtx: import("../transform/plugin-types.js").RequestTransformContext = {
+        body: currentBody,
+        headers: {},
+        sourceApiType: apiType,
+        targetApiType: provider.api_type as "openai" | "anthropic",
+        provider: { id: provider.id, name: provider.name, base_url: provider.base_url, api_type: provider.api_type },
+      };
+      pluginRegistry.applyBeforeRequest(pluginCtx);
+      pluginRegistry.applyAfterRequest(pluginCtx);
+      injectedHeaders = pluginCtx.headers;
     }
 
     // provider patches — 使用返回值
@@ -307,16 +334,48 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
     const reqBodyStr = JSON.stringify(patchedBody);
     const clientReq = JSON.stringify({ headers: cliHdrs, body: rawBody });
     const upstreamReqBase = JSON.stringify({
-      url: buildUpstreamUrl(provider.base_url, upstreamPath),
-      headers: sanitizeHeadersForLog(buildUpstreamHeaders(cliHdrs, apiKey, Buffer.byteLength(reqBodyStr), apiType)),
+      url: buildUpstreamUrl(provider.base_url, effectiveUpstreamPath),
+      headers: sanitizeHeadersForLog(buildUpstreamHeaders(cliHdrs, apiKey, Buffer.byteLength(reqBodyStr), effectiveApiType)),
       body: reqBodyStr,
     });
 
+    const formatTransform = needsTransform ? coordinator.createFormatTransform(apiType, provider.api_type, resolved.backend_model) : undefined;
+    if (formatTransform) {
+      formatTransform.on("warning", (err) => request.log.warn({ err, logId }, "formatTransform warning"));
+    }
+    const responseTransform = needsTransform ? (bodyStr: string): string => {
+      try {
+        const parsed = JSON.parse(bodyStr);
+        if (parsed.type === "error" || parsed.error) {
+          return coordinator.transformErrorResponse(bodyStr, provider.api_type, apiType);
+        }
+        let transformed = coordinator.transformResponse(bodyStr, provider.api_type, apiType);
+        if (pluginRegistry && !isStream) {
+          try {
+            const respObj = JSON.parse(transformed);
+            const respCtx: import("../transform/plugin-types.js").ResponseTransformContext = {
+              response: respObj,
+              sourceApiType: provider.api_type as "openai" | "anthropic",
+              targetApiType: apiType,
+              provider: { id: provider.id, name: provider.name, base_url: provider.base_url, api_type: provider.api_type },
+            };
+            pluginRegistry.applyBeforeResponse(respCtx);
+            pluginRegistry.applyAfterResponse(respCtx);
+            transformed = JSON.stringify(respCtx.response);
+          } catch { /* response hooks best-effort */ }
+        }
+        return transformed;
+      } catch (err) {
+        request.log.error({ err }, "responseTransform failed");
+        return bodyStr;
+      }
+    } : undefined;
+
     const transportFn = buildTransportFn({
-      provider, apiKey, body: patchedBody, cliHdrs, reply, upstreamPath, apiType,
+      provider, apiKey, body: patchedBody, cliHdrs, reply, upstreamPath: effectiveUpstreamPath, apiType: effectiveApiType,
       isStream, startTime, logId, effectiveModel, originalModel,
       streamTimeoutMs: config.STREAM_TIMEOUT_MS, tracker, matcher, request,
-      streamLoopEnabled,
+      streamLoopEnabled, formatTransform, responseTransform, injectedHeaders,
     });
 
     const pipelineSnapshot = iterationSnapshot.toJSON();
@@ -342,6 +401,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
 
       const tr = resilienceResult.result;
       const succeeded = tr.kind === "success" || tr.kind === "stream_success" || tr.kind === "stream_abort";
+
       if (succeeded) usageWindowTracker?.recordRequest(provider.id, routerKeyId ?? undefined);
 
       if (isStream && tracker) {

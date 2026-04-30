@@ -49,6 +49,7 @@ function buildTestApp(
   container.register("sessionTracker", () => undefined);
   container.register("adaptiveController", () => undefined);
   container.register(SERVICE_KEYS.logFileWriter, () => null);
+  container.register(SERVICE_KEYS.pluginRegistry, () => undefined);
   const app = Fastify();
   app.register(openaiProxy, { db: mockDb, container });
   return app;
