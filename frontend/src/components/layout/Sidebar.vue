@@ -378,6 +378,14 @@ function toggleGroup(index: number) {
   expandedGroups.value = next
 }
 
+const route = useRoute()
+const router = useRouter()
+
+function isActive(path: string): boolean {
+  if (path === '/') return route.path === '/'
+  return route.path.startsWith(path)
+}
+
 // Auto-expand group when sub-item is active
 watch(
   () => route.path,
@@ -392,14 +400,6 @@ watch(
   },
   { immediate: true },
 )
-
-const route = useRoute()
-const router = useRouter()
-
-function isActive(path: string): boolean {
-  if (path === '/') return route.path === '/'
-  return route.path.startsWith(path)
-}
 
 async function handleRestart() {
   try {
