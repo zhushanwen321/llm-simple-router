@@ -117,8 +117,23 @@ function makeXTickCallback(ticks: Set<number>) {
   }
 }
 
+/** Detect if dark mode is active */
+function isDarkMode(): boolean {
+  return document.documentElement.classList.contains('dark')
+}
+
+/** Grid/tick colors that adapt to the current theme */
+function chartThemeColors() {
+  const dark = isDarkMode()
+  return {
+    gridColor: dark ? 'oklch(1 0 0 / 10%)' : 'oklch(0.922 0 0)',
+    tickColor: dark ? 'oklch(0.708 0 0)' : 'oklch(0.556 0 0)',
+  }
+}
+
 export function lineOptions(unit: string, labels: string[]): ChartOptions<'line'> {
   const ticks = tickIndices(labels.length)
+  const colors = chartThemeColors()
   return {
     responsive: true,
     maintainAspectRatio: false,
@@ -133,27 +148,28 @@ export function lineOptions(unit: string, labels: string[]): ChartOptions<'line'
       x: {
         display: true,
         grid: { display: false },
-        ticks: { maxRotation: 0, autoSkip: false, callback: makeXTickCallback(ticks) },
+        ticks: { maxRotation: 0, autoSkip: false, callback: makeXTickCallback(ticks), color: colors.tickColor },
       },
-      y: { display: true, beginAtZero: true },
+      y: { display: true, beginAtZero: true, grid: { color: colors.gridColor }, ticks: { color: colors.tickColor } },
     },
   }
 }
 
 export function stackedAreaOptions(labels: string[]): ChartOptions<'line'> {
   const ticks = tickIndices(labels.length)
+  const colors = chartThemeColors()
   return {
     responsive: true,
     maintainAspectRatio: false,
     interaction: { mode: 'index', intersect: false },
-    plugins: { legend: { position: 'bottom' } },
+    plugins: { legend: { position: 'bottom', labels: { color: colors.tickColor } } },
     scales: {
       x: {
         stacked: true,
         grid: { display: false },
-        ticks: { maxRotation: 0, autoSkip: false, callback: makeXTickCallback(ticks) },
+        ticks: { maxRotation: 0, autoSkip: false, callback: makeXTickCallback(ticks), color: colors.tickColor },
       },
-      y: { stacked: true, beginAtZero: true },
+      y: { stacked: true, beginAtZero: true, grid: { color: colors.gridColor }, ticks: { color: colors.tickColor } },
     },
   }
 }

@@ -1,6 +1,15 @@
 <!-- eslint-disable vue/multi-word-component-names -->
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-background">
+  <div class="min-h-screen flex items-center justify-center bg-background relative">
+    <Button
+      variant="ghost"
+      size="icon"
+      class="absolute top-4 right-4 text-muted-foreground hover:text-foreground"
+      @click="toggleTheme"
+    >
+      <Moon v-if="!isDark" class="w-4 h-4" />
+      <Sun v-else class="w-4 h-4" />
+    </Button>
     <Card class="w-full max-w-sm shadow-lg">
       <CardContent class="pt-6">
         <div class="text-center mb-6">
@@ -44,6 +53,10 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { Moon, Sun } from 'lucide-vue-next'
+import { useTheme } from '@/composables/useTheme'
+
+const { isDark, toggleTheme } = useTheme()
 
 const router = useRouter()
 const password = ref('')

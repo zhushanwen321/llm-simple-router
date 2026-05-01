@@ -1,10 +1,11 @@
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import type { ChartData } from 'chart.js'
 import { api, getApiMessage } from '@/api/client'
 import { toast } from 'vue-sonner'
 import { fillTimeseries } from '@/views/metrics-helpers'
 import { CHART_COLORS } from '@/styles/design-tokens'
 import { formatTimeShort } from '@/utils/format'
+import { watchTheme } from '@/composables/useTheme'
 import type { Provider } from '@/types/mapping'
 
 export interface DashboardStats {
@@ -298,6 +299,9 @@ export function useDashboard() {
     }
   })
 
+  // --- Watch theme changes to re-render charts ---
+  let stopWatchTheme: (() => void) | null = null
+
   onMounted(async () => {
     await loadProviders()
     await loadFilterOptions()
@@ -305,6 +309,12 @@ export function useDashboard() {
       await loadProviderOutputTokens()
     }
     await refresh()
+    // Re-render charts when theme changes (Chart.js doesn't support CSS vars)
+    stopWatchTheme = watchTheme(() => refresh())
+  })
+
+  onUnmounted(() => {
+    if (stopWatchTheme) stopWatchTheme()
   })
 
   return {
