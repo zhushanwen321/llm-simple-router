@@ -164,7 +164,7 @@ export async function handleProxyRequest(
   if (enhancementConfig.tool_call_loop_enabled && sessionTracker && sessionId) {
     const routerKeyId = (request.routerKey as { id?: string } | undefined)?.id ?? null;
     const sessionKey = routerKeyId ? `${routerKeyId}:${sessionId}` : sessionId;
-    const lastToolUse = extractLastToolUse(enhancedBody);
+    const lastToolUse = extractLastToolUse(pipelineBody);
     if (lastToolUse) {
       const toolGuard = new ToolLoopGuard(sessionTracker, {
         enabled: true,
@@ -176,7 +176,7 @@ export async function handleProxyRequest(
         const loopCount = sessionTracker.getLoopCount(sessionKey);
         if (loopCount === 1) {
           // 层级 1：透明重试 — 注入中断提示词
-          pipelineBody = toolGuard.injectLoopBreakPrompt(enhancedBody, apiType, lastToolUse.toolName);
+          pipelineBody = toolGuard.injectLoopBreakPrompt(pipelineBody, apiType, lastToolUse.toolName);
           snapshot.add({ stage: "tool_guard", action: "inject_break_prompt", tool: lastToolUse.toolName });
           request.log.warn({ sessionId, toolName: lastToolUse.toolName, loopCount },
             "Tool call loop detected, injecting break prompt");

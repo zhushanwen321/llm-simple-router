@@ -336,7 +336,10 @@ export async function buildApp(
     log: app.log,
   });
 
+  let closed = false;
   let close = async () => {
+    if (closed) return;
+    closed = true;
     stopUpgradeChecker();
     logCleanup.stop();
     dbSizeMonitor.stop();

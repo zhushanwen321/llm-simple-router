@@ -28,9 +28,9 @@ export function compressFinishedFiles(baseDir: string, now: Date): number {
       const fileHour = parseInt(match[1], 10);
       const fileMinute = parseInt(match[2], 10);
 
-      // 使用本地时间构建窗口结束时间
-      const windowEnd = new Date(`${dayDir.name}T${String(fileHour).padStart(TIME_PAD_WIDTH, "0")}:${String(fileMinute).padStart(TIME_PAD_WIDTH, "0")}:00`);
-      windowEnd.setMinutes(windowEnd.getMinutes() + WINDOW_MINUTES);
+      // 使用本地时间构建窗口结束时间（使用 Date 构造函数，避免字符串解析的 V8 依赖）
+      const dateParts = dayDir.name.split("-").map(Number);
+      const windowEnd = new Date(dateParts[0], dateParts[1] - 1, dateParts[2], fileHour, fileMinute + WINDOW_MINUTES);
 
       if (now >= windowEnd) {
         const filePath = join(dirPath, file);
