@@ -85,53 +85,46 @@
       </Card>
     </div>
 
-    <!-- Model Config (full width) -->
-    <Card>
-      <CardHeader class="pb-3">
-        <div class="flex items-center justify-between">
-          <CardTitle class="text-sm font-medium">模型配置</CardTitle>
-          <Badge variant="secondary" class="text-xs">{{ modelConfigs.length }} 个模型</Badge>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div class="grid grid-cols-2 gap-3">
-          <ModelCard
-            v-for="(model, index) in modelConfigs"
-            :key="model.name"
-            :model="model"
-            :api-type="apiType"
-            :is-deep-seek="model.name.toLowerCase().includes('deepseek')"
-            :is-non-openai-endpoint="isNonOpenaiEndpoint"
-            @update:model="updateModel(index, $event)"
-            @remove="removeModel(index)"
-          />
-        </div>
-        <p v-if="modelConfigs.length === 0" class="py-8 text-center text-sm text-muted-foreground">
-          请先选择供应商与套餐
-        </p>
-      </CardContent>
-    </Card>
-
-    <!-- Row 2: Mappings (left) | Retry rules (right) -->
-    <div class="grid grid-cols-2 gap-4">
-      <!-- Left: Mappings -->
-      <Card>
+    <!-- Row 2: Models + Mappings (left) | Retry rules (right) -->
+    <div class="grid grid-cols-5 gap-4">
+      <!-- Left: Models & Mappings -->
+      <Card class="col-span-3">
         <CardHeader class="pb-3">
           <div class="flex items-center justify-between">
-            <CardTitle class="text-sm font-medium">模型映射</CardTitle>
-            <Badge variant="secondary" class="text-xs">{{ mappingPreview.length }} 条</Badge>
+            <CardTitle class="text-sm font-medium">模型与映射</CardTitle>
+            <div class="flex items-center gap-2">
+              <Badge variant="secondary" class="text-xs">{{ enabledModelCount }} 个模型</Badge>
+              <Badge variant="secondary" class="text-xs">{{ mappingPreview.length }} 条映射</Badge>
+            </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <MappingPreview
-            :mappings="mappingPreview"
-            :available-models="enabledModelNames"
-          />
+        <CardContent class="space-y-4">
+          <div class="grid grid-cols-2 gap-3">
+            <ModelCard
+              v-for="(model, index) in modelConfigs"
+              :key="model.name"
+              :model="model"
+              :api-type="apiType"
+              :is-deep-seek="model.name.toLowerCase().includes('deepseek')"
+              :is-non-openai-endpoint="isNonOpenaiEndpoint"
+              @update:model="updateModel(index, $event)"
+              @remove="removeModel(index)"
+            />
+          </div>
+          <p v-if="modelConfigs.length === 0" class="py-4 text-center text-sm text-muted-foreground">
+            请先选择供应商与套餐
+          </p>
+          <div v-if="mappingPreview.length > 0" class="border-t pt-3">
+            <MappingPreview
+              :mappings="mappingPreview"
+              :available-models="enabledModelNames"
+            />
+          </div>
         </CardContent>
       </Card>
 
       <!-- Right: Retry rules -->
-      <Card>
+      <Card class="col-span-2">
         <CardHeader class="pb-3">
           <div class="flex items-center justify-between">
             <CardTitle class="text-sm font-medium">重试规则</CardTitle>
