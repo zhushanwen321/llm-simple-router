@@ -22,6 +22,7 @@ export interface RecommendedRetryRule {
   retry_delay_ms: number
   max_retries: number
   max_delay_ms: number
+  providers?: string[]
 }
 
 let cachedProviders: ProviderGroup[] = []

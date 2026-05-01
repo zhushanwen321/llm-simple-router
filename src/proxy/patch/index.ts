@@ -41,8 +41,8 @@ export function applyProviderPatches(
     const modelPatches = modelEntry?.patches ?? [];
 
     if (modelPatches.length > 0) {
-      // developer_role 补丁
-      if (modelPatches.includes("developer_role") && hasDeveloperRole(body)) {
+      // developer_role 补丁（仅 openai 格式需要）
+      if (modelPatches.includes("developer_role") && provider.api_type === "openai" && hasDeveloperRole(body)) {
         patchDeveloperRole(ensureCloned());
         patches.push("developer_role");
       }

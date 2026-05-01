@@ -99,7 +99,7 @@ function updatePatches(patches: string[]) {
                   open ? 'rotate-0' : '-rotate-90',
                 )"
               />
-              {{ open ? '收起补丁' : `补丁 (${model.patches.length})` }}
+              {{ open ? '收起' : `兼容性补丁 (${model.patches.length})` }}
             </button>
           </CollapsibleTrigger>
           <CollapsibleContent class="pt-2">

@@ -1,4 +1,4 @@
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { api, getApiMessage, type ProviderGroup, type RecommendedRetryRule, type QuickSetupPayload } from '@/api/client'
 import { toast } from 'vue-sonner'
 import {
@@ -13,10 +13,11 @@ export function useQuickSetup() {
   const providerGroups = ref<ProviderGroup[]>([])
   const selectedGroup = ref('')
   const selectedPlan = ref('')
+  const apiType = ref<'openai' | 'anthropic'>('anthropic')
   const apiKey = ref('')
   const modelConfigs = ref<ModelConfig[]>([])
   const mappingPreview = ref<MappingPreviewItem[]>([])
-  const recommendedRules = ref<RecommendedRetryRule[]>([])
+  const allRecommendedRules = ref<RecommendedRetryRule[]>([])
   const selectedRetryRules = ref<Set<string>>(new Set())
   const saving = ref(false)
   const connectionStatus = ref<'idle' | 'testing' | 'ok' | 'error'>('idle')
@@ -33,7 +34,6 @@ export function useQuickSetup() {
     return group.presets.find(p => p.plan === selectedPlan.value)
   })
 
-  const apiType = computed(() => currentPreset.value?.apiType ?? 'openai')
   const baseUrl = computed(() => currentPreset.value?.baseUrl ?? '')
 
   const availablePlans = computed(() => {
@@ -45,21 +45,30 @@ export function useQuickSetup() {
     return !baseUrl.value.includes('openai.com')
   })
 
-  // --- Patch defaults ---
+  // Filter retry rules by selected provider
+  const recommendedRules = computed(() => {
+    const group = selectedGroup.value
+    return allRecommendedRules.value.filter(r => {
+      if (!r.providers || r.providers.length === 0) return true // universal rules
+      return r.providers.includes(group)
+    })
+  })
 
-  function getDefaultPatches(modelName: string, type: 'openai' | 'anthropic'): string[] {
+  // --- Patch defaults ---
+  function getDefaultPatches(modelName: string, format: 'openai' | 'anthropic'): string[] {
     const patches: string[] = []
     const isDeepseek = modelName.toLowerCase().includes('deepseek')
 
     if (isDeepseek) {
-      if (type === 'anthropic') {
+      if (format === 'anthropic') {
         patches.push('thinking-param', 'cache-control', 'thinking-blocks', 'orphan-tool-results')
       } else {
         patches.push('non-ds-tools', 'orphan-tool-results-oa')
       }
     }
 
-    if (type === 'openai' && isNonOpenaiEndpoint.value) {
+    // developer-role only needed for openai format on non-OpenAI endpoints
+    if (format === 'openai' && isNonOpenaiEndpoint.value) {
       patches.push('developer-role')
     }
 
@@ -76,7 +85,6 @@ export function useQuickSetup() {
   }
 
   // --- Mappings ---
-
   function updateMappings() {
     const enabledModels = modelConfigs.value.filter(m => m.enabled)
     const clientDefaults = DEFAULT_CLIENT_MAPPINGS[clientType.value]
@@ -96,8 +104,13 @@ export function useQuickSetup() {
     }
   }
 
-  // --- Client / Provider / Plan selection ---
+  // --- Auto-select retry rules when provider changes ---
+  function autoSelectRetryRules() {
+    // Select all recommended rules for the current provider
+    selectedRetryRules.value = new Set(recommendedRules.value.map(r => r.name))
+  }
 
+  // --- Client / Provider / Plan selection ---
   function selectClient(type: ClientType) {
     clientType.value = type
     const client = CLIENTS.find(c => c.id === type)
@@ -112,6 +125,7 @@ export function useQuickSetup() {
         for (const preset of group.presets) {
           if (preset.plan === client.defaultPlan) {
             selectedPlan.value = preset.plan
+            apiType.value = preset.apiType as 'openai' | 'anthropic'
             initModels(preset)
             break
           }
@@ -121,6 +135,7 @@ export function useQuickSetup() {
     }
 
     updateMappings()
+    autoSelectRetryRules()
   }
 
   function onProviderChange(group: string) {
@@ -130,11 +145,19 @@ export function useQuickSetup() {
 
     const groupData = providerGroups.value.find(g => g.group === group)
     if (groupData && groupData.presets.length > 0) {
-      selectedPlan.value = groupData.presets[0].plan
-      initModels(groupData.presets[0])
+      // Auto-select plan matching client format preference
+      const client = currentClient.value
+      const match = client
+        ? groupData.presets.find(p => p.apiType === client.format)
+        : null
+      const preset = match ?? groupData.presets[0]
+      selectedPlan.value = preset.plan
+      apiType.value = preset.apiType as 'openai' | 'anthropic'
+      initModels(preset)
     }
 
     updateMappings()
+    autoSelectRetryRules()
   }
 
   function onPlanChange(plan: string) {
@@ -143,12 +166,19 @@ export function useQuickSetup() {
     if (!group) return
     const preset = group.presets.find(p => p.plan === plan)
     if (!preset) return
+    apiType.value = preset.apiType as 'openai' | 'anthropic'
     initModels(preset)
     updateMappings()
   }
 
-  // --- Retry rules ---
+  // When apiType changes, re-evaluate patches for all models
+  watch(apiType, () => {
+    for (const model of modelConfigs.value) {
+      model.patches = getDefaultPatches(model.name, apiType.value)
+    }
+  })
 
+  // --- Retry rules ---
   function toggleRetryRule(name: string, checked: boolean) {
     const next = new Set(selectedRetryRules.value)
     if (checked) {
@@ -160,7 +190,6 @@ export function useQuickSetup() {
   }
 
   // --- Connection test ---
-
   async function testConnection() {
     if (!apiKey.value.trim()) {
       connectionStatus.value = 'error'
@@ -173,7 +202,6 @@ export function useQuickSetup() {
   }
 
   // --- Submit ---
-
   async function submit() {
     if (!currentPreset.value) {
       toast.error('请选择供应商和套餐')
@@ -188,7 +216,7 @@ export function useQuickSetup() {
     try {
       const payload: QuickSetupPayload = {
         provider: {
-          name: selectedGroup.value,
+          name: selectedGroup.value.toLowerCase().replace(/\s+/g, '-'),
           api_type: apiType.value,
           base_url: baseUrl.value,
           api_key: apiKey.value.trim(),
@@ -202,7 +230,7 @@ export function useQuickSetup() {
           client_model: m.from,
           backend_model: m.to,
         })),
-        retry_rules: recommendedRules.value
+        retry_rules: allRecommendedRules.value
           .filter(r => selectedRetryRules.value.has(r.name))
           .map(r => ({
             name: r.name,
@@ -226,7 +254,6 @@ export function useQuickSetup() {
   }
 
   // --- Init ---
-
   onMounted(async () => {
     try {
       const [groups, rules] = await Promise.all([
@@ -234,7 +261,7 @@ export function useQuickSetup() {
         api.recommended.getRetryRules(),
       ])
       providerGroups.value = groups
-      recommendedRules.value = rules
+      allRecommendedRules.value = rules
 
       selectClient('claude-code')
     } catch (e: unknown) {
@@ -244,9 +271,10 @@ export function useQuickSetup() {
 
   return {
     clientType, providerGroups, selectedGroup, selectedPlan,
-    apiKey, modelConfigs, mappingPreview, recommendedRules,
+    apiType, apiKey, modelConfigs, mappingPreview,
+    allRecommendedRules, recommendedRules,
     selectedRetryRules, saving, connectionStatus,
-    currentClient, currentPreset, apiType, baseUrl,
+    currentClient, currentPreset, baseUrl,
     availablePlans, isNonOpenaiEndpoint,
     selectClient, onProviderChange, onPlanChange,
     initModels, getDefaultPatches, updateMappings,

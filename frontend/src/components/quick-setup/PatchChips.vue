@@ -19,7 +19,7 @@ const visibleGroups = computed<PatchGroup[]>(() => {
   return PATCH_GROUPS.filter((g) => {
     if (g.key === 'deepseek_anthropic') return props.isDeepSeek && props.apiType === 'anthropic'
     if (g.key === 'deepseek_openai') return props.isDeepSeek && props.apiType === 'openai'
-    if (g.key === 'general') return props.isNonOpenaiEndpoint
+    if (g.key === 'general') return props.apiType === 'openai' && props.isNonOpenaiEndpoint
     return true
   })
 })

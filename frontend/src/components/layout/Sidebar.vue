@@ -1,6 +1,6 @@
 <!-- eslint-disable vue/multi-word-component-names -->
 <template>
-  <aside class="w-56 bg-sidebar text-sidebar-foreground flex-shrink-0 flex flex-col">
+  <aside class="w-56 h-full bg-sidebar text-sidebar-foreground flex-shrink-0 flex flex-col overflow-hidden">
     <div class="p-4 border-b border-sidebar-border">
       <div class="flex items-center gap-2">
         <div class="w-8 h-8 bg-sidebar-primary rounded-lg flex items-center justify-center">

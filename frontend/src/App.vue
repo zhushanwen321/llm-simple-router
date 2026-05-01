@@ -1,5 +1,5 @@
 <template>
-  <div v-if="isAuthenticated" class="min-h-screen flex">
+  <div v-if="isAuthenticated" class="h-screen flex overflow-hidden">
     <Sidebar />
     <main class="flex-1 overflow-auto bg-muted">
       <router-view />
