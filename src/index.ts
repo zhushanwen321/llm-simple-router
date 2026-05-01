@@ -336,11 +336,16 @@ export async function buildApp(
     log: app.log,
   });
 
+  let closed = false;
   let close = async () => {
+    if (closed) return;
+    closed = true;
     stopUpgradeChecker();
     logCleanup.stop();
     dbSizeMonitor.stop();
     tracker.stopPushInterval();
+    // 关闭所有 SSE 长连接，防止 app.close() 因 hijack 的连接无限等待
+    tracker.closeAllClients();
     modelState.clearAll();
     semaphoreManager.removeAll();
     const sessionTracker = container.resolve<SessionTracker>(SERVICE_KEYS.sessionTracker);
@@ -402,7 +407,25 @@ export async function main() {
   });
 
   // 优雅关闭：SIGTERM（systemd/docker stop）和 SIGINT（Ctrl+C）
+  let isShuttingDown = false;
+  const GRACEFUL_SHUTDOWN_TIMEOUT_MS = 10_000;
+
   const shutdown = async (signal: string) => {
+    // 防止重复触发：多次 Ctrl+C 只执行一次关闭
+    if (isShuttingDown) {
+      app.log.info(`Received ${signal} again, already shutting down...`);
+      return;
+    }
+    isShuttingDown = true;
+
+    // 强制退出兜底：优雅关闭超过 N 秒则强制退出
+    const forceTimer = setTimeout(() => {
+      app.log.error("Graceful shutdown timed out, forcing exit");
+      process.exit(1);
+    }, GRACEFUL_SHUTDOWN_TIMEOUT_MS);
+    // 不阻止进程退出
+    forceTimer.unref();
+
     try {
       app.log.info(`Received ${signal}, shutting down gracefully...`);
       await close();
@@ -410,6 +433,7 @@ export async function main() {
     } catch (err) {
       app.log.error({ err }, "Error during shutdown");
     }
+    clearTimeout(forceTimer);
     process.exit(0);
   };
   process.on("SIGTERM", () => shutdown("SIGTERM"));

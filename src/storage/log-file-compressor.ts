@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, writeFileSync, unlinkSync, rmSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { gzipSync } from "node:zlib";
-import { WINDOW_MINUTES, TIME_PAD_WIDTH, ISO_DATE_LENGTH } from "./types.js";
+import { WINDOW_MINUTES, TIME_PAD_WIDTH, localDateStr } from "./types.js";
 
 const SECONDS_PER_MINUTE = 60;
 const MS_PER_SECOND = 1000;
@@ -28,8 +28,9 @@ export function compressFinishedFiles(baseDir: string, now: Date): number {
       const fileHour = parseInt(match[1], 10);
       const fileMinute = parseInt(match[2], 10);
 
-      const windowEnd = new Date(`${dayDir.name}T${String(fileHour).padStart(TIME_PAD_WIDTH, "0")}:${String(fileMinute).padStart(TIME_PAD_WIDTH, "0")}:00Z`);
-      windowEnd.setUTCMinutes(windowEnd.getUTCMinutes() + WINDOW_MINUTES);
+      // 使用本地时间构建窗口结束时间（使用 Date 构造函数，避免字符串解析的 V8 依赖）
+      const dateParts = dayDir.name.split("-").map(Number);
+      const windowEnd = new Date(dateParts[0], dateParts[1] - 1, dateParts[2], fileHour, fileMinute + WINDOW_MINUTES);
 
       if (now >= windowEnd) {
         const filePath = join(dirPath, file);
@@ -53,9 +54,7 @@ export function compressFinishedFiles(baseDir: string, now: Date): number {
 export function cleanExpiredDirs(baseDir: string, retentionDays: number, now: Date): number {
   if (!existsSync(baseDir)) return 0;
 
-  const cutoff = new Date(now);
-  cutoff.setUTCDate(cutoff.getUTCDate() - retentionDays);
-  const cutoffStr = cutoff.toISOString().slice(0, ISO_DATE_LENGTH);
+  const cutoffStr = localDateStr(new Date(now.getFullYear(), now.getMonth(), now.getDate() - retentionDays));
 
   let deleted = 0;
   const dayDirs = readdirSync(baseDir, { withFileTypes: true })

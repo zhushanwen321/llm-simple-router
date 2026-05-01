@@ -111,6 +111,26 @@
       <TabsContent value="loop-detection">
         <Card>
           <CardHeader>
+            <CardTitle>工具调用轮数限制</CardTitle>
+            <CardDescription>
+              检测 AI 连续进行工具调用的轮数（assistant → tool_use → user → tool_result 算一轮），超过 5 轮时自动注入提示词提醒 AI 不要陷入无限循环。
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div class="flex items-center gap-3">
+              <Switch
+                id="tool-round-limit-toggle"
+                v-model="toolRoundLimitEnabled"
+              />
+              <Label for="tool-round-limit-toggle">
+                {{ toolRoundLimitEnabled ? '已启用' : '已禁用' }}
+              </Label>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card class="mt-4">
+          <CardHeader>
             <CardTitle>工具调用循环检测</CardTitle>
             <CardDescription>
               检测模型重复调用同一工具的行为，超过阈值时自动中断请求或注入提示词。
@@ -178,6 +198,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import SessionTable from '@/components/proxy-enhancement/SessionTable.vue'
 
 const claudeCodeEnabled = ref(false)
+const toolRoundLimitEnabled = ref(true)
 const toolCallLoopEnabled = ref(false)
 const streamLoopEnabled = ref(false)
 const selectModelInstruction = '---\ndescription: 切换代理路由模型\n---\n\n[router-command: select-model $ARGUMENTS]'
@@ -192,6 +213,7 @@ async function loadConfig() {
   try {
     const data = await api.getProxyEnhancement()
     claudeCodeEnabled.value = data.claude_code_enabled
+    toolRoundLimitEnabled.value = data.tool_round_limit_enabled
     toolCallLoopEnabled.value = data.tool_call_loop_enabled
     streamLoopEnabled.value = data.stream_loop_enabled
   } catch (e: unknown) {
@@ -207,6 +229,7 @@ async function handleSave() {
       claude_code_enabled: claudeCodeEnabled.value,
       tool_call_loop_enabled: toolCallLoopEnabled.value,
       stream_loop_enabled: streamLoopEnabled.value,
+      tool_round_limit_enabled: toolRoundLimitEnabled.value,
     })
     toast.success('保存成功')
   } catch (e: unknown) {
