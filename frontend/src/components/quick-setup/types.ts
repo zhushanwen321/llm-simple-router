@@ -30,10 +30,11 @@ export interface ModelConfig {
   patches: string[]
 }
 
-export interface MappingPreviewItem {
-  from: string
-  to: string
-  tag: 'def' | 'auto' | 'cust'
+export interface MappingTarget {
+  backend_model: string
+  provider_id: string
+  overflow_provider_id?: string
+  overflow_model?: string
 }
 
 export const CLIENTS: ClientMeta[] = [
@@ -92,6 +93,28 @@ export function getDefaultContextWindow(modelName: string): number {
   if (m.includes('32k')) return 32000
   if (m.includes('8k')) return 8000
   return 128000
+}
+
+/** 映射目标（与后端 MappingTarget 对齐） */
+export interface MappingTarget {
+  backend_model: string
+  provider_id: string
+  overflow_provider_id?: string
+  overflow_model?: string
+}
+
+/** 映射条目：合并了新建映射和已有映射的统一结构 */
+export interface MappingEntry {
+  /** 客户端模型名 */
+  clientModel: string
+  /** 映射目标链（故障转移） */
+  targets: MappingTarget[]
+  /** 是否为已有映射（来自 DB） */
+  existing: boolean
+  /** 已有映射的 DB id，用于 updateMappingGroup */
+  existingId?: string
+  /** 来源标签 */
+  tag: 'def' | 'auto' | 'cust' | 'existing'
 }
 
 /**

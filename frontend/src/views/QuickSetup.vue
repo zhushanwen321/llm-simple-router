@@ -21,7 +21,6 @@
               :class="{
                 'bg-purple-600 text-white': c.iconClass === 'cc',
                 'bg-emerald-600 text-white': c.iconClass === 'pi',
-                'bg-green-600 text-white': c.iconClass === 'cx',
                 'bg-blue-600 text-white': c.iconClass === 'oa',
                 'bg-orange-600 text-white': c.iconClass === 'an',
               }"
@@ -152,22 +151,23 @@
       </CardContent>
     </Card>
 
-    <!-- Row 3: Mappings (left) | Retry rules (right) -->
+    <!-- Row 3: Mappings + Retry rules -->
     <div class="grid grid-cols-5 gap-4">
       <!-- Left: Mappings -->
       <Card class="col-span-3">
         <CardHeader class="pb-3">
           <div class="flex items-center justify-between">
             <CardTitle class="text-sm font-medium">模型映射</CardTitle>
-            <Badge variant="secondary" class="text-[10px]">{{ mappingPreview.length }} 条</Badge>
+            <Badge variant="secondary" class="text-[10px]">{{ mappingEntries.length }} 条</Badge>
           </div>
         </CardHeader>
         <CardContent>
-          <MappingPreview
-            :mappings="mappingPreview"
-            :available-models="enabledModelNames"
-            @remove="removeMapping"
-            @add="addMapping"
+          <MappingEditor
+            :entries="mappingEntries"
+            :provider-groups="allProviderGroups"
+            @update:targets="updateMappingTargets"
+            @add="addMappingEntry"
+            @remove="removeMappingEntry"
           />
         </CardContent>
       </Card>
@@ -189,24 +189,27 @@
               选择供应商后显示推荐规则
             </template>
           </div>
-          <div v-else class="space-y-1.5 max-h-[260px] overflow-y-auto">
+          <div v-else class="space-y-1.5 max-h-[320px] overflow-y-auto">
             <div
               v-for="rule in recommendedRules"
               :key="rule.name"
-              class="flex items-start gap-2.5 p-2 rounded-md transition-colors"
-              :class="rule.exists ? 'opacity-50' : 'hover:bg-muted/50 cursor-pointer'"
+              class="flex items-start gap-2.5 rounded-md transition-colors"
+              :class="rule.exists
+                ? 'opacity-60 cursor-default p-2'
+                : 'hover:bg-muted/50 cursor-pointer p-2'"
               @click="!rule.exists && toggleRetryRule(rule.name, !selectedRetryRules.has(rule.name))"
             >
               <Checkbox
-                :checked="rule.exists || selectedRetryRules.has(rule.name)"
+                :checked="rule.exists ? true : selectedRetryRules.has(rule.name)"
                 :disabled="rule.exists"
                 class="mt-0.5"
+                @update:checked="(val: boolean | string) => toggleRetryRule(rule.name, !!val)"
                 @click.stop
               />
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-1.5">
                   <span class="text-xs font-medium">{{ rule.name }}</span>
-                  <Badge v-if="rule.exists" variant="secondary" class="text-[9px] px-1 py-0 leading-none">已配置</Badge>
+                  <Badge v-if="rule.exists" variant="secondary" class="text-[9px] px-1.5 py-0 leading-none bg-muted text-muted-foreground">已配置</Badge>
                   <Badge v-else-if="rule.providers && rule.providers.length > 0" variant="outline" class="text-[9px] px-1 py-0 leading-none">{{ rule.providers[0] }}</Badge>
                   <Badge v-else variant="secondary" class="text-[9px] px-1 py-0 leading-none">通用</Badge>
                 </div>
@@ -233,9 +236,9 @@
         <span class="text-muted-foreground/50 mx-0.5">·</span>
         <span>{{ enabledModelCount }} 模型</span>
       </template>
-      <template v-if="mappingPreview.length > 0">
+      <template v-if="mappingEntries.length > 0">
         <span class="text-muted-foreground/50 mx-0.5">·</span>
-        <span>{{ mappingPreview.length }} 映射</span>
+        <span>{{ mappingEntries.length }} 映射</span>
       </template>
       <template v-if="selectedRetryRules.size > 0">
         <span class="text-muted-foreground/50 mx-0.5">·</span>
@@ -263,7 +266,7 @@ import { computed } from 'vue'
 import { toast } from 'vue-sonner'
 import { useQuickSetup, type ConcurrencyMode } from '@/composables/useQuickSetup'
 import ModelCard from '@/components/quick-setup/ModelCard.vue'
-import MappingPreview from '@/components/quick-setup/MappingPreview.vue'
+import MappingEditor from '@/components/quick-setup/MappingEditor.vue'
 import type { ModelConfig } from '@/components/quick-setup/types'
 import { CLIENTS } from '@/components/quick-setup/types'
 import { Button } from '@/components/ui/button'
@@ -276,29 +279,28 @@ import { Checkbox } from '@/components/ui/checkbox'
 
 const {
   clientType, providerGroups, selectedGroup, selectedPlan,
-  apiType, apiKey, modelConfigs, mappingPreview,
-  recommendedRules, allRecommendedRules, selectedRetryRules, saving, connectionStatus,
+  apiType, apiKey, modelConfigs, mappingEntries,
+  allRecommendedRules, recommendedRules,
+  selectedRetryRules, saving, connectionStatus,
   baseUrl, availablePlans, isNonOpenaiEndpoint,
   concurrencyMode, maxConcurrency, queueTimeoutMs, maxQueueSize,
+  allProviderGroups,
   selectClient, onProviderChange, onPlanChange,
-  updateMappings, toggleRetryRule, addMapping, removeMapping,
-  onConcurrencyModeChange, testConnection, submit,
+  updateMappingTargets, addMappingEntry, removeMappingEntry,
+  toggleRetryRule, onConcurrencyModeChange, testConnection, submit,
 } = useQuickSetup()
 
 const enabledModelCount = computed(() => modelConfigs.value.filter(m => m.enabled).length)
-const enabledModelNames = computed(() => modelConfigs.value.filter(m => m.enabled).map(m => m.name))
 const clientTypeLabel = computed(() => CLIENTS.find(c => c.id === clientType.value)?.name ?? clientType.value)
 
 function updateModel(index: number, updated: ModelConfig) {
   const next = [...modelConfigs.value]
   next[index] = updated
   modelConfigs.value = next
-  updateMappings()
 }
 
 function removeModel(index: number) {
   modelConfigs.value = modelConfigs.value.filter((_, i) => i !== index)
-  updateMappings()
 }
 
 function validateConfig() {

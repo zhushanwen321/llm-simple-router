@@ -589,27 +589,20 @@ const tagColors: Record<string, string> = {
             </Button>
           </div>
 
-          <!-- Overflow model -->
-          <div class="flex items-center gap-2 pl-8">
-            <span class="text-[10px] text-muted-foreground shrink-0">溢出</span>
+          <!-- Overflow model (shared for all targets) -->
+          <div class="flex items-center gap-2 pt-2 mt-2 border-t border-border">
+            <span class="text-[10px] text-muted-foreground shrink-0">溢出模型</span>
             <div class="flex-1">
               <CascadingModelSelect
                 :providers="providerGroups"
-                :model-value="target.overflow_provider_id && target.overflow_model ? { provider_id: target.overflow_provider_id, model: target.overflow_model } : undefined"
-                placeholder="可选..."
-                @update:model-value="(v: SelectedValue | undefined) => updateOverflow(idx, tIdx, v)"
+                :model-value="entry.targets[0]?.overflow_provider_id && entry.targets[0]?.overflow_model ? { provider_id: entry.targets[0].overflow_provider_id, model: entry.targets[0].overflow_model } : undefined"
+                placeholder="可选，上下文超限时自动切换..."
+                @update:model-value="(v: SelectedValue | undefined) => updateOverflow(idx, 0, v)"
               />
             </div>
           </div>
 
-          <!-- Failover arrow -->
-          <div v-if="tIdx < entry.targets.length - 1" class="flex items-center gap-1 pl-6 text-[10px] text-muted-foreground">
-            <span class="w-3 border-t border-muted-foreground/30"></span>
-            <span>失败时切换</span>
-          </div>
-        </div>
-
-        <!-- Add failover target -->
+          <!-- Add failover target -->
         <Button
           variant="ghost"
           size="sm"

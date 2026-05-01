@@ -1,10 +1,13 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { api, getApiMessage, type ProviderGroup, type RecommendedRetryRule, type QuickSetupPayload } from '@/api/client'
+import type { MappingGroup } from '@/types/mapping'
+import type { Provider as ApiProvider } from '@/types/mapping'
 import { toast } from 'vue-sonner'
 import {
-  type ClientType, type ModelConfig, type MappingPreviewItem,
+  type ClientType, type ModelConfig, type MappingEntry, type MappingTarget,
   CLIENTS, DEFAULT_CLIENT_MAPPINGS, getDefaultContextWindow,
 } from '@/components/quick-setup/types'
+import type { Rule } from '@/types/mapping'
 import router from '@/router'
 
 export type ConcurrencyMode = 'auto' | 'manual' | 'none'
@@ -18,7 +21,7 @@ export function useQuickSetup() {
   const apiType = ref<'openai' | 'anthropic'>('anthropic')
   const apiKey = ref('')
   const modelConfigs = ref<ModelConfig[]>([])
-  const mappingPreview = ref<MappingPreviewItem[]>([])
+  const mappingEntries = ref<MappingEntry[]>([])
   const allRecommendedRules = ref<RecommendedRetryRule[]>([])
   const selectedRetryRules = ref<Set<string>>(new Set())
   const saving = ref(false)
@@ -29,6 +32,10 @@ export function useQuickSetup() {
   const maxConcurrency = ref(10)
   const queueTimeoutMs = ref(120000)
   const maxQueueSize = ref(100)
+
+  // Existing mappings + providers for failover/overflow editing
+  const existingMappings = ref<MappingGroup[]>([])
+  const allProviders = ref<ApiProvider[]>([])
 
   // --- Computed ---
   const currentClient = computed(() =>
@@ -53,11 +60,22 @@ export function useQuickSetup() {
     return !baseUrl.value.includes('openai.com')
   })
 
+  // Provider groups for CascadingModelSelect
+  const allProviderGroups = computed(() =>
+    allProviders.value.map(p => ({
+      provider: { id: p.id, name: p.name },
+      models: (p.models ?? []).map(m => ({
+        name: m.name,
+        contextWindow: m.context_window ?? 128000,
+      })),
+    }))
+  )
+
   // Filter retry rules by selected provider
   const recommendedRules = computed(() => {
     const group = selectedGroup.value
     return allRecommendedRules.value.filter(r => {
-      if (!r.providers || r.providers.length === 0) return true // universal rules
+      if (!r.providers || r.providers.length === 0) return true
       return r.providers.includes(group)
     })
   })
@@ -75,7 +93,6 @@ export function useQuickSetup() {
       }
     }
 
-    // developer-role only needed for openai format on non-OpenAI endpoints
     if (format === 'openai' && isNonOpenaiEndpoint.value) {
       patches.push('developer-role')
     }
@@ -96,36 +113,72 @@ export function useQuickSetup() {
   function updateMappings() {
     const enabledModels = modelConfigs.value.filter(m => m.enabled)
 
+    // Build new recommended mappings
+    let newMappings: MappingEntry[]
     if (clientType.value === 'pi') {
-      // Pi: 1:1 mapping from provider model names
-      mappingPreview.value = enabledModels.map(m => ({
-        from: m.name,
-        to: m.name,
+      newMappings = enabledModels.map(m => ({
+        clientModel: m.name,
+        targets: [{ backend_model: m.name, provider_id: '__new__' }],
+        existing: false,
         tag: 'auto' as const,
-      }))
-      return
-    }
-
-    const clientDefaults = DEFAULT_CLIENT_MAPPINGS[clientType.value]
-
-    if (clientDefaults && enabledModels.length > 0) {
-      mappingPreview.value = clientDefaults.map((fromName, index) => ({
-        from: fromName,
-        to: enabledModels[index]?.name ?? enabledModels[enabledModels.length - 1]?.name ?? '',
-        tag: 'def' as const,
       }))
     } else {
-      mappingPreview.value = enabledModels.map(m => ({
-        from: m.name,
-        to: m.name,
-        tag: 'auto' as const,
-      }))
+      const clientDefaults = DEFAULT_CLIENT_MAPPINGS[clientType.value]
+      if (clientDefaults && enabledModels.length > 0) {
+        newMappings = clientDefaults.map((fromName, index) => ({
+          clientModel: fromName,
+          targets: [{
+            backend_model: enabledModels[index]?.name ?? enabledModels[enabledModels.length - 1]?.name ?? '',
+            provider_id: '__new__',
+          }],
+          existing: false,
+          tag: 'def' as const,
+        }))
+      } else {
+        newMappings = enabledModels.map(m => ({
+          clientModel: m.name,
+          targets: [{ backend_model: m.name, provider_id: '__new__' }],
+          existing: false,
+          tag: 'auto' as const,
+        }))
+      }
     }
+
+    // Build existing mapping map
+    const existingMap = new Map<string, MappingEntry>()
+    for (const g of existingMappings.value) {
+      let rule: Rule = {}
+      try { rule = JSON.parse(g.rule) } catch { /* ignore */ }
+      const targets = rule.targets ?? []
+      if (targets.length > 0) {
+        existingMap.set(g.client_model, {
+          clientModel: g.client_model,
+          targets: targets.map(t => ({
+            backend_model: t.backend_model,
+            provider_id: t.provider_id,
+            overflow_provider_id: t.overflow_provider_id,
+            overflow_model: t.overflow_model,
+          })),
+          existing: true,
+          existingId: g.id,
+          tag: 'existing' as const,
+        })
+      }
+    }
+
+    // Merge: existing overrides new for same clientModel, then add extra existing
+    const merged = newMappings.map(nm => existingMap.get(nm.clientModel) ?? nm)
+    for (const [_, em] of existingMap) {
+      if (!merged.find(m => m.clientModel === em.clientModel)) {
+        merged.push(em)
+      }
+    }
+
+    mappingEntries.value = merged
   }
 
   // --- Auto-select retry rules when provider changes ---
   function autoSelectRetryRules() {
-    // Select all rules for current provider, except already-existing ones
     selectedRetryRules.value = new Set(
       recommendedRules.value
         .filter(r => !r.exists)
@@ -168,7 +221,6 @@ export function useQuickSetup() {
 
     const groupData = providerGroups.value.find(g => g.group === group)
     if (groupData && groupData.presets.length > 0) {
-      // Auto-select plan matching client format preference
       const client = currentClient.value
       const match = client
         ? groupData.presets.find(p => p.apiType === client.format)
@@ -194,7 +246,6 @@ export function useQuickSetup() {
     updateMappings()
   }
 
-  // When apiType changes, re-evaluate patches for all models
   watch(apiType, () => {
     for (const model of modelConfigs.value) {
       model.patches = getDefaultPatches(model.name, apiType.value)
@@ -204,34 +255,43 @@ export function useQuickSetup() {
   // --- Retry rules ---
   function toggleRetryRule(name: string, checked: boolean) {
     const next = new Set(selectedRetryRules.value)
-    if (checked) {
-      next.add(name)
-    } else {
-      next.delete(name)
-    }
+    if (checked) next.add(name)
+    else next.delete(name)
     selectedRetryRules.value = next
   }
 
-  // --- Mapping add/remove ---
-  function addMapping(from: string, to: string) {
-    // Remove existing mapping for same client model
-    const existing = mappingPreview.value.filter(m => m.from !== from)
-    existing.push({ from, to, tag: 'cust' as const })
-    mappingPreview.value = existing
+  // --- Mapping editing ---
+  function updateMappingTargets(index: number, targets: MappingTarget[]) {
+    const next = [...mappingEntries.value]
+    next[index] = { ...next[index], targets }
+    mappingEntries.value = next
   }
 
-  function removeMapping(from: string) {
-    mappingPreview.value = mappingPreview.value.filter(m => m.from !== from)
+  function addMappingEntry(clientModel: string, targetModel: string) {
+    const existing = mappingEntries.value.filter(m => m.clientModel !== clientModel)
+    existing.push({
+      clientModel,
+      targets: [{ backend_model: targetModel, provider_id: '__new__' }],
+      existing: false,
+      tag: 'cust' as const,
+    })
+    mappingEntries.value = existing
+  }
+
+  function removeMappingEntry(clientModel: string) {
+    const entry = mappingEntries.value.find(m => m.clientModel === clientModel)
+    if (entry?.existing) {
+      toast.error('已有映射请到"模型映射"页面删除')
+      return
+    }
+    mappingEntries.value = mappingEntries.value.filter(m => m.clientModel !== clientModel)
   }
 
   // --- Concurrency ---
   function onConcurrencyModeChange(mode: ConcurrencyMode) {
     concurrencyMode.value = mode
-    if (mode === 'auto') {
-      maxConcurrency.value = 10
-    } else if (mode === 'manual') {
-      maxConcurrency.value = 3
-    }
+    if (mode === 'auto') maxConcurrency.value = 10
+    else if (mode === 'manual') maxConcurrency.value = 3
   }
 
   // --- Connection test ---
@@ -275,10 +335,12 @@ export function useQuickSetup() {
           queue_timeout_ms: concurrencyMode.value !== 'none' ? queueTimeoutMs.value : undefined,
           max_queue_size: concurrencyMode.value !== 'none' ? maxQueueSize.value : undefined,
         },
-        mappings: mappingPreview.value.map(m => ({
-          client_model: m.from,
-          backend_model: m.to,
-        })),
+        mappings: mappingEntries.value
+          .filter(m => !m.existing)
+          .map(m => ({
+            client_model: m.clientModel,
+            backend_model: m.targets[0]?.backend_model ?? '',
+          })),
         retry_rules: recommendedRules.value
           .filter(r => selectedRetryRules.value.has(r.name) && !r.exists)
           .map(r => ({
@@ -293,6 +355,18 @@ export function useQuickSetup() {
       }
 
       await api.quickSetup(payload)
+
+      // Update existing mappings (failover/overflow changes)
+      for (const entry of mappingEntries.value) {
+        if (entry.existing && entry.existingId) {
+          const ruleJson = JSON.stringify({ targets: entry.targets })
+          await api.updateMappingGroup(entry.existingId, {
+            client_model: entry.clientModel,
+            rule: ruleJson,
+          })
+        }
+      }
+
       toast.success('快速配置完成！')
       router.push('/')
     } catch (e: unknown) {
@@ -305,12 +379,16 @@ export function useQuickSetup() {
   // --- Init ---
   onMounted(async () => {
     try {
-      const [groups, rules] = await Promise.all([
+      const [groups, rules, mappings, providers] = await Promise.all([
         api.recommended.getProviders(),
         api.recommended.getRetryRules(),
+        api.getMappingGroups().catch(() => [] as MappingGroup[]),
+        api.getProviders().catch(() => [] as ApiProvider[]),
       ])
       providerGroups.value = groups
       allRecommendedRules.value = rules
+      existingMappings.value = mappings as MappingGroup[]
+      allProviders.value = providers as ApiProvider[]
 
       selectClient('claude-code')
     } catch (e: unknown) {
@@ -320,14 +398,16 @@ export function useQuickSetup() {
 
   return {
     clientType, providerGroups, selectedGroup, selectedPlan,
-    apiType, apiKey, modelConfigs, mappingPreview,
+    apiType, apiKey, modelConfigs, mappingEntries,
     allRecommendedRules, recommendedRules,
     selectedRetryRules, saving, connectionStatus,
     currentClient, currentPreset, baseUrl,
     availablePlans, isNonOpenaiEndpoint,
     concurrencyMode, maxConcurrency, queueTimeoutMs, maxQueueSize,
+    existingMappings, allProviders, allProviderGroups,
     selectClient, onProviderChange, onPlanChange,
     initModels, getDefaultPatches, updateMappings,
-    toggleRetryRule, addMapping, removeMapping, onConcurrencyModeChange, testConnection, submit,
+    updateMappingTargets, addMappingEntry, removeMappingEntry,
+    toggleRetryRule, onConcurrencyModeChange, testConnection, submit,
   }
 }
