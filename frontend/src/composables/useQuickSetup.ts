@@ -300,9 +300,6 @@ export function useQuickSetup() {
   // --- Init ---
   onMounted(async () => {
     try {
-      // Reload recommended config from disk (picks up JSON changes)
-      await api.recommended.reload()
-
       const [groups, rules] = await Promise.all([
         api.recommended.getProviders(),
         api.recommended.getRetryRules(),

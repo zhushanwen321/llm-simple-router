@@ -25,27 +25,23 @@ export interface RecommendedRetryRule {
   providers?: string[]
 }
 
-let cachedProviders: ProviderGroup[] = []
-let cachedRetryRules: RecommendedRetryRule[] = []
 let configDir = ''
 
 export function loadRecommendedConfig(dir?: string) {
   configDir = dir ?? path.resolve(process.cwd(), 'config')
-  cachedProviders = loadJson<ProviderGroup[]>('recommended-providers.json')
-  cachedRetryRules = loadJson<RecommendedRetryRule[]>('recommended-retry-rules.json')
 }
 
 export function getRecommendedProviders(): ProviderGroup[] {
-  return cachedProviders
+  return loadJson<ProviderGroup[]>('recommended-providers.json')
 }
 
 export function getRecommendedRetryRules(): RecommendedRetryRule[] {
-  return cachedRetryRules
+  return loadJson<RecommendedRetryRule[]>('recommended-retry-rules.json')
 }
 
-export function reloadConfig() {
-  loadRecommendedConfig(configDir)
-}
+// No-op: kept for backward compat (reload endpoint, upgrade flow)
+// Config is now always read from disk, no caching.
+export function reloadConfig() { /* no-op */ }
 
 function loadJson<T>(filename: string): T {
   const filePath = path.join(configDir, filename)
