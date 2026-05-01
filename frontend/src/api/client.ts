@@ -175,6 +175,10 @@ export interface QuickSetupPayload {
     base_url: string
     api_key: string
     models: Array<{ name: string; context_window?: number; patches?: string[] }>
+    concurrency_mode?: 'auto' | 'manual' | 'none'
+    max_concurrency?: number
+    queue_timeout_ms?: number
+    max_queue_size?: number
   }
   mappings: Array<{ client_model: string; backend_model: string }>
   retry_rules: Array<{

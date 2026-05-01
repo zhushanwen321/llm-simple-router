@@ -27,6 +27,10 @@ const QuickSetupProviderSchema = Type.Object({
     context_window: Type.Optional(Type.Number()),
     patches: Type.Optional(Type.Array(Type.String())),
   })),
+  concurrency_mode: Type.Optional(Type.Union([Type.Literal("auto"), Type.Literal("manual"), Type.Literal("none")])),
+  max_concurrency: Type.Optional(Type.Number()),
+  queue_timeout_ms: Type.Optional(Type.Number()),
+  max_queue_size: Type.Optional(Type.Number()),
 });
 
 const QuickSetupMappingSchema = Type.Object({
@@ -94,6 +98,11 @@ export const adminQuickSetupRoutes: FastifyPluginCallback<QuickSetupRoutesOption
         ...(m.context_window != null ? { context_window: m.context_window } : {}),
         ...(m.patches && m.patches.length > 0 ? { patches: m.patches } : {}),
       }));
+      const adaptiveEnabled = body.provider.concurrency_mode === 'auto' ? 1 : 0;
+      const maxConcurrency = body.provider.max_concurrency ?? PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency;
+      const queueTimeoutMs = body.provider.queue_timeout_ms ?? PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms;
+      const maxQueueSize = body.provider.max_queue_size ?? PROVIDER_CONCURRENCY_DEFAULTS.max_queue_size;
+
       const providerId = createProvider(db, {
         name: body.provider.name,
         api_type: body.provider.api_type,
@@ -104,10 +113,10 @@ export const adminQuickSetupRoutes: FastifyPluginCallback<QuickSetupRoutesOption
           : "****",
         models: JSON.stringify(modelEntries),
         is_active: 1,
-        max_concurrency: PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency,
-        queue_timeout_ms: PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms,
-        max_queue_size: PROVIDER_CONCURRENCY_DEFAULTS.max_queue_size,
-        adaptive_enabled: 0,
+        max_concurrency: maxConcurrency,
+        queue_timeout_ms: queueTimeoutMs,
+        max_queue_size: maxQueueSize,
+        adaptive_enabled: adaptiveEnabled,
       });
 
       // 6. Create mapping groups
@@ -141,17 +150,22 @@ export const adminQuickSetupRoutes: FastifyPluginCallback<QuickSetupRoutesOption
     const providerId = createAll();
 
     // 9. Sync concurrency state
+    const finalAdaptiveEnabled = body.provider.concurrency_mode === 'auto' ? 1 : 0;
+    const finalMaxConcurrency = body.provider.max_concurrency ?? PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency;
+    const finalQueueTimeoutMs = body.provider.queue_timeout_ms ?? PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms;
+    const finalMaxQueueSize = body.provider.max_queue_size ?? PROVIDER_CONCURRENCY_DEFAULTS.max_queue_size;
+
     adaptiveController?.syncProvider(providerId, {
-      adaptive_enabled: 0,
-      max_concurrency: PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency,
-      queue_timeout_ms: PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms,
-      max_queue_size: PROVIDER_CONCURRENCY_DEFAULTS.max_queue_size,
+      adaptive_enabled: finalAdaptiveEnabled,
+      max_concurrency: finalMaxConcurrency,
+      queue_timeout_ms: finalQueueTimeoutMs,
+      max_queue_size: finalMaxQueueSize,
     });
     tracker?.updateProviderConfig(providerId, {
       name: body.provider.name,
-      maxConcurrency: PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency,
-      queueTimeoutMs: PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms,
-      maxQueueSize: PROVIDER_CONCURRENCY_DEFAULTS.max_queue_size,
+      maxConcurrency: finalMaxConcurrency,
+      queueTimeoutMs: finalQueueTimeoutMs,
+      maxQueueSize: finalMaxQueueSize,
     });
 
     return reply.code(HTTP_CREATED).send({ success: true, provider_id: providerId });

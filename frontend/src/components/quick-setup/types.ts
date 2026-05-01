@@ -8,6 +8,7 @@ export interface ClientMeta {
   format: 'anthropic' | 'openai'
   defaultProvider: string
   defaultPlan: string
+  description: string
 }
 
 export interface PatchOption {
@@ -36,11 +37,11 @@ export interface MappingPreviewItem {
 }
 
 export const CLIENTS: ClientMeta[] = [
-  { id: 'claude-code', name: 'Claude Code', icon: 'C', iconClass: 'cc', format: 'anthropic', defaultProvider: 'DeepSeek', defaultPlan: 'Anthropic' },
-  { id: 'pi', name: 'Pi', icon: 'P', iconClass: 'pi', format: 'anthropic', defaultProvider: 'DeepSeek', defaultPlan: 'Anthropic' },
-  { id: 'codex', name: 'Codex CLI', icon: 'Cx', iconClass: 'cx', format: 'openai', defaultProvider: 'DeepSeek', defaultPlan: 'OpenAI' },
-  { id: 'openai-sdk', name: 'OpenAI SDK', icon: 'OA', iconClass: 'oa', format: 'openai', defaultProvider: 'DeepSeek', defaultPlan: 'OpenAI' },
-  { id: 'anthropic-sdk', name: 'Anthropic SDK', icon: 'AN', iconClass: 'an', format: 'anthropic', defaultProvider: 'DeepSeek', defaultPlan: 'Anthropic' },
+  { id: 'claude-code', name: 'Claude Code', icon: 'C', iconClass: 'cc', format: 'anthropic', defaultProvider: 'DeepSeek', defaultPlan: 'Anthropic', description: 'Anthropic 官方 CLI 编程助手' },
+  { id: 'pi', name: 'Pi', icon: 'P', iconClass: 'pi', format: 'anthropic', defaultProvider: 'DeepSeek', defaultPlan: 'Anthropic', description: '通用编程 Agent 框架' },
+  { id: 'codex', name: 'Codex CLI', icon: 'Cx', iconClass: 'cx', format: 'openai', defaultProvider: 'DeepSeek', defaultPlan: 'OpenAI', description: 'OpenAI 官方 CLI 编程助手' },
+  { id: 'openai-sdk', name: 'OpenAI SDK', icon: 'OA', iconClass: 'oa', format: 'openai', defaultProvider: 'DeepSeek', defaultPlan: 'OpenAI', description: 'OpenAI API 直接调用' },
+  { id: 'anthropic-sdk', name: 'Anthropic SDK', icon: 'AN', iconClass: 'an', format: 'anthropic', defaultProvider: 'DeepSeek', defaultPlan: 'Anthropic', description: 'Anthropic API 直接调用' },
 ]
 
 export const PATCH_GROUPS: PatchGroup[] = [
@@ -71,9 +72,29 @@ export const PATCH_GROUPS: PatchGroup[] = [
   },
 ]
 
-// Default mapping names for coding clients
+/**
+ * Default model name mappings for coding clients.
+ * Claude Code expects: claude-sonnet-4-20250514, claude-opus-4-20250116, claude-haiku-4-20250414 etc.
+ * But the short aliases are also accepted: opus, sonnet, haiku.
+ * We use short names for cleaner mapping display.
+ *
+ * For Pi: models are 1:1 with provider models (dynamic).
+ * For Codex CLI: expects OpenAI model names like codex-mini, o3, o4-mini, gpt-4.1
+ */
 export const DEFAULT_CLIENT_MAPPINGS: Record<string, string[]> = {
-  'claude-code': ['claude-sonnet-4', 'claude-opus-4', 'claude-haiku-4', 'claude-sonnet-4-thinking'],
-  'pi': ['claude-sonnet-4', 'claude-opus-4', 'claude-haiku-4', 'claude-sonnet-4-thinking'],
-  'codex': ['gpt-4o', 'gpt-4o-mini', 'o3', 'o4-mini'],
+  'claude-code': ['sonnet', 'opus', 'haiku'],
+  'codex': ['codex-mini', 'o3', 'o4-mini', 'gpt-4.1'],
+  'openai-sdk': ['gpt-4o', 'gpt-4o-mini', 'o3', 'o4-mini'],
+  'anthropic-sdk': ['claude-sonnet-4-20250514', 'claude-opus-4-20250116', 'claude-haiku-4-20250414'],
 }
+// Pi is special: DEFAULT_CLIENT_MAPPINGS['pi'] is dynamic = provider's model names
+
+/** Context window options for model config */
+export const CONTEXT_WINDOW_OPTIONS = [
+  { label: '8K', value: 8192 },
+  { label: '32K', value: 32768 },
+  { label: '64K', value: 65536 },
+  { label: '128K', value: 131072 },
+  { label: '256K', value: 262144 },
+  { label: '1M', value: 1048576 },
+]

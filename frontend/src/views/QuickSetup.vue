@@ -1,105 +1,107 @@
 <template>
   <div class="p-6 space-y-4 pb-20">
-    <!-- Row 1: Client+Provider (left) | Connection (right) -->
-    <div class="grid grid-cols-2 gap-4">
-      <!-- Left: Client & Provider -->
-      <Card>
-        <CardHeader class="pb-3">
-          <CardTitle class="text-sm font-medium">客户端与供应商</CardTitle>
-        </CardHeader>
-        <CardContent class="space-y-4">
-          <div class="space-y-2">
-            <Label class="text-xs text-muted-foreground">本地客户端</Label>
-            <ClientSelector v-model="clientType" @update:model-value="selectClient" />
-          </div>
-          <div class="grid grid-cols-2 gap-3">
-            <div class="space-y-1">
-              <Label class="text-xs text-muted-foreground">供应商</Label>
-              <Select :model-value="selectedGroup" @update:model-value="(v: unknown) => onProviderChange(v as string)">
-                <SelectTrigger>
-                  <SelectValue placeholder="选择供应商" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem v-for="g in providerGroups" :key="g.group" :value="g.group">{{ g.group }}</SelectItem>
-                </SelectContent>
-              </Select>
+    <!-- Row 1: Client Selection -->
+    <Card>
+      <CardHeader class="pb-3">
+        <CardTitle class="text-sm font-medium">选择客户端</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div class="flex gap-2 flex-wrap">
+          <button
+            v-for="c in CLIENTS"
+            :key="c.id"
+            class="flex items-center gap-2.5 px-4 py-2.5 rounded-lg border text-sm transition-all cursor-pointer"
+            :class="clientType === c.id
+              ? 'border-primary bg-primary/5 text-primary ring-1 ring-primary/20'
+              : 'border-border hover:border-muted-foreground/30 text-muted-foreground hover:text-foreground'"
+            @click="selectClient(c.id)"
+          >
+            <span
+              class="w-7 h-7 rounded-md text-xs font-bold flex items-center justify-center shrink-0"
+              :class="{
+                'bg-purple-600 text-white': c.iconClass === 'cc',
+                'bg-emerald-600 text-white': c.iconClass === 'pi',
+                'bg-green-600 text-white': c.iconClass === 'cx',
+                'bg-blue-600 text-white': c.iconClass === 'oa',
+                'bg-orange-600 text-white': c.iconClass === 'an',
+              }"
+            >{{ c.icon }}</span>
+            <div class="text-left">
+              <div class="font-medium text-sm leading-tight">{{ c.name }}</div>
+              <div class="text-[10px] opacity-60 leading-tight">{{ c.format }} · {{ c.description }}</div>
             </div>
-            <div class="space-y-1">
-              <Label class="text-xs text-muted-foreground">套餐</Label>
-              <Select :model-value="selectedPlan" @update:model-value="(v: unknown) => onPlanChange(v as string)">
-                <SelectTrigger>
-                  <SelectValue placeholder="选择套餐" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem v-for="p in availablePlans" :key="p.plan" :value="p.plan">{{ p.plan }}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </button>
+        </div>
+      </CardContent>
+    </Card>
 
-      <!-- Right: Connection -->
-      <Card>
-        <CardHeader class="pb-3">
-          <CardTitle class="text-sm font-medium">连接配置</CardTitle>
-        </CardHeader>
-        <CardContent class="space-y-3">
-          <div class="grid grid-cols-2 gap-3">
-            <div class="space-y-1">
-              <Label class="text-xs text-muted-foreground">格式</Label>
-              <Select v-model="apiType">
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="anthropic">Anthropic</SelectItem>
-                  <SelectItem value="openai">OpenAI</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div class="space-y-1">
-              <Label class="text-xs text-muted-foreground">Base URL</Label>
-              <Input :model-value="baseUrl" readonly class="font-mono text-xs" />
-            </div>
+    <!-- Row 2: Provider Config -->
+    <Card>
+      <CardHeader class="pb-3">
+        <CardTitle class="text-sm font-medium">供应商配置</CardTitle>
+      </CardHeader>
+      <CardContent class="space-y-4">
+        <!-- Line 1: Provider / Plan / Format / BaseURL / APIKey -->
+        <div class="flex items-end gap-2">
+          <div class="w-32 space-y-1">
+            <Label class="text-xs text-muted-foreground">供应商</Label>
+            <Select :model-value="selectedGroup" @update:model-value="(v: unknown) => onProviderChange(v as string)">
+              <SelectTrigger><SelectValue placeholder="选择" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem v-for="g in providerGroups" :key="g.group" :value="g.group">{{ g.group }}</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          <div class="space-y-1">
+          <div class="w-28 space-y-1">
+            <Label class="text-xs text-muted-foreground">套餐</Label>
+            <Select :model-value="selectedPlan" @update:model-value="(v: unknown) => onPlanChange(v as string)">
+              <SelectTrigger><SelectValue placeholder="选择" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem v-for="p in availablePlans" :key="p.plan" :value="p.plan">{{ p.plan }}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div class="w-28 space-y-1">
+            <Label class="text-xs text-muted-foreground">格式</Label>
+            <Select v-model="apiType">
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="anthropic">Anthropic</SelectItem>
+                <SelectItem value="openai">OpenAI</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div class="flex-1 space-y-1">
+            <Label class="text-xs text-muted-foreground">Base URL</Label>
+            <Input :model-value="baseUrl" readonly class="font-mono text-xs h-9" />
+          </div>
+          <div class="w-56 space-y-1">
             <Label class="text-xs text-muted-foreground">API Key</Label>
-            <Input v-model="apiKey" type="password" placeholder="输入 API Key" />
+            <Input v-model="apiKey" type="password" placeholder="输入 API Key" class="h-9" />
           </div>
-          <div class="flex items-center gap-2">
-            <Button variant="outline" size="sm" :disabled="connectionStatus === 'testing'" @click="testConnection">
-              <template v-if="connectionStatus === 'testing'">
-                <svg class="w-3.5 h-3.5 mr-1 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                测试中...
-              </template>
-              <template v-else>测试连接</template>
-            </Button>
-            <Badge v-if="connectionStatus === 'ok'" variant="default" class="bg-green-600 text-white">连接成功</Badge>
-            <Badge v-if="connectionStatus === 'error'" variant="destructive">连接失败</Badge>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+          <Button variant="outline" size="sm" class="h-9 shrink-0" :disabled="connectionStatus === 'testing'" @click="testConnection">
+            <template v-if="connectionStatus === 'testing'">
+              <svg class="w-3.5 h-3.5 mr-1 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              测试中
+            </template>
+            <template v-else-if="connectionStatus === 'ok'">✓ 已连接</template>
+            <template v-else>测试</template>
+          </Button>
+        </div>
 
-    <!-- Row 2: Models + Mappings (left) | Retry rules (right) -->
-    <div class="grid grid-cols-5 gap-4">
-      <!-- Left: Models & Mappings -->
-      <Card class="col-span-3">
-        <CardHeader class="pb-3">
-          <div class="flex items-center justify-between">
-            <CardTitle class="text-sm font-medium">模型与映射</CardTitle>
-            <div class="flex items-center gap-2">
-              <Badge variant="secondary" class="text-xs">{{ enabledModelCount }} 个模型</Badge>
-              <Badge variant="secondary" class="text-xs">{{ mappingPreview.length }} 条映射</Badge>
-            </div>
+        <!-- Line 2: Model Cards -->
+        <div class="border-t pt-3">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-medium text-muted-foreground">模型配置</span>
+            <Badge variant="secondary" class="text-[10px]">{{ enabledModelCount }}/{{ modelConfigs.length }}</Badge>
           </div>
-        </CardHeader>
-        <CardContent class="space-y-4">
-          <div class="grid grid-cols-2 gap-3">
+          <p v-if="modelConfigs.length === 0" class="py-4 text-center text-xs text-muted-foreground">
+            请先选择供应商与套餐
+          </p>
+          <div v-else class="grid grid-cols-3 gap-2">
             <ModelCard
               v-for="(model, index) in modelConfigs"
               :key="model.name"
@@ -111,48 +113,96 @@
               @remove="removeModel(index)"
             />
           </div>
-          <p v-if="modelConfigs.length === 0" class="py-4 text-center text-sm text-muted-foreground">
-            请先选择供应商与套餐
-          </p>
-          <div v-if="mappingPreview.length > 0" class="border-t pt-3">
-            <MappingPreview
-              :mappings="mappingPreview"
-              :available-models="enabledModelNames"
-            />
+        </div>
+
+        <!-- Line 3: Concurrency Control -->
+        <div class="border-t pt-3">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-medium text-muted-foreground">并发控制</span>
           </div>
+          <div class="flex items-end gap-3">
+            <div class="w-36 space-y-1">
+              <Label class="text-xs text-muted-foreground">模式</Label>
+              <Select :model-value="concurrencyMode" @update:model-value="(v: unknown) => onConcurrencyModeChange(v as ConcurrencyMode)">
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">自动（自适应）</SelectItem>
+                  <SelectItem value="manual">手动</SelectItem>
+                  <SelectItem value="none">无限制</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div v-if="concurrencyMode !== 'none'" class="w-28 space-y-1">
+              <Label class="text-xs text-muted-foreground">最大并发</Label>
+              <Input v-model.number="maxConcurrency" type="number" min="1" max="100" class="h-9" />
+            </div>
+            <div v-if="concurrencyMode !== 'none'" class="w-32 space-y-1">
+              <Label class="text-xs text-muted-foreground">队列超时(ms)</Label>
+              <Input v-model.number="queueTimeoutMs" type="number" min="0" placeholder="0=无限" class="h-9" />
+            </div>
+            <div v-if="concurrencyMode !== 'none'" class="w-32 space-y-1">
+              <Label class="text-xs text-muted-foreground">最大队列</Label>
+              <Input v-model.number="maxQueueSize" type="number" min="1" max="1000" class="h-9" />
+            </div>
+            <div v-if="concurrencyMode === 'auto'" class="text-[10px] text-muted-foreground leading-snug">
+              自适应模式会根据错误率自动调整并发度
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+
+    <!-- Row 3: Mappings (left) | Retry rules (right) -->
+    <div class="grid grid-cols-5 gap-4">
+      <!-- Left: Mappings -->
+      <Card class="col-span-3">
+        <CardHeader class="pb-3">
+          <div class="flex items-center justify-between">
+            <CardTitle class="text-sm font-medium">模型映射</CardTitle>
+            <Badge variant="secondary" class="text-[10px]">{{ mappingPreview.length }} 条</Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <MappingPreview
+            :mappings="mappingPreview"
+            :available-models="enabledModelNames"
+          />
         </CardContent>
       </Card>
 
-      <!-- Right: Retry rules -->
+      <!-- Right: Retry Rules -->
       <Card class="col-span-2">
         <CardHeader class="pb-3">
           <div class="flex items-center justify-between">
             <CardTitle class="text-sm font-medium">重试规则</CardTitle>
-            <Badge variant="secondary" class="text-xs">{{ selectedRetryRules.size }} 条已选</Badge>
+            <Badge variant="secondary" class="text-[10px]">{{ selectedRetryRules.size }} 条已选</Badge>
           </div>
         </CardHeader>
         <CardContent>
-          <div v-if="recommendedRules.length === 0" class="py-8 text-center text-sm text-muted-foreground">
+          <div v-if="recommendedRules.length === 0" class="py-6 text-center text-xs text-muted-foreground">
             选择供应商后显示推荐规则
           </div>
-          <div v-else class="space-y-2">
+          <div v-else class="space-y-1.5 max-h-[260px] overflow-y-auto">
             <div
               v-for="rule in recommendedRules"
               :key="rule.name"
-              class="flex items-start gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
+              class="flex items-start gap-2.5 p-2 rounded-md hover:bg-muted/50 transition-colors cursor-pointer"
+              @click="toggleRetryRule(rule.name, !selectedRetryRules.has(rule.name))"
             >
               <Checkbox
                 :checked="selectedRetryRules.has(rule.name)"
                 @update:checked="(val: boolean | string) => toggleRetryRule(rule.name, !!val)"
                 class="mt-0.5"
+                @click.stop
               />
               <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2">
-                  <span class="text-sm font-medium">{{ rule.name }}</span>
-                  <Badge variant="outline" class="text-[10px] px-1.5 py-0 leading-none shrink-0">推荐</Badge>
+                <div class="flex items-center gap-1.5">
+                  <span class="text-xs font-medium">{{ rule.name }}</span>
+                  <Badge v-if="rule.providers && rule.providers.length > 0" variant="outline" class="text-[9px] px-1 py-0 leading-none">{{ rule.providers[0] }}</Badge>
+                  <Badge v-else variant="secondary" class="text-[9px] px-1 py-0 leading-none">通用</Badge>
                 </div>
-                <div class="text-xs text-muted-foreground mt-0.5">
-                  {{ rule.status_code }} · {{ rule.retry_strategy === 'fixed' ? '固定间隔' : '指数退避' }} · {{ rule.retry_delay_ms / 1000 }}s · {{ rule.max_retries }}次
+                <div class="text-[10px] text-muted-foreground mt-0.5">
+                  {{ rule.status_code }} · {{ rule.retry_strategy === 'fixed' ? '固定' : '指数退避' }} · {{ rule.retry_delay_ms / 1000 }}s · {{ rule.max_retries }}次
                 </div>
               </div>
             </div>
@@ -163,35 +213,35 @@
   </div>
 
   <!-- Submit bar -->
-  <div class="fixed bottom-0 right-0 left-56 border-t bg-card px-6 py-3 flex items-center justify-between z-10">
-    <div class="text-sm text-muted-foreground flex items-center gap-1">
+  <div class="fixed bottom-0 right-0 left-56 border-t bg-card/95 backdrop-blur px-6 py-2.5 flex items-center justify-between z-10">
+    <div class="text-xs text-muted-foreground flex items-center gap-1.5">
       <template v-if="selectedGroup">
-        <Badge variant="secondary" class="text-xs">{{ clientTypeLabel }}</Badge>
-        <span>/</span>
-        <Badge variant="secondary" class="text-xs">{{ selectedGroup }}</Badge>
+        <Badge variant="secondary" class="text-[10px]">{{ clientTypeLabel }}</Badge>
+        <span class="text-muted-foreground/50">→</span>
+        <Badge variant="secondary" class="text-[10px]">{{ selectedGroup }}</Badge>
       </template>
       <template v-if="enabledModelCount > 0">
-        <span class="mx-1">·</span>
-        <span>{{ enabledModelCount }} 个模型</span>
+        <span class="text-muted-foreground/50 mx-0.5">·</span>
+        <span>{{ enabledModelCount }} 模型</span>
       </template>
       <template v-if="mappingPreview.length > 0">
-        <span class="mx-1">·</span>
-        <span>{{ mappingPreview.length }} 条映射</span>
+        <span class="text-muted-foreground/50 mx-0.5">·</span>
+        <span>{{ mappingPreview.length }} 映射</span>
       </template>
       <template v-if="selectedRetryRules.size > 0">
-        <span class="mx-1">·</span>
-        <span>{{ selectedRetryRules.size }} 条重试规则</span>
+        <span class="text-muted-foreground/50 mx-0.5">·</span>
+        <span>{{ selectedRetryRules.size }} 规则</span>
       </template>
     </div>
     <div class="flex items-center gap-2">
-      <Button variant="outline" @click="validateConfig">验证配置</Button>
-      <Button :disabled="saving" @click="submit">
+      <Button size="sm" variant="outline" @click="validateConfig">验证</Button>
+      <Button size="sm" :disabled="saving" @click="submit">
         <template v-if="saving">
-          <svg class="w-4 h-4 mr-1 animate-spin" fill="none" viewBox="0 0 24 24">
+          <svg class="w-3.5 h-3.5 mr-1 animate-spin" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
-          保存中...
+          保存中
         </template>
         <template v-else>保存配置</template>
       </Button>
@@ -202,8 +252,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { toast } from 'vue-sonner'
-import { useQuickSetup } from '@/composables/useQuickSetup'
-import ClientSelector from '@/components/quick-setup/ClientSelector.vue'
+import { useQuickSetup, type ConcurrencyMode } from '@/composables/useQuickSetup'
 import ModelCard from '@/components/quick-setup/ModelCard.vue'
 import MappingPreview from '@/components/quick-setup/MappingPreview.vue'
 import type { ModelConfig } from '@/components/quick-setup/types'
@@ -221,8 +270,9 @@ const {
   apiType, apiKey, modelConfigs, mappingPreview,
   recommendedRules, selectedRetryRules, saving, connectionStatus,
   baseUrl, availablePlans, isNonOpenaiEndpoint,
+  concurrencyMode, maxConcurrency, queueTimeoutMs, maxQueueSize,
   selectClient, onProviderChange, onPlanChange,
-  updateMappings, toggleRetryRule, testConnection, submit,
+  updateMappings, toggleRetryRule, onConcurrencyModeChange, testConnection, submit,
 } = useQuickSetup()
 
 const enabledModelCount = computed(() => modelConfigs.value.filter(m => m.enabled).length)

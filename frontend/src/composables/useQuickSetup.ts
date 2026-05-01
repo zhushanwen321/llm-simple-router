@@ -7,6 +7,8 @@ import {
 } from '@/components/quick-setup/types'
 import router from '@/router'
 
+export type ConcurrencyMode = 'auto' | 'manual' | 'none'
+
 export function useQuickSetup() {
   // --- State ---
   const clientType = ref<ClientType>('claude-code')
@@ -21,6 +23,12 @@ export function useQuickSetup() {
   const selectedRetryRules = ref<Set<string>>(new Set())
   const saving = ref(false)
   const connectionStatus = ref<'idle' | 'testing' | 'ok' | 'error'>('idle')
+
+  // Concurrency state
+  const concurrencyMode = ref<ConcurrencyMode>('auto')
+  const maxConcurrency = ref(10)
+  const queueTimeoutMs = ref(120000)
+  const maxQueueSize = ref(100)
 
   // --- Computed ---
   const currentClient = computed(() =>
@@ -87,6 +95,17 @@ export function useQuickSetup() {
   // --- Mappings ---
   function updateMappings() {
     const enabledModels = modelConfigs.value.filter(m => m.enabled)
+
+    if (clientType.value === 'pi') {
+      // Pi: 1:1 mapping from provider model names
+      mappingPreview.value = enabledModels.map(m => ({
+        from: m.name,
+        to: m.name,
+        tag: 'auto' as const,
+      }))
+      return
+    }
+
     const clientDefaults = DEFAULT_CLIENT_MAPPINGS[clientType.value]
 
     if (clientDefaults && enabledModels.length > 0) {
@@ -106,7 +125,6 @@ export function useQuickSetup() {
 
   // --- Auto-select retry rules when provider changes ---
   function autoSelectRetryRules() {
-    // Select all recommended rules for the current provider
     selectedRetryRules.value = new Set(recommendedRules.value.map(r => r.name))
   }
 
@@ -189,6 +207,16 @@ export function useQuickSetup() {
     selectedRetryRules.value = next
   }
 
+  // --- Concurrency ---
+  function onConcurrencyModeChange(mode: ConcurrencyMode) {
+    concurrencyMode.value = mode
+    if (mode === 'auto') {
+      maxConcurrency.value = 10
+    } else if (mode === 'manual') {
+      maxConcurrency.value = 3
+    }
+  }
+
   // --- Connection test ---
   async function testConnection() {
     if (!apiKey.value.trim()) {
@@ -225,6 +253,10 @@ export function useQuickSetup() {
             context_window: m.contextWindow,
             patches: m.patches.length > 0 ? m.patches : undefined,
           })),
+          concurrency_mode: concurrencyMode.value,
+          max_concurrency: concurrencyMode.value !== 'none' ? maxConcurrency.value : undefined,
+          queue_timeout_ms: concurrencyMode.value !== 'none' ? queueTimeoutMs.value : undefined,
+          max_queue_size: concurrencyMode.value !== 'none' ? maxQueueSize.value : undefined,
         },
         mappings: mappingPreview.value.map(m => ({
           client_model: m.from,
@@ -276,8 +308,9 @@ export function useQuickSetup() {
     selectedRetryRules, saving, connectionStatus,
     currentClient, currentPreset, baseUrl,
     availablePlans, isNonOpenaiEndpoint,
+    concurrencyMode, maxConcurrency, queueTimeoutMs, maxQueueSize,
     selectClient, onProviderChange, onPlanChange,
     initModels, getDefaultPatches, updateMappings,
-    toggleRetryRule, testConnection, submit,
+    toggleRetryRule, onConcurrencyModeChange, testConnection, submit,
   }
 }
