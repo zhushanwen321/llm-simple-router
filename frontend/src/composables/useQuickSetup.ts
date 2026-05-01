@@ -12,6 +12,26 @@ import router from '@/router'
 
 export type ConcurrencyMode = 'auto' | 'manual' | 'none'
 
+/** Convert Chinese provider group name to valid backend name (a-zA-Z0-9_-) */
+const PROVIDER_NAME_MAP: Record<string, string> = {
+  'DeepSeek': 'deepseek',
+  '百度千帆': 'qianfan',
+  '科大讯飞': 'iflytek',
+  '硅基流动': 'siliconflow',
+  '智谱': 'zhipu',
+  '月之暗面': 'moonshot',
+  'Minimax': 'minimax',
+  '火山引擎': 'volcengine',
+  '阿里云': 'aliyun',
+  '腾讯云': 'tencent',
+  'OpenCode Go': 'opencode-go',
+  '阶跃星辰': 'stepfun',
+}
+
+function toProviderName(group: string): string {
+  return PROVIDER_NAME_MAP[group] ?? group.toLowerCase().replace(/[^a-z0-9]/gi, '-').replace(/-+/g, '-')
+}
+
 export function useQuickSetup() {
   // --- State ---
   const clientType = ref<ClientType>('claude-code')
@@ -306,7 +326,7 @@ export function useQuickSetup() {
     try {
       const payload: QuickSetupPayload = {
         provider: {
-          name: selectedGroup.value.toLowerCase().replace(/\s+/g, '-'),
+          name: toProviderName(selectedGroup.value),
           api_type: apiType.value,
           base_url: baseUrl.value,
           api_key: apiKey.value.trim(),
@@ -342,17 +362,27 @@ export function useQuickSetup() {
       await api.quickSetup(payload)
 
       // Update existing mappings (failover/overflow changes)
+      // Best-effort: continue even if some updates fail
+      const updateErrors: string[] = []
       for (const entry of mappingEntries.value) {
         if (entry.existing && entry.existingId) {
-          const ruleJson = JSON.stringify({ targets: entry.targets })
-          await api.updateMappingGroup(entry.existingId, {
-            client_model: entry.clientModel,
-            rule: ruleJson,
-          })
+          try {
+            const ruleJson = JSON.stringify({ targets: entry.targets })
+            await api.updateMappingGroup(entry.existingId, {
+              client_model: entry.clientModel,
+              rule: ruleJson,
+            })
+          } catch (e: unknown) {
+            updateErrors.push(entry.clientModel)
+          }
         }
       }
 
-      toast.success('快速配置完成！')
+      if (updateErrors.length > 0) {
+        toast.success(`快速配置完成！${updateErrors.length} 个已有映射更新失败，请到映射页面手动修改`)
+      } else {
+        toast.success('快速配置完成！')
+      }
       router.push('/')
     } catch (e: unknown) {
       toast.error(getApiMessage(e, '快速配置失败'))
