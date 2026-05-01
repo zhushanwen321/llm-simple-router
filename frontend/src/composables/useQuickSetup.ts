@@ -215,7 +215,7 @@ export function useQuickSetup() {
           })),
       }
 
-      const result = await api.quickSetup(payload)
+      await api.quickSetup(payload)
       toast.success('快速配置完成！')
       router.push('/')
     } catch (e: unknown) {

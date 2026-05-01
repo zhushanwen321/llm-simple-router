@@ -14,6 +14,7 @@ export interface ModelMapping {
 export interface ModelInfo {
   name: string
   context_window: number | null
+  patches: string[]
 }
 
 /** 映射组（列表项，rule 为 JSON 字符串） */
