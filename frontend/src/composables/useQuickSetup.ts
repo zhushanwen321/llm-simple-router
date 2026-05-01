@@ -113,68 +113,53 @@ export function useQuickSetup() {
   function updateMappings() {
     const enabledModels = modelConfigs.value.filter(m => m.enabled)
 
-    // Build new recommended mappings
-    let newMappings: MappingEntry[]
+    // Build new recommended mappings based on client type
+    let clientModelNames: string[]
     if (clientType.value === 'pi') {
-      newMappings = enabledModels.map(m => ({
-        clientModel: m.name,
-        targets: [{ backend_model: m.name, provider_id: '__new__' }],
-        existing: false,
-        tag: 'auto' as const,
-      }))
+      // Pi: client model names = provider model names
+      clientModelNames = enabledModels.map(m => m.name)
     } else {
-      const clientDefaults = DEFAULT_CLIENT_MAPPINGS[clientType.value]
-      if (clientDefaults && enabledModels.length > 0) {
-        newMappings = clientDefaults.map((fromName, index) => ({
-          clientModel: fromName,
-          targets: [{
-            backend_model: enabledModels[index]?.name ?? enabledModels[enabledModels.length - 1]?.name ?? '',
-            provider_id: '__new__',
-          }],
-          existing: false,
-          tag: 'def' as const,
-        }))
-      } else {
-        newMappings = enabledModels.map(m => ({
-          clientModel: m.name,
-          targets: [{ backend_model: m.name, provider_id: '__new__' }],
-          existing: false,
-          tag: 'auto' as const,
-        }))
-      }
+      clientModelNames = DEFAULT_CLIENT_MAPPINGS[clientType.value] ?? enabledModels.map(m => m.name)
     }
 
-    // Build existing mapping map
-    const existingMap = new Map<string, MappingEntry>()
-    for (const g of existingMappings.value) {
-      let rule: Rule = {}
-      try { rule = JSON.parse(g.rule) } catch { /* ignore */ }
-      const targets = rule.targets ?? []
-      if (targets.length > 0) {
-        existingMap.set(g.client_model, {
-          clientModel: g.client_model,
-          targets: targets.map(t => ({
-            backend_model: t.backend_model,
-            provider_id: t.provider_id,
-            overflow_provider_id: t.overflow_provider_id,
-            overflow_model: t.overflow_model,
-          })),
+    // For each client model name, check if it already has a mapping in DB
+    const entries: MappingEntry[] = clientModelNames.map((cmName) => {
+      // Look up existing mapping for this client model
+      const existingGroup = existingMappings.value.find(g => g.client_model === cmName)
+      if (existingGroup) {
+        let rule: Rule = {}
+        try { rule = JSON.parse(existingGroup.rule) } catch { /* ignore */ }
+        const targets = rule.targets ?? []
+        return {
+          clientModel: cmName,
+          targets: targets.length > 0
+            ? targets.map(t => ({
+                backend_model: t.backend_model,
+                provider_id: t.provider_id,
+                overflow_provider_id: t.overflow_provider_id,
+                overflow_model: t.overflow_model,
+              }))
+            : [{ backend_model: enabledModels[0]?.name ?? '', provider_id: '__new__' }],
           existing: true,
-          existingId: g.id,
+          existingId: existingGroup.id,
           tag: 'existing' as const,
-        })
+        }
       }
-    }
 
-    // Merge: existing overrides new for same clientModel, then add extra existing
-    const merged = newMappings.map(nm => existingMap.get(nm.clientModel) ?? nm)
-    for (const [_, em] of existingMap) {
-      if (!merged.find(m => m.clientModel === em.clientModel)) {
-        merged.push(em)
+      // No existing mapping → create default
+      // Find best matching provider model by index
+      const defaultTarget = enabledModels[clientModelNames.indexOf(cmName)]?.name
+        ?? enabledModels[enabledModels.length - 1]?.name
+        ?? ''
+      return {
+        clientModel: cmName,
+        targets: [{ backend_model: defaultTarget, provider_id: '__new__' }],
+        existing: false,
+        tag: (clientType.value === 'pi' ? 'auto' : 'def') as 'auto' | 'def',
       }
-    }
+    })
 
-    mappingEntries.value = merged
+    mappingEntries.value = entries
   }
 
   // --- Auto-select retry rules when provider changes ---
