@@ -259,6 +259,18 @@ export class RequestTracker {
     this.clients.delete(res);
   }
 
+  /** 主动关闭所有 SSE 客户端连接，确保 app.close() 不会因长连接阻塞 */
+  closeAllClients(): void {
+    for (const client of this.clients) {
+      try {
+        if (!client.writableEnded) client.end();
+      } catch {
+        // 忽略已关闭的连接
+      }
+    }
+    this.clients.clear();
+  }
+
   // --- Push interval ---
 
   startPushInterval(): void {

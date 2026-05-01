@@ -5,6 +5,7 @@ export interface DirectiveMeta {
 
 export type StageRecord =
   | { stage: "enhancement"; router_tags_stripped: number; directive: DirectiveMeta | null }
+  | { stage: "tool_round_limit"; action: string; rounds: number }
   | { stage: "tool_guard"; action: string; tool: string }
   | { stage: "routing"; client_model: string; backend_model: string; provider_id: string; strategy: string }
   | { stage: "overflow"; triggered: boolean; redirect_to?: string; redirect_provider?: string }

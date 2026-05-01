@@ -1,7 +1,16 @@
 import { appendFileSync, mkdirSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
-import { type LogFileEntry, WINDOW_MINUTES, TIME_PAD_WIDTH, ISO_DATE_LENGTH } from "./types.js";
+import { type LogFileEntry, WINDOW_MINUTES, TIME_PAD_WIDTH, localDateStr } from "./types.js";
+
+/** 从日期对象生成本地时区的日志文件路径片段 */
+function localFilePathParts(d: Date): { dateStr: string; fileName: string } {
+  const dateStr = localDateStr(d);
+  const hour = d.getHours().toString().padStart(TIME_PAD_WIDTH, "0");
+  const minute = Math.floor(d.getMinutes() / WINDOW_MINUTES) * WINDOW_MINUTES;
+  const minuteStr = minute.toString().padStart(TIME_PAD_WIDTH, "0");
+  return { dateStr, fileName: `${hour}-${minuteStr}.jsonl` };
+}
 
 export interface LogFileWriterOptions {
   enabled?: boolean;
@@ -23,12 +32,7 @@ export class LogFileWriter {
   write(entry: LogFileEntry): void {
     if (!this.enabled) return;
 
-    const date = new Date(entry.created_at);
-    const dateStr = date.toISOString().slice(0, ISO_DATE_LENGTH);
-    const hour = date.getUTCHours().toString().padStart(TIME_PAD_WIDTH, "0");
-    const minute = Math.floor(date.getUTCMinutes() / WINDOW_MINUTES) * WINDOW_MINUTES;
-    const minuteStr = minute.toString().padStart(TIME_PAD_WIDTH, "0");
-    const fileName = `${hour}-${minuteStr}.jsonl`;
+    const { dateStr, fileName } = localFilePathParts(new Date(entry.created_at));
 
     const dayDir = join(this.baseDir, dateStr);
     if (!existsSync(dayDir)) {
@@ -54,12 +58,7 @@ export class LogFileWriter {
   read(id: string, createdAt: string): LogFileEntry | null {
     if (!this.enabled) return null;
 
-    const date = new Date(createdAt);
-    const dateStr = date.toISOString().slice(0, ISO_DATE_LENGTH);
-    const hour = date.getUTCHours().toString().padStart(TIME_PAD_WIDTH, "0");
-    const minute = Math.floor(date.getUTCMinutes() / WINDOW_MINUTES) * WINDOW_MINUTES;
-    const minuteStr = minute.toString().padStart(TIME_PAD_WIDTH, "0");
-    const fileName = `${hour}-${minuteStr}.jsonl`;
+    const { dateStr, fileName } = localFilePathParts(new Date(createdAt));
     const dayDir = join(this.baseDir, dateStr);
 
     // 尝试未压缩文件

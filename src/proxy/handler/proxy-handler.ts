@@ -29,6 +29,7 @@ import { applyOverflowRedirect } from "../routing/overflow.js";
 import { applyProviderPatches } from "../patch/index.js";
 import { PipelineSnapshot, type StageRecord } from "../pipeline-snapshot.js";
 import { maybeInjectModelInfoTag } from "../response-transform.js";
+import { applyToolRoundLimit } from "../patch/tool-round-limiter.js";
 import { loadEnhancementConfig } from "../routing/enhancement-config.js";
 import { getTransportStatusCode, serializeBlocksForStorage, extractLastToolUse } from "./proxy-handler-utils.js";
 
@@ -147,8 +148,18 @@ export async function handleProxyRequest(
   );
   snapshot.add({ stage: "enhancement", router_tags_stripped: enhMeta.router_tags_stripped, directive: enhMeta.directive });
 
-  // tool guard 阶段 — 使用 enhancedBody
+  // tool round limiter 阶段 — 检测连续工具调用轮数，超阈值时注入提示词
   let pipelineBody = enhancedBody;
+  if (enhancementConfig.tool_round_limit_enabled) {
+    const roundResult = applyToolRoundLimit(enhancedBody, apiType);
+    if (roundResult.injected) {
+      pipelineBody = roundResult.body;
+      snapshot.add({ stage: "tool_round_limit", action: "inject_warning", rounds: roundResult.rounds });
+      request.log.info({ sessionId, rounds: roundResult.rounds }, "Tool round limit reached, injecting warning prompt");
+    }
+  }
+
+  // tool guard 阶段 — 使用 pipelineBody（可能已被 round limiter 修改）
   const sessionTracker = deps.container.resolve<import("../loop-prevention/session-tracker.js").SessionTracker>(SERVICE_KEYS.sessionTracker);
   if (enhancementConfig.tool_call_loop_enabled && sessionTracker && sessionId) {
     const routerKeyId = (request.routerKey as { id?: string } | undefined)?.id ?? null;
