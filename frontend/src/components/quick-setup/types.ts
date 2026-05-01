@@ -1,4 +1,4 @@
-export type ClientType = 'claude-code' | 'pi' | 'codex' | 'openai-sdk' | 'anthropic-sdk'
+export type ClientType = 'claude-code' | 'pi' | 'openai-sdk' | 'anthropic-sdk'
 
 export interface ClientMeta {
   id: ClientType
@@ -39,7 +39,6 @@ export interface MappingPreviewItem {
 export const CLIENTS: ClientMeta[] = [
   { id: 'claude-code', name: 'Claude Code', icon: 'C', iconClass: 'cc', format: 'anthropic', defaultProvider: 'DeepSeek', defaultPlan: 'Anthropic', description: 'Anthropic 官方 CLI 编程助手' },
   { id: 'pi', name: 'Pi', icon: 'P', iconClass: 'pi', format: 'anthropic', defaultProvider: 'DeepSeek', defaultPlan: 'Anthropic', description: '通用编程 Agent 框架' },
-  { id: 'codex', name: 'Codex CLI', icon: 'Cx', iconClass: 'cx', format: 'openai', defaultProvider: 'DeepSeek', defaultPlan: 'OpenAI', description: 'OpenAI 官方 CLI 编程助手' },
   { id: 'openai-sdk', name: 'OpenAI SDK', icon: 'OA', iconClass: 'oa', format: 'openai', defaultProvider: 'DeepSeek', defaultPlan: 'OpenAI', description: 'OpenAI API 直接调用' },
   { id: 'anthropic-sdk', name: 'Anthropic SDK', icon: 'AN', iconClass: 'an', format: 'anthropic', defaultProvider: 'DeepSeek', defaultPlan: 'Anthropic', description: 'Anthropic API 直接调用' },
 ]
@@ -103,7 +102,6 @@ export function getDefaultContextWindow(modelName: string): number {
  */
 export const DEFAULT_CLIENT_MAPPINGS: Record<string, string[]> = {
   'claude-code': ['sonnet', 'opus', 'haiku'],
-  'codex': ['codex-mini', 'o3', 'o4-mini', 'gpt-4.1'],
-  'openai-sdk': ['gpt-4o', 'gpt-4o-mini', 'o3', 'o4-mini'],
+  'openai-sdk': ['gpt-5.1', 'gpt-4.1', 'o3', 'o4-mini'],
   'anthropic-sdk': ['claude-sonnet-4-20250514', 'claude-opus-4-20250116', 'claude-haiku-4-20250414'],
 }
