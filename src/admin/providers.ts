@@ -10,7 +10,7 @@ import type { AdaptiveConcurrencyController } from "../proxy/adaptive-controller
 import type { RequestTracker } from "../monitor/request-tracker.js";
 import { HTTP_CREATED, HTTP_NOT_FOUND, HTTP_CONFLICT, HTTP_BAD_REQUEST } from "./constants.js";
 import { API_CODE, apiError } from "./api-response.js";
-import { parseModels, buildModelInfoList } from "../config/model-context.js";
+import { parseModels, buildModelInfoList, type ModelEntry } from "../config/model-context.js";
 import { getModelInfoForProvider, setModelInfoForProvider, deleteAllModelInfoForProvider } from "../db/model-info.js";
 
 const API_KEY_PREVIEW_MIN_LENGTH = 8;
@@ -72,7 +72,7 @@ function cascadeProviderDisable(db: Database.Database, providerId: string): Casc
   return result;
 }
 
-type ModelInput = string | { name: string; context_window?: number };
+type ModelInput = string | { name: string; context_window?: number; patches?: string[] };
 
 interface ModelOverride {
   name: string;
@@ -80,14 +80,18 @@ interface ModelOverride {
 }
 
 function extractModelOverrides(models: ModelInput[]): {
-  names: string[];
+  entries: ModelEntry[];
   overrides: ModelOverride[];
 } {
-  const names = models.map(m => typeof m === "string" ? m : m.name);
+  const entries = models.map(m =>
+    typeof m === "string"
+      ? { name: m, patches: [] }
+      : { name: m.name, context_window: m.context_window, patches: m.patches ?? [] }
+  );
   const overrides = models.filter(
     (m): m is ModelOverride => typeof m !== "string" && m.context_window != null,
   );
-  return { names, overrides };
+  return { entries, overrides };
 }
 const API_KEY_PREVIEW_PREFIX_LEN = 4;
 
@@ -100,7 +104,7 @@ const CreateProviderSchema = Type.Object({
   api_key: Type.String({ minLength: 1 }),
   models: Type.Optional(Type.Array(Type.Union([
     Type.String(),
-    Type.Object({ name: Type.String(), context_window: Type.Optional(Type.Number()) })
+    Type.Object({ name: Type.String(), context_window: Type.Optional(Type.Number()), patches: Type.Optional(Type.Array(Type.String())) })
   ]))),
   is_active: Type.Optional(Type.Number()),
   max_concurrency: Type.Optional(Type.Integer({ minimum: 0 })),
@@ -116,7 +120,7 @@ const UpdateProviderSchema = Type.Object({
   api_key: Type.Optional(Type.String({ minLength: 1 })),
   models: Type.Optional(Type.Array(Type.Union([
     Type.String(),
-    Type.Object({ name: Type.String(), context_window: Type.Optional(Type.Number()) })
+    Type.Object({ name: Type.String(), context_window: Type.Optional(Type.Number()), patches: Type.Optional(Type.Array(Type.String())) })
   ]))),
   is_active: Type.Optional(Type.Number()),
   max_concurrency: Type.Optional(Type.Integer({ minimum: 0 })),
@@ -139,7 +143,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     const encryptionKey = getSetting(db, "encryption_key")!;
     const providers = getAllProviders(db);
     return reply.send(providers.map((s) => {
-      const modelNames = parseModels(s.models || "[]");
+      const modelEntries = parseModels(s.models || "[]");
       const overrides = new Map(
         getModelInfoForProvider(db, s.id).map(m => [m.model_name, m.context_window]),
       );
@@ -149,7 +153,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
         api_type: s.api_type,
         base_url: s.base_url,
         api_key: s.api_key ? decrypt(s.api_key, encryptionKey) : "",
-        models: buildModelInfoList(modelNames, overrides),
+        models: buildModelInfoList(modelEntries, overrides),
         is_active: s.is_active,
         max_concurrency: s.max_concurrency,
         queue_timeout_ms: s.queue_timeout_ms,
@@ -172,7 +176,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
       return reply.code(HTTP_CONFLICT).send(apiError(API_CODE.CONFLICT_NAME, `Provider 名称 '${body.name}' 已存在`));
     }
     const encryptedKey = encrypt(body.api_key, getSetting(db, "encryption_key")!);
-    const { names: normalizedModels, overrides: contextOverrides } = extractModelOverrides((body.models ?? []) as ModelInput[]);
+    const { entries: normalizedModels, overrides: contextOverrides } = extractModelOverrides((body.models ?? []) as ModelInput[]);
     const isAdaptiveEnabled = body.adaptive_enabled ?? 0;
     const id = createProvider(db, {
       name: body.name,
@@ -229,8 +233,8 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     if (body.base_url !== undefined) fields.base_url = body.base_url;
     if (body.is_active !== undefined) fields.is_active = body.is_active;
     if (body.models !== undefined) {
-      const { names, overrides } = extractModelOverrides(body.models as ModelInput[]);
-      fields.models = JSON.stringify(names);
+      const { entries, overrides } = extractModelOverrides(body.models as ModelInput[]);
+      fields.models = JSON.stringify(entries);
       if (overrides.length > 0) {
         setModelInfoForProvider(db, id, overrides.map(o => ({ model_name: o.name, context_window: o.context_window })));
       } else {

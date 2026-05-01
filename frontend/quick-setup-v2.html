@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>快速配置 — LLM Router</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #09090b;
+  --bg-raised: #111113;
+  --bg-card: #18181b;
+  --bg-hover: #1f1f23;
+  --bg-input: #0f0f11;
+  --border: #27272a;
+  --border-light: #3f3f46;
+  --border-focus: #6d5cf5;
+  --text: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --text-dim: #52525b;
+  --accent: #6d5cf5;
+  --accent-light: #8b7df5;
+  --accent-soft: rgba(109, 92, 245, 0.08);
+  --accent-soft-hover: rgba(109, 92, 245, 0.15);
+  --success: #22c55e;
+  --success-soft: rgba(34, 197, 94, 0.1);
+  --warning: #f59e0b;
+  --warning-soft: rgba(245, 158, 11, 0.1);
+  --danger: #ef4444;
+  --danger-soft: rgba(239, 68, 68, 0.1);
+  --cyan: #06b6d4;
+  --cyan-soft: rgba(6, 182, 212, 0.1);
+  --radius: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --shadow: 0 4px 24px rgba(0,0,0,0.3);
+}
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'DM Sans', -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  min-height: 100vh;
+  display: flex;
+}
+.mono { font-family: 'JetBrains Mono', monospace; }
+
+/* ===== Layout ===== */
+.sidebar {
+  width: 224px;
+  background: var(--bg-raised);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+.sidebar-logo {
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sidebar-logo .icon {
+  width: 32px; height: 32px;
+  background: var(--accent);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 700; color: #fff;
+}
+.sidebar-logo .name { font-weight: 600; font-size: 14px; }
+.sidebar-logo .ver {
+  font-size: 10px; color: var(--text-muted);
+  background: var(--bg-hover);
+  padding: 1px 6px; border-radius: 10px;
+}
+
+.sidebar-nav { flex: 1; padding: 8px; overflow-y: auto; }
+
+.nav-group { margin-bottom: 4px; }
+.nav-group-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-dim);
+  padding: 12px 12px 4px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+  user-select: none;
+}
+.nav-item:hover { background: var(--bg-hover); color: var(--text); }
+.nav-item.active {
+  background: var(--accent-soft);
+  color: var(--accent-light);
+  font-weight: 500;
+}
+.nav-item svg { width: 16px; height: 16px; opacity: 0.6; flex-shrink: 0; }
+.nav-item.active svg { opacity: 1; }
+
+.nav-sub {
+  padding-left: 16px;
+  overflow: hidden;
+  max-height: 0;
+  transition: max-height 0.3s ease;
+}
+.nav-sub.open { max-height: 300px; }
+.nav-sub .nav-item {
+  font-size: 12px;
+  padding: 6px 12px;
+  position: relative;
+}
+.nav-sub .nav-item::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 50%;
+  width: 6px; height: 1px;
+  background: var(--border);
+}
+.nav-sub .nav-item.active::before { background: var(--accent); }
+
+.nav-expand-icon {
+  margin-left: auto;
+  width: 14px; height: 14px;
+  transition: transform 0.2s;
+  opacity: 0.4;
+}
+.nav-item.expanded .nav-expand-icon { transform: rotate(90deg); opacity: 0.6; }
+
+.sidebar-footer {
+  padding: 12px;
+  border-top: 1px solid var(--border);
+}
+.sidebar-footer .nav-item { color: var(--text-dim); }
+
+/* ===== Main Content ===== */
+.main {
+  flex: 1;
+  overflow-y: auto;
+  height: 100vh;
+}
+
+.page-header {
+  padding: 24px 32px 0;
+}
+.page-header h1 {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.page-header p {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.page-body {
+  padding: 20px 32px 40px;
+  max-width: 960px;
+}
+
+/* ===== Config Card ===== */
+.config-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  margin-bottom: 16px;
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+.config-section:hover { border-color: var(--border-light); }
+.config-section.active { border-color: rgba(109, 92, 245, 0.3); }
+
+.section-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255,255,255,0.01);
+}
+.section-step {
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700;
+  background: var(--accent-soft);
+  color: var(--accent-light);
+  flex-shrink: 0;
+}
+.section-step.done {
+  background: var(--success-soft);
+  color: var(--success);
+}
+.section-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+.section-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+.section-tag {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+.tag-required { background: var(--danger-soft); color: #f87171; }
+.tag-auto { background: var(--accent-soft); color: var(--accent-light); }
+
+.section-body { padding: 20px; }
+
+/* ===== Form Controls ===== */
+.form-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.form-row:last-child { margin-bottom: 0; }
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1;
+}
+.form-group label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.form-group label .auto-badge {
+  font-size: 9px;
+  background: var(--accent-soft);
+  color: var(--accent-light);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+select, input[type="text"], input[type="password"] {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 9px 12px;
+  font-size: 13px;
+  color: var(--text);
+  font-family: inherit;
+  outline: none;
+  width: 100%;
+  transition: all 0.15s;
+}
+select { cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2371717a' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 28px; }
+select:focus, input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+input::placeholder { color: var(--text-dim); }
+
+.input-with-suffix {
+  position: relative;
+}
+.input-with-suffix input { padding-right: 80px; }
+.input-suffix {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  color: var(--text-muted);
+  background: var(--bg-hover);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+/* ===== Client Type Selector ===== */
+.client-selector {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.client-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  user-select: none;
+}
+.client-chip:hover {
+  border-color: var(--border-light);
+  background: var(--bg-hover);
+}
+.client-chip.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-light);
+}
+.client-chip .chip-icon {
+  width: 18px; height: 18px;
+  border-radius: 4px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+}
+.chip-icon.cc { background: #d97706; color: #fff; }
+.chip-icon.pi { background: var(--accent); color: #fff; }
+.chip-icon.codex { background: #10b981; color: #fff; }
+.chip-icon.oai { background: #06b6d4; color: #fff; }
+.chip-icon.ant { background: #d97706; color: #fff; }
+
+.client-chip .chip-format {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--bg-hover);
+  color: var(--text-dim);
+  margin-left: 2px;
+}
+
+/* ===== Models Table ===== */
+.models-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.models-table th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.models-table td {
+  padding: 10px 12px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.models-table tr:last-child td { border-bottom: none; }
+.models-table tr:hover td { background: rgba(255,255,255,0.01); }
+.model-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.model-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.model-dot.sonnet { background: var(--accent); }
+.model-dot.opus { background: #f59e0b; }
+.model-dot.haiku { background: var(--success); }
+.model-dot.gpt { background: var(--cyan); }
+.model-dot.other { background: var(--text-muted); }
+
+.price { color: var(--text-muted); font-size: 12px; }
+.ctx-badge {
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* ===== Mappings Preview ===== */
+.mapping-list { display: flex; flex-direction: column; gap: 8px; }
+.mapping-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 13px;
+  transition: all 0.15s;
+}
+.mapping-item:hover { border-color: var(--border-light); }
+.mapping-from {
+  font-weight: 600;
+  min-width: 140px;
+}
+.mapping-arrow {
+  color: var(--text-dim);
+  font-size: 14px;
+}
+.mapping-to {
+  color: var(--text-secondary);
+  flex: 1;
+}
+.mapping-tag {
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+.mapping-tag.default { background: var(--success-soft); color: var(--success); }
+.mapping-tag.custom { background: var(--accent-soft); color: var(--accent-light); }
+
+.mapping-remove {
+  width: 20px; height: 20px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px;
+  transition: all 0.15s;
+}
+.mapping-remove:hover { background: var(--danger-soft); color: var(--danger); }
+
+.add-mapping-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.add-mapping-row input {
+  flex: 1;
+  background: var(--bg);
+}
+.add-mapping-row .btn-ghost { white-space: nowrap; }
+
+/* ===== Retry Rules ===== */
+.retry-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.retry-card {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.retry-card:hover { border-color: var(--border-light); }
+.retry-card.selected { border-color: var(--accent); background: var(--accent-soft); }
+.retry-card .rc-name {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.retry-card .rc-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.retry-card .rc-badge {
+  margin-top: 6px;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  display: inline-block;
+}
+.retry-card .rc-badge.recommend { background: var(--success-soft); color: var(--success); }
+.retry-card .rc-badge.optional { background: var(--bg-hover); color: var(--text-dim); }
+
+/* ===== Submit Bar ===== */
+.submit-bar {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.btn {
+  padding: 8px 18px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent-light); box-shadow: 0 4px 16px rgba(109, 92, 245, 0.25); transform: translateY(-1px); }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+.btn-outline { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); }
+.btn-outline:hover { background: var(--bg-hover); color: var(--text); }
+.btn-ghost { background: transparent; color: var(--accent-light); border: none; padding: 6px 10px; }
+.btn-ghost:hover { background: var(--accent-soft); }
+
+/* ===== Validation ===== */
+.validation-result {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  background: var(--bg);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+.v-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.v-icon { font-size: 14px; }
+.v-ok { color: var(--success); }
+.v-err { color: var(--danger); }
+.v-warn { color: var(--warning); }
+
+/* ===== Animations ===== */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.anim { animation: fade-up 0.35s ease-out both; }
+.d1 { animation-delay: 0.05s; }
+.d2 { animation-delay: 0.1s; }
+.d3 { animation-delay: 0.15s; }
+.d4 { animation-delay: 0.2s; }
+.d5 { animation-delay: 0.25s; }
+
+/* ===== Responsive hints ===== */
+.summary-line {
+  font-size: 12px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.summary-line .sep { color: var(--border); }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="icon">R</div>
+    <span class="name">LLM Router</span>
+    <span class="ver">v0.8.0</span>
+  </div>
+
+  <div class="sidebar-nav">
+    <div class="nav-group">
+      <div class="nav-item active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        仪表盘
+      </div>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-group-label">代理配置</div>
+      <div class="nav-item expanded" onclick="this.classList.toggle('expanded'); this.nextElementSibling.classList.toggle('open')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        代理配置
+        <svg class="nav-expand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="nav-sub open">
+        <div class="nav-item active">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          快速配置
+        </div>
+        <div class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><circle cx="6" cy="6" r="1"/></svg>
+          供应商
+        </div>
+        <div class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+          模型映射
+        </div>
+        <div class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3"/></svg>
+          API 密钥
+        </div>
+        <div class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          重试规则
+        </div>
+      </div>
+    </div>
+
+    <div class="nav-group" style="margin-top: 8px">
+      <div class="nav-group-label">监控</div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        实时监控
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        请求日志
+      </div>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/></svg>
+        系统设置
+      </div>
+    </div>
+  </div>
+
+  <div class="sidebar-footer">
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      登出
+    </div>
+  </div>
+</nav>
+
+<!-- Main -->
+<div class="main">
+  <div class="page-header anim">
+    <h1>快速配置</h1>
+    <p>选择客户端类型和供应商，一键完成所有配置</p>
+  </div>
+
+  <div class="page-body">
+
+    <!-- Section 1: Client & Provider -->
+    <div class="config-section anim d1">
+      <div class="section-bar">
+        <div class="section-step">1</div>
+        <span class="section-title">选择客户端与供应商</span>
+        <span class="section-hint">根据选择自动填充后续配置</span>
+      </div>
+      <div class="section-body">
+        <!-- Client type -->
+        <div class="form-group" style="margin-bottom: 16px">
+          <label>本地客户端 <span class="auto-badge">决定映射格式</span></label>
+          <div class="client-selector" id="client-selector">
+            <div class="client-chip active" data-client="claude-code" onclick="selectClient(this)">
+              <span class="chip-icon cc">C</span>
+              Claude Code
+              <span class="chip-format">Anthropic</span>
+            </div>
+            <div class="client-chip" data-client="pi" onclick="selectClient(this)">
+              <span class="chip-icon pi">P</span>
+              Pi
+              <span class="chip-format">Anthropic</span>
+            </div>
+            <div class="client-chip" data-client="codex" onclick="selectClient(this)">
+              <span class="chip-icon codex">Cx</span>
+              Codex CLI
+              <span class="chip-format">OpenAI</span>
+            </div>
+            <div class="client-chip" data-client="openai-sdk" onclick="selectClient(this)">
+              <span class="chip-icon oai">OA</span>
+              OpenAI SDK
+              <span class="chip-format">OpenAI</span>
+            </div>
+            <div class="client-chip" data-client="anthropic-sdk" onclick="selectClient(this)">
+              <span class="chip-icon ant">AN</span>
+              Anthropic SDK
+              <span class="chip-format">Anthropic</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>供应商</label>
+            <select id="provider-select" onchange="onProviderChange()">
+              <option value="anthropic">Anthropic</option>
+              <option value="openai">OpenAI</option>
+              <option value="deepseek">DeepSeek</option>
+              <option value="openrouter">OpenRouter</option>
+              <option value="custom">自定义...</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>API 计划 <span class="auto-badge">自动检测</span></label>
+            <select id="plan-select">
+              <option value="coding-plan">Coding Plan (Max)</option>
+              <option value="api-plan">API Plan (Standard)</option>
+              <option value="free">Free Tier</option>
+            </select>
+          </div>
+          <div class="form-group" style="max-width: 140px">
+            <label>请求格式</label>
+            <select id="format-select">
+              <option value="anthropic">Anthropic</option>
+              <option value="openai">OpenAI</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 2: Connection -->
+    <div class="config-section anim d2">
+      <div class="section-bar">
+        <div class="section-step">2</div>
+        <span class="section-title">连接配置</span>
+        <span class="section-tag tag-required">必填</span>
+      </div>
+      <div class="section-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Base URL <span class="auto-badge">自动生成</span></label>
+            <div class="input-with-suffix">
+              <input type="text" id="base-url" value="https://api.anthropic.com">
+              <span class="input-suffix">Anthropic</span>
+            </div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>API Key</label>
+            <input type="password" id="api-key" placeholder="sk-ant-api03-..." style="font-family: 'JetBrains Mono', monospace; letter-spacing: 0.5px">
+          </div>
+        </div>
+        <div style="margin-top: 8px">
+          <button class="btn btn-outline" style="font-size: 12px; padding: 6px 14px" onclick="testConnection()">
+            🔗 测试连接
+          </button>
+          <span id="conn-status" style="font-size: 12px; margin-left: 8px; display: none"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 3: Available Models -->
+    <div class="config-section anim d3">
+      <div class="section-bar">
+        <div class="section-step">3</div>
+        <span class="section-title">可用模型</span>
+        <span class="section-hint" id="model-count">4 个模型可用</span>
+        <span class="section-tag tag-auto">自动获取</span>
+      </div>
+      <div class="section-body" style="padding: 0">
+        <table class="models-table" id="models-table">
+          <thead>
+            <tr>
+              <th style="width: 40px"></th>
+              <th>模型</th>
+              <th>上下文窗口</th>
+              <th>输入价格</th>
+              <th>输出价格</th>
+            </tr>
+          </thead>
+          <tbody id="models-tbody">
+            <!-- Filled by JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Section 4: Mappings -->
+    <div class="config-section anim d4">
+      <div class="section-bar">
+        <div class="section-step">4</div>
+        <span class="section-title">模型映射</span>
+        <span class="section-tag tag-auto">自动生成</span>
+        <span class="section-hint" id="mapping-hint">基于 Claude Code 默认映射</span>
+      </div>
+      <div class="section-body">
+        <div class="mapping-list" id="mapping-list">
+          <!-- Filled by JS -->
+        </div>
+        <div class="add-mapping-row">
+          <input type="text" id="custom-mapping" placeholder="添加自定义映射，例如：my-model">
+          <button class="btn btn-ghost" style="font-size: 12px" onclick="addCustomMapping()">+ 添加</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 5: Retry Rules -->
+    <div class="config-section anim d5">
+      <div class="section-bar">
+        <div class="section-step">5</div>
+        <span class="section-title">重试规则</span>
+        <span class="section-tag tag-auto">推荐</span>
+      </div>
+      <div class="section-body">
+        <div class="retry-grid" id="retry-grid">
+          <!-- Filled by JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Submit -->
+    <div class="submit-bar anim d5">
+      <div class="summary-line" id="summary-line">
+        <span>Anthropic</span>
+        <span class="sep">·</span>
+        <span>Claude Code</span>
+        <span class="sep">·</span>
+        <span>4 个模型</span>
+        <span class="sep">·</span>
+        <span>4 条映射</span>
+        <span class="sep">·</span>
+        <span>1 条重试规则</span>
+      </div>
+      <div style="display: flex; gap: 8px">
+        <button class="btn btn-outline" onclick="validateConfig()">校验配置</button>
+        <button class="btn btn-primary" id="submit-btn">保存并启用 →</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ===== Data =====
+const PROVIDERS = {
+  anthropic: {
+    name: 'Anthropic',
+    baseUrl: 'https://api.anthropic.com',
+    format: 'anthropic',
+    models: [
+      { id: 'claude-opus-4-20250514', name: 'Claude Opus 4', ctx: '200K', inPrice: '$15', outPrice: '$75', dot: 'opus' },
+      { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4', ctx: '200K', inPrice: '$3', outPrice: '$15', dot: 'sonnet' },
+      { id: 'claude-haiku-4-20250514', name: 'Claude Haiku 4', ctx: '200K', inPrice: '$1', outPrice: '$5', dot: 'haiku' },
+      { id: 'claude-sonnet-4-20250514-thinking', name: 'Sonnet 4 Thinking', ctx: '200K', inPrice: '$3', outPrice: '$15', dot: 'sonnet' },
+    ],
+    defaultMappings: {
+      'claude-code': [
+        { from: 'claude-sonnet-4', to: 'claude-sonnet-4-20250514', tag: 'default' },
+        { from: 'claude-opus-4', to: 'claude-opus-4-20250514', tag: 'default' },
+        { from: 'claude-haiku-4', to: 'claude-haiku-4-20250514', tag: 'default' },
+        { from: 'claude-sonnet-4-thinking', to: 'claude-sonnet-4-20250514-thinking', tag: 'default' },
+      ],
+      'pi': [
+        { from: 'claude-sonnet-4', to: 'claude-sonnet-4-20250514', tag: 'default' },
+        { from: 'claude-opus-4', to: 'claude-opus-4-20250514', tag: 'default' },
+        { from: 'claude-haiku-4', to: 'claude-haiku-4-20250514', tag: 'default' },
+        { from: 'claude-sonnet-4-thinking', to: 'claude-sonnet-4-20250514-thinking', tag: 'default' },
+      ],
+      'anthropic-sdk': 'all',
+      'openai-sdk': 'all',
+      'codex': 'all',
+    },
+    retry: [
+      { name: 'Anthropic 推荐', desc: '429/500/503 重试，指数退避', recommend: true },
+      { name: '激进重试', desc: '所有 5xx 重试，最多 5 次' },
+      { name: '不重试', desc: '失败直接返回错误' },
+    ],
+  },
+  openai: {
+    name: 'OpenAI',
+    baseUrl: 'https://api.openai.com',
+    format: 'openai',
+    models: [
+      { id: 'gpt-4o-2024-08-06', name: 'GPT-4o', ctx: '128K', inPrice: '$2.50', outPrice: '$10', dot: 'gpt' },
+      { id: 'gpt-4o-mini', name: 'GPT-4o Mini', ctx: '128K', inPrice: '$0.15', outPrice: '$0.60', dot: 'gpt' },
+      { id: 'o3', name: 'o3', ctx: '200K', inPrice: '$2', outPrice: '$8', dot: 'gpt' },
+      { id: 'o4-mini', name: 'o4-mini', ctx: '200K', inPrice: '$1.10', outPrice: '$4.40', dot: 'gpt' },
+    ],
+    defaultMappings: {
+      'claude-code': 'all',
+      'pi': 'all',
+      'anthropic-sdk': 'all',
+      'codex': [
+        { from: 'gpt-4o', to: 'gpt-4o-2024-08-06', tag: 'default' },
+        { from: 'gpt-4o-mini', to: 'gpt-4o-mini', tag: 'default' },
+        { from: 'o3', to: 'o3', tag: 'default' },
+        { from: 'o4-mini', to: 'o4-mini', tag: 'default' },
+      ],
+      'openai-sdk': 'all',
+    },
+    retry: [
+      { name: 'OpenAI 推荐', desc: '429/500 重试，指数退避', recommend: true },
+      { name: '激进重试', desc: '所有 5xx 重试，最多 5 次' },
+      { name: '不重试', desc: '失败直接返回错误' },
+    ],
+  },
+  deepseek: {
+    name: 'DeepSeek',
+    baseUrl: 'https://api.deepseek.com',
+    format: 'openai',
+    models: [
+      { id: 'deepseek-chat', name: 'DeepSeek V3', ctx: '64K', inPrice: '$0.27', outPrice: '$1.10', dot: 'other' },
+      { id: 'deepseek-reasoner', name: 'DeepSeek R1', ctx: '64K', inPrice: '$0.55', outPrice: '$2.19', dot: 'other' },
+    ],
+    defaultMappings: { 'claude-code': 'all', 'pi': 'all', 'anthropic-sdk': 'all', 'codex': 'all', 'openai-sdk': 'all' },
+    retry: [
+      { name: 'DeepSeek 推荐', desc: '429/503 重试，指数退避', recommend: true },
+      { name: '不重试', desc: '失败直接返回错误' },
+    ],
+  },
+  openrouter: {
+    name: 'OpenRouter',
+    baseUrl: 'https://openrouter.ai/api',
+    format: 'openai',
+    models: [
+      { id: 'anthropic/claude-sonnet-4', name: 'Claude Sonnet 4', ctx: '200K', inPrice: '$3', outPrice: '$15', dot: 'sonnet' },
+      { id: 'anthropic/claude-opus-4', name: 'Claude Opus 4', ctx: '200K', inPrice: '$15', outPrice: '$75', dot: 'opus' },
+      { id: 'openai/gpt-4o', name: 'GPT-4o', ctx: '128K', inPrice: '$2.50', outPrice: '$10', dot: 'gpt' },
+      { id: 'google/gemini-2.5-pro', name: 'Gemini 2.5 Pro', ctx: '1M', inPrice: '$1.25', outPrice: '$10', dot: 'other' },
+    ],
+    defaultMappings: { 'claude-code': 'all', 'pi': 'all', 'anthropic-sdk': 'all', 'codex': 'all', 'openai-sdk': 'all' },
+    retry: [
+      { name: 'OpenRouter 推荐', desc: '429/503 重试', recommend: true },
+      { name: '不重试', desc: '失败直接返回错误' },
+    ],
+  },
+};
+
+const CLIENT_DEFAULTS = {
+  'claude-code': { provider: 'anthropic', plan: 'coding-plan', format: 'anthropic' },
+  'pi': { provider: 'anthropic', plan: 'coding-plan', format: 'anthropic' },
+  'codex': { provider: 'openai', plan: 'coding-plan', format: 'openai' },
+  'openai-sdk': { provider: 'openai', plan: 'api-plan', format: 'openai' },
+  'anthropic-sdk': { provider: 'anthropic', plan: 'api-plan', format: 'anthropic' },
+};
+
+let currentClient = 'claude-code';
+let currentProvider = 'anthropic';
+let selectedModels = new Set();
+let currentMappings = [];
+let selectedRetry = 0;
+
+// ===== Init =====
+function init() {
+  selectClientByName('claude-code');
+}
+
+function selectClient(el) {
+  document.querySelectorAll('.client-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  selectClientByName(el.dataset.client);
+}
+
+function selectClientByName(name) {
+  currentClient = name;
+  const defaults = CLIENT_DEFAULTS[name];
+
+  // Update provider
+  const providerSelect = document.getElementById('provider-select');
+  providerSelect.value = defaults.provider;
+
+  // Update plan
+  const planSelect = document.getElementById('plan-select');
+  // Disable plan for non-coding clients
+  if (['openai-sdk', 'anthropic-sdk'].includes(name)) {
+    planSelect.value = 'api-plan';
+  } else {
+    planSelect.value = defaults.plan;
+  }
+
+  // Update format
+  const formatSelect = document.getElementById('format-select');
+  formatSelect.value = defaults.format;
+
+  currentProvider = defaults.provider;
+  updateAll();
+}
+
+function onProviderChange() {
+  currentProvider = document.getElementById('provider-select').value;
+  updateAll();
+}
+
+function updateAll() {
+  const provider = PROVIDERS[currentProvider];
+  if (!provider) return;
+
+  // Update base URL
+  const baseUrlInput = document.getElementById('base-url');
+  baseUrlInput.value = provider.baseUrl;
+  baseUrlInput.nextElementSibling.textContent = provider.name;
+
+  // Update format select
+  const formatSelect = document.getElementById('format-select');
+  formatSelect.value = provider.format;
+
+  // Update models
+  updateModels(provider);
+
+  // Update mappings
+  updateMappings(provider);
+
+  // Update retry rules
+  updateRetryRules(provider);
+
+  // Update summary
+  updateSummary(provider);
+}
+
+function updateModels(provider) {
+  const tbody = document.getElementById('models-tbody');
+  selectedModels = new Set(provider.models.map(m => m.id));
+  document.getElementById('model-count').textContent = `${provider.models.length} 个模型可用`;
+
+  tbody.innerHTML = provider.models.map(m => `
+    <tr>
+      <td><input type="checkbox" checked onchange="toggleModel('${m.id}', this.checked)" style="accent-color: var(--accent)"></td>
+      <td>
+        <div class="model-name-cell">
+          <span class="model-dot ${m.dot}"></span>
+          <span class="mono" style="font-size: 12px; font-weight: 500">${m.name}</span>
+          <span class="mono" style="font-size: 10px; color: var(--text-dim)">${m.id}</span>
+        </div>
+      </td>
+      <td><span class="ctx-badge">${m.ctx}</span></td>
+      <td><span class="price">${m.inPrice}</span></td>
+      <td><span class="price">${m.outPrice}</span></td>
+    </tr>
+  `).join('');
+}
+
+function toggleModel(id, checked) {
+  if (checked) selectedModels.add(id); else selectedModels.delete(id);
+  // Rebuild mappings based on selection
+  const provider = PROVIDERS[currentProvider];
+  updateMappings(provider);
+  updateSummary(provider);
+}
+
+function updateMappings(provider) {
+  const list = document.getElementById('mapping-list');
+  const hint = document.getElementById('mapping-hint');
+
+  let mappingDefs = provider.defaultMappings[currentClient];
+  if (mappingDefs === 'all') {
+    // One mapping per model
+    mappingDefs = provider.models
+      .filter(m => selectedModels.has(m.id))
+      .map(m => ({ from: m.id, to: m.id, tag: 'auto' }));
+    hint.textContent = `每个模型独立映射 · ${mappingDefs.length} 条`;
+  } else {
+    // Filter to only selected models
+    mappingDefs = mappingDefs.filter(m => selectedModels.has(m.to));
+    const clientLabels = {
+      'claude-code': 'Claude Code 默认映射',
+      'pi': 'Pi 默认映射',
+      'codex': 'Codex 默认映射',
+      'openai-sdk': 'OpenAI SDK 映射',
+      'anthropic-sdk': 'Anthropic SDK 映射',
+    };
+    hint.textContent = `基于 ${clientLabels[currentClient]} · ${mappingDefs.length} 条`;
+  }
+
+  currentMappings = mappingDefs;
+  list.innerHTML = mappingDefs.map(m => `
+    <div class="mapping-item">
+      <span class="mapping-from mono">${m.from}</span>
+      <span class="mapping-arrow">→</span>
+      <span class="mapping-to mono">${m.to}</span>
+      <span class="mapping-tag ${m.tag}">${m.tag === 'default' ? '默认' : '自动'}</span>
+      <button class="mapping-remove" onclick="removeMapping(this, '${m.from}')">×</button>
+    </div>
+  `).join('');
+}
+
+function removeMapping(btn, from) {
+  const item = btn.closest('.mapping-item');
+  item.style.opacity = '0';
+  item.style.transform = 'translateX(20px)';
+  item.style.transition = 'all 0.2s';
+  setTimeout(() => {
+    currentMappings = currentMappings.filter(m => m.from !== from);
+    item.remove();
+    updateSummary(PROVIDERS[currentProvider]);
+  }, 200);
+}
+
+function addCustomMapping() {
+  const input = document.getElementById('custom-mapping');
+  const name = input.value.trim();
+  if (!name) return;
+
+  const provider = PROVIDERS[currentProvider];
+  const list = document.getElementById('mapping-list');
+
+  const mapping = { from: name, to: provider.models[0]?.id || name, tag: 'custom' };
+  currentMappings.push(mapping);
+
+  const div = document.createElement('div');
+  div.className = 'mapping-item';
+  div.innerHTML = `
+    <span class="mapping-from mono">${mapping.from}</span>
+    <span class="mapping-arrow">→</span>
+    <span class="mapping-to mono">${mapping.to}</span>
+    <span class="mapping-tag custom">自定义</span>
+    <button class="mapping-remove" onclick="removeMapping(this, '${mapping.from}')">×</button>
+  `;
+  list.appendChild(div);
+  input.value = '';
+  updateSummary(provider);
+}
+
+function updateRetryRules(provider) {
+  const grid = document.getElementById('retry-grid');
+  selectedRetry = 0;
+  grid.innerHTML = provider.retry.map((r, i) => `
+    <div class="retry-card ${i === 0 ? 'selected' : ''}" onclick="selectRetry(this, ${i})">
+      <div class="rc-name">${r.name}</div>
+      <div class="rc-desc">${r.desc}</div>
+      ${r.recommend ? '<span class="rc-badge recommend">✓ 推荐</span>' : '<span class="rc-badge optional">可选</span>'}
+    </div>
+  `).join('');
+}
+
+function selectRetry(el, idx) {
+  document.querySelectorAll('.retry-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedRetry = idx;
+}
+
+function updateSummary(provider) {
+  const summary = document.getElementById('summary-line');
+  const clientLabels = {
+    'claude-code': 'Claude Code',
+    'pi': 'Pi',
+    'codex': 'Codex CLI',
+    'openai-sdk': 'OpenAI SDK',
+    'anthropic-sdk': 'Anthropic SDK',
+  };
+  summary.innerHTML = `
+    <span>${provider.name}</span>
+    <span class="sep">·</span>
+    <span>${clientLabels[currentClient]}</span>
+    <span class="sep">·</span>
+    <span>${selectedModels.size} 个模型</span>
+    <span class="sep">·</span>
+    <span>${currentMappings.length} 条映射</span>
+    <span class="sep">·</span>
+    <span>${provider.retry[selectedRetry]?.name || '无'}</span>
+  `;
+}
+
+function testConnection() {
+  const status = document.getElementById('conn-status');
+  status.style.display = 'inline';
+  status.style.color = 'var(--warning)';
+  status.textContent = '⏳ 正在测试连接...';
+  setTimeout(() => {
+    const key = document.getElementById('api-key').value;
+    if (key) {
+      status.style.color = 'var(--success)';
+      status.textContent = '✓ 连接成功，已获取模型列表';
+    } else {
+      status.style.color = 'var(--danger)';
+      status.textContent = '✗ 请先填写 API Key';
+    }
+  }, 800);
+}
+
+function validateConfig() {
+  const key = document.getElementById('api-key').value;
+  const hasMappings = currentMappings.length > 0;
+
+  // Show inline validation (demo)
+  const steps = document.querySelectorAll('.section-step');
+  steps[0].textContent = key ? '✓' : '!';
+  steps[0].className = `section-step ${key ? 'done' : ''}`;
+  steps[1].textContent = hasMappings ? '✓' : '!';
+  steps[1].className = `section-step ${hasMappings ? 'done' : ''}`;
+}
+
+init();
+</script>
+
+</body>
+</html>

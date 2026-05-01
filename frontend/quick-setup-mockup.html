@@ -1,0 +1,1372 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>快速配置方案对比 — LLM Router</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,200;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #09090b;
+    --bg-raised: #111113;
+    --bg-card: #18181b;
+    --bg-hover: #1f1f23;
+    --border: #27272a;
+    --border-light: #3f3f46;
+    --text: #fafafa;
+    --text-secondary: #a1a1aa;
+    --text-muted: #71717a;
+    --accent: #6d5cf5;
+    --accent-light: #8b7df5;
+    --accent-bg: rgba(109, 92, 245, 0.08);
+    --accent-bg-hover: rgba(109, 92, 245, 0.15);
+    --success: #22c55e;
+    --success-bg: rgba(34, 197, 94, 0.1);
+    --warning: #f59e0b;
+    --warning-bg: rgba(245, 158, 11, 0.1);
+    --radius: 10px;
+    --radius-lg: 14px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  .mono { font-family: 'JetBrains Mono', monospace; }
+
+  /* ===== Top Nav ===== */
+  .top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 32px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-raised);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(12px);
+  }
+  .top-bar .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .top-bar .logo-icon {
+    width: 32px; height: 32px;
+    background: var(--accent);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; font-weight: 700; color: #fff;
+  }
+  .top-bar .logo-text {
+    font-weight: 600;
+    font-size: 15px;
+  }
+  .top-bar .logo-badge {
+    font-size: 11px;
+    background: var(--accent-bg);
+    color: var(--accent-light);
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-weight: 500;
+  }
+
+  .scheme-tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--bg-card);
+    border-radius: 8px;
+    padding: 3px;
+  }
+  .scheme-tab {
+    padding: 6px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+    background: none;
+  }
+  .scheme-tab:hover { color: var(--text-secondary); }
+  .scheme-tab.active {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  /* ===== Main Layout ===== */
+  .main {
+    display: flex;
+    min-height: calc(100vh - 65px);
+  }
+
+  /* Sidebar */
+  .sidebar {
+    width: 220px;
+    border-right: 1px solid var(--border);
+    padding: 16px 12px;
+    flex-shrink: 0;
+    background: var(--bg-raised);
+  }
+  .sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-bottom: 2px;
+  }
+  .sidebar-item:hover { background: var(--bg-hover); color: var(--text); }
+  .sidebar-item.active {
+    background: var(--accent-bg);
+    color: var(--accent-light);
+    font-weight: 500;
+  }
+  .sidebar-item svg { width: 16px; height: 16px; opacity: 0.7; }
+  .sidebar-item.active svg { opacity: 1; }
+  .sidebar-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--success);
+    margin-left: auto;
+    animation: pulse-dot 2s infinite;
+  }
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* Content area */
+  .content {
+    flex: 1;
+    padding: 28px 32px;
+    overflow-y: auto;
+  }
+
+  /* ===== Section Header ===== */
+  .section-header {
+    margin-bottom: 24px;
+  }
+  .section-header h1 {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .section-header p {
+    font-size: 14px;
+    color: var(--text-muted);
+  }
+
+  /* ===== Stats Row ===== */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .stat-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+  }
+  .stat-label {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 500;
+  }
+  .stat-value {
+    font-size: 24px;
+    font-weight: 700;
+  }
+  .stat-change {
+    font-size: 11px;
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .stat-change.up { color: var(--success); }
+  .stat-change.down { color: #ef4444; }
+
+  /* ===== Scheme Panels ===== */
+  .scheme-panel { display: none; }
+  .scheme-panel.active { display: block; }
+
+  /* ==========================================================
+     SCHEME A: 横向步骤条
+     ========================================================== */
+  .steps-bar {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 28px 32px;
+    margin-bottom: 20px;
+  }
+  .steps-bar-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .steps-bar-title .badge-new {
+    font-size: 10px;
+    background: var(--accent);
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+  }
+
+  .steps-track {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+    position: relative;
+  }
+  .step-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    cursor: pointer;
+  }
+  .step-item:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    top: 18px;
+    left: calc(50% + 24px);
+    width: calc(100% - 48px);
+    height: 2px;
+    background: var(--border);
+  }
+  .step-item.done:not(:last-child)::after {
+    background: var(--success);
+  }
+  .step-item.current:not(:last-child)::after {
+    background: linear-gradient(to right, var(--accent), var(--border));
+  }
+
+  .step-circle {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 600;
+    border: 2px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text-muted);
+    position: relative;
+    z-index: 2;
+    transition: all 0.3s;
+  }
+  .step-item.done .step-circle {
+    background: var(--success);
+    border-color: var(--success);
+    color: #fff;
+  }
+  .step-item.current .step-circle {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    box-shadow: 0 0 0 4px var(--accent-bg);
+    animation: pulse-ring 2s infinite;
+  }
+  @keyframes pulse-ring {
+    0%, 100% { box-shadow: 0 0 0 4px var(--accent-bg); }
+    50% { box-shadow: 0 0 0 8px rgba(109, 92, 245, 0.05); }
+  }
+
+  .step-label {
+    margin-top: 10px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-align: center;
+    max-width: 100px;
+  }
+  .step-item.done .step-label { color: var(--text-secondary); }
+  .step-item.current .step-label { color: var(--text); font-weight: 600; }
+
+  .step-desc {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-align: center;
+    margin-top: 2px;
+  }
+
+  /* Quick config below steps */
+  .quick-config-inline {
+    margin-top: 24px;
+    padding: 20px;
+    background: var(--accent-bg);
+    border: 1px solid rgba(109, 92, 245, 0.15);
+    border-radius: var(--radius);
+  }
+  .quick-config-inline h3 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .quick-config-row {
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+  }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+  .field select, .field input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 13px;
+    color: var(--text);
+    font-family: inherit;
+    outline: none;
+  }
+  .field select:focus, .field input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-bg);
+  }
+  .field input { width: 280px; }
+  .field select { width: 160px; }
+
+  .btn {
+    padding: 8px 20px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+  }
+  .btn-primary:hover {
+    background: var(--accent-light);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(109, 92, 245, 0.3);
+  }
+  .btn-outline {
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+  }
+  .btn-outline:hover {
+    background: var(--bg-hover);
+    color: var(--text);
+  }
+  .btn-ghost {
+    background: transparent;
+    color: var(--accent-light);
+    padding: 6px 12px;
+  }
+  .btn-ghost:hover { background: var(--accent-bg); }
+
+  .expand-toggle {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--accent-light);
+    cursor: pointer;
+    margin-top: 12px;
+    user-select: none;
+  }
+  .expand-toggle svg {
+    width: 14px; height: 14px;
+    transition: transform 0.2s;
+  }
+  .expand-toggle.open svg { transform: rotate(180deg); }
+  .expand-content {
+    display: none;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+  .expand-content.show { display: block; }
+
+  .mapping-preview {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .mapping-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    padding: 8px 12px;
+    background: var(--bg);
+    border-radius: 6px;
+  }
+  .mapping-row .model-name {
+    font-weight: 600;
+  }
+  .mapping-row .arrow { color: var(--text-muted); }
+  .mapping-row .provider { color: var(--accent-light); }
+
+  /* ==========================================================
+     SCHEME B: 卡片网格
+     ========================================================== */
+  .config-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  .config-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    cursor: pointer;
+    transition: all 0.25s;
+    position: relative;
+    overflow: hidden;
+  }
+  .config-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--border);
+    transition: background 0.25s;
+  }
+  .config-card:hover {
+    border-color: var(--border-light);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  }
+  .config-card.done::before { background: var(--success); }
+  .config-card.current::before { background: var(--accent); }
+  .config-card.current { border-color: rgba(109, 92, 245, 0.3); }
+
+  .config-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .config-card-icon {
+    width: 42px; height: 42px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+  }
+  .config-card-icon.provider { background: rgba(34, 197, 94, 0.1); }
+  .config-card-icon.mapping { background: rgba(109, 92, 245, 0.1); }
+  .config-card-icon.key { background: rgba(245, 158, 11, 0.1); }
+
+  .config-card-status {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 20px;
+  }
+  .config-card-status.done {
+    background: var(--success-bg);
+    color: var(--success);
+  }
+  .config-card-status.current {
+    background: var(--accent-bg);
+    color: var(--accent-light);
+    animation: pulse-badge 2s infinite;
+  }
+  .config-card-status.pending {
+    background: var(--bg-hover);
+    color: var(--text-muted);
+  }
+  @keyframes pulse-badge {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+
+  .config-card h3 {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .config-card .desc {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+
+  .config-card-detail {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .config-card .action-area {
+    margin-top: 16px;
+    display: none;
+  }
+  .config-card.current .action-area { display: block; }
+
+  .one-click-bar {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .one-click-bar .sparkle {
+    font-size: 20px;
+  }
+  .one-click-bar .text-group h4 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+  .one-click-bar .text-group p {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  /* ==========================================================
+     SCHEME C: 单张大卡片（推荐方案）
+     ========================================================== */
+  .setup-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 24px;
+    animation: fade-in 0.4s ease-out;
+  }
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .setup-card-header {
+    padding: 24px 28px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .setup-card-header .left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .setup-card-header .rocket {
+    width: 40px; height: 40px;
+    background: linear-gradient(135deg, var(--accent), #a78bfa);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+  }
+  .setup-card-header h2 {
+    font-size: 18px;
+    font-weight: 700;
+  }
+  .setup-card-header .subtitle {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  /* Progress bar */
+  .progress-container {
+    padding: 20px 28px 0;
+  }
+  .progress-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .progress-label {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .progress-pct {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent-light);
+  }
+  .progress-track {
+    height: 4px;
+    background: var(--bg-hover);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(to right, var(--accent), #a78bfa);
+    border-radius: 4px;
+    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Steps list */
+  .setup-steps {
+    padding: 20px 28px 8px;
+  }
+  .setup-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+  }
+  .setup-step:last-child { border-bottom: none; }
+
+  .setup-step-indicator {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    font-size: 13px;
+    border: 2px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text-muted);
+    transition: all 0.3s;
+    position: relative;
+  }
+  .setup-step.done .setup-step-indicator {
+    background: var(--success);
+    border-color: var(--success);
+    color: #fff;
+    font-size: 14px;
+  }
+  .setup-step.current .setup-step-indicator {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    box-shadow: 0 0 0 4px var(--accent-bg);
+  }
+
+  /* Vertical connector line */
+  .setup-step:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    left: 15px;
+    top: 48px;
+    width: 2px;
+    height: calc(100% - 32px);
+    background: var(--border);
+  }
+  .setup-step.done:not(:last-child)::after {
+    background: var(--success);
+  }
+
+  .setup-step-body {
+    flex: 1;
+    min-width: 0;
+  }
+  .setup-step-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .setup-step-title {
+    font-size: 14px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .setup-step-title .tag {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 500;
+  }
+  .setup-step-title .tag-required {
+    background: rgba(239, 68, 68, 0.1);
+    color: #f87171;
+  }
+  .setup-step-title .tag-recommended {
+    background: var(--warning-bg);
+    color: var(--warning);
+  }
+  .setup-step-title .tag-optional {
+    background: var(--bg-hover);
+    color: var(--text-muted);
+  }
+
+  .setup-step-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 3px;
+    line-height: 1.5;
+  }
+
+  .setup-step-done-info {
+    font-size: 12px;
+    color: var(--success);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+    background: var(--success-bg);
+    padding: 4px 10px;
+    border-radius: 6px;
+    width: fit-content;
+  }
+
+  .setup-step-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  /* Inline expand form in scheme C */
+  .step-expand-form {
+    margin-top: 14px;
+    padding: 16px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    display: none;
+  }
+  .step-expand-form.show { display: block; }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .form-grid .field { display: flex; flex-direction: column; gap: 4px; }
+  .form-grid .field.full { grid-column: 1 / -1; }
+  .form-grid .field label {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+  .form-grid .field select,
+  .form-grid .field input {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 13px;
+    color: var(--text);
+    font-family: inherit;
+    outline: none;
+    width: 100%;
+  }
+  .form-grid .field select:focus,
+  .form-grid .field input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-bg);
+  }
+  .form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 14px;
+  }
+
+  /* One-click banner in scheme C */
+  .one-click-section {
+    margin: 0 28px 24px;
+    padding: 18px 20px;
+    background: linear-gradient(135deg, rgba(109, 92, 245, 0.06), rgba(167, 139, 250, 0.06));
+    border: 1px dashed rgba(109, 92, 245, 0.25);
+    border-radius: var(--radius);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .one-click-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .one-click-left .icon-circle {
+    width: 36px; height: 36px;
+    background: var(--accent-bg-hover);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+  .one-click-left .text h4 {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+  .one-click-left .text p {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  /* Scheme label */
+  .scheme-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--accent-light);
+    margin-bottom: 16px;
+    padding: 4px 10px;
+    background: var(--accent-bg);
+    border-radius: 4px;
+  }
+
+  .scheme-note {
+    margin-top: 16px;
+    padding: 14px 18px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.7;
+  }
+  .scheme-note strong {
+    color: var(--text-secondary);
+    font-weight: 600;
+  }
+
+  /* Tooltip */
+  .tooltip-demo {
+    position: relative;
+    display: inline-flex;
+  }
+  .tooltip-demo::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--text);
+    color: var(--bg);
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s;
+  }
+  .tooltip-demo:hover::after { opacity: 1; }
+
+  /* Animations */
+  .animate-in {
+    animation: slide-up 0.5s ease-out both;
+  }
+  @keyframes slide-up {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .delay-1 { animation-delay: 0.1s; }
+  .delay-2 { animation-delay: 0.2s; }
+  .delay-3 { animation-delay: 0.3s; }
+</style>
+</head>
+<body>
+
+<!-- Top Bar -->
+<div class="top-bar">
+  <div class="logo">
+    <div class="logo-icon">R</div>
+    <span class="logo-text">LLM Router</span>
+    <span class="logo-badge">v0.8.0</span>
+  </div>
+  <div class="scheme-tabs">
+    <button class="scheme-tab active" onclick="switchScheme('a')">方案 A · 横向步骤条</button>
+    <button class="scheme-tab" onclick="switchScheme('b')">方案 B · 卡片网格</button>
+    <button class="scheme-tab" onclick="switchScheme('c')">方案 C · 单张大卡片</button>
+  </div>
+  <div style="width: 200px"></div>
+</div>
+
+<div class="main">
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-item active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      仪表盘
+    </div>
+    <div class="sidebar-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><circle cx="6" cy="6" r="1"/><circle cx="6" cy="18" r="1"/></svg>
+      供应商
+      <span class="sidebar-dot"></span>
+    </div>
+    <div class="sidebar-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+      模型映射
+    </div>
+    <div class="sidebar-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+      API 密钥
+    </div>
+    <div class="sidebar-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+      重试规则
+    </div>
+    <div class="sidebar-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      请求日志
+    </div>
+    <div class="sidebar-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+      系统设置
+    </div>
+  </nav>
+
+  <!-- Content -->
+  <div class="content">
+
+    <!-- ============ SCHEME A: 横向步骤条 ============ -->
+    <div id="scheme-a" class="scheme-panel active">
+      <div class="section-header animate-in">
+        <h1>仪表盘</h1>
+        <p>快速完成初始配置，开始使用 LLM Router</p>
+      </div>
+
+      <div class="stats-row animate-in delay-1">
+        <div class="stat-card">
+          <div class="stat-label">供应商</div>
+          <div class="stat-value" style="color: var(--success)">1<span style="font-size:14px;font-weight:400;color:var(--text-muted)">/2</span></div>
+          <div class="stat-change up">↑ 1 已启用</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">映射分组</div>
+          <div class="stat-value">3</div>
+          <div class="stat-change up">↑ 2 今日活跃</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">请求数</div>
+          <div class="stat-value">128</div>
+          <div class="stat-change up">↑ 12% vs 昨日</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">路由密钥</div>
+          <div class="stat-value">0</div>
+          <div class="stat-change" style="color:var(--warning)">⚠ 未创建</div>
+        </div>
+      </div>
+
+      <div class="steps-bar animate-in delay-2">
+        <div class="steps-bar-title">
+          快速配置引导
+          <span class="badge-new">进行中</span>
+        </div>
+
+        <div class="steps-track">
+          <div class="step-item done">
+            <div class="step-circle">✓</div>
+            <div class="step-label">添加供应商</div>
+            <div class="step-desc">配置 API Key</div>
+          </div>
+          <div class="step-item done">
+            <div class="step-circle">✓</div>
+            <div class="step-label">创建模型映射</div>
+            <div class="step-desc">模型路由规则</div>
+          </div>
+          <div class="step-item current">
+            <div class="step-circle">3</div>
+            <div class="step-label">生成路由密钥</div>
+            <div class="step-desc">对外暴露的 Key</div>
+          </div>
+          <div class="step-item">
+            <div class="step-circle">4</div>
+            <div class="step-label">开始使用</div>
+            <div class="step-desc">🎉</div>
+          </div>
+        </div>
+
+        <div class="quick-config-inline">
+          <h3>⚡ 一键完成当前步骤</h3>
+          <div class="quick-config-row">
+            <div class="field">
+              <label>密钥名称</label>
+              <input type="text" placeholder="例如：我的应用" value="default">
+            </div>
+            <div class="field">
+              <label>白名单模型</label>
+              <select>
+                <option>全部模型</option>
+                <option>仅 claude-sonnet-4</option>
+              </select>
+            </div>
+            <button class="btn btn-primary">生成密钥 →</button>
+          </div>
+
+          <div class="expand-toggle" onclick="this.classList.toggle('open'); this.nextElementSibling.classList.toggle('show')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+            自定义映射详情
+          </div>
+          <div class="expand-content">
+            <div class="mapping-preview">
+              <div class="mapping-row">
+                <span class="mono model-name">claude-sonnet-4</span>
+                <span class="arrow">→</span>
+                <span class="mono provider">anthropic / claude-sonnet-4-20250514</span>
+              </div>
+              <div class="mapping-row">
+                <span class="mono model-name">gpt-4o</span>
+                <span class="arrow">→</span>
+                <span class="mono provider">openai / gpt-4o-2024-08-06</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="scheme-note animate-in delay-3">
+        <strong>💡 方案 A 特点：</strong>横向步骤条直观展示进度，适合步骤数少且固定的场景。但横向排列占用水平空间，步骤多时显得拥挤。"一键完成"区域嵌入步骤下方，需和步骤条视觉分离。
+      </div>
+    </div>
+
+    <!-- ============ SCHEME B: 卡片网格 ============ -->
+    <div id="scheme-b" class="scheme-panel">
+      <div class="section-header animate-in">
+        <h1>仪表盘</h1>
+        <p>点击卡片快速完成每项配置</p>
+      </div>
+
+      <div class="one-click-bar animate-in delay-1" style="margin-bottom: 20px">
+        <span class="sparkle">⚡</span>
+        <div class="text-group" style="flex:1">
+          <h4>一键快速配置</h4>
+          <p>选择供应商 → 填入 API Key → 自动完成映射和密钥生成</p>
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <select style="background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:8px 12px; font-size:13px; color:var(--text); font-family:inherit">
+            <option>OpenAI</option>
+            <option>Anthropic</option>
+            <option>DeepSeek</option>
+          </select>
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <input type="text" placeholder="sk-..." style="background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:8px 12px; font-size:13px; color:var(--text); font-family:inherit; width:220px">
+        </div>
+        <button class="btn btn-primary">一键配置 →</button>
+      </div>
+
+      <div class="config-grid animate-in delay-2">
+        <!-- Card 1: Provider (done) -->
+        <div class="config-card done" onclick="this.querySelector('.expand-content')?.classList.toggle('show')">
+          <div class="config-card-header">
+            <div class="config-card-icon provider">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><circle cx="6" cy="6" r="1"/><circle cx="6" cy="18" r="1"/></svg>
+            </div>
+            <span class="config-card-status done">✓ 已完成</span>
+          </div>
+          <h3>供应商配置</h3>
+          <p class="desc">添加 AI 供应商并配置 API Key，系统会自动获取可用模型列表</p>
+          <div class="config-card-detail">
+            <span class="mono" style="color:var(--success)">2 个供应商</span>
+            <span style="color:var(--text-muted)">·</span>
+            <span style="color:var(--text-muted)">8 个模型</span>
+          </div>
+        </div>
+
+        <!-- Card 2: Mapping (current) -->
+        <div class="config-card current">
+          <div class="config-card-header">
+            <div class="config-card-icon mapping">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6d5cf5" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+            </div>
+            <span class="config-card-status current">进行中</span>
+          </div>
+          <h3>模型映射</h3>
+          <p class="desc">定义客户端请求的模型名如何路由到供应商的实际模型</p>
+          <div class="action-area">
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button class="btn btn-primary" style="font-size:12px;padding:6px 14px">自动创建映射</button>
+              <button class="btn btn-outline" style="font-size:12px;padding:6px 14px">手动配置</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 3: Key (pending) -->
+        <div class="config-card">
+          <div class="config-card-header">
+            <div class="config-card-icon key">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+            </div>
+            <span class="config-card-status pending">待配置</span>
+          </div>
+          <h3>路由密钥</h3>
+          <p class="desc">生成对外暴露的 API Key，供你的应用调用路由服务</p>
+          <div class="config-card-detail" style="color:var(--text-muted)">
+            点击配置 →
+          </div>
+        </div>
+      </div>
+
+      <div class="stats-row animate-in delay-3" style="grid-template-columns: repeat(3, 1fr)">
+        <div class="stat-card">
+          <div class="stat-label">今日请求</div>
+          <div class="stat-value">128</div>
+          <div class="stat-change up">↑ 12%</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">成功率</div>
+          <div class="stat-value">98.4%</div>
+          <div class="stat-change up">↑ 0.3%</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">平均延迟</div>
+          <div class="stat-value">1.2s</div>
+          <div class="stat-change down">↓ 0.1s</div>
+        </div>
+      </div>
+
+      <div class="scheme-note">
+        <strong>💡 方案 B 特点：</strong>卡片网格视觉灵活，每张卡片可独立点击操作。但卡片间缺乏顺序感，用户可能不知道先点哪个。"一键配置"需要单独放在上方作为入口，和卡片有些割裂。
+      </div>
+    </div>
+
+    <!-- ============ SCHEME C: 单张大卡片（推荐） ============ -->
+    <div id="scheme-c" class="scheme-panel">
+      <div class="section-header animate-in">
+        <h1>仪表盘</h1>
+        <p>系统总览与快速配置</p>
+      </div>
+
+      <div class="setup-card animate-in delay-1">
+        <div class="setup-card-header">
+          <div class="left">
+            <div class="rocket">🚀</div>
+            <div>
+              <h2>快速开始</h2>
+              <div class="subtitle">完成以下 3 步，即可开始使用 LLM Router</div>
+            </div>
+          </div>
+          <button class="btn btn-ghost" style="font-size:11px">收起 ↑</button>
+        </div>
+
+        <div class="progress-container">
+          <div class="progress-meta">
+            <span class="progress-label">配置进度</span>
+            <span class="progress-pct">1 / 3 · 33%</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" style="width: 33%"></div>
+          </div>
+        </div>
+
+        <div class="setup-steps">
+          <!-- Step 1: Done -->
+          <div class="setup-step done">
+            <div class="setup-step-indicator">✓</div>
+            <div class="setup-step-body">
+              <div class="setup-step-top">
+                <div class="setup-step-title">
+                  添加供应商
+                  <span class="tag tag-required">必填</span>
+                </div>
+                <div class="setup-step-actions">
+                  <button class="btn btn-outline" style="font-size:11px;padding:4px 10px">编辑</button>
+                </div>
+              </div>
+              <div class="setup-step-desc">配置 AI 供应商的 API Key 和 Base URL</div>
+              <div class="setup-step-done-info">
+                ✓ Anthropic · 4 个模型已就绪
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 2: Current (expanded) -->
+          <div class="setup-step current">
+            <div class="setup-step-indicator">2</div>
+            <div class="setup-step-body">
+              <div class="setup-step-top">
+                <div class="setup-step-title">
+                  创建模型映射
+                  <span class="tag tag-required">必填</span>
+                </div>
+                <div class="setup-step-actions">
+                  <button class="btn btn-primary" style="font-size:11px;padding:4px 10px" onclick="document.getElementById('mapping-form').classList.toggle('show')">手动配置</button>
+                </div>
+              </div>
+              <div class="setup-step-desc">定义客户端使用的模型名如何路由到供应商的实际模型</div>
+
+              <div style="margin-top:12px; display:flex; gap:8px">
+                <button class="btn btn-primary" style="font-size:12px;padding:6px 16px" onclick="document.getElementById('auto-mapping-result').style.display='block'">
+                  ⚡ 自动创建默认映射
+                </button>
+                <div class="expand-toggle" onclick="this.classList.toggle('open'); document.getElementById('mapping-form').classList.toggle('show')">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                  自定义映射
+                </div>
+              </div>
+
+              <!-- Auto mapping result -->
+              <div id="auto-mapping-result" style="display:none; margin-top:12px; padding:12px; background:var(--success-bg); border:1px solid rgba(34,197,94,0.2); border-radius:8px">
+                <div style="font-size:12px; color:var(--success); font-weight:600; margin-bottom:8px">✓ 已自动创建 4 条映射</div>
+                <div class="mapping-preview">
+                  <div class="mapping-row">
+                    <span class="mono model-name">claude-sonnet-4</span>
+                    <span class="arrow">→</span>
+                    <span class="mono provider">anthropic/claude-sonnet-4-20250514</span>
+                  </div>
+                  <div class="mapping-row">
+                    <span class="mono model-name">claude-haiku-4</span>
+                    <span class="arrow">→</span>
+                    <span class="mono provider">anthropic/claude-haiku-4-20250514</span>
+                  </div>
+                  <div class="mapping-row">
+                    <span class="mono model-name">gpt-4o</span>
+                    <span class="arrow">→</span>
+                    <span class="mono provider">openai/gpt-4o-2024-08-06</span>
+                  </div>
+                  <div class="mapping-row">
+                    <span class="mono model-name">gpt-4o-mini</span>
+                    <span class="arrow">→</span>
+                    <span class="mono provider">openai/gpt-4o-mini</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Manual form (expandable) -->
+              <div id="mapping-form" class="step-expand-form">
+                <div class="form-grid">
+                  <div class="field full">
+                    <label>客户端模型名</label>
+                    <input type="text" placeholder="例如：claude-sonnet-4">
+                  </div>
+                  <div class="field">
+                    <label>供应商</label>
+                    <select>
+                      <option>Anthropic</option>
+                      <option>OpenAI</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label>目标模型</label>
+                    <select>
+                      <option>claude-sonnet-4-20250514</option>
+                      <option>claude-haiku-4-20250514</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="form-actions">
+                  <button class="btn btn-outline" style="font-size:12px;padding:6px 14px">取消</button>
+                  <button class="btn btn-primary" style="font-size:12px;padding:6px 14px">添加映射</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 3: Pending -->
+          <div class="setup-step">
+            <div class="setup-step-indicator">3</div>
+            <div class="setup-step-body">
+              <div class="setup-step-top">
+                <div class="setup-step-title">
+                  生成路由密钥
+                  <span class="tag tag-recommended">推荐</span>
+                </div>
+                <div class="setup-step-actions">
+                  <button class="btn btn-outline" style="font-size:11px;padding:4px 10px;opacity:0.5" disabled>先完成上一步</button>
+                </div>
+              </div>
+              <div class="setup-step-desc">创建对外暴露的 API Key，供你的应用程序调用路由服务</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- One-click section -->
+        <div class="one-click-section">
+          <div class="one-click-left">
+            <div class="icon-circle">⚡</div>
+            <div class="text">
+              <h4>懒人模式：一键完成全部配置</h4>
+              <p>只需选择供应商 + 填入 API Key，自动创建映射 + 生成密钥</p>
+            </div>
+          </div>
+          <div style="display:flex; gap:10px; align-items:center">
+            <select style="background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:7px 12px; font-size:13px; color:var(--text); font-family:inherit">
+              <option>OpenAI</option>
+              <option>Anthropic</option>
+              <option>DeepSeek</option>
+              <option>Google Gemini</option>
+            </select>
+            <input type="text" placeholder="sk-..." style="background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:7px 12px; font-size:13px; color:var(--text); font-family:inherit; width:200px">
+            <button class="btn btn-primary">一键搞定 →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats (below setup card) -->
+      <div class="stats-row animate-in delay-2">
+        <div class="stat-card">
+          <div class="stat-label">供应商</div>
+          <div class="stat-value" style="color:var(--success)">1</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">映射分组</div>
+          <div class="stat-value">3</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">今日请求</div>
+          <div class="stat-value">128</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">路由密钥</div>
+          <div class="stat-value" style="color:var(--warning)">0</div>
+        </div>
+      </div>
+
+      <div class="scheme-note animate-in delay-3">
+        <strong>💡 方案 C 特点（推荐）：</strong>单张大卡片形成"待办清单"的视觉整体感，垂直排列的步骤天然呈现顺序关系。进度条一目了然。每步内嵌"一键完成"主按钮 + "自定义"展开区域，新手只看主路径，老手可展开微调。底部"懒人模式"供极致极简用户一键搞定全部。全部配置完成后卡片可折叠/消失，仪表盘回归纯数据展示。
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+function switchScheme(scheme) {
+  document.querySelectorAll('.scheme-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.scheme-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('scheme-' + scheme).classList.add('active');
+  event.target.classList.add('active');
+}
+</script>
+
+</body>
+</html>
