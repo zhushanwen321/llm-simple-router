@@ -76,7 +76,7 @@ function enhancementLabel(raw: string | null): string {
                 class="shrink-0"
                 @click.stop="copy(log.id)"
               >
-                <CheckIcon v-if="copied" class="size-3 text-green-500" />
+                <CheckIcon v-if="copied" class="size-3 text-success" />
                 <CopyIcon v-else class="size-3" />
               </Button>
             </TooltipTrigger>

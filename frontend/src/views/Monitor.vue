@@ -51,7 +51,7 @@
                 <Tooltip>
                   <TooltipTrigger as-child>
                     <Button variant="ghost" size="icon-xs" class="shrink-0" @click.stop="copy(req.id)">
-                      <CheckIcon v-if="copied" class="size-3 text-green-500" />
+                      <CheckIcon v-if="copied" class="size-3 text-success" />
                       <CopyIcon v-else class="size-3" />
                     </Button>
                   </TooltipTrigger>
@@ -93,7 +93,7 @@
                 <Tooltip>
                   <TooltipTrigger as-child>
                     <Button variant="ghost" size="icon-xs" class="shrink-0" @click.stop="copy(req.id)">
-                      <CheckIcon v-if="copied" class="size-3 text-green-500" />
+                      <CheckIcon v-if="copied" class="size-3 text-success" />
                       <CopyIcon v-else class="size-3" />
                     </Button>
                   </TooltipTrigger>
@@ -136,7 +136,7 @@
                 <Tooltip>
                   <TooltipTrigger as-child>
                     <Button variant="ghost" size="icon-xs" class="shrink-0" @click.stop="copy(req.id)">
-                      <CheckIcon v-if="copied" class="size-3 text-green-500" />
+                      <CheckIcon v-if="copied" class="size-3 text-success" />
                       <CopyIcon v-else class="size-3" />
                     </Button>
                   </TooltipTrigger>
