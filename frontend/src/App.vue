@@ -15,10 +15,6 @@ import { useRouter, useRoute } from 'vue-router'
 import Sidebar from '@/components/layout/Sidebar.vue'
 import { Toaster } from '@/components/ui/sonner'
 import { api } from '@/api/client'
-import { useTheme } from '@/composables/useTheme'
-
-// Initialize theme ASAP to avoid flash of wrong theme
-useTheme()
 
 const router = useRouter()
 const route = useRoute()

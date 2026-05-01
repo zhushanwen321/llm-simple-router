@@ -57,3 +57,11 @@ export function useTheme() {
     toggleTheme,
   }
 }
+
+/**
+ * Call before Vue mount to apply .dark class and prevent flash.
+ * Safe to call multiple times — no-op after first call.
+ */
+export function initThemeEarly() {
+  initTheme()
+}
