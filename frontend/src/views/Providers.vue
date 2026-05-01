@@ -142,12 +142,17 @@
           </div>
           <div>
             <Label class="block text-sm font-medium text-foreground mb-1">可用模型</Label>
-            <div class="flex flex-wrap gap-1.5 mb-1.5">
-              <Badge v-for="(m, i) in form.models" :key="i" variant="secondary" class="gap-1 pr-1">
-                {{ m.name }}
-                <span class="text-muted-foreground">({{ formatContextWindow(m.context_window ?? DEFAULT_CONTEXT_WINDOW) }})</span>
-                <Button type="button" variant="ghost" size="icon" class="h-4 w-4 rounded-full hover:bg-muted p-0 text-xs leading-none" @click="removeModel(i)">&times;</Button>
-              </Badge>
+            <div class="space-y-2 mb-3">
+              <div v-for="(m, i) in form.models" :key="i">
+                <ModelCard
+                  :model="{ name: m.name, contextWindow: m.context_window ?? 200000, enabled: true, patches: m.patches ?? [] }"
+                  :api-type="form.api_type"
+                  :is-deep-seek="m.name.toLowerCase().includes('deepseek')"
+                  :is-non-openai-endpoint="!isOfficialOpenai(form.base_url)"
+                  @update:model="updateModel(i, $event)"
+                  @remove="removeModel(i)"
+                />
+              </div>
             </div>
             <div class="flex gap-2">
               <Input v-model="modelInput" placeholder="输入模型名称，多个用逗号分隔" @keydown.enter.prevent="addModel" class="flex-1" />
@@ -269,6 +274,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { ChevronDown, RotateCw, Copy, Check } from 'lucide-vue-next'
+import ModelCard from '@/components/quick-setup/ModelCard.vue'
+import type { ModelConfig } from '@/components/quick-setup/types'
 import { useTransformRules } from '@/composables/useTransformRules'
 const DEFAULT_CONCURRENCY = 3
 const DEFAULT_CONCURRENCY_AUTO = 10
@@ -377,6 +384,7 @@ function onPresetChange() {
   form.value.models = preset.models.map(name => ({
     name,
     context_window: DEFAULT_CONTEXT_WINDOW,
+    patches: getDefaultPatches(name, preset.apiType),
   }))
 }
 async function loadProviders() {
@@ -394,7 +402,7 @@ function addModel() {
   const names = input.split(/[,，]/).map(s => s.trim()).filter(Boolean)
   for (const name of names) {
     if (!form.value.models.some(m => m.name === name)) {
-      form.value.models.push({ name, context_window: modelContextWindow.value || DEFAULT_CONTEXT_WINDOW })
+      form.value.models.push({ name, context_window: modelContextWindow.value || DEFAULT_CONTEXT_WINDOW, patches: [] })
     }
   }
   modelInput.value = ''
@@ -402,6 +410,27 @@ function addModel() {
 }
 function removeModel(index: number) {
   form.value.models.splice(index, 1)
+}
+
+function isOfficialOpenai(url: string): boolean {
+  return url.includes('api.openai.com')
+}
+
+function updateModel(index: number, updated: ModelConfig) {
+  form.value.models[index].context_window = updated.contextWindow
+  form.value.models[index].patches = updated.patches
+}
+
+function getDefaultPatches(modelName: string, apiType: string): string[] {
+  const patches: string[] = []
+  if (modelName.toLowerCase().includes('deepseek')) {
+    if (apiType === 'anthropic') {
+      patches.push('thinking-param', 'cache-control', 'thinking-blocks', 'orphan-tool-results')
+    } else {
+      patches.push('non-ds-tools', 'orphan-tool-results-oa')
+    }
+  }
+  return patches
 }
 
 function onConcurrencyModeChange(mode: ConcurrencyMode) {
@@ -435,7 +464,7 @@ function openEdit(p: Provider) {
   } else {
     concurrencyMode.value = 'manual'
   }
-  form.value = { name: p.name, api_type: p.api_type, base_url: p.base_url, api_key: '', models: (p.models || []).map(m => ({ name: m.name, context_window: m.context_window ?? DEFAULT_CONTEXT_WINDOW })), is_active: !!p.is_active, max_concurrency: concurrencyMode.value === 'none' ? DEFAULT_CONCURRENCY_AUTO : mc, queue_timeout_ms: p.queue_timeout_ms ?? DEFAULT_QUEUE_TIMEOUT_MS, max_queue_size: p.max_queue_size ?? DEFAULT_QUEUE_SIZE, adaptive_enabled: concurrencyMode.value === 'auto' }
+  form.value = { name: p.name, api_type: p.api_type, base_url: p.base_url, api_key: '', models: (p.models || []).map(m => ({ name: m.name, context_window: m.context_window ?? DEFAULT_CONTEXT_WINDOW, patches: m.patches ?? [] })), is_active: !!p.is_active, max_concurrency: concurrencyMode.value === 'none' ? DEFAULT_CONCURRENCY_AUTO : mc, queue_timeout_ms: p.queue_timeout_ms ?? DEFAULT_QUEUE_TIMEOUT_MS, max_queue_size: p.max_queue_size ?? DEFAULT_QUEUE_SIZE, adaptive_enabled: concurrencyMode.value === 'auto' }
   modelInput.value = ''
   modelContextWindow.value = DEFAULT_CONTEXT_WINDOW
   presetGroup.value = ''
@@ -452,7 +481,7 @@ function buildPayload(): ProviderFormPayload {
     name: form.value.name,
     api_type: form.value.api_type,
     base_url: form.value.base_url,
-    models: form.value.models.map(m => ({ name: m.name, context_window: m.context_window ?? undefined })),
+    models: form.value.models.map(m => ({ name: m.name, context_window: m.context_window ?? undefined, patches: m.patches ?? undefined })),
     is_active: form.value.is_active ? 1 : 0,
     max_concurrency: concurrencyMode.value === 'none' ? 0 : form.value.max_concurrency,
     queue_timeout_ms: concurrencyMode.value === 'none' ? 0 : form.value.queue_timeout_ms,
