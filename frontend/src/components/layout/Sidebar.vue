@@ -96,7 +96,16 @@
         {{ item.label }}
       </router-link>
     </nav>
-    <div class="p-3 border-t border-sidebar-border">
+    <div class="p-3 border-t border-sidebar-border space-y-1">
+      <Button
+        variant="ghost"
+        class="w-full justify-start text-sidebar-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent"
+        @click="toggleTheme"
+      >
+        <Moon v-if="!isDark" class="w-4 h-4" />
+        <Sun v-else class="w-4 h-4" />
+        {{ isDark ? '浅色模式' : '深色模式' }}
+      </Button>
       <Button
         variant="ghost"
         class="w-full justify-start text-sidebar-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent"
@@ -159,6 +168,8 @@ import {
   Settings,
   LogOut,
   CalendarClock,
+  Moon,
+  Sun,
 } from 'lucide-vue-next'
 import { api, getApiMessage } from '@/api/client'
 import { Button } from '@/components/ui/button'
@@ -172,6 +183,9 @@ import {
 import { toast } from 'vue-sonner'
 import type { AcceptableValue } from 'reka-ui'
 import type { UpgradeStatus } from '@/api/client'
+import { useTheme } from '@/composables/useTheme'
+
+const { isDark, toggleTheme } = useTheme()
 
 const appVersion = __APP_VERSION__
 

@@ -21,13 +21,13 @@
         <TableCell class="font-medium">{{ entry.name }}</TableCell>
         <TableCell class="text-right">{{ entry.stats.totalRequests }}</TableCell>
         <TableCell class="text-right">
-          <span :class="entry.successRate >= 95 ? 'text-green-600' : entry.successRate >= 80 ? 'text-yellow-600' : 'text-red-500'">
+          <span :class="entry.successRate >= 95 ? 'text-green-600 dark:text-green-400' : entry.successRate >= 80 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-500 dark:text-red-400'">
             {{ entry.successRate.toFixed(1) }}%
           </span>
         </TableCell>
         <TableCell class="text-right">{{ entry.stats.avgLatencyMs.toFixed(0) }}ms</TableCell>
         <TableCell class="text-right">
-          <span :class="entry.retryRate > 10 ? 'text-yellow-600' : ''">
+          <span :class="entry.retryRate > 10 ? 'text-yellow-600 dark:text-yellow-400' : ''">
             {{ entry.retryRate.toFixed(1) }}%
           </span>
         </TableCell>

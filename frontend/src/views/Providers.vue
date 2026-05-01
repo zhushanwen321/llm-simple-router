@@ -39,7 +39,7 @@
               <div class="flex items-center gap-1">
                 <span class="font-mono text-xs text-muted-foreground">{{ maskKey(p.api_key) }}</span>
                 <Button variant="ghost" size="sm" class="h-6 w-6 p-0" @click="copyKey(p.api_key, p.id)">
-                  <component :is="copiedId === p.id ? Check : Copy" class="w-3.5 h-3.5" :class="{ 'text-green-500': copiedId === p.id }" />
+                  <component :is="copiedId === p.id ? Check : Copy" class="w-3.5 h-3.5" :class="{ 'text-success': copiedId === p.id }" />
                 </Button>
               </div>
             </TableCell>

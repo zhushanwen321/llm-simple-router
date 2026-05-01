@@ -23,7 +23,7 @@
       </div>
       <div class="h-2 bg-muted rounded-full overflow-hidden mt-1">
         <div
-          class="h-full bg-blue-500 rounded-full transition-all duration-300"
+          class="h-full bg-primary rounded-full transition-all duration-300"
           :style="{ width: `${heapPercent}%` }"
         />
       </div>
