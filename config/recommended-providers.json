@@ -8,8 +8,8 @@
         "apiType": "anthropic",
         "baseUrl": "https://api.deepseek.com/anthropic",
         "models": [
-          "deepseek-chat",
-          "deepseek-reasoner"
+          "deepseek-v4-flash",
+          "deepseek-v4-pro"
         ]
       },
       {
@@ -18,8 +18,8 @@
         "apiType": "openai",
         "baseUrl": "https://api.deepseek.com",
         "models": [
-          "deepseek-chat",
-          "deepseek-reasoner"
+          "deepseek-v4-flash",
+          "deepseek-v4-pro"
         ]
       }
     ]
