@@ -101,7 +101,7 @@
           <p v-if="modelConfigs.length === 0" class="py-4 text-center text-xs text-muted-foreground">
             请先选择供应商与套餐
           </p>
-          <div v-else class="grid grid-cols-3 gap-2">
+          <div v-else class="grid grid-cols-4 gap-2">
             <ModelCard
               v-for="(model, index) in modelConfigs"
               :key="model.name"
@@ -166,6 +166,8 @@
           <MappingPreview
             :mappings="mappingPreview"
             :available-models="enabledModelNames"
+            @remove="removeMapping"
+            @add="addMapping"
           />
         </CardContent>
       </Card>
@@ -180,7 +182,12 @@
         </CardHeader>
         <CardContent>
           <div v-if="recommendedRules.length === 0" class="py-6 text-center text-xs text-muted-foreground">
-            选择供应商后显示推荐规则
+            <template v-if="allRecommendedRules.length === 0">
+              所有推荐规则已创建，无需重复添加
+            </template>
+            <template v-else>
+              选择供应商后显示推荐规则
+            </template>
           </div>
           <div v-else class="space-y-1.5 max-h-[260px] overflow-y-auto">
             <div
@@ -268,11 +275,12 @@ import { Checkbox } from '@/components/ui/checkbox'
 const {
   clientType, providerGroups, selectedGroup, selectedPlan,
   apiType, apiKey, modelConfigs, mappingPreview,
-  recommendedRules, selectedRetryRules, saving, connectionStatus,
+  recommendedRules, allRecommendedRules, selectedRetryRules, saving, connectionStatus,
   baseUrl, availablePlans, isNonOpenaiEndpoint,
   concurrencyMode, maxConcurrency, queueTimeoutMs, maxQueueSize,
   selectClient, onProviderChange, onPlanChange,
-  updateMappings, toggleRetryRule, onConcurrencyModeChange, testConnection, submit,
+  updateMappings, toggleRetryRule, addMapping, removeMapping,
+  onConcurrencyModeChange, testConnection, submit,
 } = useQuickSetup()
 
 const enabledModelCount = computed(() => modelConfigs.value.filter(m => m.enabled).length)

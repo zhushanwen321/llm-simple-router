@@ -72,14 +72,34 @@ export const PATCH_GROUPS: PatchGroup[] = [
   },
 ]
 
+/** Context window options */
+export const CONTEXT_WINDOW_OPTIONS = [
+  { label: '8K', value: 8000 },
+  { label: '16K', value: 16000 },
+  { label: '32K', value: 32000 },
+  { label: '64K', value: 64000 },
+  { label: '128K', value: 128000 },
+  { label: '160K', value: 160000 },
+  { label: '200K', value: 200000 },
+  { label: '256K', value: 256000 },
+  { label: '1M', value: 1000000 },
+]
+
+/** Default context window per model name pattern */
+export function getDefaultContextWindow(modelName: string): number {
+  const m = modelName.toLowerCase()
+  if (m.includes('v4') || m.includes('v3.2') || m.includes('r1') || m.includes('reasoner')) return 1000000
+  if (m.includes('128k')) return 128000
+  if (m.includes('32k')) return 32000
+  if (m.includes('8k')) return 8000
+  return 128000
+}
+
 /**
  * Default model name mappings for coding clients.
- * Claude Code expects: claude-sonnet-4-20250514, claude-opus-4-20250116, claude-haiku-4-20250414 etc.
- * But the short aliases are also accepted: opus, sonnet, haiku.
- * We use short names for cleaner mapping display.
- *
- * For Pi: models are 1:1 with provider models (dynamic).
- * For Codex CLI: expects OpenAI model names like codex-mini, o3, o4-mini, gpt-4.1
+ * Claude Code expects short aliases: opus, sonnet, haiku
+ * Pi: models are 1:1 with provider models (dynamic)
+ * Codex CLI: expects OpenAI model names like codex-mini, o3, o4-mini
  */
 export const DEFAULT_CLIENT_MAPPINGS: Record<string, string[]> = {
   'claude-code': ['sonnet', 'opus', 'haiku'],
@@ -87,14 +107,3 @@ export const DEFAULT_CLIENT_MAPPINGS: Record<string, string[]> = {
   'openai-sdk': ['gpt-4o', 'gpt-4o-mini', 'o3', 'o4-mini'],
   'anthropic-sdk': ['claude-sonnet-4-20250514', 'claude-opus-4-20250116', 'claude-haiku-4-20250414'],
 }
-// Pi is special: DEFAULT_CLIENT_MAPPINGS['pi'] is dynamic = provider's model names
-
-/** Context window options for model config */
-export const CONTEXT_WINDOW_OPTIONS = [
-  { label: '8K', value: 8192 },
-  { label: '32K', value: 32768 },
-  { label: '64K', value: 65536 },
-  { label: '128K', value: 131072 },
-  { label: '256K', value: 262144 },
-  { label: '1M', value: 1048576 },
-]

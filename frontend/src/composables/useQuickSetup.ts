@@ -3,7 +3,7 @@ import { api, getApiMessage, type ProviderGroup, type RecommendedRetryRule, type
 import { toast } from 'vue-sonner'
 import {
   type ClientType, type ModelConfig, type MappingPreviewItem,
-  CLIENTS, DEFAULT_CLIENT_MAPPINGS,
+  CLIENTS, DEFAULT_CLIENT_MAPPINGS, getDefaultContextWindow,
 } from '@/components/quick-setup/types'
 import router from '@/router'
 
@@ -86,7 +86,7 @@ export function useQuickSetup() {
   function initModels(preset: { models: string[]; apiType: 'openai' | 'anthropic' }) {
     modelConfigs.value = preset.models.map(name => ({
       name,
-      contextWindow: 128000,
+      contextWindow: getDefaultContextWindow(name),
       enabled: true,
       patches: getDefaultPatches(name, preset.apiType),
     }))
@@ -207,6 +207,18 @@ export function useQuickSetup() {
     selectedRetryRules.value = next
   }
 
+  // --- Mapping add/remove ---
+  function addMapping(from: string, to: string) {
+    // Remove existing mapping for same client model
+    const existing = mappingPreview.value.filter(m => m.from !== from)
+    existing.push({ from, to, tag: 'cust' as const })
+    mappingPreview.value = existing
+  }
+
+  function removeMapping(from: string) {
+    mappingPreview.value = mappingPreview.value.filter(m => m.from !== from)
+  }
+
   // --- Concurrency ---
   function onConcurrencyModeChange(mode: ConcurrencyMode) {
     concurrencyMode.value = mode
@@ -311,6 +323,6 @@ export function useQuickSetup() {
     concurrencyMode, maxConcurrency, queueTimeoutMs, maxQueueSize,
     selectClient, onProviderChange, onPlanChange,
     initModels, getDefaultPatches, updateMappings,
-    toggleRetryRule, onConcurrencyModeChange, testConnection, submit,
+    toggleRetryRule, addMapping, removeMapping, onConcurrencyModeChange, testConnection, submit,
   }
 }

@@ -7,14 +7,14 @@
         "presetName": "deepseek",
         "apiType": "anthropic",
         "baseUrl": "https://api.deepseek.com/anthropic",
-        "models": ["deepseek-chat", "deepseek-reasoner"]
+        "models": ["deepseek-v4-flash", "deepseek-v4-pro"]
       },
       {
         "plan": "OpenAI",
         "presetName": "deepseek-openai",
         "apiType": "openai",
         "baseUrl": "https://api.deepseek.com",
-        "models": ["deepseek-chat", "deepseek-reasoner"]
+        "models": ["deepseek-v4-flash", "deepseek-v4-pro"]
       }
     ]
   },

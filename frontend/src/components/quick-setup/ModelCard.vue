@@ -1,14 +1,21 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import type { ModelConfig } from './types'
+import { CONTEXT_WINDOW_OPTIONS } from './types'
 import PatchChips from './PatchChips.vue'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   Collapsible,
   CollapsibleContent,
-  CollapsibleTrigger,
 } from '@/components/ui/collapsible'
 import { ChevronDown, Trash2 } from 'lucide-vue-next'
 import { cn } from '@/lib/utils'
@@ -27,13 +34,29 @@ const emit = defineEmits<{
 
 const open = ref(false)
 
+// Check if current context window matches a preset option
+const matchedOption = computed(() =>
+  CONTEXT_WINDOW_OPTIONS.find(o => o.value === props.model.contextWindow),
+)
+
+const isPreset = computed(() => !!matchedOption.value)
+
 function toggleEnabled() {
   emit('update:model', { ...props.model, enabled: !props.model.enabled })
 }
 
-function updateContextWindow(value: string) {
-  const num = parseInt(value, 10)
-  if (!isNaN(num) && num >= 0) {
+function updateContextWindowFromSelect(val: unknown) {
+  const str = val as string
+  if (str === '__custom__') return
+  const num = parseInt(str, 10)
+  if (!isNaN(num)) {
+    emit('update:model', { ...props.model, contextWindow: num })
+  }
+}
+
+function updateContextWindowFromInput(val: string) {
+  const num = parseInt(val, 10)
+  if (!isNaN(num) && num > 0) {
     emit('update:model', { ...props.model, contextWindow: num })
   }
 }
@@ -41,90 +64,97 @@ function updateContextWindow(value: string) {
 function updatePatches(patches: string[]) {
   emit('update:model', { ...props.model, patches })
 }
+
+function formatCw(n: number): string {
+  if (n >= 1000000) return `${n / 1000000}M`
+  if (n >= 1000) return `${n / 1000}K`
+  return String(n)
+}
 </script>
 
 <template>
   <div
     :class="cn(
-      'rounded-lg border px-4 py-3 transition-colors',
+      'rounded-lg border px-3 py-2.5 transition-colors',
       model.enabled
-        ? 'border-[var(--border)] bg-[var(--card)]'
-        : 'border-[var(--border)]/50 bg-[var(--muted)]/30 opacity-60',
+        ? 'border-border bg-card'
+        : 'border-border/50 bg-muted/30 opacity-60',
     )"
   >
-    <div class="flex items-start gap-3">
+    <div class="flex items-center gap-2">
       <!-- Checkbox -->
-      <div class="flex h-7 items-center pt-0.5">
-        <Checkbox
-          :checked="model.enabled"
-          @update:checked="toggleEnabled"
+      <Checkbox
+        :checked="model.enabled"
+        @update:checked="toggleEnabled"
+        class="shrink-0"
+      />
+
+      <!-- Model name -->
+      <span class="truncate text-sm font-medium text-foreground min-w-0 flex-1">{{ model.name }}</span>
+
+      <!-- Context window -->
+      <div class="flex items-center gap-1 shrink-0">
+        <Select
+          :model-value="isPreset ? String(model.contextWindow) : '__custom__'"
+          @update:model-value="updateContextWindowFromSelect"
+        >
+          <SelectTrigger class="h-7 w-[72px] text-xs">
+            <SelectValue>
+              {{ isPreset ? matchedOption!.label : formatCw(model.contextWindow) }}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem v-for="opt in CONTEXT_WINDOW_OPTIONS" :key="opt.value" :value="String(opt.value)">
+              {{ opt.label }}
+            </SelectItem>
+            <SelectItem value="__custom__">自定义</SelectItem>
+          </SelectContent>
+        </Select>
+        <Input
+          v-if="!isPreset"
+          :model-value="String(model.contextWindow)"
+          type="number"
+          min="1"
+          class="h-7 w-20 text-xs text-right [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          @update:model-value="updateContextWindowFromInput($event as string)"
         />
       </div>
 
-      <!-- Main area -->
-      <div class="min-w-0 flex-1">
-        <!-- Row 1: name + badge + context window -->
-        <div class="flex items-center justify-between gap-2">
-          <div class="flex items-center gap-2 min-w-0">
-            <span class="truncate text-sm font-medium text-[var(--foreground)]">{{ model.name }}</span>
-            <span
-              v-if="isDeepSeek"
-              class="inline-flex items-center rounded-sm bg-[var(--primary)]/10 px-1.5 py-0.5 text-[10px] font-semibold text-[var(--primary)] leading-none"
-            >
-              DeepSeek
-            </span>
-          </div>
-          <div class="flex items-center gap-2 shrink-0">
-            <label class="text-xs text-[var(--muted-foreground)] whitespace-nowrap">最大上下文</label>
-            <Input
-              :model-value="String(model.contextWindow)"
-              type="number"
-              min="0"
-              class="h-7 w-24 text-xs text-right [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-              @update:model-value="updateContextWindow($event as string)"
-            />
-          </div>
-        </div>
+      <!-- Patch toggle -->
+      <button
+        v-if="model.enabled"
+        type="button"
+        class="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer select-none shrink-0"
+        @click="open = !open"
+      >
+        <ChevronDown
+          :class="cn('size-3 transition-transform', open ? 'rotate-0' : '-rotate-90')"
+        />
+        {{ model.patches.length > 0 ? model.patches.length : '' }}
+      </button>
 
-        <!-- Expander: PatchChips -->
-        <Collapsible v-if="model.enabled" v-model:open="open" class="mt-1">
-          <CollapsibleTrigger as-child>
-            <button
-              type="button"
-              class="inline-flex items-center gap-1 text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors cursor-pointer select-none"
-            >
-              <ChevronDown
-                :class="cn(
-                  'size-3 transition-transform',
-                  open ? 'rotate-0' : '-rotate-90',
-                )"
-              />
-              {{ open ? '收起' : `兼容性补丁 (${model.patches.length})` }}
-            </button>
-          </CollapsibleTrigger>
-          <CollapsibleContent class="pt-2">
-            <PatchChips
-              :api-type="apiType"
-              :is-deep-seek="isDeepSeek"
-              :is-non-openai-endpoint="isNonOpenaiEndpoint"
-              :model-value="model.patches"
-              @update:model-value="updatePatches"
-            />
-          </CollapsibleContent>
-        </Collapsible>
-      </div>
-
-      <!-- Remove button -->
-      <div class="flex h-7 items-center pt-0.5">
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          class="text-[var(--muted-foreground)] hover:text-destructive"
-          @click="$emit('remove')"
-        >
-          <Trash2 class="size-3.5" />
-        </Button>
-      </div>
+      <!-- Remove -->
+      <Button
+        variant="ghost"
+        size="icon-xs"
+        class="text-muted-foreground hover:text-destructive shrink-0"
+        @click="$emit('remove')"
+      >
+        <Trash2 class="size-3" />
+      </Button>
     </div>
+
+    <!-- Patch chips (expandable) -->
+    <Collapsible v-if="model.enabled" v-model:open="open">
+      <CollapsibleContent class="pt-1.5">
+        <PatchChips
+          :api-type="apiType"
+          :is-deep-seek="isDeepSeek"
+          :is-non-openai-endpoint="isNonOpenaiEndpoint"
+          :model-value="model.patches"
+          @update:model-value="updatePatches"
+        />
+      </CollapsibleContent>
+    </Collapsible>
   </div>
 </template>
