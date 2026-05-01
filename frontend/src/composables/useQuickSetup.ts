@@ -125,8 +125,12 @@ export function useQuickSetup() {
 
   // --- Auto-select retry rules when provider changes ---
   function autoSelectRetryRules() {
-    // Select all rules (including already-existing ones) for the current provider
-    selectedRetryRules.value = new Set(recommendedRules.value.map(r => r.name))
+    // Select all rules for current provider, except already-existing ones
+    selectedRetryRules.value = new Set(
+      recommendedRules.value
+        .filter(r => !r.exists)
+        .map(r => r.name),
+    )
   }
 
   // --- Client / Provider / Plan selection ---

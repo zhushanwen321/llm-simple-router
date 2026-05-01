@@ -193,19 +193,20 @@
             <div
               v-for="rule in recommendedRules"
               :key="rule.name"
-              class="flex items-start gap-2.5 p-2 rounded-md hover:bg-muted/50 transition-colors cursor-pointer"
-              @click="toggleRetryRule(rule.name, !selectedRetryRules.has(rule.name))"
+              class="flex items-start gap-2.5 p-2 rounded-md transition-colors"
+              :class="rule.exists ? 'opacity-50' : 'hover:bg-muted/50 cursor-pointer'"
+              @click="!rule.exists && toggleRetryRule(rule.name, !selectedRetryRules.has(rule.name))"
             >
               <Checkbox
-                :checked="selectedRetryRules.has(rule.name)"
-                @update:checked="(val: boolean | string) => toggleRetryRule(rule.name, !!val)"
+                :checked="rule.exists || selectedRetryRules.has(rule.name)"
+                :disabled="rule.exists"
                 class="mt-0.5"
                 @click.stop
               />
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-1.5">
                   <span class="text-xs font-medium">{{ rule.name }}</span>
-                  <Badge v-if="rule.exists" variant="default" class="text-[9px] px-1 py-0 leading-none bg-green-600">已创建</Badge>
+                  <Badge v-if="rule.exists" variant="secondary" class="text-[9px] px-1 py-0 leading-none">已配置</Badge>
                   <Badge v-else-if="rule.providers && rule.providers.length > 0" variant="outline" class="text-[9px] px-1 py-0 leading-none">{{ rule.providers[0] }}</Badge>
                   <Badge v-else variant="secondary" class="text-[9px] px-1 py-0 leading-none">通用</Badge>
                 </div>
