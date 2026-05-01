@@ -25,9 +25,10 @@ function initTheme() {
 }
 
 function toggleTheme() {
-  const next: Theme = isDark.value ? 'light' : 'dark'
-  localStorage.setItem(STORAGE_KEY, next)
-  applyTheme(next)
+  const nextIsDark = !isDark.value
+  const next: Theme = nextIsDark ? 'dark' : 'light'
+  localStorage.setItem(STORAGE_KEY, String(next))
+  applyTheme(nextIsDark)
 }
 
 /**

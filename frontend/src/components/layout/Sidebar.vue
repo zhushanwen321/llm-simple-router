@@ -214,8 +214,6 @@ import {
   Activity,
   Settings,
   LogOut,
-<<<<<<< HEAD
-  CalendarClock,
   Moon,
   Sun,
   Zap,
