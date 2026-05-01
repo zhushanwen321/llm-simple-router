@@ -88,20 +88,20 @@
 }
 
 .dark {
-  --color-success-light: oklch(0.30 0.05 150);
-  --color-warning-light: oklch(0.32 0.06 80);
-  --color-danger-light: oklch(0.28 0.08 25);
-  --color-info-light: oklch(0.28 0.06 250);
+  --color-success-light: oklch(0.32 0.05 150);
+  --color-warning-light: oklch(0.35 0.06 80);
+  --color-danger-light: oklch(0.30 0.08 25);
+  --color-info-light: oklch(0.30 0.06 250);
 
   /* 语义色通过 var() 引用 shadcn 变量，暗色模式自动跟随 shadcn .dark 覆盖 */
   --color-bg-sidebar: oklch(0.145 0 0);
   --color-text-tertiary: oklch(0.556 0 0);
-  --color-role-user-bg:     oklch(0.28 0.04 175);
+  --color-role-user-bg:     oklch(0.32 0.05 175);
   --color-role-user:        oklch(0.72 0.08 175);
-  --color-role-assistant-bg:oklch(0.25 0.05 260);
+  --color-role-assistant-bg:oklch(0.30 0.06 260);
   --color-role-assistant:   oklch(0.60 0.10 260);
-  --color-role-tool-bg:     oklch(0.22 0.03 30);
+  --color-role-tool-bg:     oklch(0.28 0.04 30);
   --color-role-tool:        oklch(0.65 0.06 30);
-  --color-role-thinking-bg: oklch(0.23 0.04 290);
+  --color-role-thinking-bg: oklch(0.28 0.05 290);
   --color-role-thinking:    oklch(0.55 0.09 290);
 }
