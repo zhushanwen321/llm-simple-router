@@ -166,6 +166,7 @@
             :entries="mappingEntries"
             :provider-groups="allProviderGroups"
             @update:targets="updateMappingTargets"
+            @toggle-active="toggleMappingActive"
             @add="addMappingEntry"
             @remove="removeMappingEntry"
           />
@@ -286,7 +287,7 @@ const {
   concurrencyMode, maxConcurrency, queueTimeoutMs, maxQueueSize,
   allProviderGroups,
   selectClient, onProviderChange, onPlanChange,
-  updateMappingTargets, addMappingEntry, removeMappingEntry,
+  updateMappingTargets, toggleMappingActive, addMappingEntry, removeMappingEntry,
   toggleRetryRule, onConcurrencyModeChange, testConnection, submit,
 } = useQuickSetup()
 

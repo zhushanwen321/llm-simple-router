@@ -115,6 +115,8 @@ export interface MappingEntry {
   existingId?: string
   /** 来源标签 */
   tag: 'def' | 'auto' | 'cust' | 'existing'
+  /** 是否启用 */
+  active: boolean
 }
 
 /**

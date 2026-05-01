@@ -163,6 +163,7 @@ export function useQuickSetup() {
           existing: true,
           existingId: existingGroup.id,
           tag: 'existing' as const,
+          active: true,
         }
       }
 
@@ -176,6 +177,7 @@ export function useQuickSetup() {
         targets: [{ backend_model: defaultTarget, provider_id: '__new__' }],
         existing: false,
         tag: (clientType.value === 'pi' ? 'auto' : 'def') as 'auto' | 'def',
+        active: true,
       }
     })
 
@@ -272,6 +274,12 @@ export function useQuickSetup() {
     mappingEntries.value = next
   }
 
+  function toggleMappingActive(index: number) {
+    const next = [...mappingEntries.value]
+    next[index] = { ...next[index], active: !next[index].active }
+    mappingEntries.value = next
+  }
+
   function addMappingEntry(clientModel: string, targetModel: string) {
     const existing = mappingEntries.value.filter(m => m.clientModel !== clientModel)
     existing.push({
@@ -279,6 +287,7 @@ export function useQuickSetup() {
       targets: [{ backend_model: targetModel, provider_id: '__new__' }],
       existing: false,
       tag: 'cust' as const,
+      active: true,
     })
     mappingEntries.value = existing
   }
@@ -326,7 +335,7 @@ export function useQuickSetup() {
     try {
       const payload: QuickSetupPayload = {
         provider: {
-          name: toProviderName(selectedGroup.value),
+          name: `${toProviderName(selectedGroup.value)}-${toProviderName(selectedPlan.value)}`,
           api_type: apiType.value,
           base_url: baseUrl.value,
           api_key: apiKey.value.trim(),
@@ -383,6 +392,7 @@ export function useQuickSetup() {
       } else {
         toast.success('快速配置完成！')
       }
+      await new Promise(r => setTimeout(r, 1500))
       router.push('/')
     } catch (e: unknown) {
       toast.error(getApiMessage(e, '快速配置失败'))
@@ -422,7 +432,7 @@ export function useQuickSetup() {
     existingMappings, allProviders, allProviderGroups,
     selectClient, onProviderChange, onPlanChange,
     initModels, getDefaultPatches, updateMappings,
-    updateMappingTargets, addMappingEntry, removeMappingEntry,
+    updateMappingTargets, toggleMappingActive, addMappingEntry, removeMappingEntry,
     toggleRetryRule, onConcurrencyModeChange, testConnection, submit,
   }
 }

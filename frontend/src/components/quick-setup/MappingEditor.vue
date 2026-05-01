@@ -4,8 +4,9 @@ import type { MappingEntry, MappingTarget } from './types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { X, Plus, ChevronDown, Trash2, ArrowRight } from 'lucide-vue-next'
+import { Plus, ChevronDown, Trash2, ArrowRight } from 'lucide-vue-next'
 import CascadingModelSelect from '@/components/mappings/CascadingModelSelect.vue'
+import { Switch } from '@/components/ui/switch'
 import type { ProviderGroup } from '@/components/mappings/cascading-types'
 import type { SelectedValue } from '@/components/mappings/cascading-types'
 
@@ -16,6 +17,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:targets': [index: number, targets: MappingTarget[]]
+  'toggle-active': [index: number]
   'add': [clientModel: string, targetModel: string]
   'remove': [clientModel: string]
 }>()
@@ -151,15 +153,12 @@ const tagLabels: Record<string, string> = {
           class="size-3.5 shrink-0 text-muted-foreground transition-transform"
           :class="isExpanded(entry.clientModel) ? 'rotate-0' : '-rotate-90'"
         />
-        <Button
-          v-if="!entry.existing"
-          variant="ghost"
-          size="icon-xs"
-          class="shrink-0 text-muted-foreground hover:text-destructive"
-          @click.stop="emit('remove', entry.clientModel)"
-        >
-          <X class="size-3" />
-        </Button>
+        <Switch
+          :checked="entry.active"
+          @update:checked="emit('toggle-active', idx)"
+          class="scale-75"
+          @click.stop
+        />
       </div>
 
       <!-- Expanded detail -->

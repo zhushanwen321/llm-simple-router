@@ -3,7 +3,6 @@ import { ref, computed } from 'vue'
 import type { ModelConfig } from './types'
 import { CONTEXT_WINDOW_OPTIONS } from './types'
 import PatchChips from './PatchChips.vue'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import {
@@ -41,10 +40,6 @@ const matchedOption = computed(() =>
 
 const isPreset = computed(() => !!matchedOption.value)
 
-function toggleEnabled() {
-  emit('update:model', { ...props.model, enabled: !props.model.enabled })
-}
-
 function updateContextWindowFromSelect(val: unknown) {
   const str = val as string
   if (str === '__custom__') return
@@ -73,22 +68,8 @@ function formatCw(n: number): string {
 </script>
 
 <template>
-  <div
-    :class="cn(
-      'rounded-lg border px-3 py-2.5 transition-colors',
-      model.enabled
-        ? 'border-border bg-card'
-        : 'border-border/50 bg-muted/30 opacity-60',
-    )"
-  >
+  <div class="rounded-lg border border-border bg-card px-3 py-2.5 transition-colors">
     <div class="flex items-center gap-2">
-      <!-- Checkbox -->
-      <Checkbox
-        :checked="model.enabled"
-        @update:checked="toggleEnabled"
-        class="shrink-0"
-      />
-
       <!-- Model name -->
       <span class="truncate text-sm font-medium text-foreground min-w-0 flex-1">{{ model.name }}</span>
 
@@ -122,7 +103,6 @@ function formatCw(n: number): string {
 
       <!-- Patch toggle -->
       <button
-        v-if="model.enabled"
         type="button"
         class="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer select-none shrink-0"
         @click="open = !open"
@@ -145,7 +125,7 @@ function formatCw(n: number): string {
     </div>
 
     <!-- Patch chips (expandable) -->
-    <Collapsible v-if="model.enabled" v-model:open="open">
+    <Collapsible v-model:open="open">
       <CollapsibleContent class="pt-1.5">
         <PatchChips
           :api-type="apiType"
