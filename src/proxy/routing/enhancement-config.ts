@@ -5,12 +5,14 @@ export interface EnhancementConfig {
   claude_code_enabled: boolean;
   tool_call_loop_enabled: boolean;
   stream_loop_enabled: boolean;
+  tool_round_limit_enabled: boolean;
 }
 
 const DEFAULT_CONFIG: EnhancementConfig = {
   claude_code_enabled: false,
   tool_call_loop_enabled: false,
   stream_loop_enabled: false,
+  tool_round_limit_enabled: true,
 };
 
 /** 集中加载 proxy_enhancement 配置，避免多处重复 getSetting + JSON.parse */
@@ -23,6 +25,7 @@ export function loadEnhancementConfig(db: Database.Database): EnhancementConfig 
       claude_code_enabled: parsed.claude_code_enabled ?? false,
       tool_call_loop_enabled: parsed.tool_call_loop_enabled ?? false,
       stream_loop_enabled: parsed.stream_loop_enabled ?? false,
+      tool_round_limit_enabled: parsed.tool_round_limit_enabled ?? true,
     };
   } catch {
     return { ...DEFAULT_CONFIG };

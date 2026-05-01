@@ -300,6 +300,7 @@ export interface ProxyEnhancementConfig {
   claude_code_enabled: boolean;
   tool_call_loop_enabled: boolean;
   stream_loop_enabled: boolean;
+  tool_round_limit_enabled: boolean;
 }
 
 export interface UpgradeStatus {
