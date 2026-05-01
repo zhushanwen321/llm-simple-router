@@ -119,6 +119,7 @@ export interface RecommendedRetryRule {
   max_retries: number;
   max_delay_ms: number;
   providers?: string[];
+  exists?: boolean;
 }
 
 export interface ProviderPayload {

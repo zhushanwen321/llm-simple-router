@@ -205,7 +205,8 @@
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-1.5">
                   <span class="text-xs font-medium">{{ rule.name }}</span>
-                  <Badge v-if="rule.providers && rule.providers.length > 0" variant="outline" class="text-[9px] px-1 py-0 leading-none">{{ rule.providers[0] }}</Badge>
+                  <Badge v-if="rule.exists" variant="default" class="text-[9px] px-1 py-0 leading-none bg-green-600">已创建</Badge>
+                  <Badge v-else-if="rule.providers && rule.providers.length > 0" variant="outline" class="text-[9px] px-1 py-0 leading-none">{{ rule.providers[0] }}</Badge>
                   <Badge v-else variant="secondary" class="text-[9px] px-1 py-0 leading-none">通用</Badge>
                 </div>
                 <div class="text-[10px] text-muted-foreground mt-0.5">

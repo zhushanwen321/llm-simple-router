@@ -125,6 +125,7 @@ export function useQuickSetup() {
 
   // --- Auto-select retry rules when provider changes ---
   function autoSelectRetryRules() {
+    // Select all rules (including already-existing ones) for the current provider
     selectedRetryRules.value = new Set(recommendedRules.value.map(r => r.name))
   }
 
@@ -274,8 +275,8 @@ export function useQuickSetup() {
           client_model: m.from,
           backend_model: m.to,
         })),
-        retry_rules: allRecommendedRules.value
-          .filter(r => selectedRetryRules.value.has(r.name))
+        retry_rules: recommendedRules.value
+          .filter(r => selectedRetryRules.value.has(r.name) && !r.exists)
           .map(r => ({
             name: r.name,
             status_code: r.status_code,
