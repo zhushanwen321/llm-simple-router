@@ -70,11 +70,11 @@
               </SelectContent>
             </Select>
           </div>
-          <div class="flex-1 space-y-1">
+          <div class="flex-1 max-w-[280px] space-y-1">
             <Label class="text-xs text-muted-foreground">Base URL</Label>
             <Input :model-value="baseUrl" readonly class="font-mono text-xs h-9" />
           </div>
-          <div class="w-56 space-y-1">
+          <div class="w-72 space-y-1">
             <Label class="text-xs text-muted-foreground">API Key</Label>
             <Input v-model="apiKey" type="password" placeholder="输入 API Key" class="h-9" />
           </div>
