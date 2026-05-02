@@ -64,7 +64,7 @@
                 </SelectContent>
               </Select>
             </div>
-            <div class="flex-1 space-y-1">
+            <div class="w-80 space-y-1">
               <Label class="text-xs text-muted-foreground">Base URL</Label>
               <Input v-model="customBaseUrl" placeholder="https://api.example.com/v1" class="font-mono text-xs" />
             </div>
@@ -90,7 +90,7 @@
                 </SelectContent>
               </Select>
             </div>
-            <div class="flex-1 space-y-1">
+            <div class="w-80 space-y-1">
               <Label class="text-xs text-muted-foreground">Base URL</Label>
               <Input :model-value="baseUrl" readonly class="font-mono text-xs" />
             </div>
