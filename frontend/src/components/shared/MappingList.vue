@@ -76,7 +76,8 @@ function updateOverflow(entryIndex: number, val: SelectedValue | undefined) {
       if (val) {
         return { ...t, overflow_provider_id: val.provider_id, overflow_model: val.model }
       } else {
-        const { overflow_provider_id, overflow_model, ...rest } = t
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { overflow_provider_id: _opid, overflow_model: _omod, ...rest } = t
         return rest as MappingTarget
       }
     }

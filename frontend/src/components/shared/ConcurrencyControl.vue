@@ -7,7 +7,7 @@ import {
 
 export type ConcurrencyMode = 'auto' | 'manual' | 'none'
 
-const props = withDefaults(defineProps<{
+withDefaults(defineProps<{
   mode: ConcurrencyMode
   maxConcurrency?: number
   queueTimeoutMs?: number
