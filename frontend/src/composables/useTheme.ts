@@ -4,7 +4,7 @@ export type Theme = 'light' | 'dark'
 
 const STORAGE_KEY = 'llm-router-theme'
 
-const isDark = ref(false)
+export const isDark = ref(false)
 let initialized = false
 
 function applyTheme(dark: boolean) {

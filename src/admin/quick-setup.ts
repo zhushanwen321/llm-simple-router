@@ -2,7 +2,7 @@ import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
 import { Type, Static } from "@sinclair/typebox";
 import { createProvider } from "../db/providers.js";
-import { createMappingGroup } from "../db/mappings.js";
+import { createMappingGroup, updateMappingGroup } from "../db/mappings.js";
 import { createRetryRule } from "../db/retry-rules.js";
 import { upsertTransformRule } from "../db/transform-rules.js";
 import { encrypt } from "../utils/crypto.js";
@@ -127,14 +127,23 @@ export const adminQuickSetupRoutes: FastifyPluginCallback<QuickSetupRoutesOption
         adaptive_enabled: adaptiveEnabled,
       });
 
-      // 6. Create mapping groups
+      // 6. Upsert mapping groups
       for (const m of body.mappings) {
-        createMappingGroup(db, {
-          client_model: m.client_model,
-          rule: JSON.stringify({
-            targets: [{ backend_model: m.backend_model, provider_id: providerId }],
-          }),
+        const existing = db.prepare('SELECT id FROM mapping_groups WHERE client_model = ?').get(m.client_model) as { id: string } | undefined;
+        const ruleJson = JSON.stringify({
+          targets: [{ backend_model: m.backend_model, provider_id: providerId }],
         });
+        if (existing) {
+          updateMappingGroup(db, existing.id, {
+            client_model: m.client_model,
+            rule: ruleJson,
+          });
+        } else {
+          createMappingGroup(db, {
+            client_model: m.client_model,
+            rule: ruleJson,
+          });
+        }
       }
 
       // 7. Create retry rules

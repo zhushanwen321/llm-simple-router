@@ -6,19 +6,24 @@
     </main>
   </div>
   <router-view v-else />
-  <Toaster richColors position="top-center" :toastOptions="{ duration: 4000 }" :style="{ zIndex: 9999 }" />
+  <Teleport to="body">
+    <Toaster :theme="theme" richColors position="top-center" :toastOptions="{ duration: 4000 }" />
+  </Teleport>
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import Sidebar from '@/components/layout/Sidebar.vue'
 import { Toaster } from '@/components/ui/sonner'
 import { api } from '@/api/client'
+import { isDark } from '@/composables/useTheme'
 
 const router = useRouter()
 const route = useRoute()
 const isAuthenticated = ref(false)
+
+const theme = computed(() => isDark.value ? 'dark' : 'light')
 
 // 不需要认证的页面
 const publicPages = ['/login', '/setup']

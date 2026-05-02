@@ -420,7 +420,7 @@ export function useQuickSetup() {
           max_queue_size: concurrencyMode.value !== 'none' ? maxQueueSize.value : undefined,
         },
         mappings: mappingEntries.value
-          .filter(m => !m.existing)
+          .filter(m => m.targets[0]?.backend_model)
           .map(m => ({
             client_model: m.clientModel,
             backend_model: m.targets[0]?.backend_model ?? '',
@@ -445,29 +445,20 @@ export function useQuickSetup() {
 
       await api.quickSetup(payload)
 
-      // Update existing mappings (failover/overflow/active changes)
-      // Best-effort: continue even if some updates fail
-      const updateErrors: string[] = []
+      // Toggle active state for existing mappings that changed
+      const toggleErrors: string[] = []
       for (const entry of mappingEntries.value) {
-        if (entry.existing && entry.existingId) {
+        if (entry.existing && entry.existingId && entry.originalActive !== undefined && entry.active !== entry.originalActive) {
           try {
-            const ruleJson = JSON.stringify({ targets: entry.targets })
-            await api.updateMappingGroup(entry.existingId, {
-              client_model: entry.clientModel,
-              rule: ruleJson,
-            })
-            // Toggle active state if changed from original
-            if (entry.originalActive !== undefined && entry.active !== entry.originalActive) {
-              await api.toggleMappingGroup(entry.existingId)
-            }
-          } catch (e: unknown) {
-            updateErrors.push(entry.clientModel)
+            await api.toggleMappingGroup(entry.existingId)
+          } catch {
+            toggleErrors.push(entry.clientModel)
           }
         }
       }
 
-      if (updateErrors.length > 0) {
-        toast.success(`快速配置完成！${updateErrors.length} 个已有映射更新失败，请到映射页面手动修改`)
+      if (toggleErrors.length > 0) {
+        toast.success(`快速配置完成！${toggleErrors.length} 个映射状态切换失败`)
       } else {
         toast.success('快速配置完成！')
       }
