@@ -121,8 +121,8 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
 <template>
   <div class="rounded-xl border border-border bg-card overflow-hidden">
     <!-- Header -->
-    <div v-if="entries.length > 0" class="flex items-center px-4 py-2 border-b border-border bg-muted/20 text-[11px] text-muted-foreground font-medium">
-      <div class="w-[100px] shrink-0">客户端模型</div>
+    <div v-if="entries.length > 0" class="flex items-center px-5 py-2.5 border-b border-border bg-muted/20 text-xs text-muted-foreground font-medium">
+      <div class="w-[108px] shrink-0">客户端模型</div>
       <div class="w-5 shrink-0"></div>
       <div class="flex-1">目标链</div>
       <div class="shrink-0 w-[140px] text-right">操作</div>
@@ -137,11 +137,11 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
     >
       <!-- Main row (click to expand) -->
       <div
-        class="flex items-center px-4 py-2.5 cursor-pointer select-none hover:bg-muted/10"
+        class="flex items-center px-5 py-3 cursor-pointer select-none hover:bg-muted/10"
         @click="toggleExpand(entry.clientModel)"
       >
         <!-- Client model -->
-        <div class="w-[100px] shrink-0 mono text-sm font-medium text-foreground truncate" :title="entry.clientModel">
+        <div class="w-[108px] shrink-0 mono text-sm font-semibold text-foreground truncate" :title="entry.clientModel">
           {{ entry.clientModel }}
         </div>
 
@@ -160,30 +160,30 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
               <svg v-else-if="tIdx > 0" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.5" class="text-orange-400/30 shrink-0"><path d="M3 1v6M0 4l3 3 3-3" stroke-dasharray="2 2"/></svg>
 
               <span
-                class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs mono"
+                class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-sm mono"
                 :class="tIdx === 0 && cIdx === 0
                   ? 'bg-primary/10 border border-primary/20 text-primary/80'
                   : 'bg-orange-500/5 border border-orange-500/15 text-orange-400/70'"
               >
                 {{ t.backend_model }}
-                <span class="text-[10px] px-1 py-px rounded bg-muted/50 text-muted-foreground/40">{{ providerName(t.provider_id) }}</span>
+                <span class="text-[11px] px-1 py-px rounded bg-muted/50 text-muted-foreground/40">{{ providerName(t.provider_id) }}</span>
               </span>
             </template>
           </div>
           <!-- Overflow -->
           <div v-if="entry.targets[0]?.overflow_model" class="flex items-center gap-1 mt-1 pt-1 border-t border-dashed border-sky-400/10">
             <svg width="8" height="8" fill="none" stroke="currentColor" stroke-width="1.5" class="text-sky-400/30 shrink-0"><path d="M3 1v4M1 3l2 2 2-2" stroke-dasharray="1 1"/></svg>
-            <span class="text-[11px] text-sky-400/40">溢出</span>
-            <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs mono bg-sky-500/5 border border-sky-500/15 text-sky-400/70">
+            <span class="text-xs text-sky-400/40">溢出</span>
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-sm mono bg-sky-500/5 border border-sky-500/15 text-sky-400/70">
               {{ entry.targets[0].overflow_model }}
-              <span class="text-[10px] px-1 py-px rounded bg-muted/50 text-muted-foreground/40">{{ providerName(entry.targets[0].overflow_provider_id ?? '') }}</span>
+              <span class="text-[11px] px-1 py-px rounded bg-muted/50 text-muted-foreground/40">{{ providerName(entry.targets[0].overflow_provider_id ?? '') }}</span>
             </span>
           </div>
         </div>
 
         <!-- Actions -->
         <div class="shrink-0 w-[140px] flex items-center justify-end gap-1">
-          <Badge v-if="entry.targets.length > 1" variant="outline" class="text-[10px] px-1.5 py-0 border-orange-400/20 text-orange-400/50 shrink-0">
+          <Badge v-if="entry.targets.length > 1" variant="outline" class="text-[11px] px-1.5 py-0 border-orange-400/20 text-orange-400/50 shrink-0">
             {{ entry.targets.length }}级
           </Badge>
           <span v-if="!entry.active" class="text-xs text-muted-foreground/30 shrink-0">已禁用</span>
@@ -203,13 +203,13 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
       <div v-if="isExpanded(entry.clientModel)" class="border-t border-border bg-muted/5 mapping-edit-section">
         <div class="flex">
           <!-- Left: client model identity -->
-          <div class="w-[100px] shrink-0 px-4 py-3 flex flex-col items-center justify-center border-r border-border bg-muted/10">
-            <div class="mono text-sm font-semibold text-foreground">{{ entry.clientModel }}</div>
+          <div class="w-[108px] shrink-0 px-3 py-2 flex flex-col items-center justify-center border-r border-border bg-muted/10">
+            <div class="mono text-xs font-semibold text-foreground">{{ entry.clientModel }}</div>
             <div class="text-[10px] text-muted-foreground/50 mt-0.5">客户端模型</div>
           </div>
 
           <!-- Right: targets editor -->
-          <div class="flex-1 px-4 py-3 space-y-2">
+          <div class="flex-1 px-3 py-2 space-y-1.5">
             <div v-for="(target, tIdx) in entry.targets" :key="tIdx">
               <div class="flex items-center gap-2">
                 <span
