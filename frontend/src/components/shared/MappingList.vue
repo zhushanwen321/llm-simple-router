@@ -174,10 +174,10 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
             </template>
           </div>
           <!-- Overflow -->
-          <div v-if="entry.targets[0]?.overflow_model" class="flex items-center gap-1 mt-1 pt-1 border-t border-dashed border-sky-400/10">
-            <svg width="8" height="8" fill="none" stroke="currentColor" stroke-width="1.5" class="text-sky-400/30 shrink-0"><path d="M3 1v4M1 3l2 2 2-2" stroke-dasharray="1 1"/></svg>
-            <span class="text-xs text-sky-400/40">溢出</span>
-            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-sm mono bg-sky-500/5 border border-sky-500/15 text-sky-400/70">
+          <div v-if="entry.targets[0]?.overflow_model" class="flex items-center gap-1 mt-1 pt-1 border-t border-dashed border-primary/10">
+            <svg width="8" height="8" fill="none" stroke="currentColor" stroke-width="1.5" class="text-primary/30 shrink-0"><path d="M3 1v4M1 3l2 2 2-2" stroke-dasharray="1 1"/></svg>
+            <span class="text-xs text-primary/40">溢出</span>
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-sm mono bg-primary/5 border border-primary/15 text-primary/70">
               {{ entry.targets[0].overflow_model }}
               <span class="text-[11px] px-1 py-px rounded bg-muted/50 text-muted-foreground/40">{{ providerName(entry.targets[0].overflow_provider_id ?? '') }}</span>
             </span>
@@ -249,8 +249,8 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
             </div>
 
             <!-- Overflow edit -->
-            <div class="flex items-center gap-2 pt-2 border-t border-dashed border-sky-400/15">
-              <span class="text-[10px] w-10 text-center px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400/70 shrink-0">溢出</span>
+            <div class="flex items-center gap-2 pt-2 border-t border-dashed border-primary/15">
+              <span class="text-[10px] w-10 text-center px-1.5 py-0.5 rounded bg-primary/10 text-primary/70 shrink-0">溢出</span>
               <div class="flex-1">
                 <CascadingModelSelect
                   :providers="providerGroups"
