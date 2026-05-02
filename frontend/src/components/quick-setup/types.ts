@@ -85,6 +85,11 @@ export const CONTEXT_WINDOW_OPTIONS = [
   { label: '1M', value: 1000000 },
 ]
 
+const CONTEXT_1M = 1_000_000
+const CONTEXT_128K = 128_000
+const CONTEXT_32K = 32_000
+const CONTEXT_8K = 8_000
+
 /** Default context window per model name pattern */
 export function getDefaultContextWindow(modelName: string): number {
   const m = modelName.toLowerCase()
@@ -95,12 +100,12 @@ export function getDefaultContextWindow(modelName: string): number {
     m.includes('r1') ||           // DeepSeek R1
     m.includes('reasoner') ||     // OpenAI reasoner
     m.includes('qwen3.6')         // Qwen 3.6 series
-  ) return 1000000
+  ) return CONTEXT_1M
   // Named context sizes
-  if (m.includes('128k')) return 128000
-  if (m.includes('32k')) return 32000
-  if (m.includes('8k')) return 8000
-  return 128000
+  if (m.includes('128k')) return CONTEXT_128K
+  if (m.includes('32k')) return CONTEXT_32K
+  if (m.includes('8k')) return CONTEXT_8K
+  return CONTEXT_128K
 }
 
 /** 映射目标（与后端 MappingTarget 对齐） */
