@@ -10,11 +10,11 @@
     "createdAt": "Created At",
     "actions": "Actions"
   },
-  "noKeys": "No keys yet",
+  "noKeys": "No API keys",
   "confirmDeleteTitle": "Confirm Delete",
   "confirmDeleteDesc": "Are you sure you want to delete key \"{name}\"? All requests using this key will be rejected. This action cannot be undone.",
   "whitelistLabel": "Whitelist Models",
-  "whitelistHint": "Leave empty = allow all models",
+  "whitelistHint": "Leave empty to allow all models",
   "noModels": "No models available. Please configure model mappings first",
   "placeholder": {
     "name": "e.g. Production"
@@ -22,5 +22,5 @@
   "loadFailed": "Failed to load data",
   "saveFailed": "Failed to save key",
   "deleteFailed": "Failed to delete key",
-  "nameRequired": "Please enter a name"
+  "nameRequired": "Name is required"
 }
