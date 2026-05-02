@@ -1,0 +1,52 @@
+{
+  "title": "请求日志",
+  "cleanupLogs": "清理日志",
+  "clear": "清除",
+  "allProviders": "全部供应商",
+  "allModels": "全部模型",
+  "allKeys": "全部密钥",
+  "allStatus": "全部状态",
+  "non200": "非 200",
+  "noLogs": "暂无日志",
+  "pagination": "共 {total} 条，第 {page} / {totalPages} 页",
+  "firstPage": "首页",
+  "prevPage": "上一页",
+  "nextPage": "下一页",
+  "lastPage": "末页",
+  "cleanup": {
+    "title": "清理日志",
+    "description": "删除指定天数之前的日志",
+    "keepRecentDays": "保留最近天数",
+    "autoCleanup": "自动清理设置",
+    "retentionDays": "保留天数",
+    "noAutoCleanup": "0 = 不自动清理",
+    "saveSettings": "保存设置",
+    "confirmCleanup": "确认清理"
+  },
+  "cleanupResult": {
+    "title": "清理完成",
+    "description": "已删除 {count} 条日志。",
+    "ok": "确定"
+  },
+  "table": {
+    "id": "ID",
+    "time": "时间",
+    "type": "类型",
+    "model": "模型",
+    "actualForward": "实际转发",
+    "statusCode": "状态码",
+    "latency": "延迟",
+    "streaming": "流式",
+    "retry": "重试",
+    "failover": "故障转移",
+    "error": "错误",
+    "actions": "操作"
+  },
+  "row": {
+    "copyFullId": "复制完整 ID",
+    "replaced": "已替换",
+    "proxyEnhancement": "代理增强：{label}",
+    "unknown": "未知",
+    "detail": "详情"
+  }
+}

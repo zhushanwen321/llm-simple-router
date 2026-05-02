@@ -1,0 +1,52 @@
+{
+  "title": "Request Logs",
+  "cleanupLogs": "Cleanup Logs",
+  "clear": "Clear",
+  "allProviders": "All Providers",
+  "allModels": "All Models",
+  "allKeys": "All Keys",
+  "allStatus": "All Status",
+  "non200": "Non-200",
+  "noLogs": "No logs",
+  "pagination": "Total {total}, Page {page} / {totalPages}",
+  "firstPage": "First",
+  "prevPage": "Previous",
+  "nextPage": "Next",
+  "lastPage": "Last",
+  "cleanup": {
+    "title": "Cleanup Logs",
+    "description": "Delete logs older than specified days",
+    "keepRecentDays": "Keep recent days",
+    "autoCleanup": "Auto cleanup settings",
+    "retentionDays": "Retention days",
+    "noAutoCleanup": "0 = No auto cleanup",
+    "saveSettings": "Save Settings",
+    "confirmCleanup": "Confirm Cleanup"
+  },
+  "cleanupResult": {
+    "title": "Cleanup Complete",
+    "description": "Deleted {count} log entries.",
+    "ok": "OK"
+  },
+  "table": {
+    "id": "ID",
+    "time": "Time",
+    "type": "Type",
+    "model": "Model",
+    "actualForward": "Actual Forward",
+    "statusCode": "Status Code",
+    "latency": "Latency",
+    "streaming": "Streaming",
+    "retry": "Retry",
+    "failover": "Failover",
+    "error": "Error",
+    "actions": "Actions"
+  },
+  "row": {
+    "copyFullId": "Copy full ID",
+    "replaced": "Replaced",
+    "proxyEnhancement": "Enhancement: {label}",
+    "unknown": "Unknown",
+    "detail": "Detail"
+  }
+}
