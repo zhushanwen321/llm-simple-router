@@ -173,55 +173,78 @@
         </CardContent>
       </Card>
 
-      <!-- Right: Retry Rules -->
-      <Card class="col-span-2">
-        <CardHeader class="pb-3">
-          <div class="flex items-center justify-between">
-            <CardTitle class="text-sm font-medium">重试规则</CardTitle>
-            <Badge variant="secondary" class="text-[10px]">{{ selectedRetryRules.size }} 条已选</Badge>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div v-if="recommendedRules.length === 0" class="py-6 text-center text-xs text-muted-foreground">
-            <template v-if="allRecommendedRules.length === 0">
-              所有推荐规则已创建，无需重复添加
-            </template>
-            <template v-else>
-              选择供应商后显示推荐规则
-            </template>
-          </div>
-          <div v-else class="space-y-1.5 max-h-[320px] overflow-y-auto">
-            <div
-              v-for="rule in recommendedRules"
-              :key="rule.name"
-              class="flex items-start gap-2.5 rounded-md transition-colors"
-              :class="rule.exists
-                ? 'opacity-60 cursor-default p-2'
-                : 'hover:bg-muted/50 cursor-pointer p-2'"
-              @click="!rule.exists && toggleRetryRule(rule.name, !selectedRetryRules.has(rule.name))"
-            >
-              <Checkbox
-                :checked="rule.exists ? true : selectedRetryRules.has(rule.name)"
-                :disabled="rule.exists"
-                class="mt-0.5"
-                @update:checked="(val: boolean | string) => toggleRetryRule(rule.name, !!val)"
-                @click.stop
-              />
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-1.5">
-                  <span class="text-xs font-medium">{{ rule.name }}</span>
-                  <Badge v-if="rule.exists" variant="secondary" class="text-[9px] px-1.5 py-0 leading-none bg-muted text-muted-foreground">已配置</Badge>
-                  <Badge v-else-if="rule.providers && rule.providers.length > 0" variant="outline" class="text-[9px] px-1 py-0 leading-none">{{ rule.providers[0] }}</Badge>
-                  <Badge v-else variant="secondary" class="text-[9px] px-1 py-0 leading-none">通用</Badge>
-                </div>
-                <div class="text-[10px] text-muted-foreground mt-0.5">
-                  {{ rule.status_code }} · {{ rule.retry_strategy === 'fixed' ? '固定' : '指数退避' }} · {{ rule.retry_delay_ms / 1000 }}s · {{ rule.max_retries }}次
+      <!-- Right: Retry Rules + Transform Rules -->
+      <div class="col-span-2 space-y-4">
+        <Card>
+          <CardHeader class="pb-3">
+            <div class="flex items-center justify-between">
+              <CardTitle class="text-sm font-medium">重试规则</CardTitle>
+              <Badge variant="secondary" class="text-[10px]">{{ selectedRetryRules.size }} 条已选</Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div v-if="recommendedRules.length === 0" class="py-6 text-center text-xs text-muted-foreground">
+              <template v-if="allRecommendedRules.length === 0">
+                所有推荐规则已创建，无需重复添加
+              </template>
+              <template v-else>
+                选择供应商后显示推荐规则
+              </template>
+            </div>
+            <div v-else class="space-y-1.5 max-h-[320px] overflow-y-auto">
+              <div
+                v-for="rule in recommendedRules"
+                :key="rule.name"
+                class="flex items-start gap-2.5 rounded-md transition-colors"
+                :class="rule.exists
+                  ? 'opacity-60 cursor-default p-2'
+                  : 'hover:bg-muted/50 cursor-pointer p-2'"
+                @click="!rule.exists && toggleRetryRule(rule.name, !selectedRetryRules.has(rule.name))"
+              >
+                <Checkbox
+                  :checked="rule.exists ? true : selectedRetryRules.has(rule.name)"
+                  :disabled="rule.exists"
+                  class="mt-0.5"
+                  @update:checked="(val: boolean | string) => toggleRetryRule(rule.name, !!val)"
+                  @click.stop
+                />
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-xs font-medium">{{ rule.name }}</span>
+                    <Badge v-if="rule.exists" variant="secondary" class="text-[9px] px-1.5 py-0 leading-none bg-muted text-muted-foreground">已配置</Badge>
+                    <Badge v-else-if="rule.providers && rule.providers.length > 0" variant="outline" class="text-[9px] px-1 py-0 leading-none">{{ rule.providers[0] }}</Badge>
+                    <Badge v-else variant="secondary" class="text-[9px] px-1 py-0 leading-none">通用</Badge>
+                  </div>
+                  <div class="text-[10px] text-muted-foreground mt-0.5">
+                    {{ rule.status_code }} · {{ rule.retry_strategy === 'fixed' ? '固定' : '指数退避' }} · {{ rule.retry_delay_ms / 1000 }}s · {{ rule.max_retries }}次
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+
+        <!-- Transform Rules -->
+        <Card>
+          <CardHeader class="pb-3">
+            <CardTitle class="text-sm font-medium">转换规则</CardTitle>
+          </CardHeader>
+          <CardContent class="space-y-2">
+            <div>
+              <Label class="text-[11px] text-muted-foreground">注入 Headers (JSON)</Label>
+              <Input v-model="transformInjectHeaders" placeholder='{"x-custom": "value"}' class="mt-0.5 h-8 text-xs font-mono" />
+            </div>
+            <div>
+              <Label class="text-[11px] text-muted-foreground">丢弃字段（逗号分隔）</Label>
+              <Input v-model="transformDropFields" placeholder="logprobs, frequency_penalty" class="mt-0.5 h-8 text-xs font-mono" />
+            </div>
+            <div>
+              <Label class="text-[11px] text-muted-foreground">请求默认值 (JSON)</Label>
+              <Input v-model="transformRequestDefaults" placeholder='{"max_tokens": 4096}' class="mt-0.5 h-8 text-xs font-mono" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   </div>
 
@@ -286,6 +309,7 @@ const {
   baseUrl, availablePlans, isNonOpenaiEndpoint,
   concurrencyMode, maxConcurrency, queueTimeoutMs, maxQueueSize,
   allProviderGroups,
+  transformInjectHeaders, transformDropFields, transformRequestDefaults,
   selectClient, onProviderChange, onPlanChange,
   updateMappingTargets, toggleMappingActive, addMappingEntry, removeMappingEntry,
   toggleRetryRule, onConcurrencyModeChange, testConnection, submit,

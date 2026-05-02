@@ -191,6 +191,11 @@ export interface QuickSetupPayload {
     max_retries: number
     max_delay_ms: number
   }>
+  transform_rules?: {
+    inject_headers?: Record<string, string>
+    request_defaults?: Record<string, unknown>
+    drop_fields?: string[]
+  }
 }
 
 export interface SessionState {

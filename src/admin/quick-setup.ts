@@ -4,6 +4,7 @@ import { Type, Static } from "@sinclair/typebox";
 import { createProvider } from "../db/providers.js";
 import { createMappingGroup } from "../db/mappings.js";
 import { createRetryRule } from "../db/retry-rules.js";
+import { upsertTransformRule } from "../db/transform-rules.js";
 import { encrypt } from "../utils/crypto.js";
 import { getSetting } from "../db/settings.js";
 import { HTTP_CREATED, HTTP_BAD_REQUEST, HTTP_CONFLICT } from "./constants.js";
@@ -48,10 +49,17 @@ const QuickSetupRetryRuleSchema = Type.Object({
   max_delay_ms: Type.Number({ minimum: 100 }),
 });
 
+const QuickSetupTransformSchema = Type.Object({
+  inject_headers: Type.Optional(Type.Record(Type.String(), Type.String())),
+  request_defaults: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
+  drop_fields: Type.Optional(Type.Array(Type.String())),
+});
+
 const QuickSetupSchema = Type.Object({
   provider: QuickSetupProviderSchema,
   mappings: Type.Array(QuickSetupMappingSchema),
   retry_rules: Type.Array(QuickSetupRetryRuleSchema),
+  transform_rules: Type.Optional(QuickSetupTransformSchema),
 });
 
 interface QuickSetupRoutesOptions {
@@ -140,6 +148,16 @@ export const adminQuickSetupRoutes: FastifyPluginCallback<QuickSetupRoutesOption
           retry_delay_ms: r.retry_delay_ms,
           max_retries: r.max_retries,
           max_delay_ms: r.max_delay_ms,
+        });
+      }
+
+      // 8. Create transform rules
+      if (body.transform_rules) {
+        upsertTransformRule(db, providerId, {
+          inject_headers: body.transform_rules.inject_headers ?? null,
+          request_defaults: body.transform_rules.request_defaults ?? null,
+          drop_fields: body.transform_rules.drop_fields ?? null,
+          is_active: 1,
         });
       }
 

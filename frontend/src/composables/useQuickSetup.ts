@@ -53,6 +53,11 @@ export function useQuickSetup() {
   const queueTimeoutMs = ref(120000)
   const maxQueueSize = ref(100)
 
+  // Transform rules state
+  const transformInjectHeaders = ref('')
+  const transformDropFields = ref('')
+  const transformRequestDefaults = ref('')
+
   // Existing mappings + providers for failover/overflow editing
   const existingMappings = ref<MappingGroup[]>([])
   const allProviders = ref<ApiProvider[]>([])
@@ -321,6 +326,24 @@ export function useQuickSetup() {
   }
 
   // --- Submit ---
+  function buildTransformRules() {
+    const headersStr = transformInjectHeaders.value.trim()
+    const dropStr = transformDropFields.value.trim()
+    const defaultsStr = transformRequestDefaults.value.trim()
+    if (!headersStr && !dropStr && !defaultsStr) return undefined
+    const result: NonNullable<QuickSetupPayload['transform_rules']> = {}
+    if (headersStr) {
+      try { result.inject_headers = JSON.parse(headersStr) } catch { toast.error('注入 Headers JSON 格式错误') }
+    }
+    if (dropStr) {
+      result.drop_fields = dropStr.split(',').map(s => s.trim()).filter(Boolean)
+    }
+    if (defaultsStr) {
+      try { result.request_defaults = JSON.parse(defaultsStr) } catch { toast.error('请求默认值 JSON 格式错误') }
+    }
+    return Object.keys(result).length > 0 ? result : undefined
+  }
+
   async function submit() {
     if (!currentPreset.value) {
       toast.error('请选择供应商和套餐')
@@ -366,6 +389,7 @@ export function useQuickSetup() {
             max_retries: r.max_retries,
             max_delay_ms: r.max_delay_ms,
           })),
+        transform_rules: buildTransformRules(),
       }
 
       await api.quickSetup(payload)
@@ -429,6 +453,7 @@ export function useQuickSetup() {
     currentClient, currentPreset, baseUrl,
     availablePlans, isNonOpenaiEndpoint,
     concurrencyMode, maxConcurrency, queueTimeoutMs, maxQueueSize,
+    transformInjectHeaders, transformDropFields, transformRequestDefaults,
     existingMappings, allProviders, allProviderGroups,
     selectClient, onProviderChange, onPlanChange,
     initModels, getDefaultPatches, updateMappings,
