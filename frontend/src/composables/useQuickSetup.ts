@@ -1,4 +1,5 @@
 import { ref, computed, onMounted, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { api, getApiMessage, type ProviderGroup, type RecommendedRetryRule, type QuickSetupPayload } from '@/api/client'
 import type { MappingGroup } from '@/types/mapping'
 import type { Provider as ApiProvider } from '@/types/mapping'
@@ -33,6 +34,7 @@ function toProviderName(group: string): string {
 }
 
 export function useQuickSetup() {
+  const { t } = useI18n()
   // --- State ---
   const clientType = ref<ClientType>('claude-code')
   const providerGroups = ref<ProviderGroup[]>([])
@@ -96,7 +98,7 @@ export function useQuickSetup() {
       ? '__new_custom__'
       : `__new_${toProviderName(selectedGroup.value)}_${toProviderName(selectedPlan.value)}__`
     const displayName = isCustomProvider.value
-      ? '自定义供应商'
+      ? t('quickSetup.provider.customProvider')
       : `${selectedGroup.value} - ${selectedPlan.value}`
     return {
       provider: { id: tempId, name: displayName },
@@ -345,7 +347,7 @@ export function useQuickSetup() {
   function removeMappingEntry(clientModel: string) {
     const entry = mappingEntries.value.find(m => m.clientModel === clientModel)
     if (entry?.existing) {
-      toast.error('已有映射请到"模型映射"页面删除')
+      toast.error(t('quickSetup.messages.existingMappingDelete'))
       return
     }
     mappingEntries.value = mappingEntries.value.filter(m => m.clientModel !== clientModel)
@@ -362,7 +364,7 @@ export function useQuickSetup() {
   async function testConnection() {
     if (!apiKey.value.trim()) {
       connectionStatus.value = 'error'
-      toast.error('请先填写 API Key')
+      toast.error(t('quickSetup.messages.fillApiKeyFirst'))
       return
     }
     connectionStatus.value = 'testing'
@@ -378,24 +380,24 @@ export function useQuickSetup() {
     if (!headersStr && !dropStr && !defaultsStr) return undefined
     const result: NonNullable<QuickSetupPayload['transform_rules']> = {}
     if (headersStr) {
-      try { result.inject_headers = JSON.parse(headersStr) } catch { toast.error('注入 Headers JSON 格式错误'); return false }
+      try { result.inject_headers = JSON.parse(headersStr) } catch { toast.error(t('quickSetup.messages.injectHeadersJsonError')); return false }
     }
     if (dropStr) {
       result.drop_fields = dropStr.split(',').map(s => s.trim()).filter(Boolean)
     }
     if (defaultsStr) {
-      try { result.request_defaults = JSON.parse(defaultsStr) } catch { toast.error('请求默认值 JSON 格式错误'); return false }
+      try { result.request_defaults = JSON.parse(defaultsStr) } catch { toast.error(t('quickSetup.messages.requestDefaultsJsonError')); return false }
     }
     return Object.keys(result).length > 0 ? result : undefined
   }
 
   async function submit() {
     if (!currentPreset.value) {
-      toast.error('请选择供应商和套餐')
+      toast.error(t('quickSetup.messages.selectProviderAndPlan'))
       return
     }
     if (!apiKey.value.trim()) {
-      toast.error('请填写 API Key')
+      toast.error(t('quickSetup.messages.fillApiKey'))
       return
     }
 
@@ -458,14 +460,14 @@ export function useQuickSetup() {
       }
 
       if (toggleErrors.length > 0) {
-        toast.success(`快速配置完成！${toggleErrors.length} 个映射状态切换失败`)
+        toast.success(t('quickSetup.messages.setupCompleteWithErrors', { count: toggleErrors.length }))
       } else {
-        toast.success('快速配置完成！')
+        toast.success(t('quickSetup.messages.setupComplete'))
       }
       await new Promise(r => setTimeout(r, 1500))
       router.push('/')
     } catch (e: unknown) {
-      toast.error(getApiMessage(e, '快速配置失败'))
+      toast.error(getApiMessage(e, t('quickSetup.messages.setupFailed')))
     } finally {
       saving.value = false
     }
@@ -487,7 +489,7 @@ export function useQuickSetup() {
 
       selectClient('claude-code')
     } catch (e: unknown) {
-      toast.error(getApiMessage(e, '加载推荐配置失败'))
+      toast.error(getApiMessage(e, t('quickSetup.messages.loadFailed')))
     }
   })
 

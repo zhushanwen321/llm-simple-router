@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { PATCH_GROUPS } from './types'
 import type { PatchGroup } from './types'
 import { cn } from '@/lib/utils'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   apiType: string
@@ -39,13 +42,13 @@ function isActive(patchId: string): boolean {
 <template>
   <div class="space-y-3">
     <div v-for="group in visibleGroups" :key="group.key">
-      <p class="mb-1.5 text-xs font-medium text-[var(--muted-foreground)]">{{ group.label }}</p>
+      <p class="mb-1.5 text-xs font-medium text-[var(--muted-foreground)]">{{ t(group.labelKey) }}</p>
       <div class="flex flex-wrap gap-1.5">
         <button
           v-for="item in group.items"
           :key="item.id"
           type="button"
-          :title="item.desc"
+          :title="t(item.descKey)"
           :class="cn(
             'inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium transition-all cursor-pointer select-none',
             isActive(item.id)
@@ -60,7 +63,7 @@ function isActive(patchId: string): boolean {
               isActive(item.id) ? 'bg-[var(--primary)]' : 'bg-[var(--border)]',
             )"
           />
-          {{ item.name }}
+          {{ t(item.nameKey) }}
         </button>
       </div>
     </div>

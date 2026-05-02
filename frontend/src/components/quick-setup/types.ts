@@ -8,18 +8,18 @@ export interface ClientMeta {
   format: 'anthropic' | 'openai'
   defaultProvider: string
   defaultPlan: string
-  description: string
+  descriptionKey: string
 }
 
 export interface PatchOption {
   id: string
-  name: string
-  desc: string
+  nameKey: string
+  descKey: string
 }
 
 export interface PatchGroup {
   key: string
-  label: string
+  labelKey: string
   items: PatchOption[]
 }
 
@@ -38,36 +38,36 @@ export interface MappingTarget {
 }
 
 export const CLIENTS: ClientMeta[] = [
-  { id: 'claude-code', name: 'Claude Code', icon: 'C', iconClass: 'cc', format: 'anthropic', defaultProvider: 'DeepSeek', defaultPlan: 'Anthropic', description: 'Anthropic 官方 CLI 编程助手' },
-  { id: 'pi', name: 'Pi', icon: 'P', iconClass: 'pi', format: 'anthropic', defaultProvider: 'DeepSeek', defaultPlan: 'Anthropic', description: '通用编程 Agent 框架' },
-  { id: 'openai-sdk', name: 'OpenAI SDK', icon: 'OA', iconClass: 'oa', format: 'openai', defaultProvider: 'DeepSeek', defaultPlan: 'OpenAI', description: 'OpenAI API 直接调用' },
-  { id: 'anthropic-sdk', name: 'Anthropic SDK', icon: 'AN', iconClass: 'an', format: 'anthropic', defaultProvider: 'DeepSeek', defaultPlan: 'Anthropic', description: 'Anthropic API 直接调用' },
+  { id: 'claude-code', name: 'Claude Code', icon: 'C', iconClass: 'cc', format: 'anthropic', defaultProvider: 'DeepSeek', defaultPlan: 'Anthropic', descriptionKey: 'quickSetup.client.claudeCodeDesc' },
+  { id: 'pi', name: 'Pi', icon: 'P', iconClass: 'pi', format: 'anthropic', defaultProvider: 'DeepSeek', defaultPlan: 'Anthropic', descriptionKey: 'quickSetup.client.piDesc' },
+  { id: 'openai-sdk', name: 'OpenAI SDK', icon: 'OA', iconClass: 'oa', format: 'openai', defaultProvider: 'DeepSeek', defaultPlan: 'OpenAI', descriptionKey: 'quickSetup.client.openaiSdkDesc' },
+  { id: 'anthropic-sdk', name: 'Anthropic SDK', icon: 'AN', iconClass: 'an', format: 'anthropic', defaultProvider: 'DeepSeek', defaultPlan: 'Anthropic', descriptionKey: 'quickSetup.client.anthropicSdkDesc' },
 ]
 
 export const PATCH_GROUPS: PatchGroup[] = [
   {
     key: 'deepseek_anthropic',
-    label: 'DeepSeek 兼容 (Anthropic)',
+    labelKey: 'quickSetup.patch.deepseekAnthropic',
     items: [
-      { id: 'thinking-param', name: 'Thinking 参数', desc: '自动补 thinking 参数' },
-      { id: 'cache-control', name: 'Cache Control', desc: '剥离 cache_control' },
-      { id: 'thinking-blocks', name: 'Thinking Blocks', desc: '补缺失的 thinking block' },
-      { id: 'orphan-tool-results', name: '孤儿 Tool Result', desc: '清理孤儿 tool_result' },
+      { id: 'thinking-param', nameKey: 'quickSetup.patch.thinkingParam', descKey: 'quickSetup.patch.thinkingParamDesc' },
+      { id: 'cache-control', nameKey: 'quickSetup.patch.cacheControl', descKey: 'quickSetup.patch.cacheControlDesc' },
+      { id: 'thinking-blocks', nameKey: 'quickSetup.patch.thinkingBlocks', descKey: 'quickSetup.patch.thinkingBlocksDesc' },
+      { id: 'orphan-tool-results', nameKey: 'quickSetup.patch.orphanToolResult', descKey: 'quickSetup.patch.orphanToolResultDesc' },
     ],
   },
   {
     key: 'deepseek_openai',
-    label: 'DeepSeek 兼容 (OpenAI)',
+    labelKey: 'quickSetup.patch.deepseekOpenai',
     items: [
-      { id: 'non-ds-tools', name: '非DS Tool 降级', desc: '将非DS生成的 tool_calls 降级为 text' },
-      { id: 'orphan-tool-results-oa', name: '孤儿 Tool Result', desc: 'OpenAI 格式孤儿处理' },
+      { id: 'non-ds-tools', nameKey: 'quickSetup.patch.nonDsTools', descKey: 'quickSetup.patch.nonDsToolsDesc' },
+      { id: 'orphan-tool-results-oa', nameKey: 'quickSetup.patch.orphanToolResultOa', descKey: 'quickSetup.patch.orphanToolResultOaDesc' },
     ],
   },
   {
     key: 'general',
-    label: '通用兼容',
+    labelKey: 'quickSetup.patch.general',
     items: [
-      { id: 'developer-role', name: 'Developer Role', desc: 'developer role 转 system' },
+      { id: 'developer-role', nameKey: 'quickSetup.patch.developerRole', descKey: 'quickSetup.patch.developerRoleDesc' },
     ],
   },
 ]
