@@ -88,7 +88,16 @@ export const CONTEXT_WINDOW_OPTIONS = [
 /** Default context window per model name pattern */
 export function getDefaultContextWindow(modelName: string): number {
   const m = modelName.toLowerCase()
-  if (m.includes('v4') || m.includes('v3.2') || m.includes('r1') || m.includes('reasoner')) return 1000000
+  // 1M context window models
+  if (
+    m.includes('v4') ||           // DeepSeek v4
+    m.includes('v3.2') ||         // DeepSeek V3.2
+    m.includes('r1') ||           // DeepSeek R1
+    m.includes('reasoner') ||     // OpenAI reasoner
+    m.includes('minimax-m2') ||   // MiniMax M2.x series
+    m.includes('qwen3.6')         // Qwen 3.6 series
+  ) return 1000000
+  // Named context sizes
   if (m.includes('128k')) return 128000
   if (m.includes('32k')) return 32000
   if (m.includes('8k')) return 8000

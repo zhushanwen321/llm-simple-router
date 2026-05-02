@@ -260,7 +260,7 @@ import { toast } from 'vue-sonner'
 import * as z from 'zod'
 import { api, getApiMessage, type ProviderPayload, type ProviderGroup } from '@/api/client'
 import type { Provider, ModelInfo } from '@/types/mapping'
-import { DEFAULT_CONTEXT_WINDOW } from '@/constants'
+import { DEFAULT_CONTEXT_WINDOW, getDefaultContextWindow } from '@/constants'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -390,7 +390,7 @@ function onPresetChange() {
   form.value.base_url = preset.baseUrl
   form.value.models = preset.models.map(name => ({
     name,
-    context_window: DEFAULT_CONTEXT_WINDOW,
+    context_window: getDefaultContextWindow(name),
     patches: getDefaultPatches(name, preset.apiType),
   }))
 }
