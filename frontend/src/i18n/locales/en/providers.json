@@ -59,7 +59,7 @@
     "apiKeyRequired": "Please enter API Key",
     "concurrencyRange": "Range {min}-{max}",
     "negativeNotAllowed": "Cannot be negative",
-    "queueSizeRange": "Range 1-{max}"
+    "queueSizeRange": "Range {min}-{max}"
   },
   "confirmDelete": {
     "title": "Confirm Delete",
@@ -79,10 +79,8 @@
     "deleteFailed": "Failed to delete provider",
     "reloadFailed": "Reload failed",
     "reloadSuccess": "Plugin reload complete: {pluginCount} plugins, {rulesCount} rules",
-    "cascadeClean": "cleaned",
-    "cascadeDisable": "disabled",
-    "cascadeGroups": "groups",
-    "cascadeReferences": "group references",
-    "cascadeAuto": "Auto-{parts}"
+    "cascadeClean": "cleaned {count} group references",
+    "cascadeDisable": "disabled {count} groups",
+    "cascadeAuto": "Auto-{actions}"
   }
 }

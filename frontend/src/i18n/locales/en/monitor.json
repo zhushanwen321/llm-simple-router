@@ -24,7 +24,7 @@
   },
   "concurrencyPanel": {
     "noData": "No concurrency data",
-    "adaptive": "adaptive",
+    "adaptive": "Adaptive",
     "unlimited": "Unlimited",
     "queued": "Queued: {count}",
     "queueLimit": "Queue limit: {limit}"

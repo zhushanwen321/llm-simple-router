@@ -59,7 +59,7 @@
     "apiKeyRequired": "请输入 API Key",
     "concurrencyRange": "范围 {min}-{max}",
     "negativeNotAllowed": "不能为负数",
-    "queueSizeRange": "范围 1-{max}"
+    "queueSizeRange": "范围 {min}-{max}"
   },
   "confirmDelete": {
     "title": "确认删除",
@@ -79,10 +79,8 @@
     "deleteFailed": "删除供应商失败",
     "reloadFailed": "重载失败",
     "reloadSuccess": "插件重载完成：{pluginCount} 个插件，{rulesCount} 条规则",
-    "cascadeClean": "清理",
-    "cascadeDisable": "禁用",
-    "cascadeGroups": "个分组",
-    "cascadeReferences": "个分组的引用",
-    "cascadeAuto": "已自动{parts}"
+    "cascadeClean": "清理 {count} 个分组的引用",
+    "cascadeDisable": "禁用 {count} 个分组",
+    "cascadeAuto": "已自动{actions}"
   }
 }

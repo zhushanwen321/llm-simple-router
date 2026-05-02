@@ -317,11 +317,11 @@ const { transformForm, loadTransformRules, saveTransformRules, handleDeleteTrans
 const copiedId = ref<string | null>(null)
 const reloading = ref(false)
 const MASK_VISIBLE_LEN = 7, MASK_ASTERISK_COUNT = 7, COPY_FEEDBACK_MS = 2000
-const providerSchema = z.object({
-  name: z.string().min(1, '请输入名称').regex(/^[a-zA-Z0-9_-]+$/, '仅允许英文、数字、横线和下划线'),
-  base_url: z.string().min(1, '请输入 Base URL').url('请输入合法的 URL'),
-})
 function validate(): boolean {
+  const providerSchema = z.object({
+    name: z.string().min(1, t('providers.validation.nameRequired')).regex(/^[a-zA-Z0-9_-]+$/, t('providers.validation.namePattern')),
+    base_url: z.string().min(1, t('providers.validation.baseUrlRequired')).url(t('providers.validation.baseUrlInvalid')),
+  })
   const errs: Record<string, string> = {}
   const result = providerSchema.safeParse({ name: form.value.name.trim(), base_url: form.value.base_url.trim() })
   if (!result.success) {
@@ -330,13 +330,13 @@ function validate(): boolean {
       if (!errs[field]) errs[field] = issue.message
     }
   }
-  if (!editingId.value && !form.value.api_key.trim()) errs.api_key = '请输入 API Key'
+  if (!editingId.value && !form.value.api_key.trim()) errs.api_key = t('providers.validation.apiKeyRequired')
   if (concurrencyMode.value !== 'none') {
     const mc = form.value.max_concurrency
-    if (!mc || mc < 1 || mc > MAX_CONCURRENCY) errs.max_concurrency = `范围 1-${MAX_CONCURRENCY}`
-    if (form.value.queue_timeout_ms < 0) errs.queue_timeout_ms = '不能为负数'
+    if (!mc || mc < 1 || mc > MAX_CONCURRENCY) errs.max_concurrency = t('providers.validation.concurrencyRange', { min: 1, max: MAX_CONCURRENCY })
+    if (form.value.queue_timeout_ms < 0) errs.queue_timeout_ms = t('providers.validation.negativeNotAllowed')
     const qs = form.value.max_queue_size
-    if (!qs || qs < 1 || qs > MAX_QUEUE_SIZE) errs.max_queue_size = `范围 1-${MAX_QUEUE_SIZE}`
+    if (!qs || qs < 1 || qs > MAX_QUEUE_SIZE) errs.max_queue_size = t('providers.validation.queueSizeRange', { min: 1, max: MAX_QUEUE_SIZE })
   }
   errors.value = errs
   return Object.keys(errs).length === 0
@@ -387,7 +387,7 @@ async function loadProviders() {
     providers.value = data
   } catch (e: unknown) {
     console.error('Failed to load providers:', e)
-    toast.error(getApiMessage(e, '加载供应商失败'))
+    toast.error(getApiMessage(e, t('providers.toast.loadFailed')))
   }
 }
 function addModel() {
@@ -479,7 +479,7 @@ async function handleSave() {
     await loadProviders()
   } catch (e: unknown) {
     console.error('Failed to save provider:', e)
-    toast.error(getApiMessage(e, '保存供应商失败'))
+    toast.error(getApiMessage(e, t('providers.toast.saveFailed')))
   }
 }
 function confirmDelete(p: Provider) {
@@ -509,14 +509,14 @@ async function handleToggle() {
       const disabled = res.cascadedGroups.filter((g: { disabled: boolean }) => g.disabled).length
       const cleaned = res.cascadedGroups.length - disabled
       const parts: string[] = []
-      if (cleaned > 0) parts.push(`清理 ${cleaned} 个分组的引用`)
-      if (disabled > 0) parts.push(`禁用 ${disabled} 个分组`)
-      toast.warning(`已自动${parts.join('、')}`)
+      if (cleaned > 0) parts.push(t('providers.toast.cascadeClean', { count: cleaned }))
+      if (disabled > 0) parts.push(t('providers.toast.cascadeDisable', { count: disabled }))
+      toast.warning(t('providers.toast.cascadeAuto', { actions: parts.join(', ') }))
     }
     await loadProviders()
   } catch (e: unknown) {
     console.error('Failed to toggle provider:', e)
-    toast.error(getApiMessage(e, '切换状态失败'))
+    toast.error(getApiMessage(e, t('providers.toast.toggleFailed')))
   }
 }
 async function handleDelete() {
@@ -528,16 +528,16 @@ async function handleDelete() {
     await loadProviders()
   } catch (e: unknown) {
     console.error('Failed to delete provider:', e)
-    toast.error(getApiMessage(e, '删除供应商失败'))
+    toast.error(getApiMessage(e, t('providers.toast.deleteFailed')))
   }
 }
 async function handleReload() {
   reloading.value = true
   try {
     const result = await api.reloadTransformRules()
-    toast.success(`插件重载完成：${result.loadedPlugins.length} 个插件，${result.rulesCount} 条规则`)
+    toast.success(t('providers.toast.reloadSuccess', { pluginCount: result.loadedPlugins.length, rulesCount: result.rulesCount }))
   } catch (e: unknown) {
-    toast.error(getApiMessage(e, '重载失败'))
+    toast.error(getApiMessage(e, t('providers.toast.reloadFailed')))
   } finally {
     reloading.value = false
   }

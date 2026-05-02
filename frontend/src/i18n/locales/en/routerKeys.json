@@ -22,5 +22,5 @@
   "loadFailed": "Failed to load data",
   "saveFailed": "Failed to save key",
   "deleteFailed": "Failed to delete key",
-  "nameRequired": "Name is required"
+  "nameRequired": "Please enter a name"
 }
