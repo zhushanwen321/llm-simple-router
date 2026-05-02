@@ -213,9 +213,11 @@ async function saveAll() {
         // New entry
         try {
           const ruleJson = JSON.stringify({ targets: entry.targets })
-          await api.createMappingGroup({ client_model: entry.clientModel, rule: ruleJson })
-          // Toggle active if disabled
-          // (createMappingGroup defaults to active, so only need to toggle if user set inactive)
+          const result = await api.createMappingGroup({ client_model: entry.clientModel, rule: ruleJson })
+          // Toggle active if user set inactive (create defaults to active)
+          if (!entry.active && result.id) {
+            await api.toggleMappingGroup(result.id)
+          }
         } catch (e: unknown) {
           errors.push(`创建 ${entry.clientModel} 失败: ${getApiMessage(e, "")}`)
         }
