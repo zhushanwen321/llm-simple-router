@@ -63,6 +63,8 @@ export function useQuickSetup() {
   const allProviders = ref<ApiProvider[]>([])
 
   // --- Computed ---
+  const isCustomProvider = computed(() => selectedGroup.value === '__custom__')
+
   const currentClient = computed(() =>
     CLIENTS.find(c => c.id === clientType.value),
   )
@@ -74,7 +76,8 @@ export function useQuickSetup() {
     return group.presets.find(p => p.plan === selectedPlan.value)
   })
 
-  const baseUrl = computed(() => currentPreset.value?.baseUrl ?? '')
+  const customBaseUrl = ref('')
+  const baseUrl = computed(() => isCustomProvider.value ? customBaseUrl.value : (currentPreset.value?.baseUrl ?? ''))
 
   const availablePlans = computed(() => {
     const group = providerGroups.value.find(g => g.group === selectedGroup.value)
@@ -132,6 +135,16 @@ export function useQuickSetup() {
       enabled: true,
       patches: getDefaultPatches(name, preset.apiType),
     }))
+  }
+
+  // --- Custom model management ---
+  function addCustomModel(name: string, contextWindow = 128000) {
+    modelConfigs.value.push({
+      name,
+      contextWindow,
+      enabled: true,
+      patches: getDefaultPatches(name, apiType.value),
+    })
   }
 
   // --- Mappings ---
@@ -231,16 +244,22 @@ export function useQuickSetup() {
     selectedPlan.value = ''
     modelConfigs.value = []
 
-    const groupData = providerGroups.value.find(g => g.group === group)
-    if (groupData && groupData.presets.length > 0) {
-      const client = currentClient.value
-      const match = client
-        ? groupData.presets.find(p => p.apiType === client.format)
-        : null
-      const preset = match ?? groupData.presets[0]
-      selectedPlan.value = preset.plan
-      apiType.value = preset.apiType as 'openai' | 'anthropic'
-      initModels(preset)
+    if (group === '__custom__') {
+      apiType.value = 'openai'
+      customBaseUrl.value = ''
+      modelConfigs.value = []
+    } else {
+      const groupData = providerGroups.value.find(g => g.group === group)
+      if (groupData && groupData.presets.length > 0) {
+        const client = currentClient.value
+        const match = client
+          ? groupData.presets.find(p => p.apiType === client.format)
+          : null
+        const preset = match ?? groupData.presets[0]
+        selectedPlan.value = preset.plan
+        apiType.value = preset.apiType as 'openai' | 'anthropic'
+        initModels(preset)
+      }
     }
 
     updateMappings()
@@ -271,7 +290,6 @@ export function useQuickSetup() {
     else next.delete(name)
     selectedRetryRules.value = next
   }
-
   // --- Mapping editing ---
   function updateMappingTargets(index: number, targets: MappingTarget[]) {
     const next = [...mappingEntries.value]
@@ -358,7 +376,9 @@ export function useQuickSetup() {
     try {
       const payload: QuickSetupPayload = {
         provider: {
-          name: `${toProviderName(selectedGroup.value)}-${toProviderName(selectedPlan.value)}`,
+          name: isCustomProvider.value
+            ? `custom-${Date.now()}`
+            : `${toProviderName(selectedGroup.value)}-${toProviderName(selectedPlan.value)}`,
           api_type: apiType.value,
           base_url: baseUrl.value,
           api_key: apiKey.value.trim(),
@@ -450,7 +470,7 @@ export function useQuickSetup() {
     apiType, apiKey, modelConfigs, mappingEntries,
     allRecommendedRules, recommendedRules,
     selectedRetryRules, saving, connectionStatus,
-    currentClient, currentPreset, baseUrl,
+    currentClient, currentPreset, baseUrl, customBaseUrl, isCustomProvider,
     availablePlans, isNonOpenaiEndpoint,
     concurrencyMode, maxConcurrency, queueTimeoutMs, maxQueueSize,
     transformInjectHeaders, transformDropFields, transformRequestDefaults,
@@ -459,5 +479,6 @@ export function useQuickSetup() {
     initModels, getDefaultPatches, updateMappings,
     updateMappingTargets, toggleMappingActive, addMappingEntry, removeMappingEntry,
     toggleRetryRule, onConcurrencyModeChange, testConnection, submit,
+    addCustomModel,
   }
 }

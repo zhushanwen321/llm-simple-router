@@ -101,7 +101,7 @@
               <Select v-model="presetGroup" @update:model-value="onGroupChange">
                 <SelectTrigger class="flex-1 border-primary/40"><SelectValue placeholder="选择供应商模板" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__custom__">✨ 自定义</SelectItem>
+                  <SelectItem value="__custom__">自定义</SelectItem>
                   <SelectItem v-for="g in providerPresets" :key="g.group" :value="g.group">{{ g.group }}</SelectItem>
                 </SelectContent>
               </Select>
@@ -182,52 +182,30 @@
             <!-- 并发控制 -->
             <div class="border rounded-md p-3 space-y-3">
               <div class="text-xs font-medium text-muted-foreground">并发控制</div>
-              <div class="space-y-2">
-                <div>
-                  <Label class="text-[11px] text-muted-foreground">模式</Label>
-                  <Select v-model="concurrencyMode" @update:model-value="(v: unknown) => onConcurrencyModeChange(v as 'auto' | 'manual' | 'none')" class="mt-0.5">
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="auto">自动（自适应）</SelectItem>
-                      <SelectItem value="manual">手动</SelectItem>
-                      <SelectItem value="none">无</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <template v-if="concurrencyMode !== 'none'">
-                  <div>
-                    <Label class="text-[11px] text-muted-foreground">最大并发</Label>
-                    <Input v-model.number="form.max_concurrency" type="number" min="1" :max="MAX_CONCURRENCY" :placeholder="concurrencyMode === 'auto' ? '10' : '3'" class="mt-0.5 h-8 text-xs" @input="delete errors.max_concurrency" />
-                  </div>
-                  <div>
-                    <Label class="text-[11px] text-muted-foreground">队列超时(ms)</Label>
-                    <Input v-model.number="form.queue_timeout_ms" type="number" min="0" placeholder="0=无限" class="mt-0.5 h-8 text-xs" @input="delete errors.queue_timeout_ms" />
-                  </div>
-                  <div>
-                    <Label class="text-[11px] text-muted-foreground">最大队列</Label>
-                    <Input v-model.number="form.max_queue_size" type="number" min="1" :max="MAX_QUEUE_SIZE" :placeholder="DEFAULT_QUEUE_SIZE" class="mt-0.5 h-8 text-xs" @input="delete errors.max_queue_size" />
-                  </div>
-                </template>
-              </div>
+              <ConcurrencyControl
+                :mode="concurrencyMode"
+                :max-concurrency="form.max_concurrency"
+                :queue-timeout-ms="form.queue_timeout_ms"
+                :max-queue-size="form.max_queue_size"
+                compact
+                @update:mode="(v: unknown) => onConcurrencyModeChange(v as 'auto' | 'manual' | 'none')"
+                @update:max-concurrency="form.max_concurrency = $event"
+                @update:queue-timeout-ms="form.queue_timeout_ms = $event"
+                @update:max-queue-size="form.max_queue_size = $event"
+              />
             </div>
 
             <!-- 转换规则 -->
             <div class="border rounded-md p-3 space-y-3">
               <div class="text-xs font-medium text-muted-foreground">转换规则</div>
-              <div class="space-y-2">
-                <div>
-                  <Label class="text-[11px] text-muted-foreground">注入 Headers (JSON)</Label>
-                  <Input v-model="transformForm.injectHeadersInput" placeholder='{"x-custom": "value"}' class="mt-0.5 h-8 text-xs font-mono" />
-                </div>
-                <div>
-                  <Label class="text-[11px] text-muted-foreground">丢弃字段（逗号分隔）</Label>
-                  <Input v-model="transformForm.dropFieldsInput" placeholder="logprobs, frequency_penalty" class="mt-0.5 h-8 text-xs font-mono" />
-                </div>
-                <div>
-                  <Label class="text-[11px] text-muted-foreground">请求默认值 (JSON)</Label>
-                  <Input v-model="transformForm.requestDefaultsInput" placeholder='{"max_tokens": 4096}' class="mt-0.5 h-8 text-xs font-mono" />
-                </div>
-              </div>
+              <TransformRulesForm
+                :inject-headers="transformForm.injectHeadersInput"
+                :drop-fields="transformForm.dropFieldsInput"
+                :request-defaults="transformForm.requestDefaultsInput"
+                @update:inject-headers="transformForm.injectHeadersInput = $event"
+                @update:drop-fields="transformForm.dropFieldsInput = $event"
+                @update:request-defaults="transformForm.requestDefaultsInput = $event"
+              />
             </div>
           </div>
 
@@ -290,6 +268,8 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog'
 import { RotateCw, Copy, Check } from 'lucide-vue-next'
+import ConcurrencyControl from '@/components/shared/ConcurrencyControl.vue'
+import TransformRulesForm from '@/components/shared/TransformRulesForm.vue'
 import ModelCard from '@/components/quick-setup/ModelCard.vue'
 import type { ModelConfig } from '@/components/quick-setup/types'
 import { useTransformRules } from '@/composables/useTransformRules'

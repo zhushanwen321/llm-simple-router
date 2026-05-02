@@ -47,33 +47,54 @@
             <Select :model-value="selectedGroup" @update:model-value="(v: unknown) => onProviderChange(v as string)">
               <SelectTrigger><SelectValue placeholder="选择" /></SelectTrigger>
               <SelectContent>
+                <SelectItem value="__custom__">自定义</SelectItem>
                 <SelectItem v-for="g in providerGroups" :key="g.group" :value="g.group">{{ g.group }}</SelectItem>
               </SelectContent>
             </Select>
           </div>
-          <div class="w-28 space-y-1">
-            <Label class="text-xs text-muted-foreground">套餐</Label>
-            <Select :model-value="selectedPlan" @update:model-value="(v: unknown) => onPlanChange(v as string)">
-              <SelectTrigger><SelectValue placeholder="选择" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem v-for="p in availablePlans" :key="p.plan" :value="p.plan">{{ p.plan }}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div class="w-28 space-y-1">
-            <Label class="text-xs text-muted-foreground">格式</Label>
-            <Select v-model="apiType">
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="anthropic">Anthropic</SelectItem>
-                <SelectItem value="openai">OpenAI</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div class="flex-1 max-w-[280px] space-y-1">
-            <Label class="text-xs text-muted-foreground">Base URL</Label>
-            <Input :model-value="baseUrl" readonly class="font-mono text-xs h-9" />
-          </div>
+          <!-- Custom mode: show format + editable base url -->
+          <template v-if="isCustomProvider">
+            <div class="w-28 space-y-1">
+              <Label class="text-xs text-muted-foreground">格式</Label>
+              <Select v-model="apiType">
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="anthropic">Anthropic</SelectItem>
+                  <SelectItem value="openai">OpenAI</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div class="flex-1 max-w-[280px] space-y-1">
+              <Label class="text-xs text-muted-foreground">Base URL</Label>
+              <Input v-model="customBaseUrl" placeholder="https://api.example.com/v1" class="font-mono text-xs h-9" />
+            </div>
+          </template>
+          <!-- Preset mode: show plan + readonly base url -->
+          <template v-else>
+            <div class="w-28 space-y-1">
+              <Label class="text-xs text-muted-foreground">套餐</Label>
+              <Select :model-value="selectedPlan" @update:model-value="(v: unknown) => onPlanChange(v as string)">
+                <SelectTrigger><SelectValue placeholder="选择" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem v-for="p in availablePlans" :key="p.plan" :value="p.plan">{{ p.plan }}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div class="w-28 space-y-1">
+              <Label class="text-xs text-muted-foreground">格式</Label>
+              <Select v-model="apiType">
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="anthropic">Anthropic</SelectItem>
+                  <SelectItem value="openai">OpenAI</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div class="flex-1 max-w-[280px] space-y-1">
+              <Label class="text-xs text-muted-foreground">Base URL</Label>
+              <Input :model-value="baseUrl" readonly class="font-mono text-xs h-9" />
+            </div>
+          </template>
           <div class="w-72 space-y-1">
             <Label class="text-xs text-muted-foreground">API Key</Label>
             <Input v-model="apiKey" type="password" placeholder="输入 API Key" class="h-9" />
@@ -86,7 +107,7 @@
               </svg>
               测试中
             </template>
-            <template v-else-if="connectionStatus === 'ok'">✓ 已连接</template>
+            <template v-else-if="connectionStatus === 'ok'">已连接</template>
             <template v-else>测试</template>
           </Button>
         </div>
@@ -112,6 +133,11 @@
               @remove="removeModel(index)"
             />
           </div>
+          <!-- Custom mode: add model input -->
+          <div v-if="isCustomProvider" class="flex gap-2 mt-2">
+            <Input v-model="customModelInput" placeholder="输入模型名称" @keydown.enter.prevent="handleAddCustomModel" class="flex-1" />
+            <Button type="button" variant="outline" size="sm" @click="handleAddCustomModel" :disabled="!customModelInput.trim()">添加</Button>
+          </div>
         </div>
 
         <!-- Line 3: Concurrency Control -->
@@ -119,34 +145,16 @@
           <div class="flex items-center justify-between mb-2">
             <span class="text-xs font-medium text-muted-foreground">并发控制</span>
           </div>
-          <div class="flex items-end gap-3">
-            <div class="w-36 space-y-1">
-              <Label class="text-xs text-muted-foreground">模式</Label>
-              <Select :model-value="concurrencyMode" @update:model-value="(v: unknown) => onConcurrencyModeChange(v as ConcurrencyMode)">
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="auto">自动（自适应）</SelectItem>
-                  <SelectItem value="manual">手动</SelectItem>
-                  <SelectItem value="none">无限制</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div v-if="concurrencyMode !== 'none'" class="w-28 space-y-1">
-              <Label class="text-xs text-muted-foreground">最大并发</Label>
-              <Input v-model.number="maxConcurrency" type="number" min="1" max="100" class="h-9" />
-            </div>
-            <div v-if="concurrencyMode !== 'none'" class="w-32 space-y-1">
-              <Label class="text-xs text-muted-foreground">队列超时(ms)</Label>
-              <Input v-model.number="queueTimeoutMs" type="number" min="0" placeholder="0=无限" class="h-9" />
-            </div>
-            <div v-if="concurrencyMode !== 'none'" class="w-32 space-y-1">
-              <Label class="text-xs text-muted-foreground">最大队列</Label>
-              <Input v-model.number="maxQueueSize" type="number" min="1" max="1000" class="h-9" />
-            </div>
-            <div v-if="concurrencyMode === 'auto'" class="text-[10px] text-muted-foreground leading-snug">
-              自适应模式会根据错误率自动调整并发度
-            </div>
-          </div>
+          <ConcurrencyControl
+            :mode="concurrencyMode"
+            :max-concurrency="maxConcurrency"
+            :queue-timeout-ms="queueTimeoutMs"
+            :max-queue-size="maxQueueSize"
+            @update:mode="onConcurrencyModeChange"
+            @update:max-concurrency="maxConcurrency = $event"
+            @update:queue-timeout-ms="queueTimeoutMs = $event"
+            @update:max-queue-size="maxQueueSize = $event"
+          />
         </div>
       </CardContent>
     </Card>
@@ -229,19 +237,15 @@
           <CardHeader class="pb-3">
             <CardTitle class="text-sm font-medium">转换规则</CardTitle>
           </CardHeader>
-          <CardContent class="space-y-2">
-            <div>
-              <Label class="text-[11px] text-muted-foreground">注入 Headers (JSON)</Label>
-              <Input v-model="transformInjectHeaders" placeholder='{"x-custom": "value"}' class="mt-0.5 h-8 text-xs font-mono" />
-            </div>
-            <div>
-              <Label class="text-[11px] text-muted-foreground">丢弃字段（逗号分隔）</Label>
-              <Input v-model="transformDropFields" placeholder="logprobs, frequency_penalty" class="mt-0.5 h-8 text-xs font-mono" />
-            </div>
-            <div>
-              <Label class="text-[11px] text-muted-foreground">请求默认值 (JSON)</Label>
-              <Input v-model="transformRequestDefaults" placeholder='{"max_tokens": 4096}' class="mt-0.5 h-8 text-xs font-mono" />
-            </div>
+          <CardContent>
+            <TransformRulesForm
+              :inject-headers="transformInjectHeaders"
+              :drop-fields="transformDropFields"
+              :request-defaults="transformRequestDefaults"
+              @update:inject-headers="transformInjectHeaders = $event"
+              @update:drop-fields="transformDropFields = $event"
+              @update:request-defaults="transformRequestDefaults = $event"
+            />
           </CardContent>
         </Card>
       </div>
@@ -254,7 +258,7 @@
       <template v-if="selectedGroup">
         <Badge variant="secondary" class="text-[10px]">{{ clientTypeLabel }}</Badge>
         <span class="text-muted-foreground/50">→</span>
-        <Badge variant="secondary" class="text-[10px]">{{ selectedGroup }}</Badge>
+        <Badge variant="secondary" class="text-[10px]">{{ isCustomProvider ? '自定义' : selectedGroup }}</Badge>
       </template>
       <template v-if="enabledModelCount > 0">
         <span class="text-muted-foreground/50 mx-0.5">·</span>
@@ -286,11 +290,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import { toast } from 'vue-sonner'
 import { useQuickSetup, type ConcurrencyMode } from '@/composables/useQuickSetup'
 import ModelCard from '@/components/quick-setup/ModelCard.vue'
 import MappingEditor from '@/components/quick-setup/MappingEditor.vue'
+import ConcurrencyControl from '@/components/shared/ConcurrencyControl.vue'
+import TransformRulesForm from '@/components/shared/TransformRulesForm.vue'
 import type { ModelConfig } from '@/components/quick-setup/types'
 import { CLIENTS } from '@/components/quick-setup/types'
 import { Button } from '@/components/ui/button'
@@ -307,13 +313,23 @@ const {
   allRecommendedRules, recommendedRules,
   selectedRetryRules, saving, connectionStatus,
   baseUrl, availablePlans, isNonOpenaiEndpoint,
+  isCustomProvider, customBaseUrl,
   concurrencyMode, maxConcurrency, queueTimeoutMs, maxQueueSize,
   allProviderGroups,
   transformInjectHeaders, transformDropFields, transformRequestDefaults,
   selectClient, onProviderChange, onPlanChange,
   updateMappingTargets, toggleMappingActive, addMappingEntry, removeMappingEntry,
   toggleRetryRule, onConcurrencyModeChange, testConnection, submit,
+  addCustomModel,
 } = useQuickSetup()
+
+const customModelInput = ref('')
+
+function handleAddCustomModel() {
+  if (!customModelInput.value.trim()) return
+  addCustomModel(customModelInput.value.trim())
+  customModelInput.value = ''
+}
 
 const enabledModelCount = computed(() => modelConfigs.value.filter(m => m.enabled).length)
 const clientTypeLabel = computed(() => CLIENTS.find(c => c.id === clientType.value)?.name ?? clientType.value)
