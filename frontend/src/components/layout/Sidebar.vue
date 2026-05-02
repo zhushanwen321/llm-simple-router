@@ -77,7 +77,7 @@
             </div>
             <!-- 底部 -->
             <div class="px-3 py-2 flex justify-between items-center text-xs text-muted-foreground">
-              <span>{{ upgradeStatus?.lastCheckedAt ? t('sidebar.upgrade.checkedAt', { time: parseUtc(upgradeStatus.lastCheckedAt).toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai' }) }) : t('sidebar.upgrade.notChecked') }}</span>
+              <span>{{ upgradeStatus?.lastCheckedAt ? t('sidebar.upgrade.checkedAt', { time: parseUtc(upgradeStatus.lastCheckedAt).toLocaleTimeString(locale === 'zh-CN' ? 'zh-CN' : 'en', { timeZone: 'Asia/Shanghai' }) }) : t('sidebar.upgrade.notChecked') }}</span>
               <Button variant="link" class="text-primary h-auto p-0" @click="handleCheckNow">{{ t('sidebar.upgrade.checkNow') }}</Button>
             </div>
           </PopoverContent>
