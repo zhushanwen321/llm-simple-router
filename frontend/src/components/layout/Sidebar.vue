@@ -177,7 +177,7 @@
         <AlertDialogHeader>
           <AlertDialogTitle>{{ t('sidebar.upgrade.confirmUpgrade', { version: upgradeStatus?.npm.latestVersion }) }}</AlertDialogTitle>
           <AlertDialogDescription>
-            {{ t('sidebar.upgrade.upgradeDesc', { command: `npm install -g llm-simple-router@${upgradeStatus?.npm.latestVersion}` }) }}
+            {{ t('sidebar.upgrade.upgradeDescBefore') }} <code class="bg-muted px-1 py-0.5 rounded text-xs">npm install -g llm-simple-router@{{ upgradeStatus?.npm.latestVersion }}</code>{{ t('sidebar.upgrade.upgradeDescAfter') }}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
