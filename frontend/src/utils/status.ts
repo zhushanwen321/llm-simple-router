@@ -9,11 +9,14 @@ export function statusVariant(status: string): StatusVariant {
   }
 }
 
+import { i18n } from '@/i18n'
+
 export function statusLabel(status: string): string {
+  const { t } = i18n.global
   switch (status) {
-    case 'pending': return '进行中'
-    case 'failed': return '失败'
-    case 'completed': return '完成'
+    case 'pending': return t('common.statusPending')
+    case 'failed': return t('common.statusFailed')
+    case 'completed': return t('common.statusCompleted')
     default: return status
   }
 }
