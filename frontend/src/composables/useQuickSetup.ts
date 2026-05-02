@@ -40,7 +40,7 @@ export function useQuickSetup() {
   const providerGroups = ref<ProviderGroup[]>([])
   const selectedGroup = ref('')
   const selectedPlan = ref('')
-  const apiType = ref<'openai' | 'anthropic'>('anthropic')
+  const apiType = ref<'openai' | 'openai-responses' | 'anthropic'>('anthropic')
   const apiKey = ref('')
   const modelConfigs = ref<ModelConfig[]>([])
   const mappingEntries = ref<MappingEntry[]>([])
@@ -137,7 +137,7 @@ export function useQuickSetup() {
   })
 
   // --- Patch defaults ---
-  function getDefaultPatches(modelName: string, format: 'openai' | 'anthropic'): string[] {
+  function getDefaultPatches(modelName: string, format: 'openai' | 'openai-responses' | 'anthropic'): string[] {
     const patches: string[] = []
     const isDeepseek = modelName.toLowerCase().includes('deepseek')
 
@@ -156,7 +156,7 @@ export function useQuickSetup() {
     return patches
   }
 
-  function initModels(preset: { models: string[]; apiType: 'openai' | 'anthropic' }) {
+  function initModels(preset: { models: string[]; apiType: 'openai' | 'openai-responses' | 'anthropic' }) {
     modelConfigs.value = preset.models.map(name => ({
       name,
       contextWindow: getDefaultContextWindow(name),
@@ -255,7 +255,7 @@ export function useQuickSetup() {
         for (const preset of group.presets) {
           if (preset.plan === client.defaultPlan) {
             selectedPlan.value = preset.plan
-            apiType.value = preset.apiType as 'openai' | 'anthropic'
+            apiType.value = preset.apiType as 'openai' | 'openai-responses' | 'anthropic'
             initModels(preset)
             break
           }
@@ -286,7 +286,7 @@ export function useQuickSetup() {
           : null
         const preset = match ?? groupData.presets[0]
         selectedPlan.value = preset.plan
-        apiType.value = preset.apiType as 'openai' | 'anthropic'
+        apiType.value = preset.apiType as 'openai' | 'openai-responses' | 'anthropic'
         initModels(preset)
       }
     }
@@ -301,7 +301,7 @@ export function useQuickSetup() {
     if (!group) return
     const preset = group.presets.find(p => p.plan === plan)
     if (!preset) return
-    apiType.value = preset.apiType as 'openai' | 'anthropic'
+    apiType.value = preset.apiType as 'openai' | 'openai-responses' | 'anthropic'
     initModels(preset)
     updateMappings()
   }

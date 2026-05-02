@@ -32,7 +32,7 @@
           <TableRow v-for="p in providers" :key="p.id" :class="{ 'opacity-60': !p.is_active }">
             <TableCell class="font-medium">{{ p.name }}</TableCell>
             <TableCell>
-              <Badge variant="secondary">{{ p.api_type }}</Badge>
+              <Badge variant="secondary">{{ API_TYPE_LABELS[p.api_type] ?? p.api_type }}</Badge>
             </TableCell>
             <TableCell class="text-muted-foreground">{{ p.base_url }}</TableCell>
             <TableCell>
@@ -125,8 +125,9 @@
                 <SelectValue :placeholder="t('providers.quickConfig.selectApiType')" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="openai">OpenAI</SelectItem>
-                <SelectItem value="anthropic">Anthropic</SelectItem>
+                <SelectItem value="openai">OpenAI Chat Completions</SelectItem>
+                <SelectItem value="openai-responses">OpenAI Responses</SelectItem>
+                <SelectItem value="anthropic">Anthropic Messages</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -290,6 +291,7 @@ const CONTEXT_WINDOW_OPTIONS = [
   { label: '256K', value: '256000' },
   { label: '1M', value: '1000000' },
 ] as const
+const API_TYPE_LABELS: Record<string, string> = { openai: 'OpenAI Chat Completions', 'openai-responses': 'OpenAI Responses', anthropic: 'Anthropic Messages' }
 const DEFAULT_FORM = { name: '', api_type: 'anthropic', base_url: '', api_key: '', models: [] as ModelInfo[], is_active: true, max_concurrency: DEFAULT_CONCURRENCY_AUTO, queue_timeout_ms: DEFAULT_QUEUE_TIMEOUT_MS, max_queue_size: DEFAULT_QUEUE_SIZE, adaptive_enabled: true }
 const modelInput = ref('')
 const modelContextWindow = ref(DEFAULT_CONTEXT_WINDOW)

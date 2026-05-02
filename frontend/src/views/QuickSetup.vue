@@ -59,8 +59,9 @@
               <Select v-model="apiType">
                 <SelectTrigger class="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="anthropic">Anthropic</SelectItem>
-                  <SelectItem value="openai">OpenAI</SelectItem>
+                  <SelectItem value="anthropic">Anthropic Messages</SelectItem>
+                  <SelectItem value="openai">OpenAI Chat Completions</SelectItem>
+                  <SelectItem value="openai-responses">OpenAI Responses</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -85,8 +86,9 @@
               <Select v-model="apiType">
                 <SelectTrigger class="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="anthropic">Anthropic</SelectItem>
-                  <SelectItem value="openai">OpenAI</SelectItem>
+                  <SelectItem value="anthropic">Anthropic Messages</SelectItem>
+                  <SelectItem value="openai">OpenAI Chat Completions</SelectItem>
+                  <SelectItem value="openai-responses">OpenAI Responses</SelectItem>
                 </SelectContent>
               </Select>
             </div>

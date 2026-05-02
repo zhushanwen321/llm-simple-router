@@ -20,7 +20,7 @@ const API_KEY_PREVIEW_PREFIX_LEN = 4;
 
 const QuickSetupProviderSchema = Type.Object({
   name: Type.String({ minLength: 1 }),
-  api_type: Type.Union([Type.Literal("openai"), Type.Literal("anthropic")]),
+  api_type: Type.Union([Type.Literal("openai"), Type.Literal("openai-responses"), Type.Literal("anthropic")]),
   base_url: Type.String({ minLength: 1 }),
   api_key: Type.String({ minLength: 1 }),
   models: Type.Array(Type.Object({
