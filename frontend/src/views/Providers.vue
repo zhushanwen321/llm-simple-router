@@ -253,7 +253,7 @@
   </div>
 </template>
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { toast } from 'vue-sonner'
 import * as z from 'zod'
 import { api, getApiMessage, type ProviderPayload, type ProviderGroup } from '@/api/client'
@@ -561,10 +561,8 @@ async function handleDelete() {
     await api.deleteProvider(target.id)
     await loadProviders()
   } catch (e: unknown) {
-    console.error('Failed to delete provider:', e)
-    const msg = getApiMessage(e, '删除供应商失败')
-    console.log('toast message:', msg)
-    toast.error(msg)
+    await nextTick()
+    toast.error(getApiMessage(e, '删除供应商失败'))
   }
 }
 async function handleReload() {
