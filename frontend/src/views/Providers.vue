@@ -219,15 +219,16 @@
       </DialogContent>
     </Dialog>
     <!-- Delete Confirm AlertDialog -->
-    <AlertDialog :open="!!deleteTarget" @update:open="(val) => { if (!val) deleteTarget = null }">
+    <AlertDialog :open="!!deleteTarget" @update:open="(val) => { if (!val) { deleteTarget = null; deleteError = '' } }">
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>确认删除</AlertDialogTitle>
           <AlertDialogDescription>确定要删除供应商「{{ deleteTarget?.name }}」吗？此操作不可撤销。</AlertDialogDescription>
         </AlertDialogHeader>
+        <div v-if="deleteError" class="text-sm text-destructive bg-destructive/10 rounded px-3 py-2">{{ deleteError }}</div>
         <AlertDialogFooter>
-          <AlertDialogCancel>取消</AlertDialogCancel>
-          <Button variant="destructive" @click="handleDelete">删除</Button>
+          <AlertDialogCancel @click="deleteError = ''">取消</AlertDialogCancel>
+          <Button variant="destructive" :disabled="!!deleteError" @click="handleDelete">删除</Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -253,7 +254,7 @@
   </div>
 </template>
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
 import * as z from 'zod'
 import { api, getApiMessage, type ProviderPayload, type ProviderGroup } from '@/api/client'
@@ -304,6 +305,7 @@ const providerPresets = ref<ProviderGroup[]>([])
 const dialogOpen = ref(false)
 const editingId = ref<string | null>(null)
 const deleteTarget = ref<Provider | null>(null)
+const deleteError = ref('')
 const toggleTarget = ref<Provider | null>(null)
 const pendingToggleId = ref<string | null>(null)
 const pendingToggleActive = ref<boolean>(false)
@@ -518,6 +520,7 @@ async function handleSave() {
 }
 function confirmDelete(p: Provider) {
   deleteTarget.value = p
+  deleteError.value = ''
 }
 async function confirmToggle(p: Provider) {
   toggleTarget.value = p
@@ -556,14 +559,13 @@ async function handleToggle() {
 async function handleDelete() {
   const target = deleteTarget.value
   if (!target) return
-  deleteTarget.value = null
   try {
     await api.deleteProvider(target.id)
+    deleteTarget.value = null
+    deleteError.value = ''
     await loadProviders()
   } catch (e: unknown) {
-    setTimeout(() => {
-      toast.error(getApiMessage(e, '删除供应商失败'))
-    }, 300)
+    deleteError.value = getApiMessage(e, '删除供应商失败')
   }
 }
 async function handleReload() {
