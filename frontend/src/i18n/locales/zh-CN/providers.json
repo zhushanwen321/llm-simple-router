@@ -1,0 +1,117 @@
+{
+  "title": "供应商",
+  "addProvider": "添加供应商",
+  "editProvider": "编辑供应商",
+  "reloadPlugin": "重载插件",
+  "noProviders": "暂无供应商",
+  "tableHeaders": {
+    "name": "名称",
+    "type": "类型",
+    "baseUrl": "Base URL",
+    "apiKey": "API Key",
+    "models": "模型",
+    "concurrency": "并发",
+    "status": "状态",
+    "actions": "操作"
+  },
+  "quickConfig": {
+    "title": "快速配置",
+    "selectProvider": "选择供应商",
+    "selectPlan": "选择套餐",
+    "selectApiType": "选择 API 类型"
+  },
+  "fields": {
+    "name": "名称",
+    "apiType": "API 类型",
+    "baseUrl": "Base URL",
+    "apiKey": "API Key",
+    "apiKeyPlaceholder": "留空则保持原密钥不变",
+    "availableModels": "可用模型",
+    "modelInputPlaceholder": "输入模型名称，多个用逗号分隔",
+    "context": "上下文",
+    "addModel": "添加"
+  },
+  "concurrency": {
+    "title": "并发控制",
+    "mode": "模式",
+    "selectMode": "选择模式",
+    "autoAdaptive": "自动（自适应）",
+    "manual": "手动",
+    "none": "无限制",
+    "maxConcurrency": "最大并发度",
+    "queueTimeout": "队列超时 (ms)",
+    "queueTimeoutPlaceholder": "0 = 无限等待",
+    "maxQueueSize": "最大队列长度"
+  },
+  "transform": {
+    "title": "转换规则",
+    "injectHeaders": "注入 Headers (JSON)",
+    "dropFields": "丢弃字段（逗号分隔）",
+    "requestDefaults": "请求默认值 (JSON)",
+    "saveRules": "保存规则",
+    "deleteRules": "删除规则",
+    "loadFailed": "加载转换规则失败",
+    "requestDefaultsJsonError": "请求默认值 JSON 格式错误",
+    "injectHeadersJsonError": "注入 Headers JSON 格式错误",
+    "saved": "转换规则已保存",
+    "deleteFailed": "删除规则失败",
+    "deleted": "转换规则已删除"
+  },
+  "validation": {
+    "nameRequired": "请输入名称",
+    "namePattern": "仅允许英文、数字、横线和下划线",
+    "baseUrlRequired": "请输入 Base URL",
+    "baseUrlInvalid": "请输入合法的 URL",
+    "apiKeyRequired": "请输入 API Key",
+    "concurrencyRange": "范围 {min}-{max}",
+    "negativeNotAllowed": "不能为负数",
+    "queueSizeRange": "范围 {min}-{max}"
+  },
+  "confirmDelete": {
+    "title": "确认删除",
+    "message": "确定要删除供应商「{name}」吗？此操作不可撤销。"
+  },
+  "confirmToggle": {
+    "titleDisable": "确认禁用",
+    "titleEnable": "确认启用",
+    "messageDisable": "确定要禁用供应商「{name}」吗？",
+    "messageEnable": "确定要启用供应商「{name}」吗？",
+    "dependencyWarning": "以下映射分组正在使用此供应商："
+  },
+  "shared": {
+    "clientModel": "客户端模型",
+    "targetModel": "目标模型",
+    "targetChain": "目标链",
+    "actions": "操作",
+    "enabled": "启用",
+    "disabled": "已禁用",
+    "level": "{count}级",
+    "overflow": "溢出",
+    "primary": "首选",
+    "backup": "备{n}",
+    "switchOnFail": "失败时切换",
+    "overflowPlaceholder": "可选，上下文超限时切换...",
+    "addFailover": "添加故障转移",
+    "noMappings": "暂无映射",
+    "add": "添加",
+    "autoHint": "自适应模式会根据错误率自动调整并发度",
+    "queueTimeoutPlaceholder": "0=无限",
+    "tagDefault": "默认",
+    "tagAuto": "自动",
+    "tagCustom": "自定义",
+    "tagExisting": "已有",
+    "selectModel": "选择模型...",
+    "unlimited": "无限制"
+  },
+  "toast": {
+    "loadFailed": "加载供应商失败",
+    "saveFailed": "保存供应商失败",
+    "toggleFailed": "切换状态失败",
+    "deleteFailed": "删除供应商失败",
+    "reloadFailed": "重载失败",
+    "reloadSuccess": "插件重载完成：{pluginCount} 个插件，{rulesCount} 条规则",
+    "cascadeClean": "清理 {count} 个分组的引用",
+    "cascadeDisable": "禁用 {count} 个分组",
+    "cascadeAuto": "已自动{actions}"
+  }
+}

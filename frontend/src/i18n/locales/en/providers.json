@@ -1,0 +1,117 @@
+{
+  "title": "Providers",
+  "addProvider": "Add Provider",
+  "editProvider": "Edit Provider",
+  "reloadPlugin": "Reload Plugins",
+  "noProviders": "No providers yet",
+  "tableHeaders": {
+    "name": "Name",
+    "type": "Type",
+    "baseUrl": "Base URL",
+    "apiKey": "API Key",
+    "models": "Models",
+    "concurrency": "Concurrency",
+    "status": "Status",
+    "actions": "Actions"
+  },
+  "quickConfig": {
+    "title": "Quick Config",
+    "selectProvider": "Select Provider",
+    "selectPlan": "Select Plan",
+    "selectApiType": "Select API Type"
+  },
+  "fields": {
+    "name": "Name",
+    "apiType": "API Type",
+    "baseUrl": "Base URL",
+    "apiKey": "API Key",
+    "apiKeyPlaceholder": "Leave empty to keep the original key",
+    "availableModels": "Available Models",
+    "modelInputPlaceholder": "Enter model names, separated by commas",
+    "context": "Context",
+    "addModel": "Add"
+  },
+  "concurrency": {
+    "title": "Concurrency Control",
+    "mode": "Mode",
+    "selectMode": "Select Mode",
+    "autoAdaptive": "Auto (Adaptive)",
+    "manual": "Manual",
+    "none": "Unlimited",
+    "maxConcurrency": "Max Concurrency",
+    "queueTimeout": "Queue Timeout (ms)",
+    "queueTimeoutPlaceholder": "0 = unlimited wait",
+    "maxQueueSize": "Max Queue Size"
+  },
+  "transform": {
+    "title": "Transform Rules",
+    "injectHeaders": "Inject Headers (JSON)",
+    "dropFields": "Drop Fields (comma-separated)",
+    "requestDefaults": "Request Defaults (JSON)",
+    "saveRules": "Save Rules",
+    "deleteRules": "Delete Rules",
+    "loadFailed": "Failed to load transform rules",
+    "requestDefaultsJsonError": "Invalid JSON format for request defaults",
+    "injectHeadersJsonError": "Invalid JSON format for inject headers",
+    "saved": "Transform rules saved",
+    "deleteFailed": "Failed to delete rules",
+    "deleted": "Transform rules deleted"
+  },
+  "validation": {
+    "nameRequired": "Please enter a name",
+    "namePattern": "Only letters, numbers, hyphens and underscores allowed",
+    "baseUrlRequired": "Please enter Base URL",
+    "baseUrlInvalid": "Please enter a valid URL",
+    "apiKeyRequired": "Please enter API Key",
+    "concurrencyRange": "Range {min}-{max}",
+    "negativeNotAllowed": "Cannot be negative",
+    "queueSizeRange": "Range {min}-{max}"
+  },
+  "confirmDelete": {
+    "title": "Confirm Delete",
+    "message": "Are you sure you want to delete provider \"{name}\"? This action cannot be undone."
+  },
+  "confirmToggle": {
+    "titleDisable": "Confirm Disable",
+    "titleEnable": "Confirm Enable",
+    "messageDisable": "Are you sure you want to disable provider \"{name}\"?",
+    "messageEnable": "Are you sure you want to enable provider \"{name}\"?",
+    "dependencyWarning": "The following mapping groups are using this provider:"
+  },
+  "shared": {
+    "clientModel": "Client Model",
+    "targetModel": "Target Model",
+    "targetChain": "Target Chain",
+    "actions": "Actions",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "level": "{count} levels",
+    "overflow": "Overflow",
+    "primary": "Primary",
+    "backup": "Backup {n}",
+    "switchOnFail": "Switch on failure",
+    "overflowPlaceholder": "Optional, switch when context exceeds limit...",
+    "addFailover": "Add Failover",
+    "noMappings": "No mappings yet",
+    "add": "Add",
+    "autoHint": "Adaptive mode auto-adjusts concurrency based on error rate",
+    "queueTimeoutPlaceholder": "0=unlimited",
+    "tagDefault": "Default",
+    "tagAuto": "Auto",
+    "tagCustom": "Custom",
+    "tagExisting": "Existing",
+    "selectModel": "Select model...",
+    "unlimited": "Unlimited"
+  },
+  "toast": {
+    "loadFailed": "Failed to load providers",
+    "saveFailed": "Failed to save provider",
+    "toggleFailed": "Failed to toggle status",
+    "deleteFailed": "Failed to delete provider",
+    "reloadFailed": "Reload failed",
+    "reloadSuccess": "Plugin reload complete: {pluginCount} plugins, {rulesCount} rules",
+    "cascadeClean": "cleaned {count} group references",
+    "cascadeDisable": "disabled {count} groups",
+    "cascadeAuto": "Auto-{actions}"
+  }
+}

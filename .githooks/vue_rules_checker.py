@@ -285,6 +285,48 @@ def check_vue_file(content: str, relative_path: str) -> tuple[int, list[str]]:
         exit_code = comp_exit
     issues.extend(comp_issues)
 
+    # 检查 6: 禁止在模板中硬编码中文（i18n 规范）
+    if '/i18n/' not in relative_path and 'i18n/' not in relative_path:
+        in_template = False
+        for i, line in enumerate(lines, 1):
+            if '<template' in line and '</template>' not in line:
+                in_template = True
+                continue
+            if '</template>' in line:
+                in_template = False
+                continue
+            if not in_template:
+                continue
+
+            stripped = line.strip()
+            if not stripped or stripped.startswith('<!--'):
+                continue
+
+            # 检查是否包含中文字符
+            has_chinese = False
+            for char in stripped:
+                cp = ord(char)
+                if 0x4E00 <= cp <= 0x9FFF:
+                    has_chinese = True
+                    break
+
+            if not has_chinese:
+                continue
+
+            # 去掉 t('...') 和 t("...") 调用内的内容后再检查
+            import re as _re
+            cleaned = _re.sub(r"t\(['\"].*?['\"]\)", '', stripped)
+            cleaned = _re.sub(r"\{\{\s*t\(['\"].*?['\"]\)\s*\}\}", '', cleaned)
+
+            # 如果去掉 t() 调用后仍有中文，则报错
+            for char in cleaned:
+                cp = ord(char)
+                if 0x4E00 <= cp <= 0x9FFF:
+                    issues.append(f"  [第{i}行] 禁止在模板中硬编码中文文本")
+                    issues.append("    请使用 t() 函数进行国际化，如 {{ t('module.key') }}")
+                    exit_code = 2
+                    break
+
     return exit_code, issues
 
 

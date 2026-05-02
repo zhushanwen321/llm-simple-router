@@ -1,0 +1,98 @@
+{
+  "title": "快速配置",
+  "client": {
+    "selectClient": "选择客户端",
+    "claudeCode": "Claude Code",
+    "claudeCodeDesc": "Anthropic 官方 CLI 编程助手",
+    "pi": "Pi",
+    "piDesc": "通用编程 Agent 框架",
+    "openaiSdk": "OpenAI SDK",
+    "openaiSdkDesc": "OpenAI API 直接调用",
+    "anthropicSdk": "Anthropic SDK",
+    "anthropicSdkDesc": "Anthropic API 直接调用"
+  },
+  "provider": {
+    "config": "供应商配置",
+    "label": "供应商",
+    "select": "选择",
+    "custom": "自定义",
+    "customProvider": "自定义供应商",
+    "format": "格式",
+    "plan": "套餐",
+    "apiKey": "API Key",
+    "apiKeyPlaceholder": "输入 API Key",
+    "connect": "连接",
+    "testing": "测试中",
+    "connected": "已连接",
+    "test": "测试"
+  },
+  "model": {
+    "config": "模型配置",
+    "selectProviderFirst": "请先选择供应商与套餐",
+    "namePlaceholder": "输入模型名称",
+    "contextCustom": "自定义"
+  },
+  "patch": {
+    "deepseekAnthropic": "DeepSeek 兼容 (Anthropic)",
+    "thinkingParam": "Thinking 参数",
+    "thinkingParamDesc": "自动补 thinking 参数",
+    "cacheControl": "Cache Control",
+    "cacheControlDesc": "剥离 cache_control",
+    "thinkingBlocks": "Thinking Blocks",
+    "thinkingBlocksDesc": "补缺失的 thinking block",
+    "orphanToolResult": "孤儿 Tool Result",
+    "orphanToolResultDesc": "清理孤儿 tool_result",
+    "deepseekOpenai": "DeepSeek 兼容 (OpenAI)",
+    "nonDsTools": "非DS Tool 降级",
+    "nonDsToolsDesc": "将非DS生成的 tool_calls 降级为 text",
+    "orphanToolResultOa": "孤儿 Tool Result",
+    "orphanToolResultOaDesc": "OpenAI 格式孤儿处理",
+    "general": "通用兼容",
+    "developerRole": "Developer Role",
+    "developerRoleDesc": "developer role 转 system"
+  },
+  "concurrency": {
+    "control": "并发控制"
+  },
+  "mapping": {
+    "title": "模型映射",
+    "count": "{count} 条"
+  },
+  "retry": {
+    "title": "重试规则",
+    "selectedCount": "{count} 条已选",
+    "allCreated": "所有推荐规则已创建,无需重复添加",
+    "selectProviderFirst": "选择供应商后显示推荐规则",
+    "configured": "已配置",
+    "general": "通用",
+    "fixed": "固定",
+    "exponential": "指数退避",
+    "times": "次"
+  },
+  "transform": {
+    "title": "转换规则"
+  },
+  "footer": {
+    "models": "{count} 模型",
+    "mappings": "{count} 映射",
+    "rules": "{count} 规则",
+    "validate": "验证",
+    "saving": "保存中",
+    "saveConfig": "保存配置"
+  },
+  "messages": {
+    "selectProvider": "请选择供应商",
+    "fillApiKey": "请填写 API Key",
+    "enableOneModel": "至少启用一个模型",
+    "validationPassed": "配置验证通过",
+    "existingMappingDelete": "已有映射请到\"模型映射\"页面删除",
+    "fillApiKeyFirst": "请先填写 API Key",
+    "injectHeadersJsonError": "注入 Headers JSON 格式错误",
+    "requestDefaultsJsonError": "请求默认值 JSON 格式错误",
+    "selectProviderAndPlan": "请选择供应商和套餐",
+    "setupCompleteWithErrors": "快速配置完成!{count} 个映射状态切换失败",
+    "setupComplete": "快速配置完成!",
+    "setupFailed": "快速配置失败",
+    "loadFailed": "加载推荐配置失败"
+  }
+}

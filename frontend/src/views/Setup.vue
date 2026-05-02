@@ -19,24 +19,24 @@
             </svg>
           </div>
           <h1 class="text-xl font-semibold text-foreground">LLM Simple Router</h1>
-          <p class="text-sm text-muted-foreground mt-1">初始设置 — 设置管理员密码</p>
+          <p class="text-sm text-muted-foreground mt-1">{{ t('setup.subtitle') }}</p>
         </div>
         <form @submit.prevent="handleSetup" class="space-y-4">
           <div>
-            <Label class="block text-sm font-medium text-foreground mb-1">密码</Label>
+            <Label class="block text-sm font-medium text-foreground mb-1">{{ t('setup.password') }}</Label>
             <Input
               v-model="password"
               type="password"
-              placeholder="至少 6 位"
+              :placeholder="t('setup.passwordPlaceholder')"
               :disabled="loading"
             />
           </div>
           <div>
-            <Label class="block text-sm font-medium text-foreground mb-1">确认密码</Label>
+            <Label class="block text-sm font-medium text-foreground mb-1">{{ t('setup.confirmPassword') }}</Label>
             <Input
               v-model="confirmPassword"
               type="password"
-              placeholder="再次输入密码"
+              :placeholder="t('setup.confirmPasswordPlaceholder')"
               :disabled="loading"
             />
           </div>
@@ -46,7 +46,7 @@
             class="w-full"
             :disabled="loading"
           >
-            {{ loading ? '设置中...' : '完成设置' }}
+            {{ loading ? t('setup.settingUp') : t('setup.setupButton') }}
           </Button>
         </form>
       </CardContent>
@@ -56,6 +56,8 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 import { useRouter } from 'vue-router'
 import { api, getApiMessage } from '@/api/client'
 import { Card, CardContent } from '@/components/ui/card'
@@ -75,15 +77,15 @@ const loading = ref(false)
 
 async function handleSetup() {
   if (!password.value || !confirmPassword.value) {
-    error.value = '请输入密码'
+    error.value = t('setup.pleaseInputPassword')
     return
   }
   if (password.value !== confirmPassword.value) {
-    error.value = '两次密码不一致'
+    error.value = t('setup.passwordMismatch')
     return
   }
   if (password.value.length < 6) { // eslint-disable-line no-magic-numbers
-    error.value = '密码至少 6 位'
+    error.value = t('setup.passwordTooShort')
     return
   }
   error.value = ''
@@ -92,7 +94,7 @@ async function handleSetup() {
     await api.initializeSetup(password.value)
     router.push('/admin/dashboard')
   } catch (e: unknown) {
-    error.value = getApiMessage(e, '设置失败')
+    error.value = getApiMessage(e, t('setup.setupFailed'))
   } finally {
     loading.value = false
   }

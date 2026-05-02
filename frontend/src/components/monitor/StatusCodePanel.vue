@@ -1,5 +1,5 @@
 <template>
-  <div v-if="total === 0" class="text-sm text-muted-foreground">暂无状态码数据</div>
+  <div v-if="total === 0" class="text-sm text-muted-foreground">{{ t('monitor.statusCodes.noData') }}</div>
   <div v-else class="space-y-2">
     <div v-for="group in groups" :key="group.label" class="space-y-1">
       <div class="flex items-center justify-between text-sm">
@@ -22,6 +22,9 @@
 <!-- eslint-disable no-magic-numbers -->
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   byStatusCode: Record<number, number>
@@ -41,7 +44,7 @@ const total = computed(() => {
 
 const groups = computed<StatusGroup[]>(() => {
   const codes = props.byStatusCode
-  const t = total.value || 1
+  const totalVal = total.value || 1
 
   const count2xx = sumRange(codes, 200, 299)
   const count4xx = sumRange(codes, 400, 499) - (codes[429] || 0)
@@ -50,30 +53,30 @@ const groups = computed<StatusGroup[]>(() => {
 
   return [
     {
-      label: '2xx 成功',
+      label: t('monitor.statusCodes.success'),
       count: count2xx,
-      percent: ((count2xx / t) * 100).toFixed(1),
+      percent: ((count2xx / totalVal) * 100).toFixed(1),
       textClass: 'text-green-600 dark:text-green-400',
       barClass: 'bg-green-500',
     },
     {
-      label: '4xx 客户端错误',
+      label: t('monitor.statusCodes.clientError'),
       count: count4xx,
-      percent: ((count4xx / t) * 100).toFixed(1),
+      percent: ((count4xx / totalVal) * 100).toFixed(1),
       textClass: 'text-yellow-600 dark:text-yellow-400',
       barClass: 'bg-yellow-500',
     },
     {
-      label: '429 限流',
+      label: t('monitor.statusCodes.rateLimited'),
       count: count429,
-      percent: ((count429 / t) * 100).toFixed(1),
+      percent: ((count429 / totalVal) * 100).toFixed(1),
       textClass: 'text-orange-600 dark:text-orange-400',
       barClass: 'bg-orange-500',
     },
     {
-      label: '5xx 服务端错误',
+      label: t('monitor.statusCodes.serverError'),
       count: count5xx,
-      percent: ((count5xx / t) * 100).toFixed(1),
+      percent: ((count5xx / totalVal) * 100).toFixed(1),
       textClass: 'text-red-600 dark:text-red-400',
       barClass: 'bg-red-500',
     },

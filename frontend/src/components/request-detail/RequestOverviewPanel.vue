@@ -2,10 +2,10 @@
   <div class="space-y-3">
     <!-- Toggle: structured / raw -->
     <div class="flex items-center justify-between">
-      <span class="text-xs font-medium text-muted-foreground">请求概览</span>
+      <span class="text-xs font-medium text-muted-foreground">{{ t('requestDetail.overviewTitle') }}</span>
       <Button size="sm" variant="outline" class="h-6 gap-1 text-xs" @click="showRaw = !showRaw">
         <component :is="showRaw ? FileText : FileJson" class="h-3 w-3" />
-        {{ showRaw ? '结构化' : '原始数据' }}
+        {{ showRaw ? t('requestDetail.structured') : t('requestDetail.rawData') }}
       </Button>
     </div>
 
@@ -20,24 +20,24 @@
     <!-- Row 1: model @ provider -->
     <div class="flex items-baseline gap-1 min-w-0">
       <span class="font-mono text-[11px] font-semibold truncate min-w-0">{{ overview.model }}</span>
-      <span class="text-[10px] text-muted-foreground flex-shrink-0">@ {{ overview.providerName || 'unknown' }}</span>
+      <span class="text-[10px] text-muted-foreground flex-shrink-0">@ {{ overview.providerName || t('requestDetail.unknownProvider') }}</span>
     </div>
 
     <!-- Row 2: status + SSE + apiType -->
     <div class="flex items-center gap-1.5">
       <Badge v-if="statusColor === 'pending'" variant="outline" class="border-warning/30 bg-warning-light text-warning-dark">
         <span class="w-1.5 h-1.5 rounded-full bg-warning animate-pulse" />
-        进行中
+        {{ t('requestDetail.pending') }}
       </Badge>
       <Badge v-else-if="statusColor === 'error'" variant="outline" class="border-danger/30 bg-danger-light text-danger-dark">
-        {{ overview.statusCode ?? '失败' }}
+        {{ overview.statusCode ?? t('requestDetail.failed') }}
       </Badge>
       <Badge v-else variant="outline" class="border-success/30 bg-success-light text-success-dark">
         <span class="w-1.5 h-1.5 rounded-full bg-success" />
-        已完成
+        {{ t('requestDetail.completed') }}
       </Badge>
 
-      <Badge variant="outline">{{ overview.isStream ? 'SSE' : '非流式' }}</Badge>
+      <Badge variant="outline">{{ overview.isStream ? 'SSE' : t('requestDetail.nonStream') }}</Badge>
       <Badge variant="outline">{{ overview.apiType }}</Badge>
     </div>
 
@@ -50,27 +50,27 @@
     <!-- Metrics grid -->
     <div class="grid grid-cols-2 gap-1.5">
       <div class="bg-muted/50 rounded-md px-2 py-1.5 min-w-0">
-        <div class="text-[10px] text-muted-foreground">耗时</div>
+        <div class="text-[10px] text-muted-foreground">{{ t('requestDetail.latency') }}</div>
         <div class="text-sm font-semibold truncate">{{ latencyText }}</div>
       </div>
       <div class="bg-muted/50 rounded-md px-2 py-1.5 min-w-0">
-        <div class="text-[10px] text-muted-foreground">TTFT</div>
+        <div class="text-[10px] text-muted-foreground">{{ t('requestDetail.ttft') }}</div>
         <div class="text-sm font-semibold truncate">{{ overview.ttftMs != null ? `${overview.ttftMs}ms` : '--' }}</div>
       </div>
       <div class="bg-muted/50 rounded-md px-2 py-1.5 min-w-0">
-        <div class="text-[10px] text-muted-foreground">{{ overview.inputTokensEstimated ? 'Est Input Tokens' : 'Input Tokens' }}</div>
+        <div class="text-[10px] text-muted-foreground">{{ overview.inputTokensEstimated ? t('requestDetail.estInputTokens') : t('requestDetail.inputTokens') }}</div>
         <div class="text-sm font-semibold truncate">{{ overview.inputTokens != null ? overview.inputTokens : '--' }}</div>
       </div>
       <div class="bg-muted/50 rounded-md px-2 py-1.5 min-w-0">
-        <div class="text-[10px] text-muted-foreground">Output Tokens</div>
+        <div class="text-[10px] text-muted-foreground">{{ t('requestDetail.outputTokens') }}</div>
         <div class="text-sm font-semibold truncate" :class="isOutputPending ? 'diff-added' : ''">{{ outputTokenText }}</div>
       </div>
       <div class="bg-muted/50 rounded-md px-2 py-1.5 min-w-0">
-        <div class="text-[10px] text-muted-foreground">速度 (tok/s)</div>
+        <div class="text-[10px] text-muted-foreground">{{ t('requestDetail.speed') }}</div>
         <div class="text-sm font-semibold truncate">{{ speedText }}</div>
       </div>
       <div class="bg-muted/50 rounded-md px-2 py-1.5 min-w-0">
-        <div class="text-[10px] text-muted-foreground">Cache Read</div>
+        <div class="text-[10px] text-muted-foreground">{{ t('requestDetail.cacheRead') }}</div>
         <div class="text-sm font-semibold truncate">{{ overview.cacheReadTokens != null ? overview.cacheReadTokens : '--' }}</div>
       </div>
     </div>
@@ -79,8 +79,8 @@
 
     <!-- Attempt history -->
     <div class="space-y-1.5">
-      <span class="text-[10px] text-muted-foreground uppercase tracking-wider">尝试历史</span>
-      <div v-if="overview.attempts.length === 0" class="text-[11px] text-muted-foreground">无重试</div>
+      <span class="text-[10px] text-muted-foreground uppercase tracking-wider">{{ t('requestDetail.attemptHistory') }}</span>
+      <div v-if="overview.attempts.length === 0" class="text-[11px] text-muted-foreground">{{ t('requestDetail.noRetry') }}</div>
       <div
         v-for="(attempt, i) in overview.attempts"
         :key="i"
@@ -99,11 +99,11 @@
     <!-- Metadata -->
     <div class="space-y-1">
       <div v-if="overview.statusCode != null" class="flex items-center justify-between text-[11px]">
-        <span class="text-muted-foreground">状态码</span>
+        <span class="text-muted-foreground">{{ t('requestDetail.statusCodeLabel') }}</span>
         <span class="font-mono">{{ overview.statusCode }}</span>
       </div>
       <div v-if="overview.clientIp" class="flex items-center justify-between text-[11px]">
-        <span class="text-muted-foreground">Client IP</span>
+        <span class="text-muted-foreground">{{ t('requestDetail.clientIp') }}</span>
         <span class="font-mono truncate max-w-[160px]">{{ overview.clientIp }}</span>
       </div>
     </div>
@@ -114,6 +114,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { UnifiedRequestOverview } from './types'
 import { MS_PER_SECOND, HTTP_ERROR_THRESHOLD } from './types'
 import { Badge } from '@/components/ui/badge'
@@ -122,6 +123,8 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { FileJson, FileText } from 'lucide-vue-next'
 import { Separator } from '@/components/ui/separator'
 import { extractResponseMetadata } from './upstream-merge'
+
+const { t } = useI18n()
 
 const props = defineProps<{ overview: UnifiedRequestOverview }>()
 

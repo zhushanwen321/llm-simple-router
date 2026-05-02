@@ -3,10 +3,10 @@
   <div class="p-6">
     <!-- Header: connection status + overview stats -->
     <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-semibold text-foreground">实时监控</h2>
+      <h2 class="text-lg font-semibold text-foreground">{{ t('monitor.title') }}</h2>
       <div class="flex items-center gap-2">
         <Badge :variant="connected ? 'default' : 'destructive'">
-          {{ connected ? '已连接' : '未连接' }}
+          {{ connected ? t('monitor.connected') : t('monitor.disconnected') }}
         </Badge>
       </div>
     </div>
@@ -24,14 +24,14 @@
       <Card>
         <CardHeader class="pb-2">
           <div class="flex items-center justify-between">
-            <CardTitle class="text-sm font-medium text-foreground">活跃请求</CardTitle>
+            <CardTitle class="text-sm font-medium text-foreground">{{ t('monitor.activeRequests') }}</CardTitle>
             <Badge variant="secondary">{{ streamingRequests.length }}</Badge>
           </div>
         </CardHeader>
         <CardContent>
           <ScrollArea class="h-64">
             <div v-if="streamingRequests.length === 0" class="text-sm text-muted-foreground py-2">
-              暂无活跃请求
+              {{ t('monitor.noActiveRequests') }}
             </div>
             <div
               v-for="req in streamingRequests"
@@ -55,7 +55,7 @@
                       <CopyIcon v-else class="size-3" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>复制 ID</TooltipContent>
+                  <TooltipContent>{{ t('monitor.copyId') }}</TooltipContent>
                 </Tooltip>
               </TooltipProvider>
             </div>
@@ -67,14 +67,14 @@
       <Card>
         <CardHeader class="pb-2">
           <div class="flex items-center justify-between">
-            <CardTitle class="text-sm font-medium text-foreground">队列请求</CardTitle>
+            <CardTitle class="text-sm font-medium text-foreground">{{ t('monitor.queuedRequests') }}</CardTitle>
             <Badge variant="secondary">{{ queuedRequests.length }}</Badge>
           </div>
         </CardHeader>
         <CardContent>
           <ScrollArea class="h-64">
             <div v-if="queuedRequests.length === 0" class="text-sm text-muted-foreground py-2">
-              暂无排队请求
+              {{ t('monitor.noQueuedRequests') }}
             </div>
             <div
               v-for="req in queuedRequests"
@@ -84,7 +84,7 @@
               @click="selectRequest(req.id)"
             >
               <Badge variant="outline" class="shrink-0">
-                排队
+                {{ t('monitor.queued') }}
               </Badge>
               <span class="text-sm text-foreground truncate flex-1">{{ req.model }}</span>
               <Badge variant="outline" class="shrink-0 text-xs">{{ req.providerName }}</Badge>
@@ -97,7 +97,7 @@
                       <CopyIcon v-else class="size-3" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>复制 ID</TooltipContent>
+                  <TooltipContent>{{ t('monitor.copyId') }}</TooltipContent>
                 </Tooltip>
               </TooltipProvider>
             </div>
@@ -109,14 +109,14 @@
       <Card>
         <CardHeader class="pb-2">
           <div class="flex items-center justify-between">
-            <CardTitle class="text-sm font-medium text-foreground">已完成</CardTitle>
+            <CardTitle class="text-sm font-medium text-foreground">{{ t('monitor.completed') }}</CardTitle>
             <Badge variant="secondary">{{ recentCompleted.length }}</Badge>
           </div>
         </CardHeader>
         <CardContent>
           <ScrollArea class="h-64">
             <div v-if="recentCompleted.length === 0" class="text-sm text-muted-foreground py-2">
-              暂无已完成请求
+              {{ t('monitor.noCompletedRequests') }}
             </div>
             <div
               v-for="req in recentCompleted"
@@ -140,7 +140,7 @@
                       <CopyIcon v-else class="size-3" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>复制 ID</TooltipContent>
+                  <TooltipContent>{{ t('monitor.copyId') }}</TooltipContent>
                 </Tooltip>
               </TooltipProvider>
             </div>
@@ -152,7 +152,7 @@
     <!-- Provider Stats Table -->
     <Card class="mb-4">
       <CardHeader>
-        <CardTitle class="text-sm font-medium text-foreground">Provider 统计</CardTitle>
+        <CardTitle class="text-sm font-medium text-foreground">{{ t('monitor.providerStats') }}</CardTitle>
       </CardHeader>
       <CardContent>
         <ProviderStatsTable :stats="stats" />
@@ -163,7 +163,7 @@
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
       <Card>
         <CardHeader>
-          <CardTitle class="text-sm font-medium text-foreground">并发度</CardTitle>
+          <CardTitle class="text-sm font-medium text-foreground">{{ t('monitor.concurrency') }}</CardTitle>
         </CardHeader>
         <CardContent>
           <ConcurrencyPanel :providers="concurrency" />
@@ -172,7 +172,7 @@
 
       <Card>
         <CardHeader>
-          <CardTitle class="text-sm font-medium text-foreground">状态码分布</CardTitle>
+          <CardTitle class="text-sm font-medium text-foreground">{{ t('monitor.statusCodeDistribution') }}</CardTitle>
         </CardHeader>
         <CardContent>
           <StatusCodePanel :by-status-code="stats?.byStatusCode ?? {}" />
@@ -181,7 +181,7 @@
 
       <Card>
         <CardHeader>
-          <CardTitle class="text-sm font-medium text-foreground">运行时</CardTitle>
+          <CardTitle class="text-sm font-medium text-foreground">{{ t('monitor.runtime') }}</CardTitle>
         </CardHeader>
         <CardContent>
           <RuntimePanel :runtime="runtime" />
@@ -202,6 +202,7 @@
 
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -218,6 +219,8 @@ import { useMonitorSSE } from '@/composables/useMonitorSSE'
 import { useMonitorData } from '@/composables/useMonitorData'
 import { useClipboard } from '@/composables/useClipboard'
 import { statusVariant, statusLabel } from '@/utils/status'
+
+const { t } = useI18n()
 
 // --- Data layer ---
 const {

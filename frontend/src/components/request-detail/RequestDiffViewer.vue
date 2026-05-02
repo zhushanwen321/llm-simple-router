@@ -4,7 +4,7 @@
       <Button variant="outline" size="xs" class="gap-1" @click="showRaw = !showRaw">
         <FileJson v-if="showRaw" class="size-3" />
         <FileText v-else class="size-3" />
-        {{ showRaw ? 'Structured' : 'Raw JSON' }}
+        {{ showRaw ? t('requestDetail.structured') : t('requestDetail.rawJson') }}
       </Button>
     </div>
 
@@ -14,13 +14,13 @@
         <div class="space-y-3">
           <div>
             <div class="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1">
-              Client Request
+              {{ t('requestDetail.clientRequest') }}
             </div>
             <JsonCopyBlock :content="overview.clientRequest ?? '{}'" />
           </div>
           <div>
             <div class="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1">
-              Upstream Request
+              {{ t('requestDetail.upstreamRequest') }}
             </div>
             <JsonCopyBlock :content="overview.upstreamRequest ?? '{}'" />
           </div>
@@ -30,17 +30,17 @@
       <!-- Structured view -->
       <template v-else>
         <div v-if="!upstreamParsed && !clientParsed" class="text-[11px] text-muted-foreground py-4 text-center">
-          No request data available
+          {{ t('requestDetail.noRequestData') }}
         </div>
         <div v-else-if="!upstreamParsed && clientParsed" class="text-[11px] text-muted-foreground py-2 text-center">
-          请求进行中，上游请求内容将在映射完成后显示
+          {{ t('requestDetail.requestInProgress') }}
         </div>
 
         <div v-else class="space-y-4">
           <!-- Model mapping -->
           <div v-if="modelDiff.hasDiff">
             <div class="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1">
-              Model Mapping
+              {{ t('requestDetail.modelMapping') }}
             </div>
             <div class="flex items-center gap-2 text-[11px]">
               <span class="font-mono text-muted-foreground">{{ modelDiff.from }}</span>
@@ -52,7 +52,7 @@
           <!-- System prompt -->
           <div v-if="systemPrompt">
             <div class="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1">
-              System
+              {{ t('requestDetail.system') }}
             </div>
             <pre class="text-[11px] bg-muted/50 rounded-md border px-2.5 py-2 overflow-y-auto whitespace-pre-wrap break-words max-h-40">{{ systemPrompt }}</pre>
           </div>
@@ -60,7 +60,7 @@
           <!-- Messages -->
           <div v-if="messages.length > 0">
             <div class="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1">
-              Messages ({{ messages.length }})
+              {{ t('requestDetail.messagesCount', { count: messages.length }) }}
             </div>
             <div class="space-y-1.5">
               <div
@@ -78,7 +78,7 @@
                     {{ msg.role }}
                   </Badge>
                   <Badge v-if="msg.modified" variant="outline" class="bg-role-thinking-bg text-role-thinking text-[9px] px-1.5 py-0 border-transparent">
-                    Modified
+                    {{ t('requestDetail.modified') }}
                   </Badge>
                   <span v-if="msg.toolCalls.length > 0" class="text-[9px] text-muted-foreground">
                     &rarr; {{ msg.toolCalls.join(', ') }}
@@ -89,7 +89,7 @@
                 </div>
                 <div v-if="msg.text" class="text-foreground overflow-y-auto max-h-40">{{ msg.text }}</div>
                 <div v-else-if="msg.toolResultCount > 0" class="text-muted-foreground text-[10px]">
-                  {{ msg.toolResultCount }} tool result(s)
+                  {{ t('requestDetail.toolResultCount', { count: msg.toolResultCount }) }}
                 </div>
               </div>
             </div>
@@ -98,7 +98,7 @@
           <!-- Tools -->
           <div v-if="tools.length > 0">
             <div class="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1">
-              Tools ({{ tools.length }})
+              {{ t('requestDetail.toolsCount', { count: tools.length }) }}
             </div>
             <div class="space-y-1">
               <template v-for="(row, rowIdx) in toolRows" :key="rowIdx">
@@ -133,10 +133,10 @@
           <!-- stream_options injection -->
           <div v-if="streamOptionsInjected">
             <div class="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1">
-              Stream Options
+              {{ t('requestDetail.streamOptions') }}
             </div>
             <div class="flex items-center gap-2 text-[11px]">
-              <Badge variant="outline" class="bg-success-light text-success-dark text-[9px] px-1.5 py-0 border-transparent">Injected</Badge>
+              <Badge variant="outline" class="bg-success-light text-success-dark text-[9px] px-1.5 py-0 border-transparent">{{ t('requestDetail.injected') }}</Badge>
               <code class="font-mono diff-added">{ "include_usage": true }</code>
             </div>
           </div>
@@ -144,7 +144,7 @@
           <!-- Authorization replacement -->
           <div v-if="authDiff.hasDiff">
             <div class="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1">
-              Auth Replacement
+              {{ t('requestDetail.authReplacement') }}
             </div>
             <div class="flex items-center gap-2 text-[11px]">
               <span class="font-mono diff-removed line-through">{{ authDiff.old }}</span>
@@ -160,6 +160,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { FileJson, FileText } from 'lucide-vue-next'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -168,6 +169,7 @@ import { Separator } from '@/components/ui/separator'
 import JsonCopyBlock from '@/components/log-viewer/JsonCopyBlock.vue'
 import type { UnifiedRequestOverview } from './types'
 
+const { t } = useI18n()
 const props = defineProps<{ overview: UnifiedRequestOverview }>()
 const showRaw = ref(false)
 

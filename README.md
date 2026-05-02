@@ -1,3 +1,5 @@
+**[English](README.en.md)** | **[中文](README.md)**
+
 # LLM Simple Router
 
 LLM API 代理路由器。接收 Claude Code / Cursor 等客户端请求，通过模型映射和路由策略转发到配置的后端 Provider，支持流式（SSE）和非流式代理。

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
@@ -14,12 +15,14 @@ const emit = defineEmits<{
   'update:dropFields': [value: string]
   'update:requestDefaults': [value: string]
 }>()
+
+const { t } = useI18n()
 </script>
 
 <template>
   <div :class="compact ? 'space-y-2' : 'space-y-3'">
     <div>
-      <Label class="text-[11px] text-muted-foreground">注入 Headers (JSON)</Label>
+      <Label class="text-[11px] text-muted-foreground">{{ t('providers.transform.injectHeaders') }}</Label>
       <Input
         :model-value="injectHeaders"
         placeholder='{"x-custom": "value"}'
@@ -28,7 +31,7 @@ const emit = defineEmits<{
       />
     </div>
     <div>
-      <Label class="text-[11px] text-muted-foreground">丢弃字段（逗号分隔）</Label>
+      <Label class="text-[11px] text-muted-foreground">{{ t('providers.transform.dropFields') }}</Label>
       <Input
         :model-value="dropFields"
         placeholder="logprobs, frequency_penalty"
@@ -37,7 +40,7 @@ const emit = defineEmits<{
       />
     </div>
     <div>
-      <Label class="text-[11px] text-muted-foreground">请求默认值 (JSON)</Label>
+      <Label class="text-[11px] text-muted-foreground">{{ t('providers.transform.requestDefaults') }}</Label>
       <Input
         :model-value="requestDefaults"
         placeholder='{"max_tokens": 4096}'

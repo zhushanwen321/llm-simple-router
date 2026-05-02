@@ -2,10 +2,10 @@
 <template>
   <div class="p-6">
     <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-semibold text-foreground">API 密钥</h2>
+      <h2 class="text-lg font-semibold text-foreground">{{ t('routerKeys.title') }}</h2>
       <Button @click="openCreate" class="flex items-center gap-1">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-        创建密钥
+        {{ t('routerKeys.createKey') }}
       </Button>
     </div>
 
@@ -13,12 +13,12 @@
       <Table>
         <TableHeader>
           <TableRow class="bg-muted">
-            <TableHead class="text-muted-foreground">名称</TableHead>
-            <TableHead class="text-muted-foreground">密钥</TableHead>
-            <TableHead class="text-muted-foreground">白名单模型</TableHead>
-            <TableHead class="text-muted-foreground">状态</TableHead>
-            <TableHead class="text-muted-foreground">创建时间</TableHead>
-            <TableHead class="text-right text-muted-foreground">操作</TableHead>
+            <TableHead class="text-muted-foreground">{{ t('routerKeys.tableHeaders.name') }}</TableHead>
+            <TableHead class="text-muted-foreground">{{ t('routerKeys.tableHeaders.key') }}</TableHead>
+            <TableHead class="text-muted-foreground">{{ t('routerKeys.tableHeaders.whitelist') }}</TableHead>
+            <TableHead class="text-muted-foreground">{{ t('routerKeys.tableHeaders.status') }}</TableHead>
+            <TableHead class="text-muted-foreground">{{ t('routerKeys.tableHeaders.createdAt') }}</TableHead>
+            <TableHead class="text-right text-muted-foreground">{{ t('routerKeys.tableHeaders.actions') }}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -43,19 +43,19 @@
                   <Badge v-for="m in k.allowed_models" :key="m" variant="outline" class="text-xs">{{ m }}</Badge>
                 </div>
               </template>
-              <Badge v-else variant="secondary">全部模型</Badge>
+              <Badge v-else variant="secondary">{{ t('common.allModels') }}</Badge>
             </TableCell>
             <TableCell>
-              <Badge :variant="k.is_active ? 'default' : 'secondary'">{{ k.is_active ? '启用' : '禁用' }}</Badge>
+              <Badge :variant="k.is_active ? 'default' : 'secondary'">{{ k.is_active ? t('common.enabled') : t('common.disabled') }}</Badge>
             </TableCell>
             <TableCell class="text-muted-foreground text-sm">{{ formatDate(k.created_at) }}</TableCell>
             <TableCell class="text-right">
-              <Button variant="ghost" size="sm" @click="openEdit(k)" class="text-muted-foreground hover:text-primary mr-2">编辑</Button>
-              <Button variant="ghost" size="sm" @click="confirmDelete(k)" class="text-muted-foreground hover:text-destructive">删除</Button>
+              <Button variant="ghost" size="sm" @click="openEdit(k)" class="text-muted-foreground hover:text-primary mr-2">{{ t('common.edit') }}</Button>
+              <Button variant="ghost" size="sm" @click="confirmDelete(k)" class="text-muted-foreground hover:text-destructive">{{ t('common.delete') }}</Button>
             </TableCell>
           </TableRow>
           <TableRow v-if="keys.length === 0">
-            <TableCell colspan="6" class="text-center text-muted-foreground py-8">暂无密钥</TableCell>
+            <TableCell colspan="6" class="text-center text-muted-foreground py-8">{{ t('routerKeys.noKeys') }}</TableCell>
           </TableRow>
         </TableBody>
       </Table>
@@ -65,17 +65,17 @@
     <Dialog v-model:open="dialogOpen">
       <DialogContent class="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{{ editingId ? '编辑密钥' : '创建密钥' }}</DialogTitle>
+          <DialogTitle>{{ editingId ? t('routerKeys.editKey') : t('routerKeys.createKey') }}</DialogTitle>
         </DialogHeader>
         <form @submit.prevent="handleSave" class="space-y-4">
           <div>
-            <Label class="block text-sm font-medium text-foreground mb-1">名称</Label>
-            <Input v-model="form.name" type="text" required placeholder="例如：生产环境" @input="delete errors.name" />
+            <Label class="block text-sm font-medium text-foreground mb-1">{{ t('routerKeys.tableHeaders.name') }}</Label>
+            <Input v-model="form.name" type="text" required :placeholder="t('routerKeys.placeholder.name')" @input="delete errors.name" />
             <p v-if="errors.name" class="text-sm text-destructive mt-1">{{ errors.name }}</p>
           </div>
           <div>
-            <Label class="block text-sm font-medium text-foreground mb-1">白名单模型</Label>
-            <div class="text-xs text-muted-foreground mb-2">不选择 = 允许所有模型</div>
+            <Label class="block text-sm font-medium text-foreground mb-1">{{ t('routerKeys.whitelistLabel') }}</Label>
+            <div class="text-xs text-muted-foreground mb-2">{{ t('routerKeys.whitelistHint') }}</div>
             <div class="border rounded-md p-3 max-h-48 overflow-y-auto space-y-2 bg-muted">
               <Label
                 v-for="model in availableModels"
@@ -89,7 +89,7 @@
                 <span class="font-mono text-xs">{{ model }}</span>
               </Label>
               <div v-if="availableModels.length === 0" class="text-muted-foreground text-sm text-center py-2">
-                暂无可用模型，请先配置模型映射
+                {{ t('routerKeys.noModels') }}
               </div>
             </div>
             <div v-if="form.allowed_models.length > 0" class="flex flex-wrap gap-1 mt-2">
@@ -101,11 +101,11 @@
           </div>
           <div v-if="editingId" class="flex items-center gap-2">
             <Checkbox v-model="form.is_active" id="key-active" />
-            <Label for="key-active" class="text-sm text-foreground">启用</Label>
+            <Label for="key-active" class="text-sm text-foreground">{{ t('common.enable') }}</Label>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" @click="dialogOpen = false">取消</Button>
-            <Button type="submit">保存</Button>
+            <Button type="button" variant="outline" @click="dialogOpen = false">{{ t('common.cancel') }}</Button>
+            <Button type="submit">{{ t('common.save') }}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -115,12 +115,12 @@
     <AlertDialog :open="!!deleteTarget" @update:open="(val) => { if (!val) deleteTarget = null }">
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>确认删除</AlertDialogTitle>
-          <AlertDialogDescription>确定要删除密钥「{{ deleteTarget?.name }}」吗？使用此密钥的所有请求将被拒绝，此操作不可撤销。</AlertDialogDescription>
+          <AlertDialogTitle>{{ t('routerKeys.confirmDeleteTitle') }}</AlertDialogTitle>
+          <AlertDialogDescription>{{ t('routerKeys.confirmDeleteDesc', { name: deleteTarget?.name }) }}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>取消</AlertDialogCancel>
-          <Button variant="destructive" @click="handleDelete">删除</Button>
+          <AlertDialogCancel>{{ t('common.cancel') }}</AlertDialogCancel>
+          <Button variant="destructive" @click="handleDelete">{{ t('common.delete') }}</Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -129,6 +129,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { api, getApiMessage } from '@/api/client'
 import { formatTime } from '@/utils/format'
@@ -152,6 +153,8 @@ interface RouterKey {
   created_at: string
 }
 
+const { t } = useI18n()
+
 const DEFAULT_FORM = { name: '', allowed_models: [] as string[], is_active: true }
 
 const keys = ref<RouterKey[]>([])
@@ -161,7 +164,6 @@ const editingId = ref<string | null>(null)
 const deleteTarget = ref<RouterKey | null>(null)
 const form = ref({ ...DEFAULT_FORM, allowed_models: [] as string[] })
 const errors = ref<Record<string, string>>({})
-
 const { copied: tableCopied, copy: tableCopy } = useClipboard()
 
 function maskKey(key: string | null): string {
@@ -188,7 +190,7 @@ async function loadData() {
     if (modelsRes.status === 'fulfilled') availableModels.value = modelsRes.value
   } catch (e: unknown) {
     console.error('Failed to load data:', e)
-    toast.error(getApiMessage(e, '加载数据失败'))
+    toast.error(getApiMessage(e, t('routerKeys.loadFailed')))
   }
 }
 
@@ -228,7 +230,7 @@ function buildCreatePayload(): { name: string; allowed_models: string[] | null }
 async function handleSave() {
   const errs: Record<string, string> = {}
   const name = form.value.name.trim()
-  if (!name) errs.name = '请输入名称'
+  if (!name) errs.name = t('routerKeys.nameRequired')
   errors.value = errs
   if (Object.keys(errs).length > 0) return
 
@@ -242,7 +244,7 @@ async function handleSave() {
     await loadData()
   } catch (e: unknown) {
     console.error('Failed to save router key:', e)
-    toast.error(getApiMessage(e, '保存密钥失败'))
+    toast.error(getApiMessage(e, t('routerKeys.saveFailed')))
   }
 }
 
@@ -259,7 +261,7 @@ async function handleDelete() {
     await loadData()
   } catch (e: unknown) {
     console.error('Failed to delete router key:', e)
-    toast.error(getApiMessage(e, '删除密钥失败'))
+    toast.error(getApiMessage(e, t('routerKeys.deleteFailed')))
   }
 }
 

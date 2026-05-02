@@ -1,5 +1,6 @@
 <!-- eslint-disable vue/multi-word-component-names -->
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { TableCell, TableRow } from '@/components/ui/table'
@@ -24,17 +25,18 @@ const emit = defineEmits<{
   openDetail: [id: string]
 }>()
 
+const { t } = useI18n()
 const { copied, copy } = useClipboard()
 
 function enhancementLabel(raw: string | null): string {
-  if (!raw) return '未知'
+  if (!raw) return t('logs.row.unknown')
   try {
     const meta = JSON.parse(raw)
     if (meta.action) {
       return meta.detail ? `${meta.action}: ${meta.detail}` : meta.action
     }
     return raw
-  } catch { return '未知' }
+  } catch { return t('logs.row.unknown') }
 }
 
 </script>
@@ -80,7 +82,7 @@ function enhancementLabel(raw: string | null): string {
                 <CopyIcon v-else class="size-3" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>复制完整 ID</TooltipContent>
+            <TooltipContent>{{ t('logs.row.copyFullId') }}</TooltipContent>
           </Tooltip>
         </TooltipProvider>
       </span>
@@ -100,13 +102,13 @@ function enhancementLabel(raw: string | null): string {
         v-if="!isChild && log.original_model"
         variant="secondary"
         class="ml-1 text-xs"
-      >已替换</Badge>
+      >{{ t('logs.row.replaced') }}</Badge>
     </TableCell>
 
     <TableCell class="text-xs">
       <template v-if="!isChild && log.provider_id === PROVIDER_ID_ROUTER">
         <Badge variant="secondary" class="text-[10px] px-1 py-0">
-          代理增强：{{ enhancementLabel(log.upstream_request) }}
+          {{ t('logs.row.proxyEnhancement', { label: enhancementLabel(log.upstream_request) }) }}
         </Badge>
       </template>
       <template v-else-if="log.backend_model || log.provider_name">
@@ -129,19 +131,19 @@ function enhancementLabel(raw: string | null): string {
     <TableCell>{{ log.is_stream ? 'Yes' : 'No' }}</TableCell>
 
     <TableCell>
-      <Badge v-if="log.is_retry" variant="outline" class="text-warning-dark border-warning">重试</Badge>
+      <Badge v-if="log.is_retry" variant="outline" class="text-warning-dark border-warning">{{ t('logs.table.retry') }}</Badge>
       <span v-else class="text-muted-foreground">-</span>
     </TableCell>
 
     <TableCell>
-      <Badge v-if="log.is_failover" variant="outline" class="text-danger-dark border-danger">故障转移</Badge>
+      <Badge v-if="log.is_failover" variant="outline" class="text-danger-dark border-danger">{{ t('logs.table.failover') }}</Badge>
       <span v-else class="text-muted-foreground">-</span>
     </TableCell>
 
     <TableCell class="text-destructive text-xs">{{ log.error_message || '-' }}</TableCell>
 
     <TableCell>
-      <Button variant="ghost" size="sm" @click="emit('openDetail', log.id)">详情</Button>
+      <Button variant="ghost" size="sm" @click="emit('openDetail', log.id)">{{ t('logs.row.detail') }}</Button>
     </TableCell>
   </TableRow>
 </template>

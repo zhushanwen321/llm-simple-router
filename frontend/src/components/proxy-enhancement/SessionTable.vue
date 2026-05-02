@@ -1,15 +1,15 @@
 <template>
-  <div v-if="loading" class="py-8 text-center text-muted-foreground">加载中...</div>
-  <div v-else-if="sessions.length === 0" class="py-8 text-center text-muted-foreground">暂无活跃 Session</div>
+  <div v-if="loading" class="py-8 text-center text-muted-foreground">{{ t('common.loading') }}</div>
+  <div v-else-if="sessions.length === 0" class="py-8 text-center text-muted-foreground">{{ t('proxyEnhancement.sessions.noSessions') }}</div>
   <Table v-else>
     <TableHeader>
       <TableRow>
-        <TableHead>密钥名称</TableHead>
-        <TableHead>Session ID</TableHead>
-        <TableHead>当前模型</TableHead>
-        <TableHead>原始模型</TableHead>
-        <TableHead>最后活跃</TableHead>
-        <TableHead>操作</TableHead>
+        <TableHead>{{ t('proxyEnhancement.sessions.keyName') }}</TableHead>
+        <TableHead>{{ t('proxyEnhancement.sessions.sessionId') }}</TableHead>
+        <TableHead>{{ t('proxyEnhancement.sessions.currentModel') }}</TableHead>
+        <TableHead>{{ t('proxyEnhancement.sessions.originalModel') }}</TableHead>
+        <TableHead>{{ t('proxyEnhancement.sessions.lastActive') }}</TableHead>
+        <TableHead>{{ t('proxyEnhancement.sessions.actions') }}</TableHead>
       </TableRow>
     </TableHeader>
     <TableBody>
@@ -39,7 +39,7 @@
           <TableCell>
             <div class="flex items-center gap-2">
               <Button variant="ghost" size="sm" @click="$emit('viewHistory', session)">
-                {{ historyMap[session.session_id] ? '收起' : '历史' }}
+                {{ historyMap[session.session_id] ? t('proxyEnhancement.sessions.collapse') : t('proxyEnhancement.sessions.history') }}
               </Button>
               <Button
                 variant="ghost"
@@ -47,7 +47,7 @@
                 class="text-destructive hover:text-destructive"
                 @click="openClearDialog(session)"
               >
-                清除
+                {{ t('proxyEnhancement.sessions.clear') }}
               </Button>
             </div>
           </TableCell>
@@ -55,7 +55,7 @@
         <TableRow v-if="historyMap[session.session_id]">
           <TableCell colspan="6" class="bg-muted/50 px-6 py-3">
             <div class="space-y-2">
-              <p class="text-sm font-medium text-foreground">切换历史</p>
+              <p class="text-sm font-medium text-foreground">{{ t('proxyEnhancement.sessions.switchHistory') }}</p>
               <div
                 v-for="entry in historyMap[session.session_id]"
                 :key="entry.id"
@@ -64,7 +64,7 @@
                 <span class="text-muted-foreground whitespace-nowrap">{{ formatTime(entry.created_at) }}</span>
                 <Badge variant="outline" class="text-xs">{{ entry.trigger_type }}</Badge>
                 <span>
-                  <span class="text-muted-foreground">{{ entry.old_model || '默认' }}</span>
+                  <span class="text-muted-foreground">{{ entry.old_model || t('proxyEnhancement.sessions.default') }}</span>
                   <span class="mx-1">&rarr;</span>
                   <span class="font-medium">{{ entry.new_model }}</span>
                 </span>
@@ -79,14 +79,14 @@
   <AlertDialog :open="showClearDialog" @update:open="showClearDialog = $event">
     <AlertDialogContent>
       <AlertDialogHeader>
-        <AlertDialogTitle>确认清除 Session</AlertDialogTitle>
+        <AlertDialogTitle>{{ t('proxyEnhancement.sessions.confirmClearTitle') }}</AlertDialogTitle>
         <AlertDialogDescription>
-          清除后，该 Session 将恢复使用默认模型映射。此操作不可撤销。
+          {{ t('proxyEnhancement.sessions.confirmClearDescription') }}
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
-        <AlertDialogCancel>取消</AlertDialogCancel>
-        <AlertDialogAction @click="handleClear">确认清除</AlertDialogAction>
+        <AlertDialogCancel>{{ t('common.cancel') }}</AlertDialogCancel>
+        <AlertDialogAction @click="handleClear">{{ t('proxyEnhancement.sessions.confirmClear') }}</AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>
   </AlertDialog>
@@ -94,6 +94,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { SessionState, SessionHistoryEntry } from '@/api/client'
 import { formatTime, parseUtc } from '@/utils/format'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
@@ -115,6 +116,8 @@ const emit = defineEmits<{
   clear: [session: SessionState]
   viewHistory: [session: SessionState]
 }>()
+
+const { t } = useI18n()
 
 const showClearDialog = ref(false)
 const sessionToClear = ref<SessionState | null>(null)
@@ -143,10 +146,10 @@ function shortId(id: string): string {
 function relativeTime(iso: string): string {
   const diff = Date.now() - parseUtc(iso).getTime()
   const minutes = Math.floor(diff / MS_PER_MINUTE)
-  if (minutes < 1) return '刚刚'
-  if (minutes < MINUTES_PER_HOUR) return `${minutes} 分钟前`
+  if (minutes < 1) return t('proxyEnhancement.sessions.justNow')
+  if (minutes < MINUTES_PER_HOUR) return t('proxyEnhancement.sessions.minutesAgo', { minutes })
   const hours = Math.floor(minutes / MINUTES_PER_HOUR)
-  if (hours < HOURS_PER_DAY) return `${hours} 小时前`
-  return `${Math.floor(hours / HOURS_PER_DAY)} 天前`
+  if (hours < HOURS_PER_DAY) return t('proxyEnhancement.sessions.hoursAgo', { hours })
+  return t('proxyEnhancement.sessions.daysAgo', { days: Math.floor(hours / HOURS_PER_DAY) })
 }
 </script>

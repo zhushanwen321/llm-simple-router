@@ -1,0 +1,98 @@
+{
+  "title": "Request Logs",
+  "cleanupLogs": "Cleanup Logs",
+  "clear": "Clear",
+  "allProviders": "All Providers",
+  "allModels": "All Models",
+  "allKeys": "All Keys",
+  "allStatus": "All Status",
+  "non200": "Non-200",
+  "noLogs": "No logs",
+  "pagination": "Total {total}, Page {page} / {totalPages}",
+  "firstPage": "First",
+  "prevPage": "Previous",
+  "nextPage": "Next",
+  "lastPage": "Last",
+  "cleanup": {
+    "title": "Cleanup Logs",
+    "description": "Delete logs older than specified days",
+    "keepRecentDays": "Keep recent days",
+    "autoCleanup": "Auto cleanup settings",
+    "retentionDays": "Retention days",
+    "noAutoCleanup": "0 = No auto cleanup",
+    "saveSettings": "Save Settings",
+    "confirmCleanup": "Confirm Cleanup"
+  },
+  "cleanupResult": {
+    "title": "Cleanup Complete",
+    "description": "Deleted {count} log entries.",
+    "ok": "OK"
+  },
+  "table": {
+    "id": "ID",
+    "time": "Time",
+    "type": "Type",
+    "model": "Model",
+    "actualForward": "Actual Forward",
+    "statusCode": "Status Code",
+    "latency": "Latency",
+    "streaming": "Streaming",
+    "retry": "Retry",
+    "failover": "Failover",
+    "error": "Error",
+    "actions": "Actions"
+  },
+  "row": {
+    "copyFullId": "Copy full ID",
+    "replaced": "Replaced",
+    "proxyEnhancement": "Enhancement: {label}",
+    "unknown": "Unknown",
+    "detail": "Detail"
+  },
+  "messages": {
+    "loadFailed": "Failed to load logs",
+    "cleanupFailed": "Failed to cleanup logs",
+    "loadSubRequestsFailed": "Failed to load sub-requests",
+    "loadDetailFailed": "Failed to load log details",
+    "loadProvidersFailed": "Failed to load providers",
+    "loadKeysFailed": "Failed to load router keys"
+  },
+  "validation": {
+    "endTimeAfterStart": "End time must be after start time"
+  },
+  "retention": {
+    "saved": "Log retention days updated",
+    "updateFailed": "Failed to update retention days",
+    "loadFailed": "Failed to load retention days, using default"
+  },
+  "viewer": {
+    "structured": "Structured",
+    "rawData": "Raw Data",
+    "rawJson": "Raw JSON",
+    "rawSse": "Raw SSE",
+    "copied": "Copied",
+    "copyJson": "Copy JSON",
+    "copy": "Copy",
+    "parseError": "Parse failed, switch to Raw JSON to view",
+    "claudeCodeRequest": "Claude Code Request",
+    "headers": "Headers ({count})",
+    "key": "Key",
+    "expand": "Expand",
+    "expandAll": "Expand All",
+    "collapse": "Collapse",
+    "moreTools": "+{count}",
+    "otherFields": "Other Fields",
+    "deltaEvents": "{count} delta events",
+    "completeResponse": "Complete Response",
+    "rawEvents": "Raw Events",
+    "streamEnd": "Stream End",
+    "content": "Content",
+    "deltaGroupSummary": "{deltaType} · keep {kept}",
+    "deltaFoldedInfo": " +{folded} collapsed ({chars} chars)",
+    "collapsedEvents": "Collapsed Events",
+    "rawSseText": "Raw SSE Text",
+    "thinkingTokens": "Thinking Tokens",
+    "toolsCount": "Tools ({count})",
+    "value": "Value"
+  }
+}

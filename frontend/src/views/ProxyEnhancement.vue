@@ -1,18 +1,18 @@
 <template>
   <div class="p-6">
-    <h2 class="text-lg font-semibold text-foreground mb-4">代理增强（实验性）</h2>
+    <h2 class="text-lg font-semibold text-foreground mb-4">{{ t('proxyEnhancement.title') }}</h2>
 
     <Tabs default-value="dynamic-model">
       <TabsList>
-        <TabsTrigger value="dynamic-model">动态模型切换</TabsTrigger>
-        <TabsTrigger value="loop-detection">循环输出检测</TabsTrigger>
+        <TabsTrigger value="dynamic-model">{{ t('proxyEnhancement.tabs.dynamicModel') }}</TabsTrigger>
+        <TabsTrigger value="loop-detection">{{ t('proxyEnhancement.tabs.loopDetection') }}</TabsTrigger>
       </TabsList>
       <TabsContent value="dynamic-model">
         <Card>
           <CardHeader>
-            <CardTitle>Claude Code 动态模型切换</CardTitle>
+            <CardTitle>{{ t('proxyEnhancement.dynamicModel.title') }}</CardTitle>
             <CardDescription>
-              在 Claude Code 对话中通过 /select-model 命令动态切换后端模型。模型选择在当前会话内有效（24h），不影响路由配置。
+              {{ t('proxyEnhancement.dynamicModel.description') }}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -22,7 +22,7 @@
                 v-model="claudeCodeEnabled"
               />
               <Label for="claude-code-toggle">
-                {{ claudeCodeEnabled ? '已启用' : '已禁用' }}
+                {{ claudeCodeEnabled ? t('proxyEnhancement.dynamicModel.enabled') : t('proxyEnhancement.dynamicModel.disabled') }}
               </Label>
             </div>
           </CardContent>
@@ -32,9 +32,9 @@
           <Button :disabled="saving" @click="handleSave">
             <span v-if="saving" class="flex items-center gap-1">
               <Loader2 class="w-4 h-4 animate-spin" />
-              保存中...
+              {{ t('proxyEnhancement.dynamicModel.saving') }}
             </span>
-            <span v-else>保存</span>
+            <span v-else>{{ t('common.save') }}</span>
           </Button>
         </div>
 
@@ -42,7 +42,7 @@
         <Collapsible v-model:open="instructionsOpen" class="mt-4">
           <CollapsibleTrigger as-child>
             <Button variant="ghost" class="w-full justify-between">
-              <span>使用说明</span>
+              <span>{{ t('proxyEnhancement.instructions.title') }}</span>
               <ChevronDown class="w-4 h-4 transition-transform" :class="{ 'rotate-180': instructionsOpen }" />
             </Button>
           </CollapsibleTrigger>
@@ -50,35 +50,35 @@
             <Card>
               <CardContent class="space-y-4 text-sm">
                 <div>
-                  <p class="font-medium text-foreground mb-1 leading-relaxed">配置方法</p>
+                  <p class="font-medium text-foreground mb-1 leading-relaxed">{{ t('proxyEnhancement.instructions.config.title') }}</p>
                   <p class="text-muted-foreground leading-relaxed">
-                    在 Claude Code 项目级或全局级目录下创建 Command 文件：
+                    {{ t('proxyEnhancement.instructions.config.description') }}
                   </p>
                   <code class="block mt-1 px-3 py-2 bg-muted rounded text-xs font-mono whitespace-pre-wrap leading-relaxed">
-                    # 项目级 .claude/commands/select-model.md<br />
-                    # 全局级 ~/.claude/commands/select-model.md
+                    {{ t('proxyEnhancement.instructions.config.pathProject') }}<br />
+                    {{ t('proxyEnhancement.instructions.config.pathGlobal') }}
                   </code>
                   <p class="text-muted-foreground leading-relaxed mt-2">
-                    文件内容：
+                    {{ t('proxyEnhancement.instructions.config.contentLabel') }}
                   </p>
                   <code class="block mt-1 px-3 py-2 bg-muted rounded text-xs font-mono whitespace-pre-wrap leading-relaxed" v-text="selectModelInstruction" />
                 </div>
                 <div>
-                  <p class="font-medium text-foreground mb-1 leading-relaxed">使用方法</p>
+                  <p class="font-medium text-foreground mb-1 leading-relaxed">{{ t('proxyEnhancement.instructions.usage.title') }}</p>
                   <p class="text-muted-foreground leading-relaxed">
-                    查看可用模型列表（格式为 provider_name/backend_model）：
+                    {{ t('proxyEnhancement.instructions.usage.viewModels') }}
                   </p>
                   <code class="block mt-1 px-3 py-2 bg-muted rounded text-xs font-mono whitespace-pre-wrap leading-relaxed">
                     /select-model
                   </code>
                   <p class="text-muted-foreground leading-relaxed mt-2">
-                    选择模型并记住到当前会话：
+                    {{ t('proxyEnhancement.instructions.usage.selectModel') }}
                   </p>
                   <code class="block mt-1 px-3 py-2 bg-muted rounded text-xs font-mono whitespace-pre-wrap leading-relaxed">
                     /select-model provider_name/backend_model
                   </code>
                   <p class="text-muted-foreground leading-relaxed mt-2">
-                    切换后在下方活跃 Session 表中确认状态，请求日志中可验证路由是否生效。
+                    {{ t('proxyEnhancement.instructions.usage.verify') }}
                   </p>
                 </div>
               </CardContent>
@@ -91,10 +91,10 @@
           <CardHeader>
             <div class="flex items-center justify-between">
               <div>
-                <CardTitle>活跃 Session</CardTitle>
-                <CardDescription>查看和管理当前已配置模型的 session</CardDescription>
+                <CardTitle>{{ t('proxyEnhancement.sessions.title') }}</CardTitle>
+                <CardDescription>{{ t('proxyEnhancement.sessions.description') }}</CardDescription>
               </div>
-              <Button variant="outline" size="sm" @click="loadSessions" :disabled="sessionsLoading">刷新</Button>
+              <Button variant="outline" size="sm" @click="loadSessions" :disabled="sessionsLoading">{{ t('proxyEnhancement.sessions.refresh') }}</Button>
             </div>
           </CardHeader>
           <CardContent>
@@ -111,9 +111,9 @@
       <TabsContent value="loop-detection">
         <Card>
           <CardHeader>
-            <CardTitle>工具调用轮数限制</CardTitle>
+            <CardTitle>{{ t('proxyEnhancement.loopDetection.toolRoundLimit.title') }}</CardTitle>
             <CardDescription>
-              检测 AI 连续进行工具调用的轮数（assistant → tool_use → user → tool_result 算一轮），超过 5 轮时自动注入提示词提醒 AI 不要陷入无限循环。
+              {{ t('proxyEnhancement.loopDetection.toolRoundLimit.description') }}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -123,7 +123,7 @@
                 v-model="toolRoundLimitEnabled"
               />
               <Label for="tool-round-limit-toggle">
-                {{ toolRoundLimitEnabled ? '已启用' : '已禁用' }}
+                {{ toolRoundLimitEnabled ? t('proxyEnhancement.dynamicModel.enabled') : t('proxyEnhancement.dynamicModel.disabled') }}
               </Label>
             </div>
           </CardContent>
@@ -131,9 +131,9 @@
 
         <Card class="mt-4">
           <CardHeader>
-            <CardTitle>工具调用循环检测</CardTitle>
+            <CardTitle>{{ t('proxyEnhancement.loopDetection.toolCallLoop.title') }}</CardTitle>
             <CardDescription>
-              检测模型重复调用同一工具的行为，超过阈值时自动中断请求或注入提示词。
+              {{ t('proxyEnhancement.loopDetection.toolCallLoop.description') }}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -143,7 +143,7 @@
                 v-model="toolCallLoopEnabled"
               />
               <Label for="tool-call-loop-toggle">
-                {{ toolCallLoopEnabled ? '已启用' : '已禁用' }}
+                {{ toolCallLoopEnabled ? t('proxyEnhancement.dynamicModel.enabled') : t('proxyEnhancement.dynamicModel.disabled') }}
               </Label>
             </div>
           </CardContent>
@@ -151,9 +151,9 @@
 
         <Card class="mt-4">
           <CardHeader>
-            <CardTitle>SSE 输出内容循环检测</CardTitle>
+            <CardTitle>{{ t('proxyEnhancement.loopDetection.streamLoop.title') }}</CardTitle>
             <CardDescription>
-              检测流式输出中内容重复循环（N-gram 模式），超过阈值时自动中断流。
+              {{ t('proxyEnhancement.loopDetection.streamLoop.description') }}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -163,7 +163,7 @@
                 v-model="streamLoopEnabled"
               />
               <Label for="stream-loop-toggle">
-                {{ streamLoopEnabled ? '已启用' : '已禁用' }}
+                {{ streamLoopEnabled ? t('proxyEnhancement.dynamicModel.enabled') : t('proxyEnhancement.dynamicModel.disabled') }}
               </Label>
             </div>
           </CardContent>
@@ -173,9 +173,9 @@
           <Button :disabled="saving" @click="handleSave">
             <span v-if="saving" class="flex items-center gap-1">
               <Loader2 class="w-4 h-4 animate-spin" />
-              保存中...
+              {{ t('proxyEnhancement.dynamicModel.saving') }}
             </span>
-            <span v-else>保存</span>
+            <span v-else>{{ t('common.save') }}</span>
           </Button>
         </div>
       </TabsContent>
@@ -185,6 +185,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { api, getApiMessage } from '@/api/client'
 import type { SessionState, SessionHistoryEntry } from '@/api/client'
@@ -197,11 +198,12 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/component
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import SessionTable from '@/components/proxy-enhancement/SessionTable.vue'
 
+const { t } = useI18n()
 const claudeCodeEnabled = ref(false)
 const toolRoundLimitEnabled = ref(true)
 const toolCallLoopEnabled = ref(false)
 const streamLoopEnabled = ref(false)
-const selectModelInstruction = '---\ndescription: 切换代理路由模型\n---\n\n[router-command: select-model $ARGUMENTS]'
+const selectModelInstruction = '---\ndescription: ' + t('proxyEnhancement.instructions.config.title') + '\n---\n\n[router-command: select-model $ARGUMENTS]'
 const saving = ref(false)
 const instructionsOpen = ref(true)
 
@@ -218,7 +220,7 @@ async function loadConfig() {
     streamLoopEnabled.value = data.stream_loop_enabled
   } catch (e: unknown) {
     console.error('Failed to load proxy enhancement config:', e)
-    toast.error(getApiMessage(e, '加载配置失败'))
+    toast.error(getApiMessage(e, t('proxyEnhancement.loadFailed')))
   }
 }
 
@@ -231,10 +233,10 @@ async function handleSave() {
       stream_loop_enabled: streamLoopEnabled.value,
       tool_round_limit_enabled: toolRoundLimitEnabled.value,
     })
-    toast.success('保存成功')
+    toast.success(t('common.saveSuccess'))
   } catch (e: unknown) {
     console.error('Failed to save proxy enhancement config:', e)
-    toast.error(getApiMessage(e, '保存失败'))
+    toast.error(getApiMessage(e, t('proxyEnhancement.saveFailed')))
   } finally {
     saving.value = false
   }
@@ -246,7 +248,7 @@ async function loadSessions() {
     sessions.value = await api.getSessionStates()
   } catch (e: unknown) {
     console.error('Failed to load sessions:', e)
-    toast.error(getApiMessage(e, '加载 Session 列表失败'))
+    toast.error(getApiMessage(e, t('proxyEnhancement.sessions.loadFailed')))
   } finally {
     sessionsLoading.value = false
   }
@@ -255,11 +257,11 @@ async function loadSessions() {
 async function handleClearSession(session: SessionState) {
   try {
     await api.deleteSessionState(session.router_key_id, session.session_id)
-    toast.success('Session 已清除')
+    toast.success(t('proxyEnhancement.sessions.clearSuccess'))
     loadSessions()
   } catch (e: unknown) {
     console.error('Failed to clear session:', e)
-    toast.error(getApiMessage(e, '清除 Session 失败'))
+    toast.error(getApiMessage(e, t('proxyEnhancement.sessions.clearFailed')))
   }
 }
 
@@ -274,7 +276,7 @@ async function handleViewHistory(session: SessionState) {
     sessionHistoryMap.value[key] = history
   } catch (e: unknown) {
     console.error('Failed to load history:', e)
-    toast.error(getApiMessage(e, '加载历史记录失败'))
+    toast.error(getApiMessage(e, t('proxyEnhancement.sessions.loadHistoryFailed')))
   }
 }
 

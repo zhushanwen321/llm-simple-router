@@ -1,4 +1,5 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { ChartData } from 'chart.js'
 import { api, getApiMessage } from '@/api/client'
 import { toast } from 'vue-sonner'
@@ -29,6 +30,8 @@ function toIsoEnd(dateStr: string): string {
 }
 
 export function useDashboard() {
+  const { t } = useI18n()
+
   // --- Provider list and selection ---
   const providers = ref<Provider[]>([])
   const selectedProvider = ref('')
@@ -163,7 +166,7 @@ export function useDashboard() {
       providers.value = await api.getProviders()
     } catch (e: unknown) {
       console.error('Failed to load providers:', e)
-      toast.error(getApiMessage(e, '加载供应商列表失败'))
+      toast.error(getApiMessage(e, t('dashboard.loadProvidersFailed')))
     }
   }
 
@@ -237,27 +240,27 @@ export function useDashboard() {
 
       if (fulfilled(tpsRes) && tpsRes.value.length > 0) {
         const filled = fillTimeseries(tpsRes.value, period, timeRange)
-        tpsChartData.value = toChartData(filled, 'Token 输出速度 (t/s)', CHART_COLORS.indigo)
+        tpsChartData.value = toChartData(filled, t('dashboard.charts.tokenOutputSpeed'), CHART_COLORS.indigo)
       } else {
         tpsChartData.value = null
       }
 
       if (fulfilled(inputRes) && inputRes.value.length > 0) {
         const filled = fillTimeseries(inputRes.value, period, timeRange)
-        inputTokensChartData.value = toChartData(filled, 'Token 输入总量', CHART_COLORS.teal)
+        inputTokensChartData.value = toChartData(filled, t('dashboard.charts.tokenInputTotal'), CHART_COLORS.teal)
       } else {
         inputTokensChartData.value = null
       }
 
       if (fulfilled(outputRes) && outputRes.value.length > 0) {
         const filled = fillTimeseries(outputRes.value, period, timeRange)
-        outputTokensChartData.value = toChartData(filled, 'Token 输出总量', CHART_COLORS.green)
+        outputTokensChartData.value = toChartData(filled, t('dashboard.charts.tokenOutputTotal'), CHART_COLORS.green)
       } else {
         outputTokensChartData.value = null
       }
     } catch (e: unknown) {
       console.error('Failed to load dashboard:', e)
-      toast.error(getApiMessage(e, '加载仪表盘数据失败'))
+      toast.error(getApiMessage(e, t('dashboard.loadDashboardFailed')))
     } finally {
       loading.value = false
     }

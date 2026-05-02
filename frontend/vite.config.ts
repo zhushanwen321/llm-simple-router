@@ -8,7 +8,9 @@ const rootVersion = JSON.parse(
 ).version
 
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [
+    vue(),
+  ],
   define: {
     __APP_VERSION__: JSON.stringify(rootVersion),
   },

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { MappingEntry, MappingTarget } from '@/components/quick-setup/types'
 import type { ProviderGroup, SelectedValue } from '@/components/mappings/cascading-types'
 import { Switch } from '@/components/ui/switch'
@@ -8,6 +9,8 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Trash2, Plus } from 'lucide-vue-next'
 import CascadingModelSelect from '@/components/mappings/CascadingModelSelect.vue'
+
+const { t } = useI18n()
 
 const props = withDefaults(defineProps<{
   entries: MappingEntry[]
@@ -125,10 +128,10 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
   <div class="rounded-xl border border-border bg-card overflow-hidden">
     <!-- Header -->
     <div v-if="entries.length > 0" class="flex items-center px-5 py-2.5 border-b border-border bg-muted/20 text-xs text-muted-foreground font-medium">
-      <div class="w-[140px] shrink-0">客户端模型</div>
+      <div class="w-[140px] shrink-0">{{ t('providers.shared.clientModel') }}</div>
       <div class="w-5 shrink-0"></div>
-      <div class="flex-1">目标链</div>
-      <div class="shrink-0 w-[140px] text-right">操作</div>
+      <div class="flex-1">{{ t('providers.shared.targetChain') }}</div>
+      <div class="shrink-0 w-[140px] text-right">{{ t('providers.shared.actions') }}</div>
     </div>
 
     <!-- Entries -->
@@ -177,7 +180,7 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
           <!-- Overflow -->
           <div v-if="entry.targets[0]?.overflow_model" class="flex items-center gap-1 mt-1 pt-1 border-t border-dashed border-primary/10">
             <svg width="8" height="8" fill="none" stroke="currentColor" stroke-width="1.5" class="text-primary/30 shrink-0"><path d="M3 1v4M1 3l2 2 2-2" stroke-dasharray="1 1"/></svg>
-            <span class="text-xs text-primary/40">溢出</span>
+            <span class="text-xs text-primary/40">{{ t('providers.shared.overflow') }}</span>
             <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-sm mono bg-primary/5 border border-primary/15 text-primary/70">
               {{ entry.targets[0].overflow_model }}
               <span class="text-[11px] px-1 py-px rounded bg-muted/50 text-muted-foreground/40">{{ providerName(entry.targets[0].overflow_provider_id ?? '') }}</span>
@@ -188,9 +191,9 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
         <!-- Actions -->
         <div class="shrink-0 w-[140px] flex items-center justify-end gap-1">
           <Badge v-if="entry.targets.length > 1" variant="outline" class="text-[11px] px-1.5 py-0 border-border text-muted-foreground/50 shrink-0">
-            {{ entry.targets.length }}级
+            {{ t('providers.shared.level', { count: entry.targets.length }) }}
           </Badge>
-          <span v-if="!editable" class="text-[11px] shrink-0" :class="entry.active ? 'text-primary/60' : 'text-muted-foreground/30'">{{ entry.active ? '启用' : '已禁用' }}</span>
+          <span v-if="!editable" class="text-[11px] shrink-0" :class="entry.active ? 'text-primary/60' : 'text-muted-foreground/30'">{{ entry.active ? t('providers.shared.enabled') : t('providers.shared.disabled') }}</span>
           <Button v-if="showDelete && editable" variant="ghost" size="icon-xs" class="text-muted-foreground/40 hover:text-destructive shrink-0" @click.stop="emit('remove', entry.clientModel)">
             <Trash2 class="size-3" />
           </Button>
@@ -210,7 +213,7 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
           <!-- Left: client model identity -->
           <div class="w-[140px] shrink-0 px-3 py-2 flex flex-col items-center justify-center border-r border-border bg-muted/10">
             <div class="mono text-xs font-semibold text-foreground">{{ entry.clientModel }}</div>
-            <div class="text-[10px] text-muted-foreground/50 mt-0.5">客户端模型</div>
+            <div class="text-[10px] text-muted-foreground/50 mt-0.5">{{ t('providers.shared.clientModel') }}</div>
           </div>
 
           <!-- Right: targets editor -->
@@ -223,13 +226,13 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
                     ? 'bg-primary/10 text-primary'
                     : 'bg-muted/30 text-muted-foreground'"
                 >
-                  {{ tIdx === 0 ? '首选' : `备${tIdx}` }}
+                  {{ tIdx === 0 ? t('providers.shared.primary') : t('providers.shared.backup', { n: tIdx }) }}
                 </span>
                 <div class="flex-1">
                   <CascadingModelSelect
                     :providers="providerGroups"
                     :model-value="{ provider_id: target.provider_id, model: target.backend_model }"
-                    compact placeholder="选择模型..."
+                    compact :placeholder="t('providers.shared.selectModel')"
                     @update:model-value="(v: SelectedValue) => updateTargetProvider(idx, tIdx, v)"
                   />
                 </div>
@@ -245,18 +248,18 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
               </div>
               <div v-if="tIdx < entry.targets.length - 1" class="flex items-center gap-1 pl-10 text-[11px] text-muted-foreground/30 py-0.5">
                 <span class="w-3 border-t border-muted-foreground/20"></span>
-                <span>失败时切换</span>
+                <span>{{ t('providers.shared.switchOnFail') }}</span>
               </div>
             </div>
 
             <!-- Overflow edit -->
             <div class="flex items-center gap-2 pt-2 border-t border-dashed border-primary/15">
-              <span class="text-[10px] w-10 text-center px-1.5 py-0.5 rounded bg-primary/10 text-primary/70 shrink-0">溢出</span>
+              <span class="text-[10px] w-10 text-center px-1.5 py-0.5 rounded bg-primary/10 text-primary/70 shrink-0">{{ t('providers.shared.overflow') }}</span>
               <div class="flex-1">
                 <CascadingModelSelect
                   :providers="providerGroups"
                   :model-value="entry.targets[0]?.overflow_provider_id && entry.targets[0]?.overflow_model ? { provider_id: entry.targets[0].overflow_provider_id, model: entry.targets[0].overflow_model } : undefined"
-                  compact placeholder="可选，上下文超限时切换..."
+                  compact :placeholder="t('providers.shared.overflowPlaceholder')"
                   @update:model-value="(v: SelectedValue | undefined) => updateOverflow(idx, v)"
                 />
               </div>
@@ -265,7 +268,7 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
             <!-- Add failover button -->
             <Button variant="ghost" size="sm" class="w-full text-xs text-muted-foreground/50" @click="addTarget(idx)">
               <Plus class="w-3 h-3 mr-1" />
-              添加故障转移
+              {{ t('providers.shared.addFailover') }}
             </Button>
           </div>
         </div>
@@ -274,15 +277,15 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
 
     <!-- Empty state -->
     <div v-if="entries.length === 0" class="py-10 text-center text-xs text-muted-foreground/40">
-      暂无映射
+      {{ t('providers.shared.noMappings') }}
     </div>
 
     <!-- Add mapping form -->
     <div v-if="showAddForm && editable" class="flex items-center gap-2 px-4 py-3 border-t border-border">
-      <Input v-model="newFrom" placeholder="客户端模型" class="h-8 flex-1 text-xs mono" @keydown="handleKeydown" />
+      <Input v-model="newFrom" :placeholder="t('providers.shared.clientModel')" class="h-8 flex-1 text-xs mono" @keydown="handleKeydown" />
       <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" class="shrink-0 text-muted-foreground/20"><path d="M1 6h10M8 3l3 3-3 3"/></svg>
-      <Input v-model="newTo" placeholder="目标模型" class="h-8 flex-1 text-xs mono" @keydown="handleKeydown" />
-      <Button size="sm" variant="outline" class="h-8 shrink-0" :disabled="!canAdd()" @click="addMapping">添加</Button>
+      <Input v-model="newTo" :placeholder="t('providers.shared.targetModel')" class="h-8 flex-1 text-xs mono" @keydown="handleKeydown" />
+      <Button size="sm" variant="outline" class="h-8 shrink-0" :disabled="!canAdd()" @click="addMapping">{{ t('providers.shared.add') }}</Button>
     </div>
   </div>
 </template>

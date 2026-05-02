@@ -2,13 +2,13 @@
 <template>
   <div class="p-6">
     <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-semibold text-foreground">请求日志</h2>
+      <h2 class="text-lg font-semibold text-foreground">{{ t('logs.title') }}</h2>
       <Button
         variant="outline"
         class="text-destructive border-destructive hover:bg-destructive/10"
         @click="showCleanup = true"
       >
-        清理日志
+        {{ t('logs.cleanupLogs') }}
       </Button>
     </div>
 
@@ -26,15 +26,15 @@
         </Button>
       </div>
       <div class="flex items-center gap-1">
-        <Input type="datetime-local" v-model="dateRange.start" class="w-44" />
-        <span class="text-muted-foreground text-sm">-</span>
-        <Input type="datetime-local" v-model="dateRange.end" class="w-44" />
+        <Input type="datetime-local" v-model="dateRange.start" class="w-48" />
+        <span class="text-muted-foreground text-sm">~</span>
+        <Input type="datetime-local" v-model="dateRange.end" class="w-48" />
         <Button
           v-if="dateRange.start || dateRange.end"
           variant="ghost"
           size="sm"
           @click="clearDateRange"
-          >清除</Button
+          >{{ t('logs.clear') }}</Button
         >
         <span
           v-if="dateRangeError"
@@ -44,10 +44,10 @@
       </div>
       <Select v-model="providerFilter">
         <SelectTrigger class="w-28 truncate">
-          <SelectValue placeholder="全部供应商" />
+          <SelectValue :placeholder="t('logs.allProviders')" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">全部供应商</SelectItem>
+          <SelectItem value="all">{{ t('logs.allProviders') }}</SelectItem>
           <SelectItem v-for="p in providers" :key="p.id" :value="p.id">{{
             p.name
           }}</SelectItem>
@@ -55,10 +55,10 @@
       </Select>
       <Select v-model="modelFilter">
         <SelectTrigger class="w-32 truncate">
-          <SelectValue placeholder="全部模型" />
+          <SelectValue :placeholder="t('logs.allModels')" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">全部模型</SelectItem>
+          <SelectItem value="all">{{ t('logs.allModels') }}</SelectItem>
           <SelectItem v-for="m in filteredModelOptions" :key="m" :value="m">{{
             m
           }}</SelectItem>
@@ -66,10 +66,10 @@
       </Select>
       <Select v-model="keyFilter">
         <SelectTrigger class="w-32 truncate">
-          <SelectValue placeholder="全部密钥" />
+          <SelectValue :placeholder="t('logs.allKeys')" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">全部密钥</SelectItem>
+          <SelectItem value="all">{{ t('logs.allKeys') }}</SelectItem>
           <SelectItem v-for="rk in routerKeys" :key="rk.id" :value="rk.id">{{
             rk.name
           }}</SelectItem>
@@ -77,12 +77,12 @@
       </Select>
       <Select v-model="statusFilter">
         <SelectTrigger class="w-28 truncate">
-          <SelectValue placeholder="全部状态" />
+          <SelectValue :placeholder="t('logs.allStatus')" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">全部状态</SelectItem>
+          <SelectItem value="all">{{ t('logs.allStatus') }}</SelectItem>
           <SelectItem value="200">200</SelectItem>
-          <SelectItem value="non200">非 200</SelectItem>
+          <SelectItem value="non200">{{ t('logs.non200') }}</SelectItem>
         </SelectContent>
       </Select>
     </div>
@@ -92,18 +92,18 @@
         <TableHeader>
           <TableRow class="bg-muted">
             <TableHead class="w-10"></TableHead>
-            <TableHead class="text-muted-foreground">ID</TableHead>
-            <TableHead class="text-muted-foreground">时间</TableHead>
-            <TableHead class="text-muted-foreground">类型</TableHead>
-            <TableHead class="text-muted-foreground">模型</TableHead>
-            <TableHead class="text-muted-foreground">实际转发</TableHead>
-            <TableHead class="text-muted-foreground">状态码</TableHead>
-            <TableHead class="text-muted-foreground">延迟</TableHead>
-            <TableHead class="text-muted-foreground">流式</TableHead>
-            <TableHead class="text-muted-foreground">重试</TableHead>
-            <TableHead class="text-muted-foreground">故障转移</TableHead>
-            <TableHead class="text-muted-foreground">错误</TableHead>
-            <TableHead class="text-muted-foreground">操作</TableHead>
+            <TableHead class="text-muted-foreground">{{ t('logs.table.id') }}</TableHead>
+            <TableHead class="text-muted-foreground">{{ t('logs.table.time') }}</TableHead>
+            <TableHead class="text-muted-foreground">{{ t('logs.table.type') }}</TableHead>
+            <TableHead class="text-muted-foreground">{{ t('logs.table.model') }}</TableHead>
+            <TableHead class="text-muted-foreground">{{ t('logs.table.actualForward') }}</TableHead>
+            <TableHead class="text-muted-foreground">{{ t('logs.table.statusCode') }}</TableHead>
+            <TableHead class="text-muted-foreground">{{ t('logs.table.latency') }}</TableHead>
+            <TableHead class="text-muted-foreground">{{ t('logs.table.streaming') }}</TableHead>
+            <TableHead class="text-muted-foreground">{{ t('logs.table.retry') }}</TableHead>
+            <TableHead class="text-muted-foreground">{{ t('logs.table.failover') }}</TableHead>
+            <TableHead class="text-muted-foreground">{{ t('logs.table.error') }}</TableHead>
+            <TableHead class="text-muted-foreground">{{ t('logs.table.actions') }}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -140,7 +140,7 @@
             <TableCell
               :colspan="TABLE_COL_COUNT"
               class="text-center text-muted-foreground py-8"
-              >暂无日志</TableCell
+              >{{ t('logs.noLogs') }}</TableCell
             >
           </TableRow>
         </TableBody>
@@ -149,7 +149,7 @@
 
     <div class="flex items-center justify-between mt-4">
       <p class="text-sm text-muted-foreground">
-        共 {{ total }} 条，第 {{ page }} / {{ totalPages }} 页
+        {{ t('logs.pagination', { total, page, totalPages }) }}
       </p>
       <div class="flex items-center gap-1">
         <Button
@@ -157,14 +157,14 @@
           size="sm"
           @click="goToPage(1)"
           :disabled="page <= 1"
-          >首页</Button
+          >{{ t('logs.firstPage') }}</Button
         >
         <Button
           variant="outline"
           size="sm"
           @click="goToPage(page - 1)"
           :disabled="page <= 1"
-          >上一页</Button
+          >{{ t('logs.prevPage') }}</Button
         >
         <template v-for="item in pageNumbers" :key="item">
           <span v-if="item === '...'" class="px-2 text-sm text-muted-foreground"
@@ -184,14 +184,14 @@
           size="sm"
           @click="goToPage(page + 1)"
           :disabled="page >= totalPages"
-          >下一页</Button
+          >{{ t('logs.nextPage') }}</Button
         >
         <Button
           variant="outline"
           size="sm"
           @click="goToPage(totalPages)"
           :disabled="page >= totalPages"
-          >末页</Button
+          >{{ t('logs.lastPage') }}</Button>
         >
       </div>
     </div>
@@ -206,20 +206,20 @@
     <Dialog v-model:open="showCleanup">
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>清理日志</DialogTitle>
+          <DialogTitle>{{ t('logs.cleanup.title') }}</DialogTitle>
         </DialogHeader>
-        <p class="text-sm text-muted-foreground">删除指定天数之前的日志</p>
+        <p class="text-sm text-muted-foreground">{{ t('logs.cleanup.description') }}</p>
         <div class="mb-4">
           <Label class="block text-sm font-medium text-foreground mb-1"
-            >保留最近天数</Label
+            >{{ t('logs.cleanup.keepRecentDays') }}</Label
           >
           <Input v-model.number="cleanupDays" type="number" :min="1" />
         </div>
         <Separator />
         <div class="space-y-3">
-          <div class="text-sm font-medium">自动清理设置</div>
+          <div class="text-sm font-medium">{{ t('logs.cleanup.autoCleanup') }}</div>
           <div class="flex items-center gap-3">
-            <Label class="whitespace-nowrap">保留天数</Label>
+            <Label class="whitespace-nowrap">{{ t('logs.cleanup.retentionDays') }}</Label>
             <Input
               type="number"
               v-model.number="retentionDays"
@@ -227,7 +227,7 @@
               :max="90"
               class="w-20"
             />
-            <span class="text-xs text-muted-foreground">0 = 不自动清理</span>
+            <span class="text-xs text-muted-foreground">{{ t('logs.cleanup.noAutoCleanup') }}</span>
           </div>
           <div class="flex justify-end">
             <Button
@@ -235,13 +235,13 @@
               @click="saveRetention"
               :disabled="retentionSaving"
             >
-              保存设置
+              {{ t('logs.cleanup.saveSettings') }}
             </Button>
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" @click="showCleanup = false">取消</Button>
-          <Button variant="destructive" @click="handleCleanup">确认清理</Button>
+          <Button variant="outline" @click="showCleanup = false">{{ t('common.cancel') }}</Button>
+          <Button variant="destructive" @click="handleCleanup">{{ t('logs.cleanup.confirmCleanup') }}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -250,14 +250,14 @@
     <AlertDialog v-model:open="showCleanupResult">
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>清理完成</AlertDialogTitle>
+          <AlertDialogTitle>{{ t('logs.cleanupResult.title') }}</AlertDialogTitle>
           <AlertDialogDescription
-            >已删除 {{ cleanupResult }} 条日志。</AlertDialogDescription
+            >{{ t('logs.cleanupResult.description', { count: cleanupResult }) }}</AlertDialogDescription
           >
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogAction @click="showCleanupResult = false"
-            >确定</AlertDialogAction
+            >{{ t('logs.cleanupResult.ok') }}</AlertDialogAction
           >
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -267,6 +267,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -308,6 +309,8 @@ import LogTableRow from "@/components/logs/LogTableRow.vue";
 import { useLogFilters } from "@/composables/useLogFilters";
 import { useLogs } from "@/composables/useLogs";
 import { useLogRetention } from "@/composables/useLogRetention";
+
+const { t } = useI18n();
 
 const {
   PERIODS,

@@ -1,0 +1,40 @@
+{
+  "title": "系统设置",
+  "retention": {
+    "title": "日志保留策略",
+    "desc": "超过保留天数的日志将被自动清理",
+    "daysLabel": "保留天数",
+    "integerRequired": "请输入整数",
+    "rangeError": "请输入 {min}-{max} 之间的整数"
+  },
+  "storage": {
+    "title": "存储管理",
+    "desc": "监控数据库大小并配置自动清理阈值",
+    "dbTotalSize": "数据库总大小",
+    "logSize": "请求日志大小",
+    "logFileSize": "日志文件大小",
+    "dbMaxSizeLabel": "数据库大小上限 (MB)",
+    "logMaxSizeLabel": "日志表大小上限 (MB)",
+    "minValueError": "请输入不小于 {min} 的数值",
+    "logExceedsDbError": "日志表上限不应超过数据库上限",
+    "thresholdsUpdated": "存储阈值已更新",
+    "updateFailed": "更新失败"
+  },
+  "importExport": {
+    "title": "配置导入导出",
+    "desc": "导出当前配置或从文件恢复",
+    "export": "导出配置",
+    "import": "导入配置",
+    "exportSuccess": "配置已导出",
+    "exportFailed": "导出失败",
+    "unsupportedVersion": "不支持的配置文件版本",
+    "invalidJson": "无效的 JSON 文件",
+    "importSuccess": "配置已导入",
+    "importFailed": "导入失败",
+    "confirmImport": "确认导入配置",
+    "importWarning": "导入将覆盖当前的供应商、映射、密钥等配置。安全设置（密码、JWT）将保留不变。",
+    "confirmButton": "确认导入",
+    "importing": "导入中...",
+    "importComplete": "导入完成："
+  }
+}

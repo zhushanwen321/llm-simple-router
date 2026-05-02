@@ -1,5 +1,6 @@
 import { ref, computed } from 'vue'
 import { toast } from 'vue-sonner'
+import { useI18n } from 'vue-i18n'
 import { api, getApiMessage } from '@/api/client'
 import type { LogEntry } from '@/components/logs/types'
 
@@ -7,6 +8,7 @@ const PAGE_SIZE = 20
 const MS_PER_DAY = 86400000
 
 export function useLogs() {
+  const { t } = useI18n()
   const logs = ref<LogEntry[]>([])
   const total = ref(0)
   const page = ref(1)
@@ -35,7 +37,7 @@ export function useLogs() {
       childLoading.value = {}
     } catch (e: unknown) {
       console.error('Failed to load logs:', e)
-      toast.error(getApiMessage(e, '加载日志失败'))
+      toast.error(getApiMessage(e, t('logs.messages.loadFailed')))
     }
   }
 
@@ -60,7 +62,7 @@ export function useLogs() {
       showCleanupResult.value = true
     } catch (e: unknown) {
       console.error('Failed to cleanup logs:', e)
-      toast.error(getApiMessage(e, '清理日志失败'))
+      toast.error(getApiMessage(e, t('logs.messages.cleanupFailed')))
     }
   }
 
@@ -77,7 +79,7 @@ export function useLogs() {
         childLogs.value[id] = await api.getLogChildren(id)
       } catch (e: unknown) {
         console.error('Failed to load child logs:', e)
-        toast.error(getApiMessage(e, '加载子请求失败'))
+        toast.error(getApiMessage(e, t('logs.messages.loadSubRequestsFailed')))
       } finally {
         childLoading.value[id] = false
       }
@@ -90,7 +92,7 @@ export function useLogs() {
       logDetailOpen.value = true
     } catch (e: unknown) {
       console.error('Failed to load log detail:', e)
-      toast.error(getApiMessage(e, '加载日志详情失败'))
+      toast.error(getApiMessage(e, t('logs.messages.loadDetailFailed')))
     }
   }
 

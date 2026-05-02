@@ -3,22 +3,22 @@
     <!-- Header -->
     <div class="flex items-center justify-between">
       <div>
-        <h2 class="text-lg font-semibold text-foreground">模型映射</h2>
+        <h2 class="text-lg font-semibold text-foreground">{{ t('mappings.title') }}</h2>
         <div class="flex gap-2 mt-1">
-          <span class="text-[11px] px-2 py-0.5 rounded-full bg-muted/40 text-muted-foreground">{{ draftEntries.length }} 条映射</span>
-          <span class="text-[11px] px-2 py-0.5 rounded-full bg-muted/40 text-muted-foreground">{{ activeCount }} 启用</span>
-          <span v-if="hasChanges" class="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400">有未保存的修改</span>
+          <span class="text-[11px] px-2 py-0.5 rounded-full bg-muted/40 text-muted-foreground">{{ t('mappings.totalMappings', { count: draftEntries.length }) }}</span>
+          <span class="text-[11px] px-2 py-0.5 rounded-full bg-muted/40 text-muted-foreground">{{ t('mappings.enabledCount', { count: activeCount }) }}</span>
+          <span v-if="hasChanges" class="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400">{{ t('mappings.unsavedChanges') }}</span>
         </div>
       </div>
       <Button v-if="!editing" size="sm" variant="outline" @click="enterEdit">
         <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-        编辑
+        {{ t('common.edit') }}
       </Button>
       <div v-else class="flex gap-2">
-        <Button size="sm" variant="outline" @click="cancelEdit">取消</Button>
+        <Button size="sm" variant="outline" @click="cancelEdit">{{ t('common.cancel') }}</Button>
         <Button size="sm" :disabled="saving || !hasChanges" @click="saveAll">
           <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-          {{ saving ? '保存中...' : '保存' }}
+          {{ saving ? t('common.saving') : t('common.save') }}
         </Button>
       </div>
     </div>
@@ -40,12 +40,12 @@
     <AlertDialog :open="!!deleteTarget" @update:open="(val: boolean) => { if (!val) deleteTarget = null }">
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>确认删除</AlertDialogTitle>
-          <AlertDialogDescription>确定要删除映射「{{ deleteTarget?.clientModel }}」吗？</AlertDialogDescription>
+          <AlertDialogTitle>{{ t('common.confirmDelete') }}</AlertDialogTitle>
+          <AlertDialogDescription>{{ t('mappings.confirmDeleteDesc', { model: deleteTarget?.clientModel }) }}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>取消</AlertDialogCancel>
-          <Button variant="destructive" @click="confirmDelete">删除</Button>
+          <AlertDialogCancel>{{ t('common.cancel') }}</AlertDialogCancel>
+          <Button variant="destructive" @click="confirmDelete">{{ t('common.delete') }}</Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -54,6 +54,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { api, getApiMessage } from '@/api/client'
 import { Button } from '@/components/ui/button'
@@ -63,6 +64,8 @@ import type { MappingEntry, MappingTarget } from '@/components/quick-setup/types
 import type { ProviderGroup } from '@/components/mappings/cascading-types'
 import type { MappingGroup, Provider, Rule } from '@/types/mapping'
 import { DEFAULT_CONTEXT_WINDOW } from '@/constants'
+
+const { t } = useI18n()
 
 // --- State ---
 const groups = ref<MappingGroup[]>([])
@@ -199,7 +202,7 @@ async function saveAll() {
         try {
           await api.deleteMappingGroup(entry.existingId)
         } catch (e: unknown) {
-          errors.push(`删除 ${cm} 失败: ${getApiMessage(e, "")}`)
+          errors.push(`${t('mappings.messages.deleteFailed', { model: cm })}: ${getApiMessage(e, "")}`)
         }
       }
     }
@@ -219,7 +222,7 @@ async function saveAll() {
             await api.toggleMappingGroup(result.id)
           }
         } catch (e: unknown) {
-          errors.push(`创建 ${entry.clientModel} 失败: ${getApiMessage(e, "")}`)
+          errors.push(`${t('mappings.messages.createFailed', { model: entry.clientModel })}: ${getApiMessage(e, "")}`)
         }
       } else {
         // Existing entry — update rule if changed
@@ -234,7 +237,7 @@ async function saveAll() {
               rule: JSON.stringify({ targets: entry.targets }),
             })
           } catch (e: unknown) {
-            errors.push(`更新 ${entry.clientModel} 失败: ${getApiMessage(e, "")}`)
+            errors.push(`${t('mappings.messages.updateFailed', { model: entry.clientModel })}: ${getApiMessage(e, "")}`)
           }
         }
 
@@ -242,7 +245,7 @@ async function saveAll() {
           try {
             await api.toggleMappingGroup(originalEntry.existingId)
           } catch (e: unknown) {
-            errors.push(`切换 ${entry.clientModel} 状态失败: ${getApiMessage(e, "")}`)
+            errors.push(`${t('mappings.messages.toggleFailed', { model: entry.clientModel })}: ${getApiMessage(e, "")}`)
           }
         }
       }
@@ -252,12 +255,12 @@ async function saveAll() {
     editing.value = false
 
     if (errors.length > 0) {
-      toast.error(`${errors.length} 个操作失败`)
+      toast.error(t('mappings.messages.partialFail', { count: errors.length }))
     } else {
-      toast.success('保存成功')
+      toast.success(t('common.saveSuccess'))
     }
   } catch (e: unknown) {
-    toast.error(getApiMessage(e, '保存失败'))
+    toast.error(getApiMessage(e, t('mappings.messages.saveFailed')))
   } finally {
     saving.value = false
   }

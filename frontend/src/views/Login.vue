@@ -19,15 +19,15 @@
             </svg>
           </div>
           <h1 class="text-xl font-semibold text-foreground">LLM Simple Router</h1>
-          <p class="text-sm text-muted-foreground mt-1">管理后台登录</p>
+          <p class="text-sm text-muted-foreground mt-1">{{ t('login.subtitle') }}</p>
         </div>
         <form @submit.prevent="handleLogin" class="space-y-4">
           <div>
-            <Label class="block text-sm font-medium text-foreground mb-1">密码</Label>
+            <Label class="block text-sm font-medium text-foreground mb-1">{{ t('login.password') }}</Label>
             <Input
               v-model="password"
               type="password"
-              placeholder="输入管理员密码"
+              :placeholder="t('login.passwordPlaceholder')"
               :disabled="loading"
             />
           </div>
@@ -37,7 +37,7 @@
             class="w-full"
             :disabled="loading"
           >
-            {{ loading ? '登录中...' : '登 录' }}
+            {{ loading ? t('login.loggingIn') : t('login.loginButton') }}
           </Button>
         </form>
       </CardContent>
@@ -47,6 +47,8 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 import { useRouter } from 'vue-router'
 import { api, getApiMessage } from '@/api/client'
 import { Card, CardContent } from '@/components/ui/card'
@@ -71,7 +73,7 @@ async function handleLogin() {
     await api.login(password.value)
     router.push('/')
   } catch (e: unknown) {
-    error.value = getApiMessage(e, '登录失败')
+    error.value = getApiMessage(e, t('login.loginFailed'))
   } finally {
     loading.value = false
   }

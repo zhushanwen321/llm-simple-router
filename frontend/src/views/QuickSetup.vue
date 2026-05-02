@@ -3,7 +3,7 @@
     <!-- Row 1: Client Selection -->
     <Card>
       <CardHeader class="pb-3">
-        <CardTitle class="text-sm font-medium">选择客户端</CardTitle>
+        <CardTitle class="text-sm font-medium">{{ t('quickSetup.client.selectClient') }}</CardTitle>
       </CardHeader>
       <CardContent>
         <div class="flex gap-2 flex-wrap">
@@ -27,7 +27,7 @@
             >{{ c.icon }}</span>
             <div class="text-left">
               <div class="font-medium text-sm leading-tight">{{ c.name }}</div>
-              <div class="text-[10px] opacity-60 leading-tight">{{ c.format }} · {{ c.description }}</div>
+              <div class="text-[10px] opacity-60 leading-tight">{{ c.format }} · {{ t(c.descriptionKey) }}</div>
             </div>
           </button>
         </div>
@@ -37,17 +37,17 @@
     <!-- Row 2: Provider Config -->
     <Card>
       <CardHeader class="pb-3">
-        <CardTitle class="text-sm font-medium">供应商配置</CardTitle>
+        <CardTitle class="text-sm font-medium">{{ t('quickSetup.provider.config') }}</CardTitle>
       </CardHeader>
       <CardContent class="space-y-4">
         <!-- Line 1: Provider / Plan / Format / BaseURL / APIKey -->
         <div class="flex items-end gap-2">
           <div class="w-40 space-y-1">
-            <Label class="text-xs text-muted-foreground">供应商</Label>
+            <Label class="text-xs text-muted-foreground">{{ t('quickSetup.provider.label') }}</Label>
             <Select :model-value="selectedGroup" @update:model-value="(v: unknown) => onProviderChange(v as string)">
-              <SelectTrigger class="w-full"><SelectValue placeholder="选择" /></SelectTrigger>
+              <SelectTrigger class="w-full"><SelectValue :placeholder="t('quickSetup.provider.select')" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="__custom__">自定义</SelectItem>
+                <SelectItem value="__custom__">{{ t('quickSetup.provider.custom') }}</SelectItem>
                 <SelectItem v-for="g in providerGroups" :key="g.group" :value="g.group">{{ g.group }}</SelectItem>
               </SelectContent>
             </Select>
@@ -55,7 +55,7 @@
           <!-- Custom mode: show format + editable base url -->
           <template v-if="isCustomProvider">
             <div class="w-28 space-y-1">
-              <Label class="text-xs text-muted-foreground">格式</Label>
+              <Label class="text-xs text-muted-foreground">{{ t('quickSetup.provider.format') }}</Label>
               <Select v-model="apiType">
                 <SelectTrigger class="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -72,16 +72,16 @@
           <!-- Preset mode: show plan + readonly base url -->
           <template v-else>
             <div class="w-28 space-y-1">
-              <Label class="text-xs text-muted-foreground">套餐</Label>
+              <Label class="text-xs text-muted-foreground">{{ t('quickSetup.provider.plan') }}</Label>
               <Select :model-value="selectedPlan" @update:model-value="(v: unknown) => onPlanChange(v as string)">
-                <SelectTrigger class="w-full"><SelectValue placeholder="选择" /></SelectTrigger>
+                <SelectTrigger class="w-full"><SelectValue :placeholder="t('quickSetup.provider.select')" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem v-for="p in availablePlans" :key="p.plan" :value="p.plan">{{ p.plan }}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div class="w-28 space-y-1">
-              <Label class="text-xs text-muted-foreground">格式</Label>
+              <Label class="text-xs text-muted-foreground">{{ t('quickSetup.provider.format') }}</Label>
               <Select v-model="apiType">
                 <SelectTrigger class="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -96,21 +96,21 @@
             </div>
           </template>
           <div class="w-64 space-y-1">
-            <Label class="text-xs text-muted-foreground">API Key</Label>
-            <Input v-model="apiKey" type="password" placeholder="输入 API Key" />
+            <Label class="text-xs text-muted-foreground">{{ t('quickSetup.provider.apiKey') }}</Label>
+            <Input v-model="apiKey" type="password" :placeholder="t('quickSetup.provider.apiKeyPlaceholder')" />
           </div>
           <div class="shrink-0 space-y-1">
-            <Label class="text-xs text-muted-foreground invisible">连接</Label>
+            <Label class="text-xs text-muted-foreground invisible">{{ t('quickSetup.provider.connect') }}</Label>
             <Button variant="outline" size="sm" :disabled="connectionStatus === 'testing'" @click="testConnection">
               <template v-if="connectionStatus === 'testing'">
                 <svg class="w-3.5 h-3.5 mr-1 animate-spin" fill="none" viewBox="0 0 24 24">
                   <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                   <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
-                测试中
+                {{ t('quickSetup.provider.testing') }}
               </template>
-              <template v-else-if="connectionStatus === 'ok'">已连接</template>
-              <template v-else>测试</template>
+              <template v-else-if="connectionStatus === 'ok'">{{ t('quickSetup.provider.connected') }}</template>
+              <template v-else>{{ t('quickSetup.provider.test') }}</template>
             </Button>
           </div>
         </div>
@@ -118,11 +118,11 @@
         <!-- Line 2: Model Cards -->
         <div class="border-t pt-3">
           <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-medium text-muted-foreground">模型配置</span>
+            <span class="text-xs font-medium text-muted-foreground">{{ t('quickSetup.model.config') }}</span>
             <Badge variant="secondary" class="text-[10px]">{{ enabledModelCount }}/{{ modelConfigs.length }}</Badge>
           </div>
           <p v-if="modelConfigs.length === 0" class="py-4 text-center text-xs text-muted-foreground">
-            请先选择供应商与套餐
+            {{ t('quickSetup.model.selectProviderFirst') }}
           </p>
           <div v-else class="grid grid-cols-4 gap-2">
             <ModelCard
@@ -138,15 +138,15 @@
           </div>
           <!-- Custom mode: add model input -->
           <div v-if="isCustomProvider" class="flex gap-2 mt-2">
-            <Input v-model="customModelInput" placeholder="输入模型名称" @keydown.enter.prevent="handleAddCustomModel" class="flex-1" />
-            <Button type="button" variant="outline" size="sm" @click="handleAddCustomModel" :disabled="!customModelInput.trim()">添加</Button>
+            <Input v-model="customModelInput" :placeholder="t('quickSetup.model.namePlaceholder')" @keydown.enter.prevent="handleAddCustomModel" class="flex-1" />
+            <Button type="button" variant="outline" size="sm" @click="handleAddCustomModel" :disabled="!customModelInput.trim()">{{ t('common.add') }}</Button>
           </div>
         </div>
 
         <!-- Line 3: Concurrency Control -->
         <div class="border-t pt-3">
           <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-medium text-muted-foreground">并发控制</span>
+            <span class="text-xs font-medium text-muted-foreground">{{ t('quickSetup.concurrency.control') }}</span>
           </div>
           <ConcurrencyControl
             :mode="concurrencyMode"
@@ -168,8 +168,8 @@
       <Card class="col-span-3">
         <CardHeader class="pb-3">
           <div class="flex items-center justify-between">
-            <CardTitle class="text-sm font-medium">模型映射</CardTitle>
-            <Badge variant="secondary" class="text-[10px]">{{ mappingEntries.length }} 条</Badge>
+            <CardTitle class="text-sm font-medium">{{ t('quickSetup.mapping.title') }}</CardTitle>
+            <Badge variant="secondary" class="text-[10px]">{{ t('quickSetup.mapping.count', { count: mappingEntries.length }) }}</Badge>
           </div>
         </CardHeader>
         <CardContent>
@@ -191,17 +191,17 @@
         <Card>
           <CardHeader class="pb-3">
             <div class="flex items-center justify-between">
-              <CardTitle class="text-sm font-medium">重试规则</CardTitle>
-              <Badge variant="secondary" class="text-[10px]">{{ selectedRetryRules.size }} 条已选</Badge>
+              <CardTitle class="text-sm font-medium">{{ t('quickSetup.retry.title') }}</CardTitle>
+              <Badge variant="secondary" class="text-[10px]">{{ t('quickSetup.retry.selectedCount', { count: selectedRetryRules.size }) }}</Badge>
             </div>
           </CardHeader>
           <CardContent>
             <div v-if="recommendedRules.length === 0" class="py-6 text-center text-xs text-muted-foreground">
               <template v-if="allRecommendedRules.length === 0">
-                所有推荐规则已创建，无需重复添加
+                {{ t('quickSetup.retry.allCreated') }}
               </template>
               <template v-else>
-                选择供应商后显示推荐规则
+                {{ t('quickSetup.retry.selectProviderFirst') }}
               </template>
             </div>
             <div v-else class="space-y-1.5 max-h-[320px] overflow-y-auto">
@@ -224,12 +224,12 @@
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-1.5">
                     <span class="text-xs font-medium">{{ rule.name }}</span>
-                    <Badge v-if="rule.exists" variant="secondary" class="text-[9px] px-1.5 py-0 leading-none bg-muted text-muted-foreground">已配置</Badge>
+                    <Badge v-if="rule.exists" variant="secondary" class="text-[9px] px-1.5 py-0 leading-none bg-muted text-muted-foreground">{{ t('quickSetup.retry.configured') }}</Badge>
                     <Badge v-else-if="rule.providers && rule.providers.length > 0" variant="outline" class="text-[9px] px-1 py-0 leading-none">{{ rule.providers[0] }}</Badge>
-                    <Badge v-else variant="secondary" class="text-[9px] px-1 py-0 leading-none">通用</Badge>
+                    <Badge v-else variant="secondary" class="text-[9px] px-1 py-0 leading-none">{{ t('quickSetup.retry.general') }}</Badge>
                   </div>
                   <div class="text-[10px] text-muted-foreground mt-0.5">
-                    {{ rule.status_code }} · {{ rule.retry_strategy === 'fixed' ? '固定' : '指数退避' }} · {{ rule.retry_delay_ms / 1000 }}s · {{ rule.max_retries }}次
+                    {{ rule.status_code }} · {{ rule.retry_strategy === 'fixed' ? t('quickSetup.retry.fixed') : t('quickSetup.retry.exponential') }} · {{ rule.retry_delay_ms / 1000 }}s · {{ rule.max_retries }}{{ t('quickSetup.retry.times') }}
                   </div>
                 </div>
               </div>
@@ -240,7 +240,7 @@
         <!-- Transform Rules -->
         <Card>
           <CardHeader class="pb-3">
-            <CardTitle class="text-sm font-medium">转换规则</CardTitle>
+            <CardTitle class="text-sm font-medium">{{ t('quickSetup.transform.title') }}</CardTitle>
           </CardHeader>
           <CardContent>
             <TransformRulesForm
@@ -263,32 +263,32 @@
       <template v-if="selectedGroup">
         <Badge variant="secondary" class="text-[10px]">{{ clientTypeLabel }}</Badge>
         <span class="text-muted-foreground/50">→</span>
-        <Badge variant="secondary" class="text-[10px]">{{ isCustomProvider ? '自定义' : selectedGroup }}</Badge>
+        <Badge variant="secondary" class="text-[10px]">{{ isCustomProvider ? t('quickSetup.provider.custom') : selectedGroup }}</Badge>
       </template>
       <template v-if="enabledModelCount > 0">
         <span class="text-muted-foreground/50 mx-0.5">·</span>
-        <span>{{ enabledModelCount }} 模型</span>
+        <span>{{ t('quickSetup.footer.models', { count: enabledModelCount }) }}</span>
       </template>
       <template v-if="mappingEntries.length > 0">
         <span class="text-muted-foreground/50 mx-0.5">·</span>
-        <span>{{ mappingEntries.length }} 映射</span>
+        <span>{{ t('quickSetup.footer.mappings', { count: mappingEntries.length }) }}</span>
       </template>
       <template v-if="selectedRetryRules.size > 0">
         <span class="text-muted-foreground/50 mx-0.5">·</span>
-        <span>{{ selectedRetryRules.size }} 规则</span>
+        <span>{{ t('quickSetup.footer.rules', { count: selectedRetryRules.size }) }}</span>
       </template>
     </div>
     <div class="flex items-center gap-2">
-      <Button size="sm" variant="outline" @click="validateConfig">验证</Button>
+      <Button size="sm" variant="outline" @click="validateConfig">{{ t('quickSetup.footer.validate') }}</Button>
       <Button size="sm" :disabled="saving" @click="submit">
         <template v-if="saving">
           <svg class="w-3.5 h-3.5 mr-1 animate-spin" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
-          保存中
+          {{ t('quickSetup.footer.saving') }}
         </template>
-        <template v-else>保存配置</template>
+        <template v-else>{{ t('quickSetup.footer.saveConfig') }}</template>
       </Button>
     </div>
   </div>
@@ -296,6 +296,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { useQuickSetup, type ConcurrencyMode } from '@/composables/useQuickSetup'
 import ModelCard from '@/components/quick-setup/ModelCard.vue'
@@ -311,6 +312,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
+
+const { t } = useI18n()
 
 const {
   clientType, providerGroups, selectedGroup, selectedPlan,
@@ -350,9 +353,9 @@ function removeModel(index: number) {
 }
 
 function validateConfig() {
-  if (!selectedGroup.value) { toast.error('请选择供应商'); return }
-  if (!apiKey.value.trim()) { toast.error('请填写 API Key'); return }
-  if (enabledModelCount.value === 0) { toast.error('至少启用一个模型'); return }
-  toast.success('配置验证通过')
+  if (!selectedGroup.value) { toast.error(t('quickSetup.messages.selectProvider')); return }
+  if (!apiKey.value.trim()) { toast.error(t('quickSetup.messages.fillApiKey')); return }
+  if (enabledModelCount.value === 0) { toast.error(t('quickSetup.messages.enableOneModel')); return }
+  toast.success(t('quickSetup.messages.validationPassed'))
 }
 </script>

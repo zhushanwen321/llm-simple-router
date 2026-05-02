@@ -1,0 +1,63 @@
+{
+  "title": "Retry Rules",
+  "addRule": "Add Rule",
+  "tableHeaders": {
+    "name": "Name",
+    "statusCode": "HTTP Status Code",
+    "bodyPattern": "Body Pattern",
+    "retryStrategy": "Retry Strategy",
+    "status": "Status",
+    "actions": "Actions"
+  },
+  "strategy": {
+    "fixed": "Fixed Interval",
+    "exponential": "Exponential Backoff"
+  },
+  "times": "{count} times",
+  "upperLimit": "max {value}s",
+  "noRules": "No rules yet",
+  "dialog": {
+    "editRule": "Edit Rule",
+    "addRule": "Add Rule",
+    "name": "Name",
+    "statusCode": "HTTP Status Code",
+    "bodyPattern": "Body Pattern",
+    "bodyPatternPlaceholder": "Regex pattern, e.g. .*rate_limit.*",
+    "retryStrategy": "Retry Strategy",
+    "selectStrategy": "Select strategy",
+    "intervalMs": "Interval (ms)",
+    "initialDelayMs": "Initial Delay (ms)",
+    "maxRetries": "Max Retries",
+    "maxDelayMs": "Max Delay (ms)",
+    "enable": "Enable"
+  },
+  "deleteConfirm": {
+    "title": "Confirm Delete",
+    "description": "Are you sure you want to delete rule \"{name}\"?"
+  },
+  "recommended": {
+    "title": "Recommended Retry Rules ({count})",
+    "selectAll": "Select All",
+    "addSelected": "Add Selected ({count})",
+    "headers": {
+      "name": "Name",
+      "statusCode": "Status Code",
+      "pattern": "Pattern",
+      "strategy": "Strategy"
+    }
+  },
+  "messages": {
+    "loadFailed": "Failed to load data",
+    "saveFailed": "Failed to save rule",
+    "deleteFailed": "Failed to delete rule",
+    "addedCount": "Added {count} rules"
+  },
+  "validation": {
+    "nameRequired": "Please enter a name",
+    "statusCodeRange": "Range {min}-{max}",
+    "bodyPatternRequired": "Please enter a pattern",
+    "bodyPatternInvalid": "Invalid regex pattern",
+    "delayMin": "Cannot be less than {min}ms",
+    "retriesRange": "Range 0-{max}"
+  }
+}

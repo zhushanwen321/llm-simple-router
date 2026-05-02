@@ -3,17 +3,17 @@
     <!-- 粘性控制栏：结构化/原始切换 + 复制 -->
     <div v-if="!mode" class="flex items-center justify-between py-2 border-b mb-2 sticky top-0 z-10 bg-background">
       <TabsList>
-        <TabsTrigger value="structured">结构化</TabsTrigger>
-        <TabsTrigger value="raw">{{ isStream ? '原始 SSE 文本' : '原始 JSON' }}</TabsTrigger>
+        <TabsTrigger value="structured">{{ t('logs.viewer.structured') }}</TabsTrigger>
+        <TabsTrigger value="raw">{{ isStream ? t('logs.viewer.rawSseText') : t('logs.viewer.rawJson') }}</TabsTrigger>
       </TabsList>
       <Button variant="ghost" size="xs" class="h-auto py-1" @click="copyRaw">
-        {{ copied ? '已复制' : '复制' }}
+        {{ copied ? t('logs.viewer.copied') : t('logs.viewer.copy') }}
       </Button>
     </div>
 
     <TabsContent value="structured" class="space-y-3">
       <template v-if="parseError">
-        <div class="text-destructive text-sm">解析失败，请切换到原始 JSON 查看</div>
+        <div class="text-destructive text-sm">{{ t('logs.viewer.parseError') }}</div>
       </template>
       <template v-else>
         <!-- Status -->
@@ -25,7 +25,7 @@
         <Collapsible>
           <CollapsibleTrigger as-child>
             <Button variant="ghost" size="xs" class="px-0 h-auto text-xs">
-              Headers ({{ headerEntries.length }} 个)
+              {{ t('logs.viewer.headers', { count: headerEntries.length }) }}
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent>
@@ -33,8 +33,8 @@
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead class="w-1/3">Key</TableHead>
-                    <TableHead>Value</TableHead>
+                    <TableHead class="w-1/3">{{ t('logs.viewer.key') }}</TableHead>
+                    <TableHead>{{ t('logs.viewer.value') }}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -66,7 +66,7 @@
                 <CardContent>
                   <Collapsible>
                     <CollapsibleTrigger as-child>
-                      <Button variant="ghost" size="xs" class="px-0 h-auto text-xs">内容</Button>
+                      <Button variant="ghost" size="xs" class="px-0 h-auto text-xs">{{ t('logs.viewer.content') }}</Button>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
                       <pre class="mt-1 whitespace-pre-wrap break-all text-xs bg-muted rounded-md p-2 border">{{ choice.content }}</pre>
@@ -152,8 +152,8 @@
         <template v-else>
           <div class="space-y-3">
             <div class="flex gap-1">
-              <Button variant="ghost" :class="streamTab === 'assembled' ? 'bg-secondary' : ''" size="xs" class="h-auto py-1" @click="streamTab = 'assembled'">完整响应</Button>
-              <Button variant="ghost" :class="streamTab === 'raw-events' ? 'bg-secondary' : ''" size="xs" class="h-auto py-1" @click="streamTab = 'raw-events'">原始事件流</Button>
+              <Button variant="ghost" :class="streamTab === 'assembled' ? 'bg-secondary' : ''" size="xs" class="h-auto py-1" @click="streamTab = 'assembled'">{{ t('logs.viewer.completeResponse') }}</Button>
+              <Button variant="ghost" :class="streamTab === 'raw-events' ? 'bg-secondary' : ''" size="xs" class="h-auto py-1" @click="streamTab = 'raw-events'">{{ t('logs.viewer.rawEvents') }}</Button>
             </div>
 
             <!-- 完整响应 -->
@@ -168,12 +168,12 @@
                 <div v-for="(blk, idx) in assembledBlocks" :key="idx" :class="['rounded-md border p-3', blockBorderClass(blk.type)]">
                   <div class="flex items-center gap-2 mb-2">
                     <Badge :class="blockClass(blk.type)">{{ blk.type }}</Badge>
-                    <span class="text-xs text-muted-foreground">{{ blk.eventCount }} 个 delta 事件</span>
+                    <span class="text-xs text-muted-foreground">{{ t('logs.viewer.deltaEvents', { count: blk.eventCount }) }}</span>
                     <span v-if="blk.toolName" class="text-xs font-mono">{{ blk.toolName }}</span>
                   </div>
                   <template v-if="blk.content.length > 500 && !expandedBlock[idx]">
                     <pre class="whitespace-pre-wrap break-all text-sm bg-muted rounded-md p-3 border">{{ blk.content.slice(0, 500) }}...</pre>
-                    <Button variant="link" size="xs" class="px-0" @click="expandedBlock[idx] = true">展开全部</Button>
+                    <Button variant="link" size="xs" class="px-0" @click="expandedBlock[idx] = true">{{ t('logs.viewer.expandAll') }}</Button>
                   </template>
                   <pre v-else class="whitespace-pre-wrap break-all text-sm bg-muted rounded-md p-3 border max-h-[40vh] overflow-auto">{{ blk.content }}</pre>
                 </div>
@@ -223,7 +223,7 @@
                   <span class="text-muted-foreground">finish_reason:</span> {{ openaiSseFinishReason }}
                 </div>
                 <div v-if="openaiSseCollapsedCount > 0" class="text-xs text-muted-foreground">
-                  +{{ openaiSseCollapsedCount }} 个 delta 事件已折叠
+                  {{ t('logs.viewer.collapsedEvents', { count: openaiSseCollapsedCount }) }}
                 </div>
                 <div v-if="openaiSseUsage" class="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <Card class="bg-muted/40"><CardContent class="py-2 px-3 text-xs">
@@ -255,7 +255,7 @@
                 />
                 <SseEventLine v-for="(group, idx) in anthropicDeltaGroups" :key="'dg-' + idx"
                   event-type="content_block_delta"
-                  :summary="`${group.deltaType} · keep ${group.kept} 个${group.folded > 0 ? ` +${group.folded} 个已折叠 (${group.foldedChars} 字符)` : ''}`"
+                  :summary="formatDeltaGroupSummary(group)"
                 />
                 <SseEventLine v-if="anthropicMessageDelta"
                   event-type="message_delta"
@@ -264,7 +264,7 @@
                 />
                 <SseEventLine v-if="anthropicMessageStop"
                   event-type="message_stop"
-                  summary="流结束"
+                  :summary="t('logs.viewer.streamEnd')"
                 />
               </template>
             </template>
@@ -281,6 +281,7 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useClipboard } from '@/composables/useClipboard'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -302,6 +303,7 @@ const props = defineProps<{
   mode?: 'structured' | 'raw'
 }>()
 
+const { t } = useI18n()
 const parsed = computed(() => {
   try {
     return JSON.parse(props.raw) as { statusCode?: number; headers?: Record<string, string>; body?: string }
@@ -393,5 +395,20 @@ const { copied, copy: clipboardCopy } = useClipboard()
 
 async function copyRaw() {
   await clipboardCopy(props.raw)
+}
+
+interface DeltaGroup {
+  deltaType: string
+  kept: number
+  folded: number
+  foldedChars: number
+}
+
+function formatDeltaGroupSummary(group: DeltaGroup): string {
+  const base = t('logs.viewer.deltaGroupSummary', { deltaType: group.deltaType, kept: group.kept })
+  if (group.folded > 0) {
+    return base + t('logs.viewer.deltaFoldedInfo', { folded: group.folded, chars: group.foldedChars })
+  }
+  return base
 }
 </script>

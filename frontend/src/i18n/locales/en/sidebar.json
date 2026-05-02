@@ -1,0 +1,54 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "providers": "Providers",
+    "modelMappings": "Model Mappings",
+    "schedules": "Schedule Management",
+    "routerKeys": "API Keys",
+    "retryRules": "Retry Rules",
+    "proxyEnhancement": "Proxy Enhancement (Experimental)",
+    "monitor": "Realtime Monitor",
+    "logs": "Request Logs",
+    "settings": "Settings",
+    "agentConfig": "Agent Config",
+    "quickSetup": "Quick Setup",
+    "monitoring": "Monitoring"
+  },
+  "theme": {
+    "light": "Light Mode",
+    "dark": "Dark Mode"
+  },
+  "language": {
+    "switchToEn": "English",
+    "switchToZh": "中文"
+  },
+  "logout": "Logout",
+  "upgrade": {
+    "newVersion": "New version available",
+    "oneClickUpgrade": "One-click Upgrade",
+    "upgrading": "Upgrading...",
+    "configUpdated": "Recommended config updated",
+    "configUpdatedDesc": "Provider or retry rules have new versions",
+    "source": "Source",
+    "syncConfig": "Sync Config",
+    "syncing": "Syncing...",
+    "upToDate": "You're on the latest version with up-to-date config",
+    "notChecked": "Not checked",
+    "checkedAt": "Checked at {time}",
+    "checkNow": "Check Now",
+    "confirmUpgrade": "Confirm upgrade to {version}?",
+    "upgradeSuccess": "Upgrade successful",
+    "restartNeeded": "Upgraded to {version}. Service restart required.",
+    "laterRestart": "Restart Later",
+    "restartNow": "Restart Now",
+    "dockerDeploy": "Detected {type} deployment, please update manually:",
+    "checkFailed": "Check failed",
+    "upgradeFailed": "Upgrade failed",
+    "syncFailed": "Sync failed",
+    "saveFailed": "Failed to save",
+    "configSyncSuccess": "Config synced successfully",
+    "restartSent": "Restart command sent, waiting for service to recover...",
+    "restartFailed": "Restart failed",
+    "upgradeDesc": "Will execute {command}. Service restart is required after upgrade."
+  }
+}

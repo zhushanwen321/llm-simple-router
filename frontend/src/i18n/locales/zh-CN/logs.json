@@ -1,0 +1,98 @@
+{
+  "title": "请求日志",
+  "cleanupLogs": "清理日志",
+  "clear": "清除",
+  "allProviders": "全部供应商",
+  "allModels": "全部模型",
+  "allKeys": "全部密钥",
+  "allStatus": "全部状态",
+  "non200": "非 200",
+  "noLogs": "暂无日志",
+  "pagination": "共 {total} 条，第 {page} / {totalPages} 页",
+  "firstPage": "首页",
+  "prevPage": "上一页",
+  "nextPage": "下一页",
+  "lastPage": "末页",
+  "cleanup": {
+    "title": "清理日志",
+    "description": "删除指定天数之前的日志",
+    "keepRecentDays": "保留最近天数",
+    "autoCleanup": "自动清理设置",
+    "retentionDays": "保留天数",
+    "noAutoCleanup": "0 = 不自动清理",
+    "saveSettings": "保存设置",
+    "confirmCleanup": "确认清理"
+  },
+  "cleanupResult": {
+    "title": "清理完成",
+    "description": "已删除 {count} 条日志。",
+    "ok": "确定"
+  },
+  "table": {
+    "id": "ID",
+    "time": "时间",
+    "type": "类型",
+    "model": "模型",
+    "actualForward": "实际转发",
+    "statusCode": "状态码",
+    "latency": "延迟",
+    "streaming": "流式",
+    "retry": "重试",
+    "failover": "故障转移",
+    "error": "错误",
+    "actions": "操作"
+  },
+  "row": {
+    "copyFullId": "复制完整 ID",
+    "replaced": "已替换",
+    "proxyEnhancement": "代理增强：{label}",
+    "unknown": "未知",
+    "detail": "详情"
+  },
+  "messages": {
+    "loadFailed": "加载日志失败",
+    "cleanupFailed": "清理日志失败",
+    "loadSubRequestsFailed": "加载子请求失败",
+    "loadDetailFailed": "加载日志详情失败",
+    "loadProvidersFailed": "加载供应商列表失败",
+    "loadKeysFailed": "加载密钥列表失败"
+  },
+  "validation": {
+    "endTimeAfterStart": "结束时间须晚于开始时间"
+  },
+  "retention": {
+    "saved": "日志保留天数已更新",
+    "updateFailed": "更新保留天数失败",
+    "loadFailed": "加载保留天数失败，使用默认值"
+  },
+  "viewer": {
+    "structured": "结构化",
+    "rawData": "原始数据",
+    "rawJson": "原始 JSON",
+    "rawSse": "原始 SSE",
+    "copied": "已复制",
+    "copyJson": "复制 JSON",
+    "copy": "复制",
+    "parseError": "解析失败，请切换到原始 JSON 查看",
+    "claudeCodeRequest": "Claude Code 请求",
+    "headers": "Headers ({count} 个)",
+    "key": "Key",
+    "expand": "展开",
+    "expandAll": "展开全部",
+    "collapse": "收起",
+    "moreTools": "+{count}",
+    "otherFields": "其他字段",
+    "deltaEvents": "{count} 个 delta 事件",
+    "completeResponse": "完整响应",
+    "rawEvents": "原始事件流",
+    "streamEnd": "流结束",
+    "content": "内容",
+    "deltaGroupSummary": "{deltaType} · keep {kept} 个",
+    "deltaFoldedInfo": " +{folded} 个已折叠 ({chars} 字符)",
+    "collapsedEvents": "已折叠事件",
+    "rawSseText": "原始 SSE 文本",
+    "thinkingTokens": "思考 Token",
+    "toolsCount": "工具 ({count})",
+    "value": "值"
+  }
+}

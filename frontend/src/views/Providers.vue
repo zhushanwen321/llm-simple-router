@@ -2,15 +2,15 @@
 <template>
   <div class="p-6">
     <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-semibold text-foreground">供应商</h2>
+      <h2 class="text-lg font-semibold text-foreground">{{ t('providers.title') }}</h2>
       <div class="flex items-center gap-2">
         <Button variant="outline" size="sm" @click="handleReload" :disabled="reloading">
           <RotateCw class="w-4 h-4 mr-1" :class="{ 'animate-spin': reloading }" />
-          重载插件
+          {{ t('providers.reloadPlugin') }}
         </Button>
         <Button @click="openCreate" class="flex items-center gap-1">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-          添加供应商
+          {{ t('providers.addProvider') }}
         </Button>
       </div>
     </div>
@@ -18,14 +18,14 @@
       <Table>
         <TableHeader>
           <TableRow class="bg-muted">
-            <TableHead class="text-muted-foreground">名称</TableHead>
-            <TableHead class="text-muted-foreground">类型</TableHead>
-            <TableHead class="text-muted-foreground">Base URL</TableHead>
-            <TableHead class="text-muted-foreground">API Key</TableHead>
-            <TableHead class="text-muted-foreground">模型</TableHead>
-            <TableHead class="text-muted-foreground">并发</TableHead>
-            <TableHead class="text-muted-foreground">状态</TableHead>
-            <TableHead class="text-right text-muted-foreground">操作</TableHead>
+            <TableHead class="text-muted-foreground">{{ t('providers.tableHeaders.name') }}</TableHead>
+            <TableHead class="text-muted-foreground">{{ t('providers.tableHeaders.type') }}</TableHead>
+            <TableHead class="text-muted-foreground">{{ t('providers.tableHeaders.baseUrl') }}</TableHead>
+            <TableHead class="text-muted-foreground">{{ t('providers.tableHeaders.apiKey') }}</TableHead>
+            <TableHead class="text-muted-foreground">{{ t('providers.tableHeaders.models') }}</TableHead>
+            <TableHead class="text-muted-foreground">{{ t('providers.tableHeaders.concurrency') }}</TableHead>
+            <TableHead class="text-muted-foreground">{{ t('providers.tableHeaders.status') }}</TableHead>
+            <TableHead class="text-right text-muted-foreground">{{ t('providers.tableHeaders.actions') }}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -53,7 +53,7 @@
               </div>
             </TableCell>
             <TableCell>
-              <Badge v-if="p.adaptive_enabled" variant="outline">自适应</Badge>
+              <Badge v-if="p.adaptive_enabled" variant="outline">{{ t('common.adaptive') }}</Badge>
               <Badge v-else-if="p.max_concurrency > 0" variant="secondary">{{ p.max_concurrency }}</Badge>
               <span v-else class="text-muted-foreground">-</span>
             </TableCell>
@@ -69,151 +69,151 @@
                   />
                 </span>
                 <Badge :variant="p.is_active ? 'default' : 'secondary'">
-                  {{ p.is_active ? '启用' : '禁用' }}
+                  {{ p.is_active ? t('common.enabled') : t('common.disabled') }}
                 </Badge>
               </Button>
             </TableCell>
             <TableCell class="text-right">
-              <Button variant="ghost" size="sm" @click="openEdit(p)" class="text-muted-foreground hover:text-primary mr-2">编辑</Button>
-              <Button variant="ghost" size="sm" @click="confirmDelete(p)" class="text-muted-foreground hover:text-destructive">删除</Button>
+              <Button variant="ghost" size="sm" @click="openEdit(p)" class="text-muted-foreground hover:text-primary mr-2">{{ t('common.edit') }}</Button>
+              <Button variant="ghost" size="sm" @click="confirmDelete(p)" class="text-muted-foreground hover:text-destructive">{{ t('common.delete') }}</Button>
             </TableCell>
           </TableRow>
           <TableRow v-if="providers.length === 0">
-            <TableCell colspan="8" class="text-center text-muted-foreground py-8">暂无供应商</TableCell>
+            <TableCell colspan="8" class="text-center text-muted-foreground py-8">{{ t('providers.noProviders') }}</TableCell>
           </TableRow>
         </TableBody>
       </Table>
     </div>
     <!-- Create/Edit Dialog -->
     <Dialog v-model:open="dialogOpen">
-      <DialogContent class="sm:max-w-4xl max-h-[85vh] overflow-y-auto">
+      <DialogContent>
         <DialogHeader>
-          <DialogTitle>{{ editingId ? '编辑供应商' : '添加供应商' }}</DialogTitle>
+          <DialogTitle>{{ editingId ? t('providers.editProvider') : t('providers.addProvider') }}</DialogTitle>
         </DialogHeader>
-        <form @submit.prevent="handleSave" class="space-y-4">
-          <!-- 模板选择 (仅新建模式) -->
-          <div v-if="!editingId" class="rounded-md border-2 border-primary/30 bg-primary/5 p-3 space-y-2">
-            <div class="flex items-center gap-1.5 text-xs font-semibold text-primary">
-              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-              模板选择
-            </div>
+        <form @submit.prevent="handleSave" class="space-y-3">
+          <!-- 快速配置 -->
+          <div class="rounded-md border bg-muted/40 p-3 space-y-2">
+            <div class="text-xs font-medium text-muted-foreground">{{ t('providers.quickConfig.title') }}</div>
             <div class="flex gap-2">
               <Select v-model="presetGroup" @update:model-value="onGroupChange">
-                <SelectTrigger class="flex-1 border-primary/40"><SelectValue placeholder="选择供应商模板" /></SelectTrigger>
+                <SelectTrigger class="flex-1">
+                  <SelectValue :placeholder="t('providers.quickConfig.selectProvider')" />
+                </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__custom__">自定义</SelectItem>
                   <SelectItem v-for="g in providerPresets" :key="g.group" :value="g.group">{{ g.group }}</SelectItem>
                 </SelectContent>
               </Select>
-              <Select v-if="presetGroup !== '__custom__'" v-model="presetPlan" @update:model-value="onPresetChange" :disabled="!presetGroup || presetGroup === '__custom__'">
-                <SelectTrigger class="flex-1 border-primary/40"><SelectValue placeholder="选择套餐" /></SelectTrigger>
+              <Select v-model="presetPlan" @update:model-value="onPresetChange" :disabled="!presetGroup">
+                <SelectTrigger class="flex-1">
+                  <SelectValue :placeholder="t('providers.quickConfig.selectPlan')" />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem v-for="p in availablePlans" :key="p.plan" :value="p.plan">{{ p.plan }}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
-
-          <!-- 未选模板提示 (仅新建模式) -->
-          <div v-if="!presetGroup && !editingId" class="flex flex-col items-center justify-center py-10 text-muted-foreground">
-            <svg class="w-10 h-10 mb-3 opacity-30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 12l2 2 4-4"/></svg>
-            <span class="text-sm">请先选择模板，或使用自定义模式</span>
-          </div>
-
-          <template v-if="presetGroup || editingId">
-          <!-- 基本信息 2x2 -->
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <Label class="text-xs text-muted-foreground">名称</Label>
-              <Input v-model="form.name" type="text" required class="mt-1" @input="delete errors.name" />
-              <p v-if="errors.name" class="text-xs text-destructive mt-0.5">{{ errors.name }}</p>
-            </div>
-            <div>
-              <Label class="text-xs text-muted-foreground">API 类型</Label>
-              <Select v-model="form.api_type" class="mt-1">
-                <SelectTrigger><SelectValue placeholder="选择" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="openai">OpenAI</SelectItem>
-                  <SelectItem value="anthropic">Anthropic</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label class="text-xs text-muted-foreground">Base URL</Label>
-              <Input v-model="form.base_url" type="url" required class="mt-1 font-mono text-xs" @input="delete errors.base_url" />
-              <p v-if="errors.base_url" class="text-xs text-destructive mt-0.5">{{ errors.base_url }}</p>
-            </div>
-            <div>
-              <Label class="text-xs text-muted-foreground">API Key</Label>
-              <Input v-model="form.api_key" type="text" :required="!editingId" :placeholder="editingId ? '留空保持原密钥' : ''" class="mt-1" @input="delete errors.api_key" />
-              <p v-if="errors.api_key" class="text-xs text-destructive mt-0.5">{{ errors.api_key }}</p>
-            </div>
-          </div>
-
-          <!-- 可用模型 -->
           <div>
-            <Label class="text-xs text-muted-foreground mb-2">可用模型</Label>
-            <div class="grid grid-cols-3 gap-2 mb-3">
-              <div v-for="(m, i) in form.models" :key="i">
-                <ModelCard
-                  :model="{ name: m.name, contextWindow: m.context_window ?? 200000, enabled: true, patches: m.patches ?? [] }"
-                  :api-type="form.api_type"
-                  :is-deep-seek="m.name.toLowerCase().includes('deepseek')"
-                  :is-non-openai-endpoint="!isOfficialOpenai(form.base_url)"
-                  @update:model="updateModel(i, $event)"
-                  @remove="removeModel(i)"
-                />
-              </div>
+            <Label class="block text-sm font-medium text-foreground mb-1">{{ t('providers.fields.name') }}</Label>
+            <Input v-model="form.name" type="text" required @input="delete errors.name" />
+            <p v-if="errors.name" class="text-sm text-destructive mt-1">{{ errors.name }}</p>
+          </div>
+          <div>
+            <Label class="block text-sm font-medium text-foreground mb-1">{{ t('providers.fields.apiType') }}</Label>
+            <Select v-model="form.api_type">
+              <SelectTrigger>
+                <SelectValue :placeholder="t('providers.quickConfig.selectApiType')" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="openai">OpenAI</SelectItem>
+                <SelectItem value="anthropic">Anthropic</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label class="block text-sm font-medium text-foreground mb-1">{{ t('providers.fields.baseUrl') }}</Label>
+            <Input v-model="form.base_url" type="url" required @input="delete errors.base_url" />
+            <p v-if="errors.base_url" class="text-sm text-destructive mt-1">{{ errors.base_url }}</p>
+          </div>
+          <div>
+            <Label class="block text-sm font-medium text-foreground mb-1">{{ t('providers.fields.apiKey') }}</Label>
+            <Input v-model="form.api_key" type="text" :required="!editingId" :placeholder="editingId ? t('providers.fields.apiKeyPlaceholder') : ''" @input="delete errors.api_key" />
+            <p v-if="errors.api_key" class="text-sm text-destructive mt-1">{{ errors.api_key }}</p>
+          </div>
+          <div>
+            <Label class="block text-sm font-medium text-foreground mb-1">{{ t('providers.fields.availableModels') }}</Label>
+            <div class="flex flex-wrap gap-1.5 mb-1.5">
+              <Badge v-for="(m, i) in form.models" :key="i" variant="secondary" class="gap-1 pr-1">
+                {{ m.name }}
+                <span class="text-muted-foreground">({{ formatContextWindow(m.context_window ?? DEFAULT_CONTEXT_WINDOW) }})</span>
+                <Button type="button" variant="ghost" size="icon" class="h-4 w-4 rounded-full hover:bg-muted p-0 text-xs leading-none" @click="removeModel(i)">&times;</Button>
+              </Badge>
             </div>
             <div class="flex gap-2">
-              <Input v-model="modelInput" placeholder="输入模型名称" @keydown.enter.prevent="addModel" class="flex-1" />
+              <Input v-model="modelInput" :placeholder="t('providers.fields.modelInputPlaceholder')" @keydown.enter.prevent="addModel" class="flex-1" />
               <Select v-model="contextWindowSelect">
-                <SelectTrigger class="w-28"><SelectValue placeholder="上下文" /></SelectTrigger>
+                <SelectTrigger class="w-28">
+                  <SelectValue :placeholder="t('providers.fields.context')" />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem v-for="opt in CONTEXT_WINDOW_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</SelectItem>
                 </SelectContent>
               </Select>
-              <Button type="button" variant="outline" size="sm" @click="addModel" :disabled="!modelInput.trim()">添加</Button>
+              <Button type="button" variant="outline" size="sm" @click="addModel" :disabled="!modelInput.trim()">{{ t('providers.fields.addModel') }}</Button>
             </div>
           </div>
-
-          <!-- 并发控制 + 转换规则 2 columns -->
-          <div class="grid grid-cols-2 gap-4">
-            <!-- 并发控制 -->
-            <div class="border rounded-md p-3 space-y-3">
-              <div class="text-xs font-medium text-muted-foreground">并发控制</div>
-              <ConcurrencyControl
-                :mode="concurrencyMode"
-                :max-concurrency="form.max_concurrency"
-                :queue-timeout-ms="form.queue_timeout_ms"
-                :max-queue-size="form.max_queue_size"
-                compact
-                @update:mode="(v: unknown) => onConcurrencyModeChange(v as 'auto' | 'manual' | 'none')"
-                @update:max-concurrency="form.max_concurrency = $event"
-                @update:queue-timeout-ms="form.queue_timeout_ms = $event"
-                @update:max-queue-size="form.max_queue_size = $event"
-              />
-            </div>
-
-            <!-- 转换规则 -->
-            <div class="border rounded-md p-3 space-y-3">
-              <div class="text-xs font-medium text-muted-foreground">转换规则</div>
-              <TransformRulesForm
-                :inject-headers="transformForm.injectHeadersInput"
-                :drop-fields="transformForm.dropFieldsInput"
-                :request-defaults="transformForm.requestDefaultsInput"
-                @update:inject-headers="transformForm.injectHeadersInput = $event"
-                @update:drop-fields="transformForm.dropFieldsInput = $event"
-                @update:request-defaults="transformForm.requestDefaultsInput = $event"
-              />
+          <!-- 并发控制 -->
+          <div class="border-t pt-4 mt-4">
+            <div class="text-sm font-medium text-foreground mb-3">{{ t('providers.concurrency.title') }}</div>
+            <div class="space-y-3">
+              <div>
+                <Label class="block text-sm font-medium text-foreground mb-1">{{ t('providers.concurrency.mode') }}</Label>
+                <Select v-model="concurrencyMode" @update:model-value="(v: unknown) => onConcurrencyModeChange(v as 'auto' | 'manual' | 'none')">
+                  <SelectTrigger>
+                    <SelectValue :placeholder="t('providers.concurrency.selectMode')" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="auto">{{ t('providers.concurrency.autoAdaptive') }}</SelectItem>
+                    <SelectItem value="manual">{{ t('providers.concurrency.manual') }}</SelectItem>
+                    <SelectItem value="none">{{ t('providers.concurrency.none') }}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div v-if="concurrencyMode !== 'none'" class="space-y-2">
+                <div>
+                  <Label class="block text-sm font-medium text-foreground mb-1">{{ t('providers.concurrency.maxConcurrency') }}</Label>
+                  <Input v-model.number="form.max_concurrency" type="number" min="1" :max="MAX_CONCURRENCY" :placeholder="concurrencyMode === 'auto' ? '10' : '3'" @input="delete errors.max_concurrency" />
+                  <p v-if="errors.max_concurrency" class="text-sm text-destructive mt-1">{{ errors.max_concurrency }}</p>
+                </div>
+                <div>
+                  <Label class="block text-sm font-medium text-foreground mb-1">{{ t('providers.concurrency.queueTimeout') }}</Label>
+                  <Input v-model.number="form.queue_timeout_ms" type="number" min="0" :placeholder="t('providers.concurrency.queueTimeoutPlaceholder')" @input="delete errors.queue_timeout_ms" />
+                  <p v-if="errors.queue_timeout_ms" class="text-sm text-destructive mt-1">{{ errors.queue_timeout_ms }}</p>
+                </div>
+                <div>
+                  <Label class="block text-sm font-medium text-foreground mb-1">{{ t('providers.concurrency.maxQueueSize') }}</Label>
+                  <Input v-model.number="form.max_queue_size" type="number" min="1" :max="MAX_QUEUE_SIZE" :placeholder="DEFAULT_QUEUE_SIZE" @input="delete errors.max_queue_size" />
+                  <p v-if="errors.max_queue_size" class="text-sm text-destructive mt-1">{{ errors.max_queue_size }}</p>
+                </div>
+              </div>
             </div>
           </div>
-
-          </template>
-
+          <!-- 转换规则面板（仅在编辑现有 Provider 时显示） -->
+          <Collapsible v-if="editingId" v-model:open="transformOpen" class="border rounded-md p-3 mt-2">
+            <CollapsibleTrigger class="flex items-center justify-between w-full text-sm font-medium text-foreground">
+              {{ t('providers.transform.title') }}
+              <ChevronDown class="w-4 h-4 transition-transform" :class="transformOpen ? 'rotate-180' : ''" />
+            </CollapsibleTrigger>
+            <CollapsibleContent class="mt-3 space-y-3">
+              <div><Label class="text-xs text-muted-foreground">{{ t('providers.transform.injectHeaders') }}</Label><Input v-model="transformForm.injectHeadersInput" placeholder='{"x-custom": "value"}' class="mt-1" /></div>
+              <div><Label class="text-xs text-muted-foreground">{{ t('providers.transform.dropFields') }}</Label><Input v-model="transformForm.dropFieldsInput" placeholder="logprobs, frequency_penalty" class="mt-1" /></div>
+              <div><Label class="text-xs text-muted-foreground">{{ t('providers.transform.requestDefaults') }}</Label><Input v-model="transformForm.requestDefaultsInput" placeholder='{"max_tokens": 4096}' class="mt-1" /></div>
+              <div class="flex gap-2"><Button type="button" variant="outline" size="sm" @click="saveTransformRules(editingId!)">{{ t('providers.transform.saveRules') }}</Button><Button type="button" variant="ghost" size="sm" @click="handleDeleteTransformRules(editingId!)" v-if="transformForm.exists">{{ t('providers.transform.deleteRules') }}</Button></div>
+            </CollapsibleContent>
+          </Collapsible>
           <DialogFooter>
-            <Button type="button" variant="outline" @click="dialogOpen = false">取消</Button>
-            <Button type="submit">保存</Button>
+            <Button type="button" variant="outline" @click="dialogOpen = false">{{ t('common.cancel') }}</Button>
+            <Button type="submit">{{ t('common.save') }}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -222,12 +222,12 @@
     <AlertDialog :open="!!deleteTarget" @update:open="(val) => { if (!val) deleteTarget = null }">
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>确认删除</AlertDialogTitle>
-          <AlertDialogDescription>确定要删除供应商「{{ deleteTarget?.name }}」吗？此操作不可撤销。</AlertDialogDescription>
+          <AlertDialogTitle>{{ t('providers.confirmDelete.title') }}</AlertDialogTitle>
+          <AlertDialogDescription>{{ t('providers.confirmDelete.message', { name: deleteTarget?.name }) }}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>取消</AlertDialogCancel>
-          <Button variant="destructive" @click="handleDelete">删除</Button>
+          <AlertDialogCancel>{{ t('common.cancel') }}</AlertDialogCancel>
+          <Button variant="destructive" @click="handleDelete">{{ t('common.delete') }}</Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -235,18 +235,18 @@
     <AlertDialog :open="!!toggleTarget" @update:open="(val: boolean) => { if (!val) toggleTarget = null }">
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>确认{{ toggleTarget?.is_active ? '禁用' : '启用' }}</AlertDialogTitle>
+          <AlertDialogTitle>{{ toggleTarget?.is_active ? t('providers.confirmToggle.titleDisable') : t('providers.confirmToggle.titleEnable') }}</AlertDialogTitle>
           <AlertDialogDescription>
-            确定要{{ toggleTarget?.is_active ? '禁用' : '启用' }}供应商「{{ toggleTarget?.name }}」吗？
+            {{ toggleTarget?.is_active ? t('providers.confirmToggle.messageDisable', { name: toggleTarget?.name }) : t('providers.confirmToggle.messageEnable', { name: toggleTarget?.name }) }}
             <div v-if="toggleDependencies.length" class="mt-2 space-y-1">
-              <div class="text-sm font-medium">以下映射分组正在使用此供应商：</div>
+              <div class="text-sm font-medium">{{ t('providers.confirmToggle.dependencyWarning') }}</div>
               <div v-for="ref in toggleDependencies" :key="ref" class="text-destructive text-sm">{{ ref }}</div>
             </div>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>取消</AlertDialogCancel>
-          <AlertDialogAction @click="handleToggle">确认</AlertDialogAction>
+          <AlertDialogCancel>{{ t('common.cancel') }}</AlertDialogCancel>
+          <AlertDialogAction @click="handleToggle">{{ t('common.confirm') }}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -254,6 +254,7 @@
 </template>
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import * as z from 'zod'
 import { api, getApiMessage, type ProviderPayload, type ProviderGroup } from '@/api/client'
@@ -267,11 +268,8 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog'
-import { RotateCw, Copy, Check } from 'lucide-vue-next'
-import ConcurrencyControl from '@/components/shared/ConcurrencyControl.vue'
-import TransformRulesForm from '@/components/shared/TransformRulesForm.vue'
-import ModelCard from '@/components/quick-setup/ModelCard.vue'
-import type { ModelConfig } from '@/components/quick-setup/types'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { ChevronDown, RotateCw, Copy, Check } from 'lucide-vue-next'
 import { useTransformRules } from '@/composables/useTransformRules'
 const DEFAULT_CONCURRENCY = 3
 const DEFAULT_CONCURRENCY_AUTO = 10
@@ -313,15 +311,17 @@ const errors = ref<Record<string, string>>({})
 type ConcurrencyMode = 'auto' | 'manual' | 'none'
 const concurrencyMode = ref<ConcurrencyMode>('auto')
 // Transform rules state
-const { transformForm, loadTransformRules, saveTransformRules } = useTransformRules()
+const transformOpen = ref(false)
+const { t } = useI18n()
+const { transformForm, loadTransformRules, saveTransformRules, handleDeleteTransformRules } = useTransformRules()
 const copiedId = ref<string | null>(null)
 const reloading = ref(false)
 const MASK_VISIBLE_LEN = 7, MASK_ASTERISK_COUNT = 7, COPY_FEEDBACK_MS = 2000
-const providerSchema = z.object({
-  name: z.string().min(1, '请输入名称').regex(/^[a-zA-Z0-9_-]+$/, '仅允许英文、数字、横线和下划线'),
-  base_url: z.string().min(1, '请输入 Base URL').url('请输入合法的 URL'),
-})
 function validate(): boolean {
+  const providerSchema = z.object({
+    name: z.string().min(1, t('providers.validation.nameRequired')).regex(/^[a-zA-Z0-9_-]+$/, t('providers.validation.namePattern')),
+    base_url: z.string().min(1, t('providers.validation.baseUrlRequired')).url(t('providers.validation.baseUrlInvalid')),
+  })
   const errs: Record<string, string> = {}
   const result = providerSchema.safeParse({ name: form.value.name.trim(), base_url: form.value.base_url.trim() })
   if (!result.success) {
@@ -330,13 +330,13 @@ function validate(): boolean {
       if (!errs[field]) errs[field] = issue.message
     }
   }
-  if (!editingId.value && !form.value.api_key.trim()) errs.api_key = '请输入 API Key'
+  if (!editingId.value && !form.value.api_key.trim()) errs.api_key = t('providers.validation.apiKeyRequired')
   if (concurrencyMode.value !== 'none') {
     const mc = form.value.max_concurrency
-    if (!mc || mc < 1 || mc > MAX_CONCURRENCY) errs.max_concurrency = `范围 1-${MAX_CONCURRENCY}`
-    if (form.value.queue_timeout_ms < 0) errs.queue_timeout_ms = '不能为负数'
+    if (!mc || mc < 1 || mc > MAX_CONCURRENCY) errs.max_concurrency = t('providers.validation.concurrencyRange', { min: 1, max: MAX_CONCURRENCY })
+    if (form.value.queue_timeout_ms < 0) errs.queue_timeout_ms = t('providers.validation.negativeNotAllowed')
     const qs = form.value.max_queue_size
-    if (!qs || qs < 1 || qs > MAX_QUEUE_SIZE) errs.max_queue_size = `范围 1-${MAX_QUEUE_SIZE}`
+    if (!qs || qs < 1 || qs > MAX_QUEUE_SIZE) errs.max_queue_size = t('providers.validation.queueSizeRange', { min: 1, max: MAX_QUEUE_SIZE })
   }
   errors.value = errs
   return Object.keys(errs).length === 0
@@ -362,14 +362,6 @@ const availablePlans = computed(() => {
   return providerPresets.value.find(g => g.group === presetGroup.value)?.presets ?? []
 })
 function onGroupChange() {
-  if (presetGroup.value === '__custom__') {
-    presetPlan.value = ''
-    form.value.name = ''
-    form.value.api_type = 'openai'
-    form.value.base_url = ''
-    form.value.models = []
-    return
-  }
   const plans = providerPresets.value.find(g => g.group === presetGroup.value)?.presets
   if (plans?.length) {
     presetPlan.value = plans[0].plan
@@ -387,7 +379,7 @@ function onPresetChange() {
   form.value.models = preset.models.map(name => ({
     name,
     context_window: DEFAULT_CONTEXT_WINDOW,
-    patches: getDefaultPatches(name, preset.apiType),
+    patches: [],
   }))
 }
 async function loadProviders() {
@@ -396,7 +388,7 @@ async function loadProviders() {
     providers.value = data
   } catch (e: unknown) {
     console.error('Failed to load providers:', e)
-    toast.error(getApiMessage(e, '加载供应商失败'))
+    toast.error(getApiMessage(e, t('providers.toast.loadFailed')))
   }
 }
 function addModel() {
@@ -413,27 +405,6 @@ function addModel() {
 }
 function removeModel(index: number) {
   form.value.models.splice(index, 1)
-}
-
-function isOfficialOpenai(url: string): boolean {
-  return url.includes('api.openai.com')
-}
-
-function updateModel(index: number, updated: ModelConfig) {
-  form.value.models[index].context_window = updated.contextWindow
-  form.value.models[index].patches = updated.patches
-}
-
-function getDefaultPatches(modelName: string, apiType: string): string[] {
-  const patches: string[] = []
-  if (modelName.toLowerCase().includes('deepseek')) {
-    if (apiType === 'anthropic') {
-      patches.push('thinking-param', 'cache-control', 'thinking-blocks', 'orphan-tool-results')
-    } else {
-      patches.push('non-ds-tools', 'orphan-tool-results-oa')
-    }
-  }
-  return patches
 }
 
 function onConcurrencyModeChange(mode: ConcurrencyMode) {
@@ -484,7 +455,7 @@ function buildPayload(): ProviderFormPayload {
     name: form.value.name,
     api_type: form.value.api_type,
     base_url: form.value.base_url,
-    models: form.value.models.map(m => ({ name: m.name, context_window: m.context_window ?? undefined, patches: m.patches ?? undefined })),
+    models: form.value.models.map(m => ({ name: m.name, context_window: m.context_window ?? undefined, patches: m.patches ?? [] })),
     is_active: form.value.is_active ? 1 : 0,
     max_concurrency: concurrencyMode.value === 'none' ? 0 : form.value.max_concurrency,
     queue_timeout_ms: concurrencyMode.value === 'none' ? 0 : form.value.queue_timeout_ms,
@@ -499,21 +470,17 @@ async function handleSave() {
   try {
     const payload = buildPayload()
     payload.name = form.value.name.trim()
-    let providerId = editingId.value
     if (editingId.value) {
       await api.updateProvider(editingId.value, payload)
     } else {
       payload.api_key = form.value.api_key
-      const result = await api.createProvider(payload)
-      providerId = result.id
+      await api.createProvider(payload)
     }
-    // Save transform rules along with the provider
-    await saveTransformRules(providerId)
     dialogOpen.value = false
     await loadProviders()
   } catch (e: unknown) {
     console.error('Failed to save provider:', e)
-    toast.error(getApiMessage(e, '保存供应商失败'))
+    toast.error(getApiMessage(e, t('providers.toast.saveFailed')))
   }
 }
 function confirmDelete(p: Provider) {
@@ -543,14 +510,14 @@ async function handleToggle() {
       const disabled = res.cascadedGroups.filter((g: { disabled: boolean }) => g.disabled).length
       const cleaned = res.cascadedGroups.length - disabled
       const parts: string[] = []
-      if (cleaned > 0) parts.push(`清理 ${cleaned} 个分组的引用`)
-      if (disabled > 0) parts.push(`禁用 ${disabled} 个分组`)
-      toast.warning(`已自动${parts.join('、')}`)
+      if (cleaned > 0) parts.push(t('providers.toast.cascadeClean', { count: cleaned }))
+      if (disabled > 0) parts.push(t('providers.toast.cascadeDisable', { count: disabled }))
+      toast.warning(t('providers.toast.cascadeAuto', { actions: parts.join(', ') }))
     }
     await loadProviders()
   } catch (e: unknown) {
     console.error('Failed to toggle provider:', e)
-    toast.error(getApiMessage(e, '切换状态失败'))
+    toast.error(getApiMessage(e, t('providers.toast.toggleFailed')))
   }
 }
 async function handleDelete() {
@@ -561,16 +528,17 @@ async function handleDelete() {
     await api.deleteProvider(target.id)
     await loadProviders()
   } catch (e: unknown) {
-    toast.error(getApiMessage(e, '删除供应商失败'))
+    console.error('Failed to delete provider:', e)
+    toast.error(getApiMessage(e, t('providers.toast.deleteFailed')))
   }
 }
 async function handleReload() {
   reloading.value = true
   try {
     const result = await api.reloadTransformRules()
-    toast.success(`插件重载完成：${result.loadedPlugins.length} 个插件，${result.rulesCount} 条规则`)
+    toast.success(t('providers.toast.reloadSuccess', { pluginCount: result.loadedPlugins.length, rulesCount: result.rulesCount }))
   } catch (e: unknown) {
-    toast.error(getApiMessage(e, '重载失败'))
+    toast.error(getApiMessage(e, t('providers.toast.reloadFailed')))
   } finally {
     reloading.value = false
   }

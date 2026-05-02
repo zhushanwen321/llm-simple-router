@@ -27,7 +27,7 @@
                 <div class="w-4 h-4 rounded-full bg-primary flex items-center justify-center text-primary-foreground">
                 <ArrowUpRight class="w-3 h-3" />
               </div>
-                <span class="text-sm font-medium">新版本可用</span>
+                <span class="text-sm font-medium">{{ t('sidebar.upgrade.newVersion') }}</span>
               </div>
               <p class="text-xs text-muted-foreground mb-2">
                 {{ upgradeStatus.npm.currentVersion }} → <span class="text-primary font-medium">{{ upgradeStatus.npm.latestVersion }}</span>
@@ -37,10 +37,10 @@
                 size="sm" class="w-full text-xs" :disabled="isUpgrading"
                 @click="showUpgradeConfirm = true"
               >
-                {{ isUpgrading ? '升级中...' : '一键升级' }}
+                {{ isUpgrading ? t('sidebar.upgrade.upgrading') : t('sidebar.upgrade.oneClickUpgrade') }}
               </Button>
               <div v-else class="text-xs text-warning bg-warning-light p-2 rounded">
-                检测到 {{ upgradeStatus.deployment === 'docker' ? 'Docker' : '未知' }} 部署，请手动更新：
+                {{ t('sidebar.upgrade.dockerDeploy', { type: upgradeStatus.deployment === 'docker' ? 'Docker' : 'Unknown' }) }}
                 <code class="block mt-1 text-warning bg-warning-dark/10 p-1 rounded">docker pull ghcr.io/zhushanwen321/llm-simple-router:latest</code>
               </div>
             </div>
@@ -50,13 +50,13 @@
                 <div class="w-4 h-4 rounded-full bg-primary flex items-center justify-center text-primary-foreground">
                 <RefreshCw class="w-3 h-3" />
               </div>
-                <span class="text-sm font-medium">推荐配置已更新</span>
+                <span class="text-sm font-medium">{{ t('sidebar.upgrade.configUpdated') }}</span>
               </div>
               <p class="text-xs text-muted-foreground mb-2">
-                供应商或重试规则有新版本
+                {{ t('sidebar.upgrade.configUpdatedDesc') }}
               </p>
               <div class="flex items-center gap-2 mb-2">
-                <span class="text-xs text-muted-foreground">来源</span>
+                <span class="text-xs text-muted-foreground">{{ t('sidebar.upgrade.source') }}</span>
                 <Select :model-value="upgradeStatus?.syncSource" @update:model-value="handleSourceChange">
                   <SelectTrigger class="h-7 text-xs flex-1">
                     <SelectValue />
@@ -68,17 +68,17 @@
                 </Select>
               </div>
               <Button size="sm" variant="secondary" class="w-full text-xs" :disabled="isSyncing" @click="handleSync">
-                {{ isSyncing ? '同步中...' : '同步配置' }}
+                {{ isSyncing ? t('sidebar.upgrade.syncing') : t('sidebar.upgrade.syncConfig') }}
               </Button>
             </div>
             <!-- 无更新 -->
             <div v-if="!upgradeStatus?.npm.hasUpdate && !upgradeStatus?.config.hasUpdate" class="p-3">
-              <p class="text-xs text-muted-foreground">当前已是最新版本，配置也是最新的</p>
+              <p class="text-xs text-muted-foreground">{{ t('sidebar.upgrade.upToDate') }}</p>
             </div>
             <!-- 底部 -->
             <div class="px-3 py-2 flex justify-between items-center text-xs text-muted-foreground">
-              <span>{{ upgradeStatus?.lastCheckedAt ? `检查于 ${parseUtc(upgradeStatus.lastCheckedAt).toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai' })}` : '未检查' }}</span>
-              <Button variant="link" class="text-primary h-auto p-0" @click="handleCheckNow">立即检查</Button>
+              <span>{{ upgradeStatus?.lastCheckedAt ? t('sidebar.upgrade.checkedAt', { time: parseUtc(upgradeStatus.lastCheckedAt).toLocaleTimeString(locale === 'zh-CN' ? 'zh-CN' : 'en', { timeZone: 'Asia/Shanghai' }) }) : t('sidebar.upgrade.notChecked') }}</span>
+              <Button variant="link" class="text-primary h-auto p-0" @click="handleCheckNow">{{ t('sidebar.upgrade.checkNow') }}</Button>
             </div>
           </PopoverContent>
         </Popover>
@@ -152,7 +152,15 @@
       >
         <Moon v-if="!isDark" class="w-4 h-4" />
         <Sun v-else class="w-4 h-4" />
-        {{ isDark ? '浅色模式' : '深色模式' }}
+        {{ isDark ? t('sidebar.theme.light') : t('sidebar.theme.dark') }}
+      </Button>
+      <Button
+        variant="ghost"
+        class="w-full justify-start text-sidebar-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent"
+        @click="handleSwitchLocale"
+      >
+        <Globe class="w-4 h-4" />
+        {{ locale === 'zh-CN' ? t('sidebar.language.switchToEn') : t('sidebar.language.switchToZh') }}
       </Button>
       <Button
         variant="ghost"
@@ -160,22 +168,22 @@
         @click="handleLogout"
       >
         <LogOut class="w-4 h-4" />
-        登出
+        {{ t('sidebar.logout') }}
       </Button>
     </div>
     <!-- 升级确认 -->
     <AlertDialog v-model:open="showUpgradeConfirm">
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>确认升级到 {{ upgradeStatus?.npm.latestVersion }}？</AlertDialogTitle>
+          <AlertDialogTitle>{{ t('sidebar.upgrade.confirmUpgrade', { version: upgradeStatus?.npm.latestVersion }) }}</AlertDialogTitle>
           <AlertDialogDescription>
-            将执行 <code class="bg-muted px-1 py-0.5 rounded text-xs">npm install -g llm-simple-router@{{ upgradeStatus?.npm.latestVersion }}</code>，升级完成后需要重启服务才能生效。
+            {{ t('sidebar.upgrade.upgradeDesc', { command: `npm install -g llm-simple-router@${upgradeStatus?.npm.latestVersion}` }) }}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>取消</AlertDialogCancel>
+          <AlertDialogCancel>{{ t('common.cancel') }}</AlertDialogCancel>
           <AlertDialogAction @click="handleUpgrade" :disabled="isUpgrading">
-            {{ isUpgrading ? '升级中...' : '确认升级' }}
+            {{ isUpgrading ? t('sidebar.upgrade.upgrading') : t('common.confirm') }}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -184,14 +192,14 @@
     <AlertDialog v-model:open="showRestartConfirm">
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>升级成功</AlertDialogTitle>
+          <AlertDialogTitle>{{ t('sidebar.upgrade.upgradeSuccess') }}</AlertDialogTitle>
           <AlertDialogDescription>
-            已升级到 {{ upgradeStatus?.npm.latestVersion }}。需要重启服务才能生效。
+            {{ t('sidebar.upgrade.restartNeeded', { version: upgradeStatus?.npm.latestVersion }) }}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel @click="showRestartConfirm = false">稍后重启</AlertDialogCancel>
-          <AlertDialogAction @click="handleRestart">立即重启</AlertDialogAction>
+          <AlertDialogCancel @click="showRestartConfirm = false">{{ t('sidebar.upgrade.laterRestart') }}</AlertDialogCancel>
+          <AlertDialogAction @click="handleRestart">{{ t('sidebar.upgrade.restartNow') }}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -200,6 +208,8 @@
 
 <script setup lang="ts">
 import { type Component, ref, onMounted, onUnmounted, computed, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useLocale } from '@/composables/useLocale'
 import { parseUtc } from '@/utils/format'
 import { useRoute, useRouter } from 'vue-router'
 import {
@@ -218,6 +228,7 @@ import {
   Sun,
   Zap,
   ChevronDown,
+  Globe,
 } from 'lucide-vue-next'
 import { api, getApiMessage } from '@/api/client'
 import { Button } from '@/components/ui/button'
@@ -234,6 +245,12 @@ import type { UpgradeStatus } from '@/api/client'
 import { useTheme } from '@/composables/useTheme'
 
 const { isDark, toggleTheme } = useTheme()
+const { t } = useI18n()
+const { locale, setLocale, toggleTarget } = useLocale()
+
+async function handleSwitchLocale() {
+  await setLocale(toggleTarget.value)
+}
 
 const appVersion = __APP_VERSION__
 
@@ -260,7 +277,7 @@ async function handleCheckNow() {
   try {
     await api.triggerUpgradeCheck()
     await loadUpgradeStatus()
-  } catch (e: unknown) { toast.error(getApiMessage(e, '检查失败')) }
+  } catch (e: unknown) { toast.error(getApiMessage(e, t('sidebar.upgrade.checkFailed'))) }
 }
 
 async function handleUpgrade() {
@@ -268,12 +285,12 @@ async function handleUpgrade() {
   isUpgrading.value = true
   try {
     await api.executeUpgrade(upgradeStatus.value.npm.latestVersion)
-    toast.success('升级成功')
+    toast.success(t('sidebar.upgrade.upgradeSuccess'))
     showUpgradeConfirm.value = false
     showRestartConfirm.value = true
     await loadUpgradeStatus()
   } catch (e: unknown) {
-    toast.error(getApiMessage(e, '升级失败'))
+    toast.error(getApiMessage(e, t('sidebar.upgrade.upgradeFailed')))
   } finally {
     isUpgrading.value = false
   }
@@ -284,10 +301,10 @@ async function handleSync() {
   isSyncing.value = true
   try {
     await api.syncConfig(source)
-    toast.success('配置同步成功')
+    toast.success(t('sidebar.upgrade.configSyncSuccess'))
     await loadUpgradeStatus()
   } catch (e: unknown) {
-    toast.error(getApiMessage(e, '同步失败'))
+    toast.error(getApiMessage(e, t('sidebar.upgrade.syncFailed')))
   } finally {
     isSyncing.value = false
   }
@@ -298,7 +315,7 @@ async function handleSourceChange(val: AcceptableValue) {
   try {
     await api.setSyncSource(val as 'github' | 'gitee')
     await loadUpgradeStatus()
-  } catch (e: unknown) { toast.error(getApiMessage(e, '保存失败')) }
+  } catch (e: unknown) { toast.error(getApiMessage(e, t('sidebar.upgrade.saveFailed'))) }
 }
 
 const updateCount = computed(() => {
@@ -331,36 +348,39 @@ interface NavGroup {
 }
 
 // 与 router/index.ts 路由定义保持同步
-const navGroups: NavGroup[] = [
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const navGroups = computed(() => {
+  return [
   {
     items: [
-      { path: '/', label: '仪表盘', icon: LayoutDashboard },
+      { path: '/', label: t('sidebar.nav.dashboard'), icon: LayoutDashboard },
     ],
   },
   {
-    label: '代理配置',
+    label: t('sidebar.nav.agentConfig'),
     expandable: true,
     items: [
-      { path: '/quick-setup', label: '快速配置', icon: Zap },
-      { path: '/providers', label: '供应商', icon: Server },
-      { path: '/mappings', label: '模型映射', icon: ArrowLeftRight },
-      { path: '/router-keys', label: 'API 密钥', icon: KeyRound },
-      { path: '/retry-rules', label: '重试规则', icon: RefreshCcw },
+      { path: '/quick-setup', label: t('sidebar.nav.quickSetup'), icon: Zap },
+      { path: '/providers', label: t('sidebar.nav.providers'), icon: Server },
+      { path: '/mappings', label: t('sidebar.nav.modelMappings'), icon: ArrowLeftRight },
+      { path: '/router-keys', label: t('sidebar.nav.routerKeys'), icon: KeyRound },
+      { path: '/retry-rules', label: t('sidebar.nav.retryRules'), icon: RefreshCcw },
     ],
   },
   {
-    label: '监控',
+    label: t('sidebar.nav.monitoring'),
     items: [
-      { path: '/monitor', label: '实时监控', icon: Activity },
-      { path: '/logs', label: '请求日志', icon: FileText },
+      { path: '/monitor', label: t('sidebar.nav.monitor'), icon: Activity },
+      { path: '/logs', label: t('sidebar.nav.logs'), icon: FileText },
     ],
   },
   {
     items: [
-      { path: '/settings', label: '系统设置', icon: Settings },
+      { path: '/settings', label: t('sidebar.nav.settings'), icon: Settings },
     ],
   },
-]
+  ] as NavGroup[]
+})
 
 const expandedGroups = ref<Set<number>>(new Set([1]))
 
@@ -390,7 +410,7 @@ function isActive(path: string): boolean {
 watch(
   () => route.path,
   () => {
-    navGroups.forEach((group, index) => {
+    navGroups.value.forEach((group, index) => {
       if (!group.expandable) return
       const hasActive = group.items.some(item => isActive(item.path))
       if (hasActive) {
@@ -404,7 +424,7 @@ watch(
 async function handleRestart() {
   try {
     await api.restartServer()
-    toast.success('重启指令已发送，等待服务恢复...')
+    toast.success(t('sidebar.upgrade.restartSent'))
     showRestartConfirm.value = false
     // 等待服务重启完成（新进程启动需要几秒）
     const RESTART_DELAY_MS = 5000
@@ -412,7 +432,7 @@ async function handleRestart() {
       window.location.reload()
     }, RESTART_DELAY_MS)
   } catch (e: unknown) {
-    toast.error(getApiMessage(e, '重启失败'))
+    toast.error(getApiMessage(e, t('sidebar.upgrade.restartFailed')))
   }
 }
 

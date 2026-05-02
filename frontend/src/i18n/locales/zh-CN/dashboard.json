@@ -1,0 +1,23 @@
+{
+  "title": "仪表盘",
+  "stats": {
+    "totalRequests": "总请求数",
+    "successRate": "成功率",
+    "tokenOutputSpeed": "Token 输出速度",
+    "tokenInputTotal": "Token 输入总量",
+    "tokenOutputTotal": "Token 输出总量"
+  },
+  "charts": {
+    "tokenOutputSpeed": "Token 输出速度 (t/s)",
+    "tokenInputTotal": "Token 输入总量",
+    "tokenOutputTotal": "Token 输出总量"
+  },
+  "period": {
+    "last5Hours": "最近5小时",
+    "weekly": "本周",
+    "monthly": "本月",
+    "custom": "自定义"
+  },
+  "loadProvidersFailed": "加载供应商列表失败",
+  "loadDashboardFailed": "加载仪表盘数据失败"
+}

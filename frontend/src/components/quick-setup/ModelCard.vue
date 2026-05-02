@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { ModelConfig } from './types'
 import { CONTEXT_WINDOW_OPTIONS } from './types'
 import PatchChips from './PatchChips.vue'
@@ -18,6 +19,8 @@ import {
 } from '@/components/ui/collapsible'
 import { ChevronDown, Trash2 } from 'lucide-vue-next'
 import { cn } from '@/lib/utils'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   model: ModelConfig
@@ -88,7 +91,7 @@ function formatCw(n: number): string {
             <SelectItem v-for="opt in CONTEXT_WINDOW_OPTIONS" :key="opt.value" :value="String(opt.value)">
               {{ opt.label }}
             </SelectItem>
-            <SelectItem value="__custom__">自定义</SelectItem>
+            <SelectItem value="__custom__">{{ t('quickSetup.model.contextCustom') }}</SelectItem>
           </SelectContent>
         </Select>
         <Input

@@ -1,0 +1,57 @@
+{
+  "title": "Realtime Monitor",
+  "connected": "Connected",
+  "disconnected": "Disconnected",
+  "activeRequests": "Active Requests",
+  "queuedRequests": "Queued Requests",
+  "completed": "Completed",
+  "noActiveRequests": "No active requests",
+  "noQueuedRequests": "No queued requests",
+  "noCompletedRequests": "No completed requests",
+  "queued": "Queued",
+  "copyId": "Copy ID",
+  "providerStats": "Provider Stats",
+  "concurrency": "Concurrency",
+  "statusCodeDistribution": "Status Code Distribution",
+  "runtime": "Runtime",
+  "header": {
+    "activeRequests": "Active Requests",
+    "streamNonStream": "{stream} streaming / {nonStream} non-streaming",
+    "errorRate": "Error Rate",
+    "p50Latency": "P50 Latency",
+    "avgLatency": "Avg {value}ms",
+    "retryRate": "Retry Rate"
+  },
+  "concurrencyPanel": {
+    "noData": "No concurrency data",
+    "adaptive": "Adaptive",
+    "unlimited": "Unlimited",
+    "queued": "Queued: {count}",
+    "queueLimit": "Queue limit: {limit}"
+  },
+  "providerTable": {
+    "noData": "No data",
+    "noProviders": "No provider stats",
+    "requests": "Requests",
+    "successRate": "Success Rate",
+    "avgLatency": "Avg Latency",
+    "retryRate": "Retry Rate",
+    "topErrors": "Top Errors"
+  },
+  "runtimePanel": {
+    "noData": "No runtime data",
+    "uptime": "Uptime",
+    "memoryRss": "Memory RSS",
+    "heapUsage": "Heap Usage",
+    "activeHandles": "Active Handles",
+    "activeRequests": "Active Requests",
+    "eventLoopDelay": "Event Loop Delay"
+  },
+  "statusCodes": {
+    "noData": "No status code data",
+    "success": "2xx Success",
+    "clientError": "4xx Client Error",
+    "rateLimited": "429 Rate Limited",
+    "serverError": "5xx Server Error"
+  }
+}

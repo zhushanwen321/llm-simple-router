@@ -2,24 +2,24 @@
   <div class="p-6">
     <div class="flex items-center justify-between mb-4">
       <div>
-        <h2 class="text-lg font-semibold text-foreground">调度管理</h2>
+        <h2 class="text-lg font-semibold text-foreground">{{ t('schedules.title') }}</h2>
         <p class="text-sm text-muted-foreground mt-1">
-          为映射组配置分时段调度规则，在不同时间段使用不同的模型和并发配置
+          {{ t('schedules.description') }}
         </p>
       </div>
     </div>
 
     <div v-if="loading" class="flex items-center justify-center py-16 text-muted-foreground text-sm">
-      Loading...
+      {{ t('common.loading') }}
     </div>
 
     <template v-if="!loading">
     <!-- 映射组选择器 -->
     <div class="mb-4">
-      <Label class="block text-sm font-medium text-foreground mb-2">选择映射组</Label>
+      <Label class="block text-sm font-medium text-foreground mb-2">{{ t('schedules.selectGroup') }}</Label>
       <Select v-model="selectedGroupId" @update:model-value="handleGroupChange">
         <SelectTrigger class="w-80">
-          <SelectValue placeholder="请选择映射组" />
+          <SelectValue :placeholder="t('schedules.selectGroupPlaceholder')" />
         </SelectTrigger>
         <SelectContent>
           <SelectItem v-for="g in groups" :key="g.id" :value="g.id">
@@ -32,10 +32,10 @@
     <!-- 调度列表 -->
     <template v-if="selectedGroupId">
       <div class="flex items-center justify-between mb-3">
-        <h3 class="text-sm font-medium text-foreground">调度规则</h3>
+        <h3 class="text-sm font-medium text-foreground">{{ t('schedules.scheduleRules') }}</h3>
         <Button size="sm" @click="openCreate">
           <Plus class="w-4 h-4 mr-1" />
-          新建调度
+          {{ t('schedules.createSchedule') }}
         </Button>
       </div>
 
@@ -43,11 +43,11 @@
         <Table>
           <TableHeader>
             <TableRow class="bg-muted">
-              <TableHead class="text-muted-foreground">名称</TableHead>
-              <TableHead class="text-muted-foreground">状态</TableHead>
-              <TableHead class="text-muted-foreground">星期</TableHead>
-              <TableHead class="text-muted-foreground">时间段</TableHead>
-              <TableHead class="text-right text-muted-foreground">操作</TableHead>
+              <TableHead class="text-muted-foreground">{{ t('schedules.tableHeaders.name') }}</TableHead>
+              <TableHead class="text-muted-foreground">{{ t('schedules.tableHeaders.status') }}</TableHead>
+              <TableHead class="text-muted-foreground">{{ t('schedules.tableHeaders.week') }}</TableHead>
+              <TableHead class="text-muted-foreground">{{ t('schedules.tableHeaders.timeRange') }}</TableHead>
+              <TableHead class="text-right text-muted-foreground">{{ t('schedules.tableHeaders.actions') }}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -55,7 +55,7 @@
               <TableCell class="font-medium">{{ s.name }}</TableCell>
               <TableCell>
                 <Badge :variant="s.enabled ? 'default' : 'secondary'">
-                  {{ s.enabled ? '启用' : '禁用' }}
+                  {{ s.enabled ? t('schedules.enabled') : t('schedules.disabled') }}
                 </Badge>
               </TableCell>
               <TableCell>
@@ -76,14 +76,14 @@
                   <Button variant="ghost" size="sm" @click="handleToggle(s)">
                     <Switch :checked="!!s.enabled" size="sm" />
                   </Button>
-                  <Button variant="ghost" size="sm" @click="openEdit(s)">编辑</Button>
-                  <Button variant="ghost" size="sm" class="text-destructive hover:text-destructive" @click="deleteTarget = s">删除</Button>
+                  <Button variant="ghost" size="sm" @click="openEdit(s)">{{ t('common.edit') }}</Button>
+                  <Button variant="ghost" size="sm" class="text-destructive hover:text-destructive" @click="deleteTarget = s">{{ t('common.delete') }}</Button>
                 </div>
               </TableCell>
             </TableRow>
             <TableRow v-if="schedules.length === 0">
               <TableCell colspan="5" class="text-center text-muted-foreground py-8">
-                暂无调度规则，点击「新建调度」添加
+                {{ t('schedules.emptyRules') }}
               </TableCell>
             </TableRow>
           </TableBody>
@@ -92,14 +92,14 @@
     </template>
 
     <div v-else class="text-center text-muted-foreground py-12 bg-card rounded-xl border">
-      请先选择一个映射组
+      {{ t('schedules.pleaseSelectGroup') }}
     </div>
 
     <!-- 创建/编辑弹窗 -->
     <Dialog v-model:open="dialogOpen">
       <DialogContent class="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{{ editingId ? '编辑调度' : '新建调度' }}</DialogTitle>
+          <DialogTitle>{{ editingId ? t('schedules.editSchedule') : t('schedules.createSchedule') }}</DialogTitle>
         </DialogHeader>
         <form @submit.prevent="handleSave" class="space-y-4">
           <!-- API 错误提示 -->
@@ -109,14 +109,14 @@
 
           <!-- 名称 -->
           <div>
-            <Label class="block text-sm font-medium text-foreground mb-1">名称</Label>
-            <Input v-model="form.name" placeholder="例如：工作日白天" @input="delete errors.name" />
+            <Label class="block text-sm font-medium text-foreground mb-1">{{ t('schedules.form.name') }}</Label>
+            <Input v-model="form.name" :placeholder="t('schedules.form.namePlaceholder')" @input="delete errors.name" />
             <p v-if="errors.name" class="text-sm text-destructive mt-1">{{ errors.name }}</p>
           </div>
 
           <!-- 星期选择 -->
           <div>
-            <Label class="block text-sm font-medium text-foreground mb-1">适用星期</Label>
+            <Label class="block text-sm font-medium text-foreground mb-1">{{ t('schedules.form.week') }}</Label>
             <div class="flex flex-wrap gap-2">
               <Button
                 v-for="(label, idx) in WEEK_LABELS"
@@ -133,9 +133,9 @@
           <!-- 时间段 -->
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <Label class="text-sm font-medium text-foreground mb-1 block">开始时间</Label>
+              <Label class="text-sm font-medium text-foreground mb-1 block">{{ t('schedules.form.startTime') }}</Label>
               <Select v-model="form.start_hour" @update:model-value="(v: unknown) => { form.start_hour = Number(v); delete errors.time }">
-                <SelectTrigger><SelectValue placeholder="选择小时" /></SelectTrigger>
+                <SelectTrigger><SelectValue :placeholder="t('schedules.form.selectHour')" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem v-for="h in 24" :key="h - 1" :value="h - 1">
                     {{ String(h - 1).padStart(2, '0') }}:00
@@ -145,9 +145,9 @@
             </div>
 
             <div>
-              <Label class="text-sm font-medium text-foreground mb-1 block">结束时间</Label>
+              <Label class="text-sm font-medium text-foreground mb-1 block">{{ t('schedules.form.endTime') }}</Label>
               <Select v-model="form.end_hour" @update:model-value="(v: unknown) => { form.end_hour = Number(v); delete errors.time }">
-                <SelectTrigger><SelectValue placeholder="选择小时" /></SelectTrigger>
+                <SelectTrigger><SelectValue :placeholder="t('schedules.form.selectHour')" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem v-for="h in 24" :key="h" :value="h">
                     {{ String(h).padStart(2, '0') }}:00
@@ -160,19 +160,19 @@
 
           <!-- 映射目标列表 -->
           <div>
-            <Label class="block text-sm font-medium text-foreground mb-1">映射目标</Label>
+            <Label class="block text-sm font-medium text-foreground mb-1">{{ t('schedules.form.targets') }}</Label>
             <div class="space-y-2">
               <div
-                v-for="(t, idx) in form.targets"
+                v-for="(tgt, idx) in form.targets"
                 :key="idx"
                 class="flex items-center gap-2"
               >
                 <div class="flex-1">
                   <CascadingModelSelect
                     :providers="providerGroups"
-                    :model-value="t.provider_id && t.backend_model ? { provider_id: t.provider_id, model: t.backend_model } : undefined"
-                    placeholder="选择模型..."
-                    @update:model-value="(v: SelectedValue) => { t.provider_id = v.provider_id; t.backend_model = v.model; delete errors.targets }"
+                    :model-value="tgt.provider_id && tgt.backend_model ? { provider_id: tgt.provider_id, model: tgt.backend_model } : undefined"
+                    :placeholder="t('schedules.form.selectModel')"
+                    @update:model-value="(v: SelectedValue) => { tgt.provider_id = v.provider_id; tgt.backend_model = v.model; delete errors.targets }"
                   />
                 </div>
                 <Button
@@ -187,7 +187,7 @@
               </div>
               <Button type="button" variant="outline" size="sm" @click="addTarget">
                 <Plus class="w-3 h-3 mr-1" />
-                添加目标
+                {{ t('schedules.form.addTarget') }}
               </Button>
             </div>
             <p v-if="errors.targets" class="text-sm text-destructive mt-1">{{ errors.targets }}</p>
@@ -197,31 +197,31 @@
           <Collapsible v-model:open="concurrencyOpen">
             <CollapsibleTrigger as-child>
               <Button type="button" variant="ghost" class="w-full justify-between px-0">
-                <span class="text-sm font-medium">并发配置（可选）</span>
+                <span class="text-sm font-medium">{{ t('schedules.form.concurrencyTitle') }}</span>
                 <ChevronDown class="h-4 w-4 transition-transform" :class="{ 'rotate-180': concurrencyOpen }" />
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent class="space-y-3 pt-2">
               <div class="grid grid-cols-3 gap-3">
                 <div>
-                  <Label class="text-xs text-muted-foreground">最大并发</Label>
-                  <Input v-model.number="form.max_concurrency" type="number" :min="1" placeholder="不限" />
+                  <Label class="text-xs text-muted-foreground">{{ t('schedules.form.maxConcurrency') }}</Label>
+                  <Input v-model.number="form.max_concurrency" type="number" :min="1" :placeholder="t('schedules.form.maxConcurrencyPlaceholder')" />
                 </div>
                 <div>
-                  <Label class="text-xs text-muted-foreground">队列超时 (ms)</Label>
-                  <Input v-model.number="form.queue_timeout_ms" type="number" :min="1000" placeholder="默认" />
+                  <Label class="text-xs text-muted-foreground">{{ t('schedules.form.queueTimeout') }}</Label>
+                  <Input v-model.number="form.queue_timeout_ms" type="number" :min="1000" :placeholder="t('schedules.form.queueTimeoutPlaceholder')" />
                 </div>
                 <div>
-                  <Label class="text-xs text-muted-foreground">最大队列</Label>
-                  <Input v-model.number="form.max_queue_size" type="number" :min="0" placeholder="默认" />
+                  <Label class="text-xs text-muted-foreground">{{ t('schedules.form.maxQueue') }}</Label>
+                  <Input v-model.number="form.max_queue_size" type="number" :min="0" :placeholder="t('schedules.form.maxQueuePlaceholder')" />
                 </div>
               </div>
             </CollapsibleContent>
           </Collapsible>
 
           <DialogFooter>
-            <Button type="button" variant="outline" @click="dialogOpen = false">取消</Button>
-            <Button type="submit">保存</Button>
+            <Button type="button" variant="outline" @click="dialogOpen = false">{{ t('common.cancel') }}</Button>
+            <Button type="submit">{{ t('common.save') }}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -231,14 +231,14 @@
     <AlertDialog :open="!!deleteTarget" @update:open="(val: boolean) => { if (!val) deleteTarget = null }">
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>确认删除</AlertDialogTitle>
+          <AlertDialogTitle>{{ t('schedules.confirmDeleteTitle') }}</AlertDialogTitle>
           <AlertDialogDescription>
-            确定要删除调度「{{ deleteTarget?.name }}」吗？此操作不可撤销。
+            {{ t('schedules.confirmDeleteMessage', { name: deleteTarget?.name ?? '' }) }}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>取消</AlertDialogCancel>
-          <Button variant="destructive" @click="handleDelete">删除</Button>
+          <AlertDialogCancel>{{ t('common.cancel') }}</AlertDialogCancel>
+          <Button variant="destructive" @click="handleDelete">{{ t('common.delete') }}</Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -248,6 +248,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { Plus, Trash2, ChevronDown } from 'lucide-vue-next'
 import { api, getApiMessage } from '@/api/client'
@@ -267,7 +268,17 @@ import { DEFAULT_CONTEXT_WINDOW } from '@/constants'
 import type { Schedule, SchedulePayload } from '@/types/schedule'
 import type { MappingGroup, Provider } from '@/types/mapping'
 
-const WEEK_LABELS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+const { t } = useI18n()
+
+const WEEK_LABELS = computed(() => [
+  t('schedules.weekDays.sun'),
+  t('schedules.weekDays.mon'),
+  t('schedules.weekDays.tue'),
+  t('schedules.weekDays.wed'),
+  t('schedules.weekDays.thu'),
+  t('schedules.weekDays.fri'),
+  t('schedules.weekDays.sat'),
+])
 
 interface TargetForm {
   backend_model: string
@@ -310,9 +321,10 @@ const errors = ref<Record<string, string>>({})
 const formError = ref('')
 
 function parseWeek(weekStr: string): string[] {
+  const labels = WEEK_LABELS.value
   let arr: number[] = []
   try { arr = JSON.parse(weekStr) } catch (e) { console.warn('Failed to parse week JSON:', e); return [] }
-  return arr.map(d => WEEK_LABELS[d] ?? String(d))
+  return arr.map(d => labels[d] ?? String(d))
 }
 
 function formatHour(h: number): string {
@@ -323,7 +335,7 @@ async function loadGroups() {
   try {
     groups.value = await api.getMappingGroups()
   } catch (e: unknown) {
-    toast.error(getApiMessage(e, '加载映射组失败'))
+    toast.error(getApiMessage(e, t('schedules.loadGroupsFailed')))
   }
 }
 
@@ -331,7 +343,7 @@ async function loadProviders() {
   try {
     providers.value = await api.getProviders()
   } catch (e: unknown) {
-    toast.error(getApiMessage(e, '加载供应商失败'))
+    toast.error(getApiMessage(e, t('schedules.loadProvidersFailed')))
   }
 }
 
@@ -350,7 +362,7 @@ async function loadSchedules() {
   try {
     schedules.value = await api.getSchedulesByGroup(selectedGroupId.value)
   } catch (e: unknown) {
-    toast.error(getApiMessage(e, '加载调度失败'))
+    toast.error(getApiMessage(e, t('schedules.loadSchedulesFailed')))
   }
 }
 
@@ -426,15 +438,15 @@ function openEdit(s: Schedule) {
 
 function validate(): boolean {
   const errs: Record<string, string> = {}
-  if (!form.value.name.trim()) errs.name = '请输入名称'
-  if (form.value.week.length === 0) errs.week = '至少选择一天'
-  if (form.value.start_hour >= form.value.end_hour) errs.time = '开始时间必须小于结束时间'
+  if (!form.value.name.trim()) errs.name = t('schedules.form.nameRequired')
+  if (form.value.week.length === 0) errs.week = t('schedules.form.weekRequired')
+  if (form.value.start_hour >= form.value.end_hour) errs.time = t('schedules.form.timeInvalid')
 
   let targetErr = ''
   for (let i = 0; i < form.value.targets.length; i++) {
-    const t = form.value.targets[i]
-    if (!t.provider_id || !t.backend_model) {
-      targetErr = '每个目标必须选择模型'
+    const tgt = form.value.targets[i]
+    if (!tgt.provider_id || !tgt.backend_model) {
+      targetErr = t('schedules.form.targetRequired')
       break
     }
   }
@@ -477,7 +489,7 @@ async function handleSave() {
     dialogOpen.value = false
     await loadSchedules()
   } catch (e: unknown) {
-    formError.value = getApiMessage(e, '保存调度失败')
+    formError.value = getApiMessage(e, t('schedules.saveFailed'))
   }
 }
 
@@ -486,7 +498,7 @@ async function handleToggle(s: Schedule) {
     await api.toggleSchedule(s.id)
     await loadSchedules()
   } catch (e: unknown) {
-    toast.error(getApiMessage(e, '切换状态失败'))
+    toast.error(getApiMessage(e, t('schedules.toggleFailed')))
   }
 }
 
@@ -498,7 +510,7 @@ async function handleDelete() {
     await api.deleteSchedule(target.id)
     await loadSchedules()
   } catch (e: unknown) {
-    toast.error(getApiMessage(e, '删除调度失败'))
+    toast.error(getApiMessage(e, t('schedules.deleteFailed')))
   }
 }
 

@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import CascadingSelect from '@/components/ui/cascading-select/CascadingSelect.vue'
 import type { CascadingGroup, CascadingSelectedValue } from '@/components/ui/cascading-select'
 import type { ProviderGroup, SelectedValue } from './cascading-types'
+
+const { t } = useI18n()
 
 const props = withDefaults(defineProps<{
   providers: ProviderGroup[]
@@ -10,8 +13,10 @@ const props = withDefaults(defineProps<{
   placeholder?: string
   compact?: boolean
 }>(), {
-  placeholder: '选择供应商 / 模型',
+  placeholder: '',
 })
+
+const resolvedPlaceholder = computed(() => props.placeholder || t('mappings.selectProviderModel'))
 
 const emit = defineEmits<{
   'update:modelValue': [value: SelectedValue]
@@ -26,7 +31,7 @@ const groups = computed<CascadingGroup[]>(() =>
   props.providers.map(g => ({
     key: g.provider.id,
     label: g.provider.name,
-    badge: g.isNew ? '新' : undefined,
+    badge: g.isNew ? t('common.new') : undefined,
     options: g.models.map(m => ({
       value: m.name,
       label: m.name,
@@ -50,7 +55,7 @@ function onUpdate(val: CascadingSelectedValue) {
   <CascadingSelect
     :groups="groups"
     :model-value="selectedValue"
-    :placeholder="placeholder"
+    :placeholder="resolvedPlaceholder"
     :compact="compact"
     @update:model-value="onUpdate"
   />
