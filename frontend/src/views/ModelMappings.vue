@@ -25,7 +25,7 @@
       :provider-groups="providerGroups"
       :show-delete="true"
       :show-add-form="true"
-      :readonly="!editing"
+      :editable="editing"
       @update:targets="updateTargets"
       @toggle-active="toggleActive"
       @remove="removeMapping"

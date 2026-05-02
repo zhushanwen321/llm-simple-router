@@ -14,11 +14,11 @@ const props = withDefaults(defineProps<{
   providerGroups: ProviderGroup[]
   showDelete?: boolean
   showAddForm?: boolean
-  readonly?: boolean
+  editable?: boolean
 }>(), {
   showDelete: false,
   showAddForm: true,
-  readonly: false,
+  editable: true,
 })
 
 const emit = defineEmits<{
@@ -140,8 +140,8 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
       <!-- Main row (click to expand) -->
       <div
         class="flex items-center px-5 py-3 cursor-pointer select-none hover:bg-muted/10"
-        :class="{ 'cursor-default hover:bg-transparent': readonly }"
-        @click="!readonly && toggleExpand(entry.clientModel)"
+        :class="{ 'cursor-default hover:bg-transparent': !editable }"
+        @click="editable && toggleExpand(entry.clientModel)"
       >
         <!-- Client model -->
         <div class="w-[140px] shrink-0 mono text-sm font-semibold text-foreground truncate" :title="entry.clientModel">
@@ -190,11 +190,11 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
             {{ entry.targets.length }}级
           </Badge>
           <span v-if="!entry.active" class="text-xs text-muted-foreground/30 shrink-0">已禁用</span>
-          <Button v-if="showDelete && !readonly" variant="ghost" size="icon-xs" class="text-muted-foreground/40 hover:text-destructive shrink-0" @click.stop="emit('remove', entry.clientModel)">
+          <Button v-if="showDelete && editable" variant="ghost" size="icon-xs" class="text-muted-foreground/40 hover:text-destructive shrink-0" @click.stop="emit('remove', entry.clientModel)">
             <Trash2 class="size-3" />
           </Button>
           <Switch
-            v-if="!readonly"
+            v-if="editable"
             :checked="entry.active"
             @update:checked="emit('toggle-active', idx)"
             class="scale-75 shrink-0"
@@ -204,7 +204,7 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
       </div>
 
       <!-- Expanded: edit mode (only in non-readonly) -->
-      <div v-if="!readonly && isExpanded(entry.clientModel)" class="border-t border-border bg-muted/5 mapping-edit-section">
+      <div v-if="editable && isExpanded(entry.clientModel)" class="border-t border-border bg-muted/5 mapping-edit-section">
         <div class="flex">
           <!-- Left: client model identity -->
           <div class="w-[140px] shrink-0 px-3 py-2 flex flex-col items-center justify-center border-r border-border bg-muted/10">
@@ -277,7 +277,7 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
     </div>
 
     <!-- Add mapping form -->
-    <div v-if="showAddForm && !readonly" class="flex items-center gap-2 px-4 py-3 border-t border-border">
+    <div v-if="showAddForm && editable" class="flex items-center gap-2 px-4 py-3 border-t border-border">
       <Input v-model="newFrom" placeholder="客户端模型" class="h-8 flex-1 text-xs mono" @keydown="handleKeydown" />
       <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" class="shrink-0 text-muted-foreground/20"><path d="M1 6h10M8 3l3 3-3 3"/></svg>
       <Input v-model="newTo" placeholder="目标模型" class="h-8 flex-1 text-xs mono" @keydown="handleKeydown" />
