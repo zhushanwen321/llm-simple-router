@@ -3,24 +3,24 @@
     <!-- 粘性控制栏：结构化/原始JSON 切换 + 复制 -->
     <div v-if="!mode" class="flex items-center justify-between py-2 border-b mb-2 sticky top-0 z-10 bg-background">
       <TabsList>
-        <TabsTrigger value="structured">结构化</TabsTrigger>
-        <TabsTrigger value="raw">原始 JSON</TabsTrigger>
+        <TabsTrigger value="structured">{{ t('logs.viewer.structured') }}</TabsTrigger>
+        <TabsTrigger value="raw">{{ t('logs.viewer.rawJson') }}</TabsTrigger>
       </TabsList>
       <Button variant="ghost" size="xs" class="h-auto py-1" @click="copyRaw">
-        {{ copied ? '已复制' : '复制 JSON' }}
+        {{ copied ? t('logs.viewer.copied') : t('logs.viewer.copyJson') }}
       </Button>
     </div>
 
     <TabsContent value="structured" class="space-y-3">
       <template v-if="parseError">
-        <div class="text-destructive text-sm">解析失败，请切换到原始 JSON 查看</div>
+        <div class="text-destructive text-sm">{{ t('logs.viewer.parseError') }}</div>
       </template>
       <template v-else>
         <!-- Claude Code context card -->
         <InfoBanner
           v-if="isClaudeCode"
           icon="CC"
-          title="Claude Code 请求"
+          :title="t('logs.viewer.claudeCodeRequest')"
           :subtitle="`user-agent: ${claudeMode}`"
           :details="claudeCodeDetails"
         />
@@ -42,7 +42,7 @@
         <Collapsible v-model:open="headersOpen">
           <CollapsibleTrigger as-child>
             <Button variant="ghost" size="xs" class="px-0 h-auto">
-              Headers ({{ headerEntries.length }} 个)
+              {{ t('logs.viewer.headers', { count: headerEntries.length }) }}
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent>
@@ -50,8 +50,8 @@
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead class="w-1/3">Key</TableHead>
-                    <TableHead>Value</TableHead>
+                    <TableHead class="w-1/3">{{ t('logs.viewer.key') }}</TableHead>
+                    <TableHead>{{ t('logs.viewer.value') }}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -79,7 +79,7 @@
                 <div v-if="block.type === 'text'">
                   <div v-if="block.text.length > 120 && !expanded[`${idx}-${bidx}`]" class="text-sm">
                     {{ block.text.slice(0, 120) }}
-                    <Button variant="link" size="xs" class="px-0 h-auto" @click="expanded[`${idx}-${bidx}`] = true">展开</Button>
+                    <Button variant="link" size="xs" class="px-0 h-auto" @click="expanded[`${idx}-${bidx}`] = true">{{ t('logs.viewer.expand') }}</Button>
                   </div>
                   <div v-else class="text-sm whitespace-pre-wrap break-all">{{ block.text }}</div>
                 </div>
@@ -112,7 +112,7 @@
           <div class="flex flex-wrap gap-1">
             <TagPill v-for="name in displayedToolNames" :key="name" :label="name" />
             <Button v-if="toolNames.length > 8" variant="ghost" size="xs" class="px-1 h-5" @click="toolsExpanded = !toolsExpanded">
-              {{ toolsExpanded ? '收起' : `+${toolNames.length - 8}` }}
+              {{ toolsExpanded ? t('logs.viewer.collapse') : t('logs.viewer.moreTools', { count: toolNames.length - 8 }) }}
             </Button>
           </div>
         </div>
@@ -134,7 +134,7 @@
         <Collapsible v-if="otherFieldsKeys.length">
           <CollapsibleTrigger as-child>
             <Button variant="ghost" size="xs" class="px-0 h-auto">
-              其他字段
+              {{ t('logs.viewer.otherFields') }}
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent>
@@ -152,6 +152,7 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useClipboard } from '@/composables/useClipboard'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -175,6 +176,7 @@ const props = defineProps<{
   mode?: 'structured' | 'raw'
 }>()
 
+const { t } = useI18n()
 const headersOpen = ref(false)
 const expanded = reactive<Record<string, boolean>>({})
 const toolsExpanded = ref(false)
@@ -246,8 +248,8 @@ const toolsCount = computed(() => {
 
 const claudeCodeDetails = computed(() => {
   const parts: string[] = []
-  if (thinkingBudget.value != null) parts.push(`thinking: ${thinkingBudget.value} tokens`)
-  if (toolsCount.value != null) parts.push(`tools: ${toolsCount.value} 个`)
+  if (thinkingBudget.value != null) parts.push(t('logs.viewer.thinkingTokens', { count: thinkingBudget.value }))
+  if (toolsCount.value != null) parts.push(t('logs.viewer.toolsCount', { count: toolsCount.value }))
   return parts
 })
 

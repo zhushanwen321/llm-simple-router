@@ -48,5 +48,33 @@
     "proxyEnhancement": "代理增强：{label}",
     "unknown": "未知",
     "detail": "详情"
+  },
+  "viewer": {
+    "structured": "结构化",
+    "rawJson": "原始 JSON",
+    "rawSseText": "原始 SSE 文本",
+    "copied": "已复制",
+    "copyJson": "复制 JSON",
+    "copy": "复制",
+    "parseError": "解析失败，请切换到原始 JSON 查看",
+    "claudeCodeRequest": "Claude Code 请求",
+    "headers": "Headers ({count} 个)",
+    "key": "Key",
+    "value": "Value",
+    "expand": "展开",
+    "expandAll": "展开全部",
+    "collapse": "收起",
+    "moreTools": "+{count}",
+    "otherFields": "其他字段",
+    "deltaEvents": "{count} 个 delta 事件",
+    "completeResponse": "完整响应",
+    "rawEvents": "原始事件流",
+    "streamEnd": "流结束",
+    "content": "内容",
+    "collapsedEvents": "+{count} 个 delta 事件已折叠",
+    "thinkingTokens": "thinking: {count} tokens",
+    "toolsCount": "tools: {count} 个",
+    "deltaGroupSummary": "{deltaType} · keep {kept} 个",
+    "deltaFoldedInfo": " +{folded} 个已折叠 ({chars} 字符)"
   }
 }

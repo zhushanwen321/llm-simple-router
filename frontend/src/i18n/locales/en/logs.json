@@ -48,5 +48,33 @@
     "proxyEnhancement": "Enhancement: {label}",
     "unknown": "Unknown",
     "detail": "Detail"
+  },
+  "viewer": {
+    "structured": "Structured",
+    "rawJson": "Raw JSON",
+    "rawSseText": "Raw SSE Text",
+    "copied": "Copied",
+    "copyJson": "Copy JSON",
+    "copy": "Copy",
+    "parseError": "Parse failed, switch to Raw JSON to view",
+    "claudeCodeRequest": "Claude Code Request",
+    "headers": "Headers ({count})",
+    "key": "Key",
+    "value": "Value",
+    "expand": "Expand",
+    "expandAll": "Expand All",
+    "collapse": "Collapse",
+    "moreTools": "+{count}",
+    "otherFields": "Other Fields",
+    "deltaEvents": "{count} delta events",
+    "completeResponse": "Complete Response",
+    "rawEvents": "Raw Events",
+    "streamEnd": "Stream End",
+    "content": "Content",
+    "collapsedEvents": "+{count} delta events collapsed",
+    "thinkingTokens": "thinking: {count} tokens",
+    "toolsCount": "tools: {count}",
+    "deltaGroupSummary": "{deltaType} · keep {kept}",
+    "deltaFoldedInfo": " +{folded} collapsed ({chars} chars)"
   }
 }
