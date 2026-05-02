@@ -344,20 +344,20 @@ export function useQuickSetup() {
   }
 
   // --- Submit ---
-  function buildTransformRules() {
+  function buildTransformRules(): NonNullable<QuickSetupPayload['transform_rules']> | undefined | false {
     const headersStr = transformInjectHeaders.value.trim()
     const dropStr = transformDropFields.value.trim()
     const defaultsStr = transformRequestDefaults.value.trim()
     if (!headersStr && !dropStr && !defaultsStr) return undefined
     const result: NonNullable<QuickSetupPayload['transform_rules']> = {}
     if (headersStr) {
-      try { result.inject_headers = JSON.parse(headersStr) } catch { toast.error('注入 Headers JSON 格式错误') }
+      try { result.inject_headers = JSON.parse(headersStr) } catch { toast.error('注入 Headers JSON 格式错误'); return false }
     }
     if (dropStr) {
       result.drop_fields = dropStr.split(',').map(s => s.trim()).filter(Boolean)
     }
     if (defaultsStr) {
-      try { result.request_defaults = JSON.parse(defaultsStr) } catch { toast.error('请求默认值 JSON 格式错误') }
+      try { result.request_defaults = JSON.parse(defaultsStr) } catch { toast.error('请求默认值 JSON 格式错误'); return false }
     }
     return Object.keys(result).length > 0 ? result : undefined
   }
@@ -409,7 +409,11 @@ export function useQuickSetup() {
             max_retries: r.max_retries,
             max_delay_ms: r.max_delay_ms,
           })),
-        transform_rules: buildTransformRules(),
+        transform_rules: (() => {
+          const rules = buildTransformRules()
+          if (rules === false) throw new Error('__transform_invalid__')
+          return rules
+        })(),
       }
 
       await api.quickSetup(payload)
