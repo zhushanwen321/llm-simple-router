@@ -71,7 +71,7 @@ function formatCw(n: number): string {
   <div class="rounded-lg border border-border bg-card px-3 py-2.5 transition-colors">
     <div class="flex items-center gap-2">
       <!-- Model name -->
-      <span class="truncate text-sm font-medium text-foreground min-w-0 flex-1">{{ model.name }}</span>
+      <span class="truncate text-xs font-medium text-foreground min-w-0 flex-1" :title="model.name">{{ model.name }}</span>
 
       <!-- Context window -->
       <div class="flex items-center gap-1 shrink-0">
