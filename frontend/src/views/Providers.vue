@@ -2,15 +2,15 @@
 <template>
   <div class="p-6">
     <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-semibold text-foreground">供应商</h2>
+      <h2 class="text-lg font-semibold text-foreground">{{ t('providers.title') }}</h2>
       <div class="flex items-center gap-2">
         <Button variant="outline" size="sm" @click="handleReload" :disabled="reloading">
           <RotateCw class="w-4 h-4 mr-1" :class="{ 'animate-spin': reloading }" />
-          重载插件
+          {{ t('providers.reloadPlugin') }}
         </Button>
         <Button @click="openCreate" class="flex items-center gap-1">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-          添加供应商
+          {{ t('providers.addProvider') }}
         </Button>
       </div>
     </div>
@@ -18,14 +18,14 @@
       <Table>
         <TableHeader>
           <TableRow class="bg-muted">
-            <TableHead class="text-muted-foreground">名称</TableHead>
-            <TableHead class="text-muted-foreground">类型</TableHead>
-            <TableHead class="text-muted-foreground">Base URL</TableHead>
-            <TableHead class="text-muted-foreground">API Key</TableHead>
-            <TableHead class="text-muted-foreground">模型</TableHead>
-            <TableHead class="text-muted-foreground">并发</TableHead>
-            <TableHead class="text-muted-foreground">状态</TableHead>
-            <TableHead class="text-right text-muted-foreground">操作</TableHead>
+            <TableHead class="text-muted-foreground">{{ t('providers.tableHeaders.name') }}</TableHead>
+            <TableHead class="text-muted-foreground">{{ t('providers.tableHeaders.type') }}</TableHead>
+            <TableHead class="text-muted-foreground">{{ t('providers.tableHeaders.baseUrl') }}</TableHead>
+            <TableHead class="text-muted-foreground">{{ t('providers.tableHeaders.apiKey') }}</TableHead>
+            <TableHead class="text-muted-foreground">{{ t('providers.tableHeaders.models') }}</TableHead>
+            <TableHead class="text-muted-foreground">{{ t('providers.tableHeaders.concurrency') }}</TableHead>
+            <TableHead class="text-muted-foreground">{{ t('providers.tableHeaders.status') }}</TableHead>
+            <TableHead class="text-right text-muted-foreground">{{ t('providers.tableHeaders.actions') }}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -53,7 +53,7 @@
               </div>
             </TableCell>
             <TableCell>
-              <Badge v-if="p.adaptive_enabled" variant="outline">自适应</Badge>
+              <Badge v-if="p.adaptive_enabled" variant="outline">{{ t('common.adaptive') }}</Badge>
               <Badge v-else-if="p.max_concurrency > 0" variant="secondary">{{ p.max_concurrency }}</Badge>
               <span v-else class="text-muted-foreground">-</span>
             </TableCell>
@@ -69,17 +69,17 @@
                   />
                 </span>
                 <Badge :variant="p.is_active ? 'default' : 'secondary'">
-                  {{ p.is_active ? '启用' : '禁用' }}
+                  {{ p.is_active ? t('common.enabled') : t('common.disabled') }}
                 </Badge>
               </Button>
             </TableCell>
             <TableCell class="text-right">
-              <Button variant="ghost" size="sm" @click="openEdit(p)" class="text-muted-foreground hover:text-primary mr-2">编辑</Button>
-              <Button variant="ghost" size="sm" @click="confirmDelete(p)" class="text-muted-foreground hover:text-destructive">删除</Button>
+              <Button variant="ghost" size="sm" @click="openEdit(p)" class="text-muted-foreground hover:text-primary mr-2">{{ t('common.edit') }}</Button>
+              <Button variant="ghost" size="sm" @click="confirmDelete(p)" class="text-muted-foreground hover:text-destructive">{{ t('common.delete') }}</Button>
             </TableCell>
           </TableRow>
           <TableRow v-if="providers.length === 0">
-            <TableCell colspan="8" class="text-center text-muted-foreground py-8">暂无供应商</TableCell>
+            <TableCell colspan="8" class="text-center text-muted-foreground py-8">{{ t('providers.noProviders') }}</TableCell>
           </TableRow>
         </TableBody>
       </Table>
@@ -88,16 +88,16 @@
     <Dialog v-model:open="dialogOpen">
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{{ editingId ? '编辑供应商' : '添加供应商' }}</DialogTitle>
+          <DialogTitle>{{ editingId ? t('providers.editProvider') : t('providers.addProvider') }}</DialogTitle>
         </DialogHeader>
         <form @submit.prevent="handleSave" class="space-y-3">
           <!-- 快速配置 -->
           <div class="rounded-md border bg-muted/40 p-3 space-y-2">
-            <div class="text-xs font-medium text-muted-foreground">快速配置</div>
+            <div class="text-xs font-medium text-muted-foreground">{{ t('providers.quickConfig.title') }}</div>
             <div class="flex gap-2">
               <Select v-model="presetGroup" @update:model-value="onGroupChange">
                 <SelectTrigger class="flex-1">
-                  <SelectValue placeholder="选择供应商" />
+                  <SelectValue :placeholder="t('providers.quickConfig.selectProvider')" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem v-for="g in providerPresets" :key="g.group" :value="g.group">{{ g.group }}</SelectItem>
@@ -105,7 +105,7 @@
               </Select>
               <Select v-model="presetPlan" @update:model-value="onPresetChange" :disabled="!presetGroup">
                 <SelectTrigger class="flex-1">
-                  <SelectValue placeholder="选择套餐" />
+                  <SelectValue :placeholder="t('providers.quickConfig.selectPlan')" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem v-for="p in availablePlans" :key="p.plan" :value="p.plan">{{ p.plan }}</SelectItem>
@@ -114,15 +114,15 @@
             </div>
           </div>
           <div>
-            <Label class="block text-sm font-medium text-foreground mb-1">名称</Label>
+            <Label class="block text-sm font-medium text-foreground mb-1">{{ t('providers.fields.name') }}</Label>
             <Input v-model="form.name" type="text" required @input="delete errors.name" />
             <p v-if="errors.name" class="text-sm text-destructive mt-1">{{ errors.name }}</p>
           </div>
           <div>
-            <Label class="block text-sm font-medium text-foreground mb-1">API 类型</Label>
+            <Label class="block text-sm font-medium text-foreground mb-1">{{ t('providers.fields.apiType') }}</Label>
             <Select v-model="form.api_type">
               <SelectTrigger>
-                <SelectValue placeholder="选择 API 类型" />
+                <SelectValue :placeholder="t('providers.quickConfig.selectApiType')" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="openai">OpenAI</SelectItem>
@@ -131,17 +131,17 @@
             </Select>
           </div>
           <div>
-            <Label class="block text-sm font-medium text-foreground mb-1">Base URL</Label>
+            <Label class="block text-sm font-medium text-foreground mb-1">{{ t('providers.fields.baseUrl') }}</Label>
             <Input v-model="form.base_url" type="url" required @input="delete errors.base_url" />
             <p v-if="errors.base_url" class="text-sm text-destructive mt-1">{{ errors.base_url }}</p>
           </div>
           <div>
-            <Label class="block text-sm font-medium text-foreground mb-1">API Key</Label>
-            <Input v-model="form.api_key" type="text" :required="!editingId" :placeholder="editingId ? '留空则保持原密钥不变' : ''" @input="delete errors.api_key" />
+            <Label class="block text-sm font-medium text-foreground mb-1">{{ t('providers.fields.apiKey') }}</Label>
+            <Input v-model="form.api_key" type="text" :required="!editingId" :placeholder="editingId ? t('providers.fields.apiKeyPlaceholder') : ''" @input="delete errors.api_key" />
             <p v-if="errors.api_key" class="text-sm text-destructive mt-1">{{ errors.api_key }}</p>
           </div>
           <div>
-            <Label class="block text-sm font-medium text-foreground mb-1">可用模型</Label>
+            <Label class="block text-sm font-medium text-foreground mb-1">{{ t('providers.fields.availableModels') }}</Label>
             <div class="flex flex-wrap gap-1.5 mb-1.5">
               <Badge v-for="(m, i) in form.models" :key="i" variant="secondary" class="gap-1 pr-1">
                 {{ m.name }}
@@ -150,48 +150,48 @@
               </Badge>
             </div>
             <div class="flex gap-2">
-              <Input v-model="modelInput" placeholder="输入模型名称，多个用逗号分隔" @keydown.enter.prevent="addModel" class="flex-1" />
+              <Input v-model="modelInput" :placeholder="t('providers.fields.modelInputPlaceholder')" @keydown.enter.prevent="addModel" class="flex-1" />
               <Select v-model="contextWindowSelect">
                 <SelectTrigger class="w-28">
-                  <SelectValue placeholder="上下文" />
+                  <SelectValue :placeholder="t('providers.fields.context')" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem v-for="opt in CONTEXT_WINDOW_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</SelectItem>
                 </SelectContent>
               </Select>
-              <Button type="button" variant="outline" size="sm" @click="addModel" :disabled="!modelInput.trim()">添加</Button>
+              <Button type="button" variant="outline" size="sm" @click="addModel" :disabled="!modelInput.trim()">{{ t('providers.fields.addModel') }}</Button>
             </div>
           </div>
           <!-- 并发控制 -->
           <div class="border-t pt-4 mt-4">
-            <div class="text-sm font-medium text-foreground mb-3">并发控制</div>
+            <div class="text-sm font-medium text-foreground mb-3">{{ t('providers.concurrency.title') }}</div>
             <div class="space-y-3">
               <div>
-                <Label class="block text-sm font-medium text-foreground mb-1">模式</Label>
+                <Label class="block text-sm font-medium text-foreground mb-1">{{ t('providers.concurrency.mode') }}</Label>
                 <Select v-model="concurrencyMode" @update:model-value="(v: unknown) => onConcurrencyModeChange(v as 'auto' | 'manual' | 'none')">
                   <SelectTrigger>
-                    <SelectValue placeholder="选择模式" />
+                    <SelectValue :placeholder="t('providers.concurrency.selectMode')" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="auto">自动（自适应）</SelectItem>
-                    <SelectItem value="manual">手动</SelectItem>
-                    <SelectItem value="none">无</SelectItem>
+                    <SelectItem value="auto">{{ t('providers.concurrency.autoAdaptive') }}</SelectItem>
+                    <SelectItem value="manual">{{ t('providers.concurrency.manual') }}</SelectItem>
+                    <SelectItem value="none">{{ t('providers.concurrency.none') }}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div v-if="concurrencyMode !== 'none'" class="space-y-2">
                 <div>
-                  <Label class="block text-sm font-medium text-foreground mb-1">最大并发度</Label>
+                  <Label class="block text-sm font-medium text-foreground mb-1">{{ t('providers.concurrency.maxConcurrency') }}</Label>
                   <Input v-model.number="form.max_concurrency" type="number" min="1" :max="MAX_CONCURRENCY" :placeholder="concurrencyMode === 'auto' ? '10' : '3'" @input="delete errors.max_concurrency" />
                   <p v-if="errors.max_concurrency" class="text-sm text-destructive mt-1">{{ errors.max_concurrency }}</p>
                 </div>
                 <div>
-                  <Label class="block text-sm font-medium text-foreground mb-1">队列超时 (ms)</Label>
-                  <Input v-model.number="form.queue_timeout_ms" type="number" min="0" placeholder="0 = 无限等待" @input="delete errors.queue_timeout_ms" />
+                  <Label class="block text-sm font-medium text-foreground mb-1">{{ t('providers.concurrency.queueTimeout') }}</Label>
+                  <Input v-model.number="form.queue_timeout_ms" type="number" min="0" :placeholder="t('providers.concurrency.queueTimeoutPlaceholder')" @input="delete errors.queue_timeout_ms" />
                   <p v-if="errors.queue_timeout_ms" class="text-sm text-destructive mt-1">{{ errors.queue_timeout_ms }}</p>
                 </div>
                 <div>
-                  <Label class="block text-sm font-medium text-foreground mb-1">最大队列长度</Label>
+                  <Label class="block text-sm font-medium text-foreground mb-1">{{ t('providers.concurrency.maxQueueSize') }}</Label>
                   <Input v-model.number="form.max_queue_size" type="number" min="1" :max="MAX_QUEUE_SIZE" :placeholder="DEFAULT_QUEUE_SIZE" @input="delete errors.max_queue_size" />
                   <p v-if="errors.max_queue_size" class="text-sm text-destructive mt-1">{{ errors.max_queue_size }}</p>
                 </div>
@@ -201,19 +201,19 @@
           <!-- 转换规则面板（仅在编辑现有 Provider 时显示） -->
           <Collapsible v-if="editingId" v-model:open="transformOpen" class="border rounded-md p-3 mt-2">
             <CollapsibleTrigger class="flex items-center justify-between w-full text-sm font-medium text-foreground">
-              转换规则
+              {{ t('providers.transform.title') }}
               <ChevronDown class="w-4 h-4 transition-transform" :class="transformOpen ? 'rotate-180' : ''" />
             </CollapsibleTrigger>
             <CollapsibleContent class="mt-3 space-y-3">
-              <div><Label class="text-xs text-muted-foreground">注入 Headers (JSON)</Label><Input v-model="transformForm.injectHeadersInput" placeholder='{"x-custom": "value"}' class="mt-1" /></div>
-              <div><Label class="text-xs text-muted-foreground">丢弃字段（逗号分隔）</Label><Input v-model="transformForm.dropFieldsInput" placeholder="logprobs, frequency_penalty" class="mt-1" /></div>
-              <div><Label class="text-xs text-muted-foreground">请求默认值 (JSON)</Label><Input v-model="transformForm.requestDefaultsInput" placeholder='{"max_tokens": 4096}' class="mt-1" /></div>
-              <div class="flex gap-2"><Button type="button" variant="outline" size="sm" @click="saveTransformRules(editingId!)">保存规则</Button><Button type="button" variant="ghost" size="sm" @click="handleDeleteTransformRules(editingId!)" v-if="transformForm.exists">删除规则</Button></div>
+              <div><Label class="text-xs text-muted-foreground">{{ t('providers.transform.injectHeaders') }}</Label><Input v-model="transformForm.injectHeadersInput" placeholder='{"x-custom": "value"}' class="mt-1" /></div>
+              <div><Label class="text-xs text-muted-foreground">{{ t('providers.transform.dropFields') }}</Label><Input v-model="transformForm.dropFieldsInput" placeholder="logprobs, frequency_penalty" class="mt-1" /></div>
+              <div><Label class="text-xs text-muted-foreground">{{ t('providers.transform.requestDefaults') }}</Label><Input v-model="transformForm.requestDefaultsInput" placeholder='{"max_tokens": 4096}' class="mt-1" /></div>
+              <div class="flex gap-2"><Button type="button" variant="outline" size="sm" @click="saveTransformRules(editingId!)">{{ t('providers.transform.saveRules') }}</Button><Button type="button" variant="ghost" size="sm" @click="handleDeleteTransformRules(editingId!)" v-if="transformForm.exists">{{ t('providers.transform.deleteRules') }}</Button></div>
             </CollapsibleContent>
           </Collapsible>
           <DialogFooter>
-            <Button type="button" variant="outline" @click="dialogOpen = false">取消</Button>
-            <Button type="submit">保存</Button>
+            <Button type="button" variant="outline" @click="dialogOpen = false">{{ t('common.cancel') }}</Button>
+            <Button type="submit">{{ t('common.save') }}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -222,12 +222,12 @@
     <AlertDialog :open="!!deleteTarget" @update:open="(val) => { if (!val) deleteTarget = null }">
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>确认删除</AlertDialogTitle>
-          <AlertDialogDescription>确定要删除供应商「{{ deleteTarget?.name }}」吗？此操作不可撤销。</AlertDialogDescription>
+          <AlertDialogTitle>{{ t('providers.confirmDelete.title') }}</AlertDialogTitle>
+          <AlertDialogDescription>{{ t('providers.confirmDelete.message', { name: deleteTarget?.name }) }}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>取消</AlertDialogCancel>
-          <Button variant="destructive" @click="handleDelete">删除</Button>
+          <AlertDialogCancel>{{ t('common.cancel') }}</AlertDialogCancel>
+          <Button variant="destructive" @click="handleDelete">{{ t('common.delete') }}</Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -235,18 +235,18 @@
     <AlertDialog :open="!!toggleTarget" @update:open="(val: boolean) => { if (!val) toggleTarget = null }">
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>确认{{ toggleTarget?.is_active ? '禁用' : '启用' }}</AlertDialogTitle>
+          <AlertDialogTitle>{{ toggleTarget?.is_active ? t('providers.confirmToggle.titleDisable') : t('providers.confirmToggle.titleEnable') }}</AlertDialogTitle>
           <AlertDialogDescription>
-            确定要{{ toggleTarget?.is_active ? '禁用' : '启用' }}供应商「{{ toggleTarget?.name }}」吗？
+            {{ toggleTarget?.is_active ? t('providers.confirmToggle.messageDisable', { name: toggleTarget?.name }) : t('providers.confirmToggle.messageEnable', { name: toggleTarget?.name }) }}
             <div v-if="toggleDependencies.length" class="mt-2 space-y-1">
-              <div class="text-sm font-medium">以下映射分组正在使用此供应商：</div>
+              <div class="text-sm font-medium">{{ t('providers.confirmToggle.dependencyWarning') }}</div>
               <div v-for="ref in toggleDependencies" :key="ref" class="text-destructive text-sm">{{ ref }}</div>
             </div>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>取消</AlertDialogCancel>
-          <AlertDialogAction @click="handleToggle">确认</AlertDialogAction>
+          <AlertDialogCancel>{{ t('common.cancel') }}</AlertDialogCancel>
+          <AlertDialogAction @click="handleToggle">{{ t('common.confirm') }}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -254,6 +254,7 @@
 </template>
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import * as z from 'zod'
 import { api, getApiMessage, type ProviderPayload, type ProviderGroup } from '@/api/client'
@@ -311,6 +312,7 @@ type ConcurrencyMode = 'auto' | 'manual' | 'none'
 const concurrencyMode = ref<ConcurrencyMode>('auto')
 // Transform rules state
 const transformOpen = ref(false)
+const { t } = useI18n()
 const { transformForm, loadTransformRules, saveTransformRules, handleDeleteTransformRules } = useTransformRules()
 const copiedId = ref<string | null>(null)
 const reloading = ref(false)
