@@ -229,6 +229,7 @@ import {
   Zap,
   ChevronDown,
   Globe,
+  CalendarClock,
 } from 'lucide-vue-next'
 import { api, getApiMessage } from '@/api/client'
 import { Button } from '@/components/ui/button'
@@ -365,6 +366,7 @@ const navGroups = computed(() => {
       { path: '/mappings', label: t('sidebar.nav.modelMappings'), icon: ArrowLeftRight },
       { path: '/router-keys', label: t('sidebar.nav.routerKeys'), icon: KeyRound },
       { path: '/retry-rules', label: t('sidebar.nav.retryRules'), icon: RefreshCcw },
+      { path: '/schedules', label: t('sidebar.nav.schedules'), icon: CalendarClock },
     ],
   },
   {
