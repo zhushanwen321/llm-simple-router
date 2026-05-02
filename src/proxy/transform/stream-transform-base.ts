@@ -54,6 +54,10 @@ export abstract class BaseSSETransform extends Transform {
     this.push(`data: ${JSON.stringify(data)}\n\n`);
   }
 
+  protected pushResponsesSSE(eventType: string, data: unknown): void {
+    this.push(`event: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`);
+  }
+
   protected pushDone(): void {
     this.push("data: [DONE]\n\n");
     this.done = true;
