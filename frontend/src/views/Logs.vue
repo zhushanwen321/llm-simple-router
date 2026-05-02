@@ -26,9 +26,9 @@
         </Button>
       </div>
       <div class="flex items-center gap-1">
-        <DatetimePicker v-model="dateRange.start" class="w-48" />
+        <Input type="datetime-local" v-model="dateRange.start" class="w-48" />
         <span class="text-muted-foreground text-sm">~</span>
-        <DatetimePicker v-model="dateRange.end" class="w-48" />
+        <Input type="datetime-local" v-model="dateRange.end" class="w-48" />
         <Button
           v-if="dateRange.start || dateRange.end"
           variant="ghost"

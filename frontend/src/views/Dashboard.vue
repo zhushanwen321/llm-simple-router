@@ -32,9 +32,9 @@
     <!-- 时间范围 -->
     <div class="flex items-center gap-2 mb-4 text-sm text-muted-foreground">
       <template v-if="periodTab === 'custom'">
-        <DatetimePicker v-model="customStart" class="w-44" />
+        <Input type="datetime-local" v-model="customStart" class="w-44" />
         <span>~</span>
-        <DatetimePicker v-model="customEnd" class="w-44" />
+        <Input type="datetime-local" v-model="customEnd" class="w-44" />
       </template>
       <span v-else>⏱ {{ timeRangeText }}</span>
     </div>
@@ -152,8 +152,8 @@ import {
 import { Line } from 'vue-chartjs'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import DatetimePicker from '@/components/ui/datetime-picker/DatetimePicker.vue'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { lineOptions } from './metrics-helpers'

@@ -13,6 +13,8 @@ app.use(router)
 app.use(i18n)
 
 // Load translations for current locale before mounting
-loadLocaleMessages(i18n.global.locale.value as 'zh-CN' | 'en').then(() => {
+const initLocale = i18n.global.locale.value as 'zh-CN' | 'en'
+document.documentElement.setAttribute('lang', initLocale)
+loadLocaleMessages(initLocale).then(() => {
   app.mount('#app')
 })
