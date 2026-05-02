@@ -26,6 +26,29 @@ export function extractStreamText(line: string, apiType: "openai" | "openai-resp
     return { text, block: text ? { index: 0, type: "text", content: text } : null };
   }
 
+  if (apiType === "openai-responses") {
+    // Responses SSE uses named events, but line format is "data: {json}" (same as Anthropic)
+    // The event type is in the data JSON's "type" field
+    const type = obj.type as string;
+
+    if (type === "response.output_text.delta") {
+      const text = (obj.delta as string) ?? "";
+      const outputIndex = (obj.output_index as number) ?? 0;
+      return { text, block: text ? { index: outputIndex, type: "text" as const, content: text } : empty.block };
+    }
+    if (type === "response.function_call_arguments.delta") {
+      const partialJson = (obj.delta as string) ?? "";
+      const outputIndex = (obj.output_index as number) ?? 0;
+      return { text: "", block: { index: outputIndex, type: "tool_use" as const, content: partialJson } };
+    }
+    if (type === "response.reasoning_summary_text.delta") {
+      const thinking = (obj.delta as string) ?? "";
+      const outputIndex = (obj.output_index as number) ?? 0;
+      return { text: "", block: { index: outputIndex, type: "thinking" as const, content: thinking } };
+    }
+    return empty;
+  }
+
   // Anthropic
   const type = obj.type as string | undefined;
   const index = obj.index as number | undefined;

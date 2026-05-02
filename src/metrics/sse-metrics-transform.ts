@@ -100,6 +100,12 @@ export class SSEMetricsTransform extends Transform {
         if (delta.type === "thinking_delta" && typeof delta.thinking === "string") return delta.thinking;
         if (delta.type === "text_delta" && typeof delta.text === "string") return delta.text;
         if (delta.type === "input_json_delta" && typeof delta.partial_json === "string") return delta.partial_json;
+      } else if (this.apiType === "openai-responses") {
+        const type = parsed.type as string;
+        if (type === "response.output_text.delta") return parsed.delta as string;
+        if (type === "response.reasoning_summary_text.delta") return parsed.delta as string;
+        if (type === "response.function_call_arguments.delta") return parsed.delta as string;
+        return undefined;
       } else {
         const choices = parsed.choices;
         if (!Array.isArray(choices) || choices.length === 0) return undefined;
