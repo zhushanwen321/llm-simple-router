@@ -65,7 +65,7 @@ export class MetricsExtractor {
   private toolUseStreamStartTime: number | null = null;
 
   constructor(
-    private apiType: "openai" | "anthropic",
+    private apiType: "openai" | "openai-responses" | "anthropic",
     private requestStartTime: number,
   ) {}
 
@@ -158,7 +158,7 @@ export class MetricsExtractor {
   }
 
   static fromNonStreamResponse(
-    apiType: "openai" | "anthropic",
+    apiType: "openai" | "openai-responses" | "anthropic",
     responseBody: string,
   ): MetricsResult | null {
     let parsed: Record<string, unknown>;

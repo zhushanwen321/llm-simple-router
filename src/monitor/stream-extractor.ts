@@ -7,7 +7,7 @@ export interface StreamExtraction {
   block?: { index: number; type: ContentBlock["type"]; content: string; name?: string } | null;
 }
 
-export function extractStreamText(line: string, apiType: "openai" | "anthropic"): StreamExtraction {
+export function extractStreamText(line: string, apiType: "openai" | "openai-responses" | "anthropic"): StreamExtraction {
   const empty: StreamExtraction = { text: "", block: null };
   if (!line.startsWith(SSE_DATA_PREFIX)) return empty;
   const jsonStr = line.slice(SSE_DATA_PREFIX.length);

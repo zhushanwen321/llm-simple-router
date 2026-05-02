@@ -6,21 +6,21 @@ export interface PluginMatch {
   providerId?: string;
   providerName?: string;
   providerNamePattern?: string;
-  apiType?: "openai" | "anthropic";
+  apiType?: "openai" | "openai-responses" | "anthropic";
 }
 
 export interface RequestTransformContext {
   body: Record<string, unknown>;
   headers: Record<string, string>;
-  sourceApiType: "openai" | "anthropic";
-  targetApiType: "openai" | "anthropic";
+  sourceApiType: "openai" | "openai-responses" | "anthropic";
+  targetApiType: "openai" | "openai-responses" | "anthropic";
   provider: { id: string; name: string; base_url: string; api_type: string };
 }
 
 export interface ResponseTransformContext {
   response: Record<string, unknown>;
-  sourceApiType: "openai" | "anthropic";
-  targetApiType: "openai" | "anthropic";
+  sourceApiType: "openai" | "openai-responses" | "anthropic";
+  targetApiType: "openai" | "openai-responses" | "anthropic";
   provider: { id: string; name: string; base_url: string; api_type: string };
 }
 

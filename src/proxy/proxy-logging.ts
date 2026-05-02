@@ -33,7 +33,7 @@ export function sanitizeHeadersForLog(headers: Record<string, string>): Record<s
 
 export function handleIntercept(
   db: Database.Database,
-  apiType: "openai" | "anthropic",
+  apiType: "openai" | "openai-responses" | "anthropic",
   request: FastifyRequest,
   reply: import("fastify").FastifyReply,
   interceptResponse: { statusCode: number; body: unknown; meta?: unknown },
@@ -70,7 +70,7 @@ export function handleIntercept(
 export function logResilienceResult(
   db: Database.Database,
   params: {
-    apiType: "openai" | "anthropic";
+    apiType: "openai" | "openai-responses" | "anthropic";
     model: string;
     providerId: string;
     isStream: boolean;
@@ -184,7 +184,7 @@ export function logResilienceResult(
 
 export function collectTransportMetrics(
   db: Database.Database,
-  apiType: "openai" | "anthropic",
+  apiType: "openai" | "openai-responses" | "anthropic",
   result: TransportResult,
   isStream: boolean,
   lastSuccessLogId: string,

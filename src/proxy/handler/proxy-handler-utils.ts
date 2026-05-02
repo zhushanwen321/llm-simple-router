@@ -14,7 +14,7 @@ export function getTransportStatusCode(result: TransportResult): number | null {
 }
 
 /** 将 tracker blocks 序列化为前端 tryDirectParse 可解析的 JSON */
-export function serializeBlocksForStorage(blocks: ContentBlock[] | undefined, apiType: "openai" | "anthropic"): string {
+export function serializeBlocksForStorage(blocks: ContentBlock[] | undefined, apiType: "openai" | "openai-responses" | "anthropic"): string {
   if (!blocks || blocks.length === 0) return "";
   if (apiType === "anthropic") {
     const content = blocks.map(b => {

@@ -5,7 +5,7 @@ import { buildUpdateQuery, deleteById } from "./helpers.js";
 export interface Provider {
   id: string;
   name: string;
-  api_type: "openai" | "anthropic";
+  api_type: "openai" | "openai-responses" | "anthropic";
   base_url: string;
   api_key: string;
   api_key_preview?: string;
@@ -31,7 +31,7 @@ const PROVIDER_FIELDS = new Set([
 
 export function getActiveProviders(
   db: Database.Database,
-  apiType: "openai" | "anthropic",
+  apiType: "openai" | "openai-responses" | "anthropic",
 ): Provider[] {
   return db
     .prepare("SELECT * FROM providers WHERE api_type = ? AND is_active = 1")
@@ -50,7 +50,7 @@ export function createProvider(
   db: Database.Database,
   provider: {
     name: string;
-    api_type: "openai" | "anthropic";
+    api_type: "openai" | "openai-responses" | "anthropic";
     base_url: string;
     api_key: string;
     api_key_preview?: string;

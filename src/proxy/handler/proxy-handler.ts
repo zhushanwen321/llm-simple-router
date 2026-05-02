@@ -44,7 +44,7 @@ const TIER2_LOOP_THRESHOLD = 2;
 interface FailoverContext {
   request: FastifyRequest;
   reply: FastifyReply;
-  apiType: "openai" | "anthropic";
+  apiType: "openai" | "openai-responses" | "anthropic";
   upstreamPath: string;
   errors: ProxyErrorFormatter;
   deps: RouteHandlerDeps;
@@ -65,7 +65,7 @@ interface FailoverContext {
 interface RejectParams {
   db: Database.Database;
   logId: string;
-  apiType: "openai" | "anthropic";
+  apiType: "openai" | "openai-responses" | "anthropic";
   model: string;
   startTime: number;
   isStream: boolean;
@@ -117,7 +117,7 @@ import { TransformCoordinator } from "../transform/transform-coordinator.js";
 export async function handleProxyRequest(
   request: FastifyRequest,
   reply: FastifyReply,
-  apiType: "openai" | "anthropic",
+  apiType: "openai" | "openai-responses" | "anthropic",
   upstreamPath: string,
   errors: ProxyErrorFormatter,
   deps: RouteHandlerDeps,
@@ -322,7 +322,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
         body: currentBody,
         headers: {},
         sourceApiType: apiType,
-        targetApiType: provider.api_type as "openai" | "anthropic",
+        targetApiType: provider.api_type as "openai" | "openai-responses" | "anthropic",
         provider: { id: provider.id, name: provider.name, base_url: provider.base_url, api_type: provider.api_type },
       };
       pluginRegistry.applyBeforeRequest(pluginCtx);
@@ -372,7 +372,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
             const respObj = JSON.parse(transformed);
             const respCtx: import("../transform/plugin-types.js").ResponseTransformContext = {
               response: respObj,
-              sourceApiType: provider.api_type as "openai" | "anthropic",
+              sourceApiType: provider.api_type as "openai" | "openai-responses" | "anthropic",
               targetApiType: apiType,
               provider: { id: provider.id, name: provider.name, base_url: provider.base_url, api_type: provider.api_type },
             };

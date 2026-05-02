@@ -15,7 +15,7 @@ export class StreamContentAccumulator {
     private readonly maxText: number = DEFAULT_MAX_TEXT,
   ) {}
 
-  append(rawLine: string, apiType: "openai" | "anthropic"): void {
+  append(rawLine: string, apiType: "openai" | "openai-responses" | "anthropic"): void {
     this.totalChars += rawLine.length;
 
     this.rawChunks += rawLine + "\n";

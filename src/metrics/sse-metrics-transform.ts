@@ -25,7 +25,7 @@ export interface MetricsTransformOptions {
 export class SSEMetricsTransform extends Transform {
   private parser: SSEParser;
   private extractor: MetricsExtractor;
-  private readonly apiType: "openai" | "anthropic";
+  private readonly apiType: "openai" | "openai-responses" | "anthropic";
   private onMetrics?: (metrics: MetricsResult) => void;
   private onChunk?: (rawLine: string) => void;
   private onContentDelta?: (text: string) => void;
@@ -34,7 +34,7 @@ export class SSEMetricsTransform extends Transform {
   private flushed = false;
 
   constructor(
-    apiType: "openai" | "anthropic",
+    apiType: "openai" | "openai-responses" | "anthropic",
     requestStartTime: number,
     options?: MetricsTransformOptions,
   ) {

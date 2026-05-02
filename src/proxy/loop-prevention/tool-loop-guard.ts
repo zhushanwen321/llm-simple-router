@@ -42,7 +42,7 @@ export class ToolLoopGuard {
     return { detected: false };
   }
 
-  injectLoopBreakPrompt(body: Record<string, unknown>, apiType: "openai" | "anthropic", toolName: string): Record<string, unknown> {
+  injectLoopBreakPrompt(body: Record<string, unknown>, apiType: "openai" | "openai-responses" | "anthropic", toolName: string): Record<string, unknown> {
     const cloned = JSON.parse(JSON.stringify(body));
     const prompt = `[系统提醒] 检测到你可能陷入了反复调用 "${toolName}" 工具的循环。请停下来，总结当前进展，直接告知用户。`;
 

@@ -76,7 +76,7 @@ export function countConsecutiveToolRounds(messages: Message[]): number {
  */
 export function applyToolRoundLimit(
   body: Record<string, unknown>,
-  apiType: "openai" | "anthropic",
+  apiType: "openai" | "openai-responses" | "anthropic",
   maxRounds: number = DEFAULT_MAX_ROUNDS,
 ): { body: Record<string, unknown>; injected: boolean; rounds: number } {
   const messages = (body.messages as Message[]) ?? [];

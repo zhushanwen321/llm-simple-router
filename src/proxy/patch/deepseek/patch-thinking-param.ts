@@ -5,7 +5,7 @@
  */
 export function patchThinkingParam(
   body: Record<string, unknown>,
-  apiType: "openai" | "anthropic",
+  apiType: "openai" | "openai-responses" | "anthropic",
 ): void {
   if (body.thinking) return;
 

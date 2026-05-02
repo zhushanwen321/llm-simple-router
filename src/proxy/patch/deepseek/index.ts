@@ -23,7 +23,7 @@ import { patchOrphanToolResults, patchOrphanToolResultsOA } from "./patch-orphan
  */
 export function applyDeepSeekPatches(
   body: Record<string, unknown>,
-  apiType: "openai" | "anthropic",
+  apiType: "openai" | "openai-responses" | "anthropic",
 ): void {
   if (apiType === "anthropic") {
     patchThinkingParam(body, apiType);
