@@ -14,9 +14,11 @@ const props = withDefaults(defineProps<{
   providerGroups: ProviderGroup[]
   showDelete?: boolean
   showAddForm?: boolean
+  readonly?: boolean
 }>(), {
   showDelete: false,
   showAddForm: true,
+  readonly: false,
 })
 
 const emit = defineEmits<{
@@ -122,7 +124,7 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
   <div class="rounded-xl border border-border bg-card overflow-hidden">
     <!-- Header -->
     <div v-if="entries.length > 0" class="flex items-center px-5 py-2.5 border-b border-border bg-muted/20 text-xs text-muted-foreground font-medium">
-      <div class="w-[128px] shrink-0">客户端模型</div>
+      <div class="w-[140px] shrink-0">客户端模型</div>
       <div class="w-5 shrink-0"></div>
       <div class="flex-1">目标链</div>
       <div class="shrink-0 w-[140px] text-right">操作</div>
@@ -138,10 +140,11 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
       <!-- Main row (click to expand) -->
       <div
         class="flex items-center px-5 py-3 cursor-pointer select-none hover:bg-muted/10"
-        @click="toggleExpand(entry.clientModel)"
+        :class="{ 'cursor-default hover:bg-transparent': readonly }"
+        @click="!readonly && toggleExpand(entry.clientModel)"
       >
         <!-- Client model -->
-        <div class="w-[128px] shrink-0 mono text-sm font-semibold text-foreground truncate" :title="entry.clientModel">
+        <div class="w-[140px] shrink-0 mono text-sm font-semibold text-foreground truncate" :title="entry.clientModel">
           {{ entry.clientModel }}
         </div>
 
@@ -155,15 +158,15 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
           <div v-for="(chunk, cIdx) in chunkTargets(entry.targets)" :key="cIdx" class="flex items-center gap-1 flex-wrap" :class="cIdx > 0 ? 'mt-0.5' : ''">
             <template v-for="(t, tIdx) in chunk" :key="tIdx">
               <!-- Connector between chunks -->
-              <svg v-if="cIdx > 0 && tIdx === 0" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.5" class="text-orange-400/30 shrink-0"><path d="M3 1v6M0 4l3 3 3-3" stroke-dasharray="2 2"/></svg>
+              <svg v-if="cIdx > 0 && tIdx === 0" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.5" class="text-muted-foreground/20 shrink-0"><path d="M3 1v6M0 4l3 3 3-3" stroke-dasharray="2 2"/></svg>
               <!-- Connector within chunk -->
-              <svg v-else-if="tIdx > 0" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.5" class="text-orange-400/30 shrink-0"><path d="M3 1v6M0 4l3 3 3-3" stroke-dasharray="2 2"/></svg>
+              <svg v-else-if="tIdx > 0" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.5" class="text-muted-foreground/20 shrink-0"><path d="M3 1v6M0 4l3 3 3-3" stroke-dasharray="2 2"/></svg>
 
               <span
-                class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-sm mono"
+                class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-sm mono min-w-[180px]"
                 :class="tIdx === 0 && cIdx === 0
-                  ? 'bg-primary/10 border border-primary/20 text-primary/80'
-                  : 'bg-orange-500/5 border border-orange-500/15 text-orange-400/70'"
+                  ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
+                  : 'bg-muted/30 border border-border text-muted-foreground'"
               >
                 {{ t.backend_model }}
                 <span class="text-[11px] px-1 py-px rounded bg-muted/50 text-muted-foreground/40">{{ providerName(t.provider_id) }}</span>
@@ -183,14 +186,15 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
 
         <!-- Actions -->
         <div class="shrink-0 w-[140px] flex items-center justify-end gap-1">
-          <Badge v-if="entry.targets.length > 1" variant="outline" class="text-[11px] px-1.5 py-0 border-orange-400/20 text-orange-400/50 shrink-0">
+          <Badge v-if="entry.targets.length > 1" variant="outline" class="text-[11px] px-1.5 py-0 border-border text-muted-foreground/50 shrink-0">
             {{ entry.targets.length }}级
           </Badge>
           <span v-if="!entry.active" class="text-xs text-muted-foreground/30 shrink-0">已禁用</span>
-          <Button v-if="showDelete" variant="ghost" size="icon-xs" class="text-muted-foreground/40 hover:text-destructive shrink-0" @click.stop="emit('remove', entry.clientModel)">
+          <Button v-if="showDelete && !readonly" variant="ghost" size="icon-xs" class="text-muted-foreground/40 hover:text-destructive shrink-0" @click.stop="emit('remove', entry.clientModel)">
             <Trash2 class="size-3" />
           </Button>
           <Switch
+            v-if="!readonly"
             :checked="entry.active"
             @update:checked="emit('toggle-active', idx)"
             class="scale-75 shrink-0"
@@ -199,11 +203,11 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
         </div>
       </div>
 
-      <!-- Expanded: edit mode -->
-      <div v-if="isExpanded(entry.clientModel)" class="border-t border-border bg-muted/5 mapping-edit-section">
+      <!-- Expanded: edit mode (only in non-readonly) -->
+      <div v-if="!readonly && isExpanded(entry.clientModel)" class="border-t border-border bg-muted/5 mapping-edit-section">
         <div class="flex">
           <!-- Left: client model identity -->
-          <div class="w-[128px] shrink-0 px-3 py-2 flex flex-col items-center justify-center border-r border-border bg-muted/10">
+          <div class="w-[140px] shrink-0 px-3 py-2 flex flex-col items-center justify-center border-r border-border bg-muted/10">
             <div class="mono text-xs font-semibold text-foreground">{{ entry.clientModel }}</div>
             <div class="text-[10px] text-muted-foreground/50 mt-0.5">客户端模型</div>
           </div>
@@ -215,8 +219,8 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
                 <span
                   class="text-xs font-medium shrink-0 w-8 px-1.5 py-0.5 rounded"
                   :class="tIdx === 0
-                    ? 'bg-primary/10 text-primary'
-                    : 'bg-orange-500/10 text-orange-400'"
+                    ? 'bg-emerald-500/10 text-emerald-400'
+                    : 'bg-muted/30 text-muted-foreground'"
                 >
                   {{ tIdx === 0 ? '首选' : `备${tIdx}` }}
                 </span>
@@ -273,7 +277,7 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
     </div>
 
     <!-- Add mapping form -->
-    <div v-if="showAddForm" class="flex items-center gap-2 px-4 py-3 border-t border-border">
+    <div v-if="showAddForm && !readonly" class="flex items-center gap-2 px-4 py-3 border-t border-border">
       <Input v-model="newFrom" placeholder="客户端模型" class="h-8 flex-1 text-xs mono" @keydown="handleKeydown" />
       <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" class="shrink-0 text-muted-foreground/20"><path d="M1 6h10M8 3l3 3-3 3"/></svg>
       <Input v-model="newTo" placeholder="目标模型" class="h-8 flex-1 text-xs mono" @keydown="handleKeydown" />

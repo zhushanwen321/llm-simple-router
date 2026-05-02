@@ -9,6 +9,14 @@
           <span class="text-[11px] px-2 py-0.5 rounded-full bg-muted/40 text-muted-foreground">{{ activeCount }} 启用</span>
         </div>
       </div>
+      <Button v-if="!editing" size="sm" variant="outline" @click="editing = true">
+        <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        编辑
+      </Button>
+      <Button v-else size="sm" @click="editing = false">
+        <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+        保存
+      </Button>
     </div>
 
     <!-- Mapping List -->
@@ -17,6 +25,7 @@
       :provider-groups="providerGroups"
       :show-delete="true"
       :show-add-form="true"
+      :readonly="!editing"
       @update:targets="updateTargets"
       @toggle-active="toggleActive"
       @remove="removeMapping"
@@ -54,6 +63,7 @@ import { DEFAULT_CONTEXT_WINDOW } from '@/constants'
 const groups = ref<MappingGroup[]>([])
 const providersList = ref<Provider[]>([])
 const deleteTarget = ref<MappingEntry | null>(null)
+const editing = ref(false)
 
 const activeCount = computed(() => groups.value.filter(g => g.is_active).length)
 
