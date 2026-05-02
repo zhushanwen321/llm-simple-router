@@ -51,5 +51,7 @@
   "statusFailed": "失败",
   "statusCompleted": "完成",
   "new": "新",
-  "saveFailed": "保存失败"
+  "saveFailed": "保存失败",
+  "cascadingSelect": "请选择...",
+  "cascadingNoOptions": "暂无选项"
 }

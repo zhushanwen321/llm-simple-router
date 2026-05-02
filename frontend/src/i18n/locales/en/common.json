@@ -51,5 +51,7 @@
   "statusFailed": "Failed",
   "statusCompleted": "Completed",
   "new": "New",
-  "saveFailed": "Save failed"
+  "saveFailed": "Save failed",
+  "cascadingSelect": "Please select...",
+  "cascadingNoOptions": "No options"
 }

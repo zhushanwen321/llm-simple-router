@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ChevronDown, ChevronRight } from 'lucide-vue-next'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import type { CascadingGroup, CascadingSelectedValue } from './types'
+
+const { t } = useI18n()
 
 const props = withDefaults(defineProps<{
   groups: CascadingGroup[]
@@ -10,9 +13,11 @@ const props = withDefaults(defineProps<{
   placeholder?: string
   compact?: boolean
 }>(), {
-  placeholder: '请选择...',
+  placeholder: '',
   compact: false,
 })
+
+const resolvedPlaceholder = computed(() => props.placeholder || t('common.selectPlaceholder'))
 
 const emit = defineEmits<{
   'update:modelValue': [value: CascadingSelectedValue]
@@ -49,7 +54,7 @@ function onOpenChange(val: boolean) {
         :class="[compact ? 'h-8 text-xs px-2.5 py-1' : 'h-10 text-sm px-3 py-2', { 'ring-2 ring-ring ring-offset-2': open }]"
       >
         <span class="truncate" :class="modelValue ? 'text-foreground' : 'text-muted-foreground'">
-          {{ displayText || placeholder }}
+          {{ displayText || resolvedPlaceholder }}
         </span>
         <ChevronDown class="h-4 w-4 shrink-0 opacity-50" />
       </div>
@@ -90,7 +95,7 @@ function onOpenChange(val: boolean) {
       </div>
 
       <div v-if="groups.length === 0" class="px-2 py-1.5 text-sm text-muted-foreground">
-        暂无选项
+        {{ t('common.noOptions') }}
       </div>
     </PopoverContent>
   </Popover>
