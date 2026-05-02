@@ -199,55 +199,71 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
         </div>
       </div>
 
-      <!-- Expanded: edit mode with CascadingModelSelect -->
-      <div v-if="isExpanded(entry.clientModel)" class="px-4 py-3 border-t border-border bg-muted/5 space-y-2 mapping-edit-section">
-        <div v-for="(target, tIdx) in entry.targets" :key="tIdx">
-          <div class="flex items-center gap-2">
-            <span class="text-xs font-medium shrink-0 w-8" :class="tIdx === 0 ? 'text-primary' : 'text-muted-foreground'">
-              {{ tIdx === 0 ? '首选' : `备${tIdx}` }}
-            </span>
-            <div class="flex-1">
-              <CascadingModelSelect
-                :providers="providerGroups"
-                :model-value="{ provider_id: target.provider_id, model: target.backend_model }"
-                placeholder="选择模型..."
-                @update:model-value="(v: SelectedValue) => updateTargetProvider(idx, tIdx, v)"
-              />
+      <!-- Expanded: edit mode -->
+      <div v-if="isExpanded(entry.clientModel)" class="border-t border-border bg-muted/5 mapping-edit-section">
+        <div class="flex">
+          <!-- Left: client model identity -->
+          <div class="w-[100px] shrink-0 px-4 py-3 flex flex-col items-center justify-center border-r border-border bg-muted/10">
+            <div class="mono text-sm font-semibold text-foreground">{{ entry.clientModel }}</div>
+            <div class="text-[10px] text-muted-foreground/50 mt-0.5">客户端模型</div>
+          </div>
+
+          <!-- Right: targets editor -->
+          <div class="flex-1 px-4 py-3 space-y-2">
+            <div v-for="(target, tIdx) in entry.targets" :key="tIdx">
+              <div class="flex items-center gap-2">
+                <span
+                  class="text-xs font-medium shrink-0 w-8 px-1.5 py-0.5 rounded"
+                  :class="tIdx === 0
+                    ? 'bg-primary/10 text-primary'
+                    : 'bg-orange-500/10 text-orange-400'"
+                >
+                  {{ tIdx === 0 ? '首选' : `备${tIdx}` }}
+                </span>
+                <div class="flex-1">
+                  <CascadingModelSelect
+                    :providers="providerGroups"
+                    :model-value="{ provider_id: target.provider_id, model: target.backend_model }"
+                    placeholder="选择模型..."
+                    @update:model-value="(v: SelectedValue) => updateTargetProvider(idx, tIdx, v)"
+                  />
+                </div>
+                <Button
+                  v-if="entry.targets.length > 1"
+                  variant="ghost"
+                  size="icon-xs"
+                  class="shrink-0 text-muted-foreground/40 hover:text-destructive"
+                  @click="removeTarget(idx, tIdx)"
+                >
+                  <Trash2 class="size-3" />
+                </Button>
+              </div>
+              <div v-if="tIdx < entry.targets.length - 1" class="flex items-center gap-1 pl-10 text-[11px] text-muted-foreground/30 py-0.5">
+                <span class="w-3 border-t border-muted-foreground/20"></span>
+                <span>失败时切换</span>
+              </div>
             </div>
-            <Button
-              v-if="entry.targets.length > 1"
-              variant="ghost"
-              size="icon-xs"
-              class="shrink-0 text-muted-foreground/40 hover:text-destructive"
-              @click="removeTarget(idx, tIdx)"
-            >
-              <Trash2 class="size-3" />
+
+            <!-- Overflow edit -->
+            <div class="flex items-center gap-2 pt-2 border-t border-dashed border-sky-400/15">
+              <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400/70 shrink-0">溢出</span>
+              <div class="flex-1">
+                <CascadingModelSelect
+                  :providers="providerGroups"
+                  :model-value="entry.targets[0]?.overflow_provider_id && entry.targets[0]?.overflow_model ? { provider_id: entry.targets[0].overflow_provider_id, model: entry.targets[0].overflow_model } : undefined"
+                  placeholder="可选，上下文超限时切换..."
+                  @update:model-value="(v: SelectedValue | undefined) => updateOverflow(idx, v)"
+                />
+              </div>
+            </div>
+
+            <!-- Add failover button -->
+            <Button variant="ghost" size="sm" class="w-full text-xs text-muted-foreground/50" @click="addTarget(idx)">
+              <Plus class="w-3 h-3 mr-1" />
+              添加故障转移
             </Button>
           </div>
-          <div v-if="tIdx < entry.targets.length - 1" class="flex items-center gap-1 pl-10 text-[11px] text-muted-foreground/30 py-0.5">
-            <span class="w-3 border-t border-muted-foreground/20"></span>
-            <span>失败时切换</span>
-          </div>
         </div>
-
-        <!-- Overflow edit -->
-        <div class="flex items-center gap-2 pt-2 border-t border-border">
-          <span class="text-xs text-muted-foreground/40 shrink-0">溢出模型</span>
-          <div class="flex-1">
-            <CascadingModelSelect
-              :providers="providerGroups"
-              :model-value="entry.targets[0]?.overflow_provider_id && entry.targets[0]?.overflow_model ? { provider_id: entry.targets[0].overflow_provider_id, model: entry.targets[0].overflow_model } : undefined"
-              placeholder="可选，上下文超限时切换..."
-              @update:model-value="(v: SelectedValue | undefined) => updateOverflow(idx, v)"
-            />
-          </div>
-        </div>
-
-        <!-- Add failover button -->
-        <Button variant="ghost" size="sm" class="w-full text-xs text-muted-foreground/50" @click="addTarget(idx)">
-          <Plus class="w-3 h-3 mr-1" />
-          添加故障转移
-        </Button>
       </div>
     </div>
 
