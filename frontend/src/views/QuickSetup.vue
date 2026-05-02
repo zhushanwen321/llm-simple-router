@@ -42,7 +42,7 @@
       <CardContent class="space-y-4">
         <!-- Line 1: Provider / Plan / Format / BaseURL / APIKey -->
         <div class="flex items-end gap-2">
-          <div class="w-32 space-y-1">
+          <div class="w-40 space-y-1">
             <Label class="text-xs text-muted-foreground">供应商</Label>
             <Select :model-value="selectedGroup" @update:model-value="(v: unknown) => onProviderChange(v as string)">
               <SelectTrigger><SelectValue placeholder="选择" /></SelectTrigger>
@@ -64,9 +64,9 @@
                 </SelectContent>
               </Select>
             </div>
-            <div class="flex-1 max-w-[280px] space-y-1">
+            <div class="flex-1 space-y-1">
               <Label class="text-xs text-muted-foreground">Base URL</Label>
-              <Input v-model="customBaseUrl" placeholder="https://api.example.com/v1" class="font-mono text-xs h-9" />
+              <Input v-model="customBaseUrl" placeholder="https://api.example.com/v1" class="font-mono text-xs" />
             </div>
           </template>
           <!-- Preset mode: show plan + readonly base url -->
@@ -90,26 +90,29 @@
                 </SelectContent>
               </Select>
             </div>
-            <div class="flex-1 max-w-[280px] space-y-1">
+            <div class="flex-1 space-y-1">
               <Label class="text-xs text-muted-foreground">Base URL</Label>
-              <Input :model-value="baseUrl" readonly class="font-mono text-xs h-9" />
+              <Input :model-value="baseUrl" readonly class="font-mono text-xs" />
             </div>
           </template>
-          <div class="w-72 space-y-1">
+          <div class="w-64 space-y-1">
             <Label class="text-xs text-muted-foreground">API Key</Label>
-            <Input v-model="apiKey" type="password" placeholder="输入 API Key" class="h-9" />
+            <Input v-model="apiKey" type="password" placeholder="输入 API Key" />
           </div>
-          <Button variant="outline" size="sm" class="h-9 shrink-0" :disabled="connectionStatus === 'testing'" @click="testConnection">
-            <template v-if="connectionStatus === 'testing'">
-              <svg class="w-3.5 h-3.5 mr-1 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              测试中
-            </template>
-            <template v-else-if="connectionStatus === 'ok'">已连接</template>
-            <template v-else>测试</template>
-          </Button>
+          <div class="shrink-0 space-y-1">
+            <Label class="text-xs text-muted-foreground invisible">连接</Label>
+            <Button variant="outline" size="sm" :disabled="connectionStatus === 'testing'" @click="testConnection">
+              <template v-if="connectionStatus === 'testing'">
+                <svg class="w-3.5 h-3.5 mr-1 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                测试中
+              </template>
+              <template v-else-if="connectionStatus === 'ok'">已连接</template>
+              <template v-else>测试</template>
+            </Button>
+          </div>
         </div>
 
         <!-- Line 2: Model Cards -->

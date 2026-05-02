@@ -36,7 +36,7 @@ const emit = defineEmits<{
         :model-value="mode"
         @update:model-value="(v: unknown) => emit('update:mode', v as ConcurrencyMode)"
       >
-        <SelectTrigger :class="compact ? 'h-8 text-xs' : ''">
+        <SelectTrigger>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -52,7 +52,6 @@ const emit = defineEmits<{
         <Input
           :model-value="maxConcurrency"
           type="number" min="1" max="100"
-          :class="compact ? 'h-8 text-xs' : 'h-9'"
           @update:model-value="emit('update:maxConcurrency', Number($event))"
         />
       </div>
@@ -62,7 +61,6 @@ const emit = defineEmits<{
           :model-value="queueTimeoutMs"
           type="number" min="0"
           placeholder="0=无限"
-          :class="compact ? 'h-8 text-xs' : 'h-9'"
           @update:model-value="emit('update:queueTimeoutMs', Number($event))"
         />
       </div>
@@ -71,7 +69,6 @@ const emit = defineEmits<{
         <Input
           :model-value="maxQueueSize"
           type="number" min="1" max="1000"
-          :class="compact ? 'h-8 text-xs' : 'h-9'"
           @update:model-value="emit('update:maxQueueSize', Number($event))"
         />
       </div>
