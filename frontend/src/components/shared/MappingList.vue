@@ -30,17 +30,17 @@ const emit = defineEmits<{
 
 const newFrom = ref('')
 const newTo = ref('')
-const expandedEntries = ref<Set<string>>(new Set())
+const expandedEntries = ref<Record<string, boolean>>({})
 
 function toggleExpand(clientModel: string) {
-  const next = new Set(expandedEntries.value)
-  if (next.has(clientModel)) next.delete(clientModel)
-  else next.add(clientModel)
-  expandedEntries.value = next
+  expandedEntries.value = {
+    ...expandedEntries.value,
+    [clientModel]: !expandedEntries.value[clientModel],
+  }
 }
 
 function isExpanded(clientModel: string) {
-  return expandedEntries.value.has(clientModel)
+  return !!expandedEntries.value[clientModel]
 }
 
 function addTarget(entryIndex: number) {
