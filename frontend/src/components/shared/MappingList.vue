@@ -250,7 +250,7 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
 
             <!-- Overflow edit -->
             <div class="flex items-center gap-2 pt-2 border-t border-dashed border-sky-400/15">
-              <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400/70 shrink-0">溢出</span>
+              <span class="text-[10px] w-10 text-center px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400/70 shrink-0">溢出</span>
               <div class="flex-1">
                 <CascadingModelSelect
                   :providers="providerGroups"

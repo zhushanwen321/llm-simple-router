@@ -5,31 +5,35 @@
       <div>
         <h2 class="text-lg font-semibold text-foreground">模型映射</h2>
         <div class="flex gap-2 mt-1">
-          <span class="text-[11px] px-2 py-0.5 rounded-full bg-muted/40 text-muted-foreground">{{ groups.length }} 条映射</span>
+          <span class="text-[11px] px-2 py-0.5 rounded-full bg-muted/40 text-muted-foreground">{{ draftEntries.length }} 条映射</span>
           <span class="text-[11px] px-2 py-0.5 rounded-full bg-muted/40 text-muted-foreground">{{ activeCount }} 启用</span>
+          <span v-if="hasChanges" class="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400">有未保存的修改</span>
         </div>
       </div>
-      <Button v-if="!editing" size="sm" variant="outline" @click="editing = true">
+      <Button v-if="!editing" size="sm" variant="outline" @click="enterEdit">
         <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         编辑
       </Button>
-      <Button v-else size="sm" @click="editing = false">
-        <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-        保存
-      </Button>
+      <div v-else class="flex gap-2">
+        <Button size="sm" variant="outline" @click="cancelEdit">取消</Button>
+        <Button size="sm" :disabled="saving || !hasChanges" @click="saveAll">
+          <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+          {{ saving ? '保存中...' : '保存' }}
+        </Button>
+      </div>
     </div>
 
     <!-- Mapping List -->
     <MappingList
-      :entries="entries"
+      :entries="draftEntries"
       :provider-groups="providerGroups"
-      :show-delete="true"
-      :show-add-form="true"
+      :show-delete="editing"
+      :show-add-form="editing"
       :editable="editing"
-      @update:targets="updateTargets"
-      @toggle-active="toggleActive"
-      @remove="removeMapping"
-      @add="addNewMapping"
+      @update:targets="updateDraftTargets"
+      @toggle-active="toggleDraftActive"
+      @remove="removeDraftEntry"
+      @add="addDraftEntry"
     />
 
     <!-- Delete Confirm -->
@@ -37,11 +41,11 @@
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>确认删除</AlertDialogTitle>
-          <AlertDialogDescription>确定要删除映射「{{ deleteTarget?.clientModel }}」吗？此操作不可撤销。</AlertDialogDescription>
+          <AlertDialogDescription>确定要删除映射「{{ deleteTarget?.clientModel }}」吗？</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>取消</AlertDialogCancel>
-          <Button variant="destructive" @click="handleDelete">删除</Button>
+          <Button variant="destructive" @click="confirmDelete">删除</Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -60,12 +64,17 @@ import type { ProviderGroup } from '@/components/mappings/cascading-types'
 import type { MappingGroup, Provider, Rule } from '@/types/mapping'
 import { DEFAULT_CONTEXT_WINDOW } from '@/constants'
 
+// --- State ---
 const groups = ref<MappingGroup[]>([])
 const providersList = ref<Provider[]>([])
-const deleteTarget = ref<MappingEntry | null>(null)
 const editing = ref(false)
+const saving = ref(false)
+const deleteTarget = ref<MappingEntry | null>(null)
+const draftEntries = ref<MappingEntry[]>([])
+const pendingDeletes = ref<string[]>([]) // clientModels to delete
 
-const activeCount = computed(() => groups.value.filter(g => g.is_active).length)
+// --- Computed ---
+const activeCount = computed(() => draftEntries.value.filter(e => e.active).length)
 
 const providerGroups = computed<ProviderGroup[]>(() =>
   providersList.value.map(p => ({
@@ -77,8 +86,22 @@ const providerGroups = computed<ProviderGroup[]>(() =>
   }))
 )
 
-const entries = computed<MappingEntry[]>(() =>
-  groups.value.map((g) => {
+const hasChanges = computed(() => {
+  const original = buildEntriesFromGroups()
+  if (original.length !== draftEntries.value.length) return true
+  if (pendingDeletes.value.length > 0) return true
+  for (let i = 0; i < original.length; i++) {
+    const o = original[i], d = draftEntries.value[i]
+    if (o.clientModel !== d.clientModel) return true
+    if (o.active !== d.active) return true
+    if (JSON.stringify(o.targets) !== JSON.stringify(d.targets)) return true
+  }
+  return false
+})
+
+// --- Build entries from DB groups ---
+function buildEntriesFromGroups(): MappingEntry[] {
+  return groups.value.map((g) => {
     let rule: Rule = {}
     try {
       const parsed = JSON.parse(g.rule)
@@ -100,8 +123,9 @@ const entries = computed<MappingEntry[]>(() =>
       originalActive: !!g.is_active,
     }
   })
-)
+}
 
+// --- Data loading ---
 async function loadData() {
   const results = await Promise.allSettled([
     api.getMappingGroups(),
@@ -109,58 +133,131 @@ async function loadData() {
   ])
   if (results[0].status === 'fulfilled') groups.value = results[0].value
   if (results[1].status === 'fulfilled') providersList.value = results[1].value as Provider[]
+  draftEntries.value = buildEntriesFromGroups()
 }
 
-function updateTargets(index: number, targets: MappingTarget[]) {
-  const entry = entries.value[index]
-  if (!entry?.existingId) return
-  const ruleJson = JSON.stringify({ targets })
-  api.updateMappingGroup(entry.existingId, {
-    client_model: entry.clientModel,
-    rule: ruleJson,
-  }).then(() => loadData()).catch((e: unknown) => {
-    toast.error(getApiMessage(e, '更新映射失败'))
-  })
+// --- Edit mode ---
+function enterEdit() {
+  draftEntries.value = buildEntriesFromGroups()
+  pendingDeletes.value = []
+  editing.value = true
 }
 
-async function toggleActive(index: number) {
-  const entry = entries.value[index]
-  if (!entry?.existingId) return
-  try {
-    await api.toggleMappingGroup(entry.existingId)
-    await loadData()
-  } catch (e: unknown) {
-    toast.error(getApiMessage(e, '切换状态失败'))
-  }
+function cancelEdit() {
+  draftEntries.value = buildEntriesFromGroups()
+  pendingDeletes.value = []
+  editing.value = false
 }
 
-function removeMapping(clientModel: string) {
-  const entry = entries.value.find(e => e.clientModel === clientModel)
+// --- Draft mutations (local only) ---
+function updateDraftTargets(index: number, targets: MappingTarget[]) {
+  const next = [...draftEntries.value]
+  next[index] = { ...next[index], targets }
+  draftEntries.value = next
+}
+
+function toggleDraftActive(index: number) {
+  const next = [...draftEntries.value]
+  next[index] = { ...next[index], active: !next[index].active }
+  draftEntries.value = next
+}
+
+function removeDraftEntry(clientModel: string) {
+  const entry = draftEntries.value.find(e => e.clientModel === clientModel)
   if (entry) deleteTarget.value = entry
 }
 
-async function handleDelete() {
+function confirmDelete() {
   const target = deleteTarget.value
-  if (!target?.existingId) return
+  if (!target) return
   deleteTarget.value = null
-  try {
-    await api.deleteMappingGroup(target.existingId)
-    await loadData()
-  } catch (e: unknown) {
-    toast.error(getApiMessage(e, '删除映射失败'))
-  }
+  pendingDeletes.value.push(target.clientModel)
+  draftEntries.value = draftEntries.value.filter(e => e.clientModel !== target.clientModel)
 }
 
-async function addNewMapping(clientModel: string, targetModel: string) {
+function addDraftEntry(clientModel: string, targetModel: string) {
   const firstProvider = providersList.value[0]
-  const ruleJson = JSON.stringify({
+  draftEntries.value = [...draftEntries.value, {
+    clientModel,
     targets: [{ backend_model: targetModel, provider_id: firstProvider?.id ?? '' }],
-  })
+    existing: false,
+    tag: 'cust' as const,
+    active: true,
+  }]
+}
+
+// --- Save all ---
+async function saveAll() {
+  saving.value = true
+  const errors: string[] = []
+
   try {
-    await api.createMappingGroup({ client_model: clientModel, rule: ruleJson })
+    // 1. Delete pending entries
+    for (const cm of pendingDeletes.value) {
+      const entry = buildEntriesFromGroups().find(e => e.clientModel === cm)
+      if (entry?.existingId) {
+        try {
+          await api.deleteMappingGroup(entry.existingId)
+        } catch (e: unknown) {
+          errors.push(`删除 ${cm} 失败: ${getApiMessage(e, "")}`)
+        }
+      }
+    }
+
+    // 2. Create new entries
+    const originalGroups = groups.value
+    for (const entry of draftEntries.value) {
+      const existing = originalGroups.find(g => g.client_model === entry.clientModel)
+
+      if (!existing) {
+        // New entry
+        try {
+          const ruleJson = JSON.stringify({ targets: entry.targets })
+          await api.createMappingGroup({ client_model: entry.clientModel, rule: ruleJson })
+          // Toggle active if disabled
+          // (createMappingGroup defaults to active, so only need to toggle if user set inactive)
+        } catch (e: unknown) {
+          errors.push(`创建 ${entry.clientModel} 失败: ${getApiMessage(e, "")}`)
+        }
+      } else {
+        // Existing entry — update rule if changed
+        const originalEntry = buildEntriesFromGroups().find(e => e.clientModel === entry.clientModel)
+        const ruleChanged = originalEntry && JSON.stringify(originalEntry.targets) !== JSON.stringify(entry.targets)
+        const activeChanged = originalEntry && originalEntry.active !== entry.active
+
+        if (ruleChanged && originalEntry?.existingId) {
+          try {
+            await api.updateMappingGroup(originalEntry.existingId, {
+              client_model: entry.clientModel,
+              rule: JSON.stringify({ targets: entry.targets }),
+            })
+          } catch (e: unknown) {
+            errors.push(`更新 ${entry.clientModel} 失败: ${getApiMessage(e, "")}`)
+          }
+        }
+
+        if (activeChanged && originalEntry?.existingId) {
+          try {
+            await api.toggleMappingGroup(originalEntry.existingId)
+          } catch (e: unknown) {
+            errors.push(`切换 ${entry.clientModel} 状态失败: ${getApiMessage(e, "")}`)
+          }
+        }
+      }
+    }
+
     await loadData()
+    editing.value = false
+
+    if (errors.length > 0) {
+      toast.error(`${errors.length} 个操作失败`)
+    } else {
+      toast.success('保存成功')
+    }
   } catch (e: unknown) {
-    toast.error(getApiMessage(e, '创建映射失败'))
+    toast.error(getApiMessage(e, '保存失败'))
+  } finally {
+    saving.value = false
   }
 }
 
