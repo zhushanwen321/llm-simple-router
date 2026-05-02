@@ -24,6 +24,7 @@
   "status": "Status",
   "actions": "Actions",
   "createdAt": "Created At",
+  "saving": "Saving...",
   "saveSuccess": "Saved successfully",
   "deleteSuccess": "Deleted successfully",
   "confirmDelete": "Confirm Delete",
@@ -48,5 +49,7 @@
   "disable": "Disable",
   "statusPending": "In Progress",
   "statusFailed": "Failed",
-  "statusCompleted": "Completed"
+  "statusCompleted": "Completed",
+  "new": "New",
+  "saveFailed": "Save failed"
 }

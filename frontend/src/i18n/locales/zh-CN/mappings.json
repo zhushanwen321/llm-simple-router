@@ -31,12 +31,24 @@
   "disableAction": "禁用",
   "enableAction": "启用",
   "confirmDeleteTitle": "确认删除",
-  "confirmDeleteDesc": "确定要删除分组「{model}」吗？",
+  "confirmDeleteDesc": "确定要删除映射「{model}」吗？",
   "errorClientModelRequired": "请输入客户端模型名称",
   "errorAtLeastOneTarget": "至少添加一个目标",
   "errorSelectModel": "请选择模型",
   "errorLoadProviders": "加载供应商失败",
   "errorSaveGroup": "保存分组失败",
   "errorDeleteGroup": "删除分组失败",
-  "errorToggleStatus": "切换状态失败"
+  "errorToggleStatus": "切换状态失败",
+  "totalMappings": "{count} 条映射",
+  "enabledCount": "{count} 启用",
+  "unsavedChanges": "有未保存的修改",
+  "messages": {
+    "deleteFailed": "删除 {model} 失败",
+    "createFailed": "创建 {model} 失败",
+    "updateFailed": "更新 {model} 失败",
+    "toggleFailed": "切换 {model} 状态失败",
+    "partialFail": "{count} 个操作失败",
+    "saveFailed": "保存失败"
+  },
+  "selectProviderModel": "选择供应商 / 模型"
 }

@@ -49,7 +49,13 @@
     "dropFields": "Drop Fields (comma-separated)",
     "requestDefaults": "Request Defaults (JSON)",
     "saveRules": "Save Rules",
-    "deleteRules": "Delete Rules"
+    "deleteRules": "Delete Rules",
+    "loadFailed": "Failed to load transform rules",
+    "requestDefaultsJsonError": "Invalid JSON format for request defaults",
+    "injectHeadersJsonError": "Invalid JSON format for inject headers",
+    "saved": "Transform rules saved",
+    "deleteFailed": "Failed to delete rules",
+    "deleted": "Transform rules deleted"
   },
   "validation": {
     "nameRequired": "Please enter a name",

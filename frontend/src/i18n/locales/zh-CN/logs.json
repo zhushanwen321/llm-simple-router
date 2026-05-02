@@ -77,6 +77,22 @@
     "deltaGroupSummary": "{deltaType} · keep {kept} 个",
     "deltaFoldedInfo": " +{folded} 个已折叠 ({chars} 字符)"
   },
+  "messages": {
+    "loadFailed": "加载日志失败",
+    "cleanupFailed": "清理日志失败",
+    "loadSubRequestsFailed": "加载子请求失败",
+    "loadDetailFailed": "加载日志详情失败",
+    "loadProvidersFailed": "加载供应商列表失败",
+    "loadKeysFailed": "加载密钥列表失败"
+  },
+  "validation": {
+    "endTimeAfterStart": "结束时间须晚于开始时间"
+  },
+  "retention": {
+    "saved": "日志保留天数已更新",
+    "updateFailed": "更新保留天数失败",
+    "loadFailed": "加载保留天数失败，使用默认值"
+  },
   "requestDetail": {
     "structured": "结构化",
     "rawData": "原始数据",

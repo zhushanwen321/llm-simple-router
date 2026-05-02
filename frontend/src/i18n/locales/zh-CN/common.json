@@ -24,6 +24,7 @@
   "status": "状态",
   "actions": "操作",
   "createdAt": "创建时间",
+  "saving": "保存中...",
   "saveSuccess": "保存成功",
   "deleteSuccess": "删除成功",
   "confirmDelete": "确认删除",
@@ -48,5 +49,7 @@
   "disable": "禁用",
   "statusPending": "进行中",
   "statusFailed": "失败",
-  "statusCompleted": "完成"
+  "statusCompleted": "完成",
+  "new": "新",
+  "saveFailed": "保存失败"
 }

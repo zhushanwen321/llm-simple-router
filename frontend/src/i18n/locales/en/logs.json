@@ -77,6 +77,22 @@
     "deltaGroupSummary": "{deltaType} · keep {kept}",
     "deltaFoldedInfo": " +{folded} collapsed ({chars} chars)"
   },
+  "messages": {
+    "loadFailed": "Failed to load logs",
+    "cleanupFailed": "Failed to cleanup logs",
+    "loadSubRequestsFailed": "Failed to load sub-requests",
+    "loadDetailFailed": "Failed to load log details",
+    "loadProvidersFailed": "Failed to load providers",
+    "loadKeysFailed": "Failed to load router keys"
+  },
+  "validation": {
+    "endTimeAfterStart": "End time must be after start time"
+  },
+  "retention": {
+    "saved": "Log retention days updated",
+    "updateFailed": "Failed to update retention days",
+    "loadFailed": "Failed to load retention days, using default"
+  },
   "requestDetail": {
     "structured": "Structured",
     "rawData": "Raw Data",
