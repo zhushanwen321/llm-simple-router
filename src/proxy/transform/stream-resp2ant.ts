@@ -164,28 +164,13 @@ export class ResponsesToAnthropicTransform extends BaseSSETransform {
       }
 
       case "response.output_item.done": {
-        const item = payload.item as Record<string, unknown>;
         const outputIdx = (payload.output_index as number) ?? this.currentOutputIndex;
-        const itemType = item?.type as string;
 
-        if (itemType === "function_call") {
-          // Send content_block_stop with tool_use id/name from the done event
-          const tracked = this.activeItems.get(outputIdx);
-          const toolId = item.call_id as string ?? tracked?.callId ?? tracked?.id ?? "";
-          const toolName = item.name as string ?? tracked?.name ?? "";
-          // Re-emit content_block_start if we need to update (but typically already done at added)
-          // Just emit stop
-          this.pushAnthropicSSE("content_block_stop", {
-            type: "content_block_stop",
-            index: this.blockIndex,
-          });
-        } else {
-          // message or reasoning — emit content_block_stop
-          this.pushAnthropicSSE("content_block_stop", {
-            type: "content_block_stop",
-            index: this.blockIndex,
-          });
-        }
+        // content_block_stop — same for all item types (index-only)
+        this.pushAnthropicSSE("content_block_stop", {
+          type: "content_block_stop",
+          index: this.blockIndex,
+        });
 
         this.activeItems.delete(outputIdx);
         this.blockIndex++;
