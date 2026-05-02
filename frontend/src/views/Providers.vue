@@ -562,7 +562,9 @@ async function handleDelete() {
     await loadProviders()
   } catch (e: unknown) {
     console.error('Failed to delete provider:', e)
-    toast.error(getApiMessage(e, '删除供应商失败'))
+    const msg = getApiMessage(e, '删除供应商失败')
+    console.log('toast message:', msg)
+    toast.error(msg)
   }
 }
 async function handleReload() {

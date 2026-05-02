@@ -6,7 +6,7 @@
     </main>
   </div>
   <router-view v-else />
-  <Toaster richColors position="top-center" />
+  <Toaster richColors position="top-center" :toastOptions="{ duration: 4000 }" />
 </template>
 
 <script setup lang="ts">
