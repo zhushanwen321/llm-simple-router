@@ -181,7 +181,8 @@ export function useQuickSetup() {
           existing: true,
           existingId: existingGroup.id,
           tag: 'existing' as const,
-          active: true,
+          active: !!existingGroup.is_active,
+          originalActive: !!existingGroup.is_active,
         }
       }
 
@@ -418,7 +419,7 @@ export function useQuickSetup() {
 
       await api.quickSetup(payload)
 
-      // Update existing mappings (failover/overflow changes)
+      // Update existing mappings (failover/overflow/active changes)
       // Best-effort: continue even if some updates fail
       const updateErrors: string[] = []
       for (const entry of mappingEntries.value) {
@@ -429,6 +430,10 @@ export function useQuickSetup() {
               client_model: entry.clientModel,
               rule: ruleJson,
             })
+            // Toggle active state if changed from original
+            if (entry.originalActive !== undefined && entry.active !== entry.originalActive) {
+              await api.toggleMappingGroup(entry.existingId)
+            }
           } catch (e: unknown) {
             updateErrors.push(entry.clientModel)
           }

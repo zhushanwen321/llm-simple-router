@@ -117,6 +117,8 @@ export interface MappingEntry {
   tag: 'def' | 'auto' | 'cust' | 'existing'
   /** 是否启用 */
   active: boolean
+  /** 已有映射的原始 active 状态，用于判断是否需要 toggle */
+  originalActive?: boolean
 }
 
 /**
