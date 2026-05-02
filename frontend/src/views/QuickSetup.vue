@@ -45,7 +45,7 @@
           <div class="w-40 space-y-1">
             <Label class="text-xs text-muted-foreground">供应商</Label>
             <Select :model-value="selectedGroup" @update:model-value="(v: unknown) => onProviderChange(v as string)">
-              <SelectTrigger><SelectValue placeholder="选择" /></SelectTrigger>
+              <SelectTrigger class="w-full"><SelectValue placeholder="选择" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__custom__">自定义</SelectItem>
                 <SelectItem v-for="g in providerGroups" :key="g.group" :value="g.group">{{ g.group }}</SelectItem>
@@ -57,7 +57,7 @@
             <div class="w-28 space-y-1">
               <Label class="text-xs text-muted-foreground">格式</Label>
               <Select v-model="apiType">
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger class="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="anthropic">Anthropic</SelectItem>
                   <SelectItem value="openai">OpenAI</SelectItem>
@@ -74,7 +74,7 @@
             <div class="w-28 space-y-1">
               <Label class="text-xs text-muted-foreground">套餐</Label>
               <Select :model-value="selectedPlan" @update:model-value="(v: unknown) => onPlanChange(v as string)">
-                <SelectTrigger><SelectValue placeholder="选择" /></SelectTrigger>
+                <SelectTrigger class="w-full"><SelectValue placeholder="选择" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem v-for="p in availablePlans" :key="p.plan" :value="p.plan">{{ p.plan }}</SelectItem>
                 </SelectContent>
@@ -83,7 +83,7 @@
             <div class="w-28 space-y-1">
               <Label class="text-xs text-muted-foreground">格式</Label>
               <Select v-model="apiType">
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger class="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="anthropic">Anthropic</SelectItem>
                   <SelectItem value="openai">OpenAI</SelectItem>
