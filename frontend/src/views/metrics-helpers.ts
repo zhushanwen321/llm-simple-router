@@ -1,5 +1,5 @@
 import type { ChartOptions } from 'chart.js'
-import { parseUtc, formatTimeHM } from '@/utils/format'
+import { parseUtc, formatTimeHM, formatTimeMDH } from '@/utils/format'
 
 const MS_PER_SEC = 1000
 const DAY_MS = 86400 * MS_PER_SEC
@@ -46,7 +46,7 @@ function pickLabelFormat(periodStr: string, firstTs?: number, lastTs?: number): 
 }
 
 function makeLabel(date: Date, fmt: 'time' | 'day'): string {
-  return fmt === 'day' ? `${date.getMonth() + 1}/${date.getDate()}` : formatTimeHM(date)
+  return fmt === 'day' ? formatTimeMDH(date) : formatTimeHM(date)
 }
 
 export function fillTimeseries(
