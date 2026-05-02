@@ -1,0 +1,40 @@
+{
+  "title": "Settings",
+  "retention": {
+    "title": "Log Retention Policy",
+    "desc": "Logs older than the retention period will be automatically cleaned up",
+    "daysLabel": "Retention Days",
+    "integerRequired": "Please enter an integer",
+    "rangeError": "Please enter an integer between {min} and {max}"
+  },
+  "storage": {
+    "title": "Storage Management",
+    "desc": "Monitor database size and configure auto-cleanup thresholds",
+    "dbTotalSize": "Database Total Size",
+    "logSize": "Request Log Size",
+    "logFileSize": "Log File Size",
+    "dbMaxSizeLabel": "Database Size Limit (MB)",
+    "logMaxSizeLabel": "Log Table Size Limit (MB)",
+    "minValueError": "Please enter a value no less than {min}",
+    "logExceedsDbError": "Log table limit should not exceed database limit",
+    "thresholdsUpdated": "Storage thresholds updated",
+    "updateFailed": "Update failed"
+  },
+  "importExport": {
+    "title": "Config Import/Export",
+    "desc": "Export current config or restore from file",
+    "export": "Export Config",
+    "import": "Import Config",
+    "exportSuccess": "Config exported",
+    "exportFailed": "Export failed",
+    "unsupportedVersion": "Unsupported config file version",
+    "invalidJson": "Invalid JSON file",
+    "importSuccess": "Config imported",
+    "importFailed": "Import failed",
+    "confirmImport": "Confirm Config Import",
+    "importWarning": "Import will overwrite current providers, mappings, keys and other config. Security settings (password, JWT) will be preserved.",
+    "confirmButton": "Confirm Import",
+    "importing": "Importing...",
+    "importComplete": "Import complete:"
+  }
+}

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { api, getApiMessage, type DbSizeInfoResponse, type ConfigExportResponse } from '@/api/client'
 import { useLogRetention } from '@/composables/useLogRetention'
@@ -13,6 +14,8 @@ import {
   AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Download, Upload, HardDrive } from 'lucide-vue-next'
+
+const { t } = useI18n()
 
 const BYTES_PER_MB = 1_048_576
 const KB_BASE = 1024
@@ -73,11 +76,11 @@ function validateRetention(): boolean {
   retentionError.value = ''
   const val = retentionDays.value
   if (!Number.isInteger(val)) {
-    retentionError.value = '请输入整数'
+    retentionError.value = t('settings.retention.integerRequired')
     return false
   }
   if (val < RETENTION_MIN || val > RETENTION_MAX) {
-    retentionError.value = `请输入 ${RETENTION_MIN}-${RETENTION_MAX} 之间的整数`
+    retentionError.value = t('settings.retention.rangeError', { min: RETENTION_MIN, max: RETENTION_MAX })
     return false
   }
   return true
@@ -93,15 +96,15 @@ function validateThresholds(): boolean {
   logTableMaxSizeError.value = ''
   let valid = true
   if (!Number.isFinite(dbMaxSizeMb.value) || dbMaxSizeMb.value < SIZE_MB_MIN) {
-    dbMaxSizeError.value = `请输入不小于 ${SIZE_MB_MIN} 的数值`
+    dbMaxSizeError.value = t('settings.storage.minValueError', { min: SIZE_MB_MIN })
     valid = false
   }
   if (!Number.isFinite(logTableMaxSizeMb.value) || logTableMaxSizeMb.value < SIZE_MB_MIN) {
-    logTableMaxSizeError.value = `请输入不小于 ${SIZE_MB_MIN} 的数值`
+    logTableMaxSizeError.value = t('settings.storage.minValueError', { min: SIZE_MB_MIN })
     valid = false
   }
   if (valid && logTableMaxSizeMb.value > dbMaxSizeMb.value) {
-    logTableMaxSizeError.value = '日志表上限不应超过数据库上限'
+    logTableMaxSizeError.value = t('settings.storage.logExceedsDbError')
     valid = false
   }
   return valid
@@ -116,10 +119,10 @@ async function saveThresholds() {
     })
     dbMaxSizeMb.value = result.dbMaxSizeMb
     logTableMaxSizeMb.value = result.logTableMaxSizeMb
-    toast.success('存储阈值已更新')
+    toast.success(t('settings.storage.thresholdsUpdated'))
     await loadSettings()
   } catch (e: unknown) {
-    toast.error(getApiMessage(e, '更新失败'))
+    toast.error(getApiMessage(e, t('settings.storage.updateFailed')))
   }
 }
 
@@ -133,9 +136,9 @@ async function handleExport() {
     a.download = `router-config-${new Date().toISOString().slice(0, DATE_SLICE_END)}.json`
     a.click()
     URL.revokeObjectURL(url)
-    toast.success('配置已导出')
+    toast.success(t('settings.importExport.exportSuccess'))
   } catch (e: unknown) {
-    toast.error(getApiMessage(e, '导出失败'))
+    toast.error(getApiMessage(e, t('settings.importExport.exportFailed')))
   }
 }
 
@@ -148,13 +151,13 @@ function handleFileSelect(event: Event) {
     try {
       const data = JSON.parse(reader.result as string) as ConfigExportResponse
       if (!data.version || data.version !== 1) {
-        toast.error('不支持的配置文件版本')
+        toast.error(t('settings.importExport.unsupportedVersion'))
         return
       }
       pendingImportData.value = data
       showImportDialog.value = true
     } catch {
-      toast.error('无效的 JSON 文件')
+      toast.error(t('settings.importExport.invalidJson'))
     }
   }
   reader.readAsText(file)
@@ -168,10 +171,10 @@ async function confirmImport() {
     const result = await api.importConfig(pendingImportData.value)
     importResult.value = result
     showImportDialog.value = false
-    toast.success('配置已导入')
+    toast.success(t('settings.importExport.importSuccess'))
     await loadSettings()
   } catch (e: unknown) {
-    toast.error(getApiMessage(e, '导入失败'))
+    toast.error(getApiMessage(e, t('settings.importExport.importFailed')))
   } finally {
     importing.value = false
     pendingImportData.value = null
@@ -183,15 +186,15 @@ onMounted(loadSettings)
 
 <template>
   <div class="p-6 space-y-6">
-    <h2 class="text-lg font-semibold text-foreground">系统设置</h2>
+    <h2 class="text-lg font-semibold text-foreground">{{ t('settings.title') }}</h2>
 
     <!-- Log Retention -->
     <div class="bg-card rounded-lg border p-4 space-y-3">
-      <h3 class="font-medium text-sm text-foreground">日志保留策略</h3>
-      <p class="text-sm text-muted-foreground">超过保留天数的日志将被自动清理</p>
+      <h3 class="font-medium text-sm text-foreground">{{ t('settings.retention.title') }}</h3>
+      <p class="text-sm text-muted-foreground">{{ t('settings.retention.desc') }}</p>
       <div class="flex items-end gap-4">
         <div class="space-y-1">
-          <Label for="retention-days">保留天数</Label>
+          <Label for="retention-days">{{ t('settings.retention.daysLabel') }}</Label>
           <Input
             id="retention-days"
             v-model.number="retentionDays"
@@ -203,7 +206,7 @@ onMounted(loadSettings)
           />
           <p v-if="retentionError" class="text-sm text-destructive mt-1">{{ retentionError }}</p>
         </div>
-        <Button size="sm" :disabled="loading" @click="handleSaveRetention">保存</Button>
+        <Button size="sm" :disabled="loading" @click="handleSaveRetention">{{ t('common.save') }}</Button>
       </div>
     </div>
 
@@ -211,14 +214,14 @@ onMounted(loadSettings)
     <div class="bg-card rounded-lg border p-4 space-y-4">
       <h3 class="font-medium text-sm text-foreground flex items-center gap-2">
         <HardDrive class="h-4 w-4" />
-        存储管理
+        {{ t('settings.storage.title') }}
       </h3>
-      <p class="text-sm text-muted-foreground">监控数据库大小并配置自动清理阈值</p>
+      <p class="text-sm text-muted-foreground">{{ t('settings.storage.desc') }}</p>
 
       <template v-if="dbSizeInfo">
         <div class="space-y-1">
           <div class="flex justify-between text-sm">
-            <span>数据库总大小</span>
+            <span>{{ t('settings.storage.dbTotalSize') }}</span>
             <span class="text-muted-foreground">
               {{ formatBytes(dbSizeInfo.totalBytes) }} / {{ dbMaxSizeMb }} MB
             </span>
@@ -230,7 +233,7 @@ onMounted(loadSettings)
 
         <div class="space-y-1">
           <div class="flex justify-between text-sm">
-            <span>请求日志大小 ({{ dbSizeInfo.logCount }} 条)</span>
+            <span>{{ t('settings.storage.logSize') }} ({{ t('common.count', { count: dbSizeInfo.logCount }) }})</span>
             <span class="text-muted-foreground">
               {{ formatBytes(dbSizeInfo.logTableBytes) }} / {{ logTableMaxSizeMb }} MB
             </span>
@@ -242,7 +245,7 @@ onMounted(loadSettings)
 
         <div class="space-y-1">
           <div class="flex justify-between text-sm">
-            <span>日志文件大小</span>
+            <span>{{ t('settings.storage.logFileSize') }}</span>
             <span class="text-muted-foreground">
               {{ formatBytes(dbSizeInfo.logFileBytes ?? 0) }}
             </span>
@@ -250,47 +253,47 @@ onMounted(loadSettings)
         </div>
 
         <p v-if="dbSizeInfo.lastChecked" class="text-xs text-muted-foreground">
-          上次检查：{{ dbSizeInfo.lastChecked }}
+          {{ t('common.lastChecked') }}：{{ dbSizeInfo.lastChecked }}
         </p>
       </template>
 
       <div class="grid grid-cols-2 gap-4 pt-3 border-t">
         <div class="space-y-1">
-          <Label for="db-max-size">数据库大小上限 (MB)</Label>
+          <Label for="db-max-size">{{ t('settings.storage.dbMaxSizeLabel') }}</Label>
           <Input id="db-max-size" v-model.number="dbMaxSizeMb" type="number" :min="SIZE_MB_MIN" @input="dbMaxSizeError = ''" />
           <p v-if="dbMaxSizeError" class="text-sm text-destructive mt-1">{{ dbMaxSizeError }}</p>
         </div>
         <div class="space-y-1">
-          <Label for="log-max-size">日志表大小上限 (MB)</Label>
+          <Label for="log-max-size">{{ t('settings.storage.logMaxSizeLabel') }}</Label>
           <Input id="log-max-size" v-model.number="logTableMaxSizeMb" type="number" :min="SIZE_MB_MIN" @input="logTableMaxSizeError = ''" />
           <p v-if="logTableMaxSizeError" class="text-sm text-destructive mt-1">{{ logTableMaxSizeError }}</p>
         </div>
       </div>
-      <Button size="sm" :disabled="loading" @click="saveThresholds">保存阈值</Button>
+      <Button size="sm" :disabled="loading" @click="saveThresholds">{{ t('common.saveThresholds') }}</Button>
     </div>
 
     <!-- Config Import/Export -->
     <div class="bg-card rounded-lg border p-4 space-y-3">
-      <h3 class="font-medium text-sm text-foreground">配置导入导出</h3>
-      <p class="text-sm text-muted-foreground">导出当前配置或从文件恢复</p>
+      <h3 class="font-medium text-sm text-foreground">{{ t('settings.importExport.title') }}</h3>
+      <p class="text-sm text-muted-foreground">{{ t('settings.importExport.desc') }}</p>
 
       <div class="flex gap-3">
         <Button variant="outline" size="sm" :disabled="loading" @click="handleExport">
           <Download class="mr-2 h-4 w-4" />
-          导出配置
+          {{ t('settings.importExport.export') }}
         </Button>
 
         <Button variant="outline" size="sm" :disabled="loading" @click="fileInput?.click()">
           <Upload class="mr-2 h-4 w-4" />
-          导入配置
+          {{ t('settings.importExport.import') }}
         </Button>
         <input ref="fileInput" type="file" accept=".json" class="hidden" @change="handleFileSelect" />
       </div>
 
       <div v-if="importResult" class="text-sm space-y-1 p-3 bg-muted rounded-md">
-        <p class="font-medium">导入完成：</p>
+        <p class="font-medium">{{ t('settings.importExport.importComplete') }}</p>
         <p v-for="(count, table) in importResult" :key="table">
-          {{ table }}: {{ count }} 条
+          {{ table }}: {{ t('common.count', { count }) }}
         </p>
       </div>
     </div>
@@ -299,16 +302,16 @@ onMounted(loadSettings)
     <AlertDialog v-model:open="showImportDialog">
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>确认导入配置</AlertDialogTitle>
+          <AlertDialogTitle>{{ t('settings.importExport.confirmImport') }}</AlertDialogTitle>
           <AlertDialogDescription>
-            导入将覆盖当前的供应商、映射、密钥等配置。安全设置（密码、JWT）将保留不变。
-            此操作不可撤销。
+            {{ t('settings.importExport.importWarning') }}
+            {{ t('common.irreversible') }}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel :disabled="importing">取消</AlertDialogCancel>
+          <AlertDialogCancel :disabled="importing">{{ t('common.cancel') }}</AlertDialogCancel>
           <AlertDialogAction :disabled="importing" @click="confirmImport">
-            {{ importing ? '导入中...' : '确认导入' }}
+            {{ importing ? t('settings.importExport.importing') : t('settings.importExport.confirmButton') }}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
