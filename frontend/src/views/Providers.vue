@@ -142,7 +142,7 @@
           <!-- 可用模型 -->
           <div>
             <Label class="text-xs text-muted-foreground mb-2">可用模型</Label>
-            <div class="space-y-2 mb-3">
+            <div class="grid grid-cols-3 gap-2 mb-3">
               <div v-for="(m, i) in form.models" :key="i">
                 <ModelCard
                   :model="{ name: m.name, contextWindow: m.context_window ?? 200000, enabled: true, patches: m.patches ?? [] }"
@@ -155,7 +155,7 @@
               </div>
             </div>
             <div class="flex gap-2">
-              <Input v-model="modelInput" placeholder="模型名称，逗号分隔" @keydown.enter.prevent="addModel" class="flex-1" />
+              <Input v-model="modelInput" placeholder="输入模型名称" @keydown.enter.prevent="addModel" class="flex-1" />
               <Select v-model="contextWindowSelect">
                 <SelectTrigger class="w-28"><SelectValue placeholder="上下文" /></SelectTrigger>
                 <SelectContent>
