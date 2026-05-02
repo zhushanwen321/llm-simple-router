@@ -2,7 +2,7 @@
   <div class="p-6">
     <!-- 顶部：provider 按钮组 -->
     <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-semibold text-foreground">仪表盘</h2>
+      <h2 class="text-lg font-semibold text-foreground">{{ t('dashboard.title') }}</h2>
       <div class="flex gap-1">
         <Button
           v-for="p in sortedProviders"
@@ -43,56 +43,56 @@
     <div class="flex items-center gap-3 mb-4">
       <Select v-model="modelFilter">
         <SelectTrigger class="w-44">
-          <SelectValue placeholder="全部模型" />
+          <SelectValue :placeholder="t('common.allModels')" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">全部模型</SelectItem>
+          <SelectItem value="all">{{ t('common.allModels') }}</SelectItem>
           <SelectItem v-for="m in modelOptions" :key="m" :value="m">{{ m }}</SelectItem>
         </SelectContent>
       </Select>
       <Select v-model="keyFilter">
         <SelectTrigger class="w-48">
-          <SelectValue placeholder="全部密钥" />
+          <SelectValue :placeholder="t('common.allKeys')" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">全部密钥</SelectItem>
+          <SelectItem value="all">{{ t('common.allKeys') }}</SelectItem>
           <SelectItem v-for="rk in keyOptions" :key="rk.id" :value="rk.id">{{ rk.name }}</SelectItem>
         </SelectContent>
       </Select>
     </div>
 
     <!-- 数据区 -->
-    <div v-if="loading" class="text-center text-muted-foreground py-20">加载中...</div>
+    <div v-if="loading" class="text-center text-muted-foreground py-20">{{ t('common.loading') }}</div>
     <template v-else>
       <!-- 指标卡片 5 卡一行 -->
       <div class="grid grid-cols-5 gap-3 mb-6">
         <Card>
           <CardContent class="p-4">
-            <p class="text-sm text-muted-foreground">总请求数</p>
+            <p class="text-sm text-muted-foreground">{{ t('dashboard.stats.totalRequests') }}</p>
             <p class="text-2xl font-bold text-foreground mt-1">{{ stats.totalRequests.toLocaleString() }}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent class="p-4">
-            <p class="text-sm text-muted-foreground">成功率</p>
+            <p class="text-sm text-muted-foreground">{{ t('dashboard.stats.successRate') }}</p>
             <p class="text-2xl font-bold text-success mt-1">{{ (stats.successRate * 100).toFixed(1) }}%</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent class="p-4">
-            <p class="text-sm text-muted-foreground">Token 输出速度</p>
+            <p class="text-sm text-muted-foreground">{{ t('dashboard.stats.tokenOutputSpeed') }}</p>
             <p class="text-2xl font-bold text-foreground mt-1">{{ stats.avgTps.toFixed(1) }} <span class="text-sm font-normal text-muted-foreground">t/s</span></p>
           </CardContent>
         </Card>
         <Card>
           <CardContent class="p-4">
-            <p class="text-sm text-muted-foreground">Token 输入总量</p>
+            <p class="text-sm text-muted-foreground">{{ t('dashboard.stats.tokenInputTotal') }}</p>
             <p class="text-2xl font-bold text-foreground mt-1">{{ stats.totalInputTokens.toLocaleString() }}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent class="p-4">
-            <p class="text-sm text-muted-foreground">Token 输出总量</p>
+            <p class="text-sm text-muted-foreground">{{ t('dashboard.stats.tokenOutputTotal') }}</p>
             <p class="text-2xl font-bold text-foreground mt-1">{{ stats.totalOutputTokens.toLocaleString() }}</p>
           </CardContent>
         </Card>
@@ -102,34 +102,34 @@
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
         <Card>
           <CardHeader>
-            <CardTitle class="text-sm font-medium text-foreground">Token 输出速度</CardTitle>
+            <CardTitle class="text-sm font-medium text-foreground">{{ t('dashboard.charts.tokenOutputSpeed') }}</CardTitle>
           </CardHeader>
           <CardContent>
             <div class="h-56">
               <Line v-if="tpsChartData" :data="tpsChartData" :options="chartOptions(tpsChartData.labels as string[])" />
-              <div v-else class="flex items-center justify-center h-full text-muted-foreground text-sm">暂无数据</div>
+              <div v-else class="flex items-center justify-center h-full text-muted-foreground text-sm">{{ t('common.noData') }}</div>
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle class="text-sm font-medium text-foreground">Token 输入总量</CardTitle>
+            <CardTitle class="text-sm font-medium text-foreground">{{ t('dashboard.charts.tokenInputTotal') }}</CardTitle>
           </CardHeader>
           <CardContent>
             <div class="h-56">
               <Line v-if="inputTokensChartData" :data="inputTokensChartData" :options="chartOptions(inputTokensChartData.labels as string[])" />
-              <div v-else class="flex items-center justify-center h-full text-muted-foreground text-sm">暂无数据</div>
+              <div v-else class="flex items-center justify-center h-full text-muted-foreground text-sm">{{ t('common.noData') }}</div>
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle class="text-sm font-medium text-foreground">Token 输出总量</CardTitle>
+            <CardTitle class="text-sm font-medium text-foreground">{{ t('dashboard.charts.tokenOutputTotal') }}</CardTitle>
           </CardHeader>
           <CardContent>
             <div class="h-56">
               <Line v-if="outputTokensChartData" :data="outputTokensChartData" :options="chartOptions(outputTokensChartData.labels as string[])" />
-              <div v-else class="flex items-center justify-center h-full text-muted-foreground text-sm">暂无数据</div>
+              <div v-else class="flex items-center justify-center h-full text-muted-foreground text-sm">{{ t('common.noData') }}</div>
             </div>
           </CardContent>
         </Card>
@@ -154,6 +154,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { lineOptions } from './metrics-helpers'
 import { useDashboard } from '@/composables/useDashboard'
 
@@ -168,12 +170,14 @@ const {
   tpsChartData, inputTokensChartData, outputTokensChartData,
 } = useDashboard()
 
-const periodTabs = [
-  { label: '最近5小时', value: 'window' },
-  { label: '本周', value: 'weekly' },
-  { label: '本月', value: 'monthly' },
-  { label: '自定义', value: 'custom' },
-] as const
+const { t } = useI18n()
+
+const periodTabs = computed(() => [
+  { label: t('dashboard.period.last5Hours'), value: 'window' as const },
+  { label: t('dashboard.period.weekly'), value: 'weekly' as const },
+  { label: t('dashboard.period.monthly'), value: 'monthly' as const },
+  { label: t('dashboard.period.custom'), value: 'custom' as const },
+])
 
 function chartOptions(labels: string[]): ReturnType<typeof lineOptions> {
   return lineOptions('', labels)

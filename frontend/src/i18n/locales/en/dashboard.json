@@ -1,0 +1,23 @@
+{
+  "title": "Dashboard",
+  "stats": {
+    "totalRequests": "Total Requests",
+    "successRate": "Success Rate",
+    "tokenOutputSpeed": "Token Output Speed",
+    "tokenInputTotal": "Token Input Total",
+    "tokenOutputTotal": "Token Output Total"
+  },
+  "charts": {
+    "tokenOutputSpeed": "Token Output Speed (t/s)",
+    "tokenInputTotal": "Token Input Total",
+    "tokenOutputTotal": "Token Output Total"
+  },
+  "period": {
+    "last5Hours": "Last 5 Hours",
+    "weekly": "This Week",
+    "monthly": "This Month",
+    "custom": "Custom"
+  },
+  "loadProvidersFailed": "Failed to load providers",
+  "loadDashboardFailed": "Failed to load dashboard data"
+}
