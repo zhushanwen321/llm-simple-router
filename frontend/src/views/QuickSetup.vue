@@ -54,7 +54,7 @@
           </div>
           <!-- Custom mode: show format + editable base url -->
           <template v-if="isCustomProvider">
-            <div class="w-28 space-y-1">
+            <div class="w-48 space-y-1">
               <Label class="text-xs text-muted-foreground">{{ t('quickSetup.provider.format') }}</Label>
               <Select v-model="apiType">
                 <SelectTrigger class="w-full"><SelectValue /></SelectTrigger>
@@ -81,7 +81,7 @@
                 </SelectContent>
               </Select>
             </div>
-            <div class="w-28 space-y-1">
+            <div class="w-48 space-y-1">
               <Label class="text-xs text-muted-foreground">{{ t('quickSetup.provider.format') }}</Label>
               <Select v-model="apiType">
                 <SelectTrigger class="w-full"><SelectValue /></SelectTrigger>
@@ -92,7 +92,7 @@
                 </SelectContent>
               </Select>
             </div>
-            <div class="w-80 space-y-1">
+            <div class="w-72 space-y-1">
               <Label class="text-xs text-muted-foreground">Base URL</Label>
               <Input :model-value="baseUrl" readonly class="font-mono text-xs" />
             </div>
