@@ -561,8 +561,9 @@ async function handleDelete() {
     await api.deleteProvider(target.id)
     await loadProviders()
   } catch (e: unknown) {
-    await nextTick()
-    toast.error(getApiMessage(e, '删除供应商失败'))
+    setTimeout(() => {
+      toast.error(getApiMessage(e, '删除供应商失败'))
+    }, 300)
   }
 }
 async function handleReload() {
