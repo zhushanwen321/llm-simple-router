@@ -20,7 +20,11 @@ export const adminRecommendedRoutes: FastifyPluginCallback<RecommendedRoutesOpti
       (db.prepare("SELECT name FROM retry_rules").all() as { name: string }[]).map((r) => r.name),
     )
 
-    return reply.send(rules.filter((r) => !existing.has(r.name)))
+    // Return all rules with `exists` flag, so the frontend can show all and mark existing ones
+    return reply.send(rules.map(r => ({
+      ...r,
+      exists: existing.has(r.name),
+    })))
   })
 
   app.post("/admin/api/recommended/reload", async (_req, reply) => {

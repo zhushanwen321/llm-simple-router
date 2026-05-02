@@ -16,6 +16,7 @@ import { adminSettingsRoutes } from "./settings.js";
 import { adminRecommendedRoutes } from "./recommended.js";
 import { adminUsageRoutes } from "./usage.js";
 import { adminUpgradeRoutes } from "./upgrade.js";
+import { adminQuickSetupRoutes } from "./quick-setup.js";
 import { adminImportExportRoutes } from "./settings-import-export.js";
 import { adminTransformRuleRoutes } from "./transform-rules.js";
 import { adminScheduleRoutes } from "./schedules.js";
@@ -54,6 +55,7 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (app, opti
   app.register(adminImportExportRoutes, { db: options.db, stateRegistry: options.stateRegistry, pluginRegistry: options.pluginRegistry });
   app.register(adminRecommendedRoutes, { db: options.db });
   app.register(adminUsageRoutes, { db: options.db });
+  app.register(adminQuickSetupRoutes, { db: options.db, stateRegistry: options.stateRegistry, tracker: options.tracker, adaptiveController: options.adaptiveController });
   app.register(adminUpgradeRoutes, { db: options.db, closeFn: options.closeFn ?? (async () => {}) });
   app.register(adminTransformRuleRoutes, { db: options.db, pluginRegistry: options.pluginRegistry });
   done();

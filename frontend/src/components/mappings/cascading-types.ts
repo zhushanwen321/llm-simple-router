@@ -8,6 +8,7 @@ export interface ModelOption {
 export interface ProviderGroup {
   provider: ProviderSummary
   models: ModelOption[]
+  isNew?: boolean
 }
 
 export interface SelectedValue {

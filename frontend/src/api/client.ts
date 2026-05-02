@@ -92,6 +92,7 @@ const API = {
   UPGRADE_SYNC_CONFIG: "/upgrade/sync-config",
   UPGRADE_SYNC_SOURCE: "/upgrade/sync-source",
   TRANSFORM_RULES: "/transform-rules",
+  QUICK_SETUP: "/quick-setup",
 } as const;
 
 // --- Payload types ---
@@ -117,6 +118,8 @@ export interface RecommendedRetryRule {
   retry_delay_ms: number;
   max_retries: number;
   max_delay_ms: number;
+  providers?: string[];
+  exists?: boolean;
 }
 
 export interface ProviderPayload {
@@ -124,7 +127,7 @@ export interface ProviderPayload {
   api_type: string;
   base_url: string;
   api_key?: string;
-  models?: Array<string | { name: string; context_window?: number }>;
+  models?: Array<string | { name: string; context_window?: number; patches?: string[] }>;
   is_active: number;
   max_concurrency?: number;
   queue_timeout_ms?: number;
@@ -164,6 +167,35 @@ interface RetryRulePayload {
   retry_delay_ms?: number;
   max_retries?: number;
   max_delay_ms?: number;
+}
+
+export interface QuickSetupPayload {
+  provider: {
+    name: string
+    api_type: string
+    base_url: string
+    api_key: string
+    models: Array<{ name: string; context_window?: number; patches?: string[] }>
+    concurrency_mode?: 'auto' | 'manual' | 'none'
+    max_concurrency?: number
+    queue_timeout_ms?: number
+    max_queue_size?: number
+  }
+  mappings: Array<{ client_model: string; backend_model: string }>
+  retry_rules: Array<{
+    name: string
+    status_code: number
+    body_pattern: string
+    retry_strategy: string
+    retry_delay_ms: number
+    max_retries: number
+    max_delay_ms: number
+  }>
+  transform_rules?: {
+    inject_headers?: Record<string, string>
+    request_defaults?: Record<string, unknown>
+    drop_fields?: string[]
+  }
 }
 
 export interface SessionState {
@@ -574,4 +606,7 @@ export const api = {
     request<{ success: boolean }>("delete", `${API.TRANSFORM_RULES}/${providerId}`),
   reloadTransformRules: () =>
     request<{ loadedPlugins: string[]; rulesCount: number }>("post", `${API.TRANSFORM_RULES}/reload`),
+
+  quickSetup: (data: QuickSetupPayload) =>
+    request<{ success: boolean; provider_id: string }>("post", API.QUICK_SETUP, data),
 };

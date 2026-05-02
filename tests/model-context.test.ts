@@ -11,14 +11,25 @@ describe('model-context', () => {
     expect(lookupContextWindow('unknown-model')).toBe(DEFAULT_CONTEXT_WINDOW)
   })
 
-  it('parseModels handles string[] format', () => {
+  it('parseModels handles string[] format (backward compatible)', () => {
     const result = parseModels('["glm-5","unknown"]')
-    expect(result).toEqual(['glm-5', 'unknown'])
+    expect(result).toEqual([
+      { name: 'glm-5', patches: [] },
+      { name: 'unknown', patches: [] },
+    ])
   })
 
-  it('parseModels normalizes object[] to string[]', () => {
+  it('parseModels handles object[] format with patches', () => {
+    const result = parseModels('[{"name":"glm-5","patches":["thinking-param"]},{"name":"deepseek-chat"}]')
+    expect(result).toEqual([
+      { name: 'glm-5', patches: ['thinking-param'] },
+      { name: 'deepseek-chat', patches: [] },
+    ])
+  })
+
+  it('parseModels normalizes object[] without patches', () => {
     const result = parseModels('[{"name":"glm-5","context_window":128000}]')
-    expect(result).toEqual(['glm-5'])
+    expect(result).toEqual([{ name: 'glm-5', patches: [] }])
   })
 
   it('parseModels handles empty', () => {
@@ -26,12 +37,15 @@ describe('model-context', () => {
     expect(parseModels('')).toEqual([])
   })
 
-  it('buildModelInfoList enriches names with overrides and defaults', () => {
+  it('buildModelInfoList enriches entries with overrides, defaults, and patches', () => {
     const overrides = new Map([['glm-5', 999000]])
-    const result = buildModelInfoList(['glm-5', 'unknown'], overrides)
+    const result = buildModelInfoList([
+      { name: 'glm-5', patches: ['thinking-param'] },
+      { name: 'unknown', patches: [] },
+    ], overrides)
     expect(result).toEqual([
-      { name: 'glm-5', context_window: 999000 },
-      { name: 'unknown', context_window: 200000 },
+      { name: 'glm-5', context_window: 999000, patches: ['thinking-param'] },
+      { name: 'unknown', context_window: 200000, patches: [] },
     ])
   })
 

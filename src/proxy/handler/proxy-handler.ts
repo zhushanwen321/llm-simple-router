@@ -26,6 +26,7 @@ import type { ProxyErrorFormatter, ProxyErrorResponse } from "../proxy-core.js";
 import { ToolLoopGuard } from "../loop-prevention/tool-loop-guard.js";
 import { buildTransportFn } from "../transport/transport-fn.js";
 import { applyOverflowRedirect } from "../routing/overflow.js";
+import { parseModels } from "../../config/model-context.js";
 import { applyProviderPatches } from "../patch/index.js";
 import { PipelineSnapshot, type StageRecord } from "../pipeline-snapshot.js";
 import { maybeInjectModelInfoTag } from "../response-transform.js";
@@ -329,8 +330,13 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
       injectedHeaders = pluginCtx.headers;
     }
 
-    // provider patches — 使用返回值
-    const { body: patchedBody, meta: patchMeta } = applyProviderPatches(currentBody, provider);
+    // provider patches — 优先从 DB models JSON 读取 patch 配置，无配置时回退自动检测
+    const providerModels = parseModels(provider.models || "[]");
+    const { body: patchedBody, meta: patchMeta } = applyProviderPatches(currentBody, {
+      base_url: provider.base_url,
+      api_type: provider.api_type,
+      models: providerModels,
+    });
     iterationSnapshot.add({ stage: "provider_patch", types: patchMeta.types });
 
     const encryptionKey = getSetting(deps.db, "encryption_key");

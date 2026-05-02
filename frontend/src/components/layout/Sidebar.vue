@@ -1,6 +1,6 @@
 <!-- eslint-disable vue/multi-word-component-names -->
 <template>
-  <aside class="w-56 bg-sidebar text-sidebar-foreground flex-shrink-0 flex flex-col">
+  <aside class="w-56 h-full bg-sidebar text-sidebar-foreground flex-shrink-0 flex flex-col overflow-hidden">
     <div class="p-4 border-b border-sidebar-border">
       <div class="flex items-center gap-2">
         <div class="w-8 h-8 bg-sidebar-primary rounded-lg flex items-center justify-center">
@@ -84,17 +84,65 @@
         </Popover>
       </div>
     </div>
-    <nav class="flex-1 p-2 space-y-1">
-      <router-link
-        v-for="item in navItems"
-        :key="item.path"
-        :to="item.path"
-        class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors"
-        :class="isActive(item.path) ? 'bg-sidebar-accent text-sidebar-primary' : 'text-sidebar-foreground hover:bg-sidebar-accent'"
-      >
-        <component :is="item.icon" class="w-4 h-4" />
-        {{ item.label }}
-      </router-link>
+    <nav class="flex-1 p-2 space-y-0.5 overflow-y-auto">
+      <template v-for="(group, gIdx) in navGroups" :key="gIdx">
+        <!-- Divider between groups -->
+        <div v-if="gIdx > 0" class="my-1.5 border-t border-sidebar-border" />
+
+        <!-- Group label (if any) -->
+        <div
+          v-if="group.label"
+          class="flex items-center justify-between px-3 py-1.5"
+        >
+          <span class="text-[11px] font-medium text-sidebar-foreground/50 uppercase tracking-wider">{{ group.label }}</span>
+          <button
+            v-if="group.expandable"
+            type="button"
+            class="flex items-center justify-center w-5 h-5 rounded hover:bg-sidebar-accent text-sidebar-foreground/50 hover:text-sidebar-foreground transition-colors cursor-pointer select-none"
+            @click="toggleGroup(gIdx)"
+          >
+            <ChevronDown
+              class="w-3.5 h-3.5 transition-transform duration-200"
+              :class="isGroupExpanded(gIdx) ? 'rotate-0' : '-rotate-90'"
+            />
+          </button>
+        </div>
+
+        <!-- Sub-items -->
+        <div
+          v-if="group.expandable"
+          class="overflow-hidden transition-all duration-200 ease-in-out"
+          :style="{
+            maxHeight: isGroupExpanded(gIdx) ? group.items.length * 44 + 'px' : '0px',
+            opacity: isGroupExpanded(gIdx) ? 1 : 0,
+          }"
+        >
+          <router-link
+            v-for="item in group.items"
+            :key="item.path"
+            :to="item.path"
+            class="flex items-center gap-3 px-3 py-2 ml-1 rounded-lg text-sm transition-colors"
+            :class="isActive(item.path) ? 'bg-sidebar-accent text-sidebar-primary' : 'text-sidebar-foreground hover:bg-sidebar-accent'"
+          >
+            <component :is="item.icon" class="w-4 h-4" />
+            {{ item.label }}
+          </router-link>
+        </div>
+
+        <!-- Non-expandable items (single level) -->
+        <template v-if="!group.expandable">
+          <router-link
+            v-for="item in group.items"
+            :key="item.path"
+            :to="item.path"
+            class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors"
+            :class="isActive(item.path) ? 'bg-sidebar-accent text-sidebar-primary' : 'text-sidebar-foreground hover:bg-sidebar-accent'"
+          >
+            <component :is="item.icon" class="w-4 h-4" />
+            {{ item.label }}
+          </router-link>
+        </template>
+      </template>
     </nav>
     <div class="p-3 border-t border-sidebar-border space-y-1">
       <Button
@@ -151,7 +199,7 @@
 </template>
 
 <script setup lang="ts">
-import { type Component, ref, onMounted, onUnmounted, computed } from 'vue'
+import { type Component, ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { parseUtc } from '@/utils/format'
 import { useRoute, useRouter } from 'vue-router'
 import {
@@ -162,14 +210,14 @@ import {
   ArrowLeftRight,
   KeyRound,
   RefreshCcw,
-  Sparkles,
   FileText,
   Activity,
   Settings,
   LogOut,
-  CalendarClock,
   Moon,
   Sun,
+  Zap,
+  ChevronDown,
 } from 'lucide-vue-next'
 import { api, getApiMessage } from '@/api/client'
 import { Button } from '@/components/ui/button'
@@ -276,19 +324,59 @@ interface NavItem {
   icon: Component
 }
 
+interface NavGroup {
+  label?: string
+  items: NavItem[]
+  expandable?: boolean
+}
+
 // 与 router/index.ts 路由定义保持同步
-const navItems: NavItem[] = [
-  { path: '/', label: '仪表盘', icon: LayoutDashboard },
-  { path: '/providers', label: '供应商', icon: Server },
-  { path: '/mappings', label: '模型映射', icon: ArrowLeftRight },
-  { path: '/schedules', label: '调度管理', icon: CalendarClock },
-  { path: '/router-keys', label: 'API 密钥', icon: KeyRound },
-  { path: '/retry-rules', label: '重试规则', icon: RefreshCcw },
-  { path: '/proxy-enhancement', label: '代理增强（实验性）', icon: Sparkles },
-  { path: '/monitor', label: '实时监控', icon: Activity },
-  { path: '/logs', label: '请求日志', icon: FileText },
-  { path: '/settings', label: '系统设置', icon: Settings },
+const navGroups: NavGroup[] = [
+  {
+    items: [
+      { path: '/', label: '仪表盘', icon: LayoutDashboard },
+    ],
+  },
+  {
+    label: '代理配置',
+    expandable: true,
+    items: [
+      { path: '/quick-setup', label: '快速配置', icon: Zap },
+      { path: '/providers', label: '供应商', icon: Server },
+      { path: '/mappings', label: '模型映射', icon: ArrowLeftRight },
+      { path: '/router-keys', label: 'API 密钥', icon: KeyRound },
+      { path: '/retry-rules', label: '重试规则', icon: RefreshCcw },
+    ],
+  },
+  {
+    label: '监控',
+    items: [
+      { path: '/monitor', label: '实时监控', icon: Activity },
+      { path: '/logs', label: '请求日志', icon: FileText },
+    ],
+  },
+  {
+    items: [
+      { path: '/settings', label: '系统设置', icon: Settings },
+    ],
+  },
 ]
+
+const expandedGroups = ref<Set<number>>(new Set([1]))
+
+function isGroupExpanded(index: number): boolean {
+  return expandedGroups.value.has(index)
+}
+
+function toggleGroup(index: number) {
+  const next = new Set(expandedGroups.value)
+  if (next.has(index)) {
+    next.delete(index)
+  } else {
+    next.add(index)
+  }
+  expandedGroups.value = next
+}
 
 const route = useRoute()
 const router = useRouter()
@@ -297,6 +385,21 @@ function isActive(path: string): boolean {
   if (path === '/') return route.path === '/'
   return route.path.startsWith(path)
 }
+
+// Auto-expand group when sub-item is active
+watch(
+  () => route.path,
+  () => {
+    navGroups.forEach((group, index) => {
+      if (!group.expandable) return
+      const hasActive = group.items.some(item => isActive(item.path))
+      if (hasActive) {
+        expandedGroups.value.add(index)
+      }
+    })
+  },
+  { immediate: true },
+)
 
 async function handleRestart() {
   try {

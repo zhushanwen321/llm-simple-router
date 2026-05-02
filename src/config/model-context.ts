@@ -1,6 +1,13 @@
 export interface ModelInfo {
   name: string
   context_window: number | null
+  patches: string[]
+}
+
+export interface ModelEntry {
+  name: string
+  context_window?: number
+  patches?: string[]
 }
 
 export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
@@ -92,25 +99,34 @@ export function lookupContextWindow(modelName: string): number {
   return MODEL_CONTEXT_WINDOWS[modelName] ?? DEFAULT_CONTEXT_WINDOW
 }
 
-export function parseModels(raw: string): string[] {
+export function parseModels(raw: string): ModelEntry[] {
   if (!raw) return []
   try {
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
-    return parsed.map((item: unknown) =>
-      typeof item === 'string' ? item : (item as { name?: string })?.name ?? ''
-    ).filter(Boolean)
+    return parsed.map((item: unknown): ModelEntry | null => {
+      if (typeof item === 'string') {
+        return item ? { name: item, patches: [] } : null
+      }
+      const obj = item as { name?: string; patches?: string[] } | null
+      if (!obj || !obj.name) return null
+      return {
+        name: obj.name,
+        patches: obj.patches ?? [],
+      }
+    }).filter((e): e is ModelEntry => e !== null)
   } catch {
     return []
   }
 }
 
 export function buildModelInfoList(
-  modelNames: string[],
+  modelEntries: ModelEntry[],
   overrides: Map<string, number>,
 ): ModelInfo[] {
-  return modelNames.map(name => ({
-    name,
-    context_window: overrides.get(name) ?? lookupContextWindow(name),
+  return modelEntries.map(entry => ({
+    name: entry.name,
+    context_window: overrides.get(entry.name) ?? lookupContextWindow(entry.name),
+    patches: entry.patches ?? [],
   }))
 }

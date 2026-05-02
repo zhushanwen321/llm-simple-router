@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>模型映射编辑器 Demo</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      colors: {
+        card: '#1a1a2e',
+        border: '#2d2d4a',
+        primary: '#6366f1',
+        muted: '#16162a',
+        foreground: '#e2e8f0',
+        'muted-foreground': '#94a3b8',
+        destructive: '#ef4444',
+      }
+    }
+  }
+}
+</script>
+<style>
+  body { background: #0f0f23; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  select, input { background: #1e1e3a; color: #e2e8f0; border: 1px solid #2d2d4a; border-radius: 6px; padding: 4px 8px; font-size: 12px; outline: none; }
+  select:focus, input:focus { border-color: #6366f1; }
+  .badge { display: inline-flex; align-items: center; padding: 1px 6px; border-radius: 4px; font-size: 9px; font-weight: 500; line-height: 16px; }
+  .badge-outline { border: 1px solid #3f3f6a; color: #94a3b8; }
+  .badge-secondary { background: #2d2d4a; color: #94a3b8; }
+  .badge-primary { background: #6366f1; color: white; }
+  .badge-green { background: #16a34a; color: white; }
+  .badge-orange { border: 1px solid #f97316; color: #f97316; }
+  .badge-blue { border: 1px solid #3b82f6; color: #3b82f6; }
+  .btn { padding: 4px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; transition: all 0.15s; }
+  .btn-ghost { background: transparent; color: #94a3b8; border: none; }
+  .btn-ghost:hover { color: #e2e8f0; background: rgba(255,255,255,0.05); }
+  .btn-outline { background: transparent; border: 1px solid #3f3f6a; color: #e2e8f0; }
+  .btn-outline:hover { background: rgba(255,255,255,0.05); }
+  .btn-primary { background: #6366f1; border: none; color: white; }
+  .cascading-select { display: flex; gap: 4px; }
+  .cascading-select select { flex: 1; min-width: 0; }
+  .entry-card { background: #1a1a2e; border: 1px solid #2d2d4a; border-radius: 8px; overflow: hidden; transition: all 0.15s; }
+  .entry-card:hover { border-color: #3f3f6a; }
+  .entry-existing { background: rgba(99,102,241,0.05); border-color: rgba(99,102,241,0.2); }
+  .target-row { padding: 6px 0; }
+  .failover-line { display: flex; align-items: center; gap: 4px; padding-left: 24px; font-size: 10px; color: #64748b; }
+  .failover-line span { width: 12px; border-top: 1px solid #334155; }
+  .chevron { transition: transform 0.2s; }
+  .chevron-up { transform: rotate(0deg); }
+  .chevron-down { transform: rotate(-90deg); }
+</style>
+</head>
+<body class="p-6 max-w-3xl mx-auto">
+
+<h2 class="text-base font-semibold mb-4">模型映射</h2>
+
+<!-- Entry 1: Existing mapping with failover + overflow -->
+<div class="entry-card entry-existing mb-2" id="entry1">
+  <div class="flex items-center gap-2 px-3 py-2.5 cursor-pointer select-none" onclick="toggleExpand('entry1')">
+    <span class="flex-1 truncate font-mono text-xs font-medium">sonnet</span>
+    <span class="badge badge-green">已有</span>
+    <span class="text-xs text-muted-foreground">→ deepseek-v4-flash</span>
+    <span class="badge badge-orange">3级</span>
+    <span class="badge badge-blue">溢出</span>
+    <svg class="w-3.5 h-3.5 text-muted-foreground chevron chevron-up" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+  </div>
+  <div class="border-t border-border px-3 py-2 space-y-1" id="entry1-detail" style="display:none">
+    <!-- Target 1: Primary -->
+    <div class="target-row">
+      <div class="flex items-center gap-2">
+        <span class="text-[10px] font-medium text-primary shrink-0 w-8">首选</span>
+        <div class="cascading-select flex-1">
+          <select><option>DeepSeek</option><option>智谱</option><option>阿里云</option></select>
+          <select><option>deepseek-v4-flash</option><option>deepseek-v4-pro</option></select>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 pl-10 mt-1">
+        <span class="text-[10px] text-muted-foreground shrink-0">溢出</span>
+        <div class="cascading-select flex-1">
+          <select><option>DeepSeek</option></select>
+          <select><option>deepseek-v4-pro</option></select>
+        </div>
+        <button class="btn btn-ghost text-muted-foreground hover:text-destructive" title="移除溢出" style="font-size:10px">✕</button>
+      </div>
+    </div>
+    <!-- Failover arrow -->
+    <div class="failover-line"><span></span>失败时切换</div>
+    <!-- Target 2: Backup 1 -->
+    <div class="target-row">
+      <div class="flex items-center gap-2">
+        <span class="text-[10px] font-medium text-muted-foreground shrink-0 w-8">备1</span>
+        <div class="cascading-select flex-1">
+          <select><option>智谱</option><option>DeepSeek</option><option>阿里云</option></select>
+          <select><option>glm-5.1</option><option>glm-5</option></select>
+        </div>
+        <button class="btn btn-ghost text-muted-foreground hover:text-destructive" title="删除">🗑</button>
+      </div>
+    </div>
+    <!-- Failover arrow -->
+    <div class="failover-line"><span></span>失败时切换</div>
+    <!-- Target 3: Backup 2 -->
+    <div class="target-row">
+      <div class="flex items-center gap-2">
+        <span class="text-[10px] font-medium text-muted-foreground shrink-0 w-8">备2</span>
+        <div class="cascading-select flex-1">
+          <select><option>阿里云</option><option>DeepSeek</option><option>智谱</option></select>
+          <select><option>qwen3-coder-plus</option><option>qwen3.6-plus</option></select>
+        </div>
+        <button class="btn btn-ghost text-muted-foreground hover:text-destructive" title="删除">🗑</button>
+      </div>
+    </div>
+    <!-- Add failover -->
+    <button class="btn btn-ghost w-full text-xs text-muted-foreground mt-1">+ 添加故障转移</button>
+    <!-- Overflow model at bottom with divider -->
+    <div class="border-t border-dashed border-border mt-2 pt-2">
+      <div class="flex items-center gap-2">
+        <span class="text-[10px] text-muted-foreground shrink-0">溢出模型</span>
+        <div class="cascading-select flex-1">
+          <select><option>DeepSeek</option><option>智谱</option></select>
+          <select><option>deepseek-v4-pro</option><option>deepseek-v4-flash</option></select>
+        </div>
+        <button class="btn btn-ghost text-muted-foreground hover:text-destructive" title="移除溢出" style="font-size:10px">✕</button>
+      </div>
+      <div class="text-[10px] text-primary mt-0.5 pl-14">上下文超过 deepseek-v4-flash 限制时自动切换到 deepseek-v4-pro</div>
+    </div>
+  </div>
+</div>
+
+<!-- Entry 2: Existing mapping, simple -->
+<div class="entry-card entry-existing mb-2" id="entry2">
+  <div class="flex items-center gap-2 px-3 py-2.5 cursor-pointer select-none" onclick="toggleExpand('entry2')">
+    <span class="flex-1 truncate font-mono text-xs font-medium">opus</span>
+    <span class="badge badge-green">已有</span>
+    <span class="text-xs text-muted-foreground">→ deepseek-v4-pro</span>
+    <svg class="w-3.5 h-3.5 text-muted-foreground chevron chevron-down" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+  </div>
+  <div class="border-t border-border px-3 py-2 space-y-1" id="entry2-detail" style="display:none">
+    <div class="target-row">
+      <div class="flex items-center gap-2">
+        <span class="text-[10px] font-medium text-primary shrink-0 w-8">首选</span>
+        <div class="cascading-select flex-1">
+          <select><option>DeepSeek</option><option>智谱</option></select>
+          <select><option>deepseek-v4-pro</option><option>deepseek-v4-flash</option></select>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 pl-10 mt-1">
+        <span class="text-[10px] text-muted-foreground shrink-0">溢出</span>
+        <div class="cascading-select flex-1">
+          <select><option disabled selected>选择供应商...</option><option>DeepSeek</option><option>智谱</option></select>
+          <select disabled><option>选择模型...</option></select>
+        </div>
+      </div>
+    </div>
+    <button class="btn btn-ghost w-full text-xs text-muted-foreground mt-1">+ 添加故障转移</button>
+    <!-- Overflow model at bottom with divider -->
+    <div class="border-t border-dashed border-border mt-2 pt-2">
+      <div class="flex items-center gap-2">
+        <span class="text-[10px] text-muted-foreground shrink-0">溢出模型</span>
+        <div class="cascading-select flex-1">
+          <select><option disabled selected>选择供应商...</option><option>DeepSeek</option><option>智谱</option></select>
+          <select disabled><option>选择模型...</option></select>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Entry 3: New recommended mapping (collapsed) -->
+<div class="entry-card mb-2" id="entry3">
+  <div class="flex items-center gap-2 px-3 py-2.5 cursor-pointer select-none" onclick="toggleExpand('entry3')">
+    <span class="flex-1 truncate font-mono text-xs font-medium">haiku</span>
+    <span class="badge badge-secondary">默认</span>
+    <span class="text-xs text-muted-foreground">→ deepseek-v4-flash</span>
+    <svg class="w-3.5 h-3.5 text-muted-foreground chevron chevron-down" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+    <button class="btn btn-ghost text-muted-foreground hover:text-destructive" onclick="event.stopPropagation()" title="删除" style="padding:2px">✕</button>
+  </div>
+  <div class="border-t border-border px-3 py-2 space-y-1" id="entry3-detail" style="display:none">
+    <div class="target-row">
+      <div class="flex items-center gap-2">
+        <span class="text-[10px] font-medium text-primary shrink-0 w-8">首选</span>
+        <div class="cascading-select flex-1">
+          <select><option>DeepSeek</option><option>智谱</option></select>
+          <select><option>deepseek-v4-flash</option><option>deepseek-v4-pro</option></select>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 pl-10 mt-1">
+        <span class="text-[10px] text-muted-foreground shrink-0">溢出</span>
+        <div class="cascading-select flex-1">
+          <select><option disabled selected>选择供应商...</option></select>
+          <select disabled><option>选择模型...</option></select>
+        </div>
+      </div>
+    </div>
+    <button class="btn btn-ghost w-full text-xs text-muted-foreground mt-1">+ 添加故障转移</button>
+  </div>
+</div>
+
+<!-- Add new mapping -->
+<div class="flex items-center gap-2 pt-3 border-t border-border mt-3">
+  <input placeholder="客户端模型" class="flex-1 h-8 text-xs font-mono" />
+  <span class="text-muted-foreground">→</span>
+  <input placeholder="目标模型" class="flex-1 h-8 text-xs font-mono" />
+  <button class="btn btn-outline h-8">添加</button>
+</div>
+
+<script>
+function toggleExpand(id) {
+  const detail = document.getElementById(id + '-detail');
+  const card = document.getElementById(id);
+  const chevron = card.querySelector('.chevron');
+  if (detail.style.display === 'none') {
+    detail.style.display = 'block';
+    chevron.classList.remove('chevron-down');
+    chevron.classList.add('chevron-up');
+  } else {
+    detail.style.display = 'none';
+    chevron.classList.remove('chevron-up');
+    chevron.classList.add('chevron-down');
+  }
+}
+// Auto-expand first entry
+toggleExpand('entry1');
+</script>
+</body>
+</html>

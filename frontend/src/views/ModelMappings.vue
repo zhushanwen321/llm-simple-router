@@ -1,101 +1,51 @@
 <template>
-  <div class="p-6">
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-semibold text-foreground">模型映射</h2>
-      <Button @click="openCreate" class="flex items-center gap-1">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-        </svg>
-        添加分组
+  <div class="p-6 space-y-4">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+      <div>
+        <h2 class="text-lg font-semibold text-foreground">模型映射</h2>
+        <div class="flex gap-2 mt-1">
+          <span class="text-[11px] px-2 py-0.5 rounded-full bg-muted/40 text-muted-foreground">{{ draftEntries.length }} 条映射</span>
+          <span class="text-[11px] px-2 py-0.5 rounded-full bg-muted/40 text-muted-foreground">{{ activeCount }} 启用</span>
+          <span v-if="hasChanges" class="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400">有未保存的修改</span>
+        </div>
+      </div>
+      <Button v-if="!editing" size="sm" variant="outline" @click="enterEdit">
+        <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        编辑
       </Button>
-    </div>
-
-    <div class="grid grid-cols-3 gap-4">
-      <Card v-for="g in groupsWithParsedRule" :key="g.id" :class="{ 'opacity-60': !g.is_active }">
-        <CardHeader class="flex flex-row items-center justify-between gap-2 pb-2">
-          <div class="flex items-center gap-2 min-w-0">
-            <CardTitle class="font-mono text-sm truncate">{{ g.client_model }}</CardTitle>
-          </div>
-          <div class="flex items-center gap-1 shrink-0">
-            <Button variant="ghost" size="sm" class="gap-1" @click="confirmToggle(g)">
-              <span
-                class="relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors"
-                :class="g.is_active ? 'bg-primary' : 'bg-input'"
-              >
-                <span
-                  class="inline-block h-3 w-3 rounded-full bg-background shadow-sm transition-transform"
-                  :class="g.is_active ? 'translate-x-3.5' : 'translate-x-0.5'"
-                />
-              </span>
-            </Button>
-            <Button variant="ghost" size="sm" @click="openEdit(g)">编辑</Button>
-            <Button variant="ghost" size="sm" class="text-destructive hover:text-destructive" @click="deleteTarget = g">删除</Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <!-- 故障转移标识 -->
-          <div v-if="(g.parsedRule.targets || []).length > 1" class="mb-2">
-            <span class="inline-flex items-center rounded-full bg-orange-100 dark:bg-orange-900/30 px-2 py-0.5 text-xs font-medium text-orange-700 dark:text-orange-300">
-              故障转移 · {{ (g.parsedRule.targets ?? []).length }} 级
-            </span>
-          </div>
-          <!-- 目标列表 -->
-          <div class="space-y-1 text-sm">
-            <div v-for="(t, idx) in (g.parsedRule.targets || [])" :key="idx">
-              <div class="flex items-center gap-1.5">
-                <span class="text-xs shrink-0" :class="idx === 0 ? 'text-primary font-medium' : 'text-muted-foreground'">{{ idx === 0 ? '首选' : `备${idx}` }}</span>
-                <span class="font-mono">{{ t.backend_model }}</span>
-                <span class="text-muted-foreground">/</span>
-                <span class="text-muted-foreground truncate">{{ providerNameMap.get(t.provider_id) || t.provider_id }}</span>
-                <template v-if="t.overflow_model">
-                  <span class="text-muted-foreground">→</span>
-                  <span class="font-mono text-primary truncate">{{ t.overflow_model }}</span>
-                </template>
-              </div>
-              <div v-if="idx < (g.parsedRule.targets || []).length - 1" class="flex items-center gap-1 pl-4 text-xs text-muted-foreground">
-                <span class="w-3 border-t border-muted-foreground/30"></span>
-                <span>失败时切换</span>
-              </div>
-            </div>
-            <div v-if="!(g.parsedRule.targets || []).length" class="text-xs text-muted-foreground">无目标</div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <div v-if="groups.length === 0" class="col-span-3 text-center text-muted-foreground py-12 bg-card rounded-xl border">
-        暂无映射分组
+      <div v-else class="flex gap-2">
+        <Button size="sm" variant="outline" @click="cancelEdit">取消</Button>
+        <Button size="sm" :disabled="saving || !hasChanges" @click="saveAll">
+          <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+          {{ saving ? '保存中...' : '保存' }}
+        </Button>
       </div>
     </div>
 
-    <MappingGroupFormDialog
-      v-model:open="dialogOpen"
-      :editing-id="editingId"
-      :form="form"
-      :providers="providersList"
+    <!-- Mapping List -->
+    <MappingList
+      :entries="draftEntries"
       :provider-groups="providerGroups"
-      :context-window-map="contextWindowMap"
-      @save="handleSave"
-      @add-target="addTarget"
-      @remove-target="removeTarget"
-      @move-target-up="moveTargetUp"
-      @move-target-down="moveTargetDown"
+      :show-delete="editing"
+      :show-add-form="editing"
+      :editable="editing"
+      @update:targets="updateDraftTargets"
+      @toggle-active="toggleDraftActive"
+      @remove="removeDraftEntry"
+      @add="addDraftEntry"
     />
 
-    <MappingGroupDeleteDialog
-      :target="deleteTarget"
-      @confirm="handleDelete"
-      @cancel="deleteTarget = null"
-    />
-
-    <AlertDialog :open="!!toggleTarget" @update:open="(val: boolean) => { if (!val) toggleTarget = null }">
+    <!-- Delete Confirm -->
+    <AlertDialog :open="!!deleteTarget" @update:open="(val: boolean) => { if (!val) deleteTarget = null }">
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>确认{{ toggleTarget?.is_active ? '禁用' : '启用' }}</AlertDialogTitle>
-          <AlertDialogDescription>确定要{{ toggleTarget?.is_active ? '禁用' : '启用' }}映射「{{ toggleTarget?.client_model }}」吗？</AlertDialogDescription>
+          <AlertDialogTitle>确认删除</AlertDialogTitle>
+          <AlertDialogDescription>确定要删除映射「{{ deleteTarget?.clientModel }}」吗？</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>取消</AlertDialogCancel>
-          <AlertDialogAction @click="handleToggle">确认</AlertDialogAction>
+          <Button variant="destructive" @click="confirmDelete">删除</Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -107,37 +57,24 @@ import { ref, computed, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
 import { api, getApiMessage } from '@/api/client'
 import { Button } from '@/components/ui/button'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog'
-import MappingGroupFormDialog from '@/components/mappings/MappingGroupFormDialog.vue'
-import MappingGroupDeleteDialog from '@/components/mappings/MappingGroupDeleteDialog.vue'
-import type { MappingGroup, Provider, MappingTarget, Rule } from '@/types/mapping'
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from '@/components/ui/alert-dialog'
+import MappingList from '@/components/shared/MappingList.vue'
+import type { MappingEntry, MappingTarget } from '@/components/quick-setup/types'
 import type { ProviderGroup } from '@/components/mappings/cascading-types'
+import type { MappingGroup, Provider, Rule } from '@/types/mapping'
 import { DEFAULT_CONTEXT_WINDOW } from '@/constants'
 
-interface FormData {
-  client_model: string
-  targets: MappingTarget[]
-}
-
-const DEFAULT_FORM: FormData = {
-  client_model: '',
-  targets: [],
-}
-
+// --- State ---
 const groups = ref<MappingGroup[]>([])
 const providersList = ref<Provider[]>([])
-const dialogOpen = ref(false)
-const editingId = ref<string | null>(null)
-const deleteTarget = ref<MappingGroup | null>(null)
-const toggleTarget = ref<MappingGroup | null>(null)
-const form = ref<FormData>({ ...DEFAULT_FORM, targets: [] })
+const editing = ref(false)
+const saving = ref(false)
+const deleteTarget = ref<MappingEntry | null>(null)
+const draftEntries = ref<MappingEntry[]>([])
+const pendingDeletes = ref<string[]>([]) // clientModels to delete
 
-const providerNameMap = computed(() => {
-  const map = new Map<string, string>()
-  for (const p of providersList.value) map.set(p.id, p.name)
-  return map
-})
+// --- Computed ---
+const activeCount = computed(() => draftEntries.value.filter(e => e.active).length)
 
 const providerGroups = computed<ProviderGroup[]>(() =>
   providersList.value.map(p => ({
@@ -149,162 +86,180 @@ const providerGroups = computed<ProviderGroup[]>(() =>
   }))
 )
 
-const contextWindowMap = computed(() => {
-  const map = new Map<string, number>()
-  for (const p of providersList.value) {
-    for (const m of p.models ?? []) {
-      if (m.context_window != null) {
-        map.set(`${p.id}:${m.name}`, m.context_window)
-      }
-    }
+const hasChanges = computed(() => {
+  const original = buildEntriesFromGroups()
+  if (original.length !== draftEntries.value.length) return true
+  if (pendingDeletes.value.length > 0) return true
+  for (let i = 0; i < original.length; i++) {
+    const o = original[i], d = draftEntries.value[i]
+    if (o.clientModel !== d.clientModel) return true
+    if (o.active !== d.active) return true
+    if (JSON.stringify(o.targets) !== JSON.stringify(d.targets)) return true
   }
-  return map
+  return false
 })
 
-// 预解析 rule，避免模板中重复调用
-// 兼容 migration 026 前旧格式 { default, windows } → 归一化为 { targets }  
-const groupsWithParsedRule = computed(() =>
-  groups.value.map((g) => {
-    let parsedRule: Rule = {}
+// --- Build entries from DB groups ---
+function buildEntriesFromGroups(): MappingEntry[] {
+  return groups.value.map((g) => {
+    let rule: Rule = {}
     try {
-      const rule = JSON.parse(g.rule)
-      if (rule.default && !rule.targets) {
-        parsedRule = { targets: [rule.default] }
-      } else {
-        parsedRule = rule
-      }
-    } catch (e) {
-      console.warn('Failed to parse mapping group rule JSON:', e)
+      const parsed = JSON.parse(g.rule)
+      rule = parsed.default && !parsed.targets ? { targets: [parsed.default] } : parsed
+    } catch { /* ignore */ }
+    const targets: MappingTarget[] = (rule.targets ?? []).map((t: MappingTarget) => ({
+      backend_model: t.backend_model || '',
+      provider_id: t.provider_id || '',
+      overflow_provider_id: t.overflow_provider_id,
+      overflow_model: t.overflow_model,
+    }))
+    return {
+      clientModel: g.client_model,
+      targets: targets.length > 0 ? targets : [{ backend_model: '', provider_id: providersList.value[0]?.id ?? '' }],
+      existing: true,
+      existingId: g.id,
+      tag: 'existing' as const,
+      active: !!g.is_active,
+      originalActive: !!g.is_active,
     }
-    return { ...g, parsedRule }
   })
-)
+}
 
+// --- Data loading ---
 async function loadData() {
   const results = await Promise.allSettled([
     api.getMappingGroups(),
     api.getProviders(),
   ])
-  if (results[0].status === 'fulfilled') {
-    groups.value = results[0].value
-  } else {
-    console.error('Failed to load groups:', results[0].reason)
-  }
-  if (results[1].status === 'fulfilled') {
-    providersList.value = results[1].value as Provider[]
-  } else {
-    console.error('Failed to load providers:', results[1].reason)
-    toast.error(getApiMessage(results[1].reason, '加载供应商失败'))
-  }
+  if (results[0].status === 'fulfilled') groups.value = results[0].value
+  if (results[1].status === 'fulfilled') providersList.value = results[1].value as Provider[]
+  draftEntries.value = buildEntriesFromGroups()
 }
 
-function getFirstModel(providerId: string): string {
-  const p = providersList.value.find(x => x.id === providerId)
-  return p?.models?.[0]?.name || ''
+// --- Edit mode ---
+function enterEdit() {
+  draftEntries.value = buildEntriesFromGroups()
+  pendingDeletes.value = []
+  editing.value = true
 }
 
-function openCreate() {
-  editingId.value = null
-  const firstProviderId = providersList.value[0]?.id || ''
-  form.value = {
-    client_model: '',
-    targets: [{ backend_model: getFirstModel(firstProviderId), provider_id: firstProviderId }],
-  }
-  dialogOpen.value = true
+function cancelEdit() {
+  draftEntries.value = buildEntriesFromGroups()
+  pendingDeletes.value = []
+  editing.value = false
 }
 
-function openEdit(g: MappingGroup & { parsedRule?: Rule }) {
-  editingId.value = g.id
-  let rule: Rule = {}
-  try { rule = JSON.parse(g.rule) } catch (e) { console.warn('Failed to parse rule JSON:', e) }
-
-  const firstProviderId = providersList.value[0]?.id || ''
-  form.value = {
-    client_model: g.client_model,
-    targets: Array.isArray(rule.targets)
-      ? rule.targets.map((t: MappingTarget) => ({
-        backend_model: t.backend_model || '',
-        provider_id: t.provider_id || firstProviderId,
-        overflow_provider_id: t.overflow_provider_id,
-        overflow_model: t.overflow_model,
-      }))
-      : [{ backend_model: getFirstModel(firstProviderId), provider_id: firstProviderId }],
-  }
-  dialogOpen.value = true
+// --- Draft mutations (local only) ---
+function updateDraftTargets(index: number, targets: MappingTarget[]) {
+  const next = [...draftEntries.value]
+  next[index] = { ...next[index], targets }
+  draftEntries.value = next
 }
 
-function addTarget() {
-  const firstProviderId = providersList.value[0]?.id || ''
-  form.value.targets.push({ backend_model: getFirstModel(firstProviderId), provider_id: firstProviderId })
+function toggleDraftActive(index: number) {
+  const next = [...draftEntries.value]
+  next[index] = { ...next[index], active: !next[index].active }
+  draftEntries.value = next
 }
 
-function removeTarget(idx: number) {
-  form.value.targets.splice(idx, 1)
+function removeDraftEntry(clientModel: string) {
+  const entry = draftEntries.value.find(e => e.clientModel === clientModel)
+  if (entry) deleteTarget.value = entry
 }
 
-function moveTargetUp(idx: number) {
-  if (idx <= 0) return
-  const targets = form.value.targets
-  ;[targets[idx - 1], targets[idx]] = [targets[idx], targets[idx - 1]]
-}
-
-function moveTargetDown(idx: number) {
-  const targets = form.value.targets
-  if (idx >= targets.length - 1) return
-  ;[targets[idx], targets[idx + 1]] = [targets[idx + 1], targets[idx]]
-}
-
-async function handleSave() {
-  try {
-    const ruleJson = JSON.stringify({ targets: form.value.targets })
-    const payload = {
-      client_model: form.value.client_model,
-      rule: ruleJson,
-    }
-    if (editingId.value) {
-      await api.updateMappingGroup(editingId.value, payload)
-    } else {
-      await api.createMappingGroup(payload)
-    }
-    dialogOpen.value = false
-    await loadData()
-  } catch (e: unknown) {
-    console.error('Failed to save mapping group:', e)
-    toast.error(getApiMessage(e, '保存分组失败'))
-  }
-}
-
-async function handleDelete() {
+function confirmDelete() {
   const target = deleteTarget.value
   if (!target) return
   deleteTarget.value = null
-  try {
-    await api.deleteMappingGroup(target.id)
-    await loadData()
-  } catch (e: unknown) {
-    console.error('Failed to delete mapping group:', e)
-    toast.error(getApiMessage(e, '删除分组失败'))
-  }
+  pendingDeletes.value.push(target.clientModel)
+  draftEntries.value = draftEntries.value.filter(e => e.clientModel !== target.clientModel)
 }
 
-const pendingToggleId = ref<string | null>(null)
-
-function confirmToggle(g: MappingGroup) {
-  toggleTarget.value = g
-  pendingToggleId.value = g.id
+function addDraftEntry(clientModel: string, targetModel: string) {
+  const firstProvider = providersList.value[0]
+  draftEntries.value = [...draftEntries.value, {
+    clientModel,
+    targets: [{ backend_model: targetModel, provider_id: firstProvider?.id ?? '' }],
+    existing: false,
+    tag: 'cust' as const,
+    active: true,
+  }]
 }
 
-async function handleToggle() {
-  const id = pendingToggleId.value
-  if (!id) return
-  toggleTarget.value = null
-  pendingToggleId.value = null
+// --- Save all ---
+async function saveAll() {
+  saving.value = true
+  const errors: string[] = []
+
   try {
-    await api.toggleMappingGroup(id)
+    // 1. Delete pending entries
+    for (const cm of pendingDeletes.value) {
+      const entry = buildEntriesFromGroups().find(e => e.clientModel === cm)
+      if (entry?.existingId) {
+        try {
+          await api.deleteMappingGroup(entry.existingId)
+        } catch (e: unknown) {
+          errors.push(`删除 ${cm} 失败: ${getApiMessage(e, "")}`)
+        }
+      }
+    }
+
+    // 2. Create new entries
+    const originalGroups = groups.value
+    for (const entry of draftEntries.value) {
+      const existing = originalGroups.find(g => g.client_model === entry.clientModel)
+
+      if (!existing) {
+        // New entry
+        try {
+          const ruleJson = JSON.stringify({ targets: entry.targets })
+          const result = await api.createMappingGroup({ client_model: entry.clientModel, rule: ruleJson })
+          // Toggle active if user set inactive (create defaults to active)
+          if (!entry.active && result.id) {
+            await api.toggleMappingGroup(result.id)
+          }
+        } catch (e: unknown) {
+          errors.push(`创建 ${entry.clientModel} 失败: ${getApiMessage(e, "")}`)
+        }
+      } else {
+        // Existing entry — update rule if changed
+        const originalEntry = buildEntriesFromGroups().find(e => e.clientModel === entry.clientModel)
+        const ruleChanged = originalEntry && JSON.stringify(originalEntry.targets) !== JSON.stringify(entry.targets)
+        const activeChanged = originalEntry && originalEntry.active !== entry.active
+
+        if (ruleChanged && originalEntry?.existingId) {
+          try {
+            await api.updateMappingGroup(originalEntry.existingId, {
+              client_model: entry.clientModel,
+              rule: JSON.stringify({ targets: entry.targets }),
+            })
+          } catch (e: unknown) {
+            errors.push(`更新 ${entry.clientModel} 失败: ${getApiMessage(e, "")}`)
+          }
+        }
+
+        if (activeChanged && originalEntry?.existingId) {
+          try {
+            await api.toggleMappingGroup(originalEntry.existingId)
+          } catch (e: unknown) {
+            errors.push(`切换 ${entry.clientModel} 状态失败: ${getApiMessage(e, "")}`)
+          }
+        }
+      }
+    }
+
     await loadData()
+    editing.value = false
+
+    if (errors.length > 0) {
+      toast.error(`${errors.length} 个操作失败`)
+    } else {
+      toast.success('保存成功')
+    }
   } catch (e: unknown) {
-    console.error('Failed to toggle mapping group:', e)
-    toast.error(getApiMessage(e, '切换状态失败'))
+    toast.error(getApiMessage(e, '保存失败'))
+  } finally {
+    saving.value = false
   }
 }
 
