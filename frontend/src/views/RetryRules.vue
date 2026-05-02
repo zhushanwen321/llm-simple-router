@@ -198,6 +198,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ChevronDown } from 'lucide-vue-next'
 
+const { t } = useI18n()
+
 interface RetryRule {
   id: string
   name: string
@@ -225,8 +227,6 @@ const editingId = ref<string | null>(null)
 const deleteTarget = ref<RetryRule | null>(null)
 const form = ref({ ...DEFAULT_FORM })
 const errors = ref<Record<string, string>>({})
-
-const { t } = useI18n()
 
 const MIN_STATUS_CODE = 100
 const MAX_STATUS_CODE = 599
