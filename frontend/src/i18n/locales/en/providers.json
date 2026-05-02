@@ -2,7 +2,7 @@
   "title": "Providers",
   "addProvider": "Add Provider",
   "editProvider": "Edit Provider",
-  "reloadPlugin": "Reload Plugin",
+  "reloadPlugin": "Reload Plugins",
   "noProviders": "No providers yet",
   "tableHeaders": {
     "name": "Name",
@@ -25,7 +25,7 @@
     "apiType": "API Type",
     "baseUrl": "Base URL",
     "apiKey": "API Key",
-    "apiKeyPlaceholder": "Leave empty to keep the current key",
+    "apiKeyPlaceholder": "Leave empty to keep the original key",
     "availableModels": "Available Models",
     "modelInputPlaceholder": "Enter model names, separated by commas",
     "context": "Context",
@@ -53,10 +53,10 @@
   },
   "validation": {
     "nameRequired": "Please enter a name",
-    "namePattern": "Only letters, numbers, hyphens and underscores",
-    "baseUrlRequired": "Please enter a Base URL",
+    "namePattern": "Only letters, numbers, hyphens and underscores allowed",
+    "baseUrlRequired": "Please enter Base URL",
     "baseUrlInvalid": "Please enter a valid URL",
-    "apiKeyRequired": "Please enter an API Key",
+    "apiKeyRequired": "Please enter API Key",
     "concurrencyRange": "Range {min}-{max}",
     "negativeNotAllowed": "Cannot be negative",
     "queueSizeRange": "Range 1-{max}"
@@ -83,6 +83,6 @@
     "cascadeDisable": "disabled",
     "cascadeGroups": "groups",
     "cascadeReferences": "group references",
-    "cascadeAuto": "Automatically {parts}"
+    "cascadeAuto": "Auto-{parts}"
   }
 }
