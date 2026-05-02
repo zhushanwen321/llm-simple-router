@@ -7,6 +7,7 @@ export interface CascadingOption {
 export interface CascadingGroup {
   key: string
   label: string
+  badge?: string
   options: CascadingOption[]
 }
 

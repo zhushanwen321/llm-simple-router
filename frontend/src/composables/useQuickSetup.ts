@@ -88,16 +88,42 @@ export function useQuickSetup() {
     return !baseUrl.value.includes('openai.com')
   })
 
-  // Provider groups for CascadingModelSelect
-  const allProviderGroups = computed(() =>
-    allProviders.value.map(p => ({
+  // Provider groups for CascadingModelSelect (includes current new provider)
+  const currentProviderGroup = computed(() => {
+    if (!selectedGroup.value) return null
+    // Determine a temporary ID and display name for the new provider
+    const tempId = isCustomProvider.value
+      ? '__new_custom__'
+      : `__new_${toProviderName(selectedGroup.value)}_${toProviderName(selectedPlan.value)}__`
+    const displayName = isCustomProvider.value
+      ? '自定义供应商'
+      : `${selectedGroup.value} - ${selectedPlan.value}`
+    return {
+      provider: { id: tempId, name: displayName },
+      models: modelConfigs.value
+        .filter(m => m.enabled)
+        .map(m => ({
+          name: m.name,
+          contextWindow: m.contextWindow,
+        })),
+      isNew: true,
+    }
+  })
+
+  const allProviderGroups = computed(() => {
+    const existing = allProviders.value.map(p => ({
       provider: { id: p.id, name: p.name },
       models: (p.models ?? []).map(m => ({
         name: m.name,
         contextWindow: m.context_window ?? 128000,
       })),
     }))
-  )
+    // Only include new provider when there are enabled models configured
+    if (currentProviderGroup.value && currentProviderGroup.value.models.length > 0) {
+      return [...existing, currentProviderGroup.value]
+    }
+    return existing
+  })
 
   // Filter retry rules by selected provider
   const recommendedRules = computed(() => {

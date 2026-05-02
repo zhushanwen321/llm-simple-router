@@ -65,6 +65,7 @@ function onOpenChange(val: boolean) {
         @mouseenter="hoveredGroupKey = group.key"
       >
         <span class="truncate max-w-40">{{ group.label }}</span>
+        <span v-if="group.badge" class="ml-1 text-[10px] px-1 py-px rounded bg-emerald-500/15 text-emerald-400 shrink-0">{{ group.badge }}</span>
         <ChevronRight class="ml-1 h-4 w-4 shrink-0 opacity-50" />
 
         <!-- Level 2 -->

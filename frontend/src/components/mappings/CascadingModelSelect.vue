@@ -26,6 +26,7 @@ const groups = computed<CascadingGroup[]>(() =>
   props.providers.map(g => ({
     key: g.provider.id,
     label: g.provider.name,
+    badge: g.isNew ? '新' : undefined,
     options: g.models.map(m => ({
       value: m.name,
       label: m.name,
