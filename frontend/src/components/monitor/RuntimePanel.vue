@@ -1,22 +1,22 @@
 <template>
-  <div v-if="!runtime" class="text-sm text-muted-foreground">暂无运行时数据</div>
+  <div v-if="!runtime" class="text-sm text-muted-foreground">{{ t('monitor.runtimePanel.noData') }}</div>
   <div v-else class="grid grid-cols-2 gap-3 text-sm">
     <!-- 运行时间 -->
     <div>
-      <p class="text-muted-foreground">运行时间</p>
+      <p class="text-muted-foreground">{{ t('monitor.runtimePanel.uptime') }}</p>
       <p class="font-medium text-foreground">{{ formatUptime(runtime.uptimeMs) }}</p>
     </div>
 
     <!-- 内存 RSS -->
     <div>
-      <p class="text-muted-foreground">内存 RSS</p>
+      <p class="text-muted-foreground">{{ t('monitor.runtimePanel.memoryRss') }}</p>
       <p class="font-medium text-foreground">{{ formatBytes(runtime.memoryUsage.rss) }}</p>
     </div>
 
     <!-- Heap 使用率 -->
     <div class="col-span-2">
       <div class="flex items-center justify-between">
-        <p class="text-muted-foreground">Heap 使用</p>
+        <p class="text-muted-foreground">{{ t('monitor.runtimePanel.heapUsage') }}</p>
         <p class="text-muted-foreground">
           {{ formatBytes(runtime.memoryUsage.heapUsed) }} / {{ formatBytes(runtime.memoryUsage.heapTotal) }}
         </p>
@@ -31,19 +31,19 @@
 
     <!-- Active handles -->
     <div>
-      <p class="text-muted-foreground">Active Handles</p>
+      <p class="text-muted-foreground">{{ t('monitor.runtimePanel.activeHandles') }}</p>
       <p class="font-medium text-foreground">{{ runtime.activeHandles }}</p>
     </div>
 
     <!-- Active requests -->
     <div>
-      <p class="text-muted-foreground">Active Requests</p>
+      <p class="text-muted-foreground">{{ t('monitor.runtimePanel.activeRequests') }}</p>
       <p class="font-medium text-foreground">{{ runtime.activeRequests }}</p>
     </div>
 
     <!-- Event loop delay -->
     <div class="col-span-2">
-      <p class="text-muted-foreground">Event Loop 延迟</p>
+      <p class="text-muted-foreground">{{ t('monitor.runtimePanel.eventLoopDelay') }}</p>
       <p class="font-medium text-foreground">{{ runtime.eventLoopDelayMs.toFixed(2) }}ms</p>
     </div>
   </div>
@@ -52,7 +52,10 @@
 <!-- eslint-disable no-magic-numbers -->
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { RuntimeMetrics } from '@/types/monitor'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   runtime: RuntimeMetrics | null

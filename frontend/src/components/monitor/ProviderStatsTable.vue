@@ -1,19 +1,19 @@
 <template>
   <div v-if="!stats" class="text-sm text-muted-foreground py-4 text-center">
-    暂无数据
+    {{ t('monitor.providerTable.noData') }}
   </div>
   <div v-else-if="providerEntries.length === 0" class="text-sm text-muted-foreground py-4 text-center">
-    暂无 Provider 统计
+    {{ t('monitor.providerTable.noProviders') }}
   </div>
   <Table v-else>
     <TableHeader>
       <TableRow>
         <TableHead>Provider</TableHead>
-        <TableHead class="text-right">请求数</TableHead>
-        <TableHead class="text-right">成功率</TableHead>
-        <TableHead class="text-right">平均延迟</TableHead>
-        <TableHead class="text-right">重试率</TableHead>
-        <TableHead>Top Errors</TableHead>
+        <TableHead class="text-right">{{ t('monitor.providerTable.requests') }}</TableHead>
+        <TableHead class="text-right">{{ t('monitor.providerTable.successRate') }}</TableHead>
+        <TableHead class="text-right">{{ t('monitor.providerTable.avgLatency') }}</TableHead>
+        <TableHead class="text-right">{{ t('monitor.providerTable.retryRate') }}</TableHead>
+        <TableHead>{{ t('monitor.providerTable.topErrors') }}</TableHead>
       </TableRow>
     </TableHeader>
     <TableBody>
@@ -52,11 +52,14 @@
 <!-- eslint-disable no-magic-numbers -->
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import type { StatsSnapshot } from '@/types/monitor'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   stats: StatsSnapshot | null
