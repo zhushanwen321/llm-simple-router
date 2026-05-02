@@ -1,12 +1,12 @@
 <template>
   <div class="p-6">
     <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-semibold text-foreground">重试规则</h2>
+      <h2 class="text-lg font-semibold text-foreground">{{ t('retryRules.title') }}</h2>
       <Button @click="openCreate" class="flex items-center gap-1">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
         </svg>
-        添加规则
+        {{ t('retryRules.addRule') }}
       </Button>
     </div>
 
@@ -14,12 +14,12 @@
       <Table>
         <TableHeader>
           <TableRow class="bg-muted">
-            <TableHead class="text-muted-foreground">名称</TableHead>
-            <TableHead class="text-muted-foreground">HTTP 状态码</TableHead>
-            <TableHead class="text-muted-foreground">响应体匹配</TableHead>
-            <TableHead class="text-muted-foreground">重试策略</TableHead>
-            <TableHead class="text-muted-foreground">状态</TableHead>
-            <TableHead class="text-right text-muted-foreground">操作</TableHead>
+            <TableHead class="text-muted-foreground">{{ t('retryRules.tableHeaders.name') }}</TableHead>
+            <TableHead class="text-muted-foreground">{{ t('retryRules.tableHeaders.statusCode') }}</TableHead>
+            <TableHead class="text-muted-foreground">{{ t('retryRules.tableHeaders.bodyPattern') }}</TableHead>
+            <TableHead class="text-muted-foreground">{{ t('retryRules.tableHeaders.retryStrategy') }}</TableHead>
+            <TableHead class="text-muted-foreground">{{ t('retryRules.tableHeaders.status') }}</TableHead>
+            <TableHead class="text-right text-muted-foreground">{{ t('retryRules.tableHeaders.actions') }}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -29,23 +29,23 @@
             <TableCell class="font-mono text-xs text-muted-foreground">{{ r.body_pattern }}</TableCell>
             <TableCell>
               <div class="flex items-center gap-2">
-                <Badge variant="outline">{{ r.retry_strategy === 'fixed' ? '固定间隔' : '指数退避' }}</Badge>
+                <Badge variant="outline">{{ r.retry_strategy === 'fixed' ? t('retryRules.strategy.fixed') : t('retryRules.strategy.exponential') }}</Badge>
                 <span class="text-xs text-muted-foreground">
-                  {{ r.retry_delay_ms / 1000 }}s · {{ r.max_retries }}次
-                  <template v-if="r.retry_strategy === 'exponential'"> · 上限{{ r.max_delay_ms / 1000 }}s</template>
+                  {{ r.retry_delay_ms / 1000 }}s · {{ t('retryRules.times', { count: r.max_retries }) }}
+                  <template v-if="r.retry_strategy === 'exponential'"> · {{ t('retryRules.upperLimit', { value: r.max_delay_ms / 1000 }) }}</template>
                 </span>
               </div>
             </TableCell>
             <TableCell>
-              <Badge :variant="r.is_active ? 'default' : 'secondary'">{{ r.is_active ? '启用' : '禁用' }}</Badge>
+              <Badge :variant="r.is_active ? 'default' : 'secondary'">{{ r.is_active ? t('common.enabled') : t('common.disabled') }}</Badge>
             </TableCell>
             <TableCell class="text-right">
-              <Button variant="ghost" size="sm" @click="openEdit(r)" class="mr-2">编辑</Button>
-              <Button variant="ghost" size="sm" class="text-destructive hover:text-destructive" @click="confirmDelete(r)">删除</Button>
+              <Button variant="ghost" size="sm" @click="openEdit(r)" class="mr-2">{{ t('common.edit') }}</Button>
+              <Button variant="ghost" size="sm" class="text-destructive hover:text-destructive" @click="confirmDelete(r)">{{ t('common.delete') }}</Button>
             </TableCell>
           </TableRow>
           <TableRow v-if="rules.length === 0">
-            <TableCell colspan="6" class="text-center text-muted-foreground py-8">暂无规则</TableCell>
+            <TableCell colspan="6" class="text-center text-muted-foreground py-8">{{ t('retryRules.noRules') }}</TableCell>
           </TableRow>
         </TableBody>
       </Table>
@@ -55,61 +55,61 @@
     <Dialog v-model:open="dialogOpen">
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{{ editingId ? '编辑规则' : '添加规则' }}</DialogTitle>
+          <DialogTitle>{{ editingId ? t('retryRules.dialog.editRule') : t('retryRules.dialog.addRule') }}</DialogTitle>
         </DialogHeader>
         <form @submit.prevent="handleSave" class="space-y-3">
           <div>
-            <Label class="block text-sm font-medium text-foreground mb-1">名称</Label>
+            <Label class="block text-sm font-medium text-foreground mb-1">{{ t('retryRules.dialog.name') }}</Label>
             <Input v-model="form.name" type="text" required @input="delete errors.name" />
             <p v-if="errors.name" class="text-sm text-destructive mt-1">{{ errors.name }}</p>
           </div>
           <div>
-            <Label class="block text-sm font-medium text-foreground mb-1">HTTP 状态码</Label>
+            <Label class="block text-sm font-medium text-foreground mb-1">{{ t('retryRules.dialog.statusCode') }}</Label>
             <Input v-model.number="form.status_code" type="number" required @input="delete errors.status_code" />
             <p v-if="errors.status_code" class="text-sm text-destructive mt-1">{{ errors.status_code }}</p>
           </div>
           <div>
-            <Label class="block text-sm font-medium text-foreground mb-1">响应体匹配</Label>
-            <Input v-model="form.body_pattern" type="text" placeholder="正则表达式，例如 .*rate_limit.*" required @input="delete errors.body_pattern" />
+            <Label class="block text-sm font-medium text-foreground mb-1">{{ t('retryRules.dialog.bodyPattern') }}</Label>
+            <Input v-model="form.body_pattern" type="text" :placeholder="t('retryRules.dialog.bodyPatternPlaceholder')" required @input="delete errors.body_pattern" />
             <p v-if="errors.body_pattern" class="text-sm text-destructive mt-1">{{ errors.body_pattern }}</p>
           </div>
           <!-- 重试策略 -->
           <div>
-            <Label class="block text-sm font-medium text-foreground mb-1">重试策略</Label>
+            <Label class="block text-sm font-medium text-foreground mb-1">{{ t('retryRules.dialog.retryStrategy') }}</Label>
             <Select v-model="form.retry_strategy">
               <SelectTrigger class="w-full">
-                <SelectValue placeholder="选择策略" />
+                <SelectValue :placeholder="t('retryRules.dialog.selectStrategy')" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="exponential">指数退避</SelectItem>
-                <SelectItem value="fixed">固定间隔</SelectItem>
+                <SelectItem value="exponential">{{ t('retryRules.strategy.exponential') }}</SelectItem>
+                <SelectItem value="fixed">{{ t('retryRules.strategy.fixed') }}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div class="grid grid-cols-2 gap-3">
             <div>
-              <Label class="block text-sm font-medium text-foreground mb-1">{{ form.retry_strategy === 'fixed' ? '间隔时间 (ms)' : '初始延迟 (ms)' }}</Label>
+              <Label class="block text-sm font-medium text-foreground mb-1">{{ form.retry_strategy === 'fixed' ? t('retryRules.dialog.intervalMs') : t('retryRules.dialog.initialDelayMs') }}</Label>
               <Input v-model.number="form.retry_delay_ms" type="number" :min="100" required @input="delete errors.retry_delay_ms" />
               <p v-if="errors.retry_delay_ms" class="text-sm text-destructive mt-1">{{ errors.retry_delay_ms }}</p>
             </div>
             <div>
-              <Label class="block text-sm font-medium text-foreground mb-1">最大重试次数</Label>
+              <Label class="block text-sm font-medium text-foreground mb-1">{{ t('retryRules.dialog.maxRetries') }}</Label>
               <Input v-model.number="form.max_retries" type="number" :min="0" :max="100" required @input="delete errors.max_retries" />
               <p v-if="errors.max_retries" class="text-sm text-destructive mt-1">{{ errors.max_retries }}</p>
             </div>
           </div>
           <div v-if="form.retry_strategy === 'exponential'">
-            <Label class="block text-sm font-medium text-foreground mb-1">延迟上限 (ms)</Label>
+            <Label class="block text-sm font-medium text-foreground mb-1">{{ t('retryRules.dialog.maxDelayMs') }}</Label>
             <Input v-model.number="form.max_delay_ms" type="number" :min="100" required @input="delete errors.max_delay_ms" />
             <p v-if="errors.max_delay_ms" class="text-sm text-destructive mt-1">{{ errors.max_delay_ms }}</p>
           </div>
           <div class="flex items-center gap-2">
             <Checkbox v-model="form.is_active" id="rule-active" />
-            <Label for="rule-active" class="text-sm text-foreground">启用</Label>
+            <Label for="rule-active" class="text-sm text-foreground">{{ t('retryRules.dialog.enable') }}</Label>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" @click="dialogOpen = false">取消</Button>
-            <Button type="submit">保存</Button>
+            <Button type="button" variant="outline" @click="dialogOpen = false">{{ t('common.cancel') }}</Button>
+            <Button type="submit">{{ t('common.save') }}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -119,12 +119,12 @@
     <AlertDialog :open="!!deleteTarget" @update:open="(val) => { if (!val) deleteTarget = null }">
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>确认删除</AlertDialogTitle>
-          <AlertDialogDescription>确定要删除规则「{{ deleteTarget?.name }}」吗？</AlertDialogDescription>
+          <AlertDialogTitle>{{ t('retryRules.deleteConfirm.title') }}</AlertDialogTitle>
+          <AlertDialogDescription>{{ t('retryRules.deleteConfirm.description', { name: deleteTarget?.name }) }}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>取消</AlertDialogCancel>
-          <Button variant="destructive" @click="handleDelete">删除</Button>
+          <AlertDialogCancel>{{ t('common.cancel') }}</AlertDialogCancel>
+          <Button variant="destructive" @click="handleDelete">{{ t('common.delete') }}</Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -135,7 +135,7 @@
         <CollapsibleTrigger as-child>
           <CardHeader class="cursor-pointer hover:bg-muted/50 transition-colors">
             <div class="flex items-center justify-between">
-              <CardTitle class="text-sm font-medium">推荐重试规则 ({{ recommendedRules.length }})</CardTitle>
+              <CardTitle class="text-sm font-medium">{{ t('retryRules.recommended.title', { count: recommendedRules.length }) }}</CardTitle>
               <ChevronDown class="h-4 w-4 text-muted-foreground transition-transform" :class="{ 'rotate-180': recOpen }" />
             </div>
           </CardHeader>
@@ -145,20 +145,20 @@
             <div class="flex items-center justify-between mb-3">
               <div class="flex items-center gap-2">
                 <Checkbox :model-value="recAllChecked" @update:model-value="toggleRecAll" />
-                <span class="text-sm text-muted-foreground">全选</span>
+                <span class="text-sm text-muted-foreground">{{ t('retryRules.recommended.selectAll') }}</span>
               </div>
               <Button size="sm" :disabled="recSelected.size === 0" @click="addRecRules">
-                添加选中 ({{ recSelected.size }})
+                {{ t('retryRules.recommended.addSelected', { count: recSelected.size }) }}
               </Button>
             </div>
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead class="w-10"></TableHead>
-                  <TableHead>名称</TableHead>
-                  <TableHead>状态码</TableHead>
-                  <TableHead>匹配模式</TableHead>
-                  <TableHead>策略</TableHead>
+                  <TableHead>{{ t('retryRules.recommended.headers.name') }}</TableHead>
+                  <TableHead>{{ t('retryRules.recommended.headers.statusCode') }}</TableHead>
+                  <TableHead>{{ t('retryRules.recommended.headers.pattern') }}</TableHead>
+                  <TableHead>{{ t('retryRules.recommended.headers.strategy') }}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -169,7 +169,7 @@
                   <TableCell>{{ rule.name }}</TableCell>
                   <TableCell>{{ rule.status_code }}</TableCell>
                   <TableCell class="font-mono text-xs max-w-[200px] truncate">{{ rule.body_pattern }}</TableCell>
-                  <TableCell>{{ rule.retry_strategy === 'fixed' ? '固定间隔' : '指数退避' }}</TableCell>
+                  <TableCell>{{ rule.retry_strategy === 'fixed' ? t('retryRules.strategy.fixed') : t('retryRules.strategy.exponential') }}</TableCell>
                 </TableRow>
               </TableBody>
             </Table>
@@ -182,6 +182,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { api, getApiMessage, type RecommendedRetryRule } from '@/api/client'
 import { Button } from '@/components/ui/button'
@@ -225,6 +226,8 @@ const deleteTarget = ref<RetryRule | null>(null)
 const form = ref({ ...DEFAULT_FORM })
 const errors = ref<Record<string, string>>({})
 
+const { t } = useI18n()
+
 const MIN_STATUS_CODE = 100
 const MAX_STATUS_CODE = 599
 const MIN_DELAY_MS = 100
@@ -232,25 +235,25 @@ const MAX_RETRIES = 100
 
 function validate(): boolean {
   const errs: Record<string, string> = {}
-  if (!form.value.name.trim()) errs.name = '请输入名称'
+  if (!form.value.name.trim()) errs.name = t('retryRules.validation.nameRequired')
 
   const sc = Number(form.value.status_code)
-  if (!Number.isInteger(sc) || sc < MIN_STATUS_CODE || sc > MAX_STATUS_CODE) errs.status_code = `范围 ${MIN_STATUS_CODE}-${MAX_STATUS_CODE}`
+  if (!Number.isInteger(sc) || sc < MIN_STATUS_CODE || sc > MAX_STATUS_CODE) errs.status_code = t('retryRules.validation.statusCodeRange', { min: MIN_STATUS_CODE, max: MAX_STATUS_CODE })
 
-  if (!form.value.body_pattern.trim()) errs.body_pattern = '请输入匹配规则'
+  if (!form.value.body_pattern.trim()) errs.body_pattern = t('retryRules.validation.bodyPatternRequired')
   else {
-    try { new RegExp(form.value.body_pattern) } catch { errs.body_pattern = '不是合法的正则表达式' }
+    try { new RegExp(form.value.body_pattern) } catch { errs.body_pattern = t('retryRules.validation.bodyPatternInvalid') }
   }
 
   const delay = Number(form.value.retry_delay_ms)
-  if (!delay || delay < MIN_DELAY_MS) errs.retry_delay_ms = `不能小于 ${MIN_DELAY_MS}ms`
+  if (!delay || delay < MIN_DELAY_MS) errs.retry_delay_ms = t('retryRules.validation.delayMin', { min: MIN_DELAY_MS })
 
   const retries = Number(form.value.max_retries)
-  if (!Number.isInteger(retries) || retries < 0 || retries > MAX_RETRIES) errs.max_retries = `范围 0-${MAX_RETRIES}`
+  if (!Number.isInteger(retries) || retries < 0 || retries > MAX_RETRIES) errs.max_retries = t('retryRules.validation.retriesRange', { max: MAX_RETRIES })
 
   if (form.value.retry_strategy === 'exponential') {
     const maxDelay = Number(form.value.max_delay_ms)
-    if (!maxDelay || maxDelay < MIN_DELAY_MS) errs.max_delay_ms = `不能小于 ${MIN_DELAY_MS}ms`
+    if (!maxDelay || maxDelay < MIN_DELAY_MS) errs.max_delay_ms = t('retryRules.validation.delayMin', { min: MIN_DELAY_MS })
   }
 
   errors.value = errs
@@ -263,7 +266,7 @@ async function loadData() {
     rules.value = res
   } catch (e: unknown) {
     console.error('Failed to load retry rules:', e)
-    toast.error(getApiMessage(e, '加载数据失败'))
+    toast.error(getApiMessage(e, t('retryRules.messages.loadFailed')))
   }
 }
 
@@ -312,7 +315,7 @@ async function handleSave() {
     await loadData()
   } catch (e: unknown) {
     console.error('Failed to save retry rule:', e)
-    toast.error(getApiMessage(e, '保存规则失败'))
+    toast.error(getApiMessage(e, t('retryRules.messages.saveFailed')))
   }
 }
 
@@ -329,7 +332,7 @@ async function handleDelete() {
     await loadData()
   } catch (e: unknown) {
     console.error('Failed to delete retry rule:', e)
-    toast.error(getApiMessage(e, '删除规则失败'))
+    toast.error(getApiMessage(e, t('retryRules.messages.deleteFailed')))
   }
 }
 
@@ -372,7 +375,7 @@ async function addRecRules() {
       max_delay_ms: rule.max_delay_ms,
     })
   }
-  toast.success(`已添加 ${toAdd.length} 条规则`)
+  toast.success(t('retryRules.messages.addedCount', { count: toAdd.length }))
   recSelected.value = new Set()
   await Promise.allSettled([loadRecommended(), loadData()])
 }

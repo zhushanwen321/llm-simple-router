@@ -3,7 +3,7 @@
   "addProvider": "Add Provider",
   "editProvider": "Edit Provider",
   "reloadPlugin": "Reload Plugin",
-  "noProviders": "No providers",
+  "noProviders": "No providers yet",
   "tableHeaders": {
     "name": "Name",
     "type": "Type",
@@ -16,9 +16,9 @@
   },
   "quickConfig": {
     "title": "Quick Config",
-    "selectProvider": "Select provider",
-    "selectPlan": "Select plan",
-    "selectApiType": "Select API type"
+    "selectProvider": "Select Provider",
+    "selectPlan": "Select Plan",
+    "selectApiType": "Select API Type"
   },
   "fields": {
     "name": "Name",
@@ -34,13 +34,13 @@
   "concurrency": {
     "title": "Concurrency Control",
     "mode": "Mode",
-    "selectMode": "Select mode",
+    "selectMode": "Select Mode",
     "autoAdaptive": "Auto (Adaptive)",
     "manual": "Manual",
     "none": "None",
     "maxConcurrency": "Max Concurrency",
     "queueTimeout": "Queue Timeout (ms)",
-    "queueTimeoutPlaceholder": "0 = wait indefinitely",
+    "queueTimeoutPlaceholder": "0 = unlimited wait",
     "maxQueueSize": "Max Queue Size"
   },
   "transform": {

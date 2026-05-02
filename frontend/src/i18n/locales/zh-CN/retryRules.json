@@ -1,0 +1,63 @@
+{
+  "title": "重试规则",
+  "addRule": "添加规则",
+  "tableHeaders": {
+    "name": "名称",
+    "statusCode": "HTTP 状态码",
+    "bodyPattern": "响应体匹配",
+    "retryStrategy": "重试策略",
+    "status": "状态",
+    "actions": "操作"
+  },
+  "strategy": {
+    "fixed": "固定间隔",
+    "exponential": "指数退避"
+  },
+  "times": "{count}次",
+  "upperLimit": "上限{value}s",
+  "noRules": "暂无规则",
+  "dialog": {
+    "editRule": "编辑规则",
+    "addRule": "添加规则",
+    "name": "名称",
+    "statusCode": "HTTP 状态码",
+    "bodyPattern": "响应体匹配",
+    "bodyPatternPlaceholder": "正则表达式，例如 .*rate_limit.*",
+    "retryStrategy": "重试策略",
+    "selectStrategy": "选择策略",
+    "intervalMs": "间隔时间 (ms)",
+    "initialDelayMs": "初始延迟 (ms)",
+    "maxRetries": "最大重试次数",
+    "maxDelayMs": "延迟上限 (ms)",
+    "enable": "启用"
+  },
+  "deleteConfirm": {
+    "title": "确认删除",
+    "description": "确定要删除规则「{name}」吗？"
+  },
+  "recommended": {
+    "title": "推荐重试规则 ({count})",
+    "selectAll": "全选",
+    "addSelected": "添加选中 ({count})",
+    "headers": {
+      "name": "名称",
+      "statusCode": "状态码",
+      "pattern": "匹配模式",
+      "strategy": "策略"
+    }
+  },
+  "messages": {
+    "loadFailed": "加载数据失败",
+    "saveFailed": "保存规则失败",
+    "deleteFailed": "删除规则失败",
+    "addedCount": "已添加 {count} 条规则"
+  },
+  "validation": {
+    "nameRequired": "请输入名称",
+    "statusCodeRange": "范围 {min}-{max}",
+    "bodyPatternRequired": "请输入匹配规则",
+    "bodyPatternInvalid": "不是合法的正则表达式",
+    "delayMin": "不能小于 {min}ms",
+    "retriesRange": "范围 0-{max}"
+  }
+}
