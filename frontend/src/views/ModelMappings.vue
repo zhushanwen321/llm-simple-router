@@ -1,13 +1,5 @@
 <template>
-  <div class="p-6 space-y-4">
-    <div class="flex items-center justify-between">
-      <h2 class="text-lg font-semibold text-foreground">模型映射</h2>
-      <Button size="sm" @click="addNewMapping" :disabled="!canAdd">
-        <Plus class="w-3.5 h-3.5 mr-1" />
-        添加映射
-      </Button>
-    </div>
-
+  <div class="p-6">
     <Card>
       <CardContent class="pt-4">
         <!-- Add mapping row -->
@@ -28,6 +20,7 @@
           :entries="entries"
           :provider-groups="providerGroups"
           :show-delete="true"
+          :show-add-form="false"
           @update:targets="updateTargets"
           @toggle-active="toggleActive"
           @remove="removeMapping"
@@ -48,20 +41,6 @@
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
-
-    <!-- Toggle Confirm -->
-    <AlertDialog :open="!!toggleTarget" @update:open="(val: boolean) => { if (!val) toggleTarget = null }">
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>确认{{ toggleTarget?.active ? '禁用' : '启用' }}</AlertDialogTitle>
-          <AlertDialogDescription>确定要{{ toggleTarget?.active ? '禁用' : '启用' }}映射「{{ toggleTarget?.clientModel }}」吗？</AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>取消</AlertDialogCancel>
-          <AlertDialogAction @click="handleToggle">确认</AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
   </div>
 </template>
 
@@ -73,8 +52,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog'
-import { Plus } from 'lucide-vue-next'
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from '@/components/ui/alert-dialog'
 import MappingEditor from '@/components/shared/MappingEditor.vue'
 import type { MappingEntry, MappingTarget } from '@/components/quick-setup/types'
 import type { ProviderGroup } from '@/components/mappings/cascading-types'
@@ -87,7 +65,6 @@ const providersList = ref<Provider[]>([])
 const newFrom = ref('')
 const newTo = ref('')
 const deleteTarget = ref<MappingEntry | null>(null)
-const toggleTarget = ref<MappingEntry | null>(null)
 
 // --- Computed ---
 const canAdd = computed(() => newFrom.value.trim().length > 0 && newTo.value.trim().length > 0)
@@ -150,18 +127,11 @@ function updateTargets(index: number, targets: MappingTarget[]) {
   })
 }
 
-function toggleActive(index: number) {
+async function toggleActive(index: number) {
   const entry = entries.value[index]
-  if (!entry) return
-  toggleTarget.value = { ...entry }
-}
-
-async function handleToggle() {
-  const target = toggleTarget.value
-  if (!target?.existingId) return
-  toggleTarget.value = null
+  if (!entry?.existingId) return
   try {
-    await api.toggleMappingGroup(target.existingId)
+    await api.toggleMappingGroup(entry.existingId)
     await loadData()
   } catch (e: unknown) {
     toast.error(getApiMessage(e, '切换状态失败'))

@@ -14,8 +14,10 @@ const props = withDefaults(defineProps<{
   entries: MappingEntry[]
   providerGroups: ProviderGroup[]
   showDelete?: boolean
+  showAddForm?: boolean
 }>(), {
   showDelete: false,
+  showAddForm: true,
 })
 
 const emit = defineEmits<{
@@ -240,7 +242,7 @@ const tagLabels: Record<string, string> = {
     <p v-if="entries.length === 0" class="py-3 text-center text-xs text-muted-foreground">暂无映射</p>
 
     <!-- Add new mapping -->
-    <div class="flex items-center gap-2 pt-2 border-t mt-2">
+    <div v-if="showAddForm" class="flex items-center gap-2 pt-2 border-t mt-2">
       <Input v-model="newFrom" placeholder="客户端模型" class="h-8 flex-1 text-xs font-mono" @keydown="handleKeydown" />
       <ArrowRight class="size-3 shrink-0 text-muted-foreground" />
       <Input v-model="newTo" placeholder="目标模型" class="h-8 flex-1 text-xs font-mono" @keydown="handleKeydown" />
