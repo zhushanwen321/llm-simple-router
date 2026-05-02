@@ -1,10 +1,10 @@
 <template>
   <div class="flex flex-col gap-2 min-h-0 flex-1">
     <div class="flex items-center justify-between flex-shrink-0">
-      <span class="text-xs font-medium text-muted-foreground">响应内容</span>
+      <span class="text-xs font-medium text-muted-foreground">{{ t('requestDetail.responseTitle') }}</span>
       <Button size="sm" variant="outline" class="h-6 gap-1 text-xs" @click="showRaw = !showRaw">
         <component :is="showRaw ? FileText : FileJson" class="h-3 w-3" />
-        {{ showRaw ? '结构化' : (props.isStream ? '原始 SSE' : '原始 JSON') }}
+        {{ showRaw ? t('requestDetail.structured') : (props.isStream ? t('requestDetail.rawSse') : t('requestDetail.rawJson')) }}
       </Button>
     </div>
 
@@ -24,9 +24,9 @@
             />
           </div>
         </template>
-        <p v-else-if="props.status === 'pending'" class="text-xs text-muted-foreground">等待响应数据...</p>
-        <p v-else-if="props.source === 'history' && props.isStream && !hasAnyResponseData" class="text-xs text-muted-foreground">流式响应内容未持久化存储</p>
-        <p v-else class="text-xs text-muted-foreground">无响应内容</p>
+        <p v-else-if="props.status === 'pending'" class="text-xs text-muted-foreground">{{ t('requestDetail.waitingResponse') }}</p>
+        <p v-else-if="props.source === 'history' && props.isStream && !hasAnyResponseData" class="text-xs text-muted-foreground">{{ t('requestDetail.streamNotPersisted') }}</p>
+        <p v-else class="text-xs text-muted-foreground">{{ t('requestDetail.noResponseContent') }}</p>
       </div>
       <!-- Scroll to bottom button -->
       <Button
@@ -49,6 +49,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { FileJson, FileText, ArrowDown } from 'lucide-vue-next'
@@ -59,6 +60,7 @@ import type { ContentBlock, StreamContentSnapshot } from '@/types/monitor'
 import { useSSEParsing } from '@/components/log-viewer/useSSEParsing'
 import { mergeUpstreamData } from './upstream-merge'
 
+const { t } = useI18n()
 const structuredRef = ref<HTMLElement | null>(null)
 
 const props = withDefaults(defineProps<{

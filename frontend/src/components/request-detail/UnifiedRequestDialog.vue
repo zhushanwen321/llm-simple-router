@@ -19,7 +19,7 @@
 
       <DialogHeader class="px-4 pt-2 pb-0">
         <DialogTitle class="text-sm flex items-center gap-2">
-          请求详情
+          {{ t('requestDetail.dialogTitle') }}
           <span
             v-if="overview"
             class="font-mono text-[11px] text-muted-foreground"
@@ -36,9 +36,7 @@
             <CopyIcon v-else class="size-3" />
           </Button>
         </DialogTitle>
-        <DialogDescription class="sr-only"
-          >查看请求的响应内容和请求内容</DialogDescription
-        >
+        <DialogDescription class="sr-only">{{ t('requestDetail.dialogDescription') }}</DialogDescription>
       </DialogHeader>
 
       <!-- Main content area -->
@@ -62,8 +60,8 @@
             </div>
             <Tabs v-model="activeTab" class="flex-1 flex flex-col min-h-0">
               <TabsList class="flex-shrink-0">
-                <TabsTrigger value="response">响应内容</TabsTrigger>
-                <TabsTrigger value="request">请求内容</TabsTrigger>
+                <TabsTrigger value="response">{{ t('requestDetail.responseTab') }}</TabsTrigger>
+                <TabsTrigger value="request">{{ t('requestDetail.requestTab') }}</TabsTrigger>
               </TabsList>
 
               <!-- Response tab -->
@@ -96,7 +94,7 @@
       <template v-else>
         <div class="flex items-center justify-center h-[calc(85vh-80px)]">
           <p class="text-sm text-muted-foreground">
-            {{ props.source === "realtime" ? "加载中..." : "无选中请求" }}
+            {{ props.source === "realtime" ? t('requestDetail.loading') : t('requestDetail.noSelectedRequest') }}
           </p>
         </div>
       </template>
@@ -106,6 +104,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
+import { useI18n } from 'vue-i18n';
 import {
   Dialog,
   DialogContent,
@@ -125,6 +124,7 @@ import { fromActiveRequest, fromLogEntry } from "./types";
 import type { ActiveRequest, StreamContentSnapshot } from "@/types/monitor";
 import type { LogEntry } from "@/components/logs/types";
 
+const { t } = useI18n();
 const { copied, copy } = useClipboard();
 
 function handleCopyId() {
