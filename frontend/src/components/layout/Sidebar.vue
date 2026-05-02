@@ -348,7 +348,9 @@ interface NavGroup {
 }
 
 // 与 router/index.ts 路由定义保持同步
-const navGroups = computed<NavGroup[]>(() => [
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const navGroups = computed(() => {
+  return [
   {
     items: [
       { path: '/', label: t('sidebar.nav.dashboard'), icon: LayoutDashboard },
@@ -377,7 +379,8 @@ const navGroups = computed<NavGroup[]>(() => [
       { path: '/settings', label: t('sidebar.nav.settings'), icon: Settings },
     ],
   },
-]))
+  ] as NavGroup[]
+})
 
 const expandedGroups = ref<Set<number>>(new Set([1]))
 
