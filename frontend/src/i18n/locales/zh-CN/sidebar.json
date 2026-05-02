@@ -9,7 +9,10 @@
     "proxyEnhancement": "代理增强（实验性）",
     "monitor": "实时监控",
     "logs": "请求日志",
-    "settings": "系统设置"
+    "settings": "系统设置",
+    "agentConfig": "智能体配置",
+    "quickSetup": "快速配置",
+    "monitoring": "监控"
   },
   "theme": {
     "light": "浅色模式",

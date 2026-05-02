@@ -9,7 +9,10 @@
     "proxyEnhancement": "Proxy Enhancement (Experimental)",
     "monitor": "Realtime Monitor",
     "logs": "Request Logs",
-    "settings": "Settings"
+    "settings": "Settings",
+    "agentConfig": "Agent Config",
+    "quickSetup": "Quick Setup",
+    "monitoring": "Monitoring"
   },
   "theme": {
     "light": "Light Mode",
