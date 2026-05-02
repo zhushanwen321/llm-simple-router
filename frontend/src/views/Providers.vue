@@ -91,18 +91,22 @@
           <DialogTitle>{{ editingId ? '编辑供应商' : '添加供应商' }}</DialogTitle>
         </DialogHeader>
         <form @submit.prevent="handleSave" class="space-y-4">
-          <!-- 快速配置 -->
-          <div class="rounded-md border bg-muted/40 p-3 space-y-2">
-            <div class="text-xs font-medium text-muted-foreground">快速配置</div>
+          <!-- 模板选择 (仅新建模式) -->
+          <div v-if="!editingId" class="rounded-md border-2 border-primary/30 bg-primary/5 p-3 space-y-2">
+            <div class="flex items-center gap-1.5 text-xs font-semibold text-primary">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+              模板选择
+            </div>
             <div class="flex gap-2">
               <Select v-model="presetGroup" @update:model-value="onGroupChange">
-                <SelectTrigger class="flex-1"><SelectValue placeholder="选择供应商" /></SelectTrigger>
+                <SelectTrigger class="flex-1 border-primary/40"><SelectValue placeholder="选择供应商模板" /></SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="__custom__">✨ 自定义</SelectItem>
                   <SelectItem v-for="g in providerPresets" :key="g.group" :value="g.group">{{ g.group }}</SelectItem>
                 </SelectContent>
               </Select>
-              <Select v-model="presetPlan" @update:model-value="onPresetChange" :disabled="!presetGroup">
-                <SelectTrigger class="flex-1"><SelectValue placeholder="选择套餐" /></SelectTrigger>
+              <Select v-if="presetGroup !== '__custom__'" v-model="presetPlan" @update:model-value="onPresetChange" :disabled="!presetGroup || presetGroup === '__custom__'">
+                <SelectTrigger class="flex-1 border-primary/40"><SelectValue placeholder="选择套餐" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem v-for="p in availablePlans" :key="p.plan" :value="p.plan">{{ p.plan }}</SelectItem>
                 </SelectContent>
@@ -110,6 +114,13 @@
             </div>
           </div>
 
+          <!-- 未选模板提示 (仅新建模式) -->
+          <div v-if="!presetGroup && !editingId" class="flex flex-col items-center justify-center py-10 text-muted-foreground">
+            <svg class="w-10 h-10 mb-3 opacity-30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 12l2 2 4-4"/></svg>
+            <span class="text-sm">请先选择模板，或使用自定义模式</span>
+          </div>
+
+          <template v-if="presetGroup || editingId">
           <!-- 基本信息 2x2 -->
           <div class="grid grid-cols-2 gap-3">
             <div>
@@ -219,6 +230,8 @@
               </div>
             </div>
           </div>
+
+          </template>
 
           <DialogFooter>
             <Button type="button" variant="outline" @click="dialogOpen = false">取消</Button>
@@ -369,6 +382,14 @@ const availablePlans = computed(() => {
   return providerPresets.value.find(g => g.group === presetGroup.value)?.presets ?? []
 })
 function onGroupChange() {
+  if (presetGroup.value === '__custom__') {
+    presetPlan.value = ''
+    form.value.name = ''
+    form.value.api_type = 'openai'
+    form.value.base_url = ''
+    form.value.models = []
+    return
+  }
   const plans = providerPresets.value.find(g => g.group === presetGroup.value)?.presets
   if (plans?.length) {
     presetPlan.value = plans[0].plan
