@@ -1,9 +1,12 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
+
+const { t } = useI18n()
 
 export type ConcurrencyMode = 'auto' | 'manual' | 'none'
 
@@ -31,7 +34,7 @@ const emit = defineEmits<{
 <template>
   <div :class="compact ? 'space-y-2' : 'flex items-end gap-3 flex-wrap'">
     <div :class="compact ? '' : 'w-36'" class="space-y-1">
-      <Label class="text-xs text-muted-foreground">模式</Label>
+      <Label class="text-xs text-muted-foreground">{{ t('providers.concurrency.mode') }}</Label>
       <Select
         :model-value="mode"
         @update:model-value="(v: unknown) => emit('update:mode', v as ConcurrencyMode)"
@@ -40,15 +43,15 @@ const emit = defineEmits<{
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="auto">自动（自适应）</SelectItem>
-          <SelectItem value="manual">手动</SelectItem>
-          <SelectItem value="none">无限制</SelectItem>
+          <SelectItem value="auto">{{ t('providers.concurrency.autoAdaptive') }}</SelectItem>
+          <SelectItem value="manual">{{ t('providers.concurrency.manual') }}</SelectItem>
+          <SelectItem value="none">{{ t('providers.concurrency.none') }}</SelectItem>
         </SelectContent>
       </Select>
     </div>
     <template v-if="mode !== 'none'">
       <div :class="compact ? '' : 'w-28'" class="space-y-1">
-        <Label class="text-xs text-muted-foreground">最大并发</Label>
+        <Label class="text-xs text-muted-foreground">{{ t('providers.concurrency.maxConcurrency') }}</Label>
         <Input
           :model-value="maxConcurrency"
           type="number" min="1" max="100"
@@ -56,16 +59,16 @@ const emit = defineEmits<{
         />
       </div>
       <div :class="compact ? '' : 'w-32'" class="space-y-1">
-        <Label class="text-xs text-muted-foreground">队列超时(ms)</Label>
+        <Label class="text-xs text-muted-foreground">{{ t('providers.concurrency.queueTimeout') }}</Label>
         <Input
           :model-value="queueTimeoutMs"
           type="number" min="0"
-          placeholder="0=无限"
+          :placeholder="t('providers.shared.queueTimeoutPlaceholder')"
           @update:model-value="emit('update:queueTimeoutMs', Number($event))"
         />
       </div>
       <div :class="compact ? '' : 'w-32'" class="space-y-1">
-        <Label class="text-xs text-muted-foreground">最大队列</Label>
+        <Label class="text-xs text-muted-foreground">{{ t('providers.concurrency.maxQueueSize') }}</Label>
         <Input
           :model-value="maxQueueSize"
           type="number" min="1" max="1000"
@@ -74,7 +77,7 @@ const emit = defineEmits<{
       </div>
     </template>
     <div v-if="mode === 'auto' && !compact" class="text-[10px] text-muted-foreground leading-snug">
-      自适应模式会根据错误率自动调整并发度
+      {{ t('providers.shared.autoHint') }}
     </div>
   </div>
 </template>

@@ -1,0 +1,98 @@
+{
+  "title": "Quick Setup",
+  "client": {
+    "selectClient": "Select Client",
+    "claudeCode": "Claude Code",
+    "claudeCodeDesc": "Official Anthropic CLI coding assistant",
+    "pi": "Pi",
+    "piDesc": "Universal coding Agent framework",
+    "openaiSdk": "OpenAI SDK",
+    "openaiSdkDesc": "Direct OpenAI API calls",
+    "anthropicSdk": "Anthropic SDK",
+    "anthropicSdkDesc": "Direct Anthropic API calls"
+  },
+  "provider": {
+    "config": "Provider Configuration",
+    "label": "Provider",
+    "select": "Select",
+    "custom": "Custom",
+    "customProvider": "Custom Provider",
+    "format": "Format",
+    "plan": "Plan",
+    "apiKey": "API Key",
+    "apiKeyPlaceholder": "Enter API Key",
+    "connect": "Connect",
+    "testing": "Testing",
+    "connected": "Connected",
+    "test": "Test"
+  },
+  "model": {
+    "config": "Model Configuration",
+    "selectProviderFirst": "Please select a provider and plan first",
+    "namePlaceholder": "Enter model name",
+    "contextCustom": "Custom"
+  },
+  "patch": {
+    "deepseekAnthropic": "DeepSeek Compatible (Anthropic)",
+    "thinkingParam": "Thinking Param",
+    "thinkingParamDesc": "Auto-fill thinking parameter",
+    "cacheControl": "Cache Control",
+    "cacheControlDesc": "Strip cache_control",
+    "thinkingBlocks": "Thinking Blocks",
+    "thinkingBlocksDesc": "Fill missing thinking blocks",
+    "orphanToolResult": "Orphan Tool Result",
+    "orphanToolResultDesc": "Clean up orphan tool_result",
+    "deepseekOpenai": "DeepSeek Compatible (OpenAI)",
+    "nonDsTools": "Non-DS Tool Downgrade",
+    "nonDsToolsDesc": "Downgrade non-DS tool_calls to text",
+    "orphanToolResultOa": "Orphan Tool Result",
+    "orphanToolResultOaDesc": "OpenAI format orphan handling",
+    "general": "General Compatibility",
+    "developerRole": "Developer Role",
+    "developerRoleDesc": "Convert developer role to system"
+  },
+  "concurrency": {
+    "control": "Concurrency Control"
+  },
+  "mapping": {
+    "title": "Model Mappings",
+    "count": "{count} items"
+  },
+  "retry": {
+    "title": "Retry Rules",
+    "selectedCount": "{count} selected",
+    "allCreated": "All recommended rules have been created",
+    "selectProviderFirst": "Select a provider to see recommended rules",
+    "configured": "Configured",
+    "general": "General",
+    "fixed": "Fixed",
+    "exponential": "Exponential",
+    "times": "times"
+  },
+  "transform": {
+    "title": "Transform Rules"
+  },
+  "footer": {
+    "models": "{count} models",
+    "mappings": "{count} mappings",
+    "rules": "{count} rules",
+    "validate": "Validate",
+    "saving": "Saving",
+    "saveConfig": "Save Config"
+  },
+  "messages": {
+    "selectProvider": "Please select a provider",
+    "fillApiKey": "Please enter API Key",
+    "enableOneModel": "Please enable at least one model",
+    "validationPassed": "Configuration validated",
+    "existingMappingDelete": "Existing mappings can only be deleted from the Model Mappings page",
+    "fillApiKeyFirst": "Please enter API Key first",
+    "injectHeadersJsonError": "Invalid inject headers JSON format",
+    "requestDefaultsJsonError": "Invalid request defaults JSON format",
+    "selectProviderAndPlan": "Please select a provider and plan",
+    "setupCompleteWithErrors": "Quick setup complete! {count} mapping toggle(s) failed",
+    "setupComplete": "Quick setup complete!",
+    "setupFailed": "Quick setup failed",
+    "loadFailed": "Failed to load recommended configuration"
+  }
+}

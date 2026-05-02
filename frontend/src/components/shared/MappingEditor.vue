@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { MappingEntry, MappingTarget } from '@/components/quick-setup/types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -26,6 +27,8 @@ const emit = defineEmits<{
   'add': [clientModel: string, targetModel: string]
   'remove': [clientModel: string]
 }>()
+
+const { t } = useI18n()
 
 const newFrom = ref('')
 const newTo = ref('')
@@ -107,10 +110,10 @@ function handleKeydown(e: KeyboardEvent) {
 }
 
 const tagLabels: Record<string, string> = {
-  def: '默认',
-  auto: '自动',
-  cust: '自定义',
-  existing: '已有',
+  def: t('providers.shared.tagDefault'),
+  auto: t('providers.shared.tagAuto'),
+  cust: t('providers.shared.tagCustom'),
+  existing: t('providers.shared.tagExisting'),
 }
 </script>
 
@@ -146,14 +149,14 @@ const tagLabels: Record<string, string> = {
           variant="outline"
           class="shrink-0 text-[9px] px-1 py-0 border-orange-400 text-orange-500"
         >
-          {{ entry.targets.length }}级
+          {{ t('providers.shared.level', { count: entry.targets.length }) }}
         </Badge>
         <Badge
           v-if="entry.targets[0]?.overflow_model"
           variant="outline"
           class="shrink-0 text-[9px] px-1 py-0 border-blue-400 text-blue-500"
         >
-          溢出
+          {{ t('providers.shared.overflow') }}
         </Badge>
         <ChevronDown
           class="size-3.5 shrink-0 text-muted-foreground transition-transform"
@@ -185,13 +188,13 @@ const tagLabels: Record<string, string> = {
           <!-- Target row -->
           <div class="flex items-center gap-2">
             <span class="text-[10px] font-medium shrink-0 w-6" :class="tIdx === 0 ? 'text-primary' : 'text-muted-foreground'">
-              {{ tIdx === 0 ? '首选' : `备${tIdx}` }}
+              {{ tIdx === 0 ? t('providers.shared.primary') : t('providers.shared.backup', { n: tIdx }) }}
             </span>
             <div class="flex-1">
               <CascadingModelSelect
                 :providers="providerGroups"
                 :model-value="{ provider_id: target.provider_id, model: target.backend_model }"
-                placeholder="选择模型..."
+                placeholder="Select model..."
                 @update:model-value="(v: SelectedValue) => updateTargetProvider(idx, tIdx, v)"
               />
             </div>
@@ -209,18 +212,18 @@ const tagLabels: Record<string, string> = {
           <!-- Failover arrow -->
           <div v-if="tIdx < entry.targets.length - 1" class="flex items-center gap-1 pl-8 text-[10px] text-muted-foreground py-0.5">
             <span class="w-3 border-t border-muted-foreground/30"></span>
-            <span>失败时切换</span>
+            <span>{{ t('providers.shared.switchOnFail') }}</span>
           </div>
         </div>
 
         <!-- Overflow model (bottom, separated by border) -->
         <div class="flex items-center gap-2 pt-2 mt-1 border-t border-border">
-          <span class="text-[10px] text-muted-foreground shrink-0">溢出模型</span>
+          <span class="text-[10px] text-muted-foreground shrink-0">{{ t('providers.shared.overflow') }}</span>
           <div class="flex-1">
             <CascadingModelSelect
               :providers="providerGroups"
               :model-value="entry.targets[0]?.overflow_provider_id && entry.targets[0]?.overflow_model ? { provider_id: entry.targets[0].overflow_provider_id, model: entry.targets[0].overflow_model } : undefined"
-              placeholder="可选，上下文超限时切换..."
+              :placeholder="t('providers.shared.overflowPlaceholder')"
               @update:model-value="(v: SelectedValue | undefined) => updateOverflow(idx, v)"
             />
           </div>
@@ -234,20 +237,20 @@ const tagLabels: Record<string, string> = {
           @click="addTarget(idx)"
         >
           <Plus class="w-3 h-3 mr-1" />
-          添加故障转移
+          {{ t('providers.shared.addFailover') }}
         </Button>
       </div>
     </div>
 
     <!-- Empty state -->
-    <p v-if="entries.length === 0" class="py-3 text-center text-xs text-muted-foreground">暂无映射</p>
+    <p v-if="entries.length === 0" class="py-3 text-center text-xs text-muted-foreground">{{ t('providers.shared.noMappings') }}</p>
 
     <!-- Add new mapping -->
     <div v-if="showAddForm" class="flex items-center gap-2 pt-2 border-t mt-2">
-      <Input v-model="newFrom" placeholder="客户端模型" class="h-8 flex-1 text-xs font-mono" @keydown="handleKeydown" />
+      <Input v-model="newFrom" :placeholder="t('providers.shared.clientModel')" class="h-8 flex-1 text-xs font-mono" @keydown="handleKeydown" />
       <ArrowRight class="size-3 shrink-0 text-muted-foreground" />
-      <Input v-model="newTo" placeholder="目标模型" class="h-8 flex-1 text-xs font-mono" @keydown="handleKeydown" />
-      <Button size="sm" variant="outline" class="h-8 shrink-0" :disabled="!canAdd()" @click="addMapping">添加</Button>
+      <Input v-model="newTo" :placeholder="t('providers.shared.targetModel')" class="h-8 flex-1 text-xs font-mono" @keydown="handleKeydown" />
+      <Button size="sm" variant="outline" class="h-8 shrink-0" :disabled="!canAdd()" @click="addMapping">{{ t('providers.shared.add') }}</Button>
     </div>
   </div>
 </template>
