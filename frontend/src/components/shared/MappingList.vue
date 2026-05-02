@@ -122,7 +122,7 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
   <div class="rounded-xl border border-border bg-card overflow-hidden">
     <!-- Header -->
     <div v-if="entries.length > 0" class="flex items-center px-5 py-2.5 border-b border-border bg-muted/20 text-xs text-muted-foreground font-medium">
-      <div class="w-[108px] shrink-0">客户端模型</div>
+      <div class="w-[128px] shrink-0">客户端模型</div>
       <div class="w-5 shrink-0"></div>
       <div class="flex-1">目标链</div>
       <div class="shrink-0 w-[140px] text-right">操作</div>
@@ -141,7 +141,7 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
         @click="toggleExpand(entry.clientModel)"
       >
         <!-- Client model -->
-        <div class="w-[108px] shrink-0 mono text-sm font-semibold text-foreground truncate" :title="entry.clientModel">
+        <div class="w-[128px] shrink-0 mono text-sm font-semibold text-foreground truncate" :title="entry.clientModel">
           {{ entry.clientModel }}
         </div>
 
@@ -203,7 +203,7 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
       <div v-if="isExpanded(entry.clientModel)" class="border-t border-border bg-muted/5 mapping-edit-section">
         <div class="flex">
           <!-- Left: client model identity -->
-          <div class="w-[108px] shrink-0 px-3 py-2 flex flex-col items-center justify-center border-r border-border bg-muted/10">
+          <div class="w-[128px] shrink-0 px-3 py-2 flex flex-col items-center justify-center border-r border-border bg-muted/10">
             <div class="mono text-xs font-semibold text-foreground">{{ entry.clientModel }}</div>
             <div class="text-[10px] text-muted-foreground/50 mt-0.5">客户端模型</div>
           </div>
