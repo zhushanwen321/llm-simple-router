@@ -213,7 +213,7 @@ describe("ResponsesToAnthropicTransform", () => {
     const blockStart = events.find((e) => e.event === "content_block_start");
     const block = (blockStart?.data as Record<string, unknown>)?.content_block as Record<string, unknown>;
     expect(block?.type).toBe("tool_use");
-    expect(block?.id).toBe("fc_1");
+    expect(block?.id).toBe("toolu_fc_1");
     expect(block?.name).toBe("get_weather");
 
     // input_json_delta

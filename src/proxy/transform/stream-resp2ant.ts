@@ -76,7 +76,9 @@ export class ResponsesToAnthropicTransform extends BaseSSETransform {
           // Don't start content block yet — wait for content_part.added
         } else if (itemType === "function_call") {
           this.hasFunctionCall = true;
-          const toolId = tracked.callId ?? tracked.id;
+          const rawCallId = tracked.callId ?? tracked.id;
+          // Anthropic requires "toolu_" prefix on tool_use IDs
+          const toolId = rawCallId.startsWith("toolu_") ? rawCallId : `toolu_${rawCallId}`;
           const toolName = tracked.name ?? "";
           this.pushAnthropicSSE("content_block_start", {
             type: "content_block_start",
