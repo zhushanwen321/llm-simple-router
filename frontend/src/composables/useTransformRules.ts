@@ -1,8 +1,10 @@
 import { ref } from 'vue'
 import { toast } from 'vue-sonner'
+import { useI18n } from 'vue-i18n'
 import { api, getApiMessage } from '@/api/client'
 
 export function useTransformRules() {
+  const { t } = useI18n()
   const transformForm = ref({
     dropFieldsInput: '',
     requestDefaultsInput: '',
@@ -25,7 +27,7 @@ export function useTransformRules() {
         transformForm.value.exists = false
       }
     } catch (e) {
-      toast.error(getApiMessage(e, '加载转换规则失败'))
+      toast.error(getApiMessage(e, t('providers.transform.loadFailed')))
       transformForm.value.dropFieldsInput = ''
       transformForm.value.requestDefaultsInput = ''
       transformForm.value.injectHeadersInput = ''
@@ -41,16 +43,16 @@ export function useTransformRules() {
     let requestDefaults = null
     if (transformForm.value.requestDefaultsInput.trim()) {
       try { requestDefaults = JSON.parse(transformForm.value.requestDefaultsInput) }
-      catch { toast.error('请求默认值 JSON 格式错误'); return Promise.resolve() }
+      catch { toast.error(t('providers.transform.requestDefaultsJsonError')); return Promise.resolve() }
     }
     let injectHeaders = null
     if (transformForm.value.injectHeadersInput.trim()) {
       try { injectHeaders = JSON.parse(transformForm.value.injectHeadersInput) }
-      catch { toast.error('注入 Headers JSON 格式错误'); return Promise.resolve() }
+      catch { toast.error(t('providers.transform.injectHeadersJsonError')); return Promise.resolve() }
     }
     return api.upsertTransformRules(editingId, { drop_fields: dropFields, request_defaults: requestDefaults, inject_headers: injectHeaders, is_active: 1 })
-      .then(() => { transformForm.value.exists = true; toast.success('转换规则已保存') })
-      .catch((e) => toast.error(getApiMessage(e, '保存失败')))
+      .then(() => { transformForm.value.exists = true; toast.success(t('providers.transform.saved')) })
+      .catch((e) => toast.error(getApiMessage(e, t('common.saveFailed'))))
   }
 
   function handleDeleteTransformRules(editingId: string | null) {
@@ -61,9 +63,9 @@ export function useTransformRules() {
         transformForm.value.requestDefaultsInput = ''
         transformForm.value.injectHeadersInput = ''
         transformForm.value.exists = false
-        toast.success('转换规则已删除')
+        toast.success(t('providers.transform.deleted'))
       })
-      .catch((e) => toast.error(getApiMessage(e, '删除失败')))
+      .catch((e) => toast.error(getApiMessage(e, t('providers.transform.deleteFailed'))))
   }
 
   return { transformForm, loadTransformRules, saveTransformRules, handleDeleteTransformRules }

@@ -1,5 +1,6 @@
 import { ref, computed, onMounted } from "vue";
 import { toast } from "vue-sonner";
+import { useI18n } from "vue-i18n";
 import { api, getApiMessage } from "@/api/client";
 import type { Provider } from "@/types/mapping";
 
@@ -14,6 +15,7 @@ const PERIODS = [
 export type PeriodValue = (typeof PERIODS)[number]["value"];
 
 export function useLogFilters() {
+  const { t } = useI18n();
   const period = ref<PeriodValue>("5h");
   const dateRange = ref({ start: "", end: "" });
   const providerFilter = ref("all");
@@ -36,7 +38,7 @@ export function useLogFilters() {
   const dateRangeError = computed(() => {
     const { start, end } = dateRange.value;
     if (!start || !end) return "";
-    return start >= end ? "结束时间须晚于开始时间" : "";
+    return start >= end ? t('logs.validation.endTimeAfterStart') : "";
   });
 
   const filteredModelOptions = computed(() => {
@@ -93,7 +95,7 @@ export function useLogFilters() {
       providers.value = await api.getProviders();
     } catch (e: unknown) {
       console.error("Failed to load providers:", e);
-      toast.error(getApiMessage(e, "加载供应商列表失败"));
+      toast.error(getApiMessage(e, t('logs.messages.loadProvidersFailed')));
     }
   }
 
@@ -102,7 +104,7 @@ export function useLogFilters() {
       routerKeys.value = await api.getRouterKeys();
     } catch (e: unknown) {
       console.error("Failed to load router keys:", e);
-      toast.error(getApiMessage(e, "加载密钥列表失败"));
+      toast.error(getApiMessage(e, t('logs.messages.loadKeysFailed')));
     }
   }
 
