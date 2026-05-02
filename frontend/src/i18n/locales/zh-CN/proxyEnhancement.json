@@ -16,7 +16,9 @@
     "config": {
       "title": "配置方法",
       "description": "在 Claude Code 项目级或全局级目录下创建 Command 文件：",
-      "contentLabel": "文件内容："
+      "contentLabel": "文件内容：",
+      "pathProject": "# 项目级 .claude/commands/select-model.md",
+      "pathGlobal": "# 全局级 ~/.claude/commands/select-model.md"
     },
     "usage": {
       "title": "使用方法",

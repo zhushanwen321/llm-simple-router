@@ -16,7 +16,9 @@
     "config": {
       "title": "Configuration",
       "description": "Create a Command file in the Claude Code project or global directory:",
-      "contentLabel": "File content:"
+      "contentLabel": "File content:",
+      "pathProject": "# Project-level .claude/commands/select-model.md",
+      "pathGlobal": "# Global ~/.claude/commands/select-model.md"
     },
     "usage": {
       "title": "Usage",

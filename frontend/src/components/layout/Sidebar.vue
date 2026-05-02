@@ -177,7 +177,7 @@
         <AlertDialogHeader>
           <AlertDialogTitle>{{ t('sidebar.upgrade.confirmUpgrade', { version: upgradeStatus?.npm.latestVersion }) }}</AlertDialogTitle>
           <AlertDialogDescription>
-            将执行 <code class="bg-muted px-1 py-0.5 rounded text-xs">npm install -g llm-simple-router@{{ upgradeStatus?.npm.latestVersion }}</code>，升级完成后需要重启服务才能生效。
+            {{ t('sidebar.upgrade.upgradeDesc', { command: `npm install -g llm-simple-router@${upgradeStatus?.npm.latestVersion}` }) }}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

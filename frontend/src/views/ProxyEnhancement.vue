@@ -55,8 +55,8 @@
                     {{ t('proxyEnhancement.instructions.config.description') }}
                   </p>
                   <code class="block mt-1 px-3 py-2 bg-muted rounded text-xs font-mono whitespace-pre-wrap leading-relaxed">
-                    # 项目级 .claude/commands/select-model.md<br />
-                    # 全局级 ~/.claude/commands/select-model.md
+                    {{ t('proxyEnhancement.instructions.config.pathProject') }}<br />
+                    {{ t('proxyEnhancement.instructions.config.pathGlobal') }}
                   </code>
                   <p class="text-muted-foreground leading-relaxed mt-2">
                     {{ t('proxyEnhancement.instructions.config.contentLabel') }}
