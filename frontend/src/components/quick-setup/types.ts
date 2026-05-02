@@ -94,7 +94,6 @@ export function getDefaultContextWindow(modelName: string): number {
     m.includes('v3.2') ||         // DeepSeek V3.2
     m.includes('r1') ||           // DeepSeek R1
     m.includes('reasoner') ||     // OpenAI reasoner
-    m.includes('minimax-m2') ||   // MiniMax M2.x series
     m.includes('qwen3.6')         // Qwen 3.6 series
   ) return 1000000
   // Named context sizes
