@@ -194,7 +194,7 @@ const tagLabels: Record<string, string> = {
               <CascadingModelSelect
                 :providers="providerGroups"
                 :model-value="{ provider_id: target.provider_id, model: target.backend_model }"
-                placeholder="Select model..."
+                :placeholder="t('providers.shared.selectModel')"
                 @update:model-value="(v: SelectedValue) => updateTargetProvider(idx, tIdx, v)"
               />
             </div>

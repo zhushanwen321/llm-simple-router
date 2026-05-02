@@ -49,6 +49,7 @@
     "configSyncSuccess": "配置同步成功",
     "restartSent": "重启指令已发送，等待服务恢复...",
     "restartFailed": "重启失败",
-    "upgradeDesc": "将执行 {command}，升级完成后需要重启服务才能生效。"
+    "upgradeDescBefore": "将执行",
+    "upgradeDescAfter": "，升级完成后需要重启服务才能生效。"
   }
 }

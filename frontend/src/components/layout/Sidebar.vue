@@ -177,7 +177,7 @@
         <AlertDialogHeader>
           <AlertDialogTitle>{{ t('sidebar.upgrade.confirmUpgrade', { version: upgradeStatus?.npm.latestVersion }) }}</AlertDialogTitle>
           <AlertDialogDescription>
-            {{ t('sidebar.upgrade.upgradeDesc', { command: `npm install -g llm-simple-router@${upgradeStatus?.npm.latestVersion}` }) }}
+            {{ t('sidebar.upgrade.upgradeDescBefore') }} <code class="bg-muted px-1 py-0.5 rounded text-xs">npm install -g llm-simple-router@{{ upgradeStatus?.npm.latestVersion }}</code>{{ t('sidebar.upgrade.upgradeDescAfter') }}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -229,6 +229,7 @@ import {
   Zap,
   ChevronDown,
   Globe,
+  CalendarClock,
 } from 'lucide-vue-next'
 import { api, getApiMessage } from '@/api/client'
 import { Button } from '@/components/ui/button'
@@ -348,37 +349,37 @@ interface NavGroup {
 }
 
 // 与 router/index.ts 路由定义保持同步
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const navGroups = computed(() => {
   return [
-  {
-    items: [
-      { path: '/', label: t('sidebar.nav.dashboard'), icon: LayoutDashboard },
-    ],
-  },
-  {
-    label: t('sidebar.nav.agentConfig'),
-    expandable: true,
-    items: [
-      { path: '/quick-setup', label: t('sidebar.nav.quickSetup'), icon: Zap },
-      { path: '/providers', label: t('sidebar.nav.providers'), icon: Server },
-      { path: '/mappings', label: t('sidebar.nav.modelMappings'), icon: ArrowLeftRight },
-      { path: '/router-keys', label: t('sidebar.nav.routerKeys'), icon: KeyRound },
-      { path: '/retry-rules', label: t('sidebar.nav.retryRules'), icon: RefreshCcw },
-    ],
-  },
-  {
-    label: t('sidebar.nav.monitoring'),
-    items: [
-      { path: '/monitor', label: t('sidebar.nav.monitor'), icon: Activity },
-      { path: '/logs', label: t('sidebar.nav.logs'), icon: FileText },
-    ],
-  },
-  {
-    items: [
-      { path: '/settings', label: t('sidebar.nav.settings'), icon: Settings },
-    ],
-  },
+    {
+      items: [
+        { path: '/', label: t('sidebar.nav.dashboard'), icon: LayoutDashboard },
+      ],
+    },
+    {
+      label: t('sidebar.nav.agentConfig'),
+      expandable: true,
+      items: [
+        { path: '/quick-setup', label: t('sidebar.nav.quickSetup'), icon: Zap },
+        { path: '/providers', label: t('sidebar.nav.providers'), icon: Server },
+        { path: '/mappings', label: t('sidebar.nav.modelMappings'), icon: ArrowLeftRight },
+        { path: '/router-keys', label: t('sidebar.nav.routerKeys'), icon: KeyRound },
+        { path: '/retry-rules', label: t('sidebar.nav.retryRules'), icon: RefreshCcw },
+        { path: '/schedules', label: t('sidebar.nav.schedules'), icon: CalendarClock },
+      ],
+    },
+    {
+      label: t('sidebar.nav.monitoring'),
+      items: [
+        { path: '/monitor', label: t('sidebar.nav.monitor'), icon: Activity },
+        { path: '/logs', label: t('sidebar.nav.logs'), icon: FileText },
+      ],
+    },
+    {
+      items: [
+        { path: '/settings', label: t('sidebar.nav.settings'), icon: Settings },
+      ],
+    },
   ] as NavGroup[]
 })
 

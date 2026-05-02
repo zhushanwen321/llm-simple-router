@@ -117,7 +117,7 @@ export class RequestTracker {
   appendStreamChunk(
     id: string,
     rawLine: string,
-    apiType: "openai" | "anthropic",
+    apiType: "openai" | "openai-responses" | "anthropic",
     maxRaw: number,
     maxText: number,
   ): void {

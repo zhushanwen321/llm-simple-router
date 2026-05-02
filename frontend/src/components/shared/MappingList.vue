@@ -199,8 +199,8 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
           </Button>
           <Switch
             v-if="editable"
-            :checked="entry.active"
-            @update:checked="emit('toggle-active', idx)"
+            :model-value="entry.active"
+            @update:model-value="emit('toggle-active', idx)"
             class="scale-75 shrink-0"
             @click.stop
           />

@@ -18,6 +18,19 @@ export function maybeInjectModelInfoTag(
       bodyObj.content[0].text += `\n\n${buildModelInfoTag(effectiveModel)}`;
       return { body: JSON.stringify(bodyObj), meta: { model_info_tag_injected: true } };
     }
+    // Responses format: output[type=message].content[type=output_text].text
+    if (Array.isArray(bodyObj.output)) {
+      for (const item of bodyObj.output as Array<Record<string, unknown>>) {
+        if (item.type === "message" && Array.isArray(item.content)) {
+          for (const part of item.content as Array<Record<string, unknown>>) {
+            if (part.type === "output_text" && part.text) {
+              (part as Record<string, unknown>).text = (part.text as string) + `\n\n${buildModelInfoTag(effectiveModel)}`;
+              return { body: JSON.stringify(bodyObj), meta: { model_info_tag_injected: true } };
+            }
+          }
+        }
+      }
+    }
   } catch { /* non-JSON response, skip injection */ }
   return { body: responseBody, meta: { model_info_tag_injected: false } };
 }

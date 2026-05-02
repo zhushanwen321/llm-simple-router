@@ -76,9 +76,24 @@ export function countConsecutiveToolRounds(messages: Message[]): number {
  */
 export function applyToolRoundLimit(
   body: Record<string, unknown>,
-  apiType: "openai" | "anthropic",
+  apiType: "openai" | "openai-responses" | "anthropic",
   maxRounds: number = DEFAULT_MAX_ROUNDS,
 ): { body: Record<string, unknown>; injected: boolean; rounds: number } {
+  if (apiType === "openai-responses") {
+    const input = body.input as Array<Record<string, unknown>> | undefined;
+    if (!input || !Array.isArray(input)) return { body, injected: false, rounds: 0 };
+    const funcCalls = input.filter(i => i.type === "function_call").length;
+    if (funcCalls <= maxRounds) return { body, injected: false, rounds: funcCalls };
+    // Inject warning: append a user message to input
+    const cloned: Record<string, unknown> = { ...body, input: [...input] };
+    (cloned.input as Array<Record<string, unknown>>).push({
+      type: "message",
+      role: "user",
+      content: [{ type: "input_text", text: LOOP_WARNING_PROMPT }],
+    });
+    return { body: cloned, injected: true, rounds: funcCalls };
+  }
+
   const messages = (body.messages as Message[]) ?? [];
   if (messages.length === 0) return { body, injected: false, rounds: 0 };
 

@@ -65,7 +65,7 @@ export class MetricsExtractor {
   private toolUseStreamStartTime: number | null = null;
 
   constructor(
-    private apiType: "openai" | "anthropic",
+    private apiType: "openai" | "openai-responses" | "anthropic",
     private requestStartTime: number,
   ) {}
 
@@ -74,6 +74,8 @@ export class MetricsExtractor {
 
     if (this.apiType === "anthropic") {
       this.processAnthropicEvent(event);
+    } else if (this.apiType === "openai-responses") {
+      this.processResponsesEvent(event);
     } else {
       this.processOpenAIEvent(event);
     }
@@ -158,7 +160,7 @@ export class MetricsExtractor {
   }
 
   static fromNonStreamResponse(
-    apiType: "openai" | "anthropic",
+    apiType: "openai" | "openai-responses" | "anthropic",
     responseBody: string,
   ): MetricsResult | null {
     let parsed: Record<string, unknown>;
@@ -172,6 +174,44 @@ export class MetricsExtractor {
       return extractOpenAINonStream(parsed);
     }
     return extractAnthropicNonStream(parsed);
+  }
+
+  private processResponsesEvent(event: SSEEvent): void {
+    let obj: Record<string, unknown>;
+    try { obj = JSON.parse(event.data!) as Record<string, unknown>; } catch { return; }
+    const type = obj.type as string;
+
+    // Track first content for TTFT
+    const isContentDelta = type === "response.output_text.delta"
+      || type === "response.function_call_arguments.delta"
+      || type === "response.reasoning_summary_text.delta";
+
+    if (isContentDelta) {
+      const delta = (obj.delta as string) ?? "";
+      if (delta && !this.firstContentReceived) {
+        this.firstContentReceived = true;
+        this.ttftMs = Date.now() - this.requestStartTime;
+      }
+      this.textContentBuffer += delta;
+    }
+
+    // Track completion
+    if (type === "response.completed" || type === "response.incomplete") {
+      this.streamEndTime = Date.now();
+      this.complete = true;
+      const resp = obj.response as Record<string, unknown> | undefined;
+      if (resp) {
+        const usage = resp.usage as Record<string, number> | undefined;
+        if (usage) {
+          this.inputTokens = usage.input_tokens ?? null;
+          this.outputTokens = usage.output_tokens ?? null;
+        }
+        const status = resp.status as string;
+        if (status === "completed") this.stopReason = "end_turn";
+        else if (status === "incomplete") this.stopReason = "max_tokens";
+        else this.stopReason = "stop";
+      }
+    }
   }
 
   private processAnthropicEvent(event: SSEEvent): void {

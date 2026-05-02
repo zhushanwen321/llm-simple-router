@@ -42,7 +42,7 @@ export class ToolLoopGuard {
     return { detected: false };
   }
 
-  injectLoopBreakPrompt(body: Record<string, unknown>, apiType: "openai" | "anthropic", toolName: string): Record<string, unknown> {
+  injectLoopBreakPrompt(body: Record<string, unknown>, apiType: "openai" | "openai-responses" | "anthropic", toolName: string): Record<string, unknown> {
     const cloned = JSON.parse(JSON.stringify(body));
     const prompt = `[系统提醒] 检测到你可能陷入了反复调用 "${toolName}" 工具的循环。请停下来，总结当前进展，直接告知用户。`;
 
@@ -55,6 +55,15 @@ export class ToolLoopGuard {
       } else {
         cloned.system = [{ type: "text", text: prompt }];
       }
+    } else if (apiType === "openai-responses") {
+      // Append a user message to input items
+      const inputArr = Array.isArray(body.input) ? [...(body.input as Array<Record<string, unknown>>)] : [];
+      inputArr.push({
+        type: "message" as const,
+        role: "user" as const,
+        content: [{ type: "input_text", text: `[系统提醒] 检测到工具 "${toolName}" 可能陷入循环。请停止重复调用，总结当前进展。` }],
+      });
+      return { ...body, input: inputArr };
     } else {
       const messages = (cloned.messages as unknown[]) ?? [];
       messages.unshift({ role: "system", content: prompt });

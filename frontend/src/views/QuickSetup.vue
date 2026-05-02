@@ -54,13 +54,14 @@
           </div>
           <!-- Custom mode: show format + editable base url -->
           <template v-if="isCustomProvider">
-            <div class="w-28 space-y-1">
+            <div class="w-48 space-y-1">
               <Label class="text-xs text-muted-foreground">{{ t('quickSetup.provider.format') }}</Label>
               <Select v-model="apiType">
                 <SelectTrigger class="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="anthropic">Anthropic</SelectItem>
-                  <SelectItem value="openai">OpenAI</SelectItem>
+                  <SelectItem value="anthropic">Anthropic Messages</SelectItem>
+                  <SelectItem value="openai">OpenAI Chat Completions</SelectItem>
+                  <SelectItem value="openai-responses">OpenAI Responses</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -80,17 +81,18 @@
                 </SelectContent>
               </Select>
             </div>
-            <div class="w-28 space-y-1">
+            <div class="w-48 space-y-1">
               <Label class="text-xs text-muted-foreground">{{ t('quickSetup.provider.format') }}</Label>
               <Select v-model="apiType">
                 <SelectTrigger class="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="anthropic">Anthropic</SelectItem>
-                  <SelectItem value="openai">OpenAI</SelectItem>
+                  <SelectItem value="anthropic">Anthropic Messages</SelectItem>
+                  <SelectItem value="openai">OpenAI Chat Completions</SelectItem>
+                  <SelectItem value="openai-responses">OpenAI Responses</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div class="w-80 space-y-1">
+            <div class="w-72 space-y-1">
               <Label class="text-xs text-muted-foreground">Base URL</Label>
               <Input :model-value="baseUrl" readonly class="font-mono text-xs" />
             </div>
@@ -298,7 +300,7 @@
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
-import { useQuickSetup, type ConcurrencyMode } from '@/composables/useQuickSetup'
+import { useQuickSetup } from '@/composables/useQuickSetup'
 import ModelCard from '@/components/quick-setup/ModelCard.vue'
 import MappingList from '@/components/shared/MappingList.vue'
 import ConcurrencyControl from '@/components/shared/ConcurrencyControl.vue'

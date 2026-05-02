@@ -19,6 +19,7 @@ import { loadRecommendedConfig } from "./config/recommended.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { openaiProxy } from "./proxy/handler/openai.js";
 import { anthropicProxy } from "./proxy/handler/anthropic.js";
+import { responsesProxy } from "./proxy/handler/responses.js";
 import { adminRoutes } from "./admin/routes.js";
 import { RetryRuleMatcher } from "./proxy/orchestration/retry-rules.js";
 import { PluginRegistry } from "./proxy/transform/plugin-registry.js";
@@ -272,6 +273,7 @@ export async function buildApp(
   app.register(authMiddleware, { db });
   app.register(openaiProxy, { db, container });
   app.register(anthropicProxy, { db, container });
+  app.register(responsesProxy, { db, container });
 
   // StateRegistry — Admin 层通过此接口触发 proxy 层状态刷新，消除 admin→proxy 依赖
   const stateRegistry: StateRegistry = {

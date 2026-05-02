@@ -48,7 +48,7 @@ export interface TransportFnParams {
   cliHdrs: RawHeaders;
   reply: FastifyReply;
   upstreamPath: string;
-  apiType: "openai" | "anthropic";
+  apiType: "openai" | "openai-responses" | "anthropic";
   isStream: boolean;
   startTime: number;
   logId: string;

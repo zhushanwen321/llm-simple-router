@@ -76,7 +76,7 @@ export function applyProviderPatches(
 
   // DeepSeek 特定补丁
   if (needsDeepSeekPatch(body, provider)) {
-    applyDeepSeekPatches(ensureCloned(), provider.api_type as "openai" | "anthropic");
+    applyDeepSeekPatches(ensureCloned(), provider.api_type as "openai" | "openai-responses" | "anthropic");
     patches.push("deepseek");
   }
 

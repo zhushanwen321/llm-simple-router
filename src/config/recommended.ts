@@ -4,7 +4,7 @@ import path from 'path'
 export interface ProviderPreset {
   plan: string
   presetName: string
-  apiType: 'openai' | 'anthropic'
+  apiType: 'openai' | 'openai-responses' | 'anthropic'
   baseUrl: string
   models: string[]
 }

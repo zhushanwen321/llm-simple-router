@@ -49,6 +49,7 @@
     "configSyncSuccess": "Config synced successfully",
     "restartSent": "Restart command sent, waiting for service to recover...",
     "restartFailed": "Restart failed",
-    "upgradeDesc": "Will execute {command}. Service restart is required after upgrade."
+    "upgradeDescBefore": "Will execute",
+    "upgradeDescAfter": ". Service restart is required after upgrade."
   }
 }

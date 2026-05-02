@@ -16,6 +16,8 @@ export const PROXY_API_TYPES: Record<string, string> = {
   "/v1/chat/completions": "openai",
   "/v1/models": "openai",
   "/v1/messages": "anthropic",
+  "/v1/responses": "openai-responses",
+  "/responses": "openai-responses",
 };
 
 export function getProxyApiType(url: string): string | null {

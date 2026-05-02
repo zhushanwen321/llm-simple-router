@@ -143,6 +143,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from '@/components/ui/alert-dialog'
 import { Checkbox } from '@/components/ui/checkbox'
 
+const { t } = useI18n()
+
 interface RouterKey {
   id: string
   name: string
@@ -153,8 +155,6 @@ interface RouterKey {
   created_at: string
 }
 
-const { t } = useI18n()
-
 const DEFAULT_FORM = { name: '', allowed_models: [] as string[], is_active: true }
 
 const keys = ref<RouterKey[]>([])
@@ -164,6 +164,7 @@ const editingId = ref<string | null>(null)
 const deleteTarget = ref<RouterKey | null>(null)
 const form = ref({ ...DEFAULT_FORM, allowed_models: [] as string[] })
 const errors = ref<Record<string, string>>({})
+
 const { copied: tableCopied, copy: tableCopy } = useClipboard()
 
 function maskKey(key: string | null): string {

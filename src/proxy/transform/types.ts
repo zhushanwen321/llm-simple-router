@@ -1,5 +1,14 @@
 /** 格式转换方向 */
-export type TransformDirection = "openai-to-anthropic" | "anthropic-to-openai";
+export type TransformDirection =
+  // 现有
+  | "openai-to-anthropic" | "anthropic-to-openai"
+  // 一级：Responses ↔ Anthropic
+  | "openai-responses-to-anthropic" | "anthropic-to-openai-responses"
+  // 二级：Responses ↔ Chat
+  | "openai-to-openai-responses" | "openai-responses-to-openai";
+
+/** 所有支持的 API 格式类型 */
+export type ApiType = "openai" | "openai-responses" | "anthropic";
 
 // ---------- Anthropic Content Block 类型 ----------
 

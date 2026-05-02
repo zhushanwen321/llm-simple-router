@@ -32,7 +32,7 @@
           <TableRow v-for="p in providers" :key="p.id" :class="{ 'opacity-60': !p.is_active }">
             <TableCell class="font-medium">{{ p.name }}</TableCell>
             <TableCell>
-              <Badge variant="secondary">{{ p.api_type }}</Badge>
+              <Badge variant="secondary">{{ API_TYPE_LABELS[p.api_type] ?? p.api_type }}</Badge>
             </TableCell>
             <TableCell class="text-muted-foreground">{{ p.base_url }}</TableCell>
             <TableCell>
@@ -86,75 +86,90 @@
     </div>
     <!-- Create/Edit Dialog -->
     <Dialog v-model:open="dialogOpen">
-      <DialogContent>
+      <DialogContent class="sm:max-w-4xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{{ editingId ? t('providers.editProvider') : t('providers.addProvider') }}</DialogTitle>
         </DialogHeader>
-        <form @submit.prevent="handleSave" class="space-y-3">
-          <!-- 快速配置 -->
-          <div class="rounded-md border bg-muted/40 p-3 space-y-2">
-            <div class="text-xs font-medium text-muted-foreground">{{ t('providers.quickConfig.title') }}</div>
+        <form @submit.prevent="handleSave" class="space-y-4">
+          <!-- 模板选择 (仅新建模式) -->
+          <div v-if="!editingId" class="rounded-md border-2 border-primary/30 bg-primary/5 p-3 space-y-2">
+            <div class="flex items-center gap-1.5 text-xs font-semibold text-primary">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+              {{ t('providers.template.title') }}
+            </div>
             <div class="flex gap-2">
               <Select v-model="presetGroup" @update:model-value="onGroupChange">
-                <SelectTrigger class="flex-1">
-                  <SelectValue :placeholder="t('providers.quickConfig.selectProvider')" />
-                </SelectTrigger>
+                <SelectTrigger class="flex-1 border-primary/40"><SelectValue :placeholder="t('providers.template.selectProvider')" /></SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="__custom__">{{ t('providers.template.custom') }}</SelectItem>
                   <SelectItem v-for="g in providerPresets" :key="g.group" :value="g.group">{{ g.group }}</SelectItem>
                 </SelectContent>
               </Select>
-              <Select v-model="presetPlan" @update:model-value="onPresetChange" :disabled="!presetGroup">
-                <SelectTrigger class="flex-1">
-                  <SelectValue :placeholder="t('providers.quickConfig.selectPlan')" />
-                </SelectTrigger>
+              <Select v-if="presetGroup !== '__custom__'" v-model="presetPlan" @update:model-value="onPresetChange" :disabled="!presetGroup || presetGroup === '__custom__'">
+                <SelectTrigger class="flex-1 border-primary/40"><SelectValue :placeholder="t('providers.template.selectPlan')" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem v-for="p in availablePlans" :key="p.plan" :value="p.plan">{{ p.plan }}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
-          <div>
-            <Label class="block text-sm font-medium text-foreground mb-1">{{ t('providers.fields.name') }}</Label>
-            <Input v-model="form.name" type="text" required @input="delete errors.name" />
-            <p v-if="errors.name" class="text-sm text-destructive mt-1">{{ errors.name }}</p>
+
+          <!-- 未选模板提示 (仅新建模式) -->
+          <div v-if="!presetGroup && !editingId" class="flex flex-col items-center justify-center py-10 text-muted-foreground">
+            <svg class="w-10 h-10 mb-3 opacity-30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 12l2 2 4-4"/></svg>
+            <span class="text-sm">{{ t('providers.template.selectFirst') }}</span>
           </div>
-          <div>
-            <Label class="block text-sm font-medium text-foreground mb-1">{{ t('providers.fields.apiType') }}</Label>
-            <Select v-model="form.api_type">
-              <SelectTrigger>
-                <SelectValue :placeholder="t('providers.quickConfig.selectApiType')" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="openai">OpenAI</SelectItem>
-                <SelectItem value="anthropic">Anthropic</SelectItem>
-              </SelectContent>
-            </Select>
+
+          <template v-if="presetGroup || editingId">
+          <!-- 基本信息 2x2 -->
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <Label class="text-xs text-muted-foreground">{{ t('providers.fields.name') }}</Label>
+              <Input v-model="form.name" type="text" required class="mt-1" @input="delete errors.name" />
+              <p v-if="errors.name" class="text-xs text-destructive mt-0.5">{{ errors.name }}</p>
+            </div>
+            <div>
+              <Label class="text-xs text-muted-foreground">{{ t('providers.fields.apiType') }}</Label>
+              <Select v-model="form.api_type" class="mt-1">
+                <SelectTrigger><SelectValue :placeholder="t('common.pleaseSelect')" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="openai">OpenAI Chat Completions</SelectItem>
+                  <SelectItem value="openai-responses">OpenAI Responses</SelectItem>
+                  <SelectItem value="anthropic">Anthropic Messages</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label class="text-xs text-muted-foreground">{{ t('providers.fields.baseUrl') }}</Label>
+              <Input v-model="form.base_url" type="url" required class="mt-1 font-mono text-xs" @input="delete errors.base_url" />
+              <p v-if="errors.base_url" class="text-xs text-destructive mt-0.5">{{ errors.base_url }}</p>
+            </div>
+            <div>
+              <Label class="text-xs text-muted-foreground">{{ t('providers.fields.apiKey') }}</Label>
+              <Input v-model="form.api_key" type="text" :required="!editingId" :placeholder="editingId ? t('providers.fields.apiKeyPlaceholder') : ''" class="mt-1" @input="delete errors.api_key" />
+              <p v-if="errors.api_key" class="text-xs text-destructive mt-0.5">{{ errors.api_key }}</p>
+            </div>
           </div>
+
+          <!-- 可用模型 -->
           <div>
-            <Label class="block text-sm font-medium text-foreground mb-1">{{ t('providers.fields.baseUrl') }}</Label>
-            <Input v-model="form.base_url" type="url" required @input="delete errors.base_url" />
-            <p v-if="errors.base_url" class="text-sm text-destructive mt-1">{{ errors.base_url }}</p>
-          </div>
-          <div>
-            <Label class="block text-sm font-medium text-foreground mb-1">{{ t('providers.fields.apiKey') }}</Label>
-            <Input v-model="form.api_key" type="text" :required="!editingId" :placeholder="editingId ? t('providers.fields.apiKeyPlaceholder') : ''" @input="delete errors.api_key" />
-            <p v-if="errors.api_key" class="text-sm text-destructive mt-1">{{ errors.api_key }}</p>
-          </div>
-          <div>
-            <Label class="block text-sm font-medium text-foreground mb-1">{{ t('providers.fields.availableModels') }}</Label>
-            <div class="flex flex-wrap gap-1.5 mb-1.5">
-              <Badge v-for="(m, i) in form.models" :key="i" variant="secondary" class="gap-1 pr-1">
-                {{ m.name }}
-                <span class="text-muted-foreground">({{ formatContextWindow(m.context_window ?? DEFAULT_CONTEXT_WINDOW) }})</span>
-                <Button type="button" variant="ghost" size="icon" class="h-4 w-4 rounded-full hover:bg-muted p-0 text-xs leading-none" @click="removeModel(i)">&times;</Button>
-              </Badge>
+            <Label class="text-xs text-muted-foreground mb-2">{{ t('providers.fields.availableModels') }}</Label>
+            <div class="grid grid-cols-3 gap-2 mb-3">
+              <div v-for="(m, i) in form.models" :key="i">
+                <ModelCard
+                  :model="{ name: m.name, contextWindow: m.context_window ?? 200000, enabled: true, patches: m.patches ?? [] }"
+                  :api-type="form.api_type"
+                  :is-deep-seek="m.name.toLowerCase().includes('deepseek')"
+                  :is-non-openai-endpoint="!isOfficialOpenai(form.base_url)"
+                  @update:model="updateModel(i, $event)"
+                  @remove="removeModel(i)"
+                />
+              </div>
             </div>
             <div class="flex gap-2">
               <Input v-model="modelInput" :placeholder="t('providers.fields.modelInputPlaceholder')" @keydown.enter.prevent="addModel" class="flex-1" />
               <Select v-model="contextWindowSelect">
-                <SelectTrigger class="w-28">
-                  <SelectValue :placeholder="t('providers.fields.context')" />
-                </SelectTrigger>
+                <SelectTrigger class="w-28"><SelectValue :placeholder="t('providers.fields.context')" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem v-for="opt in CONTEXT_WINDOW_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</SelectItem>
                 </SelectContent>
@@ -162,55 +177,41 @@
               <Button type="button" variant="outline" size="sm" @click="addModel" :disabled="!modelInput.trim()">{{ t('providers.fields.addModel') }}</Button>
             </div>
           </div>
-          <!-- 并发控制 -->
-          <div class="border-t pt-4 mt-4">
-            <div class="text-sm font-medium text-foreground mb-3">{{ t('providers.concurrency.title') }}</div>
-            <div class="space-y-3">
-              <div>
-                <Label class="block text-sm font-medium text-foreground mb-1">{{ t('providers.concurrency.mode') }}</Label>
-                <Select v-model="concurrencyMode" @update:model-value="(v: unknown) => onConcurrencyModeChange(v as 'auto' | 'manual' | 'none')">
-                  <SelectTrigger>
-                    <SelectValue :placeholder="t('providers.concurrency.selectMode')" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="auto">{{ t('providers.concurrency.autoAdaptive') }}</SelectItem>
-                    <SelectItem value="manual">{{ t('providers.concurrency.manual') }}</SelectItem>
-                    <SelectItem value="none">{{ t('providers.concurrency.none') }}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div v-if="concurrencyMode !== 'none'" class="space-y-2">
-                <div>
-                  <Label class="block text-sm font-medium text-foreground mb-1">{{ t('providers.concurrency.maxConcurrency') }}</Label>
-                  <Input v-model.number="form.max_concurrency" type="number" min="1" :max="MAX_CONCURRENCY" :placeholder="concurrencyMode === 'auto' ? '10' : '3'" @input="delete errors.max_concurrency" />
-                  <p v-if="errors.max_concurrency" class="text-sm text-destructive mt-1">{{ errors.max_concurrency }}</p>
-                </div>
-                <div>
-                  <Label class="block text-sm font-medium text-foreground mb-1">{{ t('providers.concurrency.queueTimeout') }}</Label>
-                  <Input v-model.number="form.queue_timeout_ms" type="number" min="0" :placeholder="t('providers.concurrency.queueTimeoutPlaceholder')" @input="delete errors.queue_timeout_ms" />
-                  <p v-if="errors.queue_timeout_ms" class="text-sm text-destructive mt-1">{{ errors.queue_timeout_ms }}</p>
-                </div>
-                <div>
-                  <Label class="block text-sm font-medium text-foreground mb-1">{{ t('providers.concurrency.maxQueueSize') }}</Label>
-                  <Input v-model.number="form.max_queue_size" type="number" min="1" :max="MAX_QUEUE_SIZE" :placeholder="DEFAULT_QUEUE_SIZE" @input="delete errors.max_queue_size" />
-                  <p v-if="errors.max_queue_size" class="text-sm text-destructive mt-1">{{ errors.max_queue_size }}</p>
-                </div>
-              </div>
+
+          <!-- 并发控制 + 转换规则 2 columns -->
+          <div class="grid grid-cols-2 gap-4">
+            <!-- 并发控制 -->
+            <div class="border rounded-md p-3 space-y-3">
+              <div class="text-xs font-medium text-muted-foreground">{{ t('providers.concurrency.title') }}</div>
+              <ConcurrencyControl
+                :mode="concurrencyMode"
+                :max-concurrency="form.max_concurrency"
+                :queue-timeout-ms="form.queue_timeout_ms"
+                :max-queue-size="form.max_queue_size"
+                compact
+                @update:mode="(v: unknown) => onConcurrencyModeChange(v as 'auto' | 'manual' | 'none')"
+                @update:max-concurrency="form.max_concurrency = $event"
+                @update:queue-timeout-ms="form.queue_timeout_ms = $event"
+                @update:max-queue-size="form.max_queue_size = $event"
+              />
+            </div>
+
+            <!-- 转换规则 -->
+            <div class="border rounded-md p-3 space-y-3">
+              <div class="text-xs font-medium text-muted-foreground">{{ t('providers.transform.title') }}</div>
+              <TransformRulesForm
+                :inject-headers="transformForm.injectHeadersInput"
+                :drop-fields="transformForm.dropFieldsInput"
+                :request-defaults="transformForm.requestDefaultsInput"
+                @update:inject-headers="transformForm.injectHeadersInput = $event"
+                @update:drop-fields="transformForm.dropFieldsInput = $event"
+                @update:request-defaults="transformForm.requestDefaultsInput = $event"
+              />
             </div>
           </div>
-          <!-- 转换规则面板（仅在编辑现有 Provider 时显示） -->
-          <Collapsible v-if="editingId" v-model:open="transformOpen" class="border rounded-md p-3 mt-2">
-            <CollapsibleTrigger class="flex items-center justify-between w-full text-sm font-medium text-foreground">
-              {{ t('providers.transform.title') }}
-              <ChevronDown class="w-4 h-4 transition-transform" :class="transformOpen ? 'rotate-180' : ''" />
-            </CollapsibleTrigger>
-            <CollapsibleContent class="mt-3 space-y-3">
-              <div><Label class="text-xs text-muted-foreground">{{ t('providers.transform.injectHeaders') }}</Label><Input v-model="transformForm.injectHeadersInput" placeholder='{"x-custom": "value"}' class="mt-1" /></div>
-              <div><Label class="text-xs text-muted-foreground">{{ t('providers.transform.dropFields') }}</Label><Input v-model="transformForm.dropFieldsInput" placeholder="logprobs, frequency_penalty" class="mt-1" /></div>
-              <div><Label class="text-xs text-muted-foreground">{{ t('providers.transform.requestDefaults') }}</Label><Input v-model="transformForm.requestDefaultsInput" placeholder='{"max_tokens": 4096}' class="mt-1" /></div>
-              <div class="flex gap-2"><Button type="button" variant="outline" size="sm" @click="saveTransformRules(editingId!)">{{ t('providers.transform.saveRules') }}</Button><Button type="button" variant="ghost" size="sm" @click="handleDeleteTransformRules(editingId!)" v-if="transformForm.exists">{{ t('providers.transform.deleteRules') }}</Button></div>
-            </CollapsibleContent>
-          </Collapsible>
+
+          </template>
+
           <DialogFooter>
             <Button type="button" variant="outline" @click="dialogOpen = false">{{ t('common.cancel') }}</Button>
             <Button type="submit">{{ t('common.save') }}</Button>
@@ -259,7 +260,7 @@ import { toast } from 'vue-sonner'
 import * as z from 'zod'
 import { api, getApiMessage, type ProviderPayload, type ProviderGroup } from '@/api/client'
 import type { Provider, ModelInfo } from '@/types/mapping'
-import { DEFAULT_CONTEXT_WINDOW } from '@/constants'
+import { DEFAULT_CONTEXT_WINDOW, getDefaultContextWindow } from '@/constants'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -268,8 +269,11 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { ChevronDown, RotateCw, Copy, Check } from 'lucide-vue-next'
+import { RotateCw, Copy, Check } from 'lucide-vue-next'
+import ConcurrencyControl from '@/components/shared/ConcurrencyControl.vue'
+import TransformRulesForm from '@/components/shared/TransformRulesForm.vue'
+import ModelCard from '@/components/quick-setup/ModelCard.vue'
+import type { ModelConfig } from '@/components/quick-setup/types'
 import { useTransformRules } from '@/composables/useTransformRules'
 const DEFAULT_CONCURRENCY = 3
 const DEFAULT_CONCURRENCY_AUTO = 10
@@ -290,6 +294,7 @@ const CONTEXT_WINDOW_OPTIONS = [
   { label: '256K', value: '256000' },
   { label: '1M', value: '1000000' },
 ] as const
+const API_TYPE_LABELS: Record<string, string> = { openai: 'OpenAI Chat Completions', 'openai-responses': 'OpenAI Responses', anthropic: 'Anthropic Messages' }
 const DEFAULT_FORM = { name: '', api_type: 'anthropic', base_url: '', api_key: '', models: [] as ModelInfo[], is_active: true, max_concurrency: DEFAULT_CONCURRENCY_AUTO, queue_timeout_ms: DEFAULT_QUEUE_TIMEOUT_MS, max_queue_size: DEFAULT_QUEUE_SIZE, adaptive_enabled: true }
 const modelInput = ref('')
 const modelContextWindow = ref(DEFAULT_CONTEXT_WINDOW)
@@ -311,9 +316,8 @@ const errors = ref<Record<string, string>>({})
 type ConcurrencyMode = 'auto' | 'manual' | 'none'
 const concurrencyMode = ref<ConcurrencyMode>('auto')
 // Transform rules state
-const transformOpen = ref(false)
 const { t } = useI18n()
-const { transformForm, loadTransformRules, saveTransformRules, handleDeleteTransformRules } = useTransformRules()
+const { transformForm, loadTransformRules, saveTransformRules } = useTransformRules()
 const copiedId = ref<string | null>(null)
 const reloading = ref(false)
 const MASK_VISIBLE_LEN = 7, MASK_ASTERISK_COUNT = 7, COPY_FEEDBACK_MS = 2000
@@ -362,6 +366,14 @@ const availablePlans = computed(() => {
   return providerPresets.value.find(g => g.group === presetGroup.value)?.presets ?? []
 })
 function onGroupChange() {
+  if (presetGroup.value === '__custom__') {
+    presetPlan.value = ''
+    form.value.name = ''
+    form.value.api_type = 'openai'
+    form.value.base_url = ''
+    form.value.models = []
+    return
+  }
   const plans = providerPresets.value.find(g => g.group === presetGroup.value)?.presets
   if (plans?.length) {
     presetPlan.value = plans[0].plan
@@ -378,8 +390,8 @@ function onPresetChange() {
   form.value.base_url = preset.baseUrl
   form.value.models = preset.models.map(name => ({
     name,
-    context_window: DEFAULT_CONTEXT_WINDOW,
-    patches: [],
+    context_window: getDefaultContextWindow(name),
+    patches: getDefaultPatches(name, preset.apiType),
   }))
 }
 async function loadProviders() {
@@ -405,6 +417,27 @@ function addModel() {
 }
 function removeModel(index: number) {
   form.value.models.splice(index, 1)
+}
+
+function isOfficialOpenai(url: string): boolean {
+  return url.includes('api.openai.com')
+}
+
+function updateModel(index: number, updated: ModelConfig) {
+  form.value.models[index].context_window = updated.contextWindow
+  form.value.models[index].patches = updated.patches
+}
+
+function getDefaultPatches(modelName: string, apiType: string): string[] {
+  const patches: string[] = []
+  if (modelName.toLowerCase().includes('deepseek')) {
+    if (apiType === 'anthropic') {
+      patches.push('thinking-param', 'cache-control', 'thinking-blocks', 'orphan-tool-results')
+    } else {
+      patches.push('non-ds-tools', 'orphan-tool-results-oa')
+    }
+  }
+  return patches
 }
 
 function onConcurrencyModeChange(mode: ConcurrencyMode) {
@@ -455,7 +488,7 @@ function buildPayload(): ProviderFormPayload {
     name: form.value.name,
     api_type: form.value.api_type,
     base_url: form.value.base_url,
-    models: form.value.models.map(m => ({ name: m.name, context_window: m.context_window ?? undefined, patches: m.patches ?? [] })),
+    models: form.value.models.map(m => ({ name: m.name, context_window: m.context_window ?? undefined, patches: m.patches ?? undefined })),
     is_active: form.value.is_active ? 1 : 0,
     max_concurrency: concurrencyMode.value === 'none' ? 0 : form.value.max_concurrency,
     queue_timeout_ms: concurrencyMode.value === 'none' ? 0 : form.value.queue_timeout_ms,
@@ -470,12 +503,16 @@ async function handleSave() {
   try {
     const payload = buildPayload()
     payload.name = form.value.name.trim()
+    let providerId = editingId.value
     if (editingId.value) {
       await api.updateProvider(editingId.value, payload)
     } else {
       payload.api_key = form.value.api_key
-      await api.createProvider(payload)
+      const result = await api.createProvider(payload)
+      providerId = result.id
     }
+    // Save transform rules along with the provider
+    await saveTransformRules(providerId)
     dialogOpen.value = false
     await loadProviders()
   } catch (e: unknown) {
@@ -528,7 +565,6 @@ async function handleDelete() {
     await api.deleteProvider(target.id)
     await loadProviders()
   } catch (e: unknown) {
-    console.error('Failed to delete provider:', e)
     toast.error(getApiMessage(e, t('providers.toast.deleteFailed')))
   }
 }

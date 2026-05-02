@@ -74,7 +74,7 @@ export class ProxyOrchestrator {
   async handle(
     request: FastifyRequest,
     reply: FastifyReply,
-    apiType: "openai" | "anthropic",
+    apiType: "openai" | "openai-responses" | "anthropic",
     config: OrchestratorConfig,
     ctx?: HandleContext,
   ): Promise<ResilienceResult> {
@@ -124,7 +124,7 @@ export class ProxyOrchestrator {
   private buildActiveRequest(
     request: FastifyRequest,
     config: OrchestratorConfig,
-    apiType: "openai" | "anthropic",
+    apiType: "openai" | "openai-responses" | "anthropic",
   ): ActiveRequest {
     return {
       id: config.trackerId ?? crypto.randomUUID(),

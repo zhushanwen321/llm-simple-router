@@ -115,7 +115,7 @@ export function buildUpstreamHeaders(
   clientHeaders: RawHeaders,
   apiKey: string,
   payloadBytes?: number,
-  apiType?: "openai" | "anthropic"
+  apiType?: "openai" | "openai-responses" | "anthropic"
 ): Record<string, string> {
   const headers = selectHeaders(clientHeaders, SKIP_UPSTREAM);
   if (apiType === "anthropic") {
