@@ -1,32 +1,27 @@
 <template>
-  <div class="p-6">
-    <Card>
-      <CardContent class="pt-4">
-        <!-- Add mapping row -->
-        <div class="flex items-end gap-2 mb-4">
-          <div class="flex-1 space-y-1">
-            <Label class="text-xs text-muted-foreground">客户端模型</Label>
-            <Input v-model="newFrom" placeholder="例如: sonnet, gpt-5.1" class="font-mono text-xs" @keydown.enter.prevent="addNewMapping" />
-          </div>
-          <div class="flex-1 space-y-1">
-            <Label class="text-xs text-muted-foreground">目标模型</Label>
-            <Input v-model="newTo" placeholder="例如: deepseek-chat" class="font-mono text-xs" @keydown.enter.prevent="addNewMapping" />
-          </div>
-          <Button size="sm" variant="outline" class="shrink-0" :disabled="!canAdd" @click="addNewMapping">添加</Button>
+  <div class="p-6 space-y-4">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+      <div>
+        <h2 class="text-lg font-semibold text-foreground">模型映射</h2>
+        <div class="flex gap-2 mt-1">
+          <span class="text-[11px] px-2 py-0.5 rounded-full bg-muted/40 text-muted-foreground">{{ groups.length }} 条映射</span>
+          <span class="text-[11px] px-2 py-0.5 rounded-full bg-muted/40 text-muted-foreground">{{ activeCount }} 启用</span>
         </div>
+      </div>
+    </div>
 
-        <!-- Mapping list -->
-        <MappingEditor
-          :entries="entries"
-          :provider-groups="providerGroups"
-          :show-delete="true"
-          :show-add-form="false"
-          @update:targets="updateTargets"
-          @toggle-active="toggleActive"
-          @remove="removeMapping"
-        />
-      </CardContent>
-    </Card>
+    <!-- Mapping List -->
+    <MappingList
+      :entries="entries"
+      :provider-groups="providerGroups"
+      :show-delete="true"
+      :show-add-form="true"
+      @update:targets="updateTargets"
+      @toggle-active="toggleActive"
+      @remove="removeMapping"
+      @add="addNewMapping"
+    />
 
     <!-- Delete Confirm -->
     <AlertDialog :open="!!deleteTarget" @update:open="(val: boolean) => { if (!val) deleteTarget = null }">
@@ -49,25 +44,18 @@ import { ref, computed, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
 import { api, getApiMessage } from '@/api/client'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from '@/components/ui/alert-dialog'
-import MappingEditor from '@/components/shared/MappingEditor.vue'
+import MappingList from '@/components/shared/MappingList.vue'
 import type { MappingEntry, MappingTarget } from '@/components/quick-setup/types'
 import type { ProviderGroup } from '@/components/mappings/cascading-types'
 import type { MappingGroup, Provider, Rule } from '@/types/mapping'
 import { DEFAULT_CONTEXT_WINDOW } from '@/constants'
 
-// --- State ---
 const groups = ref<MappingGroup[]>([])
 const providersList = ref<Provider[]>([])
-const newFrom = ref('')
-const newTo = ref('')
 const deleteTarget = ref<MappingEntry | null>(null)
 
-// --- Computed ---
-const canAdd = computed(() => newFrom.value.trim().length > 0 && newTo.value.trim().length > 0)
+const activeCount = computed(() => groups.value.filter(g => g.is_active).length)
 
 const providerGroups = computed<ProviderGroup[]>(() =>
   providersList.value.map(p => ({
@@ -104,7 +92,6 @@ const entries = computed<MappingEntry[]>(() =>
   })
 )
 
-// --- Data loading ---
 async function loadData() {
   const results = await Promise.allSettled([
     api.getMappingGroups(),
@@ -114,7 +101,6 @@ async function loadData() {
   if (results[1].status === 'fulfilled') providersList.value = results[1].value as Provider[]
 }
 
-// --- Actions ---
 function updateTargets(index: number, targets: MappingTarget[]) {
   const entry = entries.value[index]
   if (!entry?.existingId) return
@@ -155,19 +141,13 @@ async function handleDelete() {
   }
 }
 
-async function addNewMapping() {
-  const from = newFrom.value.trim()
-  const to = newTo.value.trim()
-  if (!from || !to) return
-
+async function addNewMapping(clientModel: string, targetModel: string) {
   const firstProvider = providersList.value[0]
   const ruleJson = JSON.stringify({
-    targets: [{ backend_model: to, provider_id: firstProvider?.id ?? '' }],
+    targets: [{ backend_model: targetModel, provider_id: firstProvider?.id ?? '' }],
   })
   try {
-    await api.createMappingGroup({ client_model: from, rule: ruleJson })
-    newFrom.value = ''
-    newTo.value = ''
+    await api.createMappingGroup({ client_model: clientModel, rule: ruleJson })
     await loadData()
   } catch (e: unknown) {
     toast.error(getApiMessage(e, '创建映射失败'))

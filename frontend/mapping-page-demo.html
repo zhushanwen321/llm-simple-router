@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>模型映射 - Demo</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600&display=swap');
+  body { font-family: 'Inter', sans-serif; background: #09090b; color: #fafafa; }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+
+  .mapping-row {
+    padding: 14px 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    transition: background 0.15s;
+  }
+  .mapping-row:hover { background: rgba(255,255,255,0.02); }
+  .mapping-row:last-child { border-bottom: none; }
+  .mapping-row.inactive { opacity: 0.4; }
+
+  /* 固定宽度对齐 */
+  .col-client { width: 100px; flex-shrink: 0; }
+  .col-arrow { width: 20px; flex-shrink: 0; text-align: center; }
+  .col-chain { flex: 1; min-width: 0; }
+
+  .chain-node {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px;
+    border-radius: 5px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  .chain-node.primary {
+    background: rgba(99,102,241,0.12);
+    border: 1px solid rgba(99,102,241,0.25);
+    color: #a5b4fc;
+  }
+  .chain-node.failover {
+    background: rgba(251,146,60,0.08);
+    border: 1px solid rgba(251,146,60,0.18);
+    color: #fdba74;
+  }
+  .chain-node.overflow {
+    background: rgba(56,189,248,0.08);
+    border: 1px solid rgba(56,189,248,0.18);
+    color: #7dd3fc;
+  }
+
+  .chain-connector {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 3px;
+    color: rgba(255,255,255,0.15);
+  }
+
+  .provider-tag {
+    font-size: 10px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.05);
+    color: rgba(255,255,255,0.35);
+  }
+
+  /* chain wrap line */
+  .chain-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+  }
+  .chain-line {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding-left: 120px; /* client width + arrow + gap */
+  }
+
+  .overflow-line {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding-left: 120px;
+    margin-top: 6px;
+    border-top: 1px dashed rgba(56,189,248,0.12);
+    padding-top: 6px;
+  }
+
+  .switch-track {
+    width: 28px; height: 16px;
+    border-radius: 999px;
+    position: relative;
+    cursor: pointer;
+    transition: background 0.2s;
+    flex-shrink: 0;
+  }
+  .switch-track.on { background: #6366f1; }
+  .switch-track.off { background: rgba(255,255,255,0.1); }
+  .switch-thumb {
+    position: absolute; top: 2px;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: white;
+    transition: left 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  }
+  .switch-track.on .switch-thumb { left: 14px; }
+  .switch-track.off .switch-thumb { left: 2px; }
+
+  .btn-ghost {
+    padding: 3px 6px;
+    border-radius: 5px;
+    font-size: 11px;
+    color: rgba(255,255,255,0.4);
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    transition: all 0.15s;
+  }
+  .btn-ghost:hover { color: #fff; background: rgba(255,255,255,0.06); }
+  .btn-ghost.danger:hover { color: #f87171; }
+
+  .stat-pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 999px;
+    font-size: 11px;
+    background: rgba(255,255,255,0.04);
+    color: rgba(255,255,255,0.4);
+  }
+
+  .add-panel {
+    background: rgba(99,102,241,0.03);
+    border: 1px dashed rgba(99,102,241,0.2);
+    border-radius: 10px;
+    padding: 14px 20px;
+  }
+  .add-input {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 6px;
+    padding: 5px 10px;
+    color: #fafafa;
+    font-size: 12px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .add-input:focus { border-color: rgba(99,102,241,0.4); }
+  .add-input::placeholder { color: rgba(255,255,255,0.15); }
+  .add-btn {
+    padding: 5px 14px;
+    border-radius: 6px;
+    background: #6366f1;
+    color: white;
+    font-size: 12px;
+    font-weight: 500;
+    border: none;
+    cursor: pointer;
+  }
+  .add-btn:hover { background: #5558e6; }
+
+  .actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    margin-left: auto;
+  }
+
+  .failover-label {
+    font-size: 10px;
+    color: rgba(251,146,60,0.5);
+    flex-shrink: 0;
+  }
+  .disabled-label {
+    font-size: 10px;
+    color: rgba(255,255,255,0.15);
+  }
+</style>
+</head>
+<body class="p-8">
+<div class="max-w-5xl mx-auto space-y-5">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <div>
+      <h2 class="text-lg font-semibold text-white">模型映射</h2>
+      <div class="flex gap-2 mt-1.5">
+        <span class="stat-pill">6 条映射</span>
+        <span class="stat-pill">5 启用</span>
+        <span class="stat-pill">3 供应商</span>
+      </div>
+    </div>
+    <button class="add-btn flex items-center gap-1.5" onclick="document.getElementById('addPanel').classList.toggle('hidden')">
+      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M6.5 1.5v10M1.5 6.5h10"/></svg>
+      添加映射
+    </button>
+  </div>
+
+  <!-- Add Panel -->
+  <div id="addPanel" class="add-panel hidden">
+    <div class="flex items-center gap-3">
+      <div class="flex-1">
+        <div class="text-[10px] text-white/30 mb-1">客户端模型</div>
+        <input class="add-input mono w-full" placeholder="例如 sonnet, gpt-5.1">
+      </div>
+      <svg width="14" height="14" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1.5" class="mt-4"><path d="M1 7h12M10 3l3 4-3 4"/></svg>
+      <div class="flex-1">
+        <div class="text-[10px] text-white/30 mb-1">目标模型</div>
+        <input class="add-input mono w-full" placeholder="例如 deepseek-chat">
+      </div>
+      <button class="add-btn mt-4">添加</button>
+    </div>
+  </div>
+
+  <!-- Mapping List -->
+  <div class="rounded-xl border border-white/[0.06] bg-white/[0.01] overflow-hidden">
+
+    <!-- Row 1: Single target -->
+    <div class="mapping-row">
+      <div class="flex items-center">
+        <div class="col-client mono text-sm font-medium text-white/90">sonnet</div>
+        <div class="col-arrow"><svg width="12" height="12" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1.5"><path d="M2 6h8M8 3l3 3-3 3"/></svg></div>
+        <div class="col-chain">
+          <div class="chain-wrap">
+            <span class="chain-node primary mono">deepseek-r1-0528 <span class="provider-tag">DeepSeek</span></span>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="btn-ghost">编辑</button>
+          <button class="btn-ghost danger">删除</button>
+          <div class="switch-track on" onclick="this.classList.toggle('on');this.classList.toggle('off')"><div class="switch-thumb"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 2: 2-level failover -->
+    <div class="mapping-row">
+      <div class="flex items-center">
+        <div class="col-client mono text-sm font-medium text-white/90">opus</div>
+        <div class="col-arrow"><svg width="12" height="12" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1.5"><path d="M2 6h8M8 3l3 3-3 3"/></svg></div>
+        <div class="col-chain">
+          <div class="chain-wrap">
+            <span class="chain-node primary mono">deepseek-r1-0528 <span class="provider-tag">DeepSeek</span></span>
+            <span class="chain-connector"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 1v7M1 4l3 3 3-3" stroke-dasharray="2 2"/></svg></span>
+            <span class="chain-node failover mono">qwen3-235b <span class="provider-tag">阿里云</span></span>
+          </div>
+        </div>
+        <div class="actions">
+          <span class="failover-label">2级</span>
+          <button class="btn-ghost">编辑</button>
+          <button class="btn-ghost danger">删除</button>
+          <div class="switch-track on" onclick="this.classList.toggle('on');this.classList.toggle('off')"><div class="switch-thumb"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 3: 3-level failover + overflow (wraps to 2 lines) -->
+    <div class="mapping-row">
+      <div class="flex items-center">
+        <div class="col-client mono text-sm font-medium text-white/90">haiku</div>
+        <div class="col-arrow"><svg width="12" height="12" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1.5"><path d="M2 6h8M8 3l3 3-3 3"/></svg></div>
+        <div class="col-chain">
+          <div class="chain-wrap">
+            <span class="chain-node primary mono">deepseek-v4-flash <span class="provider-tag">DeepSeek</span></span>
+            <span class="chain-connector"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 1v7M1 4l3 3 3-3" stroke-dasharray="2 2"/></svg></span>
+            <span class="chain-node failover mono">glm-4-flash <span class="provider-tag">智谱</span></span>
+            <br>
+            <span class="chain-connector"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 1v7M1 4l3 3 3-3" stroke-dasharray="2 2"/></svg></span>
+            <span class="chain-node failover mono">qwen3-30b-a3b <span class="provider-tag">阿里云</span></span>
+          </div>
+        </div>
+        <div class="actions">
+          <span class="failover-label">3级</span>
+          <button class="btn-ghost">编辑</button>
+          <button class="btn-ghost danger">删除</button>
+          <div class="switch-track on" onclick="this.classList.toggle('on');this.classList.toggle('off')"><div class="switch-thumb"></div></div>
+        </div>
+      </div>
+      <!-- Overflow -->
+      <div class="overflow-line">
+        <svg width="10" height="10" fill="none" stroke="rgba(56,189,248,0.35)" stroke-width="1.5"><path d="M5 1v6M2 4l3 3 3-3" stroke-dasharray="1 1"/></svg>
+        <span style="font-size:10px;color:rgba(56,189,248,0.4)">溢出</span>
+        <span class="chain-node overflow mono" style="font-size:11px">deepseek-v4-pro <span class="provider-tag" style="background:rgba(56,189,248,0.06);color:rgba(56,189,248,0.35)">DeepSeek</span></span>
+      </div>
+    </div>
+
+    <!-- Row 4 -->
+    <div class="mapping-row">
+      <div class="flex items-center">
+        <div class="col-client mono text-sm font-medium text-white/90">gpt-5.1</div>
+        <div class="col-arrow"><svg width="12" height="12" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1.5"><path d="M2 6h8M8 3l3 3-3 3"/></svg></div>
+        <div class="col-chain">
+          <div class="chain-wrap">
+            <span class="chain-node primary mono">deepseek-v4-pro <span class="provider-tag">DeepSeek</span></span>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="btn-ghost">编辑</button>
+          <button class="btn-ghost danger">删除</button>
+          <div class="switch-track on" onclick="this.classList.toggle('on');this.classList.toggle('off')"><div class="switch-thumb"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 5 -->
+    <div class="mapping-row">
+      <div class="flex items-center">
+        <div class="col-client mono text-sm font-medium text-white/90">gpt-4.1</div>
+        <div class="col-arrow"><svg width="12" height="12" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1.5"><path d="M2 6h8M8 3l3 3-3 3"/></svg></div>
+        <div class="col-chain">
+          <div class="chain-wrap">
+            <span class="chain-node primary mono">qwen3-235b-a22b <span class="provider-tag">阿里云</span></span>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="btn-ghost">编辑</button>
+          <button class="btn-ghost danger">删除</button>
+          <div class="switch-track on" onclick="this.classList.toggle('on');this.classList.toggle('off')"><div class="switch-thumb"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 6: Disabled -->
+    <div class="mapping-row inactive">
+      <div class="flex items-center">
+        <div class="col-client mono text-sm font-medium text-white/90">o3</div>
+        <div class="col-arrow"><svg width="12" height="12" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1.5"><path d="M2 6h8M8 3l3 3-3 3"/></svg></div>
+        <div class="col-chain">
+          <div class="chain-wrap">
+            <span class="chain-node primary mono">glm-4-flash <span class="provider-tag">智谱</span></span>
+          </div>
+        </div>
+        <div class="actions">
+          <span class="disabled-label">已禁用</span>
+          <button class="btn-ghost">编辑</button>
+          <button class="btn-ghost danger">删除</button>
+          <div class="switch-track off" onclick="this.classList.toggle('on');this.classList.toggle('off');this.closest('.mapping-row').classList.toggle('inactive')"><div class="switch-thumb"></div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>

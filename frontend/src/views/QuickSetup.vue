@@ -173,9 +173,11 @@
           </div>
         </CardHeader>
         <CardContent>
-          <MappingEditor
+          <MappingList
             :entries="mappingEntries"
             :provider-groups="allProviderGroups"
+            :show-delete="false"
+            :show-add-form="true"
             @update:targets="updateMappingTargets"
             @toggle-active="toggleMappingActive"
             @add="addMappingEntry"
@@ -297,7 +299,7 @@ import { ref, computed } from 'vue'
 import { toast } from 'vue-sonner'
 import { useQuickSetup, type ConcurrencyMode } from '@/composables/useQuickSetup'
 import ModelCard from '@/components/quick-setup/ModelCard.vue'
-import MappingEditor from '@/components/shared/MappingEditor.vue'
+import MappingList from '@/components/shared/MappingList.vue'
 import ConcurrencyControl from '@/components/shared/ConcurrencyControl.vue'
 import TransformRulesForm from '@/components/shared/TransformRulesForm.vue'
 import type { ModelConfig } from '@/components/quick-setup/types'
