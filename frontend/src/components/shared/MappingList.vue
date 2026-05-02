@@ -189,7 +189,7 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
           <Badge v-if="entry.targets.length > 1" variant="outline" class="text-[11px] px-1.5 py-0 border-border text-muted-foreground/50 shrink-0">
             {{ entry.targets.length }}级
           </Badge>
-          <span v-if="!entry.active" class="text-xs text-muted-foreground/30 shrink-0">已禁用</span>
+          <span v-if="!editable" class="text-[11px] shrink-0" :class="entry.active ? 'text-emerald-400/60' : 'text-muted-foreground/30'">{{ entry.active ? '启用' : '已禁用' }}</span>
           <Button v-if="showDelete && editable" variant="ghost" size="icon-xs" class="text-muted-foreground/40 hover:text-destructive shrink-0" @click.stop="emit('remove', entry.clientModel)">
             <Trash2 class="size-3" />
           </Button>
