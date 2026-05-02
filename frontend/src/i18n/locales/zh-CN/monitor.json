@@ -1,0 +1,57 @@
+{
+  "title": "实时监控",
+  "connected": "已连接",
+  "disconnected": "未连接",
+  "activeRequests": "活跃请求",
+  "queuedRequests": "队列请求",
+  "completed": "已完成",
+  "noActiveRequests": "暂无活跃请求",
+  "noQueuedRequests": "暂无排队请求",
+  "noCompletedRequests": "暂无已完成请求",
+  "queued": "排队",
+  "copyId": "复制 ID",
+  "providerStats": "Provider 统计",
+  "concurrency": "并发度",
+  "statusCodeDistribution": "状态码分布",
+  "runtime": "运行时",
+  "header": {
+    "activeRequests": "活跃请求",
+    "streamNonStream": "{stream} 流式 / {nonStream} 非流式",
+    "errorRate": "错误率",
+    "p50Latency": "P50 延迟",
+    "avgLatency": "平均 {value}ms",
+    "retryRate": "重试率"
+  },
+  "concurrencyPanel": {
+    "noData": "暂无并发数据",
+    "adaptive": "自适应",
+    "unlimited": "未限制",
+    "queued": "排队: {count}",
+    "queueLimit": "队列上限: {limit}"
+  },
+  "providerTable": {
+    "noData": "暂无数据",
+    "noProviders": "暂无 Provider 统计",
+    "requests": "请求数",
+    "successRate": "成功率",
+    "avgLatency": "平均延迟",
+    "retryRate": "重试率",
+    "topErrors": "Top Errors"
+  },
+  "runtimePanel": {
+    "noData": "暂无运行时数据",
+    "uptime": "运行时间",
+    "memoryRss": "内存 RSS",
+    "heapUsage": "Heap 使用",
+    "activeHandles": "Active Handles",
+    "activeRequests": "Active Requests",
+    "eventLoopDelay": "Event Loop 延迟"
+  },
+  "statusCodes": {
+    "noData": "暂无状态码数据",
+    "success": "2xx 成功",
+    "clientError": "4xx 客户端错误",
+    "rateLimited": "429 限流",
+    "serverError": "5xx 服务端错误"
+  }
+}
