@@ -14,6 +14,13 @@
     "status": "Status",
     "actions": "Actions"
   },
+  "template": {
+    "title": "Template Selection",
+    "selectProvider": "Select provider template",
+    "selectPlan": "Select plan",
+    "custom": "Custom",
+    "selectFirst": "Select a template first, or use custom mode"
+  },
   "quickConfig": {
     "title": "Quick Config",
     "selectProvider": "Select Provider",

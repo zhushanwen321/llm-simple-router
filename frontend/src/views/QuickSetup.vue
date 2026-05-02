@@ -300,7 +300,7 @@
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
-import { useQuickSetup, type ConcurrencyMode } from '@/composables/useQuickSetup'
+import { useQuickSetup } from '@/composables/useQuickSetup'
 import ModelCard from '@/components/quick-setup/ModelCard.vue'
 import MappingList from '@/components/shared/MappingList.vue'
 import ConcurrencyControl from '@/components/shared/ConcurrencyControl.vue'

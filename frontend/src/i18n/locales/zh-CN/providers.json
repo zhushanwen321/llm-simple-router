@@ -20,6 +20,13 @@
     "selectPlan": "选择套餐",
     "selectApiType": "选择 API 类型"
   },
+  "template": {
+    "title": "模板选择",
+    "selectProvider": "选择供应商模板",
+    "selectPlan": "选择套餐",
+    "custom": "自定义",
+    "selectFirst": "请先选择模板，或使用自定义模式"
+  },
   "fields": {
     "name": "名称",
     "apiType": "API 类型",
