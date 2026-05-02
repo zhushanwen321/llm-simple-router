@@ -165,7 +165,7 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
               <span
                 class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-sm mono min-w-[180px]"
                 :class="tIdx === 0 && cIdx === 0
-                  ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
+                  ? 'bg-primary/10 border border-primary/20 text-primary'
                   : 'bg-muted/30 border border-border text-muted-foreground'"
               >
                 {{ t.backend_model }}
@@ -189,7 +189,7 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
           <Badge v-if="entry.targets.length > 1" variant="outline" class="text-[11px] px-1.5 py-0 border-border text-muted-foreground/50 shrink-0">
             {{ entry.targets.length }}级
           </Badge>
-          <span v-if="!editable" class="text-[11px] shrink-0" :class="entry.active ? 'text-emerald-400/60' : 'text-muted-foreground/30'">{{ entry.active ? '启用' : '已禁用' }}</span>
+          <span v-if="!editable" class="text-[11px] shrink-0" :class="entry.active ? 'text-primary/60' : 'text-muted-foreground/30'">{{ entry.active ? '启用' : '已禁用' }}</span>
           <Button v-if="showDelete && editable" variant="ghost" size="icon-xs" class="text-muted-foreground/40 hover:text-destructive shrink-0" @click.stop="emit('remove', entry.clientModel)">
             <Trash2 class="size-3" />
           </Button>
@@ -219,7 +219,7 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
                 <span
                   class="text-xs font-medium shrink-0 w-10 px-1.5 py-0.5 rounded"
                   :class="tIdx === 0
-                    ? 'bg-emerald-500/10 text-emerald-400'
+                    ? 'bg-primary/10 text-primary'
                     : 'bg-muted/30 text-muted-foreground'"
                 >
                   {{ tIdx === 0 ? '首选' : `备${tIdx}` }}
