@@ -224,7 +224,7 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
                   <CascadingModelSelect
                     :providers="providerGroups"
                     :model-value="{ provider_id: target.provider_id, model: target.backend_model }"
-                    placeholder="选择模型..."
+                    compact placeholder="选择模型..."
                     @update:model-value="(v: SelectedValue) => updateTargetProvider(idx, tIdx, v)"
                   />
                 </div>
@@ -251,7 +251,7 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
                 <CascadingModelSelect
                   :providers="providerGroups"
                   :model-value="entry.targets[0]?.overflow_provider_id && entry.targets[0]?.overflow_model ? { provider_id: entry.targets[0].overflow_provider_id, model: entry.targets[0].overflow_model } : undefined"
-                  placeholder="可选，上下文超限时切换..."
+                  compact placeholder="可选，上下文超限时切换..."
                   @update:model-value="(v: SelectedValue | undefined) => updateOverflow(idx, v)"
                 />
               </div>
@@ -283,9 +283,4 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
 </template>
 
 <style scoped>
-.mapping-edit-section :deep(button[role="combobox"]) {
-  height: 32px;
-  font-size: 12px;
-  padding: 4px 10px;
-}
 </style>

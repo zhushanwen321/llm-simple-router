@@ -8,6 +8,7 @@ const props = withDefaults(defineProps<{
   providers: ProviderGroup[]
   modelValue?: SelectedValue
   placeholder?: string
+  compact?: boolean
 }>(), {
   placeholder: '选择供应商 / 模型',
 })
@@ -49,6 +50,7 @@ function onUpdate(val: CascadingSelectedValue) {
     :groups="groups"
     :model-value="selectedValue"
     :placeholder="placeholder"
+    :compact="compact"
     @update:model-value="onUpdate"
   />
 </template>

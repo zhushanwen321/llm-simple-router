@@ -8,8 +8,10 @@ const props = withDefaults(defineProps<{
   groups: CascadingGroup[]
   modelValue?: CascadingSelectedValue
   placeholder?: string
+  compact?: boolean
 }>(), {
   placeholder: '请选择...',
+  compact: false,
 })
 
 const emit = defineEmits<{
@@ -44,7 +46,7 @@ function onOpenChange(val: boolean) {
     <PopoverTrigger as-child>
       <div
         class="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background cursor-pointer hover:bg-accent hover:text-accent-foreground"
-        :class="{ 'ring-2 ring-ring ring-offset-2': open }"
+        :class="[compact ? 'h-8 text-xs px-2.5 py-1' : 'h-10 text-sm px-3 py-2', { 'ring-2 ring-ring ring-offset-2': open }]"
       >
         <span class="truncate" :class="modelValue ? 'text-foreground' : 'text-muted-foreground'">
           {{ displayText || placeholder }}
