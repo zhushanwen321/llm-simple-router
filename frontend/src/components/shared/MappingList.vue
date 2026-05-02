@@ -121,7 +121,7 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
 <template>
   <div class="rounded-xl border border-border bg-card overflow-hidden">
     <!-- Header -->
-    <div v-if="entries.length > 0" class="flex items-center px-4 py-2 border-b border-border bg-muted/20 text-[10px] text-muted-foreground font-medium">
+    <div v-if="entries.length > 0" class="flex items-center px-4 py-2 border-b border-border bg-muted/20 text-[11px] text-muted-foreground font-medium">
       <div class="w-[100px] shrink-0">客户端模型</div>
       <div class="w-5 shrink-0"></div>
       <div class="flex-1">目标链</div>
@@ -141,7 +141,7 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
         @click="toggleExpand(entry.clientModel)"
       >
         <!-- Client model -->
-        <div class="w-[100px] shrink-0 mono text-xs font-medium text-foreground truncate" :title="entry.clientModel">
+        <div class="w-[100px] shrink-0 mono text-sm font-medium text-foreground truncate" :title="entry.clientModel">
           {{ entry.clientModel }}
         </div>
 
@@ -160,33 +160,33 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
               <svg v-else-if="tIdx > 0" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.5" class="text-orange-400/30 shrink-0"><path d="M3 1v6M0 4l3 3 3-3" stroke-dasharray="2 2"/></svg>
 
               <span
-                class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] mono"
+                class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs mono"
                 :class="tIdx === 0 && cIdx === 0
                   ? 'bg-primary/10 border border-primary/20 text-primary/80'
                   : 'bg-orange-500/5 border border-orange-500/15 text-orange-400/70'"
               >
                 {{ t.backend_model }}
-                <span class="text-[9px] px-1 py-px rounded bg-muted/50 text-muted-foreground/40">{{ providerName(t.provider_id) }}</span>
+                <span class="text-[10px] px-1 py-px rounded bg-muted/50 text-muted-foreground/40">{{ providerName(t.provider_id) }}</span>
               </span>
             </template>
           </div>
           <!-- Overflow -->
           <div v-if="entry.targets[0]?.overflow_model" class="flex items-center gap-1 mt-1 pt-1 border-t border-dashed border-sky-400/10">
             <svg width="8" height="8" fill="none" stroke="currentColor" stroke-width="1.5" class="text-sky-400/30 shrink-0"><path d="M3 1v4M1 3l2 2 2-2" stroke-dasharray="1 1"/></svg>
-            <span class="text-[9px] text-sky-400/40">溢出</span>
-            <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] mono bg-sky-500/5 border border-sky-500/15 text-sky-400/70">
+            <span class="text-[11px] text-sky-400/40">溢出</span>
+            <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs mono bg-sky-500/5 border border-sky-500/15 text-sky-400/70">
               {{ entry.targets[0].overflow_model }}
-              <span class="text-[9px] px-1 py-px rounded bg-muted/50 text-muted-foreground/40">{{ providerName(entry.targets[0].overflow_provider_id ?? '') }}</span>
+              <span class="text-[10px] px-1 py-px rounded bg-muted/50 text-muted-foreground/40">{{ providerName(entry.targets[0].overflow_provider_id ?? '') }}</span>
             </span>
           </div>
         </div>
 
         <!-- Actions -->
         <div class="shrink-0 w-[140px] flex items-center justify-end gap-1">
-          <Badge v-if="entry.targets.length > 1" variant="outline" class="text-[9px] px-1.5 py-0 border-orange-400/20 text-orange-400/50 shrink-0">
+          <Badge v-if="entry.targets.length > 1" variant="outline" class="text-[10px] px-1.5 py-0 border-orange-400/20 text-orange-400/50 shrink-0">
             {{ entry.targets.length }}级
           </Badge>
-          <span v-if="!entry.active" class="text-[10px] text-muted-foreground/30 shrink-0">已禁用</span>
+          <span v-if="!entry.active" class="text-xs text-muted-foreground/30 shrink-0">已禁用</span>
           <Button v-if="showDelete" variant="ghost" size="icon-xs" class="text-muted-foreground/40 hover:text-destructive shrink-0" @click.stop="emit('remove', entry.clientModel)">
             <Trash2 class="size-3" />
           </Button>
@@ -200,10 +200,10 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
       </div>
 
       <!-- Expanded: edit mode with CascadingModelSelect -->
-      <div v-if="isExpanded(entry.clientModel)" class="px-4 py-3 border-t border-border bg-muted/5 space-y-2">
+      <div v-if="isExpanded(entry.clientModel)" class="px-4 py-3 border-t border-border bg-muted/5 space-y-2 mapping-edit-section">
         <div v-for="(target, tIdx) in entry.targets" :key="tIdx">
           <div class="flex items-center gap-2">
-            <span class="text-[10px] font-medium shrink-0 w-8" :class="tIdx === 0 ? 'text-primary' : 'text-muted-foreground'">
+            <span class="text-xs font-medium shrink-0 w-8" :class="tIdx === 0 ? 'text-primary' : 'text-muted-foreground'">
               {{ tIdx === 0 ? '首选' : `备${tIdx}` }}
             </span>
             <div class="flex-1">
@@ -224,7 +224,7 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
               <Trash2 class="size-3" />
             </Button>
           </div>
-          <div v-if="tIdx < entry.targets.length - 1" class="flex items-center gap-1 pl-10 text-[10px] text-muted-foreground/30 py-0.5">
+          <div v-if="tIdx < entry.targets.length - 1" class="flex items-center gap-1 pl-10 text-[11px] text-muted-foreground/30 py-0.5">
             <span class="w-3 border-t border-muted-foreground/20"></span>
             <span>失败时切换</span>
           </div>
@@ -232,7 +232,7 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
 
         <!-- Overflow edit -->
         <div class="flex items-center gap-2 pt-2 border-t border-border">
-          <span class="text-[10px] text-muted-foreground/40 shrink-0">溢出模型</span>
+          <span class="text-xs text-muted-foreground/40 shrink-0">溢出模型</span>
           <div class="flex-1">
             <CascadingModelSelect
               :providers="providerGroups"
@@ -265,3 +265,11 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
     </div>
   </div>
 </template>
+
+<style scoped>
+.mapping-edit-section :deep(button[role="combobox"]) {
+  height: 32px;
+  font-size: 12px;
+  padding: 4px 10px;
+}
+</style>
