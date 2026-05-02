@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import type { MappingEntry, MappingTarget } from './types'
+import type { MappingEntry, MappingTarget } from '@/components/quick-setup/types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,10 +10,13 @@ import { Switch } from '@/components/ui/switch'
 import type { ProviderGroup } from '@/components/mappings/cascading-types'
 import type { SelectedValue } from '@/components/mappings/cascading-types'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   entries: MappingEntry[]
   providerGroups: ProviderGroup[]
-}>()
+  showDelete?: boolean
+}>(), {
+  showDelete: false,
+})
 
 const emit = defineEmits<{
   'update:targets': [index: number, targets: MappingTarget[]]
@@ -51,7 +54,7 @@ function addTarget(entryIndex: number) {
 function removeTarget(entryIndex: number, targetIndex: number) {
   const entry = props.entries[entryIndex]
   if (!entry || entry.targets.length <= 1) return
-  emit('update:targets', entryIndex, entry.targets.filter((_, i) => i !== targetIndex))
+  emit('update:targets', entryIndex, entry.targets.filter((_t: MappingTarget, i: number) => i !== targetIndex))
 }
 
 function updateTargetProvider(entryIndex: number, targetIndex: number, val: SelectedValue) {
@@ -65,7 +68,7 @@ function updateTargetProvider(entryIndex: number, targetIndex: number, val: Sele
 function updateOverflow(entryIndex: number, val: SelectedValue | undefined) {
   const entry = props.entries[entryIndex]
   if (!entry) return
-  const newTargets = entry.targets.map((t, i) => {
+  const newTargets = entry.targets.map((t: MappingTarget, i: number) => {
     if (i === 0) {
       if (val) {
         return { ...t, overflow_provider_id: val.provider_id, overflow_model: val.model }
@@ -159,6 +162,15 @@ const tagLabels: Record<string, string> = {
           class="scale-75"
           @click.stop
         />
+        <Button
+          v-if="showDelete"
+          variant="ghost"
+          size="icon-xs"
+          class="shrink-0 text-muted-foreground hover:text-destructive"
+          @click.stop="emit('remove', entry.clientModel)"
+        >
+          <Trash2 class="size-3" />
+        </Button>
       </div>
 
       <!-- Expanded detail -->

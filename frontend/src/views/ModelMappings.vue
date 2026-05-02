@@ -1,97 +1,60 @@
 <template>
-  <div class="p-6">
-    <div class="flex items-center justify-between mb-4">
+  <div class="p-6 space-y-4">
+    <div class="flex items-center justify-between">
       <h2 class="text-lg font-semibold text-foreground">模型映射</h2>
-      <Button @click="openCreate" class="flex items-center gap-1">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-        </svg>
-        添加分组
+      <Button size="sm" @click="addNewMapping" :disabled="!canAdd">
+        <Plus class="w-3.5 h-3.5 mr-1" />
+        添加映射
       </Button>
     </div>
 
-    <div class="grid grid-cols-3 gap-4">
-      <Card v-for="g in groupsWithParsedRule" :key="g.id" :class="{ 'opacity-60': !g.is_active }">
-        <CardHeader class="flex flex-row items-center justify-between gap-2 pb-2">
-          <div class="flex items-center gap-2 min-w-0">
-            <CardTitle class="font-mono text-sm truncate">{{ g.client_model }}</CardTitle>
+    <Card>
+      <CardContent class="pt-4">
+        <!-- Add mapping row -->
+        <div class="flex items-end gap-2 mb-4">
+          <div class="flex-1 space-y-1">
+            <Label class="text-xs text-muted-foreground">客户端模型</Label>
+            <Input v-model="newFrom" placeholder="例如: sonnet, gpt-5.1" class="font-mono text-xs" @keydown.enter.prevent="addNewMapping" />
           </div>
-          <div class="flex items-center gap-1 shrink-0">
-            <Button variant="ghost" size="sm" class="gap-1" @click="confirmToggle(g)">
-              <span
-                class="relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors"
-                :class="g.is_active ? 'bg-primary' : 'bg-input'"
-              >
-                <span
-                  class="inline-block h-3 w-3 rounded-full bg-background shadow-sm transition-transform"
-                  :class="g.is_active ? 'translate-x-3.5' : 'translate-x-0.5'"
-                />
-              </span>
-            </Button>
-            <Button variant="ghost" size="sm" @click="openEdit(g)">编辑</Button>
-            <Button variant="ghost" size="sm" class="text-destructive hover:text-destructive" @click="deleteTarget = g">删除</Button>
+          <div class="flex-1 space-y-1">
+            <Label class="text-xs text-muted-foreground">目标模型</Label>
+            <Input v-model="newTo" placeholder="例如: deepseek-chat" class="font-mono text-xs" @keydown.enter.prevent="addNewMapping" />
           </div>
-        </CardHeader>
-        <CardContent>
-          <!-- 故障转移标识 -->
-          <div v-if="(g.parsedRule.targets || []).length > 1" class="mb-2">
-            <span class="inline-flex items-center rounded-full bg-orange-100 dark:bg-orange-900/30 px-2 py-0.5 text-xs font-medium text-orange-700 dark:text-orange-300">
-              故障转移 · {{ (g.parsedRule.targets ?? []).length }} 级
-            </span>
-          </div>
-          <!-- 目标列表 -->
-          <div class="space-y-1 text-sm">
-            <div v-for="(t, idx) in (g.parsedRule.targets || [])" :key="idx">
-              <div class="flex items-center gap-1.5">
-                <span class="text-xs shrink-0" :class="idx === 0 ? 'text-primary font-medium' : 'text-muted-foreground'">{{ idx === 0 ? '首选' : `备${idx}` }}</span>
-                <span class="font-mono">{{ t.backend_model }}</span>
-                <span class="text-muted-foreground">/</span>
-                <span class="text-muted-foreground truncate">{{ providerNameMap.get(t.provider_id) || t.provider_id }}</span>
-                <template v-if="t.overflow_model">
-                  <span class="text-muted-foreground">→</span>
-                  <span class="font-mono text-primary truncate">{{ t.overflow_model }}</span>
-                </template>
-              </div>
-              <div v-if="idx < (g.parsedRule.targets || []).length - 1" class="flex items-center gap-1 pl-4 text-xs text-muted-foreground">
-                <span class="w-3 border-t border-muted-foreground/30"></span>
-                <span>失败时切换</span>
-              </div>
-            </div>
-            <div v-if="!(g.parsedRule.targets || []).length" class="text-xs text-muted-foreground">无目标</div>
-          </div>
-        </CardContent>
-      </Card>
+          <Button size="sm" variant="outline" class="shrink-0" :disabled="!canAdd" @click="addNewMapping">添加</Button>
+        </div>
 
-      <div v-if="groups.length === 0" class="col-span-3 text-center text-muted-foreground py-12 bg-card rounded-xl border">
-        暂无映射分组
-      </div>
-    </div>
+        <!-- Mapping list -->
+        <MappingEditor
+          :entries="entries"
+          :provider-groups="providerGroups"
+          :show-delete="true"
+          @update:targets="updateTargets"
+          @toggle-active="toggleActive"
+          @remove="removeMapping"
+        />
+      </CardContent>
+    </Card>
 
-    <MappingGroupFormDialog
-      v-model:open="dialogOpen"
-      :editing-id="editingId"
-      :form="form"
-      :providers="providersList"
-      :provider-groups="providerGroups"
-      :context-window-map="contextWindowMap"
-      @save="handleSave"
-      @add-target="addTarget"
-      @remove-target="removeTarget"
-      @move-target-up="moveTargetUp"
-      @move-target-down="moveTargetDown"
-    />
+    <!-- Delete Confirm -->
+    <AlertDialog :open="!!deleteTarget" @update:open="(val: boolean) => { if (!val) deleteTarget = null }">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>确认删除</AlertDialogTitle>
+          <AlertDialogDescription>确定要删除映射「{{ deleteTarget?.clientModel }}」吗？此操作不可撤销。</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>取消</AlertDialogCancel>
+          <Button variant="destructive" @click="handleDelete">删除</Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
 
-    <MappingGroupDeleteDialog
-      :target="deleteTarget"
-      @confirm="handleDelete"
-      @cancel="deleteTarget = null"
-    />
-
+    <!-- Toggle Confirm -->
     <AlertDialog :open="!!toggleTarget" @update:open="(val: boolean) => { if (!val) toggleTarget = null }">
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>确认{{ toggleTarget?.is_active ? '禁用' : '启用' }}</AlertDialogTitle>
-          <AlertDialogDescription>确定要{{ toggleTarget?.is_active ? '禁用' : '启用' }}映射「{{ toggleTarget?.client_model }}」吗？</AlertDialogDescription>
+          <AlertDialogTitle>确认{{ toggleTarget?.active ? '禁用' : '启用' }}</AlertDialogTitle>
+          <AlertDialogDescription>确定要{{ toggleTarget?.active ? '禁用' : '启用' }}映射「{{ toggleTarget?.clientModel }}」吗？</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>取消</AlertDialogCancel>
@@ -107,37 +70,27 @@ import { ref, computed, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
 import { api, getApiMessage } from '@/api/client'
 import { Button } from '@/components/ui/button'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog'
-import MappingGroupFormDialog from '@/components/mappings/MappingGroupFormDialog.vue'
-import MappingGroupDeleteDialog from '@/components/mappings/MappingGroupDeleteDialog.vue'
-import type { MappingGroup, Provider, MappingTarget, Rule } from '@/types/mapping'
+import { Plus } from 'lucide-vue-next'
+import MappingEditor from '@/components/shared/MappingEditor.vue'
+import type { MappingEntry, MappingTarget } from '@/components/quick-setup/types'
 import type { ProviderGroup } from '@/components/mappings/cascading-types'
+import type { MappingGroup, Provider, Rule } from '@/types/mapping'
 import { DEFAULT_CONTEXT_WINDOW } from '@/constants'
 
-interface FormData {
-  client_model: string
-  targets: MappingTarget[]
-}
-
-const DEFAULT_FORM: FormData = {
-  client_model: '',
-  targets: [],
-}
-
+// --- State ---
 const groups = ref<MappingGroup[]>([])
 const providersList = ref<Provider[]>([])
-const dialogOpen = ref(false)
-const editingId = ref<string | null>(null)
-const deleteTarget = ref<MappingGroup | null>(null)
-const toggleTarget = ref<MappingGroup | null>(null)
-const form = ref<FormData>({ ...DEFAULT_FORM, targets: [] })
+const newFrom = ref('')
+const newTo = ref('')
+const deleteTarget = ref<MappingEntry | null>(null)
+const toggleTarget = ref<MappingEntry | null>(null)
 
-const providerNameMap = computed(() => {
-  const map = new Map<string, string>()
-  for (const p of providersList.value) map.set(p.id, p.name)
-  return map
-})
+// --- Computed ---
+const canAdd = computed(() => newFrom.value.trim().length > 0 && newTo.value.trim().length > 0)
 
 const providerGroups = computed<ProviderGroup[]>(() =>
   providersList.value.map(p => ({
@@ -149,162 +102,105 @@ const providerGroups = computed<ProviderGroup[]>(() =>
   }))
 )
 
-const contextWindowMap = computed(() => {
-  const map = new Map<string, number>()
-  for (const p of providersList.value) {
-    for (const m of p.models ?? []) {
-      if (m.context_window != null) {
-        map.set(`${p.id}:${m.name}`, m.context_window)
-      }
-    }
-  }
-  return map
-})
-
-// 预解析 rule，避免模板中重复调用
-// 兼容 migration 026 前旧格式 { default, windows } → 归一化为 { targets }  
-const groupsWithParsedRule = computed(() =>
+const entries = computed<MappingEntry[]>(() =>
   groups.value.map((g) => {
-    let parsedRule: Rule = {}
+    let rule: Rule = {}
     try {
-      const rule = JSON.parse(g.rule)
-      if (rule.default && !rule.targets) {
-        parsedRule = { targets: [rule.default] }
-      } else {
-        parsedRule = rule
-      }
-    } catch (e) {
-      console.warn('Failed to parse mapping group rule JSON:', e)
+      const parsed = JSON.parse(g.rule)
+      rule = parsed.default && !parsed.targets ? { targets: [parsed.default] } : parsed
+    } catch { /* ignore */ }
+    const targets: MappingTarget[] = (rule.targets ?? []).map((t: MappingTarget) => ({
+      backend_model: t.backend_model || '',
+      provider_id: t.provider_id || '',
+      overflow_provider_id: t.overflow_provider_id,
+      overflow_model: t.overflow_model,
+    }))
+    return {
+      clientModel: g.client_model,
+      targets: targets.length > 0 ? targets : [{ backend_model: '', provider_id: providersList.value[0]?.id ?? '' }],
+      existing: true,
+      existingId: g.id,
+      tag: 'existing' as const,
+      active: !!g.is_active,
+      originalActive: !!g.is_active,
     }
-    return { ...g, parsedRule }
   })
 )
 
+// --- Data loading ---
 async function loadData() {
   const results = await Promise.allSettled([
     api.getMappingGroups(),
     api.getProviders(),
   ])
-  if (results[0].status === 'fulfilled') {
-    groups.value = results[0].value
-  } else {
-    console.error('Failed to load groups:', results[0].reason)
-  }
-  if (results[1].status === 'fulfilled') {
-    providersList.value = results[1].value as Provider[]
-  } else {
-    console.error('Failed to load providers:', results[1].reason)
-    toast.error(getApiMessage(results[1].reason, '加载供应商失败'))
-  }
+  if (results[0].status === 'fulfilled') groups.value = results[0].value
+  if (results[1].status === 'fulfilled') providersList.value = results[1].value as Provider[]
 }
 
-function getFirstModel(providerId: string): string {
-  const p = providersList.value.find(x => x.id === providerId)
-  return p?.models?.[0]?.name || ''
+// --- Actions ---
+function updateTargets(index: number, targets: MappingTarget[]) {
+  const entry = entries.value[index]
+  if (!entry?.existingId) return
+  const ruleJson = JSON.stringify({ targets })
+  api.updateMappingGroup(entry.existingId, {
+    client_model: entry.clientModel,
+    rule: ruleJson,
+  }).then(() => loadData()).catch((e: unknown) => {
+    toast.error(getApiMessage(e, '更新映射失败'))
+  })
 }
 
-function openCreate() {
-  editingId.value = null
-  const firstProviderId = providersList.value[0]?.id || ''
-  form.value = {
-    client_model: '',
-    targets: [{ backend_model: getFirstModel(firstProviderId), provider_id: firstProviderId }],
-  }
-  dialogOpen.value = true
+function toggleActive(index: number) {
+  const entry = entries.value[index]
+  if (!entry) return
+  toggleTarget.value = { ...entry }
 }
 
-function openEdit(g: MappingGroup & { parsedRule?: Rule }) {
-  editingId.value = g.id
-  let rule: Rule = {}
-  try { rule = JSON.parse(g.rule) } catch (e) { console.warn('Failed to parse rule JSON:', e) }
-
-  const firstProviderId = providersList.value[0]?.id || ''
-  form.value = {
-    client_model: g.client_model,
-    targets: Array.isArray(rule.targets)
-      ? rule.targets.map((t: MappingTarget) => ({
-        backend_model: t.backend_model || '',
-        provider_id: t.provider_id || firstProviderId,
-        overflow_provider_id: t.overflow_provider_id,
-        overflow_model: t.overflow_model,
-      }))
-      : [{ backend_model: getFirstModel(firstProviderId), provider_id: firstProviderId }],
-  }
-  dialogOpen.value = true
-}
-
-function addTarget() {
-  const firstProviderId = providersList.value[0]?.id || ''
-  form.value.targets.push({ backend_model: getFirstModel(firstProviderId), provider_id: firstProviderId })
-}
-
-function removeTarget(idx: number) {
-  form.value.targets.splice(idx, 1)
-}
-
-function moveTargetUp(idx: number) {
-  if (idx <= 0) return
-  const targets = form.value.targets
-  ;[targets[idx - 1], targets[idx]] = [targets[idx], targets[idx - 1]]
-}
-
-function moveTargetDown(idx: number) {
-  const targets = form.value.targets
-  if (idx >= targets.length - 1) return
-  ;[targets[idx], targets[idx + 1]] = [targets[idx + 1], targets[idx]]
-}
-
-async function handleSave() {
+async function handleToggle() {
+  const target = toggleTarget.value
+  if (!target?.existingId) return
+  toggleTarget.value = null
   try {
-    const ruleJson = JSON.stringify({ targets: form.value.targets })
-    const payload = {
-      client_model: form.value.client_model,
-      rule: ruleJson,
-    }
-    if (editingId.value) {
-      await api.updateMappingGroup(editingId.value, payload)
-    } else {
-      await api.createMappingGroup(payload)
-    }
-    dialogOpen.value = false
+    await api.toggleMappingGroup(target.existingId)
     await loadData()
   } catch (e: unknown) {
-    console.error('Failed to save mapping group:', e)
-    toast.error(getApiMessage(e, '保存分组失败'))
+    toast.error(getApiMessage(e, '切换状态失败'))
   }
+}
+
+function removeMapping(clientModel: string) {
+  const entry = entries.value.find(e => e.clientModel === clientModel)
+  if (entry) deleteTarget.value = entry
 }
 
 async function handleDelete() {
   const target = deleteTarget.value
-  if (!target) return
+  if (!target?.existingId) return
   deleteTarget.value = null
   try {
-    await api.deleteMappingGroup(target.id)
+    await api.deleteMappingGroup(target.existingId)
     await loadData()
   } catch (e: unknown) {
-    console.error('Failed to delete mapping group:', e)
-    toast.error(getApiMessage(e, '删除分组失败'))
+    toast.error(getApiMessage(e, '删除映射失败'))
   }
 }
 
-const pendingToggleId = ref<string | null>(null)
+async function addNewMapping() {
+  const from = newFrom.value.trim()
+  const to = newTo.value.trim()
+  if (!from || !to) return
 
-function confirmToggle(g: MappingGroup) {
-  toggleTarget.value = g
-  pendingToggleId.value = g.id
-}
-
-async function handleToggle() {
-  const id = pendingToggleId.value
-  if (!id) return
-  toggleTarget.value = null
-  pendingToggleId.value = null
+  const firstProvider = providersList.value[0]
+  const ruleJson = JSON.stringify({
+    targets: [{ backend_model: to, provider_id: firstProvider?.id ?? '' }],
+  })
   try {
-    await api.toggleMappingGroup(id)
+    await api.createMappingGroup({ client_model: from, rule: ruleJson })
+    newFrom.value = ''
+    newTo.value = ''
     await loadData()
   } catch (e: unknown) {
-    console.error('Failed to toggle mapping group:', e)
-    toast.error(getApiMessage(e, '切换状态失败'))
+    toast.error(getApiMessage(e, '创建映射失败'))
   }
 }
 
