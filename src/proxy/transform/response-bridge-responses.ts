@@ -120,7 +120,8 @@ function mapStatusToFinishReason(status: string): string {
  */
 export function chatToResponsesResponse(bodyStr: string): string {
   const oai = JSON.parse(bodyStr) as Record<string, unknown>;
-  const choice = oai.choices?.[0] as Record<string, unknown> | undefined;
+  const choices = (oai.choices ?? []) as Array<Record<string, unknown>>;
+  const choice = choices[0];
   const msg = choice?.message as Record<string, unknown> | undefined;
   const output: Array<Record<string, unknown>> = [];
 
