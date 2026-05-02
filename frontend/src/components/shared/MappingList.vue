@@ -217,7 +217,7 @@ function chunkTargets(targets: MappingTarget[], size = 2): MappingTarget[][] {
             <div v-for="(target, tIdx) in entry.targets" :key="tIdx">
               <div class="flex items-center gap-2">
                 <span
-                  class="text-xs font-medium shrink-0 w-8 px-1.5 py-0.5 rounded"
+                  class="text-xs font-medium shrink-0 w-10 px-1.5 py-0.5 rounded"
                   :class="tIdx === 0
                     ? 'bg-emerald-500/10 text-emerald-400'
                     : 'bg-muted/30 text-muted-foreground'"
