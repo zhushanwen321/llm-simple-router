@@ -17,8 +17,9 @@ jobs:
           cache: npm
 
       - run: npm ci
+      - run: cd core && npx tsc
+      - run: cd router && npx tsc
       - run: npm run test -w core -w router
-      - run: npm run build -w core -w router
 
   docker:
     needs: test
