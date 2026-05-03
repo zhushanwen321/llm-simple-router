@@ -17,6 +17,11 @@ const MIGRATION_RENAMES: Record<string, string> = {
   "028_convert_old_rule_format.sql": "029_convert_old_rule_format.sql",
   "029_add_input_tokens_estimated.sql": "030_add_input_tokens_estimated.sql",
   "030_add_tps_breakdown.sql": "031_add_tps_breakdown.sql",
+  // 消除双 033/034，重新编号 035→038
+  "033_add_pipeline_snapshot.sql": "033_add_adaptive_concurrency.sql",
+  "034_drop_redundant_log_columns.sql": "035_drop_redundant_log_columns.sql",
+  "035_add_openai_responses_api_type.sql": "036_add_openai_responses_api_type.sql",
+  "036_fix_035_data_corruption.sql": "037_fix_035_data_corruption.sql",
 };
 
 export function initDatabase(dbPath: string): Database.Database {

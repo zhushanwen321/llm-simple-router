@@ -408,14 +408,16 @@ export async function main() {
     /* eslint-enable taste/no-silent-catch */
   });
 
-  // 优雅关闭：SIGTERM（systemd/docker stop）和 SIGINT（Ctrl+C）
+  // 优雅关闭：SIGTERM 和 SIGINT（Ctrl+C）
+  // 首次 = 优雅关闭，再次 = 强制退出
   let isShuttingDown = false;
   const GRACEFUL_SHUTDOWN_TIMEOUT_MS = 10_000;
 
   const shutdown = async (signal: string) => {
-    // 防止重复触发：多次 Ctrl+C 只执行一次关闭
+    // 第二次收到信号 = 强制退出（Ctrl+C 卡住时用户可再按一次）
     if (isShuttingDown) {
-      app.log.info(`Received ${signal} again, already shutting down...`);
+      app.log.warn(`Received ${signal} again, forcing exit`);
+      process.exit(1);
       return;
     }
     isShuttingDown = true;
