@@ -32,6 +32,7 @@ export interface Provider {
   name: string
   api_type: string
   base_url: string
+  upstream_path: string | null
   api_key: string
   models: ModelInfo[]
   is_active: number

@@ -32,14 +32,14 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div :class="compact ? 'space-y-2' : 'flex items-end gap-3 flex-wrap'">
+  <div :class="compact ? 'space-y-2' : 'flex items-end gap-2 flex-wrap'">
     <div :class="compact ? '' : 'w-36'" class="space-y-1">
       <Label class="text-xs text-muted-foreground">{{ t('providers.concurrency.mode') }}</Label>
       <Select
         :model-value="mode"
         @update:model-value="(v: unknown) => emit('update:mode', v as ConcurrencyMode)"
       >
-        <SelectTrigger>
+        <SelectTrigger class="w-full text-xs data-[size=default]:h-7">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -55,6 +55,7 @@ const emit = defineEmits<{
         <Input
           :model-value="maxConcurrency"
           type="number" min="1" max="100"
+          class="text-xs md:text-xs md:text-xs h-7"
           @update:model-value="emit('update:maxConcurrency', Number($event))"
         />
       </div>
@@ -64,6 +65,7 @@ const emit = defineEmits<{
           :model-value="queueTimeoutMs"
           type="number" min="0"
           :placeholder="t('providers.shared.queueTimeoutPlaceholder')"
+          class="text-xs md:text-xs md:text-xs h-7"
           @update:model-value="emit('update:queueTimeoutMs', Number($event))"
         />
       </div>
@@ -72,6 +74,7 @@ const emit = defineEmits<{
         <Input
           :model-value="maxQueueSize"
           type="number" min="1" max="1000"
+          class="text-xs md:text-xs md:text-xs h-7"
           @update:model-value="emit('update:maxQueueSize', Number($event))"
         />
       </div>

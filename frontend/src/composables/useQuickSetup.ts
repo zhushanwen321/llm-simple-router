@@ -25,7 +25,7 @@ const PROVIDER_NAME_MAP: Record<string, string> = {
   '火山引擎': 'volcengine',
   '阿里云': 'aliyun',
   '腾讯云': 'tencent',
-  'OpenCode Go': 'opencode-go',
+  'OpenCode': 'opencode',
   '阶跃星辰': 'stepfun',
 }
 
@@ -79,7 +79,18 @@ export function useQuickSetup() {
   })
 
   const customBaseUrl = ref('')
+  const customUpstreamPath = ref('')
   const baseUrl = computed(() => isCustomProvider.value ? customBaseUrl.value : (currentPreset.value?.baseUrl ?? ''))
+  const upstreamPath = computed(() => {
+    if (isCustomProvider.value) return customUpstreamPath.value
+    const preset = currentPreset.value
+    if (!preset) return ''
+    const defaultPath = preset.apiType === 'anthropic' ? '/v1/messages'
+      : preset.apiType === 'openai-responses' ? '/v1/responses'
+      : '/v1/chat/completions'
+    if (preset.upstreamPath && preset.upstreamPath !== defaultPath) return preset.upstreamPath
+    return ''
+  })
 
   const availablePlans = computed(() => {
     const group = providerGroups.value.find(g => g.group === selectedGroup.value)
@@ -276,6 +287,7 @@ export function useQuickSetup() {
     if (group === '__custom__') {
       apiType.value = 'openai'
       customBaseUrl.value = ''
+      customUpstreamPath.value = ''
       modelConfigs.value = []
     } else {
       const groupData = providerGroups.value.find(g => g.group === group)
@@ -410,6 +422,7 @@ export function useQuickSetup() {
             : `${toProviderName(selectedGroup.value)}-${toProviderName(selectedPlan.value)}`,
           api_type: apiType.value,
           base_url: baseUrl.value,
+          upstream_path: upstreamPath.value || undefined,
           api_key: apiKey.value.trim(),
           models: modelConfigs.value.map(m => ({
             name: m.name,
@@ -498,7 +511,7 @@ export function useQuickSetup() {
     apiType, apiKey, modelConfigs, mappingEntries,
     allRecommendedRules, recommendedRules,
     selectedRetryRules, saving, connectionStatus,
-    currentClient, currentPreset, baseUrl, customBaseUrl, isCustomProvider,
+    currentClient, currentPreset, baseUrl, customBaseUrl, upstreamPath, customUpstreamPath, isCustomProvider,
     availablePlans, isNonOpenaiEndpoint,
     concurrencyMode, maxConcurrency, queueTimeoutMs, maxQueueSize,
     transformInjectHeaders, transformDropFields, transformRequestDefaults,

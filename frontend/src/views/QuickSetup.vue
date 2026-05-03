@@ -45,7 +45,7 @@
           <div class="w-40 space-y-1">
             <Label class="text-xs text-muted-foreground">{{ t('quickSetup.provider.label') }}</Label>
             <Select :model-value="selectedGroup" @update:model-value="(v: unknown) => onProviderChange(v as string)">
-              <SelectTrigger class="w-full"><SelectValue :placeholder="t('quickSetup.provider.select')" /></SelectTrigger>
+              <SelectTrigger class="w-full text-xs data-[size=default]:h-7"><SelectValue :placeholder="t('quickSetup.provider.select')" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__custom__">{{ t('quickSetup.provider.custom') }}</SelectItem>
                 <SelectItem v-for="g in providerGroups" :key="g.group" :value="g.group">{{ g.group }}</SelectItem>
@@ -57,7 +57,7 @@
             <div class="w-48 space-y-1">
               <Label class="text-xs text-muted-foreground">{{ t('quickSetup.provider.format') }}</Label>
               <Select v-model="apiType">
-                <SelectTrigger class="w-full"><SelectValue /></SelectTrigger>
+                <SelectTrigger class="w-full text-xs data-[size=default]:h-7"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="anthropic">Anthropic Messages</SelectItem>
                   <SelectItem value="openai">OpenAI Chat Completions</SelectItem>
@@ -67,7 +67,11 @@
             </div>
             <div class="w-80 space-y-1">
               <Label class="text-xs text-muted-foreground">Base URL</Label>
-              <Input v-model="customBaseUrl" placeholder="https://api.example.com/v1" class="font-mono text-xs" />
+              <Input v-model="customBaseUrl" placeholder="https://api.example.com/v1" class="font-mono md:text-xs h-7" />
+            </div>
+            <div class="w-48 space-y-1">
+              <Label class="text-xs text-muted-foreground">Upstream Path</Label>
+              <Input v-model="customUpstreamPath" placeholder="/v1/chat/completions" class="font-mono md:text-xs h-7" />
             </div>
           </template>
           <!-- Preset mode: show plan + readonly base url -->
@@ -75,7 +79,7 @@
             <div class="w-28 space-y-1">
               <Label class="text-xs text-muted-foreground">{{ t('quickSetup.provider.plan') }}</Label>
               <Select :model-value="selectedPlan" @update:model-value="(v: unknown) => onPlanChange(v as string)">
-                <SelectTrigger class="w-full"><SelectValue :placeholder="t('quickSetup.provider.select')" /></SelectTrigger>
+                <SelectTrigger class="w-full text-xs data-[size=default]:h-7"><SelectValue :placeholder="t('quickSetup.provider.select')" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem v-for="p in availablePlans" :key="p.plan" :value="p.plan">{{ p.plan }}</SelectItem>
                 </SelectContent>
@@ -84,7 +88,7 @@
             <div class="w-48 space-y-1">
               <Label class="text-xs text-muted-foreground">{{ t('quickSetup.provider.format') }}</Label>
               <Select v-model="apiType">
-                <SelectTrigger class="w-full"><SelectValue /></SelectTrigger>
+                <SelectTrigger class="w-full text-xs data-[size=default]:h-7"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="anthropic">Anthropic Messages</SelectItem>
                   <SelectItem value="openai">OpenAI Chat Completions</SelectItem>
@@ -94,12 +98,17 @@
             </div>
             <div class="w-72 space-y-1">
               <Label class="text-xs text-muted-foreground">Base URL</Label>
-              <Input :model-value="baseUrl" readonly class="font-mono text-xs" />
+              <Input :model-value="baseUrl" readonly class="font-mono md:text-xs h-7" />
+            </div>
+            <!-- 非默认 upstream path（如百度千帆） -->
+            <div v-if="upstreamPath" class="w-48 space-y-1">
+              <Label class="text-xs text-muted-foreground">Upstream Path</Label>
+              <Input :model-value="upstreamPath" readonly class="font-mono md:text-xs h-7" />
             </div>
           </template>
           <div class="w-64 space-y-1">
             <Label class="text-xs text-muted-foreground">{{ t('quickSetup.provider.apiKey') }}</Label>
-            <Input v-model="apiKey" type="password" :placeholder="t('quickSetup.provider.apiKeyPlaceholder')" />
+            <Input v-model="apiKey" type="password" :placeholder="t('quickSetup.provider.apiKeyPlaceholder')" class="md:text-xs h-7" />
           </div>
           <div class="shrink-0 space-y-1">
             <Label class="text-xs text-muted-foreground invisible">{{ t('quickSetup.provider.connect') }}</Label>
@@ -140,7 +149,7 @@
           </div>
           <!-- Custom mode: add model input -->
           <div v-if="isCustomProvider" class="flex gap-2 mt-2">
-            <Input v-model="customModelInput" :placeholder="t('quickSetup.model.namePlaceholder')" @keydown.enter.prevent="handleAddCustomModel" class="flex-1" />
+            <Input v-model="customModelInput" :placeholder="t('quickSetup.model.namePlaceholder')" @keydown.enter.prevent="handleAddCustomModel" class="flex-1 md:text-xs h-7" />
             <Button type="button" variant="outline" size="sm" @click="handleAddCustomModel" :disabled="!customModelInput.trim()">{{ t('common.add') }}</Button>
           </div>
         </div>
@@ -323,7 +332,7 @@ const {
   allRecommendedRules, recommendedRules,
   selectedRetryRules, saving, connectionStatus,
   baseUrl, availablePlans, isNonOpenaiEndpoint,
-  isCustomProvider, customBaseUrl,
+  isCustomProvider, customBaseUrl, upstreamPath, customUpstreamPath,
   concurrencyMode, maxConcurrency, queueTimeoutMs, maxQueueSize,
   allProviderGroups,
   transformInjectHeaders, transformDropFields, transformRequestDefaults,
