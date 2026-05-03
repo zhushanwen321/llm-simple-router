@@ -22,13 +22,13 @@ import { adminTransformRuleRoutes } from "./transform-rules.js";
 import { adminScheduleRoutes } from "./schedules.js";
 import type { StateRegistry } from "../core/registry.js";
 import type { RequestTracker } from "@llm-router/core/monitor";
-import type { AdaptiveController as AdaptiveConcurrencyController } from "@llm-router/core/concurrency";
+import type { AdaptiveController } from "@llm-router/core/concurrency";
 
 interface AdminRoutesOptions {
   db: Database.Database;
   stateRegistry: StateRegistry;
   tracker?: RequestTracker;
-  adaptiveController?: AdaptiveConcurrencyController;
+  adaptiveController?: AdaptiveController;
   logFileWriter?: import("../storage/log-file-writer.js").LogFileWriter | null;
   logsDir?: string;
   pluginRegistry?: import("../proxy/transform/plugin-registry.js").PluginRegistry;

@@ -12,7 +12,7 @@ import { API_CODE, apiError } from "./api-response.js";
 import { PROVIDER_CONCURRENCY_DEFAULTS } from "../db/providers.js";
 import type { StateRegistry } from "../core/registry.js";
 import type { RequestTracker } from "@llm-router/core/monitor";
-import type { AdaptiveController as AdaptiveConcurrencyController } from "@llm-router/core/concurrency";
+import type { AdaptiveController } from "@llm-router/core/concurrency";
 
 const PROVIDER_NAME_RE = /^[a-zA-Z0-9_-]+$/;
 const API_KEY_PREVIEW_MIN_LENGTH = 8;
@@ -66,7 +66,7 @@ interface QuickSetupRoutesOptions {
   db: Database.Database;
   stateRegistry?: StateRegistry;
   tracker?: RequestTracker;
-  adaptiveController?: AdaptiveConcurrencyController;
+  adaptiveController?: AdaptiveController;
 }
 
 export const adminQuickSetupRoutes: FastifyPluginCallback<QuickSetupRoutesOptions> = (app, options, done) => {

@@ -10,9 +10,9 @@ import { SemaphoreScope as SemaphoreScopeClass } from "./scope.js";
 import type { TrackerScope } from "./scope.js";
 import { TrackerScope as TrackerScopeClass } from "./scope.js";
 import type { ActiveRequest } from "@llm-router/core/monitor";
-import type { SemaphoreManager as ProviderSemaphoreManager } from "@llm-router/core/concurrency";
+import type { SemaphoreManager } from "@llm-router/core/concurrency";
 import type { RequestTracker } from "@llm-router/core/monitor";
-import type { AdaptiveController as AdaptiveConcurrencyController } from "@llm-router/core/concurrency";
+import type { AdaptiveController } from "@llm-router/core/concurrency";
 
 const DEFAULT_BASE_DELAY_MS = 1000;
 const DEFAULT_FAILOVER_THRESHOLD = 400;
@@ -51,9 +51,9 @@ export interface HandleContext {
  * 两个 provider 的创建逻辑完全一致。
  */
 export function createOrchestrator(
-  semaphoreManager?: ProviderSemaphoreManager,
+  semaphoreManager?: SemaphoreManager,
   tracker?: RequestTracker,
-  adaptiveController?: AdaptiveConcurrencyController,
+  adaptiveController?: AdaptiveController,
 ): ProxyOrchestrator | undefined {
   const semaphoreScope = semaphoreManager ? new SemaphoreScopeClass(semaphoreManager) : undefined;
   const trackerScope = tracker ? new TrackerScopeClass(tracker) : undefined;
@@ -67,7 +67,7 @@ export class ProxyOrchestrator {
       semaphoreScope: SemaphoreScope;
       trackerScope: TrackerScope;
       resilience: ResilienceLayer;
-      adaptiveController?: AdaptiveConcurrencyController;
+      adaptiveController?: AdaptiveController;
     },
   ) {}
 

@@ -6,7 +6,7 @@ import { getAllProviders, getProviderById, createProvider, updateProvider, delet
 import { encrypt, decrypt } from "../utils/crypto.js";
 import { getSetting } from "../db/settings.js";
 import type { StateRegistry } from "../core/registry.js";
-import type { AdaptiveController as AdaptiveConcurrencyController } from "@llm-router/core/concurrency";
+import type { AdaptiveController } from "@llm-router/core/concurrency";
 import type { RequestTracker } from "@llm-router/core/monitor";
 import { HTTP_CREATED, HTTP_NOT_FOUND, HTTP_CONFLICT, HTTP_BAD_REQUEST } from "./constants.js";
 import { API_CODE, apiError } from "./api-response.js";
@@ -133,7 +133,7 @@ interface ProviderRoutesOptions {
   db: Database.Database;
   stateRegistry?: StateRegistry;
   tracker?: RequestTracker;
-  adaptiveController?: AdaptiveConcurrencyController;
+  adaptiveController?: AdaptiveController;
 }
 
 export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> = (app, options, done) => {
