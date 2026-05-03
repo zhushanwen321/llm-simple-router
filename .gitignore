@@ -121,3 +121,8 @@ frontend-dist/
 # Personal scripts
 .scripts/
 .tracers/
+
+# Workspace package dists
+core/dist
+router/dist
+pi-extension/dist
