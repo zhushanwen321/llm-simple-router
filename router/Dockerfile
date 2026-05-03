@@ -19,12 +19,20 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-COPY package*.json ./
+# 安装 monorepo 所有依赖（workspace）
+COPY package.json package-lock.json ./
+COPY router/package.json router/package.json
+COPY core/package.json core/package.json
 RUN npm ci
 
-COPY tsconfig.json .
-COPY src/ src/
-RUN npm run build
+# 复制源码和 tsconfig
+COPY tsconfig.base.json .
+COPY router/tsconfig.json router/
+COPY router/src/ router/src/
+COPY core/ core/
+
+# 构建 router（自动编译 core 引用）
+RUN npm run build -w router
 
 # 阶段2：运行时
 FROM node:22-alpine
@@ -38,25 +46,27 @@ RUN apk add --no-cache tzdata
 # better-sqlite3 native addon 编译需要这些工具
 RUN apk add --no-cache python3 make g++
 
-# 只安装生产依赖
-COPY package*.json ./
+# 安装 monorepo 生产依赖
+COPY package.json package-lock.json ./
+COPY router/package.json router/package.json
+COPY core/package.json core/package.json
 RUN npm ci --omit=dev && npm cache clean --force
 
 # 清理编译工具，减小镜像体积
 RUN apk del python3 make g++
 
 # 复制后端编译产物
-COPY --from=builder /app/dist dist/
+COPY --from=builder /app/router/dist router/dist/
 
 # migrations SQL 文件在运行时需要
-COPY --from=builder /app/src/db/migrations/ dist/db/migrations/
+COPY --from=builder /app/router/src/db/migrations/ router/dist/db/migrations/
 
 # 复制前端编译产物
 COPY --from=frontend-builder /app/frontend/dist frontend-dist/
 
 # 复制配置模板（recommended-providers.json 等）
-COPY config/ config/
+COPY router/config/ router/config/
 
 EXPOSE 9981
 
-CMD ["node", "dist/index.js"]
+CMD ["node", "router/dist/index.js"]

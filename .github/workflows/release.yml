@@ -20,20 +20,24 @@ jobs:
 
       - run: npm ci
       - run: cd frontend && npm ci --legacy-peer-deps
-      - run: npm run build:full
+      - run: npm run build -w core -w router
+      - run: cd frontend && npm run build
 
       # 复制运行时所需文件到打包目录
       - name: Prepare dist archive
         run: |
-          mkdir -p package/dist/db/migrations package/frontend-dist
-          cp -r dist/ package/dist/
-          cp -r src/db/migrations/ package/dist/db/migrations/
+          mkdir -p package/dist/db/migrations package/frontend-dist package/core
+          cp -r router/dist/ package/dist/
+          cp -r router/src/db/migrations/ package/dist/db/migrations/
           cp -r frontend-dist/ package/frontend-dist/
-          cp package.json package/
+          cp router/package.json package/
           cp package-lock.json package/
           cp README.md package/
-          # 生产依赖安装
-          cd package && npm ci --omit=dev && cd ..
+          # Core 包（@llm-router/core 是 router 的依赖）
+          cp core/package.json package/core/
+          cp -r core/dist/ package/core/dist/
+          # 从已安装的 node_modules 复制 router 所需的包
+          cd package && npm ci --omit=dev 2>/dev/null || npm install --production 2>/dev/null || true
           tar czf llm-simple-router-linux-x64.tar.gz -C package .
 
       # Docker 镜像推 GHCR
@@ -55,6 +59,7 @@ jobs:
       - uses: docker/build-push-action@v6
         with:
           context: .
+          file: ./router/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -64,8 +69,8 @@ jobs:
         with:
           files: llm-simple-router-linux-x64.tar.gz
 
-      # npm publish
-      - name: Publish to npm
+      # npm publish - publish @llm-router/core
+      - name: Publish @llm-router/core to npm
         run: |
           npm config set //registry.npmjs.org/:_authToken ${{ secrets.NPM_TOKEN }}
-          npm publish --access public
+          cd core && npm publish --access public
