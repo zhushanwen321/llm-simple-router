@@ -48,7 +48,8 @@ function loadJson<T>(filename: string): T {
   try {
     if (!fs.existsSync(filePath)) return [] as unknown as T
     return JSON.parse(fs.readFileSync(filePath, 'utf-8')) as T
-  } catch {
+  } catch (err) {
+    process.stderr.write(`[recommended] 加载 ${filename} 失败: ${err instanceof Error ? err.message : String(err)}\n`)
     return [] as unknown as T
   }
 }
