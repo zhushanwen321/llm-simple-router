@@ -18,7 +18,7 @@ jobs:
 
       - run: npm ci
       - run: cd core && npx tsc
-      - run: cd router && npx tsc
+      - run: cd router && ../node_modules/.bin/tsc
       - run: npm run test -w core -w router
 
   docker:

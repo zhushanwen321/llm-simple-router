@@ -21,7 +21,7 @@ jobs:
       - run: npm ci
       - run: cd frontend && npm ci --legacy-peer-deps
       - run: cd core && npx tsc
-      - run: cd router && npx tsc
+      - run: cd router && ../node_modules/.bin/tsc
       - run: cd frontend && npm run build
 
       # 复制运行时所需文件到打包目录
