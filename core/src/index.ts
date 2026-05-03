@@ -30,3 +30,12 @@ export type {
   LoopDetector,
   LoopDetectorStatus,
 } from "./loop-prevention/index.js";
+
+// Monitor
+export { RequestTracker, StatsAggregator, RuntimeCollector } from "./monitor/index.js";
+export type { ISemaphoreStatus, IAdaptiveStatus } from "./monitor/index.js";
+export type {
+  ActiveRequest, AttemptSnapshot, ContentBlock,
+  ProviderConcurrencySnapshot, ProviderStats, RuntimeMetrics,
+  SSEClient, StatsSnapshot, StreamContentSnapshot, StreamMetricsSnapshot,
+} from "./monitor/index.js";
