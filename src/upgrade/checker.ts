@@ -103,17 +103,13 @@ export function createUpgradeChecker(options?: CheckerOptions) {
   async function checkConfig(sourceOverride?: string): Promise<void> {
     try {
       const base = sourceOverride ?? configBaseUrl
-      const [versionResult] = await Promise.allSettled([
-        fetchJson(`${base}/version.json`),
-      ])
+      const remote = await fetchJson(`${base}/version.json`) as { providers?: number; retryRules?: number } | null
 
       // 远程无 version.json（老版本仓库）→ 视为无更新
-      if (versionResult.status !== 'fulfilled' || versionResult.value === null) {
+      if (remote === null) {
         configStatus = { hasUpdate: false, providerChanges: 0, retryRuleChanges: 0 }
         return
       }
-
-      const remote = versionResult.value as { providers?: number; retryRules?: number }
       const local = getConfigVersions()
 
       const providersChanged = (remote.providers ?? 0) > local.providers

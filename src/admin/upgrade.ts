@@ -158,6 +158,9 @@ export const adminUpgradeRoutes: FastifyPluginCallback<UpgradeRoutesOptions> = (
       if (providersResult.status === 'rejected' && rulesResult.status === 'rejected') {
         throw new Error('同步失败: 无法获取 providers 和 retry-rules 配置')
       }
+      if (versionResult.status === 'rejected') {
+        process.stderr.write('[upgrade] warning: version.json sync failed, providers/rules synced without version\n')
+      }
       reloadConfig()
       if (checker) await checker.check(getConfigBaseUrl(source))
       return reply.send({ ok: true })
