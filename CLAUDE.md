@@ -308,6 +308,40 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 ### 版本与发布规则
 
 - **合并 PR 到 main 不需要更新版本号**，多个 PR 可以积攒后统一发布
-- **发布流程**：更新 `package.json` 的 `version` → 推送到 main → 在 GitHub 创建 Release → CI 自动 `npm publish`
+- **发布流程**：更新 `router/package.json` 的 `version` → 提交并推送到 main → 打 tag → **创建 GitHub Release** → CI 自动 `npm publish`
+- **关键**：`release.yml` 的触发条件是 `on: release: types: [published]`，仅推送 tag **不会触发** npm 发布。必须通过 `gh release create` 创建 GitHub Release 才会触发 CI 发布流水线
 - **构建命令**：`npm run build:full`（tsc + 复制 migrations + 构建前端）；`prepublishOnly` 会自动执行前端构建
 - npm 不允许重复发布同一版本号，发布前必须 bump version
+
+### 合并与发布操作流程
+
+> **merge-worktree skill 必须先读取此段**，了解项目使用的脚本和流程。
+
+本项目使用 **bare repo + worktree** 结构（`workspace/.bare/` + `workspace/<branch>/`）。合并和发布使用项目内的 `scripts/release.sh`。
+
+#### 脚本
+
+| 脚本 | 用途 | 参数 |
+|------|------|------|
+| `scripts/release.sh` | 合并 + 版本升级 + tag + push + GitHub Release | `[patch\|minor\|major]`（默认 patch） |
+| `~/.claude/skills/pr-worktree/pr-worktree.sh` | 提交 + 推送 + 创建/更新 PR | `[--draft] [--title] [--body]` |
+| `~/.claude/skills/merge-worktree/merge-worktree.sh` | 清理已合并 worktree + 同步其他 worktree | `<branch-name>` |
+
+#### 完整操作步骤
+
+```
+1. 在 feature worktree 中开发完成
+2. 代码审查：bash ~/.claude/skills/code-review-worktree/review-context.sh
+3. 创建 PR：bash ~/.claude/skills/pr-worktree/pr-worktree.sh
+4. 合并+发布：bash scripts/release.sh [patch|minor|major]
+   ↑ 自动完成：merge --no-ff → 版本升级 → tag → push → GitHub Release
+5. 清理 worktree：bash ~/.claude/skills/merge-worktree/merge-worktree.sh <branch>
+```
+
+#### `scripts/release.sh` 执行环境
+
+- **运行位置**：feature worktree 目录（如 `fix/quick-setup-providers/`）
+- **不要在 main worktree 中运行**
+- **前提**：所有变更已 commit 并 push、gh CLI 已登录
+- **幂等**：最新 commit 含 "bump version" 时跳过版本升级；tag/release 已存在时跳过
+- **lock 文件**：自动检测 `router/package-lock.json` 和根 `package-lock.json`，只提交有变更的
