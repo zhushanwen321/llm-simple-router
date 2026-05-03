@@ -101,6 +101,7 @@ const CreateProviderSchema = Type.Object({
   name: Type.String({ minLength: 1 }),
   api_type: Type.Union([Type.Literal("openai"), Type.Literal("anthropic")]),
   base_url: Type.String({ minLength: 1 }),
+  upstream_path: Type.Optional(Type.String({ minLength: 1 })),
   api_key: Type.String({ minLength: 1 }),
   models: Type.Optional(Type.Array(Type.Union([
     Type.String(),
@@ -117,6 +118,7 @@ const UpdateProviderSchema = Type.Object({
   name: Type.Optional(Type.String({ minLength: 1 })),
   api_type: Type.Optional(Type.Union([Type.Literal("openai"), Type.Literal("anthropic")])),
   base_url: Type.Optional(Type.String({ minLength: 1 })),
+  upstream_path: Type.Optional(Type.String({ minLength: 1 })),
   api_key: Type.Optional(Type.String({ minLength: 1 })),
   models: Type.Optional(Type.Array(Type.Union([
     Type.String(),
@@ -182,6 +184,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
       name: body.name,
       api_type: body.api_type,
       base_url: body.base_url,
+      upstream_path: body.upstream_path ?? null,
       api_key: encryptedKey,
       api_key_preview: body.api_key.length > API_KEY_PREVIEW_MIN_LENGTH ? `${body.api_key.slice(0, API_KEY_PREVIEW_PREFIX_LEN)}...${body.api_key.slice(-API_KEY_PREVIEW_PREFIX_LEN)}` : "****",
       models: JSON.stringify(normalizedModels),
@@ -227,10 +230,11 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     if (body.name !== undefined && !PROVIDER_NAME_RE.test(body.name)) {
       return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.VALIDATION_FAILED, "Provider 名称仅允许英文大小写字母、数字、横线和下划线"));
     }
-    const fields: Partial<Pick<Provider, 'name' | 'api_type' | 'base_url' | 'api_key' | 'api_key_preview' | 'models' | 'is_active' | 'max_concurrency' | 'queue_timeout_ms' | 'max_queue_size' | 'adaptive_enabled'>> = {};
+    const fields: Partial<Pick<Provider, 'name' | 'api_type' | 'base_url' | 'upstream_path' | 'api_key' | 'api_key_preview' | 'models' | 'is_active' | 'max_concurrency' | 'queue_timeout_ms' | 'max_queue_size' | 'adaptive_enabled'>> = {};
     if (body.name !== undefined) fields.name = body.name;
     if (body.api_type !== undefined) fields.api_type = body.api_type;
     if (body.base_url !== undefined) fields.base_url = body.base_url;
+    if (body.upstream_path !== undefined) fields.upstream_path = body.upstream_path || null;
     if (body.is_active !== undefined) fields.is_active = body.is_active;
     if (body.models !== undefined) {
       const { entries, overrides } = extractModelOverrides(body.models as ModelInput[]);

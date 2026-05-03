@@ -22,6 +22,7 @@ const QuickSetupProviderSchema = Type.Object({
   name: Type.String({ minLength: 1 }),
   api_type: Type.Union([Type.Literal("openai"), Type.Literal("openai-responses"), Type.Literal("anthropic")]),
   base_url: Type.String({ minLength: 1 }),
+  upstream_path: Type.Optional(Type.String({ minLength: 1 })),
   api_key: Type.String({ minLength: 1 }),
   models: Type.Array(Type.Object({
     name: Type.String(),
@@ -115,6 +116,7 @@ export const adminQuickSetupRoutes: FastifyPluginCallback<QuickSetupRoutesOption
         name: body.provider.name,
         api_type: body.provider.api_type,
         base_url: body.provider.base_url,
+        upstream_path: body.provider.upstream_path ?? null,
         api_key: encryptedKey,
         api_key_preview: body.provider.api_key.length > API_KEY_PREVIEW_MIN_LENGTH
           ? `${body.provider.api_key.slice(0, API_KEY_PREVIEW_PREFIX_LEN)}...${body.provider.api_key.slice(-API_KEY_PREVIEW_PREFIX_LEN)}`

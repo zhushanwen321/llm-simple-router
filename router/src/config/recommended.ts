@@ -6,6 +6,7 @@ export interface ProviderPreset {
   presetName: string
   apiType: 'openai' | 'openai-responses' | 'anthropic'
   baseUrl: string
+  upstreamPath?: string
   models: string[]
 }
 
