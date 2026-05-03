@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { SemaphoreScope, TrackerScope } from "../src/proxy/orchestration/scope.js";
-import { ProviderSemaphoreManager } from "../src/proxy/orchestration/semaphore.js";
-import { RequestTracker } from "../src/monitor/request-tracker.js";
-import type { ActiveRequest } from "../src/monitor/types.js";
+import { SemaphoreManager as ProviderSemaphoreManager } from "@llm-router/core/concurrency";
+import { RequestTracker } from "@llm-router/core/monitor";
+import type { ActiveRequest } from "@llm-router/core/monitor";
 
 describe("SemaphoreScope", () => {
   function setup(maxConcurrency: number) {

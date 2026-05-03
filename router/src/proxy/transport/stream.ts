@@ -4,7 +4,7 @@ import { UPSTREAM_SUCCESS, filterHeaders } from "../types.js";
 import { buildUpstreamUrl } from "../proxy-core.js";
 import type { RawHeaders, StreamState, TransportResult, MetricsResult } from "../types.js";
 import type { SSEMetricsTransform } from "../../metrics/sse-metrics-transform.js";
-import type { StreamLoopGuard } from "../loop-prevention/stream-loop-guard.js";
+import type { StreamLoopGuard } from "@llm-router/core/loop-prevention";
 import {
   _transportInternals,
   buildRequestOptions,

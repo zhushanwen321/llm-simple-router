@@ -1,7 +1,7 @@
-import type { ProviderSemaphoreManager } from "./semaphore.js";
+import type { SemaphoreManager as ProviderSemaphoreManager } from "@llm-router/core/concurrency";
 import type { ConcurrencyOverride } from "../../core/types.js";
-import type { RequestTracker } from "../../monitor/request-tracker.js";
-import type { ActiveRequest, AttemptSnapshot } from "../../monitor/types.js";
+import type { RequestTracker } from "@llm-router/core/monitor";
+import type { ActiveRequest, AttemptSnapshot } from "@llm-router/core/monitor";
 
 export class SemaphoreScope {
   constructor(private manager: ProviderSemaphoreManager) {}

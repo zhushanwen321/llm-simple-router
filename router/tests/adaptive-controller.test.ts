@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { AdaptiveConcurrencyController } from "../src/proxy/adaptive-controller.js";
+import { AdaptiveController as AdaptiveConcurrencyController } from "@llm-router/core/concurrency";
 
 function createMockSemaphore() {
   return {

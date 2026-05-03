@@ -1,6 +1,9 @@
 // src/core/types.ts
 // 被多个目录（proxy, db, monitor, admin）共享的类型定义
 
+// Re-export ConcurrencyConfig from core
+export type { ConcurrencyConfig } from "@llm-router/core/concurrency";
+
 // ========== 来自原 proxy/strategy/types.ts ==========
 
 export interface Target {
@@ -13,13 +16,6 @@ export interface Target {
 export interface ResolveContext {
   now: Date;
   excludeTargets?: Target[];
-}
-
-/** Provider 级并发控制配置（唯一来源，替代 semaphore.ts 和 registry.ts 中的重复定义） */
-export interface ConcurrencyConfig {
-  maxConcurrency: number;
-  queueTimeoutMs: number;
-  maxQueueSize: number;
 }
 
 export interface ConcurrencyOverride {

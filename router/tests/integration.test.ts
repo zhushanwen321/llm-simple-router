@@ -13,7 +13,7 @@ import { encrypt } from "../src/utils/crypto.js";
 import { initDatabase } from "../src/db/index.js";
 import { setSetting } from "../src/db/settings.js";
 import { hashPassword } from "../src/utils/password.js";
-import { DEFAULT_LOOP_PREVENTION_CONFIG } from "../src/proxy/loop-prevention/types.js";
+import { DEFAULT_LOOP_PREVENTION_CONFIG } from "@llm-router/core/loop-prevention";
 
 const TEST_ENCRYPTION_KEY =
   "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";

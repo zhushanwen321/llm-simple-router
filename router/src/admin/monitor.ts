@@ -1,5 +1,6 @@
 import { FastifyPluginCallback } from "fastify";
-import type { RequestTracker } from "../monitor/request-tracker.js";
+import type { RequestTracker } from "@llm-router/core/monitor";
+import { adaptSSEClient } from "../core/sse-client-adapter.js";
 import { HTTP_NOT_FOUND } from "./constants.js";
 import { API_CODE, apiError } from "./api-response.js";
 
@@ -31,9 +32,10 @@ export const adminMonitorRoutes: FastifyPluginCallback<MonitorRoutesOptions> = (
       "Cache-Control": "no-cache",
       Connection: "keep-alive",
     });
-    tracker.addClient(reply.raw);
+    const sseClient = adaptSSEClient(reply.raw);
+    tracker.addClient(sseClient);
     request.raw.on("close", () => {
-      tracker.removeClient(reply.raw);
+      tracker.removeClient(sseClient);
     });
   });
 

@@ -1,6 +1,6 @@
 import { createHash } from "crypto";
-import type { ContentBlock } from "../../monitor/types.js";
-import type { ToolCallRecord } from "../loop-prevention/types.js";
+import type { ContentBlock } from "@llm-router/core/monitor";
+import type { ToolCallRecord } from "@llm-router/core/loop-prevention";
 import type { TransportResult } from "../types.js";
 import { parseToolArguments } from "../transform/sanitize.js";
 

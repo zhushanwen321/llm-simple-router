@@ -41,7 +41,7 @@ export interface StateRegistry {
   /** 移除 provider 的自适应并发状态（AdaptiveConcurrencyController.remove） */
   removeAdaptiveProvider(providerId: string): void;
   /** 获取 provider 的自适应并发状态 */
-  getAdaptiveStatus(providerId: string): import("../proxy/adaptive-controller.js").AdaptiveState | undefined;
+  getAdaptiveStatus(providerId: string): import("@llm-router/core/concurrency").AdaptiveState | undefined;
   /** 从 DB 重新读取所有 provider 配置，重建信号量/adaptive/tracker 缓存（导入配置后调用） */
   reinitializeProviders(): void;
 }

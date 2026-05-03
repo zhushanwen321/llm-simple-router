@@ -6,8 +6,8 @@ import { encrypt } from "../src/utils/crypto.js";
 import { anthropicProxy } from "../src/proxy/handler/anthropic.js";
 import { initDatabase } from "../src/db/index.js";
 import { setSetting } from "../src/db/settings.js";
-import { ProviderSemaphoreManager } from "../src/proxy/orchestration/semaphore.js";
-import { RequestTracker } from "../src/monitor/request-tracker.js";
+import { SemaphoreManager as ProviderSemaphoreManager } from "@llm-router/core/concurrency";
+import { RequestTracker } from "@llm-router/core/monitor";
 import { ServiceContainer, SERVICE_KEYS } from "../src/core/container.js";
 
 
