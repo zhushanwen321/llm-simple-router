@@ -1,6 +1,6 @@
 {
   "name": "llm-simple-router",
-  "version": "0.9.5",
+  "version": "0.9.6",
   "description": "LLM API proxy router with OpenAI/Anthropic support, model mapping, retry strategies, and admin dashboard",
   "license": "MIT",
   "author": "ZZzzswszzZZ",
@@ -9,8 +9,16 @@
     "type": "git",
     "url": "git+https://github.com/zhushanwen321/llm-simple-router.git"
   },
-  "bin": { "llm-simple-router": "./dist/cli.js" },
-  "files": ["dist/", "frontend-dist/", "config/", ".env.example", "LICENSE"],
+  "bin": {
+    "llm-simple-router": "./dist/cli.js"
+  },
+  "files": [
+    "dist/",
+    "frontend-dist/",
+    "config/",
+    ".env.example",
+    "LICENSE"
+  ],
   "scripts": {
     "dev": "PORT=9980 tsx watch src/index.ts",
     "build": "tsc",
