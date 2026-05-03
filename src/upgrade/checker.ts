@@ -1,8 +1,8 @@
 import http from 'node:http'
 import https from 'node:https'
-import fs from 'node:fs'
 import path from 'node:path'
 import { getInstalledVersion } from './version.js'
+import { getConfigVersions } from '../config/recommended.js'
 
 export interface NpmStatus {
   hasUpdate: boolean
@@ -86,16 +86,6 @@ export function createUpgradeChecker(options?: CheckerOptions) {
   }
   let lastCheckedAt: string | null = null
 
-  function loadLocalJson(filename: string): unknown {
-    const filePath = path.join(configDir, filename)
-    try {
-      if (!fs.existsSync(filePath)) return null
-      return JSON.parse(fs.readFileSync(filePath, 'utf-8'))
-    } catch {
-      return null
-    }
-  }
-
   async function checkNpm(): Promise<void> {
     try {
       const data = await fetchJson(npmRegistryUrl) as { 'dist-tags'?: { latest?: string } }
@@ -113,20 +103,17 @@ export function createUpgradeChecker(options?: CheckerOptions) {
   async function checkConfig(sourceOverride?: string): Promise<void> {
     try {
       const base = sourceOverride ?? configBaseUrl
-      const [providersResult, rulesResult] = await Promise.allSettled([
-        fetchJson(`${base}/recommended-providers.json`),
-        fetchJson(`${base}/recommended-retry-rules.json`),
-      ])
-      const remoteProviders = providersResult.status === 'fulfilled' ? providersResult.value : null
-      const remoteRules = rulesResult.status === 'fulfilled' ? rulesResult.value : null
-      if (!remoteProviders && !remoteRules) {
-        throw new Error('both providers and rules fetch failed')
-      }
-      const localProviders = loadLocalJson('recommended-providers.json')
-      const localRules = loadLocalJson('recommended-retry-rules.json')
+      const remote = await fetchJson(`${base}/version.json`) as { providers?: number; retryRules?: number } | null
 
-      const providersChanged = remoteProviders !== null && JSON.stringify(remoteProviders) !== JSON.stringify(localProviders)
-      const rulesChanged = remoteRules !== null && JSON.stringify(remoteRules) !== JSON.stringify(localRules)
+      // 远程无 version.json（老版本仓库）→ 视为无更新
+      if (remote === null) {
+        configStatus = { hasUpdate: false, providerChanges: 0, retryRuleChanges: 0 }
+        return
+      }
+      const local = getConfigVersions()
+
+      const providersChanged = (remote.providers ?? 0) > local.providers
+      const rulesChanged = (remote.retryRules ?? 0) > local.retryRules
 
       configStatus = {
         hasUpdate: providersChanged || rulesChanged,

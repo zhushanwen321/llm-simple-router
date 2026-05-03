@@ -25,6 +25,11 @@ export interface RecommendedRetryRule {
   providers?: string[]
 }
 
+export interface ConfigVersions {
+  providers: number
+  retryRules: number
+}
+
 let configDir = ''
 
 export function loadRecommendedConfig(dir?: string) {
@@ -42,6 +47,17 @@ export function getRecommendedRetryRules(): RecommendedRetryRule[] {
 // No-op: kept for backward compat (reload endpoint, upgrade flow)
 // Config is now always read from disk, no caching.
 export function reloadConfig() { /* no-op */ }
+
+/** 读取推荐配置的版本号（来自独立 version.json，历史版本代码不会读取此文件） */
+export function getConfigVersions(): ConfigVersions {
+  const filePath = path.join(configDir, 'version.json')
+  try {
+    if (!fs.existsSync(filePath)) return { providers: 0, retryRules: 0 }
+    return JSON.parse(fs.readFileSync(filePath, 'utf-8')) as ConfigVersions
+  } catch {
+    return { providers: 0, retryRules: 0 }
+  }
+}
 
 function loadJson<T>(filename: string): T {
   const filePath = path.join(configDir, filename)

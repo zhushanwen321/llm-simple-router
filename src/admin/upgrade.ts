@@ -141,9 +141,10 @@ export const adminUpgradeRoutes: FastifyPluginCallback<UpgradeRoutesOptions> = (
     const configDir = path.resolve(process.cwd(), 'config')
     try {
       fs.mkdirSync(configDir, { recursive: true })
-      const [providersResult, rulesResult] = await Promise.allSettled([
+      const [providersResult, rulesResult, versionResult] = await Promise.allSettled([
         fetchJson(`${base}/recommended-providers.json`),
         fetchJson(`${base}/recommended-retry-rules.json`),
+        fetchJson(`${base}/version.json`),
       ])
       if (providersResult.status === 'fulfilled') {
         fs.writeFileSync(path.join(configDir, 'recommended-providers.json'), JSON.stringify(providersResult.value, null, JSON_INDENT))
@@ -151,8 +152,14 @@ export const adminUpgradeRoutes: FastifyPluginCallback<UpgradeRoutesOptions> = (
       if (rulesResult.status === 'fulfilled') {
         fs.writeFileSync(path.join(configDir, 'recommended-retry-rules.json'), JSON.stringify(rulesResult.value, null, JSON_INDENT))
       }
+      if (versionResult.status === 'fulfilled') {
+        fs.writeFileSync(path.join(configDir, 'version.json'), JSON.stringify(versionResult.value, null, JSON_INDENT))
+      }
       if (providersResult.status === 'rejected' && rulesResult.status === 'rejected') {
         throw new Error('同步失败: 无法获取 providers 和 retry-rules 配置')
+      }
+      if (versionResult.status === 'rejected') {
+        process.stderr.write('[upgrade] warning: version.json sync failed, providers/rules synced without version\n')
       }
       reloadConfig()
       if (checker) await checker.check(getConfigBaseUrl(source))
