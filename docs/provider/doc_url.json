@@ -109,7 +109,8 @@
       "changelog": null
     },
     "pages": [],
-    "note": "Coding Plan (Anthropic 格式)；面向编码场景"
+    "note": "Coding Plan (Anthropic 格式)；面向编码场景",
+    "models": "https://docs.bigmodel.cn/cn/guide/develop/claude"
   },
   "kimi": {
     "group": "KIMI",
@@ -338,7 +339,7 @@
       "changelog": null
     },
     "pages": [],
-    "note": "OpenCode Go OpenAI 兼容端点; base_url 末尾不含 /v1/chat/completions 因为路由需要完整路径"
+    "note": "OpenCode Go OpenAI 兼容端点; baseUrl 已包含完整路径，buildUpstreamUrl 会自动检测后缀匹配不做二次追加"
   },
   "opencode-go-anthropic": {
     "group": "OpenCode",
@@ -354,6 +355,6 @@
       "changelog": null
     },
     "pages": [],
-    "note": "OpenCode Go Anthropic 兼容端点; base_url 末尾不含 /v1/messages 因为路由需要完整路径"
+    "note": "OpenCode Go Anthropic 兼容端点; baseUrl 已包含完整路径，buildUpstreamUrl 会自动检测后缀匹配不做二次追加"
   }
 }
