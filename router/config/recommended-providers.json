@@ -41,7 +41,8 @@
           "ernie-x1-32k-preview",
           "deepseek-v3",
           "deepseek-r1"
-        ]
+        ],
+        "upstreamPath": "/chat/completions"
       }
     ]
   },
@@ -52,7 +53,7 @@
         "plan": "API",
         "presetName": "iflytek-spark",
         "apiType": "openai",
-        "baseUrl": "https://spark-api-open.xf-yun.com/v1",
+        "baseUrl": "https://spark-api-open.xf-yun.com",
         "models": [
           "4.0Ultra",
           "generalv3.5",
@@ -71,7 +72,7 @@
         "plan": "API",
         "presetName": "siliconflow",
         "apiType": "openai",
-        "baseUrl": "https://api.siliconflow.cn/v1",
+        "baseUrl": "https://api.siliconflow.cn",
         "models": [
           "deepseek-ai/DeepSeek-V3.2-Exp",
           "deepseek-ai/DeepSeek-R1",
@@ -178,7 +179,7 @@
         "plan": "Coding Plan",
         "presetName": "volcengine-coding-plan",
         "apiType": "anthropic",
-        "baseUrl": "https://ark.cn-beijing.volces.com/api/compatible",
+        "baseUrl": "https://ark.cn-beijing.volces.com/api/coding",
         "models": [
           "ark-code-latest",
           "doubao-seed-2.0-code",
@@ -267,16 +268,34 @@
     ]
   },
   {
-    "group": "OpenCode Go",
+    "group": "OpenCode",
     "presets": [
       {
-        "plan": "Go",
+        "plan": "Go OpenAI",
+        "presetName": "opencode-go-openai",
+        "apiType": "openai",
+        "baseUrl": "https://opencode.ai/zen/go/v1/chat/completions",
+        "models": [
+          "glm-5.1",
+          "glm-5",
+          "kimi-k2.5",
+          "kimi-k2.6",
+          "deepseek-v4-pro",
+          "deepseek-v4-flash",
+          "mimo-v2-pro",
+          "mimo-v2-omni",
+          "mimo-v2.5-pro",
+          "mimo-v2.5",
+          "qwen3.6-plus",
+          "qwen3.5-plus"
+        ]
+      },
+      {
+        "plan": "Go Anthropic",
         "presetName": "opencode-go-anthropic",
         "apiType": "anthropic",
         "baseUrl": "https://opencode.ai/zen/go/v1/messages",
         "models": [
-          "deepseek-v4-pro",
-          "deepseek-v4-flash",
           "minimax-m2.7",
           "minimax-m2.5"
         ]
