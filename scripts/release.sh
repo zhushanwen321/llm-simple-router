@@ -2,9 +2,9 @@
 # release.sh — 合并 PR 分支到 main，升级版本，打 tag，推送，创建 GitHub Release
 #
 # 用法:
-#   ./scripts/release.sh [patch|minor|major]
-#   ./scripts/release.sh              # 默认 patch
-#   ./scripts/release.sh minor        # 升级中间位
+#   bash scripts/release.sh [patch|minor|major]
+#   bash scripts/release.sh              # 默认 patch
+#   bash scripts/release.sh minor        # 升级中间位
 #
 # 前提:
 #   - 在 feature worktree 目录中执行（如 fix/quick-setup-providers/）
@@ -32,8 +32,8 @@ command -v gh >/dev/null 2>&1 || { echo "Error: gh CLI 未安装"; exit 1; }
 gh auth status >/dev/null 2>&1 || { echo "Error: gh CLI 未登录"; exit 1; }
 
 # ── 定位 workspace ───────────────────────────────────
-# 当前 worktree 目录（feature 分支）
-WORKTREE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WORKTREE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 WORKSPACE_ROOT="$(cd "$WORKTREE_DIR/.." && pwd)"
 BARE_DIR="$WORKSPACE_ROOT/.bare"
 
@@ -108,11 +108,25 @@ echo ""
 # ── 步骤 2: 升级版本号 ────────────────────────────────
 echo "=== 步骤 2/5: 升级版本号 ==="
 
-PKG_FILE="$MAIN_WORKTREE/router/package.json"
-if [[ ! -f "$PKG_FILE" ]]; then
-  echo "Error: 找不到 $PKG_FILE"
+# 自动检测包含 version 字段的 package.json（可能是子包）
+PKG_FILE=""
+for candidate in \
+  "$MAIN_WORKTREE/router/package.json" \
+  "$MAIN_WORKTREE/package.json"; do
+  if [[ -f "$candidate" ]] && node -e "const p=require('$candidate'); if(!p.version) process.exit(1)" 2>/dev/null; then
+    PKG_FILE="$candidate"
+    break
+  fi
+done
+
+if [[ -z "$PKG_FILE" ]]; then
+  echo "Error: 找不到包含 version 字段的 package.json"
   exit 1
 fi
+
+# 获取 package.json 所在子目录（相对于 main worktree 根）
+PKG_SUBDIR=$(dirname "${PKG_FILE#$MAIN_WORKTREE/}")
+echo "发布包: $PKG_SUBDIR/package.json"
 
 OLD_VERSION=$(node -p "require('$PKG_FILE').version")
 
@@ -123,7 +137,7 @@ if echo "$LATEST_COMMIT_MSG" | grep -qi "bump version"; then
   NEW_VERSION="$OLD_VERSION"
 else
   # 使用 npm version 升级（不自动 commit）
-  cd "$MAIN_WORKTREE/router"
+  cd "$MAIN_WORKTREE/$PKG_SUBDIR"
   npm version "$VERSION_TYPE" --no-git-tag-version --allow-same-version
   cd "$MAIN_WORKTREE"
   NEW_VERSION=$(node -p "require('$PKG_FILE').version")
@@ -140,8 +154,20 @@ TAG="v$NEW_VERSION"
 if git diff --quiet HEAD 2>/dev/null; then
   echo "无版本变更需要提交"
 else
-  git add router/package.json router/package-lock.json
-  git commit -m "chore: bump version to $NEW_VERSION"
+  # 自动检测所有被 npm version 修改的文件（package.json + 可能的 lock 文件）
+  CHANGED_FILES=()
+  for f in \
+    "$PKG_SUBDIR/package.json" \
+    "$PKG_SUBDIR/package-lock.json" \
+    "package-lock.json"; do
+    [[ -f "$MAIN_WORKTREE/$f" ]] && git diff --quiet HEAD -- "$f" 2>/dev/null || CHANGED_FILES+=("$f")
+  done
+
+  if [[ ${#CHANGED_FILES[@]} -gt 0 ]]; then
+    git add "${CHANGED_FILES[@]}"
+    git commit -m "chore: bump version to $NEW_VERSION"
+    echo "提交: ${CHANGED_FILES[*]}"
+  fi
 fi
 
 # 检查 tag 是否已存在

@@ -1,6 +1,6 @@
 {
   "name": "llm-simple-router",
-  "version": "0.9.7",
+  "version": "0.9.8",
   "description": "LLM API proxy router with OpenAI/Anthropic support, model mapping, retry strategies, and admin dashboard",
   "license": "MIT",
   "author": "ZZzzswszzZZ",
