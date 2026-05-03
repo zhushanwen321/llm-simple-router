@@ -211,8 +211,11 @@ export async function buildApp(
     return payload
   })
 
-  loadRecommendedConfig();
-  startUpgradeChecker(options?.upgradeCheckerOptions);
+  loadRecommendedConfig(path.resolve(__dirname, '../config'));
+  startUpgradeChecker({
+    ...options?.upgradeCheckerOptions,
+    configDir: path.resolve(__dirname, '../config'),
+  });
 
   const container = new ServiceContainer();
   container.register(SERVICE_KEYS.db, () => db);

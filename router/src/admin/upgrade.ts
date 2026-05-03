@@ -20,13 +20,15 @@ interface UpgradeRoutesOptions {
   closeFn: () => Promise<void>
 }
 
-// 模块级单例：checker 和定时器
+// 模块级单例：checker、configDir 和定时器
 let checker: ReturnType<typeof createUpgradeChecker> | null = null
+let configDir: string = ''
 let intervalId: ReturnType<typeof setInterval> | null = null
 
 export function startUpgradeChecker(opts?: CheckerOptions) {
   if (checker) return checker
-  checker = createUpgradeChecker(opts)
+  configDir = opts?.configDir ?? path.resolve(process.cwd(), 'config')
+  checker = createUpgradeChecker({ ...opts, configDir })
   // 启动时检查一次，之后每小时
   checker.check()
   intervalId = setInterval(() => checker!.check(), CHECK_INTERVAL_MS)
@@ -138,18 +140,18 @@ export const adminUpgradeRoutes: FastifyPluginCallback<UpgradeRoutesOptions> = (
       return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.BAD_REQUEST, 'source must be github or gitee'))
     }
     const base = getConfigBaseUrl(source)
-    const configDir = path.resolve(process.cwd(), 'config')
+    const syncConfigDir = configDir || path.resolve(process.cwd(), 'config')
     try {
-      fs.mkdirSync(configDir, { recursive: true })
+      fs.mkdirSync(syncConfigDir, { recursive: true })
       const [providersResult, rulesResult] = await Promise.allSettled([
         fetchJson(`${base}/recommended-providers.json`),
         fetchJson(`${base}/recommended-retry-rules.json`),
       ])
       if (providersResult.status === 'fulfilled') {
-        fs.writeFileSync(path.join(configDir, 'recommended-providers.json'), JSON.stringify(providersResult.value, null, JSON_INDENT))
+        fs.writeFileSync(path.join(syncConfigDir, 'recommended-providers.json'), JSON.stringify(providersResult.value, null, JSON_INDENT))
       }
       if (rulesResult.status === 'fulfilled') {
-        fs.writeFileSync(path.join(configDir, 'recommended-retry-rules.json'), JSON.stringify(rulesResult.value, null, JSON_INDENT))
+        fs.writeFileSync(path.join(syncConfigDir, 'recommended-retry-rules.json'), JSON.stringify(rulesResult.value, null, JSON_INDENT))
       }
       if (providersResult.status === 'rejected' && rulesResult.status === 'rejected') {
         throw new Error('同步失败: 无法获取 providers 和 retry-rules 配置')

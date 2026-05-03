@@ -54,6 +54,9 @@ COPY --from=builder /app/src/db/migrations/ dist/db/migrations/
 # 复制前端编译产物
 COPY --from=frontend-builder /app/frontend/dist frontend-dist/
 
+# 复制配置模板（recommended-providers.json 等）
+COPY config/ config/
+
 EXPOSE 9981
 
 CMD ["node", "dist/index.js"]
