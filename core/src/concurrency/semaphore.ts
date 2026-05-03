@@ -61,6 +61,13 @@ export class SemaphoreManager {
 
     if (entry.current < 0) entry.current = 0;
 
+    // 当 maxConcurrency 降低时，将 current 限制在新的上限，
+    // 防止 current 停留在旧的高位，导致新请求始终进入队列、
+    // 且 release() 无法通过空队检查来递减 current（排队长驻）
+    if (entry.current > config.maxConcurrency) {
+      entry.current = config.maxConcurrency;
+    }
+
     while (
       entry.current < config.maxConcurrency &&
       entry.queue.length > 0
