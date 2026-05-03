@@ -22,13 +22,13 @@ export interface ProviderConcurrencyParams {
 export interface StateRegistry {
   /** 刷新重试规则缓存（RetryRuleMatcher.load） */
   refreshRetryRules(): void;
-  /** 更新 provider 并发配置（ProviderSemaphoreManager.updateConfig） */
+  /** 更新 provider 并发配置（SemaphoreManager.updateConfig） */
   updateProviderConcurrency(providerId: string, config: ConcurrencyConfig): void;
-  /** 移除 provider 的信号量（ProviderSemaphoreManager.remove） */
+  /** 移除 provider 的信号量（SemaphoreManager.remove） */
   removeProvider(providerId: string): void;
-  /** 移除所有信号量配置（ProviderSemaphoreManager.removeAll） */
+  /** 移除所有信号量配置（SemaphoreManager.removeAll） */
   removeAllProviders(): void;
-  /** 获取 provider 并发状态（ProviderSemaphoreManager.getStatus） */
+  /** 获取 provider 并发状态（SemaphoreManager.getStatus） */
   getProviderStatus(providerId: string): { active: number; queued: number };
   /** 清空所有会话模型状态（modelState.clearAll） */
   clearModelState(): void;
@@ -36,9 +36,9 @@ export interface StateRegistry {
   deleteModelState(keyId: string, sessionId: string): void;
   /** 读取 proxy enhancement 配置 */
   getEnhancementConfig(): EnhancementConfig;
-  /** 同步 provider 的自适应并发配置（AdaptiveConcurrencyController.syncProvider） */
+  /** 同步 provider 的自适应并发配置（AdaptiveController.syncProvider） */
   syncAdaptiveProvider(providerId: string, params: ProviderConcurrencyParams): void;
-  /** 移除 provider 的自适应并发状态（AdaptiveConcurrencyController.remove） */
+  /** 移除 provider 的自适应并发状态（AdaptiveController.remove） */
   removeAdaptiveProvider(providerId: string): void;
   /** 获取 provider 的自适应并发状态 */
   getAdaptiveStatus(providerId: string): import("@llm-router/core/concurrency").AdaptiveState | undefined;
