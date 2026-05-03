@@ -33,7 +33,8 @@ CREATE TABLE providers_new (
   updated_at TEXT NOT NULL
 );
 
-INSERT INTO providers_new SELECT * FROM providers;
+INSERT INTO providers_new (id, name, api_type, base_url, api_key, api_key_preview, models, is_active, max_concurrency, queue_timeout_ms, max_queue_size, adaptive_enabled, adaptive_min, created_at, updated_at)
+SELECT id, name, api_type, base_url, api_key, api_key_preview, models, is_active, max_concurrency, queue_timeout_ms, max_queue_size, adaptive_enabled, adaptive_min, created_at, updated_at FROM providers;
 DROP TABLE providers;
 ALTER TABLE providers_new RENAME TO providers;
 
