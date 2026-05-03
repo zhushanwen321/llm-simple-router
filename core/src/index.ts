@@ -7,6 +7,10 @@
 export { SemaphoreQueueFullError, SemaphoreTimeoutError } from "./errors.js";
 export type { Logger } from "./types.js";
 
+// Concurrency
+export { SemaphoreManager, AdaptiveController } from "./concurrency/index.js";
+export type { AcquireToken, ConcurrencyConfig, AdaptiveState, AdaptiveResult, ISemaphoreControl, ProviderConcurrencyParams } from "./concurrency/index.js";
+
 // Loop prevention
 export {
   SessionTracker,
