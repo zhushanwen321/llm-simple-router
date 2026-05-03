@@ -29,7 +29,7 @@ export interface CheckerOptions {
 }
 
 const DEFAULT_NPM_REGISTRY = 'https://registry.npmjs.org/llm-simple-router'
-const DEFAULT_GITHUB_CONFIG_BASE = 'https://raw.githubusercontent.com/zhushanwen321/llm-simple-router/main/config'
+const DEFAULT_GITHUB_CONFIG_BASE = 'https://raw.githubusercontent.com/zhushanwen321/llm-simple-router/main/router/config'
 const CHECK_TIMEOUT_MS = 5000
 const HTTP_STATUS_REDIRECT_LOWER = 300
 const HTTP_STATUS_REDIRECT_UPPER = 400

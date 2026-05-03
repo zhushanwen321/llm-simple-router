@@ -7,6 +7,7 @@ export interface Provider {
   name: string;
   api_type: "openai" | "openai-responses" | "anthropic";
   base_url: string;
+  upstream_path: string | null;
   api_key: string;
   api_key_preview?: string;
   models: string; // JSON 数组文本
@@ -26,7 +27,7 @@ export const PROVIDER_CONCURRENCY_DEFAULTS = {
 } as const;
 
 const PROVIDER_FIELDS = new Set([
-  "name", "api_type", "base_url", "api_key", "api_key_preview", "models", "is_active", "max_concurrency", "queue_timeout_ms", "max_queue_size", "adaptive_enabled",
+  "name", "api_type", "base_url", "upstream_path", "api_key", "api_key_preview", "models", "is_active", "max_concurrency", "queue_timeout_ms", "max_queue_size", "adaptive_enabled",
 ]);
 
 export function getActiveProviders(
@@ -52,6 +53,7 @@ export function createProvider(
     name: string;
     api_type: "openai" | "openai-responses" | "anthropic";
     base_url: string;
+    upstream_path?: string | null;
     api_key: string;
     api_key_preview?: string;
     models?: string;
@@ -65,10 +67,11 @@ export function createProvider(
   const id = randomUUID();
   const now = new Date().toISOString();
   db.prepare(
-    `INSERT INTO providers (id, name, api_type, base_url, api_key, api_key_preview, models, is_active, max_concurrency, queue_timeout_ms, max_queue_size, adaptive_enabled, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO providers (id, name, api_type, base_url, upstream_path, api_key, api_key_preview, models, is_active, max_concurrency, queue_timeout_ms, max_queue_size, adaptive_enabled, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     id, provider.name, provider.api_type, provider.base_url,
+    provider.upstream_path ?? null,
     provider.api_key, provider.api_key_preview ?? null,
     provider.models ?? "[]",
     provider.is_active ?? 1,
@@ -84,7 +87,7 @@ export function createProvider(
 export function updateProvider(
   db: Database.Database,
   id: string,
-  fields: Partial<Pick<Provider, "name" | "api_type" | "base_url" | "api_key" | "api_key_preview" | "models" | "is_active" | "max_concurrency" | "queue_timeout_ms" | "max_queue_size" | "adaptive_enabled">>,
+  fields: Partial<Pick<Provider, "name" | "api_type" | "base_url" | "upstream_path" | "api_key" | "api_key_preview" | "models" | "is_active" | "max_concurrency" | "queue_timeout_ms" | "max_queue_size" | "adaptive_enabled">>,
 ): void {
   buildUpdateQuery(db, "providers", id, fields, PROVIDER_FIELDS, { updatedAt: true });
 }

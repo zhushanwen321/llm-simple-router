@@ -21,6 +21,7 @@
             <TableHead class="text-muted-foreground">{{ t('providers.tableHeaders.name') }}</TableHead>
             <TableHead class="text-muted-foreground">{{ t('providers.tableHeaders.type') }}</TableHead>
             <TableHead class="text-muted-foreground">{{ t('providers.tableHeaders.baseUrl') }}</TableHead>
+            <TableHead class="text-xs">Path</TableHead>
             <TableHead class="text-muted-foreground">{{ t('providers.tableHeaders.apiKey') }}</TableHead>
             <TableHead class="text-muted-foreground">{{ t('providers.tableHeaders.models') }}</TableHead>
             <TableHead class="text-muted-foreground">{{ t('providers.tableHeaders.concurrency') }}</TableHead>
@@ -35,6 +36,7 @@
               <Badge variant="secondary">{{ API_TYPE_LABELS[p.api_type] ?? p.api_type }}</Badge>
             </TableCell>
             <TableCell class="text-muted-foreground">{{ p.base_url }}</TableCell>
+            <TableCell class="text-muted-foreground text-xs">{{ p.upstream_path || (p.api_type === 'anthropic' ? '/v1/messages' : '/v1/chat/completions') }}</TableCell>
             <TableCell>
               <div class="flex items-center gap-1">
                 <span class="font-mono text-xs text-muted-foreground">{{ maskKey(p.api_key) }}</span>
@@ -79,7 +81,7 @@
             </TableCell>
           </TableRow>
           <TableRow v-if="providers.length === 0">
-            <TableCell colspan="8" class="text-center text-muted-foreground py-8">{{ t('providers.noProviders') }}</TableCell>
+            <TableCell colspan="9" class="text-center text-muted-foreground py-8">{{ t('providers.noProviders') }}</TableCell>
           </TableRow>
         </TableBody>
       </Table>
@@ -149,6 +151,12 @@
               <Input v-model="form.api_key" type="text" :required="!editingId" :placeholder="editingId ? t('providers.fields.apiKeyPlaceholder') : ''" class="mt-1" @input="delete errors.api_key" />
               <p v-if="errors.api_key" class="text-xs text-destructive mt-0.5">{{ errors.api_key }}</p>
             </div>
+          </div>
+          <!-- Upstream Path -->
+          <div>
+            <Label class="text-xs">Upstream Path</Label>
+            <Input v-model="form.upstream_path" placeholder="默认: /v1/chat/completions 或 /v1/messages" class="mt-1 font-mono text-xs" />
+            <p class="text-xs text-muted-foreground mt-0.5">留空使用 API 类型默认路径</p>
           </div>
 
           <!-- 可用模型 -->
@@ -296,7 +304,7 @@ const CONTEXT_WINDOW_OPTIONS = [
   { label: '1M', value: '1000000' },
 ] as const
 const API_TYPE_LABELS: Record<string, string> = { openai: 'OpenAI Chat Completions', 'openai-responses': 'OpenAI Responses', anthropic: 'Anthropic Messages' }
-const DEFAULT_FORM = { name: '', api_type: 'anthropic', base_url: '', api_key: '', models: [] as ModelInfo[], is_active: true, max_concurrency: DEFAULT_CONCURRENCY_AUTO, queue_timeout_ms: DEFAULT_QUEUE_TIMEOUT_MS, max_queue_size: DEFAULT_QUEUE_SIZE, adaptive_enabled: true }
+const DEFAULT_FORM = { name: '', api_type: 'anthropic', base_url: '', upstream_path: '' as string, api_key: '', models: [] as ModelInfo[], is_active: true, max_concurrency: DEFAULT_CONCURRENCY_AUTO, queue_timeout_ms: DEFAULT_QUEUE_TIMEOUT_MS, max_queue_size: DEFAULT_QUEUE_SIZE, adaptive_enabled: true }
 const modelInput = ref('')
 const modelContextWindow = ref(DEFAULT_CONTEXT_WINDOW)
 const contextWindowSelect = computed({
@@ -472,7 +480,7 @@ function openEdit(p: Provider) {
   } else {
     concurrencyMode.value = 'manual'
   }
-  form.value = { name: p.name, api_type: p.api_type, base_url: p.base_url, api_key: '', models: (p.models || []).map(m => ({ name: m.name, context_window: m.context_window ?? DEFAULT_CONTEXT_WINDOW, patches: m.patches ?? [] })), is_active: !!p.is_active, max_concurrency: concurrencyMode.value === 'none' ? DEFAULT_CONCURRENCY_AUTO : mc, queue_timeout_ms: p.queue_timeout_ms ?? DEFAULT_QUEUE_TIMEOUT_MS, max_queue_size: p.max_queue_size ?? DEFAULT_QUEUE_SIZE, adaptive_enabled: concurrencyMode.value === 'auto' }
+  form.value = { name: p.name, api_type: p.api_type, base_url: p.base_url, upstream_path: p.upstream_path || '', api_key: '', models: (p.models || []).map(m => ({ name: m.name, context_window: m.context_window ?? DEFAULT_CONTEXT_WINDOW, patches: m.patches ?? [] })), is_active: !!p.is_active, max_concurrency: concurrencyMode.value === 'none' ? DEFAULT_CONCURRENCY_AUTO : mc, queue_timeout_ms: p.queue_timeout_ms ?? DEFAULT_QUEUE_TIMEOUT_MS, max_queue_size: p.max_queue_size ?? DEFAULT_QUEUE_SIZE, adaptive_enabled: concurrencyMode.value === 'auto' }
   modelInput.value = ''
   modelContextWindow.value = DEFAULT_CONTEXT_WINDOW
   presetGroup.value = ''
@@ -482,13 +490,14 @@ function openEdit(p: Provider) {
   loadTransformRules(p.id)
 }
 
-type ProviderFormPayload = Pick<ProviderPayload, 'name' | 'api_type' | 'base_url' | 'models' | 'is_active' | 'max_concurrency' | 'queue_timeout_ms' | 'max_queue_size' | 'adaptive_enabled'> & { api_key?: string }
+type ProviderFormPayload = Pick<ProviderPayload, 'name' | 'api_type' | 'base_url' | 'upstream_path' | 'models' | 'is_active' | 'max_concurrency' | 'queue_timeout_ms' | 'max_queue_size' | 'adaptive_enabled'> & { api_key?: string }
 
 function buildPayload(): ProviderFormPayload {
   const payload: ProviderFormPayload = {
     name: form.value.name,
     api_type: form.value.api_type,
     base_url: form.value.base_url,
+    upstream_path: form.value.upstream_path || null,
     models: form.value.models.map(m => ({ name: m.name, context_window: m.context_window ?? undefined, patches: m.patches ?? undefined })),
     is_active: form.value.is_active ? 1 : 0,
     max_concurrency: concurrencyMode.value === 'none' ? 0 : form.value.max_concurrency,

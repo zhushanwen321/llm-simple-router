@@ -102,6 +102,7 @@ export interface ProviderPreset {
   presetName: string;
   apiType: "openai" | "openai-responses" | "anthropic";
   baseUrl: string;
+  upstreamPath?: string;
   models: string[];
 }
 
@@ -126,6 +127,7 @@ export interface ProviderPayload {
   name: string;
   api_type: string;
   base_url: string;
+  upstream_path?: string;
   api_key?: string;
   models?: Array<string | { name: string; context_window?: number; patches?: string[] }>;
   is_active: number;
@@ -174,6 +176,7 @@ export interface QuickSetupPayload {
     name: string
     api_type: string
     base_url: string
+    upstream_path?: string
     api_key: string
     models: Array<{ name: string; context_window?: number; patches?: string[] }>
     concurrency_mode?: 'auto' | 'manual' | 'none'

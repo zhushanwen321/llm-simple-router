@@ -10,8 +10,8 @@ import path from 'node:path'
 import { HTTP_BAD_REQUEST, HTTP_INTERNAL_ERROR } from '../core/constants.js'
 import { API_CODE, apiError } from './api-response.js'
 
-const GITHUB_CONFIG_BASE = 'https://raw.githubusercontent.com/zhushanwen321/llm-simple-router/main/config'
-const GITEE_CONFIG_BASE = 'https://gitee.com/zzzzswszzzz/llm-simple-router/raw/main/config'
+const GITHUB_CONFIG_BASE = 'https://raw.githubusercontent.com/zhushanwen321/llm-simple-router/main/router/config'
+const GITEE_CONFIG_BASE = 'https://gitee.com/zzzzswszzzz/llm-simple-router/raw/main/router/config'
 const CHECK_INTERVAL_MS = 60 * 60 * 1000 // eslint-disable-line no-magic-numbers
 const JSON_INDENT = 2
 

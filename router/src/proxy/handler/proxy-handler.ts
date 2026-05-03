@@ -307,6 +307,11 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
       effectiveApiType = provider.api_type;
     }
 
+    // Provider 自定义 upstream_path 覆盖默认路径（例如百度千帆 /chat/completions）
+    if (provider.upstream_path) {
+      effectiveUpstreamPath = provider.upstream_path;
+    }
+
     // routing — 创建新对象而非 in-place mutation
     currentBody = { ...currentBody, model: resolved.backend_model };
     iterationSnapshot.add({ stage: "routing", client_model: effectiveModel, backend_model: resolved.backend_model, provider_id: resolved.provider_id, strategy: resolveResult.targetCount > 1 ? "failover" : "scheduled" });

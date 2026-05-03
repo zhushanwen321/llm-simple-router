@@ -26,7 +26,7 @@ const { t } = useI18n()
       <Input
         :model-value="injectHeaders"
         placeholder='{"x-custom": "value"}'
-        class="mt-0.5 text-xs font-mono"
+        class="mt-0.5 md:text-xs font-mono"
         @update:model-value="emit('update:injectHeaders', $event as string)"
       />
     </div>
@@ -35,7 +35,7 @@ const { t } = useI18n()
       <Input
         :model-value="dropFields"
         placeholder="logprobs, frequency_penalty"
-        class="mt-0.5 text-xs font-mono"
+        class="mt-0.5 md:text-xs font-mono"
         @update:model-value="emit('update:dropFields', $event as string)"
       />
     </div>
@@ -44,7 +44,7 @@ const { t } = useI18n()
       <Input
         :model-value="requestDefaults"
         placeholder='{"max_tokens": 4096}'
-        class="mt-0.5 text-xs font-mono"
+        class="mt-0.5 md:text-xs font-mono"
         @update:model-value="emit('update:requestDefaults', $event as string)"
       />
     </div>
