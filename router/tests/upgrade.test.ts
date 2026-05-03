@@ -67,11 +67,13 @@ function createMockRegistry(_port: number, latestVersion: string) {
   })
 }
 
-function createMockFileServer(_port: number, providers: unknown, rules: unknown) {
+function createMockFileServer(_port: number, providers: unknown, rules: unknown, versions?: { providers: number; retryRules: number }) {
   return http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json' })
-    if (req.url?.includes('providers')) {
+    if (req.url?.includes('providers') && !req.url?.includes('version')) {
       res.end(JSON.stringify(providers))
+    } else if (req.url?.includes('version')) {
+      res.end(JSON.stringify(versions ?? { providers: 1, retryRules: 1 }))
     } else {
       res.end(JSON.stringify(rules))
     }
