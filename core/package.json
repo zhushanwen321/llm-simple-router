@@ -23,7 +23,9 @@
       "import": "./dist/monitor/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
@@ -31,6 +33,7 @@
     "clean": "rm -rf dist"
   },
   "devDependencies": {
+    "@types/node": "^24.12.2",
     "typescript": "^5.8.3",
     "vitest": "^3.1.2"
   }
