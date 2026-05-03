@@ -10,9 +10,9 @@ import type { ErrorKind } from "../proxy-core.js";
 import type { RawHeaders } from "../types.js";
 import { handleProxyRequest, type RouteHandlerDeps } from "./proxy-handler.js";
 import { createOrchestrator } from "../orchestration/orchestrator.js";
-import { SemaphoreManager as ProviderSemaphoreManager } from "@llm-router/core/concurrency";
+import { SemaphoreManager } from "@llm-router/core/concurrency";
 import type { RequestTracker } from "@llm-router/core/monitor";
-import type { AdaptiveController as AdaptiveConcurrencyController } from "@llm-router/core/concurrency";
+import { AdaptiveController } from "@llm-router/core/concurrency";
 import { HTTP_NOT_FOUND, HTTP_BAD_GATEWAY } from "../../core/constants.js";
 import { SERVICE_KEYS } from "../../core/container.js";
 
@@ -51,9 +51,9 @@ const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, do
   const { db, container } = opts;
 
   const orchestrator = createOrchestrator(
-    container.resolve<ProviderSemaphoreManager>(SERVICE_KEYS.semaphoreManager),
+    container.resolve<SemaphoreManager>(SERVICE_KEYS.semaphoreManager),
     container.resolve<RequestTracker>(SERVICE_KEYS.tracker),
-    container.resolve<AdaptiveConcurrencyController>(SERVICE_KEYS.adaptiveController),
+    container.resolve<AdaptiveController>(SERVICE_KEYS.adaptiveController),
   );
 
   const handleChatCompletions = async (request: FastifyRequest, reply: FastifyReply) => {

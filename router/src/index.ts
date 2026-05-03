@@ -23,15 +23,13 @@ import { responsesProxy } from "./proxy/handler/responses.js";
 import { adminRoutes } from "./admin/routes.js";
 import { RetryRuleMatcher } from "./proxy/orchestration/retry-rules.js";
 import { PluginRegistry } from "./proxy/transform/plugin-registry.js";
-import { ProviderSemaphoreManager } from "./proxy/orchestration/semaphore.js";
-import { AdaptiveConcurrencyController } from "./proxy/adaptive-controller.js";
+import { SemaphoreManager, AdaptiveController } from "@llm-router/core/concurrency";
 import { loadEnhancementConfig } from "./proxy/routing/enhancement-config.js";
 import type { StateRegistry } from "./core/registry.js";
-import { RequestTracker } from "./monitor/request-tracker.js";
+import { RequestTracker } from "@llm-router/core/monitor";
 import { modelState } from "./proxy/routing/model-state.js";
 import { UsageWindowTracker } from "./proxy/routing/usage-window-tracker.js";
-import { SessionTracker } from "./proxy/loop-prevention/session-tracker.js";
-import { DEFAULT_LOOP_PREVENTION_CONFIG } from "./proxy/loop-prevention/types.js";
+import { SessionTracker, DEFAULT_LOOP_PREVENTION_CONFIG } from "@llm-router/core/loop-prevention";
 import { scheduleLogCleanup } from "./db/log-cleaner.js";
 import { scheduleDbSizeMonitor } from "./db/db-size-monitor.js";
 import { startUpgradeChecker, stopUpgradeChecker } from "./admin/upgrade.js";
@@ -56,8 +54,8 @@ export interface AppOptions {
  */
 export function initializeProviderState(
   db: Database.Database,
-  semaphoreManager: ProviderSemaphoreManager,
-  adaptiveController: AdaptiveConcurrencyController,
+  semaphoreManager: SemaphoreManager,
+  adaptiveController: AdaptiveController,
   tracker: RequestTracker,
 ): void {
   const allProviders = getAllProviders(db);
@@ -219,7 +217,7 @@ export async function buildApp(
   const container = new ServiceContainer();
   container.register(SERVICE_KEYS.db, () => db);
   container.register(SERVICE_KEYS.matcher, (c) => { const m = new RetryRuleMatcher(); m.load(c.resolve(SERVICE_KEYS.db)); return m; });
-  container.register(SERVICE_KEYS.semaphoreManager, () => new ProviderSemaphoreManager());
+  container.register(SERVICE_KEYS.semaphoreManager, () => new SemaphoreManager());
   container.register(SERVICE_KEYS.tracker, (c) => {
     const t = new RequestTracker({ semaphoreManager: c.resolve(SERVICE_KEYS.semaphoreManager), logger: app.log });
     t.startPushInterval();
@@ -244,9 +242,9 @@ export async function buildApp(
   // 注入 DB 到 modelState 单例，启用会话级持久化
   modelState.init(db);
 
-  // 注册 AdaptiveConcurrencyController（依赖已注册的 semaphoreManager）
+  // 注册 AdaptiveController（依赖已注册的 semaphoreManager）
   container.register(SERVICE_KEYS.adaptiveController, (c) => {
-    const ac = new AdaptiveConcurrencyController(c.resolve(SERVICE_KEYS.semaphoreManager), app.log);
+    const ac = new AdaptiveController(c.resolve(SERVICE_KEYS.semaphoreManager), app.log);
     return ac;
   });
 
@@ -259,13 +257,13 @@ export async function buildApp(
 
   // 从容器解析所有服务
   const matcher = container.resolve<RetryRuleMatcher>(SERVICE_KEYS.matcher);
-  const semaphoreManager = container.resolve<ProviderSemaphoreManager>(SERVICE_KEYS.semaphoreManager);
+  const semaphoreManager = container.resolve<SemaphoreManager>(SERVICE_KEYS.semaphoreManager);
   const tracker = container.resolve<RequestTracker>(SERVICE_KEYS.tracker);
   const usageWindowTracker = container.resolve<UsageWindowTracker>(SERVICE_KEYS.usageWindowTracker);
-  const adaptiveController = container.resolve<AdaptiveConcurrencyController>(SERVICE_KEYS.adaptiveController);
+  const adaptiveController = container.resolve<AdaptiveController>(SERVICE_KEYS.adaptiveController);
 
   // Wire adaptive controller to tracker
-  tracker.setAdaptiveController(adaptiveController);
+  tracker.setAdaptiveStatusProvider(adaptiveController);
 
   // 从 DB 读取已有 provider 的并发配置，初始化信号量/adaptive/tracker（共享逻辑）
   initializeProviderState(db, semaphoreManager, adaptiveController, tracker);
