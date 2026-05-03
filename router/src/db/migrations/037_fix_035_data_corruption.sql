@@ -27,6 +27,9 @@
 --   old(15) adaptive_min        → new updated_at
 --
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> dabf184 (fix(shutdown): second Ctrl+C force-exits immediately)
 -- Guard: only fixes rows where max_concurrency contains text data
 -- (api_key_preview leaked into an INTEGER column). Providers created after
 -- 035 have correct INTEGER values and are not affected.
@@ -53,6 +56,7 @@ WHERE typeof((
 
 -- Step 3: Cleanup
 DROP TABLE _m036_snapshot;
+<<<<<<< HEAD
 =======
 -- This migration reverses the shift with explicit column mapping.
 
@@ -146,3 +150,5 @@ INSERT OR IGNORE INTO provider_transform_rules SELECT * FROM _tmp_m036_transform
 DROP TABLE _tmp_m036_model_info;
 DROP TABLE _tmp_m036_transform_rules;
 >>>>>>> c5fc153 (fix(db): fix column order corruption in migration 035)
+=======
+>>>>>>> dabf184 (fix(shutdown): second Ctrl+C force-exits immediately)

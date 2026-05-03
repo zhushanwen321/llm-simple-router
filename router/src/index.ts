@@ -23,14 +23,15 @@ import { responsesProxy } from "./proxy/handler/responses.js";
 import { adminRoutes } from "./admin/routes.js";
 import { RetryRuleMatcher } from "./proxy/orchestration/retry-rules.js";
 import { PluginRegistry } from "./proxy/transform/plugin-registry.js";
-import { SemaphoreManager as ProviderSemaphoreManager } from "@llm-router/core/concurrency";
-import { AdaptiveController as AdaptiveConcurrencyController } from "@llm-router/core/concurrency";
+import { ProviderSemaphoreManager } from "./proxy/orchestration/semaphore.js";
+import { AdaptiveConcurrencyController } from "./proxy/adaptive-controller.js";
 import { loadEnhancementConfig } from "./proxy/routing/enhancement-config.js";
 import type { StateRegistry } from "./core/registry.js";
-import { RequestTracker } from "@llm-router/core/monitor";
+import { RequestTracker } from "./monitor/request-tracker.js";
 import { modelState } from "./proxy/routing/model-state.js";
 import { UsageWindowTracker } from "./proxy/routing/usage-window-tracker.js";
-import { SessionTracker, DEFAULT_LOOP_PREVENTION_CONFIG } from "@llm-router/core/loop-prevention";
+import { SessionTracker } from "./proxy/loop-prevention/session-tracker.js";
+import { DEFAULT_LOOP_PREVENTION_CONFIG } from "./proxy/loop-prevention/types.js";
 import { scheduleLogCleanup } from "./db/log-cleaner.js";
 import { scheduleDbSizeMonitor } from "./db/db-size-monitor.js";
 import { startUpgradeChecker, stopUpgradeChecker } from "./admin/upgrade.js";
@@ -264,7 +265,7 @@ export async function buildApp(
   const adaptiveController = container.resolve<AdaptiveConcurrencyController>(SERVICE_KEYS.adaptiveController);
 
   // Wire adaptive controller to tracker
-  tracker.setAdaptiveStatusProvider(adaptiveController);
+  tracker.setAdaptiveController(adaptiveController);
 
   // 从 DB 读取已有 provider 的并发配置，初始化信号量/adaptive/tracker（共享逻辑）
   initializeProviderState(db, semaphoreManager, adaptiveController, tracker);
