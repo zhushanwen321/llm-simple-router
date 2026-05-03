@@ -1,4 +1,4 @@
--- Fix data corruption caused by migration 035.
+-- Fix data corruption caused by migration 036.
 -- Migration 035 used `INSERT INTO providers_new SELECT * FROM providers`
 -- which matches columns by position, not by name. The new table had a different
 -- column order than the old table (where columns were added sequentially via
