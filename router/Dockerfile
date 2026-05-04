@@ -3,15 +3,15 @@ FROM node:22-alpine AS frontend-builder
 
 WORKDIR /app
 
-# vite.config.ts 引用根目录 package.json 读取版本号
-COPY package.json package.json
+# 复制 monorepo 锁文件和根 package.json
+COPY package.json package-lock.json ./
+COPY frontend/ frontend/
 
+# 通过 monorepo workspace 安装前端依赖
+RUN npm ci --workspace=frontend --legacy-peer-deps
+
+# 构建前端
 WORKDIR /app/frontend
-
-COPY frontend/package*.json ./
-RUN npm ci --legacy-peer-deps
-
-COPY frontend/ .
 RUN npm run build
 
 # 阶段1：构建后端
