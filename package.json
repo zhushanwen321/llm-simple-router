@@ -1,10 +1,18 @@
 {
   "name": "llm-simple-router-workspace",
   "private": true,
-  "workspaces": ["core", "router", "pi-extension", "frontend"],
+  "workspaces": [
+    "core",
+    "router",
+    "pi-extension",
+    "frontend"
+  ],
   "scripts": {
     "build": "npm run build -w core -w router",
     "test": "npm run test -w core -w router",
     "dev": "npm run dev -w router"
+  },
+  "devDependencies": {
+    "eslint-plugin-vue": "^10.9.0"
   }
 }

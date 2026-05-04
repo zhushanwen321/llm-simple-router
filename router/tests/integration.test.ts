@@ -475,12 +475,6 @@ describe("Integration tests", () => {
 
       const stages = JSON.parse(row.pipeline_snapshot);
 
-      // enhancement — 始终存在
-      const enh = stages.find((s: any) => s.stage === "enhancement");
-      expect(enh).toBeDefined();
-      expect(enh.router_tags_stripped).toBe(0);
-      expect(enh.directive).toBeNull();
-
       // routing — 始终存在
       const routing = stages.find((s: any) => s.stage === "routing");
       expect(routing).toBeDefined();
@@ -498,20 +492,18 @@ describe("Integration tests", () => {
       expect(patch).toBeDefined();
       expect(patch.types).toEqual([]);
 
-      // response_transform — 普通场景下 originalModel 为 null，不会注入
-      const respTransform = stages.find((s: any) => s.stage === "response_transform");
-      expect(respTransform).toBeUndefined();
+      // 不再有 enhancement / response_transform stage（已移除 select-model 功能）
     });
 
     it("should preserve raw client_request before any processing", async () => {
-      const routerTag = '<router-response type="model-info">test</router-response>';
+      // client_request 记录原始请求深拷贝
       const response = await app.inject({
         method: "POST",
         url: "/v1/chat/completions",
         headers: { ...AUTH_HEADER, "content-type": "application/json" },
         payload: {
           model: "gpt-4",
-          messages: [{ role: "user", content: `Previous ${routerTag} and current message` }],
+          messages: [{ role: "user", content: "Hello world" }],
         },
       });
 
@@ -521,8 +513,7 @@ describe("Integration tests", () => {
       expect(row.client_request).not.toBeNull();
 
       const parsed = JSON.parse(row.client_request);
-      // client_request 记录的是原始请求深拷贝，应保留 router-response 标签
-      expect(parsed.body.messages[0].content).toContain(routerTag);
+      expect(parsed.body.messages[0].content).toBe("Hello world");
     });
 
     it("should record upstream_response before model-info injection", async () => {
@@ -542,9 +533,9 @@ describe("Integration tests", () => {
       expect(row.upstream_response).not.toBeNull();
 
       const parsed = JSON.parse(row.upstream_response);
-      // upstream_response 不含 model-info 标签（普通场景下不会注入）
+      // upstream_response 不含 model-info 标签（功能已移除）
       const bodyStr = typeof parsed.body === "string" ? parsed.body : JSON.stringify(parsed.body);
-      expect(bodyStr).not.toContain('router-response type="model-info"');
+      expect(bodyStr).not.toContain('router-response');
     });
 
     it("should record pipeline_snapshot for stream request", async () => {
@@ -567,7 +558,6 @@ describe("Integration tests", () => {
       const stages = JSON.parse(row.pipeline_snapshot);
       const stageNames = stages.map((s: any) => s.stage);
 
-      expect(stageNames).toContain("enhancement");
       expect(stageNames).toContain("routing");
       expect(stageNames).toContain("overflow");
       expect(stageNames).toContain("provider_patch");

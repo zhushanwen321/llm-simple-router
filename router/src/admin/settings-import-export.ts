@@ -3,7 +3,6 @@ import Database from "better-sqlite3";
 import { createHash } from "crypto";
 import type { StateRegistry } from "../core/registry.js";
 import { resolve } from "path";
-import { getAllProviders, PROVIDER_CONCURRENCY_DEFAULTS } from "../db/index.js";
 import { encrypt, decrypt } from "../utils/crypto.js";
 import { getSetting } from "../db/settings.js";
 import { API_CODE, apiError } from "./api-response.js";
@@ -20,10 +19,8 @@ const CONFIG_TABLES = [
   "retry_rules",
   "router_keys",
   "settings",
-  "session_model_states",
   "schedules",
   "provider_model_info",
-  "session_model_history",
   "provider_transform_rules",
 ];
 
@@ -158,7 +155,6 @@ export const adminImportExportRoutes: FastifyPluginCallback<ImportExportOptions>
 
     // 清除旧的 semaphore/adaptive/tracker 配置，按导入后的 DB 数据全量重建
     stateRegistry.removeAllProviders();
-    stateRegistry.clearModelState();
     stateRegistry.reinitializeProviders();
 
     // 刷新 transform plugin 缓存（从 DB 重新加载规则 + 扫描插件目录）

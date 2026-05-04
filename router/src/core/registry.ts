@@ -5,12 +5,6 @@ import type { ConcurrencyConfig } from "./types.js";
 
 export type { ConcurrencyConfig };
 
-export interface EnhancementConfig {
-  claude_code_enabled: boolean;
-  tool_call_loop_enabled: boolean;
-  stream_loop_enabled: boolean;
-}
-
 /** Provider 自适应/手动并发配置（DB 字段） */
 export interface ProviderConcurrencyParams {
   adaptive_enabled: number;
@@ -30,12 +24,6 @@ export interface StateRegistry {
   removeAllProviders(): void;
   /** 获取 provider 并发状态（SemaphoreManager.getStatus） */
   getProviderStatus(providerId: string): { active: number; queued: number };
-  /** 清空所有会话模型状态（modelState.clearAll） */
-  clearModelState(): void;
-  /** 删除指定会话模型状态（modelState.delete） */
-  deleteModelState(keyId: string, sessionId: string): void;
-  /** 读取 proxy enhancement 配置 */
-  getEnhancementConfig(): EnhancementConfig;
   /** 同步 provider 的自适应并发配置（AdaptiveController.syncProvider） */
   syncAdaptiveProvider(providerId: string, params: ProviderConcurrencyParams): void;
   /** 移除 provider 的自适应并发状态（AdaptiveController.remove） */

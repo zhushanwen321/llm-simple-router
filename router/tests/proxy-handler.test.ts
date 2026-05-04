@@ -155,14 +155,6 @@ describe("handleProxyRequest", () => {
     expect(deps.orchestrator.handle).toHaveBeenCalledTimes(2);
   });
 
-  it("拦截响应直接处理不进入 orchestrator", async () => {
-    vi.mocked(applyEnhancement).mockReturnValueOnce({ body: { model: "gpt-4", stream: false, messages: [] }, effectiveModel: "gpt-4", originalModel: null, interceptResponse: { statusCode: 200, body: "ok" }, meta: { router_tags_stripped: 0, directive: null } });
-    const deps = createDeps();
-    await handleProxyRequest(createRequest(), createReply(), "openai", "/v1/chat/completions", errors, deps);
-    expect(handleIntercept).toHaveBeenCalled();
-    expect(deps.orchestrator.handle).not.toHaveBeenCalled();
-  });
-
   it("SemaphoreQueueFullError 返回 503", async () => {
     vi.mocked(resolveMapping).mockReturnValue({ target: { backend_model: "gpt-4", provider_id: "p1" }, targetCount: 1 });
     vi.mocked(getProviderById).mockReturnValue(activeProvider);

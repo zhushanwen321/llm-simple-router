@@ -2,17 +2,15 @@ import { randomUUID } from "crypto";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import Database from "better-sqlite3";
 import { HTTP_UNPROCESSABLE_ENTITY } from "../../core/constants.js";
-import { getProviderById, insertRequestLog, updateLogPipelineSnapshot, updateLogStreamContent, updateLogClientStatus } from "../../db/index.js";
+import { getProviderById, insertRequestLog, updateLogStreamContent, updateLogClientStatus } from "../../db/index.js";
 import { decrypt } from "../../utils/crypto.js";
 import { getSetting } from "../../db/settings.js";
 import { resolveMapping } from "../routing/mapping-resolver.js";
-import { applyEnhancement } from "../enhancement/enhancement-handler.js";
 import { SemaphoreQueueFullError, SemaphoreTimeoutError } from "@llm-router/core";
 import type { RequestTracker } from "@llm-router/core/monitor";
 import {
   logResilienceResult,
   collectTransportMetrics,
-  handleIntercept,
   sanitizeHeadersForLog,
 } from "../proxy-logging.js";
 import { buildUpstreamHeaders, buildUpstreamUrl } from "../proxy-core.js";
@@ -29,7 +27,6 @@ import { applyOverflowRedirect } from "../routing/overflow.js";
 import { parseModels } from "../../config/model-context.js";
 import { applyProviderPatches } from "../patch/index.js";
 import { PipelineSnapshot, type StageRecord } from "../pipeline-snapshot.js";
-import { maybeInjectModelInfoTag } from "../response-transform.js";
 import { applyToolRoundLimit } from "../patch/tool-round-limiter.js";
 import { loadEnhancementConfig } from "../routing/enhancement-config.js";
 import { getTransportStatusCode, serializeBlocksForStorage, extractLastToolUse } from "./proxy-handler-utils.js";
@@ -143,16 +140,11 @@ export async function handleProxyRequest(
   const rawBody = reqBody ? JSON.parse(JSON.stringify(reqBody)) : {};
   const snapshot = new PipelineSnapshot();
 
-  // enhancement 阶段
-  const { body: enhancedBody, effectiveModel, originalModel, interceptResponse, meta: enhMeta } = applyEnhancement(
-    deps.db, request.body as Record<string, unknown>, clientModel, sessionId, request.routerKey,
-  );
-  snapshot.add({ stage: "enhancement", router_tags_stripped: enhMeta.router_tags_stripped, directive: enhMeta.directive });
-
-  // tool round limiter 阶段 — 检测连续工具调用轮数，超阈值时注入提示词
-  let pipelineBody = enhancedBody;
+  let pipelineBody = request.body as Record<string, unknown>;
+  const effectiveModel = clientModel;
+  const originalModel = null;
   if (enhancementConfig.tool_round_limit_enabled) {
-    const roundResult = applyToolRoundLimit(enhancedBody, apiType);
+    const roundResult = applyToolRoundLimit(pipelineBody, apiType);
     if (roundResult.injected) {
       pipelineBody = roundResult.body;
       snapshot.add({ stage: "tool_round_limit", action: "inject_warning", rounds: roundResult.rounds });
@@ -201,14 +193,12 @@ export async function handleProxyRequest(
     }
   }
 
-  if (interceptResponse) return handleIntercept(deps.db, apiType, request, reply, interceptResponse, clientModel, sessionId, snapshot.toJSON(), matcher, logFileWriter);
-
   return executeFailoverLoop({
     request, reply, apiType, upstreamPath, errors, deps, options,
     effectiveModel, originalModel,
     pipelineBody,
     rawBody,
-    baseStages: snapshot.getStages() as StageRecord[],
+    baseStages: [],
     sessionId,
     streamLoopEnabled: enhancementConfig.stream_loop_enabled,
     matcher, logFileWriter,
@@ -452,12 +442,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
         const tr = resilienceResult.result;
         if (tr.kind === "success") {
           // response transform — 注入 model info tag
-          const { body: finalBody, meta: respMeta } = maybeInjectModelInfoTag(tr.body, originalModel, effectiveModel);
-          if (respMeta.model_info_tag_injected) {
-            iterationSnapshot.add({ stage: "response_transform", model_info_tag_injected: true });
-            updateLogPipelineSnapshot(deps.db, lastLogId, iterationSnapshot.toJSON());
-          }
-          return reply.code(tr.statusCode).send(finalBody);
+          return reply.code(tr.statusCode).send(tr.body);
         }
         if (tr.kind === "throw" || (tr.kind === "error" && tr.statusCode >= HTTP_ERROR_THRESHOLD)) {
           const err = errors.upstreamConnectionFailed();
