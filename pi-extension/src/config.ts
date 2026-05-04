@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { ConcurrencyConfig, LoopPreventionConfig } from "llm-router-core";
+import type { ConcurrencyConfig, LoopPreventionConfig } from "@llm-router/core";
 
 export interface ProviderConcurrencyEntry extends ConcurrencyConfig {
   adaptive: boolean;

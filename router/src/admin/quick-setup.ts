@@ -11,8 +11,8 @@ import { HTTP_CREATED, HTTP_BAD_REQUEST, HTTP_CONFLICT } from "./constants.js";
 import { API_CODE, apiError } from "./api-response.js";
 import { PROVIDER_CONCURRENCY_DEFAULTS } from "../db/providers.js";
 import type { StateRegistry } from "../core/registry.js";
-import type { RequestTracker } from "llm-router-core/monitor";
-import type { AdaptiveController } from "llm-router-core/concurrency";
+import type { RequestTracker } from "@llm-router/core/monitor";
+import type { AdaptiveController } from "@llm-router/core/concurrency";
 
 const PROVIDER_NAME_RE = /^[a-zA-Z0-9_-]+$/;
 const API_KEY_PREVIEW_MIN_LENGTH = 8;

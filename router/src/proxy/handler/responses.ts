@@ -7,9 +7,9 @@ import { createErrorFormatter, type ProxyErrorResponse } from "../proxy-core.js"
 import type { ErrorKind } from "../proxy-core.js";
 import { handleProxyRequest, type RouteHandlerDeps } from "./proxy-handler.js";
 import { createOrchestrator } from "../orchestration/orchestrator.js";
-import { SemaphoreManager } from "llm-router-core/concurrency";
-import type { RequestTracker } from "llm-router-core/monitor";
-import { AdaptiveController } from "llm-router-core/concurrency";
+import { SemaphoreManager } from "@llm-router/core/concurrency";
+import type { RequestTracker } from "@llm-router/core/monitor";
+import { AdaptiveController } from "@llm-router/core/concurrency";
 import { HTTP_BAD_GATEWAY } from "../../core/constants.js";
 import { SERVICE_KEYS } from "../../core/container.js";
 

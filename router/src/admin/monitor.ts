@@ -1,5 +1,5 @@
 import { FastifyPluginCallback } from "fastify";
-import type { RequestTracker } from "llm-router-core/monitor";
+import type { RequestTracker } from "@llm-router/core/monitor";
 import { adaptSSEClient } from "../core/sse-client-adapter.js";
 import { HTTP_NOT_FOUND } from "./constants.js";
 import { API_CODE, apiError } from "./api-response.js";

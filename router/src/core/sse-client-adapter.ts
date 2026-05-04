@@ -1,4 +1,4 @@
-import type { SSEClient } from "llm-router-core/monitor";
+import type { SSEClient } from "@llm-router/core/monitor";
 
 /** Adapt Node.js ServerResponse to core SSEClient interface. */
 export function adaptSSEClient(res: import("node:http").ServerResponse): SSEClient {

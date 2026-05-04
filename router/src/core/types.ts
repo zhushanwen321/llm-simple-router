@@ -2,7 +2,7 @@
 // 被多个目录（proxy, db, monitor, admin）共享的类型定义
 
 // Re-export ConcurrencyConfig from core
-export type { ConcurrencyConfig } from "llm-router-core/concurrency";
+export type { ConcurrencyConfig } from "@llm-router/core/concurrency";
 
 // ========== 来自原 proxy/strategy/types.ts ==========
 
