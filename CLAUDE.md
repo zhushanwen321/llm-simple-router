@@ -301,7 +301,15 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 
 ### 发布方式
 
-**唯一推荐方式**：GitHub → Actions → Publish → Run workflow
+**方式一（推荐）：本地一键脚本**
+
+```bash
+bash scripts/publish.sh patch   # 或 minor / major
+```
+
+自动完成：触发 workflow → 等待完成 → 验证 npm + release + docker。
+
+**方式二：GitHub Actions UI**
 
 1. 打开 https://github.com/zhushanwen321/llm-simple-router/actions/workflows/publish.yml
 2. 点击 **Run workflow** 按钮
@@ -362,13 +370,49 @@ gh run list --workflow=Publish --limit 1 --json conclusion,status
 - npm 不允许重复发布同一版本号，重复发布需 bump 到下一个版本
 - `@llm-router/core` 和 `llm-simple-router` 始终保持相同版本号
 
-### 旧版脚本（worktree 模式）
+## merge-worktree 对接说明
 
-仍可通过 `scripts/release.sh` 在 worktree 中手动发布，但推荐使用 GitHub Actions 一键发布。
+本项目的发布流程由 **GitHub Actions Publish workflow** 驱动，merge-worktree skill 执行时遵循以下规则：
+
+### 合并流程（CLAUDE.md 脚本覆盖）
+
+| 阶段 | 脚本/操作 | 说明 |
+|------|-----------|------|
+| 验证 | 本地验证（lint + test + build） | merge 前必须全部通过 |
+| 合并 | `gh pr merge <num> --merge --auto` | 使用 GitHub merge，不调用 merge-worktree-release.sh |
+| 发布 | `bash scripts/publish.sh <patch\|minor\|major>` | 替换 merge-worktree-release.sh，触发 Actions 发布 |
+| 清理 | `bash ~/.claude/skills/merge-worktree/merge-worktree.sh <branch>` | 删除 worktree + 同步其他分支 |
+
+**不使用 `merge-worktree-release.sh`**，因为发布全部通过 GitHub Actions 完成，无需本地 tag + release。
+
+### 完整执行顺序
+
+```bash
+# 1. 本地验证（lint + test + build）
+cd <worktree>
+npm run lint && npm test && npm run build
+
+# 2. 合并 PR
+gh pr merge <num> --merge --auto
+
+# 3. 等待 merge 完成
+gh pr view <num> --json state --jq '.state'
+
+# 4. 触发发布
+bash scripts/publish.sh patch
+
+# 5. 清理 worktree
+cd <workspace-root>
+bash ~/.claude/skills/merge-worktree/merge-worktree.sh <branch>
+```
+
+### 旧版脚本（备用）
+
+仍可通过 `scripts/release.sh` 在 worktree 中手动发布（旧方式，不推荐）。
 
 | 脚本 | 用途 |
 |------|------|
-| `scripts/release.sh` | 合并 + 版本升级 + tag + push + GitHub Release |
+| `scripts/release.sh` | 手动合并 + 版本升级 + tag + push + GitHub Release |
 
 #### `scripts/release.sh` 执行环境
 
