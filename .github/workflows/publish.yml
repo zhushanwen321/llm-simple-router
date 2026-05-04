@@ -68,7 +68,7 @@ jobs:
         run: |
           npm ci
           cd core && npx tsc
-          cd ../router && ../node_modules/.bin/tsc
+          cd ../router && npm run build
           cd ../frontend && npm run build
 
       # ── 步骤 6: Publish @llm-router/core ─────────────
