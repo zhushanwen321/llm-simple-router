@@ -38,7 +38,7 @@ describe("log file compressor", () => {
       mkdirSync(dayDir, { recursive: true });
       writeFileSync(join(dayDir, "14-20.jsonl"), '{"id":"test"}\n', "utf-8");
 
-      compressFinishedFiles(tempDir, new Date("2026-04-30T14:25:00Z"));
+      compressFinishedFiles(tempDir, new Date("2026-04-30T06:25:00Z"));
 
       const files = readdirSync(dayDir);
       expect(files).toContain("14-20.jsonl");
