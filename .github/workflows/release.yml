@@ -70,8 +70,4 @@ jobs:
         with:
           files: llm-simple-router-linux-x64.tar.gz
 
-      # npm publish - publish @llm-router/core
-      - name: Publish @llm-router/core to npm
-        run: |
-          npm config set //registry.npmjs.org/:_authToken ${{ secrets.NPM_TOKEN }}
-          cd core && npm publish --access public
+
