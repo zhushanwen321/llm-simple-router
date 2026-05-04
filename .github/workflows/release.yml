@@ -38,7 +38,7 @@ jobs:
           cp core/package.json package/core/
           cp -r core/dist/ package/core/dist/
           # 从已安装的 node_modules 复制 router 所需的包
-          cd package && npm ci --omit=dev 2>/dev/null || npm install --production 2>/dev/null || true
+          (cd package && npm ci --omit=dev 2>/dev/null || npm install --production 2>/dev/null || true)
           tar czf llm-simple-router-linux-x64.tar.gz -C package .
 
       # Docker 镜像推 GHCR
