@@ -295,9 +295,59 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 
 组件安装：`cd frontend && npx shadcn-vue@latest add <component>`
 
-## npm 发布流程
+## 发布流程（一键 GitHub Actions）
 
-项目已发布到 npm（`llm-simple-router`），用户可通过 `npx llm-simple-router` 或 `npm install -g llm-simple-router` 使用。
+项目使用 **GitHub Actions `Publish` workflow** 一键发布，**无需本地操作**。
+
+### 发布方式
+
+**唯一推荐方式**：GitHub → Actions → Publish → Run workflow
+
+1. 打开 https://github.com/zhushanwen321/llm-simple-router/actions/workflows/publish.yml
+2. 点击 **Run workflow** 按钮
+3. 选择版本类型：`patch`（默认）、`minor`、`major`
+4. 点击绿色 **Run workflow** 确认
+
+Workflow 自动完成：
+
+```
+版本升级（router + core）→ commit + tag → GitHub Release
+→ npm publish: @llm-router/core
+→ npm publish: llm-simple-router
+→ Docker 镜像推送到 GHCR
+→ Release Asset 上传
+```
+
+### 发布后检查（验证机制）
+
+发布完成后，运行以下命令验证所有产物正常：
+
+```bash
+# 1. 检查 npm 包版本
+npm info @llm-router/core version && npm info llm-simple-router version
+# 输出应显示最新版本号，且两个包版本一致
+
+# 2. 检查 GitHub Release
+gh release view v$(jq -r '.version' router/package.json) --json tagName,url,assets
+# 应包含 llm-simple-router-linux-x64.tar.gz
+
+# 3. 检查 CI 状态（最新 workflow 应全部绿色）
+gh run list --workflow=Publish --limit 1 --json conclusion,status
+# conclusion 应为 "success"
+
+# 4. 检查 Docker 镜像（可选）
+# https://github.com/zhushanwen321/llm-simple-router/pkgs/container/llm-simple-router
+```
+
+### 常见失败原因
+
+| 失败步骤 | 原因 | 解决 |
+|---------|------|------|
+| Bump version | workflow 权限不足 | 确保 GITHUB_TOKEN 有 contents: write |
+| Publish @llm-router/core | npm token 过期或权限不足 | 更新 NPM_TOKEN（需 bypass 2FA 权限） |
+| Publish llm-simple-router | 同上 | 同上 |
+| Build | TypeScript 编译错误 | 本地先通过所有检查再发布 |
+| Docker build | Dockerfile 问题 | 检查 CI 日志定位具体错误 |
 
 ### 入口文件
 
@@ -305,43 +355,23 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 - `src/index.ts` — 库入口，导出 `buildApp` 和 `main`；开发时 `tsx src/index.ts` 仍可直接运行
 - 两者分离是因为 npm 通过 wrapper 脚本调用时 `process.argv[1]` 不以 `index.js` 结尾
 
-### 版本与发布规则
+### 版本规则
 
 - **合并 PR 到 main 不需要更新版本号**，多个 PR 可以积攒后统一发布
-- **发布流程**：更新 `router/package.json` 的 `version` → 提交并推送到 main → 打 tag → **创建 GitHub Release** → CI 自动 `npm publish`
-- **关键**：`release.yml` 的触发条件是 `on: release: types: [published]`，仅推送 tag **不会触发** npm 发布。必须通过 `gh release create` 创建 GitHub Release 才会触发 CI 发布流水线
-- **构建命令**：`npm run build:full`（tsc + 复制 migrations + 构建前端）；`prepublishOnly` 会自动执行前端构建
-- npm 不允许重复发布同一版本号，发布前必须 bump version
+- 发布时 workflow 自动升级版本，无需手动修改 `package.json`
+- npm 不允许重复发布同一版本号，重复发布需 bump 到下一个版本
+- `@llm-router/core` 和 `llm-simple-router` 始终保持相同版本号
 
-### 合并与发布操作流程
+### 旧版脚本（worktree 模式）
 
-> **merge-worktree skill 必须先读取此段**，了解项目使用的脚本和流程。
+仍可通过 `scripts/release.sh` 在 worktree 中手动发布，但推荐使用 GitHub Actions 一键发布。
 
-本项目使用 **bare repo + worktree** 结构（`workspace/.bare/` + `workspace/<branch>/`）。合并和发布使用项目内的 `scripts/release.sh`。
-
-#### 脚本
-
-| 脚本 | 用途 | 参数 |
-|------|------|------|
-| `scripts/release.sh` | 合并 + 版本升级 + tag + push + GitHub Release | `[patch\|minor\|major]`（默认 patch） |
-| `~/.claude/skills/pr-worktree/pr-worktree.sh` | 提交 + 推送 + 创建/更新 PR | `[--draft] [--title] [--body]` |
-| `~/.claude/skills/merge-worktree/merge-worktree.sh` | 清理已合并 worktree + 同步其他 worktree | `<branch-name>` |
-
-#### 完整操作步骤
-
-```
-1. 在 feature worktree 中开发完成
-2. 代码审查：bash ~/.claude/skills/code-review-worktree/review-context.sh
-3. 创建 PR：bash ~/.claude/skills/pr-worktree/pr-worktree.sh
-4. 合并+发布：bash scripts/release.sh [patch|minor|major]
-   ↑ 自动完成：merge --no-ff → 版本升级 → tag → push → GitHub Release
-5. 清理 worktree：bash ~/.claude/skills/merge-worktree/merge-worktree.sh <branch>
-```
+| 脚本 | 用途 |
+|------|------|
+| `scripts/release.sh` | 合并 + 版本升级 + tag + push + GitHub Release |
 
 #### `scripts/release.sh` 执行环境
 
-- **运行位置**：feature worktree 目录（如 `fix/quick-setup-providers/`）
-- **不要在 main worktree 中运行**
+- **运行位置**：feature worktree 目录
 - **前提**：所有变更已 commit 并 push、gh CLI 已登录
 - **幂等**：最新 commit 含 "bump version" 时跳过版本升级；tag/release 已存在时跳过
-- **lock 文件**：自动检测 `router/package-lock.json` 和根 `package-lock.json`，只提交有变更的
