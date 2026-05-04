@@ -28,9 +28,9 @@ export function compressFinishedFiles(baseDir: string, now: Date): number {
       const fileHour = parseInt(match[1], 10);
       const fileMinute = parseInt(match[2], 10);
 
-      // 使用本地时间构建窗口结束时间（使用 Date 构造函数，避免字符串解析的 V8 依赖）
+      // 使用 UTC 时间构建窗口结束时间
       const dateParts = dayDir.name.split("-").map(Number);
-      const windowEnd = new Date(dateParts[0], dateParts[1] - 1, dateParts[2], fileHour, fileMinute + WINDOW_MINUTES);
+      const windowEnd = new Date(Date.UTC(dateParts[0], dateParts[1] - 1, dateParts[2], fileHour, fileMinute + WINDOW_MINUTES));
 
       if (now >= windowEnd) {
         const filePath = join(dirPath, file);
@@ -54,7 +54,7 @@ export function compressFinishedFiles(baseDir: string, now: Date): number {
 export function cleanExpiredDirs(baseDir: string, retentionDays: number, now: Date): number {
   if (!existsSync(baseDir)) return 0;
 
-  const cutoffStr = localDateStr(new Date(now.getFullYear(), now.getMonth(), now.getDate() - retentionDays));
+  const cutoffStr = localDateStr(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - retentionDays)));
 
   let deleted = 0;
   const dayDirs = readdirSync(baseDir, { withFileTypes: true })

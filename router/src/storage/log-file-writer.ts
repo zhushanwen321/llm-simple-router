@@ -3,11 +3,11 @@ import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
 import { type LogFileEntry, WINDOW_MINUTES, TIME_PAD_WIDTH, localDateStr } from "./types.js";
 
-/** 从日期对象生成本地时区的日志文件路径片段 */
+/** 从日期对象生成 UTC 时区的日志文件路径片段 */
 function localFilePathParts(d: Date): { dateStr: string; fileName: string } {
   const dateStr = localDateStr(d);
-  const hour = d.getHours().toString().padStart(TIME_PAD_WIDTH, "0");
-  const minute = Math.floor(d.getMinutes() / WINDOW_MINUTES) * WINDOW_MINUTES;
+  const hour = d.getUTCHours().toString().padStart(TIME_PAD_WIDTH, "0");
+  const minute = Math.floor(d.getUTCMinutes() / WINDOW_MINUTES) * WINDOW_MINUTES;
   const minuteStr = minute.toString().padStart(TIME_PAD_WIDTH, "0");
   return { dateStr, fileName: `${hour}-${minuteStr}.jsonl` };
 }

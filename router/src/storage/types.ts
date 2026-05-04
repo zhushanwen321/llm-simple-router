@@ -4,11 +4,11 @@ export const TIME_PAD_WIDTH = 2;
 /** ISO 日期字符串长度（"YYYY-MM-DD"） */
 export const ISO_DATE_LENGTH = 10;
 
-/** 格式化本地日期为 YYYY-MM-DD */
+/** 格式化 UTC 日期为 YYYY-MM-DD */
 export function localDateStr(d: Date): string {
-  const y = d.getFullYear().toString();
-  const m = (d.getMonth() + 1).toString().padStart(TIME_PAD_WIDTH, "0");
-  const day = d.getDate().toString().padStart(TIME_PAD_WIDTH, "0");
+  const y = d.getUTCFullYear().toString();
+  const m = (d.getUTCMonth() + 1).toString().padStart(TIME_PAD_WIDTH, "0");
+  const day = d.getUTCDate().toString().padStart(TIME_PAD_WIDTH, "0");
   return `${y}-${m}-${day}`;
 }
 
