@@ -16,7 +16,7 @@
             v-model="toolRoundLimitEnabled"
           />
           <Label for="tool-round-limit-toggle">
-            {{ toolRoundLimitEnabled ? t('proxyEnhancement.dynamicModel.enabled') : t('proxyEnhancement.dynamicModel.disabled') }}
+            {{ toolRoundLimitEnabled ? t('proxyEnhancement.status.enabled') : t('proxyEnhancement.status.disabled') }}
           </Label>
         </div>
       </CardContent>
@@ -36,7 +36,7 @@
             v-model="toolCallLoopEnabled"
           />
           <Label for="tool-call-loop-toggle">
-            {{ toolCallLoopEnabled ? t('proxyEnhancement.dynamicModel.enabled') : t('proxyEnhancement.dynamicModel.disabled') }}
+            {{ toolCallLoopEnabled ? t('proxyEnhancement.status.enabled') : t('proxyEnhancement.status.disabled') }}
           </Label>
         </div>
       </CardContent>
@@ -56,7 +56,7 @@
             v-model="streamLoopEnabled"
           />
           <Label for="stream-loop-toggle">
-            {{ streamLoopEnabled ? t('proxyEnhancement.dynamicModel.enabled') : t('proxyEnhancement.dynamicModel.disabled') }}
+            {{ streamLoopEnabled ? t('proxyEnhancement.status.enabled') : t('proxyEnhancement.status.disabled') }}
           </Label>
         </div>
       </CardContent>

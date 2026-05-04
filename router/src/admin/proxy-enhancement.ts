@@ -2,7 +2,6 @@ import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
 import { Type, Static } from "@sinclair/typebox";
 import { getSetting, setSetting } from "../db/settings.js";
-import type { StateRegistry } from "../core/registry.js";
 
 const UpdateProxyEnhancementSchema = Type.Object({
   tool_call_loop_enabled: Type.Boolean(),
@@ -13,7 +12,6 @@ const UpdateProxyEnhancementSchema = Type.Object({
 
 interface ProxyEnhancementOptions {
   db: Database.Database;
-  stateRegistry?: StateRegistry;
 }
 
 export const adminProxyEnhancementRoutes: FastifyPluginCallback<ProxyEnhancementOptions> = (app, options, done) => {

@@ -47,7 +47,6 @@ interface FailoverContext {
   deps: RouteHandlerDeps;
   options?: { beforeSendProxy?: (body: Record<string, unknown>, isStream: boolean) => void };
   effectiveModel: string;
-  originalModel: string | null;
   pipelineBody: Record<string, unknown>;
   rawBody: Record<string, unknown>;
   baseStages: StageRecord[];
@@ -69,7 +68,6 @@ interface RejectParams {
   routerKeyId: string | null;
   originalBody: Record<string, unknown>;
   clientHeaders: RawHeaders;
-  originalModel: string | null;
   isFailover: boolean;
   originalRequestId: string | null;
   sessionId: string | undefined;
@@ -90,7 +88,7 @@ function rejectAndReply(
     statusCode: error.statusCode, errorMessage, startTime: params.startTime,
     isStream: params.isStream, routerKeyId: params.routerKeyId,
     originalBody: params.originalBody, clientHeaders: params.clientHeaders,
-    providerId, originalModel: params.originalModel,
+    providerId, originalModel: null,
     isFailover: params.isFailover, originalRequestId: params.originalRequestId,
     sessionId: params.sessionId, pipelineSnapshot: params.pipelineSnapshot,
     matcher: params.matcher, logFileWriter: params.logFileWriter,
@@ -142,7 +140,6 @@ export async function handleProxyRequest(
 
   let pipelineBody = request.body as Record<string, unknown>;
   const effectiveModel = clientModel;
-  const originalModel = null;
   if (enhancementConfig.tool_round_limit_enabled) {
     const roundResult = applyToolRoundLimit(pipelineBody, apiType);
     if (roundResult.injected) {
@@ -195,7 +192,7 @@ export async function handleProxyRequest(
 
   return executeFailoverLoop({
     request, reply, apiType, upstreamPath, errors, deps, options,
-    effectiveModel, originalModel,
+    effectiveModel,
     pipelineBody,
     rawBody,
     baseStages: [],
@@ -208,7 +205,7 @@ export async function handleProxyRequest(
 // ---------- Failover loop ----------
 
 async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> {
-  const { request, reply, apiType, upstreamPath, errors, deps, options, effectiveModel, originalModel, pipelineBody, rawBody, baseStages, sessionId, streamLoopEnabled, matcher, logFileWriter } = ctx;
+  const { request, reply, apiType, upstreamPath, errors, deps, options, effectiveModel, pipelineBody, rawBody, baseStages, sessionId, streamLoopEnabled, matcher, logFileWriter } = ctx;
   const tracker = deps.container.resolve<RequestTracker>(SERVICE_KEYS.tracker);
   const usageWindowTracker = deps.container.resolve<import("../routing/usage-window-tracker.js").UsageWindowTracker>(SERVICE_KEYS.usageWindowTracker);
   const config = getConfig();
@@ -233,7 +230,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
 
     const rCtx: RejectParams = {
       db: deps.db, logId, apiType, model: effectiveModel,
-      startTime, isStream, routerKeyId, originalBody: rawBody, clientHeaders: cliHdrs, originalModel,
+      startTime, isStream, routerKeyId, originalBody: rawBody, clientHeaders: cliHdrs,
       isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null, sessionId,
       pipelineSnapshot: iterationSnapshot.toJSON(),
       matcher, logFileWriter,
@@ -385,7 +382,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
 
     const transportFn = buildTransportFn({
       provider, apiKey, body: patchedBody, cliHdrs, reply, upstreamPath: effectiveUpstreamPath, apiType: effectiveApiType,
-      isStream, startTime, logId, effectiveModel, originalModel,
+      isStream, startTime, logId, effectiveModel,
       streamTimeoutMs: config.STREAM_TIMEOUT_MS, tracker, matcher, request,
       streamLoopEnabled, formatTransform, responseTransform, injectedHeaders,
     });
@@ -402,7 +399,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
         deps.db,
         {
           apiType, model: effectiveModel, providerId: provider.id, isStream,
-          clientReq, upstreamReqBase, logId, routerKeyId, originalModel, sessionId,
+          clientReq, upstreamReqBase, logId, routerKeyId, originalModel: null, sessionId,
           failover: { isFailoverIteration, rootLogId: rootLogId! },
           pipelineSnapshot,
           matcher, logFileWriter,
@@ -465,7 +462,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
             deps.db,
             {
               apiType, model: effectiveModel, providerId: provider.id, isStream,
-              clientReq, upstreamReqBase, logId, routerKeyId, originalModel, sessionId,
+              clientReq, upstreamReqBase, logId, routerKeyId, originalModel: null, sessionId,
               failover: { isFailoverIteration, rootLogId: rootLogId! },
               pipelineSnapshot,
               matcher, logFileWriter,
@@ -493,7 +490,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
         error_message: errMsg || "Upstream connection failed", created_at: new Date().toISOString(),
         client_request: clientReq, upstream_request: upstreamReqBase,
         is_failover: isFailoverIteration ? 1 : 0, original_request_id: isFailoverIteration ? rootLogId : null,
-        router_key_id: routerKeyId, original_model: originalModel,
+        router_key_id: routerKeyId, original_model: null,
         session_id: sessionId,
         pipeline_snapshot: pipelineSnapshot,
       }, (matcher || logFileWriter) ? {

@@ -52,7 +52,6 @@ export interface TransportFnParams {
   startTime: number;
   logId: string;
   effectiveModel: string;
-  originalModel: string | null;
   streamTimeoutMs: number;
   tracker?: RequestTracker;
   matcher?: RetryRuleMatcher;

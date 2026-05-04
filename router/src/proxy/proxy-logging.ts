@@ -31,40 +31,6 @@ export function sanitizeHeadersForLog(headers: Record<string, string>): Record<s
 
 // ---------- Logging helpers (extracted from proxy-core) ----------
 
-export function handleIntercept(
-  db: Database.Database,
-  apiType: "openai" | "openai-responses" | "anthropic",
-  request: FastifyRequest,
-  reply: import("fastify").FastifyReply,
-  interceptResponse: { statusCode: number; body: unknown; meta?: unknown },
-  clientModel: string,
-  sessionId?: string,
-  pipelineSnapshot?: string,
-  matcher?: { test: (statusCode: number, body: string) => boolean } | null,
-  logFileWriter?: LogFileWriter | null,
-): import("fastify").FastifyReply {
-  const logId = randomUUID();
-  const isStream = (request.body as Record<string, unknown>).stream === true;
-  const respBody = JSON.stringify(interceptResponse.body);
-  const writeContext: LogWriteContext | undefined = (matcher || logFileWriter) ? {
-    matcher, logFileWriter, responseBody: respBody,
-  } : undefined;
-  insertRequestLog(db, {
-    id: logId, api_type: apiType, model: clientModel, provider_id: "router",
-    status_code: interceptResponse.statusCode, latency_ms: 0,
-    is_stream: isStream ? 1 : 0, error_message: null,
-    created_at: new Date().toISOString(),
-    client_request: JSON.stringify({ headers: request.headers as RawHeaders, body: request.body }),
-    upstream_request: interceptResponse.meta ? JSON.stringify(interceptResponse.meta) : null,
-    upstream_response: JSON.stringify({ statusCode: interceptResponse.statusCode, body: respBody }),
-    is_retry: 0, is_failover: 0, original_request_id: null,
-    router_key_id: request.routerKey?.id ?? null, original_model: null,
-    session_id: sessionId,
-    pipeline_snapshot: pipelineSnapshot ?? null,
-  }, writeContext);
-  return reply.code(interceptResponse.statusCode).send(interceptResponse.body);
-}
-
 // ---------- New-architecture logging ----------
 
 export function logResilienceResult(

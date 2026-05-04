@@ -49,7 +49,7 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (app, opti
   app.register(adminRouterKeyRoutes, { db: options.db });
   app.register(adminStatsRoutes, { db: options.db });
   app.register(adminMetricsRoutes, { db: options.db });
-  app.register(adminProxyEnhancementRoutes, { db: options.db, stateRegistry: options.stateRegistry });
+  app.register(adminProxyEnhancementRoutes, { db: options.db });
   app.register(adminMonitorRoutes, { tracker: options.tracker });
   app.register(adminSettingsRoutes, { db: options.db, logsDir: options.logsDir });
   app.register(adminImportExportRoutes, { db: options.db, stateRegistry: options.stateRegistry, pluginRegistry: options.pluginRegistry });
