@@ -31,8 +31,8 @@ COPY router/tsconfig.json router/
 COPY router/src/ router/src/
 COPY core/ core/
 
-# 构建 router（自动编译 core 引用）
-RUN npm run build -w router
+# 先编译 core，再编译 router（core 编译产物是 router 的依赖）
+RUN npm run build -w core && npm run build -w router
 
 # 阶段2：运行时
 FROM node:22-alpine
