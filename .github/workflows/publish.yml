@@ -34,7 +34,7 @@ jobs:
         run: |
           OLD_VERSION=$(jq -r '.version' router/package.json)
           cd router && npm version ${{ github.event.inputs.bump_type }} --no-git-tag-version
-          NEW_VERSION=$(jq -r '.version' router/package.json)
+          NEW_VERSION=$(jq -r '.version' package.json)
           echo "OLD_VERSION=$OLD_VERSION" >> $GITHUB_ENV
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
 
