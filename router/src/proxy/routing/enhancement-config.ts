@@ -2,14 +2,12 @@ import Database from "better-sqlite3";
 import { getSetting } from "../../db/settings.js";
 
 export interface EnhancementConfig {
-  claude_code_enabled: boolean;
   tool_call_loop_enabled: boolean;
   stream_loop_enabled: boolean;
   tool_round_limit_enabled: boolean;
 }
 
 const DEFAULT_CONFIG: EnhancementConfig = {
-  claude_code_enabled: false,
   tool_call_loop_enabled: false,
   stream_loop_enabled: false,
   tool_round_limit_enabled: true,
@@ -22,7 +20,6 @@ export function loadEnhancementConfig(db: Database.Database): EnhancementConfig 
   try {
     const parsed = JSON.parse(raw);
     return {
-      claude_code_enabled: parsed.claude_code_enabled ?? false,
       tool_call_loop_enabled: parsed.tool_call_loop_enabled ?? false,
       stream_loop_enabled: parsed.stream_loop_enabled ?? false,
       tool_round_limit_enabled: parsed.tool_round_limit_enabled ?? true,

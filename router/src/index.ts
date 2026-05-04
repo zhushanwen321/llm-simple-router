@@ -24,10 +24,8 @@ import { adminRoutes } from "./admin/routes.js";
 import { RetryRuleMatcher } from "./proxy/orchestration/retry-rules.js";
 import { PluginRegistry } from "./proxy/transform/plugin-registry.js";
 import { SemaphoreManager, AdaptiveController } from "@llm-router/core/concurrency";
-import { loadEnhancementConfig } from "./proxy/routing/enhancement-config.js";
 import type { StateRegistry } from "./core/registry.js";
 import { RequestTracker } from "@llm-router/core/monitor";
-import { modelState } from "./proxy/routing/model-state.js";
 import { UsageWindowTracker } from "./proxy/routing/usage-window-tracker.js";
 import { SessionTracker, DEFAULT_LOOP_PREVENTION_CONFIG } from "@llm-router/core/loop-prevention";
 import { scheduleLogCleanup } from "./db/log-cleaner.js";
@@ -242,9 +240,6 @@ export async function buildApp(
     : new LogFileWriter(logsDir, { enabled: getDetailLogEnabled(db) });
   container.register(SERVICE_KEYS.logFileWriter, () => logFileWriter);
 
-  // 注入 DB 到 modelState 单例，启用会话级持久化
-  modelState.init(db);
-
   // 注册 AdaptiveController（依赖已注册的 semaphoreManager）
   container.register(SERVICE_KEYS.adaptiveController, (c) => {
     const ac = new AdaptiveController(c.resolve(SERVICE_KEYS.semaphoreManager), app.log);
@@ -283,9 +278,6 @@ export async function buildApp(
     removeProvider: (providerId) => semaphoreManager.remove(providerId),
     removeAllProviders: () => semaphoreManager.removeAll(),
     getProviderStatus: (providerId) => semaphoreManager.getStatus(providerId),
-    clearModelState: () => modelState.clearAll(),
-    deleteModelState: (keyId, sessionId) => modelState.delete(keyId, sessionId),
-    getEnhancementConfig: () => loadEnhancementConfig(db),
     syncAdaptiveProvider: (providerId, cfg) => adaptiveController.syncProvider(providerId, cfg),
     removeAdaptiveProvider: (providerId) => adaptiveController.remove(providerId),
     getAdaptiveStatus: (providerId) => adaptiveController.getStatus(providerId),
@@ -349,7 +341,6 @@ export async function buildApp(
     tracker.stopPushInterval();
     // 关闭所有 SSE 长连接，防止 app.close() 因 hijack 的连接无限等待
     tracker.closeAllClients();
-    modelState.clearAll();
     semaphoreManager.removeAll();
     const sessionTracker = container.resolve<SessionTracker>(SERVICE_KEYS.sessionTracker);
     sessionTracker.stop();

@@ -12,7 +12,6 @@ import type { RawHeaders, TransportResult } from "../types.js";
 import type { Target } from "../../core/types.js";
 import type { RequestTracker } from "@llm-router/core/monitor";
 import type { RetryRuleMatcher } from "../orchestration/retry-rules.js";
-import { buildModelInfoTag } from "../enhancement/enhancement-handler.js";
 import { DEFAULT_MAX_RAW as STREAM_CONTENT_MAX_RAW, DEFAULT_MAX_TEXT as STREAM_CONTENT_MAX_TEXT } from "@llm-router/core/monitor";
 
 const LOOP_DETECTOR_N = 6;
@@ -53,7 +52,6 @@ export interface TransportFnParams {
   startTime: number;
   logId: string;
   effectiveModel: string;
-  originalModel: string | null;
   streamTimeoutMs: number;
   tracker?: RequestTracker;
   matcher?: RetryRuleMatcher;
@@ -107,15 +105,6 @@ export function buildTransportFn(p: TransportFnParams): (target: Target) => Prom
     // Apply format transformation (responseTransform handles both success and error internally)
     if (p.responseTransform && "body" in result && result.body) {
       result = { ...result, body: p.responseTransform(result.body) };
-    }
-    if (p.originalModel && result.kind === "success" && result.statusCode === UPSTREAM_SUCCESS) {
-      try {
-        const bodyObj = JSON.parse(result.body);
-        if (bodyObj.content?.[0]?.text) {
-          bodyObj.content[0].text += `\n\n${buildModelInfoTag(p.effectiveModel)}`;
-          return { ...result, body: JSON.stringify(bodyObj) };
-        }
-      } catch { p.request.log.warn("Failed to inject model-info tag into non-JSON response"); }
     }
     return result;
   };

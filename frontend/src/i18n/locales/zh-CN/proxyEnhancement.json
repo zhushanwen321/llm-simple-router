@@ -1,59 +1,8 @@
 {
-  "title": "代理增强（实验性）",
-  "tabs": {
-    "dynamicModel": "动态模型切换",
-    "loopDetection": "循环输出检测"
-  },
-  "dynamicModel": {
-    "title": "Claude Code 动态模型切换",
-    "description": "在 Claude Code 对话中通过 /select-model 命令动态切换后端模型。模型选择在当前会话内有效（24h），不影响路由配置。",
+  "title": "代理增强",
+  "status": {
     "enabled": "已启用",
-    "disabled": "已禁用",
-    "saving": "保存中..."
-  },
-  "instructions": {
-    "title": "使用说明",
-    "config": {
-      "title": "配置方法",
-      "description": "在 Claude Code 项目级或全局级目录下创建 Command 文件：",
-      "contentLabel": "文件内容：",
-      "pathProject": "# 项目级 .claude/commands/select-model.md",
-      "pathGlobal": "# 全局级 ~/.claude/commands/select-model.md"
-    },
-    "usage": {
-      "title": "使用方法",
-      "viewModels": "查看可用模型列表（格式为 provider_name/backend_model）：",
-      "selectModel": "选择模型并记住到当前会话：",
-      "verify": "切换后在下方活跃 Session 表中确认状态，请求日志中可验证路由是否生效。"
-    }
-  },
-  "sessions": {
-    "title": "活跃 Session",
-    "description": "查看和管理当前已配置模型的 session",
-    "refresh": "刷新",
-    "noSessions": "暂无活跃 Session",
-    "confirmClearTitle": "确认清除 Session",
-    "confirmClearDescription": "清除后，该 Session 将恢复使用默认模型映射。此操作不可撤销。",
-    "confirmClear": "确认清除",
-    "clearSuccess": "Session 已清除",
-    "clearFailed": "清除 Session 失败",
-    "loadFailed": "加载 Session 列表失败",
-    "loadHistoryFailed": "加载历史记录失败",
-    "keyName": "密钥名称",
-    "sessionId": "Session ID",
-    "currentModel": "当前模型",
-    "originalModel": "原始模型",
-    "lastActive": "最后活跃",
-    "actions": "操作",
-    "history": "历史",
-    "collapse": "收起",
-    "clear": "清除",
-    "switchHistory": "切换历史",
-    "default": "默认",
-    "justNow": "刚刚",
-    "minutesAgo": "{minutes} 分钟前",
-    "hoursAgo": "{hours} 小时前",
-    "daysAgo": "{days} 天前"
+    "disabled": "已禁用"
   },
   "loopDetection": {
     "toolRoundLimit": {

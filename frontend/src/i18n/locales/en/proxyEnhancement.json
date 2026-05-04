@@ -1,59 +1,8 @@
 {
-  "title": "Proxy Enhancement (Experimental)",
-  "tabs": {
-    "dynamicModel": "Dynamic Model Switching",
-    "loopDetection": "Loop Detection"
-  },
-  "dynamicModel": {
-    "title": "Claude Code Dynamic Model Switching",
-    "description": "Dynamically switch backend models via the /select-model command in Claude Code conversations. Model selection is valid within the current session (24h) and does not affect routing configuration.",
+  "title": "Proxy Enhancement",
+  "status": {
     "enabled": "Enabled",
-    "disabled": "Disabled",
-    "saving": "Saving..."
-  },
-  "instructions": {
-    "title": "Instructions",
-    "config": {
-      "title": "Configuration",
-      "description": "Create a Command file in the Claude Code project or global directory:",
-      "contentLabel": "File content:",
-      "pathProject": "# Project-level .claude/commands/select-model.md",
-      "pathGlobal": "# Global ~/.claude/commands/select-model.md"
-    },
-    "usage": {
-      "title": "Usage",
-      "viewModels": "View available models (format: provider_name/backend_model):",
-      "selectModel": "Select a model and remember it for the current session:",
-      "verify": "After switching, confirm the status in the Active Sessions table below. Check request logs to verify routing."
-    }
-  },
-  "sessions": {
-    "title": "Active Sessions",
-    "description": "View and manage sessions with configured models",
-    "refresh": "Refresh",
-    "noSessions": "No active sessions",
-    "confirmClearTitle": "Confirm Clear Session",
-    "confirmClearDescription": "After clearing, this session will revert to the default model mapping. This action cannot be undone.",
-    "confirmClear": "Confirm Clear",
-    "clearSuccess": "Session cleared",
-    "clearFailed": "Failed to clear session",
-    "loadFailed": "Failed to load session list",
-    "loadHistoryFailed": "Failed to load history",
-    "keyName": "Key Name",
-    "sessionId": "Session ID",
-    "currentModel": "Current Model",
-    "originalModel": "Original Model",
-    "lastActive": "Last Active",
-    "actions": "Actions",
-    "history": "History",
-    "collapse": "Collapse",
-    "clear": "Clear",
-    "switchHistory": "Switch History",
-    "default": "Default",
-    "justNow": "Just now",
-    "minutesAgo": "{minutes} min ago",
-    "hoursAgo": "{hours} hr ago",
-    "daysAgo": "{days} days ago"
+    "disabled": "Disabled"
   },
   "loopDetection": {
     "toolRoundLimit": {

@@ -62,7 +62,6 @@ const API = {
   ROUTER_KEYS: "/router-keys",
   MODELS_AVAILABLE: "/models/available",
   PROXY_ENHANCEMENT: "/proxy-enhancement",
-  SESSION_STATES: "/session-states",
   MONITOR_ACTIVE: "/monitor/active",
   MONITOR_RECENT: "/monitor/recent",
   MONITOR_STATS: "/monitor/stats",
@@ -201,24 +200,6 @@ export interface QuickSetupPayload {
   }
 }
 
-export interface SessionState {
-  id: string;
-  router_key_id: string;
-  router_key_name: string;
-  session_id: string;
-  current_model: string;
-  original_model: string | null;
-  last_active_at: string;
-  created_at: string;
-}
-
-export interface SessionHistoryEntry {
-  id: string;
-  old_model: string | null;
-  new_model: string;
-  trigger_type: "directive" | "command" | "manual_clear";
-  created_at: string;
-}
 
 // --- Response types ---
 
@@ -332,7 +313,6 @@ export interface ConfigExportResponse {
 }
 
 export interface ProxyEnhancementConfig {
-  claude_code_enabled: boolean;
   tool_call_loop_enabled: boolean;
   stream_loop_enabled: boolean;
   tool_round_limit_enabled: boolean;
@@ -530,18 +510,6 @@ export const api = {
     request<ProxyEnhancementConfig>("get", API.PROXY_ENHANCEMENT),
   updateProxyEnhancement: (data: ProxyEnhancementConfig) =>
     request<{ success: boolean }>("put", API.PROXY_ENHANCEMENT, data),
-
-  getSessionStates: () => request<SessionState[]>("get", API.SESSION_STATES),
-  getSessionHistory: (keyId: string, sessionId: string) =>
-    request<SessionHistoryEntry[]>(
-      "get",
-      `${API.SESSION_STATES}/${keyId}/${encodeURIComponent(sessionId)}/history`,
-    ),
-  deleteSessionState: (keyId: string, sessionId: string) =>
-    request<{ success: boolean }>(
-      "delete",
-      `${API.SESSION_STATES}/${keyId}/${encodeURIComponent(sessionId)}`,
-    ),
 
   getMonitorActive: () => request<ActiveRequest[]>("get", API.MONITOR_ACTIVE),
   getMonitorRecent: () => request<ActiveRequest[]>("get", API.MONITOR_RECENT),
