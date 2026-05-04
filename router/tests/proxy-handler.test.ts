@@ -3,7 +3,7 @@ import { handleProxyRequest } from "../src/proxy/handler/proxy-handler.js";
 import type { ProxyErrorFormatter } from "../src/proxy/proxy-core.js";
 import type { ResilienceResult } from "../src/proxy/orchestration/resilience.js";
 import { ProviderSwitchNeeded } from "../src/proxy/types.js";
-import { SemaphoreQueueFullError, SemaphoreTimeoutError } from "@llm-router/core";
+import { SemaphoreQueueFullError, SemaphoreTimeoutError } from "llm-router-core";
 
 vi.mock("../src/db/index.js", () => ({
   getMappingGroup: vi.fn(() => undefined),

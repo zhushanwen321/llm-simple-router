@@ -7,8 +7,8 @@ import { decrypt } from "../../utils/crypto.js";
 import { getSetting } from "../../db/settings.js";
 import { resolveMapping } from "../routing/mapping-resolver.js";
 import { applyEnhancement } from "../enhancement/enhancement-handler.js";
-import { SemaphoreQueueFullError, SemaphoreTimeoutError } from "@llm-router/core";
-import type { RequestTracker } from "@llm-router/core/monitor";
+import { SemaphoreQueueFullError, SemaphoreTimeoutError } from "llm-router-core";
+import type { RequestTracker } from "llm-router-core/monitor";
 import {
   logResilienceResult,
   collectTransportMetrics,
@@ -23,7 +23,7 @@ import { insertRejectedLog } from "../log-helpers.js";
 import type { RetryRuleMatcher } from "../orchestration/retry-rules.js";
 import type { ProxyOrchestrator } from "../orchestration/orchestrator.js";
 import type { ProxyErrorFormatter, ProxyErrorResponse } from "../proxy-core.js";
-import { ToolLoopGuard } from "@llm-router/core/loop-prevention";
+import { ToolLoopGuard } from "llm-router-core/loop-prevention";
 import { buildTransportFn } from "../transport/transport-fn.js";
 import { applyOverflowRedirect } from "../routing/overflow.js";
 import { parseModels } from "../../config/model-context.js";
@@ -161,7 +161,7 @@ export async function handleProxyRequest(
   }
 
   // tool guard 阶段 — 使用 pipelineBody（可能已被 round limiter 修改）
-  const sessionTracker = deps.container.resolve<import("@llm-router/core/loop-prevention").SessionTracker>(SERVICE_KEYS.sessionTracker);
+  const sessionTracker = deps.container.resolve<import("llm-router-core/loop-prevention").SessionTracker>(SERVICE_KEYS.sessionTracker);
   if (enhancementConfig.tool_call_loop_enabled && sessionTracker && sessionId) {
     const routerKeyId = (request.routerKey as { id?: string } | undefined)?.id ?? null;
     const sessionKey = routerKeyId ? `${routerKeyId}:${sessionId}` : sessionId;

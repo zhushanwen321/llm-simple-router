@@ -29,7 +29,7 @@
     "lint": "eslint . --max-warnings=0"
   },
   "dependencies": {
-    "@llm-router/core": "*",
+    "llm-router-core": "*",
     "@fastify/cookie": "^11.0.2",
     "@fastify/static": "^9.1.0",
     "@sinclair/typebox": "^0.34.49",

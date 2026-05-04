@@ -76,13 +76,11 @@ jobs:
           cd ../router && ../node_modules/.bin/tsc
           cd ../frontend && npm run build
 
-      # ── 步骤 6: Publish @llm-router/core ─────────────
-      # 如果 @llm-router scope 未注册，需先在 npmjs.com 创建组织
-      - name: Publish @llm-router/core to npm
+      # ── 步骤 6: Publish llm-router-core ─────────────
+      - name: Publish llm-router-core to npm
         run: |
           npm config set //registry.npmjs.org/:_authToken ${{ secrets.NPM_TOKEN }}
-          cd core && npm publish --access public
-        continue-on-error: true
+          cd core && npm publish
 
       # ── 步骤 7: Publish llm-simple-router ────────────
       - name: Publish llm-simple-router to npm

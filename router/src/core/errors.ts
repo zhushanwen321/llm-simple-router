@@ -1,8 +1,8 @@
 // src/core/errors.ts
 // Re-export core errors + router-specific errors
 
-// Re-export errors that have been migrated to @llm-router/core
-export { SemaphoreQueueFullError, SemaphoreTimeoutError } from "@llm-router/core";
+// Re-export errors that have been migrated to llm-router-core
+export { SemaphoreQueueFullError, SemaphoreTimeoutError } from "llm-router-core";
 
 import type { TransportResult, ResilienceAttempt } from "./types.js";
 

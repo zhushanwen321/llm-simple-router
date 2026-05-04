@@ -34,7 +34,7 @@ jobs:
           cp router/package.json package/
           cp package-lock.json package/
           cp README.md package/
-          # Core 包（@llm-router/core 是 router 的依赖）
+          # Core 包（llm-router-core 是 router 的依赖）
           cp core/package.json package/core/
           cp -r core/dist/ package/core/dist/
           # 从已安装的 node_modules 复制 router 所需的包

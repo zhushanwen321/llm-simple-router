@@ -9,10 +9,10 @@ import type { SemaphoreScope } from "./scope.js";
 import { SemaphoreScope as SemaphoreScopeClass } from "./scope.js";
 import type { TrackerScope } from "./scope.js";
 import { TrackerScope as TrackerScopeClass } from "./scope.js";
-import type { ActiveRequest } from "@llm-router/core/monitor";
-import type { SemaphoreManager } from "@llm-router/core/concurrency";
-import type { RequestTracker } from "@llm-router/core/monitor";
-import type { AdaptiveController } from "@llm-router/core/concurrency";
+import type { ActiveRequest } from "llm-router-core/monitor";
+import type { SemaphoreManager } from "llm-router-core/concurrency";
+import type { RequestTracker } from "llm-router-core/monitor";
+import type { AdaptiveController } from "llm-router-core/concurrency";
 
 const DEFAULT_BASE_DELAY_MS = 1000;
 const DEFAULT_FAILOVER_THRESHOLD = 400;

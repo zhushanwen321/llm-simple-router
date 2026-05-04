@@ -8,7 +8,7 @@ import {
   NGramLoopDetector,
   DEFAULT_LOOP_PREVENTION_CONFIG,
   RequestTracker,
-} from "@llm-router/core";
+} from "llm-router-core";
 import { loadConfig } from "./config.js";
 
 export default function (pi: ExtensionAPI) {

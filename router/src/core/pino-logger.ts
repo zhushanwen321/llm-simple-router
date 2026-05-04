@@ -1,4 +1,4 @@
-import type { Logger } from "@llm-router/core";
+import type { Logger } from "llm-router-core";
 import type { FastifyBaseLogger } from "fastify";
 
 /** Adapt fastify/pino logger to core Logger interface. */

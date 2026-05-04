@@ -21,8 +21,8 @@ import { adminImportExportRoutes } from "./settings-import-export.js";
 import { adminTransformRuleRoutes } from "./transform-rules.js";
 import { adminScheduleRoutes } from "./schedules.js";
 import type { StateRegistry } from "../core/registry.js";
-import type { RequestTracker } from "@llm-router/core/monitor";
-import type { AdaptiveController } from "@llm-router/core/concurrency";
+import type { RequestTracker } from "llm-router-core/monitor";
+import type { AdaptiveController } from "llm-router-core/concurrency";
 
 interface AdminRoutesOptions {
   db: Database.Database;
