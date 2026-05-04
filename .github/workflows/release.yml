@@ -26,10 +26,11 @@ jobs:
       # 复制运行时所需文件到打包目录
       - name: Prepare dist archive
         run: |
-          mkdir -p package/dist/db/migrations package/frontend-dist package/core
+          mkdir -p package/dist/db/migrations package/core
+          # frontend 构建产物在 frontend/dist/
+          mkdir -p package/frontend-dist && cp -r frontend/dist/* package/frontend-dist/
           cp -r router/dist/ package/dist/
           cp -r router/src/db/migrations/ package/dist/db/migrations/
-          cp -r frontend-dist/ package/frontend-dist/
           cp router/package.json package/
           cp package-lock.json package/
           cp README.md package/
