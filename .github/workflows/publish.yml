@@ -22,7 +22,6 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          # 需要有写权限才能 push 版本变更和 tag
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: actions/setup-node@v6
@@ -33,20 +32,16 @@ jobs:
       # ── 步骤 1: 升级版本号 ──────────────────────────
       - name: Bump version
         run: |
-          OLD_VERSION=$(node -p "require('./router/package.json').version")
+          OLD_VERSION=$(jq -r '.version' router/package.json)
           cd router && npm version ${{ github.event.inputs.bump_type }} --no-git-tag-version
-          NEW_VERSION=$(node -p "require('./router/package.json').version")
+          NEW_VERSION=$(jq -r '.version' router/package.json)
           echo "OLD_VERSION=$OLD_VERSION" >> $GITHUB_ENV
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
 
       # ── 步骤 2: 更新 core 版本到相同版本号 ──────────
       - name: Sync core version
         run: |
-          node -e "
-            const pkg = require('./core/package.json');
-            pkg.version = '${{ env.NEW_VERSION }}';
-            require('fs').writeFileSync('./core/package.json', JSON.stringify(pkg, null, 2) + '\n');
-          "
+          jq --arg v "${{ env.NEW_VERSION }}" '.version = $v' core/package.json > tmp.json && mv tmp.json core/package.json
 
       # ── 步骤 3: 提交 + 打 tag ────────────────────────
       - name: Commit and tag
