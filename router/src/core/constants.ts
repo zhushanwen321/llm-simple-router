@@ -1,6 +1,7 @@
 // src/core/constants.ts
 
 // HTTP 状态码常量 — 全局唯一来源
+export const HTTP_OK = 200;
 export const HTTP_BAD_REQUEST = 400;
 export const HTTP_CREATED = 201;
 export const HTTP_FORBIDDEN = 403;
