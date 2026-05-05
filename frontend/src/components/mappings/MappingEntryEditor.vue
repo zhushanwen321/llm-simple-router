@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
-import { Plus, Trash2, CircleHelp } from 'lucide-vue-next'
+import { Plus, Trash2, CircleHelp, ArrowRight } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -89,10 +89,7 @@ function updateOverflow(val: SelectedValue | undefined) {
       <span class="min-w-[90px] font-mono text-sm font-semibold text-foreground shrink-0 truncate" :title="entry.clientModel">
         {{ entry.clientModel }}
       </span>
-      <svg width="14" height="14" class="mt-0.5 shrink-0 text-muted-foreground/30">
-        <line x1="0" y1="7" x2="11" y2="7" stroke="currentColor" stroke-width="1.5"/>
-        <polyline points="8,3 12,7 8,11" fill="none" stroke="currentColor" stroke-width="1.5"/>
-      </svg>
+      <ArrowRight class="size-3.5 mt-0.5 shrink-0 text-muted-foreground/30" />
       <div class="flex-1 flex flex-col gap-0 min-w-0">
         <div v-for="(target, tIdx) in entry.targets" :key="tIdx">
           <div
