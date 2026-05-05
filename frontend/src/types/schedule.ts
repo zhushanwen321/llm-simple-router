@@ -8,6 +8,7 @@ export interface Schedule {
   end_hour: number
   mapping_rule: string
   concurrency_rule: string | null
+  transform_rule: string | null
   priority: number
   created_at: string
   updated_at: string
@@ -21,4 +22,5 @@ export interface SchedulePayload {
   end_hour: number
   mapping_rule: string
   concurrency_rule?: string | null
+  transform_rule?: string | null
 }
