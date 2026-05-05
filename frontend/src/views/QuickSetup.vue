@@ -184,15 +184,12 @@
           </div>
         </CardHeader>
         <CardContent>
-          <MappingList
+          <QuickSetupMappingList
             :entries="mappingEntries"
             :provider-groups="allProviderGroups"
-            :show-delete="false"
-            :show-add-form="true"
             @update:targets="updateMappingTargets"
             @toggle-active="toggleMappingActive"
             @add="addMappingEntry"
-            @remove="removeMappingEntry"
           />
         </CardContent>
       </Card>
@@ -311,7 +308,7 @@ import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { useQuickSetup } from '@/composables/useQuickSetup'
 import ModelCard from '@/components/quick-setup/ModelCard.vue'
-import MappingList from '@/components/shared/MappingList.vue'
+import QuickSetupMappingList from '@/components/shared/QuickSetupMappingList.vue'
 import ConcurrencyControl from '@/components/shared/ConcurrencyControl.vue'
 import TransformRulesForm from '@/components/shared/TransformRulesForm.vue'
 import type { ModelConfig } from '@/components/quick-setup/types'
@@ -337,7 +334,7 @@ const {
   allProviderGroups,
   transformInjectHeaders, transformDropFields, transformRequestDefaults,
   selectClient, onProviderChange, onPlanChange,
-  updateMappingTargets, toggleMappingActive, addMappingEntry, removeMappingEntry,
+  updateMappingTargets, toggleMappingActive, addMappingEntry,
   toggleRetryRule, onConcurrencyModeChange, testConnection, submit,
   addCustomModel,
 } = useQuickSetup()
