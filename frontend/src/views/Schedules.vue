@@ -413,10 +413,10 @@ function openEdit(s: Schedule) {
   try {
     const rule = JSON.parse(s.mapping_rule) as { targets?: MappingTarget[] }
     if (rule.targets?.length) targets = rule.targets
-  } catch { /* ignore */ }
+  } catch (e) { console.warn('Failed to parse mapping_rule:', e) }
 
   let week: number[] = [1, 2, 3, 4, 5]
-  try { week = JSON.parse(s.week) } catch { /* ignore */ }
+  try { week = JSON.parse(s.week) } catch (e) { console.warn('Failed to parse week:', e) }
 
   let concurrencyMode: ConcurrencyMode = 'auto'
   let maxConcurrency = 10
@@ -429,7 +429,7 @@ function openEdit(s: Schedule) {
       if (cr.max_concurrency) maxConcurrency = cr.max_concurrency as number
       if (cr.queue_timeout_ms) queueTimeoutMs = cr.queue_timeout_ms as number
       if (cr.max_queue_size) maxQueueSize = cr.max_queue_size as number
-    } catch { /* ignore */ }
+    } catch (e) { console.warn('Failed to parse concurrency_rule:', e) }
   }
 
   let injectHeaders = ''
@@ -441,7 +441,7 @@ function openEdit(s: Schedule) {
       dropFields = (tr.drop_fields as string[] || []).join(', ')
       requestDefaults = tr.request_defaults ? JSON.stringify(tr.request_defaults) : ''
       injectHeaders = tr.inject_headers ? JSON.stringify(tr.inject_headers) : ''
-    } catch { /* ignore */ }
+    } catch (e) { console.warn('Failed to parse transform_rule:', e) }
   }
 
   form.value = {
@@ -492,11 +492,11 @@ async function handleSave() {
     const mappingRule = JSON.stringify({ targets: form.value.targets })
     const concurrencyRule = form.value.concurrency_mode !== 'none'
       ? JSON.stringify({
-          mode: form.value.concurrency_mode,
-          max_concurrency: form.value.max_concurrency,
-          queue_timeout_ms: form.value.queue_timeout_ms,
-          max_queue_size: form.value.max_queue_size,
-        })
+        mode: form.value.concurrency_mode,
+        max_concurrency: form.value.max_concurrency,
+        queue_timeout_ms: form.value.queue_timeout_ms,
+        max_queue_size: form.value.max_queue_size,
+      })
       : null
 
     const payload: SchedulePayload = {
