@@ -1,6 +1,6 @@
 {
   "name": "@llm-router/core",
-  "version": "0.9.17",
+  "version": "0.9.18",
   "description": "Shared core library for LLM router: concurrency control, loop prevention, request monitoring",
   "type": "module",
   "main": "./dist/index.js",
