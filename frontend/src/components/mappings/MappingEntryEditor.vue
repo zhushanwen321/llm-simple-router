@@ -156,6 +156,7 @@ function updateOverflow(val: SelectedValue | undefined) {
           </div>
           <Button
             v-if="tIdx > 0 && entry.targets.length > 1"
+            type="button"
             variant="ghost"
             size="icon-xs"
             class="shrink-0 text-muted-foreground/40 hover:text-destructive"
@@ -171,7 +172,7 @@ function updateOverflow(val: SelectedValue | undefined) {
       </div>
 
       <!-- Add mapping / failover button -->
-      <Button variant="ghost" size="sm" class="w-full text-xs text-muted-foreground/50" @click="addTarget">
+      <Button type="button" variant="ghost" size="sm" class="w-full text-xs text-muted-foreground/50" @click="addTarget">
         <Plus class="w-3 h-3 mr-1" />
         {{ entry.targets.length === 0 ? t('providers.shared.addMappingModel') : t('providers.shared.addFailover') }}
       </Button>
@@ -191,6 +192,7 @@ function updateOverflow(val: SelectedValue | undefined) {
             />
           </div>
           <Button
+            type="button"
             variant="ghost"
             size="icon-xs"
             class="shrink-0 text-muted-foreground/40 hover:text-destructive"
@@ -201,7 +203,7 @@ function updateOverflow(val: SelectedValue | undefined) {
         </div>
         <!-- No overflow: show add button with tooltip -->
         <div v-else class="flex items-center gap-1.5">
-          <Button variant="ghost" size="sm" class="text-xs text-muted-foreground/50" @click="addOverflow">
+          <Button type="button" variant="ghost" size="sm" class="text-xs text-muted-foreground/50" @click="addOverflow">
             <Plus class="w-3 h-3 mr-1" />
             {{ t('providers.shared.addOverflow') }}
           </Button>

@@ -122,7 +122,7 @@
 
     <!-- Create/Edit Dialog -->
     <Dialog v-model:open="dialogOpen">
-      <DialogContent class="max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogContent class="max-w-3xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{{ editingId ? t('schedules.editSchedule') : t('schedules.createSchedule') }}</DialogTitle>
         </DialogHeader>
