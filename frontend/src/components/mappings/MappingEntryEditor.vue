@@ -61,19 +61,15 @@ function updateTargetProvider(targetIndex: number, val: SelectedValue) {
   emit('update:targets', newTargets)
 }
 
-function omit<T extends Record<string, unknown>, K extends keyof T>(obj: T, ...keys: K[]): Omit<T, K> {
-  const result = { ...obj }
-  for (const key of keys) delete result[key]
-  return result
-}
-
 function updateOverflow(val: SelectedValue | undefined) {
   const newTargets = props.entry.targets.map((t: MappingTarget, i: number) => {
     if (i === 0) {
       if (val) {
         return { ...t, overflow_provider_id: val.provider_id, overflow_model: val.model }
       } else {
-        return omit(t, 'overflow_provider_id', 'overflow_model')
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { overflow_provider_id: _opid, overflow_model: _omod, ...rest } = t
+        return rest as MappingTarget
       }
     }
     return t
@@ -126,7 +122,7 @@ function updateOverflow(val: SelectedValue | undefined) {
           :model-value="entry.clientModel"
           class="h-7 flex-1 text-xs font-mono"
           :placeholder="t('providers.shared.clientModel')"
-          @update:model-value="(v: string) => emit('update:clientModel', v)"
+          @update:model-value="(v: string | number) => emit('update:clientModel', String(v))"
         />
       </div>
       <div v-else class="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-muted/20 border border-border/50">

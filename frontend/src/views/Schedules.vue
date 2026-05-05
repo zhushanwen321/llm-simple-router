@@ -465,28 +465,28 @@ function validate(): boolean {
   return Object.keys(errs).length === 0
 }
 
-function buildTransformRule(): string | null {
+function buildTransformRule(): { rule: string | null; error: boolean } {
   const { injectHeadersInput, dropFieldsInput, requestDefaultsInput } = transformForm.value
-  if (!injectHeadersInput.trim() && !dropFieldsInput.trim() && !requestDefaultsInput.trim()) return null
+  if (!injectHeadersInput.trim() && !dropFieldsInput.trim() && !requestDefaultsInput.trim()) return { rule: null, error: false }
   const dropFields = dropFieldsInput ? dropFieldsInput.split(',').map(s => s.trim()).filter(Boolean) : null
   let requestDefaults = null
   if (requestDefaultsInput.trim()) {
     try { requestDefaults = JSON.parse(requestDefaultsInput) }
-    catch { toast.error(t('providers.transform.requestDefaultsJsonError')); return undefined }
+    catch { toast.error(t('providers.transform.requestDefaultsJsonError')); return { rule: null, error: true } }
   }
   let injectHeaders = null
   if (injectHeadersInput.trim()) {
     try { injectHeaders = JSON.parse(injectHeadersInput) }
-    catch { toast.error(t('providers.transform.injectHeadersJsonError')); return undefined }
+    catch { toast.error(t('providers.transform.injectHeadersJsonError')); return { rule: null, error: true } }
   }
-  return JSON.stringify({ drop_fields: dropFields, request_defaults: requestDefaults, inject_headers: injectHeaders })
+  return { rule: JSON.stringify({ drop_fields: dropFields, request_defaults: requestDefaults, inject_headers: injectHeaders }), error: false }
 }
 
 async function handleSave() {
   formError.value = ''
   if (!validate()) return
-  const transformRule = buildTransformRule()
-  if (transformRule === undefined) return // JSON parse error
+  const { rule: transformRule, error: transformError } = buildTransformRule()
+  if (transformError) return
 
   try {
     const mappingRule = JSON.stringify({ targets: form.value.targets })
