@@ -2,7 +2,7 @@ import type { FastifyPluginCallback, FastifyReply, FastifyRequest } from "fastif
 import { randomUUID } from "crypto";
 import Database from "better-sqlite3";
 import fp from "fastify-plugin";
-import { getActiveProvidersWithModels, insertRequestLog } from "../../db/index.js";
+import { getAllProviders, insertRequestLog } from "../../db/index.js";
 import { createErrorFormatter, type ProxyErrorResponse } from "../proxy-core.js";
 import type { ErrorKind } from "../proxy-core.js";
 import { handleProxyRequest, type RouteHandlerDeps } from "./proxy-handler.js";
@@ -82,13 +82,13 @@ const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, do
 
   const handleModels = async (request: FastifyRequest, reply: FastifyReply) => {
     // 聚合所有活跃 provider 的模型列表
-    const providers = getActiveProvidersWithModels(db);
-    const modelMeta = new Map<string, string>(); // modelId → providerName
-    for (const p of providers) {
+    const allProviders = getAllProviders(db).filter(p => p.is_active);
+    const modelMeta = new Map<string, { providerName: string; createdAt: string }>();
+    for (const p of allProviders) {
       try {
         const models: string[] = JSON.parse(p.models || '[]');
         for (const m of models) {
-          if (!modelMeta.has(m)) modelMeta.set(m, p.name);
+          if (!modelMeta.has(m)) modelMeta.set(m, { providerName: p.name, createdAt: p.created_at });
         }
       } catch { /* skip invalid JSON */ }
     }
@@ -125,7 +125,7 @@ const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, do
         type: 'model' as const,
         id,
         display_name: id,
-        created_at: new Date().toISOString(),
+        created_at: modelMeta.get(id)!.createdAt,
       }));
 
       return reply.code(200).send({
@@ -140,8 +140,8 @@ const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, do
     const data = sortedIds.map(id => ({
       id,
       object: 'model' as const,
-      created: Math.floor(Date.now() / 1000),
-      owned_by: modelMeta.get(id) ?? 'llm-router',
+      created: Math.floor(new Date(modelMeta.get(id)!.createdAt).getTime() / 1000),
+      owned_by: modelMeta.get(id)!.providerName,
     }));
 
     return reply.code(200).send({
