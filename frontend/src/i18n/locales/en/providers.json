@@ -99,6 +99,8 @@
     "switchOnFail": "Switch on failure",
     "overflowPlaceholder": "Optional, switch when context exceeds limit...",
     "addFailover": "Add Failover",
+    "addMappingModel": "Add Mapping Model",
+    "addOverflow": "Add Overflow Model",
     "noMappings": "No mappings yet",
     "add": "Add",
     "autoHint": "Adaptive mode auto-adjusts concurrency based on error rate",

@@ -1,11 +1,11 @@
 {
-  "title": "Schedule Management",
-  "description": "Configure time-based scheduling rules for mapping groups to use different models and concurrency settings in different time periods",
+  "title": "Time-based Mapping",
+  "description": "Configure time-based mapping rules for mapping groups to use different models and concurrency settings in different time periods",
   "selectGroup": "Select Mapping Group",
   "selectGroupPlaceholder": "Please select a mapping group",
-  "scheduleRules": "Schedule Rules",
-  "createSchedule": "New Schedule",
-  "editSchedule": "Edit Schedule",
+  "scheduleRules": "Time Rules",
+  "createSchedule": "New Rule",
+  "editSchedule": "Edit Rule",
   "tableHeaders": {
     "name": "Name",
     "status": "Status",
@@ -15,8 +15,17 @@
   },
   "enabled": "Enabled",
   "disabled": "Disabled",
-  "emptyRules": "No schedule rules yet. Click \"New Schedule\" to add one",
+  "emptyRules": "No time rules yet. Click \"New Rule\" to add one",
+  "noRules": "Not configured",
+  "noGroups": "No mapping groups yet. Create one on the Model Mappings page first",
+  "ruleCount": "{count} rules",
   "pleaseSelectGroup": "Please select a mapping group first",
+  "timePresets": {
+    "label": "Quick Select",
+    "morning": "Morning",
+    "afternoon": "Afternoon",
+    "evening": "Evening"
+  },
   "form": {
     "name": "Name",
     "namePlaceholder": "e.g., Weekday Daytime",
@@ -31,13 +40,7 @@
     "selectModel": "Select model...",
     "targetRequired": "Each target must have a model selected",
     "addTarget": "Add Target",
-    "concurrencyTitle": "Concurrency Settings (Optional)",
-    "maxConcurrency": "Max Concurrency",
-    "maxConcurrencyPlaceholder": "Unlimited",
-    "queueTimeout": "Queue Timeout (ms)",
-    "queueTimeoutPlaceholder": "Default",
-    "maxQueue": "Max Queue Size",
-    "maxQueuePlaceholder": "Default"
+    "concurrencyTitle": "Concurrency Settings (Optional)"
   },
   "weekDays": {
     "sun": "Sun",
@@ -49,11 +52,11 @@
     "sat": "Sat"
   },
   "confirmDeleteTitle": "Confirm Delete",
-  "confirmDeleteMessage": "Are you sure you want to delete schedule \"{name}\"? This action cannot be undone.",
+  "confirmDeleteMessage": "Are you sure you want to delete rule \"{name}\"? This action cannot be undone.",
   "loadGroupsFailed": "Failed to load mapping groups",
   "loadProvidersFailed": "Failed to load providers",
-  "loadSchedulesFailed": "Failed to load schedules",
-  "saveFailed": "Failed to save schedule",
+  "loadSchedulesFailed": "Failed to load rules",
+  "saveFailed": "Failed to save rule",
   "toggleFailed": "Failed to toggle status",
-  "deleteFailed": "Failed to delete schedule"
+  "deleteFailed": "Failed to delete rule"
 }

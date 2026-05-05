@@ -12,6 +12,7 @@ export interface Schedule {
   end_hour: number;
   mapping_rule: string;
   concurrency_rule: string | null;
+  transform_rule: string | null;
   priority: number;
   created_at: string;
   updated_at: string;
@@ -20,6 +21,7 @@ export interface Schedule {
 const SCHEDULE_FIELDS = new Set([
   "mapping_group_id", "name", "enabled", "week",
   "start_hour", "end_hour", "mapping_rule", "concurrency_rule",
+  "transform_rule",
 ]);
 
 export function getSchedulesByGroup(db: Database.Database, mappingGroupId: string): Schedule[] {
@@ -52,17 +54,18 @@ export function createSchedule(
     end_hour: number;
     mapping_rule: string;
     concurrency_rule?: string;
+    transform_rule?: string;
   },
 ): string {
   const id = randomUUID();
   const now = new Date().toISOString();
   db.prepare(
-    `INSERT INTO schedules (id, mapping_group_id, name, enabled, week, start_hour, end_hour, mapping_rule, concurrency_rule, priority, created_at, updated_at)
-     VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?, 0, ?, ?)`,
+    `INSERT INTO schedules (id, mapping_group_id, name, enabled, week, start_hour, end_hour, mapping_rule, concurrency_rule, transform_rule, priority, created_at, updated_at)
+     VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
   ).run(
     id, data.mapping_group_id, data.name,
     data.week, data.start_hour, data.end_hour,
-    data.mapping_rule, data.concurrency_rule ?? null,
+    data.mapping_rule, data.concurrency_rule ?? null, data.transform_rule ?? null,
     now, now,
   );
   return id;
@@ -71,7 +74,7 @@ export function createSchedule(
 export function updateSchedule(
   db: Database.Database,
   id: string,
-  fields: Partial<Pick<Schedule, "name" | "enabled" | "week" | "start_hour" | "end_hour" | "mapping_rule" | "concurrency_rule">>,
+  fields: Partial<Pick<Schedule, "name" | "enabled" | "week" | "start_hour" | "end_hour" | "mapping_rule" | "concurrency_rule" | "transform_rule">>,
 ): void {
   const now = new Date().toISOString();
   buildUpdateQuery(db, "schedules", id, fields as Record<string, unknown>, SCHEDULE_FIELDS);

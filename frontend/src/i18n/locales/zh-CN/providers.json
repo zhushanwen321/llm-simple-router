@@ -99,6 +99,8 @@
     "switchOnFail": "失败时切换",
     "overflowPlaceholder": "可选，上下文超限时切换...",
     "addFailover": "添加故障转移",
+    "addMappingModel": "添加映射模型",
+    "addOverflow": "添加溢出模型",
     "noMappings": "暂无映射",
     "add": "添加",
     "autoHint": "自适应模式会根据错误率自动调整并发度",

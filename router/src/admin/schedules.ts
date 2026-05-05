@@ -21,6 +21,7 @@ const CreateScheduleSchema = Type.Object({
   end_hour: Type.Number({ minimum: 1, maximum: 24 }),
   mapping_rule: Type.String(),
   concurrency_rule: Type.Optional(Type.String()),
+  transform_rule: Type.Optional(Type.String()),
 });
 
 const UpdateScheduleSchema = Type.Object({
@@ -31,6 +32,7 @@ const UpdateScheduleSchema = Type.Object({
   end_hour: Type.Optional(Type.Number({ minimum: 1, maximum: 24 })),
   mapping_rule: Type.Optional(Type.String()),
   concurrency_rule: Type.Optional(Type.String()),
+  transform_rule: Type.Optional(Type.String()),
 });
 
 function validateMappingRule(db: Database.Database, ruleJson: string): string | undefined {
@@ -151,6 +153,14 @@ export const adminScheduleRoutes: FastifyPluginCallback<ScheduleRoutesOptions> =
       }
     }
 
+    if (body.transform_rule) {
+      try {
+        JSON.parse(body.transform_rule);
+      } catch {
+        return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.BAD_REQUEST, "Invalid transform_rule JSON"));
+      }
+    }
+
     if (body.start_hour >= body.end_hour) {
       return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.BAD_REQUEST, "start_hour must be < end_hour"));
     }
@@ -173,6 +183,7 @@ export const adminScheduleRoutes: FastifyPluginCallback<ScheduleRoutesOptions> =
       end_hour: body.end_hour,
       mapping_rule: body.mapping_rule,
       concurrency_rule: body.concurrency_rule,
+      transform_rule: body.transform_rule,
     });
     return reply.code(HTTP_CREATED).send({ id });
   });
@@ -195,6 +206,14 @@ export const adminScheduleRoutes: FastifyPluginCallback<ScheduleRoutesOptions> =
       }
     }
 
+    if (body.transform_rule) {
+      try {
+        JSON.parse(body.transform_rule);
+      } catch {
+        return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.BAD_REQUEST, "Invalid transform_rule JSON"));
+      }
+    }
+
     const startH = body.start_hour ?? existing.start_hour;
     const endH = body.end_hour ?? existing.end_hour;
     if (startH >= endH) {
@@ -214,7 +233,7 @@ export const adminScheduleRoutes: FastifyPluginCallback<ScheduleRoutesOptions> =
     }
 
     const fields: Record<string, unknown> = {};
-    const UPDATE_FIELDS = ["name", "enabled", "week", "start_hour", "end_hour", "mapping_rule", "concurrency_rule"] as const;
+    const UPDATE_FIELDS = ["name", "enabled", "week", "start_hour", "end_hour", "mapping_rule", "concurrency_rule", "transform_rule"] as const;
     const bodyObj = body as Record<string, unknown>;
     for (const key of UPDATE_FIELDS) {
       if (bodyObj[key] !== undefined) fields[key] = bodyObj[key];
