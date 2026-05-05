@@ -75,7 +75,7 @@ function filterExcluded(targets: Target[], excludeTargets: Target[] | undefined)
 
 // ---------- Schedule matching ----------
 
-const ALL_WEEK_DAYS = [0, 1, 2, 3, 4, 5, 6] as const;
+const ALL_WEEK_DAYS = [0, 1, 2, 3, 4, 5, 6] as const; // eslint-disable-line no-magic-numbers
 
 /** 将 week JSON 字符串解析为 dayOfWeek 数字集合 (0=Sun ~ 6=Sat) */
 function parseWeekDays(weekJson: string): Set<number> {

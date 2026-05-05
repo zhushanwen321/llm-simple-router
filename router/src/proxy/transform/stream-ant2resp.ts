@@ -1,6 +1,6 @@
 import { randomBytes } from "crypto";
 import { BaseSSETransform } from "./stream-transform-base.js";
-import { generateRespId } from "./id-utils.js";
+import { generateRespId, MS_PER_SECOND } from "./id-utils.js";
 import { RESPONSES_SSE_EVENTS } from "./types-responses.js";
 import type { ResponsesApiResponse, ResponseOutputItem } from "./types-responses.js";
 
@@ -9,6 +9,10 @@ type Ant2RespState = "init" | "text" | "thinking" | "tool_use" | "closing";
 function randomHex(bytes: number): string {
   return randomBytes(bytes).toString("hex");
 }
+
+const ID_HEX_LENGTH = 12;
+const SHORT_HEX_LENGTH = 8;
+const TOOLU_PREFIX_LEN = "toolu_".length;
 
 export class AnthropicToResponsesTransform extends BaseSSETransform {
   private state: Ant2RespState = "init";
@@ -24,7 +28,7 @@ export class AnthropicToResponsesTransform extends BaseSSETransform {
   private currentItemId = "";
   private currentSummaryPartId = "";
   private currentContentPartIndex = 0;
-  private createdAt = Math.floor(Date.now() / 1000);
+  private createdAt = Math.floor(Date.now() / MS_PER_SECOND);
 
   private nextSeq(): number {
     return this.sequenceNumber++;
@@ -72,8 +76,8 @@ export class AnthropicToResponsesTransform extends BaseSSETransform {
 
         if (blockType === "thinking") {
           this.state = "thinking";
-          this.currentItemId = `rs_${randomHex(12)}`;
-          this.currentSummaryPartId = `sp_${randomHex(8)}`;
+          this.currentItemId = `rs_${randomHex(ID_HEX_LENGTH)}`;
+          this.currentSummaryPartId = `sp_${randomHex(SHORT_HEX_LENGTH)}`;
           this.pushResponsesSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED, {
             type: RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED,
             output_index: this.outputIndex,
@@ -89,7 +93,7 @@ export class AnthropicToResponsesTransform extends BaseSSETransform {
           });
         } else if (blockType === "text") {
           this.state = "text";
-          this.currentItemId = `msg_${randomHex(12)}`;
+          this.currentItemId = `msg_${randomHex(ID_HEX_LENGTH)}`;
           this.currentContentPartIndex = 0;
           this.pushResponsesSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED, {
             type: RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED,
@@ -109,8 +113,8 @@ export class AnthropicToResponsesTransform extends BaseSSETransform {
           const toolId = block.id as string;
           // Convert toolu_ prefix to fc_ prefix
           this.activeToolCallId = toolId.startsWith("toolu_")
-            ? `fc_${toolId.slice(6)}`
-            : `fc_${randomHex(12)}`;
+            ? `fc_${toolId.slice(TOOLU_PREFIX_LEN)}`
+            : `fc_${randomHex(ID_HEX_LENGTH)}`;
           const callId = this.activeToolCallId;
           this.currentItemId = callId;
           this.pushResponsesSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED, {
@@ -294,7 +298,7 @@ export class AnthropicToResponsesTransform extends BaseSSETransform {
 
   private emitCompleted(): void {
     const status = this.pendingStatus ?? "completed";
-    const completedAt = Math.floor(Date.now() / 1000);
+    const completedAt = Math.floor(Date.now() / MS_PER_SECOND);
     const response: ResponsesApiResponse = {
       id: this.responseId,
       object: "response",

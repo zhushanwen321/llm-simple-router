@@ -167,7 +167,7 @@ class StreamProxy {
     this.passThrough.on("data", (chunk: Buffer) => {
       try {
         this.reply.raw.write(chunk);
-      } catch {
+      } catch { // eslint-disable-line taste/no-silent-catch
         // 客户端已断开，写已销毁的 socket 会抛出异常，可安全忽略
       }
     });
@@ -225,7 +225,7 @@ class StreamProxy {
           // headers 已发送：必须结束 reply 避免 client hang
           if (this.headersSent) {
             setImmediate(() => {
-              try { this.reply.raw.end(); } catch {
+              try { this.reply.raw.end(); } catch { // eslint-disable-line taste/no-silent-catch
                 // reply 可能已 destroyed，安全忽略
               }
             });
@@ -272,7 +272,7 @@ class StreamProxy {
     setImmediate(() => {
       this.pipeEntry.end();
       if (this.headersSent) {
-        try { this.reply.raw.end(); } catch {
+        try { this.reply.raw.end(); } catch { // eslint-disable-line taste/no-silent-catch
           // reply 可能已 destroyed，安全忽略
         }
       }

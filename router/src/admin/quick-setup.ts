@@ -71,7 +71,7 @@ interface QuickSetupRoutesOptions {
 }
 
 export const adminQuickSetupRoutes: FastifyPluginCallback<QuickSetupRoutesOptions> = (app, options, done) => {
-  const { db, stateRegistry, tracker, adaptiveController } = options;
+  const { db, tracker, adaptiveController } = options;
 
   app.post("/admin/api/quick-setup", { schema: { body: QuickSetupSchema } }, async (request, reply) => {
     const body = request.body as Static<typeof QuickSetupSchema>;

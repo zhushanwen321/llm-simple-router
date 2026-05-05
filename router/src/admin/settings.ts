@@ -89,7 +89,7 @@ function calcDirSize(dirPath: string): number {
     if (entry.isDirectory()) {
       total += calcDirSize(fullPath);
     } else if (entry.isFile()) {
-      try { total += statSync(fullPath).size; } catch { /* 文件可能刚被删除 */ }
+      try { total += statSync(fullPath).size; } catch { /* 文件可能刚被删除 */ } // eslint-disable-line taste/no-silent-catch
     }
   }
   return total;

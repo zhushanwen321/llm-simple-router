@@ -114,7 +114,7 @@ export class SSEMetricsTransform extends Transform {
         const delta = first.delta as Record<string, unknown>;
         if (typeof delta.content === "string") return delta.content;
       }
-    } catch { /* 非 JSON 数据行，跳过 */ }
+    } catch { /* 非 JSON 数据行，跳过 */ } // eslint-disable-line taste/no-silent-catch
     return undefined;
   }
 

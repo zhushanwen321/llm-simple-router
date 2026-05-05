@@ -16,8 +16,10 @@ interface AntMessage {
 // ---------- Helpers ----------
 
 /** Strip "toolu_" prefix from a tool_use_id to recover the original call_id. */
+const TOOLU_PREFIX_LEN = "toolu_".length;
+
 function stripTooluPrefix(id: string): string {
-  return id.startsWith("toolu_") ? id.slice(6) : id;
+  return id.startsWith("toolu_") ? id.slice(TOOLU_PREFIX_LEN) : id;
 }
 
 /** Merge consecutive same-role messages to satisfy Anthropic strict alternation. */

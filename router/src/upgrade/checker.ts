@@ -1,6 +1,5 @@
 import http from 'node:http'
 import https from 'node:https'
-import path from 'node:path'
 import { getInstalledVersion } from './version.js'
 import { getConfigVersions } from '../config/recommended.js'
 
@@ -72,7 +71,6 @@ export async function fetchJson(url: string, redirects = 0): Promise<unknown> {
 export function createUpgradeChecker(options?: CheckerOptions) {
   const npmRegistryUrl = options?.npmRegistryUrl ?? DEFAULT_NPM_REGISTRY
   const configBaseUrl = options?.configBaseUrl ?? DEFAULT_GITHUB_CONFIG_BASE
-  const configDir = options?.configDir ?? path.resolve(process.cwd(), 'config')
 
   let npmStatus: NpmStatus = {
     hasUpdate: false,
