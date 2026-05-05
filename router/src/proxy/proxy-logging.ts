@@ -13,7 +13,6 @@ import type { TransportResult } from "./types.js";
 
 // Internal imports from types.ts
 import { UPSTREAM_SUCCESS } from "./types.js";
-import type { RawHeaders } from "./types.js";
 import { HTTP_BAD_GATEWAY } from "../core/constants.js";
 
 // ---------- Header sanitization ----------

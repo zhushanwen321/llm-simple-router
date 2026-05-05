@@ -86,9 +86,12 @@ const PERIOD_OFFSET: Record<MetricsPeriod, string> = {
   "30d": "-30 days",
 };
 
-// 精确 10 个数据点：总秒数 / 10，最小 60 秒避免过细
+// 精确 DATA_POINT_COUNT 个数据点：总秒数 / DATA_POINT_COUNT，最小 MIN_BUCKET_SEC 秒避免过细
+const MIN_BUCKET_SEC = 60;
+const DATA_POINT_COUNT = 10;
+
 function calcBucketSec(totalSec: number): number {
-  return Math.max(60, Math.round(totalSec / 10));
+  return Math.max(MIN_BUCKET_SEC, Math.round(totalSec / DATA_POINT_COUNT));
 }
 
 export interface MetricsSummaryRow {

@@ -88,9 +88,11 @@ export function responsesToAnthropicResponse(bodyStr: string): string {
 
 // ---------- Anthropic → Responses ----------
 
+const TOOLU_PREFIX_LEN = "toolu_".length;
+
 /** Strip "toolu_" prefix from a tool_use_id to recover the original call_id. */
 function stripTooluPrefix(id: string): string {
-  return id.startsWith("toolu_") ? id.slice(6) : id;
+  return id.startsWith("toolu_") ? id.slice(TOOLU_PREFIX_LEN) : id;
 }
 
 export function anthropicToResponsesResponse(bodyStr: string): string {

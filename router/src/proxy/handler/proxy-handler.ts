@@ -371,7 +371,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
             pluginRegistry.applyBeforeResponse(respCtx);
             pluginRegistry.applyAfterResponse(respCtx);
             transformed = JSON.stringify(respCtx.response);
-          } catch { /* response hooks best-effort */ }
+          } catch { /* response hooks best-effort */ } // eslint-disable-line taste/no-silent-catch
         }
         return transformed;
       } catch (err) {

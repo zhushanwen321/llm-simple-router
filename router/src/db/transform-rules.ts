@@ -20,7 +20,7 @@ function parseJsonColumns(row: Record<string, unknown>): TransformRules {
     if (result[col]) {
       try {
         result[col] = JSON.parse(result[col] as string);
-      } catch {
+      } catch { // eslint-disable-line taste/no-silent-catch
         console.error(`[transform-rules] Failed to parse JSON column "${col}", keeping raw value`);
       }
     }

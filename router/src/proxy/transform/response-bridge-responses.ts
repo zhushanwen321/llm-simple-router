@@ -9,7 +9,6 @@
  */
 
 import { generateChatcmplId, generateRespId, MS_PER_SECOND } from "./id-utils.js";
-import { parseToolArguments } from "./sanitize.js";
 
 // ---------- Responses → Chat Completions ----------
 

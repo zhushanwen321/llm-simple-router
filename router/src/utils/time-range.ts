@@ -15,6 +15,12 @@ const MS_PER_HOUR = 3600_000
 // 与 usage-windows 的默认窗口时长对齐
 const WINDOW_DURATION_MS = WINDOW_HOURS * MS_PER_HOUR
 
+const DAYS_TO_SUNDAY = 6;
+const END_OF_DAY_HOUR = 23;
+const END_OF_DAY_MINUTE = 59;
+const END_OF_DAY_SECOND = 59;
+const END_OF_DAY_MS = 999;
+
 export function resolveTimeRange(
   period: DashboardPeriod,
   db: Database.Database,
@@ -39,14 +45,14 @@ export function resolveTimeRange(
       const monday = getMonday(now);
       monday.setHours(0, 0, 0, 0);
       const sunday = new Date(monday);
-      sunday.setDate(sunday.getDate() + 6);
-      sunday.setHours(23, 59, 59, 999);
+      sunday.setDate(sunday.getDate() + DAYS_TO_SUNDAY);
+      sunday.setHours(END_OF_DAY_HOUR, END_OF_DAY_MINUTE, END_OF_DAY_SECOND, END_OF_DAY_MS);
       return { startTime: toSqliteDatetime(monday), endTime: toSqliteDatetime(sunday) };
     }
     case "monthly": {
       const first = new Date(now.getFullYear(), now.getMonth(), 1);
       const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      last.setHours(23, 59, 59, 999);
+      last.setHours(END_OF_DAY_HOUR, END_OF_DAY_MINUTE, END_OF_DAY_SECOND, END_OF_DAY_MS);
       return { startTime: toSqliteDatetime(first), endTime: toSqliteDatetime(last) };
     }
   }

@@ -1,12 +1,14 @@
 import { randomBytes } from "crypto";
 import { BaseSSETransform } from "./stream-transform-base.js";
-import { generateRespId } from "./id-utils.js";
+import { generateRespId, MS_PER_SECOND } from "./id-utils.js";
 import { RESPONSES_SSE_EVENTS } from "./types-responses.js";
 import type { ResponsesApiResponse, ResponseOutputItem } from "./types-responses.js";
 
 function randomHex(bytes: number): string {
   return randomBytes(bytes).toString("hex");
 }
+
+const ID_HEX_LENGTH = 12;
 
 /**
  * Bridge transform: Chat Completions SSE → Responses API SSE.
@@ -32,7 +34,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
   private currentFunctionCallId = "";
   private currentFunctionCallName = "";
   private currentReasoningItemId = "";
-  private createdAt = Math.floor(Date.now() / 1000);
+  private createdAt = Math.floor(Date.now() / MS_PER_SECOND);
 
   private nextSeq(): number {
     return this.sequenceNumber++;
@@ -181,7 +183,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
   }
 
   private emitCompleted(): void {
-    const completedAt = Math.floor(Date.now() / 1000);
+    const completedAt = Math.floor(Date.now() / MS_PER_SECOND);
     const response: ResponsesApiResponse = {
       id: this.responseId,
       object: "response",
@@ -244,7 +246,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
 
       if (!this.hasReasoningItemStarted) {
         this.hasReasoningItemStarted = true;
-        this.currentReasoningItemId = `rs_${randomHex(12)}`;
+        this.currentReasoningItemId = `rs_${randomHex(ID_HEX_LENGTH)}`;
         this.pushResponsesSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED, {
           type: RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED,
           output_index: this.outputIndex,
@@ -277,7 +279,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
       if (!this.hasMessageItemStarted) {
         this.hasMessageItemStarted = true;
         this.contentIndex = 0;
-        this.currentMessageItemId = `msg_${randomHex(12)}`;
+        this.currentMessageItemId = `msg_${randomHex(ID_HEX_LENGTH)}`;
         this.pushResponsesSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED, {
           type: RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED,
           output_index: this.outputIndex,

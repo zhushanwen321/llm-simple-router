@@ -73,10 +73,12 @@ function validateMappingRule(db: Database.Database, ruleJson: string): string | 
 }
 
 /** 解析 week JSON 为数字数组，失败返回 null */
+const MAX_WEEK_DAY = 6;
+
 function parseWeekSafe(weekJson: string): number[] | null {
   try {
     const arr = JSON.parse(weekJson);
-    if (!Array.isArray(arr) || !arr.every((d: unknown) => typeof d === "number" && d >= 0 && d <= 6)) return null;
+    if (!Array.isArray(arr) || !arr.every((d: unknown) => typeof d === "number" && d >= 0 && d <= MAX_WEEK_DAY)) return null;
     return arr;
   } catch { return null; }
 }
@@ -106,8 +108,10 @@ function checkOverlap(
   return undefined;
 }
 
+const HOUR_PAD_WIDTH = 2;
+
 function formatHour(h: number): string {
-  return String(h).padStart(2, "0") + ":00";
+  return String(h).padStart(HOUR_PAD_WIDTH, "0") + ":00";
 }
 
 interface ScheduleRoutesOptions {

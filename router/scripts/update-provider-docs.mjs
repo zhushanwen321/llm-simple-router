@@ -96,7 +96,8 @@ async function callClaude(prompt) {
 
       child.on('close', code => {
         clearTimeout(timer)
-        code === 0 ? resolve(stdout) : reject(new Error(`claude 退出码 ${code}: ${stderr.slice(0, 500)}`))
+        if (code === 0) resolve(stdout)
+        else reject(new Error(`claude 退出码 ${code}: ${stderr.slice(0, 500)}`))
       })
 
       child.stdin.write(prompt)

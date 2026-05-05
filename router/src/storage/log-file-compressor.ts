@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, writeFileSync, unlinkSync, rmSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { gzipSync } from "node:zlib";
-import { WINDOW_MINUTES, TIME_PAD_WIDTH, localDateStr } from "./types.js";
+import { WINDOW_MINUTES, localDateStr } from "./types.js";
 
 const SECONDS_PER_MINUTE = 60;
 const MS_PER_SECOND = 1000;

@@ -63,7 +63,7 @@ export class PluginRegistry {
     for (const p of this.getMatchingPlugins(ctx.provider)) {
       try {
         p.beforeRequestTransform?.(ctx);
-      } catch (err) {
+      } catch (err) { // eslint-disable-line taste/no-silent-catch
         console.error(`[plugin-registry] Plugin "${p.name}" beforeRequestTransform error:`, err);
       }
     }
@@ -73,7 +73,7 @@ export class PluginRegistry {
     for (const p of this.getMatchingPlugins(ctx.provider)) {
       try {
         p.afterRequestTransform?.(ctx);
-      } catch (err) {
+      } catch (err) { // eslint-disable-line taste/no-silent-catch
         console.error(`[plugin-registry] Plugin "${p.name}" afterRequestTransform error:`, err);
       }
     }
@@ -83,7 +83,7 @@ export class PluginRegistry {
     for (const p of this.getMatchingPlugins(ctx.provider)) {
       try {
         p.beforeResponseTransform?.(ctx);
-      } catch (err) {
+      } catch (err) { // eslint-disable-line taste/no-silent-catch
         console.error(`[plugin-registry] Plugin "${p.name}" beforeResponseTransform error:`, err);
       }
     }
@@ -93,7 +93,7 @@ export class PluginRegistry {
     for (const p of this.getMatchingPlugins(ctx.provider)) {
       try {
         p.afterResponseTransform?.(ctx);
-      } catch (err) {
+      } catch (err) { // eslint-disable-line taste/no-silent-catch
         console.error(`[plugin-registry] Plugin "${p.name}" afterResponseTransform error:`, err);
       }
     }
@@ -136,7 +136,7 @@ export class PluginRegistry {
           }
         }
       },
-      afterResponseTransform(_ctx: ResponseTransformContext): void {
+      afterResponseTransform(): void {
         // field_overrides only applies to request direction;
         // response should reflect actual upstream data, not override rules
       },
