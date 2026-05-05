@@ -444,7 +444,6 @@ const emit = defineEmits<{
   'update:targets': [index: number, targets: MappingTarget[]]
   'toggle-active': [index: number]
   'add': [clientModel: string, targetModel: string]
-  'remove': [clientModel: string]
 }>()
 
 const expandedEntries = ref<Set<string>>(new Set())
@@ -714,18 +713,46 @@ git commit -m "refactor: simplify ModelMappings page to use ModelMappingCard per
 
 - [ ] **Step 1: Change the import path**
 
-In `QuickSetup.vue`, change:
+In `QuickSetup.vue`, make three changes:
+
+**1. Change the import:**
 ```
 import MappingList from '@/components/shared/MappingList.vue'
 ```
-to:
+→
 ```
 import QuickSetupMappingList from '@/components/shared/QuickSetupMappingList.vue'
 ```
 
-Then update the template usage:
-- Change `<MappingList` to `<QuickSetupMappingList`
-- Keep all props and emits the same (interface is compatible)
+**2. Update the template tag name and remove incompatible props:**
+
+The new `QuickSetupMappingList` doesn't accept `show-delete`, `show-add-form`, or `remove` (delete is never needed in quick setup, add form is always shown). Change:
+```html
+<MappingList
+  :entries="mappingEntries"
+  :provider-groups="allProviderGroups"
+  :show-delete="false"
+  :show-add-form="true"
+  @update:targets="updateMappingTargets"
+  @toggle-active="toggleMappingActive"
+  @add="addMappingEntry"
+  @remove="removeMappingEntry"
+/>
+```
+→
+```html
+<QuickSetupMappingList
+  :entries="mappingEntries"
+  :provider-groups="allProviderGroups"
+  @update:targets="updateMappingTargets"
+  @toggle-active="toggleMappingActive"
+  @add="addMappingEntry"
+/>
+```
+
+**3. Remove unused `removeMappingEntry` import if it becomes dead code:**
+
+Check if `removeMappingEntry` (from `useQuickSetup`) is still referenced elsewhere. If not, remove it from the destructured import.
 
 - [ ] **Step 2: Commit**
 
