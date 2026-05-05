@@ -2,18 +2,15 @@ import type { FastifyPluginCallback, FastifyReply, FastifyRequest } from "fastif
 import { randomUUID } from "crypto";
 import Database from "better-sqlite3";
 import fp from "fastify-plugin";
-import { getActiveProviders, insertRequestLog } from "../../db/index.js";
-import { getSetting } from "../../db/settings.js";
-import { decrypt } from "../../utils/crypto.js";
-import { proxyGetRequest, createErrorFormatter, type ProxyErrorResponse } from "../proxy-core.js";
+import { getAllProviders, insertRequestLog } from "../../db/index.js";
+import { createErrorFormatter, type ProxyErrorResponse } from "../proxy-core.js";
 import type { ErrorKind } from "../proxy-core.js";
-import type { RawHeaders } from "../types.js";
 import { handleProxyRequest, type RouteHandlerDeps } from "./proxy-handler.js";
 import { createOrchestrator } from "../orchestration/orchestrator.js";
 import { SemaphoreManager } from "@llm-router/core/concurrency";
 import type { RequestTracker } from "@llm-router/core/monitor";
 import { AdaptiveController } from "@llm-router/core/concurrency";
-import { HTTP_NOT_FOUND, HTTP_BAD_GATEWAY } from "../../core/constants.js";
+import { HTTP_OK, HTTP_BAD_GATEWAY, MS_PER_SECOND } from "../../core/constants.js";
 import { SERVICE_KEYS } from "../../core/container.js";
 
 export interface OpenaiProxyOptions {
@@ -83,52 +80,80 @@ const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, do
   app.post(CHAT_COMPLETIONS_PATH, handleChatCompletions);
   app.post(CHAT_COMPLETIONS_COMPAT_PATH, handleChatCompletions);
 
+  const ANTHROPIC_DEFAULT_PAGE_SIZE = 20;
+  const ANTHROPIC_MAX_PAGE_SIZE = 1000;
+
   const handleModels = async (request: FastifyRequest, reply: FastifyReply) => {
-    const startTime = Date.now();
-    const providers = getActiveProviders(db, "openai");
-    if (providers.length === 0) {
-      insertRequestLog(db, {
-        id: randomUUID(), api_type: "openai", model: null,
-        provider_id: null, status_code: HTTP_NOT_FOUND, latency_ms: Date.now() - startTime, is_stream: 0,
-        error_message: "No active OpenAI provider configured",
-        created_at: new Date().toISOString(),
-        client_request: JSON.stringify({ headers: request.headers }),
-        router_key_id: request.routerKey?.id ?? null,
-      });
-      return sendError(reply, {
-        statusCode: HTTP_NOT_FOUND,
-        body: { error: { message: "No active OpenAI provider configured", type: "invalid_request_error", code: "no_provider" } },
+    // 聚合所有活跃 provider 的模型列表
+    const allProviders = getAllProviders(db).filter(p => p.is_active);
+    const modelMeta = new Map<string, { providerName: string; createdAt: string }>();
+    for (const p of allProviders) {
+      try {
+        const models: string[] = JSON.parse(p.models || '[]');
+        for (const m of models) {
+          if (!modelMeta.has(m)) modelMeta.set(m, { providerName: p.name, createdAt: p.created_at });
+        }
+      } catch {
+        // providers.models 有 NOT NULL 约束默认 '[]'，此处防御开发期误配的非法 JSON
+        continue;
+      }
+    }
+    const sortedIds = [...modelMeta.keys()].sort();
+
+    // 根据请求头判断响应格式：Anthropic 客户端发送 anthropic-version 头
+    const isAnthropicFormat = !!request.headers['anthropic-version'];
+
+    if (isAnthropicFormat) {
+      // Anthropic 格式: { data: [...], has_more, first_id, last_id }
+      const query = request.query as { limit?: string; before_id?: string; after_id?: string };
+      const limit = Math.min(Math.max(parseInt(query.limit || String(ANTHROPIC_DEFAULT_PAGE_SIZE), 10) || ANTHROPIC_DEFAULT_PAGE_SIZE, 1), ANTHROPIC_MAX_PAGE_SIZE);
+
+      let sliced: string[];
+      let hasMore: boolean;
+
+      if (query.after_id) {
+        const idx = sortedIds.indexOf(query.after_id);
+        const start = idx !== -1 ? idx + 1 : 0;
+        sliced = sortedIds.slice(start, start + limit);
+        hasMore = start + limit < sortedIds.length;
+      } else if (query.before_id) {
+        const endIdx = sortedIds.indexOf(query.before_id);
+        const end = endIdx !== -1 ? endIdx : sortedIds.length;
+        const start = Math.max(0, end - limit);
+        sliced = sortedIds.slice(start, end);
+        hasMore = start > 0;
+      } else {
+        sliced = sortedIds.slice(0, limit);
+        hasMore = limit < sortedIds.length;
+      }
+
+      const data = sliced.map(id => ({
+        type: 'model' as const,
+        id,
+        display_name: id,
+        created_at: modelMeta.get(id)!.createdAt,
+      }));
+
+      return reply.code(HTTP_OK).send({
+        data,
+        has_more: hasMore,
+        first_id: data.length > 0 ? data[0].id : null,
+        last_id: data.length > 0 ? data[data.length - 1].id : null,
       });
     }
-    const provider = providers[0];
-    const apiKey = decrypt(provider.api_key, getSetting(db, "encryption_key")!);
-    const cliHdrs: RawHeaders = request.headers as RawHeaders;
-    try {
-      const result = await proxyGetRequest(provider, apiKey, cliHdrs, MODELS_PATH);
-      insertRequestLog(db, {
-        id: randomUUID(), api_type: "openai", model: null,
-        provider_id: provider.id, status_code: result.statusCode, latency_ms: Date.now() - startTime, is_stream: 0,
-        error_message: null, created_at: new Date().toISOString(),
-        client_request: JSON.stringify({ headers: request.headers }),
-        router_key_id: request.routerKey?.id ?? null,
-      });
-      for (const [k, v] of Object.entries(result.headers)) reply.header(k, v);
-      return reply.code(result.statusCode).send(result.body);
-    } catch (err: unknown) {
-      insertRequestLog(db, {
-        id: randomUUID(), api_type: "openai", model: null,
-        provider_id: provider.id, status_code: HTTP_BAD_GATEWAY, latency_ms: Date.now() - startTime, is_stream: 0,
-        error_message: err instanceof Error ? err.message : String(err),
-        created_at: new Date().toISOString(),
-        client_request: JSON.stringify({ headers: request.headers }),
-        router_key_id: request.routerKey?.id ?? null,
-      });
-      request.log.error({ err: err instanceof Error ? err.message : String(err) }, "Failed to reach OpenAI backend for /v1/models");
-      return sendError(reply, {
-        statusCode: HTTP_BAD_GATEWAY,
-        body: { error: { message: "Failed to reach backend service", type: "server_error", code: "upstream_error" } },
-      });
-    }
+
+    // OpenAI 格式: { object: "list", data: [...] }
+    const data = sortedIds.map(id => ({
+      id,
+      object: 'model' as const,
+      created: Math.floor(new Date(modelMeta.get(id)!.createdAt).getTime() / MS_PER_SECOND),
+      owned_by: modelMeta.get(id)!.providerName,
+    }));
+
+    return reply.code(HTTP_OK).send({
+      object: 'list',
+      data,
+    });
   };
 
   // 规范路径 + 兼容路径
