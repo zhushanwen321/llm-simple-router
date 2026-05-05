@@ -9,30 +9,37 @@
           <span class="text-[11px] px-2 py-0.5 rounded-full bg-muted/40 text-muted-foreground">{{ t('mappings.enabledCount', { count: activeCount }) }}</span>
         </div>
       </div>
-    </div>
-
-    <!-- Mapping Cards -->
-    <ModelMappingCard
-      v-for="entry in entries"
-      :key="entry.clientModel"
-      :entry="entry"
-      :provider-groups="providerGroups"
-      @saved="loadData"
-      @deleted="handleDelete"
-    />
-
-    <!-- Empty state -->
-    <p v-if="entries.length === 0" class="py-8 text-center text-xs text-muted-foreground">{{ t('providers.shared.noMappings') }}</p>
-
-    <!-- Add new mapping -->
-    <div class="flex items-center gap-2 pt-3 border-t">
-      <Input v-model="newClientModel" :placeholder="t('providers.shared.clientModel')" class="h-8 flex-1 text-xs font-mono" @keydown.enter.prevent="handleAdd" />
-      <ArrowRight class="size-3 shrink-0 text-muted-foreground/30" />
-      <Input v-model="newTargetModel" :placeholder="t('providers.shared.targetModel')" class="h-8 flex-1 text-xs font-mono" @keydown.enter.prevent="handleAdd" />
-      <Button size="sm" variant="outline" class="h-8 shrink-0" :disabled="!canAdd || adding" @click="handleAdd">
-        {{ adding ? t('common.saving') : t('providers.shared.add') }}
+      <Button v-if="!showAddCard" size="sm" variant="outline" @click="showAddCard = true">
+        <Plus class="w-3.5 h-3.5 mr-1" />
+        {{ t('providers.shared.add') }}
       </Button>
     </div>
+
+    <!-- Mapping Cards Grid -->
+    <div class="grid grid-cols-3 gap-3">
+      <ModelMappingCard
+        v-for="entry in entries"
+        :key="entry.clientModel"
+        :entry="entry"
+        :provider-groups="providerGroups"
+        @saved="loadData"
+        @deleted="handleDelete"
+      />
+
+      <!-- Add new mapping card -->
+      <ModelMappingCard
+        v-if="showAddCard"
+        :entry="newEntry"
+        :provider-groups="providerGroups"
+        :editable-client-model="true"
+        :default-expanded="true"
+        @saved="handleAddSaved"
+        @cancel-add="showAddCard = false"
+      />
+    </div>
+
+    <!-- Empty state -->
+    <p v-if="entries.length === 0 && !showAddCard" class="py-8 text-center text-xs text-muted-foreground">{{ t('providers.shared.noMappings') }}</p>
   </div>
 </template>
 
@@ -40,10 +47,9 @@
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
+import { Plus } from 'lucide-vue-next'
 import { api, getApiMessage } from '@/api/client'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { ArrowRight } from 'lucide-vue-next'
 import ModelMappingCard from '@/components/mappings/ModelMappingCard.vue'
 import type { MappingEntry, MappingTarget } from '@/components/quick-setup/types'
 import type { ProviderGroup } from '@/components/mappings/cascading-types'
@@ -56,9 +62,7 @@ const { t } = useI18n()
 const groups = ref<MappingGroup[]>([])
 const providersList = ref<Provider[]>([])
 const entries = ref<MappingEntry[]>([])
-const newClientModel = ref('')
-const newTargetModel = ref('')
-const adding = ref(false)
+const showAddCard = ref(false)
 
 // --- Computed ---
 const activeCount = computed(() => entries.value.filter(e => e.active).length)
@@ -73,7 +77,13 @@ const providerGroups = computed<ProviderGroup[]>(() =>
   }))
 )
 
-const canAdd = computed(() => newClientModel.value.trim().length > 0 && newTargetModel.value.trim().length > 0)
+const newEntry = computed<MappingEntry>(() => ({
+  clientModel: '',
+  targets: [{ backend_model: '', provider_id: providersList.value[0]?.id ?? '' }],
+  existing: false,
+  tag: 'cust' as const,
+  active: true,
+}))
 
 // --- Build entries from DB ---
 function buildEntries(): MappingEntry[] {
@@ -112,23 +122,10 @@ async function loadData() {
   entries.value = buildEntries()
 }
 
-// --- Add new mapping ---
-async function handleAdd() {
-  const cm = newClientModel.value.trim()
-  const tm = newTargetModel.value.trim()
-  if (!cm || !tm) return
-  adding.value = true
-  try {
-    await api.createMappingGroup({ client_model: cm, rule: JSON.stringify({ targets: [{ backend_model: tm, provider_id: providersList.value[0]?.id ?? '' }] }) })
-    newClientModel.value = ''
-    newTargetModel.value = ''
-    await loadData()
-    toast.success(t('common.saveSuccess'))
-  } catch (e: unknown) {
-    toast.error(getApiMessage(e, t('mappings.messages.saveFailed')))
-  } finally {
-    adding.value = false
-  }
+// --- After add card saved ---
+function handleAddSaved() {
+  showAddCard.value = false
+  loadData()
 }
 
 // --- Delete mapping ---

@@ -13,17 +13,29 @@ import type { ProviderGroup } from '@/components/mappings/cascading-types'
 
 const { t } = useI18n()
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   entry: MappingEntry
   providerGroups: ProviderGroup[]
-}>()
+  editableClientModel?: boolean
+  defaultExpanded?: boolean
+}>(), {
+  defaultExpanded: false,
+})
 
 const emit = defineEmits<{
   'saved': []
   'deleted': [clientModel: string]
+  'cancel-add': []
 }>()
 
-const expanded = ref(false)
+const localClientModel = ref('')
+
+// Sync localClientModel from entry for new-card mode
+watch(() => props.entry.clientModel, (val) => {
+  localClientModel.value = val
+}, { immediate: true })
+
+const expanded = ref(props.defaultExpanded)
 const localTargets = ref<MappingTarget[]>([])
 const saving = ref(false)
 const showDeleteConfirm = ref(false)
@@ -52,17 +64,23 @@ function handleUpdateTargets(targets: MappingTarget[]) {
   localTargets.value = targets
 }
 
+function handleUpdateClientModel(val: string) {
+  localClientModel.value = val
+}
+
 async function handleSave() {
   saving.value = true
   try {
+    const clientModel = props.editableClientModel ? localClientModel.value.trim() : props.entry.clientModel
+    if (!clientModel) return
     const ruleJson = JSON.stringify({ targets: localTargets.value })
     if (props.entry.existingId) {
       await api.updateMappingGroup(props.entry.existingId, {
-        client_model: props.entry.clientModel,
+        client_model: clientModel,
         rule: ruleJson,
       })
     } else {
-      await api.createMappingGroup({ client_model: props.entry.clientModel, rule: ruleJson })
+      await api.createMappingGroup({ client_model: clientModel, rule: ruleJson })
     }
     expanded.value = false
     emit('saved')
@@ -75,7 +93,11 @@ async function handleSave() {
 }
 
 function handleCancel() {
-  expanded.value = false
+  if (props.editableClientModel) {
+    emit('cancel-add')
+  } else {
+    expanded.value = false
+  }
 }
 
 async function handleToggleActive() {
@@ -113,7 +135,9 @@ function handleConfirmDelete() {
           :provider-groups="providerGroups"
           :expanded="expanded"
           :editable="true"
+          :editable-client-model="editableClientModel"
           @update:targets="handleUpdateTargets"
+          @update:client-model="handleUpdateClientModel"
         />
       </div>
 
@@ -124,6 +148,7 @@ function handleConfirmDelete() {
             {{ t('providers.shared.level', { count: entry.targets.length }) }}
           </span>
           <Button
+            v-if="!editableClientModel"
             variant="ghost"
             size="icon-xs"
             class="text-muted-foreground/40 hover:text-destructive"
@@ -132,6 +157,7 @@ function handleConfirmDelete() {
             <Trash2 class="size-3" />
           </Button>
           <Switch
+            v-if="!editableClientModel"
             :model-value="entry.active"
             @update:model-value="handleToggleActive"
             class="scale-75"

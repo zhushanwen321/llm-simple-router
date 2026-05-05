@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
-import { Plus, Trash2 } from 'lucide-vue-next'
+import { Plus, Trash2, CircleHelp } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import CascadingModelSelect from '@/components/mappings/CascadingModelSelect.vue'
 import type { MappingTarget, MappingEntry } from '@/components/quick-setup/types'
 import type { ProviderGroup, SelectedValue } from '@/components/mappings/cascading-types'
@@ -13,12 +15,15 @@ const props = withDefaults(defineProps<{
   providerGroups: ProviderGroup[]
   expanded: boolean
   editable: boolean
+  editableClientModel?: boolean
 }>(), {
   editable: true,
+  editableClientModel: false,
 })
 
 const emit = defineEmits<{
   'update:targets': [targets: MappingTarget[]]
+  'update:clientModel': [clientModel: string]
 }>()
 
 function providerName(providerId: string): string {
@@ -31,6 +36,17 @@ function addTarget() {
     backend_model: firstProvider?.models[0]?.name ?? '',
     provider_id: firstProvider?.provider.id ?? '',
   }]
+  emit('update:targets', newTargets)
+}
+
+function addOverflow() {
+  const firstProvider = props.providerGroups[0]
+  const newTargets = props.entry.targets.map((t: MappingTarget, i: number) => {
+    if (i === 0) {
+      return { ...t, overflow_provider_id: firstProvider?.provider.id ?? '', overflow_model: firstProvider?.models[0]?.name ?? '' }
+    }
+    return t
+  })
   emit('update:targets', newTargets)
 }
 
@@ -106,6 +122,21 @@ function updateOverflow(val: SelectedValue | undefined) {
 
     <!-- Expanded: Editor -->
     <div v-else class="space-y-1.5">
+      <!-- Client model name: editable or read-only -->
+      <div v-if="editableClientModel" class="flex items-center gap-2">
+        <span class="text-[10px] text-muted-foreground/60 shrink-0 w-6 text-center">Client</span>
+        <Input
+          :model-value="entry.clientModel"
+          class="h-7 flex-1 text-xs font-mono"
+          :placeholder="t('providers.shared.clientModel')"
+          @update:model-value="(v: string) => emit('update:clientModel', v)"
+        />
+      </div>
+      <div v-else class="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-muted/20 border border-border/50">
+        <span class="text-[10px] text-muted-foreground/60 shrink-0">Client</span>
+        <span class="font-mono text-sm font-medium text-foreground truncate">{{ entry.clientModel }}</span>
+      </div>
+      <!-- Failover targets -->
       <div v-for="(target, tIdx) in entry.targets" :key="tIdx">
         <div class="flex items-center gap-2">
           <span
@@ -139,23 +170,53 @@ function updateOverflow(val: SelectedValue | undefined) {
         </div>
       </div>
 
-      <div class="flex items-center gap-2 pt-2 mt-1 border-t border-dashed border-primary/15">
-        <span class="text-[10px] w-6 text-center px-1 py-0.5 rounded bg-primary/10 text-primary/70 shrink-0">{{ t('providers.shared.overflow') }}</span>
-        <div class="flex-1">
-          <CascadingModelSelect
-            :providers="providerGroups"
-            :model-value="entry.targets[0]?.overflow_provider_id && entry.targets[0]?.overflow_model ? { provider_id: entry.targets[0].overflow_provider_id, model: entry.targets[0].overflow_model } : undefined"
-            compact
-            :placeholder="t('providers.shared.overflowPlaceholder')"
-            @update:model-value="(v: SelectedValue | undefined) => updateOverflow(v)"
-          />
-        </div>
-      </div>
-
+      <!-- Add mapping / failover button -->
       <Button variant="ghost" size="sm" class="w-full text-xs text-muted-foreground/50" @click="addTarget">
         <Plus class="w-3 h-3 mr-1" />
-        {{ t('providers.shared.addFailover') }}
+        {{ entry.targets.length === 0 ? t('providers.shared.addMappingModel') : t('providers.shared.addFailover') }}
       </Button>
+
+      <!-- Overflow model section -->
+      <div class="pt-2 mt-1 border-t border-dashed border-primary/15 space-y-1.5">
+        <!-- Has overflow: show select with remove button -->
+        <div v-if="entry.targets[0]?.overflow_model" class="flex items-center gap-2">
+          <span class="text-[10px] w-6 text-center px-1 py-0.5 rounded bg-primary/10 text-primary/70 shrink-0">{{ t('providers.shared.overflow') }}</span>
+          <div class="flex-1">
+            <CascadingModelSelect
+              :providers="providerGroups"
+              :model-value="entry.targets[0]?.overflow_provider_id && entry.targets[0]?.overflow_model ? { provider_id: entry.targets[0].overflow_provider_id, model: entry.targets[0].overflow_model } : undefined"
+              compact
+              :placeholder="t('providers.shared.overflowPlaceholder')"
+              @update:model-value="(v: SelectedValue | undefined) => updateOverflow(v)"
+            />
+          </div>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            class="shrink-0 text-muted-foreground/40 hover:text-destructive"
+            @click="updateOverflow(undefined)"
+          >
+            <Trash2 class="size-3" />
+          </Button>
+        </div>
+        <!-- No overflow: show add button with tooltip -->
+        <div v-else class="flex items-center gap-1.5">
+          <Button variant="ghost" size="sm" class="text-xs text-muted-foreground/50" @click="addOverflow">
+            <Plus class="w-3 h-3 mr-1" />
+            {{ t('providers.shared.addOverflow') }}
+          </Button>
+          <TooltipProvider :delay-duration="200">
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <CircleHelp class="size-3 text-muted-foreground/30 cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent side="top" class="max-w-[240px] text-xs">
+                {{ t('providers.shared.overflowTooltip') }}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      </div>
     </div>
   </div>
 </template>

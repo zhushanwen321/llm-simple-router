@@ -1,11 +1,11 @@
 {
-  "title": "调度管理",
-  "description": "为映射组配置分时段调度规则，在不同时间段使用不同的模型和并发配置",
+  "title": "分时段映射",
+  "description": "为映射组配置分时段映射规则，在不同时间段使用不同的模型和并发配置",
   "selectGroup": "选择映射组",
   "selectGroupPlaceholder": "请选择映射组",
-  "scheduleRules": "调度规则",
-  "createSchedule": "新建调度",
-  "editSchedule": "编辑调度",
+  "scheduleRules": "时段规则",
+  "createSchedule": "新建时段",
+  "editSchedule": "编辑时段",
   "tableHeaders": {
     "name": "名称",
     "status": "状态",
@@ -15,8 +15,17 @@
   },
   "enabled": "启用",
   "disabled": "禁用",
-  "emptyRules": "暂无调度规则，点击「新建调度」添加",
+  "emptyRules": "暂无时段规则，点击「新建时段」添加",
+  "noRules": "未配置",
+  "noGroups": "暂无映射组，请先在模型映射页面创建",
+  "ruleCount": "{count} 条规则",
   "pleaseSelectGroup": "请先选择一个映射组",
+  "timePresets": {
+    "label": "快捷选择",
+    "morning": "上午",
+    "afternoon": "下午",
+    "evening": "晚上"
+  },
   "form": {
     "name": "名称",
     "namePlaceholder": "例如：工作日白天",
@@ -31,13 +40,7 @@
     "selectModel": "选择模型...",
     "targetRequired": "每个目标必须选择模型",
     "addTarget": "添加目标",
-    "concurrencyTitle": "并发配置（可选）",
-    "maxConcurrency": "最大并发",
-    "maxConcurrencyPlaceholder": "不限",
-    "queueTimeout": "队列超时 (ms)",
-    "queueTimeoutPlaceholder": "默认",
-    "maxQueue": "最大队列",
-    "maxQueuePlaceholder": "默认"
+    "concurrencyTitle": "并发配置（可选）"
   },
   "weekDays": {
     "sun": "周日",
@@ -49,11 +52,11 @@
     "sat": "周六"
   },
   "confirmDeleteTitle": "确认删除",
-  "confirmDeleteMessage": "确定要删除调度「{name}」吗？此操作不可撤销。",
+  "confirmDeleteMessage": "确定要删除时段「{name}」吗？此操作不可撤销。",
   "loadGroupsFailed": "加载映射组失败",
   "loadProvidersFailed": "加载供应商失败",
-  "loadSchedulesFailed": "加载调度失败",
-  "saveFailed": "保存调度失败",
+  "loadSchedulesFailed": "加载时段失败",
+  "saveFailed": "保存时段失败",
   "toggleFailed": "切换状态失败",
-  "deleteFailed": "删除调度失败"
+  "deleteFailed": "删除时段失败"
 }

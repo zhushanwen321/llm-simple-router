@@ -3,7 +3,7 @@
     "dashboard": "仪表盘",
     "providers": "供应商",
     "modelMappings": "模型映射",
-    "schedules": "调度管理",
+    "schedules": "分时段映射",
     "routerKeys": "API 密钥",
     "retryRules": "重试规则",
     "proxyEnhancement": "代理增强（实验性）",
