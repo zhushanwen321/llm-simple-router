@@ -5,6 +5,7 @@ import { HTTP_UNPROCESSABLE_ENTITY } from "../../core/constants.js";
 import { getProviderById, insertRequestLog, updateLogStreamContent, updateLogClientStatus } from "../../db/index.js";
 import { decrypt } from "../../utils/crypto.js";
 import { getSetting } from "../../db/settings.js";
+import { getModelStreamTimeout } from "../../db/providers.js";
 import { resolveMapping } from "../routing/mapping-resolver.js";
 import { SemaphoreQueueFullError, SemaphoreTimeoutError } from "@llm-router/core";
 import type { RequestTracker } from "@llm-router/core/monitor";
@@ -383,7 +384,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
     const transportFn = buildTransportFn({
       provider, apiKey, body: patchedBody, cliHdrs, reply, upstreamPath: effectiveUpstreamPath, apiType: effectiveApiType,
       isStream, startTime, logId, effectiveModel,
-      streamTimeoutMs: config.STREAM_TIMEOUT_MS, tracker, matcher, request,
+      streamTimeoutMs: getModelStreamTimeout(provider, resolved.backend_model), tracker, matcher, request,
       streamLoopEnabled, formatTransform, responseTransform, injectedHeaders,
     });
 
