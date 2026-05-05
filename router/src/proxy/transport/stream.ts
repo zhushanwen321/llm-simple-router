@@ -49,6 +49,7 @@ class StreamProxy {
     private readonly timeoutMs: number,
     private readonly loopGuard: StreamLoopGuard | undefined,
     formatTransform?: Transform,
+    private readonly timeoutContext?: { modelId: string; providerId: string },
   ) {
     this.formatTransform = formatTransform;
     this.sseHeaders = filterHeaders(rawUpstreamHeaders);
@@ -96,7 +97,7 @@ class StreamProxy {
         result = { kind: "stream_error", ...base, body: extra.body as string, headers: this.sseHeaders, headersSent: this.headersSent || undefined };
         break;
       case "stream_abort":
-        result = { kind: "stream_abort", ...base, metrics: extra.metrics as MetricsResult | undefined };
+        result = { kind: "stream_abort", ...base, metrics: extra.metrics as MetricsResult | undefined, timeoutContext: extra.timeoutContext as { modelId: string; providerId: string } | undefined, timeoutMs: extra.timeoutMs as number | undefined };
         break;
     }
 
@@ -141,7 +142,7 @@ class StreamProxy {
     if (this.idleTimer) clearTimeout(this.idleTimer);
     this.idleTimer = setTimeout(() => {
       if (this.resolved) return;
-      this.terminal("stream_abort", { metrics: this.collectMetrics(false) });
+      this.terminal("stream_abort", { metrics: this.collectMetrics(false), timeoutContext: this.timeoutContext, timeoutMs: this.timeoutMs });
     }, this.timeoutMs);
   }
 
@@ -309,6 +310,7 @@ export function callStream(
   compatResolve?: (result: TransportResult) => void,
   loopGuard?: StreamLoopGuard,
   formatTransform?: import("stream").Transform,
+  timeoutContext?: { modelId: string; providerId: string },
 ): Promise<TransportResult> {
   return new Promise((resolve) => {
     const effectiveResolve = compatResolve ?? resolve;
@@ -345,7 +347,7 @@ export function callStream(
         metricsTransform,
         checkEarlyError,
         timeoutMs,
-        loopGuard, formatTransform,
+        loopGuard, formatTransform, timeoutContext,
       );
 
       proxy.bindResolve(effectiveResolve);
