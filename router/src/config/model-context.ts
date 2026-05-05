@@ -99,6 +99,11 @@ export function lookupContextWindow(modelName: string): number {
   return MODEL_CONTEXT_WINDOWS[modelName] ?? DEFAULT_CONTEXT_WINDOW
 }
 
+/** 标准化 patch 名称：连字符 → 下划线 */
+function normalizePatchName(name: string): string {
+  return name.replace(/-/g, "_")
+}
+
 export function parseModels(raw: string): ModelEntry[] {
   if (!raw) return []
   try {
@@ -112,7 +117,7 @@ export function parseModels(raw: string): ModelEntry[] {
       if (!obj || !obj.name) return null
       return {
         name: obj.name,
-        patches: obj.patches ?? [],
+        patches: (obj.patches ?? []).map(normalizePatchName),
       }
     }).filter((e): e is ModelEntry => e !== null)
   } catch {

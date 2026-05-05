@@ -22,7 +22,7 @@ describe('model-context', () => {
   it('parseModels handles object[] format with patches', () => {
     const result = parseModels('[{"name":"glm-5","patches":["thinking-param"]},{"name":"deepseek-chat"}]')
     expect(result).toEqual([
-      { name: 'glm-5', patches: ['thinking-param'] },
+      { name: 'glm-5', patches: ['thinking_param'] },
       { name: 'deepseek-chat', patches: [] },
     ])
   })
@@ -40,11 +40,11 @@ describe('model-context', () => {
   it('buildModelInfoList enriches entries with overrides, defaults, and patches', () => {
     const overrides = new Map([['glm-5', 999000]])
     const result = buildModelInfoList([
-      { name: 'glm-5', patches: ['thinking-param'] },
+      { name: 'glm-5', patches: ['thinking_param'] },
       { name: 'unknown', patches: [] },
     ], overrides)
     expect(result).toEqual([
-      { name: 'glm-5', context_window: 999000, patches: ['thinking-param'] },
+      { name: 'glm-5', context_window: 999000, patches: ['thinking_param'] },
       { name: 'unknown', context_window: 200000, patches: [] },
     ])
   })
