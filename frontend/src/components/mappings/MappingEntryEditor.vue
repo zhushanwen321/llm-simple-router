@@ -19,7 +19,6 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   'update:targets': [targets: MappingTarget[]]
-  'toggle:expand': []
 }>()
 
 function providerName(providerId: string): string {
@@ -46,15 +45,19 @@ function updateTargetProvider(targetIndex: number, val: SelectedValue) {
   emit('update:targets', newTargets)
 }
 
+function omit<T extends Record<string, unknown>, K extends keyof T>(obj: T, ...keys: K[]): Omit<T, K> {
+  const result = { ...obj }
+  for (const key of keys) delete result[key]
+  return result
+}
+
 function updateOverflow(val: SelectedValue | undefined) {
   const newTargets = props.entry.targets.map((t: MappingTarget, i: number) => {
     if (i === 0) {
       if (val) {
         return { ...t, overflow_provider_id: val.provider_id, overflow_model: val.model }
       } else {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { overflow_provider_id: _opid, overflow_model: _omod, ...rest } = t
-        return rest as MappingTarget
+        return omit(t, 'overflow_provider_id', 'overflow_model')
       }
     }
     return t
@@ -66,7 +69,7 @@ function updateOverflow(val: SelectedValue | undefined) {
 <template>
   <div>
     <!-- Collapsed: Vertical Pipeline -->
-    <div v-if="!expanded" class="flex items-start gap-3" @click="editable && emit('toggle:expand')">
+    <div v-if="!expanded" class="flex items-start gap-3">
       <span class="min-w-[90px] font-mono text-sm font-semibold text-foreground shrink-0 truncate" :title="entry.clientModel">
         {{ entry.clientModel }}
       </span>
@@ -121,7 +124,7 @@ function updateOverflow(val: SelectedValue | undefined) {
             />
           </div>
           <Button
-            v-if="entry.targets.length > 1"
+            v-if="tIdx > 0 && entry.targets.length > 1"
             variant="ghost"
             size="icon-xs"
             class="shrink-0 text-muted-foreground/40 hover:text-destructive"

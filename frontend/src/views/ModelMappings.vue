@@ -27,7 +27,7 @@
     <!-- Add new mapping -->
     <div class="flex items-center gap-2 pt-3 border-t">
       <Input v-model="newClientModel" :placeholder="t('providers.shared.clientModel')" class="h-8 flex-1 text-xs font-mono" @keydown.enter.prevent="handleAdd" />
-      <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" class="shrink-0 text-muted-foreground/30"><path d="M1 6h10M8 3l3 3-3 3"/></svg>
+      <ArrowRight class="size-3 shrink-0 text-muted-foreground/30" />
       <Input v-model="newTargetModel" :placeholder="t('providers.shared.targetModel')" class="h-8 flex-1 text-xs font-mono" @keydown.enter.prevent="handleAdd" />
       <Button size="sm" variant="outline" class="h-8 shrink-0" :disabled="!canAdd || adding" @click="handleAdd">
         {{ adding ? t('common.saving') : t('providers.shared.add') }}
@@ -43,6 +43,7 @@ import { toast } from 'vue-sonner'
 import { api, getApiMessage } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { ArrowRight } from 'lucide-vue-next'
 import ModelMappingCard from '@/components/mappings/ModelMappingCard.vue'
 import type { MappingEntry, MappingTarget } from '@/components/quick-setup/types'
 import type { ProviderGroup } from '@/components/mappings/cascading-types'

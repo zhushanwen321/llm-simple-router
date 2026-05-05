@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
+import { Trash2 } from 'lucide-vue-next'
 import { api, getApiMessage } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
@@ -34,12 +35,18 @@ watch(expanded, (val) => {
   }
 })
 
-function getWorkingEntry(): MappingEntry {
+// Sync localTargets when parent refreshes data while card is expanded
+watch(() => props.entry.targets, (newTargets) => {
   if (expanded.value) {
-    return { ...props.entry, targets: localTargets.value }
+    localTargets.value = newTargets.map(t => ({ ...t }))
   }
-  return props.entry
-}
+}, { deep: true })
+
+const workingEntry = computed<MappingEntry>(() =>
+  expanded.value
+    ? { ...props.entry, targets: localTargets.value }
+    : props.entry
+)
 
 function handleUpdateTargets(targets: MappingTarget[]) {
   localTargets.value = targets
@@ -102,7 +109,7 @@ function handleConfirmDelete() {
       <!-- Editor (collapsed or expanded) -->
       <div class="flex-1 min-w-0">
         <MappingEntryEditor
-          :entry="getWorkingEntry()"
+          :entry="workingEntry"
           :provider-groups="providerGroups"
           :expanded="expanded"
           :editable="true"
@@ -122,7 +129,7 @@ function handleConfirmDelete() {
             class="text-muted-foreground/40 hover:text-destructive"
             @click.stop="showDeleteConfirm = true"
           >
-            <svg class="size-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+            <Trash2 class="size-3" />
           </Button>
           <Switch
             :model-value="entry.active"
