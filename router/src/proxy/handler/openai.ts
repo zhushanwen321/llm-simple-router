@@ -10,7 +10,7 @@ import { createOrchestrator } from "../orchestration/orchestrator.js";
 import { SemaphoreManager } from "@llm-router/core/concurrency";
 import type { RequestTracker } from "@llm-router/core/monitor";
 import { AdaptiveController } from "@llm-router/core/concurrency";
-import { HTTP_BAD_GATEWAY } from "../../core/constants.js";
+import { HTTP_OK, HTTP_BAD_GATEWAY, MS_PER_SECOND } from "../../core/constants.js";
 import { SERVICE_KEYS } from "../../core/container.js";
 
 export interface OpenaiProxyOptions {
@@ -80,6 +80,9 @@ const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, do
   app.post(CHAT_COMPLETIONS_PATH, handleChatCompletions);
   app.post(CHAT_COMPLETIONS_COMPAT_PATH, handleChatCompletions);
 
+  const ANTHROPIC_DEFAULT_PAGE_SIZE = 20;
+  const ANTHROPIC_MAX_PAGE_SIZE = 1000;
+
   const handleModels = async (request: FastifyRequest, reply: FastifyReply) => {
     // 聚合所有活跃 provider 的模型列表
     const allProviders = getAllProviders(db).filter(p => p.is_active);
@@ -90,7 +93,10 @@ const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, do
         for (const m of models) {
           if (!modelMeta.has(m)) modelMeta.set(m, { providerName: p.name, createdAt: p.created_at });
         }
-      } catch { /* skip invalid JSON */ }
+      } catch {
+        // providers.models 有 NOT NULL 约束默认 '[]'，此处防御开发期误配的非法 JSON
+        continue;
+      }
     }
     const sortedIds = [...modelMeta.keys()].sort();
 
@@ -100,7 +106,7 @@ const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, do
     if (isAnthropicFormat) {
       // Anthropic 格式: { data: [...], has_more, first_id, last_id }
       const query = request.query as { limit?: string; before_id?: string; after_id?: string };
-      const limit = Math.min(Math.max(parseInt(query.limit || '20', 10) || 20, 1), 1000);
+      const limit = Math.min(Math.max(parseInt(query.limit || String(ANTHROPIC_DEFAULT_PAGE_SIZE), 10) || ANTHROPIC_DEFAULT_PAGE_SIZE, 1), ANTHROPIC_MAX_PAGE_SIZE);
 
       let sliced: string[];
       let hasMore: boolean;
@@ -128,7 +134,7 @@ const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, do
         created_at: modelMeta.get(id)!.createdAt,
       }));
 
-      return reply.code(200).send({
+      return reply.code(HTTP_OK).send({
         data,
         has_more: hasMore,
         first_id: data.length > 0 ? data[0].id : null,
@@ -140,11 +146,11 @@ const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, do
     const data = sortedIds.map(id => ({
       id,
       object: 'model' as const,
-      created: Math.floor(new Date(modelMeta.get(id)!.createdAt).getTime() / 1000),
+      created: Math.floor(new Date(modelMeta.get(id)!.createdAt).getTime() / MS_PER_SECOND),
       owned_by: modelMeta.get(id)!.providerName,
     }));
 
-    return reply.code(200).send({
+    return reply.code(HTTP_OK).send({
       object: 'list',
       data,
     });
