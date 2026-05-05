@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Plus, Trash2 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
