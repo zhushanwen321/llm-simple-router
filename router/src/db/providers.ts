@@ -20,6 +20,35 @@ export interface Provider {
   updated_at: string;
 }
 
+/** 解析后的模型条目 */
+export interface ModelEntry {
+  id: string;
+  stream_timeout_ms?: number;
+}
+
+/** 默认流式超时 10 分钟 */
+export const DEFAULT_STREAM_TIMEOUT_MS = 600_000;
+
+/** 从 provider 的 models JSON 中查找指定模型的超时值 */
+export function getModelStreamTimeout(
+  provider: Provider,
+  backendModel: string,
+): number {
+  let entries: ModelEntry[];
+  try {
+    const raw = JSON.parse(provider.models);
+    if (!Array.isArray(raw) || raw.length === 0) return DEFAULT_STREAM_TIMEOUT_MS;
+    // 兼容旧格式字符串数组
+    entries = raw.map((m: string | ModelEntry) =>
+      typeof m === "string" ? { id: m } : m,
+    );
+  } catch {
+    return DEFAULT_STREAM_TIMEOUT_MS;
+  }
+  const entry = entries.find((m) => m.id === backendModel);
+  return entry?.stream_timeout_ms ?? DEFAULT_STREAM_TIMEOUT_MS;
+}
+
 export const PROVIDER_CONCURRENCY_DEFAULTS = {
   max_concurrency: 0,
   queue_timeout_ms: 0,
