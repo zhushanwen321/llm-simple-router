@@ -61,9 +61,9 @@ export class AdaptiveController {
     const entry = this.entries.get(providerId);
     if (!entry) return;
     if (result.success) {
-      this.transitionSuccess(providerId, entry);
+      this.transitionSuccess(providerId, entry, result);
     } else {
-      this.transitionFailure(providerId, entry, result.statusCode);
+      this.transitionFailure(providerId, entry, result);
     }
   }
 
@@ -98,7 +98,7 @@ export class AdaptiveController {
     }
   }
 
-  private transitionSuccess(providerId: string, entry: AdaptiveEntry): void {
+  private transitionSuccess(providerId: string, entry: AdaptiveEntry, result: AdaptiveResult): void {
     const s = entry.state;
     s.consecutiveSuccesses++;
     s.consecutiveFailures = 0;
@@ -108,23 +108,29 @@ export class AdaptiveController {
       if (!s.probeActive) {
         s.probeActive = true;
         s.consecutiveSuccesses = 0;
-        this.logger?.debug?.({ providerId, currentLimit: s.currentLimit, action: "probe_open" }, "Adaptive: probe window opened");
+        const effective = Math.min(Math.max(s.currentLimit + 1, ADAPTIVE_MIN), entry.max);
+        this.logger?.info?.({ providerId, requestId: result.requestId, prevLimit: s.currentLimit, newLimit: s.currentLimit, effectiveLimit: effective, action: "probe_open" }, "Adaptive: probe window opened");
       } else {
+        const prevLimit = s.currentLimit;
         s.currentLimit = Math.min(s.currentLimit + 1, entry.max);
         s.consecutiveSuccesses = 0;
-        this.logger?.debug?.({ providerId, currentLimit: s.currentLimit, max: entry.max, action: "limit_increased" }, "Adaptive: limit increased by 1");
+        const effective = Math.min(Math.max(s.currentLimit + 1, ADAPTIVE_MIN), entry.max);
+        this.logger?.info?.({ providerId, requestId: result.requestId, prevLimit, newLimit: s.currentLimit, effectiveLimit: effective, max: entry.max, action: "limit_increased" }, "Adaptive: limit increased by 1");
       }
       this.syncToSemaphore(providerId);
     }
   }
 
-  private transitionFailure(providerId: string, entry: AdaptiveEntry, statusCode?: number): void {
-    // 只对明确的并发相关错误做退避：
-    // - 429: 限流
-    // - 5xx: 服务端错误（可能过载）
-    // - undefined: 网络异常
-    // 2xx（如 upstream 200 body 含 error）和 4xx（客户端错误）不是并发问题，不触发退避
-    if (statusCode !== undefined && statusCode !== RATE_LIMIT_STATUS && statusCode < 500) {
+  private transitionFailure(providerId: string, entry: AdaptiveEntry, result: AdaptiveResult): void {
+    const statusCode = result.statusCode;
+    // 过滤非并发相关的错误：
+    // - retryRuleMatched=true → resilience 层根据重试规则判断为可重试的失败，计入退避
+    // - 429: 限流，计入退避
+    // - 5xx: 服务端错误（可能过载），计入退避
+    // - undefined: 网络异常，计入退避
+    // - 2xx/4xx 且 retryRuleMatched!=true: 非并发问题（如 upstream 200 body error 但未命中重试规则），不触发退避
+    if (!result.retryRuleMatched && statusCode !== undefined && statusCode !== RATE_LIMIT_STATUS && statusCode < 500) {
+      this.logger?.debug?.({ providerId, statusCode, action: "failure_ignored" }, "Adaptive: non-concurrency failure ignored");
       return;
     }
 
@@ -139,14 +145,14 @@ export class AdaptiveController {
       s.cooldownUntil = Date.now() + COOLDOWN_MS;
       s.consecutiveFailures = 0;
       this.syncToSemaphore(providerId);
-      this.logger?.warn?.({ providerId, prevLimit, newLimit: s.currentLimit, cooldownMs: COOLDOWN_MS, action: "rate_limit_backoff" }, "Adaptive: 429 rate limit, halved concurrency and entered cooldown");
+      this.logger?.warn?.({ providerId, requestId: result.requestId, prevLimit, newLimit: s.currentLimit, cooldownMs: COOLDOWN_MS, statusCode, action: "rate_limit_backoff" }, "Adaptive: 429 rate limit, halved concurrency and entered cooldown");
     } else if (s.consecutiveFailures >= FAILURE_THRESHOLD) {
       const prevLimit = s.currentLimit;
       s.currentLimit = Math.max(s.currentLimit - DECREASE_STEP, ADAPTIVE_MIN);
       s.probeActive = false;
       s.consecutiveFailures = 0;
       this.syncToSemaphore(providerId);
-      this.logger?.warn?.({ providerId, prevLimit, newLimit: s.currentLimit, action: "failure_backoff" }, "Adaptive: sustained failures, decreased concurrency");
+      this.logger?.warn?.({ providerId, requestId: result.requestId, prevLimit, newLimit: s.currentLimit, statusCode, retryRuleMatched: result.retryRuleMatched ?? false, action: "failure_backoff" }, "Adaptive: sustained failures, decreased concurrency");
     }
   }
 

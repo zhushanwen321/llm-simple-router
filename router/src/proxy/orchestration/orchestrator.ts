@@ -11,6 +11,7 @@ import type { TrackerScope } from "./scope.js";
 import { TrackerScope as TrackerScopeClass } from "./scope.js";
 import type { ActiveRequest } from "@llm-router/core/monitor";
 import type { SemaphoreManager } from "@llm-router/core/concurrency";
+import { SemaphoreTimeoutError, SemaphoreQueueFullError } from "@llm-router/core";
 import type { RequestTracker } from "@llm-router/core/monitor";
 import type { AdaptiveController } from "@llm-router/core/concurrency";
 
@@ -108,14 +109,20 @@ export class ProxyOrchestrator {
         })),
       );
       const { status, statusCode } = this.extractTrackStatus(result);
-      this.deps.adaptiveController?.onRequestComplete(providerId, { success: status === "completed", statusCode });
+      // 如果有重试尝试（非 throw 类型），说明 resilience 层的重试规则匹配了，
+      // 意味着这是一个"有意义的失败"——即使上游返回 200 body error 也应该计入退避
+      const retryRuleMatched = status === "failed" && result.attempts.length > 1;
+      this.deps.adaptiveController?.onRequestComplete(providerId, { success: status === "completed", statusCode, retryRuleMatched, requestId: config.trackerId });
       this.sendResponse(reply, result.result, ctx);
       return result;
     } catch (e) {
       if (e instanceof ProviderSwitchNeeded) {
         const lastResult = e.lastResult;
         const statusCode = lastResult && "statusCode" in lastResult ? lastResult.statusCode : undefined;
-        this.deps.adaptiveController?.onRequestComplete(providerId, { success: false, statusCode });
+        this.deps.adaptiveController?.onRequestComplete(providerId, { success: false, statusCode, retryRuleMatched: true, requestId: config.trackerId });
+      } else if (e instanceof SemaphoreTimeoutError || e instanceof SemaphoreQueueFullError) {
+        // 信号量超时或队列满：说明并发压力大，上报给自适应控制器
+        this.deps.adaptiveController?.onRequestComplete(providerId, { success: false, requestId: config.trackerId });
       }
       throw e;
     }
