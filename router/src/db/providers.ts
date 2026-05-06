@@ -20,12 +20,6 @@ export interface Provider {
   updated_at: string;
 }
 
-/** 解析后的模型条目 */
-export interface ModelEntry {
-  id: string;
-  stream_timeout_ms?: number;
-}
-
 /** 默认流式超时 10 分钟 */
 export const DEFAULT_STREAM_TIMEOUT_MS = 600_000;
 
@@ -34,19 +28,25 @@ export function getModelStreamTimeout(
   provider: Provider,
   backendModel: string,
 ): number {
-  let entries: ModelEntry[];
   try {
     const raw = JSON.parse(provider.models);
-    if (!Array.isArray(raw) || raw.length === 0) return DEFAULT_STREAM_TIMEOUT_MS;
-    // 兼容旧格式字符串数组
-    entries = raw.map((m: string | ModelEntry) =>
-      typeof m === "string" ? { id: m } : m,
-    );
+    if (!Array.isArray(raw)) return DEFAULT_STREAM_TIMEOUT_MS;
+    for (const m of raw) {
+      if (typeof m === "string") {
+        if (m === backendModel) return DEFAULT_STREAM_TIMEOUT_MS;
+        continue;
+      }
+      const obj = m as Record<string, unknown>;
+      if (!obj || typeof obj !== "object") continue;
+      const modelId = (obj.name ?? obj.id) as string | undefined;
+      if (modelId === backendModel) {
+        return (obj.stream_timeout_ms as number | undefined) ?? DEFAULT_STREAM_TIMEOUT_MS;
+      }
+    }
   } catch {
-    return DEFAULT_STREAM_TIMEOUT_MS;
+    // ignore parse errors
   }
-  const entry = entries.find((m) => m.id === backendModel);
-  return entry?.stream_timeout_ms ?? DEFAULT_STREAM_TIMEOUT_MS;
+  return DEFAULT_STREAM_TIMEOUT_MS;
 }
 
 export const PROVIDER_CONCURRENCY_DEFAULTS = {

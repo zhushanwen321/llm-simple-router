@@ -2,12 +2,14 @@ export interface ModelInfo {
   name: string
   context_window: number | null
   patches: string[]
+  stream_timeout_ms?: number
 }
 
 export interface ModelEntry {
   name: string
   context_window?: number
   patches?: string[]
+  stream_timeout_ms?: number
 }
 
 export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
@@ -113,12 +115,14 @@ export function parseModels(raw: string): ModelEntry[] {
       if (typeof item === 'string') {
         return item ? { name: item, patches: [] } : null
       }
-      const obj = item as { name?: string; patches?: string[] } | null
+      const obj = item as { name?: string; patches?: string[]; stream_timeout_ms?: number } | null
       if (!obj || !obj.name) return null
-      return {
+      const result: ModelEntry = {
         name: obj.name,
         patches: (obj.patches ?? []).map(normalizePatchName),
       }
+      if (obj.stream_timeout_ms != null) result.stream_timeout_ms = obj.stream_timeout_ms
+      return result
     }).filter((e): e is ModelEntry => e !== null)
   } catch {
     return []
@@ -129,9 +133,13 @@ export function buildModelInfoList(
   modelEntries: ModelEntry[],
   overrides: Map<string, number>,
 ): ModelInfo[] {
-  return modelEntries.map(entry => ({
-    name: entry.name,
-    context_window: overrides.get(entry.name) ?? lookupContextWindow(entry.name),
-    patches: entry.patches ?? [],
-  }))
+  return modelEntries.map(entry => {
+    const info: ModelInfo = {
+      name: entry.name,
+      context_window: overrides.get(entry.name) ?? lookupContextWindow(entry.name),
+      patches: entry.patches ?? [],
+    }
+    if (entry.stream_timeout_ms != null) info.stream_timeout_ms = entry.stream_timeout_ms
+    return info
+  })
 }
