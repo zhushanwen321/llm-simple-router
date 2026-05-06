@@ -18,6 +18,10 @@
       "description": "检测流式输出中内容重复循环（N-gram 模式），超过阈值时自动中断流。"
     }
   },
+  "toolErrorLogging": {
+    "title": "工具调用错误日志",
+    "description": "记录 Claude Code / pi 工具调用失败的详细信息（包含 tool_use 输入参数、错误内容、provider、模型），用于分析各模型产生错误 tool_use 参数的模式。"
+  },
   "loadFailed": "加载配置失败",
   "saveFailed": "保存失败"
 }
