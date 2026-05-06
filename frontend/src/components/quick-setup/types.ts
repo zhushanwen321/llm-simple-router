@@ -86,6 +86,8 @@ export const CONTEXT_WINDOW_OPTIONS = [
 ]
 
 const CONTEXT_1M = 1_000_000
+const CONTEXT_256K = 256_000
+const CONTEXT_200K = 200_000
 const CONTEXT_128K = 128_000
 const CONTEXT_32K = 32_000
 const CONTEXT_8K = 8_000
@@ -101,6 +103,16 @@ export function getDefaultContextWindow(modelName: string): number {
     m.includes('reasoner') ||     // OpenAI reasoner
     m.includes('qwen3.6')         // Qwen 3.6 series
   ) return CONTEXT_1M
+  // 256K context window models
+  if (
+    m.includes('kimi') ||         // Kimi K2/K2.5/K2.6/coding
+    m.includes('moonshotai')      // moonshotai/Kimi-K2 on SiliconFlow
+  ) return CONTEXT_256K
+  // 200K context window models
+  if (
+    m.includes('glm-5') ||        // GLM-5.1, GLM-5, GLM-5-Turbo
+    m.includes('glm-4.7')         // GLM-4.7, GLM-4.7-Flash
+  ) return CONTEXT_200K
   // Named context sizes
   if (m.includes('128k')) return CONTEXT_128K
   if (m.includes('32k')) return CONTEXT_32K
