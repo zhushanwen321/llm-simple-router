@@ -93,6 +93,7 @@ async function handleSetup() {
   loading.value = true
   try {
     await api.initializeSetup(password.value)
+    markSetupDone()
     router.push({ name: 'dashboard' })
   } catch (e: unknown) {
     error.value = getApiMessage(e, t('setup.setupFailed'))
