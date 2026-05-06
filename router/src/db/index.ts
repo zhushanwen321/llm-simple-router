@@ -141,9 +141,7 @@ function runApplicationMigrations(db: Database.Database): void {
         }).filter((m: unknown): m is Record<string, unknown> => m !== null);
 
         update.run(JSON.stringify(converted), p.id);
-      } catch {
-        // JSON 解析失败 → 跳过此 provider
-      }
+      } catch { /* JSON parse failed — skip this provider's models conversion */ } // eslint-disable-line taste/no-silent-catch
     }
     db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)").run(markerKey, "done");
   })();
