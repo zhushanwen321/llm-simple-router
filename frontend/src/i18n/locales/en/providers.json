@@ -47,7 +47,12 @@
     "proxyUrlPlaceholderSocks5": "socks5://127.0.0.1:1080",
     "proxyUsername": "Username",
     "proxyPassword": "Password",
-    "proxyAuthOptional": "Optional"
+    "proxyAuthOptional": "Optional",
+    "upstreamPath": "Upstream Path",
+    "upstreamPathPlaceholder": "Default: /v1/chat/completions or /v1/messages",
+    "upstreamPathHint": "Leave empty for API type default path",
+    "timeoutLabel": "Timeout(s)",
+    "timeoutPlaceholder": "Default"
   },
   "concurrency": {
     "title": "Concurrency Control",

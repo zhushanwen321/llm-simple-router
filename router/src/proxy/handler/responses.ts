@@ -12,6 +12,7 @@ import type { RequestTracker } from "@llm-router/core/monitor";
 import { AdaptiveController } from "@llm-router/core/concurrency";
 import { HTTP_BAD_GATEWAY } from "../../core/constants.js";
 import { SERVICE_KEYS } from "../../core/container.js";
+import type { ProxyAgentFactory } from "../transport/proxy-agent.js";
 
 export interface ResponsesProxyOptions {
   db: Database.Database;
@@ -62,7 +63,7 @@ const responsesProxyRaw: FastifyPluginCallback<ResponsesProxyOptions> = (app, op
       });
       return sendError(reply, responsesErrors.providerUnavailable());
     }
-    const deps: RouteHandlerDeps = { db, orchestrator, container };
+    const deps: RouteHandlerDeps = { db, orchestrator, container, proxyAgentFactory: container.resolve<ProxyAgentFactory>(SERVICE_KEYS.proxyAgentFactory) };
     return handleProxyRequest(request, reply, "openai-responses", RESPONSES_PATH, responsesErrors, deps);
   };
 

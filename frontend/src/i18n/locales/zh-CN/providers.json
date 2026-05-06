@@ -47,7 +47,12 @@
     "proxyUrlPlaceholderSocks5": "socks5://127.0.0.1:1080",
     "proxyUsername": "用户名",
     "proxyPassword": "密码",
-    "proxyAuthOptional": "可选"
+    "proxyAuthOptional": "可选",
+    "upstreamPath": "上游路径",
+    "upstreamPathPlaceholder": "默认: /v1/chat/completions 或 /v1/messages",
+    "upstreamPathHint": "留空使用 API 类型默认路径",
+    "timeoutLabel": "超时(秒)",
+    "timeoutPlaceholder": "默认"
   },
   "concurrency": {
     "title": "并发控制",

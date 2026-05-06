@@ -12,6 +12,7 @@ import type { RequestTracker } from "@llm-router/core/monitor";
 import { AdaptiveController } from "@llm-router/core/concurrency";
 import { HTTP_BAD_GATEWAY } from "../../core/constants.js";
 import { SERVICE_KEYS } from "../../core/container.js";
+import type { ProxyAgentFactory } from "../transport/proxy-agent.js";
 
 export interface AnthropicProxyOptions {
   db: Database.Database;
@@ -58,7 +59,7 @@ const anthropicProxyRaw: FastifyPluginCallback<AnthropicProxyOptions> = (app, op
       const e = anthropicErrors.providerUnavailable();
       return reply.code(e.statusCode).send(e.body);
     }
-    const deps: RouteHandlerDeps = { db, orchestrator, container };
+    const deps: RouteHandlerDeps = { db, orchestrator, container, proxyAgentFactory: container.resolve<ProxyAgentFactory>(SERVICE_KEYS.proxyAgentFactory) };
     return handleProxyRequest(request, reply, "anthropic", MESSAGES_PATH, anthropicErrors, deps);
   });
 

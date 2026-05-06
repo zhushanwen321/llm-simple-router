@@ -36,6 +36,7 @@ import fastifyStatic from "@fastify/static";
 import { ServiceContainer, SERVICE_KEYS } from "./core/container.js";
 import Database from "better-sqlite3";
 import { LogFileWriter } from "./storage/log-file-writer.js";
+import { ProxyAgentFactory } from "./proxy/transport/proxy-agent.js";
 import { scheduleLogFileMaintenance } from "./storage/log-file-compressor.js";
 import { getDetailLogEnabled, getLogFileRetentionDays } from "./db/settings.js";
 import { dirname, join } from "node:path";
@@ -253,12 +254,16 @@ export async function buildApp(
   pluginRegistry.scanPluginsDir(pluginsDir);
   container.register(SERVICE_KEYS.pluginRegistry, () => pluginRegistry);
 
+  // 注册 ProxyAgentFactory
+  container.register(SERVICE_KEYS.proxyAgentFactory, () => new ProxyAgentFactory());
+
   // 从容器解析所有服务
   const matcher = container.resolve<RetryRuleMatcher>(SERVICE_KEYS.matcher);
   const semaphoreManager = container.resolve<SemaphoreManager>(SERVICE_KEYS.semaphoreManager);
   const tracker = container.resolve<RequestTracker>(SERVICE_KEYS.tracker);
   const usageWindowTracker = container.resolve<UsageWindowTracker>(SERVICE_KEYS.usageWindowTracker);
   const adaptiveController = container.resolve<AdaptiveController>(SERVICE_KEYS.adaptiveController);
+  const proxyAgentFactory = container.resolve<ProxyAgentFactory>(SERVICE_KEYS.proxyAgentFactory);
 
   // Wire adaptive controller to tracker
   tracker.setAdaptiveStatusProvider(adaptiveController);
@@ -291,7 +296,7 @@ export async function buildApp(
   // 但 restart API 需要在运行时调用它
   const closeRef = { fn: async () => {} };
 
-  app.register(adminRoutes, { db, stateRegistry, tracker, adaptiveController, logFileWriter, logsDir, closeFn: () => closeRef.fn(), pluginRegistry });
+  app.register(adminRoutes, { db, stateRegistry, tracker, adaptiveController, logFileWriter, logsDir, closeFn: () => closeRef.fn(), pluginRegistry, proxyAgentFactory });
 
   // 前端静态文件服务（生产环境）
   const frontendDist = path.resolve(
@@ -342,6 +347,7 @@ export async function buildApp(
     // 关闭所有 SSE 长连接，防止 app.close() 因 hijack 的连接无限等待
     tracker.closeAllClients();
     semaphoreManager.removeAll();
+    proxyAgentFactory.invalidateAll();
     const sessionTracker = container.resolve<SessionTracker>(SERVICE_KEYS.sessionTracker);
     sessionTracker.stop();
     await app.close();
