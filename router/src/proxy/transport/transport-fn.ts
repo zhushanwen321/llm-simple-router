@@ -60,6 +60,7 @@ export interface TransportFnParams {
   formatTransform?: import("stream").Transform;
   responseTransform?: (body: string) => string;
   injectedHeaders?: Record<string, string>;
+  timeoutContext?: { modelId: string; providerId: string };
 }
 
 export function buildTransportFn(p: TransportFnParams): (target: Target) => Promise<TransportResult> {
@@ -91,6 +92,7 @@ export function buildTransportFn(p: TransportFnParams): (target: Target) => Prom
       const streamResult = await callStream(
         p.provider, p.apiKey, p.body, p.cliHdrs, p.reply, p.streamTimeoutMs,
         p.upstreamPath, buildHeaders, metricsTransform, checkEarlyError, undefined, streamLoopGuard, p.formatTransform,
+        p.timeoutContext,
       );
       const m = (streamResult.kind === "stream_success" || streamResult.kind === "stream_abort")
         ? streamResult.metrics : undefined;

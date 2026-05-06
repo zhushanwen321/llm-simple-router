@@ -36,9 +36,15 @@ async function checkAuth() {
   try {
     await api.getStats()
     isAuthenticated.value = true
-  } catch {
+  } catch (err: unknown) {
     isAuthenticated.value = false
-    router.push('/login')
+    const code = (err as { apiCode?: number }).apiCode
+    const CODE_NOT_INITIALIZED = 40_103
+    if (code === CODE_NOT_INITIALIZED) {
+      router.push('/setup')
+    } else {
+      router.push('/login')
+    }
   }
 }
 

@@ -96,6 +96,8 @@ export type TransportResult =
       metrics?: MetricsResult;
       upstreamResponseHeaders?: Record<string, string>;
       sentHeaders: Record<string, string>;
+      timeoutContext?: { modelId: string; providerId: string };
+      timeoutMs?: number;
     }
   | {
       kind: "error";

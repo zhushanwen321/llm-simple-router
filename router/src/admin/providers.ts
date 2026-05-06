@@ -72,7 +72,7 @@ function cascadeProviderDisable(db: Database.Database, providerId: string): Casc
   return result;
 }
 
-type ModelInput = string | { name: string; context_window?: number; patches?: string[] };
+type ModelInput = string | { name?: string; id?: string; context_window?: number; patches?: string[]; stream_timeout_ms?: number };
 
 interface ModelOverride {
   name: string;
@@ -83,14 +83,22 @@ function extractModelOverrides(models: ModelInput[]): {
   entries: ModelEntry[];
   overrides: ModelOverride[];
 } {
-  const entries = models.map(m =>
-    typeof m === "string"
-      ? { name: m, patches: [] }
-      : { name: m.name, context_window: m.context_window, patches: m.patches ?? [] }
-  );
-  const overrides = models.filter(
-    (m): m is ModelOverride => typeof m !== "string" && m.context_window != null,
-  );
+  const entries: ModelEntry[] = [];
+  const overrides: ModelOverride[] = [];
+  for (const m of models) {
+    if (typeof m === "string") {
+      entries.push({ name: m, patches: [] });
+      continue;
+    }
+    const name = m.name ?? m.id;
+    if (!name) continue;
+    const entry: ModelEntry = { name, patches: m.patches ?? [] };
+    if (m.stream_timeout_ms != null) entry.stream_timeout_ms = m.stream_timeout_ms;
+    entries.push(entry);
+    if (m.name != null && m.context_window != null) {
+      overrides.push({ name: m.name, context_window: m.context_window });
+    }
+  }
   return { entries, overrides };
 }
 const API_KEY_PREVIEW_PREFIX_LEN = 4;
@@ -105,7 +113,8 @@ const CreateProviderSchema = Type.Object({
   api_key: Type.String({ minLength: 1 }),
   models: Type.Optional(Type.Array(Type.Union([
     Type.String(),
-    Type.Object({ name: Type.String(), context_window: Type.Optional(Type.Number()), patches: Type.Optional(Type.Array(Type.String())) })
+    Type.Object({ name: Type.String(), context_window: Type.Optional(Type.Number()), patches: Type.Optional(Type.Array(Type.String())), stream_timeout_ms: Type.Optional(Type.Number({ minimum: 0, maximum: 86_400_000 })) }),
+    Type.Object({ id: Type.String(), stream_timeout_ms: Type.Optional(Type.Number({ minimum: 0, maximum: 86_400_000 })) })
   ]))),
   is_active: Type.Optional(Type.Number()),
   max_concurrency: Type.Optional(Type.Integer({ minimum: 0 })),
@@ -122,7 +131,8 @@ const UpdateProviderSchema = Type.Object({
   api_key: Type.Optional(Type.String({ minLength: 1 })),
   models: Type.Optional(Type.Array(Type.Union([
     Type.String(),
-    Type.Object({ name: Type.String(), context_window: Type.Optional(Type.Number()), patches: Type.Optional(Type.Array(Type.String())) })
+    Type.Object({ name: Type.String(), context_window: Type.Optional(Type.Number()), patches: Type.Optional(Type.Array(Type.String())), stream_timeout_ms: Type.Optional(Type.Number({ minimum: 0, maximum: 86_400_000 })) }),
+    Type.Object({ id: Type.String(), stream_timeout_ms: Type.Optional(Type.Number({ minimum: 0, maximum: 86_400_000 })) })
   ]))),
   is_active: Type.Optional(Type.Number()),
   max_concurrency: Type.Optional(Type.Integer({ minimum: 0 })),

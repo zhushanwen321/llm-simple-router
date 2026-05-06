@@ -5,6 +5,7 @@ import { HTTP_UNPROCESSABLE_ENTITY } from "../../core/constants.js";
 import { getProviderById, insertRequestLog, updateLogStreamContent, updateLogClientStatus } from "../../db/index.js";
 import { decrypt } from "../../utils/crypto.js";
 import { getSetting } from "../../db/settings.js";
+import { getModelStreamTimeout } from "../../db/providers.js";
 import { resolveMapping } from "../routing/mapping-resolver.js";
 import { SemaphoreQueueFullError, SemaphoreTimeoutError } from "@llm-router/core";
 import type { RequestTracker } from "@llm-router/core/monitor";
@@ -383,8 +384,9 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
     const transportFn = buildTransportFn({
       provider, apiKey, body: patchedBody, cliHdrs, reply, upstreamPath: effectiveUpstreamPath, apiType: effectiveApiType,
       isStream, startTime, logId, effectiveModel,
-      streamTimeoutMs: config.STREAM_TIMEOUT_MS, tracker, matcher, request,
+      streamTimeoutMs: getModelStreamTimeout(provider, resolved.backend_model), tracker, matcher, request,
       streamLoopEnabled, formatTransform, responseTransform, injectedHeaders,
+      timeoutContext: { modelId: resolved.backend_model, providerId: provider.id },
     });
 
     const pipelineSnapshot = iterationSnapshot.toJSON();
@@ -407,6 +409,17 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
         resilienceResult.attempts, resilienceResult.result, startTime,
       );
       collectTransportMetrics(deps.db, apiType, resilienceResult.result, isStream, lastLogId, provider.id, resolved.backend_model, request, routerKeyId, getTransportStatusCode(resilienceResult.result));
+
+      // Stream timeout: send 408 error with API-specific body to client
+      if (resilienceResult.result.kind === "stream_abort" && resilienceResult.result.timeoutContext) {
+        const { modelId, providerId } = resilienceResult.result.timeoutContext;
+        const msg = `Stream timeout: no data received for ${resilienceResult.result.timeoutMs}ms (model: ${modelId}, provider: ${providerId})`;
+        const errBody = apiType === "anthropic"
+          ? { type: "error", error: { type: "api_error", message: msg } }
+          : { error: { message: msg, type: "server_error", code: "stream_timeout" } };
+        try { reply.raw.write(`data: ${JSON.stringify(errBody)}\n\n`); } catch { /* client disconnected */ } // eslint-disable-line taste/no-silent-catch
+        try { reply.raw.end(); } catch { /* client disconnected */ } // eslint-disable-line taste/no-silent-catch
+      }
 
       const tr = resilienceResult.result;
       const succeeded = tr.kind === "success" || tr.kind === "stream_success" || tr.kind === "stream_abort";

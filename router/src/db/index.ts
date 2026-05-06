@@ -100,7 +100,51 @@ export function initDatabase(dbPath: string): Database.Database {
     }
   }
 
+  // 应用层迁移：SQL 无法安全处理的转换
+  runApplicationMigrations(db);
+
   return db;
+}
+
+/**
+ * 应用层迁移：需要 Node.js 逻辑处理的 DB 转换。
+ * 在 SQL migration 执行完毕后运行。
+ */
+function runApplicationMigrations(db: Database.Database): void {
+  // 040: providers.models 从字符串数组转为对象数组
+  // ["glm-5.1"] → [{"id":"glm-5.1"}]
+  // 已有对象数组（{name, patches}）→ 补充 id 字段
+  const markerKey = "app_migration_040_models_object_format";
+  const done = db.prepare("SELECT value FROM settings WHERE key = ?").get(markerKey) as { value: string } | undefined;
+  if (done) return;
+
+  const providers = db.prepare("SELECT id, models FROM providers").all() as { id: string; models: string }[];
+  const update = db.prepare("UPDATE providers SET models = ? WHERE id = ?");
+
+  db.transaction(() => {
+    for (const p of providers) {
+      try {
+        const raw = JSON.parse(p.models);
+        if (!Array.isArray(raw) || raw.length === 0) continue;
+
+        // 已是对象数组且每个元素都有 id → 无需转换
+        if (raw.every((m: unknown) => typeof m === "object" && m !== null && "id" in (m as Record<string, unknown>))) continue;
+
+        const converted = raw.map((m: unknown) => {
+          if (typeof m === "string") return { id: m };
+          const obj = m as Record<string, unknown>;
+          if (typeof obj !== "object" || obj === null) return null;
+          // 已有 id → 保留；有 name 无 id → 用 name 作 id
+          if ("id" in obj) return obj;
+          if ("name" in obj) return { id: obj.name, ...obj };
+          return obj;
+        }).filter((m: unknown): m is Record<string, unknown> => m !== null);
+
+        update.run(JSON.stringify(converted), p.id);
+      } catch { /* JSON parse failed — skip this provider's models conversion */ } // eslint-disable-line taste/no-silent-catch
+    }
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)").run(markerKey, "done");
+  })();
 }
 
 // --- Re-export from per-table modules ---

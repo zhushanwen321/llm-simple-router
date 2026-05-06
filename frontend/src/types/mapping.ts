@@ -15,6 +15,7 @@ export interface ModelInfo {
   name: string
   context_window: number | null
   patches: string[]
+  stream_timeout_ms?: number | null
 }
 
 /** 映射组（列表项，rule 为 JSON 字符串） */

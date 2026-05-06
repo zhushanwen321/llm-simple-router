@@ -20,6 +20,37 @@ export interface Provider {
   updated_at: string;
 }
 
+/** 默认流式超时 10 分钟 */
+export const DEFAULT_STREAM_TIMEOUT_MS = 600_000;
+
+/** 从 provider 的 models JSON 中查找指定模型的超时值 */
+export function getModelStreamTimeout(
+  provider: Provider,
+  backendModel: string,
+): number {
+  try {
+    const raw = JSON.parse(provider.models);
+    if (!Array.isArray(raw)) return DEFAULT_STREAM_TIMEOUT_MS;
+    for (const m of raw) {
+      if (typeof m === "string") {
+        if (m === backendModel) return DEFAULT_STREAM_TIMEOUT_MS;
+        continue;
+      }
+      const obj = m as Record<string, unknown>;
+      if (!obj || typeof obj !== "object") continue;
+      const modelId = (obj.name ?? obj.id) as string | undefined;
+      if (modelId === backendModel) {
+        const timeout = obj.stream_timeout_ms as number | undefined;
+        // stream_timeout_ms: 0 表示禁用超时，返回 Infinity；
+        // undefined/null/未设置 表示使用默认值
+        if (timeout === 0) return Number.POSITIVE_INFINITY;
+        return timeout ?? DEFAULT_STREAM_TIMEOUT_MS;
+      }
+    }
+  } catch { /* ignore parse errors — models field may be empty or invalid */ } // eslint-disable-line taste/no-silent-catch
+  return DEFAULT_STREAM_TIMEOUT_MS;
+}
+
 export const PROVIDER_CONCURRENCY_DEFAULTS = {
   max_concurrency: 0,
   queue_timeout_ms: 0,

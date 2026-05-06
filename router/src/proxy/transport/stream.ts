@@ -49,6 +49,8 @@ class StreamProxy {
     private readonly timeoutMs: number,
     private readonly loopGuard: StreamLoopGuard | undefined,
     formatTransform?: Transform,
+    private readonly timeoutContext?: { modelId: string; providerId: string },
+    private readonly onTimeoutAbort?: () => void,
   ) {
     this.formatTransform = formatTransform;
     this.sseHeaders = filterHeaders(rawUpstreamHeaders);
@@ -96,7 +98,7 @@ class StreamProxy {
         result = { kind: "stream_error", ...base, body: extra.body as string, headers: this.sseHeaders, headersSent: this.headersSent || undefined };
         break;
       case "stream_abort":
-        result = { kind: "stream_abort", ...base, metrics: extra.metrics as MetricsResult | undefined };
+        result = { kind: "stream_abort", ...base, metrics: extra.metrics as MetricsResult | undefined, timeoutContext: extra.timeoutContext as { modelId: string; providerId: string } | undefined, timeoutMs: extra.timeoutMs as number | undefined };
         break;
     }
 
@@ -110,7 +112,8 @@ class StreamProxy {
       }
     } else {
       // stream_abort 且 headers 已发送时，必须 end reply 避免客户端挂起
-      if (kind === "stream_abort" && this.headersSent) {
+      // 但如果有 timeoutContext，让 handler 层负责写入错误 SSE 后再 end
+      if (kind === "stream_abort" && this.headersSent && !extra.timeoutContext) {
         // eslint-disable-next-line taste/no-silent-catch -- reply may already be destroyed, warn is sufficient
         try { this.reply.raw.end(); } catch { console.warn("[stream-proxy] reply.raw.end() failed, likely already destroyed"); }
       }
@@ -139,9 +142,15 @@ class StreamProxy {
 
   resetIdleTimer(): void {
     if (this.idleTimer) clearTimeout(this.idleTimer);
+    if (!isFinite(this.timeoutMs) || this.timeoutMs <= 0) return; // 0 或 Infinity 表示禁用超时
     this.idleTimer = setTimeout(() => {
       if (this.resolved) return;
-      this.terminal("stream_abort", { metrics: this.collectMetrics(false) });
+      // 在 terminal() 调用 reply.raw.end() 之前，同步写入超时错误 SSE
+      // 必须同步执行，确保 inject() 能正确收集响应体
+      if (this.onTimeoutAbort) {
+        try { this.onTimeoutAbort(); } catch { /* reply may be destroyed */ } // eslint-disable-line taste/no-silent-catch
+      }
+      this.terminal("stream_abort", { metrics: this.collectMetrics(false), timeoutContext: this.timeoutContext, timeoutMs: this.timeoutMs });
     }, this.timeoutMs);
   }
 
@@ -309,6 +318,8 @@ export function callStream(
   compatResolve?: (result: TransportResult) => void,
   loopGuard?: StreamLoopGuard,
   formatTransform?: import("stream").Transform,
+  timeoutContext?: { modelId: string; providerId: string },
+  onTimeoutAbort?: () => void,
 ): Promise<TransportResult> {
   return new Promise((resolve) => {
     const effectiveResolve = compatResolve ?? resolve;
@@ -345,7 +356,7 @@ export function callStream(
         metricsTransform,
         checkEarlyError,
         timeoutMs,
-        loopGuard, formatTransform,
+        loopGuard, formatTransform, timeoutContext, onTimeoutAbort,
       );
 
       proxy.bindResolve(effectiveResolve);
