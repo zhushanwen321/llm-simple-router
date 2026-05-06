@@ -470,6 +470,7 @@ function getDefaultPatches(modelName: string, apiType: string): string[] {
 }
 
 function onConcurrencyModeChange(mode: ConcurrencyMode) {
+  concurrencyMode.value = mode
   if (mode === 'auto') {
     if (!form.value.max_concurrency || form.value.max_concurrency < 1) form.value.max_concurrency = DEFAULT_CONCURRENCY_AUTO
     form.value.adaptive_enabled = true

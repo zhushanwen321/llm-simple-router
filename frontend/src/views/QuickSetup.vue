@@ -335,7 +335,7 @@ const {
   allProviderGroups,
   transformInjectHeaders, transformDropFields, transformRequestDefaults,
   selectClient, onProviderChange, onPlanChange,
-  updateMappingTargets, toggleMappingActive, addMappingEntry,
+  updateMappingTargets, toggleMappingActive, addMappingEntry, removeMappingEntry,
   toggleRetryRule, onConcurrencyModeChange, testConnection, submit,
   addCustomModel,
 } = useQuickSetup()
