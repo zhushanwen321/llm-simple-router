@@ -78,7 +78,7 @@ export const adminLoginRoutes: FastifyPluginCallback<AdminAuthOptions> = (app, o
     reply.setCookie("admin_token", token, {
       path: "/admin",
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: request.protocol === "https" || request.headers["x-forwarded-proto"] === "https",
       sameSite: "lax",
       maxAge: TOKEN_EXPIRY_SECONDS,
     });
