@@ -90,6 +90,7 @@ const CONTEXT_256K = 256_000
 const CONTEXT_200K = 200_000
 const CONTEXT_128K = 128_000
 const CONTEXT_32K = 32_000
+const CONTEXT_16K = 16_000
 const CONTEXT_8K = 8_000
 
 /** Default context window per model name pattern */
@@ -106,16 +107,28 @@ export function getDefaultContextWindow(modelName: string): number {
   // 256K context window models
   if (
     m.includes('kimi') ||         // Kimi K2/K2.5/K2.6/coding
-    m.includes('moonshotai')      // moonshotai/Kimi-K2 on SiliconFlow
+    m.includes('moonshotai') ||   // moonshotai/Kimi-K2 on SiliconFlow
+    m.includes('hunyuan-2.0') ||  // 混元 2.0 (instruct/thinking)
+    m.includes('hunyuan-a13b') || // 混元 A13B
+    m.includes('hunyuan-t1') ||   // 混元 T1
+    m.includes('step-3.5') ||     // 阶跃星辰 Step 3.5 Flash
+    m.includes('step-3') ||       // 阶跃星辰 Step 3
+    m.includes('qwen3.5-plus') || // Qwen 3.5 Plus
+    m.includes('qwen3-max') ||    // Qwen 3 Max
+    m.includes('doubao') ||       // 豆包 Seed 系列 (1.6+ 256K)
+    m.includes('ark-code') ||     // 火山引擎 Coding Plan
+    m.includes('tc-code')         // 腾讯云 Coding Plan
   ) return CONTEXT_256K
   // 200K context window models
   if (
     m.includes('glm-5') ||        // GLM-5.1, GLM-5, GLM-5-Turbo
-    m.includes('glm-4.7')         // GLM-4.7, GLM-4.7-Flash
+    m.includes('glm-4.7') ||      // GLM-4.7, GLM-4.7-Flash
+    m.includes('minimax')         // MiniMax M2 series (204,800 tokens)
   ) return CONTEXT_200K
   // Named context sizes
   if (m.includes('128k')) return CONTEXT_128K
   if (m.includes('32k')) return CONTEXT_32K
+  if (m.includes('16k')) return CONTEXT_16K
   if (m.includes('8k')) return CONTEXT_8K
   return CONTEXT_128K
 }
