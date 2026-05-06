@@ -40,6 +40,8 @@ function toStreamMetrics(m: MetricsResult) {
   };
 }
 
+import type { ProxyAgentFactory } from "./proxy-agent.js";
+
 export interface TransportFnParams {
   provider: NonNullable<ReturnType<typeof getProviderById>>;
   apiKey: string;
@@ -61,6 +63,7 @@ export interface TransportFnParams {
   responseTransform?: (body: string) => string;
   injectedHeaders?: Record<string, string>;
   timeoutContext?: { modelId: string; providerId: string };
+  proxyAgentFactory?: ProxyAgentFactory;
 }
 
 export function buildTransportFn(p: TransportFnParams): (target: Target) => Promise<TransportResult> {
@@ -68,6 +71,7 @@ export function buildTransportFn(p: TransportFnParams): (target: Target) => Prom
     const base = buildUpstreamHeaders(cliHdrs, key, bytes, p.apiType);
     return p.injectedHeaders ? { ...base, ...p.injectedHeaders } : base;
   };
+  const agent = p.proxyAgentFactory?.getAgent(p.provider);
   // _target 未使用 — resilience 层始终传入当前 resolved target；
   // 跨 target failover 由外层 executeFailoverLoop 的 ProviderSwitchNeeded 处理
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -92,14 +96,14 @@ export function buildTransportFn(p: TransportFnParams): (target: Target) => Prom
       const streamResult = await callStream(
         p.provider, p.apiKey, p.body, p.cliHdrs, p.reply, p.streamTimeoutMs,
         p.upstreamPath, buildHeaders, metricsTransform, checkEarlyError, undefined, streamLoopGuard, p.formatTransform,
-        p.timeoutContext,
+        p.timeoutContext, undefined, agent,
       );
       const m = (streamResult.kind === "stream_success" || streamResult.kind === "stream_abort")
         ? streamResult.metrics : undefined;
       if (m) p.tracker?.update(p.logId, { streamMetrics: toStreamMetrics(m) });
       return streamResult;
     }
-    let result = await callNonStream(p.provider, p.apiKey, p.body, p.cliHdrs, p.upstreamPath, buildHeaders);
+    let result = await callNonStream(p.provider, p.apiKey, p.body, p.cliHdrs, p.upstreamPath, buildHeaders, agent);
     if (result.kind === "success") {
       const mr = MetricsExtractor.fromNonStreamResponse(p.apiType, result.body);
       if (mr) p.tracker?.update(p.logId, { streamMetrics: toStreamMetrics(mr) });

@@ -8,6 +8,7 @@ import { getSetting } from "../db/settings.js";
 import type { StateRegistry } from "../core/registry.js";
 import type { AdaptiveController } from "@llm-router/core/concurrency";
 import type { RequestTracker } from "@llm-router/core/monitor";
+import type { ProxyAgentFactory } from "../proxy/transport/proxy-agent.js";
 import { HTTP_CREATED, HTTP_NOT_FOUND, HTTP_CONFLICT, HTTP_BAD_REQUEST } from "./constants.js";
 import { API_CODE, apiError } from "./api-response.js";
 import { parseModels, buildModelInfoList, type ModelEntry } from "../config/model-context.js";
@@ -121,6 +122,10 @@ const CreateProviderSchema = Type.Object({
   queue_timeout_ms: Type.Optional(Type.Integer({ minimum: 0 })),
   max_queue_size: Type.Optional(Type.Integer({ minimum: 1 })),
   adaptive_enabled: Type.Optional(Type.Integer({ minimum: 0, maximum: 1 })),
+  proxy_type: Type.Optional(Type.Union([Type.Literal("http"), Type.Literal("socks5")])),
+  proxy_url: Type.Optional(Type.String({ minLength: 1 })),
+  proxy_username: Type.Optional(Type.String()),
+  proxy_password: Type.Optional(Type.String()),
 });
 
 const UpdateProviderSchema = Type.Object({
@@ -139,6 +144,10 @@ const UpdateProviderSchema = Type.Object({
   queue_timeout_ms: Type.Optional(Type.Integer({ minimum: 0 })),
   max_queue_size: Type.Optional(Type.Integer({ minimum: 1 })),
   adaptive_enabled: Type.Optional(Type.Integer({ minimum: 0, maximum: 1 })),
+  proxy_type: Type.Optional(Type.Union([Type.Literal("http"), Type.Literal("socks5")])),
+  proxy_url: Type.Optional(Type.String({ minLength: 1 })),
+  proxy_username: Type.Optional(Type.String()),
+  proxy_password: Type.Optional(Type.String()),
 });
 
 interface ProviderRoutesOptions {
@@ -146,10 +155,11 @@ interface ProviderRoutesOptions {
   stateRegistry?: StateRegistry;
   tracker?: RequestTracker;
   adaptiveController?: AdaptiveController;
+  proxyAgentFactory?: ProxyAgentFactory;
 }
 
 export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> = (app, options, done) => {
-  const { db, stateRegistry, tracker, adaptiveController } = options;
+  const { db, stateRegistry, tracker, adaptiveController, proxyAgentFactory } = options;
 
   app.get("/admin/api/providers", async (_request, reply) => {
     const encryptionKey = getSetting(db, "encryption_key")!;
@@ -171,6 +181,10 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
         queue_timeout_ms: s.queue_timeout_ms,
         max_queue_size: s.max_queue_size,
         adaptive_enabled: s.adaptive_enabled,
+        proxy_type: s.proxy_type,
+        proxy_url: s.proxy_url,
+        proxy_username: s.proxy_username ? decrypt(s.proxy_username, encryptionKey) : null,
+        proxy_password: s.proxy_password ? decrypt(s.proxy_password, encryptionKey) : null,
         concurrency_status: stateRegistry?.getProviderStatus(s.id) ?? { active: 0, queued: 0 },
         created_at: s.created_at,
         updated_at: s.updated_at,
@@ -190,6 +204,11 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     const encryptedKey = encrypt(body.api_key, getSetting(db, "encryption_key")!);
     const { entries: normalizedModels, overrides: contextOverrides } = extractModelOverrides((body.models ?? []) as ModelInput[]);
     const isAdaptiveEnabled = body.adaptive_enabled ?? 0;
+    if (body.proxy_type && !body.proxy_url) {
+      return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.VALIDATION_FAILED, "proxy_url is required when proxy_type is set"));
+    }
+    const encryptedProxyUsername = body.proxy_username ? encrypt(body.proxy_username, getSetting(db, "encryption_key")!) : null;
+    const encryptedProxyPassword = body.proxy_password ? encrypt(body.proxy_password, getSetting(db, "encryption_key")!) : null;
     const id = createProvider(db, {
       name: body.name,
       api_type: body.api_type,
@@ -203,6 +222,10 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
       queue_timeout_ms: body.queue_timeout_ms ?? PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms,
       max_queue_size: body.max_queue_size ?? PROVIDER_CONCURRENCY_DEFAULTS.max_queue_size,
       adaptive_enabled: isAdaptiveEnabled,
+      proxy_type: body.proxy_type ?? null,
+      proxy_url: body.proxy_type ? body.proxy_url! : null,
+      proxy_username: encryptedProxyUsername,
+      proxy_password: encryptedProxyPassword,
     });
     if (contextOverrides.length > 0) {
       setModelInfoForProvider(db, id, contextOverrides.map(o => ({ model_name: o.name, context_window: o.context_window })));
@@ -240,7 +263,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     if (body.name !== undefined && !PROVIDER_NAME_RE.test(body.name)) {
       return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.VALIDATION_FAILED, "Provider 名称仅允许英文大小写字母、数字、横线和下划线"));
     }
-    const fields: Partial<Pick<Provider, 'name' | 'api_type' | 'base_url' | 'upstream_path' | 'api_key' | 'api_key_preview' | 'models' | 'is_active' | 'max_concurrency' | 'queue_timeout_ms' | 'max_queue_size' | 'adaptive_enabled'>> = {};
+    const fields: Partial<Pick<Provider, 'name' | 'api_type' | 'base_url' | 'upstream_path' | 'api_key' | 'api_key_preview' | 'models' | 'is_active' | 'max_concurrency' | 'queue_timeout_ms' | 'max_queue_size' | 'adaptive_enabled' | 'proxy_type' | 'proxy_url' | 'proxy_username' | 'proxy_password'>> = {};
     if (body.name !== undefined) fields.name = body.name;
     if (body.api_type !== undefined) fields.api_type = body.api_type;
     if (body.base_url !== undefined) fields.base_url = body.base_url;
@@ -263,7 +286,26 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
       fields.api_key = encrypt(body.api_key, getSetting(db, "encryption_key")!);
       fields.api_key_preview = body.api_key.length > API_KEY_PREVIEW_MIN_LENGTH ? `${body.api_key.slice(0, API_KEY_PREVIEW_PREFIX_LEN)}...${body.api_key.slice(-API_KEY_PREVIEW_PREFIX_LEN)}` : "****";
     }
+    // Proxy field handling
+    if (body.proxy_type !== undefined) {
+      fields.proxy_type = body.proxy_type || null;
+      if (!body.proxy_type) {
+        fields.proxy_url = null;
+        fields.proxy_username = null;
+        fields.proxy_password = null;
+      }
+    }
+    if (body.proxy_url !== undefined && body.proxy_type) {
+      fields.proxy_url = body.proxy_url;
+    }
+    if (body.proxy_username !== undefined && body.proxy_type) {
+      fields.proxy_username = body.proxy_username ? encrypt(body.proxy_username, getSetting(db, "encryption_key")!) : null;
+    }
+    if (body.proxy_password !== undefined && body.proxy_type) {
+      fields.proxy_password = body.proxy_password ? encrypt(body.proxy_password, getSetting(db, "encryption_key")!) : null;
+    }
     updateProvider(db, id, fields);
+    proxyAgentFactory?.invalidate(id);
     const updated = getProviderById(db, id)!;
 
     let cascade: CascadeResult | undefined;
@@ -357,6 +399,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
         }
       } catch { continue }
     }
+    proxyAgentFactory?.invalidate(id);
     deleteProvider(db, id);
     stateRegistry?.removeProvider(id);
     adaptiveController?.remove(id);

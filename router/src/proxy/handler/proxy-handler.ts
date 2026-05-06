@@ -22,6 +22,7 @@ import { insertRejectedLog } from "../log-helpers.js";
 import type { RetryRuleMatcher } from "../orchestration/retry-rules.js";
 import type { ProxyOrchestrator } from "../orchestration/orchestrator.js";
 import type { ProxyErrorFormatter, ProxyErrorResponse } from "../proxy-core.js";
+import type { ProxyAgentFactory } from "../transport/proxy-agent.js";
 import { ToolLoopGuard } from "@llm-router/core/loop-prevention";
 import { buildTransportFn } from "../transport/transport-fn.js";
 import { applyOverflowRedirect } from "../routing/overflow.js";
@@ -102,6 +103,7 @@ export interface RouteHandlerDeps {
   db: Database.Database;
   orchestrator: ProxyOrchestrator;
   container: ServiceContainer;
+  proxyAgentFactory?: ProxyAgentFactory;
 }
 
 import { getConfig } from "../../config/index.js";
@@ -409,6 +411,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
       streamTimeoutMs: getModelStreamTimeout(provider, resolved.backend_model), tracker, matcher, request,
       streamLoopEnabled, formatTransform, responseTransform, injectedHeaders,
       timeoutContext: { modelId: resolved.backend_model, providerId: provider.id },
+      proxyAgentFactory: deps.proxyAgentFactory,
     });
 
     const pipelineSnapshot = iterationSnapshot.toJSON();

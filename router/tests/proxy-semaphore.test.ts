@@ -9,6 +9,7 @@ import { openaiProxy } from "../src/proxy/handler/openai.js";
 import { SemaphoreManager as ProviderSemaphoreManager } from "@llm-router/core/concurrency";
 import { RequestTracker } from "@llm-router/core/monitor";
 import { ServiceContainer, SERVICE_KEYS } from "../src/core/container.js";
+import { ProxyAgentFactory } from "../src/proxy/transport/proxy-agent.js";
 
 
 const TEST_ENCRYPTION_KEY =
@@ -50,6 +51,7 @@ function buildTestApp(
   container.register("adaptiveController", () => undefined);
   container.register(SERVICE_KEYS.logFileWriter, () => null);
   container.register(SERVICE_KEYS.pluginRegistry, () => undefined);
+  container.register(SERVICE_KEYS.proxyAgentFactory, () => new ProxyAgentFactory());
   const app = Fastify();
   app.register(openaiProxy, { db: mockDb, container });
   return app;

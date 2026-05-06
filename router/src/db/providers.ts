@@ -16,6 +16,10 @@ export interface Provider {
   queue_timeout_ms: number;
   max_queue_size: number;
   adaptive_enabled: number;
+  proxy_type: string | null;
+  proxy_url: string | null;
+  proxy_username: string | null;
+  proxy_password: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -58,7 +62,7 @@ export const PROVIDER_CONCURRENCY_DEFAULTS = {
 } as const;
 
 const PROVIDER_FIELDS = new Set([
-  "name", "api_type", "base_url", "upstream_path", "api_key", "api_key_preview", "models", "is_active", "max_concurrency", "queue_timeout_ms", "max_queue_size", "adaptive_enabled",
+  "name", "api_type", "base_url", "upstream_path", "api_key", "api_key_preview", "models", "is_active", "max_concurrency", "queue_timeout_ms", "max_queue_size", "adaptive_enabled", "proxy_type", "proxy_url", "proxy_username", "proxy_password",
 ]);
 
 export function getActiveProviders(
@@ -93,13 +97,17 @@ export function createProvider(
     queue_timeout_ms?: number;
     max_queue_size?: number;
     adaptive_enabled?: number;
+    proxy_type?: string | null;
+    proxy_url?: string | null;
+    proxy_username?: string | null;
+    proxy_password?: string | null;
   },
 ): string {
   const id = randomUUID();
   const now = new Date().toISOString();
   db.prepare(
-    `INSERT INTO providers (id, name, api_type, base_url, upstream_path, api_key, api_key_preview, models, is_active, max_concurrency, queue_timeout_ms, max_queue_size, adaptive_enabled, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO providers (id, name, api_type, base_url, upstream_path, api_key, api_key_preview, models, is_active, max_concurrency, queue_timeout_ms, max_queue_size, adaptive_enabled, proxy_type, proxy_url, proxy_username, proxy_password, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     id, provider.name, provider.api_type, provider.base_url,
     provider.upstream_path ?? null,
@@ -110,6 +118,10 @@ export function createProvider(
     provider.queue_timeout_ms ?? PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms,
     provider.max_queue_size ?? PROVIDER_CONCURRENCY_DEFAULTS.max_queue_size,
     provider.adaptive_enabled ?? 0,
+    provider.proxy_type ?? null,
+    provider.proxy_url ?? null,
+    provider.proxy_username ?? null,
+    provider.proxy_password ?? null,
     now, now,
   );
   return id;
@@ -118,7 +130,7 @@ export function createProvider(
 export function updateProvider(
   db: Database.Database,
   id: string,
-  fields: Partial<Pick<Provider, "name" | "api_type" | "base_url" | "upstream_path" | "api_key" | "api_key_preview" | "models" | "is_active" | "max_concurrency" | "queue_timeout_ms" | "max_queue_size" | "adaptive_enabled">>,
+  fields: Partial<Pick<Provider, "name" | "api_type" | "base_url" | "upstream_path" | "api_key" | "api_key_preview" | "models" | "is_active" | "max_concurrency" | "queue_timeout_ms" | "max_queue_size" | "adaptive_enabled" | "proxy_type" | "proxy_url" | "proxy_username" | "proxy_password">>,
 ): void {
   buildUpdateQuery(db, "providers", id, fields, PROVIDER_FIELDS, { updatedAt: true });
 }

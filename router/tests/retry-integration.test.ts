@@ -10,6 +10,7 @@ import { RetryRuleMatcher } from "../src/proxy/orchestration/retry-rules.js";
 import { SemaphoreManager as ProviderSemaphoreManager } from "@llm-router/core/concurrency";
 import { RequestTracker } from "@llm-router/core/monitor";
 import { ServiceContainer, SERVICE_KEYS } from "../src/core/container.js";
+import { ProxyAgentFactory } from "../src/proxy/transport/proxy-agent.js";
 
 
 const TEST_KEY =
@@ -116,6 +117,7 @@ describe("Retry integration", () => {
     container.register("adaptiveController", () => undefined);
     container.register(SERVICE_KEYS.logFileWriter, () => null);
   container.register(SERVICE_KEYS.pluginRegistry, () => undefined);
+  container.register(SERVICE_KEYS.proxyAgentFactory, () => new ProxyAgentFactory());
     container.register("semaphoreManager", () => new ProviderSemaphoreManager());
     matcher.load(db);
     app = Fastify();
@@ -175,6 +177,7 @@ describe("Retry integration", () => {
     container.register("adaptiveController", () => undefined);
     container.register(SERVICE_KEYS.logFileWriter, () => null);
   container.register(SERVICE_KEYS.pluginRegistry, () => undefined);
+  container.register(SERVICE_KEYS.proxyAgentFactory, () => new ProxyAgentFactory());
     container.register("semaphoreManager", () => new ProviderSemaphoreManager());
     app = Fastify();
     app.register(anthropicProxy, { db: db, container });
@@ -234,6 +237,7 @@ describe("Retry integration", () => {
     container.register("adaptiveController", () => undefined);
     container.register(SERVICE_KEYS.logFileWriter, () => null);
   container.register(SERVICE_KEYS.pluginRegistry, () => undefined);
+  container.register(SERVICE_KEYS.proxyAgentFactory, () => new ProxyAgentFactory());
     app = Fastify();
     app.register(anthropicProxy, { db: db, container });
 

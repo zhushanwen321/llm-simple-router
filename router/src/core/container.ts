@@ -9,6 +9,7 @@ export const SERVICE_KEYS = {
   adaptiveController: "adaptiveController",
   pluginRegistry: "pluginRegistry",
   logFileWriter: "logFileWriter",
+  proxyAgentFactory: "proxyAgentFactory",
 } as const;
 
 export type ServiceKey = (typeof SERVICE_KEYS)[keyof typeof SERVICE_KEYS];

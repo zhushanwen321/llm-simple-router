@@ -11,11 +11,26 @@ import { RequestTracker } from "@llm-router/core/monitor";
 import { createMockBackend } from "./helpers/mock-backend.js";
 import { TEST_ENCRYPTION_KEY } from "./helpers/test-setup.js";
 import { ServiceContainer, SERVICE_KEYS } from "../src/core/container.js";
+import { ProxyAgentFactory } from "../src/proxy/transport/proxy-agent.js";
 
 
 function closeServer(server: Server): Promise<void> {
   return new Promise((resolve, reject) => {
     server.close((err) => (err ? reject(err) : resolve()));
+  });
+}
+
+/** Get a port that is guaranteed to have no listener */
+async function getDeadPort(): Promise<{ port: number }> {
+  const net = await import('net');
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.listen(0, '127.0.0.1', () => {
+      const addr = server.address() as net.AddressInfo;
+      const port = addr.port;
+      server.close(() => resolve({ port }));
+    });
+    server.on('error', reject);
   });
 }
 
@@ -32,6 +47,7 @@ function buildTestApp(mockDb: Database.Database): FastifyInstance {
   container.register("adaptiveController", () => undefined);
   container.register(SERVICE_KEYS.logFileWriter, () => null);
   container.register(SERVICE_KEYS.pluginRegistry, () => undefined);
+  container.register(SERVICE_KEYS.proxyAgentFactory, () => new ProxyAgentFactory());
 
   app.register(openaiProxy, { db: mockDb, container });
 
@@ -285,8 +301,9 @@ describe("OpenAI proxy", () => {
 
   // 5. 后端不可达 - 返回 502
   it("should return 502 when backend is unreachable", async () => {
-    // 指向一个不存在的端口
-    insertMockBackend(mockDb, "http://127.0.0.1:19999");
+    // 使用随机未被占用的端口，避免冲突
+    const { port: deadPort } = await getDeadPort();
+    insertMockBackend(mockDb, `http://127.0.0.1:${deadPort}`);
     insertModelMapping(mockDb, "gpt-4", "gpt-4");
 
     app = buildTestApp(mockDb);

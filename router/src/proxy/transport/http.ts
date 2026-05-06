@@ -1,5 +1,6 @@
 import { request as httpRequestFn } from "http";
 import { request as httpsRequestFn } from "https";
+import type { Agent } from "http";
 import { UPSTREAM_SUCCESS, filterHeaders } from "../types.js";
 import { buildUpstreamUrl } from "../proxy-core.js";
 import type { RawHeaders, TransportResult } from "../types.js";
@@ -24,10 +25,11 @@ export interface UpstreamRequestOptions {
 }
 
 export const _transportInternals = {
-  createUpstreamRequest(url: URL, options: UpstreamRequestOptions) {
+  createUpstreamRequest(url: URL, options: UpstreamRequestOptions, agent?: Agent) {
+    const opts = agent ? { ...options, agent } : options;
     return url.protocol === "https:"
-      ? httpsRequestFn(options)
-      : httpRequestFn(options);
+      ? httpsRequestFn(opts)
+      : httpRequestFn(opts);
   },
 };
 
@@ -64,6 +66,7 @@ export function callNonStream(
   clientHeaders: RawHeaders,
   upstreamPath: string,
   buildHeaders: BuildHeadersFn,
+  agent?: Agent,
 ): Promise<TransportResult> {
   return new Promise((resolve) => {
     const url = new URL(buildUpstreamUrl(backend.base_url, upstreamPath));
@@ -75,7 +78,7 @@ export function callNonStream(
     );
     const options = buildRequestOptions(url, upstreamHeaders);
 
-    const req = _transportInternals.createUpstreamRequest(url, options);
+    const req = _transportInternals.createUpstreamRequest(url, options, agent);
 
     req.on("response", (res) => {
       const chunks: Buffer[] = [];
@@ -127,13 +130,14 @@ export function callGet(
   clientHeaders: RawHeaders,
   upstreamPath: string,
   buildHeaders: (cliHdrs: RawHeaders, key: string) => Record<string, string>,
+  agent?: Agent,
 ): Promise<GetTransportResult> {
   return new Promise((resolve, reject) => {
     const url = new URL(buildUpstreamUrl(backend.base_url, upstreamPath));
     const headers = buildHeaders(clientHeaders, apiKey);
     const options = buildRequestOptions(url, headers, "GET");
 
-    const req = _transportInternals.createUpstreamRequest(url, options);
+    const req = _transportInternals.createUpstreamRequest(url, options, agent);
     req.on("response", (res) => {
       const chunks: Buffer[] = [];
       res.on("data", (chunk: Buffer) => chunks.push(chunk));

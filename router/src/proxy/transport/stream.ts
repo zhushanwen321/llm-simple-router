@@ -1,4 +1,5 @@
 import { PassThrough, Transform } from "stream";
+import type { Agent } from "http";
 import type { FastifyReply } from "fastify";
 import { UPSTREAM_SUCCESS, filterHeaders } from "../types.js";
 import { buildUpstreamUrl } from "../proxy-core.js";
@@ -320,6 +321,7 @@ export function callStream(
   formatTransform?: import("stream").Transform,
   timeoutContext?: { modelId: string; providerId: string },
   onTimeoutAbort?: () => void,
+  agent?: Agent,
 ): Promise<TransportResult> {
   return new Promise((resolve) => {
     const effectiveResolve = compatResolve ?? resolve;
@@ -328,7 +330,7 @@ export function callStream(
     const upstreamHeaders = buildHeaders(clientHeaders, apiKey, Buffer.byteLength(payload));
     const options = buildRequestOptions(url, upstreamHeaders);
 
-    const upstreamReq = _transportInternals.createUpstreamRequest(url, options);
+    const upstreamReq = _transportInternals.createUpstreamRequest(url, options, agent);
 
     upstreamReq.on("response", (upstreamRes) => {
       const statusCode = upstreamRes.statusCode || UPSTREAM_BAD_GATEWAY;

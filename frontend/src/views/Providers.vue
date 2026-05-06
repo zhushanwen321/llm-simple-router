@@ -35,7 +35,12 @@
             <TableCell>
               <Badge variant="secondary">{{ API_TYPE_LABELS[p.api_type] ?? p.api_type }}</Badge>
             </TableCell>
-            <TableCell class="text-muted-foreground">{{ p.base_url }}</TableCell>
+            <TableCell>
+              <div class="flex items-center gap-1">
+                <span class="text-muted-foreground">{{ p.base_url }}</span>
+                <Shield v-if="p.proxy_type" class="w-3 h-3 text-muted-foreground" :title="`Proxy: ${p.proxy_type.toUpperCase()}`" />
+              </div>
+            </TableCell>
             <TableCell class="text-muted-foreground text-xs">{{ p.upstream_path || (p.api_type === 'anthropic' ? '/v1/messages' : '/v1/chat/completions') }}</TableCell>
             <TableCell>
               <div class="flex items-center gap-1">
@@ -61,18 +66,10 @@
             </TableCell>
             <TableCell>
               <Button variant="ghost" size="sm" class="gap-1.5" @click="confirmToggle(p)">
-                <span
-                  class="relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors"
-                  :class="p.is_active ? 'bg-primary' : 'bg-input'"
-                >
-                  <span
-                    class="inline-block h-3 w-3 rounded-full bg-background shadow-sm transition-transform"
-                    :class="p.is_active ? 'translate-x-3.5' : 'translate-x-0.5'"
-                  />
+                <span class="relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors" :class="p.is_active ? 'bg-primary' : 'bg-input'">
+                  <span class="inline-block h-3 w-3 rounded-full bg-background shadow-sm transition-transform" :class="p.is_active ? 'translate-x-3.5' : 'translate-x-0.5'" />
                 </span>
-                <Badge :variant="p.is_active ? 'default' : 'secondary'">
-                  {{ p.is_active ? t('common.enabled') : t('common.disabled') }}
-                </Badge>
+                <Badge :variant="p.is_active ? 'default' : 'secondary'">{{ p.is_active ? t('common.enabled') : t('common.disabled') }}</Badge>
               </Button>
             </TableCell>
             <TableCell class="text-right">
@@ -115,15 +112,12 @@
               </Select>
             </div>
           </div>
-
           <!-- 未选模板提示 (仅新建模式) -->
           <div v-if="!presetGroup && !editingId" class="flex flex-col items-center justify-center py-10 text-muted-foreground">
             <svg class="w-10 h-10 mb-3 opacity-30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 12l2 2 4-4"/></svg>
             <span class="text-sm">{{ t('providers.template.selectFirst') }}</span>
           </div>
-
           <template v-if="presetGroup || editingId">
-          <!-- 基本信息 2x2 -->
           <div class="grid grid-cols-2 gap-3">
             <div>
               <Label class="text-xs text-muted-foreground">{{ t('providers.fields.name') }}</Label>
@@ -152,13 +146,17 @@
               <p v-if="errors.api_key" class="text-xs text-destructive mt-0.5">{{ errors.api_key }}</p>
             </div>
           </div>
-          <!-- Upstream Path -->
           <div>
-            <Label class="text-xs">Upstream Path</Label>
-            <Input v-model="form.upstream_path" placeholder="默认: /v1/chat/completions 或 /v1/messages" class="mt-1 font-mono text-xs" />
-            <p class="text-xs text-muted-foreground mt-0.5">留空使用 API 类型默认路径</p>
+            <Label class="text-xs">{{ t('providers.fields.upstreamPath') }}</Label>
+            <Input v-model="form.upstream_path" :placeholder="t('providers.fields.upstreamPathPlaceholder')" class="mt-1 font-mono text-xs" />
+            <p class="text-xs text-muted-foreground mt-0.5">{{ t('providers.fields.upstreamPathHint') }}</p>
           </div>
-
+          <ProxyConfigForm
+            :proxy-type="form.proxy_type" :proxy-url="form.proxy_url" :proxy-username="form.proxy_username" :proxy-password="form.proxy_password"
+            @update:proxy-type="form.proxy_type = $event" @update:proxy-url="form.proxy_url = $event"
+            @update:proxy-username="form.proxy_username = $event" @update:proxy-password="form.proxy_password = $event"
+            @clear="form.proxy_url = ''; form.proxy_username = ''; form.proxy_password = ''"
+          />
           <!-- 可用模型 -->
           <div>
             <Label class="text-xs text-muted-foreground mb-2">{{ t('providers.fields.availableModels') }}</Label>
@@ -166,21 +164,14 @@
               <div v-for="(m, i) in form.models" :key="i">
                 <ModelCard
                   :model="{ name: m.name, contextWindow: m.context_window ?? 200000, enabled: true, patches: m.patches ?? [] }"
-                  :api-type="form.api_type"
-                  :is-deep-seek="m.name.toLowerCase().includes('deepseek')"
+                  :api-type="form.api_type" :is-deep-seek="m.name.toLowerCase().includes('deepseek')"
                   :is-non-openai-endpoint="!isOfficialOpenai(form.base_url)"
-                  @update:model="updateModel(i, $event)"
-                  @remove="removeModel(i)"
+                  @update:model="updateModel(i, $event)" @remove="removeModel(i)"
                 />
                 <div class="flex items-center gap-1.5 mt-1.5">
-                  <Label class="text-xs text-muted-foreground whitespace-nowrap">Timeout(s)</Label>
-                  <Input
-                    type="number"
-                    :model-value="m.stream_timeout_ms ? Math.round(m.stream_timeout_ms / 1000) : ''"
-                    @update:model-value="updateModelTimeout(i, $event)"
-                    placeholder="默认"
-                    class="h-7 text-xs"
-                    min="1"
+                  <Label class="text-xs text-muted-foreground whitespace-nowrap">{{ t('providers.fields.timeoutLabel') }}</Label>
+                  <Input type="number" :model-value="m.stream_timeout_ms ? Math.round(m.stream_timeout_ms / 1000) : ''"
+                    @update:model-value="updateModelTimeout(i, $event)" :placeholder="t('providers.fields.timeoutPlaceholder')" class="h-7 text-xs" min="1"
                   />
                 </div>
               </div>
@@ -196,31 +187,20 @@
               <Button type="button" variant="outline" size="sm" @click="addModel" :disabled="!modelInput.trim()">{{ t('providers.fields.addModel') }}</Button>
             </div>
           </div>
-
-          <!-- 并发控制 + 转换规则 2 columns -->
           <div class="grid grid-cols-2 gap-4">
-            <!-- 并发控制 -->
             <div class="border rounded-md p-3 space-y-3">
               <div class="text-xs font-medium text-muted-foreground">{{ t('providers.concurrency.title') }}</div>
-              <ConcurrencyControl
-                :mode="concurrencyMode"
-                :max-concurrency="form.max_concurrency"
-                :queue-timeout-ms="form.queue_timeout_ms"
-                :max-queue-size="form.max_queue_size"
-                compact
-                @update:mode="(v: unknown) => onConcurrencyModeChange(v as 'auto' | 'manual' | 'none')"
+              <ConcurrencyControl :mode="concurrencyMode" :max-concurrency="form.max_concurrency"
+                :queue-timeout-ms="form.queue_timeout_ms" :max-queue-size="form.max_queue_size" compact
+                @update:mode="(v: unknown) => onConcurrencyModeChange(v as ConcurrencyMode)"
                 @update:max-concurrency="form.max_concurrency = $event"
                 @update:queue-timeout-ms="form.queue_timeout_ms = $event"
                 @update:max-queue-size="form.max_queue_size = $event"
               />
             </div>
-
-            <!-- 转换规则 -->
             <div class="border rounded-md p-3 space-y-3">
               <div class="text-xs font-medium text-muted-foreground">{{ t('providers.transform.title') }}</div>
-              <TransformRulesForm
-                :inject-headers="transformForm.injectHeadersInput"
-                :drop-fields="transformForm.dropFieldsInput"
+              <TransformRulesForm :inject-headers="transformForm.injectHeadersInput" :drop-fields="transformForm.dropFieldsInput"
                 :request-defaults="transformForm.requestDefaultsInput"
                 @update:inject-headers="transformForm.injectHeadersInput = $event"
                 @update:drop-fields="transformForm.dropFieldsInput = $event"
@@ -228,9 +208,7 @@
               />
             </div>
           </div>
-
           </template>
-
           <DialogFooter>
             <Button type="button" variant="outline" @click="dialogOpen = false">{{ t('common.cancel') }}</Button>
             <Button type="submit">{{ t('common.save') }}</Button>
@@ -273,14 +251,10 @@
   </div>
 </template>
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
-import * as z from 'zod'
-import { api, getApiMessage, type ProviderPayload, type ProviderGroup } from '@/api/client'
-import type { Provider, ModelInfo } from '@/types/mapping'
-import { DEFAULT_CONTEXT_WINDOW } from '@/constants'
-import { getDefaultContextWindow } from '@/components/quick-setup/types'
+import { api, getApiMessage } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -289,246 +263,34 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog'
-import { RotateCw, Copy, Check } from 'lucide-vue-next'
+import { RotateCw, Copy, Check, Shield } from 'lucide-vue-next'
 import ConcurrencyControl from '@/components/shared/ConcurrencyControl.vue'
 import TransformRulesForm from '@/components/shared/TransformRulesForm.vue'
+import ProxyConfigForm from '@/components/shared/ProxyConfigForm.vue'
 import ModelCard from '@/components/quick-setup/ModelCard.vue'
-import type { ModelConfig } from '@/components/quick-setup/types'
-import { useTransformRules } from '@/composables/useTransformRules'
-const DEFAULT_CONCURRENCY = 3
-const DEFAULT_CONCURRENCY_AUTO = 10
-const DEFAULT_QUEUE_TIMEOUT_MS = 120_000
-const DEFAULT_QUEUE_SIZE = 10
-const MAX_CONCURRENCY = 100
-const MAX_QUEUE_SIZE = 1000
-const CONTEXT_K = 1000
-const CONTEXT_M = 1_000_000
-const CONTEXT_WINDOW_OPTIONS = [
-  { label: '8K', value: '8000' },
-  { label: '16K', value: '16000' },
-  { label: '32K', value: '32000' },
-  { label: '64K', value: '64000' },
-  { label: '128K', value: '128000' },
-  { label: '160K', value: '160000' },
-  { label: '200K', value: '200000' },
-  { label: '256K', value: '256000' },
-  { label: '1M', value: '1000000' },
-] as const
-const API_TYPE_LABELS: Record<string, string> = { openai: 'OpenAI Chat Completions', 'openai-responses': 'OpenAI Responses', anthropic: 'Anthropic Messages' }
-const DEFAULT_FORM = { name: '', api_type: 'anthropic', base_url: '', upstream_path: '' as string, api_key: '', models: [] as ModelInfo[], is_active: true, max_concurrency: DEFAULT_CONCURRENCY_AUTO, queue_timeout_ms: DEFAULT_QUEUE_TIMEOUT_MS, max_queue_size: DEFAULT_QUEUE_SIZE, adaptive_enabled: true }
-const modelInput = ref('')
-const modelContextWindow = ref(DEFAULT_CONTEXT_WINDOW)
-const contextWindowSelect = computed({
-  get: () => String(modelContextWindow.value),
-  set: (val: string) => { modelContextWindow.value = Number(val) },
-})
-const providers = ref<Provider[]>([])
-const providerPresets = ref<ProviderGroup[]>([])
-const dialogOpen = ref(false)
-const editingId = ref<string | null>(null)
-const deleteTarget = ref<Provider | null>(null)
-const toggleTarget = ref<Provider | null>(null)
-const pendingToggleId = ref<string | null>(null)
-const pendingToggleActive = ref<boolean>(false)
-const toggleDependencies = ref<string[]>([])
-const form = ref({ ...DEFAULT_FORM })
-const errors = ref<Record<string, string>>({})
-type ConcurrencyMode = 'auto' | 'manual' | 'none'
-const concurrencyMode = ref<ConcurrencyMode>('auto')
-// Transform rules state
+import { useProviderForm, API_TYPE_LABELS, CONTEXT_WINDOW_OPTIONS, CONTEXT_K, CONTEXT_M } from '@/composables/useProviderForm'
+import type { ConcurrencyMode } from '@/composables/useProviderForm'
+import { useProviderActions } from '@/composables/useProviderActions'
+
 const { t } = useI18n()
-const { transformForm, loadTransformRules, saveTransformRules } = useTransformRules()
-const copiedId = ref<string | null>(null)
-const reloading = ref(false)
-const MASK_VISIBLE_LEN = 7, MASK_ASTERISK_COUNT = 7, COPY_FEEDBACK_MS = 2000
-function validate(): boolean {
-  const providerSchema = z.object({
-    name: z.string().min(1, t('providers.validation.nameRequired')).regex(/^[a-zA-Z0-9_-]+$/, t('providers.validation.namePattern')),
-    base_url: z.string().min(1, t('providers.validation.baseUrlRequired')).url(t('providers.validation.baseUrlInvalid')),
-  })
-  const errs: Record<string, string> = {}
-  const result = providerSchema.safeParse({ name: form.value.name.trim(), base_url: form.value.base_url.trim() })
-  if (!result.success) {
-    for (const issue of result.error.issues) {
-      const field = issue.path[0] as string
-      if (!errs[field]) errs[field] = issue.message
-    }
-  }
-  if (!editingId.value && !form.value.api_key.trim()) errs.api_key = t('providers.validation.apiKeyRequired')
-  if (concurrencyMode.value !== 'none') {
-    const mc = form.value.max_concurrency
-    if (!mc || mc < 1 || mc > MAX_CONCURRENCY) errs.max_concurrency = t('providers.validation.concurrencyRange', { min: 1, max: MAX_CONCURRENCY })
-    if (form.value.queue_timeout_ms < 0) errs.queue_timeout_ms = t('providers.validation.negativeNotAllowed')
-    const qs = form.value.max_queue_size
-    if (!qs || qs < 1 || qs > MAX_QUEUE_SIZE) errs.max_queue_size = t('providers.validation.queueSizeRange', { min: 1, max: MAX_QUEUE_SIZE })
-  }
-  errors.value = errs
-  return Object.keys(errs).length === 0
-}
-function maskKey(key: string): string {
-  if (!key) return ''
-  const visible = key.slice(0, MASK_VISIBLE_LEN)
-  return visible + '*'.repeat(MASK_ASTERISK_COUNT)
-}
+const {
+  form, errors, concurrencyMode, dialogOpen, editingId,
+  modelInput, contextWindowSelect, transformForm, presetHook,
+  validate, buildPayload, addModel, removeModel, updateModel, updateModelTimeout,
+  onConcurrencyModeChange, isOfficialOpenai, openCreate, openEdit, saveTransformRules,
+} = useProviderForm()
+const { providerPresets, presetGroup, presetPlan, availablePlans, onGroupChange, onPresetChange, loadPresets } = presetHook
+const {
+  providers, reloading, copiedId, deleteTarget, toggleTarget, toggleDependencies,
+  maskKey, copyKey, loadProviders, confirmDelete, confirmToggle, handleToggle, handleDelete, handleReload,
+} = useProviderActions()
+
 function formatContextWindow(tokens: number): string {
   if (tokens >= CONTEXT_M) return `${tokens / CONTEXT_M}M`
   if (tokens >= CONTEXT_K) return `${tokens / CONTEXT_K}K`
   return String(tokens)
 }
-async function copyKey(key: string, id: string) {
-  await navigator.clipboard.writeText(key)
-  copiedId.value = id
-  setTimeout(() => { copiedId.value = null }, COPY_FEEDBACK_MS)
-}
-const presetGroup = ref(''), presetPlan = ref('')
-const availablePlans = computed(() => {
-  if (!presetGroup.value) return []
-  return providerPresets.value.find(g => g.group === presetGroup.value)?.presets ?? []
-})
-function onGroupChange() {
-  if (presetGroup.value === '__custom__') {
-    presetPlan.value = ''
-    form.value.name = ''
-    form.value.api_type = 'openai'
-    form.value.base_url = ''
-    form.value.models = []
-    return
-  }
-  const plans = providerPresets.value.find(g => g.group === presetGroup.value)?.presets
-  if (plans?.length) {
-    presetPlan.value = plans[0].plan
-    onPresetChange()
-  } else {
-    presetPlan.value = ''
-  }
-}
-function onPresetChange() {
-  const preset = availablePlans.value.find(p => p.plan === presetPlan.value)
-  if (!preset) return
-  form.value.name = preset.presetName
-  form.value.api_type = preset.apiType
-  form.value.base_url = preset.baseUrl
-  form.value.models = preset.models.map(name => ({
-    name,
-    context_window: getDefaultContextWindow(name),
-    patches: getDefaultPatches(name, preset.apiType),
-  }))
-}
-async function loadProviders() {
-  try {
-    const data = await api.getProviders()
-    providers.value = data
-  } catch (e: unknown) {
-    console.error('Failed to load providers:', e)
-    toast.error(getApiMessage(e, t('providers.toast.loadFailed')))
-  }
-}
-function addModel() {
-  const input = modelInput.value.trim()
-  if (!input) return
-  const names = input.split(/[,，]/).map(s => s.trim()).filter(Boolean)
-  for (const name of names) {
-    if (!form.value.models.some(m => m.name === name)) {
-      form.value.models.push({ name, context_window: modelContextWindow.value || DEFAULT_CONTEXT_WINDOW, patches: [] })
-    }
-  }
-  modelInput.value = ''
-  modelContextWindow.value = DEFAULT_CONTEXT_WINDOW
-}
-function removeModel(index: number) {
-  form.value.models.splice(index, 1)
-}
 
-function isOfficialOpenai(url: string): boolean {
-  return url.includes('api.openai.com')
-}
-
-function updateModel(index: number, updated: ModelConfig) {
-  form.value.models[index].context_window = updated.contextWindow
-  form.value.models[index].patches = updated.patches
-}
-
-function updateModelTimeout(index: number, seconds: string | number) {
-  const val = Number(seconds)
-  if (val > 0) {
-    form.value.models[index].stream_timeout_ms = val * 1000
-  } else {
-    form.value.models[index].stream_timeout_ms = null
-  }
-}
-
-function getDefaultPatches(modelName: string, apiType: string): string[] {
-  const patches: string[] = []
-  if (modelName.toLowerCase().includes('deepseek')) {
-    if (apiType === 'anthropic') {
-      patches.push('thinking-param', 'cache-control', 'thinking-blocks', 'orphan-tool-results')
-    } else {
-      patches.push('non-ds-tools', 'orphan-tool-results-oa')
-    }
-  }
-  return patches
-}
-
-function onConcurrencyModeChange(mode: ConcurrencyMode) {
-  concurrencyMode.value = mode
-  if (mode === 'auto') {
-    if (!form.value.max_concurrency || form.value.max_concurrency < 1) form.value.max_concurrency = DEFAULT_CONCURRENCY_AUTO
-    form.value.adaptive_enabled = true
-  } else if (mode === 'manual') {
-    if (!form.value.max_concurrency || form.value.max_concurrency < 1) form.value.max_concurrency = DEFAULT_CONCURRENCY
-    form.value.adaptive_enabled = false
-  }
-}
-
-function openCreate() {
-  editingId.value = null
-  form.value = { ...DEFAULT_FORM, models: [] }
-  concurrencyMode.value = 'auto'
-  modelInput.value = ''
-  modelContextWindow.value = DEFAULT_CONTEXT_WINDOW
-  presetGroup.value = ''
-  presetPlan.value = ''
-  errors.value = {}
-  dialogOpen.value = true
-}
-function openEdit(p: Provider) {
-  editingId.value = p.id
-  const mc = p.max_concurrency ?? 0
-  if (mc === 0) {
-    concurrencyMode.value = 'none'
-  } else if (p.adaptive_enabled) {
-    concurrencyMode.value = 'auto'
-  } else {
-    concurrencyMode.value = 'manual'
-  }
-  form.value = { name: p.name, api_type: p.api_type, base_url: p.base_url, upstream_path: p.upstream_path || '', api_key: '', models: (p.models || []).map(m => ({ name: m.name, context_window: m.context_window ?? DEFAULT_CONTEXT_WINDOW, patches: m.patches ?? [], stream_timeout_ms: m.stream_timeout_ms ?? null })), is_active: !!p.is_active, max_concurrency: concurrencyMode.value === 'none' ? DEFAULT_CONCURRENCY_AUTO : mc, queue_timeout_ms: p.queue_timeout_ms ?? DEFAULT_QUEUE_TIMEOUT_MS, max_queue_size: p.max_queue_size ?? DEFAULT_QUEUE_SIZE, adaptive_enabled: concurrencyMode.value === 'auto' }
-  modelInput.value = ''
-  modelContextWindow.value = DEFAULT_CONTEXT_WINDOW
-  presetGroup.value = ''
-  presetPlan.value = ''
-  errors.value = {}
-  dialogOpen.value = true
-  loadTransformRules(p.id)
-}
-
-type ProviderFormPayload = Pick<ProviderPayload, 'name' | 'api_type' | 'base_url' | 'upstream_path' | 'models' | 'is_active' | 'max_concurrency' | 'queue_timeout_ms' | 'max_queue_size' | 'adaptive_enabled'> & { api_key?: string }
-
-function buildPayload(): ProviderFormPayload {
-  const payload: ProviderFormPayload = {
-    name: form.value.name,
-    api_type: form.value.api_type,
-    base_url: form.value.base_url,
-    upstream_path: form.value.upstream_path || undefined,
-    models: form.value.models.map(m => ({ name: m.name, context_window: m.context_window ?? undefined, patches: m.patches ?? undefined, stream_timeout_ms: m.stream_timeout_ms ?? undefined })),
-    is_active: form.value.is_active ? 1 : 0,
-    max_concurrency: concurrencyMode.value === 'none' ? 0 : form.value.max_concurrency,
-    queue_timeout_ms: concurrencyMode.value === 'none' ? 0 : form.value.queue_timeout_ms,
-    max_queue_size: concurrencyMode.value === 'none' ? DEFAULT_QUEUE_SIZE : form.value.max_queue_size,
-    adaptive_enabled: concurrencyMode.value === 'auto' ? 1 : 0,
-  }
-  if (form.value.api_key) payload.api_key = form.value.api_key
-  return payload
-}
 async function handleSave() {
   if (!validate()) return
   try {
@@ -542,7 +304,6 @@ async function handleSave() {
       const result = await api.createProvider(payload)
       providerId = result.id
     }
-    // Save transform rules along with the provider
     await saveTransformRules(providerId)
     dialogOpen.value = false
     await loadProviders()
@@ -551,72 +312,8 @@ async function handleSave() {
     toast.error(getApiMessage(e, t('providers.toast.saveFailed')))
   }
 }
-function confirmDelete(p: Provider) {
-  deleteTarget.value = p
-}
-async function confirmToggle(p: Provider) {
-  toggleTarget.value = p
-  pendingToggleId.value = p.id
-  pendingToggleActive.value = !!p.is_active
-  toggleDependencies.value = []
-  if (p.is_active) {
-    try {
-      const result = await api.getProviderDependencies(p.id)
-      toggleDependencies.value = result.references
-    } catch { /* eslint-disable-line taste/no-silent-catch -- 依赖查询失败不阻塞 toggle 弹框 */ }
-  }
-}
-async function handleToggle() {
-  const id = pendingToggleId.value
-  if (!id) return
-  const wasActive = pendingToggleActive.value
-  toggleTarget.value = null
-  pendingToggleId.value = null
-  try {
-    const res = await api.updateProvider(id, { is_active: wasActive ? 0 : 1 })
-    if (res.cascadedGroups?.length) {
-      const disabled = res.cascadedGroups.filter((g: { disabled: boolean }) => g.disabled).length
-      const cleaned = res.cascadedGroups.length - disabled
-      const parts: string[] = []
-      if (cleaned > 0) parts.push(t('providers.toast.cascadeClean', { count: cleaned }))
-      if (disabled > 0) parts.push(t('providers.toast.cascadeDisable', { count: disabled }))
-      toast.warning(t('providers.toast.cascadeAuto', { actions: parts.join(', ') }))
-    }
-    await loadProviders()
-  } catch (e: unknown) {
-    console.error('Failed to toggle provider:', e)
-    toast.error(getApiMessage(e, t('providers.toast.toggleFailed')))
-  }
-}
-async function handleDelete() {
-  const target = deleteTarget.value
-  if (!target) return
-  deleteTarget.value = null
-  try {
-    await api.deleteProvider(target.id)
-    await loadProviders()
-  } catch (e: unknown) {
-    toast.error(getApiMessage(e, t('providers.toast.deleteFailed')))
-  }
-}
-async function handleReload() {
-  reloading.value = true
-  try {
-    const result = await api.reloadTransformRules()
-    toast.success(t('providers.toast.reloadSuccess', { pluginCount: result.loadedPlugins.length, rulesCount: result.rulesCount }))
-  } catch (e: unknown) {
-    toast.error(getApiMessage(e, t('providers.toast.reloadFailed')))
-  } finally {
-    reloading.value = false
-  }
-}
+
 onMounted(async () => {
-  const [presetsResult] = await Promise.allSettled([api.recommended.getProviders(), loadProviders()])
-  if (presetsResult.status === 'fulfilled') {
-    providerPresets.value = presetsResult.value
-  } else {
-    providerPresets.value = []
-    console.error('Failed to load provider presets:', presetsResult.reason)
-  }
+  await Promise.allSettled([loadPresets(), loadProviders()])
 })
 </script>

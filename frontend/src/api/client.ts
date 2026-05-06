@@ -134,6 +134,10 @@ export interface ProviderPayload {
   queue_timeout_ms?: number;
   max_queue_size?: number;
   adaptive_enabled?: number;
+  proxy_type?: string | null;
+  proxy_url?: string | null;
+  proxy_username?: string | null;
+  proxy_password?: string | null;
 }
 
 interface MappingPayload {

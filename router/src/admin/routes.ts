@@ -23,6 +23,7 @@ import { adminScheduleRoutes } from "./schedules.js";
 import type { StateRegistry } from "../core/registry.js";
 import type { RequestTracker } from "@llm-router/core/monitor";
 import type { AdaptiveController } from "@llm-router/core/concurrency";
+import type { ProxyAgentFactory } from "../proxy/transport/proxy-agent.js";
 
 interface AdminRoutesOptions {
   db: Database.Database;
@@ -33,6 +34,7 @@ interface AdminRoutesOptions {
   logsDir?: string;
   pluginRegistry?: import("../proxy/transform/plugin-registry.js").PluginRegistry;
   closeFn?: () => Promise<void>;
+  proxyAgentFactory?: ProxyAgentFactory;
 }
 
 export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (app, options, done) => {
@@ -40,7 +42,7 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (app, opti
   app.register(adminSetupRoutes, { db: options.db });
   app.register(adminAuthPlugin, { db: options.db });
   app.register(adminLoginRoutes, { db: options.db });
-  app.register(adminProviderRoutes, { db: options.db, stateRegistry: options.stateRegistry, tracker: options.tracker, adaptiveController: options.adaptiveController });
+  app.register(adminProviderRoutes, { db: options.db, stateRegistry: options.stateRegistry, tracker: options.tracker, adaptiveController: options.adaptiveController, proxyAgentFactory: options.proxyAgentFactory });
   app.register(adminMappingRoutes, { db: options.db });
   app.register(adminGroupRoutes, { db: options.db });
   app.register(adminScheduleRoutes, { db: options.db });

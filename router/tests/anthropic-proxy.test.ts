@@ -9,6 +9,7 @@ import { setSetting } from "../src/db/settings.js";
 import { SemaphoreManager as ProviderSemaphoreManager } from "@llm-router/core/concurrency";
 import { RequestTracker } from "@llm-router/core/monitor";
 import { ServiceContainer, SERVICE_KEYS } from "../src/core/container.js";
+import { ProxyAgentFactory } from "../src/proxy/transport/proxy-agent.js";
 
 
 const TEST_ENCRYPTION_KEY =
@@ -36,6 +37,20 @@ function closeServer(server: Server): Promise<void> {
   });
 }
 
+/** Get a port that is guaranteed to have no listener */
+async function getDeadPort(): Promise<{ port: number }> {
+  const net = await import('net');
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.listen(0, '127.0.0.1', () => {
+      const addr = server.address() as net.AddressInfo;
+      const port = addr.port;
+      server.close(() => resolve({ port }));
+    });
+    server.on('error', reject);
+  });
+}
+
 function buildTestApp(mockDb: Database.Database): FastifyInstance {
   const app = Fastify();
   const semaphoreManager = new ProviderSemaphoreManager();
@@ -49,6 +64,7 @@ function buildTestApp(mockDb: Database.Database): FastifyInstance {
   container.register("adaptiveController", () => undefined);
   container.register(SERVICE_KEYS.logFileWriter, () => null);
   container.register(SERVICE_KEYS.pluginRegistry, () => undefined);
+  container.register(SERVICE_KEYS.proxyAgentFactory, () => new ProxyAgentFactory());
 
   app.register(anthropicProxy, { db: mockDb, container });
 
@@ -335,7 +351,9 @@ describe("Anthropic proxy", () => {
 
   // 5. 后端不可达 - 502
   it("should return 502 when backend is unreachable", async () => {
-    insertMockBackend(mockDb, "http://127.0.0.1:19999");
+    // 使用随机未被占用的端口，避免冲突
+    const { port: deadPort } = await getDeadPort();
+    insertMockBackend(mockDb, `http://127.0.0.1:${deadPort}`);
     insertModelMapping(mockDb, "claude-3-opus-20240229", "claude-3-opus-20240229");
 
     app = buildTestApp(mockDb);
