@@ -172,6 +172,17 @@
                   @update:model="updateModel(i, $event)"
                   @remove="removeModel(i)"
                 />
+                <div class="flex items-center gap-1.5 mt-1.5">
+                  <Label class="text-xs text-muted-foreground whitespace-nowrap">Timeout(s)</Label>
+                  <Input
+                    type="number"
+                    :model-value="m.stream_timeout_ms ? Math.round(m.stream_timeout_ms / 1000) : ''"
+                    @update:model-value="updateModelTimeout(i, $event)"
+                    placeholder="默认"
+                    class="h-7 text-xs"
+                    min="1"
+                  />
+                </div>
               </div>
             </div>
             <div class="flex gap-2">
@@ -437,6 +448,15 @@ function updateModel(index: number, updated: ModelConfig) {
   form.value.models[index].patches = updated.patches
 }
 
+function updateModelTimeout(index: number, seconds: string | number) {
+  const val = Number(seconds)
+  if (val > 0) {
+    form.value.models[index].stream_timeout_ms = val * 1000
+  } else {
+    form.value.models[index].stream_timeout_ms = null
+  }
+}
+
 function getDefaultPatches(modelName: string, apiType: string): string[] {
   const patches: string[] = []
   if (modelName.toLowerCase().includes('deepseek')) {
@@ -480,7 +500,7 @@ function openEdit(p: Provider) {
   } else {
     concurrencyMode.value = 'manual'
   }
-  form.value = { name: p.name, api_type: p.api_type, base_url: p.base_url, upstream_path: p.upstream_path || '', api_key: '', models: (p.models || []).map(m => ({ name: m.name, context_window: m.context_window ?? DEFAULT_CONTEXT_WINDOW, patches: m.patches ?? [] })), is_active: !!p.is_active, max_concurrency: concurrencyMode.value === 'none' ? DEFAULT_CONCURRENCY_AUTO : mc, queue_timeout_ms: p.queue_timeout_ms ?? DEFAULT_QUEUE_TIMEOUT_MS, max_queue_size: p.max_queue_size ?? DEFAULT_QUEUE_SIZE, adaptive_enabled: concurrencyMode.value === 'auto' }
+  form.value = { name: p.name, api_type: p.api_type, base_url: p.base_url, upstream_path: p.upstream_path || '', api_key: '', models: (p.models || []).map(m => ({ name: m.name, context_window: m.context_window ?? DEFAULT_CONTEXT_WINDOW, patches: m.patches ?? [], stream_timeout_ms: m.stream_timeout_ms ?? null })), is_active: !!p.is_active, max_concurrency: concurrencyMode.value === 'none' ? DEFAULT_CONCURRENCY_AUTO : mc, queue_timeout_ms: p.queue_timeout_ms ?? DEFAULT_QUEUE_TIMEOUT_MS, max_queue_size: p.max_queue_size ?? DEFAULT_QUEUE_SIZE, adaptive_enabled: concurrencyMode.value === 'auto' }
   modelInput.value = ''
   modelContextWindow.value = DEFAULT_CONTEXT_WINDOW
   presetGroup.value = ''
@@ -498,7 +518,7 @@ function buildPayload(): ProviderFormPayload {
     api_type: form.value.api_type,
     base_url: form.value.base_url,
     upstream_path: form.value.upstream_path || undefined,
-    models: form.value.models.map(m => ({ name: m.name, context_window: m.context_window ?? undefined, patches: m.patches ?? undefined })),
+    models: form.value.models.map(m => ({ name: m.name, context_window: m.context_window ?? undefined, patches: m.patches ?? undefined, stream_timeout_ms: m.stream_timeout_ms ?? undefined })),
     is_active: form.value.is_active ? 1 : 0,
     max_concurrency: concurrencyMode.value === 'none' ? 0 : form.value.max_concurrency,
     queue_timeout_ms: concurrencyMode.value === 'none' ? 0 : form.value.queue_timeout_ms,
