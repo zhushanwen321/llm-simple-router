@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
-import { Plus, Trash2, CircleHelp, ArrowRight } from 'lucide-vue-next'
+import { Plus, Trash2, CircleHelp, ArrowRight, Timer } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -28,6 +28,11 @@ const emit = defineEmits<{
 
 function providerName(providerId: string): string {
   return props.providerGroups.find(p => p.provider.id === providerId)?.provider.name ?? providerId.slice(0, 6)
+}
+
+function modelTimeout(providerId: string, modelName: string): number | null | undefined {
+  const group = props.providerGroups.find(p => p.provider.id === providerId)
+  return group?.models.find(m => m.name === modelName)?.streamTimeoutMs
 }
 
 function addTarget() {
@@ -98,7 +103,11 @@ function updateOverflow(val: SelectedValue | undefined) {
               {{ tIdx === 0 ? '①' : tIdx === 1 ? '②' : tIdx === 2 ? '③' : `${tIdx + 1}` }}
             </span>
             <span class="font-mono truncate">{{ target.backend_model }}</span>
-            <span class="text-[10px] px-1 py-px rounded bg-muted/50 text-muted-foreground/50 ml-auto shrink-0">{{ providerName(target.provider_id) }}</span>
+            <span class="text-[10px] px-1 py-px rounded bg-muted/50 text-muted-foreground/50 shrink-0">{{ providerName(target.provider_id) }}</span>
+            <span v-if="modelTimeout(target.provider_id, target.backend_model)" class="text-[10px] px-1 py-px rounded bg-blue-500/10 text-blue-500/60 flex items-center gap-0.5 shrink-0">
+              <Timer class="size-2.5" />
+              {{ Math.round(modelTimeout(target.provider_id, target.backend_model)! / 1000) }}s
+            </span>
           </div>
           <div v-if="tIdx < entry.targets.length - 1" class="flex items-center gap-1 pl-5 py-0.5">
             <div class="w-px h-1.5 bg-orange-400/30"></div>

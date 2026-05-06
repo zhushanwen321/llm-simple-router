@@ -73,6 +73,7 @@ const providerGroups = computed<ProviderGroup[]>(() =>
     models: (p.models ?? []).map(m => ({
       name: m.name,
       contextWindow: m.context_window ?? DEFAULT_CONTEXT_WINDOW,
+      streamTimeoutMs: m.stream_timeout_ms ?? null,
     })),
   }))
 )

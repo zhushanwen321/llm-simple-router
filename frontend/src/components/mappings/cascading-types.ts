@@ -3,6 +3,7 @@ import type { ProviderSummary } from '@/types/mapping'
 export interface ModelOption {
   name: string
   contextWindow: number
+  streamTimeoutMs?: number | null
 }
 
 export interface ProviderGroup {
