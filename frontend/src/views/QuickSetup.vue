@@ -190,6 +190,7 @@
             @update:targets="updateMappingTargets"
             @toggle-active="toggleMappingActive"
             @add="addMappingEntry"
+            @remove="removeMappingEntry"
           />
         </CardContent>
       </Card>

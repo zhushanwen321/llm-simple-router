@@ -252,31 +252,11 @@ export function useQuickSetup() {
   }
 
   // --- Client / Provider / Plan selection ---
+  // Client selection only changes client type and rebuilds mappings.
+  // It does NOT affect provider configuration (group, plan, apiType, models).
   function selectClient(type: ClientType) {
     clientType.value = type
-    const client = CLIENTS.find(c => c.id === type)
-    if (!client) return
-
-    selectedGroup.value = ''
-    selectedPlan.value = ''
-
-    for (const group of providerGroups.value) {
-      if (group.group === client.defaultProvider) {
-        selectedGroup.value = group.group
-        for (const preset of group.presets) {
-          if (preset.plan === client.defaultPlan) {
-            selectedPlan.value = preset.plan
-            apiType.value = preset.apiType as 'openai' | 'openai-responses' | 'anthropic'
-            initModels(preset)
-            break
-          }
-        }
-        break
-      }
-    }
-
     updateMappings()
-    autoSelectRetryRules()
   }
 
   function onProviderChange(group: string) {
