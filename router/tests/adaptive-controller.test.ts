@@ -162,13 +162,19 @@ describe("AdaptiveConcurrencyController", () => {
       sem.updateConfig.mockClear();
     });
 
-    it("ignores stream_error with upstream 200 (body error)", () => {
-      for (let i = 0; i < 5; i++) ctrl.onRequestComplete("p1", { success: false, statusCode: 200 });
+    it("ignores stream_error with upstream 200 when retryRuleMatched is false", () => {
+      for (let i = 0; i < 5; i++) ctrl.onRequestComplete("p1", { success: false, statusCode: 200, retryRuleMatched: false });
       expect(ctrl.getStatus("p1")!.currentLimit).toBe(6);
       expect(ctrl.getStatus("p1")!.consecutiveFailures).toBe(0);
     });
 
-    it("ignores 4xx client errors", () => {
+    it("counts stream_error with upstream 200 when retryRuleMatched is true", () => {
+      for (let i = 0; i < 3; i++) ctrl.onRequestComplete("p1", { success: false, statusCode: 200, retryRuleMatched: true });
+      expect(ctrl.getStatus("p1")!.currentLimit).toBe(4);
+      expect(ctrl.getStatus("p1")!.probeActive).toBe(false);
+    });
+
+    it("ignores 4xx client errors without retryRuleMatched", () => {
       ctrl.onRequestComplete("p1", { success: false, statusCode: 400 });
       ctrl.onRequestComplete("p1", { success: false, statusCode: 401 });
       ctrl.onRequestComplete("p1", { success: false, statusCode: 403 });
@@ -177,12 +183,25 @@ describe("AdaptiveConcurrencyController", () => {
       expect(ctrl.getStatus("p1")!.consecutiveFailures).toBe(0);
     });
 
-    it("does not reset success counter on 2xx/4xx failures", () => {
+    it("counts 4xx as failure when retryRuleMatched is true", () => {
+      for (let i = 0; i < 3; i++) ctrl.onRequestComplete("p1", { success: false, statusCode: 400, retryRuleMatched: true });
+      expect(ctrl.getStatus("p1")!.currentLimit).toBe(4);
+    });
+
+    it("does not reset success counter on 2xx/4xx failures without retryRuleMatched", () => {
       ctrl.onRequestComplete("p1", { success: true });
       ctrl.onRequestComplete("p1", { success: true });
-      ctrl.onRequestComplete("p1", { success: false, statusCode: 200 });
+      ctrl.onRequestComplete("p1", { success: false, statusCode: 200, retryRuleMatched: false });
       expect(ctrl.getStatus("p1")!.consecutiveSuccesses).toBe(2); // not reset
       expect(ctrl.getStatus("p1")!.consecutiveFailures).toBe(0); // not incremented
+    });
+
+    it("resets success counter on any failure with retryRuleMatched", () => {
+      ctrl.onRequestComplete("p1", { success: true });
+      ctrl.onRequestComplete("p1", { success: true });
+      ctrl.onRequestComplete("p1", { success: false, statusCode: 200, retryRuleMatched: true });
+      expect(ctrl.getStatus("p1")!.consecutiveSuccesses).toBe(0); // reset
+      expect(ctrl.getStatus("p1")!.consecutiveFailures).toBe(1);
     });
   });
 
