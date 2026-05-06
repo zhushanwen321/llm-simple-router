@@ -41,6 +41,10 @@ export interface Provider {
   queue_timeout_ms: number
   max_queue_size: number
   adaptive_enabled: number
+  proxy_type: string | null
+  proxy_url: string | null
+  proxy_username: string | null
+  proxy_password: string | null
 }
 
 /** Provider 精简信息（映射配置、下拉选择等场景使用） */

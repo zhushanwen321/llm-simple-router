@@ -35,7 +35,12 @@
             <TableCell>
               <Badge variant="secondary">{{ API_TYPE_LABELS[p.api_type] ?? p.api_type }}</Badge>
             </TableCell>
-            <TableCell class="text-muted-foreground">{{ p.base_url }}</TableCell>
+            <TableCell>
+              <div class="flex items-center gap-1">
+                <span class="text-muted-foreground">{{ p.base_url }}</span>
+                <Shield v-if="p.proxy_type" class="w-3 h-3 text-muted-foreground" :title="`Proxy: ${p.proxy_type.toUpperCase()}`" />
+              </div>
+            </TableCell>
             <TableCell class="text-muted-foreground text-xs">{{ p.upstream_path || (p.api_type === 'anthropic' ? '/v1/messages' : '/v1/chat/completions') }}</TableCell>
             <TableCell>
               <div class="flex items-center gap-1">
@@ -157,6 +162,38 @@
             <Label class="text-xs">Upstream Path</Label>
             <Input v-model="form.upstream_path" placeholder="默认: /v1/chat/completions 或 /v1/messages" class="mt-1 font-mono text-xs" />
             <p class="text-xs text-muted-foreground mt-0.5">留空使用 API 类型默认路径</p>
+          </div>
+
+          <!-- Proxy Configuration -->
+          <div class="border rounded-md p-3 space-y-3">
+            <div class="text-xs font-medium text-muted-foreground">{{ t('providers.fields.proxyTitle') }}</div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <Label class="text-xs text-muted-foreground">{{ t('providers.fields.proxyType') }}</Label>
+                <Select v-model="form.proxy_type" class="mt-1" @update:model-value="onProxyTypeChange">
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">{{ t('providers.fields.proxyNoProxy') }}</SelectItem>
+                    <SelectItem value="http">{{ t('providers.fields.proxyHttp') }}</SelectItem>
+                    <SelectItem value="socks5">{{ t('providers.fields.proxySocks5') }}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div v-if="form.proxy_type">
+                <Label class="text-xs text-muted-foreground">{{ t('providers.fields.proxyUrl') }}</Label>
+                <Input v-model="form.proxy_url" type="text" class="mt-1 font-mono text-xs" :placeholder="form.proxy_type === 'socks5' ? t('providers.fields.proxyUrlPlaceholderSocks5') : t('providers.fields.proxyUrlPlaceholderHttp')" />
+              </div>
+            </div>
+            <div v-if="form.proxy_type" class="grid grid-cols-2 gap-3">
+              <div>
+                <Label class="text-xs text-muted-foreground">{{ t('providers.fields.proxyUsername') }}</Label>
+                <Input v-model="form.proxy_username" type="text" class="mt-1" :placeholder="t('providers.fields.proxyAuthOptional')" />
+              </div>
+              <div>
+                <Label class="text-xs text-muted-foreground">{{ t('providers.fields.proxyPassword') }}</Label>
+                <Input v-model="form.proxy_password" type="password" class="mt-1" :placeholder="t('providers.fields.proxyAuthOptional')" />
+              </div>
+            </div>
           </div>
 
           <!-- 可用模型 -->
@@ -289,7 +326,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog'
-import { RotateCw, Copy, Check } from 'lucide-vue-next'
+import { RotateCw, Copy, Check, Shield } from 'lucide-vue-next'
 import ConcurrencyControl from '@/components/shared/ConcurrencyControl.vue'
 import TransformRulesForm from '@/components/shared/TransformRulesForm.vue'
 import ModelCard from '@/components/quick-setup/ModelCard.vue'
@@ -315,7 +352,7 @@ const CONTEXT_WINDOW_OPTIONS = [
   { label: '1M', value: '1000000' },
 ] as const
 const API_TYPE_LABELS: Record<string, string> = { openai: 'OpenAI Chat Completions', 'openai-responses': 'OpenAI Responses', anthropic: 'Anthropic Messages' }
-const DEFAULT_FORM = { name: '', api_type: 'anthropic', base_url: '', upstream_path: '' as string, api_key: '', models: [] as ModelInfo[], is_active: true, max_concurrency: DEFAULT_CONCURRENCY_AUTO, queue_timeout_ms: DEFAULT_QUEUE_TIMEOUT_MS, max_queue_size: DEFAULT_QUEUE_SIZE, adaptive_enabled: true }
+const DEFAULT_FORM = { name: '', api_type: 'anthropic', base_url: '', upstream_path: '' as string, api_key: '', models: [] as ModelInfo[], is_active: true, max_concurrency: DEFAULT_CONCURRENCY_AUTO, queue_timeout_ms: DEFAULT_QUEUE_TIMEOUT_MS, max_queue_size: DEFAULT_QUEUE_SIZE, adaptive_enabled: true, proxy_type: '' as string, proxy_url: '', proxy_username: '', proxy_password: '' }
 const modelInput = ref('')
 const modelContextWindow = ref(DEFAULT_CONTEXT_WINDOW)
 const contextWindowSelect = computed({
@@ -480,6 +517,14 @@ function onConcurrencyModeChange(mode: ConcurrencyMode) {
   }
 }
 
+function onProxyTypeChange(val: unknown) {
+  if (!val) {
+    form.value.proxy_url = ''
+    form.value.proxy_username = ''
+    form.value.proxy_password = ''
+  }
+}
+
 function openCreate() {
   editingId.value = null
   form.value = { ...DEFAULT_FORM, models: [] }
@@ -501,7 +546,7 @@ function openEdit(p: Provider) {
   } else {
     concurrencyMode.value = 'manual'
   }
-  form.value = { name: p.name, api_type: p.api_type, base_url: p.base_url, upstream_path: p.upstream_path || '', api_key: '', models: (p.models || []).map(m => ({ name: m.name, context_window: m.context_window ?? DEFAULT_CONTEXT_WINDOW, patches: m.patches ?? [], stream_timeout_ms: m.stream_timeout_ms ?? null })), is_active: !!p.is_active, max_concurrency: concurrencyMode.value === 'none' ? DEFAULT_CONCURRENCY_AUTO : mc, queue_timeout_ms: p.queue_timeout_ms ?? DEFAULT_QUEUE_TIMEOUT_MS, max_queue_size: p.max_queue_size ?? DEFAULT_QUEUE_SIZE, adaptive_enabled: concurrencyMode.value === 'auto' }
+  form.value = { name: p.name, api_type: p.api_type, base_url: p.base_url, upstream_path: p.upstream_path || '', api_key: '', models: (p.models || []).map(m => ({ name: m.name, context_window: m.context_window ?? DEFAULT_CONTEXT_WINDOW, patches: m.patches ?? [], stream_timeout_ms: m.stream_timeout_ms ?? null })), is_active: !!p.is_active, max_concurrency: concurrencyMode.value === 'none' ? DEFAULT_CONCURRENCY_AUTO : mc, queue_timeout_ms: p.queue_timeout_ms ?? DEFAULT_QUEUE_TIMEOUT_MS, max_queue_size: p.max_queue_size ?? DEFAULT_QUEUE_SIZE, adaptive_enabled: concurrencyMode.value === 'auto', proxy_type: p.proxy_type || '', proxy_url: p.proxy_url || '', proxy_username: p.proxy_username || '', proxy_password: '' }
   modelInput.value = ''
   modelContextWindow.value = DEFAULT_CONTEXT_WINDOW
   presetGroup.value = ''
@@ -511,7 +556,7 @@ function openEdit(p: Provider) {
   loadTransformRules(p.id)
 }
 
-type ProviderFormPayload = Pick<ProviderPayload, 'name' | 'api_type' | 'base_url' | 'upstream_path' | 'models' | 'is_active' | 'max_concurrency' | 'queue_timeout_ms' | 'max_queue_size' | 'adaptive_enabled'> & { api_key?: string }
+type ProviderFormPayload = Pick<ProviderPayload, 'name' | 'api_type' | 'base_url' | 'upstream_path' | 'models' | 'is_active' | 'max_concurrency' | 'queue_timeout_ms' | 'max_queue_size' | 'adaptive_enabled' | 'proxy_type' | 'proxy_url' | 'proxy_username' | 'proxy_password'> & { api_key?: string }
 
 function buildPayload(): ProviderFormPayload {
   const payload: ProviderFormPayload = {
@@ -525,6 +570,10 @@ function buildPayload(): ProviderFormPayload {
     queue_timeout_ms: concurrencyMode.value === 'none' ? 0 : form.value.queue_timeout_ms,
     max_queue_size: concurrencyMode.value === 'none' ? DEFAULT_QUEUE_SIZE : form.value.max_queue_size,
     adaptive_enabled: concurrencyMode.value === 'auto' ? 1 : 0,
+    proxy_type: form.value.proxy_type || null,
+    proxy_url: form.value.proxy_type ? form.value.proxy_url : null,
+    proxy_username: form.value.proxy_type ? form.value.proxy_username : null,
+    proxy_password: form.value.proxy_type && form.value.proxy_password ? form.value.proxy_password : null,
   }
   if (form.value.api_key) payload.api_key = form.value.api_key
   return payload

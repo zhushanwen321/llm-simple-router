@@ -36,7 +36,18 @@
     "availableModels": "可用模型",
     "modelInputPlaceholder": "输入模型名称，多个用逗号分隔",
     "context": "上下文",
-    "addModel": "添加"
+    "addModel": "添加",
+    "proxyTitle": "代理配置",
+    "proxyType": "代理类型",
+    "proxyNoProxy": "无代理",
+    "proxyHttp": "HTTP",
+    "proxySocks5": "SOCKS5",
+    "proxyUrl": "代理地址",
+    "proxyUrlPlaceholderHttp": "http://127.0.0.1:7890",
+    "proxyUrlPlaceholderSocks5": "socks5://127.0.0.1:1080",
+    "proxyUsername": "用户名",
+    "proxyPassword": "密码",
+    "proxyAuthOptional": "可选"
   },
   "concurrency": {
     "title": "并发控制",

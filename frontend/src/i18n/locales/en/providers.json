@@ -36,7 +36,18 @@
     "availableModels": "Available Models",
     "modelInputPlaceholder": "Enter model names, separated by commas",
     "context": "Context",
-    "addModel": "Add"
+    "addModel": "Add",
+    "proxyTitle": "Proxy Configuration",
+    "proxyType": "Proxy Type",
+    "proxyNoProxy": "No Proxy",
+    "proxyHttp": "HTTP",
+    "proxySocks5": "SOCKS5",
+    "proxyUrl": "Proxy URL",
+    "proxyUrlPlaceholderHttp": "http://127.0.0.1:7890",
+    "proxyUrlPlaceholderSocks5": "socks5://127.0.0.1:1080",
+    "proxyUsername": "Username",
+    "proxyPassword": "Password",
+    "proxyAuthOptional": "Optional"
   },
   "concurrency": {
     "title": "Concurrency Control",
