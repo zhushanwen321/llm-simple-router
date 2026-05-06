@@ -8,7 +8,10 @@
     "frontend"
   ],
   "scripts": {
-    "build": "npm run build -w core -w router",
+    "build": "npm run build -w core -w router -w frontend",
+    "build:core": "npm run build -w core",
+    "build:router": "npm run build -w core -w router",
+    "build:frontend": "npm run build -w frontend",
     "test": "npm run test -w core -w router",
     "dev": "npm run dev -w router"
   },
