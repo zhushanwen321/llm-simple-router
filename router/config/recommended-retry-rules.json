@@ -7,5 +7,6 @@
   { "name": "ZAI 速率限制 (HTTP 200, code 1302)", "status_code": 200, "body_pattern": "\"error\".*\"code\"\\s*:\\s*\"1302\"", "retry_strategy": "exponential", "retry_delay_ms": 5000, "max_retries": 10, "max_delay_ms": 60000, "providers": ["智谱"] },
   { "name": "ZAI SSE 错误 (HTTP 200, code 500)", "status_code": 200, "body_pattern": "\"error\".*\"code\"\\s*:\\s*\"500\"", "retry_strategy": "exponential", "retry_delay_ms": 5000, "max_retries": 10, "max_delay_ms": 60000, "providers": ["智谱"] },
   { "name": "ZAI SSE 错误 (HTTP 200, code 1234)", "status_code": 200, "body_pattern": "\"error\".*\"code\"\\s*:\\s*\"1234\"", "retry_strategy": "exponential", "retry_delay_ms": 5000, "max_retries": 10, "max_delay_ms": 60000, "providers": ["智谱"] },
+  { "name": "ZAI 模型过载 (HTTP 200, code 1305)", "status_code": 200, "body_pattern": "\"error\".*\"code\"\\s*:\\s*\"1305\"", "retry_strategy": "exponential", "retry_delay_ms": 5000, "max_retries": 10, "max_delay_ms": 60000, "providers": ["智谱"] },
   { "name": "KIMI 401 认证错误", "status_code": 401, "body_pattern": ".*authentication_error.*", "retry_strategy": "exponential", "retry_delay_ms": 5000, "max_retries": 3, "max_delay_ms": 60000, "providers": ["月之暗面"] }
 ]
