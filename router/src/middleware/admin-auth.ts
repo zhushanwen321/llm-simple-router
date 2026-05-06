@@ -5,6 +5,7 @@ import jwt from "jsonwebtoken";
 import Database from "better-sqlite3";
 import { isInitialized, getSetting } from "../db/settings.js";
 import { verifyPassword } from "../utils/password.js";
+import { isForwardedProtoHttps } from "../utils/cookie-secure.js";
 import { API_CODE, apiError } from "../admin/api-response.js";
 
 interface AdminAuthOptions {
@@ -78,7 +79,7 @@ export const adminLoginRoutes: FastifyPluginCallback<AdminAuthOptions> = (app, o
     reply.setCookie("admin_token", token, {
       path: "/admin",
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: request.protocol === "https" || isForwardedProtoHttps(request),
       sameSite: "lax",
       maxAge: TOKEN_EXPIRY_SECONDS,
     });

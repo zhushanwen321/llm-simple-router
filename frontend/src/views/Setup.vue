@@ -60,6 +60,7 @@ import { useI18n } from 'vue-i18n'
 const { t } = useI18n()
 import { useRouter } from 'vue-router'
 import { api, getApiMessage } from '@/api/client'
+import { markSetupDone } from '@/router'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -92,7 +93,8 @@ async function handleSetup() {
   loading.value = true
   try {
     await api.initializeSetup(password.value)
-    router.push('/admin/dashboard')
+    markSetupDone()
+    router.push({ name: 'dashboard' })
   } catch (e: unknown) {
     error.value = getApiMessage(e, t('setup.setupFailed'))
   } finally {

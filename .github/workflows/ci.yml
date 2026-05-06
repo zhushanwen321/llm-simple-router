@@ -19,6 +19,7 @@ jobs:
       - run: npm ci
       - run: cd core && npx tsc
       - run: cd router && npm run build
+      - run: cd pi-extension && npx tsc --noEmit
       - run: npm run test -w core -w router
 
   docker:

@@ -87,6 +87,12 @@ const router = createRouter({
 let setupChecked = false
 let isSetupInitialized = false
 
+/** 供 Setup 页面调用：setup 完成后刷新缓存状态 */
+export function markSetupDone() {
+  setupChecked = true
+  isSetupInitialized = true
+}
+
 router.beforeEach(async (to, _from, next) => {
   if (!setupChecked) {
     try {
