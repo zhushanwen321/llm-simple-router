@@ -6,6 +6,7 @@ import { encrypt } from "../src/utils/crypto.js";
 import { initDatabase } from "../src/db/index.js";
 import { setSetting } from "../src/db/settings.js";
 import { ServiceContainer, SERVICE_KEYS } from "../src/core/container.js";
+import { ProxyAgentFactory } from "../src/proxy/transport/proxy-agent.js";
 
 const TEST_ENCRYPTION_KEY =
   "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
@@ -63,6 +64,7 @@ function buildApp(db: Database.Database): FastifyInstance {
   container.register("adaptiveController", () => undefined);
   container.register(SERVICE_KEYS.logFileWriter, () => null);
   container.register(SERVICE_KEYS.pluginRegistry, () => undefined);
+  container.register(SERVICE_KEYS.proxyAgentFactory, () => new ProxyAgentFactory());
   app.register(openaiProxy, { db, container });
   return app;
 }

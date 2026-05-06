@@ -11,6 +11,7 @@ import { anthropicProxy } from "../../../src/proxy/handler/anthropic.js";
 import { SemaphoreManager as ProviderSemaphoreManager } from "@llm-router/core/concurrency";
 import { RequestTracker } from "@llm-router/core/monitor";
 import { ServiceContainer, SERVICE_KEYS } from "../../../src/core/container.js";
+import { ProxyAgentFactory } from "../../../src/proxy/transport/proxy-agent.js";
 import { createMockBackend } from "../../helpers/mock-backend.js";
 import { TEST_ENCRYPTION_KEY } from "../../helpers/test-setup.js";
 
@@ -29,6 +30,7 @@ function buildOAApp(db: Database.Database): FastifyInstance {
   container.register(SERVICE_KEYS.adaptiveController, () => undefined);
   container.register(SERVICE_KEYS.logFileWriter, () => null);
   container.register(SERVICE_KEYS.pluginRegistry, () => undefined);
+  container.register(SERVICE_KEYS.proxyAgentFactory, () => new ProxyAgentFactory());
   app.register(openaiProxy, { db, container });
   return app;
 }
@@ -46,6 +48,7 @@ function buildAntApp(db: Database.Database): FastifyInstance {
   container.register(SERVICE_KEYS.adaptiveController, () => undefined);
   container.register(SERVICE_KEYS.logFileWriter, () => null);
   container.register(SERVICE_KEYS.pluginRegistry, () => undefined);
+  container.register(SERVICE_KEYS.proxyAgentFactory, () => new ProxyAgentFactory());
   app.register(anthropicProxy, { db, container });
   return app;
 }

@@ -33,6 +33,7 @@ import { resolveMapping } from "../src/proxy/routing/mapping-resolver.js";
 import { logResilienceResult, collectTransportMetrics } from "../src/proxy/proxy-logging.js";
 import { insertRejectedLog } from "../src/proxy/log-helpers.js";
 import { ServiceContainer, SERVICE_KEYS } from "../src/core/container.js";
+import { ProxyAgentFactory } from "../src/proxy/transport/proxy-agent.js";
 
 
 const errors: ProxyErrorFormatter = {
@@ -73,6 +74,7 @@ function createDeps(overrides = {}) {
   container.register("semaphoreManager", () => undefined);
   container.register(SERVICE_KEYS.logFileWriter, () => null);
   container.register(SERVICE_KEYS.pluginRegistry, () => undefined);
+  container.register(SERVICE_KEYS.proxyAgentFactory, () => new ProxyAgentFactory());
   return {
     db: {} as any,
     orchestrator: { handle: vi.fn() } as any,

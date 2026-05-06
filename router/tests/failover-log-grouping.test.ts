@@ -12,6 +12,7 @@ import { RetryRuleMatcher } from "../src/proxy/orchestration/retry-rules.js";
 import { SemaphoreManager as ProviderSemaphoreManager } from "@llm-router/core/concurrency";
 import { RequestTracker } from "@llm-router/core/monitor";
 import { ServiceContainer, SERVICE_KEYS } from "../src/core/container.js";
+import { ProxyAgentFactory } from "../src/proxy/transport/proxy-agent.js";
 
 
 const API_KEY = "sk-test-router";
@@ -161,6 +162,7 @@ describe("Failover log grouping", () => {
     container.register("adaptiveController", () => undefined);
     container.register(SERVICE_KEYS.logFileWriter, () => null);
   container.register(SERVICE_KEYS.pluginRegistry, () => undefined);
+  container.register(SERVICE_KEYS.proxyAgentFactory, () => new ProxyAgentFactory());
     app = Fastify();
     app.register(authMiddleware, { db });
     app.register(openaiProxy, { db: db, container });
@@ -259,6 +261,7 @@ describe("Failover log grouping", () => {
     container.register("adaptiveController", () => undefined);
     container.register(SERVICE_KEYS.logFileWriter, () => null);
   container.register(SERVICE_KEYS.pluginRegistry, () => undefined);
+  container.register(SERVICE_KEYS.proxyAgentFactory, () => new ProxyAgentFactory());
     app = Fastify();
     app.register(authMiddleware, { db });
     app.register(openaiProxy, { db: db, container });
@@ -341,6 +344,7 @@ describe("Failover log grouping", () => {
     container.register("adaptiveController", () => undefined);
     container.register(SERVICE_KEYS.logFileWriter, () => null);
   container.register(SERVICE_KEYS.pluginRegistry, () => undefined);
+  container.register(SERVICE_KEYS.proxyAgentFactory, () => new ProxyAgentFactory());
     app = Fastify();
     app.register(authMiddleware, { db });
     app.register(openaiProxy, { db: db, container });
@@ -429,6 +433,7 @@ describe("Failover log grouping", () => {
     container.register("adaptiveController", () => undefined);
     container.register(SERVICE_KEYS.logFileWriter, () => null);
   container.register(SERVICE_KEYS.pluginRegistry, () => undefined);
+  container.register(SERVICE_KEYS.proxyAgentFactory, () => new ProxyAgentFactory());
     container.register("semaphoreManager", () => new ProviderSemaphoreManager());
     matcher.load(db);
     app = Fastify();

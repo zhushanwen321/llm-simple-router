@@ -11,6 +11,7 @@ import { RequestTracker } from "@llm-router/core/monitor";
 import { createMockBackend } from "./helpers/mock-backend.js";
 import { TEST_ENCRYPTION_KEY } from "./helpers/test-setup.js";
 import { ServiceContainer, SERVICE_KEYS } from "../src/core/container.js";
+import { ProxyAgentFactory } from "../src/proxy/transport/proxy-agent.js";
 
 
 function closeServer(server: Server): Promise<void> {
@@ -32,6 +33,7 @@ function buildTestApp(mockDb: Database.Database): FastifyInstance {
   container.register("adaptiveController", () => undefined);
   container.register(SERVICE_KEYS.logFileWriter, () => null);
   container.register(SERVICE_KEYS.pluginRegistry, () => undefined);
+  container.register(SERVICE_KEYS.proxyAgentFactory, () => new ProxyAgentFactory());
 
   app.register(openaiProxy, { db: mockDb, container });
 
