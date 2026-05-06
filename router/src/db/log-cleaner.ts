@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import { deleteLogsBefore } from "./logs.js";
 import { getLogRetentionDays } from "./settings.js";
+import { deleteToolErrorLogsBefore } from "./tool-error-logs.js";
 
 const MS_PER_DAY = 86_400_000;
 const CLEANUP_INTERVAL_MS = 3_600_000; // 1 小时
@@ -14,7 +15,9 @@ export function runLogCleanup(db: Database.Database): number {
   const days = getLogRetentionDays(db);
   if (days <= 0) return 0;
   const cutoff = new Date(Date.now() - days * MS_PER_DAY).toISOString();
-  return deleteLogsBefore(db, cutoff);
+  const logDeleted = deleteLogsBefore(db, cutoff);
+  const toolErrorDeleted = deleteToolErrorLogsBefore(db, cutoff);
+  return logDeleted + toolErrorDeleted;
 }
 
 /** 启动定时清理，返回 handle 用于停止 */

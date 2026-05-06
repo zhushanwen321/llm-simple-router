@@ -7,6 +7,7 @@ const UpdateProxyEnhancementSchema = Type.Object({
   tool_call_loop_enabled: Type.Boolean(),
   stream_loop_enabled: Type.Boolean(),
   tool_round_limit_enabled: Type.Boolean(),
+  tool_error_logging_enabled: Type.Boolean(),
 });
 
 
@@ -19,7 +20,7 @@ export const adminProxyEnhancementRoutes: FastifyPluginCallback<ProxyEnhancement
 
   app.get("/admin/api/proxy-enhancement", async (_request, reply) => {
     const raw = getSetting(db, "proxy_enhancement");
-    const defaults = { tool_call_loop_enabled: false, stream_loop_enabled: false, tool_round_limit_enabled: true };
+    const defaults = { tool_call_loop_enabled: false, stream_loop_enabled: false, tool_round_limit_enabled: true, tool_error_logging_enabled: false };
     let config = defaults;
     if (raw) {
       try {
@@ -28,6 +29,7 @@ export const adminProxyEnhancementRoutes: FastifyPluginCallback<ProxyEnhancement
           tool_call_loop_enabled: parsed.tool_call_loop_enabled ?? false,
           stream_loop_enabled: parsed.stream_loop_enabled ?? false,
           tool_round_limit_enabled: parsed.tool_round_limit_enabled ?? true,
+          tool_error_logging_enabled: parsed.tool_error_logging_enabled ?? false,
         };
       } catch { /* eslint-disable-line taste/no-silent-catch -- invalid JSON, return defaults */ }
     }
@@ -40,6 +42,7 @@ export const adminProxyEnhancementRoutes: FastifyPluginCallback<ProxyEnhancement
       tool_call_loop_enabled: body.tool_call_loop_enabled,
       stream_loop_enabled: body.stream_loop_enabled,
       tool_round_limit_enabled: body.tool_round_limit_enabled,
+      tool_error_logging_enabled: body.tool_error_logging_enabled,
     };
     setSetting(db, "proxy_enhancement", JSON.stringify(config));
     return reply.send({ success: true });
