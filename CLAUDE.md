@@ -374,11 +374,29 @@ gh run list --workflow=Publish --limit 1 --json conclusion,status
 
 本项目的发布流程由 **GitHub Actions Publish workflow** 驱动，merge-worktree skill 执行时遵循以下规则：
 
+### PR 提交前验证（强制）
+
+**所有 workspace 子包都必须通过验证**，包括非本次修改的子包（如 pi-extension）。
+类型错误会跨子包传播，遗漏检查会导致合并后 main 分支 CI 失败。
+
+```bash
+# 一键验证（推荐）：自动检测 monorepo，覆盖所有子包的 tsc/lint/test/build
+bash ~/.pi/agent/skills/merge-worktree/pre-merge-check.sh
+```
+
+| 检查项 | 要求 |
+|--------|------|
+| 所有子包 tsc --noEmit | 0 error |
+| lint | 0 error 0 warning |
+| 单元测试 | 全部通过 |
+| 构建 | router + frontend 成功 |
+| Git 工作区 | 干净 + 已推送 |
+
 ### 合并流程（CLAUDE.md 脚本覆盖）
 
 | 阶段 | 脚本/操作 | 说明 |
 |------|-----------|------|
-| 验证 | 本地验证（lint + test + build） | merge 前必须全部通过 |
+| 验证 | `bash ~/.pi/agent/skills/merge-worktree/pre-merge-check.sh` | PR push 前 + merge 前必须全部通过 |
 | 合并 | `gh pr merge <num> --merge --auto` | 使用 GitHub merge，不调用 merge-worktree-release.sh |
 | 发布 | `bash scripts/publish.sh <patch\|minor\|major>` | 替换 merge-worktree-release.sh，触发 Actions 发布 |
 | 清理 | `bash ~/.claude/skills/merge-worktree/merge-worktree.sh <branch>` | 删除 worktree + 同步其他分支 |
