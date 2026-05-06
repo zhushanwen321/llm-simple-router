@@ -142,6 +142,7 @@ class StreamProxy {
 
   resetIdleTimer(): void {
     if (this.idleTimer) clearTimeout(this.idleTimer);
+    if (!isFinite(this.timeoutMs) || this.timeoutMs <= 0) return; // 0 或 Infinity 表示禁用超时
     this.idleTimer = setTimeout(() => {
       if (this.resolved) return;
       // 在 terminal() 调用 reply.raw.end() 之前，同步写入超时错误 SSE

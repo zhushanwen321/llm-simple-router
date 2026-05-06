@@ -40,7 +40,11 @@ export function getModelStreamTimeout(
       if (!obj || typeof obj !== "object") continue;
       const modelId = (obj.name ?? obj.id) as string | undefined;
       if (modelId === backendModel) {
-        return (obj.stream_timeout_ms as number | undefined) ?? DEFAULT_STREAM_TIMEOUT_MS;
+        const timeout = obj.stream_timeout_ms as number | undefined;
+      // stream_timeout_ms: 0 表示禁用超时，返回 Infinity；
+      // undefined/null/未设置 表示使用默认值
+      if (timeout === 0) return Number.POSITIVE_INFINITY;
+      return timeout ?? DEFAULT_STREAM_TIMEOUT_MS;
       }
     }
   } catch {

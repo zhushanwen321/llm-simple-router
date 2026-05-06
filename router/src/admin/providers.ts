@@ -113,8 +113,8 @@ const CreateProviderSchema = Type.Object({
   api_key: Type.String({ minLength: 1 }),
   models: Type.Optional(Type.Array(Type.Union([
     Type.String(),
-    Type.Object({ name: Type.String(), context_window: Type.Optional(Type.Number()), patches: Type.Optional(Type.Array(Type.String())), stream_timeout_ms: Type.Optional(Type.Number()) }),
-    Type.Object({ id: Type.String(), stream_timeout_ms: Type.Optional(Type.Number()) })
+    Type.Object({ name: Type.String(), context_window: Type.Optional(Type.Number()), patches: Type.Optional(Type.Array(Type.String())), stream_timeout_ms: Type.Optional(Type.Number({ minimum: 0, maximum: 86_400_000 })) }),
+    Type.Object({ id: Type.String(), stream_timeout_ms: Type.Optional(Type.Number({ minimum: 0, maximum: 86_400_000 })) })
   ]))),
   is_active: Type.Optional(Type.Number()),
   max_concurrency: Type.Optional(Type.Integer({ minimum: 0 })),
@@ -131,8 +131,8 @@ const UpdateProviderSchema = Type.Object({
   api_key: Type.Optional(Type.String({ minLength: 1 })),
   models: Type.Optional(Type.Array(Type.Union([
     Type.String(),
-    Type.Object({ name: Type.String(), context_window: Type.Optional(Type.Number()), patches: Type.Optional(Type.Array(Type.String())), stream_timeout_ms: Type.Optional(Type.Number()) }),
-    Type.Object({ id: Type.String(), stream_timeout_ms: Type.Optional(Type.Number()) })
+    Type.Object({ name: Type.String(), context_window: Type.Optional(Type.Number()), patches: Type.Optional(Type.Array(Type.String())), stream_timeout_ms: Type.Optional(Type.Number({ minimum: 0, maximum: 86_400_000 })) }),
+    Type.Object({ id: Type.String(), stream_timeout_ms: Type.Optional(Type.Number({ minimum: 0, maximum: 86_400_000 })) })
   ]))),
   is_active: Type.Optional(Type.Number()),
   max_concurrency: Type.Optional(Type.Integer({ minimum: 0 })),
