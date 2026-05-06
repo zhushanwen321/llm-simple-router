@@ -50,6 +50,7 @@ class StreamProxy {
     private readonly loopGuard: StreamLoopGuard | undefined,
     formatTransform?: Transform,
     private readonly timeoutContext?: { modelId: string; providerId: string },
+    private readonly onTimeoutAbort?: () => void,
   ) {
     this.formatTransform = formatTransform;
     this.sseHeaders = filterHeaders(rawUpstreamHeaders);
@@ -111,7 +112,8 @@ class StreamProxy {
       }
     } else {
       // stream_abort 且 headers 已发送时，必须 end reply 避免客户端挂起
-      if (kind === "stream_abort" && this.headersSent) {
+      // 但如果有 timeoutContext，让 handler 层负责写入错误 SSE 后再 end
+      if (kind === "stream_abort" && this.headersSent && !extra.timeoutContext) {
         // eslint-disable-next-line taste/no-silent-catch -- reply may already be destroyed, warn is sufficient
         try { this.reply.raw.end(); } catch { console.warn("[stream-proxy] reply.raw.end() failed, likely already destroyed"); }
       }
@@ -142,6 +144,11 @@ class StreamProxy {
     if (this.idleTimer) clearTimeout(this.idleTimer);
     this.idleTimer = setTimeout(() => {
       if (this.resolved) return;
+      // 在 terminal() 调用 reply.raw.end() 之前，同步写入超时错误 SSE
+      // 必须同步执行，确保 inject() 能正确收集响应体
+      if (this.onTimeoutAbort) {
+        try { this.onTimeoutAbort(); } catch { /* reply may be destroyed */ } // eslint-disable-line taste/no-silent-catch
+      }
       this.terminal("stream_abort", { metrics: this.collectMetrics(false), timeoutContext: this.timeoutContext, timeoutMs: this.timeoutMs });
     }, this.timeoutMs);
   }
@@ -311,6 +318,7 @@ export function callStream(
   loopGuard?: StreamLoopGuard,
   formatTransform?: import("stream").Transform,
   timeoutContext?: { modelId: string; providerId: string },
+  onTimeoutAbort?: () => void,
 ): Promise<TransportResult> {
   return new Promise((resolve) => {
     const effectiveResolve = compatResolve ?? resolve;
@@ -347,7 +355,7 @@ export function callStream(
         metricsTransform,
         checkEarlyError,
         timeoutMs,
-        loopGuard, formatTransform, timeoutContext,
+        loopGuard, formatTransform, timeoutContext, onTimeoutAbort,
       );
 
       proxy.bindResolve(effectiveResolve);
