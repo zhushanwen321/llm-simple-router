@@ -316,6 +316,7 @@ export interface ProxyEnhancementConfig {
   tool_call_loop_enabled: boolean;
   stream_loop_enabled: boolean;
   tool_round_limit_enabled: boolean;
+  tool_error_logging_enabled: boolean;
 }
 
 export interface UpgradeStatus {

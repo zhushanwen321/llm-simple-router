@@ -62,6 +62,26 @@
       </CardContent>
     </Card>
 
+    <Card class="mt-4">
+      <CardHeader>
+        <CardTitle>{{ t('proxyEnhancement.toolErrorLogging.title') }}</CardTitle>
+        <CardDescription>
+          {{ t('proxyEnhancement.toolErrorLogging.description') }}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div class="flex items-center gap-3">
+          <Switch
+            id="tool-error-logging-toggle"
+            v-model="toolErrorLoggingEnabled"
+          />
+          <Label for="tool-error-logging-toggle">
+            {{ toolErrorLoggingEnabled ? t('proxyEnhancement.status.enabled') : t('proxyEnhancement.status.disabled') }}
+          </Label>
+        </div>
+      </CardContent>
+    </Card>
+
     <div class="flex justify-end mt-4">
       <Button :disabled="saving" @click="handleSave">
         <span v-if="saving" class="flex items-center gap-1">
@@ -89,6 +109,7 @@ const { t } = useI18n()
 const toolRoundLimitEnabled = ref(true)
 const toolCallLoopEnabled = ref(false)
 const streamLoopEnabled = ref(false)
+const toolErrorLoggingEnabled = ref(false)
 const saving = ref(false)
 
 async function loadConfig() {
@@ -97,6 +118,7 @@ async function loadConfig() {
     toolRoundLimitEnabled.value = data.tool_round_limit_enabled
     toolCallLoopEnabled.value = data.tool_call_loop_enabled
     streamLoopEnabled.value = data.stream_loop_enabled
+    toolErrorLoggingEnabled.value = data.tool_error_logging_enabled
   } catch (e: unknown) {
     console.error('Failed to load proxy enhancement config:', e)
     toast.error(getApiMessage(e, t('proxyEnhancement.loadFailed')))
@@ -110,6 +132,7 @@ async function handleSave() {
       tool_call_loop_enabled: toolCallLoopEnabled.value,
       stream_loop_enabled: streamLoopEnabled.value,
       tool_round_limit_enabled: toolRoundLimitEnabled.value,
+      tool_error_logging_enabled: toolErrorLoggingEnabled.value,
     })
     toast.success(t('common.saveSuccess'))
   } catch (e: unknown) {

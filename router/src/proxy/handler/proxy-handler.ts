@@ -30,7 +30,8 @@ import { applyProviderPatches } from "../patch/index.js";
 import { PipelineSnapshot, type StageRecord } from "../pipeline-snapshot.js";
 import { applyToolRoundLimit } from "../patch/tool-round-limiter.js";
 import { loadEnhancementConfig } from "../routing/enhancement-config.js";
-import { getTransportStatusCode, serializeBlocksForStorage, extractLastToolUse } from "./proxy-handler-utils.js";
+import { getTransportStatusCode, serializeBlocksForStorage, extractLastToolUse, extractFailedToolResults, detectClientAgentType } from "./proxy-handler-utils.js";
+import { logToolErrors } from "../tool-error-logger.js";
 
 const HTTP_ERROR_THRESHOLD = 400;
 const MAX_LOG_FIELD_LENGTH = 80;
@@ -212,8 +213,10 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
   const config = getConfig();
   const excludeTargets: Target[] = [];
   let rootLogId: string | null = null;
+  let toolErrorsLogged = false;
   // TransformCoordinator 无状态，只需创建一次
   const coordinator = new TransformCoordinator();
+  const enhancementConfig = loadEnhancementConfig(deps.db);
   while (true) {
     const startTime = Date.now();
     const logId = randomUUID();
@@ -271,6 +274,25 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
       return rejectAndReply(reply, rCtx, errors.providerUnavailable(),
         `Provider '${resolved.provider_id}' unavailable`, resolved.provider_id);
     }
+
+    // 工具错误日志记录 — 首次迭代时执行，记录本轮请求中的 is_error tool_result
+    if (enhancementConfig.tool_error_logging_enabled && !toolErrorsLogged) {
+      toolErrorsLogged = true;
+      const failures = extractFailedToolResults(pipelineBody);
+      if (failures.length > 0) {
+        request.log.info({ failures: failures.length, sessionId }, "Tool error results detected");
+        logToolErrors(failures, {
+          db: deps.db,
+          providerId: resolved.provider_id,
+          backendModel: resolved.backend_model ?? effectiveModel,
+          clientAgentType: detectClientAgentType(cliHdrs),
+          requestLogId: logId,
+          routerKeyId,
+          sessionId,
+        });
+      }
+    }
+
     // --- 溢出重定向：上下文超出时切换到更大模型（必须在 transform 之前，确保使用正确的 api_type） ---
     const overflowResult = applyOverflowRedirect(resolved, deps.db, currentBody);
     if (overflowResult) {

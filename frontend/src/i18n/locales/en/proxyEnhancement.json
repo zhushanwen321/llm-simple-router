@@ -18,6 +18,10 @@
       "description": "Detect content repetition loops in streaming output (N-gram pattern). Automatically interrupts the stream when the threshold is exceeded."
     }
   },
+  "toolErrorLogging": {
+    "title": "Tool Error Logging",
+    "description": "Record detailed information about Claude Code / pi tool call failures (including tool_use input, error content, provider, model). Used for analyzing patterns of model-generated incorrect tool_use parameters."
+  },
   "loadFailed": "Failed to load configuration",
   "saveFailed": "Failed to save"
 }
