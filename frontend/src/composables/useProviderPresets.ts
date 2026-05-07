@@ -52,6 +52,12 @@ export function useProviderPresets(form: { value: { name: string; api_type: stri
     return preset?.modelsEndpoint
   }
 
+  /** 获取当前选中预设的写死模型列表（用于兜底） */
+  function getCurrentPresetModels(): string[] {
+    const preset = availablePlans.value.find(p => p.plan === presetPlan.value)
+    return preset?.models ?? []
+  }
+
   function getDefaultPatches(modelName: string, apiType: string): string[] {
     const patches: string[] = []
     if (modelName.toLowerCase().includes(DEFAULT_PATCHES_BY_KEYWORD)) {
@@ -86,6 +92,7 @@ export function useProviderPresets(form: { value: { name: string; api_type: stri
     onGroupChange,
     onPresetChange,
     getCurrentModelsEndpoint,
+    getCurrentPresetModels,
     loadPresets,
     resetPreset,
   }

@@ -141,11 +141,14 @@
   },
   "fetchModels": {
     "button": "从上游获取模型",
+    "buttonPreset": "使用预设模型",
     "loading": "获取中...",
-    "noEndpoint": "当前模板不支持自动获取模型",
     "noApiKey": "请先输入 API Key",
-    "success": "获取到 {total} 个模型，新增 {added} 个",
-    "empty": "上游返回空模型列表",
-    "failed": "获取上游模型列表失败"
+    "success": "{source}获取到 {total} 个模型，新增 {added} 个",
+    "allExist": "{source}共 {total} 个模型，已全部存在",
+    "empty": "上游返回空模型列表，已使用预设模型",
+    "failed": "获取上游模型列表失败",
+    "sourceUpstream": "上游",
+    "sourcePreset": "预设"
   }
 }

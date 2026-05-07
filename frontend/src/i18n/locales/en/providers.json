@@ -141,11 +141,14 @@
   },
   "fetchModels": {
     "button": "Fetch Models from Upstream",
+    "buttonPreset": "Use Preset Models",
     "loading": "Fetching...",
-    "noEndpoint": "Current template does not support auto-fetching models",
     "noApiKey": "Please enter API Key first",
-    "success": "Fetched {total} models, {added} new",
-    "empty": "Upstream returned empty model list",
-    "failed": "Failed to fetch upstream models"
+    "success": "{source}: fetched {total} models, {added} new",
+    "allExist": "{source}: {total} models already exist",
+    "empty": "Upstream returned empty model list, using preset models",
+    "failed": "Failed to fetch upstream models",
+    "sourceUpstream": "Upstream",
+    "sourcePreset": "Preset"
   }
 }
