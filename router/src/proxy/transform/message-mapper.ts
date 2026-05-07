@@ -197,7 +197,7 @@ export function convertMessagesAnt2OA(
         result.push({ role: "tool", tool_call_id: toolCallId, content: tr.content ?? "" });
       }
     } else if (m.role === "assistant") {
-      if (!content || !Array.isArray(content)) continue;
+      if (!content || !Array.isArray(content)) { assistantCounter++; continue; }
       const textBlocks = content.filter(b => b.type === "text");
       const toolBlocks = content.filter(b => b.type === "tool_use");
 
