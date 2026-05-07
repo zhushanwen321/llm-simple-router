@@ -9,12 +9,15 @@ import type { StateRegistry } from "../core/registry.js";
 import type { AdaptiveController } from "@llm-router/core/concurrency";
 import type { RequestTracker } from "@llm-router/core/monitor";
 import type { ProxyAgentFactory } from "../proxy/transport/proxy-agent.js";
-import { HTTP_CREATED, HTTP_NOT_FOUND, HTTP_CONFLICT, HTTP_BAD_REQUEST } from "./constants.js";
+import { HTTP_CREATED, HTTP_NOT_FOUND, HTTP_CONFLICT, HTTP_BAD_REQUEST, HTTP_OK } from "./constants.js";
 import { API_CODE, apiError } from "./api-response.js";
 import { parseModels, buildModelInfoList, type ModelEntry } from "../config/model-context.js";
 import { getModelInfoForProvider, setModelInfoForProvider, deleteAllModelInfoForProvider } from "../db/model-info.js";
+import { buildUpstreamHeaders } from "../proxy/proxy-core.js";
+import { callGet } from "../proxy/transport/http.js";
 
 const API_KEY_PREVIEW_MIN_LENGTH = 8;
+const FETCH_MODELS_BODY_PREVIEW_LENGTH = 200;
 
 interface CascadeResult {
   updatedGroups: Array<{ id: string; client_model: string; disabled: boolean }>;
@@ -407,6 +410,65 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     adaptiveController?.remove(id);
     tracker?.removeProviderConfig(id);
     return reply.send({ success: true });
+  });
+
+  // --- 从上游 Provider 获取可用模型列表 ---
+  const FetchModelsSchema = Type.Object({
+    base_url: Type.String({ minLength: 1 }),
+    models_endpoint: Type.String({ minLength: 1 }),
+    api_key: Type.String({ minLength: 1 }),
+    api_type: Type.Union([Type.Literal("openai"), Type.Literal("anthropic")]),
+  });
+
+  app.post("/admin/api/providers/fetch-models", { schema: { body: FetchModelsSchema } }, async (request, reply) => {
+    const { base_url, models_endpoint, api_key, api_type } = request.body as Static<typeof FetchModelsSchema>;
+
+    const backend = { base_url };
+    const clientHeaders: Record<string, string> = {};
+    try {
+      const result = await callGet(
+        backend,
+        api_key,
+        clientHeaders as import("../proxy/types.js").RawHeaders,
+        models_endpoint,
+        (cliHdrs, key) => buildUpstreamHeaders(cliHdrs, key, undefined, api_type),
+      );
+
+      if (result.statusCode !== HTTP_OK) {
+        return reply.code(HTTP_BAD_REQUEST).send(apiError(
+          API_CODE.BAD_REQUEST,
+          `上游返回 HTTP ${result.statusCode}: ${result.body.substring(0, FETCH_MODELS_BODY_PREVIEW_LENGTH) as string}`,
+        ));
+      }
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(result.body);
+      } catch {
+        return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.BAD_REQUEST, "上游返回非 JSON 响应"));
+      }
+
+      // OpenAI 格式: { object: "list", data: [{ id: "model-name", ... }] }
+      // Anthropic 格式: { data: [{ type: "model", id: "model-name", ... }] }
+      const data = (parsed as Record<string, unknown>)?.data;
+      if (!Array.isArray(data)) {
+        return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.BAD_REQUEST, "上游返回的模型列表格式不符合预期"));
+      }
+
+      const modelIds = data
+        .map((item: unknown) => {
+          if (typeof item === "string") return item;
+          if (typeof item === "object" && item !== null && "id" in item) return (item as { id: string }).id;
+          return null;
+        })
+        .filter((id): id is string => typeof id === "string")
+        .sort();
+
+      return reply.send(modelIds);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.BAD_REQUEST, `连接上游失败: ${message}`));
+    }
   });
 
   app.get("/admin/api/providers/:id/adaptive-status", async (request, reply) => {

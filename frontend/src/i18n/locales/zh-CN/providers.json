@@ -138,5 +138,14 @@
     "cascadeClean": "清理 {count} 个分组的引用",
     "cascadeDisable": "禁用 {count} 个分组",
     "cascadeAuto": "已自动{actions}"
+  },
+  "fetchModels": {
+    "button": "从上游获取模型",
+    "loading": "获取中...",
+    "noEndpoint": "当前模板不支持自动获取模型",
+    "noApiKey": "请先输入 API Key",
+    "success": "获取到 {total} 个模型，新增 {added} 个",
+    "empty": "上游返回空模型列表",
+    "failed": "获取上游模型列表失败"
   }
 }
