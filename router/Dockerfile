@@ -5,6 +5,7 @@ WORKDIR /app
 
 # 复制 monorepo 锁文件和根 package.json
 COPY package.json package-lock.json ./
+COPY router/package.json router/package.json
 COPY frontend/ frontend/
 
 # 通过 monorepo workspace 安装前端依赖
