@@ -40,7 +40,7 @@
     "proxyTitle": "Proxy Configuration",
     "proxyType": "Proxy Type",
     "proxyNoProxy": "No Proxy",
-    "proxyHttp": "HTTP",
+    "proxyHttp": "HTTP/HTTPS",
     "proxySocks5": "SOCKS5",
     "proxyUrl": "Proxy URL",
     "proxyUrlPlaceholderHttp": "http://127.0.0.1:7890",

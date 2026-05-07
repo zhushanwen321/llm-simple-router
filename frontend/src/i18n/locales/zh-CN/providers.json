@@ -40,7 +40,7 @@
     "proxyTitle": "代理配置",
     "proxyType": "代理类型",
     "proxyNoProxy": "无代理",
-    "proxyHttp": "HTTP",
+    "proxyHttp": "HTTP/HTTPS",
     "proxySocks5": "SOCKS5",
     "proxyUrl": "代理地址",
     "proxyUrlPlaceholderHttp": "http://127.0.0.1:7890",
