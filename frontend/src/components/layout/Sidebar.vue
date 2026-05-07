@@ -194,12 +194,18 @@
         <AlertDialogHeader>
           <AlertDialogTitle>{{ t('sidebar.upgrade.upgradeSuccess') }}</AlertDialogTitle>
           <AlertDialogDescription>
-            {{ t('sidebar.upgrade.restartNeeded', { version: upgradeStatus?.npm.latestVersion }) }}
+            <template v-if="upgradeStatus?.restartMethod === 'process_manager'">
+              {{ t('sidebar.upgrade.restartNeeded', { version: upgradeStatus?.npm.latestVersion }) }}
+            </template>
+            <template v-else>
+              {{ t('sidebar.upgrade.manualRestartNeeded', { version: upgradeStatus?.npm.latestVersion }) }}
+            </template>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel @click="showRestartConfirm = false">{{ t('sidebar.upgrade.laterRestart') }}</AlertDialogCancel>
-          <AlertDialogAction @click="handleRestart">{{ t('sidebar.upgrade.restartNow') }}</AlertDialogAction>
+          <AlertDialogAction v-if="upgradeStatus?.restartMethod === 'process_manager'" @click="handleRestart">{{ t('sidebar.upgrade.restartNow') }}</AlertDialogAction>
+          <AlertDialogAction v-else @click="showRestartConfirm = false">{{ t('common.confirm') }}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

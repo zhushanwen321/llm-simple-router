@@ -1,10 +1,10 @@
 import { FastifyPluginCallback } from 'fastify'
 import Database from 'better-sqlite3'
 import { getConfigSyncSource, setConfigSyncSource } from '../db/settings.js'
-import { detectDeployment, hasProcessManager, resolveRestartBinPath, getRestartMethod } from '../upgrade/deployment.js'
+import { detectDeployment, hasProcessManager, getRestartMethod } from '../upgrade/deployment.js'
 import { createUpgradeChecker, fetchJson, CheckerOptions } from '../upgrade/checker.js'
 import { reloadConfig } from '../config/recommended.js'
-import { execSync, spawn } from 'node:child_process'
+import { execSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { HTTP_BAD_REQUEST, HTTP_INTERNAL_ERROR } from '../core/constants.js'
@@ -103,6 +103,16 @@ export const adminUpgradeRoutes: FastifyPluginCallback<UpgradeRoutesOptions> = (
     const managed = hasProcessManager()
     const method = getRestartMethod()
 
+    if (!managed) {
+      // 无进程管理器（npx / 手动 node）时无法安全自动重启：
+      // 1. spawn 路径不可靠（npx 不注册全局 bin）
+      // 2. 新旧进程端口竞态（EADDRINUSE）
+      // 3. 原始启动参数无法复现
+      return reply.code(HTTP_BAD_REQUEST).send(
+        apiError(API_CODE.BAD_REQUEST, 'No process manager detected (PM2/systemd/Docker). Please restart manually.'),
+      )
+    }
+
     // 先回复客户端，再执行重启（否则客户端收不到响应）
     reply.send({ ok: true, method })
 
@@ -111,23 +121,6 @@ export const adminUpgradeRoutes: FastifyPluginCallback<UpgradeRoutesOptions> = (
 
     try {
       req.log.info({ method, managed }, 'Restarting server...')
-
-      if (!managed) {
-        // 无进程管理器（npx / 手动 node）：先 spawn 新进程，再关闭旧进程。
-        // 必须在 closeFn 之前 spawn，否则 closeFn 可能因活跃 SSE 连接卡住导致新进程永远不启动。
-        const binPath = resolveRestartBinPath()
-        const args = process.argv.slice(2) // eslint-disable-line no-magic-numbers
-        req.log.info({ binPath, args }, 'Spawning new process before exit')
-        const child = spawn(binPath, args, {
-          detached: true,
-          stdio: 'ignore',
-          env: { ...process.env },
-        })
-        child.on('error', (err) => {
-          req.log.error({ err, binPath }, 'Failed to spawn new process')
-        })
-        child.unref()
-      }
 
       // 强制退出兜底：即使 closeFn 卡住（如活跃代理 SSE 流），也能确保进程退出。
       const forceExitTimer = setTimeout(() => {
@@ -143,7 +136,6 @@ export const adminUpgradeRoutes: FastifyPluginCallback<UpgradeRoutesOptions> = (
       req.log.info('Exiting current process')
       process.exit(0)
     } catch (err) {
-      // 优雅关闭失败时也必须退出：新进程已经 spawn，旧进程必须让出端口
       const msg = err instanceof Error ? err.message : String(err)
       req.log.error({ err }, `Restart failed: ${msg}`)
       process.exit(1)
