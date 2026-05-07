@@ -14,8 +14,6 @@ export type ClientAgentType = "claude-code" | "pi" | "unknown";
 export interface FailedToolResult {
   toolName: string;
   toolUseId: string | undefined;
-  toolInput: string | undefined;
-  errorContent: string;
 }
 
 /**
@@ -37,7 +35,8 @@ export function detectClientAgentType(headers: RawHeaders): ClientAgentType {
  * 避免重复记录前轮请求已记录的 tool 失败。
  *
  * 通过向前扫描 assistant 消息中的 tool_use 块
- * 关联对应的 tool_name 和 tool_input。
+ * 关联对应的 tool_name。完整 input/error 内容通过
+ * request_log_id + tool_use_id 从 request_logs 回溯。
  */
 export function extractFailedToolResults(
   body: Record<string, unknown>,
@@ -48,9 +47,9 @@ export function extractFailedToolResults(
   }> | undefined;
   if (!messages || messages.length === 0) return [];
 
-  // 第一步：向后往前找最后一个包含 tool_result 的 user 消息
+  // 第一步：从后往前找最后一个包含 tool_result 的 user 消息
   let lastUserIndex = -1;
-  const resultBlocks: Array<{ tool_use_id?: string; content: unknown; is_error?: boolean }> = [];
+  const resultBlocks: Array<{ tool_use_id?: string; is_error?: boolean }> = [];
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i];
     if (msg.role !== "user") continue;
@@ -66,16 +65,15 @@ export function extractFailedToolResults(
   }
   if (lastUserIndex < 0) return [];
 
-  // 第二步：在整个 messages 中建立 tool_use_id → { name, input } 映射
-  const toolUseMap = new Map<string, { name: string; input: string }>();
+  // 第二步：建立 tool_use_id → tool_name 映射
+  const toolUseMap = new Map<string, string>();
   for (let i = 0; i < lastUserIndex; i++) {
     const msg = messages[i];
     if (msg.role !== "assistant") continue;
     const content = Array.isArray(msg.content) ? msg.content : [];
     for (const block of content) {
       if (block.type === "tool_use" && block.id) {
-        const inputText = block.input ? JSON.stringify(block.input) : "";
-        toolUseMap.set(block.id, { name: block.name ?? "unknown", input: inputText });
+        toolUseMap.set(block.id, block.name ?? "unknown");
       }
     }
   }
@@ -84,17 +82,11 @@ export function extractFailedToolResults(
   const failures: FailedToolResult[] = [];
   for (const block of resultBlocks) {
     if (block.is_error !== true) continue;
-    const toolUse = block.tool_use_id && typeof block.tool_use_id === "string"
-      ? toolUseMap.get(block.tool_use_id)
-      : undefined;
-    const errorContent = typeof block.content === "string"
-      ? block.content
-      : JSON.stringify(block.content ?? "");
+    const toolUseId = block.tool_use_id && typeof block.tool_use_id === "string"
+      ? block.tool_use_id : undefined;
     failures.push({
-      toolName: toolUse?.name ?? "unknown",
-      toolUseId: block.tool_use_id,
-      toolInput: toolUse?.input,
-      errorContent,
+      toolName: toolUseId ? (toolUseMap.get(toolUseId) ?? "unknown") : "unknown",
+      toolUseId,
     });
   }
   return failures;
