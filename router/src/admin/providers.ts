@@ -204,11 +204,13 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     const encryptedKey = encrypt(body.api_key, getSetting(db, "encryption_key")!);
     const { entries: normalizedModels, overrides: contextOverrides } = extractModelOverrides((body.models ?? []) as ModelInput[]);
     const isAdaptiveEnabled = body.adaptive_enabled ?? 0;
-    if (body.proxy_type && !body.proxy_url) {
-      return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.VALIDATION_FAILED, "proxy_url is required when proxy_type is set"));
-    }
-    const encryptedProxyUsername = body.proxy_username ? encrypt(body.proxy_username, getSetting(db, "encryption_key")!) : null;
-    const encryptedProxyPassword = body.proxy_password ? encrypt(body.proxy_password, getSetting(db, "encryption_key")!) : null;
+
+    // 将空 proxy_url 视为不使用代理
+    const effectiveProxyType = body.proxy_url?.trim() ? body.proxy_type : null;
+    const effectiveProxyUrl = body.proxy_url?.trim() || null;
+
+    const encryptedProxyUsername = (effectiveProxyType && body.proxy_username) ? encrypt(body.proxy_username, getSetting(db, "encryption_key")!) : null;
+    const encryptedProxyPassword = (effectiveProxyType && body.proxy_password) ? encrypt(body.proxy_password, getSetting(db, "encryption_key")!) : null;
     const id = createProvider(db, {
       name: body.name,
       api_type: body.api_type,
@@ -222,8 +224,8 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
       queue_timeout_ms: body.queue_timeout_ms ?? PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms,
       max_queue_size: body.max_queue_size ?? PROVIDER_CONCURRENCY_DEFAULTS.max_queue_size,
       adaptive_enabled: isAdaptiveEnabled,
-      proxy_type: body.proxy_type ?? null,
-      proxy_url: body.proxy_type ? body.proxy_url! : null,
+      proxy_type: effectiveProxyType,
+      proxy_url: effectiveProxyUrl,
       proxy_username: encryptedProxyUsername,
       proxy_password: encryptedProxyPassword,
     });
@@ -286,22 +288,22 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
       fields.api_key = encrypt(body.api_key, getSetting(db, "encryption_key")!);
       fields.api_key_preview = body.api_key.length > API_KEY_PREVIEW_MIN_LENGTH ? `${body.api_key.slice(0, API_KEY_PREVIEW_PREFIX_LEN)}...${body.api_key.slice(-API_KEY_PREVIEW_PREFIX_LEN)}` : "****";
     }
-    // Proxy field handling
-    if (body.proxy_type !== undefined) {
-      fields.proxy_type = body.proxy_type || null;
-      if (!body.proxy_type) {
-        fields.proxy_url = null;
+    // Proxy field handling - 空URL视为不使用代理
+    const effectiveProxyUrl = body.proxy_url !== undefined ? (body.proxy_url?.trim() || null) : undefined;
+    const effectiveProxyType = effectiveProxyUrl !== undefined ? (effectiveProxyUrl ? body.proxy_type : null) : undefined;
+
+    if (effectiveProxyType !== undefined) {
+      fields.proxy_type = effectiveProxyType;
+      fields.proxy_url = effectiveProxyUrl;
+      if (!effectiveProxyType) {
         fields.proxy_username = null;
         fields.proxy_password = null;
       }
     }
-    if (body.proxy_url !== undefined && body.proxy_type) {
-      fields.proxy_url = body.proxy_url;
-    }
-    if (body.proxy_username !== undefined && body.proxy_type) {
+    if (body.proxy_username !== undefined && effectiveProxyType) {
       fields.proxy_username = body.proxy_username ? encrypt(body.proxy_username, getSetting(db, "encryption_key")!) : null;
     }
-    if (body.proxy_password !== undefined && body.proxy_type) {
+    if (body.proxy_password !== undefined && effectiveProxyType) {
       fields.proxy_password = body.proxy_password ? encrypt(body.proxy_password, getSetting(db, "encryption_key")!) : null;
     }
     updateProvider(db, id, fields);
