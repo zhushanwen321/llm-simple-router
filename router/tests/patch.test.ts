@@ -6,8 +6,24 @@ import { applyProviderPatches } from "../src/proxy/patch/index.js";
 // ---------- patchNonDeepSeekToolMessages（方案 7，OpenAI 格式）----------
 
 describe("patchNonDeepSeekToolMessages", () => {
-  it("将无 reasoning_content 的 assistant tool_calls 降级为 text", () => {
+  it("thinking 未激活时跳过降级", () => {
     const body = {
+      messages: [
+        { role: "user", content: "read a file" },
+        { role: "assistant", content: null, tool_calls: [{ id: "call_1", type: "function", function: { name: "read", arguments: '{"path":"a.ts"}' } }] },
+        { role: "tool", tool_call_id: "call_1", content: "file content" },
+        { role: "user", content: "thanks" },
+      ],
+    };
+    const original = JSON.stringify(body);
+    patchNonDeepSeekToolMessages(body);
+    // thinking 未激活，不应修改
+    expect(JSON.stringify(body)).toBe(original);
+  });
+
+  it("thinking 激活时将无 reasoning_content 的 assistant tool_calls 降级为 text", () => {
+    const body = {
+      thinking: { type: "enabled" },
       messages: [
         { role: "user", content: "read a file" },
         { role: "assistant", content: null, tool_calls: [{ id: "call_1", type: "function", function: { name: "read", arguments: '{"path":"a.ts"}' } }] },
@@ -32,6 +48,7 @@ describe("patchNonDeepSeekToolMessages", () => {
 
   it("保留有 reasoning_content 的 DeepSeek 原生消息", () => {
     const body = {
+      thinking: { type: "enabled" },
       messages: [
         { role: "assistant", reasoning_content: "thinking...", content: null, tool_calls: [{ id: "call_ds", type: "function", function: { name: "read", arguments: "{}" } }] },
         { role: "tool", tool_call_id: "call_ds", content: "result" },
@@ -44,6 +61,7 @@ describe("patchNonDeepSeekToolMessages", () => {
 
   it("无 tool_calls 时不修改", () => {
     const body = {
+      thinking: { type: "enabled" },
       messages: [
         { role: "assistant", content: "hello" },
       ],
@@ -53,8 +71,9 @@ describe("patchNonDeepSeekToolMessages", () => {
     expect(JSON.stringify(body)).toBe(original);
   });
 
-  it("保留 assistant 的原始 content", () => {
+  it("thinking 激活时保留 assistant 的原始 content 并追加降级文本", () => {
     const body = {
+      thinking: { type: "enabled" },
       messages: [
         { role: "assistant", content: "Let me read that file.", tool_calls: [{ id: "call_1", type: "function", function: { name: "read", arguments: "{}" } }] },
         { role: "tool", tool_call_id: "call_1", content: "file" },

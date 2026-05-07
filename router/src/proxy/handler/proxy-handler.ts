@@ -98,7 +98,7 @@ function rejectAndReply(
     sessionId: params.sessionId, pipelineSnapshot: params.pipelineSnapshot,
     matcher: params.matcher, logFileWriter: params.logFileWriter,
   });
-  afterLog?.();
+  try { afterLog?.(); } catch { /* tool error log 写入失败不影响响应 */ } // eslint-disable-line taste/no-silent-catch
   return reply.code(error.statusCode).send(error.body);
 }
 
