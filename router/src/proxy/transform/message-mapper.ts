@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import type { AnthropicContentBlock } from "./types.js";
 import { sanitizeToolUseId, ensureNonEmptyContent, parseToolArguments } from "./sanitize.js";
 
@@ -133,6 +134,38 @@ export function convertMessagesAnt2OA(
 ): unknown[] {
   const result: unknown[] = [];
 
+  // 预扫描：收集无 id 的 tool_use，为每个生成唯一 UUID。
+  // 返回 assistant 索引 → { tool_use 数组索引 → UUID } 的映射，
+  // 以及空 tool_use_id 的 tool_result → UUID 的顺序配对列表。
+  // OpenAI 格式要求 tool_calls[].id 非空，且 tool.tool_call_id 与之匹配。
+  const syntheticIds: string[] = [];
+  const assistantToolMap = new Map<number, Map<number, string>>();
+  {
+    let assistantIdx = 0;
+    for (const msg of messages) {
+      const m = msg as Record<string, unknown>;
+      if (m.role !== "assistant") continue;
+      const content = m.content as Array<Record<string, unknown>> | undefined;
+      if (!content) { assistantIdx++; continue; }
+      const toolBlocks = content.filter(b => b.type === "tool_use");
+      if (toolBlocks.length > 0) {
+        const idxMap = new Map<number, string>();
+        for (let i = 0; i < toolBlocks.length; i++) {
+          if (!toolBlocks[i].id) {
+            const uid = randomUUID();
+            idxMap.set(i, uid);
+            syntheticIds.push(uid);
+          }
+        }
+        if (idxMap.size > 0) assistantToolMap.set(assistantIdx, idxMap);
+      }
+      assistantIdx++;
+    }
+  }
+  // 空 tool_use_id 的 tool_result 按出现顺序配对到 syntheticIds
+  let syntheticCursor = 0;
+  let assistantCounter = 0;
+
   // system → role:"system"
   if (system != null) {
     const text = typeof system === "string"
@@ -156,7 +189,12 @@ export function convertMessagesAnt2OA(
         result.push({ role: "user", content: textParts.map(b => b.text ?? "").join("") });
       }
       for (const tr of toolResults) {
-        result.push({ role: "tool", tool_call_id: tr.tool_use_id, content: tr.content ?? "" });
+        let toolCallId = String(tr.tool_use_id ?? "");
+        // 空 tool_use_id → 按顺序配对到预生成的 UUID
+        if (!toolCallId && syntheticCursor < syntheticIds.length) {
+          toolCallId = syntheticIds[syntheticCursor++];
+        }
+        result.push({ role: "tool", tool_call_id: toolCallId, content: tr.content ?? "" });
       }
     } else if (m.role === "assistant") {
       if (!content || !Array.isArray(content)) continue;
@@ -176,10 +214,11 @@ export function convertMessagesAnt2OA(
       if (textBlocks.length > 0) {
         oaiMsg.content = textBlocks.map(b => b.text ?? "").join("");
       }
-      // tool_use → tool_calls
+      // tool_use → tool_calls（无 id 的 tool_use 使用预生成的 UUID）
       if (toolBlocks.length > 0) {
-        oaiMsg.tool_calls = toolBlocks.map(b => ({
-          id: b.id,
+        const idMap = assistantToolMap.get(assistantCounter);
+        oaiMsg.tool_calls = toolBlocks.map((b, i) => ({
+          id: b.id || (idMap ? idMap.get(i) || randomUUID() : randomUUID()),
           type: "function",
           function: { name: b.name, arguments: JSON.stringify(b.input ?? {}) },
         }));
@@ -188,6 +227,7 @@ export function convertMessagesAnt2OA(
       if (oaiMsg.content || oaiMsg.tool_calls) {
         result.push(oaiMsg);
       }
+      assistantCounter++;
     }
   }
 
