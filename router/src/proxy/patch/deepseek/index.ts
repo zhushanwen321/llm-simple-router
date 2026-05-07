@@ -18,8 +18,9 @@ import { patchOrphanToolResults, patchOrphanToolResultsOA } from "./patch-orphan
  *   4. patchOrphanToolResults — 清理孤儿 tool_result
  *
  * OpenAI 格式执行顺序（参考 docs/deepseek-patch-investigation.md §5.5）：
- *   1. patchNonDeepSeekToolMessages — 将非 DeepSeek 生成的 tool_calls 降级为 text
- *   2. patchOrphanToolResultsOA — 处理孤儿 tool 消息
+ *   1. patchThinkingParam — 检测历史 reasoning_content，注入 thinking 参数
+ *   2. patchNonDeepSeekToolMessages — 将非 DeepSeek 生成的 tool_calls 降级为 text
+ *   3. patchOrphanToolResultsOA — 处理孤儿 tool 消息
  */
 export function applyDeepSeekPatches(
   body: Record<string, unknown>,
@@ -31,6 +32,7 @@ export function applyDeepSeekPatches(
     patchMissingThinkingBlocks(body);
     patchOrphanToolResults(body);
   } else {
+    patchThinkingParam(body, apiType);
     patchNonDeepSeekToolMessages(body);
     patchOrphanToolResultsOA(body);
   }

@@ -5,6 +5,10 @@
  * 可能不包含 DeepSeek 要求的 reasoning_content，导致上游校验失败或
  * 工具调用无限循环。
  *
+ * 前置条件：仅 thinking 模式激活时执行。
+ * DeepSeek 只在 thinking 模式下才要求 reasoning_content，未激活时
+ * 降级既无必要又可能导致模型学会以文本形式输出 tool_calls。
+ *
  * 判断标准：assistant 消息有 tool_calls 但无 reasoning_content → 非 DeepSeek 生成。
  *
  * 转换：
@@ -14,6 +18,9 @@
  * 设计文档：docs/deepseek-patch-investigation.md §5
  */
 export function patchNonDeepSeekToolMessages(body: Record<string, unknown>): void {
+  // thinking 模式未激活时，DeepSeek 不要求 reasoning_content，无需降级
+  if (!body.thinking && !body.reasoning) return;
+
   const messages = body.messages as Array<Record<string, unknown>> | undefined;
   if (!messages || !Array.isArray(messages)) return;
 
