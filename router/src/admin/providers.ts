@@ -123,9 +123,9 @@ const CreateProviderSchema = Type.Object({
   max_queue_size: Type.Optional(Type.Integer({ minimum: 1 })),
   adaptive_enabled: Type.Optional(Type.Integer({ minimum: 0, maximum: 1 })),
   proxy_type: Type.Optional(Type.Union([Type.Literal("http"), Type.Literal("socks5"), Type.Null()])),
-  proxy_url: Type.Optional(Type.String({ minLength: 1 })),
-  proxy_username: Type.Optional(Type.String()),
-  proxy_password: Type.Optional(Type.String()),
+  proxy_url: Type.Optional(Type.Union([Type.String({ minLength: 1 }), Type.Null()])),
+  proxy_username: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+  proxy_password: Type.Optional(Type.Union([Type.String(), Type.Null()])),
 });
 
 const UpdateProviderSchema = Type.Object({
@@ -145,9 +145,9 @@ const UpdateProviderSchema = Type.Object({
   max_queue_size: Type.Optional(Type.Integer({ minimum: 1 })),
   adaptive_enabled: Type.Optional(Type.Integer({ minimum: 0, maximum: 1 })),
   proxy_type: Type.Optional(Type.Union([Type.Literal("http"), Type.Literal("socks5"), Type.Null()])),
-  proxy_url: Type.Optional(Type.String({ minLength: 1 })),
-  proxy_username: Type.Optional(Type.String()),
-  proxy_password: Type.Optional(Type.String()),
+  proxy_url: Type.Optional(Type.Union([Type.String({ minLength: 1 }), Type.Null()])),
+  proxy_username: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+  proxy_password: Type.Optional(Type.Union([Type.String(), Type.Null()])),
 });
 
 interface ProviderRoutesOptions {

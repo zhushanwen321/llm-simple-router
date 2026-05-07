@@ -5,10 +5,10 @@
     <div class="grid grid-cols-2 gap-3">
       <div>
         <Label class="text-xs text-muted-foreground">{{ t('providers.fields.proxyType') }}</Label>
-        <Select :model-value="proxyType" class="mt-1" @update:model-value="onTypeChange">
+        <Select :model-value="proxyType || 'none'" class="mt-1" @update:model-value="onTypeChange">
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="">{{ t('providers.fields.proxyNoProxy') }}</SelectItem>
+            <SelectItem value="none">{{ t('providers.fields.proxyNoProxy') }}</SelectItem>
             <SelectItem value="http">{{ t('providers.fields.proxyHttp') }}</SelectItem>
             <SelectItem value="socks5">{{ t('providers.fields.proxySocks5') }}</SelectItem>
           </SelectContent>
@@ -50,7 +50,7 @@ const emit = defineEmits(['update:proxyType', 'update:proxyUrl', 'update:proxyUs
 const { t } = useI18n()
 
 function onTypeChange(val: unknown) {
-  const value = String(val ?? '')
+  const value = String(val ?? '') === 'none' ? '' : String(val ?? '')
   emit('update:proxyType', value)
   if (!value) {
     emit('clear')

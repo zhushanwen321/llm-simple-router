@@ -122,9 +122,9 @@ export function useProviderForm() {
       max_queue_size: concurrencyMode.value === 'none' ? DEFAULT_QUEUE_SIZE : form.value.max_queue_size,
       adaptive_enabled: concurrencyMode.value === 'auto' ? 1 : 0,
       proxy_type: form.value.proxy_type || null,
-      proxy_url: form.value.proxy_type ? form.value.proxy_url : null,
-      proxy_username: form.value.proxy_type ? form.value.proxy_username : null,
-      proxy_password: form.value.proxy_type && form.value.proxy_password ? form.value.proxy_password : null,
+      proxy_url: form.value.proxy_url?.trim() || null,
+      proxy_username: form.value.proxy_username?.trim() || null,
+      proxy_password: form.value.proxy_password || null,
     }
     if (form.value.api_key) payload.api_key = form.value.api_key
     return payload
