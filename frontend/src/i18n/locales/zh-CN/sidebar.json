@@ -10,7 +10,7 @@
     "monitor": "实时监控",
     "logs": "请求日志",
     "settings": "系统设置",
-    "agentConfig": "智能体配置",
+    "agentConfig": "路由代理配置",
     "quickSetup": "快速配置",
     "monitoring": "监控"
   },

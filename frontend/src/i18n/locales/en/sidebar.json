@@ -10,7 +10,7 @@
     "monitor": "Realtime Monitor",
     "logs": "Request Logs",
     "settings": "Settings",
-    "agentConfig": "Agent Config",
+    "agentConfig": "Proxy Config",
     "quickSetup": "Quick Setup",
     "monitoring": "Monitoring"
   },
