@@ -14,6 +14,7 @@ import {
 
 const UPSTREAM_BAD_GATEWAY = 502;
 const BUFFER_SIZE_LIMIT = 4096;
+const END_REPLY_TIMEOUT_MS = 1000;
 
 // ---------- StreamProxy ----------
 
@@ -278,15 +279,32 @@ class StreamProxy {
     const metrics = this.collectMetrics(true);
     this.terminal("stream_success", { metrics }, true);
 
-    // 延迟结束管道和响应，属于 reply 层面操作，不属于 StreamProxy 状态管理
+    // 延迟结束管道和响应，属于 reply 层面操作，不属于 StreamProxy 状态管理。
+    //
+    // 当 formatTransform 存在时（如 OpenAI→Anthropic 转换），Transform 链的 flush
+    // 通过 process.nextTick 异步传播。pipeEntry.end() 后不能同步调用 reply.raw.end()，
+    // 否则 formatTransform._flush() 中的 ensureTerminated()（发送 message_stop）
+    // 尚未执行，连接就被关闭，导致客户端收到 "stream ended before message_stop"。
     setImmediate(() => {
-      this.pipeEntry.end();
-      if (this.headersSent) {
-        try { this.reply.raw.end(); } catch { // eslint-disable-line taste/no-silent-catch
-          // reply 可能已 destroyed，安全忽略
+      const endReply = () => {
+        if (this.headersSent) {
+          try { this.reply.raw.end(); } catch { // eslint-disable-line taste/no-silent-catch
+            // reply 可能已 destroyed，安全忽略
+          }
         }
+        this.cleanup();
+      };
+
+      this.pipeEntry.end();
+
+      if (this.formatTransform) {
+        // 等 passThrough end 事件触发（整个 transform 链 flush 完成后），再关闭 reply
+        this.passThrough.once("end", endReply);
+        // 安全超时兜底，防止 end 事件未触发导致连接挂起
+        setTimeout(endReply, END_REPLY_TIMEOUT_MS).unref();
+      } else {
+        endReply();
       }
-      this.cleanup();
     });
   }
 
