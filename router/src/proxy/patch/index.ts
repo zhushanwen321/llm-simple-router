@@ -1,4 +1,4 @@
-import type { ModelEntry } from "../../config/model-context.js";
+import { type ModelEntry, normalizePatchName } from "../../config/model-context.js";
 import { applyDeepSeekPatches } from "./deepseek/index.js";
 
 export interface ProviderInfo {
@@ -42,21 +42,21 @@ export function applyProviderPatches(
 
     if (modelPatches.length > 0) {
       // developer_role 补丁（仅 openai 格式需要）
-      if (modelPatches.includes("developer_role") && provider.api_type === "openai" && hasDeveloperRole(body)) {
+      if (hasPatch(modelPatches, "developer-role") && provider.api_type === "openai" && hasDeveloperRole(body)) {
         patchDeveloperRole(ensureCloned());
         patches.push("developer_role");
       }
 
       // DeepSeek Anthropic 补丁
       const dsAnthropicPatches = ["thinking-param", "cache-control", "thinking-blocks", "orphan-tool-results"];
-      if (dsAnthropicPatches.some(p => modelPatches.includes(p)) && provider.api_type === "anthropic") {
+      if (dsAnthropicPatches.some(p => hasPatch(modelPatches, p)) && provider.api_type === "anthropic") {
         applyDeepSeekPatches(ensureCloned(), "anthropic");
         patches.push("deepseek");
       }
 
       // DeepSeek OpenAI 补丁
       const dsOpenAIPatches = ["non-ds-tools", "orphan-tool-results-oa"];
-      if (dsOpenAIPatches.some(p => modelPatches.includes(p)) && provider.api_type === "openai") {
+      if (dsOpenAIPatches.some(p => hasPatch(modelPatches, p)) && provider.api_type === "openai") {
         applyDeepSeekPatches(ensureCloned(), "openai");
         patches.push("deepseek");
       }
@@ -116,4 +116,12 @@ function needsDeepSeekPatch(body: Record<string, unknown>, provider: ProviderInf
   if (provider.base_url.includes("deepseek")) return true;
   const model = (body.model as string) ?? "";
   return model.includes("deepseek");
+}
+
+/**
+ * 格式无关的 patch 匹配：将比较值与 modelPatches（已由 parseModels 归一化）
+ * 通过同一个 normalizePatchName 函数比较，无论 DB 存的是连字符还是下划线都能匹配。
+ */
+function hasPatch(modelPatches: string[], name: string): boolean {
+  return modelPatches.includes(normalizePatchName(name));
 }

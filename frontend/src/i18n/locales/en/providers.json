@@ -40,7 +40,7 @@
     "proxyTitle": "Proxy Configuration",
     "proxyType": "Proxy Type",
     "proxyNoProxy": "No Proxy",
-    "proxyHttp": "HTTP",
+    "proxyHttp": "HTTP/HTTPS",
     "proxySocks5": "SOCKS5",
     "proxyUrl": "Proxy URL",
     "proxyUrlPlaceholderHttp": "http://127.0.0.1:7890",
@@ -138,5 +138,17 @@
     "cascadeClean": "cleaned {count} group references",
     "cascadeDisable": "disabled {count} groups",
     "cascadeAuto": "Auto-{actions}"
+  },
+  "fetchModels": {
+    "button": "Fetch Models from Upstream",
+    "buttonPreset": "Use Preset Models",
+    "loading": "Fetching...",
+    "noApiKey": "Please enter API Key first",
+    "success": "{source}: fetched {total} models, {added} new",
+    "allExist": "{source}: {total} models already exist",
+    "empty": "Upstream returned empty model list, using preset models",
+    "failed": "Failed to fetch upstream models",
+    "sourceUpstream": "Upstream",
+    "sourcePreset": "Preset"
   }
 }

@@ -4,8 +4,8 @@ import { fileURLToPath, URL } from 'node:url'
 import { readFileSync } from 'node:fs'
 
 const rootVersion = JSON.parse(
-  readFileSync(new URL('../package.json', import.meta.url), 'utf-8')
-).version
+  readFileSync(new URL('../router/package.json', import.meta.url), 'utf-8')
+).version ?? 'dev'
 
 export default defineConfig({
   plugins: [

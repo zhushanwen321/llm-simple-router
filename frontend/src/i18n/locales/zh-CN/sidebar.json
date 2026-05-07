@@ -10,7 +10,7 @@
     "monitor": "实时监控",
     "logs": "请求日志",
     "settings": "系统设置",
-    "agentConfig": "智能体配置",
+    "agentConfig": "路由代理配置",
     "quickSetup": "快速配置",
     "monitoring": "监控"
   },
@@ -39,6 +39,7 @@
     "confirmUpgrade": "确认升级到 {version}？",
     "upgradeSuccess": "升级成功",
     "restartNeeded": "已升级到 {version}。需要重启服务才能生效。",
+    "manualRestartNeeded": "已升级到 {version}。未检测到进程管理器（PM2/systemd/Docker），请手动重启服务。",
     "laterRestart": "稍后重启",
     "restartNow": "立即重启",
     "dockerDeploy": "检测到 {type} 部署，请手动更新：",
@@ -48,6 +49,7 @@
     "saveFailed": "保存失败",
     "configSyncSuccess": "配置同步成功",
     "restartSent": "重启指令已发送，等待服务恢复...",
+    "restartTimeout": "重启超时，请手动刷新页面",
     "restartFailed": "重启失败",
     "upgradeDescBefore": "将执行",
     "upgradeDescAfter": "，升级完成后需要重启服务才能生效。"

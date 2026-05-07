@@ -159,7 +159,21 @@
           />
           <!-- 可用模型 -->
           <div>
-            <Label class="text-xs text-muted-foreground mb-2">{{ t('providers.fields.availableModels') }}</Label>
+            <div class="flex items-center justify-between mb-2">
+              <Label class="text-xs text-muted-foreground">{{ t('providers.fields.availableModels') }}</Label>
+              <Button
+                v-if="!editingId && presetGroup && presetGroup !== '__custom__' && (form.api_key || !getCurrentModelsEndpoint())"
+                type="button"
+                variant="outline"
+                size="sm"
+                class="text-xs"
+                :disabled="fetchingModels"
+                @click="fetchUpstreamModels"
+              >
+                <RotateCw class="w-3 h-3 mr-1" :class="{ 'animate-spin': fetchingModels }" />
+                {{ fetchingModels ? t('providers.fetchModels.loading') : getCurrentModelsEndpoint() ? t('providers.fetchModels.button') : t('providers.fetchModels.buttonPreset') }}
+              </Button>
+            </div>
             <div class="grid grid-cols-3 gap-2 mb-3">
               <div v-for="(m, i) in form.models" :key="i">
                 <ModelCard
@@ -271,6 +285,7 @@ import ModelCard from '@/components/quick-setup/ModelCard.vue'
 import { useProviderForm, API_TYPE_LABELS, CONTEXT_WINDOW_OPTIONS, CONTEXT_K, CONTEXT_M } from '@/composables/useProviderForm'
 import type { ConcurrencyMode } from '@/composables/useProviderForm'
 import { useProviderActions } from '@/composables/useProviderActions'
+import { useFetchUpstreamModels } from '@/composables/useFetchUpstreamModels'
 
 const { t } = useI18n()
 const {
@@ -279,11 +294,12 @@ const {
   validate, buildPayload, addModel, removeModel, updateModel, updateModelTimeout,
   onConcurrencyModeChange, isOfficialOpenai, openCreate, openEdit, saveTransformRules,
 } = useProviderForm()
-const { providerPresets, presetGroup, presetPlan, availablePlans, onGroupChange, onPresetChange, loadPresets } = presetHook
+const { providerPresets, presetGroup, presetPlan, availablePlans, onGroupChange, onPresetChange, loadPresets, getCurrentModelsEndpoint, getCurrentPresetModels } = presetHook
 const {
   providers, reloading, copiedId, deleteTarget, toggleTarget, toggleDependencies,
   maskKey, copyKey, loadProviders, confirmDelete, confirmToggle, handleToggle, handleDelete, handleReload,
 } = useProviderActions()
+const { fetchingModels, fetchUpstreamModels } = useFetchUpstreamModels(form, getCurrentModelsEndpoint, getCurrentPresetModels)
 
 function formatContextWindow(tokens: number): string {
   if (tokens >= CONTEXT_M) return `${tokens / CONTEXT_M}M`

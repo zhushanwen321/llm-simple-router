@@ -10,7 +10,7 @@
     "monitor": "Realtime Monitor",
     "logs": "Request Logs",
     "settings": "Settings",
-    "agentConfig": "Agent Config",
+    "agentConfig": "Proxy Config",
     "quickSetup": "Quick Setup",
     "monitoring": "Monitoring"
   },
@@ -39,6 +39,7 @@
     "confirmUpgrade": "Confirm upgrade to {version}?",
     "upgradeSuccess": "Upgrade successful",
     "restartNeeded": "Upgraded to {version}. Service restart required.",
+    "manualRestartNeeded": "Upgraded to {version}. No process manager detected (PM2/systemd/Docker), please restart the service manually.",
     "laterRestart": "Restart Later",
     "restartNow": "Restart Now",
     "dockerDeploy": "Detected {type} deployment, please update manually:",
@@ -48,6 +49,7 @@
     "saveFailed": "Failed to save",
     "configSyncSuccess": "Config synced successfully",
     "restartSent": "Restart command sent, waiting for service to recover...",
+    "restartTimeout": "Restart timed out, please refresh manually",
     "restartFailed": "Restart failed",
     "upgradeDescBefore": "Will execute",
     "upgradeDescAfter": ". Service restart is required after upgrade."

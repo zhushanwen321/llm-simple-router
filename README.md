@@ -314,6 +314,28 @@ npm test
 npm run lint
 ```
 
+## 联系与交流
+
+<table>
+  <tr>
+    <td align="center">
+      <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https%3A%2F%2Fqm.qq.com%2Fcgi-bin%2Fqm%2Fqr%3Fk%3D541815155%26jump_from%3Dwebapi" width="150" height="150" alt="QQ" /><br/>
+      <b>QQ</b><br/>
+      <sub>541815155</sub>
+    </td>
+    <td align="center">
+      <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https%3A%2F%2Fwww.feishu.cn%2Finvitation%2Fpage%2Fadd_contact%2F%3Ftoken%3D7ccp43ba-47a2-4337-b9d6-b706d713cc42%26unique_id%3Dnjim8puWP3aFvs9haj9E2Q%3D%3D" width="150" height="150" alt="飞书" /><br/>
+      <b>飞书</b><br/>
+      <sub>添加飞书联系人</sub>
+    </td>
+    <td align="center">
+      <img src="docs/images/feishu-group.png" width="150" height="150" alt="飞书交流群" /><br/>
+      <b>飞书交流群</b><br/>
+      <sub>扫码加入交流群</sub>
+    </td>
+  </tr>
+</table>
+
 ## License
 
 MIT

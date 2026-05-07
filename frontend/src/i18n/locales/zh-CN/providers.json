@@ -40,7 +40,7 @@
     "proxyTitle": "代理配置",
     "proxyType": "代理类型",
     "proxyNoProxy": "无代理",
-    "proxyHttp": "HTTP",
+    "proxyHttp": "HTTP/HTTPS",
     "proxySocks5": "SOCKS5",
     "proxyUrl": "代理地址",
     "proxyUrlPlaceholderHttp": "http://127.0.0.1:7890",
@@ -138,5 +138,17 @@
     "cascadeClean": "清理 {count} 个分组的引用",
     "cascadeDisable": "禁用 {count} 个分组",
     "cascadeAuto": "已自动{actions}"
+  },
+  "fetchModels": {
+    "button": "从上游获取模型",
+    "buttonPreset": "使用预设模型",
+    "loading": "获取中...",
+    "noApiKey": "请先输入 API Key",
+    "success": "{source}获取到 {total} 个模型，新增 {added} 个",
+    "allExist": "{source}共 {total} 个模型，已全部存在",
+    "empty": "上游返回空模型列表，已使用预设模型",
+    "failed": "获取上游模型列表失败",
+    "sourceUpstream": "上游",
+    "sourcePreset": "预设"
   }
 }

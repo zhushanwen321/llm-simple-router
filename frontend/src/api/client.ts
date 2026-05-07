@@ -102,6 +102,8 @@ export interface ProviderPreset {
   apiType: "openai" | "openai-responses" | "anthropic";
   baseUrl: string;
   upstreamPath?: string;
+  /** 上游模型列表端点路径，如 /v1/models 或 /models */
+  modelsEndpoint?: string;
   models: string[];
 }
 
@@ -397,6 +399,12 @@ export const api = {
       "get",
       `${API.PROVIDERS}/${id}/dependencies`,
     ),
+  fetchUpstreamModels: (data: {
+    base_url: string;
+    models_endpoint: string;
+    api_key: string;
+    api_type: string;
+  }) => request<string[]>("post", `${API.PROVIDERS}/fetch-models`, data),
 
   getMappings: () => request<ModelMapping[]>("get", API.MAPPINGS),
   createMapping: (data: MappingPayload) =>

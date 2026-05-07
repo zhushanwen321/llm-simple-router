@@ -1,25 +1,22 @@
 <!-- eslint-disable vue/multi-word-component-names -->
 <template>
   <div class="border rounded-md p-3 space-y-3">
-    <div class="text-xs font-medium text-muted-foreground">{{ t('providers.fields.proxyTitle') }}</div>
-    <div class="grid grid-cols-2 gap-3">
-      <div>
-        <Label class="text-xs text-muted-foreground">{{ t('providers.fields.proxyType') }}</Label>
-        <Select :model-value="proxyType || 'none'" class="mt-1" @update:model-value="onTypeChange">
-          <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none">{{ t('providers.fields.proxyNoProxy') }}</SelectItem>
-            <SelectItem value="http">{{ t('providers.fields.proxyHttp') }}</SelectItem>
-            <SelectItem value="socks5">{{ t('providers.fields.proxySocks5') }}</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <div v-if="proxyType">
+    <div class="flex items-center gap-3">
+      <span class="text-xs font-medium text-muted-foreground whitespace-nowrap">{{ t('providers.fields.proxyTitle') }}</span>
+      <Select :model-value="proxyType || 'none'" class="w-32" @update:model-value="onTypeChange">
+        <SelectTrigger><SelectValue /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="none">{{ t('providers.fields.proxyNoProxy') }}</SelectItem>
+          <SelectItem value="http">{{ t('providers.fields.proxyHttp') }}</SelectItem>
+          <SelectItem value="socks5">{{ t('providers.fields.proxySocks5') }}</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+    <div v-if="proxyType" class="grid grid-cols-4 gap-3">
+      <div class="col-span-2">
         <Label class="text-xs text-muted-foreground">{{ t('providers.fields.proxyUrl') }}</Label>
         <Input :model-value="proxyUrl" type="text" class="mt-1 font-mono text-xs" :placeholder="proxyType === 'socks5' ? t('providers.fields.proxyUrlPlaceholderSocks5') : t('providers.fields.proxyUrlPlaceholderHttp')" @update:model-value="emit('update:proxyUrl', $event)" />
       </div>
-    </div>
-    <div v-if="proxyType" class="grid grid-cols-2 gap-3">
       <div>
         <Label class="text-xs text-muted-foreground">{{ t('providers.fields.proxyUsername') }}</Label>
         <Input :model-value="proxyUsername" type="text" class="mt-1" :placeholder="t('providers.fields.proxyAuthOptional')" @update:model-value="emit('update:proxyUsername', $event)" />

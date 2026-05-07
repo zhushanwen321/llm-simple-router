@@ -7,6 +7,8 @@ export interface ProviderPreset {
   apiType: 'openai' | 'openai-responses' | 'anthropic'
   baseUrl: string
   upstreamPath?: string
+  /** 上游模型列表端点路径，如 /v1/models 或 /models；拼接在 baseUrl 后 */
+  modelsEndpoint?: string
   models: string[]
 }
 

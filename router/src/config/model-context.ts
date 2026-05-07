@@ -102,7 +102,7 @@ export function lookupContextWindow(modelName: string): number {
 }
 
 /** 标准化 patch 名称：连字符 → 下划线 */
-function normalizePatchName(name: string): string {
+export function normalizePatchName(name: string): string {
   return name.replace(/-/g, "_")
 }
 
