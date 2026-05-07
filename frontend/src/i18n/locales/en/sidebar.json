@@ -49,6 +49,7 @@
     "saveFailed": "Failed to save",
     "configSyncSuccess": "Config synced successfully",
     "restartSent": "Restart command sent, waiting for service to recover...",
+    "restartTimeout": "Restart timed out, please refresh manually",
     "restartFailed": "Restart failed",
     "upgradeDescBefore": "Will execute",
     "upgradeDescAfter": ". Service restart is required after upgrade."

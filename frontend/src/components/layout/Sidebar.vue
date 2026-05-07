@@ -435,11 +435,27 @@ async function handleRestart() {
     await api.restartServer()
     toast.success(t('sidebar.upgrade.restartSent'))
     showRestartConfirm.value = false
-    // 等待服务重启完成（新进程启动需要几秒）
-    const RESTART_DELAY_MS = 5000
-    setTimeout(() => {
-      window.location.reload()
-    }, RESTART_DELAY_MS)
+    // 轮询 /health 等待服务恢复，替代固定延时
+    const POLL_INTERVAL_MS = 1_000
+    const MAX_WAIT_MS = 30_000
+    const INITIAL_DELAY_MS = 2_000
+    const start = Date.now()
+    // 先等 2s 让旧进程开始关闭
+    await new Promise(resolve => setTimeout(resolve, INITIAL_DELAY_MS))
+    const poll = setInterval(() => {
+      fetch('/health')
+        .then(r => {
+          if (r.ok) {
+            clearInterval(poll)
+            window.location.reload()
+          }
+        })
+        .catch(() => { /* 服务尚未恢复，继续轮询 */ })
+      if (Date.now() - start > MAX_WAIT_MS) {
+        clearInterval(poll)
+        toast.error(t('sidebar.upgrade.restartTimeout'))
+      }
+    }, POLL_INTERVAL_MS)
   } catch (e: unknown) {
     toast.error(getApiMessage(e, t('sidebar.upgrade.restartFailed')))
   }
