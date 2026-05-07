@@ -350,6 +350,11 @@ export async function buildApp(
     proxyAgentFactory.invalidateAll();
     const sessionTracker = container.resolve<SessionTracker>(SERVICE_KEYS.sessionTracker);
     sessionTracker.stop();
+    // 强制关闭所有活跃连接（包括代理 SSE 流），防止 app.close() 因长连接卡住。
+    // Node 18+ 支持 server.closeAllConnections()。
+    if (typeof app.server.closeAllConnections === 'function') {
+      app.server.closeAllConnections();
+    }
     await app.close();
     db.close();
   };

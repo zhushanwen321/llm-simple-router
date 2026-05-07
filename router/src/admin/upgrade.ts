@@ -109,11 +109,9 @@ export const adminUpgradeRoutes: FastifyPluginCallback<UpgradeRoutesOptions> = (
     try {
       req.log.info({ method, managed }, 'Restarting server...')
 
-      // 优雅关闭（释放端口、等待活跃请求完成）
-      await options.closeFn()
-
       if (!managed) {
-        // 无进程管理器（npx / 手动 node）：自 spawn 新进程
+        // 无进程管理器（npx / 手动 node）：先 spawn 新进程，再关闭旧进程。
+        // 必须在 closeFn 之前 spawn，否则 closeFn 可能因活跃 SSE 连接卡住导致新进程永远不启动。
         const binPath = resolveRestartBinPath()
         const args = process.argv.slice(2) // eslint-disable-line no-magic-numbers
         req.log.info({ binPath, args }, 'Spawning new process before exit')
@@ -125,12 +123,25 @@ export const adminUpgradeRoutes: FastifyPluginCallback<UpgradeRoutesOptions> = (
         child.unref()
       }
 
+      // 强制退出兜底：即使 closeFn 卡住（如活跃代理 SSE 流），也能确保进程退出。
+      const RESTART_FORCE_EXIT_MS = 3000
+      const forceExitTimer = setTimeout(() => {
+        req.log.warn('Graceful shutdown timed out during restart, forcing exit')
+        process.exit(0)
+      }, RESTART_FORCE_EXIT_MS)
+      forceExitTimer.unref()
+
+      // 尝试优雅关闭（closeFn 内部已调用 closeAllConnections 加速关闭）
+      await options.closeFn()
+
+      clearTimeout(forceExitTimer)
       req.log.info('Exiting current process')
       process.exit(0)
     } catch (err) {
-      // 重启失败时记录错误，保持服务运行
+      // 优雅关闭失败时也必须退出：新进程已经 spawn，旧进程必须让出端口
       const msg = err instanceof Error ? err.message : String(err)
       req.log.error({ err }, `Restart failed: ${msg}`)
+      process.exit(1)
     }
   })
 
