@@ -326,10 +326,10 @@ npm run lint
     <td align="center">
       <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https%3A%2F%2Fwww.feishu.cn%2Finvitation%2Fpage%2Fadd_contact%2F%3Ftoken%3D7ccp43ba-47a2-4337-b9d6-b706d713cc42%26unique_id%3Dnjim8puWP3aFvs9haj9E2Q%3D%3D" width="150" height="150" alt="飞书" /><br/>
       <b>飞书</b><br/>
-      <sub>添加飞书联系人</sub>
+      <sub>徐迪涛（老⑧）</sub>
     </td>
     <td align="center">
-      <img src="docs/images/feishu-group.png" width="150" height="150" alt="飞书交流群" /><br/>
+      <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https%3A%2F%2Fapplink.feishu.cn%2Fclient%2Fchat%2Fchatter%2Fadd_by_link%3Flink_token%3D446o6009-2a23-4e8a-ab2e-5d726a28f6f9%26qr_code%3Dtrue" width="150" height="150" alt="飞书交流群" /><br/>
       <b>飞书交流群</b><br/>
       <sub>扫码加入交流群</sub>
     </td>
