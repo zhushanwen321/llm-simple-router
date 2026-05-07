@@ -350,12 +350,16 @@ export async function buildApp(
     proxyAgentFactory.invalidateAll();
     const sessionTracker = container.resolve<SessionTracker>(SERVICE_KEYS.sessionTracker);
     sessionTracker.stop();
-    // 强制关闭所有活跃连接（包括代理 SSE 流），防止 app.close() 因长连接卡住。
-    // Node 18+ 支持 server.closeAllConnections()。
-    if (typeof app.server.closeAllConnections === 'function') {
-      app.server.closeAllConnections();
-    }
+    // 等待活跃代理请求自然完成，超时后强制关闭所有连接。
+    // 先调用 app.close() 停止接受新连接并等待现有连接结束，
+    // 如果 2 秒内未完成则调用 closeAllConnections() 强制断开，防止 SSE 长连接导致无限等待。
+    const CLOSE_GRACE_PERIOD_MS = 2_000;
+    const forceClose = typeof app.server.closeAllConnections === 'function'
+      ? setTimeout(() => app.server.closeAllConnections!(), CLOSE_GRACE_PERIOD_MS)
+      : null;
+    if (forceClose) forceClose.unref();
     await app.close();
+    if (forceClose) clearTimeout(forceClose);
     db.close();
   };
 

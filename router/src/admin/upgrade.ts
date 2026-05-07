@@ -15,6 +15,9 @@ const GITEE_CONFIG_BASE = 'https://gitee.com/zzzzswszzzz/llm-simple-router/raw/m
 const CHECK_INTERVAL_MS = 60 * 60 * 1000 // eslint-disable-line no-magic-numbers
 const JSON_INDENT = 2
 
+const RESTART_FORCE_EXIT_MS = 3_000
+const RESTART_RESPONSE_FLUSH_MS = 300
+
 interface UpgradeRoutesOptions {
   db: Database.Database
   closeFn: () => Promise<void>
@@ -104,7 +107,7 @@ export const adminUpgradeRoutes: FastifyPluginCallback<UpgradeRoutesOptions> = (
     reply.send({ ok: true, method })
 
     // 给响应发送窗口
-    await new Promise((resolve) => setTimeout(resolve, 300)) // eslint-disable-line no-magic-numbers
+    await new Promise((resolve) => setTimeout(resolve, RESTART_RESPONSE_FLUSH_MS))
 
     try {
       req.log.info({ method, managed }, 'Restarting server...')
@@ -120,18 +123,20 @@ export const adminUpgradeRoutes: FastifyPluginCallback<UpgradeRoutesOptions> = (
           stdio: 'ignore',
           env: { ...process.env },
         })
+        child.on('error', (err) => {
+          req.log.error({ err, binPath }, 'Failed to spawn new process')
+        })
         child.unref()
       }
 
       // 强制退出兜底：即使 closeFn 卡住（如活跃代理 SSE 流），也能确保进程退出。
-      const RESTART_FORCE_EXIT_MS = 3000
       const forceExitTimer = setTimeout(() => {
         req.log.warn('Graceful shutdown timed out during restart, forcing exit')
         process.exit(0)
       }, RESTART_FORCE_EXIT_MS)
       forceExitTimer.unref()
 
-      // 尝试优雅关闭（closeFn 内部已调用 closeAllConnections 加速关闭）
+      // 尝试优雅关闭（closeFn 内部有 2s 优雅等待 + closeAllConnections 兜底）
       await options.closeFn()
 
       clearTimeout(forceExitTimer)
