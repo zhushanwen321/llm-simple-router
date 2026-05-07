@@ -32,6 +32,7 @@ import { PipelineSnapshot, type StageRecord } from "../pipeline-snapshot.js";
 import { applyToolRoundLimit } from "../patch/tool-round-limiter.js";
 import { loadEnhancementConfig } from "../routing/enhancement-config.js";
 import { getTransportStatusCode, serializeBlocksForStorage, extractLastToolUse, extractFailedToolResults, detectClientAgentType } from "./proxy-handler-utils.js";
+import type { FailedToolResult } from "./proxy-handler-utils.js";
 import { logToolErrors } from "../tool-error-logger.js";
 
 const HTTP_ERROR_THRESHOLD = 400;
@@ -85,6 +86,7 @@ function rejectAndReply(
   error: ProxyErrorResponse,
   errorMessage: string,
   providerId?: string,
+  afterLog?: () => void,
 ): FastifyReply {
   insertRejectedLog({
     db: params.db, logId: params.logId, apiType: params.apiType, model: params.model,
@@ -96,6 +98,7 @@ function rejectAndReply(
     sessionId: params.sessionId, pipelineSnapshot: params.pipelineSnapshot,
     matcher: params.matcher, logFileWriter: params.logFileWriter,
   });
+  afterLog?.();
   return reply.code(error.statusCode).send(error.body);
 }
 
@@ -216,6 +219,13 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
   const excludeTargets: Target[] = [];
   let rootLogId: string | null = null;
   let toolErrorsLogged = false;
+  let pendingToolErrors: FailedToolResult[] | null = null;
+  /** request_logs 写入后调用，将 pending 的 tool error logs 安全写入 DB */
+  const flushToolErrors = (providerId: string, model: string, reqLogId: string) => {
+    if (!pendingToolErrors) return;
+    logToolErrors(pendingToolErrors, { db: deps.db, providerId, backendModel: model, clientAgentType: detectClientAgentType(request.headers as RawHeaders), requestLogId: reqLogId, routerKeyId: request.routerKey?.id ?? null, sessionId });
+    pendingToolErrors = null;
+  };
   // TransformCoordinator 无状态，只需创建一次
   const coordinator = new TransformCoordinator();
   const enhancementConfig = loadEnhancementConfig(deps.db);
@@ -277,21 +287,14 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
         `Provider '${resolved.provider_id}' unavailable`, resolved.provider_id);
     }
 
-    // 工具错误日志记录 — 首次迭代时执行，记录本轮请求中的 is_error tool_result
+    // 工具错误日志：首次迭代时提取 failures，延迟到 request_logs 写入后再记录
+    // 避免 request_log_id 外键引用尚未存在的 request_logs 记录
     if (enhancementConfig.tool_error_logging_enabled && !toolErrorsLogged) {
       toolErrorsLogged = true;
       const failures = extractFailedToolResults(pipelineBody);
       if (failures.length > 0) {
         request.log.info({ failures: failures.length, sessionId }, "Tool error results detected");
-        logToolErrors(failures, {
-          db: deps.db,
-          providerId: resolved.provider_id,
-          backendModel: resolved.backend_model ?? effectiveModel,
-          clientAgentType: detectClientAgentType(cliHdrs),
-          requestLogId: logId,
-          routerKeyId,
-          sessionId,
-        });
+        pendingToolErrors = failures;
       }
     }
 
@@ -359,7 +362,8 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
     const encryptionKey = getSetting(deps.db, "encryption_key");
     if (!encryptionKey) {
       return rejectAndReply(reply, rCtx, errors.providerUnavailable(),
-        `Encryption key not configured`, provider.id);
+        `Encryption key not configured`, provider.id,
+        () => flushToolErrors(provider.id, resolved.backend_model ?? effectiveModel, logId));
     }
     const apiKey = decrypt(provider.api_key, encryptionKey);
     options?.beforeSendProxy?.(patchedBody, isStream);
@@ -435,6 +439,9 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
       );
       collectTransportMetrics(deps.db, apiType, resilienceResult.result, isStream, lastLogId, provider.id, resolved.backend_model, request, routerKeyId, getTransportStatusCode(resilienceResult.result));
 
+      // request_logs 已写入，安全写入 pending tool error logs
+      flushToolErrors(resolved.provider_id, resolved.backend_model ?? effectiveModel, lastLogId);
+
       // Stream timeout: send 408 error with API-specific body to client
       if (resilienceResult.result.kind === "stream_abort" && resilienceResult.result.timeoutContext) {
         const { modelId, providerId } = resilienceResult.result.timeoutContext;
@@ -509,16 +516,20 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
           );
         }
         request.log.debug({ logId, action: "provider_switch", targetProviderId: e.targetProviderId });
+        // request_logs 已写入（logResilienceResult），flush pending tool errors
+        flushToolErrors(resolved.provider_id, resolved.backend_model ?? effectiveModel, logId);
         excludeTargets.push(resolved);
         continue;
       }
       if (e instanceof SemaphoreQueueFullError) {
         return rejectAndReply(reply, rCtx, errors.concurrencyQueueFull(provider.id),
-          `Concurrency queue full for provider '${provider.id}'`, provider.id);
+          `Concurrency queue full for provider '${provider.id}'`, provider.id,
+          () => flushToolErrors(provider.id, resolved.backend_model ?? effectiveModel, logId));
       }
       if (e instanceof SemaphoreTimeoutError) {
         return rejectAndReply(reply, rCtx, errors.concurrencyTimeout(provider.id, e.timeoutMs),
-          `Concurrency wait timeout for provider '${provider.id}' (${e.timeoutMs}ms)`, provider.id);
+          `Concurrency wait timeout for provider '${provider.id}' (${e.timeoutMs}ms)`, provider.id,
+          () => flushToolErrors(provider.id, resolved.backend_model ?? effectiveModel, logId));
       }
       const errMsg = e instanceof Error ? e.message : String(e);
       request.log.debug({ logId, error: errMsg, action: "upstream_error" });
@@ -534,6 +545,8 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
       }, (matcher || logFileWriter) ? {
         matcher, logFileWriter, responseBody: null,
       } : undefined);
+      // request_logs 已写入，flush pending tool errors
+      flushToolErrors(provider.id, resolved.backend_model ?? effectiveModel, logId);
       const err = errors.upstreamConnectionFailed();
       return reply.code(err.statusCode).send(err.body);
     }
