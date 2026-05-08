@@ -45,6 +45,7 @@ import { ServiceContainer, SERVICE_KEYS } from "./core/container.js";
 import Database from "better-sqlite3";
 import { LogFileWriter } from "./storage/log-file-writer.js";
 import { ProxyAgentFactory } from "./proxy/transport/proxy-agent.js";
+import { registerBuiltinHooks } from "./proxy/pipeline/register-hooks.js";
 import { scheduleLogFileMaintenance } from "./storage/log-file-compressor.js";
 import { getDetailLogEnabled, getLogFileRetentionDays } from "./db/settings.js";
 import { dirname, join } from "node:path";
@@ -293,6 +294,9 @@ export async function buildApp(
   initializeProviderState(db, semaphoreManager, adaptiveController, tracker);
 
   app.register(authMiddleware, { db });
+
+  // 注册内置 hooks 到 hookRegistry（供 Admin API 查询）
+  registerBuiltinHooks();
 
   // --- New pipeline-based proxy handlers (Phase 3) ---
   const openaiHandler = createProxyHandler({

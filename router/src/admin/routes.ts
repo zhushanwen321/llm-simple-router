@@ -20,6 +20,7 @@ import { adminQuickSetupRoutes } from "./quick-setup.js";
 import { adminImportExportRoutes } from "./settings-import-export.js";
 import { adminTransformRuleRoutes } from "./transform-rules.js";
 import { adminScheduleRoutes } from "./schedules.js";
+import { hookRegistry } from "../proxy/pipeline/hook-registry.js";
 import type { StateRegistry } from "../core/registry.js";
 import type { RequestTracker } from "@llm-router/core/monitor";
 import type { AdaptiveController } from "@llm-router/core/concurrency";
@@ -60,5 +61,11 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (app, opti
   app.register(adminQuickSetupRoutes, { db: options.db, stateRegistry: options.stateRegistry, tracker: options.tracker, adaptiveController: options.adaptiveController });
   app.register(adminUpgradeRoutes, { db: options.db, closeFn: options.closeFn ?? (async () => {}) });
   app.register(adminTransformRuleRoutes, { db: options.db, pluginRegistry: options.pluginRegistry });
+
+  // Pipeline hooks 查询
+  app.get("/admin/api/pipeline/hooks", async (_req, reply) => {
+    return { hooks: hookRegistry.getAll() };
+  });
+
   done();
 };
