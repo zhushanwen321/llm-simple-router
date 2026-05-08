@@ -27,12 +27,11 @@ export class FormatRegistry {
     target: string,
     model: string,
   ): { body: Record<string, unknown>; upstreamPath: string } {
+    const targetAdapter = this.adapters.get(target);
+    const upstreamPath = targetAdapter?.defaultPath ?? "/v1/chat/completions";
     const converter = this.converters.get(`${source}→${target}`);
-    if (!converter) {
-      const targetAdapter = this.adapters.get(target);
-      return { body, upstreamPath: targetAdapter?.defaultPath ?? "/v1/chat/completions" };
-    }
-    return converter.transformRequest(body, model);
+    if (!converter) return { body, upstreamPath };
+    return { body: converter.transformRequest(body, model), upstreamPath };
   }
 
   transformResponse(bodyStr: string, source: string, target: string): string {

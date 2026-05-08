@@ -15,10 +15,11 @@ import { randomUUID } from "crypto";
 import type { FastifyReply } from "fastify";
 import { ProviderSwitchNeeded } from "../../core/errors.js";
 import { SemaphoreQueueFullError, SemaphoreTimeoutError } from "@llm-router/core";
-import { getProviderById } from "../../db/index.js";
+import { getProviderById, updateLogClientStatus, insertRequestLog, updateLogStreamContent } from "../../db/index.js";
 import { getSetting } from "../../db/settings.js";
 import { decrypt } from "../../utils/crypto.js";
 import { resolveMapping } from "../routing/mapping-resolver.js";
+import { applyOverflowRedirect } from "../routing/overflow.js";
 import { getConfig } from "../../config/index.js";
 import type { ProxyErrorFormatter } from "../proxy-core.js";
 import type { FormatAdapter } from "../format/types.js";
@@ -26,13 +27,12 @@ import type { FormatRegistry } from "../format/registry.js";
 import { insertRejectedLog } from "../log-helpers.js";
 import { logResilienceResult, collectTransportMetrics, sanitizeHeadersForLog } from "../proxy-logging.js";
 import { buildUpstreamHeaders, buildUpstreamUrl } from "../proxy-core.js";
-import { updateLogClientStatus } from "../../db/index.js";
 import { getModelStreamTimeout } from "../../db/providers.js";
 import { buildTransportFn } from "../transport/transport-fn.js";
 import { parseModels } from "../../config/model-context.js";
 import { applyProviderPatches } from "../patch/index.js";
 import { loadEnhancementConfig } from "../routing/enhancement-config.js";
-import { extractFailedToolResults, getTransportStatusCode, detectClientAgentType } from "./proxy-handler-utils.js";
+import { extractFailedToolResults, getTransportStatusCode, detectClientAgentType, serializeBlocksForStorage } from "./proxy-handler-utils.js";
 import type { FailedToolResult } from "./proxy-handler-utils.js";
 import { logToolErrors } from "../tool-error-logger.js";
 import type { Target } from "../../core/types.js";
@@ -150,6 +150,7 @@ export async function executeFailoverLoop(
 
   const clientModel = ctx.clientModel;
   const rawBody = ctx.rawBody;
+  const clientApiType = ctx.apiType as "openai" | "openai-responses" | "anthropic";
   let failoverIteration = 0;
 
   while (true) {
@@ -165,7 +166,7 @@ export async function executeFailoverLoop(
     const routerKeyId = request.routerKey?.id ?? null;
 
     // 每次迭代从 pipelineBody 重新开始
-    let currentBody = JSON.parse(JSON.stringify(ctx.body));
+    let currentBody = structuredClone(ctx.body);
     const isStream = currentBody.stream === true;
     const cliHdrs: RawHeaders = request.headers as RawHeaders;
     const iterationSnapshot = new PipelineSnapshot();
@@ -185,8 +186,7 @@ export async function executeFailoverLoop(
 
     if (!resolveResult) {
       if (excludeTargets.length > 0) {
-        return rejectAndReply(reply, { ...rCtx, isFailover: true, originalRequestId: rootLogId },
-          errors.upstreamConnectionFailed(), `All failover targets exhausted (${excludeTargets.length} attempted)`);
+        return rejectAndReply(reply, rCtx, errors.upstreamConnectionFailed(), `All failover targets exhausted (${excludeTargets.length} attempted)`);
       }
       return rejectAndReply(reply, rCtx, errors.modelNotFound(clientModel), `No mapping found for model '${clientModel}'`);
     }
@@ -228,7 +228,6 @@ export async function executeFailoverLoop(
     }
 
     // --- 溢出重定向 ---
-    const { applyOverflowRedirect } = await import("../routing/overflow.js");
     const overflowResult = applyOverflowRedirect(resolved, db, currentBody);
     if (overflowResult) {
       const overflowProvider = getProviderById(db, overflowResult.provider_id);
@@ -239,9 +238,12 @@ export async function executeFailoverLoop(
       }
     }
 
+    // 当前迭代的工具错误刷新闭包（统一 6 处调用）
+    const flushCurrentErrors = () => flushToolErrors(provider.id, resolved.backend_model ?? clientModel, logId);
+
     // --- 格式转换 ---
     const needsTransform = formatRegistry.needsTransform(ctx.apiType, provider.api_type);
-    let effectiveApiType = ctx.apiType as "openai" | "openai-responses" | "anthropic";
+    let effectiveApiType = clientApiType;
     let effectiveUpstreamPath = upstreamPath;
 
     if (needsTransform) {
@@ -267,7 +269,7 @@ export async function executeFailoverLoop(
       const pluginCtx: import("../transform/plugin-types.js").RequestTransformContext = {
         body: currentBody,
         headers: {},
-        sourceApiType: ctx.apiType as "openai" | "openai-responses" | "anthropic",
+        sourceApiType: clientApiType,
         targetApiType: provider.api_type as "openai" | "openai-responses" | "anthropic",
         provider: { id: provider.id, name: provider.name, base_url: provider.base_url, api_type: provider.api_type },
       };
@@ -290,7 +292,7 @@ export async function executeFailoverLoop(
     if (!encryptionKey) {
       return rejectAndReply(reply, rCtx, errors.providerUnavailable(),
         `Encryption key not configured`, provider.id,
-        () => flushToolErrors(provider.id, resolved.backend_model ?? clientModel, logId));
+        flushCurrentErrors);
     }
     const apiKey = decrypt(provider.api_key, encryptionKey);
 
@@ -326,7 +328,7 @@ export async function executeFailoverLoop(
             const respCtx: ResponseTransformContext = {
               response: respObj,
               sourceApiType: provider.api_type as "openai" | "openai-responses" | "anthropic",
-              targetApiType: ctx.apiType as "openai" | "openai-responses" | "anthropic",
+              targetApiType: clientApiType,
               provider: { id: provider.id, name: provider.name, base_url: provider.base_url, api_type: provider.api_type },
             };
             pluginRegistry.applyBeforeResponse(respCtx);
@@ -358,7 +360,7 @@ export async function executeFailoverLoop(
     // --- Execute through orchestrator ---
     try {
       const resilienceResult = await orchestrator.handle(
-        request, reply, ctx.apiType as "openai" | "openai-responses" | "anthropic",
+        request, reply, clientApiType,
         { resolved, provider, clientModel, isStream, trackerId: logId, sessionId: ctx.sessionId, clientRequest: clientReq, upstreamRequest: upstreamReqBase, concurrencyOverride },
         { retryBaseDelayMs: config.RETRY_BASE_DELAY_MS, isFailover, ruleMatcher: matcher, transportFn },
       );
@@ -367,7 +369,7 @@ export async function executeFailoverLoop(
       const lastLogId = logResilienceResult(
         db,
         {
-          apiType: ctx.apiType as "openai" | "openai-responses" | "anthropic",
+          apiType: clientApiType,
           model: clientModel, providerId: provider.id, isStream,
           clientReq, upstreamReqBase, logId, routerKeyId, originalModel: null, sessionId: ctx.sessionId,
           failover: { isFailoverIteration, rootLogId: rootLogId! },
@@ -376,16 +378,16 @@ export async function executeFailoverLoop(
         },
         resilienceResult.attempts, resilienceResult.result, startTime,
       );
-      collectTransportMetrics(db, ctx.apiType as "openai" | "openai-responses" | "anthropic", resilienceResult.result, isStream, lastLogId, provider.id, resolved.backend_model, request, routerKeyId, getTransportStatusCode(resilienceResult.result));
+      collectTransportMetrics(db, clientApiType, resilienceResult.result, isStream, lastLogId, provider.id, resolved.backend_model, request, routerKeyId, getTransportStatusCode(resilienceResult.result));
 
       // flush tool errors
-      flushToolErrors(resolved.provider_id, resolved.backend_model ?? clientModel, lastLogId);
+      flushToolErrors(provider.id, resolved.backend_model ?? clientModel, lastLogId);
 
       // Stream timeout
       if (resilienceResult.result.kind === "stream_abort" && resilienceResult.result.timeoutContext) {
         const { modelId, providerId } = resilienceResult.result.timeoutContext;
         const msg = `Stream timeout: no data received for ${resilienceResult.result.timeoutMs}ms (model: ${modelId}, provider: ${providerId})`;
-        const errBody = ctx.apiType === "anthropic"
+        const errBody = clientApiType === "anthropic"
           ? { type: "error", error: { type: "api_error", message: msg } }
           : { error: { message: msg, type: "server_error", code: "stream_timeout" } };
         try { reply.raw.write(`data: ${JSON.stringify(errBody)}\n\n`); } catch { /* client disconnected */ } // eslint-disable-line taste/no-silent-catch
@@ -398,15 +400,13 @@ export async function executeFailoverLoop(
 
       // 流式内容日志
       if (isStream && tracker) {
-        const { serializeBlocksForStorage } = await import("./proxy-handler-utils.js");
         const sc = tracker.get(logId)?.streamContent;
         const blocks = sc?.blocks;
         const hasStructured = blocks && blocks.length > 0 && blocks.some((b: { type: string }) => b.type !== "text");
         const content = hasStructured
-          ? serializeBlocksForStorage(blocks, ctx.apiType as "openai" | "openai-responses" | "anthropic")
+          ? serializeBlocksForStorage(blocks, clientApiType)
           : (sc?.textContent || "");
         if (content) {
-          const { updateLogStreamContent } = await import("../../db/index.js");
           updateLogStreamContent(db, lastLogId, content);
         }
       }
@@ -451,7 +451,7 @@ export async function executeFailoverLoop(
           logResilienceResult(
             db,
             {
-              apiType: ctx.apiType as "openai" | "openai-responses" | "anthropic",
+              apiType: clientApiType,
               model: clientModel, providerId: provider.id, isStream,
               clientReq, upstreamReqBase, logId, routerKeyId, originalModel: null, sessionId: ctx.sessionId,
               failover: { isFailoverIteration, rootLogId: rootLogId! },
@@ -461,7 +461,7 @@ export async function executeFailoverLoop(
             e.attempts, fakeResult, startTime,
           );
         }
-        flushToolErrors(resolved.provider_id, resolved.backend_model ?? clientModel, logId);
+        flushCurrentErrors();
         excludeTargets.push(resolved);
         continue;
       }
@@ -469,20 +469,19 @@ export async function executeFailoverLoop(
       if (e instanceof SemaphoreQueueFullError) {
         return rejectAndReply(reply, rCtx, errors.concurrencyQueueFull(provider.id),
           `Concurrency queue full for provider '${provider.id}'`, provider.id,
-          () => flushToolErrors(provider.id, resolved.backend_model ?? clientModel, logId));
+          flushCurrentErrors);
       }
       if (e instanceof SemaphoreTimeoutError) {
         return rejectAndReply(reply, rCtx, errors.concurrencyTimeout(provider.id, (e as SemaphoreTimeoutError).timeoutMs),
           `Concurrency wait timeout for provider '${provider.id}' (${(e as SemaphoreTimeoutError).timeoutMs}ms)`, provider.id,
-          () => flushToolErrors(provider.id, resolved.backend_model ?? clientModel, logId));
+          flushCurrentErrors);
       }
 
       // 其他未知错误
       const errMsg = e instanceof Error ? e.message : String(e);
       request.log.debug({ logId, error: errMsg, action: "upstream_error" });
-      const { insertRequestLog } = await import("../../db/index.js");
       insertRequestLog(db, {
-        id: logId, api_type: ctx.apiType as "openai" | "openai-responses" | "anthropic",
+        id: logId, api_type: clientApiType,
         model: clientModel, provider_id: provider.id,
         status_code: UPSTREAM_ERROR_STATUS, latency_ms: Date.now() - startTime, is_stream: isStream ? 1 : 0,
         error_message: errMsg || "Upstream connection failed", created_at: new Date().toISOString(),
@@ -494,7 +493,7 @@ export async function executeFailoverLoop(
       }, (matcher || logFileWriter) ? {
         matcher, logFileWriter, responseBody: null,
       } : undefined);
-      flushToolErrors(provider.id, resolved.backend_model ?? clientModel, logId);
+      flushCurrentErrors();
       const err = errors.upstreamConnectionFailed();
       return reply.code(err.statusCode).send(err.body);
     }

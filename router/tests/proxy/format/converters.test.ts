@@ -3,7 +3,7 @@
  *
  * 覆盖 spec 中 format-adapter.md 定义的核心契约：
  * - sourceType / targetType 正确声明
- * - transformRequest 返回 { body, upstreamPath }
+ * - transformRequest 返回转换后的 body
  * - transformResponse 返回有效的 JSON string
  * - createStreamTransform 返回 Transform stream
  *
@@ -45,7 +45,6 @@ describe("FormatConverter contracts", () => {
   function validateConverter(
     converter: FormatConverter,
     sourceBody: Record<string, unknown>,
-    expectedPath: string,
   ) {
     it(`has correct direction: ${converter.sourceType} → ${converter.targetType}`, () => {
       expect(converter.sourceType).toBeDefined();
@@ -53,19 +52,16 @@ describe("FormatConverter contracts", () => {
       expect(converter.sourceType).not.toBe(converter.targetType);
     });
 
-    it("transformRequest returns body and upstreamPath", () => {
+    it("transformRequest returns transformed body", () => {
       const result = converter.transformRequest(structuredClone(sourceBody), "test-model");
-      expect(result).toHaveProperty("body");
-      expect(result).toHaveProperty("upstreamPath");
-      expect(typeof result.upstreamPath).toBe("string");
-      expect(result.upstreamPath).toBe(expectedPath);
+      expect(result).toBeDefined();
+      expect(typeof result).toBe("object");
     });
 
     it("transformRequest does not return the same body object reference", () => {
       const original = structuredClone(sourceBody);
       const result = converter.transformRequest(original, "test-model");
-      // converter 应该返回转换后的 body，而非原样透传
-      expect(result.body).toBeDefined();
+      expect(result).toBeDefined();
     });
 
     it("transformResponse returns valid JSON string", () => {
@@ -84,26 +80,26 @@ describe("FormatConverter contracts", () => {
   }
 
   describe("openai → anthropic", () => {
-    validateConverter(openaiToAnthropicConverter, openaiBody, "/v1/messages");
+    validateConverter(openaiToAnthropicConverter, openaiBody);
   });
 
   describe("anthropic → openai", () => {
-    validateConverter(anthropicToOpenAIConverter, anthropicBody, "/v1/chat/completions");
+    validateConverter(anthropicToOpenAIConverter, anthropicBody);
   });
 
   describe("openai → responses", () => {
-    validateConverter(openaiToResponsesConverter, openaiBody, "/v1/responses");
+    validateConverter(openaiToResponsesConverter, openaiBody);
   });
 
   describe("responses → openai", () => {
-    validateConverter(responsesToOpenAIConverter, responsesBody, "/v1/chat/completions");
+    validateConverter(responsesToOpenAIConverter, responsesBody);
   });
 
   describe("responses → anthropic", () => {
-    validateConverter(responsesToAnthropicConverter, responsesBody, "/v1/messages");
+    validateConverter(responsesToAnthropicConverter, responsesBody);
   });
 
   describe("anthropic → responses", () => {
-    validateConverter(anthropicToResponsesConverter, anthropicBody, "/v1/responses");
+    validateConverter(anthropicToResponsesConverter, anthropicBody);
   });
 });

@@ -48,8 +48,8 @@ function createMockConverter(source: string, target: string): FormatConverter {
   return {
     sourceType: source,
     targetType: target,
-    transformRequest(body, _model) {
-      return { body: { ...body, _converted: `${source}->${target}` }, upstreamPath: `/v1/${target}` };
+    transformRequest(body) {
+      return { ...body, _converted: `${source}->${target}` };
     },
     transformResponse(bodyStr) {
       const parsed = JSON.parse(bodyStr);
@@ -91,7 +91,7 @@ describe("FormatRegistry", () => {
 
     const result = registry.transformRequest({ messages: [] }, "openai", "anthropic", "gpt-4");
     expect(result.body._converted).toBe("openai->anthropic");
-    expect(result.upstreamPath).toBe("/v1/anthropic");
+    expect(result.upstreamPath).toBe("/v1/messages");
   });
 
   it("transformRequest returns original body when no converter", () => {

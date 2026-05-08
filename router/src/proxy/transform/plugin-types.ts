@@ -2,6 +2,16 @@
  * Transform Plugin 类型定义
  */
 
+import type { ApiType } from "./types.js";
+
+/** Minimal provider info carried in plugin contexts */
+export interface ProviderInfo {
+  id: string;
+  name: string;
+  base_url: string;
+  api_type: string;
+}
+
 /** SSE Layer 1 event for streaming interception */
 export interface SSEEvent {
   /** SSE event type (e.g. "content_block_delta"), may be undefined */
@@ -12,7 +22,7 @@ export interface SSEEvent {
 
 /** Stream plugin context */
 export interface StreamPluginContext {
-  provider: { id: string; name: string; base_url: string; api_type: string };
+  provider: ProviderInfo;
   sourceApiType: string;
   targetApiType: string;
 }
@@ -21,7 +31,7 @@ export interface StreamPluginContext {
 export interface ErrorPluginContext {
   error: Error;
   statusCode?: number;
-  provider: { id: string; name: string; base_url: string; api_type: string };
+  provider: ProviderInfo;
   providerId?: string;
 }
 
@@ -29,22 +39,22 @@ export interface PluginMatch {
   providerId?: string;
   providerName?: string;
   providerNamePattern?: string;
-  apiType?: "openai" | "openai-responses" | "anthropic";
+  apiType?: ApiType;
 }
 
 export interface RequestTransformContext {
   body: Record<string, unknown>;
   headers: Record<string, string>;
-  sourceApiType: "openai" | "openai-responses" | "anthropic";
-  targetApiType: "openai" | "openai-responses" | "anthropic";
-  provider: { id: string; name: string; base_url: string; api_type: string };
+  sourceApiType: ApiType;
+  targetApiType: ApiType;
+  provider: ProviderInfo;
 }
 
 export interface ResponseTransformContext {
   response: Record<string, unknown>;
-  sourceApiType: "openai" | "openai-responses" | "anthropic";
-  targetApiType: "openai" | "openai-responses" | "anthropic";
-  provider: { id: string; name: string; base_url: string; api_type: string };
+  sourceApiType: ApiType;
+  targetApiType: ApiType;
+  provider: ProviderInfo;
 }
 
 export interface TransformPlugin {

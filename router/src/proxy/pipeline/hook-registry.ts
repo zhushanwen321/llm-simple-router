@@ -36,11 +36,7 @@ class HookRegistry {
   }
 
   getAll(): Record<string, HookSummary[]> {
-    const result = {} as Record<string, HookSummary[]>;
-    for (const phase of ALL_PHASES) {
-      result[phase] = this.getByPhase(phase);
-    }
-    return result;
+    return Object.fromEntries(ALL_PHASES.map(phase => [phase, this.getByPhase(phase)]));
   }
 }
 

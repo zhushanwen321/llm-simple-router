@@ -1,6 +1,5 @@
 import { Transform, type TransformCallback } from "stream";
 import type { PipelineContext } from "../pipeline/types.js";
-import type { ProxyPipeline } from "../pipeline/pipeline.js";
 import type { SSEEvent } from "../transform/plugin-types.js";
 
 /**
@@ -9,13 +8,11 @@ import type { SSEEvent } from "../transform/plugin-types.js";
  */
 export class SSEEventTransform extends Transform {
   private buffer = "";
-  private readonly pipeline: ProxyPipeline;
   private readonly ctx: PipelineContext;
 
-  constructor(ctx: PipelineContext, pipeline: ProxyPipeline) {
+  constructor(ctx: PipelineContext) {
     super({ decodeStrings: true });
     this.ctx = ctx;
-    this.pipeline = pipeline;
   }
 
   _transform(chunk: Buffer, _encoding: BufferEncoding, callback: TransformCallback): void {
@@ -53,18 +50,9 @@ export class SSEEventTransform extends Transform {
         continue;
       }
 
-      // Emit hooks with the parsed event
+      // Store parsed event for on_stream_event hooks
       const sseEvent: SSEEvent = { event, data: parsedData };
-      // Store event in metadata for hooks to access
       this.ctx.metadata.set("currentSSEEvent", sseEvent);
-
-      // Fire hooks synchronously (we don't await in stream transform)
-      // Hooks that need async should use separate mechanisms
-      const hookChain = this.pipeline.getHookChain("on_stream_event");
-      for (const _hookInfo of hookChain) {
-        // In the future, this will call hook.execute(ctx)
-        // For now, just pass through
-      }
 
       // Forward the original SSE event
       this.push(part + "\n\n");
