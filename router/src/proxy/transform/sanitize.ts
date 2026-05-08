@@ -4,7 +4,7 @@ export function sanitizeToolUseId(id: string): string {
 }
 
 export function parseToolArguments(args: unknown): Record<string, unknown> {
-  try { return JSON.parse(String(args ?? "{}")); }
+  try { return JSON.parse(JSON.stringify(args ?? {})); }
   catch { console.warn("[transform] Failed to parse tool arguments, using empty object"); return {}; }
 }
 

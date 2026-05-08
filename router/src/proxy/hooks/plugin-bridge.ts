@@ -123,7 +123,7 @@ export function bridgePlugin(plugin: TransformPlugin): PipelineHook[] {
       execute(ctx) {
         const err = ctx.metadata.get("error") as Error | undefined;
         const statusCode = ctx.metadata.get("errorStatusCode") as number | undefined;
-        if (!err || !ctx.provider) return;
+        if (!err || !ctx.provider || !pluginMatches(plugin, ctx.provider)) return;
         plugin.onError!({
           error: err,
           statusCode,

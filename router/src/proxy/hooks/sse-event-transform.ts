@@ -36,7 +36,8 @@ export class SSEEventTransform extends Transform {
         if (line.startsWith("event:")) {
           event = line.slice(6).trim();
         } else if (line.startsWith("data:")) {
-          data += line.slice(5).trim();
+          const dataLine = line.slice(5);
+          data += (data ? "\n" : "") + dataLine.trimStart();
         }
       }
 
@@ -73,9 +74,7 @@ export class SSEEventTransform extends Transform {
   }
 
   _flush(callback: TransformCallback): void {
-    if (this.buffer.trim()) {
-      this.push(this.buffer);
-    }
+    // Discard incomplete trailing SSE events (no \n\n terminator)
     callback();
   }
 }

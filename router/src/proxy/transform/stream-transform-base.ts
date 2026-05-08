@@ -21,11 +21,11 @@ export abstract class BaseSSETransform extends Transform {
         try {
           this.processEvent(event);
         } catch (err) {
-          this.emit("warning", { event: "process_error", error: String(err) });
+          this.emit("warning", { event: "process_error", error: err instanceof Error ? err.message : JSON.stringify(err) });
         }
       }
     } catch (err) {
-      this.emit("warning", { event: "buffer_overflow", error: String(err) });
+      this.emit("warning", { event: "buffer_overflow", error: err instanceof Error ? err.message : JSON.stringify(err) });
       this.flushPendingData();
       this.ensureTerminated();
     }

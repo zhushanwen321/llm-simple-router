@@ -33,6 +33,7 @@ import { PipelineAbort } from "../pipeline/types.js";
 import { PipelineSnapshot } from "../pipeline-snapshot.js";
 import { applyToolRoundLimit } from "../patch/tool-round-limiter.js";
 import { extractLastToolUse } from "./proxy-handler-utils.js";
+import { parseModels } from "../../config/model-context.js";
 
 // ---------- Factory config ----------
 
@@ -59,9 +60,9 @@ function handleModelsRequest(db: Database.Database) {
     const modelMeta = new Map<string, { providerName: string; createdAt: string }>();
     for (const p of allProviders) {
       try {
-        const models: string[] = JSON.parse(p.models || "[]");
+        const models = parseModels(p.models || "[]");
         for (const m of models) {
-          if (!modelMeta.has(m)) modelMeta.set(m, { providerName: p.name, createdAt: p.created_at });
+          if (m.name && !modelMeta.has(m.name)) modelMeta.set(m.name, { providerName: p.name, createdAt: p.created_at });
         }
       } catch {
         continue;

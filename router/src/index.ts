@@ -352,7 +352,7 @@ export async function buildApp(
     // SPA fallback: /admin/ 下非 API 路径返回 index.html
     app.setNotFoundHandler((request, reply) => {
       if (
-        request.url.startsWith("/admin") &&
+        (request.url.startsWith("/admin/") || request.url === "/admin") &&
         !request.url.startsWith("/admin/api")
       ) {
         return reply.sendFile("index.html");

@@ -53,6 +53,8 @@ import Database from "better-sqlite3";
 
 const HTTP_ERROR_THRESHOLD = 400;
 const UPSTREAM_ERROR_STATUS = 502;
+const HTTP_SERVICE_UNAVAILABLE = 503;
+const MAX_FAILOVER_ITERATIONS = 10;
 
 // ---------- Dependencies ----------
 
@@ -148,8 +150,14 @@ export async function executeFailoverLoop(
 
   const clientModel = ctx.clientModel;
   const rawBody = ctx.rawBody;
+  let failoverIteration = 0;
 
   while (true) {
+    if (++failoverIteration > MAX_FAILOVER_ITERATIONS) {
+      return reply.code(HTTP_SERVICE_UNAVAILABLE).send({
+        error: { message: `Max failover iterations (${MAX_FAILOVER_ITERATIONS}) exceeded`, type: "server_error", code: "failover_limit_exceeded" },
+      });
+    }
     const startTime = Date.now();
     const logId = randomUUID();
     if (rootLogId === null) rootLogId = logId;
@@ -291,7 +299,7 @@ export async function executeFailoverLoop(
 
     // --- Build logging data ---
     const reqBodyStr = JSON.stringify(patchedBody);
-    const clientReq = JSON.stringify({ headers: cliHdrs, body: rawBody });
+    const clientReq = JSON.stringify({ headers: sanitizeHeadersForLog(cliHdrs as Record<string, string>), body: rawBody });
     const upstreamReqBase = JSON.stringify({
       url: buildUpstreamUrl(provider.base_url, effectiveUpstreamPath),
       headers: sanitizeHeadersForLog(buildUpstreamHeaders(cliHdrs, apiKey, Buffer.byteLength(reqBodyStr), effectiveApiType)),
@@ -422,6 +430,10 @@ export async function executeFailoverLoop(
           updateLogClientStatus(db, lastLogId, err.statusCode);
           return reply.code(err.statusCode).send(err.body);
         }
+        // 未知 TransportResult kind 的兜底响应
+        return reply.code(UPSTREAM_ERROR_STATUS).send(
+          adapter.formatError("Unhandled transport result") ?? { error: { message: "Unhandled transport result", type: "server_error" } },
+        );
       }
 
       return reply;

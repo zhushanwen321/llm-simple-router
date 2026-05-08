@@ -46,10 +46,11 @@ export class FormatRegistry {
     try {
       const parsed = JSON.parse(bodyStr);
       const message =
-        parsed.error?.message ?? parsed.message ?? String(parsed);
+        parsed.error?.message ?? parsed.message ?? JSON.stringify(parsed);
+      const code = parsed.error?.code ?? parsed.code;
       const targetAdapter = this.adapters.get(target);
       if (!targetAdapter) return bodyStr;
-      return JSON.stringify(targetAdapter.formatError(String(message)));
+      return JSON.stringify(targetAdapter.formatError(message, code));
     } catch {
       return bodyStr;
     }
