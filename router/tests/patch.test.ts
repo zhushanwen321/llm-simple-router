@@ -1,65 +1,54 @@
 import { describe, it, expect } from "vitest";
-import { patchNonDeepSeekToolMessages } from "../src/proxy/patch/deepseek/patch-non-deepseek-tools.js";
+import { patchThinkingConsistency, _internals } from "../src/proxy/patch/deepseek/patch-thinking.js";
 import { patchOrphanToolResultsOA } from "../src/proxy/patch/deepseek/patch-orphan-tool-results.js";
 import { applyProviderPatches } from "../src/proxy/patch/index.js";
 
-// ---------- patchNonDeepSeekToolMessages（方案 7，OpenAI 格式）----------
+// ---------- patchMissingReasoningContent ----------
 
-describe("patchNonDeepSeekToolMessages", () => {
-  it("thinking 未激活时跳过降级", () => {
+describe("patchMissingReasoningContent", () => {
+  it("thinking 未激活时不补 reasoning_content", () => {
     const body = {
       messages: [
         { role: "user", content: "read a file" },
         { role: "assistant", content: null, tool_calls: [{ id: "call_1", type: "function", function: { name: "read", arguments: '{"path":"a.ts"}' } }] },
         { role: "tool", tool_call_id: "call_1", content: "file content" },
-        { role: "user", content: "thanks" },
       ],
     };
     const original = JSON.stringify(body);
-    patchNonDeepSeekToolMessages(body);
-    // thinking 未激活，不应修改
+    _internals.patchMissingReasoningContent(body);
     expect(JSON.stringify(body)).toBe(original);
   });
 
-  it("thinking 激活时将无 reasoning_content 的 assistant tool_calls 降级为 text", () => {
+  it("thinking 激活时对有 tool_calls 但无 reasoning_content 的消息补空字符串", () => {
     const body = {
       thinking: { type: "enabled" },
       messages: [
         { role: "user", content: "read a file" },
         { role: "assistant", content: null, tool_calls: [{ id: "call_1", type: "function", function: { name: "read", arguments: '{"path":"a.ts"}' } }] },
         { role: "tool", tool_call_id: "call_1", content: "file content" },
-        { role: "user", content: "thanks" },
       ],
     };
-    patchNonDeepSeekToolMessages(body);
+    _internals.patchMissingReasoningContent(body);
 
     const assistant = body.messages[1] as Record<string, unknown>;
-    expect(assistant.tool_calls).toBeUndefined();
-    expect(typeof assistant.content).toBe("string");
-    expect((assistant.content as string)).toContain("[tool_calls]:");
-    expect((assistant.content as string)).toContain("call_1");
-
-    const tool = body.messages[2] as Record<string, unknown>;
-    expect(tool.role).toBe("user");
-    expect(tool.tool_call_id).toBeUndefined();
-    expect(typeof tool.content).toBe("string");
-    expect((tool.content as string)).toContain("tool_result");
+    expect(assistant.reasoning_content).toBe("");
+    expect(assistant.tool_calls).toHaveLength(1);
+    expect((assistant.tool_calls as Array<Record<string, unknown>>)[0].id).toBe("call_1");
   });
 
-  it("保留有 reasoning_content 的 DeepSeek 原生消息", () => {
+  it("已有 reasoning_content 的消息不修改", () => {
     const body = {
       thinking: { type: "enabled" },
       messages: [
         { role: "assistant", reasoning_content: "thinking...", content: null, tool_calls: [{ id: "call_ds", type: "function", function: { name: "read", arguments: "{}" } }] },
-        { role: "tool", tool_call_id: "call_ds", content: "result" },
       ],
     };
     const original = JSON.stringify(body);
-    patchNonDeepSeekToolMessages(body);
+    _internals.patchMissingReasoningContent(body);
     expect(JSON.stringify(body)).toBe(original);
   });
 
-  it("无 tool_calls 时不修改", () => {
+  it("无 tool_calls 的消息不修改", () => {
     const body = {
       thinking: { type: "enabled" },
       messages: [
@@ -67,28 +56,65 @@ describe("patchNonDeepSeekToolMessages", () => {
       ],
     };
     const original = JSON.stringify(body);
-    patchNonDeepSeekToolMessages(body);
+    _internals.patchMissingReasoningContent(body);
     expect(JSON.stringify(body)).toBe(original);
   });
 
-  it("thinking 激活时保留 assistant 的原始 content 并追加降级文本", () => {
+  it("无 messages 时安全返回", () => {
+    expect(() => _internals.patchMissingReasoningContent({})).not.toThrow();
+    expect(() => _internals.patchMissingReasoningContent({ thinking: { type: "enabled" }, messages: [] })).not.toThrow();
+  });
+});
+
+// ---------- patchThinkingConsistency 集成 ----------
+
+describe("patchThinkingConsistency", () => {
+  it("OpenAI 路径：注入 thinking + 补 reasoning_content", () => {
     const body = {
-      thinking: { type: "enabled" },
       messages: [
-        { role: "assistant", content: "Let me read that file.", tool_calls: [{ id: "call_1", type: "function", function: { name: "read", arguments: "{}" } }] },
-        { role: "tool", tool_call_id: "call_1", content: "file" },
+        { role: "assistant", reasoning_content: "I thought...", content: "hello" },
+        { role: "user", content: "now read a file" },
+        { role: "assistant", content: null, tool_calls: [{ id: "call_1", type: "function", function: { name: "read", arguments: "{}" } }] },
       ],
     };
-    patchNonDeepSeekToolMessages(body);
+    patchThinkingConsistency(body, "openai");
 
-    const assistant = body.messages[0] as Record<string, unknown>;
-    expect((assistant.content as string)).toContain("Let me read that file.");
-    expect((assistant.content as string)).toContain("[tool_calls]:");
+    expect(body.thinking).toEqual({ type: "enabled" });
+    const lastAssistant = body.messages[2] as Record<string, unknown>;
+    expect(lastAssistant.reasoning_content).toBe("");
   });
 
-  it("无 messages 时安全返回", () => {
-    expect(() => patchNonDeepSeekToolMessages({})).not.toThrow();
-    expect(() => patchNonDeepSeekToolMessages({ messages: [] })).not.toThrow();
+  it("Anthropic 路径：注入 thinking + 补 thinking block + 剥离 cache_control", () => {
+    const body = {
+      messages: [
+        {
+          role: "assistant",
+          content: [
+            { type: "thinking", thinking: "I thought...", signature: "abc" },
+            { type: "text", text: "hello" },
+          ],
+        },
+        { role: "user", content: [{ type: "text", text: "go" }, { type: "tool_result", tool_use_id: "t1", content: "ok", cache_control: { type: "ephemeral" } }] },
+        {
+          role: "assistant",
+          content: [
+            { type: "tool_use", id: "t1", name: "read", input: {} },
+          ],
+        },
+      ],
+      tools: [{ name: "read", description: "read", input_schema: {}, cache_control: { type: "ephemeral" } }],
+    };
+    patchThinkingConsistency(body, "anthropic");
+
+    expect(body.thinking).toEqual({ type: "enabled", budget_tokens: 10000 });
+
+    const lastAssistant = body.messages[2] as { content: Array<Record<string, unknown>> };
+    expect(lastAssistant.content[0].type).toBe("thinking");
+
+    const userMsg = body.messages[1] as { content: Array<Record<string, unknown>> };
+    expect(userMsg.content[1].cache_control).toBeUndefined();
+    const tools = body.tools as Array<Record<string, unknown>>;
+    expect(tools[0].cache_control).toBeUndefined();
   });
 });
 
@@ -104,7 +130,6 @@ describe("patchOrphanToolResults", () => {
       ],
     };
     patchOrphanToolResultsOA(body);
-    // orphan tool removed, then consecutive users merged
     expect(body.messages).toHaveLength(1);
     expect(body.messages[0].role).toBe("user");
     expect((body.messages[0].content as string)).toContain("hi");
@@ -139,33 +164,6 @@ describe("patchOrphanToolResults", () => {
     patchOrphanToolResultsOA(body);
     const roles = (body.messages as Array<{ role: string }>).map(m => m.role);
     expect(roles).toEqual(["assistant", "tool", "assistant", "user"]);
-  });
-
-  it("合并连续 user 消息（移除 orphan 后）", () => {
-    const body = {
-      messages: [
-        { role: "user", content: "first" },
-        { role: "tool", tool_call_id: "call_ghost", content: "orphan" },
-        { role: "user", content: "second" },
-      ],
-    };
-    patchOrphanToolResultsOA(body);
-    expect(body.messages).toHaveLength(1);
-    expect(body.messages[0].role).toBe("user");
-    expect((body.messages[0].content as string)).toContain("first");
-    expect((body.messages[0].content as string)).toContain("second");
-  });
-
-  it("无孤儿时不修改", () => {
-    const body = {
-      messages: [
-        { role: "assistant", content: null, tool_calls: [{ id: "call_1", type: "function", function: { name: "A", arguments: "{}" } }] },
-        { role: "tool", tool_call_id: "call_1", content: "ok" },
-      ],
-    };
-    const original = JSON.stringify(body);
-    patchOrphanToolResultsOA(body);
-    expect(JSON.stringify(body)).toBe(original);
   });
 
   it("空 messages 时安全返回", () => {

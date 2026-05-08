@@ -21,10 +21,11 @@ export function useFetchUpstreamModels(form: {
   function getDefaultPatches(modelName: string, apiType: string): string[] {
     const patches: string[] = []
     if (modelName.toLowerCase().includes(DEFAULT_PATCHES_BY_KEYWORD)) {
+      patches.push('thinking-consistency')
       if (apiType === 'anthropic') {
-        patches.push('thinking-param', 'cache-control', 'thinking-blocks', 'orphan-tool-results')
+        patches.push('orphan-tool-results')
       } else {
-        patches.push('non-ds-tools', 'orphan-tool-results-oa')
+        patches.push('orphan-tool-results-oa')
       }
     }
     return patches
