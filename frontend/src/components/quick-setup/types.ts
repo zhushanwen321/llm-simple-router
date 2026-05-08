@@ -49,9 +49,7 @@ export const PATCH_GROUPS: PatchGroup[] = [
     key: 'deepseek_anthropic',
     labelKey: 'quickSetup.patch.deepseekAnthropic',
     items: [
-      { id: 'thinking-param', nameKey: 'quickSetup.patch.thinkingParam', descKey: 'quickSetup.patch.thinkingParamDesc' },
-      { id: 'cache-control', nameKey: 'quickSetup.patch.cacheControl', descKey: 'quickSetup.patch.cacheControlDesc' },
-      { id: 'thinking-blocks', nameKey: 'quickSetup.patch.thinkingBlocks', descKey: 'quickSetup.patch.thinkingBlocksDesc' },
+      { id: 'thinking-consistency', nameKey: 'quickSetup.patch.thinkingConsistency', descKey: 'quickSetup.patch.thinkingConsistencyDesc' },
       { id: 'orphan-tool-results', nameKey: 'quickSetup.patch.orphanToolResult', descKey: 'quickSetup.patch.orphanToolResultDesc' },
     ],
   },
@@ -59,7 +57,7 @@ export const PATCH_GROUPS: PatchGroup[] = [
     key: 'deepseek_openai',
     labelKey: 'quickSetup.patch.deepseekOpenai',
     items: [
-      { id: 'non-ds-tools', nameKey: 'quickSetup.patch.nonDsTools', descKey: 'quickSetup.patch.nonDsToolsDesc' },
+      { id: 'thinking-consistency', nameKey: 'quickSetup.patch.thinkingConsistency', descKey: 'quickSetup.patch.thinkingConsistencyDesc' },
       { id: 'orphan-tool-results-oa', nameKey: 'quickSetup.patch.orphanToolResultOa', descKey: 'quickSetup.patch.orphanToolResultOaDesc' },
     ],
   },
