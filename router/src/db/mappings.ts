@@ -78,12 +78,10 @@ export function getActiveProviderModels(db: Database.Database): ProviderModelEnt
   const providers = db.prepare("SELECT name, models, is_active FROM providers WHERE is_active = 1").all() as { name: string; models: string; is_active: number }[];
   const results: ProviderModelEntry[] = [];
   for (const p of providers) {
-    try {
-      const modelEntries = parseModels(p.models);
-      for (const m of modelEntries) {
-        results.push({ provider_name: p.name, backend_model: m.name });
-      }
-    } catch { continue }
+    const modelEntries = parseModels(p.models);
+    for (const m of modelEntries) {
+      results.push({ provider_name: p.name, backend_model: m.name });
+    }
   }
   return results;
 }
@@ -131,10 +129,8 @@ export function resolveByProviderModel(
 ): { client_model: string; provider_id: string; backend_model: string } | null {
   const providerRow = db.prepare("SELECT id, models FROM providers WHERE name = ? AND is_active = 1").get(providerName) as { id: string; models: string } | undefined;
   if (!providerRow) return null;
-  try {
-    const modelEntries = parseModels(providerRow.models);
-    if (!modelEntries.some(m => m.name === backendModel)) return null;
-  } catch { return null }
+  const modelEntries = parseModels(providerRow.models);
+  if (!modelEntries.some(m => m.name === backendModel)) return null;
 
   // 尝试从 mapping_groups 找到包含此 provider+backend_model 的 client_model
   const groups = db.prepare("SELECT client_model, rule FROM mapping_groups").all() as { client_model: string; rule: string }[];

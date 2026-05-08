@@ -129,12 +129,10 @@ export function resolveMapping(
     const backendModel = slashMatch[2];
     const provider = getActiveProviderByName(db, providerName);
     if (provider) {
-      try {
-        const modelEntries = parseModels(provider.models);
-        if (modelEntries.some(m => m.name === backendModel)) {
-          return { target: { backend_model: backendModel, provider_id: provider.id }, targetCount: 1 };
-        }
-      } catch { return null }
+      const modelEntries = parseModels(provider.models);
+      if (modelEntries.some(m => m.name === backendModel)) {
+        return { target: { backend_model: backendModel, provider_id: provider.id }, targetCount: 1 };
+      }
     }
     return null;
   }
@@ -145,12 +143,10 @@ export function resolveMapping(
     // fallback: 直接查 provider 的 models 字段
     const providers = getActiveProvidersWithModels(db);
     for (const p of providers) {
-      try {
-        const modelEntries = parseModels(p.models);
-        if (modelEntries.some(m => m.name === clientModel)) {
-          return { target: { backend_model: clientModel, provider_id: p.id }, targetCount: 1 };
-        }
-      } catch { continue }
+      const modelEntries = parseModels(p.models);
+      if (modelEntries.some(m => m.name === clientModel)) {
+        return { target: { backend_model: clientModel, provider_id: p.id }, targetCount: 1 };
+      }
     }
     return null;
   }

@@ -52,6 +52,7 @@ cat > "$GIT_HOOKS_DIR/pre-commit" << 'HOOK_EOF'
 #   SKIP_FRONTEND_LINT=1      - 跳过前端 ESLint
 #   SKIP_TYPE_CHECK=1         - 跳过 vue-tsc 类型检查
 #   SKIP_CODE_RULES_CHECK=1   - 跳过自定义代码规范检查
+#   SKIP_BACKEND_LINT=1       - 跳过后端 ESLint
 
 set -e
 

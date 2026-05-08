@@ -45,7 +45,7 @@ export default {
             return;
           }
           // JSON.parse(xxx.models || "[]") — BinaryExpression 中包含 .models
-          if (arg.type === 'BinaryExpression') {
+          if (arg.type === 'BinaryExpression' || arg.type === 'LogicalExpression') {
             function containsModelsAccess(n) {
               if (
                 n.type === 'MemberExpression' &&

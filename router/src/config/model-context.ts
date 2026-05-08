@@ -115,6 +115,14 @@ export function normalizePatchName(name: string): string {
  *
  * ESLint 规则 taste/no-raw-json-parse-models 会强制执行此约束。
  */
+/** 旧 patch ID 到新 patch ID 的迁移映射 */
+const PATCH_ID_MIGRATION: Record<string, string> = {
+  thinking_param: "thinking_consistency",
+  thinking_blocks: "thinking_consistency",
+  non_ds_tools: "thinking_consistency",
+  cache_control: "thinking_consistency",
+};
+
 export function parseModels(raw: string): ModelEntry[] {
   if (!raw) return []
   try {
@@ -128,13 +136,6 @@ export function parseModels(raw: string): ModelEntry[] {
       if (!obj) return null
       const modelName = obj.name ?? obj.id
       if (!modelName) return null
-      /** 旧 patch ID 到新 patch ID 的运行时迁移映射 */
-      const PATCH_ID_MIGRATION: Record<string, string> = {
-        thinking_param: "thinking_consistency",
-        thinking_blocks: "thinking_consistency",
-        non_ds_tools: "thinking_consistency",
-        cache_control: "thinking_consistency",
-      };
       const rawPatches = (obj.patches ?? []).map(normalizePatchName);
       const migrated = rawPatches.map(p => PATCH_ID_MIGRATION[p] ?? p);
       const patches = [...new Set(migrated)];
