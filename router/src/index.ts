@@ -23,6 +23,16 @@ import { responsesProxy } from "./proxy/handler/responses.js";
 import { adminRoutes } from "./admin/routes.js";
 import { RetryRuleMatcher } from "./proxy/orchestration/retry-rules.js";
 import { PluginRegistry } from "./proxy/transform/plugin-registry.js";
+import { FormatRegistry } from "./proxy/format/registry.js";
+import { openaiAdapter } from "./proxy/format/adapters/openai.js";
+import { anthropicAdapter } from "./proxy/format/adapters/anthropic.js";
+import { responsesAdapter } from "./proxy/format/adapters/responses.js";
+import { openaiToAnthropicConverter } from "./proxy/format/converters/openai-anthropic.js";
+import { anthropicToOpenAIConverter } from "./proxy/format/converters/anthropic-openai.js";
+import { openaiToResponsesConverter } from "./proxy/format/converters/openai-responses.js";
+import { responsesToOpenAIConverter } from "./proxy/format/converters/responses-openai.js";
+import { responsesToAnthropicConverter } from "./proxy/format/converters/responses-anthropic.js";
+import { anthropicToResponsesConverter } from "./proxy/format/converters/anthropic-responses.js";
 import { SemaphoreManager, AdaptiveController } from "@llm-router/core/concurrency";
 import type { StateRegistry } from "./core/registry.js";
 import { RequestTracker } from "@llm-router/core/monitor";
@@ -253,6 +263,19 @@ export async function buildApp(
   const pluginsDir = path.resolve(__dirname, "../plugins/transform");
   pluginRegistry.scanPluginsDir(pluginsDir);
   container.register(SERVICE_KEYS.pluginRegistry, () => pluginRegistry);
+
+  // 注册 FormatRegistry（3 adapters + 6 converters 覆盖所有格式转换）
+  const formatRegistry = new FormatRegistry();
+  formatRegistry.registerAdapter(openaiAdapter);
+  formatRegistry.registerAdapter(anthropicAdapter);
+  formatRegistry.registerAdapter(responsesAdapter);
+  formatRegistry.registerConverter(openaiToAnthropicConverter);
+  formatRegistry.registerConverter(anthropicToOpenAIConverter);
+  formatRegistry.registerConverter(openaiToResponsesConverter);
+  formatRegistry.registerConverter(responsesToOpenAIConverter);
+  formatRegistry.registerConverter(responsesToAnthropicConverter);
+  formatRegistry.registerConverter(anthropicToResponsesConverter);
+  container.register(SERVICE_KEYS.formatRegistry, () => formatRegistry);
 
   // 注册 ProxyAgentFactory
   container.register(SERVICE_KEYS.proxyAgentFactory, () => new ProxyAgentFactory());

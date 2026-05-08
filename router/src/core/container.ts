@@ -8,6 +8,7 @@ export const SERVICE_KEYS = {
   sessionTracker: "sessionTracker",
   adaptiveController: "adaptiveController",
   pluginRegistry: "pluginRegistry",
+  formatRegistry: "formatRegistry",
   logFileWriter: "logFileWriter",
   proxyAgentFactory: "proxyAgentFactory",
 } as const;

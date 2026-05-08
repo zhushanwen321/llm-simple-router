@@ -112,7 +112,7 @@ export interface RouteHandlerDeps {
 import { getConfig } from "../../config/index.js";
 import type { ServiceContainer } from "../../core/container.js";
 import { SERVICE_KEYS } from "../../core/container.js";
-import { TransformCoordinator } from "../transform/transform-coordinator.js";
+import type { FormatRegistry } from "../format/registry.js";
 
 // ---------- Main entry ----------
 
@@ -226,8 +226,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
     logToolErrors(pendingToolErrors, { db: deps.db, providerId, backendModel: model, clientAgentType: detectClientAgentType(request.headers as RawHeaders), requestLogId: reqLogId, routerKeyId: request.routerKey?.id ?? null, sessionId });
     pendingToolErrors = null;
   };
-  // TransformCoordinator 无状态，只需创建一次
-  const coordinator = new TransformCoordinator();
+  const formatRegistry = deps.container.resolve<FormatRegistry>(SERVICE_KEYS.formatRegistry);
   const enhancementConfig = loadEnhancementConfig(deps.db);
   while (true) {
     const startTime = Date.now();
@@ -310,12 +309,12 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
     }
 
     // 格式转换：apiType 不匹配时转换请求体和路径
-    const needsTransform = coordinator.needsTransform(apiType, provider.api_type);
+    const needsTransform = formatRegistry.needsTransform(apiType, provider.api_type);
     let effectiveApiType = apiType;
     let effectiveUpstreamPath = upstreamPath;
 
     if (needsTransform) {
-      const transformed = coordinator.transformRequest(currentBody, apiType, provider.api_type, resolved.backend_model);
+      const transformed = formatRegistry.transformRequest(currentBody, apiType, provider.api_type, resolved.backend_model);
       // 用转换后的结果替换 currentBody
       currentBody = transformed.body as Record<string, unknown>;
       effectiveUpstreamPath = transformed.upstreamPath;
@@ -377,7 +376,7 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
       body: reqBodyStr,
     });
 
-    const formatTransform = needsTransform ? coordinator.createFormatTransform(apiType, provider.api_type, resolved.backend_model) : undefined;
+    const formatTransform = needsTransform ? formatRegistry.createStreamTransform(apiType, provider.api_type, resolved.backend_model) : undefined;
     if (formatTransform) {
       formatTransform.on("warning", (err) => request.log.warn({ err, logId }, "formatTransform warning"));
     }
@@ -385,9 +384,9 @@ async function executeFailoverLoop(ctx: FailoverContext): Promise<FastifyReply> 
       try {
         const parsed = JSON.parse(bodyStr);
         if (parsed.type === "error" || parsed.error) {
-          return coordinator.transformErrorResponse(bodyStr, provider.api_type, apiType);
+          return formatRegistry.transformError(bodyStr, provider.api_type, apiType);
         }
-        let transformed = coordinator.transformResponse(bodyStr, provider.api_type, apiType);
+        let transformed = formatRegistry.transformResponse(bodyStr, provider.api_type, apiType);
         if (pluginRegistry && !isStream) {
           try {
             const respObj = JSON.parse(transformed);
