@@ -8,7 +8,24 @@
  *
  * 例外：迁移代码（db/index.ts 中 app_migration_040 开头的函数）需要操作原始 JSON 结构，
  * 已通过注释标注豁免。
+ *
+ * 已知限制：无法检测变量别名（const m = provider.models; JSON.parse(m)）、
+ * 动态属性访问（provider[field]）或解构（const { models } = provider; JSON.parse(models)）。
  */
+
+/** 递归检测 AST 节点中是否包含 .models 属性访问 */
+function containsModelsAccess(n) {
+  if (
+    n.type === 'MemberExpression' &&
+    n.property.type === 'Identifier' &&
+    n.property.name === 'models'
+  ) return true;
+  if (n.type === 'BinaryExpression' || n.type === 'LogicalExpression') {
+    return containsModelsAccess(n.left) || containsModelsAccess(n.right);
+  }
+  return false;
+}
+
 export default {
   meta: {
     type: 'problem',
@@ -25,7 +42,6 @@ export default {
   create(context) {
     return {
       CallExpression(node) {
-        // 匹配 JSON.parse(xxx.models) 或 JSON.parse(xxx.models || "[]") 等模式
         if (
           node.callee.type === 'MemberExpression' &&
           node.callee.object.type === 'Identifier' &&
@@ -44,22 +60,8 @@ export default {
             context.report({ node, messageId: 'rawJsonParseModels' });
             return;
           }
-          // JSON.parse(xxx.models || "[]") — BinaryExpression 中包含 .models
+          // JSON.parse(xxx.models || "[]") / JSON.parse(xxx.models ?? "[]")
           if (arg.type === 'BinaryExpression' || arg.type === 'LogicalExpression') {
-            function containsModelsAccess(n) {
-              if (
-                n.type === 'MemberExpression' &&
-                n.property.type === 'Identifier' &&
-                n.property.name === 'models'
-              ) return true;
-              if (n.type === 'BinaryExpression') {
-                return containsModelsAccess(n.left) || containsModelsAccess(n.right);
-              }
-              if (n.type === 'LogicalExpression') {
-                return containsModelsAccess(n.left) || containsModelsAccess(n.right);
-              }
-              return false;
-            }
             if (containsModelsAccess(arg)) {
               context.report({ node, messageId: 'rawJsonParseModels' });
             }
