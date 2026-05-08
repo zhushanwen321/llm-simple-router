@@ -117,9 +117,19 @@ export function parseModels(raw: string): ModelEntry[] {
       }
       const obj = item as { name?: string; patches?: string[]; stream_timeout_ms?: number } | null
       if (!obj || !obj.name) return null
+      /** 旧 patch ID 到新 patch ID 的运行时迁移映射 */
+      const PATCH_ID_MIGRATION: Record<string, string> = {
+        thinking_param: "thinking_consistency",
+        thinking_blocks: "thinking_consistency",
+        non_ds_tools: "thinking_consistency",
+        cache_control: "thinking_consistency",
+      };
+      const rawPatches = (obj.patches ?? []).map(normalizePatchName);
+      const migrated = rawPatches.map(p => PATCH_ID_MIGRATION[p] ?? p);
+      const patches = [...new Set(migrated)];
       const result: ModelEntry = {
         name: obj.name,
-        patches: (obj.patches ?? []).map(normalizePatchName),
+        patches,
       }
       if (obj.stream_timeout_ms != null) result.stream_timeout_ms = obj.stream_timeout_ms
       return result

@@ -204,7 +204,7 @@ export function convertMessagesAnt2OA(
       const oaiMsg: Record<string, unknown> = { role: "assistant" };
 
       // thinking → reasoning_content（保留 DeepSeek 原生思考信息，
-      // 避免 A→O 转换后被 patchNonDeepSeekToolMessages 误判为非 DeepSeek 消息）
+      // 便于 patchThinkingConsistency 判断 thinking 模式是否激活）
       const thinkingBlocks = content.filter(b => b.type === "thinking");
       if (thinkingBlocks.length > 0) {
         oaiMsg.reasoning_content = thinkingBlocks.map(b => b.thinking ?? "").join("");
