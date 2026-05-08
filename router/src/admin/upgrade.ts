@@ -1,10 +1,10 @@
 import { FastifyPluginCallback } from 'fastify'
 import Database from 'better-sqlite3'
 import { getConfigSyncSource, setConfigSyncSource } from '../db/settings.js'
-import { detectDeployment, hasProcessManager, getRestartMethod } from '../upgrade/deployment.js'
+import { detectDeployment, hasProcessManager, resolveRestartBinPath, getRestartMethod } from '../upgrade/deployment.js'
 import { createUpgradeChecker, fetchJson, CheckerOptions } from '../upgrade/checker.js'
 import { reloadConfig } from '../config/recommended.js'
-import { execSync } from 'node:child_process'
+import { execSync, spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { HTTP_BAD_REQUEST, HTTP_INTERNAL_ERROR } from '../core/constants.js'
@@ -15,8 +15,23 @@ const GITEE_CONFIG_BASE = 'https://gitee.com/zzzzswszzzz/llm-simple-router/raw/m
 const CHECK_INTERVAL_MS = 60 * 60 * 1000 // eslint-disable-line no-magic-numbers
 const JSON_INDENT = 2
 
-const RESTART_FORCE_EXIT_MS = 3_000
+const RESTART_FORCE_EXIT_MS = 5_000
 const RESTART_RESPONSE_FLUSH_MS = 300
+
+function spawnDetached(req: import('fastify').FastifyRequest) {
+  const binPath = resolveRestartBinPath()
+  const args = process.argv.slice(2) // eslint-disable-line no-magic-numbers
+  req.log.info({ binPath, args }, 'Spawning new process')
+  const child = spawn(binPath, args, {
+    detached: true,
+    stdio: 'ignore',
+    env: { ...process.env },
+  })
+  child.on('error', (err) => {
+    req.log.error({ err, binPath }, 'Failed to spawn new process')
+  })
+  child.unref()
+}
 
 interface UpgradeRoutesOptions {
   db: Database.Database
@@ -103,16 +118,6 @@ export const adminUpgradeRoutes: FastifyPluginCallback<UpgradeRoutesOptions> = (
     const managed = hasProcessManager()
     const method = getRestartMethod()
 
-    if (!managed) {
-      // 无进程管理器（npx / 手动 node）时无法安全自动重启：
-      // 1. spawn 路径不可靠（npx 不注册全局 bin）
-      // 2. 新旧进程端口竞态（EADDRINUSE）
-      // 3. 原始启动参数无法复现
-      return reply.code(HTTP_BAD_REQUEST).send(
-        apiError(API_CODE.BAD_REQUEST, 'No process manager detected (PM2/systemd/Docker). Please restart manually.'),
-      )
-    }
-
     // 先回复客户端，再执行重启（否则客户端收不到响应）
     reply.send({ ok: true, method })
 
@@ -125,6 +130,8 @@ export const adminUpgradeRoutes: FastifyPluginCallback<UpgradeRoutesOptions> = (
       // 强制退出兜底：即使 closeFn 卡住（如活跃代理 SSE 流），也能确保进程退出。
       const forceExitTimer = setTimeout(() => {
         req.log.warn('Graceful shutdown timed out during restart, forcing exit')
+        // 超时强制退出前仍尝试 spawn（无进程管理器时）
+        if (!managed) spawnDetached(req)
         process.exit(0)
       }, RESTART_FORCE_EXIT_MS)
       forceExitTimer.unref()
@@ -133,6 +140,10 @@ export const adminUpgradeRoutes: FastifyPluginCallback<UpgradeRoutesOptions> = (
       await options.closeFn()
 
       clearTimeout(forceExitTimer)
+
+      // 无进程管理器时，先 closeFn 释放端口，再 spawn 新进程，避免 EADDRINUSE 竞态
+      if (!managed) spawnDetached(req)
+
       req.log.info('Exiting current process')
       process.exit(0)
     } catch (err) {
