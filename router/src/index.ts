@@ -20,6 +20,7 @@ import { authMiddleware } from "./middleware/auth.js";
 import { openaiProxy } from "./proxy/handler/openai.js";
 import { anthropicProxy } from "./proxy/handler/anthropic.js";
 import { responsesProxy } from "./proxy/handler/responses.js";
+import { createProxyHandler } from "./proxy/handler/create-proxy-handler.js";
 import { adminRoutes } from "./admin/routes.js";
 import { RetryRuleMatcher } from "./proxy/orchestration/retry-rules.js";
 import { PluginRegistry } from "./proxy/transform/plugin-registry.js";
@@ -295,9 +296,28 @@ export async function buildApp(
   initializeProviderState(db, semaphoreManager, adaptiveController, tracker);
 
   app.register(authMiddleware, { db });
-  app.register(openaiProxy, { db, container });
-  app.register(anthropicProxy, { db, container });
-  app.register(responsesProxy, { db, container });
+
+  // --- New pipeline-based proxy handlers (Phase 3) ---
+  const openaiHandler = createProxyHandler({
+    apiType: "openai",
+    paths: ["/v1/chat/completions", "/chat/completions"],
+  });
+  const anthropicHandler = createProxyHandler({
+    apiType: "anthropic",
+    paths: ["/v1/messages"],
+  });
+  const responsesHandler = createProxyHandler({
+    apiType: "openai-responses",
+    paths: ["/v1/responses", "/responses"],
+  });
+  app.register(openaiHandler, { db, container });
+  app.register(anthropicHandler, { db, container });
+  app.register(responsesHandler, { db, container });
+
+  // Old handlers still registered — will be removed in Phase 5 cleanup
+  // app.register(openaiProxy, { db, container });
+  // app.register(anthropicProxy, { db, container });
+  // app.register(responsesProxy, { db, container });
 
   // StateRegistry — Admin 层通过此接口触发 proxy 层状态刷新，消除 admin→proxy 依赖
   const stateRegistry: StateRegistry = {
