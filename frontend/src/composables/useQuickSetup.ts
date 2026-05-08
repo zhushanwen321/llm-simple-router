@@ -49,10 +49,11 @@ function computeDefaultPatches(
   const patches: string[] = []
   const isDeepseek = modelName.toLowerCase().includes('deepseek')
   if (isDeepseek) {
+    patches.push('thinking-consistency')
     if (format === 'anthropic') {
-      patches.push('thinking-param', 'cache-control', 'thinking-blocks', 'orphan-tool-results')
+      patches.push('orphan-tool-results')
     } else {
-      patches.push('non-ds-tools', 'orphan-tool-results-oa')
+      patches.push('orphan-tool-results-oa')
     }
   }
   if (format === 'openai' && isNonOpenaiEndpoint) {
