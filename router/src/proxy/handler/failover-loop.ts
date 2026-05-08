@@ -425,7 +425,7 @@ export async function executeFailoverLoop(
       }
 
       return reply;
-    } catch (e) {
+    } catch (e: unknown) {
       if (e instanceof PipelineAbort) {
         return reply.code(e.statusCode).send(e.body);
       }
@@ -459,8 +459,8 @@ export async function executeFailoverLoop(
           () => flushToolErrors(provider.id, resolved.backend_model ?? clientModel, logId));
       }
       if (e instanceof SemaphoreTimeoutError) {
-        return rejectAndReply(reply, rCtx, errors.concurrencyTimeout(provider.id, e.timeoutMs),
-          `Concurrency wait timeout for provider '${provider.id}' (${e.timeoutMs}ms)`, provider.id,
+        return rejectAndReply(reply, rCtx, errors.concurrencyTimeout(provider.id, (e as SemaphoreTimeoutError).timeoutMs),
+          `Concurrency wait timeout for provider '${provider.id}' (${(e as SemaphoreTimeoutError).timeoutMs}ms)`, provider.id,
           () => flushToolErrors(provider.id, resolved.backend_model ?? clientModel, logId));
       }
 
