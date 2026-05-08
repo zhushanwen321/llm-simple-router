@@ -15,6 +15,9 @@ import noHardcodedColors from './rules/no-hardcoded-colors.mjs';
 import noMagicSpacing from './rules/no-magic-spacing.mjs';
 import noDeprecatedRuleFormat from './rules/no-deprecated-rule-format.mjs';
 import noRawJsonParseModels from './rules/no-raw-json-parse-models.mjs';
+import noUnsafeStringConversion from './rules/no-unsafe-string-conversion.mjs';
+import noUnboundedWhileTrue from './rules/no-unbounded-while-true.mjs';
+import noInlineImportType from './rules/no-inline-import-type.mjs';
 
 export const tastePlugin = {
   meta: { name: 'eslint-plugin-taste' },
@@ -26,6 +29,9 @@ export const tastePlugin = {
     'no-magic-spacing': noMagicSpacing,
     'no-deprecated-rule-format': noDeprecatedRuleFormat,
     'no-raw-json-parse-models': noRawJsonParseModels,
+    'no-unsafe-string-conversion': noUnsafeStringConversion,
+    'no-unbounded-while-true': noUnboundedWhileTrue,
+    'no-inline-import-type': noInlineImportType,
   },
 };
 
@@ -60,6 +66,9 @@ export const tasteRules = {
   'taste/no-unsafe-object-entries': 'warn',
   'taste/no-deprecated-rule-format': 'warn',
   'taste/no-raw-json-parse-models': 'error',
+  'taste/no-unsafe-string-conversion': 'warn',
+  'taste/no-unbounded-while-true': 'warn',
+  'taste/no-inline-import-type': 'warn',
 };
 
 export default [

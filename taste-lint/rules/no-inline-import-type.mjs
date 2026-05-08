@@ -36,14 +36,27 @@ export default {
       if (text.includes('// taste:allow-inline-import-type')) return {};
     }
 
+    /** 递归检查类型节点中是否包含 TSImportType */
+    function containsImportType(typeNode) {
+      if (!typeNode) return false;
+      if (typeNode.type === 'TSImportType') return true;
+      if (typeNode.type === 'TSUnionType' || typeNode.type === 'TSIntersectionType') {
+        return (typeNode.types ?? []).some(containsImportType);
+      }
+      if (typeNode.type === 'TSTypeReference' && typeNode.typeName?.type === 'TSImportType') {
+        return true;
+      }
+      return false;
+    }
+
     return {
       TSAsExpression(node) {
-        if (node.typeAnnotation?.type === 'TSImportType') {
+        if (containsImportType(node.typeAnnotation)) {
           context.report({ node, messageId: 'inlineImportType' });
         }
       },
       TSSatisfiesExpression(node) {
-        if (node.typeAnnotation?.type === 'TSImportType') {
+        if (containsImportType(node.typeAnnotation)) {
           context.report({ node, messageId: 'inlineImportType' });
         }
       },
