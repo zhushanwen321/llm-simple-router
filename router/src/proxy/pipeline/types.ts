@@ -1,7 +1,8 @@
 // router/src/proxy/pipeline/types.ts
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { PipelineSnapshot } from "../pipeline-snapshot.js";
-import type { Target } from "../../core/types.js";
+import type { Target, TransportResult } from "../../core/types.js";
+import type { ResilienceResult } from "../orchestration/resilience.js";
 
 /** Hook 挂载阶段 */
 export type HookPhase =
@@ -72,6 +73,8 @@ export interface PipelineContext {
   metadata: Map<string, unknown>;
   logId: string;
   rootLogId: string | null;
+  transportResult: TransportResult | null;
+  resilienceResult: ResilienceResult | null;
   clientRequest: string;
   upstreamRequest: string;
   snapshot: PipelineSnapshot;

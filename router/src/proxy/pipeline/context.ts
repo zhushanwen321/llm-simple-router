@@ -30,6 +30,8 @@ export function createPipelineContext(
     metadata: new Map(),
     logId: "",
     rootLogId: null,
+    transportResult: null,
+    resilienceResult: null,
     clientRequest: "",
     upstreamRequest: "",
     snapshot: new PipelineSnapshot(),
