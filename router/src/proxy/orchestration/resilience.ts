@@ -12,7 +12,6 @@ export interface RetryStrategy {
 
 export class FixedIntervalStrategy implements RetryStrategy {
   constructor(private delayMs: number) {}
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   getDelay(_attempt: number): number { return this.delayMs; }
 }
 

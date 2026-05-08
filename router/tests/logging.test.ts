@@ -8,8 +8,10 @@ import {
 } from "http";
 import Database from "better-sqlite3";
 import { createHash } from "crypto";
-import { openaiProxy } from "../src/proxy/handler/openai.js";
-import { anthropicProxy } from "../src/proxy/handler/anthropic.js";
+import { createProxyHandler } from "../src/proxy/handler/create-proxy-handler.js";
+import { FormatRegistry } from "../src/proxy/format/registry.js";
+import { openaiAdapter } from "../src/proxy/format/adapters/openai.js";
+import { anthropicAdapter } from "../src/proxy/format/adapters/anthropic.js";
 import { authMiddleware } from "../src/middleware/auth.js";
 import { encrypt } from "../src/utils/crypto.js";
 import { initDatabase } from "../src/db/index.js";
@@ -71,9 +73,14 @@ function createApp() {
     container.register(SERVICE_KEYS.logFileWriter, () => null);
   container.register(SERVICE_KEYS.pluginRegistry, () => undefined);
   container.register(SERVICE_KEYS.proxyAgentFactory, () => new ProxyAgentFactory());
+
+  const formatRegistry = new FormatRegistry();
+  formatRegistry.registerAdapter(openaiAdapter);
+  formatRegistry.registerAdapter(anthropicAdapter);
+  container.register(SERVICE_KEYS.formatRegistry, () => formatRegistry);
   app.register(authMiddleware, { db });
-  app.register(openaiProxy, { db: db, container });
-  app.register(anthropicProxy, { db: db, container });
+  app.register(createProxyHandler({ apiType: "openai", paths: ["/v1/chat/completions", "/chat/completions"] }), { db: db, container });
+  app.register(createProxyHandler({ apiType: "anthropic", paths: ["/v1/messages"] }), { db: db, container });
 
   return { app, db };
 }

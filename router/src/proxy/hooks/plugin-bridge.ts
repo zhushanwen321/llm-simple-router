@@ -1,4 +1,4 @@
-import type { PipelineHook, PipelineContext } from "../pipeline/types.js";
+import type { PipelineHook } from "../pipeline/types.js";
 import type {
   TransformPlugin,
   RequestTransformContext,
@@ -6,6 +6,8 @@ import type {
   ErrorPluginContext,
 } from "../transform/plugin-types.js";
 import { pluginMatches } from "../transform/plugin-types.js";
+
+type ApiType = "openai" | "openai-responses" | "anthropic";
 
 /**
  * Register a TransformPlugin as PipelineHooks.
@@ -25,8 +27,8 @@ export function bridgePlugin(plugin: TransformPlugin): PipelineHook[] {
         const pluginCtx: RequestTransformContext = {
           body: ctx.body,
           headers: ctx.injectedHeaders,
-          sourceApiType: ctx.apiType as any,
-          targetApiType: ctx.effectiveApiType as any,
+          sourceApiType: ctx.apiType as ApiType,
+          targetApiType: ctx.effectiveApiType as ApiType,
           provider: ctx.provider,
         };
         if (plugin.beforeRequest) plugin.beforeRequest(pluginCtx);
@@ -47,8 +49,8 @@ export function bridgePlugin(plugin: TransformPlugin): PipelineHook[] {
         const pluginCtx: RequestTransformContext = {
           body: ctx.body,
           headers: ctx.injectedHeaders,
-          sourceApiType: ctx.apiType as any,
-          targetApiType: ctx.effectiveApiType as any,
+          sourceApiType: ctx.apiType as ApiType,
+          targetApiType: ctx.effectiveApiType as ApiType,
           provider: ctx.provider,
         };
         if (plugin.afterRequest) plugin.afterRequest(pluginCtx);
@@ -73,8 +75,8 @@ export function bridgePlugin(plugin: TransformPlugin): PipelineHook[] {
           const respObj = JSON.parse(ctx.transportResult.body);
           const pluginCtx: ResponseTransformContext = {
             response: respObj,
-            sourceApiType: ctx.effectiveApiType as any,
-            targetApiType: ctx.apiType as any,
+            sourceApiType: ctx.effectiveApiType as ApiType,
+            targetApiType: ctx.apiType as ApiType,
             provider: ctx.provider,
           };
           if (plugin.beforeResponse) plugin.beforeResponse(pluginCtx);
@@ -100,8 +102,8 @@ export function bridgePlugin(plugin: TransformPlugin): PipelineHook[] {
           const respObj = JSON.parse(ctx.transportResult.body);
           const pluginCtx: ResponseTransformContext = {
             response: respObj,
-            sourceApiType: ctx.effectiveApiType as any,
-            targetApiType: ctx.apiType as any,
+            sourceApiType: ctx.effectiveApiType as ApiType,
+            targetApiType: ctx.apiType as ApiType,
             provider: ctx.provider,
           };
           if (plugin.afterResponse) plugin.afterResponse(pluginCtx);

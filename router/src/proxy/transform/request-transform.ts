@@ -151,7 +151,6 @@ export function transformRequestBody(
   body: Record<string, unknown>,
   sourceApiType: string,
   targetApiType: string,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _model: string,
 ): Record<string, unknown> {
   if (sourceApiType === targetApiType) return body;

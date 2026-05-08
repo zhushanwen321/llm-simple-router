@@ -4,7 +4,9 @@ import Database from "better-sqlite3";
 import { initDatabase } from "../src/db/index.js";
 import { setSetting } from "../src/db/settings.js";
 import { encrypt } from "../src/utils/crypto.js";
-import { openaiProxy } from "../src/proxy/handler/openai.js";
+import { createProxyHandler } from "../src/proxy/handler/create-proxy-handler.js";
+import { FormatRegistry } from "../src/proxy/format/registry.js";
+import { openaiAdapter } from "../src/proxy/format/adapters/openai.js";
 import { SemaphoreManager as ProviderSemaphoreManager } from "@llm-router/core/concurrency";
 import { RequestTracker } from "@llm-router/core/monitor";
 import { createMockBackend } from "./helpers/mock-backend.js";
@@ -64,7 +66,11 @@ function buildTestApp(db: Database.Database): FastifyInstance {
     container.register(SERVICE_KEYS.logFileWriter, () => null);
   container.register(SERVICE_KEYS.pluginRegistry, () => undefined);
   container.register(SERVICE_KEYS.proxyAgentFactory, () => new ProxyAgentFactory());
-  app.register(openaiProxy, { db: db, container });
+
+  const formatRegistry = new FormatRegistry();
+  formatRegistry.registerAdapter(openaiAdapter);
+  container.register(SERVICE_KEYS.formatRegistry, () => formatRegistry);
+  app.register(createProxyHandler({ apiType: "openai", paths: ["/v1/chat/completions", "/chat/completions"] }), { db: db, container });
   return app;
 }
 

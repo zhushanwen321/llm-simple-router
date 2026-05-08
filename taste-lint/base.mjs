@@ -40,6 +40,9 @@ export const tasteRules = {
   // 类型即契约
   '@typescript-eslint/no-explicit-any': 'error',
 
+  // 允许 _ 前缀的未使用变量和参数（惯用模式）
+  '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+
   // 缩进：仅允许 space
   'indent': ['warn', 2, { SwitchCase: 1 }],
 

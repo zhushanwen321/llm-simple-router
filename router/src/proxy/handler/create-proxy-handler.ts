@@ -13,7 +13,7 @@ import type { FastifyPluginCallback, FastifyReply, FastifyRequest } from "fastif
 import Database from "better-sqlite3";
 import fp from "fastify-plugin";
 import { insertRequestLog, getAllProviders } from "../../db/index.js";
-import { createErrorFormatter, type ProxyErrorResponse, type ErrorKind } from "../proxy-core.js";
+import { createErrorFormatter, type ErrorKind } from "../proxy-core.js";
 import { createOrchestrator } from "../orchestration/orchestrator.js";
 import { SemaphoreManager } from "@llm-router/core/concurrency";
 import type { RequestTracker } from "@llm-router/core/monitor";
@@ -22,7 +22,6 @@ import { HTTP_OK, HTTP_BAD_GATEWAY, MS_PER_SECOND } from "../../core/constants.j
 import { SERVICE_KEYS } from "../../core/container.js";
 import type { ServiceContainer } from "../../core/container.js";
 import type { FormatRegistry } from "../format/registry.js";
-import type { FormatAdapter } from "../format/types.js";
 import type { ProxyAgentFactory } from "../transport/proxy-agent.js";
 import { createPipelineContext } from "../pipeline/context.js";
 import { executeFailoverLoop, type FailoverLoopDeps } from "./failover-loop.js";
@@ -30,7 +29,6 @@ import { loadEnhancementConfig } from "../routing/enhancement-config.js";
 import { ToolLoopGuard, type SessionTracker } from "@llm-router/core/loop-prevention";
 import { HTTP_UNPROCESSABLE_ENTITY } from "../../core/constants.js";
 import { PipelineAbort } from "../pipeline/types.js";
-import { PipelineSnapshot } from "../pipeline-snapshot.js";
 import { applyToolRoundLimit } from "../patch/tool-round-limiter.js";
 import { extractLastToolUse } from "./proxy-handler-utils.js";
 import { parseModels } from "../../config/model-context.js";

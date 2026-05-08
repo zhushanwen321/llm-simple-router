@@ -4,8 +4,11 @@ export function sanitizeToolUseId(id: string): string {
 }
 
 export function parseToolArguments(args: unknown): Record<string, unknown> {
-  try { return JSON.parse(JSON.stringify(args ?? {})); }
-  catch { console.warn("[transform] Failed to parse tool arguments, using empty object"); return {}; }
+  try {
+    if (typeof args === "string") return JSON.parse(args);
+    if (typeof args === "object" && args !== null) return args as Record<string, unknown>;
+    return {};
+  } catch { console.warn("[transform] Failed to parse tool arguments, using empty object"); return {}; }
 }
 
 export function ensureNonEmptyContent(messages: unknown[]): void {

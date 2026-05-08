@@ -12,7 +12,7 @@
  * - 内置 hook 负责日志/溢出/patches 等，此文件只关注 failover 循环控制
  */
 import { randomUUID } from "crypto";
-import type { FastifyReply, FastifyRequest } from "fastify";
+import type { FastifyReply } from "fastify";
 import { ProviderSwitchNeeded } from "../../core/errors.js";
 import { SemaphoreQueueFullError, SemaphoreTimeoutError } from "@llm-router/core";
 import { getProviderById } from "../../db/index.js";
@@ -20,8 +20,8 @@ import { getSetting } from "../../db/settings.js";
 import { decrypt } from "../../utils/crypto.js";
 import { resolveMapping } from "../routing/mapping-resolver.js";
 import { getConfig } from "../../config/index.js";
-import { createErrorFormatter, type ProxyErrorFormatter } from "../proxy-core.js";
-import type { FormatAdapter, ErrorKind } from "../format/types.js";
+import type { ProxyErrorFormatter } from "../proxy-core.js";
+import type { FormatAdapter } from "../format/types.js";
 import type { FormatRegistry } from "../format/registry.js";
 import { insertRejectedLog } from "../log-helpers.js";
 import { logResilienceResult, collectTransportMetrics, sanitizeHeadersForLog } from "../proxy-logging.js";
@@ -37,7 +37,7 @@ import type { FailedToolResult } from "./proxy-handler-utils.js";
 import { logToolErrors } from "../tool-error-logger.js";
 import type { Target } from "../../core/types.js";
 import type { RawHeaders } from "../types.js";
-import type { PipelineContext, ProviderInfo } from "../pipeline/types.js";
+import type { PipelineContext } from "../pipeline/types.js";
 import { PipelineAbort } from "../pipeline/types.js";
 import { PipelineSnapshot } from "../pipeline-snapshot.js";
 import type { ServiceContainer } from "../../core/container.js";
@@ -307,7 +307,8 @@ export async function executeFailoverLoop(
     });
 
     // --- Stream transforms ---
-    const formatTransform = needsTransform ? formatRegistry.createStreamTransform(ctx.apiType, provider.api_type, resolved.backend_model) : undefined;
+    // source=上游格式, target=客户端格式 — 流从上游流向客户端需要反向转换
+    const formatTransform = needsTransform ? formatRegistry.createStreamTransform(provider.api_type, ctx.apiType, resolved.backend_model) : undefined;
     if (formatTransform) {
       formatTransform.on("warning", (err) => request.log.warn({ err, logId }, "formatTransform warning"));
     }

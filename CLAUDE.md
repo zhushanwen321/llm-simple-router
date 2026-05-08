@@ -213,6 +213,13 @@ Handler (handler/proxy-handler.ts)
 所有 secrets 通过首次启动的 Setup 页面设置，存入 DB settings 表。
 可选环境变量：`PORT`（默认 9981）、`DB_PATH`（默认 `~/.llm-simple-router/router.db`）、`LOG_LEVEL`、`STREAM_TIMEOUT_MS`（默认 3000000）、`RETRY_BASE_DELAY_MS`（默认 1000）
 
+## 质量门禁
+
+- 编译: `npm run build`
+- 测试: `npm run test`
+- 后端 lint: `npm run lint -w router`
+- 前端类型检查: `cd frontend && npx vue-tsc -b --noEmit`
+
 ## 测试
 
 **框架：** Vitest 3.1.2，配置 `vitest.config.ts`（globals: true, environment: node）
@@ -458,3 +465,14 @@ bash ~/.claude/skills/merge-worktree/merge-worktree.sh <branch>
 - **运行位置**：feature worktree 目录
 - **前提**：所有变更已 commit 并 push、gh CLI 已登录
 - **幂等**：最新 commit 含 "bump version" 时跳过版本升级；tag/release 已存在时跳过
+
+## 已知陷阱
+
+- `providers.models` 等 DB JSON 字段禁止裸 `JSON.parse`，必须用 `parseModels()` 等类型安全函数（ESLint 规则强制）
+- `while(true)` 必须包含迭代计数器和上限检查（ESLint 规则强制）
+- token 计数禁止用字符长度估算，统一使用 `gpt-tokenizer`（o200k_base）
+- SSE 多行 `data:` 必须用 `\n` 连接，不能直接拼接
+- 前端禁止使用原生 HTML 表单元素，必须用 shadcn-vue 组件
+- 前端 `<style scoped>` 内只允许 `@apply`，禁止手写 CSS 选择器
+- `structuredClone()` 替代 `JSON.parse(JSON.stringify())` 做深拷贝
+- headers 写入日志前必须脱敏（authorization、cookie、x-api-key）

@@ -63,7 +63,7 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (app, opti
   app.register(adminTransformRuleRoutes, { db: options.db, pluginRegistry: options.pluginRegistry });
 
   // Pipeline hooks 查询
-  app.get("/admin/api/pipeline/hooks", async (_req, reply) => {
+  app.get("/admin/api/pipeline/hooks", async () => {
     return { hooks: hookRegistry.getAll() };
   });
 

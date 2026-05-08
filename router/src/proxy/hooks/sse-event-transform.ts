@@ -1,5 +1,5 @@
 import { Transform, type TransformCallback } from "stream";
-import type { PipelineContext, HookPhase } from "../pipeline/types.js";
+import type { PipelineContext } from "../pipeline/types.js";
 import type { ProxyPipeline } from "../pipeline/pipeline.js";
 import type { SSEEvent } from "../transform/plugin-types.js";
 
