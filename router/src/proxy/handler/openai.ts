@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import Database from "better-sqlite3";
 import fp from "fastify-plugin";
 import { getAllProviders, insertRequestLog } from "../../db/index.js";
+import { parseModels } from "../../config/model-context.js";
 import { createErrorFormatter, type ProxyErrorResponse } from "../proxy-core.js";
 import type { ErrorKind } from "../proxy-core.js";
 import { handleProxyRequest, type RouteHandlerDeps } from "./proxy-handler.js";
@@ -90,9 +91,9 @@ const openaiProxyRaw: FastifyPluginCallback<OpenaiProxyOptions> = (app, opts, do
     const modelMeta = new Map<string, { providerName: string; createdAt: string }>();
     for (const p of allProviders) {
       try {
-        const models: string[] = JSON.parse(p.models || '[]');
-        for (const m of models) {
-          if (!modelMeta.has(m)) modelMeta.set(m, { providerName: p.name, createdAt: p.created_at });
+        const modelEntries = parseModels(p.models || '[]');
+        for (const m of modelEntries) {
+          if (!modelMeta.has(m.name)) modelMeta.set(m.name, { providerName: p.name, createdAt: p.created_at });
         }
       } catch {
         // providers.models 有 NOT NULL 约束默认 '[]'，此处防御开发期误配的非法 JSON

@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import { randomUUID } from "crypto";
 import { buildUpdateQuery, deleteById } from "./helpers.js";
+import { parseModels } from "../config/model-context.js";
 
 export interface Provider {
   id: string;
@@ -10,7 +11,8 @@ export interface Provider {
   upstream_path: string | null;
   api_key: string;
   api_key_preview?: string;
-  models: string; // JSON 数组文本
+  /** @internal 原始 JSON 文本，业务层请使用 parseModels() 解析，禁止直接 JSON.parse */
+  models: string;
   is_active: number;
   max_concurrency: number;
   queue_timeout_ms: number;
@@ -32,27 +34,14 @@ export function getModelStreamTimeout(
   provider: Provider,
   backendModel: string,
 ): number {
-  try {
-    const raw = JSON.parse(provider.models);
-    if (!Array.isArray(raw)) return DEFAULT_STREAM_TIMEOUT_MS;
-    for (const m of raw) {
-      if (typeof m === "string") {
-        if (m === backendModel) return DEFAULT_STREAM_TIMEOUT_MS;
-        continue;
-      }
-      const obj = m as Record<string, unknown>;
-      if (!obj || typeof obj !== "object") continue;
-      const modelId = (obj.name ?? obj.id) as string | undefined;
-      if (modelId === backendModel) {
-        const timeout = obj.stream_timeout_ms as number | undefined;
-        // stream_timeout_ms: 0 表示禁用超时，返回 Infinity；
-        // undefined/null/未设置 表示使用默认值
-        if (timeout === 0) return Number.POSITIVE_INFINITY;
-        return timeout ?? DEFAULT_STREAM_TIMEOUT_MS;
-      }
-    }
-  } catch { /* ignore parse errors — models field may be empty or invalid */ } // eslint-disable-line taste/no-silent-catch
-  return DEFAULT_STREAM_TIMEOUT_MS;
+  const entries = parseModels(provider.models);
+  const entry = entries.find(m => m.name === backendModel);
+  if (!entry) return DEFAULT_STREAM_TIMEOUT_MS;
+  const timeout = entry.stream_timeout_ms;
+  // stream_timeout_ms: 0 表示禁用超时，返回 Infinity；
+  // undefined/null/未设置 表示使用默认值
+  if (timeout === 0) return Number.POSITIVE_INFINITY;
+  return timeout ?? DEFAULT_STREAM_TIMEOUT_MS;
 }
 
 export const PROVIDER_CONCURRENCY_DEFAULTS = {

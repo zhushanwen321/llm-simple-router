@@ -2,6 +2,7 @@ import Database from "better-sqlite3";
 import { randomUUID } from "crypto";
 import type { Target } from "../core/types.js";
 import { buildUpdateQuery, deleteById } from "./helpers.js";
+import { parseModels } from "../config/model-context.js";
 
 export interface MappingGroup {
   id: string;
@@ -78,9 +79,9 @@ export function getActiveProviderModels(db: Database.Database): ProviderModelEnt
   const results: ProviderModelEntry[] = [];
   for (const p of providers) {
     try {
-      const models: string[] = JSON.parse(p.models);
-      for (const m of models) {
-        results.push({ provider_name: p.name, backend_model: m });
+      const modelEntries = parseModels(p.models);
+      for (const m of modelEntries) {
+        results.push({ provider_name: p.name, backend_model: m.name });
       }
     } catch { continue }
   }
@@ -131,8 +132,8 @@ export function resolveByProviderModel(
   const providerRow = db.prepare("SELECT id, models FROM providers WHERE name = ? AND is_active = 1").get(providerName) as { id: string; models: string } | undefined;
   if (!providerRow) return null;
   try {
-    const models: string[] = JSON.parse(providerRow.models);
-    if (!models.includes(backendModel)) return null;
+    const modelEntries = parseModels(providerRow.models);
+    if (!modelEntries.some(m => m.name === backendModel)) return null;
   } catch { return null }
 
   // 尝试从 mapping_groups 找到包含此 provider+backend_model 的 client_model
