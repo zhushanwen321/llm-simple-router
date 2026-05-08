@@ -37,6 +37,7 @@
                 size="sm" class="w-full text-xs" :disabled="isUpgrading"
                 @click="showUpgradeConfirm = true"
               >
+                <RefreshCw v-if="isUpgrading" class="w-3 h-3 animate-spin mr-1" />
                 {{ isUpgrading ? t('sidebar.upgrade.upgrading') : t('sidebar.upgrade.oneClickUpgrade') }}
               </Button>
               <div v-else class="text-xs text-warning bg-warning-light p-2 rounded">
@@ -78,7 +79,10 @@
             <!-- 底部 -->
             <div class="px-3 py-2 flex justify-between items-center text-xs text-muted-foreground">
               <span>{{ upgradeStatus?.lastCheckedAt ? t('sidebar.upgrade.checkedAt', { time: parseUtc(upgradeStatus.lastCheckedAt).toLocaleTimeString(locale === 'zh-CN' ? 'zh-CN' : 'en', { timeZone: 'Asia/Shanghai' }) }) : t('sidebar.upgrade.notChecked') }}</span>
-              <Button variant="link" class="text-primary h-auto p-0" @click="handleCheckNow">{{ t('sidebar.upgrade.checkNow') }}</Button>
+              <Button variant="link" class="text-primary h-auto p-0" :disabled="isChecking" @click="handleCheckNow">
+                <RefreshCw v-if="isChecking" class="w-3 h-3 animate-spin mr-1" />
+                {{ isChecking ? t('sidebar.upgrade.checking') : t('sidebar.upgrade.checkNow') }}
+              </Button>
             </div>
           </PopoverContent>
         </Popover>
@@ -181,31 +185,11 @@
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>{{ t('common.cancel') }}</AlertDialogCancel>
+          <AlertDialogCancel :disabled="isUpgrading">{{ t('common.cancel') }}</AlertDialogCancel>
           <AlertDialogAction @click="handleUpgrade" :disabled="isUpgrading">
+            <RefreshCw v-if="isUpgrading" class="w-3 h-3 animate-spin" />
             {{ isUpgrading ? t('sidebar.upgrade.upgrading') : t('common.confirm') }}
           </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-    <!-- 重启确认 -->
-    <AlertDialog v-model:open="showRestartConfirm">
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{{ t('sidebar.upgrade.upgradeSuccess') }}</AlertDialogTitle>
-          <AlertDialogDescription>
-            <template v-if="upgradeStatus?.restartMethod === 'process_manager'">
-              {{ t('sidebar.upgrade.restartNeeded', { version: upgradeStatus?.npm.latestVersion }) }}
-            </template>
-            <template v-else>
-              {{ t('sidebar.upgrade.manualRestartNeeded', { version: upgradeStatus?.npm.latestVersion }) }}
-            </template>
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel @click="showRestartConfirm = false">{{ t('sidebar.upgrade.laterRestart') }}</AlertDialogCancel>
-          <AlertDialogAction v-if="upgradeStatus?.restartMethod === 'process_manager'" @click="handleRestart">{{ t('sidebar.upgrade.restartNow') }}</AlertDialogAction>
-          <AlertDialogAction v-else @click="showRestartConfirm = false">{{ t('common.confirm') }}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -264,8 +248,8 @@ const appVersion = __APP_VERSION__
 
 const upgradeStatus = ref<UpgradeStatus | null>(null)
 const showUpgradeConfirm = ref(false)
-const showRestartConfirm = ref(false)
 const isUpgrading = ref(false)
+const isChecking = ref(false)
 const isSyncing = ref(false)
 const isOpen = ref(false)
 
@@ -282,10 +266,12 @@ async function loadUpgradeStatus() {
 }
 
 async function handleCheckNow() {
+  isChecking.value = true
   try {
     await api.triggerUpgradeCheck()
     await loadUpgradeStatus()
   } catch (e: unknown) { toast.error(getApiMessage(e, t('sidebar.upgrade.checkFailed'))) }
+  finally { isChecking.value = false }
 }
 
 async function handleUpgrade() {
@@ -295,11 +281,10 @@ async function handleUpgrade() {
     await api.executeUpgrade(upgradeStatus.value.npm.latestVersion)
     toast.success(t('sidebar.upgrade.upgradeSuccess'))
     showUpgradeConfirm.value = false
-    showRestartConfirm.value = true
-    await loadUpgradeStatus()
+    // 升级成功后直接重启，避免“已升级未重启”的不一致状态
+    await doRestart()
   } catch (e: unknown) {
     toast.error(getApiMessage(e, t('sidebar.upgrade.upgradeFailed')))
-  } finally {
     isUpgrading.value = false
   }
 }
@@ -430,35 +415,36 @@ watch(
   { immediate: true },
 )
 
-async function handleRestart() {
+async function doRestart() {
   try {
     await api.restartServer()
     toast.success(t('sidebar.upgrade.restartSent'))
-    showRestartConfirm.value = false
-    // 轮询 /health 等待服务恢复，替代固定延时
-    const POLL_INTERVAL_MS = 1_000
-    const MAX_WAIT_MS = 30_000
-    const INITIAL_DELAY_MS = 2_000
-    const start = Date.now()
-    // 先等 2s 让旧进程开始关闭
-    await new Promise(resolve => setTimeout(resolve, INITIAL_DELAY_MS))
-    const poll = setInterval(() => {
-      fetch('/health')
-        .then(r => {
-          if (r.ok) {
-            clearInterval(poll)
-            window.location.reload()
-          }
-        })
-        .catch(() => { /* 服务尚未恢复，继续轮询 */ })
-      if (Date.now() - start > MAX_WAIT_MS) {
-        clearInterval(poll)
-        toast.error(t('sidebar.upgrade.restartTimeout'))
-      }
-    }, POLL_INTERVAL_MS)
   } catch (e: unknown) {
     toast.error(getApiMessage(e, t('sidebar.upgrade.restartFailed')))
+    isUpgrading.value = false
+    return
   }
+  // 轮询 /health 等待服务恢复
+  const POLL_INTERVAL_MS = 1_000
+  const MAX_WAIT_MS = 30_000
+  const INITIAL_DELAY_MS = 2_000
+  const start = Date.now()
+  await new Promise(resolve => setTimeout(resolve, INITIAL_DELAY_MS))
+  const poll = setInterval(() => {
+    fetch('/health')
+      .then(r => {
+        if (r.ok) {
+          clearInterval(poll)
+          window.location.reload()
+        }
+      })
+      .catch(() => { /* 服务尚未恢复，继续轮询 */ })
+    if (Date.now() - start > MAX_WAIT_MS) {
+      clearInterval(poll)
+      toast.error(t('sidebar.upgrade.restartTimeout'))
+      isUpgrading.value = false
+    }
+  }, POLL_INTERVAL_MS)
 }
 
 async function handleLogout() {
