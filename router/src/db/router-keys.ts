@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import { randomUUID } from "crypto";
 import { buildUpdateQuery, deleteById } from "./helpers.js";
+import { parseModels } from "../config/model-context.js";
 
 export interface RouterKey {
   id: string;
@@ -57,7 +58,10 @@ export function getAvailableModels(db: Database.Database): string[] {
   const rows = db.prepare("SELECT models FROM providers WHERE is_active = 1").all() as { models: string }[];
   const set = new Set<string>();
   for (const r of rows) {
-    try { JSON.parse(r.models || "[]").forEach((m: string) => set.add(m)); } catch { continue }
+    const entries = parseModels(r.models);
+    for (const m of entries) {
+      set.add(m.name);
+    }
   }
   return [...set].sort();
 }

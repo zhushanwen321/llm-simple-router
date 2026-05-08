@@ -14,6 +14,7 @@ import noUnsafeObjectEntries from './rules/no-unsafe-object-entries.mjs';
 import noHardcodedColors from './rules/no-hardcoded-colors.mjs';
 import noMagicSpacing from './rules/no-magic-spacing.mjs';
 import noDeprecatedRuleFormat from './rules/no-deprecated-rule-format.mjs';
+import noRawJsonParseModels from './rules/no-raw-json-parse-models.mjs';
 
 export const tastePlugin = {
   meta: { name: 'eslint-plugin-taste' },
@@ -24,6 +25,7 @@ export const tastePlugin = {
     'no-hardcoded-colors': noHardcodedColors,
     'no-magic-spacing': noMagicSpacing,
     'no-deprecated-rule-format': noDeprecatedRuleFormat,
+    'no-raw-json-parse-models': noRawJsonParseModels,
   },
 };
 
@@ -57,6 +59,7 @@ export const tasteRules = {
   'taste/no-silent-catch': 'warn',
   'taste/no-unsafe-object-entries': 'warn',
   'taste/no-deprecated-rule-format': 'warn',
+  'taste/no-raw-json-parse-models': 'error',
 };
 
 export default [

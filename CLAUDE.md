@@ -206,6 +206,7 @@ Handler (handler/proxy-handler.ts)
 - **token 计数统一使用 `gpt-tokenizer`（o200k_base）**：禁止用字符长度估算 token 数。当 API 未返回 `input_tokens`（如部分第三方模型）时，`collectTransportMetrics()` 自动回退到 `estimateInputTokens()` 从请求体计数。
   相关文件：`src/utils/token-counter.ts`（共享工具）、`src/proxy/routing/overflow.ts`（请求 token 估算溢出）、`src/metrics/metrics-extractor.ts`（thinking 模型 text-only TPS 计算）。
   长文本（>4000 字符）采用采样外推策略避免性能问题。
+- **禁止对 DB 中的 JSON 字段直接 JSON.parse**：`providers.models` 等字段存储的是 JSON 文本，数据格式会演进（如从 `string[]` 到 `ModelEntry[]`）。所有解析必须通过对应的类型安全函数（如 `parseModels()`），禁止裸 `JSON.parse`。ESLint 规则 `taste/no-raw-json-parse-models` 会强制执行此约束。
 
 ## 环境变量
 

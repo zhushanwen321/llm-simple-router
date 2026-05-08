@@ -52,6 +52,7 @@ cat > "$GIT_HOOKS_DIR/pre-commit" << 'HOOK_EOF'
 #   SKIP_FRONTEND_LINT=1      - 跳过前端 ESLint
 #   SKIP_TYPE_CHECK=1         - 跳过 vue-tsc 类型检查
 #   SKIP_CODE_RULES_CHECK=1   - 跳过自定义代码规范检查
+#   SKIP_BACKEND_LINT=1       - 跳过后端 ESLint
 
 set -e
 
@@ -167,6 +168,33 @@ if [ -n "$FRONTEND_FILES" ]; then
 fi
 
 # ============================================================================
+# 1.5. 后端 ESLint 检查（router/ 目录）
+# ============================================================================
+
+ROUTER_FILES=$(echo "$STAGED_FILES" | grep -E "^router/src/.*\.ts$" || true)
+if [ -n "$ROUTER_FILES" ]; then
+    print_section "[后端 ESLint 检查]"
+
+    if [ "$SKIP_BACKEND_LINT" != "1" ]; then
+        echo -e "${BLUE}[INFO] 运行 router ESLint 检查...${NC}"
+
+        ROUTER_ESLINT_FILES=$(echo "$ROUTER_FILES" | tr '\n' ' ')
+        ESLINT_OUTPUT=$(npx eslint --max-warnings=0 $ROUTER_ESLINT_FILES 2>&1)
+        ESLINT_EXIT_CODE=$?
+
+        if [ $ESLINT_EXIT_CODE -ne 0 ]; then
+            echo -e "${RED}[ERROR] 后端 ESLint 检查失败:${NC}"
+            echo "$ESLINT_OUTPUT"
+            exit 1
+        fi
+
+        echo -e "${GREEN}[OK] 后端 ESLint 检查通过${NC}"
+    else
+        echo -e "${YELLOW}[SKIP] 后端 ESLint 检查已跳过${NC}"
+    fi
+fi
+
+# ============================================================================
 # 2. 前端 vue-tsc 类型检查（与 CI 等价）
 # ============================================================================
 
@@ -250,6 +278,7 @@ echo -e "  ${YELLOW}SKIP_FORMAT=1${NC}             - 跳过 Prettier"
 echo -e "  ${YELLOW}SKIP_FRONTEND_LINT=1${NC}      - 跳过 ESLint"
 echo -e "  ${YELLOW}SKIP_TYPE_CHECK=1${NC}          - 跳过 vue-tsc"
 echo -e "  ${YELLOW}SKIP_CODE_RULES_CHECK=1${NC}   - 跳过代码规范"
+echo -e "  ${YELLOW}SKIP_BACKEND_LINT=1${NC}       - 跳过后端 ESLint"
 echo ""
 
 exit 0
@@ -272,6 +301,7 @@ echo ""
 echo -e "${CYAN}已安装的检查项目:${NC}"
 echo -e "  ${GREEN}[+]${NC} Prettier 格式化（自动修复）"
 echo -e "  ${GREEN}[+]${NC} 前端 ESLint 代码检查"
+echo -e "  ${GREEN}[+]${NC} 后端 ESLint 代码检查（router/）"
 echo -e "  ${GREEN}[+]${NC} vue-tsc 类型检查（全量，与 CI 等价）"
 echo -e "  ${GREEN}[+]${NC} Vue 组件规范检查（禁止原生 HTML、Emoji、自定义 CSS）"
 echo ""

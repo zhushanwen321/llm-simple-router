@@ -124,6 +124,7 @@ function runApplicationMigrations(db: Database.Database): void {
   db.transaction(() => {
     for (const p of providers) {
       try {
+        // eslint-disable-next-line taste/no-raw-json-parse-models -- 迁移代码需要操作原始 JSON 结构，parseModels() 会过滤非标准字段
         const raw = JSON.parse(p.models);
         if (!Array.isArray(raw) || raw.length === 0) continue;
 

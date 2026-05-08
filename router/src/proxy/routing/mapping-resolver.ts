@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import type { Target, ResolveContext, ResolveResult, ConcurrencyOverride } from "../../core/types.js";
 import { getMappingGroup, getActiveProviderByName, getActiveProvidersWithModels, getActiveSchedulesForGroup } from "../../db/index.js";
+import { parseModels } from "../../config/model-context.js";
 import type { Schedule } from "../../db/schedules.js";
 
 // ---------- Type guards ----------
@@ -128,12 +129,10 @@ export function resolveMapping(
     const backendModel = slashMatch[2];
     const provider = getActiveProviderByName(db, providerName);
     if (provider) {
-      try {
-        const models: string[] = JSON.parse(provider.models);
-        if (models.includes(backendModel)) {
-          return { target: { backend_model: backendModel, provider_id: provider.id }, targetCount: 1 };
-        }
-      } catch { return null }
+      const modelEntries = parseModels(provider.models);
+      if (modelEntries.some(m => m.name === backendModel)) {
+        return { target: { backend_model: backendModel, provider_id: provider.id }, targetCount: 1 };
+      }
     }
     return null;
   }
@@ -144,12 +143,10 @@ export function resolveMapping(
     // fallback: 直接查 provider 的 models 字段
     const providers = getActiveProvidersWithModels(db);
     for (const p of providers) {
-      try {
-        const models: string[] = JSON.parse(p.models);
-        if (models.includes(clientModel)) {
-          return { target: { backend_model: clientModel, provider_id: p.id }, targetCount: 1 };
-        }
-      } catch { continue }
+      const modelEntries = parseModels(p.models);
+      if (modelEntries.some(m => m.name === clientModel)) {
+        return { target: { backend_model: clientModel, provider_id: p.id }, targetCount: 1 };
+      }
     }
     return null;
   }

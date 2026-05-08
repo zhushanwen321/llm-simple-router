@@ -106,6 +106,23 @@ export function normalizePatchName(name: string): string {
   return name.replace(/-/g, "_")
 }
 
+/**
+ * 解析 providers.models 的 JSON 文本。
+ *
+ * 这是解析 providers.models 字段的唯一合法入口。
+ * 禁止直接 JSON.parse(provider.models) —— 数据格式已从 string[] 演进为 ModelEntry[]，
+ * 直接 JSON.parse 会得到对象数组而非字符串数组，导致运行时错误。
+ *
+ * ESLint 规则 taste/no-raw-json-parse-models 会强制执行此约束。
+ */
+/** 旧 patch ID 到新 patch ID 的迁移映射 */
+const PATCH_ID_MIGRATION: Record<string, string> = {
+  thinking_param: "thinking_consistency",
+  thinking_blocks: "thinking_consistency",
+  non_ds_tools: "thinking_consistency",
+  cache_control: "thinking_consistency",
+};
+
 export function parseModels(raw: string): ModelEntry[] {
   if (!raw) return []
   try {
@@ -115,20 +132,15 @@ export function parseModels(raw: string): ModelEntry[] {
       if (typeof item === 'string') {
         return item ? { name: item, patches: [] } : null
       }
-      const obj = item as { name?: string; patches?: string[]; stream_timeout_ms?: number } | null
-      if (!obj || !obj.name) return null
-      /** 旧 patch ID 到新 patch ID 的运行时迁移映射 */
-      const PATCH_ID_MIGRATION: Record<string, string> = {
-        thinking_param: "thinking_consistency",
-        thinking_blocks: "thinking_consistency",
-        non_ds_tools: "thinking_consistency",
-        cache_control: "thinking_consistency",
-      };
+      const obj = item as { name?: string; id?: string; patches?: string[]; stream_timeout_ms?: number } | null
+      if (!obj) return null
+      const modelName = obj.name ?? obj.id
+      if (!modelName) return null
       const rawPatches = (obj.patches ?? []).map(normalizePatchName);
       const migrated = rawPatches.map(p => PATCH_ID_MIGRATION[p] ?? p);
       const patches = [...new Set(migrated)];
       const result: ModelEntry = {
-        name: obj.name,
+        name: modelName,
         patches,
       }
       if (obj.stream_timeout_ms != null) result.stream_timeout_ms = obj.stream_timeout_ms
