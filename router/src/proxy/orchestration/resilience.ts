@@ -239,7 +239,7 @@ export class ResilienceLayer {
       try {
         transportResult = await fn(currentTarget);
       } catch (err: unknown) {
-        const errMsg = err instanceof Error ? err.message : String(err);
+        const errMsg = err instanceof Error ? err.message : err instanceof Error ? err.message : JSON.stringify(err);
         transportResult = { kind: "throw", error: err instanceof Error ? err : new Error(errMsg) };
       }
 
@@ -249,7 +249,7 @@ export class ResilienceLayer {
         const throwErr = transportResult.error;
         allAttempts.push({
           target: currentTarget, attemptIndex: globalAttemptIndex,
-          statusCode: null, error: throwErr instanceof Error ? throwErr.message : String(throwErr),
+          statusCode: null, error: (throwErr instanceof Error ? throwErr.message : JSON.stringify(throwErr)) as string,
           latencyMs: Date.now() - start, responseBody: null,
           responseHeaders: null, resultKind: transportResult.kind,
         });

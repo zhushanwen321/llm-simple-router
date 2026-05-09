@@ -9,7 +9,7 @@
  * 依赖：ctx.metadata 中需设置 "db"
  */
 import Database from "better-sqlite3";
-import type { PipelineHook, PipelineContext } from "../../pipeline/types.js";
+import type { PipelineHook, PipelineContext, ProviderInfo } from "../../pipeline/types.js";
 import { getProviderById } from "../../../db/index.js";
 import { applyOverflowRedirect } from "../../routing/overflow.js";
 
@@ -37,7 +37,7 @@ export const overflowRedirectHook: PipelineHook = {
         provider_id: overflowResult.provider_id,
         backend_model: overflowResult.backend_model,
       };
-      ctx.provider = overflowProvider as unknown as import("../../pipeline/types.js").ProviderInfo;
+      ctx.provider = overflowProvider as unknown as ProviderInfo;
       body.model = overflowResult.backend_model;
       ctx.snapshot.add({
         stage: "overflow",

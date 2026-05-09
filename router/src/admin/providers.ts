@@ -2,6 +2,7 @@ import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
 import { Type, Static } from "@sinclair/typebox";
 import type { Provider } from "../db/index.js";
+import type { RawHeaders } from "../proxy/types.js";
 import { getAllProviders, getProviderById, createProvider, updateProvider, deleteProvider, getAllMappingGroups, updateMappingGroup, PROVIDER_CONCURRENCY_DEFAULTS } from "../db/index.js";
 import { encrypt, decrypt } from "../utils/crypto.js";
 import { getSetting } from "../db/settings.js";
@@ -429,7 +430,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
       const result = await callGet(
         backend,
         api_key,
-        clientHeaders as import("../proxy/types.js").RawHeaders,
+        clientHeaders as RawHeaders,
         models_endpoint,
         (cliHdrs, key) => buildUpstreamHeaders(cliHdrs, key, undefined, api_type),
       );
@@ -466,7 +467,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
 
       return reply.send(modelIds);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = err instanceof Error ? err.message : err instanceof Error ? err.message : JSON.stringify(err);
       return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.BAD_REQUEST, `连接上游失败: ${message}`));
     }
   });

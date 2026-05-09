@@ -18,7 +18,7 @@ import { createOrchestrator } from "../orchestration/orchestrator.js";
 import { SemaphoreManager } from "@llm-router/core/concurrency";
 import type { RequestTracker } from "@llm-router/core/monitor";
 import { AdaptiveController } from "@llm-router/core/concurrency";
-import { HTTP_OK, HTTP_BAD_GATEWAY, MS_PER_SECOND } from "../../core/constants.js";
+import { HTTP_OK, HTTP_BAD_GATEWAY, HTTP_CLIENT_CLOSED, MS_PER_SECOND } from "../../core/constants.js";
 import { SERVICE_KEYS } from "../../core/container.js";
 import type { ServiceContainer } from "../../core/container.js";
 import type { FormatRegistry } from "../format/registry.js";
@@ -72,7 +72,7 @@ function handleModelsRequest(db: Database.Database) {
 
     if (isAnthropicFormat) {
       const query = request.query as { limit?: string; before_id?: string; after_id?: string };
-      const limit = Math.min(Math.max(parseInt(query.limit || String(ANTHROPIC_DEFAULT_PAGE_SIZE), 10) || ANTHROPIC_DEFAULT_PAGE_SIZE, 1), ANTHROPIC_MAX_PAGE_SIZE);
+      const limit = Math.min(Math.max(parseInt(query.limit || ANTHROPIC_DEFAULT_PAGE_SIZE.toString(), 10) || ANTHROPIC_DEFAULT_PAGE_SIZE, 1), ANTHROPIC_MAX_PAGE_SIZE);
 
       let sliced: string[];
       let hasMore: boolean;
@@ -184,7 +184,7 @@ function applyEnhancementPreprocess(
   } else {
     request.log.warn({ sessionId, toolName: lastToolUse.toolName, loopCount },
       "Tool call loop detected, hard disconnecting");
-    throw new PipelineAbort(499, { _disconnect: true });
+    throw new PipelineAbort(HTTP_CLIENT_CLOSED, { _disconnect: true });
   }
 }
 
@@ -255,7 +255,7 @@ export function createProxyHandler(config: ProxyHandlerConfig) {
         applyEnhancementPreprocess(request, reply, ctx, db, container);
       } catch (e) {
         if (e instanceof PipelineAbort) {
-          if (e.statusCode === 499 && (e.body as Record<string, unknown>)?._disconnect) {
+          if (e.statusCode === HTTP_CLIENT_CLOSED && (e.body as Record<string, unknown>)?._disconnect) {
             reply.raw.destroy();
             return reply;
           }

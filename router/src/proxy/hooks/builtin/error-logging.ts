@@ -16,6 +16,8 @@ import { logToolErrors } from "../../tool-error-logger.js";
 import { detectClientAgentType } from "../../handler/proxy-handler-utils.js";
 import type { FailedToolResult } from "../../handler/proxy-handler-utils.js";
 import type { PipelineHook, PipelineContext } from "../../pipeline/types.js";
+import type { RetryMatcher } from "../../log-detail-policy.js";
+import type { LogFileWriter } from "../../../storage/log-file-writer.js";
 
 const UPSTREAM_ERROR_STATUS = 502;
 
@@ -63,8 +65,8 @@ export const errorLoggingHook: PipelineHook = {
         originalRequestId: isFailoverIteration ? ctx.rootLogId : null,
         sessionId: ctx.sessionId,
         pipelineSnapshot: snapshot,
-        matcher: matcher as import("../../log-detail-policy.js").RetryMatcher | null,
-        logFileWriter: logFileWriter as import("../../../storage/log-file-writer.js").LogFileWriter | null,
+        matcher: matcher as RetryMatcher | null,
+        logFileWriter: logFileWriter as LogFileWriter | null,
       });
     } else {
       // upstream error 路径：使用 insertRequestLog
@@ -88,7 +90,7 @@ export const errorLoggingHook: PipelineHook = {
         pipeline_snapshot: snapshot,
       }, (matcher || logFileWriter) ? {
         matcher,
-        logFileWriter: logFileWriter as import("../../../storage/log-file-writer.js").LogFileWriter | null,
+        logFileWriter: logFileWriter as LogFileWriter | null,
         responseBody: null,
       } : undefined);
     }

@@ -45,7 +45,7 @@ function loadJson<T>(filename: string): T {
     if (!fs.existsSync(filePath)) return [] as unknown as T
     return JSON.parse(fs.readFileSync(filePath, 'utf-8')) as T
   } catch (err) {
-    process.stderr.write(`[recommended] 加载 ${filename} 失败: ${err instanceof Error ? err.message : String(err)}\n`)
+    process.stderr.write(`[recommended] 加载 ${filename} 失败: ${err instanceof Error ? err.message : err instanceof Error ? err.message : JSON.stringify(err)}\n`)
     return [] as unknown as T
   }
 }
@@ -65,7 +65,7 @@ export function getConfigVersions(): ConfigVersions {
     if (!fs.existsSync(filePath)) return { providers: 0, retryRules: 0 }
     return JSON.parse(fs.readFileSync(filePath, 'utf-8')) as ConfigVersions
   } catch (err) {
-    process.stderr.write(`[recommended] 加载 version.json 失败: ${err instanceof Error ? err.message : String(err)}\n`)
+    process.stderr.write(`[recommended] 加载 version.json 失败: ${err instanceof Error ? err.message : err instanceof Error ? err.message : JSON.stringify(err)}\n`)
     return { providers: 0, retryRules: 0 }
   }
 }

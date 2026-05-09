@@ -51,8 +51,8 @@ function applyResponseTransform(
     const fn = plugin[primary] ?? plugin[legacy];
     if (fn) fn(pluginCtx);
     ctx.transportResult = { ...ctx.transportResult, body: JSON.stringify(pluginCtx.response) };
-  } catch {
-    /* best effort */
+  } catch (e) {
+    ctx.request.log.warn({ err: e }, 'plugin response hook failed');
   }
 }
 

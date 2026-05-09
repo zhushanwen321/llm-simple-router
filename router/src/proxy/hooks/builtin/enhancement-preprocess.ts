@@ -8,7 +8,7 @@
  *
  * 依赖：ctx.metadata 中需设置 "db" 和 "container"
  */
-import { HTTP_UNPROCESSABLE_ENTITY } from "../../../core/constants.js";
+import { HTTP_UNPROCESSABLE_ENTITY, HTTP_CLIENT_CLOSED } from "../../../core/constants.js";
 import { SERVICE_KEYS, type ServiceContainer } from "../../../core/container.js";
 import { ToolLoopGuard, type SessionTracker } from "@llm-router/core/loop-prevention";
 import Database from "better-sqlite3";
@@ -84,7 +84,7 @@ export const enhancementPreprocessHook: PipelineHook = {
       ctx.snapshot.add({ stage: "tool_guard", action: "hard_disconnect", tool: lastToolUse.toolName });
       request.log.warn({ sessionId, toolName: lastToolUse.toolName, loopCount },
         "Tool call loop detected, hard disconnecting");
-      throw new PipelineAbort(499, { _disconnect: true });
+      throw new PipelineAbort(HTTP_CLIENT_CLOSED, { _disconnect: true });
     }
   },
 };

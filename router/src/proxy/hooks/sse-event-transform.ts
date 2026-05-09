@@ -29,11 +29,13 @@ export class SSEEventTransform extends Transform {
       let event: string | undefined;
       let data = "";
 
+      const EVENT_PREFIX_LEN = "event:".length;
+      const DATA_PREFIX_LEN = "data:".length;
       for (const line of lines) {
         if (line.startsWith("event:")) {
-          event = line.slice(6).trim();
+          event = line.slice(EVENT_PREFIX_LEN).trim();
         } else if (line.startsWith("data:")) {
-          const dataLine = line.slice(5);
+          const dataLine = line.slice(DATA_PREFIX_LEN);
           data += (data ? "\n" : "") + dataLine.trimStart();
         }
       }

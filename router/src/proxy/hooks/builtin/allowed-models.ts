@@ -10,6 +10,7 @@
  */
 import type { PipelineHook, PipelineContext } from "../../pipeline/types.js";
 import { PipelineAbort } from "../../pipeline/types.js";
+import { HTTP_FORBIDDEN } from "../../../core/constants.js";
 
 const MAX_LOG_FIELD_LENGTH = 80;
 
@@ -35,7 +36,7 @@ export const allowedModelsHook: PipelineHook = {
           modelNotAllowed: (model: string) => { statusCode: number; body: unknown };
         };
         const err = errors?.modelNotAllowed(resolved.backend_model);
-        throw new PipelineAbort(err?.statusCode ?? 403, err?.body ?? {
+        throw new PipelineAbort(err?.statusCode ?? HTTP_FORBIDDEN, err?.body ?? {
           error: { type: "model_not_allowed", message: `Model '${resolved.backend_model}' not allowed` },
         });
       }

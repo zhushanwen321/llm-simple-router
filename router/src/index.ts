@@ -446,7 +446,7 @@ export async function main() {
 
   process.on("unhandledRejection", (reason) => {
     try {
-      app.log.error({ err: reason instanceof Error ? reason : new Error(String(reason)) }, "Unhandled rejection");
+      app.log.error({ err: reason instanceof Error ? reason : new Error(typeof reason === 'string' ? reason : JSON.stringify(reason)) }, "Unhandled rejection");
     /* eslint-disable taste/no-silent-catch -- app.log 可能已崩溃，console 是最后手段 */
     } catch {
       console.error("Unhandled rejection:", reason);

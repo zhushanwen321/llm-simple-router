@@ -49,6 +49,7 @@ import type { UsageWindowTracker } from "../routing/usage-window-tracker.js";
 import type { ProxyAgentFactory } from "../transport/proxy-agent.js";
 import type { PluginRegistry } from "../transform/plugin-registry.js";
 import type { ResponseTransformContext } from "../transform/plugin-types.js";
+import type { ApiType } from "../transform/types.js";
 import Database from "better-sqlite3";
 
 const HTTP_ERROR_THRESHOLD = 400;
@@ -85,6 +86,26 @@ interface RejectParams {
   logFileWriter?: import("../../storage/log-file-writer.js").LogFileWriter | null;
 }
 
+// --- Plugin 调整 body 和 headers ---
+function applyPluginAdjustments(
+  pluginRegistry: import("../transform/plugin-registry.js").PluginRegistry | undefined,
+  body: Record<string, unknown>,
+  clientApiType: string,
+  provider: { id: string; name: string; base_url: string; api_type: string },
+): { headers: Record<string, string> } {
+  if (!pluginRegistry) return { headers: {} };
+  const pluginCtx: import("../transform/plugin-types.js").RequestTransformContext = {
+    body,
+    headers: {},
+    sourceApiType: clientApiType as ApiType,
+    targetApiType: provider.api_type as ApiType,
+    provider: { id: provider.id, name: provider.name, base_url: provider.base_url, api_type: provider.api_type },
+  };
+  pluginRegistry.applyBeforeRequest(pluginCtx);
+  pluginRegistry.applyAfterRequest(pluginCtx);
+  return { headers: pluginCtx.headers };
+}
+
 function rejectAndReply(
   reply: FastifyReply,
   params: RejectParams,
@@ -113,6 +134,7 @@ function rejectAndReply(
  * 执行 failover 循环。每次迭代通过 pipeline 处理请求，
  * 失败时将 target 加入 excludeTargets 并继续。
  */
+// eslint-disable-next-line max-lines-per-function
 export async function executeFailoverLoop(
   ctx: PipelineContext,
   errors: ProxyErrorFormatter,
@@ -206,6 +228,7 @@ export async function executeFailoverLoop(
               `Model '${resolved.backend_model}' not allowed`, resolved.provider_id);
           }
         } catch {
+          // eslint-disable-next-line no-magic-numbers -- log truncation length
           request.log.warn({ allowedModels: allowedModels?.slice(0, 80) }, "Invalid allowed_models JSON, allowing all models");
         }
       }
@@ -241,22 +264,12 @@ export async function executeFailoverLoop(
     // 当前迭代的工具错误刷新闭包（统一 6 处调用）
     const flushCurrentErrors = () => flushToolErrors(provider.id, resolved.backend_model ?? clientModel, logId);
 
-    // --- 格式转换 ---
-    const needsTransform = formatRegistry.needsTransform(ctx.apiType, provider.api_type);
-    let effectiveApiType = clientApiType;
-    let effectiveUpstreamPath = upstreamPath;
-
-    if (needsTransform) {
-      const transformed = formatRegistry.transformRequest(currentBody, ctx.apiType, provider.api_type, resolved.backend_model);
-      currentBody = transformed.body as Record<string, unknown>;
-      effectiveUpstreamPath = transformed.upstreamPath;
-      effectiveApiType = provider.api_type as "openai" | "openai-responses" | "anthropic";
-    }
-
-    // Provider 自定义 upstream_path 覆盖
-    if (provider.upstream_path) {
-      effectiveUpstreamPath = provider.upstream_path;
-    }
+    // --- 格式转换 + upstreamPath 决策 ---
+    const resolvedPath = resolveUpstreamPath(formatRegistry, currentBody, ctx.apiType as ApiType, provider.api_type as ApiType, provider.upstream_path ?? undefined, upstreamPath, resolved.backend_model ?? clientModel ?? "");
+    currentBody = resolvedPath.body;
+    const effectiveApiType = resolvedPath.effectiveApiType;
+    const effectiveUpstreamPath = resolvedPath.effectiveUpstreamPath;
+    const needsTransform = resolvedPath.needsTransform;
 
     // --- routing ---
     currentBody = { ...currentBody, model: resolved.backend_model };
@@ -264,19 +277,8 @@ export async function executeFailoverLoop(
     iterationSnapshot.add({ stage: "overflow", triggered: overflowResult != null });
 
     // --- Plugin 调整 body 和 headers ---
-    let injectedHeaders: Record<string, string> = {};
-    if (pluginRegistry) {
-      const pluginCtx: import("../transform/plugin-types.js").RequestTransformContext = {
-        body: currentBody,
-        headers: {},
-        sourceApiType: clientApiType,
-        targetApiType: provider.api_type as "openai" | "openai-responses" | "anthropic",
-        provider: { id: provider.id, name: provider.name, base_url: provider.base_url, api_type: provider.api_type },
-      };
-      pluginRegistry.applyBeforeRequest(pluginCtx);
-      pluginRegistry.applyAfterRequest(pluginCtx);
-      injectedHeaders = pluginCtx.headers;
-    }
+    const pluginResult = applyPluginAdjustments(pluginRegistry, currentBody, clientApiType, provider);
+    const injectedHeaders = pluginResult.headers;
 
     // --- Provider patches ---
     const providerModels = parseModels(provider.models || "[]");
@@ -296,10 +298,8 @@ export async function executeFailoverLoop(
     }
     const apiKey = decrypt(provider.api_key, encryptionKey);
 
-    // --- beforeSendProxy (adapter callback, e.g. stream_options injection) ---
+    // --- beforeSendProxy + Build logging data ---
     adapter.beforeSendProxy?.(patchedBody, isStream);
-
-    // --- Build logging data ---
     const reqBodyStr = JSON.stringify(patchedBody);
     const clientReq = JSON.stringify({ headers: sanitizeHeadersForLog(cliHdrs as Record<string, string>), body: rawBody });
     const upstreamReqBase = JSON.stringify({
@@ -478,7 +478,7 @@ export async function executeFailoverLoop(
       }
 
       // 其他未知错误
-      const errMsg = e instanceof Error ? e.message : String(e);
+      const errMsg = e instanceof Error ? e.message : e instanceof Error ? e.message : JSON.stringify(e);
       request.log.debug({ logId, error: errMsg, action: "upstream_error" });
       insertRequestLog(db, {
         id: logId, api_type: clientApiType,
@@ -498,4 +498,32 @@ export async function executeFailoverLoop(
       return reply.code(err.statusCode).send(err.body);
     }
   }
+}
+
+// --- 格式转换 + upstreamPath 决策 ---
+function resolveUpstreamPath(
+  formatRegistry: import("../format/registry.js").FormatRegistry,
+  body: Record<string, unknown>,
+  clientApiType: ApiType,
+  providerApiType: ApiType,
+  providerUpstreamPath: string | undefined,
+  defaultUpstreamPath: string,
+  backendModel: string,
+): { body: Record<string, unknown>; effectiveApiType: ApiType; effectiveUpstreamPath: string; needsTransform: boolean } {
+  const needsTransform = formatRegistry.needsTransform(clientApiType, providerApiType);
+  let effectiveApiType: ApiType = clientApiType;
+  let effectiveUpstreamPath = defaultUpstreamPath;
+
+  if (needsTransform) {
+    const transformed = formatRegistry.transformRequest(body, clientApiType, providerApiType, backendModel);
+    body = transformed.body as Record<string, unknown>;
+    effectiveUpstreamPath = transformed.upstreamPath;
+    effectiveApiType = providerApiType;
+  }
+
+  if (providerUpstreamPath) {
+    effectiveUpstreamPath = providerUpstreamPath;
+  }
+
+  return { body, effectiveApiType, effectiveUpstreamPath, needsTransform };
 }
