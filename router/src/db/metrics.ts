@@ -176,7 +176,7 @@ export function getMetricsSummary(
       CASE WHEN SUM(rm.total_duration_ms) > 0 THEN CAST(SUM(rm.output_tokens) AS REAL) * 1000.0 / SUM(rm.total_duration_ms) ELSE NULL END AS avg_tps,
       COALESCE(SUM(rm.input_tokens), 0) AS total_input_tokens, COALESCE(SUM(rm.output_tokens), 0) AS total_output_tokens,
       COALESCE(SUM(rm.cache_read_tokens), 0) AS total_cache_hit_tokens,
-      CASE WHEN SUM(rm.input_tokens) > 0 THEN SUM(rm.cache_read_tokens) * 1.0 / SUM(rm.input_tokens) ELSE NULL END AS cache_hit_rate
+      CASE WHEN SUM(rm.input_tokens) > 0 THEN SUM(rm.cache_read_tokens) * 100.0 / SUM(rm.input_tokens) ELSE NULL END AS cache_hit_rate
     FROM request_metrics rm
     ${joins.join(" ")}
     WHERE ${conditions.join(" AND ")}
