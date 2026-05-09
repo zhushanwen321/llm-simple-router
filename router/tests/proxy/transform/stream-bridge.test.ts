@@ -657,11 +657,11 @@ describe("ChatToResponsesBridgeTransform", () => {
     expect(outputItems).toEqual([]);
   });
 
-  it("no content before finish_reason produces done events with empty text", async () => {
+  it("content in same chunk as finish_reason is accumulated", async () => {
     const t = new ChatToResponsesBridgeTransform("gpt-4o");
     const output = collectOutput(t);
     t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { role: "assistant" }, finish_reason: null }] }));
-    // Add text to trigger message item open, but then immediately finish without any content delta
+    // Add text to trigger message item open, finish in same chunk
     t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { content: "Hi" }, finish_reason: "stop" }], usage: { prompt_tokens: 5, completion_tokens: 1, total_tokens: 6 } }));
     t.end();
     const result = await output;
