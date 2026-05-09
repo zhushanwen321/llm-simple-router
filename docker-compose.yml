@@ -12,9 +12,9 @@ services:
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - JWT_SECRET=${JWT_SECRET}
       - TZ=Asia/Shanghai
-      - DB_PATH=/data/router.db
+      - DB_PATH=/app/data/router.db
     volumes:
-      - ~/.llm-simple-router:/data
+      - ~/.llm-simple-router:/app/data
     env_file:
       - .env
     restart: unless-stopped
