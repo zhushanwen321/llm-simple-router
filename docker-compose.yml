@@ -2,9 +2,11 @@ version: "3.8"
 
 services:
   router:
-    build:
-      context: .
-      dockerfile: router/Dockerfile
+    image: ghcr.io/zhushanwen321/llm-simple-router:latest
+    # 如需本地构建，取消注释以下配置并注释掉 image
+    # build:
+    #   context: .
+    #   dockerfile: router/Dockerfile
     ports:
       - "${PORT:-9981}:9981"
     environment:
