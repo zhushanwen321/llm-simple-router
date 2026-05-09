@@ -73,6 +73,7 @@ async function handleLogin() {
     await api.login(password.value)
     router.push('/')
   } catch (e: unknown) {
+    console.error('login:', e)
     error.value = getApiMessage(e, t('login.loginFailed'))
   } finally {
     loading.value = false

@@ -85,6 +85,7 @@ export function useProviderActions() {
       await api.deleteProvider(target.id)
       await loadProviders()
     } catch (e: unknown) {
+      console.error('providerActions.delete:', e)
       toast.error(getApiMessage(e, t('providers.toast.deleteFailed')))
     }
   }
@@ -95,6 +96,7 @@ export function useProviderActions() {
       const result = await api.reloadTransformRules()
       toast.success(t('providers.toast.reloadSuccess', { pluginCount: result.loadedPlugins.length, rulesCount: result.rulesCount }))
     } catch (e: unknown) {
+      console.error('providerActions.reload:', e)
       toast.error(getApiMessage(e, t('providers.toast.reloadFailed')))
     } finally {
       reloading.value = false

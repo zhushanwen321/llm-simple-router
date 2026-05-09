@@ -270,6 +270,30 @@ Handler (handler/proxy-handler.ts)
 | **插件过滤一致性** | Plugin 的 onError 必须与 beforeRequest 做同等的 provider 过滤 | `plugin-bridge.ts` `onError` 缺 `pluginMatches` |
 | **headers 安全** | headers 写入日志前必须脱敏（authorization、cookie、x-api-key） | `failover-loop.ts` `clientReq` 未脱敏 headsers |
 
+### 前端错误处理规范
+
+所有前端 API 调用的 `catch` 块必须同时包含两层错误处理：
+
+```typescript
+// 正确：双层错误处理
+} catch (e: unknown) {
+  console.error('模块名.操作名:', e)    // 开发调试：记录完整错误堆栈
+  toast.error(getApiMessage(e, t('xxx')))
+}
+
+// 错误：只有 toast 没有 console
+} catch (e: unknown) {
+  toast.error(getApiMessage(e, t('xxx')))
+}
+```
+
+| 规则 | 说明 |
+|------|------|
+| **console.error 在 toast 之前** | 先记录日志，再通知用户 |
+| **console.error 格式** | `console.error('模块名.操作名:', e)`，模块名用 camelCase |
+| **纯 JSON.parse 验证可省略 console** | 输入格式验证不是 API 错误，只需 toast 提示用户 |
+| **silent catch 必须注释** | 空的 `catch {}` 必须加 `/* 原因 */` 注释 |
+
 ### Git Pre-commit Hook
 
 `.githooks/pre-commit` 通过 `npm prepare` 自动安装，四阶段检查：

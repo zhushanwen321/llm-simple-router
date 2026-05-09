@@ -270,7 +270,7 @@ async function handleCheckNow() {
   try {
     await api.triggerUpgradeCheck()
     await loadUpgradeStatus()
-  } catch (e: unknown) { toast.error(getApiMessage(e, t('sidebar.upgrade.checkFailed'))) }
+  } catch (e: unknown) { console.error('sidebar.checkUpgrade:', e); toast.error(getApiMessage(e, t('sidebar.upgrade.checkFailed'))) }
   finally { isChecking.value = false }
 }
 
@@ -284,6 +284,7 @@ async function handleUpgrade() {
     // 升级成功后直接重启，避免“已升级未重启”的不一致状态
     await doRestart()
   } catch (e: unknown) {
+    console.error('sidebar.upgrade:', e)
     toast.error(getApiMessage(e, t('sidebar.upgrade.upgradeFailed')))
     isUpgrading.value = false
   }
@@ -297,6 +298,7 @@ async function handleSync() {
     toast.success(t('sidebar.upgrade.configSyncSuccess'))
     await loadUpgradeStatus()
   } catch (e: unknown) {
+    console.error('sidebar.sync:', e)
     toast.error(getApiMessage(e, t('sidebar.upgrade.syncFailed')))
   } finally {
     isSyncing.value = false
@@ -308,7 +310,7 @@ async function handleSourceChange(val: AcceptableValue) {
   try {
     await api.setSyncSource(val as 'github' | 'gitee')
     await loadUpgradeStatus()
-  } catch (e: unknown) { toast.error(getApiMessage(e, t('sidebar.upgrade.saveFailed'))) }
+  } catch (e: unknown) { console.error('sidebar.setSource:', e); toast.error(getApiMessage(e, t('sidebar.upgrade.saveFailed'))) }
 }
 
 const updateCount = computed(() => {
@@ -420,6 +422,7 @@ async function doRestart() {
     await api.restartServer()
     toast.success(t('sidebar.upgrade.restartSent'))
   } catch (e: unknown) {
+    console.error('sidebar.restart:', e)
     toast.error(getApiMessage(e, t('sidebar.upgrade.restartFailed')))
     isUpgrading.value = false
     return
