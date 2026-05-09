@@ -94,12 +94,15 @@
           <Switch
             id="token-estimation-toggle"
             :model-value="tokenEstimationEnabled"
-            @update:model-value="handleTokenEstimationToggle"
+            @update:model-value="tokenEstimationEnabled = $event"
           />
           <Label for="token-estimation-toggle">
             {{ tokenEstimationEnabled ? t('proxyEnhancement.status.enabled') : t('proxyEnhancement.status.disabled') }}
           </Label>
         </div>
+        <p class="text-xs text-muted-foreground mt-2">
+          修改后点击「保存」按钮生效
+        </p>
       </CardContent>
     </Card>
 
@@ -152,29 +155,21 @@ async function loadConfig() {
 async function handleSave() {
   saving.value = true
   try {
-    await api.updateProxyEnhancement({
-      tool_call_loop_enabled: toolCallLoopEnabled.value,
-      stream_loop_enabled: streamLoopEnabled.value,
-      tool_round_limit_enabled: toolRoundLimitEnabled.value,
-      tool_error_logging_enabled: toolErrorLoggingEnabled.value,
-    })
+    await Promise.all([
+      api.updateProxyEnhancement({
+        tool_call_loop_enabled: toolCallLoopEnabled.value,
+        stream_loop_enabled: streamLoopEnabled.value,
+        tool_round_limit_enabled: toolRoundLimitEnabled.value,
+        tool_error_logging_enabled: toolErrorLoggingEnabled.value,
+      }),
+      api.updateTokenEstimation(tokenEstimationEnabled.value),
+    ])
     toast.success(t('common.saveSuccess'))
   } catch (e: unknown) {
-    console.error('Failed to save proxy enhancement config:', e)
+    console.error('Failed to save config:', e)
     toast.error(getApiMessage(e, t('proxyEnhancement.saveFailed')))
   } finally {
     saving.value = false
-  }
-}
-
-async function handleTokenEstimationToggle(val: boolean) {
-  try {
-    await api.updateTokenEstimation(val)
-    tokenEstimationEnabled.value = val
-    toast.success(t('common.saveSuccess'))
-  } catch (e: unknown) {
-    console.error('Failed to save token estimation config:', e)
-    toast.error(getApiMessage(e, t('proxyEnhancement.saveFailed')))
   }
 }
 
