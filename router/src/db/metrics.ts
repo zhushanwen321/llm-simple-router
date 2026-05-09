@@ -22,6 +22,8 @@ export interface MetricsRow {
   tokens_per_second: number | null;
   stop_reason: string | null;
   is_complete: number;
+  client_type: string;
+  cache_read_tokens_estimated: number;
   created_at: string;
 }
 
@@ -42,6 +44,8 @@ export type MetricsInsert = {
   stop_reason?: string | null;
   is_complete?: number;
   input_tokens_estimated?: number;
+  client_type?: string;
+  cache_read_tokens_estimated?: number;
   // TPS breakdown
   thinking_tokens?: number | null;
   text_tokens?: number | null;
@@ -58,9 +62,10 @@ export function insertMetrics(db: Database.Database, m: MetricsInsert): string {
   db.prepare(
     `INSERT INTO request_metrics (id, request_log_id, provider_id, backend_model, api_type, router_key_id, status_code,
        input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, ttft_ms, total_duration_ms, tokens_per_second, stop_reason, is_complete, input_tokens_estimated,
+       client_type, cache_read_tokens_estimated,
        thinking_tokens, text_tokens, tool_use_tokens, thinking_duration_ms,
        thinking_tps, total_tps, non_thinking_duration_ms, non_thinking_tps)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     id, m.request_log_id, m.provider_id, m.backend_model, m.api_type,
     m.router_key_id ?? null, m.status_code ?? null,
@@ -69,6 +74,7 @@ export function insertMetrics(db: Database.Database, m: MetricsInsert): string {
     m.ttft_ms ?? null, m.total_duration_ms ?? null,
     m.tokens_per_second ?? null, m.stop_reason ?? null, m.is_complete ?? 1,
     m.input_tokens_estimated ?? 0,
+    m.client_type ?? 'unknown', m.cache_read_tokens_estimated ?? 0,
     m.thinking_tokens ?? null, m.text_tokens ?? null, m.tool_use_tokens ?? null,
     m.thinking_duration_ms ?? null,
     m.thinking_tps ?? null, m.total_tps ?? null,
@@ -98,6 +104,7 @@ export interface MetricsSummaryRow {
   provider_id: string;
   provider_name: string;
   backend_model: string;
+  client_type: string;
   request_count: number;
   avg_ttft_ms: number | null;
   // TODO: 实现 p50/p95 百分位（SQLite 不原生支持 PERCENTILE，需要用 JSON 数组或子查询方案）
@@ -147,6 +154,7 @@ export function getMetricsSummary(
   routerKeyId?: string,
   startTime?: string,
   endTime?: string,
+  clientType?: string,
 ): MetricsSummaryRow[] {
   const { timeWhere, timeParams } = buildTimeCondition(period, startTime, endTime);
   const conditions = ["rm.is_complete = 1", timeWhere];
@@ -159,10 +167,11 @@ export function getMetricsSummary(
     conditions.push("rm.router_key_id = ?");
     params.push(routerKeyId);
   }
+  if (clientType) { conditions.push("rm.client_type = ?"); params.push(clientType); }
 
   return db.prepare(`
     SELECT
-      rm.provider_id, COALESCE(p.name, rm.provider_id) AS provider_name, rm.backend_model,
+      rm.provider_id, COALESCE(p.name, rm.provider_id) AS provider_name, rm.backend_model, rm.client_type,
       COUNT(*) AS request_count, AVG(rm.ttft_ms) AS avg_ttft_ms, NULL AS p50_ttft_ms, NULL AS p95_ttft_ms,
       CASE WHEN SUM(rm.total_duration_ms) > 0 THEN CAST(SUM(rm.output_tokens) AS REAL) * 1000.0 / SUM(rm.total_duration_ms) ELSE NULL END AS avg_tps,
       COALESCE(SUM(rm.input_tokens), 0) AS total_input_tokens, COALESCE(SUM(rm.output_tokens), 0) AS total_output_tokens,
@@ -171,7 +180,7 @@ export function getMetricsSummary(
     FROM request_metrics rm
     ${joins.join(" ")}
     WHERE ${conditions.join(" AND ")}
-    GROUP BY rm.provider_id, rm.backend_model ORDER BY request_count DESC
+    GROUP BY rm.provider_id, rm.backend_model, rm.client_type ORDER BY request_count DESC
   `).all(...params) as MetricsSummaryRow[];
 }
 
