@@ -75,6 +75,23 @@
       </div>
     </div>
 
+    <!-- Cache source -->
+    <div v-if="overview.cacheReadTokens != null && overview.cacheReadTokens > 0" class="rounded-md px-2 py-1.5 bg-muted/50">
+      <div class="text-[10px] text-muted-foreground">{{ t('requestDetail.cacheSource') }}</div>
+      <div
+        v-if="overview.cacheReadTokensEstimated === 0"
+        class="text-[11px] font-semibold text-success-dark"
+      >
+        {{ t('requestDetail.cacheSourceApi') }}
+      </div>
+      <div
+        v-else
+        class="text-[11px] font-semibold text-warning-dark"
+      >
+        {{ t('requestDetail.cacheSourceEstimated') }}
+      </div>
+    </div>
+
     <Separator />
 
     <!-- Attempt history -->
@@ -98,6 +115,10 @@
 
     <!-- Metadata -->
     <div class="space-y-1">
+      <div v-if="overview.clientType != null" class="flex items-center justify-between text-[11px]">
+        <span class="text-muted-foreground">{{ t('requestDetail.clientType') }}</span>
+        <span class="font-mono">{{ clientTypeLabel }}</span>
+      </div>
       <div v-if="overview.statusCode != null" class="flex items-center justify-between text-[11px]">
         <span class="text-muted-foreground">{{ t('requestDetail.statusCodeLabel') }}</span>
         <span class="font-mono">{{ overview.statusCode }}</span>
@@ -129,6 +150,13 @@ const { t } = useI18n()
 const props = defineProps<{ overview: UnifiedRequestOverview }>()
 
 const showRaw = ref(false)
+
+const clientTypeLabel = computed(() => {
+  const ct = props.overview.clientType
+  if (ct === 'claude-code') return 'Claude Code'
+  if (ct === 'pi') return 'Pi'
+  return 'Unknown'
+})
 
 const responseMetadataJson = computed(() => {
   const result = extractResponseMetadata(

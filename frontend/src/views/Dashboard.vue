@@ -59,13 +59,23 @@
           <SelectItem v-for="rk in keyOptions" :key="rk.id" :value="rk.id">{{ rk.name }}</SelectItem>
         </SelectContent>
       </Select>
+      <Select v-model="clientType">
+        <SelectTrigger class="w-40">
+          <SelectValue :placeholder="t('dashboard.clientType.all')" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">{{ t('dashboard.clientType.all') }}</SelectItem>
+          <SelectItem value="claude-code">{{ t('dashboard.clientType.claude-code') }}</SelectItem>
+          <SelectItem value="pi">{{ t('dashboard.clientType.pi') }}</SelectItem>
+        </SelectContent>
+      </Select>
     </div>
 
     <!-- 数据区 -->
     <div v-if="loading" class="text-center text-muted-foreground py-20">{{ t('common.loading') }}</div>
     <template v-else>
-      <!-- 指标卡片 5 卡一行 -->
-      <div class="grid grid-cols-5 gap-3 mb-6">
+      <!-- 指标卡片 6 卡一行 -->
+      <div class="grid grid-cols-6 gap-3 mb-6">
         <Card>
           <CardContent class="p-4">
             <p class="text-sm text-muted-foreground">{{ t('dashboard.stats.totalRequests') }}</p>
@@ -94,6 +104,19 @@
           <CardContent class="p-4">
             <p class="text-sm text-muted-foreground">{{ t('dashboard.stats.tokenOutputTotal') }}</p>
             <p class="text-2xl font-bold text-foreground mt-1">{{ stats.totalOutputTokens.toLocaleString() }}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent class="p-4">
+            <p class="text-sm text-muted-foreground">{{ t('dashboard.stats.cacheHitRate') }}</p>
+            <p class="text-2xl font-bold text-primary mt-1">
+              <template v-if="stats.totalInputTokens > 0">
+                {{ cacheHitRate.toFixed(1) }}%
+              </template>
+              <template v-else>
+                <span class="text-base font-normal text-muted-foreground">{{ t('dashboard.noCacheData') }}</span>
+              </template>
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -164,9 +187,10 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, C
 const {
   sortedProviders, selectedProvider,
   periodTab, customStart, customEnd,
-  modelFilter, keyFilter, modelOptions, keyOptions,
+  modelFilter, keyFilter, clientType, modelOptions, keyOptions,
   timeRangeText,
   stats, loading,
+  cacheHitRate,
   tpsChartData, inputTokensChartData, outputTokensChartData,
 } = useDashboard()
 

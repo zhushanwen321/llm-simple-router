@@ -44,6 +44,8 @@ const TimeseriesQuerySchema = Type.Object({
 });
 
 const DASHBOARD_PERIODS = new Set(["window", "weekly", "monthly"]);
+const PCT_FACTOR = 100;
+const PCT_ROUND_DIGITS = 10;
 
 interface MetricsRoutesOptions {
   db: Database.Database;
@@ -74,7 +76,10 @@ export const adminMetricsRoutes: FastifyPluginCallback<MetricsRoutesOptions> = (
     const { startTime, endTime, legacyPeriod } = resolveMetricsTime(query, db, query.router_key_id, query.provider_id);
     const summary = getMetricsSummary(db, legacyPeriod as MetricsPeriod, query.provider_id, query.backend_model, query.router_key_id, startTime, endTime, query.client_type);
     const breakdown = getClientTypeBreakdown(db, legacyPeriod as MetricsPeriod, query.provider_id, query.backend_model, query.router_key_id, startTime, endTime);
-    return reply.send({ rows: summary, client_type_breakdown: breakdown });
+    const totalInputTokens = summary.reduce((sum, r) => sum + r.total_input_tokens, 0);
+    const totalCacheHitTokens = summary.reduce((sum, r) => sum + r.total_cache_hit_tokens, 0);
+    const cacheHitRate = totalInputTokens > 0 ? totalCacheHitTokens * PCT_FACTOR / totalInputTokens : 0;
+    return reply.send({ rows: summary, client_type_breakdown: breakdown, cache_hit_rate: Math.round(cacheHitRate * PCT_ROUND_DIGITS) / PCT_ROUND_DIGITS });
   });
 
   app.get("/admin/api/metrics/timeseries", { schema: { querystring: TimeseriesQuerySchema } }, async (request, reply) => {

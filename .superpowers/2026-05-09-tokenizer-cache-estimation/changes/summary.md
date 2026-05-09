@@ -135,3 +135,30 @@
   - `frontend/src/api/client.ts`（新增 API.TOKEN_ESTIMATION + getTokenEstimation + updateTokenEstimation）
 - 摘要：在 ProxyEnhancement 页面底部添加 Token 预估开关，通过 GET/PUT `/admin/api/settings/token-estimation` 控制。使用 Switch 组件，加载时读取状态，切换时自动保存，成功失败均有 toast 提示。
 - 时间：2026-05-09
+
+## 阶段 Task 8 - Dashboard cache hit rate card with client_type filtering
+
+- 状态：done
+- 变更文件：
+  - `router/src/admin/metrics.ts`（新增 top-level `cache_hit_rate` 字段到 summary 响应，由各行的 total_cache_hit_tokens / total_input_tokens 汇总计算）
+  - `frontend/src/api/client.ts`（新增 `MetricsSummaryResponse` 类型，更新 `getMetricsSummary()` 返回类型和参数，增加 `client_type` 查询参数）
+  - `frontend/src/composables/useDashboard.ts`（新增 `clientType` filter、`cacheHitRate` 和 `clientTypeBreakdown` 状态、`cacheSummaryParams` computed、在 `refresh()` 中并行请求 metrics summary，`clientType` 变化时重刷）
+  - `frontend/src/composables/useLogFilters.ts`（适配 `getMetricsSummary` 新返回类型 `{ rows, ... }`）
+  - `frontend/src/views/Dashboard.vue`（修改 5→6 列网格布局，新增缓存命中率卡片；新增 client_type 筛选下拉框；解构新状态）
+  - `frontend/src/i18n/locales/zh-CN/dashboard.json`（新增 `stats.cacheHitRate`、`clientType.{all,claude-code,pi}`、`noCacheData`）
+  - `frontend/src/i18n/locales/en/dashboard.json`（同上，英文）
+- 摘要：Dashboard 添加缓存命中率卡片（展示百分比，无数据时显示"暂无缓存数据"），新增 client_type 筛选下拉框（全部 / Claude Code / Pi），选择后数据联动刷新。后端 metrics summary 端点增加 top-level cache_hit_rate 汇总计算。
+- 时间：2026-05-09
+
+## 阶段 Task 9 - Log detail showing client_type and cache source
+
+- 状态：done
+- 变更文件：
+  - `router/src/db/logs.ts`（SQL SELECT 增加 `rm.client_type, rm.cache_read_tokens_estimated` 列）
+  - `frontend/src/components/logs/types.ts`（`LogEntry` 增加 `client_type`、`cache_read_tokens_estimated` 字段）
+  - `frontend/src/components/request-detail/types.ts`（`UnifiedRequestOverview` 增加 `clientType`、`cacheReadTokensEstimated`；`fromLogEntry()` 映射新字段；`fromActiveRequest()` 添加默认 null）
+  - `frontend/src/components/request-detail/RequestOverviewPanel.vue`（元数据区增加 clientType 显示带翻译 label；缓存命中来源区域显示在 metrics grid 下方，分 API 上报/预估两种样式）
+  - `frontend/src/i18n/locales/zh-CN/requestDetail.json`（新增 `clientType`、`cacheSource`、`cacheSourceApi`、`cacheSourceEstimated`）
+  - `frontend/src/i18n/locales/en/requestDetail.json`（同上，英文）
+- 摘要：日志详情对话框展示客户端类型（Claude Code / Pi / Unknown）和缓存命中来源（API 上报绿色 / 预估橙色），后端日志查询新增两列 SELECT 以透传数据。
+- 时间：2026-05-09

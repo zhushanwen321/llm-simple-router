@@ -40,7 +40,7 @@ const LOG_LIST_SELECT = `rl.id, rl.api_type, rl.model, rl.provider_id, rl.status
             rl.session_id, rl.pipeline_snapshot,
             rm.input_tokens, rm.output_tokens, rm.cache_read_tokens, rm.ttft_ms,
             rm.tokens_per_second, rm.stop_reason, rm.backend_model, rm.is_complete AS metrics_complete,
-            rm.input_tokens_estimated,
+            rm.input_tokens_estimated, rm.client_type, rm.cache_read_tokens_estimated,
             COALESCE(p.name, rl.provider_id) AS provider_name`;
 const LOG_LIST_JOIN = `LEFT JOIN providers p ON p.id = rl.provider_id LEFT JOIN request_metrics rm ON rm.request_log_id = rl.id`;
 
@@ -201,7 +201,7 @@ export function getRequestLogById(db: Database.Database, id: string): RequestLog
   return db.prepare(
     `SELECT rl.*, rm.input_tokens, rm.output_tokens, rm.cache_read_tokens, rm.ttft_ms,
             rm.tokens_per_second, rm.stop_reason, rm.backend_model, rm.is_complete AS metrics_complete,
-            rm.input_tokens_estimated,
+            rm.input_tokens_estimated, rm.client_type, rm.cache_read_tokens_estimated,
             COALESCE(p.name, rl.provider_id) AS provider_name
      FROM request_logs rl
      LEFT JOIN providers p ON p.id = rl.provider_id

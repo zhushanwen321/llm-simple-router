@@ -267,6 +267,12 @@ interface MetricsSummaryRow {
   cache_hit_rate: number | null;
 }
 
+interface MetricsSummaryResponse {
+  rows: MetricsSummaryRow[];
+  client_type_breakdown: Record<string, number>;
+  cache_hit_rate: number;
+}
+
 interface StatsResponse {
   totalRequests: number;
   successRate: number;
@@ -452,10 +458,11 @@ export const api = {
     provider_id?: string;
     backend_model?: string;
     router_key_id?: string;
+    client_type?: string;
     start_time?: string;
     end_time?: string;
   }) =>
-    request<MetricsSummaryRow[]>("get", API.METRICS_SUMMARY, undefined, {
+    request<MetricsSummaryResponse>("get", API.METRICS_SUMMARY, undefined, {
       params,
     }),
   getMetricsTimeseries: (params: {

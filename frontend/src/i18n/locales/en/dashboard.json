@@ -5,7 +5,8 @@
     "successRate": "Success Rate",
     "tokenOutputSpeed": "Token Output Speed",
     "tokenInputTotal": "Token Input Total",
-    "tokenOutputTotal": "Token Output Total"
+    "tokenOutputTotal": "Token Output Total",
+    "cacheHitRate": "Cache Hit Rate"
   },
   "charts": {
     "tokenOutputSpeed": "Token Output Speed (t/s)",
@@ -18,6 +19,12 @@
     "monthly": "This Month",
     "custom": "Custom"
   },
+  "clientType": {
+    "all": "All",
+    "claude-code": "Claude Code",
+    "pi": "Pi"
+  },
+  "noCacheData": "No cache data",
   "loadProvidersFailed": "Failed to load providers",
   "loadDashboardFailed": "Failed to load dashboard data"
 }

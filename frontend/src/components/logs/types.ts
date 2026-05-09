@@ -30,4 +30,6 @@ export interface LogEntry {
   stream_text_content: string | null
   session_id: string | null
   input_tokens_estimated: number | null
+  client_type: string | null
+  cache_read_tokens_estimated: number | null
 }
