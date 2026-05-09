@@ -2,7 +2,9 @@ version: "3.8"
 
 services:
   router:
-    build: .
+    build:
+      context: .
+      dockerfile: router/Dockerfile
     ports:
       - "${PORT:-9981}:9981"
     environment:
