@@ -113,6 +113,20 @@
 - **TTL**：每次 `estimateHit()`/`update()`/`cleanup()` 前自动清理过期条目（updatedAt < Date.now() - 30min）
 - **estimateHit 流程**：cleanup → 查历史 → 前缀匹配 → update(刷新缓存) → 返回重叠数（无历史返回 null）
 
+## 阶段 Task 3 - Pipeline Hooks (client_type detection + cache estimation)
+
+- 状态：done
+- 变更文件：
+  - `router/src/proxy/hooks/builtin/client-detection.ts`（新建，pre_route hook priority 200）
+  - `router/src/proxy/hooks/builtin/cache-estimation.ts`（新建，post_response hook priority 200）
+  - `router/src/proxy/proxy-logging.ts`（修改：`collectTransportMetrics()` 新增 `clientType`/`cacheReadTokensEstimated` 参数 + `getTokenEstimationEnabled()` toggle 控制估算）
+  - `router/src/proxy/pipeline/register-hooks.ts`（修改：注册两个新 hook）
+  - `router/src/proxy/hooks/builtin/request-logging.ts`（修改：传 ctx.metadata 值到 collectTransportMetrics）
+  - `router/src/proxy/handler/failover-loop.ts`（修改：传 ctx.metadata 值到 collectTransportMetrics）
+- 摘要：创建 client-detection（客户端类型检测 + session_id 提取）和 cache-estimation（缓存命中预估）两个 pipeline hook。修改 `collectTransportMetrics()` 支持从 metadata 传入 `client_type` 和 `cache_read_tokens_estimated`，并受 `token_estimation_enabled` 开关控制。TS 编译 0 error，ESLint 0 warning。
+- 测试：3 个失败与本次变更无关（db.test.ts/metrics.test.ts 硬编码迁移数 43→44，integration.test.ts 超时 flaky）。
+- 时间：2026-05-09
+
 ## 阶段 Task 7 - Frontend experimental feature toggle for token estimation
 
 - 状态：done

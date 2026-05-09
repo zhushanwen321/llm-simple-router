@@ -12,6 +12,8 @@ import { pluginRequestHook } from "../hooks/builtin/plugin-request.js";
 import { providerPatchesHook } from "../hooks/builtin/provider-patches.js";
 import { requestLoggingHook } from "../hooks/builtin/request-logging.js";
 import { errorLoggingHook } from "../hooks/builtin/error-logging.js";
+import { clientDetectionHook } from "../hooks/builtin/client-detection.js";
+import { cacheEstimationHook } from "../hooks/builtin/cache-estimation.js";
 
 export function registerBuiltinHooks(): void {
   hookRegistry.register(enhancementPreprocessHook);
@@ -21,4 +23,6 @@ export function registerBuiltinHooks(): void {
   hookRegistry.register(providerPatchesHook);
   hookRegistry.register(requestLoggingHook);
   hookRegistry.register(errorLoggingHook);
+  hookRegistry.register(clientDetectionHook);
+  hookRegistry.register(cacheEstimationHook);
 }

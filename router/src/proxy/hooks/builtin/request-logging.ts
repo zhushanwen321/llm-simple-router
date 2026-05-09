@@ -84,6 +84,8 @@ export const requestLoggingHook: PipelineHook = {
         ctx.request,
         routerKeyId,
         getTransportStatusCode(resilienceResult.result),
+        ctx.metadata.get("client_type") as string | undefined,
+        ctx.metadata.get("cache_read_tokens_estimated") as number | undefined,
       );
     }
 

@@ -7,6 +7,7 @@ import type { LogFileWriter } from "../storage/log-file-writer.js";
 import { insertSuccessLog, type FailoverContext } from "./log-helpers.js";
 import { MetricsExtractor } from "../metrics/metrics-extractor.js";
 import { estimateInputTokens } from "../utils/token-counter.js";
+import { getTokenEstimationEnabled } from "../db/settings.js";
 import type { FastifyRequest } from "fastify";
 import type { ResilienceAttempt } from "../core/types.js";
 import type { TransportResult } from "./types.js";
@@ -158,6 +159,8 @@ export function collectTransportMetrics(
   request: FastifyRequest,
   routerKeyId?: string | null,
   statusCode?: number | null,
+  clientType?: string,
+  cacheReadTokensEstimated?: number,
 ) {
   const base = {
     request_log_id: lastSuccessLogId, provider_id: providerId, backend_model: backendModel, api_type: apiType,
@@ -167,25 +170,40 @@ export function collectTransportMetrics(
     if (isStream && (result.kind === "stream_success" || result.kind === "stream_abort")) {
       if (result.metrics) {
         const metrics = { ...result.metrics };
-        if (!metrics.input_tokens && request.body) {
+        if (!metrics.input_tokens && request.body && getTokenEstimationEnabled(db)) {
           metrics.input_tokens = estimateInputTokens(request.body as Record<string, unknown>);
           metrics.input_tokens_estimated = 1;
         }
-        insertMetrics(db, { ...base, ...metrics });
+        insertMetrics(db, {
+          ...base,
+          ...metrics,
+          client_type: clientType,
+          cache_read_tokens_estimated: cacheReadTokensEstimated,
+        });
         return;
       }
     } else if (result.kind === "success") {
       const mr = MetricsExtractor.fromNonStreamResponse(apiType, result.body);
       if (mr) {
-        if (!mr.input_tokens && request.body) {
+        if (!mr.input_tokens && request.body && getTokenEstimationEnabled(db)) {
           mr.input_tokens = estimateInputTokens(request.body as Record<string, unknown>);
           mr.input_tokens_estimated = 1;
         }
-        insertMetrics(db, { ...base, ...mr });
+        insertMetrics(db, {
+          ...base,
+          ...mr,
+          client_type: clientType,
+          cache_read_tokens_estimated: cacheReadTokensEstimated,
+        });
         return;
       }
     }
     // 无法提取完整 metrics 的 fallback，标记为未完成
-    insertMetrics(db, { ...base, is_complete: 0 });
+    insertMetrics(db, {
+      ...base,
+      is_complete: 0,
+      client_type: clientType,
+      cache_read_tokens_estimated: cacheReadTokensEstimated,
+    });
   } catch (err) { request.log.error({ err }, "Failed to insert metrics"); }
 }

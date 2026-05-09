@@ -378,7 +378,7 @@ export async function executeFailoverLoop(
         },
         resilienceResult.attempts, resilienceResult.result, startTime,
       );
-      collectTransportMetrics(db, clientApiType, resilienceResult.result, isStream, lastLogId, provider.id, resolved.backend_model, request, routerKeyId, getTransportStatusCode(resilienceResult.result));
+      collectTransportMetrics(db, clientApiType, resilienceResult.result, isStream, lastLogId, provider.id, resolved.backend_model, request, routerKeyId, getTransportStatusCode(resilienceResult.result), ctx.metadata.get("client_type") as string | undefined, ctx.metadata.get("cache_read_tokens_estimated") as number | undefined);
 
       // flush tool errors
       flushToolErrors(provider.id, resolved.backend_model ?? clientModel, lastLogId);
