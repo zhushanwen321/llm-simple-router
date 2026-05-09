@@ -84,6 +84,7 @@ const API = {
   SETTINGS_LOG_RETENTION: "/settings/log-retention",
   SCHEDULES: "/schedules",
   SCHEDULES_BY_GROUP: "/schedules/group",
+  TOKEN_ESTIMATION: "/settings/token-estimation",
   UPGRADE_STATUS: "/upgrade/status",
   UPGRADE_CHECK: "/upgrade/check",
   UPGRADE_EXECUTE: "/upgrade/execute",
@@ -593,4 +594,9 @@ export const api = {
 
   quickSetup: (data: QuickSetupPayload) =>
     request<{ success: boolean; provider_id: string }>("post", API.QUICK_SETUP, data),
+
+  getTokenEstimation: () =>
+    request<{ enabled: boolean }>("get", API.TOKEN_ESTIMATION),
+  updateTokenEstimation: (enabled: boolean) =>
+    request<{ success: boolean }>("put", API.TOKEN_ESTIMATION, { enabled }),
 };

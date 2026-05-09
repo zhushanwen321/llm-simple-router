@@ -184,6 +184,41 @@ export function getMetricsSummary(
   `).all(...params) as MetricsSummaryRow[];
 }
 
+export interface ClientTypeBreakdown {
+  [clientType: string]: number;
+}
+
+export function getClientTypeBreakdown(
+  db: Database.Database,
+  period: MetricsPeriod,
+  providerId?: string,
+  backendModel?: string,
+  routerKeyId?: string,
+  startTime?: string,
+  endTime?: string,
+): ClientTypeBreakdown {
+  const { timeWhere, timeParams } = buildTimeCondition(period, startTime, endTime);
+  const conditions = ["rm.is_complete = 1", timeWhere];
+  const params: unknown[] = [...timeParams];
+
+  if (providerId) { conditions.push("rm.provider_id = ?"); params.push(providerId); }
+  if (backendModel) { conditions.push("rm.backend_model = ?"); params.push(backendModel); }
+  if (routerKeyId) { conditions.push("rm.router_key_id = ?"); params.push(routerKeyId); }
+
+  const rows = db.prepare(`
+    SELECT rm.client_type, COUNT(*) AS cnt
+    FROM request_metrics rm
+    WHERE ${conditions.join(" AND ")}
+    GROUP BY rm.client_type
+  `).all(...params) as { client_type: string; cnt: number }[];
+
+  const breakdown: ClientTypeBreakdown = {};
+  for (const r of rows) {
+    breakdown[r.client_type] = r.cnt;
+  }
+  return breakdown;
+}
+
 export interface MetricsTimeseriesRow {
   time_bucket: string;
   avg_value: number | null;

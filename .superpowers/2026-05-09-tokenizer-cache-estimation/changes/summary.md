@@ -81,6 +81,19 @@
 - 摘要：实现 CacheEstimator 引擎，基于 `(sessionId, model)` 维度的 token 序列前缀匹配预估缓存命中量。包含 `update()`、`estimateHit()`、`cleanup()` 三个公有方法，TTL 30 分钟自动清理。22 个测试全部通过。
 - 时间：2026-05-09
 
+## 阶段 Task 5 - Metrics API extension for client_type filtering
+
+- 状态：done
+- 变更文件：
+  - `router/src/db/metrics.ts`（新增 `getClientTypeBreakdown()` 函数 + `ClientTypeBreakdown` 类型）
+  - `router/src/db/index.ts`（导出 `getClientTypeBreakdown` + `ClientTypeBreakdown`）
+  - `router/src/admin/metrics.ts`（SummaryQuerySchema 增加 `client_type` 参数；route handler 传递 `query.client_type` 到 DB 层；响应包装为 `{ rows, client_type_breakdown }`）
+- 摘要：
+  - `GET /admin/api/metrics/summary` 新增可选 `client_type` 查询参数（`claude-code` / `pi` / `unknown`），筛选特定客户端类型的指标
+  - 路由响应从数组改为对象 `{ rows, client_type_breakdown }`，其中 `rows` 包含已有分组明细，`client_type_breakdown` 为 `{ claude-code: N, pi: N, unknown: N }` 计数
+  - `cache_hit_rate` 字段（SUM(cache_read_tokens) / SUM(input_tokens)）已在 Task 2 的 `getMetricsSummary()` SQL 中实现，无需额外改动
+- 时间：2026-05-09
+
 ## 阶段 Task 2 - DB Migration (client_type + cache_estimation columns)
 
 - 状态：done
@@ -99,3 +112,12 @@
 - **前缀匹配**：线性逐位比较两个 number[] 数组
 - **TTL**：每次 `estimateHit()`/`update()`/`cleanup()` 前自动清理过期条目（updatedAt < Date.now() - 30min）
 - **estimateHit 流程**：cleanup → 查历史 → 前缀匹配 → update(刷新缓存) → 返回重叠数（无历史返回 null）
+
+## 阶段 Task 7 - Frontend experimental feature toggle for token estimation
+
+- 状态：done
+- 变更文件：
+  - `frontend/src/views/ProxyEnhancement.vue`（新增 Token 预估 Card + handleTokenEstimationToggle）
+  - `frontend/src/api/client.ts`（新增 API.TOKEN_ESTIMATION + getTokenEstimation + updateTokenEstimation）
+- 摘要：在 ProxyEnhancement 页面底部添加 Token 预估开关，通过 GET/PUT `/admin/api/settings/token-estimation` 控制。使用 Switch 组件，加载时读取状态，切换时自动保存，成功失败均有 toast 提示。
+- 时间：2026-05-09

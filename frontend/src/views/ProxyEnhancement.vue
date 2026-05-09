@@ -82,6 +82,27 @@
       </CardContent>
     </Card>
 
+    <Card class="mt-4">
+      <CardHeader>
+        <CardTitle>Token 预估</CardTitle>
+        <CardDescription>
+          上游 API 不返回 token 统计数据时，通过 gpt-tokenizer 估算输入 token 数和缓存命中量。仅对携带 session_id 的请求生效。
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div class="flex items-center gap-3">
+          <Switch
+            id="token-estimation-toggle"
+            :model-value="tokenEstimationEnabled"
+            @update:model-value="handleTokenEstimationToggle"
+          />
+          <Label for="token-estimation-toggle">
+            {{ tokenEstimationEnabled ? t('proxyEnhancement.status.enabled') : t('proxyEnhancement.status.disabled') }}
+          </Label>
+        </div>
+      </CardContent>
+    </Card>
+
     <div class="flex justify-end mt-4">
       <Button :disabled="saving" @click="handleSave">
         <span v-if="saving" class="flex items-center gap-1">
@@ -110,6 +131,7 @@ const toolRoundLimitEnabled = ref(true)
 const toolCallLoopEnabled = ref(false)
 const streamLoopEnabled = ref(false)
 const toolErrorLoggingEnabled = ref(false)
+const tokenEstimationEnabled = ref(false)
 const saving = ref(false)
 
 async function loadConfig() {
@@ -119,6 +141,8 @@ async function loadConfig() {
     toolCallLoopEnabled.value = data.tool_call_loop_enabled
     streamLoopEnabled.value = data.stream_loop_enabled
     toolErrorLoggingEnabled.value = data.tool_error_logging_enabled
+    const tokenEstData = await api.getTokenEstimation()
+    tokenEstimationEnabled.value = tokenEstData.enabled
   } catch (e: unknown) {
     console.error('Failed to load proxy enhancement config:', e)
     toast.error(getApiMessage(e, t('proxyEnhancement.loadFailed')))
@@ -140,6 +164,17 @@ async function handleSave() {
     toast.error(getApiMessage(e, t('proxyEnhancement.saveFailed')))
   } finally {
     saving.value = false
+  }
+}
+
+async function handleTokenEstimationToggle(val: boolean) {
+  try {
+    await api.updateTokenEstimation(val)
+    tokenEstimationEnabled.value = val
+    toast.success(t('common.saveSuccess'))
+  } catch (e: unknown) {
+    console.error('Failed to save token estimation config:', e)
+    toast.error(getApiMessage(e, t('proxyEnhancement.saveFailed')))
   }
 }
 

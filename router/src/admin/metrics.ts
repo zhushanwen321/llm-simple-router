@@ -1,7 +1,7 @@
 import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
 import { Type, Static } from "@sinclair/typebox";
-import { getMetricsSummary, getMetricsTimeseries } from "../db/index.js";
+import { getMetricsSummary, getMetricsTimeseries, getClientTypeBreakdown } from "../db/index.js";
 import type { MetricsPeriod, MetricsMetric } from "../db/metrics.js";
 import { resolveTimeRange } from "../utils/time-range.js";
 import type { DashboardPeriod } from "../utils/time-range.js";
@@ -28,6 +28,7 @@ const SummaryQuerySchema = Type.Object({
   provider_id: Type.Optional(Type.String()),
   backend_model: Type.Optional(Type.String()),
   router_key_id: Type.Optional(Type.String()),
+  client_type: Type.Optional(Type.String()),
   start_time: Type.Optional(Type.String()),
   end_time: Type.Optional(Type.String()),
 });
@@ -71,8 +72,9 @@ export const adminMetricsRoutes: FastifyPluginCallback<MetricsRoutesOptions> = (
   app.get("/admin/api/metrics/summary", { schema: { querystring: SummaryQuerySchema } }, async (request, reply) => {
     const query = request.query as Static<typeof SummaryQuerySchema>;
     const { startTime, endTime, legacyPeriod } = resolveMetricsTime(query, db, query.router_key_id, query.provider_id);
-    const summary = getMetricsSummary(db, legacyPeriod as MetricsPeriod, query.provider_id, query.backend_model, query.router_key_id, startTime, endTime);
-    return reply.send(summary);
+    const summary = getMetricsSummary(db, legacyPeriod as MetricsPeriod, query.provider_id, query.backend_model, query.router_key_id, startTime, endTime, query.client_type);
+    const breakdown = getClientTypeBreakdown(db, legacyPeriod as MetricsPeriod, query.provider_id, query.backend_model, query.router_key_id, startTime, endTime);
+    return reply.send({ rows: summary, client_type_breakdown: breakdown });
   });
 
   app.get("/admin/api/metrics/timeseries", { schema: { querystring: TimeseriesQuerySchema } }, async (request, reply) => {
