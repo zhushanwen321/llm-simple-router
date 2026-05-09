@@ -47,6 +47,12 @@
     "activeRequests": "Active Requests",
     "eventLoopDelay": "Event Loop 延迟"
   },
+  "kill": "终止",
+  "killCancel": "取消",
+  "killConfirmTitle": "确认终止请求",
+  "killConfirm": "确定要终止 {model}（{provider}）的请求吗？此操作不可撤销。",
+  "killSuccess": "请求已终止",
+  "killFailed": "终止请求失败",
   "statusCodes": {
     "noData": "暂无状态码数据",
     "success": "2xx 成功",

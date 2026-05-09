@@ -176,6 +176,8 @@ export async function executeFailoverLoop(
   let failoverIteration = 0;
 
   while (true) {
+    // 请求被 kill 后 reply 已销毁，直接退出避免浪费 failover 迭代
+    if (reply.raw.destroyed) return reply;
     if (++failoverIteration > MAX_FAILOVER_ITERATIONS) {
       return reply.code(HTTP_SERVICE_UNAVAILABLE).send({
         error: { message: `Max failover iterations (${MAX_FAILOVER_ITERATIONS}) exceeded`, type: "server_error", code: "failover_limit_exceeded" },
@@ -475,6 +477,11 @@ export async function executeFailoverLoop(
         return rejectAndReply(reply, rCtx, errors.concurrencyTimeout(provider.id, (e as SemaphoreTimeoutError).timeoutMs),
           `Concurrency wait timeout for provider '${provider.id}' (${(e as SemaphoreTimeoutError).timeoutMs}ms)`, provider.id,
           flushCurrentErrors);
+      }
+
+      // 请求被主动 kill（abort + reply destroy），直接退出不写日志
+      if (e instanceof Error && e.name === "AbortError") {
+        return reply;
       }
 
       // 其他未知错误

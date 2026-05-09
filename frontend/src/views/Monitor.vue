@@ -58,6 +58,16 @@
                   <TooltipContent>{{ t('monitor.copyId') }}</TooltipContent>
                 </Tooltip>
               </TooltipProvider>
+              <TooltipProvider :delay-duration="300">
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <Button variant="ghost" size="icon-xs" class="shrink-0 text-destructive hover:text-destructive" @click.stop="openKillDialog(req.id)">
+                      <XIcon class="size-3" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{{ t('monitor.kill') }}</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
           </ScrollArea>
         </CardContent>
@@ -98,6 +108,16 @@
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>{{ t('monitor.copyId') }}</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <TooltipProvider :delay-duration="300">
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <Button variant="ghost" size="icon-xs" class="shrink-0 text-destructive hover:text-destructive" @click.stop="openKillDialog(req.id)">
+                      <XIcon class="size-3" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{{ t('monitor.kill') }}</TooltipContent>
                 </Tooltip>
               </TooltipProvider>
             </div>
@@ -197,18 +217,39 @@
       :stream-content="selectedRequest?.streamContent"
       :log-detail-data="logDetailData"
     />
+
+    <!-- Kill Confirmation Dialog -->
+    <AlertDialog v-model:open="killDialogOpen">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{{ t('monitor.killConfirmTitle') }}</AlertDialogTitle>
+          <AlertDialogDescription v-if="killTarget">
+            {{ t('monitor.killConfirm', { model: killTarget.model, provider: killTarget.providerName }) }}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>{{ t('monitor.killCancel') }}</AlertDialogCancel>
+          <AlertDialogAction class="bg-destructive text-destructive-foreground hover:bg-destructive/90" @click="executeKill">
+            {{ t('monitor.kill') }}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { CheckIcon, CopyIcon } from 'lucide-vue-next'
+import { CheckIcon, CopyIcon, XIcon } from 'lucide-vue-next'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
+import { api, getApiMessage } from '@/api/client'
+import { toast } from 'vue-sonner'
 import MonitorHeader from '@/components/monitor/MonitorHeader.vue'
 import ConcurrencyPanel from '@/components/monitor/ConcurrencyPanel.vue'
 import RuntimePanel from '@/components/monitor/RuntimePanel.vue'
@@ -260,6 +301,33 @@ const { connect } = useMonitorSSE(
 )
 
 const { copied, copy } = useClipboard()
+
+// --- Kill request ---
+const killDialogOpen = ref(false)
+const killTargetId = ref<string | null>(null)
+const killTarget = computed(() => {
+  if (!killTargetId.value) return null
+  return activeRequests.value.find(r => r.id === killTargetId.value) ?? null
+})
+
+function openKillDialog(id: string) {
+  killTargetId.value = id
+  killDialogOpen.value = true
+}
+
+async function executeKill() {
+  if (!killTargetId.value) return
+  try {
+    await api.killMonitorRequest(killTargetId.value)
+    // 立即从活跃列表移除，不等 SSE
+    activeRequests.value = activeRequests.value.filter(r => r.id !== killTargetId.value)
+    toast.success(t('monitor.killSuccess'))
+  } catch (e: unknown) {
+    console.error('Monitor.killRequest:', e)
+    toast.error(getApiMessage(e, t('monitor.killFailed')))
+  }
+  killDialogOpen.value = false
+}
 
 // --- Helper functions ---
 

@@ -46,5 +46,14 @@ export const adminMonitorRoutes: FastifyPluginCallback<MonitorRoutesOptions> = (
     return req;
   });
 
+  app.delete("/admin/api/monitor/request/:id", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const killed = tracker.killRequest(id);
+    if (!killed) {
+      return reply.code(HTTP_NOT_FOUND).send(apiError(API_CODE.NOT_FOUND, "Request not found or already completed"));
+    }
+    return { killed: true };
+  });
+
   done();
 };
