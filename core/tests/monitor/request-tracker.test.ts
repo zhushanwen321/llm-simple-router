@@ -439,7 +439,101 @@ describe("RequestTracker", () => {
     });
   });
 
-  describe("getStats()", () => {
+  describe("killRequest()", () => {
+    it("returns true and invokes registered kill callback", () => {
+      const killCb = vi.fn();
+      tracker.start(createActiveRequest({ id: "kill-1" }));
+      tracker.registerKillCallback("kill-1", killCb);
+
+      const result = tracker.killRequest("kill-1");
+
+      expect(result).toBe(true);
+      expect(killCb).toHaveBeenCalledTimes(1);
+    });
+
+    it("returns false for non-existent request", () => {
+      const result = tracker.killRequest("nonexistent");
+      expect(result).toBe(false);
+    });
+
+    it("returns false for request without registered callback", () => {
+      tracker.start(createActiveRequest({ id: "no-cb" }));
+
+      const result = tracker.killRequest("no-cb");
+      expect(result).toBe(false);
+    });
+
+    it("logs info on successful kill", () => {
+      const logger = { debug: vi.fn(), info: vi.fn(), warn: vi.fn() };
+      const localTracker = new RequestTracker({ logger });
+      const killCb = vi.fn();
+
+      localTracker.start(createActiveRequest({ id: "log-1" }));
+      localTracker.registerKillCallback("log-1", killCb);
+      localTracker.killRequest("log-1");
+
+      expect(logger.info).toHaveBeenCalledWith(
+        expect.objectContaining({ reqId: "log-1" }),
+        "Tracker: killRequest",
+      );
+    });
+
+    it("logs debug when kill target not found", () => {
+      const logger = { debug: vi.fn(), info: vi.fn(), warn: vi.fn() };
+      const localTracker = new RequestTracker({ logger });
+
+      localTracker.killRequest("ghost");
+
+      expect(logger.debug).toHaveBeenCalledWith(
+        expect.objectContaining({ reqId: "ghost" }),
+        "Tracker: killRequest not found (already completed or unknown)",
+      );
+    });
+  });
+
+  describe("kill + complete interaction", () => {
+    it("complete after kill forces status to failed", () => {
+      const killCb = vi.fn();
+      tracker.start(createActiveRequest({ id: "killed-1" }));
+      tracker.registerKillCallback("killed-1", killCb);
+
+      tracker.killRequest("killed-1");
+
+      // Simulate the abort completing the request
+      tracker.complete("killed-1", { status: "completed", statusCode: 200 });
+
+      const found = tracker.get("killed-1");
+      expect(found).toBeDefined();
+      expect(found!.status).toBe("failed");
+    });
+
+    it("normal complete clears kill callback so subsequent killRequest returns false", () => {
+      const killCb = vi.fn();
+      tracker.start(createActiveRequest({ id: "normal-1" }));
+      tracker.registerKillCallback("normal-1", killCb);
+
+      // Complete without killing
+      tracker.complete("normal-1", { status: "completed", statusCode: 200 });
+
+      // killCallback should have been cleaned up in complete()
+      const result = tracker.killRequest("normal-1");
+      expect(result).toBe(false);
+    });
+
+    it("kill then complete still moves to recentCompleted", () => {
+      const killCb = vi.fn();
+      tracker.start(createActiveRequest({ id: "kcr-1" }));
+      tracker.registerKillCallback("kcr-1", killCb);
+      tracker.killRequest("kcr-1");
+      tracker.complete("kcr-1", { status: "completed", statusCode: 200 });
+
+      const recent = tracker.getRecent();
+      expect(recent).toHaveLength(1);
+      expect(recent[0].status).toBe("failed");
+    });
+  });
+
+describe("getStats()", () => {
     it("delegates to statsAggregator", () => {
       const stats = tracker.getStats();
       expect(getStatsSpy).toHaveBeenCalled();
