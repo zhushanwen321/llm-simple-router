@@ -3,7 +3,7 @@
 ## 基本信息
 - 需求描述：通过 tokenizer + 前缀匹配预估 LLM 缓存命中情况，填补第三方 Provider 不返回缓存数据的空白
 - 开始时间：2026-05-09
-- 当前阶段：2 需求评审（已完成）
+- 当前阶段：4 编码评审
 
 ## 阶段状态
 
@@ -11,8 +11,8 @@
 |------|------|---------|------|
 | 1 需求分析 | ✅ 通过 | 1轮 | 2026-05-09 |
 | 2 需求评审 | ✅ 通过 | 3轮 | 2026-05-09 |
-| 3 编码实现 | ⬜ 未开始 | - | - |
-| 4 编码评审 | ⬜ 未开始 | - | - |
+| 3 编码实现 | ✅ 通过 | - | 2026-05-09，9 tasks |
+| 4 编码评审 | 🔄 进行中 | - | 2026-05-09 |
 | 5 测试编写 | ⬜ 未开始 | - | - |
 | 6 测试评审 | ⬜ 未开始 | - | - |
 | 7 代码推送 | ⬜ 未开始 | - | - |
@@ -161,4 +161,18 @@
   - `frontend/src/i18n/locales/zh-CN/requestDetail.json`（新增 `clientType`、`cacheSource`、`cacheSourceApi`、`cacheSourceEstimated`）
   - `frontend/src/i18n/locales/en/requestDetail.json`（同上，英文）
 - 摘要：日志详情对话框展示客户端类型（Claude Code / Pi / Unknown）和缓存命中来源（API 上报绿色 / 预估橙色），后端日志查询新增两列 SELECT 以透传数据。
+- 时间：2026-05-09
+
+## 阶段 5 - Change-Driven Testing（接口级测试编写）
+
+- 状态：done
+- 变更文件：
+  - `router/tests/cache-estimation-hooks.test.ts`（新建，18 个测试：client-detection hook 6 + cache-estimation hook 7 + collectTransportMetrics 5）
+  - `router/tests/metrics.test.ts`（追加，17 个测试：getClientTypeBreakdown 5 + Admin Metrics API 7 + 已有 5 个保留）
+- 摘要：编写 24 个新增接口级测试覆盖 cache estimation 变更：
+  1. **Pipeline hooks** — clientDetectionHook（6 tests: claude-code/pi/unknown 检测、session_id 提取、fallback）、cacheEstimationHook（7 tests: db/missing/disabled/session/API cache/estimate hit/error）
+  2. **collectTransportMetrics 新增参数** — 4 tests 覆盖 stream/non-stream/fallback 路径 + cacheReadTokensEstimated 开关控制
+  3. **getClientTypeBreakdown** — 5 tests 覆盖多类型计数、空数据、provider/backend_model 过滤、is_complete 过滤
+  4. **Admin Metrics API** — 7 tests 覆盖 `{ rows, client_type_breakdown, cache_hit_rate }` 响应格式、client_type 查询过滤、cache_hit_rate 计算
+- 测试结果：1023 passed / 87 test files / 0 failed（3 pre-existing skipped）
 - 时间：2026-05-09
