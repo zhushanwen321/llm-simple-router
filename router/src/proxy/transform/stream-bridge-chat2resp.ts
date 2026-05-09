@@ -34,6 +34,9 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
   private currentFunctionCallId = "";
   private currentFunctionCallName = "";
   private currentReasoningItemId = "";
+  private textBuffer = "";
+  private reasoningBuffer = "";
+  private argsBuffer = "";
   private createdAt = Math.floor(Date.now() / MS_PER_SECOND);
 
   private nextSeq(): number {
@@ -69,14 +72,14 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
         type: RESPONSES_SSE_EVENTS.OUTPUT_TEXT_DONE,
         output_index: this.outputIndex,
         content_index: this.contentIndex,
-        text: "",
+        text: this.textBuffer,
         sequence_number: this.nextSeq(),
       });
       this.pushResponsesSSE(RESPONSES_SSE_EVENTS.CONTENT_PART_DONE, {
         type: RESPONSES_SSE_EVENTS.CONTENT_PART_DONE,
         output_index: this.outputIndex,
         content_index: this.contentIndex,
-        part: { type: "output_text", text: "", annotations: [] },
+        part: { type: "output_text", text: this.textBuffer, annotations: [] },
         sequence_number: this.nextSeq(),
       });
       this.hasContentPartStarted = false;
@@ -89,7 +92,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
           type: "message",
           id: this.currentMessageItemId,
           role: "assistant",
-          content: [{ type: "output_text", text: "", annotations: [] }],
+          content: [{ type: "output_text", text: this.textBuffer, annotations: [] }],
           status: "completed",
         },
         sequence_number: this.nextSeq(),
@@ -98,7 +101,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
         type: "message",
         id: this.currentMessageItemId,
         role: "assistant",
-        content: [{ type: "output_text", text: "", annotations: [] }],
+        content: [{ type: "output_text", text: this.textBuffer, annotations: [] }],
       });
       this.hasMessageItemStarted = false;
       this.outputIndex++;
@@ -111,14 +114,14 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
       type: RESPONSES_SSE_EVENTS.REASONING_SUMMARY_TEXT_DONE,
       output_index: this.outputIndex,
       summary_index: 0,
-      text: "",
+      text: this.reasoningBuffer,
       sequence_number: this.nextSeq(),
     });
     this.pushResponsesSSE(RESPONSES_SSE_EVENTS.REASONING_SUMMARY_PART_DONE, {
       type: RESPONSES_SSE_EVENTS.REASONING_SUMMARY_PART_DONE,
       output_index: this.outputIndex,
       summary_index: 0,
-      part: { type: "summary_text", text: "" },
+      part: { type: "summary_text", text: this.reasoningBuffer },
       sequence_number: this.nextSeq(),
     });
     this.pushResponsesSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_DONE, {
@@ -127,14 +130,14 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
       item: {
         type: "reasoning",
         id: this.currentReasoningItemId,
-        summary: [{ type: "summary_text", text: "" }],
+        summary: [{ type: "summary_text", text: this.reasoningBuffer }],
       },
       sequence_number: this.nextSeq(),
     });
     this.collectedOutput.push({
       type: "reasoning",
       id: this.currentReasoningItemId,
-      summary: [{ type: "summary_text", text: "" }],
+      summary: [{ type: "summary_text", text: this.reasoningBuffer }],
     });
     this.hasReasoningItemStarted = false;
     this.outputIndex++;
@@ -146,7 +149,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
       output_index: this.outputIndex,
       item_id: this.currentFunctionCallId,
       call_id: this.currentFunctionCallId,
-      arguments: "",
+      arguments: this.argsBuffer,
       sequence_number: this.nextSeq(),
     });
     this.pushResponsesSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_DONE, {
@@ -157,7 +160,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
         id: this.currentFunctionCallId,
         call_id: this.currentFunctionCallId,
         name: this.currentFunctionCallName,
-        arguments: "",
+        arguments: this.argsBuffer,
         status: "completed",
       },
       sequence_number: this.nextSeq(),
@@ -167,7 +170,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
       id: this.currentFunctionCallId,
       call_id: this.currentFunctionCallId,
       name: this.currentFunctionCallName,
-      arguments: "",
+      arguments: this.argsBuffer,
     });
     this.outputIndex++;
     this.currentFunctionCallId = "";
@@ -246,6 +249,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
 
       if (!this.hasReasoningItemStarted) {
         this.hasReasoningItemStarted = true;
+        this.reasoningBuffer = "";
         this.currentReasoningItemId = `rs_${randomHex(ID_HEX_LENGTH)}`;
         this.pushResponsesSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED, {
           type: RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED,
@@ -268,6 +272,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
         delta: delta.reasoning_content as string,
         sequence_number: this.nextSeq(),
       });
+      this.reasoningBuffer += delta.reasoning_content as string;
     }
 
     // Handle text content
@@ -278,6 +283,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
 
       if (!this.hasMessageItemStarted) {
         this.hasMessageItemStarted = true;
+        this.textBuffer = "";
         this.contentIndex = 0;
         this.currentMessageItemId = `msg_${randomHex(ID_HEX_LENGTH)}`;
         this.pushResponsesSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED, {
@@ -310,6 +316,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
         delta: delta.content as string,
         sequence_number: this.nextSeq(),
       });
+      this.textBuffer += delta.content as string;
     }
 
     // Handle tool_calls
@@ -333,6 +340,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
           }
           this.currentFunctionCallId = tcId;
           this.currentFunctionCallName = tcName;
+          this.argsBuffer = "";
           this.pushResponsesSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED, {
             type: RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED,
             output_index: this.outputIndex,
@@ -357,6 +365,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
               delta: args,
               sequence_number: this.nextSeq(),
             });
+            this.argsBuffer += args;
           }
         } else if (fn?.arguments) {
           // Arguments continuation for current tool call
@@ -368,6 +377,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
             delta: fn.arguments as string,
             sequence_number: this.nextSeq(),
           });
+          this.argsBuffer += fn.arguments as string;
         }
       }
     }
