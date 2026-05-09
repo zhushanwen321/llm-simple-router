@@ -13,7 +13,7 @@
 | 2 需求评审 | 🔄 进行中 | 第2轮 | 已修复 MUST FIX（spec+plan），等待重审 |
 | 3 编码实现 | ✅ 已完成 | - | 2026-05-09 - textBuffer/reasoningBuffer/argsBuffer 累加器实现 |
 | 4 编码评审 | ⬜ 未开始 | - | - |
-| 5 测试编写 | ⬜ 未开始 | - | - |
+| 5 测试编写 | ✅ 已完成 | - | 补充接口级边界测试 11 个 |
 | 6 测试评审 | ⬜ 未开始 | - | - |
 | 7 代码推送 | ⬜ 未开始 | - | - |
 | 8 CI 验证 | ⬜ 未开始 | - | - |
@@ -31,6 +31,12 @@
 - 变更文件：`router/src/proxy/transform/stream-bridge-chat2resp.ts`
 - 摘要：添加 textBuffer/reasoningBuffer/argsBuffer 三个累加器到 ChatToResponsesBridgeTransform，在所有 done 事件和 response.completed.output 中使用累加后的完整文本，修复 Codex Desktop 显示空回复 bug
 - 测试：29 tests passed (router/tests/proxy/transform/stream-bridge.test.ts)
+
+### 阶段 5 测试编写 — 2026-05-09
+- 状态：已完成
+- 变更文件：`router/tests/proxy/transform/stream-bridge.test.ts`
+- 摘要：补充 11 个接口级边界测试（空流、buffer 隔离、arguments 多片、非 ASCII、invalid JSON、ensureTerminated），共 40 测试全部通过
+- 全量测试：988 passed / 3 skipped
 
 ## 异常记录
 [待后续阶段补充]
