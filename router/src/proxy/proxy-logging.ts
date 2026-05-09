@@ -8,6 +8,7 @@ import { insertSuccessLog, type FailoverContext } from "./log-helpers.js";
 import { MetricsExtractor } from "../metrics/metrics-extractor.js";
 import { estimateInputTokens } from "../utils/token-counter.js";
 import { cacheEstimator } from "../routing/cache-estimator.js";
+import type { RequestTracker } from "@llm-router/core/monitor";
 import { getTokenEstimationEnabled } from "../db/settings.js";
 import type { FastifyRequest } from "fastify";
 import type { ResilienceAttempt } from "../core/types.js";
@@ -162,6 +163,7 @@ export function collectTransportMetrics(
   statusCode?: number | null,
   clientType?: string,
   sessionId?: string,
+  tracker?: RequestTracker,
 ) {
   const base = {
     request_log_id: lastSuccessLogId, provider_id: providerId, backend_model: backendModel, api_type: apiType,
@@ -181,6 +183,10 @@ export function collectTransportMetrics(
           if (estimated != null && estimated > 0) {
             metrics.cache_read_tokens = estimated;
             metrics.cache_read_tokens_estimated = 1;
+            // 更新实时监控中的缓存数据
+            if (tracker) {
+              try { tracker.updateCompletedMetrics(lastSuccessLogId, estimated); } catch { /* 非关键路径，静默降级 */ }
+            }
           }
         } catch (e) {
           request.log.error({ err: e }, "cache estimation failed");

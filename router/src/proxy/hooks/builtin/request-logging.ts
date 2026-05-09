@@ -73,6 +73,7 @@ export const requestLoggingHook: PipelineHook = {
 
     // 2. 采集 transport 指标
     if (ctx.provider) {
+      const metricsTracker = container ? container.resolve<RequestTracker>(SERVICE_KEYS.tracker) : undefined;
       collectTransportMetrics(
         db,
         apiType,
@@ -86,6 +87,7 @@ export const requestLoggingHook: PipelineHook = {
         getTransportStatusCode(resilienceResult.result),
         ctx.metadata.get("client_type") as string | undefined,
         (ctx.metadata.get("session_id") as string | undefined) ?? ctx.sessionId,
+        metricsTracker,
       );
     }
 
