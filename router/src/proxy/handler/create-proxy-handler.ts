@@ -24,6 +24,7 @@ import type { ServiceContainer } from "../../core/container.js";
 import type { FormatRegistry } from "../format/registry.js";
 import type { ProxyAgentFactory } from "../transport/proxy-agent.js";
 import { createPipelineContext } from "../pipeline/context.js";
+import { proxyPipeline } from "../pipeline/pipeline.js";
 import { executeFailoverLoop, type FailoverLoopDeps } from "./failover-loop.js";
 import { loadEnhancementConfig } from "../routing/enhancement-config.js";
 import { ToolLoopGuard, type SessionTracker } from "@llm-router/core/loop-prevention";
@@ -250,6 +251,14 @@ export function createProxyHandler(config: ProxyHandlerConfig) {
       // 创建 pipeline context
       const ctx = createPipelineContext(request, reply, apiType);
 
+      // 注入 DB 到 metadata（hooks 需要访问 settings/写入数据）
+      ctx.metadata.set("db", db);
+
+      // 执行 pre_route 阶段 hooks（client-detection 在此阶段设置 client_type / session_id）
+      await proxyPipeline.emit("pre_route", ctx).catch(err => {
+        request.log.error({ err }, "pre_route hook failed");
+      });
+
       // 增强预处理（工具轮数限制 + 工具循环检测）
       try {
         applyEnhancementPreprocess(request, reply, ctx, db, container);
@@ -271,12 +280,14 @@ export function createProxyHandler(config: ProxyHandlerConfig) {
         proxyAgentFactory: container.resolve<ProxyAgentFactory>(SERVICE_KEYS.proxyAgentFactory),
       };
 
-      return executeFailoverLoop(ctx, apiTypeErrors, deps, defaultUpstreamPath, adapter ?? {
+      const result = await executeFailoverLoop(ctx, apiTypeErrors, deps, defaultUpstreamPath, adapter ?? {
         apiType,
         defaultPath: defaultUpstreamPath,
         errorMeta,
         formatError: (message: string) => ({ error: { message } }),
       });
+
+      return result;
     };
 
     // 注册 POST 路由

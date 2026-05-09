@@ -28,3 +28,6 @@ export class ProxyPipeline {
     }
   }
 }
+
+/** 全局 Pipeline 单例，由 registerBuiltinHooks() 注册所有内置 hook */
+export const proxyPipeline = new ProxyPipeline();

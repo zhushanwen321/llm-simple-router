@@ -292,7 +292,7 @@ describe("collectTransportMetrics — new cache params", () => {
     db.close();
   });
 
-  it("stream success path: writes client_type and cache_read_tokens_estimated", () => {
+  it("stream success path: writes client_type and estimated cache hit", () => {
     const logId = nextLogId();
     insertRequestLog(db, {
       id: logId, api_type: "openai", model: "gpt-4", provider_id: "p1",
@@ -300,6 +300,11 @@ describe("collectTransportMetrics — new cache params", () => {
       created_at: new Date().toISOString(),
     });
 
+    // 先建立缓存基线（模拟上一轮请求）
+    const sessionId = "test-session";
+    cacheEstimator.update(sessionId, "gpt-4", { messages: [{ role: "user", content: "hello world" }] });
+
+    // 第二轮请求与上轮共享前缀（cache_read_tokens=0 触发预估）
     collectTransportMetrics(
       db,
       "openai",
@@ -317,19 +322,18 @@ describe("collectTransportMetrics — new cache params", () => {
       null,
       200,
       "claude-code",
-      1,
-      42,
+      sessionId,
     );
 
     const rows = db.prepare("SELECT * FROM request_metrics WHERE request_log_id = ?").all(logId) as any[];
     expect(rows).toHaveLength(1);
     expect(rows[0].client_type).toBe("claude-code");
+    // api cache_read_tokens=0 + sessionId + toggle ON → cache estimator should estimate
     expect(rows[0].cache_read_tokens_estimated).toBe(1);
-    // metrics.cache_read_tokens=0 but we passed cacheReadTokensEstimated=1 & value=42 → should override
-    expect(rows[0].cache_read_tokens).toBe(42);
+    expect(rows[0].cache_read_tokens).toBeGreaterThan(0);
   });
 
-  it("non-stream success path: writes client_type and cache estimation", () => {
+  it("non-stream success path: uses API cache data when available, ignores estimated", () => {
     const logId = nextLogId();
     insertRequestLog(db, {
       id: logId, api_type: "openai", model: "gpt-4", provider_id: "p1",
@@ -338,12 +342,15 @@ describe("collectTransportMetrics — new cache params", () => {
     });
 
     // Non-stream response body that MetricsExtractor can parse
+    // OpenAI format: usage.prompt_tokens_details.cached_tokens
     const responseBody = JSON.stringify({
       model: "gpt-4",
       usage: {
         prompt_tokens: 100,
         completion_tokens: 50,
-        prompt_cache_hit_tokens: 42,
+        prompt_tokens_details: {
+          cached_tokens: 42,
+        },
       },
       choices: [{ message: { content: "hello" } }],
     });
@@ -367,17 +374,16 @@ describe("collectTransportMetrics — new cache params", () => {
       null,
       200,
       "pi",
-      1,
-      42,
+      undefined,
     );
 
     const rows = db.prepare("SELECT * FROM request_metrics WHERE request_log_id = ?").all(logId) as any[];
     expect(rows).toHaveLength(1);
     expect(rows[0].client_type).toBe("pi");
-    expect(rows[0].cache_read_tokens_estimated).toBe(1);
-    // Non-stream: MetricsExtractor.fromNonStreamResponse parses prompt_cache_hit_tokens → cache_read_tokens
-    // The override logic: (!metrics.cache_read_tokens || metrics.cache_read_tokens === 0) → override
-    // But the extractor returns cache_read_tokens from prompt_cache_hit_tokens which is 42
+    // MetricsExtractor.fromNonStreamResponse parses prompt_cache_hit_tokens → cache_read_tokens = 42
+    // Since API returned cache data (42 > 0), estimation is skipped
+    expect(rows[0].cache_read_tokens).toBe(42);
+    expect(rows[0].cache_read_tokens_estimated).toBe(0);
     // Since metrics.cache_read_tokens would be 42 (from parser), the override condition (!mr.cache_read_tokens || mr.cache_read_tokens === 0) is false
     // So cache_read_tokens should be 42 from the extractor
     expect(rows[0].cache_read_tokens).toBe(42);
@@ -448,13 +454,12 @@ describe("collectTransportMetrics — new cache params", () => {
       null,
       200,
       "claude-code",
-      0,    // estimated=0 → do not override
-      42,   // value would override but estimated says no
+      "test-session",
     );
 
     const rows = db.prepare("SELECT * FROM request_metrics WHERE request_log_id = ?").all(logId) as any[];
     expect(rows).toHaveLength(1);
-    // API reported 15
+    // API reported 15, estimation is skipped because cache_read_tokens > 0
     expect(rows[0].cache_read_tokens).toBe(15);
     expect(rows[0].client_type).toBe("claude-code");
     expect(rows[0].cache_read_tokens_estimated).toBe(0);
@@ -523,7 +528,6 @@ describe("collectTransportMetrics — new cache params", () => {
       null,
       200,
       "claude-code",
-      0,
       undefined,
     );
 
