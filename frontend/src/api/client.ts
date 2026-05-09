@@ -532,6 +532,8 @@ export const api = {
   getMonitorConcurrency: () =>
     request<ProviderConcurrencySnapshot[]>("get", API.MONITOR_CONCURRENCY),
   getMonitorRuntime: () => request<RuntimeMetrics>("get", API.MONITOR_RUNTIME),
+  killMonitorRequest: (id: string) =>
+    request<{ killed: boolean }>("delete", `${API.MONITOR_REQUEST}/${id}`),
 
   recommended: {
     getProviders: () =>

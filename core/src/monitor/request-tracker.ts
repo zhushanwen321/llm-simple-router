@@ -48,6 +48,8 @@ export class RequestTracker {
   private streamAccumulators = new Map<string, StreamContentAccumulator>();
   private streamContentPending = new Set<string>();
   private streamContentTimer: ReturnType<typeof setTimeout> | null = null;
+  private killCallbacks = new Map<string, () => void>();
+  private killedRequests = new Set<string>();
 
   /** Visible for testing */
   readonly statsAggregator: StatsAggregator;
@@ -149,6 +151,9 @@ export class RequestTracker {
       return;
     }
 
+    const wasKilled = this.killedRequests.has(id);
+    if (wasKilled) this.killedRequests.delete(id);
+
     const now = Date.now();
     const latency = now - req.startTime;
     const statusCode = result.statusCode ?? 0;
@@ -165,13 +170,14 @@ export class RequestTracker {
 
     const completed: ActiveRequest = {
       ...req,
-      status: result.status,
+      status: wasKilled ? "failed" : result.status,
       completedAt: now,
       attempts: result.attempts ?? req.attempts,
     };
 
     this.streamContentPending.delete(id);
     this.activeMap.delete(id);
+    this.killCallbacks.delete(id);
     this.streamAccumulators.delete(id);
     this.recentCompleted.unshift(completed);
     if (this.recentCompleted.length > RECENT_COMPLETED_MAX) {
@@ -204,6 +210,29 @@ export class RequestTracker {
   /** Public alias for API endpoint use — returns full request data including clientRequest */
   getRequestById(id: string): ActiveRequest | undefined {
     return this.get(id);
+  }
+
+  /** 注册请求的终止回调，由 orchestrator 在请求开始时调用 */
+  registerKillCallback(id: string, callback: () => void): void {
+    this.killCallbacks.set(id, callback);
+  }
+
+  /** 主动终止指定请求。返回 true 表示成功终止，false 表示请求不存在或已完成 */
+  killRequest(id: string): boolean {
+    const callback = this.killCallbacks.get(id);
+    if (!callback) {
+      this.logger?.debug?.({ reqId: id }, "Tracker: killRequest not found (already completed or unknown)");
+      return false;
+    }
+    this.killedRequests.add(id);
+    this.killCallbacks.delete(id);
+    this.logger?.info?.({ reqId: id }, "Tracker: killRequest");
+    callback();
+    // transport 可能尚未 resolve（上游未响应时 StreamProxy 不存在），强制完成请求
+    if (this.activeMap.has(id)) {
+      this.complete(id, { status: "failed" });
+    }
+    return true;
   }
 
   // --- Stats / monitoring ---

@@ -9,7 +9,7 @@ import { ProviderSwitchNeeded } from "../src/proxy/types.js";
 function createMockDeps() {
   return {
     semaphoreScope: { withSlot: vi.fn() } as unknown as SemaphoreScope,
-    trackerScope: { track: vi.fn() } as unknown as TrackerScope,
+    trackerScope: { track: vi.fn(), registerKillCallback: vi.fn() } as unknown as TrackerScope,
     resilience: { execute: vi.fn() },
   };
 }

@@ -80,26 +80,40 @@ export class ProxyOrchestrator {
     ctx?: HandleContext,
   ): Promise<ResilienceResult> {
     const providerId = config.provider.id;
+    const controller = new AbortController();
+    // 客户端断连时自动 abort（保留原有行为）
+    request.raw.on("close", () => {
+      if (!request.raw.readableEnded) {
+        controller.abort();
+      }
+    });
     const trackerReq = this.buildActiveRequest(request, config, apiType);
     try {
       const result = await this.deps.trackerScope.track<ResilienceResult>(
         trackerReq,
-        () => this.deps.semaphoreScope.withSlot(
-          providerId,
-          this.createAbortSignal(request),
-          () => {
-            trackerReq.queued = true;
-            this.deps.trackerScope.markQueued(trackerReq.id, true);
-          },
-          () => {
-            if (trackerReq.queued) {
-              trackerReq.queued = false;
-              this.deps.trackerScope.markQueued(trackerReq.id, false);
-            }
-            return this.executeResilience(config, ctx);
-          },
-          config.concurrencyOverride,
-        ),
+        () => {
+          // kill 回调必须在 tracker.start() 之后注册，确保请求已在 activeMap 中
+          this.deps.trackerScope.registerKillCallback(trackerReq.id, () => {
+            controller.abort();
+            try { reply.raw.destroy(); } catch { /* reply may already be destroyed */ } // eslint-disable-line taste/no-silent-catch
+          });
+          return this.deps.semaphoreScope.withSlot(
+            providerId,
+            controller.signal,
+            () => {
+              trackerReq.queued = true;
+              this.deps.trackerScope.markQueued(trackerReq.id, true);
+            },
+            () => {
+              if (trackerReq.queued) {
+                trackerReq.queued = false;
+                this.deps.trackerScope.markQueued(trackerReq.id, false);
+              }
+              return this.executeResilience(config, ctx);
+            },
+            config.concurrencyOverride,
+          );
+        },
         (result) => this.extractTrackStatus(result),
         (result) => result.attempts.map(a => ({
           statusCode: a.statusCode,
@@ -150,16 +164,6 @@ export class ProxyOrchestrator {
       clientRequest: config.clientRequest,
       upstreamRequest: config.upstreamRequest,
     };
-  }
-
-  private createAbortSignal(request: FastifyRequest): AbortSignal {
-    const controller = new AbortController();
-    request.raw.on("close", () => {
-      if (!request.raw.readableEnded) {
-        controller.abort();
-      }
-    });
-    return controller.signal;
   }
 
   private async executeResilience(

@@ -155,4 +155,26 @@ describe("Admin Monitor API", () => {
     });
     expect(res.statusCode).toBe(404);
   });
+
+  describe("DELETE /admin/api/monitor/request/:id", () => {
+    it("returns 404 for non-existent request", async () => {
+      const res = await app.inject({
+        method: "DELETE",
+        url: "/admin/api/monitor/request/nonexistent-id",
+        headers: { cookie },
+      });
+      expect(res.statusCode).toBe(404);
+      const body = res.json();
+      expect(body.code).toBe(40401);
+      expect(body.data).toBeNull();
+    });
+
+    it("returns 401 without authentication", async () => {
+      const res = await app.inject({
+        method: "DELETE",
+        url: "/admin/api/monitor/request/some-id",
+      });
+      expect(res.statusCode).toBe(401);
+    });
+  });
 });
