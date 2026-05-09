@@ -56,14 +56,17 @@ RUN npm ci --omit=dev && npm cache clean --force
 # 清理编译工具，减小镜像体积
 RUN apk del python3 make g++
 
-# 复制后端编译产物
+# 复制 core 编译产物（router 运行时依赖 @llm-router/core 的子路径导出）
+COPY --from=builder /app/core/dist core/dist/
+
+# 复制 router 编译产物
 COPY --from=builder /app/router/dist router/dist/
 
 # migrations SQL 文件在运行时需要
 COPY --from=builder /app/router/src/db/migrations/ router/dist/db/migrations/
 
-# 复制前端编译产物
-COPY --from=frontend-builder /app/frontend/dist frontend-dist/
+# 复制前端编译产物（__dirname = router/dist/，代码里用 ../frontend-dist 查找）
+COPY --from=frontend-builder /app/frontend/dist router/frontend-dist/
 
 # 复制配置模板（recommended-providers.json 等）
 COPY router/config/ router/config/

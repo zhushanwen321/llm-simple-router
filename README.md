@@ -166,11 +166,37 @@ claude
 
 ## Docker 部署
 
+**方式一：直接拉取镜像（推荐）**
+
 ```bash
+# 一键启动，数据持久化到 ~/.llm-simple-router/
 docker compose up -d
 ```
 
+`docker-compose.yml` 默认从 ghcr.io 拉取预构建镜像，数据映射到宿主机 `~/.llm-simple-router/`。
+
+也可用 `docker run` 直接启动：
+
+```bash
+docker run -d \
+  --name llm-router \
+  -p 9981:9981 \
+  -v ~/.llm-simple-router:/app/data \
+  -e DB_PATH=/app/data/router.db \
+  -e TZ=Asia/Shanghai \
+  --restart unless-stopped \
+  ghcr.io/zhushanwen321/llm-simple-router:latest
+```
+
 环境变量通过 Setup 页面设置，不需要 `.env` 文件。
+
+**方式二：本地构建**
+
+编辑 `docker-compose.yml`，注释掉 `image` 行，取消 `build` 部分的注释，然后：
+
+```bash
+docker compose up -d --build
+```
 
 ## 进程管理
 
