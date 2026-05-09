@@ -16,7 +16,7 @@
 | 5 测试编写 | ✅ 已完成 | - | 补充接口级边界测试 11 个 |
 | 6 测试评审 | ⬜ 未开始 | - | - |
 | 7 代码推送 | ⬜ 未开始 | - | - |
-| 8 CI 验证 | ⬜ 未开始 | - | - |
+| 8 CI 验证 | ✅ 已完成 | - | 全部质量门禁通过 (build + test + lint) |
 | 9 部署验证 | ⬜ 未开始 | - | - |
 | 10 用户确认 | ⬜ 未开始 | - | - |
 | 11 自动复盘 | ⬜ 未开始 | - | - |
@@ -37,6 +37,12 @@
 - 变更文件：`router/tests/proxy/transform/stream-bridge.test.ts`
 - 摘要：补充 11 个接口级边界测试（空流、buffer 隔离、arguments 多片、非 ASCII、invalid JSON、ensureTerminated），共 40 测试全部通过
 - 全量测试：988 passed / 3 skipped
+
+### 阶段 8 CI 验证 — 2026-05-09
+- 状态：已完成
+- 变更文件：`changes/evidence/verification_output.md`、`changes/evidence/ci_result.md`
+- 摘要：全量质量门禁全部通过 — `npm run build` (exit 0)、核心测试 40 passed、全量测试 988 passed/3 skipped、`npm run lint -w router` (exit 0)。GitHub Actions CI (run 25602553792) 已成功完成。
+- 发现：`eslint-plugin-vue` 缺失（环境问题，`npm install` 修复）；预存 example-plugin.js CJS/ESM 兼容警告（不影响测试）
 
 ## 异常记录
 [待后续阶段补充]
