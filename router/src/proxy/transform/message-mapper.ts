@@ -12,7 +12,7 @@ export function extractSystemMessages(
   for (const msg of messages) {
     const m = msg as Record<string, unknown>;
     if (m.role === "system" || m.role === "developer") {
-      systemParts.push(String(m.content ?? ""));
+      systemParts.push((m.content ?? "") as string);
     } else {
       nonSystemMsgs.push(msg);
     }
@@ -30,7 +30,7 @@ function normalizeToTextBlocks(content: unknown): AnthropicContentBlock[] {
   if (Array.isArray(content)) {
     return (content as Array<Record<string, unknown>>).flatMap((p): AnthropicContentBlock[] => {
       if (p.type === "text" && p.text) {
-        return [{ type: "text" as const, text: String(p.text) }];
+        return [{ type: "text" as const, text: p.text as string }];
       }
       // Convert OpenAI image_url to Anthropic image source
       if (p.type === "image_url") {
@@ -73,7 +73,7 @@ export function convertMessagesOA2Ant(
       const blocks: AnthropicContentBlock[] = [];
       // reasoning_content → thinking block (before text)
       if (m.reasoning_content) {
-        blocks.push({ type: "thinking", thinking: String(m.reasoning_content) });
+        blocks.push({ type: "thinking", thinking: m.reasoning_content as string });
       }
       // text content (skip null/undefined/empty string)
       if (m.content != null && m.content !== "") {
@@ -85,7 +85,7 @@ export function convertMessagesOA2Ant(
         for (const tc of toolCalls) {
           const fn = tc.function as Record<string, unknown>;
           const input = parseToolArguments(fn.arguments);
-          blocks.push({ type: "tool_use", id: sanitizeToolUseId(String(tc.id)), name: String(fn.name), input });
+          blocks.push({ type: "tool_use", id: sanitizeToolUseId(tc.id as string), name: fn.name as string, input });
         }
       }
       if (blocks.length === 0) blocks.push({ type: "text", text: "" });
@@ -94,8 +94,8 @@ export function convertMessagesOA2Ant(
       // role:"tool" → role:"user" + tool_result
       const toolResult: AnthropicContentBlock = {
         type: "tool_result",
-        tool_use_id: sanitizeToolUseId(String(m.tool_call_id ?? "")),
-        content: String(m.content ?? ""),
+        tool_use_id: sanitizeToolUseId((m.tool_call_id ?? "") as string),
+        content: (m.content ?? "") as string,
       };
       // 尝试合并到前一条 user 消息（或已有的 tool result 序列）
       const last = raw[raw.length - 1];
@@ -172,7 +172,7 @@ export function convertMessagesAnt2OA(
       ? system
       : Array.isArray(system)
         ? (system as Array<Record<string, unknown>>).map(b => b.text ?? "").join("\n")
-        : String(system);
+        : typeof system === 'string' ? system : JSON.stringify(system);
     if (text) result.push({ role: "system", content: text });
   }
 
@@ -189,7 +189,7 @@ export function convertMessagesAnt2OA(
         result.push({ role: "user", content: textParts.map(b => b.text ?? "").join("") });
       }
       for (const tr of toolResults) {
-        let toolCallId = String(tr.tool_use_id ?? "");
+        let toolCallId = (tr.tool_use_id ?? "") as string;
         // 空 tool_use_id → 按顺序配对到预生成的 UUID
         if (!toolCallId && syntheticCursor < syntheticIds.length) {
           toolCallId = syntheticIds[syntheticCursor++];

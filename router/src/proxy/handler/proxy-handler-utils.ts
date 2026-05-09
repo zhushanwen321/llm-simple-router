@@ -23,7 +23,7 @@ export interface FailedToolResult {
  */
 export function detectClientAgentType(headers: RawHeaders): ClientAgentType {
   if (headers["x-claude-code-session-id"]) return "claude-code";
-  const ua = String(headers["user-agent"] ?? "").toLowerCase();
+  const ua = (typeof headers["user-agent"] === 'string' ? headers["user-agent"] : "").toLowerCase();
   if (ua.includes("pi-coding-agent")) return "pi";
   return "unknown";
 }

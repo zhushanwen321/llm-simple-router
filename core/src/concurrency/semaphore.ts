@@ -61,12 +61,16 @@ export class SemaphoreManager {
 
     if (entry.current < 0) entry.current = 0;
 
-    // 当 maxConcurrency 降低时，将 current 限制在新的上限，
-    // 防止 current 停留在旧的高位，导致新请求始终进入队列、
-    // 且 release() 无法通过空队检查来递减 current（排队长驻）
-    if (entry.current > config.maxConcurrency) {
-      entry.current = config.maxConcurrency;
-    }
+    // maxConcurrency 降低时**不截断 current**、**不递增 generation**。
+    //
+    // 原因：截断 current + 递增 generation 会导致所有旧请求的 release() 失效，
+    // current 永远停留在截断值（即使旧请求全部完成也无法回落），信号量卡死。
+    //
+    // 不截断的代价：current 可能暂时超过 maxConcurrency，但旧请求完成后
+    // release() 会正常递减 current，自然回落到 maxConcurrency 以下。
+    // 新请求在 current >= maxConcurrency 时仍会排队，不会被超限放行。
+    //
+    // 唯一的例外是 maxConcurrency=0（关闭信号量），在上面单独处理。
 
     while (
       entry.current < config.maxConcurrency &&

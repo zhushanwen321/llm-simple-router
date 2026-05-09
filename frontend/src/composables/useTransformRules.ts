@@ -27,6 +27,7 @@ export function useTransformRules() {
         transformForm.value.exists = false
       }
     } catch (e) {
+      console.error('transformRules.load:', e)
       toast.error(getApiMessage(e, t('providers.transform.loadFailed')))
       transformForm.value.dropFieldsInput = ''
       transformForm.value.requestDefaultsInput = ''
@@ -52,7 +53,7 @@ export function useTransformRules() {
     }
     return api.upsertTransformRules(editingId, { drop_fields: dropFields, request_defaults: requestDefaults, inject_headers: injectHeaders, is_active: 1 })
       .then(() => { transformForm.value.exists = true; toast.success(t('providers.transform.saved')) })
-      .catch((e) => toast.error(getApiMessage(e, t('common.saveFailed'))))
+      .catch((e) => { console.error('transformRules.save:', e); toast.error(getApiMessage(e, t('common.saveFailed'))) })
   }
 
   function handleDeleteTransformRules(editingId: string | null) {
@@ -65,7 +66,7 @@ export function useTransformRules() {
         transformForm.value.exists = false
         toast.success(t('providers.transform.deleted'))
       })
-      .catch((e) => toast.error(getApiMessage(e, t('providers.transform.deleteFailed'))))
+      .catch((e) => { console.error('transformRules.delete:', e); toast.error(getApiMessage(e, t('providers.transform.deleteFailed'))) })
   }
 
   return { transformForm, loadTransformRules, saveTransformRules, handleDeleteTransformRules }

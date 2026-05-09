@@ -23,7 +23,7 @@ export function responsesToChatRequest(
   // instructions → system message
   const messages: Array<Record<string, unknown>> = [];
   if (body.instructions != null && body.instructions !== "") {
-    messages.push({ role: "system", content: String(body.instructions) });
+    messages.push({ role: "system", content: body.instructions });
   }
 
   // input → messages
@@ -48,8 +48,8 @@ export function responsesToChatRequest(
       if (t.type === "function") {
         // Responses tools are flat: {type:"function", name, parameters, description}
         // Chat tools need function wrapper: {type:"function", function:{name, parameters}}
-        const fn: Record<string, unknown> = { name: String(t.name) };
-        if (t.description != null) fn.description = String(t.description);
+        const fn: Record<string, unknown> = { name: t.name };
+        if (t.description != null) fn.description = t.description;
         if (t.parameters != null) fn.parameters = t.parameters;
         chatTools.push({ type: "function", function: fn });
       }
@@ -119,24 +119,24 @@ function convertResponsesInputToChatMessages(
       const content = extractMessageTextContent(item);
       messages.push({ role, content });
     } else if (type === "input_text") {
-      messages.push({ role: "user", content: String(item.text ?? "") });
+      messages.push({ role: "user", content: (item.text ?? "") as string });
     } else if (type === "function_call") {
       // Collect; will be flushed when next non-function_call item appears
       // or at end of loop
       const fn: Record<string, unknown> = {
-        name: String(item.name ?? ""),
-        arguments: String(item.arguments ?? "{}"),
+        name: (item.name ?? "") as string,
+        arguments: (item.arguments ?? "{}") as string,
       };
       pendingFnCalls.push({
-        id: String(item.id ?? ""),
+        id: (item.id ?? "") as string,
         type: "function",
         function: fn,
       });
     } else if (type === "function_call_output") {
       messages.push({
         role: "tool",
-        tool_call_id: String(item.call_id ?? ""),
-        content: String(item.output ?? ""),
+        tool_call_id: (item.call_id ?? "") as string,
+        content: (item.output ?? "") as string,
       });
     } else if (type === "reasoning") {
       // No Chat Completions equivalent — skip
@@ -175,7 +175,7 @@ function extractMessageTextContent(msg: Record<string, unknown>): string {
   if (Array.isArray(content)) {
     return (content as Array<Record<string, unknown>>)
       .filter((p) => p.type === "input_text" && p.text != null)
-      .map((p) => String(p.text))
+      .map((p) => p.text)
       .join("");
   }
   return "";
@@ -226,9 +226,9 @@ export function chatToResponsesRequest(
         const fn = t.function as Record<string, unknown>;
         const mapped: Record<string, unknown> = {
           type: "function",
-          name: String(fn.name),
+          name: fn.name,
         };
-        if (fn.description != null) mapped.description = String(fn.description);
+        if (fn.description != null) mapped.description = fn.description;
         if (fn.parameters != null) mapped.parameters = fn.parameters;
         respTools.push(mapped);
       }
@@ -274,7 +274,7 @@ function extractChatInstructions(
   for (const msg of messages) {
     const role = msg.role as string;
     if (role === "system" || role === "developer") {
-      parts.push(String(msg.content ?? ""));
+      parts.push((msg.content ?? "") as string);
     } else {
       nonSystemMsgs.push(msg);
     }
@@ -299,7 +299,7 @@ function convertChatMessagesToResponsesInput(
 
     if (role === "user") {
       const content = msg.content;
-      const text = typeof content === "string" ? content : String(content ?? "");
+      const text = typeof content === "string" ? content : (content ?? "") as string;
       items.push({
         type: "message",
         role: "user",
@@ -309,7 +309,7 @@ function convertChatMessagesToResponsesInput(
       // Text content → assistant message with output_text
       const content = msg.content;
       if (content != null && content !== "" && content !== null) {
-        const text = typeof content === "string" ? content : String(content);
+        const text = typeof content === "string" ? content : JSON.stringify(content);
         items.push({
           type: "message",
           role: "assistant",
@@ -324,18 +324,18 @@ function convertChatMessagesToResponsesInput(
           const fn = tc.function as Record<string, unknown> | undefined;
           items.push({
             type: "function_call",
-            id: String(tc.id ?? ""),
-            call_id: String(tc.id ?? ""),
-            name: String(fn?.name ?? ""),
-            arguments: String(fn?.arguments ?? "{}"),
+            id: (tc.id ?? "") as string,
+            call_id: (tc.id ?? "") as string,
+            name: (fn?.name ?? ""),
+            arguments: (fn?.arguments ?? "{}"),
           });
         }
       }
     } else if (role === "tool") {
       items.push({
         type: "function_call_output",
-        call_id: String(msg.tool_call_id ?? ""),
-        output: String(msg.content ?? ""),
+        call_id: (msg.tool_call_id ?? "") as string,
+        output: (msg.content ?? "") as string,
       });
     }
     // reasoning_content in messages → skip (can't create reasoning items)

@@ -122,6 +122,7 @@ async function saveThresholds() {
     toast.success(t('settings.storage.thresholdsUpdated'))
     await loadSettings()
   } catch (e: unknown) {
+    console.error('settings.updateThresholds:', e)
     toast.error(getApiMessage(e, t('settings.storage.updateFailed')))
   }
 }
@@ -138,6 +139,7 @@ async function handleExport() {
     URL.revokeObjectURL(url)
     toast.success(t('settings.importExport.exportSuccess'))
   } catch (e: unknown) {
+    console.error('settings.export:', e)
     toast.error(getApiMessage(e, t('settings.importExport.exportFailed')))
   }
 }
@@ -174,6 +176,7 @@ async function confirmImport() {
     toast.success(t('settings.importExport.importSuccess'))
     await loadSettings()
   } catch (e: unknown) {
+    console.error('settings.import:', e)
     toast.error(getApiMessage(e, t('settings.importExport.importFailed')))
   } finally {
     importing.value = false

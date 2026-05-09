@@ -105,7 +105,7 @@ export function patchOrphanToolResultsOA(body: Record<string, unknown>): void {
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i];
     if (msg.role !== "tool") continue;
-    const toolCallId = String(msg.tool_call_id ?? "");
+    const toolCallId = (msg.tool_call_id ?? "") as string;
     if (!knownToolCallIds.has(toolCallId)) {
       messages.splice(i, 1);
       removedAny = true;
@@ -120,8 +120,8 @@ export function patchOrphanToolResultsOA(body: Record<string, unknown>): void {
     if (messages[i].role === "user" && messages[i - 1].role === "user") {
       const prev = messages[i - 1];
       const curr = messages[i];
-      const prevContent = typeof prev.content === "string" ? prev.content : JSON.stringify(prev.content ?? "");
-      const currContent = typeof curr.content === "string" ? curr.content : JSON.stringify(curr.content ?? "");
+      const prevContent = typeof prev.content === "string" ? prev.content : JSON.stringify(prev.content ?? "") as string;
+      const currContent = typeof curr.content === "string" ? curr.content : JSON.stringify(curr.content ?? "") as string;
       prev.content = prevContent + "\n" + currContent;
       messages.splice(i, 1);
     } else {

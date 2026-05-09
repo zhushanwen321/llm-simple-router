@@ -113,7 +113,7 @@ function checkOverlap(
 const HOUR_PAD_WIDTH = 2;
 
 function formatHour(h: number): string {
-  return String(h).padStart(HOUR_PAD_WIDTH, "0") + ":00";
+  return h.toString().padStart(HOUR_PAD_WIDTH, "0") + ":00";
 }
 
 interface ScheduleRoutesOptions {

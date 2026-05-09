@@ -88,7 +88,7 @@ export function scheduleDbSizeMonitor(
       if (deleted > 0) options.log.info(`Size-based cleanup: deleted ${deleted} log records`);
     } catch (e) {
       // DB 可能已关闭（测试清理、进程关闭等）
-      options.log.info(`Size monitor check skipped: ${e instanceof Error ? e.message : String(e)}`);
+      options.log.info(`Size monitor check skipped: ${e instanceof Error ? e.message : e instanceof Error ? e.message : JSON.stringify(e)}`);
     } finally {
       running = false;
     }

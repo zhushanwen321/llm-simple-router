@@ -17,6 +17,7 @@ export function useLogRetention() {
       retentionDays.value = result.days
       toast.success(t('logs.retention.saved'))
     } catch (e: unknown) {
+      console.error('logRetention.save:', e)
       toast.error(getApiMessage(e, t('logs.retention.updateFailed')))
     } finally {
       retentionSaving.value = false
@@ -28,6 +29,7 @@ export function useLogRetention() {
       const { days } = await api.getLogRetention()
       retentionDays.value = days
     } catch (e: unknown) {
+      console.error('logRetention.load:', e)
       toast.error(getApiMessage(e, t('logs.retention.loadFailed')))
     }
   }

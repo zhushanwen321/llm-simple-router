@@ -41,24 +41,24 @@ export function responsesToAnthropicResponse(bodyStr: string): string {
       const msgContent = (item.content as Array<Record<string, unknown>>) ?? [];
       for (const part of msgContent) {
         if (part.type === "output_text" && part.text != null) {
-          content.push({ type: "text", text: String(part.text) });
+          content.push({ type: "text", text: part.text });
         }
       }
     } else if (type === "function_call") {
       // → tool_use block (Anthropic requires "toolu_" prefix)
-      const rawCallId = String(item.call_id ?? "");
+      const rawCallId = (item.call_id ?? "") as string;
       const antId = rawCallId.startsWith("toolu_") ? rawCallId : `toolu_${rawCallId}`;
       content.push({
         type: "tool_use",
         id: antId,
-        name: String(item.name ?? ""),
+        name: (item.name ?? "") as string,
         input: parseToolArguments(item.arguments),
       });
     } else if (type === "reasoning") {
       // → thinking block
       const summary = item.summary as Array<Record<string, unknown>> | undefined;
       const thinkingText = summary
-        ? summary.map(s => String(s.text ?? "")).join("")
+        ? summary.map(s => (s.text ?? "") as string).join("")
         : "";
       content.push({ type: "thinking", thinking: thinkingText });
     }
@@ -77,7 +77,7 @@ export function responsesToAnthropicResponse(bodyStr: string): string {
     role: "assistant",
     content,
     model: resp.model ?? "",
-    stop_reason: mapStatusToStopReason(String(resp.status ?? "completed")),
+    stop_reason: mapStatusToStopReason((resp.status ?? "completed") as string),
     stop_sequence: null,
     usage: {
       input_tokens: (usage?.input_tokens as number) ?? 0,
@@ -108,7 +108,7 @@ export function anthropicToResponsesResponse(bodyStr: string): string {
       output.push({
         type: "reasoning",
         id: `rs_${Date.now()}_${output.length}`,
-        summary: [{ type: "summary_text", text: String(block.thinking ?? "") }],
+        summary: [{ type: "summary_text", text: (block.thinking ?? "") as string }],
       });
     } else if (type === "text") {
       // → message output
@@ -116,17 +116,17 @@ export function anthropicToResponsesResponse(bodyStr: string): string {
         type: "message",
         id: generateMsgId(),
         role: "assistant",
-        content: [{ type: "output_text", text: String(block.text ?? "") }],
+        content: [{ type: "output_text", text: (block.text ?? "") as string }],
       });
     } else if (type === "tool_use") {
       // → function_call output
-      const rawId = String(block.id ?? "");
+      const rawId = (block.id ?? "") as string;
       const callId = stripTooluPrefix(rawId);
       output.push({
         type: "function_call",
         id: `fc_${callId}`,
         call_id: callId,
-        name: String(block.name ?? ""),
+        name: (block.name ?? "") as string,
         arguments: JSON.stringify(block.input ?? {}),
       });
     }
@@ -144,7 +144,7 @@ export function anthropicToResponsesResponse(bodyStr: string): string {
     id: generateRespId(),
     object: "response",
     model: ant.model ?? "",
-    status: mapStopReasonToStatus(String(ant.stop_reason ?? "end_turn")),
+    status: mapStopReasonToStatus((ant.stop_reason ?? "end_turn") as string),
     output,
     usage: {
       input_tokens: inputTokens,

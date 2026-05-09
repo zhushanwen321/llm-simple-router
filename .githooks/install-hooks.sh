@@ -268,6 +268,34 @@ fi
 # 全部通过
 # ============================================================================
 
+# ============================================================================
+# 4. startsWith 路径前缀检查
+# ============================================================================
+
+print_section "[startsWith 路径前缀检查]"
+
+if [ "$SKIP_CODE_RULES_CHECK" != "1" ]; then
+    SUSPICIOUS_PREFIX=$(echo "$STAGED_FILES" | grep '\.ts$' | xargs grep -n '\.startsWith("[a-z]' 2>/dev/null || true)
+    if [ -n "$SUSPICIOUS_PREFIX" ]; then
+        echo -e "${YELLOW}[WARN] 以下文件使用了不安全的路径前缀检查:${NC}"
+        echo "$SUSPICIOUS_PREFIX" | while IFS= read -r line; do
+            echo -e "  ${YELLOW}- $line${NC}"
+        done
+        echo -e "${YELLOW}startsWith('/xxx') 可能错误匹配 /xxx-suffix。建议加尾部斜杠: startsWith('/xxx/')。${NC}"
+        echo ""
+        echo -e "${YELLOW}[HINT] 设置 SKIP_CODE_RULES_CHECK=1 跳过此项检查${NC}"
+        # Warning only, not blocking — this is a best-practice suggestion
+    else
+        echo -e "${GREEN}[OK] 所有路径前缀检查通过${NC}"
+    fi
+else
+    echo -e "${YELLOW}[SKIP] startsWith 路径前缀检查已跳过${NC}"
+fi
+
+# ============================================================================
+# 全部通过
+# ============================================================================
+
 print_section "[所有检查通过]"
 
 echo -e "${GREEN}代码质量检查全部通过！${NC}"

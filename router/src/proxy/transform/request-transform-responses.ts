@@ -54,7 +54,7 @@ export function responsesToAnthropicRequest(
 
   // instructions → system
   if (body.instructions != null) {
-    result.system = String(body.instructions);
+    result.system = body.instructions;
   }
 
   // input → messages
@@ -76,8 +76,8 @@ export function responsesToAnthropicRequest(
     const fnTools = tools.filter(t => t.type === "function");
     if (fnTools.length > 0 && body.tool_choice !== "none") {
       result.tools = fnTools.map(t => {
-        const mapped: Record<string, unknown> = { name: String(t.name) };
-        if (t.description != null) mapped.description = String(t.description);
+        const mapped: Record<string, unknown> = { name: t.name };
+        if (t.description != null) mapped.description = t.description;
         if (t.parameters != null) mapped.input_schema = t.parameters;
         return mapped;
       });
@@ -140,34 +140,34 @@ function convertResponsesInputToAntMessages(input: unknown): AntMessage[] {
       raw.push({ role, content });
     } else if (type === "function_call") {
       // → assistant tool_use (Anthropic requires "toolu_" prefix)
-      const rawId = String(item.call_id ?? item.id ?? "");
+      const rawId = (item.call_id ?? item.id ?? "") as string;
       const antId = rawId.startsWith("toolu_") ? rawId : `toolu_${rawId}`;
       raw.push({
         role: "assistant",
         content: [{
           type: "tool_use",
           id: sanitizeToolUseId(antId),
-          name: String(item.name ?? ""),
+          name: (item.name ?? "") as string,
           input: parseToolArguments(item.arguments),
         }],
       });
     } else if (type === "function_call_output") {
       // → user tool_result (Anthropic requires "toolu_" prefix)
-      const rawCallId = String(item.call_id ?? "");
+      const rawCallId = (item.call_id ?? "") as string;
       const antCallId = rawCallId.startsWith("toolu_") ? rawCallId : `toolu_${rawCallId}`;
       raw.push({
         role: "user",
         content: [{
           type: "tool_result",
           tool_use_id: sanitizeToolUseId(antCallId),
-          content: String(item.output ?? ""),
+          content: (item.output ?? "") as string,
         }],
       });
     } else if (type === "reasoning") {
       // → assistant thinking
       const summary = item.summary as Array<Record<string, unknown>> | undefined;
       const thinkingText = summary
-        ? summary.map(s => String(s.text ?? "")).join("\n")
+        ? summary.map(s => (s.text ?? "") as string).join("\n")
         : "";
       raw.push({
         role: "assistant",
@@ -177,7 +177,7 @@ function convertResponsesInputToAntMessages(input: unknown): AntMessage[] {
       // → user text
       raw.push({
         role: "user",
-        content: [{ type: "text", text: String(item.text ?? "") }],
+        content: [{ type: "text", text: (item.text ?? "") as string }],
       });
     }
   }
@@ -197,7 +197,7 @@ function extractMessageContent(msg: Record<string, unknown>): AnthropicContentBl
   if (Array.isArray(content)) {
     return (content as Array<Record<string, unknown>>).flatMap((part): AnthropicContentBlock[] => {
       if (part.type === "input_text" && part.text != null) {
-        return [{ type: "text", text: String(part.text) }];
+        return [{ type: "text", text: part.text as string }];
       }
       return [];
     });
@@ -213,7 +213,7 @@ function mapToolChoiceResponses2Ant(tc: unknown): Record<string, unknown> | unde
   if (typeof tc === "object" && tc !== null) {
     const obj = tc as Record<string, unknown>;
     if (obj.type === "function" && obj.name) {
-      return { type: "tool", name: String(obj.name) };
+      return { type: "tool", name: obj.name };
     }
   }
   return { type: "auto" };
@@ -233,10 +233,10 @@ export function anthropicToResponsesRequest(
       result.instructions = body.system;
     } else if (Array.isArray(body.system)) {
       result.instructions = (body.system as Array<Record<string, unknown>>)
-        .map(b => String(b.text ?? ""))
+        .map(b => (b.text ?? "") as string)
         .join("\n");
     } else {
-      result.instructions = String(body.system);
+      result.instructions = body.system;
     }
   }
 
@@ -258,9 +258,9 @@ export function anthropicToResponsesRequest(
     result.tools = tools.map(t => {
       const mapped: Record<string, unknown> = {
         type: "function",
-        name: String(t.name),
+        name: t.name,
       };
-      if (t.description != null) mapped.description = String(t.description);
+      if (t.description != null) mapped.description = t.description;
       if (t.input_schema != null) mapped.parameters = t.input_schema;
       return mapped;
     });
@@ -306,7 +306,7 @@ function convertAntMessagesToResponsesInput(
       const toolResultBlocks = content.filter(b => b.type === "tool_result");
 
       if (textBlocks.length > 0) {
-        const text = textBlocks.map(b => String(b.text ?? "")).join("");
+        const text = textBlocks.map(b => (b.text ?? "") as string).join("");
         items.push({
           type: "message",
           role: "user",
@@ -316,8 +316,8 @@ function convertAntMessagesToResponsesInput(
       for (const tr of toolResultBlocks) {
         items.push({
           type: "function_call_output",
-          call_id: stripTooluPrefix(String(tr.tool_use_id ?? "")),
-          output: String(tr.content ?? ""),
+          call_id: stripTooluPrefix((tr.tool_use_id ?? "") as string),
+          output: (tr.content ?? "") as string,
         });
       }
     } else if (role === "assistant") {
@@ -330,13 +330,13 @@ function convertAntMessagesToResponsesInput(
         items.push({
           type: "reasoning",
           id: `rs_${Date.now()}_${items.length}`,
-          summary: [{ type: "summary_text", text: String(tb.thinking ?? "") }],
+          summary: [{ type: "summary_text", text: (tb.thinking ?? "") as string }],
         });
       }
 
       // text → assistant message
       if (textBlocks.length > 0) {
-        const text = textBlocks.map(b => String(b.text ?? "")).join("");
+        const text = textBlocks.map(b => (b.text ?? "") as string).join("");
         items.push({
           type: "message",
           role: "assistant",
@@ -348,9 +348,9 @@ function convertAntMessagesToResponsesInput(
       for (const tu of toolUseBlocks) {
         items.push({
           type: "function_call",
-          id: String(tu.id ?? ""),
-          call_id: stripTooluPrefix(String(tu.id ?? "")),
-          name: String(tu.name ?? ""),
+          id: (tu.id ?? "") as string,
+          call_id: stripTooluPrefix((tu.id ?? "") as string),
+          name: (tu.name ?? "") as string,
           arguments: JSON.stringify(tu.input ?? {}),
         });
       }
@@ -372,7 +372,7 @@ function mapToolChoiceAnt2Responses(tc: unknown): unknown {
     if (obj.type === "auto") return "auto";
     if (obj.type === "any") return "required";
     if (obj.type === "tool" && obj.name) {
-      return { type: "function", name: String(obj.name) };
+      return { type: "function", name: obj.name };
     }
   }
   return "auto";

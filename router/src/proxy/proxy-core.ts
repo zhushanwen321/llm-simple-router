@@ -126,7 +126,7 @@ export function buildUpstreamHeaders(
   }
   if (payloadBytes !== undefined) {
     headers["Content-Type"] = "application/json";
-    headers["Content-Length"] = String(payloadBytes);
+    headers["Content-Length"] = payloadBytes.toString();
   }
   return headers;
 }

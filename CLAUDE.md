@@ -213,6 +213,13 @@ Handler (handler/proxy-handler.ts)
 所有 secrets 通过首次启动的 Setup 页面设置，存入 DB settings 表。
 可选环境变量：`PORT`（默认 9981）、`DB_PATH`（默认 `~/.llm-simple-router/router.db`）、`LOG_LEVEL`、`STREAM_TIMEOUT_MS`（默认 3000000）、`RETRY_BASE_DELAY_MS`（默认 1000）
 
+## 质量门禁
+
+- 编译: `npm run build`
+- 测试: `npm run test`
+- 后端 lint: `npm run lint -w router`
+- 前端类型检查: `cd frontend && npx vue-tsc -b --noEmit`
+
 ## 测试
 
 **框架：** Vitest 3.1.2，配置 `vitest.config.ts`（globals: true, environment: node）
@@ -232,7 +239,7 @@ Handler (handler/proxy-handler.ts)
 
 ### taste-lint 自定义 ESLint 插件
 
-项目内建 `taste-lint/` ESLint 插件（`eslint-plugin-taste`），5 条自定义规则：
+项目内建 `taste-lint/` ESLint 插件（`eslint-plugin-taste`），10 条自定义规则：
 
 | 规则 | 级别 | 说明 |
 |------|------|------|
@@ -241,17 +248,61 @@ Handler (handler/proxy-handler.ts)
 | `taste/no-unsafe-object-entries` | warn | `Object.entries()` 后拼 SQL/配置前必须白名单过滤 |
 | `taste/no-hardcoded-colors` | warn | 前端禁止 Tailwind 原始色名，必须用语义 token |
 | `taste/no-magic-spacing` | warn | 前端禁止任意值间距如 `p-[17px]` |
+| `taste/no-deprecated-rule-format` | warn | 禁止访问已废弃的 `rule.default` / `rule.windows` 字段 |
+| `taste/no-raw-json-parse-models` | error | 禁止直接 `JSON.parse(provider.models)`，必须用 `parseModels()` |
+| `taste/no-unsafe-string-conversion` | warn | 禁止对非原始类型使用 `String()`，可能输出 `[object Object]` |
+| `taste/no-unbounded-while-true` | warn | `while(true)` 必须包含迭代计数器 + 上限检查 |
+| `taste/no-inline-import-type` | warn | 禁止行内 `as import(...).Type`，应在文件顶部统一 import 类型 |
 
 基础规则：`no-explicit-any: error`、`max-lines: 500`、`max-lines-per-function: 300`、`no-magic-numbers: warn`、`no-eval: error`。测试文件被排除在 lint 之外。
 
+### 代码品味原则
+
+以下原则自动规则难以覆盖，需要开发时自觉遵守：
+
+| 原则 | 说明 | 反例 |
+|------|------|------|
+| **兜底响应** | 所有 `catch` 分支、switch default、防御性检查必须发送响应，不能让客户端挂起 | `failover-loop.ts` 缺少兜底响应 |
+| **完整错误提取** | 解析上游错误响应时提取 `message` + `code` + `type` 所有字段 | `registry.ts` `transformError` 只取 message，丢了 code |
+| **幂等注册** | `register()` / `registerAdapter()` 方法必须检测重复，不可静默追加 | `pipeline.ts` `register()` 允许同一 hook 重复注册 |
+| **structuredClone** | 深拷贝对象用 `structuredClone()` 替代 `JSON.parse(JSON.stringify())`（Node 17+） | `context.ts`、`failover-loop.ts` 使用 JSON roundtrip |
+| **SSE data 拼接** | SSE 多行 `data:` 用 `\n` 连接，不是直接拼接 | `sse-event-transform.ts` 多行 data 缺少换行符 |
+| **插件过滤一致性** | Plugin 的 onError 必须与 beforeRequest 做同等的 provider 过滤 | `plugin-bridge.ts` `onError` 缺 `pluginMatches` |
+| **headers 安全** | headers 写入日志前必须脱敏（authorization、cookie、x-api-key） | `failover-loop.ts` `clientReq` 未脱敏 headsers |
+
+### 前端错误处理规范
+
+所有前端 API 调用的 `catch` 块必须同时包含两层错误处理：
+
+```typescript
+// 正确：双层错误处理
+} catch (e: unknown) {
+  console.error('模块名.操作名:', e)    // 开发调试：记录完整错误堆栈
+  toast.error(getApiMessage(e, t('xxx')))
+}
+
+// 错误：只有 toast 没有 console
+} catch (e: unknown) {
+  toast.error(getApiMessage(e, t('xxx')))
+}
+```
+
+| 规则 | 说明 |
+|------|------|
+| **console.error 在 toast 之前** | 先记录日志，再通知用户 |
+| **console.error 格式** | `console.error('模块名.操作名:', e)`，模块名用 camelCase |
+| **纯 JSON.parse 验证可省略 console** | 输入格式验证不是 API 错误，只需 toast 提示用户 |
+| **silent catch 必须注释** | 空的 `catch {}` 必须加 `/* 原因 */` 注释 |
+
 ### Git Pre-commit Hook
 
-`.githooks/pre-commit` 通过 `npm prepare` 自动安装，两阶段检查：
+`.githooks/pre-commit` 通过 `npm prepare` 自动安装，四阶段检查：
 
 | 阶段 | 检查内容 | 跳过方式 |
 |------|---------|---------|
-| ESLint | `frontend/` 下变更的 `.vue`/`.ts` 文件 | `SKIP_FRONTEND_LINT=1` |
-| 代码规范 | `vue_rules_checker.py`（见下） | `SKIP_CODE_RULES_CHECK=1` |
+| Prettier + ESLint | `frontend/` + `router/src/` 变更文件 | `SKIP_FRONTEND_LINT=1` / `SKIP_BACKEND_LINT=1` |
+| vue-tsc | 前端 TypeScript 类型检查（全量） | `SKIP_TYPE_CHECK=1` |
+| 代码规范 | `vue_rules_checker.py` + startsWith 路径前缀检查 | `SKIP_CODE_RULES_CHECK=1` |
 | 全部跳过 | — | `SKIP_ALL_CHECKS=1` |
 
 **vue_rules_checker.py 四项硬性规范：**
@@ -438,3 +489,14 @@ bash ~/.claude/skills/merge-worktree/merge-worktree.sh <branch>
 - **运行位置**：feature worktree 目录
 - **前提**：所有变更已 commit 并 push、gh CLI 已登录
 - **幂等**：最新 commit 含 "bump version" 时跳过版本升级；tag/release 已存在时跳过
+
+## 已知陷阱
+
+- `providers.models` 等 DB JSON 字段禁止裸 `JSON.parse`，必须用 `parseModels()` 等类型安全函数（ESLint 规则强制）
+- `while(true)` 必须包含迭代计数器和上限检查（ESLint 规则强制）
+- token 计数禁止用字符长度估算，统一使用 `gpt-tokenizer`（o200k_base）
+- SSE 多行 `data:` 必须用 `\n` 连接，不能直接拼接
+- 前端禁止使用原生 HTML 表单元素，必须用 shadcn-vue 组件
+- 前端 `<style scoped>` 内只允许 `@apply`，禁止手写 CSS 选择器
+- `structuredClone()` 替代 `JSON.parse(JSON.stringify())` 做深拷贝
+- headers 写入日志前必须脱敏（authorization、cookie、x-api-key）

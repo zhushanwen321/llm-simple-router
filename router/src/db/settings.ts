@@ -20,7 +20,7 @@ export function getLogRetentionDays(db: Database.Database): number {
 }
 
 export function setLogRetentionDays(db: Database.Database, days: number): void {
-  setSetting(db, "log_retention_days", String(days));
+  setSetting(db, "log_retention_days", days.toString());
 }
 
 const DEFAULT_DB_MAX_SIZE_MB = 1024;
@@ -32,7 +32,7 @@ export function getDbMaxSizeMb(db: Database.Database): number {
 }
 
 export function setDbMaxSizeMb(db: Database.Database, mb: number): void {
-  setSetting(db, "db_max_size_mb", String(mb));
+  setSetting(db, "db_max_size_mb", mb.toString());
 }
 
 export function getLogTableMaxSizeMb(db: Database.Database): number {
@@ -41,7 +41,7 @@ export function getLogTableMaxSizeMb(db: Database.Database): number {
 }
 
 export function setLogTableMaxSizeMb(db: Database.Database, mb: number): void {
-  setSetting(db, "log_table_max_size_mb", String(mb));
+  setSetting(db, "log_table_max_size_mb", mb.toString());
 }
 
 export function getConfigSyncSource(db: Database.Database): "github" | "gitee" {

@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import Fastify, { FastifyInstance } from "fastify";
 import Database from "better-sqlite3";
-import { openaiProxy } from "../src/proxy/handler/openai.js";
+import { createProxyHandler } from "../src/proxy/handler/create-proxy-handler.js";
+import { FormatRegistry } from "../src/proxy/format/registry.js";
+import { openaiAdapter } from "../src/proxy/format/adapters/openai.js";
 import { encrypt } from "../src/utils/crypto.js";
 import { initDatabase } from "../src/db/index.js";
 import { setSetting } from "../src/db/settings.js";
@@ -65,7 +67,11 @@ function buildApp(db: Database.Database): FastifyInstance {
   container.register(SERVICE_KEYS.logFileWriter, () => null);
   container.register(SERVICE_KEYS.pluginRegistry, () => undefined);
   container.register(SERVICE_KEYS.proxyAgentFactory, () => new ProxyAgentFactory());
-  app.register(openaiProxy, { db, container });
+
+  const formatRegistry = new FormatRegistry();
+  formatRegistry.registerAdapter(openaiAdapter);
+  container.register(SERVICE_KEYS.formatRegistry, () => formatRegistry);
+  app.register(createProxyHandler({ apiType: "openai", paths: ["/v1/chat/completions", "/chat/completions"] }), { db, container });
   return app;
 }
 

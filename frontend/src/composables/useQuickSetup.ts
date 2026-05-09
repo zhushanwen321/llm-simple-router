@@ -516,6 +516,7 @@ export function useQuickSetup() {
       await new Promise(r => setTimeout(r, POST_SAVE_REDIRECT_MS))
       router.push('/')
     } catch (e: unknown) {
+      console.error('quickSetup.save:', e)
       toast.error(getApiMessage(e, t('quickSetup.messages.setupFailed')))
     } finally {
       saving.value = false
@@ -538,6 +539,7 @@ export function useQuickSetup() {
 
       selectClient('claude-code')
     } catch (e: unknown) {
+      console.error('quickSetup.load:', e)
       toast.error(getApiMessage(e, t('quickSetup.messages.loadFailed')))
     }
   })

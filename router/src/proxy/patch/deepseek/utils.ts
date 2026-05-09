@@ -4,7 +4,7 @@ export type Message = { role: string; content: unknown };
 export function normalizeToArray(content: unknown): ContentBlock[] {
   if (Array.isArray(content)) return content as ContentBlock[];
   if (typeof content === "string") return [{ type: "text", text: content }];
-  return [{ type: "text", text: String(content ?? "") }];
+  return [{ type: "text", text: (content ?? "") }];
 }
 
 export function mergeConsecutive(

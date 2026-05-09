@@ -109,7 +109,7 @@ export const adminUpgradeRoutes: FastifyPluginCallback<UpgradeRoutesOptions> = (
       })
       return reply.send({ ok: true, version })
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err)
+      const msg = err instanceof Error ? err.message : err instanceof Error ? err.message : JSON.stringify(err)
       return reply.code(HTTP_INTERNAL_ERROR).send(apiError(API_CODE.INTERNAL_ERROR, `升级失败: ${msg}`))
     }
   })
@@ -147,7 +147,7 @@ export const adminUpgradeRoutes: FastifyPluginCallback<UpgradeRoutesOptions> = (
       req.log.info('Exiting current process')
       process.exit(0)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
+      const msg = err instanceof Error ? err.message : err instanceof Error ? err.message : JSON.stringify(err)
       req.log.error({ err }, `Restart failed: ${msg}`)
       process.exit(1)
     }
@@ -183,7 +183,7 @@ export const adminUpgradeRoutes: FastifyPluginCallback<UpgradeRoutesOptions> = (
       if (checker) await checker.check(getConfigBaseUrl(source))
       return reply.send({ ok: true })
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err)
+      const msg = err instanceof Error ? err.message : err instanceof Error ? err.message : JSON.stringify(err)
       return reply.code(HTTP_INTERNAL_ERROR).send(apiError(API_CODE.INTERNAL_ERROR, `同步失败: ${msg}`))
     }
   })

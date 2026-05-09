@@ -74,7 +74,6 @@ export function buildTransportFn(p: TransportFnParams): (target: Target) => Prom
   const agent = p.proxyAgentFactory?.getAgent(p.provider);
   // _target 未使用 — resilience 层始终传入当前 resolved target；
   // 跨 target failover 由外层 executeFailoverLoop 的 ProviderSwitchNeeded 处理
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   return async (_target: Target) => {
     if (p.isStream) {
       let streamLoopGuard: StreamLoopGuard | undefined;

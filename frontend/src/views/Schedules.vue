@@ -366,17 +366,17 @@ function toggleExpand(groupId: string) {
 
 async function loadGroups() {
   try { groups.value = await api.getMappingGroups() }
-  catch (e: unknown) { toast.error(getApiMessage(e, t('schedules.loadGroupsFailed'))) }
+  catch (e: unknown) { console.error('schedules.loadGroups:', e); toast.error(getApiMessage(e, t('schedules.loadGroupsFailed'))) }
 }
 
 async function loadProviders() {
   try { providers.value = await api.getProviders() }
-  catch (e: unknown) { toast.error(getApiMessage(e, t('schedules.loadProvidersFailed'))) }
+  catch (e: unknown) { console.error('schedules.loadProviders:', e); toast.error(getApiMessage(e, t('schedules.loadProvidersFailed'))) }
 }
 
 async function loadAllSchedules() {
   try { allSchedules.value = await api.getSchedules() }
-  catch (e: unknown) { toast.error(getApiMessage(e, t('schedules.loadSchedulesFailed'))) }
+  catch (e: unknown) { console.error('schedules.loadAll:', e); toast.error(getApiMessage(e, t('schedules.loadSchedulesFailed'))) }
 }
 
 const providerGroups = computed<ProviderGroup[]>(() =>
@@ -521,7 +521,7 @@ async function handleSave() {
 
 async function handleToggle(s: Schedule) {
   try { await api.toggleSchedule(s.id); await loadAllSchedules() }
-  catch (e: unknown) { toast.error(getApiMessage(e, t('schedules.toggleFailed'))) }
+  catch (e: unknown) { console.error('schedules.toggle:', e); toast.error(getApiMessage(e, t('schedules.toggleFailed'))) }
 }
 
 async function handleDelete() {
@@ -529,7 +529,7 @@ async function handleDelete() {
   if (!target) return
   deleteTarget.value = null
   try { await api.deleteSchedule(target.id); await loadAllSchedules() }
-  catch (e: unknown) { toast.error(getApiMessage(e, t('schedules.deleteFailed'))) }
+  catch (e: unknown) { console.error('schedules.delete:', e); toast.error(getApiMessage(e, t('schedules.deleteFailed'))) }
 }
 
 onMounted(async () => {

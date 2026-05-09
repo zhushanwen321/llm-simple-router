@@ -3,7 +3,10 @@ import Fastify, { FastifyInstance } from "fastify";
 import { createServer, Server, IncomingMessage, ServerResponse } from "http";
 import Database from "better-sqlite3";
 import { encrypt } from "../src/utils/crypto.js";
-import { anthropicProxy } from "../src/proxy/handler/anthropic.js";
+import { createProxyHandler } from "../src/proxy/handler/create-proxy-handler.js";
+import { FormatRegistry } from "../src/proxy/format/registry.js";
+import { openaiAdapter } from "../src/proxy/format/adapters/openai.js";
+import { anthropicAdapter } from "../src/proxy/format/adapters/anthropic.js";
 import { initDatabase } from "../src/db/index.js";
 import { setSetting } from "../src/db/settings.js";
 import { SemaphoreManager as ProviderSemaphoreManager } from "@llm-router/core/concurrency";
@@ -66,7 +69,12 @@ function buildTestApp(mockDb: Database.Database): FastifyInstance {
   container.register(SERVICE_KEYS.pluginRegistry, () => undefined);
   container.register(SERVICE_KEYS.proxyAgentFactory, () => new ProxyAgentFactory());
 
-  app.register(anthropicProxy, { db: mockDb, container });
+  const formatRegistry = new FormatRegistry();
+  formatRegistry.registerAdapter(openaiAdapter);
+  formatRegistry.registerAdapter(anthropicAdapter);
+  container.register(SERVICE_KEYS.formatRegistry, () => formatRegistry);
+
+  app.register(createProxyHandler({ apiType: "anthropic", paths: ["/v1/messages"] }), { db: mockDb, container });
 
   return app;
 }
@@ -343,8 +351,8 @@ describe("Anthropic proxy", () => {
 
     expect(response.statusCode).toBe(404);
     const json = response.json();
-    expect(json.type).toBe("error");
     expect(json.error.type).toBe("not_found_error");
+    expect(json.error.code).toBe("model_not_found");
 
     await closeServer(backendServer);
   });
@@ -416,7 +424,7 @@ describe("Anthropic proxy", () => {
 
     expect(response.statusCode).toBe(404);
     const json = response.json();
-    expect(json.type).toBe("error");
     expect(json.error.type).toBe("not_found_error");
+    expect(json.error.code).toBe("model_not_found");
   });
 });

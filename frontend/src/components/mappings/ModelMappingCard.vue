@@ -86,6 +86,7 @@ async function handleSave() {
     emit('saved')
     toast.success(t('common.saveSuccess'))
   } catch (e: unknown) {
+    console.error('mappingCard.save:', e)
     toast.error(getApiMessage(e, t('mappings.messages.saveFailed')))
   } finally {
     saving.value = false
@@ -107,6 +108,7 @@ async function handleToggleActive() {
     }
     emit('saved')
   } catch (e: unknown) {
+    console.error('mappingCard.toggle:', e)
     toast.error(getApiMessage(e, t('mappings.messages.toggleFailed')))
   }
 }

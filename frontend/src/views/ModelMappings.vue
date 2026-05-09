@@ -138,6 +138,7 @@ async function handleDelete(clientModel: string) {
       await loadData()
       toast.success(t('common.saveSuccess'))
     } catch (e: unknown) {
+      console.error('modelMappings.deleteAndSave:', e)
       toast.error(getApiMessage(e, t('mappings.messages.deleteFailed', { model: clientModel })))
     }
   }

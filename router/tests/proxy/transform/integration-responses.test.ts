@@ -1,7 +1,30 @@
 import { describe, it, expect } from "vitest";
-import { TransformCoordinator } from "../../../src/proxy/transform/transform-coordinator.js";
+import { FormatRegistry } from "../../../src/proxy/format/registry.js";
+import { openaiAdapter } from "../../../src/proxy/format/adapters/openai.js";
+import { anthropicAdapter } from "../../../src/proxy/format/adapters/anthropic.js";
+import { responsesAdapter } from "../../../src/proxy/format/adapters/responses.js";
+import { openaiToAnthropicConverter } from "../../../src/proxy/format/converters/openai-anthropic.js";
+import { anthropicToOpenAIConverter } from "../../../src/proxy/format/converters/anthropic-openai.js";
+import { responsesToAnthropicConverter } from "../../../src/proxy/format/converters/responses-anthropic.js";
+import { anthropicToResponsesConverter } from "../../../src/proxy/format/converters/anthropic-responses.js";
+import { openaiToResponsesConverter } from "../../../src/proxy/format/converters/openai-responses.js";
+import { responsesToOpenAIConverter } from "../../../src/proxy/format/converters/responses-openai.js";
 
-const coordinator = new TransformCoordinator();
+function createRegistry(): FormatRegistry {
+  const registry = new FormatRegistry();
+  registry.registerAdapter(openaiAdapter);
+  registry.registerAdapter(anthropicAdapter);
+  registry.registerAdapter(responsesAdapter);
+  registry.registerConverter(openaiToAnthropicConverter);
+  registry.registerConverter(anthropicToOpenAIConverter);
+  registry.registerConverter(responsesToAnthropicConverter);
+  registry.registerConverter(anthropicToResponsesConverter);
+  registry.registerConverter(openaiToResponsesConverter);
+  registry.registerConverter(responsesToOpenAIConverter);
+  return registry;
+}
+
+const registry = createRegistry();
 
 describe("Responses API integration — full conversion pipeline", () => {
   it("Responses → Anthropic → Responses (round-trip preserves intent)", () => {
@@ -25,7 +48,7 @@ describe("Responses API integration — full conversion pipeline", () => {
     };
 
     // Responses → Anthropic
-    const { body: antReq } = coordinator.transformRequest(
+    const { body: antReq } = registry.transformRequest(
       request,
       "openai-responses",
       "anthropic",
@@ -45,7 +68,7 @@ describe("Responses API integration — full conversion pipeline", () => {
       stop_reason: "end_turn",
       usage: { input_tokens: 20, output_tokens: 10 },
     });
-    const respResponse = coordinator.transformResponse(
+    const respResponse = registry.transformResponse(
       antResponse,
       "anthropic",
       "openai-responses",
@@ -64,7 +87,7 @@ describe("Responses API integration — full conversion pipeline", () => {
     };
 
     // Responses → Chat
-    const { body: chatReq } = coordinator.transformRequest(
+    const { body: chatReq } = registry.transformRequest(
       request,
       "openai-responses",
       "openai",
@@ -74,7 +97,7 @@ describe("Responses API integration — full conversion pipeline", () => {
     expect(chatReq.max_completion_tokens).toBe(1024);
 
     // Chat → Responses
-    const { body: respReq } = coordinator.transformRequest(
+    const { body: respReq } = registry.transformRequest(
       chatReq,
       "openai",
       "openai-responses",
@@ -96,7 +119,7 @@ describe("Responses API integration — full conversion pipeline", () => {
     };
 
     // Chat → Responses
-    const { body: respReq } = coordinator.transformRequest(
+    const { body: respReq } = registry.transformRequest(
       request,
       "openai",
       "openai-responses",
@@ -106,7 +129,7 @@ describe("Responses API integration — full conversion pipeline", () => {
     expect(respReq.max_output_tokens).toBe(1024);
 
     // Responses → Chat
-    const { body: chatReq } = coordinator.transformRequest(
+    const { body: chatReq } = registry.transformRequest(
       respReq,
       "openai-responses",
       "openai",
@@ -125,7 +148,7 @@ describe("Responses API integration — full conversion pipeline", () => {
       max_tokens: 1024,
     };
 
-    const { body: chatReq } = coordinator.transformRequest(
+    const { body: chatReq } = registry.transformRequest(
       request,
       "anthropic",
       "openai",
@@ -133,7 +156,7 @@ describe("Responses API integration — full conversion pipeline", () => {
     );
     expect(chatReq.messages).toBeDefined();
 
-    const { body: antReq } = coordinator.transformRequest(
+    const { body: antReq } = registry.transformRequest(
       chatReq,
       "openai",
       "anthropic",
@@ -143,25 +166,25 @@ describe("Responses API integration — full conversion pipeline", () => {
   });
 
   it("needsTransform returns false for same api_type", () => {
-    expect(coordinator.needsTransform("openai", "openai")).toBe(false);
-    expect(coordinator.needsTransform("anthropic", "anthropic")).toBe(false);
+    expect(registry.needsTransform("openai", "openai")).toBe(false);
+    expect(registry.needsTransform("anthropic", "anthropic")).toBe(false);
     expect(
-      coordinator.needsTransform("openai-responses", "openai-responses"),
+      registry.needsTransform("openai-responses", "openai-responses"),
     ).toBe(false);
   });
 
   it("needsTransform returns true for different api_types", () => {
-    expect(coordinator.needsTransform("openai", "anthropic")).toBe(true);
-    expect(coordinator.needsTransform("openai", "openai-responses")).toBe(true);
+    expect(registry.needsTransform("openai", "anthropic")).toBe(true);
+    expect(registry.needsTransform("openai", "openai-responses")).toBe(true);
     expect(
-      coordinator.needsTransform("openai-responses", "anthropic"),
+      registry.needsTransform("openai-responses", "anthropic"),
     ).toBe(true);
-    expect(coordinator.needsTransform("anthropic", "openai")).toBe(true);
+    expect(registry.needsTransform("anthropic", "openai")).toBe(true);
     expect(
-      coordinator.needsTransform("anthropic", "openai-responses"),
+      registry.needsTransform("anthropic", "openai-responses"),
     ).toBe(true);
     expect(
-      coordinator.needsTransform("openai-responses", "openai"),
+      registry.needsTransform("openai-responses", "openai"),
     ).toBe(true);
   });
 
@@ -172,7 +195,7 @@ describe("Responses API integration — full conversion pipeline", () => {
     });
 
     // Anthropic → Responses
-    const r1 = coordinator.transformErrorResponse(
+    const r1 = registry.transformError(
       anthropicError,
       "anthropic",
       "openai-responses",
@@ -182,7 +205,7 @@ describe("Responses API integration — full conversion pipeline", () => {
     expect(parsed1.error.message).toContain("Model not found");
 
     // Anthropic → OpenAI (existing path)
-    const r2 = coordinator.transformErrorResponse(
+    const r2 = registry.transformError(
       anthropicError,
       "anthropic",
       "openai",
@@ -225,7 +248,7 @@ describe("Responses API integration — full conversion pipeline", () => {
       ],
     };
 
-    const { body: antReq } = coordinator.transformRequest(
+    const { body: antReq } = registry.transformRequest(
       request,
       "openai-responses",
       "anthropic",
@@ -249,7 +272,7 @@ describe("Responses API integration — full conversion pipeline", () => {
     });
 
     // Anthropic → Responses
-    const respResp = coordinator.transformResponse(
+    const respResp = registry.transformResponse(
       anthropicResp,
       "anthropic",
       "openai-responses",
@@ -259,7 +282,7 @@ describe("Responses API integration — full conversion pipeline", () => {
     expect(parsed.status).toBe("completed");
 
     // Anthropic → Chat (existing path)
-    const chatResp = coordinator.transformResponse(
+    const chatResp = registry.transformResponse(
       anthropicResp,
       "anthropic",
       "openai",
@@ -268,9 +291,9 @@ describe("Responses API integration — full conversion pipeline", () => {
     expect(chatParsed.model).toBe("claude-3-opus");
   });
 
-  it("createFormatTransform returns correct stream transform for each direction", () => {
+  it("createStreamTransform returns correct stream transform for each direction", () => {
     // Tier-1: Responses → Anthropic
-    const t1 = coordinator.createFormatTransform(
+    const t1 = registry.createStreamTransform(
       "openai-responses",
       "anthropic",
       "gpt-4o",
@@ -279,7 +302,7 @@ describe("Responses API integration — full conversion pipeline", () => {
     expect(t1!.constructor.name).toContain("ResponsesToAnthropic");
 
     // Tier-1: Anthropic → Responses
-    const t2 = coordinator.createFormatTransform(
+    const t2 = registry.createStreamTransform(
       "anthropic",
       "openai-responses",
       "gpt-4o",
@@ -288,7 +311,7 @@ describe("Responses API integration — full conversion pipeline", () => {
     expect(t2!.constructor.name).toContain("AnthropicToResponses");
 
     // Bridge: Responses → Chat
-    const t3 = coordinator.createFormatTransform(
+    const t3 = registry.createStreamTransform(
       "openai-responses",
       "openai",
       "gpt-4o",
@@ -297,7 +320,7 @@ describe("Responses API integration — full conversion pipeline", () => {
     expect(t3!.constructor.name).toContain("ResponsesToChat");
 
     // Bridge: Chat → Responses
-    const t4 = coordinator.createFormatTransform(
+    const t4 = registry.createStreamTransform(
       "openai",
       "openai-responses",
       "gpt-4o",
@@ -306,7 +329,7 @@ describe("Responses API integration — full conversion pipeline", () => {
     expect(t4!.constructor.name).toContain("ChatToResponses");
 
     // Identity: no transform
-    const t5 = coordinator.createFormatTransform(
+    const t5 = registry.createStreamTransform(
       "openai",
       "openai",
       "gpt-4o",

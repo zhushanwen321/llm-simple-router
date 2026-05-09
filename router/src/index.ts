@@ -17,12 +17,20 @@ import { getConfig, getBaseConfig, Config } from "./config/index.js";
 import { initDatabase, getAllProviders } from "./db/index.js";
 import { loadRecommendedConfig } from "./config/recommended.js";
 import { authMiddleware } from "./middleware/auth.js";
-import { openaiProxy } from "./proxy/handler/openai.js";
-import { anthropicProxy } from "./proxy/handler/anthropic.js";
-import { responsesProxy } from "./proxy/handler/responses.js";
+import { createProxyHandler } from "./proxy/handler/create-proxy-handler.js";
 import { adminRoutes } from "./admin/routes.js";
 import { RetryRuleMatcher } from "./proxy/orchestration/retry-rules.js";
 import { PluginRegistry } from "./proxy/transform/plugin-registry.js";
+import { FormatRegistry } from "./proxy/format/registry.js";
+import { openaiAdapter } from "./proxy/format/adapters/openai.js";
+import { anthropicAdapter } from "./proxy/format/adapters/anthropic.js";
+import { responsesAdapter } from "./proxy/format/adapters/responses.js";
+import { openaiToAnthropicConverter } from "./proxy/format/converters/openai-anthropic.js";
+import { anthropicToOpenAIConverter } from "./proxy/format/converters/anthropic-openai.js";
+import { openaiToResponsesConverter } from "./proxy/format/converters/openai-responses.js";
+import { responsesToOpenAIConverter } from "./proxy/format/converters/responses-openai.js";
+import { responsesToAnthropicConverter } from "./proxy/format/converters/responses-anthropic.js";
+import { anthropicToResponsesConverter } from "./proxy/format/converters/anthropic-responses.js";
 import { SemaphoreManager, AdaptiveController } from "@llm-router/core/concurrency";
 import type { StateRegistry } from "./core/registry.js";
 import { RequestTracker } from "@llm-router/core/monitor";
@@ -37,6 +45,7 @@ import { ServiceContainer, SERVICE_KEYS } from "./core/container.js";
 import Database from "better-sqlite3";
 import { LogFileWriter } from "./storage/log-file-writer.js";
 import { ProxyAgentFactory } from "./proxy/transport/proxy-agent.js";
+import { registerBuiltinHooks } from "./proxy/pipeline/register-hooks.js";
 import { scheduleLogFileMaintenance } from "./storage/log-file-compressor.js";
 import { getDetailLogEnabled, getLogFileRetentionDays } from "./db/settings.js";
 import { dirname, join } from "node:path";
@@ -254,6 +263,19 @@ export async function buildApp(
   pluginRegistry.scanPluginsDir(pluginsDir);
   container.register(SERVICE_KEYS.pluginRegistry, () => pluginRegistry);
 
+  // 注册 FormatRegistry（3 adapters + 6 converters 覆盖所有格式转换）
+  const formatRegistry = new FormatRegistry();
+  formatRegistry.registerAdapter(openaiAdapter);
+  formatRegistry.registerAdapter(anthropicAdapter);
+  formatRegistry.registerAdapter(responsesAdapter);
+  formatRegistry.registerConverter(openaiToAnthropicConverter);
+  formatRegistry.registerConverter(anthropicToOpenAIConverter);
+  formatRegistry.registerConverter(openaiToResponsesConverter);
+  formatRegistry.registerConverter(responsesToOpenAIConverter);
+  formatRegistry.registerConverter(responsesToAnthropicConverter);
+  formatRegistry.registerConverter(anthropicToResponsesConverter);
+  container.register(SERVICE_KEYS.formatRegistry, () => formatRegistry);
+
   // 注册 ProxyAgentFactory
   container.register(SERVICE_KEYS.proxyAgentFactory, () => new ProxyAgentFactory());
 
@@ -272,9 +294,26 @@ export async function buildApp(
   initializeProviderState(db, semaphoreManager, adaptiveController, tracker);
 
   app.register(authMiddleware, { db });
-  app.register(openaiProxy, { db, container });
-  app.register(anthropicProxy, { db, container });
-  app.register(responsesProxy, { db, container });
+
+  // 注册内置 hooks 到 hookRegistry（供 Admin API 查询）
+  registerBuiltinHooks();
+
+  // --- New pipeline-based proxy handlers (Phase 3) ---
+  const openaiHandler = createProxyHandler({
+    apiType: "openai",
+    paths: ["/v1/chat/completions", "/chat/completions"],
+  });
+  const anthropicHandler = createProxyHandler({
+    apiType: "anthropic",
+    paths: ["/v1/messages"],
+  });
+  const responsesHandler = createProxyHandler({
+    apiType: "openai-responses",
+    paths: ["/v1/responses", "/responses"],
+  });
+  app.register(openaiHandler, { db, container });
+  app.register(anthropicHandler, { db, container });
+  app.register(responsesHandler, { db, container });
 
   // StateRegistry — Admin 层通过此接口触发 proxy 层状态刷新，消除 admin→proxy 依赖
   const stateRegistry: StateRegistry = {
@@ -313,7 +352,7 @@ export async function buildApp(
     // SPA fallback: /admin/ 下非 API 路径返回 index.html
     app.setNotFoundHandler((request, reply) => {
       if (
-        request.url.startsWith("/admin") &&
+        (request.url.startsWith("/admin/") || request.url === "/admin") &&
         !request.url.startsWith("/admin/api")
       ) {
         return reply.sendFile("index.html");
@@ -407,7 +446,7 @@ export async function main() {
 
   process.on("unhandledRejection", (reason) => {
     try {
-      app.log.error({ err: reason instanceof Error ? reason : new Error(String(reason)) }, "Unhandled rejection");
+      app.log.error({ err: reason instanceof Error ? reason : new Error(typeof reason === 'string' ? reason : JSON.stringify(reason)) }, "Unhandled rejection");
     /* eslint-disable taste/no-silent-catch -- app.log 可能已崩溃，console 是最后手段 */
     } catch {
       console.error("Unhandled rejection:", reason);

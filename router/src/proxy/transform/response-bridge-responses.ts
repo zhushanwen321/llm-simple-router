@@ -35,25 +35,25 @@ export function responsesToChatResponse(bodyStr: string): string {
       const msgContent = (item.content as Array<Record<string, unknown>>) ?? [];
       for (const part of msgContent) {
         if (part.type === "output_text" && part.text != null) {
-          textParts.push(String(part.text));
+          textParts.push(part.text as string);
         }
       }
     } else if (type === "function_call") {
       // → tool_calls
       hasFunctionCall = true;
       toolCalls.push({
-        id: String(item.id ?? ""),
+        id: (item.id ?? "") as string,
         type: "function",
         function: {
-          name: String(item.name ?? ""),
-          arguments: String(item.arguments ?? "{}"),
+          name: (item.name ?? "") as string,
+          arguments: (item.arguments ?? "{}") as string,
         },
       });
     } else if (type === "reasoning") {
       // → reasoning_content (joined summary text, LOSSY)
       const summary = item.summary as Array<Record<string, unknown>> | undefined;
       if (summary) {
-        const joined = summary.map(s => String(s.text ?? "")).join("");
+        const joined = summary.map(s => (s.text ?? "") as string).join("");
         if (joined) {
           message.reasoning_content = joined;
         }
@@ -77,7 +77,7 @@ export function responsesToChatResponse(bodyStr: string): string {
   if (hasFunctionCall) {
     finishReason = "tool_calls";
   } else {
-    finishReason = mapStatusToFinishReason(String(resp.status ?? "completed"));
+    finishReason = mapStatusToFinishReason((resp.status ?? "completed") as string);
   }
 
   // Usage mapping
@@ -129,7 +129,7 @@ export function chatToResponsesResponse(bodyStr: string): string {
     output.push({
       type: "reasoning",
       id: `rs_${Date.now()}_0`,
-      summary: [{ type: "summary_text", text: String(msg.reasoning_content) }],
+      summary: [{ type: "summary_text", text: msg.reasoning_content }],
     });
   }
 
@@ -139,7 +139,7 @@ export function chatToResponsesResponse(bodyStr: string): string {
       type: "message",
       id: `msg_${Date.now()}_1`,
       role: "assistant",
-      content: [{ type: "output_text", text: String(msg.content) }],
+      content: [{ type: "output_text", text: msg.content }],
     });
   }
 
@@ -151,16 +151,16 @@ export function chatToResponsesResponse(bodyStr: string): string {
       const fn = tc.function as Record<string, unknown> | undefined;
       output.push({
         type: "function_call",
-        id: String(tc.id ?? `fc_${i}`),
-        call_id: String(tc.id ?? `fc_${i}`),
-        name: String(fn?.name ?? ""),
-        arguments: String(fn?.arguments ?? "{}"),
+        id: (tc.id ?? `fc_${i}`) as string,
+        call_id: (tc.id ?? `fc_${i}`) as string,
+        name: (fn?.name ?? ""),
+        arguments: (fn?.arguments ?? "{}"),
       });
     }
   }
 
   // Status mapping
-  const finishReason = String(choice?.finish_reason ?? "stop");
+  const finishReason = (choice?.finish_reason ?? "stop") as string;
   const status = mapFinishReasonToStatus(finishReason);
 
   // Usage mapping
