@@ -283,6 +283,350 @@ describe("ChatToResponsesBridgeTransform", () => {
     const itemDoneEvents = events.filter((e) => e.event === RESPONSES_SSE_EVENTS.OUTPUT_ITEM_DONE);
     expect(itemDoneEvents.length).toBe(2);
   });
+
+  // ---------- Text accumulation: done events contain full accumulated text ----------
+
+  it("output_text.done contains full accumulated text from deltas", async () => {
+    const t = new ChatToResponsesBridgeTransform("gpt-4o");
+    const output = collectOutput(t);
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { role: "assistant" }, finish_reason: null }] }));
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { content: "Hello" }, finish_reason: null }] }));
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { content: " world" }, finish_reason: null }] }));
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: {}, finish_reason: "stop" }], usage: { prompt_tokens: 5, completion_tokens: 2, total_tokens: 7 } }));
+    t.end();
+    const result = await output;
+    const events = parseSSEEvents(result);
+    const textDone = events.find((e) => e.event === RESPONSES_SSE_EVENTS.OUTPUT_TEXT_DONE);
+    expect(textDone).toBeDefined();
+    expect((textDone!.data as Record<string, unknown>).text).toBe("Hello world");
+  });
+
+  it("content_part.done contains full accumulated text", async () => {
+    const t = new ChatToResponsesBridgeTransform("gpt-4o");
+    const output = collectOutput(t);
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { role: "assistant" }, finish_reason: null }] }));
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { content: "Hello" }, finish_reason: null }] }));
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { content: " world" }, finish_reason: null }] }));
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: {}, finish_reason: "stop" }], usage: { prompt_tokens: 5, completion_tokens: 2, total_tokens: 7 } }));
+    t.end();
+    const result = await output;
+    const events = parseSSEEvents(result);
+    const partDone = events.find((e) => e.event === RESPONSES_SSE_EVENTS.CONTENT_PART_DONE);
+    expect(partDone).toBeDefined();
+    const part = (partDone!.data as Record<string, unknown>).part as Record<string, unknown>;
+    expect(part.text).toBe("Hello world");
+  });
+
+  it("output_item.done contains full accumulated text in item.content", async () => {
+    const t = new ChatToResponsesBridgeTransform("gpt-4o");
+    const output = collectOutput(t);
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { role: "assistant" }, finish_reason: null }] }));
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { content: "Hello" }, finish_reason: null }] }));
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { content: " world" }, finish_reason: null }] }));
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: {}, finish_reason: "stop" }], usage: { prompt_tokens: 5, completion_tokens: 2, total_tokens: 7 } }));
+    t.end();
+    const result = await output;
+    const events = parseSSEEvents(result);
+    const messageItemDone = events.find((e) => {
+      const eData = e.data as Record<string, unknown>;
+      const item = eData?.item as Record<string, unknown>;
+      return e.event === RESPONSES_SSE_EVENTS.OUTPUT_ITEM_DONE && item?.type === "message";
+    });
+    expect(messageItemDone).toBeDefined();
+    const item = (messageItemDone!.data as Record<string, unknown>).item as Record<string, unknown>;
+    const content = item.content as Array<Record<string, unknown>>;
+    expect(content[0].text).toBe("Hello world");
+  });
+
+  it("response.completed output contains full accumulated text", async () => {
+    const t = new ChatToResponsesBridgeTransform("gpt-4o");
+    const output = collectOutput(t);
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { role: "assistant" }, finish_reason: null }] }));
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { content: "Hello" }, finish_reason: null }] }));
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { content: " world" }, finish_reason: null }] }));
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: {}, finish_reason: "stop" }], usage: { prompt_tokens: 5, completion_tokens: 2, total_tokens: 7 } }));
+    t.end();
+    const result = await output;
+    const events = parseSSEEvents(result);
+    const completed = events.find((e) => e.event === RESPONSES_SSE_EVENTS.COMPLETED);
+    expect(completed).toBeDefined();
+    const resp = (completed!.data as Record<string, unknown>).response as Record<string, unknown>;
+    const outputItems = resp.output as Array<Record<string, unknown>>;
+    const messageItem = outputItems.find((o) => o.type === "message") as Record<string, unknown>;
+    expect(messageItem).toBeDefined();
+    const content = messageItem.content as Array<Record<string, unknown>>;
+    expect(content[0].text).toBe("Hello world");
+  });
+
+  // ---------- Reasoning text accumulation ----------
+
+  it("reasoning_summary_text.done contains full accumulated reasoning text", async () => {
+    const t = new ChatToResponsesBridgeTransform("gpt-4o");
+    const output = collectOutput(t);
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { role: "assistant" }, finish_reason: null }] }));
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { reasoning_content: "Let me" }, finish_reason: null }] }));
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { reasoning_content: " think..." }, finish_reason: null }] }));
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { content: "42" }, finish_reason: null }] }));
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: {}, finish_reason: "stop" }], usage: { prompt_tokens: 5, completion_tokens: 3, total_tokens: 8 } }));
+    t.end();
+    const result = await output;
+    const events = parseSSEEvents(result);
+    const reasoningDone = events.find((e) => e.event === RESPONSES_SSE_EVENTS.REASONING_SUMMARY_TEXT_DONE);
+    expect(reasoningDone).toBeDefined();
+    expect((reasoningDone!.data as Record<string, unknown>).text).toBe("Let me think...");
+  });
+
+  it("reasoning_summary_part.done contains full accumulated reasoning text", async () => {
+    const t = new ChatToResponsesBridgeTransform("gpt-4o");
+    const output = collectOutput(t);
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { role: "assistant" }, finish_reason: null }] }));
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { reasoning_content: "Let me" }, finish_reason: null }] }));
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { reasoning_content: " think..." }, finish_reason: null }] }));
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { content: "42" }, finish_reason: null }] }));
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: {}, finish_reason: "stop" }], usage: { prompt_tokens: 5, completion_tokens: 3, total_tokens: 8 } }));
+    t.end();
+    const result = await output;
+    const events = parseSSEEvents(result);
+    const partDone = events.find((e) => e.event === RESPONSES_SSE_EVENTS.REASONING_SUMMARY_PART_DONE);
+    expect(partDone).toBeDefined();
+    const part = (partDone!.data as Record<string, unknown>).part as Record<string, unknown>;
+    expect(part.text).toBe("Let me think...");
+  });
+
+  it("reasoning output_item.done contains full accumulated reasoning text in summary", async () => {
+    const t = new ChatToResponsesBridgeTransform("gpt-4o");
+    const output = collectOutput(t);
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { role: "assistant" }, finish_reason: null }] }));
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { reasoning_content: "Let me" }, finish_reason: null }] }));
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { reasoning_content: " think..." }, finish_reason: null }] }));
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { content: "42" }, finish_reason: null }] }));
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: {}, finish_reason: "stop" }], usage: { prompt_tokens: 5, completion_tokens: 3, total_tokens: 8 } }));
+    t.end();
+    const result = await output;
+    const events = parseSSEEvents(result);
+    const reasoningItemDone = events.find((e) => {
+      const eData = e.data as Record<string, unknown>;
+      const item = eData?.item as Record<string, unknown>;
+      return e.event === RESPONSES_SSE_EVENTS.OUTPUT_ITEM_DONE && item?.type === "reasoning";
+    });
+    expect(reasoningItemDone).toBeDefined();
+    const item = (reasoningItemDone!.data as Record<string, unknown>).item as Record<string, unknown>;
+    const summary = item.summary as Array<Record<string, unknown>>;
+    expect(summary[0].text).toBe("Let me think...");
+  });
+
+  it("response.completed output contains full accumulated reasoning text", async () => {
+    const t = new ChatToResponsesBridgeTransform("gpt-4o");
+    const output = collectOutput(t);
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { role: "assistant" }, finish_reason: null }] }));
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { reasoning_content: "Let me" }, finish_reason: null }] }));
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { reasoning_content: " think..." }, finish_reason: null }] }));
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { content: "42" }, finish_reason: null }] }));
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: {}, finish_reason: "stop" }], usage: { prompt_tokens: 5, completion_tokens: 3, total_tokens: 8 } }));
+    t.end();
+    const result = await output;
+    const events = parseSSEEvents(result);
+    const completed = events.find((e) => e.event === RESPONSES_SSE_EVENTS.COMPLETED);
+    expect(completed).toBeDefined();
+    const resp = (completed!.data as Record<string, unknown>).response as Record<string, unknown>;
+    const outputItems = resp.output as Array<Record<string, unknown>>;
+    const reasoningItem = outputItems.find((o) => o.type === "reasoning") as Record<string, unknown>;
+    expect(reasoningItem).toBeDefined();
+    const summary = reasoningItem.summary as Array<Record<string, unknown>>;
+    expect(summary[0].text).toBe("Let me think...");
+  });
+
+  // ---------- Function call arguments accumulation ----------
+
+  it("function_call_arguments.done contains full accumulated arguments", async () => {
+    const t = new ChatToResponsesBridgeTransform("gpt-4o");
+    const output = collectOutput(t);
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { role: "assistant" }, finish_reason: null }] }));
+    t.write(chatSSE({
+      id: "chatcmpl-1", object: "chat.completion.chunk",
+      choices: [{
+        index: 0,
+        delta: { tool_calls: [{ index: 0, id: "call_abc", type: "function", function: { name: "get_weather", arguments: "" } }] },
+        finish_reason: null,
+      }],
+    }));
+    t.write(chatSSE({
+      id: "chatcmpl-1", object: "chat.completion.chunk",
+      choices: [{
+        index: 0,
+        delta: { tool_calls: [{ index: 0, function: { arguments: '{"city":"NYC"}' } }] },
+        finish_reason: null,
+      }],
+    }));
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }], usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 } }));
+    t.end();
+    const result = await output;
+    const events = parseSSEEvents(result);
+    const argsDone = events.find((e) => e.event === RESPONSES_SSE_EVENTS.FUNCTION_CALL_ARGUMENTS_DONE);
+    expect(argsDone).toBeDefined();
+    expect((argsDone!.data as Record<string, unknown>).arguments).toBe('{"city":"NYC"}');
+  });
+
+  it("function_call output_item.done contains full accumulated arguments", async () => {
+    const t = new ChatToResponsesBridgeTransform("gpt-4o");
+    const output = collectOutput(t);
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { role: "assistant" }, finish_reason: null }] }));
+    t.write(chatSSE({
+      id: "chatcmpl-1", object: "chat.completion.chunk",
+      choices: [{
+        index: 0,
+        delta: { tool_calls: [{ index: 0, id: "call_abc", type: "function", function: { name: "get_weather", arguments: "" } }] },
+        finish_reason: null,
+      }],
+    }));
+    t.write(chatSSE({
+      id: "chatcmpl-1", object: "chat.completion.chunk",
+      choices: [{
+        index: 0,
+        delta: { tool_calls: [{ index: 0, function: { arguments: '{"city":"NYC"}' } }] },
+        finish_reason: null,
+      }],
+    }));
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }], usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 } }));
+    t.end();
+    const result = await output;
+    const events = parseSSEEvents(result);
+    const fcItemDone = events.find((e) => {
+      const eData = e.data as Record<string, unknown>;
+      const item = eData?.item as Record<string, unknown>;
+      return e.event === RESPONSES_SSE_EVENTS.OUTPUT_ITEM_DONE && item?.type === "function_call";
+    });
+    expect(fcItemDone).toBeDefined();
+    const item = (fcItemDone!.data as Record<string, unknown>).item as Record<string, unknown>;
+    expect(item.arguments).toBe('{"city":"NYC"}');
+  });
+
+  it("response.completed output contains full accumulated function_call arguments", async () => {
+    const t = new ChatToResponsesBridgeTransform("gpt-4o");
+    const output = collectOutput(t);
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { role: "assistant" }, finish_reason: null }] }));
+    t.write(chatSSE({
+      id: "chatcmpl-1", object: "chat.completion.chunk",
+      choices: [{
+        index: 0,
+        delta: { tool_calls: [{ index: 0, id: "call_abc", type: "function", function: { name: "get_weather", arguments: "" } }] },
+        finish_reason: null,
+      }],
+    }));
+    t.write(chatSSE({
+      id: "chatcmpl-1", object: "chat.completion.chunk",
+      choices: [{
+        index: 0,
+        delta: { tool_calls: [{ index: 0, function: { arguments: '{"city":"NYC"}' } }] },
+        finish_reason: null,
+      }],
+    }));
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }], usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 } }));
+    t.end();
+    const result = await output;
+    const events = parseSSEEvents(result);
+    const completed = events.find((e) => e.event === RESPONSES_SSE_EVENTS.COMPLETED);
+    expect(completed).toBeDefined();
+    const resp = (completed!.data as Record<string, unknown>).response as Record<string, unknown>;
+    const outputItems = resp.output as Array<Record<string, unknown>>;
+    const fcItem = outputItems.find((o) => o.type === "function_call") as Record<string, unknown>;
+    expect(fcItem).toBeDefined();
+    expect(fcItem.arguments).toBe('{"city":"NYC"}');
+  });
+
+  // ---------- Integration: full end-to-end text accumulation ----------
+
+  it("full end-to-end flow accumulates all text types correctly", async () => {
+    const t = new ChatToResponsesBridgeTransform("gpt-4o");
+    const output = collectOutput(t);
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { role: "assistant" }, finish_reason: null }] }));
+    // Reasoning chunks (multi-chunk)
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { reasoning_content: "I need to" }, finish_reason: null }] }));
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { reasoning_content: " analyze this." }, finish_reason: null }] }));
+    // Text chunks (multi-chunk)
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { content: "The answer" }, finish_reason: null }] }));
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { content: " is 42." }, finish_reason: null }] }));
+    // Tool call (multi-chunk)
+    t.write(chatSSE({
+      id: "chatcmpl-1", object: "chat.completion.chunk",
+      choices: [{
+        index: 0,
+        delta: { tool_calls: [{ index: 0, id: "call_1", type: "function", function: { name: "search", arguments: "" } }] },
+        finish_reason: null,
+      }],
+    }));
+    t.write(chatSSE({
+      id: "chatcmpl-1", object: "chat.completion.chunk",
+      choices: [{
+        index: 0,
+        delta: { tool_calls: [{ index: 0, function: { arguments: '{"query"' } }] },
+        finish_reason: null,
+      }],
+    }));
+    t.write(chatSSE({
+      id: "chatcmpl-1", object: "chat.completion.chunk",
+      choices: [{
+        index: 0,
+        delta: { tool_calls: [{ index: 0, function: { arguments: ':"life"}' } }] },
+        finish_reason: null,
+      }],
+    }));
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }], usage: { prompt_tokens: 10, completion_tokens: 25, total_tokens: 35 } }));
+    t.end();
+    const result = await output;
+    const events = parseSSEEvents(result);
+
+    // Verify reasoning done events
+    const reasoningTextDone = events.find((e) => e.event === RESPONSES_SSE_EVENTS.REASONING_SUMMARY_TEXT_DONE);
+    expect(reasoningTextDone).toBeDefined();
+    expect((reasoningTextDone!.data as Record<string, unknown>).text).toBe("I need to analyze this.");
+
+    const reasoningPartDone = events.find((e) => e.event === RESPONSES_SSE_EVENTS.REASONING_SUMMARY_PART_DONE);
+    expect(reasoningPartDone).toBeDefined();
+    const rPart = (reasoningPartDone!.data as Record<string, unknown>).part as Record<string, unknown>;
+    expect(rPart.text).toBe("I need to analyze this.");
+
+    // Verify text done events
+    const textDone = events.find((e) => e.event === RESPONSES_SSE_EVENTS.OUTPUT_TEXT_DONE);
+    expect(textDone).toBeDefined();
+    expect((textDone!.data as Record<string, unknown>).text).toBe("The answer is 42.");
+
+    const contentPartDone = events.find((e) => e.event === RESPONSES_SSE_EVENTS.CONTENT_PART_DONE);
+    expect(contentPartDone).toBeDefined();
+    const cPart = (contentPartDone!.data as Record<string, unknown>).part as Record<string, unknown>;
+    expect(cPart.text).toBe("The answer is 42.");
+
+    // Verify function call done events
+    const argsDone = events.find((e) => e.event === RESPONSES_SSE_EVENTS.FUNCTION_CALL_ARGUMENTS_DONE);
+    expect(argsDone).toBeDefined();
+    expect((argsDone!.data as Record<string, unknown>).arguments).toBe('{"query":"life"}');
+
+    // Verify response.completed output
+    const completed = events.find((e) => e.event === RESPONSES_SSE_EVENTS.COMPLETED);
+    expect(completed).toBeDefined();
+    const resp = (completed!.data as Record<string, unknown>).response as Record<string, unknown>;
+    const outputItems = resp.output as Array<Record<string, unknown>>;
+
+    // Should have 3 output items: reasoning, message, function_call
+    expect(outputItems.length).toBe(3);
+
+    // Reasoning item
+    const reasoningItem = outputItems.find((o) => o.type === "reasoning") as Record<string, unknown>;
+    expect(reasoningItem).toBeDefined();
+    const rSummary = reasoningItem.summary as Array<Record<string, unknown>>;
+    expect(rSummary[0].text).toBe("I need to analyze this.");
+
+    // Message item
+    const messageItem = outputItems.find((o) => o.type === "message") as Record<string, unknown>;
+    expect(messageItem).toBeDefined();
+    const mContent = messageItem.content as Array<Record<string, unknown>>;
+    expect(mContent[0].text).toBe("The answer is 42.");
+
+    // Function call item
+    const fcItem = outputItems.find((o) => o.type === "function_call") as Record<string, unknown>;
+    expect(fcItem).toBeDefined();
+    expect(fcItem.arguments).toBe('{"query":"life"}');
+  });
 });
 
 // ---------- ResponsesToChatBridgeTransform ----------
