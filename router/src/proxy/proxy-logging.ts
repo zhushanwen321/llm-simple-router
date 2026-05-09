@@ -161,6 +161,7 @@ export function collectTransportMetrics(
   statusCode?: number | null,
   clientType?: string,
   cacheReadTokensEstimated?: number,
+  cacheReadTokensValue?: number,
 ) {
   const base = {
     request_log_id: lastSuccessLogId, provider_id: providerId, backend_model: backendModel, api_type: apiType,
@@ -173,6 +174,9 @@ export function collectTransportMetrics(
         if (!metrics.input_tokens && request.body && getTokenEstimationEnabled(db)) {
           metrics.input_tokens = estimateInputTokens(request.body as Record<string, unknown>);
           metrics.input_tokens_estimated = 1;
+        }
+        if ((!metrics.cache_read_tokens || metrics.cache_read_tokens === 0) && cacheReadTokensEstimated === 1 && cacheReadTokensValue != null) {
+          metrics.cache_read_tokens = cacheReadTokensValue;
         }
         insertMetrics(db, {
           ...base,
@@ -188,6 +192,9 @@ export function collectTransportMetrics(
         if (!mr.input_tokens && request.body && getTokenEstimationEnabled(db)) {
           mr.input_tokens = estimateInputTokens(request.body as Record<string, unknown>);
           mr.input_tokens_estimated = 1;
+        }
+        if ((!mr.cache_read_tokens || mr.cache_read_tokens === 0) && cacheReadTokensEstimated === 1 && cacheReadTokensValue != null) {
+          mr.cache_read_tokens = cacheReadTokensValue;
         }
         insertMetrics(db, {
           ...base,

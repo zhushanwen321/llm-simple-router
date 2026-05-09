@@ -459,4 +459,77 @@ describe("collectTransportMetrics — new cache params", () => {
     expect(rows[0].client_type).toBe("claude-code");
     expect(rows[0].cache_read_tokens_estimated).toBe(0);
   });
+
+  it("estimates input_tokens when missing from API and token_estimation_enabled is ON (AC5)", () => {
+    const logId = nextLogId();
+    insertRequestLog(db, {
+      id: logId, api_type: "openai", model: "gpt-4", provider_id: "p1",
+      status_code: 200, latency_ms: 100, is_stream: 1, error_message: null,
+      created_at: new Date().toISOString(),
+    });
+
+    // stream_success with input_tokens=0 (API did not provide)
+    collectTransportMetrics(
+      db,
+      "openai",
+      {
+        kind: "stream_success",
+        statusCode: 200,
+        metrics: { input_tokens: 0, output_tokens: 50, cache_read_tokens: 0, cache_creation_tokens: 0, ttft_ms: 100, total_duration_ms: 500, tokens_per_second: 100, stop_reason: "stop", is_complete: 1 } as any,
+        sentHeaders: {},
+      },
+      true,
+      logId,
+      "p1",
+      "gpt-4",
+      makeMockRequest({ messages: [{ role: "user", content: "hello" }] }),
+      null,
+      200,
+      "claude-code",
+      0,
+      undefined,
+    );
+
+    const rows = db.prepare("SELECT * FROM request_metrics WHERE request_log_id = ?").all(logId) as any[];
+    expect(rows).toHaveLength(1);
+    expect(rows[0].input_tokens).toBeGreaterThan(0);
+    expect(rows[0].input_tokens_estimated).toBe(1);
+  });
+
+  it("does NOT estimate input_tokens when token_estimation_enabled is OFF", () => {
+    const logId = nextLogId();
+    insertRequestLog(db, {
+      id: logId, api_type: "openai", model: "gpt-4", provider_id: "p1",
+      status_code: 200, latency_ms: 100, is_stream: 1, error_message: null,
+      created_at: new Date().toISOString(),
+    });
+
+    setTokenEstimationEnabled(db, false);
+
+    collectTransportMetrics(
+      db,
+      "openai",
+      {
+        kind: "stream_success",
+        statusCode: 200,
+        metrics: { input_tokens: 0, output_tokens: 50, cache_read_tokens: 0, cache_creation_tokens: 0, ttft_ms: 100, total_duration_ms: 500, tokens_per_second: 100, stop_reason: "stop", is_complete: 1 } as any,
+        sentHeaders: {},
+      },
+      true,
+      logId,
+      "p1",
+      "gpt-4",
+      makeMockRequest({ messages: [{ role: "user", content: "hello" }] }),
+      null,
+      200,
+      "claude-code",
+      0,
+      undefined,
+    );
+
+    const rows = db.prepare("SELECT * FROM request_metrics WHERE request_log_id = ?").all(logId) as any[];
+    expect(rows).toHaveLength(1);
+    expect(rows[0].input_tokens).toBe(0);
+    expect(rows[0].input_tokens_estimated).toBe(0);
+  });
 });

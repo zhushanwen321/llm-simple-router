@@ -1,8 +1,11 @@
 import { encode } from "gpt-tokenizer";
 import { extractAllText } from "../utils/token-counter.js";
+import { MS_PER_SECOND } from "../core/constants.js";
 
+const SECONDS_PER_MINUTE = 60;
+const TTL_MINUTES = 30;
 /** TTL for cache entries: 30 minutes in milliseconds */
-const TTL_MS = 30 * 60 * 1000;
+const TTL_MS = TTL_MINUTES * SECONDS_PER_MINUTE * MS_PER_SECOND;
 
 interface CacheEntry {
   tokens: number[];
