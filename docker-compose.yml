@@ -2,7 +2,11 @@ version: "3.8"
 
 services:
   router:
-    build: .
+    image: ghcr.io/zhushanwen321/llm-simple-router:latest
+    # 如需本地构建，取消注释以下配置并注释掉 image
+    # build:
+    #   context: .
+    #   dockerfile: router/Dockerfile
     ports:
       - "${PORT:-9981}:9981"
     environment:
@@ -10,11 +14,9 @@ services:
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - JWT_SECRET=${JWT_SECRET}
       - TZ=Asia/Shanghai
+      - DB_PATH=/app/data/router.db
     volumes:
-      - router-data:/app/data
+      - ~/.llm-simple-router:/app/data
     env_file:
       - .env
     restart: unless-stopped
-
-volumes:
-  router-data:
