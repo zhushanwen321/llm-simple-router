@@ -1,6 +1,6 @@
 {
   "name": "llm-simple-router",
-  "version": "0.10.1",
+  "version": "0.10.3",
   "description": "LLM API proxy router with OpenAI/Anthropic support, model mapping, retry strategies, and admin dashboard",
   "license": "MIT",
   "author": "ZZzzswszzZZ",
@@ -50,7 +50,7 @@
     "@eslint/js": "^10.0.1",
     "@types/better-sqlite3": "^7.6.13",
     "@types/jsonwebtoken": "^9.0.10",
-    "@types/node": "^22.15.3",
+    "@types/node": "^22.19.18",
     "eslint": "^10.2.0",
     "tsx": "^4.19.3",
     "typescript": "^5.8.3",

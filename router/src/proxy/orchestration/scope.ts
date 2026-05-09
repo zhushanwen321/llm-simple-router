@@ -48,4 +48,9 @@ export class TrackerScope {
   markQueued(id: string, queued: boolean): void {
     this.tracker.update(id, { queued });
   }
+
+  /** 注册请求终止回调，代理到 RequestTracker */
+  registerKillCallback(id: string, callback: () => void): void {
+    this.tracker.registerKillCallback(id, callback);
+  }
 }

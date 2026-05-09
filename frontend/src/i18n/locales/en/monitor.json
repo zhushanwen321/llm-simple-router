@@ -47,6 +47,12 @@
     "activeRequests": "Active Requests",
     "eventLoopDelay": "Event Loop Delay"
   },
+  "kill": "Kill",
+  "killCancel": "Cancel",
+  "killConfirmTitle": "Confirm Kill Request",
+  "killConfirm": "Are you sure you want to kill the request for {model} ({provider})? This action cannot be undone.",
+  "killSuccess": "Request killed",
+  "killFailed": "Failed to kill request",
   "statusCodes": {
     "noData": "No status code data",
     "success": "2xx Success",
