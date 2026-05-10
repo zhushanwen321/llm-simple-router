@@ -22,9 +22,12 @@ const emit = defineEmits<{
   'update:modelValue': [value: SelectedValue]
 }>()
 
+const CONTEXT_MILLION = 1_000_000
+const CONTEXT_THOUSAND = 1_000
+
 function formatContextWindow(cw: number): string {
-  if (cw >= 1000000) return `${cw / 1000000}M`
-  return `${cw / 1000}K`
+  if (cw >= CONTEXT_MILLION) return `${cw / CONTEXT_MILLION}M`
+  return `${cw / CONTEXT_THOUSAND}K`
 }
 
 const groups = computed<CascadingGroup[]>(() =>

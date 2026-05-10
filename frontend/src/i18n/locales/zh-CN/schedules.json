@@ -58,5 +58,9 @@
   "loadSchedulesFailed": "加载时段失败",
   "saveFailed": "保存时段失败",
   "toggleFailed": "切换状态失败",
-  "deleteFailed": "删除时段失败"
+  "deleteFailed": "删除时段失败",
+  "parseRuleFailed": "路由规则格式异常，已使用默认值",
+  "parseWeekFailed": "工作日格式异常，已使用默认工作日",
+  "parseConcurrencyFailed": "并发规则格式异常，已使用默认配置",
+  "parseTransformFailed": "转换规则格式异常，已使用默认配置"
 }

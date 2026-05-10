@@ -391,8 +391,10 @@ function copyLogId(id: string) {
   copiedId.value = id;
   setTimeout(() => {
     if (copiedId.value === id) copiedId.value = null;
-  }, 2000);
+  }, COPY_FEEDBACK_MS);
 }
+
+const COPY_FEEDBACK_MS = 2000;
 
 let filterTimer: ReturnType<typeof setTimeout> | null = null;
 watch(

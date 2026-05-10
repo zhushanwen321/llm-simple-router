@@ -48,7 +48,8 @@
     "updateFailed": "Failed to update {model}",
     "toggleFailed": "Failed to toggle {model} status",
     "partialFail": "{count} operations failed",
-    "saveFailed": "Failed to save"
+    "saveFailed": "Failed to save",
+    "parseRuleFailed": "Invalid rule format, using defaults"
   },
   "selectProviderModel": "Select Provider / Model"
 }

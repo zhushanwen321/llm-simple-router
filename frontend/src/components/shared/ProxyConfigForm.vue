@@ -47,7 +47,8 @@ const emit = defineEmits(['update:proxyType', 'update:proxyUrl', 'update:proxyUs
 const { t } = useI18n()
 
 function onTypeChange(val: unknown) {
-  const value = String(val ?? '') === 'none' ? '' : String(val ?? '')
+  const strVal = typeof val === 'string' ? val : val != null ? JSON.stringify(val) : ''
+  const value = strVal === 'none' ? '' : strVal
   emit('update:proxyType', value)
   if (!value) {
     emit('clear')

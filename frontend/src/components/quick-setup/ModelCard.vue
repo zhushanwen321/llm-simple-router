@@ -63,10 +63,13 @@ function updatePatches(patches: string[]) {
   emit('update:model', { ...props.model, patches })
 }
 
+const CONTEXT_MILLION = 1_000_000
+const CONTEXT_THOUSAND = 1_000
+
 function formatCw(n: number): string {
-  if (n >= 1000000) return `${n / 1000000}M`
-  if (n >= 1000) return `${n / 1000}K`
-  return String(n)
+  if (n >= CONTEXT_MILLION) return `${n / CONTEXT_MILLION}M`
+  if (n >= CONTEXT_THOUSAND) return `${n / CONTEXT_THOUSAND}K`
+  return `${n}`
 }
 </script>
 

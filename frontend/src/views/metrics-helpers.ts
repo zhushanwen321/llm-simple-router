@@ -2,8 +2,11 @@ import type { ChartOptions } from 'chart.js'
 import { parseUtc, formatTimeHM, formatTimeMDH } from '@/utils/format'
 
 const MS_PER_SEC = 1000
-const DAY_MS = 86400 * MS_PER_SEC
+const SEC_PER_DAY = 86400
+const DAY_MS = SEC_PER_DAY * MS_PER_SEC
 const DAY_TICK_THRESHOLD = 4
+const BUCKET_MIN_SEC = 60
+const BUCKET_DIVISOR = 10
 
 const PERIOD_TOTAL_SEC: Record<string, number> = {
   '1h': 3600,
@@ -18,10 +21,10 @@ const PERIOD_TOTAL_SEC: Record<string, number> = {
 }
 
 function calcBucketSec(totalSec: number): number {
-  return Math.max(60, Math.round(totalSec / 10))
+  return Math.max(BUCKET_MIN_SEC, Math.round(totalSec / BUCKET_DIVISOR))
 }
 
-const DEFAULT_TOTAL_SEC = 86400
+const DEFAULT_TOTAL_SEC = SEC_PER_DAY
 const TICK_COUNT = 5
 const LONG_PERIODS = new Set(['7d', '30d', 'weekly', 'monthly'])
 

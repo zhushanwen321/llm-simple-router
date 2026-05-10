@@ -77,7 +77,7 @@ export function useProviderForm() {
   const modelInput = ref('')
   const modelContextWindow = ref(DEFAULT_CONTEXT_WINDOW)
   const contextWindowSelect = computed({
-    get: () => String(modelContextWindow.value),
+    get: () => `${modelContextWindow.value}`,
     set: (val: string) => { modelContextWindow.value = Number(val) },
   })
 

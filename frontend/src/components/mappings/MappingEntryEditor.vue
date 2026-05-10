@@ -8,6 +8,8 @@ import CascadingModelSelect from '@/components/mappings/CascadingModelSelect.vue
 import type { MappingTarget, MappingEntry } from '@/components/quick-setup/types'
 import type { ProviderGroup, SelectedValue } from '@/components/mappings/cascading-types'
 
+const PROVIDER_NAME_TRUNCATE_LEN = 6
+
 const { t } = useI18n()
 
 const props = withDefaults(defineProps<{
@@ -27,7 +29,7 @@ const emit = defineEmits<{
 }>()
 
 function providerName(providerId: string): string {
-  return props.providerGroups.find(p => p.provider.id === providerId)?.provider.name ?? providerId.slice(0, 6)
+  return props.providerGroups.find(p => p.provider.id === providerId)?.provider.name ?? providerId.slice(0, PROVIDER_NAME_TRUNCATE_LEN)
 }
 
 function modelTimeout(providerId: string, modelName: string): number | null | undefined {
@@ -72,7 +74,6 @@ function updateOverflow(val: SelectedValue | undefined) {
       if (val) {
         return { ...t, overflow_provider_id: val.provider_id, overflow_model: val.model }
       } else {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { overflow_provider_id: _opid, overflow_model: _omod, ...rest } = t
         return rest as MappingTarget
       }

@@ -18,10 +18,10 @@ export function mergeUpstreamData(
     if (typeof parsed.statusCode === 'number' && (parsed.headers || parsed.body !== undefined)) {
       // body 为 null 但有 responseBody（来自 stream_text_content），合并
       if (parsed.body === null && responseBody) {
-        return JSON.stringify({ ...parsed, body: responseBody }, null, 2)
+        return JSON.stringify({ ...parsed, body: responseBody }, null, JSON_INDENT)
       }
       // body 有值（非流式），直接格式化展示
-      return JSON.stringify(parsed, null, 2)
+      return JSON.stringify(parsed, null, JSON_INDENT)
     }
     // 不是 wrapper 格式，直接返回
     return upstreamResponse
@@ -34,6 +34,7 @@ export function mergeUpstreamData(
  * 从 LLM 响应体中移除内容字段（choices/content），
  * 只保留元数据（model, id, usage, headers 等）。
  */
+const JSON_INDENT = 2
 const CONTENT_KEYS: ReadonlySet<string> = new Set(['choices', 'content'])
 
 export function extractResponseMetadata(
@@ -53,13 +54,13 @@ export function extractResponseMetadata(
     if (bodyStr) {
       result.body = parseAndStripContent(bodyStr)
     }
-    return JSON.stringify(result, null, 2)
+    return JSON.stringify(result, null, JSON_INDENT)
   }
 
   // 没有 headers，直接从 body 中提取元数据
   if (bodyStr) {
     const stripped = parseAndStripContent(bodyStr)
-    return JSON.stringify(stripped, null, 2)
+    return JSON.stringify(stripped, null, JSON_INDENT)
   }
 
   return ''

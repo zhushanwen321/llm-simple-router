@@ -147,6 +147,8 @@ import { extractResponseMetadata } from './upstream-merge'
 
 const { t } = useI18n()
 
+const JSON_INDENT = 2
+
 const props = defineProps<{ overview: UnifiedRequestOverview }>()
 
 const showRaw = ref(false)
@@ -173,7 +175,7 @@ const responseMetadataJson = computed(() => {
     cacheWriteTokens: props.overview.cacheWriteTokens,
     stopReason: props.overview.stopReason,
     statusCode: props.overview.statusCode,
-  }, null, 2)
+  }, null, JSON_INDENT)
 })
 
 const statusColor = computed(() => {
@@ -190,7 +192,7 @@ const isOutputPending = computed(
 const outputTokenText = computed(() => {
   const val = props.overview.outputTokens
   if (val == null) return '--'
-  return isOutputPending.value ? `+${val}` : String(val)
+  return isOutputPending.value ? `+${val}` : `${val}`
 })
 
 const latencyText = computed(() => {

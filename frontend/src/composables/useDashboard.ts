@@ -198,7 +198,9 @@ export function useDashboard() {
       if (models.status === 'fulfilled') allModelOptions.value = models.value
       if (keys.status === 'fulfilled') keyOptions.value = keys.value
     } catch (e: unknown) {
-      console.error('Failed to load options:', e)
+      console.error('Failed to load filter options:', e)
+      /* 非关键操作：filter 缺失不影响主仪表盘功能 */
+      toast.error(getApiMessage(e, t('dashboard.loadFilterFailed')))
     }
   }
 
@@ -228,6 +230,8 @@ export function useDashboard() {
       }
     } catch (e: unknown) {
       console.error('Failed to load output tokens:', e)
+      /* 非关键操作：provider 排序降级为默认顺序 */
+      toast.error(getApiMessage(e, t('dashboard.loadOutputTokensFailed')))
     }
   }
 
@@ -321,11 +325,11 @@ export function useDashboard() {
     }
   })
 
-  // 单一 debounced watch：watchKey 变化时 300ms 后 refresh
+  // 单一 debounced watch：watchKey 变化时 DEBOUNCE_MS 后 refresh
   let refreshTimer: ReturnType<typeof setTimeout> | null = null
   watch(watchKey, () => {
     if (refreshTimer) clearTimeout(refreshTimer)
-    refreshTimer = setTimeout(() => refresh(), 300)
+    refreshTimer = setTimeout(() => refresh(), DEBOUNCE_MS)
   })
 
   // periodTab 变化时重新加载 provider 排序数据
@@ -336,6 +340,7 @@ export function useDashboard() {
   })
 
   // --- Refresh 去重缓存 ---
+  const DEBOUNCE_MS = 300
   const CACHE_TTL = 5000
   let lastRefreshKey = ''
   let lastRefreshTime = 0

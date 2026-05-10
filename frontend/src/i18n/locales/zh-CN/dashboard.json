@@ -26,5 +26,7 @@
   },
   "noCacheData": "暂无缓存数据",
   "loadProvidersFailed": "加载供应商列表失败",
-  "loadDashboardFailed": "加载仪表盘数据失败"
+  "loadDashboardFailed": "加载仪表盘数据失败",
+  "loadFilterFailed": "加载筛选项失败",
+  "loadOutputTokensFailed": "加载供应商排序数据失败"
 }
