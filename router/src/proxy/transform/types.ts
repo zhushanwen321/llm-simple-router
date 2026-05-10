@@ -77,6 +77,21 @@ export interface AnthropicMessage {
   content: AnthropicContentBlock[];
 }
 
+export interface AnthropicRequest {
+  model: string;
+  system?: string | Array<{ type: string; text?: string }>;
+  messages?: AnthropicMessage[];
+  max_tokens?: number;
+  stop_sequences?: string[];
+  temperature?: number;
+  top_p?: number;
+  stream?: boolean;
+  tools?: Array<{ name: string; description?: string; input_schema?: Record<string, unknown> }>;
+  tool_choice?: unknown;
+  thinking?: { type: string; budget_tokens?: number } | Record<string, unknown>;
+  metadata?: { user_id?: string } | Record<string, unknown>;
+}
+
 // ---------- 转换结果 ----------
 
 export interface TransformResult {

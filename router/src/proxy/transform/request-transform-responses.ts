@@ -1,5 +1,5 @@
 import { sanitizeToolUseId, parseToolArguments } from "./sanitize.js";
-import type { AnthropicContentBlock, AnthropicMessage } from "./types.js";
+import type { AnthropicContentBlock, AnthropicMessage, AnthropicRequest } from "./types.js";
 import type {
   ResponsesApiRequest,
   ResponseInputItem,
@@ -80,7 +80,7 @@ export function responsesToAnthropicRequest(
   // tools: only function-type tools are forwarded
   if (req.tools) {
     const fnTools = req.tools.filter((t): t is Extract<ResponseTool, { type: "function" }> => t.type === "function");
-    if (fnTools.length > 0 && req.tool_choice as string !== "none") {
+    if (fnTools.length > 0 && req.tool_choice !== "none") {
       result.tools = fnTools.map(t => {
         const mapped: Record<string, unknown> = { name: t.name };
         if (t.description != null) mapped.description = t.description;
@@ -89,7 +89,7 @@ export function responsesToAnthropicRequest(
       });
 
       // tool_choice mapping
-      if (req.tool_choice != null && req.tool_choice !== "none") {
+      if (req.tool_choice != null) {
         const tc = mapToolChoiceResponses2Ant(req.tool_choice);
         if (tc != null) {
           result.tool_choice = req.parallel_tool_calls === false
@@ -217,24 +217,6 @@ function mapToolChoiceResponses2Ant(tc: unknown): Record<string, unknown> | unde
 }
 
 // ---------- Anthropic → Responses ----------
-
-interface AnthropicRequest {
-  model: string;
-  system?: string | Array<{ type: string; text?: string }>;
-  messages?: AnthropicMessage[];
-  max_tokens?: number;
-  temperature?: number;
-  top_p?: number;
-  tools?: Array<{
-    name: string;
-    description?: string;
-    input_schema?: Record<string, unknown>;
-  }>;
-  tool_choice?: unknown;
-  stream?: boolean;
-  thinking?: { type: string; budget_tokens?: number };
-  metadata?: { user_id?: string };
-}
 
 export function anthropicToResponsesRequest(
   body: Record<string, unknown>,

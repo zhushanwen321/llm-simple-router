@@ -368,10 +368,30 @@ export function responsesToChatRequest(
 
 流式转换（`stream-*.ts`）和 patch 层（`patch/*.ts`）的数据来自上游 JSON.parse，结构不完全可控。这些文件中 `Record<string, unknown>` 是合理的，但仍应优先用具体类型。
 
+**规则 5：`Record<string, unknown>` 白名单**
+
+以下场景中 `Record<string, unknown>` 是合理且允许的，不视为类型安全违规：
+
+| 场景 | 文件 | 说明 |
+|------|------|------|
+| 外部接口签名 | `format/types.ts` | `FormatConverter` 接口定义 `body: Record<string, unknown>`，所有转换函数签名必须兼容 |
+| 输出对象构造 | `request-*.ts`, `response-*.ts` | 转换函数返回 `Record<string, unknown>`，输出对象的字段通过 `result.xxx = ...` 赋值 |
+| 中间集合 | `request-bridge-responses.ts` | `pendingFnCalls`、`chatTools` 等混合了多种 tool_call 结构的集合 |
+| 流式 SSE payload | `stream-*.ts`（6 个文件） | SSE `data:` 字段经 `JSON.parse` 解析，结构由上游决定 |
+| Patch 层 | `patch/*.ts` | 处理上游响应，字段访问多为单值 `as string`/`as number` |
+| 错误格式转换 | `response-transform.ts` `transformErrorResponse` | 错误响应结构多变，用 `Record<string, unknown>` 解构 |
+| tool_choice 映射 | `mapToolChoice*` 函数 | tool_choice 格式跨 API 差异大，参数保持 `unknown` |
+| PSF 扩展字段 | `request-transform.ts` | Anthropic `signature` 等非标准字段需 `as unknown as Record<string, unknown>` 写入 |
+| provider_meta | `provider-meta.ts` | 跨 provider 的元数据结构不定型 |
+| 插件接口 | `plugin-types.ts` | 插件数据结构由外部定义，无法预知 |
+| usage 映射 | `usage-mapper.ts` | usage 字段跨 API 格式差异大，保持灵活 |
+| sanitize 工具 | `sanitize.ts` | `parseToolArguments` 返回 `Record<string, unknown>`，因为 JSON.parse 结果类型不定 |
+
 **类型定义位置：**
 - Responses API 类型：`src/proxy/transform/types-responses.ts`
 - Chat Completions / Anthropic 类型：`src/proxy/transform/types.ts`
 - 新增 API 字段时必须同步更新对应的类型定义
+- 类型定义跨文件共享时，统一放在 `types.ts` 中（如 `AnthropicRequest`），禁止在各文件中重复定义同名接口
 
 ### 前端错误处理规范
 

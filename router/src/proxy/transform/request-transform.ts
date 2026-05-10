@@ -2,7 +2,7 @@ import { convertMessagesOA2Ant, convertMessagesAnt2OA } from "./message-mapper.j
 import { convertToolsOA2Ant, convertToolsAnt2OA, mapToolChoiceOA2Ant, mapToolChoiceAnt2OA } from "./tool-mapper.js";
 import { mapReasoningToThinking, mapThinkingToReasoning } from "./thinking-mapper.js";
 import { stripProviderMeta } from "./provider-meta.js";
-import type { ChatCompletionRequest, AnthropicMessage, AnthropicContentBlock } from "./types.js";
+import type { ChatCompletionRequest, AnthropicMessage, AnthropicContentBlock, AnthropicRequest } from "./types.js";
 
 const DEFAULT_MAX_TOKENS = 4096;
 const OA_KNOWN_FIELDS = new Set([
@@ -117,20 +117,7 @@ export function openaiToAnthropicRequest(body: Record<string, unknown>): Record<
 }
 
 export function anthropicToOpenAIRequest(body: Record<string, unknown>): Record<string, unknown> {
-  const req = body as unknown as {
-    model: string;
-    messages?: AnthropicMessage[];
-    system?: unknown;
-    max_tokens?: number;
-    stop_sequences?: string[];
-    temperature?: number;
-    top_p?: number;
-    stream?: boolean;
-    tools?: Array<{ name: string; description?: string; input_schema?: Record<string, unknown> }>;
-    tool_choice?: unknown;
-    thinking?: Record<string, unknown>;
-    metadata?: Record<string, unknown>;
-  };
+  const req = body as unknown as AnthropicRequest;
 
   const result: Record<string, unknown> = {};
   result.model = req.model;
