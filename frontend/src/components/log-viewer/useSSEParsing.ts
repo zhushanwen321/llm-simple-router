@@ -128,8 +128,9 @@ export function useSSEParsing(body: Ref<string | undefined>, isStream: boolean, 
     return { role, content, contentEventCount, finishReason, usage }
   })
 
-  // Anthropic SSE 原始事件解析
+  // Anthropic SSE 原始事件解析（非流式直接返回）
   const anthropicMessageStart = computed(() => {
+    if (!isStream) return null
     for (const ev of sseEvents.value) {
       if (ev.type !== 'data') continue
       const d = ev.data as Record<string, unknown>
@@ -146,6 +147,7 @@ export function useSSEParsing(body: Ref<string | undefined>, isStream: boolean, 
   })
 
   const anthropicContentBlockStarts = computed(() => {
+    if (!isStream) return []
     const results: { index: number; type: string }[] = []
     for (const ev of sseEvents.value) {
       if (ev.type !== 'data') continue
@@ -159,6 +161,7 @@ export function useSSEParsing(body: Ref<string | undefined>, isStream: boolean, 
   })
 
   const anthropicDeltaGroups = computed<DeltaGroup[]>(() => {
+    if (!isStream) return []
     const groups: Record<string, DeltaGroup> = {}
     for (const ev of sseEvents.value) {
       if (ev.type !== 'data') continue
@@ -183,6 +186,7 @@ export function useSSEParsing(body: Ref<string | undefined>, isStream: boolean, 
   })
 
   const anthropicMessageDelta = computed(() => {
+    if (!isStream) return null
     for (const ev of sseEvents.value) {
       if (ev.type !== 'data') continue
       const d = ev.data as Record<string, unknown>
@@ -199,11 +203,13 @@ export function useSSEParsing(body: Ref<string | undefined>, isStream: boolean, 
   })
 
   const anthropicMessageStop = computed(() => {
+    if (!isStream) return false
     return sseEvents.value.some((ev) => ev.type === 'data' && (ev.data as Record<string, unknown>).type === 'message_stop')
   })
 
-  // OpenAI SSE 原始事件解析
+  // OpenAI SSE 原始事件解析（非流式直接返回）
   const openaiSseRole = computed(() => {
+    if (!isStream) return null
     for (const ev of sseEvents.value) {
       if (ev.type !== 'data') continue
       const d = ev.data as Record<string, unknown>
@@ -215,6 +221,7 @@ export function useSSEParsing(body: Ref<string | undefined>, isStream: boolean, 
   })
 
   const openaiSseFirstContent = computed(() => {
+    if (!isStream) return null
     for (const ev of sseEvents.value) {
       if (ev.type !== 'data') continue
       const d = ev.data as Record<string, unknown>
@@ -226,6 +233,7 @@ export function useSSEParsing(body: Ref<string | undefined>, isStream: boolean, 
   })
 
   const openaiSseFinishReason = computed(() => {
+    if (!isStream) return null
     for (const ev of sseEvents.value) {
       if (ev.type !== 'data') continue
       const d = ev.data as Record<string, unknown>
@@ -237,6 +245,7 @@ export function useSSEParsing(body: Ref<string | undefined>, isStream: boolean, 
   })
 
   const openaiSseCollapsedCount = computed(() => {
+    if (!isStream) return 0
     let count = 0
     let foundFirstContent = false
     for (const ev of sseEvents.value) {
@@ -254,6 +263,7 @@ export function useSSEParsing(body: Ref<string | undefined>, isStream: boolean, 
   })
 
   const openaiSseUsage = computed(() => {
+    if (!isStream) return null
     for (let i = sseEvents.value.length - 1; i >= 0; i--) {
       const ev = sseEvents.value[i]
       if (ev.type !== 'data') continue

@@ -111,8 +111,10 @@
             <LogTableRow
               :log="log"
               :expanded="expandedRows.has(log.id)"
+              :copied-id="copiedId"
               @toggle-expand="toggleExpand"
               @open-detail="openLogDetail"
+              @copy="copyLogId"
             />
 
             <template v-if="expandedRows.has(log.id)">
@@ -130,7 +132,9 @@
                   :key="child.id"
                   :log="child"
                   :is-child="true"
+                  :copied-id="copiedId"
                   @open-detail="openLogDetail"
+                  @copy="copyLogId"
                 />
               </template>
             </template>
@@ -309,6 +313,8 @@ import LogTableRow from "@/components/logs/LogTableRow.vue";
 import { useLogFilters } from "@/composables/useLogFilters";
 import { useLogs } from "@/composables/useLogs";
 import { useLogRetention } from "@/composables/useLogRetention";
+import { useClipboard } from "@/composables/useClipboard";
+import { ref } from "vue";
 
 const { t } = useI18n();
 
@@ -375,6 +381,18 @@ const pageNumbers = computed(() => {
 
 const { retentionDays, retentionSaving, saveRetention, loadRetention } =
   useLogRetention();
+
+// 共享 clipboard：所有行复用同一个实例
+const { copy } = useClipboard();
+const copiedId = ref<string | null>(null);
+
+function copyLogId(id: string) {
+  copy(id);
+  copiedId.value = id;
+  setTimeout(() => {
+    if (copiedId.value === id) copiedId.value = null;
+  }, 2000);
+}
 
 let filterTimer: ReturnType<typeof setTimeout> | null = null;
 watch(

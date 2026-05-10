@@ -235,6 +235,10 @@ export function useDashboard() {
   async function refresh() {
     if (!selectedProvider.value) return
     if (periodTab.value === 'custom' && !(apiStartTime.value && apiEndTime.value)) return
+    // 相同参数 5s 内不重复请求
+    const key = watchKey.value
+    const now = Date.now()
+    if (key === lastRefreshKey && now - lastRefreshTime < CACHE_TTL) return
     loading.value = true
     try {
       const [statsRes, tpsRes, inputRes, outputRes, summaryRes] = await Promise.allSettled([
@@ -284,10 +288,25 @@ export function useDashboard() {
       toast.error(getApiMessage(e, t('dashboard.loadDashboardFailed')))
     } finally {
       loading.value = false
+      lastRefreshKey = key
+      lastRefreshTime = Date.now()
     }
   }
 
   // --- Watchers ---
+
+  // 统一 watch key：所有影响 refresh 的参数
+  const watchKey = computed(() => JSON.stringify({
+    periodTab: periodTab.value,
+    selectedProvider: selectedProvider.value,
+    modelFilter: modelFilter.value,
+    keyFilter: keyFilter.value,
+    clientType: clientType.value,
+    customStart: customStart.value,
+    customEnd: customEnd.value,
+  }))
+
+  // 副作用：离开自定义日期模式时清空日期（间接通过 watchKey 变化触发 refresh）
   watch(periodTab, () => {
     if (periodTab.value !== 'custom') {
       customStart.value = ''
@@ -295,33 +314,31 @@ export function useDashboard() {
     }
   })
 
-  // 切换 provider 时，如果当前模型不在新 provider 下，重置为 all
+  // 副作用：切换 provider 时重置 modelFilter（间接通过 watchKey 变化触发 refresh）
   watch(selectedProvider, () => {
     if (modelFilter.value !== 'all' && !modelOptions.value.includes(modelFilter.value)) {
       modelFilter.value = 'all'
     }
   })
 
-  // When period tab changes, reload sorting data and select best provider
-  watch(periodTab, () => {
-    if (providers.value.length > 0) {
-      loadProviderOutputTokens().then(() => refresh())
-    }
-  })
-
+  // 单一 debounced watch：watchKey 变化时 300ms 后 refresh
   let refreshTimer: ReturnType<typeof setTimeout> | null = null
-  watch([selectedProvider, modelFilter, keyFilter, clientType], () => {
+  watch(watchKey, () => {
     if (refreshTimer) clearTimeout(refreshTimer)
     refreshTimer = setTimeout(() => refresh(), 300)
   })
 
-  // Custom date range: trigger refresh on both start and end filled
-  watch([customStart, customEnd], () => {
-    if (periodTab.value === 'custom' && customStart.value && customEnd.value) {
-      if (refreshTimer) clearTimeout(refreshTimer)
-      refreshTimer = setTimeout(() => refresh(), 300)
+  // periodTab 变化时重新加载 provider 排序数据
+  watch(periodTab, () => {
+    if (providers.value.length > 0) {
+      loadProviderOutputTokens()
     }
   })
+
+  // --- Refresh 去重缓存 ---
+  const CACHE_TTL = 5000
+  let lastRefreshKey = ''
+  let lastRefreshTime = 0
 
   // --- Watch theme changes to re-render charts ---
   let stopWatchTheme: (() => void) | null = null

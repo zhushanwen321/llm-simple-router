@@ -49,7 +49,7 @@ export function extractBlocks(content: unknown): Block[] {
   if (Array.isArray(content)) {
     return content.flatMap((item: unknown) => {
       const block = item as Record<string, unknown>
-      const blockType = String(block.type || 'unknown')
+      const blockType = typeof block.type === 'string' ? block.type : 'unknown'
 
       if (blockType === 'text' && typeof block.text === 'string') {
         return parseTaggedContent(block.text)
@@ -58,7 +58,7 @@ export function extractBlocks(content: unknown): Block[] {
         return [{ type: 'image', text: '' }]
       }
       if (blockType === 'tool_use') {
-        const name = String(block.name || '')
+        const name = typeof block.name === 'string' ? block.name : ''
         const input = block.input ? JSON.stringify(block.input, null, JSON_INDENT) : ''
         return [{ type: 'tool_use', text: input, label: name || undefined }]
       }
@@ -74,10 +74,10 @@ export function extractBlocks(content: unknown): Block[] {
         return [{ type: 'tool_result', text }]
       }
       if (blockType === 'thinking') {
-        return [{ type: 'thinking', text: String(block.thinking || '') }]
+        return [{ type: 'thinking', text: typeof block.thinking === 'string' ? block.thinking : '' }]
       }
       return [{ type: blockType, text: typeof block.text === 'string' ? block.text : '' }]
     })
   }
-  return [{ type: 'text', text: String(content ?? '') }]
+  return [{ type: 'text', text: typeof content === 'string' ? content : content != null ? JSON.stringify(content) : '' }]
 }
