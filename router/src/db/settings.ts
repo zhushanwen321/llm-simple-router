@@ -1,12 +1,28 @@
 import Database from "better-sqlite3";
 
+// TTL 缓存：WeakMap 按 db 实例隔离，确保测试中 :memory: db 互不干扰
+const settingsCache = new WeakMap<Database.Database, Map<string, { value: string | null; expiresAt: number }>>();
+const CACHE_TTL_MS = 30_000;
+
 export function getSetting(db: Database.Database, key: string): string | null {
+  let cache = settingsCache.get(db);
+  if (!cache) {
+    cache = new Map();
+    settingsCache.set(db, cache);
+  }
+  const cached = cache.get(key);
+  if (cached && Date.now() < cached.expiresAt) return cached.value;
+
   const row = db.prepare("SELECT value FROM settings WHERE key = ?").get(key) as { value: string } | undefined;
-  return row?.value ?? null;
+  const value = row?.value ?? null;
+  cache.set(key, { value, expiresAt: Date.now() + CACHE_TTL_MS });
+  return value;
 }
 
 export function setSetting(db: Database.Database, key: string, value: string): void {
   db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)").run(key, value);
+  const cache = settingsCache.get(db);
+  if (cache) cache.delete(key);
 }
 
 export function isInitialized(db: Database.Database): boolean {
