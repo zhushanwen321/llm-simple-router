@@ -95,6 +95,7 @@ export async function buildApp(
   app: FastifyInstance;
   db: Database.Database;
   usageWindowTracker: UsageWindowTracker;
+  tracker: RequestTracker;
   close: () => Promise<void>;
 }> {
   const config = options?.config ?? getBaseConfig();
@@ -423,6 +424,7 @@ export async function buildApp(
     app,
     db,
     usageWindowTracker,
+    tracker,
     close,
   };
 }

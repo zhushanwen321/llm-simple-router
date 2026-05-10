@@ -5,6 +5,8 @@ import { initDatabase } from "../src/db/index.js";
 import { setSetting } from "../src/db/settings.js";
 import { hashPassword } from "../src/utils/password.js";
 import { ServiceContainer } from "../src/core/container.js";
+import type { RequestTracker } from "../src/core/monitor/index.js";
+import type { ActiveRequest } from "../src/core/monitor/types.js";
 
 
 const TEST_ENCRYPTION_KEY =
@@ -46,6 +48,7 @@ describe("Admin Monitor API", () => {
   let db: ReturnType<typeof initDatabase>;
   let close: () => Promise<void>;
   let cookie: string;
+  let tracker: RequestTracker;
 
   beforeEach(async () => {
     db = initDatabase(":memory:");
@@ -53,6 +56,7 @@ describe("Admin Monitor API", () => {
     const result = await buildApp({ config: makeConfig() as any, db });
     app = result.app;
     close = result.close;
+    tracker = result.tracker;
     cookie = await login(app);
   });
 
@@ -175,6 +179,103 @@ describe("Admin Monitor API", () => {
         url: "/admin/api/monitor/request/some-id",
       });
       expect(res.statusCode).toBe(401);
+    });
+  });
+
+  // --- 接口级集成测试：recent 性能优化后 clientRequest/upstreamRequest 分离 ---
+
+  function createTestActiveRequest(overrides?: Partial<ActiveRequest>): ActiveRequest {
+    return {
+      id: "req-integ-1",
+      apiType: "openai",
+      model: "gpt-4",
+      providerId: "provider-test",
+      providerName: "TestProvider",
+      isStream: true,
+      startTime: Date.now(),
+      status: "pending",
+      retryCount: 0,
+      attempts: [],
+      clientRequest: JSON.stringify({ model: "gpt-4", messages: [{ role: "user", content: "hello" }] }),
+      upstreamRequest: JSON.stringify({ model: "gpt-4", messages: [{ role: "user", content: "hello" }], stream: true }),
+      ...overrides,
+    };
+  }
+
+  describe("GET /admin/api/monitor/recent — completed 请求不含大字段", () => {
+    it("completed 请求不包含 clientRequest 和 upstreamRequest", async () => {
+      tracker.start(createTestActiveRequest({ id: "req-completed-no-large" }));
+      tracker.complete("req-completed-no-large", { status: "completed", statusCode: 200 });
+
+      const res = await app.inject({
+        method: "GET",
+        url: "/admin/api/monitor/recent",
+        headers: { cookie },
+      });
+      expect(res.statusCode).toBe(200);
+
+      const recent = res.json().data as ActiveRequest[];
+      expect(recent.length).toBeGreaterThanOrEqual(1);
+
+      const found = recent.find((r) => r.id === "req-completed-no-large");
+      expect(found).toBeDefined();
+      expect(found!.clientRequest).toBeUndefined();
+      expect(found!.upstreamRequest).toBeUndefined();
+    });
+  });
+
+  describe("GET /admin/api/monitor/request/:id — completed 请求合并 completedDetails", () => {
+    it("completed 请求仍返回 clientRequest 和 upstreamRequest", async () => {
+      const clientBody = JSON.stringify({ model: "gpt-4", messages: [{ role: "user", content: "test" }] });
+      const upstreamBody = JSON.stringify({ model: "gpt-4", messages: [{ role: "user", content: "test" }], stream: true });
+
+      tracker.start(createTestActiveRequest({
+        id: "req-detail-merge",
+        clientRequest: clientBody,
+        upstreamRequest: upstreamBody,
+      }));
+      tracker.complete("req-detail-merge", { status: "completed", statusCode: 200 });
+
+      const res = await app.inject({
+        method: "GET",
+        url: "/admin/api/monitor/request/req-detail-merge",
+        headers: { cookie },
+      });
+      expect(res.statusCode).toBe(200);
+
+      const data = res.json().data as ActiveRequest;
+      expect(data.id).toBe("req-detail-merge");
+      expect(data.status).toBe("completed");
+      expect(data.clientRequest).toBe(clientBody);
+      expect(data.upstreamRequest).toBe(upstreamBody);
+    });
+  });
+
+  describe("GET /admin/api/monitor/request/:id — pending 请求返回完整数据", () => {
+    it("pending 请求保留 clientRequest 和 upstreamRequest", async () => {
+      const clientBody = JSON.stringify({ model: "claude-3", messages: [{ role: "user", content: "pending-test" }] });
+      const upstreamBody = JSON.stringify({ model: "claude-3", messages: [{ role: "user", content: "pending-test" }], stream: false });
+
+      tracker.start(createTestActiveRequest({
+        id: "req-pending-full",
+        apiType: "anthropic",
+        model: "claude-3",
+        clientRequest: clientBody,
+        upstreamRequest: upstreamBody,
+      }));
+
+      const res = await app.inject({
+        method: "GET",
+        url: "/admin/api/monitor/request/req-pending-full",
+        headers: { cookie },
+      });
+      expect(res.statusCode).toBe(200);
+
+      const data = res.json().data as ActiveRequest;
+      expect(data.id).toBe("req-pending-full");
+      expect(data.status).toBe("pending");
+      expect(data.clientRequest).toBe(clientBody);
+      expect(data.upstreamRequest).toBe(upstreamBody);
     });
   });
 });
