@@ -18,7 +18,7 @@ import { SemaphoreQueueFullError, SemaphoreTimeoutError } from "../../core/error
 import { getProviderById, updateLogClientStatus, insertRequestLog, updateLogStreamContent } from "../../db/index.js";
 import { getSetting } from "../../db/settings.js";
 import { decrypt } from "../../utils/crypto.js";
-import { resolveMapping } from "../routing/mapping-resolver.js";
+import { resolveMapping, filterExcluded } from "../routing/mapping-resolver.js";
 import { applyOverflowRedirect } from "../routing/overflow.js";
 import { getConfig } from "../../config/index.js";
 import type { ProxyErrorFormatter } from "../proxy-core.js";
@@ -35,7 +35,7 @@ import { loadEnhancementConfig } from "../routing/enhancement-config.js";
 import { extractFailedToolResults, getTransportStatusCode, serializeBlocksForStorage } from "./proxy-handler-utils.js";
 import type { FailedToolResult } from "./proxy-handler-utils.js";
 import { logToolErrors } from "../tool-error-logger.js";
-import type { Target } from "../../core/types.js";
+import type { Target, ResolveResult, ConcurrencyOverride } from "../../core/types.js";
 import type { RawHeaders } from "../types.js";
 import type { PipelineContext } from "../pipeline/types.js";
 import { PipelineAbort } from "../pipeline/types.js";
@@ -183,6 +183,10 @@ export async function executeFailoverLoop(
   const decryptedApiKeys = new Map<string, string>();
   const encryptionKey = getSetting(db, "encryption_key");
 
+  // BP-H2: 请求级缓存 — resolveMapping 的 DB 查询结果在 failover 迭代间不变，只 excludeTargets 变化
+  let cachedTargets: Target[] | undefined;
+  let cachedConcurrencyOverride: ConcurrencyOverride | undefined;
+
   let failoverIteration = 0;
 
   while (true) {
@@ -215,8 +219,21 @@ export async function executeFailoverLoop(
     };
 
     // --- Route ---
-    const resolveResult = resolveMapping(db, clientModel, { now: new Date(), excludeTargets });
-    request.log.debug({ logId, model: clientModel, apiType: ctx.apiType, isStream, action: "resolve_mapping", resolved: !!resolveResult });
+    // BP-H2: 后续迭代使用缓存的 targets，只做 filterExcluded，不查 DB
+    let resolveResult: ResolveResult | null;
+    if (cachedTargets) {
+      const filtered = filterExcluded(cachedTargets, excludeTargets);
+      resolveResult = filtered.length > 0
+        ? { target: filtered[0], concurrency_override: cachedConcurrencyOverride, targetCount: cachedTargets.length }
+        : null;
+    } else {
+      resolveResult = resolveMapping(db, clientModel, { now: new Date(), excludeTargets });
+      if (resolveResult?.allTargets) {
+        cachedTargets = resolveResult.allTargets;
+        cachedConcurrencyOverride = resolveResult.concurrency_override;
+      }
+    }
+    request.log.debug({ logId, model: clientModel, apiType: ctx.apiType, isStream, action: "resolve_mapping", resolved: !!resolveResult, cached: !!cachedTargets });
 
     if (!resolveResult) {
       if (excludeTargets.length > 0) {

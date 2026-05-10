@@ -65,7 +65,7 @@ function parseConcurrencyRule(concurrencyRule: string | null): ConcurrencyOverri
 }
 
 /** 过滤掉被排除的 targets（failover 循环中已尝试过的） */
-function filterExcluded(targets: Target[], excludeTargets: Target[] | undefined): Target[] {
+export function filterExcluded(targets: Target[], excludeTargets: Target[] | undefined): Target[] {
   if (!excludeTargets || excludeTargets.length === 0) return targets;
   const excludedSet = new Set(excludeTargets.map(e => `${e.provider_id}:${e.backend_model}`));
   return targets.filter(t =>
@@ -190,5 +190,6 @@ export function resolveMapping(
     target: filtered[0],
     concurrency_override: concurrencyOverride,
     targetCount: activeTargets.length,
+    allTargets: activeTargets,
   };
 }

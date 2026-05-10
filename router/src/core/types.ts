@@ -37,6 +37,8 @@ export interface ResolveResult {
   concurrency_override?: ConcurrencyOverride;
   /** 活跃规则（schedule 或 base）中的 target 总数，用于 failover 判断 */
   targetCount: number;
+  /** 排除前的完整 target 列表，用于请求级缓存（BP-H2） */
+  allTargets?: Target[];
 }
 
 // ========== 来自原 proxy/types.ts 公共部分 ==========
