@@ -15,7 +15,7 @@
 | BP-C2 | CRITICAL | CacheEstimator 重复 tokenize，同一请求最多 4-6 次 BPE 编码 | 长对话 P50 降低 30-100ms | ✅ |
 | BP-C3 | CRITICAL | failover 循环每次迭代 `structuredClone(body)` 深拷贝 | 正常请求 P50 降低 5-50ms | ✅ |
 | BP-H1 | HIGH | `loadEnhancementConfig()` 每次请求查 DB | 每请求减少 2-4 次 SQLite 查询 | ✅ |
-| BP-H2 | HIGH | `resolveMapping()` 每次迭代查 DB，无缓存 | 减少 90%+ mapping 查询 |
+| BP-H2 | HIGH | `resolveMapping()` 每次迭代查 DB，无缓存 | 减少 90%+ mapping 查询 | ✅ |
 | BP-H3 | HIGH | API Key 每次 failover 迭代重复 AES 解密 | failover 场景减少冗余密码学操作 | ✅ |
 | BP-H4 | HIGH | 日志 `JSON.stringify` 请求体在循环内重复 3 次 | 大 body P50 降低 3-15ms | ✅ |
 | BP-H5 | HIGH | `excludedTargets` 用 `Array.some()` 做 O(N×M) 过滤 | 10+ targets 场景有意义 | ✅ |
