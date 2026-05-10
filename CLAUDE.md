@@ -623,3 +623,33 @@ bash ~/.claude/skills/merge-worktree/merge-worktree.sh <branch>
 - 前端 `<style scoped>` 内只允许 `@apply`，禁止手写 CSS 选择器
 - `structuredClone()` 替代 `JSON.parse(JSON.stringify())` 做深拷贝
 - headers 写入日志前必须脱敏（authorization、cookie、x-api-key）
+
+## Dev-Flow 流程合规规则
+
+以下规则由 2026-05-10 自适应并发控制器需求的复盘产出，适用于所有后续 dev-flow 执行。
+
+### 评审不可跳过（P0）
+
+dev-flow 阶段 4（编码评审）和阶段 6（测试评审）标记为 **MUST NOT SKIP**。
+- 主 agent 必须拒绝用户的跳过请求，并说明理由（评审是质量门禁）
+- 如用户坚持跳过，要求书面确认（commit message 或 PR comment），且在合并前必须补跑
+- 违反后果：本次 PR #123 在评审前合并，导致 MUST FIX bug（冷却期累积）进入 main
+
+### 合并前评审门禁（P0）
+
+PR 合并前必须满足以下三个条件，缺一不可：
+1. 编码评审通过（`.xyz-harness/changes/reviews/code_review_v{N}.md` 存在且无未解决 MUST FIX）
+2. 测试评审通过（`.xyz-harness/changes/reviews/test_review_v{N}.md` 存在且无未解决 MUST FIX）
+3. CI 通过（tsc + vitest + eslint 全部零错误）
+
+### 算法类需求行为表（P1）
+
+spec 阶段对算法/公式类需求，必须产出完整的行为表（输入→期望输出映射），作为 TDD 的测试基准。
+
+- Spec 层：算法类需求必须产出行为表
+- Plan 层：将算法拆为两步——先纯函数（基于行为表 TDD），再状态机（可先实现后测试，但需 plan 中明确说明）
+- 编码层：纯函数必须 TDD
+
+### 评审修复走 PR（P1）
+
+评审发现的 MUST FIX 修复应通过 PR 流程，禁止直接 push 到已合并的分支。如果分支已合并，应创建 hotfix 分支。

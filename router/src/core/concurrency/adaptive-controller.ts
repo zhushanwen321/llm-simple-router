@@ -128,11 +128,12 @@ export class AdaptiveController {
 
   private transitionSuccess(providerId: string, entry: AdaptiveEntry, result: AdaptiveResult): void {
     const s = entry.state;
+
+    // 冷却期内不累计成功计数
+    if (Date.now() < s.cooldownUntil) return;
+
     s.consecutiveSuccesses++;
     s.consecutiveFailures = 0;
-
-    // 冷却期内不累计
-    if (Date.now() < s.cooldownUntil) return;
 
     // 利用率信号：请求排过队说明 limit 被实际触及
     if (result.wasQueued) {
