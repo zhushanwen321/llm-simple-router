@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { RequestTracker } from "../../src/monitor/request-tracker.js";
-import type { ActiveRequest, SSEClient } from "../../src/monitor/types.js";
+import { RequestTracker } from "../../../src/core/monitor/request-tracker.js";
+import type { ActiveRequest, SSEClient } from "../../../src/core/monitor/types.js";
 
 // --- Helpers ---
 
