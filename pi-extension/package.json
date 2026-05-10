@@ -1,15 +1,12 @@
 {
   "name": "pi-extension-router",
   "version": "0.1.0",
-  "description": "Pi coding agent extension providing concurrency control, loop prevention, and monitoring from @llm-router/core",
+  "description": "Pi coding agent extension for llm-simple-router: session ID injection",
   "type": "module",
   "main": "./dist/index.js",
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist"
-  },
-  "dependencies": {
-    "@llm-router/core": "*"
   },
   "peerDependencies": {
     "@mariozechner/pi-coding-agent": ">=0.70.0"

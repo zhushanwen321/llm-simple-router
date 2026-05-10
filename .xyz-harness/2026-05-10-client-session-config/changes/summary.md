@@ -43,3 +43,14 @@
   - router/src/proxy/hooks/builtin/enhancement-preprocess.ts — sessionId 改为从 metadata 获取
 - 摘要：实现客户端 session header 配置化的 DB 层、Admin API、检测逻辑重构。14 个目标测试全部通过，1174 个全量测试通过，build + lint 无错误。
 - 时间：2026-05-10T13:08:00+08:00
+
+## 阶段 3 - 编码实现 (Task 5)
+
+- 状态：done
+- 变更文件：
+  - pi-extension/src/index.ts — 重写为仅保留 session_id 注入（before_provider_request 事件）
+  - pi-extension/src/config.ts — 删除
+  - pi-extension/config.example.json — 删除
+  - pi-extension/package.json — 移除 @llm-router/core 依赖
+- 摘要：精简 pi-extension，移除并发控制/循环防护/监控代码，只保留 session_id 注入。注意 pi extension API 不支持直接修改 HTTP headers，当前通过 payload 注入 session_id。
+- 时间：2026-05-10T14:00:00+08:00
