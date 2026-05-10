@@ -22,8 +22,8 @@ import { adminTransformRuleRoutes } from "./transform-rules.js";
 import { adminScheduleRoutes } from "./schedules.js";
 import { hookRegistry } from "../proxy/pipeline/hook-registry.js";
 import type { StateRegistry } from "../core/registry.js";
-import type { RequestTracker } from "@llm-router/core/monitor";
-import type { AdaptiveController } from "@llm-router/core/concurrency";
+import type { RequestTracker } from "../core/monitor/index.js";
+import type { AdaptiveController } from "../core/concurrency/index.js";
 import type { ProxyAgentFactory } from "../proxy/transport/proxy-agent.js";
 
 interface AdminRoutesOptions {

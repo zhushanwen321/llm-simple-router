@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { RuntimeCollector } from "../../src/monitor/runtime-collector.js";
-import type { RuntimeMetrics } from "../../src/monitor/types.js";
+import { RuntimeCollector } from "../../../src/core/monitor/runtime-collector.js";
+import type { RuntimeMetrics } from "../../../src/core/monitor/types.js";
 
 describe("RuntimeCollector", () => {
   let collector: RuntimeCollector;

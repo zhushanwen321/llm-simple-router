@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { SessionTracker } from "../../src/loop-prevention/session-tracker.js";
+import { SessionTracker } from "../../../src/core/loop-prevention/session-tracker.js";
 
 describe("SessionTracker", () => {
   beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(1_000_000); });

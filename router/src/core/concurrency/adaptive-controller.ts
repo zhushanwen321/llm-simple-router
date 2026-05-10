@@ -12,6 +12,7 @@ const DECREASE_STEP = 2;
 const COOLDOWN_MS = 30_000;
 const RATE_LIMIT_STATUS = 429;
 const HALF_DIVISOR = 2;
+const HTTP_SERVER_ERROR_MIN = 500;
 
 const ADAPTIVE_MIN = 1;
 
@@ -129,7 +130,7 @@ export class AdaptiveController {
     // - 5xx: 服务端错误（可能过载），计入退避
     // - undefined: 网络异常，计入退避
     // - 2xx/4xx 且 retryRuleMatched!=true: 非并发问题（如 upstream 200 body error 但未命中重试规则），不触发退避
-    if (!result.retryRuleMatched && statusCode !== undefined && statusCode !== RATE_LIMIT_STATUS && statusCode < 500) {
+    if (!result.retryRuleMatched && statusCode !== undefined && statusCode !== RATE_LIMIT_STATUS && statusCode < HTTP_SERVER_ERROR_MIN) {
       this.logger?.debug?.({ providerId, statusCode, action: "failure_ignored" }, "Adaptive: non-concurrency failure ignored");
       return;
     }

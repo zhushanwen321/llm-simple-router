@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from "vitest";
-import { RequestTracker } from "../../src/monitor/request-tracker.js";
-import { StatsAggregator } from "../../src/monitor/stats-aggregator.js";
-import { RuntimeCollector } from "../../src/monitor/runtime-collector.js";
-import { SemaphoreManager } from "../../src/concurrency/semaphore.js";
-import type { ActiveRequest, SSEClient } from "../../src/monitor/types.js";
+import { RequestTracker } from "../../../src/core/monitor/request-tracker.js";
+import { StatsAggregator } from "../../../src/core/monitor/stats-aggregator.js";
+import { RuntimeCollector } from "../../../src/core/monitor/runtime-collector.js";
+import { SemaphoreManager } from "../../../src/core/concurrency/semaphore.js";
+import type { ActiveRequest, SSEClient } from "../../../src/core/monitor/types.js";
 
 // --- Mocks ---
 

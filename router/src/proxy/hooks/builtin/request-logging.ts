@@ -15,7 +15,7 @@ import Database from "better-sqlite3";
 import { SERVICE_KEYS, type ServiceContainer } from "../../../core/container.js";
 import type { PipelineHook, PipelineContext } from "../../pipeline/types.js";
 import type { LogFileWriter } from "../../../storage/log-file-writer.js";
-import type { RequestTracker } from "@llm-router/core/monitor";
+import type { RequestTracker } from "../../../core/monitor/index.js";
 import type { TransportResult } from "../../types.js";
 import {
   logResilienceResult,

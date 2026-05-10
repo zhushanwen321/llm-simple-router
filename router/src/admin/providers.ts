@@ -7,8 +7,8 @@ import { getAllProviders, getProviderById, createProvider, updateProvider, delet
 import { encrypt, decrypt } from "../utils/crypto.js";
 import { getSetting } from "../db/settings.js";
 import type { StateRegistry } from "../core/registry.js";
-import type { AdaptiveController } from "@llm-router/core/concurrency";
-import type { RequestTracker } from "@llm-router/core/monitor";
+import type { AdaptiveController } from "../core/concurrency/index.js";
+import type { RequestTracker } from "../core/monitor/index.js";
 import type { ProxyAgentFactory } from "../proxy/transport/proxy-agent.js";
 import { HTTP_CREATED, HTTP_NOT_FOUND, HTTP_CONFLICT, HTTP_BAD_REQUEST, HTTP_OK } from "./constants.js";
 import { API_CODE, apiError } from "./api-response.js";

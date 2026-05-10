@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { StatsAggregator } from "../../src/monitor/stats-aggregator.js";
-import type { StatsSnapshot } from "../../src/monitor/types.js";
+import { StatsAggregator } from "../../../src/core/monitor/stats-aggregator.js";
+import type { StatsSnapshot } from "../../../src/core/monitor/types.js";
 
 describe("StatsAggregator", () => {
   let agg: StatsAggregator;

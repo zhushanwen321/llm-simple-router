@@ -9,6 +9,7 @@ import type {
   ProviderConcurrencySnapshot,
   RuntimeMetrics,
   StatsSnapshot,
+  StreamMetricsSnapshot,
 } from "./types.js";
 import type { SSEClient } from "./types.js";
 
@@ -195,7 +196,7 @@ export class RequestTracker {
     req.streamMetrics = {
       ...req.streamMetrics,
       cacheReadTokens,
-    } as any;
+    } as StreamMetricsSnapshot;
     this.broadcast("request_complete", req);
   }
 
@@ -311,8 +312,8 @@ export class RequestTracker {
     for (const client of clients) {
       try {
         if (!client.writableEnded) client.end();
-      } catch {
-        // 忽略已关闭的连接
+      } catch { // eslint-disable-line taste/no-silent-catch
+        /* 忽略已关闭的连接 */
       }
     }
   }

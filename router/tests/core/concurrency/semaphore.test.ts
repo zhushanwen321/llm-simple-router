@@ -3,7 +3,7 @@ import {
   SemaphoreManager,
   SemaphoreQueueFullError,
   SemaphoreTimeoutError,
-} from "../../src/concurrency/semaphore.js";
+} from "../../../src/core/concurrency/semaphore.js";
 
 describe("SemaphoreManager", () => {
   let mgr: SemaphoreManager;

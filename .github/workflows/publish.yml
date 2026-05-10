@@ -38,17 +38,12 @@ jobs:
           echo "OLD_VERSION=$OLD_VERSION" >> $GITHUB_ENV
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
 
-      # ── 步骤 2: 更新 core 版本到相同版本号 ──────────
-      - name: Sync core version
-        run: |
-          jq --arg v "${{ env.NEW_VERSION }}" '.version = $v' core/package.json > tmp.json && mv tmp.json core/package.json
-
-      # ── 步骤 3: 提交 + 打 tag ────────────────────────
+      # ── 步骤 2: 提交 + 打 tag ────────────────────────
       - name: Commit and tag
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add router/package.json core/package.json package-lock.json
+          git add router/package.json package-lock.json
           git commit -m "chore: bump version to ${{ env.NEW_VERSION }}"
           git tag v${{ env.NEW_VERSION }}
           git push origin main --tags
@@ -63,27 +58,20 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # ── 步骤 5: 构建 ────────────────────────────────
+      # ── 步骤 4: 构建 ────────────────────────────────
       - name: Build
         run: |
           npm ci
-          cd core && npx tsc
-          cd ../router && npm run build
+          cd router && npm run build
           cd ../frontend && npm run build
 
-      # ── 步骤 6: Publish @llm-router/core ─────────────
-      - name: Publish @llm-router/core to npm
-        run: |
-          npm config set //registry.npmjs.org/:_authToken ${{ secrets.NPM_TOKEN }}
-          cd core && npm publish --access public
-
-      # ── 步骤 7: Publish llm-simple-router ────────────
+      # ── 步骤 5: Publish llm-simple-router ────────────
       - name: Publish llm-simple-router to npm
         run: |
           npm config set //registry.npmjs.org/:_authToken ${{ secrets.NPM_TOKEN }}
           cd router && npm publish
 
-      # ── 步骤 8: Docker 镜像 ─────────────────────────
+      # ── 步骤 6: Docker 镜像 ─────────────────────────
       - uses: docker/login-action@v4
         with:
           registry: ghcr.io
@@ -107,18 +95,16 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-      # ── 步骤 9: Release Asset ───────────────────────
+      # ── 步骤 7: Release Asset ───────────────────────
       - name: Prepare and upload dist archive
         run: |
-          mkdir -p package/dist/db/migrations package/core
+          mkdir -p package/dist/db/migrations package/frontend-dist
           mkdir -p package/frontend-dist && cp -r frontend/dist/* package/frontend-dist/
           cp -r router/dist/ package/dist/
           cp -r router/src/db/migrations/ package/dist/db/migrations/
           cp router/package.json package/
           cp package-lock.json package/
           cp README.md package/
-          cp core/package.json package/core/
-          cp -r core/dist/ package/core/dist/
           (cd package && npm ci --omit=dev 2>/dev/null || npm install --production 2>/dev/null || true)
           tar czf llm-simple-router-linux-x64.tar.gz -C package .
           gh release upload v${{ env.NEW_VERSION }} llm-simple-router-linux-x64.tar.gz --clobber

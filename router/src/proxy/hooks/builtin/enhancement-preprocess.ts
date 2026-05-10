@@ -10,7 +10,7 @@
  */
 import { HTTP_UNPROCESSABLE_ENTITY, HTTP_CLIENT_CLOSED } from "../../../core/constants.js";
 import { SERVICE_KEYS, type ServiceContainer } from "../../../core/container.js";
-import { ToolLoopGuard, type SessionTracker } from "@llm-router/core/loop-prevention";
+import { ToolLoopGuard, type SessionTracker } from "../../../core/loop-prevention/index.js";
 import Database from "better-sqlite3";
 import type { PipelineHook, PipelineContext } from "../../pipeline/types.js";
 import { PipelineAbort } from "../../pipeline/types.js";

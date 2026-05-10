@@ -8,7 +8,7 @@ import { insertSuccessLog, type FailoverContext } from "./log-helpers.js";
 import { MetricsExtractor } from "../metrics/metrics-extractor.js";
 import { estimateInputTokens } from "../utils/token-counter.js";
 import { cacheEstimator } from "../routing/cache-estimator.js";
-import type { RequestTracker } from "@llm-router/core/monitor";
+import type { RequestTracker } from "../core/monitor/index.js";
 import { getTokenEstimationEnabled } from "../db/settings.js";
 import type { FastifyRequest } from "fastify";
 import type { ResilienceAttempt } from "../core/types.js";

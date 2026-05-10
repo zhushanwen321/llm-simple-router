@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { NGramLoopDetector } from "../../src/loop-prevention/ngram-detector.js";
+import { NGramLoopDetector } from "../../../src/core/loop-prevention/ngram-detector.js";
 
 describe("NGramLoopDetector", () => {
   const config = { n: 6, windowSize: 1000, repeatThreshold: 5 };

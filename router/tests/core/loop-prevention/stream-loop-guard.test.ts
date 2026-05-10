@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-import { StreamLoopGuard } from "../../src/loop-prevention/stream-loop-guard.js";
-import { NGramLoopDetector } from "../../src/loop-prevention/ngram-detector.js";
+import { StreamLoopGuard } from "../../../src/core/loop-prevention/stream-loop-guard.js";
+import { NGramLoopDetector } from "../../../src/core/loop-prevention/ngram-detector.js";
 
 describe("StreamLoopGuard", () => {
   const config = { enabled: true, detectorConfig: { n: 6, windowSize: 1000, repeatThreshold: 5 } };

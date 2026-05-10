@@ -1,8 +1,8 @@
-// @llm-router/core — unified re-export
+// src/core/index.ts — unified re-export
 // Individual sub-path imports also available:
-//   @llm-router/core/concurrency
-//   @llm-router/core/loop-prevention
-//   @llm-router/core/monitor
+//   ./concurrency
+//   ./loop-prevention
+//   ./monitor
 
 export { SemaphoreQueueFullError, SemaphoreTimeoutError } from "./errors.js";
 export type { Logger } from "./types.js";

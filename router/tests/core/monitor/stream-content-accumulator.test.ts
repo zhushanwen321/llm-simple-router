@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { StreamContentAccumulator } from "../../src/monitor/stream-content-accumulator.js";
+import { StreamContentAccumulator } from "../../../src/core/monitor/stream-content-accumulator.js";
 
 describe("StreamContentAccumulator", () => {
   it("accumulates text from openai stream", () => {

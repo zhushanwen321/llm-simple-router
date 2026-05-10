@@ -1,8 +1,8 @@
 // tests/loop-prevention/tool-loop-guard.test.ts
 
 import { describe, it, expect } from "vitest";
-import { ToolLoopGuard } from "../../src/loop-prevention/tool-loop-guard.js";
-import { SessionTracker } from "../../src/loop-prevention/session-tracker.js";
+import { ToolLoopGuard } from "../../../src/core/loop-prevention/tool-loop-guard.js";
+import { SessionTracker } from "../../../src/core/loop-prevention/session-tracker.js";
 
 describe("ToolLoopGuard", () => {
   const trackerConfig = { sessionTtlMs: 60000, maxToolCallRecords: 50, cleanupIntervalMs: 0 };

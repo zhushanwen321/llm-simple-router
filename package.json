@@ -2,17 +2,15 @@
   "name": "llm-simple-router-workspace",
   "private": true,
   "workspaces": [
-    "core",
     "router",
     "pi-extension",
     "frontend"
   ],
   "scripts": {
-    "build": "npm run build -w core -w router -w frontend",
-    "build:core": "npm run build -w core",
-    "build:router": "npm run build -w core -w router",
+    "build": "npm run build -w router -w frontend",
+    "build:router": "npm run build -w router",
     "build:frontend": "npm run build -w frontend",
-    "test": "npm run test -w core -w router",
+    "test": "npm run test -w router",
     "dev": "npm run dev -w router"
   },
   "devDependencies": {

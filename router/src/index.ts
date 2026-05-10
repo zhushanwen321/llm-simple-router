@@ -31,11 +31,11 @@ import { openaiToResponsesConverter } from "./proxy/format/converters/openai-res
 import { responsesToOpenAIConverter } from "./proxy/format/converters/responses-openai.js";
 import { responsesToAnthropicConverter } from "./proxy/format/converters/responses-anthropic.js";
 import { anthropicToResponsesConverter } from "./proxy/format/converters/anthropic-responses.js";
-import { SemaphoreManager, AdaptiveController } from "@llm-router/core/concurrency";
+import { SemaphoreManager, AdaptiveController } from "./core/concurrency/index.js";
 import type { StateRegistry } from "./core/registry.js";
-import { RequestTracker } from "@llm-router/core/monitor";
+import { RequestTracker } from "./core/monitor/index.js";
 import { UsageWindowTracker } from "./proxy/routing/usage-window-tracker.js";
-import { SessionTracker, DEFAULT_LOOP_PREVENTION_CONFIG } from "@llm-router/core/loop-prevention";
+import { SessionTracker, DEFAULT_LOOP_PREVENTION_CONFIG } from "./core/loop-prevention/index.js";
 import { scheduleLogCleanup } from "./db/log-cleaner.js";
 import { scheduleDbSizeMonitor } from "./db/db-size-monitor.js";
 import { startUpgradeChecker, stopUpgradeChecker } from "./admin/upgrade.js";

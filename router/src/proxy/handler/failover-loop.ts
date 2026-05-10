@@ -14,7 +14,7 @@
 import { randomUUID } from "crypto";
 import type { FastifyReply } from "fastify";
 import { ProviderSwitchNeeded } from "../../core/errors.js";
-import { SemaphoreQueueFullError, SemaphoreTimeoutError } from "@llm-router/core";
+import { SemaphoreQueueFullError, SemaphoreTimeoutError } from "../../core/errors.js";
 import { getProviderById, updateLogClientStatus, insertRequestLog, updateLogStreamContent } from "../../db/index.js";
 import { getSetting } from "../../db/settings.js";
 import { decrypt } from "../../utils/crypto.js";
@@ -44,7 +44,7 @@ import type { ServiceContainer } from "../../core/container.js";
 import { SERVICE_KEYS } from "../../core/container.js";
 import type { RetryRuleMatcher } from "../orchestration/retry-rules.js";
 import type { ProxyOrchestrator } from "../orchestration/orchestrator.js";
-import type { RequestTracker } from "@llm-router/core/monitor";
+import type { RequestTracker } from "../../core/monitor/index.js";
 import type { UsageWindowTracker } from "../routing/usage-window-tracker.js";
 import type { ProxyAgentFactory } from "../transport/proxy-agent.js";
 import type { PluginRegistry } from "../transform/plugin-registry.js";
