@@ -164,6 +164,7 @@ export function collectTransportMetrics(
   clientType?: string,
   sessionId?: string,
   tracker?: RequestTracker,
+  metadata?: Map<string, unknown>,
 ) {
   const base = {
     request_log_id: lastSuccessLogId, provider_id: providerId, backend_model: backendModel, api_type: apiType,
@@ -176,20 +177,29 @@ export function collectTransportMetrics(
         metrics.input_tokens = estimateInputTokens(request.body as Record<string, unknown>);
         metrics.input_tokens_estimated = 1;
       }
-      // 缓存命中预估（API 未返回时，用 tokenizer 前缀匹配）
+      // 缓存命中预估（API 未返回时，优先从 metadata 读取，否则用 tokenizer 前缀匹配）
       if ((!metrics.cache_read_tokens || metrics.cache_read_tokens === 0) && getTokenEstimationEnabled(db) && sessionId) {
-        try {
-          const estimated = cacheEstimator.estimateHit(sessionId, backendModel, request.body as Record<string, unknown>);
-          if (estimated != null && estimated > 0) {
-            metrics.cache_read_tokens = estimated;
-            metrics.cache_read_tokens_estimated = 1;
-            // 更新实时监控中的缓存数据
-            if (tracker) {
-              try { tracker.updateCompletedMetrics(lastSuccessLogId, estimated); } catch (e) { request.log.error({ err: e }, "tracker update failed"); }
-            }
+        // 优先从 pipeline metadata 读取缓存结果（由 cache-estimation hook 写入）
+        const cachedTokens = metadata?.get("_cachedCacheTokens") as number | undefined;
+        if (cachedTokens != null && cachedTokens > 0) {
+          metrics.cache_read_tokens = cachedTokens;
+          metrics.cache_read_tokens_estimated = 1;
+          if (tracker) {
+            try { tracker.updateCompletedMetrics(lastSuccessLogId, cachedTokens); } catch (e) { request.log.error({ err: e }, "tracker update failed"); }
           }
-        } catch (e) {
-          request.log.error({ err: e }, "cache estimation failed");
+        } else {
+          try {
+            const estimated = cacheEstimator.estimateHit(sessionId, backendModel, request.body as Record<string, unknown>);
+            if (estimated != null && estimated > 0) {
+              metrics.cache_read_tokens = estimated;
+              metrics.cache_read_tokens_estimated = 1;
+              if (tracker) {
+                try { tracker.updateCompletedMetrics(lastSuccessLogId, estimated); } catch (e) { request.log.error({ err: e }, "tracker update failed"); }
+              }
+            }
+          } catch (e) {
+            request.log.error({ err: e }, "cache estimation failed");
+          }
         }
       }
       insertMetrics(db, {

@@ -53,6 +53,10 @@ export const cacheEstimationHook: PipelineHook = {
       } else {
         // API 未报告缓存，估算并写入 metadata
         const estimated = cacheEstimator.estimateHit(sessionId, ctx.clientModel, ctx.rawBody);
+        // 缓存 tokenize 结果，供 collectTransportMetrics 复用
+        if (estimated != null) {
+          ctx.metadata.set("_cachedCacheTokens", estimated);
+        }
         if (estimated != null && estimated > 0) {
           ctx.metadata.set("cache_read_tokens_estimated", 1);
           ctx.metadata.set("cache_read_tokens", estimated);

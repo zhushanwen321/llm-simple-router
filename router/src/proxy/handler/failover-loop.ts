@@ -392,7 +392,7 @@ export async function executeFailoverLoop(
         },
         resilienceResult.attempts, resilienceResult.result, startTime,
       );
-      collectTransportMetrics(db, clientApiType, resilienceResult.result, isStream, lastLogId, provider.id, resolved.backend_model, request, routerKeyId, getTransportStatusCode(resilienceResult.result), ctx.metadata.get("client_type") as string | undefined, ctx.metadata.get("session_id") as string | undefined, tracker);
+      collectTransportMetrics(db, clientApiType, resilienceResult.result, isStream, lastLogId, provider.id, resolved.backend_model, request, routerKeyId, getTransportStatusCode(resilienceResult.result), ctx.metadata.get("client_type") as string | undefined, ctx.metadata.get("session_id") as string | undefined, tracker, ctx.metadata);
 
       // flush tool errors
       flushToolErrors(provider.id, resolved.backend_model ?? clientModel, lastLogId);
