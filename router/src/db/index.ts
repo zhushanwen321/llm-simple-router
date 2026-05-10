@@ -33,6 +33,12 @@ export function initDatabase(dbPath: string): Database.Database {
   db.pragma("journal_mode = WAL");
   db.pragma("auto_vacuum = INCREMENTAL");
   db.pragma("foreign_keys = ON");
+  db.pragma("synchronous = NORMAL");
+  db.pragma("cache_size = -16000");
+  db.pragma("busy_timeout = 5000");
+  db.pragma("temp_store = MEMORY");
+  db.pragma("mmap_size = 67108864");
+  db.pragma("journal_size_limit = 67108864");
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS migrations (

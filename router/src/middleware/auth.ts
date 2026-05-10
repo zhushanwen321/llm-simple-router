@@ -1,9 +1,8 @@
-import { FastifyPluginCallback, FastifyReply, FastifyRequest } from "fastify";
-import { createHash, randomUUID } from "crypto";
+import { FastifyPluginCallback, FastifyReply } from "fastify";
+import { createHash } from "crypto";
 import fp from "fastify-plugin";
 import Database from "better-sqlite3";
 import { isInitialized } from "../db/settings.js";
-import { insertRequestLog } from "../db/logs.js";
 import { getProxyApiType, HTTP_SERVICE_UNAVAILABLE } from "../core/constants.js";
 
 declare module "fastify" {
@@ -36,27 +35,6 @@ function unauthorizedReply(reply: FastifyReply): void {
   });
 }
 
-function logRejectedAuth(
-  db: Database.Database,
-  apiType: string,
-  statusCode: number,
-  errorMessage: string,
-  request: FastifyRequest,
-): void {
-  insertRequestLog(db, {
-    id: randomUUID(),
-    api_type: apiType,
-    model: null,
-    provider_id: null,
-    status_code: statusCode,
-    latency_ms: 0,
-    is_stream: 0,
-    error_message: errorMessage,
-    created_at: new Date().toISOString(),
-    client_request: JSON.stringify({ method: request.method, ip: request.ip, headers: request.headers }),
-  });
-}
-
 const authMiddlewareRaw: FastifyPluginCallback<{ db: Database.Database }> = (
   app,
   options,
@@ -84,7 +62,7 @@ const authMiddlewareRaw: FastifyPluginCallback<{ db: Database.Database }> = (
     // 未初始化时代理层不可用
     if (!isInitialized(options.db)) {
       if (proxyApiType) {
-        logRejectedAuth(options.db, proxyApiType, HTTP_SERVICE_UNAVAILABLE, "Service not initialized", request);
+        request.log.info({ method: request.method, url: request.url, ip: request.ip }, `Rejected: service not initialized [${proxyApiType}]`);
       }
       reply.code(HTTP_SERVICE_UNAVAILABLE).send({ error: { message: "Service not initialized" } });
       return reply;
@@ -104,7 +82,7 @@ const authMiddlewareRaw: FastifyPluginCallback<{ db: Database.Database }> = (
 
     if (!token) {
       if (proxyApiType) {
-        logRejectedAuth(options.db, proxyApiType, HTTP_UNAUTHORIZED, "Invalid API key", request);
+        request.log.info({ method: request.method, url: request.url, ip: request.ip }, `Rejected: no API key [${proxyApiType}]`);
       }
       unauthorizedReply(reply);
       return reply;
@@ -113,7 +91,7 @@ const authMiddlewareRaw: FastifyPluginCallback<{ db: Database.Database }> = (
     const row = stmt.get(hash) as RouterKeyRow | undefined;
     if (!row) {
       if (proxyApiType) {
-        logRejectedAuth(options.db, proxyApiType, HTTP_UNAUTHORIZED, "Invalid API key", request);
+        request.log.info({ method: request.method, url: request.url, ip: request.ip }, `Rejected: invalid API key [${proxyApiType}]`);
       }
       unauthorizedReply(reply);
       return reply;

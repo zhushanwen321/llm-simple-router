@@ -67,10 +67,9 @@ function parseConcurrencyRule(concurrencyRule: string | null): ConcurrencyOverri
 /** 过滤掉被排除的 targets（failover 循环中已尝试过的） */
 function filterExcluded(targets: Target[], excludeTargets: Target[] | undefined): Target[] {
   if (!excludeTargets || excludeTargets.length === 0) return targets;
+  const excludedSet = new Set(excludeTargets.map(e => `${e.provider_id}:${e.backend_model}`));
   return targets.filter(t =>
-    !excludeTargets.some(e =>
-      e.backend_model === t.backend_model && e.provider_id === t.provider_id,
-    ),
+    !excludedSet.has(`${t.provider_id}:${t.backend_model}`),
   );
 }
 

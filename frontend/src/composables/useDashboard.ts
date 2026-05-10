@@ -204,25 +204,22 @@ export function useDashboard() {
 
   // --- Fetch provider output tokens for sorting ---
   async function loadProviderOutputTokens() {
+    if (providers.value.length === 0) return
     if (periodTab.value === 'custom' && !(apiStartTime.value && apiEndTime.value)) return
+    // 复用 summary API，一次请求获取所有 provider 的 output tokens
+    const params: Record<string, string> = { ...statsParams.value }
+    delete params.provider_id
+    delete params.backend_model
+    delete params.router_key_id
     try {
-      const results = await Promise.allSettled(
-        providers.value.map(async (p) => {
-          const p2: Record<string, string> = {}
-          if (periodTab.value !== 'custom') {
-            p2.period = periodTab.value
-          } else if (apiStartTime.value && apiEndTime.value) {
-            p2.start_time = apiStartTime.value
-            p2.end_time = apiEndTime.value
-          }
-          p2.provider_id = p.id
-          const stat = await api.getStats(p2)
-          return { id: p.id, outputTokens: stat.totalOutputTokens }
-        }),
-      )
+      const summary = await api.getMetricsSummary(params)
       const map: Record<string, number> = {}
-      for (const r of results) {
-        if (r.status === 'fulfilled') map[r.value.id] = r.value.outputTokens
+      if (summary.rows && Array.isArray(summary.rows)) {
+        for (const row of summary.rows) {
+          if (row.provider_id) {
+            map[row.provider_id] = row.total_output_tokens || 0
+          }
+        }
       }
       providerOutputTokens.value = map
       if (Object.keys(map).length > 0 && !selectedProvider.value) {

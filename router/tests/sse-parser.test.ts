@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { SSEParser } from "../src/metrics/sse-parser.js";
 
 describe("SSEParser", () => {
@@ -204,6 +204,51 @@ describe("SSEParser", () => {
     expect(e2).toHaveLength(2);
     expect(e2[0].data).toBe("first");
     expect(e2[1].data).toBe("second");
+  });
+
+  // ============================================================
+  // BP-M4: \\r\\n 条件替换性能优化测试
+  // ============================================================
+
+  it("BP-M4: 无 \\r 的 chunk 不触发 replace（条件跳过）", () => {
+    const parser = new SSEParser();
+    // 监视 buffer 的 replace 是否被调用
+    // 由于没有 \\r，buffer 不应该被整体替换
+    const events1 = parser.feed('data: hello\n\n');
+    expect(events1).toHaveLength(1);
+    expect(events1[0].data).toBe("hello");
+    // buffer 应该已被清空（事件已解析）
+    const events2 = parser.feed('data: world\n\n');
+    expect(events2).toHaveLength(1);
+    expect(events2[0].data).toBe("world");
+  });
+
+  it("BP-M4: \\r\\n 跨 chunk 边界正确处理", () => {
+    const parser = new SSEParser();
+    // \\r 在 chunk1 末尾，\\n 在 chunk2 开头
+    const e1 = parser.feed('data: first\r');
+    expect(e1).toHaveLength(0);
+    const e2 = parser.feed('\n\r\ndata: second\r\n\r\n');
+    expect(e2).toHaveLength(2);
+    expect(e2[0].data).toBe("first");
+    expect(e2[1].data).toBe("second");
+  });
+
+  it("BP-M4: 纯 \\n chunk 批量处理正确", () => {
+    const parser = new SSEParser();
+    // 连续发送多个不含 \\r 的 chunk
+    const events = parser.feed('data: a\n\ndata: b\n\ndata: c\n\n');
+    expect(events).toHaveLength(3);
+    expect(events.map(e => e.data)).toEqual(['a', 'b', 'c']);
+  });
+
+  it("BP-M4: 混合 \\r\\n 和 \\n 仍然正确", () => {
+    const parser = new SSEParser();
+    const events = parser.feed('data: first\r\n\r\ndata: second\n\ndata: third\r\n\r\n');
+    expect(events).toHaveLength(3);
+    expect(events[0].data).toBe("first");
+    expect(events[1].data).toBe("second");
+    expect(events[2].data).toBe("third");
   });
 
   it("should handle chunk boundary splitting in the middle of \\n\\n", () => {

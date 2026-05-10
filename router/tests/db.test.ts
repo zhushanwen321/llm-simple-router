@@ -39,7 +39,7 @@ describe("initDatabase", () => {
       .prepare("SELECT name FROM migrations")
       .all() as { name: string }[];
 
-    expect(rows.length).toBe(44);
+    expect(rows.length).toBe(45);
     expect(rows[0].name).toBe("001_init.sql");
     expect(rows[1].name).toBe("002_add_request_response_body.sql");
     expect(rows[2].name).toBe("003_add_full_request_chain_log.sql");
@@ -127,6 +127,24 @@ describe("initDatabase", () => {
     db = initDatabase(":memory:");
     const [{ auto_vacuum }] = db.pragma("auto_vacuum") as { auto_vacuum: number }[];
     expect(auto_vacuum).toBe(2);
+  });
+
+  it("should create performance indexes from migration 044", () => {
+    db = initDatabase(":memory:");
+
+    const indexes = (
+      db.prepare(
+        "SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%' ORDER BY name"
+      ).all() as { name: string }[]
+    ).map((r) => r.name);
+
+    // request_logs indexes
+    expect(indexes).toContain("idx_request_logs_provider_id");
+    expect(indexes).toContain("idx_request_logs_created_at_provider");
+    expect(indexes).toContain("idx_request_logs_created_at_router_key");
+    // request_metrics indexes
+    expect(indexes).toContain("idx_metrics_router_key");
+    expect(indexes).toContain("idx_metrics_created_at_router_key");
   });
 
   it("should enforce UNIQUE on client_model", () => {

@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { lookupContextWindow, parseModels, buildModelInfoList, MODEL_CONTEXT_WINDOWS, DEFAULT_CONTEXT_WINDOW, OVERFLOW_THRESHOLD } from '../src/config/model-context'
+import { describe, it, expect, afterEach } from 'vitest'
+import { lookupContextWindow, parseModels, buildModelInfoList, MODEL_CONTEXT_WINDOWS, DEFAULT_CONTEXT_WINDOW, OVERFLOW_THRESHOLD, clearModelsCache } from '../src/config/model-context'
 
 describe('model-context', () => {
   it('lookupContextWindow returns known value', () => {
@@ -57,5 +57,49 @@ describe('model-context', () => {
     const millionModels = Object.entries(MODEL_CONTEXT_WINDOWS)
       .filter(([, v]) => v >= OVERFLOW_THRESHOLD)
     expect(millionModels.length).toBeGreaterThan(0)
+  })
+
+  // ============================================================
+  // BP-M5: parseModels 缓存测试
+  // ============================================================
+
+  describe('parseModels cache', () => {
+    afterEach(() => {
+      clearModelsCache()
+    })
+
+    it('相同 raw 字符串两次调用返回相同引用（缓存命中）', () => {
+      const raw = '["glm-5","deepseek-chat"]'
+      const result1 = parseModels(raw)
+      const result2 = parseModels(raw)
+      expect(result1).toBe(result2) // 引用相等 = 缓存命中
+    })
+
+    it('不同 raw 字符串返回不同结果', () => {
+      const result1 = parseModels('["glm-5"]')
+      const result2 = parseModels('["deepseek-chat"]')
+      expect(result1).not.toBe(result2)
+      expect(result1[0].name).toBe('glm-5')
+      expect(result2[0].name).toBe('deepseek-chat')
+    })
+
+    it('空字符串返回空数组', () => {
+      const result = parseModels('')
+      expect(result).toEqual([])
+    })
+
+    it('无效 JSON 返回空数组', () => {
+      const result = parseModels('not json')
+      expect(result).toEqual([])
+    })
+
+    it('缓存结果内容正确（含 patches 迁移）', () => {
+      const raw = '[{"name":"glm-5","patches":["thinking-param"]}]'
+      const result = parseModels(raw)
+      expect(result).toEqual([{ name: 'glm-5', patches: ['thinking_consistency'] }])
+      // 第二次调用也应返回相同结果
+      const result2 = parseModels(raw)
+      expect(result2).toEqual([{ name: 'glm-5', patches: ['thinking_consistency'] }])
+    })
   })
 })

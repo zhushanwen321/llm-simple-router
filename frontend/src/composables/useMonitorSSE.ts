@@ -23,7 +23,9 @@ export function useMonitorSSE(
 ) {
   let eventSource: EventSource | null = null
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
-  const RECONNECT_DELAY = 3000
+  let reconnectAttempt = 0
+  const INITIAL_DELAY = 3000
+  const MAX_DELAY = 30000
 
   function connect(): void {
     if (eventSource) return
@@ -31,6 +33,7 @@ export function useMonitorSSE(
     eventSource = new EventSource(url)
 
     eventSource.onopen = () => {
+      reconnectAttempt = 0
       callbacks?.onOpen?.()
     }
 
@@ -41,7 +44,10 @@ export function useMonitorSSE(
     eventSource.onerror = () => {
       cleanup()
       callbacks?.onClose?.()
-      reconnectTimer = setTimeout(connect, RECONNECT_DELAY)
+      // eslint-disable-next-line no-magic-numbers
+      const delay = Math.min(INITIAL_DELAY * Math.pow(2, reconnectAttempt), MAX_DELAY)
+      reconnectAttempt++
+      reconnectTimer = setTimeout(connect, delay)
     }
   }
 

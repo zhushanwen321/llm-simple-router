@@ -2,7 +2,7 @@
 
 import { MS_PER_SECOND } from "../core/constants.js";
 import type { MetricsResult } from "../core/types.js";
-import { encode } from "gpt-tokenizer";
+import { countTokens } from "../utils/token-counter.js";
 import type { SSEEvent } from "./sse-parser.js";
 
 interface AnthropicMessageStart {
@@ -104,7 +104,7 @@ export class MetricsExtractor {
       }
 
       if (hasThinking) {
-        thinkingTokens = encode(this.thinkingContentBuffer).length;
+        thinkingTokens = countTokens(this.thinkingContentBuffer);
 
         // thinking_duration: T3 - T0 (includes network RTT + generation)
         if (this.thinkingStreamEndTime !== null) {
@@ -131,10 +131,10 @@ export class MetricsExtractor {
 
       // content token counts (for analysis only)
       if (this.textContentBuffer.length > 0) {
-        textTokens = encode(this.textContentBuffer).length;
+        textTokens = countTokens(this.textContentBuffer);
       }
       if (this.toolUseContentBuffer.length > 0) {
-        toolUseTokens = encode(this.toolUseContentBuffer).length;
+        toolUseTokens = countTokens(this.toolUseContentBuffer);
       }
     }
 

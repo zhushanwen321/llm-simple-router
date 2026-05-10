@@ -129,7 +129,7 @@
           </CardHeader>
           <CardContent>
             <div class="h-56">
-              <Line v-if="tpsChartData" :data="tpsChartData" :options="chartOptions(tpsChartData.labels as string[])" />
+              <Line v-if="tpsChartData" :key="'tps-' + periodTab + '-' + selectedProvider" :data="tpsChartData" :options="chartOptions(tpsChartData.labels as string[])" />
               <div v-else class="flex items-center justify-center h-full text-muted-foreground text-sm">{{ t('common.noData') }}</div>
             </div>
           </CardContent>
@@ -140,7 +140,7 @@
           </CardHeader>
           <CardContent>
             <div class="h-56">
-              <Line v-if="inputTokensChartData" :data="inputTokensChartData" :options="chartOptions(inputTokensChartData.labels as string[])" />
+              <Line v-if="inputTokensChartData" :key="'input-' + periodTab + '-' + selectedProvider" :data="inputTokensChartData" :options="chartOptions(inputTokensChartData.labels as string[])" />
               <div v-else class="flex items-center justify-center h-full text-muted-foreground text-sm">{{ t('common.noData') }}</div>
             </div>
           </CardContent>
@@ -151,7 +151,7 @@
           </CardHeader>
           <CardContent>
             <div class="h-56">
-              <Line v-if="outputTokensChartData" :data="outputTokensChartData" :options="chartOptions(outputTokensChartData.labels as string[])" />
+              <Line v-if="outputTokensChartData" :key="'output-' + periodTab + '-' + selectedProvider" :data="outputTokensChartData" :options="chartOptions(outputTokensChartData.labels as string[])" />
               <div v-else class="flex items-center justify-center h-full text-muted-foreground text-sm">{{ t('common.noData') }}</div>
             </div>
           </CardContent>
@@ -168,7 +168,6 @@ import {
   LinearScale,
   PointElement,
   LineElement,
-  Title,
   Tooltip as ChartTooltip,
   Legend,
 } from 'chart.js'
@@ -182,7 +181,7 @@ import { useI18n } from 'vue-i18n'
 import { lineOptions } from './metrics-helpers'
 import { useDashboard } from '@/composables/useDashboard'
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, ChartTooltip, Legend)
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, ChartTooltip, Legend)
 
 const {
   sortedProviders, selectedProvider,

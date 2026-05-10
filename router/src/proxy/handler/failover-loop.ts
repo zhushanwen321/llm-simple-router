@@ -173,6 +173,16 @@ export async function executeFailoverLoop(
   const clientModel = ctx.clientModel;
   const rawBody = ctx.rawBody;
   const clientApiType = ctx.apiType as "openai" | "openai-responses" | "anthropic";
+
+  // BP-H4: 循环不变量预计算，避免每次迭代重复 JSON.stringify + sanitizeHeaders
+  const cliHdrs: RawHeaders = request.headers as RawHeaders;
+  const sanitizedClientHeaders = sanitizeHeadersForLog(cliHdrs as Record<string, string>);
+  const precomputedClientReq = JSON.stringify({ headers: sanitizedClientHeaders, body: rawBody });
+
+  // BP-H3: 请求级 API Key 缓存，避免同一 provider 重复解密
+  const decryptedApiKeys = new Map<string, string>();
+  const encryptionKey = getSetting(db, "encryption_key");
+
   let failoverIteration = 0;
 
   while (true) {
@@ -192,7 +202,6 @@ export async function executeFailoverLoop(
     // 每次迭代从 pipelineBody 重新开始
     let currentBody = structuredClone(ctx.body);
     const isStream = currentBody.stream === true;
-    const cliHdrs: RawHeaders = request.headers as RawHeaders;
     const iterationSnapshot = new PipelineSnapshot();
 
     const rCtx: RejectParams = {
@@ -292,18 +301,21 @@ export async function executeFailoverLoop(
     iterationSnapshot.add({ stage: "provider_patch", types: patchMeta.types });
 
     // --- API key ---
-    const encryptionKey = getSetting(db, "encryption_key");
     if (!encryptionKey) {
       return rejectAndReply(reply, rCtx, errors.providerUnavailable(),
         `Encryption key not configured`, provider.id,
         flushCurrentErrors);
     }
-    const apiKey = decrypt(provider.api_key, encryptionKey);
+    let apiKey = decryptedApiKeys.get(provider.id);
+    if (!apiKey) {
+      apiKey = decrypt(provider.api_key, encryptionKey);
+      decryptedApiKeys.set(provider.id, apiKey);
+    }
 
     // --- beforeSendProxy + Build logging data ---
     adapter.beforeSendProxy?.(patchedBody, isStream);
     const reqBodyStr = JSON.stringify(patchedBody);
-    const clientReq = JSON.stringify({ headers: sanitizeHeadersForLog(cliHdrs as Record<string, string>), body: rawBody });
+    const clientReq = precomputedClientReq;
     const upstreamReqBase = JSON.stringify({
       url: buildUpstreamUrl(provider.base_url, effectiveUpstreamPath),
       headers: sanitizeHeadersForLog(buildUpstreamHeaders(cliHdrs, apiKey, Buffer.byteLength(reqBodyStr), effectiveApiType)),

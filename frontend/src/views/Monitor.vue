@@ -332,6 +332,7 @@ async function executeKill() {
 // --- Helper functions ---
 
 const MS_PER_SECOND = 1000
+const NOW_TICK_INTERVAL = 3000
 const now = ref(Date.now())
 let tickTimer: ReturnType<typeof setInterval> | null = null
 
@@ -349,7 +350,7 @@ function duration(req: { completedAt?: number; startTime: number }): string {
 onMounted(async () => {
   await loadInitialData()
   connect()
-  tickTimer = setInterval(() => { now.value = Date.now() }, MS_PER_SECOND)
+  tickTimer = setInterval(() => { now.value = Date.now() }, NOW_TICK_INTERVAL)
 })
 
 onUnmounted(() => {
