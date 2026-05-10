@@ -175,16 +175,10 @@ export class RequestTracker {
     if (clientRequest !== undefined || upstreamRequest !== undefined) {
       this.completedDetails.set(id, { clientRequest, upstreamRequest, completedAt: now });
       // completedDetails 容量保护：超过上限时移除最早条目
+      // Map 按插入顺序迭代，complete() 按时间顺序调用，首个 key 即最旧
       if (this.completedDetails.size > RECENT_COMPLETED_MAX) {
-        let oldestKey: string | undefined;
-        let oldestTime = Infinity;
-        for (const [k, v] of this.completedDetails) {
-          if (v.completedAt < oldestTime) {
-            oldestTime = v.completedAt;
-            oldestKey = k;
-          }
-        }
-        if (oldestKey) this.completedDetails.delete(oldestKey);
+        const oldestKey = this.completedDetails.keys().next().value;
+        if (oldestKey !== undefined) this.completedDetails.delete(oldestKey);
       }
     }
 
@@ -322,7 +316,11 @@ export class RequestTracker {
 
   /** 向单个客户端发送当前活跃请求快照（保留 clientRequest 以便前端即时展示） */
   private sendInitialSnapshot(client: SSEClient): void {
-    const active = this.getActive();
+    const active = this.getActive().map((req: ActiveRequest) => {
+      const copy = { ...req };
+      delete copy.upstreamRequest;
+      return copy;
+    });
     const msg = `event: request_update\ndata: ${JSON.stringify(active)}\n\n`;
     try {
       if (!client.writableEnded) client.write(msg);
