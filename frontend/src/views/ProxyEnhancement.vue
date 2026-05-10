@@ -184,6 +184,7 @@ import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { api, getApiMessage } from '@/api/client'
+import { getTokenEstimation, updateTokenEstimation, getClientSessionHeaders, updateClientSessionHeaders } from '@/api/settings-api'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Loader2, Plus, Trash2 } from 'lucide-vue-next'
@@ -214,10 +215,10 @@ async function loadConfig() {
     toolCallLoopEnabled.value = data.tool_call_loop_enabled
     streamLoopEnabled.value = data.stream_loop_enabled
     toolErrorLoggingEnabled.value = data.tool_error_logging_enabled
-    const tokenEstData = await api.getTokenEstimation()
+    const tokenEstData = await getTokenEstimation()
     tokenEstimationEnabled.value = tokenEstData.enabled
     const [sessionHeadersData] = await Promise.allSettled([
-      api.getClientSessionHeaders(),
+      getClientSessionHeaders(),
     ])
     if (sessionHeadersData.status === 'fulfilled') {
       clientSessionHeaders.value = sessionHeadersData.value.entries.map(e => ({
@@ -246,8 +247,8 @@ async function handleSave() {
         tool_round_limit_enabled: toolRoundLimitEnabled.value,
         tool_error_logging_enabled: toolErrorLoggingEnabled.value,
       }),
-      api.updateTokenEstimation(tokenEstimationEnabled.value),
-      api.updateClientSessionHeaders(entriesToSave),
+      updateTokenEstimation(tokenEstimationEnabled.value),
+      updateClientSessionHeaders(entriesToSave),
     ])
     toast.success(t('common.saveSuccess'))
   } catch (e: unknown) {

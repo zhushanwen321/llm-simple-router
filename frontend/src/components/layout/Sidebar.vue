@@ -223,6 +223,7 @@ import {
   Wand2,
 } from 'lucide-vue-next'
 import { api, getApiMessage } from '@/api/client'
+import { getUpgradeStatus, triggerUpgradeCheck, executeUpgrade, restartServer, syncConfig, setSyncSource, type UpgradeStatus } from '@/api/settings-api'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -233,7 +234,6 @@ import {
 } from '@/components/ui/alert-dialog'
 import { toast } from 'vue-sonner'
 import type { AcceptableValue } from 'reka-ui'
-import type { UpgradeStatus } from '@/api/client'
 import { useTheme } from '@/composables/useTheme'
 
 const { isDark, toggleTheme } = useTheme()
@@ -259,7 +259,7 @@ let pollTimer: ReturnType<typeof setInterval> | null = null
 
 async function loadUpgradeStatus() {
   try {
-    upgradeStatus.value = await api.getUpgradeStatus()
+    upgradeStatus.value = await getUpgradeStatus()
   } catch {
     upgradeStatus.value = null
   }
@@ -268,7 +268,7 @@ async function loadUpgradeStatus() {
 async function handleCheckNow() {
   isChecking.value = true
   try {
-    await api.triggerUpgradeCheck()
+    await triggerUpgradeCheck()
     await loadUpgradeStatus()
   } catch (e: unknown) { console.error('sidebar.checkUpgrade:', e); toast.error(getApiMessage(e, t('sidebar.upgrade.checkFailed'))) }
   finally { isChecking.value = false }
@@ -278,7 +278,7 @@ async function handleUpgrade() {
   if (!upgradeStatus.value?.npm.latestVersion) return
   isUpgrading.value = true
   try {
-    await api.executeUpgrade(upgradeStatus.value.npm.latestVersion)
+    await executeUpgrade(upgradeStatus.value.npm.latestVersion)
     toast.success(t('sidebar.upgrade.upgradeSuccess'))
     showUpgradeConfirm.value = false
     // 升级成功后直接重启，避免“已升级未重启”的不一致状态
@@ -294,7 +294,7 @@ async function handleSync() {
   const source = upgradeStatus.value?.syncSource ?? 'github'
   isSyncing.value = true
   try {
-    await api.syncConfig(source)
+    await syncConfig(source)
     toast.success(t('sidebar.upgrade.configSyncSuccess'))
     await loadUpgradeStatus()
   } catch (e: unknown) {
@@ -308,7 +308,7 @@ async function handleSync() {
 async function handleSourceChange(val: AcceptableValue) {
   if (typeof val !== 'string') return
   try {
-    await api.setSyncSource(val as 'github' | 'gitee')
+    await setSyncSource(val as 'github' | 'gitee')
     await loadUpgradeStatus()
   } catch (e: unknown) { console.error('sidebar.setSource:', e); toast.error(getApiMessage(e, t('sidebar.upgrade.saveFailed'))) }
 }
@@ -419,7 +419,7 @@ watch(
 
 async function doRestart() {
   try {
-    await api.restartServer()
+    await restartServer()
     toast.success(t('sidebar.upgrade.restartSent'))
   } catch (e: unknown) {
     console.error('sidebar.restart:', e)

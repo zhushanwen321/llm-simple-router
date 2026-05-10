@@ -46,56 +46,6 @@ export function getApiMessage(error: unknown, fallback: string): string {
   return (error as { apiMessage?: string }).apiMessage || fallback;
 }
 
-// --- API endpoint constants ---
-
-const API = {
-  LOGIN: "/login",
-  LOGOUT: "/logout",
-  PROVIDERS: "/providers",
-  MAPPINGS: "/mappings",
-  MAPPING_GROUPS: "/mapping-groups",
-  RETRY_RULES: "/retry-rules",
-  LOGS: "/logs",
-  STATS: "/stats",
-  METRICS_SUMMARY: "/metrics/summary",
-  METRICS_TIMESERIES: "/metrics/timeseries",
-  ROUTER_KEYS: "/router-keys",
-  MODELS_AVAILABLE: "/models/available",
-  PROXY_ENHANCEMENT: "/proxy-enhancement",
-  MONITOR_ACTIVE: "/monitor/active",
-  MONITOR_RECENT: "/monitor/recent",
-  MONITOR_STATS: "/monitor/stats",
-  MONITOR_CONCURRENCY: "/monitor/concurrency",
-  MONITOR_RUNTIME: "/monitor/runtime",
-  MONITOR_STREAM: "/monitor/stream",
-  MONITOR_REQUEST: "/monitor/request",
-  RECOMMENDED_PROVIDERS: "/recommended/providers",
-  RECOMMENDED_RETRY_RULES: "/recommended/retry-rules",
-  RECOMMENDED_RELOAD: "/recommended/reload",
-  USAGE_WINDOWS: "/usage/windows",
-  USAGE_WEEKLY: "/usage/weekly",
-  USAGE_MONTHLY: "/usage/monthly",
-  SETTINGS_DB_SIZE: "/settings/db-size",
-  SETTINGS_DB_SIZE_THRESHOLDS: "/settings/db-size-thresholds",
-  SETTINGS_EXPORT: "/settings/export",
-  SETTINGS_IMPORT: "/settings/import",
-  SETUP_STATUS: "/setup/status",
-  SETUP_INITIALIZE: "/setup/initialize",
-  SETTINGS_LOG_RETENTION: "/settings/log-retention",
-  SCHEDULES: "/schedules",
-  SCHEDULES_BY_GROUP: "/schedules/group",
-  TOKEN_ESTIMATION: "/settings/token-estimation",
-  UPGRADE_STATUS: "/upgrade/status",
-  UPGRADE_CHECK: "/upgrade/check",
-  UPGRADE_EXECUTE: "/upgrade/execute",
-  UPGRADE_RESTART: "/upgrade/restart",
-  UPGRADE_SYNC_CONFIG: "/upgrade/sync-config",
-  UPGRADE_SYNC_SOURCE: "/upgrade/sync-source",
-  TRANSFORM_RULES: "/transform-rules",
-  CLIENT_SESSION_HEADERS: "/settings/client-session-headers",
-  QUICK_SETUP: "/quick-setup",
-} as const;
-
 // --- Payload types ---
 
 export interface ProviderPreset {
@@ -208,7 +158,6 @@ export interface QuickSetupPayload {
   }
 }
 
-
 // --- Response types ---
 
 interface LogsResponse {
@@ -308,46 +257,11 @@ export interface DailyUsage {
   total_output_tokens: number;
 }
 
-export interface DbSizeInfoResponse {
-  totalBytes: number;
-  logTableBytes: number;
-  logFileBytes: number;
-  logCount: number;
-  lastChecked: string | null;
-  thresholds: {
-    dbMaxSizeMb: number;
-    logTableMaxSizeMb: number;
-  };
-}
-
-export interface ConfigExportResponse {
-  version: number;
-  exportedAt: string;
-  data: Record<string, unknown[]>;
-}
-
 export interface ProxyEnhancementConfig {
   tool_call_loop_enabled: boolean;
   stream_loop_enabled: boolean;
   tool_round_limit_enabled: boolean;
   tool_error_logging_enabled: boolean;
-}
-
-export interface UpgradeStatus {
-  npm: {
-    hasUpdate: boolean;
-    currentVersion: string;
-    latestVersion: string | null;
-  };
-  config: {
-    hasUpdate: boolean;
-    providerChanges: number;
-    retryRuleChanges: number;
-  };
-  deployment: "npm" | "docker" | "unknown";
-  syncSource: "github" | "gitee";
-  restartMethod: "process_manager" | "self_spawn";
-  lastCheckedAt: string | null;
 }
 
 // --- Typed request helper ---
@@ -357,7 +271,7 @@ interface RequestOptions {
   params?: Record<string, unknown>;
 }
 
-async function request<T>(
+export async function request<T>(
   method: "get" | "post" | "put" | "delete",
   url: string,
   data?: unknown,
@@ -380,17 +294,17 @@ async function request<T>(
 
 export const api = {
   login: (password: string) =>
-    request<{ success: boolean }>("post", API.LOGIN, { password }),
-  logout: () => request<{ success: boolean }>("post", API.LOGOUT),
+    request<{ success: boolean }>("post", "/login", { password }),
+  logout: () => request<{ success: boolean }>("post", "/logout"),
 
   getSetupStatus: () =>
-    request<{ initialized: boolean }>("get", API.SETUP_STATUS),
+    request<{ initialized: boolean }>("get", "/setup/status"),
   initializeSetup: (password: string) =>
-    request<{ success: boolean }>("post", API.SETUP_INITIALIZE, { password }),
+    request<{ success: boolean }>("post", "/setup/initialize", { password }),
 
-  getProviders: () => request<Provider[]>("get", API.PROVIDERS),
+  getProviders: () => request<Provider[]>("get", "/providers"),
   createProvider: (data: ProviderPayload) =>
-    request<{ id: string }>("post", API.PROVIDERS, data),
+    request<{ id: string }>("post", "/providers", data),
   updateProvider: (id: string, data: Partial<ProviderPayload>) =>
     request<{
       success: boolean;
@@ -399,28 +313,25 @@ export const api = {
         client_model: string;
         disabled: boolean;
       }>;
-    }>("put", `${API.PROVIDERS}/${id}`, data),
+    }>("put", `/providers/${id}`, data),
   deleteProvider: (id: string) =>
-    request<{ success: boolean }>("delete", `${API.PROVIDERS}/${id}`),
+    request<{ success: boolean }>("delete", `/providers/${id}`),
   getProviderDependencies: (id: string) =>
-    request<{ references: string[] }>(
-      "get",
-      `${API.PROVIDERS}/${id}/dependencies`,
-    ),
+    request<{ references: string[] }>("get", `/providers/${id}/dependencies`),
   fetchUpstreamModels: (data: {
     base_url: string;
     models_endpoint: string;
     api_key: string;
     api_type: string;
-  }) => request<string[]>("post", `${API.PROVIDERS}/fetch-models`, data),
+  }) => request<string[]>("post", "/providers/fetch-models", data),
 
-  getMappings: () => request<ModelMapping[]>("get", API.MAPPINGS),
+  getMappings: () => request<ModelMapping[]>("get", "/mappings"),
   createMapping: (data: MappingPayload) =>
-    request<{ id: string }>("post", API.MAPPINGS, data),
+    request<{ id: string }>("post", "/mappings", data),
   updateMapping: (id: string, data: MappingPayload) =>
-    request<{ success: boolean }>("put", `${API.MAPPINGS}/${id}`, data),
+    request<{ success: boolean }>("put", `/mappings/${id}`, data),
   deleteMapping: (id: string) =>
-    request<{ success: boolean }>("delete", `${API.MAPPINGS}/${id}`),
+    request<{ success: boolean }>("delete", `/mappings/${id}`),
 
   getLogs: (params: {
     page: number;
@@ -433,17 +344,17 @@ export const api = {
     end_time?: string;
     status_code?: string;
     view?: string;
-  }) => request<LogsResponse>("get", API.LOGS, undefined, { params }),
+  }) => request<LogsResponse>("get", "/logs", undefined, { params }),
   getLogDetail: (id: string) =>
-    request<LogDetailResponse>("get", `${API.LOGS}/${id}`),
+    request<LogDetailResponse>("get", `/logs/${id}`),
   getLogChildren: (id: string) =>
-    request<LogEntry[]>("get", `${API.LOGS}/${id}/children`),
+    request<LogEntry[]>("get", `/logs/${id}/children`),
   deleteLogsBefore: (before: string) =>
-    request<DeleteLogsResponse>("delete", `${API.LOGS}/before`, { before }),
+    request<DeleteLogsResponse>("delete", "/logs/before", { before }),
   getLogRetention: () =>
-    request<{ days: number }>("get", API.SETTINGS_LOG_RETENTION),
+    request<{ days: number }>("get", "/settings/log-retention"),
   setLogRetention: (days: number) =>
-    request<{ days: number }>("put", API.SETTINGS_LOG_RETENTION, { days }),
+    request<{ days: number }>("put", "/settings/log-retention", { days }),
 
   getStats: (params?: {
     period?: string;
@@ -452,7 +363,7 @@ export const api = {
     router_key_id?: string;
     provider_id?: string;
     backend_model?: string;
-  }) => request<StatsResponse>("get", API.STATS, undefined, { params }),
+  }) => request<StatsResponse>("get", "/stats", undefined, { params }),
 
   getMetricsSummary: (params: {
     period?: string;
@@ -463,9 +374,7 @@ export const api = {
     start_time?: string;
     end_time?: string;
   }) =>
-    request<MetricsSummaryResponse>("get", API.METRICS_SUMMARY, undefined, {
-      params,
-    }),
+    request<MetricsSummaryResponse>("get", "/metrics/summary", undefined, { params }),
   getMetricsTimeseries: (params: {
     period?: string;
     metric: string;
@@ -475,143 +384,91 @@ export const api = {
     start_time?: string;
     end_time?: string;
   }) =>
-    request<TimeseriesRawRow[]>("get", API.METRICS_TIMESERIES, undefined, {
-      params,
-    }),
+    request<TimeseriesRawRow[]>("get", "/metrics/timeseries", undefined, { params }),
 
-  getRouterKeys: () => request<RouterKeyPublic[]>("get", API.ROUTER_KEYS),
+  getRouterKeys: () => request<RouterKeyPublic[]>("get", "/router-keys"),
   createRouterKey: (data: RouterKeyCreatePayload) =>
-    request<{ id: string; name: string; key: string }>(
-      "post",
-      API.ROUTER_KEYS,
-      data,
-    ),
+    request<{ id: string; name: string; key: string }>("post", "/router-keys", data),
   updateRouterKey: (id: string, data: RouterKeyUpdatePayload) =>
-    request<{ success: boolean }>("put", `${API.ROUTER_KEYS}/${id}`, data),
+    request<{ success: boolean }>("put", `/router-keys/${id}`, data),
   deleteRouterKey: (id: string) =>
-    request<{ success: boolean }>("delete", `${API.ROUTER_KEYS}/${id}`),
-  getAvailableModels: () => request<string[]>("get", API.MODELS_AVAILABLE),
+    request<{ success: boolean }>("delete", `/router-keys/${id}`),
+  getAvailableModels: () => request<string[]>("get", "/models/available"),
 
-  getMappingGroups: () => request<MappingGroup[]>("get", API.MAPPING_GROUPS),
+  getMappingGroups: () => request<MappingGroup[]>("get", "/mapping-groups"),
   createMappingGroup: (data: MappingGroupPayload) =>
-    request<{ id: string }>("post", API.MAPPING_GROUPS, data),
+    request<{ id: string }>("post", "/mapping-groups", data),
   updateMappingGroup: (id: string, data: MappingGroupPayload) =>
-    request<{ success: boolean }>("put", `${API.MAPPING_GROUPS}/${id}`, data),
+    request<{ success: boolean }>("put", `/mapping-groups/${id}`, data),
   deleteMappingGroup: (id: string) =>
-    request<{ success: boolean }>("delete", `${API.MAPPING_GROUPS}/${id}`),
+    request<{ success: boolean }>("delete", `/mapping-groups/${id}`),
   toggleMappingGroup: (id: string) =>
-    request<{ success: boolean; is_active: number }>(
-      "post",
-      `${API.MAPPING_GROUPS}/${id}/toggle`,
-    ),
+    request<{ success: boolean; is_active: number }>("post", `/mapping-groups/${id}/toggle`),
 
-  getRetryRules: () => request<RetryRule[]>("get", API.RETRY_RULES),
+  getRetryRules: () => request<RetryRule[]>("get", "/retry-rules"),
   createRetryRule: (data: RetryRulePayload) =>
-    request<{ id: string }>("post", API.RETRY_RULES, data),
+    request<{ id: string }>("post", "/retry-rules", data),
   updateRetryRule: (id: string, data: RetryRulePayload) =>
-    request<{ success: boolean }>("put", `${API.RETRY_RULES}/${id}`, data),
+    request<{ success: boolean }>("put", `/retry-rules/${id}`, data),
   deleteRetryRule: (id: string) =>
-    request<{ success: boolean }>("delete", `${API.RETRY_RULES}/${id}`),
+    request<{ success: boolean }>("delete", `/retry-rules/${id}`),
 
-  getSchedules: () => request<Schedule[]>("get", API.SCHEDULES),
+  getSchedules: () => request<Schedule[]>("get", "/schedules"),
   getSchedulesByGroup: (groupId: string) =>
-    request<Schedule[]>("get", `${API.SCHEDULES_BY_GROUP}/${groupId}`),
+    request<Schedule[]>("get", `/schedules/group/${groupId}`),
   createSchedule: (data: SchedulePayload) =>
-    request<{ id: string }>("post", API.SCHEDULES, data),
+    request<{ id: string }>("post", "/schedules", data),
   updateSchedule: (id: string, data: Partial<SchedulePayload>) =>
-    request<{ success: boolean }>("put", `${API.SCHEDULES}/${id}`, data),
+    request<{ success: boolean }>("put", `/schedules/${id}`, data),
   deleteSchedule: (id: string) =>
-    request<{ success: boolean }>("delete", `${API.SCHEDULES}/${id}`),
+    request<{ success: boolean }>("delete", `/schedules/${id}`),
   toggleSchedule: (id: string) =>
-    request<{ success: boolean; enabled: number }>(
-      "post",
-      `${API.SCHEDULES}/${id}/toggle`,
-    ),
+    request<{ success: boolean; enabled: number }>("post", `/schedules/${id}/toggle`),
 
   getProxyEnhancement: () =>
-    request<ProxyEnhancementConfig>("get", API.PROXY_ENHANCEMENT),
+    request<ProxyEnhancementConfig>("get", "/proxy-enhancement"),
   updateProxyEnhancement: (data: ProxyEnhancementConfig) =>
-    request<{ success: boolean }>("put", API.PROXY_ENHANCEMENT, data),
+    request<{ success: boolean }>("put", "/proxy-enhancement", data),
 
-  getMonitorActive: () => request<ActiveRequest[]>("get", API.MONITOR_ACTIVE),
-  getMonitorRecent: () => request<ActiveRequest[]>("get", API.MONITOR_RECENT),
-  getMonitorStats: () => request<StatsSnapshot>("get", API.MONITOR_STATS),
+  getMonitorActive: () => request<ActiveRequest[]>("get", "/monitor/active"),
+  getMonitorRecent: () => request<ActiveRequest[]>("get", "/monitor/recent"),
+  getMonitorStats: () => request<StatsSnapshot>("get", "/monitor/stats"),
   getMonitorRequest: (id: string) =>
-    request<ActiveRequest>("get", `${API.MONITOR_REQUEST}/${id}`),
+    request<ActiveRequest>("get", `/monitor/request/${id}`),
   getMonitorConcurrency: () =>
-    request<ProviderConcurrencySnapshot[]>("get", API.MONITOR_CONCURRENCY),
-  getMonitorRuntime: () => request<RuntimeMetrics>("get", API.MONITOR_RUNTIME),
+    request<ProviderConcurrencySnapshot[]>("get", "/monitor/concurrency"),
+  getMonitorRuntime: () => request<RuntimeMetrics>("get", "/monitor/runtime"),
   killMonitorRequest: (id: string) =>
-    request<{ killed: boolean }>("delete", `${API.MONITOR_REQUEST}/${id}`),
+    request<{ killed: boolean }>("delete", `/monitor/request/${id}`),
 
   recommended: {
     getProviders: () =>
-      request<ProviderGroup[]>("get", API.RECOMMENDED_PROVIDERS),
+      request<ProviderGroup[]>("get", "/recommended/providers"),
     getRetryRules: () =>
-      request<RecommendedRetryRule[]>("get", API.RECOMMENDED_RETRY_RULES),
-    reload: () => request<{ ok: boolean }>("post", API.RECOMMENDED_RELOAD),
+      request<RecommendedRetryRule[]>("get", "/recommended/retry-rules"),
+    reload: () => request<{ ok: boolean }>("post", "/recommended/reload"),
   },
 
   getUsageWindows: (params?: {
     router_key_id?: string;
     provider_id?: string;
   }) =>
-    request<UsageWindowWithUsage[]>("get", API.USAGE_WINDOWS, undefined, {
-      params,
-    }),
+    request<UsageWindowWithUsage[]>("get", "/usage/windows", undefined, { params }),
   getUsageWeekly: (params?: { router_key_id?: string }) =>
-    request<DailyUsage[]>("get", API.USAGE_WEEKLY, undefined, { params }),
+    request<DailyUsage[]>("get", "/usage/weekly", undefined, { params }),
   getUsageMonthly: (params?: { router_key_id?: string }) =>
-    request<DailyUsage[]>("get", API.USAGE_MONTHLY, undefined, { params }),
-
-  getDbSizeInfo: () => request<DbSizeInfoResponse>("get", API.SETTINGS_DB_SIZE),
-  setDbSizeThresholds: (data: {
-    dbMaxSizeMb?: number;
-    logTableMaxSizeMb?: number;
-  }) =>
-    request<{ dbMaxSizeMb: number; logTableMaxSizeMb: number }>(
-      "put",
-      API.SETTINGS_DB_SIZE_THRESHOLDS,
-      data,
-    ),
-  exportConfig: () => request<ConfigExportResponse>("get", API.SETTINGS_EXPORT),
-  importConfig: (data: ConfigExportResponse) =>
-    request<Record<string, number>>("post", API.SETTINGS_IMPORT, data),
-
-  getUpgradeStatus: () => request<UpgradeStatus>("get", API.UPGRADE_STATUS),
-  triggerUpgradeCheck: () =>
-    request<{ ok: boolean }>("post", API.UPGRADE_CHECK),
-  executeUpgrade: (version: string) =>
-    request<{ ok: boolean; version: string }>("post", API.UPGRADE_EXECUTE, {
-      version,
-    }),
-  restartServer: () =>
-    request<{ ok: boolean; method: string }>("post", API.UPGRADE_RESTART),
-  syncConfig: (source: "github" | "gitee") =>
-    request<{ ok: boolean }>("post", API.UPGRADE_SYNC_CONFIG, { source }),
-  setSyncSource: (source: "github" | "gitee") =>
-    request<{ ok: boolean }>("put", API.UPGRADE_SYNC_SOURCE, { source }),
+    request<DailyUsage[]>("get", "/usage/monthly", undefined, { params }),
 
   // Transform Rules
   getTransformRules: (providerId: string) =>
-    request<TransformRule | null>("get", `${API.TRANSFORM_RULES}/${providerId}`),
+    request<TransformRule | null>("get", `/transform-rules/${providerId}`),
   upsertTransformRules: (providerId: string, data: Partial<TransformRule>) =>
-    request<{ success: boolean }>("put", `${API.TRANSFORM_RULES}/${providerId}`, data),
+    request<{ success: boolean }>("put", `/transform-rules/${providerId}`, data),
   deleteTransformRules: (providerId: string) =>
-    request<{ success: boolean }>("delete", `${API.TRANSFORM_RULES}/${providerId}`),
+    request<{ success: boolean }>("delete", `/transform-rules/${providerId}`),
   reloadTransformRules: () =>
-    request<{ loadedPlugins: string[]; rulesCount: number }>("post", `${API.TRANSFORM_RULES}/reload`),
+    request<{ loadedPlugins: string[]; rulesCount: number }>("post", "/transform-rules/reload"),
 
   quickSetup: (data: QuickSetupPayload) =>
-    request<{ success: boolean; provider_id: string }>("post", API.QUICK_SETUP, data),
-
-  getTokenEstimation: () =>
-    request<{ enabled: boolean }>("get", API.TOKEN_ESTIMATION),
-  updateTokenEstimation: (enabled: boolean) =>
-    request<{ success: boolean }>("put", API.TOKEN_ESTIMATION, { enabled }),
-
-  getClientSessionHeaders: () =>
-    request<{ entries: Array<{ client_type: string; session_header_key: string }> }>("get", API.CLIENT_SESSION_HEADERS),
-  updateClientSessionHeaders: (entries: Array<{ client_type: string; session_header_key: string }>) =>
-    request<{ success: boolean }>("put", API.CLIENT_SESSION_HEADERS, { entries }),
+    request<{ success: boolean; provider_id: string }>("post", "/quick-setup", data),
 };
