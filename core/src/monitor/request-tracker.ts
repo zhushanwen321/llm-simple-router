@@ -188,6 +188,17 @@ export class RequestTracker {
     this.broadcast("request_complete", completed);
   }
 
+  /** Update stream metrics for a completed request (e.g., after cache estimation) */
+  updateCompletedMetrics(id: string, cacheReadTokens: number): void {
+    const req = this.recentCompleted.find(r => r.id === id);
+    if (!req || !req.streamMetrics) return;
+    req.streamMetrics = {
+      ...req.streamMetrics,
+      cacheReadTokens,
+    } as any;
+    this.broadcast("request_complete", req);
+  }
+
   // --- Query methods ---
 
   getActive(): ActiveRequest[] {

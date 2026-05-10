@@ -212,8 +212,8 @@ export {
 } from "./router-keys.js";
 export type { RouterKey } from "./router-keys.js";
 
-export { getMetricsSummary, getMetricsTimeseries, insertMetrics } from "./metrics.js";
-export type { MetricsSummaryRow, MetricsTimeseriesRow, MetricsPeriod, MetricsMetric, MetricsRow, MetricsInsert } from "./metrics.js";
+export { getMetricsSummary, getMetricsTimeseries, insertMetrics, getClientTypeBreakdown } from "./metrics.js";
+export type { MetricsSummaryRow, MetricsTimeseriesRow, MetricsPeriod, MetricsMetric, MetricsRow, MetricsInsert, ClientTypeBreakdown } from "./metrics.js";
 
 export { getStats } from "./stats.js";
 export type { Stats } from "./stats.js";

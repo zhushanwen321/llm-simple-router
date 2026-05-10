@@ -5,7 +5,8 @@
     "successRate": "成功率",
     "tokenOutputSpeed": "Token 输出速度",
     "tokenInputTotal": "Token 输入总量",
-    "tokenOutputTotal": "Token 输出总量"
+    "tokenOutputTotal": "Token 输出总量",
+    "cacheHitRate": "缓存命中率"
   },
   "charts": {
     "tokenOutputSpeed": "Token 输出速度 (t/s)",
@@ -18,6 +19,12 @@
     "monthly": "本月",
     "custom": "自定义"
   },
+  "clientType": {
+    "all": "全部",
+    "claude-code": "Claude Code",
+    "pi": "Pi"
+  },
+  "noCacheData": "暂无缓存数据",
   "loadProvidersFailed": "加载供应商列表失败",
   "loadDashboardFailed": "加载仪表盘数据失败"
 }

@@ -19,10 +19,11 @@ export interface FailedToolResult {
 /**
  * 根据请求头识别客户端类型。
  * - Claude Code 独有 x-claude-code-session-id 头
- * - pi 的 User-Agent 包含 "pi-coding-agent"
+ * - pi 的 User-Agent 包含 "pi-coding-agent"，或 x-client-type 为 "pi-coding-agent"
  */
 export function detectClientAgentType(headers: RawHeaders): ClientAgentType {
   if (headers["x-claude-code-session-id"]) return "claude-code";
+  if (headers["x-client-type"] === "pi-coding-agent") return "pi";
   const ua = (typeof headers["user-agent"] === 'string' ? headers["user-agent"] : "").toLowerCase();
   if (ua.includes("pi-coding-agent")) return "pi";
   return "unknown";

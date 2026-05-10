@@ -52,6 +52,7 @@ export function useDashboard() {
   // --- Filters ---
   const modelFilter = ref('all')
   const keyFilter = ref('all')
+  const clientType = ref('all')
   const allModelOptions = ref<string[]>([])
   const keyOptions = ref<{ id: string; name: string }[]>([])
 
@@ -106,6 +107,21 @@ export function useDashboard() {
     return p
   })
 
+  const cacheSummaryParams = computed(() => {
+    const p: Record<string, string> = {}
+    if (periodTab.value !== 'custom') {
+      p.period = periodTab.value
+    } else if (apiStartTime.value && apiEndTime.value) {
+      p.start_time = apiStartTime.value
+      p.end_time = apiEndTime.value
+    }
+    if (selectedProvider.value) p.provider_id = selectedProvider.value
+    if (modelFilter.value !== 'all') p.backend_model = modelFilter.value
+    if (keyFilter.value !== 'all') p.router_key_id = keyFilter.value
+    if (clientType.value !== 'all') p.client_type = clientType.value
+    return p
+  })
+
   const timeseriesPeriod = computed(() => {
     if (periodTab.value === 'custom' && apiStartTime.value && apiEndTime.value) {
       return 'monthly'
@@ -133,6 +149,8 @@ export function useDashboard() {
     totalInputTokens: 0, totalOutputTokens: 0,
     startTime: null, endTime: null,
   })
+  const cacheHitRate = ref(0)
+  const clientTypeBreakdown = ref<Record<string, number>>({})
   const tpsChartData = ref<ChartData<'line'> | null>(null)
   const inputTokensChartData = ref<ChartData<'line'> | null>(null)
   const outputTokensChartData = ref<ChartData<'line'> | null>(null)
@@ -222,11 +240,12 @@ export function useDashboard() {
     if (periodTab.value === 'custom' && !(apiStartTime.value && apiEndTime.value)) return
     loading.value = true
     try {
-      const [statsRes, tpsRes, inputRes, outputRes] = await Promise.allSettled([
+      const [statsRes, tpsRes, inputRes, outputRes, summaryRes] = await Promise.allSettled([
         api.getStats(statsParams.value),
         api.getMetricsTimeseries(tsParams('total_tps')),
         api.getMetricsTimeseries(tsParams('input_tokens')),
         api.getMetricsTimeseries(tsParams('output_tokens')),
+        api.getMetricsSummary(cacheSummaryParams.value),
       ])
 
       const fulfilled = <T>(r: PromiseSettledResult<T>): r is PromiseFulfilledResult<T> => r.status === 'fulfilled'
@@ -257,6 +276,11 @@ export function useDashboard() {
         outputTokensChartData.value = toChartData(filled, t('dashboard.charts.tokenOutputTotal'), CHART_COLORS.green)
       } else {
         outputTokensChartData.value = null
+      }
+
+      if (fulfilled(summaryRes)) {
+        cacheHitRate.value = summaryRes.value.cache_hit_rate
+        clientTypeBreakdown.value = summaryRes.value.client_type_breakdown
       }
     } catch (e: unknown) {
       console.error('Failed to load dashboard:', e)
@@ -289,7 +313,7 @@ export function useDashboard() {
   })
 
   let refreshTimer: ReturnType<typeof setTimeout> | null = null
-  watch([selectedProvider, modelFilter, keyFilter], () => {
+  watch([selectedProvider, modelFilter, keyFilter, clientType], () => {
     if (refreshTimer) clearTimeout(refreshTimer)
     refreshTimer = setTimeout(() => refresh(), 300)
   })
@@ -323,9 +347,10 @@ export function useDashboard() {
   return {
     providers, selectedProvider, sortedProviders,
     periodTab, customStart, customEnd,
-    modelFilter, keyFilter, modelOptions, keyOptions,
+    modelFilter, keyFilter, clientType, modelOptions, keyOptions,
     timeRangeText,
     stats, loading,
+    cacheHitRate, clientTypeBreakdown,
     tpsChartData, inputTokensChartData, outputTokensChartData,
   }
 }

@@ -110,9 +110,9 @@ export function useLogFilters() {
 
   async function loadModelOptions() {
     try {
-      const rows = await api.getMetricsSummary({ period: "30d" });
+      const result = await api.getMetricsSummary({ period: "30d" });
       modelOptions.value = [
-        ...new Set(rows.map((r: { backend_model: string }) => r.backend_model)),
+        ...new Set(result.rows.map((r) => r.backend_model)),
       ];
     } catch {
       modelOptions.value = [];

@@ -6,7 +6,7 @@ import {
   getLogRetentionDays, setLogRetentionDays,
   getDbMaxSizeMb, setDbMaxSizeMb,
   getLogTableMaxSizeMb, setLogTableMaxSizeMb,
-  getSetting,
+  getSetting, getTokenEstimationEnabled, setTokenEstimationEnabled,
 } from "../db/settings.js";
 import { HTTP_BAD_REQUEST } from "./constants.js";
 import { API_CODE, apiError } from "./api-response.js";
@@ -76,6 +76,19 @@ export const adminSettingsRoutes: FastifyPluginCallback<SettingsOptions> = (app,
       dbMaxSizeMb: getDbMaxSizeMb(db),
       logTableMaxSizeMb: getLogTableMaxSizeMb(db),
     };
+  });
+
+  app.get("/admin/api/settings/token-estimation", async () => {
+    return { enabled: getTokenEstimationEnabled(db) };
+  });
+
+  app.put("/admin/api/settings/token-estimation", async (request, reply) => {
+    const { enabled } = request.body as { enabled: boolean };
+    if (typeof enabled !== "boolean") {
+      return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.BAD_REQUEST, "enabled must be a boolean"));
+    }
+    setTokenEstimationEnabled(db, enabled);
+    return { success: true };
   });
 
   done();

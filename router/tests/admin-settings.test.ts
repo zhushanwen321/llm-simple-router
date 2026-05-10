@@ -113,6 +113,60 @@ describe("Admin Settings API", () => {
     expect(putRes.json().data).toEqual({ dbMaxSizeMb: 2048, logTableMaxSizeMb: 1600 });
   });
 
+  it("GET /settings/token-estimation returns default false", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: "/admin/api/settings/token-estimation",
+      headers: { cookie },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().data).toEqual({ enabled: false });
+  });
+
+  it("PUT /settings/token-estimation updates value", async () => {
+    const putRes = await app.inject({
+      method: "PUT",
+      url: "/admin/api/settings/token-estimation",
+      payload: { enabled: true },
+      headers: { cookie },
+    });
+    expect(putRes.statusCode).toBe(200);
+    expect(putRes.json().data).toEqual({ success: true });
+
+    const getRes = await app.inject({
+      method: "GET",
+      url: "/admin/api/settings/token-estimation",
+      headers: { cookie },
+    });
+    expect(getRes.json().data).toEqual({ enabled: true });
+  });
+
+  it("PUT /settings/token-estimation can toggle back to false", async () => {
+    // Set to true first
+    await app.inject({
+      method: "PUT",
+      url: "/admin/api/settings/token-estimation",
+      payload: { enabled: true },
+      headers: { cookie },
+    });
+    // Toggle back to false
+    const putRes = await app.inject({
+      method: "PUT",
+      url: "/admin/api/settings/token-estimation",
+      payload: { enabled: false },
+      headers: { cookie },
+    });
+    expect(putRes.statusCode).toBe(200);
+    expect(putRes.json().data).toEqual({ success: true });
+
+    const getRes = await app.inject({
+      method: "GET",
+      url: "/admin/api/settings/token-estimation",
+      headers: { cookie },
+    });
+    expect(getRes.json().data).toEqual({ enabled: false });
+  });
+
   it("PUT /settings/db-size-thresholds rejects invalid values", async () => {
     const res = await app.inject({
       method: "PUT",

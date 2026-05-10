@@ -38,7 +38,7 @@ function extractTextFromContent(content: unknown): string {
 }
 
 /** 从请求体中提取所有需要计算 token 的文本 */
-function extractAllText(body: Record<string, unknown>): string {
+export function extractAllText(body: Record<string, unknown>): string {
   const parts: string[] = [];
 
   const messages = body.messages as Array<{ role?: string; content?: unknown }> | undefined;

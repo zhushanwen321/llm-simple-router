@@ -84,6 +84,7 @@ const API = {
   SETTINGS_LOG_RETENTION: "/settings/log-retention",
   SCHEDULES: "/schedules",
   SCHEDULES_BY_GROUP: "/schedules/group",
+  TOKEN_ESTIMATION: "/settings/token-estimation",
   UPGRADE_STATUS: "/upgrade/status",
   UPGRADE_CHECK: "/upgrade/check",
   UPGRADE_EXECUTE: "/upgrade/execute",
@@ -264,6 +265,12 @@ interface MetricsSummaryRow {
   total_output_tokens: number;
   total_cache_hit_tokens: number;
   cache_hit_rate: number | null;
+}
+
+interface MetricsSummaryResponse {
+  rows: MetricsSummaryRow[];
+  client_type_breakdown: Record<string, number>;
+  cache_hit_rate: number;
 }
 
 interface StatsResponse {
@@ -451,10 +458,11 @@ export const api = {
     provider_id?: string;
     backend_model?: string;
     router_key_id?: string;
+    client_type?: string;
     start_time?: string;
     end_time?: string;
   }) =>
-    request<MetricsSummaryRow[]>("get", API.METRICS_SUMMARY, undefined, {
+    request<MetricsSummaryResponse>("get", API.METRICS_SUMMARY, undefined, {
       params,
     }),
   getMetricsTimeseries: (params: {
@@ -595,4 +603,9 @@ export const api = {
 
   quickSetup: (data: QuickSetupPayload) =>
     request<{ success: boolean; provider_id: string }>("post", API.QUICK_SETUP, data),
+
+  getTokenEstimation: () =>
+    request<{ enabled: boolean }>("get", API.TOKEN_ESTIMATION),
+  updateTokenEstimation: (enabled: boolean) =>
+    request<{ success: boolean }>("put", API.TOKEN_ESTIMATION, { enabled }),
 };

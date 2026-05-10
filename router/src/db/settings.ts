@@ -58,6 +58,15 @@ export function getDetailLogEnabled(db: Database.Database): boolean {
   return row ? row.value !== "0" : true;
 }
 
+export function getTokenEstimationEnabled(db: Database.Database): boolean {
+  const val = getSetting(db, "token_estimation_enabled");
+  return val === "true";
+}
+
+export function setTokenEstimationEnabled(db: Database.Database, enabled: boolean): void {
+  setSetting(db, "token_estimation_enabled", enabled ? "true" : "false");
+}
+
 const DEFAULT_LOG_FILE_RETENTION_DAYS = 3;
 
 export function getLogFileRetentionDays(db: Database.Database): number {
