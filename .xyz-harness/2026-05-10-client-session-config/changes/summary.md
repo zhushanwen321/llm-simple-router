@@ -44,6 +44,15 @@
 - 摘要：实现客户端 session header 配置化的 DB 层、Admin API、检测逻辑重构。14 个目标测试全部通过，1174 个全量测试通过，build + lint 无错误。
 - 时间：2026-05-10T13:08:00+08:00
 
+## 阶段 3 - 编码实现 (Task 4)
+
+- 状态：done
+- 变更文件：
+  - frontend/src/api/client.ts — 新增 CLIENT_SESSION_HEADERS API 常量、getClientSessionHeaders/updateClientSessionHeaders 方法
+  - frontend/src/views/ProxyEnhancement.vue — 新增「客户端识别」Card（Badge+Input+增删按钮），遵循保存按钮模式，统一 handleSave 提交
+- 摘要：前端 ProxyEnhancement 页面新增客户端识别配置 Card。vue-tsc + eslint 验证通过。
+- 时间：2026-05-10T14:00:00+08:00
+
 ## 阶段 3 - 编码实现 (Task 5)
 
 - 状态：done

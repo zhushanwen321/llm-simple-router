@@ -92,6 +92,7 @@ const API = {
   UPGRADE_SYNC_CONFIG: "/upgrade/sync-config",
   UPGRADE_SYNC_SOURCE: "/upgrade/sync-source",
   TRANSFORM_RULES: "/transform-rules",
+  CLIENT_SESSION_HEADERS: "/settings/client-session-headers",
   QUICK_SETUP: "/quick-setup",
 } as const;
 
@@ -608,4 +609,9 @@ export const api = {
     request<{ enabled: boolean }>("get", API.TOKEN_ESTIMATION),
   updateTokenEstimation: (enabled: boolean) =>
     request<{ success: boolean }>("put", API.TOKEN_ESTIMATION, { enabled }),
+
+  getClientSessionHeaders: () =>
+    request<{ entries: Array<{ client_type: string; session_header_key: string }> }>("get", API.CLIENT_SESSION_HEADERS),
+  updateClientSessionHeaders: (entries: Array<{ client_type: string; session_header_key: string }>) =>
+    request<{ success: boolean }>("put", API.CLIENT_SESSION_HEADERS, { entries }),
 };
