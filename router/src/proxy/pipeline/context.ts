@@ -10,8 +10,6 @@ export function createPipelineContext(
 ): PipelineContext {
   const body = request.body as Record<string, unknown>;
   const clientModel = (body.model as string) || "unknown";
-  const sessionHeader = request.headers["x-claude-code-session-id"];
-  const sessionId = Array.isArray(sessionHeader) ? sessionHeader[0] : sessionHeader;
   const rawBody = body ? structuredClone(body) : {};
 
   return {
@@ -20,7 +18,6 @@ export function createPipelineContext(
     rawBody,
     clientModel,
     apiType,
-    sessionId,
     body,
     isStream: body.stream === true,
     resolved: null,

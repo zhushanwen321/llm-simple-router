@@ -28,7 +28,7 @@ export interface OrchestratorConfig {
   isStream: boolean;
   /** 外部生成的 tracker ID，用于 tracker.appendStreamChunk / tracker.update 等回调匹配 */
   trackerId?: string;
-  /** Claude Code 的 session ID，从 x-claude-code-session-id 请求头获取 */
+  /** Session ID，由 client-detection hook 通过 metadata 设置 */
   sessionId?: string;
   /** 客户端请求的 JSON 字符串（headers + body），用于 Monitor 实时查看 */
   clientRequest?: string;

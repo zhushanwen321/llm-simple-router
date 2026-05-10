@@ -25,18 +25,31 @@ export interface FailedToolResult {
 }
 
 /**
- * 根据配置的 session header 匹配请求头，识别客户端类型并提取 session_id。
- * 遍历配置列表，第一个匹配的条目确定 client_type 和 session_id。
+ * 根据配置的 session header 匹配请求头或请求体，识别客户端类型并提取 session_id。
+ * 遍历配置列表，先检查 headers，再 fallback 检查 body 顶层字段。
+ * 第一个匹配的条目确定 client_type 和 session_id。
  * 无匹配返回 { client_type: "unknown", session_id: undefined }。
+ *
+ * body fallback 用于 pi-coding-agent 等无法动态修改 HTTP headers 的客户端：
+ * 这些客户端通过 before_provider_request 将 session_id 写入 payload 顶层字段。
  */
 export function detectClient(
   headers: RawHeaders,
   config: ClientSessionHeaderEntry[],
+  body?: Record<string, unknown>,
 ): ClientDetectionResult {
   for (const entry of config) {
-    const value = headers[entry.session_header_key];
-    if (value && typeof value === "string") {
-      return { client_type: entry.client_type, session_id: value };
+    // 优先从 headers 中查找
+    const headerValue = headers[entry.session_header_key];
+    if (headerValue && typeof headerValue === "string") {
+      return { client_type: entry.client_type, session_id: headerValue };
+    }
+    // Fallback: 从 body 顶层字段查找（pi 等客户端无法动态修改 headers）
+    if (body) {
+      const bodyValue = body[entry.session_header_key];
+      if (bodyValue && typeof bodyValue === "string") {
+        return { client_type: entry.client_type, session_id: bodyValue };
+      }
     }
   }
   return { client_type: "unknown", session_id: undefined };
