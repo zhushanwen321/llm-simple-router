@@ -2,6 +2,7 @@ import { convertMessagesOA2Ant, convertMessagesAnt2OA } from "./message-mapper.j
 import { convertToolsOA2Ant, convertToolsAnt2OA, mapToolChoiceOA2Ant, mapToolChoiceAnt2OA } from "./tool-mapper.js";
 import { mapReasoningToThinking, mapThinkingToReasoning } from "./thinking-mapper.js";
 import { stripProviderMeta } from "./provider-meta.js";
+import type { ChatCompletionRequest, AnthropicMessage, AnthropicContentBlock } from "./types.js";
 
 const DEFAULT_MAX_TOKENS = 4096;
 const OA_KNOWN_FIELDS = new Set([
@@ -25,58 +26,66 @@ function logDroppedFields(body: Record<string, unknown>, known: Set<string>, dir
   }
 }
 
+/** ChatCompletionRequest 补充工具层使用的额外字段 */
+type FullOARequest = ChatCompletionRequest & {
+  stop?: string | string[];
+  parallel_tool_calls?: boolean;
+  user?: string;
+};
+
 export function openaiToAnthropicRequest(body: Record<string, unknown>): Record<string, unknown> {
   // strip provider_meta before processing, restore PSF to messages later
   const { meta: antMeta, body: cleanedBody } = stripProviderMeta(body);
+  const req = cleanedBody as unknown as FullOARequest;
 
   const result: Record<string, unknown> = {};
-  result.model = cleanedBody.model;
+  result.model = req.model;
 
-  const { system, messages } = convertMessagesOA2Ant(cleanedBody.messages as unknown[] ?? []);
+  const { system, messages } = convertMessagesOA2Ant(req.messages ?? []);
   if (system != null) result.system = system;
   result.messages = messages;
 
-  result.max_tokens = cleanedBody.max_completion_tokens ?? cleanedBody.max_tokens ?? DEFAULT_MAX_TOKENS;
+  result.max_tokens = req.max_completion_tokens ?? req.max_tokens ?? DEFAULT_MAX_TOKENS;
 
-  if (cleanedBody.stop != null) {
-    result.stop_sequences = Array.isArray(cleanedBody.stop) ? cleanedBody.stop : [cleanedBody.stop];
+  if (req.stop != null) {
+    result.stop_sequences = Array.isArray(req.stop) ? req.stop : [req.stop];
   }
 
-  if (cleanedBody.temperature != null) result.temperature = cleanedBody.temperature;
-  if (cleanedBody.top_p != null) result.top_p = cleanedBody.top_p;
-  if (cleanedBody.stream != null) result.stream = cleanedBody.stream;
+  if (req.temperature != null) result.temperature = req.temperature;
+  if (req.top_p != null) result.top_p = req.top_p;
+  if (req.stream != null) result.stream = req.stream;
 
-  if (cleanedBody.tool_choice === "none" || (typeof cleanedBody.tool_choice === "object" && (cleanedBody.tool_choice as Record<string, unknown>).type === "none")) {
+  if (req.tool_choice === "none" || (typeof req.tool_choice === "object" && (req.tool_choice as Record<string, unknown>).type === "none")) {
     // Anthropic has no "none" tool_choice — skip tools entirely
   } else {
-    if (cleanedBody.tools) {
-      result.tools = convertToolsOA2Ant(cleanedBody.tools as unknown[]);
+    if (req.tools) {
+      result.tools = convertToolsOA2Ant(req.tools);
     }
-    if (cleanedBody.tool_choice != null) {
-      const mapped = mapToolChoiceOA2Ant(cleanedBody.tool_choice);
+    if (req.tool_choice != null) {
+      const mapped = mapToolChoiceOA2Ant(req.tool_choice);
       if (mapped != null) {
-        result.tool_choice = cleanedBody.parallel_tool_calls === false
+        result.tool_choice = req.parallel_tool_calls === false
           ? { ...(mapped as Record<string, unknown>), disable_parallel_tool_use: true }
           : mapped;
       }
-    } else if (cleanedBody.parallel_tool_calls === false) {
+    } else if (req.parallel_tool_calls === false) {
       result.tool_choice = { type: "auto", disable_parallel_tool_use: true };
     }
   }
 
-  if (cleanedBody.reasoning) {
-    const thinking = mapReasoningToThinking(cleanedBody.reasoning as Record<string, unknown>);
+  if (req.reasoning) {
+    const thinking = mapReasoningToThinking(req.reasoning);
     result.thinking = thinking;
     if (thinking.budget_tokens && (result.max_tokens as number) < (thinking.budget_tokens as number)) {
       result.max_tokens = thinking.budget_tokens;
     }
   }
 
-  if (cleanedBody.user) {
-    result.metadata = { user_id: cleanedBody.user };
+  if (req.user) {
+    result.metadata = { user_id: req.user };
   }
 
-  if (cleanedBody.response_format) {
+  if (req.response_format) {
     console.warn("[request-transform] response_format dropped: Anthropic has no JSON mode");
   }
 
@@ -84,18 +93,18 @@ export function openaiToAnthropicRequest(body: Record<string, unknown>): Record<
   if (antMeta?.thinking_signatures?.length || antMeta?.redacted_thinking?.length) {
     let sigIdx = 0;
     let redactedApplied = false;
-    for (const msg of result.messages as Array<Record<string, unknown>>) {
+    for (const msg of result.messages as Array<{ role: string; content: AnthropicContentBlock[] }>) {
       if (msg.role !== "assistant") continue;
-      const content = msg.content as Array<Record<string, unknown>> | undefined;
-      if (!content) continue;
+      if (!msg.content) continue;
       if (antMeta?.redacted_thinking?.length && !redactedApplied) {
-        msg.content = [...antMeta.redacted_thinking, ...content];
+        msg.content = [...antMeta.redacted_thinking as AnthropicContentBlock[], ...msg.content];
         redactedApplied = true;
       }
       if (antMeta?.thinking_signatures?.length) {
-        for (const block of (msg.content as Array<Record<string, unknown>>)) {
+        for (const block of msg.content) {
           if (block.type === "thinking" && sigIdx < antMeta.thinking_signatures.length) {
-            block.signature = antMeta.thinking_signatures[sigIdx].signature;
+            // PSF extension: signature not in AnthropicThinkingBlock
+            (block as unknown as Record<string, unknown>).signature = antMeta.thinking_signatures[sigIdx].signature;
             sigIdx++;
           }
         }
@@ -108,38 +117,51 @@ export function openaiToAnthropicRequest(body: Record<string, unknown>): Record<
 }
 
 export function anthropicToOpenAIRequest(body: Record<string, unknown>): Record<string, unknown> {
+  const req = body as unknown as {
+    model: string;
+    messages?: AnthropicMessage[];
+    system?: unknown;
+    max_tokens?: number;
+    stop_sequences?: string[];
+    temperature?: number;
+    top_p?: number;
+    stream?: boolean;
+    tools?: Array<{ name: string; description?: string; input_schema?: Record<string, unknown> }>;
+    tool_choice?: unknown;
+    thinking?: Record<string, unknown>;
+    metadata?: Record<string, unknown>;
+  };
+
   const result: Record<string, unknown> = {};
-  result.model = body.model;
+  result.model = req.model;
 
-  const antMessages = body.messages as unknown[] ?? [];
-  result.messages = convertMessagesAnt2OA(body.system, antMessages);
+  result.messages = convertMessagesAnt2OA(req.system, req.messages ?? []);
 
-  if (body.max_tokens != null) result.max_completion_tokens = body.max_tokens;
-  if (body.stop_sequences) result.stop = body.stop_sequences;
+  if (req.max_tokens != null) result.max_completion_tokens = req.max_tokens;
+  if (req.stop_sequences) result.stop = req.stop_sequences;
 
-  if (body.temperature != null) result.temperature = body.temperature;
-  if (body.top_p != null) result.top_p = body.top_p;
-  if (body.stream != null) result.stream = body.stream;
+  if (req.temperature != null) result.temperature = req.temperature;
+  if (req.top_p != null) result.top_p = req.top_p;
+  if (req.stream != null) result.stream = req.stream;
 
-  if (body.stream === true) {
+  if (req.stream === true) {
     result.stream_options = { include_usage: true };
   }
 
-  if (body.tools) {
-    result.tools = convertToolsAnt2OA(body.tools as unknown[]);
+  if (req.tools) {
+    result.tools = convertToolsAnt2OA(req.tools);
   }
-  if (body.tool_choice != null) {
-    result.tool_choice = mapToolChoiceAnt2OA(body.tool_choice);
+  if (req.tool_choice != null) {
+    result.tool_choice = mapToolChoiceAnt2OA(req.tool_choice);
   }
 
-  if (body.thinking) {
-    const reasoning = mapThinkingToReasoning(body.thinking as Record<string, unknown>);
+  if (req.thinking) {
+    const reasoning = mapThinkingToReasoning(req.thinking);
     if (reasoning) result.reasoning = reasoning;
   }
 
-  const metadata = body.metadata as Record<string, unknown> | undefined;
-  if (metadata?.user_id) {
-    result.user = metadata.user_id;
+  if (req.metadata?.user_id) {
+    result.user = req.metadata.user_id;
   }
 
   logDroppedFields(body, ANT_KNOWN_FIELDS, "Ant→OA");

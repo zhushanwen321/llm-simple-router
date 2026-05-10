@@ -1,11 +1,11 @@
+import type { ChatCompletionTool } from "./types.js";
+
 /** OpenAI tools[] → Anthropic tools[] */
-export function convertToolsOA2Ant(tools: unknown[]): unknown[] {
+export function convertToolsOA2Ant(tools: ChatCompletionTool[]): unknown[] {
   return tools.map((t) => {
-    const tool = t as Record<string, unknown>;
-    const fn = tool.function as Record<string, unknown>;
-    const result: Record<string, unknown> = { name: fn.name };
-    if (fn.description != null) result.description = fn.description;
-    if (fn.parameters != null) result.input_schema = fn.parameters;
+    const result: Record<string, unknown> = { name: t.function.name };
+    if (t.function.description != null) result.description = t.function.description;
+    if (t.function.parameters != null) result.input_schema = t.function.parameters;
     return result;
   });
 }
@@ -13,7 +13,7 @@ export function convertToolsOA2Ant(tools: unknown[]): unknown[] {
 /** Anthropic tools[] → OpenAI tools[] */
 export function convertToolsAnt2OA(tools: unknown[]): unknown[] {
   return tools.map((t) => {
-    const tool = t as Record<string, unknown>;
+    const tool = t as { name: string; description?: string; input_schema?: Record<string, unknown> };
     return {
       type: "function",
       function: {
@@ -31,10 +31,9 @@ export function mapToolChoiceOA2Ant(tc: unknown): unknown {
   if (tc === "auto") return { type: "auto" };
   if (tc === "required") return { type: "any" };
   if (typeof tc === "object" && tc !== null) {
-    const obj = tc as Record<string, unknown>;
+    const obj = tc as { type?: string; function?: { name?: string } };
     if (obj.type === "function" && obj.function) {
-      const fn = obj.function as Record<string, unknown>;
-      return { type: "tool", name: fn.name };
+      return { type: "tool", name: obj.function.name };
     }
   }
   return { type: "auto" };
@@ -48,7 +47,7 @@ export function mapToolChoiceAnt2OA(tc: unknown): unknown {
     return "auto";
   }
   if (typeof tc === "object" && tc !== null) {
-    const obj = tc as Record<string, unknown>;
+    const obj = tc as { type?: string; name?: string; disable_parallel_tool_use?: boolean };
     if (obj.type === "auto") {
       if (obj.disable_parallel_tool_use) return { type: "auto", parallel_tool_calls: false };
       return "auto";
