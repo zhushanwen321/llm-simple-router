@@ -32,7 +32,7 @@ import { buildTransportFn } from "../transport/transport-fn.js";
 import { parseModels } from "../../config/model-context.js";
 import { applyProviderPatches } from "../patch/index.js";
 import { loadEnhancementConfig } from "../routing/enhancement-config.js";
-import { extractFailedToolResults, getTransportStatusCode, detectClientAgentType, serializeBlocksForStorage } from "./proxy-handler-utils.js";
+import { extractFailedToolResults, getTransportStatusCode, serializeBlocksForStorage } from "./proxy-handler-utils.js";
 import type { FailedToolResult } from "./proxy-handler-utils.js";
 import { logToolErrors } from "../tool-error-logger.js";
 import type { Target } from "../../core/types.js";
@@ -162,10 +162,10 @@ export async function executeFailoverLoop(
     if (!pendingToolErrors) return;
     logToolErrors(pendingToolErrors, {
       db, providerId, backendModel: model,
-      clientAgentType: detectClientAgentType(request.headers as RawHeaders),
+      clientAgentType: ctx.metadata.get("client_type") as string ?? "unknown",
       requestLogId: reqLogId,
       routerKeyId: request.routerKey?.id ?? null,
-      sessionId: ctx.sessionId,
+      sessionId: ctx.metadata.get("session_id") as string | undefined,
     });
     pendingToolErrors = null;
   };
@@ -199,7 +199,7 @@ export async function executeFailoverLoop(
       db, logId, apiType: ctx.apiType, model: clientModel,
       startTime, isStream, routerKeyId, originalBody: rawBody, clientHeaders: cliHdrs,
       isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null,
-      sessionId: ctx.sessionId,
+      sessionId: ctx.metadata.get("session_id") as string | undefined,
       pipelineSnapshot: iterationSnapshot.toJSON(),
       matcher, logFileWriter,
     };
@@ -247,7 +247,7 @@ export async function executeFailoverLoop(
       toolErrorsLogged = true;
       const failures = extractFailedToolResults(ctx.body);
       if (failures.length > 0) {
-        request.log.info({ failures: failures.length, sessionId: ctx.sessionId }, "Tool error results detected");
+        request.log.info({ failures: failures.length, sessionId: ctx.metadata.get("session_id") }, "Tool error results detected");
         pendingToolErrors = failures;
       }
     }
@@ -363,7 +363,7 @@ export async function executeFailoverLoop(
     try {
       const resilienceResult = await orchestrator.handle(
         request, reply, clientApiType,
-        { resolved, provider, clientModel, isStream, trackerId: logId, sessionId: ctx.sessionId, clientRequest: clientReq, upstreamRequest: upstreamReqBase, concurrencyOverride },
+        { resolved, provider, clientModel, isStream, trackerId: logId, sessionId: ctx.metadata.get("session_id") as string | undefined, clientRequest: clientReq, upstreamRequest: upstreamReqBase, concurrencyOverride },
         { retryBaseDelayMs: config.RETRY_BASE_DELAY_MS, isFailover, ruleMatcher: matcher, transportFn },
       );
 
@@ -373,14 +373,14 @@ export async function executeFailoverLoop(
         {
           apiType: clientApiType,
           model: clientModel, providerId: provider.id, isStream,
-          clientReq, upstreamReqBase, logId, routerKeyId, originalModel: null, sessionId: ctx.sessionId,
+          clientReq, upstreamReqBase, logId, routerKeyId, originalModel: null, sessionId: ctx.metadata.get("session_id") as string | undefined,
           failover: { isFailoverIteration, rootLogId: rootLogId! },
           pipelineSnapshot,
           matcher, logFileWriter,
         },
         resilienceResult.attempts, resilienceResult.result, startTime,
       );
-      collectTransportMetrics(db, clientApiType, resilienceResult.result, isStream, lastLogId, provider.id, resolved.backend_model, request, routerKeyId, getTransportStatusCode(resilienceResult.result), ctx.metadata.get("client_type") as string | undefined, (ctx.metadata.get("session_id") as string | undefined) ?? ctx.sessionId, tracker);
+      collectTransportMetrics(db, clientApiType, resilienceResult.result, isStream, lastLogId, provider.id, resolved.backend_model, request, routerKeyId, getTransportStatusCode(resilienceResult.result), ctx.metadata.get("client_type") as string | undefined, ctx.metadata.get("session_id") as string | undefined, tracker);
 
       // flush tool errors
       flushToolErrors(provider.id, resolved.backend_model ?? clientModel, lastLogId);
@@ -455,7 +455,7 @@ export async function executeFailoverLoop(
             {
               apiType: clientApiType,
               model: clientModel, providerId: provider.id, isStream,
-              clientReq, upstreamReqBase, logId, routerKeyId, originalModel: null, sessionId: ctx.sessionId,
+              clientReq, upstreamReqBase, logId, routerKeyId, originalModel: null, sessionId: ctx.metadata.get("session_id") as string | undefined,
               failover: { isFailoverIteration, rootLogId: rootLogId! },
               pipelineSnapshot,
               matcher, logFileWriter,
@@ -495,7 +495,7 @@ export async function executeFailoverLoop(
         client_request: clientReq, upstream_request: upstreamReqBase,
         is_failover: isFailoverIteration ? 1 : 0, original_request_id: isFailoverIteration ? rootLogId : null,
         router_key_id: routerKeyId, original_model: null,
-        session_id: ctx.sessionId,
+        session_id: ctx.metadata.get("session_id") as string | undefined,
         pipeline_snapshot: pipelineSnapshot,
       }, (matcher || logFileWriter) ? {
         matcher, logFileWriter, responseBody: null,

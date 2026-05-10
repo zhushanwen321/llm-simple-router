@@ -25,7 +25,8 @@ export const enhancementPreprocessHook: PipelineHook = {
   phase: "pre_route",
   priority: 110,
   execute(ctx: PipelineContext): void {
-    const { request, body, sessionId, metadata } = ctx;
+    const { request, body, metadata } = ctx;
+    const sessionId = metadata.get("session_id") as string | undefined;
     const db = metadata.get("db") as Database.Database;
     const container = metadata.get("container") as ServiceContainer;
     if (!db || !container) return;

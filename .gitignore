@@ -114,6 +114,7 @@ __pycache__/
 .mcp.json
 .playwright-mcp/
 .superpowers/
+.xyz-harness/gate/
 
 # Build output
 frontend-dist/

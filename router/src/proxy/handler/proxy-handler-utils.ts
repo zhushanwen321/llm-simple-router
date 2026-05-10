@@ -9,7 +9,15 @@ const HASH_DIGEST_LENGTH = 16;
 
 // ---------- Tool Error Logging ----------
 
-export type ClientAgentType = "claude-code" | "pi" | "unknown";
+export interface ClientSessionHeaderEntry {
+  client_type: string;
+  session_header_key: string;
+}
+
+export interface ClientDetectionResult {
+  client_type: string;
+  session_id: string | undefined;
+}
 
 export interface FailedToolResult {
   toolName: string;
@@ -17,16 +25,21 @@ export interface FailedToolResult {
 }
 
 /**
- * 根据请求头识别客户端类型。
- * - Claude Code 独有 x-claude-code-session-id 头
- * - pi 的 User-Agent 包含 "pi-coding-agent"，或 x-client-type 为 "pi-coding-agent"
+ * 根据配置的 session header 匹配请求头，识别客户端类型并提取 session_id。
+ * 遍历配置列表，第一个匹配的条目确定 client_type 和 session_id。
+ * 无匹配返回 { client_type: "unknown", session_id: undefined }。
  */
-export function detectClientAgentType(headers: RawHeaders): ClientAgentType {
-  if (headers["x-claude-code-session-id"]) return "claude-code";
-  if (headers["x-client-type"] === "pi-coding-agent") return "pi";
-  const ua = (typeof headers["user-agent"] === 'string' ? headers["user-agent"] : "").toLowerCase();
-  if (ua.includes("pi-coding-agent")) return "pi";
-  return "unknown";
+export function detectClient(
+  headers: RawHeaders,
+  config: ClientSessionHeaderEntry[],
+): ClientDetectionResult {
+  for (const entry of config) {
+    const value = headers[entry.session_header_key];
+    if (value && typeof value === "string") {
+      return { client_type: entry.client_type, session_id: value };
+    }
+  }
+  return { client_type: "unknown", session_id: undefined };
 }
 
 /**

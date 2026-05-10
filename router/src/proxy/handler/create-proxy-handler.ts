@@ -137,7 +137,7 @@ function applyEnhancementPreprocess(
 ): void {
   const enhancementConfig = loadEnhancementConfig(db);
   const apiType = ctx.apiType as "openai" | "openai-responses" | "anthropic";
-  const sessionId = ctx.sessionId;
+  const sessionId = ctx.metadata.get("session_id") as string | undefined;
 
   // 工具轮数限制
   if (enhancementConfig.tool_round_limit_enabled) {

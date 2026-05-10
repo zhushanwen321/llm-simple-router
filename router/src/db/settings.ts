@@ -73,3 +73,34 @@ export function getLogFileRetentionDays(db: Database.Database): number {
   const row = db.prepare("SELECT value FROM settings WHERE key = ?").get("log_file_retention_days") as { value: string } | undefined;
   return row ? parseInt(row.value, 10) : DEFAULT_LOG_FILE_RETENTION_DAYS;
 }
+
+// ---------- Client Session Headers ----------
+
+export interface ClientSessionHeaderEntry {
+  client_type: string;
+  session_header_key: string;
+}
+
+const DEFAULT_CLIENT_SESSION_HEADERS: ClientSessionHeaderEntry[] = [
+  { client_type: "claude-code", session_header_key: "x-claude-code-session-id" },
+  { client_type: "pi", session_header_key: "x-pi-session-id" },
+];
+
+export function getClientSessionHeaders(db: Database.Database): ClientSessionHeaderEntry[] {
+  const val = getSetting(db, "client_session_headers");
+  if (!val) return DEFAULT_CLIENT_SESSION_HEADERS;
+  try {
+    const parsed = JSON.parse(val);
+    if (!Array.isArray(parsed) || parsed.length === 0) return DEFAULT_CLIENT_SESSION_HEADERS;
+    return parsed;
+  } catch {
+    return DEFAULT_CLIENT_SESSION_HEADERS;
+  }
+}
+
+export function setClientSessionHeaders(db: Database.Database, entries: ClientSessionHeaderEntry[]): void {
+  if (!Array.isArray(entries) || entries.length === 0) {
+    throw new Error("entries must be a non-empty array");
+  }
+  setSetting(db, "client_session_headers", JSON.stringify(entries));
+}
