@@ -2,24 +2,28 @@
 
 > 分析日期：2025-05-10
 > 分支：feat-performance-impr-more
+>
+> ## 状态说明
+> - ✅ = 已完成（Round 1）
+> - ⬜ = 待实施
 
 ## 一、后端热路径（代理转发链路）
 
 | 编号 | 级别 | 问题 | 预估收益 |
 |------|------|------|----------|
-| BP-C1 | CRITICAL | 无 HTTP Agent 连接复用，每次请求新建 TCP+TLS 连接 | P50 降低 30-80ms |
+| BP-C1 | CRITICAL | 无 HTTP Agent 连接复用，每次请求新建 TCP+TLS 连接 | P50 降低 30-80ms | ✅ |
 | BP-C2 | CRITICAL | CacheEstimator 重复 tokenize，同一请求最多 4-6 次 BPE 编码 | 长对话 P50 降低 30-100ms |
 | BP-C3 | CRITICAL | failover 循环每次迭代 `structuredClone(body)` 深拷贝 | 正常请求 P50 降低 5-50ms |
 | BP-H1 | HIGH | `loadEnhancementConfig()` 每次请求查 DB | 每请求减少 2-4 次 SQLite 查询 |
 | BP-H2 | HIGH | `resolveMapping()` 每次迭代查 DB，无缓存 | 减少 90%+ mapping 查询 |
-| BP-H3 | HIGH | API Key 每次 failover 迭代重复 AES 解密 | failover 场景减少冗余密码学操作 |
-| BP-H4 | HIGH | 日志 `JSON.stringify` 请求体在循环内重复 3 次 | 大 body P50 降低 3-15ms |
-| BP-H5 | HIGH | `excludedTargets` 用 `Array.some()` 做 O(N×M) 过滤 | 10+ targets 场景有意义 |
+| BP-H3 | HIGH | API Key 每次 failover 迭代重复 AES 解密 | failover 场景减少冗余密码学操作 | ✅ |
+| BP-H4 | HIGH | 日志 `JSON.stringify` 请求体在循环内重复 3 次 | 大 body P50 降低 3-15ms | ✅ |
+| BP-H5 | HIGH | `excludedTargets` 用 `Array.some()` 做 O(N×M) 过滤 | 10+ targets 场景有意义 | ✅ |
 | BP-M1 | MEDIUM | Pipeline hooks 串行执行 | 当前 <1ms，未来扩展瓶颈 |
-| BP-M2 | MEDIUM | SSE `\r\n` 每个 chunk 做正则替换 | 减少 50%+ 临时字符串分配 |
+| BP-M2 | MEDIUM | SSE `\r\n` 每个 chunk 做正则替换 | 减少 50%+ 临时字符串分配 | ✅ |
 | BP-M3 | MEDIUM | `Buffer.concat` 在 BUFFERING 状态每 chunk 调用 | CPU 降低 30-50% |
 | BP-M4 | MEDIUM | `allowed_models` 每次请求重复 JSON.parse | 消除冗余解析 |
-| BP-M5 | MEDIUM | `parseModels()` 无缓存，重复 JSON.parse | 消除 failover 中重复解析 |
+| BP-M5 | MEDIUM | `parseModels()` 无缓存，重复 JSON.parse | 消除 failover 中重复解析 | ✅ |
 | BP-M6 | MEDIUM | `collectTransportMetrics` 重复调用 cache estimation | 长对话减少一次完整 tokenize |
 
 ### BP-C1: 无 HTTP Agent 连接复用
@@ -81,11 +85,11 @@
 
 | 编号 | 级别 | 问题 | 预估收益 |
 |------|------|------|----------|
-| BI-C1 | CRITICAL | SQLite 缺 `synchronous=NORMAL`/`cache_size`/`busy_timeout` 等关键 PRAGMA | 代理写入延迟降 30-50% |
+| BI-C1 | CRITICAL | SQLite 缺 `synchronous=NORMAL`/`cache_size`/`busy_timeout` 等关键 PRAGMA | 代理写入延迟降 30-50% | ✅ |
 | BI-C2 | CRITICAL | Prepared statements 未缓存，每次查询重新编译 SQL | 每请求减少 0.1-0.3ms |
-| BI-C3 | CRITICAL | MetricsExtractor 对 thinking 内容完整 tokenize | thinking 模型 metrics 延迟降 50-80% |
-| BI-H1 | HIGH | `request_logs` 缺复合索引 | 10 万行查询从 500ms 降到 50ms |
-| BI-H2 | HIGH | `request_metrics` 缺 `router_key_id` 索引 | Dashboard 聚合提升 5-10x |
+| BI-C3 | CRITICAL | MetricsExtractor 对 thinking 内容完整 tokenize | thinking 模型 metrics 延迟降 50-80% | ✅ |
+| BI-H1 | HIGH | `request_logs` 缺复合索引 | 10 万行查询从 500ms 降到 50ms | ✅ |
+| BI-H2 | HIGH | `request_metrics` 缺 `router_key_id` 索引 | Dashboard 聚合提升 5-10x | ✅ |
 | BI-H3 | HIGH | `log-file-writer` 用 `appendFileSync` 阻塞事件循环 | 高并发减少 0.5-2ms/请求 |
 | BI-H4 | HIGH | SSE 广播频率过高（5s 定时 + 流内容叠加） | Monitor 空转 CPU 降 50%+ |
 | BI-H5 | HIGH | `estimateLogTableSize()` 全表扫描 | 大表监控从秒级降到毫秒级 |
@@ -93,7 +97,7 @@
 | BI-M2 | MEDIUM | MetricsExtractor 缓冲区无上限 + O(n²) 字符串拼接 | 长请求内存降 50%+ |
 | BI-M3 | MEDIUM | `getRequestLogsGrouped()` N+1 子查询 | grouped 视图查询优化 |
 | BI-M4 | MEDIUM | StatsAggregator 每次 5s 调用做 O(n log n) 排序 | Monitor 推送 CPU 降 60% |
-| BI-M5 | MEDIUM | Auth 拒绝请求写日志 | 攻击场景 DB 负载降 50%+ |
+| BI-M5 | MEDIUM | Auth 拒绝请求写日志 | 攻击场景 DB 负载降 50%+ | ✅ |
 
 ### BI-C1: SQLite PRAGMA 缺失
 - **文件**: `router/src/db/index.ts:initDatabase()`
@@ -139,17 +143,17 @@
 
 | 编号 | 级别 | 问题 | 预估收益 |
 |------|------|------|----------|
-| FE-H1 | HIGH | Dashboard `loadProviderOutputTokens()` N+1 请求 | Provider >5 时首屏加速 |
+| FE-H1 | HIGH | Dashboard `loadProviderOutputTokens()` N+1 请求 | Provider >5 时首屏加速 | ✅ |
 | FE-H2 | HIGH | Dashboard `refresh()` 每次触发 5 个并行请求 | 首屏时间减少 30-50% |
-| FE-H3 | HIGH | SSE `stream_content_update` 频繁 re-render | Monitor 流畅度 |
+| FE-H3 | HIGH | SSE `stream_content_update` 频繁 re-render | Monitor 流畅度 | ✅ |
 | FE-H4 | HIGH | 路由切换重复鉴权请求 | 每次导航减少 1 请求 |
-| FE-H5 | HIGH | Chart.js 注册了不需要的模块 | 减少约 20KB gzip |
+| FE-H5 | HIGH | Chart.js 注册了不需要的模块 | 减少约 20KB gzip | ✅ |
 | FE-M1 | MEDIUM | useSSEParsing computed 链 | 日志详情打开速度 |
 | FE-M2 | MEDIUM | LogTableRow 重复 useClipboard/useI18n 实例 | 内存优化 |
-| FE-M3 | MEDIUM | Monitor now ref 每秒 re-render | 活跃请求多时流畅度 |
-| FE-M4 | MEDIUM | SSE 重连无指数退避 | 后端不可用时行为 |
+| FE-M3 | MEDIUM | Monitor now ref 每秒 re-render | 活跃请求多时流畅度 | ✅ |
+| FE-M4 | MEDIUM | SSE 重连无指数退避 | 后端不可用时行为 | ✅ |
 | FE-M5 | MEDIUM | Dashboard watch 链重复请求 | 减少无效请求 |
-| FE-M6 | MEDIUM | Line chart 缺少 key | 图表视觉正确性 |
+| FE-M6 | MEDIUM | Line chart 缺少 key | 图表视觉正确性 | ✅ |
 | FE-L1 | LOW | Chunk 分割优化 | 首屏体积 |
 | FE-L2 | LOW | zod 全量引入 | Providers chunk 体积 |
 
