@@ -8,6 +8,13 @@
  * reasoning items.
  */
 
+import type { ChatCompletionMessage, ChatCompletionRequest } from "./types.js";
+import type {
+  ResponsesApiRequest,
+  ResponseInputItem,
+  ResponseInputMessage,
+} from "./types-responses.js";
+
 // ---------- Responses → Chat Completions ----------
 
 /**
@@ -17,34 +24,34 @@
 export function responsesToChatRequest(
   body: Record<string, unknown>,
 ): Record<string, unknown> {
+  const req = body as unknown as ResponsesApiRequest;
   const result: Record<string, unknown> = {};
-  result.model = body.model;
+  result.model = req.model;
 
   // instructions → system message
   const messages: Array<Record<string, unknown>> = [];
-  if (body.instructions != null && body.instructions !== "") {
-    messages.push({ role: "system", content: body.instructions });
+  if (req.instructions != null && req.instructions !== "") {
+    messages.push({ role: "system", content: req.instructions });
   }
 
   // input → messages
-  convertResponsesInputToChatMessages(body.input, messages);
+  convertResponsesInputToChatMessages(req.input, messages);
   result.messages = messages;
 
   // max_output_tokens → max_completion_tokens
-  if (body.max_output_tokens != null) {
-    result.max_completion_tokens = body.max_output_tokens;
+  if (req.max_output_tokens != null) {
+    result.max_completion_tokens = req.max_output_tokens;
   }
 
   // Pass-through fields
-  if (body.temperature != null) result.temperature = body.temperature;
-  if (body.top_p != null) result.top_p = body.top_p;
-  if (body.stream != null) result.stream = body.stream;
+  if (req.temperature != null) result.temperature = req.temperature;
+  if (req.top_p != null) result.top_p = req.top_p;
+  if (req.stream != null) result.stream = req.stream;
 
   // tools: Responses format → Chat Completions format
-  const tools = body.tools as Array<Record<string, unknown>> | undefined;
-  if (tools) {
+  if (req.tools) {
     const chatTools: Array<Record<string, unknown>> = [];
-    for (const t of tools) {
+    for (const t of req.tools) {
       if (t.type === "function") {
         // Responses tools are flat: {type:"function", name, parameters, description}
         // Chat tools need function wrapper: {type:"function", function:{name, parameters}}
@@ -61,24 +68,23 @@ export function responsesToChatRequest(
   }
 
   // tool_choice — compatible between Chat and Responses
-  if (body.tool_choice != null) {
-    result.tool_choice = body.tool_choice;
+  if (req.tool_choice != null) {
+    result.tool_choice = req.tool_choice;
   }
 
   // reasoning — pass through (both use {effort?, max_tokens?})
-  if (body.reasoning != null) {
-    result.reasoning = body.reasoning;
+  if (req.reasoning != null) {
+    result.reasoning = req.reasoning;
   }
 
   // text.format → response_format
-  const text = body.text as Record<string, unknown> | undefined;
-  if (text?.format != null) {
-    result.response_format = text.format;
+  if (req.text?.format != null) {
+    result.response_format = req.text.format;
   }
 
   // stream_options
-  if (body.stream_options != null) {
-    result.stream_options = body.stream_options;
+  if (req.stream_options != null) {
+    result.stream_options = req.stream_options;
   }
 
   return result;
@@ -89,7 +95,7 @@ export function responsesToChatRequest(
  * Completions `messages[]`, appending to the provided array.
  */
 function convertResponsesInputToChatMessages(
-  input: unknown,
+  input: string | ResponseInputItem[] | undefined,
   messages: Array<Record<string, unknown>>,
 ): void {
   if (input == null) return;
@@ -105,44 +111,48 @@ function convertResponsesInputToChatMessages(
   // Track pending function_calls to merge into a single assistant message
   const pendingFnCalls: Array<Record<string, unknown>> = [];
 
-  for (const item of input as Array<Record<string, unknown>>) {
-    const type = item.type as string;
-
+  for (const item of input) {
     // Flush any pending function_calls before processing non-function_call items
-    if (type !== "function_call" && pendingFnCalls.length > 0) {
+    if (item.type !== "function_call" && pendingFnCalls.length > 0) {
       flushFunctionCalls(messages, pendingFnCalls);
     }
 
-    if (type === "message") {
-      // ResponseInputMessage → Chat message
-      const role = item.role as string;
-      const content = extractMessageTextContent(item);
-      messages.push({ role, content });
-    } else if (type === "input_text") {
-      messages.push({ role: "user", content: (item.text ?? "") as string });
-    } else if (type === "function_call") {
-      // Collect; will be flushed when next non-function_call item appears
-      // or at end of loop
-      const fn: Record<string, unknown> = {
-        name: (item.name ?? "") as string,
-        arguments: (item.arguments ?? "{}") as string,
-      };
-      // Responses API function_call uses call_id (not id) as the tool call identifier
-      pendingFnCalls.push({
-        id: (item.call_id ?? item.id ?? "") as string,
-        type: "function",
-        function: fn,
-      });
-    } else if (type === "function_call_output") {
-      messages.push({
-        role: "tool",
-        tool_call_id: (item.call_id ?? "") as string,
-        content: (item.output ?? "") as string,
-      });
-    } else if (type === "reasoning") {
-      // No Chat Completions equivalent — skip
+    switch (item.type) {
+      case "message": {
+        // ResponseInputMessage → Chat message (discriminated union narrows to ResponseInputMessage)
+        const content = extractMessageTextContent(item);
+        messages.push({ role: item.role, content });
+        break;
+      }
+      case "input_text":
+        messages.push({ role: "user", content: item.text ?? "" });
+        break;
+      case "function_call": {
+        // Collect; will be flushed when next non-function_call item appears or at end of loop
+        const fn: Record<string, unknown> = {
+          name: item.name ?? "",
+          arguments: item.arguments ?? "{}",
+        };
+        // Responses API function_call uses call_id (not id) as the tool call identifier
+        pendingFnCalls.push({
+          id: item.call_id ?? item.id ?? "",
+          type: "function",
+          function: fn,
+        });
+        break;
+      }
+      case "function_call_output":
+        messages.push({
+          role: "tool",
+          tool_call_id: item.call_id ?? "",
+          content: item.output ?? "",
+        });
+        break;
+      case "reasoning":
+        // No Chat Completions equivalent — skip
+        break;
+      // input_image and unknown item types → skip
     }
-    // Unknown item types → skip
   }
 
   // Flush any remaining pending function_calls
@@ -169,17 +179,14 @@ function flushFunctionCalls(
 /**
  * Extract text content from a ResponseInputMessage.
  */
-function extractMessageTextContent(msg: Record<string, unknown>): string {
+function extractMessageTextContent(msg: ResponseInputMessage): string {
   const content = msg.content;
   if (content == null) return "";
   if (typeof content === "string") return content;
-  if (Array.isArray(content)) {
-    return (content as Array<Record<string, unknown>>)
-      .filter((p) => p.type === "input_text" && p.text != null)
-      .map((p) => p.text)
-      .join("");
-  }
-  return "";
+  return content
+    .filter((p) => p.type === "input_text" && p.text != null)
+    .map((p) => p.text)
+    .join("");
 }
 
 // ---------- Chat Completions → Responses ----------
@@ -191,12 +198,12 @@ function extractMessageTextContent(msg: Record<string, unknown>): string {
 export function chatToResponsesRequest(
   body: Record<string, unknown>,
 ): Record<string, unknown> {
+  const req = body as unknown as ChatCompletionRequest;
   const result: Record<string, unknown> = {};
-  result.model = body.model;
+  result.model = req.model;
 
   // Extract instructions from system/developer messages
-  const messages = body.messages as Array<Record<string, unknown>> | undefined;
-  const { instructions, nonSystemMsgs } = extractChatInstructions(messages ?? []);
+  const { instructions, nonSystemMsgs } = extractChatInstructions(req.messages ?? []);
   if (instructions) {
     result.instructions = instructions;
   }
@@ -205,26 +212,25 @@ export function chatToResponsesRequest(
   result.input = convertChatMessagesToResponsesInput(nonSystemMsgs);
 
   // max_completion_tokens / max_tokens → max_output_tokens
-  if (body.max_completion_tokens != null) {
-    result.max_output_tokens = body.max_completion_tokens;
-  } else if (body.max_tokens != null) {
-    result.max_output_tokens = body.max_tokens;
+  if (req.max_completion_tokens != null) {
+    result.max_output_tokens = req.max_completion_tokens;
+  } else if (req.max_tokens != null) {
+    result.max_output_tokens = req.max_tokens;
   }
 
   // Pass-through fields
-  if (body.temperature != null) result.temperature = body.temperature;
-  if (body.top_p != null) result.top_p = body.top_p;
-  if (body.stream != null) result.stream = body.stream;
+  if (req.temperature != null) result.temperature = req.temperature;
+  if (req.top_p != null) result.top_p = req.top_p;
+  if (req.stream != null) result.stream = req.stream;
 
   // tools: Chat format → Responses format
-  const tools = body.tools as Array<Record<string, unknown>> | undefined;
-  if (tools) {
+  if (req.tools) {
     const respTools: Array<Record<string, unknown>> = [];
-    for (const t of tools) {
+    for (const t of req.tools) {
       if (t.type === "function" && t.function) {
         // Chat: {type:"function", function:{name, parameters, description}}
         // Responses: {type:"function", name, parameters, description}
-        const fn = t.function as Record<string, unknown>;
+        const fn = t.function;
         const mapped: Record<string, unknown> = {
           type: "function",
           name: fn.name,
@@ -241,23 +247,23 @@ export function chatToResponsesRequest(
   }
 
   // tool_choice — compatible
-  if (body.tool_choice != null) {
-    result.tool_choice = body.tool_choice;
+  if (req.tool_choice != null) {
+    result.tool_choice = req.tool_choice;
   }
 
   // reasoning — pass through
-  if (body.reasoning != null) {
-    result.reasoning = body.reasoning;
+  if (req.reasoning != null) {
+    result.reasoning = req.reasoning;
   }
 
   // response_format → text.format
-  if (body.response_format != null) {
-    result.text = { format: body.response_format };
+  if (req.response_format != null) {
+    result.text = { format: req.response_format };
   }
 
   // stream_options
-  if (body.stream_options != null) {
-    result.stream_options = body.stream_options;
+  if (req.stream_options != null) {
+    result.stream_options = req.stream_options;
   }
 
   return result;
@@ -267,15 +273,14 @@ export function chatToResponsesRequest(
  * Extract system/developer messages from Chat messages as instructions.
  */
 function extractChatInstructions(
-  messages: Array<Record<string, unknown>>,
-): { instructions: string; nonSystemMsgs: Array<Record<string, unknown>> } {
+  messages: ChatCompletionMessage[],
+): { instructions: string; nonSystemMsgs: ChatCompletionMessage[] } {
   const parts: string[] = [];
-  const nonSystemMsgs: Array<Record<string, unknown>> = [];
+  const nonSystemMsgs: ChatCompletionMessage[] = [];
 
   for (const msg of messages) {
-    const role = msg.role as string;
-    if (role === "system" || role === "developer") {
-      parts.push((msg.content ?? "") as string);
+    if (msg.role === "system" || msg.role === "developer") {
+      parts.push(msg.content ?? "");
     } else {
       nonSystemMsgs.push(msg);
     }
@@ -291,26 +296,22 @@ function extractChatInstructions(
  * Convert Chat Completions non-system messages → Responses input items.
  */
 function convertChatMessagesToResponsesInput(
-  messages: Array<Record<string, unknown>>,
+  messages: ChatCompletionMessage[],
 ): unknown[] {
   const items: unknown[] = [];
 
   for (const msg of messages) {
-    const role = msg.role as string;
-
-    if (role === "user") {
-      const content = msg.content;
-      const text = typeof content === "string" ? content : (content ?? "") as string;
+    if (msg.role === "user") {
+      const text = typeof msg.content === "string" ? msg.content : (msg.content ?? "") as string;
       items.push({
         type: "message",
         role: "user",
         content: [{ type: "input_text", text }],
       });
-    } else if (role === "assistant") {
+    } else if (msg.role === "assistant") {
       // Text content → assistant message with output_text
-      const content = msg.content;
-      if (content != null && content !== "" && content !== null) {
-        const text = typeof content === "string" ? content : JSON.stringify(content);
+      if (msg.content != null && msg.content !== "") {
+        const text = typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content);
         items.push({
           type: "message",
           role: "assistant",
@@ -319,24 +320,22 @@ function convertChatMessagesToResponsesInput(
       }
 
       // tool_calls → function_call items
-      const toolCalls = msg.tool_calls as Array<Record<string, unknown>> | undefined;
-      if (toolCalls) {
-        for (const tc of toolCalls) {
-          const fn = tc.function as Record<string, unknown> | undefined;
+      if (msg.tool_calls) {
+        for (const tc of msg.tool_calls) {
           items.push({
             type: "function_call",
-            id: (tc.id ?? "") as string,
-            call_id: (tc.id ?? "") as string,
-            name: (fn?.name ?? ""),
-            arguments: (fn?.arguments ?? "{}"),
+            id: tc.id ?? "",
+            call_id: tc.id ?? "",
+            name: tc.function.name ?? "",
+            arguments: tc.function.arguments ?? "{}",
           });
         }
       }
-    } else if (role === "tool") {
+    } else if (msg.role === "tool") {
       items.push({
         type: "function_call_output",
-        call_id: (msg.tool_call_id ?? "") as string,
-        output: (msg.content ?? "") as string,
+        call_id: msg.tool_call_id ?? "",
+        output: msg.content ?? "",
       });
     }
     // reasoning_content in messages → skip (can't create reasoning items)

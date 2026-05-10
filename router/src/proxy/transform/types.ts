@@ -36,6 +36,47 @@ export interface OpenAIToolCall {
   function: { name: string; arguments: string };
 }
 
+// ---------- Chat Completions 类型 ----------
+
+export interface ChatCompletionMessage {
+  role: "system" | "developer" | "user" | "assistant" | "tool";
+  content?: string | null;
+  tool_calls?: OpenAIToolCall[];
+  tool_call_id?: string;
+  reasoning_content?: string;
+}
+
+export interface ChatCompletionTool {
+  type: "function";
+  function: {
+    name: string;
+    description?: string;
+    parameters?: Record<string, unknown>;
+  };
+}
+
+export interface ChatCompletionRequest {
+  model: string;
+  messages?: ChatCompletionMessage[];
+  tools?: ChatCompletionTool[];
+  tool_choice?: unknown;
+  stream?: boolean;
+  temperature?: number;
+  top_p?: number;
+  max_completion_tokens?: number;
+  max_tokens?: number;
+  reasoning?: Record<string, unknown>;
+  response_format?: unknown;
+  stream_options?: unknown;
+}
+
+// ---------- Anthropic 消息类型 ----------
+
+export interface AnthropicMessage {
+  role: "user" | "assistant";
+  content: AnthropicContentBlock[];
+}
+
 // ---------- 转换结果 ----------
 
 export interface TransformResult {
