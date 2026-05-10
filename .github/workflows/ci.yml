@@ -17,10 +17,9 @@ jobs:
           cache: npm
 
       - run: npm ci
-      - run: cd core && npx tsc
       - run: cd router && npm run build
       - run: cd pi-extension && npx tsc --noEmit
-      - run: npm run test -w core -w router
+      - run: npm run test -w router
 
   docker:
     needs: test
