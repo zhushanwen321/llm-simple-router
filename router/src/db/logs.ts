@@ -235,17 +235,21 @@ export function deleteLogsBefore(db: Database.Database, beforeDate: string): num
 /** 每行元数据（数字列+索引）的估算字节数 */
 const ROW_METADATA_BYTES = 500;
 
-/** 估算 request_logs 表占用字节数 */
+/** 采样估算 request_logs 表占用字节数（避免全表 SUM 扫描） */
 export function estimateLogTableSize(db: Database.Database): number {
-  const row = db.prepare(`
-    SELECT COALESCE(SUM(
-      COALESCE(length(client_request), 0) + COALESCE(length(upstream_request), 0) +
-      COALESCE(length(upstream_response), 0) + COALESCE(length(stream_text_content), 0) +
-      COALESCE(length(error_message), 0) + COALESCE(length(pipeline_snapshot), 0) + ?
-    ), 0) as size
-    FROM request_logs
-  `).get(ROW_METADATA_BYTES) as { size: number };
-  return row.size;
+  const countRow = db.prepare("SELECT COUNT(*) as cnt FROM request_logs").get() as { cnt: number };
+  if (countRow.cnt === 0) return 0;
+
+  // 采样最近 100 行，计算平均行大小
+  const samples = db.prepare(`
+    SELECT COALESCE(length(client_request), 0) + COALESCE(length(upstream_request), 0) +
+           COALESCE(length(upstream_response), 0) + COALESCE(length(stream_text_content), 0) +
+           COALESCE(length(error_message), 0) + COALESCE(length(pipeline_snapshot), 0) + ? AS row_size
+    FROM request_logs ORDER BY created_at DESC LIMIT 100
+  `).all(ROW_METADATA_BYTES) as { row_size: number }[];
+
+  const avgRowSize = samples.reduce((s, r) => s + r.row_size, 0) / samples.length;
+  return Math.round(avgRowSize * countRow.cnt);
 }
 
 const DELETE_BATCH_SIZE = 1000;
