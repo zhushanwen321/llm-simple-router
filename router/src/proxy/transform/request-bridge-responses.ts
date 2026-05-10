@@ -127,8 +127,9 @@ function convertResponsesInputToChatMessages(
         name: (item.name ?? "") as string,
         arguments: (item.arguments ?? "{}") as string,
       };
+      // Responses API function_call uses call_id (not id) as the tool call identifier
       pendingFnCalls.push({
-        id: (item.id ?? "") as string,
+        id: (item.call_id ?? item.id ?? "") as string,
         type: "function",
         function: fn,
       });

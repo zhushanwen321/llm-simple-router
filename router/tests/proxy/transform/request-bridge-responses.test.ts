@@ -151,13 +151,14 @@ describe("responsesToChatRequest", () => {
       expect(msgs[1].content).toBeNull();
       const toolCalls = msgs[1].tool_calls as Array<Record<string, unknown>>;
       expect(toolCalls).toHaveLength(2);
+      // call_id takes priority over id for tool call identification
       expect(toolCalls[0]).toEqual({
-        id: "fc_1",
+        id: "call_1",
         type: "function",
         function: { name: "get_weather", arguments: '{"city":"SF"}' },
       });
       expect(toolCalls[1]).toEqual({
-        id: "fc_2",
+        id: "call_2",
         type: "function",
         function: { name: "get_time", arguments: '{"tz":"PST"}' },
       });
@@ -170,7 +171,6 @@ describe("responsesToChatRequest", () => {
           { type: "message", role: "user", content: "Go" },
           {
             type: "function_call",
-            id: "fc_1",
             call_id: "call_1",
             name: "do_stuff",
             arguments: "{}",
@@ -192,7 +192,6 @@ describe("responsesToChatRequest", () => {
           { type: "message", role: "user", content: "Go" },
           {
             type: "function_call",
-            id: "fc_last",
             call_id: "call_last",
             name: "last_fn",
             arguments: "{}",
@@ -213,7 +212,6 @@ describe("responsesToChatRequest", () => {
           { type: "message", role: "user", content: "Go" },
           {
             type: "function_call",
-            id: "fc_1",
             call_id: "call_1",
             name: "fn",
             arguments: "{}",
@@ -238,7 +236,6 @@ describe("responsesToChatRequest", () => {
           { type: "message", role: "user", content: "Check weather" },
           {
             type: "function_call",
-            id: "fc_1",
             call_id: "call_1",
             name: "get_weather",
             arguments: "{}",
@@ -258,6 +255,39 @@ describe("responsesToChatRequest", () => {
         tool_call_id: "call_1",
         content: "Sunny, 72°F",
       });
+    });
+
+    it("uses call_id for tool call id when id field is absent", () => {
+      // Codex sends function_call with call_id but no id field
+      const result = responsesToChatRequest({
+        model: "gpt-4o",
+        input: [
+          { type: "message", role: "user", content: "Run it" },
+          {
+            type: "function_call",
+            call_id: "call_00_abc123",
+            name: "exec_command",
+            arguments: '{"cmd":"ls"}',
+          },
+          {
+            type: "function_call_output",
+            call_id: "call_00_abc123",
+            output: "file1.txt\nfile2.txt",
+          },
+          { type: "message", role: "user", content: "Thanks" },
+        ],
+      });
+
+      const msgs = result.messages as Array<Record<string, unknown>>;
+      // assistant tool_call id must match tool message tool_call_id
+      const assistantMsg = msgs[1];
+      expect(assistantMsg.role).toBe("assistant");
+      const toolCalls = assistantMsg.tool_calls as Array<Record<string, unknown>>;
+      expect(toolCalls[0].id).toBe("call_00_abc123");
+
+      const toolMsg = msgs[2];
+      expect(toolMsg.role).toBe("tool");
+      expect(toolMsg.tool_call_id).toBe("call_00_abc123");
     });
   });
 
@@ -816,7 +846,6 @@ describe("round-trip: Responses → Chat → Responses", () => {
         { type: "message", role: "user", content: "What's the weather?" },
         {
           type: "function_call",
-          id: "fc_1",
           call_id: "call_1",
           name: "get_weather",
           arguments: '{"city":"SF"}',
