@@ -213,11 +213,58 @@ Handler (handler/proxy-handler.ts)
 所有 secrets 通过首次启动的 Setup 页面设置，存入 DB settings 表。
 可选环境变量：`PORT`（默认 9981）、`DB_PATH`（默认 `~/.llm-simple-router/router.db`）、`LOG_LEVEL`、`STREAM_TIMEOUT_MS`（默认 3000000）、`RETRY_BASE_DELAY_MS`（默认 1000）
 
+## 开发规范
+
+### Pipeline Hook 执行路径验证
+
+新增 PipelineHook 时，必须同时满足两个条件：
+1. 在 `registerBuiltinHooks()` 中注册到 `proxyPipeline`（非 `hookRegistry` 单表）
+2. 确保 `create-proxy-handler.ts` 中对应 phase 的 `proxyPipeline.emit()` 被调用
+
+`hookRegistry` 仅为 Admin API 查询用，**不执行 hook**。只有 `proxyPipeline.emit()` 调用才会实际执行 hook。
+
+```typescript
+// 正确：同时注册到两者
+hookRegistry.register(hook);
+proxyPipeline.register(hook);  // 必须
+```
+
+### 新字段数据消费者检查
+
+新增 DB 列或 metadata 字段时，必须在 spec 阶段列出所有数据消费者并逐一验证：
+- DB 写入（`insertMetrics()`、`insertRequestLog()` 等）
+- SSE 实时监控推送（`RequestTracker` 的 streamMetrics 等）
+- Admin API 查询（`getMetricsSummary()` 等）
+- 前端展示（组件取数据路径）
+
+**任何消费者遗漏即视为 MUST FIX。**
+
+### 测试验收标准覆盖矩阵
+
+每个 spec 的验收标准（AC）必须有对应的测试用例。测试评审环节强制检查 AC 覆盖矩阵。
+
+```
+AC1: 开关 OFF → 测试 xxxx
+AC2: 开关 ON + 无 session_id → 测试 xxxx
+...
+```
+
+### 前端控件交互模式一致性
+
+新增 UI 控件时，必须遵循页面的既有人机交互模式：
+- `ProxyEnhancement.vue`：编辑→保存按钮模式，禁止 Switch/Input 直调 API
+- `Dashboard.vue` / `Monitor.vue`：实时模式，允许自动刷新
+
+### L1 Gate 执行强制化
+
+`.xyz-harness/gate/` 下的 pass 文件必须通过 `gate-script.sh` 生成，**禁止人工创建**。
+
 ## 质量门禁
 
 - 编译: `npm run build`
 - 测试: `npm run test`
 - 后端 lint: `npm run lint -w router`
+- 前端 lint: `cd frontend && npx eslint . --max-warnings=0`
 - 前端类型检查: `cd frontend && npx vue-tsc -b --noEmit`
 
 ## 测试
@@ -234,6 +281,8 @@ Handler (handler/proxy-handler.ts)
 **辅助函数模式**（多文件重复定义）：`createMockBackend()`、`closeServer()`、`buildTestApp()`、`insertMockBackend()`、`insertModelMapping()`
 
 **覆盖范围（40 个测试文件）：** 加密、认证、数据库、配置、SSE 解析、指标提取、4 种路由策略、resilience 重试、并发信号量、代理转发（OpenAI/Anthropic）、Admin API（7 个 CRUD 测试）、监控、日志清理
+
+**验收标准覆盖矩阵：** 每个 spec 的 AC 必须有至少一个测试用例覆盖。测试评审时以 AC 覆盖矩阵为依据。
 
 ## 代码质量工具
 
@@ -269,6 +318,10 @@ Handler (handler/proxy-handler.ts)
 | **SSE data 拼接** | SSE 多行 `data:` 用 `\n` 连接，不是直接拼接 | `sse-event-transform.ts` 多行 data 缺少换行符 |
 | **插件过滤一致性** | Plugin 的 onError 必须与 beforeRequest 做同等的 provider 过滤 | `plugin-bridge.ts` `onError` 缺 `pluginMatches` |
 | **headers 安全** | headers 写入日志前必须脱敏（authorization、cookie、x-api-key） | `failover-loop.ts` `clientReq` 未脱敏 headsers |
+| **Hook 降级** | PipelineHook 的 `execute()` 必须用 try-catch 包裹，异常不得传播到调用链 | `cache-estimation.ts` 缺少降级逻辑 |
+| **数据消费者完整性** | 新增数据字段时必须列出所有消费点（DB、SSE、Admin API、前端） | cache_read_tokens_estimated 漏了实时监控同步 |
+| **前端控件模式一致** | 保存按钮模式页面新增控件不得直调 API | ProxyEnhancement.vue Switch 直调 API |
+| **Hook 注册验证** | 新增 Hook 时除了注册到 `hookRegistry`，还需注册到 `proxyPipeline` 并验证 emit 路径 | 所有 hooks 仅注册到 hookRegistry，从未被执行 |
 
 ### 前端错误处理规范
 
