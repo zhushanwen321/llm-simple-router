@@ -51,6 +51,7 @@ export class RequestTracker {
   private streamContentTimer: ReturnType<typeof setTimeout> | null = null;
   private killCallbacks = new Map<string, () => void>();
   private killedRequests = new Set<string>();
+  private completedDetails = new Map<string, { clientRequest?: string; upstreamRequest?: string; completedAt: number }>();
 
   /** Visible for testing */
   readonly statsAggregator: StatsAggregator;
@@ -169,8 +170,20 @@ export class RequestTracker {
     );
     this.statsAggregator.recordProviderLatency(req.providerId, latency);
 
+    // 分离大字段到 completedDetails，recentCompleted 仅保留摘要
+    const { clientRequest, upstreamRequest, ...rest } = req;
+    if (clientRequest !== undefined || upstreamRequest !== undefined) {
+      this.completedDetails.set(id, { clientRequest, upstreamRequest, completedAt: now });
+      // completedDetails 容量保护：超过上限时移除最早条目
+      // Map 按插入顺序迭代，complete() 按时间顺序调用，首个 key 即最旧
+      if (this.completedDetails.size > RECENT_COMPLETED_MAX) {
+        const oldestKey = this.completedDetails.keys().next().value;
+        if (oldestKey !== undefined) this.completedDetails.delete(oldestKey);
+      }
+    }
+
     const completed: ActiveRequest = {
-      ...req,
+      ...rest,
       status: wasKilled ? "failed" : result.status,
       completedAt: now,
       attempts: result.attempts ?? req.attempts,
@@ -221,7 +234,18 @@ export class RequestTracker {
 
   /** Public alias for API endpoint use — returns full request data including clientRequest */
   getRequestById(id: string): ActiveRequest | undefined {
-    return this.get(id);
+    // 1. 先从 activeMap 查找（pending 请求，完整数据）
+    const active = this.activeMap.get(id);
+    if (active) return active;
+
+    // 2. 从 recentCompleted 查找摘要，合并 completedDetails
+    const completed = this.recentCompleted.find((r) => r.id === id);
+    if (!completed) return undefined;
+
+    const details = this.completedDetails.get(id);
+    if (!details) return completed;
+
+    return { ...completed, clientRequest: details.clientRequest, upstreamRequest: details.upstreamRequest };
   }
 
   /** 注册请求的终止回调，由 orchestrator 在请求开始时调用 */
@@ -292,7 +316,11 @@ export class RequestTracker {
 
   /** 向单个客户端发送当前活跃请求快照（保留 clientRequest 以便前端即时展示） */
   private sendInitialSnapshot(client: SSEClient): void {
-    const active = this.getActive();
+    const active = this.getActive().map((req: ActiveRequest) => {
+      const copy = { ...req };
+      delete copy.upstreamRequest;
+      return copy;
+    });
     const msg = `event: request_update\ndata: ${JSON.stringify(active)}\n\n`;
     try {
       if (!client.writableEnded) client.write(msg);
@@ -363,11 +391,13 @@ export class RequestTracker {
       payload = data.map((req: ActiveRequest) => {
         const copy = { ...req };
         delete copy.clientRequest;
+        delete copy.upstreamRequest;
         return copy;
       });
     } else if ((event === "request_complete" || event === "request_start") && data && typeof data === "object") {
       const copy = { ...(data as ActiveRequest) };
       delete copy.clientRequest;
+      delete copy.upstreamRequest;
       payload = copy;
     }
     const msg = `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
@@ -423,10 +453,18 @@ export class RequestTracker {
         break;
       }
     }
-    this.recentCompleted = this.recentCompleted.slice(
+    // 收集被 slice 丢弃的条目 ID，同步清理 completedDetails
+    const trimmed = this.recentCompleted.slice(
       0,
       Math.min(i, RECENT_COMPLETED_MAX),
     );
+    const trimmedIds = new Set(trimmed.map((r) => r.id));
+    for (const entry of this.recentCompleted) {
+      if (!trimmedIds.has(entry.id)) {
+        this.completedDetails.delete(entry.id);
+      }
+    }
+    this.recentCompleted = trimmed;
   }
 
   /** 最终一致性兜底：清理异常残留的 active 条目 */
