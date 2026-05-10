@@ -185,7 +185,7 @@ export function collectTransportMetrics(
             metrics.cache_read_tokens_estimated = 1;
             // 更新实时监控中的缓存数据
             if (tracker) {
-              try { tracker.updateCompletedMetrics(lastSuccessLogId, estimated); } catch { /* 非关键路径，静默降级 */ }
+              try { tracker.updateCompletedMetrics(lastSuccessLogId, estimated); } catch (e) { request.log.error({ err: e }, "tracker update failed"); }
             }
           }
         } catch (e) {
