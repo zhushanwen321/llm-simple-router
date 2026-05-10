@@ -53,15 +53,21 @@ export class MetricsExtractor {
   private firstContentReceived = false;
   private complete = false;
 
-  // --- Phase content buffers + timing ---
-  private thinkingContentBuffer = "";
+  // --- Phase content buffers (array-based) + timing ---
+  /** Buffer 容量上限，超过后停止 push 避免内存膨胀 */
+  private static readonly MAX_BUFFER_SIZE = 500_000; // eslint-disable-line no-magic-numbers
+
+  private thinkingChunks: string[] = [];
+  private thinkingTotalLength = 0;
   private thinkingStreamStartTime: number | null = null;
   private thinkingStreamEndTime: number | null = null;
 
-  private textContentBuffer = "";
+  private textChunks: string[] = [];
+  private textTotalLength = 0;
   private textStreamStartTime: number | null = null;
 
-  private toolUseContentBuffer = "";
+  private toolUseChunks: string[] = [];
+  private toolUseTotalLength = 0;
   private toolUseStreamStartTime: number | null = null;
 
   constructor(
@@ -91,7 +97,8 @@ export class MetricsExtractor {
     let thinkingDurationMs: number | null = null;
     let textTokens: number | null = null;
     let toolUseTokens: number | null = null;
-    const hasThinking = this.thinkingContentBuffer.length > 0;
+    const thinkingContent = this.thinkingChunks.join("");
+    const hasThinking = thinkingContent.length > 0;
 
     if (
       this.streamEndTime !== null &&
@@ -104,7 +111,7 @@ export class MetricsExtractor {
       }
 
       if (hasThinking) {
-        thinkingTokens = countTokens(this.thinkingContentBuffer);
+        thinkingTokens = countTokens(thinkingContent);
 
         // thinking_duration: T3 - T0 (includes network RTT + generation)
         if (this.thinkingStreamEndTime !== null) {
@@ -130,11 +137,13 @@ export class MetricsExtractor {
       }
 
       // content token counts (for analysis only)
-      if (this.textContentBuffer.length > 0) {
-        textTokens = countTokens(this.textContentBuffer);
+      const textContent = this.textChunks.join("");
+      if (textContent.length > 0) {
+        textTokens = countTokens(textContent);
       }
-      if (this.toolUseContentBuffer.length > 0) {
-        toolUseTokens = countTokens(this.toolUseContentBuffer);
+      const toolUseContent = this.toolUseChunks.join("");
+      if (toolUseContent.length > 0) {
+        toolUseTokens = countTokens(toolUseContent);
       }
     }
 
@@ -192,7 +201,8 @@ export class MetricsExtractor {
         this.firstContentReceived = true;
         this.ttftMs = Date.now() - this.requestStartTime;
       }
-      this.textContentBuffer += delta;
+      this.textChunks.push(delta);
+      this.textTotalLength += delta.length;
     }
 
     // Track completion
@@ -245,23 +255,26 @@ export class MetricsExtractor {
           this.thinkingStreamStartTime = Date.now();
         }
         const thinking = delta.thinking ?? "";
-        if (thinking) {
-          this.thinkingContentBuffer += thinking;
+        if (thinking && this.thinkingTotalLength < MetricsExtractor.MAX_BUFFER_SIZE) {
+          this.thinkingChunks.push(thinking);
+          this.thinkingTotalLength += thinking.length;
           this.thinkingStreamEndTime = Date.now();
         }
       } else if (delta?.type === "text_delta") {
         if (this.textStreamStartTime === null) {
           this.textStreamStartTime = Date.now();
         }
-        if (delta.text) {
-          this.textContentBuffer += delta.text;
+        if (delta.text && this.textTotalLength < MetricsExtractor.MAX_BUFFER_SIZE) {
+          this.textChunks.push(delta.text);
+          this.textTotalLength += delta.text.length;
         }
       } else if (delta?.type === "input_json_delta") {
         if (this.toolUseStreamStartTime === null) {
           this.toolUseStreamStartTime = Date.now();
         }
-        if (delta.partial_json) {
-          this.toolUseContentBuffer += delta.partial_json;
+        if (delta.partial_json && this.toolUseTotalLength < MetricsExtractor.MAX_BUFFER_SIZE) {
+          this.toolUseChunks.push(delta.partial_json);
+          this.toolUseTotalLength += delta.partial_json.length;
         }
       }
     } else if (type === "message_delta") {
@@ -306,8 +319,9 @@ export class MetricsExtractor {
         this.textStreamStartTime = Date.now();
       }
 
-      if (delta?.content) {
-        this.textContentBuffer += delta.content;
+      if (delta?.content && this.textTotalLength < MetricsExtractor.MAX_BUFFER_SIZE) {
+        this.textChunks.push(delta.content);
+        this.textTotalLength += delta.content.length;
       }
 
       if (choice.finish_reason) {
