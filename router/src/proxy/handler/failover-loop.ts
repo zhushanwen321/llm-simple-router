@@ -199,8 +199,9 @@ export async function executeFailoverLoop(
     const isFailoverIteration = rootLogId !== logId;
     const routerKeyId = request.routerKey?.id ?? null;
 
-    // 每次迭代从 pipelineBody 重新开始
-    let currentBody = structuredClone(ctx.body);
+    // 浅拷贝：后续操作只修改顶层属性（model），嵌套对象不被修改
+    // 如果需要修改嵌套属性，在使用点做深拷贝（applyProviderPatches 已有 CoW）
+    let currentBody = { ...ctx.body };
     const isStream = currentBody.stream === true;
     const iterationSnapshot = new PipelineSnapshot();
 
@@ -228,20 +229,12 @@ export async function executeFailoverLoop(
     let resolved = resolveResult.target;
     const isFailover = resolveResult.targetCount > 1;
 
-    // allowed_models 检查 — 仅首次迭代
+    // allowed_models 检查 — 仅首次迭代（已由 auth 中间件预解析为数组）
     if (excludeTargets.length === 0) {
-      const allowedModels = (request.routerKey as { allowed_models?: string } | undefined)?.allowed_models;
-      if (allowedModels) {
-        try {
-          const models: string[] = JSON.parse(allowedModels).filter((m: string) => m.trim() !== "");
-          if (models.length > 0 && !models.includes(resolved.backend_model)) {
-            return rejectAndReply(reply, rCtx, errors.modelNotAllowed(resolved.backend_model),
-              `Model '${resolved.backend_model}' not allowed`, resolved.provider_id);
-          }
-        } catch {
-          // eslint-disable-next-line no-magic-numbers -- log truncation length
-          request.log.warn({ allowedModels: allowedModels?.slice(0, 80) }, "Invalid allowed_models JSON, allowing all models");
-        }
+      const allowedModels = request.routerKey?.allowed_models;
+      if (allowedModels && allowedModels.length > 0 && !allowedModels.includes(resolved.backend_model)) {
+        return rejectAndReply(reply, rCtx, errors.modelNotAllowed(resolved.backend_model),
+          `Model '${resolved.backend_model}' not allowed`, resolved.provider_id);
       }
     }
 

@@ -1,5 +1,16 @@
 import Database from "better-sqlite3";
 
+/** WeakMap 按 db 实例缓存 prepared statements，避免重复 prepare() */
+const stmtCache = new WeakMap<Database.Database, Map<string, Database.Statement>>();
+
+export function getCachedStmt(db: Database.Database, sql: string): Database.Statement {
+  let cache = stmtCache.get(db);
+  if (!cache) { cache = new Map(); stmtCache.set(db, cache); }
+  let stmt = cache.get(sql);
+  if (!stmt) { stmt = db.prepare(sql); cache.set(sql, stmt); }
+  return stmt;
+}
+
 /**
  * 通用 UPDATE 构建器。
  * 用白名单过滤安全字段，拼接 SET 子句。

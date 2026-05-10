@@ -37,8 +37,8 @@ describe("BI-H3: LogFileWriter async WriteStream", () => {
     writer = new LogFileWriter(tempDir);
   });
 
-  afterEach(() => {
-    writer.stop();
+  afterEach(async () => {
+    await writer.stop();
     rmSync(tempDir, { recursive: true, force: true });
   });
 
@@ -67,7 +67,7 @@ describe("BI-H3: LogFileWriter async WriteStream", () => {
     }
 
     // stop 应确保所有缓冲数据写入
-    writer.stop();
+    await writer.stop();
 
     const content = readFileSync(join(tempDir, "2026-04-30", "14-00.jsonl"), "utf-8");
     const lines = content.trim().split("\n");
@@ -85,7 +85,7 @@ describe("BI-H3: LogFileWriter async WriteStream", () => {
     }
 
     // 等待异步写入完成
-    writer.stop();
+    await writer.stop();
 
     const content = readFileSync(join(tempDir, "2026-04-30", "14-00.jsonl"), "utf-8");
     const lines = content.trim().split("\n");
@@ -113,7 +113,7 @@ describe("BI-H3: LogFileWriter async WriteStream", () => {
     // 异步 WriteStream 应该非常快（只写入内存缓冲区）
     // 这个断言验证 write() 不会显著阻塞
     // 但实际阈值很难精确设定，主要作为回归保护
-    writer.stop();
+    await writer.stop();
 
     // 验证数据完整性
     const content = readFileSync(join(tempDir, "2026-04-30", "14-00.jsonl"), "utf-8");
@@ -125,7 +125,7 @@ describe("BI-H3: LogFileWriter async WriteStream", () => {
     writer.write(makeEntry("day1", "2026-04-30T23:55:00.000Z"));
     writer.write(makeEntry("day2", "2026-05-01T00:05:00.000Z"));
 
-    writer.stop();
+    await writer.stop();
 
     const file1 = join(tempDir, "2026-04-30", "23-50.jsonl");
     const file2 = join(tempDir, "2026-05-01", "00-00.jsonl");

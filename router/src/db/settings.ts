@@ -1,4 +1,5 @@
 import Database from "better-sqlite3";
+import { getCachedStmt } from "./helpers.js";
 
 // TTL 缓存：WeakMap 按 db 实例隔离，确保测试中 :memory: db 互不干扰
 const settingsCache = new WeakMap<Database.Database, Map<string, { value: string | null; expiresAt: number }>>();
@@ -13,14 +14,14 @@ export function getSetting(db: Database.Database, key: string): string | null {
   const cached = cache.get(key);
   if (cached && Date.now() < cached.expiresAt) return cached.value;
 
-  const row = db.prepare("SELECT value FROM settings WHERE key = ?").get(key) as { value: string } | undefined;
+  const row = getCachedStmt(db, "SELECT value FROM settings WHERE key = ?").get(key) as { value: string } | undefined;
   const value = row?.value ?? null;
   cache.set(key, { value, expiresAt: Date.now() + CACHE_TTL_MS });
   return value;
 }
 
 export function setSetting(db: Database.Database, key: string, value: string): void {
-  db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)").run(key, value);
+  getCachedStmt(db, "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)").run(key, value);
   const cache = settingsCache.get(db);
   if (cache) cache.delete(key);
 }
@@ -70,7 +71,7 @@ export function setConfigSyncSource(db: Database.Database, source: "github" | "g
 }
 
 export function getDetailLogEnabled(db: Database.Database): boolean {
-  const row = db.prepare("SELECT value FROM settings WHERE key = ?").get("detail_log_enabled") as { value: string } | undefined;
+  const row = getCachedStmt(db, "SELECT value FROM settings WHERE key = ?").get("detail_log_enabled") as { value: string } | undefined;
   return row ? row.value !== "0" : true;
 }
 
@@ -86,7 +87,7 @@ export function setTokenEstimationEnabled(db: Database.Database, enabled: boolea
 const DEFAULT_LOG_FILE_RETENTION_DAYS = 3;
 
 export function getLogFileRetentionDays(db: Database.Database): number {
-  const row = db.prepare("SELECT value FROM settings WHERE key = ?").get("log_file_retention_days") as { value: string } | undefined;
+  const row = getCachedStmt(db, "SELECT value FROM settings WHERE key = ?").get("log_file_retention_days") as { value: string } | undefined;
   return row ? parseInt(row.value, 10) : DEFAULT_LOG_FILE_RETENTION_DAYS;
 }
 

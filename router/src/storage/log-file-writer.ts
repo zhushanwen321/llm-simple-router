@@ -1,4 +1,5 @@
-import { appendFileSync, mkdirSync, existsSync, readFileSync } from "node:fs";
+import { createWriteStream, mkdirSync, existsSync, readFileSync } from "node:fs";
+import type { WriteStream } from "node:fs";
 import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
 import { type LogFileEntry, WINDOW_MINUTES, TIME_PAD_WIDTH, localDateStr } from "./types.js";
@@ -16,9 +17,12 @@ export interface LogFileWriterOptions {
   enabled?: boolean;
 }
 
+const FLUSH_TIMEOUT_MS = 2000;
+
 export class LogFileWriter {
   private readonly baseDir: string;
   private readonly enabled: boolean;
+  private readonly streams = new Map<string, WriteStream>();
 
   constructor(baseDir: string, options?: LogFileWriterOptions) {
     this.baseDir = baseDir;
@@ -27,6 +31,19 @@ export class LogFileWriter {
 
   get isEnabled(): boolean {
     return this.enabled;
+  }
+
+  private getOrCreateStream(filePath: string): WriteStream | null {
+    let stream = this.streams.get(filePath);
+    if (!stream || stream.destroyed) {
+      try {
+        stream = createWriteStream(filePath, { flags: "a", encoding: "utf-8" });
+        this.streams.set(filePath, stream);
+      } catch {
+        return null;
+      }
+    }
+    return stream;
   }
 
   write(entry: LogFileEntry): void {
@@ -43,7 +60,8 @@ export class LogFileWriter {
     const line = JSON.stringify(entry) + "\n";
 
     try {
-      appendFileSync(filePath, line, "utf-8");
+      const stream = this.getOrCreateStream(filePath);
+      stream?.write(line);
     // eslint-disable-next-line taste/no-silent-catch
     } catch {
       // 文件写入是辅助通道，失败不影响主流程
@@ -109,7 +127,24 @@ export class LogFileWriter {
     return null;
   }
 
-  stop(): void {
-    // 当前实现无需清理
+  /**
+   * 关闭所有 WriteStream 并等待数据刷盘。
+   * 返回 Promise 以便调用方 await 确保数据落盘。
+   * 不 await 调用也是安全的（仅可能丢失最后的缓冲数据）。
+   */
+  stop(): Promise<void> {
+    if (this.streams.size === 0) return Promise.resolve();
+    const pending: Promise<void>[] = [];
+    for (const [, stream] of this.streams) {
+      if (stream.destroyed) continue;
+      pending.push(new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, FLUSH_TIMEOUT_MS);
+        stream.once("finish", () => { clearTimeout(timer); resolve(); });
+        stream.once("error", () => { clearTimeout(timer); resolve(); });
+      }));
+      try { stream.end(); } catch { /* stream 可能已关闭 */ } // eslint-disable-line taste/no-silent-catch
+    }
+    this.streams.clear();
+    return Promise.allSettled(pending).then(() => { /* void */ });
   }
 }

@@ -7,8 +7,8 @@ import { getProxyApiType, HTTP_SERVICE_UNAVAILABLE } from "../core/constants.js"
 
 declare module "fastify" {
   interface FastifyRequest {
-    // allowed_models 是 JSON 字符串，需 JSON.parse
-    routerKey?: { id: string; name: string; allowed_models: string | null };
+    // allowed_models 已在 auth 中间件中预解析为数组，无需 JSON.parse
+    routerKey?: { id: string; name: string; allowed_models: string[] | null };
   }
 }
 
@@ -97,7 +97,13 @@ const authMiddlewareRaw: FastifyPluginCallback<{ db: Database.Database }> = (
       return reply;
     }
 
-    request.routerKey = { id: row.id, name: row.name, allowed_models: row.allowed_models };
+    let parsedAllowedModels: string[] | null = null;
+    if (row.allowed_models) {
+      try {
+        parsedAllowedModels = JSON.parse(row.allowed_models);
+      } catch { /* JSON 解析失败时 allowed_models 保持为 null，允许所有模型 */ } // eslint-disable-line taste/no-silent-catch
+    }
+    request.routerKey = { id: row.id, name: row.name, allowed_models: parsedAllowedModels };
   });
 
   done();
