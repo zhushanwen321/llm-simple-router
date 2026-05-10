@@ -101,8 +101,22 @@
           </Label>
         </div>
         <p class="text-xs text-muted-foreground mt-2">
+          {{ t('proxyEnhancement.tokenEstimation.desc') }}
+        </p>
+        <p class="text-xs text-muted-foreground mt-1">
           修改后点击「保存」按钮生效
         </p>
+        <!-- 配置说明 -->
+        <details class="mt-3 text-xs text-muted-foreground">
+          <summary class="cursor-pointer hover:text-foreground transition-colors">
+            {{ t('proxyEnhancement.tokenEstimation.setupTitle') }} ▸
+          </summary>
+          <div class="mt-2 space-y-1 pl-2 border-l-2 border-muted">
+            <p>{{ t('proxyEnhancement.tokenEstimation.claudeCode') }}</p>
+            <p class="whitespace-pre-line">{{ t('proxyEnhancement.tokenEstimation.piExtension') }}</p>
+            <p class="whitespace-pre-line">{{ t('proxyEnhancement.tokenEstimation.piModelsJson') }}</p>
+          </div>
+        </details>
       </CardContent>
     </Card>
 

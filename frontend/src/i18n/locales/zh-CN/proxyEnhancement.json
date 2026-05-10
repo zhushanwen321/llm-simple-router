@@ -22,6 +22,13 @@
     "title": "工具调用错误日志",
     "description": "记录 Claude Code / pi 工具调用失败的详细信息（包含 tool_use 输入参数、错误内容、provider、模型），用于分析各模型产生错误 tool_use 参数的模式。"
   },
+  "tokenEstimation": {
+    "setupTitle": "客户端配置要求",
+    "claudeCode": "Claude Code：自动发送 x-claude-code-session-id，无需额外配置",
+    "piExtension": "Pi：安装扩展 ~/.pi/agent/extensions/llm-router-session/\n（session_start 时自动生成 UUID 并注入 x-pi-session-id header）",
+    "piModelsJson": "Pi：在 models.json 的 provider 配置中添加 headers:\n\"headers\": { \"x-client-type\": \"pi-coding-agent\" }",
+    "desc": "开启后仅对携带 session_id 的请求生效。无 session_id 的请求不参与缓存命中率计算。"
+  },
   "loadFailed": "加载配置失败",
   "saveFailed": "保存失败"
 }

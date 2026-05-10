@@ -22,6 +22,13 @@
     "title": "Tool Error Logging",
     "description": "Record detailed information about Claude Code / pi tool call failures (including tool_use input, error content, provider, model). Used for analyzing patterns of model-generated incorrect tool_use parameters."
   },
+  "tokenEstimation": {
+    "setupTitle": "Client Setup",
+    "claudeCode": "Claude Code: sends x-claude-code-session-id automatically, no extra config needed",
+    "piExtension": "Pi: install extension at ~/.pi/agent/extensions/llm-router-session/\n(generates a UUID on session_start and injects x-pi-session-id header)",
+    "piModelsJson": "Pi: add headers to your provider config in models.json:\n\"headers\": { \"x-client-type\": \"pi-coding-agent\" }",
+    "desc": "Only applies to requests with a session_id. Requests without a session_id will not participate in cache hit rate calculation."
+  },
   "loadFailed": "Failed to load configuration",
   "saveFailed": "Failed to save"
 }
