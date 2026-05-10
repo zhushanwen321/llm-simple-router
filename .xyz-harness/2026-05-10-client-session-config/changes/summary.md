@@ -63,3 +63,16 @@
   - pi-extension/package.json — 移除 @llm-router/core 依赖
 - 摘要：精简 pi-extension，移除并发控制/循环防护/监控代码，只保留 session_id 注入。注意 pi extension API 不支持直接修改 HTTP headers，当前通过 payload 注入 session_id。
 - 时间：2026-05-10T14:00:00+08:00
+
+## 阶段 5 - 补充接口级测试 (Task 5)
+
+- 状态：done
+- 变更文件：
+  - router/tests/client-session-headers.test.ts — 新增 13 个集成测试
+- 摘要：补充客户端 session 识别的端到端集成测试，覆盖 4 个测试组：
+  1. **DB 配置驱动集成测试**（5 个）：hook 从 DB 加载默认/自定义配置，正确识别 claude-code/pi/unknown，自定义配置覆盖后原默认 header 不再匹配
+  2. **配置变更立即生效**（2 个）：DB 直接修改和 Admin API PUT 修改后，hook 无需重启即可使用新配置
+  3. **AC5 端到端验证**（4 个）：AC5.1 claude-code 识别、AC5.2 pi 识别、AC5.3 新增 codex 配置识别、AC5.4 User-Agent-only 不再识别
+  4. **hook → metrics 联动**（2 个）：hook 识别的 client_type 通过 collectTransportMetrics 写入 request_metrics 表
+- 测试结果：34 passed（原 21 + 新 13），全量 1199 passed / 3 skipped
+- 时间：2026-05-10T14:05:00+08:00
