@@ -5,14 +5,14 @@ import { SSEMetricsTransform } from "../../metrics/sse-metrics-transform.js";
 import { MetricsExtractor } from "../../metrics/metrics-extractor.js";
 import type { MetricsResult } from "../types.js";
 import { buildUpstreamHeaders } from "../proxy-core.js";
-import { StreamLoopGuard } from "@llm-router/core/loop-prevention";
-import { NGramLoopDetector } from "@llm-router/core/loop-prevention";
+import { StreamLoopGuard } from "../../core/loop-prevention/index.js";
+import { NGramLoopDetector } from "../../core/loop-prevention/index.js";
 import { UPSTREAM_SUCCESS } from "../types.js";
 import type { RawHeaders, TransportResult } from "../types.js";
 import type { Target } from "../../core/types.js";
-import type { RequestTracker } from "@llm-router/core/monitor";
+import type { RequestTracker } from "../../core/monitor/index.js";
 import type { RetryRuleMatcher } from "../orchestration/retry-rules.js";
-import { DEFAULT_MAX_RAW as STREAM_CONTENT_MAX_RAW, DEFAULT_MAX_TEXT as STREAM_CONTENT_MAX_TEXT } from "@llm-router/core/monitor";
+import { DEFAULT_MAX_RAW as STREAM_CONTENT_MAX_RAW, DEFAULT_MAX_TEXT as STREAM_CONTENT_MAX_TEXT } from "../../core/monitor/index.js";
 
 const LOOP_DETECTOR_N = 6;
 const LOOP_DETECTOR_WINDOW_SIZE = 1000;

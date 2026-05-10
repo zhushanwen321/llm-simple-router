@@ -1,5 +1,11 @@
 import { sanitizeToolUseId, parseToolArguments } from "./sanitize.js";
-import type { AnthropicContentBlock } from "./types.js";
+import type { AnthropicContentBlock, AnthropicMessage, AnthropicRequest } from "./types.js";
+import type {
+  ResponsesApiRequest,
+  ResponseInputItem,
+  ResponseInputMessage,
+  ResponseTool,
+} from "./types-responses.js";
 
 // ---------- Effort → budget mapping (shared with thinking-mapper) ----------
 
@@ -49,32 +55,32 @@ function ensureFirstIsUser(msgs: AntMessage[]): AntMessage[] {
 export function responsesToAnthropicRequest(
   body: Record<string, unknown>,
 ): Record<string, unknown> {
+  const req = body as unknown as ResponsesApiRequest;
   const result: Record<string, unknown> = {};
-  result.model = body.model;
+  result.model = req.model;
 
   // instructions → system
-  if (body.instructions != null) {
-    result.system = body.instructions;
+  if (req.instructions != null) {
+    result.system = req.instructions;
   }
 
   // input → messages
-  result.messages = convertResponsesInputToAntMessages(body.input);
+  result.messages = convertResponsesInputToAntMessages(req.input);
 
   // max_output_tokens → max_tokens
-  if (body.max_output_tokens != null) {
-    result.max_tokens = body.max_output_tokens;
+  if (req.max_output_tokens != null) {
+    result.max_tokens = req.max_output_tokens;
   }
 
   // temperature, top_p, stream — pass through
-  if (body.temperature != null) result.temperature = body.temperature;
-  if (body.top_p != null) result.top_p = body.top_p;
-  if (body.stream != null) result.stream = body.stream;
+  if (req.temperature != null) result.temperature = req.temperature;
+  if (req.top_p != null) result.top_p = req.top_p;
+  if (req.stream != null) result.stream = req.stream;
 
   // tools: only function-type tools are forwarded
-  const tools = body.tools as Array<Record<string, unknown>> | undefined;
-  if (tools) {
-    const fnTools = tools.filter(t => t.type === "function");
-    if (fnTools.length > 0 && body.tool_choice !== "none") {
+  if (req.tools) {
+    const fnTools = req.tools.filter((t): t is Extract<ResponseTool, { type: "function" }> => t.type === "function");
+    if (fnTools.length > 0 && req.tool_choice !== "none") {
       result.tools = fnTools.map(t => {
         const mapped: Record<string, unknown> = { name: t.name };
         if (t.description != null) mapped.description = t.description;
@@ -83,25 +89,22 @@ export function responsesToAnthropicRequest(
       });
 
       // tool_choice mapping
-      if (body.tool_choice != null && body.tool_choice !== "none") {
-        const tc = mapToolChoiceResponses2Ant(body.tool_choice);
+      if (req.tool_choice != null) {
+        const tc = mapToolChoiceResponses2Ant(req.tool_choice);
         if (tc != null) {
-          result.tool_choice = body.parallel_tool_calls === false
+          result.tool_choice = req.parallel_tool_calls === false
             ? { ...(tc as Record<string, unknown>), disable_parallel_tool_use: true }
             : tc;
         }
-      } else if (body.parallel_tool_calls === false) {
+      } else if (req.parallel_tool_calls === false) {
         result.tool_choice = { type: "auto", disable_parallel_tool_use: true };
       }
     }
   }
 
   // reasoning → thinking
-  if (body.reasoning) {
-    const reasoning = body.reasoning as Record<string, unknown>;
-    const effort = reasoning.effort as string | undefined;
-    const maxTokens = reasoning.max_tokens as number | undefined;
-    const budget = maxTokens ?? EFFORT_BUDGET[effort ?? ""] ?? DEFAULT_BUDGET;
+  if (req.reasoning) {
+    const budget = req.reasoning.max_tokens ?? EFFORT_BUDGET[req.reasoning.effort ?? ""] ?? DEFAULT_BUDGET;
     result.thinking = { type: "enabled", budget_tokens: budget };
 
     // Ensure max_tokens >= budget_tokens
@@ -111,16 +114,15 @@ export function responsesToAnthropicRequest(
   }
 
   // metadata.user_id
-  const meta = body.metadata as Record<string, unknown> | undefined;
-  if (meta?.user_id) {
-    result.metadata = { user_id: meta.user_id };
+  if (req.metadata?.user_id) {
+    result.metadata = { user_id: req.metadata.user_id };
   }
 
   return result;
 }
 
 /** Convert Responses input (string | ResponseInputItem[]) → Anthropic messages. */
-function convertResponsesInputToAntMessages(input: unknown): AntMessage[] {
+function convertResponsesInputToAntMessages(input: string | ResponseInputItem[] | undefined): AntMessage[] {
   if (input == null) return [];
   // String shorthand → single user message
   if (typeof input === "string") {
@@ -130,54 +132,49 @@ function convertResponsesInputToAntMessages(input: unknown): AntMessage[] {
 
   const raw: AntMessage[] = [];
 
-  for (const item of input as Array<Record<string, unknown>>) {
-    const type = item.type as string;
-
-    if (type === "message") {
-      // ResponseInputMessage: extract content as AnthropicContentBlock[]
-      const role = item.role as string;
+  for (const item of input) {
+    if (item.type === "message") {
+      // item is narrowed to ResponseInputMessage
       const content = extractMessageContent(item);
-      raw.push({ role, content });
-    } else if (type === "function_call") {
-      // → assistant tool_use (Anthropic requires "toolu_" prefix)
-      const rawId = (item.call_id ?? item.id ?? "") as string;
+      raw.push({ role: item.role, content });
+    } else if (item.type === "function_call") {
+      // item is narrowed to ResponseFunctionCallInput
+      const rawId = item.call_id ?? item.id ?? "";
       const antId = rawId.startsWith("toolu_") ? rawId : `toolu_${rawId}`;
       raw.push({
         role: "assistant",
         content: [{
           type: "tool_use",
           id: sanitizeToolUseId(antId),
-          name: (item.name ?? "") as string,
+          name: item.name ?? "",
           input: parseToolArguments(item.arguments),
         }],
       });
-    } else if (type === "function_call_output") {
-      // → user tool_result (Anthropic requires "toolu_" prefix)
-      const rawCallId = (item.call_id ?? "") as string;
-      const antCallId = rawCallId.startsWith("toolu_") ? rawCallId : `toolu_${rawCallId}`;
+    } else if (item.type === "function_call_output") {
+      // item is narrowed to ResponseFunctionCallOutputInput
+      const antCallId = item.call_id.startsWith("toolu_") ? item.call_id : `toolu_${item.call_id}`;
       raw.push({
         role: "user",
         content: [{
           type: "tool_result",
           tool_use_id: sanitizeToolUseId(antCallId),
-          content: (item.output ?? "") as string,
+          content: item.output ?? "",
         }],
       });
-    } else if (type === "reasoning") {
-      // → assistant thinking
-      const summary = item.summary as Array<Record<string, unknown>> | undefined;
-      const thinkingText = summary
-        ? summary.map(s => (s.text ?? "") as string).join("\n")
+    } else if (item.type === "reasoning") {
+      // item is narrowed to ResponseReasoningInput
+      const thinkingText = item.summary
+        ? item.summary.map(s => s.text ?? "").join("\n")
         : "";
       raw.push({
         role: "assistant",
         content: [{ type: "thinking", thinking: thinkingText }],
       });
-    } else if (type === "input_text") {
-      // → user text
+    } else if (item.type === "input_text") {
+      // item is narrowed to ResponseInputText
       raw.push({
         role: "user",
-        content: [{ type: "text", text: (item.text ?? "") as string }],
+        content: [{ type: "text", text: item.text ?? "" }],
       });
     }
   }
@@ -188,16 +185,16 @@ function convertResponsesInputToAntMessages(input: unknown): AntMessage[] {
 }
 
 /** Extract content blocks from a ResponseInputMessage. */
-function extractMessageContent(msg: Record<string, unknown>): AnthropicContentBlock[] {
-  const content = msg.content;
+function extractMessageContent(msg: ResponseInputMessage): AnthropicContentBlock[] {
+  const { content } = msg;
   if (content == null) return [];
   if (typeof content === "string") {
     return [{ type: "text", text: content }];
   }
   if (Array.isArray(content)) {
-    return (content as Array<Record<string, unknown>>).flatMap((part): AnthropicContentBlock[] => {
+    return content.flatMap((part): AnthropicContentBlock[] => {
       if (part.type === "input_text" && part.text != null) {
-        return [{ type: "text", text: part.text as string }];
+        return [{ type: "text", text: part.text }];
       }
       return [];
     });
@@ -224,38 +221,35 @@ function mapToolChoiceResponses2Ant(tc: unknown): Record<string, unknown> | unde
 export function anthropicToResponsesRequest(
   body: Record<string, unknown>,
 ): Record<string, unknown> {
+  const req = body as unknown as AnthropicRequest;
   const result: Record<string, unknown> = {};
-  result.model = body.model;
+  result.model = req.model;
 
   // system → instructions
-  if (body.system != null) {
-    if (typeof body.system === "string") {
-      result.instructions = body.system;
-    } else if (Array.isArray(body.system)) {
-      result.instructions = (body.system as Array<Record<string, unknown>>)
-        .map(b => (b.text ?? "") as string)
-        .join("\n");
+  if (req.system != null) {
+    if (typeof req.system === "string") {
+      result.instructions = req.system;
+    } else if (Array.isArray(req.system)) {
+      result.instructions = req.system.map(b => b.text ?? "").join("\n");
     } else {
-      result.instructions = body.system;
+      result.instructions = req.system;
     }
   }
 
   // messages → input items
-  const antMessages = body.messages as Array<Record<string, unknown>> | undefined;
-  result.input = antMessages ? convertAntMessagesToResponsesInput(antMessages) : [];
+  result.input = req.messages ? convertAntMessagesToResponsesInput(req.messages) : [];
 
   // max_tokens → max_output_tokens
-  if (body.max_tokens != null) result.max_output_tokens = body.max_tokens;
+  if (req.max_tokens != null) result.max_output_tokens = req.max_tokens;
 
   // temperature, top_p, stream — pass through
-  if (body.temperature != null) result.temperature = body.temperature;
-  if (body.top_p != null) result.top_p = body.top_p;
-  if (body.stream != null) result.stream = body.stream;
+  if (req.temperature != null) result.temperature = req.temperature;
+  if (req.top_p != null) result.top_p = req.top_p;
+  if (req.stream != null) result.stream = req.stream;
 
   // tools
-  const tools = body.tools as Array<Record<string, unknown>> | undefined;
-  if (tools && tools.length > 0) {
-    result.tools = tools.map(t => {
+  if (req.tools && req.tools.length > 0) {
+    result.tools = req.tools.map(t => {
       const mapped: Record<string, unknown> = {
         type: "function",
         name: t.name,
@@ -267,23 +261,21 @@ export function anthropicToResponsesRequest(
   }
 
   // tool_choice
-  if (body.tool_choice != null) {
-    const tc = mapToolChoiceAnt2Responses(body.tool_choice);
+  if (req.tool_choice != null) {
+    const tc = mapToolChoiceAnt2Responses(req.tool_choice);
     if (tc != null) result.tool_choice = tc;
   }
 
   // thinking → reasoning
-  if (body.thinking) {
-    const thinking = body.thinking as Record<string, unknown>;
-    if (thinking.type === "enabled" && thinking.budget_tokens != null) {
-      result.reasoning = { max_tokens: thinking.budget_tokens };
+  if (req.thinking) {
+    if (req.thinking.type === "enabled" && req.thinking.budget_tokens != null) {
+      result.reasoning = { max_tokens: req.thinking.budget_tokens };
     }
   }
 
   // metadata.user_id
-  const meta = body.metadata as Record<string, unknown> | undefined;
-  if (meta?.user_id) {
-    result.metadata = { user_id: meta.user_id };
+  if (req.metadata?.user_id) {
+    result.metadata = { user_id: req.metadata.user_id };
   }
 
   return result;
@@ -291,22 +283,21 @@ export function anthropicToResponsesRequest(
 
 /** Convert Anthropic messages → Responses input items. */
 function convertAntMessagesToResponsesInput(
-  messages: Array<Record<string, unknown>>,
+  messages: AnthropicMessage[],
 ): unknown[] {
   const items: unknown[] = [];
 
   for (const msg of messages) {
-    const role = msg.role as string;
-    const content = msg.content as Array<Record<string, unknown>> | undefined;
+    const { role, content } = msg;
     if (!content || !Array.isArray(content)) continue;
 
     if (role === "user") {
       // Separate text blocks and tool_result blocks
-      const textBlocks = content.filter(b => b.type === "text");
-      const toolResultBlocks = content.filter(b => b.type === "tool_result");
+      const textBlocks = content.filter((b): b is Extract<AnthropicContentBlock, { type: "text" }> => b.type === "text");
+      const toolResultBlocks = content.filter((b): b is Extract<AnthropicContentBlock, { type: "tool_result" }> => b.type === "tool_result");
 
       if (textBlocks.length > 0) {
-        const text = textBlocks.map(b => (b.text ?? "") as string).join("");
+        const text = textBlocks.map(b => b.text ?? "").join("");
         items.push({
           type: "message",
           role: "user",
@@ -316,27 +307,27 @@ function convertAntMessagesToResponsesInput(
       for (const tr of toolResultBlocks) {
         items.push({
           type: "function_call_output",
-          call_id: stripTooluPrefix((tr.tool_use_id ?? "") as string),
-          output: (tr.content ?? "") as string,
+          call_id: stripTooluPrefix(tr.tool_use_id ?? ""),
+          output: tr.content ?? "",
         });
       }
     } else if (role === "assistant") {
-      const textBlocks = content.filter(b => b.type === "text");
-      const toolUseBlocks = content.filter(b => b.type === "tool_use");
-      const thinkingBlocks = content.filter(b => b.type === "thinking");
+      const textBlocks = content.filter((b): b is Extract<AnthropicContentBlock, { type: "text" }> => b.type === "text");
+      const toolUseBlocks = content.filter((b): b is Extract<AnthropicContentBlock, { type: "tool_use" }> => b.type === "tool_use");
+      const thinkingBlocks = content.filter((b): b is Extract<AnthropicContentBlock, { type: "thinking" }> => b.type === "thinking");
 
       // thinking → reasoning items
       for (const tb of thinkingBlocks) {
         items.push({
           type: "reasoning",
           id: `rs_${Date.now()}_${items.length}`,
-          summary: [{ type: "summary_text", text: (tb.thinking ?? "") as string }],
+          summary: [{ type: "summary_text", text: tb.thinking ?? "" }],
         });
       }
 
       // text → assistant message
       if (textBlocks.length > 0) {
-        const text = textBlocks.map(b => (b.text ?? "") as string).join("");
+        const text = textBlocks.map(b => b.text ?? "").join("");
         items.push({
           type: "message",
           role: "assistant",
@@ -348,9 +339,9 @@ function convertAntMessagesToResponsesInput(
       for (const tu of toolUseBlocks) {
         items.push({
           type: "function_call",
-          id: (tu.id ?? "") as string,
-          call_id: stripTooluPrefix((tu.id ?? "") as string),
-          name: (tu.name ?? "") as string,
+          id: tu.id ?? "",
+          call_id: stripTooluPrefix(tu.id ?? ""),
+          name: tu.name ?? "",
           arguments: JSON.stringify(tu.input ?? {}),
         });
       }

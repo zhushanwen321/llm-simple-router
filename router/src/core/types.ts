@@ -1,8 +1,16 @@
 // src/core/types.ts
 // 被多个目录（proxy, db, monitor, admin）共享的类型定义
 
-// Re-export ConcurrencyConfig from core
-export type { ConcurrencyConfig } from "@llm-router/core/concurrency";
+// Re-export ConcurrencyConfig from merged core
+export type { ConcurrencyConfig } from "./concurrency/types.js";
+
+/** Generic logger interface for core package decoupling from pino/fastify. */
+export interface Logger {
+  debug?(obj: Record<string, unknown>, msg: string): void;
+  info?(obj: Record<string, unknown>, msg: string): void;
+  warn?(obj: Record<string, unknown>, msg: string): void;
+  error?(obj: Record<string, unknown>, msg: string): void;
+}
 
 // ========== 来自原 proxy/strategy/types.ts ==========
 

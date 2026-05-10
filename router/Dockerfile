@@ -23,17 +23,15 @@ WORKDIR /app
 # 安装 monorepo 所有依赖（workspace）
 COPY package.json package-lock.json ./
 COPY router/package.json router/package.json
-COPY core/package.json core/package.json
 RUN npm ci
 
 # 复制源码和 tsconfig
 COPY tsconfig.base.json .
 COPY router/tsconfig.json router/
 COPY router/src/ router/src/
-COPY core/ core/
 
-# 先编译 core，再编译 router（core 编译产物是 router 的依赖）
-RUN npm run build -w core && npm run build -w router
+# 编译 router（core 已合并到 router/src/core/）
+RUN npm run build -w router
 
 # 阶段2：运行时
 FROM node:22-alpine
@@ -50,14 +48,10 @@ RUN apk add --no-cache python3 make g++
 # 安装 monorepo 生产依赖
 COPY package.json package-lock.json ./
 COPY router/package.json router/package.json
-COPY core/package.json core/package.json
 RUN npm ci --omit=dev && npm cache clean --force
 
 # 清理编译工具，减小镜像体积
 RUN apk del python3 make g++
-
-# 复制 core 编译产物（router 运行时依赖 @llm-router/core 的子路径导出）
-COPY --from=builder /app/core/dist core/dist/
 
 # 复制 router 编译产物
 COPY --from=builder /app/router/dist router/dist/

@@ -323,6 +323,76 @@ AC2: 开关 ON + 无 session_id → 测试 xxxx
 | **前端控件模式一致** | 保存按钮模式页面新增控件不得直调 API | ProxyEnhancement.vue Switch 直调 API |
 | **Hook 注册验证** | 新增 Hook 时除了注册到 `hookRegistry`，还需注册到 `proxyPipeline` 并验证 emit 路径 | 所有 hooks 仅注册到 hookRegistry，从未被执行 |
 
+### 转换层类型安全规范
+
+`src/proxy/transform/` 下的格式转换代码必须遵循以下规范，防止字段名拼写错误导致运行时 bug：
+
+**规则 1：使用结构化类型，禁止裸 `Record<string, unknown>` 访问 API 字段**
+
+转换函数内部必须使用 `types.ts` / `types-responses.ts` 中定义的结构化类型（如 `ResponsesApiRequest`、`ResponseInputItem`、`ChatCompletionMessage`、`AnthropicMessage`、`AnthropicContentBlock`），不得用 `Record<string, unknown>` 访问 API 字段。
+
+```typescript
+// 禁止：字段名拼错不会报编译错误
+const id = (item.id ?? "") as string;  // 实际上应该是 call_id
+
+// 正确：入口断言为结构化类型，编译器检查字段名
+const req = body as unknown as ResponsesApiRequest;
+for (const item of (req.input as ResponseInputItem[])) {
+  if (item.type === "function_call") {
+    // TypeScript discriminated union 自动收窄
+    const id = item.call_id ?? item.id ?? "";  // 编译器知道这两个字段存在
+  }
+}
+```
+
+**规则 2：函数签名保持 `Record<string, unknown>` 不变**
+
+导出函数的参数和返回类型保持 `Record<string, unknown>`（兼容 `format/types.ts` 的 `FormatConverter` 接口），仅在函数体内部断言为具体类型。
+
+```typescript
+// 签名不变
+export function responsesToChatRequest(
+  body: Record<string, unknown>,
+): Record<string, unknown> {
+  // 入口断言
+  const req = body as unknown as ResponsesApiRequest;
+  // 后续全用 req.xxx
+}
+```
+
+**规则 3：数组遍历使用 discriminated union 收窄**
+
+遍历 `ResponseInputItem[]`、`AnthropicContentBlock[]`、`ResponseOutputItem[]` 等 union type 数组时，通过 `item.type` 判断后让 TypeScript 自动收窄类型，不再用 `as` 断言。
+
+**规则 4：SSE 流式和 patch 层允许 `Record<string, unknown>`**
+
+流式转换（`stream-*.ts`）和 patch 层（`patch/*.ts`）的数据来自上游 JSON.parse，结构不完全可控。这些文件中 `Record<string, unknown>` 是合理的，但仍应优先用具体类型。
+
+**规则 5：`Record<string, unknown>` 白名单**
+
+以下场景中 `Record<string, unknown>` 是合理且允许的，不视为类型安全违规：
+
+| 场景 | 文件 | 说明 |
+|------|------|------|
+| 外部接口签名 | `format/types.ts` | `FormatConverter` 接口定义 `body: Record<string, unknown>`，所有转换函数签名必须兼容 |
+| 输出对象构造 | `request-*.ts`, `response-*.ts` | 转换函数返回 `Record<string, unknown>`，输出对象的字段通过 `result.xxx = ...` 赋值 |
+| 中间集合 | `request-bridge-responses.ts` | `pendingFnCalls`、`chatTools` 等混合了多种 tool_call 结构的集合 |
+| 流式 SSE payload | `stream-*.ts`（6 个文件） | SSE `data:` 字段经 `JSON.parse` 解析，结构由上游决定 |
+| Patch 层 | `patch/*.ts` | 处理上游响应，字段访问多为单值 `as string`/`as number` |
+| 错误格式转换 | `response-transform.ts` `transformErrorResponse` | 错误响应结构多变，用 `Record<string, unknown>` 解构 |
+| tool_choice 映射 | `mapToolChoice*` 函数 | tool_choice 格式跨 API 差异大，参数保持 `unknown` |
+| PSF 扩展字段 | `request-transform.ts` | Anthropic `signature` 等非标准字段需 `as unknown as Record<string, unknown>` 写入 |
+| provider_meta | `provider-meta.ts` | 跨 provider 的元数据结构不定型 |
+| 插件接口 | `plugin-types.ts` | 插件数据结构由外部定义，无法预知 |
+| usage 映射 | `usage-mapper.ts` | usage 字段跨 API 格式差异大，保持灵活 |
+| sanitize 工具 | `sanitize.ts` | `parseToolArguments` 返回 `Record<string, unknown>`，因为 JSON.parse 结果类型不定 |
+
+**类型定义位置：**
+- Responses API 类型：`src/proxy/transform/types-responses.ts`
+- Chat Completions / Anthropic 类型：`src/proxy/transform/types.ts`
+- 新增 API 字段时必须同步更新对应的类型定义
+- 类型定义跨文件共享时，统一放在 `types.ts` 中（如 `AnthropicRequest`），禁止在各文件中重复定义同名接口
+
 ### 前端错误处理规范
 
 所有前端 API 调用的 `catch` 块必须同时包含两层错误处理：

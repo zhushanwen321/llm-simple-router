@@ -11,8 +11,8 @@ import { authMiddleware } from "../src/middleware/auth.js";
 import { initDatabase } from "../src/db/index.js";
 import { setSetting } from "../src/db/settings.js";
 import { RetryRuleMatcher } from "../src/proxy/orchestration/retry-rules.js";
-import { SemaphoreManager as ProviderSemaphoreManager } from "@llm-router/core/concurrency";
-import { RequestTracker } from "@llm-router/core/monitor";
+import { SemaphoreManager as ProviderSemaphoreManager } from "../src/core/concurrency/index.js";
+import { RequestTracker } from "../src/core/monitor/index.js";
 import { ServiceContainer, SERVICE_KEYS } from "../src/core/container.js";
 import { ProxyAgentFactory } from "../src/proxy/transport/proxy-agent.js";
 

@@ -15,9 +15,9 @@ import fp from "fastify-plugin";
 import { insertRequestLog, getAllProviders } from "../../db/index.js";
 import { createErrorFormatter, type ErrorKind } from "../proxy-core.js";
 import { createOrchestrator } from "../orchestration/orchestrator.js";
-import { SemaphoreManager } from "@llm-router/core/concurrency";
-import type { RequestTracker } from "@llm-router/core/monitor";
-import { AdaptiveController } from "@llm-router/core/concurrency";
+import { SemaphoreManager } from "../../core/concurrency/index.js";
+import type { RequestTracker } from "../../core/monitor/index.js";
+import { AdaptiveController } from "../../core/concurrency/index.js";
 import { HTTP_OK, HTTP_BAD_GATEWAY, HTTP_CLIENT_CLOSED, MS_PER_SECOND } from "../../core/constants.js";
 import { SERVICE_KEYS } from "../../core/container.js";
 import type { ServiceContainer } from "../../core/container.js";
@@ -27,7 +27,7 @@ import { createPipelineContext } from "../pipeline/context.js";
 import { proxyPipeline } from "../pipeline/pipeline.js";
 import { executeFailoverLoop, type FailoverLoopDeps } from "./failover-loop.js";
 import { loadEnhancementConfig } from "../routing/enhancement-config.js";
-import { ToolLoopGuard, type SessionTracker } from "@llm-router/core/loop-prevention";
+import { ToolLoopGuard, type SessionTracker } from "../../core/loop-prevention/index.js";
 import { HTTP_UNPROCESSABLE_ENTITY } from "../../core/constants.js";
 import { PipelineAbort } from "../pipeline/types.js";
 import { applyToolRoundLimit } from "../patch/tool-round-limiter.js";
@@ -137,7 +137,7 @@ function applyEnhancementPreprocess(
 ): void {
   const enhancementConfig = loadEnhancementConfig(db);
   const apiType = ctx.apiType as "openai" | "openai-responses" | "anthropic";
-  const sessionId = ctx.sessionId;
+  const sessionId = ctx.metadata.get("session_id") as string | undefined;
 
   // 工具轮数限制
   if (enhancementConfig.tool_round_limit_enabled) {

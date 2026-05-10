@@ -1,18 +1,25 @@
 import { randomUUID } from "crypto";
-import type { AnthropicContentBlock } from "./types.js";
+import type {
+  ChatCompletionMessage,
+  AnthropicMessage,
+  AnthropicContentBlock,
+  AnthropicTextBlock,
+  AnthropicThinkingBlock,
+  AnthropicToolUseBlock,
+  AnthropicToolResultBlock,
+} from "./types.js";
 import { sanitizeToolUseId, ensureNonEmptyContent, parseToolArguments } from "./sanitize.js";
 
 // ---------- extractSystemMessages ----------
 
 export function extractSystemMessages(
-  messages: unknown[],
-): { systemParts: string[]; nonSystemMsgs: unknown[] } {
+  messages: ChatCompletionMessage[],
+): { systemParts: string[]; nonSystemMsgs: ChatCompletionMessage[] } {
   const systemParts: string[] = [];
-  const nonSystemMsgs: unknown[] = [];
+  const nonSystemMsgs: ChatCompletionMessage[] = [];
   for (const msg of messages) {
-    const m = msg as Record<string, unknown>;
-    if (m.role === "system" || m.role === "developer") {
-      systemParts.push((m.content ?? "") as string);
+    if (msg.role === "system" || msg.role === "developer") {
+      systemParts.push(msg.content ?? "");
     } else {
       nonSystemMsgs.push(msg);
     }
@@ -37,7 +44,6 @@ function normalizeToTextBlocks(content: unknown): AnthropicContentBlock[] {
         const imageUrl = (p.image_url as { url: string })?.url;
         if (imageUrl) {
           if (imageUrl.startsWith("data:")) {
-            // base64 data URL → base64 source
             const match = imageUrl.match(/^data:(image\/[^;]+);base64,(.+)$/);
             if (match) {
               return [{ type: "image" as const, source: { type: "base64", media_type: match[1], data: match[2] } }];
@@ -57,7 +63,7 @@ function normalizeToTextBlocks(content: unknown): AnthropicContentBlock[] {
 interface AntMessage { role: string; content: AnthropicContentBlock[] }
 
 export function convertMessagesOA2Ant(
-  messages: unknown[],
+  messages: ChatCompletionMessage[],
 ): { system?: string; messages: AntMessage[] } {
   ensureNonEmptyContent(messages);
   const { systemParts, nonSystemMsgs } = extractSystemMessages(messages);
@@ -66,36 +72,33 @@ export function convertMessagesOA2Ant(
   const raw: AntMessage[] = [];
 
   for (const msg of nonSystemMsgs) {
-    const m = msg as Record<string, unknown>;
-    if (m.role === "user") {
-      raw.push({ role: "user", content: normalizeToTextBlocks(m.content) });
-    } else if (m.role === "assistant") {
+    if (msg.role === "user") {
+      raw.push({ role: "user", content: normalizeToTextBlocks(msg.content) });
+    } else if (msg.role === "assistant") {
       const blocks: AnthropicContentBlock[] = [];
       // reasoning_content → thinking block (before text)
-      if (m.reasoning_content) {
-        blocks.push({ type: "thinking", thinking: m.reasoning_content as string });
+      if (msg.reasoning_content) {
+        blocks.push({ type: "thinking", thinking: msg.reasoning_content });
       }
       // text content (skip null/undefined/empty string)
-      if (m.content != null && m.content !== "") {
-        blocks.push(...normalizeToTextBlocks(m.content));
+      if (msg.content != null && msg.content !== "") {
+        blocks.push(...normalizeToTextBlocks(msg.content));
       }
       // tool_calls → tool_use blocks
-      const toolCalls = m.tool_calls as Array<Record<string, unknown>> | undefined;
-      if (toolCalls) {
-        for (const tc of toolCalls) {
-          const fn = tc.function as Record<string, unknown>;
-          const input = parseToolArguments(fn.arguments);
-          blocks.push({ type: "tool_use", id: sanitizeToolUseId(tc.id as string), name: fn.name as string, input });
+      if (msg.tool_calls) {
+        for (const tc of msg.tool_calls) {
+          const input = parseToolArguments(tc.function.arguments);
+          blocks.push({ type: "tool_use", id: sanitizeToolUseId(tc.id), name: tc.function.name, input });
         }
       }
       if (blocks.length === 0) blocks.push({ type: "text", text: "" });
       raw.push({ role: "assistant", content: blocks });
-    } else if (m.role === "tool") {
+    } else if (msg.role === "tool") {
       // role:"tool" → role:"user" + tool_result
       const toolResult: AnthropicContentBlock = {
         type: "tool_result",
-        tool_use_id: sanitizeToolUseId((m.tool_call_id ?? "") as string),
-        content: (m.content ?? "") as string,
+        tool_use_id: sanitizeToolUseId(msg.tool_call_id ?? ""),
+        content: msg.content ?? "",
       };
       // 尝试合并到前一条 user 消息（或已有的 tool result 序列）
       const last = raw[raw.length - 1];
@@ -130,24 +133,20 @@ export function convertMessagesOA2Ant(
 
 export function convertMessagesAnt2OA(
   system: unknown,
-  messages: unknown[],
+  messages: AnthropicMessage[],
 ): unknown[] {
   const result: unknown[] = [];
 
   // 预扫描：收集无 id 的 tool_use，为每个生成唯一 UUID。
-  // 返回 assistant 索引 → { tool_use 数组索引 → UUID } 的映射，
-  // 以及空 tool_use_id 的 tool_result → UUID 的顺序配对列表。
   // OpenAI 格式要求 tool_calls[].id 非空，且 tool.tool_call_id 与之匹配。
   const syntheticIds: string[] = [];
   const assistantToolMap = new Map<number, Map<number, string>>();
   {
     let assistantIdx = 0;
     for (const msg of messages) {
-      const m = msg as Record<string, unknown>;
-      if (m.role !== "assistant") continue;
-      const content = m.content as Array<Record<string, unknown>> | undefined;
-      if (!content) { assistantIdx++; continue; }
-      const toolBlocks = content.filter(b => b.type === "tool_use");
+      if (msg.role !== "assistant") continue;
+      if (!msg.content) { assistantIdx++; continue; }
+      const toolBlocks = msg.content.filter((b): b is AnthropicToolUseBlock => b.type === "tool_use");
       if (toolBlocks.length > 0) {
         const idxMap = new Map<number, string>();
         for (let i = 0; i < toolBlocks.length; i++) {
@@ -171,48 +170,48 @@ export function convertMessagesAnt2OA(
     const text = typeof system === "string"
       ? system
       : Array.isArray(system)
-        ? (system as Array<Record<string, unknown>>).map(b => b.text ?? "").join("\n")
-        : typeof system === 'string' ? system : JSON.stringify(system);
+        ? (system as Array<{ text?: string }>).map(b => b.text ?? "").join("\n")
+        : JSON.stringify(system);
     if (text) result.push({ role: "system", content: text });
   }
 
   for (const msg of messages) {
-    const m = msg as Record<string, unknown>;
-    const content = m.content as Array<Record<string, unknown>> | undefined;
-
-    if (m.role === "user") {
-      if (!content || !Array.isArray(content)) continue;
-      const textParts = content.filter(b => b.type === "text");
-      const toolResults = content.filter(b => b.type === "tool_result");
+    if (msg.role === "user") {
+      // content 在运行时可能是 string（非标准但需兼容）
+      const content = Array.isArray(msg.content) ? msg.content : undefined;
+      if (!content?.length) continue;
+      const textParts = content.filter((b): b is AnthropicTextBlock => b.type === "text");
+      const toolResults = content.filter((b): b is AnthropicToolResultBlock => b.type === "tool_result");
 
       if (textParts.length > 0) {
-        result.push({ role: "user", content: textParts.map(b => b.text ?? "").join("") });
+        result.push({ role: "user", content: textParts.map(b => b.text).join("") });
       }
       for (const tr of toolResults) {
-        let toolCallId = (tr.tool_use_id ?? "") as string;
+        let toolCallId = tr.tool_use_id;
         // 空 tool_use_id → 按顺序配对到预生成的 UUID
         if (!toolCallId && syntheticCursor < syntheticIds.length) {
           toolCallId = syntheticIds[syntheticCursor++];
         }
         result.push({ role: "tool", tool_call_id: toolCallId, content: tr.content ?? "" });
       }
-    } else if (m.role === "assistant") {
-      if (!content || !Array.isArray(content)) { assistantCounter++; continue; }
-      const textBlocks = content.filter(b => b.type === "text");
-      const toolBlocks = content.filter(b => b.type === "tool_use");
+    } else if (msg.role === "assistant") {
+      const content = Array.isArray(msg.content) ? msg.content : undefined;
+      if (!content?.length) { assistantCounter++; continue; }
+      const textBlocks = content.filter((b): b is AnthropicTextBlock => b.type === "text");
+      const toolBlocks = content.filter((b): b is AnthropicToolUseBlock => b.type === "tool_use");
+      const thinkingBlocks = content.filter((b): b is AnthropicThinkingBlock => b.type === "thinking");
 
       const oaiMsg: Record<string, unknown> = { role: "assistant" };
 
       // thinking → reasoning_content（保留 DeepSeek 原生思考信息，
       // 便于 patchThinkingConsistency 判断 thinking 模式是否激活）
-      const thinkingBlocks = content.filter(b => b.type === "thinking");
       if (thinkingBlocks.length > 0) {
-        oaiMsg.reasoning_content = thinkingBlocks.map(b => b.thinking ?? "").join("");
+        oaiMsg.reasoning_content = thinkingBlocks.map(b => b.thinking).join("");
       }
 
       // text → content
       if (textBlocks.length > 0) {
-        oaiMsg.content = textBlocks.map(b => b.text ?? "").join("");
+        oaiMsg.content = textBlocks.map(b => b.text).join("");
       }
       // tool_use → tool_calls（无 id 的 tool_use 使用预生成的 UUID）
       if (toolBlocks.length > 0) {

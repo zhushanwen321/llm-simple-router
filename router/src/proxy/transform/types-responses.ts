@@ -19,7 +19,7 @@ export interface ResponseInputImage {
 
 export interface ResponseFunctionCallInput {
   type: "function_call";
-  id: string;
+  id?: string;
   call_id: string;
   name: string;
   arguments: string;

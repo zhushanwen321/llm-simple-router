@@ -9,11 +9,11 @@ import type { SemaphoreScope } from "./scope.js";
 import { SemaphoreScope as SemaphoreScopeClass } from "./scope.js";
 import type { TrackerScope } from "./scope.js";
 import { TrackerScope as TrackerScopeClass } from "./scope.js";
-import type { ActiveRequest } from "@llm-router/core/monitor";
-import type { SemaphoreManager } from "@llm-router/core/concurrency";
-import { SemaphoreTimeoutError, SemaphoreQueueFullError } from "@llm-router/core";
-import type { RequestTracker } from "@llm-router/core/monitor";
-import type { AdaptiveController } from "@llm-router/core/concurrency";
+import type { ActiveRequest } from "../../core/monitor/types.js";
+import type { SemaphoreManager } from "../../core/concurrency/index.js";
+import { SemaphoreTimeoutError, SemaphoreQueueFullError } from "../../core/errors.js";
+import type { RequestTracker } from "../../core/monitor/index.js";
+import type { AdaptiveController } from "../../core/concurrency/index.js";
 
 const DEFAULT_BASE_DELAY_MS = 1000;
 const DEFAULT_FAILOVER_THRESHOLD = 400;
@@ -28,7 +28,7 @@ export interface OrchestratorConfig {
   isStream: boolean;
   /** 外部生成的 tracker ID，用于 tracker.appendStreamChunk / tracker.update 等回调匹配 */
   trackerId?: string;
-  /** Claude Code 的 session ID，从 x-claude-code-session-id 请求头获取 */
+  /** Session ID，由 client-detection hook 通过 metadata 设置 */
   sessionId?: string;
   /** 客户端请求的 JSON 字符串（headers + body），用于 Monitor 实时查看 */
   clientRequest?: string;

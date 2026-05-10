@@ -2,9 +2,10 @@
  * PipelineContext 工厂函数接口契约测试。
  *
  * 覆盖 spec 中 pipeline-hooks.md 对 PipelineContext 的定义：
- * - readonly 字段不可变（request, reply, rawBody, clientModel, apiType, sessionId）
+ * - readonly 字段不可变（request, reply, rawBody, clientModel, apiType）
  * - 可变字段正确初始化
  * - createPipelineContext 从 Fastify request 正确提取上下文
+ * - sessionId 不再硬编码在 PipelineContext 中，由 client-detection hook 通过 metadata 设置
  */
 import { describe, it, expect, vi } from "vitest";
 import { createPipelineContext } from "../../../src/proxy/pipeline/context.js";
@@ -42,31 +43,6 @@ describe("PipelineContext", () => {
   it("sets apiType from constructor parameter", () => {
     const ctx = createPipelineContext(createMockRequest(), createMockReply(), "anthropic");
     expect(ctx.apiType).toBe("anthropic");
-  });
-
-  it("extracts sessionId from x-claude-code-session-id header", () => {
-    const req = createMockRequest({
-      headers: { "x-claude-code-session-id": "sess-123" },
-    });
-    const ctx = createPipelineContext(req, createMockReply(), "openai");
-    expect(ctx.sessionId).toBe("sess-123");
-  });
-
-  it("sets sessionId to undefined when header is missing", () => {
-    const ctx = createPipelineContext(createMockRequest(), createMockReply(), "openai");
-    expect(ctx.sessionId).toBeUndefined();
-  });
-
-  it("initializes isStream from body.stream", () => {
-    const req = createMockRequest({ body: { model: "gpt-4", stream: true } });
-    const ctx = createPipelineContext(req, createMockReply(), "openai");
-    expect(ctx.isStream).toBe(true);
-  });
-
-  it("defaults isStream to false when body.stream is falsy", () => {
-    const req = createMockRequest({ body: { model: "gpt-4" } });
-    const ctx = createPipelineContext(req, createMockReply(), "openai");
-    expect(ctx.isStream).toBe(false);
   });
 
   it("initializes mutable fields to null/empty", () => {

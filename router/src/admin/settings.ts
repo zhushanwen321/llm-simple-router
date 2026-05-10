@@ -7,6 +7,7 @@ import {
   getDbMaxSizeMb, setDbMaxSizeMb,
   getLogTableMaxSizeMb, setLogTableMaxSizeMb,
   getSetting, getTokenEstimationEnabled, setTokenEstimationEnabled,
+  getClientSessionHeaders, setClientSessionHeaders,
 } from "../db/settings.js";
 import { HTTP_BAD_REQUEST } from "./constants.js";
 import { API_CODE, apiError } from "./api-response.js";
@@ -88,6 +89,32 @@ export const adminSettingsRoutes: FastifyPluginCallback<SettingsOptions> = (app,
       return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.BAD_REQUEST, "enabled must be a boolean"));
     }
     setTokenEstimationEnabled(db, enabled);
+    return { success: true };
+  });
+
+  app.get("/admin/api/settings/client-session-headers", async () => {
+    const entries = getClientSessionHeaders(db);
+    return { entries };
+  });
+
+  app.put("/admin/api/settings/client-session-headers", async (request, reply) => {
+    const body = request.body as { entries?: unknown };
+    if (!Array.isArray(body.entries)) {
+      return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.BAD_REQUEST, "entries must be a non-empty array"));
+    }
+    const entries = body.entries as Array<{ client_type?: string; session_header_key?: string }>;
+    if (entries.length === 0) {
+      return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.BAD_REQUEST, "entries must be a non-empty array"));
+    }
+    for (const entry of entries) {
+      if (!entry.client_type || typeof entry.client_type !== "string" || entry.client_type.trim() === "") {
+        return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.BAD_REQUEST, "each entry must have a non-empty client_type"));
+      }
+      if (!entry.session_header_key || typeof entry.session_header_key !== "string" || entry.session_header_key.trim() === "") {
+        return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.BAD_REQUEST, "each entry must have a non-empty session_header_key"));
+      }
+    }
+    setClientSessionHeaders(db, entries as Array<{ client_type: string; session_header_key: string }>);
     return { success: true };
   });
 

@@ -1,12 +1,12 @@
 import { randomUUID } from "crypto";
 import type Database from "better-sqlite3";
-import type { FailedToolResult, ClientAgentType } from "./handler/proxy-handler-utils.js";
+import type { FailedToolResult } from "./handler/proxy-handler-utils.js";
 
 export interface ToolErrorLogContext {
   db: Database.Database;
   providerId: string;
   backendModel: string;
-  clientAgentType: ClientAgentType;
+  clientAgentType: string;
   requestLogId: string;
   routerKeyId: string | null;
   sessionId: string | undefined;

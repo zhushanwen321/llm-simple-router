@@ -61,9 +61,9 @@ describe("clientDetectionHook", () => {
     expect(ctx.metadata.get("client_type")).toBe("claude-code");
   });
 
-  it("detects pi from user-agent header containing pi-coding-agent", () => {
+  it("detects pi from x-pi-session-id header", () => {
     const ctx = createMockContext({
-      request: { headers: { "user-agent": "pi-coding-agent/1.0" } } as any,
+      request: { headers: { "x-pi-session-id": "pi-session-123" } } as any,
     });
     clientDetectionHook.execute(ctx);
     expect(ctx.metadata.get("client_type")).toBe("pi");

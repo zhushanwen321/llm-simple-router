@@ -2,9 +2,21 @@ import { generateMsgId, generateChatcmplId, MS_PER_SECOND } from "./id-utils.js"
 import { mapFinishReasonToStopReason, mapStopReasonToFinishReason, mapUsageOA2Ant, mapUsageAnt2OA } from "./usage-mapper.js";
 import { extractAnthropicMeta } from "./provider-meta.js";
 import { parseToolArguments } from "./sanitize.js";
+import type { AnthropicContentBlock, AnthropicTextBlock, AnthropicThinkingBlock, AnthropicToolUseBlock, OpenAIToolCall } from "./types.js";
 
 export function openaiResponseToAnthropic(bodyStr: string): string {
-  const oai = JSON.parse(bodyStr);
+  const oai = JSON.parse(bodyStr) as {
+    model?: string;
+    choices?: Array<{
+      message?: {
+        content?: string;
+        reasoning_content?: string;
+        tool_calls?: OpenAIToolCall[];
+      };
+      finish_reason?: string;
+    }>;
+    usage?: Record<string, unknown>;
+  };
   const choice = oai.choices?.[0];
   const msg = choice?.message;
   const content: unknown[] = [];
@@ -39,12 +51,18 @@ export function openaiResponseToAnthropic(bodyStr: string): string {
 }
 
 export function anthropicResponseToOpenAI(bodyStr: string): string {
-  const ant = JSON.parse(bodyStr);
-  const blocks = (ant.content ?? []) as Array<Record<string, unknown>>;
+  const ant = JSON.parse(bodyStr) as {
+    id?: string;
+    model?: string;
+    content?: AnthropicContentBlock[];
+    stop_reason?: string;
+    usage?: Record<string, unknown>;
+  };
+  const blocks = ant.content ?? [];
 
-  const thinkingText = blocks.filter(b => b.type === "thinking").map(b => b.thinking as string).join("");
-  const textContent = blocks.filter(b => b.type === "text").map(b => b.text as string).join("");
-  const toolBlocks = blocks.filter(b => b.type === "tool_use");
+  const thinkingText = blocks.filter((b): b is AnthropicThinkingBlock => b.type === "thinking").map(b => b.thinking).join("");
+  const textContent = blocks.filter((b): b is AnthropicTextBlock => b.type === "text").map(b => b.text).join("");
+  const toolBlocks = blocks.filter((b): b is AnthropicToolUseBlock => b.type === "tool_use");
 
   const message: Record<string, unknown> = { role: "assistant" };
   if (thinkingText) message.reasoning_content = thinkingText;
@@ -58,7 +76,7 @@ export function anthropicResponseToOpenAI(bodyStr: string): string {
   }
 
   // preserve Anthropic-specific fields that would be lost in conversion
-  const antMeta = extractAnthropicMeta(ant);
+  const antMeta = extractAnthropicMeta(ant as Record<string, unknown>);
 
   const result: Record<string, unknown> = {
     id: ant.id ?? generateChatcmplId(),
@@ -86,12 +104,12 @@ export function transformErrorResponse(bodyStr: string, sourceApiType: string, t
   if (sourceApiType === targetApiType) return bodyStr;
   try {
     if (sourceApiType === "anthropic" && targetApiType === "openai") {
-      const ant = JSON.parse(bodyStr);
-      const err = ant.error as Record<string, unknown> ?? {};
+      const ant = JSON.parse(bodyStr) as Record<string, unknown>;
+      const err = (ant.error as Record<string, unknown>) ?? {};
       return JSON.stringify({ error: { message: err.message ?? "Unknown error", type: err.type ?? "api_error", code: "upstream_error" } });
     }
     if (sourceApiType === "openai" && targetApiType === "anthropic") {
-      const oai = JSON.parse(bodyStr);
+      const oai = JSON.parse(bodyStr) as Record<string, unknown>;
       const err = (oai.error as Record<string, unknown>) ?? {};
       return JSON.stringify({ type: "error", error: { type: err.type ?? "api_error", message: err.message ?? "Unknown error" } });
     }

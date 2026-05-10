@@ -1,0 +1,41 @@
+{
+  "requirement": "客户端 Session 识别配置化 + Core 包合并 + Pi 插件精简",
+  "date": "2026-05-10",
+  "total_duration_seconds": 7200,
+  "total_tokens": 250000,
+  "stages": [
+    {"stage": 1, "duration_seconds": 600, "tokens": 20000, "status": "pass", "retries": 0},
+    {"stage": 2, "duration_seconds": 900, "tokens": 35000, "status": "pass", "retries": 1},
+    {"stage": 3, "duration_seconds": 2400, "tokens": 100000, "status": "pass", "retries": 0},
+    {"stage": 4, "duration_seconds": 600, "tokens": 25000, "status": "pass", "retries": 0},
+    {"stage": 5, "duration_seconds": 300, "tokens": 15000, "status": "pass", "retries": 0},
+    {"stage": 6, "duration_seconds": 300, "tokens": 10000, "status": "pass", "retries": 0},
+    {"stage": 7, "duration_seconds": 120, "tokens": 5000, "status": "pass", "retries": 0},
+    {"stage": 8, "duration_seconds": 600, "tokens": 10000, "status": "pass", "retries": 0},
+    {"stage": 9, "duration_seconds": 120, "tokens": 3000, "status": "pass", "retries": 0},
+    {"stage": 10, "duration_seconds": 60, "tokens": 2000, "status": "pass", "retries": 0},
+    {"stage": 11, "duration_seconds": 300, "tokens": 15000, "status": "pass", "retries": 0}
+  ],
+  "rollbacks": [
+    {"from": 2, "to": 1, "reason": "计划评审 MUST FIX: sessionId 消费者遗漏、detectClientAgentType 调用方遗漏、core/tests 迁移未规划"},
+    {"from": 2, "to": 1, "reason": "计划评审 v2 MUST FIX: error-logging/request-logging/enhancement-preprocess 的 sessionId 遗漏"},
+    {"from": 4, "to": 3, "reason": "编码评审 MUST FIX: PipelineContext.sessionId 残留、UA fallback 未移除、body fallback 测试"}
+  ],
+  "review_effectiveness": {
+    "issues_found_by_agent": 7,
+    "issues_found_by_user": 0
+  },
+  "process_issues": {
+    "l1_gates_skipped": true,
+    "l2_gates_skipped": true,
+    "summary_not_updated": true,
+    "root_cause": "主 agent 未严格遵循 dev-flow skill 的调度流程，跳过了 Step 2 (L1) 和 Step 3 (L2) 门禁检查"
+  },
+  "key_metrics": {
+    "files_changed": 40,
+    "new_tests": 34,
+    "total_tests": 1199,
+    "commits": 9,
+    "lint_errors_before_fix": 2
+  }
+}

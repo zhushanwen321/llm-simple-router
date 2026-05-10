@@ -182,7 +182,7 @@ describe("responsesToChatResponse", () => {
     const msg = result.choices[0].message;
     expect(msg.tool_calls).toHaveLength(1);
     expect(msg.tool_calls[0]).toEqual({
-      id: "fc_001",
+      id: "call_abc",
       type: "function",
       function: { name: "get_weather", arguments: '{"city":"NYC"}' },
     });

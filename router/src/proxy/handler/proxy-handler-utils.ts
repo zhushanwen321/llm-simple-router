@@ -1,6 +1,6 @@
 import { createHash } from "crypto";
-import type { ContentBlock } from "@llm-router/core/monitor";
-import type { ToolCallRecord } from "@llm-router/core/loop-prevention";
+import type { ContentBlock } from "../../core/monitor/types.js";
+import type { ToolCallRecord } from "../../core/loop-prevention/types.js";
 import type { TransportResult } from "../types.js";
 import { parseToolArguments } from "../transform/sanitize.js";
 import type { RawHeaders } from "../types.js";
@@ -9,7 +9,15 @@ const HASH_DIGEST_LENGTH = 16;
 
 // ---------- Tool Error Logging ----------
 
-export type ClientAgentType = "claude-code" | "pi" | "unknown";
+export interface ClientSessionHeaderEntry {
+  client_type: string;
+  session_header_key: string;
+}
+
+export interface ClientDetectionResult {
+  client_type: string;
+  session_id: string | undefined;
+}
 
 export interface FailedToolResult {
   toolName: string;
@@ -17,16 +25,34 @@ export interface FailedToolResult {
 }
 
 /**
- * 根据请求头识别客户端类型。
- * - Claude Code 独有 x-claude-code-session-id 头
- * - pi 的 User-Agent 包含 "pi-coding-agent"，或 x-client-type 为 "pi-coding-agent"
+ * 根据配置的 session header 匹配请求头或请求体，识别客户端类型并提取 session_id。
+ * 遍历配置列表，先检查 headers，再 fallback 检查 body 顶层字段。
+ * 第一个匹配的条目确定 client_type 和 session_id。
+ * 无匹配返回 { client_type: "unknown", session_id: undefined }。
+ *
+ * body fallback 用于 pi-coding-agent 等无法动态修改 HTTP headers 的客户端：
+ * 这些客户端通过 before_provider_request 将 session_id 写入 payload 顶层字段。
  */
-export function detectClientAgentType(headers: RawHeaders): ClientAgentType {
-  if (headers["x-claude-code-session-id"]) return "claude-code";
-  if (headers["x-client-type"] === "pi-coding-agent") return "pi";
-  const ua = (typeof headers["user-agent"] === 'string' ? headers["user-agent"] : "").toLowerCase();
-  if (ua.includes("pi-coding-agent")) return "pi";
-  return "unknown";
+export function detectClient(
+  headers: RawHeaders,
+  config: ClientSessionHeaderEntry[],
+  body?: Record<string, unknown>,
+): ClientDetectionResult {
+  for (const entry of config) {
+    // 优先从 headers 中查找
+    const headerValue = headers[entry.session_header_key];
+    if (headerValue && typeof headerValue === "string") {
+      return { client_type: entry.client_type, session_id: headerValue };
+    }
+    // Fallback: 从 body 顶层字段查找（pi 等客户端无法动态修改 headers）
+    if (body) {
+      const bodyValue = body[entry.session_header_key];
+      if (bodyValue && typeof bodyValue === "string") {
+        return { client_type: entry.client_type, session_id: bodyValue };
+      }
+    }
+  }
+  return { client_type: "unknown", session_id: undefined };
 }
 
 /**

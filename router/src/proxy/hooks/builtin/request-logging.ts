@@ -15,7 +15,7 @@ import Database from "better-sqlite3";
 import { SERVICE_KEYS, type ServiceContainer } from "../../../core/container.js";
 import type { PipelineHook, PipelineContext } from "../../pipeline/types.js";
 import type { LogFileWriter } from "../../../storage/log-file-writer.js";
-import type { RequestTracker } from "@llm-router/core/monitor";
+import type { RequestTracker } from "../../../core/monitor/index.js";
 import type { TransportResult } from "../../types.js";
 import {
   logResilienceResult,
@@ -23,7 +23,7 @@ import {
 } from "../../proxy-logging.js";
 import { updateLogStreamContent } from "../../../db/index.js";
 import { logToolErrors } from "../../tool-error-logger.js";
-import { getTransportStatusCode, serializeBlocksForStorage, detectClientAgentType } from "../../handler/proxy-handler-utils.js";
+import { getTransportStatusCode, serializeBlocksForStorage } from "../../handler/proxy-handler-utils.js";
 import type { FailedToolResult } from "../../handler/proxy-handler-utils.js";
 
 export const requestLoggingHook: PipelineHook = {
@@ -44,6 +44,7 @@ export const requestLoggingHook: PipelineHook = {
     if (!db || !resilienceResult) return;
 
     const routerKeyId = (ctx.request.routerKey as { id?: string } | undefined)?.id ?? null;
+    const sessionId = ctx.metadata.get("session_id") as string | undefined;
     const isFailoverIteration = ctx.rootLogId !== null && ctx.rootLogId !== ctx.logId;
     const apiType = ctx.apiType as "openai" | "openai-responses" | "anthropic";
 
@@ -60,7 +61,7 @@ export const requestLoggingHook: PipelineHook = {
         logId: ctx.logId,
         routerKeyId,
         originalModel: null,
-        sessionId: ctx.sessionId,
+        sessionId: sessionId,
         pipelineSnapshot: ctx.snapshot.toJSON(),
         failover: { isFailoverIteration, rootLogId: ctx.rootLogId ?? ctx.logId },
         matcher,
@@ -86,7 +87,7 @@ export const requestLoggingHook: PipelineHook = {
         routerKeyId,
         getTransportStatusCode(resilienceResult.result),
         ctx.metadata.get("client_type") as string | undefined,
-        (ctx.metadata.get("session_id") as string | undefined) ?? ctx.sessionId,
+        sessionId,
         metricsTracker,
       );
     }
@@ -112,10 +113,10 @@ export const requestLoggingHook: PipelineHook = {
         db,
         providerId: ctx.provider.id,
         backendModel: ctx.resolved?.backend_model ?? ctx.clientModel,
-        clientAgentType: detectClientAgentType(ctx.request.headers as Record<string, string>),
+        clientAgentType: ctx.metadata.get("client_type") as string ?? "unknown",
         requestLogId: lastLogId,
         routerKeyId,
-        sessionId: ctx.sessionId,
+        sessionId: sessionId,
       });
       ctx.metadata.delete("pendingToolErrors");
     }

@@ -10,7 +10,7 @@
  */
 import { HTTP_UNPROCESSABLE_ENTITY, HTTP_CLIENT_CLOSED } from "../../../core/constants.js";
 import { SERVICE_KEYS, type ServiceContainer } from "../../../core/container.js";
-import { ToolLoopGuard, type SessionTracker } from "@llm-router/core/loop-prevention";
+import { ToolLoopGuard, type SessionTracker } from "../../../core/loop-prevention/index.js";
 import Database from "better-sqlite3";
 import type { PipelineHook, PipelineContext } from "../../pipeline/types.js";
 import { PipelineAbort } from "../../pipeline/types.js";
@@ -25,7 +25,8 @@ export const enhancementPreprocessHook: PipelineHook = {
   phase: "pre_route",
   priority: 110,
   execute(ctx: PipelineContext): void {
-    const { request, body, sessionId, metadata } = ctx;
+    const { request, body, metadata } = ctx;
+    const sessionId = metadata.get("session_id") as string | undefined;
     const db = metadata.get("db") as Database.Database;
     const container = metadata.get("container") as ServiceContainer;
     if (!db || !container) return;

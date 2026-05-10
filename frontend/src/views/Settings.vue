@@ -2,7 +2,8 @@
 import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
-import { api, getApiMessage, type DbSizeInfoResponse, type ConfigExportResponse } from '@/api/client'
+import { api, getApiMessage } from '@/api/client'
+import { getDbSizeInfo, setDbSizeThresholds, exportConfig, importConfig, type DbSizeInfoResponse, type ConfigExportResponse } from '@/api/settings-api'
 import { useLogRetention } from '@/composables/useLogRetention'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -56,7 +57,7 @@ async function loadSettings() {
   loading.value = true
   try {
     const [sizeInfo, retention] = await Promise.allSettled([
-      api.getDbSizeInfo(),
+      getDbSizeInfo(),
       api.getLogRetention(),
     ])
     if (sizeInfo.status === 'fulfilled') {
@@ -113,7 +114,7 @@ function validateThresholds(): boolean {
 async function saveThresholds() {
   if (!validateThresholds()) return
   try {
-    const result = await api.setDbSizeThresholds({
+    const result = await setDbSizeThresholds({
       dbMaxSizeMb: dbMaxSizeMb.value,
       logTableMaxSizeMb: logTableMaxSizeMb.value,
     })
@@ -129,7 +130,7 @@ async function saveThresholds() {
 
 async function handleExport() {
   try {
-    const data = await api.exportConfig()
+    const data = await exportConfig()
     const blob = new Blob([JSON.stringify(data, null, JSON_INDENT)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -170,7 +171,7 @@ async function confirmImport() {
   if (!pendingImportData.value) return
   importing.value = true
   try {
-    const result = await api.importConfig(pendingImportData.value)
+    const result = await importConfig(pendingImportData.value)
     importResult.value = result
     showImportDialog.value = false
     toast.success(t('settings.importExport.importSuccess'))

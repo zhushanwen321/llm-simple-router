@@ -3,14 +3,15 @@ const DEFAULT_BUDGET = 8192;
 
 /** OpenAI reasoning → Anthropic thinking */
 export function mapReasoningToThinking(reasoning: Record<string, unknown>): Record<string, unknown> {
-  const effort = reasoning.effort as string | undefined;
-  const maxTokens = reasoning.max_tokens as number | undefined;
-  const budget = maxTokens ?? EFFORT_BUDGET[effort ?? ""] ?? DEFAULT_BUDGET;
+  const r = reasoning as { effort?: string; max_tokens?: number };
+  const budget = r.max_tokens ?? EFFORT_BUDGET[r.effort ?? ""] ?? DEFAULT_BUDGET;
   return { type: "enabled", budget_tokens: budget };
 }
 
 /** Anthropic thinking → OpenAI reasoning */
 export function mapThinkingToReasoning(thinking: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
-  if (!thinking || thinking.type !== "enabled") return undefined;
-  return { max_tokens: thinking.budget_tokens as number };
+  if (!thinking) return undefined;
+  const t = thinking as { type?: string; budget_tokens?: number };
+  if (t.type !== "enabled") return undefined;
+  return { max_tokens: t.budget_tokens };
 }

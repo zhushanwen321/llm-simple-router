@@ -60,7 +60,6 @@ export interface PipelineContext {
   readonly rawBody: Record<string, unknown>;
   readonly clientModel: string;
   readonly apiType: string;
-  readonly sessionId: string | undefined;
 
   // 可变
   body: Record<string, unknown>;

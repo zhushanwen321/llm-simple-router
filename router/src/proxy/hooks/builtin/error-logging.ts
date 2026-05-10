@@ -13,7 +13,6 @@ import Database from "better-sqlite3";
 import { insertRequestLog } from "../../../db/index.js";
 import { insertRejectedLog } from "../../log-helpers.js";
 import { logToolErrors } from "../../tool-error-logger.js";
-import { detectClientAgentType } from "../../handler/proxy-handler-utils.js";
 import type { FailedToolResult } from "../../handler/proxy-handler-utils.js";
 import type { PipelineHook, PipelineContext } from "../../pipeline/types.js";
 import type { RetryMatcher } from "../../log-detail-policy.js";
@@ -42,6 +41,7 @@ export const errorLoggingHook: PipelineHook = {
     if (!db || !startTime) return;
 
     const routerKeyId = (ctx.request.routerKey as { id?: string } | undefined)?.id ?? null;
+    const sessionId = ctx.metadata.get("session_id") as string | undefined;
     const isFailoverIteration = ctx.rootLogId !== null && ctx.rootLogId !== ctx.logId;
     const apiType = ctx.apiType as "openai" | "openai-responses" | "anthropic";
     const snapshot = (ctx.metadata.get("pipelineSnapshot") as string) ?? ctx.snapshot.toJSON();
@@ -63,7 +63,7 @@ export const errorLoggingHook: PipelineHook = {
         providerId: errorInfo.providerId ?? null,
         isFailover: isFailoverIteration,
         originalRequestId: isFailoverIteration ? ctx.rootLogId : null,
-        sessionId: ctx.sessionId,
+        sessionId: sessionId,
         pipelineSnapshot: snapshot,
         matcher: matcher as RetryMatcher | null,
         logFileWriter: logFileWriter as LogFileWriter | null,
@@ -86,7 +86,7 @@ export const errorLoggingHook: PipelineHook = {
         original_request_id: isFailoverIteration ? ctx.rootLogId : null,
         router_key_id: routerKeyId,
         original_model: null,
-        session_id: ctx.sessionId,
+        session_id: sessionId,
         pipeline_snapshot: snapshot,
       }, (matcher || logFileWriter) ? {
         matcher,
@@ -102,10 +102,10 @@ export const errorLoggingHook: PipelineHook = {
         db,
         providerId: errorInfo?.providerId ?? ctx.provider!.id,
         backendModel: ctx.resolved?.backend_model ?? ctx.clientModel,
-        clientAgentType: detectClientAgentType(ctx.request.headers as Record<string, string>),
+        clientAgentType: ctx.metadata.get("client_type") as string ?? "unknown",
         requestLogId: ctx.logId,
         routerKeyId,
-        sessionId: ctx.sessionId,
+        sessionId: sessionId,
       });
       ctx.metadata.delete("pendingToolErrors");
     }

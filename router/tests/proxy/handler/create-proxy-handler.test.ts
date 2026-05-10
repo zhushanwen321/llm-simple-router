@@ -23,8 +23,8 @@ import { openaiToAnthropicConverter } from "../../../src/proxy/format/converters
 import { anthropicToOpenAIConverter } from "../../../src/proxy/format/converters/anthropic-openai.js";
 import { SERVICE_KEYS } from "../../../src/core/container.js";
 import { ServiceContainer } from "../../../src/core/container.js";
-import { SemaphoreManager } from "@llm-router/core/concurrency";
-import { RequestTracker } from "@llm-router/core/monitor";
+import { SemaphoreManager } from "../../../src/core/concurrency/index.js";
+import { RequestTracker } from "../../../src/core/monitor/index.js";
 import { initDatabase, setSetting } from "../../../src/db/index.js";
 import { ProxyAgentFactory } from "../../../src/proxy/transport/proxy-agent.js";
 import { encrypt } from "../../../src/utils/crypto.js";
