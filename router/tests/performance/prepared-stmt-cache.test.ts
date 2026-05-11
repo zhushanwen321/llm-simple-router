@@ -8,7 +8,7 @@
 // 2. 多个 :memory: DB 实例的缓存互相隔离
 // 3. setSetting 后 getSetting 立即返回新值（写穿透）
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import Database from "better-sqlite3";
 import { initDatabase } from "../../src/db/index.js";
 import { getSetting, setSetting } from "../../src/db/settings.js";

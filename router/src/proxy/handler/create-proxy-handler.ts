@@ -13,6 +13,7 @@ import type { FastifyPluginCallback, FastifyReply, FastifyRequest } from "fastif
 import Database from "better-sqlite3";
 import fp from "fastify-plugin";
 import { insertRequestLog, getAllProviders } from "../../db/index.js";
+import { parseModels } from "../../config/model-context.js";
 import { createErrorFormatter, type ErrorKind } from "../proxy-core.js";
 import { createOrchestrator } from "../orchestration/orchestrator.js";
 import { SemaphoreManager } from "../../core/concurrency/index.js";
@@ -32,7 +33,6 @@ import { HTTP_UNPROCESSABLE_ENTITY } from "../../core/constants.js";
 import { PipelineAbort } from "../pipeline/types.js";
 import { applyToolRoundLimit } from "../patch/tool-round-limiter.js";
 import { extractLastToolUse } from "./proxy-handler-utils.js";
-import { parseModels } from "../../config/model-context.js";
 
 // ---------- Factory config ----------
 
@@ -67,7 +67,12 @@ function handleModelsRequest(db: Database.Database) {
         continue;
       }
     }
-    const sortedIds = [...modelMeta.keys()].sort();
+
+    // 如果请求的 key 配置了 allowed_models 白名单，则过滤
+    const allowedModels = request.routerKey?.allowed_models;
+    const sortedIds = allowedModels
+      ? [...modelMeta.keys()].filter(id => allowedModels.includes(id)).sort()
+      : [...modelMeta.keys()].sort();
 
     const isAnthropicFormat = !!request.headers["anthropic-version"];
 
