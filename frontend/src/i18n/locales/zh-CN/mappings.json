@@ -48,7 +48,8 @@
     "updateFailed": "更新 {model} 失败",
     "toggleFailed": "切换 {model} 状态失败",
     "partialFail": "{count} 个操作失败",
-    "saveFailed": "保存失败"
+    "saveFailed": "保存失败",
+    "parseRuleFailed": "路由规则格式异常，已使用默认配置"
   },
   "selectProviderModel": "选择供应商 / 模型"
 }

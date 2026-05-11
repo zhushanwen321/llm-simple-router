@@ -21,8 +21,11 @@ export class SSEParser {
   feed(chunk: string): SSEEvent[] {
     if (this.isDone) return [];
     this.buffer += chunk;
-    // SSE 规范允许 \r\n 行尾，统一为 \n
-    this.buffer = this.buffer.replace(/\r\n/g, "\n");
+    // SSE 规范允许 \\r\\n 行尾，统一为 \\n
+    // 绝大多数 chunk 不含 \\r，跳过全局 replace
+    if (this.buffer.includes('\r')) {
+      this.buffer = this.buffer.replace(/\r\n/g, "\n");
+    }
     return this.drainEvents();
   }
 

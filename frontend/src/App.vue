@@ -49,5 +49,7 @@ async function checkAuth() {
 }
 
 checkAuth()
-watch(() => route.path, checkAuth)
+watch(() => route.path, () => {
+  isAuthenticated.value = !publicPages.includes(route.path)
+})
 </script>

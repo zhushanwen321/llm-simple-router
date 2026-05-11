@@ -26,5 +26,7 @@
   },
   "noCacheData": "No cache data",
   "loadProvidersFailed": "Failed to load providers",
-  "loadDashboardFailed": "Failed to load dashboard data"
+  "loadDashboardFailed": "Failed to load dashboard data",
+  "loadFilterFailed": "Failed to load filter options",
+  "loadOutputTokensFailed": "Failed to load provider ranking data"
 }

@@ -12,8 +12,6 @@ import type { PipelineHook, PipelineContext } from "../../pipeline/types.js";
 import { PipelineAbort } from "../../pipeline/types.js";
 import { HTTP_FORBIDDEN } from "../../../core/constants.js";
 
-const MAX_LOG_FIELD_LENGTH = 80;
-
 export const allowedModelsHook: PipelineHook = {
   name: "builtin:allowed-models",
   phase: "post_route",
@@ -26,28 +24,18 @@ export const allowedModelsHook: PipelineHook = {
     const isFailoverIteration = ctx.rootLogId !== null && ctx.rootLogId !== ctx.logId;
     if (isFailoverIteration) return;
 
-    const allowedModels = (request.routerKey as { allowed_models?: string } | undefined)?.allowed_models;
-    if (!allowedModels) return;
+    // allowed_models 已由 auth 中间件预解析为 string[] | null
+    const allowedModels = request.routerKey?.allowed_models;
+    if (!allowedModels || allowedModels.length === 0) return;
 
-    try {
-      const models: string[] = JSON.parse(allowedModels).filter((m: string) => m.trim() !== "");
-      if (models.length > 0 && !models.includes(resolved.backend_model)) {
-        const errors = ctx.metadata.get("errors") as {
-          modelNotAllowed: (model: string) => { statusCode: number; body: unknown };
-        };
-        const err = errors?.modelNotAllowed(resolved.backend_model);
-        throw new PipelineAbort(err?.statusCode ?? HTTP_FORBIDDEN, err?.body ?? {
-          error: { type: "model_not_allowed", message: `Model '${resolved.backend_model}' not allowed` },
-        });
-      }
-    } catch (e) {
-      // PipelineAbort 正常向上传播
-      if (e instanceof PipelineAbort) throw e;
-      // JSON 解析失败时允许所有模型
-      request.log.warn(
-        { allowedModels: allowedModels.slice(0, MAX_LOG_FIELD_LENGTH) },
-        "Invalid allowed_models JSON, allowing all models",
-      );
+    if (!allowedModels.includes(resolved.backend_model)) {
+      const errors = ctx.metadata.get("errors") as {
+        modelNotAllowed: (model: string) => { statusCode: number; body: unknown };
+      };
+      const err = errors?.modelNotAllowed(resolved.backend_model);
+      throw new PipelineAbort(err?.statusCode ?? HTTP_FORBIDDEN, err?.body ?? {
+        error: { type: "model_not_allowed", message: `Model '${resolved.backend_model}' not allowed` },
+      });
     }
   },
 };

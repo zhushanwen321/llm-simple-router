@@ -58,5 +58,9 @@
   "loadSchedulesFailed": "Failed to load rules",
   "saveFailed": "Failed to save rule",
   "toggleFailed": "Failed to toggle status",
-  "deleteFailed": "Failed to delete rule"
+  "deleteFailed": "Failed to delete rule",
+  "parseRuleFailed": "Invalid rule format, using defaults",
+  "parseWeekFailed": "Invalid week format, using defaults",
+  "parseConcurrencyFailed": "Invalid concurrency format, using defaults",
+  "parseTransformFailed": "Invalid transform format, using defaults"
 }

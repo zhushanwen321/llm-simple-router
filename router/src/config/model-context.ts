@@ -123,12 +123,22 @@ const PATCH_ID_MIGRATION: Record<string, string> = {
   cache_control: "thinking_consistency",
 };
 
+// parseModels 缓存，key 为 raw 字符串引用
+const modelsCache = new Map<string, ModelEntry[]>();
+
+/** 清除缓存（仅供测试使用） */
+export function clearModelsCache(): void {
+  modelsCache.clear();
+}
+
 export function parseModels(raw: string): ModelEntry[] {
   if (!raw) return []
+  const cached = modelsCache.get(raw)
+  if (cached) return cached
   try {
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
-    return parsed.map((item: unknown): ModelEntry | null => {
+    const result = parsed.map((item: unknown): ModelEntry | null => {
       if (typeof item === 'string') {
         return item ? { name: item, patches: [] } : null
       }
@@ -139,13 +149,15 @@ export function parseModels(raw: string): ModelEntry[] {
       const rawPatches = (obj.patches ?? []).map(normalizePatchName);
       const migrated = rawPatches.map(p => PATCH_ID_MIGRATION[p] ?? p);
       const patches = [...new Set(migrated)];
-      const result: ModelEntry = {
+      const entry: ModelEntry = {
         name: modelName,
         patches,
       }
-      if (obj.stream_timeout_ms != null) result.stream_timeout_ms = obj.stream_timeout_ms
-      return result
+      if (obj.stream_timeout_ms != null) entry.stream_timeout_ms = obj.stream_timeout_ms
+      return entry
     }).filter((e): e is ModelEntry => e !== null)
+    modelsCache.set(raw, result)
+    return result
   } catch {
     return []
   }

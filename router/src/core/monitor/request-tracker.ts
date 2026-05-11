@@ -46,6 +46,7 @@ export class RequestTracker {
   >();
   private pushTimer: ReturnType<typeof setInterval> | null = null;
   private tickCount = 0;
+  private requestUpdateDirty = true;
   private streamAccumulators = new Map<string, StreamContentAccumulator>();
   private streamContentPending = new Set<string>();
   private streamContentTimer: ReturnType<typeof setTimeout> | null = null;
@@ -78,6 +79,7 @@ export class RequestTracker {
 
   start(req: ActiveRequest): void {
     this.activeMap.set(req.id, { ...req });
+    this.requestUpdateDirty = true;
     this.logger?.debug?.({ reqId: req.id, model: req.model, providerId: req.providerId, activeCount: this.activeMap.size }, "Tracker: start");
     this.broadcast("request_start", req);
   }
@@ -199,6 +201,7 @@ export class RequestTracker {
     }
 
     this.logger?.debug?.({ reqId: id, status: result.status, statusCode, latency, activeCount: this.activeMap.size }, "Tracker: complete");
+    this.requestUpdateDirty = true;
     this.broadcast("request_complete", completed);
   }
 
@@ -358,7 +361,10 @@ export class RequestTracker {
       this.cleanupRecent();
       this.cleanupStaleActive();
 
-      this.broadcast("request_update", this.getActive());
+      if (this.requestUpdateDirty) {
+        this.broadcast("request_update", this.getActive());
+        this.requestUpdateDirty = false;
+      }
       this.broadcast("concurrency_update", this.getConcurrency());
       this.broadcast("stats_update", this.getStats());
 

@@ -71,7 +71,9 @@ export function buildTransportFn(p: TransportFnParams): (target: Target) => Prom
     const base = buildUpstreamHeaders(cliHdrs, key, bytes, p.apiType);
     return p.injectedHeaders ? { ...base, ...p.injectedHeaders } : base;
   };
-  const agent = p.proxyAgentFactory?.getAgent(p.provider);
+  const agent = p.proxyAgentFactory
+    ? (p.proxyAgentFactory.getAgent(p.provider) ?? p.proxyAgentFactory.getKeepAliveAgent(p.provider.base_url))
+    : undefined;
   // _target 未使用 — resilience 层始终传入当前 resolved target；
   // 跨 target failover 由外层 executeFailoverLoop 的 ProviderSwitchNeeded 处理
   return async (_target: Target) => {

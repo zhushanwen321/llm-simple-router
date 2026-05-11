@@ -287,9 +287,13 @@ interface ScheduleForm {
   max_queue_size: number
 }
 
+// eslint-disable-next-line no-magic-numbers -- ISO weekday numbers (Mon=1..Fri=5)
+const WEEKDAYS_MON_FRI: number[] = [1, 2, 3, 4, 5]
+const PAD_WIDTH = 2
+
 const DEFAULT_FORM = (): ScheduleForm => ({
   name: '',
-  week: [1, 2, 3, 4, 5],
+  week: [...WEEKDAYS_MON_FRI],
   start_hour: 0,
   end_hour: 24,
   targets: [{ backend_model: '', provider_id: '' }],
@@ -347,11 +351,11 @@ function parseWeek(weekStr: string): string[] {
   const labels = WEEK_LABELS.value
   let arr: number[] = []
   try { arr = JSON.parse(weekStr) } catch { return [] }
-  return arr.map(d => labels[d] ?? String(d))
+  return arr.map(d => labels[d] ?? `${d}`)
 }
 
 function formatHour(h: number): string {
-  return String(h).padStart(2, '0') + ':00'
+  return `${h}`.padStart(PAD_WIDTH, '0') + ':00'
 }
 
 function applyTimePreset(start: number, end: number) {
@@ -413,10 +417,10 @@ function openEdit(s: Schedule) {
   try {
     const rule = JSON.parse(s.mapping_rule) as { targets?: MappingTarget[] }
     if (rule.targets?.length) targets = rule.targets
-  } catch (e) { console.warn('Failed to parse mapping_rule:', e) }
+  } catch (e) { console.warn('Failed to parse mapping_rule:', e); toast.error(t('schedules.parseRuleFailed')) }
 
-  let week: number[] = [1, 2, 3, 4, 5]
-  try { week = JSON.parse(s.week) } catch (e) { console.warn('Failed to parse week:', e) }
+  let week: number[] = [...WEEKDAYS_MON_FRI]
+  try { week = JSON.parse(s.week) } catch (e) { console.warn('Failed to parse week:', e); toast.error(t('schedules.parseWeekFailed')) }
 
   let concurrencyMode: ConcurrencyMode = 'auto'
   let maxConcurrency = 10
@@ -429,7 +433,7 @@ function openEdit(s: Schedule) {
       if (cr.max_concurrency) maxConcurrency = cr.max_concurrency as number
       if (cr.queue_timeout_ms) queueTimeoutMs = cr.queue_timeout_ms as number
       if (cr.max_queue_size) maxQueueSize = cr.max_queue_size as number
-    } catch (e) { console.warn('Failed to parse concurrency_rule:', e) }
+    } catch (e) { console.warn('Failed to parse concurrency_rule:', e); toast.error(t('schedules.parseConcurrencyFailed')) }
   }
 
   let injectHeaders = ''
@@ -441,7 +445,7 @@ function openEdit(s: Schedule) {
       dropFields = (tr.drop_fields as string[] || []).join(', ')
       requestDefaults = tr.request_defaults ? JSON.stringify(tr.request_defaults) : ''
       injectHeaders = tr.inject_headers ? JSON.stringify(tr.inject_headers) : ''
-    } catch (e) { console.warn('Failed to parse transform_rule:', e) }
+    } catch (e) { console.warn('Failed to parse transform_rule:', e); toast.error(t('schedules.parseTransformFailed')) }
   }
 
   form.value = {

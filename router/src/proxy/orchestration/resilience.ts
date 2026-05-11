@@ -217,10 +217,9 @@ export class ResilienceLayer {
         };
       }
 
+      const excludedSet = new Set(excludedTargets.map(e => `${e.provider_id}:${e.backend_model}`));
       const available = targets().filter(
-        t => !excludedTargets.some(e =>
-          e.backend_model === t.backend_model && e.provider_id === t.provider_id
-        ),
+        t => !excludedSet.has(`${t.provider_id}:${t.backend_model}`),
       );
 
       if (available.length === 0) {
@@ -281,10 +280,9 @@ export class ResilienceLayer {
           excludedTargets.push(decision.excludeTarget);
           globalAttemptIndex++;
           // 跨 provider failover 需要切换信号量，抛出异常让上层处理
+          const nextExcludedSet = new Set(excludedTargets.map(e => `${e.provider_id}:${e.backend_model}`));
           const nextAvail = targets().filter(
-            t => !excludedTargets.some(e =>
-              e.backend_model === t.backend_model && e.provider_id === t.provider_id
-            ),
+            t => !nextExcludedSet.has(`${t.provider_id}:${t.backend_model}`),
           );
           if (nextAvail.length > 0 && nextAvail[0].provider_id !== currentTarget.provider_id) {
             throw new ProviderSwitchNeeded(nextAvail[0].provider_id, [...allAttempts], transportResult);

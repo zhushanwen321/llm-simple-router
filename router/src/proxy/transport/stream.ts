@@ -28,6 +28,8 @@ class StreamProxy {
 
   private readonly bufferChunks: Buffer[] = [];
   private readonly captureChunks: Buffer[] = [];
+  private totalBuffered = 0;
+  private lastChunkEndedWithNewline = false;
   private idleTimer: NodeJS.Timeout | null = null;
   private headersSent = false;
   private closeHandlerRegistered = false;
@@ -207,17 +209,39 @@ class StreamProxy {
     if (this.state === "BUFFERING") {
       this.captureChunks.push(chunk);
       this.bufferChunks.push(chunk);
-      const buf = Buffer.concat(this.bufferChunks);
-      const text = buf.toString("utf-8");
-      if (text.includes("\n\n")) {
+      this.totalBuffered += chunk.length;
+
+      // 快速路径：检查大小限制（无需 concat）
+      if (this.totalBuffered >= BUFFER_SIZE_LIMIT) {
+        const buf = Buffer.concat(this.bufferChunks);
+        const text = buf.toString("utf-8");
         if (this.checkEarlyError?.(text)) {
           this.transition("EARLY_ERROR");
           this.terminal("stream_error", { body: text });
           return;
         }
         this.startStreaming();
-      } else if (buf.length >= BUFFER_SIZE_LIMIT) {
-        this.startStreaming();
+        return;
+      }
+
+      // 快速路径：检查当前 chunk 是否包含 \n\n
+      const chunkStr = chunk.toString("utf-8");
+      const hasNewlinePair = chunkStr.includes("\n\n");
+      // 跨 chunk 边界检测：上一个 chunk 以 \n 结尾 + 当前以 \n 开头
+      const crossBoundary = this.lastChunkEndedWithNewline && chunkStr.startsWith("\n");
+      this.lastChunkEndedWithNewline = chunkStr.endsWith("\n");
+
+      if (hasNewlinePair || crossBoundary) {
+        const buf = Buffer.concat(this.bufferChunks);
+        const text = buf.toString("utf-8");
+        if (text.includes("\n\n")) {
+          if (this.checkEarlyError?.(text)) {
+            this.transition("EARLY_ERROR");
+            this.terminal("stream_error", { body: text });
+            return;
+          }
+          this.startStreaming();
+        }
       }
       return;
     }

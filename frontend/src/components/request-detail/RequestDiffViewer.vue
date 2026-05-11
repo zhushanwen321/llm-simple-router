@@ -204,7 +204,7 @@ function extractText(msg: Record<string, unknown>): string {
       .map(b => typeof b.text === 'string' ? b.text : '')
       .join('')
   }
-  return String(content ?? '')
+  return typeof content === 'string' ? content : content != null ? JSON.stringify(content) : ''
 }
 
 const MASK_PREFIX_LEN = 4
@@ -272,7 +272,7 @@ const messages = computed<MessageView[]>(() => {
   const result: MessageView[] = []
   for (let i = 0; i < upstreamMsgs.length; i++) {
     const upstreamMsg = upstreamMsgs[i]
-    const role = String(upstreamMsg.role ?? 'unknown')
+    const role = typeof upstreamMsg.role === 'string' ? upstreamMsg.role : 'unknown'
     if (role === 'system') continue
 
     const upstreamText = extractText(upstreamMsg)

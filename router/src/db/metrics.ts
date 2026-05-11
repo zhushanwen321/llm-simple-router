@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import { randomUUID } from "crypto";
 import { MS_PER_SECOND } from "../core/constants.js";
+import { getCachedStmt } from "./helpers.js";
 
 export type MetricsPeriod = "1h" | "5h" | "6h" | "24h" | "7d" | "30d";
 export type MetricsMetric = "ttft" | "tps" | "text_tps" | "thinking_tps" | "tool_use_tps" | "non_thinking_tps" | "total_tps" | "tokens" | "cache_rate" | "request_count" | "input_tokens" | "output_tokens" | "cache_hit_tokens";
@@ -59,7 +60,8 @@ export type MetricsInsert = {
 
 export function insertMetrics(db: Database.Database, m: MetricsInsert): string {
   const id = randomUUID();
-  db.prepare(
+  getCachedStmt(
+    db,
     `INSERT INTO request_metrics (id, request_log_id, provider_id, backend_model, api_type, router_key_id, status_code,
        input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, ttft_ms, total_duration_ms, tokens_per_second, stop_reason, is_complete, input_tokens_estimated,
        client_type, cache_read_tokens_estimated,

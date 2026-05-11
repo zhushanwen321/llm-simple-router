@@ -1,4 +1,4 @@
-import { ref, computed, watch } from 'vue'
+import { ref, shallowRef, triggerRef, computed, watch } from 'vue'
 import { api } from '@/api/client'
 import type {
   ActiveRequest,
@@ -16,7 +16,7 @@ const RECENT_COMPLETED_MAX = 200
  * 所有响应式状态均由此 composable 持有，UI 组件只做绑定。
  */
 export function useMonitorData() {
-  const activeRequests = ref<ActiveRequest[]>([])
+  const activeRequests = shallowRef<ActiveRequest[]>([])
   const recentCompleted = ref<ActiveRequest[]>([])
   const stats = ref<StatsSnapshot | null>(null)
   const concurrency = ref<ProviderConcurrencySnapshot[]>([])
@@ -75,6 +75,7 @@ export function useMonitorData() {
             if (update.streamMetrics) req.streamMetrics = update.streamMetrics
           }
         }
+        triggerRef(activeRequests)
         break
       }
       case 'runtime_update': {

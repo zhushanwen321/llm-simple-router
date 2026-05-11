@@ -93,7 +93,7 @@ function buildEntries(): MappingEntry[] {
     try {
       const parsed = JSON.parse(g.rule)
       rule = parsed.default && !parsed.targets ? { targets: [parsed.default] } : parsed
-    } catch (e) { console.warn('Failed to parse rule:', e) }
+    } catch (e) { console.warn('Failed to parse rule:', e); toast.error(getApiMessage(e, t('mappings.messages.parseRuleFailed'))) }
     const targets: MappingTarget[] = (rule.targets ?? []).map((t: MappingTarget) => ({
       backend_model: t.backend_model || '',
       provider_id: t.provider_id || '',

@@ -390,6 +390,8 @@ export async function buildApp(
     proxyAgentFactory.invalidateAll();
     const sessionTracker = container.resolve<SessionTracker>(SERVICE_KEYS.sessionTracker);
     sessionTracker.stop();
+    // Flush LogFileWriter 的 WriteStream 缓冲数据到磁盘
+    await logFileWriter?.stop();
     // 等待活跃代理请求自然完成，超时后强制关闭所有连接。
     // 先调用 app.close() 停止接受新连接并等待现有连接结束，
     // 如果 2 秒内未完成则调用 closeAllConnections() 强制断开，防止 SSE 长连接导致无限等待。

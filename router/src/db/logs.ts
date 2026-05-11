@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import type { LogFileWriter } from "../storage/log-file-writer.js";
 import { shouldPreserveDetail, type RetryMatcher } from "../proxy/log-detail-policy.js";
+import { getCachedStmt } from "./helpers.js";
 
 type CountRow = { count: number };
 
@@ -99,7 +100,8 @@ export function insertRequestLog(
     !!writeContext?.logFileWriter,
   );
 
-  db.prepare(
+  getCachedStmt(
+    db,
     `INSERT INTO request_logs (id, api_type, model, provider_id, status_code, client_status_code, latency_ms,
       is_stream, error_message, created_at, client_request, upstream_request, upstream_response,
       is_retry, is_failover, original_request_id, router_key_id, original_model, session_id, pipeline_snapshot)
@@ -214,12 +216,12 @@ export function getRequestLogById(db: Database.Database, id: string): RequestLog
 
 /** 流式请求完成后，将 tracker 中累积的文本内容写入 request_logs */
 export function updateLogStreamContent(db: Database.Database, logId: string, textContent: string): void {
-  db.prepare("UPDATE request_logs SET stream_text_content = ? WHERE id = ?").run(textContent, logId);
+  getCachedStmt(db, "UPDATE request_logs SET stream_text_content = ? WHERE id = ?").run(textContent, logId);
 }
 
 /** 当 router 返回给客户端的 status code 与上游不同时，记录实际发送的 status */
 export function updateLogClientStatus(db: Database.Database, logId: string, clientStatusCode: number): void {
-  db.prepare("UPDATE request_logs SET client_status_code = ? WHERE id = ?").run(clientStatusCode, logId);
+  getCachedStmt(db, "UPDATE request_logs SET client_status_code = ? WHERE id = ?").run(clientStatusCode, logId);
 }
 
 
@@ -235,17 +237,21 @@ export function deleteLogsBefore(db: Database.Database, beforeDate: string): num
 /** 每行元数据（数字列+索引）的估算字节数 */
 const ROW_METADATA_BYTES = 500;
 
-/** 估算 request_logs 表占用字节数 */
+/** 采样估算 request_logs 表占用字节数（避免全表 SUM 扫描） */
 export function estimateLogTableSize(db: Database.Database): number {
-  const row = db.prepare(`
-    SELECT COALESCE(SUM(
-      COALESCE(length(client_request), 0) + COALESCE(length(upstream_request), 0) +
-      COALESCE(length(upstream_response), 0) + COALESCE(length(stream_text_content), 0) +
-      COALESCE(length(error_message), 0) + COALESCE(length(pipeline_snapshot), 0) + ?
-    ), 0) as size
-    FROM request_logs
-  `).get(ROW_METADATA_BYTES) as { size: number };
-  return row.size;
+  const countRow = db.prepare("SELECT COUNT(*) as cnt FROM request_logs").get() as { cnt: number };
+  if (countRow.cnt === 0) return 0;
+
+  // 采样最近 100 行，计算平均行大小
+  const samples = db.prepare(`
+    SELECT COALESCE(length(client_request), 0) + COALESCE(length(upstream_request), 0) +
+           COALESCE(length(upstream_response), 0) + COALESCE(length(stream_text_content), 0) +
+           COALESCE(length(error_message), 0) + COALESCE(length(pipeline_snapshot), 0) + ? AS row_size
+    FROM request_logs ORDER BY created_at DESC LIMIT 100
+  `).all(ROW_METADATA_BYTES) as { row_size: number }[];
+
+  const avgRowSize = samples.reduce((s, r) => s + r.row_size, 0) / samples.length;
+  return Math.round(avgRowSize * countRow.cnt);
 }
 
 const DELETE_BATCH_SIZE = 1000;
@@ -322,11 +328,24 @@ export function getRequestLogsGrouped(
   const offset = (options.page - 1) * options.limit;
   const data = db
     .prepare(
-      `SELECT ${LOG_LIST_SELECT},
-              (SELECT COUNT(*) FROM request_logs c WHERE c.original_request_id = rl.id) AS child_count
-       FROM request_logs rl
+      `WITH page_ids AS (
+         SELECT rl.id FROM request_logs rl
+         ${LOG_LIST_JOIN}
+         WHERE ${where}
+         ORDER BY rl.created_at DESC LIMIT ? OFFSET ?
+       )
+       SELECT ${LOG_LIST_SELECT},
+              COALESCE(child.cnt, 0) AS child_count
+       FROM page_ids pg
+       JOIN request_logs rl ON rl.id = pg.id
        ${LOG_LIST_JOIN}
-       WHERE ${where} ORDER BY rl.created_at DESC LIMIT ? OFFSET ?`,
+       LEFT JOIN (
+         SELECT original_request_id, COUNT(*) AS cnt
+         FROM request_logs
+         WHERE original_request_id IN (SELECT id FROM page_ids)
+         GROUP BY original_request_id
+       ) child ON child.original_request_id = rl.id
+       ORDER BY rl.created_at DESC`,
     )
     .all(...params, options.limit, offset) as RequestLogGroupedRow[];
   return { data, total };
@@ -334,5 +353,5 @@ export function getRequestLogsGrouped(
 
 /** 后续 pipeline 阶段完成后，回写 snapshot 到已有日志 */
 export function updateLogPipelineSnapshot(db: Database.Database, logId: string, snapshot: string): void {
-  db.prepare("UPDATE request_logs SET pipeline_snapshot = ? WHERE id = ?").run(snapshot, logId);
+  getCachedStmt(db, "UPDATE request_logs SET pipeline_snapshot = ? WHERE id = ?").run(snapshot, logId);
 }

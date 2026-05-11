@@ -37,8 +37,10 @@ export async function loadLocaleMessages(locale: SupportedLocale): Promise<void>
       return { fileName, messages: mod.default }
     })
 
-  const results = await Promise.all(loadJobs)
-  for (const { fileName, messages } of results) {
+  const results = await Promise.allSettled(loadJobs)
+  for (const result of results) {
+    if (result.status !== 'fulfilled') continue
+    const { fileName, messages } = result.value
     i18n.global.mergeLocaleMessage(locale, { [fileName]: messages })
   }
 }

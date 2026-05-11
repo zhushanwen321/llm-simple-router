@@ -198,31 +198,30 @@ export function useDashboard() {
       if (models.status === 'fulfilled') allModelOptions.value = models.value
       if (keys.status === 'fulfilled') keyOptions.value = keys.value
     } catch (e: unknown) {
-      console.error('Failed to load options:', e)
+      console.error('Failed to load filter options:', e)
+      /* 非关键操作：filter 缺失不影响主仪表盘功能 */
+      toast.error(getApiMessage(e, t('dashboard.loadFilterFailed')))
     }
   }
 
   // --- Fetch provider output tokens for sorting ---
   async function loadProviderOutputTokens() {
+    if (providers.value.length === 0) return
     if (periodTab.value === 'custom' && !(apiStartTime.value && apiEndTime.value)) return
+    // 复用 summary API，一次请求获取所有 provider 的 output tokens
+    const params: Record<string, string> = { ...statsParams.value }
+    delete params.provider_id
+    delete params.backend_model
+    delete params.router_key_id
     try {
-      const results = await Promise.allSettled(
-        providers.value.map(async (p) => {
-          const p2: Record<string, string> = {}
-          if (periodTab.value !== 'custom') {
-            p2.period = periodTab.value
-          } else if (apiStartTime.value && apiEndTime.value) {
-            p2.start_time = apiStartTime.value
-            p2.end_time = apiEndTime.value
-          }
-          p2.provider_id = p.id
-          const stat = await api.getStats(p2)
-          return { id: p.id, outputTokens: stat.totalOutputTokens }
-        }),
-      )
+      const summary = await api.getMetricsSummary(params)
       const map: Record<string, number> = {}
-      for (const r of results) {
-        if (r.status === 'fulfilled') map[r.value.id] = r.value.outputTokens
+      if (summary.rows && Array.isArray(summary.rows)) {
+        for (const row of summary.rows) {
+          if (row.provider_id) {
+            map[row.provider_id] = row.total_output_tokens || 0
+          }
+        }
       }
       providerOutputTokens.value = map
       if (Object.keys(map).length > 0 && !selectedProvider.value) {
@@ -231,6 +230,8 @@ export function useDashboard() {
       }
     } catch (e: unknown) {
       console.error('Failed to load output tokens:', e)
+      /* 非关键操作：provider 排序降级为默认顺序 */
+      toast.error(getApiMessage(e, t('dashboard.loadOutputTokensFailed')))
     }
   }
 
@@ -238,6 +239,10 @@ export function useDashboard() {
   async function refresh() {
     if (!selectedProvider.value) return
     if (periodTab.value === 'custom' && !(apiStartTime.value && apiEndTime.value)) return
+    // 相同参数 5s 内不重复请求
+    const key = watchKey.value
+    const now = Date.now()
+    if (key === lastRefreshKey && now - lastRefreshTime < CACHE_TTL) return
     loading.value = true
     try {
       const [statsRes, tpsRes, inputRes, outputRes, summaryRes] = await Promise.allSettled([
@@ -287,10 +292,25 @@ export function useDashboard() {
       toast.error(getApiMessage(e, t('dashboard.loadDashboardFailed')))
     } finally {
       loading.value = false
+      lastRefreshKey = key
+      lastRefreshTime = Date.now()
     }
   }
 
   // --- Watchers ---
+
+  // 统一 watch key：所有影响 refresh 的参数
+  const watchKey = computed(() => JSON.stringify({
+    periodTab: periodTab.value,
+    selectedProvider: selectedProvider.value,
+    modelFilter: modelFilter.value,
+    keyFilter: keyFilter.value,
+    clientType: clientType.value,
+    customStart: customStart.value,
+    customEnd: customEnd.value,
+  }))
+
+  // 副作用：离开自定义日期模式时清空日期（间接通过 watchKey 变化触发 refresh）
   watch(periodTab, () => {
     if (periodTab.value !== 'custom') {
       customStart.value = ''
@@ -298,33 +318,32 @@ export function useDashboard() {
     }
   })
 
-  // 切换 provider 时，如果当前模型不在新 provider 下，重置为 all
+  // 副作用：切换 provider 时重置 modelFilter（间接通过 watchKey 变化触发 refresh）
   watch(selectedProvider, () => {
     if (modelFilter.value !== 'all' && !modelOptions.value.includes(modelFilter.value)) {
       modelFilter.value = 'all'
     }
   })
 
-  // When period tab changes, reload sorting data and select best provider
+  // 单一 debounced watch：watchKey 变化时 DEBOUNCE_MS 后 refresh
+  let refreshTimer: ReturnType<typeof setTimeout> | null = null
+  watch(watchKey, () => {
+    if (refreshTimer) clearTimeout(refreshTimer)
+    refreshTimer = setTimeout(() => refresh(), DEBOUNCE_MS)
+  })
+
+  // periodTab 变化时重新加载 provider 排序数据
   watch(periodTab, () => {
     if (providers.value.length > 0) {
-      loadProviderOutputTokens().then(() => refresh())
+      loadProviderOutputTokens()
     }
   })
 
-  let refreshTimer: ReturnType<typeof setTimeout> | null = null
-  watch([selectedProvider, modelFilter, keyFilter, clientType], () => {
-    if (refreshTimer) clearTimeout(refreshTimer)
-    refreshTimer = setTimeout(() => refresh(), 300)
-  })
-
-  // Custom date range: trigger refresh on both start and end filled
-  watch([customStart, customEnd], () => {
-    if (periodTab.value === 'custom' && customStart.value && customEnd.value) {
-      if (refreshTimer) clearTimeout(refreshTimer)
-      refreshTimer = setTimeout(() => refresh(), 300)
-    }
-  })
+  // --- Refresh 去重缓存 ---
+  const DEBOUNCE_MS = 300
+  const CACHE_TTL = 5000
+  let lastRefreshKey = ''
+  let lastRefreshTime = 0
 
   // --- Watch theme changes to re-render charts ---
   let stopWatchTheme: (() => void) | null = null

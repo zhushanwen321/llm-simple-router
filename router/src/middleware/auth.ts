@@ -1,15 +1,14 @@
-import { FastifyPluginCallback, FastifyReply, FastifyRequest } from "fastify";
-import { createHash, randomUUID } from "crypto";
+import { FastifyPluginCallback, FastifyReply } from "fastify";
+import { createHash } from "crypto";
 import fp from "fastify-plugin";
 import Database from "better-sqlite3";
 import { isInitialized } from "../db/settings.js";
-import { insertRequestLog } from "../db/logs.js";
 import { getProxyApiType, HTTP_SERVICE_UNAVAILABLE } from "../core/constants.js";
 
 declare module "fastify" {
   interface FastifyRequest {
-    // allowed_models 是 JSON 字符串，需 JSON.parse
-    routerKey?: { id: string; name: string; allowed_models: string | null };
+    // allowed_models 已在 auth 中间件中预解析为数组，无需 JSON.parse
+    routerKey?: { id: string; name: string; allowed_models: string[] | null };
   }
 }
 
@@ -33,27 +32,6 @@ function unauthorizedReply(reply: FastifyReply): void {
       type: "invalid_request_error",
       code: "invalid_api_key",
     },
-  });
-}
-
-function logRejectedAuth(
-  db: Database.Database,
-  apiType: string,
-  statusCode: number,
-  errorMessage: string,
-  request: FastifyRequest,
-): void {
-  insertRequestLog(db, {
-    id: randomUUID(),
-    api_type: apiType,
-    model: null,
-    provider_id: null,
-    status_code: statusCode,
-    latency_ms: 0,
-    is_stream: 0,
-    error_message: errorMessage,
-    created_at: new Date().toISOString(),
-    client_request: JSON.stringify({ method: request.method, ip: request.ip, headers: request.headers }),
   });
 }
 
@@ -84,7 +62,7 @@ const authMiddlewareRaw: FastifyPluginCallback<{ db: Database.Database }> = (
     // 未初始化时代理层不可用
     if (!isInitialized(options.db)) {
       if (proxyApiType) {
-        logRejectedAuth(options.db, proxyApiType, HTTP_SERVICE_UNAVAILABLE, "Service not initialized", request);
+        request.log.info({ method: request.method, url: request.url, ip: request.ip }, `Rejected: service not initialized [${proxyApiType}]`);
       }
       reply.code(HTTP_SERVICE_UNAVAILABLE).send({ error: { message: "Service not initialized" } });
       return reply;
@@ -104,7 +82,7 @@ const authMiddlewareRaw: FastifyPluginCallback<{ db: Database.Database }> = (
 
     if (!token) {
       if (proxyApiType) {
-        logRejectedAuth(options.db, proxyApiType, HTTP_UNAUTHORIZED, "Invalid API key", request);
+        request.log.info({ method: request.method, url: request.url, ip: request.ip }, `Rejected: no API key [${proxyApiType}]`);
       }
       unauthorizedReply(reply);
       return reply;
@@ -113,13 +91,19 @@ const authMiddlewareRaw: FastifyPluginCallback<{ db: Database.Database }> = (
     const row = stmt.get(hash) as RouterKeyRow | undefined;
     if (!row) {
       if (proxyApiType) {
-        logRejectedAuth(options.db, proxyApiType, HTTP_UNAUTHORIZED, "Invalid API key", request);
+        request.log.info({ method: request.method, url: request.url, ip: request.ip }, `Rejected: invalid API key [${proxyApiType}]`);
       }
       unauthorizedReply(reply);
       return reply;
     }
 
-    request.routerKey = { id: row.id, name: row.name, allowed_models: row.allowed_models };
+    let parsedAllowedModels: string[] | null = null;
+    if (row.allowed_models) {
+      try {
+        parsedAllowedModels = JSON.parse(row.allowed_models);
+      } catch { /* JSON 解析失败时 allowed_models 保持为 null，允许所有模型 */ } // eslint-disable-line taste/no-silent-catch
+    }
+    request.routerKey = { id: row.id, name: row.name, allowed_models: parsedAllowedModels };
   });
 
   done();

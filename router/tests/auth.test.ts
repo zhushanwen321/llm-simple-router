@@ -116,6 +116,21 @@ describe("auth middleware", () => {
     expect(response.statusCode).toBe(401);
   });
 
+  it("should NOT write to request_logs on auth failure (BI-M5)", async () => {
+    const logCount = db.prepare("SELECT COUNT(*) as count FROM request_logs").get() as { count: number };
+    expect(logCount.count).toBe(0);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/chat/completions",
+    });
+
+    expect(response.statusCode).toBe(401);
+
+    const logCountAfter = db.prepare("SELECT COUNT(*) as count FROM request_logs").get() as { count: number };
+    expect(logCountAfter.count).toBe(0);
+  });
+
   it("should return OpenAI-compatible error format", async () => {
     const response = await app.inject({
       method: "GET",

@@ -304,7 +304,7 @@ const { fetchingModels, fetchUpstreamModels } = useFetchUpstreamModels(form, get
 function formatContextWindow(tokens: number): string {
   if (tokens >= CONTEXT_M) return `${tokens / CONTEXT_M}M`
   if (tokens >= CONTEXT_K) return `${tokens / CONTEXT_K}K`
-  return String(tokens)
+  return `${tokens}`
 }
 
 async function handleSave() {

@@ -18,7 +18,7 @@ import { SemaphoreQueueFullError, SemaphoreTimeoutError } from "../../core/error
 import { getProviderById, updateLogClientStatus, insertRequestLog, updateLogStreamContent } from "../../db/index.js";
 import { getSetting } from "../../db/settings.js";
 import { decrypt } from "../../utils/crypto.js";
-import { resolveMapping } from "../routing/mapping-resolver.js";
+import { resolveMapping, filterExcluded } from "../routing/mapping-resolver.js";
 import { applyOverflowRedirect } from "../routing/overflow.js";
 import { getConfig } from "../../config/index.js";
 import type { ProxyErrorFormatter } from "../proxy-core.js";
@@ -35,7 +35,7 @@ import { loadEnhancementConfig } from "../routing/enhancement-config.js";
 import { extractFailedToolResults, getTransportStatusCode, serializeBlocksForStorage } from "./proxy-handler-utils.js";
 import type { FailedToolResult } from "./proxy-handler-utils.js";
 import { logToolErrors } from "../tool-error-logger.js";
-import type { Target } from "../../core/types.js";
+import type { Target, ResolveResult, ConcurrencyOverride } from "../../core/types.js";
 import type { RawHeaders } from "../types.js";
 import type { PipelineContext } from "../pipeline/types.js";
 import { PipelineAbort } from "../pipeline/types.js";
@@ -173,6 +173,20 @@ export async function executeFailoverLoop(
   const clientModel = ctx.clientModel;
   const rawBody = ctx.rawBody;
   const clientApiType = ctx.apiType as "openai" | "openai-responses" | "anthropic";
+
+  // BP-H4: 循环不变量预计算，避免每次迭代重复 JSON.stringify + sanitizeHeaders
+  const cliHdrs: RawHeaders = request.headers as RawHeaders;
+  const sanitizedClientHeaders = sanitizeHeadersForLog(cliHdrs as Record<string, string>);
+  const precomputedClientReq = JSON.stringify({ headers: sanitizedClientHeaders, body: rawBody });
+
+  // BP-H3: 请求级 API Key 缓存，避免同一 provider 重复解密
+  const decryptedApiKeys = new Map<string, string>();
+  const encryptionKey = getSetting(db, "encryption_key");
+
+  // BP-H2: 请求级缓存 — resolveMapping 的 DB 查询结果在 failover 迭代间不变，只 excludeTargets 变化
+  let cachedTargets: Target[] | undefined;
+  let cachedConcurrencyOverride: ConcurrencyOverride | undefined;
+
   let failoverIteration = 0;
 
   while (true) {
@@ -189,10 +203,10 @@ export async function executeFailoverLoop(
     const isFailoverIteration = rootLogId !== logId;
     const routerKeyId = request.routerKey?.id ?? null;
 
-    // 每次迭代从 pipelineBody 重新开始
-    let currentBody = structuredClone(ctx.body);
+    // 浅拷贝：后续操作只修改顶层属性（model），嵌套对象不被修改
+    // 如果需要修改嵌套属性，在使用点做深拷贝（applyProviderPatches 已有 CoW）
+    let currentBody = { ...ctx.body };
     const isStream = currentBody.stream === true;
-    const cliHdrs: RawHeaders = request.headers as RawHeaders;
     const iterationSnapshot = new PipelineSnapshot();
 
     const rCtx: RejectParams = {
@@ -205,8 +219,21 @@ export async function executeFailoverLoop(
     };
 
     // --- Route ---
-    const resolveResult = resolveMapping(db, clientModel, { now: new Date(), excludeTargets });
-    request.log.debug({ logId, model: clientModel, apiType: ctx.apiType, isStream, action: "resolve_mapping", resolved: !!resolveResult });
+    // BP-H2: 后续迭代使用缓存的 targets，只做 filterExcluded，不查 DB
+    let resolveResult: ResolveResult | null;
+    if (cachedTargets) {
+      const filtered = filterExcluded(cachedTargets, excludeTargets);
+      resolveResult = filtered.length > 0
+        ? { target: filtered[0], concurrency_override: cachedConcurrencyOverride, targetCount: cachedTargets.length }
+        : null;
+    } else {
+      resolveResult = resolveMapping(db, clientModel, { now: new Date(), excludeTargets });
+      if (resolveResult?.allTargets) {
+        cachedTargets = resolveResult.allTargets;
+        cachedConcurrencyOverride = resolveResult.concurrency_override;
+      }
+    }
+    request.log.debug({ logId, model: clientModel, apiType: ctx.apiType, isStream, action: "resolve_mapping", resolved: !!resolveResult, cached: !!cachedTargets });
 
     if (!resolveResult) {
       if (excludeTargets.length > 0) {
@@ -219,20 +246,12 @@ export async function executeFailoverLoop(
     let resolved = resolveResult.target;
     const isFailover = resolveResult.targetCount > 1;
 
-    // allowed_models 检查 — 仅首次迭代
+    // allowed_models 检查 — 仅首次迭代（已由 auth 中间件预解析为数组）
     if (excludeTargets.length === 0) {
-      const allowedModels = (request.routerKey as { allowed_models?: string } | undefined)?.allowed_models;
-      if (allowedModels) {
-        try {
-          const models: string[] = JSON.parse(allowedModels).filter((m: string) => m.trim() !== "");
-          if (models.length > 0 && !models.includes(resolved.backend_model)) {
-            return rejectAndReply(reply, rCtx, errors.modelNotAllowed(resolved.backend_model),
-              `Model '${resolved.backend_model}' not allowed`, resolved.provider_id);
-          }
-        } catch {
-          // eslint-disable-next-line no-magic-numbers -- log truncation length
-          request.log.warn({ allowedModels: allowedModels?.slice(0, 80) }, "Invalid allowed_models JSON, allowing all models");
-        }
+      const allowedModels = request.routerKey?.allowed_models;
+      if (allowedModels && allowedModels.length > 0 && !allowedModels.includes(resolved.backend_model)) {
+        return rejectAndReply(reply, rCtx, errors.modelNotAllowed(resolved.backend_model),
+          `Model '${resolved.backend_model}' not allowed`, resolved.provider_id);
       }
     }
 
@@ -292,18 +311,21 @@ export async function executeFailoverLoop(
     iterationSnapshot.add({ stage: "provider_patch", types: patchMeta.types });
 
     // --- API key ---
-    const encryptionKey = getSetting(db, "encryption_key");
     if (!encryptionKey) {
       return rejectAndReply(reply, rCtx, errors.providerUnavailable(),
         `Encryption key not configured`, provider.id,
         flushCurrentErrors);
     }
-    const apiKey = decrypt(provider.api_key, encryptionKey);
+    let apiKey = decryptedApiKeys.get(provider.id);
+    if (!apiKey) {
+      apiKey = decrypt(provider.api_key, encryptionKey);
+      decryptedApiKeys.set(provider.id, apiKey);
+    }
 
     // --- beforeSendProxy + Build logging data ---
     adapter.beforeSendProxy?.(patchedBody, isStream);
     const reqBodyStr = JSON.stringify(patchedBody);
-    const clientReq = JSON.stringify({ headers: sanitizeHeadersForLog(cliHdrs as Record<string, string>), body: rawBody });
+    const clientReq = precomputedClientReq;
     const upstreamReqBase = JSON.stringify({
       url: buildUpstreamUrl(provider.base_url, effectiveUpstreamPath),
       headers: sanitizeHeadersForLog(buildUpstreamHeaders(cliHdrs, apiKey, Buffer.byteLength(reqBodyStr), effectiveApiType)),
@@ -380,7 +402,7 @@ export async function executeFailoverLoop(
         },
         resilienceResult.attempts, resilienceResult.result, startTime,
       );
-      collectTransportMetrics(db, clientApiType, resilienceResult.result, isStream, lastLogId, provider.id, resolved.backend_model, request, routerKeyId, getTransportStatusCode(resilienceResult.result), ctx.metadata.get("client_type") as string | undefined, ctx.metadata.get("session_id") as string | undefined, tracker);
+      collectTransportMetrics(db, clientApiType, resilienceResult.result, isStream, lastLogId, provider.id, resolved.backend_model, request, routerKeyId, getTransportStatusCode(resilienceResult.result), ctx.metadata.get("client_type") as string | undefined, ctx.metadata.get("session_id") as string | undefined, tracker, ctx.metadata);
 
       // flush tool errors
       flushToolErrors(provider.id, resolved.backend_model ?? clientModel, lastLogId);

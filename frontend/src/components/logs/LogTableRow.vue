@@ -9,24 +9,25 @@ import { CheckIcon, CopyIcon } from 'lucide-vue-next'
 import type { LogEntry } from '@/components/logs/types'
 import { PROVIDER_ID_ROUTER } from '@/components/logs/types'
 import { formatTime } from '@/utils/format'
-import { useClipboard } from '@/composables/useClipboard'
 
 withDefaults(defineProps<{
   log: LogEntry
   isChild?: boolean
   expanded?: boolean
+  copiedId?: string | null
 }>(), {
   isChild: false,
   expanded: false,
+  copiedId: null,
 })
 
 const emit = defineEmits<{
   toggleExpand: [log: LogEntry]
   openDetail: [id: string]
+  copy: [id: string]
 }>()
 
 const { t } = useI18n()
-const { copied, copy } = useClipboard()
 
 function enhancementLabel(raw: string | null): string {
   if (!raw) return t('logs.row.unknown')
@@ -76,9 +77,9 @@ function enhancementLabel(raw: string | null): string {
                 variant="ghost"
                 size="icon-xs"
                 class="shrink-0"
-                @click.stop="copy(log.id)"
+                @click.stop="emit('copy', log.id)"
               >
-                <CheckIcon v-if="copied" class="size-3 text-success" />
+                <CheckIcon v-if="copiedId === log.id" class="size-3 text-success" />
                 <CopyIcon v-else class="size-3" />
               </Button>
             </TooltipTrigger>

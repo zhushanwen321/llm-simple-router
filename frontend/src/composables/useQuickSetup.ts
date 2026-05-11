@@ -450,7 +450,7 @@ export function useQuickSetup() {
   // --- Concurrency ---
   function onConcurrencyModeChange(mode: ConcurrencyMode) {
     concurrencyMode.value = mode
-    if (mode === 'auto') maxConcurrency.value = 10
+    if (mode === 'auto') maxConcurrency.value = DEFAULT_CONCURRENCY
     else if (mode === 'manual') maxConcurrency.value = 3
   }
 
@@ -557,7 +557,6 @@ export function useQuickSetup() {
     selectClient, onProviderChange, onPlanChange,
     initModels, getDefaultPatches, updateMappings,
     updateMappingTargets, toggleMappingActive, addMappingEntry, removeMappingEntry,
-    toggleRetryRule, onConcurrencyModeChange, testConnection, submit,
-    addCustomModel,
+    toggleRetryRule, onConcurrencyModeChange, testConnection, submit, addCustomModel,
   }
 }
