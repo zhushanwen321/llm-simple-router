@@ -2,6 +2,7 @@ import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
 import { Type, Static } from "@sinclair/typebox";
 import { getSetting, setSetting } from "../db/settings.js";
+import { clearEnhancementConfigCache } from "../proxy/routing/enhancement-config.js";
 
 const UpdateProxyEnhancementSchema = Type.Object({
   tool_call_loop_enabled: Type.Boolean(),
@@ -45,6 +46,7 @@ export const adminProxyEnhancementRoutes: FastifyPluginCallback<ProxyEnhancement
       tool_error_logging_enabled: body.tool_error_logging_enabled,
     };
     setSetting(db, "proxy_enhancement", JSON.stringify(config));
+    clearEnhancementConfigCache();
     return reply.send({ success: true });
   });
 
