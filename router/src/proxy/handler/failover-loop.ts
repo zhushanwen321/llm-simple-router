@@ -510,7 +510,7 @@ export async function executeFailoverLoop(
       const errMsg = e instanceof Error ? e.message : e instanceof Error ? e.message : JSON.stringify(e);
       request.log.debug({ logId, error: errMsg, action: "upstream_error" });
       insertRequestLog(db, {
-        id: logId, api_type: clientApiType,
+        id: randomUUID(), api_type: clientApiType,
         model: clientModel, provider_id: provider.id,
         status_code: UPSTREAM_ERROR_STATUS, latency_ms: Date.now() - startTime, is_stream: isStream ? 1 : 0,
         error_message: errMsg || "Upstream connection failed", created_at: new Date().toISOString(),
