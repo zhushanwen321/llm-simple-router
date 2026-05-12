@@ -37,3 +37,13 @@
   - `router/tests/core/monitor/request-tracker-details.test.ts`
 - 摘要：将 SSE broadcast 从推送完整 streamContent 改为轻量摘要（totalChars + streamMetrics），所有 SSE 事件 strip streamContent，request_update 额外 strip streamMetrics。新增 5 个测试覆盖轻量化行为，全部 1336 测试通过。
 - 时间：2026-05-12T15:13:00Z
+
+## 阶段 3 - 编码实现（Task 3：前端按需获取 streamContent）
+
+- 状态：done
+- 变更文件：
+  - `frontend/src/types/monitor.ts`
+  - `frontend/src/composables/useMonitorData.ts`
+  - `frontend/src/views/Monitor.vue`
+- 摘要：前端 stream_content_update handler 改为轻量更新（totalChars + streamMetrics），新增 HTTP 轮询机制按需获取完整 streamContent（500ms 间隔），活跃请求列表展示 tokensPerSecond 和 outputTokens。vue-tsc + eslint + 后端测试全部通过。
+- 时间：2026-05-12T15:25:00Z
