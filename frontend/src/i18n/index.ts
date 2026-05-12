@@ -1,4 +1,5 @@
 import { createI18n } from 'vue-i18n'
+import { ref } from 'vue'
 
 const SUPPORTED_LOCALES = ['zh-CN', 'en'] as const
 export type SupportedLocale = typeof SUPPORTED_LOCALES[number]
@@ -25,6 +26,9 @@ export const i18n = createI18n({
  * Dynamically load all module translations for a given locale via import.meta.glob.
  * Called on initial load in main.ts and on locale switch in useLocale.
  */
+/** locale 加载完成状态，App.vue 用于控制渲染时机 */
+export const localeLoaded = ref(false)
+
 export async function loadLocaleMessages(locale: SupportedLocale): Promise<void> {
   const modules = import.meta.glob<{ default: Record<string, unknown> }>('./locales/*/*.json')
   const localeDir = `./locales/${locale}/`
@@ -43,6 +47,7 @@ export async function loadLocaleMessages(locale: SupportedLocale): Promise<void>
     const { fileName, messages } = result.value
     i18n.global.mergeLocaleMessage(locale, { [fileName]: messages })
   }
+  localeLoaded.value = true
 }
 
 /** Get current locale (type-safe) */

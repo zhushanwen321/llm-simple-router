@@ -5,6 +5,11 @@ import { existsSync } from "node:fs";
 import { randomUUID } from "crypto";
 import Fastify, { FastifyInstance } from "fastify";
 import { insertRequestLog } from "./db/logs.js";
+import { initLogBuffer, stopLogBuffer } from "./db/logs.js";
+import { setLogBuffer, clearLogBuffer } from "./db/metrics.js";
+import { LogWriteBuffer } from "./db/log-write-buffer.js";
+import { rawInsertRequestLog } from "./db/logs.js";
+import { rawInsertMetrics } from "./db/metrics.js";
 import { HTTP_NOT_FOUND, HTTP_INTERNAL_ERROR, getProxyApiType } from "./core/constants.js";
 import { API_CODE, ApiResponse, apiError, isAdminApiResponse, statusToApiCode } from "./admin/api-response.js";
 
@@ -251,6 +256,15 @@ export async function buildApp(
     : new LogFileWriter(logsDir, { enabled: getDetailLogEnabled(db) });
   container.register(SERVICE_KEYS.logFileWriter, () => logFileWriter);
 
+  // 日志 DB 写入缓冲（非 :memory: 模式）
+  const logWriteBuffer = isMemoryDb
+    ? null
+    : new LogWriteBuffer(db, rawInsertRequestLog, rawInsertMetrics);
+  if (logWriteBuffer) {
+    initLogBuffer(logWriteBuffer);
+    setLogBuffer(logWriteBuffer);
+  }
+
   // 注册 AdaptiveController（依赖已注册的 semaphoreManager）
   container.register(SERVICE_KEYS.adaptiveController, (c) => {
     const ac = new AdaptiveController(c.resolve(SERVICE_KEYS.semaphoreManager), app.log);
@@ -390,6 +404,9 @@ export async function buildApp(
     proxyAgentFactory.invalidateAll();
     const sessionTracker = container.resolve<SessionTracker>(SERVICE_KEYS.sessionTracker);
     sessionTracker.stop();
+    // 同步 flush DB 日志缓冲（在 flush 文件缓冲之前）
+    stopLogBuffer();
+    clearLogBuffer();
     // Flush LogFileWriter 的 WriteStream 缓冲数据到磁盘
     await logFileWriter?.stop();
     // 等待活跃代理请求自然完成，超时后强制关闭所有连接。

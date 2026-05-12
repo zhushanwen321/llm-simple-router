@@ -360,6 +360,7 @@ export function useDashboard() {
   })
 
   onUnmounted(() => {
+    if (refreshTimer) clearTimeout(refreshTimer)
     if (stopWatchTheme) stopWatchTheme()
   })
 

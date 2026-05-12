@@ -2,6 +2,7 @@ import Database from "better-sqlite3";
 import type { LogFileWriter } from "../storage/log-file-writer.js";
 import { shouldPreserveDetail, type RetryMatcher } from "../proxy/log-detail-policy.js";
 import { getCachedStmt } from "./helpers.js";
+import type { LogWriteBuffer } from "./log-write-buffer.js";
 
 type CountRow = { count: number };
 
@@ -74,26 +75,28 @@ export interface LogWriteContext {
   responseBody?: string | null;
 }
 
-export function insertRequestLog(
+/** 模块级缓冲实例，由 initLogBuffer 设置 */
+let logBuffer: LogWriteBuffer | null = null;
+
+/** 初始化日志缓冲（buildApp 时调用） */
+export function initLogBuffer(buffer: LogWriteBuffer): void {
+  logBuffer = buffer;
+}
+
+/** 停止日志缓冲，同步 flush 剩余数据（close 时调用） */
+export function stopLogBuffer(): void {
+  if (logBuffer) {
+    logBuffer.stop();
+    logBuffer = null;
+  }
+}
+
+/** 原始 DB INSERT 逻辑（无缓冲） */
+function rawInsertRequestLog(
   db: Database.Database,
   log: RequestLogInsert,
   writeContext?: LogWriteContext,
 ): void {
-  // 文件写入：始终写入全文
-  if (writeContext?.logFileWriter) {
-    writeContext.logFileWriter.write({
-      id: log.id,
-      created_at: log.created_at,
-      api_type: log.api_type,
-      status_code: log.status_code,
-      client_request: log.client_request ?? null,
-      upstream_request: log.upstream_request ?? null,
-      upstream_response: log.upstream_response ?? null,
-      stream_text_content: null,
-      pipeline_snapshot: log.pipeline_snapshot ?? null,
-    });
-  }
-
   // 详情保留判定
   const preserveDetail = shouldPreserveDetail(
     log.status_code, writeContext?.responseBody ?? null, writeContext?.matcher ?? null,
@@ -118,6 +121,37 @@ export function insertRequestLog(
     log.session_id ?? null,
     log.pipeline_snapshot ?? null,
   );
+}
+
+// 导出给 LogWriteBuffer 的原始插入函数引用
+export { rawInsertRequestLog };
+
+export function insertRequestLog(
+  db: Database.Database,
+  log: RequestLogInsert,
+  writeContext?: LogWriteContext,
+): void {
+  // 文件写入：始终同步调用（WriteStream 内部异步，不阻塞事件循环）
+  if (writeContext?.logFileWriter) {
+    writeContext.logFileWriter.write({
+      id: log.id,
+      created_at: log.created_at,
+      api_type: log.api_type,
+      status_code: log.status_code,
+      client_request: log.client_request ?? null,
+      upstream_request: log.upstream_request ?? null,
+      upstream_response: log.upstream_response ?? null,
+      stream_text_content: null,
+      pipeline_snapshot: log.pipeline_snapshot ?? null,
+    });
+  }
+
+  // DB INSERT：缓冲已初始化则走缓冲，否则走同步
+  if (logBuffer) {
+    logBuffer.pushLog(log, writeContext);
+  } else {
+    rawInsertRequestLog(db, log, writeContext);
+  }
 }
 
 type LogFilterOptions = {
