@@ -1,8 +1,8 @@
 import { extractStreamText } from "./stream-extractor.js";
 import type { StreamContentSnapshot, ContentBlock } from "./types.js";
 
-export const DEFAULT_MAX_RAW = 131072;
-export const DEFAULT_MAX_TEXT = 65536;
+export const DEFAULT_MAX_RAW = 32768;
+export const DEFAULT_MAX_TEXT = 16384;
 
 export class StreamContentAccumulator {
   private rawChunks = "";

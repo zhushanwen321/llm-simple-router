@@ -25,6 +25,7 @@ export interface ActiveRequest {
   attempts: AttemptSnapshot[]
   streamMetrics?: StreamMetricsSnapshot
   streamContent?: StreamContentSnapshot
+  streamTotalChars?: number
   clientIp?: string
   sessionId?: string
   clientRequest?: string

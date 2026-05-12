@@ -28,7 +28,7 @@ interface AnthropicMessageDelta {
 }
 
 interface OpenAIChoice {
-  delta?: { role?: string; content?: string };
+  delta?: { role?: string; content?: string; reasoning_content?: string };
   finish_reason?: string;
 }
 
@@ -309,17 +309,18 @@ export class MetricsExtractor {
       if (
         !this.firstContentReceived &&
         delta &&
-        delta.content !== undefined &&
-        delta.content !== ""
+        ((delta.content !== undefined && delta.content !== "") ||
+         (delta.reasoning_content !== undefined && delta.reasoning_content !== ""))
       ) {
         this.firstContentReceived = true;
         this.ttftMs = Date.now() - this.requestStartTime;
         this.textStreamStartTime = Date.now();
       }
 
-      if (delta?.content && this.textTotalLength < MetricsExtractor.MAX_BUFFER_SIZE) {
-        this.textChunks.push(delta.content);
-        this.textTotalLength += delta.content.length;
+      const contentText = delta?.content || delta?.reasoning_content || "";
+      if (contentText && this.textTotalLength < MetricsExtractor.MAX_BUFFER_SIZE) {
+        this.textChunks.push(contentText);
+        this.textTotalLength += contentText.length;
       }
 
       if (choice.finish_reason) {

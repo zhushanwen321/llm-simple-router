@@ -1,4 +1,4 @@
-import { ref, shallowRef, triggerRef, computed, watch } from 'vue'
+import { ref, shallowRef, triggerRef, computed, watch, onUnmounted } from 'vue'
 import { api } from '@/api/client'
 import type {
   ActiveRequest,
@@ -67,11 +67,12 @@ export function useMonitorData() {
         break
       }
       case 'stream_content_update': {
-        const updates = data as Array<{ id: string; streamContent: StreamContentSnapshot | null; streamMetrics: StreamMetricsSnapshot | null }>
+        // 后端已改为轻量推送：只含 id + totalChars + streamMetrics（不含 streamContent）
+        const updates = data as Array<{ id: string; totalChars: number; streamMetrics: StreamMetricsSnapshot | null }>
         for (const update of updates) {
           const req = activeRequests.value.find((r) => r.id === update.id)
           if (req) {
-            if (update.streamContent) req.streamContent = update.streamContent
+            req.streamTotalChars = update.totalChars
             if (update.streamMetrics) req.streamMetrics = update.streamMetrics
           }
         }
@@ -193,11 +194,78 @@ export function useMonitorData() {
 
   const selectedRequestId = ref<string | null>(null)
   const requestDetailOpen = ref(false)
+  const selectedStreamContent = ref<StreamContentSnapshot | null>(null)
+  let streamPollingTimer: ReturnType<typeof setInterval> | null = null
+
+  function startStreamContentPolling(id: string) {
+    stopStreamContentPolling()
+    if (!id) return
+
+    const poll = async () => {
+      // 只轮询活跃请求
+      const req = activeRequests.value.find(r => r.id === id)
+      if (!req || req.status === 'completed' || req.status === 'failed') {
+        stopStreamContentPolling()
+        return
+      }
+      try {
+        const full = await api.getMonitorRequest(id)
+        // 选中已变化，丢弃
+        if (selectedRequestId.value !== id) return
+        // 防闪烁：仅在响应包含有效 streamContent 时更新
+        if (full.streamContent) {
+          selectedStreamContent.value = full.streamContent
+        }
+      } catch (e: unknown) {
+        const status = (e as { response?: { status?: number } })?.response?.status
+        if (status === 404) { // eslint-disable-line no-magic-numbers
+          stopStreamContentPolling()
+        }
+      }
+    }
+
+    poll() // 立即首次获取
+    streamPollingTimer = setInterval(poll, 500) // eslint-disable-line no-magic-numbers
+  }
+
+  function stopStreamContentPolling() {
+    if (streamPollingTimer) {
+      clearInterval(streamPollingTimer)
+      streamPollingTimer = null
+    }
+  }
 
   function selectRequest(id: string) {
     selectedRequestId.value = id
     requestDetailOpen.value = true
+    selectedStreamContent.value = null
+    // 已完成请求从 recentCompleted 或 API 获取最终 snapshot
+    const existing = recentCompleted.value.find(r => r.id === id)
+    if (existing && (existing.status === 'completed' || existing.status === 'failed')) {
+      // 优先使用 existing.streamContent（从 loadInitialData 加载的完整条目）
+      if (existing.streamContent) {
+        selectedStreamContent.value = existing.streamContent
+      } else {
+        // SSE request_complete 剥离了 streamContent，需要单独获取
+        loadCompletedStreamContent(id)
+      }
+    }
+    startStreamContentPolling(id)
     loadLogDetail(id)
+  }
+
+  /** 对已完成请求，从后端 tracker 拉取最后一帧 streamContent */
+  async function loadCompletedStreamContent(id: string) {
+    try {
+      const full = await api.getMonitorRequest(id)
+      if (selectedRequestId.value !== id) return
+      if (full.streamContent) {
+        selectedStreamContent.value = full.streamContent
+      }
+    } catch (e: unknown) {
+      console.error('loadCompletedStreamContent:', e)
+      void e
+    }
   }
 
   const selectedRequest = computed(() => {
@@ -209,11 +277,16 @@ export function useMonitorData() {
     )
   })
 
-  // 请求从 pending 变为 completed 时，自动重新加载日志详情
+  // 请求从 pending 变为 completed 时，停止轮询，保留最后 snapshot
   watch(() => selectedRequest.value?.status, (newStatus, oldStatus) => {
     if (oldStatus === 'pending' && (newStatus === 'completed' || newStatus === 'failed')) {
+      stopStreamContentPolling()
       loadLogDetail(selectedRequestId.value!)
     }
+  })
+
+  onUnmounted(() => {
+    stopStreamContentPolling()
   })
 
   return {
@@ -232,6 +305,8 @@ export function useMonitorData() {
     selectedRequest,
     requestDetailOpen,
     selectRequest,
+    // Stream content (on-demand polling)
+    selectedStreamContent,
     // Log detail data
     logDetailData,
     nonStreamBodyLoading,

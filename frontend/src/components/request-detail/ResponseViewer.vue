@@ -24,7 +24,7 @@
             />
           </div>
         </template>
-        <p v-else-if="props.status === 'pending'" class="text-xs text-muted-foreground">{{ t('requestDetail.waitingResponse') }}</p>
+        <p v-if="blocks.length === 0 && props.status === 'pending' && !props.streamContent?.rawChunks" class="text-xs text-muted-foreground">{{ t('requestDetail.waitingResponse') }}</p>
         <p v-else-if="props.source === 'history' && props.isStream && !hasAnyResponseData" class="text-xs text-muted-foreground">{{ t('requestDetail.streamNotPersisted') }}</p>
         <p v-else class="text-xs text-muted-foreground">{{ t('requestDetail.noResponseContent') }}</p>
       </div>
@@ -107,6 +107,11 @@ const blocks = computed<ContentBlock[]>(() => {
     if (props.responseBody) {
       const direct = tryDirectParse(props.responseBody, null, props.apiType)
       if (direct.length > 0) return direct
+    }
+    // blocks 为空时回退到 rawChunks：至少让用户看到流式内容
+    const raw = props.streamContent?.rawChunks
+    if (raw && raw.trim().length > 0) {
+      return [{ type: 'text' as const, content: raw }]
     }
     return []
   }

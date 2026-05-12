@@ -96,11 +96,15 @@ export class RequestTracker {
     this.streamContentTimer = null;
     if (this.streamContentPending.size === 0) return;
 
-    const updates: Array<{ id: string; streamContent: unknown; streamMetrics: unknown }> = [];
+    const updates: Array<{ id: string; totalChars: number; streamMetrics: StreamMetricsSnapshot | null }> = [];
     for (const id of this.streamContentPending) {
       const req = this.activeMap.get(id);
       if (req) {
-        updates.push({ id, streamContent: req.streamContent ?? null, streamMetrics: req.streamMetrics ?? null });
+        updates.push({
+          id,
+          totalChars: req.streamContent?.totalChars ?? 0,
+          streamMetrics: req.streamMetrics ?? null,
+        });
       }
     }
     this.streamContentPending.clear();
@@ -189,6 +193,7 @@ export class RequestTracker {
       status: wasKilled ? "failed" : result.status,
       completedAt: now,
       attempts: result.attempts ?? req.attempts,
+      // 保留 streamContent 最后 snapshot，供前端列表页点击已完成请求时展示
     };
 
     this.streamContentPending.delete(id);
@@ -317,11 +322,13 @@ export class RequestTracker {
     });
   }
 
-  /** 向单个客户端发送当前活跃请求快照（保留 clientRequest 以便前端即时展示） */
+  /** 向单个客户端发送当前活跃请求快照（strip 大字段以减少初始推送带宽） */
   private sendInitialSnapshot(client: SSEClient): void {
     const active = this.getActive().map((req: ActiveRequest) => {
       const copy = { ...req };
       delete copy.upstreamRequest;
+      delete copy.streamContent;
+      delete copy.streamMetrics;
       return copy;
     });
     const msg = `event: request_update\ndata: ${JSON.stringify(active)}\n\n`;
@@ -389,21 +396,23 @@ export class RequestTracker {
   }
 
   broadcast(event: string, data: unknown): void {
-    // request_update: 保留 clientRequest，前端 pending 请求需要即时展示内容
-    // request_start: 无需处理，已是原始数据
-    // request_complete: strip clientRequest（完成后从 DB 加载详情）
+    // request_update: strip clientRequest/upstreamRequest/streamContent/streamMetrics
+    // request_start / request_complete: strip clientRequest/upstreamRequest/streamContent，保留 streamMetrics
     let payload = data;
     if (event === "request_update" && Array.isArray(data)) {
       payload = data.map((req: ActiveRequest) => {
         const copy = { ...req };
         delete copy.clientRequest;
         delete copy.upstreamRequest;
+        delete copy.streamContent;
+        delete copy.streamMetrics;
         return copy;
       });
     } else if ((event === "request_complete" || event === "request_start") && data && typeof data === "object") {
       const copy = { ...(data as ActiveRequest) };
       delete copy.clientRequest;
       delete copy.upstreamRequest;
+      delete copy.streamContent;
       payload = copy;
     }
     const msg = `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
