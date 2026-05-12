@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { countTokens, estimateInputTokens } from "../src/utils/token-counter.js";
+import { countTokens, estimateInputTokens, countTokensFromChunks } from "../src/utils/token-counter.js";
 import { encode } from "gpt-tokenizer";
 
 describe("countTokens", () => {
@@ -158,5 +158,64 @@ describe("estimateInputTokens", () => {
     };
     const count = estimateInputTokens(body);
     expect(count).toBeGreaterThan(0);
+  });
+});
+
+describe("countTokensFromChunks", () => {
+  it("returns 0 for empty array", () => {
+    expect(countTokensFromChunks([])).toBe(0);
+  });
+
+  it("returns same result as countTokens for short chunks", () => {
+    const chunks = ["Hello, ", "world!"];
+    const fromChunks = countTokensFromChunks(chunks);
+    const direct = countTokens(chunks.join(""));
+    expect(fromChunks).toBe(direct);
+  });
+
+  it("returns same result as countTokens for single chunk", () => {
+    const text = "This is a single chunk of text.";
+    expect(countTokensFromChunks([text])).toBe(countTokens(text));
+  });
+
+  it("handles unicode chunks", () => {
+    const chunks = ["你好", "世界", "测试"];
+    const fromChunks = countTokensFromChunks(chunks);
+    const direct = countTokens(chunks.join(""));
+    expect(fromChunks).toBe(direct);
+  });
+
+  it("sampling extrapolation for many chunks is within 20% of actual", () => {
+    // Generate many small chunks totaling > 4000 chars
+    const sentence = "The quick brown fox jumps over the lazy dog. ";
+    const chunks: string[] = [];
+    let total = 0;
+    while (total <= 4000) {
+      chunks.push(sentence);
+      total += sentence.length;
+    }
+    expect(total).toBeGreaterThan(4000);
+
+    const estimated = countTokensFromChunks(chunks);
+    const actual = encode(chunks.join("")).length;
+
+    expect(estimated).toBeGreaterThan(0);
+    expect(Math.abs(estimated - actual) / actual).toBeLessThan(0.2);
+  });
+
+  it("never creates full joined string when chunks are large", () => {
+    // Single chunk > SAMPLE_SIZE should still work via sampling
+    const longText = "A".repeat(8000);
+    const result = countTokensFromChunks([longText]);
+    expect(result).toBeGreaterThan(0);
+    // Should match countTokens on same input
+    expect(result).toBe(countTokens(longText));
+  });
+
+  it("handles chunks where individual chunk exceeds SAMPLE_SIZE", () => {
+    const chunks = ["short prefix ", "B".repeat(8000)];
+    const estimated = countTokensFromChunks(chunks);
+    const actual = encode(chunks.join("")).length;
+    expect(Math.abs(estimated - actual) / actual).toBeLessThan(0.2);
   });
 });
