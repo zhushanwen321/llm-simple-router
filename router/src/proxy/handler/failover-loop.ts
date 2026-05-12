@@ -507,7 +507,7 @@ export async function executeFailoverLoop(
       }
 
       // 其他未知错误
-      const errMsg = e instanceof Error ? e.message : e instanceof Error ? e.message : JSON.stringify(e);
+      const errMsg = e instanceof Error ? e.message : JSON.stringify(e);
       request.log.debug({ logId, error: errMsg, action: "upstream_error" });
       insertRequestLog(db, {
         id: randomUUID(), api_type: clientApiType,
