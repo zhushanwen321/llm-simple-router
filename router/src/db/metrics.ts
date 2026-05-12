@@ -2,7 +2,6 @@ import Database from "better-sqlite3";
 import { randomUUID } from "crypto";
 import { MS_PER_SECOND } from "../core/constants.js";
 import { getCachedStmt } from "./helpers.js";
-import type { LogWriteBuffer } from "./log-write-buffer.js";
 
 export type MetricsPeriod = "1h" | "5h" | "6h" | "24h" | "7d" | "30d";
 export type MetricsMetric = "ttft" | "tps" | "text_tps" | "thinking_tps" | "tool_use_tps" | "non_thinking_tps" | "total_tps" | "tokens" | "cache_rate" | "request_count" | "input_tokens" | "output_tokens" | "cache_hit_tokens";
@@ -59,20 +58,7 @@ export type MetricsInsert = {
   total_tps?: number | null;
 };
 
-/** 模块级缓冲实例，与 logs.ts 共享同一个 LogWriteBuffer */
-let logBuffer: LogWriteBuffer | null = null;
-
-/** 设置缓冲实例（由 index.ts buildApp 调用，传入与 logs.ts 共享的 buffer） */
-export function setLogBuffer(buffer: LogWriteBuffer): void {
-  logBuffer = buffer;
-}
-
-/** 清除缓冲引用（由 stopLogBuffer 调用） */
-export function clearLogBuffer(): void {
-  logBuffer = null;
-}
-
-/** 原始 DB INSERT 逻辑（无缓冲） */
+/** DB INSERT 逻辑 */
 function rawInsertMetrics(db: Database.Database, m: MetricsInsert & { id: string }): void {
   getCachedStmt(
     db,
@@ -98,16 +84,9 @@ function rawInsertMetrics(db: Database.Database, m: MetricsInsert & { id: string
   );
 }
 
-// 导出给 LogWriteBuffer 的原始插入函数引用
-export { rawInsertMetrics };
-
 export function insertMetrics(db: Database.Database, m: MetricsInsert): string {
   const id = randomUUID();
-  if (logBuffer) {
-    logBuffer.pushMetrics({ ...m, id });
-  } else {
-    rawInsertMetrics(db, { ...m, id });
-  }
+  rawInsertMetrics(db, { ...m, id });
   return id;
 }
 

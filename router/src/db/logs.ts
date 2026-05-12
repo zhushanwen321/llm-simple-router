@@ -2,7 +2,6 @@ import Database from "better-sqlite3";
 import type { LogFileWriter } from "../storage/log-file-writer.js";
 import { shouldPreserveDetail, type RetryMatcher } from "../proxy/log-detail-policy.js";
 import { getCachedStmt } from "./helpers.js";
-import type { LogWriteBuffer } from "./log-write-buffer.js";
 
 type CountRow = { count: number };
 
@@ -75,23 +74,7 @@ export interface LogWriteContext {
   responseBody?: string | null;
 }
 
-/** 模块级缓冲实例，由 initLogBuffer 设置 */
-let logBuffer: LogWriteBuffer | null = null;
-
-/** 初始化日志缓冲（buildApp 时调用） */
-export function initLogBuffer(buffer: LogWriteBuffer): void {
-  logBuffer = buffer;
-}
-
-/** 停止日志缓冲，同步 flush 剩余数据（close 时调用） */
-export function stopLogBuffer(): void {
-  if (logBuffer) {
-    logBuffer.stop();
-    logBuffer = null;
-  }
-}
-
-/** 原始 DB INSERT 逻辑（无缓冲） */
+/** DB INSERT 逻辑 */
 function rawInsertRequestLog(
   db: Database.Database,
   log: RequestLogInsert,
@@ -123,9 +106,6 @@ function rawInsertRequestLog(
   );
 }
 
-// 导出给 LogWriteBuffer 的原始插入函数引用
-export { rawInsertRequestLog };
-
 export function insertRequestLog(
   db: Database.Database,
   log: RequestLogInsert,
@@ -146,12 +126,7 @@ export function insertRequestLog(
     });
   }
 
-  // DB INSERT：缓冲已初始化则走缓冲，否则走同步
-  if (logBuffer) {
-    logBuffer.pushLog(log, writeContext);
-  } else {
-    rawInsertRequestLog(db, log, writeContext);
-  }
+  rawInsertRequestLog(db, log, writeContext);
 }
 
 type LogFilterOptions = {
