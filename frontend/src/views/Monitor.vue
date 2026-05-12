@@ -46,6 +46,12 @@
               <span class="text-sm text-foreground truncate flex-1">{{ req.model }}</span>
               <Badge variant="outline" class="shrink-0 text-xs">{{ req.providerName }}</Badge>
               <span class="text-xs text-muted-foreground shrink-0">{{ elapsed(req.startTime) }}s</span>
+              <span v-if="req.streamMetrics?.tokensPerSecond" class="text-xs text-muted-foreground shrink-0">
+                {{ req.streamMetrics.tokensPerSecond.toFixed(0) }} t/s
+              </span>
+              <span v-if="req.streamMetrics?.outputTokens" class="text-xs text-muted-foreground shrink-0">
+                {{ req.streamMetrics.outputTokens }} tok
+              </span>
               <Badge v-if="req.isStream" variant="outline" class="shrink-0 text-xs">SSE</Badge>
               <TooltipProvider :delay-duration="300">
                 <Tooltip>
@@ -214,7 +220,7 @@
       v-model:open="requestDetailOpen"
       source="realtime"
       :request="selectedRequest"
-      :stream-content="selectedRequest?.streamContent"
+      :stream-content="selectedStreamContent"
       :log-detail-data="logDetailData"
     />
 
@@ -278,6 +284,7 @@ const {
   selectedRequest,
   requestDetailOpen,
   selectRequest,
+  selectedStreamContent,
   logDetailData,
   handleSSEMessage,
   handleSSEOpen,
