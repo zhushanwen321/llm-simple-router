@@ -10,6 +10,7 @@ export const SERVICE_KEYS = {
   pluginRegistry: "pluginRegistry",
   formatRegistry: "formatRegistry",
   logFileWriter: "logFileWriter",
+  logWriteBuffer: "logWriteBuffer",
   proxyAgentFactory: "proxyAgentFactory",
 } as const;
 

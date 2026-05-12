@@ -1,11 +1,14 @@
 <template>
-  <div v-if="isAuthenticated" class="h-screen flex overflow-hidden">
-    <Sidebar />
-    <main class="flex-1 overflow-auto bg-muted">
-      <router-view />
-    </main>
-  </div>
-  <router-view v-else />
+  <div v-if="!localeLoaded" />
+  <template v-else>
+    <div v-if="isAuthenticated" class="h-screen flex overflow-hidden">
+      <Sidebar />
+      <main class="flex-1 overflow-auto bg-muted">
+        <router-view />
+      </main>
+    </div>
+    <router-view v-else />
+  </template>
   <Teleport to="body">
     <Toaster :theme="theme" richColors position="top-center" :toastOptions="{ duration: 4000 }" />
   </Teleport>
@@ -18,6 +21,7 @@ import Sidebar from '@/components/layout/Sidebar.vue'
 import { Toaster } from '@/components/ui/sonner'
 import { api } from '@/api/client'
 import { isDark } from '@/composables/useTheme'
+import { localeLoaded } from '@/i18n'
 
 const router = useRouter()
 const route = useRoute()

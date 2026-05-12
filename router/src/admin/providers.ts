@@ -178,6 +178,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
         name: s.name,
         api_type: s.api_type,
         base_url: s.base_url,
+        upstream_path: s.upstream_path,
         api_key: s.api_key ? decrypt(s.api_key, encryptionKey) : "",
         models: buildModelInfoList(modelEntries, overrides),
         is_active: s.is_active,

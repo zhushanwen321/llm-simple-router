@@ -27,7 +27,6 @@ class StreamProxy {
   private pendingResult: TransportResult | null = null;
 
   private readonly bufferChunks: Buffer[] = [];
-  private readonly captureChunks: Buffer[] = [];
   private totalBuffered = 0;
   private lastChunkEndedWithNewline = false;
   private idleTimer: NodeJS.Timeout | null = null;
@@ -207,7 +206,6 @@ class StreamProxy {
     this.resetIdleTimer();
 
     if (this.state === "BUFFERING") {
-      this.captureChunks.push(chunk);
       this.bufferChunks.push(chunk);
       this.totalBuffered += chunk.length;
 
@@ -282,7 +280,7 @@ class StreamProxy {
     if (this.idleTimer) clearTimeout(this.idleTimer);
 
     if (this.state === "BUFFERING" && this.checkEarlyError) {
-      const text = Buffer.concat(this.captureChunks).toString("utf-8");
+      const text = Buffer.concat(this.bufferChunks).toString("utf-8");
       if (this.checkEarlyError(text)) {
         this.transition("EARLY_ERROR");
         this.terminal("stream_error", { body: text });
