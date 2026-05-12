@@ -238,9 +238,34 @@ export function useMonitorData() {
   function selectRequest(id: string) {
     selectedRequestId.value = id
     requestDetailOpen.value = true
-    selectedStreamContent.value = null // 重置
+    selectedStreamContent.value = null
+    // 已完成请求从 recentCompleted 或 API 获取最终 snapshot
+    const existing = recentCompleted.value.find(r => r.id === id)
+    if (existing && (existing.status === 'completed' || existing.status === 'failed')) {
+      // 优先使用 existing.streamContent（从 loadInitialData 加载的完整条目）
+      if (existing.streamContent) {
+        selectedStreamContent.value = existing.streamContent
+      } else {
+        // SSE request_complete 剥离了 streamContent，需要单独获取
+        loadCompletedStreamContent(id)
+      }
+    }
     startStreamContentPolling(id)
     loadLogDetail(id)
+  }
+
+  /** 对已完成请求，从后端 tracker 拉取最后一帧 streamContent */
+  async function loadCompletedStreamContent(id: string) {
+    try {
+      const full = await api.getMonitorRequest(id)
+      if (selectedRequestId.value !== id) return
+      if (full.streamContent) {
+        selectedStreamContent.value = full.streamContent
+      }
+    } catch (e: unknown) {
+      console.error('loadCompletedStreamContent:', e)
+      void e
+    }
   }
 
   const selectedRequest = computed(() => {
@@ -252,11 +277,10 @@ export function useMonitorData() {
     )
   })
 
-  // 请求从 pending 变为 completed 时，停止轮询并切换为 DB 数据源
+  // 请求从 pending 变为 completed 时，停止轮询，保留最后 snapshot
   watch(() => selectedRequest.value?.status, (newStatus, oldStatus) => {
     if (oldStatus === 'pending' && (newStatus === 'completed' || newStatus === 'failed')) {
       stopStreamContentPolling()
-      selectedStreamContent.value = null // 切换为 DB 数据源
       loadLogDetail(selectedRequestId.value!)
     }
   })
