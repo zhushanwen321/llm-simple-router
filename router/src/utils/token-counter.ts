@@ -12,6 +12,31 @@ export function countTokens(text: string): number {
   return Math.ceil((sampleTokens / sample.length) * text.length);
 }
 
+/**
+ * 从 string chunks 中估算 token 数，避免 join 成完整大字符串。
+ * 累积到 SAMPLE_SIZE 字符后停止拼接，用采样外推。
+ */
+export function countTokensFromChunks(chunks: string[]): number {
+  if (chunks.length === 0) return 0;
+
+  let combined = "";
+  let totalChars = 0;
+  for (const chunk of chunks) {
+    totalChars += chunk.length;
+    if (combined.length < SAMPLE_SIZE) {
+      combined += combined.length + chunk.length <= SAMPLE_SIZE
+        ? chunk
+        : chunk.slice(0, SAMPLE_SIZE - combined.length);
+    }
+  }
+
+  if (totalChars <= SAMPLE_SIZE) {
+    return countTokens(combined);
+  }
+  const sampleTokens = countTokens(combined);
+  return Math.ceil(sampleTokens * (totalChars / combined.length));
+}
+
 type ContentBlock = { type: string; text?: string; content?: unknown; input?: unknown };
 
 /** 从 message content 中提取文本（兼容 OpenAI 和 Anthropic 格式） */
