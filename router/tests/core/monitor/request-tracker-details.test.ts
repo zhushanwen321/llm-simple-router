@@ -334,6 +334,222 @@ describe("RequestTracker — completedDetails 分离", () => {
     });
   });
 
+  // --- Task 1: broadcast 轻量化 — strip streamContent/streamMetrics ---
+
+  describe("broadcast 轻量化 — strip streamContent/streamMetrics", () => {
+    it("test_stream_content_update_不含streamContent", () => {
+      const { client, writes } = createMockClient();
+      tracker.addClient(client);
+
+      // 模拟有 streamContent 的活跃请求
+      tracker.start(createActiveRequest({
+        id: "req-light-1",
+        isStream: true,
+        streamContent: {
+          rawChunks: "data: huge...",
+          textContent: "hello world",
+          totalChars: 1000,
+          blocks: [{ type: "text", content: "hello" }],
+        },
+        streamMetrics: {
+          inputTokens: 100,
+          outputTokens: 50,
+          cacheReadTokens: null,
+          ttftMs: 200,
+          tokensPerSecond: 25.5,
+          stopReason: null,
+          isComplete: false,
+          thinkingTokens: null,
+          thinkingDurationMs: null,
+          thinkingTps: null,
+          nonThinkingDurationMs: null,
+          nonThinkingTps: null,
+          totalTps: null,
+          textTokens: null,
+          toolUseTokens: null,
+        },
+      }));
+      writes.length = 0;
+
+      // 模拟 flushStreamContentPush：直接调用 appendStreamChunk 触发推送
+      // 使用 fake timers 控制定时器
+      vi.useFakeTimers();
+      tracker.appendStreamChunk("req-light-1", "data: {\"text\":\"hi\"}\n\n", "openai", 32768, 16384);
+      vi.advanceTimersByTime(500);
+
+      const payload = extractSSEPayload(writes, "stream_content_update") as Array<{ id: string; totalChars: number; streamMetrics: unknown; streamContent?: unknown }>;
+      expect(payload).toBeDefined();
+      expect(payload).toHaveLength(1);
+
+      const update = payload[0];
+      expect(update.id).toBe("req-light-1");
+      expect(typeof update.totalChars).toBe("number");
+      // streamContent 不应出现在 payload 中
+      expect(update.streamContent).toBeUndefined();
+      // streamMetrics 应保留（轻量字段，<200 bytes）
+      expect(update.streamMetrics).toBeDefined();
+
+      vi.useRealTimers();
+    });
+
+    it("test_request_update_不含streamContent和streamMetrics", () => {
+      const { client, writes } = createMockClient();
+      tracker.addClient(client);
+
+      tracker.start(createActiveRequest({
+        id: "req-strip-1",
+        streamContent: {
+          rawChunks: "data: huge...",
+          textContent: "content",
+          totalChars: 500,
+        },
+        streamMetrics: {
+          inputTokens: 10,
+          outputTokens: 20,
+          cacheReadTokens: null,
+          ttftMs: 100,
+          tokensPerSecond: 50,
+          stopReason: null,
+          isComplete: false,
+          thinkingTokens: null,
+          thinkingDurationMs: null,
+          thinkingTps: null,
+          nonThinkingDurationMs: null,
+          nonThinkingTps: null,
+          totalTps: null,
+          textTokens: null,
+          toolUseTokens: null,
+        },
+      }));
+      writes.length = 0;
+
+      // queued 状态变化触发 request_update
+      tracker.update("req-strip-1", { queued: true });
+
+      const payload = extractSSEPayload(writes, "request_update") as Array<Record<string, unknown>>;
+      expect(payload).toBeDefined();
+      const req = payload.find((r) => r.id === "req-strip-1");
+      expect(req).toBeDefined();
+      expect(req!.streamContent).toBeUndefined();
+      expect(req!.streamMetrics).toBeUndefined();
+      expect(req!.clientRequest).toBeUndefined();
+      expect(req!.upstreamRequest).toBeUndefined();
+    });
+
+    it("test_request_start_不含streamContent_保留streamMetrics", () => {
+      const { client, writes } = createMockClient();
+      tracker.addClient(client);
+
+      tracker.start(createActiveRequest({
+        id: "req-start-strip",
+        streamContent: {
+          rawChunks: "data: test",
+          textContent: "test",
+          totalChars: 50,
+        },
+        streamMetrics: {
+          inputTokens: 5,
+          outputTokens: 10,
+          cacheReadTokens: null,
+          ttftMs: 50,
+          tokensPerSecond: 20,
+          stopReason: null,
+          isComplete: false,
+          thinkingTokens: null,
+          thinkingDurationMs: null,
+          thinkingTps: null,
+          nonThinkingDurationMs: null,
+          nonThinkingTps: null,
+          totalTps: null,
+          textTokens: null,
+          toolUseTokens: null,
+        },
+      }));
+
+      const payload = extractSSEPayload(writes, "request_start") as Record<string, unknown>;
+      expect(payload).toBeDefined();
+      expect(payload.streamContent).toBeUndefined();
+      expect(payload.streamMetrics).toBeDefined();
+    });
+
+    it("test_request_complete_不含streamContent_保留streamMetrics", () => {
+      const { client, writes } = createMockClient();
+      tracker.addClient(client);
+
+      tracker.start(createActiveRequest({
+        id: "req-complete-strip",
+        clientRequest: "client-body",
+        upstreamRequest: "upstream-body",
+        streamMetrics: {
+          inputTokens: 100,
+          outputTokens: 200,
+          cacheReadTokens: null,
+          ttftMs: 150,
+          tokensPerSecond: 30,
+          stopReason: "end_turn",
+          isComplete: true,
+          thinkingTokens: null,
+          thinkingDurationMs: null,
+          thinkingTps: null,
+          nonThinkingDurationMs: null,
+          nonThinkingTps: null,
+          totalTps: null,
+          textTokens: null,
+          toolUseTokens: null,
+        },
+      }));
+      writes.length = 0;
+
+      tracker.complete("req-complete-strip", { status: "completed", statusCode: 200 });
+
+      const payload = extractSSEPayload(writes, "request_complete") as Record<string, unknown>;
+      expect(payload).toBeDefined();
+      expect(payload.streamContent).toBeUndefined();
+      expect(payload.streamMetrics).toBeDefined();
+      expect(payload.clientRequest).toBeUndefined();
+      expect(payload.upstreamRequest).toBeUndefined();
+    });
+
+    it("test_sendInitialSnapshot_不含streamContent和streamMetrics", () => {
+      tracker.start(createActiveRequest({
+        id: "req-snapshot-1",
+        streamContent: {
+          rawChunks: "data: big",
+          textContent: "big content",
+          totalChars: 9999,
+        },
+        streamMetrics: {
+          inputTokens: 100,
+          outputTokens: 200,
+          cacheReadTokens: null,
+          ttftMs: 100,
+          tokensPerSecond: 40,
+          stopReason: null,
+          isComplete: false,
+          thinkingTokens: null,
+          thinkingDurationMs: null,
+          thinkingTps: null,
+          nonThinkingDurationMs: null,
+          nonThinkingTps: null,
+          totalTps: null,
+          textTokens: null,
+          toolUseTokens: null,
+        },
+      }));
+
+      const { client, writes } = createMockClient();
+      tracker.addClient(client);
+
+      const payload = extractSSEPayload(writes, "request_update") as Array<Record<string, unknown>>;
+      expect(payload).toBeDefined();
+      expect(payload).toHaveLength(1);
+      const req = payload[0];
+      expect(req.streamContent).toBeUndefined();
+      expect(req.streamMetrics).toBeUndefined();
+      expect(req.upstreamRequest).toBeUndefined();
+    });
+  });
+
   // --- Regression: pending 请求行为不变 ---
 
   describe("pending 请求 getRequestById() 行为不变", () => {
