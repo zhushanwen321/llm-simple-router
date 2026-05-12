@@ -193,6 +193,7 @@ export class RequestTracker {
       status: wasKilled ? "failed" : result.status,
       completedAt: now,
       attempts: result.attempts ?? req.attempts,
+      streamContent: undefined,
     };
 
     this.streamContentPending.delete(id);
