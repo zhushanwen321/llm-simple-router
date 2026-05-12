@@ -193,7 +193,7 @@ export class RequestTracker {
       status: wasKilled ? "failed" : result.status,
       completedAt: now,
       attempts: result.attempts ?? req.attempts,
-      streamContent: undefined,
+      // 保留 streamContent 最后 snapshot，供前端列表页点击已完成请求时展示
     };
 
     this.streamContentPending.delete(id);
