@@ -22,7 +22,7 @@ export function extractStreamText(line: string, apiType: "openai" | "openai-resp
   if (apiType === "openai") {
     const choices = obj.choices as Array<Record<string, unknown>> | undefined;
     const delta = choices?.[0]?.delta as Record<string, unknown> | undefined;
-    const text = (delta?.content as string) ?? "";
+    const text = (delta?.content as string) ?? (delta?.reasoning_content as string) ?? "";
     return { text, block: text ? { index: 0, type: "text", content: text } : null };
   }
 
