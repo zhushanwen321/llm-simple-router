@@ -113,6 +113,7 @@ export class SSEMetricsTransform extends Transform {
         if (typeof first.delta !== "object" || !first.delta) return undefined;
         const delta = first.delta as Record<string, unknown>;
         if (typeof delta.content === "string") return delta.content;
+        if (typeof delta.reasoning_content === "string") return delta.reasoning_content;
       }
     } catch { /* 非 JSON 数据行，跳过 */ } // eslint-disable-line taste/no-silent-catch
     return undefined;
