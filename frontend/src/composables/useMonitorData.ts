@@ -217,7 +217,6 @@ export function useMonitorData() {
           selectedStreamContent.value = full.streamContent
         }
       } catch (e: unknown) {
-        // 404 说明请求已从 tracker 中移除，停止轮询
         const status = (e as { response?: { status?: number } })?.response?.status
         if (status === 404) { // eslint-disable-line no-magic-numbers
           stopStreamContentPolling()
