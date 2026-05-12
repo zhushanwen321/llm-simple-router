@@ -29,31 +29,31 @@
           </div>
         </CardHeader>
         <CardContent>
-          <ScrollArea class="h-64">
-            <div v-if="streamingRequests.length === 0" class="text-sm text-muted-foreground py-2">
-              {{ t('monitor.noActiveRequests') }}
-            </div>
-            <div
-              v-for="req in streamingRequests"
-              :key="req.id"
-              class="flex items-center gap-2 py-2 px-2 rounded cursor-pointer hover:bg-muted/50 transition-colors"
-              :class="{ 'bg-muted': selectedRequestId === req.id }"
-              @click="selectRequest(req.id)"
-            >
-              <Badge :variant="statusVariant(req.status)" class="shrink-0">
-                {{ statusLabel(req.status) }}
-              </Badge>
-              <span class="text-sm text-foreground truncate flex-1">{{ req.model }}</span>
-              <Badge variant="outline" class="shrink-0 text-xs">{{ req.providerName }}</Badge>
-              <span class="text-xs text-muted-foreground shrink-0">{{ elapsed(req.startTime) }}s</span>
-              <span v-if="req.streamMetrics?.tokensPerSecond" class="text-xs text-muted-foreground shrink-0">
-                {{ req.streamMetrics.tokensPerSecond.toFixed(0) }} t/s
-              </span>
-              <span v-if="req.streamMetrics?.outputTokens" class="text-xs text-muted-foreground shrink-0">
-                {{ req.streamMetrics.outputTokens }} tok
-              </span>
-              <Badge v-if="req.isStream" variant="outline" class="shrink-0 text-xs">SSE</Badge>
-              <TooltipProvider :delay-duration="300">
+          <TooltipProvider :delay-duration="300">
+            <ScrollArea class="h-64">
+              <div v-if="streamingRequests.length === 0" class="text-sm text-muted-foreground py-2">
+                {{ t('monitor.noActiveRequests') }}
+              </div>
+              <div
+                v-for="req in streamingRequests"
+                :key="req.id"
+                class="flex items-center gap-2 py-2 px-2 rounded cursor-pointer hover:bg-muted/50 transition-colors"
+                :class="{ 'bg-muted': selectedRequestId === req.id }"
+                @click="selectRequest(req.id)"
+              >
+                <Badge :variant="statusVariant(req.status)" class="shrink-0">
+                  {{ statusLabel(req.status) }}
+                </Badge>
+                <span class="text-sm text-foreground truncate flex-1">{{ req.model }}</span>
+                <Badge variant="outline" class="shrink-0 text-xs">{{ req.providerName }}</Badge>
+                <span class="text-xs text-muted-foreground shrink-0">{{ elapsed(req.startTime) }}s</span>
+                <span v-if="req.streamMetrics?.tokensPerSecond" class="text-xs text-muted-foreground shrink-0">
+                  {{ req.streamMetrics.tokensPerSecond.toFixed(0) }} t/s
+                </span>
+                <span v-if="req.streamMetrics?.outputTokens" class="text-xs text-muted-foreground shrink-0">
+                  {{ req.streamMetrics.outputTokens }} tok
+                </span>
+                <Badge v-if="req.isStream" variant="outline" class="shrink-0 text-xs">SSE</Badge>
                 <Tooltip>
                   <TooltipTrigger as-child>
                     <Button variant="ghost" size="icon-xs" class="shrink-0" @click.stop="copy(req.id)">
@@ -63,8 +63,6 @@
                   </TooltipTrigger>
                   <TooltipContent>{{ t('monitor.copyId') }}</TooltipContent>
                 </Tooltip>
-              </TooltipProvider>
-              <TooltipProvider :delay-duration="300">
                 <Tooltip>
                   <TooltipTrigger as-child>
                     <Button variant="ghost" size="icon-xs" class="shrink-0 text-destructive hover:text-destructive" @click.stop="openKillDialog(req.id)">
@@ -73,9 +71,9 @@
                   </TooltipTrigger>
                   <TooltipContent>{{ t('monitor.kill') }}</TooltipContent>
                 </Tooltip>
-              </TooltipProvider>
-            </div>
-          </ScrollArea>
+              </div>
+            </ScrollArea>
+          </TooltipProvider>
         </CardContent>
       </Card>
 
@@ -88,24 +86,24 @@
           </div>
         </CardHeader>
         <CardContent>
-          <ScrollArea class="h-64">
-            <div v-if="queuedRequests.length === 0" class="text-sm text-muted-foreground py-2">
-              {{ t('monitor.noQueuedRequests') }}
-            </div>
-            <div
-              v-for="req in queuedRequests"
-              :key="req.id"
-              class="flex items-center gap-2 py-2 px-2 rounded cursor-pointer hover:bg-muted/50 transition-colors"
-              :class="{ 'bg-muted': selectedRequestId === req.id }"
-              @click="selectRequest(req.id)"
-            >
-              <Badge variant="outline" class="shrink-0">
-                {{ t('monitor.queued') }}
-              </Badge>
-              <span class="text-sm text-foreground truncate flex-1">{{ req.model }}</span>
-              <Badge variant="outline" class="shrink-0 text-xs">{{ req.providerName }}</Badge>
-              <span class="text-xs text-muted-foreground shrink-0">{{ elapsed(req.startTime) }}s</span>
-              <TooltipProvider :delay-duration="300">
+          <TooltipProvider :delay-duration="300">
+            <ScrollArea class="h-64">
+              <div v-if="queuedRequests.length === 0" class="text-sm text-muted-foreground py-2">
+                {{ t('monitor.noQueuedRequests') }}
+              </div>
+              <div
+                v-for="req in queuedRequests"
+                :key="req.id"
+                class="flex items-center gap-2 py-2 px-2 rounded cursor-pointer hover:bg-muted/50 transition-colors"
+                :class="{ 'bg-muted': selectedRequestId === req.id }"
+                @click="selectRequest(req.id)"
+              >
+                <Badge variant="outline" class="shrink-0">
+                  {{ t('monitor.queued') }}
+                </Badge>
+                <span class="text-sm text-foreground truncate flex-1">{{ req.model }}</span>
+                <Badge variant="outline" class="shrink-0 text-xs">{{ req.providerName }}</Badge>
+                <span class="text-xs text-muted-foreground shrink-0">{{ elapsed(req.startTime) }}s</span>
                 <Tooltip>
                   <TooltipTrigger as-child>
                     <Button variant="ghost" size="icon-xs" class="shrink-0" @click.stop="copy(req.id)">
@@ -115,8 +113,6 @@
                   </TooltipTrigger>
                   <TooltipContent>{{ t('monitor.copyId') }}</TooltipContent>
                 </Tooltip>
-              </TooltipProvider>
-              <TooltipProvider :delay-duration="300">
                 <Tooltip>
                   <TooltipTrigger as-child>
                     <Button variant="ghost" size="icon-xs" class="shrink-0 text-destructive hover:text-destructive" @click.stop="openKillDialog(req.id)">
@@ -125,9 +121,9 @@
                   </TooltipTrigger>
                   <TooltipContent>{{ t('monitor.kill') }}</TooltipContent>
                 </Tooltip>
-              </TooltipProvider>
-            </div>
-          </ScrollArea>
+              </div>
+            </ScrollArea>
+          </TooltipProvider>
         </CardContent>
       </Card>
 
@@ -140,25 +136,25 @@
           </div>
         </CardHeader>
         <CardContent>
-          <ScrollArea class="h-64">
-            <div v-if="recentCompleted.length === 0" class="text-sm text-muted-foreground py-2">
-              {{ t('monitor.noCompletedRequests') }}
-            </div>
-            <div
-              v-for="req in recentCompleted"
-              :key="req.id"
-              class="flex items-center gap-2 py-1.5 px-2 rounded cursor-pointer opacity-60 hover:opacity-80 hover:bg-muted/50 transition-colors"
-              :class="{ 'bg-muted': selectedRequestId === req.id }"
-              @click="selectRequest(req.id)"
-            >
-              <Badge :variant="statusVariant(req.status)" class="shrink-0">
-                {{ statusLabel(req.status) }}
-              </Badge>
-              <span class="text-sm text-foreground truncate flex-1">{{ req.model }}</span>
-              <Badge variant="outline" class="shrink-0 text-xs">{{ req.providerName }}</Badge>
-              <Badge v-if="req.isStream" variant="outline" class="shrink-0 text-xs">SSE</Badge>
-              <span class="text-xs text-muted-foreground shrink-0">{{ duration(req) }}</span>
-              <TooltipProvider :delay-duration="300">
+          <TooltipProvider :delay-duration="300">
+            <ScrollArea class="h-64">
+              <div v-if="recentCompleted.length === 0" class="text-sm text-muted-foreground py-2">
+                {{ t('monitor.noCompletedRequests') }}
+              </div>
+              <div
+                v-for="req in recentCompleted"
+                :key="req.id"
+                class="flex items-center gap-2 py-1.5 px-2 rounded cursor-pointer opacity-60 hover:opacity-80 hover:bg-muted/50 transition-colors"
+                :class="{ 'bg-muted': selectedRequestId === req.id }"
+                @click="selectRequest(req.id)"
+              >
+                <Badge :variant="statusVariant(req.status)" class="shrink-0">
+                  {{ statusLabel(req.status) }}
+                </Badge>
+                <span class="text-sm text-foreground truncate flex-1">{{ req.model }}</span>
+                <Badge variant="outline" class="shrink-0 text-xs">{{ req.providerName }}</Badge>
+                <Badge v-if="req.isStream" variant="outline" class="shrink-0 text-xs">SSE</Badge>
+                <span class="text-xs text-muted-foreground shrink-0">{{ duration(req) }}</span>
                 <Tooltip>
                   <TooltipTrigger as-child>
                     <Button variant="ghost" size="icon-xs" class="shrink-0" @click.stop="copy(req.id)">
@@ -168,9 +164,9 @@
                   </TooltipTrigger>
                   <TooltipContent>{{ t('monitor.copyId') }}</TooltipContent>
                 </Tooltip>
-              </TooltipProvider>
-            </div>
-          </ScrollArea>
+              </div>
+            </ScrollArea>
+          </TooltipProvider>
         </CardContent>
       </Card>
     </div>
@@ -343,6 +339,27 @@ const NOW_TICK_INTERVAL = 3000
 const now = ref(Date.now())
 let tickTimer: ReturnType<typeof setInterval> | null = null
 
+function startTick() {
+  stopTick()
+  tickTimer = setInterval(() => { now.value = Date.now() }, NOW_TICK_INTERVAL)
+}
+
+function stopTick() {
+  if (tickTimer) {
+    clearInterval(tickTimer)
+    tickTimer = null
+  }
+}
+
+function handleMonitorVisibility() {
+  if (document.hidden) {
+    stopTick()
+  } else {
+    now.value = Date.now()
+    startTick()
+  }
+}
+
 function elapsed(startTime: number): string {
   return ((now.value - startTime) / MS_PER_SECOND).toFixed(1)
 }
@@ -357,10 +374,12 @@ function duration(req: { completedAt?: number; startTime: number }): string {
 onMounted(async () => {
   await loadInitialData()
   connect()
-  tickTimer = setInterval(() => { now.value = Date.now() }, NOW_TICK_INTERVAL)
+  startTick()
+  document.addEventListener('visibilitychange', handleMonitorVisibility)
 })
 
 onUnmounted(() => {
-  if (tickTimer) { clearInterval(tickTimer); tickTimer = null }
+  stopTick()
+  document.removeEventListener('visibilitychange', handleMonitorVisibility)
 })
 </script>
