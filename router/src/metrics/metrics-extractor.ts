@@ -2,7 +2,7 @@
 
 import { MS_PER_SECOND } from "../core/constants.js";
 import type { MetricsResult } from "../core/types.js";
-import { countTokens } from "../utils/token-counter.js";
+import { countTokensFromChunks } from "../utils/token-counter.js";
 import type { SSEEvent } from "./sse-parser.js";
 
 interface AnthropicMessageStart {
@@ -97,8 +97,8 @@ export class MetricsExtractor {
     let thinkingDurationMs: number | null = null;
     let textTokens: number | null = null;
     let toolUseTokens: number | null = null;
-    const thinkingContent = this.thinkingChunks.join("");
-    const hasThinking = thinkingContent.length > 0;
+    const thinkingTotalLength = this.thinkingTotalLength;
+    const hasThinking = thinkingTotalLength > 0;
 
     if (
       this.streamEndTime !== null &&
@@ -111,7 +111,7 @@ export class MetricsExtractor {
       }
 
       if (hasThinking) {
-        thinkingTokens = countTokens(thinkingContent);
+        thinkingTokens = countTokensFromChunks(this.thinkingChunks);
 
         // thinking_duration: T3 - T0 (includes network RTT + generation)
         if (this.thinkingStreamEndTime !== null) {
@@ -137,13 +137,11 @@ export class MetricsExtractor {
       }
 
       // content token counts (for analysis only)
-      const textContent = this.textChunks.join("");
-      if (textContent.length > 0) {
-        textTokens = countTokens(textContent);
+      if (this.textTotalLength > 0) {
+        textTokens = countTokensFromChunks(this.textChunks);
       }
-      const toolUseContent = this.toolUseChunks.join("");
-      if (toolUseContent.length > 0) {
-        toolUseTokens = countTokens(toolUseContent);
+      if (this.toolUseTotalLength > 0) {
+        toolUseTokens = countTokensFromChunks(this.toolUseChunks);
       }
     }
 
