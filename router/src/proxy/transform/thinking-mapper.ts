@@ -21,7 +21,7 @@ export function mapThinkingToReasoning(thinking: Record<string, unknown> | undef
   const result: Record<string, unknown> = { max_tokens: t.budget_tokens };
   // 精确匹配 standard budget → 还原 effort 级别
   if (t.budget_tokens != null && BUDGET_TO_EFFORT[t.budget_tokens] != null) {
-  result.effort = BUDGET_TO_EFFORT[t.budget_tokens];
+    result.effort = BUDGET_TO_EFFORT[t.budget_tokens];
   }
   return result;
 }

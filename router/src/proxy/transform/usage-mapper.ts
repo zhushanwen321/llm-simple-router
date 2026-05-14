@@ -30,10 +30,10 @@ export function mapUsageOA2Ant(u: Record<string, unknown> | undefined): Record<s
   if (!u) return { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
   const details = u.prompt_tokens_details as Record<string, unknown> | undefined;
   return {
-  input_tokens: (u.prompt_tokens as number) ?? 0,
-  output_tokens: (u.completion_tokens as number) ?? 0,
-  cache_read_input_tokens: (details?.cached_tokens as number) ?? 0,
-  cache_creation_input_tokens: (details?.cached_write_tokens as number) ?? 0,
+    input_tokens: (u.prompt_tokens as number) ?? 0,
+    output_tokens: (u.completion_tokens as number) ?? 0,
+    cache_read_input_tokens: (details?.cached_tokens as number) ?? 0,
+    cache_creation_input_tokens: (details?.cached_write_tokens as number) ?? 0,
   };
 }
 
@@ -46,9 +46,9 @@ export function mapUsageAnt2OA(u: Record<string, unknown> | undefined): Record<s
   const outputTokens = Number(u.output_tokens) || 0;
   const totalInput = inputTokens + cacheRead + cacheCreation;
   return {
-  prompt_tokens: totalInput,
-  completion_tokens: outputTokens,
-  total_tokens: totalInput + outputTokens,
-  prompt_tokens_details: { cached_tokens: cacheRead, cached_write_tokens: cacheCreation },
+    prompt_tokens: totalInput,
+    completion_tokens: outputTokens,
+    total_tokens: totalInput + outputTokens,
+    prompt_tokens_details: { cached_tokens: cacheRead, cached_write_tokens: cacheCreation },
   };
 }
