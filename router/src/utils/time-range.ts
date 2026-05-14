@@ -12,6 +12,7 @@ export interface TimeRange {
 
 const WINDOW_HOURS = 5;
 const MS_PER_HOUR = 3600_000;
+const MS_PER_MINUTE = 60000;
 const WINDOW_DURATION_MS = WINDOW_HOURS * MS_PER_HOUR;
 
 const DAYS_TO_SUNDAY = 6;
@@ -39,13 +40,14 @@ export function resolveTimeRange(
       const metricTimeStr = getLatestMetricTime(db, providerId, routerKeyId);
       if (metricTimeStr) {
         const metricTime = parseSqliteDatetime(metricTimeStr);
-        metricTime.setSeconds(0, 0);
-        const start = new Date(metricTime.getTime() - WINDOW_DURATION_MS);
-        return { startTime: toSqliteDatetime(start), endTime: toSqliteDatetime(metricTime) };
+        // 向上取整到下一分钟，确保当前分钟内的数据不被 < end_time 排除
+        const end = new Date(Math.ceil(metricTime.getTime() / MS_PER_MINUTE) * MS_PER_MINUTE);
+        const start = new Date(end.getTime() - WINDOW_DURATION_MS);
+        return { startTime: toSqliteDatetime(start), endTime: toSqliteDatetime(end) };
       }
       // 完全没有数据 → 从当前时间回溯
-      const fallbackEnd = new Date(now);
-      fallbackEnd.setSeconds(0, 0);
+      const nowMs = Math.ceil(now.getTime() / MS_PER_MINUTE) * MS_PER_MINUTE;
+      const fallbackEnd = new Date(nowMs);
       const fallbackStart = new Date(fallbackEnd.getTime() - WINDOW_DURATION_MS);
       return { startTime: toSqliteDatetime(fallbackStart), endTime: toSqliteDatetime(fallbackEnd) };
     }
