@@ -81,19 +81,19 @@ export function responsesToAnthropicResponse(bodyStr: string): string {
   const cachedInputTokens = (inputTokensDetails?.cached_tokens as number) ?? 0;
 
   return JSON.stringify({
-  id: generateMsgId(),
-  type: "message",
-  role: "assistant",
-  content,
-  model: resp.model ?? "",
-  stop_reason: mapStatusToStopReason(resp.status ?? "completed"),
-  stop_sequence: null,
-  usage: {
-    input_tokens: (usage?.input_tokens ?? 0) - cachedInputTokens,
-    output_tokens: usage?.output_tokens ?? 0,
-    cache_read_input_tokens: cachedInputTokens,
-    cache_creation_input_tokens: 0,
-  },
+    id: generateMsgId(),
+    type: "message",
+    role: "assistant",
+    content,
+    model: resp.model ?? "",
+    stop_reason: mapStatusToStopReason(resp.status ?? "completed"),
+    stop_sequence: null,
+    usage: {
+      input_tokens: Math.max(0, (usage?.input_tokens ?? 0) - cachedInputTokens),
+      output_tokens: usage?.output_tokens ?? 0,
+      cache_read_input_tokens: cachedInputTokens,
+      cache_creation_input_tokens: 0,
+    },
   });
 }
 
@@ -161,18 +161,18 @@ export function anthropicToResponsesResponse(bodyStr: string): string {
   const cacheCreation = (antUsage?.cache_creation_input_tokens as number) ?? 0;
 
   return JSON.stringify({
-  id: generateRespId(),
-  object: "response",
-  model: ant.model ?? "",
-  status: mapStopReasonToStatus((ant.stop_reason ?? "end_turn") as string),
-  output,
-  usage: {
-    input_tokens: inputTokens,
-    output_tokens: outputTokens,
-    total_tokens: inputTokens + outputTokens,
-    input_tokens_details: {
-    cached_tokens: cacheRead + cacheCreation,
+    id: generateRespId(),
+    object: "response",
+    model: ant.model ?? "",
+    status: mapStopReasonToStatus((ant.stop_reason ?? "end_turn") as string),
+    output,
+    usage: {
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+      total_tokens: inputTokens + outputTokens,
+      input_tokens_details: {
+        cached_tokens: cacheRead + cacheCreation,
+      },
     },
-  },
   });
 }

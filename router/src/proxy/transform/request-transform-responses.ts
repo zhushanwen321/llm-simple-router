@@ -161,29 +161,29 @@ function convertResponsesInputToAntMessages(input: string | ResponseInputItem[] 
           content: item.output ?? "",
         }],
       });
-  } else if (item.type === "reasoning") {
+    } else if (item.type === "reasoning") {
     // item is narrowed to ResponseReasoningInput
-    const thinkingText = item.summary
-    ? item.summary.map(s => s.text ?? "").join("\n")
-    : "";
-    const content: AnthropicContentBlock[] = [];
-    if (thinkingText) {
-    content.push({ type: "thinking", thinking: thinkingText });
-    }
-    // encrypted_content → redacted_thinking（extended thinking 多轮回传关键数据）
-    if (item.encrypted_content) {
-    content.push({
-      type: "redacted_thinking",
-    data: item.encrypted_content,
-    } as unknown as AnthropicContentBlock);
-    }
-    if (content.length === 0) {
-    content.push({ type: "thinking", thinking: "" });
-    }
-    raw.push({
-    role: "assistant",
-    content,
-    });
+      const thinkingText = item.summary
+        ? item.summary.map(s => s.text ?? "").join("\n")
+        : "";
+      const content: AnthropicContentBlock[] = [];
+      if (thinkingText) {
+        content.push({ type: "thinking", thinking: thinkingText });
+      }
+      // encrypted_content → redacted_thinking（extended thinking 多轮回传关键数据）
+      if (item.encrypted_content) {
+        content.push({
+          type: "redacted_thinking",
+          data: item.encrypted_content,
+        } as unknown as AnthropicContentBlock);
+      }
+      if (content.length === 0) {
+        content.push({ type: "thinking", thinking: "" });
+      }
+      raw.push({
+        role: "assistant",
+        content,
+      });
     } else if (item.type === "input_text") {
       // item is narrowed to ResponseInputText
       raw.push({
