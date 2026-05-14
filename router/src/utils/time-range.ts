@@ -36,19 +36,18 @@ export function resolveTimeRange(
         // 有未过期窗口 → 直接使用窗口范围
         return { startTime: latest.start_time, endTime: latest.end_time };
       }
-      // 无窗口或窗口已过期 → 从最新 metric 时间回溯 5h 生成范围（不写 DB）
+      // 无窗口或窗口已过期 → 从最新 metric 时间前向 5h 生成范围（不写 DB）
       const metricTimeStr = getLatestMetricTime(db, providerId, routerKeyId);
       if (metricTimeStr) {
         const metricTime = parseSqliteDatetime(metricTimeStr);
-        // 向上取整到下一分钟，确保当前分钟内的数据不被 < end_time 排除
-        const end = new Date(Math.ceil(metricTime.getTime() / MS_PER_MINUTE) * MS_PER_MINUTE);
-        const start = new Date(end.getTime() - WINDOW_DURATION_MS);
+        // start 向下取整到分钟，end = start + 5h
+        const start = new Date(Math.floor(metricTime.getTime() / MS_PER_MINUTE) * MS_PER_MINUTE);
+        const end = new Date(start.getTime() + WINDOW_DURATION_MS);
         return { startTime: toSqliteDatetime(start), endTime: toSqliteDatetime(end) };
       }
-      // 完全没有数据 → 从当前时间回溯
-      const nowMs = Math.ceil(now.getTime() / MS_PER_MINUTE) * MS_PER_MINUTE;
-      const fallbackEnd = new Date(nowMs);
-      const fallbackStart = new Date(fallbackEnd.getTime() - WINDOW_DURATION_MS);
+      // 完全没有数据 → 从当前时间前向
+      const fallbackStart = new Date(Math.floor(now.getTime() / MS_PER_MINUTE) * MS_PER_MINUTE);
+      const fallbackEnd = new Date(fallbackStart.getTime() + WINDOW_DURATION_MS);
       return { startTime: toSqliteDatetime(fallbackStart), endTime: toSqliteDatetime(fallbackEnd) };
     }
     case "weekly": {
