@@ -47,13 +47,10 @@ export function mapToolChoiceAnt2OA(tc: unknown): unknown {
     return "auto";
   }
   if (typeof tc === "object" && tc !== null) {
-    const obj = tc as { type?: string; name?: string; disable_parallel_tool_use?: boolean };
-    if (obj.type === "auto") {
-      if (obj.disable_parallel_tool_use) return { type: "auto", parallel_tool_calls: false };
-      return "auto";
-    }
-    if (obj.type === "any") return "required";
-    if (obj.type === "tool") return { type: "function", function: { name: obj.name } };
+  const obj = tc as { type?: string; name?: string; disable_parallel_tool_use?: boolean };
+  if (obj.type === "auto") return "auto";
+  if (obj.type === "any") return "required";
+  if (obj.type === "tool") return { type: "function", function: { name: obj.name } };
   }
   return "auto";
 }

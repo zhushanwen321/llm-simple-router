@@ -103,18 +103,26 @@ export function transformResponseBody(bodyStr: string, sourceApiType: string, ta
 export function transformErrorResponse(bodyStr: string, sourceApiType: string, targetApiType: string): string {
   if (sourceApiType === targetApiType) return bodyStr;
   try {
-    if (sourceApiType === "anthropic" && targetApiType === "openai") {
-      const ant = JSON.parse(bodyStr) as Record<string, unknown>;
-      const err = (ant.error as Record<string, unknown>) ?? {};
-      return JSON.stringify({ error: { message: err.message ?? "Unknown error", type: err.type ?? "api_error", code: "upstream_error" } });
-    }
-    if (sourceApiType === "openai" && targetApiType === "anthropic") {
-      const oai = JSON.parse(bodyStr) as Record<string, unknown>;
-      const err = (oai.error as Record<string, unknown>) ?? {};
-      return JSON.stringify({ type: "error", error: { type: err.type ?? "api_error", message: err.message ?? "Unknown error" } });
-    }
+  if (sourceApiType === "anthropic" && targetApiType === "openai") {
+    const ant = JSON.parse(bodyStr) as Record<string, unknown>;
+  const err = (ant.error as Record<string, unknown>) ?? {};
+  return JSON.stringify({ error: { message: err.message ?? "Unknown error", type: err.type ?? "api_error", code: "upstream_error" } });
+  }
+  if (sourceApiType === "openai" && targetApiType === "anthropic") {
+    const oai = JSON.parse(bodyStr) as Record<string, unknown>;
+    const err = (oai.error as Record<string, unknown>) ?? {};
+  return JSON.stringify({
+    type: "error",
+    error: {
+    type: err.type ?? "api_error",
+    message: err.message ?? "Unknown error",
+    code: err.code ?? undefined,
+    param: err.param ?? undefined,
+    },
+  });
+  }
   } catch {
-    return bodyStr;
+  return bodyStr;
   }
   return bodyStr;
 }

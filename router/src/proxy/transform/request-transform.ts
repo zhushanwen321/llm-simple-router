@@ -31,6 +31,7 @@ type FullOARequest = ChatCompletionRequest & {
   stop?: string | string[];
   parallel_tool_calls?: boolean;
   user?: string;
+  n?: number;
 };
 
 export function openaiToAnthropicRequest(body: Record<string, unknown>): Record<string, unknown> {
@@ -54,6 +55,10 @@ export function openaiToAnthropicRequest(body: Record<string, unknown>): Record<
   if (req.temperature != null) result.temperature = req.temperature;
   if (req.top_p != null) result.top_p = req.top_p;
   if (req.stream != null) result.stream = req.stream;
+
+  if (req.n != null && req.n !== 1) {
+  console.warn(`[request-transform] n=${req.n} dropped: Anthropic only supports n=1`);
+  }
 
   if (req.tool_choice === "none" || (typeof req.tool_choice === "object" && (req.tool_choice as Record<string, unknown>).type === "none")) {
     // Anthropic has no "none" tool_choice — skip tools entirely
@@ -139,7 +144,12 @@ export function anthropicToOpenAIRequest(body: Record<string, unknown>): Record<
     result.tools = convertToolsAnt2OA(req.tools);
   }
   if (req.tool_choice != null) {
-    result.tool_choice = mapToolChoiceAnt2OA(req.tool_choice);
+  const antTc = req.tool_choice as Record<string, unknown> | undefined;
+  const disableParallel = typeof antTc === "object" && antTc?.disable_parallel_tool_use === true;
+  result.tool_choice = mapToolChoiceAnt2OA(req.tool_choice);
+  if (disableParallel) {
+    result.parallel_tool_calls = false;
+  }
   }
 
   if (req.thinking) {
