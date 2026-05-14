@@ -9,16 +9,16 @@ export function getLatestMetricTime(
   const conditions: string[] = [];
   const params: unknown[] = [];
   if (providerId) {
-  conditions.push("rm.provider_id = ?");
-  params.push(providerId);
+    conditions.push("rm.provider_id = ?");
+    params.push(providerId);
   }
   if (routerKeyId) {
-  conditions.push("rm.router_key_id = ?");
-  params.push(routerKeyId);
+    conditions.push("rm.router_key_id = ?");
+    params.push(routerKeyId);
   }
   const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
   const row = db.prepare(
-  `SELECT rm.created_at FROM request_metrics rm ${where} ORDER BY rm.created_at DESC LIMIT 1`,
+    `SELECT rm.created_at FROM request_metrics rm ${where} ORDER BY rm.created_at DESC LIMIT 1`,
   ).get(...params) as { created_at: string } | undefined;
   return row?.created_at ?? null;
 }
