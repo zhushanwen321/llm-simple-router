@@ -78,15 +78,15 @@ export class SSEMetricsTransform extends Transform {
 
   /** Flush SSE parser 缓冲区并处理残余事件，确保 extractor 状态完整 */
   flushParser(): void {
-  const events = this.parser.flush();
-  for (const event of events) {
-    this.extractor.processEvent(event);
-    this.emitContentDelta(event);
-  }
+    const events = this.parser.flush();
+    for (const event of events) {
+      this.extractor.processEvent(event);
+      this.emitContentDelta(event);
+    }
   }
 
   getExtractor(): MetricsExtractor {
-  return this.extractor;
+    return this.extractor;
   }
 
   /** 从 SSE 事件中提取内容文本，触发 onContentDelta 回调 */
