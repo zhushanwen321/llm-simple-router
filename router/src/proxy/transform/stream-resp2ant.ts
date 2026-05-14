@@ -235,7 +235,7 @@ export class ResponsesToAnthropicTransform extends BaseSSETransform {
     this.pushAnthropicSSE("message_delta", {
       type: "message_delta",
       delta: { stop_reason: stopReason, stop_sequence: null },
-      usage: { output_tokens: this.outputTokens },
+    usage: { input_tokens: this.inputTokens, output_tokens: this.outputTokens },
     });
     this.pushAnthropicSSE("message_stop", { type: "message_stop" });
     this.hasSentMessageStop = true;
