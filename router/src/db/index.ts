@@ -221,7 +221,7 @@ export type { RouterKey } from "./router-keys.js";
 export { getMetricsSummary, getMetricsTimeseries, insertMetrics, getClientTypeBreakdown } from "./metrics.js";
 export type { MetricsSummaryRow, MetricsTimeseriesRow, MetricsPeriod, MetricsMetric, MetricsRow, MetricsInsert, ClientTypeBreakdown } from "./metrics.js";
 
-export { getStats } from "./stats.js";
+export { getStats, getLatestMetricTime } from "./stats.js";
 export type { Stats } from "./stats.js";
 
 export { getSetting, setSetting, isInitialized } from "./settings.js";
