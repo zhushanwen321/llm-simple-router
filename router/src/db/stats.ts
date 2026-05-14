@@ -1,5 +1,28 @@
 import Database from "better-sqlite3";
 
+/** 获取指定条件下的最近一条 metric 的 created_at（用于窗口补齐定位，不限制 is_complete） */
+export function getLatestMetricTime(
+  db: Database.Database,
+  providerId?: string,
+  routerKeyId?: string,
+): string | null {
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+  if (providerId) {
+  conditions.push("rm.provider_id = ?");
+  params.push(providerId);
+  }
+  if (routerKeyId) {
+  conditions.push("rm.router_key_id = ?");
+  params.push(routerKeyId);
+  }
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  const row = db.prepare(
+  `SELECT rm.created_at FROM request_metrics rm ${where} ORDER BY rm.created_at DESC LIMIT 1`,
+  ).get(...params) as { created_at: string } | undefined;
+  return row?.created_at ?? null;
+}
+
 export interface Stats {
   totalRequests: number;
   successRate: number;
