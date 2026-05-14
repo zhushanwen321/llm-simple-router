@@ -32,16 +32,21 @@ export function resolveTimeRange(
 
   switch (period) {
     case "window": {
-      const latest = getLatestWindow(db, routerKeyId, providerId);
-      if (!latest) {
-        return createAndReturnWindow(db, now, routerKeyId, providerId);
-      }
-      // 最新窗口已过期（无请求触发新窗口创建），基于上一次窗口结束时间补齐
-      if (now > parseSqliteDatetime(latest.end_time)) {
-        return createAndReturnWindow(db, now, routerKeyId, providerId, parseSqliteDatetime(latest.end_time));
-      }
+    const latest = getLatestWindow(db, routerKeyId, providerId);
+    if (!latest) {
+    return createAndReturnWindow(db, now, routerKeyId, providerId);
+    }
+    // 最新窗口已过期（无请求触发新窗口创建），基于最近 metric 时间判断是否需创建新窗口
+    if (now > parseSqliteDatetime(latest.end_time)) {
+    const latestMetric = getLatestMetricTime(db, providerId, routerKeyId);
+    // 过期窗口中仍然有数据 → 直接复用旧窗口，不创建空的新窗口
+    if (latestMetric && parseSqliteDatetime(latestMetric) < parseSqliteDatetime(latest.end_time)) {
       return { startTime: latest.start_time, endTime: latest.end_time };
     }
+    return createAndReturnWindow(db, now, routerKeyId, providerId, parseSqliteDatetime(latest.end_time));
+    }
+    return { startTime: latest.start_time, endTime: latest.end_time };
+  }
     case "weekly": {
       const monday = getMonday(now);
       monday.setHours(0, 0, 0, 0);
