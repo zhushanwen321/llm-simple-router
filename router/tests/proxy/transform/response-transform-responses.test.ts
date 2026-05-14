@@ -218,8 +218,11 @@ describe("responsesToAnthropicResponse", () => {
   });
 
   it("maps usage correctly", () => {
-    const result = JSON.parse(responsesToAnthropicResponse(RESP_TEXT));
-    expect(result.usage).toEqual({ input_tokens: 15, output_tokens: 8 });
+  const result = JSON.parse(responsesToAnthropicResponse(RESP_TEXT));
+  expect(result.usage.input_tokens).toBe(15);
+  expect(result.usage.output_tokens).toBe(8);
+  expect(result.usage.cache_read_input_tokens).toBe(0);
+  expect(result.usage.cache_creation_input_tokens).toBe(0);
   });
 });
 

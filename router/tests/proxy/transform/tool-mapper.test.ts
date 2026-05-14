@@ -40,9 +40,9 @@ describe("tool mapping", () => {
     it("{type:'tool',name} → {type:'function',function:{name}}", () => {
       expect(mapToolChoiceAnt2OA({ type: "tool", name: "get_weather" })).toEqual({ type: "function", function: { name: "get_weather" } });
     });
-    it("{type:'auto', disable_parallel_tool_use:true} → {type:'auto', parallel_tool_calls:false}", () => {
-      const result = mapToolChoiceAnt2OA({ type: "auto", disable_parallel_tool_use: true });
-      expect(result).toEqual({ type: "auto", parallel_tool_calls: false });
+  it("{type:'auto', disable_parallel_tool_use:true} → 'auto' (parallel_tool_calls handled at top level)", () => {
+    const result = mapToolChoiceAnt2OA({ type: "auto", disable_parallel_tool_use: true });
+    expect(result).toBe("auto");
     });
     it("plain 'auto' string → 'auto'", () => expect(mapToolChoiceAnt2OA("auto")).toBe("auto"));
   });
