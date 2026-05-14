@@ -6,8 +6,9 @@ import { toSqliteDatetime, parseSqliteDatetime as parseDate } from "../../utils/
 
 // eslint-disable-next-line no-magic-numbers
 const WINDOW_DURATION_MS = 5 * 3600_000;
+const MS_PER_MINUTE = 60000;
 // 过期判断最小间隔（毫秒），同分钟内不重复创建窗口
-const WINDOW_GRACE_PERIOD_MS = 60000;
+const WINDOW_GRACE_PERIOD_MS = MS_PER_MINUTE;
 
 export class UsageWindowTracker {
   constructor(private db: Database.Database) {}
@@ -43,19 +44,19 @@ export class UsageWindowTracker {
     ).get(providerId) as { created_at: string } | undefined;
     if (!lastLog) return;
 
-    const end = truncateToMinute(parseDate(lastLog.created_at));
+    const end = parseDate(lastLog.created_at);
     createBackwardWindow(this.db, end, undefined, providerId);
   }
 }
 
-/** 创建 5h 回溯窗口：窗口 = [end - 5h, end] */
+/** 创建 5h 回溯窗口：窗口 = [end - 5h, end + 1min]，加 1min 确保当前分钟的请求不被 < end_time 排除 */
 function createBackwardWindow(
   db: Database.Database,
   end: Date,
   routerKeyId?: string,
   providerId?: string,
 ): void {
-  const endMinute = truncateToMinute(end);
+  const endMinute = new Date(Math.ceil(end.getTime() / MS_PER_MINUTE) * MS_PER_MINUTE);
   const start = new Date(endMinute.getTime() - WINDOW_DURATION_MS);
   insertWindow(db, {
     id: randomUUID(),
@@ -64,10 +65,4 @@ function createBackwardWindow(
     start_time: toSqliteDatetime(start),
     end_time: toSqliteDatetime(endMinute),
   });
-}
-
-function truncateToMinute(date: Date): Date {
-  const d = new Date(date);
-  d.setSeconds(0, 0);
-  return d;
 }
