@@ -58,24 +58,23 @@ describe("Responses API integration — full conversion pipeline", () => {
     expect(antReq.messages).toBeDefined();
     expect(antReq.tools).toBeDefined();
 
-    // Anthropic → Responses (response direction)
-    const antResponse = JSON.stringify({
-      id: "msg_1",
-      type: "message",
-      role: "assistant",
-      model: "gpt-4o",
-      content: [{ type: "text", text: "The weather is sunny." }],
-      stop_reason: "end_turn",
-      usage: { input_tokens: 20, output_tokens: 10 },
-    });
-    const respResponse = registry.transformResponse(
-      antResponse,
-      "anthropic",
-      "openai-responses",
-    );
-    const parsed = JSON.parse(respResponse);
-    expect(parsed.object).toBe("response");
-    expect(parsed.status).toBe("completed");
+  // Anthropic → Responses (response direction)
+  const antResponse = {
+    id: "msg_1",
+    type: "message",
+    role: "assistant",
+    model: "gpt-4o",
+    content: [{ type: "text", text: "The weather is sunny." }],
+    stop_reason: "end_turn",
+    usage: { input_tokens: 20, output_tokens: 10 },
+  } as Record<string, unknown>;
+  const respResponse = registry.transformResponse(
+    antResponse,
+    "anthropic",
+    "openai-responses",
+  );
+  expect(respResponse.object).toBe("response");
+  expect(respResponse.status).toBe("completed");
   });
 
   it("Responses → Chat (bridge) → back to Responses (round-trip)", () => {
@@ -189,29 +188,29 @@ describe("Responses API integration — full conversion pipeline", () => {
   });
 
   it("error response transforms work for all directions", () => {
-    const anthropicError = JSON.stringify({
-      type: "error",
-      error: { type: "not_found_error", message: "Model not found" },
-    });
+  const anthropicError = {
+    type: "error",
+    error: { type: "not_found_error", message: "Model not found" },
+  } as Record<string, unknown>;
 
-    // Anthropic → Responses
-    const r1 = registry.transformError(
-      anthropicError,
-      "anthropic",
-      "openai-responses",
-    );
-    const parsed1 = JSON.parse(r1);
-    expect(parsed1.error).toBeDefined();
-    expect(parsed1.error.message).toContain("Model not found");
+  // Anthropic → Responses
+  const r1 = registry.transformError(
+    anthropicError,
+    "anthropic",
+    "openai-responses",
+  );
+  const parsed1 = JSON.parse(r1);
+  expect(parsed1.error).toBeDefined();
+  expect(parsed1.error.message).toContain("Model not found");
 
-    // Anthropic → OpenAI (existing path)
-    const r2 = registry.transformError(
-      anthropicError,
-      "anthropic",
-      "openai",
-    );
-    const parsed2 = JSON.parse(r2);
-    expect(parsed2.error).toBeDefined();
+  // Anthropic → OpenAI (existing path)
+  const r2 = registry.transformError(
+    anthropicError,
+    "anthropic",
+    "openai",
+  );
+  const parsed2 = JSON.parse(r2);
+  expect(parsed2.error).toBeDefined();
   });
 
   it("Responses request with function_call items converts to Anthropic tool_use", () => {
@@ -261,34 +260,32 @@ describe("Responses API integration — full conversion pipeline", () => {
   });
 
   it("response transform preserves model info across all paths", () => {
-    const anthropicResp = JSON.stringify({
-      id: "msg_test",
-      type: "message",
-      role: "assistant",
-      model: "claude-3-opus",
-      content: [{ type: "text", text: "Hello!" }],
-      stop_reason: "end_turn",
-      usage: { input_tokens: 10, output_tokens: 5 },
-    });
+  const anthropicResp = {
+    id: "msg_test",
+    type: "message",
+    role: "assistant",
+    model: "claude-3-opus",
+    content: [{ type: "text", text: "Hello!" }],
+    stop_reason: "end_turn",
+    usage: { input_tokens: 10, output_tokens: 5 },
+  } as Record<string, unknown>;
 
-    // Anthropic → Responses
-    const respResp = registry.transformResponse(
-      anthropicResp,
-      "anthropic",
-      "openai-responses",
-    );
-    const parsed = JSON.parse(respResp);
-    expect(parsed.model).toBe("claude-3-opus");
-    expect(parsed.status).toBe("completed");
+  // Anthropic → Responses
+  const respResp = registry.transformResponse(
+    anthropicResp,
+    "anthropic",
+    "openai-responses",
+  );
+  expect(respResp.model).toBe("claude-3-opus");
+  expect(respResp.status).toBe("completed");
 
-    // Anthropic → Chat (existing path)
-    const chatResp = registry.transformResponse(
-      anthropicResp,
-      "anthropic",
-      "openai",
-    );
-    const chatParsed = JSON.parse(chatResp);
-    expect(chatParsed.model).toBe("claude-3-opus");
+  // Anthropic → Chat (existing path)
+  const chatResp = registry.transformResponse(
+    anthropicResp,
+    "anthropic",
+    "openai",
+  );
+  expect(chatResp.model).toBe("claude-3-opus");
   });
 
   it("createStreamTransform returns correct stream transform for each direction", () => {

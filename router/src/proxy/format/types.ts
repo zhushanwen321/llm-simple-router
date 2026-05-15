@@ -22,7 +22,7 @@ export interface FormatConverter {
   readonly sourceType: string;
   readonly targetType: string;
   transformRequest(body: Record<string, unknown>, model: string): Record<string, unknown>;
-  transformResponse(bodyStr: string): string;
+  transformResponse(body: Record<string, unknown>): Record<string, unknown>;
   createStreamTransform(model: string): Transform;
 }
 
@@ -31,7 +31,7 @@ export function createConverter(deps: {
   sourceType: string;
   targetType: string;
   requestTransform: (body: Record<string, unknown>) => Record<string, unknown>;
-  responseTransform: (bodyStr: string) => string;
+  responseTransform: (body: Record<string, unknown>) => Record<string, unknown>;
   streamTransformClass: new (model: string) => Transform;
 }): FormatConverter {
   return {
@@ -40,8 +40,8 @@ export function createConverter(deps: {
     transformRequest(body) {
       return deps.requestTransform(body);
     },
-    transformResponse(bodyStr) {
-      return deps.responseTransform(bodyStr);
+    transformResponse(body) {
+      return deps.responseTransform(body);
     },
     createStreamTransform(model) {
       return new deps.streamTransformClass(model);

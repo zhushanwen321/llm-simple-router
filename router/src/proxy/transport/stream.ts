@@ -139,6 +139,9 @@ class StreamProxy {
 
   private collectMetrics(isComplete: boolean): MetricsResult | undefined {
     if (!this.metricsTransform) return undefined;
+    // 在读取 metrics 之前 flush SSE parser 缓冲区，确保 [DONE] / message_stop
+    // 等末尾事件已被处理。否则 extractor.complete 可能为 false，导致 is_complete=0。
+    this.metricsTransform.flushParser();
     const result = this.metricsTransform.getExtractor().getMetrics();
     return isComplete ? result : { ...result, is_complete: 0 };
   }

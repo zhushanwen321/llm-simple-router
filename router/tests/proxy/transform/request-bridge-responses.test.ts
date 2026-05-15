@@ -287,8 +287,36 @@ describe("responsesToChatRequest", () => {
 
       const toolMsg = msgs[2];
       expect(toolMsg.role).toBe("tool");
-      expect(toolMsg.tool_call_id).toBe("call_00_abc123");
+    expect(toolMsg.tool_call_id).toBe("call_00_abc123");
+  });
+
+  it("reorders system/developer messages inserted between function_call and function_call_output", () => {
+    // Codex sends developer messages between function_calls and their outputs.
+    // Chat Completions requires tool messages to immediately follow assistant(tool_calls).
+    const result = responsesToChatRequest({
+    model: "gpt-4o",
+    input: [
+      { type: "message", role: "user", content: "Go" },
+      { type: "function_call", call_id: "call_1", name: "fn1", arguments: "{}" },
+      { type: "function_call", call_id: "call_2", name: "fn2", arguments: "{}" },
+      { type: "message", role: "developer", content: "System reminder" },
+      { type: "function_call_output", call_id: "call_1", output: "result1" },
+      { type: "function_call_output", call_id: "call_2", output: "result2" },
+      { type: "message", role: "user", content: "Next" },
+    ],
     });
+
+    const msgs = result.messages as Array<Record<string, unknown>>;
+    // Expected order: user -> assistant(tool_calls) -> tool -> tool -> developer -> user
+    // NOT: user -> assistant(tool_calls) -> developer -> tool -> tool -> user
+    expect(msgs).toHaveLength(6);
+    expect(msgs[0].role).toBe("user");
+    expect(msgs[1].role).toBe("assistant");
+    expect(msgs[2].role).toBe("tool");
+    expect(msgs[3].role).toBe("tool");
+    expect(msgs[4].role).toBe("developer");
+    expect(msgs[5].role).toBe("user");
+  });
   });
 
   // --- 5. Tools conversion ---
@@ -401,17 +429,17 @@ describe("responsesToChatRequest", () => {
       expect(result.reasoning).toEqual({ effort: "high", max_tokens: 10000 });
     });
 
-    it("maps text.format → response_format", () => {
-      const result = responsesToChatRequest({
-        model: "gpt-4o",
-        input: "hi",
-        text: { format: { type: "json_schema", json_schema: { name: "test" } } },
-      });
-      expect(result.response_format).toEqual({
-        type: "json_schema",
-        json_schema: { name: "test" },
-      });
+  it("maps text.format → response_format", () => {
+    const result = responsesToChatRequest({
+    model: "gpt-4o",
+    input: "hi",
+    text: { format: { type: "json_schema", name: "test", schema: { type: "object" }, strict: true } },
     });
+    expect(result.response_format).toEqual({
+    type: "json_schema",
+    json_schema: { name: "test", schema: { type: "object" }, strict: true },
+    });
+  });
 
     it("passes stream_options through", () => {
       const result = responsesToChatRequest({
@@ -682,16 +710,16 @@ describe("chatToResponsesRequest", () => {
 
   // --- response_format → text.format ---
   describe("response_format conversion", () => {
-    it("maps response_format → text.format", () => {
-      const result = chatToResponsesRequest({
-        model: "gpt-4o",
-        messages: [],
-        response_format: { type: "json_schema", json_schema: { name: "test" } },
-      });
-      expect(result.text).toEqual({
-        format: { type: "json_schema", json_schema: { name: "test" } },
-      });
+  it("maps response_format → text.format", () => {
+    const result = chatToResponsesRequest({
+    model: "gpt-4o",
+    messages: [],
+    response_format: { type: "json_schema", json_schema: { name: "test", schema: { type: "object" }, strict: true } },
     });
+    expect(result.text).toEqual({
+    format: { type: "json_schema", name: "test", schema: { type: "object" }, strict: true },
+    });
+  });
   });
 
   // --- Assistant text → message ---

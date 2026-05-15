@@ -22,6 +22,7 @@ const ANT_STOP_TO_RESP_STATUS: Record<string, string> = {
   stop_sequence: "completed",
   tool_use: "completed",
   max_tokens: "incomplete",
+  content_filtered: "incomplete",
 };
 
 /** Responses API status → Anthropic stop_reason */
@@ -36,8 +37,8 @@ function mapStopReasonToStatus(reason: string): string {
 
 // ---------- Responses → Anthropic ----------
 
-export function responsesToAnthropicResponse(bodyStr: string): string {
-  const resp = JSON.parse(bodyStr) as ResponsesApiResponse;
+export function responsesToAnthropicResponse(body: Record<string, unknown>): Record<string, unknown> {
+  const resp = body as unknown as ResponsesApiResponse;
   const output = resp.output ?? [];
   const content: Array<Record<string, unknown>> = [];
 
@@ -77,8 +78,10 @@ export function responsesToAnthropicResponse(bodyStr: string): string {
   }
 
   const usage = resp.usage;
+  const inputTokensDetails = usage?.input_tokens_details as Record<string, unknown> | undefined;
+  const cachedInputTokens = (inputTokensDetails?.cached_tokens as number) ?? 0;
 
-  return JSON.stringify({
+  return {
     id: generateMsgId(),
     type: "message",
     role: "assistant",
@@ -87,10 +90,12 @@ export function responsesToAnthropicResponse(bodyStr: string): string {
     stop_reason: mapStatusToStopReason(resp.status ?? "completed"),
     stop_sequence: null,
     usage: {
-      input_tokens: usage?.input_tokens ?? 0,
+      input_tokens: Math.max(0, (usage?.input_tokens ?? 0) - cachedInputTokens),
       output_tokens: usage?.output_tokens ?? 0,
+      cache_read_input_tokens: cachedInputTokens,
+      cache_creation_input_tokens: 0,
     },
-  });
+  };
 }
 
 // ---------- Anthropic → Responses ----------
@@ -102,21 +107,43 @@ function stripTooluPrefix(id: string): string {
   return id.startsWith("toolu_") ? id.slice(TOOLU_PREFIX_LEN) : id;
 }
 
-export function anthropicToResponsesResponse(bodyStr: string): string {
-  const ant = JSON.parse(bodyStr) as {
-    type?: string;
-    role?: string;
-    model?: string;
-    content?: AnthropicContentBlock[];
-    stop_reason?: string;
-    usage?: Record<string, unknown>;
+// ---------- Error format conversion ----------
+
+export function transformErrorResponse(body: Record<string, unknown>, sourceApiType: string, targetApiType: string): string {
+  if (sourceApiType === targetApiType) return JSON.stringify(body);
+  try {
+    if (sourceApiType === "anthropic" && targetApiType === "openai-responses") {
+      // Anthropic error: {type:"error", error:{type, message}} → Responses: {error:{code, message}}
+      const err = (body.error as Record<string, unknown>) ?? {};
+      return JSON.stringify({ error: { code: err.type ?? "api_error", message: err.message ?? "Unknown error" } });
+    }
+    if (sourceApiType === "openai-responses" && targetApiType === "anthropic") {
+      // Responses error: {error:{code, message}} → Anthropic: {type:"error", error:{type, message}}
+      const err = (body.error as Record<string, unknown>) ?? {};
+      return JSON.stringify({ type: "error", error: { type: err.code ?? "api_error", message: err.message ?? "Unknown error" } });
+    }
+  } catch {
+    return JSON.stringify(body);
+  }
+  return JSON.stringify(body);
+}
+
+export function anthropicToResponsesResponse(body: Record<string, unknown>): Record<string, unknown> {
+  const ant = body as unknown as {
+  type?: string;
+  role?: string;
+  model?: string;
+  content?: AnthropicContentBlock[];
+  stop_reason?: string;
+  usage?: Record<string, unknown>;
   };
-  const blocks = ant.content ?? [];
+  // Content may include redacted_thinking blocks not in AnthropicContentBlock union
+  const blocks = (ant.content ?? []) as Array<AnthropicContentBlock | { type: "redacted_thinking"; data: string }>;
   const output: ResponseOutputItem[] = [];
 
   for (const block of blocks) {
     if (block.type === "thinking") {
-      // → reasoning output
+    // → reasoning output
       const tb = block as AnthropicThinkingBlock;
       output.push({
         type: "reasoning",
@@ -124,7 +151,7 @@ export function anthropicToResponsesResponse(bodyStr: string): string {
         summary: [{ type: "summary_text", text: tb.thinking ?? "" }],
       });
     } else if (block.type === "text") {
-      // → message output
+    // → message output
       const tb = block as AnthropicTextBlock;
       output.push({
         type: "message",
@@ -132,6 +159,15 @@ export function anthropicToResponsesResponse(bodyStr: string): string {
         role: "assistant",
         content: [{ type: "output_text", text: tb.text ?? "" }],
       });
+    } else if ((block as unknown as { type: string }).type === "redacted_thinking") {
+      // redacted_thinking is not in AnthropicContentBlock union; attach to latest reasoning item
+      const rb = block as unknown as { type: "redacted_thinking"; data: string };
+      const lastReasoning = [...output]
+        .reverse()
+        .find((o): o is ResponseReasoningOutput => o.type === "reasoning");
+      if (lastReasoning && rb.data) {
+        lastReasoning.encrypted_content = rb.data;
+      }
     } else if (block.type === "tool_use") {
       // → function_call output
       const tb = block as AnthropicToolUseBlock;
@@ -149,12 +185,12 @@ export function anthropicToResponsesResponse(bodyStr: string): string {
   // Usage mapping: Anthropic → Responses
   const antUsage = ant.usage as Record<string, unknown> | undefined;
   const inputTokens =
-    ((antUsage?.input_tokens as number) ?? 0) +
-    ((antUsage?.cache_read_input_tokens as number) ?? 0) +
-    ((antUsage?.cache_creation_input_tokens as number) ?? 0);
+  ((antUsage?.input_tokens as number) ?? 0) +
+  ((antUsage?.cache_read_input_tokens as number) ?? 0) +
+  ((antUsage?.cache_creation_input_tokens as number) ?? 0);
   const outputTokens = (antUsage?.output_tokens as number) ?? 0;
-
-  return JSON.stringify({
+  const cacheRead = (antUsage?.cache_read_input_tokens as number) ?? 0;
+  return {
     id: generateRespId(),
     object: "response",
     model: ant.model ?? "",
@@ -164,6 +200,9 @@ export function anthropicToResponsesResponse(bodyStr: string): string {
       input_tokens: inputTokens,
       output_tokens: outputTokens,
       total_tokens: inputTokens + outputTokens,
+      input_tokens_details: {
+        cached_tokens: cacheRead,
+      },
     },
-  });
+  };
 }

@@ -4,20 +4,17 @@ import { extractAnthropicMeta } from "./provider-meta.js";
 import { parseToolArguments } from "./sanitize.js";
 import type { AnthropicContentBlock, AnthropicTextBlock, AnthropicThinkingBlock, AnthropicToolUseBlock, OpenAIToolCall } from "./types.js";
 
-export function openaiResponseToAnthropic(bodyStr: string): string {
-  const oai = JSON.parse(bodyStr) as {
-    model?: string;
-    choices?: Array<{
-      message?: {
-        content?: string;
-        reasoning_content?: string;
-        tool_calls?: OpenAIToolCall[];
-      };
-      finish_reason?: string;
-    }>;
-    usage?: Record<string, unknown>;
+export function openaiResponseToAnthropic(body: Record<string, unknown>): Record<string, unknown> {
+  const oai = body;
+  const choices = oai.choices as Array<{
+  message?: {
+    content?: string;
+    reasoning_content?: string;
+    tool_calls?: OpenAIToolCall[];
   };
-  const choice = oai.choices?.[0];
+  finish_reason?: string;
+  }> | undefined;
+  const choice = choices?.[0];
   const msg = choice?.message;
   const content: unknown[] = [];
 
@@ -32,13 +29,14 @@ export function openaiResponseToAnthropic(bodyStr: string): string {
   // tool_calls → tool_use blocks
   if (msg?.tool_calls) {
     for (const tc of msg.tool_calls) {
+      if (!tc.function) continue;
       const input = parseToolArguments(tc.function.arguments);
       content.push({ type: "tool_use", id: tc.id, name: tc.function.name, input });
     }
   }
   if (content.length === 0) content.push({ type: "text", text: "" });
 
-  return JSON.stringify({
+  return {
     id: generateMsgId(),
     type: "message",
     role: "assistant",
@@ -46,19 +44,13 @@ export function openaiResponseToAnthropic(bodyStr: string): string {
     model: oai.model,
     stop_reason: mapFinishReasonToStopReason(choice?.finish_reason ?? "stop"),
     stop_sequence: null,
-    usage: mapUsageOA2Ant(oai.usage),
-  });
+    usage: mapUsageOA2Ant(oai.usage as Record<string, unknown> | undefined),
+  };
 }
 
-export function anthropicResponseToOpenAI(bodyStr: string): string {
-  const ant = JSON.parse(bodyStr) as {
-    id?: string;
-    model?: string;
-    content?: AnthropicContentBlock[];
-    stop_reason?: string;
-    usage?: Record<string, unknown>;
-  };
-  const blocks = ant.content ?? [];
+export function anthropicResponseToOpenAI(body: Record<string, unknown>): Record<string, unknown> {
+  const ant = body;
+  const blocks = Array.isArray(ant.content) ? (ant.content as AnthropicContentBlock[]) : [];
 
   const thinkingText = blocks.filter((b): b is AnthropicThinkingBlock => b.type === "thinking").map(b => b.thinking).join("");
   const textContent = blocks.filter((b): b is AnthropicTextBlock => b.type === "text").map(b => b.text).join("");
@@ -83,38 +75,44 @@ export function anthropicResponseToOpenAI(bodyStr: string): string {
     object: "chat.completion",
     created: Math.floor(Date.now() / MS_PER_SECOND),
     model: ant.model,
-    choices: [{ index: 0, message, finish_reason: mapStopReasonToFinishReason(ant.stop_reason ?? "end_turn") }],
-    usage: mapUsageAnt2OA(ant.usage),
+    choices: [{ index: 0, message, finish_reason: mapStopReasonToFinishReason(ant.stop_reason as string ?? "end_turn") }],
+    usage: mapUsageAnt2OA(ant.usage as Record<string, unknown> | undefined),
   };
   if (antMeta) {
     result.provider_meta = { anthropic: antMeta };
   }
 
-  return JSON.stringify(result);
+  return result;
 }
 
-export function transformResponseBody(bodyStr: string, sourceApiType: string, targetApiType: string): string {
-  if (sourceApiType === targetApiType) return bodyStr;
-  if (sourceApiType === "openai" && targetApiType === "anthropic") return openaiResponseToAnthropic(bodyStr);
-  if (sourceApiType === "anthropic" && targetApiType === "openai") return anthropicResponseToOpenAI(bodyStr);
-  return bodyStr;
+export function transformResponseBody(body: Record<string, unknown>, sourceApiType: string, targetApiType: string): Record<string, unknown> {
+  if (sourceApiType === targetApiType) return body;
+  if (sourceApiType === "openai" && targetApiType === "anthropic") return openaiResponseToAnthropic(body);
+  if (sourceApiType === "anthropic" && targetApiType === "openai") return anthropicResponseToOpenAI(body);
+  return body;
 }
 
-export function transformErrorResponse(bodyStr: string, sourceApiType: string, targetApiType: string): string {
-  if (sourceApiType === targetApiType) return bodyStr;
+export function transformErrorResponse(body: Record<string, unknown>, sourceApiType: string, targetApiType: string): string {
+  if (sourceApiType === targetApiType) return JSON.stringify(body);
   try {
     if (sourceApiType === "anthropic" && targetApiType === "openai") {
-      const ant = JSON.parse(bodyStr) as Record<string, unknown>;
-      const err = (ant.error as Record<string, unknown>) ?? {};
+      const err = (body.error as Record<string, unknown>) ?? {};
       return JSON.stringify({ error: { message: err.message ?? "Unknown error", type: err.type ?? "api_error", code: "upstream_error" } });
     }
     if (sourceApiType === "openai" && targetApiType === "anthropic") {
-      const oai = JSON.parse(bodyStr) as Record<string, unknown>;
-      const err = (oai.error as Record<string, unknown>) ?? {};
-      return JSON.stringify({ type: "error", error: { type: err.type ?? "api_error", message: err.message ?? "Unknown error" } });
+      const err = (body.error as Record<string, unknown>) ?? {};
+      return JSON.stringify({
+        type: "error",
+        error: {
+          type: err.type ?? "api_error",
+          message: err.message ?? "Unknown error",
+          code: err.code ?? undefined,
+          param: err.param ?? undefined,
+        },
+      });
     }
   } catch {
-    return bodyStr;
+    return JSON.stringify(body);
   }
-  return bodyStr;
+  return JSON.stringify(body);
 }

@@ -55,132 +55,142 @@ const ANT_THINKING = JSON.stringify({
 
 describe("openaiResponseToAnthropic", () => {
   it("converts basic text response", () => {
-    const result = JSON.parse(openaiResponseToAnthropic(OA_SUCCESS));
-    expect(result.type).toBe("message");
-    expect(result.role).toBe("assistant");
-    expect(result.content).toEqual([{ type: "text", text: "Hello" }]);
-    expect(result.stop_reason).toBe("end_turn");
-    expect(result.usage.input_tokens).toBe(10);
-    expect(result.usage.output_tokens).toBe(5);
+  const result = openaiResponseToAnthropic(JSON.parse(OA_SUCCESS));
+  expect(result.type).toBe("message");
+  expect(result.role).toBe("assistant");
+  expect(result.content).toEqual([{ type: "text", text: "Hello" }]);
+  expect(result.stop_reason).toBe("end_turn");
+  expect((result.usage as Record<string, unknown>).input_tokens).toBe(10);
+  expect((result.usage as Record<string, unknown>).output_tokens).toBe(5);
   });
 
   it("converts tool_calls response", () => {
-    const result = JSON.parse(openaiResponseToAnthropic(OA_TOOL_CALL));
-    expect(result.content[0].type).toBe("tool_use");
-    expect(result.content[0].id).toBe("call_1");
-    expect(result.content[0].input).toEqual({ city: "NYC" });
-    expect(result.stop_reason).toBe("tool_use");
+  const result = openaiResponseToAnthropic(JSON.parse(OA_TOOL_CALL));
+  expect((result.content as Array<Record<string, unknown>>)[0].type).toBe("tool_use");
+  expect((result.content as Array<Record<string, unknown>>)[0].id).toBe("call_1");
+  expect((result.content as Array<Record<string, unknown>>)[0].input).toEqual({ city: "NYC" });
+  expect(result.stop_reason).toBe("tool_use");
   });
 
   it("converts reasoning_content to thinking block", () => {
-    const result = JSON.parse(openaiResponseToAnthropic(OA_REASONING));
-    expect(result.content[0]).toEqual({ type: "thinking", thinking: "Let me think..." });
-    expect(result.content[1]).toEqual({ type: "text", text: "The answer is 42" });
+  const result = openaiResponseToAnthropic(JSON.parse(OA_REASONING));
+  expect((result.content as Array<Record<string, unknown>>)[0]).toEqual({ type: "thinking", thinking: "Let me think..." });
+  expect((result.content as Array<Record<string, unknown>>)[1]).toEqual({ type: "text", text: "The answer is 42" });
   });
 
   it("generates msg_ prefix id", () => {
-    const result = JSON.parse(openaiResponseToAnthropic(OA_SUCCESS));
-    expect(result.id).toMatch(/^msg_/);
+  const result = openaiResponseToAnthropic(JSON.parse(OA_SUCCESS));
+  expect(result.id).toMatch(/^msg_/);
   });
 });
 
 describe("anthropicResponseToOpenAI", () => {
   it("converts basic text response", () => {
-    const result = JSON.parse(anthropicResponseToOpenAI(ANT_SUCCESS));
-    expect(result.object).toBe("chat.completion");
-    expect(result.choices[0].message.content).toBe("Hello");
-    expect(result.choices[0].finish_reason).toBe("stop");
-    expect(result.usage.prompt_tokens).toBe(10);
-    expect(result.usage.completion_tokens).toBe(5);
+  const result = anthropicResponseToOpenAI(JSON.parse(ANT_SUCCESS));
+  expect(result.object).toBe("chat.completion");
+  const choices = result.choices as Array<Record<string, unknown>>;
+  const msg = (choices[0] as Record<string, unknown>).message as Record<string, unknown>;
+  expect(msg.content).toBe("Hello");
+  expect((choices[0] as Record<string, unknown>).finish_reason).toBe("stop");
+  const usage = result.usage as Record<string, unknown>;
+  expect(usage.prompt_tokens).toBe(10);
+  expect(usage.completion_tokens).toBe(5);
   });
 
   it("converts tool_use to tool_calls", () => {
-    const result = JSON.parse(anthropicResponseToOpenAI(ANT_TOOL_USE));
-    const tc = result.choices[0].message.tool_calls[0];
-    expect(tc.id).toBe("toolu_1");
-    expect(tc.function.name).toBe("get_weather");
-    expect(JSON.parse(tc.function.arguments)).toEqual({ city: "NYC" });
-    expect(result.choices[0].finish_reason).toBe("tool_calls");
+  const result = anthropicResponseToOpenAI(JSON.parse(ANT_TOOL_USE));
+  const choices = result.choices as Array<Record<string, unknown>>;
+  const msg = (choices[0] as Record<string, unknown>).message as Record<string, unknown>;
+  const tc = (msg.tool_calls as Array<Record<string, unknown>>)[0] as Record<string, unknown>;
+  expect(tc.id).toBe("toolu_1");
+  const fn = tc.function as Record<string, unknown>;
+  expect(fn.name).toBe("get_weather");
+  expect(JSON.parse(fn.arguments as string)).toEqual({ city: "NYC" });
+  expect((choices[0] as Record<string, unknown>).finish_reason).toBe("tool_calls");
   });
 
   it("converts thinking to reasoning_content", () => {
-    const result = JSON.parse(anthropicResponseToOpenAI(ANT_THINKING));
-    expect(result.choices[0].message.reasoning_content).toBe("Let me think...");
-    expect(result.choices[0].message.content).toBe("The answer is 42");
+  const result = anthropicResponseToOpenAI(JSON.parse(ANT_THINKING));
+  const choices = result.choices as Array<Record<string, unknown>>;
+  const msg = (choices[0] as Record<string, unknown>).message as Record<string, unknown>;
+  expect(msg.reasoning_content).toBe("Let me think...");
+  expect(msg.content).toBe("The answer is 42");
   });
 
   it("preserves thinking signature in provider_meta", () => {
-    const antWithSig = JSON.stringify({
-      id: "msg_sig", model: "claude-3", role: "assistant",
-      content: [
-        { type: "thinking", thinking: "hmm", signature: "sig_abc" },
-        { type: "text", text: "answer" },
-      ],
-      stop_reason: "end_turn", usage: { input_tokens: 10, output_tokens: 5 },
-    });
-    const result = JSON.parse(anthropicResponseToOpenAI(antWithSig));
-    expect(result.provider_meta.anthropic.thinking_signatures).toEqual([
-      { index: 0, signature: "sig_abc" },
-    ]);
+  const antWithSig = {
+    id: "msg_sig", model: "claude-3", role: "assistant",
+    content: [
+    { type: "thinking", thinking: "hmm", signature: "sig_abc" },
+    { type: "text", text: "answer" },
+    ],
+    stop_reason: "end_turn", usage: { input_tokens: 10, output_tokens: 5 },
+  };
+  const result = anthropicResponseToOpenAI(antWithSig as Record<string, unknown>);
+  const meta = (result.provider_meta as Record<string, unknown>).anthropic as Record<string, unknown>;
+  expect(meta.thinking_signatures).toEqual([
+    { index: 0, signature: "sig_abc" },
+  ]);
   });
 
   it("preserves cache usage in provider_meta", () => {
-    const antWithCache = JSON.stringify({
-      id: "msg_cache", model: "claude-3", role: "assistant",
-      content: [{ type: "text", text: "hi" }],
-      stop_reason: "end_turn",
-      usage: { input_tokens: 10, output_tokens: 5, cache_read_input_tokens: 100, cache_creation_input_tokens: 50 },
-    });
-    const result = JSON.parse(anthropicResponseToOpenAI(antWithCache));
-    expect(result.provider_meta.anthropic.cache_usage).toEqual({
-      cache_read_input_tokens: 100,
-      cache_creation_input_tokens: 50,
-    });
+  const antWithCache = {
+    id: "msg_cache", model: "claude-3", role: "assistant",
+    content: [{ type: "text", text: "hi" }],
+    stop_reason: "end_turn",
+    usage: { input_tokens: 10, output_tokens: 5, cache_read_input_tokens: 100, cache_creation_input_tokens: 50 },
+  };
+  const result = anthropicResponseToOpenAI(antWithCache as Record<string, unknown>);
+  const meta = (result.provider_meta as Record<string, unknown>).anthropic as Record<string, unknown>;
+  expect(meta.cache_usage).toEqual({
+    cache_read_input_tokens: 100,
+    cache_creation_input_tokens: 50,
+  });
   });
 
   it("no provider_meta when no PSF present", () => {
-    const result = JSON.parse(anthropicResponseToOpenAI(ANT_SUCCESS));
-    expect(result.provider_meta).toBeUndefined();
+  const result = anthropicResponseToOpenAI(JSON.parse(ANT_SUCCESS));
+  expect(result.provider_meta).toBeUndefined();
   });
 });
 
 describe("transformResponseBody", () => {
   it("returns body unchanged when same apiType", () => {
-    const body = '{"choices":[]}';
-    expect(transformResponseBody(body, "openai", "openai")).toBe(body);
+  const body = { choices: [] } as Record<string, unknown>;
+  expect(transformResponseBody(body, "openai", "openai")).toBe(body);
   });
 
   it("transforms OA→Ant", () => {
-    const result = JSON.parse(transformResponseBody(OA_SUCCESS, "openai", "anthropic"));
-    expect(result.type).toBe("message");
+  const result = transformResponseBody(JSON.parse(OA_SUCCESS) as Record<string, unknown>, "openai", "anthropic");
+  expect(result.type).toBe("message");
   });
 
   it("transforms Ant→OA", () => {
-    const result = JSON.parse(transformResponseBody(ANT_SUCCESS, "anthropic", "openai"));
-    expect(result.object).toBe("chat.completion");
+  const result = transformResponseBody(JSON.parse(ANT_SUCCESS) as Record<string, unknown>, "anthropic", "openai");
+  expect(result.object).toBe("chat.completion");
   });
 });
 
 describe("transformErrorResponse", () => {
   it("converts Anthropic error to OpenAI format", () => {
-    const antError = JSON.stringify({ type: "error", error: { type: "invalid_request_error", message: "Bad request" } });
-    const result = JSON.parse(transformErrorResponse(antError, "anthropic", "openai"));
-    expect(result.error.message).toBe("Bad request");
-    expect(result.error.type).toBe("invalid_request_error");
-    expect(result.error.code).toBe("upstream_error");
+  const antError = { type: "error", error: { type: "invalid_request_error", message: "Bad request" } } as Record<string, unknown>;
+  const result = JSON.parse(transformErrorResponse(antError, "anthropic", "openai"));
+  expect(result.error.message).toBe("Bad request");
+  expect(result.error.type).toBe("invalid_request_error");
+  expect(result.error.code).toBe("upstream_error");
   });
 
   it("converts OpenAI error to Anthropic format", () => {
-    const oaiError = JSON.stringify({ error: { message: "Rate limited", type: "rate_limit_error", code: "rate_limit_exceeded" } });
-    const result = JSON.parse(transformErrorResponse(oaiError, "openai", "anthropic"));
-    expect(result.type).toBe("error");
-    expect(result.error.message).toBe("Rate limited");
-    expect(result.error.type).toBe("rate_limit_error");
+  const oaiError = { error: { message: "Rate limited", type: "rate_limit_error", code: "rate_limit_exceeded" } } as Record<string, unknown>;
+  const result = JSON.parse(transformErrorResponse(oaiError, "openai", "anthropic"));
+  expect(result.type).toBe("error");
+  expect(result.error.message).toBe("Rate limited");
+  expect(result.error.type).toBe("rate_limit_error");
   });
 
   it("returns body unchanged when same apiType", () => {
-    const body = '{"error":{"message":"x"}}';
-    expect(transformErrorResponse(body, "openai", "openai")).toBe(body);
+  const body = { error: { message: "x" } } as Record<string, unknown>;
+  expect(transformErrorResponse(body, "openai", "openai")).toBe(JSON.stringify(body));
   });
 });
 

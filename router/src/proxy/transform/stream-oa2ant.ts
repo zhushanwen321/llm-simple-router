@@ -10,6 +10,7 @@ export class OpenAIToAnthropicTransform extends BaseSSETransform {
   private msgId = generateMsgId();
   private inputTokens = 0;
   private outputTokens = 0;
+  private cacheReadTokens = 0;
 
   private pendingStopReason: string | null = null;
   private hasSentMessageStop = false;
@@ -27,9 +28,11 @@ export class OpenAIToAnthropicTransform extends BaseSSETransform {
 
     // P0 fix: always extract usage when present, even if choices are in the same chunk
     if (chunk.usage) {
-      const usage = chunk.usage as Record<string, number>;
-      this.inputTokens = usage.prompt_tokens ?? this.inputTokens;
-      this.outputTokens = usage.completion_tokens ?? this.outputTokens;
+      const usage = chunk.usage as Record<string, unknown>;
+      this.inputTokens = (usage.prompt_tokens as number) ?? this.inputTokens;
+      this.outputTokens = (usage.completion_tokens as number) ?? this.outputTokens;
+      const details = usage.prompt_tokens_details as Record<string, unknown> | undefined;
+      this.cacheReadTokens = (details?.cached_tokens as number) ?? this.cacheReadTokens;
     }
 
     // Usage-only chunk (no choices) triggers stop sequence
@@ -53,7 +56,7 @@ export class OpenAIToAnthropicTransform extends BaseSSETransform {
         message: {
           id: this.msgId, type: "message", role: "assistant", content: [],
           model: this.model, status: "in_progress",
-          usage: { input_tokens: this.inputTokens },
+          usage: { input_tokens: Math.max(0, this.inputTokens - this.cacheReadTokens), cache_read_input_tokens: this.cacheReadTokens },
         },
       });
       this.hasSentMessageStart = true;
@@ -75,8 +78,8 @@ export class OpenAIToAnthropicTransform extends BaseSSETransform {
       });
     }
 
-    const toolCalls = delta.tool_calls as Array<Record<string, unknown>> | undefined;
-    if (toolCalls) {
+    const toolCalls = delta.tool_calls;
+    if (Array.isArray(toolCalls)) {
       for (const tc of toolCalls) {
         this.handleToolCallDelta(tc);
       }
@@ -186,7 +189,7 @@ export class OpenAIToAnthropicTransform extends BaseSSETransform {
     this.pushAnthropicSSE("message_delta", {
       type: "message_delta",
       delta: { stop_reason: stopReason, stop_sequence: null },
-      usage: { output_tokens: this.outputTokens },
+      usage: { input_tokens: Math.max(0, this.inputTokens - this.cacheReadTokens) || 0, output_tokens: this.outputTokens, cache_read_input_tokens: this.cacheReadTokens },
     });
     this.pushAnthropicSSE("message_stop", { type: "message_stop" });
     this.hasSentMessageStop = true;
@@ -197,6 +200,11 @@ export class OpenAIToAnthropicTransform extends BaseSSETransform {
     for (const [idx, data] of this.toolCallBlocks) {
       if (data.args) {
         this.emit("warning", { event: "buffered_tool_call", index: idx, argsLength: data.args.length });
+        // Flush buffered args as a content_block_delta so data is not lost
+        this.pushAnthropicSSE("content_block_delta", {
+          type: "content_block_delta", index: idx,
+          delta: { type: "input_json_delta", partial_json: data.args },
+        });
       }
     }
     this.toolCallBlocks.clear();
