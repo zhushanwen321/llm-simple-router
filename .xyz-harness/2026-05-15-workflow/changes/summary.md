@@ -13,3 +13,10 @@
 - 变更文件：`router/src/admin/groups.ts`
 - 摘要：在 `validateRule()` 函数中新增 `image_fallback` 字段校验：检查 provider_id 非空、backend_model 非空、provider 存在且 is_active。向后兼容（无 image_fallback 时跳过）。8 个测试全部通过，已有 15 个 admin-groups 测试无回归。
 - 时间：2026-05-15T23:44:30Z
+
+## 阶段 4 - T1 编码实现
+
+- 状态：done
+- 变更文件：`router/src/config/model-context.ts`
+- 摘要：实现已就绪 — ModelEntry/ModelInfo 接口含 capabilities 字段、MODEL_CAPABILITIES 白名单常量、parseModels() 三级回退（显式 > 白名单 > 默认 text）、buildModelInfoList() 透传 capabilities。8 个测试全部通过。
+- 时间：2026-05-15T23:52:00Z
