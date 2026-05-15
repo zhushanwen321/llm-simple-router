@@ -4,7 +4,7 @@
   "topicDir": "2026-05-15-issue-feature",
   "projectRoot": "/Users/zhushanwen/Code/llm-simple-router-workspace/feat-mapping-reason-track",
   "currentPhase": 2,
-  "currentStage": 11,
+  "currentStage": 15,
   "completed": false,
   "startedAt": "2026-05-15T03:08:52.707Z",
   "stages": [
@@ -155,8 +155,48 @@
     {
       "number": 11,
       "name": "编码评审",
-      "status": "active",
+      "status": "pass",
       "startedAt": "2026-05-15T04:44:49.070Z",
+      "completedAt": "2026-05-15T04:59:40.919Z",
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 12,
+      "name": "单元测试",
+      "status": "pass",
+      "startedAt": "2026-05-15T04:59:40.919Z",
+      "completedAt": "2026-05-15T05:04:06.630Z",
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 13,
+      "name": "E2E 测试",
+      "status": "pass",
+      "startedAt": "2026-05-15T05:04:06.630Z",
+      "completedAt": "2026-05-15T05:05:20.556Z",
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 14,
+      "name": "测试评审",
+      "status": "pass",
+      "startedAt": "2026-05-15T05:05:20.556Z",
+      "completedAt": "2026-05-15T05:09:03.256Z",
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 15,
+      "name": "推送+CI+部署",
+      "status": "active",
+      "startedAt": "2026-05-15T05:09:03.256Z",
       "completedAt": null,
       "gateResult": null,
       "gateOutput": null,
