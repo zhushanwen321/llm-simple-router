@@ -20,3 +20,10 @@
 - 变更文件：`router/src/config/model-context.ts`
 - 摘要：实现已就绪 — ModelEntry/ModelInfo 接口含 capabilities 字段、MODEL_CAPABILITIES 白名单常量、parseModels() 三级回退（显式 > 白名单 > 默认 text）、buildModelInfoList() 透传 capabilities。8 个测试全部通过。
 - 时间：2026-05-15T23:52:00Z
+
+## 阶段 4 - T1 编码实现（修复）
+
+- 状态：done
+- 变更文件：`router/src/config/model-context.ts`, `router/tests/model-context.test.ts`
+- 摘要：修复缩进问题（edit 工具受 .editorconfig 影响导致缩进异常），更新现有 model-context.test.ts 中的 4 个 toEqual 断言以包含 capabilities 字段。22 个测试全部通过，lint 零新增警告，tsc 编译通过。
+- 时间：2026-05-15T23:57:00Z
