@@ -114,6 +114,31 @@ interface OverflowResult {
  * 检查请求是否超出当前模型的上下文窗口，若超出且配置了溢出目标，则返回重定向信息。
  * 返回 null 表示无需溢出。
  */
+/**
+ * 为 targets 列表中每个配置了溢出的 target 预计算 overflow 重定向目标。
+ * 返回值中溢出目标排在原 target 之前，供 failover 循环直接消费。
+ * 单个 target 的溢出计算失败不影响其他 target。
+ */
+export function expandOverflowTargets(
+  targets: Target[],
+  db: Database.Database,
+  body: Record<string, unknown>,
+): Target[] {
+  const expanded: Target[] = [];
+  for (const target of targets) {
+  try {
+    const result = applyOverflowRedirect(target, db, body);
+    if (result) {
+    expanded.push({ provider_id: result.provider_id, backend_model: result.backend_model });
+    }
+  } catch {
+    // 单个 target 溢出计算失败不阻塞其余 target
+  }
+  expanded.push(target);
+  }
+  return expanded;
+}
+
 export function applyOverflowRedirect(
   target: Target,
   db: Database.Database,
