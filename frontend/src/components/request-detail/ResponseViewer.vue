@@ -24,9 +24,11 @@
             />
           </div>
         </template>
-        <p v-if="blocks.length === 0 && props.status === 'pending' && !props.streamContent?.rawChunks" class="text-xs text-muted-foreground">{{ t('requestDetail.waitingResponse') }}</p>
-        <p v-else-if="props.source === 'history' && props.isStream && !hasAnyResponseData" class="text-xs text-muted-foreground">{{ t('requestDetail.streamNotPersisted') }}</p>
-        <p v-else class="text-xs text-muted-foreground">{{ t('requestDetail.noResponseContent') }}</p>
+    <template v-if="blocks.length === 0">
+      <p v-if="props.status === 'pending' && !props.streamContent?.rawChunks" class="text-xs text-muted-foreground">{{ t('requestDetail.waitingResponse') }}</p>
+      <p v-else-if="props.source === 'history' && props.isStream && !hasAnyResponseData" class="text-xs text-muted-foreground">{{ t('requestDetail.streamNotPersisted') }}</p>
+      <p v-else class="text-xs text-muted-foreground">{{ t('requestDetail.noResponseContent') }}</p>
+    </template>
       </div>
       <!-- Scroll to bottom button -->
       <Button

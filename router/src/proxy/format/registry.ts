@@ -34,24 +34,23 @@ export class FormatRegistry {
     return { body: converter.transformRequest(body, model), upstreamPath };
   }
 
-  transformResponse(bodyStr: string, source: string, target: string): string {
+  transformResponse(body: Record<string, unknown>, source: string, target: string): Record<string, unknown> {
     const converter = this.converters.get(`${source}→${target}`);
-    if (!converter) return bodyStr;
-    return converter.transformResponse(bodyStr);
+    if (!converter) return body;
+    return converter.transformResponse(body);
   }
 
-  transformError(bodyStr: string, source: string, target: string): string {
-    if (source === target) return bodyStr;
+  transformError(body: Record<string, unknown>, source: string, target: string): string {
+    if (source === target) return JSON.stringify(body);
     try {
-      const parsed = JSON.parse(bodyStr);
       const message =
-        parsed.error?.message ?? parsed.message ?? JSON.stringify(parsed);
-      const code = parsed.error?.code ?? parsed.code;
+    (body.error as Record<string, unknown> | undefined)?.message as string ?? body.message as string ?? JSON.stringify(body);
+      const code = (body.error as Record<string, unknown> | undefined)?.code as string ?? body.code as string;
       const targetAdapter = this.adapters.get(target);
-      if (!targetAdapter) return bodyStr;
+      if (!targetAdapter) return JSON.stringify(body);
       return JSON.stringify(targetAdapter.formatError(message, code));
     } catch {
-      return bodyStr;
+      return JSON.stringify(body);
     }
   }
 

@@ -67,9 +67,19 @@ export function responsesToChatRequest(
     }
   }
 
-  // tool_choice — compatible between Chat and Responses
+  // tool_choice — normalize {type:"tool"} from Cursor IDE, then pass through
   if (req.tool_choice != null) {
-    result.tool_choice = req.tool_choice;
+    const tc = req.tool_choice;
+    if (typeof tc === "object" && tc !== null) {
+      const obj = tc as Record<string, unknown>;
+      if (obj.type === "tool" && !obj.name) {
+        result.tool_choice = "required";
+      } else {
+        result.tool_choice = tc;
+      }
+    } else {
+      result.tool_choice = tc;
+    }
   }
 
   // reasoning — pass through (both use {effort?, max_tokens?})
@@ -77,9 +87,31 @@ export function responsesToChatRequest(
     result.reasoning = req.reasoning;
   }
 
-  // text.format → response_format
+  // text.format → response_format (json_schema 结构差异需转换)
   if (req.text?.format != null) {
-    result.response_format = req.text.format;
+    const format = req.text.format as Record<string, unknown>;
+    if (format.type === "json_schema") {
+      result.response_format = {
+        type: "json_schema",
+        json_schema: {
+          name: format.name ?? "response_schema",
+          schema: format.schema ?? {},
+          strict: format.strict ?? false,
+        },
+      };
+    } else {
+      result.response_format = format;
+    }
+  }
+
+  // parallel_tool_calls — pass through
+  if (req.parallel_tool_calls != null) {
+    result.parallel_tool_calls = req.parallel_tool_calls;
+  }
+
+  // metadata.user_id → user
+  if (req.metadata?.user_id) {
+    result.user = req.metadata.user_id;
   }
 
   // stream_options
@@ -159,6 +191,11 @@ function convertResponsesInputToChatMessages(
   if (pendingFnCalls.length > 0) {
     flushFunctionCalls(messages, pendingFnCalls);
   }
+
+  // Post-process: 确保 system/developer 消息不出现在 assistant(tool_calls) 和 tool 之间
+  // Responses API 允许 function_call 和 function_call_output 之间插入 developer 消息，
+  // 但 Chat Completions 格式要求 assistant(tool_calls) 后必须紧跟 tool 消息。
+  reorderMessagesAroundToolCalls(messages);
 }
 
 /**
@@ -174,6 +211,85 @@ function flushFunctionCalls(
     tool_calls: [...pending],
   });
   pending.length = 0;
+}
+
+/**
+ * 将 system/developer 消息从 assistant(tool_calls) 和 tool 之间移走。
+ *
+ * Responses API 允许 function_call 和 function_call_output 之间插入 developer 消息，
+ * 但 Chat Completions 格式要求 assistant(tool_calls) 后必须紧跟对应的 tool 消息。
+ *
+ * 算法：遍历 messages，当发现 assistant(tool_calls) 后紧跟的非 tool 消息时，
+ * 收集这些非 tool 消息，跳过后续的 tool 消息，然后在 tool 消息之后插入收集的非 tool 消息。
+ */
+function reorderMessagesAroundToolCalls(
+  messages: Array<Record<string, unknown>>,
+): void {
+  const toolCallIds = new Set<string>();
+
+  // 先收集所有 assistant tool_calls 的 ID，用于判断 tool 消息是否属于该批次
+  for (const msg of messages) {
+    if (msg.role === "assistant" && msg.tool_calls) {
+      const calls = msg.tool_calls as Array<Record<string, unknown>>;
+      for (const tc of calls) {
+        if (typeof tc.id === "string") toolCallIds.add(tc.id);
+      }
+    }
+  }
+
+  let i = 0;
+  while (i < messages.length) {
+    const msg = messages[i];
+    // 找到 assistant(tool_calls) 消息
+    if (msg.role === "assistant" && msg.tool_calls) {
+      const calls = msg.tool_calls as Array<Record<string, unknown>>;
+      const batchIds = new Set(calls.map((tc) => tc.id as string));
+
+      // 检查紧跟的消息是否为 tool 消息
+      let j = i + 1;
+      const pendingNonTool: Array<Record<string, unknown>> = [];
+
+      while (j < messages.length) {
+        const next = messages[j];
+        if (next.role === "tool" && batchIds.has(next.tool_call_id as string)) {
+          // 这是属于当前 assistant 的 tool 消息，停止扫描
+          break;
+        }
+        if (next.role === "system" || next.role === "developer") {
+          // 收集需要延后的 system/developer 消息
+          pendingNonTool.push(next);
+          j++;
+        } else if (next.role === "tool") {
+          // 属于其他 assistant 的 tool 消息，停止
+          break;
+        } else {
+          // 其他角色消息（user/assistant），停止
+          break;
+        }
+      }
+
+      if (pendingNonTool.length > 0) {
+        // 从 messages 中删除这些非 tool 消息
+        messages.splice(i + 1, pendingNonTool.length);
+        // 找到属于当前 assistant 的所有 tool 消息的末尾位置
+        let toolEnd = i + 1; // splice 后 j 可能已经变了
+        while (toolEnd < messages.length) {
+          const candidate = messages[toolEnd];
+          if (candidate.role === "tool" && batchIds.has(candidate.tool_call_id as string)) {
+            toolEnd++;
+          } else {
+            break;
+          }
+        }
+        // 在 tool 消息之后插入收集的非 tool 消息
+        messages.splice(toolEnd, 0, ...pendingNonTool);
+        // 跳过处理过的消息
+        i = toolEnd + pendingNonTool.length;
+        continue;
+      }
+    }
+    i++;
+  }
 }
 
 /**
@@ -256,9 +372,34 @@ export function chatToResponsesRequest(
     result.reasoning = req.reasoning;
   }
 
-  // response_format → text.format
+  // response_format → text.format (json_schema 结构差异需转换)
   if (req.response_format != null) {
-    result.text = { format: req.response_format };
+    const rf = req.response_format as Record<string, unknown>;
+    if (rf.type === "json_schema" && rf.json_schema) {
+      const js = rf.json_schema as Record<string, unknown>;
+      result.text = {
+        format: {
+          type: "json_schema",
+          name: js.name ?? "response_schema",
+          schema: js.schema,
+          strict: js.strict,
+        },
+      };
+    } else if (rf.type === "json_object") {
+      result.text = { format: { type: "json_object" } };
+    } else {
+      result.text = { format: rf };
+    }
+  }
+
+  // parallel_tool_calls — pass through
+  if (req.parallel_tool_calls != null) {
+    result.parallel_tool_calls = req.parallel_tool_calls;
+  }
+
+  // user → metadata.user_id
+  if (req.user) {
+    result.metadata = { user_id: req.user };
   }
 
   // stream_options
@@ -302,12 +443,38 @@ function convertChatMessagesToResponsesInput(
 
   for (const msg of messages) {
     if (msg.role === "user") {
-      const text = typeof msg.content === "string" ? msg.content : (msg.content ?? "") as string;
-      items.push({
-        type: "message",
-        role: "user",
-        content: [{ type: "input_text", text }],
-      });
+      const raw = msg.content as string | Array<Record<string, unknown>> | null | undefined;
+      if (typeof raw === "string") {
+        items.push({
+          type: "message",
+          role: "user",
+          content: [{ type: "input_text", text: raw }],
+        });
+      } else if (Array.isArray(raw)) {
+        const parts: Array<Record<string, unknown>> = [];
+        for (const part of raw) {
+          if (typeof part === "object" && part !== null) {
+            const p = part as Record<string, unknown>;
+            if (p.type === "text" && p.text != null) {
+              parts.push({ type: "input_text", text: p.text as string });
+            } else if (p.type === "image_url") {
+              parts.push({
+                type: "input_image",
+                image_url: (p.image_url as Record<string, unknown>)?.url ?? "",
+              });
+            }
+          }
+        }
+        if (parts.length > 0) {
+          items.push({ type: "message", role: "user", content: parts });
+        }
+      } else if (raw != null) {
+        items.push({
+          type: "message",
+          role: "user",
+          content: [{ type: "input_text", text: JSON.stringify(raw) }],
+        });
+      }
     } else if (msg.role === "assistant") {
       // Text content → assistant message with output_text
       if (msg.content != null && msg.content !== "") {

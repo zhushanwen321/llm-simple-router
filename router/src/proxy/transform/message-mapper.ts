@@ -7,6 +7,7 @@ import type {
   AnthropicThinkingBlock,
   AnthropicToolUseBlock,
   AnthropicToolResultBlock,
+  AnthropicImageBlock,
 } from "./types.js";
 import { sanitizeToolUseId, ensureNonEmptyContent, parseToolArguments } from "./sanitize.js";
 
@@ -87,6 +88,7 @@ export function convertMessagesOA2Ant(
       // tool_calls → tool_use blocks
       if (msg.tool_calls) {
         for (const tc of msg.tool_calls) {
+          if (!tc.function) continue;
           const input = parseToolArguments(tc.function.arguments);
           blocks.push({ type: "tool_use", id: sanitizeToolUseId(tc.id), name: tc.function.name, input });
         }
@@ -177,14 +179,30 @@ export function convertMessagesAnt2OA(
 
   for (const msg of messages) {
     if (msg.role === "user") {
-      // content 在运行时可能是 string（非标准但需兼容）
+    // content 在运行时可能是 string（非标准但需兼容）
       const content = Array.isArray(msg.content) ? msg.content : undefined;
       if (!content?.length) continue;
       const textParts = content.filter((b): b is AnthropicTextBlock => b.type === "text");
+      const imageParts = content.filter((b): b is AnthropicImageBlock => b.type === "image");
       const toolResults = content.filter((b): b is AnthropicToolResultBlock => b.type === "tool_result");
 
-      if (textParts.length > 0) {
+      // 仅有 text → 简单字符串 content
+      if (textParts.length > 0 && imageParts.length === 0) {
         result.push({ role: "user", content: textParts.map(b => b.text).join("") });
+      } else if (textParts.length > 0 || imageParts.length > 0) {
+        // 有 image 或混合 → content part 数组
+        const parts: Record<string, unknown>[] = [];
+        for (const tb of textParts) {
+          parts.push({ type: "text", text: tb.text });
+        }
+        for (const ib of imageParts) {
+          if (ib.source.type === "base64" && ib.source.data) {
+            parts.push({ type: "image_url", image_url: { url: `data:${ib.source.media_type};base64,${ib.source.data}` } });
+          } else if (ib.source.type === "url" && ib.source.url) {
+            parts.push({ type: "image_url", image_url: { url: ib.source.url } });
+          }
+        }
+        result.push({ role: "user", content: parts });
       }
       for (const tr of toolResults) {
         let toolCallId = tr.tool_use_id;
@@ -219,7 +237,7 @@ export function convertMessagesAnt2OA(
         oaiMsg.tool_calls = toolBlocks.map((b, i) => ({
           id: b.id || (idMap ? idMap.get(i) || randomUUID() : randomUUID()),
           type: "function",
-          function: { name: b.name, arguments: JSON.stringify(b.input ?? {}) },
+          function: { name: b.name ?? "unknown", arguments: JSON.stringify(b.input ?? {}) },
         }));
       }
 

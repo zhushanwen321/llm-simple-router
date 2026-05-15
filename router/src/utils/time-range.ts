@@ -1,7 +1,7 @@
-import { randomUUID } from "crypto";
 import Database from "better-sqlite3";
-import { getLatestWindow, insertWindow } from "../db/usage-windows.js";
+import { getLatestWindow } from "../db/usage-windows.js";
 import { toSqliteDatetime, parseSqliteDatetime } from "./datetime.js";
+import { getLatestMetricTime } from "../db/stats.js";
 
 export type DashboardPeriod = "window" | "weekly" | "monthly";
 
@@ -10,10 +10,10 @@ export interface TimeRange {
   endTime: string;
 }
 
-const WINDOW_HOURS = 5
-const MS_PER_HOUR = 3600_000
-// 与 usage-windows 的默认窗口时长对齐
-const WINDOW_DURATION_MS = WINDOW_HOURS * MS_PER_HOUR
+const WINDOW_HOURS = 5;
+const MS_PER_HOUR = 3600_000;
+const MS_PER_MINUTE = 60000;
+const WINDOW_DURATION_MS = WINDOW_HOURS * MS_PER_HOUR;
 
 const DAYS_TO_SUNDAY = 6;
 const END_OF_DAY_HOUR = 23;
@@ -32,14 +32,23 @@ export function resolveTimeRange(
   switch (period) {
     case "window": {
       const latest = getLatestWindow(db, routerKeyId, providerId);
-      if (!latest) {
-        return createAndReturnWindow(db, now, routerKeyId, providerId);
+      if (latest && now <= parseSqliteDatetime(latest.end_time)) {
+        // 有未过期窗口 → 直接使用窗口范围
+        return { startTime: latest.start_time, endTime: latest.end_time };
       }
-      // 最新窗口已过期（无请求触发新窗口创建），主动补齐
-      if (now > parseSqliteDatetime(latest.end_time)) {
-        return createAndReturnWindow(db, now, routerKeyId, providerId);
+      // 无窗口或窗口已过期 → 从最新 metric 时间前向 5h 生成范围（不写 DB）
+      const metricTimeStr = getLatestMetricTime(db, providerId, routerKeyId);
+      if (metricTimeStr) {
+        const metricTime = parseSqliteDatetime(metricTimeStr);
+        // start 向下取整到分钟，end = start + 5h
+        const start = new Date(Math.floor(metricTime.getTime() / MS_PER_MINUTE) * MS_PER_MINUTE);
+        const end = new Date(start.getTime() + WINDOW_DURATION_MS);
+        return { startTime: toSqliteDatetime(start), endTime: toSqliteDatetime(end) };
       }
-      return { startTime: latest.start_time, endTime: latest.end_time };
+      // 完全没有数据 → 从当前时间前向
+      const fallbackStart = new Date(Math.floor(now.getTime() / MS_PER_MINUTE) * MS_PER_MINUTE);
+      const fallbackEnd = new Date(fallbackStart.getTime() + WINDOW_DURATION_MS);
+      return { startTime: toSqliteDatetime(fallbackStart), endTime: toSqliteDatetime(fallbackEnd) };
     }
     case "weekly": {
       const monday = getMonday(now);
@@ -62,29 +71,9 @@ export function resolveTimeRange(
 export function getMonday(date: Date): Date {
   const d = new Date(date);
   const day = d.getDay();
-  // 周日 getDay()=0，需要回退到上周一；+1 将周日=0 映射到周一=1 基准
   const SUNDAY_OFFSET = -6;
   const MONDAY_BASE = 1;
   const diff = d.getDate() - day + (day === 0 ? SUNDAY_OFFSET : MONDAY_BASE);
   d.setDate(diff);
   return d;
-}
-
-function createAndReturnWindow(
-  db: Database.Database,
-  now: Date,
-  routerKeyId?: string,
-  providerId?: string,
-): TimeRange {
-  const start = new Date(now);
-  start.setMinutes(0, 0, 0);
-  const end = new Date(start.getTime() + WINDOW_DURATION_MS);
-  insertWindow(db, {
-    id: randomUUID(),
-    router_key_id: routerKeyId ?? null,
-    provider_id: providerId ?? null,
-    start_time: toSqliteDatetime(start),
-    end_time: toSqliteDatetime(end),
-  });
-  return { startTime: toSqliteDatetime(start), endTime: toSqliteDatetime(end) };
 }

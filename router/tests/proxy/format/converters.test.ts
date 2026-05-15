@@ -64,12 +64,13 @@ describe("FormatConverter contracts", () => {
       expect(result).toBeDefined();
     });
 
-    it("transformResponse returns valid JSON string", () => {
-      // 用一个简单的上游响应格式测试
-      const upstreamResponse = JSON.stringify({ id: "test", choices: [] });
-      const result = converter.transformResponse(upstreamResponse);
-      expect(() => JSON.parse(result)).not.toThrow();
-    });
+  it("transformResponse returns valid object", () => {
+    // 用一个简单的上游响应格式测试
+    const upstreamResponse = { id: "test", choices: [] } as Record<string, unknown>;
+    const result = converter.transformResponse(upstreamResponse);
+    expect(result).toBeDefined();
+    expect(typeof result).toBe("object");
+  });
 
     it("createStreamTransform returns a Transform stream", () => {
       const transform = converter.createStreamTransform("test-model");

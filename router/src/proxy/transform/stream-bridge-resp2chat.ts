@@ -16,6 +16,7 @@ export class ResponsesToChatBridgeTransform extends BaseSSETransform {
   private outputTokens = 0;
   private finishReasonEmitted = false;
   private hasFunctionCall = false;
+  private cachedTokens = 0;
 
   private ensureRoleSent(): void {
     if (this.hasSentRole) return;
@@ -42,6 +43,10 @@ export class ResponsesToChatBridgeTransform extends BaseSSETransform {
           const usage = resp.usage as Record<string, unknown>;
           this.inputTokens = (usage.input_tokens as number) ?? this.inputTokens;
           this.outputTokens = (usage.output_tokens as number) ?? this.outputTokens;
+          const inputDetails = usage.input_tokens_details as Record<string, number> | undefined;
+          if (inputDetails?.cached_tokens) {
+            this.cachedTokens = inputDetails.cached_tokens;
+          }
         }
         break;
       }
@@ -93,6 +98,8 @@ export class ResponsesToChatBridgeTransform extends BaseSSETransform {
       case "response.function_call_arguments.delta": {
         const delta = payload.delta as string;
         if (delta) {
+          // arguments.delta should only arrive after a function_call item was added
+          if (this.currentToolCallIndex <= 0) break;
           // Use currentToolCallIndex - 1 because the tool call was already registered
           const tcIndex = this.currentToolCallIndex - 1;
           this.pushOpenAISSE({
@@ -129,6 +136,10 @@ export class ResponsesToChatBridgeTransform extends BaseSSETransform {
           const usage = resp.usage as Record<string, unknown>;
           this.inputTokens = (usage.input_tokens as number) ?? this.inputTokens;
           this.outputTokens = (usage.output_tokens as number) ?? this.outputTokens;
+          const inputDetails = usage.input_tokens_details as Record<string, number> | undefined;
+          if (inputDetails?.cached_tokens) {
+            this.cachedTokens = inputDetails.cached_tokens;
+          }
         }
 
         if (!this.finishReasonEmitted) {
@@ -150,6 +161,7 @@ export class ResponsesToChatBridgeTransform extends BaseSSETransform {
             prompt_tokens: this.inputTokens,
             completion_tokens: this.outputTokens,
             total_tokens: this.inputTokens + this.outputTokens,
+            ...(this.cachedTokens > 0 ? { prompt_tokens_details: { cached_tokens: this.cachedTokens } } : {}),
           },
         });
         this.pushDone();
@@ -157,6 +169,17 @@ export class ResponsesToChatBridgeTransform extends BaseSSETransform {
       }
 
       case "response.incomplete": {
+        const incResp = payload.response as Record<string, unknown> | undefined;
+        if (incResp?.usage) {
+          const usage = incResp.usage as Record<string, unknown>;
+          this.inputTokens = (usage.input_tokens as number) ?? this.inputTokens;
+          this.outputTokens = (usage.output_tokens as number) ?? this.outputTokens;
+          const inputDetails = usage.input_tokens_details as Record<string, number> | undefined;
+          if (inputDetails?.cached_tokens) {
+            this.cachedTokens = inputDetails.cached_tokens;
+          }
+        }
+
         if (!this.finishReasonEmitted) {
           this.finishReasonEmitted = true;
           this.pushOpenAISSE({
@@ -173,6 +196,7 @@ export class ResponsesToChatBridgeTransform extends BaseSSETransform {
             prompt_tokens: this.inputTokens,
             completion_tokens: this.outputTokens,
             total_tokens: this.inputTokens + this.outputTokens,
+            ...(this.cachedTokens > 0 ? { prompt_tokens_details: { cached_tokens: this.cachedTokens } } : {}),
           },
         });
         this.pushDone();

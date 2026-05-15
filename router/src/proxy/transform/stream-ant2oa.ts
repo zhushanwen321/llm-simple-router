@@ -152,13 +152,21 @@ export class AnthropicToOpenAITransform extends BaseSSETransform {
           this.push(`event: message_meta\ndata: ${JSON.stringify({ provider_meta: { anthropic: meta } })}\n\n`);
         }
 
+        // Anthropic input_tokens excludes cache; OpenAI prompt_tokens includes cache
+        const cacheRead = this.cacheUsage?.cache_read_input_tokens ?? 0;
+        const cacheCreation = this.cacheUsage?.cache_creation_input_tokens ?? 0;
+        const totalInput = this.inputTokens + cacheRead + cacheCreation;
         this.pushOpenAISSE({
           id: this.chatcmplId, object: "chat.completion.chunk",
           choices: [],
           usage: {
-            prompt_tokens: this.inputTokens,
+            prompt_tokens: totalInput,
             completion_tokens: this.outputTokens,
-            total_tokens: this.inputTokens + this.outputTokens,
+            total_tokens: totalInput + this.outputTokens,
+            prompt_tokens_details: {
+              cached_tokens: cacheRead,
+              cached_write_tokens: cacheCreation,
+            },
           },
         });
         this.pushDone();

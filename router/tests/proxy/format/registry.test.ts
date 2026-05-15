@@ -51,10 +51,9 @@ function createMockConverter(source: string, target: string): FormatConverter {
     transformRequest(body) {
       return { ...body, _converted: `${source}->${target}` };
     },
-    transformResponse(bodyStr) {
-      const parsed = JSON.parse(bodyStr);
-      return JSON.stringify({ ...parsed, _converted: `${source}->${target}` });
-    },
+  transformResponse(body: Record<string, unknown>) {
+    return { ...body, _converted: `${source}->${target}` };
+  },
     createStreamTransform(_model) {
       return new Transform({ transform(chunk, _, cb) { cb(null, chunk); } });
     },
@@ -102,38 +101,38 @@ describe("FormatRegistry", () => {
   });
 
   it("transformResponse delegates to converter", () => {
-    const registry = new FormatRegistry();
-    registry.registerConverter(createMockConverter("openai", "anthropic"));
+  const registry = new FormatRegistry();
+  registry.registerConverter(createMockConverter("openai", "anthropic"));
 
-    const result = registry.transformResponse('{"choices":[]}', "openai", "anthropic");
-    const parsed = JSON.parse(result);
-    expect(parsed._converted).toBe("openai->anthropic");
+  const result = registry.transformResponse({ choices: [] } as Record<string, unknown>, "openai", "anthropic");
+  expect(result._converted).toBe("openai->anthropic");
   });
 
   it("transformResponse returns original when no converter", () => {
-    const registry = new FormatRegistry();
-    expect(registry.transformResponse('{"ok":true}', "openai", "gemini")).toBe('{"ok":true}');
+  const registry = new FormatRegistry();
+  const body = { ok: true } as Record<string, unknown>;
+  expect(registry.transformResponse(body, "openai", "gemini")).toBe(body);
   });
 
   it("transformError extracts message and formats with target adapter", () => {
-    const registry = new FormatRegistry();
-    registry.registerAdapter(openaiAdapter);
-    registry.registerAdapter(anthropicAdapter);
+  const registry = new FormatRegistry();
+  registry.registerAdapter(openaiAdapter);
+  registry.registerAdapter(anthropicAdapter);
 
-    const result = registry.transformError(
-      '{"error":{"message":"model not found"}}',
-      "openai",
-      "anthropic",
-    );
-    const parsed = JSON.parse(result);
-    expect(parsed.type).toBe("error");
-    expect(parsed.error.message).toBe("model not found");
+  const result = registry.transformError(
+    { error: { message: "model not found" } } as Record<string, unknown>,
+    "openai",
+    "anthropic",
+  );
+  const parsed = JSON.parse(result);
+  expect(parsed.type).toBe("error");
+  expect(parsed.error.message).toBe("model not found");
   });
 
   it("transformError returns original when source===target", () => {
-    const registry = new FormatRegistry();
-    const body = '{"error":{"message":"fail"}}';
-    expect(registry.transformError(body, "openai", "openai")).toBe(body);
+  const registry = new FormatRegistry();
+  const body = { error: { message: "fail" } } as Record<string, unknown>;
+  expect(registry.transformError(body, "openai", "openai")).toBe(JSON.stringify(body));
   });
 
   it("createStreamTransform returns undefined when no converter", () => {

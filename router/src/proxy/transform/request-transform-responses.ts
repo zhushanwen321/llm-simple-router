@@ -1,5 +1,5 @@
 import { sanitizeToolUseId, parseToolArguments } from "./sanitize.js";
-import type { AnthropicContentBlock, AnthropicMessage, AnthropicRequest } from "./types.js";
+import type { AnthropicContentBlock, AnthropicImageBlock, AnthropicMessage, AnthropicRequest } from "./types.js";
 import type {
   ResponsesApiRequest,
   ResponseInputItem,
@@ -11,6 +11,8 @@ import type {
 
 const EFFORT_BUDGET: Record<string, number> = { low: 1024, medium: 8192, high: 32768 };
 const DEFAULT_BUDGET = 8192;
+const DEFAULT_MAX_TOKENS_MULTIPLIER = 2;
+const MIN_MAX_TOKENS = 16000;
 
 // ---------- Internal types ----------
 
@@ -59,13 +61,19 @@ export function responsesToAnthropicRequest(
   const result: Record<string, unknown> = {};
   result.model = req.model;
 
-  // instructions → system
-  if (req.instructions != null) {
-    result.system = req.instructions;
-  }
+  // input → messages (同时收集 developer/system 消息作为 system 的一部分)
+  const { messages: antMessages, systemParts } = convertResponsesInputToAntMessages(req.input);
+  result.messages = antMessages;
 
-  // input → messages
-  result.messages = convertResponsesInputToAntMessages(req.input);
+  // instructions + developer/system 消息合并为 system
+  const allSystemParts: string[] = [];
+  if (req.instructions != null && req.instructions !== "") {
+    allSystemParts.push(req.instructions);
+  }
+  allSystemParts.push(...systemParts);
+  if (allSystemParts.length > 0) {
+    result.system = allSystemParts.join("\n");
+  }
 
   // max_output_tokens → max_tokens
   if (req.max_output_tokens != null) {
@@ -107,9 +115,16 @@ export function responsesToAnthropicRequest(
     const budget = req.reasoning.max_tokens ?? EFFORT_BUDGET[req.reasoning.effort ?? ""] ?? DEFAULT_BUDGET;
     result.thinking = { type: "enabled", budget_tokens: budget };
 
-    // Ensure max_tokens >= budget_tokens
-    if (result.max_tokens != null && (result.max_tokens as number) < budget) {
-      result.max_tokens = budget;
+    // Anthropic requires max_tokens > budget_tokens (strictly greater).
+    // If max_tokens is absent, auto-set to a reasonable value > budget.
+    if (result.max_tokens != null) {
+      if ((result.max_tokens as number) <= budget) {
+        result.max_tokens = budget + 1;
+      }
+    } else {
+    // No max_output_tokens set, but reasoning is enabled. Default to 2x budget
+    // or 16000, whichever is larger, so there's room for text output.
+      result.max_tokens = Math.max(budget * DEFAULT_MAX_TOKENS_MULTIPLIER, MIN_MAX_TOKENS);
     }
   }
 
@@ -121,20 +136,27 @@ export function responsesToAnthropicRequest(
   return result;
 }
 
-/** Convert Responses input (string | ResponseInputItem[]) → Anthropic messages. */
-function convertResponsesInputToAntMessages(input: string | ResponseInputItem[] | undefined): AntMessage[] {
-  if (input == null) return [];
+/** Convert Responses input (string | ResponseInputItem[]) → Anthropic messages + system parts. */
+function convertResponsesInputToAntMessages(input: string | ResponseInputItem[] | undefined): { messages: AntMessage[]; systemParts: string[] } {
+  if (input == null) return { messages: [], systemParts: [] };
   // String shorthand → single user message
   if (typeof input === "string") {
-    return [{ role: "user", content: [{ type: "text", text: input }] }];
+    return { messages: [{ role: "user", content: [{ type: "text", text: input }] }], systemParts: [] };
   }
-  if (!Array.isArray(input)) return [];
+  if (!Array.isArray(input)) return { messages: [], systemParts: [] };
 
   const raw: AntMessage[] = [];
+  const systemParts: string[] = [];
 
   for (const item of input) {
     if (item.type === "message") {
-      // item is narrowed to ResponseInputMessage
+    // developer/system 消息提取为 system part，不放入 messages
+      if (item.role === "developer" || item.role === "system") {
+        const content = extractMessageContent(item);
+        const text = content.map(b => b.type === "text" ? b.text : "").join("");
+        if (text) systemParts.push(text);
+        continue;
+      }
       const content = extractMessageContent(item);
       raw.push({ role: item.role, content });
     } else if (item.type === "function_call") {
@@ -152,7 +174,8 @@ function convertResponsesInputToAntMessages(input: string | ResponseInputItem[] 
       });
     } else if (item.type === "function_call_output") {
       // item is narrowed to ResponseFunctionCallOutputInput
-      const antCallId = item.call_id.startsWith("toolu_") ? item.call_id : `toolu_${item.call_id}`;
+      const rawCallId = item.call_id ?? "";
+      const antCallId = rawCallId.startsWith("toolu_") ? rawCallId : `toolu_${rawCallId}`;
       raw.push({
         role: "user",
         content: [{
@@ -162,26 +185,48 @@ function convertResponsesInputToAntMessages(input: string | ResponseInputItem[] 
         }],
       });
     } else if (item.type === "reasoning") {
-      // item is narrowed to ResponseReasoningInput
+    // item is narrowed to ResponseReasoningInput
       const thinkingText = item.summary
         ? item.summary.map(s => s.text ?? "").join("\n")
         : "";
+      const content: AnthropicContentBlock[] = [];
+      if (thinkingText) {
+        content.push({ type: "thinking", thinking: thinkingText });
+      }
+      // encrypted_content → redacted_thinking（extended thinking 多轮回传关键数据）
+      if (item.encrypted_content) {
+        content.push({
+          type: "redacted_thinking",
+          data: item.encrypted_content,
+        } as unknown as AnthropicContentBlock);
+      }
+      if (content.length === 0) {
+        content.push({ type: "thinking", thinking: "" });
+      }
       raw.push({
         role: "assistant",
-        content: [{ type: "thinking", thinking: thinkingText }],
+        content,
       });
     } else if (item.type === "input_text") {
-      // item is narrowed to ResponseInputText
+    // item is narrowed to ResponseInputText
       raw.push({
         role: "user",
         content: [{ type: "text", text: item.text ?? "" }],
+      });
+    } else if (item.type === "input_image") {
+      raw.push({
+        role: "user",
+        content: [{
+          type: "image",
+          source: { type: "url", url: item.image_url },
+        }],
       });
     }
   }
 
   const merged = mergeConsecutiveMessages(raw);
   ensureFirstIsUser(merged);
-  return merged;
+  return { messages: merged, systemParts };
 }
 
 /** Extract content blocks from a ResponseInputMessage. */
@@ -195,6 +240,9 @@ function extractMessageContent(msg: ResponseInputMessage): AnthropicContentBlock
     return content.flatMap((part): AnthropicContentBlock[] => {
       if (part.type === "input_text" && part.text != null) {
         return [{ type: "text", text: part.text }];
+      }
+      if (part.type === "input_image" && part.image_url != null) {
+        return [{ type: "image", source: { type: "url", url: part.image_url } }];
       }
       return [];
     });
@@ -211,6 +259,10 @@ function mapToolChoiceResponses2Ant(tc: unknown): Record<string, unknown> | unde
     const obj = tc as Record<string, unknown>;
     if (obj.type === "function" && obj.name) {
       return { type: "tool", name: obj.name };
+    }
+    // Handle {type:"tool"} without name (Cursor IDE format) → use any tool
+    if (obj.type === "tool") {
+      return { type: "any" };
     }
   }
   return { type: "auto" };
@@ -295,15 +347,29 @@ function convertAntMessagesToResponsesInput(
       // Separate text blocks and tool_result blocks
       const textBlocks = content.filter((b): b is Extract<AnthropicContentBlock, { type: "text" }> => b.type === "text");
       const toolResultBlocks = content.filter((b): b is Extract<AnthropicContentBlock, { type: "tool_result" }> => b.type === "tool_result");
+      const imageBlocks = content.filter((b): b is AnthropicImageBlock => b.type === "image");
 
+      // Build user message content parts: text + images
+      const userParts: Array<Record<string, unknown>> = [];
       if (textBlocks.length > 0) {
         const text = textBlocks.map(b => b.text ?? "").join("");
+        userParts.push({ type: "input_text", text });
+      }
+      for (const img of imageBlocks) {
+        const src = img.source;
+        const imageUrl = src.type === "url"
+          ? (src.url ?? "")
+          : `data:${src.media_type ?? "image/png"};base64,${src.data ?? ""}`;
+        userParts.push({ type: "input_image", image_url: imageUrl });
+      }
+      if (userParts.length > 0) {
         items.push({
           type: "message",
           role: "user",
-          content: [{ type: "input_text", text }],
+          content: userParts,
         });
       }
+
       for (const tr of toolResultBlocks) {
         items.push({
           type: "function_call_output",
@@ -323,6 +389,18 @@ function convertAntMessagesToResponsesInput(
           id: `rs_${Date.now()}_${items.length}`,
           summary: [{ type: "summary_text", text: tb.thinking ?? "" }],
         });
+      }
+
+      // redacted_thinking → reasoning items with encrypted_content
+      for (const block of content) {
+        const raw = block as unknown as { type: string; data?: string };
+        if (raw.type === "redacted_thinking" && raw.data != null) {
+          items.push({
+            type: "reasoning",
+            id: `rs_${Date.now()}_${items.length}`,
+            encrypted_content: raw.data,
+          });
+        }
       }
 
       // text → assistant message

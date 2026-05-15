@@ -19,12 +19,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 # 兼容 git worktree（.git 可能是文件）
-if [ -f "$PROJECT_ROOT/.git" ]; then
-    GIT_DIR=$(git -C "$PROJECT_ROOT" rev-parse --git-dir)
-    GIT_HOOKS_DIR="$GIT_DIR/hooks"
-else
-    GIT_HOOKS_DIR="$PROJECT_ROOT/.git/hooks"
-fi
+# git-path hooks 返回 git 实际查找 hooks 的目录。
+# 在 bare repo + worktree 模式下，--git-dir 返回 worktree 私有目录，
+# 但 --git-path hooks 返回 bare repo 级共享目录，两者不同。
+GIT_HOOKS_DIR=$(git -C "$PROJECT_ROOT" rev-parse --git-path hooks)
 
 echo -e "${BLUE}======================================${NC}"
 echo -e "${BLUE}Git Hooks 安装脚本${NC}"
