@@ -1,7 +1,7 @@
 export type StageRecord =
   | { stage: "tool_round_limit"; action: string; rounds: number }
   | { stage: "tool_guard"; action: string; tool: string }
-  | { stage: "routing"; client_model: string; backend_model: string; provider_id: string; strategy: string }
+  | { stage: "routing"; client_model: string; backend_model: string; provider_id: string; strategy: string; mapping_reason?: string }
   | { stage: "overflow"; triggered: boolean; redirect_to?: string; redirect_provider?: string }
   | { stage: "provider_patch"; types: string[] };
 
