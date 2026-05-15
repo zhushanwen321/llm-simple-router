@@ -339,33 +339,32 @@ export async function executeFailoverLoop(
       formatTransform.on("warning", (err) => request.log.warn({ err, logId }, "formatTransform warning"));
     }
 
-    const responseTransform = needsTransform ? (bodyStr: string): string => {
+  const responseTransform = needsTransform ? (bodyStr: string): string => {
+    try {
+    const parsed = JSON.parse(bodyStr) as Record<string, unknown>;
+    if (parsed.type === "error" || parsed.error) {
+      return formatRegistry.transformError(parsed, provider.api_type, ctx.apiType);
+    }
+    let transformed = formatRegistry.transformResponse(parsed, provider.api_type, ctx.apiType);
+    if (pluginRegistry && !isStream) {
       try {
-        const parsed = JSON.parse(bodyStr);
-        if (parsed.type === "error" || parsed.error) {
-          return formatRegistry.transformError(bodyStr, provider.api_type, ctx.apiType);
-        }
-        let transformed = formatRegistry.transformResponse(bodyStr, provider.api_type, ctx.apiType);
-        if (pluginRegistry && !isStream) {
-          try {
-            const respObj = JSON.parse(transformed);
-            const respCtx: ResponseTransformContext = {
-              response: respObj,
-              sourceApiType: provider.api_type as "openai" | "openai-responses" | "anthropic",
-              targetApiType: clientApiType,
-              provider: { id: provider.id, name: provider.name, base_url: provider.base_url, api_type: provider.api_type },
-            };
-            pluginRegistry.applyBeforeResponse(respCtx);
-            pluginRegistry.applyAfterResponse(respCtx);
-            transformed = JSON.stringify(respCtx.response);
-          } catch { /* response hooks best-effort */ } // eslint-disable-line taste/no-silent-catch
-        }
-        return transformed;
-      } catch (err) {
-        request.log.error({ err }, "responseTransform failed");
-        return bodyStr;
-      }
-    } : undefined;
+      const respCtx: ResponseTransformContext = {
+        response: transformed,
+        sourceApiType: provider.api_type as "openai" | "openai-responses" | "anthropic",
+        targetApiType: clientApiType,
+        provider: { id: provider.id, name: provider.name, base_url: provider.base_url, api_type: provider.api_type },
+      };
+      pluginRegistry.applyBeforeResponse(respCtx);
+      pluginRegistry.applyAfterResponse(respCtx);
+      transformed = respCtx.response;
+      } catch { /* response hooks best-effort */ } // eslint-disable-line taste/no-silent-catch
+    }
+    return JSON.stringify(transformed);
+    } catch (err) {
+    request.log.error({ err }, "responseTransform failed");
+    return bodyStr;
+    }
+  } : undefined;
 
     // --- Build transport function ---
     const streamLoopEnabled = enhancementConfig.stream_loop_enabled;
