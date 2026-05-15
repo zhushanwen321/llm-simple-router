@@ -5,7 +5,7 @@
  * 则将 fallback target prepend 到列表头部。
  */
 import type Database from "better-sqlite3";
-import type { Target } from "../core/types.js";
+import type { Target } from "../../core/types.js";
 import { PipelineSnapshot, type StageRecord } from "../pipeline-snapshot.js";
 import { getProviderById } from "../../db/providers.js";
 import { getMappingGroup } from "../../db/mappings.js";
@@ -75,10 +75,20 @@ export function computeImageRedirectTargets(
 ): Target[] {
   try {
   // 空列表直接返回
-    if (targets.length === 0) return targets;
+  if (targets.length === 0) return targets;
 
-    // 无图片 → no-op
-    if (!hasImage(body)) return targets;
+  // 无图片 → no-op，记录 triggered:false
+  if (!hasImage(body)) {
+    snapshot.add({
+    stage: "image-redirect",
+    triggered: false,
+    original_model: targets[0].backend_model,
+    redirect_to: "",
+    redirect_provider: "",
+    reason: "no-image-detected",
+    } satisfies StageRecord);
+    return targets;
+  }
 
     // 检查首 target 的 provider 是否已支持图片
     const firstTarget = targets[0];
@@ -86,33 +96,89 @@ export function computeImageRedirectTargets(
     if (provider) {
       const entries = parseModels(provider.models);
       const entry = entries.find(e => e.name === firstTarget.backend_model);
-      if (entry && supportsImage(entry.capabilities)) {
-        // 首 target 已支持图片，无需 redirect
-        return targets;
-      }
+    if (entry && supportsImage(entry.capabilities)) {
+    // 首 target 已支持图片，无需 redirect
+    snapshot.add({
+      stage: "image-redirect",
+      triggered: false,
+      original_model: firstTarget.backend_model,
+      redirect_to: "",
+      redirect_provider: "",
+      reason: "first-target-already-supports-image",
+    } satisfies StageRecord);
+    return targets;
+    }
     }
 
-    // 查找 image_fallback 配置
-    const group = getMappingGroup(db, clientModel);
-    if (!group) return targets;
+  // 查找 image_fallback 配置
+  const group = getMappingGroup(db, clientModel);
+  if (!group) {
+    snapshot.add({
+    stage: "image-redirect",
+    triggered: false,
+    original_model: firstTarget.backend_model,
+    redirect_to: "",
+    redirect_provider: "",
+    reason: "no-mapping-group",
+    } satisfies StageRecord);
+    return targets;
+  }
 
     let rule: Record<string, unknown>;
     try {
       rule = JSON.parse(group.rule) as Record<string, unknown>;
-    } catch {
-      return targets;
-    }
+  } catch {
+    snapshot.add({
+    stage: "image-redirect",
+    triggered: false,
+    original_model: firstTarget.backend_model,
+    redirect_to: "",
+    redirect_provider: "",
+    reason: "rule-parse-error",
+    } satisfies StageRecord);
+    return targets;
+  }
 
-    const fallback = rule.image_fallback;
-    if (fallback == null || typeof fallback !== "object") return targets;
+  const fallback = rule.image_fallback;
+  if (fallback == null || typeof fallback !== "object") {
+    snapshot.add({
+    stage: "image-redirect",
+    triggered: false,
+    original_model: firstTarget.backend_model,
+    redirect_to: "",
+    redirect_provider: "",
+    reason: "no-image-fallback-configured",
+    } satisfies StageRecord);
+    return targets;
+  }
     const fb = fallback as Record<string, unknown>;
     const fbProviderId = fb.provider_id;
     const fbBackendModel = fb.backend_model;
-    if (typeof fbProviderId !== "string" || typeof fbBackendModel !== "string") return targets;
+  if (typeof fbProviderId !== "string" || typeof fbBackendModel !== "string") {
+    snapshot.add({
+    stage: "image-redirect",
+    triggered: false,
+    original_model: firstTarget.backend_model,
+    redirect_to: "",
+    redirect_provider: "",
+    reason: "invalid-fallback-config",
+    } satisfies StageRecord);
+    return targets;
+  }
 
-    // fallback provider 必须存在且 active
-    const fbProvider = getProviderById(db, fbProviderId);
-    if (!fbProvider || fbProvider.is_active !== 1) return targets;
+  // fallback provider 必须存在且 active
+  const fbProvider = getProviderById(db, fbProviderId);
+  if (!fbProvider || fbProvider.is_active !== 1) {
+    snapshot.add({
+    stage: "image-redirect",
+    triggered: false,
+    original_model: firstTarget.backend_model,
+    redirect_to: fbBackendModel,
+    redirect_provider: fbProviderId,
+    reason: "fallback-provider-unavailable",
+    } satisfies StageRecord);
+    return targets;
+  }
 
     // prepend fallback target
     const fbTarget: Target = {

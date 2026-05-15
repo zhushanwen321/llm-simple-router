@@ -19,7 +19,8 @@ import { getProviderById, updateLogClientStatus, insertRequestLog, updateLogStre
 import { getSetting } from "../../db/settings.js";
 import { decrypt } from "../../utils/crypto.js";
 import { resolveMapping, filterExcluded } from "../routing/mapping-resolver.js";
-import { applyOverflowRedirect } from "../routing/overflow.js";
+import { expandOverflowTargets } from "../routing/overflow.js";
+import { computeImageRedirectTargets } from "../routing/image-redirect.js";
 import { getConfig } from "../../config/index.js";
 import type { ProxyErrorFormatter } from "../proxy-core.js";
 import type { FormatAdapter } from "../format/types.js";
@@ -35,7 +36,7 @@ import { loadEnhancementConfig } from "../routing/enhancement-config.js";
 import { extractFailedToolResults, getTransportStatusCode, serializeBlocksForStorage } from "./proxy-handler-utils.js";
 import type { FailedToolResult } from "./proxy-handler-utils.js";
 import { logToolErrors } from "../tool-error-logger.js";
-import type { Target, ResolveResult, ConcurrencyOverride } from "../../core/types.js";
+import type { Target } from "../../core/types.js";
 import type { RawHeaders } from "../types.js";
 import type { PipelineContext } from "../pipeline/types.js";
 import { PipelineAbort } from "../pipeline/types.js";
@@ -155,7 +156,6 @@ export async function executeFailoverLoop(
 
   const excludeTargets: Target[] = [];
   let rootLogId: string | null = null;
-  let toolErrorsLogged = false;
   let pendingToolErrors: FailedToolResult[] | null = null;
 
   const flushToolErrors = (providerId: string, model: string, reqLogId: string) => {
@@ -183,104 +183,118 @@ export async function executeFailoverLoop(
   const decryptedApiKeys = new Map<string, string>();
   const encryptionKey = getSetting(db, "encryption_key");
 
-  // BP-H2: 请求级缓存 — resolveMapping 的 DB 查询结果在 failover 迭代间不变，只 excludeTargets 变化
-  let cachedTargets: Target[] | undefined;
-  let cachedConcurrencyOverride: ConcurrencyOverride | undefined;
+  // === 循环前：路由决策（resolveMapping → IR → OF 分层预计算） ===
 
+  const precomputeSnapshot = new PipelineSnapshot();
+
+  // 1. resolveMapping — 只调一次，不传 excludeTargets（exclude 在循环内处理）
+  const resolveResult = resolveMapping(db, clientModel, { now: new Date() });
+
+  // resolveMapping 返回 null 时，需要用占位 snapshot 做错误日志
+  const rejectSnapshot = new PipelineSnapshot();
+
+  if (!resolveResult) {
+  const logId = randomUUID();
+  const startTime = Date.now();
+  const isStream = (ctx.body as Record<string, unknown>).stream === true;
+  const rCtx: RejectParams = {
+    db, logId, apiType: ctx.apiType, model: clientModel,
+    startTime, isStream, routerKeyId: request.routerKey?.id ?? null, originalBody: rawBody, clientHeaders: cliHdrs,
+    isFailover: false, originalRequestId: null,
+    sessionId: ctx.metadata.get("session_id") as string | undefined,
+    pipelineSnapshot: rejectSnapshot.toJSON(),
+    matcher, logFileWriter,
+  };
+  return rejectAndReply(reply, rCtx, errors.modelNotFound(clientModel), `No mapping found for model '${clientModel}'`);
+  }
+
+  let allTargets = resolveResult.allTargets ?? [resolveResult.target];
+  const concurrencyOverride = resolveResult.concurrency_override;
+
+  // allowed_models 检查 — 只检查首个 target（IR fallback 是 admin 配置的，视为已授权）
+  const allowedModels = request.routerKey?.allowed_models;
+  if (allowedModels && allowedModels.length > 0 && !allowedModels.includes(allTargets[0].backend_model)) {
+  const logId = randomUUID();
+  const startTime = Date.now();
+  const isStream = (ctx.body as Record<string, unknown>).stream === true;
+  const rCtx: RejectParams = {
+    db, logId, apiType: ctx.apiType, model: clientModel,
+    startTime, isStream, routerKeyId: request.routerKey?.id ?? null, originalBody: rawBody, clientHeaders: cliHdrs,
+    isFailover: false, originalRequestId: null,
+    sessionId: ctx.metadata.get("session_id") as string | undefined,
+    pipelineSnapshot: rejectSnapshot.toJSON(),
+    matcher, logFileWriter,
+  };
+  return rejectAndReply(reply, rCtx, errors.modelNotAllowed(allTargets[0].backend_model),
+    `Model '${allTargets[0].backend_model}' not allowed`, allTargets[0].provider_id);
+  }
+
+  // 2. IR 层：图片检测 → 可能 prepend fallback target
+  allTargets = computeImageRedirectTargets(db, allTargets, clientModel, ctx.body, precomputeSnapshot);
+
+  // 3. OF 层：为每个 target 预计算 overflow
+  const targetsBeforeOF = allTargets.length;
+  allTargets = expandOverflowTargets(allTargets, db, ctx.body);
+  precomputeSnapshot.add({ stage: "overflow", triggered: allTargets.length > targetsBeforeOF });
+
+  // 预计算完成，缓存到循环外
+  const cachedTargets = allTargets;
+
+  // 工具错误日志提取（循环外一次性执行）
+  if (enhancementConfig.tool_error_logging_enabled) {
+  const failures = extractFailedToolResults(ctx.body);
+  if (failures.length > 0) {
+    request.log.info({ failures: failures.length, sessionId: ctx.metadata.get("session_id") }, "Tool error results detected");
+    pendingToolErrors = failures;
+  }
+  }
+
+  // === while(true)：纯执行循环 ===
   let failoverIteration = 0;
 
   while (true) {
-    // 请求被 kill 后 reply 已销毁，直接退出避免浪费 failover 迭代
-    if (reply.raw.destroyed) return reply;
-    if (++failoverIteration > MAX_FAILOVER_ITERATIONS) {
-      return reply.code(HTTP_SERVICE_UNAVAILABLE).send({
-        error: { message: `Max failover iterations (${MAX_FAILOVER_ITERATIONS}) exceeded`, type: "server_error", code: "failover_limit_exceeded" },
-      });
-    }
-    const startTime = Date.now();
-    const logId = randomUUID();
-    if (rootLogId === null) rootLogId = logId;
-    const isFailoverIteration = rootLogId !== logId;
-    const routerKeyId = request.routerKey?.id ?? null;
+  // 请求被 kill 后 reply 已销毁，直接退出避免浪费 failover 迭代
+  if (reply.raw.destroyed) return reply;
+  if (++failoverIteration > MAX_FAILOVER_ITERATIONS) {
+    return reply.code(HTTP_SERVICE_UNAVAILABLE).send({
+    error: { message: `Max failover iterations (${MAX_FAILOVER_ITERATIONS}) exceeded`, type: "server_error", code: "failover_limit_exceeded" },
+    });
+  }
+  const startTime = Date.now();
+  const logId = randomUUID();
+  if (rootLogId === null) rootLogId = logId;
+  const isFailoverIteration = rootLogId !== logId;
+  const routerKeyId = request.routerKey?.id ?? null;
 
-    // 浅拷贝：后续操作只修改顶层属性（model），嵌套对象不被修改
-    // 如果需要修改嵌套属性，在使用点做深拷贝（applyProviderPatches 已有 CoW）
-    let currentBody = { ...ctx.body };
-    const isStream = currentBody.stream === true;
-    const iterationSnapshot = new PipelineSnapshot();
+  // 浅拷贝：后续操作只修改顶层属性（model），嵌套对象不被修改
+  let currentBody = { ...ctx.body };
+  const isStream = currentBody.stream === true;
+  const iterationSnapshot = new PipelineSnapshot(precomputeSnapshot.getStages());
 
-    const rCtx: RejectParams = {
-      db, logId, apiType: ctx.apiType, model: clientModel,
-      startTime, isStream, routerKeyId, originalBody: rawBody, clientHeaders: cliHdrs,
-      isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null,
-      sessionId: ctx.metadata.get("session_id") as string | undefined,
-      pipelineSnapshot: iterationSnapshot.toJSON(),
-      matcher, logFileWriter,
-    };
+  const rCtx: RejectParams = {
+    db, logId, apiType: ctx.apiType, model: clientModel,
+    startTime, isStream, routerKeyId, originalBody: rawBody, clientHeaders: cliHdrs,
+    isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null,
+    sessionId: ctx.metadata.get("session_id") as string | undefined,
+    pipelineSnapshot: iterationSnapshot.toJSON(),
+    matcher, logFileWriter,
+  };
 
-    // --- Route ---
-    // BP-H2: 后续迭代使用缓存的 targets，只做 filterExcluded，不查 DB
-    let resolveResult: ResolveResult | null;
-    if (cachedTargets) {
-      const filtered = filterExcluded(cachedTargets, excludeTargets);
-      resolveResult = filtered.length > 0
-        ? { target: filtered[0], concurrency_override: cachedConcurrencyOverride, targetCount: cachedTargets.length }
-        : null;
-    } else {
-      resolveResult = resolveMapping(db, clientModel, { now: new Date(), excludeTargets });
-      if (resolveResult?.allTargets) {
-        cachedTargets = resolveResult.allTargets;
-        cachedConcurrencyOverride = resolveResult.concurrency_override;
-      }
-    }
-    request.log.debug({ logId, model: clientModel, apiType: ctx.apiType, isStream, action: "resolve_mapping", resolved: !!resolveResult, cached: !!cachedTargets });
+  // --- 选第一个非 excluded target ---
+  const filtered = filterExcluded(cachedTargets, excludeTargets);
+  if (filtered.length === 0) {
+    return rejectAndReply(reply, rCtx, errors.upstreamConnectionFailed(),
+    `All failover targets exhausted (${excludeTargets.length} attempted)`);
+  }
 
-    if (!resolveResult) {
-      if (excludeTargets.length > 0) {
-        return rejectAndReply(reply, rCtx, errors.upstreamConnectionFailed(), `All failover targets exhausted (${excludeTargets.length} attempted)`);
-      }
-      return rejectAndReply(reply, rCtx, errors.modelNotFound(clientModel), `No mapping found for model '${clientModel}'`);
-    }
+  const resolved = filtered[0];
+  const isFailover = cachedTargets.length > 1;
 
-    const concurrencyOverride = resolveResult.concurrency_override;
-    let resolved = resolveResult.target;
-    const isFailover = resolveResult.targetCount > 1;
-
-    // allowed_models 检查 — 仅首次迭代（已由 auth 中间件预解析为数组）
-    if (excludeTargets.length === 0) {
-      const allowedModels = request.routerKey?.allowed_models;
-      if (allowedModels && allowedModels.length > 0 && !allowedModels.includes(resolved.backend_model)) {
-        return rejectAndReply(reply, rCtx, errors.modelNotAllowed(resolved.backend_model),
-          `Model '${resolved.backend_model}' not allowed`, resolved.provider_id);
-      }
-    }
-
-    let provider = getProviderById(db, resolved.provider_id);
-    if (!provider || !provider.is_active) {
-      return rejectAndReply(reply, rCtx, errors.providerUnavailable(),
-        `Provider '${resolved.provider_id}' unavailable`, resolved.provider_id);
-    }
-
-    // 工具错误日志提取（仅首次迭代）
-    if (enhancementConfig.tool_error_logging_enabled && !toolErrorsLogged) {
-      toolErrorsLogged = true;
-      const failures = extractFailedToolResults(ctx.body);
-      if (failures.length > 0) {
-        request.log.info({ failures: failures.length, sessionId: ctx.metadata.get("session_id") }, "Tool error results detected");
-        pendingToolErrors = failures;
-      }
-    }
-
-    // --- 溢出重定向 ---
-    const overflowResult = applyOverflowRedirect(resolved, db, currentBody);
-    if (overflowResult) {
-      const overflowProvider = getProviderById(db, overflowResult.provider_id);
-      if (overflowProvider && overflowProvider.is_active) {
-        resolved = { ...resolved, provider_id: overflowResult.provider_id, backend_model: overflowResult.backend_model };
-        provider = overflowProvider;
-        currentBody = { ...currentBody, model: overflowResult.backend_model };
-      }
-    }
+  const provider = getProviderById(db, resolved.provider_id);
+  if (!provider || !provider.is_active) {
+    return rejectAndReply(reply, rCtx, errors.providerUnavailable(),
+    `Provider '${resolved.provider_id}' unavailable`, resolved.provider_id);
+  }
 
     // 当前迭代的工具错误刷新闭包（统一 6 处调用）
     const flushCurrentErrors = () => flushToolErrors(provider.id, resolved.backend_model ?? clientModel, logId);
@@ -292,10 +306,9 @@ export async function executeFailoverLoop(
     const effectiveUpstreamPath = resolvedPath.effectiveUpstreamPath;
     const needsTransform = resolvedPath.needsTransform;
 
-    // --- routing ---
-    currentBody = { ...currentBody, model: resolved.backend_model };
-    iterationSnapshot.add({ stage: "routing", client_model: clientModel, backend_model: resolved.backend_model, provider_id: resolved.provider_id, strategy: resolveResult.targetCount > 1 ? "failover" : "scheduled" });
-    iterationSnapshot.add({ stage: "overflow", triggered: overflowResult != null });
+  // --- routing ---
+  currentBody = { ...currentBody, model: resolved.backend_model };
+  iterationSnapshot.add({ stage: "routing", client_model: clientModel, backend_model: resolved.backend_model, provider_id: resolved.provider_id, strategy: cachedTargets.length > 1 ? "failover" : "scheduled" });
 
     // --- Plugin 调整 body 和 headers ---
     const pluginResult = applyPluginAdjustments(pluginRegistry, currentBody, clientApiType, provider);

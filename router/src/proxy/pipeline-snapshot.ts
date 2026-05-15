@@ -3,13 +3,14 @@ export type StageRecord =
   | { stage: "tool_guard"; action: string; tool: string }
   | { stage: "routing"; client_model: string; backend_model: string; provider_id: string; strategy: string }
   | { stage: "overflow"; triggered: boolean; redirect_to?: string; redirect_provider?: string }
-  | { stage: "provider_patch"; types: string[] };
+  | { stage: "provider_patch"; types: string[] }
+  | { stage: "image-redirect"; triggered: boolean; original_model: string; redirect_to: string; redirect_provider: string; reason: string };
 
 export class PipelineSnapshot {
   private readonly stages: StageRecord[];
 
-  constructor(initial?: StageRecord[]) {
-    this.stages = initial ? [...initial] : [];
+  constructor(initial?: readonly StageRecord[]) {
+  this.stages = initial ? [...initial] : [];
   }
 
   add(record: StageRecord): void {

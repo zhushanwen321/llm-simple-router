@@ -34,3 +34,10 @@
 - 变更文件：`router/src/proxy/routing/image-redirect.ts`（新建）
 - 摘要：实现 IR 层纯函数 `computeImageRedirectTargets()` 和 `hasImage()`。hasImage 检测三种 API 图片格式（OpenAI image_url、Anthropic image、Responses API input_image）。主函数流程：hasImage → 首target capabilities 检查 → fallback 配置查找 → provider 存活校验 → prepend + snapshot 记录。异常安全（try-catch 返回原 targets）。16/16 测试通过。
 - 时间：2026-05-15T23:58:00Z
+
+## 阶段 6 - T3 编码实现（failover-loop 重构）
+
+- 状态：done
+- 变更文件：`router/src/proxy/handler/failover-loop.ts`, `router/src/proxy/pipeline-snapshot.ts`, `router/src/proxy/routing/image-redirect.ts`
+- 摘要：将 failover-loop.ts 的 while(true) 循环重构为分层预计算模型。resolveMapping/IR/OF 三层在循环外执行，循环简化为纯执行+exclude。同时为 IR 层所有 early-return 路径添加 triggered:false 的 StageRecord，确保 pipeline_snapshot 总是包含 image-redirect stage。修复 pipeline-snapshot 构造函数接受 readonly 参数。修复 image-redirect.ts 的 import 路径。117/117 测试文件、1401/1401 测试通过，零回归。
+- 时间：2026-05-16T00:10:00Z
