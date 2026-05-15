@@ -250,6 +250,10 @@ function mapToolChoiceResponses2Ant(tc: unknown): Record<string, unknown> | unde
     if (obj.type === "function" && obj.name) {
       return { type: "tool", name: obj.name };
     }
+    // Handle {type:"tool"} without name (Cursor IDE format) → use any tool
+    if (obj.type === "tool") {
+      return { type: "any" };
+    }
   }
   return { type: "auto" };
 }
@@ -361,6 +365,18 @@ function convertAntMessagesToResponsesInput(
           id: `rs_${Date.now()}_${items.length}`,
           summary: [{ type: "summary_text", text: tb.thinking ?? "" }],
         });
+      }
+
+      // redacted_thinking → reasoning items with encrypted_content
+      for (const block of content) {
+        const raw = block as unknown as { type: string; data?: string };
+        if (raw.type === "redacted_thinking" && raw.data != null) {
+          items.push({
+            type: "reasoning",
+            id: `rs_${Date.now()}_${items.length}`,
+            encrypted_content: raw.data,
+          });
+        }
       }
 
       // text → assistant message

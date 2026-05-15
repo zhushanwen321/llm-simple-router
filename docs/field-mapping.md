@@ -265,7 +265,69 @@
 
 ---
 
-## 6. 检查清单
+## 6. 参考实现对比
+
+### 6.1 litellm 关键模式
+
+**架构**：Responses→Chat（通用桥）→ Provider adapter（如 Anthropic）
+- 文件：`litellm/responses/litellm_completion_transformation/transformation.py`
+- 核心类：`LiteLLMCompletionResponsesConfig`
+
+**关键差异**：
+| 模式 | litellm | 本项目 |
+|------|---------|--------|
+| `input_image`→Chat | 转为 `image_url` content part | 跳过（lossy bridge） |
+| `reasoning`→Chat | 跳过（request 方向无对应） | 同 litellm |
+| Chat `reasoning_content`→Responses reasoning | 反向时提取 | 跳过（lossy bridge） |
+| tool_choice `{type:"tool"}` | → `"required"` | **未处理** |
+| `content_filter` finish_reason | → `"incomplete"` | 需确认 |
+| `text.format`→`response_format` | 完整转换（含 json_schema） | 直传（部分支持） |
+| tool result 顺序 | 大量工具确保 tool_result 有对应 tool_call | `reorderMessagesAroundToolCalls` |
+
+**effort→budget 映射差异**：
+| effort | litellm（Anthropic adapter） | 本项目 |
+|--------|---------------------------|--------|
+| high | ≥10000 | 32768 |
+| medium | ≥5000 | 8192 |
+| low | ≥2000 | 1024 |
+| minimal | <2000 | N/A |
+
+> 本项目使用固定值映射（兼容 OpenAI 默认），litellm 使用阈值范围。
+
+### 6.2 octopus 关键模式
+
+**架构**：Inbound (API format) → Internal Model (Chat-based) → Outbound (target format)
+- 文件：`internal/transformer/model/model.go`
+- 内部模型基于 Chat Completions + 辅助字段（`ReasoningContent`, `ReasoningSignature`, `CacheControl`）
+
+**关键差异**：
+| 模式 | octopus | 本项目 |
+|------|---------|--------|
+| system→Anthropic | `messages[0].role="system"` → Anthropic `system` | 同 octopus |
+| tool call ID 自动填充 | `fillMissingToolCallIDsFromToolMessages()` | 不填充 |
+| `CacheControl` | 内部模型显式支持 | 通过 `provider_meta` |
+| `ReasoningSignature` | 内部模型显式字段 | 通过 `provider_meta` |
+| default max_tokens | 8192（内部） | 4096（Anthropic 默认） |
+| message 角色交替 | 合并连续同角色消息 | 同 octopus |
+
+### 6.3 本项目与参考实现的差异总结
+
+**已对齐**：
+- system/developer→system 提取
+- function_call 连续合并
+- tool_use↔function_call 映射（含 toolu_ 前缀）
+- thinking↔reasoning 映射
+- stop_reason↔finish_reason 映射
+- Usage cache token 处理
+- message 角色交替
+
+**待优化**：
+1. `redacted_thinking` 在 Anthropic↔Responses 方向未完全处理
+2. `{type:"tool"}` tool_choice 格式（Cursor IDE）未处理
+3. Anthropic↔Responses error 转换缺失
+4. `input_image` 在 Responses→Chat 桥中被跳过（lossy bridge）
+
+## 7. 检查清单
 
 用以下清单逐字段验证转换实现：
 
