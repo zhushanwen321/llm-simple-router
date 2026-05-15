@@ -31,6 +31,7 @@ export interface ActiveRequest {
   clientRequest?: string
   upstreamRequest?: string
   completedAt?: number
+  mappingReason?: string
 }
 
 export interface AttemptSnapshot {

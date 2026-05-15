@@ -57,5 +57,13 @@
   "rawData": "Raw Data",
   "rawJson": "Raw JSON",
   "rawSse": "Raw SSE",
-  "structured": "Structured"
+  "structured": "Structured",
+  "mappingReason": {
+  "direct_format": "Direct Format",
+  "group_base_rule": "Base Rule",
+  "group_schedule": "Scheduled Rule",
+  "fallback_provider": "Provider Match",
+  "overflow_redirect": "Overflow Redirect",
+  "failover_retry": "Failover Retry"
+  }
 }
