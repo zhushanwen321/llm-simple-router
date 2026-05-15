@@ -78,12 +78,12 @@ export class OpenAIToAnthropicTransform extends BaseSSETransform {
       });
     }
 
-  const toolCalls = delta.tool_calls;
-  if (Array.isArray(toolCalls)) {
-    for (const tc of toolCalls) {
-    this.handleToolCallDelta(tc);
+    const toolCalls = delta.tool_calls;
+    if (Array.isArray(toolCalls)) {
+      for (const tc of toolCalls) {
+        this.handleToolCallDelta(tc);
+      }
     }
-  }
 
     const finishReason = choice.finish_reason as string | undefined;
     if (finishReason && !this.finishReasonReceived) {
@@ -189,25 +189,25 @@ export class OpenAIToAnthropicTransform extends BaseSSETransform {
     this.pushAnthropicSSE("message_delta", {
       type: "message_delta",
       delta: { stop_reason: stopReason, stop_sequence: null },
-    usage: { input_tokens: Math.max(0, this.inputTokens - this.cacheReadTokens) || 0, output_tokens: this.outputTokens, cache_read_input_tokens: this.cacheReadTokens },
-  });
-  this.pushAnthropicSSE("message_stop", { type: "message_stop" });
-  this.hasSentMessageStop = true;
-  this.pendingStopReason = null;
+      usage: { input_tokens: Math.max(0, this.inputTokens - this.cacheReadTokens) || 0, output_tokens: this.outputTokens, cache_read_input_tokens: this.cacheReadTokens },
+    });
+    this.pushAnthropicSSE("message_stop", { type: "message_stop" });
+    this.hasSentMessageStop = true;
+    this.pendingStopReason = null;
   }
 
   protected flushPendingData(): void {
-  for (const [idx, data] of this.toolCallBlocks) {
-    if (data.args) {
-    this.emit("warning", { event: "buffered_tool_call", index: idx, argsLength: data.args.length });
-    // Flush buffered args as a content_block_delta so data is not lost
-    this.pushAnthropicSSE("content_block_delta", {
-      type: "content_block_delta", index: idx,
-      delta: { type: "input_json_delta", partial_json: data.args },
-    });
+    for (const [idx, data] of this.toolCallBlocks) {
+      if (data.args) {
+        this.emit("warning", { event: "buffered_tool_call", index: idx, argsLength: data.args.length });
+        // Flush buffered args as a content_block_delta so data is not lost
+        this.pushAnthropicSSE("content_block_delta", {
+          type: "content_block_delta", index: idx,
+          delta: { type: "input_json_delta", partial_json: data.args },
+        });
+      }
     }
-  }
-  this.toolCallBlocks.clear();
+    this.toolCallBlocks.clear();
   }
 
   protected ensureTerminated(): void {

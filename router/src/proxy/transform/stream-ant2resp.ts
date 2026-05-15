@@ -82,11 +82,11 @@ export class AnthropicToResponsesTransform extends BaseSSETransform {
         const block = data.content_block as Record<string, unknown>;
         const blockType = block?.type as string;
 
-    if (blockType === "thinking") {
-      this.state = "thinking";
-      this.reasoningBuffer = "";
-      this.currentItemId = `rs_${randomHex(ID_HEX_LENGTH)}`;
-      this.currentSummaryPartId = `sp_${randomHex(SHORT_HEX_LENGTH)}`;
+        if (blockType === "thinking") {
+          this.state = "thinking";
+          this.reasoningBuffer = "";
+          this.currentItemId = `rs_${randomHex(ID_HEX_LENGTH)}`;
+          this.currentSummaryPartId = `sp_${randomHex(SHORT_HEX_LENGTH)}`;
           this.pushResponsesSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED, {
             type: RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED,
             output_index: this.outputIndex,
@@ -100,11 +100,11 @@ export class AnthropicToResponsesTransform extends BaseSSETransform {
             part: { type: "summary_text", text: "" },
             sequence_number: this.nextSeq(),
           });
-    } else if (blockType === "text") {
-      this.state = "text";
-      this.textBuffer = "";
-      this.currentItemId = `msg_${randomHex(ID_HEX_LENGTH)}`;
-      this.currentContentPartIndex = 0;
+        } else if (blockType === "text") {
+          this.state = "text";
+          this.textBuffer = "";
+          this.currentItemId = `msg_${randomHex(ID_HEX_LENGTH)}`;
+          this.currentContentPartIndex = 0;
           this.pushResponsesSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED, {
             type: RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED,
             output_index: this.outputIndex,
@@ -118,17 +118,17 @@ export class AnthropicToResponsesTransform extends BaseSSETransform {
             part: { type: "output_text", text: "", annotations: [] },
             sequence_number: this.nextSeq(),
           });
-    } else if (blockType === "tool_use") {
-      this.state = "tool_use";
-      this.activeToolName = (block.name as string) ?? "";
-      this.activeToolArgs = "";
-      const toolId = block.id as string;
-      // Convert toolu_ prefix to fc_ prefix
-      this.activeToolCallId = toolId.startsWith("toolu_")
-      ? `fc_${toolId.slice(TOOLU_PREFIX_LEN)}`
-      : `fc_${randomHex(ID_HEX_LENGTH)}`;
-      const callId = this.activeToolCallId;
-      this.currentItemId = callId;
+        } else if (blockType === "tool_use") {
+          this.state = "tool_use";
+          this.activeToolName = (block.name as string) ?? "";
+          this.activeToolArgs = "";
+          const toolId = block.id as string;
+          // Convert toolu_ prefix to fc_ prefix
+          this.activeToolCallId = toolId.startsWith("toolu_")
+            ? `fc_${toolId.slice(TOOLU_PREFIX_LEN)}`
+            : `fc_${randomHex(ID_HEX_LENGTH)}`;
+          const callId = this.activeToolCallId;
+          this.currentItemId = callId;
           this.pushResponsesSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED, {
             type: RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED,
             output_index: this.outputIndex,
@@ -150,10 +150,10 @@ export class AnthropicToResponsesTransform extends BaseSSETransform {
         const delta = data.delta as Record<string, unknown>;
         const deltaType = delta?.type as string;
 
-    if (deltaType === "thinking_delta") {
-      const thinking = delta.thinking as string;
-      if (thinking) {
-      this.reasoningBuffer += thinking;
+        if (deltaType === "thinking_delta") {
+          const thinking = delta.thinking as string;
+          if (thinking) {
+            this.reasoningBuffer += thinking;
             this.pushResponsesSSE(RESPONSES_SSE_EVENTS.REASONING_SUMMARY_TEXT_DELTA, {
               type: RESPONSES_SSE_EVENTS.REASONING_SUMMARY_TEXT_DELTA,
               output_index: this.outputIndex,
@@ -162,10 +162,10 @@ export class AnthropicToResponsesTransform extends BaseSSETransform {
               sequence_number: this.nextSeq(),
             });
           }
-    } else if (deltaType === "text_delta") {
-      const text = delta.text as string;
-      if (text) {
-      this.textBuffer += text;
+        } else if (deltaType === "text_delta") {
+          const text = delta.text as string;
+          if (text) {
+            this.textBuffer += text;
             this.pushResponsesSSE(RESPONSES_SSE_EVENTS.OUTPUT_TEXT_DELTA, {
               type: RESPONSES_SSE_EVENTS.OUTPUT_TEXT_DELTA,
               output_index: this.outputIndex,
@@ -174,10 +174,10 @@ export class AnthropicToResponsesTransform extends BaseSSETransform {
               sequence_number: this.nextSeq(),
             });
           }
-    } else if (deltaType === "input_json_delta") {
-      const partialJson = delta.partial_json as string;
-      if (partialJson) {
-      this.activeToolArgs += partialJson;
+        } else if (deltaType === "input_json_delta") {
+          const partialJson = delta.partial_json as string;
+          if (partialJson) {
+            this.activeToolArgs += partialJson;
             this.pushResponsesSSE(RESPONSES_SSE_EVENTS.FUNCTION_CALL_ARGUMENTS_DELTA, {
               type: RESPONSES_SSE_EVENTS.FUNCTION_CALL_ARGUMENTS_DELTA,
               output_index: this.outputIndex,
@@ -191,92 +191,92 @@ export class AnthropicToResponsesTransform extends BaseSSETransform {
         break;
       }
 
-    case "content_block_stop": {
-    if (this.state === "init") break;
+      case "content_block_stop": {
+        if (this.state === "init") break;
 
-    if (this.state === "thinking") {
-      const text = this.reasoningBuffer;
-      this.reasoningBuffer = "";
-      this.pushResponsesSSE(RESPONSES_SSE_EVENTS.REASONING_SUMMARY_TEXT_DONE, {
-      type: RESPONSES_SSE_EVENTS.REASONING_SUMMARY_TEXT_DONE,
-      output_index: this.outputIndex,
-      summary_index: 0,
-      text,
-      sequence_number: this.nextSeq(),
-      });
-      this.pushResponsesSSE(RESPONSES_SSE_EVENTS.REASONING_SUMMARY_PART_DONE, {
-      type: RESPONSES_SSE_EVENTS.REASONING_SUMMARY_PART_DONE,
-      output_index: this.outputIndex,
-      summary_index: 0,
-      part: { type: "summary_text", text },
-      sequence_number: this.nextSeq(),
-      });
-      this.pushResponsesSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_DONE, {
-      type: RESPONSES_SSE_EVENTS.OUTPUT_ITEM_DONE,
-      output_index: this.outputIndex,
-      item: { type: "reasoning", id: this.currentItemId, summary: [{ type: "summary_text", text }] },
-      sequence_number: this.nextSeq(),
-      });
-      this.collectedOutput.push({ type: "reasoning", id: this.currentItemId, summary: [{ type: "summary_text", text }] });
-    } else if (this.state === "text") {
-      const text = this.textBuffer;
-      this.textBuffer = "";
-      this.pushResponsesSSE(RESPONSES_SSE_EVENTS.OUTPUT_TEXT_DONE, {
-      type: RESPONSES_SSE_EVENTS.OUTPUT_TEXT_DONE,
-      output_index: this.outputIndex,
-      content_index: 0,
-      text,
-      sequence_number: this.nextSeq(),
-      });
-      this.pushResponsesSSE(RESPONSES_SSE_EVENTS.CONTENT_PART_DONE, {
-      type: RESPONSES_SSE_EVENTS.CONTENT_PART_DONE,
-      output_index: this.outputIndex,
-      content_index: 0,
-      part: { type: "output_text", text, annotations: [] },
-      sequence_number: this.nextSeq(),
-      });
-      this.pushResponsesSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_DONE, {
-      type: RESPONSES_SSE_EVENTS.OUTPUT_ITEM_DONE,
-      output_index: this.outputIndex,
-      item: { type: "message", id: this.currentItemId, role: "assistant", content: [{ type: "output_text", text, annotations: [] }], status: "completed" },
-      sequence_number: this.nextSeq(),
-      });
-      this.collectedOutput.push({
-      type: "message", id: this.currentItemId, role: "assistant",
-      content: [{ type: "output_text", text, annotations: [] }],
-      });
-    } else if (this.state === "tool_use") {
-      const args = this.activeToolArgs;
-      const name = this.activeToolName;
-      this.activeToolArgs = "";
-      this.activeToolName = "";
-      this.pushResponsesSSE(RESPONSES_SSE_EVENTS.FUNCTION_CALL_ARGUMENTS_DONE, {
-      type: RESPONSES_SSE_EVENTS.FUNCTION_CALL_ARGUMENTS_DONE,
-      output_index: this.outputIndex,
-      item_id: this.currentItemId,
-      call_id: this.activeToolCallId,
-      arguments: args,
-      sequence_number: this.nextSeq(),
-      });
-      this.pushResponsesSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_DONE, {
-      type: RESPONSES_SSE_EVENTS.OUTPUT_ITEM_DONE,
-      output_index: this.outputIndex,
-      item: {
-        type: "function_call", id: this.activeToolCallId,
-        call_id: this.activeToolCallId,
-        name, arguments: args, status: "completed",
-      },
-      sequence_number: this.nextSeq(),
-      });
-      this.collectedOutput.push({
-      type: "function_call", id: this.activeToolCallId,
-      call_id: this.activeToolCallId, name, arguments: args,
-      });
-    }
-    this.outputIndex++;
-    this.state = "init";
-    break;
-    }
+        if (this.state === "thinking") {
+          const text = this.reasoningBuffer;
+          this.reasoningBuffer = "";
+          this.pushResponsesSSE(RESPONSES_SSE_EVENTS.REASONING_SUMMARY_TEXT_DONE, {
+            type: RESPONSES_SSE_EVENTS.REASONING_SUMMARY_TEXT_DONE,
+            output_index: this.outputIndex,
+            summary_index: 0,
+            text,
+            sequence_number: this.nextSeq(),
+          });
+          this.pushResponsesSSE(RESPONSES_SSE_EVENTS.REASONING_SUMMARY_PART_DONE, {
+            type: RESPONSES_SSE_EVENTS.REASONING_SUMMARY_PART_DONE,
+            output_index: this.outputIndex,
+            summary_index: 0,
+            part: { type: "summary_text", text },
+            sequence_number: this.nextSeq(),
+          });
+          this.pushResponsesSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_DONE, {
+            type: RESPONSES_SSE_EVENTS.OUTPUT_ITEM_DONE,
+            output_index: this.outputIndex,
+            item: { type: "reasoning", id: this.currentItemId, summary: [{ type: "summary_text", text }] },
+            sequence_number: this.nextSeq(),
+          });
+          this.collectedOutput.push({ type: "reasoning", id: this.currentItemId, summary: [{ type: "summary_text", text }] });
+        } else if (this.state === "text") {
+          const text = this.textBuffer;
+          this.textBuffer = "";
+          this.pushResponsesSSE(RESPONSES_SSE_EVENTS.OUTPUT_TEXT_DONE, {
+            type: RESPONSES_SSE_EVENTS.OUTPUT_TEXT_DONE,
+            output_index: this.outputIndex,
+            content_index: 0,
+            text,
+            sequence_number: this.nextSeq(),
+          });
+          this.pushResponsesSSE(RESPONSES_SSE_EVENTS.CONTENT_PART_DONE, {
+            type: RESPONSES_SSE_EVENTS.CONTENT_PART_DONE,
+            output_index: this.outputIndex,
+            content_index: 0,
+            part: { type: "output_text", text, annotations: [] },
+            sequence_number: this.nextSeq(),
+          });
+          this.pushResponsesSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_DONE, {
+            type: RESPONSES_SSE_EVENTS.OUTPUT_ITEM_DONE,
+            output_index: this.outputIndex,
+            item: { type: "message", id: this.currentItemId, role: "assistant", content: [{ type: "output_text", text, annotations: [] }], status: "completed" },
+            sequence_number: this.nextSeq(),
+          });
+          this.collectedOutput.push({
+            type: "message", id: this.currentItemId, role: "assistant",
+            content: [{ type: "output_text", text, annotations: [] }],
+          });
+        } else if (this.state === "tool_use") {
+          const args = this.activeToolArgs;
+          const name = this.activeToolName;
+          this.activeToolArgs = "";
+          this.activeToolName = "";
+          this.pushResponsesSSE(RESPONSES_SSE_EVENTS.FUNCTION_CALL_ARGUMENTS_DONE, {
+            type: RESPONSES_SSE_EVENTS.FUNCTION_CALL_ARGUMENTS_DONE,
+            output_index: this.outputIndex,
+            item_id: this.currentItemId,
+            call_id: this.activeToolCallId,
+            arguments: args,
+            sequence_number: this.nextSeq(),
+          });
+          this.pushResponsesSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_DONE, {
+            type: RESPONSES_SSE_EVENTS.OUTPUT_ITEM_DONE,
+            output_index: this.outputIndex,
+            item: {
+              type: "function_call", id: this.activeToolCallId,
+              call_id: this.activeToolCallId,
+              name, arguments: args, status: "completed",
+            },
+            sequence_number: this.nextSeq(),
+          });
+          this.collectedOutput.push({
+            type: "function_call", id: this.activeToolCallId,
+            call_id: this.activeToolCallId, name, arguments: args,
+          });
+        }
+        this.outputIndex++;
+        this.state = "init";
+        break;
+      }
 
       case "message_delta": {
         const msgDelta = data.delta as Record<string, unknown>;

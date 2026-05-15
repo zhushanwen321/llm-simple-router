@@ -109,7 +109,7 @@ export function openaiToAnthropicRequest(body: Record<string, unknown>): Record<
         for (const block of msg.content) {
           if (block.type === "thinking" && sigIdx < antMeta.thinking_signatures.length) {
             // PSF extension: signature not in AnthropicThinkingBlock
-      (block as unknown as Record<string, unknown>).signature = antMeta.thinking_signatures[sigIdx]?.signature;
+            (block as unknown as Record<string, unknown>).signature = antMeta.thinking_signatures[sigIdx]?.signature;
             sigIdx++;
           }
         }

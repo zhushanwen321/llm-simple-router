@@ -40,9 +40,9 @@ export function createConverter(deps: {
     transformRequest(body) {
       return deps.requestTransform(body);
     },
-  transformResponse(body) {
-    return deps.responseTransform(body);
-  },
+    transformResponse(body) {
+      return deps.responseTransform(body);
+    },
     createStreamTransform(model) {
       return new deps.streamTransformClass(model);
     },

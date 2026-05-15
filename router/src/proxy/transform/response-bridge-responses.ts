@@ -94,20 +94,20 @@ export function responsesToChatResponse(body: Record<string, unknown>): Record<s
   const completionTokens = usage?.output_tokens ?? 0;
 
   return {
-  id: generateChatcmplId(),
-  object: "chat.completion",
-  created: Math.floor(Date.now() / MS_PER_SECOND),
-  model: resp.model ?? "",
-  choices: [{
-    index: 0,
-    message,
-    finish_reason: finishReason,
-  }],
-  usage: {
-    prompt_tokens: promptTokens,
-    completion_tokens: completionTokens,
-    total_tokens: promptTokens + completionTokens,
-  },
+    id: generateChatcmplId(),
+    object: "chat.completion",
+    created: Math.floor(Date.now() / MS_PER_SECOND),
+    model: resp.model ?? "",
+    choices: [{
+      index: 0,
+      message,
+      finish_reason: finishReason,
+    }],
+    usage: {
+      prompt_tokens: promptTokens,
+      completion_tokens: completionTokens,
+      total_tokens: promptTokens + completionTokens,
+    },
   };
 }
 
@@ -187,16 +187,16 @@ export function chatToResponsesResponse(body: Record<string, unknown>): Record<s
   const outputTokens = oai.usage?.completion_tokens ?? 0;
 
   return {
-  id: generateRespId(),
-  object: "response",
-  model: oai.model ?? "",
-  status,
-  output,
-  usage: {
-    input_tokens: inputTokens,
-    output_tokens: outputTokens,
-    total_tokens: inputTokens + outputTokens,
-  },
+    id: generateRespId(),
+    object: "response",
+    model: oai.model ?? "",
+    status,
+    output,
+    usage: {
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+      total_tokens: inputTokens + outputTokens,
+    },
   };
 }
 
