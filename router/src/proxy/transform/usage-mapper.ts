@@ -33,12 +33,12 @@ export function mapStopReasonToFinishReason(reason: string): string {
 export function mapUsageOA2Ant(u: Record<string, unknown> | undefined): Record<string, unknown> {
   if (!u) return { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
   const details = u.prompt_tokens_details as Record<string, unknown> | undefined;
-  const cachedTokens = Number(details?.cached_tokens ?? 0);
+  const cachedTokens = Number(details?.cached_tokens ?? 0) || 0;
   return {
-    input_tokens: Math.max(0, Number(u.prompt_tokens ?? 0) - cachedTokens),
-    output_tokens: Number(u.completion_tokens ?? 0),
-    cache_read_input_tokens: Number(details?.cached_tokens ?? 0),
-    cache_creation_input_tokens: Number(details?.cached_write_tokens ?? 0),
+  input_tokens: Math.max(0, (Number(u.prompt_tokens ?? 0) || 0) - cachedTokens),
+  output_tokens: Number(u.completion_tokens ?? 0) || 0,
+  cache_read_input_tokens: Number(details?.cached_tokens ?? 0) || 0,
+  cache_creation_input_tokens: Number(details?.cached_write_tokens ?? 0) || 0,
   };
 }
 

@@ -34,7 +34,7 @@ export class ResponsesToAnthropicTransform extends BaseSSETransform {
         content: [],
         model: this.model,
         status: "in_progress",
-        usage: { input_tokens: Math.max(0, this.inputTokens - this.cachedTokens) },
+    usage: { input_tokens: Math.max(0, this.inputTokens - this.cachedTokens) || 0 },
       },
     });
   }
@@ -111,9 +111,10 @@ export class ResponsesToAnthropicTransform extends BaseSSETransform {
         break;
       }
 
-      case "response.output_text.delta": {
-        const delta = payload.delta as string;
-        if (delta) {
+    case "response.output_text.delta": {
+    this.ensureMessageStart();
+    const delta = payload.delta as string;
+    if (delta) {
           this.pushAnthropicSSE("content_block_delta", {
             type: "content_block_delta",
             index: this.blockIndex,
@@ -179,28 +180,30 @@ export class ResponsesToAnthropicTransform extends BaseSSETransform {
         break;
       }
 
-      case "response.completed": {
-        const resp = payload.response as Record<string, unknown>;
-        if (resp?.usage) {
-          const usage = resp.usage as Record<string, unknown>;
-          this.inputTokens = (usage.input_tokens as number) ?? this.inputTokens;
-          this.outputTokens = (usage.output_tokens as number) ?? this.outputTokens;
-          const details = usage.input_tokens_details as Record<string, unknown> | undefined;
-          this.cachedTokens = Number(details?.cached_tokens ?? this.cachedTokens);
-        }
-        this.emitStopSequence(resp?.status as string);
-        break;
-      }
+    case "response.completed": {
+    this.ensureMessageStart();
+    const resp = payload.response as Record<string, unknown>;
+    if (resp?.usage) {
+      const usage = resp.usage as Record<string, unknown>;
+      this.inputTokens = (usage.input_tokens as number) ?? this.inputTokens;
+      this.outputTokens = (usage.output_tokens as number) ?? this.outputTokens;
+      const details = usage.input_tokens_details as Record<string, unknown> | undefined;
+      this.cachedTokens = Number(details?.cached_tokens ?? this.cachedTokens);
+    }
+    this.emitStopSequence(resp?.status as string);
+    break;
+    }
 
-      case "response.incomplete": {
-        const resp = payload.response as Record<string, unknown>;
-        if (resp?.usage) {
-          const usage = resp.usage as Record<string, unknown>;
-          this.outputTokens = (usage.output_tokens as number) ?? this.outputTokens;
-        }
-        this.emitStopSequence("incomplete");
-        break;
-      }
+    case "response.incomplete": {
+    this.ensureMessageStart();
+    const resp = payload.response as Record<string, unknown>;
+    if (resp?.usage) {
+      const usage = resp.usage as Record<string, unknown>;
+      this.outputTokens = (usage.output_tokens as number) ?? this.outputTokens;
+    }
+    this.emitStopSequence("incomplete");
+    break;
+    }
 
       case "response.failed": {
         const resp = payload.response as Record<string, unknown>;
@@ -239,7 +242,7 @@ export class ResponsesToAnthropicTransform extends BaseSSETransform {
     this.pushAnthropicSSE("message_delta", {
       type: "message_delta",
       delta: { stop_reason: stopReason, stop_sequence: null },
-      usage: { input_tokens: Math.max(0, this.inputTokens - this.cachedTokens), output_tokens: this.outputTokens },
+    usage: { input_tokens: Math.max(0, this.inputTokens - this.cachedTokens) || 0, output_tokens: this.outputTokens },
     });
     this.pushAnthropicSSE("message_stop", { type: "message_stop" });
     this.hasSentMessageStop = true;

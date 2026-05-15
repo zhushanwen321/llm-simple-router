@@ -14,17 +14,20 @@ export function convertToolsOA2Ant(tools: ChatCompletionTool[]): unknown[] {
 
 /** Anthropic tools[] → OpenAI tools[] */
 export function convertToolsAnt2OA(tools: unknown[]): unknown[] {
-  return tools.map((t) => {
+  return tools
+  .map((t) => {
+    if (typeof t !== "object" || t === null) return null;
     const tool = t as { name: string; description?: string; input_schema?: Record<string, unknown> };
     return {
-      type: "function",
-      function: {
-        name: tool.name,
-        ...(tool.description != null ? { description: tool.description } : {}),
-        ...(tool.input_schema != null ? { parameters: tool.input_schema } : {}),
-      },
+    type: "function",
+    function: {
+      name: tool.name,
+      ...(tool.description != null ? { description: tool.description } : {}),
+      ...(tool.input_schema != null ? { parameters: tool.input_schema } : {}),
+    },
     };
-  });
+  })
+  .filter(Boolean);
 }
 
 /** OpenAI tool_choice → Anthropic tool_choice */

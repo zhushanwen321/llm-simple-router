@@ -165,15 +165,16 @@ function convertResponsesInputToAntMessages(input: string | ResponseInputItem[] 
       });
     } else if (item.type === "function_call_output") {
       // item is narrowed to ResponseFunctionCallOutputInput
-      const antCallId = item.call_id.startsWith("toolu_") ? item.call_id : `toolu_${item.call_id}`;
-      raw.push({
-        role: "user",
-        content: [{
-          type: "tool_result",
-          tool_use_id: sanitizeToolUseId(antCallId),
-          content: item.output ?? "",
-        }],
-      });
+    const rawCallId = item.call_id ?? "";
+    const antCallId = rawCallId.startsWith("toolu_") ? rawCallId : `toolu_${rawCallId}`;
+    raw.push({
+    role: "user",
+    content: [{
+      type: "tool_result",
+      tool_use_id: sanitizeToolUseId(antCallId),
+      content: item.output ?? "",
+    }],
+    });
     } else if (item.type === "reasoning") {
     // item is narrowed to ResponseReasoningInput
       const thinkingText = item.summary

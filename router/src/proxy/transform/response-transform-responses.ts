@@ -38,7 +38,12 @@ function mapStopReasonToStatus(reason: string): string {
 // ---------- Responses → Anthropic ----------
 
 export function responsesToAnthropicResponse(bodyStr: string): string {
-  const resp = JSON.parse(bodyStr) as ResponsesApiResponse;
+  let resp: ResponsesApiResponse;
+  try {
+  resp = JSON.parse(bodyStr) as ResponsesApiResponse;
+  } catch {
+  return bodyStr;
+  }
   const output = resp.output ?? [];
   const content: Array<Record<string, unknown>> = [];
 
@@ -131,14 +136,19 @@ export function transformErrorResponse(bodyStr: string, sourceApiType: string, t
 }
 
 export function anthropicToResponsesResponse(bodyStr: string): string {
-  const ant = JSON.parse(bodyStr) as {
-    type?: string;
-    role?: string;
-    model?: string;
-    content?: AnthropicContentBlock[];
-    stop_reason?: string;
-    usage?: Record<string, unknown>;
+  let ant: {
+  type?: string;
+  role?: string;
+  model?: string;
+  content?: AnthropicContentBlock[];
+  stop_reason?: string;
+  usage?: Record<string, unknown>;
   };
+  try {
+  ant = JSON.parse(bodyStr) as typeof ant;
+  } catch {
+  return bodyStr;
+  }
   // Content may include redacted_thinking blocks not in AnthropicContentBlock union
   const blocks = (ant.content ?? []) as Array<AnthropicContentBlock | { type: "redacted_thinking"; data: string }>;
   const output: ResponseOutputItem[] = [];
