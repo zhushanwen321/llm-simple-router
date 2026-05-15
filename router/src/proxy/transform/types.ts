@@ -70,6 +70,7 @@ export interface ChatCompletionRequest {
   response_format?: unknown;
   stream_options?: unknown;
   parallel_tool_calls?: boolean;
+  user?: string;
 }
 
 // ---------- Anthropic 消息类型 ----------

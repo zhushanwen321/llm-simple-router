@@ -67,9 +67,19 @@ export function responsesToChatRequest(
     }
   }
 
-  // tool_choice — compatible between Chat and Responses
+  // tool_choice — normalize {type:"tool"} from Cursor IDE, then pass through
   if (req.tool_choice != null) {
-    result.tool_choice = req.tool_choice;
+  const tc = req.tool_choice;
+  if (typeof tc === "object" && tc !== null) {
+    const obj = tc as Record<string, unknown>;
+    if (obj.type === "tool" && !obj.name) {
+    result.tool_choice = "required";
+    } else {
+    result.tool_choice = tc;
+    }
+  } else {
+    result.tool_choice = tc;
+  }
   }
 
   // reasoning — pass through (both use {effort?, max_tokens?})
@@ -77,9 +87,21 @@ export function responsesToChatRequest(
     result.reasoning = req.reasoning;
   }
 
-  // text.format → response_format
+  // text.format → response_format (json_schema 结构差异需转换)
   if (req.text?.format != null) {
-    result.response_format = req.text.format;
+  const format = req.text.format as Record<string, unknown>;
+  if (format.type === "json_schema") {
+    result.response_format = {
+    type: "json_schema",
+    json_schema: {
+      name: format.name ?? "response_schema",
+      schema: format.schema ?? {},
+      strict: format.strict ?? false,
+    },
+    };
+  } else {
+    result.response_format = format;
+  }
   }
 
   // parallel_tool_calls — pass through
@@ -87,9 +109,14 @@ export function responsesToChatRequest(
     result.parallel_tool_calls = req.parallel_tool_calls;
   }
 
+  // metadata.user_id → user
+  if (req.metadata?.user_id) {
+  result.user = req.metadata.user_id;
+  }
+
   // stream_options
   if (req.stream_options != null) {
-    result.stream_options = req.stream_options;
+  result.stream_options = req.stream_options;
   }
 
   return result;
@@ -345,9 +372,24 @@ export function chatToResponsesRequest(
     result.reasoning = req.reasoning;
   }
 
-  // response_format → text.format
+  // response_format → text.format (json_schema 结构差异需转换)
   if (req.response_format != null) {
-    result.text = { format: req.response_format };
+  const rf = req.response_format as Record<string, unknown>;
+  if (rf.type === "json_schema" && rf.json_schema) {
+    const js = rf.json_schema as Record<string, unknown>;
+    result.text = {
+    format: {
+      type: "json_schema",
+      name: js.name ?? "response_schema",
+      schema: js.schema,
+      strict: js.strict,
+    },
+    };
+  } else if (rf.type === "json_object") {
+    result.text = { format: { type: "json_object" } };
+  } else {
+    result.text = { format: rf };
+  }
   }
 
   // parallel_tool_calls — pass through
@@ -355,9 +397,14 @@ export function chatToResponsesRequest(
     result.parallel_tool_calls = req.parallel_tool_calls;
   }
 
+  // user → metadata.user_id
+  if (req.user) {
+  result.metadata = { user_id: req.user };
+  }
+
   // stream_options
   if (req.stream_options != null) {
-    result.stream_options = req.stream_options;
+  result.stream_options = req.stream_options;
   }
 
   return result;
@@ -395,14 +442,40 @@ function convertChatMessagesToResponsesInput(
   const items: unknown[] = [];
 
   for (const msg of messages) {
-    if (msg.role === "user") {
-      const text = typeof msg.content === "string" ? msg.content : (msg.content ?? "") as string;
+  if (msg.role === "user") {
+    const raw = msg.content as string | Array<Record<string, unknown>> | null | undefined;
+    if (typeof raw === "string") {
       items.push({
         type: "message",
         role: "user",
-        content: [{ type: "input_text", text }],
+        content: [{ type: "input_text", text: raw }],
       });
-    } else if (msg.role === "assistant") {
+    } else if (Array.isArray(raw)) {
+      const parts: Array<Record<string, unknown>> = [];
+      for (const part of raw) {
+        if (typeof part === "object" && part !== null) {
+          const p = part as Record<string, unknown>;
+          if (p.type === "text" && p.text != null) {
+            parts.push({ type: "input_text", text: p.text as string });
+          } else if (p.type === "image_url") {
+            parts.push({
+              type: "input_image",
+              image_url: (p.image_url as Record<string, unknown>)?.url ?? "",
+            });
+          }
+        }
+      }
+      if (parts.length > 0) {
+        items.push({ type: "message", role: "user", content: parts });
+      }
+    } else if (raw != null) {
+      items.push({
+        type: "message",
+        role: "user",
+        content: [{ type: "input_text", text: JSON.stringify(raw) }],
+      });
+    }
+  } else if (msg.role === "assistant") {
       // Text content → assistant message with output_text
       if (msg.content != null && msg.content !== "") {
         const text = typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content);

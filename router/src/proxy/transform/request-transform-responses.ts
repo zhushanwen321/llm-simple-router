@@ -1,5 +1,5 @@
 import { sanitizeToolUseId, parseToolArguments } from "./sanitize.js";
-import type { AnthropicContentBlock, AnthropicMessage, AnthropicRequest } from "./types.js";
+import type { AnthropicContentBlock, AnthropicImageBlock, AnthropicMessage, AnthropicRequest } from "./types.js";
 import type {
   ResponsesApiRequest,
   ResponseInputItem,
@@ -335,24 +335,38 @@ function convertAntMessagesToResponsesInput(
 
     if (role === "user") {
       // Separate text blocks and tool_result blocks
-      const textBlocks = content.filter((b): b is Extract<AnthropicContentBlock, { type: "text" }> => b.type === "text");
-      const toolResultBlocks = content.filter((b): b is Extract<AnthropicContentBlock, { type: "tool_result" }> => b.type === "tool_result");
+    const textBlocks = content.filter((b): b is Extract<AnthropicContentBlock, { type: "text" }> => b.type === "text");
+    const toolResultBlocks = content.filter((b): b is Extract<AnthropicContentBlock, { type: "tool_result" }> => b.type === "tool_result");
+    const imageBlocks = content.filter((b): b is AnthropicImageBlock => b.type === "image");
 
-      if (textBlocks.length > 0) {
-        const text = textBlocks.map(b => b.text ?? "").join("");
-        items.push({
-          type: "message",
-          role: "user",
-          content: [{ type: "input_text", text }],
-        });
-      }
-      for (const tr of toolResultBlocks) {
-        items.push({
-          type: "function_call_output",
-          call_id: stripTooluPrefix(tr.tool_use_id ?? ""),
-          output: tr.content ?? "",
-        });
-      }
+    // Build user message content parts: text + images
+    const userParts: Array<Record<string, unknown>> = [];
+    if (textBlocks.length > 0) {
+    const text = textBlocks.map(b => b.text ?? "").join("");
+    userParts.push({ type: "input_text", text });
+    }
+    for (const img of imageBlocks) {
+    const src = img.source;
+    const imageUrl = src.type === "url"
+      ? (src.url ?? "")
+      : `data:${src.media_type ?? "image/png"};base64,${src.data ?? ""}`;
+    userParts.push({ type: "input_image", image_url: imageUrl });
+    }
+    if (userParts.length > 0) {
+    items.push({
+      type: "message",
+      role: "user",
+      content: userParts,
+    });
+    }
+
+    for (const tr of toolResultBlocks) {
+    items.push({
+      type: "function_call_output",
+      call_id: stripTooluPrefix(tr.tool_use_id ?? ""),
+      output: tr.content ?? "",
+    });
+    }
     } else if (role === "assistant") {
       const textBlocks = content.filter((b): b is Extract<AnthropicContentBlock, { type: "text" }> => b.type === "text");
       const toolUseBlocks = content.filter((b): b is Extract<AnthropicContentBlock, { type: "tool_use" }> => b.type === "tool_use");

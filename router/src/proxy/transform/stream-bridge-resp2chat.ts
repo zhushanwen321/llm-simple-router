@@ -16,6 +16,7 @@ export class ResponsesToChatBridgeTransform extends BaseSSETransform {
   private outputTokens = 0;
   private finishReasonEmitted = false;
   private hasFunctionCall = false;
+  private cachedTokens = 0;
 
   private ensureRoleSent(): void {
     if (this.hasSentRole) return;
@@ -33,18 +34,22 @@ export class ResponsesToChatBridgeTransform extends BaseSSETransform {
     try { payload = JSON.parse(event.data!); } catch (err) { this.emit("warning", err); return; }
 
     switch (eventType) {
-      case "response.created":
-      case "response.in_progress":
-      case "response.queued": {
-        // Extract usage from response object if present
-        const resp = payload.response as Record<string, unknown> | undefined;
-        if (resp?.usage) {
-          const usage = resp.usage as Record<string, unknown>;
-          this.inputTokens = (usage.input_tokens as number) ?? this.inputTokens;
-          this.outputTokens = (usage.output_tokens as number) ?? this.outputTokens;
-        }
-        break;
+    case "response.created":
+    case "response.in_progress":
+    case "response.queued": {
+    // Extract usage from response object if present
+    const resp = payload.response as Record<string, unknown> | undefined;
+    if (resp?.usage) {
+      const usage = resp.usage as Record<string, unknown>;
+      this.inputTokens = (usage.input_tokens as number) ?? this.inputTokens;
+      this.outputTokens = (usage.output_tokens as number) ?? this.outputTokens;
+      const inputDetails = usage.input_tokens_details as Record<string, number> | undefined;
+      if (inputDetails?.cached_tokens) {
+      this.cachedTokens = inputDetails.cached_tokens;
       }
+    }
+    break;
+    }
 
       case "response.output_text.delta": {
         this.ensureRoleSent();
@@ -123,61 +128,78 @@ export class ResponsesToChatBridgeTransform extends BaseSSETransform {
         break;
       }
 
-      case "response.completed": {
-        const resp = payload.response as Record<string, unknown>;
-        if (resp?.usage) {
-          const usage = resp.usage as Record<string, unknown>;
-          this.inputTokens = (usage.input_tokens as number) ?? this.inputTokens;
-          this.outputTokens = (usage.output_tokens as number) ?? this.outputTokens;
-        }
-
-        if (!this.finishReasonEmitted) {
-          this.finishReasonEmitted = true;
-          const finishReason = this.hasFunctionCall ? "tool_calls" : "stop";
-          this.pushOpenAISSE({
-            id: this.chatcmplId,
-            object: "chat.completion.chunk",
-            choices: [{ index: 0, delta: {}, finish_reason: finishReason }],
-          });
-        }
-
-        // Emit usage chunk
-        this.pushOpenAISSE({
-          id: this.chatcmplId,
-          object: "chat.completion.chunk",
-          choices: [],
-          usage: {
-            prompt_tokens: this.inputTokens,
-            completion_tokens: this.outputTokens,
-            total_tokens: this.inputTokens + this.outputTokens,
-          },
-        });
-        this.pushDone();
-        break;
+    case "response.completed": {
+    const resp = payload.response as Record<string, unknown>;
+    if (resp?.usage) {
+      const usage = resp.usage as Record<string, unknown>;
+      this.inputTokens = (usage.input_tokens as number) ?? this.inputTokens;
+      this.outputTokens = (usage.output_tokens as number) ?? this.outputTokens;
+      const inputDetails = usage.input_tokens_details as Record<string, number> | undefined;
+      if (inputDetails?.cached_tokens) {
+      this.cachedTokens = inputDetails.cached_tokens;
       }
+    }
 
-      case "response.incomplete": {
-        if (!this.finishReasonEmitted) {
-          this.finishReasonEmitted = true;
-          this.pushOpenAISSE({
-            id: this.chatcmplId,
-            object: "chat.completion.chunk",
-            choices: [{ index: 0, delta: {}, finish_reason: "length" }],
-          });
-        }
-        this.pushOpenAISSE({
-          id: this.chatcmplId,
-          object: "chat.completion.chunk",
-          choices: [],
-          usage: {
-            prompt_tokens: this.inputTokens,
-            completion_tokens: this.outputTokens,
-            total_tokens: this.inputTokens + this.outputTokens,
-          },
-        });
-        this.pushDone();
-        break;
+    if (!this.finishReasonEmitted) {
+      this.finishReasonEmitted = true;
+      const finishReason = this.hasFunctionCall ? "tool_calls" : "stop";
+      this.pushOpenAISSE({
+      id: this.chatcmplId,
+      object: "chat.completion.chunk",
+      choices: [{ index: 0, delta: {}, finish_reason: finishReason }],
+      });
+    }
+
+    // Emit usage chunk
+    this.pushOpenAISSE({
+      id: this.chatcmplId,
+      object: "chat.completion.chunk",
+      choices: [],
+      usage: {
+      prompt_tokens: this.inputTokens,
+      completion_tokens: this.outputTokens,
+      total_tokens: this.inputTokens + this.outputTokens,
+      ...(this.cachedTokens > 0 ? { prompt_tokens_details: { cached_tokens: this.cachedTokens } } : {}),
+      },
+    });
+    this.pushDone();
+    break;
+    }
+
+    case "response.incomplete": {
+    const incResp = payload.response as Record<string, unknown> | undefined;
+    if (incResp?.usage) {
+      const usage = incResp.usage as Record<string, unknown>;
+      this.inputTokens = (usage.input_tokens as number) ?? this.inputTokens;
+      this.outputTokens = (usage.output_tokens as number) ?? this.outputTokens;
+      const inputDetails = usage.input_tokens_details as Record<string, number> | undefined;
+      if (inputDetails?.cached_tokens) {
+      this.cachedTokens = inputDetails.cached_tokens;
       }
+    }
+
+    if (!this.finishReasonEmitted) {
+      this.finishReasonEmitted = true;
+      this.pushOpenAISSE({
+      id: this.chatcmplId,
+      object: "chat.completion.chunk",
+      choices: [{ index: 0, delta: {}, finish_reason: "length" }],
+      });
+    }
+    this.pushOpenAISSE({
+      id: this.chatcmplId,
+      object: "chat.completion.chunk",
+      choices: [],
+      usage: {
+      prompt_tokens: this.inputTokens,
+      completion_tokens: this.outputTokens,
+      total_tokens: this.inputTokens + this.outputTokens,
+      ...(this.cachedTokens > 0 ? { prompt_tokens_details: { cached_tokens: this.cachedTokens } } : {}),
+      },
+    });
+    this.pushDone();
+    break;
+    }
 
       case "response.failed": {
         const resp = payload.response as Record<string, unknown>;
