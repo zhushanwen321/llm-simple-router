@@ -23,6 +23,13 @@
       <span class="text-[10px] text-muted-foreground flex-shrink-0">@ {{ overview.providerName || t('requestDetail.unknownProvider') }}</span>
     </div>
 
+    <!-- Mapping reason badge -->
+    <div v-if="overview.mappingReason" class="flex items-center gap-1.5">
+      <Badge variant="secondary" class="text-[10px]">
+        {{ t(`requestDetail.mappingReason.${overview.mappingReason}`) }}
+      </Badge>
+    </div>
+
     <!-- Row 2: status + SSE + apiType -->
     <div class="flex items-center gap-1.5">
       <Badge v-if="statusColor === 'pending'" variant="outline" class="border-warning/30 bg-warning-light text-warning-dark">

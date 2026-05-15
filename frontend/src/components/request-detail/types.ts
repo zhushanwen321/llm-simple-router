@@ -42,6 +42,7 @@ export interface UnifiedRequestOverview {
   inputTokensEstimated: boolean;
   clientType: string | null;
   cacheReadTokensEstimated: number | null;
+  mappingReason?: string;
 }
 
 export function fromActiveRequest(
@@ -96,6 +97,7 @@ export function fromActiveRequest(
     inputTokensEstimated: false,
     clientType: null,
     cacheReadTokensEstimated: null,
+    mappingReason: req.mappingReason,
   };
 }
 
@@ -127,6 +129,51 @@ function extractResponseBody(upstreamResponse: string | null): string | null {
 const ROUTER_INTERNAL_ERROR_PREFIXES = [
   "stream_error: upstream returned 200 but body contains error",
 ];
+
+// 注意：此函数与 router/src/utils/mapping-reason-parser.ts 保持同步
+// 修改此函数时必须同步修改 router 端并确保测试通过
+const KNOWN_MAPPING_REASONS = new Set([
+  "direct_format",
+  "group_base_rule",
+  "group_schedule",
+  "fallback_provider",
+  "overflow_redirect",
+  "failover_retry",
+]);
+
+/**
+ * 从 pipeline_snapshot JSON 中提取映射原因。
+ * 优先检查 overflow stage（triggered === true → "overflow_redirect"），
+ * 否则取 routing stage 的 mapping_reason 字段。
+ * 只返回白名单中的值，避免未知的 mapping_reason 导致 i18n key 断裂。
+ */
+export function parseMappingReason(
+  snapshot: string | null | undefined,
+): string | undefined {
+  if (!snapshot) return undefined;
+  try {
+    const parsed: unknown = JSON.parse(snapshot);
+    const stages: Array<Record<string, unknown>> = Array.isArray(parsed) ? parsed : [];
+    if (stages.length === 0) return undefined;
+    // 优先检查 overflow stage
+    for (const stage of stages) {
+      if (stage.stage === "overflow" && stage.triggered === true) {
+        return "overflow_redirect";
+      }
+    }
+    // 取 routing stage 的 mapping_reason
+    for (const stage of stages) {
+      if (stage.stage === "routing" && typeof stage.mapping_reason === "string") {
+        return KNOWN_MAPPING_REASONS.has(stage.mapping_reason)
+          ? stage.mapping_reason
+          : undefined;
+      }
+    }
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 function isRouterInternalError(msg: string | null | undefined): boolean {
   if (!msg) return false;
@@ -190,5 +237,6 @@ export function fromLogEntry(entry: LogEntry): UnifiedRequestOverview {
     inputTokensEstimated: entry.input_tokens_estimated === 1,
     clientType: entry.client_type ?? null,
     cacheReadTokensEstimated: entry.cache_read_tokens_estimated ?? null,
+    mappingReason: parseMappingReason(entry.pipeline_snapshot),
   };
 }

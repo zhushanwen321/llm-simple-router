@@ -1,0 +1,160 @@
+{
+  "requirement": "映射原因追踪 (Mapping Reason Tracking)",
+  "branch": "feat-mapping-reason-track",
+  "date": "2026-05-15",
+  "complexity": "L2",
+  "phases": {
+    "phase1": {
+      "name": "Spec + Plan",
+      "stages": [1, 2, 3, 4, 5, 6, 7, 8],
+      "durationMinutes": 73,
+      "specReviewRounds": 3,
+      "planReviewRounds": 1,
+      "e2ePlanReviewRounds": 1
+    },
+    "phase2": {
+      "name": "Implementation + Test",
+      "stages": [9, 10, 11, 12, 13, 14, 15],
+      "durationMinutes": 77,
+      "codeReviewRounds": 1,
+      "testReviewRounds": 1,
+      "tddRedTests": 9,
+      "tddRedFailures": 7,
+      "tddRedPasses": 2
+    }
+  },
+  "changes": {
+    "filesTotal": 37,
+    "filesAdded": 0,
+    "filesModified": 17,
+    "linesAdded": 2878,
+    "linesDeleted": 95,
+    "netLines": 2783,
+    "backendFiles": [
+      "router/src/core/types.ts",
+      "router/src/core/monitor/types.ts",
+      "router/src/proxy/pipeline-snapshot.ts",
+      "router/src/proxy/routing/mapping-resolver.ts",
+      "router/src/proxy/orchestration/orchestrator.ts",
+      "router/src/proxy/handler/failover-loop.ts"
+    ],
+    "frontendFiles": [
+      "frontend/src/types/monitor.ts",
+      "frontend/src/components/logs/types.ts",
+      "frontend/src/components/request-detail/types.ts",
+      "frontend/src/components/request-detail/RequestOverviewPanel.vue",
+      "frontend/src/i18n/locales/zh-CN/requestDetail.json",
+      "frontend/src/i18n/locales/en/requestDetail.json"
+    ],
+    "testFiles": [
+      "router/tests/mapping-reason.test.ts",
+      "router/tests/mapping-reason-overflow.test.ts",
+      "router/tests/mapping-reason-failover.test.ts",
+      "router/tests/parse-mapping-reason.test.ts",
+      "router/tests/admin-monitor.test.ts"
+    ]
+  },
+  "tests": {
+    "newTestFiles": 5,
+    "newTestCases": 32,
+    "totalTestCases": 1375,
+    "skippedTests": 3,
+    "failedTests": 0,
+    "regressions": 0,
+    "testDurationSeconds": 1.97
+  },
+  "quality": {
+    "gatesPassed": true,
+    "backendLint": "0 warnings",
+    "frontendLint": "0 warnings",
+    "frontendTypeCheck": "0 errors",
+    "backendBuild": "pass",
+    "frontendBuild": "pass"
+  },
+  "issues": {
+    "totalBugsFound": 1,
+    "bugsFoundByCodeReview": 1,
+    "bugsFoundByTestReview": 0,
+    "bugsFoundByTesting": 0,
+    "bugsFoundAfterDeploy": 0,
+    "mustFixInCodeReview": 1,
+    "mustFixInTestReview": 0,
+    "lintIssues": 1
+  },
+  "rootCause": {
+    "specIncomplete": 1,
+    "codeLogic": 1,
+    "testGap": 0,
+    "environment": 0
+  },
+  "reviewEffectiveness": {
+    "specReviewBlockingRate": 1.0,
+    "planReviewBlockingRate": 0.0,
+    "codeReviewDefectDetectionRate": 1.0,
+    "testReviewDefectDetectionRate": null,
+    "codeReviewROI": "high"
+  },
+  "stageTimings": [
+    {"stage": 1, "name": "需求讨论", "durationSeconds": 285},
+    {"stage": 2, "name": "Spec 编写", "durationSeconds": 993},
+    {"stage": 3, "name": "Spec 评审", "durationSeconds": 1171},
+    {"stage": 4, "name": "Plan 编写", "durationSeconds": 600},
+    {"stage": 5, "name": "Plan 评审", "durationSeconds": 331},
+    {"stage": 6, "name": "E2E 测试计划", "durationSeconds": 73},
+    {"stage": 7, "name": "E2E 测试计划评审", "durationSeconds": 654},
+    {"stage": 8, "name": "用户确认", "durationSeconds": 309},
+    {"stage": 9, "name": "TDD 测试编写", "durationSeconds": 502},
+    {"stage": 10, "name": "编码实现", "durationSeconds": 839},
+    {"stage": 11, "name": "编码评审", "durationSeconds": 891},
+    {"stage": 12, "name": "单元测试补充", "durationSeconds": 266},
+    {"stage": 13, "name": "E2E 测试", "durationSeconds": 74},
+    {"stage": 14, "name": "测试评审", "durationSeconds": 223},
+    {"stage": 15, "name": "推送+CI+部署", "durationSeconds": 287}
+  ],
+  "lessonsLearned": [
+    {
+      "id": "L1",
+      "category": "bug_pattern",
+      "severity": "high",
+      "description": "DB JSON 字段解析格式假设错误是 TDD 盲区：当测试数据和实现代码共享同一错误假设时，TDD 无法检测",
+      "action": "编码前从 DB 读真实数据验证格式；测试数据使用与 DB 序列化一致的构造方法"
+    },
+    {
+      "id": "L2",
+      "category": "spec_quality",
+      "severity": "medium",
+      "description": "跨层穿透需求（后端函数→DB→SSE→前端展示）信息密度高，需要显式的数据消费者矩阵",
+      "action": "Spec 完成前用六要素覆盖矩阵自检"
+    },
+    {
+      "id": "L3",
+      "category": "review_value",
+      "severity": "low",
+      "description": "编码评审的独立验证价值：TDD 保证代码实现测试期望，但不验证测试期望本身是否正确",
+      "action": "评审者重点关注与外部系统（DB、API）的接口边界"
+    },
+    {
+      "id": "L4",
+      "category": "efficiency",
+      "severity": "low",
+      "description": "并行 subagent + 清晰 Task 拆分 + TDD 先行 = 高效编码",
+      "action": "继续保持此模式"
+    }
+  ],
+  "claudeMdSuggestions": [
+    {
+      "id": "S1",
+      "priority": "P1",
+      "section": "代码品味原则",
+      "description": "新增 DB JSON 字段解析验证规范：测试必须使用 DB 实际序列化的数据格式",
+      "evidence": "parseMappingReason 格式 bug"
+    },
+    {
+      "id": "S2",
+      "priority": "P2",
+      "section": "plan 编写规范",
+      "description": "Plan 中涉及 DB JSON 字段解析的伪代码必须标注数据来源和实际序列化格式",
+      "evidence": "Plan 伪代码的 parsed.stages 假设错误传播到实现"
+    }
+  ]
+}

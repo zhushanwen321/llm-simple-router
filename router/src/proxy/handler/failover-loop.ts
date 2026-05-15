@@ -35,7 +35,7 @@ import { loadEnhancementConfig } from "../routing/enhancement-config.js";
 import { extractFailedToolResults, getTransportStatusCode, serializeBlocksForStorage } from "./proxy-handler-utils.js";
 import type { FailedToolResult } from "./proxy-handler-utils.js";
 import { logToolErrors } from "../tool-error-logger.js";
-import type { Target, ResolveResult, ConcurrencyOverride } from "../../core/types.js";
+import type { Target, ResolveResult, ConcurrencyOverride, MappingReason } from "../../core/types.js";
 import type { RawHeaders } from "../types.js";
 import type { PipelineContext } from "../pipeline/types.js";
 import { PipelineAbort } from "../pipeline/types.js";
@@ -224,7 +224,7 @@ export async function executeFailoverLoop(
     if (cachedTargets) {
       const filtered = filterExcluded(cachedTargets, excludeTargets);
       resolveResult = filtered.length > 0
-        ? { target: filtered[0], concurrency_override: cachedConcurrencyOverride, targetCount: cachedTargets.length }
+        ? { target: filtered[0], concurrency_override: cachedConcurrencyOverride, targetCount: cachedTargets.length, mappingReason: "failover_retry" as const }
         : null;
     } else {
       resolveResult = resolveMapping(db, clientModel, { now: new Date(), excludeTargets });
@@ -272,6 +272,7 @@ export async function executeFailoverLoop(
     }
 
     // --- 溢出重定向 ---
+    let effectiveMappingReason: MappingReason = resolveResult.mappingReason;
     const overflowResult = applyOverflowRedirect(resolved, db, currentBody);
     if (overflowResult) {
       const overflowProvider = getProviderById(db, overflowResult.provider_id);
@@ -279,6 +280,7 @@ export async function executeFailoverLoop(
         resolved = { ...resolved, provider_id: overflowResult.provider_id, backend_model: overflowResult.backend_model };
         provider = overflowProvider;
         currentBody = { ...currentBody, model: overflowResult.backend_model };
+        effectiveMappingReason = "overflow_redirect";
       }
     }
 
@@ -294,7 +296,7 @@ export async function executeFailoverLoop(
 
     // --- routing ---
     currentBody = { ...currentBody, model: resolved.backend_model };
-    iterationSnapshot.add({ stage: "routing", client_model: clientModel, backend_model: resolved.backend_model, provider_id: resolved.provider_id, strategy: resolveResult.targetCount > 1 ? "failover" : "scheduled" });
+    iterationSnapshot.add({ stage: "routing", client_model: clientModel, backend_model: resolved.backend_model, provider_id: resolved.provider_id, strategy: resolveResult.targetCount > 1 ? "failover" : "scheduled", mapping_reason: effectiveMappingReason });
     iterationSnapshot.add({ stage: "overflow", triggered: overflowResult != null });
 
     // --- Plugin 调整 body 和 headers ---
@@ -384,7 +386,7 @@ export async function executeFailoverLoop(
     try {
       const resilienceResult = await orchestrator.handle(
         request, reply, clientApiType,
-        { resolved, provider, clientModel, isStream, trackerId: logId, sessionId: ctx.metadata.get("session_id") as string | undefined, clientRequest: clientReq, upstreamRequest: upstreamReqBase, concurrencyOverride },
+        { resolved, provider, clientModel, isStream, trackerId: logId, sessionId: ctx.metadata.get("session_id") as string | undefined, clientRequest: clientReq, upstreamRequest: upstreamReqBase, concurrencyOverride, mappingReason: effectiveMappingReason },
         { retryBaseDelayMs: config.RETRY_BASE_DELAY_MS, isFailover, ruleMatcher: matcher, transportFn },
       );
 
