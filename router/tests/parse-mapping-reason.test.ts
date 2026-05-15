@@ -1,30 +1,5 @@
 import { describe, it, expect } from "vitest";
-
-/**
- * parseMappingReason: 从 pipeline_snapshot JSON 中提取映射原因。
- * 此函数与前端实现完全一致，用于后端单元测试。
- */
-function parseMappingReason(snapshot: string | null | undefined): string | undefined {
-  if (!snapshot) return undefined;
-  try {
-  const parsed: unknown = JSON.parse(snapshot);
-  const stages: Array<Record<string, unknown>> = Array.isArray(parsed) ? parsed : [];
-  if (stages.length === 0) return undefined;
-  for (const stage of stages) {
-    if (stage.stage === "overflow" && stage.triggered === true) {
-    return "overflow_redirect";
-    }
-  }
-  for (const stage of stages) {
-    if (stage.stage === "routing" && typeof stage.mapping_reason === "string") {
-    return stage.mapping_reason;
-    }
-  }
-  return undefined;
-  } catch {
-  return undefined;
-  }
-}
+import { parseMappingReason } from "../src/utils/mapping-reason-parser.js";
 
 describe("parseMappingReason", () => {
   it("returns undefined for null input", () => {
@@ -55,9 +30,7 @@ describe("parseMappingReason", () => {
   });
 
   it("returns undefined when routing stage has no mapping_reason field", () => {
-  const snapshot = JSON.stringify([
-    { stage: "routing" },
-  ]);
+  const snapshot = JSON.stringify([{ stage: "routing" }]);
   expect(parseMappingReason(snapshot)).toBeUndefined();
   });
 
