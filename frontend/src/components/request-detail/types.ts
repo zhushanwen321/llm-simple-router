@@ -130,6 +130,8 @@ const ROUTER_INTERNAL_ERROR_PREFIXES = [
   "stream_error: upstream returned 200 but body contains error",
 ];
 
+// 注意：此函数与 router/src/utils/mapping-reason-parser.ts 保持同步
+// 修改此函数时必须同步修改 router 端并确保测试通过
 const KNOWN_MAPPING_REASONS = new Set([
   "direct_format",
   "group_base_rule",

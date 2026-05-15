@@ -4,17 +4,12 @@ import Database from "better-sqlite3";
 import { createHash } from "crypto";
 import { encrypt } from "../src/utils/crypto.js";
 import { createProxyHandler } from "../src/proxy/handler/create-proxy-handler.js";
-import { FormatRegistry } from "../src/proxy/format/registry.js";
-import { openaiAdapter } from "../src/proxy/format/adapters/openai.js";
 import { authMiddleware } from "../src/middleware/auth.js";
 import { initDatabase } from "../src/db/index.js";
 import { setSetting } from "../src/db/settings.js";
-import { SemaphoreManager as ProviderSemaphoreManager } from "../src/core/concurrency/index.js";
-import { RequestTracker } from "../src/core/monitor/index.js";
 import { createMockBackend } from "./helpers/mock-backend.js";
 import { TEST_ENCRYPTION_KEY } from "./helpers/test-setup.js";
-import { ServiceContainer, SERVICE_KEYS } from "../src/core/container.js";
-import { ProxyAgentFactory } from "../src/proxy/transport/proxy-agent.js";
+import { createTestContainer } from "./helpers/mapping-reason-test-helper.js";
 
 const API_KEY = "sk-test-router";
 const API_KEY_HASH = createHash("sha256").update(API_KEY).digest("hex");
@@ -24,7 +19,11 @@ const SUCCESS_BODY = {
   object: "chat.completion",
   model: "gpt-4",
   choices: [
-  { index: 0, message: { role: "assistant", content: "Hi" }, finish_reason: "stop" },
+  {
+    index: 0,
+    message: { role: "assistant", content: "Hi" },
+    finish_reason: "stop",
+  },
   ],
   usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
 };
@@ -40,12 +39,32 @@ function insertFailoverGroup(
   db.prepare(
   `INSERT INTO providers (id, name, api_type, base_url, api_key, is_active, models, created_at, updated_at)
    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run("prov-primary", "Primary", "openai", url1, encryptedKey, 1, JSON.stringify(["gpt-4"]), now, now);
+  ).run(
+  "prov-primary",
+  "Primary",
+  "openai",
+  url1,
+  encryptedKey,
+  1,
+  JSON.stringify(["gpt-4"]),
+  now,
+  now,
+  );
 
   db.prepare(
   `INSERT INTO providers (id, name, api_type, base_url, api_key, is_active, models, created_at, updated_at)
    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run("prov-fallback", "Fallback", "openai", url2, encryptedKey, 1, JSON.stringify(["gpt-4"]), now, now);
+  ).run(
+  "prov-fallback",
+  "Fallback",
+  "openai",
+  url2,
+  encryptedKey,
+  1,
+  JSON.stringify(["gpt-4"]),
+  now,
+  now,
+  );
 
   db.prepare(
   `INSERT INTO mapping_groups (id, client_model, rule, is_active, created_at)
@@ -68,19 +87,6 @@ function insertFailoverGroup(
   ).run("test-router-key", "Test Key", API_KEY_HASH, API_KEY.slice(0, 8));
 }
 
-function buildTestApp(db: Database.Database, container: ServiceContainer): FastifyInstance {
-  const app = Fastify();
-  app.register(authMiddleware, { db });
-  const formatRegistry = new FormatRegistry();
-  formatRegistry.registerAdapter(openaiAdapter);
-  container.register(SERVICE_KEYS.formatRegistry, () => formatRegistry);
-  app.register(
-  createProxyHandler({ apiType: "openai", paths: ["/v1/chat/completions", "/chat/completions"] }),
-  { db, container },
-  );
-  return app;
-}
-
 describe("mappingReason: failover_retry", () => {
   let app: FastifyInstance;
   let db: Database.Database;
@@ -95,16 +101,27 @@ describe("mappingReason: failover_retry", () => {
 
   it("should set mappingReason to failover_retry on 2nd+ iteration when primary returns 500", async () => {
   // Primary 返回 500，触发 failover
-  const { port: primaryPort, close: closePrimary } = await createMockBackend((_req, res) => {
+  const {
+    port: primaryPort,
+    close: closePrimary,
+  } = await createMockBackend((_req, res) => {
     res.writeHead(500, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({
-    error: { message: "Internal Server Error", type: "server_error" },
-    }));
+    res.end(
+    JSON.stringify({
+      error: {
+      message: "Internal Server Error",
+      type: "server_error",
+      },
+    }),
+    );
   });
   servers.push({ close: closePrimary });
 
   // Fallback 返回 200
-  const { port: fallbackPort, close: closeFallback } = await createMockBackend((_req, res) => {
+  const {
+    port: fallbackPort,
+    close: closeFallback,
+  } = await createMockBackend((_req, res) => {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify(SUCCESS_BODY));
   });
@@ -113,22 +130,22 @@ describe("mappingReason: failover_retry", () => {
   db = initDatabase(":memory:");
   setSetting(db, "encryption_key", TEST_ENCRYPTION_KEY);
   setSetting(db, "initialized", "true");
-  insertFailoverGroup(db, `http://127.0.0.1:${primaryPort}`, `http://127.0.0.1:${fallbackPort}`);
+  insertFailoverGroup(
+    db,
+    `http://127.0.0.1:${primaryPort}`,
+    `http://127.0.0.1:${fallbackPort}`,
+  );
 
-  const container = new ServiceContainer();
-  const semaphoreManager = new ProviderSemaphoreManager();
-  const tracker = new RequestTracker({ semaphoreManager });
-  container.register("semaphoreManager", () => semaphoreManager);
-  container.register("tracker", () => tracker);
-  container.register("matcher", () => undefined);
-  container.register("usageWindowTracker", () => undefined);
-  container.register("sessionTracker", () => undefined);
-  container.register("adaptiveController", () => undefined);
-  container.register(SERVICE_KEYS.logFileWriter, () => null);
-  container.register(SERVICE_KEYS.pluginRegistry, () => undefined);
-  container.register(SERVICE_KEYS.proxyAgentFactory, () => new ProxyAgentFactory());
-
-  app = buildTestApp(db, container);
+  const container = createTestContainer();
+  app = Fastify();
+  app.register(authMiddleware, { db });
+  app.register(
+    createProxyHandler({
+    apiType: "openai",
+    paths: ["/v1/chat/completions", "/chat/completions"],
+    }),
+    { db, container },
+  );
 
   const resp = await app.inject({
     method: "POST",
@@ -147,21 +164,26 @@ describe("mappingReason: failover_retry", () => {
   expect(resp.statusCode).toBe(200);
 
   // 断言 1: is_failover=1 的日志的 pipeline_snapshot 中 routing stage mapping_reason = "failover_retry"
-  const failoverLog = db.prepare(
+  const failoverLog = db
+    .prepare(
     "SELECT pipeline_snapshot FROM request_logs WHERE is_failover = 1 ORDER BY rowid DESC LIMIT 1",
-  ).get() as { pipeline_snapshot: string } | undefined;
+    )
+    .get() as { pipeline_snapshot: string } | undefined;
   expect(failoverLog).toBeDefined();
 
-  const stages = JSON.parse(failoverLog!.pipeline_snapshot) as Array<Record<string, unknown>>;
+  const stages = JSON.parse(failoverLog!.pipeline_snapshot) as Array<
+    Record<string, unknown>
+  >;
   const routingStage = stages.find((s) => s.stage === "routing");
   expect(routingStage).toBeDefined();
   expect(routingStage!.mapping_reason).toBe("failover_retry");
 
   // 断言 2: ActiveRequest（通过 tracker.getRecent）的 mappingReason = "failover_retry"
+  const tracker = container.resolve<import("../src/core/monitor/index.js").RequestTracker>("tracker");
   const recent = tracker.getRecent();
   // 取最后一个完成的请求（即 failover 成功的那个）
-  const failoverReq = recent.find((r) =>
-    r.providerId === "prov-fallback" && r.status === "completed",
+  const failoverReq = recent.find(
+    (r) => r.providerId === "prov-fallback" && r.status === "completed",
   );
   expect(failoverReq).toBeDefined();
   expect(failoverReq!.mappingReason).toBe("failover_retry");
@@ -169,14 +191,20 @@ describe("mappingReason: failover_retry", () => {
 
   it("should NOT set mappingReason to failover_retry on first iteration (no failover)", async () => {
   // Primary 直接返回 200，不触发 failover
-  const { port: primaryPort, close: closePrimary } = await createMockBackend((_req, res) => {
+  const {
+    port: primaryPort,
+    close: closePrimary,
+  } = await createMockBackend((_req, res) => {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify(SUCCESS_BODY));
   });
   servers.push({ close: closePrimary });
 
   // Fallback — 不应被调用
-  const { port: fallbackPort, close: closeFallback } = await createMockBackend((_req, res) => {
+  const {
+    port: fallbackPort,
+    close: closeFallback,
+  } = await createMockBackend((_req, res) => {
     res.writeHead(500);
     res.end("should not reach fallback");
   });
@@ -185,22 +213,22 @@ describe("mappingReason: failover_retry", () => {
   db = initDatabase(":memory:");
   setSetting(db, "encryption_key", TEST_ENCRYPTION_KEY);
   setSetting(db, "initialized", "true");
-  insertFailoverGroup(db, `http://127.0.0.1:${primaryPort}`, `http://127.0.0.1:${fallbackPort}`);
+  insertFailoverGroup(
+    db,
+    `http://127.0.0.1:${primaryPort}`,
+    `http://127.0.0.1:${fallbackPort}`,
+  );
 
-  const container = new ServiceContainer();
-  const semaphoreManager = new ProviderSemaphoreManager();
-  const tracker = new RequestTracker({ semaphoreManager });
-  container.register("semaphoreManager", () => semaphoreManager);
-  container.register("tracker", () => tracker);
-  container.register("matcher", () => undefined);
-  container.register("usageWindowTracker", () => undefined);
-  container.register("sessionTracker", () => undefined);
-  container.register("adaptiveController", () => undefined);
-  container.register(SERVICE_KEYS.logFileWriter, () => null);
-  container.register(SERVICE_KEYS.pluginRegistry, () => undefined);
-  container.register(SERVICE_KEYS.proxyAgentFactory, () => new ProxyAgentFactory());
-
-  app = buildTestApp(db, container);
+  const container = createTestContainer();
+  app = Fastify();
+  app.register(authMiddleware, { db });
+  app.register(
+    createProxyHandler({
+    apiType: "openai",
+    paths: ["/v1/chat/completions", "/chat/completions"],
+    }),
+    { db, container },
+  );
 
   const resp = await app.inject({
     method: "POST",
@@ -218,12 +246,16 @@ describe("mappingReason: failover_retry", () => {
   expect(resp.statusCode).toBe(200);
 
   // 首次迭代的日志 routing stage mapping_reason 不应是 failover_retry
-  const logRow = db.prepare(
+  const logRow = db
+    .prepare(
     "SELECT pipeline_snapshot FROM request_logs WHERE is_failover = 0 ORDER BY rowid DESC LIMIT 1",
-  ).get() as { pipeline_snapshot: string } | undefined;
+    )
+    .get() as { pipeline_snapshot: string } | undefined;
   expect(logRow).toBeDefined();
 
-  const stages = JSON.parse(logRow!.pipeline_snapshot) as Array<Record<string, unknown>>;
+  const stages = JSON.parse(logRow!.pipeline_snapshot) as Array<
+    Record<string, unknown>
+  >;
   const routingStage = stages.find((s) => s.stage === "routing");
   expect(routingStage).toBeDefined();
   expect(routingStage!.mapping_reason).not.toBe("failover_retry");
