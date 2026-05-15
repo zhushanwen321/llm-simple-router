@@ -85,13 +85,14 @@ export function convertMessagesOA2Ant(
       if (msg.content != null && msg.content !== "") {
         blocks.push(...normalizeToTextBlocks(msg.content));
       }
-      // tool_calls → tool_use blocks
-      if (msg.tool_calls) {
-        for (const tc of msg.tool_calls) {
-          const input = parseToolArguments(tc.function.arguments);
-          blocks.push({ type: "tool_use", id: sanitizeToolUseId(tc.id), name: tc.function.name, input });
-        }
-      }
+    // tool_calls → tool_use blocks
+    if (msg.tool_calls) {
+    for (const tc of msg.tool_calls) {
+      if (!tc.function) continue;
+      const input = parseToolArguments(tc.function.arguments);
+      blocks.push({ type: "tool_use", id: sanitizeToolUseId(tc.id), name: tc.function.name, input });
+    }
+    }
       if (blocks.length === 0) blocks.push({ type: "text", text: "" });
       raw.push({ role: "assistant", content: blocks });
     } else if (msg.role === "tool") {
@@ -233,11 +234,11 @@ export function convertMessagesAnt2OA(
       // tool_use → tool_calls（无 id 的 tool_use 使用预生成的 UUID）
       if (toolBlocks.length > 0) {
         const idMap = assistantToolMap.get(assistantCounter);
-        oaiMsg.tool_calls = toolBlocks.map((b, i) => ({
-          id: b.id || (idMap ? idMap.get(i) || randomUUID() : randomUUID()),
-          type: "function",
-          function: { name: b.name, arguments: JSON.stringify(b.input ?? {}) },
-        }));
+    oaiMsg.tool_calls = toolBlocks.map((b, i) => ({
+      id: b.id || (idMap ? idMap.get(i) || randomUUID() : randomUUID()),
+      type: "function",
+      function: { name: b.name ?? "unknown", arguments: JSON.stringify(b.input ?? {}) },
+    }));
       }
 
       if (oaiMsg.content || oaiMsg.tool_calls) {

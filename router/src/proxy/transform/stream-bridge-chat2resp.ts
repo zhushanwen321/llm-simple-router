@@ -333,8 +333,8 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
     }
 
     // Handle tool_calls
-    const toolCalls = delta?.tool_calls as Array<Record<string, unknown>> | undefined;
-    if (toolCalls) {
+  const toolCalls = delta?.tool_calls;
+  if (Array.isArray(toolCalls)) {
       this.ensureResponseCreated();
       // Close any open items before starting a tool call
       this.closeCurrentReasoningItem();

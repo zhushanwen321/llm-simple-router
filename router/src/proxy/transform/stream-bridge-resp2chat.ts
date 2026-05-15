@@ -95,11 +95,13 @@ export class ResponsesToChatBridgeTransform extends BaseSSETransform {
         break;
       }
 
-      case "response.function_call_arguments.delta": {
-        const delta = payload.delta as string;
-        if (delta) {
-          // Use currentToolCallIndex - 1 because the tool call was already registered
-          const tcIndex = this.currentToolCallIndex - 1;
+    case "response.function_call_arguments.delta": {
+    const delta = payload.delta as string;
+    if (delta) {
+      // arguments.delta should only arrive after a function_call item was added
+      if (this.currentToolCallIndex <= 0) break;
+      // Use currentToolCallIndex - 1 because the tool call was already registered
+      const tcIndex = this.currentToolCallIndex - 1;
           this.pushOpenAISSE({
             id: this.chatcmplId,
             object: "chat.completion.chunk",
