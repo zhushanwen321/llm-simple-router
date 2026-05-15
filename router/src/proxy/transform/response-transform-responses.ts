@@ -82,19 +82,19 @@ export function responsesToAnthropicResponse(body: Record<string, unknown>): Rec
   const cachedInputTokens = (inputTokensDetails?.cached_tokens as number) ?? 0;
 
   return {
-  id: generateMsgId(),
-  type: "message",
-  role: "assistant",
-  content,
-  model: resp.model ?? "",
-  stop_reason: mapStatusToStopReason(resp.status ?? "completed"),
-  stop_sequence: null,
-  usage: {
-    input_tokens: Math.max(0, (usage?.input_tokens ?? 0) - cachedInputTokens),
-    output_tokens: usage?.output_tokens ?? 0,
-    cache_read_input_tokens: cachedInputTokens,
-    cache_creation_input_tokens: 0,
-  },
+    id: generateMsgId(),
+    type: "message",
+    role: "assistant",
+    content,
+    model: resp.model ?? "",
+    stop_reason: mapStatusToStopReason(resp.status ?? "completed"),
+    stop_sequence: null,
+    usage: {
+      input_tokens: Math.max(0, (usage?.input_tokens ?? 0) - cachedInputTokens),
+      output_tokens: usage?.output_tokens ?? 0,
+      cache_read_input_tokens: cachedInputTokens,
+      cache_creation_input_tokens: 0,
+    },
   };
 }
 
@@ -112,18 +112,18 @@ function stripTooluPrefix(id: string): string {
 export function transformErrorResponse(body: Record<string, unknown>, sourceApiType: string, targetApiType: string): string {
   if (sourceApiType === targetApiType) return JSON.stringify(body);
   try {
-  if (sourceApiType === "anthropic" && targetApiType === "openai-responses") {
-  // Anthropic error: {type:"error", error:{type, message}} → Responses: {error:{code, message}}
-    const err = (body.error as Record<string, unknown>) ?? {};
-    return JSON.stringify({ error: { code: err.type ?? "api_error", message: err.message ?? "Unknown error" } });
-  }
-  if (sourceApiType === "openai-responses" && targetApiType === "anthropic") {
-  // Responses error: {error:{code, message}} → Anthropic: {type:"error", error:{type, message}}
-    const err = (body.error as Record<string, unknown>) ?? {};
-    return JSON.stringify({ type: "error", error: { type: err.code ?? "api_error", message: err.message ?? "Unknown error" } });
-  }
+    if (sourceApiType === "anthropic" && targetApiType === "openai-responses") {
+      // Anthropic error: {type:"error", error:{type, message}} → Responses: {error:{code, message}}
+      const err = (body.error as Record<string, unknown>) ?? {};
+      return JSON.stringify({ error: { code: err.type ?? "api_error", message: err.message ?? "Unknown error" } });
+    }
+    if (sourceApiType === "openai-responses" && targetApiType === "anthropic") {
+      // Responses error: {error:{code, message}} → Anthropic: {type:"error", error:{type, message}}
+      const err = (body.error as Record<string, unknown>) ?? {};
+      return JSON.stringify({ type: "error", error: { type: err.code ?? "api_error", message: err.message ?? "Unknown error" } });
+    }
   } catch {
-  return JSON.stringify(body);
+    return JSON.stringify(body);
   }
   return JSON.stringify(body);
 }
@@ -191,18 +191,18 @@ export function anthropicToResponsesResponse(body: Record<string, unknown>): Rec
   const outputTokens = (antUsage?.output_tokens as number) ?? 0;
   const cacheRead = (antUsage?.cache_read_input_tokens as number) ?? 0;
   return {
-  id: generateRespId(),
-  object: "response",
-  model: ant.model ?? "",
-  status: mapStopReasonToStatus((ant.stop_reason ?? "end_turn") as string),
-  output,
-  usage: {
-    input_tokens: inputTokens,
-    output_tokens: outputTokens,
-    total_tokens: inputTokens + outputTokens,
-    input_tokens_details: {
-    cached_tokens: cacheRead,
+    id: generateRespId(),
+    object: "response",
+    model: ant.model ?? "",
+    status: mapStopReasonToStatus((ant.stop_reason ?? "end_turn") as string),
+    output,
+    usage: {
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+      total_tokens: inputTokens + outputTokens,
+      input_tokens_details: {
+        cached_tokens: cacheRead,
+      },
     },
-  },
   };
 }

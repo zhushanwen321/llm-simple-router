@@ -11,6 +11,8 @@ import type {
 
 const EFFORT_BUDGET: Record<string, number> = { low: 1024, medium: 8192, high: 32768 };
 const DEFAULT_BUDGET = 8192;
+const DEFAULT_MAX_TOKENS_MULTIPLIER = 2;
+const MIN_MAX_TOKENS = 16000;
 
 // ---------- Internal types ----------
 
@@ -113,17 +115,17 @@ export function responsesToAnthropicRequest(
     const budget = req.reasoning.max_tokens ?? EFFORT_BUDGET[req.reasoning.effort ?? ""] ?? DEFAULT_BUDGET;
     result.thinking = { type: "enabled", budget_tokens: budget };
 
-  // Anthropic requires max_tokens > budget_tokens (strictly greater).
-  // If max_tokens is absent, auto-set to a reasonable value > budget.
-  if (result.max_tokens != null) {
-    if ((result.max_tokens as number) <= budget) {
-    result.max_tokens = budget + 1;
-    }
-  } else {
+    // Anthropic requires max_tokens > budget_tokens (strictly greater).
+    // If max_tokens is absent, auto-set to a reasonable value > budget.
+    if (result.max_tokens != null) {
+      if ((result.max_tokens as number) <= budget) {
+        result.max_tokens = budget + 1;
+      }
+    } else {
     // No max_output_tokens set, but reasoning is enabled. Default to 2x budget
     // or 16000, whichever is larger, so there's room for text output.
-    result.max_tokens = Math.max(budget * 2, 16000);
-  }
+      result.max_tokens = Math.max(budget * DEFAULT_MAX_TOKENS_MULTIPLIER, MIN_MAX_TOKENS);
+    }
   }
 
   // metadata.user_id
@@ -172,16 +174,16 @@ function convertResponsesInputToAntMessages(input: string | ResponseInputItem[] 
       });
     } else if (item.type === "function_call_output") {
       // item is narrowed to ResponseFunctionCallOutputInput
-    const rawCallId = item.call_id ?? "";
-    const antCallId = rawCallId.startsWith("toolu_") ? rawCallId : `toolu_${rawCallId}`;
-    raw.push({
-    role: "user",
-    content: [{
-      type: "tool_result",
-      tool_use_id: sanitizeToolUseId(antCallId),
-      content: item.output ?? "",
-    }],
-    });
+      const rawCallId = item.call_id ?? "";
+      const antCallId = rawCallId.startsWith("toolu_") ? rawCallId : `toolu_${rawCallId}`;
+      raw.push({
+        role: "user",
+        content: [{
+          type: "tool_result",
+          tool_use_id: sanitizeToolUseId(antCallId),
+          content: item.output ?? "",
+        }],
+      });
     } else if (item.type === "reasoning") {
     // item is narrowed to ResponseReasoningInput
       const thinkingText = item.summary
@@ -343,38 +345,38 @@ function convertAntMessagesToResponsesInput(
 
     if (role === "user") {
       // Separate text blocks and tool_result blocks
-    const textBlocks = content.filter((b): b is Extract<AnthropicContentBlock, { type: "text" }> => b.type === "text");
-    const toolResultBlocks = content.filter((b): b is Extract<AnthropicContentBlock, { type: "tool_result" }> => b.type === "tool_result");
-    const imageBlocks = content.filter((b): b is AnthropicImageBlock => b.type === "image");
+      const textBlocks = content.filter((b): b is Extract<AnthropicContentBlock, { type: "text" }> => b.type === "text");
+      const toolResultBlocks = content.filter((b): b is Extract<AnthropicContentBlock, { type: "tool_result" }> => b.type === "tool_result");
+      const imageBlocks = content.filter((b): b is AnthropicImageBlock => b.type === "image");
 
-    // Build user message content parts: text + images
-    const userParts: Array<Record<string, unknown>> = [];
-    if (textBlocks.length > 0) {
-    const text = textBlocks.map(b => b.text ?? "").join("");
-    userParts.push({ type: "input_text", text });
-    }
-    for (const img of imageBlocks) {
-    const src = img.source;
-    const imageUrl = src.type === "url"
-      ? (src.url ?? "")
-      : `data:${src.media_type ?? "image/png"};base64,${src.data ?? ""}`;
-    userParts.push({ type: "input_image", image_url: imageUrl });
-    }
-    if (userParts.length > 0) {
-    items.push({
-      type: "message",
-      role: "user",
-      content: userParts,
-    });
-    }
+      // Build user message content parts: text + images
+      const userParts: Array<Record<string, unknown>> = [];
+      if (textBlocks.length > 0) {
+        const text = textBlocks.map(b => b.text ?? "").join("");
+        userParts.push({ type: "input_text", text });
+      }
+      for (const img of imageBlocks) {
+        const src = img.source;
+        const imageUrl = src.type === "url"
+          ? (src.url ?? "")
+          : `data:${src.media_type ?? "image/png"};base64,${src.data ?? ""}`;
+        userParts.push({ type: "input_image", image_url: imageUrl });
+      }
+      if (userParts.length > 0) {
+        items.push({
+          type: "message",
+          role: "user",
+          content: userParts,
+        });
+      }
 
-    for (const tr of toolResultBlocks) {
-    items.push({
-      type: "function_call_output",
-      call_id: stripTooluPrefix(tr.tool_use_id ?? ""),
-      output: tr.content ?? "",
-    });
-    }
+      for (const tr of toolResultBlocks) {
+        items.push({
+          type: "function_call_output",
+          call_id: stripTooluPrefix(tr.tool_use_id ?? ""),
+          output: tr.content ?? "",
+        });
+      }
     } else if (role === "assistant") {
       const textBlocks = content.filter((b): b is Extract<AnthropicContentBlock, { type: "text" }> => b.type === "text");
       const toolUseBlocks = content.filter((b): b is Extract<AnthropicContentBlock, { type: "tool_use" }> => b.type === "tool_use");
