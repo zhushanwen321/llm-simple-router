@@ -26,8 +26,8 @@ import type {
  * Lossy: structured reasoning summaries are flattened to a single string;
  * built-in tool output items (web_search_call, etc.) are skipped.
  */
-export function responsesToChatResponse(bodyStr: string): string {
-  const resp = JSON.parse(bodyStr) as ResponsesApiResponse;
+export function responsesToChatResponse(body: Record<string, unknown>): Record<string, unknown> {
+  const resp = body as unknown as ResponsesApiResponse;
   const output = resp.output ?? [];
 
   const message: Record<string, unknown> = { role: "assistant" };
@@ -93,22 +93,22 @@ export function responsesToChatResponse(bodyStr: string): string {
   const promptTokens = usage?.input_tokens ?? 0;
   const completionTokens = usage?.output_tokens ?? 0;
 
-  return JSON.stringify({
-    id: generateChatcmplId(),
-    object: "chat.completion",
-    created: Math.floor(Date.now() / MS_PER_SECOND),
-    model: resp.model ?? "",
-    choices: [{
-      index: 0,
-      message,
-      finish_reason: finishReason,
-    }],
-    usage: {
-      prompt_tokens: promptTokens,
-      completion_tokens: completionTokens,
-      total_tokens: promptTokens + completionTokens,
-    },
-  });
+  return {
+  id: generateChatcmplId(),
+  object: "chat.completion",
+  created: Math.floor(Date.now() / MS_PER_SECOND),
+  model: resp.model ?? "",
+  choices: [{
+    index: 0,
+    message,
+    finish_reason: finishReason,
+  }],
+  usage: {
+    prompt_tokens: promptTokens,
+    completion_tokens: completionTokens,
+    total_tokens: promptTokens + completionTokens,
+  },
+  };
 }
 
 /** Responses API status → Chat Completions finish_reason */
@@ -125,21 +125,21 @@ function mapStatusToFinishReason(status: string): string {
  * Lossy: Chat Completions has no equivalent for built-in tool output items
  * or structured reasoning summaries.
  */
-export function chatToResponsesResponse(bodyStr: string): string {
-  const oai = JSON.parse(bodyStr) as {
-    id?: string;
-    model?: string;
-    choices?: Array<{
-      index: number;
-      message?: {
-        role?: string;
-        content?: string;
-        reasoning_content?: string;
-        tool_calls?: OpenAIToolCall[];
-      };
-      finish_reason?: string;
-    }>;
-    usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+export function chatToResponsesResponse(body: Record<string, unknown>): Record<string, unknown> {
+  const oai = body as unknown as {
+  id?: string;
+  model?: string;
+  choices?: Array<{
+    index: number;
+    message?: {
+    role?: string;
+    content?: string;
+    reasoning_content?: string;
+    tool_calls?: OpenAIToolCall[];
+    };
+    finish_reason?: string;
+  }>;
+  usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
   };
   const choice = oai.choices?.[0];
   const msg = choice?.message;
@@ -186,18 +186,18 @@ export function chatToResponsesResponse(bodyStr: string): string {
   const inputTokens = oai.usage?.prompt_tokens ?? 0;
   const outputTokens = oai.usage?.completion_tokens ?? 0;
 
-  return JSON.stringify({
-    id: generateRespId(),
-    object: "response",
-    model: oai.model ?? "",
-    status,
-    output,
-    usage: {
-      input_tokens: inputTokens,
-      output_tokens: outputTokens,
-      total_tokens: inputTokens + outputTokens,
-    },
-  });
+  return {
+  id: generateRespId(),
+  object: "response",
+  model: oai.model ?? "",
+  status,
+  output,
+  usage: {
+    input_tokens: inputTokens,
+    output_tokens: outputTokens,
+    total_tokens: inputTokens + outputTokens,
+  },
+  };
 }
 
 /** Chat Completions finish_reason → Responses API status */

@@ -37,13 +37,8 @@ function mapStopReasonToStatus(reason: string): string {
 
 // ---------- Responses → Anthropic ----------
 
-export function responsesToAnthropicResponse(bodyStr: string): string {
-  let resp: ResponsesApiResponse;
-  try {
-  resp = JSON.parse(bodyStr) as ResponsesApiResponse;
-  } catch {
-  return bodyStr;
-  }
+export function responsesToAnthropicResponse(body: Record<string, unknown>): Record<string, unknown> {
+  const resp = body as unknown as ResponsesApiResponse;
   const output = resp.output ?? [];
   const content: Array<Record<string, unknown>> = [];
 
@@ -86,21 +81,21 @@ export function responsesToAnthropicResponse(bodyStr: string): string {
   const inputTokensDetails = usage?.input_tokens_details as Record<string, unknown> | undefined;
   const cachedInputTokens = (inputTokensDetails?.cached_tokens as number) ?? 0;
 
-  return JSON.stringify({
-    id: generateMsgId(),
-    type: "message",
-    role: "assistant",
-    content,
-    model: resp.model ?? "",
-    stop_reason: mapStatusToStopReason(resp.status ?? "completed"),
-    stop_sequence: null,
-    usage: {
-      input_tokens: Math.max(0, (usage?.input_tokens ?? 0) - cachedInputTokens),
-      output_tokens: usage?.output_tokens ?? 0,
-      cache_read_input_tokens: cachedInputTokens,
-      cache_creation_input_tokens: 0,
-    },
-  });
+  return {
+  id: generateMsgId(),
+  type: "message",
+  role: "assistant",
+  content,
+  model: resp.model ?? "",
+  stop_reason: mapStatusToStopReason(resp.status ?? "completed"),
+  stop_sequence: null,
+  usage: {
+    input_tokens: Math.max(0, (usage?.input_tokens ?? 0) - cachedInputTokens),
+    output_tokens: usage?.output_tokens ?? 0,
+    cache_read_input_tokens: cachedInputTokens,
+    cache_creation_input_tokens: 0,
+  },
+  };
 }
 
 // ---------- Anthropic → Responses ----------
@@ -114,29 +109,27 @@ function stripTooluPrefix(id: string): string {
 
 // ---------- Error format conversion ----------
 
-export function transformErrorResponse(bodyStr: string, sourceApiType: string, targetApiType: string): string {
-  if (sourceApiType === targetApiType) return bodyStr;
+export function transformErrorResponse(body: Record<string, unknown>, sourceApiType: string, targetApiType: string): string {
+  if (sourceApiType === targetApiType) return JSON.stringify(body);
   try {
-    if (sourceApiType === "anthropic" && targetApiType === "openai-responses") {
-    // Anthropic error: {type:"error", error:{type, message}} → Responses: {error:{code, message}}
-      const ant = JSON.parse(bodyStr) as Record<string, unknown>;
-      const err = (ant.error as Record<string, unknown>) ?? {};
-      return JSON.stringify({ error: { code: err.type ?? "api_error", message: err.message ?? "Unknown error" } });
-    }
-    if (sourceApiType === "openai-responses" && targetApiType === "anthropic") {
-    // Responses error: {error:{code, message}} → Anthropic: {type:"error", error:{type, message}}
-      const resp = JSON.parse(bodyStr) as Record<string, unknown>;
-      const err = (resp.error as Record<string, unknown>) ?? {};
-      return JSON.stringify({ type: "error", error: { type: err.code ?? "api_error", message: err.message ?? "Unknown error" } });
-    }
-  } catch {
-    return bodyStr;
+  if (sourceApiType === "anthropic" && targetApiType === "openai-responses") {
+  // Anthropic error: {type:"error", error:{type, message}} → Responses: {error:{code, message}}
+    const err = (body.error as Record<string, unknown>) ?? {};
+    return JSON.stringify({ error: { code: err.type ?? "api_error", message: err.message ?? "Unknown error" } });
   }
-  return bodyStr;
+  if (sourceApiType === "openai-responses" && targetApiType === "anthropic") {
+  // Responses error: {error:{code, message}} → Anthropic: {type:"error", error:{type, message}}
+    const err = (body.error as Record<string, unknown>) ?? {};
+    return JSON.stringify({ type: "error", error: { type: err.code ?? "api_error", message: err.message ?? "Unknown error" } });
+  }
+  } catch {
+  return JSON.stringify(body);
+  }
+  return JSON.stringify(body);
 }
 
-export function anthropicToResponsesResponse(bodyStr: string): string {
-  let ant: {
+export function anthropicToResponsesResponse(body: Record<string, unknown>): Record<string, unknown> {
+  const ant = body as unknown as {
   type?: string;
   role?: string;
   model?: string;
@@ -144,11 +137,6 @@ export function anthropicToResponsesResponse(bodyStr: string): string {
   stop_reason?: string;
   usage?: Record<string, unknown>;
   };
-  try {
-  ant = JSON.parse(bodyStr) as typeof ant;
-  } catch {
-  return bodyStr;
-  }
   // Content may include redacted_thinking blocks not in AnthropicContentBlock union
   const blocks = (ant.content ?? []) as Array<AnthropicContentBlock | { type: "redacted_thinking"; data: string }>;
   const output: ResponseOutputItem[] = [];
@@ -202,19 +190,19 @@ export function anthropicToResponsesResponse(bodyStr: string): string {
   ((antUsage?.cache_creation_input_tokens as number) ?? 0);
   const outputTokens = (antUsage?.output_tokens as number) ?? 0;
   const cacheRead = (antUsage?.cache_read_input_tokens as number) ?? 0;
-  return JSON.stringify({
-    id: generateRespId(),
-    object: "response",
-    model: ant.model ?? "",
-    status: mapStopReasonToStatus((ant.stop_reason ?? "end_turn") as string),
-    output,
-    usage: {
-      input_tokens: inputTokens,
-      output_tokens: outputTokens,
-      total_tokens: inputTokens + outputTokens,
-      input_tokens_details: {
-        cached_tokens: cacheRead,
-      },
+  return {
+  id: generateRespId(),
+  object: "response",
+  model: ant.model ?? "",
+  status: mapStopReasonToStatus((ant.stop_reason ?? "end_turn") as string),
+  output,
+  usage: {
+    input_tokens: inputTokens,
+    output_tokens: outputTokens,
+    total_tokens: inputTokens + outputTokens,
+    input_tokens_details: {
+    cached_tokens: cacheRead,
     },
-  });
+  },
+  };
 }

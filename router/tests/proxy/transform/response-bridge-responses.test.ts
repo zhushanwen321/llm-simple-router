@@ -166,65 +166,75 @@ const CHAT_LENGTH = JSON.stringify({
 
 describe("responsesToChatResponse", () => {
   it("converts basic text output", () => {
-    const result = JSON.parse(responsesToChatResponse(RESP_TEXT));
-    expect(result.object).toBe("chat.completion");
-    expect(result.id).toMatch(/^chatcmpl-/);
-    expect(result.model).toBe("gpt-4o");
-    expect(result.created).toBeTypeOf("number");
-    expect(result.choices).toHaveLength(1);
-    expect(result.choices[0].message.role).toBe("assistant");
-    expect(result.choices[0].message.content).toBe("Hello, world!");
-    expect(result.choices[0].finish_reason).toBe("stop");
+  const result = responsesToChatResponse(JSON.parse(RESP_TEXT) as Record<string, unknown>);
+  expect(result.object).toBe("chat.completion");
+  expect(result.id).toMatch(/^chatcmpl-/);
+  expect(result.model).toBe("gpt-4o");
+  expect(result.created).toBeTypeOf("number");
+  const choices = result.choices as Array<Record<string, unknown>>;
+  expect(choices).toHaveLength(1);
+  const msg = (choices[0] as Record<string, unknown>).message as Record<string, unknown>;
+  expect(msg.role).toBe("assistant");
+  expect(msg.content).toBe("Hello, world!");
+  expect((choices[0] as Record<string, unknown>).finish_reason).toBe("stop");
   });
 
   it("converts function_call output to tool_calls", () => {
-    const result = JSON.parse(responsesToChatResponse(RESP_FUNCTION_CALL));
-    const msg = result.choices[0].message;
-    expect(msg.tool_calls).toHaveLength(1);
-    expect(msg.tool_calls[0]).toEqual({
-      id: "call_abc",
-      type: "function",
-      function: { name: "get_weather", arguments: '{"city":"NYC"}' },
-    });
-    expect(result.choices[0].finish_reason).toBe("tool_calls");
+  const result = responsesToChatResponse(JSON.parse(RESP_FUNCTION_CALL) as Record<string, unknown>);
+  const choices = result.choices as Array<Record<string, unknown>>;
+  const msg = (choices[0] as Record<string, unknown>).message as Record<string, unknown>;
+  const toolCalls = msg.tool_calls as Array<Record<string, unknown>>;
+  expect(toolCalls).toHaveLength(1);
+  expect(toolCalls[0]).toEqual({
+    id: "call_abc",
+    type: "function",
+    function: { name: "get_weather", arguments: '{"city":"NYC"}' },
+  });
+  expect((choices[0] as Record<string, unknown>).finish_reason).toBe("tool_calls");
   });
 
   it("converts reasoning output to reasoning_content (flattened)", () => {
-    const result = JSON.parse(responsesToChatResponse(RESP_REASONING));
-    const msg = result.choices[0].message;
-    // Structured summaries are LOSSY joined into a single string
-    expect(msg.reasoning_content).toBe("Step 1: Analyze the problem.");
-    expect(msg.content).toBe("The answer is 42.");
+  const result = responsesToChatResponse(JSON.parse(RESP_REASONING) as Record<string, unknown>);
+  const choices = result.choices as Array<Record<string, unknown>>;
+  const msg = (choices[0] as Record<string, unknown>).message as Record<string, unknown>;
+  // Structured summaries are LOSSY joined into a single string
+  expect(msg.reasoning_content).toBe("Step 1: Analyze the problem.");
+  expect(msg.content).toBe("The answer is 42.");
   });
 
   it("maps status completed → stop", () => {
-    const result = JSON.parse(responsesToChatResponse(RESP_TEXT));
-    expect(result.choices[0].finish_reason).toBe("stop");
+  const result = responsesToChatResponse(JSON.parse(RESP_TEXT) as Record<string, unknown>);
+  const choices = result.choices as Array<Record<string, unknown>>;
+  expect((choices[0] as Record<string, unknown>).finish_reason).toBe("stop");
   });
 
   it("maps status incomplete → length", () => {
-    const result = JSON.parse(responsesToChatResponse(RESP_INCOMPLETE));
-    expect(result.choices[0].finish_reason).toBe("length");
+  const result = responsesToChatResponse(JSON.parse(RESP_INCOMPLETE) as Record<string, unknown>);
+  const choices = result.choices as Array<Record<string, unknown>>;
+  expect((choices[0] as Record<string, unknown>).finish_reason).toBe("length");
   });
 
   it("overrides finish_reason to tool_calls when function_call present", () => {
-    // Even if status were incomplete, function_call forces tool_calls
-    const result = JSON.parse(responsesToChatResponse(RESP_FUNCTION_CALL));
-    expect(result.choices[0].finish_reason).toBe("tool_calls");
+  // Even if status were incomplete, function_call forces tool_calls
+  const result = responsesToChatResponse(JSON.parse(RESP_FUNCTION_CALL) as Record<string, unknown>);
+  const choices = result.choices as Array<Record<string, unknown>>;
+  expect((choices[0] as Record<string, unknown>).finish_reason).toBe("tool_calls");
   });
 
   it("skips non-convertible output types (web_search_call)", () => {
-    const result = JSON.parse(responsesToChatResponse(RESP_WITH_SKIP_ITEMS));
-    expect(result.choices[0].message.content).toBe("Search result.");
+  const result = responsesToChatResponse(JSON.parse(RESP_WITH_SKIP_ITEMS) as Record<string, unknown>);
+  const choices = result.choices as Array<Record<string, unknown>>;
+  const msg = (choices[0] as Record<string, unknown>).message as Record<string, unknown>;
+  expect(msg.content).toBe("Search result.");
   });
 
   it("maps usage correctly", () => {
-    const result = JSON.parse(responsesToChatResponse(RESP_TEXT));
-    expect(result.usage).toEqual({
-      prompt_tokens: 15,
-      completion_tokens: 8,
-      total_tokens: 23,
-    });
+  const result = responsesToChatResponse(JSON.parse(RESP_TEXT) as Record<string, unknown>);
+  expect(result.usage).toEqual({
+    prompt_tokens: 15,
+    completion_tokens: 8,
+    total_tokens: 23,
+  });
   });
 });
 
@@ -232,87 +242,91 @@ describe("responsesToChatResponse", () => {
 
 describe("chatToResponsesResponse", () => {
   it("converts basic Chat text to Responses output message", () => {
-    const result = JSON.parse(chatToResponsesResponse(CHAT_TEXT));
-    expect(result.object).toBe("response");
-    expect(result.id).toMatch(/^resp_/);
-    expect(result.model).toBe("gpt-4o");
-    expect(result.status).toBe("completed");
-    expect(result.output).toHaveLength(1);
-    expect(result.output[0].type).toBe("message");
-    expect(result.output[0].role).toBe("assistant");
-    expect(result.output[0].content).toEqual([{ type: "output_text", text: "Hello from Chat!" }]);
+  const result = chatToResponsesResponse(JSON.parse(CHAT_TEXT) as Record<string, unknown>);
+  expect(result.object).toBe("response");
+  expect(result.id).toMatch(/^resp_/);
+  expect(result.model).toBe("gpt-4o");
+  expect(result.status).toBe("completed");
+  const output = result.output as Array<Record<string, unknown>>;
+  expect(output).toHaveLength(1);
+  expect(output[0].type).toBe("message");
+  expect(output[0].role).toBe("assistant");
+  expect(output[0].content).toEqual([{ type: "output_text", text: "Hello from Chat!" }]);
   });
 
   it("converts Chat tool_calls to Responses function_call items", () => {
-    const result = JSON.parse(chatToResponsesResponse(CHAT_TOOL_CALLS));
-    const fc = result.output.find((o: Record<string, unknown>) => o.type === "function_call");
-    expect(fc).toBeDefined();
-    expect(fc.call_id).toBe("call_abc");
-    expect(fc.id).toBe("call_abc");
-    expect(fc.name).toBe("get_weather");
-    expect(fc.arguments).toBe('{"city":"NYC"}');
-    expect(result.status).toBe("completed");
+  const result = chatToResponsesResponse(JSON.parse(CHAT_TOOL_CALLS) as Record<string, unknown>);
+  const output = result.output as Array<Record<string, unknown>>;
+  const fc = output.find((o: Record<string, unknown>) => o.type === "function_call") as Record<string, unknown>;
+  expect(fc).toBeDefined();
+  expect(fc.call_id).toBe("call_abc");
+  expect(fc.id).toBe("call_abc");
+  expect(fc.name).toBe("get_weather");
+  expect(fc.arguments).toBe('{"city":"NYC"}');
+  expect(result.status).toBe("completed");
   });
 
   it("converts Chat reasoning_content to Responses reasoning output", () => {
-    const result = JSON.parse(chatToResponsesResponse(CHAT_REASONING));
-    const reasoning = result.output.find((o: Record<string, unknown>) => o.type === "reasoning");
-    expect(reasoning).toBeDefined();
-    expect(reasoning.summary).toEqual([{ type: "summary_text", text: "Let me think about this step by step..." }]);
+  const result = chatToResponsesResponse(JSON.parse(CHAT_REASONING) as Record<string, unknown>);
+  const output = result.output as Array<Record<string, unknown>>;
+  const reasoning = output.find((o: Record<string, unknown>) => o.type === "reasoning") as Record<string, unknown>;
+  expect(reasoning).toBeDefined();
+  expect(reasoning.summary).toEqual([{ type: "summary_text", text: "Let me think about this step by step..." }]);
 
-    const message = result.output.find((o: Record<string, unknown>) => o.type === "message");
-    expect(message).toBeDefined();
-    expect(message.content).toEqual([{ type: "output_text", text: "The answer is 42." }]);
+  const message = output.find((o: Record<string, unknown>) => o.type === "message") as Record<string, unknown>;
+  expect(message).toBeDefined();
+  expect(message.content).toEqual([{ type: "output_text", text: "The answer is 42." }]);
   });
 
   it("maps finish_reason stop → completed", () => {
-    const result = JSON.parse(chatToResponsesResponse(CHAT_TEXT));
-    expect(result.status).toBe("completed");
+  const result = chatToResponsesResponse(JSON.parse(CHAT_TEXT) as Record<string, unknown>);
+  expect(result.status).toBe("completed");
   });
 
   it("maps finish_reason length → incomplete", () => {
-    const result = JSON.parse(chatToResponsesResponse(CHAT_LENGTH));
-    expect(result.status).toBe("incomplete");
+  const result = chatToResponsesResponse(JSON.parse(CHAT_LENGTH) as Record<string, unknown>);
+  expect(result.status).toBe("incomplete");
   });
 
   it("maps finish_reason tool_calls → completed", () => {
-    const result = JSON.parse(chatToResponsesResponse(CHAT_TOOL_CALLS));
-    expect(result.status).toBe("completed");
+  const result = chatToResponsesResponse(JSON.parse(CHAT_TOOL_CALLS) as Record<string, unknown>);
+  expect(result.status).toBe("completed");
   });
 
   it("maps usage correctly", () => {
-    const result = JSON.parse(chatToResponsesResponse(CHAT_TEXT));
-    expect(result.usage).toEqual({
-      input_tokens: 15,
-      output_tokens: 8,
-      total_tokens: 23,
-    });
+  const result = chatToResponsesResponse(JSON.parse(CHAT_TEXT) as Record<string, unknown>);
+  expect(result.usage).toEqual({
+    input_tokens: 15,
+    output_tokens: 8,
+    total_tokens: 23,
+  });
   });
 
   it("handles multiple tool_calls", () => {
-    const multiToolChat = JSON.stringify({
-      id: "chatcmpl-multi",
-      object: "chat.completion",
-      model: "gpt-4o",
-      choices: [{
-        index: 0,
-        message: {
-          role: "assistant",
-          content: null,
-          tool_calls: [
-            { id: "call_1", type: "function", function: { name: "fn1", arguments: "{}" } },
-            { id: "call_2", type: "function", function: { name: "fn2", arguments: '{"a":1}' } },
-          ],
-        },
-        finish_reason: "tool_calls",
-      }],
-      usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 },
-    });
+  const multiToolChat = {
+    id: "chatcmpl-multi",
+    object: "chat.completion",
+    model: "gpt-4o",
+    choices: [{
+    index: 0,
+    message: {
+      role: "assistant",
+      content: null,
+      tool_calls: [
+      { id: "call_1", type: "function", function: { name: "fn1", arguments: "{}" } },
+      { id: "call_2", type: "function", function: { name: "fn2", arguments: '{"a":1}' } },
+      ],
+    },
+    finish_reason: "tool_calls",
+    }],
+    usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 },
+  } as Record<string, unknown>;
 
-    const result = JSON.parse(chatToResponsesResponse(multiToolChat));
-    const fcItems = result.output.filter((o: Record<string, unknown>) => o.type === "function_call");
-    expect(fcItems).toHaveLength(2);
-    expect(fcItems[0].name).toBe("fn1");
-    expect(fcItems[1].name).toBe("fn2");
+  const result = chatToResponsesResponse(multiToolChat);
+  const output = result.output as Array<Record<string, unknown>>;
+  const fcItems = output.filter((o: Record<string, unknown>) => o.type === "function_call");
+  expect(fcItems).toHaveLength(2);
+  expect((fcItems[0] as Record<string, unknown>).name).toBe("fn1");
+  expect((fcItems[1] as Record<string, unknown>).name).toBe("fn2");
   });
 });
