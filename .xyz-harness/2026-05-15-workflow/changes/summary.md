@@ -27,3 +27,10 @@
 - 变更文件：`router/src/config/model-context.ts`, `router/tests/model-context.test.ts`
 - 摘要：修复缩进问题（edit 工具受 .editorconfig 影响导致缩进异常），更新现有 model-context.test.ts 中的 4 个 toEqual 断言以包含 capabilities 字段。22 个测试全部通过，lint 零新增警告，tsc 编译通过。
 - 时间：2026-05-15T23:57:00Z
+
+## 阶段 5 - T2 编码实现
+
+- 状态：done
+- 变更文件：`router/src/proxy/routing/image-redirect.ts`（新建）
+- 摘要：实现 IR 层纯函数 `computeImageRedirectTargets()` 和 `hasImage()`。hasImage 检测三种 API 图片格式（OpenAI image_url、Anthropic image、Responses API input_image）。主函数流程：hasImage → 首target capabilities 检查 → fallback 配置查找 → provider 存活校验 → prepend + snapshot 记录。异常安全（try-catch 返回原 targets）。16/16 测试通过。
+- 时间：2026-05-15T23:58:00Z
