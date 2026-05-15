@@ -140,24 +140,18 @@ export function parseMappingReason(
 ): string | undefined {
   if (!snapshot) return undefined;
   try {
-    const parsed: { stages?: Array<Record<string, unknown>> } =
-    JSON.parse(snapshot);
-    if (!Array.isArray(parsed.stages)) return undefined;
+    const parsed: unknown = JSON.parse(snapshot);
+    const stages: Array<Record<string, unknown>> = Array.isArray(parsed) ? parsed : [];
+    if (stages.length === 0) return undefined;
     // 优先检查 overflow stage
-    for (const stage of parsed.stages) {
-      if (
-        stage.stage === "overflow" &&
-    stage.triggered === true
-      ) {
+    for (const stage of stages) {
+      if (stage.stage === "overflow" && stage.triggered === true) {
         return "overflow_redirect";
       }
     }
     // 取 routing stage 的 mapping_reason
-    for (const stage of parsed.stages) {
-      if (
-        stage.stage === "routing" &&
-    typeof stage.mapping_reason === "string"
-      ) {
+    for (const stage of stages) {
+      if (stage.stage === "routing" && typeof stage.mapping_reason === "string") {
         return stage.mapping_reason;
       }
     }
