@@ -198,10 +198,18 @@ function convertResponsesInputToAntMessages(input: string | ResponseInputItem[] 
         content,
       });
     } else if (item.type === "input_text") {
-      // item is narrowed to ResponseInputText
+    // item is narrowed to ResponseInputText
       raw.push({
         role: "user",
         content: [{ type: "text", text: item.text ?? "" }],
+      });
+    } else if (item.type === "input_image") {
+      raw.push({
+        role: "user",
+        content: [{
+          type: "image",
+          source: { type: "url", url: item.image_url },
+        }],
       });
     }
   }
@@ -222,6 +230,9 @@ function extractMessageContent(msg: ResponseInputMessage): AnthropicContentBlock
     return content.flatMap((part): AnthropicContentBlock[] => {
       if (part.type === "input_text" && part.text != null) {
         return [{ type: "text", text: part.text }];
+      }
+      if (part.type === "input_image" && part.image_url != null) {
+        return [{ type: "image", source: { type: "url", url: part.image_url } }];
       }
       return [];
     });

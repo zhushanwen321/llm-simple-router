@@ -158,8 +158,6 @@ export function anthropicToResponsesResponse(bodyStr: string): string {
   ((antUsage?.cache_creation_input_tokens as number) ?? 0);
   const outputTokens = (antUsage?.output_tokens as number) ?? 0;
   const cacheRead = (antUsage?.cache_read_input_tokens as number) ?? 0;
-  const cacheCreation = (antUsage?.cache_creation_input_tokens as number) ?? 0;
-
   return JSON.stringify({
     id: generateRespId(),
     object: "response",
@@ -171,7 +169,7 @@ export function anthropicToResponsesResponse(bodyStr: string): string {
       output_tokens: outputTokens,
       total_tokens: inputTokens + outputTokens,
       input_tokens_details: {
-        cached_tokens: cacheRead + cacheCreation,
+        cached_tokens: cacheRead,
       },
     },
   });

@@ -29,6 +29,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
   private inputTokens = 0;
   private outputTokens = 0;
   private pendingCompletion = false;
+  private pendingCompletionStatus: "completed" | "incomplete" = "completed";
   private collectedOutput: ResponseOutputItem[] = [];
   private currentMessageItemId = "";
   private currentFunctionCallId = "";
@@ -185,13 +186,13 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
     }
   }
 
-  private emitCompleted(): void {
+  private emitCompleted(status: "completed" | "incomplete" = "completed"): void {
     const completedAt = Math.floor(Date.now() / MS_PER_SECOND);
     const response: ResponsesApiResponse = {
       id: this.responseId,
       object: "response",
       model: this.model,
-      status: "completed",
+      status: status,
       output: this.collectedOutput,
       usage: {
         input_tokens: this.inputTokens,
@@ -224,7 +225,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
     if (chunk.usage && !(Array.isArray(chunk.choices) && chunk.choices.length > 0)) {
       if (this.pendingCompletion) {
         this.closeAllOpenItems();
-        this.emitCompleted();
+        this.emitCompleted(this.pendingCompletionStatus);
         this.pendingCompletion = false;
       }
       return;
@@ -387,10 +388,11 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
     if (finishReason) {
       this.closeAllOpenItems();
       this.pendingCompletion = true;
+      this.pendingCompletionStatus = finishReason === "length" ? "incomplete" : "completed";
       // If there's no usage-only chunk coming, emit completed now
       // Usage chunk may come in a separate chunk or was already in this chunk
       if (chunk.usage) {
-        this.emitCompleted();
+        this.emitCompleted(this.pendingCompletionStatus);
         this.pendingCompletion = false;
       }
     }

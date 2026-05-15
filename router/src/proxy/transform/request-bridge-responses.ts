@@ -82,6 +82,11 @@ export function responsesToChatRequest(
     result.response_format = req.text.format;
   }
 
+  // parallel_tool_calls — pass through
+  if (req.parallel_tool_calls != null) {
+    result.parallel_tool_calls = req.parallel_tool_calls;
+  }
+
   // stream_options
   if (req.stream_options != null) {
     result.stream_options = req.stream_options;
@@ -343,6 +348,11 @@ export function chatToResponsesRequest(
   // response_format → text.format
   if (req.response_format != null) {
     result.text = { format: req.response_format };
+  }
+
+  // parallel_tool_calls — pass through
+  if (req.parallel_tool_calls != null) {
+    result.parallel_tool_calls = req.parallel_tool_calls;
   }
 
   // stream_options

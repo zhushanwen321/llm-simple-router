@@ -69,6 +69,7 @@ export interface ChatCompletionRequest {
   reasoning?: Record<string, unknown>;
   response_format?: unknown;
   stream_options?: unknown;
+  parallel_tool_calls?: boolean;
 }
 
 // ---------- Anthropic 消息类型 ----------

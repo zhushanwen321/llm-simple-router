@@ -22,6 +22,8 @@ export class AnthropicToResponsesTransform extends BaseSSETransform {
   private hasResponseCreated = false;
   private inputTokens = 0;
   private outputTokens = 0;
+  private cacheReadTokens = 0;
+  private cacheCreationTokens = 0;
   private pendingStatus: string | null = null;
   private activeToolCallId = "";
   private collectedOutput: ResponseOutputItem[] = [];
@@ -66,6 +68,8 @@ export class AnthropicToResponsesTransform extends BaseSSETransform {
         const msg = data.message as Record<string, unknown> | undefined;
         const usage = msg?.usage as Record<string, unknown> | undefined;
         this.inputTokens = (usage?.input_tokens as number) ?? 0;
+        this.cacheReadTokens = Number(usage?.cache_read_input_tokens ?? 0);
+        this.cacheCreationTokens = Number(usage?.cache_creation_input_tokens ?? 0);
         this.emitResponseCreated();
         break;
       }
@@ -299,6 +303,8 @@ export class AnthropicToResponsesTransform extends BaseSSETransform {
   private emitCompleted(): void {
     const status = this.pendingStatus ?? "completed";
     const completedAt = Math.floor(Date.now() / MS_PER_SECOND);
+    // Anthropic input_tokens excludes cache; Responses input_tokens includes cache
+    const totalInput = this.inputTokens + this.cacheReadTokens + this.cacheCreationTokens;
     const response: ResponsesApiResponse = {
       id: this.responseId,
       object: "response",
@@ -306,9 +312,12 @@ export class AnthropicToResponsesTransform extends BaseSSETransform {
       status: status as ResponsesApiResponse["status"],
       output: this.collectedOutput,
       usage: {
-        input_tokens: this.inputTokens,
+        input_tokens: totalInput,
         output_tokens: this.outputTokens,
-        total_tokens: this.inputTokens + this.outputTokens,
+        total_tokens: totalInput + this.outputTokens,
+        input_tokens_details: {
+          cached_tokens: this.cacheReadTokens,
+        },
       },
       created_at: this.createdAt,
       completed_at: completedAt,
