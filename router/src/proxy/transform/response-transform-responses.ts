@@ -106,6 +106,29 @@ function stripTooluPrefix(id: string): string {
   return id.startsWith("toolu_") ? id.slice(TOOLU_PREFIX_LEN) : id;
 }
 
+// ---------- Error format conversion ----------
+
+export function transformErrorResponse(bodyStr: string, sourceApiType: string, targetApiType: string): string {
+  if (sourceApiType === targetApiType) return bodyStr;
+  try {
+    if (sourceApiType === "anthropic" && targetApiType === "openai-responses") {
+    // Anthropic error: {type:"error", error:{type, message}} → Responses: {error:{code, message}}
+      const ant = JSON.parse(bodyStr) as Record<string, unknown>;
+      const err = (ant.error as Record<string, unknown>) ?? {};
+      return JSON.stringify({ error: { code: err.type ?? "api_error", message: err.message ?? "Unknown error" } });
+    }
+    if (sourceApiType === "openai-responses" && targetApiType === "anthropic") {
+    // Responses error: {error:{code, message}} → Anthropic: {type:"error", error:{type, message}}
+      const resp = JSON.parse(bodyStr) as Record<string, unknown>;
+      const err = (resp.error as Record<string, unknown>) ?? {};
+      return JSON.stringify({ type: "error", error: { type: err.code ?? "api_error", message: err.message ?? "Unknown error" } });
+    }
+  } catch {
+    return bodyStr;
+  }
+  return bodyStr;
+}
+
 export function anthropicToResponsesResponse(bodyStr: string): string {
   const ant = JSON.parse(bodyStr) as {
     type?: string;
@@ -115,12 +138,13 @@ export function anthropicToResponsesResponse(bodyStr: string): string {
     stop_reason?: string;
     usage?: Record<string, unknown>;
   };
-  const blocks = ant.content ?? [];
+  // Content may include redacted_thinking blocks not in AnthropicContentBlock union
+  const blocks = (ant.content ?? []) as Array<AnthropicContentBlock | { type: "redacted_thinking"; data: string }>;
   const output: ResponseOutputItem[] = [];
 
   for (const block of blocks) {
     if (block.type === "thinking") {
-      // → reasoning output
+    // → reasoning output
       const tb = block as AnthropicThinkingBlock;
       output.push({
         type: "reasoning",
@@ -128,7 +152,7 @@ export function anthropicToResponsesResponse(bodyStr: string): string {
         summary: [{ type: "summary_text", text: tb.thinking ?? "" }],
       });
     } else if (block.type === "text") {
-      // → message output
+    // → message output
       const tb = block as AnthropicTextBlock;
       output.push({
         type: "message",
@@ -136,6 +160,15 @@ export function anthropicToResponsesResponse(bodyStr: string): string {
         role: "assistant",
         content: [{ type: "output_text", text: tb.text ?? "" }],
       });
+    } else if ((block as unknown as { type: string }).type === "redacted_thinking") {
+      // redacted_thinking is not in AnthropicContentBlock union; attach to latest reasoning item
+      const rb = block as unknown as { type: "redacted_thinking"; data: string };
+      const lastReasoning = [...output]
+        .reverse()
+        .find((o): o is ResponseReasoningOutput => o.type === "reasoning");
+      if (lastReasoning && rb.data) {
+        lastReasoning.encrypted_content = rb.data;
+      }
     } else if (block.type === "tool_use") {
       // → function_call output
       const tb = block as AnthropicToolUseBlock;
