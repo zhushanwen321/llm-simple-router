@@ -4,6 +4,8 @@ const OA_TO_ANT_STOP: Record<string, string> = {
   stop: "end_turn",
   length: "max_tokens",
   tool_calls: "tool_use",
+  content_filter: "end_turn",
+  function_call: "tool_use",
 };
 
 const ANT_TO_OA_STOP: Record<string, string> = {
@@ -11,6 +13,8 @@ const ANT_TO_OA_STOP: Record<string, string> = {
   max_tokens: "length",
   stop_sequence: "stop",
   tool_use: "tool_calls",
+  content_filtered: "content_filter",
+  pause_turn: "stop",
 };
 
 /** finish_reason (OpenAI) → stop_reason (Anthropic) */

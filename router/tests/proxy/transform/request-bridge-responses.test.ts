@@ -429,17 +429,17 @@ describe("responsesToChatRequest", () => {
       expect(result.reasoning).toEqual({ effort: "high", max_tokens: 10000 });
     });
 
-    it("maps text.format → response_format", () => {
-      const result = responsesToChatRequest({
-        model: "gpt-4o",
-        input: "hi",
-        text: { format: { type: "json_schema", json_schema: { name: "test" } } },
-      });
-      expect(result.response_format).toEqual({
-        type: "json_schema",
-        json_schema: { name: "test" },
-      });
+  it("maps text.format → response_format", () => {
+    const result = responsesToChatRequest({
+    model: "gpt-4o",
+    input: "hi",
+    text: { format: { type: "json_schema", name: "test", schema: { type: "object" }, strict: true } },
     });
+    expect(result.response_format).toEqual({
+    type: "json_schema",
+    json_schema: { name: "test", schema: { type: "object" }, strict: true },
+    });
+  });
 
     it("passes stream_options through", () => {
       const result = responsesToChatRequest({
@@ -710,16 +710,16 @@ describe("chatToResponsesRequest", () => {
 
   // --- response_format → text.format ---
   describe("response_format conversion", () => {
-    it("maps response_format → text.format", () => {
-      const result = chatToResponsesRequest({
-        model: "gpt-4o",
-        messages: [],
-        response_format: { type: "json_schema", json_schema: { name: "test" } },
-      });
-      expect(result.text).toEqual({
-        format: { type: "json_schema", json_schema: { name: "test" } },
-      });
+  it("maps response_format → text.format", () => {
+    const result = chatToResponsesRequest({
+    model: "gpt-4o",
+    messages: [],
+    response_format: { type: "json_schema", json_schema: { name: "test", schema: { type: "object" }, strict: true } },
     });
+    expect(result.text).toEqual({
+    format: { type: "json_schema", name: "test", schema: { type: "object" }, strict: true },
+    });
+  });
   });
 
   // --- Assistant text → message ---

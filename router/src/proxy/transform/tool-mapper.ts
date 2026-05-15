@@ -2,7 +2,9 @@ import type { ChatCompletionTool } from "./types.js";
 
 /** OpenAI tools[] → Anthropic tools[] */
 export function convertToolsOA2Ant(tools: ChatCompletionTool[]): unknown[] {
-  return tools.map((t) => {
+  return tools
+  .filter(t => t.type === "function")
+  .map((t) => {
     const result: Record<string, unknown> = { name: t.function.name };
     if (t.function.description != null) result.description = t.function.description;
     if (t.function.parameters != null) result.input_schema = t.function.parameters;

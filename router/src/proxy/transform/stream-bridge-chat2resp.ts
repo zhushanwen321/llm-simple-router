@@ -30,6 +30,8 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
   private outputTokens = 0;
   private pendingCompletion = false;
   private pendingCompletionStatus: "completed" | "incomplete" = "completed";
+  private cachedTokens = 0;
+  private reasoningTokens = 0;
   private collectedOutput: ResponseOutputItem[] = [];
   private currentMessageItemId = "";
   private currentFunctionCallId = "";
@@ -194,11 +196,13 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
       model: this.model,
       status: status,
       output: this.collectedOutput,
-      usage: {
-        input_tokens: this.inputTokens,
-        output_tokens: this.outputTokens,
-        total_tokens: this.inputTokens + this.outputTokens,
-      },
+    usage: {
+    input_tokens: this.inputTokens,
+    output_tokens: this.outputTokens,
+    total_tokens: this.inputTokens + this.outputTokens,
+    ...(this.cachedTokens > 0 ? { input_tokens_details: { cached_tokens: this.cachedTokens } } : {}),
+    ...(this.reasoningTokens > 0 ? { output_tokens_details: { reasoning_tokens: this.reasoningTokens } } : {}),
+    },
       created_at: this.createdAt,
       completed_at: completedAt,
     };
@@ -214,12 +218,20 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
     let chunk: Record<string, unknown>;
     try { chunk = JSON.parse(event.data!); } catch (err) { this.emit("warning", err); return; }
 
-    // Extract usage when present (usage-only chunks or chunks with usage)
-    if (chunk.usage) {
-      const usage = chunk.usage as Record<string, number>;
-      this.inputTokens = usage.prompt_tokens ?? this.inputTokens;
-      this.outputTokens = usage.completion_tokens ?? this.outputTokens;
+  // Extract usage when present (usage-only chunks or chunks with usage)
+  if (chunk.usage) {
+    const usage = chunk.usage as Record<string, unknown>;
+    this.inputTokens = (usage.prompt_tokens as number) ?? this.inputTokens;
+    this.outputTokens = (usage.completion_tokens as number) ?? this.outputTokens;
+    const promptDetails = usage.prompt_tokens_details as Record<string, number> | undefined;
+    if (promptDetails?.cached_tokens) {
+    this.cachedTokens = promptDetails.cached_tokens;
     }
+    const completionDetails = usage.completion_tokens_details as Record<string, number> | undefined;
+    if (completionDetails?.reasoning_tokens) {
+    this.reasoningTokens = completionDetails.reasoning_tokens;
+    }
+  }
 
     // Usage-only chunk (no choices) — may trigger completion
     if (chunk.usage && !(Array.isArray(chunk.choices) && chunk.choices.length > 0)) {
@@ -388,7 +400,8 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
     if (finishReason) {
       this.closeAllOpenItems();
       this.pendingCompletion = true;
-      this.pendingCompletionStatus = finishReason === "length" ? "incomplete" : "completed";
+    const incompleteReasons = new Set(["length", "content_filter", "refusal"]);
+    this.pendingCompletionStatus = incompleteReasons.has(finishReason ?? "") ? "incomplete" : "completed";
       // If there's no usage-only chunk coming, emit completed now
       // Usage chunk may come in a separate chunk or was already in this chunk
       if (chunk.usage) {

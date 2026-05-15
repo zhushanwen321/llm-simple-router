@@ -22,6 +22,7 @@ const ANT_STOP_TO_RESP_STATUS: Record<string, string> = {
   stop_sequence: "completed",
   tool_use: "completed",
   max_tokens: "incomplete",
+  content_filtered: "incomplete",
 };
 
 /** Responses API status → Anthropic stop_reason */
