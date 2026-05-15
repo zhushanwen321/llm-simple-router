@@ -113,10 +113,17 @@ export function responsesToAnthropicRequest(
     const budget = req.reasoning.max_tokens ?? EFFORT_BUDGET[req.reasoning.effort ?? ""] ?? DEFAULT_BUDGET;
     result.thinking = { type: "enabled", budget_tokens: budget };
 
-    // Ensure max_tokens >= budget_tokens
-    if (result.max_tokens != null && (result.max_tokens as number) < budget) {
-      result.max_tokens = budget;
+  // Anthropic requires max_tokens > budget_tokens (strictly greater).
+  // If max_tokens is absent, auto-set to a reasonable value > budget.
+  if (result.max_tokens != null) {
+    if ((result.max_tokens as number) <= budget) {
+    result.max_tokens = budget + 1;
     }
+  } else {
+    // No max_output_tokens set, but reasoning is enabled. Default to 2x budget
+    // or 16000, whichever is larger, so there's room for text output.
+    result.max_tokens = Math.max(budget * 2, 16000);
+  }
   }
 
   // metadata.user_id

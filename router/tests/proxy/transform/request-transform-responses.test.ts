@@ -245,15 +245,27 @@ describe("responsesToAnthropicRequest", () => {
       expect(result.thinking).toEqual({ type: "enabled", budget_tokens: 8192 });
     });
 
-    it("ensures max_tokens >= budget_tokens", () => {
-      const result = responsesToAnthropicRequest({
-        model: "gpt-4o",
-        input: "hi",
-        max_output_tokens: 100,
-        reasoning: { effort: "high" },
-      });
-      expect(result.max_tokens).toBe(32768);
+  it("ensures max_tokens > budget_tokens (strict, per Anthropic spec)", () => {
+    const result = responsesToAnthropicRequest({
+    model: "gpt-4o",
+    input: "hi",
+    max_output_tokens: 100,
+    reasoning: { effort: "high" },
     });
+    expect(result.max_tokens).toBe(32769);
+  });
+
+  it("auto-sets max_tokens when reasoning present but max_output_tokens absent", () => {
+    const result = responsesToAnthropicRequest({
+    model: "gpt-4o",
+    input: "hi",
+    // max_output_tokens intentionally omitted
+    reasoning: { effort: "medium" },
+    });
+    // medium effort → budget=8192, max_tokens auto-set to Math.max(8192*2, 16000) = 16384
+    expect(result.max_tokens).toBe(16384);
+    expect(result.thinking).toEqual({ type: "enabled", budget_tokens: 8192 });
+  });
 
     it("converts reasoning input items to assistant thinking blocks", () => {
       const result = responsesToAnthropicRequest({
