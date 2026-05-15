@@ -32,4 +32,5 @@ export interface LogEntry {
   input_tokens_estimated: number | null
   client_type: string | null
   cache_read_tokens_estimated: number | null
+  pipeline_snapshot?: string | null
 }

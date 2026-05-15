@@ -1,7 +1,7 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { TransportResult } from "../types.js";
 import { ProviderSwitchNeeded } from "../types.js";
-import type { Target, ConcurrencyOverride } from "../../core/types.js";
+import type { Target, ConcurrencyOverride, MappingReason } from "../../core/types.js";
 import type { ResilienceLayer, ResilienceResult, ResilienceConfig } from "./resilience.js";
 import { ResilienceLayer as ResilienceLayerClass } from "./resilience.js";
 import type { RetryRuleMatcher } from "./retry-rules.js";
@@ -21,8 +21,8 @@ const DEFAULT_FAILOVER_THRESHOLD = 400;
 export interface OrchestratorConfig {
   resolved: Target;
   provider: {
-    id: string; name: string; is_active: number; api_type: string;
-    base_url: string; api_key: string;
+  id: string; name: string; is_active: number; api_type: string;
+  base_url: string; api_key: string;
   };
   clientModel: string;
   isStream: boolean;
@@ -36,6 +36,8 @@ export interface OrchestratorConfig {
   upstreamRequest?: string;
   /** Schedule 层的并发覆盖配置，覆盖 Provider 默认并发限制 */
   concurrencyOverride?: ConcurrencyOverride;
+  /** 映射解析原因 */
+  mappingReason?: MappingReason;
 }
 
 export interface HandleContext {
@@ -165,6 +167,7 @@ export class ProxyOrchestrator {
       sessionId: config.sessionId,
       clientRequest: config.clientRequest,
       upstreamRequest: config.upstreamRequest,
+      mappingReason: config.mappingReason,
     };
   }
 

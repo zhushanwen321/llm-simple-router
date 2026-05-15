@@ -1,0 +1,217 @@
+{
+  "version": 1,
+  "requirement": "创建一个issue，有一位用户发来如下诉求： 提个feature。我可以从哪里判断这个模型转发的原因不，是溢出还是分时段映射。 我现在属于溢出情况，因为我知道我还没命中分时段的规则，但两个一起配的时候，脑子就容易混。这里加一列，就清晰一点。 帮我看看这个需求应该如何实现？",
+  "topicDir": "2026-05-15-issue-feature",
+  "projectRoot": "/Users/zhushanwen/Code/llm-simple-router-workspace/feat-mapping-reason-track",
+  "currentPhase": 2,
+  "currentStage": 16,
+  "completed": true,
+  "startedAt": "2026-05-15T03:08:52.707Z",
+  "stages": [
+    {
+      "number": 1,
+      "name": "需求讨论",
+      "status": "pass",
+      "startedAt": "2026-05-15T03:08:52.708Z",
+      "completedAt": "2026-05-15T03:13:37.816Z",
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 2,
+      "name": "Spec 编写",
+      "status": "pass",
+      "startedAt": "2026-05-15T03:13:37.816Z",
+      "completedAt": "2026-05-15T03:30:10.631Z",
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 3,
+      "name": "Spec 评审",
+      "status": "pass",
+      "startedAt": "2026-05-15T03:30:10.632Z",
+      "completedAt": "2026-05-15T03:49:41.003Z",
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 4,
+      "name": "Plan 编写",
+      "status": "pass",
+      "startedAt": "2026-05-15T03:49:41.003Z",
+      "completedAt": "2026-05-15T03:59:41.370Z",
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 5,
+      "name": "Plan 评审",
+      "status": "pass",
+      "startedAt": "2026-05-15T03:59:41.370Z",
+      "completedAt": "2026-05-15T04:05:12.462Z",
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 6,
+      "name": "E2E 测试计划",
+      "status": "pass",
+      "startedAt": "2026-05-15T04:05:12.462Z",
+      "completedAt": "2026-05-15T04:06:25.220Z",
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 7,
+      "name": "E2E 测试计划评审",
+      "status": "pass",
+      "startedAt": "2026-05-15T04:06:25.220Z",
+      "completedAt": "2026-05-15T04:17:19.887Z",
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 8,
+      "name": "用户确认",
+      "status": "pass",
+      "startedAt": "2026-05-15T04:17:19.887Z",
+      "completedAt": "2026-05-15T04:22:28.690Z",
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 9,
+      "name": "TDD 测试编写",
+      "status": "pass",
+      "startedAt": "2026-05-15T04:22:28.690Z",
+      "completedAt": "2026-05-15T04:30:50.510Z",
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": [
+        {
+          "id": "tdd-resolver",
+          "name": "TDD: resolveMapping 4种映射原因测试",
+          "status": "pass",
+          "completedAt": "2026-05-15T04:29:54.981Z",
+          "summary": "5 个测试用例覆盖 resolveMapping 4 种映射原因路径（direct_format/group_base_rule/group_schedule/fallback_provider），全部 FAIL（RED）。已提交。"
+        },
+        {
+          "id": "tdd-failover-overflow",
+          "name": "TDD: failover-loop overflow_redirect + failover_retry 测试",
+          "status": "pass",
+          "completedAt": "2026-05-15T04:30:02.372Z",
+          "summary": "4 个测试用例覆盖 overflow_redirect 和 failover_retry（2 FAIL + 2 PASS），FAIL 符合预期。已提交。"
+        },
+        {
+          "id": "tdd-frontend-parse",
+          "name": "TDD: parseMappingReason 前端解析测试",
+          "status": "pass",
+          "completedAt": "2026-05-15T04:30:11.448Z",
+          "summary": "前端 parseMappingReason 无独立前端测试基础设施，将在 Task F2 实现阶段同步编写单元测试。后端 TDD 覆盖完整数据流。"
+        }
+      ]
+    },
+    {
+      "number": 10,
+      "name": "编码实现",
+      "status": "pass",
+      "startedAt": "2026-05-15T04:30:50.510Z",
+      "completedAt": "2026-05-15T04:44:49.070Z",
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": [
+        {
+          "id": "impl-types-resolver",
+          "name": "B1+B2+B3+B4: 后端类型定义 + resolveMapping 核心逻辑",
+          "status": "pass",
+          "completedAt": "2026-05-15T04:39:46.753Z",
+          "summary": "B1-B6 全部实现。MappingReason type + ResolveResult + ActiveRequest + PipelineSnapshot + resolveMapping 4路径 + failover-loop overflow/failover 覆写 + orchestrator 传递。9 TDD 测试全部 GREEN，1361 全量测试 0 回归。已提交。"
+        },
+        {
+          "id": "impl-failover",
+          "name": "B5+B6: orchestrator + failover-loop 映射原因传递",
+          "status": "pass",
+          "completedAt": "2026-05-15T04:39:57.222Z",
+          "summary": "B5+B6 已随 B1-B4 一并实现。OrchestratorConfig 新增 mappingReason + buildActiveRequest 传递 + failover-loop BP-H2缓存扩展 + overflow/failover 后置覆写。overflow/failover 测试 GREEN。"
+        },
+        {
+          "id": "impl-frontend",
+          "name": "F1+F2+F3+F4+F5: 前端类型+解析器+Badge+i18n",
+          "status": "pass",
+          "completedAt": "2026-05-15T04:44:39.515Z",
+          "summary": "F1-F5 全部实现。LogEntry+ActiveRequest 类型扩展、parseMappingReason 防御性解析、fromLogEntry/fromActiveRequest 转换器、RequestOverviewPanel Badge 展示、zh-CN/en 双语 i18n 6 种映射原因。vue-tsc + eslint 0 错误。已提交。"
+        }
+      ]
+    },
+    {
+      "number": 11,
+      "name": "编码评审",
+      "status": "pass",
+      "startedAt": "2026-05-15T04:44:49.070Z",
+      "completedAt": "2026-05-15T04:59:40.919Z",
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 12,
+      "name": "单元测试",
+      "status": "pass",
+      "startedAt": "2026-05-15T04:59:40.919Z",
+      "completedAt": "2026-05-15T05:04:06.630Z",
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 13,
+      "name": "E2E 测试",
+      "status": "pass",
+      "startedAt": "2026-05-15T05:04:06.630Z",
+      "completedAt": "2026-05-15T05:05:20.556Z",
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 14,
+      "name": "测试评审",
+      "status": "pass",
+      "startedAt": "2026-05-15T05:05:20.556Z",
+      "completedAt": "2026-05-15T05:09:03.256Z",
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 15,
+      "name": "推送+CI+部署",
+      "status": "pass",
+      "startedAt": "2026-05-15T05:09:03.256Z",
+      "completedAt": "2026-05-15T05:13:50.264Z",
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 16,
+      "name": "自动复盘",
+      "status": "pass",
+      "startedAt": "2026-05-15T05:13:50.264Z",
+      "completedAt": "2026-05-15T05:18:42.342Z",
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    }
+  ],
+  "rollbackHistory": []
+}
