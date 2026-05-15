@@ -4,7 +4,7 @@
   "topicDir": "2026-05-15-issue-feature",
   "projectRoot": "/Users/zhushanwen/Code/llm-simple-router-workspace/feat-mapping-reason-track",
   "currentPhase": 2,
-  "currentStage": 15,
+  "currentStage": 16,
   "completed": false,
   "startedAt": "2026-05-15T03:08:52.707Z",
   "stages": [
@@ -195,8 +195,18 @@
     {
       "number": 15,
       "name": "推送+CI+部署",
-      "status": "active",
+      "status": "pass",
       "startedAt": "2026-05-15T05:09:03.256Z",
+      "completedAt": "2026-05-15T05:13:50.264Z",
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 16,
+      "name": "自动复盘",
+      "status": "active",
+      "startedAt": "2026-05-15T05:13:50.264Z",
       "completedAt": null,
       "gateResult": null,
       "gateOutput": null,
