@@ -35,7 +35,7 @@ import { loadEnhancementConfig } from "../routing/enhancement-config.js";
 import { extractFailedToolResults, getTransportStatusCode, serializeBlocksForStorage } from "./proxy-handler-utils.js";
 import type { FailedToolResult } from "./proxy-handler-utils.js";
 import { logToolErrors } from "../tool-error-logger.js";
-import type { Target, ResolveResult, ConcurrencyOverride } from "../../core/types.js";
+import type { Target, ResolveResult, ConcurrencyOverride, MappingReason } from "../../core/types.js";
 import type { RawHeaders } from "../types.js";
 import type { PipelineContext } from "../pipeline/types.js";
 import { PipelineAbort } from "../pipeline/types.js";
@@ -272,7 +272,7 @@ export async function executeFailoverLoop(
     }
 
     // --- 溢出重定向 ---
-    let effectiveMappingReason: string = resolveResult.mappingReason;
+    let effectiveMappingReason: MappingReason = resolveResult.mappingReason;
     const overflowResult = applyOverflowRedirect(resolved, db, currentBody);
     if (overflowResult) {
       const overflowProvider = getProviderById(db, overflowResult.provider_id);

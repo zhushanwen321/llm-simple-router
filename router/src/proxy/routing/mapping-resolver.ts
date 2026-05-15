@@ -177,6 +177,9 @@ export function resolveMapping(
   let mappingReason: MappingReason = "group_base_rule";
   if (matchedSchedule) {
     const scheduleTargets = parseScheduleTargets(matchedSchedule.mapping_rule);
+    // schedule 命中但 targets 解析失败时，activeTargets 仍为 base targets
+    // mappingReason 保持 group_base_rule（实际使用的 targets 来源）
+    // concurrencyOverride 来自 schedule（有意保留，schedule 控制并发上限）
     if (scheduleTargets.length > 0) {
       activeTargets = scheduleTargets;
       mappingReason = "group_schedule";

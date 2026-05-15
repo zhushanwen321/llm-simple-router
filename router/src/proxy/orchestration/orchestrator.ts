@@ -1,7 +1,7 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { TransportResult } from "../types.js";
 import { ProviderSwitchNeeded } from "../types.js";
-import type { Target, ConcurrencyOverride } from "../../core/types.js";
+import type { Target, ConcurrencyOverride, MappingReason } from "../../core/types.js";
 import type { ResilienceLayer, ResilienceResult, ResilienceConfig } from "./resilience.js";
 import { ResilienceLayer as ResilienceLayerClass } from "./resilience.js";
 import type { RetryRuleMatcher } from "./retry-rules.js";
@@ -37,7 +37,7 @@ export interface OrchestratorConfig {
   /** Schedule 层的并发覆盖配置，覆盖 Provider 默认并发限制 */
   concurrencyOverride?: ConcurrencyOverride;
   /** 映射解析原因 */
-  mappingReason?: string;
+  mappingReason?: MappingReason;
 }
 
 export interface HandleContext {
