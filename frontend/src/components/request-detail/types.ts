@@ -42,6 +42,7 @@ export interface UnifiedRequestOverview {
   inputTokensEstimated: boolean;
   clientType: string | null;
   cacheReadTokensEstimated: number | null;
+  mappingReason?: string;
 }
 
 export function fromActiveRequest(
@@ -96,6 +97,7 @@ export function fromActiveRequest(
     inputTokensEstimated: false,
     clientType: null,
     cacheReadTokensEstimated: null,
+    mappingReason: req.mappingReason,
   };
 }
 
@@ -127,6 +129,43 @@ function extractResponseBody(upstreamResponse: string | null): string | null {
 const ROUTER_INTERNAL_ERROR_PREFIXES = [
   "stream_error: upstream returned 200 but body contains error",
 ];
+
+/**
+ * 从 pipeline_snapshot JSON 中提取映射原因。
+ * 优先检查 overflow stage（triggered === true → "overflow_redirect"），
+ * 否则取 routing stage 的 mapping_reason 字段。
+ */
+export function parseMappingReason(
+  snapshot: string | null | undefined,
+): string | undefined {
+  if (!snapshot) return undefined;
+  try {
+    const parsed: { stages?: Array<Record<string, unknown>> } =
+    JSON.parse(snapshot);
+    if (!Array.isArray(parsed.stages)) return undefined;
+    // 优先检查 overflow stage
+    for (const stage of parsed.stages) {
+      if (
+        stage.stage === "overflow" &&
+    stage.triggered === true
+      ) {
+        return "overflow_redirect";
+      }
+    }
+    // 取 routing stage 的 mapping_reason
+    for (const stage of parsed.stages) {
+      if (
+        stage.stage === "routing" &&
+    typeof stage.mapping_reason === "string"
+      ) {
+        return stage.mapping_reason;
+      }
+    }
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 function isRouterInternalError(msg: string | null | undefined): boolean {
   if (!msg) return false;
@@ -190,5 +229,6 @@ export function fromLogEntry(entry: LogEntry): UnifiedRequestOverview {
     inputTokensEstimated: entry.input_tokens_estimated === 1,
     clientType: entry.client_type ?? null,
     cacheReadTokensEstimated: entry.cache_read_tokens_estimated ?? null,
+    mappingReason: parseMappingReason(entry.pipeline_snapshot),
   };
 }
