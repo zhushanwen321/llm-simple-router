@@ -21,8 +21,8 @@ const DEFAULT_FAILOVER_THRESHOLD = 400;
 export interface OrchestratorConfig {
   resolved: Target;
   provider: {
-    id: string; name: string; is_active: number; api_type: string;
-    base_url: string; api_key: string;
+  id: string; name: string; is_active: number; api_type: string;
+  base_url: string; api_key: string;
   };
   clientModel: string;
   isStream: boolean;
@@ -36,6 +36,8 @@ export interface OrchestratorConfig {
   upstreamRequest?: string;
   /** Schedule 层的并发覆盖配置，覆盖 Provider 默认并发限制 */
   concurrencyOverride?: ConcurrencyOverride;
+  /** 映射解析原因 */
+  mappingReason?: string;
 }
 
 export interface HandleContext {
@@ -161,11 +163,12 @@ export class ProxyOrchestrator {
       status: "pending",
       retryCount: 0,
       attempts: [],
-      clientIp: request.ip,
-      sessionId: config.sessionId,
-      clientRequest: config.clientRequest,
-      upstreamRequest: config.upstreamRequest,
-    };
+    clientIp: request.ip,
+    sessionId: config.sessionId,
+    clientRequest: config.clientRequest,
+    upstreamRequest: config.upstreamRequest,
+    mappingReason: config.mappingReason,
+  };
   }
 
   private async executeResilience(

@@ -38,6 +38,7 @@ export interface ActiveRequest {
   streamContent?: StreamContentSnapshot;
   clientIp?: string;
   sessionId?: string;
+  mappingReason?: string;
   clientRequest?: string;
   upstreamRequest?: string;
   completedAt?: number;

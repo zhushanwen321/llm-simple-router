@@ -1,5 +1,5 @@
 import Database from "better-sqlite3";
-import type { Target, ResolveContext, ResolveResult, ConcurrencyOverride } from "../../core/types.js";
+import type { Target, ResolveContext, ResolveResult, ConcurrencyOverride, MappingReason } from "../../core/types.js";
 import { getMappingGroup, getActiveProviderByName, getActiveProvidersWithModels, getActiveSchedulesForGroup } from "../../db/index.js";
 import { parseModels } from "../../config/model-context.js";
 import type { Schedule } from "../../db/schedules.js";
@@ -129,9 +129,9 @@ export function resolveMapping(
     const provider = getActiveProviderByName(db, providerName);
     if (provider) {
       const modelEntries = parseModels(provider.models);
-      if (modelEntries.some(m => m.name === backendModel)) {
-        return { target: { backend_model: backendModel, provider_id: provider.id }, targetCount: 1 };
-      }
+    if (modelEntries.some(m => m.name === backendModel)) {
+    return { target: { backend_model: backendModel, provider_id: provider.id }, targetCount: 1, mappingReason: "direct_format" as MappingReason };
+    }
     }
     return null;
   }
@@ -143,9 +143,9 @@ export function resolveMapping(
     const providers = getActiveProvidersWithModels(db);
     for (const p of providers) {
       const modelEntries = parseModels(p.models);
-      if (modelEntries.some(m => m.name === clientModel)) {
-        return { target: { backend_model: clientModel, provider_id: p.id }, targetCount: 1 };
-      }
+    if (modelEntries.some(m => m.name === clientModel)) {
+    return { target: { backend_model: clientModel, provider_id: p.id }, targetCount: 1, mappingReason: "fallback_provider" as MappingReason };
+    }
     }
     return null;
   }
@@ -174,12 +174,14 @@ export function resolveMapping(
   let activeTargets = baseTargets;
   let concurrencyOverride: ConcurrencyOverride | undefined;
 
+  let mappingReason: MappingReason = "group_base_rule";
   if (matchedSchedule) {
-    const scheduleTargets = parseScheduleTargets(matchedSchedule.mapping_rule);
-    if (scheduleTargets.length > 0) {
-      activeTargets = scheduleTargets;
-    }
-    concurrencyOverride = parseConcurrencyRule(matchedSchedule.concurrency_rule);
+  const scheduleTargets = parseScheduleTargets(matchedSchedule.mapping_rule);
+  if (scheduleTargets.length > 0) {
+    activeTargets = scheduleTargets;
+    mappingReason = "group_schedule";
+  }
+  concurrencyOverride = parseConcurrencyRule(matchedSchedule.concurrency_rule);
   }
 
   // 6. 过滤已排除的 targets
@@ -187,9 +189,10 @@ export function resolveMapping(
   if (filtered.length === 0) return null;
 
   return {
-    target: filtered[0],
-    concurrency_override: concurrencyOverride,
-    targetCount: activeTargets.length,
-    allTargets: activeTargets,
+  target: filtered[0],
+  concurrency_override: concurrencyOverride,
+  targetCount: activeTargets.length,
+  allTargets: activeTargets,
+  mappingReason,
   };
 }
