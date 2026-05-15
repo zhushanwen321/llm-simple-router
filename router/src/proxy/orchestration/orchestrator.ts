@@ -163,12 +163,12 @@ export class ProxyOrchestrator {
       status: "pending",
       retryCount: 0,
       attempts: [],
-    clientIp: request.ip,
-    sessionId: config.sessionId,
-    clientRequest: config.clientRequest,
-    upstreamRequest: config.upstreamRequest,
-    mappingReason: config.mappingReason,
-  };
+      clientIp: request.ip,
+      sessionId: config.sessionId,
+      clientRequest: config.clientRequest,
+      upstreamRequest: config.upstreamRequest,
+      mappingReason: config.mappingReason,
+    };
   }
 
   private async executeResilience(
