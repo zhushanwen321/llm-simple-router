@@ -5,7 +5,7 @@
   "projectRoot": "/Users/zhushanwen/Code/llm-simple-router-workspace/feat-mapping-reason-track",
   "currentPhase": 2,
   "currentStage": 16,
-  "completed": false,
+  "completed": true,
   "startedAt": "2026-05-15T03:08:52.707Z",
   "stages": [
     {
@@ -205,10 +205,10 @@
     {
       "number": 16,
       "name": "自动复盘",
-      "status": "active",
+      "status": "pass",
       "startedAt": "2026-05-15T05:13:50.264Z",
-      "completedAt": null,
-      "gateResult": null,
+      "completedAt": "2026-05-15T05:18:42.342Z",
+      "gateResult": "pass",
       "gateOutput": null,
       "tasks": []
     }
