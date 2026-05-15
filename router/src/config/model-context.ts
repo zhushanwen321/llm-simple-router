@@ -3,6 +3,7 @@ export interface ModelInfo {
   context_window: number | null
   patches: string[]
   stream_timeout_ms?: number
+  capabilities?: string[]
 }
 
 export interface ModelEntry {
@@ -10,6 +11,7 @@ export interface ModelEntry {
   context_window?: number
   patches?: string[]
   stream_timeout_ms?: number
+  capabilities?: string[]
 }
 
 export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
@@ -94,6 +96,80 @@ export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
   "moonshotai/Kimi-K2.5": 256000,
 }
 
+/** 已知支持图片输入的模型白名单。不在表中的模型默认 [\"text\"]。 */
+export const MODEL_CAPABILITIES: Record<string, string[]> = {
+  // OpenAI
+  "gpt-4o": ["text", "image"],
+  "gpt-4o-mini": ["text", "image"],
+  "gpt-4-turbo": ["text", "image"],
+  "gpt-4.1": ["text", "image"],
+  "gpt-4.1-mini": ["text", "image"],
+  "gpt-4.1-nano": ["text", "image"],
+  "o1": ["text", "image"],
+  "o1-pro": ["text", "image"],
+  "o3": ["text", "image"],
+  "o3-mini": ["text", "image"],
+  "o4-mini": ["text", "image"],
+  // Anthropic
+  "claude-3.5-sonnet": ["text", "image"],
+  "claude-3.5-haiku": ["text", "image"],
+  "claude-3-opus": ["text", "image"],
+  "claude-4-sonnet": ["text", "image"],
+  "claude-4-opus": ["text", "image"],
+  // DeepSeek
+  "deepseek-chat": ["text", "image"],
+  "deepseek-v3": ["text", "image"],
+  "deepseek-v4-flash": ["text", "image"],
+  "deepseek-v4-pro": ["text", "image"],
+  // 智谱
+  "glm-4.5-air": ["text", "image"],
+  "glm-4v-plus": ["text", "image"],
+  "glm-4v-flash": ["text", "image"],
+  // 月之暗面
+  "moonshot-v1-128k": ["text", "image"],
+  "moonshot-v1-32k": ["text", "image"],
+  "moonshot-v1-8k": ["text", "image"],
+  "kimi-k2.6": ["text", "image"],
+  "kimi-k2.5": ["text", "image"],
+  "kimi-k2-turbo-preview": ["text", "image"],
+  "kimi-k2-thinking": ["text", "image"],
+  "kimi-for-coding": ["text", "image"],
+  // 阿里云 Qwen
+  "qwen-vl-max": ["text", "image"],
+  "qwen-vl-plus": ["text", "image"],
+  "qwen3.6-plus": ["text", "image"],
+  "qwen3.5-plus": ["text", "image"],
+  "qwen3.5-flash": ["text", "image"],
+  // MiniMax
+  "MiniMax-M2.7": ["text", "image"],
+  "MiniMax-M2.7-highspeed": ["text", "image"],
+  "MiniMax-M2.5": ["text", "image"],
+  "MiniMax-M2.5-highspeed": ["text", "image"],
+  // 百度千帆
+  "ernie-4.0-8k": ["text", "image"],
+  "ernie-4.0-turbo-8k": ["text", "image"],
+  "ernie-3.5-8k": ["text", "image"],
+  // 火山引擎
+  "doubao-seed-2-0-pro-260215": ["text", "image"],
+  "doubao-seed-1-8-251228": ["text", "image"],
+  // 腾讯云
+  "hunyuan-2.0-instruct": ["text", "image"],
+  "hunyuan-2.0-thinking": ["text", "image"],
+  // 科大讯飞
+  "4.0Ultra": ["text", "image"],
+  "generalv3.5": ["text", "image"],
+  // 硅基流动
+  "deepseek-ai/DeepSeek-V3.2-Exp": ["text", "image"],
+  // 阶跃星辰
+  "step-3.5-flash": ["text", "image"],
+  "step-3.5-flash-2603": ["text", "image"],
+  // OpenCode
+  "mimo-v2-pro": ["text", "image"],
+  "mimo-v2-omni": ["text", "image"],
+  "mimo-v2.5-pro": ["text", "image"],
+  "mimo-v2.5": ["text", "image"],
+}
+
 export const DEFAULT_CONTEXT_WINDOW = 200000
 export const OVERFLOW_THRESHOLD = 1000000
 
@@ -140,9 +216,11 @@ export function parseModels(raw: string): ModelEntry[] {
     if (!Array.isArray(parsed)) return []
     const result = parsed.map((item: unknown): ModelEntry | null => {
       if (typeof item === 'string') {
-        return item ? { name: item, patches: [] } : null
+        return item
+          ? { name: item, patches: [], capabilities: MODEL_CAPABILITIES[item] ?? ["text"] }
+          : null
       }
-      const obj = item as { name?: string; id?: string; patches?: string[]; stream_timeout_ms?: number } | null
+      const obj = item as { name?: string; id?: string; patches?: string[]; stream_timeout_ms?: number; capabilities?: string[] } | null
       if (!obj) return null
       const modelName = obj.name ?? obj.id
       if (!modelName) return null
@@ -154,6 +232,8 @@ export function parseModels(raw: string): ModelEntry[] {
         patches,
       }
       if (obj.stream_timeout_ms != null) entry.stream_timeout_ms = obj.stream_timeout_ms
+      // capabilities: 显式 > 白名单查表 > 默认 ["text"]
+      entry.capabilities = obj.capabilities ?? MODEL_CAPABILITIES[modelName] ?? ["text"]
       return entry
     }).filter((e): e is ModelEntry => e !== null)
     modelsCache.set(raw, result)
@@ -174,6 +254,7 @@ export function buildModelInfoList(
       patches: entry.patches ?? [],
     }
     if (entry.stream_timeout_ms != null) info.stream_timeout_ms = entry.stream_timeout_ms
+    if (entry.capabilities != null) info.capabilities = entry.capabilities
     return info
   })
 }
