@@ -15,6 +15,7 @@ export class ResponsesToAnthropicTransform extends BaseSSETransform {
   private msgId = generateMsgId();
   private inputTokens = 0;
   private outputTokens = 0;
+  private cachedTokens = 0;
   private currentOutputIndex = -1;
   private hasSentMessageStop = false;
   private hasFunctionCall = false;
@@ -33,7 +34,7 @@ export class ResponsesToAnthropicTransform extends BaseSSETransform {
         content: [],
         model: this.model,
         status: "in_progress",
-        usage: { input_tokens: this.inputTokens },
+        usage: { input_tokens: Math.max(0, this.inputTokens - this.cachedTokens) },
       },
     });
   }
@@ -47,11 +48,12 @@ export class ResponsesToAnthropicTransform extends BaseSSETransform {
       case "response.created":
       case "response.in_progress":
       case "response.queued": {
-        // Extract usage from response object if present
         const resp = payload.response as Record<string, unknown> | undefined;
         if (resp?.usage) {
           const usage = resp.usage as Record<string, unknown>;
           this.inputTokens = (usage.input_tokens as number) ?? this.inputTokens;
+          const details = usage.input_tokens_details as Record<string, unknown> | undefined;
+          this.cachedTokens = Number(details?.cached_tokens ?? this.cachedTokens);
         }
         break;
       }
@@ -183,6 +185,8 @@ export class ResponsesToAnthropicTransform extends BaseSSETransform {
           const usage = resp.usage as Record<string, unknown>;
           this.inputTokens = (usage.input_tokens as number) ?? this.inputTokens;
           this.outputTokens = (usage.output_tokens as number) ?? this.outputTokens;
+          const details = usage.input_tokens_details as Record<string, unknown> | undefined;
+          this.cachedTokens = Number(details?.cached_tokens ?? this.cachedTokens);
         }
         this.emitStopSequence(resp?.status as string);
         break;
@@ -235,7 +239,7 @@ export class ResponsesToAnthropicTransform extends BaseSSETransform {
     this.pushAnthropicSSE("message_delta", {
       type: "message_delta",
       delta: { stop_reason: stopReason, stop_sequence: null },
-      usage: { input_tokens: this.inputTokens, output_tokens: this.outputTokens },
+      usage: { input_tokens: Math.max(0, this.inputTokens - this.cachedTokens), output_tokens: this.outputTokens },
     });
     this.pushAnthropicSSE("message_stop", { type: "message_stop" });
     this.hasSentMessageStop = true;

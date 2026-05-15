@@ -56,7 +56,7 @@ export class OpenAIToAnthropicTransform extends BaseSSETransform {
         message: {
           id: this.msgId, type: "message", role: "assistant", content: [],
           model: this.model, status: "in_progress",
-          usage: { input_tokens: this.inputTokens, cache_read_input_tokens: this.cacheReadTokens },
+          usage: { input_tokens: Math.max(0, this.inputTokens - this.cacheReadTokens), cache_read_input_tokens: this.cacheReadTokens },
         },
       });
       this.hasSentMessageStart = true;
@@ -189,7 +189,7 @@ export class OpenAIToAnthropicTransform extends BaseSSETransform {
     this.pushAnthropicSSE("message_delta", {
       type: "message_delta",
       delta: { stop_reason: stopReason, stop_sequence: null },
-      usage: { input_tokens: this.inputTokens, output_tokens: this.outputTokens, cache_read_input_tokens: this.cacheReadTokens },
+      usage: { input_tokens: Math.max(0, this.inputTokens - this.cacheReadTokens), output_tokens: this.outputTokens, cache_read_input_tokens: this.cacheReadTokens },
     });
     this.pushAnthropicSSE("message_stop", { type: "message_stop" });
     this.hasSentMessageStop = true;
