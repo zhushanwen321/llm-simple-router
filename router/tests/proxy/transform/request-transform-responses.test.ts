@@ -61,7 +61,50 @@ describe("responsesToAnthropicRequest", () => {
         metadata: { user_id: "user123" },
       });
       expect(result.metadata).toEqual({ user_id: "user123" });
+  });
+  });
+
+  describe("developer and system messages in input", () => {
+  it("extracts developer messages from input into system (not messages)", () => {
+    const result = responsesToAnthropicRequest({
+    model: "gpt-4o",
+    input: [
+      { type: "message", role: "developer", content: [{ type: "input_text", text: "Be precise" }] },
+      { type: "message", role: "user", content: [{ type: "input_text", text: "Hello" }] },
+    ],
     });
+    // developer 消息应合并到 system，不出现在 messages 中
+    expect(result.system).toContain("Be precise");
+    const msgs = result.messages as Array<{ role: string }>;
+    expect(msgs.every(m => m.role !== "developer")).toBe(true);
+    expect(msgs.some(m => m.role === "user")).toBe(true);
+  });
+
+  it("merges instructions and developer messages into system", () => {
+    const result = responsesToAnthropicRequest({
+    model: "gpt-4o",
+    instructions: "Base instructions",
+    input: [
+      { type: "message", role: "developer", content: [{ type: "input_text", text: "Extra context" }] },
+      { type: "message", role: "user", content: [{ type: "input_text", text: "Go" }] },
+    ],
+    });
+    expect(result.system).toContain("Base instructions");
+    expect(result.system).toContain("Extra context");
+  });
+
+  it("extracts system role messages from input into system", () => {
+    const result = responsesToAnthropicRequest({
+    model: "gpt-4o",
+    input: [
+      { type: "message", role: "system", content: [{ type: "input_text", text: "System rule" }] },
+      { type: "message", role: "user", content: [{ type: "input_text", text: "Hi" }] },
+    ],
+    });
+    expect(result.system).toContain("System rule");
+    const msgs = result.messages as Array<{ role: string }>;
+    expect(msgs.every(m => m.role !== "system")).toBe(true);
+  });
   });
 
   // --- 2. Multi-turn with function_call / function_call_output ---

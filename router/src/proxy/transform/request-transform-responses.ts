@@ -59,13 +59,19 @@ export function responsesToAnthropicRequest(
   const result: Record<string, unknown> = {};
   result.model = req.model;
 
-  // instructions → system
-  if (req.instructions != null) {
-    result.system = req.instructions;
-  }
+  // input → messages (同时收集 developer/system 消息作为 system 的一部分)
+  const { messages: antMessages, systemParts } = convertResponsesInputToAntMessages(req.input);
+  result.messages = antMessages;
 
-  // input → messages
-  result.messages = convertResponsesInputToAntMessages(req.input);
+  // instructions + developer/system 消息合并为 system
+  const allSystemParts: string[] = [];
+  if (req.instructions != null && req.instructions !== "") {
+    allSystemParts.push(req.instructions);
+  }
+  allSystemParts.push(...systemParts);
+  if (allSystemParts.length > 0) {
+    result.system = allSystemParts.join("\n");
+  }
 
   // max_output_tokens → max_tokens
   if (req.max_output_tokens != null) {
@@ -121,20 +127,27 @@ export function responsesToAnthropicRequest(
   return result;
 }
 
-/** Convert Responses input (string | ResponseInputItem[]) → Anthropic messages. */
-function convertResponsesInputToAntMessages(input: string | ResponseInputItem[] | undefined): AntMessage[] {
-  if (input == null) return [];
+/** Convert Responses input (string | ResponseInputItem[]) → Anthropic messages + system parts. */
+function convertResponsesInputToAntMessages(input: string | ResponseInputItem[] | undefined): { messages: AntMessage[]; systemParts: string[] } {
+  if (input == null) return { messages: [], systemParts: [] };
   // String shorthand → single user message
   if (typeof input === "string") {
-    return [{ role: "user", content: [{ type: "text", text: input }] }];
+    return { messages: [{ role: "user", content: [{ type: "text", text: input }] }], systemParts: [] };
   }
-  if (!Array.isArray(input)) return [];
+  if (!Array.isArray(input)) return { messages: [], systemParts: [] };
 
   const raw: AntMessage[] = [];
+  const systemParts: string[] = [];
 
   for (const item of input) {
     if (item.type === "message") {
-      // item is narrowed to ResponseInputMessage
+    // developer/system 消息提取为 system part，不放入 messages
+      if (item.role === "developer" || item.role === "system") {
+        const content = extractMessageContent(item);
+        const text = content.map(b => b.type === "text" ? b.text : "").join("");
+        if (text) systemParts.push(text);
+        continue;
+      }
       const content = extractMessageContent(item);
       raw.push({ role: item.role, content });
     } else if (item.type === "function_call") {
@@ -195,7 +208,7 @@ function convertResponsesInputToAntMessages(input: string | ResponseInputItem[] 
 
   const merged = mergeConsecutiveMessages(raw);
   ensureFirstIsUser(merged);
-  return merged;
+  return { messages: merged, systemParts };
 }
 
 /** Extract content blocks from a ResponseInputMessage. */
