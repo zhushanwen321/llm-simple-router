@@ -1,3 +1,5 @@
+import type { MappingReason } from "../types.js";
+
 /** Abstract SSE client interface (decouples from Node http ServerResponse). */
 export interface SSEClient {
   write(data: string): void;
@@ -38,6 +40,7 @@ export interface ActiveRequest {
   streamContent?: StreamContentSnapshot;
   clientIp?: string;
   sessionId?: string;
+  mappingReason?: MappingReason;
   clientRequest?: string;
   upstreamRequest?: string;
   completedAt?: number;
