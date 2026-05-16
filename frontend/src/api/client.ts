@@ -1,5 +1,6 @@
 import axios from "axios";
 import router from "@/router";
+import { HTTP_STATUS, API_CODE } from "@/constants";
 import type { LogEntry } from "@/components/logs/types";
 import type {
   Provider,
@@ -31,8 +32,8 @@ const client = axios.create({
 client.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      if (error.response.data?.code === 40103) {
+    if (error.response?.status === HTTP_STATUS.UNAUTHORIZED) {
+      if (error.response.data?.code === API_CODE.NOT_INITIALIZED) {
         router.push("/setup");
       } else {
         router.push("/login");
