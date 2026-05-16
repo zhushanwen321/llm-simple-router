@@ -23,7 +23,7 @@ describe('model-context', () => {
     const result = parseModels('[{"name":"glm-5","patches":["thinking-param"]},{"name":"deepseek-chat"}]')
   expect(result).toEqual([
     { name: 'glm-5', patches: ['thinking_consistency'], capabilities: ['text'] },
-    { name: 'deepseek-chat', patches: [], capabilities: ['text', 'image'] },
+  { name: 'deepseek-chat', patches: [], capabilities: ['text'] },
   ])
   })
 
