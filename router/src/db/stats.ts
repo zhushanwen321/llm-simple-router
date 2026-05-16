@@ -48,9 +48,8 @@ export function getStats(
   backendModel?: string,
 ): Stats {
   const conditions = [
-    "rm.is_complete = 1",
-    "rm.created_at >= datetime(?)",
-    "rm.created_at < datetime(?)",
+  "rm.created_at >= datetime(?)",
+  "rm.created_at < datetime(?)",
   ];
   const params: unknown[] = [startTime, endTime];
   if (routerKeyId) {
