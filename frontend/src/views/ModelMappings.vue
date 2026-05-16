@@ -135,9 +135,9 @@ function buildEntries(): MappingEntry[] {
     );
     const imageFallback = rule.image_fallback
       ? {
-          provider_id: rule.image_fallback.provider_id,
-          backend_model: rule.image_fallback.backend_model,
-        }
+        provider_id: rule.image_fallback.provider_id,
+        backend_model: rule.image_fallback.backend_model,
+      }
       : undefined;
     return {
       clientModel: g.client_model,
@@ -145,11 +145,11 @@ function buildEntries(): MappingEntry[] {
         targets.length > 0
           ? targets
           : [
-              {
-                backend_model: "",
-                provider_id: providersList.value[0]?.id ?? "",
-              },
-            ],
+            {
+              backend_model: "",
+              provider_id: providersList.value[0]?.id ?? "",
+            },
+          ],
       existing: true,
       existingId: g.id,
       tag: "existing" as const,
