@@ -211,7 +211,7 @@ export function loadModelDirectory(configDir?: string): void {
 }
 
 /** 查询模型 capabilities：显式配置 > model-directory.json > 硬编码白名单 > ["text"] */
-function lookupCapabilities(modelName: string): string[] {
+export function lookupCapabilities(modelName: string): string[] {
   return MODEL_CAPABILITIES[modelName]
   ?? directoryCapabilities[modelName]
   ?? ["text"]
