@@ -133,10 +133,10 @@ function buildEntries(): MappingEntry[] {
         overflow_model: t.overflow_model,
       }),
     );
-    const imageFallback = rule.image_fallback
+    const multimodalFallback = rule.multimodal_fallback
       ? {
-        provider_id: rule.image_fallback.provider_id,
-        backend_model: rule.image_fallback.backend_model,
+        provider_id: rule.multimodal_fallback.provider_id,
+        backend_model: rule.multimodal_fallback.backend_model,
       }
       : undefined;
     return {
@@ -155,7 +155,7 @@ function buildEntries(): MappingEntry[] {
       tag: "existing" as const,
       active: !!g.is_active,
       originalActive: !!g.is_active,
-      imageFallback,
+      multimodalFallback,
     };
   });
 }

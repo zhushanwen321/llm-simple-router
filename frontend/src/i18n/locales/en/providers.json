@@ -152,7 +152,9 @@
     "sourcePreset": "Preset"
   },
   "capabilities": {
-    "text": "Text",
-    "image": "Image"
+  "text": "Text",
+  "image": "Image",
+  "audio": "Audio",
+  "video": "Video"
   }
 }

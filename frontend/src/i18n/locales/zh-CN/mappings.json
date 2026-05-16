@@ -52,12 +52,15 @@
     "parseRuleFailed": "路由规则格式异常，已使用默认配置"
   },
   "selectProviderModel": "选择供应商 / 模型",
-  "imageFallback": {
-    "title": "图片 Fallback",
-    "add": "添加图片 Fallback",
-    "configured": "已配置",
-    "selectProvider": "选择供应商",
-    "modelPlaceholder": "模型名称（如 gpt-4o）",
-    "selectProviderModel": "选择供应商和模型"
+  "multimodalFallback": {
+  "title": "多模态 Fallback",
+  "add": "添加多模态 Fallback",
+  "configured": "已配置",
+  "selectProvider": "选择供应商",
+  "modelPlaceholder": "模型名称（如 gpt-4o）",
+  "selectProviderModel": "选择供应商和模型",
+  "sessionLockWarning": "注意：一旦请求中包含图片、音频或视频，整个会话将持续路由到 fallback 模型。",
+  "sessionLockReason": "原因：客户端每轮发送完整对话历史，历史中的多媒体内容会持续触发重定向。客户端执行 compact 或开启新会话后自动恢复。",
+  "costSuggestion": "建议：选择与原始模型价位相近的 fallback 模型，避免成本差异过大。"
   }
 }

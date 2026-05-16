@@ -2,7 +2,7 @@
 import { ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { toast } from "vue-sonner";
-import { Trash2, ImageIcon, Plus } from "lucide-vue-next";
+import { Trash2, Layers, Plus, AlertTriangle } from "lucide-vue-next";
 import { api, getApiMessage } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -22,7 +22,7 @@ import MappingEntryEditor from "@/components/mappings/MappingEntryEditor.vue";
 import type {
   MappingTarget,
   MappingEntry,
-  ImageFallback,
+  MultimodalFallback,
 } from "@/components/quick-setup/types";
 import type { ProviderGroup } from "@/components/mappings/cascading-types";
 
@@ -59,7 +59,7 @@ watch(
 
 const expanded = ref(props.defaultExpanded);
 const localTargets = ref<MappingTarget[]>([]);
-const localImageFallback = ref<ImageFallback | undefined>(undefined);
+const localMultimodalFallback = ref<MultimodalFallback | undefined>(undefined);
 const saving = ref(false);
 const showDeleteConfirm = ref(false);
 
@@ -67,8 +67,8 @@ const showDeleteConfirm = ref(false);
 watch(expanded, (val) => {
   if (val) {
     localTargets.value = props.entry.targets.map((t) => ({ ...t }));
-    localImageFallback.value = props.entry.imageFallback
-      ? { ...props.entry.imageFallback }
+    localMultimodalFallback.value = props.entry.multimodalFallback
+      ? { ...props.entry.multimodalFallback }
       : undefined;
   }
 });
@@ -85,10 +85,10 @@ watch(
 );
 
 watch(
-  () => props.entry.imageFallback,
+  () => props.entry.multimodalFallback,
   (fb) => {
     if (expanded.value) {
-      localImageFallback.value = fb ? { ...fb } : undefined;
+      localMultimodalFallback.value = fb ? { ...fb } : undefined;
     }
   },
 );
@@ -98,7 +98,7 @@ const workingEntry = computed<MappingEntry>(() =>
     ? {
       ...props.entry,
       targets: localTargets.value,
-      imageFallback: localImageFallback.value,
+      multimodalFallback: localMultimodalFallback.value,
     }
     : props.entry,
 );
@@ -111,8 +111,8 @@ function handleUpdateClientModel(val: string) {
   localClientModel.value = val;
 }
 
-function handleUpdateImageFallback(fb: ImageFallback | undefined) {
-  localImageFallback.value = fb;
+function handleUpdateMultimodalFallback(fb: MultimodalFallback | undefined) {
+  localMultimodalFallback.value = fb;
 }
 
 async function handleSave() {
@@ -124,8 +124,8 @@ async function handleSave() {
     if (!clientModel) return;
     const ruleJson = JSON.stringify({
       targets: localTargets.value,
-      ...(localImageFallback.value?.backend_model
-        ? { image_fallback: localImageFallback.value }
+      ...(localMultimodalFallback.value?.backend_model
+        ? { multimodal_fallback: localMultimodalFallback.value }
         : {}),
     });
     if (props.entry.existingId) {
@@ -178,16 +178,16 @@ function handleConfirmDelete() {
 // Active providers for image fallback select
 const activeProviders = computed(() => props.providerGroups);
 
-function addImageFallback() {
+function addMultimodalFallback() {
   const firstProvider = props.providerGroups[0];
-  localImageFallback.value = {
+  localMultimodalFallback.value = {
     provider_id: firstProvider?.provider.id ?? "",
     backend_model: "",
   };
 }
 
 function handleFallbackSelect(val: SelectedValue) {
-  localImageFallback.value = {
+  localMultimodalFallback.value = {
     provider_id: val.provider_id,
     backend_model: val.model,
   };
@@ -232,10 +232,10 @@ function handleFallbackSelect(val: SelectedValue) {
             {{ t("providers.shared.level", { count: entry.targets.length }) }}
           </span>
           <span
-            v-if="entry.imageFallback"
+            v-if="entry.multimodalFallback"
             class="text-[10px] px-1.5 py-0.5 rounded border border-primary/20 text-primary/60 flex items-center gap-0.5"
           >
-            <ImageIcon class="w-2.5 h-2.5" />
+            <Layers class="w-2.5 h-2.5" />
           </span>
           <Button
             v-if="!editableClientModel"
@@ -260,30 +260,30 @@ function handleFallbackSelect(val: SelectedValue) {
     <!-- Image Fallback section (only when expanded) -->
     <div v-if="expanded" class="px-4 pt-2 pb-1 border-t border-border/30">
       <div class="flex items-center gap-2 mb-1.5">
-        <ImageIcon class="w-3.5 h-3.5 text-muted-foreground/50" />
+        <Layers class="w-3.5 h-3.5 text-muted-foreground/50" />
         <span class="text-xs text-muted-foreground">{{
-          t("mappings.imageFallback.title")
+          t("mappings.multimodalFallback.title")
         }}</span>
         <Badge
-          v-if="localImageFallback"
+          v-if="localMultimodalFallback"
           variant="outline"
           class="text-[10px] px-1.5 py-0 text-primary/60 border-primary/20"
         >
-          {{ t("mappings.imageFallback.configured") }}
+          {{ t("mappings.multimodalFallback.configured") }}
         </Badge>
       </div>
-      <div v-if="localImageFallback" class="flex items-center gap-2">
+      <div v-if="localMultimodalFallback" class="flex items-center gap-2">
         <CascadingModelSelect
           :providers="activeProviders"
           :model-value="
-            localImageFallback
+            localMultimodalFallback
               ? {
-                  provider_id: localImageFallback.provider_id,
-                  model: localImageFallback.backend_model,
+                  provider_id: localMultimodalFallback.provider_id,
+                  model: localMultimodalFallback.backend_model,
                 }
               : undefined
           "
-          :placeholder="t('mappings.imageFallback.selectProviderModel')"
+          :placeholder="t('mappings.multimodalFallback.selectProviderModel')"
           compact
           @update:model-value="handleFallbackSelect($event)"
         />
@@ -292,10 +292,33 @@ function handleFallbackSelect(val: SelectedValue) {
           variant="ghost"
           size="icon-xs"
           class="shrink-0 text-muted-foreground/40 hover:text-destructive"
-          @click="handleUpdateImageFallback(undefined)"
+          @click="handleUpdateMultimodalFallback(undefined)"
         >
           <Trash2 class="size-3" />
         </Button>
+      </div>
+      <!-- 永久锁定警告 -->
+      <div
+        v-if="localMultimodalFallback"
+        class="mt-2 p-2 rounded-md border border-amber-500/30 bg-amber-500/5"
+      >
+        <div class="flex gap-2">
+          <AlertTriangle
+            class="w-3.5 h-3.5 shrink-0 mt-0.5"
+            style="color: rgba(245, 158, 11, 0.9)"
+          />
+          <div class="space-y-1">
+            <p class="text-[11px]" style="color: rgba(245, 158, 11, 0.9)">
+              {{ t("mappings.multimodalFallback.sessionLockWarning") }}
+            </p>
+            <p class="text-[11px]" style="color: rgba(245, 158, 11, 0.6)">
+              {{ t("mappings.multimodalFallback.sessionLockReason") }}
+            </p>
+            <p class="text-[11px]" style="color: rgba(245, 158, 11, 0.5)">
+              {{ t("mappings.multimodalFallback.costSuggestion") }}
+            </p>
+          </div>
+        </div>
       </div>
       <Button
         v-else
@@ -303,10 +326,10 @@ function handleFallbackSelect(val: SelectedValue) {
         variant="ghost"
         size="sm"
         class="text-xs text-muted-foreground/50"
-        @click="addImageFallback"
+        @click="addMultimodalFallback"
       >
         <Plus class="w-3 h-3 mr-1" />
-        {{ t("mappings.imageFallback.add") }}
+        {{ t("mappings.multimodalFallback.add") }}
       </Button>
     </div>
 

@@ -62,8 +62,8 @@ export interface MappingTarget {
   overflow_model?: string;
 }
 
-/** 图片 Fallback 配置 */
-export interface ImageFallback {
+/** 多模态 Fallback 配置 */
+export interface MultimodalFallback {
   provider_id: string;
   backend_model: string;
 }
@@ -71,7 +71,7 @@ export interface ImageFallback {
 /** 映射组 rule 字段解析后的结构 */
 export interface Rule {
   targets?: MappingTarget[];
-  image_fallback?: ImageFallback;
+  multimodal_fallback?: MultimodalFallback;
 }
 
 /** Provider 转换规则 */

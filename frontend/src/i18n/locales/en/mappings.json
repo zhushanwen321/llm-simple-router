@@ -52,12 +52,15 @@
     "parseRuleFailed": "Invalid rule format, using defaults"
   },
   "selectProviderModel": "Select Provider / Model",
-  "imageFallback": {
-    "title": "Image Fallback",
-    "add": "Add Image Fallback",
-    "configured": "Configured",
-    "selectProvider": "Select Provider",
-    "modelPlaceholder": "Model name (e.g. gpt-4o)",
-    "selectProviderModel": "Select provider & model"
+  "multimodalFallback": {
+  "title": "Multimodal Fallback",
+  "add": "Add Multimodal Fallback",
+  "configured": "Configured",
+  "selectProvider": "Select Provider",
+  "modelPlaceholder": "Model name (e.g. gpt-4o)",
+  "selectProviderModel": "Select provider & model",
+  "sessionLockWarning": "Note: Once a request contains images, audio, or video, the entire session will be persistently routed to the fallback model.",
+  "sessionLockReason": "Reason: The client sends the full conversation history each turn, and multimedia content in history keeps triggering redirects. Session auto-recovers after client compact or new session.",
+  "costSuggestion": "Tip: Choose a fallback model with similar pricing to the original model."
   }
 }
