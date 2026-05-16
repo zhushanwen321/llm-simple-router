@@ -32,7 +32,7 @@ export class PluginRegistry {
       return loaded;
     }
     const files = readdirSync(resolvedDir).filter(
-      (f) => f.endsWith(".js") || f.endsWith(".mjs"),
+      (f) => f.endsWith(".js") || f.endsWith(".mjs") || f.endsWith(".cjs"),
     );
     for (const file of files) {
       const filePath = join(resolvedDir, file);
