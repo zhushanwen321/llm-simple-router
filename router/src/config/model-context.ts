@@ -195,7 +195,6 @@ export function loadModelDirectory(configDir?: string): void {
   try {
     const dir = configDir ?? path.resolve(process.cwd(), "config")
     const filePath = path.join(dir, "model-directory.json")
-    if (!fs.existsSync(filePath)) return
     const raw = fs.readFileSync(filePath, "utf-8")
     const data: ModelDirectoryData = JSON.parse(raw)
     if (data.capabilities && typeof data.capabilities === "object") {
@@ -204,9 +203,10 @@ export function loadModelDirectory(configDir?: string): void {
     if (data.context_windows && typeof data.context_windows === "object") {
       directoryContextWindows = data.context_windows
     }
+  // eslint-disable-next-line taste/no-silent-catch -- 加载失败不影响启动，使用硬编码白名单兆底。但记录到 stderr 供诊断
   } catch (err: unknown) {
-   
-    void err
+  // 加载失败不影响启动，使用硬编码白名单兆底。但记录到 stderr 供诊断
+    console.error('loadModelDirectory: failed to load, using hardcoded fallback', err)
   }
 }
 

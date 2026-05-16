@@ -44,13 +44,13 @@ describe("expandOverflowTargets", () => {
   const result = expandOverflowTargets([targetA, targetB], db, body);
 
   // Expect: [overflow_target, targetA, targetB]
-  expect(result).toHaveLength(3);
-  expect(result[0]).toEqual({
+  expect(result.targets).toHaveLength(3);
+  expect(result.targets[0]).toEqual({
     provider_id: "p-overflow",
     backend_model: "big-model",
   });
-  expect(result[1]).toBe(targetA);
-  expect(result[2]).toBe(targetB);
+  expect(result.targets[1]).toBe(targetA);
+  expect(result.targets[2]).toBe(targetB);
   });
 
   it("IR fallback target without overflow fields is not expanded", () => {
@@ -66,8 +66,8 @@ describe("expandOverflowTargets", () => {
 
   const result = expandOverflowTargets([irFallback], db, body);
 
-  expect(result).toHaveLength(1);
-  expect(result[0]).toBe(irFallback);
+  expect(result.targets).toHaveLength(1);
+  expect(result.targets[0]).toBe(irFallback);
   });
 
   it("empty targets array returns empty result", () => {
@@ -75,7 +75,7 @@ describe("expandOverflowTargets", () => {
 
   const result = expandOverflowTargets([], db, body);
 
-  expect(result).toEqual([]);
+  expect(result.targets).toEqual([]);
   });
 
   it("exception in applyOverflowRedirect for one target does not block others", () => {
@@ -98,7 +98,7 @@ describe("expandOverflowTargets", () => {
   const result = expandOverflowTargets([targetA, targetB], db, body);
 
   // Both original targets must be present in result
-  expect(result).toContain(targetA);
-  expect(result).toContain(targetB);
+  expect(result.targets).toContain(targetA);
+  expect(result.targets).toContain(targetB);
   });
 });

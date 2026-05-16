@@ -30,12 +30,8 @@ export interface ModelConfig {
   patches: string[];
 }
 
-export interface MappingTarget {
-  backend_model: string;
-  provider_id: string;
-  overflow_provider_id?: string;
-  overflow_model?: string;
-}
+import type { MappingTarget, ImageFallback } from '@/types/mapping'
+export type { MappingTarget, ImageFallback }
 
 export const CLIENTS: ClientMeta[] = [
   {
@@ -190,21 +186,7 @@ export function getDefaultContextWindow(modelName: string): number {
   return CONTEXT_128K;
 }
 
-/** 映射目标（与后端 MappingTarget 对齐） */
-export interface MappingTarget {
-  backend_model: string;
-  provider_id: string;
-  overflow_provider_id?: string;
-  overflow_model?: string;
-}
-
 /** 映射条目：合并了新建映射和已有映射的统一结构 */
-/** 图片 Fallback 配置 */
-export interface ImageFallback {
-  provider_id: string;
-  backend_model: string;
-}
-
 export interface MappingEntry {
   /** 客户端模型名 */
   clientModel: string;
