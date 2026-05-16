@@ -336,7 +336,7 @@
               @update:model="updateModel"
               @remove-model="removeModel"
               @update:model-timeout="updateModelTimeout"
-              @toggle-model-image-capability="toggleModelImageCapability"
+              @toggle-model-capability="toggleModelCapability"
               @fetch-upstream-models="fetchUpstreamModels"
               @add-model="addModel"
               @update:model-input="modelInput = $event"
@@ -507,7 +507,7 @@ const {
   removeModel,
   updateModel,
   updateModelTimeout,
-  toggleModelImageCapability,
+  toggleModelCapability,
   onConcurrencyModeChange,
   openCreate,
   openEdit,

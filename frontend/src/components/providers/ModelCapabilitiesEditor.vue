@@ -72,7 +72,7 @@ const emit = defineEmits<{
   "update:model": [index: number, event: ModelConfig];
   "remove-model": [index: number];
   "update:model-timeout": [index: number, value: string | number];
-  "toggle-model-image-capability": [index: number];
+  "toggle-model-capability": [index: number, capability: string];
   "fetch-upstream-models": [];
   "add-model": [];
   "update:model-input": [value: string];
@@ -252,7 +252,9 @@ function isOfficialOpenai(url: string): boolean {
               String($event ? Math.round($event / 1000) : ''),
             )
           "
-          @toggle-image-capability="emit('toggle-model-image-capability', i)"
+          @toggle-capability="
+            (cap: string) => emit('toggle-model-capability', i, cap)
+          "
         />
       </div>
     </div>

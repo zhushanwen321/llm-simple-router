@@ -220,14 +220,14 @@ export function useProviderForm() {
     form.value.models[index].patches = updated.patches;
   }
 
-  /** 切换模型的 image 能力 */
-  function toggleModelImageCapability(index: number) {
+  /** 切换模型的指定能力 */
+  function toggleModelCapability(index: number, capability: string) {
     const model = form.value.models[index];
     const caps = model.capabilities ?? ["text"];
-    const hasImage = caps.includes("image");
-    model.capabilities = hasImage
-      ? caps.filter((c) => c !== "image")
-      : [...caps, "image"];
+    const hasIt = caps.includes(capability);
+    model.capabilities = hasIt
+      ? caps.filter((c) => c !== capability)
+      : [...caps, capability];
   }
 
   function updateModelTimeout(index: number, seconds: string | number) {
@@ -321,7 +321,7 @@ export function useProviderForm() {
     removeModel,
     updateModel,
     updateModelTimeout,
-    toggleModelImageCapability,
+    toggleModelCapability,
     onConcurrencyModeChange,
     isOfficialOpenai,
     openCreate,

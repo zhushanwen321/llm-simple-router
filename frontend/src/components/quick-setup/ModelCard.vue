@@ -17,7 +17,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
-import { ChevronDown, Trash2, ImageIcon, FileText } from "lucide-vue-next";
+import {
+  ChevronDown,
+  Trash2,
+  ImageIcon,
+  FileText,
+  Volume2,
+  Video,
+} from "lucide-vue-next";
 import { cn } from "@/lib/utils";
 
 const { t } = useI18n();
@@ -35,7 +42,7 @@ const emit = defineEmits<{
   "update:model": [value: ModelConfig];
   remove: [];
   "update:stream-timeout-ms": [value: number | undefined];
-  "toggle-image-capability": [];
+  "toggle-capability": [capability: string];
 }>();
 
 const open = ref(false);
@@ -201,13 +208,37 @@ function formatCw(n: number): string {
         <Label class="flex items-center gap-1.5 cursor-pointer">
           <Checkbox
             :checked="capabilities.includes('image')"
-            @update:checked="emit('toggle-image-capability')"
+            @update:checked="emit('toggle-capability', 'image')"
           />
           <span
             class="text-[10px] text-muted-foreground flex items-center gap-0.5"
           >
             <ImageIcon class="w-2.5 h-2.5" />
             {{ t("providers.capabilities.image") }}
+          </span>
+        </Label>
+        <Label class="flex items-center gap-1.5 cursor-pointer">
+          <Checkbox
+            :checked="capabilities.includes('audio')"
+            @update:checked="emit('toggle-capability', 'audio')"
+          />
+          <span
+            class="text-[10px] text-muted-foreground flex items-center gap-0.5"
+          >
+            <Volume2 class="w-2.5 h-2.5" />
+            {{ t("providers.capabilities.audio") }}
+          </span>
+        </Label>
+        <Label class="flex items-center gap-1.5 cursor-pointer">
+          <Checkbox
+            :checked="capabilities.includes('video')"
+            @update:checked="emit('toggle-capability', 'video')"
+          />
+          <span
+            class="text-[10px] text-muted-foreground flex items-center gap-0.5"
+          >
+            <Video class="w-2.5 h-2.5" />
+            {{ t("providers.capabilities.video") }}
           </span>
         </Label>
       </div>

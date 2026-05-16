@@ -32,8 +32,8 @@ export interface ModelConfig {
   capabilities?: string[];
 }
 
-import type { MappingTarget, ImageFallback } from '@/types/mapping'
-export type { MappingTarget, ImageFallback }
+import type { MappingTarget, MultimodalFallback } from "@/types/mapping";
+export type { MappingTarget, MultimodalFallback };
 
 export const CLIENTS: ClientMeta[] = [
   {
@@ -204,8 +204,8 @@ export interface MappingEntry {
   active: boolean;
   /** 已有映射的原始 active 状态，用于判断是否需要 toggle */
   originalActive?: boolean;
-  /** 图片 Fallback 配置（可选） */
-  imageFallback?: ImageFallback;
+  /** 多模态 Fallback 配置（可选） */
+  multimodalFallback?: MultimodalFallback;
 }
 
 /**
