@@ -1,6 +1,7 @@
 import { FastifyPluginCallback } from "fastify"
 import Database from "better-sqlite3"
 import { getRecommendedProviders, getRecommendedRetryRules, reloadConfig } from "../config/recommended.js"
+import { lookupCapabilities } from "../config/model-context.js"
 
 interface RecommendedRoutesOptions {
   db: Database.Database
@@ -10,7 +11,18 @@ export const adminRecommendedRoutes: FastifyPluginCallback<RecommendedRoutesOpti
   const { db } = options
 
   app.get("/admin/api/recommended/providers", async (_req, reply) => {
-    return reply.send(getRecommendedProviders())
+  const groups = getRecommendedProviders()
+  // 给每个预设的模型补上 capabilities
+  for (const group of groups) {
+    for (const preset of group.presets) {
+    const capMap: Record<string, string[]> = {}
+    for (const m of preset.models) {
+      capMap[m] = lookupCapabilities(m)
+    }
+    (preset as Record<string, unknown>).modelCapabilities = capMap
+    }
+  }
+  return reply.send(groups)
   })
 
   app.get("/admin/api/recommended/retry-rules", async (_req, reply) => {
