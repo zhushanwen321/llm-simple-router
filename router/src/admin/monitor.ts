@@ -45,7 +45,9 @@ export const adminMonitorRoutes: FastifyPluginCallback<MonitorRoutesOptions> = (
         "Cache-Control": "no-cache",
         Connection: "keep-alive",
       });
-    } catch { /* 客户端在 hijack 和 writeHead 之间断连，安全忽略 */ } // eslint-disable-line taste/no-silent-catch
+    } catch {
+      request.log.debug("client disconnected before writeHead");
+    }
   });
 
   app.get("/admin/api/monitor/request/:id", async (request, reply) => {
