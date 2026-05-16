@@ -259,8 +259,8 @@ export function getMetricsTimeseries(
   endTime?: string,
 ): MetricsTimeseriesRow[] {
   const bucketSec = (startTime && endTime)
-  ? calcBucketSec((new Date(endTime).getTime() - new Date(startTime).getTime()) / MS_PER_SECOND)
-  : calcBucketSec(PERIOD_TOTAL_SEC[period]);
+    ? calcBucketSec((new Date(endTime).getTime() - new Date(startTime).getTime()) / MS_PER_SECOND)
+    : calcBucketSec(PERIOD_TOTAL_SEC[period]);
   const { timeWhere, timeParams } = buildTimeCondition(period, startTime, endTime);
   const conditions = [timeWhere];
   const params: unknown[] = [...timeParams];
