@@ -94,11 +94,12 @@
     "group": "智谱",
     "presets": [
       {
-        "plan": "Coding Plan",
-        "presetName": "zhipu-coding-plan",
-        "apiType": "anthropic",
-        "baseUrl": "https://open.bigmodel.cn/api/anthropic",
-        "modelsEndpoint": "/v1/models",
+      "plan": "Coding Plan",
+    "presetName": "zhipu-coding-plan",
+    "apiType": "openai",
+    "baseUrl": "https://open.bigmodel.cn",
+    "upstreamPath": "/api/coding/paas/v4/chat/completions",
+    "modelsEndpoint": "/v1/models",
         "models": [
           "glm-5.1",
           "glm-5",
