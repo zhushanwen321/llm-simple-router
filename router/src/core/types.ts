@@ -32,6 +32,14 @@ export interface ConcurrencyOverride {
   max_queue_size?: number;
 }
 
+export type MappingReason =
+  | "direct_format"
+  | "group_base_rule"
+  | "group_schedule"
+  | "fallback_provider"
+  | "overflow_redirect"
+  | "failover_retry";
+
 export interface ResolveResult {
   target: Target;
   concurrency_override?: ConcurrencyOverride;
@@ -39,6 +47,8 @@ export interface ResolveResult {
   targetCount: number;
   /** 排除前的完整 target 列表，用于请求级缓存（BP-H2） */
   allTargets?: Target[];
+  /** 映射解析原因，标识走了哪条解析路径 */
+  mappingReason: MappingReason;
 }
 
 // ========== 来自原 proxy/types.ts 公共部分 ==========

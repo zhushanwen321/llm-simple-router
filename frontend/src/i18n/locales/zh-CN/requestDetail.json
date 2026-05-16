@@ -57,5 +57,13 @@
   "rawData": "原始数据",
   "rawJson": "原始 JSON",
   "rawSse": "原始 SSE",
-  "structured": "结构化"
+  "structured": "结构化",
+  "mappingReason": {
+  "direct_format": "直接指定",
+  "group_base_rule": "基础规则",
+  "group_schedule": "分时段规则",
+  "fallback_provider": "Provider 匹配",
+  "overflow_redirect": "溢出重定向",
+  "failover_retry": "Failover 重试"
+  }
 }

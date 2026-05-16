@@ -1,5 +1,5 @@
 import Database from "better-sqlite3";
-import type { Target, ResolveContext, ResolveResult, ConcurrencyOverride } from "../../core/types.js";
+import type { Target, ResolveContext, ResolveResult, ConcurrencyOverride, MappingReason } from "../../core/types.js";
 import { getMappingGroup, getActiveProviderByName, getActiveProvidersWithModels, getActiveSchedulesForGroup } from "../../db/index.js";
 import { parseModels } from "../../config/model-context.js";
 import type { Schedule } from "../../db/schedules.js";
@@ -130,7 +130,7 @@ export function resolveMapping(
     if (provider) {
       const modelEntries = parseModels(provider.models);
       if (modelEntries.some(m => m.name === backendModel)) {
-        return { target: { backend_model: backendModel, provider_id: provider.id }, targetCount: 1 };
+        return { target: { backend_model: backendModel, provider_id: provider.id }, targetCount: 1, mappingReason: "direct_format" as MappingReason };
       }
     }
     return null;
@@ -144,7 +144,7 @@ export function resolveMapping(
     for (const p of providers) {
       const modelEntries = parseModels(p.models);
       if (modelEntries.some(m => m.name === clientModel)) {
-        return { target: { backend_model: clientModel, provider_id: p.id }, targetCount: 1 };
+        return { target: { backend_model: clientModel, provider_id: p.id }, targetCount: 1, mappingReason: "fallback_provider" as MappingReason };
       }
     }
     return null;
@@ -174,10 +174,15 @@ export function resolveMapping(
   let activeTargets = baseTargets;
   let concurrencyOverride: ConcurrencyOverride | undefined;
 
+  let mappingReason: MappingReason = "group_base_rule";
   if (matchedSchedule) {
     const scheduleTargets = parseScheduleTargets(matchedSchedule.mapping_rule);
+    // schedule 命中但 targets 解析失败时，activeTargets 仍为 base targets
+    // mappingReason 保持 group_base_rule（实际使用的 targets 来源）
+    // concurrencyOverride 来自 schedule（有意保留，schedule 控制并发上限）
     if (scheduleTargets.length > 0) {
       activeTargets = scheduleTargets;
+      mappingReason = "group_schedule";
     }
     concurrencyOverride = parseConcurrencyRule(matchedSchedule.concurrency_rule);
   }
@@ -191,5 +196,6 @@ export function resolveMapping(
     concurrency_override: concurrencyOverride,
     targetCount: activeTargets.length,
     allTargets: activeTargets,
+    mappingReason,
   };
 }

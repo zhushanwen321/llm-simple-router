@@ -36,7 +36,7 @@ import { loadEnhancementConfig } from "../routing/enhancement-config.js";
 import { extractFailedToolResults, getTransportStatusCode, serializeBlocksForStorage } from "./proxy-handler-utils.js";
 import type { FailedToolResult } from "./proxy-handler-utils.js";
 import { logToolErrors } from "../tool-error-logger.js";
-import type { Target } from "../../core/types.js";
+import type { Target, MappingReason } from "../../core/types.js";
 import type { RawHeaders } from "../types.js";
 import type { PipelineContext } from "../pipeline/types.js";
 import { PipelineAbort } from "../pipeline/types.js";
@@ -296,6 +296,7 @@ export async function executeFailoverLoop(
         `Provider '${resolved.provider_id}' unavailable`, resolved.provider_id);
     }
 
+
     // 当前迭代的工具错误刷新闭包（统一 6 处调用）
     const flushCurrentErrors = () => flushToolErrors(provider.id, resolved.backend_model ?? clientModel, logId);
 
@@ -306,9 +307,14 @@ export async function executeFailoverLoop(
     const effectiveUpstreamPath = resolvedPath.effectiveUpstreamPath;
     const needsTransform = resolvedPath.needsTransform;
 
+    // effectiveMappingReason: 首次迭代用 resolveResult.reason，溢出时覆盖
+    let effectiveMappingReason: MappingReason = isFailoverIteration ? "failover_retry" : resolveResult.mappingReason;
+    const overflowTriggered = allTargets.length > targetsBeforeOF;
+    if (overflowTriggered) effectiveMappingReason = "overflow_redirect";
+
     // --- routing ---
     currentBody = { ...currentBody, model: resolved.backend_model };
-    iterationSnapshot.add({ stage: "routing", client_model: clientModel, backend_model: resolved.backend_model, provider_id: resolved.provider_id, strategy: cachedTargets.length > 1 ? "failover" : "scheduled" });
+    iterationSnapshot.add({ stage: "routing", client_model: clientModel, backend_model: resolved.backend_model, provider_id: resolved.provider_id, strategy: cachedTargets.length > 1 ? "failover" : "scheduled", mapping_reason: effectiveMappingReason });
 
     // --- Plugin 调整 body 和 headers ---
     const pluginResult = applyPluginAdjustments(pluginRegistry, currentBody, clientApiType, provider);
@@ -397,7 +403,7 @@ export async function executeFailoverLoop(
     try {
       const resilienceResult = await orchestrator.handle(
         request, reply, clientApiType,
-        { resolved, provider, clientModel, isStream, trackerId: logId, sessionId: ctx.metadata.get("session_id") as string | undefined, clientRequest: clientReq, upstreamRequest: upstreamReqBase, concurrencyOverride },
+        { resolved, provider, clientModel, isStream, trackerId: logId, sessionId: ctx.metadata.get("session_id") as string | undefined, clientRequest: clientReq, upstreamRequest: upstreamReqBase, concurrencyOverride, mappingReason: effectiveMappingReason },
         { retryBaseDelayMs: config.RETRY_BASE_DELAY_MS, isFailover, ruleMatcher: matcher, transportFn },
       );
 

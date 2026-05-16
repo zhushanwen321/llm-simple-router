@@ -251,6 +251,45 @@ describe("Admin Monitor API", () => {
     });
   });
 
+  describe("GET /admin/api/monitor/recent — ActiveRequest 包含 mappingReason", () => {
+  it("completed 请求返回 mappingReason 字段", async () => {
+    tracker.start(createTestActiveRequest({
+    id: "req-mapping-reason-test",
+    mappingReason: "group_schedule",
+    }));
+    tracker.complete("req-mapping-reason-test", { status: "completed", statusCode: 200 });
+
+    const res = await app.inject({
+    method: "GET",
+    url: "/admin/api/monitor/recent",
+    headers: { cookie },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const recent = res.json().data as ActiveRequest[];
+    const found = recent.find((r) => r.id === "req-mapping-reason-test");
+    expect(found).toBeDefined();
+    expect(found!.mappingReason).toBe("group_schedule");
+  });
+
+  it("请求无 mappingReason 时字段为 undefined", async () => {
+    tracker.start(createTestActiveRequest({ id: "req-no-reason" }));
+    tracker.complete("req-no-reason", { status: "completed", statusCode: 200 });
+
+    const res = await app.inject({
+    method: "GET",
+    url: "/admin/api/monitor/recent",
+    headers: { cookie },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const recent = res.json().data as ActiveRequest[];
+    const found = recent.find((r) => r.id === "req-no-reason");
+    expect(found).toBeDefined();
+    expect(found!.mappingReason).toBeUndefined();
+  });
+  });
+
   describe("GET /admin/api/monitor/request/:id — pending 请求返回完整数据", () => {
     it("pending 请求保留 clientRequest 和 upstreamRequest", async () => {
       const clientBody = JSON.stringify({ model: "claude-3", messages: [{ role: "user", content: "pending-test" }] });
