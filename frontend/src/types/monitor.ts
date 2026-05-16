@@ -45,6 +45,7 @@ export interface StreamMetricsSnapshot {
   inputTokens: number | null;
   outputTokens: number | null;
   cacheReadTokens: number | null;
+  cacheReadTokensEstimated?: number | null;
   ttftMs: number | null;
   tokensPerSecond: number | null;
   stopReason: string | null;

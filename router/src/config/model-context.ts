@@ -212,15 +212,15 @@ export function loadModelDirectory(configDir?: string): void {
 
 /** 查询模型 capabilities：显式配置 > model-directory.json > 硬编码白名单 > ["text"] */
 function lookupCapabilities(modelName: string): string[] {
-  return directoryCapabilities[modelName]
-  ?? MODEL_CAPABILITIES[modelName]
+  return MODEL_CAPABILITIES[modelName]
+  ?? directoryCapabilities[modelName]
   ?? ["text"]
 }
 
 /** 查询模型上下文窗口：model-directory.json > 硬编码表 > 默认值 */
 export function lookupContextWindow(modelName: string): number {
-  return directoryContextWindows[modelName]
-  ?? MODEL_CONTEXT_WINDOWS[modelName]
+  return MODEL_CONTEXT_WINDOWS[modelName]
+  ?? directoryContextWindows[modelName]
   ?? DEFAULT_CONTEXT_WINDOW
 }
 

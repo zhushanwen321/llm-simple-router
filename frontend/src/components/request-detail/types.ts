@@ -96,7 +96,7 @@ export function fromActiveRequest(
     createdAt: null,
     inputTokensEstimated: false,
     clientType: null,
-    cacheReadTokensEstimated: null,
+    cacheReadTokensEstimated: m?.cacheReadTokensEstimated ?? null,
     mappingReason: req.mappingReason,
   };
 }
