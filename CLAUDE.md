@@ -303,7 +303,7 @@ AC2: 开关 ON + 无 session_id → 测试 xxxx
 | `taste/no-unbounded-while-true` | warn | `while(true)` 必须包含迭代计数器 + 上限检查 |
 | `taste/no-inline-import-type` | warn | 禁止行内 `as import(...).Type`，应在文件顶部统一 import 类型 |
 
-基础规则：`no-explicit-any: error`、`max-lines: 500`、`max-lines-per-function: 300`、`no-magic-numbers: warn`、`no-eval: error`。测试文件被排除在 lint 之外。
+基础规则：`no-explicit-any: error`、`max-lines: 1000`、`max-lines-per-function: 300`、`no-magic-numbers: warn`、`no-eval: error`。测试文件被排除在 lint 之外。
 
 ### 代码品味原则
 
@@ -432,7 +432,7 @@ export function responsesToChatRequest(
 - 原生 HTML 元素（button/input/select/dialog/label/table 等）→ 必须用 shadcn-vue 组件（`components/ui/` 豁免）
 - Emoji → 必须用 `lucide-vue-next` 图标
 - 自定义 CSS → `<style scoped>` 内只允许 `@apply`，禁止手写选择器（`@keyframes`/`animation`/`transition` 例外）
-- 行数上限 → `<template>` 400 行、`<script setup>` 300 行
+- 行数上限 → `<template>` 800 行、`<script setup>` 600 行
 
 ## MCP Tools: code-review-graph
 

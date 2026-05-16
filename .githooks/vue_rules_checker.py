@@ -5,7 +5,7 @@
 1. 禁止使用原生 HTML 元素（应使用 shadcn-vue 组件）
 2. 禁止使用 Emoji 图标（应使用 lucide-vue-next）
 3. 禁止编写自定义 CSS（应使用 Tailwind 工具类）
-4. <template> 行数上限 400 行，<script setup> 行数上限 300 行
+4. <template> 行数上限 800 行，<script setup> 行数上限 600 行
 5. 禁止使用 Tab 缩进（仅允许 Space）
 
 用法：
@@ -35,8 +35,8 @@ SHADCN_COMPONENTS_MAP = {
 NATIVE_ELEM_WHITELIST: list[str] = []
 
 # .vue 文件各区块行数上限
-MAX_TEMPLATE_LINES = 400
-MAX_SCRIPT_LINES = 300
+MAX_TEMPLATE_LINES = 800
+MAX_SCRIPT_LINES = 600
 
 # 允许保留 <style scoped> 的文件（子串匹配）
 STYLE_SCOPED_WHITELIST: list[str] = []

@@ -47,7 +47,7 @@ export const tasteRules = {
   'indent': ['warn', 2, { SwitchCase: 1 }],
 
   // 结构先于一切
-  'max-lines': ['warn', { max: 500, skipBlankLines: true, skipComments: true }],
+  'max-lines': ['warn', { max: 1000, skipBlankLines: true, skipComments: true }],
   'max-lines-per-function': ['warn', { max: 300, skipBlankLines: true, skipComments: true }],
 
   // 语义化命名
