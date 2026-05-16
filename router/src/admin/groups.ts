@@ -10,6 +10,7 @@ import {
   getMappingGroupById,
 } from "../db/index.js";
 import { HTTP_BAD_REQUEST, HTTP_CREATED, HTTP_CONFLICT, HTTP_NOT_FOUND } from "./constants.js";
+import { parseModels } from "../config/model-context.js";
 import { API_CODE, apiError } from "./api-response.js";
 
 const CreateGroupSchema = Type.Object({
@@ -98,6 +99,12 @@ function validateRule(
     }
     if (!fbProvider.is_active) {
       return `image_fallback: provider '${fbProvider.name}' is not active`;
+    }
+    // 校验 backend_model 是否在 provider 的 models 列表中
+    const providerModels = parseModels(fbProvider.models);
+    const modelExists = providerModels.some(m => m.name === fb.backend_model);
+    if (!modelExists) {
+      return `image_fallback: backend_model '${fb.backend_model}' not found in provider '${fbProvider.name}' models list`;
     }
   }
 

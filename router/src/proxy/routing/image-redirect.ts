@@ -91,6 +91,9 @@ export function computeImageRedirectTargets(
     }
 
     // 检查首 target 的 provider 是否已支持图片
+    // 设计决策：只检查第一个 target。如果 failover 列表有多个 target 且后续某个也支持图片，
+    // 仍会 prepend fallback。这是因为 failover 按序尝试，第一个不支持就应尽早切换，
+    // 而非等第一个失败后再尝试第二个（用户体验：避免不必要的上游失败+重试延迟）。
     const firstTarget = targets[0];
     const provider = getProviderById(db, firstTarget.provider_id);
     if (provider) {
@@ -196,8 +199,17 @@ export function computeImageRedirectTargets(
     } satisfies StageRecord);
 
     return [fbTarget, ...targets];
-  } catch {
-  // 异常安全：返回原始 targets
+  } catch (err: unknown) {
+  // 异常安全：返回原始 targets，但记录诊断信息
+    console.error('computeImageRedirectTargets: internal error, falling back to original targets', err);
+    snapshot.add({
+      stage: "image-redirect",
+      triggered: false,
+      original_model: targets[0]?.backend_model ?? "",
+      redirect_to: "",
+      redirect_provider: "",
+      reason: "internal-error",
+    } satisfies StageRecord);
     return targets;
   }
 }
