@@ -29,7 +29,7 @@ describe("request_metrics migration and insertMetrics", () => {
       .prepare("SELECT name FROM migrations")
       .all() as { name: string }[];
 
-  expect(rows).toHaveLength(47);
+  expect(rows).toHaveLength(48);
     expect(rows[5].name).toBe("006_create_request_metrics.sql");
     expect(rows[6].name).toBe("007_add_retry_fields.sql");
     expect(rows[7].name).toBe("008_create_router_keys.sql");
@@ -398,20 +398,20 @@ describe("getClientTypeBreakdown", () => {
     expect(breakdown).toEqual({ "claude-code": 2 });
   });
 
-  it("only counts is_complete=1 rows", () => {
-    const logId = "b-incomplete";
-    insertRequestLog(db, {
-      id: logId, api_type: "openai", model: "gpt-4", provider_id: "p1",
-      status_code: 200, latency_ms: 100, is_stream: 0, error_message: null,
-      created_at: new Date().toISOString(),
-    });
-    insertMetrics(db, {
-      request_log_id: logId, provider_id: "p1", backend_model: "gpt-4", api_type: "openai",
-      input_tokens: 100, output_tokens: 50, is_complete: 0, client_type: "claude-code",
-    });
+  it("counts incomplete records too", () => {
+  const logId = "b-incomplete";
+  insertRequestLog(db, {
+    id: logId, api_type: "openai", model: "gpt-4", provider_id: "p1",
+    status_code: 200, latency_ms: 100, is_stream: 0, error_message: null,
+    created_at: new Date().toISOString(),
+  });
+  insertMetrics(db, {
+    request_log_id: logId, provider_id: "p1", backend_model: "gpt-4", api_type: "openai",
+    input_tokens: 100, output_tokens: 50, is_complete: 0, client_type: "claude-code",
+  });
 
-    const breakdown = getClientTypeBreakdown(db, "24h");
-    expect(breakdown).toEqual({});
+  const breakdown = getClientTypeBreakdown(db, "24h");
+  expect(breakdown).toEqual({ "claude-code": 1 });
   });
 
   it("filters by backend_model", () => {
