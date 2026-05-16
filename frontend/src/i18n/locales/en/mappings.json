@@ -53,10 +53,11 @@
   },
   "selectProviderModel": "Select Provider / Model",
   "imageFallback": {
-  "title": "Image Fallback",
-  "add": "Add Image Fallback",
-  "configured": "Configured",
-  "selectProvider": "Select Provider",
-  "modelPlaceholder": "Model name (e.g. gpt-4o)"
+    "title": "Image Fallback",
+    "add": "Add Image Fallback",
+    "configured": "Configured",
+    "selectProvider": "Select Provider",
+    "modelPlaceholder": "Model name (e.g. gpt-4o)",
+    "selectProviderModel": "Select provider & model"
   }
 }
