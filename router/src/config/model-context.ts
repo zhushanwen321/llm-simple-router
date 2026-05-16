@@ -101,7 +101,7 @@ export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
 
 /** 已知支持图片输入的模型白名单。不在表中的模型默认 [\"text\"]。 */
 export const MODEL_CAPABILITIES: Record<string, string[]> = {
-  // OpenAI
+  // ── OpenAI ── 文档确认支持 image_url
   "gpt-4o": ["text", "image"],
   "gpt-4o-mini": ["text", "image"],
   "gpt-4-turbo": ["text", "image"],
@@ -113,22 +113,24 @@ export const MODEL_CAPABILITIES: Record<string, string[]> = {
   "o3": ["text", "image"],
   "o3-mini": ["text", "image"],
   "o4-mini": ["text", "image"],
-  // Anthropic
+  // ── Anthropic ── 文档确认支持 image content block
   "claude-3.5-sonnet": ["text", "image"],
   "claude-3.5-haiku": ["text", "image"],
   "claude-3-opus": ["text", "image"],
   "claude-4-sonnet": ["text", "image"],
   "claude-4-opus": ["text", "image"],
-  // DeepSeek
-  "deepseek-chat": ["text", "image"],
-  "deepseek-v3": ["text", "image"],
-  "deepseek-v4-flash": ["text", "image"],
-  "deepseek-v4-pro": ["text", "image"],
-  // 智谱
-  "glm-4.5-air": ["text", "image"],
+  // ── DeepSeek ──
+  // V3/V4 不接受 OpenAI image_url 格式（API 返回 unknown variant 'image_url'）
+  // 只有专用视觉模型 deepseek-vl2 支持
+  "deepseek-vl2": ["text", "image"],
+  // ── 智谱 ──
+  // GLM-5/5.1 是纯文本 LLM；GLM-5V-Turbo / GLM-4.5V 才是视觉模型
+  // 文档确认视觉模型支持 image_url 格式
+  "glm-5v-turbo": ["text", "image"],
+  "glm-4.5v": ["text", "image"],
   "glm-4v-plus": ["text", "image"],
   "glm-4v-flash": ["text", "image"],
-  // 月之暗面
+  // ── 月之暗面 ── 原生多模态架构，全部支持 image_url
   "moonshot-v1-128k": ["text", "image"],
   "moonshot-v1-32k": ["text", "image"],
   "moonshot-v1-8k": ["text", "image"],
@@ -137,39 +139,16 @@ export const MODEL_CAPABILITIES: Record<string, string[]> = {
   "kimi-k2-turbo-preview": ["text", "image"],
   "kimi-k2-thinking": ["text", "image"],
   "kimi-for-coding": ["text", "image"],
-  // 阿里云 Qwen
+  // ── 阿里云 Qwen ── 百炼文档确认 qwen3.6-plus/qwen3.5-plus/flash 支持 image_url
   "qwen-vl-max": ["text", "image"],
   "qwen-vl-plus": ["text", "image"],
   "qwen3.6-plus": ["text", "image"],
   "qwen3.5-plus": ["text", "image"],
   "qwen3.5-flash": ["text", "image"],
-  // MiniMax
-  "MiniMax-M2.7": ["text", "image"],
-  "MiniMax-M2.7-highspeed": ["text", "image"],
-  "MiniMax-M2.5": ["text", "image"],
-  "MiniMax-M2.5-highspeed": ["text", "image"],
-  // 百度千帆
-  "ernie-4.0-8k": ["text", "image"],
-  "ernie-4.0-turbo-8k": ["text", "image"],
-  "ernie-3.5-8k": ["text", "image"],
-  // 火山引擎
+  // ── 火山引擎 ── Doubao Seed 2.0 Pro 规格：Input Text, Images, Video
   "doubao-seed-2-0-pro-260215": ["text", "image"],
-  "doubao-seed-1-8-251228": ["text", "image"],
-  // 腾讯云
-  "hunyuan-2.0-instruct": ["text", "image"],
-  "hunyuan-2.0-thinking": ["text", "image"],
-  // 科大讯飞
-  "4.0Ultra": ["text", "image"],
-  "generalv3.5": ["text", "image"],
-  // 硅基流动
-  "deepseek-ai/DeepSeek-V3.2-Exp": ["text", "image"],
-  // 阶跃星辰
-  "step-3.5-flash": ["text", "image"],
-  "step-3.5-flash-2603": ["text", "image"],
-  // OpenCode
-  "mimo-v2-pro": ["text", "image"],
+  // ── 小米 MiMo ── 只有 omni 版本支持图片，pro 版本是纯文本
   "mimo-v2-omni": ["text", "image"],
-  "mimo-v2.5-pro": ["text", "image"],
   "mimo-v2.5": ["text", "image"],
 }
 
