@@ -40,60 +40,79 @@ describe("PipelineSnapshot", () => {
 });
 
 // ============================================================
-// T5: StageRecord "image-redirect" 变体测试
+// T5: StageRecord "modality-redirect" 变体测试
 // 实现尚未存在，以下测试必须 FAIL
 // ============================================================
-describe("StageRecord image-redirect variant", () => {
-  it("StageRecord accepts image-redirect variant with required fields", () => {
-  // 构造 image-redirect StageRecord，验证类型系统接受它
+describe("StageRecord modality-redirect variant", () => {
+  it("StageRecord accepts modality-redirect variant with required fields", () => {
+  // 构造 modality-redirect StageRecord，验证类型系统接受它
   const record: StageRecord = {
-    stage: "image-redirect",
-    triggered: true,
-    original_model: "gpt-5.1",
-    redirect_to: "gpt-4o",
-    redirect_provider: "openai",
-    reason: "image_detected_model_not_capable",
+  stage: "modality-redirect",
+  triggered: true,
+  detected_modalities: ["image"],
+  original_model: "gpt-5.1",
+  redirect_to: "gpt-4o",
+  redirect_provider: "openai",
+  reason: "image_detected_model_not_capable",
   };
 
-  expect(record.stage).toBe("image-redirect");
+  expect(record.stage).toBe("modality-redirect");
   expect(record.triggered).toBe(true);
+  expect(record.detected_modalities).toEqual(["image"]);
   expect(record.original_model).toBe("gpt-5.1");
   expect(record.redirect_to).toBe("gpt-4o");
   expect(record.redirect_provider).toBe("openai");
   expect(record.reason).toBe("image_detected_model_not_capable");
   });
 
-  it("PipelineSnapshot.add accepts image-redirect record", () => {
+  it("PipelineSnapshot.add accepts modality-redirect record", () => {
   const snap = new PipelineSnapshot();
   snap.add({
-    stage: "image-redirect",
-    triggered: true,
-    original_model: "glm-5",
-    redirect_to: "gpt-4o",
-    redirect_provider: "openai",
-    reason: "image_detected_model_not_capable",
+  stage: "modality-redirect",
+  triggered: true,
+  detected_modalities: ["image"],
+  original_model: "glm-5",
+  redirect_to: "gpt-4o",
+  redirect_provider: "openai",
+  reason: "image_detected_model_not_capable",
   });
 
   const parsed = JSON.parse(snap.toJSON());
   expect(parsed).toHaveLength(1);
-  expect(parsed[0].stage).toBe("image-redirect");
+  expect(parsed[0].stage).toBe("modality-redirect");
   expect(parsed[0].triggered).toBe(true);
+  expect(parsed[0].detected_modalities).toEqual(["image"]);
   expect(parsed[0].original_model).toBe("glm-5");
   expect(parsed[0].redirect_to).toBe("gpt-4o");
   expect(parsed[0].redirect_provider).toBe("openai");
   expect(parsed[0].reason).toBe("image_detected_model_not_capable");
   });
 
-  it("StageRecord image-redirect with triggered=false", () => {
+  it("StageRecord modality-redirect with triggered=false", () => {
   const record: StageRecord = {
-    stage: "image-redirect",
-    triggered: false,
-    original_model: "gpt-4o",
-    redirect_to: "",
-    redirect_provider: "",
-    reason: "no_image_detected",
+  stage: "modality-redirect",
+  triggered: false,
+  original_model: "gpt-4o",
+  redirect_to: "",
+  redirect_provider: "",
+  reason: "no_image_detected",
   };
 
   expect(record.triggered).toBe(false);
+  });
+
+  it("StageRecord modality-redirect with detected_modalities containing multiple modalities", () => {
+  const record: StageRecord = {
+  stage: "modality-redirect",
+  triggered: true,
+  detected_modalities: ["image", "video", "audio"],
+  original_model: "glm-5",
+  redirect_to: "gpt-4o",
+  redirect_provider: "openai",
+  reason: "unsupported_modalities_detected",
+  };
+
+  expect(record.detected_modalities).toEqual(["image", "video", "audio"]);
+  expect(record.detected_modalities).toHaveLength(3);
   });
 });
