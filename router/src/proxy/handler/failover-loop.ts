@@ -234,7 +234,8 @@ export async function executeFailoverLoop(
 
   // 3. OF 层：为每个 target 预计算 overflow
   const targetsBeforeOF = allTargets.length;
-  allTargets = expandOverflowTargets(allTargets, db, ctx.body);
+  const ofResult = expandOverflowTargets(allTargets, db, ctx.body);
+  allTargets = ofResult.targets;
   precomputeSnapshot.add({ stage: "overflow", triggered: allTargets.length > targetsBeforeOF });
 
   // 预计算完成，缓存到循环外
@@ -309,8 +310,9 @@ export async function executeFailoverLoop(
 
     // effectiveMappingReason: 首次迭代用 resolveResult.reason，溢出时覆盖
     let effectiveMappingReason: MappingReason = isFailoverIteration ? "failover_retry" : resolveResult.mappingReason;
-    const overflowTriggered = allTargets.length > targetsBeforeOF;
-    if (overflowTriggered) effectiveMappingReason = "overflow_redirect";
+    // 只有当前 target 是 overflow 扩展产生的才标记
+    const resolvedIdx = cachedTargets.findIndex(t => t.provider_id === resolved.provider_id && t.backend_model === resolved.backend_model);
+    if (ofResult.overflowIndices.has(resolvedIdx)) effectiveMappingReason = "overflow_redirect";
 
     // --- routing ---
     currentBody = { ...currentBody, model: resolved.backend_model };

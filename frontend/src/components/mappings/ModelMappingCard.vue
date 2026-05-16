@@ -96,10 +96,10 @@ watch(
 const workingEntry = computed<MappingEntry>(() =>
   expanded.value
     ? {
-        ...props.entry,
-        targets: localTargets.value,
-        imageFallback: localImageFallback.value,
-      }
+      ...props.entry,
+      targets: localTargets.value,
+      imageFallback: localImageFallback.value,
+    }
     : props.entry,
 );
 
@@ -124,7 +124,7 @@ async function handleSave() {
     if (!clientModel) return;
     const ruleJson = JSON.stringify({
       targets: localTargets.value,
-      ...(localImageFallback.value
+      ...(localImageFallback.value?.backend_model
         ? { image_fallback: localImageFallback.value }
         : {}),
     });

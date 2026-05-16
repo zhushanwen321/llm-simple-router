@@ -97,7 +97,7 @@ function validateRule(
     if (!fbProvider) {
       return `image_fallback: provider_id '${fb.provider_id}' not found`;
     }
-    if (!fbProvider.is_active) {
+    if (fbProvider.is_active !== 1) {
       return `image_fallback: provider '${fbProvider.name}' is not active`;
     }
     // 校验 backend_model 是否在 provider 的 models 列表中
