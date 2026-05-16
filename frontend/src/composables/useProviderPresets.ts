@@ -59,6 +59,7 @@ export function useProviderPresets(form: {
       name,
       context_window: getDefaultContextWindow(name),
       patches: getDefaultPatches(name, preset.apiType),
+      capabilities: preset.modelCapabilities?.[name],
     }));
   }
 

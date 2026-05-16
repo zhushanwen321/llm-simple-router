@@ -60,9 +60,11 @@ export interface ProviderPreset {
   apiType: "openai" | "openai-responses" | "anthropic";
   baseUrl: string;
   upstreamPath?: string;
-  /** 上游模型列表端点路径，如 /v1/models 或 /models */
+  /** 上游模型列表端点路径 */
   modelsEndpoint?: string;
   models: string[];
+  /** 模型名 → capabilities 映射（由后端补充） */
+  modelCapabilities?: Record<string, string[]>;
 }
 
 export interface ProviderGroup {

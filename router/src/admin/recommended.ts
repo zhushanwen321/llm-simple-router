@@ -11,18 +11,18 @@ export const adminRecommendedRoutes: FastifyPluginCallback<RecommendedRoutesOpti
   const { db } = options
 
   app.get("/admin/api/recommended/providers", async (_req, reply) => {
-  const groups = getRecommendedProviders()
-  // 给每个预设的模型补上 capabilities
-  for (const group of groups) {
-    for (const preset of group.presets) {
-    const capMap: Record<string, string[]> = {}
-    for (const m of preset.models) {
-      capMap[m] = lookupCapabilities(m)
+    const groups = getRecommendedProviders()
+    // 给每个预设的模型补上 capabilities
+    for (const group of groups) {
+      for (const preset of group.presets) {
+        const capMap: Record<string, string[]> = {}
+        for (const m of preset.models) {
+          capMap[m] = lookupCapabilities(m)
+        }
+        preset.modelCapabilities = capMap
+      }
     }
-    (preset as Record<string, unknown>).modelCapabilities = capMap
-    }
-  }
-  return reply.send(groups)
+    return reply.send(groups)
   })
 
   app.get("/admin/api/recommended/retry-rules", async (_req, reply) => {
