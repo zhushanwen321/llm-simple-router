@@ -30,13 +30,13 @@ export function resolveTimeRange(
   const now = new Date();
 
   switch (period) {
-  case "window": {
+    case "window": {
     // 有 providerId 但无 routerKeyId 时，忽略 router_key_id 查找最新窗口
     // （dashboard 等调用方不知道 router_key_id 时，也能匹配到实际窗口）
-    const latest = providerId && !routerKeyId
-    ? getLatestWindowByProvider(db, providerId)
-    : getLatestWindow(db, routerKeyId, providerId);
-    if (latest && now <= parseSqliteDatetime(latest.end_time)) {
+      const latest = providerId && !routerKeyId
+        ? getLatestWindowByProvider(db, providerId)
+        : getLatestWindow(db, routerKeyId, providerId);
+      if (latest && now <= parseSqliteDatetime(latest.end_time)) {
         // 有未过期窗口 → 直接使用窗口范围
         return { startTime: latest.start_time, endTime: latest.end_time };
       }

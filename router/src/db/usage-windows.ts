@@ -58,7 +58,7 @@ export function getLatestWindowByProvider(
   providerId: string,
 ): UsageWindow | null {
   return db.prepare(
-  "SELECT * FROM usage_windows WHERE provider_id = ? ORDER BY start_time DESC LIMIT 1",
+    "SELECT * FROM usage_windows WHERE provider_id = ? ORDER BY start_time DESC LIMIT 1",
   ).get(providerId) as UsageWindow | null ?? null;
 }
 
@@ -96,8 +96,8 @@ export function getWindowUsage(
   providerId?: string,
 ): WindowUsage {
   const conditions = [
-  "rm.created_at >= datetime(?)",
-  "rm.created_at < datetime(?)",
+    "rm.created_at >= datetime(?)",
+    "rm.created_at < datetime(?)",
   ];
   const params: unknown[] = [startTime, endTime];
 
