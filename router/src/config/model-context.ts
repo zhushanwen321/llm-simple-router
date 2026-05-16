@@ -126,7 +126,7 @@ export const MODEL_CAPABILITIES: Record<string, string[]> = {
   // ── 智谱 ──
   // GLM-5/5.1 是纯文本 LLM；GLM-5V-Turbo / GLM-4.5V 才是视觉模型
   // 文档确认视觉模型支持 image_url 格式
-  "glm-5v-turbo": ["text", "image"],
+  "glm-5v-turbo": ["text", "image", "audio", "video"],
   "glm-4.5v": ["text", "image"],
   "glm-4v-plus": ["text", "image"],
   "glm-4v-flash": ["text", "image"],
@@ -134,22 +134,22 @@ export const MODEL_CAPABILITIES: Record<string, string[]> = {
   "moonshot-v1-128k": ["text", "image"],
   "moonshot-v1-32k": ["text", "image"],
   "moonshot-v1-8k": ["text", "image"],
-  "kimi-k2.6": ["text", "image"],
-  "kimi-k2.5": ["text", "image"],
+  "kimi-k2.6": ["text", "image", "video"],
+  "kimi-k2.5": ["text", "image", "video"],
   "kimi-k2-turbo-preview": ["text", "image"],
   "kimi-k2-thinking": ["text", "image"],
   "kimi-for-coding": ["text", "image"],
   // ── 阿里云 Qwen ── 百炼文档确认 qwen3.6-plus/qwen3.5-plus/flash 支持 image_url
   "qwen-vl-max": ["text", "image"],
   "qwen-vl-plus": ["text", "image"],
-  "qwen3.6-plus": ["text", "image"],
-  "qwen3.5-plus": ["text", "image"],
+  "qwen3.6-plus": ["text", "image", "video"],
+  "qwen3.5-plus": ["text", "image", "video"],
   "qwen3.5-flash": ["text", "image"],
   // ── 火山引擎 ── Doubao Seed 2.0 Pro 规格：Input Text, Images, Video
-  "doubao-seed-2-0-pro-260215": ["text", "image"],
+  "doubao-seed-2-0-pro-260215": ["text", "image", "video"],
   // ── 小米 MiMo ── 只有 omni 版本支持图片，pro 版本是纯文本
-  "mimo-v2-omni": ["text", "image"],
-  "mimo-v2.5": ["text", "image"],
+  "mimo-v2-omni": ["text", "image", "audio", "video"],
+  "mimo-v2.5": ["text", "image", "audio", "video"],
 }
 
 export const DEFAULT_CONTEXT_WINDOW = 200000

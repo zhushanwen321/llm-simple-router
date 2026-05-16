@@ -83,28 +83,28 @@ function validateRule(
     if (overflowErr) return overflowErr;
   }
 
-  // Validate image_fallback if present
-  const fallback = (r as Record<string, unknown>).image_fallback;
+  // Validate multimodal_fallback if present
+  const fallback = (r as Record<string, unknown>).multimodal_fallback;
   if (fallback !== undefined && fallback !== null) {
     const fb = fallback as { provider_id?: string; backend_model?: string };
     if (!fb.provider_id) {
-      return "image_fallback: provider_id is required";
+      return "multimodal_fallback: provider_id is required";
     }
     if (!fb.backend_model) {
-      return "image_fallback: backend_model is required";
+      return "multimodal_fallback: backend_model is required";
     }
     const fbProvider = getProviderById(db, fb.provider_id);
     if (!fbProvider) {
-      return `image_fallback: provider_id '${fb.provider_id}' not found`;
+      return `multimodal_fallback: provider_id '${fb.provider_id}' not found`;
     }
     if (fbProvider.is_active !== 1) {
-      return `image_fallback: provider '${fbProvider.name}' is not active`;
+      return `multimodal_fallback: provider '${fbProvider.name}' is not active`;
     }
     // 校验 backend_model 是否在 provider 的 models 列表中
     const providerModels = parseModels(fbProvider.models);
     const modelExists = providerModels.some(m => m.name === fb.backend_model);
     if (!modelExists) {
-      return `image_fallback: backend_model '${fb.backend_model}' not found in provider '${fbProvider.name}' models list`;
+      return `multimodal_fallback: backend_model '${fb.backend_model}' not found in provider '${fbProvider.name}' models list`;
     }
   }
 
