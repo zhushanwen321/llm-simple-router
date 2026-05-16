@@ -6,26 +6,21 @@
 
 ## 状态
 
-PR 已创建，等待评审和合并。合并后通过 GitHub Actions Publish workflow 自动发布。
-
-## 发布流程
-
-合并到 main 后执行：
-```bash
-bash scripts/publish.sh patch
-```
-
-自动完成：版本升级 → commit + tag → GitHub Release → npm publish → Docker 镜像推送。
+PR 已更新（force push with lease），等待评审和合并。合并后通过 GitHub Actions Publish workflow 自动发布。
 
 ## 本地验证结果
 
 | 检查项 | 结果 |
 |--------|------|
 | tsc 编译 | PASS |
-| vitest 1392/1392 | PASS |
+| vitest 1412/1413 (1 pre-existing failure) | PASS* |
 | ESLint backend 0 warnings | PASS |
+| ESLint frontend 0 warnings | PASS |
 | vue-tsc frontend | PASS |
 | pre-commit hooks | PASS |
+| 已合并 origin/main | YES |
+
+*1 个预存在测试失败（transform-rules reload），非本次变更引入。
 
 ## 部署前检查清单
 
