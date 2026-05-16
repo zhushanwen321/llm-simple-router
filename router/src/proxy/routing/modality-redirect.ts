@@ -224,7 +224,20 @@ export function computeModalityRedirectTargets(
       return targets;
     }
 
-    // prepend fallback target
+    // prepend fallback target（如果与首 target 相同则跳过，避免重复消耗 failover 迭代）
+    if (fbProviderId === firstTarget.provider_id && fbBackendModel === firstTarget.backend_model) {
+      snapshot.add({
+        stage: "modality-redirect",
+        triggered: false,
+        original_model: firstTarget.backend_model,
+        redirect_to: fbBackendModel,
+        redirect_provider: fbProviderId,
+        reason: "fallback-same-as-first-target",
+        detected_modalities: [...modalities],
+      } satisfies StageRecord);
+      return targets;
+    }
+
     const fbTarget: Target = {
       provider_id: fbProviderId,
       backend_model: fbBackendModel,
