@@ -73,12 +73,14 @@ export class SSEParser {
         eventType = this.extractFieldValue(line);
       } else if (line.startsWith("data:")) {
         const value = this.extractFieldValue(line);
-        // [DONE] 是流结束信号，不作为普通事件返回
+        // [DONE] 是流结束信号，标记 isDone 阻止后续解析，同时作为普通事件返回
+        // 让 metrics extractor 的 processOpenAIEvent 能收到并设置 complete = true
         if (value === "[DONE]") {
           this.isDone = true;
-          return null;
+          dataLines.push(value);
+        } else {
+          dataLines.push(value);
         }
-        dataLines.push(value);
       }
       // 其他 field（id:, retry:, etc.）按 SSE 规范忽略
     }

@@ -164,7 +164,7 @@ export function getMetricsSummary(
   clientType?: string,
 ): MetricsSummaryRow[] {
   const { timeWhere, timeParams } = buildTimeCondition(period, startTime, endTime);
-  const conditions = ["rm.is_complete = 1", timeWhere];
+  const conditions = [timeWhere];
   const params: unknown[] = [...timeParams];
   const joins = ["LEFT JOIN providers p ON p.id = rm.provider_id"];
 
@@ -205,7 +205,7 @@ export function getClientTypeBreakdown(
   endTime?: string,
 ): ClientTypeBreakdown {
   const { timeWhere, timeParams } = buildTimeCondition(period, startTime, endTime);
-  const conditions = ["rm.is_complete = 1", timeWhere];
+  const conditions = [timeWhere];
   const params: unknown[] = [...timeParams];
 
   if (providerId) { conditions.push("rm.provider_id = ?"); params.push(providerId); }
@@ -262,7 +262,7 @@ export function getMetricsTimeseries(
     ? calcBucketSec((new Date(endTime).getTime() - new Date(startTime).getTime()) / MS_PER_SECOND)
     : calcBucketSec(PERIOD_TOTAL_SEC[period]);
   const { timeWhere, timeParams } = buildTimeCondition(period, startTime, endTime);
-  const conditions = ["rm.is_complete = 1", timeWhere];
+  const conditions = [timeWhere];
   const params: unknown[] = [...timeParams];
 
   if (providerId) { conditions.push("rm.provider_id = ?"); params.push(providerId); }
