@@ -233,6 +233,7 @@ export {
 export {
   insertWindow,
   getLatestWindow,
+  getLatestWindowByProvider,
   getWindowsInRange,
   getWindowUsage,
 } from "./usage-windows.js";
