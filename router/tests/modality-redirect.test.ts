@@ -1146,3 +1146,89 @@ describe("computeModalityRedirectTargets", () => {
   expect(stage.reason).toBe("first-target-lacks-modality");
   });
 });
+
+// ============================================================
+// 补充 reason 测试覆盖（评审 required-fix）
+// ============================================================
+describe("computeModalityRedirectTargets — reason 覆盖补全", () => {
+  it("reason: no-mapping-group — 不存在 mapping group", () => {
+    const db = initDatabase(":memory:");
+    seedSettings(db);
+    const snap = new PipelineSnapshot();
+    const targets: Target[] = [{ provider_id: "p1", backend_model: "m1" }];
+    const body = openaiImageBody();
+
+    const result = computeModalityRedirectTargets(db, targets, "nonexistent-model", body, snap);
+    expect(result).toEqual(targets);
+
+    const stage = JSON.parse(snap.toJSON()).find((s: Record<string, unknown>) => s.stage === "modality-redirect");
+    expect(stage).toBeDefined();
+    expect(stage.reason).toBe("no-mapping-group");
+  });
+
+  it("reason: rule-parse-error — mapping group 存在但 rule 不是合法 JSON", () => {
+    const db = initDatabase(":memory:");
+    seedSettings(db);
+    insertProvider(db, { id: "p1", name: "P1", models: JSON.stringify([{ name: "m1", capabilities: ["text"] }]) });
+    const now = new Date().toISOString();
+    db.prepare(
+      `INSERT INTO mapping_groups (id, client_model, rule, is_active, created_at)
+       VALUES (?, ?, ?, ?, ?)`,
+    ).run("mg-test", "test-model", "NOT-VALID-JSON{{{{", 1, now);
+
+    const snap = new PipelineSnapshot();
+    const targets: Target[] = [{ provider_id: "p1", backend_model: "m1" }];
+    const body = openaiImageBody();
+
+    const result = computeModalityRedirectTargets(db, targets, "test-model", body, snap);
+    expect(result).toEqual(targets);
+
+    const stage = JSON.parse(snap.toJSON()).find((s: Record<string, unknown>) => s.stage === "modality-redirect");
+    expect(stage).toBeDefined();
+    expect(stage.reason).toBe("rule-parse-error");
+  });
+
+  it("reason: invalid-fallback-config — multimodal_fallback 的 provider_id 不是字符串", () => {
+    const db = initDatabase(":memory:");
+    seedSettings(db);
+    insertProvider(db, { id: "p1", name: "P1", models: JSON.stringify([{ name: "m1", capabilities: ["text"] }]) });
+    const rule = {
+      targets: [{ provider_id: "p1", backend_model: "m1" }],
+      multimodal_fallback: { provider_id: 12345, backend_model: "m2" },
+    };
+    const now = new Date().toISOString();
+    db.prepare(
+      `INSERT INTO mapping_groups (id, client_model, rule, is_active, created_at)
+       VALUES (?, ?, ?, ?, ?)`,
+    ).run("mg-test", "test-model", JSON.stringify(rule), 1, now);
+
+    const snap = new PipelineSnapshot();
+    const targets: Target[] = [{ provider_id: "p1", backend_model: "m1" }];
+    const body = openaiImageBody();
+
+    const result = computeModalityRedirectTargets(db, targets, "test-model", body, snap);
+    expect(result).toEqual(targets);
+
+    const stage = JSON.parse(snap.toJSON()).find((s: Record<string, unknown>) => s.stage === "modality-redirect");
+    expect(stage).toBeDefined();
+    expect(stage.reason).toBe("invalid-fallback-config");
+  });
+
+  it("reason: internal-error — 数据库操作抛异常", () => {
+    const db = initDatabase(":memory:");
+    seedSettings(db);
+    // 关闭数据库以触发内部异常
+    db.close();
+
+    const snap = new PipelineSnapshot();
+    const targets: Target[] = [{ provider_id: "p1", backend_model: "m1" }];
+    const body = openaiImageBody();
+
+    const result = computeModalityRedirectTargets(db, targets, "test-model", body, snap);
+    expect(result).toEqual(targets);
+
+    const stage = JSON.parse(snap.toJSON()).find((s: Record<string, unknown>) => s.stage === "modality-redirect");
+    expect(stage).toBeDefined();
+    expect(stage.reason).toBe("internal-error");
+  });
+});

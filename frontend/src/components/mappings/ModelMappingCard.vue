@@ -300,21 +300,18 @@ function handleFallbackSelect(val: SelectedValue) {
       <!-- 永久锁定警告 -->
       <div
         v-if="localMultimodalFallback"
-        class="mt-2 p-2 rounded-md border border-amber-500/30 bg-amber-500/5"
+        class="mt-2 p-2 rounded-md border border-warning/30 bg-warning/5"
       >
         <div class="flex gap-2">
-          <AlertTriangle
-            class="w-3.5 h-3.5 shrink-0 mt-0.5"
-            style="color: rgba(245, 158, 11, 0.9)"
-          />
+          <AlertTriangle class="w-3.5 h-3.5 shrink-0 mt-0.5 text-warning" />
           <div class="space-y-1">
-            <p class="text-[11px]" style="color: rgba(245, 158, 11, 0.9)">
+            <p class="text-[11px] text-warning">
               {{ t("mappings.multimodalFallback.sessionLockWarning") }}
             </p>
-            <p class="text-[11px]" style="color: rgba(245, 158, 11, 0.6)">
+            <p class="text-[11px] text-warning/60">
               {{ t("mappings.multimodalFallback.sessionLockReason") }}
             </p>
-            <p class="text-[11px]" style="color: rgba(245, 158, 11, 0.5)">
+            <p class="text-[11px] text-warning/50">
               {{ t("mappings.multimodalFallback.costSuggestion") }}
             </p>
           </div>
