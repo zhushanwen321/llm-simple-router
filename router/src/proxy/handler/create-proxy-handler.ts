@@ -249,8 +249,24 @@ export function createProxyHandler(config: ProxyHandlerConfig) {
       // Socket error handling
       const socketErrorHandler = (err: Error) => request.log.debug({ err }, "client socket error");
       request.raw.socket.on("error", socketErrorHandler);
+
+      // reply.raw (ServerResponse) error handling
+      // Node.js 中，TCP socket write 异步完成失败时（如 EPIPE），
+      // 内部 socketErrorListener → response.destroy(err) → response.emit('error')。
+      // 若无 listener，该 error 成为 uncaught exception 导致进程退出。
+      const replyErrorHandler = (err: Error) => {
+        const code = (err as { code?: string }).code;
+        if (code === 'EPIPE') {
+          request.log.debug({ err }, "client disconnected (EPIPE)");
+        } else {
+          request.log.warn({ err }, "response stream error");
+        }
+      };
+      reply.raw.on("error", replyErrorHandler);
+
       reply.raw.on("close", () => {
         request.raw.socket.removeListener("error", socketErrorHandler);
+        reply.raw.removeListener("error", replyErrorHandler);
       });
 
       // 创建 pipeline context

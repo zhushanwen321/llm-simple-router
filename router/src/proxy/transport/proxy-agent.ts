@@ -45,9 +45,14 @@ export class ProxyAgentFactory {
       this.cache.delete(provider.id);
     }
 
-    const agent = this.createAgent(provider.proxy_type, fullUrl);
-    this.cache.set(provider.id, { agent, proxyUrl: fullUrl });
-    return agent;
+    try {
+      const agent = this.createAgent(provider.proxy_type, fullUrl);
+      this.cache.set(provider.id, { agent, proxyUrl: fullUrl });
+      return agent;
+    } catch {
+    // proxy_url 格式无效时返回 undefined，由调用方回退到非代理的 keep-alive agent
+      return undefined;
+    }
   }
 
   invalidate(providerId: string): void {
@@ -92,10 +97,15 @@ export class ProxyAgentFactory {
     const password = provider.proxy_password;
 
     if (username) {
-      const parsed = new URL(url);
-      parsed.username = username;
-      if (password) parsed.password = password;
-      url = parsed.toString();
+      try {
+        const parsed = new URL(url);
+        parsed.username = username;
+        if (password) parsed.password = password;
+        url = parsed.toString();
+      } catch {
+        // proxy_url 格式无效时返回原始 URL，由上游请求层处理连接错误
+        return url;
+      }
     }
     return url;
   }
