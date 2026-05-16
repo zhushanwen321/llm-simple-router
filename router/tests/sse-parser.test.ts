@@ -33,12 +33,13 @@ describe("SSEParser", () => {
   });
 
   it("should detect [DONE] and set isDone", () => {
-    const parser = new SSEParser();
-    const events = parser.feed("data: hello\n\ndata: [DONE]\n\n");
-    // [DONE] 不作为事件返回
-    expect(events).toHaveLength(1);
-    expect(events[0].data).toBe("hello");
-    expect(parser.isDone).toBe(true);
+  const parser = new SSEParser();
+  const events = parser.feed("data: hello\n\ndata: [DONE]\n\n");
+  // [DONE] 作为普通事件返回，让 extractor 能收到并设置 complete = true
+  expect(events).toHaveLength(2);
+  expect(events[0].data).toBe("hello");
+  expect(events[1].data).toBe("[DONE]");
+  expect(parser.isDone).toBe(true);
   });
 
   it("should ignore events after [DONE]", () => {
@@ -138,11 +139,12 @@ describe("SSEParser", () => {
       allEvents = allEvents.concat(parser.feed(chunk));
     }
 
-    expect(allEvents).toHaveLength(3);
-    expect(allEvents[0].data).toContain('"role":"assistant"');
-    expect(allEvents[1].data).toContain('"content":"Hello"');
-    expect(allEvents[2].data).toContain('"content":" world"');
-    expect(parser.isDone).toBe(true);
+  expect(allEvents).toHaveLength(4);
+  expect(allEvents[0].data).toContain('"role":"assistant"');
+  expect(allEvents[1].data).toContain('"content":"Hello"');
+  expect(allEvents[2].data).toContain('"content":" world"');
+  expect(allEvents[3].data).toBe("[DONE]");
+  expect(parser.isDone).toBe(true);
   });
 
   it("should handle realistic Anthropic streaming events", () => {
