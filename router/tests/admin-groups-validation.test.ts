@@ -6,11 +6,11 @@ import { makeConfig, seedSettings, login } from "./helpers/test-setup.js";
 import { API_CODE } from "../src/admin/api-response.js";
 
 /**
- * TDD FAILING tests for T6: validateRule() extension for image_fallback.
+ * TDD FAILING tests for T6: validateRule() extension for multimodal_fallback.
  *
  * These tests verify that validateRule() in src/admin/groups.ts validates
- * the new image_fallback field in mapping group rules. All tests are
- * expected to FAIL because image_fallback validation has not been implemented yet.
+ * the new multimodal_fallback field in mapping group rules. All tests are
+ * expected to FAIL because multimodal_fallback validation has not been implemented yet.
  */
 
 const VALID_RULE_WITH_FALLBACK = (
@@ -21,9 +21,9 @@ const VALID_RULE_WITH_FALLBACK = (
   targets: [
     { backend_model: "text-model", provider_id: providerId },
   ],
-  image_fallback: {
-    backend_model: "vision-model",
-    provider_id: fallbackProviderId,
+  multimodal_fallback: {
+  backend_model: "vision-model",
+  provider_id: fallbackProviderId,
   },
   });
 
@@ -34,7 +34,7 @@ const VALID_RULE_WITHOUT_FALLBACK = (providerId: string) =>
   ],
   });
 
-describe("validateRule: image_fallback validation (T6)", () => {
+describe("validateRule: multimodal_fallback validation (T6)", () => {
   let app: FastifyInstance;
   let db: ReturnType<typeof initDatabase>;
   let close: () => Promise<void>;
@@ -87,9 +87,9 @@ describe("validateRule: image_fallback validation (T6)", () => {
   });
 
   // ------------------------------------------------------------------
-  // Test 1: Valid image_fallback passes validation
+  // Test 1: Valid multimodal_fallback passes validation
   // ------------------------------------------------------------------
-  it("test_validateRule_valid_image_fallback_passes", async () => {
+  it("test_validateRule_valid_multimodal_fallback_passes", async () => {
   const res = await app.inject({
     method: "POST",
     url: "/admin/api/mapping-groups",
@@ -99,16 +99,16 @@ describe("validateRule: image_fallback validation (T6)", () => {
     rule: VALID_RULE_WITH_FALLBACK(activeProviderId, activeProviderId),
     },
   });
-  // Will fail: validateRule doesn't check image_fallback yet,
-  // so it passes but for the wrong reason (ignores image_fallback).
+  // Will fail: validateRule doesn't check multimodal_fallback yet,
+  // so it passes but for the wrong reason (ignores multimodal_fallback).
   // After implementation: should return 201 (validation passes).
   expect(res.statusCode).toBe(201);
   });
 
   // ------------------------------------------------------------------
-  // Test 2: image_fallback with non-existent provider_id fails
+  // Test 2: multimodal_fallback with non-existent provider_id fails
   // ------------------------------------------------------------------
-  it("test_validateRule_image_fallback_nonexistent_provider_fails", async () => {
+  it("test_validateRule_multimodal_fallback_nonexistent_provider_fails", async () => {
   const res = await app.inject({
     method: "POST",
     url: "/admin/api/mapping-groups",
@@ -119,10 +119,10 @@ describe("validateRule: image_fallback validation (T6)", () => {
       targets: [
       { backend_model: "text-model", provider_id: activeProviderId },
       ],
-      image_fallback: {
-      backend_model: "vision-model",
-      provider_id: "non-existent-provider-id",
-      },
+    multimodal_fallback: {
+    backend_model: "vision-model",
+    provider_id: "non-existent-provider-id",
+    },
     }),
     },
   });
@@ -130,14 +130,14 @@ describe("validateRule: image_fallback validation (T6)", () => {
   expect(res.statusCode).toBe(400);
   const body = res.json();
   expect(body.code).toBe(API_CODE.BAD_REQUEST);
-  expect(body.message).toContain("image_fallback");
+  expect(body.message).toContain("multimodal_fallback");
   expect(body.message).toContain("not found");
   });
 
   // ------------------------------------------------------------------
-  // Test 3: image_fallback with inactive provider fails
+  // Test 3: multimodal_fallback with inactive provider fails
   // ------------------------------------------------------------------
-  it("test_validateRule_image_fallback_inactive_provider_fails", async () => {
+  it("test_validateRule_multimodal_fallback_inactive_provider_fails", async () => {
   const res = await app.inject({
     method: "POST",
     url: "/admin/api/mapping-groups",
@@ -148,10 +148,10 @@ describe("validateRule: image_fallback validation (T6)", () => {
       targets: [
       { backend_model: "text-model", provider_id: activeProviderId },
       ],
-      image_fallback: {
-      backend_model: "vision-model",
-      provider_id: inactiveProviderId,
-      },
+    multimodal_fallback: {
+    backend_model: "vision-model",
+    provider_id: inactiveProviderId,
+    },
     }),
     },
   });
@@ -159,14 +159,14 @@ describe("validateRule: image_fallback validation (T6)", () => {
   expect(res.statusCode).toBe(400);
   const body = res.json();
   expect(body.code).toBe(API_CODE.BAD_REQUEST);
-  expect(body.message).toContain("image_fallback");
+  expect(body.message).toContain("multimodal_fallback");
   expect(body.message).toContain("not active");
   });
 
   // ------------------------------------------------------------------
-  // Test 4: No image_fallback passes (backward compatible)
+  // Test 4: No multimodal_fallback passes (backward compatible)
   // ------------------------------------------------------------------
-  it("test_validateRule_no_image_fallback_passes_backward_compat", async () => {
+  it("test_validateRule_no_multimodal_fallback_passes_backward_compat", async () => {
   const res = await app.inject({
     method: "POST",
     url: "/admin/api/mapping-groups",
@@ -176,14 +176,14 @@ describe("validateRule: image_fallback validation (T6)", () => {
     rule: VALID_RULE_WITHOUT_FALLBACK(activeProviderId),
     },
   });
-  // This should always pass — no image_fallback means no extra validation
+  // This should always pass — no multimodal_fallback means no extra validation
   expect(res.statusCode).toBe(201);
   });
 
   // ------------------------------------------------------------------
-  // Test 5: image_fallback with missing backend_model fails
+  // Test 5: multimodal_fallback with missing backend_model fails
   // ------------------------------------------------------------------
-  it("test_validateRule_image_fallback_missing_backend_model_fails", async () => {
+  it("test_validateRule_multimodal_fallback_missing_backend_model_fails", async () => {
   const res = await app.inject({
     method: "POST",
     url: "/admin/api/mapping-groups",
@@ -194,10 +194,10 @@ describe("validateRule: image_fallback validation (T6)", () => {
       targets: [
       { backend_model: "text-model", provider_id: activeProviderId },
       ],
-      image_fallback: {
-      provider_id: activeProviderId,
-      // backend_model intentionally missing
-      },
+    multimodal_fallback: {
+    provider_id: activeProviderId,
+    // backend_model intentionally missing
+    },
     }),
     },
   });
@@ -205,13 +205,13 @@ describe("validateRule: image_fallback validation (T6)", () => {
   expect(res.statusCode).toBe(400);
   const body = res.json();
   expect(body.code).toBe(API_CODE.BAD_REQUEST);
-  expect(body.message).toContain("image_fallback");
+  expect(body.message).toContain("multimodal_fallback");
   });
 
   // ------------------------------------------------------------------
-  // Test 6: image_fallback with missing provider_id fails
+  // Test 6: multimodal_fallback with missing provider_id fails
   // ------------------------------------------------------------------
-  it("test_validateRule_image_fallback_missing_provider_id_fails", async () => {
+  it("test_validateRule_multimodal_fallback_missing_provider_id_fails", async () => {
   const res = await app.inject({
     method: "POST",
     url: "/admin/api/mapping-groups",
@@ -222,10 +222,10 @@ describe("validateRule: image_fallback validation (T6)", () => {
       targets: [
       { backend_model: "text-model", provider_id: activeProviderId },
       ],
-      image_fallback: {
-      backend_model: "vision-model",
-      // provider_id intentionally missing
-      },
+    multimodal_fallback: {
+    backend_model: "vision-model",
+    // provider_id intentionally missing
+    },
     }),
     },
   });
@@ -233,14 +233,14 @@ describe("validateRule: image_fallback validation (T6)", () => {
   expect(res.statusCode).toBe(400);
   const body = res.json();
   expect(body.code).toBe(API_CODE.BAD_REQUEST);
-  expect(body.message).toContain("image_fallback");
+  expect(body.message).toContain("multimodal_fallback");
   });
 
   // ------------------------------------------------------------------
-  // Test 7: PUT update group with image_fallback validates correctly
+  // Test 7: PUT update group with multimodal_fallback validates correctly
   // ------------------------------------------------------------------
-  it("test_validateRule_put_update_validates_image_fallback", async () => {
-  // First create a group without image_fallback
+  it("test_validateRule_put_update_validates_multimodal_fallback", async () => {
+  // First create a group without multimodal_fallback
   const createRes = await app.inject({
     method: "POST",
     url: "/admin/api/mapping-groups",
@@ -253,7 +253,7 @@ describe("validateRule: image_fallback validation (T6)", () => {
   expect(createRes.statusCode).toBe(201);
   const id = createRes.json().data.id;
 
-  // Update with invalid image_fallback (non-existent provider)
+  // Update with invalid multimodal_fallback (non-existent provider)
   const updateRes = await app.inject({
     method: "PUT",
     url: `/admin/api/mapping-groups/${id}`,
@@ -263,10 +263,10 @@ describe("validateRule: image_fallback validation (T6)", () => {
       targets: [
       { backend_model: "text-model", provider_id: activeProviderId },
       ],
-      image_fallback: {
-      backend_model: "vision-model",
-      provider_id: "ghost-provider",
-      },
+    multimodal_fallback: {
+    backend_model: "vision-model",
+    provider_id: "ghost-provider",
+    },
     }),
     },
   });
@@ -274,13 +274,13 @@ describe("validateRule: image_fallback validation (T6)", () => {
   expect(updateRes.statusCode).toBe(400);
   const body = updateRes.json();
   expect(body.code).toBe(API_CODE.BAD_REQUEST);
-  expect(body.message).toContain("image_fallback");
+  expect(body.message).toContain("multimodal_fallback");
   });
 
   // ------------------------------------------------------------------
-  // Test 8: image_fallback with empty object fails
+  // Test 8: multimodal_fallback with empty object fails
   // ------------------------------------------------------------------
-  it("test_validateRule_image_fallback_empty_object_fails", async () => {
+  it("test_validateRule_multimodal_fallback_empty_object_fails", async () => {
   const res = await app.inject({
     method: "POST",
     url: "/admin/api/mapping-groups",
@@ -291,7 +291,7 @@ describe("validateRule: image_fallback validation (T6)", () => {
       targets: [
       { backend_model: "text-model", provider_id: activeProviderId },
       ],
-      image_fallback: {},
+    multimodal_fallback: {},
     }),
     },
   });
@@ -299,13 +299,13 @@ describe("validateRule: image_fallback validation (T6)", () => {
   expect(res.statusCode).toBe(400);
   const body = res.json();
   expect(body.code).toBe(API_CODE.BAD_REQUEST);
-  expect(body.message).toContain("image_fallback");
+  expect(body.message).toContain("multimodal_fallback");
   });
 
   // ------------------------------------------------------------------
-  // Test 9: image_fallback with backend_model not in provider models fails
+  // Test 9: multimodal_fallback with backend_model not in provider models fails
   // ------------------------------------------------------------------
-  it("test_validateRule_image_fallback_backend_model_not_in_provider_models_fails", async () => {
+  it("test_validateRule_multimodal_fallback_backend_model_not_in_provider_models_fails", async () => {
   const res = await app.inject({
   method: "POST",
   url: "/admin/api/mapping-groups",
@@ -316,10 +316,10 @@ describe("validateRule: image_fallback validation (T6)", () => {
     targets: [
     { backend_model: "text-model", provider_id: activeProviderId },
     ],
-    image_fallback: {
-    provider_id: activeProviderId,
-    backend_model: "nonexistent-model",
-    },
+  multimodal_fallback: {
+  provider_id: activeProviderId,
+  backend_model: "nonexistent-model",
+  },
   }),
   },
   });
