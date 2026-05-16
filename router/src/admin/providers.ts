@@ -107,8 +107,17 @@ function extractModelOverrides(models: ModelInput[]): {
   return { entries, overrides };
 }
 const API_KEY_PREVIEW_PREFIX_LEN = 4;
-
 const PROVIDER_NAME_RE = /^[a-zA-Z0-9_-]+$/;
+
+/** 校验 base_url 是否为合法的 HTTP(S) URL */
+function isValidHttpUrl(str: string): boolean {
+  try {
+    const url = new URL(str);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
 
 const CreateProviderSchema = Type.Object({
   name: Type.String({ minLength: 1 }),
@@ -206,6 +215,9 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     if (existing) {
       return reply.code(HTTP_CONFLICT).send(apiError(API_CODE.CONFLICT_NAME, `Provider 名称 '${body.name}' 已存在`));
     }
+    if (!isValidHttpUrl(body.base_url)) {
+      return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.VALIDATION_FAILED, "base_url 格式无效，必须是以 http:// 或 https:// 开头的合法 URL"));
+    }
     const encryptedKey = encrypt(body.api_key, getSetting(db, "encryption_key")!);
     const { entries: normalizedModels, overrides: contextOverrides } = extractModelOverrides((body.models ?? []) as ModelInput[]);
     const isAdaptiveEnabled = body.adaptive_enabled ?? 0;
@@ -273,7 +285,12 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     const fields: Partial<Pick<Provider, 'name' | 'api_type' | 'base_url' | 'upstream_path' | 'api_key' | 'api_key_preview' | 'models' | 'is_active' | 'max_concurrency' | 'queue_timeout_ms' | 'max_queue_size' | 'adaptive_enabled' | 'proxy_type' | 'proxy_url' | 'proxy_username' | 'proxy_password'>> = {};
     if (body.name !== undefined) fields.name = body.name;
     if (body.api_type !== undefined) fields.api_type = body.api_type;
-    if (body.base_url !== undefined) fields.base_url = body.base_url;
+    if (body.base_url !== undefined) {
+      if (!isValidHttpUrl(body.base_url)) {
+        return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.VALIDATION_FAILED, "base_url 格式无效，必须是以 http:// 或 https:// 开头的合法 URL"));
+      }
+      fields.base_url = body.base_url;
+    }
     if (body.upstream_path !== undefined) fields.upstream_path = body.upstream_path || null;
     if (body.is_active !== undefined) fields.is_active = body.is_active;
     if (body.models !== undefined) {
