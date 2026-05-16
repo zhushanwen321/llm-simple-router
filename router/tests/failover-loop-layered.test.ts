@@ -7,7 +7,7 @@
  *
  * 这些测试必须 FAIL，因为当前实现尚未重构。
  * 失败原因预期：
- * - image-redirect stage 不存在于 pipeline_snapshot（IR 层未实现）
+ * - modality-redirect stage 不���在于 pipeline_snapshot（IR 层未实现）
  * - IR 层未将 image-capable fallback target prepend 到 target 列表
  * - image-capable provider 永远不会被 IR 路径调用
  */
@@ -142,7 +142,7 @@ describe("Failover-loop layered routing (TDD - expecting FAIL)", () => {
   }
 
   /**
-   * 插入 mapping group，支持 image_fallback 和 overflow 配置。
+   * 插入 mapping group，支持 multimodal_fallback 和 overflow 配置。
    */
   function insertMappingGroup(
   clientModel: string,
@@ -152,21 +152,21 @@ describe("Failover-loop layered routing (TDD - expecting FAIL)", () => {
     overflow_provider_id?: string;
     overflow_model?: string;
   }>,
-  imageFallback?: { backend_model: string; provider_id: string },
+  multimodalFallback?: { backend_model: string; provider_id: string },
   ) {
   const now = new Date().toISOString();
   const id = `mg-${clientModel}`;
 
   for (const t of targets) {
-    db.prepare(
-    `INSERT OR IGNORE INTO model_mappings (id, client_model, backend_model, provider_id, is_active, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    ).run(`mm-${t.provider_id}-${t.backend_model}`, clientModel, t.backend_model, t.provider_id, 1, now);
+  db.prepare(
+  `INSERT OR IGNORE INTO model_mappings (id, client_model, backend_model, provider_id, is_active, created_at)
+   VALUES (?, ?, ?, ?, ?, ?)`,
+  ).run(`mm-${t.provider_id}-${t.backend_model}`, clientModel, t.backend_model, t.provider_id, 1, now);
   }
 
   const rule: Record<string, unknown> = { targets };
-  if (imageFallback) {
-    rule.image_fallback = imageFallback;
+  if (multimodalFallback) {
+  rule.multimodal_fallback = multimodalFallback;
   }
 
   db.prepare(
@@ -212,11 +212,11 @@ describe("Failover-loop layered routing (TDD - expecting FAIL)", () => {
   describe("AC18: IR + OF layers correctly expand target list", () => {
   it("test_imageRequest_withFallbackAndOverflow_precomputesExpandedTargets", async () => {
     // 设置：
-    // - mapping group: targets=[A(text-only, 有 overflow)], image_fallback={B(image-capable)}
+  // - mapping group: targets=[A(text-only, 有 overflow)], multimodal_fallback={B(image-capable)}
     // - 请求包含图片
     // - 预期 target 列表：[IR_F(B), OF_A, A]
     // - B 返回 200，A 返回 500
-    // - pipeline_snapshot 应包含 image-redirect stage
+  // - pipeline_snapshot 应包含 modality-redirect stage
 
     let textOnlyCalls = 0;
     let imageCapableCalls = 0;
@@ -272,16 +272,16 @@ describe("Failover-loop layered routing (TDD - expecting FAIL)", () => {
     // IR provider 应该被调用（因为图片请求 + 首个 target 不支持图片）
     expect(imageCapableCalls).toBeGreaterThanOrEqual(1);
 
-    // 验证 pipeline_snapshot 包含 image-redirect stage
+  // 验证 pipeline_snapshot 包含 modality-redirect stage
     const logs = db.prepare("SELECT pipeline_snapshot FROM request_logs WHERE status_code = 200").all() as Array<{ pipeline_snapshot: string }>;
     expect(logs.length).toBeGreaterThanOrEqual(1);
 
     const stages = JSON.parse(logs[0].pipeline_snapshot || "[]");
-    const irStage = stages.find((s: Record<string, unknown>) => s.stage === "image-redirect");
-    expect(irStage).toBeDefined();
-    expect(irStage).toMatchObject({
-    stage: "image-redirect",
-    triggered: true,
+  const irStage = stages.find((s: Record<string, unknown>) => s.stage === "modality-redirect");
+  expect(irStage).toBeDefined();
+  expect(irStage).toMatchObject({
+  stage: "modality-redirect",
+  triggered: true,
     redirect_to: "gpt-4o",
     redirect_provider: "svc-image-capable",
     });
@@ -291,7 +291,7 @@ describe("Failover-loop layered routing (TDD - expecting FAIL)", () => {
   describe("AC19: IR_F excluded after failure — no deadloop", () => {
   it("test_irFallbackFails_excluded_noDeadloop", async () => {
     // 设置：
-    // - mapping group: targets=[A(text-only, 返回 200)], image_fallback={B(返回 500)}
+  // - mapping group: targets=[A(text-only, 返回 200)], multimodal_fallback={B(返回 500)}
     // - 请求包含图片
     // - 预期：先尝试 B（IR_F），失败，exclude B，然后尝试 A，成功
     // - 总日志数 ≤ 5（无死循环到 MAX_FAILOVER_ITERATIONS）
@@ -354,11 +354,11 @@ describe("Failover-loop layered routing (TDD - expecting FAIL)", () => {
   describe("Fallback: non-image request — IR layer records triggered:false", () => {
   it("test_textOnlyRequest_IRStageRecordedTriggeredFalse", async () => {
     // 设置：
-    // - mapping group: targets=[A(text-only)], image_fallback={B(image-capable)}
-    // - 纯文本请求（无图片）
-    // - 预期：IR 层执行但不扩展，记录 image-redirect stage（triggered: false）
-    // - B 不被调用
-    // - 关键：重构后 IR 层总是执行，pipeline_snapshot 总包含 image-redirect stage
+  // - mapping group: targets=[A(text-only)], multimodal_fallback={B(image-capable)}
+  // - 纯文本请求（无图片）
+  // - 预期：IR 层执行但不扩展，记录 modality-redirect stage（triggered: false）
+  // - B 不被调用
+  // - 关键：重构后 IR 层总是执行，pipeline_snapshot 总包含 modality-redirect stage
 
     let textOnlyCalls = 0;
     let imageCapableCalls = 0;
@@ -408,16 +408,16 @@ describe("Failover-loop layered routing (TDD - expecting FAIL)", () => {
     expect(imageCapableCalls).toBe(0);
     expect(textOnlyCalls).toBe(1);
 
-    // 关键断言：重构后 pipeline_snapshot 应包含 image-redirect stage（triggered: false）
-    // 当前实现不含此 stage，所以测试 FAIL
-    const logRow = db.prepare("SELECT pipeline_snapshot FROM request_logs WHERE status_code = 200").get() as { pipeline_snapshot: string };
-    expect(logRow).toBeDefined();
-    const stages = JSON.parse(logRow.pipeline_snapshot || "[]");
-    const irStage = stages.find((s: Record<string, unknown>) => s.stage === "image-redirect");
-    expect(irStage).toBeDefined();
-    expect(irStage).toMatchObject({
-    stage: "image-redirect",
-    triggered: false,
+  // 关键断言：重构后 pipeline_snapshot 应包含 modality-redirect stage（triggered: false）
+  // 当前实现不含此 stage，所以测试 FAIL
+  const logRow = db.prepare("SELECT pipeline_snapshot FROM request_logs WHERE status_code = 200").get() as { pipeline_snapshot: string };
+  expect(logRow).toBeDefined();
+  const stages = JSON.parse(logRow.pipeline_snapshot || "[]");
+  const irStage = stages.find((s: Record<string, unknown>) => s.stage === "modality-redirect");
+  expect(irStage).toBeDefined();
+  expect(irStage).toMatchObject({
+  stage: "modality-redirect",
+  triggered: false,
     });
   });
   });
@@ -425,7 +425,7 @@ describe("Failover-loop layered routing (TDD - expecting FAIL)", () => {
   describe("Failover: all targets exhausted returns error", () => {
   it("test_allTargetsExhausted_returnsError", async () => {
     // 设置：
-    // - mapping group: targets=[A(返回 500)], image_fallback={B(返回 500)}
+  // - mapping group: targets=[A(返回 500)], multimodal_fallback={B(返回 500)}
     // - 请求包含图片
     // - 预期：IR 层展开为 [B, A]，全部失败后返回错误
     // - 总请求数 ≤ 5（无死循环）
@@ -488,11 +488,11 @@ describe("Failover-loop layered routing (TDD - expecting FAIL)", () => {
   describe("Pre-computed IR stage always recorded in snapshot", () => {
   it("test_failoverGroup_IRStageAlwaysPresentInSnapshot", async () => {
     // 设置：
-    // - mapping group: targets=[A(返回 500), B(返回 200)], 无 image_fallback
+  // - mapping group: targets=[A(返回 500), B(返回 200)], 无 multimodal_fallback
     // - 纯文本请求
     // - 预期：A 失败 → failover → B 成功
-    // - 关键断言：每次迭代的 snapshot 都应包含 image-redirect stage（triggered: false）
-    //   重构后 IR 层总是执行，这是分层路由已实现的标志
+  // - 关键断言：每次迭代的 snapshot 都应包含 modality-redirect stage（triggered: false）
+  //   重构后 IR 层总是执行，这是分层路由已实现的标志
 
     let textOnlyCalls = 0;
     let imageCapableCalls = 0;
@@ -518,7 +518,7 @@ describe("Failover-loop layered routing (TDD - expecting FAIL)", () => {
     insertProvider("svc-text-only", "TextOnly", `http://127.0.0.1:${textOnly.port}`, encryptedKey);
     insertProvider("svc-image-capable", "ImageCapable", `http://127.0.0.1:${imageCapable.port}`, encryptedKey);
 
-    // 两个 targets 的 failover group（无 image_fallback）
+  // 两个 targets 的 failover group（无 multimodal_fallback）
     insertMappingGroup("gpt-4", [
     { backend_model: "gpt-4", provider_id: "svc-text-only" },
     { backend_model: "gpt-4o", provider_id: "svc-image-capable" },
@@ -564,11 +564,11 @@ describe("Failover-loop layered routing (TDD - expecting FAIL)", () => {
     backend_model: "gpt-4o",
     });
 
-    // 关键新断言：第一次迭代的 snapshot 应包含 image-redirect stage（triggered: false）
-    // 这是分层路由已实现的标志 — IR 层总是执行，即使不触发重定向
-    const firstIR = firstStages.find((s: Record<string, unknown>) => s.stage === "image-redirect");
-    expect(firstIR).toBeDefined();
-    expect(firstIR).toMatchObject({ stage: "image-redirect", triggered: false });
+  // 关键新断言：第一次迭代的 snapshot 应包含 modality-redirect stage（triggered: false）
+  // 这是分层路由已实现的标志 — IR 层总是执行，即使不触发重定向
+  const firstIR = firstStages.find((s: Record<string, unknown>) => s.stage === "modality-redirect");
+  expect(firstIR).toBeDefined();
+  expect(firstIR).toMatchObject({ stage: "modality-redirect", triggered: false });
   });
   });
 });
