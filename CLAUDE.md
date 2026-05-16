@@ -622,10 +622,12 @@ bash ~/.claude/skills/merge-worktree/merge-worktree.sh <branch>
 | 优先级 | 来源 | 存储位置 | 说明 |
 |--------|------|----------|------|
 | 1（最高） | 用户手动配置 | DB `providers.models` JSON 中每个 ModelEntry 的 `capabilities` 字段 | Provider 编辑页面可修改 |
-| 2 | 内置白名单 | `router/src/config/model-context.ts` `MODEL_CAPABILITIES` | 硬编码，覆盖常见模型，发版更新 |
-| 3（最低） | 默认值 | `parseModels()` 返回 `capabilities: ["text"]` | 不在白名单中的模型默认仅支持文本 |
+| 2 | 内置白名单 | `router/src/config/model-context.ts` `MODEL_CAPABILITIES` | 硬编码，人工验证，覆盖常见模型，发版更新 |
+| 3 | 外部模型目录 | `router/config/model-directory.json` | 由 `sync-model-directory.sh` 从 ai-model-directory 拉取 |
+| 4（最低） | 默认值 | `parseModels()` 返回 `capabilities: ["text"]` | 不在白名单和目录中的模型默认仅支持文本 |
 
-`parseModels()` 自动按优先级合并：显式配置 > 白名单查表 > `["text"]`。
+`parseModels()` 自动按优先级合并：显式配置 > 硬编码白名单 > 外部目录 > `["text"]`。
+白名单优先于目录数据，因为白名单经过人工验证（如月之暗面 moonshot-v1 系列API支持图片但目录中标记为纯文本）。
 
 ### 外部模型目录（未来增强）
 

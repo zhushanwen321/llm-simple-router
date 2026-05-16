@@ -22,8 +22,9 @@ function toStreamMetrics(m: MetricsResult) {
   return {
     inputTokens: m.input_tokens,
     outputTokens: m.output_tokens,
-    cacheReadTokens: m.cache_read_tokens,
-    ttftMs: m.ttft_ms,
+  cacheReadTokens: m.cache_read_tokens,
+  cacheReadTokensEstimated: m.cache_read_tokens_estimated,
+  ttftMs: m.ttft_ms,
     tokensPerSecond: m.tokens_per_second,
     stopReason: m.stop_reason,
     isComplete: m.is_complete === 1,

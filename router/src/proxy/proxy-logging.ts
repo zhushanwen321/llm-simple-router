@@ -184,18 +184,18 @@ export function collectTransportMetrics(
         if (cachedTokens != null && cachedTokens > 0) {
           metrics.cache_read_tokens = cachedTokens;
           metrics.cache_read_tokens_estimated = 1;
-          if (tracker) {
-            try { tracker.updateCompletedMetrics(lastSuccessLogId, cachedTokens); } catch (e) { request.log.error({ err: e }, "tracker update failed"); }
-          }
+      if (tracker) {
+      try { tracker.updateCompletedMetrics(lastSuccessLogId, cachedTokens, true); } catch (e) { request.log.error({ err: e }, "tracker update failed"); }
+      }
         } else {
           try {
             const estimated = cacheEstimator.estimateHit(sessionId, backendModel, request.body as Record<string, unknown>);
             if (estimated != null && estimated > 0) {
               metrics.cache_read_tokens = estimated;
               metrics.cache_read_tokens_estimated = 1;
-              if (tracker) {
-                try { tracker.updateCompletedMetrics(lastSuccessLogId, estimated); } catch (e) { request.log.error({ err: e }, "tracker update failed"); }
-              }
+        if (tracker) {
+        try { tracker.updateCompletedMetrics(lastSuccessLogId, estimated, true); } catch (e) { request.log.error({ err: e }, "tracker update failed"); }
+        }
             }
           } catch (e) {
             request.log.error({ err: e }, "cache estimation failed");
