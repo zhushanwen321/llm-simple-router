@@ -126,15 +126,16 @@ export function expandOverflowTargets(
 ): Target[] {
   const expanded: Target[] = [];
   for (const target of targets) {
-  try {
-    const result = applyOverflowRedirect(target, db, body);
-    if (result) {
-    expanded.push({ provider_id: result.provider_id, backend_model: result.backend_model });
+    try {
+      const result = applyOverflowRedirect(target, db, body);
+      if (result) {
+        expanded.push({ provider_id: result.provider_id, backend_model: result.backend_model });
+      }
+      // eslint-disable-next-line taste/no-silent-catch -- 单target溢出失败不阻塞其余target
+    } catch {
+      console.error('expandOverflowTargets: overflow computation failed for target', target.backend_model);
     }
-  } catch {
-    // 单个 target 溢出计算失败不阻塞其余 target
-  }
-  expanded.push(target);
+    expanded.push(target);
   }
   return expanded;
 }

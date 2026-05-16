@@ -51,5 +51,12 @@
     "saveFailed": "Failed to save",
     "parseRuleFailed": "Invalid rule format, using defaults"
   },
-  "selectProviderModel": "Select Provider / Model"
+  "selectProviderModel": "Select Provider / Model",
+  "imageFallback": {
+  "title": "Image Fallback",
+  "add": "Add Image Fallback",
+  "configured": "Configured",
+  "selectProvider": "Select Provider",
+  "modelPlaceholder": "Model name (e.g. gpt-4o)"
+  }
 }

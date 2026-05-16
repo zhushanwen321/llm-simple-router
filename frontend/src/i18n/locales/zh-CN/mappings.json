@@ -51,5 +51,12 @@
     "saveFailed": "保存失败",
     "parseRuleFailed": "路由规则格式异常，已使用默认配置"
   },
-  "selectProviderModel": "选择供应商 / 模型"
+  "selectProviderModel": "选择供应商 / 模型",
+  "imageFallback": {
+  "title": "图片 Fallback",
+  "add": "添加图片 Fallback",
+  "configured": "已配置",
+  "selectProvider": "选择供应商",
+  "modelPlaceholder": "模型名称（如 gpt-4o）"
+  }
 }
