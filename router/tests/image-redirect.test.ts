@@ -105,6 +105,40 @@ function anthropicImageBody(): Record<string, unknown> {
   };
 }
 
+/** Anthropic tool_result 内嵌图片（regression: IR 层漏检 tool_result.content[] 中的 image block） */
+function anthropicToolResultImageBody(): Record<string, unknown> {
+  return {
+  model: "glm-5.1",
+  messages: [
+    { role: "user", content: [{ type: "text", text: "hello" }] },
+    {
+      role: "assistant",
+      content: [{ type: "tool_use", id: "tool_1", name: "read", input: { path: "/tmp/screenshot.png" } }],
+    },
+    {
+      role: "user",
+      content: [
+        {
+        type: "tool_result",
+        tool_use_id: "tool_1",
+        content: [
+          { type: "text", text: "File content" },
+          {
+          type: "image",
+          source: {
+            type: "base64",
+            media_type: "image/png",
+            data: "iVBOR...",
+          },
+          },
+        ],
+        },
+      ],
+    },
+  ],
+  };
+  }
+
 /** 构造 Responses API 图片请求体（input[] 含 type="input_image"） */
 function responsesApiImageBody(): Record<string, unknown> {
   return {
@@ -123,7 +157,7 @@ function responsesApiImageBody(): Record<string, unknown> {
     },
   ],
   };
-}
+  }
 
 /** 构造 Responses API 图片请求体（input[] 顶层 type="input_image"） */
 function responsesApiTopLevelImageBody(): Record<string, unknown> {
@@ -669,5 +703,42 @@ describe("computeImageRedirectTargets", () => {
   // legacy-model 无 capabilities → 视为 text-only → 应 prepend fallback
   expect(result).toHaveLength(2);
   expect(result[0].backend_model).toBe("vision-model");
+  });
+
+  it('detects image inside Anthropic tool_result content', () => {
+  const providerAId = insertProvider(db, {
+    id: "pa",
+    name: "text-provider",
+    models: JSON.stringify([{ name: "glm-5.1" }]),
+  });
+  const providerBId = insertProvider(db, {
+    id: "pb",
+    name: "image-provider",
+    models: JSON.stringify([{ name: "kimi-for-coding", capabilities: ["text", "image"] }]),
+  });
+
+  insertMappingGroup(db, "glm-5.1", {
+    targets: [{ provider_id: providerAId, backend_model: "glm-5.1" }],
+    image_fallback: {
+    provider_id: providerBId,
+    backend_model: "kimi-for-coding",
+    },
+  });
+
+  const targets: Target[] = [
+    { provider_id: providerAId, backend_model: "glm-5.1" },
+  ];
+  const snapshot = new PipelineSnapshot();
+  // tool_result 内嵌图片 — 这是真实 bug case
+  const body = anthropicToolResultImageBody();
+
+  const result = computeImageRedirectTargets(db, targets, "glm-5.1", body, snapshot);
+
+  expect(result).toHaveLength(2);
+  expect(result[0].backend_model).toBe("kimi-for-coding");
+  const parsed = JSON.parse(snapshot.toJSON());
+  const irStage = parsed.find((s: { stage: string }) => s.stage === "image-redirect");
+  expect(irStage).toBeDefined();
+  expect(irStage.triggered).toBe(true);
   });
 });

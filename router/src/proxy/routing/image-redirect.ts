@@ -16,7 +16,7 @@ import { parseModels } from "../../config/model-context.js";
 /**
  * 检测请求体是否包含图片，支持三种 API 格式：
  * 1. OpenAI: messages[].content 为数组且含 type="image_url"
- * 2. Anthropic: messages[].content[] 含 type="image"
+ * 2. Anthropic: messages[].content[] 含 type="image"（包括嵌套在 tool_result.content[] 中的图片）
  * 3. Responses API: input[] 含 type="input_image"（顶层或嵌套在 message content 中）
  */
 export function hasImage(body: Record<string, unknown>): boolean {
@@ -28,8 +28,20 @@ export function hasImage(body: Record<string, unknown>): boolean {
       if (!Array.isArray(content)) continue;
       for (const block of content) {
         if (block == null || typeof block !== "object") continue;
-        const t = (block as Record<string, unknown>).type;
+        const rec = block as Record<string, unknown>;
+        const t = rec.type;
+        // OpenAI: type="image_url"; Anthropic direct: type="image"
         if (t === "image_url" || t === "image") return true;
+        // Anthropic tool_result 内嵌: type="tool_result" → content[] 可能含 image
+        if (t === "tool_result") {
+          const inner = rec.content;
+          if (Array.isArray(inner)) {
+            for (const ib of inner) {
+              if (ib == null || typeof ib !== "object") continue;
+              if ((ib as Record<string, unknown>).type === "image") return true;
+            }
+          }
+        }
       }
     }
   }
