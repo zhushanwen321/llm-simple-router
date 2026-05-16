@@ -171,7 +171,13 @@ class StreamProxy {
     }
     this.transition("STREAMING");
     this.headersSent = true;
-    this.reply.raw.writeHead(this.statusCode, this.sseHeaders);
+    try {
+      this.reply.raw.writeHead(this.statusCode, this.sseHeaders);
+    } catch {
+    // 客户端在 state transition 和 writeHead 之间断连，可安全忽略
+      this.terminal("stream_abort");
+      return;
+    }
     if (this.metricsTransform) {
       this.metricsTransform.pipe(this.formatTransform ?? this.passThrough, { end: true });
     }
