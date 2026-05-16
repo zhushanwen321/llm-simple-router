@@ -211,24 +211,6 @@ export async function executeFailoverLoop(
   let allTargets = resolveResult.allTargets ?? [resolveResult.target];
   const concurrencyOverride = resolveResult.concurrency_override;
 
-  // allowed_models 检查 — 只检查首个 target（IR fallback 是 admin 配置的，视为已授权）
-  const allowedModels = request.routerKey?.allowed_models;
-  if (allowedModels && allowedModels.length > 0 && !allowedModels.includes(allTargets[0].backend_model)) {
-    const logId = randomUUID();
-    const startTime = Date.now();
-    const isStream = (ctx.body as Record<string, unknown>).stream === true;
-    const rCtx: RejectParams = {
-      db, logId, apiType: ctx.apiType, model: clientModel,
-      startTime, isStream, routerKeyId: request.routerKey?.id ?? null, originalBody: rawBody, clientHeaders: cliHdrs,
-      isFailover: false, originalRequestId: null,
-      sessionId: ctx.metadata.get("session_id") as string | undefined,
-      pipelineSnapshot: rejectSnapshot.toJSON(),
-      matcher, logFileWriter,
-    };
-    return rejectAndReply(reply, rCtx, errors.modelNotAllowed(allTargets[0].backend_model),
-      `Model '${allTargets[0].backend_model}' not allowed`, allTargets[0].provider_id);
-  }
-
   // 2. modality-redirect 层：模态重定向 → 可能 prepend fallback target
   allTargets = computeModalityRedirectTargets(db, allTargets, clientModel, ctx.body, precomputeSnapshot);
 
@@ -237,6 +219,38 @@ export async function executeFailoverLoop(
   const ofResult = expandOverflowTargets(allTargets, db, ctx.body);
   allTargets = ofResult.targets;
   precomputeSnapshot.add({ stage: "overflow", triggered: allTargets.length > targetsBeforeOF });
+
+  // 4. allowed_models 过滤：MRL fallback 和 overflow 扩展的 target 也必须受约束
+  const allowedModels = request.routerKey?.allowed_models;
+  let overflowIndices = ofResult.overflowIndices;
+  if (allowedModels && allowedModels.length > 0) {
+    // 重建 overflowIndices：filter 会改变 index，需同步更新
+    const newOverflowIndices = new Set<number>();
+    const filtered: Target[] = [];
+    for (let i = 0; i < allTargets.length; i++) {
+      if (allowedModels.includes(allTargets[i].backend_model)) {
+        if (overflowIndices.has(i)) newOverflowIndices.add(filtered.length);
+        filtered.push(allTargets[i]);
+      }
+    }
+    allTargets = filtered;
+    overflowIndices = newOverflowIndices;
+    if (allTargets.length === 0) {
+      const logId = randomUUID();
+      const startTime = Date.now();
+      const isStream = (ctx.body as Record<string, unknown>).stream === true;
+      const rCtx: RejectParams = {
+        db, logId, apiType: ctx.apiType, model: clientModel,
+        startTime, isStream, routerKeyId: request.routerKey?.id ?? null, originalBody: rawBody, clientHeaders: cliHdrs,
+        isFailover: false, originalRequestId: null,
+        sessionId: ctx.metadata.get("session_id") as string | undefined,
+        pipelineSnapshot: precomputeSnapshot.toJSON(),
+        matcher, logFileWriter,
+      };
+      return rejectAndReply(reply, rCtx, errors.modelNotAllowed(clientModel),
+        `No allowed model available for '${clientModel}'`);
+    }
+  }
 
   // 预计算完成，缓存到循环外
   const cachedTargets = allTargets;
@@ -312,7 +326,7 @@ export async function executeFailoverLoop(
     let effectiveMappingReason: MappingReason = isFailoverIteration ? "failover_retry" : resolveResult.mappingReason;
     // 只有当前 target 是 overflow 扩展产生的才标记
     const resolvedIdx = cachedTargets.findIndex(t => t.provider_id === resolved.provider_id && t.backend_model === resolved.backend_model);
-    if (ofResult.overflowIndices.has(resolvedIdx)) effectiveMappingReason = "overflow_redirect";
+    if (overflowIndices.has(resolvedIdx)) effectiveMappingReason = "overflow_redirect";
 
     // --- routing ---
     currentBody = { ...currentBody, model: resolved.backend_model };
