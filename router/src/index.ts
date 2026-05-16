@@ -154,8 +154,22 @@ export async function buildApp(
   });
 
   // 记录请求到达时间，供全局错误处理计算延迟
-  app.addHook("onRequest", (request, _reply, done) => {
+  app.addHook("onRequest", (request, reply, done) => {
     (request as unknown as { receivedAt: number }).receivedAt = Date.now();
+
+    // 全局 EPIPE 防护：ServerResponse 的 write 异步完成失败时，
+    // 内部 socketErrorListener → response.destroy(err) → response.emit('error')。
+    // 若无 listener 则该 error 成为 uncaught exception。
+    // 代理路由在 create-proxy-handler.ts 中已有额外监听，此处覆盖所有路由。
+    reply.raw.on("error", (err: Error) => {
+      const code = (err as { code?: string }).code;
+      if (code === 'EPIPE') {
+        request.log.debug({ err }, "client disconnected (EPIPE)");
+      } else {
+        request.log.warn({ err }, "response stream error");
+      }
+    });
+
     done();
   });
 
