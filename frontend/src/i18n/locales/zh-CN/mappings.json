@@ -53,10 +53,11 @@
   },
   "selectProviderModel": "选择供应商 / 模型",
   "imageFallback": {
-  "title": "图片 Fallback",
-  "add": "添加图片 Fallback",
-  "configured": "已配置",
-  "selectProvider": "选择供应商",
-  "modelPlaceholder": "模型名称（如 gpt-4o）"
+    "title": "图片 Fallback",
+    "add": "添加图片 Fallback",
+    "configured": "已配置",
+    "selectProvider": "选择供应商",
+    "modelPlaceholder": "模型名称（如 gpt-4o）",
+    "selectProviderModel": "选择供应商和模型"
   }
 }

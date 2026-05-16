@@ -3,8 +3,6 @@ import { useI18n } from "vue-i18n";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectTrigger,
@@ -12,7 +10,7 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import { RotateCw, FileText, ImageIcon } from "lucide-vue-next";
+import { RotateCw } from "lucide-vue-next";
 import ModelCard from "@/components/quick-setup/ModelCard.vue";
 import ConcurrencyControl from "@/components/shared/ConcurrencyControl.vue";
 import TransformRulesForm from "@/components/shared/TransformRulesForm.vue";
@@ -243,46 +241,19 @@ function isOfficialOpenai(url: string): boolean {
           :api-type="props.apiType"
           :is-deep-seek="m.name.toLowerCase().includes('deepseek')"
           :is-non-openai-endpoint="!isOfficialOpenai(props.baseUrl)"
+          :stream-timeout-ms="m.stream_timeout_ms ?? undefined"
+          :capabilities="modelCapabilities(m)"
           @update:model="emit('update:model', i, $event)"
           @remove="emit('remove-model', i)"
+          @update:stream-timeout-ms="
+            emit(
+              'update:model-timeout',
+              i,
+              String($event ? Math.round($event / 1000) : ''),
+            )
+          "
+          @toggle-image-capability="emit('toggle-model-image-capability', i)"
         />
-        <div class="flex items-center gap-3 mt-1.5">
-          <div class="flex items-center gap-1.5">
-            <Label class="text-xs text-muted-foreground whitespace-nowrap">{{
-              t("providers.fields.timeoutLabel")
-            }}</Label>
-            <Input
-              type="number"
-              :model-value="
-                m.stream_timeout_ms
-                  ? Math.round(m.stream_timeout_ms / 1000)
-                  : ''
-              "
-              @update:model-value="emit('update:model-timeout', i, $event)"
-              :placeholder="t('providers.fields.timeoutPlaceholder')"
-              class="h-7 text-xs"
-              min="1"
-            />
-          </div>
-          <div class="flex items-center gap-2">
-            <Badge variant="secondary" class="text-[10px] px-1.5 py-0 gap-0.5">
-              <FileText class="w-2.5 h-2.5" />
-              {{ t("providers.capabilities.text") }}
-            </Badge>
-            <Label class="flex items-center gap-1.5 cursor-pointer">
-              <Checkbox
-                :checked="modelCapabilities(m).includes('image')"
-                @update:checked="emit('toggle-model-image-capability', i)"
-              />
-              <span
-                class="text-[10px] text-muted-foreground flex items-center gap-0.5"
-              >
-                <ImageIcon class="w-2.5 h-2.5" />
-                {{ t("providers.capabilities.image") }}
-              </span>
-            </Label>
-          </div>
-        </div>
       </div>
     </div>
     <div class="flex gap-2">

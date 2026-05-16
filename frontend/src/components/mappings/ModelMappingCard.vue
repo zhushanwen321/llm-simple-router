@@ -6,15 +6,9 @@ import { Trash2, ImageIcon, Plus } from "lucide-vue-next";
 import { api, getApiMessage } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui/select";
+import CascadingModelSelect from "@/components/mappings/CascadingModelSelect.vue";
+import type { SelectedValue } from "@/components/mappings/cascading-types";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -102,10 +96,10 @@ watch(
 const workingEntry = computed<MappingEntry>(() =>
   expanded.value
     ? {
-      ...props.entry,
-      targets: localTargets.value,
-      imageFallback: localImageFallback.value,
-    }
+        ...props.entry,
+        targets: localTargets.value,
+        imageFallback: localImageFallback.value,
+      }
     : props.entry,
 );
 
@@ -192,20 +186,11 @@ function addImageFallback() {
   };
 }
 
-function updateFallbackProvider(providerId: unknown) {
-  if (localImageFallback.value) {
-    const id = typeof providerId === "string" ? providerId : "";
-    localImageFallback.value = { ...localImageFallback.value, provider_id: id };
-  }
-}
-
-function updateFallbackModel(model: string) {
-  if (localImageFallback.value) {
-    localImageFallback.value = {
-      ...localImageFallback.value,
-      backend_model: model,
-    };
-  }
+function handleFallbackSelect(val: SelectedValue) {
+  localImageFallback.value = {
+    provider_id: val.provider_id,
+    backend_model: val.model,
+  };
 }
 </script>
 
@@ -288,32 +273,19 @@ function updateFallbackModel(model: string) {
         </Badge>
       </div>
       <div v-if="localImageFallback" class="flex items-center gap-2">
-        <Select
-          :model-value="localImageFallback.provider_id"
-          @update:model-value="updateFallbackProvider"
-        >
-          <SelectTrigger class="h-7 flex-1 text-xs">
-            <SelectValue
-              :placeholder="t('mappings.imageFallback.selectProvider')"
-            />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem
-              v-for="p in activeProviders"
-              :key="p.provider.id"
-              :value="p.provider.id"
-            >
-              {{ p.provider.name }}
-            </SelectItem>
-          </SelectContent>
-        </Select>
-        <Input
-          :model-value="localImageFallback.backend_model"
-          @update:model-value="
-            (v: string | number) => updateFallbackModel(String(v))
+        <CascadingModelSelect
+          :providers="activeProviders"
+          :model-value="
+            localImageFallback
+              ? {
+                  provider_id: localImageFallback.provider_id,
+                  model: localImageFallback.backend_model,
+                }
+              : undefined
           "
-          :placeholder="t('mappings.imageFallback.modelPlaceholder')"
-          class="h-7 flex-1 text-xs"
+          :placeholder="t('mappings.imageFallback.selectProviderModel')"
+          compact
+          @update:model-value="handleFallbackSelect($event)"
         />
         <Button
           type="button"
