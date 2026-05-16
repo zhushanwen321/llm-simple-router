@@ -102,10 +102,10 @@ watch(
 const workingEntry = computed<MappingEntry>(() =>
   expanded.value
     ? {
-        ...props.entry,
-        targets: localTargets.value,
-        imageFallback: localImageFallback.value,
-      }
+      ...props.entry,
+      targets: localTargets.value,
+      imageFallback: localImageFallback.value,
+    }
     : props.entry,
 );
 
