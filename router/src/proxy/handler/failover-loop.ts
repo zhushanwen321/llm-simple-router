@@ -194,18 +194,18 @@ export async function executeFailoverLoop(
   const rejectSnapshot = new PipelineSnapshot();
 
   if (!resolveResult) {
-  const logId = randomUUID();
-  const startTime = Date.now();
-  const isStream = (ctx.body as Record<string, unknown>).stream === true;
-  const rCtx: RejectParams = {
-    db, logId, apiType: ctx.apiType, model: clientModel,
-    startTime, isStream, routerKeyId: request.routerKey?.id ?? null, originalBody: rawBody, clientHeaders: cliHdrs,
-    isFailover: false, originalRequestId: null,
-    sessionId: ctx.metadata.get("session_id") as string | undefined,
-    pipelineSnapshot: rejectSnapshot.toJSON(),
-    matcher, logFileWriter,
-  };
-  return rejectAndReply(reply, rCtx, errors.modelNotFound(clientModel), `No mapping found for model '${clientModel}'`);
+    const logId = randomUUID();
+    const startTime = Date.now();
+    const isStream = (ctx.body as Record<string, unknown>).stream === true;
+    const rCtx: RejectParams = {
+      db, logId, apiType: ctx.apiType, model: clientModel,
+      startTime, isStream, routerKeyId: request.routerKey?.id ?? null, originalBody: rawBody, clientHeaders: cliHdrs,
+      isFailover: false, originalRequestId: null,
+      sessionId: ctx.metadata.get("session_id") as string | undefined,
+      pipelineSnapshot: rejectSnapshot.toJSON(),
+      matcher, logFileWriter,
+    };
+    return rejectAndReply(reply, rCtx, errors.modelNotFound(clientModel), `No mapping found for model '${clientModel}'`);
   }
 
   let allTargets = resolveResult.allTargets ?? [resolveResult.target];
@@ -214,19 +214,19 @@ export async function executeFailoverLoop(
   // allowed_models 检查 — 只检查首个 target（IR fallback 是 admin 配置的，视为已授权）
   const allowedModels = request.routerKey?.allowed_models;
   if (allowedModels && allowedModels.length > 0 && !allowedModels.includes(allTargets[0].backend_model)) {
-  const logId = randomUUID();
-  const startTime = Date.now();
-  const isStream = (ctx.body as Record<string, unknown>).stream === true;
-  const rCtx: RejectParams = {
-    db, logId, apiType: ctx.apiType, model: clientModel,
-    startTime, isStream, routerKeyId: request.routerKey?.id ?? null, originalBody: rawBody, clientHeaders: cliHdrs,
-    isFailover: false, originalRequestId: null,
-    sessionId: ctx.metadata.get("session_id") as string | undefined,
-    pipelineSnapshot: rejectSnapshot.toJSON(),
-    matcher, logFileWriter,
-  };
-  return rejectAndReply(reply, rCtx, errors.modelNotAllowed(allTargets[0].backend_model),
-    `Model '${allTargets[0].backend_model}' not allowed`, allTargets[0].provider_id);
+    const logId = randomUUID();
+    const startTime = Date.now();
+    const isStream = (ctx.body as Record<string, unknown>).stream === true;
+    const rCtx: RejectParams = {
+      db, logId, apiType: ctx.apiType, model: clientModel,
+      startTime, isStream, routerKeyId: request.routerKey?.id ?? null, originalBody: rawBody, clientHeaders: cliHdrs,
+      isFailover: false, originalRequestId: null,
+      sessionId: ctx.metadata.get("session_id") as string | undefined,
+      pipelineSnapshot: rejectSnapshot.toJSON(),
+      matcher, logFileWriter,
+    };
+    return rejectAndReply(reply, rCtx, errors.modelNotAllowed(allTargets[0].backend_model),
+      `Model '${allTargets[0].backend_model}' not allowed`, allTargets[0].provider_id);
   }
 
   // 2. IR 层：图片检测 → 可能 prepend fallback target
@@ -242,11 +242,11 @@ export async function executeFailoverLoop(
 
   // 工具错误日志提取（循环外一次性执行）
   if (enhancementConfig.tool_error_logging_enabled) {
-  const failures = extractFailedToolResults(ctx.body);
-  if (failures.length > 0) {
-    request.log.info({ failures: failures.length, sessionId: ctx.metadata.get("session_id") }, "Tool error results detected");
-    pendingToolErrors = failures;
-  }
+    const failures = extractFailedToolResults(ctx.body);
+    if (failures.length > 0) {
+      request.log.info({ failures: failures.length, sessionId: ctx.metadata.get("session_id") }, "Tool error results detected");
+      pendingToolErrors = failures;
+    }
   }
 
   // === while(true)：纯执行循环 ===
@@ -254,47 +254,47 @@ export async function executeFailoverLoop(
 
   while (true) {
   // 请求被 kill 后 reply 已销毁，直接退出避免浪费 failover 迭代
-  if (reply.raw.destroyed) return reply;
-  if (++failoverIteration > MAX_FAILOVER_ITERATIONS) {
-    return reply.code(HTTP_SERVICE_UNAVAILABLE).send({
-    error: { message: `Max failover iterations (${MAX_FAILOVER_ITERATIONS}) exceeded`, type: "server_error", code: "failover_limit_exceeded" },
-    });
-  }
-  const startTime = Date.now();
-  const logId = randomUUID();
-  if (rootLogId === null) rootLogId = logId;
-  const isFailoverIteration = rootLogId !== logId;
-  const routerKeyId = request.routerKey?.id ?? null;
+    if (reply.raw.destroyed) return reply;
+    if (++failoverIteration > MAX_FAILOVER_ITERATIONS) {
+      return reply.code(HTTP_SERVICE_UNAVAILABLE).send({
+        error: { message: `Max failover iterations (${MAX_FAILOVER_ITERATIONS}) exceeded`, type: "server_error", code: "failover_limit_exceeded" },
+      });
+    }
+    const startTime = Date.now();
+    const logId = randomUUID();
+    if (rootLogId === null) rootLogId = logId;
+    const isFailoverIteration = rootLogId !== logId;
+    const routerKeyId = request.routerKey?.id ?? null;
 
-  // 浅拷贝：后续操作只修改顶层属性（model），嵌套对象不被修改
-  let currentBody = { ...ctx.body };
-  const isStream = currentBody.stream === true;
-  const iterationSnapshot = new PipelineSnapshot(precomputeSnapshot.getStages());
+    // 浅拷贝：后续操作只修改顶层属性（model），嵌套对象不被修改
+    let currentBody = { ...ctx.body };
+    const isStream = currentBody.stream === true;
+    const iterationSnapshot = new PipelineSnapshot(precomputeSnapshot.getStages());
 
-  const rCtx: RejectParams = {
-    db, logId, apiType: ctx.apiType, model: clientModel,
-    startTime, isStream, routerKeyId, originalBody: rawBody, clientHeaders: cliHdrs,
-    isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null,
-    sessionId: ctx.metadata.get("session_id") as string | undefined,
-    pipelineSnapshot: iterationSnapshot.toJSON(),
-    matcher, logFileWriter,
-  };
+    const rCtx: RejectParams = {
+      db, logId, apiType: ctx.apiType, model: clientModel,
+      startTime, isStream, routerKeyId, originalBody: rawBody, clientHeaders: cliHdrs,
+      isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null,
+      sessionId: ctx.metadata.get("session_id") as string | undefined,
+      pipelineSnapshot: iterationSnapshot.toJSON(),
+      matcher, logFileWriter,
+    };
 
-  // --- 选第一个非 excluded target ---
-  const filtered = filterExcluded(cachedTargets, excludeTargets);
-  if (filtered.length === 0) {
-    return rejectAndReply(reply, rCtx, errors.upstreamConnectionFailed(),
-    `All failover targets exhausted (${excludeTargets.length} attempted)`);
-  }
+    // --- 选第一个非 excluded target ---
+    const filtered = filterExcluded(cachedTargets, excludeTargets);
+    if (filtered.length === 0) {
+      return rejectAndReply(reply, rCtx, errors.upstreamConnectionFailed(),
+        `All failover targets exhausted (${excludeTargets.length} attempted)`);
+    }
 
-  const resolved = filtered[0];
-  const isFailover = cachedTargets.length > 1;
+    const resolved = filtered[0];
+    const isFailover = cachedTargets.length > 1;
 
-  const provider = getProviderById(db, resolved.provider_id);
-  if (!provider || !provider.is_active) {
-    return rejectAndReply(reply, rCtx, errors.providerUnavailable(),
-    `Provider '${resolved.provider_id}' unavailable`, resolved.provider_id);
-  }
+    const provider = getProviderById(db, resolved.provider_id);
+    if (!provider || !provider.is_active) {
+      return rejectAndReply(reply, rCtx, errors.providerUnavailable(),
+        `Provider '${resolved.provider_id}' unavailable`, resolved.provider_id);
+    }
 
     // 当前迭代的工具错误刷新闭包（统一 6 处调用）
     const flushCurrentErrors = () => flushToolErrors(provider.id, resolved.backend_model ?? clientModel, logId);
@@ -306,9 +306,9 @@ export async function executeFailoverLoop(
     const effectiveUpstreamPath = resolvedPath.effectiveUpstreamPath;
     const needsTransform = resolvedPath.needsTransform;
 
-  // --- routing ---
-  currentBody = { ...currentBody, model: resolved.backend_model };
-  iterationSnapshot.add({ stage: "routing", client_model: clientModel, backend_model: resolved.backend_model, provider_id: resolved.provider_id, strategy: cachedTargets.length > 1 ? "failover" : "scheduled" });
+    // --- routing ---
+    currentBody = { ...currentBody, model: resolved.backend_model };
+    iterationSnapshot.add({ stage: "routing", client_model: clientModel, backend_model: resolved.backend_model, provider_id: resolved.provider_id, strategy: cachedTargets.length > 1 ? "failover" : "scheduled" });
 
     // --- Plugin 调整 body 和 headers ---
     const pluginResult = applyPluginAdjustments(pluginRegistry, currentBody, clientApiType, provider);

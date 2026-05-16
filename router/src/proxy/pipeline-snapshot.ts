@@ -10,7 +10,7 @@ export class PipelineSnapshot {
   private readonly stages: StageRecord[];
 
   constructor(initial?: readonly StageRecord[]) {
-  this.stages = initial ? [...initial] : [];
+    this.stages = initial ? [...initial] : [];
   }
 
   add(record: StageRecord): void {

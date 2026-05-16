@@ -70,35 +70,35 @@ function validateRule(
   }
 
   for (let i = 0; i < r.targets.length; i++) {
-  const t = r.targets[i] as TargetInput;
-  if (!t.backend_model || !t.provider_id) {
-    return `targets[${i}] missing backend_model or provider_id`;
-  }
-  const p = getProviderById(db, t.provider_id);
-  if (!p) {
-    return `targets[${i}] provider_id '${t.provider_id}' not found`;
-  }
-  const overflowErr = validateOverflow(db, t, `targets[${i}]`);
-  if (overflowErr) return overflowErr;
+    const t = r.targets[i] as TargetInput;
+    if (!t.backend_model || !t.provider_id) {
+      return `targets[${i}] missing backend_model or provider_id`;
+    }
+    const p = getProviderById(db, t.provider_id);
+    if (!p) {
+      return `targets[${i}] provider_id '${t.provider_id}' not found`;
+    }
+    const overflowErr = validateOverflow(db, t, `targets[${i}]`);
+    if (overflowErr) return overflowErr;
   }
 
   // Validate image_fallback if present
   const fallback = (r as Record<string, unknown>).image_fallback;
   if (fallback !== undefined && fallback !== null) {
-  const fb = fallback as { provider_id?: string; backend_model?: string };
-  if (!fb.provider_id) {
-    return "image_fallback: provider_id is required";
-  }
-  if (!fb.backend_model) {
-    return "image_fallback: backend_model is required";
-  }
-  const fbProvider = getProviderById(db, fb.provider_id);
-  if (!fbProvider) {
-    return `image_fallback: provider_id '${fb.provider_id}' not found`;
-  }
-  if (!fbProvider.is_active) {
-    return `image_fallback: provider '${fbProvider.name}' is not active`;
-  }
+    const fb = fallback as { provider_id?: string; backend_model?: string };
+    if (!fb.provider_id) {
+      return "image_fallback: provider_id is required";
+    }
+    if (!fb.backend_model) {
+      return "image_fallback: backend_model is required";
+    }
+    const fbProvider = getProviderById(db, fb.provider_id);
+    if (!fbProvider) {
+      return `image_fallback: provider_id '${fb.provider_id}' not found`;
+    }
+    if (!fbProvider.is_active) {
+      return `image_fallback: provider '${fbProvider.name}' is not active`;
+    }
   }
 
   return undefined;
