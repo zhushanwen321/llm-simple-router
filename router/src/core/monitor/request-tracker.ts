@@ -212,14 +212,14 @@ export class RequestTracker {
 
   /** Update stream metrics for a completed request (e.g., after cache estimation) */
   updateCompletedMetrics(id: string, cacheReadTokens: number, cacheReadTokensEstimated?: boolean): void {
-  const req = this.recentCompleted.find(r => r.id === id);
-  if (!req || !req.streamMetrics) return;
-  req.streamMetrics = {
-  ...req.streamMetrics,
-  cacheReadTokens,
-  cacheReadTokensEstimated: cacheReadTokensEstimated ? 1 : 0,
-  } as StreamMetricsSnapshot;
-  this.broadcast("request_complete", req);
+    const req = this.recentCompleted.find(r => r.id === id);
+    if (!req || !req.streamMetrics) return;
+    req.streamMetrics = {
+      ...req.streamMetrics,
+      cacheReadTokens,
+      cacheReadTokensEstimated: cacheReadTokensEstimated ? 1 : 0,
+    } as StreamMetricsSnapshot;
+    this.broadcast("request_complete", req);
   }
 
   // --- Query methods ---
