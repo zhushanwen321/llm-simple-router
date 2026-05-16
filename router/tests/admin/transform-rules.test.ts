@@ -78,7 +78,7 @@ describe("Transform Rules Admin API", () => {
     expect(res.statusCode).toBe(200);
     const json = res.json();
     expect(json.code).toBe(0);
-    expect(json.data.loadedPlugins).toEqual([]);
-    expect(json.data.rulesCount).toBe(0);
+  expect(json.data.loadedPlugins).toEqual(["example (example-plugin.js)"]);
+  expect(json.data.rulesCount).toBe(0);
   });
 });
