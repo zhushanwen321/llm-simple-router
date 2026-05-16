@@ -29,9 +29,8 @@ function getDailyUsage(
   providerId?: string,
 ): DailyUsageRow[] {
   const conditions = [
-    "rm.is_complete = 1",
-    "rm.created_at >= datetime(?)",
-    "rm.created_at < datetime(?)",
+  "rm.created_at >= datetime(?)",
+  "rm.created_at < datetime(?)",
   ];
   const params: unknown[] = [startTime, endTime];
 

@@ -52,6 +52,16 @@ export function getLatestWindow(
   return db.prepare(sql).get(...params) as UsageWindow | null ?? null;
 }
 
+/** 获取指定 provider 的最新窗口，忽略 router_key_id 过滤。当 dashboard 等调用方不知道 router_key_id 时使用。 */
+export function getLatestWindowByProvider(
+  db: Database.Database,
+  providerId: string,
+): UsageWindow | null {
+  return db.prepare(
+  "SELECT * FROM usage_windows WHERE provider_id = ? ORDER BY start_time DESC LIMIT 1",
+  ).get(providerId) as UsageWindow | null ?? null;
+}
+
 /** 返回与 [start, end) 区间有重叠的窗口。可选参数不传表示不过滤该维度（与 getLatestWindow 的 IS NULL 语义不同） */
 export function getWindowsInRange(
   db: Database.Database,
@@ -86,9 +96,8 @@ export function getWindowUsage(
   providerId?: string,
 ): WindowUsage {
   const conditions = [
-    "rm.is_complete = 1",
-    "rm.created_at >= datetime(?)",
-    "rm.created_at < datetime(?)",
+  "rm.created_at >= datetime(?)",
+  "rm.created_at < datetime(?)",
   ];
   const params: unknown[] = [startTime, endTime];
 
