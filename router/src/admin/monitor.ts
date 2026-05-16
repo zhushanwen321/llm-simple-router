@@ -27,16 +27,25 @@ export const adminMonitorRoutes: FastifyPluginCallback<MonitorRoutesOptions> = (
   app.get("/admin/api/monitor/stream", (request, reply) => {
     // hijack() 让 Fastify 完全放弃响应管理，避免 onSend hook 向 SSE 流注入信封 JSON
     reply.hijack();
-    reply.raw.writeHead(HTTP_OK, {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-    });
+
     const sseClient = adaptSSEClient(reply.raw);
     tracker.addClient(sseClient);
-    request.raw.on("close", () => {
+
+    // 在 writeHead 之前注册 close 处理器，避免竞态导致 tracker 泄漏
+    reply.raw.on("close", () => {
       tracker.removeClient(sseClient);
     });
+
+    // 客户端在 hijack 之前已断连，无需发送响应头
+    if (reply.raw.destroyed) return;
+
+    try {
+      reply.raw.writeHead(HTTP_OK, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      });
+    } catch { /* 客户端在 hijack 和 writeHead 之间断连，安全忽略 */ } // eslint-disable-line taste/no-silent-catch
   });
 
   app.get("/admin/api/monitor/request/:id", async (request, reply) => {
