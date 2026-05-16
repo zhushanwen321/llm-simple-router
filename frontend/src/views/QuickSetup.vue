@@ -135,18 +135,22 @@
           <p v-if="modelConfigs.length === 0" class="py-4 text-center text-xs text-muted-foreground">
             {{ t('quickSetup.model.selectProviderFirst') }}
           </p>
-          <div v-else class="grid grid-cols-4 gap-2">
-            <ModelCard
-              v-for="(model, index) in modelConfigs"
-              :key="model.name"
-              :model="model"
-              :api-type="apiType"
-              :is-deep-seek="model.name.toLowerCase().includes('deepseek')"
-              :is-non-openai-endpoint="isNonOpenaiEndpoint"
-              @update:model="updateModel(index, $event)"
-              @remove="removeModel(index)"
-            />
-          </div>
+      <div v-else class="grid grid-cols-4 gap-2">
+      <ModelCard
+        v-for="(model, index) in modelConfigs"
+        :key="model.name"
+        :model="model"
+        :api-type="apiType"
+        :is-deep-seek="model.name.toLowerCase().includes('deepseek')"
+        :is-non-openai-endpoint="isNonOpenaiEndpoint"
+        :capabilities="model.capabilities ?? ['text']"
+        :stream-timeout-ms="model.stream_timeout_ms ?? undefined"
+        @update:model="updateModel(index, $event)"
+        @remove="removeModel(index)"
+        @update:stream-timeout-ms="updateModelTimeout(index, $event)"
+        @toggle-image-capability="toggleModelImageCapability(index)"
+      />
+      </div>
           <!-- Custom mode: add model input -->
           <div v-if="isCustomProvider" class="flex gap-2 mt-2">
             <Input v-model="customModelInput" :placeholder="t('quickSetup.model.namePlaceholder')" @keydown.enter.prevent="handleAddCustomModel" class="flex-1 md:text-xs h-7" />
@@ -359,6 +363,25 @@ function updateModel(index: number, updated: ModelConfig) {
 
 function removeModel(index: number) {
   modelConfigs.value = modelConfigs.value.filter((_, i) => i !== index)
+}
+
+function updateModelTimeout(index: number, ms: number | undefined) {
+  const next = [...modelConfigs.value]
+  next[index] = { ...next[index], stream_timeout_ms: ms || undefined }
+  modelConfigs.value = next
+}
+
+function toggleModelImageCapability(index: number) {
+  const next = [...modelConfigs.value]
+  const model = { ...next[index] }
+  const caps = model.capabilities ?? ['text']
+  if (caps.includes('image')) {
+    model.capabilities = caps.filter(c => c !== 'image')
+  } else {
+    model.capabilities = [...caps, 'image']
+  }
+  next[index] = model
+  modelConfigs.value = next
 }
 
 function validateConfig() {

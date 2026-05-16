@@ -28,6 +28,8 @@ export interface ModelConfig {
   contextWindow: number;
   enabled: boolean;
   patches: string[];
+  stream_timeout_ms?: number;
+  capabilities?: string[];
 }
 
 import type { MappingTarget, ImageFallback } from '@/types/mapping'
