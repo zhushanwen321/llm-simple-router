@@ -1,3 +1,6 @@
+import fs from "node:fs"
+import path from "node:path"
+
 export interface ModelInfo {
   name: string
   context_window: number | null
@@ -173,8 +176,52 @@ export const MODEL_CAPABILITIES: Record<string, string[]> = {
 export const DEFAULT_CONTEXT_WINDOW = 200000
 export const OVERFLOW_THRESHOLD = 1000000
 
+// ---------- model-directory.json 运行时加载 ----------
+
+/** 从 ai-model-directory 提取的精简数据结构 */
+interface ModelDirectoryData {
+  capabilities: Record<string, string[]>
+  context_windows: Record<string, number>
+}
+
+let directoryCapabilities: Record<string, string[]> = {}
+let directoryContextWindows: Record<string, number> = {}
+
+/**
+ * 加载 config/model-directory.json（由 sync-model-directory.sh 生成）。
+ * 加载失败时不覆盖默认值，fallback 到硬编码白名单。
+ */
+export function loadModelDirectory(configDir?: string): void {
+  try {
+    const dir = configDir ?? path.resolve(process.cwd(), "config")
+    const filePath = path.join(dir, "model-directory.json")
+    if (!fs.existsSync(filePath)) return
+    const raw = fs.readFileSync(filePath, "utf-8")
+    const data: ModelDirectoryData = JSON.parse(raw)
+    if (data.capabilities && typeof data.capabilities === "object") {
+      directoryCapabilities = data.capabilities
+    }
+    if (data.context_windows && typeof data.context_windows === "object") {
+      directoryContextWindows = data.context_windows
+    }
+  } catch (err: unknown) {
+   
+    void err
+  }
+}
+
+/** 查询模型 capabilities：显式配置 > model-directory.json > 硬编码白名单 > ["text"] */
+function lookupCapabilities(modelName: string): string[] {
+  return directoryCapabilities[modelName]
+  ?? MODEL_CAPABILITIES[modelName]
+  ?? ["text"]
+}
+
+/** 查询模型上下文窗口：model-directory.json > 硬编码表 > 默认值 */
 export function lookupContextWindow(modelName: string): number {
-  return MODEL_CONTEXT_WINDOWS[modelName] ?? DEFAULT_CONTEXT_WINDOW
+  return directoryContextWindows[modelName]
+  ?? MODEL_CONTEXT_WINDOWS[modelName]
+  ?? DEFAULT_CONTEXT_WINDOW
 }
 
 /** 标准化 patch 名称：连字符 → 下划线 */
@@ -217,7 +264,7 @@ export function parseModels(raw: string): ModelEntry[] {
     const result = parsed.map((item: unknown): ModelEntry | null => {
       if (typeof item === 'string') {
         return item
-          ? { name: item, patches: [], capabilities: MODEL_CAPABILITIES[item] ?? ["text"] }
+          ? { name: item, patches: [], capabilities: lookupCapabilities(item) }
           : null
       }
       const obj = item as { name?: string; id?: string; patches?: string[]; stream_timeout_ms?: number; capabilities?: string[] } | null
@@ -232,8 +279,8 @@ export function parseModels(raw: string): ModelEntry[] {
         patches,
       }
       if (obj.stream_timeout_ms != null) entry.stream_timeout_ms = obj.stream_timeout_ms
-      // capabilities: 显式 > 白名单查表 > 默认 ["text"]
-      entry.capabilities = obj.capabilities ?? MODEL_CAPABILITIES[modelName] ?? ["text"]
+      // capabilities: 显式 > model-directory > 硬编码白名单 > 默认 ["text"]
+      entry.capabilities = obj.capabilities ?? lookupCapabilities(modelName)
       return entry
     }).filter((e): e is ModelEntry => e !== null)
     modelsCache.set(raw, result)

@@ -6,6 +6,7 @@ import { randomUUID } from "crypto";
 import Fastify, { FastifyInstance } from "fastify";
 import { insertRequestLog } from "./db/logs.js";
 import { HTTP_NOT_FOUND, HTTP_INTERNAL_ERROR, getProxyApiType } from "./core/constants.js";
+import { loadModelDirectory } from "./config/model-context.js";
 import { API_CODE, ApiResponse, apiError, isAdminApiResponse, statusToApiCode } from "./admin/api-response.js";
 
 const PROVIDER_DEFAULT_QUEUE_TIMEOUT_MS = 5000;
@@ -107,6 +108,9 @@ export async function buildApp(
   } else {
     db = initDatabase(config.DB_PATH);
   }
+
+  // 加载外部模型目录（ai-model-directory），fallback 到硬编码白名单
+  loadModelDirectory();
 
   const isDev = process.env.NODE_ENV !== "production";
 
