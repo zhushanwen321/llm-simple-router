@@ -23,6 +23,9 @@ export class OpenAIToAnthropicTransform extends BaseSSETransform {
   private finishReasonReceived = false;
 
   protected processEvent(event: { event?: string; data?: string }): void {
+  // OpenAI SSE 标准结束信号 [DONE] 不是 JSON，跳过解析
+    if (event.data === '[DONE]') return;
+  
     let chunk: Record<string, unknown>;
     try { chunk = JSON.parse(event.data!); } catch (err) { this.emit("warning", err); return; }
 
