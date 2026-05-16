@@ -108,6 +108,9 @@ export function callNonStream(
           });
         }
       });
+      // 上游响应过程中连接中断时，IncomingMessage 发射 'error' 事件。
+      // 无 listener 会导致 uncaught exception 使进程退出。
+      res.on("error", (error) => resolve({ kind: "throw", error }));
     });
 
     req.on("error", (error) => resolve({ kind: "throw", error }));
@@ -148,6 +151,9 @@ export function callGet(
           headers: filterHeaders(res.headers as RawHeaders),
         });
       });
+      // 上游响应过程中连接中断时，IncomingMessage 发射 'error' 事件。
+      // 无 listener 会导致 uncaught exception 使进程退出。
+      res.on("error", (err) => reject(err));
     });
     req.on("error", (err) => reject(err));
     req.end();
