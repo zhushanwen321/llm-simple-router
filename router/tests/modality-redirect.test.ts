@@ -1215,20 +1215,163 @@ describe("computeModalityRedirectTargets — reason 覆盖补全", () => {
   });
 
   it("reason: internal-error — 数据库操作抛异常", () => {
-    const db = initDatabase(":memory:");
-    seedSettings(db);
-    // 关闭数据库以触发内部异常
-    db.close();
+  const db = initDatabase(":memory:");
+  seedSettings(db);
+  // 关闭数据库以触发内部异常
+  db.close();
 
-    const snap = new PipelineSnapshot();
-    const targets: Target[] = [{ provider_id: "p1", backend_model: "m1" }];
-    const body = openaiImageBody();
+  const snap = new PipelineSnapshot();
+  const targets: Target[] = [{ provider_id: "p1", backend_model: "m1" }];
+  const body = openaiImageBody();
 
-    const result = computeModalityRedirectTargets(db, targets, "test-model", body, snap);
-    expect(result).toEqual(targets);
+  const result = computeModalityRedirectTargets(db, targets, "test-model", body, snap);
+  expect(result).toEqual(targets);
 
-    const stage = JSON.parse(snap.toJSON()).find((s: Record<string, unknown>) => s.stage === "modality-redirect");
-    expect(stage).toBeDefined();
-    expect(stage.reason).toBe("internal-error");
+  const stage = JSON.parse(snap.toJSON()).find((s: Record<string, unknown>) => s.stage === "modality-redirect");
+  expect(stage).toBeDefined();
+  expect(stage.reason).toBe("internal-error");
+  });
+});
+
+// ============================================================
+// 边界条件补充测试（gap coverage）
+// ============================================================
+describe("detectModalities — boundary conditions", () => {
+  // ----------------------------------------------------------
+  // content 是 string 不是 array → 应跳过，返回空 Set
+  // ----------------------------------------------------------
+  it("detectModalities: content is string not array → empty Set", () => {
+  const body = {
+    messages: [{ role: "user", content: "just text" }],
+  };
+  const result = detectModalities(body);
+  expect(result.size).toBe(0);
+  });
+
+  // ----------------------------------------------------------
+  // content 是空数组 → 无 block 可检测，返回空 Set
+  // ----------------------------------------------------------
+  it("detectModalities: empty content array → empty Set", () => {
+  const body = {
+    messages: [{ role: "user", content: [] }],
+  };
+  const result = detectModalities(body);
+  expect(result.size).toBe(0);
+  });
+
+  // ----------------------------------------------------------
+  // Anthropic tool_result 的 content 为 string（非数组）→ 应跳过，不 crash
+  // ----------------------------------------------------------
+  it("detectModalities: Anthropic tool_result with string content → empty Set", () => {
+  const body = {
+    messages: [
+    {
+      role: "user",
+      content: [{ type: "tool_result", tool_use_id: "t1", content: "text string" }],
+    },
+    ],
+  };
+  const result = detectModalities(body);
+  expect(result.size).toBe(0);
+  });
+});
+
+describe("computeModalityRedirectTargets — boundary conditions", () => {
+  let db: Database.Database;
+
+  beforeEach(() => {
+  db = initDatabase(":memory:");
+  seedSettings(db);
+  });
+
+  // ----------------------------------------------------------
+  // fallback 有额外的 capabilities（audio+video），不影响 image redirect
+  // 只要 fallback 覆盖了 body 中缺失的 modality 即可
+  // ----------------------------------------------------------
+  it("fallback with extra capabilities beyond body needs → redirect succeeds", () => {
+  const providerAId = insertProvider(db, {
+    id: "pa",
+    name: "text-provider",
+    models: JSON.stringify([{ name: "text-model", capabilities: ["text"] }]),
+  });
+
+  // fallback 模型支持 image+audio+video，远超 body 需要的 image
+  const providerBId = insertProvider(db, {
+    id: "pb",
+    name: "super-multimodal-provider",
+    models: JSON.stringify([{ name: "mega-model", capabilities: ["text", "image", "audio", "video"] }]),
+  });
+
+  insertMappingGroup(db, "gpt-5", {
+    targets: [{ provider_id: providerAId, backend_model: "text-model" }],
+    multimodal_fallback: {
+    provider_id: providerBId,
+    backend_model: "mega-model",
+    },
+  });
+
+  const targets: Target[] = [
+    { provider_id: providerAId, backend_model: "text-model" },
+  ];
+  const snapshot = new PipelineSnapshot();
+  // body 只有 image
+  const body = openaiImageBody();
+
+  const result = computeModalityRedirectTargets(db, targets, "gpt-5", body, snapshot);
+
+  // fallback 覆盖了 image → redirect 成功
+  expect(result).toHaveLength(2);
+  expect(result[0]).toEqual({
+    provider_id: providerBId,
+    backend_model: "mega-model",
+  });
+  });
+
+  // ----------------------------------------------------------
+  // 首个 target 的 provider 不在 MODEL_CAPABILITIES 中 →
+  // parseModels 返回 capabilities 为 undefined → 默认 ["text"] → redirect 触发
+  // ----------------------------------------------------------
+  it("first target model not in MODEL_CAPABILITIES → defaults to text-only → redirect triggered", () => {
+  const providerAId = insertProvider(db, {
+    id: "pa",
+    name: "unknown-provider",
+    // 无 capabilities 字段
+    models: JSON.stringify([{ name: "unknown-model" }]),
+  });
+
+  const providerBId = insertProvider(db, {
+    id: "pb",
+    name: "image-provider",
+    models: JSON.stringify([{ name: "vision-model", capabilities: ["text", "image"] }]),
+  });
+
+  insertMappingGroup(db, "gpt-5", {
+    targets: [{ provider_id: providerAId, backend_model: "unknown-model" }],
+    multimodal_fallback: {
+    provider_id: providerBId,
+    backend_model: "vision-model",
+    },
+  });
+
+  const targets: Target[] = [
+    { provider_id: providerAId, backend_model: "unknown-model" },
+  ];
+  const snapshot = new PipelineSnapshot();
+  const body = openaiImageBody();
+
+  const result = computeModalityRedirectTargets(db, targets, "gpt-5", body, snapshot);
+
+  // capabilities undefined → 默认 ["text"] → 缺 image → redirect 触发
+  expect(result).toHaveLength(2);
+  expect(result[0]).toEqual({
+    provider_id: providerBId,
+    backend_model: "vision-model",
+  });
+
+  const parsed = JSON.parse(snapshot.toJSON());
+  const stage = parsed.find((s: { stage: string }) => s.stage === "modality-redirect");
+  expect(stage).toBeDefined();
+  expect(stage.triggered).toBe(true);
+  expect(stage.reason).toBe("first-target-lacks-modality");
   });
 });
