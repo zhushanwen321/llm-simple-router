@@ -93,6 +93,17 @@ export function buildTransportFn(p: TransportFnParams): (target: Target) => Prom
         onChunk: (rawLine) => { p.tracker?.appendStreamChunk(p.logId, rawLine, p.apiType, STREAM_CONTENT_MAX_RAW, STREAM_CONTENT_MAX_TEXT); },
         onContentDelta: streamLoopGuard ? (text) => streamLoopGuard.feed(text) : undefined,
       });
+      // Transform stream 内部异常若无 listener 会触发 uncaught exception，
+      // 指标采集错误不影响业务数据流，仅记录 warn 日志。
+      metricsTransform.on("error", (err) => {
+        p.request.log.warn({ err, logId: p.logId }, "metricsTransform stream error");
+      });
+      if (p.formatTransform) {
+        // 格式转换异常会破坏管道，记录 warn 后由 StreamProxy 的空闲超时兜底清理。
+        p.formatTransform.on("error", (err) => {
+          p.request.log.warn({ err, logId: p.logId }, "formatTransform stream error");
+        });
+      }
       const checkEarlyError = p.matcher ? (data: string) => p.matcher!.test(UPSTREAM_SUCCESS, data) : undefined;
       const streamResult = await callStream(
         p.provider, p.apiKey, p.body, p.cliHdrs, p.reply, p.streamTimeoutMs,
