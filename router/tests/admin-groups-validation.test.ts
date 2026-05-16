@@ -55,12 +55,13 @@ describe("validateRule: image_fallback validation (T6)", () => {
     method: "POST",
     url: "/admin/api/providers",
     headers: { cookie, "content-type": "application/json" },
-    payload: {
-    name: "Active-Provider",
-    api_type: "openai",
-    base_url: "https://api.active.com",
-    api_key: "sk-active-key",
-    },
+  payload: {
+  name: "Active-Provider",
+  api_type: "openai",
+  base_url: "https://api.active.com",
+  api_key: "sk-active-key",
+  models: ["text-model", "vision-model"],
+  },
   });
   activeProviderId = activeRes.json().data.id;
 
@@ -69,13 +70,14 @@ describe("validateRule: image_fallback validation (T6)", () => {
     method: "POST",
     url: "/admin/api/providers",
     headers: { cookie, "content-type": "application/json" },
-    payload: {
-    name: "Inactive-Provider",
-    api_type: "openai",
-    base_url: "https://api.inactive.com",
-    api_key: "sk-inactive-key",
-    is_active: 0,
-    },
+  payload: {
+  name: "Inactive-Provider",
+  api_type: "openai",
+  base_url: "https://api.inactive.com",
+  api_key: "sk-inactive-key",
+  models: ["text-model", "vision-model"],
+  is_active: 0,
+  },
   });
   inactiveProviderId = inactiveRes.json().data.id;
   });
@@ -298,5 +300,32 @@ describe("validateRule: image_fallback validation (T6)", () => {
   const body = res.json();
   expect(body.code).toBe(API_CODE.BAD_REQUEST);
   expect(body.message).toContain("image_fallback");
+  });
+
+  // ------------------------------------------------------------------
+  // Test 9: image_fallback with backend_model not in provider models fails
+  // ------------------------------------------------------------------
+  it("test_validateRule_image_fallback_backend_model_not_in_provider_models_fails", async () => {
+  const res = await app.inject({
+  method: "POST",
+  url: "/admin/api/mapping-groups",
+  headers: { cookie, "content-type": "application/json" },
+  payload: {
+  client_model: "model-bad-backend",
+  rule: JSON.stringify({
+    targets: [
+    { backend_model: "text-model", provider_id: activeProviderId },
+    ],
+    image_fallback: {
+    provider_id: activeProviderId,
+    backend_model: "nonexistent-model",
+    },
+  }),
+  },
+  });
+  expect(res.statusCode).toBe(400);
+  const body = res.json();
+  expect(body.code).toBe(API_CODE.BAD_REQUEST);
+  expect(body.message).toContain("backend_model");
   });
 });
