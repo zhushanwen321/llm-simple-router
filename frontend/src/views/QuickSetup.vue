@@ -9,10 +9,11 @@
       </CardHeader>
       <CardContent>
         <div class="flex gap-2 flex-wrap">
-          <button
+          <Button
             v-for="c in CLIENTS"
             :key="c.id"
-            class="flex items-center gap-2.5 px-4 py-2.5 rounded-lg border text-sm transition-all cursor-pointer"
+            variant="outline"
+            class="flex h-auto items-center gap-2.5 px-4 py-2.5 text-sm transition-all cursor-pointer"
             :class="
               clientType === c.id
                 ? 'border-primary bg-primary/5 text-primary ring-1 ring-primary/20'
@@ -36,7 +37,7 @@
                 {{ c.format }} · {{ t(c.descriptionKey) }}
               </div>
             </div>
-          </button>
+          </Button>
         </div>
       </CardContent>
     </Card>

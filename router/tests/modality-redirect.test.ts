@@ -1,7 +1,7 @@
 /**
  * modality-redirect TDD 测试（RED 阶段）
  *
- * 被测文件：src/proxy/routing/modality-redirect.ts（尚未实现，由 image-redirect.ts 重命名+重构）
+ * 被测文件：src/proxy/routing/modality-redirect.ts
  * 被测函数：
  *   - detectModalities(body) → Set<string>
  *   - computeModalityRedirectTargets(db, targets, clientModel, body, snapshot) → Target[]
@@ -304,7 +304,7 @@ describe("detectModalities", () => {
 });
 
 // ============================================================
-// computeModalityRedirectTargets 测试套件（从 image-redirect 重命名）
+// computeModalityRedirectTargets 测试套件
 // ============================================================
 
 describe("computeModalityRedirectTargets", () => {
@@ -331,7 +331,7 @@ describe("computeModalityRedirectTargets", () => {
     models: JSON.stringify([{ name: "vision-model", capabilities: ["text", "image"] }]),
   });
 
-  // multimodal_fallback（原 image_fallback）
+  // multimodal_fallback 配置
   insertMappingGroup(db, "gpt-5", {
     targets: [{ provider_id: providerAId, backend_model: "text-model" }],
     multimodal_fallback: {
@@ -537,7 +537,7 @@ describe("computeModalityRedirectTargets", () => {
 
   computeModalityRedirectTargets(db, targets, "gpt-5", body, snapshot);
 
-  // 验证 snapshot JSON 包含 "modality-redirect" stage（原 "image-redirect"）
+  // 验证 snapshot JSON 包含 "modality-redirect" stage
   const snapshotJson = snapshot.toJSON();
   const parsed = JSON.parse(snapshotJson);
   const irStage = parsed.find(
