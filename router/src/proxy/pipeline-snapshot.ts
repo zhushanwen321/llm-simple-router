@@ -4,7 +4,7 @@ export type StageRecord =
   | { stage: "routing"; client_model: string; backend_model: string; provider_id: string; strategy: string; mapping_reason?: MappingReason }
   | { stage: "overflow"; triggered: boolean; redirect_to?: string; redirect_provider?: string }
   | { stage: "provider_patch"; types: string[] }
-  | { stage: "image-redirect"; triggered: boolean; original_model: string; redirect_to: string; redirect_provider: string; reason: string };
+  | { stage: "modality-redirect"; triggered: boolean; original_model: string; redirect_to: string; redirect_provider: string; reason: string; detected_modalities?: string[] };
 
 import type { MappingReason } from "../core/types.js";
 

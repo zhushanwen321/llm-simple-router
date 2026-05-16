@@ -20,7 +20,7 @@ import { getSetting } from "../../db/settings.js";
 import { decrypt } from "../../utils/crypto.js";
 import { resolveMapping, filterExcluded } from "../routing/mapping-resolver.js";
 import { expandOverflowTargets } from "../routing/overflow.js";
-import { computeImageRedirectTargets } from "../routing/image-redirect.js";
+import { computeModalityRedirectTargets } from "../routing/modality-redirect.js";
 import { getConfig } from "../../config/index.js";
 import type { ProxyErrorFormatter } from "../proxy-core.js";
 import type { FormatAdapter } from "../format/types.js";
@@ -229,8 +229,8 @@ export async function executeFailoverLoop(
       `Model '${allTargets[0].backend_model}' not allowed`, allTargets[0].provider_id);
   }
 
-  // 2. IR 层：图片检测 → 可能 prepend fallback target
-  allTargets = computeImageRedirectTargets(db, allTargets, clientModel, ctx.body, precomputeSnapshot);
+  // 2. modality-redirect 层：模态重定向 → 可能 prepend fallback target
+  allTargets = computeModalityRedirectTargets(db, allTargets, clientModel, ctx.body, precomputeSnapshot);
 
   // 3. OF 层：为每个 target 预计算 overflow
   const targetsBeforeOF = allTargets.length;

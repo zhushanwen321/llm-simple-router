@@ -133,12 +133,14 @@ describe("Failover-loop layered routing (TDD - expecting FAIL)", () => {
   /** 插入 provider */
   function insertProvider(
   id: string, name: string, baseUrl: string, encryptedKey: string,
+    models?: string,
   ) {
+  const modelsJson = models ?? JSON.stringify([{ name: "default-model", capabilities: ["text"] }]);
   const now = new Date().toISOString();
   db.prepare(
-    `INSERT INTO providers (id, name, api_type, base_url, api_key, is_active, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(id, name, "openai", baseUrl, encryptedKey, 1, now, now);
+    `INSERT INTO providers (id, name, api_type, base_url, api_key, models, is_active, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(id, name, "openai", baseUrl, encryptedKey, modelsJson, 1, now, now);
   }
 
   /**
@@ -239,8 +241,8 @@ describe("Failover-loop layered routing (TDD - expecting FAIL)", () => {
 
     insertRouterKey();
     const encryptedKey = encrypt("sk-backend-key", TEST_ENCRYPTION_KEY);
-    insertProvider("svc-text-only", "TextOnly", `http://127.0.0.1:${textOnly.port}`, encryptedKey);
-    insertProvider("svc-image-capable", "ImageCapable", `http://127.0.0.1:${imageCapable.port}`, encryptedKey);
+    insertProvider("svc-text-only", "TextOnly", `http://127.0.0.1:${textOnly.port}`, encryptedKey, JSON.stringify([{ name: "gpt-4", capabilities: ["text"] }]));
+    insertProvider("svc-image-capable", "ImageCapable", `http://127.0.0.1:${imageCapable.port}`, encryptedKey, JSON.stringify([{ name: "gpt-4o", capabilities: ["text", "image"] }]));
 
     insertMappingGroup(
     "gpt-4",
@@ -317,8 +319,8 @@ describe("Failover-loop layered routing (TDD - expecting FAIL)", () => {
 
     insertRouterKey();
     const encryptedKey = encrypt("sk-backend-key", TEST_ENCRYPTION_KEY);
-    insertProvider("svc-text-only", "TextOnly", `http://127.0.0.1:${textOnly.port}`, encryptedKey);
-    insertProvider("svc-image-capable", "ImageCapable", `http://127.0.0.1:${imageCapable.port}`, encryptedKey);
+    insertProvider("svc-text-only", "TextOnly", `http://127.0.0.1:${textOnly.port}`, encryptedKey, JSON.stringify([{ name: "gpt-4", capabilities: ["text"] }]));
+    insertProvider("svc-image-capable", "ImageCapable", `http://127.0.0.1:${imageCapable.port}`, encryptedKey, JSON.stringify([{ name: "gpt-4o", capabilities: ["text", "image"] }]));
 
     insertMappingGroup(
     "gpt-4",
@@ -381,8 +383,8 @@ describe("Failover-loop layered routing (TDD - expecting FAIL)", () => {
 
     insertRouterKey();
     const encryptedKey = encrypt("sk-backend-key", TEST_ENCRYPTION_KEY);
-    insertProvider("svc-text-only", "TextOnly", `http://127.0.0.1:${textOnly.port}`, encryptedKey);
-    insertProvider("svc-image-capable", "ImageCapable", `http://127.0.0.1:${imageCapable.port}`, encryptedKey);
+    insertProvider("svc-text-only", "TextOnly", `http://127.0.0.1:${textOnly.port}`, encryptedKey, JSON.stringify([{ name: "gpt-4", capabilities: ["text"] }]));
+    insertProvider("svc-image-capable", "ImageCapable", `http://127.0.0.1:${imageCapable.port}`, encryptedKey, JSON.stringify([{ name: "gpt-4o", capabilities: ["text", "image"] }]));
 
     insertMappingGroup(
     "gpt-4",
@@ -451,8 +453,8 @@ describe("Failover-loop layered routing (TDD - expecting FAIL)", () => {
 
     insertRouterKey();
     const encryptedKey = encrypt("sk-backend-key", TEST_ENCRYPTION_KEY);
-    insertProvider("svc-text-only", "TextOnly", `http://127.0.0.1:${textOnly.port}`, encryptedKey);
-    insertProvider("svc-image-capable", "ImageCapable", `http://127.0.0.1:${imageCapable.port}`, encryptedKey);
+    insertProvider("svc-text-only", "TextOnly", `http://127.0.0.1:${textOnly.port}`, encryptedKey, JSON.stringify([{ name: "gpt-4", capabilities: ["text"] }]));
+    insertProvider("svc-image-capable", "ImageCapable", `http://127.0.0.1:${imageCapable.port}`, encryptedKey, JSON.stringify([{ name: "gpt-4o", capabilities: ["text", "image"] }]));
 
     insertMappingGroup(
     "gpt-4",
@@ -515,8 +517,8 @@ describe("Failover-loop layered routing (TDD - expecting FAIL)", () => {
 
     insertRouterKey();
     const encryptedKey = encrypt("sk-backend-key", TEST_ENCRYPTION_KEY);
-    insertProvider("svc-text-only", "TextOnly", `http://127.0.0.1:${textOnly.port}`, encryptedKey);
-    insertProvider("svc-image-capable", "ImageCapable", `http://127.0.0.1:${imageCapable.port}`, encryptedKey);
+    insertProvider("svc-text-only", "TextOnly", `http://127.0.0.1:${textOnly.port}`, encryptedKey, JSON.stringify([{ name: "gpt-4", capabilities: ["text"] }]));
+    insertProvider("svc-image-capable", "ImageCapable", `http://127.0.0.1:${imageCapable.port}`, encryptedKey, JSON.stringify([{ name: "gpt-4o", capabilities: ["text", "image"] }]));
 
   // 两个 targets 的 failover group（无 multimodal_fallback）
     insertMappingGroup("gpt-4", [
