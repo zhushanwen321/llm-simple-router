@@ -1,5 +1,6 @@
 import fs from "node:fs"
 import path from "node:path"
+import { fileURLToPath } from "node:url"
 
 export interface ModelInfo {
   name: string
@@ -172,7 +173,8 @@ let directoryContextWindows: Record<string, number> = {}
  */
 export function loadModelDirectory(configDir?: string): void {
   try {
-    const dir = configDir ?? path.resolve(process.cwd(), "config")
+    // 默认相对于当前文件所在目录（dist/config/ 或 src/config/），而非 process.cwd()
+    const dir = configDir ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "config")
     const filePath = path.join(dir, "model-directory.json")
     const raw = fs.readFileSync(filePath, "utf-8")
     const data: ModelDirectoryData = JSON.parse(raw)
