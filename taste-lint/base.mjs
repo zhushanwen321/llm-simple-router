@@ -18,6 +18,7 @@ import noRawJsonParseModels from './rules/no-raw-json-parse-models.mjs';
 import noUnsafeStringConversion from './rules/no-unsafe-string-conversion.mjs';
 import noUnboundedWhileTrue from './rules/no-unbounded-while-true.mjs';
 import noInlineImportType from './rules/no-inline-import-type.mjs';
+import noEslintDisable from './rules/no-eslint-disable.mjs';
 
 export const tastePlugin = {
   meta: { name: 'eslint-plugin-taste' },
@@ -32,6 +33,7 @@ export const tastePlugin = {
     'no-unsafe-string-conversion': noUnsafeStringConversion,
     'no-unbounded-while-true': noUnboundedWhileTrue,
     'no-inline-import-type': noInlineImportType,
+    'no-eslint-disable': noEslintDisable,
   },
 };
 
@@ -72,6 +74,9 @@ export const tasteRules = {
   'taste/no-unsafe-string-conversion': 'warn',
   'taste/no-unbounded-while-true': 'warn',
   'taste/no-inline-import-type': 'warn',
+  // 'taste/no-eslint-disable' 通过 githook pre-commit 在变更文件中强制执行，不在 ESLint 配置中启用
+  // （历史代码中存在大量 eslint-disable 注释，全量 lint 会失败）
+  // 'taste/no-eslint-disable': 'warn',
 };
 
 export default [
