@@ -8,36 +8,36 @@ An LLM API proxy router that receives requests from clients like Claude Code and
 
 ## Who Is This For
 
-- Developers using Claude Code with Chinese domestic models (Zhipu, Moonshot, Minimax, etc.)
-- Those who want automatic retries for rate-limit errors, time-based model switching, and concurrency queue management
+- Developers using Claude Code / Cursor / Codex with Chinese domestic models (Zhipu, Moonshot, Minimax, etc.)
+- Those who want automatic retries for rate-limit errors, scenario-based model switching, and concurrency queue management
 - Anyone looking for a turnkey solution without the hassle
 
 ## Feature Overview
 
+### Core Features
+
 | Feature | Description |
 |---------|-------------|
-| Automatic retries | Exponential backoff retries for 429/400/network timeouts, pre-configured for Zhipu models by default |
-| Multi-provider support | Zhipu, Moonshot, Minimax, Volcano Engine, Alibaba Cloud, Tencent Cloud, etc. Base URL is auto-filled when you select a Coding Plan |
-| API format conversion | Supports both OpenAI and Anthropic API formats; client and upstream formats can be freely combined |
-| DeepSeek patch compatibility | Fixes Thinking parameter passthrough, orphaned tool_result, developer role, cache_control issues |
-| Time-based model mapping | Automatically switch backend models by time period (e.g., switch to Kimi during peak hours, back to GLM during off-peak) |
-| Failover | Multiple Providers as backups; automatically switches to the next on failure |
-| Multimodal auto-routing | Detects images/audio in requests and auto-switches to a multimodal fallback model when the current model doesn't support them |
-| Context overflow switch | Automatically switches to a larger context model when conversation exceeds the current model's window (e.g., 200K → 1M) |
-| Adaptive concurrency | Dynamic concurrency adjustment based on water-level gradient (similar to TCP congestion control), no manual tuning needed |
-| Concurrency queue | Per-Provider concurrency limits with queueing for excess requests |
-| Per-model stream timeout | Configurable stream response timeout per model to prevent stuck connections |
-| Quick setup | New users can configure in 3 steps: select client → select Provider → enter API Key; mappings and retry rules auto-created |
+| Automatic error retries | Exponential backoff retries for recoverable errors (429/400/network timeouts), completely transparent to the client |
+| Concurrency queue | Per-Provider concurrency limits with queueing; supports adaptive concurrency that auto-adjusts based on load, no manual tuning needed |
+| Multi-API format support | Supports OpenAI (Chat Completions, Responses) and Anthropic (Messages) — client and upstream formats can be freely combined. Built-in DeepSeek reasoning_thinking patches |
+| Stream response timeout | Per-model configurable stream timeout to prevent stuck connections when the model stops producing output |
+| Real-time monitoring | SSE-based live view of active requests, queue status, and streaming output with structured display adapted for Claude Code |
+| Request logs | Full four-stage tracing (client request → upstream request → upstream response → client response), with log file archiving |
+
+### Additional Features
+
+| Feature | Description |
+|---------|-------------|
+| Rich model auto-switching | Failover, context overflow auto-switch to larger context models, multimodal request auto-switch, time-based scheduled switching |
+| Quick setup | Select client → select provider → enter API key, done in 3 steps. Pre-configured parameters for Zhipu, Moonshot, Minimax and other domestic providers |
 | Provider network proxy | Per-provider HTTP/SOCKS5 proxy for overseas APIs (OpenAI, Anthropic) |
-| Real-time monitoring | SSE-based live view of active requests, queue status, and streaming output |
-| Usage monitoring | View usage by time, model, and key dimensions; 5-hour sliding window optimized for Coding Plans |
-| Multi-key management | Independent API keys + model whitelists for multi-user/multi-project setups |
-| Request logs | Full four-stage tracing (client request / upstream request / upstream response / client response) |
-| Cache hit estimation | Tokenizer-based prefix matching for estimated cache hit rate |
-| Tool call loop detection | N-gram detection for tool call loops and streaming content loops, with auto-interruption and prompt injection |
+| Proxy enhancement (experimental) | Tool call loop detection (N-gram) + Token usage estimation + Cache hit rate estimation |
+| Usage dashboard | Usage statistics by time, model, and key dimensions; 5-hour sliding window optimized for Coding Plans |
+| Multi-key management | Independent Router keys + model whitelists (allowed_models) for multi-user/multi-project isolation |
 | Upgrade notifications | Automatic new version notifications + one-click upgrade |
 
-> **API Compatibility:** Supports both Anthropic and OpenAI (`/v1/chat/completions` + `/v1/responses`) API formats. Client and upstream formats can be freely combined. Google Gemini API format is not yet supported.
+> **API Compatibility:** Supports both Anthropic and OpenAI API formats. Client and upstream formats can be freely combined. Google Gemini API format is not yet supported.
 
 ## Admin Dashboard
 
@@ -59,23 +59,25 @@ An LLM API proxy router that receives requests from clients like Claude Code and
 
 ## Quick Start
 
-### 1. Start the Router
+### 1. Start Router
 
 ```bash
 npx llm-simple-router
 ```
 
-Visit http://localhost:9981/admin — on first access you'll see the Setup page to set an admin password. Data is stored in `~/.llm-simple-router/`.
+Visit http://localhost:9981/admin. On first visit, the Setup page will ask you to set an admin password. Data is stored in `~/.llm-simple-router/`.
 
-### 2. Configure a Provider
+### 2. Configure Provider
 
-Go to Admin Dashboard > Provider page > Add Provider. Select a Coding Plan and the Base URL will be auto-filled — you only need to provide the API Key.
+Admin Dashboard > Providers page > Add Provider. Select a Coding Plan to auto-fill the Base URL, then just enter the API Key.
+
+You can also use the Quick Setup page: select client → select provider → enter API key, done in 3 steps.
 
 ### 3. Configure Model Mapping
 
-Go to Admin Dashboard > Model Mapping page.
+Admin Dashboard > Model Mappings page.
 
-**Core concept:** The client sends a request with model name A. The Router replaces it with model name B (supported by the backend Provider) based on mapping rules, then forwards the request:
+**Core concept:** The client sends a request with model name A. The Router replaces it with backend model name B according to the mapping rule, then forwards the request:
 
 ```
 Claude Code (model A) → Router (A → B) → Provider API (model B)
@@ -85,29 +87,29 @@ Simply configure "client model = A, backend model = B, select provider" in the m
 
 #### Claude Code Default Model Names
 
-When no environment variables are set, Claude Code uses the following default model names: `opus`, `sonnet`, `haiku`. If the backend is Zhipu Coding Plan, the mapping configuration would be:
+When no environment variables are set, Claude Code uses these default model names: `opus`, `sonnet`, `haiku`. If the backend is a Zhipu Coding Plan, the mapping configuration would be:
 
 | Client Model | Backend Model | Provider | Time Window |
-|-------------|---------------|----------|-------------|
+|-------------|--------------|----------|-------------|
 | opus | glm-5.1 | Zhipu Coding Plan | All day |
 | sonnet | glm-5.1 | Zhipu Coding Plan | All day |
 | haiku | glm-5-turbo | Zhipu Coding Plan | All day |
 
-You can also use time-based mapping to auto-switch during peak hours:
+You can also use time-based switching for peak hours:
 
 | Client Model | Backend Model | Provider | Time Window |
-|-------------|---------------|----------|-------------|
+|-------------|--------------|----------|-------------|
 | sonnet | glm-5.1 | Zhipu Coding Plan | 00:00-14:00 |
 | sonnet | kimi-for-coding | Moonshot | 14:00-18:00 |
 | sonnet | glm-5.1 | Zhipu Coding Plan | 18:00-24:00 |
 
 ### 4. Configure Claude Code
 
-Create a Router API key in the admin dashboard, then choose one of the following methods. **You only need one of the two.**
+Create a Router API key in the admin dashboard, then choose one of the following methods. **Only one is needed.**
 
-**Method 1: Shell alias (recommended)**
+**Option 1: shell alias (recommended)**
 
-Minimal configuration — Claude Code uses default model names (opus / sonnet / haiku), and the Router converts them via the mapping table:
+Minimal configuration. Claude Code uses default model names (opus / sonnet / haiku), and the Router converts them via the mapping table:
 
 ```bash
 alias clode='\
@@ -130,11 +132,11 @@ export ANTHROPIC_SMALL_FAST_MODEL="glm-5-turbo" && \
 claude'
 ```
 
-> For debugging, add flags: `claude --dangerously-skip-permissions --verbose --debug`, or set `export DEBUG=claude:*` for detailed logs.
+> For debugging, add: `claude --dangerously-skip-permissions --verbose --debug`, or set `export DEBUG=claude:*` for detailed logs.
 
-**Method 2: ~/.claude/settings.json**
+**Option 2: ~/.claude/settings.json**
 
-Configure in the `env` field of `~/.claude/settings.json` — same effect as exporting environment variables:
+Add the configuration to the `env` field in `~/.claude/settings.json` (same effect as exporting environment variables):
 
 Minimal configuration:
 
@@ -165,29 +167,55 @@ Override model names:
 
 > Environment variables in settings.json apply to all projects. To apply only to the current project, place them in `.claude/settings.json` (in the project root).
 
-### 5. Usage
+### 5. Use
 
 ```bash
-# Method 1 (shell alias)
+# Option 1 (shell alias)
 clode
 
-# Method 2 (settings.json)
+# Option 2 (settings.json)
 claude
 ```
 
 ## Docker Deployment
 
+**Option 1: Pull pre-built image (recommended)**
+
 ```bash
+# One-click start with data persistence to ~/.llm-simple-router/
 docker compose up -d
 ```
 
-Environment variables are configured through the Setup page — no `.env` file needed.
+`docker-compose.yml` pulls the pre-built image from ghcr.io by default, with data mapped to `~/.llm-simple-router/` on the host.
+
+You can also use `docker run` directly:
+
+```bash
+docker run -d \
+  --name llm-router \
+  -p 9981:9981 \
+  -v ~/.llm-simple-router:/app/data \
+  -e DB_PATH=/app/data/router.db \
+  -e TZ=Asia/Shanghai \
+  --restart unless-stopped \
+  ghcr.io/zhushanwen321/llm-simple-router:latest
+```
+
+Environment variables are set through the Setup page; no `.env` file needed.
+
+**Option 2: Build locally**
+
+Edit `docker-compose.yml`, comment out the `image` line, uncomment the `build` section, then:
+
+```bash
+docker compose up -d --build
+```
 
 ## Process Management
 
-After upgrading via the Web UI, the service needs to restart to take effect. Use one of the following deployment methods to ensure automatic recovery after crashes or upgrade restarts.
+After upgrading via the Web UI, the service needs to restart. Use one of the following deployment methods to ensure automatic recovery after crashes or upgrades.
 
-### PM2 (Recommended)
+### PM2 (recommended)
 
 ```bash
 # Install PM2
@@ -207,11 +235,11 @@ pm2 startup
 pm2 save
 ```
 
-Upgrade flow: Web UI one-click upgrade → click restart → PM2 auto-spawns new process (< 1s downtime).
+Upgrade flow: Web UI one-click upgrade → click restart → PM2 auto-spawns new process (< 1s interruption).
 
-### systemd (Linux Servers)
+### systemd (Linux servers)
 
-Create a service file at `/etc/systemd/system/llm-simple-router.service`:
+Create service file `/etc/systemd/system/llm-simple-router.service`:
 
 ```ini
 [Unit]
@@ -232,25 +260,25 @@ Environment=LOG_LEVEL=info
 WantedBy=multi-user.target
 ```
 
-> **Note:** The `ExecStart` path depends on how Node.js is installed. Use `which llm-simple-router` to confirm the actual path.
+> **Note**: The `ExecStart` path depends on how Node.js is installed. Use `which llm-simple-router` to find the actual path.
 
 ```bash
 # Enable and start
 sudo systemctl enable llm-simple-router
 sudo systemctl start llm-simple-router
 
-# View status and logs
+# Check status and logs
 sudo systemctl status llm-simple-router
 journalctl -u llm-simple-router -f
 ```
 
-Upgrade flow: Web UI one-click upgrade → click restart → systemd auto-restarts (< 1s downtime).
+Upgrade flow: Web UI one-click upgrade → click restart → systemd auto-restarts (< 1s interruption).
 
-### npx / Manual Start
+### npx / Manual start
 
-No extra configuration needed. After upgrading via Web UI and clicking restart, the Router automatically spawns a new process and exits the old one. Brief interruption of about 1-2 seconds.
+No extra configuration needed. After Web UI upgrade and clicking restart, the Router will automatically spawn a new process and exit the old one. Brief interruption of about 1-2 seconds.
 
-> **Note:** If you directly `Ctrl+C` or close the terminal, the service won't auto-recover. For production, use PM2 or systemd.
+> **Note**: If you directly `Ctrl+C` or close the terminal, the service won't auto-recover. Use PM2 or systemd for production.
 
 ## How It Works
 
@@ -258,33 +286,32 @@ No extra configuration needed. After upgrading via Web UI and clicking restart, 
 Claude Code → Router (model mapping + auto-retry + concurrency control) → Zhipu GLM / Kimi / Other Providers
 ```
 
-The Router finds the backend provider via model mapping → forwards the request → auto-retries failed requests → logs and records performance metrics → returns the response.
-
 ### Architecture Diagram
 
-**System Context** ([detailed description](docs/system-context.md)):
+**System Context** ([details](docs/system-context.md)):
 
 ```mermaid
 graph LR
     Clients["Claude Code / Cursor / Other Clients"]
-    Admin["Administrator"]
+    Admin["Admin"]
     Router>"LLM Simple Router"]
     Providers>"Zhipu / Moonshot / OpenAI / Anthropic / ..."]
 
     Clients -->|"API Request<br/>Bearer Token"| Router
     Admin -->|"Admin Dashboard<br/>/admin/"| Router
-    Router -->|"Forwarded Request<br/>SSE Streaming"| Providers
+    Router -->|"Forward Request<br/>SSE Stream"| Providers
 ```
 
-**Request Processing Pipeline** ([detailed description](docs/request-pipeline.md)):
+**Request Processing Pipeline** ([details](docs/request-pipeline.md)):
 
 ```mermaid
 flowchart LR
     A[Client Request] --> B[Authentication]
     B --> C[Model Mapping<br/>+ Routing Strategy]
-    C --> D[Concurrency Queue]
-    D --> E[Call Upstream<br/>Auto-retry on Failure]
-    E --> F[Log Request<br/>+ Metrics]
+    C --> H[Multimodal Detection<br/>+ Overflow Detection]
+    H --> D[Concurrency Queue]
+    D --> E[Call Upstream<br/>Auto-Retry on Failure]
+    E --> F[Log + Metrics]
     F --> G[Return Response]
 
     E -.->|Failure| C
@@ -294,16 +321,16 @@ When the Router receives a request: Authentication → find backend Provider via
 
 ## Environment Variables
 
-All secrets are configured through the Setup page. The following are optional configurations:
+All secrets are set through the Setup page. Optional configuration:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PORT` | `9981` | Service port |
+| `PORT` | `9981` | Server port |
 | `DB_PATH` | `~/.llm-simple-router/router.db` | SQLite database path |
 | `LOG_LEVEL` | `info` | Log level |
-| `TZ` | `Asia/Shanghai` | Timezone setting |
-| `STREAM_TIMEOUT_MS` | `3000000` | Streaming proxy idle timeout (ms) |
-| `RETRY_MAX_ATTEMPTS` | `3` | Maximum retry attempts |
+| `TZ` | `Asia/Shanghai` | Timezone |
+| `STREAM_TIMEOUT_MS` | `3000000` | Stream proxy idle timeout (ms) |
+| `RETRY_MAX_ATTEMPTS` | `3` | Max retry attempts |
 | `RETRY_BASE_DELAY_MS` | `1000` | Retry base delay (ms) |
 
 ## Development
@@ -324,6 +351,28 @@ npm test
 # Lint
 npm run lint
 ```
+
+## Contact & Community
+
+<table>
+  <tr>
+    <td align="center">
+      <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https%3A%2F%2Fqm.qq.com%2Fcgi-bin%2Fqm%2Fqr%3Fk%3D541815155%26jump_from%3Dwebapi" width="150" height="150" alt="QQ" /><br/>
+      <b>QQ</b><br/>
+      <sub>541815155</sub>
+    </td>
+    <td align="center">
+      <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https%3A%2F%2Fwww.feishu.cn%2Finvitation%2Fpage%2Fadd_contact%2F%3Ftoken%3D7ccp43ba-47a2-4337-b9d6-b706d713cc42%26unique_id%3Dnjim8puWP3aFvs9haj9E2Q%3D%3D" width="150" height="150" alt="Feishu" /><br/>
+      <b>Feishu</b><br/>
+      <sub>Xu Ditao (Lao Ba)</sub>
+    </td>
+    <td align="center">
+      <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https%3A%2F%2Fapplink.feishu.cn%2Fclient%2Fchat%2Fchatter%2Fadd_by_link%3Flink_token%3D446o6009-2a23-4e8a-ab2e-5d726a28f6f9%26qr_code%3Dtrue" width="150" height="150" alt="Feishu Group" /><br/>
+      <b>Feishu Group</b><br/>
+      <sub>Scan to join</sub>
+    </td>
+  </tr>
+</table>
 
 ## License
 
