@@ -13,23 +13,23 @@ describe('model-context', () => {
 
   it('parseModels handles string[] format (backward compatible)', () => {
     const result = parseModels('["glm-5","unknown"]')
-    expect(result).toEqual([
-      { name: 'glm-5', patches: [] },
-      { name: 'unknown', patches: [] },
-    ])
+  expect(result).toEqual([
+    { name: 'glm-5', patches: [], capabilities: ['text'] },
+    { name: 'unknown', patches: [], capabilities: ['text'] },
+  ])
   })
 
   it('parseModels handles object[] format with patches (migrates old IDs)', () => {
     const result = parseModels('[{"name":"glm-5","patches":["thinking-param"]},{"name":"deepseek-chat"}]')
-    expect(result).toEqual([
-      { name: 'glm-5', patches: ['thinking_consistency'] },
-      { name: 'deepseek-chat', patches: [] },
-    ])
+  expect(result).toEqual([
+    { name: 'glm-5', patches: ['thinking_consistency'], capabilities: ['text'] },
+  { name: 'deepseek-chat', patches: [], capabilities: ['text'] },
+  ])
   })
 
   it('parseModels normalizes object[] without patches', () => {
     const result = parseModels('[{"name":"glm-5","context_window":128000}]')
-    expect(result).toEqual([{ name: 'glm-5', patches: [] }])
+  expect(result).toEqual([{ name: 'glm-5', patches: [], capabilities: ['text'] }])
   })
 
   it('parseModels handles empty', () => {
@@ -96,10 +96,10 @@ describe('model-context', () => {
     it('缓存结果内容正确（含 patches 迁移）', () => {
       const raw = '[{"name":"glm-5","patches":["thinking-param"]}]'
       const result = parseModels(raw)
-      expect(result).toEqual([{ name: 'glm-5', patches: ['thinking_consistency'] }])
-      // 第二次调用也应返回相同结果
-      const result2 = parseModels(raw)
-      expect(result2).toEqual([{ name: 'glm-5', patches: ['thinking_consistency'] }])
+    expect(result).toEqual([{ name: 'glm-5', patches: ['thinking_consistency'], capabilities: ['text'] }])
+    // 第二次调用也应返回相同结果
+    const result2 = parseModels(raw)
+    expect(result2).toEqual([{ name: 'glm-5', patches: ['thinking_consistency'], capabilities: ['text'] }])
     })
   })
 })

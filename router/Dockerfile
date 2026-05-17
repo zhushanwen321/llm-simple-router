@@ -25,10 +25,11 @@ COPY package.json package-lock.json ./
 COPY router/package.json router/package.json
 RUN npm ci
 
-# 复制源码和 tsconfig
+# 复制源码、tsconfig 和配置文件
 COPY tsconfig.base.json .
 COPY router/tsconfig.json router/
 COPY router/src/ router/src/
+COPY router/config/ router/config/
 
 # 编译 router（core 已合并到 router/src/core/）
 RUN npm run build -w router

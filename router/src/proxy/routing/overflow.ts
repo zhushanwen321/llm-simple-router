@@ -110,10 +110,44 @@ interface OverflowResult {
   backend_model: string;
 }
 
+export interface OverflowExpansionResult {
+  targets: Target[]
+  /** expanded 中哪些 index 是 overflow 扩展产生的 */
+  overflowIndices: Set<number>
+}
+
 /**
  * 检查请求是否超出当前模型的上下文窗口，若超出且配置了溢出目标，则返回重定向信息。
  * 返回 null 表示无需溢出。
  */
+/**
+ * 为 targets 列表中每个配置了溢出的 target 预计算 overflow 重定向目标。
+ * 返回值中溢出目标排在原 target 之前，供 failover 循环直接消费。
+ * 单个 target 的溢出计算失败不影响其他 target。
+ */
+export function expandOverflowTargets(
+  targets: Target[],
+  db: Database.Database,
+  body: Record<string, unknown>,
+): OverflowExpansionResult {
+  const expanded: Target[] = [];
+  const overflowIndices = new Set<number>();
+  for (const target of targets) {
+    try {
+      const result = applyOverflowRedirect(target, db, body);
+      if (result) {
+        overflowIndices.add(expanded.length);
+        expanded.push({ provider_id: result.provider_id, backend_model: result.backend_model });
+      }
+    // eslint-disable-next-line taste/no-silent-catch -- 单target溢出失败不阻塞其余target
+    } catch (err: unknown) {
+      console.error('expandOverflowTargets: overflow computation failed for target', target.backend_model, err);
+    }
+    expanded.push(target);
+  }
+  return { targets: expanded, overflowIndices };
+}
+
 export function applyOverflowRedirect(
   target: Target,
   db: Database.Database,

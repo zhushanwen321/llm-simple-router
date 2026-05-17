@@ -10,6 +10,8 @@ export interface ProviderPreset {
   /** 上游模型列表端点路径，如 /v1/models 或 /models；拼接在 baseUrl 后 */
   modelsEndpoint?: string
   models: string[]
+  /** 由 API handler 补充：模型名 → capabilities 映射 */
+  modelCapabilities?: Record<string, string[]>
 }
 
 export interface ProviderGroup {

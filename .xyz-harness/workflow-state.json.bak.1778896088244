@@ -1,0 +1,417 @@
+{
+  "version": 1,
+<<<<<<< HEAD
+  "requirement": "重新开始，我修复了这个workflow的插件的问题，现在不需要你来执行脚本验证了。",
+  "topicDir": "2026-05-15-workflow",
+  "projectRoot": "/Users/zhushanwen/Code/llm-simple-router-workspace/feat-image-model-switch",
+  "currentPhase": 2,
+  "currentStage": 15,
+  "completed": false,
+  "startedAt": "2026-05-15T12:17:41.434Z",
+=======
+  "requirement": "创建一个issue，有一位用户发来如下诉求： 提个feature。我可以从哪里判断这个模型转发的原因不，是溢出还是分时段映射。 我现在属于溢出情况，因为我知道我还没命中分时段的规则，但两个一起配的时候，脑子就容易混。这里加一列，就清晰一点。 帮我看看这个需求应该如何实现？",
+  "topicDir": "2026-05-15-issue-feature",
+  "projectRoot": "/Users/zhushanwen/Code/llm-simple-router-workspace/feat-mapping-reason-track",
+  "currentPhase": 2,
+  "currentStage": 16,
+  "completed": true,
+  "startedAt": "2026-05-15T03:08:52.707Z",
+>>>>>>> origin/main
+  "stages": [
+    {
+      "number": 1,
+      "name": "需求讨论",
+      "status": "pass",
+<<<<<<< HEAD
+      "startedAt": "2026-05-15T12:17:41.435Z",
+      "completedAt": "2026-05-15T12:17:51.027Z",
+=======
+      "startedAt": "2026-05-15T03:08:52.708Z",
+      "completedAt": "2026-05-15T03:13:37.816Z",
+>>>>>>> origin/main
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 2,
+      "name": "Spec 编写",
+      "status": "pass",
+<<<<<<< HEAD
+      "startedAt": "2026-05-15T14:21:40.052Z",
+      "completedAt": "2026-05-15T14:31:29.391Z",
+=======
+      "startedAt": "2026-05-15T03:13:37.816Z",
+      "completedAt": "2026-05-15T03:30:10.631Z",
+>>>>>>> origin/main
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 3,
+      "name": "Spec 评审",
+      "status": "pass",
+<<<<<<< HEAD
+      "startedAt": "2026-05-15T14:31:29.391Z",
+      "completedAt": "2026-05-15T14:43:51.201Z",
+=======
+      "startedAt": "2026-05-15T03:30:10.632Z",
+      "completedAt": "2026-05-15T03:49:41.003Z",
+>>>>>>> origin/main
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 4,
+      "name": "Plan 编写",
+      "status": "pass",
+<<<<<<< HEAD
+      "startedAt": "2026-05-15T14:43:51.201Z",
+      "completedAt": "2026-05-15T14:49:25.586Z",
+=======
+      "startedAt": "2026-05-15T03:49:41.003Z",
+      "completedAt": "2026-05-15T03:59:41.370Z",
+>>>>>>> origin/main
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 5,
+      "name": "Plan 评审",
+      "status": "pass",
+<<<<<<< HEAD
+      "startedAt": "2026-05-15T14:49:25.586Z",
+      "completedAt": "2026-05-15T15:03:29.785Z",
+=======
+      "startedAt": "2026-05-15T03:59:41.370Z",
+      "completedAt": "2026-05-15T04:05:12.462Z",
+>>>>>>> origin/main
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 6,
+      "name": "E2E 测试计划",
+      "status": "pass",
+<<<<<<< HEAD
+      "startedAt": "2026-05-15T15:03:29.785Z",
+      "completedAt": "2026-05-15T15:04:28.719Z",
+=======
+      "startedAt": "2026-05-15T04:05:12.462Z",
+      "completedAt": "2026-05-15T04:06:25.220Z",
+>>>>>>> origin/main
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 7,
+      "name": "E2E 测试计划评审",
+      "status": "pass",
+<<<<<<< HEAD
+      "startedAt": "2026-05-15T15:04:28.719Z",
+      "completedAt": "2026-05-15T15:10:10.497Z",
+=======
+      "startedAt": "2026-05-15T04:06:25.220Z",
+      "completedAt": "2026-05-15T04:17:19.887Z",
+>>>>>>> origin/main
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 8,
+      "name": "用户确认",
+      "status": "pass",
+<<<<<<< HEAD
+      "startedAt": "2026-05-15T15:10:10.497Z",
+      "completedAt": "2026-05-15T15:18:47.119Z",
+=======
+      "startedAt": "2026-05-15T04:17:19.887Z",
+      "completedAt": "2026-05-15T04:22:28.690Z",
+>>>>>>> origin/main
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 9,
+      "name": "TDD 测试编写",
+      "status": "pass",
+<<<<<<< HEAD
+      "startedAt": "2026-05-15T15:18:47.119Z",
+      "completedAt": "2026-05-15T15:40:58.134Z",
+=======
+      "startedAt": "2026-05-15T04:22:28.690Z",
+      "completedAt": "2026-05-15T04:30:50.510Z",
+>>>>>>> origin/main
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": [
+        {
+<<<<<<< HEAD
+          "id": "T1-tests",
+          "name": "TDD tests for capabilities infrastructure",
+          "status": "pass",
+          "completedAt": "2026-05-15T15:23:57.664Z",
+          "summary": "T1+T5测试完成：8个capabilities测试（7个FAIL因capabilities未定义）+3个StageRecord测试（TS2322因image-redirect变体不存在）。全部按预期失败。"
+        },
+        {
+          "id": "T2-tests",
+          "name": "TDD tests for computeImageRedirectTargets",
+          "status": "pass",
+          "completedAt": "2026-05-15T15:28:26.840Z",
+          "summary": "T2测试完成：15个测试用例全部FAIL（image-redirect模块不存在）。覆盖AC1-AC4,AC7-AC10,AC13-AC16及3个边界条件。"
+        },
+        {
+          "id": "T3-tests",
+          "name": "TDD tests for failover-loop refactoring",
+          "status": "pass",
+          "completedAt": "2026-05-15T15:39:35.985Z",
+          "summary": "T3测试完成：5个集成测试全部FAIL。IR层未实现导致image-redirect stage不存在，fallback provider从未被调用。符合预期。"
+        },
+        {
+          "id": "T4-tests",
+          "name": "TDD tests for expandOverflowTargets",
+          "status": "pass",
+          "completedAt": "2026-05-15T15:26:05.046Z",
+          "summary": "T4测试完成：4个测试用例全部FAIL（expandOverflowTargets不存在）。覆盖overflow target prepend、空数组、IR fallback跳过、异常安全。"
+        },
+        {
+          "id": "T5-tests",
+          "name": "TDD tests for StageRecord extension",
+          "status": "pass",
+          "completedAt": "2026-05-15T15:28:33.388Z",
+          "summary": "T5测试完成：3个StageRecord测试全部TS2322（image-redirect变体不在union type中）。"
+        },
+        {
+          "id": "T6-tests",
+          "name": "TDD tests for validateRule extension",
+          "status": "pass",
+          "completedAt": "2026-05-15T15:28:45.757Z",
+          "summary": "T6测试完成：8个测试用例（6 FAIL + 2 PASS）。validateRule不验证image_fallback，无效请求返回201而非400。"
+=======
+          "id": "tdd-resolver",
+          "name": "TDD: resolveMapping 4种映射原因测试",
+          "status": "pass",
+          "completedAt": "2026-05-15T04:29:54.981Z",
+          "summary": "5 个测试用例覆盖 resolveMapping 4 种映射原因路径（direct_format/group_base_rule/group_schedule/fallback_provider），全部 FAIL（RED）。已提交。"
+        },
+        {
+          "id": "tdd-failover-overflow",
+          "name": "TDD: failover-loop overflow_redirect + failover_retry 测试",
+          "status": "pass",
+          "completedAt": "2026-05-15T04:30:02.372Z",
+          "summary": "4 个测试用例覆盖 overflow_redirect 和 failover_retry（2 FAIL + 2 PASS），FAIL 符合预期。已提交。"
+        },
+        {
+          "id": "tdd-frontend-parse",
+          "name": "TDD: parseMappingReason 前端解析测试",
+          "status": "pass",
+          "completedAt": "2026-05-15T04:30:11.448Z",
+          "summary": "前端 parseMappingReason 无独立前端测试基础设施，将在 Task F2 实现阶段同步编写单元测试。后端 TDD 覆盖完整数据流。"
+>>>>>>> origin/main
+        }
+      ]
+    },
+    {
+      "number": 10,
+      "name": "编码实现",
+      "status": "pass",
+<<<<<<< HEAD
+      "startedAt": "2026-05-15T15:40:58.134Z",
+      "completedAt": "2026-05-15T16:53:16.886Z",
+      "gateResult": "pass",
+      "gateOutput": "[PASS] spec.md: ok\n[PASS] plan.md: ok\n[INFO] plan.md tasks: 4\n[WARN] CLAUDE.md has no '## 质量门禁' section — no quality commands to check\n       Add:\n       ## 质量门禁\n       - 编译: `npm run build`\n       - 测试: `npm test`\n       - Lint: `npm run lint`\n[INFO] compile: npm run build\n[FAIL] compile (exit 2)\n> build\n> npm run build -w router -w frontend\n\n\n> llm-simple-router@0.10.11 build\n> tsc\n\nsrc/proxy/routing/overflow.ts(136,86): error TS2304: Cannot find name 't'.\n\n> frontend@0.0.0 build\n> vue-tsc -b && vite build\n\nvite v8.0.10 building client environment for production...\n\u001b[2K\rtransforming...✓ 2705 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                                  0.82 kB │ gzip:  0.42 kB\ndist/assets/UnifiedRequestDialog-C4MTxb25.css    0.08 kB │ gzip:  0.08 kB\ndist/assets/index-ClQS69Or.css                  69.91 kB │ gzip: 13.23 kB\ndist/assets/constants-f6wGd-J-.js                0.02 kB │ gzip:  0.04 kB\ndist/assets/copy-BU-ZkmgI.js                     0.22 kB │ gzip:  0.19 kB\ndist/assets/image-BKhGbB6L.js                    0.25 kB │ gzip:  0.21 kB\ndist/assets/trash-2-CoRxBRwK.js                  0.31 kB │ gzip:  0.20 kB\ndist/assets/login-DWRFsEu3.js                    0.36 kB │ gzip:  0.26 kB\ndist/assets/login-BkOvA7gg.js                    0.36 kB │ gzip:  0.22 kB\ndist/assets/useClipboard-DaWyoB7c.js             0.61 kB │ gzip:  0.36 kB\ndist/assets/useLogRetention-C6h5mRot.js          0.63 kB │ gzip:  0.34 kB\ndist/assets/setup-DaeEG9ll.js                    0.71 kB │ gzip:  0.40 kB\ndist/assets/setup-Dryg-9wL.js                    0.75 kB │ gzip:  0.36 kB\ndist/assets/CardTitle-UDLBPur2.js                0.90 kB │ gzip:  0.44 k\n...(truncated)...\n0.js                  151.50 kB │ gzip: 43.61 kB\ndist/assets/Dashboard-eTlNUTls.js              177.81 kB │ gzip: 61.18 kB\ndist/assets/button-CpieLPcf.js                 274.55 kB │ gzip: 98.67 kB\n\n✓ built in 828ms\n\nnpm error Lifecycle script `build` failed with error:\nnpm error code 2\nnpm error path /Users/zhushanwen/Code/llm-simple-router-workspace/feat-image-model-switch/router\nnpm error workspace llm-simple-router@0.10.11\nnpm error location /Users/zhushanwen/Code/llm-simple-router-workspace/feat-image-model-switch/router\nnpm error command failed\nnpm error command sh -c tsc\n[INFO] test: npm run test\n[PASS] test\n\n> test\n> npm run test -w router\n\n\n> llm-simple-router@0.10.11 test\n> vitest run\n\n\n RUN  v3.2.4 /Users/zhushanwen/Code/llm-simple-router-workspace/feat-image-model-switch/router\n\n[2026-05-16 00:50:57.273] WARN: Frontend dist not found at /Users/zhushanwen/Code/llm-simple-router-workspace/feat-image-model-switch/router/frontend-dist, skipping static serving\n[2026-05-16 00:50:57.337] INFO: incoming request\n    reqId: \"req-1\"\n    req: {\n      \"method\": \"POST\",\n      \"url\": \"/admin/api/login\",\n      \"host\": \"localhost:80\",\n      \"remoteAddress\": \"127.0.0.1\"\n    }\n ✓ tests/admin-logs.test.ts (14 tests) 1521ms\n ✓ tests/admin-groups.test.ts (15 tests) 1557ms\n ✓ tests/schedules.test.ts (21 tests) 1579ms\n[2026-05-16 00:50:57.362] INFO: request completed\n    reqId: \"req-1\"\n    res: {\n      \"statusCode\": 200\n    }\n    responseTime: 24.78849983215332\n[2026-05-16 00:50:57.363] INFO: incoming request\n    reqId: \"req-2\"\n    req: {\n      \"method\": \"GET\",\n      \"url\": \"/admin/api/upgrade/status\",\n      \"host\": \"localhost:80\",\n      \"remoteAddress\": \"127.0.0.1\"\n    }\n[2026-05-16 00:50:57.471] INFO: request completed\n    reqId: \"req-2\"\n    res: {\n      \"statusCode\": 200\n    }\n    responseTime: 108.6082091331482\n[2026-05-16 00:50:57.521] WARN: Frontend dist not found at /Users/zhushanwen/Code/llm-simple-router-workspace/feat-image-model-switch/router/frontend-dist, skipping static serving\n[2026-05\n...(truncated)...\nts (3 tests) 5ms\n ✓ tests/proxy/format/adapters.test.ts (12 tests) 4ms\n ✓ tests/log-detail-policy.test.ts (7 tests) 7ms\n ✓ tests/stream-timeout.test.ts (4 tests) 22195ms\n   ✓ Stream timeout integration > should abort stream after per-model stream_timeout_ms of silence  11143ms\n   ✓ Stream timeout integration > should send properly formatted SSE error event on stream timeout  11019ms\n\n Test Files  115 passed (115)\n      Tests  1392 passed (1392)\n   Start at  00:50:56\n   Duration  22.93s (transform 1.72s, setup 0ms, collect 17.36s, tests 74.11s, environment 9ms, prepare 5.44s)\n\n\n[INFO] lint: npm run lint -w router\n[PASS] lint\n\n> llm-simple-router@0.10.11 lint\n> eslint . --max-warnings=0\n\n\n[INFO] lint: cd frontend && npx eslint . --max-warnings=0\n[PASS] lint\n[INFO] typecheck: cd frontend && npx vue-tsc -b --noEmit\n[PASS] typecheck\n\n===========================================\n  GATE FAIL: gate 09\n  1 条命令执行失败\n  ───────────────────────────────────────\n  修复指引：检查上述 [FAIL] 命令的输出，修复编译/测试/lint 错误后重新调用 harness_stage_complete。如果是 CLAUDE.md 中的命令配置错误，请修正 CLAUDE.md 的 '## 质量门禁' 章节\n===========================================",
+      "tasks": [
+        {
+          "id": "T1",
+          "name": "Model capabilities 基础设施",
+          "status": "pass",
+          "completedAt": "2026-05-15T15:52:29.232Z",
+          "summary": "T1完成：ModelEntry/ModelInfo加capabilities字段、MODEL_CAPABILITIES白名单(~45模型)、parseModels()三层回退、buildModelInfoList()透传。8/8 GREEN。"
+        },
+        {
+          "id": "T4",
+          "name": "expandOverflowTargets() 包装函数",
+          "status": "pass",
+          "completedAt": "2026-05-15T15:53:10.788Z",
+          "summary": "T4完成：expandOverflowTargets()已存在于overflow.ts，遍历targets并prepend overflow target，per-target异常隔离。4/4 GREEN。"
+        },
+        {
+          "id": "T5",
+          "name": "StageRecord union 扩展",
+          "status": "pass",
+          "completedAt": "2026-05-15T15:53:25.472Z",
+          "summary": "T5完成：StageRecord union已含image-redirect变体（triggered/original_model/redirect_to/redirect_provider/reason字段）。"
+        },
+        {
+          "id": "T6",
+          "name": "Admin API validateRule 扩展",
+          "status": "pass",
+          "completedAt": "2026-05-15T15:54:50.505Z",
+          "summary": "T6完成：validateRule()已含image_fallback校验（provider_id/backend_model非空、provider存在且active、向后兼容）。8/8 GREEN。"
+        },
+        {
+          "id": "T2",
+          "name": "computeImageRedirectTargets() 工具函数",
+          "status": "pass",
+          "completedAt": "2026-05-15T15:59:05.834Z",
+          "summary": "T2完成：computeImageRedirectTargets() + hasImage()新建。16/16 GREEN。3种API格式图片检测、capabilities三层回退、fallback校验、异常降级。"
+        },
+        {
+          "id": "T3",
+          "name": "failover-loop.ts 循环重构",
+          "status": "pass",
+          "completedAt": "2026-05-15T16:11:19.761Z",
+          "summary": "T3完成：failover-loop.ts循环重构。resolveMapping/IR/OF移出while循环，简化为纯执行+exclude。5/5 GREEN，1401/1401无回退。"
+        },
+        {
+          "id": "TF1",
+          "name": "Provider 模型能力编辑（前端）",
+          "status": "pass",
+          "completedAt": "2026-05-15T16:43:25.461Z",
+          "summary": "TF1完成：Provider模型能力编辑。表格显示图片能力Badge，编辑对话框增加text/image Checkbox切换。TypeScript+ESLint+Vite构建全通过。"
+        },
+        {
+          "id": "TF2",
+          "name": "映射组 image_fallback 配置（前端）",
+          "status": "pass",
+          "completedAt": "2026-05-15T16:43:31.771Z",
+          "summary": "TF2完成：映射组image_fallback配置。ModelMappingCard展开编辑增加图片Fallback区域（选择供应商+模型名），保存到rule JSON。TSC+ESLint+Vite全通过。"
+=======
+      "startedAt": "2026-05-15T04:30:50.510Z",
+      "completedAt": "2026-05-15T04:44:49.070Z",
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": [
+        {
+          "id": "impl-types-resolver",
+          "name": "B1+B2+B3+B4: 后端类型定义 + resolveMapping 核心逻辑",
+          "status": "pass",
+          "completedAt": "2026-05-15T04:39:46.753Z",
+          "summary": "B1-B6 全部实现。MappingReason type + ResolveResult + ActiveRequest + PipelineSnapshot + resolveMapping 4路径 + failover-loop overflow/failover 覆写 + orchestrator 传递。9 TDD 测试全部 GREEN，1361 全量测试 0 回归。已提交。"
+        },
+        {
+          "id": "impl-failover",
+          "name": "B5+B6: orchestrator + failover-loop 映射原因传递",
+          "status": "pass",
+          "completedAt": "2026-05-15T04:39:57.222Z",
+          "summary": "B5+B6 已随 B1-B4 一并实现。OrchestratorConfig 新增 mappingReason + buildActiveRequest 传递 + failover-loop BP-H2缓存扩展 + overflow/failover 后置覆写。overflow/failover 测试 GREEN。"
+        },
+        {
+          "id": "impl-frontend",
+          "name": "F1+F2+F3+F4+F5: 前端类型+解析器+Badge+i18n",
+          "status": "pass",
+          "completedAt": "2026-05-15T04:44:39.515Z",
+          "summary": "F1-F5 全部实现。LogEntry+ActiveRequest 类型扩展、parseMappingReason 防御性解析、fromLogEntry/fromActiveRequest 转换器、RequestOverviewPanel Badge 展示、zh-CN/en 双语 i18n 6 种映射原因。vue-tsc + eslint 0 错误。已提交。"
+>>>>>>> origin/main
+        }
+      ]
+    },
+    {
+      "number": 11,
+      "name": "编码评审",
+      "status": "pass",
+<<<<<<< HEAD
+      "startedAt": "2026-05-15T16:53:16.886Z",
+      "completedAt": "2026-05-16T00:59:01.875Z",
+=======
+      "startedAt": "2026-05-15T04:44:49.070Z",
+      "completedAt": "2026-05-15T04:59:40.919Z",
+>>>>>>> origin/main
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 12,
+      "name": "单元测试",
+      "status": "pass",
+<<<<<<< HEAD
+      "startedAt": "2026-05-16T00:59:01.875Z",
+      "completedAt": "2026-05-16T01:00:49.119Z",
+=======
+      "startedAt": "2026-05-15T04:59:40.919Z",
+      "completedAt": "2026-05-15T05:04:06.630Z",
+>>>>>>> origin/main
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 13,
+      "name": "E2E 测试",
+      "status": "pass",
+<<<<<<< HEAD
+      "startedAt": "2026-05-16T01:00:49.119Z",
+      "completedAt": "2026-05-16T01:03:02.537Z",
+=======
+      "startedAt": "2026-05-15T05:04:06.630Z",
+      "completedAt": "2026-05-15T05:05:20.556Z",
+>>>>>>> origin/main
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 14,
+      "name": "测试评审",
+      "status": "pass",
+<<<<<<< HEAD
+      "startedAt": "2026-05-16T01:03:02.537Z",
+      "completedAt": "2026-05-16T01:05:06.806Z",
+=======
+      "startedAt": "2026-05-15T05:05:20.556Z",
+      "completedAt": "2026-05-15T05:09:03.256Z",
+>>>>>>> origin/main
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 15,
+      "name": "推送+CI+部署",
+<<<<<<< HEAD
+      "status": "fail",
+      "startedAt": "2026-05-16T01:05:06.806Z",
+      "completedAt": null,
+      "gateResult": "fail",
+      "gateOutput": "[FAIL] working directory not clean:\n  ?? .xyz-harness/2026-05-15-workflow/changes/evidence/deploy_result.md\n  ?? .xyz-harness/2026-05-15-workflow/changes/evidence/verification_output.md\n[PASS] local HEAD matches origin/feat-image-model-switch\n[INFO] compile: npm run build\n[PASS] compile\n\n> build\n> npm run build -w router -w frontend\n\n\n> llm-simple-router@0.10.11 build\n> tsc\n\n\n> llm-simple-router@0.10.11 postbuild\n> node -e \"require('fs').cpSync('src/db/migrations','dist/db/migrations',{recursive:true})\"\n\n\n> frontend@0.0.0 build\n> vue-tsc -b && vite build\n\nvite v8.0.10 building client environment for production...\n\u001b[2K\rtransforming...✓ 2707 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                                  0.82 kB │ gzip:  0.43 kB\ndist/assets/UnifiedRequestDialog-C4MTxb25.css    0.08 kB │ gzip:  0.08 kB\ndist/assets/index-ClQS69Or.css                  69.91 kB │ gzip: 13.23 kB\ndist/assets/copy-CY1XG17n.js                     0.22 kB │ gzip:  0.20 kB\ndist/assets/image-Dvhb9Zcv.js                    0.25 kB │ gzip:  0.21 kB\ndist/assets/trash-2-B83gA2q5.js                  0.31 kB │ gzip:  0.21 kB\ndist/assets/login-DWRFsEu3.js                    0.36 kB │ gzip:  0.26 kB\ndist/assets/login-BkOvA7gg.js                    0.36 kB │ gzip:  0.22 kB\ndist/assets/useClipboard-C0Vt3BZq.js             0.61 kB │ gzip:  0.36 kB\ndist/assets/useLogRetention-CYZeBz52.js          0.63 kB │ gzip:  0.34 kB\ndist/assets/setup-DaeEG9ll.js                    0.71 kB │ gzip:  0.40 kB\ndist/assets/setup-Dryg-9wL.js                    0.75 kB │ gzip:  0.36 kB\ndist/assets/CardTitle-B_Jf6C6c.js                0.90 kB │ gzip:  0.44 kB\ndist/assets/La\n...(truncated)...\ns                    18.49 kB │ gzip:  5.47 kB\ndist/assets/Monitor-BsDLaxtA.js                 25.62 kB │ gzip:  6.40 kB\ndist/assets/QuickSetup-CQUj0UuU.js              26.37 kB │ gzip:  7.87 kB\ndist/assets/UnifiedRequestDialog-Cif_07VV.js    63.21 kB │ gzip: 16.74 kB\ndist/assets/Providers-B7xjAsO-.js               93.83 kB │ gzip: 22.89 kB\ndist/assets/index-69Pg2MrI.js                  151.52 kB │ gzip: 43.44 kB\ndist/assets/Dashboard-DHYPrP3c.js              177.81 kB │ gzip: 61.18 kB\ndist/assets/button-ss-UAaGF.js                 274.56 kB │ gzip: 98.71 kB\n\n✓ built in 1.62s\n\n[INFO] test: npm run test\n[FAIL] test (exit 1)\n> test\n> npm run test -w router\n\n\n> llm-simple-router@0.10.11 test\n> vitest run\n\n\n RUN  v3.2.4 /Users/zhushanwen/Code/llm-simple-router-workspace/feat-image-model-switch/router\n\n[2026-05-16 09:38:09.099] WARN: Frontend dist not found at /Users/zhushanwen/Code/llm-simple-router-workspace/feat-image-model-switch/router/frontend-dist, skipping static serving\n[2026-05-16 09:38:09.312] INFO: incoming request\n    reqId: \"req-1\"\n    req: {\n      \"method\": \"POST\",\n      \"url\": \"/admin/api/login\",\n      \"host\": \"localhost:80\",\n      \"remoteAddress\": \"127.0.0.1\"\n    }\n[2026-05-16 09:38:09.588] WARN: Frontend dist not found at /Users/zhushanwen/Code/llm-simple-router-workspace/feat-image-model-switch/router/frontend-dist, skipping static serving\n[2026-05-16 09:38:09.644] INFO: incoming request\n    reqId: \"req-1\"\n    req: {\n      \"method\": \"POST\",\n      \"url\": \"/admin/api/login\",\n      \"host\": \"localhost:80\",\n      \"remoteAddress\": \"127.0.0.1\"\n    }\n[2026-05-16 09:38:09.711] INFO: request completed\n    reqId: \"req-1\"\n    res: {\n      \"statusCode\": 200\n    }\n    responseTime: 66.71829080581665\n[2026-05-16 09:38:09.713] INFO: incoming request\n    reqId: \"req-2\"\n    req: {\n      \"method\": \"POST\",\n      \"url\": \"/admin/api/upgrade/check\",\n      \"host\": \"localhost:80\",\n      \"remoteAddress\": \"127.0.0.1\"\n    }\n[2026-05-16 09:38:09.421] INFO: request completed\n    reqId: \"req-1\"\n    res: {\n      \"\n...(truncated)...\ne(0);\n     81|     expect(json.data.loadedPlugins).toEqual([]);\n       |                                     ^\n     82|     expect(json.data.rulesCount).toBe(0);\n     83|   });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\nnpm error Lifecycle script `test` failed with error:\nnpm error code 1\nnpm error path /Users/zhushanwen/Code/llm-simple-router-workspace/feat-image-model-switch/router\nnpm error workspace llm-simple-router@0.10.11\nnpm error location /Users/zhushanwen/Code/llm-simple-router-workspace/feat-image-model-switch/router\nnpm error command failed\nnpm error command sh -c vitest run\n[INFO] lint: npm run lint -w router\n[PASS] lint\n\n> llm-simple-router@0.10.11 lint\n> eslint . --max-warnings=0\n\n\n[INFO] lint: cd frontend && npx eslint . --max-warnings=0\n[FAIL] lint (exit 1)\n/Users/zhushanwen/Code/llm-simple-router-workspace/feat-image-model-switch/frontend/src/components/mappings/ModelMappingCard.vue\n  105:1  warning  Expected indentation of 6 spaces but found 8  indent\n  106:1  warning  Expected indentation of 6 spaces but found 8  indent\n  107:1  warning  Expected indentation of 6 spaces but found 8  indent\n  108:1  warning  Expected indentation of 4 spaces but found 6  indent\n\n/Users/zhushanwen/Code/llm-simple-router-workspace/feat-image-model-switch/frontend/src/views/ModelMappings.vue\n  138:1  warning  Expected indentation of 8 spaces but found 10   indent\n  139:1  warning  Expected indentation of 8 spaces but found 10   indent\n  140:1  warning  Expected indentation of 6 spaces but found 8    indent\n  148:1  warning  Expected indentation of 12 spaces but found 14  indent\n  149:1  warning  Expected indentation of 14 spaces but found 16  indent\n  150:1  warning  Expected indentation of 14 spaces but found 16  indent\n  151:1  warning  Expected indentation of 12 spaces but found 14  indent\n  152:1  warning  Expected indentation of 10 spaces but found 12  indent\n\n/Users/zhushanwen/Code/llm-simple-router-workspace/feat-image-model-switch/frontend/src/views/Providers.vue\n  502:1  warning  File has too many lines (579). Maximum allowed is 500  max-lines\n\n✖ 13 problems (0 errors, 13 warnings)\n  0 errors and 12 warnings potentially fixable with the `--fix` option.\n\n\nESLint found too many warnings (maximum: 0).\n[INFO] typecheck: cd frontend && npx vue-tsc -b --noEmit\n[PASS] typecheck\n[PASS] deploy_result.md: success\n\n===========================================\n  GATE FAIL: gate 14\n  3 项检查失败\n  ───────────────────────────────────────\n  修复指引：工作区不干净：运行 git add + git commit 提交所有变更。\n===========================================",
+      "tasks": []
+    }
+  ],
+  "rollbackHistory": [
+    {
+      "from": 8,
+      "to": 2,
+      "reason": "采用分层路由模型（IR→OF→FO逐层展开）替代Pipeline Hook方案，需重写spec并重走后续所有阶段",
+      "timestamp": "2026-05-15T14:21:40.052Z"
+    }
+  ]
+=======
+      "status": "pass",
+      "startedAt": "2026-05-15T05:09:03.256Z",
+      "completedAt": "2026-05-15T05:13:50.264Z",
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 16,
+      "name": "自动复盘",
+      "status": "pass",
+      "startedAt": "2026-05-15T05:13:50.264Z",
+      "completedAt": "2026-05-15T05:18:42.342Z",
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    }
+  ],
+  "rollbackHistory": []
+>>>>>>> origin/main
+}

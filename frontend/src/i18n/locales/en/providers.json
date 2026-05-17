@@ -150,5 +150,11 @@
     "failed": "Failed to fetch upstream models",
     "sourceUpstream": "Upstream",
     "sourcePreset": "Preset"
+  },
+  "capabilities": {
+  "text": "Text",
+  "image": "Image",
+  "audio": "Audio",
+  "video": "Video"
   }
 }

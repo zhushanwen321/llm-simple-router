@@ -1,8 +1,12 @@
+import fs from "node:fs"
+import path from "node:path"
+
 export interface ModelInfo {
   name: string
   context_window: number | null
   patches: string[]
   stream_timeout_ms?: number
+  capabilities?: string[]
 }
 
 export interface ModelEntry {
@@ -10,6 +14,7 @@ export interface ModelEntry {
   context_window?: number
   patches?: string[]
   stream_timeout_ms?: number
+  capabilities?: string[]
 }
 
 export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
@@ -94,11 +99,108 @@ export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
   "moonshotai/Kimi-K2.5": 256000,
 }
 
+/** 已知支持图片输入的模型白名单。不在表中的模型默认 [\"text\"]。 */
+export const MODEL_CAPABILITIES: Record<string, string[]> = {
+  // ── OpenAI ── 文档确认支持 image_url
+  "gpt-4o": ["text", "image"],
+  "gpt-4o-mini": ["text", "image"],
+  "gpt-4-turbo": ["text", "image"],
+  "gpt-4.1": ["text", "image"],
+  "gpt-4.1-mini": ["text", "image"],
+  "gpt-4.1-nano": ["text", "image"],
+  "o1": ["text", "image"],
+  "o1-pro": ["text", "image"],
+  "o3": ["text", "image"],
+  "o3-mini": ["text", "image"],
+  "o4-mini": ["text", "image"],
+  // ── Anthropic ── 文档确认支持 image content block
+  "claude-3.5-sonnet": ["text", "image"],
+  "claude-3.5-haiku": ["text", "image"],
+  "claude-3-opus": ["text", "image"],
+  "claude-4-sonnet": ["text", "image"],
+  "claude-4-opus": ["text", "image"],
+  // ── DeepSeek ──
+  // V3/V4 不接受 OpenAI image_url 格式（API 返回 unknown variant 'image_url'）
+  // 只有专用视觉模型 deepseek-vl2 支持
+  "deepseek-vl2": ["text", "image"],
+  // ── 智谱 ──
+  // GLM-5/5.1 是纯文本 LLM；GLM-5V-Turbo / GLM-4.5V 才是视觉模型
+  // 文档确认视觉模型支持 image_url 格式
+  "glm-5v-turbo": ["text", "image", "audio", "video"],
+  "glm-4.5v": ["text", "image"],
+  "glm-4v-plus": ["text", "image"],
+  "glm-4v-flash": ["text", "image"],
+  // ── 月之暗面 ── 原生多模态架构，全部支持 image_url
+  "moonshot-v1-128k": ["text", "image"],
+  "moonshot-v1-32k": ["text", "image"],
+  "moonshot-v1-8k": ["text", "image"],
+  "kimi-k2.6": ["text", "image", "video"],
+  "kimi-k2.5": ["text", "image", "video"],
+  "kimi-k2-turbo-preview": ["text", "image"],
+  "kimi-k2-thinking": ["text", "image"],
+  "kimi-for-coding": ["text", "image"],
+  // ── 阿里云 Qwen ── 百炼文档确认 qwen3.6-plus/qwen3.5-plus/flash 支持 image_url
+  "qwen-vl-max": ["text", "image"],
+  "qwen-vl-plus": ["text", "image"],
+  "qwen3.6-plus": ["text", "image", "video"],
+  "qwen3.5-plus": ["text", "image", "video"],
+  "qwen3.5-flash": ["text", "image"],
+  // ── 火山引擎 ── Doubao Seed 2.0 Pro 规格：Input Text, Images, Video
+  "doubao-seed-2-0-pro-260215": ["text", "image", "video"],
+  // ── 小米 MiMo ── 只有 omni 版本支持图片，pro 版本是纯文本
+  "mimo-v2-omni": ["text", "image", "audio", "video"],
+  "mimo-v2.5": ["text", "image", "audio", "video"],
+}
+
 export const DEFAULT_CONTEXT_WINDOW = 200000
 export const OVERFLOW_THRESHOLD = 1000000
 
+// ---------- model-directory.json 运行时加载 ----------
+
+/** 从 ai-model-directory 提取的精简数据结构 */
+interface ModelDirectoryData {
+  capabilities: Record<string, string[]>
+  context_windows: Record<string, number>
+}
+
+let directoryCapabilities: Record<string, string[]> = {}
+let directoryContextWindows: Record<string, number> = {}
+
+/**
+ * 加载 config/model-directory.json（由 sync-model-directory.sh 生成）。
+ * 加载失败时不覆盖默认值，fallback 到硬编码白名单。
+ */
+export function loadModelDirectory(configDir?: string): void {
+  try {
+    const dir = configDir ?? path.resolve(process.cwd(), "config")
+    const filePath = path.join(dir, "model-directory.json")
+    const raw = fs.readFileSync(filePath, "utf-8")
+    const data: ModelDirectoryData = JSON.parse(raw)
+    if (data.capabilities && typeof data.capabilities === "object") {
+      directoryCapabilities = data.capabilities
+    }
+    if (data.context_windows && typeof data.context_windows === "object") {
+      directoryContextWindows = data.context_windows
+    }
+  // eslint-disable-next-line taste/no-silent-catch -- 加载失败不影响启动，使用硬编码白名单兆底。但记录到 stderr 供诊断
+  } catch (err: unknown) {
+  // 加载失败不影响启动，使用硬编码白名单兆底。但记录到 stderr 供诊断
+    console.error('loadModelDirectory: failed to load, using hardcoded fallback', err)
+  }
+}
+
+/** 查询模型 capabilities：显式配置 > model-directory.json > 硬编码白名单 > ["text"] */
+export function lookupCapabilities(modelName: string): string[] {
+  return MODEL_CAPABILITIES[modelName]
+  ?? directoryCapabilities[modelName]
+  ?? ["text"]
+}
+
+/** 查询模型上下文窗口：model-directory.json > 硬编码表 > 默认值 */
 export function lookupContextWindow(modelName: string): number {
-  return MODEL_CONTEXT_WINDOWS[modelName] ?? DEFAULT_CONTEXT_WINDOW
+  return MODEL_CONTEXT_WINDOWS[modelName]
+  ?? directoryContextWindows[modelName]
+  ?? DEFAULT_CONTEXT_WINDOW
 }
 
 /** 标准化 patch 名称：连字符 → 下划线 */
@@ -140,9 +242,11 @@ export function parseModels(raw: string): ModelEntry[] {
     if (!Array.isArray(parsed)) return []
     const result = parsed.map((item: unknown): ModelEntry | null => {
       if (typeof item === 'string') {
-        return item ? { name: item, patches: [] } : null
+        return item
+          ? { name: item, patches: [], capabilities: lookupCapabilities(item) }
+          : null
       }
-      const obj = item as { name?: string; id?: string; patches?: string[]; stream_timeout_ms?: number } | null
+      const obj = item as { name?: string; id?: string; patches?: string[]; stream_timeout_ms?: number; capabilities?: string[] } | null
       if (!obj) return null
       const modelName = obj.name ?? obj.id
       if (!modelName) return null
@@ -154,6 +258,8 @@ export function parseModels(raw: string): ModelEntry[] {
         patches,
       }
       if (obj.stream_timeout_ms != null) entry.stream_timeout_ms = obj.stream_timeout_ms
+      // capabilities: 显式 > model-directory > 硬编码白名单 > 默认 ["text"]
+      entry.capabilities = obj.capabilities ?? lookupCapabilities(modelName)
       return entry
     }).filter((e): e is ModelEntry => e !== null)
     modelsCache.set(raw, result)
@@ -174,6 +280,7 @@ export function buildModelInfoList(
       patches: entry.patches ?? [],
     }
     if (entry.stream_timeout_ms != null) info.stream_timeout_ms = entry.stream_timeout_ms
+    if (entry.capabilities != null) info.capabilities = entry.capabilities
     return info
   })
 }

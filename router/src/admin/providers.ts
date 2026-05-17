@@ -77,7 +77,7 @@ function cascadeProviderDisable(db: Database.Database, providerId: string): Casc
   return result;
 }
 
-type ModelInput = string | { name?: string; id?: string; context_window?: number; patches?: string[]; stream_timeout_ms?: number };
+type ModelInput = string | { name?: string; id?: string; context_window?: number; patches?: string[]; stream_timeout_ms?: number; capabilities?: string[] };
 
 interface ModelOverride {
   name: string;
@@ -99,6 +99,7 @@ function extractModelOverrides(models: ModelInput[]): {
     if (!name) continue;
     const entry: ModelEntry = { name, patches: m.patches ?? [] };
     if (m.stream_timeout_ms != null) entry.stream_timeout_ms = m.stream_timeout_ms;
+    if (m.capabilities != null && Array.isArray(m.capabilities)) entry.capabilities = m.capabilities;
     entries.push(entry);
     if (m.name != null && m.context_window != null) {
       overrides.push({ name: m.name, context_window: m.context_window });
@@ -127,7 +128,7 @@ const CreateProviderSchema = Type.Object({
   api_key: Type.String({ minLength: 1 }),
   models: Type.Optional(Type.Array(Type.Union([
     Type.String(),
-    Type.Object({ name: Type.String(), context_window: Type.Optional(Type.Number()), patches: Type.Optional(Type.Array(Type.String())), stream_timeout_ms: Type.Optional(Type.Number({ minimum: 0, maximum: 86_400_000 })) }),
+    Type.Object({ name: Type.String(), context_window: Type.Optional(Type.Number()), patches: Type.Optional(Type.Array(Type.String())), stream_timeout_ms: Type.Optional(Type.Number({ minimum: 0, maximum: 86_400_000 })), capabilities: Type.Optional(Type.Array(Type.String())) }),
     Type.Object({ id: Type.String(), stream_timeout_ms: Type.Optional(Type.Number({ minimum: 0, maximum: 86_400_000 })) })
   ]))),
   is_active: Type.Optional(Type.Number()),
@@ -149,7 +150,7 @@ const UpdateProviderSchema = Type.Object({
   api_key: Type.Optional(Type.String({ minLength: 1 })),
   models: Type.Optional(Type.Array(Type.Union([
     Type.String(),
-    Type.Object({ name: Type.String(), context_window: Type.Optional(Type.Number()), patches: Type.Optional(Type.Array(Type.String())), stream_timeout_ms: Type.Optional(Type.Number({ minimum: 0, maximum: 86_400_000 })) }),
+    Type.Object({ name: Type.String(), context_window: Type.Optional(Type.Number()), patches: Type.Optional(Type.Array(Type.String())), stream_timeout_ms: Type.Optional(Type.Number({ minimum: 0, maximum: 86_400_000 })), capabilities: Type.Optional(Type.Array(Type.String())) }),
     Type.Object({ id: Type.String(), stream_timeout_ms: Type.Optional(Type.Number({ minimum: 0, maximum: 86_400_000 })) })
   ]))),
   is_active: Type.Optional(Type.Number()),
