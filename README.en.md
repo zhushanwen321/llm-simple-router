@@ -18,17 +18,26 @@ An LLM API proxy router that receives requests from clients like Claude Code and
 |---------|-------------|
 | Automatic retries | Exponential backoff retries for 429/400/network timeouts, pre-configured for Zhipu models by default |
 | Multi-provider support | Zhipu, Moonshot, Minimax, Volcano Engine, Alibaba Cloud, Tencent Cloud, etc. Base URL is auto-filled when you select a Coding Plan |
+| API format conversion | Supports both OpenAI and Anthropic API formats; client and upstream formats can be freely combined |
+| DeepSeek patch compatibility | Fixes Thinking parameter passthrough, orphaned tool_result, developer role, cache_control issues |
 | Time-based model mapping | Automatically switch backend models by time period (e.g., switch to Kimi during peak hours, back to GLM during off-peak) |
-| Concurrency queue | Per-Provider concurrency limits with queueing for excess requests |
 | Failover | Multiple Providers as backups; automatically switches to the next on failure |
 | Multimodal auto-routing | Detects images/audio in requests and auto-switches to a multimodal fallback model when the current model doesn't support them |
-| Model capability management | 4-level priority (user config > whitelist > model directory > default) for automatic capability detection |
+| Context overflow switch | Automatically switches to a larger context model when conversation exceeds the current model's window (e.g., 200K → 1M) |
+| Adaptive concurrency | Dynamic concurrency adjustment based on water-level gradient (similar to TCP congestion control), no manual tuning needed |
+| Concurrency queue | Per-Provider concurrency limits with queueing for excess requests |
+| Per-model stream timeout | Configurable stream response timeout per model to prevent stuck connections |
+| Quick setup | New users can configure in 3 steps: select client → select Provider → enter API Key; mappings and retry rules auto-created |
+| Provider network proxy | Per-provider HTTP/SOCKS5 proxy for overseas APIs (OpenAI, Anthropic) |
 | Real-time monitoring | SSE-based live view of active requests, queue status, and streaming output |
+| Usage monitoring | View usage by time, model, and key dimensions; 5-hour sliding window optimized for Coding Plans |
 | Multi-key management | Independent API keys + model whitelists for multi-user/multi-project setups |
 | Request logs | Full four-stage tracing (client request / upstream request / upstream response / client response) |
-| Performance metrics | TTFT, TPS, Token usage, cache hit rate |
+| Cache hit estimation | Tokenizer-based prefix matching for estimated cache hit rate |
+| Tool call loop detection | N-gram detection for tool call loops and streaming content loops, with auto-interruption and prompt injection |
+| Upgrade notifications | Automatic new version notifications + one-click upgrade |
 
-> **API Compatibility:** Supports Anthropic-compatible API (adapted for Claude Code). OpenAI-compatible API (`/v1/chat/completions`) is not yet fully tested.
+> **API Compatibility:** Supports both Anthropic and OpenAI (`/v1/chat/completions` + `/v1/responses`) API formats. Client and upstream formats can be freely combined. Google Gemini API format is not yet supported.
 
 ## Admin Dashboard
 

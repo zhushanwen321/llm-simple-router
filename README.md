@@ -18,17 +18,26 @@ LLM API 代理路由器。接收 Claude Code / Cursor 等客户端请求，通�
 |------|------|
 | 自动重试 | 对 429/400/网络超时自动指数退避重试，默认针对智谱模型配置 |
 | 多供应商支持 | 智谱、Moonshot、Minimax、火山引擎、阿里云、腾讯云等，Coding Plan 选择后自动填写 |
+| API 格式互转 | 支持 OpenAI 和 Anthropic 两种 API 格式，客户端和上游供应商格式可任意组合 |
+| DeepSeek 补丁兼容 | 修复 Thinking 参数回传、残留 tool_result、developer role、cache_control 等兼容问题 |
 | 模型分时段映射 | 按时间段自动切换后端模型（如高峰期切到 Kimi，低谷期切回 GLM） |
-| 并发队列等待 | 按 Provider 配置并发数上限，超限请求排队等待 |
 | Failover 故障转移 | 多 Provider 互备，失败自动切换下一个 |
 | 多模态自动路由 | 检测请求中的图片/音频，当前模型不支持时自动切换到多模态 fallback 模型 |
-| 模型能力管理 | 基于 4 级优先级（用户配置 > 白名单 > 模型目录 > 默认值）自动识别模型能力 |
+| Context 溢出切模型 | 对话超出模型上下文窗口时，自动切换到大窗口模型（如 200K → 1M） |
+| 自适应并发控制 | 基于水位梯度的动态并发调整，类似 TCP 拥塞控制，无需手动调参 |
+| 并发队列等待 | 按 Provider 配置并发数上限，超限请求排队等待 |
+| 模型流式超时 | 每个模型可单独设置流式响应超时，防止卡死不输出 |
+| 快速配置 | 新用户三步完成：选客户端 → 选 Provider → 填 API Key，自动创建映射和重试规则 |
+| Provider 网络代理 | 针对境外 API（OpenAI、Anthropic）可单独配置 HTTP/SOCKS5 代理 |
 | 实时请求监控 | SSE 推送活跃请求、队列状态、流式输出实时查看 |
+| 用量监控 | 按时间、模型、密钥等维度查看用量，5 小时滑动窗口适配 Coding Plan |
 | 多密钥管理 | 独立密钥 + 模型白名单，支持多用户/多项目 |
 | 请求日志 | 四阶段完整链路（客户端请求/上游请求/上游响应/客户端响应） |
-| 性能指标 | TTFT、TPS、Token 用量、缓存命中率 |
+| 缓存命中预估 | 基于 Tokenizer 前缀匹配估算缓存命中率 |
+| 工具调用循环检测 | N-gram 检测工具调用死循环和流式内容循环，自动中断并注入提示词 |
+| 升级通知 | 新版本自动通知 + 一键升级 |
 
-> **API 兼容性：** 支持 Anthropic 兼容 API（已适配 Claude Code）。OpenAI 兼容 API（`/v1/chat/completions`）尚未充分测试。
+> **API 兼容性：** 同时支持 Anthropic 和 OpenAI（`/v1/chat/completions` + `/v1/responses`）两种 API 格式，客户端和上游格式可任意组合。暂不支持 Google Gemini API 格式。
 
 ## 管理后台
 
