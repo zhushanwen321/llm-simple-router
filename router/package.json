@@ -1,6 +1,6 @@
 {
   "name": "llm-simple-router",
-  "version": "0.10.14",
+  "version": "0.11.0",
   "description": "LLM API proxy router with OpenAI/Anthropic support, model mapping, retry strategies, and admin dashboard",
   "license": "MIT",
   "author": "ZZzzswszzZZ",
@@ -27,7 +27,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint . --max-warnings=0",
-  "postbuild": "node -e \"require('fs').cpSync('src/db/migrations','dist/db/migrations',{recursive:true});require('fs').cpSync('config','dist/config',{recursive:true})\"",
+    "postbuild": "node -e \"require('fs').cpSync('src/db/migrations','dist/db/migrations',{recursive:true});require('fs').cpSync('config','dist/config',{recursive:true})\"",
     "prepublishOnly": "node scripts/prepublish.mjs"
   },
   "dependencies": {
