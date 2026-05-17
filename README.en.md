@@ -21,6 +21,8 @@ An LLM API proxy router that receives requests from clients like Claude Code and
 | Time-based model mapping | Automatically switch backend models by time period (e.g., switch to Kimi during peak hours, back to GLM during off-peak) |
 | Concurrency queue | Per-Provider concurrency limits with queueing for excess requests |
 | Failover | Multiple Providers as backups; automatically switches to the next on failure |
+| Multimodal auto-routing | Detects images/audio in requests and auto-switches to a multimodal fallback model when the current model doesn't support them |
+| Model capability management | 4-level priority (user config > whitelist > model directory > default) for automatic capability detection |
 | Real-time monitoring | SSE-based live view of active requests, queue status, and streaming output |
 | Multi-key management | Independent API keys + model whitelists for multi-user/multi-project setups |
 | Request logs | Full four-stage tracing (client request / upstream request / upstream response / client response) |
@@ -279,7 +281,7 @@ flowchart LR
     E -.->|Failure| C
 ```
 
-When the Router receives a request: Authentication → find backend Provider via mapping rules → queue for concurrency control → forward to upstream (auto-retry on failure; under Failover strategy, switches Provider) → log and record metrics → return response.
+When the Router receives a request: Authentication → find backend Provider via mapping rules → multimodal detection (auto-switch to fallback model for images/audio) → context overflow detection → queue for concurrency control → forward to upstream (auto-retry on failure; under Failover strategy, switches Provider) → log and record metrics → return response.
 
 ## Environment Variables
 
