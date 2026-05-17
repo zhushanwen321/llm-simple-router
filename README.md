@@ -8,36 +8,36 @@ LLM API 代理路由器。接收 Claude Code / Cursor 等客户端请求，通�
 
 ## 适合谁
 
-- 用 Claude Code 配合国产模型（智谱、Moonshot、Minimax 等）的开发者
-- 希望自动重试限流错误、分时段切换模型、控制并发排队
+- 用 Claude Code / Cursor / Codex 配合国产模型（智谱、Moonshot、Minimax 等）的开发者
+- 希望自动重试限流错误、按场景切换模型、控制并发排队
 - 想要一个开箱即用的方案，不折腾
 
 ## 功能一览
 
+### 核心功能
+
 | 功能 | 说明 |
 |------|------|
-| 自动重试 | 对 429/400/网络超时自动指数退避重试，默认针对智谱模型配置 |
-| 多供应商支持 | 智谱、Moonshot、Minimax、火山引擎、阿里云、腾讯云等，Coding Plan 选择后自动填写 |
-| API 格式互转 | 支持 OpenAI 和 Anthropic 两种 API 格式，客户端和上游供应商格式可任意组合 |
-| DeepSeek 补丁兼容 | 修复 Thinking 参数回传、残留 tool_result、developer role、cache_control 等兼容问题 |
-| 模型分时段映射 | 按时间段自动切换后端模型（如高峰期切到 Kimi，低谷期切回 GLM） |
-| Failover 故障转移 | 多 Provider 互备，失败自动切换下一个 |
-| 多模态自动路由 | 检测请求中的图片/音频，当前模型不支持时自动切换到多模态 fallback 模型 |
-| Context 溢出切模型 | 对话超出模型上下文窗口时，自动切换到大窗口模型（如 200K → 1M） |
-| 自适应并发控制 | 基于水位梯度的动态并发调整，类似 TCP 拥塞控制，无需手动调参 |
-| 并发队列等待 | 按 Provider 配置并发数上限，超限请求排队等待 |
-| 模型流式超时 | 每个模型可单独设置流式响应超时，防止卡死不输出 |
-| 快速配置 | 新用户三步完成：选客户端 → 选 Provider → 填 API Key，自动创建映射和重试规则 |
-| Provider 网络代理 | 针对境外 API（OpenAI、Anthropic）可单独配置 HTTP/SOCKS5 代理 |
-| 实时请求监控 | SSE 推送活跃请求、队列状态、流式输出实时查看 |
-| 用量监控 | 按时间、模型、密钥等维度查看用量，5 小时滑动窗口适配 Coding Plan |
-| 多密钥管理 | 独立密钥 + 模型白名单，支持多用户/多项目 |
-| 请求日志 | 四阶段完整链路（客户端请求/上游请求/上游响应/客户端响应） |
-| 缓存命中预估 | 基于 Tokenizer 前缀匹配估算缓存命中率 |
-| 工具调用循环检测 | N-gram 检测工具调用死循环和流式内容循环，自动中断并注入提示词 |
-| 升级通知 | 新版本自动通知 + 一键升级 |
+| 错误自动重试 | 对 429/400/网络超时等可恢复错误自动指数退避重试，客户端完全无感 |
+| 并发队列等待 | 按 Provider 配置并发上限，超限请求排队等待；支持自适应并发，根据负载自动调整，无需手动调参 |
+| 多 API 格式支持 | 支持 OpenAI（Chat Completions、Responses）和 Anthropic（Messages）三种接口，客户端与上游格式可任意组合。内置 DeepSeek reasoning_thinking 补丁 |
+| 流式响应超时 | 每个模型可单独设置流式超时，防止模型卡死不输出导致请求挂起 |
+| 实时请求监控 | SSE 推送活跃请求、队列状态、流式输出实时查看，结构化展示适配 Claude Code 输出格式 |
+| 请求日志 | 四阶段完整链路（客户端请求 → 上游请求 → 上游响应 → 客户端响应），支持日志文件归档 |
 
-> **API 兼容性：** 同时支持 Anthropic 和 OpenAI（`/v1/chat/completions` + `/v1/responses`）两种 API 格式，客户端和上游格式可任意组合。暂不支持 Google Gemini API 格式。
+### 其他功能
+
+| 功能 | 说明 |
+|------|------|
+| 丰富的模型自动切换 | 故障转移（Failover）、上下文溢出自动切大窗口模型、多模态请求自动切多模态模型、分时段定时切换 |
+| 快速配置 | 选客户端 → 选供应商 → 填 API Key，三步完成配置。预置智谱、Moonshot、Minimax 等国内供应商参数 |
+| 供应商网络代理 | 针对境外 API（OpenAI、Anthropic）可单独配置 HTTP/SOCKS5 代理 |
+| 代理增强（实验性） | 工具调用循环检测（N-gram）+ Token 用量预估 + 缓存命中率预估 |
+| 用量大盘 | 按时间、模型、密钥等维度查看用量统计，5 小时滑动窗口适配 Coding Plan |
+| 多密钥管理 | 独立 Router 密钥 + 模型白名单（allowed_models），支持多用户/多项目隔离 |
+| 升级通知 | 新版本自动提醒 + 一键升级 |
+
+> **API 兼容性：** 同时支持 Anthropic 和 OpenAI 两种 API 格式，客户端和上游格式可任意组合。暂不支持 Google Gemini API 格式。
 
 ## 管理后台
 
@@ -70,6 +70,8 @@ npx llm-simple-router
 ### 2. 配置 Provider
 
 管理后台 > Provider 页面 > 添加 Provider。选择 Coding Plan 后会自动填写 Base URL，只需填入 API Key。
+
+也可以使用快速配置页面：选客户端 → 选供应商 → 填 API Key，三步完成。
 
 ### 3. 配置模型映射
 
@@ -284,8 +286,6 @@ journalctl -u llm-simple-router -f
 Claude Code → Router (模型映射 + 自动重试 + 并发控制) → 智谱 GLM / Kimi / 其他供应商
 ```
 
-Router 根据模型映射找到后端供应商 → 转发请求 → 自动重试失败请求 → 记录日志和性能指标 → 返回响应。
-
 ### 架构图
 
 **系统上下文**（[详细说明](docs/system-context.md)）：
@@ -308,7 +308,8 @@ graph LR
 flowchart LR
     A[客户端请求] --> B[认证]
     B --> C[模型映射<br/>+ 路由策略]
-    C --> D[并发排队]
+    C --> H[多模态检测<br/>+ 溢出检测]
+    H --> D[并发排队]
     D --> E[调用上游<br/>失败自动重试]
     E --> F[记录日志<br/>+ 指标]
     F --> G[返回响应]
