@@ -217,7 +217,19 @@ Edit `~/.pi/agent/models.json` to add the Router as a provider:
           "reasoning": true,
           "input": ["text"],
           "contextWindow": 1000000,
-          "maxTokens": 64000
+          "maxTokens": 64000,
+          "compat": {
+            "requiresReasoningContentOnAssistantMessages": true,
+            "thinkingFormat": "deepseek"
+          },
+          "thinkingLevelMap": {
+            "off": null,
+            "minimal": null,
+            "low": null,
+            "medium": null,
+            "high": "high",
+            "xhigh": "max"
+          }
         }
       ]
     }
@@ -225,7 +237,7 @@ Edit `~/.pi/agent/models.json` to add the Router as a provider:
 }
 ```
 
-> Pi connects to Router via Anthropic Messages API (`api: "anthropic-messages"`). List the mapped models in `models` and Pi will detect them automatically.
+> Pi connects to Router via Anthropic Messages API (`api: "anthropic-messages"`). DeepSeek models require `compat.thinkingFormat: "deepseek"` and `thinkingLevelMap` to correctly handle reasoning output.
 
 ### 7. Use
 
