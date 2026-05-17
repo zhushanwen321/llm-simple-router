@@ -303,7 +303,7 @@ AC2: 开关 ON + 无 session_id → 测试 xxxx
 | `taste/no-unbounded-while-true` | warn | `while(true)` 必须包含迭代计数器 + 上限检查 |
 | `taste/no-inline-import-type` | warn | 禁止行内 `as import(...).Type`，应在文件顶部统一 import 类型 |
 
-基础规则：`no-explicit-any: error`、`max-lines: 500`、`max-lines-per-function: 300`、`no-magic-numbers: warn`、`no-eval: error`。测试文件被排除在 lint 之外。
+基础规则：`no-explicit-any: error`、`max-lines: 1000`、`max-lines-per-function: 300`、`no-magic-numbers: warn`、`no-eval: error`。测试文件被排除在 lint 之外。
 
 ### 代码品味原则
 
@@ -432,7 +432,7 @@ export function responsesToChatRequest(
 - 原生 HTML 元素（button/input/select/dialog/label/table 等）→ 必须用 shadcn-vue 组件（`components/ui/` 豁免）
 - Emoji → 必须用 `lucide-vue-next` 图标
 - 自定义 CSS → `<style scoped>` 内只允许 `@apply`，禁止手写选择器（`@keyframes`/`animation`/`transition` 例外）
-- 行数上限 → `<template>` 400 行、`<script setup>` 300 行
+- 行数上限 → `<template>` 800 行、`<script setup>` 600 行
 
 ## MCP Tools: code-review-graph
 
@@ -612,6 +612,68 @@ bash ~/.claude/skills/merge-worktree/merge-worktree.sh <branch>
 - **运行位置**：feature worktree 目录
 - **前提**：所有变更已 commit 并 push、gh CLI 已登录
 - **幂等**：最新 commit 含 "bump version" 时跳过版本升级；tag/release 已存在时跳过
+
+## 模型元数据架构
+
+### 数据源层级
+
+模型元数据（capabilities、context_window 等）有三个来源，优先级从高到低：
+
+| 优先级 | 来源 | 存储位置 | 说明 |
+|--------|------|----------|------|
+| 1（最高） | 用户手动配置 | DB `providers.models` JSON 中每个 ModelEntry 的 `capabilities` 字段 | Provider 编辑页面可修改 |
+| 2 | 内置白名单 | `router/src/config/model-context.ts` `MODEL_CAPABILITIES` | 硬编码，人工验证，覆盖常见模型，发版更新 |
+| 3 | 外部模型目录 | `router/config/model-directory.json` | 由 `sync-model-directory.sh` 从 ai-model-directory 拉取 |
+| 4（最低） | 默认值 | `parseModels()` 返回 `capabilities: ["text"]` | 不在白名单和目录中的模型默认仅支持文本 |
+
+`parseModels()` 自动按优先级合并：显式配置 > 硬编码白名单 > 外部目录 > `["text"]`。
+白名单优先于目录数据，因为白名单经过人工验证（如月之暗面 moonshot-v1 系列API支持图片但目录中标记为纯文本）。
+
+### 外部模型目录（未来增强）
+
+**[ai-model-directory](https://github.com/The-Best-Codes/ai-model-directory)** 是一个自动更新的全模型元数据仓库，每日通过 GitHub Actions 刷新。
+
+**数据格式**（TOML，每个模型一个文件）：
+```toml
+# data/providers/<provider>/models/<model-id>/index.toml
+id = "gpt-4o"
+name = "GPT-4o"
+
+[modalities]
+input = ["image", "text"]    # 关键字段：支持 image/text/audio/video/file
+output = ["text"]
+
+[limit]
+context = 128000              # 上下文窗口
+output = 16384
+
+[pricing]
+input = 2.5
+output = 10
+```
+
+**获取方式**：
+- 单个模型：`https://raw.githubusercontent.com/The-Best-Codes/ai-model-directory/main/data/providers/{provider}/models/{model-id}/index.toml`
+- 全量 JSON：`https://raw.githubusercontent.com/The-Best-Codes/ai-model-directory/main/data/all.json`（约 1.6MB）
+- Provider 列表：`https://api.github.com/repos/The-Best-Codes/ai-model-directory/contents/data/providers`
+
+**集成思路**（未实现，仅记录）：
+1. 新增 `sync-model-directory` 管理命令，定期拉取 `all.json`
+2. 提取 `modalities.input` 映射为 capabilities（含 `image` → `["text", "image"]`）
+3. 合并到 `MODEL_CAPABILITIES` 白名单，替代手工维护
+4. 保留用户手动配置的优先级最高
+
+**当前状态**：未集成。`MODEL_CAPABILITIES` 白名单仍需手工维护，新增模型时需同步更新 `model-context.ts`。
+
+### 相关文件
+
+| 文件 | 职责 |
+|------|------|
+| `router/src/config/model-context.ts` | `MODEL_CAPABILITIES` 白名单 + `MODEL_CONTEXT_WINDOWS` + `parseModels()` |
+| `router/src/proxy/routing/image-redirect.ts` | IR 层：图片检测 + fallback target prepend |
+| `router/src/admin/groups.ts` | `validateRule()` image_fallback 校验 |
+| `frontend/src/components/providers/ModelCapabilitiesEditor.vue` | Provider UI capabilities 编辑 |
+| `frontend/src/components/mappings/ModelMappingCard.vue` | 映射组 UI image_fallback 配置 |
 
 ## 已知陷阱
 

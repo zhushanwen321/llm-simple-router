@@ -150,5 +150,11 @@
     "failed": "获取上游模型列表失败",
     "sourceUpstream": "上游",
     "sourcePreset": "预设"
+  },
+  "capabilities": {
+  "text": "文本",
+  "image": "图片",
+  "audio": "音频",
+  "video": "视频"
   }
 }

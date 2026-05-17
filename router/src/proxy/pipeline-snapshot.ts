@@ -3,14 +3,15 @@ export type StageRecord =
   | { stage: "tool_guard"; action: string; tool: string }
   | { stage: "routing"; client_model: string; backend_model: string; provider_id: string; strategy: string; mapping_reason?: MappingReason }
   | { stage: "overflow"; triggered: boolean; redirect_to?: string; redirect_provider?: string }
-  | { stage: "provider_patch"; types: string[] };
+  | { stage: "provider_patch"; types: string[] }
+  | { stage: "modality-redirect"; triggered: boolean; original_model: string; redirect_to: string; redirect_provider: string; reason: string; detected_modalities?: string[] };
 
 import type { MappingReason } from "../core/types.js";
 
 export class PipelineSnapshot {
   private readonly stages: StageRecord[];
 
-  constructor(initial?: StageRecord[]) {
+  constructor(initial?: readonly StageRecord[]) {
     this.stages = initial ? [...initial] : [];
   }
 

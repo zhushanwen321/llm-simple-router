@@ -96,7 +96,7 @@ export function fromActiveRequest(
     createdAt: null,
     inputTokensEstimated: false,
     clientType: null,
-    cacheReadTokensEstimated: null,
+    cacheReadTokensEstimated: m?.cacheReadTokensEstimated ?? null,
     mappingReason: req.mappingReason,
   };
 }
@@ -153,7 +153,9 @@ export function parseMappingReason(
   if (!snapshot) return undefined;
   try {
     const parsed: unknown = JSON.parse(snapshot);
-    const stages: Array<Record<string, unknown>> = Array.isArray(parsed) ? parsed : [];
+    const stages: Array<Record<string, unknown>> = Array.isArray(parsed)
+      ? parsed
+      : [];
     if (stages.length === 0) return undefined;
     // 优先检查 overflow stage
     for (const stage of stages) {
@@ -163,7 +165,10 @@ export function parseMappingReason(
     }
     // 取 routing stage 的 mapping_reason
     for (const stage of stages) {
-      if (stage.stage === "routing" && typeof stage.mapping_reason === "string") {
+      if (
+        stage.stage === "routing" &&
+        typeof stage.mapping_reason === "string"
+      ) {
         return KNOWN_MAPPING_REASONS.has(stage.mapping_reason)
           ? stage.mapping_reason
           : undefined;

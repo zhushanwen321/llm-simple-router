@@ -27,7 +27,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint . --max-warnings=0",
-    "postbuild": "node -e \"require('fs').cpSync('src/db/migrations','dist/db/migrations',{recursive:true})\"",
+  "postbuild": "node -e \"require('fs').cpSync('src/db/migrations','dist/db/migrations',{recursive:true});require('fs').cpSync('config','dist/config',{recursive:true})\"",
     "prepublishOnly": "node scripts/prepublish.mjs"
   },
   "dependencies": {

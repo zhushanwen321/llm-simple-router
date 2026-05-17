@@ -1,5 +1,5 @@
 // Example transform plugin — injects a custom header marker
-module.exports = {
+export default {
   name: "example",
   match: { providerNamePattern: ".*" },
   afterRequestTransform(ctx) {

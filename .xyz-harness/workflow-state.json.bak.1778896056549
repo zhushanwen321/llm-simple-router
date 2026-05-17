@@ -1,0 +1,391 @@
+{
+  "version": 1,
+<<<<<<< HEAD
+  "requirement": "创建一个issue，有一位用户发来如下诉求： 提个feature。我可以从哪里判断这个模型转发的原因不，是溢出还是分时段映射。 我现在属于溢出情况，因为我知道我还没命中分时段的规则，但两个一起配的时候，脑子就容易混。这里加一列，就清晰一点。 帮我看看这个需求应该如何实现？",
+  "topicDir": "2026-05-15-issue-feature",
+  "projectRoot": "/Users/zhushanwen/Code/llm-simple-router-workspace/feat-mapping-reason-track",
+  "currentPhase": 2,
+  "currentStage": 16,
+  "completed": true,
+  "startedAt": "2026-05-15T03:08:52.707Z",
+=======
+  "requirement": "重新开始，我修复了这个workflow的插件的问题，现在不需要你来执行脚本验证了。",
+  "topicDir": "2026-05-15-workflow",
+  "projectRoot": "/Users/zhushanwen/Code/llm-simple-router-workspace/feat-image-model-switch",
+  "currentPhase": 2,
+  "currentStage": 10,
+  "completed": false,
+  "startedAt": "2026-05-15T12:17:41.434Z",
+>>>>>>> 7f614a3 (refactor: move routing decisions outside failover while-loop (T3))
+  "stages": [
+    {
+      "number": 1,
+      "name": "需求讨论",
+      "status": "pass",
+<<<<<<< HEAD
+      "startedAt": "2026-05-15T03:08:52.708Z",
+      "completedAt": "2026-05-15T03:13:37.816Z",
+=======
+      "startedAt": "2026-05-15T12:17:41.435Z",
+      "completedAt": "2026-05-15T12:17:51.027Z",
+>>>>>>> 7f614a3 (refactor: move routing decisions outside failover while-loop (T3))
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 2,
+      "name": "Spec 编写",
+      "status": "pass",
+<<<<<<< HEAD
+      "startedAt": "2026-05-15T03:13:37.816Z",
+      "completedAt": "2026-05-15T03:30:10.631Z",
+=======
+      "startedAt": "2026-05-15T14:21:40.052Z",
+      "completedAt": "2026-05-15T14:31:29.391Z",
+>>>>>>> 7f614a3 (refactor: move routing decisions outside failover while-loop (T3))
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 3,
+      "name": "Spec 评审",
+      "status": "pass",
+<<<<<<< HEAD
+      "startedAt": "2026-05-15T03:30:10.632Z",
+      "completedAt": "2026-05-15T03:49:41.003Z",
+=======
+      "startedAt": "2026-05-15T14:31:29.391Z",
+      "completedAt": "2026-05-15T14:43:51.201Z",
+>>>>>>> 7f614a3 (refactor: move routing decisions outside failover while-loop (T3))
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 4,
+      "name": "Plan 编写",
+      "status": "pass",
+<<<<<<< HEAD
+      "startedAt": "2026-05-15T03:49:41.003Z",
+      "completedAt": "2026-05-15T03:59:41.370Z",
+=======
+      "startedAt": "2026-05-15T14:43:51.201Z",
+      "completedAt": "2026-05-15T14:49:25.586Z",
+>>>>>>> 7f614a3 (refactor: move routing decisions outside failover while-loop (T3))
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 5,
+      "name": "Plan 评审",
+      "status": "pass",
+<<<<<<< HEAD
+      "startedAt": "2026-05-15T03:59:41.370Z",
+      "completedAt": "2026-05-15T04:05:12.462Z",
+=======
+      "startedAt": "2026-05-15T14:49:25.586Z",
+      "completedAt": "2026-05-15T15:03:29.785Z",
+>>>>>>> 7f614a3 (refactor: move routing decisions outside failover while-loop (T3))
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 6,
+      "name": "E2E 测试计划",
+      "status": "pass",
+<<<<<<< HEAD
+      "startedAt": "2026-05-15T04:05:12.462Z",
+      "completedAt": "2026-05-15T04:06:25.220Z",
+=======
+      "startedAt": "2026-05-15T15:03:29.785Z",
+      "completedAt": "2026-05-15T15:04:28.719Z",
+>>>>>>> 7f614a3 (refactor: move routing decisions outside failover while-loop (T3))
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 7,
+      "name": "E2E 测试计划评审",
+      "status": "pass",
+<<<<<<< HEAD
+      "startedAt": "2026-05-15T04:06:25.220Z",
+      "completedAt": "2026-05-15T04:17:19.887Z",
+=======
+      "startedAt": "2026-05-15T15:04:28.719Z",
+      "completedAt": "2026-05-15T15:10:10.497Z",
+>>>>>>> 7f614a3 (refactor: move routing decisions outside failover while-loop (T3))
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 8,
+      "name": "用户确认",
+      "status": "pass",
+<<<<<<< HEAD
+      "startedAt": "2026-05-15T04:17:19.887Z",
+      "completedAt": "2026-05-15T04:22:28.690Z",
+=======
+      "startedAt": "2026-05-15T15:10:10.497Z",
+      "completedAt": "2026-05-15T15:18:47.119Z",
+>>>>>>> 7f614a3 (refactor: move routing decisions outside failover while-loop (T3))
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 9,
+      "name": "TDD 测试编写",
+      "status": "pass",
+<<<<<<< HEAD
+      "startedAt": "2026-05-15T04:22:28.690Z",
+      "completedAt": "2026-05-15T04:30:50.510Z",
+=======
+      "startedAt": "2026-05-15T15:18:47.119Z",
+      "completedAt": "2026-05-15T15:40:58.134Z",
+>>>>>>> 7f614a3 (refactor: move routing decisions outside failover while-loop (T3))
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": [
+        {
+<<<<<<< HEAD
+          "id": "tdd-resolver",
+          "name": "TDD: resolveMapping 4种映射原因测试",
+          "status": "pass",
+          "completedAt": "2026-05-15T04:29:54.981Z",
+          "summary": "5 个测试用例覆盖 resolveMapping 4 种映射原因路径（direct_format/group_base_rule/group_schedule/fallback_provider），全部 FAIL（RED）。已提交。"
+        },
+        {
+          "id": "tdd-failover-overflow",
+          "name": "TDD: failover-loop overflow_redirect + failover_retry 测试",
+          "status": "pass",
+          "completedAt": "2026-05-15T04:30:02.372Z",
+          "summary": "4 个测试用例覆盖 overflow_redirect 和 failover_retry（2 FAIL + 2 PASS），FAIL 符合预期。已提交。"
+        },
+        {
+          "id": "tdd-frontend-parse",
+          "name": "TDD: parseMappingReason 前端解析测试",
+          "status": "pass",
+          "completedAt": "2026-05-15T04:30:11.448Z",
+          "summary": "前端 parseMappingReason 无独立前端测试基础设施，将在 Task F2 实现阶段同步编写单元测试。后端 TDD 覆盖完整数据流。"
+=======
+          "id": "T1-tests",
+          "name": "TDD tests for capabilities infrastructure",
+          "status": "pass",
+          "completedAt": "2026-05-15T15:23:57.664Z",
+          "summary": "T1+T5测试完成：8个capabilities测试（7个FAIL因capabilities未定义）+3个StageRecord测试（TS2322因image-redirect变体不存在）。全部按预期失败。"
+        },
+        {
+          "id": "T2-tests",
+          "name": "TDD tests for computeImageRedirectTargets",
+          "status": "pass",
+          "completedAt": "2026-05-15T15:28:26.840Z",
+          "summary": "T2测试完成：15个测试用例全部FAIL（image-redirect模块不存在）。覆盖AC1-AC4,AC7-AC10,AC13-AC16及3个边界条件。"
+        },
+        {
+          "id": "T3-tests",
+          "name": "TDD tests for failover-loop refactoring",
+          "status": "pass",
+          "completedAt": "2026-05-15T15:39:35.985Z",
+          "summary": "T3测试完成：5个集成测试全部FAIL。IR层未实现导致image-redirect stage不存在，fallback provider从未被调用。符合预期。"
+        },
+        {
+          "id": "T4-tests",
+          "name": "TDD tests for expandOverflowTargets",
+          "status": "pass",
+          "completedAt": "2026-05-15T15:26:05.046Z",
+          "summary": "T4测试完成：4个测试用例全部FAIL（expandOverflowTargets不存在）。覆盖overflow target prepend、空数组、IR fallback跳过、异常安全。"
+        },
+        {
+          "id": "T5-tests",
+          "name": "TDD tests for StageRecord extension",
+          "status": "pass",
+          "completedAt": "2026-05-15T15:28:33.388Z",
+          "summary": "T5测试完成：3个StageRecord测试全部TS2322（image-redirect变体不在union type中）。"
+        },
+        {
+          "id": "T6-tests",
+          "name": "TDD tests for validateRule extension",
+          "status": "pass",
+          "completedAt": "2026-05-15T15:28:45.757Z",
+          "summary": "T6测试完成：8个测试用例（6 FAIL + 2 PASS）。validateRule不验证image_fallback，无效请求返回201而非400。"
+>>>>>>> 7f614a3 (refactor: move routing decisions outside failover while-loop (T3))
+        }
+      ]
+    },
+    {
+      "number": 10,
+      "name": "编码实现",
+<<<<<<< HEAD
+      "status": "pass",
+      "startedAt": "2026-05-15T04:30:50.510Z",
+      "completedAt": "2026-05-15T04:44:49.070Z",
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": [
+        {
+          "id": "impl-types-resolver",
+          "name": "B1+B2+B3+B4: 后端类型定义 + resolveMapping 核心逻辑",
+          "status": "pass",
+          "completedAt": "2026-05-15T04:39:46.753Z",
+          "summary": "B1-B6 全部实现。MappingReason type + ResolveResult + ActiveRequest + PipelineSnapshot + resolveMapping 4路径 + failover-loop overflow/failover 覆写 + orchestrator 传递。9 TDD 测试全部 GREEN，1361 全量测试 0 回归。已提交。"
+        },
+        {
+          "id": "impl-failover",
+          "name": "B5+B6: orchestrator + failover-loop 映射原因传递",
+          "status": "pass",
+          "completedAt": "2026-05-15T04:39:57.222Z",
+          "summary": "B5+B6 已随 B1-B4 一并实现。OrchestratorConfig 新增 mappingReason + buildActiveRequest 传递 + failover-loop BP-H2缓存扩展 + overflow/failover 后置覆写。overflow/failover 测试 GREEN。"
+        },
+        {
+          "id": "impl-frontend",
+          "name": "F1+F2+F3+F4+F5: 前端类型+解析器+Badge+i18n",
+          "status": "pass",
+          "completedAt": "2026-05-15T04:44:39.515Z",
+          "summary": "F1-F5 全部实现。LogEntry+ActiveRequest 类型扩展、parseMappingReason 防御性解析、fromLogEntry/fromActiveRequest 转换器、RequestOverviewPanel Badge 展示、zh-CN/en 双语 i18n 6 种映射原因。vue-tsc + eslint 0 错误。已提交。"
+        }
+      ]
+    },
+    {
+      "number": 11,
+      "name": "编码评审",
+      "status": "pass",
+      "startedAt": "2026-05-15T04:44:49.070Z",
+      "completedAt": "2026-05-15T04:59:40.919Z",
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 12,
+      "name": "单元测试",
+      "status": "pass",
+      "startedAt": "2026-05-15T04:59:40.919Z",
+      "completedAt": "2026-05-15T05:04:06.630Z",
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 13,
+      "name": "E2E 测试",
+      "status": "pass",
+      "startedAt": "2026-05-15T05:04:06.630Z",
+      "completedAt": "2026-05-15T05:05:20.556Z",
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 14,
+      "name": "测试评审",
+      "status": "pass",
+      "startedAt": "2026-05-15T05:05:20.556Z",
+      "completedAt": "2026-05-15T05:09:03.256Z",
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 15,
+      "name": "推送+CI+部署",
+      "status": "pass",
+      "startedAt": "2026-05-15T05:09:03.256Z",
+      "completedAt": "2026-05-15T05:13:50.264Z",
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    },
+    {
+      "number": 16,
+      "name": "自动复盘",
+      "status": "pass",
+      "startedAt": "2026-05-15T05:13:50.264Z",
+      "completedAt": "2026-05-15T05:18:42.342Z",
+      "gateResult": "pass",
+      "gateOutput": null,
+      "tasks": []
+    }
+  ],
+  "rollbackHistory": []
+=======
+      "status": "active",
+      "startedAt": "2026-05-15T15:40:58.134Z",
+      "completedAt": null,
+      "gateResult": null,
+      "gateOutput": null,
+      "tasks": [
+        {
+          "id": "T1",
+          "name": "Model capabilities 基础设施",
+          "status": "pass",
+          "completedAt": "2026-05-15T15:52:29.232Z",
+          "summary": "T1完成：ModelEntry/ModelInfo加capabilities字段、MODEL_CAPABILITIES白名单(~45模型)、parseModels()三层回退、buildModelInfoList()透传。8/8 GREEN。"
+        },
+        {
+          "id": "T4",
+          "name": "expandOverflowTargets() 包装函数",
+          "status": "pass",
+          "completedAt": "2026-05-15T15:53:10.788Z",
+          "summary": "T4完成：expandOverflowTargets()已存在于overflow.ts，遍历targets并prepend overflow target，per-target异常隔离。4/4 GREEN。"
+        },
+        {
+          "id": "T5",
+          "name": "StageRecord union 扩展",
+          "status": "pass",
+          "completedAt": "2026-05-15T15:53:25.472Z",
+          "summary": "T5完成：StageRecord union已含image-redirect变体（triggered/original_model/redirect_to/redirect_provider/reason字段）。"
+        },
+        {
+          "id": "T6",
+          "name": "Admin API validateRule 扩展",
+          "status": "pass",
+          "completedAt": "2026-05-15T15:54:50.505Z",
+          "summary": "T6完成：validateRule()已含image_fallback校验（provider_id/backend_model非空、provider存在且active、向后兼容）。8/8 GREEN。"
+        },
+        {
+          "id": "T2",
+          "name": "computeImageRedirectTargets() 工具函数",
+          "status": "pass",
+          "completedAt": "2026-05-15T15:59:05.834Z",
+          "summary": "T2完成：computeImageRedirectTargets() + hasImage()新建。16/16 GREEN。3种API格式图片检测、capabilities三层回退、fallback校验、异常降级。"
+        },
+        {
+          "id": "T3",
+          "name": "failover-loop.ts 循环重构",
+          "status": "pending",
+          "completedAt": null,
+          "summary": null
+        },
+        {
+          "id": "TF1",
+          "name": "Provider 模型能力编辑（前端）",
+          "status": "pending",
+          "completedAt": null,
+          "summary": null
+        },
+        {
+          "id": "TF2",
+          "name": "映射组 image_fallback 配置（前端）",
+          "status": "pending",
+          "completedAt": null,
+          "summary": null
+        }
+      ]
+    }
+  ],
+  "rollbackHistory": [
+    {
+      "from": 8,
+      "to": 2,
+      "reason": "采用分层路由模型（IR→OF→FO逐层展开）替代Pipeline Hook方案，需重写spec并重走后续所有阶段",
+      "timestamp": "2026-05-15T14:21:40.052Z"
+    }
+  ]
+>>>>>>> 7f614a3 (refactor: move routing decisions outside failover while-loop (T3))
+}

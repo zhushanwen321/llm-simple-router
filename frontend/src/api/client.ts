@@ -1,7 +1,13 @@
 import axios from "axios";
 import router from "@/router";
+import { HTTP_STATUS, API_CODE } from "@/constants";
 import type { LogEntry } from "@/components/logs/types";
-import type { Provider, MappingGroup, ModelMapping, TransformRule } from "@/types/mapping";
+import type {
+  Provider,
+  MappingGroup,
+  ModelMapping,
+  TransformRule,
+} from "@/types/mapping";
 import type { Schedule, SchedulePayload } from "@/types/schedule";
 import type {
   ActiveRequest,
@@ -26,8 +32,8 @@ const client = axios.create({
 client.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) { // eslint-disable-line no-magic-numbers
-      if (error.response.data?.code === 40103) { // eslint-disable-line no-magic-numbers
+    if (error.response?.status === HTTP_STATUS.UNAUTHORIZED) {
+      if (error.response.data?.code === API_CODE.NOT_INITIALIZED) {
         router.push("/setup");
       } else {
         router.push("/login");
@@ -54,9 +60,11 @@ export interface ProviderPreset {
   apiType: "openai" | "openai-responses" | "anthropic";
   baseUrl: string;
   upstreamPath?: string;
-  /** 上游模型列表端点路径，如 /v1/models 或 /models */
+  /** 上游模型列表端点路径 */
   modelsEndpoint?: string;
   models: string[];
+  /** 模型名 → capabilities 映射（由后端补充） */
+  modelCapabilities?: Record<string, string[]>;
 }
 
 export interface ProviderGroup {
@@ -82,7 +90,15 @@ export interface ProviderPayload {
   base_url: string;
   upstream_path?: string;
   api_key?: string;
-  models?: Array<string | { name: string; context_window?: number; patches?: string[] }>;
+  models?: Array<
+    | string
+    | {
+        name: string;
+        context_window?: number;
+        patches?: string[];
+        capabilities?: string[];
+      }
+  >;
   is_active: number;
   max_concurrency?: number;
   queue_timeout_ms?: number;
@@ -130,32 +146,36 @@ interface RetryRulePayload {
 
 export interface QuickSetupPayload {
   provider: {
-    name: string
-    api_type: string
-    base_url: string
-    upstream_path?: string
-    api_key: string
-    models: Array<{ name: string; context_window?: number; patches?: string[] }>
-    concurrency_mode?: 'auto' | 'manual' | 'none'
-    max_concurrency?: number
-    queue_timeout_ms?: number
-    max_queue_size?: number
-  }
-  mappings: Array<{ client_model: string; backend_model: string }>
+    name: string;
+    api_type: string;
+    base_url: string;
+    upstream_path?: string;
+    api_key: string;
+    models: Array<{
+      name: string;
+      context_window?: number;
+      patches?: string[];
+    }>;
+    concurrency_mode?: "auto" | "manual" | "none";
+    max_concurrency?: number;
+    queue_timeout_ms?: number;
+    max_queue_size?: number;
+  };
+  mappings: Array<{ client_model: string; backend_model: string }>;
   retry_rules: Array<{
-    name: string
-    status_code: number
-    body_pattern: string
-    retry_strategy: string
-    retry_delay_ms: number
-    max_retries: number
-    max_delay_ms: number
-  }>
+    name: string;
+    status_code: number;
+    body_pattern: string;
+    retry_strategy: string;
+    retry_delay_ms: number;
+    max_retries: number;
+    max_delay_ms: number;
+  }>;
   transform_rules?: {
-    inject_headers?: Record<string, string>
-    request_defaults?: Record<string, unknown>
-    drop_fields?: string[]
-  }
+    inject_headers?: Record<string, string>;
+    request_defaults?: Record<string, unknown>;
+    drop_fields?: string[];
+  };
 }
 
 // --- Response types ---
@@ -374,7 +394,9 @@ export const api = {
     start_time?: string;
     end_time?: string;
   }) =>
-    request<MetricsSummaryResponse>("get", "/metrics/summary", undefined, { params }),
+    request<MetricsSummaryResponse>("get", "/metrics/summary", undefined, {
+      params,
+    }),
   getMetricsTimeseries: (params: {
     period?: string;
     metric: string;
@@ -384,11 +406,17 @@ export const api = {
     start_time?: string;
     end_time?: string;
   }) =>
-    request<TimeseriesRawRow[]>("get", "/metrics/timeseries", undefined, { params }),
+    request<TimeseriesRawRow[]>("get", "/metrics/timeseries", undefined, {
+      params,
+    }),
 
   getRouterKeys: () => request<RouterKeyPublic[]>("get", "/router-keys"),
   createRouterKey: (data: RouterKeyCreatePayload) =>
-    request<{ id: string; name: string; key: string }>("post", "/router-keys", data),
+    request<{ id: string; name: string; key: string }>(
+      "post",
+      "/router-keys",
+      data,
+    ),
   updateRouterKey: (id: string, data: RouterKeyUpdatePayload) =>
     request<{ success: boolean }>("put", `/router-keys/${id}`, data),
   deleteRouterKey: (id: string) =>
@@ -403,7 +431,10 @@ export const api = {
   deleteMappingGroup: (id: string) =>
     request<{ success: boolean }>("delete", `/mapping-groups/${id}`),
   toggleMappingGroup: (id: string) =>
-    request<{ success: boolean; is_active: number }>("post", `/mapping-groups/${id}/toggle`),
+    request<{ success: boolean; is_active: number }>(
+      "post",
+      `/mapping-groups/${id}/toggle`,
+    ),
 
   getRetryRules: () => request<RetryRule[]>("get", "/retry-rules"),
   createRetryRule: (data: RetryRulePayload) =>
@@ -423,7 +454,10 @@ export const api = {
   deleteSchedule: (id: string) =>
     request<{ success: boolean }>("delete", `/schedules/${id}`),
   toggleSchedule: (id: string) =>
-    request<{ success: boolean; enabled: number }>("post", `/schedules/${id}/toggle`),
+    request<{ success: boolean; enabled: number }>(
+      "post",
+      `/schedules/${id}/toggle`,
+    ),
 
   getProxyEnhancement: () =>
     request<ProxyEnhancementConfig>("get", "/proxy-enhancement"),
@@ -453,7 +487,9 @@ export const api = {
     router_key_id?: string;
     provider_id?: string;
   }) =>
-    request<UsageWindowWithUsage[]>("get", "/usage/windows", undefined, { params }),
+    request<UsageWindowWithUsage[]>("get", "/usage/windows", undefined, {
+      params,
+    }),
   getUsageWeekly: (params?: { router_key_id?: string }) =>
     request<DailyUsage[]>("get", "/usage/weekly", undefined, { params }),
   getUsageMonthly: (params?: { router_key_id?: string }) =>
@@ -463,12 +499,23 @@ export const api = {
   getTransformRules: (providerId: string) =>
     request<TransformRule | null>("get", `/transform-rules/${providerId}`),
   upsertTransformRules: (providerId: string, data: Partial<TransformRule>) =>
-    request<{ success: boolean }>("put", `/transform-rules/${providerId}`, data),
+    request<{ success: boolean }>(
+      "put",
+      `/transform-rules/${providerId}`,
+      data,
+    ),
   deleteTransformRules: (providerId: string) =>
     request<{ success: boolean }>("delete", `/transform-rules/${providerId}`),
   reloadTransformRules: () =>
-    request<{ loadedPlugins: string[]; rulesCount: number }>("post", "/transform-rules/reload"),
+    request<{ loadedPlugins: string[]; rulesCount: number }>(
+      "post",
+      "/transform-rules/reload",
+    ),
 
   quickSetup: (data: QuickSetupPayload) =>
-    request<{ success: boolean; provider_id: string }>("post", "/quick-setup", data),
+    request<{ success: boolean; provider_id: string }>(
+      "post",
+      "/quick-setup",
+      data,
+    ),
 };

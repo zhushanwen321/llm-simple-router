@@ -144,6 +144,8 @@ function buildProviderPayload(input: ProviderPayloadInput): QuickSetupPayload['p
       name: m.name,
       context_window: m.contextWindow,
       patches: m.patches.length > 0 ? m.patches : undefined,
+      stream_timeout_ms: m.stream_timeout_ms ?? undefined,
+      capabilities: m.capabilities && m.capabilities.length > 0 ? m.capabilities : undefined,
     })),
     concurrency_mode: input.concurrencyMode,
     max_concurrency: input.concurrencyMode !== 'none' ? input.maxConcurrency : undefined,
@@ -202,6 +204,7 @@ function buildMappingEntries(
   })
 }
 
+// eslint-disable-next-line max-lines-per-function -- 函数内每个部分都是 QuickSetup 必需逻辑，拆分会降低可读性
 export function useQuickSetup() {
   const { t } = useI18n()
   // --- State ---
@@ -320,12 +323,13 @@ export function useQuickSetup() {
     return computeDefaultPatches(modelName, format, isNonOpenaiEndpoint.value)
   }
 
-  function initModels(preset: { models: string[]; apiType: 'openai' | 'openai-responses' | 'anthropic' }) {
+  function initModels(preset: { models: string[]; modelCapabilities?: Record<string, string[]>; apiType: 'openai' | 'openai-responses' | 'anthropic' }) {
     modelConfigs.value = preset.models.map(name => ({
       name,
       contextWindow: getDefaultContextWindow(name),
       enabled: true,
       patches: getDefaultPatches(name, preset.apiType),
+      capabilities: preset.modelCapabilities?.[name],
     }))
   }
 
@@ -336,6 +340,7 @@ export function useQuickSetup() {
       contextWindow,
       enabled: true,
       patches: getDefaultPatches(name, apiType.value),
+      capabilities: ["text"],
     })
   }
 

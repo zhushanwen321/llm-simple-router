@@ -60,6 +60,7 @@ export interface MetricsResult {
   output_tokens: number | null;
   cache_creation_tokens: number | null;
   cache_read_tokens: number | null;
+  cache_read_tokens_estimated?: number;
   ttft_ms: number | null;
   /** T6 - T0: proxy end-to-end streaming duration */
   total_duration_ms: number | null;

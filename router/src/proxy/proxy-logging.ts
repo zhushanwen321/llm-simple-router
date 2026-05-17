@@ -185,7 +185,7 @@ export function collectTransportMetrics(
           metrics.cache_read_tokens = cachedTokens;
           metrics.cache_read_tokens_estimated = 1;
           if (tracker) {
-            try { tracker.updateCompletedMetrics(lastSuccessLogId, cachedTokens); } catch (e) { request.log.error({ err: e }, "tracker update failed"); }
+            try { tracker.updateCompletedMetrics(lastSuccessLogId, cachedTokens, true); } catch (e) { request.log.error({ err: e }, "tracker update failed"); }
           }
         } else {
           try {
@@ -194,7 +194,7 @@ export function collectTransportMetrics(
               metrics.cache_read_tokens = estimated;
               metrics.cache_read_tokens_estimated = 1;
               if (tracker) {
-                try { tracker.updateCompletedMetrics(lastSuccessLogId, estimated); } catch (e) { request.log.error({ err: e }, "tracker update failed"); }
+                try { tracker.updateCompletedMetrics(lastSuccessLogId, estimated, true); } catch (e) { request.log.error({ err: e }, "tracker update failed"); }
               }
             }
           } catch (e) {
