@@ -8,7 +8,7 @@ LLM API 代理路由器。接收 Claude Code / Cursor 等客户端请求，通�
 
 ## 适合谁
 
-- 用 Claude Code / Cursor / Codex 配合国产模型（智谱、Moonshot、Minimax 等）的开发者
+- 用 Claude Code / Cursor / Codex / Pi 配合国产模型（智谱、Moonshot、Minimax 等）的开发者
 - 希望自动重试限流错误、按场景切换模型、控制并发排队
 - 想要一个开箱即用的方案，不折腾
 
@@ -20,7 +20,7 @@ LLM API 代理路由器。接收 Claude Code / Cursor 等客户端请求，通�
 |------|------|
 | 错误自动重试 | 对 429/400/网络超时等可恢复错误自动指数退避重试，客户端完全无感 |
 | 并发队列等待 | 按 Provider 配置并发上限，超限请求排队等待；支持自适应并发，根据负载自动调整，无需手动调参 |
-| 多 API 格式支持 | 支持 OpenAI（Chat Completions、Responses）和 Anthropic（Messages）三种接口，客户端与上游格式可任意组合。内置 DeepSeek reasoning_thinking 补丁 |
+| 多 API 格式支持 | 支持 OpenAI（Chat Completions、Responses）和 Anthropic（Messages）三种接口，客户端与上游格式可任意组合。内置 DeepSeek reasoning_thinking 补丁，支持DS和其他模型混用切换 |
 | 流式响应超时 | 每个模型可单独设置流式超时，防止模型卡死不输出导致请求挂起 |
 | 实时请求监控 | SSE 推送活跃请求、队列状态、流式输出实时查看，结构化展示适配 Claude Code 输出格式 |
 | 请求日志 | 四阶段完整链路（客户端请求 → 上游请求 → 上游响应 → 客户端响应），支持日志文件归档 |
@@ -107,7 +107,7 @@ Claude Code 未设置环境变量时，默认使用以下模型名：`opus`、`s
 
 在管理后台创建 Router API 密钥，然后选择一种方式配置。**两种方式只需选其一。**
 
-**方式一：shell alias（推荐）**
+**方��一：shell alias（推荐）**
 
 最小配置，Claude Code 使用默认模型名（opus / sonnet / haiku），Router 通过映射表转换为后端模型：
 
@@ -167,14 +167,80 @@ claude'
 
 > settings.json 中的环境变量对所有项目生效。如果只想对当前项目生效，可放在 `.claude/settings.json`（项目根目录下）。
 
-### 5. 使用
+### 5. 配置 Codex
+
+编辑 `~/.codex/config.toml`，将 Router 配置为自定义 Provider：
+
+```toml
+model_provider = "llm-simple-router"
+model = "deepseek-v4-flash"
+preferred_auth_method = "apikey"
+
+[model_providers.llm-simple-router]
+name = "LLMSimpleRouter"
+base_url = "http://127.0.0.1:9981/v1"
+env_key = "ROUTER_KEY"
+wire_api = "responses"
+```
+
+设置环境变量��Router API 密钥）：
 
 ```bash
-# 方式一（shell alias）
+export ROUTER_KEY="<your-router-key>"
+```
+
+> Codex 通过 OpenAI Responses API（`wire_api = "responses"`）连接 Router。`model` 字段填 Router 中配置的客户端模型名。
+
+### 6. 配置 Pi Coding Agent
+
+编辑 `~/.pi/agent/models.json`，添加 Router 作为 Provider：
+
+```json
+{
+  "providers": {
+    "llm-simple-router": {
+      "baseUrl": "http://127.0.0.1:9981",
+      "api": "anthropic-messages",
+      "apiKey": "<your-router-key>",
+      "models": [
+        {
+          "id": "glm-5.1",
+          "name": "glm-5.1",
+          "reasoning": true,
+          "input": ["text"],
+          "contextWindow": 200000,
+          "maxTokens": 64000
+        },
+        {
+          "id": "deepseek-v4-flash",
+          "name": "deepseek-v4-flash",
+          "reasoning": true,
+          "input": ["text"],
+          "contextWindow": 1000000,
+          "maxTokens": 64000
+        }
+      ]
+    }
+  }
+}
+```
+
+> Pi 通过 Anthropic Messages API（`api: "anthropic-messages"`）连接 Router。`models` 中列出 Router 映射的模型，Pi 会自动识别。
+
+### 7. 使用
+
+```bash
+# Claude Code（shell alias）
 clode
 
-# 方式二（settings.json）
+# Claude Code（settings.json）
 claude
+
+# Codex
+codex
+
+# Pi Coding Agent
+pi
 ```
 
 ## Docker 部署

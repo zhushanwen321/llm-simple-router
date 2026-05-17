@@ -8,7 +8,7 @@ An LLM API proxy router that receives requests from clients like Claude Code and
 
 ## Who Is This For
 
-- Developers using Claude Code / Cursor / Codex with Chinese domestic models (Zhipu, Moonshot, Minimax, etc.)
+- Developers using Claude Code / Cursor / Codex / Pi with Chinese domestic models (Zhipu, Moonshot, Minimax, etc.)
 - Those who want automatic retries for rate-limit errors, scenario-based model switching, and concurrency queue management
 - Anyone looking for a turnkey solution without the hassle
 
@@ -167,14 +167,80 @@ Override model names:
 
 > Environment variables in settings.json apply to all projects. To apply only to the current project, place them in `.claude/settings.json` (in the project root).
 
-### 5. Use
+### 5. Configure Codex
+
+Edit `~/.codex/config.toml` to add the Router as a custom provider:
+
+```toml
+model_provider = "llm-simple-router"
+model = "deepseek-v4-flash"
+preferred_auth_method = "apikey"
+
+[model_providers.llm-simple-router]
+name = "LLMSimpleRouter"
+base_url = "http://127.0.0.1:9981/v1"
+env_key = "ROUTER_KEY"
+wire_api = "responses"
+```
+
+Set the environment variable (your Router API key):
 
 ```bash
-# Option 1 (shell alias)
+export ROUTER_KEY="<your-router-key>"
+```
+
+> Codex connects to Router via OpenAI Responses API (`wire_api = "responses"`). The `model` field should be the client model name configured in Router.
+
+### 6. Configure Pi Coding Agent
+
+Edit `~/.pi/agent/models.json` to add the Router as a provider:
+
+```json
+{
+  "providers": {
+    "llm-simple-router": {
+      "baseUrl": "http://127.0.0.1:9981",
+      "api": "anthropic-messages",
+      "apiKey": "<your-router-key>",
+      "models": [
+        {
+          "id": "glm-5.1",
+          "name": "glm-5.1",
+          "reasoning": true,
+          "input": ["text"],
+          "contextWindow": 200000,
+          "maxTokens": 64000
+        },
+        {
+          "id": "deepseek-v4-flash",
+          "name": "deepseek-v4-flash",
+          "reasoning": true,
+          "input": ["text"],
+          "contextWindow": 1000000,
+          "maxTokens": 64000
+        }
+      ]
+    }
+  }
+}
+```
+
+> Pi connects to Router via Anthropic Messages API (`api: "anthropic-messages"`). List the mapped models in `models` and Pi will detect them automatically.
+
+### 7. Use
+
+```bash
+# Claude Code (shell alias)
 clode
 
-# Option 2 (settings.json)
+# Claude Code (settings.json)
 claude
+
+# Codex
+codex
+
+# Pi Coding Agent
+pi
 ```
 
 ## Docker Deployment
