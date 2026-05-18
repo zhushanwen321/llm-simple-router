@@ -73,7 +73,12 @@
             :key="p.id"
             :class="{ 'opacity-60': !p.is_active }"
           >
-            <TableCell class="font-medium">{{ p.name }}</TableCell>
+            <TableCell class="font-medium">
+              <div class="flex items-center gap-2">
+                <ProviderIcon :name="providerIconName(p.name)" :size="18" />
+                <span>{{ p.name }}</span>
+              </div>
+            </TableCell>
             <TableCell>
               <Badge variant="secondary">{{
                 API_TYPE_LABELS[p.api_type] ?? p.api_type
@@ -480,6 +485,7 @@ import {
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
 import { RotateCw, Copy, Check, Shield, ImageIcon } from "lucide-vue-next";
+import ProviderIcon from "@/components/icons/ProviderIcon.vue";
 import ModelCapabilitiesEditor from "@/components/providers/ModelCapabilitiesEditor.vue";
 import {
   useProviderForm,
@@ -545,6 +551,40 @@ const { fetchingModels, fetchUpstreamModels } = useFetchUpstreamModels(
   getCurrentModelsEndpoint,
   getCurrentPresetModels,
 );
+
+const PROVIDER_ICON_MAP: Record<string, string> = {
+  deepseek: "deepseek",
+  qianfan: "baidu",
+  "\u767e\u5ea6\u5343\u5e06": "baidu",
+  iflytek: "iflytek",
+  "\u79d1\u5927\u8baf\u98de": "iflytek",
+  siliconflow: "siliconcloud",
+  "\u7845\u57fa\u6d41\u52a8": "siliconcloud",
+  zhipu: "zhipu",
+  "\u667a\u8c31": "zhipu",
+  kimi: "moonshot",
+  moonshot: "moonshot",
+  "\u6708\u4e4b\u6697\u9762": "moonshot",
+  minimax: "minimax",
+  volcengine: "volcengine",
+  "\u706b\u5c71\u5f15\u64ce": "volcengine",
+  aliyun: "alibaba",
+  alibaba: "alibaba",
+  "\u963f\u91cc\u4e91": "alibaba",
+  tencent: "tencentcloud",
+  "\u817e\u8baf\u4e91": "tencentcloud",
+  opencode: "opencode",
+  stepfun: "stepfun",
+  "\u9636\u8dc3\u661f\u8fb0": "stepfun",
+};
+
+function providerIconName(name: string): string {
+  const lower = name.toLowerCase();
+  for (const [key, icon] of Object.entries(PROVIDER_ICON_MAP)) {
+    if (lower.includes(key)) return icon;
+  }
+  return lower;
+}
 
 function modelCapabilities(m: { capabilities?: string[] }): string[] {
   return m.capabilities ?? ["text"];

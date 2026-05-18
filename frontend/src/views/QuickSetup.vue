@@ -21,15 +21,13 @@
             "
             @click="selectClient(c.id)"
           >
-            <span
-              class="w-7 h-7 rounded-md flex items-center justify-center shrink-0 text-white"
-              :class="c.brandBg"
-              ><component
-                v-if="c.iconSvg && CLIENT_ICON_MAP[c.iconSvg]"
-                :is="CLIENT_ICON_MAP[c.iconSvg]"
-                class="w-5 h-5"
-              /><span v-else class="text-xs font-bold">{{ c.icon }}</span></span
-            >
+            <ProviderIcon
+              :name="c.iconSvg ?? ''"
+              :size="24"
+              :class="
+                clientType === c.id ? 'text-primary' : 'text-muted-foreground'
+              "
+            />
             <div class="text-left">
               <div class="font-medium text-sm leading-tight">{{ c.name }}</div>
               <div class="text-[10px] opacity-60 leading-tight">
@@ -517,20 +515,7 @@ import TransformRulesForm from "@/components/shared/TransformRulesForm.vue";
 import type { ModelConfig } from "@/components/quick-setup/types";
 import { CLIENTS } from "@/components/quick-setup/types";
 
-// SVG 图标作为 Vue 组件导入，支持 currentColor 自适应主题
-import ClaudeIcon from "@/assets/icons/claude.svg?component";
-import CodexIcon from "@/assets/icons/codex.svg?component";
-import PiIcon from "@/assets/icons/pi.svg?component";
-import OpenaiIcon from "@/assets/icons/openai.svg?component";
-import AnthropicIcon from "@/assets/icons/anthropic.svg?component";
-
-const CLIENT_ICON_MAP: Record<string, typeof ClaudeIcon> = {
-  claude: ClaudeIcon,
-  codex: CodexIcon,
-  pi: PiIcon,
-  openai: OpenaiIcon,
-  anthropic: AnthropicIcon,
-};
+import ProviderIcon from "@/components/icons/ProviderIcon.vue";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
