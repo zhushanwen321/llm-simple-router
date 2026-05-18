@@ -31,23 +31,21 @@ export const adminMonitorRoutes: FastifyPluginCallback<MonitorRoutesOptions> = (
     // 客户端在 hijack 之前已断连，无需发送响应头
     if (reply.raw.destroyed) return;
 
-    // 先发送 HTTP response headers，再 addClient（内部会 sendInitialSnapshot）。
-    // 确保 SSE event 数据在 headers 之后到达客户端，避免 Node.js 隐式 writeHead
-    // 导致后续显式 writeHead 抛 ERR_HTTP_HEADERS_SENT。
+    // writeHead 必须在 addClient 之前调用，否则 sendInitialSnapshot 的 write()
+    // 会触发 Node.js 隐式 header 发送（Content-Type 默认非 text/event-stream），
+    // 导致浏览器 EventSource 解析失败、不断重连。
     try {
       reply.raw.writeHead(HTTP_OK, {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
         Connection: "keep-alive",
       });
-    } catch (err) {
-      request.log.debug({ err }, "client disconnected before writeHead");
+    } catch {
+      request.log.debug("client disconnected before writeHead");
       return;
     }
 
     const sseClient = adaptSSEClient(reply.raw);
-    // 在 close handler 之前 addClient，确保 sendInitialSnapshot 写入的数据
-    // 在 close 事件触发前到达客户端（close handler 中 removeClient 会停止广播）
     tracker.addClient(sseClient);
 
     reply.raw.on("close", () => {

@@ -2,6 +2,11 @@ import type { ContentBlock } from "./types.js";
 
 const SSE_DATA_PREFIX = "data: ";
 
+// OpenAI stream block index 分配：reasoning/text/tools 使用不同区间避免混合
+const OPENAI_BLOCK_REASONING = 0;
+const OPENAI_BLOCK_TEXT = 1;
+const OPENAI_BLOCK_TOOLS = 2;
+
 export interface StreamExtraction {
   text: string;
   block?: { index: number; type: ContentBlock["type"]; content: string; name?: string } | null;
@@ -22,8 +27,33 @@ export function extractStreamText(line: string, apiType: "openai" | "openai-resp
   if (apiType === "openai") {
     const choices = obj.choices as Array<Record<string, unknown>> | undefined;
     const delta = choices?.[0]?.delta as Record<string, unknown> | undefined;
-    const text = (delta?.content as string) ?? (delta?.reasoning_content as string) ?? "";
-    return { text, block: text ? { index: 0, type: "text", content: text } : null };
+    const text = (delta?.content as string) ?? "";
+    const reasoning = (delta?.reasoning_content as string) ?? "";
+
+    // OpenAI 不像 Anthropic 那样为不同 content type 分配独立 index。
+    // 策略：reasoning → OPENAI_BLOCK_REASONING, text → OPENAI_BLOCK_TEXT,
+    // tool_calls[N] → OPENAI_BLOCK_TOOLS + N。
+    // 这样不同类型的内容不会混在同一个 block 中。
+    if (reasoning) {
+      return { text: reasoning, block: { index: OPENAI_BLOCK_REASONING, type: "thinking", content: reasoning } };
+    }
+    if (text) {
+      return { text, block: { index: OPENAI_BLOCK_TEXT, type: "text", content: text } };
+    }
+    const toolCalls = delta?.tool_calls as Array<Record<string, unknown>> | undefined;
+    if (toolCalls) {
+      const tc = toolCalls[0];
+      if (tc) {
+        const tcIndex = (tc.index as number) ?? 0;
+        const fn = tc.function as Record<string, unknown> | undefined;
+        const args = (fn?.arguments as string) ?? "";
+        const name = (fn?.name as string) ?? "";
+        if (args || name) {
+          return { text: "", block: { index: OPENAI_BLOCK_TOOLS + tcIndex, type: "tool_use", content: args, name: name || undefined } };
+        }
+      }
+    }
+    return empty;
   }
 
   if (apiType === "openai-responses") {
