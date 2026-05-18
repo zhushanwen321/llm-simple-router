@@ -122,10 +122,36 @@
 
 ### 3.2 Reasoning / Thinking
 
+Chat Completions 客户端可能通过三种方式发送 thinking 参数。Router 的转换层按优先级处理：
+`reasoning`(obj) > `thinking`(obj) > `reasoning_effort`(str)。
+
+**客户端三种发送方式：**
+
+| 方式 | 触发条件 | 发送的字段 | 示例 |
+|------|---------|-----------|------|
+| `reasoning` object | DeepSeek 扩展 / OpenAI 原生 | `reasoning: {effort, max_tokens}` | `{reasoning: {effort: "high"}}` |
+| `thinking` object | Pi `compat.thinkingFormat: "deepseek"` | `thinking: {type: "enabled"}` | `{thinking: {type: "enabled"}}` |
+| `reasoning_effort` string | OpenAI 标准 / Pi 无 compat | `reasoning_effort: "high"` | `{reasoning_effort: "high"}` |
+
+**三种格式的标准字段：**
+
 | Responses API | Chat Completions | Anthropic |
 |---|---|---|
 | `reasoning: {effort:"low"/"medium"/"high"}` | `reasoning: {effort:"low"/"medium"/"high"}` | `thinking: {type:"enabled", budget_tokens}` |
 | `reasoning: {max_tokens: N}` | `reasoning: {max_tokens: N}` | `thinking: {type:"enabled", budget_tokens: N}` |
+| — | `thinking: {type:"enabled"}` (DeepSeek compat) | 直传 `thinking: {type:"enabled"}` |
+| — | `reasoning_effort: "high"` (OpenAI 标准) | `thinking: {type:"enabled", budget_tokens: 32768}` |
+
+**各转换链路处理逻辑：**
+
+| 链路 | `reasoning`(obj) | `thinking`(obj) | `reasoning_effort`(str) | 结果 |
+|------|:-:|:-:|:-:|---|
+| Chat → Anthropic | `mapReasoningToThinking()` | 直传 | `mapReasoningToThinking({effort})` | `thinking: {type, budget_tokens}` |
+| Anthropic → Chat | — | `mapThinkingToReasoning()` | — | `reasoning: {max_tokens}` |
+| Chat → Responses | 直传 | `→ reasoning: {max_tokens}` | `→ reasoning: {effort}` | `reasoning: {effort, max_tokens}` |
+| Responses → Chat | 直传 | — | — | `reasoning: {effort, max_tokens}` |
+| Responses → Anthropic | `→ thinking` | — | — | `thinking: {type, budget_tokens}` |
+| Anthropic → Responses | — | `→ reasoning` | — | `reasoning: {max_tokens}` |
 
 **Effort → Budget 映射：**
 | effort | budget_tokens |
@@ -175,9 +201,10 @@
 | `temperature` | 直传 | 直传 | 直传 | — |
 | `top_p` | 直传 | 直传 | 直传 | — |
 | `stream` | 直传 | 直传 | 直传 | — |
-| `stream_options` | 直传 | 直传 | — | Anthropic 无此字段 |
+| `stream_options` | 直传 | 直传 | 保留于 payload（不透传给 Anthropic） | Anthropic 无此字段，Router 保留用于内部处理 |
 | `stop` | — | `stop` | `stop_sequences` | Chat: string或string[]; Ant: array |
 | `n` | — | `n` | — | Anthropic 只支持 n=1 |
+| `store` | — | `store: false` | — | Pi 客户端发送此字段以禁用对话存储；Router OA_KNOWN_FIELDS 保留但不映射 |
 | `metadata.user_id` | `metadata` | `user` | `metadata.user_id` | Chat 用 `user` 字段 |
 | `previous_response_id` | 支持 | — | — | 历史对话加载 |
 
@@ -323,7 +350,7 @@
 
 **待优化**：
 1. `redacted_thinking` 在 Anthropic↔Responses 方向未完全处理
-2. `{type:"tool"}` tool_choice 格式（Cursor IDE）未处理
+2. `{type:"tool"}` tool_choice 格式（Cursor IDE）已处理（`request-bridge-responses.ts:72` → `"required"`）
 3. Anthropic↔Responses error 转换缺失
 4. `input_image` 在 Responses→Chat 桥中被跳过（lossy bridge）
 
@@ -340,8 +367,10 @@
 - [ ] tool_calls/tool_result 消息重排（developer 不插在中间）
 - [ ] tool ID 前缀处理（toolu_）
 - [ ] max_output_tokens/max_tokens/max_completion_tokens 映射
+- [ ] reasoning/thinking/reasoning_effort 三源 → thinking 映射（按优先级处理）
 - [ ] reasoning.effort → thinking.budget_tokens 映射
 - [ ] tools 格式转换（function 类型）
+- [ ] store 字段保留（OA_KNOWN_FIELDS 白名单）
 - [ ] tool_choice 映射（auto/none/required/named）
 - [ ] parallel_tool_calls → disable_parallel_tool_use
 - [ ] response_format / text.format
@@ -362,3 +391,51 @@
 - [ ] 流式 usage 采集
 - [ ] 流式 tool_calls 拼接
 - [ ] 流式 thinking 内容
+
+---
+
+## 8. OA_KNOWN_FIELDS 白名单与专有字段
+
+### 8.1 白名单机制
+
+`request-transform.ts` 中的 `OA_KNOWN_FIELDS` 是一个字段白名单。Chat Completions 请求中**不在白名单内的字段会被丢弃并输出警告日志**。当前白名单：
+
+```
+model, messages, max_completion_tokens, max_tokens, stop, temperature, top_p,
+stream, tools, tool_choice, parallel_tool_calls, reasoning, reasoning_effort,
+thinking, user, n, stream_options, response_format, provider_meta, store
+```
+
+### 8.2 专有字段（correctly dropped）
+
+以下字段由 Pi 客户端的特定 provider 发送，但不适用于 Anthropic/Router，丢弃是正确的：
+
+| 字段 | 来源 provider | 说明 |
+|------|-------------|------|
+| `enable_thinking` | z.ai / Qwen | z.ai 和 Qwen 的 thinking 控制方式，不同于 Anthropic |
+| `chat_template_kwargs` | Qwen | Qwen 专用的 chat template thinking 配置 |
+| `tool_stream` | z.ai | z.ai 流式 tool call 控制 |
+| `provider` | OpenRouter | OpenRouter 路由偏好参数 |
+| `providerOptions` | Vercel AI Gateway | Vercel Gateway 路由偏好参数 |
+| `prompt_cache_key` | OpenRouter/Vercel | 提供商级别的 prompt 缓存 key |
+| `prompt_cache_retention` | OpenRouter/Vercel | 提供商级别的缓存保留时间 |
+
+### 8.3 Pi 客户端 thinking 参数配置
+
+Pi 客户端通过 `models.json` 的 `compat` 配置决定 how 发送 thinking 参数：
+
+```jsonc
+// 方案 1：DeepSeek 格式（推荐）
+{ "compat": { "thinkingFormat": "deepseek" } }
+// Pi 发送 → thinking: { type: "enabled" }
+
+// 方案 2：OpenRouter 格式
+{ "compat": { "thinkingFormat": "openrouter" } }
+// Pi 发送 → reasoning: { effort: "high" }
+
+// 方案 3：OpenAI 标准格式（无 compat 时默认）
+{ "reasoning": true }
+// Pi 发送 → reasoning_effort: "high"
+```
+
+Router 的 `openaiToAnthropicRequest()` 统一按优先级处理三种格式：
