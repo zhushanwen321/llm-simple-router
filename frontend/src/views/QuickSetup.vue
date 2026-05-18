@@ -22,15 +22,8 @@
             @click="selectClient(c.id)"
           >
             <span
-              class="w-7 h-7 rounded-md flex items-center justify-center shrink-0"
-              :class="{
-                'text-foreground': !!c.iconSvg,
-                'bg-purple-600 text-white': c.iconClass === 'cc' && !c.iconSvg,
-                'bg-teal-600 text-white': c.iconClass === 'cx' && !c.iconSvg,
-                'bg-emerald-600 text-white': c.iconClass === 'pi' && !c.iconSvg,
-                'bg-blue-600 text-white': c.iconClass === 'oa' && !c.iconSvg,
-                'bg-orange-600 text-white': c.iconClass === 'an' && !c.iconSvg,
-              }"
+              class="w-7 h-7 rounded-md flex items-center justify-center shrink-0 text-white"
+              :class="c.brandBg"
               ><component
                 v-if="c.iconSvg && CLIENT_ICON_MAP[c.iconSvg]"
                 :is="CLIENT_ICON_MAP[c.iconSvg]"

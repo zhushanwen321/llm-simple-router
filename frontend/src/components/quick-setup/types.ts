@@ -11,8 +11,10 @@ export interface ClientMeta {
   /** 文字图标（无 iconSvg 时 fallback） */
   icon: string;
   iconClass: string;
-  /** SVG 图标路径（优先于文字 icon） */
+  /** SVG 图标名（优先于文字 icon，对应 assets/icons/{name}.svg） */
   iconSvg?: string;
+  /** 品牌背景色（Tailwind class，如 bg-purple-600） */
+  brandBg: string;
   format: "anthropic" | "openai" | "openai-responses";
   defaultProvider: string;
   defaultPlan: string;
@@ -50,6 +52,7 @@ export const CLIENTS: ClientMeta[] = [
     icon: "C",
     iconClass: "cc",
     iconSvg: "claude",
+    brandBg: "bg-[#D97757]",
     format: "anthropic",
     defaultProvider: "DeepSeek",
     defaultPlan: "Anthropic",
@@ -61,6 +64,7 @@ export const CLIENTS: ClientMeta[] = [
     icon: "CX",
     iconClass: "cx",
     iconSvg: "codex",
+    brandBg: "bg-[#74AA9C]",
     format: "openai-responses",
     defaultProvider: "DeepSeek",
     defaultPlan: "OpenAI",
@@ -72,6 +76,7 @@ export const CLIENTS: ClientMeta[] = [
     icon: "P",
     iconClass: "pi",
     iconSvg: "pi",
+    brandBg: "bg-emerald-600",
     format: "anthropic",
     defaultProvider: "DeepSeek",
     defaultPlan: "Anthropic",
@@ -83,6 +88,7 @@ export const CLIENTS: ClientMeta[] = [
     icon: "OA",
     iconClass: "oa",
     iconSvg: "openai",
+    brandBg: "bg-[#10a37f]",
     format: "openai",
     defaultProvider: "DeepSeek",
     defaultPlan: "OpenAI",
@@ -94,6 +100,7 @@ export const CLIENTS: ClientMeta[] = [
     icon: "AN",
     iconClass: "an",
     iconSvg: "anthropic",
+    brandBg: "bg-[#D4976A]",
     format: "anthropic",
     defaultProvider: "DeepSeek",
     defaultPlan: "Anthropic",
