@@ -25,6 +25,7 @@
               class="w-7 h-7 rounded-md text-xs font-bold flex items-center justify-center shrink-0"
               :class="{
                 'bg-purple-600 text-white': c.iconClass === 'cc',
+                'bg-teal-600 text-white': c.iconClass === 'cx',
                 'bg-emerald-600 text-white': c.iconClass === 'pi',
                 'bg-blue-600 text-white': c.iconClass === 'oa',
                 'bg-orange-600 text-white': c.iconClass === 'an',
