@@ -379,7 +379,7 @@ export async function buildApp(
       reply.code(HTTP_NOT_FOUND).send({ error: { message: "Not Found" } });
     });
   } else {
-    app.log.warn(
+    app.log.debug(
       `Frontend dist not found at ${frontendDist}, skipping static serving`
     );
   }
