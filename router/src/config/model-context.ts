@@ -173,8 +173,17 @@ let directoryContextWindows: Record<string, number> = {}
  */
 export function loadModelDirectory(configDir?: string): void {
   try {
-    // 默认相对于当前文件所在目录（dist/config/ 或 src/config/），而非 process.cwd()
-    const dir = configDir ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "config")
+    // 优先使用传入的 configDir，否则自动检测：
+    // - 生产 (dist/config/model-context.js): 上溯一级到 dist/ → dist/config/ (postbuild 已复制)
+    // - 开发 (src/config/model-context.ts): 上溯二级到包根 → config/
+    let dir = configDir
+    if (!dir) {
+      const fileDir = path.dirname(fileURLToPath(import.meta.url))
+      const prodDir = path.resolve(fileDir, "..", "config")
+      dir = fs.existsSync(path.join(prodDir, "model-directory.json"))
+        ? prodDir
+        : path.resolve(fileDir, "..", "..", "config")
+    }
     const filePath = path.join(dir, "model-directory.json")
     const raw = fs.readFileSync(filePath, "utf-8")
     const data: ModelDirectoryData = JSON.parse(raw)
@@ -184,10 +193,9 @@ export function loadModelDirectory(configDir?: string): void {
     if (data.context_windows && typeof data.context_windows === "object") {
       directoryContextWindows = data.context_windows
     }
-  // eslint-disable-next-line taste/no-silent-catch -- 加载失败不影响启动，使用硬编码白名单兆底。但记录到 stderr 供诊断
   } catch (err: unknown) {
-  // 加载失败不影响启动，使用硬编码白名单兆底。但记录到 stderr 供诊断
-    console.error('loadModelDirectory: failed to load, using hardcoded fallback', err)
+    const msg = err instanceof Error ? err.message : typeof err === 'string' ? err : JSON.stringify(err)
+    console.warn(`loadModelDirectory: failed to load (${msg}), using hardcoded fallback`)
   }
 }
 
