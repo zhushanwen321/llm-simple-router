@@ -1,0 +1,142 @@
+{
+  "test_execution": [
+    {
+      "caseId": "TC-1-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "审查 Monitor.vue 源码：确认 copiedId 为 ref<string | null>(null)，每行通过 copiedId === req.id 独立判断",
+        "确认 copyId(id) 函数调用 copy(id) 后设置 copiedId.value = id，2s 后自动清除",
+        "模板中 3 处 v-if/click 已改为 copiedId/copyId，不再依赖全局 copied 状态"
+      ],
+      "evidence": "源码审查通过，grep confirmed 3 处 copiedId === req.id 判断点"
+    },
+    {
+      "caseId": "TC-2-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "审查 router/index.ts guard 逻辑：未登录访问受保护页面时 isAuthenticated.value = false + next('/login')",
+        "确认 App.vue v-if='isAuthenticated' 使用 router 导入的 ref",
+        "确认 setup 未初始化时访问非 setup 页面会重定向到 /setup"
+      ],
+      "evidence": "源码审查通过，router guard 6 处 isAuthenticated 赋值正确"
+    },
+    {
+      "caseId": "TC-2-02",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "审查 router guard：登录成功后 guard 置 isAuthenticated.value = true，next() 放行",
+        "页面切换时 guard 检查 api.getStats()，成功后 isAuthenticated = true 不变",
+        "App.vue 导入 isAuthenticated from '@/router'，Sidebar 通过 v-if 绑定"
+      ],
+      "evidence": "单一状态源设计，App.vue 不再有独立的 checkAuth/watch 逻辑"
+    },
+    {
+      "caseId": "TC-2-03",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "审查 router guard：to.path === '/setup' 且 setup 未初始化 → next()（正常显示）",
+        "to.path === '/setup' 且 setup 已初始化 → next('/login')（重定向）",
+        "tests/auth.test.ts 覆盖认证中间件基本场景（已通过）"
+      ],
+      "evidence": "源码审查通过，guard 逻辑覆盖 setup 未初始化/已初始化两条路径"
+    },
+    {
+      "caseId": "TC-3-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "运行 python3 .githooks/vue_rules_checker.py PatchChips.vue → 无报错",
+        "grep 确认文件中使用 Button 组件（import from '@/components/ui/button'），无原生 <button>",
+        "vue-tsc 类型检查通过，ESLint 通过"
+      ],
+      "evidence": "vue_rules_checker 输出为空（无违规），PatchChips.vue 第 7/48/70 行使用 shadcn Button"
+    },
+    {
+      "caseId": "TC-4-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "cd frontend && npx vue-tsc -b --noEmit",
+        "验证 exit code 0，0 error"
+      ],
+      "evidence": "vue-tsc exit 0, 无错误输出"
+    },
+    {
+      "caseId": "TC-4-02",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "cd frontend && npx eslint . --max-warnings=0",
+        "验证 0 error 0 warning"
+      ],
+      "evidence": "ESLint 输出为空，exit 0"
+    },
+    {
+      "caseId": "TC-4-03",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "cd frontend && npm run build",
+        "验证构建成功，生成 dist/assets/ 文件"
+      ],
+      "evidence": "Vite built in 822ms, dist/assets/index-BsnL1Amh.js 等"
+    },
+    {
+      "caseId": "TC-5-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npm test",
+        "验证 120 test files, 1447 tests 全部通过",
+        "确认 resilience 相关测试通过"
+      ],
+      "evidence": "vitest output: 120 passed (120), 1447 passed (1447)"
+    },
+    {
+      "caseId": "TC-6-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npm test — 代理相关测试通过（含 enhancement-preprocess hook 测试）",
+        "审查 create-proxy-handler.ts：确认 container 注入到 metadata",
+        "确认 enhancement-preprocess hook 从 metadata 获取 container 并正常执行"
+      ],
+      "evidence": "120 test files passed, hook 通过 proxyPipeline.emit('pre_route', ctx) 执行"
+    },
+    {
+      "caseId": "TC-6-02",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "审查 create-proxy-handler.ts：确认 applyEnhancementPreprocess 内联函数已删除",
+        "确认只有 proxyPipeline.emit('pre_route', ctx) 调用点，不重复执行",
+        "npm run build 通过 — 编译确认无残留引用"
+      ],
+      "evidence": "grep 'applyEnhancementPreprocess' 在 create-proxy-handler.ts 中无结果"
+    },
+    {
+      "caseId": "TC-7-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npm run build（含 router tsc + frontend vite build）",
+        "验证两者均成功"
+      ],
+      "evidence": "router: tsc 编译成功; frontend: Vite built in 822ms"
+    },
+    {
+      "caseId": "TC-7-02",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npm run lint -w router → 0 error 0 warning",
+        "cd frontend && npx eslint . --max-warnings=0 → 0 error 0 warning"
+      ],
+      "evidence": "两个 lint 命令均 exit 0，无输出"
+    }
+  ]
+}
