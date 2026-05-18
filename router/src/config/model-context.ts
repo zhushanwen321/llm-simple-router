@@ -184,10 +184,9 @@ export function loadModelDirectory(configDir?: string): void {
     if (data.context_windows && typeof data.context_windows === "object") {
       directoryContextWindows = data.context_windows
     }
-  // eslint-disable-next-line taste/no-silent-catch -- 加载失败不影响启动，使用硬编码白名单兆底。但记录到 stderr 供诊断
   } catch (err: unknown) {
-  // 加载失败不影响启动，使用硬编码白名单兆底。但记录到 stderr 供诊断
-    console.error('loadModelDirectory: failed to load, using hardcoded fallback', err)
+    const msg = err instanceof Error ? err.message : typeof err === 'string' ? err : JSON.stringify(err)
+    console.warn(`loadModelDirectory: failed to load (${msg}), using hardcoded fallback`)
   }
 }
 
