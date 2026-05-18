@@ -8,8 +8,11 @@ export type ClientType =
 export interface ClientMeta {
   id: ClientType;
   name: string;
+  /** 文字图标（无 iconSvg 时 fallback） */
   icon: string;
   iconClass: string;
+  /** SVG 图标路径（优先于文字 icon） */
+  iconSvg?: string;
   format: "anthropic" | "openai" | "openai-responses";
   defaultProvider: string;
   defaultPlan: string;
@@ -46,6 +49,7 @@ export const CLIENTS: ClientMeta[] = [
     name: "Claude Code",
     icon: "C",
     iconClass: "cc",
+    iconSvg: "claude",
     format: "anthropic",
     defaultProvider: "DeepSeek",
     defaultPlan: "Anthropic",
@@ -56,6 +60,7 @@ export const CLIENTS: ClientMeta[] = [
     name: "Codex CLI",
     icon: "CX",
     iconClass: "cx",
+    iconSvg: "codex",
     format: "openai-responses",
     defaultProvider: "DeepSeek",
     defaultPlan: "OpenAI",
@@ -66,6 +71,7 @@ export const CLIENTS: ClientMeta[] = [
     name: "Pi",
     icon: "P",
     iconClass: "pi",
+    iconSvg: "pi",
     format: "anthropic",
     defaultProvider: "DeepSeek",
     defaultPlan: "Anthropic",
@@ -76,6 +82,7 @@ export const CLIENTS: ClientMeta[] = [
     name: "OpenAI SDK",
     icon: "OA",
     iconClass: "oa",
+    iconSvg: "openai",
     format: "openai",
     defaultProvider: "DeepSeek",
     defaultPlan: "OpenAI",
@@ -86,6 +93,7 @@ export const CLIENTS: ClientMeta[] = [
     name: "Anthropic SDK",
     icon: "AN",
     iconClass: "an",
+    iconSvg: "anthropic",
     format: "anthropic",
     defaultProvider: "DeepSeek",
     defaultPlan: "Anthropic",

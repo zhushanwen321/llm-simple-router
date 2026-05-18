@@ -22,15 +22,20 @@
             @click="selectClient(c.id)"
           >
             <span
-              class="w-7 h-7 rounded-md text-xs font-bold flex items-center justify-center shrink-0"
+              class="w-7 h-7 rounded-md flex items-center justify-center shrink-0"
               :class="{
-                'bg-purple-600 text-white': c.iconClass === 'cc',
-                'bg-teal-600 text-white': c.iconClass === 'cx',
-                'bg-emerald-600 text-white': c.iconClass === 'pi',
-                'bg-blue-600 text-white': c.iconClass === 'oa',
-                'bg-orange-600 text-white': c.iconClass === 'an',
+                'bg-purple-600 text-white': c.iconClass === 'cc' && !c.iconSvg,
+                'bg-teal-600 text-white': c.iconClass === 'cx' && !c.iconSvg,
+                'bg-emerald-600 text-white': c.iconClass === 'pi' && !c.iconSvg,
+                'bg-blue-600 text-white': c.iconClass === 'oa' && !c.iconSvg,
+                'bg-orange-600 text-white': c.iconClass === 'an' && !c.iconSvg,
               }"
-              >{{ c.icon }}</span
+              ><img
+                v-if="c.iconSvg"
+                :src="getClientIcon(c.iconSvg)"
+                :alt="c.name"
+                class="w-5 h-5"
+              /><span v-else class="text-xs font-bold">{{ c.icon }}</span></span
             >
             <div class="text-left">
               <div class="font-medium text-sm leading-tight">{{ c.name }}</div>
@@ -518,6 +523,10 @@ import ConcurrencyControl from "@/components/shared/ConcurrencyControl.vue";
 import TransformRulesForm from "@/components/shared/TransformRulesForm.vue";
 import type { ModelConfig } from "@/components/quick-setup/types";
 import { CLIENTS } from "@/components/quick-setup/types";
+
+function getClientIcon(name: string): string {
+  return new URL(`../assets/icons/${name}.svg`, import.meta.url).href;
+}
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
