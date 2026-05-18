@@ -5,7 +5,7 @@
     "claudeCode": "Claude Code",
     "claudeCodeDesc": "Official Anthropic CLI coding assistant",
     "codex": "Codex CLI",
-    "codexDesc": "OpenAI terminal coding assistant (Responses API)",
+    "codexDesc": "OpenAI",
     "pi": "Pi",
     "piDesc": "Universal coding Agent framework",
     "openaiSdk": "OpenAI SDK",
