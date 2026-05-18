@@ -1,32 +1,32 @@
-import { defineConfig } from 'vite'
-import vue from '@vitejs/plugin-vue'
-import { fileURLToPath, URL } from 'node:url'
-import { readFileSync } from 'node:fs'
+import { defineConfig } from "vite";
+import vue from "@vitejs/plugin-vue";
+import svgLoader from "vite-svg-loader";
+import { fileURLToPath, URL } from "node:url";
+import { readFileSync } from "node:fs";
 
-const rootVersion = JSON.parse(
-  readFileSync(new URL('../router/package.json', import.meta.url), 'utf-8')
-).version ?? 'dev'
+const rootVersion =
+  JSON.parse(
+    readFileSync(new URL("../router/package.json", import.meta.url), "utf-8"),
+  ).version ?? "dev";
 
 export default defineConfig({
-  plugins: [
-    vue(),
-  ],
+  plugins: [vue(), svgLoader()],
   define: {
     __APP_VERSION__: JSON.stringify(rootVersion),
   },
-  base: '/admin/',
+  base: "/admin/",
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url))
-    }
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
+    },
   },
   server: {
     port: 5173,
     proxy: {
-      '/admin/api': {
-        target: 'http://localhost:9980',
-        changeOrigin: true
-      }
-    }
-  }
-})
+      "/admin/api": {
+        target: "http://localhost:9980",
+        changeOrigin: true,
+      },
+    },
+  },
+});
