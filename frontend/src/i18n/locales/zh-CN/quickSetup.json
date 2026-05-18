@@ -5,7 +5,7 @@
     "claudeCode": "Claude Code",
     "claudeCodeDesc": "Anthropic 官方 CLI 编程助手",
     "codex": "Codex CLI",
-    "codexDesc": "OpenAI 终端编程助手（Responses API）",
+    "codexDesc": "OpenAI",
     "pi": "Pi",
     "piDesc": "通用编程 Agent 框架",
     "openaiSdk": "OpenAI SDK",
