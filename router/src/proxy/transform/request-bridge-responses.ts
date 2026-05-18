@@ -82,9 +82,19 @@ export function responsesToChatRequest(
     }
   }
 
-  // reasoning — pass through (both use {effort?, max_tokens?})
+  // Thinking params: reasoning > thinking (deepseek compat) > reasoning_effort
   if (req.reasoning != null) {
     result.reasoning = req.reasoning;
+  } else if ((body as Record<string, unknown>).thinking) {
+    // Pi deepseek compat: thinking: {type: "enabled"} → reasoning
+    const thinking = (body as Record<string, unknown>).thinking as Record<string, unknown>;
+    if (thinking.type === "enabled" && thinking.budget_tokens != null) {
+      result.reasoning = { max_tokens: thinking.budget_tokens };
+    }
+  } else if ((body as Record<string, unknown>).reasoning_effort) {
+    // OpenAI standard: reasoning_effort: "high" → reasoning
+    const effort = (body as Record<string, unknown>).reasoning_effort as string;
+    result.reasoning = { effort };
   }
 
   // text.format → response_format (json_schema 结构差异需转换)
@@ -367,9 +377,19 @@ export function chatToResponsesRequest(
     result.tool_choice = req.tool_choice;
   }
 
-  // reasoning — pass through
+  // Thinking params: reasoning > thinking (deepseek compat) > reasoning_effort
   if (req.reasoning != null) {
     result.reasoning = req.reasoning;
+  } else if ((body as Record<string, unknown>).thinking) {
+    // Pi deepseek compat: thinking: {type: "enabled"} → reasoning
+    const thinking = (body as Record<string, unknown>).thinking as Record<string, unknown>;
+    if (thinking.type === "enabled" && thinking.budget_tokens != null) {
+      result.reasoning = { max_tokens: thinking.budget_tokens };
+    }
+  } else if ((body as Record<string, unknown>).reasoning_effort) {
+    // OpenAI standard: reasoning_effort: "high" → reasoning
+    const effort = (body as Record<string, unknown>).reasoning_effort as string;
+    result.reasoning = { effort };
   }
 
   // response_format → text.format (json_schema 结构差异需转换)

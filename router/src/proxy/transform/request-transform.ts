@@ -8,8 +8,9 @@ const DEFAULT_MAX_TOKENS = 4096;
 const OA_KNOWN_FIELDS = new Set([
   "model", "messages", "max_completion_tokens", "max_tokens",
   "stop", "temperature", "top_p", "stream", "tools", "tool_choice",
-  "parallel_tool_calls", "reasoning", "user", "n", "stream_options",
-  "response_format", "provider_meta",
+  "parallel_tool_calls", "reasoning", "reasoning_effort", "thinking",
+  "user", "n", "stream_options", "response_format", "provider_meta",
+  "store",
 ]);
 
 const ANT_KNOWN_FIELDS = new Set([
@@ -32,6 +33,8 @@ type FullOARequest = ChatCompletionRequest & {
   parallel_tool_calls?: boolean;
   user?: string;
   n?: number;
+  thinking?: Record<string, unknown>;
+  reasoning_effort?: string;
 };
 
 export function openaiToAnthropicRequest(body: Record<string, unknown>): Record<string, unknown> {
@@ -78,8 +81,27 @@ export function openaiToAnthropicRequest(body: Record<string, unknown>): Record<
     }
   }
 
+  // Thinking params: reasoning (object) > thinking (deepseek compat) > reasoning_effort (string)
   if (req.reasoning) {
     const thinking = mapReasoningToThinking(req.reasoning);
+    result.thinking = thinking;
+    if (thinking.budget_tokens && (result.max_tokens as number) < (thinking.budget_tokens as number)) {
+      result.max_tokens = thinking.budget_tokens;
+    }
+  } else if ((cleanedBody as Record<string, unknown>).thinking) {
+    // Pi deepseek compat: thinking: {type: "enabled"} — pass through directly
+    const thinkingParam = (cleanedBody as Record<string, unknown>).thinking as Record<string, unknown>;
+    if (thinkingParam.type === "enabled") {
+      result.thinking = thinkingParam;
+      const budget = thinkingParam.budget_tokens as number | undefined;
+      if (budget && (result.max_tokens as number) < budget) {
+        result.max_tokens = budget;
+      }
+    }
+  } else if ((cleanedBody as Record<string, unknown>).reasoning_effort) {
+    // OpenAI standard: reasoning_effort: "high" → thinking via mapper
+    const effort = (cleanedBody as Record<string, unknown>).reasoning_effort as string;
+    const thinking = mapReasoningToThinking({ effort });
     result.thinking = thinking;
     if (thinking.budget_tokens && (result.max_tokens as number) < (thinking.budget_tokens as number)) {
       result.max_tokens = thinking.budget_tokens;
