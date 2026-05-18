@@ -1,11 +1,16 @@
-export type ClientType = "claude-code" | "pi" | "openai-sdk" | "anthropic-sdk";
+export type ClientType =
+  | "claude-code"
+  | "codex"
+  | "pi"
+  | "openai-sdk"
+  | "anthropic-sdk";
 
 export interface ClientMeta {
   id: ClientType;
   name: string;
   icon: string;
   iconClass: string;
-  format: "anthropic" | "openai";
+  format: "anthropic" | "openai" | "openai-responses";
   defaultProvider: string;
   defaultPlan: string;
   descriptionKey: string;
@@ -45,6 +50,16 @@ export const CLIENTS: ClientMeta[] = [
     defaultProvider: "DeepSeek",
     defaultPlan: "Anthropic",
     descriptionKey: "quickSetup.client.claudeCodeDesc",
+  },
+  {
+    id: "codex",
+    name: "Codex CLI",
+    icon: "CX",
+    iconClass: "cx",
+    format: "openai-responses",
+    defaultProvider: "DeepSeek",
+    defaultPlan: "OpenAI",
+    descriptionKey: "quickSetup.client.codexDesc",
   },
   {
     id: "pi",
@@ -216,6 +231,7 @@ export interface MappingEntry {
  */
 export const DEFAULT_CLIENT_MAPPINGS: Record<string, string[]> = {
   "claude-code": ["sonnet", "opus", "haiku"],
+  codex: ["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex", "gpt-5.2"],
   "openai-sdk": ["gpt-5.1", "gpt-4.1", "o3", "o4-mini"],
   "anthropic-sdk": [
     "claude-sonnet-4-20250514",

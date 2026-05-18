@@ -445,15 +445,22 @@ export function useQuickSetup() {
       const groupData = providerGroups.value.find((g) => g.group === group);
       if (groupData && groupData.presets.length > 0) {
         const client = currentClient.value;
+        // openai-responses 客户端匹配 openai 套餐，但保持 apiType 为 openai-responses
+        const compatibleFormats =
+          client?.format === "openai-responses"
+            ? ["openai-responses", "openai"]
+            : client
+              ? [client.format]
+              : [];
         const match = client
-          ? groupData.presets.find((p) => p.apiType === client.format)
+          ? groupData.presets.find((p) => compatibleFormats.includes(p.apiType))
           : null;
         const preset = match ?? groupData.presets[0];
         selectedPlan.value = preset.plan;
-        apiType.value = preset.apiType as
-          | "openai"
-          | "openai-responses"
-          | "anthropic";
+        apiType.value =
+          client?.format === "openai-responses"
+            ? "openai-responses"
+            : (preset.apiType as "openai" | "openai-responses" | "anthropic");
         initModels(preset);
       }
     }
@@ -470,10 +477,10 @@ export function useQuickSetup() {
     if (!group) return;
     const preset = group.presets.find((p) => p.plan === plan);
     if (!preset) return;
-    apiType.value = preset.apiType as
-      | "openai"
-      | "openai-responses"
-      | "anthropic";
+    apiType.value =
+      currentClient.value?.format === "openai-responses"
+        ? "openai-responses"
+        : (preset.apiType as "openai" | "openai-responses" | "anthropic");
     initModels(preset);
     updateMappings();
   }
