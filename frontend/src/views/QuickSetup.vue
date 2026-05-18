@@ -24,16 +24,16 @@
             <span
               class="w-7 h-7 rounded-md flex items-center justify-center shrink-0"
               :class="{
+                'text-foreground': !!c.iconSvg,
                 'bg-purple-600 text-white': c.iconClass === 'cc' && !c.iconSvg,
                 'bg-teal-600 text-white': c.iconClass === 'cx' && !c.iconSvg,
                 'bg-emerald-600 text-white': c.iconClass === 'pi' && !c.iconSvg,
                 'bg-blue-600 text-white': c.iconClass === 'oa' && !c.iconSvg,
                 'bg-orange-600 text-white': c.iconClass === 'an' && !c.iconSvg,
               }"
-              ><img
-                v-if="c.iconSvg"
-                :src="getClientIcon(c.iconSvg)"
-                :alt="c.name"
+              ><component
+                v-if="c.iconSvg && CLIENT_ICON_MAP[c.iconSvg]"
+                :is="CLIENT_ICON_MAP[c.iconSvg]"
                 class="w-5 h-5"
               /><span v-else class="text-xs font-bold">{{ c.icon }}</span></span
             >
@@ -524,9 +524,20 @@ import TransformRulesForm from "@/components/shared/TransformRulesForm.vue";
 import type { ModelConfig } from "@/components/quick-setup/types";
 import { CLIENTS } from "@/components/quick-setup/types";
 
-function getClientIcon(name: string): string {
-  return new URL(`../assets/icons/${name}.svg`, import.meta.url).href;
-}
+// SVG 图标作为 Vue 组件导入，支持 currentColor 自适应主题
+import ClaudeIcon from "@/assets/icons/claude.svg?component";
+import CodexIcon from "@/assets/icons/codex.svg?component";
+import PiIcon from "@/assets/icons/pi.svg?component";
+import OpenaiIcon from "@/assets/icons/openai.svg?component";
+import AnthropicIcon from "@/assets/icons/anthropic.svg?component";
+
+const CLIENT_ICON_MAP: Record<string, typeof ClaudeIcon> = {
+  claude: ClaudeIcon,
+  codex: CodexIcon,
+  pi: PiIcon,
+  openai: OpenaiIcon,
+  anthropic: AnthropicIcon,
+};
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
