@@ -1,0 +1,159 @@
+{
+  "test_cases": [
+    {
+      "id": "TC-1-01",
+      "type": "manual",
+      "title": "Monitor clipboard: 点击任一行复制只影响该行",
+      "description": "Monitor 页面有多个请求时，点击任一行的复制按钮，只有该行显示 CheckIcon",
+      "steps": [
+        "启动 dev server，进入 Monitor 页面",
+        "等待至少 2 个活跃请求",
+        "点击第一个请求的复制按钮",
+        "验证只有第一行显示 CheckIcon",
+        "点击第二个请求的复制按钮",
+        "验证只有第二行显示 CheckIcon，第一行已恢复",
+        "等待 2 秒，验证所有 CheckIcon 恢复为 CopyIcon"
+      ]
+    },
+    {
+      "id": "TC-2-01",
+      "type": "manual",
+      "title": "认证: 未登录访问受保护页面重定向到 /login",
+      "description": "未登录状态访问根路径和受保护页面，应重定向到 /login",
+      "steps": [
+        "清除 cookie/未登录状态",
+        "访问 /admin/",
+        "验证重定向到 /admin/login",
+        "访问 /admin/providers",
+        "验证重定向到 /admin/login"
+      ]
+    },
+    {
+      "id": "TC-2-02",
+      "type": "manual",
+      "title": "认证: 登录后 Sidebar 不闪烁",
+      "description": "登录成功后和页面切换时 Sidebar 稳定显示，不会短暂消失",
+      "steps": [
+        "登录成功后跳转到 dashboard",
+        "验证 Sidebar 立即显示（无闪烁）",
+        "从 Dashboard 切到 Providers",
+        "验证 Sidebar 保持显示（不闪烁）",
+        "刷新页面",
+        "验证 Sidebar 正常显示"
+      ]
+    },
+    {
+      "id": "TC-2-03",
+      "type": "manual",
+      "title": "认证: Setup 页面在未初始化时正常显示",
+      "description": "系统未初始化时访问 /setup 正常，已初始化时重定向到 /login",
+      "steps": [
+        "清空数据库",
+        "启动应用",
+        "验证自动跳转到 /setup",
+        "完成 setup",
+        "访问 /setup",
+        "验证重定向到 /login"
+      ]
+    },
+    {
+      "id": "TC-3-01",
+      "type": "manual",
+      "title": "PatchChips: 使用 shadcn Button 组件",
+      "description": "QuickSetup 页面的 PatchChips toggle 按钮使用 shadcn Button，pre-commit hook 不报错",
+      "steps": [
+        "运行 python3 .githooks/vue_rules_checker.py frontend/src/components/quick-setup/PatchChips.vue",
+        "验证无原生 button 报错",
+        "进入 QuickSetup 页面",
+        "点击 PatchChips toggle",
+        "验证选中/取消选中正常工作"
+      ]
+    },
+    {
+      "id": "TC-4-01",
+      "type": "integration",
+      "title": "R4 提取后前端类型检查通过",
+      "description": "所有共享模块提取后，vue-tsc 类型检查无错误",
+      "steps": [
+        "cd frontend && npx vue-tsc -b --noEmit",
+        "验证 0 error"
+      ]
+    },
+    {
+      "id": "TC-4-02",
+      "type": "integration",
+      "title": "R4 提取后 ESLint 通过",
+      "description": "所有共享模块提取后，ESLint 无警告无错误",
+      "steps": [
+        "cd frontend && npx eslint . --max-warnings=0",
+        "验证 0 error 0 warning"
+      ]
+    },
+    {
+      "id": "TC-4-03",
+      "type": "integration",
+      "title": "R4 提取后前端构建成功",
+      "description": "所有共享模块提取后，Vite 构建成功",
+      "steps": [
+        "cd frontend && npm run build",
+        "验证构建成功"
+      ]
+    },
+    {
+      "id": "TC-5-01",
+      "type": "integration",
+      "title": "errMsg 三元表达式修复后测试通过",
+      "description": "resilience.ts 修改后所有现有测试通过",
+      "steps": [
+        "npm test",
+        "验证全部测试通过"
+      ]
+    },
+    {
+      "id": "TC-6-01",
+      "type": "integration",
+      "title": "enhancement-preprocess Hook 正常执行",
+      "description": "注入 container 后 hook 正常执行，工具循环检测功能正常",
+      "steps": [
+        "npm test",
+        "验证代理相关测试通过",
+        "启用 tool_call_loop_enabled",
+        "发送连续重复工具调用请求",
+        "验证请求被中断，日志中有 tool_guard snapshot"
+      ]
+    },
+    {
+      "id": "TC-6-02",
+      "type": "integration",
+      "title": "enhancement-preprocess 不重复执行",
+      "description": "Hook 和内联版本不能同时执行，同一请求只触发一次循环检测",
+      "steps": [
+        "npm run build",
+        "发送触发循环检测的请求",
+        "检查日志中 tool_guard snapshot 只出现一次"
+      ]
+    },
+    {
+      "id": "TC-7-01",
+      "type": "integration",
+      "title": "全局构建验证",
+      "description": "所有修改完成后 router + frontend 构建成功",
+      "steps": [
+        "npm run build",
+        "cd frontend && npm run build",
+        "验证两者均成功"
+      ]
+    },
+    {
+      "id": "TC-7-02",
+      "type": "integration",
+      "title": "全局 Lint 验证",
+      "description": "所有修改完成后后端 + 前端 lint 通过",
+      "steps": [
+        "npm run lint -w router",
+        "cd frontend && npx eslint . --max-warnings=0",
+        "验证两者均 0 error 0 warning"
+      ]
+    }
+  ]
+}

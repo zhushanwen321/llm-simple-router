@@ -1,19 +1,30 @@
 <template>
-  <Tabs :default-value="mode ?? 'structured'" :model-value="mode" class="w-full">
+  <Tabs
+    :default-value="mode ?? 'structured'"
+    :model-value="mode"
+    class="w-full"
+  >
     <!-- 粘性控制栏：结构化/原始JSON 切换 + 复制 -->
-    <div v-if="!mode" class="flex items-center justify-between py-2 border-b mb-2 sticky top-0 z-10 bg-background">
+    <div
+      v-if="!mode"
+      class="flex items-center justify-between py-2 border-b mb-2 sticky top-0 z-10 bg-background"
+    >
       <TabsList>
-        <TabsTrigger value="structured">{{ t('logs.viewer.structured') }}</TabsTrigger>
-        <TabsTrigger value="raw">{{ t('logs.viewer.rawJson') }}</TabsTrigger>
+        <TabsTrigger value="structured">{{
+          t("logs.viewer.structured")
+        }}</TabsTrigger>
+        <TabsTrigger value="raw">{{ t("logs.viewer.rawJson") }}</TabsTrigger>
       </TabsList>
       <Button variant="ghost" size="xs" class="h-auto py-1" @click="copyRaw">
-        {{ copied ? t('logs.viewer.copied') : t('logs.viewer.copyJson') }}
+        {{ copied ? t("logs.viewer.copied") : t("logs.viewer.copyJson") }}
       </Button>
     </div>
 
     <TabsContent value="structured" class="space-y-3">
       <template v-if="parseError">
-        <div class="text-destructive text-sm">{{ t('logs.viewer.parseError') }}</div>
+        <div class="text-destructive text-sm">
+          {{ t("logs.viewer.parseError") }}
+        </div>
       </template>
       <template v-else>
         <!-- Claude Code context card -->
@@ -26,23 +37,42 @@
         />
 
         <!-- URL -->
-        <div v-if="showUrl && parsed.url" class="text-xs text-muted-foreground break-all">
+        <div
+          v-if="showUrl && parsed.url"
+          class="text-xs text-muted-foreground break-all"
+        >
           {{ parsed.url }}
         </div>
 
         <!-- Parameter badges -->
         <div class="flex flex-wrap gap-2">
-          <StatPill v-if="(parsed.body as Record<string, unknown>)?.model" label="model" :value="String((parsed.body as Record<string, unknown>).model)" :highlight="true" />
-          <StatPill v-if="(parsed.body as Record<string, unknown>)?.stream != null" label="stream" :value="String((parsed.body as Record<string, unknown>).stream)" />
-          <StatPill v-if="(parsed.body as Record<string, unknown>)?.max_tokens != null" label="max_tokens" :value="String((parsed.body as Record<string, unknown>).max_tokens)" />
-          <TagPill v-if="(parsed.body as Record<string, unknown>)?.thinking != null" label="thinking" />
+          <StatPill
+            v-if="(parsed.body as Record<string, unknown>)?.model"
+            label="model"
+            :value="String((parsed.body as Record<string, unknown>).model)"
+            :highlight="true"
+          />
+          <StatPill
+            v-if="(parsed.body as Record<string, unknown>)?.stream != null"
+            label="stream"
+            :value="String((parsed.body as Record<string, unknown>).stream)"
+          />
+          <StatPill
+            v-if="(parsed.body as Record<string, unknown>)?.max_tokens != null"
+            label="max_tokens"
+            :value="String((parsed.body as Record<string, unknown>).max_tokens)"
+          />
+          <TagPill
+            v-if="(parsed.body as Record<string, unknown>)?.thinking != null"
+            label="thinking"
+          />
         </div>
 
         <!-- Headers -->
         <Collapsible v-model:open="headersOpen">
           <CollapsibleTrigger as-child>
             <Button variant="ghost" size="xs" class="px-0 h-auto">
-              {{ t('logs.viewer.headers', { count: headerEntries.length }) }}
+              {{ t("logs.viewer.headers", { count: headerEntries.length }) }}
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent>
@@ -50,8 +80,10 @@
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead class="w-1/3">{{ t('logs.viewer.key') }}</TableHead>
-                    <TableHead>{{ t('logs.viewer.value') }}</TableHead>
+                    <TableHead class="w-1/3">{{
+                      t("logs.viewer.key")
+                    }}</TableHead>
+                    <TableHead>{{ t("logs.viewer.value") }}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -71,35 +103,62 @@
           <Card v-for="(msg, idx) in messages" :key="idx" class="bg-muted/40">
             <CardHeader class="pb-2 flex flex-row items-center gap-2">
               <Badge :class="roleClass(msg.role)">{{ msg.role }}</Badge>
-              <span v-if="msg.blockSummary" class="text-xs text-muted-foreground">{{ msg.blockSummary }}</span>
+              <span
+                v-if="msg.blockSummary"
+                class="text-xs text-muted-foreground"
+                >{{ msg.blockSummary }}</span
+              >
             </CardHeader>
             <CardContent class="space-y-2">
               <div v-for="(block, bidx) in msg.blocks" :key="bidx">
                 <!-- 纯文本 -->
                 <div v-if="block.type === 'text'">
-                  <div v-if="block.text.length > 120 && !expanded[`${idx}-${bidx}`]" class="text-sm">
+                  <div
+                    v-if="
+                      block.text.length > 120 && !expanded[`${idx}-${bidx}`]
+                    "
+                    class="text-sm"
+                  >
                     {{ block.text.slice(0, 120) }}
-                    <Button variant="link" size="xs" class="px-0 h-auto" @click="expanded[`${idx}-${bidx}`] = true">{{ t('logs.viewer.expand') }}</Button>
+                    <Button
+                      variant="link"
+                      size="xs"
+                      class="px-0 h-auto"
+                      @click="expanded[`${idx}-${bidx}`] = true"
+                      >{{ t("logs.viewer.expand") }}</Button
+                    >
                   </div>
-                  <div v-else class="text-sm whitespace-pre-wrap break-all">{{ block.text }}</div>
+                  <div v-else class="text-sm whitespace-pre-wrap break-all">
+                    {{ block.text }}
+                  </div>
                 </div>
                 <!-- 有内容的标签块：可折叠 -->
-                <div v-else-if="block.text" class="text-xs text-muted-foreground">
+                <div
+                  v-else-if="block.text"
+                  class="text-xs text-muted-foreground"
+                >
                   <Collapsible>
                     <CollapsibleTrigger as-child>
                       <Button variant="ghost" size="xs" class="px-0 h-auto">
-                        <Badge :class="tagClass(block.type)" class="mr-1">{{ block.label || block.type }}</Badge>
+                        <Badge :class="tagClass(block.type)" class="mr-1">{{
+                          block.label || block.type
+                        }}</Badge>
                         {{ formatSize(block.text) }}
                       </Button>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
-                      <pre class="mt-1 whitespace-pre-wrap break-all text-[11px] bg-muted rounded-md p-2 border">{{ block.text }}</pre>
+                      <pre
+                        class="mt-1 whitespace-pre-wrap break-all text-[11px] bg-muted rounded-md p-2 border"
+                        >{{ block.text }}</pre
+                      >
                     </CollapsibleContent>
                   </Collapsible>
                 </div>
                 <!-- 空内容：仅显示标签 Badge -->
                 <div v-else class="text-xs">
-                  <Badge :class="tagClass(block.type)" class="mr-1">{{ block.label || block.type }}</Badge>
+                  <Badge :class="tagClass(block.type)" class="mr-1">{{
+                    block.label || block.type
+                  }}</Badge>
                 </div>
               </div>
             </CardContent>
@@ -108,21 +167,43 @@
 
         <!-- Tools -->
         <div v-if="toolNames.length">
-          <div class="text-xs font-medium text-muted-foreground mb-1">Tools</div>
+          <div class="text-xs font-medium text-muted-foreground mb-1">
+            Tools
+          </div>
           <div class="flex flex-wrap gap-1">
-            <TagPill v-for="name in displayedToolNames" :key="name" :label="name" />
-            <Button v-if="toolNames.length > 8" variant="ghost" size="xs" class="px-1 h-5" @click="toolsExpanded = !toolsExpanded">
-              {{ toolsExpanded ? t('logs.viewer.collapse') : t('logs.viewer.moreTools', { count: toolNames.length - 8 }) }}
+            <TagPill
+              v-for="name in displayedToolNames"
+              :key="name"
+              :label="name"
+            />
+            <Button
+              v-if="toolNames.length > 8"
+              variant="ghost"
+              size="xs"
+              class="px-1 h-5"
+              @click="toolsExpanded = !toolsExpanded"
+            >
+              {{
+                toolsExpanded
+                  ? t("logs.viewer.collapse")
+                  : t("logs.viewer.moreTools", { count: toolNames.length - 8 })
+              }}
             </Button>
           </div>
         </div>
 
         <!-- System (Anthropic root-level) -->
         <div v-if="systemBlocks.length">
-          <div class="text-xs font-medium text-muted-foreground mb-1">System</div>
+          <div class="text-xs font-medium text-muted-foreground mb-1">
+            System
+          </div>
           <Card class="bg-muted/40">
             <CardContent class="space-y-2">
-              <div v-for="(blk, sidx) in systemBlocks" :key="sidx" class="text-sm whitespace-pre-wrap break-all">
+              <div
+                v-for="(blk, sidx) in systemBlocks"
+                :key="sidx"
+                class="text-sm whitespace-pre-wrap break-all"
+              >
                 <Badge variant="outline" class="mb-1">{{ blk.type }}</Badge>
                 <div v-if="blk.text">{{ blk.text }}</div>
               </div>
@@ -134,11 +215,14 @@
         <Collapsible v-if="otherFieldsKeys.length">
           <CollapsibleTrigger as-child>
             <Button variant="ghost" size="xs" class="px-0 h-auto">
-              {{ t('logs.viewer.otherFields') }}
+              {{ t("logs.viewer.otherFields") }}
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <pre class="mt-1 whitespace-pre-wrap break-all text-xs bg-muted rounded p-2 border">{{ JSON.stringify(otherFields, null, 2) }}</pre>
+            <pre
+              class="mt-1 whitespace-pre-wrap break-all text-xs bg-muted rounded p-2 border"
+              >{{ JSON.stringify(otherFields, null, 2) }}</pre
+            >
           </CollapsibleContent>
         </Collapsible>
       </template>
@@ -151,179 +235,210 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { useClipboard } from '@/composables/useClipboard'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader } from '@/components/ui/card'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import JsonCopyBlock from './JsonCopyBlock.vue'
-import StatPill from './StatPill.vue'
-import TagPill from './TagPill.vue'
-import { roleClass, tagClass } from './logColors'
-import InfoBanner from './InfoBanner.vue'
-import { extractBlocks } from './requestBlockParser'
-import type { MsgBlock } from './requestBlockParser'
+import { computed, reactive, ref } from "vue";
+import { useI18n } from "vue-i18n";
+import { useClipboard } from "@/composables/useClipboard";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import JsonCopyBlock from "./JsonCopyBlock.vue";
+import StatPill from "./StatPill.vue";
+import TagPill from "./TagPill.vue";
+import { roleClass, tagClass } from "./logColors";
+import InfoBanner from "./InfoBanner.vue";
+import { extractBlocks } from "./requestBlockParser";
+import type { MsgBlock } from "./requestBlockParser";
+import { formatSize } from "@/utils/format";
 
 const props = defineProps<{
-  raw: string
-  apiType: 'openai' | 'anthropic'
-  showUrl?: boolean
+  raw: string;
+  apiType: "openai" | "anthropic";
+  showUrl?: boolean;
   /** 外部控制显示模式时传入，组件内部不渲染 tabs 和复制按钮 */
-  mode?: 'structured' | 'raw'
-}>()
+  mode?: "structured" | "raw";
+}>();
 
-const { t } = useI18n()
-const headersOpen = ref(false)
-const expanded = reactive<Record<string, boolean>>({})
-const toolsExpanded = ref(false)
-const { copied, copy: clipboardCopy } = useClipboard()
+const { t } = useI18n();
+const headersOpen = ref(false);
+const expanded = reactive<Record<string, boolean>>({});
+const toolsExpanded = ref(false);
+const { copied, copy: clipboardCopy } = useClipboard();
 
 const parsed = computed<Record<string, unknown>>(() => {
   try {
-    return JSON.parse(props.raw) as Record<string, unknown>
+    return JSON.parse(props.raw) as Record<string, unknown>;
   } catch {
-    return {}
+    return {};
   }
-})
+});
 
 const parseError = computed(() => {
   try {
-    JSON.parse(props.raw)
-    return false
+    JSON.parse(props.raw);
+    return false;
   } catch {
-    return true
+    return true;
   }
-})
+});
 
 async function copyRaw() {
-  await clipboardCopy(props.raw)
+  await clipboardCopy(props.raw);
 }
 
 const headerEntries = computed(() => {
-  const headers = (parsed.value.headers || {}) as Record<string, string>
-  const ALLOWED_HEADER_KEYS = new Set(Object.keys(headers))
+  const headers = (parsed.value.headers || {}) as Record<string, string>;
+  const ALLOWED_HEADER_KEYS = new Set(Object.keys(headers));
   return Object.entries(headers)
     .filter(([k]) => ALLOWED_HEADER_KEYS.has(k))
     .map(([k, v]) => {
-      if (k.toLowerCase() === 'authorization') {
-        return [k, 'Bearer sk-****'] as [string, string]
+      if (k.toLowerCase() === "authorization") {
+        return [k, "Bearer sk-****"] as [string, string];
       }
-      return [k, v] as [string, string]
-    })
-})
+      return [k, v] as [string, string];
+    });
+});
 
 const body = computed(() => {
-  const raw = parsed.value.body
+  const raw = parsed.value.body;
   // upstream_request 中 body 是二次 JSON 编码的字符串，需要再 parse 一次
-  if (typeof raw === 'string') {
-    try { return JSON.parse(raw) as Record<string, unknown> } catch { return {} }
+  if (typeof raw === "string") {
+    try {
+      return JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      return {};
+    }
   }
-  return (raw || {}) as Record<string, unknown>
-})
+  return (raw || {}) as Record<string, unknown>;
+});
 
 const isClaudeCode = computed(() => {
-  const ua = (parsed.value.headers as Record<string, string> | undefined)?.['user-agent'] || ''
-  return ua.includes('claude-cli')
-})
+  const ua =
+    (parsed.value.headers as Record<string, string> | undefined)?.[
+      "user-agent"
+    ] || "";
+  return ua.includes("claude-cli");
+});
 
 const claudeMode = computed(() => {
-  const ua = (parsed.value.headers as Record<string, string> | undefined)?.['user-agent'] || ''
-  const match = ua.match(/claude-cli\/[^\s]+\s+\(([^)]+)\)/)
-  return match ? match[1] : 'external, cli'
-})
+  const ua =
+    (parsed.value.headers as Record<string, string> | undefined)?.[
+      "user-agent"
+    ] || "";
+  const match = ua.match(/claude-cli\/[^\s]+\s+\(([^)]+)\)/);
+  return match ? match[1] : "external, cli";
+});
 
 const thinkingBudget = computed(() => {
-  const t = body.value.thinking as Record<string, unknown> | undefined
-  return t && typeof t.budget_tokens === 'number' ? t.budget_tokens : undefined
-})
+  const t = body.value.thinking as Record<string, unknown> | undefined;
+  return t && typeof t.budget_tokens === "number" ? t.budget_tokens : undefined;
+});
 
 const toolsCount = computed(() => {
-  const tools = body.value.tools as unknown[] | undefined
-  return Array.isArray(tools) ? tools.length : undefined
-})
+  const tools = body.value.tools as unknown[] | undefined;
+  return Array.isArray(tools) ? tools.length : undefined;
+});
 
 const claudeCodeDetails = computed(() => {
-  const parts: string[] = []
-  if (thinkingBudget.value != null) parts.push(t('logs.viewer.thinkingTokens', { count: thinkingBudget.value }))
-  if (toolsCount.value != null) parts.push(t('logs.viewer.toolsCount', { count: toolsCount.value }))
-  return parts
-})
+  const parts: string[] = [];
+  if (thinkingBudget.value != null)
+    parts.push(
+      t("logs.viewer.thinkingTokens", { count: thinkingBudget.value }),
+    );
+  if (toolsCount.value != null)
+    parts.push(t("logs.viewer.toolsCount", { count: toolsCount.value }));
+  return parts;
+});
 
 const messages = computed<MsgBlock[]>(() => {
-  const msgs = (body.value.messages || []) as Array<{ role: string; content: unknown }>
+  const msgs = (body.value.messages || []) as Array<{
+    role: string;
+    content: unknown;
+  }>;
   return msgs.map((m) => {
-    const blocks = extractBlocks(m.content)
+    const blocks = extractBlocks(m.content);
     // 统计非 text 的 block 类型和数量
-    const tagCounts: Record<string, number> = {}
+    const tagCounts: Record<string, number> = {};
     for (const b of blocks) {
-      if (b.type !== 'text' && b.text) {
-        tagCounts[b.type] = (tagCounts[b.type] || 0) + 1
+      if (b.type !== "text" && b.text) {
+        tagCounts[b.type] = (tagCounts[b.type] || 0) + 1;
       }
     }
-    const ALLOWED_TAG_KEYS = new Set(Object.keys(tagCounts))
-    const blockSummary = Object.entries(tagCounts)
-      .filter(([k]) => ALLOWED_TAG_KEYS.has(k))
-      .map(([t, c]) => `${t}${c > 1 ? ` x${c}` : ''}`)
-      .join(', ') || undefined
-    return { role: m.role, blocks, blockSummary }
-  })
-})
-
+    const ALLOWED_TAG_KEYS = new Set(Object.keys(tagCounts));
+    const blockSummary =
+      Object.entries(tagCounts)
+        .filter(([k]) => ALLOWED_TAG_KEYS.has(k))
+        .map(([t, c]) => `${t}${c > 1 ? ` x${c}` : ""}`)
+        .join(", ") || undefined;
+    return { role: m.role, blocks, blockSummary };
+  });
+});
 
 const toolNames = computed(() => {
-  const tools = (body.value.tools || []) as Array<{ function?: { name?: string }; name?: string }>
-  return tools.map((t) => t.function?.name || t.name || 'unknown').filter(Boolean)
-})
+  const tools = (body.value.tools || []) as Array<{
+    function?: { name?: string };
+    name?: string;
+  }>;
+  return tools
+    .map((t) => t.function?.name || t.name || "unknown")
+    .filter(Boolean);
+});
 
-const TOOL_PREVIEW_COUNT = 8
+const TOOL_PREVIEW_COUNT = 8;
 
 const displayedToolNames = computed(() => {
-  return toolsExpanded.value ? toolNames.value : toolNames.value.slice(0, TOOL_PREVIEW_COUNT)
-})
+  return toolsExpanded.value
+    ? toolNames.value
+    : toolNames.value.slice(0, TOOL_PREVIEW_COUNT);
+});
 
 const systemBlocks = computed(() => {
-  const sys = body.value.system
-  if (!sys) return [] as { type: string; text: string }[]
+  const sys = body.value.system;
+  if (!sys) return [] as { type: string; text: string }[];
   if (Array.isArray(sys)) {
-    return (sys as Array<{ type?: string; text?: string }>).map((s) => ({ type: s.type || 'text', text: s.text || '' }))
+    return (sys as Array<{ type?: string; text?: string }>).map((s) => ({
+      type: s.type || "text",
+      text: s.text || "",
+    }));
   }
-  if (typeof sys === 'string') {
-    return [{ type: 'text', text: sys }]
+  if (typeof sys === "string") {
+    return [{ type: "text", text: sys }];
   }
-  return [{ type: 'unknown', text: JSON.stringify(sys) }]
-})
+  return [{ type: "unknown", text: JSON.stringify(sys) }];
+});
 
 const knownKeys = new Set([
-  'model',
-  'stream',
-  'max_tokens',
-  'thinking',
-  'messages',
-  'tools',
-  'system',
-])
+  "model",
+  "stream",
+  "max_tokens",
+  "thinking",
+  "messages",
+  "tools",
+  "system",
+]);
 
 const otherFields = computed(() => {
-  const result: Record<string, unknown> = {}
+  const result: Record<string, unknown> = {};
   for (const key of Object.keys(body.value)) {
     if (!knownKeys.has(key)) {
-      result[key] = body.value[key]
+      result[key] = body.value[key];
     }
   }
-  return result
-})
+  return result;
+});
 
-const otherFieldsKeys = computed(() => Object.keys(otherFields.value))
-
-const BYTES_PER_KB = 1024
-
-function formatSize(text: string): string {
-  const bytes = new TextEncoder().encode(text).length
-  if (bytes < BYTES_PER_KB) return `${bytes}B`
-  return `${(bytes / BYTES_PER_KB).toFixed(1)}KB`
-}
+const otherFieldsKeys = computed(() => Object.keys(otherFields.value));
 </script>

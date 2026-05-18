@@ -3,10 +3,12 @@
   <div class="p-6">
     <!-- Header: connection status + overview stats -->
     <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-semibold text-foreground">{{ t('monitor.title') }}</h2>
+      <h2 class="text-lg font-semibold text-foreground">
+        {{ t("monitor.title") }}
+      </h2>
       <div class="flex items-center gap-2">
         <Badge :variant="connected ? 'default' : 'destructive'">
-          {{ connected ? t('monitor.connected') : t('monitor.disconnected') }}
+          {{ connected ? t("monitor.connected") : t("monitor.disconnected") }}
         </Badge>
       </div>
     </div>
@@ -24,15 +26,20 @@
       <Card>
         <CardHeader class="pb-2">
           <div class="flex items-center justify-between">
-            <CardTitle class="text-sm font-medium text-foreground">{{ t('monitor.activeRequests') }}</CardTitle>
+            <CardTitle class="text-sm font-medium text-foreground">{{
+              t("monitor.activeRequests")
+            }}</CardTitle>
             <Badge variant="secondary">{{ streamingRequests.length }}</Badge>
           </div>
         </CardHeader>
         <CardContent>
           <TooltipProvider :delay-duration="300">
             <ScrollArea class="h-64">
-              <div v-if="streamingRequests.length === 0" class="text-sm text-muted-foreground py-2">
-                {{ t('monitor.noActiveRequests') }}
+              <div
+                v-if="streamingRequests.length === 0"
+                class="text-sm text-muted-foreground py-2"
+              >
+                {{ t("monitor.noActiveRequests") }}
               </div>
               <div
                 v-for="req in streamingRequests"
@@ -44,32 +51,62 @@
                 <Badge :variant="statusVariant(req.status)" class="shrink-0">
                   {{ statusLabel(req.status) }}
                 </Badge>
-                <span class="text-sm text-foreground truncate flex-1">{{ req.model }}</span>
-                <Badge variant="outline" class="shrink-0 text-xs">{{ req.providerName }}</Badge>
-                <span class="text-xs text-muted-foreground shrink-0">{{ elapsed(req.startTime) }}s</span>
-                <span v-if="req.streamMetrics?.tokensPerSecond" class="text-xs text-muted-foreground shrink-0">
+                <span class="text-sm text-foreground truncate flex-1">{{
+                  req.model
+                }}</span>
+                <Badge variant="outline" class="shrink-0 text-xs">{{
+                  req.providerName
+                }}</Badge>
+                <span class="text-xs text-muted-foreground shrink-0"
+                  >{{ elapsed(req.startTime) }}s</span
+                >
+                <span
+                  v-if="req.streamMetrics?.tokensPerSecond"
+                  class="text-xs text-muted-foreground shrink-0"
+                >
                   {{ req.streamMetrics.tokensPerSecond.toFixed(0) }} t/s
                 </span>
-                <span v-if="req.streamMetrics?.outputTokens" class="text-xs text-muted-foreground shrink-0">
+                <span
+                  v-if="req.streamMetrics?.outputTokens"
+                  class="text-xs text-muted-foreground shrink-0"
+                >
                   {{ req.streamMetrics.outputTokens }} tok
                 </span>
-                <Badge v-if="req.isStream" variant="outline" class="shrink-0 text-xs">SSE</Badge>
+                <Badge
+                  v-if="req.isStream"
+                  variant="outline"
+                  class="shrink-0 text-xs"
+                  >SSE</Badge
+                >
                 <Tooltip>
                   <TooltipTrigger as-child>
-                    <Button variant="ghost" size="icon-xs" class="shrink-0" @click.stop="copy(req.id)">
-                      <CheckIcon v-if="copied" class="size-3 text-success" />
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      class="shrink-0"
+                      @click.stop="copyId(req.id)"
+                    >
+                      <CheckIcon
+                        v-if="copiedId === req.id"
+                        class="size-3 text-success"
+                      />
                       <CopyIcon v-else class="size-3" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>{{ t('monitor.copyId') }}</TooltipContent>
+                  <TooltipContent>{{ t("monitor.copyId") }}</TooltipContent>
                 </Tooltip>
                 <Tooltip>
                   <TooltipTrigger as-child>
-                    <Button variant="ghost" size="icon-xs" class="shrink-0 text-destructive hover:text-destructive" @click.stop="openKillDialog(req.id)">
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      class="shrink-0 text-destructive hover:text-destructive"
+                      @click.stop="openKillDialog(req.id)"
+                    >
                       <XIcon class="size-3" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>{{ t('monitor.kill') }}</TooltipContent>
+                  <TooltipContent>{{ t("monitor.kill") }}</TooltipContent>
                 </Tooltip>
               </div>
             </ScrollArea>
@@ -81,15 +118,20 @@
       <Card>
         <CardHeader class="pb-2">
           <div class="flex items-center justify-between">
-            <CardTitle class="text-sm font-medium text-foreground">{{ t('monitor.queuedRequests') }}</CardTitle>
+            <CardTitle class="text-sm font-medium text-foreground">{{
+              t("monitor.queuedRequests")
+            }}</CardTitle>
             <Badge variant="secondary">{{ queuedRequests.length }}</Badge>
           </div>
         </CardHeader>
         <CardContent>
           <TooltipProvider :delay-duration="300">
             <ScrollArea class="h-64">
-              <div v-if="queuedRequests.length === 0" class="text-sm text-muted-foreground py-2">
-                {{ t('monitor.noQueuedRequests') }}
+              <div
+                v-if="queuedRequests.length === 0"
+                class="text-sm text-muted-foreground py-2"
+              >
+                {{ t("monitor.noQueuedRequests") }}
               </div>
               <div
                 v-for="req in queuedRequests"
@@ -99,27 +141,46 @@
                 @click="selectRequest(req.id)"
               >
                 <Badge variant="outline" class="shrink-0">
-                  {{ t('monitor.queued') }}
+                  {{ t("monitor.queued") }}
                 </Badge>
-                <span class="text-sm text-foreground truncate flex-1">{{ req.model }}</span>
-                <Badge variant="outline" class="shrink-0 text-xs">{{ req.providerName }}</Badge>
-                <span class="text-xs text-muted-foreground shrink-0">{{ elapsed(req.startTime) }}s</span>
+                <span class="text-sm text-foreground truncate flex-1">{{
+                  req.model
+                }}</span>
+                <Badge variant="outline" class="shrink-0 text-xs">{{
+                  req.providerName
+                }}</Badge>
+                <span class="text-xs text-muted-foreground shrink-0"
+                  >{{ elapsed(req.startTime) }}s</span
+                >
                 <Tooltip>
                   <TooltipTrigger as-child>
-                    <Button variant="ghost" size="icon-xs" class="shrink-0" @click.stop="copy(req.id)">
-                      <CheckIcon v-if="copied" class="size-3 text-success" />
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      class="shrink-0"
+                      @click.stop="copyId(req.id)"
+                    >
+                      <CheckIcon
+                        v-if="copiedId === req.id"
+                        class="size-3 text-success"
+                      />
                       <CopyIcon v-else class="size-3" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>{{ t('monitor.copyId') }}</TooltipContent>
+                  <TooltipContent>{{ t("monitor.copyId") }}</TooltipContent>
                 </Tooltip>
                 <Tooltip>
                   <TooltipTrigger as-child>
-                    <Button variant="ghost" size="icon-xs" class="shrink-0 text-destructive hover:text-destructive" @click.stop="openKillDialog(req.id)">
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      class="shrink-0 text-destructive hover:text-destructive"
+                      @click.stop="openKillDialog(req.id)"
+                    >
                       <XIcon class="size-3" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>{{ t('monitor.kill') }}</TooltipContent>
+                  <TooltipContent>{{ t("monitor.kill") }}</TooltipContent>
                 </Tooltip>
               </div>
             </ScrollArea>
@@ -131,15 +192,20 @@
       <Card>
         <CardHeader class="pb-2">
           <div class="flex items-center justify-between">
-            <CardTitle class="text-sm font-medium text-foreground">{{ t('monitor.completed') }}</CardTitle>
+            <CardTitle class="text-sm font-medium text-foreground">{{
+              t("monitor.completed")
+            }}</CardTitle>
             <Badge variant="secondary">{{ recentCompleted.length }}</Badge>
           </div>
         </CardHeader>
         <CardContent>
           <TooltipProvider :delay-duration="300">
             <ScrollArea class="h-64">
-              <div v-if="recentCompleted.length === 0" class="text-sm text-muted-foreground py-2">
-                {{ t('monitor.noCompletedRequests') }}
+              <div
+                v-if="recentCompleted.length === 0"
+                class="text-sm text-muted-foreground py-2"
+              >
+                {{ t("monitor.noCompletedRequests") }}
               </div>
               <div
                 v-for="req in recentCompleted"
@@ -151,18 +217,37 @@
                 <Badge :variant="statusVariant(req.status)" class="shrink-0">
                   {{ statusLabel(req.status) }}
                 </Badge>
-                <span class="text-sm text-foreground truncate flex-1">{{ req.model }}</span>
-                <Badge variant="outline" class="shrink-0 text-xs">{{ req.providerName }}</Badge>
-                <Badge v-if="req.isStream" variant="outline" class="shrink-0 text-xs">SSE</Badge>
-                <span class="text-xs text-muted-foreground shrink-0">{{ duration(req) }}</span>
+                <span class="text-sm text-foreground truncate flex-1">{{
+                  req.model
+                }}</span>
+                <Badge variant="outline" class="shrink-0 text-xs">{{
+                  req.providerName
+                }}</Badge>
+                <Badge
+                  v-if="req.isStream"
+                  variant="outline"
+                  class="shrink-0 text-xs"
+                  >SSE</Badge
+                >
+                <span class="text-xs text-muted-foreground shrink-0">{{
+                  duration(req)
+                }}</span>
                 <Tooltip>
                   <TooltipTrigger as-child>
-                    <Button variant="ghost" size="icon-xs" class="shrink-0" @click.stop="copy(req.id)">
-                      <CheckIcon v-if="copied" class="size-3 text-success" />
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      class="shrink-0"
+                      @click.stop="copyId(req.id)"
+                    >
+                      <CheckIcon
+                        v-if="copiedId === req.id"
+                        class="size-3 text-success"
+                      />
                       <CopyIcon v-else class="size-3" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>{{ t('monitor.copyId') }}</TooltipContent>
+                  <TooltipContent>{{ t("monitor.copyId") }}</TooltipContent>
                 </Tooltip>
               </div>
             </ScrollArea>
@@ -174,7 +259,9 @@
     <!-- Provider Stats Table -->
     <Card class="mb-4">
       <CardHeader>
-        <CardTitle class="text-sm font-medium text-foreground">{{ t('monitor.providerStats') }}</CardTitle>
+        <CardTitle class="text-sm font-medium text-foreground">{{
+          t("monitor.providerStats")
+        }}</CardTitle>
       </CardHeader>
       <CardContent>
         <ProviderStatsTable :stats="stats" />
@@ -185,7 +272,9 @@
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
       <Card>
         <CardHeader>
-          <CardTitle class="text-sm font-medium text-foreground">{{ t('monitor.concurrency') }}</CardTitle>
+          <CardTitle class="text-sm font-medium text-foreground">{{
+            t("monitor.concurrency")
+          }}</CardTitle>
         </CardHeader>
         <CardContent>
           <ConcurrencyPanel :providers="concurrency" />
@@ -194,7 +283,9 @@
 
       <Card>
         <CardHeader>
-          <CardTitle class="text-sm font-medium text-foreground">{{ t('monitor.statusCodeDistribution') }}</CardTitle>
+          <CardTitle class="text-sm font-medium text-foreground">{{
+            t("monitor.statusCodeDistribution")
+          }}</CardTitle>
         </CardHeader>
         <CardContent>
           <StatusCodePanel :by-status-code="stats?.byStatusCode ?? {}" />
@@ -203,7 +294,9 @@
 
       <Card>
         <CardHeader>
-          <CardTitle class="text-sm font-medium text-foreground">{{ t('monitor.runtime') }}</CardTitle>
+          <CardTitle class="text-sm font-medium text-foreground">{{
+            t("monitor.runtime")
+          }}</CardTitle>
         </CardHeader>
         <CardContent>
           <RuntimePanel :runtime="runtime" />
@@ -224,15 +317,25 @@
     <AlertDialog v-model:open="killDialogOpen">
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>{{ t('monitor.killConfirmTitle') }}</AlertDialogTitle>
+          <AlertDialogTitle>{{
+            t("monitor.killConfirmTitle")
+          }}</AlertDialogTitle>
           <AlertDialogDescription v-if="killTarget">
-            {{ t('monitor.killConfirm', { model: killTarget.model, provider: killTarget.providerName }) }}
+            {{
+              t("monitor.killConfirm", {
+                model: killTarget.model,
+                provider: killTarget.providerName,
+              })
+            }}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>{{ t('monitor.killCancel') }}</AlertDialogCancel>
-          <AlertDialogAction class="bg-destructive text-destructive-foreground hover:bg-destructive/90" @click="executeKill">
-            {{ t('monitor.kill') }}
+          <AlertDialogCancel>{{ t("monitor.killCancel") }}</AlertDialogCancel>
+          <AlertDialogAction
+            class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            @click="executeKill"
+          >
+            {{ t("monitor.kill") }}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -241,29 +344,43 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { CheckIcon, CopyIcon, XIcon } from 'lucide-vue-next'
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { api, getApiMessage } from '@/api/client'
-import { toast } from 'vue-sonner'
-import MonitorHeader from '@/components/monitor/MonitorHeader.vue'
-import ConcurrencyPanel from '@/components/monitor/ConcurrencyPanel.vue'
-import RuntimePanel from '@/components/monitor/RuntimePanel.vue'
-import StatusCodePanel from '@/components/monitor/StatusCodePanel.vue'
-import ProviderStatsTable from '@/components/monitor/ProviderStatsTable.vue'
-import UnifiedRequestDialog from '@/components/request-detail/UnifiedRequestDialog.vue'
-import { useMonitorSSE } from '@/composables/useMonitorSSE'
-import { useMonitorData } from '@/composables/useMonitorData'
-import { useClipboard } from '@/composables/useClipboard'
-import { statusVariant, statusLabel } from '@/utils/status'
+import { computed, onMounted, onUnmounted, ref } from "vue";
+import { useI18n } from "vue-i18n";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { CheckIcon, CopyIcon, XIcon } from "lucide-vue-next";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { api, getApiMessage } from "@/api/client";
+import { toast } from "vue-sonner";
+import MonitorHeader from "@/components/monitor/MonitorHeader.vue";
+import ConcurrencyPanel from "@/components/monitor/ConcurrencyPanel.vue";
+import RuntimePanel from "@/components/monitor/RuntimePanel.vue";
+import StatusCodePanel from "@/components/monitor/StatusCodePanel.vue";
+import ProviderStatsTable from "@/components/monitor/ProviderStatsTable.vue";
+import UnifiedRequestDialog from "@/components/request-detail/UnifiedRequestDialog.vue";
+import { useMonitorSSE } from "@/composables/useMonitorSSE";
+import { useMonitorData } from "@/composables/useMonitorData";
+import { useClipboard } from "@/composables/useClipboard";
+import { statusVariant, statusLabel } from "@/utils/status";
 
-const { t } = useI18n()
+const { t } = useI18n();
 
 // --- Data layer ---
 const {
@@ -286,11 +403,11 @@ const {
   handleSSEOpen,
   handleSSEClose,
   loadInitialData,
-} = useMonitorData()
+} = useMonitorData();
 
 // --- SSE lifecycle (onOpen/onClose 驱动 connected 状态) ---
 const { connect } = useMonitorSSE(
-  '/admin/api/monitor/stream',
+  "/admin/api/monitor/stream",
   {
     request_start: handleSSEMessage,
     request_update: handleSSEMessage,
@@ -301,85 +418,99 @@ const { connect } = useMonitorSSE(
     stream_content_update: handleSSEMessage,
   },
   { onOpen: handleSSEOpen, onClose: handleSSEClose },
-)
+);
 
-const { copied, copy } = useClipboard()
+const { copy } = useClipboard();
+const copiedId = ref<string | null>(null);
+const COPY_FEEDBACK_MS = 2000;
+
+function copyId(id: string) {
+  copy(id);
+  copiedId.value = id;
+  setTimeout(() => {
+    if (copiedId.value === id) copiedId.value = null;
+  }, COPY_FEEDBACK_MS);
+}
 
 // --- Kill request ---
-const killDialogOpen = ref(false)
-const killTargetId = ref<string | null>(null)
+const killDialogOpen = ref(false);
+const killTargetId = ref<string | null>(null);
 const killTarget = computed(() => {
-  if (!killTargetId.value) return null
-  return activeRequests.value.find(r => r.id === killTargetId.value) ?? null
-})
+  if (!killTargetId.value) return null;
+  return activeRequests.value.find((r) => r.id === killTargetId.value) ?? null;
+});
 
 function openKillDialog(id: string) {
-  killTargetId.value = id
-  killDialogOpen.value = true
+  killTargetId.value = id;
+  killDialogOpen.value = true;
 }
 
 async function executeKill() {
-  if (!killTargetId.value) return
+  if (!killTargetId.value) return;
   try {
-    await api.killMonitorRequest(killTargetId.value)
+    await api.killMonitorRequest(killTargetId.value);
     // 立即从活跃列表移除，不等 SSE
-    activeRequests.value = activeRequests.value.filter(r => r.id !== killTargetId.value)
-    toast.success(t('monitor.killSuccess'))
+    activeRequests.value = activeRequests.value.filter(
+      (r) => r.id !== killTargetId.value,
+    );
+    toast.success(t("monitor.killSuccess"));
   } catch (e: unknown) {
-    console.error('Monitor.killRequest:', e)
-    toast.error(getApiMessage(e, t('monitor.killFailed')))
+    console.error("Monitor.killRequest:", e);
+    toast.error(getApiMessage(e, t("monitor.killFailed")));
   }
-  killDialogOpen.value = false
+  killDialogOpen.value = false;
 }
 
 // --- Helper functions ---
 
-const MS_PER_SECOND = 1000
-const NOW_TICK_INTERVAL = 3000
-const now = ref(Date.now())
-let tickTimer: ReturnType<typeof setInterval> | null = null
+const MS_PER_SECOND = 1000;
+const NOW_TICK_INTERVAL = 3000;
+const now = ref(Date.now());
+let tickTimer: ReturnType<typeof setInterval> | null = null;
 
 function startTick() {
-  stopTick()
-  tickTimer = setInterval(() => { now.value = Date.now() }, NOW_TICK_INTERVAL)
+  stopTick();
+  tickTimer = setInterval(() => {
+    now.value = Date.now();
+  }, NOW_TICK_INTERVAL);
 }
 
 function stopTick() {
   if (tickTimer) {
-    clearInterval(tickTimer)
-    tickTimer = null
+    clearInterval(tickTimer);
+    tickTimer = null;
   }
 }
 
 function handleMonitorVisibility() {
   if (document.hidden) {
-    stopTick()
+    stopTick();
   } else {
-    now.value = Date.now()
-    startTick()
+    now.value = Date.now();
+    startTick();
   }
 }
 
 function elapsed(startTime: number): string {
-  return ((now.value - startTime) / MS_PER_SECOND).toFixed(1)
+  return ((now.value - startTime) / MS_PER_SECOND).toFixed(1);
 }
 
 function duration(req: { completedAt?: number; startTime: number }): string {
-  if (!req.completedAt) return '--'
-  return ((req.completedAt - req.startTime) / MS_PER_SECOND).toFixed(1) + 's'
+  if (!req.completedAt) return "--";
+  return ((req.completedAt - req.startTime) / MS_PER_SECOND).toFixed(1) + "s";
 }
 
 // --- Lifecycle ---
 
 onMounted(async () => {
-  await loadInitialData()
-  connect()
-  startTick()
-  document.addEventListener('visibilitychange', handleMonitorVisibility)
-})
+  await loadInitialData();
+  connect();
+  startTick();
+  document.addEventListener("visibilitychange", handleMonitorVisibility);
+});
 
 onUnmounted(() => {
-  stopTick()
-  document.removeEventListener('visibilitychange', handleMonitorVisibility)
-})
+  stopTick();
+  document.removeEventListener("visibilitychange", handleMonitorVisibility);
+});
 </script>

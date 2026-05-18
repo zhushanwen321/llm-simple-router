@@ -2,8 +2,7 @@ import { ref, computed } from "vue";
 import { api, type ProviderGroup } from "@/api/client";
 import type { ModelInfo } from "@/types/mapping";
 import { getDefaultContextWindow } from "@/components/quick-setup/types";
-
-const DEFAULT_PATCHES_BY_KEYWORD = "deepseek";
+import { computeDefaultPatches } from "@/utils/model-patches";
 
 export function useProviderPresets(form: {
   value: {
@@ -58,7 +57,7 @@ export function useProviderPresets(form: {
     form.value.models = preset.models.map((name) => ({
       name,
       context_window: getDefaultContextWindow(name),
-      patches: getDefaultPatches(name, preset.apiType),
+      patches: computeDefaultPatches(name, preset.apiType, false),
       capabilities: preset.modelCapabilities?.[name],
     }));
   }
@@ -77,19 +76,6 @@ export function useProviderPresets(form: {
       (p) => p.plan === presetPlan.value,
     );
     return preset?.models ?? [];
-  }
-
-  function getDefaultPatches(modelName: string, apiType: string): string[] {
-    const patches: string[] = [];
-    if (modelName.toLowerCase().includes(DEFAULT_PATCHES_BY_KEYWORD)) {
-      patches.push("thinking-consistency");
-      if (apiType === "anthropic") {
-        patches.push("orphan-tool-results");
-      } else {
-        patches.push("orphan-tool-results-oa");
-      }
-    }
-    return patches;
   }
 
   async function loadPresets() {

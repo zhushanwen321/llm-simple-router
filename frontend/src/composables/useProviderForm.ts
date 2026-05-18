@@ -7,6 +7,7 @@ import { DEFAULT_CONTEXT_WINDOW } from "@/constants";
 import type { ModelConfig } from "@/components/quick-setup/types";
 import { useTransformRules } from "@/composables/useTransformRules";
 import { useProviderPresets } from "@/composables/useProviderPresets";
+import type { ConcurrencyMode } from "@/types/concurrency";
 
 const DEFAULT_CONCURRENCY = 3;
 const DEFAULT_CONCURRENCY_AUTO = 10;
@@ -17,8 +18,6 @@ const MAX_QUEUE_SIZE = 1000;
 const CONTEXT_K = 1000;
 const CONTEXT_M = 1_000_000;
 const MS_PER_SECOND = 1000;
-
-export type ConcurrencyMode = "auto" | "manual" | "none";
 
 interface FormState {
   name: string;
