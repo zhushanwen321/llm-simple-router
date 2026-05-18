@@ -238,7 +238,7 @@ export class ResilienceLayer {
       try {
         transportResult = await fn(currentTarget);
       } catch (err: unknown) {
-        const errMsg = err instanceof Error ? err.message : err instanceof Error ? err.message : JSON.stringify(err);
+        const errMsg = err instanceof Error ? err.message : JSON.stringify(err);
         transportResult = { kind: "throw", error: err instanceof Error ? err : new Error(errMsg) };
       }
 

@@ -1,190 +1,201 @@
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import { useI18n } from 'vue-i18n'
-import type { ChartData } from 'chart.js'
-import { api, getApiMessage } from '@/api/client'
-import { toast } from 'vue-sonner'
-import { fillTimeseries } from '@/views/metrics-helpers'
-import { CHART_COLORS } from '@/styles/design-tokens'
-import { formatTimeShort } from '@/utils/format'
-import { watchTheme } from '@/composables/useTheme'
-import type { Provider } from '@/types/mapping'
+import { ref, computed, watch, onMounted, onUnmounted } from "vue";
+import { useI18n } from "vue-i18n";
+import type { ChartData } from "chart.js";
+import { api, getApiMessage } from "@/api/client";
+import { toast } from "vue-sonner";
+import { fillTimeseries } from "@/views/metrics-helpers";
+import { CHART_COLORS } from "@/styles/design-tokens";
+import { formatTimeShort, toIsoStart, toIsoEnd } from "@/utils/format";
+import { watchTheme } from "@/composables/useTheme";
+import type { Provider } from "@/types/mapping";
 
 export interface DashboardStats {
-  totalRequests: number
-  successRate: number
-  avgTps: number
-  totalInputTokens: number
-  totalOutputTokens: number
-  startTime: string | null
-  endTime: string | null
+  totalRequests: number;
+  successRate: number;
+  avgTps: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  startTime: string | null;
+  endTime: string | null;
 }
 
-function toIsoStart(dateStr: string): string {
-  if (dateStr.includes('T')) return `${dateStr}:00.000Z`
-  return `${dateStr}T00:00:00.000Z`
-}
-
-function toIsoEnd(dateStr: string): string {
-  if (dateStr.includes('T')) return `${dateStr}:59.999Z`
-  return `${dateStr}T23:59:59.999Z`
-}
-
+// eslint-disable-next-line max-lines-per-function -- dashboard composable 各部分（metrics/charts/timeline）紧密耦合，拆分会降低可读性
 export function useDashboard() {
-  const { t } = useI18n()
+  const { t } = useI18n();
 
   // --- Provider list and selection ---
-  const providers = ref<Provider[]>([])
-  const selectedProvider = ref('')
+  const providers = ref<Provider[]>([]);
+  const selectedProvider = ref("");
 
   const sortedProviders = computed(() =>
     [...providers.value].sort((a, b) => {
-      const aOut = providerOutputTokens.value[a.id] ?? 0
-      const bOut = providerOutputTokens.value[b.id] ?? 0
-      return bOut - aOut
+      const aOut = providerOutputTokens.value[a.id] ?? 0;
+      const bOut = providerOutputTokens.value[b.id] ?? 0;
+      return bOut - aOut;
     }),
-  )
+  );
 
   // --- Period tab ---
-  const periodTab = ref<'window' | 'weekly' | 'monthly' | 'custom'>('window')
-  const customStart = ref('')
-  const customEnd = ref('')
+  const periodTab = ref<"window" | "weekly" | "monthly" | "custom">("window");
+  const customStart = ref("");
+  const customEnd = ref("");
 
   // --- Filters ---
-  const modelFilter = ref('all')
-  const keyFilter = ref('all')
-  const clientType = ref('all')
-  const allModelOptions = ref<string[]>([])
-  const keyOptions = ref<{ id: string; name: string }[]>([])
+  const modelFilter = ref("all");
+  const keyFilter = ref("all");
+  const clientType = ref("all");
+  const allModelOptions = ref<string[]>([]);
+  const keyOptions = ref<{ id: string; name: string }[]>([]);
 
   const modelOptions = computed(() => {
     if (selectedProvider.value) {
-      const provider = providers.value.find((p) => p.id === selectedProvider.value)
+      const provider = providers.value.find(
+        (p) => p.id === selectedProvider.value,
+      );
       if (provider) {
-        const providerModels = new Set(provider.models.map((m) => m.name))
-        return allModelOptions.value.filter((m) => providerModels.has(m))
+        const providerModels = new Set(provider.models.map((m) => m.name));
+        return allModelOptions.value.filter((m) => providerModels.has(m));
       }
     }
-    return allModelOptions.value
-  })
+    return allModelOptions.value;
+  });
 
   // --- Time range text ---
   const timeRangeText = computed(() => {
-    const start = stats.value.startTime
-    const end = stats.value.endTime
-    if (!start || !end) return '—'
+    const start = stats.value.startTime;
+    const end = stats.value.endTime;
+    if (!start || !end) return "—";
     try {
-      return `${formatTimeShort(start)} ~ ${formatTimeShort(end)}`
+      return `${formatTimeShort(start)} ~ ${formatTimeShort(end)}`;
     } catch {
-      return '—'
+      return "—";
     }
-  })
+  });
 
   // --- API params ---
   const apiStartTime = computed(() => {
-    if (periodTab.value === 'custom' && customStart.value) {
-      return toIsoStart(customStart.value)
+    if (periodTab.value === "custom" && customStart.value) {
+      return toIsoStart(customStart.value);
     }
-    return undefined
-  })
+    return undefined;
+  });
   const apiEndTime = computed(() => {
-    if (periodTab.value === 'custom' && customEnd.value) {
-      return toIsoEnd(customEnd.value)
+    if (periodTab.value === "custom" && customEnd.value) {
+      return toIsoEnd(customEnd.value);
     }
-    return undefined
-  })
+    return undefined;
+  });
 
   const statsParams = computed(() => {
-    const p: Record<string, string> = {}
-    if (periodTab.value !== 'custom') {
-      p.period = periodTab.value
+    const p: Record<string, string> = {};
+    if (periodTab.value !== "custom") {
+      p.period = periodTab.value;
     } else if (apiStartTime.value && apiEndTime.value) {
-      p.start_time = apiStartTime.value
-      p.end_time = apiEndTime.value
+      p.start_time = apiStartTime.value;
+      p.end_time = apiEndTime.value;
     }
-    if (selectedProvider.value) p.provider_id = selectedProvider.value
-    if (modelFilter.value !== 'all') p.backend_model = modelFilter.value
-    if (keyFilter.value !== 'all') p.router_key_id = keyFilter.value
-    return p
-  })
+    if (selectedProvider.value) p.provider_id = selectedProvider.value;
+    if (modelFilter.value !== "all") p.backend_model = modelFilter.value;
+    if (keyFilter.value !== "all") p.router_key_id = keyFilter.value;
+    return p;
+  });
 
   const cacheSummaryParams = computed(() => {
-    const p: Record<string, string> = {}
-    if (periodTab.value !== 'custom') {
-      p.period = periodTab.value
+    const p: Record<string, string> = {};
+    if (periodTab.value !== "custom") {
+      p.period = periodTab.value;
     } else if (apiStartTime.value && apiEndTime.value) {
-      p.start_time = apiStartTime.value
-      p.end_time = apiEndTime.value
+      p.start_time = apiStartTime.value;
+      p.end_time = apiEndTime.value;
     }
-    if (selectedProvider.value) p.provider_id = selectedProvider.value
-    if (modelFilter.value !== 'all') p.backend_model = modelFilter.value
-    if (keyFilter.value !== 'all') p.router_key_id = keyFilter.value
-    if (clientType.value !== 'all') p.client_type = clientType.value
-    return p
-  })
+    if (selectedProvider.value) p.provider_id = selectedProvider.value;
+    if (modelFilter.value !== "all") p.backend_model = modelFilter.value;
+    if (keyFilter.value !== "all") p.router_key_id = keyFilter.value;
+    if (clientType.value !== "all") p.client_type = clientType.value;
+    return p;
+  });
 
   const timeseriesPeriod = computed(() => {
-    if (periodTab.value === 'custom' && apiStartTime.value && apiEndTime.value) {
-      return 'monthly'
+    if (
+      periodTab.value === "custom" &&
+      apiStartTime.value &&
+      apiEndTime.value
+    ) {
+      return "monthly";
     }
-    return periodTab.value as 'window' | 'weekly' | 'monthly'
-  })
+    return periodTab.value as "window" | "weekly" | "monthly";
+  });
 
   function tsParams(metric: string) {
-    const p: { period?: string; metric: string; provider_id?: string; backend_model?: string; router_key_id?: string; start_time?: string; end_time?: string } = { metric }
-    if (periodTab.value !== 'custom') {
-      p.period = periodTab.value
+    const p: {
+      period?: string;
+      metric: string;
+      provider_id?: string;
+      backend_model?: string;
+      router_key_id?: string;
+      start_time?: string;
+      end_time?: string;
+    } = { metric };
+    if (periodTab.value !== "custom") {
+      p.period = periodTab.value;
     } else if (apiStartTime.value && apiEndTime.value) {
-      p.start_time = apiStartTime.value
-      p.end_time = apiEndTime.value
+      p.start_time = apiStartTime.value;
+      p.end_time = apiEndTime.value;
     }
-    if (selectedProvider.value) p.provider_id = selectedProvider.value
-    if (modelFilter.value !== 'all') p.backend_model = modelFilter.value
-    if (keyFilter.value !== 'all') p.router_key_id = keyFilter.value
-    return p
+    if (selectedProvider.value) p.provider_id = selectedProvider.value;
+    if (modelFilter.value !== "all") p.backend_model = modelFilter.value;
+    if (keyFilter.value !== "all") p.router_key_id = keyFilter.value;
+    return p;
   }
 
   // --- Data state ---
   const stats = ref<DashboardStats>({
-    totalRequests: 0, successRate: 0, avgTps: 0,
-    totalInputTokens: 0, totalOutputTokens: 0,
-    startTime: null, endTime: null,
-  })
-  const cacheHitRate = ref(0)
-  const clientTypeBreakdown = ref<Record<string, number>>({})
-  const tpsChartData = ref<ChartData<'line'> | null>(null)
-  const inputTokensChartData = ref<ChartData<'line'> | null>(null)
-  const outputTokensChartData = ref<ChartData<'line'> | null>(null)
-  const loading = ref(false)
+    totalRequests: 0,
+    successRate: 0,
+    avgTps: 0,
+    totalInputTokens: 0,
+    totalOutputTokens: 0,
+    startTime: null,
+    endTime: null,
+  });
+  const cacheHitRate = ref(0);
+  const clientTypeBreakdown = ref<Record<string, number>>({});
+  const tpsChartData = ref<ChartData<"line"> | null>(null);
+  const inputTokensChartData = ref<ChartData<"line"> | null>(null);
+  const outputTokensChartData = ref<ChartData<"line"> | null>(null);
+  const loading = ref(false);
 
   // --- Per-provider output tokens (for sorting) ---
-  const providerOutputTokens = ref<Record<string, number>>({})
+  const providerOutputTokens = ref<Record<string, number>>({});
 
   function toChartData(
     timeseries: { labels: string[]; values: number[] },
     label: string,
     color: string,
-  ): ChartData<'line'> {
+  ): ChartData<"line"> {
     return {
       labels: timeseries.labels,
-      datasets: [{
-        label,
-        data: timeseries.values,
-        borderColor: color,
-        backgroundColor: color.replace(')', ' / 0.1)'),
-        fill: false,
-        tension: 0.4,
-        pointRadius: 0,
-      }],
-    }
+      datasets: [
+        {
+          label,
+          data: timeseries.values,
+          borderColor: color,
+          backgroundColor: color.replace(")", " / 0.1)"),
+          fill: false,
+          tension: 0.4,
+          pointRadius: 0,
+        },
+      ],
+    };
   }
 
   // --- Fetch providers ---
   async function loadProviders() {
     try {
-      providers.value = await api.getProviders()
+      providers.value = await api.getProviders();
     } catch (e: unknown) {
-      console.error('Failed to load providers:', e)
-      toast.error(getApiMessage(e, t('dashboard.loadProvidersFailed')))
+      console.error("Failed to load providers:", e);
+      toast.error(getApiMessage(e, t("dashboard.loadProvidersFailed")));
     }
   }
 
@@ -194,183 +205,224 @@ export function useDashboard() {
       const [models, keys] = await Promise.allSettled([
         api.getAvailableModels(),
         api.getRouterKeys(),
-      ])
-      if (models.status === 'fulfilled') allModelOptions.value = models.value
-      if (keys.status === 'fulfilled') keyOptions.value = keys.value
+      ]);
+      if (models.status === "fulfilled") allModelOptions.value = models.value;
+      if (keys.status === "fulfilled") keyOptions.value = keys.value;
     } catch (e: unknown) {
-      console.error('Failed to load filter options:', e)
+      console.error("Failed to load filter options:", e);
       /* 非关键操作：filter 缺失不影响主仪表盘功能 */
-      toast.error(getApiMessage(e, t('dashboard.loadFilterFailed')))
+      toast.error(getApiMessage(e, t("dashboard.loadFilterFailed")));
     }
   }
 
   // --- Fetch provider output tokens for sorting ---
   async function loadProviderOutputTokens() {
-    if (providers.value.length === 0) return
-    if (periodTab.value === 'custom' && !(apiStartTime.value && apiEndTime.value)) return
+    if (providers.value.length === 0) return;
+    if (
+      periodTab.value === "custom" &&
+      !(apiStartTime.value && apiEndTime.value)
+    )
+      return;
     // 复用 summary API，一次请求获取所有 provider 的 output tokens
-    const params: Record<string, string> = { ...statsParams.value }
-    delete params.provider_id
-    delete params.backend_model
-    delete params.router_key_id
+    const params: Record<string, string> = { ...statsParams.value };
+    delete params.provider_id;
+    delete params.backend_model;
+    delete params.router_key_id;
     try {
-      const summary = await api.getMetricsSummary(params)
-      const map: Record<string, number> = {}
+      const summary = await api.getMetricsSummary(params);
+      const map: Record<string, number> = {};
       if (summary.rows && Array.isArray(summary.rows)) {
         for (const row of summary.rows) {
           if (row.provider_id) {
-            map[row.provider_id] = row.total_output_tokens || 0
+            map[row.provider_id] = row.total_output_tokens || 0;
           }
         }
       }
-      providerOutputTokens.value = map
+      providerOutputTokens.value = map;
       if (Object.keys(map).length > 0 && !selectedProvider.value) {
-        const top = sortedProviders.value[0]
-        if (top) selectedProvider.value = top.id
+        const top = sortedProviders.value[0];
+        if (top) selectedProvider.value = top.id;
       }
     } catch (e: unknown) {
-      console.error('Failed to load output tokens:', e)
+      console.error("Failed to load output tokens:", e);
       /* 非关键操作：provider 排序降级为默认顺序 */
-      toast.error(getApiMessage(e, t('dashboard.loadOutputTokensFailed')))
+      toast.error(getApiMessage(e, t("dashboard.loadOutputTokensFailed")));
     }
   }
 
   // --- Fetch stats + timeseries ---
   async function refresh() {
-    if (!selectedProvider.value) return
-    if (periodTab.value === 'custom' && !(apiStartTime.value && apiEndTime.value)) return
+    if (!selectedProvider.value) return;
+    if (
+      periodTab.value === "custom" &&
+      !(apiStartTime.value && apiEndTime.value)
+    )
+      return;
     // 相同参数 5s 内不重复请求
-    const key = watchKey.value
-    const now = Date.now()
-    if (key === lastRefreshKey && now - lastRefreshTime < CACHE_TTL) return
-    loading.value = true
+    const key = watchKey.value;
+    const now = Date.now();
+    if (key === lastRefreshKey && now - lastRefreshTime < CACHE_TTL) return;
+    loading.value = true;
     try {
-      const [statsRes, tpsRes, inputRes, outputRes, summaryRes] = await Promise.allSettled([
-        api.getStats(statsParams.value),
-        api.getMetricsTimeseries(tsParams('total_tps')),
-        api.getMetricsTimeseries(tsParams('input_tokens')),
-        api.getMetricsTimeseries(tsParams('output_tokens')),
-        api.getMetricsSummary(cacheSummaryParams.value),
-      ])
+      const [statsRes, tpsRes, inputRes, outputRes, summaryRes] =
+        await Promise.allSettled([
+          api.getStats(statsParams.value),
+          api.getMetricsTimeseries(tsParams("total_tps")),
+          api.getMetricsTimeseries(tsParams("input_tokens")),
+          api.getMetricsTimeseries(tsParams("output_tokens")),
+          api.getMetricsSummary(cacheSummaryParams.value),
+        ]);
 
-      const fulfilled = <T>(r: PromiseSettledResult<T>): r is PromiseFulfilledResult<T> => r.status === 'fulfilled'
+      const fulfilled = <T>(
+        r: PromiseSettledResult<T>,
+      ): r is PromiseFulfilledResult<T> => r.status === "fulfilled";
 
-      if (fulfilled(statsRes)) stats.value = statsRes.value
+      if (fulfilled(statsRes)) stats.value = statsRes.value;
 
-      const period = timeseriesPeriod.value
-      const timeRange = stats.value.startTime && stats.value.endTime
-        ? { startTime: stats.value.startTime, endTime: stats.value.endTime }
-        : undefined
+      const period = timeseriesPeriod.value;
+      const timeRange =
+        stats.value.startTime && stats.value.endTime
+          ? { startTime: stats.value.startTime, endTime: stats.value.endTime }
+          : undefined;
 
       if (fulfilled(tpsRes) && tpsRes.value.length > 0) {
-        const filled = fillTimeseries(tpsRes.value, period, timeRange)
-        tpsChartData.value = toChartData(filled, t('dashboard.charts.tokenOutputSpeed'), CHART_COLORS.indigo)
+        const filled = fillTimeseries(tpsRes.value, period, timeRange);
+        tpsChartData.value = toChartData(
+          filled,
+          t("dashboard.charts.tokenOutputSpeed"),
+          CHART_COLORS.indigo,
+        );
       } else {
-        tpsChartData.value = null
+        tpsChartData.value = null;
       }
 
       if (fulfilled(inputRes) && inputRes.value.length > 0) {
-        const filled = fillTimeseries(inputRes.value, period, timeRange)
-        inputTokensChartData.value = toChartData(filled, t('dashboard.charts.tokenInputTotal'), CHART_COLORS.teal)
+        const filled = fillTimeseries(inputRes.value, period, timeRange);
+        inputTokensChartData.value = toChartData(
+          filled,
+          t("dashboard.charts.tokenInputTotal"),
+          CHART_COLORS.teal,
+        );
       } else {
-        inputTokensChartData.value = null
+        inputTokensChartData.value = null;
       }
 
       if (fulfilled(outputRes) && outputRes.value.length > 0) {
-        const filled = fillTimeseries(outputRes.value, period, timeRange)
-        outputTokensChartData.value = toChartData(filled, t('dashboard.charts.tokenOutputTotal'), CHART_COLORS.green)
+        const filled = fillTimeseries(outputRes.value, period, timeRange);
+        outputTokensChartData.value = toChartData(
+          filled,
+          t("dashboard.charts.tokenOutputTotal"),
+          CHART_COLORS.green,
+        );
       } else {
-        outputTokensChartData.value = null
+        outputTokensChartData.value = null;
       }
 
       if (fulfilled(summaryRes)) {
-        cacheHitRate.value = summaryRes.value.cache_hit_rate
-        clientTypeBreakdown.value = summaryRes.value.client_type_breakdown
+        cacheHitRate.value = summaryRes.value.cache_hit_rate;
+        clientTypeBreakdown.value = summaryRes.value.client_type_breakdown;
       }
     } catch (e: unknown) {
-      console.error('Failed to load dashboard:', e)
-      toast.error(getApiMessage(e, t('dashboard.loadDashboardFailed')))
+      console.error("Failed to load dashboard:", e);
+      toast.error(getApiMessage(e, t("dashboard.loadDashboardFailed")));
     } finally {
-      loading.value = false
-      lastRefreshKey = key
-      lastRefreshTime = Date.now()
+      loading.value = false;
+      lastRefreshKey = key;
+      lastRefreshTime = Date.now();
     }
   }
 
   // --- Watchers ---
 
   // 统一 watch key：所有影响 refresh 的参数
-  const watchKey = computed(() => JSON.stringify({
-    periodTab: periodTab.value,
-    selectedProvider: selectedProvider.value,
-    modelFilter: modelFilter.value,
-    keyFilter: keyFilter.value,
-    clientType: clientType.value,
-    customStart: customStart.value,
-    customEnd: customEnd.value,
-  }))
+  const watchKey = computed(() =>
+    JSON.stringify({
+      periodTab: periodTab.value,
+      selectedProvider: selectedProvider.value,
+      modelFilter: modelFilter.value,
+      keyFilter: keyFilter.value,
+      clientType: clientType.value,
+      customStart: customStart.value,
+      customEnd: customEnd.value,
+    }),
+  );
 
   // 副作用：离开自定义日期模式时清空日期（间接通过 watchKey 变化触发 refresh）
   watch(periodTab, () => {
-    if (periodTab.value !== 'custom') {
-      customStart.value = ''
-      customEnd.value = ''
+    if (periodTab.value !== "custom") {
+      customStart.value = "";
+      customEnd.value = "";
     }
-  })
+  });
 
   // 副作用：切换 provider 时重置 modelFilter（间接通过 watchKey 变化触发 refresh）
   watch(selectedProvider, () => {
-    if (modelFilter.value !== 'all' && !modelOptions.value.includes(modelFilter.value)) {
-      modelFilter.value = 'all'
+    if (
+      modelFilter.value !== "all" &&
+      !modelOptions.value.includes(modelFilter.value)
+    ) {
+      modelFilter.value = "all";
     }
-  })
+  });
 
   // 单一 debounced watch：watchKey 变化时 DEBOUNCE_MS 后 refresh
-  let refreshTimer: ReturnType<typeof setTimeout> | null = null
+  let refreshTimer: ReturnType<typeof setTimeout> | null = null;
   watch(watchKey, () => {
-    if (refreshTimer) clearTimeout(refreshTimer)
-    refreshTimer = setTimeout(() => refresh(), DEBOUNCE_MS)
-  })
+    if (refreshTimer) clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(() => refresh(), DEBOUNCE_MS);
+  });
 
   // periodTab 变化时重新加载 provider 排序数据
   watch(periodTab, () => {
     if (providers.value.length > 0) {
-      loadProviderOutputTokens()
+      loadProviderOutputTokens();
     }
-  })
+  });
 
   // --- Refresh 去重缓存 ---
-  const DEBOUNCE_MS = 300
-  const CACHE_TTL = 5000
-  let lastRefreshKey = ''
-  let lastRefreshTime = 0
+  const DEBOUNCE_MS = 300;
+  const CACHE_TTL = 5000;
+  let lastRefreshKey = "";
+  let lastRefreshTime = 0;
 
   // --- Watch theme changes to re-render charts ---
-  let stopWatchTheme: (() => void) | null = null
+  let stopWatchTheme: (() => void) | null = null;
 
   onMounted(async () => {
-    await loadProviders()
-    await loadFilterOptions()
+    await loadProviders();
+    await loadFilterOptions();
     if (providers.value.length > 0) {
-      await loadProviderOutputTokens()
+      await loadProviderOutputTokens();
     }
-    await refresh()
+    await refresh();
     // Re-render charts when theme changes (Chart.js doesn't support CSS vars)
-    stopWatchTheme = watchTheme(() => refresh())
-  })
+    stopWatchTheme = watchTheme(() => refresh());
+  });
 
   onUnmounted(() => {
-    if (refreshTimer) clearTimeout(refreshTimer)
-    if (stopWatchTheme) stopWatchTheme()
-  })
+    if (refreshTimer) clearTimeout(refreshTimer);
+    if (stopWatchTheme) stopWatchTheme();
+  });
 
   return {
-    providers, selectedProvider, sortedProviders,
-    periodTab, customStart, customEnd,
-    modelFilter, keyFilter, clientType, modelOptions, keyOptions,
+    providers,
+    selectedProvider,
+    sortedProviders,
+    periodTab,
+    customStart,
+    customEnd,
+    modelFilter,
+    keyFilter,
+    clientType,
+    modelOptions,
+    keyOptions,
     timeRangeText,
-    stats, loading,
-    cacheHitRate, clientTypeBreakdown,
-    tpsChartData, inputTokensChartData, outputTokensChartData,
-  }
+    stats,
+    loading,
+    cacheHitRate,
+    clientTypeBreakdown,
+    tpsChartData,
+    inputTokensChartData,
+    outputTokensChartData,
+  };
 }

@@ -3,6 +3,7 @@ import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import type { ModelConfig } from "./types";
 import { CONTEXT_WINDOW_OPTIONS } from "./types";
+import { formatContextWindow } from "@/utils/format";
 import PatchChips from "./PatchChips.vue";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -73,15 +74,6 @@ function updateContextWindowFromInput(val: string) {
 function updatePatches(patches: string[]) {
   emit("update:model", { ...props.model, patches });
 }
-
-const CONTEXT_MILLION = 1_000_000;
-const CONTEXT_THOUSAND = 1_000;
-
-function formatCw(n: number): string {
-  if (n >= CONTEXT_MILLION) return `${n / CONTEXT_MILLION}M`;
-  if (n >= CONTEXT_THOUSAND) return `${n / CONTEXT_THOUSAND}K`;
-  return `${n}`;
-}
 </script>
 
 <template>
@@ -105,7 +97,9 @@ function formatCw(n: number): string {
           <SelectTrigger class="h-7 w-[72px] text-xs">
             <SelectValue>
               {{
-                isPreset ? matchedOption!.label : formatCw(model.contextWindow)
+                isPreset
+                  ? matchedOption!.label
+                  : formatContextWindow(model.contextWindow)
               }}
             </SelectValue>
           </SelectTrigger>
