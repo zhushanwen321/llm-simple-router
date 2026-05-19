@@ -196,6 +196,7 @@ export function loadModelDirectory(configDir?: string): void {
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : typeof err === 'string' ? err : JSON.stringify(err)
     console.warn(`loadModelDirectory: failed to load (${msg}), using hardcoded fallback`)
+    console.debug(err)
   }
 }
 

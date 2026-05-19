@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, type Component } from "vue";
+import { computed, type Component } from "vue";
+import { isDark } from "@/composables/useTheme";
 
 // ===== Brand-color icons (no theme switching needed) =====
 import DeepseekIcon from "@/assets/icons/deepseek.svg?component";
@@ -71,26 +72,6 @@ const props = withDefaults(
   }>(),
   { size: 20 },
 );
-
-const isDark = ref(false);
-let observer: MutationObserver | null = null;
-
-function updateTheme() {
-  isDark.value = document.documentElement.classList.contains("dark");
-}
-
-onMounted(() => {
-  updateTheme();
-  observer = new MutationObserver(updateTheme);
-  observer.observe(document.documentElement, {
-    attributes: true,
-    attributeFilter: ["class"],
-  });
-});
-
-onUnmounted(() => {
-  observer?.disconnect();
-});
 
 const iconComponent = computed(() => {
   const key = props.name.toLowerCase();

@@ -28,6 +28,8 @@
     "anthropic-sdk": "Anthropic SDK"
   },
   "noCacheData": "暂无缓存数据",
+  "loadError": "加载仪表盘失败，请检查网络连接后重试",
+  "retry": "重试",
   "loadProvidersFailed": "加载供应商列表失败",
   "loadDashboardFailed": "加载仪表盘数据失败",
   "loadFilterFailed": "加载筛选项失败",

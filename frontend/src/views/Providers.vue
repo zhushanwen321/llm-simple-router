@@ -554,27 +554,27 @@ const { fetchingModels, fetchUpstreamModels } = useFetchUpstreamModels(
 const PROVIDER_ICON_MAP: Record<string, string> = {
   deepseek: "deepseek",
   qianfan: "baidu",
-  "\u767e\u5ea6\u5343\u5e06": "baidu",
+  百度千帆: "baidu",
   iflytek: "iflytek",
-  "\u79d1\u5927\u8baf\u98de": "iflytek",
+  科大讯飞: "iflytek",
   siliconflow: "siliconcloud",
-  "\u7845\u57fa\u6d41\u52a8": "siliconcloud",
+  硅基流动: "siliconcloud",
   zhipu: "zhipu",
-  "\u667a\u8c31": "zhipu",
+  智谱: "zhipu",
   kimi: "moonshot",
   moonshot: "moonshot",
-  "\u6708\u4e4b\u6697\u9762": "moonshot",
+  月之暗面: "moonshot",
   minimax: "minimax",
   volcengine: "volcengine",
-  "\u706b\u5c71\u5f15\u64ce": "volcengine",
+  火山引擎: "volcengine",
   aliyun: "alibaba",
   alibaba: "alibaba",
-  "\u963f\u91cc\u4e91": "alibaba",
+  阿里云: "alibaba",
   tencent: "tencentcloud",
-  "\u817e\u8baf\u4e91": "tencentcloud",
+  腾讯云: "tencentcloud",
   opencode: "opencode",
   stepfun: "stepfun",
-  "\u9636\u8dc3\u661f\u8fb0": "stepfun",
+  阶跃星辰: "stepfun",
 };
 
 function providerIconName(name: string): string {
@@ -600,9 +600,19 @@ function buildFullUrl(p: {
     p.upstream_path ||
     DEFAULT_UPSTREAM_PATH[p.api_type] ||
     "/v1/chat/completions";
-  const normalized = p.base_url.replace(/\/+$/, "");
-  if (normalized.endsWith(upstreamPath)) return normalized;
-  return `${normalized}${upstreamPath}`;
+  try {
+    const url = new URL(p.base_url);
+    const pathname = url.pathname.replace(/\/+$/, "");
+    const normalizedUpstream = upstreamPath.replace(/\/+$/, "");
+    if (pathname.endsWith(normalizedUpstream)) {
+      return `${url.origin}${pathname}`;
+    }
+    return `${url.origin}${pathname}${upstreamPath}`;
+  } catch {
+    // URL 解析失败时 fallback 到简单拼接
+    const normalized = p.base_url.replace(/\/+$/, "");
+    return `${normalized}${upstreamPath}`;
+  }
 }
 
 function modelCapabilities(m: { capabilities?: string[] }): string[] {
