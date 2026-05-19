@@ -1,4 +1,5 @@
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
+import type { Ref, ComputedRef } from "vue";
 import { useI18n } from "vue-i18n";
 import type { ChartData } from "chart.js";
 import { api, getApiMessage } from "@/api/client";
@@ -19,28 +20,26 @@ export interface DashboardStats {
   endTime: string | null;
 }
 
-// eslint-disable-next-line max-lines-per-function -- dashboard composable 各部分（metrics/charts/timeline）紧密耦合，拆分会降低可读性
-export function useDashboard() {
-  const { t } = useI18n();
+type TimeseriesParamsResult = {
+  period?: string;
+  metric: string;
+  provider_id?: string;
+  backend_model?: string;
+  router_key_id?: string;
+  start_time?: string;
+  end_time?: string;
+};
 
-  // --- Provider list and selection ---
-  const providers = ref<Provider[]>([]);
-  const selectedProvider = ref("");
+// --- useDashboardFilters ---
 
-  const sortedProviders = computed(() =>
-    [...providers.value].sort((a, b) => {
-      const aOut = providerOutputTokens.value[a.id] ?? 0;
-      const bOut = providerOutputTokens.value[b.id] ?? 0;
-      return bOut - aOut;
-    }),
-  );
-
-  // --- Period tab ---
-  const periodTab = ref<"window" | "weekly" | "monthly" | "custom">("window");
-  const customStart = ref("");
-  const customEnd = ref("");
-
-  // --- Filters ---
+function useDashboardFilters(
+  periodTab: Ref<"window" | "weekly" | "monthly" | "custom">,
+  customStart: Ref<string>,
+  customEnd: Ref<string>,
+  selectedProvider: Ref<string>,
+  providers: Ref<Provider[]>,
+  t: (key: string) => string,
+) {
   const modelFilter = ref("all");
   const keyFilter = ref("all");
   const clientType = ref("all");
@@ -60,25 +59,13 @@ export function useDashboard() {
     return allModelOptions.value;
   });
 
-  // --- Time range text ---
-  const timeRangeText = computed(() => {
-    const start = stats.value.startTime;
-    const end = stats.value.endTime;
-    if (!start || !end) return "—";
-    try {
-      return `${formatTimeShort(start)} ~ ${formatTimeShort(end)}`;
-    } catch {
-      return "—";
-    }
-  });
-
-  // --- API params ---
   const apiStartTime = computed(() => {
     if (periodTab.value === "custom" && customStart.value) {
       return toIsoStart(customStart.value);
     }
     return undefined;
   });
+
   const apiEndTime = computed(() => {
     if (periodTab.value === "custom" && customEnd.value) {
       return toIsoEnd(customEnd.value);
@@ -126,16 +113,8 @@ export function useDashboard() {
     return periodTab.value as "window" | "weekly" | "monthly";
   });
 
-  function tsParams(metric: string) {
-    const p: {
-      period?: string;
-      metric: string;
-      provider_id?: string;
-      backend_model?: string;
-      router_key_id?: string;
-      start_time?: string;
-      end_time?: string;
-    } = { metric };
+  function tsParams(metric: string): TimeseriesParamsResult {
+    const p: TimeseriesParamsResult = { metric };
     if (periodTab.value !== "custom") {
       p.period = periodTab.value;
     } else if (apiStartTime.value && apiEndTime.value) {
@@ -148,7 +127,53 @@ export function useDashboard() {
     return p;
   }
 
-  // --- Data state ---
+  async function loadFilterOptions() {
+    try {
+      const [models, keys] = await Promise.allSettled([
+        api.getAvailableModels(),
+        api.getRouterKeys(),
+      ]);
+      if (models.status === "fulfilled") allModelOptions.value = models.value;
+      if (keys.status === "fulfilled") keyOptions.value = keys.value;
+    } catch (e: unknown) {
+      console.error("Failed to load filter options:", e);
+      /* 非关键操作：filter 缺失不影响主仪表盘功能 */
+      toast.error(getApiMessage(e, t("dashboard.loadFilterFailed")));
+    }
+  }
+
+  return {
+    modelFilter,
+    keyFilter,
+    clientType,
+    allModelOptions,
+    keyOptions,
+    modelOptions,
+    apiStartTime,
+    apiEndTime,
+    statsParams,
+    cacheSummaryParams,
+    timeseriesPeriod,
+    tsParams,
+    loadFilterOptions,
+  };
+}
+
+// --- useDashboardData ---
+
+function useDashboardData(
+  selectedProvider: Ref<string>,
+  periodTab: Ref<"window" | "weekly" | "monthly" | "custom">,
+  providers: Ref<Provider[]>,
+  apiStartTime: ComputedRef<string | undefined>,
+  apiEndTime: ComputedRef<string | undefined>,
+  statsParams: ComputedRef<Record<string, string>>,
+  cacheSummaryParams: ComputedRef<Record<string, string>>,
+  timeseriesPeriod: ComputedRef<"window" | "weekly" | "monthly">,
+  tsParams: (metric: string) => TimeseriesParamsResult,
+  watchKey: ComputedRef<string>,
+  t: (key: string) => string,
+) {
   const stats = ref<DashboardStats>({
     totalRequests: 0,
     successRate: 0,
@@ -164,8 +189,6 @@ export function useDashboard() {
   const inputTokensChartData = ref<ChartData<"line"> | null>(null);
   const outputTokensChartData = ref<ChartData<"line"> | null>(null);
   const loading = ref(false);
-
-  // --- Per-provider output tokens (for sorting) ---
   const providerOutputTokens = ref<Record<string, number>>({});
 
   function toChartData(
@@ -189,33 +212,19 @@ export function useDashboard() {
     };
   }
 
-  // --- Fetch providers ---
+  const loadError = ref(false);
+
   async function loadProviders() {
     try {
       providers.value = await api.getProviders();
+      loadError.value = false;
     } catch (e: unknown) {
       console.error("Failed to load providers:", e);
+      loadError.value = true;
       toast.error(getApiMessage(e, t("dashboard.loadProvidersFailed")));
     }
   }
 
-  // --- Fetch model/keys options ---
-  async function loadFilterOptions() {
-    try {
-      const [models, keys] = await Promise.allSettled([
-        api.getAvailableModels(),
-        api.getRouterKeys(),
-      ]);
-      if (models.status === "fulfilled") allModelOptions.value = models.value;
-      if (keys.status === "fulfilled") keyOptions.value = keys.value;
-    } catch (e: unknown) {
-      console.error("Failed to load filter options:", e);
-      /* 非关键操作：filter 缺失不影响主仪表盘功能 */
-      toast.error(getApiMessage(e, t("dashboard.loadFilterFailed")));
-    }
-  }
-
-  // --- Fetch provider output tokens for sorting ---
   async function loadProviderOutputTokens() {
     if (providers.value.length === 0) return;
     if (
@@ -223,7 +232,6 @@ export function useDashboard() {
       !(apiStartTime.value && apiEndTime.value)
     )
       return;
-    // 复用 summary API，一次请求获取所有 provider 的 output tokens
     const params: Record<string, string> = { ...statsParams.value };
     delete params.provider_id;
     delete params.backend_model;
@@ -239,10 +247,6 @@ export function useDashboard() {
         }
       }
       providerOutputTokens.value = map;
-      if (Object.keys(map).length > 0 && !selectedProvider.value) {
-        const top = sortedProviders.value[0];
-        if (top) selectedProvider.value = top.id;
-      }
     } catch (e: unknown) {
       console.error("Failed to load output tokens:", e);
       /* 非关键操作：provider 排序降级为默认顺序 */
@@ -250,7 +254,12 @@ export function useDashboard() {
     }
   }
 
-  // --- Fetch stats + timeseries ---
+  const DEBOUNCE_MS = 300;
+  const CACHE_TTL = 5000;
+  let lastRefreshKey = "";
+  let lastRefreshTime = 0;
+  let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
   async function refresh() {
     if (!selectedProvider.value) return;
     if (
@@ -258,7 +267,6 @@ export function useDashboard() {
       !(apiStartTime.value && apiEndTime.value)
     )
       return;
-    // 相同参数 5s 内不重复请求
     const key = watchKey.value;
     const now = Date.now();
     if (key === lastRefreshKey && now - lastRefreshTime < CACHE_TTL) return;
@@ -332,9 +340,70 @@ export function useDashboard() {
     }
   }
 
-  // --- Watchers ---
+  // debounced watch on watchKey
+  watch(watchKey, () => {
+    if (refreshTimer) clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(() => refresh(), DEBOUNCE_MS);
+  });
 
-  // 统一 watch key：所有影响 refresh 的参数
+  onUnmounted(() => {
+    if (refreshTimer) clearTimeout(refreshTimer);
+  });
+
+  return {
+    stats,
+    cacheHitRate,
+    clientTypeBreakdown,
+    tpsChartData,
+    inputTokensChartData,
+    outputTokensChartData,
+    loading,
+    loadError,
+    providerOutputTokens,
+    loadProviders,
+    loadProviderOutputTokens,
+    refresh,
+  };
+}
+
+// --- useDashboard ---
+
+export function useDashboard() {
+  const { t } = useI18n();
+
+  // --- Provider list and selection ---
+  const providers = ref<Provider[]>([]);
+  const selectedProvider = ref("");
+
+  // --- Period tab ---
+  const periodTab = ref<"window" | "weekly" | "monthly" | "custom">("window");
+  const customStart = ref("");
+  const customEnd = ref("");
+
+  // --- Filters & params ---
+  const {
+    modelFilter,
+    keyFilter,
+    clientType,
+    keyOptions,
+    modelOptions,
+    apiStartTime,
+    apiEndTime,
+    statsParams,
+    cacheSummaryParams,
+    timeseriesPeriod,
+    tsParams,
+    loadFilterOptions,
+  } = useDashboardFilters(
+    periodTab,
+    customStart,
+    customEnd,
+    selectedProvider,
+    providers,
+    t,
+  );
+
+  // --- Data fetching ---
   const watchKey = computed(() =>
     JSON.stringify({
       periodTab: periodTab.value,
@@ -347,7 +416,66 @@ export function useDashboard() {
     }),
   );
 
-  // 副作用：离开自定义日期模式时清空日期（间接通过 watchKey 变化触发 refresh）
+  const {
+    stats,
+    cacheHitRate,
+    clientTypeBreakdown,
+    tpsChartData,
+    inputTokensChartData,
+    outputTokensChartData,
+    loading,
+    loadError,
+    providerOutputTokens,
+    loadProviders,
+    loadProviderOutputTokens,
+    refresh,
+  } = useDashboardData(
+    selectedProvider,
+    periodTab,
+    providers,
+    apiStartTime,
+    apiEndTime,
+    statsParams,
+    cacheSummaryParams,
+    timeseriesPeriod,
+    tsParams,
+    watchKey,
+    t,
+  );
+
+  // --- Derived ---
+  const sortedProviders = computed(() =>
+    [...providers.value].sort((a, b) => {
+      const aOut = providerOutputTokens.value[a.id] ?? 0;
+      const bOut = providerOutputTokens.value[b.id] ?? 0;
+      return bOut - aOut;
+    }),
+  );
+
+  const timeRangeText = computed(() => {
+    const start = stats.value.startTime;
+    const end = stats.value.endTime;
+    if (!start || !end) return "—";
+    try {
+      return `${formatTimeShort(start)} ~ ${formatTimeShort(end)}`;
+    } catch {
+      return "—";
+    }
+  });
+
+  // --- Auto-select top provider after tokens are loaded ---
+  async function autoSelectIfNeeded() {
+    if (
+      Object.keys(providerOutputTokens.value).length > 0 &&
+      !selectedProvider.value
+    ) {
+      const top = sortedProviders.value[0];
+      if (top) selectedProvider.value = top.id;
+    }
+  }
+
+  // --- Watchers ---
+  // 副作用：离开自定义日期模式时清空日期
   watch(periodTab, () => {
     if (periodTab.value !== "custom") {
       customStart.value = "";
@@ -355,7 +483,7 @@ export function useDashboard() {
     }
   });
 
-  // 副作用：切换 provider 时重置 modelFilter（间接通过 watchKey 变化触发 refresh）
+  // 副作用：切换 provider 时重置 modelFilter
   watch(selectedProvider, () => {
     if (
       modelFilter.value !== "all" &&
@@ -365,42 +493,43 @@ export function useDashboard() {
     }
   });
 
-  // 单一 debounced watch：watchKey 变化时 DEBOUNCE_MS 后 refresh
-  let refreshTimer: ReturnType<typeof setTimeout> | null = null;
-  watch(watchKey, () => {
-    if (refreshTimer) clearTimeout(refreshTimer);
-    refreshTimer = setTimeout(() => refresh(), DEBOUNCE_MS);
-  });
-
   // periodTab 变化时重新加载 provider 排序数据
-  watch(periodTab, () => {
+  watch(periodTab, async () => {
     if (providers.value.length > 0) {
-      loadProviderOutputTokens();
+      await loadProviderOutputTokens();
+      await autoSelectIfNeeded();
     }
   });
-
-  // --- Refresh 去重缓存 ---
-  const DEBOUNCE_MS = 300;
-  const CACHE_TTL = 5000;
-  let lastRefreshKey = "";
-  let lastRefreshTime = 0;
 
   // --- Watch theme changes to re-render charts ---
   let stopWatchTheme: (() => void) | null = null;
 
+  // 加载失败时的重试函数
+  async function retry() {
+    await loadProviders();
+    if (!loadError.value) {
+      await Promise.allSettled([
+        loadFilterOptions(),
+        loadProviderOutputTokens(),
+      ]);
+      await autoSelectIfNeeded();
+      await refresh();
+    }
+  }
+
   onMounted(async () => {
     await loadProviders();
+    if (loadError.value) return;
     await loadFilterOptions();
     if (providers.value.length > 0) {
       await loadProviderOutputTokens();
     }
+    await autoSelectIfNeeded();
     await refresh();
-    // Re-render charts when theme changes (Chart.js doesn't support CSS vars)
     stopWatchTheme = watchTheme(() => refresh());
   });
 
   onUnmounted(() => {
-    if (refreshTimer) clearTimeout(refreshTimer);
     if (stopWatchTheme) stopWatchTheme();
   });
 
@@ -419,10 +548,12 @@ export function useDashboard() {
     timeRangeText,
     stats,
     loading,
+    loadError,
     cacheHitRate,
     clientTypeBreakdown,
     tpsChartData,
     inputTokensChartData,
     outputTokensChartData,
+    retry,
   };
 }

@@ -4,6 +4,8 @@
     "selectClient": "选择客户端",
     "claudeCode": "Claude Code",
     "claudeCodeDesc": "Anthropic 官方 CLI 编程助手",
+    "codex": "Codex CLI",
+    "codexDesc": "OpenAI",
     "pi": "Pi",
     "piDesc": "通用编程 Agent 框架",
     "openaiSdk": "OpenAI SDK",

@@ -257,8 +257,11 @@ const showRaw = ref(false);
 const clientTypeLabel = computed(() => {
   const ct = props.overview.clientType;
   if (ct === "claude-code") return "Claude Code";
+  if (ct === "codex") return "Codex CLI";
   if (ct === "pi") return "Pi";
-  return "Unknown";
+  if (ct === "openai-sdk") return "OpenAI SDK";
+  if (ct === "anthropic-sdk") return "Anthropic SDK";
+  return ct ?? "Unknown";
 });
 
 const responseMetadataJson = computed(() => {

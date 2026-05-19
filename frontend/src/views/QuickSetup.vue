@@ -21,16 +21,13 @@
             "
             @click="selectClient(c.id)"
           >
-            <span
-              class="w-7 h-7 rounded-md text-xs font-bold flex items-center justify-center shrink-0"
-              :class="{
-                'bg-purple-600 text-white': c.iconClass === 'cc',
-                'bg-emerald-600 text-white': c.iconClass === 'pi',
-                'bg-blue-600 text-white': c.iconClass === 'oa',
-                'bg-orange-600 text-white': c.iconClass === 'an',
-              }"
-              >{{ c.icon }}</span
-            >
+            <ProviderIcon
+              :name="c.iconSvg ?? ''"
+              :size="24"
+              :class="
+                clientType === c.id ? 'text-primary' : 'text-muted-foreground'
+              "
+            />
             <div class="text-left">
               <div class="font-medium text-sm leading-tight">{{ c.name }}</div>
               <div class="text-[10px] opacity-60 leading-tight">
@@ -517,6 +514,8 @@ import ConcurrencyControl from "@/components/shared/ConcurrencyControl.vue";
 import TransformRulesForm from "@/components/shared/TransformRulesForm.vue";
 import type { ModelConfig } from "@/components/quick-setup/types";
 import { CLIENTS } from "@/components/quick-setup/types";
+
+import ProviderIcon from "@/components/icons/ProviderIcon.vue";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

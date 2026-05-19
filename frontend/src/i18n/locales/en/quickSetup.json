@@ -4,6 +4,8 @@
     "selectClient": "Select Client",
     "claudeCode": "Claude Code",
     "claudeCodeDesc": "Official Anthropic CLI coding assistant",
+    "codex": "Codex CLI",
+    "codexDesc": "OpenAI",
     "pi": "Pi",
     "piDesc": "Universal coding Agent framework",
     "openaiSdk": "OpenAI SDK",

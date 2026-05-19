@@ -1,4 +1,4 @@
-const EFFORT_BUDGET: Record<string, number> = { low: 1024, medium: 8192, high: 32768 };
+export const EFFORT_BUDGET: Record<string, number> = { low: 1024, medium: 8192, high: 32768 };
 const DEFAULT_BUDGET = 8192;
 // 反向映射：budget_tokens → effort（精确匹配时还原）
 const BUDGET_TO_EFFORT: Record<number, string> = {};
