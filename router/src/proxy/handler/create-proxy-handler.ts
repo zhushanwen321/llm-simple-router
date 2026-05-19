@@ -27,12 +27,7 @@ import type { ProxyAgentFactory } from "../transport/proxy-agent.js";
 import { createPipelineContext } from "../pipeline/context.js";
 import { proxyPipeline } from "../pipeline/pipeline.js";
 import { executeFailoverLoop, type FailoverLoopDeps } from "./failover-loop.js";
-import { loadEnhancementConfig } from "../routing/enhancement-config.js";
-import { ToolLoopGuard, type SessionTracker } from "../../core/loop-prevention/index.js";
-import { HTTP_UNPROCESSABLE_ENTITY } from "../../core/constants.js";
 import { PipelineAbort } from "../pipeline/types.js";
-import { applyToolRoundLimit } from "../patch/tool-round-limiter.js";
-import { extractLastToolUse } from "./proxy-handler-utils.js";
 
 // ---------- Factory config ----------
 
@@ -129,71 +124,6 @@ function handleModelsRequest(db: Database.Database) {
   };
 }
 
-// ---------- Enhancement preprocessing (extracted from old handleProxyRequest) ----------
-
-const TIER2_LOOP_THRESHOLD = 2;
-
-function applyEnhancementPreprocess(
-  request: FastifyRequest,
-  reply: FastifyReply,
-  ctx: import("../pipeline/types.js").PipelineContext,
-  db: Database.Database,
-  container: ServiceContainer,
-): void {
-  const enhancementConfig = loadEnhancementConfig(db);
-  const apiType = ctx.apiType as "openai" | "openai-responses" | "anthropic";
-  const sessionId = ctx.metadata.get("session_id") as string | undefined;
-
-  // 工具轮数限制
-  if (enhancementConfig.tool_round_limit_enabled) {
-    const roundResult = applyToolRoundLimit(ctx.body, apiType);
-    if (roundResult.injected) {
-      ctx.body = roundResult.body;
-      ctx.snapshot.add({ stage: "tool_round_limit", action: "inject_warning", rounds: roundResult.rounds });
-      request.log.info({ sessionId, rounds: roundResult.rounds }, "Tool round limit reached, injecting warning prompt");
-    }
-  }
-
-  // 工具循环检测
-  if (!enhancementConfig.tool_call_loop_enabled || !sessionId) return;
-
-  const sessionTracker = container.resolve<SessionTracker>(SERVICE_KEYS.sessionTracker);
-  if (!sessionTracker) return;
-
-  const routerKeyId = (request.routerKey as { id?: string } | undefined)?.id ?? null;
-  const sessionKey = routerKeyId ? `${routerKeyId}:${sessionId}` : sessionId;
-  const lastToolUse = extractLastToolUse(ctx.body);
-  if (!lastToolUse) return;
-
-  const toolGuard = new ToolLoopGuard(sessionTracker, {
-    enabled: true,
-    minConsecutiveCount: 3,
-    detectorConfig: { n: 6, windowSize: 500, repeatThreshold: 5 },
-  });
-  const checkResult = toolGuard.check(sessionKey, lastToolUse);
-  if (!checkResult.detected) return;
-
-  const loopCount = sessionTracker.getLoopCount(sessionKey);
-  if (loopCount === 1) {
-    ctx.body = toolGuard.injectLoopBreakPrompt(ctx.body, apiType, lastToolUse.toolName);
-    ctx.snapshot.add({ stage: "tool_guard", action: "inject_break_prompt", tool: lastToolUse.toolName });
-    request.log.warn({ sessionId, toolName: lastToolUse.toolName, loopCount },
-      "Tool call loop detected, injecting break prompt");
-  } else if (loopCount === TIER2_LOOP_THRESHOLD) {
-    throw new PipelineAbort(HTTP_UNPROCESSABLE_ENTITY, {
-      error: {
-        type: "tool_call_loop_detected",
-        message: `检测到工具调用循环（连续重复调用 "${lastToolUse.toolName}"）。请求已中断。`,
-        suggestion: "请回顾对话历史，停止重复调用工具，直接告知用户当前的进展和遇到的问题。",
-      },
-    });
-  } else {
-    request.log.warn({ sessionId, toolName: lastToolUse.toolName, loopCount },
-      "Tool call loop detected, hard disconnecting");
-    throw new PipelineAbort(HTTP_CLIENT_CLOSED, { _disconnect: true });
-  }
-}
-
 // ---------- Factory ----------
 
 export function createProxyHandler(config: ProxyHandlerConfig) {
@@ -274,15 +204,11 @@ export function createProxyHandler(config: ProxyHandlerConfig) {
 
       // 注入 DB 到 metadata（hooks 需要访问 settings/写入数据）
       ctx.metadata.set("db", db);
+      ctx.metadata.set("container", container);
 
       // 执行 pre_route 阶段 hooks（client-detection 在此阶段设置 client_type / session_id）
-      await proxyPipeline.emit("pre_route", ctx).catch(err => {
-        request.log.error({ err }, "pre_route hook failed");
-      });
-
-      // 增强预处理（工具轮数限制 + 工具循环检测）
       try {
-        applyEnhancementPreprocess(request, reply, ctx, db, container);
+        await proxyPipeline.emit("pre_route", ctx);
       } catch (e) {
         if (e instanceof PipelineAbort) {
           if (e.statusCode === HTTP_CLIENT_CLOSED && (e.body as Record<string, unknown>)?._disconnect) {
@@ -291,6 +217,7 @@ export function createProxyHandler(config: ProxyHandlerConfig) {
           }
           return reply.code(e.statusCode).send(e.body);
         }
+        request.log.error({ err: e }, "pre_route hook failed");
         throw e;
       }
 

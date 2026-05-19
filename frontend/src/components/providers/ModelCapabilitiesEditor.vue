@@ -16,7 +16,7 @@ import ConcurrencyControl from "@/components/shared/ConcurrencyControl.vue";
 import TransformRulesForm from "@/components/shared/TransformRulesForm.vue";
 import ProxyConfigForm from "@/components/shared/ProxyConfigForm.vue";
 import { CONTEXT_WINDOW_OPTIONS } from "@/composables/useProviderForm";
-import type { ConcurrencyMode } from "@/composables/useProviderForm";
+import type { ConcurrencyMode } from "@/types/concurrency";
 import type { ModelInfo } from "@/types/mapping";
 import type { ModelConfig } from "@/components/quick-setup/types";
 
