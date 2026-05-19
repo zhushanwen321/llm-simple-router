@@ -302,6 +302,15 @@ AC2: 开关 ON + 无 session_id → 测试 xxxx
 | `taste/no-unsafe-string-conversion` | warn | 禁止对非原始类型使用 `String()`，可能输出 `[object Object]` |
 | `taste/no-unbounded-while-true` | warn | `while(true)` 必须包含迭代计数器 + 上限检查 |
 | `taste/no-inline-import-type` | warn | 禁止行内 `as import(...).Type`，应在文件顶部统一 import 类型 |
+| `taste/no-eslint-disable` | (githook) | 禁止使用 `eslint-disable` 注释跳过 lint 规则，必须正面解决 lint 问题 |
+
+**禁止 eslint-disable 注释**：代码中不允许使用 `// eslint-disable`、`// eslint-disable-line`、`// eslint-disable-next-line`、`/* eslint-disable */` 等注释来跳过 lint 规则。所有 lint 问题必须正面解决：
+- 魔法数字 → 提取命名常量
+- 函数过长 → 提取子函数到模块级
+- catch 块过简 → 加入有意义的错误处理或状态更新
+- 其他规则 → 按规则建议修改代码
+
+此规则通过 `taste/no-eslint-disable` ESLint 规则（注册但未启用，因历史代码存在大量注释）和 githook pre-commit 中的 grep 检测双重保障。历史代码中的 eslint-disable 注释会在 PR 合并时逐步清理。
 
 基础规则：`no-explicit-any: error`、`max-lines: 1000`、`max-lines-per-function: 300`、`no-magic-numbers: warn`、`no-eval: error`。测试文件被排除在 lint 之外。
 

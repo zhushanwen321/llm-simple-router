@@ -218,6 +218,7 @@ export function createProxyHandler(config: ProxyHandlerConfig) {
           return reply.code(e.statusCode).send(e.body);
         }
         request.log.error({ err: e }, "pre_route hook failed");
+        throw e;
       }
 
       const deps: FailoverLoopDeps = {

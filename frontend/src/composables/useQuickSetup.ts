@@ -1,4 +1,11 @@
-import { ref, computed, onMounted, watch } from "vue";
+import {
+  ref,
+  computed,
+  onMounted,
+  watch,
+  type Ref,
+  type ComputedRef,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import {
   api,
@@ -241,46 +248,84 @@ function buildMappingEntries(
   });
 }
 
-// eslint-disable-next-line max-lines-per-function -- QuickSetup 各步骤（preset/model/patches/submit）构成状态机，拆分会破坏流程连贯性
-export function useQuickSetup() {
-  const { t } = useI18n();
-  // --- State ---
-  const clientType = ref<ClientType>("claude-code");
-  const providerGroups = ref<ProviderGroup[]>([]);
-  const selectedGroup = ref("");
-  const selectedPlan = ref("");
-  const apiType = ref<"openai" | "openai-responses" | "anthropic">("anthropic");
-  const apiKey = ref("");
-  const modelConfigs = ref<ModelConfig[]>([]);
-  const mappingEntries = ref<MappingEntry[]>([]);
-  const allRecommendedRules = ref<RecommendedRetryRule[]>([]);
-  const selectedRetryRules = ref<Set<string>>(new Set());
-  const saving = ref(false);
-  const connectionStatus = ref<"idle" | "testing" | "ok" | "error">("idle");
+/** Resolve the effective apiType, preserving openai-responses for codex clients
+ *  when the preset is openai-compatible. Anthropic presets are never overridden. */
+function resolveApiType(
+  clientFormat: string | undefined,
+  presetApiType: string,
+): "openai" | "openai-responses" | "anthropic" {
+  if (
+    clientFormat === "openai-responses" &&
+    (presetApiType === "openai" || presetApiType === "openai-responses")
+  ) {
+    return "openai-responses";
+  }
+  return presetApiType as "openai" | "openai-responses" | "anthropic";
+}
 
-  // Concurrency state
-  const concurrencyMode = ref<ConcurrencyMode>("auto");
-  const maxConcurrency = ref(DEFAULT_CONCURRENCY);
-  const queueTimeoutMs = ref(DEFAULT_QUEUE_TIMEOUT_MS);
-  const maxQueueSize = ref(DEFAULT_QUEUE_SIZE);
+interface QuickSetupPayloadInput {
+  isCustomProvider: boolean;
+  selectedGroup: string;
+  selectedPlan: string;
+  apiType: "openai" | "openai-responses" | "anthropic";
+  baseUrl: string;
+  upstreamPath: string;
+  apiKey: string;
+  models: ModelConfig[];
+  concurrencyMode: ConcurrencyMode;
+  maxConcurrency: number;
+  queueTimeoutMs: number;
+  maxQueueSize: number;
+  mappingEntries: MappingEntry[];
+  recommendedRules: RecommendedRetryRule[];
+  selectedRetryRules: Set<string>;
+  transformRules: QuickSetupPayload["transform_rules"];
+}
 
-  // Transform rules state
-  const transformInjectHeaders = ref("");
-  const transformDropFields = ref("");
-  const transformRequestDefaults = ref("");
+function buildQuickSetupPayload(
+  input: QuickSetupPayloadInput,
+): QuickSetupPayload {
+  return {
+    provider: buildProviderPayload({
+      isCustom: input.isCustomProvider,
+      selectedGroup: input.selectedGroup,
+      selectedPlan: input.selectedPlan,
+      apiType: input.apiType,
+      baseUrl: input.baseUrl,
+      upstreamPath: input.upstreamPath,
+      apiKey: input.apiKey,
+      models: input.models,
+      concurrencyMode: input.concurrencyMode,
+      maxConcurrency: input.maxConcurrency,
+      queueTimeoutMs: input.queueTimeoutMs,
+      maxQueueSize: input.maxQueueSize,
+    }),
+    mappings: input.mappingEntries
+      .filter((m) => m.targets[0]?.backend_model)
+      .map((m) => ({
+        client_model: m.clientModel,
+        backend_model: m.targets[0]?.backend_model ?? "",
+      })),
+    retry_rules: buildRetryRulesPayload(
+      input.recommendedRules,
+      input.selectedRetryRules,
+    ),
+    transform_rules: input.transformRules,
+  };
+}
 
-  // Existing mappings + providers for failover/overflow editing
-  const existingMappings = ref<MappingGroup[]>([]);
-  const allProviders = ref<ApiProvider[]>([]);
+function makeCurrentClient(
+  clientType: Ref<ClientType>,
+): ComputedRef<(typeof CLIENTS)[number] | undefined> {
+  return computed(() => CLIENTS.find((c) => c.id === clientType.value));
+}
 
-  // --- Computed ---
-  const isCustomProvider = computed(() => selectedGroup.value === "__custom__");
-
-  const currentClient = computed(() =>
-    CLIENTS.find((c) => c.id === clientType.value),
-  );
-
-  const currentPreset = computed(() => {
+function makeCurrentPreset(
+  selectedGroup: Ref<string>,
+  selectedPlan: Ref<string>,
+  providerGroups: Ref<ProviderGroup[]>,
+): ComputedRef<ProviderGroup["presets"][number] | undefined> {
+  return computed(() => {
     if (!selectedGroup.value || !selectedPlan.value) return undefined;
     const group = providerGroups.value.find(
       (g) => g.group === selectedGroup.value,
@@ -288,15 +333,26 @@ export function useQuickSetup() {
     if (!group) return undefined;
     return group.presets.find((p) => p.plan === selectedPlan.value);
   });
+}
 
-  const customBaseUrl = ref("");
-  const customUpstreamPath = ref("");
-  const baseUrl = computed(() =>
+function makeBaseUrl(
+  isCustomProvider: Ref<boolean>,
+  customBaseUrl: Ref<string>,
+  currentPreset: ComputedRef<ProviderGroup["presets"][number] | undefined>,
+): ComputedRef<string> {
+  return computed(() =>
     isCustomProvider.value
       ? customBaseUrl.value
       : (currentPreset.value?.baseUrl ?? ""),
   );
-  const upstreamPath = computed(() => {
+}
+
+function makeUpstreamPath(
+  isCustomProvider: Ref<boolean>,
+  customUpstreamPath: Ref<string>,
+  currentPreset: ComputedRef<ProviderGroup["presets"][number] | undefined>,
+): ComputedRef<string> {
+  return computed(() => {
     if (isCustomProvider.value) return customUpstreamPath.value;
     const preset = currentPreset.value;
     if (!preset) return "";
@@ -310,22 +366,61 @@ export function useQuickSetup() {
       return preset.upstreamPath;
     return "";
   });
+}
 
-  const availablePlans = computed(() => {
+function makeAvailablePlans(
+  selectedGroup: Ref<string>,
+  providerGroups: Ref<ProviderGroup[]>,
+): ComputedRef<ProviderGroup["presets"]> {
+  return computed(() => {
     const group = providerGroups.value.find(
       (g) => g.group === selectedGroup.value,
     );
     return group?.presets ?? [];
   });
+}
 
-  const isNonOpenaiEndpoint = computed(() => {
-    return !baseUrl.value.includes("openai.com");
+function makeIsNonOpenaiEndpoint(
+  baseUrl: ComputedRef<string>,
+): ComputedRef<boolean> {
+  return computed(() => !baseUrl.value.includes("openai.com"));
+}
+
+function makeRecommendedRules(
+  selectedGroup: Ref<string>,
+  allRecommendedRules: Ref<RecommendedRetryRule[]>,
+): ComputedRef<RecommendedRetryRule[]> {
+  return computed(() => {
+    const group = selectedGroup.value;
+    return allRecommendedRules.value.filter((r) => {
+      if (!r.providers || r.providers.length === 0) return true;
+      return r.providers.includes(group);
+    });
   });
+}
 
-  // Provider groups for CascadingModelSelect (includes current new provider)
+function computeProviderGroupDisplayInfo(
+  isCustomProvider: ComputedRef<boolean>,
+  selectedGroup: Ref<string>,
+  selectedPlan: Ref<string>,
+  modelConfigs: Ref<ModelConfig[]>,
+  allProviders: Ref<ApiProvider[]>,
+  t: (key: string, params?: Record<string, unknown>) => string,
+): {
+  currentProviderGroup: ComputedRef<{
+    provider: { id: string; name: string };
+    models: { name: string; contextWindow: number }[];
+    isNew: boolean;
+  } | null>;
+  allProviderGroups: ComputedRef<
+    {
+      provider: { id: string; name: string };
+      models: { name: string; contextWindow: number }[];
+    }[]
+  >;
+} {
   const currentProviderGroup = computed(() => {
     if (!selectedGroup.value) return null;
-    // Determine a temporary ID and display name for the new provider
     const tempId = isCustomProvider.value
       ? "__new_custom__"
       : `__new_${toProviderName(selectedGroup.value)}_${toProviderName(selectedPlan.value)}__`;
@@ -352,7 +447,6 @@ export function useQuickSetup() {
         contextWindow: m.context_window ?? DEFAULT_CONTEXT_WINDOW,
       })),
     }));
-    // Only include new provider when there are enabled models configured
     if (
       currentProviderGroup.value &&
       currentProviderGroup.value.models.length > 0
@@ -362,50 +456,149 @@ export function useQuickSetup() {
     return existing;
   });
 
-  // Filter retry rules by selected provider
-  const recommendedRules = computed(() => {
-    const group = selectedGroup.value;
-    return allRecommendedRules.value.filter((r) => {
-      if (!r.providers || r.providers.length === 0) return true;
-      return r.providers.includes(group);
-    });
-  });
+  return { currentProviderGroup, allProviderGroups };
+}
 
-  function initModels(preset: {
+function applyPresetModels(
+  preset: {
     models: string[];
     modelCapabilities?: Record<string, string[]>;
     apiType: "openai" | "openai-responses" | "anthropic";
-  }) {
-    modelConfigs.value = preset.models.map((name) => ({
+  },
+  modelConfigs: Ref<ModelConfig[]>,
+  isNonOpenaiEndpoint: Ref<boolean>,
+): void {
+  modelConfigs.value = preset.models.map((name) => ({
+    name,
+    contextWindow: getDefaultContextWindow(name),
+    enabled: true,
+    patches: computeDefaultPatches(
       name,
-      contextWindow: getDefaultContextWindow(name),
-      enabled: true,
-      patches: computeDefaultPatches(
-        name,
-        preset.apiType,
-        isNonOpenaiEndpoint.value,
-      ),
-      capabilities: preset.modelCapabilities?.[name],
-    }));
-  }
+      preset.apiType,
+      isNonOpenaiEndpoint.value,
+    ),
+    capabilities: preset.modelCapabilities?.[name],
+  }));
+}
 
-  // --- Custom model management ---
-  function addCustomModel(
-    name: string,
-    contextWindow = DEFAULT_CONTEXT_WINDOW,
-  ) {
-    modelConfigs.value.push({
-      name,
-      contextWindow,
-      enabled: true,
-      patches: computeDefaultPatches(
-        name,
-        apiType.value,
-        isNonOpenaiEndpoint.value,
-      ),
-      capabilities: ["text"],
-    });
+function pushCustomModel(
+  modelConfigs: Ref<ModelConfig[]>,
+  name: string,
+  apiType: "openai" | "openai-responses" | "anthropic",
+  isNonOpenaiEndpoint: Ref<boolean>,
+  contextWindow = DEFAULT_CONTEXT_WINDOW,
+): void {
+  modelConfigs.value.push({
+    name,
+    contextWindow,
+    enabled: true,
+    patches: computeDefaultPatches(name, apiType, isNonOpenaiEndpoint.value),
+    capabilities: ["text"],
+  });
+}
+
+async function fetchQuickSetupInitialData(
+  providerGroups: Ref<ProviderGroup[]>,
+  allRecommendedRules: Ref<RecommendedRetryRule[]>,
+  existingMappings: Ref<MappingGroup[]>,
+  allProviders: Ref<ApiProvider[]>,
+  selectClient: (type: ClientType) => void,
+  toastError: (msg: string) => void,
+): Promise<void> {
+  try {
+    const [groupsResult, rulesResult, mappingsResult, providersResult] =
+      await Promise.allSettled([
+        api.recommended.getProviders(),
+        api.recommended.getRetryRules(),
+        api.getMappingGroups(),
+        api.getProviders(),
+      ]);
+    if (groupsResult.status === "fulfilled")
+      providerGroups.value = groupsResult.value;
+    if (rulesResult.status === "fulfilled")
+      allRecommendedRules.value = rulesResult.value;
+    if (mappingsResult.status === "fulfilled")
+      existingMappings.value = mappingsResult.value as MappingGroup[];
+    if (providersResult.status === "fulfilled")
+      allProviders.value = providersResult.value as ApiProvider[];
+
+    selectClient("claude-code");
+  } catch (e: unknown) {
+    console.error("quickSetup.load:", e);
+    toastError(getApiMessage(e, ""));
   }
+}
+
+async function testQuickSetupConnection(
+  apiKey: Ref<string>,
+  connectionStatus: Ref<"idle" | "testing" | "ok" | "error">,
+  toastErrorFn: (msg: string) => void,
+): Promise<void> {
+  if (!apiKey.value.trim()) {
+    connectionStatus.value = "error";
+    toastErrorFn("quickSetup.messages.fillApiKeyFirst");
+    return;
+  }
+  connectionStatus.value = "testing";
+  await new Promise((resolve) => setTimeout(resolve, CONNECTION_TEST_DELAY_MS));
+  connectionStatus.value = "ok";
+}
+
+export function useQuickSetup() {
+  const { t } = useI18n();
+
+  const clientType = ref<ClientType>("claude-code");
+  const providerGroups = ref<ProviderGroup[]>([]);
+  const selectedGroup = ref("");
+  const selectedPlan = ref("");
+  const apiType = ref<"openai" | "openai-responses" | "anthropic">("anthropic");
+  const apiKey = ref("");
+  const modelConfigs = ref<ModelConfig[]>([]);
+  const mappingEntries = ref<MappingEntry[]>([]);
+  const allRecommendedRules = ref<RecommendedRetryRule[]>([]);
+  const selectedRetryRules = ref<Set<string>>(new Set());
+  const saving = ref(false);
+  const connectionStatus = ref<"idle" | "testing" | "ok" | "error">("idle");
+  const concurrencyMode = ref<ConcurrencyMode>("auto");
+  const maxConcurrency = ref(DEFAULT_CONCURRENCY);
+  const queueTimeoutMs = ref(DEFAULT_QUEUE_TIMEOUT_MS);
+  const maxQueueSize = ref(DEFAULT_QUEUE_SIZE);
+  const transformInjectHeaders = ref("");
+  const transformDropFields = ref("");
+  const transformRequestDefaults = ref("");
+  const existingMappings = ref<MappingGroup[]>([]);
+  const allProviders = ref<ApiProvider[]>([]);
+
+  const isCustomProvider = computed(() => selectedGroup.value === "__custom__");
+  const currentClient = makeCurrentClient(clientType);
+  const currentPreset = makeCurrentPreset(
+    selectedGroup,
+    selectedPlan,
+    providerGroups,
+  );
+  const customBaseUrl = ref("");
+  const customUpstreamPath = ref("");
+  const baseUrl = makeBaseUrl(isCustomProvider, customBaseUrl, currentPreset);
+  const upstreamPath = makeUpstreamPath(
+    isCustomProvider,
+    customUpstreamPath,
+    currentPreset,
+  );
+  const availablePlans = makeAvailablePlans(selectedGroup, providerGroups);
+  const isNonOpenaiEndpoint = makeIsNonOpenaiEndpoint(baseUrl);
+  const recommendedRules = makeRecommendedRules(
+    selectedGroup,
+    allRecommendedRules,
+  );
+  const providerGroupInfo = computeProviderGroupDisplayInfo(
+    isCustomProvider,
+    selectedGroup,
+    selectedPlan,
+    modelConfigs,
+    allProviders,
+    t,
+  );
+  const allProviderGroups = providerGroupInfo.allProviderGroups;
 
   function updateMappings() {
     const enabledModels = modelConfigs.value.filter((m) => m.enabled);
@@ -416,16 +609,12 @@ export function useQuickSetup() {
     );
   }
 
-  // --- Auto-select retry rules when provider changes ---
   function autoSelectRetryRules() {
     selectedRetryRules.value = new Set(
       recommendedRules.value.filter((r) => !r.exists).map((r) => r.name),
     );
   }
 
-  // --- Client / Provider / Plan selection ---
-  // Client selection only changes client type and rebuilds mappings.
-  // It does NOT affect provider configuration (group, plan, apiType, models).
   function selectClient(type: ClientType) {
     clientType.value = type;
     updateMappings();
@@ -435,29 +624,29 @@ export function useQuickSetup() {
     selectedGroup.value = group;
     selectedPlan.value = "";
     modelConfigs.value = [];
-
     if (group === "__custom__") {
       apiType.value = "openai";
       customBaseUrl.value = "";
       customUpstreamPath.value = "";
-      modelConfigs.value = [];
     } else {
       const groupData = providerGroups.value.find((g) => g.group === group);
       if (groupData && groupData.presets.length > 0) {
         const client = currentClient.value;
+        const compatibleFormats =
+          client?.format === "openai-responses"
+            ? ["openai-responses", "openai"]
+            : client
+              ? [client.format]
+              : [];
         const match = client
-          ? groupData.presets.find((p) => p.apiType === client.format)
+          ? groupData.presets.find((p) => compatibleFormats.includes(p.apiType))
           : null;
         const preset = match ?? groupData.presets[0];
         selectedPlan.value = preset.plan;
-        apiType.value = preset.apiType as
-          | "openai"
-          | "openai-responses"
-          | "anthropic";
-        initModels(preset);
+        apiType.value = resolveApiType(client?.format, preset.apiType);
+        applyPresetModels(preset, modelConfigs, isNonOpenaiEndpoint);
       }
     }
-
     updateMappings();
     autoSelectRetryRules();
   }
@@ -470,11 +659,8 @@ export function useQuickSetup() {
     if (!group) return;
     const preset = group.presets.find((p) => p.plan === plan);
     if (!preset) return;
-    apiType.value = preset.apiType as
-      | "openai"
-      | "openai-responses"
-      | "anthropic";
-    initModels(preset);
+    apiType.value = resolveApiType(currentClient.value?.format, preset.apiType);
+    applyPresetModels(preset, modelConfigs, isNonOpenaiEndpoint);
     updateMappings();
   }
 
@@ -488,14 +674,13 @@ export function useQuickSetup() {
     }
   });
 
-  // --- Retry rules ---
   function toggleRetryRule(name: string, checked: boolean) {
     const next = new Set(selectedRetryRules.value);
     if (checked) next.add(name);
     else next.delete(name);
     selectedRetryRules.value = next;
   }
-  // --- Mapping editing ---
+
   function updateMappingTargets(index: number, targets: MappingTarget[]) {
     const next = [...mappingEntries.value];
     next[index] = { ...next[index], targets };
@@ -535,28 +720,30 @@ export function useQuickSetup() {
     );
   }
 
-  // --- Concurrency ---
   function onConcurrencyModeChange(mode: ConcurrencyMode) {
     concurrencyMode.value = mode;
     if (mode === "auto") maxConcurrency.value = DEFAULT_CONCURRENCY;
     else if (mode === "manual") maxConcurrency.value = 3;
   }
 
-  // --- Connection test ---
   async function testConnection() {
-    if (!apiKey.value.trim()) {
-      connectionStatus.value = "error";
-      toast.error(t("quickSetup.messages.fillApiKeyFirst"));
-      return;
-    }
-    connectionStatus.value = "testing";
-    await new Promise((resolve) =>
-      setTimeout(resolve, CONNECTION_TEST_DELAY_MS),
+    return testQuickSetupConnection(apiKey, connectionStatus, (msg) =>
+      toast.error(t(msg)),
     );
-    connectionStatus.value = "ok";
   }
 
-  // --- Submit ---
+  function addCustomModel(
+    name: string,
+    contextWindow = DEFAULT_CONTEXT_WINDOW,
+  ) {
+    pushCustomModel(
+      modelConfigs,
+      name,
+      apiType.value,
+      isNonOpenaiEndpoint,
+      contextWindow,
+    );
+  }
 
   async function submit() {
     if (!currentPreset.value) {
@@ -567,7 +754,6 @@ export function useQuickSetup() {
       toast.error(t("quickSetup.messages.fillApiKey"));
       return;
     }
-
     saving.value = true;
     try {
       const transformRules = parseTransformRules(
@@ -577,37 +763,25 @@ export function useQuickSetup() {
         (key) => toast.error(t(`quickSetup.messages.${key}`)),
       );
       if (transformRules === false) return;
-
-      const payload: QuickSetupPayload = {
-        provider: buildProviderPayload({
-          isCustom: isCustomProvider.value,
-          selectedGroup: selectedGroup.value,
-          selectedPlan: selectedPlan.value,
-          apiType: apiType.value,
-          baseUrl: baseUrl.value,
-          upstreamPath: upstreamPath.value,
-          apiKey: apiKey.value.trim(),
-          models: modelConfigs.value,
-          concurrencyMode: concurrencyMode.value,
-          maxConcurrency: maxConcurrency.value,
-          queueTimeoutMs: queueTimeoutMs.value,
-          maxQueueSize: maxQueueSize.value,
-        }),
-        mappings: mappingEntries.value
-          .filter((m) => m.targets[0]?.backend_model)
-          .map((m) => ({
-            client_model: m.clientModel,
-            backend_model: m.targets[0]?.backend_model ?? "",
-          })),
-        retry_rules: buildRetryRulesPayload(
-          recommendedRules.value,
-          selectedRetryRules.value,
-        ),
-        transform_rules: transformRules,
-      };
-
+      const payload = buildQuickSetupPayload({
+        isCustomProvider: isCustomProvider.value,
+        selectedGroup: selectedGroup.value,
+        selectedPlan: selectedPlan.value,
+        apiType: apiType.value,
+        baseUrl: baseUrl.value,
+        upstreamPath: upstreamPath.value,
+        apiKey: apiKey.value.trim(),
+        models: modelConfigs.value,
+        concurrencyMode: concurrencyMode.value,
+        maxConcurrency: maxConcurrency.value,
+        queueTimeoutMs: queueTimeoutMs.value,
+        maxQueueSize: maxQueueSize.value,
+        mappingEntries: mappingEntries.value,
+        recommendedRules: recommendedRules.value,
+        selectedRetryRules: selectedRetryRules.value,
+        transformRules: transformRules,
+      });
       await api.quickSetup(payload);
-
       const toggleErrors = await toggleChangedMappings(mappingEntries.value);
       if (toggleErrors.length > 0) {
         toast.success(
@@ -628,30 +802,15 @@ export function useQuickSetup() {
     }
   }
 
-  // --- Init ---
-  onMounted(async () => {
-    try {
-      const [groupsResult, rulesResult, mappingsResult, providersResult] =
-        await Promise.allSettled([
-          api.recommended.getProviders(),
-          api.recommended.getRetryRules(),
-          api.getMappingGroups(),
-          api.getProviders(),
-        ]);
-      if (groupsResult.status === "fulfilled")
-        providerGroups.value = groupsResult.value;
-      if (rulesResult.status === "fulfilled")
-        allRecommendedRules.value = rulesResult.value;
-      if (mappingsResult.status === "fulfilled")
-        existingMappings.value = mappingsResult.value as MappingGroup[];
-      if (providersResult.status === "fulfilled")
-        allProviders.value = providersResult.value as ApiProvider[];
-
-      selectClient("claude-code");
-    } catch (e: unknown) {
-      console.error("quickSetup.load:", e);
-      toast.error(getApiMessage(e, t("quickSetup.messages.loadFailed")));
-    }
+  onMounted(() => {
+    fetchQuickSetupInitialData(
+      providerGroups,
+      allRecommendedRules,
+      existingMappings,
+      allProviders,
+      selectClient,
+      (msg) => toast.error(msg),
+    );
   });
 
   return {
@@ -690,7 +849,6 @@ export function useQuickSetup() {
     selectClient,
     onProviderChange,
     onPlanChange,
-    initModels,
     updateMappings,
     updateMappingTargets,
     toggleMappingActive,

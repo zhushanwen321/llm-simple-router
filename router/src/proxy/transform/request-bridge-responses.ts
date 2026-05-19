@@ -14,6 +14,7 @@ import type {
   ResponseInputItem,
   ResponseInputMessage,
 } from "./types-responses.js";
+import { resolveThinkingParams } from "./thinking-resolver.js";
 
 // ---------- Responses → Chat Completions ----------
 
@@ -82,9 +83,10 @@ export function responsesToChatRequest(
     }
   }
 
-  // reasoning — pass through (both use {effort?, max_tokens?})
-  if (req.reasoning != null) {
-    result.reasoning = req.reasoning;
+  // Thinking params: reasoning > thinking (deepseek compat) > reasoning_effort
+  const thinkingResult = resolveThinkingParams(body as Record<string, unknown>, req.reasoning as Record<string, unknown> | undefined);
+  if (thinkingResult.reasoning) {
+    result.reasoning = thinkingResult.reasoning;
   }
 
   // text.format → response_format (json_schema 结构差异需转换)
@@ -367,9 +369,10 @@ export function chatToResponsesRequest(
     result.tool_choice = req.tool_choice;
   }
 
-  // reasoning — pass through
-  if (req.reasoning != null) {
-    result.reasoning = req.reasoning;
+  // Thinking params: reasoning > thinking (deepseek compat) > reasoning_effort
+  const thinkingResult = resolveThinkingParams(body as Record<string, unknown>, req.reasoning as Record<string, unknown> | undefined);
+  if (thinkingResult.reasoning) {
+    result.reasoning = thinkingResult.reasoning;
   }
 
   // response_format → text.format (json_schema 结构差异需转换)
