@@ -4,7 +4,7 @@ import { api } from "@/api/client";
 import type { ModelInfo } from "@/types/mapping";
 import { getDefaultContextWindow } from "@/components/quick-setup/types";
 import { useI18n } from "vue-i18n";
-import { computeDefaultPatches } from "@/utils/model-patches";
+import { computeDefaultPatches, type ApiFormat } from "@/utils/model-patches";
 
 export function useFetchUpstreamModels(
   form: {
@@ -35,7 +35,11 @@ export function useFetchUpstreamModels(
         form.value.models.push({
           name,
           context_window: getDefaultContextWindow(name),
-          patches: computeDefaultPatches(name, form.value.api_type, false),
+          patches: computeDefaultPatches(
+            name,
+            form.value.api_type as ApiFormat,
+            false,
+          ),
         });
         added++;
       }

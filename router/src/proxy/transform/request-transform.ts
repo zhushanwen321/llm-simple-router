@@ -1,6 +1,7 @@
 import { convertMessagesOA2Ant, convertMessagesAnt2OA } from "./message-mapper.js";
 import { convertToolsOA2Ant, convertToolsAnt2OA, mapToolChoiceOA2Ant, mapToolChoiceAnt2OA } from "./tool-mapper.js";
-import { mapReasoningToThinking, mapThinkingToReasoning } from "./thinking-mapper.js";
+import { mapThinkingToReasoning } from "./thinking-mapper.js";
+import { resolveThinkingParams } from "./thinking-resolver.js";
 import { stripProviderMeta } from "./provider-meta.js";
 import type { ChatCompletionRequest, AnthropicContentBlock, AnthropicRequest } from "./types.js";
 
@@ -81,30 +82,16 @@ export function openaiToAnthropicRequest(body: Record<string, unknown>): Record<
     }
   }
 
-  // Thinking params: reasoning (object) > thinking (deepseek compat) > reasoning_effort (string)
-  if (req.reasoning) {
-    const thinking = mapReasoningToThinking(req.reasoning);
-    result.thinking = thinking;
-    if (thinking.budget_tokens && (result.max_tokens as number) < (thinking.budget_tokens as number)) {
-      result.max_tokens = thinking.budget_tokens;
-    }
-  } else if ((cleanedBody as Record<string, unknown>).thinking) {
-    // Pi deepseek compat: thinking: {type: "enabled"} — pass through directly
-    const thinkingParam = (cleanedBody as Record<string, unknown>).thinking as Record<string, unknown>;
-    if (thinkingParam.type === "enabled") {
-      result.thinking = thinkingParam;
-      const budget = thinkingParam.budget_tokens as number | undefined;
-      if (budget && (result.max_tokens as number) < budget) {
-        result.max_tokens = budget;
-      }
-    }
-  } else if ((cleanedBody as Record<string, unknown>).reasoning_effort) {
-    // OpenAI standard: reasoning_effort: "high" → thinking via mapper
-    const effort = (cleanedBody as Record<string, unknown>).reasoning_effort as string;
-    const thinking = mapReasoningToThinking({ effort });
-    result.thinking = thinking;
-    if (thinking.budget_tokens && (result.max_tokens as number) < (thinking.budget_tokens as number)) {
-      result.max_tokens = thinking.budget_tokens;
+  // Thinking params: reasoning > thinking (deepseek compat) > reasoning_effort
+  const thinkingResult = resolveThinkingParams(
+    cleanedBody as Record<string, unknown>,
+    req.reasoning as Record<string, unknown> | undefined,
+  );
+  if (thinkingResult.thinking) {
+    result.thinking = thinkingResult.thinking;
+    const budget = thinkingResult.thinking.budget_tokens as number | undefined;
+    if (budget != null && budget > 0 && (result.max_tokens as number) < budget) {
+      result.max_tokens = budget;
     }
   }
 

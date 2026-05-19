@@ -14,6 +14,7 @@ import type {
   ResponseInputItem,
   ResponseInputMessage,
 } from "./types-responses.js";
+import { resolveThinkingParams } from "./thinking-resolver.js";
 
 // ---------- Responses → Chat Completions ----------
 
@@ -83,18 +84,9 @@ export function responsesToChatRequest(
   }
 
   // Thinking params: reasoning > thinking (deepseek compat) > reasoning_effort
-  if (req.reasoning != null) {
-    result.reasoning = req.reasoning;
-  } else if ((body as Record<string, unknown>).thinking) {
-    // Pi deepseek compat: thinking: {type: "enabled"} → reasoning
-    const thinking = (body as Record<string, unknown>).thinking as Record<string, unknown>;
-    if (thinking.type === "enabled" && thinking.budget_tokens != null) {
-      result.reasoning = { max_tokens: thinking.budget_tokens };
-    }
-  } else if ((body as Record<string, unknown>).reasoning_effort) {
-    // OpenAI standard: reasoning_effort: "high" → reasoning
-    const effort = (body as Record<string, unknown>).reasoning_effort as string;
-    result.reasoning = { effort };
+  const thinkingResult = resolveThinkingParams(body as Record<string, unknown>, req.reasoning as Record<string, unknown> | undefined);
+  if (thinkingResult.reasoning) {
+    result.reasoning = thinkingResult.reasoning;
   }
 
   // text.format → response_format (json_schema 结构差异需转换)
@@ -378,18 +370,9 @@ export function chatToResponsesRequest(
   }
 
   // Thinking params: reasoning > thinking (deepseek compat) > reasoning_effort
-  if (req.reasoning != null) {
-    result.reasoning = req.reasoning;
-  } else if ((body as Record<string, unknown>).thinking) {
-    // Pi deepseek compat: thinking: {type: "enabled"} → reasoning
-    const thinking = (body as Record<string, unknown>).thinking as Record<string, unknown>;
-    if (thinking.type === "enabled" && thinking.budget_tokens != null) {
-      result.reasoning = { max_tokens: thinking.budget_tokens };
-    }
-  } else if ((body as Record<string, unknown>).reasoning_effort) {
-    // OpenAI standard: reasoning_effort: "high" → reasoning
-    const effort = (body as Record<string, unknown>).reasoning_effort as string;
-    result.reasoning = { effort };
+  const thinkingResult = resolveThinkingParams(body as Record<string, unknown>, req.reasoning as Record<string, unknown> | undefined);
+  if (thinkingResult.reasoning) {
+    result.reasoning = thinkingResult.reasoning;
   }
 
   // response_format → text.format (json_schema 结构差异需转换)

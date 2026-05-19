@@ -38,7 +38,7 @@
         <span>~</span>
         <Input type="datetime-local" v-model="customEnd" class="w-44" />
       </template>
-      <span v-else>⏱ {{ timeRangeText }}</span>
+      <span v-else>{{ timeRangeText }}</span>
     </div>
 
     <!-- 模型 + 密钥筛选 -->
@@ -91,7 +91,13 @@
     </div>
 
     <!-- 数据区 -->
-    <div v-if="loading" class="text-center text-muted-foreground py-20">
+    <div v-if="loadError" class="text-center py-20">
+      <p class="text-muted-foreground mb-3">{{ t("dashboard.loadError") }}</p>
+      <Button variant="outline" size="sm" @click="retry">{{
+        t("dashboard.retry")
+      }}</Button>
+    </div>
+    <div v-else-if="loading" class="text-center text-muted-foreground py-20">
       {{ t("common.loading") }}
     </div>
     <template v-else>
@@ -294,10 +300,12 @@ const {
   timeRangeText,
   stats,
   loading,
+  loadError,
   cacheHitRate,
   tpsChartData,
   inputTokensChartData,
   outputTokensChartData,
+  retry,
 } = useDashboard();
 
 const { t } = useI18n();
