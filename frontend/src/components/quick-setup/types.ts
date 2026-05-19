@@ -1,11 +1,21 @@
-export type ClientType = "claude-code" | "pi" | "openai-sdk" | "anthropic-sdk";
+export type ClientType =
+  | "claude-code"
+  | "codex"
+  | "pi"
+  | "openai-sdk"
+  | "anthropic-sdk";
 
 export interface ClientMeta {
   id: ClientType;
   name: string;
+  /** 文字图标（无 iconSvg 时 fallback） */
   icon: string;
   iconClass: string;
-  format: "anthropic" | "openai";
+  /** SVG 图标名（优先于文字 icon，对应 assets/icons/{name}.svg） */
+  iconSvg?: string;
+  /** 品牌背景色（Tailwind class，如 bg-purple-600） */
+  brandBg: string;
+  format: "anthropic" | "openai" | "openai-responses";
   defaultProvider: string;
   defaultPlan: string;
   descriptionKey: string;
@@ -41,16 +51,32 @@ export const CLIENTS: ClientMeta[] = [
     name: "Claude Code",
     icon: "C",
     iconClass: "cc",
+    iconSvg: "claude",
+    brandBg: "bg-[#D97757]",
     format: "anthropic",
     defaultProvider: "DeepSeek",
     defaultPlan: "Anthropic",
     descriptionKey: "quickSetup.client.claudeCodeDesc",
   },
   {
+    id: "codex",
+    name: "Codex CLI",
+    icon: "CX",
+    iconClass: "cx",
+    iconSvg: "codex",
+    brandBg: "bg-[#74AA9C]",
+    format: "openai-responses",
+    defaultProvider: "DeepSeek",
+    defaultPlan: "OpenAI",
+    descriptionKey: "quickSetup.client.codexDesc",
+  },
+  {
     id: "pi",
     name: "Pi",
     icon: "P",
     iconClass: "pi",
+    iconSvg: "pi",
+    brandBg: "bg-emerald-600",
     format: "anthropic",
     defaultProvider: "DeepSeek",
     defaultPlan: "Anthropic",
@@ -61,6 +87,8 @@ export const CLIENTS: ClientMeta[] = [
     name: "OpenAI SDK",
     icon: "OA",
     iconClass: "oa",
+    iconSvg: "openai",
+    brandBg: "bg-[#10a37f]",
     format: "openai",
     defaultProvider: "DeepSeek",
     defaultPlan: "OpenAI",
@@ -71,6 +99,8 @@ export const CLIENTS: ClientMeta[] = [
     name: "Anthropic SDK",
     icon: "AN",
     iconClass: "an",
+    iconSvg: "anthropic",
+    brandBg: "bg-[#D4976A]",
     format: "anthropic",
     defaultProvider: "DeepSeek",
     defaultPlan: "Anthropic",
@@ -216,6 +246,7 @@ export interface MappingEntry {
  */
 export const DEFAULT_CLIENT_MAPPINGS: Record<string, string[]> = {
   "claude-code": ["sonnet", "opus", "haiku"],
+  codex: ["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex", "gpt-5.2"],
   "openai-sdk": ["gpt-5.1", "gpt-4.1", "o3", "o4-mini"],
   "anthropic-sdk": [
     "claude-sonnet-4-20250514",

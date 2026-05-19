@@ -22,9 +22,14 @@
   "clientType": {
     "all": "All",
     "claude-code": "Claude Code",
-    "pi": "Pi"
+    "codex": "Codex CLI",
+    "pi": "Pi",
+    "openai-sdk": "OpenAI SDK",
+    "anthropic-sdk": "Anthropic SDK"
   },
   "noCacheData": "No cache data",
+  "loadError": "Failed to load dashboard. Please check your network connection.",
+  "retry": "Retry",
   "loadProvidersFailed": "Failed to load providers",
   "loadDashboardFailed": "Failed to load dashboard data",
   "loadFilterFailed": "Failed to load filter options",

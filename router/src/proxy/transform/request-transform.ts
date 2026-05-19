@@ -1,6 +1,7 @@
 import { convertMessagesOA2Ant, convertMessagesAnt2OA } from "./message-mapper.js";
 import { convertToolsOA2Ant, convertToolsAnt2OA, mapToolChoiceOA2Ant, mapToolChoiceAnt2OA } from "./tool-mapper.js";
-import { mapReasoningToThinking, mapThinkingToReasoning } from "./thinking-mapper.js";
+import { mapThinkingToReasoning } from "./thinking-mapper.js";
+import { resolveThinkingParams } from "./thinking-resolver.js";
 import { stripProviderMeta } from "./provider-meta.js";
 import type { ChatCompletionRequest, AnthropicContentBlock, AnthropicRequest } from "./types.js";
 
@@ -8,8 +9,9 @@ const DEFAULT_MAX_TOKENS = 4096;
 const OA_KNOWN_FIELDS = new Set([
   "model", "messages", "max_completion_tokens", "max_tokens",
   "stop", "temperature", "top_p", "stream", "tools", "tool_choice",
-  "parallel_tool_calls", "reasoning", "user", "n", "stream_options",
-  "response_format", "provider_meta",
+  "parallel_tool_calls", "reasoning", "reasoning_effort", "thinking",
+  "user", "n", "stream_options", "response_format", "provider_meta",
+  "store",
 ]);
 
 const ANT_KNOWN_FIELDS = new Set([
@@ -32,6 +34,8 @@ type FullOARequest = ChatCompletionRequest & {
   parallel_tool_calls?: boolean;
   user?: string;
   n?: number;
+  thinking?: Record<string, unknown>;
+  reasoning_effort?: string;
 };
 
 export function openaiToAnthropicRequest(body: Record<string, unknown>): Record<string, unknown> {
@@ -78,11 +82,16 @@ export function openaiToAnthropicRequest(body: Record<string, unknown>): Record<
     }
   }
 
-  if (req.reasoning) {
-    const thinking = mapReasoningToThinking(req.reasoning);
-    result.thinking = thinking;
-    if (thinking.budget_tokens && (result.max_tokens as number) < (thinking.budget_tokens as number)) {
-      result.max_tokens = thinking.budget_tokens;
+  // Thinking params: reasoning > thinking (deepseek compat) > reasoning_effort
+  const thinkingResult = resolveThinkingParams(
+    cleanedBody as Record<string, unknown>,
+    req.reasoning as Record<string, unknown> | undefined,
+  );
+  if (thinkingResult.thinking) {
+    result.thinking = thinkingResult.thinking;
+    const budget = thinkingResult.thinking.budget_tokens as number | undefined;
+    if (budget != null && budget > 0 && (result.max_tokens as number) < budget) {
+      result.max_tokens = budget;
     }
   }
 

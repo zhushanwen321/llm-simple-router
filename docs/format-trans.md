@@ -54,6 +54,8 @@ Adapter 模式，内部统一为 OpenAI Chat Completions 格式。
 | max_tokens | `max_completion_tokens` | `max_tokens` |
 | stop | `stop: ["..."]` | `stop_sequences: ["..."]` |
 | reasoning | `reasoning: {effort, max_tokens}` | `thinking: {type, budget_tokens}` |
+| thinking (DeepSeek compat) | `thinking: {type: "enabled", budget_tokens}` | 直接透传（格式相同） |
+| reasoning_effort (OpenAI 标准) | `reasoning_effort: "low"/"medium"/"high"` | `thinking: {type:"enabled", budget_tokens: N}` |
 | tool_choice | `"auto"/"none"/"required"/{type:"function",...}` | `"auto"/"none"/"any"/{type:"tool",name:"X"}` |
 | response_format | `response_format: {type, json_schema}` | `output_format` 或 structured outputs beta |
 | 缓存 | 自动 | 需显式 `cache_control: {type: "ephemeral"}` |
@@ -186,3 +188,50 @@ data: {"type":"message_stop"}
 4. 流式转换需实现 SSE 事件状态机解析和重新序列化
 
 **推荐架构**：LiteLLM 的 adapter 模式（直接双向转换）在工程上比 LLM-Rosetta 的 hub-and-spoke 模式更务实。对于本项目已有的三层代理架构（Handler → Orchestrator → Transport），在 Handler 层增加 format transformer 是最自然的切入点。
+
+---
+
+## Thinking/Reasoning 多源字段处理
+
+客户端（如 pi-coding-agent）可能通过三种方式发送 thinking 参数，router 需要统一处理。转换函数按优先级尝试：`reasoning` (object) > `thinking` (object) > `reasoning_effort` (string)。
+
+| 客户端发送方式 | 触发条件 | 发送的字段 | 示例 |
+|---|---|---|---|
+| `reasoning` object | DeepSeek 扩展格式 | `reasoning: {effort, max_tokens}` | `{reasoning: {effort: "high"}}` |
+| `thinking` object | pi `compat.thinkingFormat: "deepseek"` | `thinking: {type: "enabled"}` | `{thinking: {type: "enabled"}}` |
+| `reasoning_effort` string | OpenAI 标准格式 | `reasoning_effort: "high"` | `{reasoning_effort: "high"}` |
+
+### 各转换链路处理逻辑
+
+| 链路 | reasoning (obj) | thinking (obj) | reasoning_effort (str) | 转换目标 |
+|---|---|---|---|---|
+| openai → anthropic | `mapReasoningToThinking()` | 直接透传 | `mapReasoningToThinking({effort})` | `thinking: {type, budget_tokens}` |
+| anthropic → openai | 不适用 | `mapThinkingToReasoning()` | 不适用 | `reasoning: {max_tokens}` |
+| chat → responses | 透传 | `→ reasoning: {max_tokens}` | `→ reasoning: {effort}` | `reasoning: {effort, max_tokens}` |
+| responses → chat | 透传 | 不适用 | 不适用 | `reasoning: {effort, max_tokens}` |
+| responses → anthropic | `→ thinking` | 不适用 | 不适用 | `thinking: {type, budget_tokens}` |
+| anthropic → responses | 不适用 | `→ reasoning` | 不适用 | `reasoning: {max_tokens}` |
+
+### 预算映射表 (effort → budget_tokens)
+
+| effort | budget_tokens |
+|---|---|
+| `low` | 1024 |
+| `medium` | 8192 |
+| `high` | 32768 |
+| 默认 | 8192 |
+
+### pi 客户端配置示例
+
+```json
+// models.json 中需要 compat 配置才能触发 thinking 参数发送
+{
+  "id": "kimi-for-coding",
+  "reasoning": true,
+  "compat": {
+    "thinkingFormat": "deepseek"  // pi 会发送 thinking: {type: "enabled"}
+  }
+}
+```
+
+无 `compat` 配置时，即使 `reasoning: true`，pi 也不会发送任何 thinking 参数。

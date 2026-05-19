@@ -3,6 +3,7 @@ import { toast } from "vue-sonner";
 import { useI18n } from "vue-i18n";
 import { api, getApiMessage } from "@/api/client";
 import type { Provider } from "@/types/mapping";
+import { toIsoStart, toIsoEnd } from "@/utils/format";
 
 const PERIODS = [
   { label: "1h", value: "1h" },
@@ -38,7 +39,7 @@ export function useLogFilters() {
   const dateRangeError = computed(() => {
     const { start, end } = dateRange.value;
     if (!start || !end) return "";
-    return start >= end ? t('logs.validation.endTimeAfterStart') : "";
+    return start >= end ? t("logs.validation.endTimeAfterStart") : "";
   });
 
   const filteredModelOptions = computed(() => {
@@ -48,16 +49,6 @@ export function useLogFilters() {
     const providerModels = new Set(provider.models.map((m) => m.name));
     return modelOptions.value.filter((m) => providerModels.has(m));
   });
-
-  function toIsoStart(dateStr: string): string {
-    if (dateStr.includes("T")) return `${dateStr}:00.000Z`;
-    return `${dateStr}T00:00:00.000Z`;
-  }
-
-  function toIsoEnd(dateStr: string): string {
-    if (dateStr.includes("T")) return `${dateStr}:59.999Z`;
-    return `${dateStr}T23:59:59.999Z`;
-  }
 
   const PERIOD_MS: Record<string, number> = {
     "1h": 3600000,
@@ -95,7 +86,7 @@ export function useLogFilters() {
       providers.value = await api.getProviders();
     } catch (e: unknown) {
       console.error("Failed to load providers:", e);
-      toast.error(getApiMessage(e, t('logs.messages.loadProvidersFailed')));
+      toast.error(getApiMessage(e, t("logs.messages.loadProvidersFailed")));
     }
   }
 
@@ -104,7 +95,7 @@ export function useLogFilters() {
       routerKeys.value = await api.getRouterKeys();
     } catch (e: unknown) {
       console.error("Failed to load router keys:", e);
-      toast.error(getApiMessage(e, t('logs.messages.loadKeysFailed')));
+      toast.error(getApiMessage(e, t("logs.messages.loadKeysFailed")));
     }
   }
 

@@ -37,19 +37,12 @@
       </div>
     </div>
     <div class="bg-card rounded-lg border overflow-hidden">
-      <Table>
+      <Table class="[&_td]:px-4 [&_th]:px-4">
         <TableHeader>
           <TableRow class="bg-muted">
             <TableHead class="text-muted-foreground">{{
               t("providers.tableHeaders.name")
             }}</TableHead>
-            <TableHead class="text-muted-foreground">{{
-              t("providers.tableHeaders.type")
-            }}</TableHead>
-            <TableHead class="text-muted-foreground">{{
-              t("providers.tableHeaders.baseUrl")
-            }}</TableHead>
-            <TableHead class="text-xs">Path</TableHead>
             <TableHead class="text-muted-foreground">{{
               t("providers.tableHeaders.apiKey")
             }}</TableHead>
@@ -62,7 +55,7 @@
             <TableHead class="text-muted-foreground">{{
               t("providers.tableHeaders.status")
             }}</TableHead>
-            <TableHead class="text-right text-muted-foreground">{{
+            <TableHead class="text-muted-foreground">{{
               t("providers.tableHeaders.actions")
             }}</TableHead>
           </TableRow>
@@ -73,28 +66,32 @@
             :key="p.id"
             :class="{ 'opacity-60': !p.is_active }"
           >
-            <TableCell class="font-medium">{{ p.name }}</TableCell>
             <TableCell>
-              <Badge variant="secondary">{{
-                API_TYPE_LABELS[p.api_type] ?? p.api_type
-              }}</Badge>
-            </TableCell>
-            <TableCell>
-              <div class="flex items-center gap-1">
-                <span class="text-muted-foreground">{{ p.base_url }}</span>
-                <Shield
-                  v-if="p.proxy_type"
-                  class="w-3 h-3 text-muted-foreground"
-                  :title="`Proxy: ${p.proxy_type.toUpperCase()}`"
-                />
+              <div class="space-y-0.5">
+                <!-- 名称 -->
+                <div class="flex items-center gap-2 font-medium">
+                  <ProviderIcon :name="providerIconName(p.name)" :size="18" />
+                  <span>{{ p.name }}</span>
+                </div>
+                <!-- 类型 -->
+                <div class="text-xs text-muted-foreground">
+                  <Badge variant="secondary" class="text-[11px] px-1.5 py-0">{{
+                    API_TYPE_LABELS[p.api_type] ?? p.api_type
+                  }}</Badge>
+                </div>
+                <!-- 完整地址 -->
+                <div
+                  class="text-xs text-muted-foreground flex items-center gap-1"
+                >
+                  <span>{{ buildFullUrl(p) }}</span>
+                  <Shield
+                    v-if="p.proxy_type"
+                    class="w-3 h-3"
+                    :title="`Proxy: ${p.proxy_type.toUpperCase()}`"
+                  />
+                </div>
               </div>
             </TableCell>
-            <TableCell class="text-muted-foreground text-xs">{{
-              p.upstream_path ||
-              (p.api_type === "anthropic"
-                ? "/v1/messages"
-                : "/v1/chat/completions")
-            }}</TableCell>
             <TableCell>
               <div class="flex items-center gap-1">
                 <span class="font-mono text-xs text-muted-foreground">{{
@@ -115,7 +112,12 @@
               </div>
             </TableCell>
             <TableCell>
-              <div class="flex flex-wrap gap-1">
+              <div
+                class="grid gap-1"
+                :class="
+                  (p.models?.length ?? 0) > 3 ? 'grid-cols-2' : 'grid-cols-1'
+                "
+              >
                 <div
                   v-for="m in p.models || []"
                   :key="m.name"
@@ -174,26 +176,28 @@
                 }}</Badge>
               </Button>
             </TableCell>
-            <TableCell class="text-right">
-              <Button
-                variant="ghost"
-                size="sm"
-                @click="openEdit(p)"
-                class="text-muted-foreground hover:text-primary mr-2"
-                >{{ t("common.edit") }}</Button
-              >
-              <Button
-                variant="ghost"
-                size="sm"
-                @click="confirmDelete(p)"
-                class="text-muted-foreground hover:text-destructive"
-                >{{ t("common.delete") }}</Button
-              >
+            <TableCell>
+              <div class="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  @click="openEdit(p)"
+                  class="text-muted-foreground hover:text-primary"
+                  >{{ t("common.edit") }}</Button
+                >
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  @click="confirmDelete(p)"
+                  class="text-muted-foreground hover:text-destructive"
+                  >{{ t("common.delete") }}</Button
+                >
+              </div>
             </TableCell>
           </TableRow>
           <TableRow v-if="providers.length === 0">
             <TableCell
-              colspan="9"
+              colspan="6"
               class="text-center text-muted-foreground py-8"
               >{{ t("providers.noProviders") }}</TableCell
             >
@@ -480,6 +484,7 @@ import {
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
 import { RotateCw, Copy, Check, Shield, ImageIcon } from "lucide-vue-next";
+import ProviderIcon from "@/components/icons/ProviderIcon.vue";
 import ModelCapabilitiesEditor from "@/components/providers/ModelCapabilitiesEditor.vue";
 import {
   useProviderForm,
@@ -545,6 +550,70 @@ const { fetchingModels, fetchUpstreamModels } = useFetchUpstreamModels(
   getCurrentModelsEndpoint,
   getCurrentPresetModels,
 );
+
+const PROVIDER_ICON_MAP: Record<string, string> = {
+  deepseek: "deepseek",
+  qianfan: "baidu",
+  百度千帆: "baidu",
+  iflytek: "iflytek",
+  科大讯飞: "iflytek",
+  siliconflow: "siliconcloud",
+  硅基流动: "siliconcloud",
+  zhipu: "zhipu",
+  智谱: "zhipu",
+  kimi: "moonshot",
+  moonshot: "moonshot",
+  月之暗面: "moonshot",
+  minimax: "minimax",
+  volcengine: "volcengine",
+  火山引擎: "volcengine",
+  aliyun: "alibaba",
+  alibaba: "alibaba",
+  阿里云: "alibaba",
+  tencent: "tencentcloud",
+  腾讯云: "tencentcloud",
+  opencode: "opencode",
+  stepfun: "stepfun",
+  阶跃星辰: "stepfun",
+};
+
+function providerIconName(name: string): string {
+  const lower = name.toLowerCase();
+  for (const [key, icon] of Object.entries(PROVIDER_ICON_MAP)) {
+    if (lower.includes(key)) return icon;
+  }
+  return lower;
+}
+
+const DEFAULT_UPSTREAM_PATH: Record<string, string> = {
+  anthropic: "/v1/messages",
+  openai: "/v1/chat/completions",
+  "openai-responses": "/v1/responses",
+};
+
+function buildFullUrl(p: {
+  base_url: string;
+  upstream_path?: string | null;
+  api_type: string;
+}): string {
+  const upstreamPath =
+    p.upstream_path ||
+    DEFAULT_UPSTREAM_PATH[p.api_type] ||
+    "/v1/chat/completions";
+  try {
+    const url = new URL(p.base_url);
+    const pathname = url.pathname.replace(/\/+$/, "");
+    const normalizedUpstream = upstreamPath.replace(/\/+$/, "");
+    if (pathname.endsWith(normalizedUpstream)) {
+      return `${url.origin}${pathname}`;
+    }
+    return `${url.origin}${pathname}${upstreamPath}`;
+  } catch {
+    // URL 解析失败时 fallback 到简单拼接
+    const normalized = p.base_url.replace(/\/+$/, "");
+    return `${normalized}${upstreamPath}`;
+  }
+}
 
 function modelCapabilities(m: { capabilities?: string[] }): string[] {
   return m.capabilities ?? ["text"];
