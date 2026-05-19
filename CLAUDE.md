@@ -503,8 +503,7 @@ bash scripts/publish.sh patch   # 或 minor / major
 Workflow 自动完成：
 
 ```
-版本升级（router + core）→ commit + tag → GitHub Release
-→ npm publish: @llm-router/core
+版本升级 → commit + tag → GitHub Release
 → npm publish: llm-simple-router
 → Docker 镜像推送到 GHCR
 → Release Asset 上传
@@ -516,8 +515,8 @@ Workflow 自动完成：
 
 ```bash
 # 1. 检查 npm 包版本
-npm info @llm-router/core version && npm info llm-simple-router version
-# 输出应显示最新版本号，且两个包版本一致
+npm info llm-simple-router version
+# 输出应显示最新版本号
 
 # 2. 检查 GitHub Release
 gh release view v$(jq -r '.version' router/package.json) --json tagName,url,assets
@@ -536,8 +535,7 @@ gh run list --workflow=Publish --limit 1 --json conclusion,status
 | 失败步骤 | 原因 | 解决 |
 |---------|------|------|
 | Bump version | workflow 权限不足 | 确保 GITHUB_TOKEN 有 contents: write |
-| Publish @llm-router/core | npm token 过期或权限不足 | 更新 NPM_TOKEN（需 bypass 2FA 权限） |
-| Publish llm-simple-router | 同上 | 同上 |
+| Publish llm-simple-router | npm token 过期或权限不足 | 更新 NPM_TOKEN（需 bypass 2FA 权限） |
 | Build | TypeScript 编译错误 | 本地先通过所有检查再发布 |
 | Docker build | Dockerfile 问题 | 检查 CI 日志定位具体错误 |
 
@@ -552,7 +550,7 @@ gh run list --workflow=Publish --limit 1 --json conclusion,status
 - **合并 PR 到 main 不需要更新版本号**，多个 PR 可以积攒后统一发布
 - 发布时 workflow 自动升级版本，无需手动修改 `package.json`
 - npm 不允许重复发布同一版本号，重复发布需 bump 到下一个版本
-- `@llm-router/core` 和 `llm-simple-router` 始终保持相同版本号
+- 发布时只发布 `llm-simple-router` 一个 npm 包
 
 ## merge-worktree 对接说明
 

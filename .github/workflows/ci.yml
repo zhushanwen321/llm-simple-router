@@ -2,8 +2,18 @@ name: CI & Docker Build
 
 on:
   push:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.xyz-harness/**'
+      - 'LICENSE'
   pull_request:
     branches: [main, develop]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.xyz-harness/**'
+      - 'LICENSE'
 
 jobs:
   test:

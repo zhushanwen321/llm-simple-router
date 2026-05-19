@@ -19,14 +19,13 @@ jobs:
           cache: npm
 
       - run: npm ci
-      - run: cd core && npx tsc
       - run: cd router && npm run build
       - run: cd frontend && npm run build
 
       # 复制运行时所需文件到打包目录
       - name: Prepare dist archive
         run: |
-          mkdir -p package/dist/db/migrations package/core
+          mkdir -p package/dist/db/migrations
           # frontend 构建产物在 frontend/dist/
           mkdir -p package/frontend-dist && cp -r frontend/dist/* package/frontend-dist/
           cp -r router/dist/ package/dist/
@@ -34,9 +33,6 @@ jobs:
           cp router/package.json package/
           cp package-lock.json package/
           cp README.md package/
-          # Core 包（@llm-router/core 是 router 的依赖）
-          cp core/package.json package/core/
-          cp -r core/dist/ package/core/dist/
           # 从已安装的 node_modules 复制 router 所需的包
           (cd package && npm ci --omit=dev 2>/dev/null || npm install --production 2>/dev/null || true)
           tar czf llm-simple-router-linux-x64.tar.gz -C package .
