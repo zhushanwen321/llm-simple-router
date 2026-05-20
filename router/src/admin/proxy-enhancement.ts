@@ -40,7 +40,15 @@ export const adminProxyEnhancementRoutes: FastifyPluginCallback<ProxyEnhancement
       } catch { /* eslint-disable-line taste/no-silent-catch -- invalid JSON, return defaults */ }
     }
     const aiConfigRaw = getSetting(db, "ai_retry_config");
-    const aiRetryConfig = aiConfigRaw ? JSON.parse(aiConfigRaw) : null;
+    let aiRetryConfig: { provider_id: string; model: string } | null = null;
+    if (aiConfigRaw) {
+      try {
+        aiRetryConfig = JSON.parse(aiConfigRaw) as { provider_id: string; model: string };
+      } catch (e: unknown) {
+        console.error('proxyEnhancement.parseAiConfig:', e);
+        aiRetryConfig = null; // 损坏的 JSON 回退为 null
+      }
+    }
     // Include code to bypass onSend wrapping; flat structure matches test expectations
     return reply.send({ code: API_CODE.SUCCESS, message: 'ok', ...config, ai_retry_config: aiRetryConfig });
   });
