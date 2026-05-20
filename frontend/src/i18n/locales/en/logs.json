@@ -65,6 +65,17 @@
     "updateFailed": "Failed to update retention days",
     "loadFailed": "Failed to load retention days, using default"
   },
+  "generateRetryRule": "Generate Retry Rule",
+  "analyzing": "Analyzing...",
+  "generateFailed": "AI analysis failed",
+  "needAiConfig": "AI Configuration Required",
+  "needAiConfigDesc": "To use AI retry rule generation, configure an AI model in the Proxy Enhancement settings.",
+  "configPath": "Proxy Enhancement → AI Retry Rule Generation → Select Provider / Model",
+  "goToConfig": "Go to Settings",
+  "aiGeneratedRule": "AI-Generated Retry Rule",
+  "aiGenerated": "AI",
+  "aiAnalysisComplete": "AI analysis complete",
+  "saveRule": "Save Rule",
   "viewer": {
     "structured": "Structured",
     "rawData": "Raw Data",

@@ -65,6 +65,17 @@
     "updateFailed": "更新保留天数失败",
     "loadFailed": "加载保留天数失败，使用默认值"
   },
+  "generateRetryRule": "生成重试规则",
+  "analyzing": "分析中...",
+  "generateFailed": "AI 分析失败",
+  "needAiConfig": "需要配置 AI 模型",
+  "needAiConfigDesc": "使用 AI 生成重试规则前，需要先在代理增强设置中配置 AI 模型。",
+  "configPath": "配置路径：代理增强 → AI 重试规则生成 → 选择 Provider / Model",
+  "goToConfig": "前往配置",
+  "aiGeneratedRule": "AI 生成的重试规则",
+  "aiGenerated": "AI 生成",
+  "aiAnalysisComplete": "AI 分析完成",
+  "saveRule": "保存规则",
   "viewer": {
     "structured": "结构化",
     "rawData": "原始数据",
