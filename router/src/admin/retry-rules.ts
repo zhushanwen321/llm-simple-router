@@ -149,9 +149,12 @@ function buildSystemPrompt(existingRules: RetryRule[]): string {
 - Only generate ONE rule per request — for the most specific error identifier found
 
 ## Naming Convention
-- Use the provider name from the request, not generic names
-- Format: \`{Provider} {描述} (HTTP {status}, code {code})\` — use Chinese description
-- Example: \`ZAI 速率限制 (HTTP 200, code 1302)\`
+- Use Chinese description, not English
+- Format: \`{Provider} {中文描述} (HTTP {status}, code {code})\`
+- If the error is model-specific, include model name: \`{Provider} {模型名} {中文描述} (HTTP {status}, code {code})\`
+- Examples:
+  - \`ZAI 速率限制 (HTTP 200, code 1302)\` (provider-level error)
+  - \`DeepSeek deepseek-chat 速率限制 (HTTP 429, code rate_limit)\` (model-level error)
 
 ## Existing rules (avoid duplicates)
 ${rulesList}
