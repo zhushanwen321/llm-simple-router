@@ -277,11 +277,32 @@ export interface DailyUsage {
   total_output_tokens: number;
 }
 
+export interface AiRetryConfig {
+  provider_id: string;
+  model: string;
+}
+
+export interface AiRetryGenerateResult {
+  success: boolean;
+  error?: string;
+  rule?: {
+    name: string;
+    status_code: number;
+    body_pattern: string;
+    retry_strategy: "fixed" | "exponential";
+    retry_delay_ms: number;
+    max_retries: number;
+    max_delay_ms: number;
+  };
+  summary?: string;
+}
+
 export interface ProxyEnhancementConfig {
   tool_call_loop_enabled: boolean;
   stream_loop_enabled: boolean;
   tool_round_limit_enabled: boolean;
   tool_error_logging_enabled: boolean;
+  ai_retry_config: AiRetryConfig | null;
 }
 
 // --- Typed request helper ---
@@ -463,6 +484,8 @@ export const api = {
     request<ProxyEnhancementConfig>("get", "/proxy-enhancement"),
   updateProxyEnhancement: (data: ProxyEnhancementConfig) =>
     request<{ success: boolean }>("put", "/proxy-enhancement", data),
+  aiRetryGenerate: (logId: string) =>
+    request<AiRetryGenerateResult>("post", "/retry-rules/ai-generate", { log_id: logId }),
 
   getMonitorActive: () => request<ActiveRequest[]>("get", "/monitor/active"),
   getMonitorRecent: () => request<ActiveRequest[]>("get", "/monitor/recent"),

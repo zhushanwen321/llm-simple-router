@@ -30,5 +30,7 @@
     "desc": "开启后仅对携带 session_id 的请求生效。无 session_id 的请求不参与缓存命中率计算。"
   },
   "loadFailed": "加载配置失败",
-  "saveFailed": "保存失败"
+  "saveFailed": "保存失败",
+  "aiRetryRuleGen": "AI 重试规则生成",
+  "aiRetryRuleGenDesc": "配置用于自动分析请求响应并生成重试规则的 AI 模型。模型通过已配置的 Provider 直接调用。"
 }

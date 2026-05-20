@@ -1,7 +1,6 @@
 <template>
   <div class="p-6">
     <h2 class="text-lg font-semibold text-foreground mb-4">{{ t('proxyEnhancement.title') }}</h2>
-
     <Card>
       <CardHeader>
         <CardTitle>{{ t('proxyEnhancement.loopDetection.toolRoundLimit.title') }}</CardTitle>
@@ -21,7 +20,6 @@
         </div>
       </CardContent>
     </Card>
-
     <Card class="mt-4">
       <CardHeader>
         <CardTitle>{{ t('proxyEnhancement.loopDetection.toolCallLoop.title') }}</CardTitle>
@@ -41,7 +39,6 @@
         </div>
       </CardContent>
     </Card>
-
     <Card class="mt-4">
       <CardHeader>
         <CardTitle>{{ t('proxyEnhancement.loopDetection.streamLoop.title') }}</CardTitle>
@@ -128,7 +125,6 @@
         </div>
       </CardContent>
     </Card>
-
     <Card class="mt-4">
       <CardHeader>
         <CardTitle>Token 预估</CardTitle>
@@ -166,7 +162,22 @@
         </details>
       </CardContent>
     </Card>
-
+    <Card class="mt-4">
+      <CardHeader>
+        <CardTitle class="flex items-center gap-2">
+          <Sparkles class="h-4 w-4" />
+          {{ t('proxyEnhancement.aiRetryRuleGen') }}
+        </CardTitle>
+        <CardDescription>{{ t('proxyEnhancement.aiRetryRuleGenDesc') }}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <CascadingModelSelect
+          :providers="providerGroups"
+          :model-value="aiRetryConfig"
+          @update:model-value="onAiConfigChange"
+        />
+      </CardContent>
+    </Card>
     <div class="flex justify-end mt-4">
       <Button :disabled="saving" @click="handleSave">
         <span v-if="saving" class="flex items-center gap-1">
@@ -178,7 +189,6 @@
     </div>
   </div>
 </template>
-
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -187,12 +197,13 @@ import { api, getApiMessage } from '@/api/client'
 import { getTokenEstimation, updateTokenEstimation, getClientSessionHeaders, updateClientSessionHeaders } from '@/api/settings-api'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
-import { Loader2, Plus, Trash2 } from 'lucide-vue-next'
+import { Loader2, Plus, Sparkles, Trash2 } from 'lucide-vue-next'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-
+import CascadingModelSelect from '@/components/mappings/CascadingModelSelect.vue'
+import type { ProviderGroup } from '@/components/mappings/cascading-types'
 const { t } = useI18n()
 const toolRoundLimitEnabled = ref(true)
 const toolCallLoopEnabled = ref(false)
@@ -200,14 +211,23 @@ const streamLoopEnabled = ref(false)
 const toolErrorLoggingEnabled = ref(false)
 const tokenEstimationEnabled = ref(false)
 const saving = ref(false)
-
 interface ClientSessionHeaderEntry {
   client_type: string
   session_header_key: string
   persisted: boolean
 }
 const clientSessionHeaders = ref<ClientSessionHeaderEntry[]>([])
-
+const aiRetryConfig = ref<{ provider_id: string; model: string } | undefined>(undefined)
+const providerGroups = ref<ProviderGroup[]>([])
+async function loadProviders() {
+  try {
+    const p = await api.getProviders()
+    providerGroups.value = p.filter(a => a.is_active).map(a => ({ provider: { id: a.id, name: a.name }, models: (a.models ?? []).map(m => ({ name: m.name, contextWindow: m.context_window ?? 128000, streamTimeoutMs: m.stream_timeout_ms ?? null })) }))
+  } catch (e: unknown) {
+    console.error('proxyEnhancement.loadProviders:', e)
+  }
+}
+function onAiConfigChange(value: { provider_id: string; model: string }) { aiRetryConfig.value = value }
 async function loadConfig() {
   try {
     const data = await api.getProxyEnhancement()
@@ -215,6 +235,7 @@ async function loadConfig() {
     toolCallLoopEnabled.value = data.tool_call_loop_enabled
     streamLoopEnabled.value = data.stream_loop_enabled
     toolErrorLoggingEnabled.value = data.tool_error_logging_enabled
+    aiRetryConfig.value = data.ai_retry_config ?? undefined
     const tokenEstData = await getTokenEstimation()
     tokenEstimationEnabled.value = tokenEstData.enabled
     const [sessionHeadersData] = await Promise.allSettled([
@@ -246,6 +267,7 @@ async function handleSave() {
         stream_loop_enabled: streamLoopEnabled.value,
         tool_round_limit_enabled: toolRoundLimitEnabled.value,
         tool_error_logging_enabled: toolErrorLoggingEnabled.value,
+        ai_retry_config: aiRetryConfig.value ?? null,
       }),
       updateTokenEstimation(tokenEstimationEnabled.value),
       updateClientSessionHeaders(entriesToSave),
@@ -258,7 +280,6 @@ async function handleSave() {
     saving.value = false
   }
 }
-
 function addSessionHeaderEntry() {
   clientSessionHeaders.value.push({
     client_type: '',
@@ -266,12 +287,11 @@ function addSessionHeaderEntry() {
     persisted: false,
   })
 }
-
 function removeSessionHeaderEntry(index: number) {
   clientSessionHeaders.value.splice(index, 1)
 }
-
 onMounted(() => {
   loadConfig()
+  loadProviders()
 })
 </script>
