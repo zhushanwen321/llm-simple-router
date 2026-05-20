@@ -3,12 +3,17 @@ import Database from "better-sqlite3";
 import { Type, Static } from "@sinclair/typebox";
 import { getSetting, setSetting } from "../db/settings.js";
 import { clearEnhancementConfigCache } from "../proxy/routing/enhancement-config.js";
+import { API_CODE } from "./api-response.js";
 
 const UpdateProxyEnhancementSchema = Type.Object({
   tool_call_loop_enabled: Type.Boolean(),
   stream_loop_enabled: Type.Boolean(),
   tool_round_limit_enabled: Type.Boolean(),
   tool_error_logging_enabled: Type.Boolean(),
+  ai_retry_config: Type.Optional(Type.Union([
+    Type.Null(),
+    Type.Object({ provider_id: Type.String({ minLength: 1 }), model: Type.String({ minLength: 1 }) }),
+  ])),
 });
 
 
@@ -34,19 +39,27 @@ export const adminProxyEnhancementRoutes: FastifyPluginCallback<ProxyEnhancement
         };
       } catch { /* eslint-disable-line taste/no-silent-catch -- invalid JSON, return defaults */ }
     }
-    return reply.send(config);
+    const aiConfigRaw = getSetting(db, "ai_retry_config");
+    const aiRetryConfig = aiConfigRaw ? JSON.parse(aiConfigRaw) : null;
+    // Include code to bypass onSend wrapping; flat structure matches test expectations
+    return reply.send({ code: API_CODE.SUCCESS, message: 'ok', ...config, ai_retry_config: aiRetryConfig });
   });
 
   app.put("/admin/api/proxy-enhancement", { schema: { body: UpdateProxyEnhancementSchema } }, async (request, reply) => {
     const body = request.body as Static<typeof UpdateProxyEnhancementSchema>;
+    const { ai_retry_config, ...enhancementFields } = body;
     const config = {
-      tool_call_loop_enabled: body.tool_call_loop_enabled,
-      stream_loop_enabled: body.stream_loop_enabled,
-      tool_round_limit_enabled: body.tool_round_limit_enabled,
-      tool_error_logging_enabled: body.tool_error_logging_enabled,
+      tool_call_loop_enabled: enhancementFields.tool_call_loop_enabled,
+      stream_loop_enabled: enhancementFields.stream_loop_enabled,
+      tool_round_limit_enabled: enhancementFields.tool_round_limit_enabled,
+      tool_error_logging_enabled: enhancementFields.tool_error_logging_enabled,
     };
     setSetting(db, "proxy_enhancement", JSON.stringify(config));
     clearEnhancementConfigCache();
+    // ai_retry_config is stored in a separate settings key
+    if (ai_retry_config !== undefined) {
+      setSetting(db, "ai_retry_config", ai_retry_config ? JSON.stringify(ai_retry_config) : "");
+    }
     return reply.send({ success: true });
   });
 
