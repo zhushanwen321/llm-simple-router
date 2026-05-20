@@ -1,15 +1,14 @@
 ---
+verdict: pass
+must_fix: 0
 review:
   type: spec_review
   round: 2
   timestamp: "2026-05-20T23:15:00"
   target: ".xyz-harness/2026-05-20-ai-retry-rule/spec.md"
-  verdict: pass
   summary: "Spec 评审完成，第2轮，0条MUST FIX（v1的3条全部已解决），7条LOW/INFO，通过"
 
 statistics:
-  total_issues: 11
-  must_fix: 0
   must_fix_resolved: 3
   low: 7
   info: 1
