@@ -4,6 +4,7 @@
     "enabled": "已启用",
     "disabled": "已禁用"
   },
+  "saveHint": "修改后点击「保存」按钮生效",
   "loopDetection": {
     "toolRoundLimit": {
       "title": "工具调用轮数限制",
@@ -18,11 +19,18 @@
       "description": "检测流式输出中内容重复循环（N-gram 模式），超过阈值时自动中断流。"
     }
   },
+  "clientIdentification": {
+    "title": "客户端识别",
+    "description": "配置客户端 session header 映射，用于识别请求来源。携带对应 header 的请求将被识别为该客户端类型。",
+    "addEntry": "新增条目"
+  },
   "toolErrorLogging": {
     "title": "工具调用错误日志",
     "description": "记录 Claude Code / pi 工具调用失败的详细信息（包含 tool_use 输入参数、错误内容、provider、模型），用于分析各模型产生错误 tool_use 参数的模式。"
   },
   "tokenEstimation": {
+    "title": "Token 预估",
+    "shortDescription": "上游 API 不返回 token 统计数据时，通过 gpt-tokenizer 估算输入 token 数和缓存命中量。仅对携带 session_id 的请求生效。",
     "setupTitle": "客户端配置要求",
     "claudeCode": "Claude Code：自动发送 x-claude-code-session-id，无需额外配置",
     "piExtension": "Pi：安装扩展 ~/.pi/agent/extensions/llm-router-session/\n（session_start 时自动生成 UUID 并注入 x-pi-session-id header）",
@@ -31,6 +39,7 @@
   },
   "loadFailed": "加载配置失败",
   "saveFailed": "保存失败",
+  "loadProvidersFailed": "加载 Provider 列表失败",
   "aiRetryRuleGen": "AI 重试规则生成",
   "aiRetryRuleGenDesc": "配置用于自动分析请求响应并生成重试规则的 AI 模型。模型通过已配置的 Provider 直接调用。"
 }
