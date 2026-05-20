@@ -164,7 +164,6 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
-import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { toast } from "vue-sonner";
 import {
@@ -191,8 +190,6 @@ import type { LogEntry } from "@/components/logs/types";
 
 const { t } = useI18n();
 const { copied, copy } = useClipboard();
-const router = useRouter();
-
 const generating = ref(false);
 const configPromptOpen = ref(false);
 const previewOpen = ref(false);
@@ -259,7 +256,7 @@ function onRuleSaved() {
 
 function goToConfig() {
   configPromptOpen.value = false;
-  router.push("/proxy-enhancement");
+  window.open("/admin/proxy-enhancement", "_blank");
 }
 
 const props = defineProps<{

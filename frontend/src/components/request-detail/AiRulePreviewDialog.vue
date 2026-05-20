@@ -135,6 +135,12 @@ interface RuleForm extends RuleFormData {
 
 const { t } = useI18n();
 
+// 校验常量
+const STATUS_CODE_MIN = 100;
+const STATUS_CODE_MAX = 599;
+const DELAY_MIN_MS = 100;
+const MAX_RETRIES_LIMIT = 100;
+
 const props = defineProps<{
   open: boolean;
   rule: RuleFormData | null;
@@ -177,6 +183,37 @@ watch(
 );
 
 async function handleSave() {
+  // 客户端校验
+  const errors: string[] = [];
+  if (!form.value.name.trim())
+    errors.push(t("retryRules.messages.nameRequired"));
+  if (
+    form.value.status_code < STATUS_CODE_MIN ||
+    form.value.status_code > STATUS_CODE_MAX
+  )
+    errors.push(t("retryRules.messages.statusCodeRange"));
+  try {
+    new RegExp(form.value.body_pattern);
+  } catch {
+    errors.push(t("retryRules.messages.bodyPatternInvalid"));
+  }
+  if (!form.value.body_pattern.trim())
+    errors.push(t("retryRules.messages.bodyPatternInvalid"));
+  if (form.value.retry_delay_ms < DELAY_MIN_MS)
+    errors.push(t("retryRules.messages.delayMin"));
+  if (form.value.max_retries < 0 || form.value.max_retries > MAX_RETRIES_LIMIT)
+    errors.push(t("retryRules.messages.retriesRange"));
+  if (
+    form.value.max_delay_ms < DELAY_MIN_MS &&
+    form.value.retry_strategy === "exponential"
+  )
+    errors.push(t("retryRules.messages.delayMin"));
+
+  if (errors.length > 0) {
+    toast.error(errors.join("；"));
+    return;
+  }
+
   try {
     await api.createRetryRule({
       name: form.value.name,
