@@ -132,12 +132,26 @@ function buildSystemPrompt(existingRules: RetryRule[]): string {
 
   return `You are an API retry rule expert. Analyze the HTTP error response and generate a retry rule.
 
-## Guidelines
-- Identify unique error identifiers in the response (error code, type, message)
-- Construct a specific regex body_pattern using | to combine identifiers
+## body_pattern Guidelines (CRITICAL)
+- body_pattern must be a **JSON-structure-aware regex**, NOT plain text matching
+- Match against the JSON error structure in the response body
+- Good examples: \\"error\\".*\\"code\\"\\s*:\\s*\\"rate_limit\\"  or  \\"type\\"\\s*:\\s*\\"error\\".*\\"code\\"\\s*:\\s*\\"1234\\"
+- Bad examples: rate_limit_error|too many requests  (too broad, matches anywhere)
+- Use | only to combine **same-category identifiers** (e.g. multiple error codes from the same provider)
+- Do NOT mix different error categories (e.g. rate_limit + invalid_request) in one rule
+- If the error has a specific \`code\` field, anchor on that: \`\\"code\\"\\s*:\\s*\\"<value>\\"\`
+- If no structured error code, use error.type or a distinctive substring with surrounding JSON context
+
+## Strategy Guidelines
 - 429: fixed strategy, 5000-30000ms delay, 3-5 max_retries
 - 500/502/503: exponential strategy, 1000-3000ms delay, 3-5 max_retries
-- Name: "{Provider} {StatusCode} {ErrorType} Retry"
+- 400/401: these are usually NOT retryable — only generate if the response indicates a transient condition
+- Only generate ONE rule per request — for the most specific error identifier found
+
+## Naming Convention
+- Use the provider name from the request, not generic names
+- Format: \`{Provider} {描述} (HTTP {status}, code {code})\` — use Chinese description
+- Example: \`ZAI 速率限制 (HTTP 200, code 1302)\`
 
 ## Existing rules (avoid duplicates)
 ${rulesList}
