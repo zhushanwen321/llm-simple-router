@@ -148,7 +148,10 @@ function convertResponsesInputToAntMessages(input: string | ResponseInputItem[] 
   const raw: AntMessage[] = [];
   const systemParts: string[] = [];
 
-  for (const item of input) {
+  // Codex CLI 省略 input item 的 type 字段（如 {role:"user", content:"..."}），补全为 "message"
+  const normalizedInput = normalizeInputTypes(input);
+
+  for (const item of normalizedInput) {
     if (item.type === "message") {
     // developer/system 消息提取为 system part，不放入 messages
       if (item.role === "developer" || item.role === "system") {
@@ -445,4 +448,19 @@ function mapToolChoiceAnt2Responses(tc: unknown): unknown {
     }
   }
   return "auto";
+}
+
+/**
+ * Codex CLI 省略 input item 的 type 字段（如 `{role:"user", content:"..."}`），
+ * OpenAI 官方端点静默容忍，但按 discriminated union 匹配 type 时会跳过这些 item。
+ * 补全缺失的 type 字段：有 role 但无 type 时视为 "message"。
+ */
+function normalizeInputTypes(input: ResponseInputItem[]): ResponseInputItem[] {
+  for (let i = 0; i < input.length; i++) {
+    const item = input[i] as unknown as Record<string, unknown>;
+    if (!item.type && "role" in item) {
+      input[i] = { ...item, type: "message" } as ResponseInputMessage;
+    }
+  }
+  return input;
 }

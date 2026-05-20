@@ -145,7 +145,10 @@ function convertResponsesInputToChatMessages(
   // Track pending function_calls to merge into a single assistant message
   const pendingFnCalls: Array<Record<string, unknown>> = [];
 
-  for (const item of input) {
+  // Codex CLI 省略 input item 的 type 字段（如 {role:"user", content:"..."}），补全为 "message"
+  const normalizedInput = normalizeInputTypes(input);
+
+  for (const item of normalizedInput) {
     // Flush any pending function_calls before processing non-function_call items
     if (item.type !== "function_call" && pendingFnCalls.length > 0) {
       flushFunctionCalls(messages, pendingFnCalls);
@@ -512,4 +515,19 @@ function convertChatMessagesToResponsesInput(
   }
 
   return items;
+}
+
+/**
+ * Codex CLI 省略 input item 的 type 字段（如 `{role:"user", content:"..."}`），
+ * OpenAI 官方端点静默容忍，但按 discriminated union 匹配 type 时会跳过这些 item。
+ * 补全缺失的 type 字段：有 role 但无 type 时视为 "message"。
+ */
+function normalizeInputTypes(input: ResponseInputItem[]): ResponseInputItem[] {
+  for (let i = 0; i < input.length; i++) {
+    const item = input[i] as unknown as Record<string, unknown>;
+    if (!item.type && "role" in item) {
+      input[i] = { ...item, type: "message" } as ResponseInputMessage;
+    }
+  }
+  return input;
 }

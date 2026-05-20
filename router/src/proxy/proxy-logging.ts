@@ -31,6 +31,27 @@ export function sanitizeHeadersForLog(headers: Record<string, string>): Record<s
   return sanitized;
 }
 
+/** 从上游响应 body 中提取错误信息，用于 error_message 为空但上游返回了非 200 的场景 */
+function extractErrorMessageFromResponse(responseBody: string | null | undefined): string | null {
+  if (!responseBody) return null;
+  const MAX_TEXT_LENGTH = 200;
+  try {
+    const parsed = JSON.parse(responseBody);
+    // OpenAI / DeepSeek 格式: { error: { message: "..." } }
+    if (parsed?.error?.message) return parsed.error.message;
+    // Cloudflare 格式: { title: "...", detail: "..." }
+    if (parsed?.title) return parsed.detail ? `${parsed.title}: ${parsed.detail}` : parsed.title;
+    // 兜底：直接 message 字段
+    if (typeof parsed?.message === "string") return parsed.message;
+  } catch {
+    // 非 JSON（如 HTML），截取前 200 字符
+    const text = responseBody.trim();
+    if (text.length > MAX_TEXT_LENGTH) return text.slice(0, MAX_TEXT_LENGTH) + "...";
+    return text || null;
+  }
+  return null;
+}
+
 // ---------- Logging helpers (extracted from proxy-core) ----------
 
 // ---------- New-architecture logging ----------
@@ -114,7 +135,7 @@ export function logResilienceResult(
         id: attemptLogId, api_type: params.apiType, model: params.model,
         provider_id: attempt.target.provider_id,
         status_code: attempt.statusCode!, latency_ms: attempt.latencyMs,
-        is_stream: params.isStream ? 1 : 0, error_message: null,
+        is_stream: params.isStream ? 1 : 0, error_message: extractErrorMessageFromResponse(attempt.responseBody),
         created_at: new Date().toISOString(),
         client_request: params.clientReq, upstream_request: params.upstreamReqBase,
         upstream_response: JSON.stringify({ statusCode: attempt.statusCode, headers: attempt.responseHeaders, body: attempt.responseBody }),

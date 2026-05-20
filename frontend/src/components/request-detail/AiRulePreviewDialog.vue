@@ -1,86 +1,154 @@
 <template>
   <Dialog :open="open" @update:open="emit('update:open', $event)">
-    <DialogContent class="max-w-lg">
-      <DialogHeader>
-        <DialogTitle class="flex items-center gap-2">
+    <DialogContent class="sm:max-w-xl">
+      <DialogHeader class="gap-1.5">
+        <div class="flex items-center gap-2">
           <Sparkles class="h-4 w-4 text-primary shrink-0" />
-          {{ t("logs.aiGeneratedRule") }}
-          <Badge variant="secondary" class="text-[10px] ml-auto">{{
-            t("logs.aiGenerated")
-          }}</Badge>
-        </DialogTitle>
+          <DialogTitle>{{ t("logs.aiGeneratedRule") }}</DialogTitle>
+        </div>
+        <Badge variant="secondary" class="w-fit text-[10px]">
+          {{ t("logs.aiGenerated") }}
+        </Badge>
       </DialogHeader>
 
       <!-- AI analysis summary -->
       <div
         v-if="summary"
-        class="rounded-md bg-success/10 px-3 py-2 flex items-start gap-2"
+        class="rounded-lg border border-success/20 bg-success/5 px-3 py-2.5 flex items-start gap-2.5"
       >
-        <CheckCircle2 class="h-4 w-4 text-success mt-0.5 shrink-0" />
-        <p class="text-sm text-success-foreground">{{ summary }}</p>
+        <div
+          class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-success/10 mt-0.5"
+        >
+          <CheckCircle2 class="h-3 w-3 text-success" />
+        </div>
+        <p class="text-sm text-success-foreground leading-relaxed">
+          {{ summary }}
+        </p>
       </div>
 
       <!-- Editable form -->
-      <div class="space-y-3">
-        <div>
-          <Label>{{ t("retryRules.dialog.name") }}</Label>
-          <Input v-model="form.name" type="text" />
-        </div>
-        <div class="grid grid-cols-2 gap-3">
+      <div class="space-y-4">
+        <!-- Basic info -->
+        <div class="space-y-3">
           <div>
-            <Label>{{ t("retryRules.dialog.statusCode") }}</Label>
-            <Input v-model.number="form.status_code" type="number" />
-          </div>
-          <div>
-            <Label>{{ t("retryRules.dialog.retryStrategy") }}</Label>
-            <Select v-model="form.retry_strategy">
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="exponential">{{
-                  t("retryRules.strategy.exponential")
-                }}</SelectItem>
-                <SelectItem value="fixed">{{
-                  t("retryRules.strategy.fixed")
-                }}</SelectItem>
-              </SelectContent>
-            </Select>
+            <Label class="text-xs text-muted-foreground font-medium">
+              {{ t("retryRules.dialog.name") }}
+            </Label>
+            <Input v-model="form.name" type="text" class="mt-1" />
           </div>
         </div>
-        <div>
-          <Label>{{ t("retryRules.dialog.bodyPattern") }}</Label>
-          <Textarea v-model="form.body_pattern" class="font-mono" :rows="2" />
-        </div>
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <Label>{{
-              form.retry_strategy === "fixed"
-                ? t("retryRules.dialog.intervalMs")
-                : t("retryRules.dialog.initialDelayMs")
-            }}</Label>
-            <Input v-model.number="form.retry_delay_ms" type="number" />
+
+        <!-- Match conditions -->
+        <div class="rounded-lg border bg-muted/30 p-3 space-y-3">
+          <p
+            class="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+          >
+            {{ t("logs.matchConditions") }}
+          </p>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <Label class="text-xs text-muted-foreground font-medium">
+                {{ t("retryRules.dialog.statusCode") }}
+              </Label>
+              <Input
+                v-model.number="form.status_code"
+                type="number"
+                class="mt-1"
+              />
+            </div>
+            <div>
+              <Label class="text-xs text-muted-foreground font-medium">
+                {{ t("retryRules.dialog.retryStrategy") }}
+              </Label>
+              <Select v-model="form.retry_strategy">
+                <SelectTrigger class="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="exponential">{{
+                    t("retryRules.strategy.exponential")
+                  }}</SelectItem>
+                  <SelectItem value="fixed">{{
+                    t("retryRules.strategy.fixed")
+                  }}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <div>
-            <Label>{{ t("retryRules.dialog.maxRetries") }}</Label>
-            <Input v-model.number="form.max_retries" type="number" />
+            <Label class="text-xs text-muted-foreground font-medium">
+              {{ t("retryRules.dialog.bodyPattern") }}
+            </Label>
+            <Textarea
+              v-model="form.body_pattern"
+              class="font-mono mt-1"
+              :rows="2"
+            />
           </div>
         </div>
-        <div v-if="form.retry_strategy === 'exponential'">
-          <Label>{{ t("retryRules.dialog.maxDelayMs") }}</Label>
-          <Input v-model.number="form.max_delay_ms" type="number" />
+
+        <!-- Retry params -->
+        <div class="rounded-lg border bg-muted/30 p-3 space-y-3">
+          <p
+            class="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+          >
+            {{ t("logs.retryParams") }}
+          </p>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <Label class="text-xs text-muted-foreground font-medium">
+                {{
+                  form.retry_strategy === "fixed"
+                    ? t("retryRules.dialog.intervalMs")
+                    : t("retryRules.dialog.initialDelayMs")
+                }}
+              </Label>
+              <Input
+                v-model.number="form.retry_delay_ms"
+                type="number"
+                class="mt-1"
+              />
+            </div>
+            <div>
+              <Label class="text-xs text-muted-foreground font-medium">
+                {{ t("retryRules.dialog.maxRetries") }}
+              </Label>
+              <Input
+                v-model.number="form.max_retries"
+                type="number"
+                class="mt-1"
+              />
+            </div>
+          </div>
+          <div v-if="form.retry_strategy === 'exponential'">
+            <Label class="text-xs text-muted-foreground font-medium">
+              {{ t("retryRules.dialog.maxDelayMs") }}
+            </Label>
+            <Input
+              v-model.number="form.max_delay_ms"
+              type="number"
+              class="mt-1"
+            />
+          </div>
         </div>
-        <div class="flex items-center gap-2">
+
+        <!-- Enable switch -->
+        <div class="flex items-center gap-2.5 pt-1">
           <Switch
             :checked="form.is_active"
             @update:checked="form.is_active = $event"
             id="rule-active"
           />
-          <Label for="rule-active">{{ t("retryRules.dialog.enable") }}</Label>
+          <Label
+            for="rule-active"
+            class="text-sm text-foreground cursor-pointer"
+          >
+            {{ t("retryRules.dialog.enable") }}
+          </Label>
         </div>
       </div>
 
-      <DialogFooter>
+      <DialogFooter class="border-t pt-4 mt-2">
         <Button variant="outline" @click="emit('update:open', false)">
           {{ t("common.cancel") }}
         </Button>
