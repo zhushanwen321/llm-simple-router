@@ -142,10 +142,15 @@ function buildSystemPrompt(existingRules: RetryRule[]): string {
 - If the error has a specific \`code\` field, anchor on that: \`\\"code\\"\\s*:\\s*\\"<value>\\"\`
 - If no structured error code, use error.type or a distinctive substring with surrounding JSON context
 
-## Strategy Guidelines
-- 429: fixed strategy, 5000-30000ms delay, 3-5 max_retries
-- 500/502/503: exponential strategy, 1000-3000ms delay, 3-5 max_retries
-- 400/401: these are usually NOT retryable — only generate if the response indicates a transient condition
+## Default Parameters
+- retry_strategy: \`exponential\`
+- retry_delay_ms: \`5000\`
+- max_retries: \`10\`
+- max_delay_ms: \`60000\`
+- Always use these defaults. Do NOT choose different values.
+
+## Retryable Errors
+- 400/401: usually NOT retryable — only generate if the response indicates a transient condition
 - Only generate ONE rule per request — for the most specific error identifier found
 
 ## Naming Convention
