@@ -18,6 +18,7 @@ import { TEST_ENCRYPTION_KEY } from "./helpers/mock-backend.js";
 
 function createMockLLMServer(
   response: Record<string, unknown>,
+  captureBody?: { value: string },
 ): Promise<{ server: Server; port: number }> {
   const server = createServer((req, res) => {
     let body = "";
@@ -25,6 +26,9 @@ function createMockLLMServer(
       body += chunk.toString();
     });
     req.on("end", () => {
+      if (captureBody) {
+        captureBody.value = body;
+      }
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify(response));
     });
@@ -607,5 +611,266 @@ describe("AI Retry Rule", () => {
     const body = res.json();
     expect(body.data.success).toBe(false);
     expect(body.data).toHaveProperty("error");
+  });
+
+  it("POST ai-generate validates body_pattern regex from AI response", async () => {
+    // Mock LLM returns a rule with an invalid regex
+    const mockResponse = {
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              summary: "Test rule with bad regex",
+              name: "Bad Regex Rule",
+              status_code: 503,
+              body_pattern: "[invalid",
+              retry_strategy: "fixed",
+              retry_delay_ms: 1000,
+              max_retries: 3,
+              max_delay_ms: 10000,
+            }),
+          },
+        },
+      ],
+    };
+
+    const mockLLM = await createMockLLMServer(mockResponse);
+
+    try {
+      const providerId = createProvider(db, {
+        name: "Test AI Provider",
+        api_type: "openai",
+        base_url: `http://127.0.0.1:${mockLLM.port}`,
+        upstream_path: "/v1/chat/completions",
+        api_key: encryptedApiKey,
+        is_active: 1,
+        max_concurrency: 10,
+        queue_timeout_ms: 30000,
+        max_queue_size: 100,
+      });
+
+      await app.inject({
+        method: "PUT",
+        url: "/admin/api/proxy-enhancement",
+        headers: { cookie, "content-type": "application/json" },
+        payload: {
+          tool_call_loop_enabled: false,
+          stream_loop_enabled: false,
+          tool_round_limit_enabled: true,
+          tool_error_logging_enabled: false,
+          ai_retry_config: { provider_id: providerId, model: "test-model" },
+        },
+      });
+
+      insertRequestLog(db, {
+        id: "error-log-bad-regex",
+        api_type: "openai",
+        model: "test-model",
+        provider_id: providerId,
+        status_code: 503,
+        latency_ms: 32,
+        is_stream: 0,
+        error_message: "overloaded",
+        created_at: new Date().toISOString(),
+      });
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/admin/api/retry-rules/ai-generate",
+        headers: { cookie, "content-type": "application/json" },
+        payload: { log_id: "error-log-bad-regex" },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.data.success).toBe(false);
+      expect(body.data.error).toContain("validation");
+    } finally {
+      await closeMockServer(mockLLM.server);
+    }
+  });
+
+  it("POST ai-generate includes existing rules in system prompt", async () => {
+    const capturedBody = { value: "" };
+    const mockResponse = {
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              summary: "Test rule",
+              name: "Existing Rule Check",
+              status_code: 429,
+              body_pattern: "rate_limit",
+              retry_strategy: "fixed",
+              retry_delay_ms: 5000,
+              max_retries: 3,
+              max_delay_ms: 30000,
+            }),
+          },
+        },
+      ],
+    };
+
+    const mockLLM = await createMockLLMServer(mockResponse, capturedBody);
+
+    try {
+      const providerId = createProvider(db, {
+        name: "Test AI Provider",
+        api_type: "openai",
+        base_url: `http://127.0.0.1:${mockLLM.port}`,
+        upstream_path: "/v1/chat/completions",
+        api_key: encryptedApiKey,
+        is_active: 1,
+        max_concurrency: 10,
+        queue_timeout_ms: 30000,
+        max_queue_size: 100,
+      });
+
+      await app.inject({
+        method: "PUT",
+        url: "/admin/api/proxy-enhancement",
+        headers: { cookie, "content-type": "application/json" },
+        payload: {
+          tool_call_loop_enabled: false,
+          stream_loop_enabled: false,
+          tool_round_limit_enabled: true,
+          tool_error_logging_enabled: false,
+          ai_retry_config: { provider_id: providerId, model: "test-model" },
+        },
+      });
+
+      // Create an existing retry rule
+      createRetryRule(db, {
+        name: "Existing 503 Rule",
+        status_code: 503,
+        body_pattern: "overloaded",
+        is_active: 1,
+        retry_strategy: "exponential",
+        retry_delay_ms: 2000,
+        max_retries: 5,
+        max_delay_ms: 60000,
+      });
+
+      insertRequestLog(db, {
+        id: "error-log-existing-rules",
+        api_type: "openai",
+        model: "test-model",
+        provider_id: providerId,
+        status_code: 429,
+        latency_ms: 32,
+        is_stream: 0,
+        error_message: "rate_limit",
+        created_at: new Date().toISOString(),
+      });
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/admin/api/retry-rules/ai-generate",
+        headers: { cookie, "content-type": "application/json" },
+        payload: { log_id: "error-log-existing-rules" },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.data.success).toBe(true);
+
+      // Verify the system prompt contains the existing rule
+      const llmRequestBody = JSON.parse(capturedBody.value) as { messages: Array<{ role: string; content: string }> };
+      const systemMessage = llmRequestBody.messages.find((m) => m.role === "system");
+      expect(systemMessage).toBeDefined();
+      expect(systemMessage!.content).toContain("Existing 503 Rule");
+      expect(systemMessage!.content).toContain("overloaded");
+    } finally {
+      await closeMockServer(mockLLM.server);
+    }
+  });
+
+  it("POST ai-generate truncates response text over 4000 chars", async () => {
+    const capturedBody = { value: "" };
+    const mockResponse = {
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              summary: "Test rule for long response",
+              name: "Long Response Rule",
+              status_code: 500,
+              body_pattern: "internal_error",
+              retry_strategy: "exponential",
+              retry_delay_ms: 2000,
+              max_retries: 3,
+              max_delay_ms: 30000,
+            }),
+          },
+        },
+      ],
+    };
+
+    const mockLLM = await createMockLLMServer(mockResponse, capturedBody);
+
+    try {
+      const providerId = createProvider(db, {
+        name: "Test AI Provider",
+        api_type: "openai",
+        base_url: `http://127.0.0.1:${mockLLM.port}`,
+        upstream_path: "/v1/chat/completions",
+        api_key: encryptedApiKey,
+        is_active: 1,
+        max_concurrency: 10,
+        queue_timeout_ms: 30000,
+        max_queue_size: 100,
+      });
+
+      await app.inject({
+        method: "PUT",
+        url: "/admin/api/proxy-enhancement",
+        headers: { cookie, "content-type": "application/json" },
+        payload: {
+          tool_call_loop_enabled: false,
+          stream_loop_enabled: false,
+          tool_round_limit_enabled: true,
+          tool_error_logging_enabled: false,
+          ai_retry_config: { provider_id: providerId, model: "test-model" },
+        },
+      });
+
+      // Create a 5000-char upstream_response
+      const longBody = JSON.stringify({ error: { message: "a".repeat(5000) } });
+      insertRequestLog(db, {
+        id: "error-log-long-body",
+        api_type: "openai",
+        model: "test-model",
+        provider_id: providerId,
+        status_code: 500,
+        latency_ms: 32,
+        is_stream: 0,
+        error_message: "internal_error",
+        upstream_response: longBody,
+        created_at: new Date().toISOString(),
+      });
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/admin/api/retry-rules/ai-generate",
+        headers: { cookie, "content-type": "application/json" },
+        payload: { log_id: "error-log-long-body" },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.data.success).toBe(true);
+
+      // Verify the response text in the user prompt is truncated to 4000 chars
+      const llmRequestBody = JSON.parse(capturedBody.value) as { messages: Array<{ role: string; content: string }> };
+      const userMessage = llmRequestBody.messages.find((m) => m.role === "user");
+      expect(userMessage).toBeDefined();
+
+      // Extract the Response Body portion from the user prompt
+      const responseBodySection = userMessage!.content.split("Response Body:\n")[1];
+      expect(responseBodySection).toBeDefined();
+      expect(responseBodySection!.length).toBeLessThanOrEqual(4000);
+    } finally {
+      await closeMockServer(mockLLM.server);
+    }
   });
 });
