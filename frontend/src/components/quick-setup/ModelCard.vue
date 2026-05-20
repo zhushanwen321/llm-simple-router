@@ -171,10 +171,7 @@ function updatePatches(patches: string[]) {
       v-if="streamTimeoutMs !== undefined || capabilities !== undefined"
       class="flex items-center gap-3 pt-1.5 mt-1.5 border-t border-border/30"
     >
-      <div
-        v-if="streamTimeoutMs !== undefined"
-        class="flex items-center gap-1.5"
-      >
+      <div class="flex items-center gap-1.5">
         <Label class="text-xs text-muted-foreground whitespace-nowrap">{{
           t("providers.fields.timeoutLabel")
         }}</Label>
