@@ -30,5 +30,7 @@
     "desc": "Only applies to requests with a session_id. Requests without a session_id will not participate in cache hit rate calculation."
   },
   "loadFailed": "Failed to load configuration",
-  "saveFailed": "Failed to save"
+  "saveFailed": "Failed to save",
+  "aiRetryRuleGen": "AI Retry Rule Generation",
+  "aiRetryRuleGenDesc": "Configure the AI model for automatically analyzing request responses and generating retry rules. The model is invoked directly through configured Providers."
 }
