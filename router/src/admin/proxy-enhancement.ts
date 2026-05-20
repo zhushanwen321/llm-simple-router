@@ -3,7 +3,6 @@ import Database from "better-sqlite3";
 import { Type, Static } from "@sinclair/typebox";
 import { getSetting, setSetting } from "../db/settings.js";
 import { clearEnhancementConfigCache } from "../proxy/routing/enhancement-config.js";
-import { API_CODE } from "./api-response.js";
 
 const UpdateProxyEnhancementSchema = Type.Object({
   tool_call_loop_enabled: Type.Boolean(),
@@ -49,8 +48,7 @@ export const adminProxyEnhancementRoutes: FastifyPluginCallback<ProxyEnhancement
         aiRetryConfig = null; // 损坏的 JSON 回退为 null
       }
     }
-    // Include code to bypass onSend wrapping; flat structure matches test expectations
-    return reply.send({ code: API_CODE.SUCCESS, message: 'ok', ...config, ai_retry_config: aiRetryConfig });
+    return reply.send({ ...config, ai_retry_config: aiRetryConfig });
   });
 
   app.put("/admin/api/proxy-enhancement", { schema: { body: UpdateProxyEnhancementSchema } }, async (request, reply) => {

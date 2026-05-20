@@ -78,8 +78,8 @@ describe("AI Retry Rule", () => {
 
     expect(res.statusCode).toBe(200);
     const body = res.json();
-    expect(body).toHaveProperty("ai_retry_config");
-    expect(body.ai_retry_config).toBeNull();
+    expect(body.data).toHaveProperty("ai_retry_config");
+    expect(body.data.ai_retry_config).toBeNull();
   });
 
   it("PUT proxy-enhancement with ai_retry_config saves and GET returns it", async () => {
@@ -109,7 +109,7 @@ describe("AI Retry Rule", () => {
     });
     expect(getRes.statusCode).toBe(200);
     const body = getRes.json();
-    expect(body.ai_retry_config).toEqual({
+    expect(body.data.ai_retry_config).toEqual({
       provider_id: "test-ai-provider",
       model: "test-ai-model",
     });
@@ -153,8 +153,8 @@ describe("AI Retry Rule", () => {
     });
     expect(getRes.statusCode).toBe(200);
     const body = getRes.json();
-    expect(body.tool_call_loop_enabled).toBe(true);
-    expect(body.ai_retry_config).toEqual({ provider_id: "p", model: "m" });
+    expect(body.data.tool_call_loop_enabled).toBe(true);
+    expect(body.data.ai_retry_config).toEqual({ provider_id: "p", model: "m" });
   });
 
   // ===== AI Generate =====
@@ -169,9 +169,9 @@ describe("AI Retry Rule", () => {
 
     expect(res.statusCode).toBe(200);
     const body = res.json();
-    expect(body.success).toBe(false);
-    expect(body).toHaveProperty("error");
-    expect(typeof body.error).toBe("string");
+    expect(body.data.success).toBe(false);
+    expect(body.data).toHaveProperty("error");
+    expect(typeof body.data.error).toBe("string");
   });
 
   it("POST ai-generate returns error when log not found", async () => {
@@ -198,8 +198,8 @@ describe("AI Retry Rule", () => {
 
     expect(res.statusCode).toBe(200);
     const body = res.json();
-    expect(body.success).toBe(false);
-    expect(body).toHaveProperty("error");
+    expect(body.data.success).toBe(false);
+    expect(body.data).toHaveProperty("error");
   });
 
   it("POST ai-generate returns error for 2xx success response", async () => {
@@ -255,8 +255,8 @@ describe("AI Retry Rule", () => {
 
       expect(res.statusCode).toBe(200);
       const body = res.json();
-      expect(body.success).toBe(false);
-      expect(body).toHaveProperty("error");
+      expect(body.data.success).toBe(false);
+      expect(body.data).toHaveProperty("error");
     } finally {
       await closeMockServer(mockLLM.server);
     }
@@ -337,13 +337,13 @@ describe("AI Retry Rule", () => {
 
       expect(res.statusCode).toBe(200);
       const body = res.json();
-      expect(body.success).toBe(true);
-      expect(body.rule).toBeDefined();
-      expect(body.rule.name).toBe("Test Provider 503 过载重试");
-      expect(body.rule.status_code).toBe(503);
-      expect(body.rule.body_pattern).toBe("overloaded|server_error");
-      expect(body.rule.retry_strategy).toBe("exponential");
-      expect(body.summary).toBe("检测到 503 server_error (overloaded)");
+      expect(body.data.success).toBe(true);
+      expect(body.data.rule).toBeDefined();
+      expect(body.data.rule.name).toBe("Test Provider 503 过载重试");
+      expect(body.data.rule.status_code).toBe(503);
+      expect(body.data.rule.body_pattern).toBe("overloaded|server_error");
+      expect(body.data.rule.retry_strategy).toBe("exponential");
+      expect(body.data.summary).toBe("检测到 503 server_error (overloaded)");
     } finally {
       await closeMockServer(mockLLM.server);
     }
@@ -410,8 +410,8 @@ describe("AI Retry Rule", () => {
 
       expect(res.statusCode).toBe(200);
       const body = res.json();
-      expect(body.success).toBe(false);
-      expect(body).toHaveProperty("error");
+      expect(body.data.success).toBe(false);
+      expect(body.data).toHaveProperty("error");
     } finally {
       await closeMockServer(mockLLM.server);
     }
@@ -480,8 +480,8 @@ describe("AI Retry Rule", () => {
 
       expect(res.statusCode).toBe(200);
       const body = res.json();
-      expect(body.success).toBe(false);
-      expect(body).toHaveProperty("error");
+      expect(body.data.success).toBe(false);
+      expect(body.data).toHaveProperty("error");
     } finally {
       await closeMockServer(mockLLM.server);
     }
@@ -560,7 +560,7 @@ describe("AI Retry Rule", () => {
 
       expect(res.statusCode).toBe(200);
       const body = res.json();
-      expect(body.success).toBe(true);
+      expect(body.data.success).toBe(true);
     } finally {
       await closeMockServer(mockLLM.server);
     }
@@ -605,7 +605,7 @@ describe("AI Retry Rule", () => {
 
     expect(res.statusCode).toBe(200);
     const body = res.json();
-    expect(body.success).toBe(false);
-    expect(body).toHaveProperty("error");
+    expect(body.data.success).toBe(false);
+    expect(body.data).toHaveProperty("error");
   });
 });
