@@ -27,6 +27,12 @@ verdict: pass
 | `frontend/src/views/ProxyEnhancement.vue` | modify | FG1 | 新增 AI 配置卡片 |
 | `frontend/src/components/request-detail/UnifiedRequestDialog.vue` | modify | FG1 | 新增"生成重试规则"按钮 + 配置提示 Dialog |
 | `frontend/src/components/request-detail/AiRulePreviewDialog.vue` | create | FG1 | AI 规则预览/编辑 Dialog |
+| `frontend/src/i18n/locales/zh-CN/proxyEnhancement.json` | modify | FG1 | AI 配置卡片翻译 key |
+| `frontend/src/i18n/locales/en/proxyEnhancement.json` | modify | FG1 | AI 配置卡片翻译 key |
+| `frontend/src/i18n/locales/zh-CN/logs.json` | modify | FG1 | 生成按钮、预览 Dialog 翻译 key |
+| `frontend/src/i18n/locales/en/logs.json` | modify | FG1 | 生成按钮、预览 Dialog 翻译 key |
+| `frontend/src/i18n/locales/zh-CN/requestDetail.json` | modify | FG1 | 请求详情页翻译 key（如有） |
+| `frontend/src/i18n/locales/en/requestDetail.json` | modify | FG1 | 请求详情页翻译 key（如有） |
 
 ---
 
@@ -58,7 +64,7 @@ verdict: pass
 | Agent | general-purpose → general-purpose → general-purpose |
 | Model | `llm-simple-router/glm-5.1`（executor）、`llm-simple-router/glm-5-turbo`（tdd-coder） |
 | 注入上下文 | Task 1-2 描述、spec FR1-FR3 + FR5、CLAUDE.md 编码规范 |
-| 读取文件 | `src/admin/retry-rules.ts`, `src/admin/proxy-enhancement.ts`, `src/db/settings.ts`, `src/db/retry-rules.ts`, `src/db/logs.ts`, `src/db/providers.ts`, `src/utils/crypto.ts`, `src/core/container.ts`, `src/index.ts` |
+| 读取文件 | `src/admin/retry-rules.ts`, `src/admin/proxy-enhancement.ts`, `src/db/settings.ts`, `src/db/retry-rules.ts`, `src/db/logs.ts`, `src/db/providers.ts`, `src/utils/crypto.ts`, `src/core/container.ts`, `src/proxy/handler/proxy-handler-utils.ts`（确认 stream_text_content 序列化格式） |
 | 修改/创建文件 | `src/utils/llm-client.ts`(create), `src/admin/retry-rules.ts`(modify), `src/admin/proxy-enhancement.ts`(modify), `tests/unit/llm-client.test.ts`(create), `tests/integration/ai-retry-rule.test.ts`(create) |
 
 **Execution Flow (BG1 内部):** 串行派遣。
@@ -83,7 +89,7 @@ verdict: pass
 
 **Tasks:** Task 3, Task 4
 
-**Files (预估):** 4 个文件（1 create + 3 modify）
+**Files (预估):** 10 个文件（1 create + 9 modify，含 6 个 i18n JSON 文件）
 
 **Subagent 配置:**
 
@@ -92,8 +98,8 @@ verdict: pass
 | Agent | general-purpose → general-purpose |
 | Model | `llm-simple-router/glm-5-turbo` |
 | 注入上下文 | Task 3-4 描述、spec FR1 + FR4 + FR6、CLAUDE.md 前端规范（shadcn-vue、编辑-保存模式）、demo.html 设计参考 |
-| 读取文件 | `frontend/src/api/client.ts`, `frontend/src/views/ProxyEnhancement.vue`, `frontend/src/views/RetryRules.vue`, `frontend/src/components/request-detail/UnifiedRequestDialog.vue`, `frontend/src/components/mappings/CascadingModelSelect.vue`, `frontend/src/components/request-detail/RequestOverviewPanel.vue` |
-| 修改/创建文件 | `frontend/src/api/client.ts`(modify), `frontend/src/views/ProxyEnhancement.vue`(modify), `frontend/src/components/request-detail/UnifiedRequestDialog.vue`(modify), `frontend/src/components/request-detail/AiRulePreviewDialog.vue`(create) |
+| 读取文件 | `frontend/src/api/client.ts`, `frontend/src/views/ProxyEnhancement.vue`, `frontend/src/views/RetryRules.vue`, `frontend/src/components/request-detail/UnifiedRequestDialog.vue`, `frontend/src/components/mappings/CascadingModelSelect.vue`, `frontend/src/components/mappings/cascading-types.ts`, `frontend/src/types/mapping.ts`, `frontend/src/views/ModelMappings.vue`（参考 ProviderGroup 构造模式）, `frontend/src/i18n/locales/zh-CN/proxyEnhancement.json`, `frontend/src/i18n/locales/zh-CN/logs.json` |
+| 修改/创建文件 | `frontend/src/api/client.ts`(modify), `frontend/src/views/ProxyEnhancement.vue`(modify), `frontend/src/components/request-detail/UnifiedRequestDialog.vue`(modify), `frontend/src/components/request-detail/AiRulePreviewDialog.vue`(create), i18n JSON 文件(6 modify) |
 
 **Execution Flow (FG1 内部):** 串行派遣。
 
@@ -406,7 +412,8 @@ git commit -m "feat: add lightweight LLM client utility for AI retry rule genera
 - Create: `tests/integration/ai-retry-rule.test.ts`
 
 **参考文件（先读取再编码）:**
-- `src/admin/retry-rules.ts` — 现有端点注册模式、`validateBodyPattern`、`CreateRetryRuleSchema`
+- `src/admin/retry-rules.ts` — 现有端点注册模式、`validateBodyPattern`、`CreateRetryRuleSchema`、HTTP 状态码常量
+export 方式
 - `src/admin/proxy-enhancement.ts` — GET/PUT 处理模式、TypeBox schema
 - `src/db/settings.ts` — `getSetting`/`setSetting` 函数
 - `src/db/retry-rules.ts` — `RetryRule` 接口、`getActiveRetryRules`、`createRetryRule`
@@ -414,7 +421,7 @@ git commit -m "feat: add lightweight LLM client utility for AI retry rule genera
 - `src/db/providers.ts` — `getProviderById` 函数、`Provider` 接口（`api_key` 加密字段、`base_url`、`upstream_path`）
 - `src/utils/crypto.ts` — `decrypt` 函数
 - `src/utils/llm-client.ts` — `callLLM` 函数（Task 1 产出）
-- `src/index.ts` — `buildApp` 中如何获取加密密钥（搜索 `decrypt` 或 `encryption` 相关代码，找到获取加密密钥的模式）
+- `src/proxy/handler/proxy-handler-utils.ts`（可选）— `serializeBlocksForStorage` 确认 stream_text_content 序列化格式
 
 - [ ] **Step 1: 写失败测试**
 
@@ -515,26 +522,26 @@ describe("POST /admin/api/retry-rules/ai-generate", () => {
 
   // --- 测试用例 ---
 
-  it("should return 400 when AI config not set", async () => {
+  it("should return success=false when AI config not set", async () => {
     // 不设置 ai_retry_config
     const res = await app.inject({
       method: "POST",
       url: "/admin/api/retry-rules/ai-generate",
       payload: { log_id: "test-log-1" },
     });
-    expect(res.statusCode).toBe(400);
-    expect(res.json()).toMatchObject({ success: false, error: expect.stringContaining("config") });
+    expect(res.statusCode).toBe(200); // 所有业务错误统一 200 + { success: false }
+    expect(res.json()).toMatchObject({ success: false, error: expect.stringContaining("配置") });
   });
 
-  it("should return 404 when log not found", async () => {
+  it("should return success=false when log not found", async () => {
     setSetting(db, "ai_retry_config", JSON.stringify({ provider_id: "test-provider", model: "test-model" }));
     const res = await app.inject({
       method: "POST",
       url: "/admin/api/retry-rules/ai-generate",
       payload: { log_id: "nonexistent" },
     });
-    expect(res.statusCode).toBe(404);
-    expect(res.json()).toMatchObject({ success: false, error: expect.stringContaining("not found") });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ success: false, error: expect.stringContaining("存在") });
   });
 
   it("should reject 2xx response without error features", async () => {
@@ -720,9 +727,10 @@ describe("POST /admin/api/retry-rules/ai-generate", () => {
 ```
 
 **注意：** 具体的 `insertTestProvider`、`insertTestLog`、mock LLM 服务器配置需要参考现有测试文件（如 `tests/admin-retry-rules.test.ts`）中的 setup 模式。特别是：
-- Provider 的 `api_key` 字段需要加密存储（参考 `encrypt()` 函数）
+- Provider 的 `api_key` 字段需要加密存储：先 `setSetting(db, "encryption_key", "test-encryption-key-32byte!!")`，再用 `encrypt("test-api-key", "test-encryption-key-32byte!!")` 生成加密值作为 api_key
 - `buildApp` 需要 admin auth token（参考现有测试的认证 setup）
 - `insertRequestLog` 的参数签名参考 `src/db/logs.ts`
+- 测试中统一使用 HTTP 200 + `{ success, error }` 格式验证，不检查非 200 状态码
 
 - [ ] **Step 2: 运行测试验证失败**
 
@@ -756,16 +764,27 @@ ai_retry_config: Type.Optional(Type.Union([
 ])),
 ```
 
-**PUT handler 扩展：** 在写入 `proxy_enhancement` 配置后，如果 body 含 `ai_retry_config`，写入 settings 的 `ai_retry_config` key：
+**PUT handler 扩展：** `ai_retry_config` 使用 `Type.Optional()`，所以现有前端调用（不带 `ai_retry_config` 字段）不受影响。handler 中需要先将 `ai_retry_config` 从 body 中解构出来，再将其余字段写入 `proxy_enhancement` JSON：
 
 ```typescript
-// 在 setSetting(db, "proxy_enhancement", ...) 之后：
-if (body.ai_retry_config !== undefined) {
-  setSetting(db, "ai_retry_config", body.ai_retry_config ? JSON.stringify(body.ai_retry_config) : "");
+// PUT handler 中：
+const { ai_retry_config, ...enhancementFields } = body as Static<typeof UpdateProxyEnhancementSchema>;
+
+// 写入 proxy_enhancement（只含原有字段，不含 ai_retry_config）
+const config = {
+  tool_call_loop_enabled: enhancementFields.tool_call_loop_enabled,
+  stream_loop_enabled: enhancementFields.stream_loop_enabled,
+  tool_round_limit_enabled: enhancementFields.tool_round_limit_enabled,
+  tool_error_logging_enabled: enhancementFields.tool_error_logging_enabled,
+};
+setSetting(db, "proxy_enhancement", JSON.stringify(config));
+clearEnhancementConfigCache();
+
+// 独立处理 ai_retry_config（写入独立 settings key）
+if (ai_retry_config !== undefined) {
+  setSetting(db, "ai_retry_config", ai_retry_config ? JSON.stringify(ai_retry_config) : "");
 }
 ```
-
-**注意：** PUT handler 中需要先从 schema body 中提取 `ai_retry_config`，然后将其余字段写入 `proxy_enhancement`。参考现有代码模式处理字段过滤。
 
 - [ ] **Step 4: 实现 AI 生成端点**
 
@@ -942,22 +961,22 @@ app.post("/admin/api/retry-rules/ai-generate", async (request, reply) => {
   // 1. 校验 AI 配置
   const configStr = getSetting(db, "ai_retry_config");
   if (!configStr) {
-    return reply.code(HTTP_BAD_REQUEST).send({ success: false, error: "AI 重试规则生成未配置。请前往代理增强设置配置 AI 模型。" });
+    return reply.send({ success: false, error: "AI 重试规则生成未配置。请前往代理增强设置配置 AI 模型。" });
   }
   let aiConfig: { provider_id: string; model: string };
   try {
     aiConfig = JSON.parse(configStr) as { provider_id: string; model: string };
   } catch {
-    return reply.code(HTTP_BAD_REQUEST).send({ success: false, error: "AI 配置格式错误" });
+    return reply.send({ success: false, error: "AI 配置格式错误" });
   }
   if (!aiConfig.provider_id || !aiConfig.model) {
-    return reply.code(HTTP_BAD_REQUEST).send({ success: false, error: "AI 配置不完整，请选择 Provider 和 Model" });
+    return reply.send({ success: false, error: "AI 配置不完整，请选择 Provider 和 Model" });
   }
 
   // 2. 获取日志
   const log = getRequestLogById(db, log_id);
   if (!log) {
-    return reply.code(HTTP_NOT_FOUND).send({ success: false, error: "日志不存在" });
+    return reply.send({ success: false, error: "日志不存在" });
   }
 
   // 3. 提取响应文本
@@ -972,21 +991,20 @@ app.post("/admin/api/retry-rules/ai-generate", async (request, reply) => {
   // 5. 获取 Provider
   const provider = getProviderById(db, aiConfig.provider_id);
   if (!provider) {
-    return reply.code(HTTP_BAD_REQUEST).send({ success: false, error: "配置的 Provider 不存在" });
+    return reply.send({ success: false, error: "配置的 Provider 不存在" });
   }
 
   // 6. 获取加密密钥并解密 API key
-  // 参考 src/index.ts 中获取 encryption_key 的模式
-  // 具体实现需要读取 index.ts 找到加密密钥存储的 settings key
+  // 项目通用模式：settings 表 key="encryption_key"（参考 providers.ts、failover-loop.ts 中的 decrypt 调用）
   const encryptionKey = getSetting(db, "encryption_key");
   if (!encryptionKey) {
-    return reply.code(500).send({ success: false, error: "系统加密密钥未初始化" });
+    return reply.send({ success: false, error: "系统加密密钥未初始化" });
   }
   let apiKey: string;
   try {
     apiKey = decrypt(provider.api_key, encryptionKey);
   } catch {
-    return reply.code(500).send({ success: false, error: "Provider API Key 解密失败" });
+    return reply.send({ success: false, error: "Provider API Key 解密失败" });
   }
 
   // 7. 获取现有规则并构造 prompt
@@ -1011,13 +1029,13 @@ app.post("/admin/api/retry-rules/ai-generate", async (request, reply) => {
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Unknown error";
-    return reply.code(502).send({ success: false, error: `AI 调用失败：${msg}` });
+    return reply.send({ success: false, error: `AI 调用失败：${msg}` });
   }
 
   // 9. 解析 AI 返回
   const parsed = parseAIContent(llmResult.content);
   if (!parsed) {
-    return reply.code(502).send({ success: false, error: "AI 返回内容无法解析为 JSON，请重试" });
+    return reply.send({ success: false, error: "AI 返回内容无法解析为 JSON，请重试" });
   }
 
   // 10. 检查 AI 退出（判断无法生成规则）
@@ -1028,7 +1046,7 @@ app.post("/admin/api/retry-rules/ai-generate", async (request, reply) => {
   // 11. 校验规则字段
   const validation = validateAIRule(parsed);
   if (!validation.valid || !validation.result) {
-    return reply.code(502).send({ success: false, error: `AI 返回规则校验失败：${validation.error}` });
+    return reply.send({ success: false, error: `AI 返回规则校验失败：${validation.error}` });
   }
 
   return reply.send({
@@ -1049,13 +1067,15 @@ app.post("/admin/api/retry-rules/ai-generate", async (request, reply) => {
 
 **关键实现注意事项：**
 
-1. **加密密钥获取：** 需要确认 `encryption_key` 在 settings 表中的确切 key 名。搜索 `src/index.ts` 或 `src/admin/` 中 `decrypt(` 的调用，找到加密密钥获取模式。可能不是直接的 `getSetting(db, "encryption_key")`，而是通过某个 helper 函数。
+1. **加密密钥获取：** `getSetting(db, "encryption_key")` 是项目通用模式（参考 `providers.ts:179`、`failover-loop.ts:184`）。settings 表 key 名确认为 `"encryption_key"`（setup.ts 中初始化）。无需额外注入，直接在 handler 中通过 db 调用即可。
 
-2. **HTTP 常量：** `HTTP_BAD_REQUEST`、`HTTP_NOT_FOUND` 等常量从 `src/core/constants.ts` 导入。
+2. **错误响应格式统一：** AI 生成端点所有业务逻辑错误均返回 HTTP 200 + `{ success: false, error: "..." }` 格式。前端只需检查 `result.success` 布尔值。非 200 状态码仅由 Fastify 框架（如 401 未认证）或系统级错误返回。这确保前端错误处理逻辑统一。
 
-3. **函数行数限制：** 端点 handler 约 60 行，各辅助函数各 15-30 行。总体 `retry-rules.ts` 从 110 行增长到约 280 行，在 300 行限制内。
+3. **stream_text_content 格式：** `stream_text_content` 不是 SSE 原始格式，而是经过 `serializeBlocksForStorage()` 序列化后的标准 API 响应格式（JSON 字符串，如 `{ choices: [{ message: { content: "text" } }] }`）。`extractResponseText` 直接使用全文即可，因为序列化已过滤了非文本内容（thinking blocks、tool_use 等），仅保留 text 部分。
 
-4. **TypeBox schema：** 端点请求体可以简单校验 `{ log_id: string }`，或使用内联 TypeBox schema。
+4. **函数行数限制：** 端点 handler 约 60 行，各辅助函数各 15-30 行。总体 `retry-rules.ts` 从 110 行增长到约 280 行，在 300 行限制内。
+
+5. **TypeBox schema：** 端点请求体可以简单校验 `{ log_id: string }`，或使用内联 TypeBox schema。
 
 - [ ] **Step 5: 运行测试验证通过**
 
@@ -1172,7 +1192,8 @@ aiRetryGenerate: (logId: string) =>
 - `Sparkles` from `lucide-vue-next`
 - `CascadingModelSelect` from `@/components/mappings/CascadingModelSelect.vue`
 - `api.getProviders` (现有 API 函数，用于加载 provider 列表)
-- `ProviderGroup` 类型从 CascadingModelSelect 或 api/client 中导入
+- `ProviderGroup` 类型从 `@/components/mappings/cascading-types` 导入
+- `ModelInfo` 类型从 `@/types/mapping` 导入（或内联类型推断）
 
 **Script 部分：**
 
@@ -1186,18 +1207,23 @@ const providerGroups = ref<ProviderGroup[]>([]);
 新增 `loadProviders` 函数（在 `onMounted` 中调用）：
 
 ```typescript
+const DEFAULT_CONTEXT_WINDOW = 128000;
+
 async function loadProviders() {
   try {
     const providers = await api.getProviders();
-    // 将 Provider[] 转换为 CascadingModelSelect 所需的 ProviderGroup[] 格式
-    // 参考 CascadingModelSelect.vue 中 ProviderGroup 类型定义
-    // 通常格式为: { groupKey: provider.id, label: provider.name, items: models[] }
+    // ProviderGroup 类型: { provider: { id, name }, models: ModelOption[] }
+    // 参考 ModelMappings.vue 中的实现模式
+    // api.getProviders() 返回的 p.models 已经是解析后的 ModelInfo[]（非 JSON 字符串）
     providerGroups.value = providers
       .filter((p) => p.is_active)
       .map((p) => ({
-        groupKey: p.id,
-        label: p.name,
-        items: parseModelsFromProvider(p), // 解析 models JSON
+        provider: { id: p.id, name: p.name },
+        models: (p.models ?? []).map((m) => ({
+          name: m.name,
+          contextWindow: m.context_window ?? DEFAULT_CONTEXT_WINDOW,
+          streamTimeoutMs: m.stream_timeout_ms ?? null,
+        })),
       }));
   } catch (e: unknown) {
     console.error('proxyEnhancement.loadProviders:', e);
@@ -1205,8 +1231,6 @@ async function loadProviders() {
   }
 }
 ```
-
-**注意：** `parseModelsFromProvider` 需要从 provider 的 `models` JSON 中提取模型列表。参考 `CascadingModelSelect.vue` 或 `RetryRules.vue` 中解析 provider models 的模式。具体来说，`ProviderGroup.items` 应该是 `string[]` 或 `{ value: string, label: string }[]`——读取 `CascadingModelSelect.vue` 确认格式。
 
 扩展 `loadConfig`：
 
