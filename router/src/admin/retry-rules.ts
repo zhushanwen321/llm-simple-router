@@ -228,27 +228,28 @@ export const adminRetryRuleRoutes: FastifyPluginCallback<RetryRuleRoutesOptions>
   app.post("/admin/api/retry-rules/ai-generate", async (request, reply) => {
     const { log_id } = request.body as { log_id: string };
 
-    const ok = (payload: Record<string, unknown>) => ({ code: API_CODE.SUCCESS, message: 'ok', ...payload });
+    // All responses let onSend hook wrap in { code, message, data } envelope
+    // Frontend request<T>() auto-unwraps body.data
 
     // 1. Check AI config
     const aiConfigRaw = getSetting(db, "ai_retry_config");
     if (!aiConfigRaw) {
-      return reply.send(ok({ success: false, error: "AI retry config not set" }));
+      return reply.send({ success: false, error: "AI retry config not set" });
     }
     let aiConfig: { provider_id: string; model: string };
     try {
       aiConfig = JSON.parse(aiConfigRaw) as { provider_id: string; model: string };
     } catch {
-      return reply.send(ok({ success: false, error: "AI config is invalid JSON" }));
+      return reply.send({ success: false, error: "AI config is invalid JSON" });
     }
     if (!aiConfig.provider_id || !aiConfig.model) {
-      return reply.send(ok({ success: false, error: "AI config is incomplete" }));
+      return reply.send({ success: false, error: "AI config is incomplete" });
     }
 
     // 2. Look up the log
     const log = getRequestLogById(db, log_id);
     if (!log) {
-      return reply.send(ok({ success: false, error: "Log not found" }));
+      return reply.send({ success: false, error: "Log not found" });
     }
 
     // 3. Extract response text
@@ -258,25 +259,25 @@ export const adminRetryRuleRoutes: FastifyPluginCallback<RetryRuleRoutesOptions>
     const HTTP_MULTIPLE_CHOICES = 300;
     const is2xx = log.status_code !== null && log.status_code >= HTTP_OK && log.status_code < HTTP_MULTIPLE_CHOICES;
     if (is2xx && !log.error_message && !hasErrorFeatures(responseText)) {
-      return reply.send(ok({ success: false, error: "Cannot generate retry rule for a successful response" }));
+      return reply.send({ success: false, error: "Cannot generate retry rule for a successful response" });
     }
 
     // 5. Get the configured AI provider
     const provider = getProviderById(db, aiConfig.provider_id);
     if (!provider) {
-      return reply.send(ok({ success: false, error: "AI provider not found" }));
+      return reply.send({ success: false, error: "AI provider not found" });
     }
 
     // 6. Decrypt API key
     const encryptionKey = getSetting(db, "encryption_key");
     if (!encryptionKey) {
-      return reply.send(ok({ success: false, error: "Encryption key not set" }));
+      return reply.send({ success: false, error: "Encryption key not set" });
     }
     let apiKey: string;
     try {
       apiKey = decrypt(provider.api_key, encryptionKey);
     } catch {
-      return reply.send(ok({ success: false, error: "Failed to decrypt API key" }));
+      return reply.send({ success: false, error: "Failed to decrypt API key" });
     }
 
     // 7. Build prompts
@@ -300,7 +301,7 @@ export const adminRetryRuleRoutes: FastifyPluginCallback<RetryRuleRoutesOptions>
       });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : JSON.stringify(e);
-      return reply.send(ok({ success: false, error: `LLM call failed: ${msg}` }));
+      return reply.send({ success: false, error: `LLM call failed: ${msg}` });
     }
 
     // 9. Parse AI response
@@ -309,24 +310,24 @@ export const adminRetryRuleRoutes: FastifyPluginCallback<RetryRuleRoutesOptions>
       // Check if the raw content is an error/refusal message
       const lowerContent = llmResult.content.toLowerCase().trim();
       if (lowerContent.startsWith("error") || lowerContent.includes("unable to")) {
-        return reply.send(ok({ success: false, error: "AI returned an error exit" }));
+        return reply.send({ success: false, error: "AI returned an error exit" });
       }
-      return reply.send(ok({ success: false, error: "Failed to parse AI response as JSON" }));
+      return reply.send({ success: false, error: "Failed to parse AI response as JSON" });
     }
 
     // 10. AI exit check — parsed object has an error field
     if (typeof parsed.error === "string") {
-      return reply.send(ok({ success: false, error: parsed.error }));
+      return reply.send({ success: false, error: parsed.error });
     }
 
     // 11. Validate fields
     const validationError = validateAIRule(parsed);
     if (validationError) {
-      return reply.send(ok({ success: false, error: `Rule validation failed: ${validationError}` }));
+      return reply.send({ success: false, error: `Rule validation failed: ${validationError}` });
     }
 
     // 12. Return success
-    return reply.send(ok({
+    return reply.send({
       success: true,
       rule: {
         name: parsed.name,
@@ -338,7 +339,7 @@ export const adminRetryRuleRoutes: FastifyPluginCallback<RetryRuleRoutesOptions>
         max_delay_ms: parsed.max_delay_ms,
       },
       summary: parsed.summary,
-    }));
+    });
   });
 
   done();
