@@ -151,7 +151,7 @@ function buildSystemPrompt(existingRules: RetryRule[]): string {
 ## Naming Convention
 - Use Chinese description, not English
 - Format: \`{Provider} {中文描述} (HTTP {status}, code {code})\`
-- If the error is model-specific, include model name: \`{Provider} {模型名} {中文描述} (HTTP {status}, code {code})\`
+- If the **Response Body or Error Message contains the model name**, include it: \`{Provider} {模型名} {中文描述} (HTTP {status}, code {code})\`
 - Examples:
   - \`ZAI 速率限制 (HTTP 200, code 1302)\` (provider-level error)
   - \`DeepSeek deepseek-chat 速率限制 (HTTP 429, code rate_limit)\` (model-level error)
