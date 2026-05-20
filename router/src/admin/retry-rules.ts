@@ -76,7 +76,7 @@ function extractResponseText(log: { upstream_response: string | null; stream_tex
 function hasErrorFeatures(text: string): boolean {
   if (!text) return false;
   const lower = text.toLowerCase();
-  return lower.includes("error") || lower.includes("error_code") || lower.includes("error_message") || lower.includes("error_type");
+  return lower.includes("error");
 }
 
 /** 解析 AI 返回的 JSON，支持 ```json 代码块包裹 */
@@ -224,7 +224,6 @@ export const adminRetryRuleRoutes: FastifyPluginCallback<RetryRuleRoutesOptions>
   });
 
   // AI generate retry rule endpoint
-  // All responses include code+message to bypass onSend envelope wrapping
   app.post("/admin/api/retry-rules/ai-generate", async (request, reply) => {
     const { log_id } = request.body as { log_id: string };
 
@@ -298,6 +297,7 @@ export const adminRetryRuleRoutes: FastifyPluginCallback<RetryRuleRoutesOptions>
           { role: "user", content: userPrompt },
         ],
         maxTokens: 2048,
+        timeoutMs: 30_000,
       });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : JSON.stringify(e);
