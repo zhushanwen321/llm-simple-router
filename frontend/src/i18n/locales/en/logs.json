@@ -74,6 +74,8 @@
   "goToConfig": "Go to Settings",
   "aiGeneratedRule": "AI-Generated Retry Rule",
   "aiGenerated": "AI",
+  "matchConditions": "Match Conditions",
+  "retryParams": "Retry Parameters",
   "aiAnalysisComplete": "AI analysis complete",
   "saveRule": "Save Rule",
   "viewer": {
