@@ -326,8 +326,7 @@ async function handleSave() {
         session_header_key: e.session_header_key.trim(),
       }));
 
-    // eslint-disable-next-line taste/prefer-allsettled
-    await Promise.all([
+    const results = await Promise.allSettled([
       api.updateProxyEnhancement({
         tool_call_loop_enabled: toolCallLoopEnabled.value,
         stream_loop_enabled: streamLoopEnabled.value,
@@ -338,6 +337,23 @@ async function handleSave() {
       updateTokenEstimation(tokenEstimationEnabled.value),
       updateClientSessionHeaders(entriesToSave),
     ]);
+    const failures = results.filter((r) => r.status === "rejected");
+    if (failures.length > 0) {
+      const failedReasons = failures
+        .map((f) =>
+          f.status === "rejected"
+            ? f.reason instanceof Error
+              ? f.reason.message
+              : typeof f.reason === "string"
+                ? f.reason
+                : JSON.stringify(f.reason)
+            : "",
+        )
+        .filter(Boolean)
+        .join("; ");
+      toast.error(t("proxyEnhancement.saveFailed") + ": " + failedReasons);
+      return;
+    }
     toast.success(t("common.saveSuccess"));
   } catch (e: unknown) {
     console.error("Failed to save config:", e);

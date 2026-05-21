@@ -78,7 +78,15 @@ const MAX_RETRIES_UPPER = 100;
 /** 从日志中提取响应文本，优先 upstream_response，回退 stream_text_content */
 function extractResponseText(log: { upstream_response: string | null; stream_text_content: string | null }): string {
   const raw = log.upstream_response || log.stream_text_content || "";
-  return raw.length > MAX_RESPONSE_CHARS ? raw.substring(0, MAX_RESPONSE_CHARS) : raw;
+  if (raw.length <= MAX_RESPONSE_CHARS) return raw;
+  const TRUNCATION_SUFFIX = "\n...(truncated)";
+  const truncated = raw.substring(0, MAX_RESPONSE_CHARS - TRUNCATION_SUFFIX.length);
+  // 在 JSON 边界处截断，避免破坏键值对导致 AI 生成无效正则
+  const lastBrace = truncated.lastIndexOf("}");
+  const lastBracket = truncated.lastIndexOf("]");
+  const cutPoint = Math.max(lastBrace, lastBracket);
+  const MIN_RATIO_FOR_BOUNDARY_CUT = 0.5;
+  return cutPoint > truncated.length * MIN_RATIO_FOR_BOUNDARY_CUT ? truncated.substring(0, cutPoint + 1) + TRUNCATION_SUFFIX : truncated + TRUNCATION_SUFFIX;
 }
 
 /** 检查文本是否包含错误特征关键词（case-insensitive） */
@@ -99,6 +107,14 @@ function parseAIContent(content: string): Record<string, unknown> | null {
   }
 }
 
+/** 从 AI 返回的 error 字段提取可读错误信息（兼容 string 和 object 两种格式） */
+function extractErrorMessage(error: unknown): string {
+  if (typeof error === "string") return error;
+  const obj = error as Record<string, unknown>;
+  const msg = obj.message;
+  return typeof msg === "string" ? msg : JSON.stringify(error);
+}
+
 /** 校验 AI 生成的规则字段，返回错误描述或 null */
 function validateAIRule(parsed: Record<string, unknown>): string | null {
   if (typeof parsed.summary !== "string" || parsed.summary.trim() === "") {
@@ -117,6 +133,21 @@ function validateAIRule(parsed: Record<string, unknown>): string | null {
     new RegExp(parsed.body_pattern);
   } catch {
     return "body_pattern is not a valid regex";
+  }
+  // ReDoS 防护：限制正则长度 + 检测已知危险模式
+  const MAX_PATTERN_LENGTH = 500;
+  if (parsed.body_pattern.length > MAX_PATTERN_LENGTH) {
+    return `Rule validation failed: body_pattern too long (max ${MAX_PATTERN_LENGTH} chars)`;
+  }
+  const DANGEROUS_REGEX_PATTERNS = [
+    /\([^)]*\+[^)]*\+/,          // 嵌套量词如 (a+b+)+
+    /\([^)]*[*+][^)]*\)\s*[*+]/,  // 重复分组 + 量词
+    /\(\.\*[^)]*\)\s*[*+]/,     // (.*)+ 类型
+  ];
+  for (const dangerous of DANGEROUS_REGEX_PATTERNS) {
+    if (dangerous.test(parsed.body_pattern)) {
+      return "Rule validation failed: body_pattern contains potentially catastrophic regex";
+    }
   }
   if (parsed.retry_strategy !== "fixed" && parsed.retry_strategy !== "exponential") {
     return "retry_strategy must be 'fixed' or 'exponential'";
@@ -143,7 +174,7 @@ function buildSystemPrompt(existingRules: RetryRule[]): string {
     : "(none)";
   const truncateHint = existingRules.length > MAX_PROMPT_RULES ? `\n... and ${existingRules.length - MAX_PROMPT_RULES} more rules` : "";
 
-  return `${AI_RETRY_PROMPT_TEMPLATE}\n\n${rulesList}${truncateHint}`;
+  return `${AI_RETRY_PROMPT_TEMPLATE}\n\n${rulesList}${truncateHint}\n\nNote: The Response Body may be truncated. Generate body_pattern based only on the complete key-value pairs you can see.`;
 }
 
 /** 构造 user prompt，使用 provider_name 而非 provider_id */
@@ -221,8 +252,12 @@ export const adminRetryRuleRoutes: FastifyPluginCallback<RetryRuleRoutesOptions>
     return reply.send({ success: true });
   });
 
+  const AiGenerateBodySchema = Type.Object({
+    log_id: Type.String({ minLength: 1 }),
+  });
+
   // AI generate retry rule endpoint
-  app.post("/admin/api/retry-rules/ai-generate", async (request, reply) => {
+  app.post("/admin/api/retry-rules/ai-generate", { schema: { body: AiGenerateBodySchema } }, async (request, reply) => {
     const { log_id } = request.body as { log_id: string };
 
     // All responses let onSend hook wrap in { code, message, data } envelope
@@ -317,8 +352,11 @@ export const adminRetryRuleRoutes: FastifyPluginCallback<RetryRuleRoutesOptions>
     }
 
     // 10. AI exit check — parsed object has an error field
-    if (typeof parsed.error === "string") {
-      return reply.send({ success: false, error: parsed.error });
+    if (parsed.error != null) {
+      const errorMsg = typeof parsed.error === "string"
+        ? parsed.error
+        : extractErrorMessage(parsed.error);
+      return reply.send({ success: false, error: errorMsg });
     }
 
     // 11. Validate fields

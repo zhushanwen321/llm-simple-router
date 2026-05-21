@@ -192,6 +192,23 @@ import type { LogEntry } from "@/components/logs/types";
 const { t } = useI18n();
 const router = useRouter();
 const { copied, copy } = useClipboard();
+const DEFAULT_RETRY_STATUS_CODE = 429;
+const DEFAULT_RETRY_DELAY_MS = 5000;
+const DEFAULT_MAX_RETRIES = 10;
+const DEFAULT_MAX_DELAY_MS = 60000;
+
+function createDefaultRuleForm() {
+  return {
+    name: "",
+    status_code: DEFAULT_RETRY_STATUS_CODE,
+    body_pattern: "",
+    retry_strategy: "exponential" as const,
+    retry_delay_ms: DEFAULT_RETRY_DELAY_MS,
+    max_retries: DEFAULT_MAX_RETRIES,
+    max_delay_ms: DEFAULT_MAX_DELAY_MS,
+  };
+}
+
 const generating = ref(false);
 const configPromptOpen = ref(false);
 const previewOpen = ref(false);
@@ -216,14 +233,16 @@ async function handleGenerateRule() {
   try {
     const result = await api.aiRetryGenerate(overview.value.id);
     if (result.success && result.rule) {
+      const r = result.rule;
+      const defaults = createDefaultRuleForm();
       generatedRule.value = {
-        name: result.rule.name,
-        status_code: result.rule.status_code,
-        body_pattern: result.rule.body_pattern,
-        retry_strategy: result.rule.retry_strategy,
-        retry_delay_ms: result.rule.retry_delay_ms,
-        max_retries: result.rule.max_retries,
-        max_delay_ms: result.rule.max_delay_ms,
+        name: r.name ?? defaults.name,
+        status_code: r.status_code ?? defaults.status_code,
+        body_pattern: r.body_pattern ?? defaults.body_pattern,
+        retry_strategy: r.retry_strategy ?? defaults.retry_strategy,
+        retry_delay_ms: r.retry_delay_ms ?? defaults.retry_delay_ms,
+        max_retries: r.max_retries ?? defaults.max_retries,
+        max_delay_ms: r.max_delay_ms ?? defaults.max_delay_ms,
       };
       ruleSummary.value = result.summary ?? "";
       previewOpen.value = true;
@@ -309,7 +328,14 @@ const progressStatus = computed(() => {
 });
 
 watch([() => props.open, () => props.logEntry], ([isOpen, logEntry]) => {
-  if (!isOpen) return;
+  if (!isOpen) {
+    generating.value = false;
+    previewOpen.value = false;
+    generatedRule.value = null;
+    ruleSummary.value = "";
+    configPromptOpen.value = false;
+    return;
+  }
   activeTab.value = "response";
   if (props.source === "history" && logEntry) {
     loadedOverview.value = fromLogEntry(logEntry);

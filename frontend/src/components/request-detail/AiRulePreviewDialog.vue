@@ -236,15 +236,11 @@ function createDefaultForm(): RuleForm {
 const form = ref<RuleForm>(createDefaultForm());
 
 watch(
-  () => props.rule,
-  (rule) => {
-    if (rule) {
-      form.value = {
-        ...rule,
-        is_active: true,
-      };
-    } else {
-      form.value = createDefaultForm();
+  [() => props.open, () => props.rule],
+  ([open, rule]) => {
+    if (open && rule) {
+      form.value = { ...rule, is_active: true };
+      saving.value = false;
     }
   },
   { immediate: true },

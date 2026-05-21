@@ -5,6 +5,9 @@ const DEFAULT_STATUS_CODE = 502;
 const HTTP_OK = 200;
 const HTTP_MULTIPLE_CHOICES = 300;
 const DEFAULT_UPSTREAM_PATH = "/v1/chat/completions";
+const BYTES_PER_MB = 1_048_576;
+const MAX_RESPONSE_MB = 5;
+const MAX_RESPONSE_SIZE = MAX_RESPONSE_MB * BYTES_PER_MB;
 
 export interface LLMMessage {
   role: "system" | "user" | "assistant";
@@ -73,7 +76,15 @@ export function callLLM(options: CallLLMOptions): Promise<CallLLMResult> {
 
     req.on("response", (res) => {
       const chunks: Buffer[] = [];
-      res.on("data", (chunk: Buffer) => chunks.push(chunk));
+      let totalSize = 0;
+      res.on("data", (chunk: Buffer) => {
+        totalSize += chunk.length;
+        if (totalSize > MAX_RESPONSE_SIZE) {
+          res.destroy(new Error("Response body exceeds size limit"));
+          return;
+        }
+        chunks.push(chunk);
+      });
       res.on("end", () => {
         const responseBody = Buffer.concat(chunks).toString("utf-8");
         const statusCode = res.statusCode ?? DEFAULT_STATUS_CODE;
