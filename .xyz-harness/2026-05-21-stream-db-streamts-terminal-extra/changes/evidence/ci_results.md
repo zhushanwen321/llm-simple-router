@@ -1,18 +1,21 @@
 ---
 ci_passed: true
-ci_url: https://github.com/zhushanwen321/llm-simple-router/actions/runs/26214675084
-commit_sha: b767862b67c63a2dc5ff4ca94d33b11ce8c0cf11
+ci_url: https://github.com/zhushanwen321/llm-simple-router/actions/runs/26223322644
+commit_sha: b6ac500abf5404e77d79361c5d4d68e32d2266f4
 ---
 
 # CI Results
 
-All CI checks passed for PR #161.
+All CI checks passed for PR #161 (latest commit b6ac500).
 
 ## Checks
 
-| Check | Status | Duration | URL |
-|-------|--------|----------|-----|
-| test (run 1) | pass | 1m34s | https://github.com/zhushanwen321/llm-simple-router/actions/runs/26214675084/job/77133896304 |
-| test (run 2) | pass | 1m39s | https://github.com/zhushanwen321/llm-simple-router/actions/runs/26214693546/job/77133958761 |
-| docker | pass | 55s | https://github.com/zhushanwen321/llm-simple-router/actions/runs/26214675084/job/77134149513 |
-| docker (skipping) | skipping | — | https://github.com/zhushanwen321/llm-simple-router/actions/runs/26214693546/job/77134224440 |
+| Check | Status | Run URL |
+|-------|--------|---------|
+| test | SUCCESS | https://github.com/zhushanwen321/llm-simple-router/actions/runs/26223322644 |
+| docker | SKIPPED | https://github.com/zhushanwen321/llm-simple-router/actions/runs/26223322644 |
+
+## Previous CI Runs (all passed)
+
+- c21b1de: 2x test SUCCESS + 1x docker SUCCESS (run 26222712028, 26222710474)
+- b6ac500: test SUCCESS + docker SKIPPED (run 26223322644)
