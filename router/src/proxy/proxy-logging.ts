@@ -90,11 +90,22 @@ export function logResilienceResult(
   const rootLogId = params.failover?.rootLogId ?? params.logId;
   let lastSuccessLogId = params.logId;
 
-  for (const attempt of attempts) {
+  for (let attemptIdx = 0; attemptIdx < attempts.length; attemptIdx++) {
+    const attempt = attempts[attemptIdx];
     const isOriginal = attempt.attemptIndex === 0;
     const attemptLogId = isOriginal ? params.logId : randomUUID();
     const isFailoverLog = isOriginal && isFailoverIteration;
     const parentId = isOriginal ? (isFailoverIteration ? rootLogId : null) : params.logId;
+
+    // 中间 attempt 的 resilience_action 为 "retry"（否则不会继续尝试）
+    const isLastAttempt = attemptIdx === attempts.length - 1;
+    const attemptResilienceAction = isLastAttempt
+      ? (params.resilienceAction ?? null)
+      : "retry";
+    // 中间 attempt 的 resilience_reason 为 null（retry 不携带 reason，只有 abort 才有）
+    const attemptResilienceReason = isLastAttempt
+      ? (params.resilienceReason ?? null)
+      : null;
 
     // 诊断字段：每次 attempt 通用的计算
     const diagnosticFields = {
@@ -102,8 +113,8 @@ export function logResilienceResult(
       abort_reason: attempt.resultKind === "stream_abort" && result.kind === "stream_abort" ? result.abortReason ?? null : null,
       error_code: attempt.error_code ?? null,
       headers_sent: attempt.headers_sent != null ? (attempt.headers_sent ? 1 : 0) : null,
-      resilience_action: params.resilienceAction ?? null,
-      resilience_reason: params.resilienceReason ?? null,
+      resilience_action: attemptResilienceAction,
+      resilience_reason: attemptResilienceReason,
       mapping_reason: params.mappingReason ?? null,
       failover_trigger: params.failoverTrigger ?? null,
     };

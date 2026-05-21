@@ -129,7 +129,7 @@ function getDiagnosticRow(mockDb: Database.Database, logId: string) {
 
 function getAnyLogId(mockDb: Database.Database): string | null {
   const row = mockDb
-    .prepare("SELECT id FROM request_logs LIMIT 1")
+    .prepare("SELECT id FROM request_logs ORDER BY created_at ASC LIMIT 1")
     .get() as Record<string, unknown> | undefined;
   return (row?.id as string) ?? null;
 }

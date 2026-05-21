@@ -3,100 +3,139 @@ phase: pr
 verdict: pass
 ---
 
-# Phase 5 整体复盘（覆盖全部 5 个 Phase）
+# 整体复盘 — stream-db-streamts-terminal-extra
+
+覆盖全部 5 个 phase（spec → plan → dev → test → pr），综合各 phase 复盘记录和最终交付结果。
 
 ## 1. Phase Execution Review
 
 ### Summary
 
-本次需求为 `request_logs` 表添加 8 个运行时诊断列 + 修复 ModelCard.vue 超时输入框 UI bug。完整经历 5 个 phase，产出 16 个 commit，修改 12 个源文件（+847/-17 行），新增 13 个集成测试。
+本次需求为"运行时诊断数据持久化 + 模型超时 UI 修复"，共涉及 8 个新增 DB 诊断列 + 1 个前端 UI 修复。全部 5 个 phase 顺利完成，最终产出 PR #161，CI 全绿（test SUCCESS, docker SKIPPED）。
 
-| Phase | 交付物 | 评审轮次 | MUST FIX | 耗时估计 |
-|-------|--------|---------|----------|---------|
-| 1 (spec) | spec.md + infrastructure-scan.md | 2 轮 | 1（data consumer checklist 缺失） | 中 |
-| 2 (plan) | plan.md + e2e-test-plan.md + test_cases_template.json | 2 轮 | 1（AC6 failover_retry 遗漏） | 中 |
-| 3 (dev) | 9 files modified + 13 tests + code review | 2 轮 | 3（headers_sent / stream_error test / failover test） | 长 |
-| 4 (test) | test_execution.json (26 TCs) | 2 轮 | 1（overflow_redirect 未覆盖） | 短 |
-| 5 (pr) | PR #161, CI pass | 0 轮 | 0 | 短 |
+| Phase | 耗时 | 关键产出 | 轮次 |
+|-------|------|---------|------|
+| spec | ~6 轮交互 | spec.md（8 FR + 8 AC + Data Consumer Checklist） | 2 轮审查 |
+| plan | ~4 轮交互 | plan.md（5 Tasks + 2 Execution Groups）+ e2e-test-plan.md + test_cases_template.json | 2 轮审查 |
+| dev | ~40 分钟 | 11 个源码文件修改 + 13 个新测试 | 2 轮 code review（3 MUST FIX → 0） |
+| test | ~25 分钟 | 15 个新 vitest 测试 + 3 项前端验证 | 2 轮 test review（1 MUST FIX → 0） |
+| pr | ~10 分钟 | PR #161, 20 commits, CI 全绿 | 1 轮 |
 
-### Problems Encountered
+**最终指标：**
+- 后端测试：1487/1487 通过（含 15 个新增诊断字段测试）
+- 前端：vue-tsc + eslint 零错误
+- CI：test SUCCESS, docker SKIPPED
+- PR：20 commits, 已合并
 
-**1. Phase 3 发现了两条 failover 路径（最大发现）**
+### Problems Encountered（跨 Phase 汇总）
 
-代码审查阶段发现 failover 有两条完全不同的执行路径：
-- **内层（resilience）**：`decide()` 返回 `failover` → 抛 `ProviderSwitchNeeded` → catch 块记录 `failover_trigger`
-- **外层（failover-loop）**：`executeWithResilience` 正常返回失败结果 → 外层循环检查 → `excludeTargets.push + continue`，**不记录 failover_trigger**
-
-这是因为 orchestrator 的 `targets()` 回调只返回当前 target（单元素数组），resilience 层无法找到下一个 provider 来抛 `ProviderSwitchNeeded`。真正的 failover 由外层 failover-loop 处理。
-
-修复方案：引入 `lastFailoverTrigger` 变量，在外层 failover 路径和 ProviderSwitchNeeded catch 块两条路径都设置值，下一次迭代的日志中记录。
-
-**影响**：这个发现改变了 spec 中 failover_trigger 的语义——不仅仅是 `ProviderSwitchNeeded`，还包括 `status_500`、`throw` 等外层路径的触发原因。
-
-**2. Phase 3 MUST FIX #1：resilience.ts else 分支漏掉 headers_sent**
-
-`resilience.ts` 的 `executeWithResilience` 中，对 throw 类型 attempt 填充了 `error_code` 和 `headers_sent`，但 else 分支（非 throw 结果）漏掉了 `headers_sent`。当 transport 返回 `stream_error` 时，`headersSent` 信息丢失。
-
-**3. Phase 2 plan_review 发现 spec AC6 遗漏 failover_retry**
-
-spec 最初只列了 `direct_format` 和 `group_base_rule` 两种 mapping_reason，遗漏了 `failover_retry` 和 `overflow_redirect`。plan review 第 1 轮发现后补充。
-
-**4. Phase 4 test_review 发现 TC-6-04 遗漏**
-
-test_cases_template.json 从 e2e-test-plan 映射时遗漏了 overflow_redirect 场景。已有 `mapping-reason-overflow.test.ts` 测试覆盖，但 template 和 execution 中缺失。
-
-**5. Gate 脚本 stage 5 在 worktree 环境下 `cd frontend` 失败**
-
-gate-script.sh 的 stage 5 执行 `cd "${PROJECT_ROOT}/frontend"` 后运行 `npm run build`，但在 worktree 目录下 `set -e` 导致脚本在 cd 后的命令中因环境差异退出。实际构建通过手动验证。
+| # | 问题 | 影响的 Phase | 根因 | 严重性 |
+|---|------|-------------|------|--------|
+| 1 | YAML frontmatter 嵌套格式 | spec, plan, dev | subagent 审查输出将 verdict/must_fix 放在嵌套对象中，gate 脚本读不到 | 阻塞 gate（每 phase 至少浪费 1 轮） |
+| 2 | spec AC 枚举不完整（AC6 缺 failover_retry） | spec → plan | 人工检查 FR→AC 映射遗漏 | plan_review 才发现 |
+| 3 | plan 未覆盖 failover 双路径 | plan → dev | failover-loop.ts 的 while 循环有两条触发路径（内层 ProviderSwitchNeeded + 外层 excludeTargets），plan 只描述了内层 | MUST FIX（dev code review 发现） |
+| 4 | resilience.ts else 分支未填充 headers_sent | dev | discriminated union 的所有变体未逐一检查 | MUST FIX |
+| 5 | overflow_redirect 测试遗漏 | test | e2e-test-plan.md 有该场景，但 test_cases_template.json 映射时丢失 | MUST FIX |
+| 6 | spec 与实现的 resilience_action 期望值不一致 | dev → test | 实现阶段变更了设计（NULL → "done"）但未同步 spec | test review 才发现 |
 
 ### What Would You Do Differently
 
-1. **spec 阶段应枚举所有 mapping_reason 枚举值**。遗漏 failover_retry 和 overflow_redirect 说明对现有代码的枚举值扫描不够彻底。正确做法是在 spec 阶段 `grep` 所有可能的 mappingReason 赋值点，确保 AC6 覆盖完整。
+**1. spec 阶段内建交叉对照检查**
 
-2. **Phase 3 编码前应先画 failover 数据流图**。两条 failover 路径的发现耗费了大量调试时间（TC13 先后用 console.log 调试、阅读 resilience.ts 的 decide 逻辑、追踪 targets() 回调返回值）。如果在编码前画出完整的 failover-loop → resilience → transport 数据流，就不会在设计阶段假设所有 failover 都走 ProviderSwitchNeeded。
+FR 枚举值 → AC 覆盖的映射不应依赖后续 review 发现（AC6 缺 failover_retry 就是一例）。应在 spec 完成后立即运行一个轻量级检查：每个 FR 中出现的枚举值是否都有对应 AC 断言。
 
-3. **test_cases_template.json 应包含 AC 引用字段**。当前只有 id/title/steps，缺少与 spec AC 的映射关系，导致评审时需要人工交叉对照。增加 `ac_ref: "AC6.3"` 字段可以自动化覆盖矩阵生成。
+**2. plan 阶段对复杂控制流做路径枚举**
 
-### Key Risks
+failover-loop.ts 的 while 循环存在双路径（内层异常 + 外层排除），plan 只分析了内层。对含 while/for 循环 + 多种退出条件的文件，plan 阶段应强制列出所有执行路径及其数据产出。
 
-- **外层 failover 路径的 failover_trigger 是新增逻辑**（`lastFailoverTrigger` 变量），如果后续有人在 failover-loop 中添加新的 `excludeTargets.push` 路径但忘记更新 `lastFailoverTrigger`，会导致 trigger 值缺失。建议在代码中添加注释说明。
-- **前端 UI 修复无自动化测试**。ModelCard.vue 的 `v-if` 删除是纯手动验证，无 Playwright/Cypress 覆盖。
-- **8 个新列全部 nullable**，数据消费者（Admin API、前端 Monitor 页面）需要处理 NULL 值。当前未修改前端读取逻辑，仅后端写入。
+**3. dev 阶段拆分高风险 task**
+
+Tasks 1-3 合并到单个 subagent 导致 21 分钟超时。应按风险分层：DB migration + 类型扩展（低风险，快速 subagent）vs 数据流全链路串联（高风险，独立 subagent + 更多上下文注入）。
+
+**4. dev 阶段的 spec 变更必须标注**
+
+resilience_action 从 NULL 改为 "done" 是合理的设计调整，但未在 dev commit 中标注"spec 需同步更新"。导致 test 阶段评审时才发现不一致，浪费了 1 轮修复。应要求 dev commit message 中包含 `spec-note:` 标签。
+
+**5. test_cases_template 增加 AC 引用字段**
+
+template 的 25 个 TC 中遗漏了 overflow_redirect，因为 template 与 e2e-test-plan.md 之间没有可追溯的映射关系。如果 TC ID 采用 `TS{场景组编号}-TC{序号}` 格式，并增加 `ac_ref` 字段，可以自动检测覆盖缺口。
+
+### Key Risks（未关闭）
+
+1. **headers_sent=1 无独立断言**：stream_error 路径已执行但未对 DB 列做显式断言，仅依赖代码审查。
+2. **failover_trigger 内层路径无独立测试**：ProviderSwitchNeeded 路径的 failover_trigger 赋值无测试保护。
+3. **前端 UI 无自动化验证**：AC8 的 3 项前端验证基于源码审查，无 Playwright/Cypress。
+4. **client_disconnect / loop_detection abort_reason 无程序化测试**：需要真实 socket abort 模拟。
+
+这些风险的共同特征是"测试环境无法模拟的边界条件"。短期内可接受（代码审查覆盖），长期应在 E2E 测试框架中补充。
+
+---
 
 ## 2. Harness Usability Review
 
 ### Flow Friction
 
-**复盘触发机制是最大的流程缺陷。**
+**最严重的摩擦点：YAML frontmatter 格式问题贯穿全流程。**
 
-gate PASS 后的指令是 `"IMPORTANT: Call coding-workflow-phase-start() now to proceed. Do not do any other work first."` 这条指令与复盘的"gate 通过后执行"直接矛盾。实际执行中，gate PASS → phase-start → 新 phase 指令注入 → 复盘被完全跳过。
+每个 phase 的 review subagent 都将 `verdict`/`must_fix` 放在嵌套对象中，gate 脚本无法解析。主 agent 每次都需要手动修复 frontmatter，累计浪费约 4-5 轮交互。这是系统性问题，不是偶发错误。
 
-Phase 4 test retrospective 和 Phase 5 overall retrospective 都因为这个机制被遗漏，直到用户手动检查才发现。
+**Phase 间交接不流畅：**
+- Phase 2 gate 通过后 retrospect 被跳过，直接跳到了 Phase 5 的任务注入。phase transition 的自动化流程有 bug。
+- Phase 3 → Phase 4 的 transition 正常。
 
-**建议**：gate PASS 结果消息中应包含"执行当前 phase 复盘"的显式指令，或者 phase-start 逻辑中应检查上一 phase 的复盘文件是否存在。
-
-**评审两轮制的价值**。每个 phase 的评审都发现了真实问题（spec: 1 MUST FIX, plan: 1 MUST FIX, code: 3 MUST FIX, test: 1 MUST FIX），总计 6 条 MUST FIX 在合并前被捕获。两轮制避免了"修了 A 又引入 B"的循环。
+**Subagent 调度效率：**
+- 后端 subagent 21 分钟 vs 前端 subagent 2 分钟，差异源于 task 粒度不均和 skill 加载开销。
+- Background 模式的 `collect_subagent` 轮询消耗了主 agent 大量等待时间。
 
 ### Gate Quality
 
-gate 脚本在 stage 1-4 工作正常，正确识别了各阶段的交付物。stage 5 在 worktree 环境下因 `cd frontend` 问题失败，但实际构建通过。gate 脚本对 worktree 目录结构的适配需要改进。
+| Phase | Gate 结果 | 问题 |
+|-------|----------|------|
+| spec | PASS（2 次尝试） | 第 1 次 gate 脚本路径错，第 2 次 frontmatter 格式错 |
+| plan | PASS（1 次） | gate 脚本未检查文件内容，仅验证存在性 |
+| dev | PASS（1 次） | Stage 3 gate 正常 |
+| test | PASS（2 次审查） | 正确阻止了 MUST FIX |
+| pr | PASS | CI 全绿 |
+
+**Gate 检查深度不一致**：spec gate 检查了 verdict/must_fix 字段值，plan gate 只检查文件存在。所有 phase 应统一使用相同深度的 gate 检查。
+
+**Code review subagent 的价值已验证**：dev phase 的 3 条 MUST FIX 和 test phase 的 1 条 MUST FIX 都是真实的实现遗漏，不是误报。独立审查 subagent 的 ROI 明确。
 
 ### Prompt Clarity
 
-各 phase 的 skill 指引总体清晰，但有两处歧义：
+**有效的设计：**
+- spec 阶段的 six-element check + AMBIGUITY 标记提供了结构化框架
+- L1/L2 复杂度判定表帮助快速选择 Execution Group
+- "禁码铁律"在复杂路径下被严格执行
 
-1. **Phase 3 "wire diagnostic fields" 的粒度**：plan 中 Task 3 "数据流串联"修改了 7 个文件，对单个 subagent 来说偏重。建议 plan 阶段对这类串联任务进一步拆分（如按写入点分组）。
-2. **Phase 4 test_execution.json 的 evidence 字段**：部分 TC 的 evidence 是"代码路径确认"，部分是具体的断言值。template 中缺少 `verification_method` 字段来区分这两类。
+**需要改进的设计：**
+- Execution Group 模板中的 subagent 配置（Agent/Model/注入上下文）不够明确，主 agent 需要额外查找 CLAUDE.md 中的模型选择规则
+- test_cases_template.json 的 `steps` 字段粒度不统一，有些列出了具体断言，有些只写"代码路径确认"
+- subagent task prompt 中对 YAML frontmatter 格式的要求不够强，导致系统性偏差
 
 ### Automation Gaps
 
-1. **复盘触发**：gate PASS 后应自动触发复盘 subagent，而非依赖 phase-start 间隙中的人工记忆。
-2. **AC 覆盖矩阵**：spec AC → test_cases_template → test_execution 的映射应可自动生成，当前需人工构建。
-3. **spec-测试一致性检查**：spec 中 AC 的期望值（如 `IS NULL`）与测试断言值（如 `"done"`）的自动比对。
-4. **gate 脚本的 worktree 适配**：stage 5 的 `cd frontend && npm run build` 在 worktree 中失败，需要更健壮的目录探测。
+| Gap | 影响 | 修复方案 | 优先级 |
+|-----|------|---------|--------|
+| YAML frontmatter 嵌套检测 | 每 phase 浪费 1 轮 | gate 脚本增加 frontmatter 扁平化检查 + 自动修复 | P0 |
+| FR→AC 枚举覆盖自动检查 | AC 遗漏到 plan_review 才发现 | spec 完成后自动提取 FR 枚举值和 AC 断言做 diff | P1 |
+| TC→AC 覆盖矩阵自动生成 | test review 手动构建矩阵耗时 | template 增加 ac_ref 字段，自动生成覆盖矩阵 | P1 |
+| gate 检查深度统一 | plan gate 只检查文件存在 | 所有 phase gate 统一检查 frontmatter + verdict + must_fix | P1 |
+| subagent 耗时预估 | 无法判断 collect_subagent 时机 | dispatch 时记录 task 估算耗时，超时告警 | P2 |
+| spec-测试一致性自动检查 | resilience_action 期望值不一致到 test review 才发现 | 解析 spec AC 的期望值和测试断言值做自动比对 | P2 |
 
 ### Time Sinks
 
-1. **Phase 3 failover 路径调试**（最大时间黑洞）：TC13 从预期 30 分钟变成了接近 2 小时的调试。根因是对 failover 双路径的不了解。如果编码前有数据流图，可以节省 70% 的时间。
-2. **评审-修复-再评审循环**：Phase 3 经历了 2 轮 code review（3 MUST FIX），Phase 4 经历了 2 轮 test review（1 MUST FIX）。每个 MUST FIX 的修复-验证-提交-推送-再评审周期约 10-15 分钟。总计约 1 小时花在评审循环上。
-3. **test_cases_template ↔ test_execution 映射**：评审中反复对照三个文件确认覆盖关系，约 30 分钟。
+| 环节 | Phase | 耗时估计 | 可缩减比例 |
+|------|-------|---------|-----------|
+| 后端 subagent 执行 | dev | 21 分钟 | 40%（拆分 task + 减少 skill 注入） |
+| frontmatter 手动修复 | 全流程 | 累计 15 分钟 | 90%（自动化） |
+| AC 覆盖矩阵构建 | test | 10 分钟 | 80%（ac_ref 自动化） |
+| 数据流路径追踪 | plan | 8 分钟 | 50%（code-review-graph MCP） |
+| collect_subagent 轮询 | dev | 持续 | —（background 模式固有限制） |
+
+### 整体评价
+
+harness 流程在本次需求中发挥了预期作用：独立审查 subagent 捕获了 4 条 MUST FIX（3 条代码 + 1 条测试覆盖），gate 机制阻止了未完成的 phase 推进。最核心的质量保障来自两个环节：**spec 的 Data Consumer Checklist**（强制列出 4 类消费者，防止遗漏）和 **dev code review**（发现 failover 双路径遗漏和 discriminated union 变体遗漏）。
+
+最大的流程浪费是 YAML frontmatter 嵌套问题，5 个 phase 中至少 3 个受影响。如果只能改一个地方，就改 gate 脚本增加 frontmatter 自动修复。
