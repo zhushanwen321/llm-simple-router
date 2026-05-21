@@ -31,10 +31,6 @@ jobs:
           cache: npm
           registry-url: 'https://registry.npmjs.org'
 
-      # OIDC trusted publishing 要求 npm >= 11.5.1
-      - name: Upgrade npm for OIDC support
-        run: npm install -g npm@latest
-
       # ── 步骤 1: 升级版本号 ──────────────────────────
       - name: Bump version
         run: |
@@ -72,25 +68,10 @@ jobs:
           cd ../frontend && npm run build
 
       # ── 步骤 5: Publish llm-simple-router (OIDC) ───
-      - name: Debug OIDC environment
-        run: |
-          echo "=== npm $(npm --version), node $(node --version) ==="
-          echo "ACTIONS_ID_TOKEN_REQUEST_URL: ${ACTIONS_ID_TOKEN_REQUEST_URL:-NOT_SET}"
-          echo "ACTIONS_ID_TOKEN_REQUEST_TOKEN: ${ACTIONS_ID_TOKEN_REQUEST_TOKEN:+SET(length=${#ACTIONS_ID_TOKEN_REQUEST_TOKEN})}"
-          echo "NODE_AUTH_TOKEN: ${NODE_AUTH_TOKEN:+SET(length=${#NODE_AUTH_TOKEN})}"
-          echo "NPM_CONFIG_USERCONFIG: ${NPM_CONFIG_USERCONFIG:-NOT_SET}"
-          echo "=== .npmrc content ==="
-          cat "$RUNNER_TEMP/.npmrc" 2>/dev/null || echo "(not found)"
-          echo "=== /home/runner/.npmrc ==="
-          cat /home/runner/.npmrc 2>/dev/null || echo "(not found)"
-
+      # setup-node 用 registry-url 时会设置 NODE_AUTH_TOKEN=GITHUB_TOKEN 并写 .npmrc
+      # 必须在 step-level env 覆盖空值 + 删 .npmrc，npm 才会检测 OIDC 环境并走 trusted publishing
       - name: Publish llm-simple-router to npm
-        run: |
-          # 清除 setup-node 注入的 auth 残留，让 npm 走 OIDC
-          # GitHub Actions env 变量在 shell 外无法 unset，需要写回空值到 GITHUB_ENV
-          echo "NODE_AUTH_TOKEN=" >> "$GITHUB_ENV"
-          rm -f "$RUNNER_TEMP/.npmrc"
-          cd router && npm publish
+        run: rm -f "$RUNNER_TEMP/.npmrc" && cd router && npm publish
         env:
           NODE_AUTH_TOKEN: ""
           NPM_CONFIG_USERCONFIG: ""
