@@ -4,6 +4,7 @@
     "enabled": "Enabled",
     "disabled": "Disabled"
   },
+  "saveHint": "Click \"Save\" to apply changes",
   "loopDetection": {
     "toolRoundLimit": {
       "title": "Tool Call Round Limit",
@@ -18,11 +19,18 @@
       "description": "Detect content repetition loops in streaming output (N-gram pattern). Automatically interrupts the stream when the threshold is exceeded."
     }
   },
+  "clientIdentification": {
+    "title": "Client Identification",
+    "description": "Configure client session header mapping to identify request sources. Requests with matching headers will be identified as the corresponding client type.",
+    "addEntry": "Add Entry"
+  },
   "toolErrorLogging": {
     "title": "Tool Error Logging",
     "description": "Record detailed information about Claude Code / pi tool call failures (including tool_use input, error content, provider, model). Used for analyzing patterns of model-generated incorrect tool_use parameters."
   },
   "tokenEstimation": {
+    "title": "Token Estimation",
+    "shortDescription": "When upstream API doesn't return token statistics, use gpt-tokenizer to estimate input token count and cache hits. Only applies to requests with session_id.",
     "setupTitle": "Client Setup",
     "claudeCode": "Claude Code: sends x-claude-code-session-id automatically, no extra config needed",
     "piExtension": "Pi: install extension at ~/.pi/agent/extensions/llm-router-session/\n(generates a UUID on session_start and injects x-pi-session-id header)",
@@ -30,5 +38,8 @@
     "desc": "Only applies to requests with a session_id. Requests without a session_id will not participate in cache hit rate calculation."
   },
   "loadFailed": "Failed to load configuration",
-  "saveFailed": "Failed to save"
+  "saveFailed": "Failed to save",
+  "loadProvidersFailed": "Failed to load provider list",
+  "aiRetryRuleGen": "AI Retry Rule Generation",
+  "aiRetryRuleGenDesc": "Configure the AI model for automatically analyzing request responses and generating retry rules. The model is invoked directly through configured Providers."
 }

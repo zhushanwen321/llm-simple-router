@@ -6,6 +6,7 @@ import type {
   ResponseInputMessage,
   ResponseTool,
 } from "./types-responses.js";
+import { normalizeInputTypes } from "./shared-normalize.js";
 
 // ---------- Effort → budget mapping (shared with thinking-mapper) ----------
 
@@ -148,7 +149,10 @@ function convertResponsesInputToAntMessages(input: string | ResponseInputItem[] 
   const raw: AntMessage[] = [];
   const systemParts: string[] = [];
 
-  for (const item of input) {
+  // Codex CLI 省略 input item 的 type 字段（如 {role:"user", content:"..."}），补全为 "message"
+  const normalizedInput = normalizeInputTypes(input);
+
+  for (const item of normalizedInput) {
     if (item.type === "message") {
     // developer/system 消息提取为 system part，不放入 messages
       if (item.role === "developer" || item.role === "system") {
@@ -446,3 +450,5 @@ function mapToolChoiceAnt2Responses(tc: unknown): unknown {
   }
   return "auto";
 }
+
+

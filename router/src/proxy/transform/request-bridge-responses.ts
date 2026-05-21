@@ -15,6 +15,7 @@ import type {
   ResponseInputMessage,
 } from "./types-responses.js";
 import { resolveThinkingParams } from "./thinking-resolver.js";
+import { normalizeInputTypes } from "./shared-normalize.js";
 
 // ---------- Responses → Chat Completions ----------
 
@@ -145,7 +146,10 @@ function convertResponsesInputToChatMessages(
   // Track pending function_calls to merge into a single assistant message
   const pendingFnCalls: Array<Record<string, unknown>> = [];
 
-  for (const item of input) {
+  // Codex CLI 省略 input item 的 type 字段（如 {role:"user", content:"..."}），补全为 "message"
+  const normalizedInput = normalizeInputTypes(input);
+
+  for (const item of normalizedInput) {
     // Flush any pending function_calls before processing non-function_call items
     if (item.type !== "function_call" && pendingFnCalls.length > 0) {
       flushFunctionCalls(messages, pendingFnCalls);
@@ -513,3 +517,5 @@ function convertChatMessagesToResponsesInput(
 
   return items;
 }
+
+

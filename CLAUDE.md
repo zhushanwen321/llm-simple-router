@@ -208,6 +208,17 @@ Handler (handler/proxy-handler.ts)
   长文本（>4000 字符）采用采样外推策略避免性能问题。
 - **禁止对 DB 中的 JSON 字段直接 JSON.parse**：`providers.models` 等字段存储的是 JSON 文本，数据格式会演进（如从 `string[]` 到 `ModelEntry[]`）。所有解析必须通过对应的类型安全函数（如 `parseModels()`），禁止裸 `JSON.parse`。ESLint 规则 `taste/no-raw-json-parse-models` 会强制执行此约束。
 
+## 运行时数据目录
+
+默认 `~/.llm-simple-router/`，通过 `DB_PATH` 环境变量间接控制（目录取 `DB_PATH` 的 dirname）。
+
+| 路径 | 用途 | 排查问题时使用 |
+|------|------|----------------|
+| `router.db` | SQLite 主库（19 张表） | `sqlite3 ~/.llm-simple-router/router.db "SELECT * FROM request_logs WHERE id = '...'" -json` 查请求日志 |
+| `logs/` | 请求详情日志文件（按 logId 命名） | `cat ~/.llm-simple-router/logs/<logId>.json` 查完整请求/响应内容 |
+
+**排查生产问题时**，先用 `request_logs` 表定位 logId，再从 `logs/` 目录读取完整请求体和响应体，这是复现和定位 bug 的关键数据源。
+
 ## 环境变量
 
 所有 secrets 通过首次启动的 Setup 页面设置，存入 DB settings 表。
