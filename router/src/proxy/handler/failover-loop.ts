@@ -440,7 +440,9 @@ export async function executeFailoverLoop(
           pipelineSnapshot,
           matcher, logFileWriter,
           resilienceAction: resilienceResult.finalDecision?.action,
-          resilienceReason: "reason" in (resilienceResult.finalDecision ?? {}) ? (resilienceResult.finalDecision as { action: string; reason: string }).reason : null,
+          resilienceReason: resilienceResult.finalDecision?.action === "abort"
+            ? (resilienceResult.finalDecision as { action: "abort"; reason: string }).reason
+            : null,
           mappingReason: effectiveMappingReason,
           failoverTrigger: lastFailoverTrigger,
         },
