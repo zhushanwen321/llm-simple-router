@@ -1,0 +1,237 @@
+{
+  "test_cases": [
+    {
+      "id": "TC-1-01",
+      "type": "api",
+      "title": "transport_kind=success for non-stream 200",
+      "description": "Non-stream request succeeds, verify transport_kind column in request_logs",
+      "steps": [
+        "buildTestApp with mock backend returning 200",
+        "POST /v1/chat/completions with stream=false",
+        "Query request_logs for the request ID",
+        "Assert transport_kind = 'success'"
+      ]
+    },
+    {
+      "id": "TC-1-02",
+      "type": "api",
+      "title": "transport_kind=stream_success for stream 200",
+      "description": "Stream request succeeds, verify transport_kind column",
+      "steps": [
+        "buildTestApp with mock backend returning SSE stream",
+        "POST /v1/chat/completions with stream=true",
+        "Query request_logs for the request ID",
+        "Assert transport_kind = 'stream_success'"
+      ]
+    },
+    {
+      "id": "TC-1-03",
+      "type": "api",
+      "title": "transport_kind=error for non-stream 500",
+      "steps": [
+        "buildTestApp with mock backend returning 500",
+        "POST /v1/chat/completions with stream=false",
+        "Assert transport_kind = 'error'"
+      ]
+    },
+    {
+      "id": "TC-1-04",
+      "type": "api",
+      "title": "transport_kind=stream_error for stream 500",
+      "steps": [
+        "buildTestApp with mock backend returning 500 on stream request",
+        "POST /v1/chat/completions with stream=true",
+        "Assert transport_kind = 'stream_error'"
+      ]
+    },
+    {
+      "id": "TC-1-05",
+      "type": "api",
+      "title": "transport_kind=throw for connection refused",
+      "steps": [
+        "buildTestApp with mock backend that rejects connection",
+        "POST /v1/chat/completions",
+        "Assert transport_kind = 'throw'"
+      ]
+    },
+    {
+      "id": "TC-1-06",
+      "type": "api",
+      "title": "transport_kind=stream_abort for timeout",
+      "steps": [
+        "buildTestApp with mock backend that never responds, short timeout",
+        "POST /v1/chat/completions with stream=true",
+        "Assert transport_kind = 'stream_abort'"
+      ]
+    },
+    {
+      "id": "TC-2-01",
+      "type": "api",
+      "title": "abort_reason=idle_timeout on stream timeout",
+      "steps": [
+        "Configure model with stream_timeout_ms=100",
+        "Mock backend delays > 100ms",
+        "Assert abort_reason = 'idle_timeout'"
+      ]
+    },
+    {
+      "id": "TC-2-02",
+      "type": "api",
+      "title": "abort_reason=client_disconnect on abort",
+      "steps": [
+        "Start stream request",
+        "Abort request immediately",
+        "Assert abort_reason = 'client_disconnect'"
+      ]
+    },
+    {
+      "id": "TC-2-03",
+      "type": "api",
+      "title": "abort_reason=loop_detection on repeated pattern",
+      "steps": [
+        "Mock backend returning loop-triggering pattern",
+        "Assert abort_reason = 'loop_detection'"
+      ]
+    },
+    {
+      "id": "TC-2-04",
+      "type": "api",
+      "title": "abort_reason=NULL for non-abort requests",
+      "steps": [
+        "Normal successful request",
+        "Assert abort_reason IS NULL"
+      ]
+    },
+    {
+      "id": "TC-3-01",
+      "type": "api",
+      "title": "error_code=ETIMEDOUT on connection timeout",
+      "steps": [
+        "Mock backend that triggers ETIMEDOUT",
+        "Assert error_code = 'ETIMEDOUT'"
+      ]
+    },
+    {
+      "id": "TC-3-02",
+      "type": "api",
+      "title": "error_code=NULL on success",
+      "steps": [
+        "Normal successful request",
+        "Assert error_code IS NULL"
+      ]
+    },
+    {
+      "id": "TC-4-01",
+      "type": "api",
+      "title": "headers_sent=1 when headers already sent",
+      "steps": [
+        "Stream request that fails after headers sent",
+        "Assert headers_sent = 1"
+      ]
+    },
+    {
+      "id": "TC-4-02",
+      "type": "api",
+      "title": "headers_sent=0 or NULL when headers not sent",
+      "steps": [
+        "Request that fails before headers sent",
+        "Assert headers_sent IS NULL or 0"
+      ]
+    },
+    {
+      "id": "TC-5-01",
+      "type": "api",
+      "title": "resilience_action=retry on retryable error",
+      "steps": [
+        "Configure retry rule for status 429",
+        "Mock backend returning 429 then 200",
+        "Assert resilience_action = 'retry' on first attempt log"
+      ]
+    },
+    {
+      "id": "TC-5-02",
+      "type": "api",
+      "title": "resilience_action=failover on failover",
+      "steps": [
+        "Configure failover mapping group",
+        "First provider fails",
+        "Assert resilience_action = 'failover'"
+      ]
+    },
+    {
+      "id": "TC-5-03",
+      "type": "api",
+      "title": "resilience_action=NULL on success without retry",
+      "steps": [
+        "Normal successful request without retry",
+        "Assert resilience_action IS NULL"
+      ]
+    },
+    {
+      "id": "TC-6-01",
+      "type": "api",
+      "title": "mapping_reason=direct_format",
+      "steps": [
+        "Request with model that has direct format mapping",
+        "Assert mapping_reason = 'direct_format'"
+      ]
+    },
+    {
+      "id": "TC-6-02",
+      "type": "api",
+      "title": "mapping_reason=group_base_rule",
+      "steps": [
+        "Request with model mapped via group base rule",
+        "Assert mapping_reason = 'group_base_rule'"
+      ]
+    },
+    {
+      "id": "TC-7-01",
+      "type": "api",
+      "title": "failover_trigger=ProviderSwitchNeeded",
+      "steps": [
+        "Trigger ProviderSwitchNeeded during request",
+        "Assert failover_trigger = 'ProviderSwitchNeeded'"
+      ]
+    },
+    {
+      "id": "TC-7-02",
+      "type": "api",
+      "title": "failover_trigger=NULL on normal request",
+      "steps": [
+        "Normal successful request",
+        "Assert failover_trigger IS NULL"
+      ]
+    },
+    {
+      "id": "TC-8-01",
+      "type": "ui",
+      "title": "ModelCard shows empty timeout input when not configured",
+      "steps": [
+        "Open Provider edit page",
+        "Find a model without stream_timeout_ms configured",
+        "Verify timeout input field is visible and empty"
+      ]
+    },
+    {
+      "id": "TC-8-02",
+      "type": "ui",
+      "title": "ModelCard shows configured timeout value",
+      "steps": [
+        "Open Provider edit page",
+        "Find a model with stream_timeout_ms=30000",
+        "Verify timeout input shows '30'"
+      ]
+    },
+    {
+      "id": "TC-8-03",
+      "type": "ui",
+      "title": "QuickSetup shows empty timeout input when not configured",
+      "steps": [
+        "Open QuickSetup page",
+        "Add a model without timeout",
+        "Verify timeout input is visible and empty"
+      ]
+    }
+  ]
+}
