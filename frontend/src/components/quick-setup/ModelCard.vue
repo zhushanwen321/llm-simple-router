@@ -74,7 +74,7 @@ function updatePatches(patches: string[]) {
   emit("update:model", { ...props.model, patches });
 }
 
-const DEFAULT_TIMEOUT_SECONDS = 300;
+const DEFAULT_TIMEOUT_SECONDS = 30;
 const MS_PER_SECOND = 1000;
 
 const displayTimeoutSeconds = computed(() => {
