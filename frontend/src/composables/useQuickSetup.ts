@@ -215,17 +215,17 @@ function buildMappingEntries(
         targets:
           targets.length > 0
             ? targets.map((t) => ({
-                backend_model: t.backend_model,
-                provider_id: t.provider_id,
-                overflow_provider_id: t.overflow_provider_id,
-                overflow_model: t.overflow_model,
-              }))
+              backend_model: t.backend_model,
+              provider_id: t.provider_id,
+              overflow_provider_id: t.overflow_provider_id,
+              overflow_model: t.overflow_model,
+            }))
             : [
-                {
-                  backend_model: enabledModels[0]?.name ?? "",
-                  provider_id: "__new__",
-                },
-              ],
+              {
+                backend_model: enabledModels[0]?.name ?? "",
+                provider_id: "__new__",
+              },
+            ],
         existing: true,
         existingId: existingGroup.id,
         tag: "existing" as const,
