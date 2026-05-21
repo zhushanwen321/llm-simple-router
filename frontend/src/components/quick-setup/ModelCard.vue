@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -74,6 +73,24 @@ function updateContextWindowFromInput(val: string) {
 function updatePatches(patches: string[]) {
   emit("update:model", { ...props.model, patches });
 }
+
+const DEFAULT_TIMEOUT_SECONDS = 300;
+const MS_PER_SECOND = 1000;
+
+const displayTimeoutSeconds = computed(() => {
+  if (props.streamTimeoutMs !== undefined && props.streamTimeoutMs !== null) {
+    return Math.round(props.streamTimeoutMs / MS_PER_SECOND);
+  }
+  return DEFAULT_TIMEOUT_SECONDS;
+});
+
+const isDefaultTimeout = computed(() => props.streamTimeoutMs === undefined);
+
+const toggleableCapabilities = [
+  { key: "image" as const, icon: ImageIcon, labelKey: "image" as const },
+  { key: "audio" as const, icon: Volume2, labelKey: "audio" as const },
+  { key: "video" as const, icon: Video, labelKey: "video" as const },
+];
 </script>
 
 <template>
@@ -166,72 +183,56 @@ function updatePatches(patches: string[]) {
       </CollapsibleContent>
     </Collapsible>
 
-    <!-- Timeout + Capabilities row -->
+    <!-- Timeout row -->
     <div
       v-if="streamTimeoutMs !== undefined || capabilities !== undefined"
-      class="flex items-center gap-3 pt-1.5 mt-1.5 border-t border-border/30"
+      class="flex items-center gap-2 pt-1.5 mt-1.5 border-t border-border/30"
     >
+      <Label class="text-xs text-muted-foreground whitespace-nowrap">{{
+        t("providers.fields.timeoutLabel")
+      }}</Label>
       <div class="flex items-center gap-1.5">
-        <Label class="text-xs text-muted-foreground whitespace-nowrap">{{
-          t("providers.fields.timeoutLabel")
-        }}</Label>
         <Input
           type="number"
-          :model-value="
-            streamTimeoutMs ? Math.round(streamTimeoutMs / 1000) : ''
-          "
+          :model-value="displayTimeoutSeconds"
           @update:model-value="
             emit(
               'update:stream-timeout-ms',
-              $event ? Number($event) * 1000 : undefined,
+              $event ? Number($event) * MS_PER_SECOND : undefined,
             )
           "
-          :placeholder="t('providers.fields.timeoutPlaceholder')"
-          class="h-7 text-xs"
+          class="h-7 w-20 text-xs text-right [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
           min="1"
         />
-      </div>
-      <div v-if="capabilities" class="flex items-center gap-2">
-        <Badge variant="secondary" class="text-[10px] px-1.5 py-0 gap-0.5">
-          <FileText class="w-2.5 h-2.5" />
-          {{ t("providers.capabilities.text") }}
+        <Badge
+          v-if="isDefaultTimeout"
+          variant="outline"
+          class="text-[10px] px-1 py-0 h-5 font-normal text-muted-foreground"
+        >
+          {{ t("providers.fields.timeoutPlaceholder") }}
         </Badge>
-        <Label class="flex items-center gap-1.5 cursor-pointer">
-          <Checkbox
-            :checked="capabilities.includes('image')"
-            @update:checked="emit('toggle-capability', 'image')"
-          />
-          <span
-            class="text-[10px] text-muted-foreground flex items-center gap-0.5"
-          >
-            <ImageIcon class="w-2.5 h-2.5" />
-            {{ t("providers.capabilities.image") }}
-          </span>
-        </Label>
-        <Label class="flex items-center gap-1.5 cursor-pointer">
-          <Checkbox
-            :checked="capabilities.includes('audio')"
-            @update:checked="emit('toggle-capability', 'audio')"
-          />
-          <span
-            class="text-[10px] text-muted-foreground flex items-center gap-0.5"
-          >
-            <Volume2 class="w-2.5 h-2.5" />
-            {{ t("providers.capabilities.audio") }}
-          </span>
-        </Label>
-        <Label class="flex items-center gap-1.5 cursor-pointer">
-          <Checkbox
-            :checked="capabilities.includes('video')"
-            @update:checked="emit('toggle-capability', 'video')"
-          />
-          <span
-            class="text-[10px] text-muted-foreground flex items-center gap-0.5"
-          >
-            <Video class="w-2.5 h-2.5" />
-            {{ t("providers.capabilities.video") }}
-          </span>
-        </Label>
+      </div>
+    </div>
+
+    <!-- Capabilities row -->
+    <div v-if="capabilities" class="flex items-center gap-1.5 pt-1">
+      <Badge variant="secondary" class="text-[10px] px-1.5 py-0 h-5 gap-0.5">
+        <FileText class="w-2.5 h-2.5" />
+        {{ t("providers.capabilities.text") }}
+      </Badge>
+      <div
+        v-for="cap in toggleableCapabilities"
+        :key="cap.key"
+        class="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0 text-[10px] cursor-pointer transition-colors border h-5"
+        :class="
+          capabilities.includes(cap.key)
+            ? 'bg-primary/10 text-primary border-primary/20'
+            : 'bg-transparent text-muted-foreground border-border/50 hover:bg-muted'
+        "
+        @click="emit('toggle-capability', cap.key)"
+      >
+        <component :is="cap.icon" class="w-2.5 h-2.5" />
+        {{ t(`providers.capabilities.${cap.labelKey}`) }}
       </div>
     </div>
   </div>
