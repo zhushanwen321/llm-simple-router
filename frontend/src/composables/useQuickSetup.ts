@@ -33,6 +33,7 @@ import router from "@/router";
 
 const DEFAULT_CONCURRENCY = 10;
 const DEFAULT_QUEUE_TIMEOUT_MS = 120_000;
+const DEFAULT_STREAM_TIMEOUT_MS = 300_000;
 const DEFAULT_QUEUE_SIZE = 100;
 const DEFAULT_CONTEXT_WINDOW = 128_000;
 const CONNECTION_TEST_DELAY_MS = 800;
@@ -477,6 +478,7 @@ function applyPresetModels(
       preset.apiType,
       isNonOpenaiEndpoint.value,
     ),
+    stream_timeout_ms: DEFAULT_STREAM_TIMEOUT_MS,
     capabilities: preset.modelCapabilities?.[name],
   }));
 }
@@ -493,6 +495,7 @@ function pushCustomModel(
     contextWindow,
     enabled: true,
     patches: computeDefaultPatches(name, apiType, isNonOpenaiEndpoint.value),
+    stream_timeout_ms: DEFAULT_STREAM_TIMEOUT_MS,
     capabilities: ["text"],
   });
 }
