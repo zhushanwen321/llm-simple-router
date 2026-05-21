@@ -10,7 +10,7 @@
     "url": "git+https://github.com/zhushanwen321/llm-simple-router.git"
   },
   "bin": {
-    "llm-simple-router": "./dist/cli.js"
+    "llm-simple-router": "dist/cli.js"
   },
   "files": [
     "dist/",

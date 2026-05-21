@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
 
-// tsc 不会复制非 TS 文件，需要手动复制 migrations SQL
+// tsc 不会复制非 TS 文件，需要手动复制 migrations SQL + 其他资源
 const migrationsSrc = resolve(root, "src/db/migrations");
 const migrationsDest = resolve(root, "dist/db/migrations");
 if (existsSync(migrationsSrc)) {
