@@ -3,6 +3,7 @@ import type { AnthropicContentBlock, AnthropicImageBlock, AnthropicMessage, Anth
 import type {
   ResponsesApiRequest,
   ResponseInputItem,
+  ResponseInputMessage,
   ResponseTool,
 } from "./types-responses.js";
 import { normalizeInputTypes } from "./shared-normalize.js";
