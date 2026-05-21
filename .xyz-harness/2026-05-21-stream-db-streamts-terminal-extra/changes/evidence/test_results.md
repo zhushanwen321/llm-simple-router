@@ -10,15 +10,15 @@ all_passing: true
 ```
 cd router && npm test
 
- ✓ tests/diagnostic-fields.test.ts (11 tests) 17243ms
+ ✓ tests/diagnostic-fields.test.ts (13 tests) 17469ms
  Test Files  124 passed (124)
-      Tests  1485 passed (1485)
-   Duration  22.94s
+      Tests  1487 passed (1487)
+   Duration  27.72s
 ```
 
-**All 124 backend test files passed (1485 tests).**
+**All 124 backend test files passed (1487 tests).**
 
-### New Tests (11)
+### New Tests (13)
 
 | Test | Scenario | Field Verified |
 |------|----------|---------------|
@@ -33,6 +33,8 @@ cd router && npm test
 | TC9 | Normal request | mapping_reason non-null |
 | TC10 | Success no retry | resilience_action/reason |
 | TC11 | Normal request | headers_sent IS NULL |
+| TC12 | Stream 500 | transport_kind = "stream_error" |
+| TC13 | Failover | failover_trigger = "status_500" |
 
 ## Frontend Type Check
 
