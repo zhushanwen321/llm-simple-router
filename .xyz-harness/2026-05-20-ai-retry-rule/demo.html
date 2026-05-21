@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 重试规则生成 - UI Demo</title>
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --card: #171717;
+    --card-border: #262626;
+    --input-bg: #1a1a1a;
+    --input-border: #333;
+    --text: #fafafa;
+    --text-muted: #a1a1a1;
+    --text-dim: #737373;
+    --primary: #3b82f6;
+    --primary-hover: #2563eb;
+    --danger: #ef4444;
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --radius: 8px;
+    --overlay: rgba(0,0,0,0.6);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; line-height: 1.5; }
+
+  /* Layout */
+  .page { max-width: 900px; margin: 40px auto; padding: 0 20px; }
+  .page-title { font-size: 24px; font-weight: 600; margin-bottom: 24px; }
+
+  /* Card */
+  .card { background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 24px; margin-bottom: 20px; }
+  .card-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .card-desc { color: var(--text-muted); font-size: 13px; margin-bottom: 16px; }
+
+  /* Section */
+  .section-label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; color: var(--text-muted); }
+
+  /* Select / Input */
+  select, input[type="number"], input[type="text"], textarea {
+    background: var(--input-bg); border: 1px solid var(--input-border); border-radius: 6px;
+    color: var(--text); padding: 8px 12px; font-size: 14px; width: 100%;
+    outline: none; transition: border-color 0.15s;
+  }
+  select:focus, input:focus, textarea:focus { border-color: var(--primary); }
+  textarea { font-family: 'SF Mono', Monaco, monospace; font-size: 12px; resize: vertical; min-height: 60px; }
+
+  /* Buttons */
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 500; border: none; cursor: pointer; transition: all 0.15s; }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-primary:hover { background: var(--primary-hover); }
+  .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--input-border); }
+  .btn-outline:hover { background: rgba(255,255,255,0.05); }
+  .btn-danger { background: transparent; color: var(--danger); border: 1px solid rgba(239,68,68,0.3); }
+  .btn-danger:hover { background: rgba(239,68,68,0.1); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-icon { padding: 6px 10px; }
+  .btn-group { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+
+  /* Badge */
+  .badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 500; }
+  .badge-error { background: rgba(239,68,68,0.15); color: var(--danger); }
+  .badge-success { background: rgba(34,197,94,0.15); color: var(--success); }
+  .badge-warning { background: rgba(245,158,11,0.15); color: var(--warning); }
+  .badge-blue { background: rgba(59,130,246,0.15); color: var(--primary); }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--card-border); margin-bottom: 16px; }
+  .tab { padding: 8px 16px; font-size: 13px; color: var(--text-dim); cursor: pointer; border-bottom: 2px solid transparent; }
+  .tab.active { color: var(--text); border-bottom-color: var(--primary); }
+
+  /* Dialog overlay */
+  .dialog-overlay { position: fixed; inset: 0; background: var(--overlay); display: flex; align-items: center; justify-content: center; z-index: 100; }
+  .dialog { background: var(--card); border: 1px solid var(--card-border); border-radius: 12px; width: 90%; max-height: 90vh; overflow-y: auto; }
+  .dialog-sm { max-width: 520px; }
+  .dialog-lg { max-width: 860px; }
+  .dialog-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px 0; }
+  .dialog-title { font-size: 18px; font-weight: 600; }
+  .dialog-close { background: none; border: none; color: var(--text-dim); font-size: 20px; cursor: pointer; padding: 4px 8px; border-radius: 4px; }
+  .dialog-close:hover { background: rgba(255,255,255,0.1); color: var(--text); }
+  .dialog-body { padding: 20px 24px; }
+  .dialog-footer { padding: 0 24px 20px; display: flex; justify-content: flex-end; gap: 8px; }
+
+  /* Log detail layout */
+  .log-detail { display: grid; grid-template-columns: 240px 1fr; gap: 20px; min-height: 400px; }
+  .log-meta { font-size: 13px; }
+  .log-meta-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--card-border); }
+  .log-meta-label { color: var(--text-dim); }
+  .log-meta-value { font-weight: 500; font-family: 'SF Mono', Monaco, monospace; font-size: 12px; }
+
+  /* Response viewer */
+  .response-viewer { background: var(--input-bg); border: 1px solid var(--input-border); border-radius: 6px; padding: 16px; font-family: 'SF Mono', Monaco, monospace; font-size: 12px; white-space: pre-wrap; word-break: break-all; color: var(--text-muted); max-height: 320px; overflow-y: auto; }
+
+  /* Spinner */
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Form row */
+  .form-row { margin-bottom: 14px; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+  /* Toggle */
+  .toggle { position: relative; width: 40px; height: 22px; background: var(--input-border); border-radius: 11px; cursor: pointer; transition: background 0.2s; }
+  .toggle.active { background: var(--primary); }
+  .toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; background: #fff; border-radius: 50%; transition: transform 0.2s; }
+  .toggle.active::after { transform: translateX(18px); }
+
+  /* Divider */
+  .divider { border: none; border-top: 1px solid var(--card-border); margin: 16px 0; }
+
+  /* Toast */
+  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--card); border: 1px solid var(--card-border); border-radius: 8px; padding: 12px 20px; font-size: 13px; display: flex; align-items: center; gap: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); z-index: 200; transform: translateY(80px); opacity: 0; transition: all 0.3s; }
+  .toast.show { transform: translateY(0); opacity: 1; }
+
+  /* Scenario nav */
+  .scenario-nav { display: flex; gap: 8px; margin-bottom: 32px; flex-wrap: wrap; }
+  .scenario-btn { padding: 10px 20px; background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius); color: var(--text); cursor: pointer; font-size: 14px; transition: all 0.15s; }
+  .scenario-btn:hover { border-color: var(--primary); }
+  .scenario-btn.active { border-color: var(--primary); background: rgba(59,130,246,0.1); }
+
+  .scenario { display: none; }
+  .scenario.active { display: block; }
+
+  /* Cascading select mockup */
+  .cascade-group { display: flex; gap: 8px; align-items: center; }
+  .cascade-group select { flex: 1; }
+
+  /* Highlight */
+  .highlight-row { background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.2); border-radius: 6px; padding: 10px; display: flex; align-items: center; justify-content: space-between; }
+
+  /* Code block */
+  .code-block { background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.15); border-radius: 6px; padding: 12px; font-family: 'SF Mono', Monaco, monospace; font-size: 12px; color: var(--text-muted); white-space: pre-wrap; margin: 8px 0; }
+
+  .mono { font-family: 'SF Mono', Monaco, monospace; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<div class="page">
+  <div class="page-title">AI 重试规则生成 — UI Demo</div>
+
+  <div class="scenario-nav">
+    <button class="scenario-btn active" onclick="showScenario(1)">场景 1: 代理增强配置</button>
+    <button class="scenario-btn" onclick="showScenario(2)">场景 2: 日志详情 - 生成规则</button>
+    <button class="scenario-btn" onclick="showScenario(3)">场景 3: 未配置提示</button>
+    <button class="scenario-btn" onclick="showScenario(4)">场景 4: 规则预览编辑</button>
+  </div>
+
+  <!-- ==================== 场景 1: 代理增强配置 ==================== -->
+  <div class="scenario active" id="s1">
+    <div class="card">
+      <div class="card-title">代理增强设置</div>
+
+      <div class="card" style="margin-bottom: 16px; background: rgba(255,255,255,0.02);">
+        <div class="card-title">循环检测</div>
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <span class="section-label" style="margin:0">启用循环检测</span>
+          <div class="toggle active" onclick="this.classList.toggle('active')"></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom: 16px; background: rgba(255,255,255,0.02);">
+        <div class="card-title">工具调用限制</div>
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <span class="section-label" style="margin:0">启用工具调用轮次限制</span>
+          <div class="toggle" onclick="this.classList.toggle('active')"></div>
+        </div>
+      </div>
+
+      <!-- 新增的 AI 配置区块 -->
+      <div class="card" style="background: rgba(59,130,246,0.04); border-color: rgba(59,130,246,0.2);">
+        <div class="card-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+          AI 重试规则生成
+        </div>
+        <div class="card-desc">配置用于自动分析请求响应并生成重试规则的 AI 模型。模型通过已配置的 Provider 直接调用。</div>
+
+        <div class="form-row">
+          <label class="section-label">Provider / Model</label>
+          <div class="cascade-group">
+            <select id="aiProvider">
+              <option value="">选择 Provider...</option>
+              <option value="openai">OpenAI</option>
+              <option value="deepseek" selected>DeepSeek</option>
+              <option value="zhipu">智谱</option>
+            </select>
+            <select id="aiModel">
+              <option value="">选择 Model...</option>
+              <option value="deepseek-chat">deepseek-chat</option>
+              <option value="deepseek-reasoner">deepseek-reasoner</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="btn-group">
+        <button class="btn btn-outline">重置</button>
+        <button class="btn btn-primary" onclick="showToast('配置已保存', 'success')">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 场景 2: 日志详情 - 生成规则 ==================== -->
+  <div class="scenario" id="s2">
+    <div class="dialog-overlay" style="position: relative; background: var(--bg);">
+      <div class="dialog dialog-lg" style="max-width: 100%;">
+        <div class="dialog-header">
+          <div class="dialog-title">请求详情</div>
+          <button class="dialog-close">&times;</button>
+        </div>
+        <div class="dialog-body">
+          <div class="log-detail">
+            <!-- Left: metadata -->
+            <div class="log-meta">
+              <div class="log-meta-row">
+                <span class="log-meta-label">状态</span>
+                <span class="badge badge-error">503</span>
+              </div>
+              <div class="log-meta-row">
+                <span class="log-meta-label">Provider</span>
+                <span class="log-meta-value">deepseek-main</span>
+              </div>
+              <div class="log-meta-row">
+                <span class="log-meta-label">Model</span>
+                <span class="log-meta-value">deepseek-chat</span>
+              </div>
+              <div class="log-meta-row">
+                <span class="log-meta-label">延迟</span>
+                <span class="log-meta-value">32ms</span>
+              </div>
+              <div class="log-meta-row">
+                <span class="log-meta-label">类型</span>
+                <span class="log-meta-value">openai</span>
+              </div>
+              <div class="log-meta-row">
+                <span class="log-meta-label">流式</span>
+                <span class="log-meta-value">否</span>
+              </div>
+              <div class="log-meta-row">
+                <span class="log-meta-label">时间</span>
+                <span class="log-meta-value" style="font-size:11px">2026-05-20<br>14:32:18</span>
+              </div>
+
+              <hr class="divider">
+
+              <!-- 生成规则按钮 -->
+              <button class="btn btn-primary" style="width: 100%; justify-content: center;" onclick="showScenario(4)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+                生成重试规则
+              </button>
+            </div>
+
+            <!-- Right: response -->
+            <div>
+              <div class="tabs">
+                <div class="tab active">响应</div>
+                <div class="tab">请求</div>
+              </div>
+              <div class="response-viewer">{
+  "error": {
+    "message": "The server is temporarily overloaded. Please retry after a brief wait.",
+    "type": "server_error",
+    "code": "overloaded"
+  }
+}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 场景 3: 未配置提示 ==================== -->
+  <div class="scenario" id="s3">
+    <div class="dialog-overlay" style="position: relative; background: var(--bg);">
+      <div class="dialog dialog-sm" style="max-width: 420px;">
+        <div class="dialog-header">
+          <div class="dialog-title">需要配置 AI 模型</div>
+          <button class="dialog-close" onclick="showScenario(2)">&times;</button>
+        </div>
+        <div class="dialog-body">
+          <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 16px;">
+            使用 AI 生成重试规则前，需要先在代理增强设置中配置 AI 模型。
+          </p>
+          <div style="background: rgba(59,130,246,0.08); border-radius: 6px; padding: 12px; font-size: 13px; color: var(--text-muted);">
+            配置路径：代理增强 → AI 重试规则生成 → 选择 Provider / Model
+          </div>
+        </div>
+        <div class="dialog-footer">
+          <button class="btn btn-outline" onclick="showScenario(2)">取消</button>
+          <button class="btn btn-primary" onclick="showToast('已在新标签页打开配置页面', 'info')">
+            前往配置
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 场景 4: 规则预览编辑 Dialog ==================== -->
+  <div class="scenario" id="s4">
+    <div class="dialog-overlay" style="position: relative; background: var(--bg);">
+      <div class="dialog dialog-sm" style="max-width: 520px;">
+        <div class="dialog-header">
+          <div class="dialog-title">
+            AI 生成的重试规则
+            <span class="badge badge-blue" style="margin-left: 8px; font-size: 10px;">AI 生成</span>
+          </div>
+          <button class="dialog-close" onclick="showScenario(2)">&times;</button>
+        </div>
+        <div class="dialog-body">
+          <!-- AI 分析摘要 -->
+          <div style="background: rgba(34,197,94,0.06); border: 1px solid rgba(34,197,94,0.15); border-radius: 6px; padding: 12px; margin-bottom: 20px; font-size: 13px; color: var(--text-muted);">
+            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px; color: var(--success); font-weight: 500;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              AI 分析完成
+            </div>
+            检测到 <span class="mono">503 server_error (overloaded)</span> — 上游服务过载错误，建议使用指数退避重试。
+          </div>
+
+          <div class="form-row">
+            <label class="section-label">规则名称</label>
+            <input type="text" value="DeepSeek 503 过载重试">
+          </div>
+
+          <div class="form-grid">
+            <div class="form-row">
+              <label class="section-label">状态码</label>
+              <input type="number" value="503">
+            </div>
+            <div class="form-row">
+              <label class="section-label">重试策略</label>
+              <select>
+                <option>fixed</option>
+                <option selected>exponential</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <label class="section-label">Body 正则匹配</label>
+            <textarea style="font-size: 13px;">overloaded|server_error</textarea>
+            <div style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">匹配响应体中的错误标识文本</div>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-row">
+              <label class="section-label">初始延迟 (ms)</label>
+              <input type="number" value="2000">
+            </div>
+            <div class="form-row">
+              <label class="section-label">最大重试次数</label>
+              <input type="number" value="5">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <label class="section-label">最大延迟 (ms)</label>
+            <input type="number" value="60000">
+          </div>
+
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <span class="section-label" style="margin:0">启用规则</span>
+            <div class="toggle active" onclick="this.classList.toggle('active')"></div>
+          </div>
+        </div>
+        <div class="dialog-footer">
+          <button class="btn btn-outline" onclick="showScenario(2)">取消</button>
+          <button class="btn btn-primary" onclick="showToast('重试规则已保存', 'success'); setTimeout(() => showScenario(2), 1200)">保存规则</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+function showScenario(n) {
+  document.querySelectorAll('.scenario').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.scenario-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById('s' + n).classList.add('active');
+  document.querySelectorAll('.scenario-btn')[n - 1].classList.add('active');
+}
+
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  const colors = { success: 'var(--success)', error: 'var(--danger)', info: 'var(--primary)' };
+  const icons = {
+    success: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+    error: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
+    info: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>'
+  };
+  t.innerHTML = `<span style="color:${colors[type]}">${icons[type]}</span> ${msg}`;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+</script>
+</body>
+</html>

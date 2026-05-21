@@ -50,7 +50,8 @@
     "loadFailed": "加载数据失败",
     "saveFailed": "保存规则失败",
     "deleteFailed": "删除规则失败",
-    "addedCount": "已添加 {count} 条规则"
+    "addedCount": "已添加 {count} 条规则",
+    "saveCompleted": "规则已保存"
   },
   "validation": {
     "nameRequired": "请输入名称",

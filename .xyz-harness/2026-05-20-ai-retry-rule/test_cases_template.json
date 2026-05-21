@@ -1,0 +1,310 @@
+{
+  "test_cases": [
+    {
+      "id": "TC-1-01",
+      "type": "api",
+      "title": "POST /admin/api/retry-rules/ai-generate returns 400 when config not set",
+      "description": "Verify that the endpoint returns 400 with descriptive error when ai_retry_config is not configured",
+      "steps": [
+        "Ensure ai_retry_config is null in settings",
+        "POST /admin/api/retry-rules/ai-generate with { log_id: 'any' }",
+        "Verify 400 response with { success: false, error: '...' }"
+      ]
+    },
+    {
+      "id": "TC-1-02",
+      "type": "api",
+      "title": "POST /admin/api/retry-rules/ai-generate returns 404 when log not found",
+      "description": "Verify that the endpoint returns 404 when the specified log_id does not exist",
+      "steps": [
+        "Set ai_retry_config in settings",
+        "POST /admin/api/retry-rules/ai-generate with { log_id: 'nonexistent-id' }",
+        "Verify 404 response"
+      ]
+    },
+    {
+      "id": "TC-1-03",
+      "type": "api",
+      "title": "POST /admin/api/retry-rules/ai-generate rejects 2xx response without error features",
+      "description": "Verify that the pre-check rejects successful responses without error indicators",
+      "steps": [
+        "Set ai_retry_config, insert a log with status_code=200, no error_message, normal response body",
+        "POST /admin/api/retry-rules/ai-generate with the log_id",
+        "Verify response { success: false, error: '该请求响应正常，无需生成重试规则' }"
+      ]
+    },
+    {
+      "id": "TC-1-04",
+      "type": "api",
+      "title": "POST /admin/api/retry-rules/ai-generate generates rule from 503 error response",
+      "description": "Verify successful rule generation from an overloaded 503 response",
+      "steps": [
+        "Set ai_retry_config with a working provider, insert a 503 error log",
+        "Mock LLM to return valid rule JSON",
+        "POST /admin/api/retry-rules/ai-generate with the log_id",
+        "Verify response { success: true, rule: {...}, summary: '...' }"
+      ]
+    },
+    {
+      "id": "TC-1-05",
+      "type": "api",
+      "title": "POST /admin/api/retry-rules/ai-generate handles AI exit (no rule)",
+      "description": "Verify that AI's error response (no rule generated) is properly forwarded",
+      "steps": [
+        "Mock LLM to return { error: '无法从此响应中提取重试规则：...' }",
+        "POST /admin/api/retry-rules/ai-generate",
+        "Verify response { success: false, error: '无法从...' }"
+      ]
+    },
+    {
+      "id": "TC-1-06",
+      "type": "api",
+      "title": "POST /admin/api/retry-rules/ai-generate validates AI response fields",
+      "description": "Verify that missing or invalid fields in AI response are caught",
+      "steps": [
+        "Mock LLM to return JSON missing 'summary' field",
+        "POST /admin/api/retry-rules/ai-generate",
+        "Verify response contains validation error"
+      ]
+    },
+    {
+      "id": "TC-1-07",
+      "type": "api",
+      "title": "POST /admin/api/retry-rules/ai-generate validates body_pattern regex",
+      "description": "Verify that invalid regex in AI response body_pattern is rejected",
+      "steps": [
+        "Mock LLM to return rule with body_pattern '[invalid'",
+        "POST /admin/api/retry-rules/ai-generate",
+        "Verify response contains regex validation error"
+      ]
+    },
+    {
+      "id": "TC-1-08",
+      "type": "api",
+      "title": "POST /admin/api/retry-rules/ai-generate uses stream_text_content fallback",
+      "description": "Verify that when upstream_response is null, stream_text_content is used for analysis",
+      "steps": [
+        "Insert a streaming log with upstream_response=null, stream_text_content='error text'",
+        "POST /admin/api/retry-rules/ai-generate",
+        "Verify successful rule generation"
+      ]
+    },
+    {
+      "id": "TC-1-09",
+      "type": "api",
+      "title": "POST /admin/api/retry-rules/ai-generate includes existing rules in prompt",
+      "description": "Verify that the system prompt contains existing active retry rules",
+      "steps": [
+        "Create existing retry rules in DB",
+        "Capture LLM request body",
+        "Verify system message contains existing rule names and patterns"
+      ]
+    },
+    {
+      "id": "TC-1-10",
+      "type": "api",
+      "title": "POST /admin/api/retry-rules/ai-generate returns error when provider not found",
+      "description": "Verify error when the configured provider_id does not exist",
+      "steps": [
+        "Set ai_retry_config with nonexistent provider_id",
+        "POST /admin/api/retry-rules/ai-generate",
+        "Verify error response about provider not found"
+      ]
+    },
+    {
+      "id": "TC-1-11",
+      "type": "api",
+      "title": "POST /admin/api/retry-rules/ai-generate truncates response over 4000 chars",
+      "description": "Verify that response text is truncated at 4000 characters before sending to AI",
+      "steps": [
+        "Insert a log with upstream_response longer than 4000 chars",
+        "Capture LLM request",
+        "Verify user prompt response body is at most 4000 chars"
+      ]
+    },
+    {
+      "id": "TC-2-01",
+      "type": "api",
+      "title": "GET /admin/api/proxy-enhancement includes ai_retry_config",
+      "description": "Verify that the config endpoint returns ai_retry_config field",
+      "steps": [
+        "Set ai_retry_config in settings",
+        "GET /admin/api/proxy-enhancement",
+        "Verify response contains ai_retry_config with provider_id and model"
+      ]
+    },
+    {
+      "id": "TC-2-02",
+      "type": "api",
+      "title": "PUT /admin/api/proxy-enhancement saves ai_retry_config",
+      "description": "Verify that ai_retry_config can be saved through the proxy-enhancement endpoint",
+      "steps": [
+        "PUT /admin/api/proxy-enhancement with ai_retry_config: { provider_id: 'x', model: 'y' }",
+        "GET /admin/api/proxy-enhancement",
+        "Verify ai_retry_config is persisted"
+      ]
+    },
+    {
+      "id": "TC-2-03",
+      "type": "api",
+      "title": "PUT /admin/api/proxy-enhancement clears ai_retry_config with null",
+      "description": "Verify that setting ai_retry_config to null clears the config",
+      "steps": [
+        "PUT with ai_retry_config: null",
+        "GET /admin/api/proxy-enhancement",
+        "Verify ai_retry_config is null"
+      ]
+    },
+    {
+      "id": "TC-3-01",
+      "type": "ui",
+      "title": "ProxyEnhancement page shows AI config card with CascadingModelSelect",
+      "description": "Verify the AI retry rule config section appears on the proxy enhancement page",
+      "steps": [
+        "Navigate to /admin/proxy-enhancement",
+        "Verify 'AI 重试规则生成' card is visible",
+        "Verify CascadingModelSelect dropdown is present",
+        "Select a provider and model",
+        "Click save",
+        "Reload page and verify selection is preserved"
+      ]
+    },
+    {
+      "id": "TC-3-02",
+      "type": "ui",
+      "title": "UnifiedRequestDialog shows generate button in left sidebar",
+      "description": "Verify the sparkle button appears in the log detail dialog",
+      "steps": [
+        "Navigate to /admin/logs",
+        "Open a log detail dialog",
+        "Verify '生成重试规则' button with sparkle icon is visible in left panel"
+      ]
+    },
+    {
+      "id": "TC-3-03",
+      "type": "ui",
+      "title": "Generate button shows loading state during AI call",
+      "description": "Verify the button enters loading state while AI is processing",
+      "steps": [
+        "Click '生成重试规则' button",
+        "Verify button shows spinner and '分析中...' text",
+        "Verify button is disabled during loading"
+      ]
+    },
+    {
+      "id": "TC-3-04",
+      "type": "ui",
+      "title": "Config prompt dialog opens when AI not configured",
+      "description": "Verify the configuration prompt dialog with 'go to config' button",
+      "steps": [
+        "Ensure ai_retry_config is not set",
+        "Click '生成重试规则'",
+        "Verify dialog '需要配置 AI 模型' appears",
+        "Click '前往配置'",
+        "Verify new tab opens /admin/proxy-enhancement",
+        "Verify log detail dialog remains open"
+      ]
+    },
+    {
+      "id": "TC-3-05",
+      "type": "ui",
+      "title": "AI rule preview dialog shows all fields pre-filled",
+      "description": "Verify the preview dialog displays AI-generated rule with editable fields",
+      "steps": [
+        "Configure AI, trigger generation on an error log",
+        "Verify preview dialog opens",
+        "Verify AI summary is displayed at top (green border)",
+        "Verify all fields (name, status_code, body_pattern, strategy, delays, retries, active toggle) are pre-filled",
+        "Verify all fields are editable"
+      ]
+    },
+    {
+      "id": "TC-3-06",
+      "type": "ui",
+      "title": "Save generated rule to retry rules list",
+      "description": "Verify the rule is saved and appears in the retry rules page",
+      "steps": [
+        "Generate and preview a rule",
+        "Click '保存规则'",
+        "Verify success toast",
+        "Navigate to /admin/retry-rules",
+        "Verify the new rule is in the list"
+      ]
+    },
+    {
+      "id": "TC-3-07",
+      "type": "ui",
+      "title": "Edit rule before saving",
+      "description": "Verify that modifying fields in the preview dialog takes effect",
+      "steps": [
+        "Generate a rule",
+        "Change name and retry_strategy in the preview dialog",
+        "Save",
+        "Verify the saved rule in the list has the modified values"
+      ]
+    },
+    {
+      "id": "TC-4-01",
+      "type": "integration",
+      "title": "End-to-end: config → generate → preview → save",
+      "description": "Full flow from configuring AI to generating and saving a retry rule",
+      "steps": [
+        "Navigate to proxy enhancement, configure AI provider/model",
+        "Save and verify",
+        "Navigate to logs, open an error log",
+        "Click generate button, wait for AI response",
+        "Preview dialog shows AI suggestion with summary",
+        "Save the rule",
+        "Verify rule in retry rules list",
+        "Verify rule is active and matches the error pattern"
+      ]
+    },
+    {
+      "id": "TC-4-02",
+      "type": "integration",
+      "title": "RetryRuleMatcher cache refreshes after saving AI-generated rule",
+      "description": "Verify that the in-memory retry rule cache is updated when a rule is saved from AI preview",
+      "steps": [
+        "Generate and save a rule for status 503 with pattern 'overloaded'",
+        "Make a proxy request that returns 503 with 'overloaded' in body",
+        "Verify the retry logic triggers for this request"
+      ]
+    },
+    {
+      "id": "TC-5-01",
+      "type": "manual",
+      "title": "Visual review: AI config card on ProxyEnhancement page",
+      "description": "Manual visual check that the config card matches the demo design",
+      "steps": [
+        "Open proxy enhancement page",
+        "Verify card has sparkle icon in title",
+        "Verify CascadingModelSelect is properly styled",
+        "Verify card description text is correct"
+      ]
+    },
+    {
+      "id": "TC-5-02",
+      "type": "manual",
+      "title": "Visual review: generate button in log detail dialog",
+      "description": "Manual visual check that the button placement and icon match the demo",
+      "steps": [
+        "Open a log detail dialog",
+        "Verify sparkle button is at bottom of left sidebar",
+        "Verify button text is '生成重试规则'",
+        "Verify button has primary (blue) styling"
+      ]
+    },
+    {
+      "id": "TC-5-03",
+      "type": "manual",
+      "title": "Visual review: rule preview dialog",
+      "description": "Manual visual check that the preview dialog matches the demo design",
+      "steps": [
+        "Generate a rule to open the preview dialog",
+        "Verify AI summary area has green border and check icon",
+        "Verify 'AI 生成' badge in title",
+        "Verify form layout matches RetryRules create dialog"
+      ]
+    }
+  ]
+}

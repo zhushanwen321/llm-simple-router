@@ -50,7 +50,8 @@
     "loadFailed": "Failed to load data",
     "saveFailed": "Failed to save rule",
     "deleteFailed": "Failed to delete rule",
-    "addedCount": "Added {count} rules"
+    "addedCount": "Added {count} rules",
+    "saveCompleted": "Rule saved"
   },
   "validation": {
     "nameRequired": "Please enter a name",

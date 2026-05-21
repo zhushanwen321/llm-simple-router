@@ -2,13 +2,15 @@
 <template>
   <div class="p-6">
     <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-semibold text-foreground">{{ t('logs.title') }}</h2>
+      <h2 class="text-lg font-semibold text-foreground">
+        {{ t("logs.title") }}
+      </h2>
       <Button
         variant="outline"
         class="text-destructive border-destructive hover:bg-destructive/10"
         @click="showCleanup = true"
       >
-        {{ t('logs.cleanupLogs') }}
+        {{ t("logs.cleanupLogs") }}
       </Button>
     </div>
 
@@ -34,7 +36,7 @@
           variant="ghost"
           size="sm"
           @click="clearDateRange"
-          >{{ t('logs.clear') }}</Button
+          >{{ t("logs.clear") }}</Button
         >
         <span
           v-if="dateRangeError"
@@ -47,7 +49,7 @@
           <SelectValue :placeholder="t('logs.allProviders')" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">{{ t('logs.allProviders') }}</SelectItem>
+          <SelectItem value="all">{{ t("logs.allProviders") }}</SelectItem>
           <SelectItem v-for="p in providers" :key="p.id" :value="p.id">{{
             p.name
           }}</SelectItem>
@@ -58,7 +60,7 @@
           <SelectValue :placeholder="t('logs.allModels')" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">{{ t('logs.allModels') }}</SelectItem>
+          <SelectItem value="all">{{ t("logs.allModels") }}</SelectItem>
           <SelectItem v-for="m in filteredModelOptions" :key="m" :value="m">{{
             m
           }}</SelectItem>
@@ -69,7 +71,7 @@
           <SelectValue :placeholder="t('logs.allKeys')" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">{{ t('logs.allKeys') }}</SelectItem>
+          <SelectItem value="all">{{ t("logs.allKeys") }}</SelectItem>
           <SelectItem v-for="rk in routerKeys" :key="rk.id" :value="rk.id">{{
             rk.name
           }}</SelectItem>
@@ -80,80 +82,106 @@
           <SelectValue :placeholder="t('logs.allStatus')" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">{{ t('logs.allStatus') }}</SelectItem>
+          <SelectItem value="all">{{ t("logs.allStatus") }}</SelectItem>
           <SelectItem value="200">200</SelectItem>
-          <SelectItem value="non200">{{ t('logs.non200') }}</SelectItem>
+          <SelectItem value="non200">{{ t("logs.non200") }}</SelectItem>
         </SelectContent>
       </Select>
     </div>
 
     <div class="bg-card rounded-lg border overflow-hidden">
-      <Table>
-        <TableHeader>
-          <TableRow class="bg-muted">
-            <TableHead class="w-10"></TableHead>
-            <TableHead class="text-muted-foreground">{{ t('logs.table.id') }}</TableHead>
-            <TableHead class="text-muted-foreground">{{ t('logs.table.time') }}</TableHead>
-            <TableHead class="text-muted-foreground">{{ t('logs.table.type') }}</TableHead>
-            <TableHead class="text-muted-foreground">{{ t('logs.table.model') }}</TableHead>
-            <TableHead class="text-muted-foreground">{{ t('logs.table.actualForward') }}</TableHead>
-            <TableHead class="text-muted-foreground">{{ t('logs.table.statusCode') }}</TableHead>
-            <TableHead class="text-muted-foreground">{{ t('logs.table.latency') }}</TableHead>
-            <TableHead class="text-muted-foreground">{{ t('logs.table.streaming') }}</TableHead>
-            <TableHead class="text-muted-foreground">{{ t('logs.table.retry') }}</TableHead>
-            <TableHead class="text-muted-foreground">{{ t('logs.table.failover') }}</TableHead>
-            <TableHead class="text-muted-foreground">{{ t('logs.table.error') }}</TableHead>
-            <TableHead class="text-muted-foreground">{{ t('logs.table.actions') }}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          <template v-for="log in logs" :key="log.id">
-            <LogTableRow
-              :log="log"
-              :expanded="expandedRows.has(log.id)"
-              :copied-id="copiedId"
-              @toggle-expand="toggleExpand"
-              @open-detail="openLogDetail"
-              @copy="copyLogId"
-            />
+      <TooltipProvider :delay-duration="300">
+        <Table>
+          <TableHeader>
+            <TableRow class="bg-muted">
+              <TableHead class="w-10"></TableHead>
+              <TableHead class="text-muted-foreground">{{
+                t("logs.table.id")
+              }}</TableHead>
+              <TableHead class="text-muted-foreground">{{
+                t("logs.table.time")
+              }}</TableHead>
+              <TableHead class="text-muted-foreground">{{
+                t("logs.table.type")
+              }}</TableHead>
+              <TableHead class="text-muted-foreground">{{
+                t("logs.table.model")
+              }}</TableHead>
+              <TableHead class="text-muted-foreground">{{
+                t("logs.table.actualForward")
+              }}</TableHead>
+              <TableHead class="text-muted-foreground">{{
+                t("logs.table.statusCode")
+              }}</TableHead>
+              <TableHead class="text-muted-foreground">{{
+                t("logs.table.latency")
+              }}</TableHead>
+              <TableHead class="text-muted-foreground">{{
+                t("logs.table.streaming")
+              }}</TableHead>
+              <TableHead class="text-muted-foreground">{{
+                t("logs.table.retry")
+              }}</TableHead>
+              <TableHead class="text-muted-foreground">{{
+                t("logs.table.failover")
+              }}</TableHead>
+              <TableHead class="text-muted-foreground">{{
+                t("logs.table.error")
+              }}</TableHead>
+              <TableHead class="text-muted-foreground">{{
+                t("logs.table.actions")
+              }}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <template v-for="log in logs" :key="log.id">
+              <LogTableRow
+                :log="log"
+                :expanded="expandedRows.has(log.id)"
+                :copied-id="copiedId"
+                @toggle-expand="toggleExpand"
+                @open-detail="openLogDetail"
+                @copy="copyLogId"
+              />
 
-            <template v-if="expandedRows.has(log.id)">
-              <TableRow v-if="childLoading[log.id]">
-                <TableCell
-                  :colspan="TABLE_COL_COUNT"
-                  class="text-center py-2 pl-10"
-                >
-                  <Skeleton class="h-4 w-32 mx-auto" />
-                </TableCell>
-              </TableRow>
-              <template v-else-if="childLogs[log.id]?.length">
-                <LogTableRow
-                  v-for="child in childLogs[log.id]"
-                  :key="child.id"
-                  :log="child"
-                  :is-child="true"
-                  :copied-id="copiedId"
-                  @open-detail="openLogDetail"
-                  @copy="copyLogId"
-                />
+              <template v-if="expandedRows.has(log.id)">
+                <TableRow v-if="childLoading[log.id]">
+                  <TableCell
+                    :colspan="TABLE_COL_COUNT"
+                    class="text-center py-2 pl-10"
+                  >
+                    <Skeleton class="h-4 w-32 mx-auto" />
+                  </TableCell>
+                </TableRow>
+                <template v-else-if="childLogs[log.id]?.length">
+                  <LogTableRow
+                    v-for="child in childLogs[log.id]"
+                    :key="child.id"
+                    :log="child"
+                    :is-child="true"
+                    :copied-id="copiedId"
+                    @open-detail="openLogDetail"
+                    @copy="copyLogId"
+                  />
+                </template>
               </template>
             </template>
-          </template>
 
-          <TableRow v-if="logs.length === 0">
-            <TableCell
-              :colspan="TABLE_COL_COUNT"
-              class="text-center text-muted-foreground py-8"
-              >{{ t('logs.noLogs') }}</TableCell
-            >
-          </TableRow>
-        </TableBody>
-      </Table>
+            <TableRow v-if="logs.length === 0">
+              <TableCell
+                :colspan="TABLE_COL_COUNT"
+                class="text-center text-muted-foreground py-8"
+                >{{ t("logs.noLogs") }}</TableCell
+              >
+            </TableRow>
+          </TableBody>
+        </Table>
+      </TooltipProvider>
     </div>
 
     <div class="flex items-center justify-between mt-4">
       <p class="text-sm text-muted-foreground">
-        {{ t('logs.pagination', { total, page, totalPages }) }}
+        {{ t("logs.pagination", { total, page, totalPages }) }}
       </p>
       <div class="flex items-center gap-1">
         <Button
@@ -161,14 +189,14 @@
           size="sm"
           @click="goToPage(1)"
           :disabled="page <= 1"
-          >{{ t('logs.firstPage') }}</Button
+          >{{ t("logs.firstPage") }}</Button
         >
         <Button
           variant="outline"
           size="sm"
           @click="goToPage(page - 1)"
           :disabled="page <= 1"
-          >{{ t('logs.prevPage') }}</Button
+          >{{ t("logs.prevPage") }}</Button
         >
         <template v-for="item in pageNumbers" :key="item">
           <span v-if="item === '...'" class="px-2 text-sm text-muted-foreground"
@@ -188,14 +216,15 @@
           size="sm"
           @click="goToPage(page + 1)"
           :disabled="page >= totalPages"
-          >{{ t('logs.nextPage') }}</Button
+          >{{ t("logs.nextPage") }}</Button
         >
         <Button
           variant="outline"
           size="sm"
           @click="goToPage(totalPages)"
           :disabled="page >= totalPages"
-          >{{ t('logs.lastPage') }}</Button>
+          >{{ t("logs.lastPage") }}</Button
+        >
         >
       </div>
     </div>
@@ -210,20 +239,26 @@
     <Dialog v-model:open="showCleanup">
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{{ t('logs.cleanup.title') }}</DialogTitle>
+          <DialogTitle>{{ t("logs.cleanup.title") }}</DialogTitle>
         </DialogHeader>
-        <p class="text-sm text-muted-foreground">{{ t('logs.cleanup.description') }}</p>
+        <p class="text-sm text-muted-foreground">
+          {{ t("logs.cleanup.description") }}
+        </p>
         <div class="mb-4">
-          <Label class="block text-sm font-medium text-foreground mb-1"
-            >{{ t('logs.cleanup.keepRecentDays') }}</Label
-          >
+          <Label class="block text-sm font-medium text-foreground mb-1">{{
+            t("logs.cleanup.keepRecentDays")
+          }}</Label>
           <Input v-model.number="cleanupDays" type="number" :min="1" />
         </div>
         <Separator />
         <div class="space-y-3">
-          <div class="text-sm font-medium">{{ t('logs.cleanup.autoCleanup') }}</div>
+          <div class="text-sm font-medium">
+            {{ t("logs.cleanup.autoCleanup") }}
+          </div>
           <div class="flex items-center gap-3">
-            <Label class="whitespace-nowrap">{{ t('logs.cleanup.retentionDays') }}</Label>
+            <Label class="whitespace-nowrap">{{
+              t("logs.cleanup.retentionDays")
+            }}</Label>
             <Input
               type="number"
               v-model.number="retentionDays"
@@ -231,7 +266,9 @@
               :max="90"
               class="w-20"
             />
-            <span class="text-xs text-muted-foreground">{{ t('logs.cleanup.noAutoCleanup') }}</span>
+            <span class="text-xs text-muted-foreground">{{
+              t("logs.cleanup.noAutoCleanup")
+            }}</span>
           </div>
           <div class="flex justify-end">
             <Button
@@ -239,13 +276,17 @@
               @click="saveRetention"
               :disabled="retentionSaving"
             >
-              {{ t('logs.cleanup.saveSettings') }}
+              {{ t("logs.cleanup.saveSettings") }}
             </Button>
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" @click="showCleanup = false">{{ t('common.cancel') }}</Button>
-          <Button variant="destructive" @click="handleCleanup">{{ t('logs.cleanup.confirmCleanup') }}</Button>
+          <Button variant="outline" @click="showCleanup = false">{{
+            t("common.cancel")
+          }}</Button>
+          <Button variant="destructive" @click="handleCleanup">{{
+            t("logs.cleanup.confirmCleanup")
+          }}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -254,15 +295,17 @@
     <AlertDialog v-model:open="showCleanupResult">
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>{{ t('logs.cleanupResult.title') }}</AlertDialogTitle>
-          <AlertDialogDescription
-            >{{ t('logs.cleanupResult.description', { count: cleanupResult }) }}</AlertDialogDescription
-          >
+          <AlertDialogTitle>{{
+            t("logs.cleanupResult.title")
+          }}</AlertDialogTitle>
+          <AlertDialogDescription>{{
+            t("logs.cleanupResult.description", { count: cleanupResult })
+          }}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogAction @click="showCleanupResult = false"
-            >{{ t('logs.cleanupResult.ok') }}</AlertDialogAction
-          >
+          <AlertDialogAction @click="showCleanupResult = false">{{
+            t("logs.cleanupResult.ok")
+          }}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -308,6 +351,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import UnifiedRequestDialog from "@/components/request-detail/UnifiedRequestDialog.vue";
 import LogTableRow from "@/components/logs/LogTableRow.vue";
 import { useLogFilters } from "@/composables/useLogFilters";
