@@ -50,6 +50,7 @@ verdict: pass
 | 直接格式匹配 | direct_format |
 | 映射组基础规则 | group_base_rule |
 | 溢出重定向 | overflow_redirect |
+| failover 重试 | failover_retry |
 
 ### TS6: failover_trigger (AC7)
 

@@ -107,6 +107,7 @@ verdict: pass
 - 直接格式匹配 → DB 中 `mapping_reason = "direct_format"`
 - 映射组基础规则 → DB 中 `mapping_reason = "group_base_rule"`
 - 溢出重定向 → DB 中 `mapping_reason = "overflow_redirect"`
+- failover 重试 → DB 中 `mapping_reason = "failover_retry"`
 
 ### AC7: failover_trigger 写入验证
 - 触发 ProviderSwitchNeeded → DB 中 `failover_trigger = "ProviderSwitchNeeded"`
