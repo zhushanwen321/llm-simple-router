@@ -29,7 +29,6 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          registry-url: 'https://registry.npmjs.org'
 
       # OIDC trusted publishing 要求 npm >= 11.5.1
       - name: Upgrade npm for OIDC support
@@ -72,9 +71,10 @@ jobs:
           cd ../frontend && npm run build
 
       # ── 步骤 5: Publish llm-simple-router (OIDC) ───
-      # setup-node 设置了 NODE_AUTH_TOKEN 环境变量，必须 unset 才能触发 OIDC
+      # 不用 setup-node 的 registry-url（它会设置 NODE_AUTH_TOKEN 阻断 OIDC）
+      # npm >= 11.5.1 在检测到 GitHub Actions OIDC 环境时自动交换 token
       - name: Publish llm-simple-router to npm
-        run: unset NODE_AUTH_TOKEN && cd router && npm publish
+        run: cd router && npm publish --registry https://registry.npmjs.org
 
       # ── 步骤 6: Docker 镜像 ─────────────────────────
       - uses: docker/login-action@v4
