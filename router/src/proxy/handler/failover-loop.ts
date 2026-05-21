@@ -85,6 +85,7 @@ interface RejectParams {
   pipelineSnapshot?: string;
   matcher?: RetryRuleMatcher;
   logFileWriter?: import("../../storage/log-file-writer.js").LogFileWriter | null;
+  mappingReason?: string | null;
 }
 
 // --- Plugin 调整 body 和 headers ---
@@ -124,6 +125,7 @@ function rejectAndReply(
     isFailover: params.isFailover, originalRequestId: params.originalRequestId,
     sessionId: params.sessionId, pipelineSnapshot: params.pipelineSnapshot,
     matcher: params.matcher, logFileWriter: params.logFileWriter,
+    mapping_reason: params.mappingReason ?? null,
   });
   try { afterLog?.(); } catch { /* tool error log 写入失败不影响响应 */ } // eslint-disable-line taste/no-silent-catch
   return reply.code(error.statusCode).send(error.body);
@@ -266,6 +268,7 @@ export async function executeFailoverLoop(
 
   // === while(true)：纯执行循环 ===
   let failoverIteration = 0;
+  let lastFailoverTrigger: string | null = null;
 
   while (true) {
   // 请求被 kill 后 reply 已销毁，直接退出避免浪费 failover 迭代
@@ -305,6 +308,15 @@ export async function executeFailoverLoop(
     const resolved = filtered[0];
     const isFailover = cachedTargets.length > 1;
 
+    // effectiveMappingReason: 首次迭代用 resolveResult.reason，溢出时覆盖
+    let effectiveMappingReason: MappingReason = isFailoverIteration ? "failover_retry" : resolveResult.mappingReason;
+    // 只有当前 target 是 overflow 扩展产生的才标记
+    const resolvedIdx = cachedTargets.findIndex(t => t.provider_id === resolved.provider_id && t.backend_model === resolved.backend_model);
+    if (overflowIndices.has(resolvedIdx)) effectiveMappingReason = "overflow_redirect";
+
+    // 将 mappingReason 注入 rCtx，使后续 rejectAndReply 能写入诊断字段
+    rCtx.mappingReason = effectiveMappingReason;
+
     const provider = getProviderById(db, resolved.provider_id);
     if (!provider || !provider.is_active) {
       return rejectAndReply(reply, rCtx, errors.providerUnavailable(),
@@ -321,12 +333,6 @@ export async function executeFailoverLoop(
     const effectiveApiType = resolvedPath.effectiveApiType;
     const effectiveUpstreamPath = resolvedPath.effectiveUpstreamPath;
     const needsTransform = resolvedPath.needsTransform;
-
-    // effectiveMappingReason: 首次迭代用 resolveResult.reason，溢出时覆盖
-    let effectiveMappingReason: MappingReason = isFailoverIteration ? "failover_retry" : resolveResult.mappingReason;
-    // 只有当前 target 是 overflow 扩展产生的才标记
-    const resolvedIdx = cachedTargets.findIndex(t => t.provider_id === resolved.provider_id && t.backend_model === resolved.backend_model);
-    if (overflowIndices.has(resolvedIdx)) effectiveMappingReason = "overflow_redirect";
 
     // --- routing ---
     currentBody = { ...currentBody, model: resolved.backend_model };
@@ -433,6 +439,12 @@ export async function executeFailoverLoop(
           failover: { isFailoverIteration, rootLogId: rootLogId! },
           pipelineSnapshot,
           matcher, logFileWriter,
+          resilienceAction: resilienceResult.finalDecision?.action,
+          resilienceReason: resilienceResult.finalDecision?.action === "abort"
+            ? (resilienceResult.finalDecision as { action: "abort"; reason: string }).reason
+            : null,
+          mappingReason: effectiveMappingReason,
+          failoverTrigger: lastFailoverTrigger,
         },
         resilienceResult.attempts, resilienceResult.result, startTime,
       );
@@ -474,6 +486,7 @@ export async function executeFailoverLoop(
         const failed = tr.kind === "throw"
           || ("statusCode" in tr && tr.statusCode >= HTTP_ERROR_THRESHOLD);
         if (failed) {
+          lastFailoverTrigger = tr.kind === "throw" ? "throw" : `status_${("statusCode" in tr ? tr.statusCode : 0)}`;
           excludeTargets.push(resolved);
           continue;
         }
@@ -515,11 +528,16 @@ export async function executeFailoverLoop(
               failover: { isFailoverIteration, rootLogId: rootLogId! },
               pipelineSnapshot,
               matcher, logFileWriter,
+              resilienceAction: "failover",
+              resilienceReason: "provider_switch_needed",
+              mappingReason: effectiveMappingReason,
+              failoverTrigger: e.constructor.name,
             },
             e.attempts, fakeResult, startTime,
           );
         }
         flushCurrentErrors();
+        lastFailoverTrigger = e.constructor.name;
         excludeTargets.push(resolved);
         continue;
       }
@@ -544,7 +562,7 @@ export async function executeFailoverLoop(
       const errMsg = e instanceof Error ? e.message : JSON.stringify(e);
       request.log.debug({ logId, error: errMsg, action: "upstream_error" });
       insertRequestLog(db, {
-        id: randomUUID(), api_type: clientApiType,
+        id: logId, api_type: clientApiType,
         model: clientModel, provider_id: provider.id,
         status_code: UPSTREAM_ERROR_STATUS, latency_ms: Date.now() - startTime, is_stream: isStream ? 1 : 0,
         error_message: errMsg || "Upstream connection failed", created_at: new Date().toISOString(),
@@ -553,6 +571,8 @@ export async function executeFailoverLoop(
         router_key_id: routerKeyId, original_model: null,
         session_id: ctx.metadata.get("session_id") as string | undefined,
         pipeline_snapshot: pipelineSnapshot,
+        transport_kind: "throw",
+        mapping_reason: rCtx.mappingReason ?? null,
       }, (matcher || logFileWriter) ? {
         matcher, logFileWriter, responseBody: null,
       } : undefined);

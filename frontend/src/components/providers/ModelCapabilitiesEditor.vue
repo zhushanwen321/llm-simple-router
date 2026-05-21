@@ -229,7 +229,7 @@ function isOfficialOpenai(url: string): boolean {
         }}
       </Button>
     </div>
-    <div class="grid grid-cols-3 gap-2 mb-3">
+    <div class="grid grid-cols-2 gap-2 mb-3">
       <div v-for="(m, i) in props.models" :key="i">
         <ModelCard
           :model="{
