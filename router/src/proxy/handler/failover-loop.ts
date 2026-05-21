@@ -433,6 +433,10 @@ export async function executeFailoverLoop(
           failover: { isFailoverIteration, rootLogId: rootLogId! },
           pipelineSnapshot,
           matcher, logFileWriter,
+          resilienceAction: resilienceResult.finalDecision?.action,
+          resilienceReason: "reason" in (resilienceResult.finalDecision ?? {}) ? (resilienceResult.finalDecision as { action: string; reason: string }).reason : null,
+          mappingReason: effectiveMappingReason,
+          failoverTrigger: null,
         },
         resilienceResult.attempts, resilienceResult.result, startTime,
       );
@@ -515,6 +519,10 @@ export async function executeFailoverLoop(
               failover: { isFailoverIteration, rootLogId: rootLogId! },
               pipelineSnapshot,
               matcher, logFileWriter,
+              resilienceAction: "failover",
+              resilienceReason: "provider_switch_needed",
+              mappingReason: effectiveMappingReason,
+              failoverTrigger: e.constructor.name,
             },
             e.attempts, fakeResult, startTime,
           );

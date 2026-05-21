@@ -46,6 +46,8 @@ export interface ResilienceResult {
   result: TransportResult;
   attempts: ResilienceAttempt[];
   excludedTargets: Target[];
+  /** 最终 resilience 决策，用于诊断日志 */
+  finalDecision?: ResilienceDecision;
 }
 
 export type ResilienceDecision =
@@ -214,6 +216,7 @@ export class ResilienceLayer {
           result: lastResult ?? { kind: "error" as const, statusCode: 502, body: "Iteration cap exceeded", headers: {}, sentHeaders: {}, sentBody: "" },
           attempts: allAttempts,
           excludedTargets,
+          finalDecision: { action: "abort", reason: "iteration_cap_exceeded" },
         };
       }
 
@@ -227,6 +230,7 @@ export class ResilienceLayer {
           result: lastResult ?? { kind: "error" as const, statusCode: 502, body: "All targets exhausted", headers: {}, sentHeaders: {}, sentBody: "" },
           attempts: allAttempts,
           excludedTargets,
+          finalDecision: { action: "abort", reason: "all_targets_exhausted" },
         };
       }
 
@@ -251,6 +255,8 @@ export class ResilienceLayer {
           statusCode: null, error: (throwErr instanceof Error ? throwErr.message : JSON.stringify(throwErr)) as string,
           latencyMs: Date.now() - start, responseBody: null,
           responseHeaders: null, resultKind: transportResult.kind,
+          error_code: (throwErr instanceof Error && 'code' in throwErr) ? (throwErr as NodeJS.ErrnoException).code ?? null : null,
+          headers_sent: transportResult.headersSent ?? null,
         });
       } else {
         allAttempts.push({
@@ -271,7 +277,7 @@ export class ResilienceLayer {
 
       switch (decision.action) {
         case "done":
-          return { result: transportResult, attempts: allAttempts, excludedTargets };
+          return { result: transportResult, attempts: allAttempts, excludedTargets, finalDecision: decision };
         case "retry":
           globalAttemptIndex++;
           await sleep(decision.delayMs);
@@ -289,7 +295,7 @@ export class ResilienceLayer {
           }
           continue;
         case "abort":
-          return { result: transportResult, attempts: allAttempts, excludedTargets };
+          return { result: transportResult, attempts: allAttempts, excludedTargets, finalDecision: decision };
       }
     }
   }

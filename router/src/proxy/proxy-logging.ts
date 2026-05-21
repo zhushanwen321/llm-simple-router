@@ -77,6 +77,10 @@ export function logResilienceResult(
     failover?: FailoverContext;
     matcher?: { test: (statusCode: number, body: string) => boolean } | null;
     logFileWriter?: LogFileWriter | null;
+    resilienceAction?: string | null;
+    resilienceReason?: string | null;
+    mappingReason?: string | null;
+    failoverTrigger?: string | null;
   },
   attempts: ResilienceAttempt[],
   result: TransportResult,
@@ -91,6 +95,18 @@ export function logResilienceResult(
     const attemptLogId = isOriginal ? params.logId : randomUUID();
     const isFailoverLog = isOriginal && isFailoverIteration;
     const parentId = isOriginal ? (isFailoverIteration ? rootLogId : null) : params.logId;
+
+    // 诊断字段：每次 attempt 通用的计算
+    const diagnosticFields = {
+      transport_kind: attempt.resultKind,
+      abort_reason: attempt.resultKind === "stream_abort" && result.kind === "stream_abort" ? result.abortReason ?? null : null,
+      error_code: attempt.error_code ?? null,
+      headers_sent: attempt.headers_sent != null ? (attempt.headers_sent ? 1 : 0) : null,
+      resilience_action: params.resilienceAction ?? null,
+      resilience_reason: params.resilienceReason ?? null,
+      mapping_reason: params.mappingReason ?? null,
+      failover_trigger: params.failoverTrigger ?? null,
+    };
 
     // 构建 writeContext（所有路径共享，error/stream_error 路径 status >= 400 所以 preserveDetail=true，但文件写入仍需执行）
     const attemptWriteContext: LogWriteContext | undefined = (params.matcher || params.logFileWriter) ? {
@@ -116,6 +132,7 @@ export function logResilienceResult(
         router_key_id: params.routerKeyId, original_model: params.originalModel,
         session_id: params.sessionId,
         pipeline_snapshot: params.pipelineSnapshot ?? null,
+        ...diagnosticFields,
       }, attemptWriteContext);
     } else if (attempt.error) {
       insertRequestLog(db, {
@@ -133,6 +150,7 @@ export function logResilienceResult(
         router_key_id: params.routerKeyId, original_model: params.originalModel,
         session_id: params.sessionId,
         pipeline_snapshot: params.pipelineSnapshot ?? null,
+        ...diagnosticFields,
       }, attemptWriteContext);
     } else if (attempt.statusCode !== UPSTREAM_SUCCESS) {
       insertRequestLog(db, {
@@ -148,6 +166,7 @@ export function logResilienceResult(
         router_key_id: params.routerKeyId, original_model: params.originalModel,
         session_id: params.sessionId,
         pipeline_snapshot: params.pipelineSnapshot ?? null,
+        ...diagnosticFields,
       }, attemptWriteContext);
     } else {
       const upHdrs = (result.kind === "stream_success" || result.kind === "stream_abort")
@@ -168,6 +187,7 @@ export function logResilienceResult(
         pipelineSnapshot: params.pipelineSnapshot,
         matcher: params.matcher,
         logFileWriter: params.logFileWriter,
+        ...diagnosticFields,
       });
       lastSuccessLogId = attemptLogId;
     }
