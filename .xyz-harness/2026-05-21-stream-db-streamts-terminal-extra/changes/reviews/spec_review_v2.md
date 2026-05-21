@@ -1,15 +1,15 @@
 ---
+verdict: pass
+must_fix: 0
 review:
   type: spec_review
   round: 2
   timestamp: "2026-05-21T06:29:48"
   target: ".xyz-harness/2026-05-21-stream-db-streamts-terminal-extra/spec.md"
-  verdict: pass
   summary: "Spec 评审完成，第2轮通过，0条 MUST FIX，上一轮 MUST FIX（数据消费者清单）已修复"
 
 statistics:
   total_issues: 10
-  must_fix: 0
   must_fix_resolved: 1
   low: 2
   info: 2
