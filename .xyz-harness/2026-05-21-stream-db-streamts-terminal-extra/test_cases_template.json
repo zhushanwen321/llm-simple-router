@@ -186,6 +186,15 @@
       ]
     },
     {
+      "id": "TC-6-03",
+      "type": "api",
+      "title": "mapping_reason=failover_retry",
+      "steps": [
+        "Trigger failover to secondary provider",
+        "Assert mapping_reason = 'failover_retry' on retry log"
+      ]
+    },
+    {
       "id": "TC-7-01",
       "type": "api",
       "title": "failover_trigger=ProviderSwitchNeeded",
