@@ -704,6 +704,43 @@ output = 10
 - `structuredClone()` 替代 `JSON.parse(JSON.stringify())` 做深拷贝
 - headers 写入日志前必须脱敏（authorization、cookie、x-api-key）
 
+## 构建与运行时资源管理规范
+
+### 禁止运行时 readFileSync 加载可内联资源（P0）
+
+**规则**：TypeScript 代码中禁止通过 `readFileSync`/`readFile` 在运行时加载可以内联的文本资源（prompt 模板、配置模板、SQL 片段等）。这些资源应作为 TypeScript 模板字符串常量内联到源码中。
+
+**允许的运行时文件读取**：
+| 场景 | 文件类型 | 原因 |
+|------|---------|------|
+| 数据库迁移 | `.sql` | 无法内联为 TS，且需要在 `dist/` 中保持文件结构 |
+| 配置文件 | `.json` | 外部可编辑，`postbuild` + `prepublishOnly` 确保复制 |
+| 日志文件 | 运行时生成 | 动态文件，不存在于构建产物中 |
+| package.json | `.json` | 仅在版本检测时读取，从安装根目录解析 |
+
+**禁止的场景**：
+- ✗ `readFileSync(join(__dirname, "prompt.md"))` — 应内联为 TS 模板字符串
+- ✗ `readFileSync(join(__dirname, "template.txt"))` — 应内联为 TS 常量
+- ✓ `readFileSync(join(MIGRATIONS_DIR, file))` — SQL 迁移文件，无法内联
+- ✓ `JSON.parse(readFileSync(configPath))` — 外部 JSON 配置，需运行时编辑
+
+### postbuild 维护清单
+
+当新增运行时需要的外部文件时，必须同时更新以下三处：
+
+1. **`package.json` `postbuild` 脚本**：本地 `npm run build` 时复制到 `dist/`
+2. **`scripts/prepublish.mjs`**：`npm publish` 前确保 `dist/` 中存在
+3. **`scripts/build.mjs`**：`npm run build:full` 时复制
+
+三处缺少任何一处都可能导致发布包缺少文件。
+
+### package.json 脚本格式规范
+
+`package.json` 中的 `scripts` 值必须是合法 JSON 字符串。注意事项：
+- 禁止在 JSON 字符串值中包含字面换行符（使用 `\n` 转义）
+- `\"` 会转义引号字符，确保字符串正确闭合
+- 超过 200 字符的脚本应提取到 `scripts/` 目录下的独立 `.mjs` 文件
+
 ## Dev-Flow 流程合规规则
 
 以下规则由 2026-05-10 自适应并发控制器需求的复盘产出，适用于所有后续 dev-flow 执行。
