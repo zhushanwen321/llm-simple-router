@@ -266,6 +266,7 @@ export async function executeFailoverLoop(
 
   // === while(true)：纯执行循环 ===
   let failoverIteration = 0;
+  let lastFailoverTrigger: string | null = null;
 
   while (true) {
   // 请求被 kill 后 reply 已销毁，直接退出避免浪费 failover 迭代
@@ -436,7 +437,7 @@ export async function executeFailoverLoop(
           resilienceAction: resilienceResult.finalDecision?.action,
           resilienceReason: "reason" in (resilienceResult.finalDecision ?? {}) ? (resilienceResult.finalDecision as { action: string; reason: string }).reason : null,
           mappingReason: effectiveMappingReason,
-          failoverTrigger: null,
+          failoverTrigger: lastFailoverTrigger,
         },
         resilienceResult.attempts, resilienceResult.result, startTime,
       );
@@ -478,6 +479,7 @@ export async function executeFailoverLoop(
         const failed = tr.kind === "throw"
           || ("statusCode" in tr && tr.statusCode >= HTTP_ERROR_THRESHOLD);
         if (failed) {
+          lastFailoverTrigger = tr.kind === "throw" ? "throw" : `status_${("statusCode" in tr ? tr.statusCode : 0)}`;
           excludeTargets.push(resolved);
           continue;
         }
@@ -528,6 +530,7 @@ export async function executeFailoverLoop(
           );
         }
         flushCurrentErrors();
+        lastFailoverTrigger = e.constructor.name;
         excludeTargets.push(resolved);
         continue;
       }
