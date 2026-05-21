@@ -87,9 +87,13 @@ jobs:
       - name: Publish llm-simple-router to npm
         run: |
           # 清除 setup-node 注入的 auth 残留，让 npm 走 OIDC
-          unset NODE_AUTH_TOKEN
-          sed -i '/_authToken/d' "$RUNNER_TEMP/.npmrc"
+          # GitHub Actions env 变量在 shell 外无法 unset，需要写回空值到 GITHUB_ENV
+          echo "NODE_AUTH_TOKEN=" >> "$GITHUB_ENV"
+          rm -f "$RUNNER_TEMP/.npmrc"
           cd router && npm publish
+        env:
+          NODE_AUTH_TOKEN: ""
+          NPM_CONFIG_USERCONFIG: ""
 
       # ── 步骤 6: Docker 镜像 ─────────────────────────
       - uses: docker/login-action@v4
