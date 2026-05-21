@@ -88,7 +88,11 @@ export function callLLM(options: CallLLMOptions): Promise<CallLLMResult> {
           const content = parsed.choices?.[0]?.message?.content;
           resolve({ content: content ?? "" });
         } catch {
-          reject(new Error("Failed to parse LLM response"));
+          const ERROR_BODY_PREVIEW_LENGTH = 300;
+          const preview = responseBody.length > ERROR_BODY_PREVIEW_LENGTH
+            ? responseBody.slice(0, ERROR_BODY_PREVIEW_LENGTH) + "..."
+            : responseBody;
+          reject(new Error(`Failed to parse LLM response: ${preview}`));
         }
       });
       res.on("error", (err: Error) => reject(err));

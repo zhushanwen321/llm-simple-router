@@ -165,6 +165,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRouter } from "vue-router";
 import { toast } from "vue-sonner";
 import {
   Dialog,
@@ -189,6 +190,7 @@ import type { ActiveRequest, StreamContentSnapshot } from "@/types/monitor";
 import type { LogEntry } from "@/components/logs/types";
 
 const { t } = useI18n();
+const router = useRouter();
 const { copied, copy } = useClipboard();
 const generating = ref(false);
 const configPromptOpen = ref(false);
@@ -256,7 +258,8 @@ function onRuleSaved() {
 
 function goToConfig() {
   configPromptOpen.value = false;
-  window.open("/admin/proxy-enhancement", "_blank");
+  emit("update:open", false);
+  router.push("/proxy-enhancement");
 }
 
 const props = defineProps<{
