@@ -12,19 +12,21 @@ PR #161 created and pushed to remote.
 ## PR Details
 
 - **Branch**: fix-stream-stop-reason → main
-- **Commits**: 14 commits
-- **Changes**: 8 diagnostic columns on request_logs + ModelCard.vue UI fix
+- **Commits**: 20 commits (including code review P1 fixes and robustness review P0 fix)
+- **Changes**: 8 diagnostic columns on request_logs + ModelCard.vue UI fix + constants consolidation
 
 ## Key Files Changed
 
 - `router/src/db/migrations/048_add_diagnostic_columns.sql` — new migration
 - `router/src/core/types.ts` — new type fields (abortReason, error_code, headers_sent)
 - `router/src/proxy/transport/stream.ts` — abort_reason, transport_kind extraction
-- `router/src/proxy/transport/http.ts` — transport_kind for non-stream
-- `router/src/proxy/orchestration/resilience.ts` — headers_sent, resilience_action/reason
-- `router/src/proxy/handler/failover-loop.ts` — failover_trigger, mapping_reason
-- `router/src/proxy/proxy-logging.ts` — new field extraction
-- `router/src/proxy/log-helpers.ts` — new field extraction
+- `router/src/proxy/orchestration/resilience.ts` — headers_sent, resilience_action/reason, finalDecision
+- `router/src/proxy/handler/failover-loop.ts` — failover_trigger, mapping_reason, type-safe resilienceReason
+- `router/src/proxy/proxy-logging.ts` — diagnosticFields per-attempt injection
+- `router/src/proxy/log-helpers.ts` — rejected log diagnostic fields
 - `router/src/db/logs.ts` — INSERT new columns
-- `router/tests/diagnostic-fields.test.ts` — 13 new integration tests
-- `frontend/src/components/quick-setup/ModelCard.vue` — remove v-if
+- `router/tests/diagnostic-fields.test.ts` — 13 integration tests
+- `frontend/src/components/quick-setup/ModelCard.vue` — remove v-if, layout refactor
+- `frontend/src/constants.ts` — shared DEFAULT_STREAM_TIMEOUT_MS
+- `frontend/src/composables/useProviderForm.ts` — centralized constants, text capability guard
+- `frontend/src/composables/useQuickSetup.ts` — centralized constants
