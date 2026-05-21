@@ -1,5 +1,6 @@
 export const DEFAULT_CONTEXT_WINDOW = 200_000;
 export const LARGE_CONTEXT_THRESHOLD = 1_000_000;
+export const DEFAULT_STREAM_TIMEOUT_MS = 30_000;
 
 /** HTTP 状态码 */
 export const HTTP_STATUS = {

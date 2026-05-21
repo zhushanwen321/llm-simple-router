@@ -26,6 +26,7 @@ import {
   DEFAULT_CLIENT_MAPPINGS,
   getDefaultContextWindow,
 } from "@/components/quick-setup/types";
+import { DEFAULT_CONTEXT_WINDOW, DEFAULT_STREAM_TIMEOUT_MS } from "@/constants";
 import type { Rule } from "@/types/mapping";
 import type { ConcurrencyMode } from "@/types/concurrency";
 import { computeDefaultPatches } from "@/utils/model-patches";
@@ -34,7 +35,6 @@ import router from "@/router";
 const DEFAULT_CONCURRENCY = 10;
 const DEFAULT_QUEUE_TIMEOUT_MS = 120_000;
 const DEFAULT_QUEUE_SIZE = 100;
-const DEFAULT_CONTEXT_WINDOW = 128_000;
 const CONNECTION_TEST_DELAY_MS = 800;
 const POST_SAVE_REDIRECT_MS = 1500;
 
@@ -477,6 +477,7 @@ function applyPresetModels(
       preset.apiType,
       isNonOpenaiEndpoint.value,
     ),
+    stream_timeout_ms: DEFAULT_STREAM_TIMEOUT_MS,
     capabilities: preset.modelCapabilities?.[name],
   }));
 }
@@ -493,6 +494,7 @@ function pushCustomModel(
     contextWindow,
     enabled: true,
     patches: computeDefaultPatches(name, apiType, isNonOpenaiEndpoint.value),
+    stream_timeout_ms: DEFAULT_STREAM_TIMEOUT_MS,
     capabilities: ["text"],
   });
 }

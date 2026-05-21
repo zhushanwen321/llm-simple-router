@@ -35,6 +35,14 @@ export interface RequestLogParams extends LogRetryMeta {
   pipelineSnapshot?: string | null;
   matcher?: RetryMatcher | null;
   logFileWriter?: LogFileWriter | null;
+  transport_kind?: string | null;
+  abort_reason?: string | null;
+  error_code?: string | null;
+  headers_sent?: number | null;
+  resilience_action?: string | null;
+  resilience_reason?: string | null;
+  mapping_reason?: string | null;
+  failover_trigger?: string | null;
 }
 
 /** 插入成功请求日志，供 openai/anthropic 插件共享 */
@@ -45,7 +53,8 @@ export function insertSuccessLog(
   const { id: logId, apiType, model, provider, isStream, startTime,
     clientReq, upstreamReq, status, respBody, upHdrs,
     isRetry = false, isFailover = false, originalRequestId = null, routerKeyId = null, originalModel = null,
-    sessionId = null, pipelineSnapshot = null, matcher, logFileWriter } = params;
+    sessionId = null, pipelineSnapshot = null, matcher, logFileWriter,
+    transport_kind, abort_reason, error_code, headers_sent, resilience_action, resilience_reason, mapping_reason, failover_trigger } = params;
 
   const writeContext: LogWriteContext | undefined = (matcher || logFileWriter) ? {
     matcher,
@@ -64,6 +73,14 @@ export function insertSuccessLog(
     router_key_id: routerKeyId, original_model: originalModel,
     session_id: sessionId,
     pipeline_snapshot: pipelineSnapshot ?? null,
+    transport_kind: transport_kind ?? null,
+    abort_reason: abort_reason ?? null,
+    error_code: error_code ?? null,
+    headers_sent: headers_sent ?? null,
+    resilience_action: resilience_action ?? null,
+    resilience_reason: resilience_reason ?? null,
+    mapping_reason: mapping_reason ?? null,
+    failover_trigger: failover_trigger ?? null,
   }, writeContext);
 }
 
@@ -85,6 +102,14 @@ export interface RejectedLogParams extends LogRetryMeta {
   pipelineSnapshot?: string | null;
   matcher?: RetryMatcher | null;
   logFileWriter?: LogFileWriter | null;
+  mapping_reason?: string | null;
+  transport_kind?: string | null;
+  abort_reason?: string | null;
+  error_code?: string | null;
+  headers_sent?: number | null;
+  resilience_action?: string | null;
+  resilience_reason?: string | null;
+  failover_trigger?: string | null;
 }
 
 /** Log a request rejected before reaching upstream */
@@ -92,7 +117,9 @@ export function insertRejectedLog(params: RejectedLogParams): void {
   const { db, logId, apiType, model, statusCode, errorMessage,
     startTime, isStream, routerKeyId, originalBody, clientHeaders,
     providerId = null, isFailover = false, originalRequestId = null, originalModel = null,
-    sessionId = null, pipelineSnapshot = null, matcher, logFileWriter } = params;
+    sessionId = null, pipelineSnapshot = null, matcher, logFileWriter,
+    mapping_reason, transport_kind, abort_reason, error_code, headers_sent,
+    resilience_action, resilience_reason, failover_trigger } = params;
 
   const writeContext: LogWriteContext | undefined = (matcher || logFileWriter) ? {
     matcher,
@@ -117,5 +144,13 @@ export function insertRejectedLog(params: RejectedLogParams): void {
     original_model: originalModel,
     session_id: sessionId,
     pipeline_snapshot: pipelineSnapshot ?? null,
+    transport_kind: transport_kind ?? null,
+    abort_reason: abort_reason ?? null,
+    error_code: error_code ?? null,
+    headers_sent: headers_sent ?? null,
+    resilience_action: resilience_action ?? null,
+    resilience_reason: resilience_reason ?? null,
+    mapping_reason: mapping_reason ?? null,
+    failover_trigger: failover_trigger ?? null,
   }, writeContext);
 }

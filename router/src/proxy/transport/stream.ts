@@ -101,7 +101,7 @@ class StreamProxy {
         result = { kind: "stream_error", ...base, body: extra.body as string, headers: this.sseHeaders, headersSent: this.headersSent || undefined };
         break;
       case "stream_abort":
-        result = { kind: "stream_abort", ...base, metrics: extra.metrics as MetricsResult | undefined, timeoutContext: extra.timeoutContext as { modelId: string; providerId: string } | undefined, timeoutMs: extra.timeoutMs as number | undefined };
+        result = { kind: "stream_abort", ...base, metrics: extra.metrics as MetricsResult | undefined, timeoutContext: extra.timeoutContext as { modelId: string; providerId: string } | undefined, timeoutMs: extra.timeoutMs as number | undefined, abortReason: extra.abortReason as "idle_timeout" | "client_disconnect" | "loop_detection" | undefined };
         break;
     }
 
@@ -156,7 +156,7 @@ class StreamProxy {
       if (this.onTimeoutAbort) {
         try { this.onTimeoutAbort(); } catch { /* reply may be destroyed */ } // eslint-disable-line taste/no-silent-catch
       }
-      this.terminal("stream_abort", { metrics: this.collectMetrics(false), timeoutContext: this.timeoutContext, timeoutMs: this.timeoutMs });
+      this.terminal("stream_abort", { metrics: this.collectMetrics(false), timeoutContext: this.timeoutContext, timeoutMs: this.timeoutMs, abortReason: "idle_timeout" as const });
     }, this.timeoutMs);
   }
 
@@ -175,7 +175,7 @@ class StreamProxy {
       this.reply.raw.writeHead(this.statusCode, this.sseHeaders);
     } catch {
     // 客户端在 state transition 和 writeHead 之间断连，可安全忽略
-      this.terminal("stream_abort");
+      this.terminal("stream_abort", { abortReason: "client_disconnect" as const });
       return;
     }
     if (this.metricsTransform) {
@@ -206,7 +206,7 @@ class StreamProxy {
       if (this.state === "BUFFERING" || this.state === "STREAMING") {
         this.transition("ABORTED");
       }
-      this.terminal("stream_abort", { metrics: this.collectMetrics(false) });
+      this.terminal("stream_abort", { metrics: this.collectMetrics(false), abortReason: "client_disconnect" as const });
     });
   }
 
@@ -279,8 +279,7 @@ class StreamProxy {
 
     this.pipeEntry.write(chunk);
     if (this.loopGuard?.isTriggered()) {
-      this.terminal("stream_abort", { metrics: this.collectMetrics(false) });
-      return;
+      this.terminal("stream_abort", { metrics: this.collectMetrics(false), abortReason: "loop_detection" as const });
     }
   }
 

@@ -3,7 +3,7 @@ import { useI18n } from "vue-i18n";
 import * as z from "zod";
 import type { ProviderPayload } from "@/api/client";
 import type { Provider, ModelInfo } from "@/types/mapping";
-import { DEFAULT_CONTEXT_WINDOW } from "@/constants";
+import { DEFAULT_CONTEXT_WINDOW, DEFAULT_STREAM_TIMEOUT_MS } from "@/constants";
 import type { ModelConfig } from "@/components/quick-setup/types";
 import { useTransformRules } from "@/composables/useTransformRules";
 import { useProviderPresets } from "@/composables/useProviderPresets";
@@ -203,6 +203,8 @@ export function useProviderForm() {
           name,
           context_window: modelContextWindow.value || DEFAULT_CONTEXT_WINDOW,
           patches: [],
+          stream_timeout_ms: DEFAULT_STREAM_TIMEOUT_MS,
+          capabilities: ["text"],
         });
       }
     }
@@ -219,8 +221,9 @@ export function useProviderForm() {
     form.value.models[index].patches = updated.patches;
   }
 
-  /** 切换模型的指定能力 */
+  /** 切换模型的指定能力。text 为基础能力，不可关闭。 */
   function toggleModelCapability(index: number, capability: string) {
+    if (capability === "text") return;
     const model = form.value.models[index];
     const caps = model.capabilities ?? ["text"];
     const hasIt = caps.includes(capability);
