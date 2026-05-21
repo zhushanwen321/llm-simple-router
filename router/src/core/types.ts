@@ -119,6 +119,7 @@ export type TransportResult =
       sentHeaders: Record<string, string>;
       timeoutContext?: { modelId: string; providerId: string };
       timeoutMs?: number;
+      abortReason?: "idle_timeout" | "client_disconnect" | "loop_detection";
     }
   | {
       kind: "error";
@@ -146,6 +147,10 @@ export interface ResilienceAttempt {
   responseHeaders: Record<string, string> | null;
   /** TransportResult.kind，用于区分 stream_error 等特殊类型 */
   resultKind: TransportResult["kind"];
+  /** error.code（如 ETIMEDOUT / ECONNRESET / ECONNREFUSED），仅 throw 时有值 */
+  error_code?: string | null;
+  /** response headers 是否已发送，影响重试/failover 决策 */
+  headers_sent?: boolean | null;
 }
 
 /** 流式传输阶段状态 */
