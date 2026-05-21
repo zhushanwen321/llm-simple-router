@@ -3,9 +3,9 @@ import type { AnthropicContentBlock, AnthropicImageBlock, AnthropicMessage, Anth
 import type {
   ResponsesApiRequest,
   ResponseInputItem,
-  ResponseInputMessage,
   ResponseTool,
 } from "./types-responses.js";
+import { normalizeInputTypes } from "./shared-normalize.js";
 
 // ---------- Effort → budget mapping (shared with thinking-mapper) ----------
 
@@ -450,17 +450,4 @@ function mapToolChoiceAnt2Responses(tc: unknown): unknown {
   return "auto";
 }
 
-/**
- * Codex CLI 省略 input item 的 type 字段（如 `{role:"user", content:"..."}`），
- * OpenAI 官方端点静默容忍，但按 discriminated union 匹配 type 时会跳过这些 item。
- * 补全缺失的 type 字段：有 role 但无 type 时视为 "message"。
- */
-function normalizeInputTypes(input: ResponseInputItem[]): ResponseInputItem[] {
-  for (let i = 0; i < input.length; i++) {
-    const item = input[i] as unknown as Record<string, unknown>;
-    if (!item.type && "role" in item) {
-      input[i] = { ...item, type: "message" } as ResponseInputMessage;
-    }
-  }
-  return input;
-}
+

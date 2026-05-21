@@ -152,7 +152,7 @@
         <Button variant="outline" @click="emit('update:open', false)">
           {{ t("common.cancel") }}
         </Button>
-        <Button @click="handleSave">
+        <Button :disabled="saving" @click="handleSave">
           {{ t("logs.saveRule") }}
         </Button>
       </DialogFooter>
@@ -250,14 +250,21 @@ watch(
   { immediate: true },
 );
 
+const saving = ref(false);
+
 async function handleSave() {
+  if (saving.value) return;
+
   // 客户端校验
   const errors: string[] = [];
   if (!form.value.name.trim())
     errors.push(t("retryRules.messages.nameRequired"));
+  const sc = form.value.status_code;
   if (
-    form.value.status_code < STATUS_CODE_MIN ||
-    form.value.status_code > STATUS_CODE_MAX
+    typeof sc !== "number" ||
+    isNaN(sc) ||
+    sc < STATUS_CODE_MIN ||
+    sc > STATUS_CODE_MAX
   )
     errors.push(t("retryRules.messages.statusCodeRange"));
   try {
@@ -267,21 +274,25 @@ async function handleSave() {
   }
   if (!form.value.body_pattern.trim())
     errors.push(t("retryRules.messages.bodyPatternInvalid"));
-  if (form.value.retry_delay_ms < DELAY_MIN_MS)
+  const rd = form.value.retry_delay_ms;
+  if (typeof rd !== "number" || isNaN(rd) || rd < DELAY_MIN_MS)
     errors.push(t("retryRules.messages.delayMin"));
-  if (form.value.max_retries < 0 || form.value.max_retries > MAX_RETRIES_LIMIT)
+  const mr = form.value.max_retries;
+  if (typeof mr !== "number" || isNaN(mr) || mr < 0 || mr > MAX_RETRIES_LIMIT)
     errors.push(t("retryRules.messages.retriesRange"));
+  const md = form.value.max_delay_ms;
   if (
-    form.value.max_delay_ms < DELAY_MIN_MS &&
-    form.value.retry_strategy === "exponential"
+    form.value.retry_strategy === "exponential" &&
+    (typeof md !== "number" || isNaN(md) || md < DELAY_MIN_MS)
   )
     errors.push(t("retryRules.messages.delayMin"));
 
   if (errors.length > 0) {
-    toast.error(errors.join("；"));
+    toast.error(errors.join("; "));
     return;
   }
 
+  saving.value = true;
   try {
     await api.createRetryRule({
       name: form.value.name,
@@ -302,6 +313,8 @@ async function handleSave() {
   } catch (e: unknown) {
     console.error("AiRulePreviewDialog.handleSave:", e);
     toast.error(getApiMessage(e, t("retryRules.messages.saveFailed")));
+  } finally {
+    saving.value = false;
   }
 }
 </script>

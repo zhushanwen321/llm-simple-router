@@ -38,9 +38,13 @@ function extractErrorMessageFromResponse(responseBody: string | null | undefined
   try {
     const parsed = JSON.parse(responseBody);
     // OpenAI / DeepSeek 格式: { error: { message: "..." } }
-    if (parsed?.error?.message) return parsed.error.message;
+    const openaiMsg = parsed?.error?.message;
+    if (typeof openaiMsg === "string") return openaiMsg;
     // Cloudflare 格式: { title: "...", detail: "..." }
-    if (parsed?.title) return parsed.detail ? `${parsed.title}: ${parsed.detail}` : parsed.title;
+    if (typeof parsed?.title === "string") {
+      const detail = parsed?.detail;
+      return typeof detail === "string" ? `${parsed.title}: ${detail}` : parsed.title;
+    }
     // 兜底：直接 message 字段
     if (typeof parsed?.message === "string") return parsed.message;
   } catch {

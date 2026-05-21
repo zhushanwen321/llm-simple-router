@@ -7,7 +7,6 @@ import { TableCell, TableRow } from "@/components/ui/table";
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { CheckIcon, CopyIcon } from "lucide-vue-next";
@@ -79,25 +78,23 @@ function enhancementLabel(raw: string | null): string {
     <TableCell class="font-mono text-xs text-muted-foreground" :title="log.id">
       <span class="inline-flex items-center gap-1">
         {{ log.id.slice(0, 8) }}
-        <TooltipProvider>
-          <Tooltip :delay-duration="300">
-            <TooltipTrigger as-child>
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                class="shrink-0"
-                @click.stop="emit('copy', log.id)"
-              >
-                <CheckIcon
-                  v-if="copiedId === log.id"
-                  class="size-3 text-success"
-                />
-                <CopyIcon v-else class="size-3" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{{ t("logs.row.copyFullId") }}</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <Tooltip :delay-duration="300">
+          <TooltipTrigger as-child>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              class="shrink-0"
+              @click.stop="emit('copy', log.id)"
+            >
+              <CheckIcon
+                v-if="copiedId === log.id"
+                class="size-3 text-success"
+              />
+              <CopyIcon v-else class="size-3" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{{ t("logs.row.copyFullId") }}</TooltipContent>
+        </Tooltip>
       </span>
     </TableCell>
 
@@ -174,16 +171,14 @@ function enhancementLabel(raw: string | null): string {
 
     <TableCell class="text-destructive text-xs max-w-[200px]">
       <template v-if="log.error_message">
-        <TooltipProvider>
-          <Tooltip :delay-duration="300">
-            <TooltipTrigger as-child>
-              <span class="block truncate">{{ log.error_message }}</span>
-            </TooltipTrigger>
-            <TooltipContent class="max-w-sm whitespace-pre-wrap">{{
-              log.error_message
-            }}</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <Tooltip :delay-duration="300">
+          <TooltipTrigger as-child>
+            <span class="block truncate">{{ log.error_message }}</span>
+          </TooltipTrigger>
+          <TooltipContent class="max-w-sm whitespace-pre-wrap">{{
+            log.error_message
+          }}</TooltipContent>
+        </Tooltip>
       </template>
       <span v-else class="text-muted-foreground">-</span>
     </TableCell>
