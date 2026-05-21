@@ -72,8 +72,9 @@ jobs:
           cd ../frontend && npm run build
 
       # ── 步骤 5: Publish llm-simple-router (OIDC) ───
+      # setup-node 设置了 NODE_AUTH_TOKEN 环境变量，必须 unset 才能触发 OIDC
       - name: Publish llm-simple-router to npm
-        run: cd router && npm publish
+        run: unset NODE_AUTH_TOKEN && cd router && npm publish
 
       # ── 步骤 6: Docker 镜像 ─────────────────────────
       - uses: docker/login-action@v4
