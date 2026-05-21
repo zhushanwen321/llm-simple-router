@@ -1,7 +1,7 @@
 ---
 ci_passed: true
-ci_url: https://github.com/zhushanwen321/llm-simple-router/actions/runs/26180764316
-commit_sha: df34fd0ba7749fe401919e332614f05660f57a89
+ci_url: https://github.com/zhushanwen321/llm-simple-router/actions/runs/26203118698
+commit_sha: 3fea0804
 ---
 
 # CI Results
@@ -9,6 +9,5 @@ commit_sha: df34fd0ba7749fe401919e332614f05660f57a89
 All CI checks passed.
 
 ## Checks
-- test: pass (1m36s)
-- test: pass (1m39s)
-- docker: pass (58s)
+- test (build + vitest): passed ✅
+- test (lint + build): passed ✅
