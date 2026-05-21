@@ -1,5 +1,8 @@
 import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
+import { readFileSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { Type, Static } from "@sinclair/typebox";
 import type { RetryRule } from "../db/index.js";
 import {
@@ -18,6 +21,12 @@ import { decrypt } from "../utils/crypto.js";
 import type { StateRegistry } from "../core/registry.js";
 import { HTTP_OK, HTTP_BAD_REQUEST, HTTP_CREATED, HTTP_NOT_FOUND } from "./constants.js";
 import { API_CODE, apiError } from "./api-response.js";
+
+// 加载 AI 重试规则的 system prompt 模板（独立文件，避免模板字面量转义问题）
+const AI_RETRY_PROMPT_TEMPLATE = readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), "ai-retry-prompt.md"),
+  "utf-8",
+);
 
 const DEFAULT_RETRY_DELAY_MS = 5000;
 const DEFAULT_MAX_RETRIES = 10;
@@ -124,60 +133,26 @@ function validateAIRule(parsed: Record<string, unknown>): string | null {
   return null;
 }
 
-/** 构造 system prompt，包含现有规则列表 */
+const MAX_PROMPT_RULES = 20;
+
+/** 构造 system prompt，基于外部模板文件 + 现有规则列表 */
 function buildSystemPrompt(existingRules: RetryRule[]): string {
-  const rulesList = existingRules.length > 0
-    ? existingRules.map((r) => `- ${r.name}: status=${r.status_code}, pattern=${r.body_pattern}`).join("\n")
+  const displayRules = existingRules.slice(0, MAX_PROMPT_RULES);
+  const rulesList = displayRules.length > 0
+    ? displayRules.map((r) => `- ${r.name}: status=${r.status_code}, pattern=${r.body_pattern}`).join("\n")
     : "(none)";
+  const truncateHint = existingRules.length > MAX_PROMPT_RULES ? `\n... and ${existingRules.length - MAX_PROMPT_RULES} more rules` : "";
 
-  return `You are an API retry rule expert. Analyze the HTTP error response and generate a retry rule.
-
-## body_pattern Guidelines (CRITICAL)
-- body_pattern must be a **JSON-structure-aware regex**, NOT plain text matching
-- Match against the JSON error structure in the response body
-- Good examples: \\"error\\".*\\"code\\"\\s*:\\s*\\"rate_limit\\"  or  \\"error\\".*\\"code\\"\\s*:\\s*\\"1305\\"
-- Bad examples: rate_limit_error|too many requests  (too broad, matches anywhere)
-- **CRITICAL: Match the actual JSON key in the response body.** If the response has \`{\\"error\\":{\\"code\\":\\"...\\"}}\`, use \`\\"error\\".*\\"code\\"\`. Do NOT use \`\\"type\\":\\"error\\"\` unless the response literally has \`{\\"type\\":\\"error\\"}\`.
-- Use | only to combine **same-category identifiers** (e.g. multiple error codes from the same provider)
-- Do NOT mix different error categories (e.g. rate_limit + invalid_request) in one rule
-- If the error has a specific \`code\` field, anchor on that: \`\\"code\\"\\s*:\\s*\\"<value>\\"\`
-- If no structured error code, use error.type or a distinctive substring with surrounding JSON context
-
-## Default Parameters
-- retry_strategy: \`exponential\`
-- retry_delay_ms: \`5000\`
-- max_retries: \`10\`
-- max_delay_ms: \`60000\`
-- Always use these defaults. Do NOT choose different values.
-
-## Retryable Errors
-- 400/401: usually NOT retryable — only generate if the response indicates a transient condition
-- Only generate ONE rule per request — for the most specific error identifier found
-
-## Naming Convention
-- Use Chinese description, not English
-- Format: \`{Provider} {中文描述} (HTTP {status}, code {code})\`
-- If the **Response Body or Error Message contains the model name**, include it: \`{Provider} {模型名} {中文描述} (HTTP {status}, code {code})\`
-- Examples:
-  - \`ZAI 速率限制 (HTTP 200, code 1302)\` (provider-level error)
-  - \`DeepSeek deepseek-chat 速率限制 (HTTP 429, code rate_limit)\` (model-level error)
-
-## Existing rules (avoid duplicates)
-${rulesList}
-
-## If the response is normal (no error), return:
-{"error":"Unable to generate rule: normal response"}
-
-## Otherwise return ONLY valid JSON:
-{"summary":"...","name":"...","status_code":...,"body_pattern":"...","retry_strategy":"fixed|exponential","retry_delay_ms":...,"max_retries":...,"max_delay_ms":...}`;
+  return `${AI_RETRY_PROMPT_TEMPLATE}\n\n${rulesList}${truncateHint}`;
 }
 
-/** 构造 user prompt */
+/** 构造 user prompt，使用 provider_name 而非 provider_id */
 function buildUserPrompt(
-  log: { provider_id: string | null; model: string | null; status_code: number | null; error_message: string | null },
+  log: { provider_id: string | null; provider_name: string | null; model: string | null; status_code: number | null; error_message: string | null },
   responseText: string,
 ): string {
-  return `Provider: ${log.provider_id ?? "unknown"}
+  const providerDisplayName = log.provider_name || log.provider_id || "unknown";
+  return `Provider: ${providerDisplayName}
 Model: ${log.model ?? "unknown"}
 Status Code: ${log.status_code ?? "N/A"}
 Error Message: ${log.error_message ?? "N/A"}
@@ -323,7 +298,10 @@ export const adminRetryRuleRoutes: FastifyPluginCallback<RetryRuleRoutesOptions>
         timeoutMs: 30_000,
       });
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : JSON.stringify(e);
+      const msg = e instanceof Error ? e.message : "Unknown error";
+      if (!(e instanceof Error)) {
+        request.log.error({ err: e }, "LLM call failed with non-Error");
+      }
       return reply.send({ success: false, error: `LLM call failed: ${msg}` });
     }
 
