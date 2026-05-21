@@ -68,8 +68,10 @@ jobs:
           cd ../frontend && npm run build
 
       # ── 步骤 5: Publish llm-simple-router (OIDC) ───
+      # setup-node registry-url 会在 .npmrc 写入 _authToken=${NODE_AUTH_TOKEN}
+      # 未设置该变量时展开为空串，npm 看到 _authToken= 行后不走 OIDC
       - name: Publish llm-simple-router to npm
-        run: cd router && npm publish
+        run: rm -f "$RUNNER_TEMP/.npmrc" && cd router && npm publish
 
       # ── 步骤 6: Docker 镜像 ─────────────────────────
       - uses: docker/login-action@v4
