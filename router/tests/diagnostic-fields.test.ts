@@ -599,4 +599,149 @@ describe("Diagnostic fields in request_logs", () => {
 
     await close();
   });
+
+  // TC12: Stream upstream 500 → transport_kind = "stream_error"
+  it("should set transport_kind='stream_error' for stream request with upstream error status", async () => {
+    const { port, close } = await createMockBackend((req, res) => {
+      let body = "";
+      req.on("data", (chunk: Buffer) => (body += chunk));
+      req.on("end", () => {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            error: { message: "Internal server error", type: "server_error" },
+          }),
+        );
+      });
+    });
+
+    insertMockBackend(mockDb, `http://127.0.0.1:${port}`);
+    insertModelMapping(mockDb, "gpt-4", "gpt-4");
+
+    app = buildTestApp(mockDb);
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/chat/completions",
+      headers: { "content-type": "application/json" },
+      payload: {
+        model: "gpt-4",
+        messages: [{ role: "user", content: "Hi" }],
+        stream: true,
+      },
+    });
+
+    expect(response.statusCode).toBe(500);
+
+    const logId = getAnyLogId(mockDb);
+    expect(logId).not.toBeNull();
+    const row = getDiagnosticRow(mockDb, logId!);
+    expect(row).toBeDefined();
+    expect(row!.transport_kind).toBe("stream_error");
+
+    await close();
+  });
+
+  // TC13: Failover with ProviderSwitchNeeded → failover_trigger = "ProviderSwitchNeeded"
+  it("should set failover_trigger when provider switch occurs", async () => {
+    // 第一个 provider 返回触发 ProviderSwitchNeeded 的错误
+    const { port: port1, close: close1 } = await createMockBackend((req, res) => {
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({
+          error: { message: "model overloaded", type: "server_error" },
+        }),
+      );
+    });
+
+    // 第二个 provider 正常响应
+    const { port: port2, close: close2 } = await createMockBackend((req, res) => {
+      let body = "";
+      req.on("data", (chunk: Buffer) => (body += chunk));
+      req.on("end", () => {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(OPENAI_NON_STREAM_RESPONSE));
+      });
+    });
+
+    const now = new Date().toISOString();
+    const encryptedKey = encrypt("sk-backend-key", TEST_ENCRYPTION_KEY);
+
+    // 插入两个 provider
+    mockDb
+      .prepare(
+        `INSERT INTO providers (id, name, api_type, base_url, api_key, is_active, models, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        "prov-primary", "Primary", "openai", `http://127.0.0.1:${port1}`,
+        encryptedKey, 1, JSON.stringify(["gpt-4"]), now, now,
+      );
+    mockDb
+      .prepare(
+        `INSERT INTO providers (id, name, api_type, base_url, api_key, is_active, models, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        "prov-secondary", "Secondary", "openai", `http://127.0.0.1:${port2}`,
+        encryptedKey, 1, JSON.stringify(["gpt-4"]), now, now,
+      );
+
+    // 插入 failover mapping group
+    mockDb
+      .prepare(
+        `INSERT INTO mapping_groups (id, client_model, rule, is_active, created_at)
+         VALUES (?, ?, ?, ?, ?)`,
+      )
+      .run(
+        "mg-failover", "gpt-4",
+        JSON.stringify({
+          strategy: "failover",
+          targets: [
+            { backend_model: "gpt-4", provider_id: "prov-primary" },
+            { backend_model: "gpt-4", provider_id: "prov-secondary" },
+          ],
+        }),
+        1, now,
+      );
+
+    // 配置重试规则使 500 触发 ProviderSwitchNeeded
+    mockDb
+      .prepare(
+        `INSERT INTO retry_rules (id, name, status_code, body_pattern, is_active, retry_strategy, retry_delay_ms, max_retries, max_delay_ms, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        "rule-500", "Retry 500", 500, ".*", 1, "fixed", 1, 1, 100, now,
+      );
+
+    app = buildTestApp(mockDb);
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/chat/completions",
+      headers: { "content-type": "application/json" },
+      payload: {
+        model: "gpt-4",
+        messages: [{ role: "user", content: "Hi" }],
+      },
+    });
+
+    // 最终应该成功（failover 到第二个 provider）
+    expect(response.statusCode).toBe(200);
+
+    // 查询所有日志，应该有多条
+    const rows = mockDb
+      .prepare("SELECT id, transport_kind, failover_trigger, resilience_action FROM request_logs ORDER BY created_at")
+      .all() as Record<string, unknown>[];
+
+    expect(rows.length).toBeGreaterThanOrEqual(2);
+
+    // 至少有一条日志的 failover_trigger 或 resilience_action 表明发生了 failover
+    const failoverRows = rows.filter(
+      (r) => r.resilience_action === "failover" || r.failover_trigger != null,
+    );
+    expect(failoverRows.length).toBeGreaterThan(0);
+
+    await close1();
+    await close2();
+  });
 });

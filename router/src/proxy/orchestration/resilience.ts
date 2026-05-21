@@ -265,6 +265,7 @@ export class ResilienceLayer {
           latencyMs: Date.now() - start, responseBody: extractBody(transportResult),
           responseHeaders: extractHeaders(transportResult) ?? null,
           resultKind: transportResult.kind,
+          headers_sent: transportResult.kind === "stream_error" ? transportResult.headersSent ?? null : null,
         });
       }
 
