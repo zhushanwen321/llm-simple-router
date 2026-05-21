@@ -66,6 +66,14 @@ export interface RequestLogInsert {
   session_id?: string | null;
   client_status_code?: number | null;
   pipeline_snapshot?: string | null;
+  transport_kind?: string | null;
+  abort_reason?: string | null;
+  error_code?: string | null;
+  headers_sent?: number | null;
+  resilience_action?: string | null;
+  resilience_reason?: string | null;
+  mapping_reason?: string | null;
+  failover_trigger?: string | null;
 }
 
 export interface LogWriteContext {
@@ -90,8 +98,10 @@ function rawInsertRequestLog(
     db,
     `INSERT INTO request_logs (id, api_type, model, provider_id, status_code, client_status_code, latency_ms,
       is_stream, error_message, created_at, client_request, upstream_request, upstream_response,
-      is_retry, is_failover, original_request_id, router_key_id, original_model, session_id, pipeline_snapshot)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      is_retry, is_failover, original_request_id, router_key_id, original_model, session_id, pipeline_snapshot,
+      transport_kind, abort_reason, error_code, headers_sent, resilience_action, resilience_reason, mapping_reason, failover_trigger)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+      ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     log.id, log.api_type, log.model, log.provider_id, log.status_code,
     log.client_status_code ?? null,
@@ -103,6 +113,14 @@ function rawInsertRequestLog(
     log.router_key_id ?? null, log.original_model ?? null,
     log.session_id ?? null,
     log.pipeline_snapshot ?? null,
+    log.transport_kind ?? null,
+    log.abort_reason ?? null,
+    log.error_code ?? null,
+    log.headers_sent ?? null,
+    log.resilience_action ?? null,
+    log.resilience_reason ?? null,
+    log.mapping_reason ?? null,
+    log.failover_trigger ?? null,
   );
 }
 
