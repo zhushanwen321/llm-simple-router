@@ -233,6 +233,19 @@
       "evidence": "mapping-reason-failover.test.ts verifies failover_retry mapping_reason, existing test passes"
     },
     {
+      "caseId": "TC-6-04",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "Configure model with small context window via provider_model_info",
+        "Send request with large token count exceeding context limit",
+        "Overflow redirect triggers, switches to larger model",
+        "Assert mapping_reason = 'overflow_redirect' on redirected log",
+        "Vitest test: should set mappingReason to overflow_redirect when context exceeds window"
+      ],
+      "evidence": "mapping-reason-overflow.test.ts: mapping_reason='overflow_redirect' when context exceeds window, passed (2 tests)"
+    },
+    {
       "caseId": "TC-7-01",
       "round": 1,
       "passed": true,

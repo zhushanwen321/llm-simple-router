@@ -195,6 +195,16 @@
       ]
     },
     {
+      "id": "TC-6-04",
+      "type": "api",
+      "title": "mapping_reason=overflow_redirect",
+      "steps": [
+        "Configure model with small context window",
+        "Send request exceeding context limit",
+        "Assert mapping_reason = 'overflow_redirect' on redirected log"
+      ]
+    },
+    {
       "id": "TC-7-01",
       "type": "api",
       "title": "failover_trigger=ProviderSwitchNeeded",
