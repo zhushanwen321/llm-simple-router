@@ -12,7 +12,7 @@ import type { ConcurrencyMode } from "@/types/concurrency";
 const DEFAULT_CONCURRENCY = 3;
 const DEFAULT_CONCURRENCY_AUTO = 10;
 const DEFAULT_QUEUE_TIMEOUT_MS = 120_000;
-const DEFAULT_STREAM_TIMEOUT_MS = 300_000;
+const DEFAULT_STREAM_TIMEOUT_MS = 30_000;
 const DEFAULT_QUEUE_SIZE = 10;
 const MAX_CONCURRENCY = 100;
 const MAX_QUEUE_SIZE = 1000;
