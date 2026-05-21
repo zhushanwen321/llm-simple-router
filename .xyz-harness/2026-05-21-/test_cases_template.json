@@ -1,0 +1,194 @@
+{
+  "test_cases": [
+    {
+      "id": "TC-1-01",
+      "type": "integration",
+      "title": "Pipeline emit covers all 4 core phases on successful request",
+      "description": "Send a non-stream request. Verify post_route, pre_transport, post_response emit are called.",
+      "steps": [
+        "Build test app with in-memory DB",
+        "Insert provider + mapping",
+        "Mock backend returns 200 with valid chat completion",
+        "Send POST /v1/chat/completions",
+        "Verify emit was called for post_route, pre_transport, post_response phases"
+      ]
+    },
+    {
+      "id": "TC-1-02",
+      "type": "integration",
+      "title": "Pipeline emit on_error on upstream failure",
+      "description": "Send a request that triggers an error. Verify emit('on_error') is called.",
+      "steps": [
+        "Build test app",
+        "Mock backend returns 500",
+        "Send POST /v1/chat/completions",
+        "Verify emit('on_error') was called"
+      ]
+    },
+    {
+      "id": "TC-2-01",
+      "type": "api",
+      "title": "builtin:route-resolve selects first non-excluded target",
+      "description": "Hook reads cachedTargets from metadata, selects first non-excluded, writes ctx.resolved + ctx.provider",
+      "steps": [
+        "Create PipelineContext with cachedTargets=[target1, target2] in metadata",
+        "Execute route-resolve hook",
+        "Verify ctx.resolved === target1",
+        "Verify ctx.provider is populated from DB"
+      ]
+    },
+    {
+      "id": "TC-2-02",
+      "type": "api",
+      "title": "builtin:route-resolve aborts when no targets available",
+      "description": "All targets excluded or provider inactive → PipelineAbort(503)",
+      "steps": [
+        "Create PipelineContext with cachedTargets=[target1], excludeTargets=[target1]",
+        "Execute route-resolve hook",
+        "Verify PipelineAbort is thrown with 503"
+      ]
+    },
+    {
+      "id": "TC-3-01",
+      "type": "api",
+      "title": "builtin:format-transform converts openai to anthropic",
+      "description": "When ctx.apiType='openai' and provider.api_type='anthropic', body is transformed",
+      "steps": [
+        "Set ctx.resolved to target with anthropic provider",
+        "Set ctx.provider with api_type='anthropic'",
+        "Execute format-transform hook",
+        "Verify ctx.effectiveApiType === 'anthropic'",
+        "Verify ctx.body has anthropic format"
+      ]
+    },
+    {
+      "id": "TC-4-01",
+      "type": "api",
+      "title": "builtin:api-key-decrypt caches per provider",
+      "description": "Decrypt API key once, cache in metadata map",
+      "steps": [
+        "Set ctx.provider with encrypted api_key",
+        "Set encryptionKey in metadata",
+        "Execute api-key-decrypt hook twice",
+        "Verify decrypt() called only once",
+        "Verify apiKey in metadata"
+      ]
+    },
+    {
+      "id": "TC-5-01",
+      "type": "integration",
+      "title": "builtin:transport-execute calls orchestrator.handle",
+      "description": "Hook builds transportFn and calls orchestrator, writes result to ctx",
+      "steps": [
+        "Set ctx.resolved, ctx.provider, ctx.effectiveApiType",
+        "Mock orchestrator.handle() to return success result",
+        "Execute transport-execute hook",
+        "Verify ctx.transportResult is set",
+        "Verify ctx.resilienceResult is set"
+      ]
+    },
+    {
+      "id": "TC-6-01",
+      "type": "api",
+      "title": "builtin:stream-timeout writes SSE error event",
+      "description": "When resilienceResult is stream_abort, write error SSE event to reply",
+      "steps": [
+        "Set ctx.resilienceResult to stream_abort result",
+        "Execute stream-timeout hook",
+        "Verify reply.raw.write was called with SSE error data"
+      ]
+    },
+    {
+      "id": "TC-6-02",
+      "type": "api",
+      "title": "builtin:usage-record calls usageWindowTracker",
+      "description": "On successful request, record usage window",
+      "steps": [
+        "Set ctx.resilienceResult to success result",
+        "Mock usageWindowTracker.recordRequest",
+        "Execute usage-record hook",
+        "Verify recordRequest was called with correct args"
+      ]
+    },
+    {
+      "id": "TC-7-01",
+      "type": "integration",
+      "title": "All 6 new hooks registered in proxyPipeline",
+      "description": "After registerBuiltinHooks(), all 15 hooks (9 existing + 6 new) are registered",
+      "steps": [
+        "Call registerBuiltinHooks()",
+        "Query proxyPipeline.getHookChain for each phase",
+        "Verify route-resolve in post_route, format-transform/api-key-decrypt/transport-execute in pre_transport, stream-timeout/usage-record in post_response"
+      ]
+    },
+    {
+      "id": "TC-8-01",
+      "type": "integration",
+      "title": "Failover loop is under 150 lines",
+      "description": "Static check: wc -l failover-loop.ts <= 150",
+      "steps": [
+        "Run wc -l on failover-loop.ts",
+        "Assert line count <= 150",
+        "Assert import count <= 20",
+        "Assert no forbidden imports (applyProviderPatches, logResilienceResult, etc.)"
+      ]
+    },
+    {
+      "id": "TC-8-02",
+      "type": "integration",
+      "title": "Failover with 2 targets: first fails, second succeeds",
+      "description": "Verify failover still works after migration",
+      "steps": [
+        "Insert provider with 2 targets in mapping group",
+        "Mock first backend to return 500, second to return 200",
+        "Send request",
+        "Verify response is from second target"
+      ]
+    },
+    {
+      "id": "TC-8-03",
+      "type": "integration",
+      "title": "ProviderSwitchNeeded triggers continue",
+      "description": "Orchestrator throws ProviderSwitchNeeded, failover loop continues",
+      "steps": [
+        "Mock orchestrator to throw ProviderSwitchNeeded on first call, succeed on second",
+        "Send request",
+        "Verify response is successful"
+      ]
+    },
+    {
+      "id": "TC-8-04",
+      "type": "integration",
+      "title": "Existing tests pass after migration",
+      "description": "npm test returns 0 exit code",
+      "steps": [
+        "Run npm test",
+        "Verify all tests pass"
+      ]
+    },
+    {
+      "id": "TC-9-01",
+      "type": "integration",
+      "title": "Hook priority ordering: external hook runs after builtins",
+      "description": "Register external hook at priority 200, verify it runs after builtin hooks",
+      "steps": [
+        "Register test hook at pre_transport phase, priority 200",
+        "Send request",
+        "Verify hook execution order: format-transform(0) → api-key-decrypt(1) → transport-execute(50) → provider-patches(100) → test-hook(200)"
+      ]
+    },
+    {
+      "id": "TC-9-02",
+      "type": "integration",
+      "title": "PipelineAbort from hook short-circuits pipeline",
+      "description": "If a pre_transport hook throws PipelineAbort, subsequent hooks don't execute",
+      "steps": [
+        "Register hook at pre_transport priority 150 that throws PipelineAbort(403)",
+        "Send request",
+        "Verify transport-execute hook (priority 50) already executed before abort",
+        "Verify post_response hooks did NOT execute",
+        "Verify response is 403"
+      ]
+    }
+  ]
+}

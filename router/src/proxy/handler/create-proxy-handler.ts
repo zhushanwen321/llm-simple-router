@@ -28,6 +28,7 @@ import { createPipelineContext } from "../pipeline/context.js";
 import { proxyPipeline } from "../pipeline/pipeline.js";
 import { executeFailoverLoop, type FailoverLoopDeps } from "./failover-loop.js";
 import { PipelineAbort } from "../pipeline/types.js";
+import { registerBuiltinHooks } from "../pipeline/register-hooks.js";
 
 // ---------- Factory config ----------
 
@@ -130,6 +131,9 @@ export function createProxyHandler(config: ProxyHandlerConfig) {
   const { apiType, paths } = config;
 
   const handlerRaw: FastifyPluginCallback<ProxyHandlerOptions> = (app, opts, done) => {
+    // 确保 hooks 已注册（幂等，重复调用不会重复注册）
+    registerBuiltinHooks();
+
     const { db, container } = opts;
 
     const orchestrator = createOrchestrator(

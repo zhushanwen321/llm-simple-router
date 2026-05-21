@@ -156,6 +156,20 @@ _Avoid_: 错误日志（与 Request Log 混淆时）
 - **"Provider"** 在日常用语中可指 LLM 供应商（如智谱）或系统中的 Provider 行（端点+凭证）。CONTEXT 中 Provider = 系统管理的实体（一个 API 端点 + 一个凭证）。
 - **"模型"** 在不同上下文中可指 Client Model 或 Target Model。讨论时需要明确是入口侧还是出口侧。
 
+## 管道架构
+
+**Pipeline Phase（管道阶段）**:
+代理请求生命周期中的一个具名执行点，hook 在此挂载。当前定义 6 个阶段：pre_route、post_route、pre_transport、post_response、on_error、on_stream_event。每个阶段内的 hook 按优先级升序执行。
+_Avoid_: 钩子阶段、生命周期阶段
+
+**Pipeline Hook（管道钩子）**:
+注册到某个 Pipeline Phase 的具名、有优先级的处理函数。内置 hook 命名前缀 `builtin:`，外部插件 hook 命名前缀 `plugin:`。Hook 通过 PipelineContext 与其他 hook 和核心逻辑通信。
+_Avoid_: 中间件、拦截器、处理器（单独使用时）
+
+**Pipeline Context（管道上下文）**:
+贯穿一次 failover 迭代的可变状态袋。携带 request/reply（不可变）、body/resolved/provider/transportResult（可变）、metadata（hook 间通信通道）。
+_Avoid_: 请求上下文（过于笼统）
+
 ## 示例对话
 
 > **Dev**: 用户报告请求 sonnet 模型时被拒绝了，日志里显示 403。

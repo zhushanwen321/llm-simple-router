@@ -1,4 +1,8 @@
+import { PipelineAbort } from "./types.js";
 import type { PipelineContext, HookPhase, PipelineHook } from "./types.js";
+
+/** 核心 hook 的 priority 阈值：低于此值或 core=true 的 hook 异常直接传播 */
+const CORE_HOOK_PRIORITY_THRESHOLD = 100;
 
 export class ProxyPipeline {
   private hooksByPhase = new Map<HookPhase, PipelineHook[]>();
@@ -20,11 +24,22 @@ export class ProxyPipeline {
     }));
   }
 
-  /** 触发指定阶段的所有钩子 */
+  /** 触发指定阶段的所有钩子（含异常降级） */
   async emit(phase: HookPhase, ctx: PipelineContext): Promise<void> {
     const hooks = this.hooksByPhase.get(phase) ?? [];
     for (const hook of hooks) {
-      await hook.execute(ctx);
+      try {
+        await hook.execute(ctx);
+      } catch (e: unknown) {
+        if (e instanceof PipelineAbort) throw e;
+        // 核心 hook (priority < 100 或 core === true) 异常直接传播
+        if (hook.priority < CORE_HOOK_PRIORITY_THRESHOLD || hook.core === true) throw e;
+        // 非核心 hook 异常降级：记录日志但继续执行后续 hook
+        ctx.request.log.error(
+          { err: e, hook: hook.name, phase },
+          "Pipeline hook error (degraded)",
+        );
+      }
     }
   }
 }

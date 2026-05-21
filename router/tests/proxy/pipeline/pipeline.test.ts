@@ -4,7 +4,7 @@ import type { PipelineContext } from "../../../src/proxy/pipeline/types.js";
 
 function createMockContext(): PipelineContext {
   return {
-    request: {} as any,
+    request: { log: { error: () => {} } } as any,
     reply: {} as any,
     rawBody: {},
     clientModel: "gpt-4",
@@ -91,7 +91,7 @@ describe("ProxyPipeline", () => {
     expect(order).toEqual(["async"]);
   });
 
-  it("stops execution when a hook throws", async () => {
+  it("degrades non-core hook errors and continues execution", async () => {
     const order: string[] = [];
     const pipeline = new ProxyPipeline();
 
@@ -99,7 +99,8 @@ describe("ProxyPipeline", () => {
     pipeline.register({ name: "b", phase: "pre_route", priority: 200, execute: () => { throw new Error("boom"); } });
     pipeline.register({ name: "c", phase: "pre_route", priority: 300, execute: () => { order.push("c"); } });
 
-    await expect(pipeline.emit("pre_route", createMockContext())).rejects.toThrow("boom");
-    expect(order).toEqual(["a"]);
+    // 非核心 hook (priority >= 100, core !== true) 异常降级，不传播
+    await pipeline.emit("pre_route", createMockContext());
+    expect(order).toEqual(["a", "c"]);
   });
 });

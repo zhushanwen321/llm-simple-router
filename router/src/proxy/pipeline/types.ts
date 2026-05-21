@@ -21,6 +21,8 @@ export interface PipelineHook {
   phase: HookPhase;
   /** 优先级（0-99 基础设施, 100-199 内置功能, 200-299 外部插件, 900-999 观察者） */
   priority: number;
+  /** 核心骨架 hook 标记。true = 异常不可降级，直接传播 */
+  core?: boolean;
   /** 钩子逻辑 */
   execute(ctx: PipelineContext): void | Promise<void>;
 }
@@ -48,7 +50,7 @@ export interface ProviderInfo {
   max_concurrency: number;
   queue_timeout_ms: number;
   max_queue_size: number;
-  adaptive_enabled: boolean;
+  adaptive_enabled: number;
   created_at: string;
 }
 

@@ -27,14 +27,16 @@ export const providerPatchesHook: PipelineHook = {
       models: providerModels,
     });
 
-    // 用 patch 结果替换 ctx.body
-    for (const key of Object.keys(ctx.body)) {
-      delete ctx.body[key];
-    }
-    for (const [key, value] of Object.entries(patchedBody)) {
-      ctx.body[key] = value;
+    if (patchedBody !== body) {
+      for (const key of Object.keys(ctx.body)) {
+        delete ctx.body[key];
+      }
+      for (const [key, value] of Object.entries(patchedBody)) {
+        ctx.body[key] = value;
+      }
     }
 
     ctx.snapshot.add({ stage: "provider_patch", types: patchMeta.types });
+
   },
 };

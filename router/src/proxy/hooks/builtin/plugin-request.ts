@@ -42,12 +42,13 @@ export const pluginRequestHook: PipelineHook = {
     pluginRegistry.applyBeforeRequest(pluginCtx);
     pluginRegistry.applyAfterRequest(pluginCtx);
 
-    // 用 plugin 变换后的 body 替换 ctx.body
-    for (const key of Object.keys(ctx.body)) {
-      delete ctx.body[key];
-    }
-    for (const [key, value] of Object.entries(pluginCtx.body)) {
-      ctx.body[key] = value;
+    if (pluginCtx.body !== body) {
+      for (const key of Object.keys(ctx.body)) {
+        delete ctx.body[key];
+      }
+      for (const [key, value] of Object.entries(pluginCtx.body)) {
+        ctx.body[key] = value;
+      }
     }
 
     // 合并 injected headers
