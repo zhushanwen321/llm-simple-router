@@ -102,6 +102,7 @@ export interface RejectedLogParams extends LogRetryMeta {
   pipelineSnapshot?: string | null;
   matcher?: RetryMatcher | null;
   logFileWriter?: LogFileWriter | null;
+  mapping_reason?: string | null;
 }
 
 /** Log a request rejected before reaching upstream */
@@ -109,7 +110,8 @@ export function insertRejectedLog(params: RejectedLogParams): void {
   const { db, logId, apiType, model, statusCode, errorMessage,
     startTime, isStream, routerKeyId, originalBody, clientHeaders,
     providerId = null, isFailover = false, originalRequestId = null, originalModel = null,
-    sessionId = null, pipelineSnapshot = null, matcher, logFileWriter } = params;
+    sessionId = null, pipelineSnapshot = null, matcher, logFileWriter,
+    mapping_reason } = params;
 
   const writeContext: LogWriteContext | undefined = (matcher || logFileWriter) ? {
     matcher,
@@ -134,5 +136,13 @@ export function insertRejectedLog(params: RejectedLogParams): void {
     original_model: originalModel,
     session_id: sessionId,
     pipeline_snapshot: pipelineSnapshot ?? null,
+    transport_kind: null,
+    abort_reason: null,
+    error_code: null,
+    headers_sent: null,
+    resilience_action: null,
+    resilience_reason: null,
+    mapping_reason: mapping_reason ?? null,
+    failover_trigger: null,
   }, writeContext);
 }

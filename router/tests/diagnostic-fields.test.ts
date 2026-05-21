@@ -741,6 +741,14 @@ describe("Diagnostic fields in request_logs", () => {
     );
     expect(failoverRows.length).toBeGreaterThan(0);
 
+    // 验证 resilience_reason 也被写入（外层 failover 路径：abort 原因）
+    const abortRows = rows.filter(
+      (r) => r.resilience_action === "abort",
+    );
+    if (abortRows.length > 0) {
+      expect(abortRows[0].resilience_reason).not.toBeNull();
+    }
+
     await close1();
     await close2();
   });

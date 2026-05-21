@@ -3,7 +3,7 @@ import { useI18n } from "vue-i18n";
 import * as z from "zod";
 import type { ProviderPayload } from "@/api/client";
 import type { Provider, ModelInfo } from "@/types/mapping";
-import { DEFAULT_CONTEXT_WINDOW } from "@/constants";
+import { DEFAULT_CONTEXT_WINDOW, DEFAULT_STREAM_TIMEOUT_MS } from "@/constants";
 import type { ModelConfig } from "@/components/quick-setup/types";
 import { useTransformRules } from "@/composables/useTransformRules";
 import { useProviderPresets } from "@/composables/useProviderPresets";
@@ -12,7 +12,6 @@ import type { ConcurrencyMode } from "@/types/concurrency";
 const DEFAULT_CONCURRENCY = 3;
 const DEFAULT_CONCURRENCY_AUTO = 10;
 const DEFAULT_QUEUE_TIMEOUT_MS = 120_000;
-const DEFAULT_STREAM_TIMEOUT_MS = 30_000;
 const DEFAULT_QUEUE_SIZE = 10;
 const MAX_CONCURRENCY = 100;
 const MAX_QUEUE_SIZE = 1000;
@@ -222,8 +221,9 @@ export function useProviderForm() {
     form.value.models[index].patches = updated.patches;
   }
 
-  /** 切换模型的指定能力 */
+  /** 切换模型的指定能力。text 为基础能力，不可关闭。 */
   function toggleModelCapability(index: number, capability: string) {
+    if (capability === "text") return;
     const model = form.value.models[index];
     const caps = model.capabilities ?? ["text"];
     const hasIt = caps.includes(capability);

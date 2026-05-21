@@ -26,6 +26,10 @@ import {
   Video,
 } from "lucide-vue-next";
 import { cn } from "@/lib/utils";
+import { DEFAULT_STREAM_TIMEOUT_MS } from "@/constants";
+
+const MS_PER_SECOND = 1000;
+const DEFAULT_TIMEOUT_SECONDS = DEFAULT_STREAM_TIMEOUT_MS / MS_PER_SECOND;
 
 const { t } = useI18n();
 
@@ -74,9 +78,6 @@ function updatePatches(patches: string[]) {
   emit("update:model", { ...props.model, patches });
 }
 
-const DEFAULT_TIMEOUT_SECONDS = 30;
-const MS_PER_SECOND = 1000;
-
 const displayTimeoutSeconds = computed(() => {
   if (props.streamTimeoutMs !== undefined && props.streamTimeoutMs !== null) {
     return Math.round(props.streamTimeoutMs / MS_PER_SECOND);
@@ -90,7 +91,7 @@ const toggleableCapabilities = [
   { key: "image" as const, icon: ImageIcon, labelKey: "image" as const },
   { key: "audio" as const, icon: Volume2, labelKey: "audio" as const },
   { key: "video" as const, icon: Video, labelKey: "video" as const },
-];
+] as const;
 </script>
 
 <template>
