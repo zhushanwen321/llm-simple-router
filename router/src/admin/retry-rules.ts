@@ -135,8 +135,9 @@ function buildSystemPrompt(existingRules: RetryRule[]): string {
 ## body_pattern Guidelines (CRITICAL)
 - body_pattern must be a **JSON-structure-aware regex**, NOT plain text matching
 - Match against the JSON error structure in the response body
-- Good examples: \\"error\\".*\\"code\\"\\s*:\\s*\\"rate_limit\\"  or  \\"type\\"\\s*:\\s*\\"error\\".*\\"code\\"\\s*:\\s*\\"1234\\"
+- Good examples: \\"error\\".*\\"code\\"\\s*:\\s*\\"rate_limit\\"  or  \\"error\\".*\\"code\\"\\s*:\\s*\\"1305\\"
 - Bad examples: rate_limit_error|too many requests  (too broad, matches anywhere)
+- **CRITICAL: Match the actual JSON key in the response body.** If the response has \`{\\"error\\":{\\"code\\":\\"...\\"}}\`, use \`\\"error\\".*\\"code\\"\`. Do NOT use \`\\"type\\":\\"error\\"\` unless the response literally has \`{\\"type\\":\\"error\\"}\`.
 - Use | only to combine **same-category identifiers** (e.g. multiple error codes from the same provider)
 - Do NOT mix different error categories (e.g. rate_limit + invalid_request) in one rule
 - If the error has a specific \`code\` field, anchor on that: \`\\"code\\"\\s*:\\s*\\"<value>\\"\`

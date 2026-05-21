@@ -391,7 +391,7 @@ function buildUpdatePayload(): {
   name: string;
   allowed_models: string[] | null;
   is_active: number;
-} {
+  } {
   return {
     name: form.value.name,
     allowed_models:
@@ -403,7 +403,7 @@ function buildUpdatePayload(): {
 function buildCreatePayload(): {
   name: string;
   allowed_models: string[] | null;
-} {
+  } {
   return {
     name: form.value.name,
     allowed_models:
