@@ -41,9 +41,12 @@
           <TableRow v-for="r in rules" :key="r.id">
             <TableCell class="font-mono text-sm">{{ r.name }}</TableCell>
             <TableCell>{{ r.status_code }}</TableCell>
-            <TableCell class="font-mono text-xs text-muted-foreground">{{
-              formatBodyMatch(r)
-            }}</TableCell>
+            <TableCell
+              class="font-mono text-xs text-muted-foreground max-w-[200px]"
+              ><span class="truncate block">{{
+                formatBodyMatch(r)
+              }}</span></TableCell
+            >
             <TableCell>
               <Badge v-if="!r.provider_id" variant="secondary">{{
                 t("retryRules.globalBadge")
@@ -166,9 +169,29 @@
           </div>
           <!-- Body Match: Tabs -->
           <div>
-            <Label class="block text-sm font-medium text-foreground mb-1">{{
-              t("retryRules.dialog.bodyPattern")
-            }}</Label>
+            <Label
+              class="block text-sm font-medium text-foreground mb-1 flex items-center gap-1"
+              >{{ t("retryRules.dialog.bodyPattern") }}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <span
+                      class="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-muted text-muted-foreground text-[10px] font-bold cursor-help"
+                      >?</span
+                    >
+                  </TooltipTrigger>
+                  <TooltipContent
+                    side="right"
+                    class="max-w-xs text-xs leading-relaxed"
+                  >
+                    <p class="font-medium mb-1">
+                      {{ t("retryRules.dialog.bodyPattern") }}
+                    </p>
+                    <p>{{ t("retryRules.dialog.bodyPatternTooltip") }}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </Label>
             <Tabs v-model="form.matchMode">
               <TabsList class="mb-2">
                 <TabsTrigger value="regex">{{
@@ -428,6 +451,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Plus, X } from "lucide-vue-next";
 import RecommendedRules from "@/components/retry-rules/RecommendedRules.vue";
 
