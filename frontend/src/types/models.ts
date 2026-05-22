@@ -3,6 +3,8 @@ export interface RetryRule {
   name: string;
   status_code: number;
   body_pattern: string;
+  provider_id: string | null;
+  body_matchers: string | null;
   is_active: number;
   created_at: string;
   retry_strategy: "fixed" | "exponential";

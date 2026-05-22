@@ -13,9 +13,11 @@ export interface RetryRule {
   retry_delay_ms: number;
   max_retries: number;
   max_delay_ms: number;
+  provider_id: string | null;
+  body_matchers: string | null;
 }
 
-const RETRY_FIELDS = new Set(["name", "status_code", "body_pattern", "is_active", "retry_strategy", "retry_delay_ms", "max_retries", "max_delay_ms"]);
+const RETRY_FIELDS = new Set(["name", "status_code", "body_pattern", "is_active", "retry_strategy", "retry_delay_ms", "max_retries", "max_delay_ms", "provider_id", "body_matchers"]);
 
 const DEFAULT_RETRY_DELAY_MS = 5000;
 const DEFAULT_MAX_RETRIES = 10;
@@ -38,22 +40,24 @@ export function createRetryRule(
   rule: {
     name: string; status_code: number; body_pattern: string; is_active?: number;
     retry_strategy?: string; retry_delay_ms?: number; max_retries?: number; max_delay_ms?: number;
+    provider_id?: string | null; body_matchers?: string | null;
   },
 ): string {
   const id = randomUUID();
   const now = new Date().toISOString();
   db.prepare(
-    `INSERT INTO retry_rules (id, name, status_code, body_pattern, is_active, created_at, retry_strategy, retry_delay_ms, max_retries, max_delay_ms)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO retry_rules (id, name, status_code, body_pattern, is_active, created_at, retry_strategy, retry_delay_ms, max_retries, max_delay_ms, provider_id, body_matchers)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(id, rule.name, rule.status_code, rule.body_pattern, rule.is_active ?? 1, now,
-    rule.retry_strategy ?? "exponential", rule.retry_delay_ms ?? DEFAULT_RETRY_DELAY_MS, rule.max_retries ?? DEFAULT_MAX_RETRIES, rule.max_delay_ms ?? DEFAULT_MAX_DELAY_MS);
+    rule.retry_strategy ?? "exponential", rule.retry_delay_ms ?? DEFAULT_RETRY_DELAY_MS, rule.max_retries ?? DEFAULT_MAX_RETRIES, rule.max_delay_ms ?? DEFAULT_MAX_DELAY_MS,
+    rule.provider_id ?? null, rule.body_matchers ?? null);
   return id;
 }
 
 export function updateRetryRule(
   db: Database.Database,
   id: string,
-  fields: Partial<Pick<RetryRule, "name" | "status_code" | "body_pattern" | "is_active" | "retry_strategy" | "retry_delay_ms" | "max_retries" | "max_delay_ms">>,
+  fields: Partial<Pick<RetryRule, "name" | "status_code" | "body_pattern" | "is_active" | "retry_strategy" | "retry_delay_ms" | "max_retries" | "max_delay_ms" | "provider_id" | "body_matchers">>,
 ): void {
   buildUpdateQuery(db, "retry_rules", id, fields, RETRY_FIELDS);
 }

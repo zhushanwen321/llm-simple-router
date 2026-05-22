@@ -40,6 +40,8 @@ export interface ResilienceConfig {
   isFailover: boolean;
   /** 全局迭代上限，防止极端配置导致 while(true) 循环过多 */
   iterationCap?: number;
+  /** 当前 provider ID，用于 RetryRuleMatcher 按 provider 过滤规则 */
+  providerId?: string;
 }
 
 export interface ResilienceResult {
@@ -122,7 +124,7 @@ export class ResilienceLayer {
       }
       const body = extractBody(result);
       if (body && config.ruleMatcher) {
-        const matchedRule = config.ruleMatcher.match(result.statusCode, body);
+        const matchedRule = config.ruleMatcher.match(result.statusCode, body, config.providerId);
         if (matchedRule && state.attemptCount < matchedRule.max_retries) {
           const strategy = createStrategy(matchedRule);
           return { action: "retry", delayMs: strategy.getDelay(state.attemptCount) };
@@ -164,7 +166,7 @@ export class ResilienceLayer {
     if (result.statusCode >= config.failoverThreshold) {
       const body = extractBody(result);
       const matchedRule = body && config.ruleMatcher
-        ? config.ruleMatcher.match(result.statusCode, body)
+        ? config.ruleMatcher.match(result.statusCode, body, config.providerId)
         : null;
 
       if (matchedRule && state.attemptCount < matchedRule.max_retries) {
@@ -183,7 +185,7 @@ export class ResilienceLayer {
     // 其他响应（< failoverThreshold 的非成功） -> 仅当 rule 匹配才 retry
     const body = extractBody(result);
     if (body && config.ruleMatcher) {
-      const matchedRule = config.ruleMatcher.match(result.statusCode, body);
+      const matchedRule = config.ruleMatcher.match(result.statusCode, body, config.providerId);
       if (matchedRule && state.attemptCount < matchedRule.max_retries) {
         const strategy = createStrategy(matchedRule);
         return { action: "retry", delayMs: strategy.getDelay(state.attemptCount) };

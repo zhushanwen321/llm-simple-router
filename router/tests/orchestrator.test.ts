@@ -149,7 +149,7 @@ describe("ProxyOrchestrator", () => {
     );
     expect(deps.resilience.execute).toHaveBeenCalledWith(
       expect.any(Function), expect.any(Function),
-      { baseDelayMs: 2000, failoverThreshold: 500, isFailover: true },
+      { baseDelayMs: 2000, failoverThreshold: 500, isFailover: true, providerId: defaultConfig.provider.id },
     );
   });
 

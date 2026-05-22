@@ -5,19 +5,7 @@
         {{ t("retryRules.title") }}
       </h2>
       <Button @click="openCreate" class="flex items-center gap-1">
-        <svg
-          class="w-4 h-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M12 4v16m8-8H4"
-          />
-        </svg>
+        <Plus class="w-4 h-4" />
         {{ t("retryRules.addRule") }}
       </Button>
     </div>
@@ -36,6 +24,9 @@
               t("retryRules.tableHeaders.bodyPattern")
             }}</TableHead>
             <TableHead class="text-muted-foreground">{{
+              t("retryRules.tableHeaders.provider")
+            }}</TableHead>
+            <TableHead class="text-muted-foreground">{{
               t("retryRules.tableHeaders.retryStrategy")
             }}</TableHead>
             <TableHead class="text-muted-foreground">{{
@@ -51,15 +42,23 @@
             <TableCell class="font-mono text-sm">{{ r.name }}</TableCell>
             <TableCell>{{ r.status_code }}</TableCell>
             <TableCell class="font-mono text-xs text-muted-foreground">{{
-              r.body_pattern
+              formatBodyMatch(r)
             }}</TableCell>
             <TableCell>
+              <Badge v-if="!r.provider_id" variant="secondary">{{
+                t("retryRules.globalBadge")
+              }}</Badge>
+              <span v-else>{{ getProviderName(r.provider_id) }}</span>
+            </TableCell>
+            <TableCell>
               <div class="flex items-center gap-2">
-                <Badge variant="outline">{{
-                  r.retry_strategy === "fixed"
-                    ? t("retryRules.strategy.fixed")
-                    : t("retryRules.strategy.exponential")
-                }}</Badge>
+                <Badge variant="outline">
+                  {{
+                    r.retry_strategy === "fixed"
+                      ? t("retryRules.strategy.fixed")
+                      : t("retryRules.strategy.exponential")
+                  }}
+                </Badge>
                 <span class="text-xs text-muted-foreground">
                   {{ r.retry_delay_ms / 1000 }}s ·
                   {{ t("retryRules.times", { count: r.max_retries }) }}
@@ -69,15 +68,15 @@
                       t("retryRules.upperLimit", {
                         value: r.max_delay_ms / 1000,
                       })
-                    }}</template
-                  >
+                    }}
+                  </template>
                 </span>
               </div>
             </TableCell>
             <TableCell>
-              <Badge :variant="r.is_active ? 'default' : 'secondary'">{{
-                r.is_active ? t("common.enabled") : t("common.disabled")
-              }}</Badge>
+              <Badge :variant="r.is_active ? 'default' : 'secondary'">
+                {{ r.is_active ? t("common.enabled") : t("common.disabled") }}
+              </Badge>
             </TableCell>
             <TableCell class="text-right">
               <Button
@@ -98,7 +97,7 @@
           </TableRow>
           <TableRow v-if="rules.length === 0">
             <TableCell
-              colspan="6"
+              colspan="7"
               class="text-center text-muted-foreground py-8"
               >{{ t("retryRules.noRules") }}</TableCell
             >
@@ -109,7 +108,7 @@
 
     <!-- Create/Edit Dialog -->
     <Dialog v-model:open="dialogOpen">
-      <DialogContent>
+      <DialogContent class="max-w-lg">
         <DialogHeader>
           <DialogTitle>{{
             editingId
@@ -134,6 +133,25 @@
           </div>
           <div>
             <Label class="block text-sm font-medium text-foreground mb-1">{{
+              t("retryRules.provider")
+            }}</Label>
+            <Select v-model="form.provider_id">
+              <SelectTrigger class="w-full"
+                ><SelectValue
+                  :placeholder="t('retryRules.providerPlaceholder')"
+              /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">{{
+                  t("retryRules.providerAll")
+                }}</SelectItem>
+                <SelectItem v-for="p in providers" :key="p.id" :value="p.id">{{
+                  p.name
+                }}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label class="block text-sm font-medium text-foreground mb-1">{{
               t("retryRules.dialog.statusCode")
             }}</Label>
             <Input
@@ -146,32 +164,106 @@
               {{ errors.status_code }}
             </p>
           </div>
+          <!-- Body Match: Tabs -->
           <div>
             <Label class="block text-sm font-medium text-foreground mb-1">{{
               t("retryRules.dialog.bodyPattern")
             }}</Label>
-            <Input
-              v-model="form.body_pattern"
-              type="text"
-              :placeholder="t('retryRules.dialog.bodyPatternPlaceholder')"
-              required
-              @input="delete errors.body_pattern"
-            />
-            <p v-if="errors.body_pattern" class="text-sm text-destructive mt-1">
-              {{ errors.body_pattern }}
-            </p>
+            <Tabs v-model="form.matchMode">
+              <TabsList class="mb-2">
+                <TabsTrigger value="regex">{{
+                  t("retryRules.regexMatch")
+                }}</TabsTrigger>
+                <TabsTrigger value="json">{{
+                  t("retryRules.jsonMatch")
+                }}</TabsTrigger>
+              </TabsList>
+              <TabsContent value="regex">
+                <Input
+                  v-model="form.body_pattern"
+                  type="text"
+                  :placeholder="t('retryRules.dialog.bodyPatternPlaceholder')"
+                  @input="delete errors.body_pattern"
+                />
+                <p
+                  v-if="errors.body_pattern"
+                  class="text-sm text-destructive mt-1"
+                >
+                  {{ errors.body_pattern }}
+                </p>
+              </TabsContent>
+              <TabsContent value="json">
+                <div class="space-y-2">
+                  <div
+                    v-for="(m, idx) in form.bodyMatchers"
+                    :key="idx"
+                    class="flex items-start gap-2"
+                  >
+                    <Input
+                      v-model="m.path"
+                      :placeholder="t('retryRules.fieldPath')"
+                      class="flex-1"
+                    />
+                    <Select v-model="m.operator">
+                      <SelectTrigger class="w-28 shrink-0"
+                        ><SelectValue
+                      /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="equals">{{
+                          t("retryRules.operatorEquals")
+                        }}</SelectItem>
+                        <SelectItem value="contains">{{
+                          t("retryRules.operatorContains")
+                        }}</SelectItem>
+                        <SelectItem value="exists">{{
+                          t("retryRules.operatorExists")
+                        }}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      v-if="m.operator !== 'exists'"
+                      v-model="m.value"
+                      :placeholder="t('retryRules.matchValue')"
+                      class="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      class="shrink-0 text-muted-foreground"
+                      @click="removeMatcher(idx)"
+                    >
+                      <X class="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    @click="addMatcher"
+                  >
+                    <Plus class="w-3 h-3 mr-1" />
+                    {{ t("retryRules.addCondition") }}
+                  </Button>
+                  <p
+                    v-if="errors.body_matchers"
+                    class="text-sm text-destructive mt-1"
+                  >
+                    {{ errors.body_matchers }}
+                  </p>
+                </div>
+              </TabsContent>
+            </Tabs>
           </div>
-          <!-- 重试策略 -->
           <div>
             <Label class="block text-sm font-medium text-foreground mb-1">{{
               t("retryRules.dialog.retryStrategy")
             }}</Label>
             <Select v-model="form.retry_strategy">
-              <SelectTrigger class="w-full">
-                <SelectValue
+              <SelectTrigger class="w-full"
+                ><SelectValue
                   :placeholder="t('retryRules.dialog.selectStrategy')"
-                />
-              </SelectTrigger>
+              /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="exponential">{{
                   t("retryRules.strategy.exponential")
@@ -184,11 +276,13 @@
           </div>
           <div class="grid grid-cols-2 gap-3">
             <div>
-              <Label class="block text-sm font-medium text-foreground mb-1">{{
-                form.retry_strategy === "fixed"
-                  ? t("retryRules.dialog.intervalMs")
-                  : t("retryRules.dialog.initialDelayMs")
-              }}</Label>
+              <Label class="block text-sm font-medium text-foreground mb-1">
+                {{
+                  form.retry_strategy === "fixed"
+                    ? t("retryRules.dialog.intervalMs")
+                    : t("retryRules.dialog.initialDelayMs")
+                }}
+              </Label>
               <Input
                 v-model.number="form.retry_delay_ms"
                 type="number"
@@ -257,7 +351,7 @@
       </DialogContent>
     </Dialog>
 
-    <!-- Delete Confirm AlertDialog -->
+    <!-- Delete Confirm -->
     <AlertDialog
       :open="!!deleteTarget"
       @update:open="
@@ -286,106 +380,21 @@
       </AlertDialogContent>
     </AlertDialog>
 
-    <!-- 推荐重试规则 -->
-    <Card v-if="recommendedRules.length > 0" class="mt-6">
-      <Collapsible v-model:open="recOpen">
-        <CollapsibleTrigger as-child>
-          <CardHeader
-            class="cursor-pointer hover:bg-muted/50 transition-colors"
-          >
-            <div class="flex items-center justify-between">
-              <CardTitle class="text-sm font-medium">{{
-                t("retryRules.recommended.title", {
-                  count: recommendedRules.length,
-                })
-              }}</CardTitle>
-              <ChevronDown
-                class="h-4 w-4 text-muted-foreground transition-transform"
-                :class="{ 'rotate-180': recOpen }"
-              />
-            </div>
-          </CardHeader>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <CardContent>
-            <div class="flex items-center justify-between mb-3">
-              <div class="flex items-center gap-2">
-                <Checkbox
-                  :model-value="recAllChecked"
-                  @update:model-value="toggleRecAll"
-                />
-                <span class="text-sm text-muted-foreground">{{
-                  t("retryRules.recommended.selectAll")
-                }}</span>
-              </div>
-              <Button
-                size="sm"
-                :disabled="recSelected.size === 0"
-                @click="addRecRules"
-              >
-                {{
-                  t("retryRules.recommended.addSelected", {
-                    count: recSelected.size,
-                  })
-                }}
-              </Button>
-            </div>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead class="w-10"></TableHead>
-                  <TableHead>{{
-                    t("retryRules.recommended.headers.name")
-                  }}</TableHead>
-                  <TableHead>{{
-                    t("retryRules.recommended.headers.statusCode")
-                  }}</TableHead>
-                  <TableHead>{{
-                    t("retryRules.recommended.headers.pattern")
-                  }}</TableHead>
-                  <TableHead>{{
-                    t("retryRules.recommended.headers.strategy")
-                  }}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <TableRow v-for="rule in recommendedRules" :key="rule.name">
-                  <TableCell>
-                    <Checkbox
-                      :model-value="recSelected.has(rule.name)"
-                      @update:model-value="() => toggleRec(rule.name)"
-                    />
-                  </TableCell>
-                  <TableCell>{{ rule.name }}</TableCell>
-                  <TableCell>{{ rule.status_code }}</TableCell>
-                  <TableCell class="font-mono text-xs max-w-[200px] truncate">{{
-                    rule.body_pattern
-                  }}</TableCell>
-                  <TableCell>{{
-                    rule.retry_strategy === "fixed"
-                      ? t("retryRules.strategy.fixed")
-                      : t("retryRules.strategy.exponential")
-                  }}</TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </CardContent>
-        </CollapsibleContent>
-      </Collapsible>
-    </Card>
+    <RecommendedRules :rules="recommendedRules" @added="onRecommendedAdded" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { toast } from "vue-sonner";
 import { api, getApiMessage, type RecommendedRetryRule } from "@/api/client";
+import type { Provider } from "@/types/mapping";
+import type { RetryRule } from "@/types/models";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
   TableHeader,
@@ -412,45 +421,102 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ChevronDown } from "lucide-vue-next";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Plus, X } from "lucide-vue-next";
+import RecommendedRules from "@/components/retry-rules/RecommendedRules.vue";
 
 const { t } = useI18n();
 
-import type { RetryRule } from "@/types/models";
+interface BodyMatcher {
+  path: string;
+  operator: string;
+  value: string;
+}
+interface FormData {
+  name: string;
+  status_code: number;
+  body_pattern: string;
+  provider_id: string;
+  is_active: boolean;
+  retry_strategy: "fixed" | "exponential";
+  retry_delay_ms: number;
+  max_retries: number;
+  max_delay_ms: number;
+  matchMode: "regex" | "json";
+  bodyMatchers: BodyMatcher[];
+}
 
-const DEFAULT_FORM = {
+const DEFAULT_FORM: FormData = {
   name: "",
   status_code: 429,
   body_pattern: "",
+  provider_id: "",
   is_active: true,
-  retry_strategy: "exponential" as "fixed" | "exponential",
+  retry_strategy: "exponential",
   retry_delay_ms: 5000,
   max_retries: 10,
   max_delay_ms: 60000,
+  matchMode: "regex",
+  bodyMatchers: [],
 };
 
 const rules = ref<RetryRule[]>([]);
+const providers = ref<Provider[]>([]);
 const dialogOpen = ref(false);
 const editingId = ref<string | null>(null);
 const deleteTarget = ref<RetryRule | null>(null);
-const form = ref({ ...DEFAULT_FORM });
+const form = ref<FormData>({ ...DEFAULT_FORM, bodyMatchers: [] });
 const errors = ref<Record<string, string>>({});
+const recommendedRules = ref<RecommendedRetryRule[]>([]);
 
 const MIN_STATUS_CODE = 100;
 const MAX_STATUS_CODE = 599;
 const MIN_DELAY_MS = 100;
 const MAX_RETRIES = 100;
+
+const OPERATOR_LABELS: Record<string, string> = {
+  equals: t("retryRules.operatorEquals"),
+  contains: t("retryRules.operatorContains"),
+  exists: t("retryRules.operatorExists"),
+};
+
+function getProviderName(id: string): string {
+  const p = providers.value.find((pr) => pr.id === id);
+  return p ? p.name : id;
+}
+
+function formatBodyMatch(r: RetryRule): string {
+  if (r.body_matchers) {
+    try {
+      const matchers = JSON.parse(r.body_matchers) as BodyMatcher[];
+      return matchers
+        .map((m) => {
+          const op = OPERATOR_LABELS[m.operator] ?? m.operator;
+          return m.operator === "exists"
+            ? `${m.path} ${op}`
+            : `${m.path} ${op} "${m.value}"`;
+        })
+        .join(", ");
+    } catch {
+      return r.body_matchers;
+    }
+  }
+  return r.body_pattern;
+}
+
+function addMatcher() {
+  form.value.bodyMatchers.push({ path: "", operator: "contains", value: "" });
+}
+
+function removeMatcher(idx: number) {
+  form.value.bodyMatchers.splice(idx, 1);
+}
 
 function validate(): boolean {
   const errs: Record<string, string> = {};
@@ -464,14 +530,22 @@ function validate(): boolean {
       max: MAX_STATUS_CODE,
     });
 
-  if (!form.value.body_pattern.trim())
-    errs.body_pattern = t("retryRules.validation.bodyPatternRequired");
-  else {
-    try {
-      new RegExp(form.value.body_pattern);
-    } catch {
-      errs.body_pattern = t("retryRules.validation.bodyPatternInvalid");
+  if (form.value.matchMode === "regex") {
+    if (!form.value.body_pattern.trim())
+      errs.body_pattern = t("retryRules.validation.bodyPatternRequired");
+    else {
+      try {
+        new RegExp(form.value.body_pattern);
+      } catch {
+        errs.body_pattern = t("retryRules.validation.bodyPatternInvalid");
+      }
     }
+  } else {
+    const valid = form.value.bodyMatchers.some(
+      (m) => m.path.trim() && (m.operator === "exists" || m.value.trim()),
+    );
+    if (!valid)
+      errs.body_matchers = t("retryRules.validation.bodyPatternRequired");
   }
 
   const delay = Number(form.value.retry_delay_ms);
@@ -500,32 +574,61 @@ function validate(): boolean {
 
 async function loadData() {
   try {
-    const res = await api.getRetryRules();
-    rules.value = res;
+    rules.value = await api.getRetryRules();
   } catch (e: unknown) {
-    console.error("Failed to load retry rules:", e);
+    console.error("RetryRules.loadData:", e);
     toast.error(getApiMessage(e, t("retryRules.messages.loadFailed")));
+  }
+}
+
+async function loadProviders() {
+  try {
+    providers.value = await api.getProviders();
+  } catch (e: unknown) {
+    console.error("RetryRules.loadProviders:", e);
+    toast.error(getApiMessage(e, t("retryRules.messages.loadFailed")));
+  }
+}
+
+async function loadRecommended() {
+  try {
+    recommendedRules.value = await api.recommended.getRetryRules();
+  } catch {
+    recommendedRules.value = [];
   }
 }
 
 function openCreate() {
   editingId.value = null;
-  form.value = { ...DEFAULT_FORM };
+  form.value = { ...DEFAULT_FORM, bodyMatchers: [] };
   errors.value = {};
   dialogOpen.value = true;
 }
 
 function openEdit(r: RetryRule) {
   editingId.value = r.id;
+  let matchMode: "regex" | "json" = "regex";
+  let bodyMatchers: BodyMatcher[] = [];
+  if (r.body_matchers) {
+    matchMode = "json";
+    try {
+      bodyMatchers = JSON.parse(r.body_matchers) as BodyMatcher[];
+    } catch {
+      bodyMatchers = [];
+    }
+  }
   form.value = {
     name: r.name,
     status_code: r.status_code,
     body_pattern: r.body_pattern,
+    provider_id: r.provider_id ?? "",
     is_active: !!r.is_active,
     retry_strategy: r.retry_strategy,
     retry_delay_ms: r.retry_delay_ms,
     max_retries: r.max_retries,
     max_delay_ms: r.max_delay_ms,
+    matchMode,
+    bodyMatchers,
   };
   errors.value = {};
   dialogOpen.value = true;
@@ -534,25 +637,33 @@ function openEdit(r: RetryRule) {
 async function handleSave() {
   if (!validate()) return;
   try {
+    const body_matchers =
+      form.value.matchMode === "json"
+        ? JSON.stringify(
+          form.value.bodyMatchers.filter(
+            (m) =>
+              m.path.trim() && (m.operator === "exists" || m.value.trim()),
+          ),
+        )
+        : null;
     const payload = {
       name: form.value.name,
       status_code: Number(form.value.status_code),
       body_pattern: form.value.body_pattern,
+      provider_id: form.value.provider_id || null,
+      body_matchers,
       is_active: form.value.is_active ? 1 : 0,
       retry_strategy: form.value.retry_strategy,
       retry_delay_ms: Number(form.value.retry_delay_ms),
       max_retries: Number(form.value.max_retries),
       max_delay_ms: Number(form.value.max_delay_ms),
     };
-    if (editingId.value) {
-      await api.updateRetryRule(editingId.value, payload);
-    } else {
-      await api.createRetryRule(payload);
-    }
+    if (editingId.value) await api.updateRetryRule(editingId.value, payload);
+    else await api.createRetryRule(payload);
     dialogOpen.value = false;
     await loadData();
   } catch (e: unknown) {
-    console.error("Failed to save retry rule:", e);
+    console.error("RetryRules.handleSave:", e);
     toast.error(getApiMessage(e, t("retryRules.messages.saveFailed")));
   }
 }
@@ -569,70 +680,18 @@ async function handleDelete() {
     await api.deleteRetryRule(target.id);
     await loadData();
   } catch (e: unknown) {
-    console.error("Failed to delete retry rule:", e);
+    console.error("RetryRules.handleDelete:", e);
     toast.error(getApiMessage(e, t("retryRules.messages.deleteFailed")));
   }
 }
 
-// 推荐规则
-const recOpen = ref(false);
-const recommendedRules = ref<RecommendedRetryRule[]>([]);
-const recSelected = ref(new Set<string>());
-
-const recAllChecked = computed(
-  () =>
-    recommendedRules.value.length > 0 &&
-    recSelected.value.size === recommendedRules.value.length,
-);
-
-async function loadRecommended() {
-  try {
-    recommendedRules.value = await api.recommended.getRetryRules();
-  } catch {
-    recommendedRules.value = [];
-  }
-}
-
-function toggleRec(name: string) {
-  const s = new Set(recSelected.value);
-  if (s.has(name)) {
-    s.delete(name);
-  } else {
-    s.add(name);
-  }
-  recSelected.value = s;
-}
-
-function toggleRecAll(checked: boolean | string) {
-  recSelected.value =
-    checked === true
-      ? new Set(recommendedRules.value.map((r) => r.name))
-      : new Set();
-}
-
-async function addRecRules() {
-  const toAdd = recommendedRules.value.filter((r) =>
-    recSelected.value.has(r.name),
-  );
-  for (const rule of toAdd) {
-    await api.createRetryRule({
-      name: rule.name,
-      status_code: rule.status_code,
-      body_pattern: rule.body_pattern,
-      is_active: 1,
-      retry_strategy: rule.retry_strategy,
-      retry_delay_ms: rule.retry_delay_ms,
-      max_retries: rule.max_retries,
-      max_delay_ms: rule.max_delay_ms,
-    });
-  }
-  toast.success(t("retryRules.messages.addedCount", { count: toAdd.length }));
-  recSelected.value = new Set();
+async function onRecommendedAdded() {
   await Promise.allSettled([loadRecommended(), loadData()]);
 }
 
 onMounted(() => {
   loadData();
   loadRecommended();
+  loadProviders();
 });
 </script>
