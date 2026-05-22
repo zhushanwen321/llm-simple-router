@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>路由密钥 - LLM Router Console</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: oklch(0.145 0 0);
+    --surface: oklch(0.205 0 0);
+    --surface-up: oklch(0.269 0 0);
+    --fg: oklch(0.985 0 0);
+    --muted: oklch(0.708 0 0);
+    --border: oklch(1 0 0 / 10%);
+    --primary: oklch(0.68 0.13 175);
+    --success: oklch(0.65 0.17 150);
+    --success-bg: oklch(0.32 0.05 150);
+    --warning: oklch(0.78 0.16 80);
+    --warning-bg: oklch(0.35 0.06 80);
+    --danger: oklch(0.58 0.22 25);
+    --danger-bg: oklch(0.30 0.08 25);
+    --info: oklch(0.62 0.18 250);
+    --info-bg: oklch(0.30 0.06 250);
+    --font-body: 'Inter', -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+    --radius: 8px;
+    --radius-sm: 6px;
+  }
+
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.5;
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .page-header { margin-bottom: 1.5rem; }
+  .page-header h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.02em; }
+  .page-header p { color: var(--muted); font-size: 0.8125rem; margin-top: 0.25rem; }
+
+  .anchor-bar {
+    display: flex; gap: 1.5rem; padding: 1rem 1.25rem;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); margin-bottom: 1rem;
+  }
+  .anchor-item { display: flex; flex-direction: column; gap: 0.125rem; }
+  .anchor-item .label { font-size: 0.6875rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .anchor-item .value { font-family: var(--font-mono); font-size: 1.5rem; font-weight: 600; }
+  .anchor-item .value.success { color: var(--success); }
+  .anchor-divider { width: 1px; background: var(--border); align-self: stretch; }
+
+  .filter-bar {
+    display: flex; gap: 0.75rem; align-items: center;
+    margin-bottom: 1rem; flex-wrap: wrap;
+  }
+  .filter-bar input {
+    font-family: var(--font-body); font-size: 0.8125rem;
+    background: var(--surface); color: var(--fg);
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 0.5rem 0.75rem; outline: none; min-width: 200px;
+  }
+  .filter-bar input:focus { border-color: var(--primary); }
+
+  .btn {
+    font-family: var(--font-body); font-size: 0.8125rem; font-weight: 500;
+    padding: 0.5rem 1rem; border-radius: var(--radius-sm);
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--fg); cursor: pointer; transition: all 150ms; white-space: nowrap;
+  }
+  .btn:hover { background: var(--surface-up); border-color: var(--primary); }
+  .btn-primary {
+    background: var(--primary); color: oklch(0.15 0 0);
+    border-color: var(--primary); font-weight: 600;
+  }
+  .btn-primary:hover { background: oklch(0.72 0.14 175); }
+
+  /* Table */
+  .table-wrap {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    font-size: 0.6875rem; font-weight: 600; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 0.625rem 0.75rem; text-align: left;
+    border-bottom: 1px solid var(--border); background: oklch(0.18 0 0);
+  }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background 100ms; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: oklch(0.22 0 0); }
+  tbody td {
+    padding: 0.5rem 0.75rem; font-size: 0.8125rem;
+    height: 36px; vertical-align: middle;
+  }
+
+  .mono { font-family: var(--font-mono); font-size: 0.8125rem; }
+  .mono-sm { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); }
+
+  .badge {
+    display: inline-flex; align-items: center;
+    padding: 0.125rem 0.5rem; border-radius: 9999px;
+    font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.02em; white-space: nowrap;
+  }
+  .badge-success { background: var(--success-bg); color: var(--success); }
+  .badge-muted { background: oklch(0.269 0 0); color: var(--muted); }
+  .badge-info { background: var(--info-bg); color: var(--info); }
+
+  /* Key display */
+  .key-display {
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+  .key-value {
+    font-family: var(--font-mono); font-size: 0.8125rem;
+    letter-spacing: 0.03em; color: var(--fg);
+  }
+  .key-mask {
+    color: var(--muted); letter-spacing: 0.1em;
+  }
+  .copy-btn {
+    font-size: 0.6875rem; color: var(--muted);
+    background: none; border: 1px solid var(--border);
+    padding: 0.125rem 0.375rem; border-radius: 4px;
+    cursor: pointer; font-family: var(--font-body);
+    transition: all 150ms;
+  }
+  .copy-btn:hover { color: var(--primary); border-color: var(--primary); }
+  .copy-btn.copied {
+    color: var(--success); border-color: var(--success);
+  }
+
+  /* Model whitelist badges */
+  .model-badges { display: flex; gap: 0.25rem; flex-wrap: wrap; }
+  .model-badge {
+    font-size: 0.625rem; font-family: var(--font-mono);
+    padding: 0.0625rem 0.375rem; border-radius: 9999px;
+    background: oklch(0.269 0 0); color: var(--muted);
+  }
+  .model-badge-more {
+    font-size: 0.625rem; font-family: var(--font-body);
+    padding: 0.0625rem 0.375rem; border-radius: 9999px;
+    background: var(--info-bg); color: var(--info);
+  }
+
+  .actions { display: flex; gap: 0.75rem; align-items: center; }
+  .action-link {
+    font-size: 0.8125rem; color: var(--primary); cursor: pointer;
+    background: none; border: none; font-family: var(--font-body);
+    padding: 0; transition: color 150ms;
+  }
+  .action-link:hover { color: oklch(0.78 0.14 175); }
+  .action-link.danger { color: var(--danger); }
+
+  /* Session config indicator */
+  .session-config {
+    display: flex; gap: 0.5rem; align-items: center;
+    font-size: 0.75rem; color: var(--muted);
+  }
+  .session-dot {
+    width: 5px; height: 5px; border-radius: 50%;
+  }
+  .session-dot.active { background: var(--success); }
+  .session-dot.inactive { background: oklch(0.269 0 0); }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>路由密钥</h1>
+  <p>管理客户端 API 密钥、模型白名单与会话配置</p>
+</div>
+
+<!-- Anchor Bar -->
+<div class="anchor-bar">
+  <div class="anchor-item">
+    <span class="label">密钥总数</span>
+    <span class="value">5</span>
+  </div>
+  <div class="anchor-divider"></div>
+  <div class="anchor-item">
+    <span class="label">活跃密钥</span>
+    <span class="value success">3</span>
+  </div>
+</div>
+
+<!-- Filter Bar -->
+<div class="filter-bar">
+  <input type="text" placeholder="搜索密钥名称..." />
+  <div style="flex:1"></div>
+  <button class="btn btn-primary" onclick="alert('新增密钥（demo）')">+ 新增密钥</button>
+</div>
+
+<!-- Table -->
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>名称</th>
+        <th>密钥</th>
+        <th>模型白名单</th>
+        <th>会话配置</th>
+        <th>创建时间</th>
+        <th>操作</th>
+      </tr>
+    </thead>
+    <tbody id="keyTable"></tbody>
+  </table>
+</div>
+
+<script>
+const keys = [
+  {
+    name: '生产环境主密钥',
+    keyPrefix: 'sk-lsr-a3f',
+    keyFull: 'sk-lsr-a3f8c2d1e5b7a9f0c3d2e1b4a5f6c7d8',
+    models: ['gpt-4o', 'claude-sonnet-4-20250514', 'deepseek-r1'],
+    modelCount: 12,
+    sessionTracking: true,
+    sessionSticky: true,
+    created: '2025-03-15'
+  },
+  {
+    name: '开发环境测试密钥',
+    keyPrefix: 'sk-lsr-7b2',
+    keyFull: 'sk-lsr-7b2e4d6c8a0f1e3b5d7c9a2f4e6b8d0c',
+    models: ['gpt-4o-mini', 'deepseek-chat'],
+    modelCount: 5,
+    sessionTracking: true,
+    sessionSticky: false,
+    created: '2025-04-01'
+  },
+  {
+    name: 'CI/CD 自动化密钥',
+    keyPrefix: 'sk-lsr-9e1',
+    keyFull: 'sk-lsr-9e1c3a5b7d9f1e3c5a7b9d1f3e5c7a9b',
+    models: [],
+    modelCount: 0,
+    sessionTracking: false,
+    sessionSticky: false,
+    created: '2025-04-20'
+  },
+  {
+    name: '数据分析团队',
+    keyPrefix: 'sk-lsr-4d8',
+    keyFull: 'sk-lsr-4d8f2c6a0e4b8d2f6a0c4e8b2d6f0a4c',
+    models: ['gpt-4o', 'gemini-2.5-pro'],
+    modelCount: 3,
+    sessionTracking: true,
+    sessionSticky: true,
+    created: '2025-05-10'
+  },
+  {
+    name: '已废弃 - 旧系统迁移',
+    keyPrefix: 'sk-lsr-1a5',
+    keyFull: 'sk-lsr-1a5b3c7d9e1f3a5b7c9d1e3f5a7b9c1d',
+    models: [],
+    modelCount: 0,
+    sessionTracking: false,
+    sessionSticky: false,
+    created: '2025-01-08',
+    deprecated: true
+  }
+];
+
+function renderTable() {
+  const tbody = document.getElementById('keyTable');
+  tbody.innerHTML = keys.map((k, i) => {
+    const masked = k.keyPrefix + '...' + '••••••••••••••••••••••••';
+
+    let modelHtml;
+    if (k.modelCount === 0) {
+      modelHtml = '<span class="badge badge-info">全部模型</span>';
+    } else {
+      const visibleBadges = k.models.slice(0, 2).map(m => `<span class="model-badge">${m}</span>`).join('');
+      const moreBadge = k.modelCount > 2 ? `<span class="model-badge-more">+${k.modelCount - 2}</span>` : '';
+      modelHtml = `<div class="model-badges">${visibleBadges}${moreBadge}</div>`;
+    }
+
+    const sessionHtml = `
+      <div class="session-config">
+        <span class="session-dot ${k.sessionTracking ? 'active' : 'inactive'}"></span>
+        ${k.sessionTracking ? '跟踪' + (k.sessionSticky ? ' + 粘性' : '') : '未启用'}
+      </div>
+    `;
+
+    const nameStyle = k.deprecated ? 'style="text-decoration:line-through;color:var(--muted)"' : '';
+
+    return `<tr${k.deprecated ? ' style="opacity:0.5"' : ''}>
+      <td style="font-weight:500" ${nameStyle}>${k.name}</td>
+      <td>
+        <div class="key-display">
+          <span class="key-value">${k.keyPrefix}<span class="key-mask">••••••••••••••••••••</span></span>
+          <button class="copy-btn" id="copy-${i}" onclick="copyKey(${i})">复制</button>
+        </div>
+      </td>
+      <td>${modelHtml}</td>
+      <td>${sessionHtml}</td>
+      <td class="mono-sm">${k.created}</td>
+      <td>
+        <div class="actions">
+          <button class="action-link">编辑</button>
+          ${k.deprecated
+            ? '<button class="action-link danger">删除</button>'
+            : '<button class="action-link danger">禁用</button>'}
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function copyKey(index) {
+  const btn = document.getElementById(`copy-${index}`);
+  btn.textContent = 'Copied!';
+  btn.classList.add('copied');
+  // 模拟复制到剪贴板
+  navigator.clipboard?.writeText(keys[index].keyFull);
+  setTimeout(() => {
+    btn.textContent = '复制';
+    btn.classList.remove('copied');
+  }, 2000);
+}
+
+renderTable();
+</script>
+</body>
+</html>

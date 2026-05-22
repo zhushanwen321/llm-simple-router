@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Provider 管理 - LLM Router Console</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: oklch(0.145 0 0);
+    --surface: oklch(0.205 0 0);
+    --surface-up: oklch(0.269 0 0);
+    --fg: oklch(0.985 0 0);
+    --muted: oklch(0.708 0 0);
+    --border: oklch(1 0 0 / 10%);
+    --primary: oklch(0.68 0.13 175);
+    --primary-dim: oklch(0.48 0.12 175);
+    --success: oklch(0.65 0.17 150);
+    --success-bg: oklch(0.32 0.05 150);
+    --warning: oklch(0.78 0.16 80);
+    --warning-bg: oklch(0.35 0.06 80);
+    --danger: oklch(0.58 0.22 25);
+    --danger-bg: oklch(0.30 0.08 25);
+    --info: oklch(0.62 0.18 250);
+    --info-bg: oklch(0.30 0.06 250);
+    --font-body: 'Inter', -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+    --radius: 8px;
+    --radius-sm: 6px;
+  }
+
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.5;
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  /* Page Header */
+  .page-header { margin-bottom: 1.5rem; }
+  .page-header h1 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  .page-header p { color: var(--muted); font-size: 0.8125rem; margin-top: 0.25rem; }
+
+  /* Anchor Bar */
+  .anchor-bar {
+    display: flex;
+    gap: 1.5rem;
+    padding: 1rem 1.25rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 1rem;
+  }
+  .anchor-item { display: flex; flex-direction: column; gap: 0.125rem; }
+  .anchor-item .label { font-size: 0.6875rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .anchor-item .value { font-family: var(--font-mono); font-size: 1.5rem; font-weight: 600; }
+  .anchor-item .value.success { color: var(--success); }
+  .anchor-item .value.muted-color { color: var(--muted); }
+  .anchor-divider { width: 1px; background: var(--border); align-self: stretch; }
+
+  /* Filter Bar */
+  .filter-bar {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+  }
+  .filter-bar select, .filter-bar input {
+    font-family: var(--font-body);
+    font-size: 0.8125rem;
+    background: var(--surface);
+    color: var(--fg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.5rem 0.75rem;
+    outline: none;
+    transition: border-color 150ms;
+  }
+  .filter-bar select:focus, .filter-bar input:focus {
+    border-color: var(--primary);
+  }
+  .filter-bar input { flex: 1; min-width: 200px; }
+  .filter-bar select { min-width: 120px; cursor: pointer; }
+
+  .btn {
+    font-family: var(--font-body);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--fg);
+    cursor: pointer;
+    transition: all 150ms;
+    white-space: nowrap;
+  }
+  .btn:hover { background: var(--surface-up); border-color: var(--primary); }
+  .btn-primary {
+    background: var(--primary);
+    color: oklch(0.15 0 0);
+    border-color: var(--primary);
+    font-weight: 600;
+  }
+  .btn-primary:hover { background: oklch(0.72 0.14 175); }
+
+  /* Table */
+  .table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.625rem 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    background: oklch(0.18 0 0);
+  }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background 100ms; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: oklch(0.22 0 0); }
+  tbody td {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8125rem;
+    height: 36px;
+    vertical-align: middle;
+  }
+
+  /* Mono values */
+  .mono { font-family: var(--font-mono); font-size: 0.8125rem; }
+  .mono-sm { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); }
+
+  /* Badge */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+  }
+  .badge-success { background: var(--success-bg); color: var(--success); }
+  .badge-warning { background: var(--warning-bg); color: var(--warning); }
+  .badge-danger { background: var(--danger-bg); color: var(--danger); }
+  .badge-muted { background: oklch(0.269 0 0); color: var(--muted); }
+
+  /* Connection Status */
+  .conn-status { display: flex; align-items: center; gap: 0.375rem; }
+  .conn-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    display: inline-block;
+  }
+  .conn-dot.success { background: var(--success); }
+  .conn-dot.danger { background: var(--danger); }
+  .conn-dot.testing { background: var(--muted); animation: pulse 1.5s infinite; }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* Action Links */
+  .actions { display: flex; gap: 0.75rem; align-items: center; }
+  .action-link {
+    font-size: 0.8125rem;
+    color: var(--primary);
+    cursor: pointer;
+    text-decoration: none;
+    background: none;
+    border: none;
+    font-family: var(--font-body);
+    padding: 0;
+    transition: color 150ms;
+  }
+  .action-link:hover { color: oklch(0.78 0.14 175); }
+  .action-link.danger { color: var(--danger); }
+  .action-link.danger:hover { color: oklch(0.68 0.22 25); }
+  .action-link.muted-action { color: var(--muted); }
+
+  /* Progress bar */
+  .progress-bar {
+    width: 100%;
+    height: 4px;
+    background: oklch(0.269 0 0);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .progress-bar .fill {
+    height: 100%;
+    border-radius: 2px;
+    background: var(--primary);
+    transition: width 300ms;
+  }
+
+  .tooltip-text { font-size: 0.6875rem; color: var(--muted); font-family: var(--font-body); }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>Provider 管理</h1>
+  <p>管理上游 API 供应商连接与并发配置</p>
+</div>
+
+<!-- Anchor Bar -->
+<div class="anchor-bar">
+  <div class="anchor-item">
+    <span class="label">Provider 总数</span>
+    <span class="value">6</span>
+  </div>
+  <div class="anchor-divider"></div>
+  <div class="anchor-item">
+    <span class="label">启用</span>
+    <span class="value success">4</span>
+  </div>
+  <div class="anchor-divider"></div>
+  <div class="anchor-item">
+    <span class="label">禁用</span>
+    <span class="value muted-color">2</span>
+  </div>
+</div>
+
+<!-- Filter Bar -->
+<div class="filter-bar">
+  <select id="statusFilter">
+    <option value="all">全部状态</option>
+    <option value="enabled">启用</option>
+    <option value="disabled">禁用</option>
+  </select>
+  <input type="text" id="searchInput" placeholder="搜索 Provider 名称或 URL..." />
+  <div style="flex:1"></div>
+  <button class="btn btn-primary" onclick="alert('新增 Provider 表单（demo）')">+ 新增 Provider</button>
+</div>
+
+<!-- Table -->
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>名称</th>
+        <th>API Base URL</th>
+        <th>模型数</th>
+        <th>并发配置</th>
+        <th>连接状态</th>
+        <th>状态</th>
+        <th>操作</th>
+      </tr>
+    </thead>
+    <tbody id="providerTable"></tbody>
+  </table>
+</div>
+
+<script>
+const providers = [
+  {
+    name: 'OpenAI',
+    url: 'https://api.openai.com/v1',
+    models: 12,
+    maxConcurrency: 50,
+    queueTimeout: '30s',
+    connStatus: 'connected',
+    connLabel: 'Connected',
+    enabled: true
+  },
+  {
+    name: 'Anthropic',
+    url: 'https://api.anthropic.com',
+    models: 8,
+    maxConcurrency: 30,
+    queueTimeout: '30s',
+    connStatus: 'connected',
+    connLabel: 'Connected',
+    enabled: true
+  },
+  {
+    name: 'DeepSeek',
+    url: 'https://api.deepseek.com/v1',
+    models: 5,
+    maxConcurrency: 20,
+    queueTimeout: '60s',
+    connStatus: 'connected',
+    connLabel: 'Connected',
+    enabled: true
+  },
+  {
+    name: 'Google Gemini',
+    url: 'https://generativelanguage.googleapis.com/v1beta',
+    models: 6,
+    maxConcurrency: 40,
+    queueTimeout: '30s',
+    connStatus: 'testing',
+    connLabel: 'Testing...',
+    enabled: true
+  },
+  {
+    name: 'Moonshot',
+    url: 'https://api.moonshot.cn/v1',
+    models: 3,
+    maxConcurrency: 10,
+    queueTimeout: '30s',
+    connStatus: 'error',
+    connLabel: '连接超时',
+    enabled: false
+  },
+  {
+    name: 'Azure OpenAI',
+    url: 'https://my-resource.openai.azure.com/openai',
+    models: 10,
+    maxConcurrency: 80,
+    queueTimeout: '45s',
+    connStatus: 'connected',
+    connLabel: 'Connected',
+    enabled: false
+  }
+];
+
+function renderTable() {
+  const tbody = document.getElementById('providerTable');
+  const filter = document.getElementById('statusFilter').value;
+  const search = document.getElementById('searchInput').value.toLowerCase();
+
+  const filtered = providers.filter(p => {
+    if (filter === 'enabled' && !p.enabled) return false;
+    if (filter === 'disabled' && p.enabled) return false;
+    if (search && !p.name.toLowerCase().includes(search) && !p.url.toLowerCase().includes(search)) return false;
+    return true;
+  });
+
+  tbody.innerHTML = filtered.map(p => {
+    const statusBadge = p.enabled
+      ? '<span class="badge badge-success">启用</span>'
+      : '<span class="badge badge-muted">禁用</span>';
+
+    let connDot, connBadge;
+    if (p.connStatus === 'connected') {
+      connDot = 'success';
+      connBadge = '<span class="badge badge-success" style="font-size:0.625rem">Connected</span>';
+    } else if (p.connStatus === 'testing') {
+      connDot = 'testing';
+      connBadge = '<span class="badge badge-muted" style="font-size:0.625rem">Testing...</span>';
+    } else {
+      connDot = 'danger';
+      connBadge = `<span class="badge badge-danger" style="font-size:0.625rem">${p.connLabel}</span>`;
+    }
+
+    const toggleAction = p.enabled
+      ? '<button class="action-link danger" onclick="alert(\'禁用 Provider（demo）\')">禁用</button>'
+      : '<button class="action-link" onclick="alert(\'启用 Provider（demo）\')">启用</button>';
+
+    return `<tr>
+      <td style="font-weight:600">${p.name}</td>
+      <td class="mono-sm">${p.url}</td>
+      <td class="mono">${p.models}</td>
+      <td>
+        <div style="display:flex;gap:0.75rem;align-items:center">
+          <span class="mono-sm">${p.maxConcurrency} 并发</span>
+          <span style="color:var(--border)">/</span>
+          <span class="mono-sm">${p.queueTimeout}</span>
+        </div>
+      </td>
+      <td>
+        <div class="conn-status">
+          <span class="conn-dot ${connDot}"></span>
+          ${connBadge}
+        </div>
+      </td>
+      <td>${statusBadge}</td>
+      <td>
+        <div class="actions">
+          <button class="action-link" onclick="alert('编辑 Provider（demo）')">编辑</button>
+          <button class="action-link" onclick="alert('测试连接（demo）')">测试</button>
+          ${toggleAction}
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+document.getElementById('statusFilter').addEventListener('change', renderTable);
+document.getElementById('searchInput').addEventListener('input', renderTable);
+
+renderTable();
+</script>
+</body>
+</html>
