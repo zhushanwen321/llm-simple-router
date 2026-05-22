@@ -319,8 +319,22 @@ export async function executeFailoverLoop(
 
     const provider = getProviderById(db, resolved.provider_id);
     if (!provider || !provider.is_active) {
-      return rejectAndReply(reply, rCtx, errors.providerUnavailable(),
-        `Provider '${resolved.provider_id}' unavailable`, resolved.provider_id);
+      lastFailoverTrigger = "provider_unavailable";
+      insertRejectedLog({
+        db, logId, apiType: clientApiType as "openai" | "openai-responses" | "anthropic",
+        model: clientModel, statusCode: 503,
+        errorMessage: `Provider '${resolved.provider_id}' unavailable`,
+        startTime, isStream, routerKeyId,
+        originalBody: rawBody, clientHeaders: cliHdrs,
+        providerId: resolved.provider_id, originalModel: null,
+        isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null,
+        sessionId: ctx.metadata.get("session_id") as string | undefined,
+        pipelineSnapshot: iterationSnapshot.toJSON(),
+        matcher, logFileWriter,
+        mapping_reason: rCtx.mappingReason ?? null,
+      });
+      excludeTargets.push(resolved);
+      continue;
     }
 
 

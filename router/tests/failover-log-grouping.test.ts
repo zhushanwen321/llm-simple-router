@@ -403,6 +403,109 @@ describe("Failover log grouping", () => {
     expect(logs[2].provider_id).toBeNull();
   });
 
+  it("failover: primary provider does not exist, falls back to secondary provider", async () => {
+    const { server: fallbackServer, port: fallbackPort } =
+      await createMockBackend((_req, res) => {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(SUCCESS_BODY));
+      });
+    servers.push(fallbackServer);
+
+    db = initDatabase(":memory:");
+    setSetting(db, "encryption_key", TEST_ENCRYPTION_KEY);
+    setSetting(db, "initialized", "true");
+
+    const now = new Date().toISOString();
+    const encryptedKey = encrypt("sk-test-key", TEST_ENCRYPTION_KEY);
+
+    // Insert fallback provider only; primary provider "prov-missing" is absent
+    db.prepare(
+      `INSERT INTO providers (id, name, api_type, base_url, api_key, is_active, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      "prov-fallback",
+      "Fallback",
+      "openai",
+      `http://127.0.0.1:${fallbackPort}`,
+      encryptedKey,
+      1,
+      now,
+      now
+    );
+
+    db.prepare(
+      `INSERT INTO mapping_groups (id, client_model, rule, is_active, created_at)
+       VALUES (?, ?, ?, ?, ?)`
+    ).run(
+      "mg-failover",
+      "gpt-4",
+      JSON.stringify({
+        targets: [
+          { backend_model: "gpt-4", provider_id: "prov-missing" },
+          { backend_model: "gpt-4", provider_id: "prov-fallback" },
+        ],
+      }),
+      1,
+      now
+    );
+
+    db.prepare(
+      "INSERT INTO router_keys (id, name, key_hash, key_prefix) VALUES (?, ?, ?, ?)"
+    ).run("test-router-key", "Test Key", API_KEY_HASH, API_KEY.slice(0, 8));
+
+    const container = new ServiceContainer();
+    container.register("semaphoreManager", () => new ProviderSemaphoreManager());
+    container.register("tracker", (c) => new RequestTracker({ semaphoreManager: c.resolve("semaphoreManager") }));
+    container.register("matcher", () => undefined);
+    container.register("usageWindowTracker", () => undefined);
+    container.register("sessionTracker", () => undefined);
+    container.register("adaptiveController", () => undefined);
+    container.register(SERVICE_KEYS.logFileWriter, () => null);
+    container.register(SERVICE_KEYS.pluginRegistry, () => undefined);
+    container.register(SERVICE_KEYS.proxyAgentFactory, () => new ProxyAgentFactory());
+
+    const formatRegistry = new FormatRegistry();
+    formatRegistry.registerAdapter(openaiAdapter);
+    container.register(SERVICE_KEYS.formatRegistry, () => formatRegistry);
+    app = Fastify();
+    app.register(authMiddleware, { db });
+    app.register(createProxyHandler({ apiType: "openai", paths: ["/v1/chat/completions", "/chat/completions"] }), { db: db, container });
+
+    const resp = await app.inject({
+      method: "POST",
+      url: "/v1/chat/completions",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${API_KEY}`,
+      },
+      payload: {
+        model: "gpt-4",
+        messages: [{ role: "user", content: "Hi" }],
+      },
+    });
+
+    // Should succeed via failover to fallback provider
+    expect(resp.statusCode).toBe(200);
+
+    const logs = db
+      .prepare("SELECT id, status_code, is_failover, is_retry, original_request_id, provider_id FROM request_logs ORDER BY rowid ASC")
+      .all() as any[];
+
+    // 2 logs: first iteration skipped (provider missing, no network call) + fallback success
+    expect(logs).toHaveLength(2);
+
+    // First log: provider missing, marked as failover with no provider_id
+    expect(logs[0].status_code).toBe(503);
+    expect(logs[0].is_failover).toBe(0);
+    expect(logs[0].provider_id).toBe("prov-missing");
+
+    // Second log: fallback success
+    expect(logs[1].status_code).toBe(200);
+    expect(logs[1].is_failover).toBe(1);
+    expect(logs[1].provider_id).toBe("prov-fallback");
+    expect(logs[1].original_request_id).toBe(logs[0].id);
+  });
+
   it("retry+failover: primary retriable error exhausts retries, failover to fallback succeeds", async () => {
     let primaryCalls = 0;
     const { server: primaryServer, port: primaryPort } =
