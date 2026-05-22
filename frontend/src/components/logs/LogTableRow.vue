@@ -102,12 +102,6 @@ function enhancementLabel(raw: string | null): string {
       formatTime(log.created_at)
     }}</TableCell>
 
-    <TableCell>
-      <Badge :variant="log.api_type === 'openai' ? 'default' : 'secondary'">
-        {{ log.api_type }}
-      </Badge>
-    </TableCell>
-
     <TableCell class="font-mono text-xs">
       {{ log.model || "-" }}
       <Badge
@@ -139,34 +133,39 @@ function enhancementLabel(raw: string | null): string {
     </TableCell>
 
     <TableCell>
-      <Badge
-        :variant="(log.status_code ?? 0) < 400 ? 'default' : 'destructive'"
-      >
-        {{ log.status_code || "-" }}
-      </Badge>
-    </TableCell>
-
-    <TableCell>{{ log.latency_ms ? log.latency_ms + "ms" : "-" }}</TableCell>
-    <TableCell>{{ log.is_stream ? "Yes" : "No" }}</TableCell>
-
-    <TableCell>
-      <Badge
-        v-if="log.is_retry"
-        variant="outline"
-        class="text-warning-dark border-warning"
-        >{{ t("logs.table.retry") }}</Badge
-      >
-      <span v-else class="text-muted-foreground">-</span>
-    </TableCell>
-
-    <TableCell>
-      <Badge
-        v-if="log.is_failover"
-        variant="outline"
-        class="text-danger-dark border-danger"
-        >{{ t("logs.table.failover") }}</Badge
-      >
-      <span v-else class="text-muted-foreground">-</span>
+      <div class="flex flex-wrap gap-1">
+        <Badge
+          :variant="log.api_type === 'openai' ? 'default' : 'secondary'"
+          class="text-[10px] px-1.5 py-0"
+        >
+          {{ log.api_type }}
+        </Badge>
+        <Badge
+          :variant="(log.status_code ?? 0) < 400 ? 'default' : 'destructive'"
+          class="text-[10px] px-1.5 py-0"
+        >
+          {{ log.status_code || "-" }}
+        </Badge>
+        <Badge
+          v-if="log.is_stream"
+          variant="outline"
+          class="text-[10px] px-1.5 py-0"
+        >
+          SSE
+        </Badge>
+        <Badge
+          v-if="log.is_retry"
+          variant="outline"
+          class="text-[10px] px-1.5 py-0 text-warning-dark border-warning"
+          >{{ t("logs.table.retry") }}</Badge
+        >
+        <Badge
+          v-if="log.is_failover"
+          variant="outline"
+          class="text-[10px] px-1.5 py-0 text-danger-dark border-danger"
+          >{{ t("logs.table.failover") }}</Badge
+        >
+      </div>
     </TableCell>
 
     <TableCell class="text-destructive text-xs max-w-[200px]">

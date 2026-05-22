@@ -102,7 +102,7 @@
     </div>
     <template v-else>
       <!-- 指标卡片 6 卡一行 -->
-      <div class="grid grid-cols-6 gap-3 mb-6">
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
         <Card>
           <CardContent class="p-4">
             <p class="text-sm text-muted-foreground">
