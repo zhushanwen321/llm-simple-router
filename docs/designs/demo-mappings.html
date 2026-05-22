@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>模型映射 - LLM Router Console</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: oklch(0.145 0 0);
+    --surface: oklch(0.205 0 0);
+    --surface-up: oklch(0.269 0 0);
+    --fg: oklch(0.985 0 0);
+    --muted: oklch(0.708 0 0);
+    --border: oklch(1 0 0 / 10%);
+    --primary: oklch(0.68 0.13 175);
+    --primary-dim: oklch(0.48 0.12 175);
+    --success: oklch(0.65 0.17 150);
+    --success-bg: oklch(0.32 0.05 150);
+    --warning: oklch(0.78 0.16 80);
+    --warning-bg: oklch(0.35 0.06 80);
+    --danger: oklch(0.58 0.22 25);
+    --danger-bg: oklch(0.30 0.08 25);
+    --info: oklch(0.62 0.18 250);
+    --info-bg: oklch(0.30 0.06 250);
+    --indigo: oklch(0.62 0.18 280);
+    --indigo-bg: oklch(0.30 0.06 280);
+    --amber: oklch(0.78 0.16 80);
+    --amber-bg: oklch(0.35 0.06 80);
+    --font-body: 'Inter', -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+    --radius: 8px;
+    --radius-sm: 6px;
+  }
+
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.5;
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .page-header { margin-bottom: 1.5rem; }
+  .page-header h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.02em; }
+  .page-header p { color: var(--muted); font-size: 0.8125rem; margin-top: 0.25rem; }
+
+  /* Anchor Bar */
+  .anchor-bar {
+    display: flex; gap: 1.5rem; padding: 1rem 1.25rem;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); margin-bottom: 1rem;
+  }
+  .anchor-item { display: flex; flex-direction: column; gap: 0.125rem; }
+  .anchor-item .label { font-size: 0.6875rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .anchor-item .value { font-family: var(--font-mono); font-size: 1.5rem; font-weight: 600; }
+  .anchor-item .value.success { color: var(--success); }
+  .anchor-divider { width: 1px; background: var(--border); align-self: stretch; }
+
+  /* Filter Bar */
+  .filter-bar {
+    display: flex; gap: 0.75rem; align-items: center;
+    margin-bottom: 1rem; flex-wrap: wrap;
+  }
+  .filter-bar select, .filter-bar input {
+    font-family: var(--font-body); font-size: 0.8125rem;
+    background: var(--surface); color: var(--fg);
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 0.5rem 0.75rem; outline: none; transition: border-color 150ms;
+  }
+  .filter-bar select:focus, .filter-bar input:focus { border-color: var(--primary); }
+  .filter-bar select { min-width: 140px; cursor: pointer; }
+  .filter-bar input { min-width: 200px; }
+
+  .btn {
+    font-family: var(--font-body); font-size: 0.8125rem; font-weight: 500;
+    padding: 0.5rem 1rem; border-radius: var(--radius-sm);
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--fg); cursor: pointer; transition: all 150ms; white-space: nowrap;
+  }
+  .btn:hover { background: var(--surface-up); border-color: var(--primary); }
+
+  /* Card Grid */
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+  }
+
+  .mapping-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.25rem;
+    transition: border-color 150ms;
+    cursor: default;
+  }
+  .mapping-card:hover { border-color: oklch(0.68 0.13 175 / 40%); }
+
+  .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem; }
+  .card-model {
+    font-family: var(--font-mono);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--primary);
+    word-break: break-all;
+  }
+
+  .badge {
+    display: inline-flex; align-items: center;
+    padding: 0.125rem 0.5rem; border-radius: 9999px;
+    font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.02em; white-space: nowrap;
+  }
+  .badge-teal { background: oklch(0.30 0.06 175); color: var(--primary); }
+  .badge-indigo { background: var(--indigo-bg); color: var(--indigo); }
+  .badge-amber { background: var(--amber-bg); color: var(--amber); }
+  .badge-danger { background: var(--danger-bg); color: var(--danger); }
+  .badge-success { background: var(--success-bg); color: var(--success); }
+  .badge-muted { background: oklch(0.269 0 0); color: var(--muted); }
+
+  .card-body { display: flex; flex-direction: column; gap: 0.5rem; }
+  .card-row { display: flex; justify-content: space-between; align-items: center; }
+  .card-label { font-size: 0.75rem; color: var(--muted); }
+  .card-value { font-size: 0.8125rem; }
+  .card-value.mono { font-family: var(--font-mono); }
+
+  .provider-tag {
+    display: inline-flex; align-items: center; gap: 0.25rem;
+    font-size: 0.75rem; padding: 0.125rem 0.5rem;
+    background: oklch(0.269 0 0); border-radius: 9999px;
+    color: var(--fg);
+  }
+  .provider-tag + .provider-tag { margin-left: 0.25rem; }
+
+  .card-actions {
+    display: flex; gap: 0.75rem; margin-top: 0.75rem;
+    padding-top: 0.75rem; border-top: 1px solid var(--border);
+  }
+  .action-link {
+    font-size: 0.8125rem; color: var(--primary); cursor: pointer;
+    background: none; border: none; font-family: var(--font-body);
+    padding: 0; transition: color 150ms;
+  }
+  .action-link:hover { color: oklch(0.78 0.14 175); }
+  .action-link.danger { color: var(--danger); }
+
+  /* Add Card */
+  .add-card {
+    background: transparent;
+    border: 2px dashed oklch(1 0 0 / 15%);
+    border-radius: var(--radius);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    min-height: 200px; cursor: pointer;
+    transition: all 150ms; color: var(--muted);
+  }
+  .add-card:hover {
+    border-color: var(--primary); color: var(--primary);
+    background: oklch(0.68 0.13 175 / 5%);
+  }
+  .add-icon {
+    font-size: 2rem; font-weight: 300; line-height: 1; margin-bottom: 0.5rem;
+  }
+  .add-text { font-size: 0.8125rem; }
+
+  /* Expanded Form */
+  .add-form {
+    background: var(--surface); border: 2px solid var(--primary);
+    border-radius: var(--radius); padding: 1.25rem;
+    display: none;
+  }
+  .add-form.visible { display: block; }
+  .form-title { font-size: 0.9375rem; font-weight: 600; margin-bottom: 1rem; }
+  .form-row { display: flex; gap: 0.75rem; margin-bottom: 0.75rem; align-items: center; }
+  .form-label {
+    font-size: 0.75rem; color: var(--muted); min-width: 80px; text-align: right;
+  }
+  .form-row select, .form-row input {
+    font-family: var(--font-body); font-size: 0.8125rem;
+    background: var(--bg); color: var(--fg);
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 0.5rem 0.75rem; outline: none; flex: 1;
+  }
+  .form-row select:focus, .form-row input:focus { border-color: var(--primary); }
+  .form-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; }
+  .btn-primary {
+    background: var(--primary); color: oklch(0.15 0 0);
+    border-color: var(--primary); font-weight: 600;
+  }
+  .btn-primary:hover { background: oklch(0.72 0.14 175); }
+
+  @media (max-width: 1024px) { .card-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 640px) { .card-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>模型映射</h1>
+  <p>配置客户端模型到后端 Provider 的路由策略</p>
+</div>
+
+<!-- Anchor Bar -->
+<div class="anchor-bar">
+  <div class="anchor-item">
+    <span class="label">映射组总数</span>
+    <span class="value">5</span>
+  </div>
+  <div class="anchor-divider"></div>
+  <div class="anchor-item">
+    <span class="label">活跃模型</span>
+    <span class="value success">18</span>
+  </div>
+</div>
+
+<!-- Filter Bar -->
+<div class="filter-bar">
+  <select id="strategyFilter">
+    <option value="all">全部策略</option>
+    <option value="scheduled">Scheduled</option>
+    <option value="round_robin">Round Robin</option>
+    <option value="random">Random</option>
+    <option value="failover">Failover</option>
+  </select>
+  <input type="text" placeholder="搜索模型名称..." />
+</div>
+
+<!-- Card Grid -->
+<div class="card-grid" id="cardGrid"></div>
+
+<script>
+const mappings = [
+  {
+    clientModel: 'gpt-4o',
+    strategy: 'round_robin',
+    strategyLabel: 'Round Robin',
+    strategyColor: 'indigo',
+    providers: [
+      { name: 'OpenAI', model: 'gpt-4o', weight: '60%' },
+      { name: 'Azure', model: 'gpt-4o', weight: '40%' }
+    ],
+    status: 'active'
+  },
+  {
+    clientModel: 'claude-sonnet-4-20250514',
+    strategy: 'failover',
+    strategyLabel: 'Failover',
+    strategyColor: 'danger',
+    providers: [
+      { name: 'Anthropic', model: 'claude-sonnet-4-20250514', weight: '主' },
+      { name: 'DeepSeek', model: 'deepseek-chat', weight: '备' }
+    ],
+    status: 'active'
+  },
+  {
+    clientModel: 'gpt-4o-mini',
+    strategy: 'scheduled',
+    strategyLabel: 'Scheduled',
+    strategyColor: 'teal',
+    providers: [
+      { name: 'OpenAI', model: 'gpt-4o-mini', weight: '日间' },
+      { name: 'DeepSeek', model: 'deepseek-chat', weight: '夜间' }
+    ],
+    status: 'active'
+  },
+  {
+    clientModel: 'deepseek-r1',
+    strategy: 'random',
+    strategyLabel: 'Random',
+    strategyColor: 'amber',
+    providers: [
+      { name: 'DeepSeek', model: 'deepseek-reasoner', weight: '50%' },
+      { name: 'Moonshot', model: 'moonshot-v1-128k', weight: '50%' }
+    ],
+    status: 'active'
+  },
+  {
+    clientModel: 'gemini-2.5-pro',
+    strategy: 'round_robin',
+    strategyLabel: 'Round Robin',
+    strategyColor: 'indigo',
+    providers: [
+      { name: 'Google', model: 'gemini-2.5-pro', weight: '70%' },
+      { name: 'OpenAI', model: 'gpt-4o', weight: '30%' }
+    ],
+    status: 'inactive'
+  }
+];
+
+function renderCards() {
+  const grid = document.getElementById('cardGrid');
+  const filter = document.getElementById('strategyFilter').value;
+
+  const filtered = filter === 'all' ? mappings : mappings.filter(m => m.strategy === filter);
+
+  const cards = filtered.map(m => {
+    const providerTags = m.providers.map(p =>
+      `<span class="provider-tag">${p.name} <span class="mono" style="font-size:0.625rem;color:var(--muted)">${p.weight}</span></span>`
+    ).join('');
+
+    const statusBadge = m.status === 'active'
+      ? '<span class="badge badge-success">活跃</span>'
+      : '<span class="badge badge-muted">停用</span>';
+
+    return `<div class="mapping-card">
+      <div class="card-header">
+        <span class="card-model">${m.clientModel}</span>
+        <span class="badge badge-${m.strategyColor}">${m.strategyLabel}</span>
+      </div>
+      <div class="card-body">
+        <div class="card-row">
+          <span class="card-label">Provider 分配</span>
+        </div>
+        <div>${providerTags}</div>
+        <div class="card-row">
+          <span class="card-label">状态</span>
+          ${statusBadge}
+        </div>
+      </div>
+      <div class="card-actions">
+        <button class="action-link">编辑</button>
+        <button class="action-link danger">删除</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  grid.innerHTML = cards + `
+    <div class="add-card" id="addCardBtn" onclick="showAddForm()">
+      <span class="add-icon">+</span>
+      <span class="add-text">新增映射组</span>
+    </div>
+    <div class="add-form" id="addForm">
+      <div class="form-title">新增映射组</div>
+      <div class="form-row">
+        <span class="form-label">客户端模型</span>
+        <input type="text" placeholder="例如 gpt-4o" />
+      </div>
+      <div class="form-row">
+        <span class="form-label">路由策略</span>
+        <select>
+          <option>Round Robin</option>
+          <option>Failover</option>
+          <option>Scheduled</option>
+          <option>Random</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <span class="form-label">Provider</span>
+        <select>
+          <option>OpenAI</option>
+          <option>Anthropic</option>
+          <option>DeepSeek</option>
+          <option>Google Gemini</option>
+        </select>
+      </div>
+      <div class="form-actions">
+        <button class="btn" onclick="hideAddForm()">取消</button>
+        <button class="btn btn-primary">创建</button>
+      </div>
+    </div>
+  `;
+}
+
+function showAddForm() {
+  document.getElementById('addCardBtn').style.display = 'none';
+  document.getElementById('addForm').classList.add('visible');
+}
+function hideAddForm() {
+  document.getElementById('addCardBtn').style.display = '';
+  document.getElementById('addForm').classList.remove('visible');
+}
+
+document.getElementById('strategyFilter').addEventListener('change', renderCards);
+renderCards();
+</script>
+</body>
+</html>

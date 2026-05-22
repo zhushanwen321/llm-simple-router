@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>代理增强 - LLM Router Console</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: oklch(0.145 0 0);
+    --surface: oklch(0.205 0 0);
+    --surface-up: oklch(0.269 0 0);
+    --fg: oklch(0.985 0 0);
+    --muted: oklch(0.708 0 0);
+    --border: oklch(1 0 0 / 10%);
+    --primary: oklch(0.68 0.13 175);
+    --success: oklch(0.65 0.17 150);
+    --success-bg: oklch(0.32 0.05 150);
+    --warning: oklch(0.78 0.16 80);
+    --warning-bg: oklch(0.35 0.06 80);
+    --danger: oklch(0.58 0.22 25);
+    --danger-bg: oklch(0.30 0.08 25);
+    --info: oklch(0.62 0.18 250);
+    --info-bg: oklch(0.30 0.06 250);
+    --font-body: 'Inter', -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+    --radius: 8px;
+    --radius-sm: 6px;
+  }
+
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.5;
+    padding: 2rem;
+    max-width: 1000px;
+    margin: 0 auto;
+    padding-bottom: 5rem;
+  }
+
+  .page-header { margin-bottom: 1.5rem; }
+  .page-header h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.02em; }
+  .page-header p { color: var(--muted); font-size: 0.8125rem; margin-top: 0.25rem; }
+
+  /* Config Card */
+  .config-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1rem 1.25rem;
+    margin-bottom: 0.75rem;
+  }
+  .config-card-header {
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .config-title {
+    display: flex; align-items: center; gap: 0.75rem;
+  }
+  .config-title h3 {
+    font-size: 0.9375rem; font-weight: 600;
+  }
+  .config-title .desc {
+    font-size: 0.75rem; color: var(--muted);
+  }
+  .config-body {
+    margin-top: 0.75rem; padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+    display: none;
+  }
+  .config-body.visible { display: block; }
+
+  .config-detail {
+    font-size: 0.8125rem; color: var(--muted); line-height: 1.6;
+  }
+  .config-detail code {
+    font-family: var(--font-mono); font-size: 0.75rem;
+    background: oklch(0.269 0 0); padding: 0.0625rem 0.375rem;
+    border-radius: 4px; color: var(--fg);
+  }
+
+  /* Switch */
+  .switch {
+    position: relative; width: 40px; height: 22px;
+    background: oklch(0.269 0 0); border-radius: 11px;
+    cursor: pointer; transition: background 200ms;
+    border: none; outline: none; flex-shrink: 0;
+  }
+  .switch.active { background: var(--primary); }
+  .switch::after {
+    content: ''; position: absolute;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--fg); top: 2px; left: 2px;
+    transition: transform 200ms;
+  }
+  .switch.active::after { transform: translateX(18px); }
+
+  /* Client ID Section */
+  .section-title {
+    font-size: 0.9375rem; font-weight: 600; margin-bottom: 0.75rem;
+    padding-top: 0.5rem;
+  }
+
+  .client-row {
+    display: flex; gap: 0.5rem; align-items: center;
+    margin-bottom: 0.5rem; padding: 0.5rem 0.75rem;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+  }
+  .client-row input, .client-row select {
+    font-family: var(--font-body); font-size: 0.8125rem;
+    background: var(--bg); color: var(--fg);
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 0.375rem 0.625rem; outline: none;
+  }
+  .client-row input:focus, .client-row select:focus { border-color: var(--primary); }
+  .client-row input { flex: 1; min-width: 120px; }
+  .client-row select { min-width: 180px; cursor: pointer; }
+  .row-delete {
+    font-size: 0.75rem; color: var(--danger); cursor: pointer;
+    background: none; border: none; font-family: var(--font-body);
+    padding: 0.25rem; transition: color 150ms;
+  }
+  .row-delete:hover { color: oklch(0.72 0.22 25); }
+
+  .add-row-btn {
+    font-size: 0.8125rem; color: var(--primary); cursor: pointer;
+    background: none; border: 1px dashed oklch(0.68 0.13 175 / 40%);
+    font-family: var(--font-body); padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-sm); width: 100%;
+    transition: all 150ms; text-align: center;
+  }
+  .add-row-btn:hover {
+    border-color: var(--primary); background: oklch(0.68 0.13 175 / 5%);
+  }
+
+  /* Save Bar */
+  .save-bar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: oklch(0.16 0 0); border-top: 1px solid var(--border);
+    padding: 0.75rem 2rem;
+    display: flex; justify-content: flex-end; gap: 0.75rem;
+    align-items: center; z-index: 100;
+  }
+  .save-hint {
+    font-size: 0.75rem; color: var(--warning); margin-right: auto;
+  }
+
+  .btn {
+    font-family: var(--font-body); font-size: 0.8125rem; font-weight: 500;
+    padding: 0.5rem 1rem; border-radius: var(--radius-sm);
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--fg); cursor: pointer; transition: all 150ms; white-space: nowrap;
+  }
+  .btn:hover { background: var(--surface-up); border-color: var(--primary); }
+  .btn-primary {
+    background: var(--primary); color: oklch(0.15 0 0);
+    border-color: var(--primary); font-weight: 600;
+  }
+  .btn-primary:hover { background: oklch(0.72 0.14 175); }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>代理增强</h1>
+  <p>配置请求转发增强策略、循环检测和会话管理</p>
+</div>
+
+<!-- Config Cards -->
+<div id="configCards"></div>
+
+<!-- Client ID Section -->
+<h2 class="section-title" style="margin-top:1rem">客户端识别配置</h2>
+<p style="font-size:0.75rem;color:var(--muted);margin-bottom:0.75rem">
+  通过请求 Header 识别客户端并自动选择模型映射
+</p>
+<div id="clientRows"></div>
+<button class="add-row-btn" onclick="addClientRow()">+ 添加识别规则</button>
+
+<!-- Save Bar -->
+<div class="save-bar" id="saveBar" style="display:none">
+  <span class="save-hint">有未保存的更改</span>
+  <button class="btn" onclick="cancelChanges()">取消</button>
+  <button class="btn btn-primary" onclick="saveChanges()">保存更改</button>
+</div>
+
+<script>
+const configs = [
+  {
+    id: 'session-state',
+    title: '会话模型状态跟踪',
+    desc: 'Session Model State',
+    detail: '跟踪每个会话的模型使用状态，确保同一会话的后续请求路由到相同的 Provider。避免上下文切换导致模型行为不一致。',
+    enabled: true,
+    tags: ['会话粘性', '模型一致性']
+  },
+  {
+    id: 'ai-retry',
+    title: 'AI 重试规则',
+    desc: 'AI Retry',
+    detail: '当上游返回错误时，自动分析错误类型并智能选择重试策略。支持解析 <code>context_length_exceeded</code> 等错误并触发 Failover 到更大上下文窗口的模型。',
+    enabled: true,
+    tags: ['智能重试', '错误分析']
+  },
+  {
+    id: 'tool-loop',
+    title: '工具调用循环检测',
+    desc: 'Tool Loop Detection',
+    detail: '检测工具调用中的无限循环模式（如连续 N 次调用相同工具且参数相同）。检测到循环时自动终止请求并返回错误提示，避免 token 浪费。',
+    enabled: true,
+    tags: ['循环检测', '成本控制']
+  },
+  {
+    id: 'stream-loop',
+    title: '流式循环检测',
+    desc: 'Stream Loop Detection',
+    detail: '在 SSE 流式响应中检测内容循环模式（N-gram 分析）。适用于上游模型出现重复生成的问题，及时截断避免无限输出。',
+    enabled: false,
+    tags: ['流式安全', '重复检测']
+  },
+  {
+    id: 'context-overflow',
+    title: '上下文溢出重定向',
+    desc: 'Context Overflow Redirect',
+    detail: '当请求 token 数超过当前模型上下文窗口时，自动重定向到支持更大上下文的模型。基于 <code>gpt-tokenizer</code> 精确计算 token 数。',
+    enabled: true,
+    tags: ['溢出处理', '自动降级']
+  },
+  {
+    id: 'token-estimation',
+    title: 'Token 估算',
+    desc: 'Token Estimation',
+    detail: '在上游未返回 <code>input_tokens</code> 时，自动从请求体估算 token 用量。长文本（>4000 字符）使用采样外推策略避免性能问题。',
+    enabled: true,
+    tags: ['用量统计', '兼容性']
+  }
+];
+
+const clientRules = [
+  { header: 'X-Client-App', model: 'gpt-4o-mini' },
+  { header: 'X-Model-Select', model: 'auto-detect' }
+];
+
+let dirty = false;
+
+function renderConfigCards() {
+  const container = document.getElementById('configCards');
+  container.innerHTML = configs.map((c, i) => `
+    <div class="config-card">
+      <div class="config-card-header">
+        <div class="config-title">
+          <div>
+            <h3>${c.title}</h3>
+            <span class="desc">${c.desc}</span>
+          </div>
+        </div>
+        <button class="switch ${c.enabled ? 'active' : ''}" onclick="toggleConfig(${i})"></button>
+      </div>
+      <div class="config-body ${c.enabled ? 'visible' : ''}" id="body-${i}">
+        <div class="config-detail">${c.detail}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderClientRows() {
+  const container = document.getElementById('clientRows');
+  container.innerHTML = clientRules.map((r, i) => `
+    <div class="client-row">
+      <input type="text" value="${r.header}" placeholder="Header 名称" onchange="markDirty()" />
+      <select onchange="markDirty()">
+        <option ${r.model === 'auto-detect' ? 'selected' : ''}>auto-detect</option>
+        <option ${r.model === 'gpt-4o' ? 'selected' : ''}>gpt-4o</option>
+        <option ${r.model === 'gpt-4o-mini' ? 'selected' : ''}>gpt-4o-mini</option>
+        <option ${r.model === 'claude-sonnet-4-20250514' ? 'selected' : ''}>claude-sonnet-4-20250514</option>
+        <option ${r.model === 'deepseek-chat' ? 'selected' : ''}>deepseek-chat</option>
+      </select>
+      <button class="row-delete" onclick="removeClientRow(${i})">删除</button>
+    </div>
+  `).join('');
+}
+
+function toggleConfig(index) {
+  configs[index].enabled = !configs[index].enabled;
+  markDirty();
+  renderConfigCards();
+}
+
+function addClientRow() {
+  clientRules.push({ header: '', model: 'auto-detect' });
+  markDirty();
+  renderClientRows();
+}
+
+function removeClientRow(index) {
+  clientRules.splice(index, 1);
+  markDirty();
+  renderClientRows();
+}
+
+function markDirty() {
+  dirty = true;
+  document.getElementById('saveBar').style.display = 'flex';
+}
+
+function saveChanges() {
+  dirty = false;
+  document.getElementById('saveBar').style.display = 'none';
+  alert('保存成功（demo）');
+}
+
+function cancelChanges() {
+  dirty = false;
+  document.getElementById('saveBar').style.display = 'none';
+}
+
+renderConfigCards();
+renderClientRows();
+</script>
+</body>
+</html>

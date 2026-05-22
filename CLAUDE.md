@@ -219,6 +219,26 @@ Handler (handler/proxy-handler.ts)
 
 **排查生产问题时**，先用 `request_logs` 表定位 logId，再从 `logs/` 目录读取完整请求体和响应体，这是复现和定位 bug 的关键数据源。
 
+## 设计 Demo 目录
+
+`docs/designs/` 是管理后台所有页面的 HTML 交互原型目录。每个文件是自包含的 HTML（内联 CSS + JS），可直接在浏览器打开预览。
+
+| 文件 | 页面 | 路由 |
+|------|------|------|
+| `index.html` | 目录索引 | — |
+| `demo-dashboard.html` | 仪表盘 | `/` |
+| `demo-monitor.html` | 实时监控 | `/monitor` |
+| `demo-logs.html` | 请求日志 | `/logs` |
+| `demo-providers.html` | Provider 管理 | `/providers` |
+| `demo-mappings.html` | 模型映射 | `/mappings` |
+| `demo-retry-rules.html` | 重试规则 | `/retry-rules` |
+| `demo-router-keys.html` | 路由密钥 | `/router-keys` |
+| `demo-proxy-enhancement.html` | 代理增强 | `/proxy-enhancement` |
+
+**用途**：前端页面重构时的视觉参考和交互规格。Demo 中使用的设计 token 与 `tokens.css` 保持一致。
+
+**更新规则**：当页面布局发生重大变更时，同步更新对应 demo 文件。小幅样式调整不需要更新 demo。
+
 ## 环境变量
 
 所有 secrets 通过首次启动的 Setup 页面设置，存入 DB settings 表。

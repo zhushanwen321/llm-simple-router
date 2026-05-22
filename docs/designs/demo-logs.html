@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>请求日志 - LLM Router Console</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: oklch(0.145 0 0);
+    --surface: oklch(0.205 0 0);
+    --surface-up: oklch(0.269 0 0);
+    --fg: oklch(0.985 0 0);
+    --muted: oklch(0.708 0 0);
+    --border: oklch(1 0 0 / 10%);
+    --primary: oklch(0.68 0.13 175);
+    --success: oklch(0.65 0.17 150);
+    --success-bg: oklch(0.32 0.05 150);
+    --warning: oklch(0.78 0.16 80);
+    --warning-bg: oklch(0.35 0.06 80);
+    --danger: oklch(0.58 0.22 25);
+    --danger-bg: oklch(0.30 0.08 25);
+    --info: oklch(0.62 0.18 250);
+    --info-bg: oklch(0.30 0.06 250);
+    --font-body: 'Inter', -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+    --radius: 8px;
+    --radius-sm: 6px;
+  }
+
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.5;
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .page-header { margin-bottom: 1.5rem; }
+  .page-header h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.02em; }
+  .page-header p { color: var(--muted); font-size: 0.8125rem; margin-top: 0.25rem; }
+
+  /* Filter Bar */
+  .filter-bar {
+    display: flex; gap: 0.5rem; align-items: center;
+    margin-bottom: 1rem; flex-wrap: wrap;
+  }
+  .time-btn-group { display: flex; gap: 0; }
+  .time-btn {
+    font-family: var(--font-body); font-size: 0.75rem;
+    padding: 0.375rem 0.625rem;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--muted); cursor: pointer;
+    transition: all 150ms;
+  }
+  .time-btn:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+  .time-btn:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+  .time-btn + .time-btn { border-left: none; }
+  .time-btn:hover { color: var(--fg); }
+  .time-btn.active {
+    background: var(--primary); color: oklch(0.15 0 0);
+    border-color: var(--primary); font-weight: 600;
+  }
+
+  .filter-bar select, .filter-bar input {
+    font-family: var(--font-body); font-size: 0.8125rem;
+    background: var(--surface); color: var(--fg);
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 0.375rem 0.625rem; outline: none;
+  }
+  .filter-bar select:focus, .filter-bar input:focus { border-color: var(--primary); }
+  .filter-bar select { min-width: 100px; cursor: pointer; }
+  .filter-bar input { min-width: 150px; }
+
+  /* Table */
+  .table-wrap {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    font-size: 0.6875rem; font-weight: 600; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 0.625rem 0.75rem; text-align: left;
+    border-bottom: 1px solid var(--border); background: oklch(0.18 0 0);
+  }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background 100ms; cursor: pointer; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: oklch(0.22 0 0); }
+  tbody td {
+    padding: 0.5rem 0.75rem; font-size: 0.8125rem;
+    height: 36px; vertical-align: middle;
+  }
+
+  .mono { font-family: var(--font-mono); font-size: 0.8125rem; }
+  .mono-sm { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); }
+
+  .badge {
+    display: inline-flex; align-items: center;
+    padding: 0.125rem 0.5rem; border-radius: 9999px;
+    font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.02em; white-space: nowrap;
+  }
+  .badge-success { background: var(--success-bg); color: var(--success); }
+  .badge-danger { background: var(--danger-bg); color: var(--danger); }
+  .badge-warning { background: var(--warning-bg); color: var(--warning); }
+  .badge-muted { background: oklch(0.269 0 0); color: var(--muted); }
+
+  /* Expandable Row */
+  .expand-icon {
+    display: inline-block; width: 16px; height: 16px;
+    color: var(--muted); transition: transform 200ms;
+    font-size: 0.625rem; text-align: center; line-height: 16px;
+  }
+  .expand-icon.open { transform: rotate(90deg); }
+  tr.expanded { background: oklch(0.22 0 0); }
+
+  .sub-table-wrap {
+    background: oklch(0.17 0 0);
+    border-top: 1px solid var(--border);
+    padding: 0.5rem 0.75rem 0.5rem 2.5rem;
+  }
+  .sub-table { width: 100%; border-collapse: collapse; }
+  .sub-table th {
+    font-size: 0.625rem; font-weight: 600; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 0.375rem 0.5rem; text-align: left;
+  }
+  .sub-table td {
+    padding: 0.25rem 0.5rem; font-size: 0.75rem;
+    height: 28px; border-bottom: 1px solid oklch(1 0 0 / 5%);
+  }
+
+  .action-link {
+    font-size: 0.8125rem; color: var(--primary); cursor: pointer;
+    background: none; border: none; font-family: var(--font-body);
+    padding: 0; transition: color 150ms;
+  }
+  .action-link:hover { color: oklch(0.78 0.14 175); }
+
+  /* Token usage */
+  .token-usage {
+    font-family: var(--font-mono); font-size: 0.75rem;
+    color: var(--muted);
+  }
+  .token-in { color: var(--info); }
+  .token-out { color: var(--success); }
+
+  /* Pagination */
+  .pagination {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-top: 0.75rem; padding: 0 0.25rem;
+  }
+  .pagination-info { font-size: 0.75rem; color: var(--muted); }
+  .pagination-controls { display: flex; gap: 0.25rem; }
+  .page-btn {
+    font-family: var(--font-body); font-size: 0.75rem;
+    padding: 0.25rem 0.5rem; min-width: 28px;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--muted); cursor: pointer; border-radius: 4px;
+    transition: all 150ms; text-align: center;
+  }
+  .page-btn:hover { background: var(--surface-up); color: var(--fg); }
+  .page-btn.active {
+    background: var(--primary); color: oklch(0.15 0 0);
+    border-color: var(--primary); font-weight: 600;
+  }
+  .page-btn.disabled { opacity: 0.3; cursor: default; }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>请求日志</h1>
+  <p>查看所有代理请求的详细记录与链路追踪</p>
+</div>
+
+<!-- Filter Bar -->
+<div class="filter-bar">
+  <div class="time-btn-group">
+    <button class="time-btn active">1h</button>
+    <button class="time-btn">6h</button>
+    <button class="time-btn">24h</button>
+    <button class="time-btn">7d</button>
+    <button class="time-btn">30d</button>
+  </div>
+  <select>
+    <option>全部 Provider</option>
+    <option>OpenAI</option>
+    <option>Anthropic</option>
+    <option>DeepSeek</option>
+    <option>Google</option>
+  </select>
+  <select>
+    <option>全部模型</option>
+    <option>gpt-4o</option>
+    <option>claude-sonnet-4-20250514</option>
+    <option>deepseek-r1</option>
+  </select>
+  <select>
+    <option>全部状态</option>
+    <option>2xx</option>
+    <option>4xx</option>
+    <option>5xx</option>
+  </select>
+  <select>
+    <option>全部密钥</option>
+    <option>生产环境主密钥</option>
+    <option>开发环境测试</option>
+  </select>
+  <input type="text" placeholder="搜索请求 ID..." />
+</div>
+
+<!-- Table -->
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th style="width:20px"></th>
+        <th>时间</th>
+        <th>模型</th>
+        <th>Provider</th>
+        <th>状态码</th>
+        <th>耗时</th>
+        <th>Token 用量</th>
+        <th>操作</th>
+      </tr>
+    </thead>
+    <tbody id="logTable"></tbody>
+  </table>
+</div>
+
+<!-- Pagination -->
+<div class="pagination">
+  <span class="pagination-info">显示 1-20 / 共 1,247 条</span>
+  <div class="pagination-controls">
+    <button class="page-btn disabled">&laquo;</button>
+    <button class="page-btn disabled">&lsaquo;</button>
+    <button class="page-btn active">1</button>
+    <button class="page-btn">2</button>
+    <button class="page-btn">3</button>
+    <span style="color:var(--muted);font-size:0.75rem;padding:0 0.25rem">...</span>
+    <button class="page-btn">63</button>
+    <button class="page-btn">&rsaquo;</button>
+    <button class="page-btn">&raquo;</button>
+  </div>
+</div>
+
+<script>
+const logs = [
+  {
+    time: '14:32:18',
+    model: 'gpt-4o',
+    provider: 'OpenAI',
+    status: 200,
+    duration: '2.3s',
+    tokensIn: '1.2K',
+    tokensOut: '842',
+    hasRetry: true,
+    subRequests: [
+      { provider: 'DeepSeek', model: 'deepseek-chat', status: 429, duration: '0.8s', reason: 'Rate Limited → Retry' },
+      { provider: 'OpenAI', model: 'gpt-4o', status: 200, duration: '2.3s', reason: '成功' }
+    ]
+  },
+  {
+    time: '14:31:45',
+    model: 'claude-sonnet-4-20250514',
+    provider: 'Anthropic',
+    status: 200,
+    duration: '4.1s',
+    tokensIn: '2.8K',
+    tokensOut: '1.5K',
+    hasRetry: false,
+    subRequests: []
+  },
+  {
+    time: '14:31:02',
+    model: 'deepseek-r1',
+    provider: 'DeepSeek',
+    status: 503,
+    duration: '30.0s',
+    tokensIn: '956',
+    tokensOut: '0',
+    hasRetry: false,
+    subRequests: []
+  },
+  {
+    time: '14:30:15',
+    model: 'gpt-4o-mini',
+    provider: 'OpenAI',
+    status: 200,
+    duration: '0.9s',
+    tokensIn: '512',
+    tokensOut: '234',
+    hasRetry: false,
+    subRequests: []
+  },
+  {
+    time: '14:29:48',
+    model: 'gpt-4o',
+    provider: 'OpenAI',
+    status: 200,
+    duration: '3.7s',
+    tokensIn: '3.4K',
+    tokensOut: '2.1K',
+    hasRetry: true,
+    subRequests: [
+      { provider: 'OpenAI', model: 'gpt-4o', status: 500, duration: '1.2s', reason: 'Server Error → Retry' },
+      { provider: 'OpenAI', model: 'gpt-4o', status: 200, duration: '3.7s', reason: '成功' }
+    ]
+  },
+  {
+    time: '14:28:30',
+    model: 'gemini-2.5-pro',
+    provider: 'Google',
+    status: 200,
+    duration: '5.2s',
+    tokensIn: '4.1K',
+    tokensOut: '3.2K',
+    hasRetry: false,
+    subRequests: []
+  },
+  {
+    time: '14:27:55',
+    model: 'gpt-4o',
+    provider: 'Azure',
+    status: 401,
+    duration: '0.3s',
+    tokensIn: '0',
+    tokensOut: '0',
+    hasRetry: false,
+    subRequests: []
+  },
+  {
+    time: '14:26:12',
+    model: 'deepseek-chat',
+    provider: 'DeepSeek',
+    status: 200,
+    duration: '1.8s',
+    tokensIn: '890',
+    tokensOut: '456',
+    hasRetry: false,
+    subRequests: []
+  }
+];
+
+function getStatusBadge(code) {
+  if (code >= 200 && code < 300) return `<span class="badge badge-success">${code}</span>`;
+  if (code >= 400 && code < 500) return `<span class="badge badge-warning">${code}</span>`;
+  return `<span class="badge badge-danger">${code}</span>`;
+}
+
+function renderTable() {
+  const tbody = document.getElementById('logTable');
+  tbody.innerHTML = logs.map((log, i) => {
+    const expandable = log.hasRetry && log.subRequests.length > 0;
+    const chevron = expandable
+      ? `<span class="expand-icon" id="chevron-${i}">&#9654;</span>`
+      : '';
+
+    const tokenHtml = `<span class="token-usage">
+      <span class="token-in">${log.tokensIn} in</span> / <span class="token-out">${log.tokensOut} out</span>
+    </span>`;
+
+    let subRow = '';
+    if (expandable) {
+      const subRows = log.subRequests.map(sr => `
+        <tr>
+          <td class="mono-sm">${sr.provider}</td>
+          <td class="mono-sm">${sr.model}</td>
+          <td>${getStatusBadge(sr.status)}</td>
+          <td class="mono-sm">${sr.duration}</td>
+          <td style="font-size:0.75rem;color:var(--muted)">${sr.reason}</td>
+        </tr>
+      `).join('');
+
+      subRow = `<tr id="sub-${i}" style="display:none">
+        <td colspan="8" style="padding:0">
+          <div class="sub-table-wrap">
+            <table class="sub-table">
+              <thead><tr><th>Provider</th><th>模型</th><th>状态</th><th>耗时</th><th>说明</th></tr></thead>
+              <tbody>${subRows}</tbody>
+            </table>
+          </div>
+        </td>
+      </tr>`;
+    }
+
+    return `<tr id="row-${i}" onclick="toggleRow(${i})">
+      <td>${chevron}</td>
+      <td class="mono-sm">${log.time}</td>
+      <td style="font-weight:500">${log.model}</td>
+      <td class="mono-sm">${log.provider}</td>
+      <td>${getStatusBadge(log.status)}</td>
+      <td class="mono-sm">${log.duration}</td>
+      <td>${tokenHtml}</td>
+      <td><button class="action-link" onclick="event.stopPropagation();alert('查看详情（demo）')">详情</button></td>
+    </tr>
+    ${subRow}`;
+  }).join('');
+}
+
+function toggleRow(index) {
+  const row = document.getElementById(`row-${index}`);
+  const sub = document.getElementById(`sub-${index}`);
+  const chevron = document.getElementById(`chevron-${index}`);
+  if (!sub) return;
+
+  const isVisible = sub.style.display !== 'none';
+  sub.style.display = isVisible ? 'none' : '';
+  row.classList.toggle('expanded', !isVisible);
+  if (chevron) chevron.classList.toggle('open', !isVisible);
+}
+
+// Time button group
+document.querySelectorAll('.time-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+});
+
+renderTable();
+</script>
+</body>
+</html>
