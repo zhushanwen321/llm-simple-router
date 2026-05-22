@@ -97,6 +97,7 @@ export class AnthropicToResponsesTransform extends BaseSSETransform {
             type: RESPONSES_SSE_EVENTS.REASONING_SUMMARY_PART_ADDED,
             output_index: this.outputIndex,
             summary_index: 0,
+            item_id: this.currentItemId,
             part: { type: "summary_text", text: "" },
             sequence_number: this.nextSeq(),
           });
@@ -115,6 +116,7 @@ export class AnthropicToResponsesTransform extends BaseSSETransform {
             type: RESPONSES_SSE_EVENTS.CONTENT_PART_ADDED,
             output_index: this.outputIndex,
             content_index: 0,
+            item_id: this.currentItemId,
             part: { type: "output_text", text: "", annotations: [] },
             sequence_number: this.nextSeq(),
           });
@@ -158,6 +160,7 @@ export class AnthropicToResponsesTransform extends BaseSSETransform {
               type: RESPONSES_SSE_EVENTS.REASONING_SUMMARY_TEXT_DELTA,
               output_index: this.outputIndex,
               summary_index: 0,
+              item_id: this.currentItemId,
               delta: thinking,
               sequence_number: this.nextSeq(),
             });
@@ -170,6 +173,7 @@ export class AnthropicToResponsesTransform extends BaseSSETransform {
               type: RESPONSES_SSE_EVENTS.OUTPUT_TEXT_DELTA,
               output_index: this.outputIndex,
               content_index: 0,
+              item_id: this.currentItemId,
               delta: text,
               sequence_number: this.nextSeq(),
             });
@@ -201,6 +205,7 @@ export class AnthropicToResponsesTransform extends BaseSSETransform {
             type: RESPONSES_SSE_EVENTS.REASONING_SUMMARY_TEXT_DONE,
             output_index: this.outputIndex,
             summary_index: 0,
+            item_id: this.currentItemId,
             text,
             sequence_number: this.nextSeq(),
           });
@@ -208,6 +213,7 @@ export class AnthropicToResponsesTransform extends BaseSSETransform {
             type: RESPONSES_SSE_EVENTS.REASONING_SUMMARY_PART_DONE,
             output_index: this.outputIndex,
             summary_index: 0,
+            item_id: this.currentItemId,
             part: { type: "summary_text", text },
             sequence_number: this.nextSeq(),
           });
@@ -225,6 +231,7 @@ export class AnthropicToResponsesTransform extends BaseSSETransform {
             type: RESPONSES_SSE_EVENTS.OUTPUT_TEXT_DONE,
             output_index: this.outputIndex,
             content_index: 0,
+            item_id: this.currentItemId,
             text,
             sequence_number: this.nextSeq(),
           });
@@ -232,6 +239,7 @@ export class AnthropicToResponsesTransform extends BaseSSETransform {
             type: RESPONSES_SSE_EVENTS.CONTENT_PART_DONE,
             output_index: this.outputIndex,
             content_index: 0,
+            item_id: this.currentItemId,
             part: { type: "output_text", text, annotations: [] },
             sequence_number: this.nextSeq(),
           });

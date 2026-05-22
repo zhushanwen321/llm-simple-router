@@ -292,4 +292,36 @@ describe("AnthropicToResponsesTransform", () => {
     expect(resp?.status).toBe("completed");
     expect((resp?.output as unknown[])?.length).toBe(3);
   });
+
+  it("content_part and output_text events include item_id", async () => {
+    const t = new AnthropicToResponsesTransform("claude-3");
+    const output = collectOutput(t);
+    t.write('event: message_start\ndata: {"type":"message_start","message":{"id":"msg_1","role":"assistant","content":[],"usage":{"input_tokens":10}}}\n\n');
+    t.write('event: content_block_start\ndata: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}\n\n');
+    t.write('event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hello"}}\n\n');
+    t.write('event: content_block_stop\ndata: {"type":"content_block_stop","index":0}\n\n');
+    t.write('event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":5}}\n\n');
+    t.write('event: message_stop\ndata: {"type":"message_stop"}\n\n');
+    t.end();
+    const result = await output;
+    const events = parseSSEEvents(result);
+
+    const itemAdded = events.find((e) => e.event === RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED);
+    const itemId = ((itemAdded?.data as Record<string, unknown>)?.item as Record<string, unknown>)?.id as string;
+    expect(itemId).toBeTruthy();
+
+    const partAdded = events.find((e) => e.event === RESPONSES_SSE_EVENTS.CONTENT_PART_ADDED);
+    expect((partAdded?.data as Record<string, unknown>)?.item_id).toBe(itemId);
+
+    const textDeltas = events.filter((e) => e.event === RESPONSES_SSE_EVENTS.OUTPUT_TEXT_DELTA);
+    for (const d of textDeltas) {
+      expect((d.data as Record<string, unknown>)?.item_id).toBe(itemId);
+    }
+
+    const textDone = events.find((e) => e.event === RESPONSES_SSE_EVENTS.OUTPUT_TEXT_DONE);
+    expect((textDone?.data as Record<string, unknown>)?.item_id).toBe(itemId);
+
+    const partDone = events.find((e) => e.event === RESPONSES_SSE_EVENTS.CONTENT_PART_DONE);
+    expect((partDone?.data as Record<string, unknown>)?.item_id).toBe(itemId);
+  });
 });
