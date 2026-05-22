@@ -297,6 +297,7 @@ export interface AiRetryGenerateResult {
     retry_delay_ms: number;
     max_retries: number;
     max_delay_ms: number;
+    provider_id?: string | null;
   };
   summary?: string;
 }
