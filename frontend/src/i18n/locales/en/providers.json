@@ -130,8 +130,8 @@
   },
   "toast": {
     "loadFailed": "Failed to load providers",
-    "saveFailed": "Failed to save provider",
-    "toggleFailed": "Failed to toggle status",
+    "saveFailed": "Failed to save provider. Check required fields (name, base URL, API key) and try again.",
+    "toggleFailed": "Failed to toggle provider status. The provider may be in use by active mapping groups.",
     "deleteFailed": "Failed to delete provider",
     "reloadFailed": "Reload failed",
     "reloadSuccess": "Plugin reload complete: {pluginCount} plugins, {rulesCount} rules",
