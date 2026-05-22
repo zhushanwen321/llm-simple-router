@@ -25,6 +25,8 @@ class HookRegistry {
   private allHooks: PipelineHook[] = [];
 
   register(hook: PipelineHook): void {
+    // 按 name 去重，防止 createProxyHandler 被多次调用时重复注册
+    if (this.allHooks.some(h => h.name === hook.name)) return;
     this.allHooks.push(hook);
   }
 

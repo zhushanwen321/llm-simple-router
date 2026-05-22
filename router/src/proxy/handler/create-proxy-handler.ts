@@ -66,7 +66,7 @@ function handleModelsRequest(db: Database.Database) {
 
     // 如果请求的 key 配置了 allowed_models 白名单，则过滤
     const allowedModels = request.routerKey?.allowed_models;
-    const sortedIds = allowedModels
+    const sortedIds = allowedModels?.length
       ? [...modelMeta.keys()].filter(id => allowedModels.includes(id)).sort()
       : [...modelMeta.keys()].sort();
 
@@ -114,7 +114,7 @@ function handleModelsRequest(db: Database.Database) {
     const data = sortedIds.map(id => ({
       id,
       object: "model" as const,
-      created: Math.floor(new Date(modelMeta.get(id)!.createdAt).getTime() / MS_PER_SECOND),
+      created: Math.floor(new Date(modelMeta.get(id)!.createdAt).getTime() / MS_PER_SECOND) || 0,
       owned_by: modelMeta.get(id)!.providerName,
     }));
 

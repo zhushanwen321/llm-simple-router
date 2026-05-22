@@ -42,7 +42,7 @@ describe("builtin:stream-timeout", () => {
   it("TC-6-01: writes SSE error event on stream_abort with timeout context (openai format)", () => {
     const writeFn = vi.fn();
     const endFn = vi.fn();
-    const raw = { write: writeFn, end: endFn };
+    const raw = { write: writeFn, end: endFn, headersSent: true };
 
     const ctx = mockContext({
       apiType: "openai",
@@ -74,7 +74,7 @@ describe("builtin:stream-timeout", () => {
   it("TC-6-01: writes SSE error event with anthropic format for anthropic requests", () => {
     const writeFn = vi.fn();
     const endFn = vi.fn();
-    const raw = { write: writeFn, end: endFn };
+    const raw = { write: writeFn, end: endFn, headersSent: true };
 
     const ctx = mockContext({
       apiType: "anthropic",
@@ -102,7 +102,7 @@ describe("builtin:stream-timeout", () => {
 
   it("does nothing when resilience result is not stream_abort", () => {
     const writeFn = vi.fn();
-    const raw = { write: writeFn, end: vi.fn() };
+    const raw = { write: writeFn, end: vi.fn(), headersSent: true };
 
     const ctx = mockContext({
       resilienceResult: {
@@ -133,7 +133,7 @@ describe("builtin:stream-timeout", () => {
 
   it("does nothing when stream_abort has no timeoutContext", () => {
     const writeFn = vi.fn();
-    const raw = { write: writeFn, end: vi.fn() };
+    const raw = { write: writeFn, end: vi.fn(), headersSent: true };
 
     const ctx = mockContext({
       resilienceResult: {

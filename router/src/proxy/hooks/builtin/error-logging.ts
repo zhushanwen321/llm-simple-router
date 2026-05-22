@@ -88,6 +88,8 @@ export const errorLoggingHook: PipelineHook = {
         original_model: null,
         session_id: sessionId,
         pipeline_snapshot: snapshot,
+        transport_kind: "throw",
+        mapping_reason: (ctx.metadata.get("effectiveMappingReason") as string | null) ?? null,
       }, (matcher || logFileWriter) ? {
         matcher,
         logFileWriter: logFileWriter as LogFileWriter | null,

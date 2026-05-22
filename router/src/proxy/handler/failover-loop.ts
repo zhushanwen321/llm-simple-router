@@ -291,7 +291,8 @@ export async function executeFailoverLoop(
       if (!reply.raw.headersSent) {
         if (tr.kind === "success") return reply.code(tr.statusCode).send(tr.body);
         if (tr.kind === "throw" || (tr.kind === "error" && tr.statusCode >= HTTP_ERROR_THRESHOLD)) {
-          return reply.code(errors.upstreamConnectionFailed().statusCode).send(errors.upstreamConnectionFailed().body);
+          const errResp = errors.upstreamConnectionFailed();
+          return reply.code(errResp.statusCode).send(errResp.body);
         }
         return reply.code(UPSTREAM_ERROR_STATUS).send(
           adapter.formatError("Unhandled transport result") ?? { error: { message: "Unhandled transport result", type: "server_error" } });
@@ -299,7 +300,10 @@ export async function executeFailoverLoop(
       return reply;
 
     } catch (e: unknown) {
-      if (e instanceof PipelineAbort) return reply.code(e.statusCode).send(e.body);
+      if (e instanceof PipelineAbort) {
+        if (reply.raw.headersSent) return reply;
+        return reply.code(e.statusCode).send(e.body);
+      }
       if (e instanceof ProviderSwitchNeeded) {
         if (reply.raw.headersSent) return reply;
         if (e.attempts?.length) {
@@ -309,11 +313,12 @@ export async function executeFailoverLoop(
             clientReq: ctx.clientRequest, upstreamReqBase: ctx.upstreamRequest, logId, routerKeyId,
             originalModel: null, sessionId: ctx.metadata.get("session_id") as string | undefined,
             failover: { isFailoverIteration: isFailoverIter, rootLogId: rootLogId! },
-            pipelineSnapshot: snapshot, matcher, logFileWriter, resilienceAction: "failover",
+            pipelineSnapshot: ctx.snapshot.toJSON(), matcher, logFileWriter, resilienceAction: "failover",
             resilienceReason: "provider_switch_needed", mappingReason: mapReason, failoverTrigger: e.constructor.name,
           }, e.attempts, e.lastResult ?? { kind: "throw" as const, error: new Error("provider switch") }, startTime);
         }
         if (ctx.provider) flushToolErrors(ctx.provider.id, ctx.resolved?.backend_model ?? clientModel);
+        pendingToolErrors = null;
         lastFailoverTrigger = e.constructor.name;
         if (ctx.resolved) excludeTargets.push(ctx.resolved);
         continue;

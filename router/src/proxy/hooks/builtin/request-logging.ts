@@ -65,8 +65,7 @@ export const requestLoggingHook: PipelineHook = {
         matcher,
         logFileWriter: logFileWriter as LogFileWriter | null,
         resilienceAction: resilienceResult.finalDecision?.action,
-        resilienceReason: resilienceResult.finalDecision?.action === "abort"
-          ? (resilienceResult.finalDecision as { action: "abort"; reason: string }).reason : null,
+        resilienceReason: resilienceResult.finalDecision?.action === "abort" ? resilienceResult.finalDecision.reason : null,
         mappingReason: effectiveMappingReason,
         failoverTrigger: lastFailoverTrigger,
       },

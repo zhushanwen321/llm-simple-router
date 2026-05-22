@@ -130,7 +130,7 @@ export const transportExecuteHook: PipelineHook = {
       : undefined;
 
     // 构建 transport 函数
-    const enhancementConfig = ctx.metadata.get("enhancementConfig") as EnhancementConfig;
+    const enhancementConfig = ctx.metadata.get("enhancementConfig") as EnhancementConfig | undefined;
     const cachedTargets = ctx.metadata.get("cachedTargets") as Target[];
     const isFailover = cachedTargets.length > 1;
     const concurrencyOverride = ctx.metadata.get("concurrencyOverride") as ConcurrencyOverride | undefined;
@@ -152,7 +152,7 @@ export const transportExecuteHook: PipelineHook = {
       tracker,
       matcher,
       request: ctx.request,
-      streamLoopEnabled: enhancementConfig.stream_loop_enabled,
+      streamLoopEnabled: enhancementConfig?.stream_loop_enabled ?? false,
       formatTransform,
       responseTransform,
       injectedHeaders: ctx.injectedHeaders,
@@ -160,32 +160,38 @@ export const transportExecuteHook: PipelineHook = {
       proxyAgentFactory,
     });
 
-    // 通过 orchestrator 执行
-    const resilienceResult = await orchestrator.handle(
-      ctx.request,
-      ctx.reply,
-      clientApiType as "openai" | "openai-responses" | "anthropic",
-      {
-        resolved,
-        provider,
-        clientModel: ctx.clientModel,
-        isStream,
-        trackerId: logId,
-        sessionId: ctx.metadata.get("session_id") as string | undefined,
-        clientRequest,
-        upstreamRequest,
-        concurrencyOverride,
-        mappingReason: effectiveMappingReason,
-      },
-      {
-        retryBaseDelayMs,
-        isFailover,
-        ruleMatcher: matcher,
-        transportFn,
-      },
-    );
+    // 通过 orchestrator 执行（formatTransform 在异常时需清理）
+    try {
+      const resilienceResult = await orchestrator.handle(
+        ctx.request,
+        ctx.reply,
+        clientApiType as "openai" | "openai-responses" | "anthropic",
+        {
+          resolved,
+          provider,
+          clientModel: ctx.clientModel,
+          isStream,
+          trackerId: logId,
+          sessionId: ctx.metadata.get("session_id") as string | undefined,
+          clientRequest,
+          upstreamRequest,
+          concurrencyOverride,
+          mappingReason: effectiveMappingReason,
+        },
+        {
+          retryBaseDelayMs,
+          isFailover,
+          ruleMatcher: matcher,
+          transportFn,
+        },
+      );
 
-    ctx.resilienceResult = resilienceResult;
-    ctx.transportResult = resilienceResult.result;
+      ctx.resilienceResult = resilienceResult;
+      ctx.transportResult = resilienceResult.result;
+    } catch (err) {
+      // orchestrator 异常时清理 formatTransform 防止资源泄漏
+      formatTransform?.destroy();
+      throw err;
+    }
   },
 };

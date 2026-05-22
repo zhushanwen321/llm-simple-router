@@ -156,7 +156,7 @@ describe("TC-7-01: All 6 new hooks registered in proxyPipeline", () => {
     }
 
     // 15 个内置 hook（幂等注册不重复）
-    expect(allNames.size).toBeGreaterThanOrEqual(15);
+    expect(allNames.size).toBe(15);
     expect(allNames).toContain("builtin:route-resolve");
     expect(allNames).toContain("builtin:format-transform");
     expect(allNames).toContain("builtin:api-key-decrypt");

@@ -24,7 +24,8 @@ export const usageRecordHook: PipelineHook = {
       result.kind === "stream_abort";
     if (!succeeded) return;
 
-    const provider = ctx.provider!;
+    const provider = ctx.provider;
+    if (!provider) return;
     const routerKeyId =
       (
         ctx.request.routerKey as
