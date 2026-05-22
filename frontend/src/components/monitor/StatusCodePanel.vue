@@ -8,7 +8,7 @@
           {{ group.count }} ({{ group.percent }}%)
         </span>
       </div>
-      <div class="h-2 bg-muted rounded-full overflow-hidden">
+      <div class="h-2 bg-foreground/10 rounded-full overflow-hidden">
         <div
           class="h-full rounded-full transition-all duration-300"
           :class="group.barClass"
@@ -56,29 +56,29 @@ const groups = computed<StatusGroup[]>(() => {
       label: t('monitor.statusCodes.success'),
       count: count2xx,
       percent: ((count2xx / totalVal) * 100).toFixed(1),
-      textClass: 'text-green-600 dark:text-green-400',
-      barClass: 'bg-green-500',
+      textClass: 'text-success',
+      barClass: 'bg-success',
     },
     {
       label: t('monitor.statusCodes.clientError'),
       count: count4xx,
       percent: ((count4xx / totalVal) * 100).toFixed(1),
-      textClass: 'text-yellow-600 dark:text-yellow-400',
-      barClass: 'bg-yellow-500',
+      textClass: 'text-warning',
+      barClass: 'bg-warning',
     },
     {
       label: t('monitor.statusCodes.rateLimited'),
       count: count429,
       percent: ((count429 / totalVal) * 100).toFixed(1),
-      textClass: 'text-orange-600 dark:text-orange-400',
-      barClass: 'bg-orange-500',
+      textClass: 'text-info',
+      barClass: 'bg-info',
     },
     {
       label: t('monitor.statusCodes.serverError'),
       count: count5xx,
       percent: ((count5xx / totalVal) * 100).toFixed(1),
-      textClass: 'text-red-600 dark:text-red-400',
-      barClass: 'bg-red-500',
+      textClass: 'text-danger',
+      barClass: 'bg-danger',
     },
   ].filter((g) => g.count > 0)
 })

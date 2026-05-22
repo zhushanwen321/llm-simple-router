@@ -21,7 +21,7 @@
       </div>
 
       <!-- 进度条 -->
-      <div v-if="provider.maxConcurrency > 0" class="h-2 bg-muted rounded-full overflow-hidden">
+      <div v-if="provider.maxConcurrency > 0" class="h-2 bg-foreground/10 rounded-full overflow-hidden">
         <div
           class="h-full rounded-full transition-all duration-300"
           :class="barColor(provider.active, effectiveLimit(provider))"
@@ -55,9 +55,9 @@ function effectiveLimit(provider: ProviderConcurrencySnapshot): number {
 
 function barColor(active: number, max: number): string {
   const ratio = active / max
-  if (ratio >= 1) return 'bg-red-500'
-  if (ratio >= 0.8) return 'bg-orange-500'
-  if (ratio >= 0.5) return 'bg-yellow-500'
-  return 'bg-green-500'
+  if (ratio >= 1) return 'bg-danger'
+  if (ratio >= 0.8) return 'bg-danger'
+  if (ratio >= 0.5) return 'bg-warning'
+  return 'bg-primary'
 }
 </script>

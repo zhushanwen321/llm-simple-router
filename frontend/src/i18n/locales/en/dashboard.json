@@ -1,23 +1,42 @@
 {
   "title": "Dashboard",
   "stats": {
-    "totalRequests": "Total Requests",
-    "successRate": "Success Rate",
-    "tokenOutputSpeed": "Token Output Speed",
-    "tokenInputTotal": "Token Input Total",
-    "tokenOutputTotal": "Token Output Total",
-    "cacheHitRate": "Cache Hit Rate"
+    "inputTokens": "Input Tokens",
+    "outputTokens": "Output Tokens",
+    "avgTps": "Avg TPS",
+    "cacheHitRate": "Cache Hit Rate",
+    "totalRequests": "Requests",
+    "successRate": "Success Rate"
   },
   "charts": {
-    "tokenOutputSpeed": "Token Output Speed (t/s)",
-    "tokenInputTotal": "Token Input Total",
-    "tokenOutputTotal": "Token Output Total"
+    "tokenThroughput": "Token Throughput",
+    "inputLegend": "Input",
+    "outputLegend": "Output",
+    "tps": "Output Speed (TPS)",
+    "cacheHit": "Cache Hit Rate"
   },
-  "period": {
-    "last5Hours": "Last 5 Hours",
-    "weekly": "This Week",
-    "monthly": "This Month",
-    "custom": "Custom"
+  "provider": {
+    "all": "All Providers"
+  },
+  "filters": {
+    "button": "Filters",
+    "model": "Model",
+    "key": "Key",
+    "clientType": "Client Type"
+  },
+  "timeline": {
+    "range": "{start} ~ {end}",
+    "hint": "Click a window to view",
+    "noData": "No usage data"
+  },
+  "delta": {
+    "vsPrev": "vs prev {value}",
+    "up": "+{pct}%",
+    "down": "-{pct}%",
+    "noPrev": "No prior data"
+  },
+  "window": {
+    "label": "Window"
   },
   "clientType": {
     "all": "All",
@@ -33,5 +52,9 @@
   "loadProvidersFailed": "Failed to load providers",
   "loadDashboardFailed": "Failed to load dashboard data",
   "loadFilterFailed": "Failed to load filter options",
-  "loadOutputTokensFailed": "Failed to load provider ranking data"
+  "loadOutputTokensFailed": "Failed to load provider ranking data",
+  "empty": {
+    "noProvider": "No providers configured",
+    "goToProviders": "Go to Providers"
+  }
 }

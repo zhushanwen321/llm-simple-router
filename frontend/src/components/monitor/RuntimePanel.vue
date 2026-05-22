@@ -8,7 +8,7 @@
       <p class="text-muted-foreground">
         {{ t("monitor.runtimePanel.uptime") }}
       </p>
-      <p class="font-medium text-foreground">
+      <p class="font-medium text-foreground font-mono">
         {{ formatUptime(runtime.uptimeMs) }}
       </p>
     </div>
@@ -18,7 +18,7 @@
       <p class="text-muted-foreground">
         {{ t("monitor.runtimePanel.memoryRss") }}
       </p>
-      <p class="font-medium text-foreground">
+      <p class="font-medium text-foreground font-mono">
         {{ formatBytes(runtime.memoryUsage.rss) }}
       </p>
     </div>
@@ -34,7 +34,7 @@
           {{ formatBytes(runtime.memoryUsage.heapTotal) }}
         </p>
       </div>
-      <div class="h-2 bg-muted rounded-full overflow-hidden mt-1">
+      <div class="h-2 bg-foreground/10 rounded-full overflow-hidden mt-1">
         <div
           class="h-full bg-primary rounded-full transition-all duration-300"
           :style="{ width: `${heapPercent}%` }"
@@ -47,7 +47,7 @@
       <p class="text-muted-foreground">
         {{ t("monitor.runtimePanel.activeHandles") }}
       </p>
-      <p class="font-medium text-foreground">{{ runtime.activeHandles }}</p>
+      <p class="font-medium text-foreground font-mono">{{ runtime.activeHandles }}</p>
     </div>
 
     <!-- Active requests -->
@@ -55,7 +55,7 @@
       <p class="text-muted-foreground">
         {{ t("monitor.runtimePanel.activeRequests") }}
       </p>
-      <p class="font-medium text-foreground">{{ runtime.activeRequests }}</p>
+      <p class="font-medium text-foreground font-mono">{{ runtime.activeRequests }}</p>
     </div>
 
     <!-- Event loop delay -->
@@ -63,7 +63,7 @@
       <p class="text-muted-foreground">
         {{ t("monitor.runtimePanel.eventLoopDelay") }}
       </p>
-      <p class="font-medium text-foreground">
+      <p class="font-medium text-foreground font-mono">
         {{ runtime.eventLoopDelayMs.toFixed(2) }}ms
       </p>
     </div>
