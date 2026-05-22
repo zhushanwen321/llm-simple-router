@@ -7,37 +7,37 @@
   </div>
   <Table v-else>
     <TableHeader>
-      <TableRow>
-        <TableHead>Provider</TableHead>
-        <TableHead class="text-right">{{ t('monitor.providerTable.requests') }}</TableHead>
-        <TableHead class="text-right">{{ t('monitor.providerTable.successRate') }}</TableHead>
-        <TableHead class="text-right">{{ t('monitor.providerTable.avgLatency') }}</TableHead>
-        <TableHead class="text-right">{{ t('monitor.providerTable.retryRate') }}</TableHead>
-        <TableHead>{{ t('monitor.providerTable.topErrors') }}</TableHead>
+      <TableRow class="border-b-0">
+        <TableHead class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider py-1.5">{{ t('monitor.providerTable.provider') }}</TableHead>
+        <TableHead class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider py-1.5 text-right">{{ t('monitor.providerTable.requests') }}</TableHead>
+        <TableHead class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider py-1.5 text-right">{{ t('monitor.providerTable.successRate') }}</TableHead>
+        <TableHead class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider py-1.5 text-right">{{ t('monitor.providerTable.avgLatency') }}</TableHead>
+        <TableHead class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider py-1.5 text-right">{{ t('monitor.providerTable.retryRate') }}</TableHead>
+        <TableHead class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider py-1.5">{{ t('monitor.providerTable.topErrors') }}</TableHead>
       </TableRow>
     </TableHeader>
     <TableBody>
-      <TableRow v-for="entry in providerEntries" :key="entry.id">
-        <TableCell class="font-medium">{{ entry.name }}</TableCell>
-        <TableCell class="text-right">{{ entry.stats.totalRequests }}</TableCell>
-        <TableCell class="text-right">
-          <span :class="entry.successRate >= 95 ? 'text-green-600 dark:text-green-400' : entry.successRate >= 80 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-500 dark:text-red-400'">
+      <TableRow v-for="entry in providerEntries" :key="entry.id" class="border-b-0 hover:bg-muted/50">
+        <TableCell class="font-medium text-[13px] py-1">{{ entry.name }}</TableCell>
+        <TableCell class="text-right font-mono text-xs py-1">{{ entry.stats.totalRequests }}</TableCell>
+        <TableCell class="text-right font-mono text-xs py-1">
+          <span :class="entry.successRate >= 95 ? 'text-success' : entry.successRate >= 80 ? 'text-warning' : 'text-danger'">
             {{ entry.successRate.toFixed(1) }}%
           </span>
         </TableCell>
-        <TableCell class="text-right">{{ entry.stats.avgLatencyMs.toFixed(0) }}ms</TableCell>
-        <TableCell class="text-right">
-          <span :class="entry.retryRate > 10 ? 'text-yellow-600 dark:text-yellow-400' : ''">
+        <TableCell class="text-right font-mono text-xs py-1">{{ entry.stats.avgLatencyMs.toFixed(0) }}ms</TableCell>
+        <TableCell class="text-right font-mono text-xs py-1">
+          <span :class="entry.retryRate > 10 ? 'text-warning' : ''">
             {{ entry.retryRate.toFixed(1) }}%
           </span>
         </TableCell>
-        <TableCell>
+        <TableCell class="py-1">
           <div class="flex flex-wrap gap-1">
             <Badge
               v-for="err in entry.stats.topErrors.slice(0, 3)"
               :key="err.code"
               variant="destructive"
-              class="text-xs"
+              class="text-[10px] px-1.5 py-0"
             >
               {{ err.code }} ({{ err.count }})
             </Badge>
