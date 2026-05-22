@@ -75,6 +75,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
         type: RESPONSES_SSE_EVENTS.OUTPUT_TEXT_DONE,
         output_index: this.outputIndex,
         content_index: this.contentIndex,
+        item_id: this.currentMessageItemId,
         text: this.textBuffer,
         sequence_number: this.nextSeq(),
       });
@@ -82,6 +83,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
         type: RESPONSES_SSE_EVENTS.CONTENT_PART_DONE,
         output_index: this.outputIndex,
         content_index: this.contentIndex,
+        item_id: this.currentMessageItemId,
         part: { type: "output_text", text: this.textBuffer, annotations: [] },
         sequence_number: this.nextSeq(),
       });
@@ -117,6 +119,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
       type: RESPONSES_SSE_EVENTS.REASONING_SUMMARY_TEXT_DONE,
       output_index: this.outputIndex,
       summary_index: 0,
+      item_id: this.currentReasoningItemId,
       text: this.reasoningBuffer,
       sequence_number: this.nextSeq(),
     });
@@ -124,6 +127,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
       type: RESPONSES_SSE_EVENTS.REASONING_SUMMARY_PART_DONE,
       output_index: this.outputIndex,
       summary_index: 0,
+      item_id: this.currentReasoningItemId,
       part: { type: "summary_text", text: this.reasoningBuffer },
       sequence_number: this.nextSeq(),
     });
@@ -274,6 +278,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
           type: RESPONSES_SSE_EVENTS.REASONING_SUMMARY_PART_ADDED,
           output_index: this.outputIndex,
           summary_index: 0,
+          item_id: this.currentReasoningItemId,
           part: { type: "summary_text", text: "" },
           sequence_number: this.nextSeq(),
         });
@@ -282,6 +287,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
         type: RESPONSES_SSE_EVENTS.REASONING_SUMMARY_TEXT_DELTA,
         output_index: this.outputIndex,
         summary_index: 0,
+        item_id: this.currentReasoningItemId,
         delta: delta.reasoning_content as string,
         sequence_number: this.nextSeq(),
       });
@@ -318,6 +324,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
           type: RESPONSES_SSE_EVENTS.CONTENT_PART_ADDED,
           output_index: this.outputIndex,
           content_index: this.contentIndex,
+          item_id: this.currentMessageItemId,
           part: { type: "output_text", text: "", annotations: [] },
           sequence_number: this.nextSeq(),
         });
@@ -326,6 +333,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
         type: RESPONSES_SSE_EVENTS.OUTPUT_TEXT_DELTA,
         output_index: this.outputIndex,
         content_index: this.contentIndex,
+        item_id: this.currentMessageItemId,
         delta: delta.content as string,
         sequence_number: this.nextSeq(),
       });
