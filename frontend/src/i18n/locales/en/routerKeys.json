@@ -19,8 +19,8 @@
   "placeholder": {
     "name": "e.g. Production"
   },
-  "loadFailed": "Failed to load data",
-  "saveFailed": "Failed to save key",
-  "deleteFailed": "Failed to delete key",
+  "loadFailed": "Failed to load API keys. Check your connection and try again.",
+  "saveFailed": "Failed to save API key. The name must be unique and at least 1 character.",
+  "deleteFailed": "Failed to delete API key. Try again or check if the key is in use.",
   "nameRequired": "Please enter a name"
 }

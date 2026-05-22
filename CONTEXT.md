@@ -49,7 +49,7 @@ _Avoid_: 自动重试（笼统用法）
 _Avoid_: 自动切换（笼统用法）、故障转移策略
 
 **Retry Rule（重试规则）**:
-管理员配置的实体，定义匹配条件（HTTP 状态码 + 响应体正则）和重试策略（退避方式、最大次数）。绑定到 Provider 维度。
+管理员配置的实体，定义匹配条件（HTTP 状态码 + 响应体匹配）和重试策略（退避方式、最大次数）。支持两种作用域：通用规则（provider_id = NULL，对所有 Provider 生效）和绑定规则（provider_id 指定，仅对该 Provider 生效）。匹配优先级：绑定规则优先，通用规则 fallback。
 _Avoid_: 重试配置
 
 ## 自动重定向
@@ -76,6 +76,12 @@ _Avoid_: 指标（笼统用法）
 通过 SSE 推送的实时系统状态——活跃请求、队列状态、流式输出内容、延迟统计（p50/p99）。面向实时观察，与 Request Log（事后查看）互补。
 _Avoid_: 监控页面、实时日志
 
+## 响应匹配
+
+**Body Matcher（结构化匹配条件）**:
+Retry Rule 中的 JSON 字段匹配配置。每条条件指定 JSON 路径、操作符（equals/contains/exists）和期望值，多条条件之间 AND 关系。配置 Body Matcher 后优先使用结构化匹配，未配置则 fallback 到 body_pattern 正则。解决正则匹配跨 Provider 误命中的问题。
+_Avoid_: JSON 匹配、字段匹配
+
 ## 增强功能
 
 **Proxy Enhancement（代理增强）**:
@@ -85,6 +91,12 @@ _Avoid_: 代理优化、增强代理
 **Stream Timeout（流式超时）**:
 流式响应的空闲超时配置（`STREAM_TIMEOUT_MS` 环境变量），防止模型卡死不输出导致请求挂起。
 _Avoid_: 流超时、SSE 超时
+
+## 可观测性补充
+
+**Upstream Error Log（上游错误日志）**:
+记录最终失败请求（resilience done/abort 且 status >= 400）的错误摘要，包括从上游响应体提取的 error_type 和 error_message。用于事后诊断分析，不用于实时展示。与 Request Log 通过 request_log_id 关联。
+_Avoid_: 错误日志（与 Request Log 混淆时）
 
 ## Flagged Ambiguities
 

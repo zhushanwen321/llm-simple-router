@@ -34,6 +34,7 @@
     "type": "Type",
     "model": "Model",
     "actualForward": "Actual Forward",
+    "tags": "Tags",
     "statusCode": "Status Code",
     "latency": "Latency",
     "streaming": "Streaming",

@@ -34,6 +34,7 @@
     "type": "类型",
     "model": "模型",
     "actualForward": "实际转发",
+    "tags": "标签",
     "statusCode": "状态码",
     "latency": "延迟",
     "streaming": "流式",
