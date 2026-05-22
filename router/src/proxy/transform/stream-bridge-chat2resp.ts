@@ -57,12 +57,12 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
       output: [],
       created_at: this.createdAt,
     };
-    this.pushResponsesSSE(RESPONSES_SSE_EVENTS.CREATED, {
+    this.pushAnthropicSSE(RESPONSES_SSE_EVENTS.CREATED, {
       type: RESPONSES_SSE_EVENTS.CREATED,
       response: { ...base, status: "queued" },
       sequence_number: this.nextSeq(),
     });
-    this.pushResponsesSSE(RESPONSES_SSE_EVENTS.IN_PROGRESS, {
+    this.pushAnthropicSSE(RESPONSES_SSE_EVENTS.IN_PROGRESS, {
       type: RESPONSES_SSE_EVENTS.IN_PROGRESS,
       response: base,
       sequence_number: this.nextSeq(),
@@ -71,7 +71,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
 
   private closeCurrentMessageItem(): void {
     if (this.hasContentPartStarted) {
-      this.pushResponsesSSE(RESPONSES_SSE_EVENTS.OUTPUT_TEXT_DONE, {
+      this.pushAnthropicSSE(RESPONSES_SSE_EVENTS.OUTPUT_TEXT_DONE, {
         type: RESPONSES_SSE_EVENTS.OUTPUT_TEXT_DONE,
         output_index: this.outputIndex,
         content_index: this.contentIndex,
@@ -79,7 +79,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
         text: this.textBuffer,
         sequence_number: this.nextSeq(),
       });
-      this.pushResponsesSSE(RESPONSES_SSE_EVENTS.CONTENT_PART_DONE, {
+      this.pushAnthropicSSE(RESPONSES_SSE_EVENTS.CONTENT_PART_DONE, {
         type: RESPONSES_SSE_EVENTS.CONTENT_PART_DONE,
         output_index: this.outputIndex,
         content_index: this.contentIndex,
@@ -90,7 +90,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
       this.hasContentPartStarted = false;
     }
     if (this.hasMessageItemStarted) {
-      this.pushResponsesSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_DONE, {
+      this.pushAnthropicSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_DONE, {
         type: RESPONSES_SSE_EVENTS.OUTPUT_ITEM_DONE,
         output_index: this.outputIndex,
         item: {
@@ -115,7 +115,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
 
   private closeCurrentReasoningItem(): void {
     if (!this.hasReasoningItemStarted) return;
-    this.pushResponsesSSE(RESPONSES_SSE_EVENTS.REASONING_SUMMARY_TEXT_DONE, {
+    this.pushAnthropicSSE(RESPONSES_SSE_EVENTS.REASONING_SUMMARY_TEXT_DONE, {
       type: RESPONSES_SSE_EVENTS.REASONING_SUMMARY_TEXT_DONE,
       output_index: this.outputIndex,
       summary_index: 0,
@@ -123,7 +123,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
       text: this.reasoningBuffer,
       sequence_number: this.nextSeq(),
     });
-    this.pushResponsesSSE(RESPONSES_SSE_EVENTS.REASONING_SUMMARY_PART_DONE, {
+    this.pushAnthropicSSE(RESPONSES_SSE_EVENTS.REASONING_SUMMARY_PART_DONE, {
       type: RESPONSES_SSE_EVENTS.REASONING_SUMMARY_PART_DONE,
       output_index: this.outputIndex,
       summary_index: 0,
@@ -131,7 +131,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
       part: { type: "summary_text", text: this.reasoningBuffer },
       sequence_number: this.nextSeq(),
     });
-    this.pushResponsesSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_DONE, {
+    this.pushAnthropicSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_DONE, {
       type: RESPONSES_SSE_EVENTS.OUTPUT_ITEM_DONE,
       output_index: this.outputIndex,
       item: {
@@ -151,7 +151,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
   }
 
   private closeCurrentFunctionCall(): void {
-    this.pushResponsesSSE(RESPONSES_SSE_EVENTS.FUNCTION_CALL_ARGUMENTS_DONE, {
+    this.pushAnthropicSSE(RESPONSES_SSE_EVENTS.FUNCTION_CALL_ARGUMENTS_DONE, {
       type: RESPONSES_SSE_EVENTS.FUNCTION_CALL_ARGUMENTS_DONE,
       output_index: this.outputIndex,
       item_id: this.currentFunctionCallId,
@@ -159,7 +159,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
       arguments: this.argsBuffer,
       sequence_number: this.nextSeq(),
     });
-    this.pushResponsesSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_DONE, {
+    this.pushAnthropicSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_DONE, {
       type: RESPONSES_SSE_EVENTS.OUTPUT_ITEM_DONE,
       output_index: this.outputIndex,
       item: {
@@ -210,7 +210,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
       created_at: this.createdAt,
       completed_at: completedAt,
     };
-    this.pushResponsesSSE(RESPONSES_SSE_EVENTS.COMPLETED, {
+    this.pushAnthropicSSE(RESPONSES_SSE_EVENTS.COMPLETED, {
       type: RESPONSES_SSE_EVENTS.COMPLETED,
       response,
       sequence_number: this.nextSeq(),
@@ -268,13 +268,13 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
         this.hasReasoningItemStarted = true;
         this.reasoningBuffer = "";
         this.currentReasoningItemId = `rs_${randomHex(ID_HEX_LENGTH)}`;
-        this.pushResponsesSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED, {
+        this.pushAnthropicSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED, {
           type: RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED,
           output_index: this.outputIndex,
           item: { type: "reasoning", id: this.currentReasoningItemId, summary: [] },
           sequence_number: this.nextSeq(),
         });
-        this.pushResponsesSSE(RESPONSES_SSE_EVENTS.REASONING_SUMMARY_PART_ADDED, {
+        this.pushAnthropicSSE(RESPONSES_SSE_EVENTS.REASONING_SUMMARY_PART_ADDED, {
           type: RESPONSES_SSE_EVENTS.REASONING_SUMMARY_PART_ADDED,
           output_index: this.outputIndex,
           summary_index: 0,
@@ -283,7 +283,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
           sequence_number: this.nextSeq(),
         });
       }
-      this.pushResponsesSSE(RESPONSES_SSE_EVENTS.REASONING_SUMMARY_TEXT_DELTA, {
+      this.pushAnthropicSSE(RESPONSES_SSE_EVENTS.REASONING_SUMMARY_TEXT_DELTA, {
         type: RESPONSES_SSE_EVENTS.REASONING_SUMMARY_TEXT_DELTA,
         output_index: this.outputIndex,
         summary_index: 0,
@@ -305,7 +305,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
         this.textBuffer = "";
         this.contentIndex = 0;
         this.currentMessageItemId = `msg_${randomHex(ID_HEX_LENGTH)}`;
-        this.pushResponsesSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED, {
+        this.pushAnthropicSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED, {
           type: RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED,
           output_index: this.outputIndex,
           item: {
@@ -320,7 +320,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
       }
       if (!this.hasContentPartStarted) {
         this.hasContentPartStarted = true;
-        this.pushResponsesSSE(RESPONSES_SSE_EVENTS.CONTENT_PART_ADDED, {
+        this.pushAnthropicSSE(RESPONSES_SSE_EVENTS.CONTENT_PART_ADDED, {
           type: RESPONSES_SSE_EVENTS.CONTENT_PART_ADDED,
           output_index: this.outputIndex,
           content_index: this.contentIndex,
@@ -329,7 +329,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
           sequence_number: this.nextSeq(),
         });
       }
-      this.pushResponsesSSE(RESPONSES_SSE_EVENTS.OUTPUT_TEXT_DELTA, {
+      this.pushAnthropicSSE(RESPONSES_SSE_EVENTS.OUTPUT_TEXT_DELTA, {
         type: RESPONSES_SSE_EVENTS.OUTPUT_TEXT_DELTA,
         output_index: this.outputIndex,
         content_index: this.contentIndex,
@@ -362,7 +362,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
           this.currentFunctionCallId = tcId;
           this.currentFunctionCallName = tcName;
           this.argsBuffer = "";
-          this.pushResponsesSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED, {
+          this.pushAnthropicSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED, {
             type: RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED,
             output_index: this.outputIndex,
             item: {
@@ -378,7 +378,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
           // Also emit any initial arguments
           const args = fn?.arguments as string | undefined;
           if (args && args !== "") {
-            this.pushResponsesSSE(RESPONSES_SSE_EVENTS.FUNCTION_CALL_ARGUMENTS_DELTA, {
+            this.pushAnthropicSSE(RESPONSES_SSE_EVENTS.FUNCTION_CALL_ARGUMENTS_DELTA, {
               type: RESPONSES_SSE_EVENTS.FUNCTION_CALL_ARGUMENTS_DELTA,
               output_index: this.outputIndex,
               item_id: tcId,
@@ -390,7 +390,7 @@ export class ChatToResponsesBridgeTransform extends BaseSSETransform {
           }
         } else if (fn?.arguments) {
           // Arguments continuation for current tool call
-          this.pushResponsesSSE(RESPONSES_SSE_EVENTS.FUNCTION_CALL_ARGUMENTS_DELTA, {
+          this.pushAnthropicSSE(RESPONSES_SSE_EVENTS.FUNCTION_CALL_ARGUMENTS_DELTA, {
             type: RESPONSES_SSE_EVENTS.FUNCTION_CALL_ARGUMENTS_DELTA,
             output_index: this.outputIndex,
             item_id: this.currentFunctionCallId,

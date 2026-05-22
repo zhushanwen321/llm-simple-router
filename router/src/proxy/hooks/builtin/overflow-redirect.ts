@@ -8,7 +8,6 @@
  *
  * 依赖：ctx.metadata 中需设置 "db"
  */
-import Database from "better-sqlite3";
 import type { PipelineHook, PipelineContext, ProviderInfo } from "../../pipeline/types.js";
 import { getProviderById } from "../../../db/index.js";
 import { applyOverflowRedirect } from "../../routing/overflow.js";
@@ -21,7 +20,7 @@ export const overflowRedirectHook: PipelineHook = {
     const { resolved, body } = ctx;
     if (!resolved) return;
 
-    const db = ctx.metadata.get("db") as Database.Database;
+    const db = ctx.deps?.db;
     if (!db) return;
 
     const overflowResult = applyOverflowRedirect(resolved, db, body);

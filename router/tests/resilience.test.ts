@@ -392,15 +392,15 @@ describe("ResilienceLayer.execute()", () => {
     expect(result.attempts).toHaveLength(1);
   });
 
-  it("cross-provider failover throws ProviderSwitchNeeded", async () => {
+  it("cross-provider failover returns action=failover", async () => {
     const layer = new ResilienceLayer();
     const fn = vi.fn()
       .mockResolvedValueOnce(makeError(500, "err"))
       .mockResolvedValueOnce(makeSuccess(200));
     const targets = () => [t1, t2];
-    await expect(
-      layer.execute(targets, fn, failoverConfig()),
-    ).rejects.toThrow("Provider switch needed: p2");
+    const result = await layer.execute(targets, fn, failoverConfig());
+    expect(result.action).toBe("failover");
+    expect(result.result.kind).toBe("error");
   });
 });
 

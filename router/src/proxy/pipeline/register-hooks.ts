@@ -1,10 +1,6 @@
 /**
- * 启动时注册所有内置 PipelineHook。
- *
- * 旧 hookRegistry 仅用于 Admin API 查询（不执行），
- * ProxyPipeline 单例用于实际请求处理中的 emit 调用。
+ * 启动时注册所有内置 PipelineHook 到 proxyPipeline。
  */
-import { hookRegistry } from "../pipeline/hook-registry.js";
 import { proxyPipeline } from "../pipeline/pipeline.js";
 import { enhancementPreprocessHook } from "../hooks/builtin/enhancement-preprocess.js";
 import { allowedModelsHook } from "../hooks/builtin/allowed-models.js";
@@ -42,7 +38,6 @@ const ALL_HOOKS = [
 
 export function registerBuiltinHooks(): void {
   for (const hook of ALL_HOOKS) {
-    hookRegistry.register(hook);
     proxyPipeline.register(hook);
   }
 }

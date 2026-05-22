@@ -5,7 +5,7 @@ import jwt from "jsonwebtoken";
 import { getSetting, setSetting, isInitialized } from "../db/settings.js";
 import { hashPassword } from "../utils/password.js";
 import { isForwardedProtoHttps } from "../utils/cookie-secure.js";
-import { HTTP_BAD_REQUEST, HTTP_CONFLICT } from "./constants.js";
+import { HTTP_BAD_REQUEST, HTTP_CONFLICT } from "./utils.js";
 import { API_CODE, apiError } from "./api-response.js";
 
 const CRYPTO_BYTES_LENGTH = 32;

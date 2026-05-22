@@ -9,8 +9,8 @@ import {
   updateSchedule,
   deleteSchedule,
 } from "../db/index.js";
-import { getMappingGroupById, getProviderById } from "../db/index.js";
-import { HTTP_BAD_REQUEST, HTTP_CREATED, HTTP_NOT_FOUND } from "./constants.js";
+import { getMappingGroupById } from "../db/index.js";
+import { HTTP_BAD_REQUEST, HTTP_CREATED, HTTP_NOT_FOUND, validateMappingRule } from "./utils.js";
 import { API_CODE, apiError } from "./api-response.js";
 
 const CreateScheduleSchema = Type.Object({
@@ -35,44 +35,7 @@ const UpdateScheduleSchema = Type.Object({
   transform_rule: Type.Optional(Type.String()),
 });
 
-function validateMappingRule(db: Database.Database, ruleJson: string): string | undefined {
-  let rule: unknown;
-  try {
-    rule = JSON.parse(ruleJson);
-  } catch {
-    return "Invalid mapping_rule JSON";
-  }
-
-  if (typeof rule !== "object" || rule === null) return "Invalid mapping_rule";
-  const r = rule as { targets?: unknown[] };
-
-  if (!Array.isArray(r.targets) || r.targets.length === 0) {
-    return "mapping_rule.targets must be a non-empty array";
-  }
-
-  for (let i = 0; i < r.targets.length; i++) {
-    const t = r.targets[i] as Record<string, unknown>;
-    if (!t.backend_model || !t.provider_id) {
-      return `targets[${i}] missing backend_model or provider_id`;
-    }
-    const p = getProviderById(db, t.provider_id as string);
-    if (!p) return `targets[${i}] provider_id '${t.provider_id}' not found`;
-
-    const hasOverflowProvider = !!t.overflow_provider_id;
-    const hasOverflowModel = !!t.overflow_model;
-    if (hasOverflowProvider && !hasOverflowModel) {
-      return `targets[${i}]: overflow_provider_id requires overflow_model`;
-    }
-    if (hasOverflowModel && !hasOverflowProvider) {
-      return `targets[${i}]: overflow_model requires overflow_provider_id`;
-    }
-    if (hasOverflowProvider) {
-      const op = getProviderById(db, t.overflow_provider_id as string);
-      if (!op) return `targets[${i}]: overflow_provider_id '${t.overflow_provider_id}' not found`;
-    }
-  }
-  return undefined;
-}
+// validateMappingRule 已移到 admin/utils.ts
 
 /** 解析 week JSON 为数字数组，失败返回 null */
 const MAX_WEEK_DAY = 6;

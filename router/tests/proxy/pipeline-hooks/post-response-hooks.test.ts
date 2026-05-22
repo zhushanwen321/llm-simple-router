@@ -56,6 +56,7 @@ describe("builtin:stream-timeout", () => {
         },
         attempts: [],
         excludedTargets: [],
+        action: "stop",
       } as ResilienceResult,
     });
     (ctx.reply as Record<string, unknown>).raw = raw;
@@ -88,6 +89,7 @@ describe("builtin:stream-timeout", () => {
         },
         attempts: [],
         excludedTargets: [],
+        action: "stop",
       } as ResilienceResult,
     });
     (ctx.reply as Record<string, unknown>).raw = raw;
@@ -116,6 +118,7 @@ describe("builtin:stream-timeout", () => {
         },
         attempts: [],
         excludedTargets: [],
+        action: "continue",
       } as ResilienceResult,
     });
     (ctx.reply as Record<string, unknown>).raw = raw;
@@ -145,6 +148,7 @@ describe("builtin:stream-timeout", () => {
         },
         attempts: [],
         excludedTargets: [],
+        action: "stop",
       } as ResilienceResult,
     });
     (ctx.reply as Record<string, unknown>).raw = raw;
@@ -194,6 +198,7 @@ describe("builtin:usage-record", () => {
         },
         attempts: [],
         excludedTargets: [],
+        action: "continue",
       } as ResilienceResult,
     });
     ctx.request.routerKey = { id: "key-123" } as never;
@@ -221,6 +226,7 @@ describe("builtin:usage-record", () => {
         },
         attempts: [],
         excludedTargets: [],
+        action: "continue",
       } as ResilienceResult,
     });
     ctx.metadata.set("container", container);
@@ -247,6 +253,7 @@ describe("builtin:usage-record", () => {
         },
         attempts: [],
         excludedTargets: [],
+        action: "stop",
       } as ResilienceResult,
     });
     ctx.metadata.set("container", container);
@@ -276,6 +283,7 @@ describe("builtin:usage-record", () => {
         },
         attempts: [],
         excludedTargets: [],
+        action: "stop",
       } as ResilienceResult,
     });
     ctx.metadata.set("container", container);

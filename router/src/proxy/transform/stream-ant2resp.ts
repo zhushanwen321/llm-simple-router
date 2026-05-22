@@ -51,12 +51,12 @@ export class AnthropicToResponsesTransform extends BaseSSETransform {
       output: [],
       created_at: this.createdAt,
     };
-    this.pushResponsesSSE(RESPONSES_SSE_EVENTS.CREATED, {
+    this.pushAnthropicSSE(RESPONSES_SSE_EVENTS.CREATED, {
       type: RESPONSES_SSE_EVENTS.CREATED,
       response: { ...base, status: "queued" },
       sequence_number: this.nextSeq(),
     });
-    this.pushResponsesSSE(RESPONSES_SSE_EVENTS.IN_PROGRESS, {
+    this.pushAnthropicSSE(RESPONSES_SSE_EVENTS.IN_PROGRESS, {
       type: RESPONSES_SSE_EVENTS.IN_PROGRESS,
       response: base,
       sequence_number: this.nextSeq(),
@@ -87,13 +87,13 @@ export class AnthropicToResponsesTransform extends BaseSSETransform {
           this.reasoningBuffer = "";
           this.currentItemId = `rs_${randomHex(ID_HEX_LENGTH)}`;
           this.currentSummaryPartId = `sp_${randomHex(SHORT_HEX_LENGTH)}`;
-          this.pushResponsesSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED, {
+          this.pushAnthropicSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED, {
             type: RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED,
             output_index: this.outputIndex,
             item: { type: "reasoning", id: this.currentItemId, summary: [] },
             sequence_number: this.nextSeq(),
           });
-          this.pushResponsesSSE(RESPONSES_SSE_EVENTS.REASONING_SUMMARY_PART_ADDED, {
+          this.pushAnthropicSSE(RESPONSES_SSE_EVENTS.REASONING_SUMMARY_PART_ADDED, {
             type: RESPONSES_SSE_EVENTS.REASONING_SUMMARY_PART_ADDED,
             output_index: this.outputIndex,
             summary_index: 0,
@@ -106,13 +106,13 @@ export class AnthropicToResponsesTransform extends BaseSSETransform {
           this.textBuffer = "";
           this.currentItemId = `msg_${randomHex(ID_HEX_LENGTH)}`;
           this.currentContentPartIndex = 0;
-          this.pushResponsesSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED, {
+          this.pushAnthropicSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED, {
             type: RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED,
             output_index: this.outputIndex,
             item: { type: "message", id: this.currentItemId, role: "assistant", content: [], status: "in_progress" },
             sequence_number: this.nextSeq(),
           });
-          this.pushResponsesSSE(RESPONSES_SSE_EVENTS.CONTENT_PART_ADDED, {
+          this.pushAnthropicSSE(RESPONSES_SSE_EVENTS.CONTENT_PART_ADDED, {
             type: RESPONSES_SSE_EVENTS.CONTENT_PART_ADDED,
             output_index: this.outputIndex,
             content_index: 0,
@@ -131,7 +131,7 @@ export class AnthropicToResponsesTransform extends BaseSSETransform {
             : `fc_${randomHex(ID_HEX_LENGTH)}`;
           const callId = this.activeToolCallId;
           this.currentItemId = callId;
-          this.pushResponsesSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED, {
+          this.pushAnthropicSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED, {
             type: RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED,
             output_index: this.outputIndex,
             item: {
@@ -156,7 +156,7 @@ export class AnthropicToResponsesTransform extends BaseSSETransform {
           const thinking = delta.thinking as string;
           if (thinking) {
             this.reasoningBuffer += thinking;
-            this.pushResponsesSSE(RESPONSES_SSE_EVENTS.REASONING_SUMMARY_TEXT_DELTA, {
+            this.pushAnthropicSSE(RESPONSES_SSE_EVENTS.REASONING_SUMMARY_TEXT_DELTA, {
               type: RESPONSES_SSE_EVENTS.REASONING_SUMMARY_TEXT_DELTA,
               output_index: this.outputIndex,
               summary_index: 0,
@@ -169,7 +169,7 @@ export class AnthropicToResponsesTransform extends BaseSSETransform {
           const text = delta.text as string;
           if (text) {
             this.textBuffer += text;
-            this.pushResponsesSSE(RESPONSES_SSE_EVENTS.OUTPUT_TEXT_DELTA, {
+            this.pushAnthropicSSE(RESPONSES_SSE_EVENTS.OUTPUT_TEXT_DELTA, {
               type: RESPONSES_SSE_EVENTS.OUTPUT_TEXT_DELTA,
               output_index: this.outputIndex,
               content_index: 0,
@@ -182,7 +182,7 @@ export class AnthropicToResponsesTransform extends BaseSSETransform {
           const partialJson = delta.partial_json as string;
           if (partialJson) {
             this.activeToolArgs += partialJson;
-            this.pushResponsesSSE(RESPONSES_SSE_EVENTS.FUNCTION_CALL_ARGUMENTS_DELTA, {
+            this.pushAnthropicSSE(RESPONSES_SSE_EVENTS.FUNCTION_CALL_ARGUMENTS_DELTA, {
               type: RESPONSES_SSE_EVENTS.FUNCTION_CALL_ARGUMENTS_DELTA,
               output_index: this.outputIndex,
               item_id: this.currentItemId,
@@ -201,7 +201,7 @@ export class AnthropicToResponsesTransform extends BaseSSETransform {
         if (this.state === "thinking") {
           const text = this.reasoningBuffer;
           this.reasoningBuffer = "";
-          this.pushResponsesSSE(RESPONSES_SSE_EVENTS.REASONING_SUMMARY_TEXT_DONE, {
+          this.pushAnthropicSSE(RESPONSES_SSE_EVENTS.REASONING_SUMMARY_TEXT_DONE, {
             type: RESPONSES_SSE_EVENTS.REASONING_SUMMARY_TEXT_DONE,
             output_index: this.outputIndex,
             summary_index: 0,
@@ -209,7 +209,7 @@ export class AnthropicToResponsesTransform extends BaseSSETransform {
             text,
             sequence_number: this.nextSeq(),
           });
-          this.pushResponsesSSE(RESPONSES_SSE_EVENTS.REASONING_SUMMARY_PART_DONE, {
+          this.pushAnthropicSSE(RESPONSES_SSE_EVENTS.REASONING_SUMMARY_PART_DONE, {
             type: RESPONSES_SSE_EVENTS.REASONING_SUMMARY_PART_DONE,
             output_index: this.outputIndex,
             summary_index: 0,
@@ -217,7 +217,7 @@ export class AnthropicToResponsesTransform extends BaseSSETransform {
             part: { type: "summary_text", text },
             sequence_number: this.nextSeq(),
           });
-          this.pushResponsesSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_DONE, {
+          this.pushAnthropicSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_DONE, {
             type: RESPONSES_SSE_EVENTS.OUTPUT_ITEM_DONE,
             output_index: this.outputIndex,
             item: { type: "reasoning", id: this.currentItemId, summary: [{ type: "summary_text", text }] },
@@ -227,7 +227,7 @@ export class AnthropicToResponsesTransform extends BaseSSETransform {
         } else if (this.state === "text") {
           const text = this.textBuffer;
           this.textBuffer = "";
-          this.pushResponsesSSE(RESPONSES_SSE_EVENTS.OUTPUT_TEXT_DONE, {
+          this.pushAnthropicSSE(RESPONSES_SSE_EVENTS.OUTPUT_TEXT_DONE, {
             type: RESPONSES_SSE_EVENTS.OUTPUT_TEXT_DONE,
             output_index: this.outputIndex,
             content_index: 0,
@@ -235,7 +235,7 @@ export class AnthropicToResponsesTransform extends BaseSSETransform {
             text,
             sequence_number: this.nextSeq(),
           });
-          this.pushResponsesSSE(RESPONSES_SSE_EVENTS.CONTENT_PART_DONE, {
+          this.pushAnthropicSSE(RESPONSES_SSE_EVENTS.CONTENT_PART_DONE, {
             type: RESPONSES_SSE_EVENTS.CONTENT_PART_DONE,
             output_index: this.outputIndex,
             content_index: 0,
@@ -243,7 +243,7 @@ export class AnthropicToResponsesTransform extends BaseSSETransform {
             part: { type: "output_text", text, annotations: [] },
             sequence_number: this.nextSeq(),
           });
-          this.pushResponsesSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_DONE, {
+          this.pushAnthropicSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_DONE, {
             type: RESPONSES_SSE_EVENTS.OUTPUT_ITEM_DONE,
             output_index: this.outputIndex,
             item: { type: "message", id: this.currentItemId, role: "assistant", content: [{ type: "output_text", text, annotations: [] }], status: "completed" },
@@ -258,7 +258,7 @@ export class AnthropicToResponsesTransform extends BaseSSETransform {
           const name = this.activeToolName;
           this.activeToolArgs = "";
           this.activeToolName = "";
-          this.pushResponsesSSE(RESPONSES_SSE_EVENTS.FUNCTION_CALL_ARGUMENTS_DONE, {
+          this.pushAnthropicSSE(RESPONSES_SSE_EVENTS.FUNCTION_CALL_ARGUMENTS_DONE, {
             type: RESPONSES_SSE_EVENTS.FUNCTION_CALL_ARGUMENTS_DONE,
             output_index: this.outputIndex,
             item_id: this.currentItemId,
@@ -266,7 +266,7 @@ export class AnthropicToResponsesTransform extends BaseSSETransform {
             arguments: args,
             sequence_number: this.nextSeq(),
           });
-          this.pushResponsesSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_DONE, {
+          this.pushAnthropicSSE(RESPONSES_SSE_EVENTS.OUTPUT_ITEM_DONE, {
             type: RESPONSES_SSE_EVENTS.OUTPUT_ITEM_DONE,
             output_index: this.outputIndex,
             item: {
@@ -309,7 +309,7 @@ export class AnthropicToResponsesTransform extends BaseSSETransform {
 
       case "error": {
         const error = data.error as Record<string, unknown>;
-        this.pushResponsesSSE(RESPONSES_SSE_EVENTS.ERROR, {
+        this.pushAnthropicSSE(RESPONSES_SSE_EVENTS.ERROR, {
           type: "error",
           message: (error?.message as string) ?? "Stream error",
           code: (error?.type as string) ?? "upstream_error",
@@ -351,7 +351,7 @@ export class AnthropicToResponsesTransform extends BaseSSETransform {
       created_at: this.createdAt,
       completed_at: completedAt,
     };
-    this.pushResponsesSSE(RESPONSES_SSE_EVENTS.COMPLETED, {
+    this.pushAnthropicSSE(RESPONSES_SSE_EVENTS.COMPLETED, {
       type: RESPONSES_SSE_EVENTS.COMPLETED,
       response,
       sequence_number: this.nextSeq(),

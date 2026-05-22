@@ -9,14 +9,11 @@
  *       - "errorInfo": { statusCode, errorMessage, providerId? }
  *       - "pipelineSnapshot": string (可选，默认使用 ctx.snapshot.toJSON())
  */
-import Database from "better-sqlite3";
 import { insertRequestLog } from "../../../db/index.js";
 import { insertRejectedLog } from "../../log-helpers.js";
 import { logToolErrors } from "../../tool-error-logger.js";
 import type { FailedToolResult } from "../../handler/proxy-handler-utils.js";
 import type { PipelineHook, PipelineContext } from "../../pipeline/types.js";
-import type { RetryMatcher } from "../../log-detail-policy.js";
-import type { LogFileWriter } from "../../../storage/log-file-writer.js";
 
 const UPSTREAM_ERROR_STATUS = 502;
 
@@ -32,10 +29,10 @@ export const errorLoggingHook: PipelineHook = {
   phase: "on_error",
   priority: 900,
   execute(ctx: PipelineContext): void {
-    const db = ctx.metadata.get("db") as Database.Database;
-    const startTime = ctx.metadata.get("startTime") as number;
-    const matcher = ctx.metadata.get("matcher") as { test: (statusCode: number, body: string) => boolean } | null;
-    const logFileWriter = ctx.metadata.get("logFileWriter") as unknown;
+    const db = ctx.deps?.db;
+    const startTime = ctx.iterationStartTime ?? 0;
+    const matcher = ctx.deps?.matcher ?? null;
+    const logFileWriter = ctx.deps?.logFileWriter ?? null;
     const errorInfo = ctx.metadata.get("errorInfo") as ErrorInfo | undefined;
 
     if (!db || !startTime) return;
@@ -65,8 +62,8 @@ export const errorLoggingHook: PipelineHook = {
         originalRequestId: isFailoverIteration ? ctx.rootLogId : null,
         sessionId: sessionId,
         pipelineSnapshot: snapshot,
-        matcher: matcher as RetryMatcher | null,
-        logFileWriter: logFileWriter as LogFileWriter | null,
+        matcher: matcher,
+        logFileWriter: logFileWriter,
       });
     } else {
       // upstream error 路径：使用 insertRequestLog
@@ -89,10 +86,10 @@ export const errorLoggingHook: PipelineHook = {
         session_id: sessionId,
         pipeline_snapshot: snapshot,
         transport_kind: "throw",
-        mapping_reason: (ctx.metadata.get("effectiveMappingReason") as string | null) ?? null,
+        mapping_reason: ctx.mappingReason ?? null,
       }, (matcher || logFileWriter) ? {
         matcher,
-        logFileWriter: logFileWriter as LogFileWriter | null,
+        logFileWriter: logFileWriter,
         responseBody: null,
       } : undefined);
     }

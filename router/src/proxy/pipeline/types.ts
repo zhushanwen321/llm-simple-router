@@ -1,8 +1,19 @@
 // router/src/proxy/pipeline/types.ts
 import type { FastifyReply, FastifyRequest } from "fastify";
+import type Database from "better-sqlite3";
 import type { PipelineSnapshot } from "../pipeline-snapshot.js";
-import type { Target, TransportResult } from "../../core/types.js";
+import type { Target, TransportResult, MappingReason, ResolveResult, ConcurrencyOverride } from "../../core/types.js";
+import type { RawHeaders } from "../../core/types.js";
 import type { ResilienceResult } from "../orchestration/resilience.js";
+import type { ServiceContainer } from "../../core/container.js";
+import type { FormatAdapter } from "../format/types.js";
+import type { ProxyOrchestrator } from "../orchestration/orchestrator.js";
+import type { RetryRuleMatcher } from "../orchestration/retry-rules.js";
+import type { RequestTracker } from "../../core/monitor/index.js";
+import type { LogFileWriter } from "../../storage/log-file-writer.js";
+import type { ProxyErrorFormatter } from "../proxy-core.js";
+import type { UsageWindowTracker } from "../routing/usage-window-tracker.js";
+import type { ProxyAgentFactory } from "../transport/proxy-agent.js";
 
 /** Hook 挂载阶段 */
 export type HookPhase =
@@ -54,6 +65,50 @@ export interface ProviderInfo {
   created_at: string;
 }
 
+/**
+ * PipelineDeps — 固定依赖集合（L1→L2 通道注入）。
+ * 所有字段可选，允许逐步填充（先创建空对象，再由 failover-loop 设置）。
+ */
+export interface PipelineDeps {
+  db?: Database.Database;
+  container?: ServiceContainer;
+  cachedTargets?: Target[];
+  overflowIndices?: Set<number>;
+  resolveResult?: ResolveResult;
+  precomputeSnapshot?: PipelineSnapshot;
+  decryptedApiKeys?: Map<string, string>;
+  enhancementConfig?: {
+    tool_call_loop_enabled: boolean;
+    stream_loop_enabled: boolean;
+    tool_round_limit_enabled: boolean;
+    tool_error_logging_enabled: boolean;
+  };
+  adapter?: FormatAdapter;
+  orchestrator?: ProxyOrchestrator;
+  matcher?: RetryRuleMatcher;
+  tracker?: RequestTracker;
+  defaultUpstreamPath?: string;
+  clientHeaders?: RawHeaders;
+  precomputedClientReq?: string;
+  retryBaseDelayMs?: number;
+  concurrencyOverride?: ConcurrencyOverride | null;
+  logFileWriter?: LogFileWriter | null;
+  errors?: ProxyErrorFormatter;
+  usageWindowTracker?: UsageWindowTracker;
+  proxyAgentFactory?: ProxyAgentFactory;
+}
+
+/**
+ * PipelineMetaMap — 非固定依赖的元数据键值映射（保持 Map<string, unknown> 兼容）。
+ *
+ * 常见键名（非固定，由 hook 动态设置）：
+ * - "session_id" — 当前请求的会话 ID
+ * - "client_type" — 客户端类型标识
+ * - "errorInfo" — 错误信息（{ statusCode: number; errorMessage: string; providerId?: string }）
+ * - "pendingToolErrors" — 待处理的工具执行错误
+ */
+export type PipelineMetaMap = Map<string, unknown>;
+
 /** 贯穿管道的上下文 */
 export interface PipelineContext {
   // 不可变
@@ -71,7 +126,7 @@ export interface PipelineContext {
   effectiveUpstreamPath: string;
   effectiveApiType: string;
   injectedHeaders: Record<string, string>;
-  metadata: Map<string, unknown>;
+  metadata: PipelineMetaMap;
   logId: string;
   rootLogId: string | null;
   transportResult: TransportResult | null;
@@ -79,4 +134,14 @@ export interface PipelineContext {
   clientRequest: string;
   upstreamRequest: string;
   snapshot: PipelineSnapshot;
+
+  // L1→L2 通道（固定依赖，由 PipelineDeps 定义）
+  deps?: PipelineDeps;
+
+  // 迭代级字段（每次 failover 迭代重置）
+  excludeTargets?: Target[];
+  mappingReason?: MappingReason;
+  isFailoverIteration?: boolean;
+  iterationStartTime?: number;
+  lastFailoverTrigger?: string | null;
 }

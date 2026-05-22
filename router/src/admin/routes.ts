@@ -20,7 +20,7 @@ import { adminQuickSetupRoutes } from "./quick-setup.js";
 import { adminImportExportRoutes } from "./settings-import-export.js";
 import { adminTransformRuleRoutes } from "./transform-rules.js";
 import { adminScheduleRoutes } from "./schedules.js";
-import { hookRegistry } from "../proxy/pipeline/hook-registry.js";
+import { proxyPipeline } from "../proxy/pipeline/pipeline.js";
 import type { StateRegistry } from "../core/registry.js";
 import type { RequestTracker } from "../core/monitor/index.js";
 import type { AdaptiveController } from "../core/concurrency/index.js";
@@ -64,7 +64,7 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (app, opti
 
   // Pipeline hooks 查询
   app.get("/admin/api/pipeline/hooks", async () => {
-    return { hooks: hookRegistry.getAll() };
+    return { hooks: proxyPipeline.getAllHooks() };
   });
 
   done();

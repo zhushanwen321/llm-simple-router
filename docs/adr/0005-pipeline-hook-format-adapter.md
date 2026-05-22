@@ -33,6 +33,24 @@ Route → Transform → Transport
 
 FailoverLoop 包裹 Pipeline（不在 Pipeline 内部）。Pipeline 只管单次执行，FailoverLoop 捕获 `ProviderSwitchNeeded` 并重试。如果 Failover 在 Pipeline 内部，pre_route hook 会在每次重试时重复执行，违反幂等预期。
 
+### PipelineContext L1→L2 通道：deps 字段
+
+FailoverLoop 通过 `PipelineContext.deps`（类型 `PipelineDeps`）将 L1 预计算的结果注入到 Pipeline 各 hook 中。deps 包含全部固定依赖（container、orchestrator、adapter、matcher、tracker 等），hook 直接从 `ctx.deps!.xxx` 访问，无需通过 `ctx.metadata.get("xxx")` 做类型断言。
+
+### PipelineContext 迭代级字段
+
+每次 failover 迭代前，FailoverLoop 重置以下字段为当前迭代的值：
+
+| 字段 | 类型 | 用途 |
+|------|------|------|
+| `excludeTargets` | `Target[]` | 已排除的 target 列表 |
+| `mappingReason` | `MappingReason` | 当前迭代的映射原因 |
+| `isFailoverIteration` | `boolean` | 标记是否为 failover 重试 |
+| `iterationStartTime` | `number` | 当前迭代开始时间戳 |
+| `lastFailoverTrigger` | `string \| null` | 触发 failover 的原因 |
+
+这些字段使 hook（如 request-logging、transport-execute）能感知 failover 状态，无需从 metadata 读取。
+
 ## SSE 双层
 
 - **Layer 0**：FormatTransform（格式转换，如 Anthropic SSE → Chat SSE）

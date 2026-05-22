@@ -7,7 +7,7 @@
  */
 import { randomUUID } from "crypto";
 import type { FastifyReply } from "fastify";
-import { ProviderSwitchNeeded, SemaphoreQueueFullError, SemaphoreTimeoutError } from "../../core/errors.js";
+import { SemaphoreQueueFullError, SemaphoreTimeoutError } from "../../core/errors.js";
 import { type Target, type MappingReason } from "../../core/types.js";
 import { type ServiceContainer, SERVICE_KEYS } from "../../core/container.js";
 import { resolveMapping, filterExcluded } from "../routing/mapping-resolver.js";
@@ -32,7 +32,6 @@ import type { UsageWindowTracker } from "../routing/usage-window-tracker.js";
 import type { ProxyAgentFactory } from "../transport/proxy-agent.js";
 import Database from "better-sqlite3";
 
-const HTTP_ERROR_THRESHOLD = 400;
 const UPSTREAM_ERROR_STATUS = 502;
 const HTTP_SERVICE_UNAVAILABLE = 503;
 const MAX_FAILOVER_ITERATIONS = 10;
@@ -165,27 +164,28 @@ export async function executeFailoverLoop(
     }
   }
 
-  // === L1 → L2 通道（一次性 metadata 注入） ===
-  ctx.metadata.set("db", db);
-  ctx.metadata.set("container", container);
-  ctx.metadata.set("cachedTargets", allTargets);
-  ctx.metadata.set("overflowIndices", overflowIndices);
-  ctx.metadata.set("resolveResult", resolveResult);
-  ctx.metadata.set("precomputeSnapshot", precomputeSnapshot);
-  ctx.metadata.set("decryptedApiKeys", new Map<string, string>());
-  ctx.metadata.set("enhancementConfig", enhancementConfig);
-  ctx.metadata.set("adapter", adapter);
-  ctx.metadata.set("orchestrator", orchestrator);
-  ctx.metadata.set("matcher", matcher);
-  ctx.metadata.set("tracker", tracker);
-  ctx.metadata.set("defaultUpstreamPath", upstreamPath);
-  ctx.metadata.set("clientHeaders", cliHdrs);
-  ctx.metadata.set("precomputedClientReq", precomputedClientReq);
-  ctx.metadata.set("retryBaseDelayMs", config.RETRY_BASE_DELAY_MS);
-  ctx.metadata.set("concurrencyOverride", resolveResult.concurrency_override);
-  ctx.metadata.set("logFileWriter", logFileWriter);
-  ctx.metadata.set("errors", errors);
-  ctx.metadata.set("usageWindowTracker", usageWindowTracker);
+  // === L1 → L2 通道（注入到 ctx.deps，同时保持 metadata 兼容） ===
+  ctx.deps!.db = db;
+  ctx.deps!.container = container;
+  ctx.deps!.cachedTargets = allTargets;
+  ctx.deps!.overflowIndices = overflowIndices;
+  ctx.deps!.resolveResult = resolveResult;
+  ctx.deps!.precomputeSnapshot = precomputeSnapshot;
+  ctx.deps!.decryptedApiKeys = new Map<string, string>();
+  ctx.deps!.enhancementConfig = enhancementConfig;
+  ctx.deps!.adapter = adapter;
+  ctx.deps!.orchestrator = orchestrator;
+  ctx.deps!.matcher = matcher;
+  ctx.deps!.tracker = tracker;
+  ctx.deps!.defaultUpstreamPath = upstreamPath;
+  ctx.deps!.clientHeaders = cliHdrs;
+  ctx.deps!.precomputedClientReq = precomputedClientReq;
+  ctx.deps!.retryBaseDelayMs = config.RETRY_BASE_DELAY_MS;
+  ctx.deps!.concurrencyOverride = resolveResult.concurrency_override;
+  ctx.deps!.logFileWriter = logFileWriter;
+  ctx.deps!.errors = errors;
+  ctx.deps!.usageWindowTracker = usageWindowTracker;
+
   if (pendingToolErrors) ctx.metadata.set("pendingToolErrors", pendingToolErrors);
 
   // === L3: while(true) 循环壳 ===
@@ -230,10 +230,11 @@ export async function executeFailoverLoop(
     ctx.clientRequest = precomputedClientReq;
     ctx.upstreamRequest = "";
     ctx.snapshot = new PipelineSnapshot(precomputeSnapshot.getStages());
-    ctx.metadata.set("excludeTargets", excludeTargets);
-    ctx.metadata.set("startTime", startTime);
-    ctx.metadata.set("isFailoverIteration", isFailoverIter);
-    ctx.metadata.set("effectiveMappingReason", mapReason);
+    // 迭代级字段（通过 ctx 直接属性访问为主）
+    ctx.excludeTargets = excludeTargets;
+    ctx.iterationStartTime = startTime;
+    ctx.isFailoverIteration = isFailoverIter;
+    ctx.mappingReason = mapReason;
 
     const flushToolErrors = (pId: string, model: string) => {
       if (!pendingToolErrors) return;
@@ -270,32 +271,51 @@ export async function executeFailoverLoop(
 
       await proxyPipeline.emit("pre_transport", ctx);
 
-      // 将 lastFailoverTrigger 注入 metadata 供 request-logging hook 读取
-      ctx.metadata.set("lastFailoverTrigger", lastFailoverTrigger);
+      // 注入 lastFailoverTrigger 供 request-logging hook 读取
+      ctx.lastFailoverTrigger = lastFailoverTrigger;
       await proxyPipeline.emit("post_response", ctx);
 
       // L3: 结果处理（日志已由 request-logging hook 完成）
       const rr = ctx.resilienceResult!;
       const tr = rr.result;
 
-      // Failover 判断
-      if (allTargets.length > 1 && !reply.raw.headersSent) {
-        const failed = tr.kind === "throw" || ("statusCode" in tr && tr.statusCode >= HTTP_ERROR_THRESHOLD);
-        if (failed) {
-          lastFailoverTrigger = tr.kind === "throw" ? "throw" : `status_${("statusCode" in tr ? tr.statusCode : 0)}`;
+      // 根据 resilience action 决策
+      // action-based failover/retry: 记录 resilience 结果后继续循环
+      if (rr.action === 'failover' || rr.action === 'retry') {
+        if (!reply.raw.headersSent) {
+          logResilienceResult(db, {
+            apiType: ctx.apiType as "openai" | "openai-responses" | "anthropic",
+            model: clientModel, providerId: ctx.provider?.id ?? "", isStream: ctx.isStream,
+            clientReq: ctx.clientRequest, upstreamReqBase: ctx.upstreamRequest, logId, routerKeyId,
+            originalModel: null, sessionId: ctx.metadata.get("session_id") as string | undefined,
+            failover: { isFailoverIteration: isFailoverIter, rootLogId: rootLogId! },
+            pipelineSnapshot: ctx.snapshot.toJSON(), matcher, logFileWriter, resilienceAction: rr.action,
+            resilienceReason: "resilience_action", mappingReason: mapReason,
+            failoverTrigger: `action_${rr.action}`,
+          }, rr.attempts, rr.result, startTime);
+          if (ctx.provider) flushToolErrors(ctx.provider.id, ctx.resolved?.backend_model ?? clientModel);
+          pendingToolErrors = null;
+          lastFailoverTrigger = rr.action;
           excludeTargets.push(ctx.resolved!);
           continue;
         }
+        return reply;
+      }
+
+      // stop 且有其他可用 target: 外层的 failover 循环继续尝试
+      if (rr.action === 'stop' && allTargets.length > 1 && !reply.raw.headersSent) {
+        lastFailoverTrigger = `action_stop`;
+        excludeTargets.push(ctx.resolved!);
+        continue;
       }
 
       if (!reply.raw.headersSent) {
-        if (tr.kind === "success") return reply.code(tr.statusCode).send(tr.body);
-        if (tr.kind === "throw" || (tr.kind === "error" && tr.statusCode >= HTTP_ERROR_THRESHOLD)) {
-          const errResp = errors.upstreamConnectionFailed();
-          return reply.code(errResp.statusCode).send(errResp.body);
+        if (rr.action === 'continue' && "statusCode" in tr && "body" in tr) {
+          return reply.code(tr.statusCode).send(tr.body);
         }
-        return reply.code(UPSTREAM_ERROR_STATUS).send(
-          adapter.formatError("Unhandled transport result") ?? { error: { message: "Unhandled transport result", type: "server_error" } });
+        // rr.action === 'stop'（无更多 target 可切换）
+        const errResp = errors.upstreamConnectionFailed();
+        return reply.code(errResp.statusCode).send(errResp.body);
       }
       return reply;
 
@@ -304,25 +324,8 @@ export async function executeFailoverLoop(
         if (reply.raw.headersSent) return reply;
         return reply.code(e.statusCode).send(e.body);
       }
-      if (e instanceof ProviderSwitchNeeded) {
-        if (reply.raw.headersSent) return reply;
-        if (e.attempts?.length) {
-          logResilienceResult(db, {
-            apiType: ctx.apiType as "openai" | "openai-responses" | "anthropic",
-            model: clientModel, providerId: ctx.provider?.id ?? "", isStream: ctx.isStream,
-            clientReq: ctx.clientRequest, upstreamReqBase: ctx.upstreamRequest, logId, routerKeyId,
-            originalModel: null, sessionId: ctx.metadata.get("session_id") as string | undefined,
-            failover: { isFailoverIteration: isFailoverIter, rootLogId: rootLogId! },
-            pipelineSnapshot: ctx.snapshot.toJSON(), matcher, logFileWriter, resilienceAction: "failover",
-            resilienceReason: "provider_switch_needed", mappingReason: mapReason, failoverTrigger: e.constructor.name,
-          }, e.attempts, e.lastResult ?? { kind: "throw" as const, error: new Error("provider switch") }, startTime);
-        }
-        if (ctx.provider) flushToolErrors(ctx.provider.id, ctx.resolved?.backend_model ?? clientModel);
-        pendingToolErrors = null;
-        lastFailoverTrigger = e.constructor.name;
-        if (ctx.resolved) excludeTargets.push(ctx.resolved);
-        continue;
-      }
+      // ProviderSwitchNeeded 不再由 resilience 层抛出，外部 plugin 抛出的此异常
+      // 根据 Constraint #7 应传播到顶层（不在此处捕获）
       if (e instanceof SemaphoreQueueFullError) {
         if (ctx.provider) flushToolErrors(ctx.provider.id, ctx.resolved?.backend_model ?? clientModel);
         return rejectAndReply(reply, rCtx, errors.concurrencyQueueFull(e.providerId),

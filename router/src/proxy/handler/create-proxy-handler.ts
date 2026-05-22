@@ -204,12 +204,11 @@ export function createProxyHandler(config: ProxyHandlerConfig) {
         reply.raw.removeListener("error", replyErrorHandler);
       });
 
-      // 创建 pipeline context
-      const ctx = createPipelineContext(request, reply, apiType);
-
-      // 注入 DB 到 metadata（hooks 需要访问 settings/写入数据）
-      ctx.metadata.set("db", db);
-      ctx.metadata.set("container", container);
+      // 创建 pipeline context（预填可用依赖）
+      const ctx = createPipelineContext(request, reply, apiType, {
+        db,
+        container,
+      });
 
       // 执行 pre_route 阶段 hooks（client-detection 在此阶段设置 client_type / session_id）
       try {

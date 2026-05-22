@@ -1,6 +1,5 @@
 import { MS_PER_SECOND } from "../../core/constants.js";
 import type { RetryRuleMatcher } from "./retry-rules.js";
-import { ProviderSwitchNeeded } from "../types.js";
 import type { TransportResult } from "../types.js";
 import type { Target, ResilienceAttempt } from "../../core/types.js";
 
@@ -50,6 +49,8 @@ export interface ResilienceResult {
   excludedTargets: Target[];
   /** 最终 resilience 决策，用于诊断日志 */
   finalDecision?: ResilienceDecision;
+  /** resilience 决策结果：continue=成功, failover=切换provider, retry=重试, stop=耗尽 */
+  action: 'continue' | 'failover' | 'retry' | 'stop';
 }
 
 export type ResilienceDecision =
@@ -219,6 +220,7 @@ export class ResilienceLayer {
           attempts: allAttempts,
           excludedTargets,
           finalDecision: { action: "abort", reason: "iteration_cap_exceeded" },
+          action: "stop",
         };
       }
 
@@ -233,6 +235,7 @@ export class ResilienceLayer {
           attempts: allAttempts,
           excludedTargets,
           finalDecision: { action: "abort", reason: "all_targets_exhausted" },
+          action: "stop",
         };
       }
 
@@ -280,7 +283,7 @@ export class ResilienceLayer {
 
       switch (decision.action) {
         case "done":
-          return { result: transportResult, attempts: allAttempts, excludedTargets, finalDecision: decision };
+          return { result: transportResult, attempts: allAttempts, excludedTargets, finalDecision: decision, action: "continue" };
         case "retry":
           globalAttemptIndex++;
           await sleep(decision.delayMs);
@@ -288,17 +291,18 @@ export class ResilienceLayer {
         case "failover":
           excludedTargets.push(decision.excludeTarget);
           globalAttemptIndex++;
-          // 跨 provider failover 需要切换信号量，抛出异常让上层处理
+          // 跨 provider failover 使用 action 返回值驱动，不再使用异常
           const nextExcludedSet = new Set(excludedTargets.map(e => `${e.provider_id}:${e.backend_model}`));
           const nextAvail = targets().filter(
             t => !nextExcludedSet.has(`${t.provider_id}:${t.backend_model}`),
           );
           if (nextAvail.length > 0 && nextAvail[0].provider_id !== currentTarget.provider_id) {
-            throw new ProviderSwitchNeeded(nextAvail[0].provider_id, [...allAttempts], transportResult);
+            return { result: transportResult, attempts: allAttempts, excludedTargets, finalDecision: decision, action: "failover" };
           }
+          // 同 provider failover：内部继续循环
           continue;
         case "abort":
-          return { result: transportResult, attempts: allAttempts, excludedTargets, finalDecision: decision };
+          return { result: transportResult, attempts: allAttempts, excludedTargets, finalDecision: decision, action: "stop" };
       }
     }
   }

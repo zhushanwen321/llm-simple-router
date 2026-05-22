@@ -27,7 +27,8 @@ export const apiKeyDecryptHook: PipelineHook = {
   priority: 1,
   core: true,
   execute(ctx: PipelineContext): void {
-    const db = ctx.metadata.get("db") as Database.Database;
+    const db = ctx.deps?.db ?? ctx.metadata.get("db") as Database.Database;
+    if (!db) return;
     const provider = ctx.provider!;
     const encryptionKey = getSetting(db, "encryption_key");
 
@@ -38,7 +39,7 @@ export const apiKeyDecryptHook: PipelineHook = {
       throw new PipelineAbort(HTTP_SERVICE_UNAVAILABLE, errorBody);
     }
 
-    const decryptedApiKeys = ctx.metadata.get("decryptedApiKeys") as Map<string, string>;
+    const decryptedApiKeys = ctx.deps?.decryptedApiKeys ?? ctx.metadata.get("decryptedApiKeys") as Map<string, string> ?? new Map<string, string>();
     let apiKey = decryptedApiKeys.get(provider.id);
     if (!apiKey) {
       apiKey = decrypt(provider.api_key, encryptionKey);

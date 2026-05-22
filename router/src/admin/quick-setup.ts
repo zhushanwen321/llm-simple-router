@@ -7,16 +7,12 @@ import { createRetryRule } from "../db/retry-rules.js";
 import { upsertTransformRule } from "../db/transform-rules.js";
 import { encrypt } from "../utils/crypto.js";
 import { getSetting } from "../db/settings.js";
-import { HTTP_CREATED, HTTP_BAD_REQUEST, HTTP_CONFLICT } from "./constants.js";
+import { HTTP_CREATED, HTTP_BAD_REQUEST, HTTP_CONFLICT, PROVIDER_NAME_RE, formatApiKeyPreview } from "./utils.js";
 import { API_CODE, apiError } from "./api-response.js";
 import { PROVIDER_CONCURRENCY_DEFAULTS } from "../db/providers.js";
 import type { StateRegistry } from "../core/registry.js";
 import type { RequestTracker } from "../core/monitor/index.js";
 import type { AdaptiveController } from "../core/concurrency/index.js";
-
-const PROVIDER_NAME_RE = /^[a-zA-Z0-9_-]+$/;
-const API_KEY_PREVIEW_MIN_LENGTH = 8;
-const API_KEY_PREVIEW_PREFIX_LEN = 4;
 
 const QuickSetupProviderSchema = Type.Object({
   name: Type.String({ minLength: 1 }),
@@ -118,9 +114,7 @@ export const adminQuickSetupRoutes: FastifyPluginCallback<QuickSetupRoutesOption
         base_url: body.provider.base_url,
         upstream_path: body.provider.upstream_path ?? null,
         api_key: encryptedKey,
-        api_key_preview: body.provider.api_key.length > API_KEY_PREVIEW_MIN_LENGTH
-          ? `${body.provider.api_key.slice(0, API_KEY_PREVIEW_PREFIX_LEN)}...${body.provider.api_key.slice(-API_KEY_PREVIEW_PREFIX_LEN)}`
-          : "****",
+        api_key_preview: formatApiKeyPreview(body.provider.api_key),
         models: JSON.stringify(modelEntries),
         is_active: 1,
         max_concurrency: maxConcurrency,

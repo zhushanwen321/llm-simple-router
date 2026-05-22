@@ -9,9 +9,8 @@
  * 依赖：ctx.metadata 中需设置 "db" 和 "container"
  */
 import { HTTP_UNPROCESSABLE_ENTITY, HTTP_CLIENT_CLOSED } from "../../../core/constants.js";
-import { SERVICE_KEYS, type ServiceContainer } from "../../../core/container.js";
+import { SERVICE_KEYS } from "../../../core/container.js";
 import { ToolLoopGuard, type SessionTracker } from "../../../core/loop-prevention/index.js";
-import Database from "better-sqlite3";
 import type { PipelineHook, PipelineContext } from "../../pipeline/types.js";
 import { PipelineAbort } from "../../pipeline/types.js";
 import { loadEnhancementConfig } from "../../routing/enhancement-config.js";
@@ -27,8 +26,8 @@ export const enhancementPreprocessHook: PipelineHook = {
   execute(ctx: PipelineContext): void {
     const { request, body, metadata } = ctx;
     const sessionId = metadata.get("session_id") as string | undefined;
-    const db = metadata.get("db") as Database.Database;
-    const container = metadata.get("container") as ServiceContainer;
+    const db = ctx.deps?.db;
+    const container = ctx.deps?.container;
     if (!db || !container) return;
 
     const enhancementConfig = loadEnhancementConfig(db);

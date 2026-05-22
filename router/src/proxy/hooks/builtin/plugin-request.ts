@@ -7,7 +7,7 @@
  *
  * 依赖：ctx.metadata 中需设置 "container"
  */
-import { SERVICE_KEYS, type ServiceContainer } from "../../../core/container.js";
+import { SERVICE_KEYS } from "../../../core/container.js";
 import type { PipelineHook, PipelineContext } from "../../pipeline/types.js";
 import type { PluginRegistry } from "../../transform/plugin-registry.js";
 import type { RequestTransformContext } from "../../transform/plugin-types.js";
@@ -17,7 +17,7 @@ export const pluginRequestHook: PipelineHook = {
   phase: "pre_transport",
   priority: 250,
   execute(ctx: PipelineContext): void {
-    const container = ctx.metadata.get("container") as ServiceContainer;
+    const container = ctx.deps?.container;
     if (!container) return;
 
     const pluginRegistry = container.resolve<PluginRegistry>(SERVICE_KEYS.pluginRegistry);

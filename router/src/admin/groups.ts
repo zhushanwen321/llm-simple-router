@@ -9,7 +9,7 @@ import {
   getProviderById,
   getMappingGroupById,
 } from "../db/index.js";
-import { HTTP_BAD_REQUEST, HTTP_CREATED, HTTP_CONFLICT, HTTP_NOT_FOUND } from "./constants.js";
+import { HTTP_BAD_REQUEST, HTTP_CREATED, HTTP_CONFLICT, HTTP_NOT_FOUND, validateMappingRule } from "./utils.js";
 import { parseModels } from "../config/model-context.js";
 import { API_CODE, apiError } from "./api-response.js";
 
@@ -27,64 +27,17 @@ interface GroupRoutesOptions {
   db: Database.Database;
 }
 
-interface TargetInput {
-  backend_model?: string;
-  provider_id?: string;
-  overflow_provider_id?: string;
-  overflow_model?: string;
-}
-
-function validateOverflow(db: Database.Database, target: TargetInput, label: string): string | undefined {
-  const hasOverflowProvider = !!target.overflow_provider_id;
-  const hasOverflowModel = !!target.overflow_model;
-  if (hasOverflowProvider && !hasOverflowModel) {
-    return `${label}: overflow_provider_id requires overflow_model`;
-  }
-  if (hasOverflowModel && !hasOverflowProvider) {
-    return `${label}: overflow_model requires overflow_provider_id`;
-  }
-  if (hasOverflowProvider) {
-    const p = getProviderById(db, target.overflow_provider_id!);
-    if (!p) {
-      return `${label}: overflow_provider_id '${target.overflow_provider_id}' not found`;
-    }
-  }
-  return undefined;
-}
-
+/** 扩展 validateMappingRule，追加 multimodal_fallback 校验 */
 function validateRule(
   db: Database.Database,
   ruleJson: string,
 ): string | undefined {
-  let rule: unknown;
-  try {
-    rule = JSON.parse(ruleJson);
-  } catch {
-    return "Invalid rule JSON";
-  }
-
-  if (typeof rule !== "object" || rule === null) return "Invalid rule";
-  const r = rule as { targets?: unknown[] };
-
-  if (!Array.isArray(r.targets) || r.targets.length === 0) {
-    return "rule.targets must be a non-empty array";
-  }
-
-  for (let i = 0; i < r.targets.length; i++) {
-    const t = r.targets[i] as TargetInput;
-    if (!t.backend_model || !t.provider_id) {
-      return `targets[${i}] missing backend_model or provider_id`;
-    }
-    const p = getProviderById(db, t.provider_id);
-    if (!p) {
-      return `targets[${i}] provider_id '${t.provider_id}' not found`;
-    }
-    const overflowErr = validateOverflow(db, t, `targets[${i}]`);
-    if (overflowErr) return overflowErr;
-  }
+  const baseErr = validateMappingRule(db, ruleJson);
+  if (baseErr) return baseErr;
 
   // Validate multimodal_fallback if present
-  const fallback = (r as Record<string, unknown>).multimodal_fallback;
+  const rule = JSON.parse(ruleJson) as Record<string, unknown>;
+  const fallback = rule.multimodal_fallback;
   if (fallback !== undefined && fallback !== null) {
     const fb = fallback as { provider_id?: string; backend_model?: string };
     if (!fb.provider_id) {

@@ -46,16 +46,13 @@ export abstract class BaseSSETransform extends Transform {
   protected abstract flushPendingData(): void;
   protected abstract ensureTerminated(): void;
 
+  /** 推入 event-type SSE（用于 Anthropic / Responses API 格式，两者格式相同） */
   protected pushAnthropicSSE(eventType: string, data: unknown): void {
     this.push(`event: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`);
   }
 
   protected pushOpenAISSE(data: unknown): void {
     this.push(`data: ${JSON.stringify(data)}\n\n`);
-  }
-
-  protected pushResponsesSSE(eventType: string, data: unknown): void {
-    this.push(`event: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`);
   }
 
   protected pushDone(): void {

@@ -54,6 +54,7 @@ function successResilienceResult(overrides: Partial<ResilienceResult> = {}): Res
     result: successResult,
     attempts: [{ target: { backend_model: "gpt-4", provider_id: "p1" }, attemptIndex: 0, statusCode: 200, error: null, latencyMs: 50, responseBody: null }],
     excludedTargets: [],
+    action: "continue",
     ...overrides,
   };
 }

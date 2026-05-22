@@ -1,223 +1,121 @@
+/**
+ * Stream transform: OpenAI → Anthropic (mapping table pattern)
+ * 映射表模式：processEvent 将 choice.delta 字段映射到对应 handler，消除长 if-else 链
+ */
 import { BaseSSETransform } from "./stream-transform-base.js";
 import { generateMsgId } from "./id-utils.js";
 import { mapFinishReasonToStopReason } from "./usage-mapper.js";
 
-type OA2AntState = "init" | "text" | "thinking" | "tool_use" | "closing";
+type OA2State = "init" | "text" | "thinking" | "tool_use" | "closing";
+const FH = ["reasoning_content", "content", "tool_calls"] as const;
 
 export class OpenAIToAnthropicTransform extends BaseSSETransform {
-  private state: OA2AntState = "init";
-  private blockIndex = 0;
-  private msgId = generateMsgId();
-  private inputTokens = 0;
-  private outputTokens = 0;
-  private cacheReadTokens = 0;
+  private state: OA2State = "init";
+  private bi = 0; private mid = generateMsgId();
+  private it = 0; private ot = 0; private crt = 0;
+  private psr: string | null = null;
+  private hss = false; private hms = false; private frr = false;
+  private act = -1; private tcBuf = new Map<number, string>();
 
-  private pendingStopReason: string | null = null;
-  private hasSentMessageStop = false;
-  private hasSentMessageStart = false;
-
-  private activeToolCallIndex = -1;
-  private toolCallBlocks: Map<number, { id: string; name: string; args: string }> = new Map();
-  private completedToolCallIndices: Set<number> = new Set();
-
-  private finishReasonReceived = false;
-
-  protected processEvent(event: { event?: string; data?: string }): void {
-  // OpenAI SSE 标准结束信号 [DONE] 不是 JSON，跳过解析
-    if (event.data === '[DONE]') return;
-  
-    let chunk: Record<string, unknown>;
-    try { chunk = JSON.parse(event.data!); } catch (err) { this.emit("warning", err); return; }
-
-    // P0 fix: always extract usage when present, even if choices are in the same chunk
-    if (chunk.usage) {
-      const usage = chunk.usage as Record<string, unknown>;
-      this.inputTokens = (usage.prompt_tokens as number) ?? this.inputTokens;
-      this.outputTokens = (usage.completion_tokens as number) ?? this.outputTokens;
-      const details = usage.prompt_tokens_details as Record<string, unknown> | undefined;
-      this.cacheReadTokens = (details?.cached_tokens as number) ?? this.cacheReadTokens;
-    }
-
-    // Usage-only chunk (no choices) triggers stop sequence
-    if (chunk.usage && !(Array.isArray(chunk.choices) && chunk.choices.length > 0)) {
-      if (this.pendingStopReason !== null) {
-        this.emitStopSequence();
-      }
-      return;
-    }
-
-    const choices = chunk.choices as Array<Record<string, unknown>> | undefined;
-    const choice = choices?.[0];
-    if (!choice) return;
-
-    const delta = choice.delta as Record<string, unknown> | undefined;
-    if (!delta) return;
-
-    if (!this.hasSentMessageStart) {
-      this.pushAnthropicSSE("message_start", {
-        type: "message_start",
-        message: {
-          id: this.msgId, type: "message", role: "assistant", content: [],
-          model: this.model, status: "in_progress",
-          usage: { input_tokens: Math.max(0, this.inputTokens - this.cacheReadTokens), cache_read_input_tokens: this.cacheReadTokens },
-        },
-      });
-      this.hasSentMessageStart = true;
-    }
-
-    if (delta.reasoning_content != null && delta.reasoning_content !== "") {
-      this.ensureBlockState("thinking");
-      this.pushAnthropicSSE("content_block_delta", {
-        type: "content_block_delta", index: this.blockIndex,
-        delta: { type: "thinking_delta", thinking: delta.reasoning_content },
-      });
-    }
-
-    if (delta.content != null && delta.content !== "") {
-      this.ensureBlockState("text");
-      this.pushAnthropicSSE("content_block_delta", {
-        type: "content_block_delta", index: this.blockIndex,
-        delta: { type: "text_delta", text: delta.content },
-      });
-    }
-
-    const toolCalls = delta.tool_calls;
-    if (Array.isArray(toolCalls)) {
-      for (const tc of toolCalls) {
-        this.handleToolCallDelta(tc);
+  protected processEvent(ev: { event?: string; data?: string }): void {
+    if (ev.data === "[DONE]") return;
+    let c: Record<string, unknown>; try { c = JSON.parse(ev.data!); } catch { return; }
+    this.extractUsage(c);
+    if (c.usage && !Array.isArray(c.choices)) { if (this.psr) this.emitStopSeq(); return; }
+    const ch = (c.choices as Array<Record<string, unknown>> | undefined)?.[0];
+    const d = ch?.delta as Record<string, unknown> | undefined; if (!d) return;
+    this.ensureMsgStart();
+    for (const k of FH) {
+      const v = d[k];
+      if (v != null && v !== "") {
+        if (k === "reasoning_content") this.onThinking(v);
+        else if (k === "content") this.onText(v);
+        else if (k === "tool_calls") this.onToolCalls(v);
       }
     }
-
-    const finishReason = choice.finish_reason as string | undefined;
-    if (finishReason && !this.finishReasonReceived) {
-      this.finishReasonReceived = true;
-      this.closeCurrentBlock();
-      this.pendingStopReason = mapFinishReasonToStopReason(finishReason);
-    }
+    const fr = ch!.finish_reason as string | undefined;
+    if (fr && !this.frr) { this.frr = true; this.closeBlock(); this.psr = mapFinishReasonToStopReason(fr); }
   }
 
-  private ensureBlockState(target: "text" | "thinking"): void {
-    if (this.state === target) return;
-    if (this.state !== "init") {
-      this.pushAnthropicSSE("content_block_stop", {
-        type: "content_block_stop", index: this.blockIndex,
-      });
-      this.blockIndex++;
-    }
-    this.state = target;
-    const blockContent = target === "text" ? { type: "text", text: "" } : { type: "thinking", thinking: "" };
-    this.pushAnthropicSSE("content_block_start", {
-      type: "content_block_start", index: this.blockIndex, content_block: blockContent,
-    });
+  private extractUsage(c: Record<string, unknown>): void {
+    if (!c.usage) return;
+    const u = c.usage as Record<string, unknown>;
+    this.it = (u.prompt_tokens as number) ?? this.it;
+    this.ot = (u.completion_tokens as number) ?? this.ot;
+    this.crt = ((u.prompt_tokens_details as Record<string, unknown> | undefined)?.cached_tokens as number) ?? this.crt;
   }
 
-  private handleToolCallDelta(tc: Record<string, unknown>): void {
+  private ensureMsgStart(): void {
+    if (this.hss) return;
+    this.push(`event: message_start\ndata: ${JSON.stringify({ type: "message_start", message: { id: this.mid, type: "message", role: "assistant", content: [], model: this.model, status: "in_progress", usage: { input_tokens: Math.max(0, this.it - this.crt), cache_read_input_tokens: this.crt } } })}\n\n`);
+    this.hss = true;
+  }
+
+  private onThinking(v: unknown): void { this.ensureBlock("thinking", { type: "thinking", thinking: "" }, "thinking_delta", "thinking", v as string); }
+  private onText(v: unknown): void { this.ensureBlock("text", { type: "text", text: "" }, "text_delta", "text", v as string); }
+  private onToolCalls(v: unknown): void { for (const tc of v as Array<Record<string, unknown>>) this.hTC(tc); }
+
+  private ensureBlock(t: OA2State, bs: Record<string, unknown>, dt: string, df: string, v: string): void {
+    if (this.state !== t) {
+      if (this.state !== "init") this.closeBlock();
+      this.bi++; this.pushSSE("content_block_start", { type: "content_block_start", index: this.bi, content_block: bs });
+      this.state = t;
+    }
+    this.pushSSE("content_block_delta", { type: "content_block_delta", index: this.bi, delta: { type: dt, [df]: v } });
+  }
+
+  private hTC(tc: Record<string, unknown>): void {
     const idx = (tc.index as number) ?? 0;
     const fn = tc.function as Record<string, unknown> | undefined;
-    const tcId = tc.id as string | undefined;
-    const tcName = fn?.name as string | undefined;
-
-    if (tcId && tcName) {
-      if (this.state !== "init") {
-        this.pushAnthropicSSE("content_block_stop", {
-          type: "content_block_stop", index: this.blockIndex,
-        });
-        this.blockIndex++;
-      }
-      this.activeToolCallIndex = idx;
-      this.state = "tool_use";
-      this.pushAnthropicSSE("content_block_start", {
-        type: "content_block_start", index: this.blockIndex,
-        content_block: { type: "tool_use", id: tcId, name: tcName, input: {} },
-      });
-      this.completedToolCallIndices.add(idx);
-      const args = fn?.arguments as string | undefined;
-      if (args && args !== "") {
-        this.pushAnthropicSSE("content_block_delta", {
-          type: "content_block_delta", index: this.blockIndex,
-          delta: { type: "input_json_delta", partial_json: args },
-        });
-      }
-      return;
-    }
-
-    if (idx !== this.activeToolCallIndex && this.completedToolCallIndices.has(idx)) {
-      const args = fn?.arguments as string | undefined;
-      if (args) {
-        const existing = this.toolCallBlocks.get(idx);
-        if (existing) { existing.args += args; }
-        else { this.toolCallBlocks.set(idx, { id: "", name: "", args }); }
-      }
-      return;
-    }
-
-    if (idx !== this.activeToolCallIndex && !this.completedToolCallIndices.has(idx)) {
-      if (this.state !== "init") {
-        this.pushAnthropicSSE("content_block_stop", {
-          type: "content_block_stop", index: this.blockIndex,
-        });
-        this.blockIndex++;
-      }
-      this.activeToolCallIndex = idx;
-      this.state = "tool_use";
-      // P1 fix: emit content_block_start for previously unseen tool call index
-      this.pushAnthropicSSE("content_block_start", {
-        type: "content_block_start", index: this.blockIndex,
-        content_block: { type: "tool_use", id: `tool_${idx}`, name: `tool_${idx}`, input: {} },
-      });
-      this.completedToolCallIndices.add(idx);
-    }
-
+    const id = tc.id as string | undefined;
+    const name = fn?.name as string | undefined;
     const args = fn?.arguments as string | undefined;
-    if (args && args !== "") {
-      this.pushAnthropicSSE("content_block_delta", {
-        type: "content_block_delta", index: this.blockIndex,
-        delta: { type: "input_json_delta", partial_json: args },
-      });
+
+    if (id && name) {
+      if (this.state !== "init") this.closeBlock();
+      this.act = idx; this.state = "tool_use"; this.bi++;
+      this.pushSSE("content_block_start", { type: "content_block_start", index: this.bi, content_block: { type: "tool_use", id, name, input: {} } });
+      if (args) this.pushTCArg(args); return;
+    }
+    if (args) {
+      if (this.state !== "tool_use") {
+        if (this.state !== "init") this.closeBlock();
+        this.act = idx; this.state = "tool_use"; this.bi++;
+        this.pushSSE("content_block_start", { type: "content_block_start", index: this.bi, content_block: { type: "tool_use", id: `tool_${idx}`, name: `tool_${idx}`, input: {} } });
+      }
+      this.pushTCArg(args);
     }
   }
 
-  private closeCurrentBlock(): void {
-    if (this.state !== "init" && this.state !== "closing") {
-      this.pushAnthropicSSE("content_block_stop", {
-        type: "content_block_stop", index: this.blockIndex,
-      });
-      this.state = "closing";
-    }
+  private pushTCArg(a: string): void { this.pushSSE("content_block_delta", { type: "content_block_delta", index: this.bi, delta: { type: "input_json_delta", partial_json: a } }); }
+
+  private pushSSE(evt: string, data: unknown): void { this.push(`event: ${evt}\ndata: ${JSON.stringify(data)}\n\n`); }
+
+  private closeBlock(): void {
+    if (this.state === "init" || this.state === "closing") return;
+    this.pushSSE("content_block_stop", { type: "content_block_stop", index: this.bi });
+    this.state = "closing";
   }
 
-  private emitStopSequence(): void {
-    if (this.hasSentMessageStop) return;
-    const stopReason = this.pendingStopReason ?? "end_turn";
-    this.pushAnthropicSSE("message_delta", {
-      type: "message_delta",
-      delta: { stop_reason: stopReason, stop_sequence: null },
-      usage: { input_tokens: Math.max(0, this.inputTokens - this.cacheReadTokens) || 0, output_tokens: this.outputTokens, cache_read_input_tokens: this.cacheReadTokens },
-    });
-    this.pushAnthropicSSE("message_stop", { type: "message_stop" });
-    this.hasSentMessageStop = true;
-    this.pendingStopReason = null;
+  private emitStopSeq(): void {
+    if (this.hms) return;
+    this.pushSSE("message_delta", { type: "message_delta", delta: { stop_reason: this.psr ?? "end_turn", stop_sequence: null }, usage: { input_tokens: Math.max(0, this.it - this.crt) || 0, output_tokens: this.ot, cache_read_input_tokens: this.crt } });
+    this.push("event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n");
+    this.hms = true; this.psr = null;
   }
 
   protected flushPendingData(): void {
-    for (const [idx, data] of this.toolCallBlocks) {
-      if (data.args) {
-        this.emit("warning", { event: "buffered_tool_call", index: idx, argsLength: data.args.length });
-        // Flush buffered args as a content_block_delta so data is not lost
-        this.pushAnthropicSSE("content_block_delta", {
-          type: "content_block_delta", index: idx,
-          delta: { type: "input_json_delta", partial_json: data.args },
-        });
-      }
-    }
-    this.toolCallBlocks.clear();
+    for (const [idx, args] of this.tcBuf) {
+      if (!args) continue;
+      this.emit("warning", { event: "buffered_tool_call", index: idx, argsLength: args.length });
+      this.pushSSE("content_block_delta", { type: "content_block_delta", index: idx, delta: { type: "input_json_delta", partial_json: args } });
+    } this.tcBuf.clear();
   }
 
   protected ensureTerminated(): void {
-    if (!this.hasSentMessageStop) {
-      this.closeCurrentBlock();
-      if (this.pendingStopReason === null) this.pendingStopReason = "end_turn";
-      this.emitStopSequence();
-    }
+    if (this.hms) return;
+    this.closeBlock();
+    if (this.psr === null) this.psr = "end_turn";
+    this.emitStopSeq(); this.done = true;
   }
 }

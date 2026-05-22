@@ -14,8 +14,7 @@ import { describe, it, expect } from "vitest";
 import { openaiToAnthropicConverter } from "../../../src/proxy/format/converters/openai-anthropic.js";
 import { anthropicToOpenAIConverter } from "../../../src/proxy/format/converters/anthropic-openai.js";
 import { openaiToResponsesConverter } from "../../../src/proxy/format/converters/openai-responses.js";
-import { responsesToOpenAIConverter } from "../../../src/proxy/format/converters/responses-openai.js";
-import { responsesToAnthropicConverter } from "../../../src/proxy/format/converters/responses-anthropic.js";
+import { responsesToOpenAIConverter, responsesToAnthropicConverter } from "../../../src/proxy/format/converters/openai-responses.js";
 import { anthropicToResponsesConverter } from "../../../src/proxy/format/converters/anthropic-responses.js";
 import type { FormatConverter } from "../../../src/proxy/format/types.js";
 

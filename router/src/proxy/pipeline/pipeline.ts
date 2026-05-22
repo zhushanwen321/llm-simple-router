@@ -16,6 +16,21 @@ export class ProxyPipeline {
     this.hooksByPhase.set(hook.phase, list);
   }
 
+  /** 获取所有阶段钩子的完整列表（Admin API 查询用） */
+  getAllHooks(): Record<string, { name: string; priority: number }[]> {
+    const allPhases: HookPhase[] = [
+      "pre_route",
+      "post_route",
+      "pre_transport",
+      "post_response",
+      "on_error",
+      "on_stream_event",
+    ];
+    return Object.fromEntries(
+      allPhases.map((phase) => [phase, this.getHookChain(phase) as { name: string; priority: number }[]]),
+    );
+  }
+
   /** 获取某阶段的钩子链（调试/Admin API 用） */
   getHookChain(phase: HookPhase): ReadonlyArray<{ name: string; priority: number }> {
     return (this.hooksByPhase.get(phase) ?? []).map((h) => ({

@@ -16,10 +16,10 @@
  *
  * 依赖：cacheEstimator（token 级前缀匹配）、getTokenEstimationEnabled（DB settings）
  */
-import Database from "better-sqlite3";
 import { cacheEstimator } from "../../../routing/cache-estimator.js";
 import { getTokenEstimationEnabled } from "../../../db/settings.js";
 import type { PipelineHook, PipelineContext } from "../../pipeline/types.js";
+import type Database from "better-sqlite3";
 
 export const cacheEstimationHook: PipelineHook = {
   name: "builtin:cache-estimation",
@@ -27,7 +27,7 @@ export const cacheEstimationHook: PipelineHook = {
   priority: 200,
   execute(ctx: PipelineContext): void {
     try {
-      const db = ctx.metadata.get("db") as Database.Database;
+      const db = ctx.deps?.db ?? ctx.metadata.get("db") as Database.Database;
       if (!db) return;
 
       // 开关控制

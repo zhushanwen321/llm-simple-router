@@ -29,8 +29,7 @@ import { responsesAdapter } from "./proxy/format/adapters/responses.js";
 import { openaiToAnthropicConverter } from "./proxy/format/converters/openai-anthropic.js";
 import { anthropicToOpenAIConverter } from "./proxy/format/converters/anthropic-openai.js";
 import { openaiToResponsesConverter } from "./proxy/format/converters/openai-responses.js";
-import { responsesToOpenAIConverter } from "./proxy/format/converters/responses-openai.js";
-import { responsesToAnthropicConverter } from "./proxy/format/converters/responses-anthropic.js";
+import { responsesToOpenAIConverter, responsesToAnthropicConverter } from "./proxy/format/converters/openai-responses.js";
 import { anthropicToResponsesConverter } from "./proxy/format/converters/anthropic-responses.js";
 import { SemaphoreManager, AdaptiveController } from "./core/concurrency/index.js";
 import type { StateRegistry } from "./core/registry.js";
@@ -333,7 +332,7 @@ export async function buildApp(
 
   app.register(authMiddleware, { db });
 
-  // 注册内置 hooks 到 hookRegistry（供 Admin API 查询）
+  // 注册内置 hooks 到 proxyPipeline
   registerBuiltinHooks();
 
   // --- New pipeline-based proxy handlers (Phase 3) ---

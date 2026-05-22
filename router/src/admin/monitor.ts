@@ -1,7 +1,7 @@
 import { FastifyPluginCallback } from "fastify";
 import type { RequestTracker } from "../core/monitor/index.js";
 import { adaptSSEClient } from "../core/sse-client-adapter.js";
-import { HTTP_NOT_FOUND } from "./constants.js";
+import { HTTP_NOT_FOUND } from "./utils.js";
 import { API_CODE, apiError } from "./api-response.js";
 
 const HTTP_OK = 200;

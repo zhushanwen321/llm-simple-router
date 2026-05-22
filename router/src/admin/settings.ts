@@ -9,7 +9,7 @@ import {
   getSetting, getTokenEstimationEnabled, setTokenEstimationEnabled,
   getClientSessionHeaders, setClientSessionHeaders,
 } from "../db/settings.js";
-import { HTTP_BAD_REQUEST } from "./constants.js";
+import { HTTP_BAD_REQUEST } from "./utils.js";
 import { API_CODE, apiError } from "./api-response.js";
 
 interface SettingsOptions {

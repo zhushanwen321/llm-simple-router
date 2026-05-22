@@ -408,6 +408,7 @@ describe("TC-5-01: builtin:transport-execute calls orchestrator.handle", () => {
       result: mockResult,
       attempts: [],
       excludedTargets: [],
+      action: "continue",
     };
 
     const mockOrchestrator = {
@@ -430,21 +431,32 @@ describe("TC-5-01: builtin:transport-execute calls orchestrator.handle", () => {
 
     const mockMatcher = { load: vi.fn() };
 
-    ctx.metadata.set("container", mockContainer);
-    ctx.metadata.set("adapter", { beforeSendProxy: vi.fn() });
-    ctx.metadata.set("orchestrator", mockOrchestrator);
-    ctx.metadata.set("tracker", undefined);
-    ctx.metadata.set("matcher", mockMatcher);
+    ctx.deps = {
+      container: mockContainer,
+      adapter: { beforeSendProxy: vi.fn() },
+      orchestrator: mockOrchestrator,
+      tracker: undefined,
+      matcher: mockMatcher,
+      clientHeaders: {},
+      precomputedClientReq: "{}",
+      retryBaseDelayMs: 1000,
+      enhancementConfig: { stream_loop_enabled: false } as { tool_call_loop_enabled: boolean; stream_loop_enabled: boolean; tool_round_limit_enabled: boolean; tool_error_logging_enabled: boolean },
+      cachedTargets: [ctx.resolved],
+      concurrencyOverride: undefined,
+      errors: undefined,
+      logFileWriter: undefined,
+      usageWindowTracker: undefined,
+      db: undefined,
+      defaultUpstreamPath: undefined,
+      decryptedApiKeys: undefined,
+      precomputeSnapshot: undefined,
+      resolveResult: undefined,
+      proxyAgentFactory: undefined,
+      overflowIndices: undefined,
+    };
+    ctx.iterationStartTime = Date.now();
     ctx.metadata.set("apiKey", "sk-test-key");
-    ctx.metadata.set("startTime", Date.now());
-    ctx.metadata.set("clientHeaders", {});
-    ctx.metadata.set("precomputedClientReq", "{}");
     ctx.metadata.set("needsTransform", false);
-    ctx.metadata.set("retryBaseDelayMs", 1000);
-    ctx.metadata.set("enhancementConfig", { stream_loop_enabled: false });
-    ctx.metadata.set("cachedTargets", [ctx.resolved]);
-    ctx.metadata.set("concurrencyOverride", undefined);
-    ctx.metadata.set("effectiveMappingReason", "direct");
 
     // 执行 transport-execute hook
     await transportExecuteHook.execute(ctx);
@@ -461,7 +473,7 @@ describe("TC-5-01: builtin:transport-execute calls orchestrator.handle", () => {
     expect(ctx.resilienceResult).toBe(mockResilienceResult);
 
     // 验证 adapter.beforeSendProxy 被调用
-    expect((ctx.metadata.get("adapter") as { beforeSendProxy: ReturnType<typeof vi.fn> }).beforeSendProxy).toHaveBeenCalled();
+    expect(ctx.deps!.adapter!.beforeSendProxy).toHaveBeenCalled();
   });
 
   it("TC-5-01: transport-execute propagates orchestrator errors", async () => {
@@ -501,21 +513,32 @@ describe("TC-5-01: builtin:transport-execute calls orchestrator.handle", () => {
       }),
     };
 
-    ctx.metadata.set("container", mockContainer);
-    ctx.metadata.set("adapter", { beforeSendProxy: vi.fn() });
-    ctx.metadata.set("orchestrator", mockOrchestrator);
-    ctx.metadata.set("tracker", undefined);
-    ctx.metadata.set("matcher", { load: vi.fn() });
+    ctx.deps = {
+      container: mockContainer,
+      adapter: { beforeSendProxy: vi.fn() },
+      orchestrator: mockOrchestrator,
+      tracker: undefined,
+      matcher: { load: vi.fn() },
+      clientHeaders: {},
+      precomputedClientReq: "{}",
+      retryBaseDelayMs: 1000,
+      enhancementConfig: { stream_loop_enabled: false } as { tool_call_loop_enabled: boolean; stream_loop_enabled: boolean; tool_round_limit_enabled: boolean; tool_error_logging_enabled: boolean },
+      cachedTargets: [ctx.resolved],
+      concurrencyOverride: undefined,
+      errors: undefined,
+      logFileWriter: undefined,
+      usageWindowTracker: undefined,
+      db: undefined,
+      defaultUpstreamPath: undefined,
+      decryptedApiKeys: undefined,
+      precomputeSnapshot: undefined,
+      resolveResult: undefined,
+      proxyAgentFactory: undefined,
+      overflowIndices: undefined,
+    };
+    ctx.iterationStartTime = Date.now();
     ctx.metadata.set("apiKey", "sk-test");
-    ctx.metadata.set("startTime", Date.now());
-    ctx.metadata.set("clientHeaders", {});
-    ctx.metadata.set("precomputedClientReq", "{}");
     ctx.metadata.set("needsTransform", false);
-    ctx.metadata.set("retryBaseDelayMs", 1000);
-    ctx.metadata.set("enhancementConfig", { stream_loop_enabled: false });
-    ctx.metadata.set("cachedTargets", [ctx.resolved]);
-    ctx.metadata.set("concurrencyOverride", undefined);
-    ctx.metadata.set("effectiveMappingReason", "direct");
 
     // transport-execute 是 core hook，异常应传播
     await expect(transportExecuteHook.execute(ctx)).rejects.toThrow("Connection refused");
@@ -575,21 +598,32 @@ describe("TC-5-01: builtin:transport-execute calls orchestrator.handle", () => {
       }),
     };
 
-    ctx.metadata.set("container", mockContainer);
-    ctx.metadata.set("adapter", { beforeSendProxy: vi.fn() });
-    ctx.metadata.set("orchestrator", mockOrchestrator);
-    ctx.metadata.set("tracker", undefined);
-    ctx.metadata.set("matcher", { load: vi.fn() });
+    ctx.deps = {
+      container: mockContainer,
+      adapter: { beforeSendProxy: vi.fn() },
+      orchestrator: mockOrchestrator,
+      tracker: undefined,
+      matcher: { load: vi.fn() },
+      clientHeaders: {},
+      precomputedClientReq: "{}",
+      retryBaseDelayMs: 1000,
+      enhancementConfig: { stream_loop_enabled: false } as { tool_call_loop_enabled: boolean; stream_loop_enabled: boolean; tool_round_limit_enabled: boolean; tool_error_logging_enabled: boolean },
+      cachedTargets: [resolved],
+      concurrencyOverride: undefined,
+      errors: undefined,
+      logFileWriter: undefined,
+      usageWindowTracker: undefined,
+      db: undefined,
+      defaultUpstreamPath: undefined,
+      decryptedApiKeys: undefined,
+      precomputeSnapshot: undefined,
+      resolveResult: undefined,
+      proxyAgentFactory: undefined,
+      overflowIndices: undefined,
+    };
+    ctx.iterationStartTime = Date.now();
     ctx.metadata.set("apiKey", "sk-test");
-    ctx.metadata.set("startTime", Date.now());
-    ctx.metadata.set("clientHeaders", {});
-    ctx.metadata.set("precomputedClientReq", "{}");
     ctx.metadata.set("needsTransform", false);
-    ctx.metadata.set("retryBaseDelayMs", 1000);
-    ctx.metadata.set("enhancementConfig", { stream_loop_enabled: false });
-    ctx.metadata.set("cachedTargets", [resolved]);
-    ctx.metadata.set("concurrencyOverride", undefined);
-    ctx.metadata.set("effectiveMappingReason", "direct");
 
     await transportExecuteHook.execute(ctx);
 

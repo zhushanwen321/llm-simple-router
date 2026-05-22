@@ -11,10 +11,8 @@
  *       ctx.metadata 中需设置 "db"、"container"、"startTime"、"matcher"、
  *       "logFileWriter"、"pendingToolErrors"、"effectiveMappingReason"、"lastFailoverTrigger"
  */
-import Database from "better-sqlite3";
-import { SERVICE_KEYS, type ServiceContainer } from "../../../core/container.js";
+import { SERVICE_KEYS } from "../../../core/container.js";
 import type { PipelineHook, PipelineContext } from "../../pipeline/types.js";
-import type { LogFileWriter } from "../../../storage/log-file-writer.js";
 import type { RequestTracker } from "../../../core/monitor/index.js";
 import {
   logResilienceResult,
@@ -30,12 +28,12 @@ export const requestLoggingHook: PipelineHook = {
   phase: "post_response",
   priority: 900,
   execute(ctx: PipelineContext): void | Promise<void> {
-    const db = ctx.metadata.get("db") as Database.Database;
-    const container = ctx.metadata.get("container") as ServiceContainer;
-    const startTime = ctx.metadata.get("startTime") as number;
+    const db = ctx.deps?.db;
+    const container = ctx.deps?.container;
+    const startTime = ctx.iterationStartTime ?? 0;
     const resilienceResult = ctx.resilienceResult;
-    const matcher = ctx.metadata.get("matcher") as { test: (statusCode: number, body: string) => boolean } | null;
-    const logFileWriter = ctx.metadata.get("logFileWriter") as unknown;
+    const matcher = ctx.deps?.matcher ?? null;
+    const logFileWriter = ctx.deps?.logFileWriter ?? null;
 
     if (!db || !resilienceResult) return;
 
@@ -43,8 +41,8 @@ export const requestLoggingHook: PipelineHook = {
     const sessionId = ctx.metadata.get("session_id") as string | undefined;
     const isFailoverIteration = ctx.rootLogId !== null && ctx.rootLogId !== ctx.logId;
     const apiType = ctx.apiType as "openai" | "openai-responses" | "anthropic";
-    const effectiveMappingReason = ctx.metadata.get("effectiveMappingReason") as string | null;
-    const lastFailoverTrigger = ctx.metadata.get("lastFailoverTrigger") as string | null;
+    const effectiveMappingReason = ctx.mappingReason as string | null | undefined;
+    const lastFailoverTrigger = ctx.lastFailoverTrigger as string | null | undefined;
 
     // 1. 记录 resilience 结果日志
     const lastLogId = logResilienceResult(
@@ -63,11 +61,11 @@ export const requestLoggingHook: PipelineHook = {
         pipelineSnapshot: ctx.snapshot.toJSON(),
         failover: { isFailoverIteration, rootLogId: ctx.rootLogId ?? ctx.logId },
         matcher,
-        logFileWriter: logFileWriter as LogFileWriter | null,
+        logFileWriter: logFileWriter,
         resilienceAction: resilienceResult.finalDecision?.action,
         resilienceReason: resilienceResult.finalDecision?.action === "abort" ? resilienceResult.finalDecision.reason : null,
-        mappingReason: effectiveMappingReason,
-        failoverTrigger: lastFailoverTrigger,
+        mappingReason: effectiveMappingReason ?? null,
+        failoverTrigger: lastFailoverTrigger ?? null,
       },
       resilienceResult.attempts,
       resilienceResult.result,
@@ -76,7 +74,7 @@ export const requestLoggingHook: PipelineHook = {
 
     // 2. 采集 transport 指标
     if (ctx.provider) {
-      const metricsTracker = container ? container.resolve<RequestTracker>(SERVICE_KEYS.tracker) : undefined;
+      const metricsTracker = container?.resolve<RequestTracker>(SERVICE_KEYS.tracker);
       collectTransportMetrics(
         db,
         apiType,

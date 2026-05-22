@@ -11,7 +11,7 @@ import {
   getMappingGroup,
 } from "../db/index.js";
 import type { MappingGroup } from "../db/index.js";
-import { HTTP_BAD_REQUEST, HTTP_CREATED, HTTP_NOT_FOUND, HTTP_CONFLICT } from "./constants.js";
+import { HTTP_BAD_REQUEST, HTTP_CREATED, HTTP_NOT_FOUND, HTTP_CONFLICT } from "./utils.js";
 import { API_CODE, apiError } from "./api-response.js";
 
 const CreateMappingSchema = Type.Object({

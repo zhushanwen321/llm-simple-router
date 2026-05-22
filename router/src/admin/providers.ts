@@ -10,14 +10,13 @@ import type { StateRegistry } from "../core/registry.js";
 import type { AdaptiveController } from "../core/concurrency/index.js";
 import type { RequestTracker } from "../core/monitor/index.js";
 import type { ProxyAgentFactory } from "../proxy/transport/proxy-agent.js";
-import { HTTP_CREATED, HTTP_NOT_FOUND, HTTP_CONFLICT, HTTP_BAD_REQUEST, HTTP_OK } from "./constants.js";
+import { HTTP_CREATED, HTTP_NOT_FOUND, HTTP_CONFLICT, HTTP_BAD_REQUEST, HTTP_OK, PROVIDER_NAME_RE, isValidHttpUrl, formatApiKeyPreview } from "./utils.js";
 import { API_CODE, apiError } from "./api-response.js";
 import { parseModels, buildModelInfoList, normalizePatchName, type ModelEntry } from "../config/model-context.js";
 import { getModelInfoForProvider, setModelInfoForProvider, deleteAllModelInfoForProvider } from "../db/model-info.js";
 import { buildUpstreamHeaders } from "../proxy/proxy-core.js";
 import { callGet } from "../proxy/transport/http.js";
 
-const API_KEY_PREVIEW_MIN_LENGTH = 8;
 const FETCH_MODELS_BODY_PREVIEW_LENGTH = 200;
 
 interface CascadeResult {
@@ -107,18 +106,7 @@ function extractModelOverrides(models: ModelInput[]): {
   }
   return { entries, overrides };
 }
-const API_KEY_PREVIEW_PREFIX_LEN = 4;
-const PROVIDER_NAME_RE = /^[a-zA-Z0-9_-]+$/;
-
-/** 校验 base_url 是否为合法的 HTTP(S) URL */
-function isValidHttpUrl(str: string): boolean {
-  try {
-    const url = new URL(str);
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
+// API_KEY_PREVIEW_PREFIX_LEN and PROVIDER_NAME_RE moved to utils.ts
 
 const CreateProviderSchema = Type.Object({
   name: Type.String({ minLength: 1 }),
@@ -235,7 +223,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
       base_url: body.base_url,
       upstream_path: body.upstream_path ?? null,
       api_key: encryptedKey,
-      api_key_preview: body.api_key.length > API_KEY_PREVIEW_MIN_LENGTH ? `${body.api_key.slice(0, API_KEY_PREVIEW_PREFIX_LEN)}...${body.api_key.slice(-API_KEY_PREVIEW_PREFIX_LEN)}` : "****",
+      api_key_preview: formatApiKeyPreview(body.api_key),
       models: JSON.stringify(normalizedModels),
       is_active: body.is_active ?? 1,
       max_concurrency: body.max_concurrency ?? PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency,
@@ -309,7 +297,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     if (body.adaptive_enabled !== undefined) fields.adaptive_enabled = body.adaptive_enabled;
     if (body.api_key) {
       fields.api_key = encrypt(body.api_key, getSetting(db, "encryption_key")!);
-      fields.api_key_preview = body.api_key.length > API_KEY_PREVIEW_MIN_LENGTH ? `${body.api_key.slice(0, API_KEY_PREVIEW_PREFIX_LEN)}...${body.api_key.slice(-API_KEY_PREVIEW_PREFIX_LEN)}` : "****";
+      fields.api_key_preview = formatApiKeyPreview(body.api_key);
     }
     // Proxy field handling - 空URL视为不使用代理
     const effectiveProxyUrl = body.proxy_url !== undefined ? (body.proxy_url?.trim() || null) : undefined;

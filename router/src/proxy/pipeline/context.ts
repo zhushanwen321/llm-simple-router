@@ -1,12 +1,13 @@
 // router/src/proxy/pipeline/context.ts
 import type { FastifyReply, FastifyRequest } from "fastify";
-import type { PipelineContext } from "./types.js";
+import type { PipelineContext, PipelineDeps } from "./types.js";
 import { PipelineSnapshot } from "../pipeline-snapshot.js";
 
 export function createPipelineContext(
   request: FastifyRequest,
   reply: FastifyReply,
   apiType: string,
+  deps?: PipelineDeps,
 ): PipelineContext {
   const body = request.body as Record<string, unknown>;
   const clientModel = (body.model as string) || "unknown";
@@ -33,5 +34,11 @@ export function createPipelineContext(
     clientRequest: "",
     upstreamRequest: "",
     snapshot: new PipelineSnapshot(),
+    deps: deps ?? {},
+    excludeTargets: [],
+    mappingReason: undefined,
+    isFailoverIteration: false,
+    iterationStartTime: 0,
+    lastFailoverTrigger: null,
   };
 }
