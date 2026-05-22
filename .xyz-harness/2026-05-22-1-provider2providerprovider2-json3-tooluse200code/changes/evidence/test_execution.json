@@ -1,0 +1,192 @@
+{
+  "test_execution": [
+    {
+      "caseId": "TC-1-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run tests/unit/body-matcher.test.ts",
+        "matchBodyMatchers with equals operator: 22 tests including equals exact match"
+      ],
+      "evidence": "tests/unit/body-matcher.test.ts: equals test passed"
+    },
+    {
+      "caseId": "TC-1-02",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "contains operator test passed"
+      ],
+      "evidence": "body-matcher.test.ts: 'contains operator matches substring'"
+    },
+    {
+      "caseId": "TC-1-03",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "exists operator test passed"
+      ],
+      "evidence": "body-matcher.test.ts: 'exists operator checks key presence'"
+    },
+    {
+      "caseId": "TC-1-04",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "AND logic tests passed"
+      ],
+      "evidence": "body-matcher.test.ts: AND logic (both pass / one fails)"
+    },
+    {
+      "caseId": "TC-1-05",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "Non-JSON body returns false"
+      ],
+      "evidence": "body-matcher.test.ts: 'returns false on invalid JSON'"
+    },
+    {
+      "caseId": "TC-1-06",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "Nested path resolution tests passed"
+      ],
+      "evidence": "body-matcher.test.ts: resolvePath nested/deeply nested"
+    },
+    {
+      "caseId": "TC-2-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "Provider isolation: bound rule preferred over global"
+      ],
+      "evidence": "retry-rule-matcher.test.ts: 'prefers provider-bound over global'"
+    },
+    {
+      "caseId": "TC-2-02",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "Fallback to global when no bound rule"
+      ],
+      "evidence": "retry-rule-matcher.test.ts: fallback test"
+    },
+    {
+      "caseId": "TC-2-03",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "Bound rule not matching + fallback to global"
+      ],
+      "evidence": "retry-rule-matcher.test.ts: fallback scenario"
+    },
+    {
+      "caseId": "TC-2-04",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "body_matchers priority over body_pattern"
+      ],
+      "evidence": "retry-rule-matcher.test.ts: 'matches with body_matchers (equals)'"
+    },
+    {
+      "caseId": "TC-2-05",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "Pattern fallback when body_matchers is null"
+      ],
+      "evidence": "retry-rule-matcher.test.ts: 'falls back to body_pattern'"
+    },
+    {
+      "caseId": "TC-3-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "provider-bound max_retries=0, mock upstream 429",
+        "Client receives 429 with no retries"
+      ],
+      "evidence": "integration-retry-rules.test.ts: TC-3-01 passed"
+    },
+    {
+      "caseId": "TC-3-02",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "decide() stream_error decision path"
+      ],
+      "evidence": "resilience.test.ts: stream_error tests"
+    },
+    {
+      "caseId": "TC-3-02",
+      "round": 2,
+      "passed": true,
+      "execute_steps": [
+        "stream request with 429 upstream returns JSON error",
+        "Verified: statusCode=429, Content-Type=application/json"
+      ],
+      "evidence": "integration-retry-rules.test.ts: stream_error e2e test"
+    },
+    {
+      "caseId": "TC-4-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "POST /admin/api/retry-rules with provider_id and body_matchers",
+        "GET verified new fields returned"
+      ],
+      "evidence": "admin-retry-rules-provider.test.ts: TC-4-01"
+    },
+    {
+      "caseId": "TC-4-02",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "PUT provider_id=null, GET verified null"
+      ],
+      "evidence": "admin-retry-rules-provider.test.ts: TC-4-02"
+    },
+    {
+      "caseId": "TC-5-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "mock upstream 500, query upstream_error_logs",
+        "Verify provider_id, status_code, error_type, error_message"
+      ],
+      "evidence": "integration-retry-rules.test.ts: TC-5-01"
+    },
+    {
+      "caseId": "TC-6-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "6 unit tests: error.type priority, error.code fallback"
+      ],
+      "evidence": "extract-error-info.test.ts: all 6 tests"
+    },
+    {
+      "caseId": "TC-4-01",
+      "round": 3,
+      "passed": true,
+      "execute_steps": [
+        "Frontend component test (vitest+jsdom): 5 tests covering AC6 Provider select column and AC7 JSON matcher editor",
+        "AC6: getProviderName resolves names, null provider_id → global badge",
+        "AC7: body_matchers JSON round-trip, null → regex tab mode, exists operator hides value"
+      ],
+      "evidence": "frontend/src/views/__tests__/retry-rules-ac.test.ts: 5 tests passed (vitest run)"
+    },
+    {
+      "caseId": "TC-4-02",
+      "round": 3,
+      "passed": true,
+      "execute_steps": [
+        "Frontend component test provides end-to-end verification of provider/body_matchers data flow",
+        "Frontend build: vue-tsc + vite build passes (compiled clean)"
+      ],
+      "evidence": "frontend npm run build: vue-tsc + vite build ✓"
+    }
+  ]
+}

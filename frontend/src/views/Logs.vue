@@ -91,7 +91,7 @@
 
     <div class="bg-card rounded-lg border overflow-hidden">
       <TooltipProvider :delay-duration="300">
-        <Table>
+        <Table class="[&_td]:px-4 [&_th]:px-4">
           <TableHeader>
             <TableRow class="bg-muted">
               <TableHead class="w-10"></TableHead>
@@ -102,28 +102,13 @@
                 t("logs.table.time")
               }}</TableHead>
               <TableHead class="text-muted-foreground">{{
-                t("logs.table.type")
-              }}</TableHead>
-              <TableHead class="text-muted-foreground">{{
                 t("logs.table.model")
               }}</TableHead>
               <TableHead class="text-muted-foreground">{{
                 t("logs.table.actualForward")
               }}</TableHead>
               <TableHead class="text-muted-foreground">{{
-                t("logs.table.statusCode")
-              }}</TableHead>
-              <TableHead class="text-muted-foreground">{{
-                t("logs.table.latency")
-              }}</TableHead>
-              <TableHead class="text-muted-foreground">{{
-                t("logs.table.streaming")
-              }}</TableHead>
-              <TableHead class="text-muted-foreground">{{
-                t("logs.table.retry")
-              }}</TableHead>
-              <TableHead class="text-muted-foreground">{{
-                t("logs.table.failover")
+                t("logs.table.tags")
               }}</TableHead>
               <TableHead class="text-muted-foreground">{{
                 t("logs.table.error")
@@ -378,7 +363,7 @@ const {
   buildFilterParams,
 } = useLogFilters();
 
-const TABLE_COL_COUNT = 13;
+const TABLE_COL_COUNT = 8;
 const DEBOUNCE_MS = 300;
 const MAX_PAGE_BUTTONS = 7;
 const PAGE_NEIGHBORS = 2;

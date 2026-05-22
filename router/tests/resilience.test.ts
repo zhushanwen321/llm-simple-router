@@ -45,17 +45,18 @@ function failoverConfig(overrides: Partial<ResilienceConfig> = {}): ResilienceCo
 
 function createMatcherWithDefaults(): RetryRuleMatcher {
   const matcher = new RetryRuleMatcher();
-  function makeRule(code: number): { rule: RetryRule; pattern: RegExp } {
+  function makeRule(code: number): { rule: RetryRule; matchers: null; pattern: RegExp } {
     return {
       rule: {
         id: `rule-${code}`, name: `rule-${code}`, status_code: code, body_pattern: ".*",
         is_active: 1, created_at: "", retry_strategy: "fixed", retry_delay_ms: 1,
-        max_retries: 2, max_delay_ms: 100,
+        max_retries: 2, max_delay_ms: 100, provider_id: null, body_matchers: null,
       },
+      matchers: null,
       pattern: /^.*$/,
     };
   }
-  matcher["cache"] = new Map([[429, [makeRule(429)]], [503, [makeRule(503)]]]);
+  matcher["cache"] = new Map([["__global__:429", [makeRule(429)]], ["__global__:503", [makeRule(503)]]]);
   return matcher;
 }
 
@@ -163,9 +164,9 @@ describe("ResilienceLayer.decide()", () => {
     const layer = new ResilienceLayer();
     const matcher = new RetryRuleMatcher();
     matcher["cache"] = new Map([
-      [200, [{ rule: { id: "r1", name: "SSE error 1234", status_code: 200, body_pattern: '"code"\\s*:\\s*"1234"',
+      ["__global__:200", [{ rule: { id: "r1", name: "SSE error 1234", status_code: 200, body_pattern: '"code"\\s*:\\s*"1234"',
         is_active: 1, created_at: "", retry_strategy: "fixed", retry_delay_ms: 1,
-        max_retries: 2, max_delay_ms: 100 }, pattern: /"code"\s*:\s*"1234"/ }]],
+        max_retries: 2, max_delay_ms: 100, provider_id: null, body_matchers: null }, matchers: null, pattern: /"code"\s*:\s*"1234"/ }]],
     ]);
     const state = { attemptCount: 0, currentTarget: t1, excludedTargets: [] };
     const decision = layer.decide(
@@ -180,9 +181,9 @@ describe("ResilienceLayer.decide()", () => {
     const layer = new ResilienceLayer();
     const matcher = new RetryRuleMatcher();
     matcher["cache"] = new Map([
-      [200, [{ rule: { id: "r1", name: "SSE error 1234", status_code: 200, body_pattern: '"code"\\s*:\\s*"1234"',
+      ["__global__:200", [{ rule: { id: "r1", name: "SSE error 1234", status_code: 200, body_pattern: '"code"\\s*:\\s*"1234"',
         is_active: 1, created_at: "", retry_strategy: "fixed", retry_delay_ms: 1,
-        max_retries: 2, max_delay_ms: 100 }, pattern: /"code"\s*:\s*"1234"/ }]],
+        max_retries: 2, max_delay_ms: 100, provider_id: null, body_matchers: null }, matchers: null, pattern: /"code"\s*:\s*"1234"/ }]],
     ]);
     const state = { attemptCount: 2, currentTarget: t1, excludedTargets: [] };
     const decision = layer.decide(
@@ -219,9 +220,9 @@ describe("ResilienceLayer.decide()", () => {
     const layer = new ResilienceLayer();
     const matcher = new RetryRuleMatcher();
     matcher["cache"] = new Map([
-      [400, [{ rule: { id: "r1", name: "test", status_code: 400, body_pattern: "请稍后",
+      ["__global__:400", [{ rule: { id: "r1", name: "test", status_code: 400, body_pattern: "请稍后",
         is_active: 1, created_at: "", retry_strategy: "fixed", retry_delay_ms: 1,
-        max_retries: 2, max_delay_ms: 100 }, pattern: /请稍后/ }]],
+        max_retries: 2, max_delay_ms: 100, provider_id: null, body_matchers: null }, matchers: null, pattern: /请稍后/ }]],
     ]);
     const state = { attemptCount: 0, currentTarget: t1, excludedTargets: [] };
     const decision = layer.decide(makeError(400, "网络错误请稍后重试"), state, defaultConfig({ ruleMatcher: matcher }));
@@ -359,11 +360,11 @@ describe("ResilienceLayer.execute()", () => {
     const layer = new ResilienceLayer();
     const matcher = new RetryRuleMatcher();
     matcher["cache"] = new Map([
-      [429, [{ rule: {
+      ["__global__:429", [{ rule: {
         id: "r0", name: "no retry", status_code: 429, body_pattern: ".*",
         is_active: 1, created_at: "", retry_strategy: "fixed", retry_delay_ms: 1,
-        max_retries: 0, max_delay_ms: 100,
-      }, pattern: /^.*$/ }]],
+        max_retries: 0, max_delay_ms: 100, provider_id: null, body_matchers: null,
+      }, matchers: null, pattern: /^.*$/ }]],
     ]);
     const fn = vi.fn().mockResolvedValue(makeError(429, "rate limited"));
     const targets = () => [t1];

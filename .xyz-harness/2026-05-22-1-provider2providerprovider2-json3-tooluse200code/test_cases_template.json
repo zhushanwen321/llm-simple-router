@@ -1,0 +1,123 @@
+{
+  "test_cases": [
+    {
+      "id": "TC-1-01",
+      "type": "unit",
+      "title": "matchBodyMatchers: equals 操作符精确匹配字段值",
+      "description": "JSON body 包含 error.type=rate_limit_error，matchers 要求 equals rate_limit_error → 匹配",
+      "steps": ["构造 body JSON 含 error.type 字段", "matchers = [{path:'error.type', operator:'equals', value:'rate_limit_error'}]", "断言 matchBodyMatchers 返回 true"]
+    },
+    {
+      "id": "TC-1-02",
+      "type": "unit",
+      "title": "matchBodyMatchers: contains 操作符子串匹配",
+      "description": "error.message 包含 'usage limit'，matchers 要求 contains 'usage' → 匹配",
+      "steps": ["构造 body 含 error.message='You have reached your usage limit'", "matchers = [{path:'error.message', operator:'contains', value:'usage'}]", "断言返回 true"]
+    },
+    {
+      "id": "TC-1-03",
+      "type": "unit",
+      "title": "matchBodyMatchers: exists 操作符字段存在即匹配",
+      "description": "body 含 error.type 字段，matchers 要求 exists → 匹配",
+      "steps": ["构造 body 含 error.type 字段", "matchers = [{path:'error.type', operator:'exists'}]", "断言返回 true"]
+    },
+    {
+      "id": "TC-1-04",
+      "type": "unit",
+      "title": "matchBodyMatchers: 多条件 AND 全部满足才匹配",
+      "description": "两个条件：error.type=rate_limit_error AND type=error。两个都满足匹配，任一不满足不匹配",
+      "steps": ["构造 body 含两个字段", "matchers 含两个条件", "两个都匹配 → true", "只满足一个 → false"]
+    },
+    {
+      "id": "TC-1-05",
+      "type": "unit",
+      "title": "matchBodyMatchers: 非 JSON body 返回 false",
+      "description": "body 不是合法 JSON → JSON.parse 失败 → 返回 false",
+      "steps": ["body = 'Not JSON text'", "matchers 非空", "断言返回 false"]
+    },
+    {
+      "id": "TC-1-06",
+      "type": "unit",
+      "title": "matchBodyMatchers: 嵌套路径 error.type 正确解析",
+      "description": "body = {error: {type: 'rate_limit_error'}}，path='error.type' → 正确取到值",
+      "steps": ["构造嵌套 JSON body", "path='error.type'", "断言 resolvePath 返回 'rate_limit_error'"]
+    },
+    {
+      "id": "TC-2-01",
+      "type": "unit",
+      "title": "RetryRuleMatcher: 绑定规则优先于通用规则",
+      "description": "provider A 有绑定规则 (max_retries=0)，通用规则 max_retries=10。请求 provider A 时匹配绑定规则",
+      "steps": ["创建绑定规则和通用规则", "match(429, body, 'providerA')", "断言返回绑定规则"]
+    },
+    {
+      "id": "TC-2-02",
+      "type": "unit",
+      "title": "RetryRuleMatcher: 无绑定规则时 fallback 通用规则",
+      "description": "provider B 无绑定规则，只有通用规则。请求 provider B 时匹配通用规则",
+      "steps": ["只创建通用规则", "match(429, body, 'providerB')", "断言返回通用规则"]
+    },
+    {
+      "id": "TC-2-03",
+      "type": "unit",
+      "title": "RetryRuleMatcher: 绑定规则不匹配时 fallback 通用规则",
+      "description": "provider A 有绑定规则但 body 不匹配，通用规则 body 匹配 → 返回通用规则",
+      "steps": ["创建绑定规则(body_matchers 不匹配当前 body)", "创建通用规则(body_pattern 匹配)", "match(429, body, 'providerA')", "断言返回通用规则"]
+    },
+    {
+      "id": "TC-2-04",
+      "type": "unit",
+      "title": "RetryRuleMatcher: body_matchers 优先于 body_pattern",
+      "description": "同一条规则同时有 body_matchers 和 body_pattern，优先使用 body_matchers",
+      "steps": ["创建规则有 body_matchers 和 body_pattern", "body_matchers 匹配但 body_pattern 不匹配", "断言返回该规则（body_matchers 优先生效）"]
+    },
+    {
+      "id": "TC-2-05",
+      "type": "unit",
+      "title": "RetryRuleMatcher: body_matchers 为 null 时 fallback 到 body_pattern",
+      "description": "规则只有 body_pattern，无 body_matchers → 使用正则匹配",
+      "steps": ["创建规则 body_matchers=null", "match(statusCode, body)", "断言使用 body_pattern 正则"]
+    },
+    {
+      "id": "TC-3-01",
+      "type": "integration",
+      "title": "Kimi 429 usage-limit 不触发跨 provider 重试",
+      "description": "模拟 Kimi 429 + rate_limit_error，绑定规则 max_retries=0。验证不重试直接返回",
+      "steps": ["创建 kimi 绑定规则 max_retries=0", "mock 上游返回 429 + rate_limit_error", "发送请求", "验证只有 1 次 attempt", "验证客户端收到 429"]
+    },
+    {
+      "id": "TC-3-02",
+      "type": "integration",
+      "title": "stream_error 重试耗尽后客户端收到格式化 JSON 错误",
+      "description": "流式请求上游返回 429，重试规则 max_retries=0。客户端收到 JSON 格式错误",
+      "steps": ["配置 stream=true", "mock 上游 SSE 前返回 429", "无重试规则", "验证客户端收到 JSON 错误（非 SSE 格式）"]
+    },
+    {
+      "id": "TC-4-01",
+      "type": "integration",
+      "title": "Admin API: 创建规则带 provider_id 和 body_matchers",
+      "description": "POST /admin/api/retry-rules 带 provider_id 和 body_matchers，验证创建成功",
+      "steps": ["POST 创建规则含 provider_id 和 body_matchers", "GET 验证返回包含新字段"]
+    },
+    {
+      "id": "TC-4-02",
+      "type": "integration",
+      "title": "Admin API: 更新规则 provider_id 为 null",
+      "description": "PUT 将绑定规则改为通用规则（provider_id=null）",
+      "steps": ["PUT 更新 provider_id=null", "GET 验证 provider_id 为 null"]
+    },
+    {
+      "id": "TC-5-01",
+      "type": "api",
+      "title": "upstream_error_logs: 最终失败请求写入错误日志",
+      "description": "触发最终失败请求（429 重试耗尽），验证 upstream_error_logs 表有记录",
+      "steps": ["配置重试规则 max_retries=1", "mock 上游始终返回 500", "发送请求", "查询 upstream_error_logs", "验证 provider_id, status_code, retry_count, error_type"]
+    },
+    {
+      "id": "TC-6-01",
+      "type": "unit",
+      "title": "extractErrorInfo: 从 JSON body 提取 error.type 和 error.message",
+      "description": "优先提取 error.type > error.code > null 作为 error_type",
+      "steps": ["body 含 error.type → 返回 error.type", "body 含 error.code 无 error.type → 返回 error.code", "body 无 error 字段 → 返回 null"]
+    }
+  ]
+}
