@@ -1,0 +1,94 @@
+{
+  "test_cases": [
+    {
+      "id": "TC-1-01",
+      "type": "api",
+      "title": "AI generate returns provider_id from request log",
+      "description": "POST /admin/api/retry-rules/ai-generate returns rule.provider_id matching the log's provider_id",
+      "steps": [
+        "Create provider P1 with valid AI config",
+        "Create request log L1 with provider_id=P1",
+        "POST /admin/api/retry-rules/ai-generate with log_id=L1.id",
+        "Verify response rule.provider_id === P1.id"
+      ]
+    },
+    {
+      "id": "TC-1-02",
+      "type": "api",
+      "title": "AI generate returns null provider_id for log without provider",
+      "description": "When request log has provider_id=null, AI generate returns rule.provider_id=null",
+      "steps": [
+        "Create request log L2 with provider_id=null",
+        "POST /admin/api/retry-rules/ai-generate with log_id=L2.id",
+        "Verify response rule.provider_id === null"
+      ]
+    },
+    {
+      "id": "TC-2-01",
+      "type": "ui",
+      "title": "AI preview dialog shows provider selector with default 'all'",
+      "description": "Dialog opens with provider Select defaulting to __all__ (通用)",
+      "steps": [
+        "Open request detail dialog",
+        "Click AI generate rule button",
+        "Verify provider selector is visible",
+        "Verify default selection is '通用（所有供应商）'",
+        "Verify provider list contains all configured providers"
+      ]
+    },
+    {
+      "id": "TC-2-02",
+      "type": "ui",
+      "title": "Save rule with specific provider",
+      "description": "Select a provider in AI preview dialog, save, verify rule has correct provider_id",
+      "steps": [
+        "Open AI preview dialog",
+        "Select provider P1 from dropdown",
+        "Click save",
+        "Verify createRetryRule called with provider_id=P1.id",
+        "Verify RetryRules table shows P1 name in provider column"
+      ]
+    },
+    {
+      "id": "TC-2-03",
+      "type": "ui",
+      "title": "Save rule with default 'all providers'",
+      "description": "Keep default selection and save, verify rule has provider_id=null",
+      "steps": [
+        "Open AI preview dialog",
+        "Do not change provider selector (keep 通用)",
+        "Click save",
+        "Verify createRetryRule called with provider_id=null",
+        "Verify RetryRules table shows '通用' badge"
+      ]
+    },
+    {
+      "id": "TC-2-04",
+      "type": "ui",
+      "title": "Provider load failure graceful degradation",
+      "description": "When getProviders fails, dialog still works with only 'all' option",
+      "steps": [
+        "Mock api.getProviders to throw error",
+        "Open AI preview dialog",
+        "Verify toast error shown",
+        "Verify provider selector has only '通用' option",
+        "Save rule successfully as 通用"
+      ]
+    },
+    {
+      "id": "TC-2-05",
+      "type": "integration",
+      "title": "End-to-end: log → AI generate → select provider → save → verify in rules list",
+      "description": "Full flow from request log to retry rule with provider binding",
+      "steps": [
+        "Create provider P1",
+        "Create request log with provider_id=P1",
+        "Trigger AI generate from log detail",
+        "Select P1 in preview dialog",
+        "Save",
+        "Navigate to RetryRules page",
+        "Verify new rule appears with P1 name in provider column"
+      ]
+    }
+  ]
+}

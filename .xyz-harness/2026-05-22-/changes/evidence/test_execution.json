@@ -1,0 +1,97 @@
+{
+  "test_execution": [
+    {
+      "caseId": "TC-1-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "Added test to ai-retry-rule.test.ts: create provider P1, insert log with provider_id=P1",
+        "POST /admin/api/retry-rules/ai-generate with log_id of provider-bound log",
+        "Assert response body.data.rule.provider_id === P1 id",
+        "Verified: npx vitest run tests/ai-retry-rule.test.ts → 15/15 passed"
+      ],
+      "evidence": "test 'POST ai-generate returns success with rule from LLM' now asserts provider_id matches provider"
+    },
+    {
+      "caseId": "TC-1-02",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "Added test TC-1-02 to ai-retry-rule.test.ts: insert log with provider_id=null",
+        "POST /admin/api/retry-rules/ai-generate with log_id of null-provider log",
+        "Assert response body.data.rule.provider_id === null",
+        "Verified: npx vitest run tests/ai-retry-rule.test.ts → 15/15 passed"
+      ],
+      "evidence": "new test 'TC-1-02: POST ai-generate returns null provider_id for log without provider' passes"
+    },
+    {
+      "caseId": "TC-2-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "Code review: AiRulePreviewDialog.vue L44-63 has provider Select with v-model='form.provider_id'",
+        "createDefaultForm() returns provider_id: '__all__'",
+        "watch() forces provider_id: '__all__' on open",
+        "SelectItem value='__all__' matches default → displays '通用（所有供应商）'",
+        "providers ref populated by api.getProviders()",
+        "vue-tsc --noEmit: 0 errors"
+      ],
+      "evidence": "code_review: template L44-63 + script L255-257 + L265-267 verified correct"
+    },
+    {
+      "caseId": "TC-2-02",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "Code review: SelectItem v-for='p in providers' :value='p.id' allows selecting specific provider",
+        "handleSave() maps provider_id !== '__all__' → actual provider id string",
+        "api.createRetryRule() receives provider_id field",
+        "Backend Create handler maps non-null provider_id to DB",
+        "vue-tsc --noEmit: 0 errors"
+      ],
+      "evidence": "code_review: template L55-60 + script L340-343 verified correct"
+    },
+    {
+      "caseId": "TC-2-03",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "Code review: default form.provider_id = '__all__', user does not change it",
+        "handleSave() maps '__all__' → null",
+        "api.createRetryRule() receives provider_id: null",
+        "Backend maps null → DB null (universal rule)",
+        "vue-tsc --noEmit: 0 errors"
+      ],
+      "evidence": "code_review: script L255 + L340-343 verified correct"
+    },
+    {
+      "caseId": "TC-2-04",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "Code review: loadProviders() has try-catch with toast.error on failure",
+        "providers ref defaults to empty array []",
+        "When providers=[], Select still shows '__all__' SelectItem",
+        "Save flow unaffected (no dependency on providers for save logic)",
+        "console.error + toast.error satisfy dual error handling requirement",
+        "vue-tsc --noEmit: 0 errors"
+      ],
+      "evidence": "code_review: script L270-278 verified correct"
+    },
+    {
+      "caseId": "TC-2-05",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "Backend: log.provider_id passed through to AI generate response (TC-1-01 verified)",
+        "Frontend type: AiRetryGenerateResult.rule includes provider_id?: string | null",
+        "UnifiedRequestDialog: generatedRule includes provider_id: r.provider_id ?? null",
+        "AiRulePreviewDialog: receives provider_id via props, watch sets '__all__' default",
+        "handleSave: maps '__all__' → null, or actual provider id",
+        "Full chain: backend → type → dialog → save verified",
+        "All 1552 tests pass, vue-tsc 0 errors"
+      ],
+      "evidence": "code_review: client.ts L299 + UnifiedRequestDialog L245 + AiRulePreviewDialog L267+L340-343 verified correct"
+    }
+  ]
+}
