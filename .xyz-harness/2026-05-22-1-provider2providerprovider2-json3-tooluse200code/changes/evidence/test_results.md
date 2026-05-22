@@ -8,22 +8,30 @@ all_passing: true
 ## Backend Tests
 ```
 npm test
-Test Files  124 passed (124)
-Tests  1487 passed (1487)
-Duration  22.98s
+Test Files  126 passed (126)
+Tests  1495 passed (1495)
+Duration  23.1s
 ```
 
-**All 124 backend test files passed. 1487 tests total, 0 failures.**
+**All 126 backend test files passed. 1495 tests total, 0 failures.**
 
-### New Tests
-- `tests/unit/body-matcher.test.ts`: 22 tests passed — covers resolvePath, equals/contains/exists operators, AND logic, non-JSON body, nested paths
-- `tests/unit/retry-rule-matcher.test.ts`: 15 tests passed — covers provider isolation, fallback logic, body_matchers priority, cache structure
+### Phase 3 Tests (Unit)
+- `tests/unit/body-matcher.test.ts`: 22 tests — resolvePath, equals/contains/exists, AND logic, non-JSON
+- `tests/unit/retry-rule-matcher.test.ts`: 15 tests — provider isolation, fallback, body_matchers priority
+
+### Phase 4 Tests (Integration + Unit)
+- `router/tests/admin-retry-rules-provider.test.ts`: 6 tests — CRUD with provider_id/body_matchers, validation
+- `router/tests/integration-retry-rules.test.ts`: 2 tests — TC-3-01 provider-bound retry, TC-5-01 upstream error logs
+- `tests/unit/extract-error-info.test.ts`: 6 tests — error.type priority, fallback, edge cases
 
 ### Updated Tests
-- `router/tests/db.test.ts`: migration count updated 49→50
-- `router/tests/metrics.test.ts`: migration count updated 49→50
-- `router/tests/orchestrator.test.ts`: adapted to new ResilienceConfig.providerId
-- `router/tests/resilience.test.ts`: adapted to new match() signature
+- `router/tests/db.test.ts`: migration count 49→50
+- `router/tests/metrics.test.ts`: migration count 49→50
+- `router/tests/orchestrator.test.ts`: ResilienceConfig.providerId
+- `router/tests/resilience.test.ts`: match() with providerId
+
+### Bug Fix in Phase 4
+- `router/src/admin/retry-rules.ts`: TypeBox coerces null to empty string for provider_id; added `|| null` conversion
 
 ## Frontend Build
 ```

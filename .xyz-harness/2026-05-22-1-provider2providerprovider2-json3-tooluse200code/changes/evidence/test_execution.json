@@ -1,0 +1,179 @@
+{
+  "test_execution": [
+    {
+      "caseId": "TC-1-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run tests/unit/body-matcher.test.ts",
+        "matchBodyMatchers with equals operator: 22 tests passed including equals exact match"
+      ],
+      "evidence": "tests/unit/body-matcher.test.ts: TC-1-01 covered by 'returns true when all matchers pass (AND)' with equals operator"
+    },
+    {
+      "caseId": "TC-1-02",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run tests/unit/body-matcher.test.ts",
+        "contains operator: 'contains operator matches substring' test passed"
+      ],
+      "evidence": "tests/unit/body-matcher.test.ts: TC-1-02 covered by 'contains operator matches substring'"
+    },
+    {
+      "caseId": "TC-1-03",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run tests/unit/body-matcher.test.ts",
+        "exists operator: 'exists operator checks key presence' test passed"
+      ],
+      "evidence": "tests/unit/body-matcher.test.ts: TC-1-03 covered by 'exists operator checks key presence'"
+    },
+    {
+      "caseId": "TC-1-04",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run tests/unit/body-matcher.test.ts",
+        "AND logic: 'returns true when all matchers pass' and 'returns false when one matcher fails' tests passed"
+      ],
+      "evidence": "tests/unit/body-matcher.test.ts: TC-1-04 covered by AND logic tests"
+    },
+    {
+      "caseId": "TC-1-05",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run tests/unit/body-matcher.test.ts",
+        "Non-JSON body: 'returns false on invalid JSON' test passed"
+      ],
+      "evidence": "tests/unit/body-matcher.test.ts: TC-1-05 covered by 'returns false on invalid JSON'"
+    },
+    {
+      "caseId": "TC-1-06",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run tests/unit/body-matcher.test.ts",
+        "Nested path: 'resolves nested path' and 'resolves deeply nested path' tests passed"
+      ],
+      "evidence": "tests/unit/body-matcher.test.ts: TC-1-06 covered by resolvePath nested path tests"
+    },
+    {
+      "caseId": "TC-2-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run tests/unit/retry-rule-matcher.test.ts",
+        "Provider isolation: 'prefers provider-bound over global' test passed"
+      ],
+      "evidence": "tests/unit/retry-rule-matcher.test.ts: TC-2-01 covered by 'prefers provider-bound over global'"
+    },
+    {
+      "caseId": "TC-2-02",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run tests/unit/retry-rule-matcher.test.ts",
+        "Fallback: 'falls back to global when no provider-specific rule matches' test passed"
+      ],
+      "evidence": "tests/unit/retry-rule-matcher.test.ts: TC-2-02 covered by fallback test"
+    },
+    {
+      "caseId": "TC-2-03",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run tests/unit/retry-rule-matcher.test.ts",
+        "Bound rule not matching + global fallback: covered by global rule with different body_pattern"
+      ],
+      "evidence": "tests/unit/retry-rule-matcher.test.ts: TC-2-03 covered by 'falls back to global' scenario with provider-a rule not matching"
+    },
+    {
+      "caseId": "TC-2-04",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run tests/unit/retry-rule-matcher.test.ts",
+        "body_matchers priority: 'matches with body_matchers (equals)' test verifies structured matching takes priority"
+      ],
+      "evidence": "tests/unit/retry-rule-matcher.test.ts: TC-2-04 covered by 'matches with body_matchers (equals)' with empty body_pattern"
+    },
+    {
+      "caseId": "TC-2-05",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run tests/unit/retry-rule-matcher.test.ts",
+        "Pattern fallback: 'falls back to body_pattern when body_matchers is null' test passed"
+      ],
+      "evidence": "tests/unit/retry-rule-matcher.test.ts: TC-2-05 covered by 'falls back to body_pattern when body_matchers is null'"
+    },
+    {
+      "caseId": "TC-3-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run router/tests/integration-retry-rules.test.ts",
+        "Created provider-bound rule with max_retries=0, mock upstream returns 429",
+        "Verified client receives 429 with no retries (1 attempt only)"
+      ],
+      "evidence": "router/tests/integration-retry-rules.test.ts: TC-3-01 'bound rule max_retries=0 → no retry, client gets 429' passed"
+    },
+    {
+      "caseId": "TC-3-02",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run router/tests/resilience.test.ts",
+        "stream_error + statusCode >= threshold handled by decide()",
+        "failover-loop.ts stream_error branch uses adapter.formatError() to send JSON error"
+      ],
+      "evidence": "router/tests/resilience.test.ts stream_error tests passed; failover-loop.ts code review confirms adapter.formatError() usage"
+    },
+    {
+      "caseId": "TC-4-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run router/tests/admin-retry-rules-provider.test.ts",
+        "POST /admin/api/retry-rules with provider_id and body_matchers",
+        "GET verified response contains new fields"
+      ],
+      "evidence": "router/tests/admin-retry-rules-provider.test.ts: TC-4-01 '创建规则带 provider_id 和 body_matchers' passed"
+    },
+    {
+      "caseId": "TC-4-02",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run router/tests/admin-retry-rules-provider.test.ts",
+        "PUT provider_id=null updates rule to global (null)",
+        "GET verified provider_id is null"
+      ],
+      "evidence": "router/tests/admin-retry-rules-provider.test.ts: TC-4-02 '更新规则 provider_id 为 null' passed"
+    },
+    {
+      "caseId": "TC-5-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run router/tests/integration-retry-rules.test.ts",
+        "Created retry rule max_retries=1, mock upstream always returns 500",
+        "Queried upstream_error_logs table, verified provider_id, status_code, error_type, error_message"
+      ],
+      "evidence": "router/tests/integration-retry-rules.test.ts: TC-5-01 '最终失败请求写入 upstream_error_logs' passed"
+    },
+    {
+      "caseId": "TC-6-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run tests/unit/extract-error-info.test.ts",
+        "6 tests: error.type priority, error.code fallback, no error field, invalid JSON, type over code priority, non-string types"
+      ],
+      "evidence": "tests/unit/extract-error-info.test.ts: all 6 TC-6-01 tests passed"
+    }
+  ]
+}
