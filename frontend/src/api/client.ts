@@ -137,6 +137,8 @@ interface RetryRulePayload {
   name: string;
   status_code: number;
   body_pattern: string;
+  provider_id?: string | null;
+  body_matchers?: string | null;
   is_active?: number;
   retry_strategy?: "fixed" | "exponential";
   retry_delay_ms?: number;
@@ -210,6 +212,8 @@ interface RetryRule {
   name: string;
   status_code: number;
   body_pattern: string;
+  provider_id: string | null;
+  body_matchers: string | null;
   is_active: number;
   created_at: string;
   retry_strategy: "fixed" | "exponential";
@@ -485,7 +489,9 @@ export const api = {
   updateProxyEnhancement: (data: ProxyEnhancementConfig) =>
     request<{ success: boolean }>("put", "/proxy-enhancement", data),
   aiRetryGenerate: (logId: string) =>
-    request<AiRetryGenerateResult>("post", "/retry-rules/ai-generate", { log_id: logId }),
+    request<AiRetryGenerateResult>("post", "/retry-rules/ai-generate", {
+      log_id: logId,
+    }),
 
   getMonitorActive: () => request<ActiveRequest[]>("get", "/monitor/active"),
   getMonitorRecent: () => request<ActiveRequest[]>("get", "/monitor/recent"),

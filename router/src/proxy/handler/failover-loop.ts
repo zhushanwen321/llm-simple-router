@@ -16,6 +16,7 @@ import type { FastifyReply } from "fastify";
 import { ProviderSwitchNeeded } from "../../core/errors.js";
 import { SemaphoreQueueFullError, SemaphoreTimeoutError } from "../../core/errors.js";
 import { getProviderById, updateLogClientStatus, insertRequestLog, updateLogStreamContent } from "../../db/index.js";
+import { logUpstreamError, extractErrorInfo } from "../../db/upstream-error-logs.js";
 import { getSetting } from "../../db/settings.js";
 import { decrypt } from "../../utils/crypto.js";
 import { resolveMapping, filterExcluded } from "../routing/mapping-resolver.js";
@@ -482,6 +483,27 @@ export async function executeFailoverLoop(
       const succeeded = tr.kind === "success" || tr.kind === "stream_success" || tr.kind === "stream_abort";
       if (succeeded) usageWindowTracker?.recordRequest(provider.id, routerKeyId ?? undefined);
 
+      // 失败时写入 upstream_error_logs
+      if (!succeeded) {
+        const body = 'body' in tr ? tr.body : '';
+        const { errorType, errorMessage } = extractErrorInfo(body);
+        const trStatusCode = getTransportStatusCode(tr);
+        if (trStatusCode !== null) {
+          logUpstreamError(db, {
+            request_log_id: lastLogId,
+            provider_id: provider.id,
+            backend_model: resolved.backend_model ?? clientModel,
+            status_code: trStatusCode,
+            error_type: errorType,
+            error_message: errorMessage,
+            client_agent_type: ctx.metadata.get("client_type") as string ?? "unknown",
+            router_key_id: routerKeyId,
+            session_id: ctx.metadata.get("session_id") as string | null ?? null,
+            retry_count: resilienceResult.attempts.length - 1,
+          });
+        }
+      }
+
       // 流式内容日志
       if (isStream && tracker) {
         const sc = tracker.get(logId)?.streamContent;
@@ -510,6 +532,17 @@ export async function executeFailoverLoop(
       if (!reply.raw.headersSent) {
         if (tr.kind === "success") {
           return reply.code(tr.statusCode).send(tr.body);
+        }
+        if (tr.kind === "stream_error") {
+          // stream_error + headersSent 已在 orchestrator.sendResponse 中处理
+          // 此处为 !headersSent 分支：格式化错误体并发送
+          const trStatus = getTransportStatusCode(tr);
+          if (trStatus !== null) updateLogClientStatus(db, lastLogId, trStatus);
+          const formattedBody = adapter.formatError(
+            'body' in tr ? tr.body : "stream error",
+          ) ?? { error: { message: "stream error", type: "server_error" } };
+          reply.header("content-type", "application/json");
+          return reply.code(tr.statusCode).send(formattedBody);
         }
         if (tr.kind === "throw" || (tr.kind === "error" && tr.statusCode >= HTTP_ERROR_THRESHOLD)) {
           const err = errors.upstreamConnectionFailed();
