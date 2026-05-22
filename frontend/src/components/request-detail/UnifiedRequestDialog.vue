@@ -206,6 +206,7 @@ function createDefaultRuleForm() {
     retry_delay_ms: DEFAULT_RETRY_DELAY_MS,
     max_retries: DEFAULT_MAX_RETRIES,
     max_delay_ms: DEFAULT_MAX_DELAY_MS,
+    provider_id: null as string | null,
   };
 }
 
@@ -220,6 +221,7 @@ const generatedRule = ref<{
   retry_delay_ms: number;
   max_retries: number;
   max_delay_ms: number;
+  provider_id: string | null;
 } | null>(null);
 const ruleSummary = ref("");
 
@@ -243,6 +245,7 @@ async function handleGenerateRule() {
         retry_delay_ms: r.retry_delay_ms ?? defaults.retry_delay_ms,
         max_retries: r.max_retries ?? defaults.max_retries,
         max_delay_ms: r.max_delay_ms ?? defaults.max_delay_ms,
+        provider_id: r.provider_id ?? null,
       };
       ruleSummary.value = result.summary ?? "";
       previewOpen.value = true;

@@ -144,7 +144,7 @@
                   :placeholder="t('retryRules.providerPlaceholder')"
               /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="">{{
+                <SelectItem value="__all__">{{
                   t("retryRules.providerAll")
                 }}</SelectItem>
                 <SelectItem v-for="p in providers" :key="p.id" :value="p.id">{{
@@ -485,7 +485,7 @@ const DEFAULT_FORM: FormData = {
   name: "",
   status_code: 429,
   body_pattern: "",
-  provider_id: "",
+  provider_id: "__all__",
   is_active: true,
   retry_strategy: "exponential",
   retry_delay_ms: 5000,
@@ -650,7 +650,7 @@ function openEdit(r: RetryRule) {
     name: r.name,
     status_code: r.status_code,
     body_pattern: r.body_pattern,
-    provider_id: r.provider_id ?? "",
+    provider_id: r.provider_id ?? "__all__",
     is_active: !!r.is_active,
     retry_strategy: r.retry_strategy,
     retry_delay_ms: r.retry_delay_ms,
@@ -679,7 +679,8 @@ async function handleSave() {
       name: form.value.name,
       status_code: Number(form.value.status_code),
       body_pattern: form.value.body_pattern,
-      provider_id: form.value.provider_id || null,
+      provider_id:
+        form.value.provider_id === "__all__" ? null : form.value.provider_id,
       body_matchers,
       is_active: form.value.is_active ? 1 : 0,
       retry_strategy: form.value.retry_strategy,

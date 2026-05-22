@@ -1,6 +1,9 @@
 {
   "title": "Retry Rules",
   "addRule": "Add Rule",
+  "provider": "Provider",
+  "providerAll": "All Providers",
+  "providerPlaceholder": "Select provider",
   "tableHeaders": {
     "name": "Name",
     "statusCode": "HTTP Status Code",
