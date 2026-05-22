@@ -45,7 +45,8 @@
     "initialDelayMs": "初始延迟 (ms)",
     "maxRetries": "最大重试次数",
     "maxDelayMs": "延迟上限 (ms)",
-    "enable": "启用"
+    "enable": "启用",
+    "bodyPatternTooltip": "路由器会检查上游响应体是否匹配此规则。如果匹配，则触发重试。\n正则模式：JavaScript 正则表达式，如 .*rate_limit.* 或 .*timeout.*\nJSON 字段模式：匹配错误响应中的特定字段，如 error.code 等于 rate_limit_exceeded"
   },
   "deleteConfirm": {
     "title": "确认删除",
@@ -64,7 +65,7 @@
   },
   "messages": {
     "loadFailed": "加载数据失败",
-    "saveFailed": "保存规则失败",
+    "saveFailed": "保存规则失败，请检查表单或稍后重试。",
     "deleteFailed": "删除规则失败",
     "addedCount": "已添加 {count} 条规则",
     "saveCompleted": "规则已保存"

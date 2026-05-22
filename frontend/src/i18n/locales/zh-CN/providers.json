@@ -130,8 +130,8 @@
   },
   "toast": {
     "loadFailed": "加载供应商失败",
-    "saveFailed": "保存供应商失败",
-    "toggleFailed": "切换状态失败",
+    "saveFailed": "保存供应商失败，请检查必填项（名称、Base URL、API Key）",
+    "toggleFailed": "切换供应商状态失败，该供应商可能正在被映射分组引用。",
     "deleteFailed": "删除供应商失败",
     "reloadFailed": "重载失败",
     "reloadSuccess": "插件重载完成：{pluginCount} 个插件，{rulesCount} 条规则",

@@ -53,7 +53,9 @@
             :key="k.id"
             :class="{ 'opacity-60': !k.is_active }"
           >
-            <TableCell class="font-medium">{{ k.name }}</TableCell>
+            <TableCell class="font-medium max-w-[200px]"
+              ><span class="truncate block">{{ k.name }}</span></TableCell
+            >
             <TableCell>
               <div class="flex items-center gap-1">
                 <span class="font-mono text-xs text-muted-foreground">{{

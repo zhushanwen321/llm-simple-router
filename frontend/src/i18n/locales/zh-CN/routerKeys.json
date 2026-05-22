@@ -19,8 +19,8 @@
   "placeholder": {
     "name": "例如：生产环境"
   },
-  "loadFailed": "加载数据失败",
-  "saveFailed": "保存密钥失败",
-  "deleteFailed": "删除密钥失败",
+  "loadFailed": "加载 API 密钥失败，请检查连接后重试",
+  "saveFailed": "保存密钥失败，名称需唯一且至少 1 个字符",
+  "deleteFailed": "删除密钥失败，请稍后重试",
   "nameRequired": "请输入名称"
 }

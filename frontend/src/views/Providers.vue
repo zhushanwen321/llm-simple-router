@@ -81,9 +81,9 @@
                 </div>
                 <!-- 完整地址 -->
                 <div
-                  class="text-xs text-muted-foreground flex items-center gap-1"
+                  class="text-xs text-muted-foreground flex items-center gap-1 max-w-0"
                 >
-                  <span>{{ buildFullUrl(p) }}</span>
+                  <span class="truncate">{{ buildFullUrl(p) }}</span>
                   <Shield
                     v-if="p.proxy_type"
                     class="w-3 h-3"
@@ -123,8 +123,8 @@
                   :key="m.name"
                   class="flex items-center gap-1"
                 >
-                  <Badge variant="secondary" class="text-xs">
-                    {{ m.name }}
+                  <Badge variant="secondary" class="text-xs max-w-[200px]">
+                    <span class="truncate block">{{ m.name }}</span>
                     <span
                       v-if="m.context_window"
                       class="ml-1 text-muted-foreground"
