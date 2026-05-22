@@ -324,4 +324,42 @@ describe("AnthropicToResponsesTransform", () => {
     const partDone = events.find((e) => e.event === RESPONSES_SSE_EVENTS.CONTENT_PART_DONE);
     expect((partDone?.data as Record<string, unknown>)?.item_id).toBe(itemId);
   });
+
+  it("reasoning_summary events include item_id", async () => {
+    const t = new AnthropicToResponsesTransform("claude-3");
+    const output = collectOutput(t);
+    t.write('event: message_start\ndata: {"type":"message_start","message":{"id":"msg_r","role":"assistant","content":[],"usage":{"input_tokens":10}}}\n\n');
+    t.write('event: content_block_start\ndata: {"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":""}}\n\n');
+    t.write('event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"Let me think..."}}\n\n');
+    t.write('event: content_block_stop\ndata: {"type":"content_block_stop","index":0}\n\n');
+    t.write('event: content_block_start\ndata: {"type":"content_block_start","index":1,"content_block":{"type":"text","text":""}}\n\n');
+    t.write('event: content_block_delta\ndata: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"42"}}\n\n');
+    t.write('event: content_block_stop\ndata: {"type":"content_block_stop","index":1}\n\n');
+    t.write('event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":5}}\n\n');
+    t.write('event: message_stop\ndata: {"type":"message_stop"}\n\n');
+    t.end();
+    const result = await output;
+    const events = parseSSEEvents(result);
+
+    const reasoningItemAdded = events.find((e) => {
+      const item = ((e.data as Record<string, unknown>)?.item as Record<string, unknown>);
+      return e.event === RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED && item?.type === "reasoning";
+    });
+    const reasoningItemId = ((reasoningItemAdded?.data as Record<string, unknown>)?.item as Record<string, unknown>)?.id as string;
+    expect(reasoningItemId).toBeTruthy();
+
+    const partAdded = events.find((e) => e.event === RESPONSES_SSE_EVENTS.REASONING_SUMMARY_PART_ADDED);
+    expect((partAdded?.data as Record<string, unknown>)?.item_id).toBe(reasoningItemId);
+
+    const textDeltas = events.filter((e) => e.event === RESPONSES_SSE_EVENTS.REASONING_SUMMARY_TEXT_DELTA);
+    for (const d of textDeltas) {
+      expect((d.data as Record<string, unknown>)?.item_id).toBe(reasoningItemId);
+    }
+
+    const textDone = events.find((e) => e.event === RESPONSES_SSE_EVENTS.REASONING_SUMMARY_TEXT_DONE);
+    expect((textDone?.data as Record<string, unknown>)?.item_id).toBe(reasoningItemId);
+
+    const partDone = events.find((e) => e.event === RESPONSES_SSE_EVENTS.REASONING_SUMMARY_PART_DONE);
+    expect((partDone?.data as Record<string, unknown>)?.item_id).toBe(reasoningItemId);
+  });
 });
