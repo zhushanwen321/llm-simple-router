@@ -1,0 +1,160 @@
+{
+  "test_cases": [
+    {
+      "id": "TC-1-01",
+      "type": "unit",
+      "title": "BodyMatcher resolvePath 嵌套路径解析",
+      "description": "resolvePath 应正确解析点分隔嵌套路径",
+      "steps": [
+        "resolvePath({error: {type: \"x\"}}, \"error.type\") → \"x\"",
+        "resolvePath({a: {b: {c: 1}}}, \"a.b.c\") → 1",
+        "resolvePath({a: 1}, \"a.b\") → undefined (中间层不存在)"
+      ]
+    },
+    {
+      "id": "TC-1-02",
+      "type": "unit",
+      "title": "BodyMatcher equals 操作符",
+      "description": "equals 精确匹配字段值",
+      "steps": [
+        "matchBodyMatchers('{\"error\":{\"type\":\"rate_limit_error\"}}', [{path:\"error.type\",operator:\"equals\",value:\"rate_limit_error\"}]) → true",
+        "matchBodyMatchers('{\"error\":{\"type\":\"other\"}}', [{path:\"error.type\",operator:\"equals\",value:\"rate_limit_error\"}]) → false",
+        "matchBodyMatchers('{}', [{path:\"error.type\",operator:\"equals\",value:\"x\"}]) → false (字段不存在)"
+      ]
+    },
+    {
+      "id": "TC-1-03",
+      "type": "unit",
+      "title": "BodyMatcher contains 操作符",
+      "description": "contains 子串匹配，支持嵌套路径",
+      "steps": [
+        "matchBodyMatchers('{\"error\":{\"type\":\"rate_limit_error\"}}', [{path:\"error.type\",operator:\"contains\",value:\"rate_limit\"}]) → true",
+        "matchBodyMatchers('{\"error\":{\"type\":\"invalid_key\"}}', [{path:\"error.type\",operator:\"contains\",value:\"rate_limit\"}]) → false"
+      ]
+    },
+    {
+      "id": "TC-1-04",
+      "type": "unit",
+      "title": "BodyMatcher exists 操作符",
+      "description": "exists 仅检查字段存在，忽略 value",
+      "steps": [
+        "matchBodyMatchers('{\"error\":{\"type\":\"x\"}}', [{path:\"error\",operator:\"exists\"}]) → true",
+        "matchBodyMatchers('{\"ok\":true}', [{path:\"error\",operator:\"exists\"}]) → false",
+        "matchBodyMatchers('{}', [{path:\"error\",operator:\"exists\"}]) → false"
+      ]
+    },
+    {
+      "id": "TC-1-05",
+      "type": "unit",
+      "title": "BodyMatcher AND 多条件逻辑",
+      "description": "多个 matcher 之间 AND 关系",
+      "steps": [
+        "matchBodyMatchers('{\"error\":{\"type\":\"x\",\"message\":\"y\"}}', [{path:\"error.type\",operator:\"exists\"},{path:\"error.message\",operator:\"exists\"}]) → true",
+        "matchBodyMatchers('{\"error\":{\"type\":\"x\"}}', [{path:\"error.type\",operator:\"exists\"},{path:\"error.message\",operator:\"exists\"}]) → false"
+      ]
+    },
+    {
+      "id": "TC-1-06",
+      "type": "unit",
+      "title": "BodyMatcher 非 JSON body fallback",
+      "description": "非 JSON body 时 body_matchers 返回 false",
+      "steps": [
+        "matchBodyMatchers('not json', [{path:\"error\",operator:\"exists\"}]) → false"
+      ]
+    },
+    {
+      "id": "TC-1-07",
+      "type": "unit",
+      "title": "RetryRuleMatcher load() 新缓存结构",
+      "description": "load() 应按 provider_id + status_code 二级分组缓存",
+      "steps": [
+        "配置两条规则: R1(provider_id='A', status_code=429), R2(provider_id=NULL, status_code=429)",
+        "load() 后缓存 key 为 'A:429' → [R1], '__global__:429' → [R2]"
+      ]
+    },
+    {
+      "id": "TC-1-08",
+      "type": "unit",
+      "title": "RetryRuleMatcher match() provider 隔离",
+      "description": "匹配时 providerId 参数隔离不同 provider 的规则",
+      "steps": [
+        "match(429, body, 'A') → 匹配 R1 (绑定), 不匹配 R2 (通用 fallback)",
+        "match(429, body, 'B') → 不匹配 R1, 匹配 R2 (通用规则)"
+      ]
+    },
+    {
+      "id": "TC-2-01",
+      "type": "integration",
+      "title": "上游 429 响应经 provider 隔离后正确匹配",
+      "description": "模拟 mock 后端返回 429 + JSON body, 验证 resilience 按 provider 匹配规则",
+      "steps": [
+        "创建 Provider A 和 Provider B",
+        "创建绑定规则 R1: provider_id='A', status_code=429, body_matchers=[{path:\"error.type\",operator:\"contains\",value:\"rate_limit\"}]",
+        "发送请求到 Provider A, mock 返回 429 + JSON body → 应匹配 R1",
+        "发送请求到 Provider B, mock 返回 429 + JSON body → 应走通用规则 fallback"
+      ]
+    },
+    {
+      "id": "TC-2-02",
+      "type": "integration",
+      "title": "stream_error 重试耗尽后返回格式化错误",
+      "description": "验证 stream_error 经过 resilience 后客户端收到正确格式的错误响应",
+      "steps": [
+        "发送流式请求, mock 后端返回 429",
+        "等待 resilience 重试耗尽 (done/abort)",
+        "验证客户端收到 JSON 格式错误响应",
+        "验证错误格式与请求 API 类型匹配"
+      ]
+    },
+    {
+      "id": "TC-2-03",
+      "type": "integration",
+      "title": "upstream_error_logs 写入验证",
+      "description": "最终失败请求正确写入 upstream_error_logs",
+      "steps": [
+        "发送请求到 mock 后端, 返回 429",
+        "resilience 重试耗尽后请求结束",
+        "查询 upstream_error_logs: 应有对应记录",
+        "验证 error_type, error_message, retry_count 字段正确"
+      ]
+    },
+    {
+      "id": "TC-3-01",
+      "type": "ui",
+      "title": "前端 Dialog Provider 选择",
+      "description": "RetryRules Dialog 中 Provider 选择功能",
+      "steps": [
+        "打开 RetryRules 页面",
+        "点击新建规则, 打开 Dialog",
+        "在 Provider 字段选择已配置的 provider",
+        "保存后表格显示 provider 名称",
+        "新建规则选择 '通用'",
+        "保存后表格显示 '通用' Badge"
+      ]
+    },
+    {
+      "id": "TC-3-02",
+      "type": "ui",
+      "title": "前端 JSON 字段匹配编辑",
+      "description": "Dialog 中响应体匹配的 Tab 切换和 JSON 编辑功能",
+      "steps": [
+        "打开规则编辑 Dialog",
+        "切换到 'JSON 字段匹配' Tab",
+        "添加条件: path='error.type', operator='contains', value='rate_limit'",
+        "切换到 '正则匹配' Tab → body_matchers 应清空",
+        "保存后验证 body_matchers 正确序列化"
+      ]
+    },
+    {
+      "id": "TC-4-01",
+      "type": "manual",
+      "title": "向后兼容检查",
+      "description": "现有规则在迁移后行为不变",
+      "steps": [
+        "运行迁移 049",
+        "检查已有规则: provider_id=NULL, body_matchers=NULL",
+        "发送匹配已有规则的请求 → 仍匹配现有规则"
+      ]
+    }
+  ]
+}

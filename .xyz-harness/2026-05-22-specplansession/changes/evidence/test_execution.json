@@ -1,0 +1,151 @@
+{
+  "test_execution": [
+    {
+      "caseId": "TC-1-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run tests/unit/body-matcher.test.ts --reporter=verbose",
+        "验证 resolvePath 嵌套路径解析: error.type → 值, a.b.c → 值, 中间层不存在 → undefined"
+      ],
+      "evidence": "body-matcher.test.ts 22 tests passed, resolvePath describe block all green"
+    },
+    {
+      "caseId": "TC-1-02",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run tests/unit/body-matcher.test.ts --reporter=verbose",
+        "验证 equals 操作符: 精确匹配、不匹配、字段不存在均正确"
+      ],
+      "evidence": "matchBodyMatchers > equals tests passed"
+    },
+    {
+      "caseId": "TC-1-03",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run tests/unit/body-matcher.test.ts --reporter=verbose",
+        "验证 contains 操作符: 子串匹配和不匹配场景"
+      ],
+      "evidence": "matchBodyMatchers > contains tests passed"
+    },
+    {
+      "caseId": "TC-1-04",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run tests/unit/body-matcher.test.ts --reporter=verbose",
+        "验证 exists 操作符: 字段存在/不存在, 忽略 value"
+      ],
+      "evidence": "matchBodyMatchers > exists tests passed"
+    },
+    {
+      "caseId": "TC-1-05",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run tests/unit/body-matcher.test.ts --reporter=verbose",
+        "验证多条件 AND 逻辑: 两个 matcher 都匹配才通过"
+      ],
+      "evidence": "matchBodyMatchers > AND logic tests passed"
+    },
+    {
+      "caseId": "TC-1-06",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run tests/unit/body-matcher.test.ts --reporter=verbose",
+        "验证非 JSON body 返回 false (fallback)"
+      ],
+      "evidence": "matchBodyMatchers > non-JSON fallback test passed"
+    },
+    {
+      "caseId": "TC-1-07",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run tests/unit/retry-rule-matcher.test.ts --reporter=verbose",
+        "验证 load() 按 provider_id + status_code 二级分组缓存"
+      ],
+      "evidence": "RetryRuleMatcher > TC-2-01 global rule + TC-2-02 provider-bound rule tests passed (16 tests total)"
+    },
+    {
+      "caseId": "TC-1-08",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run tests/unit/retry-rule-matcher.test.ts --reporter=verbose",
+        "验证 match() providerId 隔离: 绑定规则优先, 通用规则 fallback"
+      ],
+      "evidence": "TC-2-02 provider-bound rule > prefers provider-bound over global test passed"
+    },
+    {
+      "caseId": "TC-2-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run tests/integration-retry-rules.test.ts --reporter=verbose",
+        "创建 Provider A/B, 创建绑定规则 R1 (provider_id='A', status_code=429, body_matchers)",
+        "mock 后端返回 429 + JSON body → 验证 R1 匹配, fallback 行为正确"
+      ],
+      "evidence": "TC-3-01 Provider-bound rule prevents cross-provider retry test passed (66ms)"
+    },
+    {
+      "caseId": "TC-2-02",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run tests/integration-retry-rules.test.ts --reporter=verbose",
+        "发送流式请求, mock 返回 429, 等待 resilience 耗尽",
+        "验证客户端收到 JSON 格式错误响应 (非 SSE)"
+      ],
+      "evidence": "TC-3-02 stream_error returns formatted JSON to client test passed (15ms)"
+    },
+    {
+      "caseId": "TC-2-03",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run tests/integration-retry-rules.test.ts --reporter=verbose",
+        "发送请求 mock 返回 429, resilience 耗尽后查询 upstream_error_logs",
+        "验证 error_type, error_message, retry_count 字段正确"
+      ],
+      "evidence": "TC-5-01 upstream_error_logs written on final failure test passed (27ms)"
+    },
+    {
+      "caseId": "TC-3-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run tests/frontend-types.test.ts --reporter=verbose",
+        "验证 RetryRule 前端类型支持 provider_id 字段 (AC6)",
+        "验证 provider_id 为 null 时显示 '通用' Badge"
+      ],
+      "evidence": "frontend-types.test.ts > supports provider_id for Provider column / global badge (AC6) passed"
+    },
+    {
+      "caseId": "TC-3-02",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run tests/frontend-types.test.ts --reporter=verbose",
+        "验证 RetryRule 前端类型支持 body_matchers 字段 (AC7)",
+        "验证 body_matchers 为 null 时表示正则模式, 有值时 JSON 序列化正确"
+      ],
+      "evidence": "frontend-types.test.ts > supports body_matchers for JSON editor round-trip (AC7) passed"
+    },
+    {
+      "caseId": "TC-4-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run tests/admin-retry-rules-provider.test.ts --reporter=verbose",
+        "运行迁移 049 后检查已有规则: provider_id=NULL, body_matchers=NULL",
+        "验证不传新字段创建规则时向后兼容",
+        "验证已有规则匹配行为不变"
+      ],
+      "evidence": "admin-retry-rules-provider.test.ts > AC8: backward compatibility test passed (173ms)"
+    }
+  ]
+}
