@@ -24,7 +24,7 @@
     </div>
 
     <div class="bg-card rounded-lg border overflow-hidden">
-      <Table>
+      <Table class="[&_td]:px-4 [&_th]:px-4">
         <TableHeader>
           <TableRow class="bg-muted">
             <TableHead class="text-muted-foreground">{{
