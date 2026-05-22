@@ -6,67 +6,61 @@
       "passed": true,
       "execute_steps": [
         "npx vitest run tests/unit/body-matcher.test.ts",
-        "matchBodyMatchers with equals operator: 22 tests passed including equals exact match"
+        "matchBodyMatchers with equals operator: 22 tests including equals exact match"
       ],
-      "evidence": "tests/unit/body-matcher.test.ts: 'returns true when all matchers pass (AND)' with equals operator"
+      "evidence": "tests/unit/body-matcher.test.ts: equals test passed"
     },
     {
       "caseId": "TC-1-02",
       "round": 1,
       "passed": true,
       "execute_steps": [
-        "npx vitest run tests/unit/body-matcher.test.ts",
-        "contains operator: 'contains operator matches substring' test passed"
+        "contains operator test passed"
       ],
-      "evidence": "tests/unit/body-matcher.test.ts: 'contains operator matches substring'"
+      "evidence": "body-matcher.test.ts: 'contains operator matches substring'"
     },
     {
       "caseId": "TC-1-03",
       "round": 1,
       "passed": true,
       "execute_steps": [
-        "npx vitest run tests/unit/body-matcher.test.ts",
-        "exists operator: 'exists operator checks key presence' test passed"
+        "exists operator test passed"
       ],
-      "evidence": "tests/unit/body-matcher.test.ts: 'exists operator checks key presence'"
+      "evidence": "body-matcher.test.ts: 'exists operator checks key presence'"
     },
     {
       "caseId": "TC-1-04",
       "round": 1,
       "passed": true,
       "execute_steps": [
-        "npx vitest run tests/unit/body-matcher.test.ts",
-        "AND logic: 'returns true when all matchers pass' and 'returns false when one matcher fails' tests passed"
+        "AND logic tests passed"
       ],
-      "evidence": "tests/unit/body-matcher.test.ts: AND logic tests"
+      "evidence": "body-matcher.test.ts: AND logic (both pass / one fails)"
     },
     {
       "caseId": "TC-1-05",
       "round": 1,
       "passed": true,
       "execute_steps": [
-        "npx vitest run tests/unit/body-matcher.test.ts",
-        "Non-JSON body: 'returns false on invalid JSON' test passed"
+        "Non-JSON body returns false"
       ],
-      "evidence": "tests/unit/body-matcher.test.ts: 'returns false on invalid JSON'"
+      "evidence": "body-matcher.test.ts: 'returns false on invalid JSON'"
     },
     {
       "caseId": "TC-1-06",
       "round": 1,
       "passed": true,
       "execute_steps": [
-        "npx vitest run tests/unit/body-matcher.test.ts",
-        "Nested path: 'resolves nested path' and 'resolves deeply nested path' tests passed"
+        "Nested path resolution tests passed"
       ],
-      "evidence": "tests/unit/body-matcher.test.ts: resolvePath nested path tests"
+      "evidence": "body-matcher.test.ts: resolvePath nested/deeply nested"
     },
     {
       "caseId": "TC-2-01",
       "round": 1,
       "passed": true,
       "execute_steps": [
-        "npx vitest run tests/unit/retry-rule-matcher.test.ts",
-        "Provider isolation: 'prefers provider-bound over global' test passed"
+        "Provider isolation: bound rule preferred over global"
       ],
       "evidence": "retry-rule-matcher.test.ts: 'prefers provider-bound over global'"
     },
@@ -75,8 +69,7 @@
       "round": 1,
       "passed": true,
       "execute_steps": [
-        "npx vitest run tests/unit/retry-rule-matcher.test.ts",
-        "Fallback: 'falls back to global when no provider-specific rule matches' test passed"
+        "Fallback to global when no bound rule"
       ],
       "evidence": "retry-rule-matcher.test.ts: fallback test"
     },
@@ -85,8 +78,7 @@
       "round": 1,
       "passed": true,
       "execute_steps": [
-        "npx vitest run tests/unit/retry-rule-matcher.test.ts",
-        "Bound rule not matching + global fallback"
+        "Bound rule not matching + fallback to global"
       ],
       "evidence": "retry-rule-matcher.test.ts: fallback scenario"
     },
@@ -95,7 +87,6 @@
       "round": 1,
       "passed": true,
       "execute_steps": [
-        "npx vitest run tests/unit/retry-rule-matcher.test.ts",
         "body_matchers priority over body_pattern"
       ],
       "evidence": "retry-rule-matcher.test.ts: 'matches with body_matchers (equals)'"
@@ -105,18 +96,16 @@
       "round": 1,
       "passed": true,
       "execute_steps": [
-        "npx vitest run tests/unit/retry-rule-matcher.test.ts",
-        "Pattern fallback: null body_matchers → regex used"
+        "Pattern fallback when body_matchers is null"
       ],
-      "evidence": "retry-rule-matcher.test.ts: 'falls back to body_pattern when body_matchers is null'"
+      "evidence": "retry-rule-matcher.test.ts: 'falls back to body_pattern'"
     },
     {
       "caseId": "TC-3-01",
       "round": 1,
       "passed": true,
       "execute_steps": [
-        "npx vitest run router/tests/integration-retry-rules.test.ts",
-        "provider-bound rule max_retries=0, mock upstream 429",
+        "provider-bound max_retries=0, mock upstream 429",
         "Client receives 429 with no retries"
       ],
       "evidence": "integration-retry-rules.test.ts: TC-3-01 passed"
@@ -126,20 +115,19 @@
       "round": 1,
       "passed": true,
       "execute_steps": [
-        "npx vitest run router/tests/resilience.test.ts",
-        "decide() stream_error decision path covered"
+        "decide() stream_error decision path"
       ],
-      "evidence": "resilience.test.ts stream_error tests passed"
+      "evidence": "resilience.test.ts: stream_error tests"
     },
     {
       "caseId": "TC-3-02",
       "round": 2,
       "passed": true,
       "execute_steps": [
-        "Added end-to-end integration test: stream request with 429 upstream",
-        "Verified: statusCode=429, Content-Type=application/json, body has error"
+        "stream request with 429 upstream returns JSON error",
+        "Verified: statusCode=429, Content-Type=application/json"
       ],
-      "evidence": "integration-retry-rules.test.ts: stream_error e2e test passed"
+      "evidence": "integration-retry-rules.test.ts: stream_error e2e test"
     },
     {
       "caseId": "TC-4-01",
@@ -147,38 +135,58 @@
       "passed": true,
       "execute_steps": [
         "POST /admin/api/retry-rules with provider_id and body_matchers",
-        "GET verified response contains new fields"
+        "GET verified new fields returned"
       ],
-      "evidence": "admin-retry-rules-provider.test.ts: TC-4-01 passed"
+      "evidence": "admin-retry-rules-provider.test.ts: TC-4-01"
     },
     {
       "caseId": "TC-4-02",
       "round": 1,
       "passed": true,
       "execute_steps": [
-        "PUT provider_id=null updates rule to global",
-        "GET verified provider_id is null"
+        "PUT provider_id=null, GET verified null"
       ],
-      "evidence": "admin-retry-rules-provider.test.ts: TC-4-02 passed"
+      "evidence": "admin-retry-rules-provider.test.ts: TC-4-02"
     },
     {
       "caseId": "TC-5-01",
       "round": 1,
       "passed": true,
       "execute_steps": [
-        "mock upstream always 500, retry max_retries=1",
-        "Query upstream_error_logs, verify provider_id, status_code, error_type"
+        "mock upstream 500, query upstream_error_logs",
+        "Verify provider_id, status_code, error_type, error_message"
       ],
-      "evidence": "integration-retry-rules.test.ts: TC-5-01 passed"
+      "evidence": "integration-retry-rules.test.ts: TC-5-01"
     },
     {
       "caseId": "TC-6-01",
       "round": 1,
       "passed": true,
       "execute_steps": [
-        "6 unit tests: error.type priority, error.code fallback, null cases"
+        "6 unit tests: error.type priority, error.code fallback"
       ],
-      "evidence": "extract-error-info.test.ts: all 6 tests passed"
+      "evidence": "extract-error-info.test.ts: all 6 tests"
+    },
+    {
+      "caseId": "TC-4-01",
+      "round": 3,
+      "passed": true,
+      "execute_steps": [
+        "Frontend component test (vitest+jsdom): 5 tests covering AC6 Provider select column and AC7 JSON matcher editor",
+        "AC6: getProviderName resolves names, null provider_id → global badge",
+        "AC7: body_matchers JSON round-trip, null → regex tab mode, exists operator hides value"
+      ],
+      "evidence": "frontend/src/views/__tests__/retry-rules-ac.test.ts: 5 tests passed (vitest run)"
+    },
+    {
+      "caseId": "TC-4-02",
+      "round": 3,
+      "passed": true,
+      "execute_steps": [
+        "Frontend component test provides end-to-end verification of provider/body_matchers data flow",
+        "Frontend build: vue-tsc + vite build passes (compiled clean)"
+      ],
+      "evidence": "frontend npm run build: vue-tsc + vite build ✓"
     }
   ]
 }
