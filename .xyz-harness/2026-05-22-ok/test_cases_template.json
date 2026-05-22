@@ -1,0 +1,181 @@
+{
+  "test_cases": [
+    {
+      "id": "TC-1-01",
+      "type": "integration",
+      "title": "PipelineContext.deps 字段存在且类型正确",
+      "description": "验证 PipelineContext 包含 deps 字段，类型为 PipelineDeps，编译器可检查",
+      "steps": [
+        "构建 test app",
+        "发送 OpenAI chat completion 请求",
+        "验证 TypeScript 编译通过"
+      ]
+    },
+    {
+      "id": "TC-1-02",
+      "type": "integration",
+      "title": "failover-loop 无 metadata.set 调用",
+      "description": "验证 failover-loop.ts 中所有固定依赖和迭代级状态已从 metadata 迁移",
+      "steps": [
+        "grep metadata.set proxy/handler/failover-loop.ts",
+        "确认无 db/container/matcher 等固定依赖的 set 调用",
+        "确认无 excludeTargets/startTime 等迭代级状态的 set 调用"
+      ]
+    },
+    {
+      "id": "TC-1-03",
+      "type": "integration",
+      "title": "15 个 builtin hook 无固定依赖 as 断言",
+      "description": "验证所有 builtin hook 不再使用 metadata.get(\"xxx\") as T 访问固定依赖",
+      "steps": [
+        "grep 'metadata.get' proxy/hooks/builtin/*.ts",
+        "确认无 db/container/matcher/adapter/orchestrator 等键的 get 调用"
+      ]
+    },
+    {
+      "id": "TC-2-01",
+      "type": "integration",
+      "title": "ResilienceResult 包含 action 字段",
+      "description": "验证 ResilienceResult 有 action: 'complete' | 'switch_provider'",
+      "steps": [
+        "mock backend 返回 502",
+        "发送请求",
+        "验证 resilienceResult.action === 'switch_provider'"
+      ]
+    },
+    {
+      "id": "TC-2-02",
+      "type": "integration",
+      "title": "无 ProviderSwitchNeeded throw",
+      "description": "验证 resilience.ts 中不再 throw ProviderSwitchNeeded",
+      "steps": [
+        "grep 'throw new ProviderSwitchNeeded' proxy/orchestration/resilience.ts",
+        "确认无匹配"
+      ]
+    },
+    {
+      "id": "TC-2-03",
+      "type": "integration",
+      "title": "failover-loop 无 ProviderSwitchNeeded catch",
+      "description": "验证 failover-loop.ts 中无 ProviderSwitchNeeded catch 分支",
+      "steps": [
+        "grep 'ProviderSwitchNeeded' proxy/handler/failover-loop.ts",
+        "确认仅存在于 import 语句（用于 instanceof 检查的遗留）"
+      ]
+    },
+    {
+      "id": "TC-2-04",
+      "type": "integration",
+      "title": "Failover 行为不变",
+      "description": "验证 mock 502 后自动切换到下一个 target",
+      "steps": [
+        "配置 2 个 provider",
+        "mock provider 1 返回 502",
+        "发送请求",
+        "验证第二次请求发送到 provider 2"
+      ]
+    },
+    {
+      "id": "TC-3-01",
+      "type": "integration",
+      "title": "TransportExecutor 类存在",
+      "description": "验证 transport-executor.ts 存在且 execute(ctx) 可被调用",
+      "steps": [
+        "import TransportExecutor",
+        "mock orchestrator",
+        "调用 executor.execute(ctx)",
+        "验证返回 Promise"
+      ]
+    },
+    {
+      "id": "TC-3-02",
+      "type": "integration",
+      "title": "transport-execute hook ≤ 20 行",
+      "description": "验证 hook 文件行数不超过 20",
+      "steps": [
+        "wc -l proxy/hooks/builtin/transport-execute.ts",
+        "验证 ≤ 20"
+      ]
+    },
+    {
+      "id": "TC-4-01",
+      "type": "integration",
+      "title": "format/converters/ 目录已删除",
+      "description": "验证 converters 目录不存在",
+      "steps": [
+        "ls proxy/format/converters/",
+        "确认失败"
+      ]
+    },
+    {
+      "id": "TC-4-02",
+      "type": "integration",
+      "title": "FormatRegistry 高阶方法",
+      "description": "验证 transformRequestBody/transformResponseBody/transformErrorBody 存在",
+      "steps": [
+        "调用 registry.transformRequestBody(body, 'openai', 'anthropic', 'gpt-4')",
+        "验证返回 { body, upstreamPath }"
+      ]
+    },
+    {
+      "id": "TC-4-03",
+      "type": "integration",
+      "title": "stream-oa2ant.ts 代码量减少 ≥ 40%",
+      "description": "验证迁移为映射表模式后文件行数减少",
+      "steps": [
+        "wc -l proxy/transform/stream-oa2ant.ts",
+        "验证 ≤ 130 行"
+      ]
+    },
+    {
+      "id": "TC-5-01",
+      "type": "api",
+      "title": "admin/utils.ts 存在",
+      "description": "验证 4 个工具函数存在",
+      "steps": [
+        "import { partialBody, extractDefinedFields, notFound, conflict } from admin/utils.ts",
+        "验证每个函数可调用"
+      ]
+    },
+    {
+      "id": "TC-5-02",
+      "type": "api",
+      "title": "admin/constants.ts 已删除",
+      "description": "验证 constants.ts 不存在",
+      "steps": [
+        "ls admin/constants.ts",
+        "确认失败"
+      ]
+    },
+    {
+      "id": "TC-5-03",
+      "type": "api",
+      "title": "providers.ts 使用工具函数",
+      "description": "验证 providers.ts 调用了 partialBody/extractDefinedFields/notFound/conflict",
+      "steps": [
+        "grep 'partialBody\\|extractDefinedFields\\|notFound\\|conflict' admin/providers.ts",
+        "确认有匹配"
+      ]
+    },
+    {
+      "id": "TC-6-01",
+      "type": "api",
+      "title": "hook-registry.ts 已删除",
+      "description": "验证双注册表之一已删除",
+      "steps": [
+        "ls proxy/pipeline/hook-registry.ts",
+        "确认失败"
+      ]
+    },
+    {
+      "id": "TC-6-02",
+      "type": "api",
+      "title": "Admin API monitor 返回 proxyPipeline 数据",
+      "description": "验证 monitor 端点从 proxyPipeline 获取 hook 信息",
+      "steps": [
+        "GET /admin/api/monitor/hooks",
+        "验证返回 name/priority/phase/core 字段"
+      ]
+    }
+  ]
+}
