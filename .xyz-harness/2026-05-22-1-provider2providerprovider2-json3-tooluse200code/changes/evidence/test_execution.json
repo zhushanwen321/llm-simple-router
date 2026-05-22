@@ -128,9 +128,20 @@
       "execute_steps": [
         "npx vitest run router/tests/resilience.test.ts",
         "stream_error + statusCode >= threshold handled by decide()",
-        "failover-loop.ts stream_error branch uses adapter.formatError() to send JSON error"
+        "failover-loop.ts code review: stream_error branch uses adapter.formatError()"
       ],
-      "evidence": "router/tests/resilience.test.ts stream_error tests passed; failover-loop.ts code review confirms adapter.formatError() usage"
+      "evidence": "router/tests/resilience.test.ts stream_error tests passed; code review confirms format error path"
+    },
+    {
+      "caseId": "TC-3-02",
+      "round": 2,
+      "passed": true,
+      "execute_steps": [
+        "Added end-to-end integration test: stream request with 429 upstream returns formatted JSON error directly",
+        "npx vitest run router/tests/integration-retry-rules.test.ts: 3 tests passed",
+        "Verified: response statusCode=429, Content-Type=application/json, body is valid JSON with error field"
+      ],
+      "evidence": "integration-retry-rules.test.ts: 'stream request with 429 upstream returns JSON error (not SSE)' passed"
     },
     {
       "caseId": "TC-4-01",
@@ -173,7 +184,52 @@
         "npx vitest run tests/unit/extract-error-info.test.ts",
         "6 tests: error.type priority, error.code fallback, no error field, invalid JSON, type over code priority, non-string types"
       ],
-      "evidence": "tests/unit/extract-error-info.test.ts: all 6 TC-6-01 tests passed"
+      "evidence": "tests/unit/extract-error-info.test.ts: all 6 tests passed"
+    },
+    {
+      "caseId": "AC1",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "Added matcher ordering test: two provider-bound rules with different created_at timestamps",
+        "Direct DB insert: old rule with old pattern, new rule with body_matchers",
+        "Verified: body matching new rule's body_matchers → picks new-rule; mismatching body → falls back to old-rule"
+      ],
+      "evidence": "admin-retry-rules-provider.test.ts: '多条 provider 绑定规则按 created_at DESC 排序优先' passed"
+    },
+    {
+      "caseId": "AC6",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "Frontend Provider column data: backend API integration test verifies mixed provider_id values",
+        "Created global rule (provider_id=null), provider-a rule, provider-b rule",
+        "GET /admin/api/retry-rules: global rule returns provider_id=null, provider-a returns 'provider-a'"
+      ],
+      "evidence": "admin-retry-rules-provider.test.ts: 'AC6: 多条规则 mixed provider_id' passed"
+    },
+    {
+      "caseId": "AC7",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "Frontend JSON matcher editor: backend API round-trip test",
+        "Created rule with body_matchers=[equals, contains, exists], GET verified round-trip",
+        "Created rule with body_matchers=null → frontend should show regex tab",
+        "Bug fix: TypeBox coerces null → empty string causing validation failure; fixed in validateBodyMatchers"
+      ],
+      "evidence": "admin-retry-rules-provider.test.ts: 'AC7: body_matchers 多条件 round-trip' and 'AC7: body_matchers=null' passed"
+    },
+    {
+      "caseId": "AC8",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "Backward compatibility: create rule without provider_id or body_matchers",
+        "POST with legacy fields only (name, status_code, body_pattern, etc.)",
+        "GET verified provider_id=null, body_matchers=null"
+      ],
+      "evidence": "admin-retry-rules-provider.test.ts: 'AC8: 不传新字段创建规则时 provider_id 和 body_matchers 为 null' passed"
     }
   ]
 }
