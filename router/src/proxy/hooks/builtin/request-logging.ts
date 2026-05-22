@@ -7,16 +7,15 @@
  * 3. updateLogStreamContent — 流式请求记录生成的内容
  * 4. flushToolErrors — 写入待处理的工具错误日志
  *
- * 依赖：ctx.metadata 中需设置 "db"、"container"、"startTime"、
- *       "resilienceResult"、"isFailoverIteration"、"matcher"、"logFileWriter"、
- *       "pendingToolErrors"
+ * 依赖：ctx.resilienceResult + ctx.transportResult（由 transport-execute hook 写入），
+ *       ctx.metadata 中需设置 "db"、"container"、"startTime"、"matcher"、
+ *       "logFileWriter"、"pendingToolErrors"、"effectiveMappingReason"、"lastFailoverTrigger"
  */
 import Database from "better-sqlite3";
 import { SERVICE_KEYS, type ServiceContainer } from "../../../core/container.js";
 import type { PipelineHook, PipelineContext } from "../../pipeline/types.js";
 import type { LogFileWriter } from "../../../storage/log-file-writer.js";
 import type { RequestTracker } from "../../../core/monitor/index.js";
-import type { TransportResult } from "../../types.js";
 import {
   logResilienceResult,
   collectTransportMetrics,
@@ -34,10 +33,7 @@ export const requestLoggingHook: PipelineHook = {
     const db = ctx.metadata.get("db") as Database.Database;
     const container = ctx.metadata.get("container") as ServiceContainer;
     const startTime = ctx.metadata.get("startTime") as number;
-    const resilienceResult = ctx.metadata.get("resilienceResult") as {
-      attempts: import("../../../core/types.js").ResilienceAttempt[];
-      result: TransportResult;
-    };
+    const resilienceResult = ctx.resilienceResult;
     const matcher = ctx.metadata.get("matcher") as { test: (statusCode: number, body: string) => boolean } | null;
     const logFileWriter = ctx.metadata.get("logFileWriter") as unknown;
 
@@ -47,6 +43,8 @@ export const requestLoggingHook: PipelineHook = {
     const sessionId = ctx.metadata.get("session_id") as string | undefined;
     const isFailoverIteration = ctx.rootLogId !== null && ctx.rootLogId !== ctx.logId;
     const apiType = ctx.apiType as "openai" | "openai-responses" | "anthropic";
+    const effectiveMappingReason = ctx.metadata.get("effectiveMappingReason") as string | null;
+    const lastFailoverTrigger = ctx.metadata.get("lastFailoverTrigger") as string | null;
 
     // 1. 记录 resilience 结果日志
     const lastLogId = logResilienceResult(
@@ -66,6 +64,11 @@ export const requestLoggingHook: PipelineHook = {
         failover: { isFailoverIteration, rootLogId: ctx.rootLogId ?? ctx.logId },
         matcher,
         logFileWriter: logFileWriter as LogFileWriter | null,
+        resilienceAction: resilienceResult.finalDecision?.action,
+        resilienceReason: resilienceResult.finalDecision?.action === "abort"
+          ? (resilienceResult.finalDecision as { action: "abort"; reason: string }).reason : null,
+        mappingReason: effectiveMappingReason,
+        failoverTrigger: lastFailoverTrigger,
       },
       resilienceResult.attempts,
       resilienceResult.result,
@@ -89,6 +92,7 @@ export const requestLoggingHook: PipelineHook = {
         ctx.metadata.get("client_type") as string | undefined,
         sessionId,
         metricsTracker,
+        ctx.metadata,
       );
     }
 

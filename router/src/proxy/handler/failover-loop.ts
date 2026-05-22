@@ -10,15 +10,14 @@ import type { FastifyReply } from "fastify";
 import { ProviderSwitchNeeded, SemaphoreQueueFullError, SemaphoreTimeoutError } from "../../core/errors.js";
 import { type Target, type MappingReason } from "../../core/types.js";
 import { type ServiceContainer, SERVICE_KEYS } from "../../core/container.js";
-import { updateLogClientStatus, updateLogStreamContent } from "../../db/index.js";
 import { resolveMapping, filterExcluded } from "../routing/mapping-resolver.js";
 import { expandOverflowTargets } from "../routing/overflow.js";
 import { computeModalityRedirectTargets } from "../routing/modality-redirect.js";
 import { getConfig } from "../../config/index.js";
 import { insertRejectedLog } from "../log-helpers.js";
-import { logResilienceResult, collectTransportMetrics, sanitizeHeadersForLog } from "../proxy-logging.js";
+import { logResilienceResult, sanitizeHeadersForLog } from "../proxy-logging.js";
 import { loadEnhancementConfig } from "../routing/enhancement-config.js";
-import { extractFailedToolResults, getTransportStatusCode, serializeBlocksForStorage } from "./proxy-handler-utils.js";
+import { extractFailedToolResults } from "./proxy-handler-utils.js";
 import { logToolErrors } from "../tool-error-logger.js";
 import { PipelineAbort, type PipelineContext, type ProviderInfo } from "../pipeline/types.js";
 import { PipelineSnapshot } from "../pipeline-snapshot.js";
@@ -270,38 +269,14 @@ export async function executeFailoverLoop(
       });
 
       await proxyPipeline.emit("pre_transport", ctx);
+
+      // 将 lastFailoverTrigger 注入 metadata 供 request-logging hook 读取
+      ctx.metadata.set("lastFailoverTrigger", lastFailoverTrigger);
       await proxyPipeline.emit("post_response", ctx);
 
-      // L3: 结果处理
+      // L3: 结果处理（日志已由 request-logging hook 完成）
       const rr = ctx.resilienceResult!;
       const tr = rr.result;
-      const apiType = ctx.apiType as "openai" | "openai-responses" | "anthropic";
-
-      const lastLogId = logResilienceResult(db, {
-        apiType, model: clientModel, providerId: ctx.provider!.id, isStream: ctx.isStream,
-        clientReq: ctx.clientRequest, upstreamReqBase: ctx.upstreamRequest, logId, routerKeyId,
-        originalModel: null, sessionId: ctx.metadata.get("session_id") as string | undefined,
-        failover: { isFailoverIteration: isFailoverIter, rootLogId: rootLogId! },
-        pipelineSnapshot: ctx.snapshot.toJSON(), matcher, logFileWriter,
-        resilienceAction: rr.finalDecision?.action,
-        resilienceReason: rr.finalDecision?.action === "abort"
-          ? (rr.finalDecision as { action: "abort"; reason: string }).reason : null,
-        mappingReason: mapReason, failoverTrigger: lastFailoverTrigger,
-      }, rr.attempts, tr, startTime);
-
-      collectTransportMetrics(db, apiType, tr, ctx.isStream, lastLogId, ctx.provider!.id,
-        ctx.resolved!.backend_model, request, routerKeyId, getTransportStatusCode(tr),
-        ctx.metadata.get("client_type") as string | undefined,
-        ctx.metadata.get("session_id") as string | undefined, tracker, ctx.metadata);
-
-      flushToolErrors(ctx.provider!.id, ctx.resolved!.backend_model ?? clientModel);
-      if (ctx.isStream && tracker) {
-        const sc = tracker.get(logId)?.streamContent;
-        const blocks = sc?.blocks;
-        const content = blocks?.length && blocks.some((b: { type: string }) => b.type !== "text")
-          ? serializeBlocksForStorage(blocks, apiType) : sc?.textContent || "";
-        if (content) updateLogStreamContent(db, lastLogId, content);
-      }
 
       // Failover 判断
       if (allTargets.length > 1 && !reply.raw.headersSent) {
@@ -316,9 +291,7 @@ export async function executeFailoverLoop(
       if (!reply.raw.headersSent) {
         if (tr.kind === "success") return reply.code(tr.statusCode).send(tr.body);
         if (tr.kind === "throw" || (tr.kind === "error" && tr.statusCode >= HTTP_ERROR_THRESHOLD)) {
-          const err = errors.upstreamConnectionFailed();
-          updateLogClientStatus(db, lastLogId, err.statusCode);
-          return reply.code(err.statusCode).send(err.body);
+          return reply.code(errors.upstreamConnectionFailed().statusCode).send(errors.upstreamConnectionFailed().body);
         }
         return reply.code(UPSTREAM_ERROR_STATUS).send(
           adapter.formatError("Unhandled transport result") ?? { error: { message: "Unhandled transport result", type: "server_error" } });
