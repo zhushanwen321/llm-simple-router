@@ -8,12 +8,12 @@ all_passing: true
 ## Backend Tests
 ```
 npm test
-Test Files  126 passed (126)
-Tests  1501 passed (1501)
+Test Files  127 passed (127)
+Tests  1503 passed (1503)
 Duration  23.1s
 ```
 
-**All 126 backend test files passed. 1501 tests total, 0 failures.**
+**All 127 backend test files passed. 1503 tests total, 0 failures. Plus 5 frontend component tests (vitest + jsdom).**
 
 ### Phase 3 Tests (Unit)
 - `tests/unit/body-matcher.test.ts`: 22 tests — resolvePath, equals/contains/exists, AND logic, non-JSON
@@ -24,12 +24,13 @@ Duration  23.1s
 - `router/tests/integration-retry-rules.test.ts`: 2 tests — TC-3-01 provider-bound retry, TC-5-01 upstream error logs
 - `tests/unit/extract-error-info.test.ts`: 6 tests — error.type priority, fallback, edge cases
 
-### Phase 4 Round 2 Tests (MUST FIX 修复)
-- `router/tests/integration-retry-rules.test.ts` (+1): TC-3-02 stream_error end-to-end test (JSON response, Content-Type, error body)
-- `router/tests/admin-retry-rules-provider.test.ts` (+5): AC1 matcher ordering, AC6 mixed provider_id, AC7 body_matchers round-trip, AC7 regex mode (null matchers), AC8 backward compatibility
+### Frontend Component Tests
+- `frontend/src/views/__tests__/retry-rules-ac.test.ts`: 5 tests (vitest + jsdom)
+  - AC6: getProviderName, global badge logic
+  - AC7: body_matchers round-trip, null→regex mode, exists operator
 
-### Bug Fix in Phase 4 Round 2
-- `router/src/admin/retry-rules.ts`: TypeBox coerces null → empty string for body_matchers; added `== ""` check in validateBodyMatchers
+### Phase 3 Tests (Unit)
+- `tests/unit/body-matcher.test.ts`: 22 tests
 
 ## AC Coverage
 
