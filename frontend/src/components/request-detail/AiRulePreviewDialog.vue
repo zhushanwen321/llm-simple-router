@@ -36,6 +36,26 @@
             </Label>
             <Input v-model="form.name" type="text" class="mt-1" />
           </div>
+          <div>
+            <Label class="text-xs text-muted-foreground font-medium">
+              {{ t("retryRules.provider") }}
+            </Label>
+            <Select v-model="form.provider_id">
+              <SelectTrigger class="mt-1">
+                <SelectValue
+                  :placeholder="t('retryRules.providerPlaceholder')"
+                />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">{{
+                  t("retryRules.providerAll")
+                }}</SelectItem>
+                <SelectItem v-for="p in providers" :key="p.id" :value="p.id">
+                  {{ p.name }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         <!-- Match conditions -->
@@ -195,6 +215,7 @@ interface RuleFormData {
   retry_delay_ms: number;
   max_retries: number;
   max_delay_ms: number;
+  provider_id: string | null;
 }
 
 interface RuleForm extends RuleFormData {
@@ -230,6 +251,7 @@ function createDefaultForm(): RuleForm {
     max_retries: 10,
     max_delay_ms: 60000,
     is_active: true,
+    provider_id: "__all__",
   };
 }
 
@@ -239,12 +261,24 @@ watch(
   [() => props.open, () => props.rule],
   ([open, rule]) => {
     if (open && rule) {
-      form.value = { ...rule, is_active: true };
+      form.value = { ...rule, is_active: true, provider_id: "__all__" };
       saving.value = false;
+      loadProviders();
     }
   },
   { immediate: true },
 );
+
+const providers = ref<{ id: string; name: string }[]>([]);
+
+async function loadProviders() {
+  try {
+    providers.value = await api.getProviders();
+  } catch (e: unknown) {
+    console.error("AiRulePreviewDialog.loadProviders:", e);
+    toast.error(getApiMessage(e, t("logs.messages.loadProvidersFailed")));
+  }
+}
 
 const saving = ref(false);
 
@@ -302,6 +336,10 @@ async function handleSave() {
         form.value.retry_strategy === "exponential"
           ? Number(form.value.max_delay_ms)
           : undefined,
+      provider_id:
+        form.value.provider_id === "__all__"
+          ? null
+          : form.value.provider_id || null,
     });
     toast.success(t("retryRules.messages.saveCompleted"));
     emit("saved");

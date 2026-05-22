@@ -429,3 +429,79 @@ describe("RetryStrategy", () => {
       .toBeInstanceOf(ExponentialBackoffStrategy);
   });
 });
+
+// ============================================================
+// providerId 传递测试 (AC1: Provider 隔离)
+// ============================================================
+
+describe("ResilienceLayer — providerId 传递", () => {
+  it("decide() 将 providerId 传给 ruleMatcher.match()", () => {
+    const layer = new ResilienceLayer();
+
+    // 创建一个只匹配 provider-kimi 的 matcher
+    const kimiRule: RetryRule = {
+      id: "kimi-rule", name: "kimi-429", status_code: 429, body_pattern: "rate_limit",
+      is_active: 1, created_at: "", retry_strategy: "fixed", retry_delay_ms: 1,
+      max_retries: 2, max_delay_ms: 100, provider_id: "provider-kimi", body_matchers: null,
+    };
+    const matcher = new RetryRuleMatcher();
+    matcher["cache"] = new Map([
+      ["provider-kimi:429", [{ rule: kimiRule, matchers: null, pattern: /rate_limit/ }]],
+    ]);
+
+    const state = { attemptCount: 0, currentTarget: t1, excludedTargets: [] };
+    const config: ResilienceConfig = {
+      baseDelayMs: 1, failoverThreshold: 400, isFailover: false,
+      ruleMatcher: matcher, providerId: "provider-kimi",
+    };
+
+    // provider-kimi 的 429 规则匹配 → retry
+    const result = layer.decide(
+      { kind: "error", statusCode: 429, body: "rate_limit", headers: {} },
+      state,
+      config,
+    );
+    expect(result.action).toBe("retry");
+
+    // 不传 providerId 时无匹配 → done
+    const configNoProvider: ResilienceConfig = {
+      baseDelayMs: 1, failoverThreshold: 400, isFailover: false,
+      ruleMatcher: matcher,
+    };
+    const resultNoMatch = layer.decide(
+      { kind: "error", statusCode: 429, body: "rate_limit", headers: {} },
+      state,
+      configNoProvider,
+    );
+    expect(resultNoMatch.action).toBe("done");
+  });
+
+  it("execute() 将 config.providerId 传入 decide()", async () => {
+    // 验证 execute 内部循环使用 providerId
+    let matchedProviderId: string | undefined;
+    const trackingMatcher = new RetryRuleMatcher();
+    const origMatch = trackingMatcher.match.bind(trackingMatcher);
+    // 拦截 match 调用，记录传入的 providerId
+    trackingMatcher.match = (statusCode: number, body: string, providerId?: string) => {
+      matchedProviderId = providerId;
+      return origMatch(statusCode, body, providerId);
+    };
+
+    const result429: TransportResult =
+      { kind: "error", statusCode: 429, body: "error", headers: {} };
+
+    const layer = new ResilienceLayer();
+    const config: ResilienceConfig = {
+      baseDelayMs: 1, failoverThreshold: 400, isFailover: false,
+      ruleMatcher: trackingMatcher, providerId: "provider-test",
+    };
+
+    await layer.execute(
+      () => [t1],
+      async () => result429,
+      config,
+    );
+
+    expect(matchedProviderId).toBe("provider-test");
+  });
+});

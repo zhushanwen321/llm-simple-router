@@ -347,7 +347,86 @@ describe("AI Retry Rule", () => {
       expect(body.data.rule.status_code).toBe(503);
       expect(body.data.rule.body_pattern).toBe("overloaded|server_error");
       expect(body.data.rule.retry_strategy).toBe("exponential");
+      expect(body.data.rule.provider_id).toBe(providerId);
       expect(body.data.summary).toBe("检测到 503 server_error (overloaded)");
+    } finally {
+      await closeMockServer(mockLLM.server);
+    }
+  });
+
+  it("TC-1-02: POST ai-generate returns null provider_id for log without provider", async () => {
+    const mockResponse = {
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              summary: "检测到 503 过载",
+              name: "Global 503 Retry",
+              status_code: 503,
+              body_pattern: "overloaded",
+              retry_strategy: "fixed",
+              retry_delay_ms: 1000,
+              max_retries: 3,
+              max_delay_ms: 10000,
+            }),
+          },
+        },
+      ],
+    };
+
+    const mockLLM = await createMockLLMServer(mockResponse);
+
+    try {
+      const aiProviderId = createProvider(db, {
+        name: "Test AI Provider",
+        api_type: "openai",
+        base_url: `http://127.0.0.1:${mockLLM.port}`,
+        upstream_path: "/v1/chat/completions",
+        api_key: encryptedApiKey,
+        is_active: 1,
+        max_concurrency: 10,
+        queue_timeout_ms: 30000,
+        max_queue_size: 100,
+      });
+
+      await app.inject({
+        method: "PUT",
+        url: "/admin/api/proxy-enhancement",
+        headers: { cookie, "content-type": "application/json" },
+        payload: {
+          tool_call_loop_enabled: false,
+          stream_loop_enabled: false,
+          tool_round_limit_enabled: true,
+          tool_error_logging_enabled: false,
+          ai_retry_config: { provider_id: aiProviderId, model: "test-model" },
+        },
+      });
+
+      // Insert log WITHOUT provider_id (null)
+      insertRequestLog(db, {
+        id: "error-log-no-provider-id",
+        api_type: "openai",
+        model: "test-model",
+        provider_id: null,
+        status_code: 503,
+        latency_ms: 32,
+        is_stream: 0,
+        error_message: "overloaded",
+        created_at: new Date().toISOString(),
+      });
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/admin/api/retry-rules/ai-generate",
+        headers: { cookie, "content-type": "application/json" },
+        payload: { log_id: "error-log-no-provider-id" },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.data.success).toBe(true);
+      expect(body.data.rule).toBeDefined();
+      expect(body.data.rule.provider_id).toBeNull();
     } finally {
       await closeMockServer(mockLLM.server);
     }
