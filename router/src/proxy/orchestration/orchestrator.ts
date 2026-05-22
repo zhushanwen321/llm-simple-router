@@ -181,6 +181,7 @@ export class ProxyOrchestrator {
       failoverThreshold: ctx.failoverThreshold ?? DEFAULT_FAILOVER_THRESHOLD,
       isFailover: ctx.isFailover ?? false,
       ruleMatcher: ctx.ruleMatcher,
+      providerId: config.provider.id,
     };
     return this.deps.resilience.execute(
       () => [config.resolved],
@@ -197,7 +198,7 @@ export class ProxyOrchestrator {
     if (result.kind === "stream_error" && result.headersSent) {
       return;
     }
-    // failover 场景下错误响应由外层 proxy-handler 控制，此处不发送
+    // failover 场景下错误响应由外层 failover-loop 控制，此处不发送
     if (ctx?.isFailover && "statusCode" in result && result.statusCode >= (ctx.failoverThreshold ?? DEFAULT_FAILOVER_THRESHOLD)) {
       return;
     }

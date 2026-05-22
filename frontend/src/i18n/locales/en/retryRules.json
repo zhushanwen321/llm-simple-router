@@ -29,7 +29,8 @@
     "initialDelayMs": "Initial Delay (ms)",
     "maxRetries": "Max Retries",
     "maxDelayMs": "Max Delay (ms)",
-    "enable": "Enable"
+    "enable": "Enable",
+    "bodyPatternTooltip": "The router checks the upstream response body against this pattern. If it matches, the request is retried. Regex example: .*rate_limit.* or .*timeout.*. JSON mode: match specific fields like error.code equals rate_limit_exceeded."
   },
   "deleteConfirm": {
     "title": "Confirm Delete",
@@ -48,7 +49,7 @@
   },
   "messages": {
     "loadFailed": "Failed to load data",
-    "saveFailed": "Failed to save rule",
+    "saveFailed": "Failed to save rule. Check the form for errors or try again later.",
     "deleteFailed": "Failed to delete rule",
     "addedCount": "Added {count} rules",
     "saveCompleted": "Rule saved"

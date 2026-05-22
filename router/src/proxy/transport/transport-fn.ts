@@ -105,7 +105,7 @@ export function buildTransportFn(p: TransportFnParams): (target: Target) => Prom
           p.request.log.warn({ err, logId: p.logId }, "formatTransform stream error");
         });
       }
-      const checkEarlyError = p.matcher ? (data: string) => p.matcher!.test(UPSTREAM_SUCCESS, data) : undefined;
+      const checkEarlyError = p.matcher ? (data: string) => p.matcher!.test(UPSTREAM_SUCCESS, data, p.provider.id) : undefined;
       const streamResult = await callStream(
         p.provider, p.apiKey, p.body, p.cliHdrs, p.reply, p.streamTimeoutMs,
         p.upstreamPath, buildHeaders, metricsTransform, checkEarlyError, undefined, streamLoopGuard, p.formatTransform,

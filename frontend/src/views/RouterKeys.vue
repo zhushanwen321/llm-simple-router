@@ -24,7 +24,7 @@
     </div>
 
     <div class="bg-card rounded-lg border overflow-hidden">
-      <Table>
+      <Table class="[&_td]:px-4 [&_th]:px-4">
         <TableHeader>
           <TableRow class="bg-muted">
             <TableHead class="text-muted-foreground">{{
@@ -53,7 +53,9 @@
             :key="k.id"
             :class="{ 'opacity-60': !k.is_active }"
           >
-            <TableCell class="font-medium">{{ k.name }}</TableCell>
+            <TableCell class="font-medium max-w-[200px]"
+              ><span class="truncate block">{{ k.name }}</span></TableCell
+            >
             <TableCell>
               <div class="flex items-center gap-1">
                 <span class="font-mono text-xs text-muted-foreground">{{
@@ -63,10 +65,10 @@
                   variant="ghost"
                   size="sm"
                   class="h-6 w-6 p-0"
-                  @click="k.key && tableCopy(k.key)"
+                  @click="k.key && copyKey(k.key, k.id)"
                 >
                   <svg
-                    v-if="!tableCopied"
+                    v-if="copiedId !== k.id"
                     class="w-3.5 h-3.5"
                     fill="none"
                     stroke="currentColor"
@@ -289,7 +291,7 @@ import { useI18n } from "vue-i18n";
 import { toast } from "vue-sonner";
 import { api, getApiMessage } from "@/api/client";
 import { formatTime } from "@/utils/format";
-import { useClipboard } from "@/composables/useClipboard";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -338,7 +340,16 @@ const deleteTarget = ref<RouterKey | null>(null);
 const form = ref({ ...DEFAULT_FORM, allowed_models: [] as string[] });
 const errors = ref<Record<string, string>>({});
 
-const { copied: tableCopied, copy: tableCopy } = useClipboard();
+const copiedId = ref<string | null>(null);
+const COPY_FEEDBACK_MS = 2000;
+
+function copyKey(key: string, id: string) {
+  navigator.clipboard.writeText(key);
+  copiedId.value = id;
+  setTimeout(() => {
+    if (copiedId.value === id) copiedId.value = null;
+  }, COPY_FEEDBACK_MS);
+}
 
 function maskKey(key: string | null): string {
   if (!key) return "";

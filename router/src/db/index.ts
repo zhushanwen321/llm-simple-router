@@ -266,3 +266,10 @@ export {
   scheduleDbSizeMonitor,
 } from "./db-size-monitor.js";
 export type { DbSizeInfo, SizeThresholds, DbSizeMonitorHandle } from "./db-size-monitor.js";
+
+export {
+  logUpstreamError,
+  extractErrorInfo,
+  cleanUpstreamErrorLogs,
+} from "./upstream-error-logs.js";
+export type { UpstreamErrorLog } from "./upstream-error-logs.js";

@@ -5,6 +5,7 @@
     "name": "名称",
     "statusCode": "HTTP 状态码",
     "bodyPattern": "响应体匹配",
+    "provider": "供应商",
     "retryStrategy": "重试策略",
     "status": "状态",
     "actions": "操作"
@@ -16,6 +17,21 @@
   "times": "{count}次",
   "upperLimit": "上限{value}s",
   "noRules": "暂无规则",
+  "provider": "供应商",
+  "providerAll": "通用（所有供应商）",
+  "providerPlaceholder": "选择供应商",
+  "bodyMatchers": "JSON 字段匹配",
+  "regexMatch": "正则匹配",
+  "jsonMatch": "JSON 字段匹配",
+  "fieldPath": "字段路径",
+  "operator": "操作符",
+  "matchValue": "匹配值",
+  "addCondition": "添加条件",
+  "removeCondition": "删除条件",
+  "operatorEquals": "等于",
+  "operatorContains": "包含",
+  "operatorExists": "存在",
+  "globalBadge": "通用",
   "dialog": {
     "editRule": "编辑规则",
     "addRule": "添加规则",
@@ -29,7 +45,8 @@
     "initialDelayMs": "初始延迟 (ms)",
     "maxRetries": "最大重试次数",
     "maxDelayMs": "延迟上限 (ms)",
-    "enable": "启用"
+    "enable": "启用",
+    "bodyPatternTooltip": "路由器会检查上游响应体是否匹配此规则。如果匹配，则触发重试。\n正则模式：JavaScript 正则表达式，如 .*rate_limit.* 或 .*timeout.*\nJSON 字段模式：匹配错误响应中的特定字段，如 error.code 等于 rate_limit_exceeded"
   },
   "deleteConfirm": {
     "title": "确认删除",
@@ -48,7 +65,7 @@
   },
   "messages": {
     "loadFailed": "加载数据失败",
-    "saveFailed": "保存规则失败",
+    "saveFailed": "保存规则失败，请检查表单或稍后重试。",
     "deleteFailed": "删除规则失败",
     "addedCount": "已添加 {count} 条规则",
     "saveCompleted": "规则已保存"
