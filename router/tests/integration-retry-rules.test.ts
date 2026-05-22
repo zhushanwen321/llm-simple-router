@@ -249,3 +249,65 @@ describe("TC-5-01: upstream_error_logs written on final failure", () => {
     }
   });
 });
+
+describe("TC-3-02: stream_error returns formatted JSON to client", () => {
+  let app: FastifyInstance;
+  let mockDb: Database.Database;
+  let matcher: RetryRuleMatcher;
+
+  beforeEach(() => {
+    mockDb = initDatabase(":memory:");
+    setSetting(mockDb, "encryption_key", TEST_ENCRYPTION_KEY);
+    matcher = new RetryRuleMatcher();
+  });
+
+  afterEach(async () => {
+    if (app) await app.close();
+    if (mockDb) mockDb.close();
+  });
+
+  it("stream request with 429 upstream returns JSON error (not SSE)", async () => {
+    // 不配置重试规则，直接失败
+    matcher.load(mockDb);
+
+    // Mock 上游直接返回 429（非 SSE）
+    const { server, port } = await createMockBackend((req, res) => {
+      res.writeHead(429, { "content-type": "application/json" });
+      res.end(ERROR_429_BODY);
+    });
+
+    try {
+      insertMockBackend(mockDb, `http://127.0.0.1:${port}`, '["gpt-4"]');
+      insertModelMapping(mockDb, "gpt-4", "gpt-4");
+      app = buildTestApp(mockDb, matcher);
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/v1/chat/completions",
+        headers: {
+          "content-type": "application/json",
+          authorization: "Bearer sk-backend-key",
+        },
+        payload: {
+          model: "gpt-4",
+          messages: [{ role: "user", content: "hi" }],
+          stream: true,
+        },
+      });
+
+      // 客户端应该收到 429
+      expect(res.statusCode).toBe(429);
+
+      // 响应应该是 JSON 格式（非 SSE）
+      const contentType = res.headers["content-type"];
+      expect(contentType).toContain("application/json");
+
+      // body 应该是有效的 JSON
+      const body = res.json();
+      expect(body).toBeDefined();
+      expect(body.error).toBeDefined();
+    } finally {
+      await closeServer(server);
+    }
+  });
+});

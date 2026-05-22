@@ -145,7 +145,7 @@ function validateBodyPattern(pattern: string): string | undefined {
 
 /** 校验 body_matchers JSON 格式：必须是数组，每项含 path/operator/value */
 function validateBodyMatchers(bodyMatchers: string | null | undefined): string | null {
-  if (bodyMatchers == null) return null;
+  if (bodyMatchers == null || bodyMatchers === "") return null;
   let parsed: unknown;
   try { parsed = JSON.parse(bodyMatchers); } catch { throw new Error("body_matchers must be valid JSON"); }
   if (!Array.isArray(parsed)) throw new Error("body_matchers must be a JSON array");
