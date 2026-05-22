@@ -83,6 +83,74 @@ describe("ChatToResponsesBridgeTransform", () => {
     expect(resp2?.status).toBe("in_progress");
   });
 
+  it("content_part and output_text events include item_id", async () => {
+    const t = new ChatToResponsesBridgeTransform("gpt-4o");
+    const output = collectOutput(t);
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { role: "assistant" }, finish_reason: null }] }));
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { content: "Hello" }, finish_reason: null }] }));
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { content: " world" }, finish_reason: null }] }));
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: {}, finish_reason: "stop" }], usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 } }));
+    t.end();
+    const result = await output;
+    const events = parseSSEEvents(result);
+
+    // Get item_id from output_item.added
+    const itemAdded = events.find((e) => e.event === RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED);
+    const itemId = ((itemAdded?.data as Record<string, unknown>)?.item as Record<string, unknown>)?.id as string;
+    expect(itemId).toBeTruthy();
+
+    // CONTENT_PART_ADDED must have item_id
+    const partAdded = events.find((e) => e.event === RESPONSES_SSE_EVENTS.CONTENT_PART_ADDED);
+    expect((partAdded?.data as Record<string, unknown>)?.item_id).toBe(itemId);
+
+    // OUTPUT_TEXT_DELTA must have item_id
+    const textDeltas = events.filter((e) => e.event === RESPONSES_SSE_EVENTS.OUTPUT_TEXT_DELTA);
+    for (const d of textDeltas) {
+      expect((d.data as Record<string, unknown>)?.item_id).toBe(itemId);
+    }
+
+    // OUTPUT_TEXT_DONE must have item_id
+    const textDone = events.find((e) => e.event === RESPONSES_SSE_EVENTS.OUTPUT_TEXT_DONE);
+    expect((textDone?.data as Record<string, unknown>)?.item_id).toBe(itemId);
+
+    // CONTENT_PART_DONE must have item_id
+    const partDone = events.find((e) => e.event === RESPONSES_SSE_EVENTS.CONTENT_PART_DONE);
+    expect((partDone?.data as Record<string, unknown>)?.item_id).toBe(itemId);
+  });
+
+  it("reasoning_summary events include item_id", async () => {
+    const t = new ChatToResponsesBridgeTransform("gpt-4o");
+    const output = collectOutput(t);
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { role: "assistant" }, finish_reason: null }] }));
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { reasoning_content: "Let me" }, finish_reason: null }] }));
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: { content: "42" }, finish_reason: null }] }));
+    t.write(chatSSE({ id: "chatcmpl-1", object: "chat.completion.chunk", choices: [{ index: 0, delta: {}, finish_reason: "stop" }], usage: { prompt_tokens: 5, completion_tokens: 3, total_tokens: 8 } }));
+    t.end();
+    const result = await output;
+    const events = parseSSEEvents(result);
+
+    const reasoningItemAdded = events.find((e) => {
+      const item = ((e.data as Record<string, unknown>)?.item as Record<string, unknown>);
+      return e.event === RESPONSES_SSE_EVENTS.OUTPUT_ITEM_ADDED && item?.type === "reasoning";
+    });
+    const reasoningItemId = ((reasoningItemAdded?.data as Record<string, unknown>)?.item as Record<string, unknown>)?.id as string;
+    expect(reasoningItemId).toBeTruthy();
+
+    const partAdded = events.find((e) => e.event === RESPONSES_SSE_EVENTS.REASONING_SUMMARY_PART_ADDED);
+    expect((partAdded?.data as Record<string, unknown>)?.item_id).toBe(reasoningItemId);
+
+    const textDeltas = events.filter((e) => e.event === RESPONSES_SSE_EVENTS.REASONING_SUMMARY_TEXT_DELTA);
+    for (const d of textDeltas) {
+      expect((d.data as Record<string, unknown>)?.item_id).toBe(reasoningItemId);
+    }
+
+    const textDone = events.find((e) => e.event === RESPONSES_SSE_EVENTS.REASONING_SUMMARY_TEXT_DONE);
+    expect((textDone?.data as Record<string, unknown>)?.item_id).toBe(reasoningItemId);
+
+    const partDone = events.find((e) => e.event === RESPONSES_SSE_EVENTS.REASONING_SUMMARY_PART_DONE);
+    expect((partDone?.data as Record<string, unknown>)?.item_id).toBe(reasoningItemId);
+  });
+
   it("converts text delta to output_text.delta events", async () => {
     const t = new ChatToResponsesBridgeTransform("gpt-4o");
     const output = collectOutput(t);
