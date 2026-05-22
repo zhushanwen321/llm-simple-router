@@ -313,7 +313,7 @@ export const adminRetryRuleRoutes: FastifyPluginCallback<RetryRuleRoutesOptions>
       retry_delay_ms: body.retry_delay_ms ?? DEFAULT_RETRY_DELAY_MS,
       max_retries: body.max_retries ?? DEFAULT_MAX_RETRIES,
       max_delay_ms: body.max_delay_ms ?? DEFAULT_MAX_DELAY_MS,
-      provider_id: body.provider_id ?? null,
+      provider_id: body.provider_id || null,
       body_matchers: bodyMatchers,
     });
     stateRegistry?.refreshRetryRules();
@@ -338,7 +338,7 @@ export const adminRetryRuleRoutes: FastifyPluginCallback<RetryRuleRoutesOptions>
     if (body.retry_delay_ms !== undefined) fields.retry_delay_ms = body.retry_delay_ms;
     if (body.max_retries !== undefined) fields.max_retries = body.max_retries;
     if (body.max_delay_ms !== undefined) fields.max_delay_ms = body.max_delay_ms;
-    if (body.provider_id !== undefined) fields.provider_id = body.provider_id;
+    if (body.provider_id !== undefined) fields.provider_id = body.provider_id || null;
     if (body.body_matchers !== undefined) {
       try {
         fields.body_matchers = validateBodyMatchers(body.body_matchers);
