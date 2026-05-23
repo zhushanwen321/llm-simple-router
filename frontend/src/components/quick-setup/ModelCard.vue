@@ -98,7 +98,7 @@ function isCapabilityActive(key: string): boolean {
     <div class="flex items-center gap-2.5 px-3 min-h-8 py-1.5">
       <!-- Enable toggle: square checkbox matching demo -->
       <div
-        class="shrink-0 w-3.5 h-3.5 rounded-sm border-[1.5px] flex items-center justify-center cursor-pointer transition-all"
+        class="shrink-0 w-3.5 h-3.5 rounded-sm border border-border flex items-center justify-center cursor-pointer transition-all"
         :class="
           model.enabled
             ? 'bg-primary border-primary'

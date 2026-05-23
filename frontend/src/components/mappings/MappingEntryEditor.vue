@@ -321,7 +321,7 @@ const hasMultimodal = computed(
         >
           <Input
             v-model="clientDraft"
-            class="h-7 flex-1 text-xs font-mono border-border"
+            class="h-7 flex-1 text-xs font-mono border border-border"
             :placeholder="t('mappings.editor.clientInputPlaceholder')"
             @keydown.enter.prevent="saveClient"
             @keydown.escape.prevent="cancelEditClient"
@@ -490,7 +490,7 @@ const hasMultimodal = computed(
           <Badge
             v-if="hasMultimodal"
             variant="outline"
-            class="text-[9px] px-1.5 py-0 leading-none text-primary/60 border-primary/20"
+            class="text-[9px] px-1.5 py-0 leading-none text-primary/60 border border-primary/20"
           >
             {{ t("mappings.multimodalFallback.configured") }}
           </Badge>
