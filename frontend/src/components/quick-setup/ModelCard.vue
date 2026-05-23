@@ -14,13 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
-import {
-  Trash2,
-  Type,
-  ImageIcon,
-  Volume2,
-  Video,
-} from "lucide-vue-next";
+import { Trash2, Type, ImageIcon, Volume2, Video } from "lucide-vue-next";
 import { cn } from "@/lib/utils";
 import { DEFAULT_STREAM_TIMEOUT_MS } from "@/constants";
 
@@ -112,14 +106,26 @@ function isCapabilityActive(key: string): boolean {
         "
         @click="emit('update:model', { ...model, enabled: !model.enabled })"
       >
-        <svg v-if="model.enabled" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" class="text-primary-foreground"><path d="M18 6L9 17l-5-6"/></svg>
+        <svg
+          v-if="model.enabled"
+          width="10"
+          height="10"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="3"
+          class="text-primary-foreground"
+        >
+          <path d="M18 6L9 17l-5-6" />
+        </svg>
       </div>
 
       <!-- Model name: demo 12px mono 500 -->
       <span
         class="truncate text-xs font-medium text-foreground min-w-[160px] max-w-[280px] font-mono"
         :title="model.name"
-      >{{ model.name }}</span>
+        >{{ model.name }}</span
+      >
 
       <!-- Context window: inline select (demo: 64px mono 11px) -->
       <Select
@@ -127,7 +133,9 @@ function isCapabilityActive(key: string): boolean {
         :model-value="String(model.contextWindow)"
         @update:model-value="updateContextWindowFromSelect"
       >
-        <SelectTrigger class="h-6 w-16 text-[11px] font-mono px-1 gap-0 data-[size=default]:h-6">
+        <SelectTrigger
+          class="h-6 w-16 text-[11px] font-mono px-1 gap-0 data-[size=default]:h-6"
+        >
           <SelectValue>{{ matchedOption!.label }}</SelectValue>
         </SelectTrigger>
         <SelectContent>
@@ -135,7 +143,8 @@ function isCapabilityActive(key: string): boolean {
             v-for="opt in CONTEXT_WINDOW_OPTIONS"
             :key="opt.value"
             :value="String(opt.value)"
-          >{{ opt.label }}</SelectItem>
+            >{{ opt.label }}</SelectItem
+          >
           <SelectItem value="__custom__">{{
             t("quickSetup.model.contextCustom")
           }}</SelectItem>
@@ -152,7 +161,10 @@ function isCapabilityActive(key: string): boolean {
       </template>
 
       <!-- Capability squares (demo: 20x20 bordered clickable dots) -->
-      <div v-if="capabilities !== undefined" class="flex items-center gap-0.5 shrink-0">
+      <div
+        v-if="capabilities !== undefined"
+        class="flex items-center gap-0.5 shrink-0"
+      >
         <div
           v-for="cap in capabilityIcons"
           :key="cap.key"
@@ -173,7 +185,7 @@ function isCapabilityActive(key: string): boolean {
 
       <!-- Patch button: count + chevron, also toggles expand -->
       <div
-        class="inline-flex items-center gap-1 h-[22px] px-2 border rounded cursor-pointer transition-colors shrink-0 select-none"
+        class="inline-flex items-center gap-1 h-[22px] px-2 border border-border rounded cursor-pointer transition-colors shrink-0 select-none"
         :class="
           cn(
             model.patches.length > 0
@@ -187,7 +199,8 @@ function isCapabilityActive(key: string): boolean {
         <span
           class="text-[8px] inline-block transition-transform"
           :class="open ? 'rotate-90' : ''"
-        >&#9654;</span>
+          >&#9654;</span
+        >
       </div>
 
       <!-- Trash: hover-only -->
@@ -205,7 +218,9 @@ function isCapabilityActive(key: string): boolean {
         <div class="pl-9 pr-3 py-2 border-t border-border space-y-2">
           <!-- Patches -->
           <div>
-            <div class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1">
+            <div
+              class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1"
+            >
               Patches
             </div>
             <PatchChips
@@ -219,7 +234,9 @@ function isCapabilityActive(key: string): boolean {
 
           <!-- Timeout -->
           <div v-if="streamTimeoutMs !== undefined">
-            <div class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1">
+            <div
+              class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1"
+            >
               Timeout
             </div>
             <div class="flex items-center gap-1.5">

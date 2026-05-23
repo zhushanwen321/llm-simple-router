@@ -16,7 +16,7 @@
     "infoBar": "{client} 使用 {format}。我们会自动映射 {models} 到你的供应商模型。"
   },
   "provider": {
-    "connection": "Provider 连接",
+    "connection": "供应商配置",
     "config": "供应商配置",
     "label": "供应商",
     "groupLabel": "供应商",

@@ -70,7 +70,8 @@ function cancelEditClient() {
   editingClient.value = false;
 }
 
-function providerName(providerId: string): string {
+function providerName(providerId: string): string | null {
+  if (providerId === "__new__") return null;
   return (
     props.providerGroups.find((p) => p.provider.id === providerId)?.provider
       .name ?? providerId.slice(0, PROVIDER_NAME_TRUNCATE_LEN)
@@ -226,9 +227,11 @@ const hasMultimodal = computed(
           >
             <span class="text-[10px] font-semibold">①</span>
             {{ entry.targets[0].backend_model }}
-            <span class="text-[10px] opacity-60">{{
-              providerName(entry.targets[0].provider_id)
-            }}</span>
+            <span
+              v-if="providerName(entry.targets[0].provider_id)"
+              class="text-[10px] opacity-60"
+              >{{ providerName(entry.targets[0].provider_id) }}</span
+            >
           </span>
         </template>
 
@@ -264,7 +267,8 @@ const hasMultimodal = computed(
           <span
             class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-mono border border-dashed border-blue-500/20 text-blue-500/60 whitespace-nowrap"
           >
-            ♦ {{ entry.multimodalFallback!.backend_model }}
+            <Grid3x3 class="size-2.5" />
+            {{ entry.multimodalFallback!.backend_model }}
           </span>
         </template>
       </div>
@@ -298,7 +302,7 @@ const hasMultimodal = computed(
       <span
         class="text-[10px] text-muted-foreground/30 hidden sm:inline shrink-0 whitespace-nowrap"
       >
-        click to edit
+        {{ t("mappings.editor.clickToEdit") }}
       </span>
     </div>
 
@@ -308,7 +312,7 @@ const hasMultimodal = computed(
       <div class="flex items-center gap-2">
         <span
           class="text-[10px] text-muted-foreground/60 shrink-0 w-10 uppercase tracking-wider font-medium"
-          >Client</span
+          >{{ t("mappings.editor.clientLabel") }}</span
         >
         <div
           v-if="editingClient"
@@ -318,7 +322,7 @@ const hasMultimodal = computed(
           <Input
             v-model="clientDraft"
             class="h-7 flex-1 text-xs font-mono border-border"
-            placeholder="client model name"
+            :placeholder="t('mappings.editor.clientInputPlaceholder')"
             @keydown.enter.prevent="saveClient"
             @keydown.escape.prevent="cancelEditClient"
             @blur="saveClient"
@@ -341,7 +345,7 @@ const hasMultimodal = computed(
             class="text-[10px] text-muted-foreground/40 hover:text-muted-foreground transition-colors"
             @click.stop="startEditClient"
           >
-            edit
+            {{ t("mappings.editor.edit") }}
           </button>
         </div>
       </div>
@@ -352,7 +356,7 @@ const hasMultimodal = computed(
           <Zap class="size-3 text-muted-foreground/50" />
           <span
             class="text-[10px] font-medium text-muted-foreground/70 uppercase tracking-wider"
-            >Failover chain</span
+            >{{ t("mappings.editor.failoverChain") }}</span
           >
         </div>
 
@@ -406,7 +410,9 @@ const hasMultimodal = computed(
             class="flex items-center gap-1 pl-7 py-0.5"
           >
             <div class="w-px h-1.5 bg-orange-400/30"></div>
-            <span class="text-[9px] text-orange-400/50">failover on error</span>
+            <span class="text-[9px] text-orange-400/50">{{
+              t("mappings.editor.failoverOnError")
+            }}</span>
           </div>
         </div>
 
@@ -425,11 +431,11 @@ const hasMultimodal = computed(
           <ChevronDown class="size-3 text-primary/50" />
           <span
             class="text-[10px] font-medium text-primary/60 uppercase tracking-wider"
-            >Context overflow</span
+            >{{ t("mappings.editor.contextOverflow") }}</span
           >
-          <span class="text-[9px] text-primary/40 hidden sm:inline"
-            >when context exceeds model limit</span
-          >
+          <span class="text-[9px] text-primary/40 hidden sm:inline">{{
+            t("mappings.editor.contextOverflowHint")
+          }}</span>
         </div>
 
         <div v-if="hasOverflow" class="flex items-center gap-2">
@@ -479,7 +485,7 @@ const hasMultimodal = computed(
           <Grid3x3 class="size-3 text-blue-500/50" />
           <span
             class="text-[10px] font-medium text-blue-500/60 uppercase tracking-wider"
-            >Multimodal Fallback</span
+            >{{ t("mappings.editor.multimodalFallback") }}</span
           >
           <Badge
             v-if="hasMultimodal"
@@ -493,8 +499,8 @@ const hasMultimodal = computed(
         <div v-if="hasMultimodal" class="flex items-center gap-2">
           <span
             class="text-xs shrink-0 w-5 text-center px-0.5 py-0.5 rounded bg-blue-500/6 text-blue-500/60"
-            >♦</span
-          >
+            ><Grid3x3 class="size-2.5"
+          /></span>
           <div class="flex-1">
             <CascadingModelSelect
               :providers="providerGroups"
