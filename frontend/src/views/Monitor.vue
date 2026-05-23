@@ -3,7 +3,7 @@
   <div class="p-6">
     <!-- Page Header -->
     <div class="flex items-center justify-between mb-3">
-      <h2 class="text-lg font-semibold text-foreground">
+      <h2 class="text-base font-semibold text-foreground">
         {{ t("monitor.title") }}
       </h2>
       <Badge :variant="connected ? 'default' : 'destructive'">
@@ -23,7 +23,7 @@
     <!-- Request Panel with Tabs -->
     <div class="bg-card border border-border rounded-lg overflow-hidden mb-3">
       <!-- Tab bar -->
-      <div class="flex items-center border-b border-border bg-muted px-3">
+      <div class="flex items-center border-b border-border px-3" style="background: oklch(0.165 0 0)">
         <Button
           v-for="tab in requestTabs"
           :key="tab.key"
@@ -106,7 +106,7 @@
               <TableRow
                 class="cursor-pointer transition-colors border-b border-foreground/[0.04] hover:bg-muted/40"
                 :class="[
-                  selectedRequestId === req.id ? 'bg-primary/[0.04]' : '',
+                  selectedRequestId === req.id ? 'bg-primary/10' : '',
                   activeTab === 'recent' ? 'opacity-60 hover:opacity-80' : '',
                 ]"
                 @click="selectRequest(req.id)"
