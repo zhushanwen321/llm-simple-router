@@ -110,7 +110,8 @@ function timeLabel(hour: number): string {
         {{ dayLabel(dayIndex) }}
       </div>
       <div
-        class="flex-1 relative h-full rounded-sm overflow-visible bg-muted/30 dark:bg-white/5"
+        class="flex-1 relative h-full rounded-sm overflow-visible"
+        :class="hasRules(dayIndex) ? 'bg-muted/50 dark:bg-white/5' : 'bg-muted/20 dark:bg-white/[0.03]'"
       >
         <div
           class="absolute inset-0 grid"
