@@ -878,9 +878,9 @@ function buildTransformRule(): { rule: string | null; error: boolean } {
     return { rule: null, error: false };
   const dropFields = dropFieldsInput
     ? dropFieldsInput
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean)
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
     : null;
   let requestDefaults = null;
   if (requestDefaultsInput.trim()) {
@@ -921,11 +921,11 @@ async function handleSave() {
     const concurrencyRule =
       form.value.concurrency_mode !== "none"
         ? JSON.stringify({
-          mode: form.value.concurrency_mode,
-          max_concurrency: form.value.max_concurrency,
-          queue_timeout_ms: form.value.queue_timeout_ms,
-          max_queue_size: form.value.max_queue_size,
-        })
+            mode: form.value.concurrency_mode,
+            max_concurrency: form.value.max_concurrency,
+            queue_timeout_ms: form.value.queue_timeout_ms,
+            max_queue_size: form.value.max_queue_size,
+          })
         : null;
 
     const payload: SchedulePayload = {

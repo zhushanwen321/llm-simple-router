@@ -320,7 +320,8 @@ function buildQuickSetupPayload(
                 backend_model: t.backend_model,
                 provider_id: t.provider_id,
               };
-              if (t.overflow_provider_id) target.overflow_provider_id = t.overflow_provider_id;
+              if (t.overflow_provider_id)
+                target.overflow_provider_id = t.overflow_provider_id;
               if (t.overflow_model) target.overflow_model = t.overflow_model;
               return target;
             }),
@@ -430,7 +431,8 @@ function makeRecommendedRules(
 ): ComputedRef<RecommendedRetryRule[]> {
   return computed(() => {
     const group = selectedGroup.value;
-    const shortname = providerGroups.value.find((g) => g.group === group)?.shortname ?? group;
+    const shortname =
+      providerGroups.value.find((g) => g.group === group)?.shortname ?? group;
     return allRecommendedRules.value.filter((r) => {
       if (!r.providers || r.providers.length === 0) return true;
       return r.providers.includes(shortname);
@@ -498,6 +500,60 @@ function computeProviderGroupDisplayInfo(
   return { currentProviderGroup, allProviderGroups };
 }
 
+function buildRetryProviderMap(
+  rules: RecommendedRetryRule[],
+  currentShortname: string | undefined,
+): Map<string, "general" | string> {
+  const map = new Map<string, "general" | string>();
+  for (const rule of rules) {
+    if (rule.exists) continue;
+    const ruleProviders = rule.providers ?? [];
+    if (
+      ruleProviders.length > 0 &&
+      currentShortname &&
+      ruleProviders.includes(currentShortname)
+    ) {
+      map.set(rule.name, currentShortname);
+    } else {
+      map.set(rule.name, "general");
+    }
+  }
+  return map;
+}
+
+interface ClientDefaults {
+  group: string;
+  plan: string;
+  apiType: "openai" | "openai-responses" | "anthropic";
+  preset: ProviderGroup["presets"][number];
+}
+
+function resolveClientDefaults(
+  client: (typeof CLIENTS)[number],
+  groups: ProviderGroup[],
+): ClientDefaults | null {
+  const groupData = groups.find((g) => g.group === client.defaultProvider);
+  if (!groupData || groupData.presets.length === 0) return null;
+  const compatibleFormats =
+    client.format === "openai-responses"
+      ? ["openai-responses", "openai"]
+      : [client.format];
+  const match = groupData.presets.find(
+    (p) =>
+      compatibleFormats.includes(p.apiType) && p.plan === client.defaultPlan,
+  );
+  const preset =
+    match ??
+    groupData.presets.find((p) => compatibleFormats.includes(p.apiType)) ??
+    groupData.presets[0];
+  return {
+    group: groupData.group,
+    plan: preset.plan,
+    apiType: resolveApiType(client.format, preset.apiType),
+    preset,
+  };
+}
+
 function applyPresetModels(
   preset: {
     models: string[];
@@ -519,6 +575,14 @@ function applyPresetModels(
     stream_timeout_ms: DEFAULT_STREAM_TIMEOUT_MS,
     capabilities: preset.modelCapabilities?.[name],
   }));
+}
+
+function applyConcurrencyMode(
+  mode: ConcurrencyMode,
+  maxConcurrency: Ref<number>,
+): void {
+  if (mode === "auto") maxConcurrency.value = DEFAULT_CONCURRENCY;
+  else if (mode === "manual") maxConcurrency.value = 3;
 }
 
 function pushCustomModel(
@@ -659,20 +723,13 @@ export function useQuickSetup() {
   }
 
   function initRetryProviderMap() {
-    const map = new Map<string, "general" | string>();
     const currentShortname = providerGroups.value.find(
       (g) => g.group === selectedGroup.value,
     )?.shortname;
-    for (const rule of recommendedRules.value) {
-      if (rule.exists) continue;
-      const ruleProviders = rule.providers ?? [];
-      if (ruleProviders.length > 0 && currentShortname && ruleProviders.includes(currentShortname)) {
-        map.set(rule.name, currentShortname);
-      } else {
-        map.set(rule.name, "general");
-      }
-    }
-    retryProviderMap.value = map;
+    retryProviderMap.value = buildRetryProviderMap(
+      recommendedRules.value,
+      currentShortname,
+    );
   }
 
   function setRetryProvider(name: string, value: "general" | string) {
@@ -686,31 +743,13 @@ export function useQuickSetup() {
 
     // Auto-select default provider and plan for this client
     const client = CLIENTS.find((c) => c.id === type);
-    if (client && providerGroups.value.length > 0) {
-      const groupData = providerGroups.value.find(
-        (g) => g.group === client.defaultProvider,
-      );
-      if (groupData && groupData.presets.length > 0) {
-        const compatibleFormats =
-          client.format === "openai-responses"
-            ? ["openai-responses", "openai"]
-            : [client.format];
-        const match = groupData.presets.find(
-          (p) =>
-            compatibleFormats.includes(p.apiType) &&
-            p.plan === client.defaultPlan,
-        );
-        const preset =
-          match ??
-          groupData.presets.find((p) =>
-            compatibleFormats.includes(p.apiType),
-          ) ??
-          groupData.presets[0];
-
-        selectedGroup.value = groupData.group;
-        selectedPlan.value = preset.plan;
-        apiType.value = resolveApiType(client.format, preset.apiType);
-        applyPresetModels(preset, modelConfigs, isNonOpenaiEndpoint);
+    if (client) {
+      const defaults = resolveClientDefaults(client, providerGroups.value);
+      if (defaults) {
+        selectedGroup.value = defaults.group;
+        selectedPlan.value = defaults.plan;
+        apiType.value = defaults.apiType;
+        applyPresetModels(defaults.preset, modelConfigs, isNonOpenaiEndpoint);
       }
     }
 
@@ -748,6 +787,7 @@ export function useQuickSetup() {
     }
     updateMappings();
     autoSelectRetryRules();
+    initRetryProviderMap();
   }
 
   function onPlanChange(plan: string) {
@@ -821,8 +861,7 @@ export function useQuickSetup() {
 
   function onConcurrencyModeChange(mode: ConcurrencyMode) {
     concurrencyMode.value = mode;
-    if (mode === "auto") maxConcurrency.value = DEFAULT_CONCURRENCY;
-    else if (mode === "manual") maxConcurrency.value = 3;
+    applyConcurrencyMode(mode, maxConcurrency);
   }
 
   async function testConnection() {
@@ -913,53 +952,57 @@ export function useQuickSetup() {
     );
   });
 
-  return {
-    clientType,
-    providerGroups,
-    selectedGroup,
-    selectedPlan,
-    apiType,
-    apiKey,
-    modelConfigs,
-    mappingEntries,
-    allRecommendedRules,
-    recommendedRules,
-    selectedRetryRules,
-    retryProviderMap,
-    saving,
-    connectionStatus,
-    currentClient,
-    currentPreset,
-    baseUrl,
-    customBaseUrl,
-    upstreamPath,
-    customUpstreamPath,
-    isCustomProvider,
-    availablePlans,
-    isNonOpenaiEndpoint,
-    concurrencyMode,
-    maxConcurrency,
-    queueTimeoutMs,
-    maxQueueSize,
-    transformInjectHeaders,
-    transformDropFields,
-    transformRequestDefaults,
-    existingMappings,
-    allProviders,
-    allProviderGroups,
-    selectClient,
-    onProviderChange,
-    onPlanChange,
-    updateMappings,
-    updateMappingTargets,
-    toggleMappingActive,
-    addMappingEntry,
-    removeMappingEntry,
-    toggleRetryRule,
-    setRetryProvider,
-    onConcurrencyModeChange,
-    testConnection,
-    submit,
-    addCustomModel,
-  };
+  return Object.assign(
+    {
+      clientType,
+      providerGroups,
+      selectedGroup,
+      selectedPlan,
+      apiType,
+      apiKey,
+      modelConfigs,
+      mappingEntries,
+      allRecommendedRules,
+      recommendedRules,
+      selectedRetryRules,
+      retryProviderMap,
+      saving,
+      connectionStatus,
+      currentClient,
+      currentPreset,
+      baseUrl,
+      customBaseUrl,
+      upstreamPath,
+      customUpstreamPath,
+      isCustomProvider,
+      availablePlans,
+      isNonOpenaiEndpoint,
+      concurrencyMode,
+      maxConcurrency,
+      queueTimeoutMs,
+      maxQueueSize,
+      transformInjectHeaders,
+      transformDropFields,
+      transformRequestDefaults,
+      existingMappings,
+      allProviders,
+      allProviderGroups,
+    },
+    {
+      selectClient,
+      onProviderChange,
+      onPlanChange,
+      updateMappings,
+      updateMappingTargets,
+      toggleMappingActive,
+      addMappingEntry,
+      removeMappingEntry,
+      toggleRetryRule,
+      setRetryProvider,
+      onConcurrencyModeChange,
+      testConnection,
+      submit,
+      addCustomModel,
+    },
+  );
 }

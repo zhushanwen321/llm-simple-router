@@ -1,7 +1,7 @@
 <template>
   <div class="p-6 space-y-4 pb-20">
     <!-- Step indicator -->
-    <Card class="py-0">
+    <Card class="py-0 ring-0">
       <SetupSteps
         :current-step="currentStep"
         :client-selected="!!clientType"
@@ -11,7 +11,7 @@
     </Card>
 
     <!-- Row 1: Client Selection -->
-    <Card>
+    <Card class="ring-0">
       <CardHeader class="pb-3">
         <div class="flex items-center justify-between">
           <CardTitle class="text-sm font-medium">{{
@@ -27,7 +27,7 @@
         </div>
       </CardHeader>
       <CardContent>
-        <div class="flex gap-2 flex-wrap">
+        <div class="flex gap-2 flex-wrap p-3 rounded-lg border border-border bg-muted/20">
           <Button
             v-for="c in CLIENTS"
             :key="c.id"
@@ -48,7 +48,9 @@
               "
             />
             <div class="text-left">
-              <div class="font-medium text-sm leading-tight flex items-center gap-1.5">
+              <div
+                class="font-medium text-sm leading-tight flex items-center gap-1.5"
+              >
                 {{ c.name }}
                 <Badge
                   v-if="c.popular"
@@ -69,7 +71,7 @@
           v-if="clientType"
           class="mt-3 px-3 py-2 rounded-md bg-muted/30 border border-border/50 text-[11px] text-muted-foreground/70 flex items-center gap-1.5"
         >
-          <span class="iconify size-3.5 shrink-0 text-muted-foreground/40" data-icon="lucide:info"></span>
+          <Info class="size-3.5 shrink-0 text-muted-foreground/40" />
           <span>{{
             t("quickSetup.client.infoBar", {
               client: currentClient?.name ?? clientType,
@@ -87,7 +89,7 @@
     </Card>
 
     <!-- Row 2: Provider Config -->
-    <Card>
+    <Card class="ring-0">
       <CardHeader class="pb-3">
         <div class="flex items-center justify-between">
           <CardTitle class="text-sm font-medium">{{
@@ -97,7 +99,7 @@
             v-if="selectedGroup"
             class="text-[10px] text-muted-foreground/50 flex items-center gap-1"
           >
-            <span class="iconify size-3" data-icon="lucide:sparkles"></span>
+            <Sparkles class="size-3 text-muted-foreground/50" />
             {{ t("quickSetup.provider.autoConfigured") }}
           </span>
         </div>
@@ -296,7 +298,7 @@
           >
             {{ t("quickSetup.model.selectProviderFirst") }}
           </p>
-          <div v-else class="grid grid-cols-4 gap-2">
+          <div v-else class="space-y-1.5">
             <ModelCard
               v-for="(model, index) in modelConfigs"
               :key="model.name"
@@ -339,12 +341,12 @@
             <span class="text-xs font-medium text-muted-foreground">{{
               t("quickSetup.concurrency.control")
             }}</span>
-          <Badge
-            variant="outline"
-            class="text-[9px] px-1 py-0 leading-none text-muted-foreground/50"
-          >
-            Optional
-          </Badge>
+            <Badge
+              variant="outline"
+              class="text-[9px] px-1 py-0 leading-none text-muted-foreground/50"
+            >
+              Optional
+            </Badge>
           </div>
           <ConcurrencyControl
             :mode="concurrencyMode"
@@ -365,11 +367,10 @@
             class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground w-full text-left hover:text-foreground transition-colors"
             @click="showTransformRules = !showTransformRules"
           >
-            <span
-              class="iconify size-3 transition-transform"
+            <ChevronRight
+              class="size-3 transition-transform"
               :class="showTransformRules ? 'rotate-90' : ''"
-              data-icon="lucide:chevron-right"
-            ></span>
+            />
             {{ t("quickSetup.transform.title") }}
             <Badge
               variant="outline"
@@ -395,7 +396,7 @@
     <!-- Row 3: Mappings + Retry rules -->
     <div class="grid grid-cols-5 gap-4">
       <!-- Left: Mappings -->
-      <Card class="col-span-3">
+      <Card class="col-span-3 ring-0">
         <CardHeader class="pb-3">
           <div class="flex items-center justify-between">
             <CardTitle class="text-sm font-medium">{{
@@ -420,7 +421,7 @@
 
       <!-- Right: Retry Rules + Transform Rules -->
       <div class="col-span-2 space-y-4">
-        <Card>
+        <Card class="ring-0">
           <CardHeader class="pb-3">
             <div class="flex items-center justify-between">
               <CardTitle class="text-sm font-medium">{{
@@ -428,7 +429,9 @@
               }}</CardTitle>
               <Badge variant="secondary" class="text-[10px]">{{
                 t("quickSetup.retry.selectedCount", {
-                  count: selectedRetryRules.size,
+                  count:
+                    recommendedRules.filter((r) => r.exists).length +
+                    selectedRetryRules.size,
                 })
               }}</Badge>
             </div>
@@ -446,6 +449,39 @@
               </template>
             </div>
             <div v-else class="space-y-1.5 max-h-[320px] overflow-y-auto">
+              <!-- Select all -->
+              <div
+                v-if="recommendedRules.some((r) => !r.exists)"
+                class="flex items-center gap-2.5 pb-1 border-b border-border/30"
+              >
+                <Checkbox
+                  :checked="
+                    recommendedRules
+                      .filter((r) => !r.exists)
+                      .every((r) => selectedRetryRules.has(r.name))
+                  "
+                  :indeterminate="
+                    recommendedRules.some(
+                      (r) => !r.exists && selectedRetryRules.has(r.name),
+                    ) &&
+                    !recommendedRules
+                      .filter((r) => !r.exists)
+                      .every((r) => selectedRetryRules.has(r.name))
+                  "
+                  class="mt-0.5"
+                  @update:checked="
+                    (val: boolean | string) => {
+                      const checked = !!val;
+                      recommendedRules
+                        .filter((r) => !r.exists)
+                        .forEach((r) => toggleRetryRule(r.name, checked));
+                    }
+                  "
+                />
+                <span class="text-xs font-medium text-muted-foreground">{{
+                  t("common.selectAll")
+                }}</span>
+              </div>
               <div
                 v-for="rule in recommendedRules"
                 :key="rule.name"
@@ -480,18 +516,6 @@
                       class="text-[9px] px-1.5 py-0 leading-none bg-muted text-muted-foreground"
                       >{{ t("quickSetup.retry.configured") }}</Badge
                     >
-                    <Badge
-                      v-else-if="rule.providers && rule.providers.length > 0"
-                      variant="outline"
-                      class="text-[9px] px-1 py-0 leading-none"
-                      >{{ rule.providers[0] }}</Badge
-                    >
-                    <Badge
-                      v-else
-                      variant="secondary"
-                      class="text-[9px] px-1 py-0 leading-none"
-                      >{{ t("quickSetup.retry.general") }}</Badge
-                    >
                   </div>
                   <div class="text-[10px] text-muted-foreground mt-0.5">
                     {{ rule.status_code }} ·
@@ -504,11 +528,46 @@
                     }}{{ t("quickSetup.retry.times") }}
                   </div>
                 </div>
+                <!-- Provider dropdown for rules with provider binding -->
+                <div
+                  v-if="
+                    !rule.exists && rule.providers && rule.providers.length > 0
+                  "
+                  class="shrink-0"
+                  @click.stop
+                >
+                  <Select
+                    :model-value="retryProviderMap.get(rule.name) ?? 'general'"
+                    @update:model-value="
+                      (v: unknown) => setRetryProvider(rule.name, v as string)
+                    "
+                  >
+                    <SelectTrigger class="h-6 text-[10px] px-2 py-0 gap-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="general">{{
+                        t("quickSetup.retry.general")
+                      }}</SelectItem>
+                      <SelectItem
+                        v-for="p in rule.providers"
+                        :key="p"
+                        :value="p"
+                        >{{ p }}</SelectItem
+                      >
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Badge
+                  v-else-if="!rule.exists"
+                  variant="secondary"
+                  class="text-[9px] px-1 py-0 leading-none shrink-0 mt-0.5"
+                  >{{ t("quickSetup.retry.general") }}</Badge
+                >
               </div>
             </div>
           </CardContent>
         </Card>
-
       </div>
     </div>
   </div>
@@ -517,34 +576,38 @@
   <div
     class="fixed bottom-0 right-0 left-56 border-t bg-card/95 backdrop-blur px-6 py-2.5 flex items-center justify-between z-10"
   >
-    <div class="text-xs text-muted-foreground flex items-center gap-1.5">
+    <div
+      class="text-xs text-muted-foreground flex items-center gap-1.5 font-mono"
+    >
+      <template v-if="clientType">
+        <span class="text-foreground/80">{{ clientTypeLabel }}</span>
+      </template>
       <template v-if="selectedGroup">
-        <Badge variant="secondary" class="text-[10px]">{{
-          clientTypeLabel
-        }}</Badge>
-        <span class="text-muted-foreground/50">→</span>
-        <Badge variant="secondary" class="text-[10px]">{{
+        <span class="text-muted-foreground/40">→</span>
+        <span class="text-foreground/80">{{
           isCustomProvider ? t("quickSetup.provider.custom") : selectedGroup
-        }}</Badge>
-      </template>
-      <template v-if="enabledModelCount > 0">
-        <span class="text-muted-foreground/50 mx-0.5">·</span>
-        <span>{{
-          t("quickSetup.footer.models", { count: enabledModelCount })
         }}</span>
+        <template v-if="selectedPlan">
+          <span class="text-muted-foreground/40">/</span>
+          <span class="text-foreground/80">{{ selectedPlan }}</span>
+        </template>
       </template>
-      <template v-if="mappingEntries.length > 0">
-        <span class="text-muted-foreground/50 mx-0.5">·</span>
-        <span>{{
-          t("quickSetup.footer.mappings", { count: mappingEntries.length })
-        }}</span>
-      </template>
-      <template v-if="selectedRetryRules.size > 0">
-        <span class="text-muted-foreground/50 mx-0.5">·</span>
-        <span>{{
-          t("quickSetup.footer.rules", { count: selectedRetryRules.size })
-        }}</span>
-      </template>
+      <span class="text-muted-foreground/40">·</span>
+      <span>{{
+        t("quickSetup.footer.models", { count: enabledModelCount })
+      }}</span>
+      <span class="text-muted-foreground/40">·</span>
+      <span>{{
+        t("quickSetup.footer.mappings", { count: mappingEntries.length })
+      }}</span>
+      <span class="text-muted-foreground/40">·</span>
+      <span>{{
+        t("quickSetup.footer.rules", {
+          count:
+            selectedRetryRules.size +
+            recommendedRules.filter((r) => r.exists).length,
+        })
+      }}</span>
     </div>
     <div class="flex items-center gap-2">
       <!-- Validation status indicator -->
@@ -552,17 +615,14 @@
         v-if="validationState === 'valid'"
         class="flex items-center gap-1 text-[11px] text-emerald-500"
       >
-        <span class="iconify size-3.5" data-icon="lucide:check-circle-2"></span>
+        <CheckCircle2 class="size-3.5" />
         <span class="font-medium">Validated</span>
       </div>
       <div
         v-else-if="validationState === 'invalid'"
         class="flex items-center gap-1 text-[11px] text-destructive/70"
       >
-        <span
-          class="iconify size-3.5"
-          data-icon="lucide:alert-circle"
-        ></span>
+        <AlertCircle class="size-3.5" />
         <span>Invalid</span>
       </div>
       <Button size="sm" variant="outline" @click="validateConfig">{{
@@ -607,7 +667,10 @@ import QuickSetupMappingList from "@/components/shared/QuickSetupMappingList.vue
 import ConcurrencyControl from "@/components/shared/ConcurrencyControl.vue";
 import TransformRulesForm from "@/components/shared/TransformRulesForm.vue";
 import type { ModelConfig } from "@/components/quick-setup/types";
-import { CLIENTS, DEFAULT_CLIENT_MAPPINGS } from "@/components/quick-setup/types";
+import {
+  CLIENTS,
+  DEFAULT_CLIENT_MAPPINGS,
+} from "@/components/quick-setup/types";
 
 import SetupSteps from "@/components/quick-setup/SetupSteps.vue";
 import ProviderIcon from "@/components/icons/ProviderIcon.vue";
@@ -624,6 +687,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Info, Sparkles, ChevronRight, CheckCircle2, AlertCircle } from "lucide-vue-next";
 
 const { t } = useI18n();
 
@@ -640,6 +704,7 @@ const {
   allRecommendedRules,
   recommendedRules,
   selectedRetryRules,
+  retryProviderMap,
   saving,
   connectionStatus,
   baseUrl,
@@ -665,6 +730,7 @@ const {
   addMappingEntry,
   removeMappingEntry,
   toggleRetryRule,
+  setRetryProvider,
   onConcurrencyModeChange,
   testConnection,
   submit,
@@ -675,10 +741,12 @@ const customModelInput = ref("");
 const showTransformRules = ref(false);
 const validationState = ref<"idle" | "valid" | "invalid">("idle");
 
+const STEP_MAPPINGS = 2;
+
 const currentStep = computed(() => {
   if (!clientType.value) return 0;
   if (!selectedGroup.value || !selectedPlan.value) return 1;
-  return 2;
+  return STEP_MAPPINGS;
 });
 
 function handleAddCustomModel() {

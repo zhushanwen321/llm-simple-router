@@ -133,7 +133,9 @@ function timeLabel(hour: number): string {
           ]"
           :style="{
             ...blockStyle(rule),
-            ...(rule.enabled ? { background: blockColor(rule) } : {}),
+            ...(rule.enabled
+              ? { background: blockColor(rule), color: 'oklch(0.145 0 0)' }
+              : {}),
           }"
         >
           <span v-if="!isNarrow(rule)" class="truncate">{{ rule.name }}</span>
@@ -168,11 +170,11 @@ function timeLabel(hour: number): string {
 
 <style scoped>
 .timeline-block {
-  @apply absolute top-0.5 bottom-0.5 rounded-sm flex items-center px-1 text-[10px] font-semibold overflow-hidden whitespace-nowrap cursor-default z-10 text-[oklch(0.145_0_0)] transition-[filter] duration-100;
+  @apply absolute top-0.5 bottom-0.5 rounded-sm flex items-center px-1 text-[10px] font-semibold overflow-hidden whitespace-nowrap cursor-default z-10 transition-[filter] duration-100;
 }
 
 .timeline-block:hover {
-  @apply brightness-115 z-20;
+  @apply z-20 brightness-[1.15];
 }
 
 .timeline-tooltip {
