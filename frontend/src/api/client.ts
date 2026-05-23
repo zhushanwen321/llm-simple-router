@@ -69,6 +69,7 @@ export interface ProviderPreset {
 
 export interface ProviderGroup {
   group: string;
+  shortname: string;
   presets: ProviderPreset[];
 }
 
@@ -172,6 +173,7 @@ export interface QuickSetupPayload {
     retry_delay_ms: number;
     max_retries: number;
     max_delay_ms: number;
+    provider_shortname?: string | null;
   }>;
   transform_rules?: {
     inject_headers?: Record<string, string>;

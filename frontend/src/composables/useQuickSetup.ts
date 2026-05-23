@@ -124,18 +124,26 @@ async function toggleChangedMappings(
 function buildRetryRulesPayload(
   rules: RecommendedRetryRule[],
   selectedRules: Set<string>,
+  providerShortname: string | undefined,
 ): QuickSetupPayload["retry_rules"] {
   return rules
     .filter((r) => selectedRules.has(r.name) && !r.exists)
-    .map((r) => ({
-      name: r.name,
-      status_code: r.status_code,
-      body_pattern: r.body_pattern,
-      retry_strategy: r.retry_strategy,
-      retry_delay_ms: r.retry_delay_ms,
-      max_retries: r.max_retries,
-      max_delay_ms: r.max_delay_ms,
-    }));
+    .map((r) => {
+      const ruleProviders = r.providers ?? [];
+      // 如果这条规则关联了当前 provider 的 shortname，标记绑定
+      // 后端会把这个 shortname 映射为新创建的 provider_id
+      const bound = providerShortname && ruleProviders.includes(providerShortname);
+      return {
+        name: r.name,
+        status_code: r.status_code,
+        body_pattern: r.body_pattern,
+        retry_strategy: r.retry_strategy,
+        retry_delay_ms: r.retry_delay_ms,
+        max_retries: r.max_retries,
+        max_delay_ms: r.max_delay_ms,
+        provider_shortname: bound ? providerShortname : null,
+      };
+    });
 }
 
 interface ProviderPayloadInput {
@@ -266,6 +274,7 @@ function resolveApiType(
 interface QuickSetupPayloadInput {
   isCustomProvider: boolean;
   selectedGroup: string;
+  providerShortname: string | undefined;
   selectedPlan: string;
   apiType: "openai" | "openai-responses" | "anthropic";
   baseUrl: string;
@@ -309,6 +318,7 @@ function buildQuickSetupPayload(
     retry_rules: buildRetryRulesPayload(
       input.recommendedRules,
       input.selectedRetryRules,
+      input.providerShortname,
     ),
     transform_rules: input.transformRules,
   };
@@ -389,12 +399,14 @@ function makeIsNonOpenaiEndpoint(
 function makeRecommendedRules(
   selectedGroup: Ref<string>,
   allRecommendedRules: Ref<RecommendedRetryRule[]>,
+  providerGroups: Ref<ProviderGroup[]>,
 ): ComputedRef<RecommendedRetryRule[]> {
   return computed(() => {
     const group = selectedGroup.value;
+    const shortname = providerGroups.value.find((g) => g.group === group)?.shortname ?? group;
     return allRecommendedRules.value.filter((r) => {
       if (!r.providers || r.providers.length === 0) return true;
-      return r.providers.includes(group);
+      return r.providers.includes(shortname);
     });
   });
 }
@@ -591,6 +603,7 @@ export function useQuickSetup() {
   const recommendedRules = makeRecommendedRules(
     selectedGroup,
     allRecommendedRules,
+    providerGroups,
   );
   const providerGroupInfo = computeProviderGroupDisplayInfo(
     isCustomProvider,
@@ -768,6 +781,7 @@ export function useQuickSetup() {
       const payload = buildQuickSetupPayload({
         isCustomProvider: isCustomProvider.value,
         selectedGroup: selectedGroup.value,
+        providerShortname: providerGroups.value.find((g) => g.group === selectedGroup.value)?.shortname,
         selectedPlan: selectedPlan.value,
         apiType: apiType.value,
         baseUrl: baseUrl.value,

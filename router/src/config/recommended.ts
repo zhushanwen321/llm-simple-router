@@ -16,6 +16,7 @@ export interface ProviderPreset {
 
 export interface ProviderGroup {
   group: string
+  shortname: string
   presets: ProviderPreset[]
 }
 

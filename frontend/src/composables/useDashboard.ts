@@ -90,6 +90,46 @@ function aggregateProviderTokens(
   return map;
 }
 
+// --- Timeline window merge logic ---
+
+const MERGE_GAP_MS = 60000;
+
+/** 将同一 provider 的重叠/相邻窗口合并为一个 block，聚合 usage */
+function mergeTimelineWindows(
+  windows: UsageWindowWithUsage[],
+): UsageWindowWithUsage[] {
+  const sorted = [...windows].sort(
+    (a, b) =>
+      new Date(a.window.start_time).getTime() -
+      new Date(b.window.start_time).getTime(),
+  );
+  const merged: UsageWindowWithUsage[] = [];
+  for (const w of sorted) {
+    const prev = merged[merged.length - 1];
+    const wStart = new Date(w.window.start_time).getTime();
+    const prevEnd = prev ? new Date(prev.window.end_time).getTime() : -Infinity;
+    if (
+      prev &&
+      prev.window.provider_id === w.window.provider_id &&
+      wStart <= prevEnd + MERGE_GAP_MS
+    ) {
+      if (new Date(w.window.end_time).getTime() > prevEnd) {
+        prev.window = { ...prev.window, end_time: w.window.end_time };
+      }
+      prev.usage = {
+        request_count: prev.usage.request_count + w.usage.request_count,
+        total_input_tokens:
+          prev.usage.total_input_tokens + w.usage.total_input_tokens,
+        total_output_tokens:
+          prev.usage.total_output_tokens + w.usage.total_output_tokens,
+      };
+    } else {
+      merged.push({ window: { ...w.window }, usage: { ...w.usage } });
+    }
+  }
+  return merged;
+}
+
 // --- useDashboardFilters ---
 
 function useDashboardFilters(
@@ -446,35 +486,17 @@ export function useDashboard() {
     );
   });
 
-  // Timeline 渲染用：按 start_time 排序，过滤到单个 provider，去重 router_key_id
-  // 同一 provider 同一时间可能有多个 router_key_id 的窗口，只保留 router_key_id 为 null 的
-  // 如果没有 null 窗口，则保留每个时间段的第一个窗口
+  // Timeline 渲染用：过滤 provider + 合并重叠窗口
   const timelineWindows = computed(() => {
-    let windows = [...usageWindows.value].sort(
-      (a, b) =>
-        new Date(a.window.start_time).getTime() -
-        new Date(b.window.start_time).getTime(),
+    let windows = usageWindows.value.filter(
+      (w) => w.window.provider_id !== null,
     );
     if (selectedProvider.value) {
       windows = windows.filter(
         (w) => w.window.provider_id === selectedProvider.value,
       );
     }
-    // 去重：同一 provider 同一时间段多个 router_key_id 窗口重叠
-    // 优先保留 router_key_id === null 的窗口
-    const seen = new Map<string, UsageWindowWithUsage>();
-    for (const w of windows) {
-      // 用 start_time 近似作为去重键（同一 provider 相同 start_time 视为同一窗口）
-      const key = `${w.window.provider_id}:${w.window.start_time}`;
-      const existing = seen.get(key);
-      if (!existing) {
-        seen.set(key, w);
-      } else if (w.window.router_key_id === null) {
-        // 优先保留 null key 的窗口
-        seen.set(key, w);
-      }
-    }
-    return [...seen.values()];
+    return mergeTimelineWindows(windows);
   });
 
   // --- Filters & params ---

@@ -275,7 +275,6 @@
           <div class="flex-1 min-h-[180px]">
             <Line
               v-if="tokenThroughputChartData"
-              :key="'throughput-' + selectedWindowId"
               :data="tokenThroughputChartData"
               :options="stackedAreaOpts"
             />
@@ -298,7 +297,6 @@
           <div class="h-[140px]">
             <Line
               v-if="tpsChartData"
-              :key="'tps-' + selectedWindowId"
               :data="tpsChartData"
               :options="chartOpts(tpsChartData.labels as string[])"
             />
@@ -317,7 +315,6 @@
           <div class="h-[140px]">
             <Line
               v-if="cacheHitChartData"
-              :key="'cache-' + selectedWindowId"
               :data="cacheHitChartData"
               :options="chartOpts(cacheHitChartData.labels as string[])"
             />
