@@ -223,7 +223,7 @@ const hasMultimodal = computed(
         <!-- Primary pill -->
         <template v-if="entry.targets.length > 0">
           <span
-            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-mono bg-primary/10 border border-primary/20 text-primary whitespace-nowrap"
+            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-mono bg-primary/10 border-[1px] border-primary/20 text-primary whitespace-nowrap"
           >
             <span class="text-[10px] font-semibold">①</span>
             {{ entry.targets[0].backend_model }}
@@ -242,7 +242,7 @@ const hasMultimodal = computed(
         >
           <span class="text-orange-400/40 text-xs shrink-0">|</span>
           <span
-            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-mono bg-muted/30 border border-border text-muted-foreground whitespace-nowrap"
+            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-mono bg-muted/30 border-[1px] border-border text-muted-foreground whitespace-nowrap"
           >
             <span class="text-[10px] font-semibold">{{
               tIdx === 0 ? "②" : tIdx === 1 ? "③" : `${tIdx + 2}`
@@ -255,7 +255,7 @@ const hasMultimodal = computed(
         <template v-if="hasOverflow">
           <span class="text-muted-foreground/30 text-xs shrink-0">|</span>
           <span
-            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-mono border border-dashed border-primary/20 text-primary/60 whitespace-nowrap"
+            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-mono border-[1px] border-dashed border-primary/20 text-primary/60 whitespace-nowrap"
           >
             ↓ {{ entry.targets[0].overflow_model }}
           </span>
@@ -265,7 +265,7 @@ const hasMultimodal = computed(
         <template v-if="hasMultimodal">
           <span class="text-muted-foreground/30 text-xs shrink-0">|</span>
           <span
-            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-mono border border-dashed border-blue-500/20 text-blue-500/60 whitespace-nowrap"
+            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-mono border-[1px] border-dashed border-blue-500/20 text-blue-500/60 whitespace-nowrap"
           >
             <Grid3x3 class="size-2.5" />
             {{ entry.multimodalFallback!.backend_model }}
@@ -321,7 +321,7 @@ const hasMultimodal = computed(
         >
           <Input
             v-model="clientDraft"
-            class="h-7 flex-1 text-xs font-mono border border-border"
+            class="h-7 flex-1 text-xs font-mono border-[1px] border-border"
             :placeholder="t('mappings.editor.clientInputPlaceholder')"
             @keydown.enter.prevent="saveClient"
             @keydown.escape.prevent="cancelEditClient"
@@ -417,7 +417,7 @@ const hasMultimodal = computed(
         </div>
 
         <button
-          class="flex items-center justify-center gap-1 w-full py-1 mt-0.5 text-xs text-muted-foreground/40 border border-dashed border-border rounded hover:text-primary hover:border-primary/40 transition-colors"
+          class="flex items-center justify-center gap-1 w-full py-1 mt-0.5 text-xs text-muted-foreground/40 border-[1px] border-dashed border-border rounded hover:text-primary hover:border-primary/40 transition-colors"
           @click="addTarget"
         >
           <Plus class="size-3" />
@@ -490,7 +490,7 @@ const hasMultimodal = computed(
           <Badge
             v-if="hasMultimodal"
             variant="outline"
-            class="text-[9px] px-1.5 py-0 leading-none text-primary/60 border border-primary/20"
+            class="text-[9px] px-1.5 py-0 leading-none text-primary/60 border-[1px] border-primary/20"
           >
             {{ t("mappings.multimodalFallback.configured") }}
           </Badge>
@@ -538,7 +538,7 @@ const hasMultimodal = computed(
         <!-- Warning box -->
         <div
           v-if="hasMultimodal"
-          class="mt-2 px-2.5 py-2 rounded border border-orange-400/25 bg-orange-400/5 flex gap-2"
+          class="mt-2 px-2.5 py-2 rounded border-[1px] border-orange-400/25 bg-orange-400/5 flex gap-2"
         >
           <AlertTriangle class="size-3.5 text-orange-400 shrink-0 mt-0.5" />
           <div class="text-[10px] leading-relaxed space-y-0.5">
