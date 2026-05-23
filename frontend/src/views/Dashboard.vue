@@ -156,13 +156,15 @@
       <!-- Zone 2: Metrics + Primary Chart -->
       <div class="grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-4 mb-4">
         <!-- Left: metric cards -->
-        <div class="flex flex-col gap-3">
+        <div class="flex flex-col gap-4">
           <!-- Input Token (large) -->
-          <div class="bg-card rounded-lg ring-1 ring-foreground/10 px-5 py-4">
+          <div class="bg-card rounded-lg px-5 py-4">
             <div class="text-xs text-muted-foreground">
               {{ t("dashboard.stats.inputTokens") }}
             </div>
-            <div class="font-mono text-[32px] font-bold leading-none mt-1">
+            <div
+              class="font-mono text-[32px] font-bold leading-none mt-1 text-teal"
+            >
               {{ formatTokenCompact(stats.totalInputTokens) }}
             </div>
             <div
@@ -186,7 +188,7 @@
             </div>
           </div>
           <!-- Output Token (large) -->
-          <div class="bg-card rounded-lg ring-1 ring-foreground/10 px-5 py-4">
+          <div class="bg-card rounded-lg px-5 py-4">
             <div class="text-xs text-muted-foreground">
               {{ t("dashboard.stats.outputTokens") }}
             </div>
@@ -214,10 +216,8 @@
             </div>
           </div>
           <!-- TPS + Cache Hit (secondary, grid 2-col) -->
-          <div class="grid grid-cols-2 gap-2">
-            <div
-              class="bg-card rounded-lg ring-1 ring-foreground/10 px-3.5 py-2.5"
-            >
+          <div class="grid grid-cols-2 gap-3">
+            <div class="bg-card rounded-lg px-3.5 py-2.5">
               <div class="text-[11px] text-muted-foreground">
                 {{ t("dashboard.stats.avgTps") }}
               </div>
@@ -228,9 +228,7 @@
                 >
               </div>
             </div>
-            <div
-              class="bg-card rounded-lg ring-1 ring-foreground/10 px-3.5 py-2.5"
-            >
+            <div class="bg-card rounded-lg px-3.5 py-2.5">
               <div class="text-[11px] text-muted-foreground">
                 {{ t("dashboard.stats.cacheHitRate") }}
               </div>
@@ -266,9 +264,7 @@
         </div>
 
         <!-- Right: Token Throughput stacked area chart -->
-        <div
-          class="bg-card rounded-lg ring-1 ring-foreground/10 p-3.5 flex flex-col"
-        >
+        <div class="bg-card rounded-lg p-3.5 flex flex-col">
           <div class="text-xs font-medium text-muted-foreground mb-2">
             {{ t("dashboard.charts.tokenThroughput") }}
           </div>
@@ -289,8 +285,8 @@
       </div>
 
       <!-- Zone 3: Secondary charts (TPS + Cache Hit) -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-        <div class="bg-card rounded-lg ring-1 ring-foreground/10 p-3">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <div class="bg-card rounded-lg p-3">
           <div class="text-xs font-medium text-muted-foreground mb-1.5">
             {{ t("dashboard.charts.tps") }}
           </div>
@@ -298,7 +294,7 @@
             <Line
               v-if="tpsChartData"
               :data="tpsChartData"
-              :options="chartOpts(tpsChartData.labels as string[])"
+              :options="miniChartOpts(tpsChartData.labels as string[])"
             />
             <div
               v-else
@@ -308,7 +304,7 @@
             </div>
           </div>
         </div>
-        <div class="bg-card rounded-lg ring-1 ring-foreground/10 p-3">
+        <div class="bg-card rounded-lg p-3">
           <div class="text-xs font-medium text-muted-foreground mb-1.5">
             {{ t("dashboard.charts.cacheHit") }}
           </div>
@@ -316,7 +312,7 @@
             <Line
               v-if="cacheHitChartData"
               :data="cacheHitChartData"
-              :options="chartOpts(cacheHitChartData.labels as string[])"
+              :options="miniChartOpts(cacheHitChartData.labels as string[])"
             />
             <div
               v-else
@@ -329,7 +325,7 @@
       </div>
 
       <!-- Zone 4: Timeline window navigator -->
-      <div class="bg-card rounded-lg ring-1 ring-foreground/10 px-4 py-2.5">
+      <div class="bg-card rounded-lg px-4 py-2.5">
         <div class="flex items-center justify-between mb-1.5">
           <div class="flex items-center gap-3">
             <span class="font-mono text-xs font-medium text-foreground">{{
@@ -442,7 +438,7 @@ import {
 import { Filter } from "lucide-vue-next";
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
-import { lineOptions, stackedAreaOptions } from "./metrics-helpers";
+import { stackedAreaOptions, miniLineOptions } from "./metrics-helpers";
 import { useDashboard } from "@/composables/useDashboard";
 import { formatTokenCompact } from "@/utils/token-format";
 import type { UsageWindowWithUsage } from "@/api/client";
@@ -501,8 +497,8 @@ const stackedAreaOpts = computed(() => {
 });
 
 // --- Secondary chart options ---
-function chartOpts(labels: string[]) {
-  return lineOptions("", labels);
+function miniChartOpts(labels: string[]) {
+  return miniLineOptions(labels);
 }
 
 // --- Cache hit chart: reuse inputTokensChartData as a placeholder (no dedicated cache timeseries) ---

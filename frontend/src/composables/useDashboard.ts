@@ -385,7 +385,7 @@ function useDashboardData(
         );
         inputTokensChartData.value = toChartData(
           filled,
-          t("dashboard.charts.tokenInputTotal"),
+          t("dashboard.charts.inputLegend"),
           CHART_COLORS.teal,
         );
       } else {
@@ -400,7 +400,7 @@ function useDashboardData(
         );
         outputTokensChartData.value = toChartData(
           filled,
-          t("dashboard.charts.tokenOutputTotal"),
+          t("dashboard.charts.outputLegend"),
           CHART_COLORS.green,
         );
       } else {
@@ -427,8 +427,8 @@ function useDashboardData(
         tokenThroughputChartData.value = toThroughputChartData(
           filledInput,
           filledOutput,
-          t("dashboard.charts.tokenInputTotal"),
-          t("dashboard.charts.tokenOutputTotal"),
+          t("dashboard.charts.inputLegend"),
+          t("dashboard.charts.outputLegend"),
         );
       } else {
         tokenThroughputChartData.value = null;
