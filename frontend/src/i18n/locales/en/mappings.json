@@ -51,6 +51,18 @@
     "saveFailed": "Failed to save",
     "parseRuleFailed": "Invalid rule format, using defaults"
   },
+  "editor": {
+    "clientLabel": "Client",
+    "edit": "edit",
+    "clientInputPlaceholder": "client model name",
+    "clickToEdit": "click to edit",
+    "failoverChain": "Failover chain",
+    "failoverOnError": "failover on error",
+    "contextOverflow": "Context overflow",
+    "contextOverflowHint": "when context exceeds model limit",
+    "multimodalFallback": "Multimodal Fallback",
+    "new": "New"
+  },
   "selectProviderModel": "Select Provider / Model",
   "multimodalFallback": {
   "title": "Multimodal Fallback",
