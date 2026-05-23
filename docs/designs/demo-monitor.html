@@ -174,7 +174,7 @@
     font-size: 11px;
     font-weight: 500;
     color: var(--muted-light);
-    width: 64px;
+    width: 130px;
     flex-shrink: 0;
   }
   .concurrency-bar {
@@ -215,11 +215,12 @@
     align-items: center;
     border-bottom: 1px solid var(--border);
     background: var(--surface-header);
-    padding: 0 12px;
+    padding: 6px 12px;
+    gap: 2px;
   }
   .request-tab {
     position: relative;
-    padding: 9px 14px;
+    padding: 5px 12px;
     font-size: 13px;
     font-weight: 500;
     color: var(--muted);
@@ -227,23 +228,14 @@
     border: none;
     background: none;
     font-family: var(--font-body);
-    transition: color 150ms;
+    transition: all 150ms;
     display: flex;
     align-items: center;
     gap: 8px;
+    border-radius: 9999px;
   }
-  .request-tab:hover { color: var(--muted-light); }
-  .request-tab.active { color: var(--primary); }
-  .request-tab.active::after {
-    content: '';
-    position: absolute;
-    bottom: -1px;
-    left: 0;
-    right: 0;
-    height: 2px;
-    background: var(--primary);
-    border-radius: 1px 1px 0 0;
-  }
+  .request-tab:hover { color: var(--muted-light); background: oklch(1 0 0 / 5%); }
+  .request-tab.active { color: var(--primary); background: var(--primary-ghost); }
   .tab-count {
     font-family: var(--font-mono);
     font-size: 11px;
@@ -396,14 +388,16 @@
   .kill-no { background: transparent; color: var(--muted); }
 
   .empty-state {
-    padding: 24px;
-    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 210px;
     color: var(--muted);
     font-size: 13px;
   }
 
   .scroll-area {
-    max-height: 380px;
+    height: 252px;
     overflow-y: auto;
   }
   .scroll-area::-webkit-scrollbar { width: 4px; }
@@ -554,7 +548,7 @@
   .bottom-panel-header {
     padding: 7px 12px;
     border-bottom: 1px solid var(--border);
-    background: var(--surface-header);
+    background: oklch(1 0 0 / 3%);
   }
   .bottom-panel-title {
     font-size: 10px;
