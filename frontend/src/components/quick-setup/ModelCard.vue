@@ -97,7 +97,7 @@ function isCapabilityActive(key: string): boolean {
 
 <template>
   <div
-    class="transition-colors group border-b border-border last:border-b-0"
+    class="transition-colors group bg-card"
     :class="!model.enabled && 'opacity-40'"
   >
     <!-- Main row: toggle + name + ctx select + cap squares + patch btn + trash -->
@@ -127,7 +127,7 @@ function isCapabilityActive(key: string): boolean {
         :model-value="String(model.contextWindow)"
         @update:model-value="updateContextWindowFromSelect"
       >
-        <SelectTrigger class="h-6 w-16 text-[11px] font-mono px-1 gap-0">
+        <SelectTrigger class="h-6 w-16 text-[11px] font-mono px-1 gap-0 data-[size=default]:h-6">
           <SelectValue>{{ matchedOption!.label }}</SelectValue>
         </SelectTrigger>
         <SelectContent>
