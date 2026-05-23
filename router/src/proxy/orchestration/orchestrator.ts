@@ -124,6 +124,8 @@ export class ProxyOrchestrator {
           error: a.error,
           latencyMs: a.latencyMs,
           providerId: a.target.provider_id,
+          model: a.target.backend_model,
+          apiType: apiType,
         })),
       );
       const { status, statusCode } = this.extractTrackStatus(result);

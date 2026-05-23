@@ -4,7 +4,8 @@ import { useI18n } from "vue-i18n";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Trash2 } from "lucide-vue-next";
+import { Badge } from "@/components/ui/badge";
+import { Trash2, ArrowRight, Plus } from "lucide-vue-next";
 import MappingEntryEditor from "@/components/mappings/MappingEntryEditor.vue";
 import CascadingModelSelect from "@/components/mappings/CascadingModelSelect.vue";
 import type {
@@ -122,14 +123,17 @@ function handleKeydown(e: KeyboardEvent) {
     </p>
 
     <!-- Add new mapping -->
-    <div class="flex items-center gap-2 pt-2 border-t mt-2">
+    <div
+      class="flex items-center gap-3 rounded-md border border-dashed border-border px-3 py-2"
+    >
       <Input
         v-model="newFrom"
         :placeholder="t('providers.shared.clientModel')"
-        class="h-8 flex-1 text-xs font-mono"
+        class="h-7 min-w-[90px] text-xs font-mono"
         @keydown="handleKeydown"
       />
-      <div class="flex-1">
+      <ArrowRight class="size-3.5 shrink-0 text-muted-foreground/30" />
+      <div class="flex-1 min-w-0">
         <CascadingModelSelect
           :providers="providerGroups"
           :model-value="newToValue"
@@ -138,14 +142,18 @@ function handleKeydown(e: KeyboardEvent) {
           @update:model-value="(v: SelectedValue) => (newToValue = v)"
         />
       </div>
+      <Badge variant="outline" class="text-[10px] shrink-0 text-muted-foreground/50">
+        Custom
+      </Badge>
       <Button
-        size="sm"
         variant="outline"
-        class="h-8 shrink-0"
+        size="icon-xs"
+        class="shrink-0"
         :disabled="!canAdd()"
         @click="addMapping"
-        >{{ t("providers.shared.add") }}</Button
       >
+        <Plus class="size-3" />
+      </Button>
     </div>
   </div>
 </template>

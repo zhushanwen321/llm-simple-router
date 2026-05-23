@@ -31,6 +31,8 @@ export interface UnifiedRequestOverview {
     error: string | null;
     latencyMs: number;
     providerId: string;
+    model?: string;
+    apiType?: string;
   }[];
   status: "pending" | "completed" | "failed";
   clientRequest: string | null;
@@ -86,6 +88,8 @@ export function fromActiveRequest(
       error: a.error,
       latencyMs: a.latencyMs,
       providerId: a.providerId,
+      model: a.model,
+      apiType: a.apiType,
     })),
     status: req.status,
     clientRequest: req.clientRequest ?? null,
@@ -187,7 +191,10 @@ function isRouterInternalError(msg: string | null | undefined): boolean {
   );
 }
 
-export function fromLogEntry(entry: LogEntry): UnifiedRequestOverview {
+export function fromLogEntry(
+  entry: LogEntry,
+  children?: LogEntry[],
+): UnifiedRequestOverview {
   const inputTokens = entry.input_tokens ?? null;
   const outputTokens = entry.output_tokens ?? null;
   const ttftMs = entry.ttft_ms ?? null;
@@ -228,7 +235,24 @@ export function fromLogEntry(entry: LogEntry): UnifiedRequestOverview {
     cacheWriteTokens: null,
     stopReason: entry.stop_reason ?? null,
     isComplete: !!entry.metrics_complete,
-    attempts: [],
+    attempts: [
+      ...(children ?? []).map((child) => ({
+        statusCode: child.status_code,
+        error: child.error_message,
+        latencyMs: child.latency_ms ?? 0,
+        providerId: child.provider_id ?? "",
+        model: child.backend_model ?? child.model ?? undefined,
+        apiType: child.api_type,
+      })),
+      {
+        statusCode: entry.status_code,
+        error: entry.error_message,
+        latencyMs: entry.latency_ms ?? 0,
+        providerId: entry.provider_id ?? "",
+        model: entry.backend_model ?? entry.model ?? undefined,
+        apiType: entry.api_type,
+      },
+    ],
     status:
       (entry.status_code ?? 0) >= HTTP_ERROR_THRESHOLD ? "failed" : "completed",
     clientRequest: entry.client_request,
