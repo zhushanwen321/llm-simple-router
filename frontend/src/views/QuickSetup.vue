@@ -88,13 +88,11 @@
       </CardContent>
     </Card>
 
-    <!-- Row 2: Provider Config -->
+    <!-- Row 2a: Provider Connection -->
     <Card class="ring-0">
       <CardHeader class="pb-3">
         <div class="flex items-center justify-between">
-          <CardTitle class="text-sm font-medium">{{
-            t("quickSetup.provider.config")
-          }}</CardTitle>
+          <CardTitle class="text-sm font-medium">Provider Connection</CardTitle>
           <span
             v-if="selectedGroup"
             class="text-[10px] text-muted-foreground/50 flex items-center gap-1"
@@ -104,8 +102,9 @@
           </span>
         </div>
       </CardHeader>
-      <CardContent class="space-y-4">
-        <!-- Line 1: Provider / Plan / Format / BaseURL / APIKey -->
+      <CardContent class="space-y-3">
+        <!-- Group: Provider -->
+        <div class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60 mb-1.5">Provider</div>
         <div class="flex items-end gap-2">
           <div class="w-40 space-y-1">
             <Label class="text-xs text-muted-foreground">{{
@@ -133,7 +132,7 @@
               </SelectContent>
             </Select>
           </div>
-          <!-- Custom mode: show format + editable base url -->
+          <!-- Custom mode: only plan placeholder -->
           <template v-if="isCustomProvider">
             <div class="w-48 space-y-1">
               <Label class="text-xs text-muted-foreground">{{
@@ -154,24 +153,8 @@
                 </SelectContent>
               </Select>
             </div>
-            <div class="w-80 space-y-1">
-              <Label class="text-xs text-muted-foreground">Base URL</Label>
-              <Input
-                v-model="customBaseUrl"
-                placeholder="https://api.example.com/v1"
-                class="font-mono md:text-xs h-7"
-              />
-            </div>
-            <div class="w-48 space-y-1">
-              <Label class="text-xs text-muted-foreground">Upstream Path</Label>
-              <Input
-                v-model="customUpstreamPath"
-                placeholder="/v1/chat/completions"
-                class="font-mono md:text-xs h-7"
-              />
-            </div>
           </template>
-          <!-- Preset mode: show plan + readonly base url -->
+          <!-- Preset mode: plan selector -->
           <template v-else>
             <div class="w-28 space-y-1">
               <Label class="text-xs text-muted-foreground">{{
@@ -194,25 +177,50 @@
                 </SelectContent>
               </Select>
             </div>
-            <div class="w-48 space-y-1">
-              <Label class="text-xs text-muted-foreground">{{
-                t("quickSetup.provider.format")
-              }}</Label>
-              <Select v-model="apiType">
-                <SelectTrigger class="w-full text-xs data-[size=default]:h-7"
-                  ><SelectValue
-                /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="anthropic">Anthropic Messages</SelectItem>
-                  <SelectItem value="openai"
-                    >OpenAI Chat Completions</SelectItem
-                  >
-                  <SelectItem value="openai-responses"
-                    >OpenAI Responses</SelectItem
-                  >
-                </SelectContent>
-              </Select>
+          </template>
+        </div>
+
+        <!-- Group: Endpoint -->
+        <div class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60 mb-1.5 mt-1">Endpoint</div>
+        <div class="flex items-end gap-2">
+          <div class="w-48 space-y-1">
+            <Label class="text-xs text-muted-foreground">{{
+              t("quickSetup.provider.format")
+            }}</Label>
+            <Select v-model="apiType">
+              <SelectTrigger class="w-full text-xs data-[size=default]:h-7"
+                ><SelectValue
+              /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="anthropic">Anthropic Messages</SelectItem>
+                <SelectItem value="openai"
+                  >OpenAI Chat Completions</SelectItem
+                >
+                <SelectItem value="openai-responses"
+                  >OpenAI Responses</SelectItem
+                >
+              </SelectContent>
+            </Select>
+          </div>
+          <template v-if="isCustomProvider">
+            <div class="w-80 space-y-1">
+              <Label class="text-xs text-muted-foreground">Base URL</Label>
+              <Input
+                v-model="customBaseUrl"
+                placeholder="https://api.example.com/v1"
+                class="font-mono md:text-xs h-7"
+              />
             </div>
+            <div class="w-48 space-y-1">
+              <Label class="text-xs text-muted-foreground">Upstream Path</Label>
+              <Input
+                v-model="customUpstreamPath"
+                placeholder="/v1/chat/completions"
+                class="font-mono md:text-xs h-7"
+              />
+            </div>
+          </template>
+          <template v-else>
             <div class="w-72 space-y-1">
               <Label class="text-xs text-muted-foreground">Base URL</Label>
               <Input
@@ -221,7 +229,6 @@
                 class="font-mono md:text-xs h-7"
               />
             </div>
-            <!-- 非默认 upstream path（如百度千帆） -->
             <div v-if="upstreamPath" class="w-48 space-y-1">
               <Label class="text-xs text-muted-foreground">Upstream Path</Label>
               <Input
@@ -250,6 +257,7 @@
               variant="outline"
               size="sm"
               :disabled="connectionStatus === 'testing'"
+              :class="connectionStatus === 'ok' ? 'border-green-500/50 text-green-500' : ''"
               @click="testConnection"
             >
               <template v-if="connectionStatus === 'testing'">
@@ -274,16 +282,55 @@
                 </svg>
                 {{ t("quickSetup.provider.testing") }}
               </template>
-              <template v-else-if="connectionStatus === 'ok'">{{
-                t("quickSetup.provider.connected")
-              }}</template>
+              <template v-else-if="connectionStatus === 'ok'">
+                <CheckCircle2 class="size-3.5 mr-1" />
+                {{ t("quickSetup.provider.connected") }}
+              </template>
               <template v-else>{{ t("quickSetup.provider.test") }}</template>
             </Button>
           </div>
         </div>
 
-        <!-- Line 2: Model Cards -->
+        <!-- Concurrency Control -->
         <div class="border-t pt-3">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-medium text-muted-foreground">{{
+              t("quickSetup.concurrency.control")
+            }}</span>
+            <Badge
+              variant="outline"
+              class="text-[9px] px-1 py-0 leading-none text-muted-foreground/50"
+            >
+              Optional
+            </Badge>
+          </div>
+          <ConcurrencyControl
+            :mode="concurrencyMode"
+            :max-concurrency="maxConcurrency"
+            :queue-timeout-ms="queueTimeoutMs"
+            :max-queue-size="maxQueueSize"
+            @update:mode="onConcurrencyModeChange"
+            @update:max-concurrency="maxConcurrency = $event"
+            @update:queue-timeout-ms="queueTimeoutMs = $event"
+            @update:max-queue-size="maxQueueSize = $event"
+          />
+        </div>
+      </CardContent>
+    </Card>
+
+    <!-- Row 2b: Model Configuration -->
+    <Card class="ring-0">
+      <CardHeader class="pb-3">
+        <div class="flex items-center justify-between">
+          <CardTitle class="text-sm font-medium">{{
+            t("quickSetup.model.config")
+          }}</CardTitle>
+          <Badge variant="secondary" class="text-[10px]"
+            >{{ enabledModelCount }}/{{ modelConfigs.length }}</Badge
+          >
+        </div>
+      </CardHeader>
+      <CardContent class="space-y-3">
           <div class="flex items-center justify-between mb-2">
             <span class="text-xs font-medium text-muted-foreground">{{
               t("quickSetup.model.config")
@@ -298,7 +345,7 @@
           >
             {{ t("quickSetup.model.selectProviderFirst") }}
           </p>
-          <div v-else class="space-y-1.5">
+          <div v-else class="rounded-lg border border-border overflow-hidden">
             <ModelCard
               v-for="(model, index) in modelConfigs"
               :key="model.name"
@@ -613,7 +660,7 @@
       <!-- Validation status indicator -->
       <div
         v-if="validationState === 'valid'"
-        class="flex items-center gap-1 text-[11px] text-emerald-500"
+        class="flex items-center gap-1 text-[11px] text-primary"
       >
         <CheckCircle2 class="size-3.5" />
         <span class="font-medium">Validated</span>

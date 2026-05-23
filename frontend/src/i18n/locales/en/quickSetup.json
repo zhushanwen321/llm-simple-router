@@ -94,5 +94,12 @@
     "setupComplete": "Quick setup complete!",
     "setupFailed": "Quick setup failed",
     "loadFailed": "Failed to load recommended configuration"
+  },
+  "steps": {
+    "selectClient": "Select Client",
+    "configureProvider": "Configure Provider",
+    "modelMappings": "Model Mappings",
+    "retryRules": "Retry Rules",
+    "optional": "Optional"
   }
 }

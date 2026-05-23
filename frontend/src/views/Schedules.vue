@@ -75,7 +75,7 @@
           <!-- Group header row -->
           <div
             class="flex items-center gap-2.5 h-10 px-4 cursor-pointer transition-colors hover:bg-muted/40"
-            :class="{ 'bg-foreground/[0.03]': expandedGroupId === group.id }"
+            :class="{ 'bg-muted/40': expandedGroupId === group.id }"
             @click="toggleExpand(group.id)"
           >
             <ChevronRight
