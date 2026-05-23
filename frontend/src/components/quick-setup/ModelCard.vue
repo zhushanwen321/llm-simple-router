@@ -3,11 +3,8 @@ import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import type { ModelConfig } from "./types";
 import { CONTEXT_WINDOW_OPTIONS } from "./types";
-import { formatContextWindow } from "@/utils/format";
 import PatchChips from "./PatchChips.vue";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -19,7 +16,6 @@ import {
 } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import {
-  ChevronDown,
   Trash2,
   Type,
   ImageIcon,
@@ -102,81 +98,94 @@ function isCapabilityActive(key: string): boolean {
 
 <template>
   <div
-    class="rounded-lg border border-border bg-card transition-colors"
-    :class="open ? 'px-4 py-3' : 'px-4 py-2.5'"
+    class="rounded-lg border border-border bg-card transition-colors group"
+    :class="!model.enabled && 'opacity-40'"
   >
-    <!-- Header row: toggle + name + capabilities + context badge + chevron -->
-    <div class="flex items-center gap-2.5">
+    <!-- Main row: toggle + name + ctx select + cap squares + patch btn + trash -->
+    <div class="flex items-center gap-2.5 px-3 min-h-8 py-1.5">
       <!-- Enable toggle -->
       <Switch
-        :checked="model.enabled"
-        @update:checked="
+        :model-value="model.enabled"
+        @update:model-value="
           emit('update:model', { ...model, enabled: $event as boolean })
         "
         class="shrink-0 scale-75 origin-left"
       />
 
-      <!-- Model name -->
+      <!-- Model name: demo 12px mono 500 -->
       <span
-        class="truncate text-sm font-medium text-foreground min-w-0 font-mono"
+        class="truncate text-xs font-medium text-foreground min-w-[160px] max-w-[280px] font-mono"
         :title="model.name"
-        >{{ model.name }}</span
+      >{{ model.name }}</span>
+
+      <!-- Context window: inline select (demo: 64px mono 11px) -->
+      <Select
+        v-if="isPreset"
+        :model-value="String(model.contextWindow)"
+        @update:model-value="updateContextWindowFromSelect"
       >
+        <SelectTrigger class="h-6 w-16 text-[11px] font-mono px-1 gap-0">
+          <SelectValue>{{ matchedOption!.label }}</SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem
+            v-for="opt in CONTEXT_WINDOW_OPTIONS"
+            :key="opt.value"
+            :value="String(opt.value)"
+          >{{ opt.label }}</SelectItem>
+          <SelectItem value="__custom__">{{
+            t("quickSetup.model.contextCustom")
+          }}</SelectItem>
+        </SelectContent>
+      </Select>
+      <template v-else>
+        <Input
+          :model-value="String(model.contextWindow)"
+          type="number"
+          min="1"
+          class="h-6 w-16 text-[11px] text-center font-mono [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          @update:model-value="updateContextWindowFromInput($event as string)"
+        />
+      </template>
 
-      <!-- Capability icons (collapsed indicators) -->
-      <div class="flex items-center gap-1 shrink-0">
-        <template v-for="cap in capabilityIcons" :key="cap.key">
-          <component
-            :is="cap.icon"
-            :class="
-              cn(
-                'size-3.5 transition-colors',
-                isCapabilityActive(cap.key)
-                  ? 'text-primary'
-                  : 'text-muted-foreground/30',
-              )
-            "
-          />
-        </template>
-      </div>
-
-      <!-- Context window badge -->
-      <Badge
-        variant="secondary"
-        class="shrink-0 text-[10px] px-1.5 py-0 h-5 font-mono tabular-nums"
-      >
-        {{ formatContextWindow(model.contextWindow) }}
-      </Badge>
-
-      <!-- Patch count indicator -->
-      <Badge
-        v-if="model.patches.length > 0"
-        variant="outline"
-        class="shrink-0 text-[10px] px-1.5 py-0 h-5 font-normal text-muted-foreground"
-      >
-        {{ model.patches.length }} patches
-      </Badge>
-
-      <!-- Spacer -->
-      <div class="flex-1" />
-
-      <!-- Expand chevron -->
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-xs"
-        class="shrink-0 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-        @click="open = !open"
-      >
-        <ChevronDown
+      <!-- Capability squares (demo: 20x20 bordered clickable dots) -->
+      <div v-if="capabilities !== undefined" class="flex items-center gap-0.5 shrink-0">
+        <div
+          v-for="cap in capabilityIcons"
+          :key="cap.key"
+          class="w-5 h-5 rounded flex items-center justify-center border transition-colors cursor-pointer"
           :class="
             cn(
-              'size-3.5 transition-transform duration-200',
-              open ? 'rotate-0' : '-rotate-90',
+              isCapabilityActive(cap.key)
+                ? 'bg-primary/10 border-primary/30 text-primary'
+                : 'border-border text-muted-foreground/40 hover:text-muted-foreground',
             )
           "
-        />
-      </Button>
+          :title="cap.label"
+          @click="cap.key !== 'text' && emit('toggle-capability', cap.key)"
+        >
+          <component :is="cap.icon" class="size-[11px]" />
+        </div>
+      </div>
+
+      <!-- Patch button: count + chevron, also toggles expand -->
+      <div
+        class="inline-flex items-center gap-1 h-[22px] px-2 border rounded cursor-pointer transition-colors shrink-0 select-none"
+        :class="
+          cn(
+            model.patches.length > 0
+              ? 'bg-primary/10 border-primary/25 text-primary'
+              : 'border-border text-muted-foreground hover:border-foreground/20 hover:text-foreground',
+          )
+        "
+        @click="open = !open"
+      >
+        <span class="text-[11px]">{{ model.patches.length }} patches</span>
+        <span
+          class="text-[8px] inline-block transition-transform"
+          :class="open ? 'rotate-90' : ''"
+        >&#9654;</span>
+      </div>
 
       <!-- Remove -->
       <Button
@@ -186,71 +195,33 @@ function isCapabilityActive(key: string): boolean {
         class="shrink-0 text-muted-foreground hover:text-destructive"
         @click="$emit('remove')"
       >
-        <Trash2 class="size-3.5" />
+        <Trash2 class="size-3" />
       </Button>
     </div>
 
-    <!-- Expanded content -->
+    <!-- Expanded detail -->
     <Collapsible v-model:open="open">
       <CollapsibleContent>
-        <div class="pt-3 mt-3 space-y-3 border-t border-border/40">
-          <!-- Context window row -->
-          <div class="flex items-center gap-2">
-            <Label
-              class="text-xs text-muted-foreground whitespace-nowrap w-24 shrink-0"
-              >{{ t("quickSetup.model.contextWindow") || "Context" }}</Label
-            >
-            <div class="flex items-center gap-1.5">
-              <Select
-                :model-value="
-                  isPreset ? String(model.contextWindow) : '__custom__'
-                "
-                @update:model-value="updateContextWindowFromSelect"
-              >
-                <SelectTrigger class="h-7 w-24 text-xs">
-                  <SelectValue>
-                    {{
-                      isPreset
-                        ? matchedOption!.label
-                        : formatContextWindow(model.contextWindow)
-                    }}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem
-                    v-for="opt in CONTEXT_WINDOW_OPTIONS"
-                    :key="opt.value"
-                    :value="String(opt.value)"
-                  >
-                    {{ opt.label }}
-                  </SelectItem>
-                  <SelectItem value="__custom__">{{
-                    t("quickSetup.model.contextCustom")
-                  }}</SelectItem>
-                </SelectContent>
-              </Select>
-              <Input
-                v-if="!isPreset"
-                :model-value="String(model.contextWindow)"
-                type="number"
-                min="1"
-                class="h-7 w-24 text-xs text-right [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                @update:model-value="
-                  updateContextWindowFromInput($event as string)
-                "
-              />
+        <div class="pl-9 pr-3 py-2 border-t border-border space-y-2">
+          <!-- Patches -->
+          <div>
+            <div class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1">
+              Patches
             </div>
+            <PatchChips
+              :api-type="apiType"
+              :is-deep-seek="isDeepSeek"
+              :is-non-openai-endpoint="isNonOpenaiEndpoint"
+              :model-value="model.patches"
+              @update:model-value="updatePatches"
+            />
           </div>
 
-          <!-- Timeout row -->
-          <div
-            v-if="streamTimeoutMs !== undefined"
-            class="flex items-center gap-2"
-          >
-            <Label
-              class="text-xs text-muted-foreground whitespace-nowrap w-24 shrink-0"
-              >{{ t("providers.fields.timeoutLabel") }}</Label
-            >
+          <!-- Timeout -->
+          <div v-if="streamTimeoutMs !== undefined">
+            <div class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1">
+              Timeout
+            </div>
             <div class="flex items-center gap-1.5">
               <Input
                 type="number"
@@ -261,67 +232,19 @@ function isCapabilityActive(key: string): boolean {
                     $event ? Number($event) * MS_PER_SECOND : undefined,
                   )
                 "
-                class="h-7 w-24 text-xs text-right [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                class="h-6 w-20 text-xs text-right [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 min="1"
               />
-              <span class="text-xs text-muted-foreground">s</span>
+              <span class="text-xs text-muted-foreground">seconds</span>
               <Badge
                 v-if="isDefaultTimeout"
                 variant="outline"
-                class="text-[10px] px-1 py-0 h-5 font-normal text-muted-foreground"
+                class="text-[9px] px-1 py-0 h-4 font-normal text-muted-foreground"
               >
                 {{ t("providers.fields.timeoutPlaceholder") }}
               </Badge>
             </div>
           </div>
-
-          <!-- Capabilities row -->
-          <div
-            v-if="capabilities !== undefined"
-            class="flex items-center gap-2"
-          >
-            <Label
-              class="text-xs text-muted-foreground whitespace-nowrap w-24 shrink-0"
-              >{{ t("providers.capabilities.label") || "Capabilities" }}</Label
-            >
-            <div class="flex items-center gap-1.5">
-              <!-- Text (always active) -->
-              <Badge
-                variant="secondary"
-                class="text-[10px] px-1.5 py-0 h-5 gap-1"
-              >
-                <Type class="size-3" />
-                {{ t("providers.capabilities.text") }}
-              </Badge>
-              <!-- Toggleable capabilities -->
-              <Badge
-                v-for="cap in capabilityIcons.slice(1)"
-                :key="cap.key"
-                variant="outline"
-                :class="
-                  cn(
-                    'text-[10px] px-1.5 py-0 h-5 gap-1 cursor-pointer transition-colors select-none',
-                    capabilities.includes(cap.key)
-                      ? 'bg-primary/10 text-primary border-primary/20'
-                      : 'text-muted-foreground/40 border-border/50 hover:text-muted-foreground',
-                  )
-                "
-                @click="emit('toggle-capability', cap.key)"
-              >
-                <component :is="cap.icon" class="size-3" />
-                {{ t(`providers.capabilities.${cap.label}`) }}
-              </Badge>
-            </div>
-          </div>
-
-          <!-- Patch chips -->
-          <PatchChips
-            :api-type="apiType"
-            :is-deep-seek="isDeepSeek"
-            :is-non-openai-endpoint="isNonOpenaiEndpoint"
-            :model-value="model.patches"
-            @update:model-value="updatePatches"
-          />
         </div>
       </CollapsibleContent>
     </Collapsible>

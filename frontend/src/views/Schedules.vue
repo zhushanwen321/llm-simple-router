@@ -1,14 +1,18 @@
 <template>
   <div class="p-6 space-y-3">
-    <!-- Header -->
+    <!-- Page Header -->
     <div class="flex items-center justify-between">
-      <div>
+      <div class="flex flex-col gap-0.5">
         <h2 class="text-base font-semibold text-foreground">
           {{ t("schedules.title") }}
         </h2>
+        <p class="text-[11px] font-medium text-muted-foreground/60">
+          {{ t("schedules.description") }}
+        </p>
       </div>
     </div>
 
+    <!-- Loading -->
     <div
       v-if="loading"
       class="flex items-center justify-center py-16 text-muted-foreground text-sm"
@@ -21,7 +25,7 @@
       <div class="flex bg-card border border-border rounded-lg overflow-hidden">
         <div class="flex-1 px-3.5 py-2 border-r border-border">
           <div
-            class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider"
+            class="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider"
           >
             {{ t("schedules.stats.groupCount") }}
           </div>
@@ -31,7 +35,7 @@
         </div>
         <div class="flex-1 px-3.5 py-2 border-r border-border">
           <div
-            class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider"
+            class="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider"
           >
             {{ t("schedules.stats.activeRules") }}
           </div>
@@ -41,7 +45,7 @@
         </div>
         <div class="flex-1 px-3.5 py-2 border-r border-border">
           <div
-            class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider"
+            class="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider"
           >
             {{ t("schedules.stats.disabledRules") }}
           </div>
@@ -51,7 +55,7 @@
         </div>
         <div class="flex-1 px-3.5 py-2">
           <div
-            class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider"
+            class="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider"
           >
             {{ t("schedules.stats.coveredDays") }}
           </div>
@@ -70,12 +74,13 @@
         >
           <!-- Group header row -->
           <div
-            class="flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors hover:bg-muted/40"
+            class="flex items-center gap-2.5 h-10 px-4 cursor-pointer transition-colors hover:bg-muted/40"
+            :class="{ 'bg-foreground/[0.03]': expandedGroupId === group.id }"
             @click="toggleExpand(group.id)"
           >
-            <ChevronDown
-              class="size-4 text-muted-foreground/40 shrink-0 transition-transform"
-              :class="{ 'rotate-180': expandedGroupId === group.id }"
+            <ChevronRight
+              class="size-3.5 text-muted-foreground/40 shrink-0 transition-transform"
+              :class="{ 'rotate-90': expandedGroupId === group.id }"
             />
             <span
               class="font-mono text-[13px] font-semibold text-foreground shrink-0"
@@ -83,7 +88,7 @@
             >
             <span
               v-if="schedulesByGroup[group.id]?.length"
-              class="font-mono text-[11px] px-1.5 py-px rounded-full bg-primary/15 text-primary"
+              class="font-mono text-[10px] px-[7px] py-px rounded-full bg-primary/15 text-primary"
             >
               {{
                 t("schedules.ruleCount", {
@@ -93,35 +98,37 @@
             </span>
             <span
               v-else
-              class="font-mono text-[11px] px-1.5 py-px rounded-full bg-foreground/5 text-muted-foreground"
+              class="font-mono text-[10px] px-[7px] py-px rounded-full bg-foreground/5 text-muted-foreground"
+              >{{ t("schedules.noRules") }}</span
             >
-              {{ t("schedules.noRules") }}
-            </span>
             <div class="flex-1 flex flex-wrap gap-1 min-w-0">
               <span
                 v-for="s in (schedulesByGroup[group.id] ?? []).slice(0, 3)"
                 :key="s.id"
-                class="text-[10px] px-1.5 py-px rounded bg-foreground/5 text-muted-foreground"
+                class="text-[11px] font-medium px-1.5 py-px rounded bg-foreground/5 text-muted-foreground"
+                >{{ s.name }}</span
               >
-                {{ s.name }}
-                <span class="font-mono text-[9px] text-muted-foreground/60"
-                  >{{ formatHour(s.start_hour) }}-{{
-                    formatHour(s.end_hour)
-                  }}</span
-                >
-              </span>
               <span
                 v-if="(schedulesByGroup[group.id]?.length ?? 0) > 3"
                 class="text-[10px] text-muted-foreground/50 self-center"
+                >+{{ schedulesByGroup[group.id].length - 3 }}</span
               >
-                +{{ schedulesByGroup[group.id].length - 3 }}
-              </span>
             </div>
+            <span
+              class="size-1.5 rounded-full shrink-0"
+              :class="
+                groupAllActive(group.id)
+                  ? 'bg-success'
+                  : groupHasRules(group.id)
+                    ? 'bg-warning'
+                    : ''
+              "
+            />
           </div>
 
           <!-- Expanded content -->
           <template v-if="expandedGroupId === group.id">
-            <!-- Week Timeline -->
+            <!-- Timeline -->
             <div class="px-4 py-3 border-t border-border">
               <div class="text-[11px] font-semibold text-muted-foreground mb-2">
                 {{ t("schedules.timeline.weekView") }}
@@ -129,128 +136,136 @@
               <WeekTimeline :rules="timelineRules(group.id)" />
             </div>
 
-            <!-- Rules header bar -->
-            <div
-              class="flex items-center justify-between px-4 py-1.5 border-t border-b border-border bg-muted/30 dark:bg-muted/50"
-            >
-              <span
-                class="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider"
-                >{{ t("schedules.scheduleRules") }}</span
-              >
-              <Button
-                size="xs"
-                variant="outline"
-                class="h-6 text-[11px]"
-                @click="openCreate(group.id)"
-              >
-                <Plus class="w-3 h-3 mr-1" />
-                {{ t("schedules.createSchedule") }}
-              </Button>
-            </div>
-
             <!-- Rules table -->
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead
-                    class="text-muted-foreground text-[11px] h-8 uppercase tracking-wider font-semibold"
-                    >{{ t("schedules.tableHeaders.name") }}</TableHead
-                  >
-                  <TableHead
-                    class="text-muted-foreground text-[11px] h-8 uppercase tracking-wider font-semibold"
-                    >{{ t("schedules.tableHeaders.status") }}</TableHead
-                  >
-                  <TableHead
-                    class="text-muted-foreground text-[11px] h-8 uppercase tracking-wider font-semibold"
-                    >{{ t("schedules.tableHeaders.week") }}</TableHead
-                  >
-                  <TableHead
-                    class="text-muted-foreground text-[11px] h-8 uppercase tracking-wider font-semibold"
-                    >{{ t("schedules.tableHeaders.timeRange") }}</TableHead
-                  >
-                  <TableHead
-                    class="text-right text-muted-foreground text-[11px] h-8 uppercase tracking-wider font-semibold"
-                    >{{ t("schedules.tableHeaders.actions") }}</TableHead
-                  >
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <TableRow
-                  v-for="s in schedulesByGroup[group.id] ?? []"
-                  :key="s.id"
-                  class="hover:bg-muted/40"
-                >
-                  <TableCell class="font-medium text-[13px] py-2">{{
-                    s.name
-                  }}</TableCell>
-                  <TableCell class="py-2">
-                    <span
-                      class="inline-flex items-center gap-1.5 text-[11px] font-medium"
-                      :class="
-                        s.enabled ? 'text-success' : 'text-muted-foreground'
-                      "
+            <div class="pl-11">
+              <Table>
+                <!-- prettier-ignore -->
+                <TableHeader>
+                  <TableRow class="bg-muted/30 dark:bg-muted/50">
+                    <TableHead class="text-muted-foreground/70 text-[11px] h-8 uppercase tracking-wider font-semibold" style="width: 16%">{{ t("schedules.tableHeaders.name") }}</TableHead>
+                    <TableHead class="text-muted-foreground/70 text-[11px] h-8 uppercase tracking-wider font-semibold" style="width: 14%">{{ t("schedules.tableHeaders.week") }}</TableHead>
+                    <TableHead class="text-muted-foreground/70 text-[11px] h-8 uppercase tracking-wider font-semibold" style="width: 14%">{{ t("schedules.tableHeaders.timeRange") }}</TableHead>
+                    <TableHead class="text-muted-foreground/70 text-[11px] h-8 uppercase tracking-wider font-semibold" style="width: 10%">{{ t("schedules.tableHeaders.status") }}</TableHead>
+                    <TableHead class="text-muted-foreground/70 text-[11px] h-8 uppercase tracking-wider font-semibold" style="width: 30%">{{ t("schedules.tableHeaders.targets") }}</TableHead>
+                    <TableHead
+                      class="text-right text-muted-foreground/70 text-[11px] h-8 uppercase tracking-wider font-semibold"
+                      style="width: 16%"
                     >
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        class="h-5 text-[11px]"
+                        @click="openCreate(group.id)"
+                      >
+                        <Plus class="w-3 h-3 mr-1" />{{
+                          t("schedules.createSchedule")
+                        }}
+                      </Button>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow
+                    v-for="s in schedulesByGroup[group.id] ?? []"
+                    :key="s.id"
+                    class="hover:bg-muted/40"
+                  >
+                    <TableCell class="font-medium text-[13px] h-9">{{
+                      s.name
+                    }}</TableCell>
+                    <TableCell class="h-9">
                       <span
-                        class="size-1.5 rounded-full"
+                        v-if="smartWeekLabel(s.week)"
+                        class="text-[11px] font-medium text-muted-foreground"
+                        >{{ smartWeekLabel(s.week) }}</span
+                      >
+                      <div v-else class="flex flex-wrap gap-1">
+                        <span
+                          v-for="day in parseWeek(s.week)"
+                          :key="day"
+                          class="text-[11px] font-medium px-1.5 py-px rounded bg-foreground/5 text-muted-foreground"
+                          >{{ day }}</span
+                        >
+                      </div>
+                    </TableCell>
+                    <TableCell class="font-mono text-[12px] font-medium h-9"
+                      >{{ formatHour(s.start_hour) }}-{{
+                        formatHour(s.end_hour)
+                      }}</TableCell
+                    >
+                    <TableCell class="h-9">
+                      <span
+                        class="inline-flex items-center gap-1.5 text-[11px] font-semibold"
                         :class="
-                          s.enabled ? 'bg-success' : 'bg-muted-foreground/50'
+                          s.enabled
+                            ? 'text-success'
+                            : 'text-muted-foreground/60'
                         "
-                      />
-                      {{
-                        s.enabled
-                          ? t("schedules.enabled")
-                          : t("schedules.disabled")
-                      }}
-                    </span>
-                  </TableCell>
-                  <TableCell class="py-2">
-                    <div class="flex flex-wrap gap-1">
-                      <span
-                        v-for="day in parseWeek(s.week)"
-                        :key="day"
-                        class="text-[10px] px-1.5 py-px rounded border border-border text-muted-foreground"
-                        >{{ day }}</span
                       >
-                    </div>
-                  </TableCell>
-                  <TableCell class="font-mono text-[12px] py-2"
-                    >{{ formatHour(s.start_hour) }}-{{
-                      formatHour(s.end_hour)
-                    }}</TableCell
-                  >
-                  <TableCell class="text-right py-2">
-                    <div class="flex items-center justify-end gap-1">
-                      <Switch
-                        :model-value="!!s.enabled"
-                        class="scale-75"
-                        @click.stop="handleToggle(s)"
-                      />
-                      <Button
-                        variant="ghost"
-                        size="xs"
-                        class="text-[11px]"
-                        @click="openEdit(s)"
-                        >{{ t("common.edit") }}</Button
-                      >
-                      <Button
-                        variant="ghost"
-                        size="xs"
-                        class="text-[11px] text-destructive hover:text-destructive"
-                        @click="deleteTarget = s"
-                        >{{ t("common.delete") }}</Button
-                      >
-                    </div>
-                  </TableCell>
-                </TableRow>
-                <TableRow v-if="!schedulesByGroup[group.id]?.length">
-                  <TableCell
-                    colspan="5"
-                    class="text-center text-muted-foreground py-6 text-xs"
-                    >{{ t("schedules.emptyRules") }}</TableCell
-                  >
-                </TableRow>
-              </TableBody>
-            </Table>
+                        <span
+                          class="size-1.5 rounded-full"
+                          :class="
+                            s.enabled ? 'bg-success' : 'bg-muted-foreground/50'
+                          "
+                        />
+                        {{
+                          s.enabled
+                            ? t("schedules.enabled")
+                            : t("schedules.disabled")
+                        }}
+                      </span>
+                    </TableCell>
+                    <TableCell class="h-9">
+                      <div class="flex flex-wrap gap-1">
+                        <span
+                          v-for="(tgt, ti) in parseTargets(s.mapping_rule)"
+                          :key="ti"
+                          class="inline-flex items-center gap-0.5 px-1.5 py-px rounded text-[11px] font-medium bg-foreground/5"
+                        >
+                          <span
+                            class="text-muted-foreground/60 font-mono text-[10px]"
+                            >{{ tgt.provider }}/</span
+                          >
+                          <span class="text-muted-foreground">{{
+                            tgt.model
+                          }}</span>
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell class="h-9 text-right">
+                      <div class="flex items-center justify-end gap-1">
+                        <Switch
+                          :model-value="!!s.enabled"
+                          class="scale-75"
+                          @click.stop="handleToggle(s)"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          class="size-6"
+                          @click="openEdit(s)"
+                          ><Pencil class="size-3.5"
+                        /></Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          class="size-6 hover:bg-destructive/10 text-destructive"
+                          @click="deleteTarget = s"
+                          ><Trash2 class="size-3.5"
+                        /></Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                  <TableRow v-if="!schedulesByGroup[group.id]?.length">
+                    <TableCell
+                      colspan="6"
+                      class="text-center text-muted-foreground py-6 text-xs"
+                      >{{ t("schedules.emptyRules") }}</TableCell
+                    >
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
           </template>
         </div>
 
@@ -281,7 +296,7 @@
             {{ formError }}
           </div>
 
-          <!-- Top: Name + Week + Time -->
+          <!-- Name + Week -->
           <div class="grid grid-cols-2 gap-3">
             <div>
               <Label class="text-xs text-muted-foreground">{{
@@ -485,7 +500,7 @@
       </DialogContent>
     </Dialog>
 
-    <!-- Delete confirm -->
+    <!-- Delete AlertDialog -->
     <AlertDialog
       :open="!!deleteTarget"
       @update:open="
@@ -520,7 +535,7 @@
 import { ref, computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { toast } from "vue-sonner";
-import { Plus, ChevronDown } from "lucide-vue-next";
+import { Plus, ChevronRight, Pencil, Trash2 } from "lucide-vue-next";
 import { api, getApiMessage } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -667,6 +682,16 @@ const mappingEntry = computed<MappingEntry>(() => {
   };
 });
 
+const providerGroups = computed<ProviderGroup[]>(() =>
+  providers.value.map((p) => ({
+    provider: { id: p.id, name: p.name },
+    models: (p.models ?? []).map((m) => ({
+      name: m.name,
+      contextWindow: m.context_window ?? DEFAULT_CONTEXT_WINDOW,
+    })),
+  })),
+);
+
 function safeParseWeek(weekStr: string): number[] {
   try {
     return JSON.parse(weekStr) as number[];
@@ -674,6 +699,66 @@ function safeParseWeek(weekStr: string): number[] {
     console.error("schedules.safeParseWeek:", e);
     return [];
   }
+}
+
+const WEEKDAY_COUNT = 5;
+const WEEKEND_START = 6;
+const WEEKEND_END_INDEX = 2;
+const FULL_WEEK = 7;
+const FIRST_WEEKDAY = 1;
+const LAST_WEEKDAY = 5;
+
+function smartWeekLabel(weekStr: string): string | null {
+  const arr = safeParseWeek(weekStr).sort((a, b) => a - b);
+  if (arr.length === FULL_WEEK) return t("schedules.everyDay");
+  if (
+    arr.length === WEEKDAY_COUNT &&
+    arr[0] === FIRST_WEEKDAY &&
+    arr[WEEKDAY_COUNT - 1] === LAST_WEEKDAY
+  )
+    return t("schedules.weekdays");
+  if (
+    arr.length === WEEKEND_END_INDEX &&
+    arr[0] === WEEKEND_START &&
+    arr[1] === FULL_WEEK
+  )
+    return t("schedules.weekend");
+  return null;
+}
+
+interface ParsedTarget {
+  provider: string;
+  model: string;
+}
+
+function parseTargets(mappingRule: string): ParsedTarget[] {
+  try {
+    const parsed = JSON.parse(mappingRule) as { targets?: MappingTarget[] };
+    return (parsed.targets ?? []).map((tgt) => ({
+      provider:
+        providers.value.find((p) => p.id === tgt.provider_id)?.name ??
+        tgt.provider_id,
+      model: tgt.backend_model ?? "",
+    }));
+  } catch (e: unknown) {
+    console.error("schedules.parseTargets:", e);
+    return [];
+  }
+}
+
+function groupAllActive(groupId: string): boolean {
+  const rules = schedulesByGroup.value[groupId] ?? [];
+  return rules.length > 0 && rules.every((r) => r.enabled);
+}
+
+function groupHasRules(groupId: string): boolean {
+  return (schedulesByGroup.value[groupId]?.length ?? 0) > 0;
+}
+
+function parseWeek(weekStr: string): string[] {
+  const labels = WEEK_LABELS.value;
+  const arr = safeParseWeek(weekStr);
+  return arr.map((d) => labels[d] ?? `${d}`);
 }
 
 function timelineRules(groupId: string): TimelineRule[] {
@@ -693,12 +778,6 @@ function handleTargetsUpdate(targets: MappingTarget[]) {
   form.value.targets = targets;
 }
 
-function parseWeek(weekStr: string): string[] {
-  const labels = WEEK_LABELS.value;
-  const arr = safeParseWeek(weekStr);
-  return arr.map((d) => labels[d] ?? `${d}`);
-}
-
 function formatHour(h: number): string {
   return `${h}`.padStart(PAD_WIDTH, "0") + ":00";
 }
@@ -711,6 +790,13 @@ function applyTimePreset(start: number, end: number) {
 
 function toggleExpand(groupId: string) {
   expandedGroupId.value = expandedGroupId.value === groupId ? null : groupId;
+}
+
+function toggleWeekDay(day: number) {
+  const idx = form.value.week.indexOf(day);
+  if (idx >= 0) form.value.week.splice(idx, 1);
+  else form.value.week.push(day);
+  delete errors.value.week;
 }
 
 async function loadGroups() {
@@ -738,23 +824,6 @@ async function loadAllSchedules() {
     console.error("schedules.loadAll:", e);
     toast.error(getApiMessage(e, t("schedules.loadSchedulesFailed")));
   }
-}
-
-const providerGroups = computed<ProviderGroup[]>(() =>
-  providers.value.map((p) => ({
-    provider: { id: p.id, name: p.name },
-    models: (p.models ?? []).map((m) => ({
-      name: m.name,
-      contextWindow: m.context_window ?? DEFAULT_CONTEXT_WINDOW,
-    })),
-  })),
-);
-
-function toggleWeekDay(day: number) {
-  const idx = form.value.week.indexOf(day);
-  if (idx >= 0) form.value.week.splice(idx, 1);
-  else form.value.week.push(day);
-  delete errors.value.week;
 }
 
 function openCreate(groupId: string) {

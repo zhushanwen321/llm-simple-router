@@ -11,6 +11,7 @@
     "status": "状态",
     "week": "星期",
     "timeRange": "时间段",
+    "targets": "目标",
     "actions": "操作"
   },
   "enabled": "启用",
@@ -19,6 +20,9 @@
   "noRules": "未配置",
   "noGroups": "暂无映射组，请先在模型映射页面创建",
   "ruleCount": "{count} 条规则",
+  "everyDay": "每天",
+  "weekdays": "周一~周五",
+  "weekend": "周六~周日",
   "pleaseSelectGroup": "请先选择一个映射组",
   "timePresets": {
     "label": "快捷选择",

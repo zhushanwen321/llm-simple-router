@@ -170,7 +170,7 @@ function enhancementLabel(raw: string | null): string {
     </TableCell>
 
     <TableCell
-      class="text-destructive text-xs min-w-0 max-w-[240px] lg:max-w-xs"
+      class="text-destructive text-xs min-w-0 max-w-60 lg:max-w-xs"
     >
       <template v-if="log.error_message">
         <Tooltip :delay-duration="300">

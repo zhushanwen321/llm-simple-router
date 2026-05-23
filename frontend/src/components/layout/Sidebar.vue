@@ -26,7 +26,7 @@
           <PopoverTrigger as-child>
             <Button
               variant="ghost"
-              class="flex flex-col items-start gap-0.5 px-0 h-auto"
+              class="flex flex-col items-start gap-0.5 px-0 h-auto border-0"
             >
               <span class="font-semibold text-[13px]">LLM Simple Router</span>
               <div class="flex items-center gap-1.5">
@@ -45,7 +45,7 @@
           <PopoverContent
             side="right"
             align="start"
-            class="w-80 p-0 ring-0 border-0 shadow-[0_4px_16px_oklch(0_0_0/0.15)] dark:shadow-[0_4px_16px_oklch(0_0_0/0.4)]"
+            class="w-80 p-0 ring-0 border border-white/[0.06] shadow-[0_4px_16px_oklch(0_0_0/0.15)] dark:shadow-[0_4px_16px_oklch(0_0_0/0.4)]"
           >
             <!-- 版本升级 -->
             <div
