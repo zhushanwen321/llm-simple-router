@@ -128,7 +128,7 @@ function timeLabel(hour: number): string {
           class="timeline-block group"
           :class="[
             !rule.enabled
-              ? 'bg-transparent !border-dashed border-[1.5px] border-muted-foreground text-muted-foreground'
+              ? 'bg-transparent !border-dashed border-[1.5px] border-muted-foreground/50 text-muted-foreground/60'
               : '',
           ]"
           :style="{
@@ -140,8 +140,10 @@ function timeLabel(hour: number): string {
         >
           <span v-if="!isNarrow(rule)" class="truncate">{{ rule.name }}</span>
           <div v-if="isNarrow(rule)" class="timeline-tooltip">
-            <div class="font-medium whitespace-nowrap">{{ rule.name }}</div>
-            <div class="text-[10px] opacity-70 whitespace-nowrap">
+            <div class="font-semibold whitespace-nowrap">{{ rule.name }}</div>
+            <div
+              class="font-mono text-[11px] text-muted-foreground whitespace-nowrap"
+            >
               {{ timeLabel(rule.startHour) }} - {{ timeLabel(rule.endHour) }}
             </div>
           </div>
@@ -179,7 +181,7 @@ function timeLabel(hour: number): string {
 
 .timeline-tooltip {
   @apply hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5;
-  @apply bg-popover text-popover-foreground border rounded-md shadow-lg px-2 py-1 z-30;
-  @apply whitespace-nowrap text-[10px];
+  @apply bg-popover text-popover-foreground border rounded-md shadow-lg px-2.5 py-1.5 z-30;
+  @apply whitespace-nowrap text-[11px];
 }
 </style>
