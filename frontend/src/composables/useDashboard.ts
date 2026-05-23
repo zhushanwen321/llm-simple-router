@@ -22,6 +22,74 @@ export interface DashboardStats {
   endTime: string | null;
 }
 
+// --- Constants ---
+
+const CACHE_TTL = 5000;
+const DEBOUNCE_MS = 300;
+const PERCENT_MULTIPLIER = 100;
+const MIN_WINDOWS_FOR_DELTA = 2;
+const HOURS_PER_DAY = 24;
+const MS_PER_HOUR = 3600_000;
+const DAYS_3 = 3;
+const DAYS_7 = 7;
+const PAD_WIDTH = 2;
+
+const TIMELINE_DURATIONS: Record<TimelineRange, number> = {
+  "24h": HOURS_PER_DAY * MS_PER_HOUR,
+  "3d": DAYS_3 * HOURS_PER_DAY * MS_PER_HOUR,
+  "7d": DAYS_7 * HOURS_PER_DAY * MS_PER_HOUR,
+};
+
+export type TimelineRange = "24h" | "3d" | "7d";
+
+// --- Helpers ---
+
+/** Date → SQLite-compatible "YYYY-MM-DD HH:mm:ss" (UTC) */
+function toDateTimeStr(d: Date): string {
+  const pad = (n: number) => n.toString().padStart(PAD_WIDTH, "0");
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
+}
+
+function getTimelineTimeRange(range: TimelineRange): {
+  start_time: string;
+  end_time: string;
+} {
+  const now = new Date();
+  const start = new Date(now.getTime() - TIMELINE_DURATIONS[range]);
+  return {
+    start_time: toDateTimeStr(start),
+    end_time: toDateTimeStr(now),
+  };
+}
+
+/** 检查两个时间窗口是否有重叠 */
+function windowsOverlap(
+  a: { start_time: string; end_time: string },
+  b: { start_time: string; end_time: string },
+): boolean {
+  const aStart = new Date(a.start_time).getTime();
+  const aEnd = new Date(a.end_time).getTime();
+  const bStart = new Date(b.start_time).getTime();
+  const bEnd = new Date(b.end_time).getTime();
+  return aStart < bEnd && aEnd > bStart;
+}
+
+/** 从 usageWindows 中按 provider_id 聚合与目标窗口重叠的 output tokens */
+function aggregateProviderTokens(
+  windows: UsageWindowWithUsage[],
+  targetWindow: { start_time: string; end_time: string },
+): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const w of windows) {
+    if (!w.window.provider_id || w.usage.total_output_tokens <= 0) continue;
+    if (windowsOverlap(w.window, targetWindow)) {
+      const existing = map.get(w.window.provider_id) ?? 0;
+      map.set(w.window.provider_id, existing + w.usage.total_output_tokens);
+    }
+  }
+  return map;
+}
+
 // --- useDashboardFilters ---
 
 function useDashboardFilters(
@@ -204,11 +272,8 @@ function useDashboardData(
 
   const loadError = ref(false);
 
-  const DEBOUNCE_MS = 300;
-  const CACHE_TTL = 5000;
   let lastRefreshKey = "";
   let lastRefreshTime = 0;
-  let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
   async function refresh() {
     if (!selectedProvider.value) return;
@@ -224,13 +289,27 @@ function useDashboardData(
         }
         : undefined;
 
+      // Fix #1: 将选中窗口的时间范围合并进 stats 和 cache summary 请求参数
+      const finalStatsParams: Record<string, string> = {
+        ...statsParams.value,
+      };
+      const finalCacheSummaryParams: Record<string, string> = {
+        ...cacheSummaryParams.value,
+      };
+      if (windowTimeRange) {
+        finalStatsParams.start_time = windowTimeRange.startTime;
+        finalStatsParams.end_time = windowTimeRange.endTime;
+        finalCacheSummaryParams.start_time = windowTimeRange.startTime;
+        finalCacheSummaryParams.end_time = windowTimeRange.endTime;
+      }
+
       const [statsRes, tpsRes, inputRes, outputRes, summaryRes] =
         await Promise.allSettled([
-          api.getStats(statsParams.value),
+          api.getStats(finalStatsParams),
           api.getMetricsTimeseries(tsParams("total_tps", windowTimeRange)),
           api.getMetricsTimeseries(tsParams("input_tokens", windowTimeRange)),
           api.getMetricsTimeseries(tsParams("output_tokens", windowTimeRange)),
-          api.getMetricsSummary(cacheSummaryParams.value),
+          api.getMetricsSummary(finalCacheSummaryParams),
         ]);
 
       const fulfilled = <T>(
@@ -328,16 +407,6 @@ function useDashboardData(
     }
   }
 
-  // debounced watch on watchKey
-  watch(watchKey, () => {
-    if (refreshTimer) clearTimeout(refreshTimer);
-    refreshTimer = setTimeout(() => refresh(), DEBOUNCE_MS);
-  });
-
-  onUnmounted(() => {
-    if (refreshTimer) clearTimeout(refreshTimer);
-  });
-
   return {
     stats,
     cacheHitRate,
@@ -361,6 +430,9 @@ export function useDashboard() {
   const providers = ref<Provider[]>([]);
   const selectedProvider = ref("");
 
+  // --- Timeline range ---
+  const timelineRange = ref<TimelineRange>("24h");
+
   // --- Usage windows ---
   const usageWindows = ref<UsageWindowWithUsage[]>([]);
   const selectedWindowId = ref<string | null>(null);
@@ -373,14 +445,20 @@ export function useDashboard() {
     );
   });
 
-  // Timeline 渲染用：按 start_time 排序的窗口列表
-  const timelineWindows = computed(() =>
-    [...usageWindows.value].sort(
+  // Timeline 渲染用：按 start_time 排序，如果 selectedProvider 有值则按 provider_id 过滤
+  const timelineWindows = computed(() => {
+    let windows = [...usageWindows.value].sort(
       (a, b) =>
         new Date(a.window.start_time).getTime() -
         new Date(b.window.start_time).getTime(),
-    ),
-  );
+    );
+    if (selectedProvider.value) {
+      windows = windows.filter(
+        (w) => w.window.provider_id === selectedProvider.value,
+      );
+    }
+    return windows;
+  });
 
   // --- Filters & params ---
   const {
@@ -396,59 +474,24 @@ export function useDashboard() {
   } = useDashboardFilters(selectedProvider, providers, t);
 
   // --- Derived: provider token labels from usageWindows ---
+  // Fix #3: 使用时间重叠匹配替代 id/exact time 匹配
   const providerTokenLabels = computed(() => {
     const map = new Map<string, string>();
     const window = selectedWindow.value;
     if (!window) return map;
-    // 从 timelineWindows 中提取当前窗口下各 provider 的 output tokens
-    for (const w of usageWindows.value) {
-      if (
-        w.window.id === window.window.id &&
-        w.window.provider_id &&
-        w.usage.total_output_tokens > 0
-      ) {
-        map.set(
-          w.window.provider_id,
-          formatProviderTokenLabel(w.usage.total_output_tokens),
-        );
-      }
-    }
-    // 所有 provider 窗口：选中窗口 id 下可能有多个 provider 的窗口
-    // usageWindows 中相同 window.id 可能有不同 provider_id 条目，
-    // 上面已处理。但同一时间范围的窗口 id 可能不同，
-    // 需要匹配 start_time 和 end_time 来找同范围的所有 provider 窗口
-    for (const w of usageWindows.value) {
-      if (
-        w.window.provider_id &&
-        w.usage.total_output_tokens > 0 &&
-        w.window.start_time === window.window.start_time &&
-        w.window.end_time === window.window.end_time &&
-        w.window.id !== window.window.id
-      ) {
-        map.set(
-          w.window.provider_id,
-          formatProviderTokenLabel(w.usage.total_output_tokens),
-        );
-      }
+    const tokenMap = aggregateProviderTokens(usageWindows.value, window.window);
+    for (const [id, tokens] of tokenMap) {
+      map.set(id, formatProviderTokenLabel(tokens));
     }
     return map;
   });
 
   // --- Provider sorting based on current window's output tokens ---
   const sortedProviders = computed(() => {
-    const tokenMap = new Map<string, number>();
     const window = selectedWindow.value;
-    if (window) {
-      for (const w of usageWindows.value) {
-        if (
-          w.window.provider_id &&
-          w.window.start_time === window.window.start_time &&
-          w.window.end_time === window.window.end_time
-        ) {
-          tokenMap.set(w.window.provider_id, w.usage.total_output_tokens);
-        }
-      }
-    }
+    const tokenMap = window
+      ? aggregateProviderTokens(usageWindows.value, window.window)
+      : new Map<string, number>();
     return [...providers.value].sort((a, b) => {
       const aOut = tokenMap.get(a.id) ?? 0;
       const bOut = tokenMap.get(b.id) ?? 0;
@@ -464,6 +507,7 @@ export function useDashboard() {
       modelFilter: modelFilter.value,
       keyFilter: keyFilter.value,
       clientType: clientType.value,
+      timelineRange: timelineRange.value,
     }),
   );
 
@@ -496,7 +540,6 @@ export function useDashboard() {
     const prev = prevWindowStats.value;
     const curr = stats.value;
     if (!prev) return null;
-    const PERCENT_MULTIPLIER = 100;
     function delta(cur: number, prv: number): string {
       if (prv === 0) return cur > 0 ? "+100.0" : "0.0";
       return (((cur - prv) / prv) * PERCENT_MULTIPLIER).toFixed(1);
@@ -513,7 +556,6 @@ export function useDashboard() {
   async function loadPrevWindowStats() {
     const sorted = timelineWindows.value;
     const window = selectedWindow.value;
-    const MIN_WINDOWS_FOR_DELTA = 2;
     if (!window || sorted.length < MIN_WINDOWS_FOR_DELTA) {
       prevWindowStats.value = null;
       return;
@@ -525,7 +567,6 @@ export function useDashboard() {
     }
     const prevWindow = sorted[idx - 1];
     try {
-      // 用前一个窗口的 start_time/end_time 作为时间范围，不依赖 period=window
       const params: Record<string, string> = {
         period: "window",
         start_time: prevWindow.window.start_time,
@@ -578,9 +619,11 @@ export function useDashboard() {
   }
 
   // --- Load usage windows ---
+  // Fix #2: 传入 start_time/end_time 限制窗口范围
   async function loadUsageWindows() {
     try {
-      usageWindows.value = await api.getUsageWindows();
+      const range = getTimelineTimeRange(timelineRange.value);
+      usageWindows.value = await api.getUsageWindows(range);
     } catch (e: unknown) {
       console.error("useDashboard.loadUsageWindows:", e);
       /* 降级：无窗口数据时 dashboard 仍可用 */
@@ -591,8 +634,10 @@ export function useDashboard() {
   // --- Auto-select latest window ---
   function autoSelectLatestWindow() {
     const sorted = timelineWindows.value;
-    if (sorted.length > 0 && !selectedWindowId.value) {
+    if (sorted.length > 0) {
       selectedWindowId.value = sorted[sorted.length - 1].window.id;
+    } else {
+      selectedWindowId.value = null;
     }
   }
 
@@ -604,6 +649,10 @@ export function useDashboard() {
   }
 
   // --- Watchers ---
+
+  // 初始化标志，避免 onMounted 期间 watcher 重复触发
+  const initialized = ref(false);
+
   // 切换 provider 时重置 modelFilter
   watch(selectedProvider, () => {
     if (
@@ -614,9 +663,25 @@ export function useDashboard() {
     }
   });
 
-  // 窗口切换时加载前一个窗口的 stats 用于环比
-  watch(selectedWindowId, () => {
-    loadPrevWindowStats();
+  // Watch provider/range 变化 → 重新加载窗口 + 自动选择 + 刷新
+  watch([selectedProvider, timelineRange], async () => {
+    if (!initialized.value) return;
+    await loadUsageWindows();
+    autoSelectLatestWindow();
+    await refresh();
+    await loadPrevWindowStats();
+  });
+
+  // Watch selectedWindowId/filter 变化 → debounced refresh + loadPrev
+  let filterDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+  watch([selectedWindowId, modelFilter, keyFilter, clientType], () => {
+    if (!initialized.value) return;
+    if (filterDebounceTimer) clearTimeout(filterDebounceTimer);
+    filterDebounceTimer = setTimeout(async () => {
+      await refresh();
+      await loadPrevWindowStats();
+    }, DEBOUNCE_MS);
   });
 
   // --- Watch theme changes to re-render charts ---
@@ -643,11 +708,13 @@ export function useDashboard() {
     autoSelectProviderIfNeeded();
     await refresh();
     await loadPrevWindowStats();
+    initialized.value = true;
     stopWatchTheme = watchTheme(() => refresh());
   });
 
   onUnmounted(() => {
     if (stopWatchTheme) stopWatchTheme();
+    if (filterDebounceTimer) clearTimeout(filterDebounceTimer);
   });
 
   return {
@@ -659,6 +726,7 @@ export function useDashboard() {
     selectedWindowId,
     selectedWindow,
     timelineWindows,
+    timelineRange,
     modelFilter,
     keyFilter,
     clientType,

@@ -334,15 +334,31 @@
       <!-- Zone 4: Timeline window navigator -->
       <div class="bg-card rounded-lg ring-1 ring-foreground/10 px-4 py-2.5">
         <div class="flex items-center justify-between mb-1.5">
-          <span class="font-mono text-xs font-medium text-foreground">{{
-            windowTimeRange
-          }}</span>
+          <div class="flex items-center gap-3">
+            <span class="font-mono text-xs font-medium text-foreground">{{
+              windowTimeRange
+            }}</span>
+            <div class="flex gap-0.5">
+              <Button
+                v-for="opt in timelineZoomOptions"
+                :key="opt.value"
+                :variant="timelineRange === opt.value ? 'secondary' : 'ghost'"
+                size="sm"
+                class="h-5 px-1.5 text-[10px] font-mono"
+                @click="timelineRange = opt.value"
+              >
+                {{ opt.label }}
+              </Button>
+            </div>
+          </div>
           <span class="text-[11px] text-muted-foreground/60">{{
             t("dashboard.timeline.hint")
           }}</span>
         </div>
         <TooltipProvider v-if="usageWindows.length > 0">
-          <div class="relative h-7 bg-muted/40 rounded overflow-hidden">
+          <div
+            class="relative h-7 rounded overflow-hidden border border-border/50 bg-muted/20"
+          >
             <div
               v-for="w in timelineWindows"
               :key="w.window.id"
@@ -462,6 +478,7 @@ const {
   deltaValues,
   windowTimeRange,
   timelineWindows,
+  timelineRange,
   retry,
 } = useDashboard();
 
@@ -490,15 +507,34 @@ function chartOpts(labels: string[]) {
 // --- Cache hit chart: reuse inputTokensChartData as a placeholder (no dedicated cache timeseries) ---
 const cacheHitChartData = computed(() => inputTokensChartData.value);
 
-// --- Timeline constants and computed ---
-const TIMELINE_HOURS = 168;
+// --- Timeline zoom options ---
+const timelineZoomOptions = [
+  { value: "24h" as const, label: "24h" },
+  { value: "3d" as const, label: "3d" },
+  { value: "7d" as const, label: "7d" },
+];
+
+// --- Timeline constants ---
 const MS_PER_HOUR = 3600000;
-const TIMELINE_MS = TIMELINE_HOURS * MS_PER_HOUR;
 const HOURS_PER_DAY = 24;
 const DAY_MS = HOURS_PER_DAY * MS_PER_HOUR;
-const DAYS_IN_WEEK = 7;
+const DAYS_3 = 3;
+const DAYS_7 = 7;
 const PERCENT = 100;
 const PAD_WIDTH = 2;
+
+// Timeline duration based on current zoom level
+const timelineDurationMs = computed(() => {
+  const durations: Record<string, number> = {
+    "24h": HOURS_PER_DAY * MS_PER_HOUR,
+    "3d": DAYS_3 * DAY_MS,
+    "7d": DAYS_7 * DAY_MS,
+  };
+  return durations[timelineRange.value] ?? durations["24h"];
+});
+const timelineDurationHours = computed(() =>
+  Math.round(timelineDurationMs.value / MS_PER_HOUR),
+);
 
 // Intensity thresholds (output tokens)
 const INTENSITY_T4 = 3000000;
@@ -506,24 +542,26 @@ const INTENSITY_T3 = 1500000;
 const INTENSITY_T2 = 500000;
 
 const timelineStart = computed(() => {
-  const sorted = timelineWindows.value;
-  if (sorted.length === 0) return null;
-  const latestEnd = new Date(sorted[sorted.length - 1].window.end_time);
-  return new Date(latestEnd.getTime() - TIMELINE_MS);
+  const now = new Date();
+  return new Date(now.getTime() - timelineDurationMs.value);
 });
 
 function getWindowLeft(w: UsageWindowWithUsage): string {
   if (!timelineStart.value) return "0%";
   const start = new Date(w.window.start_time).getTime();
   const offset = start - timelineStart.value.getTime();
-  return (offset / TIMELINE_MS) * PERCENT + "%";
+  // Clip to [0%, 100%]
+  if (offset < 0) return "0%";
+  const pct = (offset / timelineDurationMs.value) * PERCENT;
+  return pct > PERCENT ? "100%" : pct + "%";
 }
 
 function getWindowWidth(w: UsageWindowWithUsage): string {
   const dur =
     new Date(w.window.end_time).getTime() -
     new Date(w.window.start_time).getTime();
-  return (dur / TIMELINE_MS) * PERCENT + "%";
+  const pct = (dur / timelineDurationMs.value) * PERCENT;
+  return Math.min(pct, PERCENT) + "%";
 }
 
 function getWindowStyle(w: UsageWindowWithUsage): Record<string, string> {
@@ -553,11 +591,12 @@ const timelineDayLabels = computed(() => {
   if (!timelineStart.value) return [];
   const labels: { label: string; position: number }[] = [];
   const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  for (let d = 0; d < DAYS_IN_WEEK; d++) {
+  const totalDays = Math.ceil(timelineDurationHours.value / HOURS_PER_DAY);
+  for (let d = 0; d < totalDays; d++) {
     const dayStart = new Date(timelineStart.value.getTime() + d * DAY_MS);
     labels.push({
       label: `${weekdays[dayStart.getDay()]} ${dayStart.getMonth() + 1}/${dayStart.getDate()}`,
-      position: ((d * HOURS_PER_DAY) / TIMELINE_HOURS) * PERCENT,
+      position: ((d * HOURS_PER_DAY) / timelineDurationHours.value) * PERCENT,
     });
   }
   return labels;
