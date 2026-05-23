@@ -1,5 +1,7 @@
 # Dashboard 页面分析
 
+> **此文档为旧版 Dashboard 分析。** 新版 4-zone 设计文档见 [`docs/design/dashboard-redesign.md`](../design/dashboard-redesign.md)。
+
 ## 文件结构
 
 | 文件 | 行数 | 角色 |
