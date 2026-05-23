@@ -36,8 +36,8 @@
                 >
                 <span
                   v-if="updateCount > 0"
-                  class="inline-flex items-center h-4 px-1.5 rounded bg-destructive/10 text-destructive font-mono text-[10px] font-medium leading-none"
-                  >{{ updateCount }} update</span
+                  class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-destructive text-destructive-foreground font-mono text-[10px] font-medium leading-none"
+                  >{{ updateCount }}</span
                 >
               </div>
             </Button>
@@ -45,7 +45,7 @@
           <PopoverContent
             side="right"
             align="start"
-            class="w-80 p-0 ring-0 border border-white/[0.06] shadow-[0_4px_16px_oklch(0_0_0/0.15)] dark:shadow-[0_4px_16px_oklch(0_0_0/0.4)]"
+            class="w-80 p-0 ring-0 border-0 shadow-[0_4px_16px_oklch(0_0_0/0.15)] dark:shadow-[0_4px_16px_oklch(0_0_0/0.4)]"
           >
             <!-- 版本升级 -->
             <div

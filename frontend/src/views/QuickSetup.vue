@@ -27,7 +27,7 @@
         </div>
       </CardHeader>
       <CardContent>
-        <div class="flex gap-2 flex-wrap p-3 rounded-lg border border-border bg-muted/20">
+        <div class="flex gap-2 flex-wrap">
           <Button
             v-for="c in CLIENTS"
             :key="c.id"

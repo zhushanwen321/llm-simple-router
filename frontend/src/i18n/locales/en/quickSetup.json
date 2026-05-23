@@ -35,7 +35,8 @@
     "config": "Model Configuration",
     "selectProviderFirst": "Please select a provider and plan first",
     "namePlaceholder": "Enter model name",
-    "contextCustom": "Custom"
+    "contextCustom": "Custom",
+    "contextWindow": "Context Window"
   },
   "patch": {
     "deepseekAnthropic": "DeepSeek Compatible (Anthropic)",
