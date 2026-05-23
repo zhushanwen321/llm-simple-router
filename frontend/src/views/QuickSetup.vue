@@ -20,8 +20,9 @@
           <Badge
             v-if="clientType"
             variant="outline"
-            class="text-[10px] px-1.5 py-0 leading-none border-primary/30 text-primary/70"
+            class="text-[10px] px-1.5 py-0 leading-none border-green-500/30 bg-green-500/10 text-green-500"
           >
+            <CheckCircle2 class="size-2.5 mr-0.5" />
             {{ t("common.selected") }}
           </Badge>
         </div>
@@ -40,13 +41,12 @@
             "
             @click="selectClient(c.id)"
           >
-            <ProviderIcon
-              :name="c.iconSvg ?? ''"
-              :size="24"
-              :class="
-                clientType === c.id ? 'text-primary' : 'text-muted-foreground'
-              "
-            />
+            <div
+              class="shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-[11px] font-bold text-white"
+              :class="c.brandBg"
+            >
+              {{ c.icon }}
+            </div>
             <div class="text-left">
               <div
                 class="font-medium text-sm leading-tight flex items-center gap-1.5"
@@ -69,9 +69,9 @@
         <!-- Info bar: auto-map description -->
         <div
           v-if="clientType"
-          class="mt-3 px-3 py-2 rounded-md bg-muted/30 border border-border/50 text-[11px] text-muted-foreground/70 flex items-center gap-1.5"
+          class="mt-2.5 px-3 py-2 rounded-md bg-primary/6 text-[11px] text-muted-foreground flex items-start gap-1.5"
         >
-          <Info class="size-3.5 shrink-0 text-muted-foreground/40" />
+          <Info class="size-3.5 shrink-0 text-primary mt-px" />
           <span>{{
             t("quickSetup.client.infoBar", {
               client: currentClient?.name ?? clientType,
@@ -92,7 +92,7 @@
     <Card class="ring-0">
       <CardHeader class="pb-3">
         <div class="flex items-center justify-between">
-          <CardTitle class="text-sm font-medium">Provider Connection</CardTitle>
+          <CardTitle class="text-sm font-medium">{{ t("quickSetup.provider.config") }}</CardTitle>
           <span
             v-if="selectedGroup"
             class="text-[10px] text-muted-foreground/50 flex items-center gap-1"
@@ -132,27 +132,8 @@
               </SelectContent>
             </Select>
           </div>
-          <!-- Custom mode: only plan placeholder -->
+          <!-- Custom mode: no extra fields here, Format/BaseURL are in Endpoint group -->
           <template v-if="isCustomProvider">
-            <div class="w-48 space-y-1">
-              <Label class="text-xs text-muted-foreground">{{
-                t("quickSetup.provider.format")
-              }}</Label>
-              <Select v-model="apiType">
-                <SelectTrigger class="w-full text-xs data-[size=default]:h-7"
-                  ><SelectValue
-                /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="anthropic">Anthropic Messages</SelectItem>
-                  <SelectItem value="openai"
-                    >OpenAI Chat Completions</SelectItem
-                  >
-                  <SelectItem value="openai-responses"
-                    >OpenAI Responses</SelectItem
-                  >
-                </SelectContent>
-              </Select>
-            </div>
           </template>
           <!-- Preset mode: plan selector -->
           <template v-else>
@@ -330,22 +311,14 @@
           >
         </div>
       </CardHeader>
-      <CardContent class="space-y-3">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-medium text-muted-foreground">{{
-              t("quickSetup.model.config")
-            }}</span>
-            <Badge variant="secondary" class="text-[10px]"
-              >{{ enabledModelCount }}/{{ modelConfigs.length }}</Badge
-            >
-          </div>
+      <CardContent>
           <p
             v-if="modelConfigs.length === 0"
             class="py-4 text-center text-xs text-muted-foreground"
           >
             {{ t("quickSetup.model.selectProviderFirst") }}
           </p>
-          <div v-else class="rounded-lg border border-border overflow-hidden">
+          <div v-else class="flex flex-col gap-px bg-border rounded-lg overflow-hidden">
             <ModelCard
               v-for="(model, index) in modelConfigs"
               :key="model.name"
@@ -380,63 +353,37 @@
               >{{ t("common.add") }}</Button
             >
           </div>
-        </div>
 
-        <!-- Line 3: Concurrency Control -->
-        <div class="border-t pt-3">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-medium text-muted-foreground">{{
-              t("quickSetup.concurrency.control")
-            }}</span>
-            <Badge
-              variant="outline"
-              class="text-[9px] px-1 py-0 leading-none text-muted-foreground/50"
+          <!-- Transform Rules (collapsible) -->
+          <div class="border-t pt-3 mt-3">
+            <button
+              type="button"
+              class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground w-full text-left hover:text-foreground transition-colors"
+              @click="showTransformRules = !showTransformRules"
             >
-              Optional
-            </Badge>
+              <ChevronRight
+                class="size-3 transition-transform"
+                :class="showTransformRules ? 'rotate-90' : ''"
+              />
+              {{ t("quickSetup.transform.title") }}
+              <Badge
+                variant="outline"
+                class="text-[9px] px-1 py-0 leading-none text-muted-foreground/50"
+              >
+                Optional
+              </Badge>
+            </button>
+            <div v-if="showTransformRules" class="mt-2">
+              <TransformRulesForm
+                :inject-headers="transformInjectHeaders"
+                :drop-fields="transformDropFields"
+                :request-defaults="transformRequestDefaults"
+                @update:inject-headers="transformInjectHeaders = $event"
+                @update:drop-fields="transformDropFields = $event"
+                @update:request-defaults="transformRequestDefaults = $event"
+              />
+            </div>
           </div>
-          <ConcurrencyControl
-            :mode="concurrencyMode"
-            :max-concurrency="maxConcurrency"
-            :queue-timeout-ms="queueTimeoutMs"
-            :max-queue-size="maxQueueSize"
-            @update:mode="onConcurrencyModeChange"
-            @update:max-concurrency="maxConcurrency = $event"
-            @update:queue-timeout-ms="queueTimeoutMs = $event"
-            @update:max-queue-size="maxQueueSize = $event"
-          />
-        </div>
-
-        <!-- Transform Rules (collapsible) -->
-        <div class="border-t pt-3">
-          <button
-            type="button"
-            class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground w-full text-left hover:text-foreground transition-colors"
-            @click="showTransformRules = !showTransformRules"
-          >
-            <ChevronRight
-              class="size-3 transition-transform"
-              :class="showTransformRules ? 'rotate-90' : ''"
-            />
-            {{ t("quickSetup.transform.title") }}
-            <Badge
-              variant="outline"
-              class="text-[9px] px-1 py-0 leading-none text-muted-foreground/50"
-            >
-              Optional
-            </Badge>
-          </button>
-          <div v-if="showTransformRules" class="mt-2">
-            <TransformRulesForm
-              :inject-headers="transformInjectHeaders"
-              :drop-fields="transformDropFields"
-              :request-defaults="transformRequestDefaults"
-              @update:inject-headers="transformInjectHeaders = $event"
-              @update:drop-fields="transformDropFields = $event"
-              @update:request-defaults="transformRequestDefaults = $event"
-            />
-          </div>
-        </div>
       </CardContent>
     </Card>
 
@@ -631,7 +578,7 @@
       </template>
       <template v-if="selectedGroup">
         <span class="text-muted-foreground/40">→</span>
-        <span class="text-foreground/80">{{
+        <span class="text-[11px] px-2 py-0.5 rounded bg-primary/8 text-primary font-medium">{{
           isCustomProvider ? t("quickSetup.provider.custom") : selectedGroup
         }}</span>
         <template v-if="selectedPlan">
@@ -720,7 +667,6 @@ import {
 } from "@/components/quick-setup/types";
 
 import SetupSteps from "@/components/quick-setup/SetupSteps.vue";
-import ProviderIcon from "@/components/icons/ProviderIcon.vue";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
