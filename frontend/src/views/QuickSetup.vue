@@ -1,11 +1,30 @@
 <template>
   <div class="p-6 space-y-4 pb-20">
+    <!-- Step indicator -->
+    <Card class="py-0">
+      <SetupSteps
+        :current-step="currentStep"
+        :client-selected="!!clientType"
+        :provider-configured="!!selectedGroup && !!selectedPlan"
+        :mappings-created="mappingEntries.length > 0"
+      />
+    </Card>
+
     <!-- Row 1: Client Selection -->
     <Card>
       <CardHeader class="pb-3">
-        <CardTitle class="text-sm font-medium">{{
-          t("quickSetup.client.selectClient")
-        }}</CardTitle>
+        <div class="flex items-center justify-between">
+          <CardTitle class="text-sm font-medium">{{
+            t("quickSetup.client.selectClient")
+          }}</CardTitle>
+          <Badge
+            v-if="clientType"
+            variant="outline"
+            class="text-[10px] px-1.5 py-0 leading-none border-primary/30 text-primary/70"
+          >
+            {{ t("common.selected") }}
+          </Badge>
+        </div>
       </CardHeader>
       <CardContent>
         <div class="flex gap-2 flex-wrap">
@@ -70,9 +89,18 @@
     <!-- Row 2: Provider Config -->
     <Card>
       <CardHeader class="pb-3">
-        <CardTitle class="text-sm font-medium">{{
-          t("quickSetup.provider.config")
-        }}</CardTitle>
+        <div class="flex items-center justify-between">
+          <CardTitle class="text-sm font-medium">{{
+            t("quickSetup.provider.config")
+          }}</CardTitle>
+          <span
+            v-if="selectedGroup"
+            class="text-[10px] text-muted-foreground/50 flex items-center gap-1"
+          >
+            <span class="iconify size-3" data-icon="lucide:sparkles"></span>
+            {{ t("quickSetup.provider.autoConfigured") }}
+          </span>
+        </div>
       </CardHeader>
       <CardContent class="space-y-4">
         <!-- Line 1: Provider / Plan / Format / BaseURL / APIKey -->
@@ -311,6 +339,12 @@
             <span class="text-xs font-medium text-muted-foreground">{{
               t("quickSetup.concurrency.control")
             }}</span>
+          <Badge
+            variant="outline"
+            class="text-[9px] px-1 py-0 leading-none text-muted-foreground/50"
+          >
+            Optional
+          </Badge>
           </div>
           <ConcurrencyControl
             :mode="concurrencyMode"
@@ -575,6 +609,7 @@ import TransformRulesForm from "@/components/shared/TransformRulesForm.vue";
 import type { ModelConfig } from "@/components/quick-setup/types";
 import { CLIENTS, DEFAULT_CLIENT_MAPPINGS } from "@/components/quick-setup/types";
 
+import SetupSteps from "@/components/quick-setup/SetupSteps.vue";
 import ProviderIcon from "@/components/icons/ProviderIcon.vue";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -639,6 +674,12 @@ const {
 const customModelInput = ref("");
 const showTransformRules = ref(false);
 const validationState = ref<"idle" | "valid" | "invalid">("idle");
+
+const currentStep = computed(() => {
+  if (!clientType.value) return 0;
+  if (!selectedGroup.value || !selectedPlan.value) return 1;
+  return 2;
+});
 
 function handleAddCustomModel() {
   if (!customModelInput.value.trim()) return;
