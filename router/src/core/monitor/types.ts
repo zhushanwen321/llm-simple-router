@@ -51,6 +51,8 @@ export interface AttemptSnapshot {
   error: string | null;
   latencyMs: number;
   providerId: string;
+  model?: string;
+  apiType?: string;
 }
 
 export interface StreamMetricsSnapshot {

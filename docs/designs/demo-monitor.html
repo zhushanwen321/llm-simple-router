@@ -1,561 +1,1046 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" class="dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>实时监控 - LLM Router Console</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
-    --bg: oklch(0.145 0 0);
-    --surface: oklch(0.205 0 0);
-    --surface-up: oklch(0.269 0 0);
+    --bg: oklch(0.13 0 0);
+    --surface: oklch(0.18 0 0);
+    --surface-up: oklch(0.22 0 0);
+    --surface-header: oklch(0.16 0 0);
     --fg: oklch(0.985 0 0);
-    --muted: oklch(0.708 0 0);
-    --border: oklch(1 0 0 / 10%);
+    --muted: oklch(0.556 0 0);
+    --muted-light: oklch(0.708 0 0);
+    --border: oklch(1 0 0 / 8%);
+    --border-strong: oklch(1 0 0 / 14%);
     --primary: oklch(0.68 0.13 175);
+    --primary-dim: oklch(0.68 0.13 175 / 15%);
+    --primary-ghost: oklch(0.68 0.13 175 / 8%);
     --success: oklch(0.65 0.17 150);
-    --success-bg: oklch(0.32 0.05 150);
+    --success-dim: oklch(0.65 0.17 150 / 12%);
     --warning: oklch(0.78 0.16 80);
-    --warning-bg: oklch(0.35 0.06 80);
+    --warning-dim: oklch(0.78 0.16 80 / 12%);
     --danger: oklch(0.58 0.22 25);
-    --danger-bg: oklch(0.30 0.08 25);
+    --danger-dim: oklch(0.58 0.22 25 / 12%);
     --info: oklch(0.62 0.18 250);
-    --info-bg: oklch(0.30 0.06 250);
-    --font-body: 'Inter', -apple-system, sans-serif;
-    --font-mono: 'JetBrains Mono', monospace;
+    --info-dim: oklch(0.62 0.18 250 / 12%);
+    --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
     --radius: 8px;
     --radius-sm: 6px;
+    --radius-xs: 4px;
   }
 
   body {
     font-family: var(--font-body);
     background: var(--bg);
     color: var(--fg);
+    font-size: 14px;
     line-height: 1.5;
-    padding: 2rem;
-    max-width: 1400px;
+    padding: 0;
+    margin: 0;
+  }
+
+  .page-wrap {
+    max-width: 1440px;
     margin: 0 auto;
+    padding: 20px 24px;
   }
 
-  .page-header { margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; }
-  .page-header h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.02em; }
-  .page-header p { color: var(--muted); font-size: 0.8125rem; margin-top: 0.25rem; }
-
-  /* Anchor Bar */
-  .anchor-bar {
-    display: flex; gap: 1.5rem; padding: 1rem 1.25rem;
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); margin-bottom: 1rem;
+  /* ========== PAGE HEADER ========== */
+  .page-header {
+    display: flex;
     align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
   }
-  .anchor-item { display: flex; flex-direction: column; gap: 0.125rem; }
-  .anchor-item .label { font-size: 0.6875rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
-  .anchor-item .value { font-family: var(--font-mono); font-size: 1.5rem; font-weight: 600; }
-  .anchor-item .value.success { color: var(--success); }
-  .anchor-item .value.warning-color { color: var(--warning); }
-  .anchor-item .value.primary-color { color: var(--primary); }
-  .anchor-divider { width: 1px; background: var(--border); align-self: stretch; }
-
+  .page-title {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--fg);
+  }
   .conn-badge {
-    display: inline-flex; align-items: center; gap: 0.375rem;
-    padding: 0.25rem 0.625rem; border-radius: 9999px;
-    font-size: 0.75rem; font-weight: 600;
-  }
-  .conn-badge.connected {
-    background: var(--success-bg); color: var(--success);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 9999px;
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--success-dim);
+    color: var(--success);
+    font-family: var(--font-mono);
   }
   .conn-dot {
-    width: 6px; height: 6px; border-radius: 50%;
-    background: var(--success); animation: pulse 2s infinite;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--success);
+    animation: pulse 2s infinite;
   }
   @keyframes pulse {
     0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
+    50% { opacity: 0.3; }
   }
 
-  /* Grid Layout */
-  .monitor-grid {
+  /* ========== PRIMARY STRIP: Active + Concurrency ========== */
+  .primary-strip {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-    margin-bottom: 1rem;
+    grid-template-columns: auto 1fr;
+    gap: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 12px;
+    overflow: hidden;
   }
 
-  /* Panel Card */
-  .panel {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); overflow: hidden;
+  /* Left: Active count block */
+  .active-block {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 20px;
+    border-right: 1px solid var(--border);
+    background: var(--primary-ghost);
   }
-  .panel-header {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 0.625rem 1rem;
-    border-bottom: 1px solid var(--border);
-    background: oklch(0.18 0 0);
+  .active-count {
+    font-family: var(--font-mono);
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--primary);
+    line-height: 1;
   }
-  .panel-title {
-    font-size: 0.75rem; font-weight: 600; color: var(--muted);
-    text-transform: uppercase; letter-spacing: 0.05em;
+  .active-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
   }
-  .panel-body { padding: 0.75rem 1rem; }
+  .active-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .active-sub {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted-light);
+  }
+  .queued-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 12px;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    background: var(--warning-dim);
+    color: var(--warning);
+  }
 
-  /* Provider Status Table */
-  .provider-table { width: 100%; border-collapse: collapse; }
-  .provider-table th {
-    font-size: 0.625rem; font-weight: 600; color: var(--muted);
-    text-transform: uppercase; letter-spacing: 0.05em;
-    padding: 0.375rem 0.5rem; text-align: left;
-    border-bottom: 1px solid var(--border);
+  /* Right: Concurrency bars */
+  .concurrency-block {
+    padding: 10px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    justify-content: center;
   }
-  .provider-table td {
-    padding: 0.375rem 0.5rem; font-size: 0.8125rem;
-    height: 32px; vertical-align: middle;
+  .concurrency-header {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 2px;
   }
-  .provider-table tr { border-bottom: 1px solid oklch(1 0 0 / 5%); }
-  .provider-table tr:last-child { border-bottom: none; }
-
-  .mono { font-family: var(--font-mono); font-size: 0.8125rem; }
-  .mono-sm { font-family: var(--font-mono); font-size: 0.75rem; }
-
-  /* Progress Bar */
-  .progress-bar {
-    width: 100%; height: 6px; background: oklch(0.269 0 0);
-    border-radius: 3px; overflow: hidden;
+  .concurrency-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
   }
-  .progress-bar .fill { height: 100%; border-radius: 3px; transition: width 300ms; }
-  .fill-teal { background: var(--primary); }
+  .concurrency-name {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted-light);
+    width: 64px;
+    flex-shrink: 0;
+  }
+  .concurrency-bar {
+    flex: 1;
+    height: 4px;
+    background: oklch(1 0 0 / 6%);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .concurrency-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 300ms ease-out;
+  }
+  .fill-primary { background: var(--primary); }
   .fill-success { background: var(--success); }
   .fill-warning { background: var(--warning); }
   .fill-danger { background: var(--danger); }
+  .concurrency-ratio {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted-light);
+    width: 40px;
+    text-align: right;
+    flex-shrink: 0;
+  }
 
-  /* Concurrency Panel */
-  .concurrency-item {
-    display: flex; justify-content: space-between; align-items: center;
-    margin-bottom: 0.5rem;
+  /* ========== REQUEST PANEL ========== */
+  .request-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 12px;
+    overflow: hidden;
   }
-  .concurrency-item:last-child { margin-bottom: 0; }
-  .concurrency-label { font-size: 0.8125rem; }
-  .concurrency-value { font-family: var(--font-mono); font-size: 0.8125rem; }
+  .request-tabs {
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-header);
+    padding: 0 12px;
+  }
+  .request-tab {
+    position: relative;
+    padding: 9px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+    cursor: pointer;
+    border: none;
+    background: none;
+    font-family: var(--font-body);
+    transition: color 150ms;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .request-tab:hover { color: var(--muted-light); }
+  .request-tab.active { color: var(--primary); }
+  .request-tab.active::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--primary);
+    border-radius: 1px 1px 0 0;
+  }
+  .tab-count {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 9999px;
+    background: oklch(1 0 0 / 8%);
+    color: var(--muted-light);
+  }
+  .request-tab.active .tab-count {
+    background: var(--primary-dim);
+    color: var(--primary);
+  }
 
-  /* Status Code Panel */
-  .status-item {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 0.5rem 0;
+  /* Request table */
+  .req-table { width: 100%; border-collapse: collapse; }
+  .req-table th {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 7px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-header);
   }
-  .status-item + .status-item { border-top: 1px solid oklch(1 0 0 / 5%); }
-  .status-label {
-    display: flex; align-items: center; gap: 0.375rem;
-    font-size: 0.8125rem; font-weight: 500;
+  .req-table th.num { text-align: right; }
+  .req-table td {
+    padding: 5px 12px;
+    font-size: 13px;
+    height: 34px;
+    vertical-align: middle;
+    border-bottom: 1px solid oklch(1 0 0 / 4%);
   }
-  .status-dot {
-    width: 8px; height: 8px; border-radius: 50%;
+  .req-table td.num {
+    text-align: right;
+    font-family: var(--font-mono);
+    font-size: 12px;
   }
-  .status-dot.success { background: var(--success); }
-  .status-dot.warning { background: var(--warning); }
-  .status-dot.danger { background: var(--danger); }
-  .status-value { font-family: var(--font-mono); font-size: 0.8125rem; }
-  .status-pct { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); margin-left: 0.375rem; }
+  .req-table tbody tr {
+    cursor: pointer;
+    transition: background 100ms;
+  }
+  .req-table tbody tr:hover { background: var(--surface-up); }
+  .req-table tbody tr.selected { background: var(--primary-ghost); }
+  .req-table tbody tr:last-child td { border-bottom: none; }
 
-  /* Runtime Panel */
-  .runtime-item {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 0.375rem 0;
+  .req-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
   }
-  .runtime-item + .runtime-item { border-top: 1px solid oklch(1 0 0 / 5%); }
-  .runtime-label { font-size: 0.8125rem; color: var(--muted); }
-  .runtime-value { font-family: var(--font-mono); font-size: 0.8125rem; }
+  .req-status-dot.streaming { background: var(--primary); animation: pulse 1.5s infinite; }
+  .req-status-dot.syncing { background: var(--muted-light); }
+  .req-status-dot.queued { background: var(--warning); animation: pulse 2s infinite; }
+  .req-status-dot.completed { background: var(--success); }
+  .req-status-dot.error { background: var(--danger); }
 
-  /* Active Request Table */
-  .active-table-wrap {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); overflow: hidden;
-  }
-  .active-table { width: 100%; border-collapse: collapse; }
-  .active-table th {
-    font-size: 0.6875rem; font-weight: 600; color: var(--muted);
-    text-transform: uppercase; letter-spacing: 0.05em;
-    padding: 0.625rem 0.75rem; text-align: left;
-    border-bottom: 1px solid var(--border); background: oklch(0.18 0 0);
-  }
-  .active-table td {
-    padding: 0.5rem 0.75rem; font-size: 0.8125rem;
-    height: 36px; vertical-align: middle;
-  }
-  .active-table tr { border-bottom: 1px solid var(--border); }
-  .active-table tr:last-child { border-bottom: none; }
-  .active-table tr:hover { background: oklch(0.22 0 0); }
+  .model-name { font-weight: 500; color: var(--fg); }
+  .provider-label { font-family: var(--font-mono); font-size: 11px; color: var(--muted-light); }
 
-  .badge {
-    display: inline-flex; align-items: center;
-    padding: 0.125rem 0.5rem; border-radius: 9999px;
-    font-size: 0.6875rem; font-weight: 600; white-space: nowrap;
+  .stream-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 6px;
+    border-radius: 9999px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    background: var(--primary-dim);
+    color: var(--primary);
   }
-  .badge-success { background: var(--success-bg); color: var(--success); }
-  .badge-warning { background: var(--warning-bg); color: var(--warning); }
-  .badge-danger { background: var(--danger-bg); color: var(--danger); }
-  .badge-muted { background: oklch(0.269 0 0); color: var(--muted); }
+  .stream-badge.sync {
+    background: oklch(1 0 0 / 6%);
+    color: var(--muted);
+  }
+  .stream-badge.queued-badge {
+    background: var(--warning-dim);
+    color: var(--warning);
+  }
 
-  .kill-btn {
-    font-family: var(--font-body); font-size: 0.75rem;
-    padding: 0.25rem 0.5rem; border-radius: 4px;
-    border: 1px solid var(--danger-bg); background: transparent;
-    color: var(--danger); cursor: pointer; transition: all 150ms;
+  /* Expanded row */
+  .req-detail-row { display: none; }
+  .req-detail-row.visible { display: table-row; }
+  .req-detail-row td {
+    padding: 0 12px 10px 12px !important;
+    border-bottom: 1px solid oklch(1 0 0 / 4%) !important;
   }
-  .kill-btn:hover { background: var(--danger-bg); }
-  .kill-confirm {
-    display: none; gap: 0.375rem; align-items: center;
-    font-size: 0.75rem; color: var(--danger);
+  .req-detail {
+    background: oklch(1 0 0 / 3%);
+    border-radius: var(--radius-sm);
+    padding: 8px 14px;
+    display: grid;
+    grid-template-columns: repeat(4, auto);
+    gap: 6px 24px;
   }
-  .kill-confirm.visible { display: flex; }
-  .kill-confirm button {
-    font-family: var(--font-body); font-size: 0.6875rem;
-    padding: 0.125rem 0.375rem; border-radius: 4px;
-    cursor: pointer; border: 1px solid var(--border);
+  .detail-label {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 600;
   }
-  .kill-yes { background: var(--danger); color: var(--fg); border-color: var(--danger); }
+  .detail-value {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--fg);
+    margin-top: 1px;
+  }
+
+  /* Action buttons */
+  .action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: var(--radius-xs);
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 100ms;
+    font-family: var(--font-body);
+  }
+  .action-btn:hover { background: oklch(1 0 0 / 8%); color: var(--fg); }
+  .action-btn.kill:hover { background: var(--danger-dim); color: var(--danger); }
+  .action-btn.copied { color: var(--success); }
+
+  .kill-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: var(--danger);
+  }
+  .kill-inline button {
+    font-family: var(--font-body);
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: var(--radius-xs);
+    cursor: pointer;
+    border: 1px solid var(--border);
+    font-weight: 500;
+  }
+  .kill-yes { background: var(--danger); color: var(--fg); border-color: var(--danger) !important; }
   .kill-no { background: transparent; color: var(--muted); }
 
-  /* Big number */
-  .big-num {
-    font-family: var(--font-mono); font-size: 2rem; font-weight: 700;
+  .empty-state {
+    padding: 24px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .scroll-area {
+    max-height: 380px;
+    overflow-y: auto;
+  }
+  .scroll-area::-webkit-scrollbar { width: 4px; }
+  .scroll-area::-webkit-scrollbar-track { background: transparent; }
+  .scroll-area::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 2px; }
+
+  /* ========== SECONDARY STRIP ========== */
+  .secondary-strip {
+    display: flex;
+    align-items: stretch;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+  .secondary-cell {
+    flex: 1;
+    padding: 8px 14px;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .secondary-cell:last-child { border-right: none; }
+  .secondary-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
     line-height: 1;
   }
-  .big-label {
-    font-size: 0.6875rem; color: var(--muted); text-transform: uppercase;
-    letter-spacing: 0.05em; margin-top: 0.25rem;
+  .secondary-value {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--fg);
+    line-height: 1.3;
   }
+  .secondary-value.text-success { color: var(--success); }
+  .secondary-value.text-warning { color: var(--warning); }
+  .secondary-value.text-danger { color: var(--danger); }
+  .secondary-sub {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--muted);
+  }
+
+  /* ========== BOTTOM: Provider Stats ========== */
+  .provider-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+  .section-header {
+    padding: 7px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-header);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .section-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .section-toggle {
+    font-family: var(--font-body);
+    font-size: 11px;
+    color: var(--muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: var(--radius-xs);
+    transition: all 100ms;
+  }
+  .section-toggle:hover { color: var(--fg); background: oklch(1 0 0 / 6%); }
+
+  .provider-table { width: 100%; border-collapse: collapse; }
+  .provider-table th {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 6px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-header);
+  }
+  .provider-table th.num { text-align: right; }
+  .provider-table td {
+    padding: 5px 12px;
+    font-size: 13px;
+    height: 30px;
+    vertical-align: middle;
+    border-bottom: 1px solid oklch(1 0 0 / 4%);
+  }
+  .provider-table td.num {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    text-align: right;
+  }
+  .provider-table td.pname { font-weight: 500; }
+  .provider-table tr:last-child td { border-bottom: none; }
+  .provider-table tbody tr:hover { background: var(--surface-up); }
+
+  .pct-value {
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+  .pct-value.text-success { color: var(--success); }
+  .pct-value.text-warning { color: var(--warning); }
+
+  .error-badge {
+    display: inline-flex;
+    padding: 1px 6px;
+    border-radius: 9999px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 500;
+    background: var(--danger-dim);
+    color: var(--danger);
+    margin-right: 2px;
+  }
+
+  .collapsible-body { transition: max-height 200ms ease-out; overflow: hidden; }
+  .collapsible-body.collapsed { max-height: 0 !important; }
+
+  /* ========== BOTTOM PANELS ========== */
+  .bottom-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 1px;
+    background: var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .bottom-panel { background: var(--surface); }
+  .bottom-panel-header {
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-header);
+  }
+  .bottom-panel-title {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .bottom-panel-body { padding: 8px 12px; }
+
+  /* Status rows */
+  .status-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 0;
+  }
+  .status-row + .status-row { border-top: 1px solid oklch(1 0 0 / 4%); }
+  .status-dot-sm {
+    width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0;
+  }
+  .status-dot-sm.success { background: var(--success); }
+  .status-dot-sm.warning { background: var(--warning); }
+  .status-dot-sm.danger { background: var(--danger); }
+  .status-dot-sm.info { background: var(--info); }
+  .status-name { font-size: 11px; font-weight: 500; flex: 1; color: var(--muted-light); }
+  .status-count { font-family: var(--font-mono); font-size: 11px; color: var(--fg); }
+  .status-pct { font-family: var(--font-mono); font-size: 10px; color: var(--muted); width: 36px; text-align: right; }
+
+  /* Runtime rows */
+  .runtime-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 3px 0;
+  }
+  .runtime-row + .runtime-row { border-top: 1px solid oklch(1 0 0 / 4%); }
+  .runtime-label { font-size: 11px; color: var(--muted); }
+  .runtime-value { font-family: var(--font-mono); font-size: 11px; color: var(--fg); }
+
+  .heap-bar-wrap { margin-top: 4px; padding-top: 4px; border-top: 1px solid oklch(1 0 0 / 4%); }
+  .heap-header { display: flex; justify-content: space-between; margin-bottom: 3px; }
+  .heap-label { font-size: 11px; color: var(--muted); }
+  .heap-value { font-family: var(--font-mono); font-size: 10px; color: var(--muted-light); }
+  .heap-bar { height: 3px; background: oklch(1 0 0 / 6%); border-radius: 2px; overflow: hidden; }
+  .heap-bar-fill { height: 100%; background: var(--primary); border-radius: 2px; transition: width 300ms ease-out; }
+
+  /* Concurrency in bottom panel */
+  .conc-sm-row { display: flex; align-items: center; gap: 6px; padding: 3px 0; }
+  .conc-sm-row + .conc-sm-row { border-top: 1px solid oklch(1 0 0 / 4%); }
+  .conc-sm-name { font-size: 11px; font-weight: 500; color: var(--muted-light); width: 60px; flex-shrink: 0; }
+  .conc-sm-bar { flex: 1; height: 3px; background: oklch(1 0 0 / 6%); border-radius: 2px; overflow: hidden; }
+  .conc-sm-fill { height: 100%; border-radius: 2px; transition: width 300ms ease-out; }
+  .conc-sm-ratio { font-family: var(--font-mono); font-size: 10px; color: var(--muted-light); width: 36px; text-align: right; flex-shrink: 0; }
 </style>
 </head>
 <body>
+<div class="page-wrap">
 
-<div class="page-header">
-  <div>
-    <h1>实时监控</h1>
-    <p>实时查看请求状态、并发指标和运行时信息</p>
-  </div>
-</div>
-
-<!-- Anchor Bar -->
-<div class="anchor-bar">
-  <span class="conn-badge connected">
-    <span class="conn-dot"></span>
-    Connected
-  </span>
-  <div class="anchor-divider"></div>
-  <div class="anchor-item">
-    <span class="label">活跃请求</span>
-    <span class="value primary-color" id="activeCount">7</span>
-  </div>
-  <div class="anchor-divider"></div>
-  <div class="anchor-item">
-    <span class="label">队列请求</span>
-    <span class="value warning-color">3</span>
-  </div>
-  <div class="anchor-divider"></div>
-  <div class="anchor-item">
-    <span class="label">已完成</span>
-    <span class="value success">1,284</span>
-  </div>
-</div>
-
-<!-- Monitor Grid -->
-<div class="monitor-grid">
-  <!-- Provider Status -->
-  <div class="panel">
-    <div class="panel-header">
-      <span class="panel-title">Provider 并发状态</span>
+  <!-- Page Header -->
+  <header class="page-header">
+    <h1 class="page-title">实时监控</h1>
+    <div class="conn-badge">
+      <span class="conn-dot"></span>
+      Connected
     </div>
-    <div class="panel-body">
+  </header>
+
+  <!-- ========== PRIMARY: Active Count + Concurrency ========== -->
+  <div class="primary-strip">
+    <div class="active-block">
+      <span class="active-count" id="stat-active">7</span>
+      <div class="active-meta">
+        <span class="active-label">Active Requests</span>
+        <span class="active-sub">5 stream / 2 sync</span>
+      </div>
+      <span class="queued-tag">3 queued</span>
+    </div>
+    <div class="concurrency-block">
+      <span class="concurrency-header">Concurrency</span>
+      <div class="concurrency-row">
+        <span class="concurrency-name">OpenAI</span>
+        <div class="concurrency-bar"><div class="concurrency-bar-fill fill-primary" style="width:24%"></div></div>
+        <span class="concurrency-ratio">12/50</span>
+      </div>
+      <div class="concurrency-row">
+        <span class="concurrency-name">Anthropic</span>
+        <div class="concurrency-bar"><div class="concurrency-bar-fill fill-primary" style="width:27%"></div></div>
+        <span class="concurrency-ratio">8/30</span>
+      </div>
+      <div class="concurrency-row">
+        <span class="concurrency-name">DeepSeek</span>
+        <div class="concurrency-bar"><div class="concurrency-bar-fill fill-danger" style="width:85%"></div></div>
+        <span class="concurrency-ratio" style="color:var(--danger)">17/20</span>
+      </div>
+      <div class="concurrency-row">
+        <span class="concurrency-name">Google</span>
+        <div class="concurrency-bar"><div class="concurrency-bar-fill fill-primary" style="width:5%"></div></div>
+        <span class="concurrency-ratio">2/40</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== REQUEST PANEL ========== -->
+  <div class="request-panel">
+    <div class="request-tabs">
+      <button class="request-tab active" data-tab="active" onclick="switchRequestTab('active')">
+        Active <span class="tab-count" id="tab-active-count">7</span>
+      </button>
+      <button class="request-tab" data-tab="queued" onclick="switchRequestTab('queued')">
+        Queued <span class="tab-count">3</span>
+      </button>
+      <button class="request-tab" data-tab="completed" onclick="switchRequestTab('completed')">
+        Recent <span class="tab-count">50</span>
+      </button>
+    </div>
+    <div class="scroll-area">
+      <table class="req-table">
+        <thead>
+          <tr>
+            <th style="width:36px"></th>
+            <th>Model</th>
+            <th>Provider</th>
+            <th>Type</th>
+            <th class="num">Elapsed</th>
+            <th class="num">Speed</th>
+            <th class="num">Output</th>
+            <th style="width:56px"></th>
+          </tr>
+        </thead>
+        <tbody id="req-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ========== SECONDARY: Secondary Metrics ========== -->
+  <div class="secondary-strip">
+    <div class="secondary-cell">
+      <span class="secondary-label">Completed</span>
+      <span class="secondary-value text-success">1,284</span>
+      <span class="secondary-sub">last 5h</span>
+    </div>
+    <div class="secondary-cell">
+      <span class="secondary-label">Error Rate</span>
+      <span class="secondary-value">2.1%</span>
+      <span class="secondary-sub">27 / 1,284</span>
+    </div>
+    <div class="secondary-cell">
+      <span class="secondary-label">P50 Latency</span>
+      <span class="secondary-value">1.2s</span>
+      <span class="secondary-sub">avg 1.8s</span>
+    </div>
+    <div class="secondary-cell">
+      <span class="secondary-label">Retry Rate</span>
+      <span class="secondary-value">1.4%</span>
+      <span class="secondary-sub">18 / 1,284</span>
+    </div>
+    <div class="secondary-cell">
+      <span class="secondary-label">Uptime</span>
+      <span class="secondary-value">3d 14h</span>
+      <span class="secondary-sub">since May 20</span>
+    </div>
+  </div>
+
+  <!-- ========== PROVIDER STATS (collapsible) ========== -->
+  <div class="provider-section">
+    <div class="section-header">
+      <span class="section-title">Provider Statistics</span>
+      <button class="section-toggle" onclick="toggleSection('provider-body', this)">Hide</button>
+    </div>
+    <div class="collapsible-body" id="provider-body">
       <table class="provider-table">
         <thead>
-          <tr><th>Provider</th><th>活跃</th><th>排队</th><th>最大并发</th><th>利用率</th></tr>
+          <tr>
+            <th>Provider</th>
+            <th class="num">Requests</th>
+            <th class="num">Success</th>
+            <th class="num">Avg Latency</th>
+            <th class="num">Retry</th>
+            <th>Top Errors</th>
+          </tr>
         </thead>
         <tbody>
           <tr>
-            <td style="font-weight:500">OpenAI</td>
-            <td class="mono">12</td>
-            <td class="mono">2</td>
-            <td class="mono-sm">50</td>
-            <td style="min-width:120px">
-              <div style="display:flex;align-items:center;gap:0.5rem">
-                <div class="progress-bar" style="flex:1"><div class="fill fill-teal" style="width:24%"></div></div>
-                <span class="mono-sm" style="min-width:32px">24%</span>
-              </div>
-            </td>
+            <td class="pname">OpenAI</td>
+            <td class="num">4,281</td>
+            <td class="num"><span class="pct-value text-success">99.1%</span></td>
+            <td class="num">1.2s</td>
+            <td class="num"><span class="pct-value text-success">0.8%</span></td>
+            <td><span class="error-badge">429 (12)</span><span class="error-badge">502 (3)</span></td>
           </tr>
           <tr>
-            <td style="font-weight:500">Anthropic</td>
-            <td class="mono">8</td>
-            <td class="mono">1</td>
-            <td class="mono-sm">30</td>
-            <td>
-              <div style="display:flex;align-items:center;gap:0.5rem">
-                <div class="progress-bar" style="flex:1"><div class="fill fill-teal" style="width:27%"></div></div>
-                <span class="mono-sm" style="min-width:32px">27%</span>
-              </div>
-            </td>
+            <td class="pname">Anthropic</td>
+            <td class="num">3,847</td>
+            <td class="num"><span class="pct-value text-success">98.7%</span></td>
+            <td class="num">1.8s</td>
+            <td class="num"><span class="pct-value text-success">1.2%</span></td>
+            <td><span class="error-badge">529 (8)</span><span class="error-badge">429 (5)</span></td>
           </tr>
           <tr>
-            <td style="font-weight:500">DeepSeek</td>
-            <td class="mono">5</td>
-            <td class="mono">0</td>
-            <td class="mono-sm">20</td>
-            <td>
-              <div style="display:flex;align-items:center;gap:0.5rem">
-                <div class="progress-bar" style="flex:1"><div class="fill fill-teal" style="width:25%"></div></div>
-                <span class="mono-sm" style="min-width:32px">25%</span>
-              </div>
-            </td>
+            <td class="pname">DeepSeek</td>
+            <td class="num">2,956</td>
+            <td class="num"><span class="pct-value text-warning">97.5%</span></td>
+            <td class="num">2.1s</td>
+            <td class="num"><span class="pct-value text-warning">2.5%</span></td>
+            <td><span class="error-badge">500 (14)</span><span class="error-badge">502 (9)</span><span class="error-badge">429 (6)</span></td>
           </tr>
           <tr>
-            <td style="font-weight:500">Google</td>
-            <td class="mono">2</td>
-            <td class="mono">0</td>
-            <td class="mono-sm">40</td>
-            <td>
-              <div style="display:flex;align-items:center;gap:0.5rem">
-                <div class="progress-bar" style="flex:1"><div class="fill fill-teal" style="width:5%"></div></div>
-                <span class="mono-sm" style="min-width:32px">5%</span>
-              </div>
-            </td>
+            <td class="pname">Google</td>
+            <td class="num">1,763</td>
+            <td class="num"><span class="pct-value text-success">100%</span></td>
+            <td class="num">0.8s</td>
+            <td class="num"><span class="pct-value text-success">0%</span></td>
+            <td><span style="font-size:11px;color:var(--muted)">--</span></td>
           </tr>
         </tbody>
       </table>
     </div>
   </div>
 
-  <!-- Right Column: Concurrency + Status Codes -->
-  <div style="display:flex;flex-direction:column;gap:1rem">
-    <!-- Concurrency Panel -->
-    <div class="panel">
-      <div class="panel-header">
-        <span class="panel-title">全局并发</span>
+  <!-- ========== BOTTOM: Status Codes + Runtime ========== -->
+  <div class="bottom-grid">
+    <div class="bottom-panel">
+      <div class="bottom-panel-header">
+        <span class="bottom-panel-title">Status Codes (1h)</span>
       </div>
-      <div class="panel-body">
-        <div style="display:flex;align-items:baseline;gap:0.5rem;margin-bottom:0.75rem">
-          <span class="big-num" style="color:var(--primary)">27</span>
-          <span style="color:var(--muted);font-size:0.875rem">/ 140</span>
-          <span style="color:var(--muted);font-size:0.75rem;margin-left:auto">19%</span>
+      <div class="bottom-panel-body">
+        <div class="status-row">
+          <span class="status-dot-sm success"></span>
+          <span class="status-name">2xx</span>
+          <span class="status-count" style="color:var(--success)">1,247</span>
+          <span class="status-pct">96.8%</span>
         </div>
-        <div class="progress-bar" style="height:8px">
-          <div class="fill fill-teal" style="width:19%"></div>
+        <div class="status-row">
+          <span class="status-dot-sm warning"></span>
+          <span class="status-name">4xx</span>
+          <span class="status-count" style="color:var(--warning)">23</span>
+          <span class="status-pct">1.8%</span>
         </div>
-        <div style="display:flex;justify-content:space-between;margin-top:0.75rem">
-          <div>
-            <div class="big-label">p50 延迟</div>
-            <span class="mono" style="font-size:1rem;color:var(--success)">1.2s</span>
-          </div>
-          <div>
-            <div class="big-label">p99 延迟</div>
-            <span class="mono" style="font-size:1rem;color:var(--warning)">8.4s</span>
-          </div>
-          <div>
-            <div class="big-label">QPS</div>
-            <span class="mono" style="font-size:1rem;color:var(--primary)">3.2</span>
-          </div>
+        <div class="status-row">
+          <span class="status-dot-sm info"></span>
+          <span class="status-name">429</span>
+          <span class="status-count" style="color:var(--info)">5</span>
+          <span class="status-pct">0.4%</span>
         </div>
-      </div>
-    </div>
-
-    <!-- Status Codes -->
-    <div class="panel">
-      <div class="panel-header">
-        <span class="panel-title">状态码分布（最近 1h）</span>
-      </div>
-      <div class="panel-body">
-        <div class="status-item">
-          <span class="status-label"><span class="status-dot success"></span> 2xx</span>
-          <span><span class="status-value" style="color:var(--success)">1,247</span><span class="status-pct">96.8%</span></span>
-        </div>
-        <div class="status-item">
-          <span class="status-label"><span class="status-dot warning"></span> 4xx</span>
-          <span><span class="status-value" style="color:var(--warning)">28</span><span class="status-pct">2.2%</span></span>
-        </div>
-        <div class="status-item">
-          <span class="status-label"><span class="status-dot danger"></span> 5xx</span>
-          <span><span class="status-value" style="color:var(--danger)">13</span><span class="status-pct">1.0%</span></span>
+        <div class="status-row">
+          <span class="status-dot-sm danger"></span>
+          <span class="status-name">5xx</span>
+          <span class="status-count" style="color:var(--danger)">13</span>
+          <span class="status-pct">1.0%</span>
         </div>
       </div>
     </div>
 
-    <!-- Runtime -->
-    <div class="panel">
-      <div class="panel-header">
-        <span class="panel-title">运行时</span>
+    <div class="bottom-panel">
+      <div class="bottom-panel-header">
+        <span class="bottom-panel-title">Runtime</span>
       </div>
-      <div class="panel-body">
-        <div class="runtime-item">
-          <span class="runtime-label">内存使用</span>
-          <span class="runtime-value">128 MB <span style="color:var(--muted);font-size:0.75rem">/ 512 MB</span></span>
+      <div class="bottom-panel-body">
+        <div class="runtime-row">
+          <span class="runtime-label">Memory RSS</span>
+          <span class="runtime-value">128 MB</span>
         </div>
-        <div class="runtime-item">
-          <span class="runtime-label">事件循环延迟</span>
+        <div class="runtime-row">
+          <span class="runtime-label">Event Loop</span>
           <span class="runtime-value" style="color:var(--success)">2.3 ms</span>
         </div>
-        <div class="runtime-item">
-          <span class="runtime-label">句柄数</span>
+        <div class="runtime-row">
+          <span class="runtime-label">Handles</span>
           <span class="runtime-value">142</span>
         </div>
-        <div class="runtime-item">
-          <span class="runtime-label">运行时长</span>
-          <span class="runtime-value">3d 14h 22m</span>
+        <div class="heap-bar-wrap">
+          <div class="heap-header">
+            <span class="heap-label">Heap</span>
+            <span class="heap-value">317 / 512 MB</span>
+          </div>
+          <div class="heap-bar"><div class="heap-bar-fill" style="width:62%"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bottom-panel">
+      <div class="bottom-panel-header">
+        <span class="bottom-panel-title">Global Concurrency</span>
+      </div>
+      <div class="bottom-panel-body">
+        <div style="display:flex;align-items:baseline;gap:6px;margin-bottom:6px">
+          <span style="font-family:var(--font-mono);font-size:20px;font-weight:700;color:var(--primary)">27</span>
+          <span style="font-family:var(--font-mono);font-size:12px;color:var(--muted)">/ 140</span>
+          <span style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-left:auto">19%</span>
+        </div>
+        <div style="height:4px;background:oklch(1 0 0 / 6%);border-radius:2px;overflow:hidden">
+          <div style="height:100%;width:19%;background:var(--primary);border-radius:2px"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px">
+          <div>
+            <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;font-weight:600">P50</div>
+            <div style="font-family:var(--font-mono);font-size:12px;color:var(--success)">1.2s</div>
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;font-weight:600">P99</div>
+            <div style="font-family:var(--font-mono);font-size:12px;color:var(--warning)">8.4s</div>
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;font-weight:600">QPS</div>
+            <div style="font-family:var(--font-mono);font-size:12px;color:var(--primary)">3.2</div>
+          </div>
         </div>
       </div>
     </div>
   </div>
-</div>
 
-<!-- Active Requests -->
-<div style="margin-bottom:0.5rem">
-  <span style="font-size:0.9375rem;font-weight:600">活跃请求</span>
-  <span style="font-size:0.75rem;color:var(--muted);margin-left:0.5rem">实时更新中</span>
-</div>
-<div class="active-table-wrap">
-  <table class="active-table">
-    <thead>
-      <tr>
-        <th>请求 ID</th>
-        <th>模型</th>
-        <th>Provider</th>
-        <th>已耗时</th>
-        <th>Token</th>
-        <th>操作</th>
-      </tr>
-    </thead>
-    <tbody id="activeTable"></tbody>
-  </table>
 </div>
 
 <script>
+// ===== Data =====
 const activeRequests = [
-  {
-    id: 'req-a3f8c2d1',
-    model: 'gpt-4o',
-    provider: 'OpenAI',
-    elapsed: '3.2s',
-    stream: true,
-    tokensSoFar: '1.2K in / 456 out'
-  },
-  {
-    id: 'req-7b2e4d6c',
-    model: 'claude-sonnet-4-20250514',
-    provider: 'Anthropic',
-    elapsed: '5.8s',
-    stream: true,
-    tokensSoFar: '2.4K in / 1.8K out'
-  },
-  {
-    id: 'req-9e1c3a5b',
-    model: 'deepseek-r1',
-    provider: 'DeepSeek',
-    elapsed: '12.4s',
-    stream: true,
-    tokensSoFar: '890 in / 3.2K out'
-  },
-  {
-    id: 'req-4d8f2c6a',
-    model: 'gpt-4o',
-    provider: 'OpenAI',
-    elapsed: '0.8s',
-    stream: false,
-    tokensSoFar: '1.5K in / 待响应'
-  },
-  {
-    id: 'req-1a5b3c7d',
-    model: 'gemini-2.5-pro',
-    provider: 'Google',
-    elapsed: '7.1s',
-    stream: true,
-    tokensSoFar: '3.1K in / 2.4K out'
-  },
-  {
-    id: 'req-6c9d2e4f',
-    model: 'gpt-4o-mini',
-    provider: 'OpenAI',
-    elapsed: '1.1s',
-    stream: false,
-    tokensSoFar: '512 in / 待响应'
-  },
-  {
-    id: 'req-8f1a3b5c',
-    model: 'deepseek-chat',
-    provider: 'DeepSeek',
-    elapsed: '2.4s',
-    stream: true,
-    tokensSoFar: '678 in / 234 out'
-  }
+  { id: 'req-a3f8c2d1', model: 'gpt-4o', provider: 'OpenAI', elapsed: 3.2, stream: true, tps: 45.2, outputTokens: 456, inputTokens: 1247, cacheTokens: 312 },
+  { id: 'req-7b2e4d6c', model: 'claude-sonnet-4-20250514', provider: 'Anthropic', elapsed: 5.8, stream: true, tps: 32.1, outputTokens: 1842, inputTokens: 2394, cacheTokens: 0 },
+  { id: 'req-9e1c3a5b', model: 'deepseek-r1', provider: 'DeepSeek', elapsed: 12.4, stream: true, tps: 18.7, outputTokens: 3210, inputTokens: 890, cacheTokens: 0 },
+  { id: 'req-4d8f2c6a', model: 'gpt-4o', provider: 'OpenAI', elapsed: 0.8, stream: false, tps: null, outputTokens: 0, inputTokens: 1523, cacheTokens: 456 },
+  { id: 'req-1a5b3c7d', model: 'gemini-2.5-pro', provider: 'Google', elapsed: 7.1, stream: true, tps: 28.4, outputTokens: 2413, inputTokens: 3120, cacheTokens: 0 },
+  { id: 'req-6c9d2e4f', model: 'gpt-4o-mini', provider: 'OpenAI', elapsed: 1.1, stream: false, tps: null, outputTokens: 0, inputTokens: 512, cacheTokens: 0 },
+  { id: 'req-8f1a3b5c', model: 'deepseek-chat', provider: 'DeepSeek', elapsed: 2.4, stream: true, tps: 41.8, outputTokens: 234, inputTokens: 678, cacheTokens: 120 },
 ];
 
-function renderActiveTable() {
-  const tbody = document.getElementById('activeTable');
-  tbody.innerHTML = activeRequests.map((r, i) => {
-    const streamBadge = r.stream
-      ? '<span class="badge badge-success" style="font-size:0.5625rem">Stream</span>'
-      : '<span class="badge badge-muted" style="font-size:0.5625rem">Sync</span>';
+const queuedRequests = [
+  { id: 'req-q1a2b3c4', model: 'gpt-4o', provider: 'OpenAI', waitTime: 1.2 },
+  { id: 'req-q5d6e7f8', model: 'deepseek-r1', provider: 'DeepSeek', waitTime: 3.8 },
+  { id: 'req-q9g0h1i2', model: 'claude-sonnet-4-20250514', provider: 'Anthropic', waitTime: 0.4 },
+];
 
-    return `<tr>
-      <td class="mono-sm" style="color:var(--primary)">${r.id}</td>
-      <td style="font-weight:500">${r.model}</td>
-      <td class="mono-sm">${r.provider}</td>
-      <td class="mono-sm">${r.elapsed}</td>
-      <td>
-        <div style="display:flex;align-items:center;gap:0.375rem">
-          <span class="mono-sm" style="color:var(--muted);font-size:0.6875rem">${r.tokensSoFar}</span>
-          ${streamBadge}
-        </div>
-      </td>
-      <td>
-        <div id="kill-area-${i}">
-          <button class="kill-btn" onclick="confirmKill(${i})">Kill</button>
-        </div>
-        <div class="kill-confirm" id="kill-confirm-${i}">
-          <span>确认终止?</span>
-          <button class="kill-yes" onclick="doKill(${i})">是</button>
-          <button class="kill-no" onclick="cancelKill(${i})">否</button>
-        </div>
-      </td>
-    </tr>`;
+const completedRequests = [
+  { id: 'req-c1a2b3c4', model: 'gpt-4o', provider: 'OpenAI', duration: 2.1, stream: true, status: 'success', outputTokens: 892 },
+  { id: 'req-c2d3e4f5', model: 'deepseek-chat', provider: 'DeepSeek', duration: 8.4, stream: true, status: 'success', outputTokens: 4521 },
+  { id: 'req-c3g4h5i6', model: 'gpt-4o-mini', provider: 'OpenAI', duration: 0.3, stream: false, status: 'success', outputTokens: 124 },
+  { id: 'req-c4j5k6l7', model: 'claude-sonnet-4-20250514', provider: 'Anthropic', duration: 5.2, stream: true, status: 'success', outputTokens: 2310 },
+  { id: 'req-c5m6n7o8', model: 'gemini-2.5-pro', provider: 'Google', duration: 12.8, stream: true, status: 'error', outputTokens: 340 },
+  { id: 'req-c6p7q8r9', model: 'gpt-4o', provider: 'OpenAI', duration: 1.5, stream: false, status: 'success', outputTokens: 567 },
+  { id: 'req-c7s8t9u0', model: 'deepseek-r1', provider: 'DeepSeek', duration: 15.3, stream: true, status: 'success', outputTokens: 6842 },
+  { id: 'req-c8v9w0x1', model: 'claude-sonnet-4-20250514', provider: 'Anthropic', duration: 3.7, stream: true, status: 'success', outputTokens: 1890 },
+];
+
+// ===== State =====
+let currentTab = 'active';
+let expandedRow = null;
+let killConfirmRow = null;
+
+function switchRequestTab(tab) {
+  currentTab = tab;
+  expandedRow = null;
+  killConfirmRow = null;
+  document.querySelectorAll('.request-tab').forEach(t => t.classList.remove('active'));
+  document.querySelector(`.request-tab[data-tab="${tab}"]`).classList.add('active');
+  renderRequests();
+}
+
+function renderRequests() {
+  const tbody = document.getElementById('req-tbody');
+  if (currentTab === 'active') tbody.innerHTML = renderActiveRequests();
+  else if (currentTab === 'queued') tbody.innerHTML = renderQueuedRequests();
+  else tbody.innerHTML = renderCompletedRequests();
+}
+
+function renderActiveRequests() {
+  return activeRequests.map((r, i) => {
+    const isExpanded = expandedRow === `a-${i}`;
+    const statusDot = r.stream ? 'streaming' : 'syncing';
+    const streamBadge = r.stream
+      ? '<span class="stream-badge">SSE</span>'
+      : '<span class="stream-badge sync">Sync</span>';
+    const tps = r.tps !== null ? r.tps.toFixed(0) + ' t/s' : '--';
+    const output = r.outputTokens > 0 ? formatTok(r.outputTokens) : '--';
+
+    let detailHtml = '';
+    if (isExpanded) {
+      detailHtml = `
+        <tr class="req-detail-row visible" onclick="event.stopPropagation()">
+          <td colspan="8">
+            <div class="req-detail">
+              <div><div class="detail-label">Request ID</div><div class="detail-value">${r.id}</div></div>
+              <div><div class="detail-label">Input Tokens</div><div class="detail-value">${r.inputTokens.toLocaleString()}</div></div>
+              <div><div class="detail-label">Output Tokens</div><div class="detail-value">${r.outputTokens.toLocaleString()}</div></div>
+              <div><div class="detail-label">Cache Tokens</div><div class="detail-value">${r.cacheTokens > 0 ? r.cacheTokens.toLocaleString() : '--'}</div></div>
+            </div>
+          </td>
+        </tr>`;
+    }
+
+    const actionsHtml = killConfirmRow === `a-${i}`
+      ? `<td><div class="kill-inline">Kill?<button class="kill-yes" onclick="event.stopPropagation();doKill('a',${i})">Y</button><button class="kill-no" onclick="event.stopPropagation();cancelKill()">N</button></div></td>`
+      : `<td><button class="action-btn" title="Copy ID" onclick="event.stopPropagation();copyId('${r.id}',this)">\u2398</button><button class="action-btn kill" title="Kill" onclick="event.stopPropagation();confirmKill('a-${i}')">\u2715</button></td>`;
+
+    return `
+      <tr class="${isExpanded ? 'selected' : ''}" onclick="toggleRow('a-${i}')">
+        <td><span class="req-status-dot ${statusDot}"></span></td>
+        <td><span class="model-name">${r.model}</span></td>
+        <td><span class="provider-label">${r.provider}</span></td>
+        <td>${streamBadge}</td>
+        <td class="num">${r.elapsed.toFixed(1)}s</td>
+        <td class="num">${tps}</td>
+        <td class="num">${output}</td>
+        ${actionsHtml}
+      </tr>
+      ${detailHtml}`;
   }).join('');
 }
 
-function confirmKill(index) {
-  document.getElementById(`kill-area-${index}`).style.display = 'none';
-  document.getElementById(`kill-confirm-${index}`).classList.add('visible');
+function renderQueuedRequests() {
+  if (queuedRequests.length === 0) {
+    return '<tr><td colspan="8"><div class="empty-state">No queued requests</div></td></tr>';
+  }
+  return queuedRequests.map((r) => `
+    <tr>
+      <td><span class="req-status-dot queued"></span></td>
+      <td><span class="model-name">${r.model}</span></td>
+      <td><span class="provider-label">${r.provider}</span></td>
+      <td><span class="stream-badge queued-badge">Queued</span></td>
+      <td class="num">${r.waitTime.toFixed(1)}s</td>
+      <td class="num">--</td>
+      <td class="num">--</td>
+      <td>
+        <button class="action-btn" title="Copy ID" onclick="event.stopPropagation();copyId('${r.id}',this)">\u2398</button>
+        <button class="action-btn kill" title="Kill" onclick="event.stopPropagation();alert('Kill: ${r.id}')">\u2715</button>
+      </td>
+    </tr>`).join('');
 }
 
-function cancelKill(index) {
-  document.getElementById(`kill-area-${index}`).style.display = '';
-  document.getElementById(`kill-confirm-${index}`).classList.remove('visible');
+function renderCompletedRequests() {
+  return completedRequests.map((r) => {
+    const statusDot = r.status === 'success' ? 'completed' : 'error';
+    const streamBadge = r.stream
+      ? '<span class="stream-badge">SSE</span>'
+      : '<span class="stream-badge sync">Sync</span>';
+    return `
+      <tr>
+        <td><span class="req-status-dot ${statusDot}"></span></td>
+        <td><span class="model-name">${r.model}</span></td>
+        <td><span class="provider-label">${r.provider}</span></td>
+        <td>${streamBadge}</td>
+        <td class="num">${r.duration.toFixed(1)}s</td>
+        <td class="num">--</td>
+        <td class="num">${formatTok(r.outputTokens)}</td>
+        <td><button class="action-btn" title="Copy ID" onclick="event.stopPropagation();copyId('${r.id}',this)">\u2398</button></td>
+      </tr>`;
+  }).join('');
 }
 
-function doKill(index) {
-  activeRequests.splice(index, 1);
-  document.getElementById('activeCount').textContent = activeRequests.length;
-  renderActiveTable();
+// ===== Actions =====
+function toggleRow(key) { expandedRow = expandedRow === key ? null : key; killConfirmRow = null; renderRequests(); }
+function confirmKill(key) { killConfirmRow = key; renderRequests(); }
+function cancelKill() { killConfirmRow = null; renderRequests(); }
+function doKill(type, index) {
+  if (type === 'a') {
+    activeRequests.splice(index, 1);
+    document.getElementById('stat-active').textContent = activeRequests.length;
+    document.getElementById('tab-active-count').textContent = activeRequests.length;
+  }
+  killConfirmRow = null; expandedRow = null; renderRequests();
+}
+function copyId(id, btn) {
+  navigator.clipboard.writeText(id).catch(() => {});
+  btn.classList.add('copied');
+  setTimeout(() => btn.classList.remove('copied'), 1500);
+}
+function formatTok(n) { return n >= 1000 ? (n / 1000).toFixed(1) + 'K' : n.toString(); }
+function toggleSection(id, btn) {
+  const el = document.getElementById(id);
+  el.classList.toggle('collapsed');
+  btn.textContent = el.classList.contains('collapsed') ? 'Show' : 'Hide';
 }
 
-// Simulate elapsed time update
+// ===== Auto-update elapsed =====
 setInterval(() => {
-  document.querySelectorAll('.active-table tbody tr').forEach((row, i) => {
-    if (activeRequests[i]) {
-      const elapsed = parseFloat(activeRequests[i].elapsed);
-      activeRequests[i].elapsed = (elapsed + 0.1).toFixed(1) + 's';
-    }
-  });
-  // Only update elapsed cells to avoid flicker
-  const rows = document.querySelectorAll('.active-table tbody tr');
+  if (currentTab !== 'active') return;
+  activeRequests.forEach(r => { r.elapsed = Math.round((r.elapsed + 0.1) * 10) / 10; });
+  const rows = document.querySelectorAll('#req-tbody tr:not(.req-detail-row)');
   rows.forEach((row, i) => {
     if (activeRequests[i]) {
       const cells = row.querySelectorAll('td');
-      cells[3].textContent = activeRequests[i].elapsed;
+      if (cells[4]) cells[4].textContent = activeRequests[i].elapsed.toFixed(1) + 's';
     }
   });
 }, 1000);
 
-renderActiveTable();
+renderRequests();
 </script>
 </body>
 </html>

@@ -36,6 +36,8 @@
     "time": "时间",
     "type": "类型",
     "model": "模型",
+    "clientModel": "客户端模型",
+    "targetModel": "目标模型",
     "actualForward": "实际转发",
     "tags": "标签",
     "statusCode": "状态码",

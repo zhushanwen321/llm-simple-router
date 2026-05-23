@@ -65,5 +65,9 @@
   "fallback_provider": "Provider 匹配",
   "overflow_redirect": "溢出重定向",
   "failover_retry": "Failover 重试"
-  }
+  },
+  "executionChain": "执行链",
+  "executionRetry": "重试",
+  "executionFinal": "最终",
+  "firstExecution": "首次执行"
 }

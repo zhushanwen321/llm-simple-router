@@ -36,6 +36,8 @@
     "time": "Time",
     "type": "Type",
     "model": "Model",
+    "clientModel": "Client Model",
+    "targetModel": "Target Model",
     "actualForward": "Actual Forward",
     "tags": "Tags",
     "statusCode": "Status Code",
