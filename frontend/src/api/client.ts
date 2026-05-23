@@ -516,6 +516,8 @@ export const api = {
   getUsageWindows: (params?: {
     router_key_id?: string;
     provider_id?: string;
+    start_time?: string;
+    end_time?: string;
   }) =>
     request<UsageWindowWithUsage[]>("get", "/usage/windows", undefined, {
       params,

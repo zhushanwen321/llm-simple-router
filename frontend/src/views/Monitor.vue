@@ -21,7 +21,7 @@
     />
 
     <!-- Request Panel with Tabs -->
-    <div class="bg-card ring-1 ring-foreground/10 rounded-lg overflow-hidden mb-3">
+    <div class="bg-card border border-border rounded-lg overflow-hidden mb-3">
       <!-- Tab bar -->
       <div class="flex border-b border-border bg-background">
         <button
@@ -190,7 +190,7 @@
     </div>
 
     <!-- Secondary Strip -->
-    <div class="flex bg-card ring-1 ring-foreground/10 rounded-lg overflow-hidden mb-3 divide-x divide-border">
+    <div class="flex bg-card border border-border rounded-lg overflow-hidden mb-3 divide-x divide-border">
       <div class="flex-1 px-3 py-2">
         <div class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{{ t('monitor.completed') }}</div>
         <div class="text-[13px] font-mono font-semibold text-success">{{ stats?.successCount ?? 0 }}</div>
@@ -221,7 +221,7 @@
     <!-- Provider Stats (collapsible) -->
     <div class="mb-3">
       <Collapsible v-model:open="providerStatsOpen">
-        <div class="flex items-center bg-card ring-1 ring-foreground/10 rounded-t-lg px-4 py-2">
+        <div class="flex items-center bg-card border border-border rounded-t-lg px-4 py-2">
           <CollapsibleTrigger as-child>
             <Button variant="ghost" size="xs" class="gap-1">
               <ChevronRightIcon class="size-3 transition-transform" :class="{ 'rotate-90': providerStatsOpen }" />
@@ -230,7 +230,7 @@
           </CollapsibleTrigger>
         </div>
         <CollapsibleContent>
-          <div class="bg-card ring-1 ring-foreground/10 ring-t-0 rounded-b-lg px-4 py-3">
+          <div class="bg-card border border-border border-t-0 rounded-b-lg px-4 py-3">
             <ProviderStatsTable :stats="stats" />
           </div>
         </CollapsibleContent>
@@ -238,7 +238,7 @@
     </div>
 
     <!-- Bottom Grid -->
-    <div class="grid grid-cols-3 gap-px bg-border rounded-lg overflow-hidden">
+    <div class="grid grid-cols-3 gap-px bg-border rounded-lg overflow-hidden border border-border">
       <div class="bg-card p-4">
         <h3 class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">{{ t('monitor.statusCodeDistribution') }}</h3>
         <StatusCodePanel :by-status-code="stats?.byStatusCode ?? {}" />

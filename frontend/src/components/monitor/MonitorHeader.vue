@@ -1,6 +1,6 @@
 <!-- eslint-disable vue/multi-word-component-names -->
 <template>
-  <div class="flex items-stretch bg-primary/10 rounded-lg overflow-hidden mb-3">
+  <div class="flex items-stretch bg-primary/10 rounded-lg overflow-hidden mb-3 border border-border">
     <!-- Left: Active count + stream/sync breakdown + queue badge -->
     <div class="flex flex-col justify-center px-5 py-3 min-w-[180px]">
       <span class="text-2xl font-bold text-primary font-mono">
