@@ -4,426 +4,1833 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>请求日志 - LLM Router Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap');
+/* ── Design Tokens ── */
+:root {
+  --bg: oklch(0.145 0 0);
+  --surface: oklch(0.205 0 0);
+  --surface-up: oklch(0.269 0 0);
+  --fg: oklch(0.985 0 0);
+  --muted: oklch(0.708 0 0);
+  --border: oklch(1 0 0 / 10%);
+  --primary: oklch(0.68 0.13 175);
+  --primary-dark: oklch(0.48 0.12 175);
+  --success: oklch(0.65 0.17 150);
+  --success-bg: oklch(0.32 0.05 150);
+  --success-dark: oklch(0.45 0.15 150);
+  --warning: oklch(0.78 0.16 80);
+  --warning-bg: oklch(0.35 0.06 80);
+  --warning-dark: oklch(0.55 0.14 80);
+  --danger: oklch(0.58 0.22 25);
+  --danger-bg: oklch(0.30 0.08 25);
+  --danger-dark: oklch(0.40 0.18 25);
+  --info: oklch(0.62 0.18 250);
+  --info-bg: oklch(0.30 0.06 250);
+  --font-body: 'Inter', -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --radius: 8px;
+  --radius-sm: 6px;
+}
 
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* ── Reset ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--fg);
+  line-height: 1.5;
+  padding: 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
+  -webkit-font-smoothing: antialiased;
+}
+button { cursor: pointer; font-family: inherit; }
+select, input { font-family: inherit; }
 
-  :root {
-    --bg: oklch(0.145 0 0);
-    --surface: oklch(0.205 0 0);
-    --surface-up: oklch(0.269 0 0);
-    --fg: oklch(0.985 0 0);
-    --muted: oklch(0.708 0 0);
-    --border: oklch(1 0 0 / 10%);
-    --primary: oklch(0.68 0.13 175);
-    --success: oklch(0.65 0.17 150);
-    --success-bg: oklch(0.32 0.05 150);
-    --warning: oklch(0.78 0.16 80);
-    --warning-bg: oklch(0.35 0.06 80);
-    --danger: oklch(0.58 0.22 25);
-    --danger-bg: oklch(0.30 0.08 25);
-    --info: oklch(0.62 0.18 250);
-    --info-bg: oklch(0.30 0.06 250);
-    --font-body: 'Inter', -apple-system, sans-serif;
-    --font-mono: 'JetBrains Mono', monospace;
-    --radius: 8px;
-    --radius-sm: 6px;
-  }
+/* ── Demo Controls ── */
+.demo-controls {
+  position: fixed; top: 12px; right: 12px;
+  display: flex; gap: 6px; z-index: 9999;
+}
+.demo-btn {
+  font-size: 11px; padding: 4px 10px;
+  background: var(--surface-up); color: var(--muted);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  transition: all 150ms;
+}
+.demo-btn:hover { color: var(--fg); border-color: oklch(1 0 0 / 20%); }
+.demo-btn.active { background: var(--primary); color: oklch(0.15 0 0); border-color: var(--primary); }
 
-  body {
-    font-family: var(--font-body);
-    background: var(--bg);
-    color: var(--fg);
-    line-height: 1.5;
-    padding: 2rem;
-    max-width: 1400px;
-    margin: 0 auto;
-  }
+/* ── Page Header ── */
+.page-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 1.25rem;
+}
+.page-header h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.02em; }
+.ghost-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 0.8125rem; color: var(--muted);
+  background: transparent; border: none;
+  padding: 4px 8px; border-radius: var(--radius-sm);
+  transition: color 150ms;
+}
+.ghost-btn:hover { color: var(--danger); }
+.ghost-btn svg { width: 14px; height: 14px; }
 
-  .page-header { margin-bottom: 1.5rem; }
-  .page-header h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.02em; }
-  .page-header p { color: var(--muted); font-size: 0.8125rem; margin-top: 0.25rem; }
+/* ── Filter Bar ── */
+.filter-bar {
+  display: flex; gap: 0.5rem; align-items: center;
+  margin-bottom: 1rem; flex-wrap: wrap;
+}
+.time-btn-group { display: flex; gap: 0; }
+.time-btn {
+  font-family: var(--font-body); font-size: 0.75rem;
+  padding: 0.375rem 0.625rem; height: 32px;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--muted); cursor: pointer; transition: all 150ms;
+}
+.time-btn:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+.time-btn:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+.time-btn + .time-btn { border-left: none; }
+.time-btn:hover { color: var(--fg); }
+.time-btn.active {
+  background: var(--primary); color: oklch(0.15 0 0);
+  border-color: var(--primary); font-weight: 600;
+}
+.time-btn.active + .time-btn { border-left-color: var(--primary); }
 
-  /* Filter Bar */
-  .filter-bar {
-    display: flex; gap: 0.5rem; align-items: center;
-    margin-bottom: 1rem; flex-wrap: wrap;
-  }
-  .time-btn-group { display: flex; gap: 0; }
-  .time-btn {
-    font-family: var(--font-body); font-size: 0.75rem;
-    padding: 0.375rem 0.625rem;
-    border: 1px solid var(--border); background: var(--surface);
-    color: var(--muted); cursor: pointer;
-    transition: all 150ms;
-  }
-  .time-btn:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
-  .time-btn:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
-  .time-btn + .time-btn { border-left: none; }
-  .time-btn:hover { color: var(--fg); }
-  .time-btn.active {
-    background: var(--primary); color: oklch(0.15 0 0);
-    border-color: var(--primary); font-weight: 600;
-  }
+.filter-select, .filter-input {
+  font-size: 0.8125rem; height: 32px;
+  background: var(--surface); color: var(--fg);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 0 0.625rem; outline: none; transition: border-color 150ms;
+}
+.filter-select:focus, .filter-input:focus { border-color: var(--primary); }
+.filter-select { min-width: 110px; cursor: pointer; appearance: auto; }
+.filter-input { min-width: 140px; }
+.filter-input::placeholder { color: oklch(0.5 0 0); }
 
-  .filter-bar select, .filter-bar input {
-    font-family: var(--font-body); font-size: 0.8125rem;
-    background: var(--surface); color: var(--fg);
-    border: 1px solid var(--border); border-radius: var(--radius-sm);
-    padding: 0.375rem 0.625rem; outline: none;
-  }
-  .filter-bar select:focus, .filter-bar input:focus { border-color: var(--primary); }
-  .filter-bar select { min-width: 100px; cursor: pointer; }
-  .filter-bar input { min-width: 150px; }
+/* ── Table ── */
+.table-container { position: relative; }
+.table-wrap {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden;
+}
+table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+thead th {
+  font-size: 0.6875rem; font-weight: 600; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.05em;
+  padding: 0.625rem 0.75rem; text-align: left;
+  border-bottom: 1px solid var(--border); background: oklch(0.18 0 0);
+  white-space: nowrap;
+}
+.col-expand { width: 32px; }
+.col-id { width: 80px; }
+.col-time { width: 90px; }
+.col-client-model { width: auto; }
+.col-target-model { width: auto; }
+.col-latency { width: 64px; }
+.col-tags { width: 120px; white-space: nowrap; }
+.col-error { min-width: 0; }
+.col-actions { width: 56px; }
 
-  /* Table */
-  .table-wrap {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); overflow: hidden;
-  }
-  table { width: 100%; border-collapse: collapse; }
-  thead th {
-    font-size: 0.6875rem; font-weight: 600; color: var(--muted);
-    text-transform: uppercase; letter-spacing: 0.05em;
-    padding: 0.625rem 0.75rem; text-align: left;
-    border-bottom: 1px solid var(--border); background: oklch(0.18 0 0);
-  }
-  tbody tr { border-bottom: 1px solid var(--border); transition: background 100ms; cursor: pointer; }
-  tbody tr:last-child { border-bottom: none; }
-  tbody tr:hover { background: oklch(0.22 0 0); }
-  tbody td {
-    padding: 0.5rem 0.75rem; font-size: 0.8125rem;
-    height: 36px; vertical-align: middle;
-  }
+.api-tag {
+  display: inline-block;
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: oklch(0.269 0 0);
+  color: oklch(0.65 0 0);
+  font-family: var(--font-mono);
+  vertical-align: middle;
+  margin-left: 4px;
+}
 
-  .mono { font-family: var(--font-mono); font-size: 0.8125rem; }
-  .mono-sm { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); }
+tbody tr.main-row {
+  border-bottom: 1px solid var(--border);
+  transition: background 100ms; cursor: default;
+}
+tbody tr.main-row:last-child { border-bottom: none; }
+tbody tr.main-row:hover { background: oklch(0.22 0 0); }
+tbody td {
+  padding: 0.4375rem 0.75rem; font-size: 0.8125rem;
+  height: 36px; vertical-align: middle;
+}
+td.col-expand-cell { text-align: center; cursor: pointer; }
+td.col-error-cell {
+  min-width: 0; max-width: 240px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--muted); font-size: 0.75rem;
+}
 
-  .badge {
-    display: inline-flex; align-items: center;
-    padding: 0.125rem 0.5rem; border-radius: 9999px;
-    font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.02em; white-space: nowrap;
-  }
-  .badge-success { background: var(--success-bg); color: var(--success); }
-  .badge-danger { background: var(--danger-bg); color: var(--danger); }
-  .badge-warning { background: var(--warning-bg); color: var(--warning); }
-  .badge-muted { background: oklch(0.269 0 0); color: var(--muted); }
+/* error row background */
+tr.row-error { background: oklch(0.30 0.08 25 / 8%); }
+tr.row-error:hover { background: oklch(0.30 0.08 25 / 14%); }
 
-  /* Expandable Row */
-  .expand-icon {
-    display: inline-block; width: 16px; height: 16px;
-    color: var(--muted); transition: transform 200ms;
-    font-size: 0.625rem; text-align: center; line-height: 16px;
-  }
-  .expand-icon.open { transform: rotate(90deg); }
-  tr.expanded { background: oklch(0.22 0 0); }
+/* expandable */
+.expand-chevron {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; color: var(--muted);
+  transition: transform 200ms ease;
+}
+.expand-chevron.open { transform: rotate(90deg); }
+tr.main-row.expandable { cursor: pointer; }
+tr.main-row.expanded { background: oklch(0.22 0 0); }
 
-  .sub-table-wrap {
-    background: oklch(0.17 0 0);
-    border-top: 1px solid var(--border);
-    padding: 0.5rem 0.75rem 0.5rem 2.5rem;
-  }
-  .sub-table { width: 100%; border-collapse: collapse; }
-  .sub-table th {
-    font-size: 0.625rem; font-weight: 600; color: var(--muted);
-    text-transform: uppercase; letter-spacing: 0.05em;
-    padding: 0.375rem 0.5rem; text-align: left;
-  }
-  .sub-table td {
-    padding: 0.25rem 0.5rem; font-size: 0.75rem;
-    height: 28px; border-bottom: 1px solid oklch(1 0 0 / 5%);
-  }
+/* sub-rows */
+tr.sub-row td { padding: 0; }
+.sub-wrap {
+  background: oklch(0.17 0 0); border-top: 1px solid var(--border);
+  padding: 0.5rem 0.75rem 0.5rem 2.5rem;
+}
+.sub-table { width: 100%; border-collapse: collapse; }
+.sub-table th {
+  font-size: 0.625rem; font-weight: 600; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.05em;
+  padding: 0.25rem 0.5rem; text-align: left;
+}
+.sub-table td {
+  padding: 0.25rem 0.5rem; font-size: 0.75rem; height: 28px;
+  border-bottom: 1px solid oklch(1 0 0 / 5%);
+}
 
-  .action-link {
-    font-size: 0.8125rem; color: var(--primary); cursor: pointer;
-    background: none; border: none; font-family: var(--font-body);
-    padding: 0; transition: color 150ms;
-  }
-  .action-link:hover { color: oklch(0.78 0.14 175); }
+/* ── Badges ── */
+.badge {
+  display: inline-flex; align-items: center;
+  padding: 1px 8px; border-radius: 9999px;
+  font-size: 0.6875rem; font-weight: 600; white-space: nowrap;
+  line-height: 1.6;
+}
+.badge-success { background: var(--success-bg); color: var(--success); }
+.badge-danger { background: var(--danger-bg); color: var(--danger); }
+.badge-warning { background: var(--warning-bg); color: var(--warning); }
+.badge-muted { background: var(--surface-up); color: var(--muted); }
+.badge-info { background: var(--info-bg); color: var(--info); }
+.badge-retry {
+  background: var(--warning-bg); color: var(--warning);
+  font-size: 0.625rem; padding: 1px 6px;
+}
+.badge-failover {
+  background: var(--danger-bg); color: var(--danger);
+  font-size: 0.625rem; padding: 1px 6px;
+}
 
-  /* Token usage */
-  .token-usage {
-    font-family: var(--font-mono); font-size: 0.75rem;
-    color: var(--muted);
-  }
-  .token-in { color: var(--info); }
-  .token-out { color: var(--success); }
+/* ── Monospace ── */
+.mono { font-family: var(--font-mono); }
+.mono-sm { font-family: var(--font-mono); font-size: 0.75rem; }
 
-  /* Pagination */
-  .pagination {
-    display: flex; justify-content: space-between; align-items: center;
-    margin-top: 0.75rem; padding: 0 0.25rem;
-  }
-  .pagination-info { font-size: 0.75rem; color: var(--muted); }
-  .pagination-controls { display: flex; gap: 0.25rem; }
-  .page-btn {
-    font-family: var(--font-body); font-size: 0.75rem;
-    padding: 0.25rem 0.5rem; min-width: 28px;
-    border: 1px solid var(--border); background: var(--surface);
-    color: var(--muted); cursor: pointer; border-radius: 4px;
-    transition: all 150ms; text-align: center;
-  }
-  .page-btn:hover { background: var(--surface-up); color: var(--fg); }
-  .page-btn.active {
-    background: var(--primary); color: oklch(0.15 0 0);
-    border-color: var(--primary); font-weight: 600;
-  }
-  .page-btn.disabled { opacity: 0.3; cursor: default; }
+/* ── Token Usage ── */
+.token-usage { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); }
+.token-in { color: var(--info); }
+.token-out { color: var(--success); }
+
+/* ── Action Link ── */
+.action-link {
+  font-size: 0.8125rem; color: var(--primary); cursor: pointer;
+  background: none; border: none; font-family: var(--font-body);
+  padding: 0; transition: color 150ms;
+}
+.action-link:hover { color: oklch(0.78 0.14 175); }
+
+/* ── Pagination ── */
+.pagination {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 0.75rem; padding: 0 0.25rem;
+}
+.pagination-info { font-size: 0.75rem; color: var(--muted); }
+.pagination-controls { display: flex; gap: 4px; align-items: center; }
+.page-btn {
+  font-family: var(--font-body); font-size: 0.75rem;
+  padding: 4px 8px; min-width: 28px; height: 28px;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--muted); cursor: pointer; border-radius: 4px;
+  transition: all 150ms; text-align: center;
+}
+.page-btn:hover { background: var(--surface-up); color: var(--fg); }
+.page-btn.active {
+  background: var(--primary); color: oklch(0.15 0 0);
+  border-color: var(--primary); font-weight: 600;
+}
+.page-btn.disabled { opacity: 0.3; pointer-events: none; }
+.page-ellipsis { color: var(--muted); font-size: 0.75rem; padding: 0 2px; }
+
+/* auto-cleanup row */
+.auto-cleanup-row {
+  display: flex; justify-content: flex-end; align-items: center;
+  gap: 6px; margin-top: 8px; padding: 0 0.25rem;
+  font-size: 0.6875rem; color: var(--muted);
+}
+.cleanup-input {
+  width: 52px; height: 24px;
+  font-family: var(--font-mono); font-size: 0.6875rem;
+  background: var(--surface); color: var(--fg);
+  border: 1px solid var(--border); border-radius: 4px;
+  padding: 0 6px; text-align: center; outline: none;
+}
+.cleanup-input:focus { border-color: var(--primary); }
+.cleanup-save {
+  font-size: 0.6875rem; height: 24px; padding: 0 8px;
+  background: var(--surface-up); color: var(--muted);
+  border: 1px solid var(--border); border-radius: 4px;
+  transition: all 150ms;
+}
+.cleanup-save:hover { color: var(--primary); border-color: var(--primary); }
+
+/* ── Loading Overlay ── */
+.loading-overlay {
+  position: absolute; inset: 0; z-index: 10;
+  background: oklch(0.145 0 0 / 50%);
+  display: none; align-items: flex-start; justify-content: center;
+  padding-top: 80px;
+}
+.loading-overlay.visible { display: flex; }
+.skeleton-stack { display: flex; flex-direction: column; gap: 8px; width: 75%; }
+.skeleton-bar {
+  height: 32px; background: oklch(0.269 0 0); border-radius: var(--radius-sm);
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+.skeleton-bar:nth-child(2) { animation-delay: 0.2s; }
+.skeleton-bar:nth-child(3) { animation-delay: 0.4s; }
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+/* ── Empty State ── */
+.empty-state {
+  display: none; flex-direction: column; align-items: center;
+  justify-content: center; padding: 4rem 2rem; text-align: center;
+}
+.empty-state.visible { display: flex; }
+.empty-title { font-size: 0.9375rem; font-weight: 600; margin-bottom: 0.375rem; }
+.empty-desc { font-size: 0.8125rem; color: var(--muted); margin-bottom: 1rem; }
+.empty-action {
+  font-size: 0.8125rem; color: var(--primary); background: none;
+  border: none; cursor: pointer; transition: color 150ms;
+}
+.empty-action:hover { color: oklch(0.78 0.14 175); }
+
+/* ── Dialog ── */
+.dialog-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  background: oklch(0 0 0 / 80%);
+  display: none; align-items: center; justify-content: center;
+}
+.dialog-overlay.open { display: flex; }
+.dialog {
+  width: 100%; max-width: 1152px; max-height: 85vh;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden;
+  display: flex; flex-direction: column;
+  animation: dialog-enter 200ms ease-out;
+}
+@keyframes dialog-enter {
+  from { opacity: 0; transform: scale(0.97) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* progress bar */
+.dialog-progress {
+  height: 4px; width: 100%; position: relative; overflow: hidden;
+  background: var(--border);
+}
+.dialog-progress-bar {
+  height: 100%; width: 100%; transition: background 300ms;
+}
+.dialog-progress-bar.completed { background: var(--primary); }
+.dialog-progress-bar.failed { background: var(--danger); }
+.dialog-progress-bar.pending { background: var(--surface-up); }
+.dialog-progress-bar.pending::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, oklch(0.68 0.13 175 / 50%), transparent);
+  animation: shimmer 2s infinite;
+}
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* dialog body */
+.dialog-body {
+  display: flex; flex: 1; overflow: hidden;
+  min-height: 0;
+}
+.dialog-left {
+  width: 280px; min-width: 280px;
+  border-right: 1px solid var(--border);
+  overflow-y: auto; padding: 1rem 1.25rem;
+  display: flex; flex-direction: column;
+}
+.dialog-right {
+  flex: 1; display: flex; flex-direction: column;
+  overflow: hidden; min-width: 0;
+}
+
+/* dialog top bar */
+.dialog-top-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.dialog-top-title { font-size: 13px; font-weight: 600; }
+.dialog-top-id { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+.dialog-close {
+  margin-left: auto;
+  width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+  background: none; border: none; color: var(--muted);
+  border-radius: var(--radius-sm); transition: all 150ms;
+}
+.dialog-close:hover { background: var(--surface-up); color: var(--fg); }
+.dialog-close svg { width: 16px; height: 16px; }
+
+/* Execution Chain */
+.exec-chain {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.exec-chain-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  background: oklch(0.18 0 0);
+}
+.exec-chain-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+.exec-chain-client {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.exec-steps {
+  padding: 4px 10px;
+}
+.exec-step {
+  padding: 4px 0;
+}
+.exec-step + .exec-step {
+  border-top: 1px solid oklch(1 0 0 / 5%);
+}
+.exec-step-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  font-size: 11px;
+}
+.exec-step-num {
+  color: oklch(0.5 0 0);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  min-width: 20px;
+  flex-shrink: 0;
+}
+.exec-step-model-wrap {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  white-space: nowrap;
+  scrollbar-width: none;
+}
+.exec-step-model-wrap::-webkit-scrollbar { display: none; }
+.exec-step-model {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.exec-step-detail {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 20px;
+  margin-top: 2px;
+  flex-wrap: wrap;
+}
+.exec-step-tag {
+  font-size: 9px;
+  padding: 0 4px;
+  border-radius: 3px;
+  line-height: 1.5;
+}
+.exec-retry-tag {
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+.exec-final-tag {
+  background: var(--success-bg);
+  color: var(--success);
+}
+.badge-session-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.mapping-reason-badge {
+  display: inline-flex; margin-top: 4px;
+  padding: 1px 8px; border-radius: 9999px;
+  font-size: 10px; font-weight: 500;
+  background: oklch(0.30 0.06 175); color: var(--primary);
+}
+
+/* Layer 4 - AI button */
+.ai-btn {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  width: 100%; height: 32px;
+  background: oklch(0.30 0.06 175); color: var(--primary);
+  border: 1px solid oklch(0.40 0.08 175);
+  border-radius: var(--radius-sm); font-size: 0.8125rem; font-weight: 500;
+  transition: all 150ms;
+}
+.ai-btn:hover { background: oklch(0.35 0.08 175); }
+.ai-btn svg { width: 14px; height: 14px; }
+
+/* Layer 5 - Metrics grid */
+.metrics-grid {
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  display: grid; grid-template-columns: 1fr 1fr;
+  overflow: hidden;
+}
+.metric-cell {
+  padding: 8px 10px; border-bottom: 1px solid var(--border);
+}
+.metric-cell:nth-child(odd) { border-right: 1px solid var(--border); }
+.metric-cell:nth-child(n+5) { border-bottom: none; }
+.metric-label { font-size: 9px; color: var(--muted); display: block; margin-bottom: 1px; text-transform: uppercase; letter-spacing: 0.05em; }
+.metric-value {
+  font-family: var(--font-mono); font-size: 0.875rem; font-weight: 600;
+  display: block;
+}
+.metric-value.placeholder { color: oklch(0.4 0 0); }
+
+/* Layer 6 - Metadata */
+.meta-list { display: flex; flex-direction: column; gap: 3px; }
+.meta-item {
+  display: flex; justify-content: space-between;
+  font-size: 11px;
+}
+.meta-key { color: var(--muted); }
+.meta-val { font-family: var(--font-mono); color: var(--fg); }
+
+/* Toggle */
+.dialog-toggle-area {
+  margin-top: auto; padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+.toggle-btn {
+  width: 100%; height: 28px;
+  font-size: 0.75rem; color: var(--muted);
+  background: none; border: none; border-radius: var(--radius-sm);
+  transition: all 150ms;
+}
+.toggle-btn:hover { color: var(--fg); background: var(--surface-up); }
+
+/* Right panel tabs */
+.tab-bar {
+  display: flex; border-bottom: 1px solid var(--border);
+  padding: 0 1rem;
+}
+.tab-btn {
+  font-size: 0.8125rem; font-weight: 500;
+  padding: 0.625rem 1rem; color: var(--muted);
+  background: none; border: none; border-bottom: 2px solid transparent;
+  transition: all 150ms; margin-bottom: -1px;
+}
+.tab-btn:hover { color: var(--fg); }
+.tab-btn.active {
+  color: var(--primary); border-bottom-color: var(--primary);
+}
+.tab-content {
+  flex: 1; overflow-y: auto; padding: 1rem;
+  font-family: var(--font-mono); font-size: 0.8125rem;
+  line-height: 1.6; position: relative;
+}
+.json-key { color: var(--primary); }
+.json-string { color: var(--success); }
+.json-number { color: var(--info); }
+.json-bool { color: var(--warning); }
+.json-null { color: var(--muted); }
+.json-bracket { color: oklch(0.5 0 0); }
+
+/* Section margins */
+.mb-section-lg { margin-bottom: 16px; }
+.mb-section-md { margin-bottom: 12px; }
+.mb-section-sm { margin-bottom: 8px; }
+.mt-section-sm { margin-top: 8px; }
+
+/* Error banner */
+.error-banner {
+  background: oklch(0.30 0.08 25 / 15%);
+  border: 1px solid oklch(0.58 0.22 25 / 30%);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+.error-banner-title {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--danger);
+  word-break: break-all;
+}
+.error-banner-meta {
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+
+
+/* JSON line numbers */
+.json-line {
+  display: flex;
+  line-height: 1.7;
+}
+.line-num {
+  width: 32px;
+  text-align: right;
+  padding-right: 12px;
+  color: oklch(0.35 0 0);
+  user-select: none;
+  flex-shrink: 0;
+  font-size: 11px;
+}
+.line-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.copy-json-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 11px;
+  padding: 4px 8px;
+  background: var(--surface-up);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 150ms;
+  z-index: 5;
+}
+.copy-json-btn:hover { color: var(--primary); border-color: var(--primary); }
+
+/* ── Structured View: Toggle ── */
+.tab-toggle {
+  margin-left: auto;
+  font-size: 10px;
+  padding: 4px 8px;
+  color: var(--muted);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 150ms;
+  font-family: var(--font-body);
+}
+.tab-toggle:hover { color: var(--fg); }
+.tab-toggle.active { color: var(--primary); border-color: var(--primary); }
+
+/* ── Structured View: Response blocks ── */
+.resp-block {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.resp-block-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  background: oklch(0.18 0 0);
+}
+.resp-block-header svg { width: 14px; height: 14px; }
+.resp-block-title { font-size: 12px; font-weight: 500; }
+.resp-block-body { padding: 10px; }
+.resp-block-body pre {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 300px;
+  overflow-y: auto;
+  margin: 0;
+}
+.resp-block-header.error {
+  background: oklch(0.30 0.08 25 / 20%);
+  color: var(--danger);
+}
+.resp-block-header.error .resp-block-title { color: var(--danger); }
+
+/* Usage mini-table */
+.usage-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 16px;
+  font-size: 11px;
+  padding: 8px 10px;
+}
+.usage-key { color: var(--muted); }
+.usage-val { font-family: var(--font-mono); font-weight: 500; }
+
+/* ── Structured View: Request sections ── */
+.req-section { margin-bottom: 12px; }
+.req-section-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+.req-mapping {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.req-mapping-from { color: var(--muted); }
+.req-mapping-arrow { color: oklch(0.4 0 0); }
+.req-mapping-to { color: var(--primary); font-weight: 600; }
+.req-system-box {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  max-height: 120px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--muted);
+  font-family: var(--font-body);
+}
+.req-msg-list { display: flex; flex-direction: column; gap: 4px; }
+.req-msg {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  line-height: 1.5;
+  background: oklch(0.18 0 0);
+}
+.req-msg-role {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.req-msg-role.user { background: oklch(0.32 0.05 175); color: oklch(0.78 0.10 175); }
+.req-msg-role.assistant { background: oklch(0.30 0.06 260); color: oklch(0.65 0.14 260); }
+.req-msg-role.system { background: oklch(0.30 0.06 250); color: oklch(0.62 0.18 250); }
+.req-msg-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  color: var(--fg);
+}
+.req-stream-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+/* ── Responsive ── */
+@media (min-width: 1024px) {
+  td.col-error-cell { max-width: 320px; }
+}
 </style>
 </head>
 <body>
 
+<!-- Demo Controls -->
+<div class="demo-controls">
+  <button class="demo-btn" id="btnToggleLoading" onclick="toggleLoading()">Toggle Loading</button>
+  <button class="demo-btn" id="btnToggleEmpty" onclick="toggleEmpty()">Toggle Empty</button>
+</div>
+
+<!-- Page Header -->
 <div class="page-header">
   <h1>请求日志</h1>
-  <p>查看所有代理请求的详细记录与链路追踪</p>
+  <button class="ghost-btn">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4h12M5.333 4V2.667a1.333 1.333 0 0 1 1.334-1.334h2.666a1.333 1.333 0 0 1 1.334 1.334V4m2 0v9.333a1.333 1.333 0 0 1-1.334 1.334H4.334a1.333 1.333 0 0 1-1.334-1.334V4h10Z"/></svg>
+    清理日志
+  </button>
 </div>
 
 <!-- Filter Bar -->
 <div class="filter-bar">
   <div class="time-btn-group">
-    <button class="time-btn active">1h</button>
-    <button class="time-btn">6h</button>
-    <button class="time-btn">24h</button>
-    <button class="time-btn">7d</button>
-    <button class="time-btn">30d</button>
+    <button class="time-btn" data-period="1h">1h</button>
+    <button class="time-btn" data-period="5h">5h</button>
+    <button class="time-btn active" data-period="24h">24h</button>
+    <button class="time-btn" data-period="7d">7d</button>
+    <button class="time-btn" data-period="30d">30d</button>
   </div>
-  <select>
+  <select class="filter-select">
     <option>全部 Provider</option>
     <option>OpenAI</option>
     <option>Anthropic</option>
     <option>DeepSeek</option>
     <option>Google</option>
+    <option>Azure</option>
   </select>
-  <select>
+  <select class="filter-select">
     <option>全部模型</option>
     <option>gpt-4o</option>
+    <option>gpt-4o-mini</option>
     <option>claude-sonnet-4-20250514</option>
     <option>deepseek-r1</option>
+    <option>deepseek-chat</option>
+    <option>gemini-2.5-pro</option>
   </select>
-  <select>
-    <option>全部状态</option>
-    <option>2xx</option>
-    <option>4xx</option>
-    <option>5xx</option>
-  </select>
-  <select>
+  <select class="filter-select">
     <option>全部密钥</option>
     <option>生产环境主密钥</option>
     <option>开发环境测试</option>
   </select>
-  <input type="text" placeholder="搜索请求 ID..." />
+  <select class="filter-select">
+    <option>全部状态</option>
+    <option>200</option>
+    <option>4xx</option>
+    <option>5xx</option>
+  </select>
 </div>
 
 <!-- Table -->
-<div class="table-wrap">
-  <table>
-    <thead>
-      <tr>
-        <th style="width:20px"></th>
-        <th>时间</th>
-        <th>模型</th>
-        <th>Provider</th>
-        <th>状态码</th>
-        <th>耗时</th>
-        <th>Token 用量</th>
-        <th>操作</th>
-      </tr>
-    </thead>
-    <tbody id="logTable"></tbody>
-  </table>
+<div class="table-container">
+  <!-- Loading overlay -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="skeleton-stack">
+      <div class="skeleton-bar"></div>
+      <div class="skeleton-bar"></div>
+      <div class="skeleton-bar"></div>
+    </div>
+  </div>
+
+  <!-- Empty state -->
+  <div class="table-wrap">
+    <div class="empty-state" id="emptyState">
+      <div class="empty-title">暂无日志</div>
+      <div class="empty-desc">当前筛选条件下没有匹配的日志</div>
+      <button class="empty-action" onclick="toggleEmpty()">清除所有筛选</button>
+    </div>
+    <table id="logTable">
+      <thead>
+        <tr>
+          <th class="col-expand"></th>
+          <th class="col-id">ID</th>
+          <th class="col-time">时间</th>
+          <th class="col-client-model">客户端模型</th>
+          <th class="col-target-model">目标模型</th>
+          <th class="col-latency">耗时</th>
+          <th class="col-tags">标签</th>
+          <th class="col-error">错误</th>
+          <th class="col-actions"></th>
+        </tr>
+      </thead>
+      <tbody id="logBody"></tbody>
+    </table>
+  </div>
 </div>
 
 <!-- Pagination -->
-<div class="pagination">
-  <span class="pagination-info">显示 1-20 / 共 1,247 条</span>
+<div class="pagination" id="pagination">
+  <span class="pagination-info">显示 1-8 / 共 1,247 条</span>
   <div class="pagination-controls">
     <button class="page-btn disabled">&laquo;</button>
     <button class="page-btn disabled">&lsaquo;</button>
     <button class="page-btn active">1</button>
     <button class="page-btn">2</button>
     <button class="page-btn">3</button>
-    <span style="color:var(--muted);font-size:0.75rem;padding:0 0.25rem">...</span>
-    <button class="page-btn">63</button>
+    <span class="page-ellipsis">...</span>
+    <button class="page-btn">156</button>
     <button class="page-btn">&rsaquo;</button>
     <button class="page-btn">&raquo;</button>
   </div>
 </div>
+<div class="auto-cleanup-row" id="autoCleanup">
+  <span>自动清理：保留</span>
+  <input class="cleanup-input" type="number" value="30" min="1" max="365">
+  <span>天</span>
+  <button class="cleanup-save">保存</button>
+</div>
+
+<!-- Detail Dialog -->
+<div class="dialog-overlay" id="dialogOverlay" onclick="onOverlayClick(event)">
+  <div class="dialog" onclick="event.stopPropagation()">
+    <div class="dialog-progress">
+      <div class="dialog-progress-bar" id="dialogProgress"></div>
+    </div>
+    <div class="dialog-top-bar">
+      <span class="dialog-top-title">请求详情</span>
+      <span class="dialog-top-id" id="dialogTopId"></span>
+      <button class="dialog-close" onclick="closeDetail()"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
+    </div>
+    <div class="dialog-body">
+      <!-- Left Panel -->
+      <div class="dialog-left" id="dialogLeft"></div>
+      <!-- Right Panel -->
+      <div class="dialog-right">
+        <div class="tab-bar">
+          <button class="tab-btn active" data-tab="response" onclick="switchTab('response')">响应</button>
+          <button class="tab-btn" data-tab="request" onclick="switchTab('request')">请求</button>
+          <button class="tab-toggle" id="rawToggle" onclick="toggleRawView()">Raw JSON</button>
+        </div>
+        <div class="tab-content" id="tabContent"></div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script>
-const logs = [
+// ── Mapping reason labels ──
+const MAPPING_LABELS = {
+  'direct_format': '直连',
+  'group_base_rule': '基础规则',
+  'group_schedule': '定时调度',
+  'fallback_provider': '回退',
+  'overflow_redirect': '溢出重定向',
+  'failover_retry': '故障转移'
+};
+
+// ── State ──
+let isLoading = false;
+let isEmpty = false;
+let expandedRows = new Set();
+let activeTab = 'response';
+let currentDetail = null;
+let showRawView = false;
+
+// ── Chevron SVG ──
+const chevronSVG = '<svg class="expand-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4l4 4-4 4"/></svg>';
+
+// ── Demo Data ──
+const tableData = [
   {
+    id: 'req-001',
     time: '14:32:18',
+    date: '2025-05-23',
     model: 'gpt-4o',
     provider: 'OpenAI',
+    apiType: 'openai',
+    clientModel: 'gpt-4o',
+    clientApi: 'openai',
+    backendModel: 'gpt-4o',
+    targetApi: 'openai',
     status: 200,
-    duration: '2.3s',
+    latency: '2.3s',
     tokensIn: '1.2K',
     tokensOut: '842',
-    hasRetry: true,
+    sse: true,
+    error: '',
+    hasSubRequests: true,
+    subType: 'retry',
     subRequests: [
-      { provider: 'DeepSeek', model: 'deepseek-chat', status: 429, duration: '0.8s', reason: 'Rate Limited → Retry' },
-      { provider: 'OpenAI', model: 'gpt-4o', status: 200, duration: '2.3s', reason: '成功' }
-    ]
+      { provider: 'DeepSeek', model: 'deepseek-chat', status: 429, latency: '0.8s', type: 'retry' },
+      { provider: 'OpenAI', model: 'gpt-4o', status: 200, latency: '2.3s', type: 'success' }
+    ],
+    // detail data
+    detail: {
+      clientModel: 'gpt-4o',
+      backendModel: 'gpt-4o',
+      providerName: 'OpenAI',
+      mappingReason: 'group_base_rule',
+      apiType: 'openai',
+      status: 200,
+      statusText: 'completed',
+      sse: true,
+      sessionId: 'a3f2b1c4',
+      latency: '2.3s',
+      ttft: '0.4s',
+      inputTokens: '1,200',
+      outputTokens: '842',
+      speed: '556.3',
+      cacheRead: '240',
+      error: '',
+      clientType: 'Claude Code',
+      statusCode: 200,
+      clientIp: '192.168.1.100',
+      retryHistory: [
+        { attempt: 1, provider: 'DeepSeek', model: 'deepseek-chat', apiType: 'openai', status: 429, latency: '0.8s' },
+        { attempt: 2, provider: 'OpenAI', model: 'gpt-4o', apiType: 'openai', status: 200, latency: '2.3s' }
+      ],
+      response: {
+        id: 'chatcmpl-abc123',
+        object: 'chat.completion',
+        model: 'gpt-4o',
+        choices: [{
+          index: 0,
+          message: { role: 'assistant', content: 'Based on the analysis, the key factors are...' },
+          finish_reason: 'stop'
+        }],
+        usage: { prompt_tokens: 1200, completion_tokens: 842, total_tokens: 2042 }
+      },
+      request: {
+        headers: {
+          'content-type': 'application/json',
+          'authorization': 'Bearer sk-***',
+          'x-request-id': 'req-001'
+        },
+        body: {
+          model: 'gpt-4o',
+          messages: [
+            { role: 'system', content: 'You are a helpful assistant.' },
+            { role: 'user', content: 'Analyze the following data patterns...' }
+          ],
+          temperature: 0.7,
+          max_tokens: 4096,
+          stream: true
+        }
+      }
+    }
   },
   {
+    id: 'req-002',
     time: '14:31:45',
+    date: '2025-05-23',
     model: 'claude-sonnet-4-20250514',
     provider: 'Anthropic',
+    apiType: 'anthropic',
+    clientModel: 'claude-sonnet-4-20250514',
+    clientApi: 'anthropic',
+    backendModel: 'claude-sonnet-4-20250514',
+    targetApi: 'anthropic',
     status: 200,
-    duration: '4.1s',
+    latency: '4.1s',
     tokensIn: '2.8K',
     tokensOut: '1.5K',
-    hasRetry: false,
-    subRequests: []
+    sse: true,
+    error: '',
+    hasSubRequests: false,
+    detail: {
+      clientModel: 'claude-sonnet-4-20250514',
+      backendModel: 'claude-sonnet-4-20250514',
+      providerName: 'Anthropic',
+      mappingReason: null,
+      apiType: 'anthropic',
+      status: 200,
+      statusText: 'completed',
+      sse: true,
+      sessionId: null,
+      latency: '4.1s', ttft: '0.6s',
+      inputTokens: '2,800', outputTokens: '1,500',
+      speed: '365.9', cacheRead: '180',
+      error: '',
+      clientType: 'Claude Code', statusCode: 200, clientIp: '192.168.1.100',
+      retryHistory: [
+        { attempt: 1, provider: 'Anthropic', model: 'claude-sonnet-4-20250514', apiType: 'anthropic', status: 200, latency: '4.1s' }
+      ],
+      response: { id: 'msg_0123', type: 'message', role: 'assistant', content: [{ type: 'text', text: 'The analysis reveals...' }], model: 'claude-sonnet-4-20250514', stop_reason: 'end_turn', usage: { input_tokens: 2800, output_tokens: 1500 } },
+      request: { headers: { 'content-type': 'application/json', 'x-api-key': 'sk-ant-***' }, body: { model: 'claude-sonnet-4-20250514', messages: [{ role: 'user', content: 'Analyze this...' }], max_tokens: 4096, stream: true } }
+    }
   },
   {
+    id: 'req-003',
     time: '14:31:02',
+    date: '2025-05-23',
     model: 'deepseek-r1',
     provider: 'DeepSeek',
+    apiType: 'openai',
+    clientModel: 'deepseek-r1',
+    clientApi: 'openai',
+    backendModel: 'deepseek-r1',
+    targetApi: 'openai',
     status: 503,
-    duration: '30.0s',
+    latency: '30.0s',
     tokensIn: '956',
     tokensOut: '0',
-    hasRetry: false,
-    subRequests: []
+    sse: false,
+    error: 'upstream service unavailable',
+    hasSubRequests: false,
+    detail: {
+      clientModel: 'deepseek-r1',
+      backendModel: 'deepseek-r1',
+      providerName: 'DeepSeek',
+      mappingReason: null,
+      apiType: 'openai',
+      status: 503,
+      statusText: 'failed',
+      sse: false,
+      sessionId: null,
+      latency: '30.0s', ttft: '--',
+      inputTokens: '956', outputTokens: '0',
+      speed: '--', cacheRead: '0',
+      error: 'upstream service unavailable',
+      clientType: 'Claude Code', statusCode: 503, clientIp: '192.168.1.100',
+      retryHistory: [
+        { attempt: 1, provider: 'DeepSeek', model: 'deepseek-r1', apiType: 'openai', status: 503, latency: '30.0s' }
+      ],
+      response: { error: { message: 'upstream service unavailable', type: 'upstream_error', code: 503 } },
+      request: { headers: { 'content-type': 'application/json', 'authorization': 'Bearer sk-***' }, body: { model: 'deepseek-r1', messages: [{ role: 'user', content: 'Explain the algorithm...' }], temperature: 0.7, max_tokens: 4096, stream: false } }
+    }
   },
   {
+    id: 'req-004',
     time: '14:30:15',
+    date: '2025-05-23',
     model: 'gpt-4o-mini',
     provider: 'OpenAI',
+    apiType: 'openai',
+    clientModel: 'gpt-4o-mini',
+    clientApi: 'openai',
+    backendModel: 'gpt-4o-mini',
+    targetApi: 'openai',
     status: 200,
-    duration: '0.9s',
+    latency: '0.9s',
     tokensIn: '512',
     tokensOut: '234',
-    hasRetry: false,
-    subRequests: []
+    sse: false,
+    error: '',
+    hasSubRequests: false,
+    detail: {
+      clientModel: 'gpt-4o-mini',
+      backendModel: 'gpt-4o-mini',
+      providerName: 'OpenAI',
+      mappingReason: null,
+      apiType: 'openai',
+      status: 200, statusText: 'completed', sse: false, sessionId: null,
+      latency: '0.9s', ttft: '--',
+      inputTokens: '512', outputTokens: '234',
+      speed: '260.0', cacheRead: '0',
+      error: '',
+      clientType: 'Web App', statusCode: 200, clientIp: '10.0.0.42',
+      retryHistory: [
+        { attempt: 1, provider: 'OpenAI', model: 'gpt-4o-mini', apiType: 'openai', status: 200, latency: '0.9s' }
+      ],
+      response: { id: 'chatcmpl-def456', object: 'chat.completion', model: 'gpt-4o-mini', choices: [{ index: 0, message: { role: 'assistant', content: 'Short answer here.' }, finish_reason: 'stop' }], usage: { prompt_tokens: 512, completion_tokens: 234, total_tokens: 746 } },
+      request: { headers: { 'content-type': 'application/json' }, body: { model: 'gpt-4o-mini', messages: [{ role: 'user', content: 'Quick question...' }], max_tokens: 1024, stream: false } }
+    }
   },
   {
+    id: 'req-005',
     time: '14:29:48',
+    date: '2025-05-23',
     model: 'gpt-4o',
     provider: 'OpenAI',
+    apiType: 'openai',
+    clientModel: 'gpt-4o',
+    clientApi: 'openai',
+    backendModel: 'gpt-4o',
+    targetApi: 'openai',
     status: 200,
-    duration: '3.7s',
+    latency: '3.7s',
     tokensIn: '3.4K',
     tokensOut: '2.1K',
-    hasRetry: true,
+    sse: true,
+    error: '',
+    hasSubRequests: true,
+    subType: 'failover',
     subRequests: [
-      { provider: 'OpenAI', model: 'gpt-4o', status: 500, duration: '1.2s', reason: 'Server Error → Retry' },
-      { provider: 'OpenAI', model: 'gpt-4o', status: 200, duration: '3.7s', reason: '成功' }
-    ]
+      { provider: 'OpenAI', model: 'gpt-4o', status: 500, latency: '1.2s', type: 'failover' },
+      { provider: 'OpenAI', model: 'gpt-4o', status: 200, latency: '3.7s', type: 'success' }
+    ],
+    detail: {
+      clientModel: 'gpt-4o',
+      backendModel: 'gpt-4o',
+      providerName: 'OpenAI',
+      mappingReason: 'group_base_rule',
+      apiType: 'openai',
+      status: 200, statusText: 'completed', sse: true, sessionId: 'b7e9d2a1',
+      latency: '3.7s', ttft: '0.5s',
+      inputTokens: '3,400', outputTokens: '2,100',
+      speed: '567.6', cacheRead: '520',
+      error: '',
+      clientType: 'Claude Code', statusCode: 200, clientIp: '192.168.1.100',
+      retryHistory: [
+        { attempt: 1, provider: 'OpenAI', model: 'gpt-4o', apiType: 'openai', status: 500, latency: '1.2s' },
+        { attempt: 2, provider: 'OpenAI', model: 'gpt-4o', apiType: 'openai', status: 200, latency: '3.7s' }
+      ],
+      response: { id: 'chatcmpl-ghi789', object: 'chat.completion', model: 'gpt-4o', choices: [{ index: 0, message: { role: 'assistant', content: 'Detailed response...' }, finish_reason: 'stop' }], usage: { prompt_tokens: 3400, completion_tokens: 2100, total_tokens: 5500 } },
+      request: { headers: { 'content-type': 'application/json' }, body: { model: 'gpt-4o', messages: [{ role: 'user', content: 'Complex query...' }], max_tokens: 8192, stream: true } }
+    }
   },
   {
+    id: 'req-006',
     time: '14:28:30',
+    date: '2025-05-23',
     model: 'gemini-2.5-pro',
     provider: 'Google',
+    apiType: 'openai',
+    clientModel: 'gemini-2.5-pro',
+    clientApi: 'openai',
+    backendModel: 'gemini-2.5-pro',
+    targetApi: 'openai',
     status: 200,
-    duration: '5.2s',
+    latency: '5.2s',
     tokensIn: '4.1K',
     tokensOut: '3.2K',
-    hasRetry: false,
-    subRequests: []
+    sse: true,
+    error: '',
+    hasSubRequests: false,
+    detail: {
+      clientModel: 'gemini-2.5-pro',
+      backendModel: 'gemini-2.5-pro',
+      providerName: 'Google',
+      mappingReason: null,
+      apiType: 'openai',
+      status: 200, statusText: 'completed', sse: true, sessionId: null,
+      latency: '5.2s', ttft: '0.8s',
+      inputTokens: '4,100', outputTokens: '3,200',
+      speed: '615.4', cacheRead: '800',
+      error: '',
+      clientType: 'Cursor', statusCode: 200, clientIp: '10.0.0.15',
+      retryHistory: [
+        { attempt: 1, provider: 'Google', model: 'gemini-2.5-pro', apiType: 'openai', status: 200, latency: '5.2s' }
+      ],
+      response: { id: 'gemini-resp-001', object: 'chat.completion', model: 'gemini-2.5-pro', choices: [{ index: 0, message: { role: 'assistant', content: 'Extended response...' }, finish_reason: 'stop' }], usage: { prompt_tokens: 4100, completion_tokens: 3200, total_tokens: 7300 } },
+      request: { headers: { 'content-type': 'application/json' }, body: { model: 'gemini-2.5-pro', messages: [{ role: 'user', content: 'Generate a detailed report...' }], max_tokens: 8192, stream: true } }
+    }
   },
   {
+    id: 'req-007',
     time: '14:27:55',
+    date: '2025-05-23',
     model: 'gpt-4o',
     provider: 'Azure',
+    apiType: 'openai',
+    clientModel: 'gpt-4o',
+    clientApi: 'openai',
+    backendModel: 'gpt-4o',
+    targetApi: 'openai',
     status: 401,
-    duration: '0.3s',
+    latency: '0.3s',
     tokensIn: '0',
     tokensOut: '0',
-    hasRetry: false,
-    subRequests: []
+    sse: false,
+    error: 'invalid api key',
+    hasSubRequests: false,
+    detail: {
+      clientModel: 'gpt-4o',
+      backendModel: 'gpt-4o',
+      providerName: 'Azure',
+      mappingReason: null,
+      apiType: 'openai',
+      status: 401, statusText: 'failed', sse: false, sessionId: null,
+      latency: '0.3s', ttft: '--',
+      inputTokens: '0', outputTokens: '0',
+      speed: '--', cacheRead: '0',
+      error: 'invalid api key',
+      clientType: 'Web App', statusCode: 401, clientIp: '172.16.0.5',
+      retryHistory: [
+        { attempt: 1, provider: 'Azure', model: 'gpt-4o', apiType: 'openai', status: 401, latency: '0.3s' }
+      ],
+      response: { error: { message: 'invalid api key', type: 'authentication_error', code: 401 } },
+      request: { headers: { 'content-type': 'application/json', 'api-key': '***' }, body: { model: 'gpt-4o', messages: [{ role: 'user', content: 'Hello' }], stream: false } }
+    }
   },
   {
+    id: 'req-008',
     time: '14:26:12',
+    date: '2025-05-23',
     model: 'deepseek-chat',
     provider: 'DeepSeek',
+    apiType: 'openai',
+    clientModel: 'deepseek-chat',
+    clientApi: 'openai',
+    backendModel: 'deepseek-chat',
+    targetApi: 'openai',
     status: 200,
-    duration: '1.8s',
+    latency: '1.8s',
     tokensIn: '890',
     tokensOut: '456',
-    hasRetry: false,
-    subRequests: []
+    sse: false,
+    error: '',
+    hasSubRequests: false,
+    detail: {
+      clientModel: 'deepseek-chat',
+      backendModel: 'deepseek-chat',
+      providerName: 'DeepSeek',
+      mappingReason: null,
+      apiType: 'openai',
+      status: 200, statusText: 'completed', sse: false, sessionId: null,
+      latency: '1.8s', ttft: '--',
+      inputTokens: '890', outputTokens: '456',
+      speed: '253.3', cacheRead: '0',
+      error: '',
+      clientType: 'CLI', statusCode: 200, clientIp: '192.168.1.55',
+      retryHistory: [
+        { attempt: 1, provider: 'DeepSeek', model: 'deepseek-chat', apiType: 'openai', status: 200, latency: '1.8s' }
+      ],
+      response: { id: 'chatcmpl-jkl012', object: 'chat.completion', model: 'deepseek-chat', choices: [{ index: 0, message: { role: 'assistant', content: 'Response text...' }, finish_reason: 'stop' }], usage: { prompt_tokens: 890, completion_tokens: 456, total_tokens: 1346 } },
+      request: { headers: { 'content-type': 'application/json' }, body: { model: 'deepseek-chat', messages: [{ role: 'user', content: 'Summarize...' }], max_tokens: 2048, stream: false } }
+    }
   }
 ];
 
+// ── Render Helpers ──
+function renderTargetModel(row) {
+  var modelSpan = escHtml(row.backendModel);
+  if (row.backendModel && row.backendModel !== row.clientModel) {
+    modelSpan = '<span style="color:var(--primary)">' + modelSpan + '</span>';
+  }
+  return modelSpan + ' <span style="color:var(--muted)">@ ' + escHtml(row.provider) + '</span>' + ' <span class="api-tag">' + escHtml(row.targetApi) + '</span>';
+}
+
+// ── Render Table ──
 function getStatusBadge(code) {
-  if (code >= 200 && code < 300) return `<span class="badge badge-success">${code}</span>`;
-  if (code >= 400 && code < 500) return `<span class="badge badge-warning">${code}</span>`;
-  return `<span class="badge badge-danger">${code}</span>`;
+  if (code >= 200 && code < 300) return '<span class="badge badge-success">' + code + '</span>';
+  if (code >= 400 && code < 500) return '<span class="badge badge-warning">' + code + '</span>';
+  return '<span class="badge badge-danger">' + code + '</span>';
+}
+
+function getSubStatusBadge(code) {
+  if (code >= 200 && code < 300) return '<span class="badge badge-success">' + code + '</span>';
+  if (code === 429) return '<span class="badge badge-warning">' + code + '</span>';
+  return '<span class="badge badge-danger">' + code + '</span>';
 }
 
 function renderTable() {
-  const tbody = document.getElementById('logTable');
-  tbody.innerHTML = logs.map((log, i) => {
-    const expandable = log.hasRetry && log.subRequests.length > 0;
-    const chevron = expandable
-      ? `<span class="expand-icon" id="chevron-${i}">&#9654;</span>`
+  const tbody = document.getElementById('logBody');
+  let html = '';
+
+  tableData.forEach(function(row, i) {
+    const isError = row.status >= 400;
+    const isExpandable = row.hasSubRequests;
+    const rowClasses = ['main-row'];
+    if (isError) rowClasses.push('row-error');
+    if (isExpandable) rowClasses.push('expandable');
+    if (expandedRows.has(i)) rowClasses.push('expanded');
+
+    // status badge
+    const statusHtml = getStatusBadge(row.status);
+
+    // expand chevron or spacer
+    const chevronHtml = isExpandable
+      ? chevronSVG.replace('class="expand-chevron"', 'class="expand-chevron' + (expandedRows.has(i) ? ' open' : '') + '"')
       : '';
 
-    const tokenHtml = `<span class="token-usage">
-      <span class="token-in">${log.tokensIn} in</span> / <span class="token-out">${log.tokensOut} out</span>
-    </span>`;
+    html += '<tr class="' + rowClasses.join(' ') + '" id="row-' + i + '"'
+      + (isExpandable ? ' onclick="toggleRow(' + i + ')"' : '') + '>'
+      + '<td class="col-expand-cell">' + chevronHtml + '</td>'
+      + '<td class="mono-sm" style="white-space:nowrap;color:var(--muted);font-size:11px">' + escHtml(row.id) + '</td>'
+      + '<td class="mono-sm" style="white-space:nowrap">' + row.time + '</td>'
+      + '<td style="font-weight:500;white-space:nowrap">' + escHtml(row.clientModel) + ' <span class="api-tag">' + row.clientApi + '</span></td>'
+      + '<td class="mono-sm" style="white-space:nowrap">' + renderTargetModel(row) + '</td>'
+      + '<td class="mono-sm">' + row.latency + '</td>'
+      + '<td style="white-space:nowrap">' + statusHtml + (row.sse ? ' <span class="badge badge-info" style="font-size:10px;padding:1px 6px">SSE</span>' : '') + (row.subType === 'retry' ? ' <span class="badge badge-retry">retry</span>' : '') + (row.subType === 'failover' ? ' <span class="badge badge-failover">failover</span>' : '') + '</td>'
+      + '<td class="col-error-cell">' + (row.error || '') + '</td>'
+      + '<td><button class="action-link" onclick="event.stopPropagation();openDetail(' + i + ')">详情</button></td>'
+      + '</tr>';
 
-    let subRow = '';
-    if (expandable) {
-      const subRows = log.subRequests.map(sr => `
-        <tr>
-          <td class="mono-sm">${sr.provider}</td>
-          <td class="mono-sm">${sr.model}</td>
-          <td>${getStatusBadge(sr.status)}</td>
-          <td class="mono-sm">${sr.duration}</td>
-          <td style="font-size:0.75rem;color:var(--muted)">${sr.reason}</td>
-        </tr>
-      `).join('');
+    // sub-row
+    if (isExpandable) {
+      const subVisible = expandedRows.has(i) ? '' : ' style="display:none"';
+      let subHtml = '';
+      row.subRequests.forEach(function(sr) {
+        const typeBadge = sr.type === 'retry'
+          ? ' <span class="badge badge-warning" style="font-size:9px;padding:0 5px">retry</span>'
+          : sr.type === 'failover'
+            ? ' <span class="badge badge-danger" style="font-size:9px;padding:0 5px">failover</span>'
+            : ' <span class="badge badge-success" style="font-size:9px;padding:0 5px">ok</span>';
+        subHtml += '<tr>'
+          + '<td class="mono-sm">' + sr.provider + '</td>'
+          + '<td class="mono-sm">' + sr.model + '</td>'
+          + '<td>' + getSubStatusBadge(sr.status) + typeBadge + '</td>'
+          + '<td class="mono-sm">' + sr.latency + '</td>'
+          + '</tr>';
+      });
 
-      subRow = `<tr id="sub-${i}" style="display:none">
-        <td colspan="8" style="padding:0">
-          <div class="sub-table-wrap">
-            <table class="sub-table">
-              <thead><tr><th>Provider</th><th>模型</th><th>状态</th><th>耗时</th><th>说明</th></tr></thead>
-              <tbody>${subRows}</tbody>
-            </table>
-          </div>
-        </td>
-      </tr>`;
+      html += '<tr class="sub-row" id="sub-' + i + '"' + subVisible + '>'
+        + '<td colspan="9" style="padding:0">'
+        + '<div class="sub-wrap">'
+        + '<table class="sub-table">'
+        + '<thead><tr><th>Provider</th><th>模型</th><th>状态</th><th>耗时</th></tr></thead>'
+        + '<tbody>' + subHtml + '</tbody>'
+        + '</table></div></td></tr>';
     }
+  });
 
-    return `<tr id="row-${i}" onclick="toggleRow(${i})">
-      <td>${chevron}</td>
-      <td class="mono-sm">${log.time}</td>
-      <td style="font-weight:500">${log.model}</td>
-      <td class="mono-sm">${log.provider}</td>
-      <td>${getStatusBadge(log.status)}</td>
-      <td class="mono-sm">${log.duration}</td>
-      <td>${tokenHtml}</td>
-      <td><button class="action-link" onclick="event.stopPropagation();alert('查看详情（demo）')">详情</button></td>
-    </tr>
-    ${subRow}`;
-  }).join('');
+  tbody.innerHTML = html;
 }
 
+// ── Row Expansion ──
 function toggleRow(index) {
-  const row = document.getElementById(`row-${index}`);
-  const sub = document.getElementById(`sub-${index}`);
-  const chevron = document.getElementById(`chevron-${index}`);
-  if (!sub) return;
-
-  const isVisible = sub.style.display !== 'none';
-  sub.style.display = isVisible ? 'none' : '';
-  row.classList.toggle('expanded', !isVisible);
-  if (chevron) chevron.classList.toggle('open', !isVisible);
+  if (expandedRows.has(index)) {
+    expandedRows.delete(index);
+  } else {
+    expandedRows.add(index);
+  }
+  renderTable();
 }
 
-// Time button group
-document.querySelectorAll('.time-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
+// ── Toggle States ──
+function toggleLoading() {
+  isLoading = !isLoading;
+  const overlay = document.getElementById('loadingOverlay');
+  const btn = document.getElementById('btnToggleLoading');
+  overlay.classList.toggle('visible', isLoading);
+  btn.classList.toggle('active', isLoading);
+}
+
+function toggleEmpty() {
+  isEmpty = !isEmpty;
+  const emptyEl = document.getElementById('emptyState');
+  const tableEl = document.getElementById('logTable');
+  const paginationEl = document.getElementById('pagination');
+  const cleanupEl = document.getElementById('autoCleanup');
+  const btn = document.getElementById('btnToggleEmpty');
+  emptyEl.classList.toggle('visible', isEmpty);
+  tableEl.style.display = isEmpty ? 'none' : '';
+  paginationEl.style.display = isEmpty ? 'none' : '';
+  cleanupEl.style.display = isEmpty ? 'none' : '';
+  btn.classList.toggle('active', isEmpty);
+}
+
+// ── Time Period ──
+document.querySelectorAll('.time-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.time-btn').forEach(function(b) { b.classList.remove('active'); });
     btn.classList.add('active');
   });
 });
 
+// ── Detail Dialog ──
+function openDetail(index) {
+  currentDetail = tableData[index].detail;
+  activeTab = 'response';
+  showRawView = false;
+  var toggle = document.getElementById('rawToggle');
+  if (toggle) { toggle.classList.remove('active'); toggle.textContent = 'Raw JSON'; }
+  renderDialog();
+  document.getElementById('dialogOverlay').classList.add('open');
+  document.addEventListener('keydown', onEscape);
+}
+
+function closeDetail() {
+  document.getElementById('dialogOverlay').classList.remove('open');
+  document.removeEventListener('keydown', onEscape);
+  currentDetail = null;
+}
+
+function onOverlayClick(e) {
+  if (e.target === document.getElementById('dialogOverlay')) closeDetail();
+}
+
+function onEscape(e) {
+  if (e.key === 'Escape') closeDetail();
+}
+
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.tab === tab);
+  });
+  renderTabContent();
+}
+
+function renderDialog() {
+  const d = currentDetail;
+  if (!d) return;
+
+  // progress bar
+  const progressBar = document.getElementById('dialogProgress');
+  progressBar.className = 'dialog-progress-bar';
+  if (d.status >= 200 && d.status < 300) {
+    progressBar.classList.add('completed');
+  } else {
+    progressBar.classList.add('failed');
+  }
+
+  // top bar id
+  const topId = document.getElementById('dialogTopId');
+  const tableEntry = tableData.find(function(r) { return r.detail === d; });
+  topId.textContent = tableEntry ? tableEntry.id : '';
+
+  // left panel
+  const left = document.getElementById('dialogLeft');
+  let html = '';
+
+  // === Execution Chain Section ===
+  html += '<div class="exec-chain mb-section-md">';
+
+  // Header row
+  html += '<div class="exec-chain-header">';
+  html += '<span class="exec-chain-label">执行链</span>';
+  html += '<span style="flex:1"></span>';
+  html += '<span class="exec-chain-client">' + escHtml(d.clientModel) + '</span>';
+  html += ' <span class="api-tag">' + escHtml(d.apiType) + '</span>';
+  if (d.mappingReason) {
+    html += ' <span class="mapping-reason-badge">' + escHtml(MAPPING_LABELS[d.mappingReason] || d.mappingReason) + '</span>';
+  }
+  html += '</div>';
+
+  // Execution steps
+  html += '<div class="exec-steps">';
+  d.retryHistory.forEach(function(r, idx) {
+    const retryBadge = r.status >= 200 && r.status < 300 ? 'badge-success' : r.status === 429 ? 'badge-warning' : 'badge-danger';
+    const isLast = idx === d.retryHistory.length - 1;
+    html += '<div class="exec-step">';
+    // Line 1: #N model @ provider (scrollable container)
+    html += '<div class="exec-step-row">';
+    html += '<span class="exec-step-num">#' + (idx + 1) + '</span>';
+    html += '<span class="exec-step-model-wrap">';
+    var stepModel = r.model || d.backendModel;
+    html += '<span class="exec-step-model">' + escHtml(stepModel) + '</span>';
+    html += ' <span style="color:var(--muted)">@ ' + escHtml(r.provider) + '</span>';
+    html += '</span>';
+    html += '</div>';
+    // Line 2: status + latency + apiType + retry/final tags
+    html += '<div class="exec-step-detail">';
+    html += '<span class="badge ' + retryBadge + '" style="font-size:9px;padding:0 5px;line-height:1.5">' + r.status + '</span>';
+    html += ' <span style="color:oklch(0.5 0 0);font-family:var(--font-mono);font-size:11px">' + r.latency + '</span>';
+    html += ' <span class="api-tag">' + escHtml(r.apiType || d.apiType) + '</span>';
+    if (idx === 0 && !isLast) {
+      html += ' <span class="exec-step-tag exec-retry-tag">retry</span>';
+    }
+    if (isLast && d.retryHistory.length > 1) {
+      html += ' <span class="exec-step-tag exec-final-tag">最终</span>';
+    }
+    html += '</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+  html += '</div>';
+
+  // === Badges + Session row ===
+  html += '<div class="badge-session-row mb-section-md">';
+  const statusColor = d.status >= 200 && d.status < 300 ? 'success' : 'danger';
+  html += '<span class="badge badge-' + statusColor + '" style="font-size:10px;padding:1px 7px"><span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--' + statusColor + ');margin-right:4px"></span>' + escHtml(d.statusText) + '</span>';
+  if (d.sse) html += '<span class="badge badge-info" style="font-size:10px;padding:1px 7px">SSE</span>';
+  if (d.sessionId) {
+    html += ' <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">' + escHtml(d.sessionId.slice(0, 8)) + '</span>';
+  }
+  html += '</div>';
+
+  // Error banner
+  if (d.error) {
+    var errorType = 'unknown_error';
+    if (d.response && d.response.error && d.response.error.type) {
+      errorType = d.response.error.type;
+    }
+    html += '<div class="error-banner mb-section-md">';
+    html += '<div class="error-banner-title">' + escHtml(d.error) + '</div>';
+    html += '<div class="error-banner-meta">' + d.statusCode + ' &middot; ' + escHtml(errorType) + '</div>';
+    html += '</div>';
+  }
+
+  // Layer 5 - Metrics Grid (mb: 8px)
+  html += '<div class="metrics-grid mb-section-sm">';
+  html += buildMetricCell('延迟', d.latency, d.latency === '--');
+  html += buildMetricCell('TTFT', d.ttft, d.ttft === '--');
+  html += buildMetricCell('Input tokens', d.inputTokens, false);
+  html += buildMetricCell('Output tokens', d.outputTokens, d.outputTokens === '0');
+  html += buildMetricCell('Speed', d.speed + (d.speed !== '--' ? ' tok/s' : ''), d.speed === '--');
+  html += buildMetricCell('Cache read', d.cacheRead, d.cacheRead === '0');
+  html += '</div>';
+
+  // Layer 6 - Metadata (no extra margin)
+  html += '<div class="meta-list">';
+  html += '<div class="meta-item"><span class="meta-key">客户端</span><span class="meta-val">' + escHtml(d.clientType) + '</span></div>';
+  html += '<div class="meta-item"><span class="meta-key">状态码</span><span class="meta-val">' + d.statusCode + '</span></div>';
+  html += '<div class="meta-item"><span class="meta-key">来源 IP</span><span class="meta-val">' + escHtml(d.clientIp) + '</span></div>';
+  html += '</div>';
+
+  // AI Button (after metadata, before toggle)
+  if (d.retryHistory.length > 0 && d.status >= 200 && d.status < 300) {
+    html += '<div class="mt-section-sm">';
+    html += '<button class="ai-btn">'
+      + '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M7.25 1.069l-.069.129-1.275 2.387a.5.5 0 01-.376.27l-2.69.39a.5.5 0 00-.278.853l1.947 1.897a.5.5 0 01.144.443l-.46 2.679a.5.5 0 00.726.527l2.408-1.266a.5.5 0 01.466 0l2.408 1.266a.5.5 0 00.726-.527l-.46-2.679a.5.5 0 01.144-.443l1.947-1.897a.5.5 0 00-.278-.853l-2.69-.39a.5.5 0 01-.376-.27L8.819 1.198l-.069-.129A.5.5 0 007.25 1.069z"/></svg>'
+      + '生成重试规则</button>';
+    html += '</div>';
+  }
+
+  // Toggle
+  html += '</div>';
+
+  left.innerHTML = html;
+
+  // right panel
+  renderTabContent();
+}
+
+function buildMetricCell(label, value, isPlaceholder) {
+  return '<div class="metric-cell"><span class="metric-label">' + label + '</span><span class="metric-value' + (isPlaceholder ? ' placeholder' : '') + '">' + escHtml(String(value)) + '</span></div>';
+}
+
+function toggleRawView() {
+  showRawView = !showRawView;
+  document.getElementById('rawToggle').classList.toggle('active', showRawView);
+  document.getElementById('rawToggle').textContent = showRawView ? '结构化' : 'Raw JSON';
+  renderTabContent();
+}
+
+function renderTabContent() {
+  var d = currentDetail;
+  if (!d) return;
+  var container = document.getElementById('tabContent');
+
+  if (showRawView) {
+    var data = activeTab === 'response' ? d.response : d.request;
+    var jsonStr = JSON.stringify(data, null, 2);
+    var highlighted = syntaxHighlight(jsonStr);
+    var lines = highlighted.split('\n');
+    var html = '<button class="copy-json-btn" onclick="copyJson()">复制</button>';
+    lines.forEach(function(line, i) {
+      html += '<div class="json-line"><span class="line-num">' + (i + 1) + '</span><span class="line-content">' + line + '</span></div>';
+    });
+    container.innerHTML = html;
+  } else {
+    if (activeTab === 'response') {
+      container.innerHTML = renderResponseStructured(d);
+    } else {
+      container.innerHTML = renderRequestStructured(d);
+    }
+  }
+}
+
+function renderResponseStructured(d) {
+  var resp = d.response;
+  var html = '';
+
+  // 检测是否为错误响应
+  if (resp.error) {
+    html += '<div class="resp-block">';
+    html += '<div class="resp-block-header error">';
+    html += '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="8" r="7"/><path d="M8 5v3M8 10.5v.5"/></svg>';
+    html += '<span class="resp-block-title">错误</span>';
+    html += '</div>';
+    html += '<div class="resp-block-body">';
+    html += '<pre style="color:var(--danger);font-weight:500;margin-bottom:8px">' + escHtml(resp.error.message) + '</pre>';
+    html += '<div class="usage-grid">';
+    if (resp.error.type) html += '<span class="usage-key">Type</span><span class="usage-val">' + escHtml(resp.error.type) + '</span>';
+    if (resp.error.code) html += '<span class="usage-key">Code</span><span class="usage-val">' + resp.error.code + '</span>';
+    html += '</div>';
+    html += '</div></div>';
+    return html;
+  }
+
+  // 成功响应 - 提取内容
+  var contentText = '';
+  var stopReason = '';
+  var model = resp.model || '';
+
+  if (resp.choices && resp.choices[0]) {
+    contentText = resp.choices[0].message ? resp.choices[0].message.content : '';
+    stopReason = resp.choices[0].finish_reason || '';
+  } else if (resp.content && Array.isArray(resp.content)) {
+    contentText = resp.content.filter(function(c) { return c.type === 'text'; }).map(function(c) { return c.text; }).join('');
+    stopReason = resp.stop_reason || '';
+  }
+
+  // Content block
+  if (contentText) {
+    html += '<div class="resp-block">';
+    html += '<div class="resp-block-header">';
+    html += '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 2h10a1 1 0 011 1v7.586a1 1 0 01-.293.707l-3.414 3.414a1 1 0 01-.707.293H3a1 1 0 01-1-1V3a1 1 0 011-1z"/><path d="M9 14v-4h4"/></svg>';
+    html += '<span class="resp-block-title">回复</span>';
+    if (model) html += '<span style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-left:auto">' + escHtml(model) + '</span>';
+    html += '</div>';
+    html += '<div class="resp-block-body">';
+    html += '<pre>' + escHtml(contentText) + '</pre>';
+    html += '</div></div>';
+  }
+
+  // Usage block
+  var usage = resp.usage;
+  if (usage) {
+    html += '<div class="resp-block">';
+    html += '<div class="resp-block-header">';
+    html += '<span class="resp-block-title">Usage</span>';
+    html += '</div>';
+    html += '<div class="usage-grid">';
+    if (usage.prompt_tokens != null) html += '<span class="usage-key">input_tokens</span><span class="usage-val">' + usage.prompt_tokens.toLocaleString() + '</span>';
+    if (usage.completion_tokens != null) html += '<span class="usage-key">output_tokens</span><span class="usage-val">' + usage.completion_tokens.toLocaleString() + '</span>';
+    if (usage.total_tokens != null) html += '<span class="usage-key">total_tokens</span><span class="usage-val">' + usage.total_tokens.toLocaleString() + '</span>';
+    if (usage.input_tokens != null) html += '<span class="usage-key">input_tokens</span><span class="usage-val">' + usage.input_tokens.toLocaleString() + '</span>';
+    if (usage.output_tokens != null) html += '<span class="usage-key">output_tokens</span><span class="usage-val">' + usage.output_tokens.toLocaleString() + '</span>';
+    html += '</div></div>';
+  }
+
+  // Stop reason badge
+  if (stopReason) {
+    html += '<div style="display:flex;align-items:center;gap:6px;font-size:11px">';
+    html += '<span style="color:var(--muted)">Stop reason</span>';
+    html += '<span style="display:inline-flex;padding:2px 8px;border-radius:4px;background:var(--success-bg);color:var(--success);font-size:10px;font-weight:500">' + escHtml(stopReason) + '</span>';
+    html += '</div>';
+  }
+
+  return html;
+}
+
+function renderRequestStructured(d) {
+  var req = d.request;
+  var headers = req.headers || {};
+  var body = req.body || {};
+  var html = '';
+
+  // Model mapping section
+  if (d.clientModel && body.model && d.clientModel !== body.model) {
+    html += '<div class="req-section">';
+    html += '<div class="req-section-label">模型映射</div>';
+    html += '<div class="req-mapping">';
+    html += '<span class="req-mapping-from">' + escHtml(d.clientModel) + '</span>';
+    html += '<span class="req-mapping-arrow">&rarr;</span>';
+    html += '<span class="req-mapping-to">' + escHtml(body.model) + '</span>';
+    html += '</div></div>';
+  } else if (body.model) {
+    html += '<div class="req-section">';
+    html += '<div class="req-section-label">Model</div>';
+    html += '<div style="font-family:var(--font-mono);font-size:12px;font-weight:500">' + escHtml(body.model) + '</div>';
+    html += '</div>';
+  }
+
+  // System prompt
+  var sysPrompt = null;
+  if (typeof body.system === 'string') sysPrompt = body.system;
+  else if (body.messages) {
+    var sysMsg = body.messages.find(function(m) { return m.role === 'system'; });
+    if (sysMsg) {
+      sysPrompt = typeof sysMsg.content === 'string' ? sysMsg.content : '';
+    }
+  }
+  if (sysPrompt) {
+    html += '<div class="req-section">';
+    html += '<div class="req-section-label">System Prompt</div>';
+    html += '<div class="req-system-box">' + escHtml(sysPrompt) + '</div>';
+    html += '</div>';
+  }
+
+  // Messages
+  if (body.messages && body.messages.length > 0) {
+    var nonSysMsgs = body.messages.filter(function(m) { return m.role !== 'system'; });
+    html += '<div class="req-section">';
+    html += '<div class="req-section-label">Messages (' + nonSysMsgs.length + ')</div>';
+    html += '<div class="req-msg-list">';
+    nonSysMsgs.forEach(function(msg) {
+      var content = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
+      html += '<div class="req-msg">';
+      html += '<span class="req-msg-role ' + msg.role + '">' + msg.role + '</span>';
+      html += '<span class="req-msg-text">' + escHtml(content) + '</span>';
+      html += '</div>';
+    });
+    html += '</div></div>';
+  }
+
+  // Stream options
+  if (body.stream || body.stream_options) {
+    html += '<div class="req-section">';
+    html += '<div class="req-section-label">Stream</div>';
+    html += '<div style="display:flex;align-items:center;gap:8px">';
+    if (body.stream) {
+      html += '<span class="req-stream-badge">SSE</span>';
+    }
+    if (body.stream_options) {
+      html += '<span style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">' + escHtml(JSON.stringify(body.stream_options)) + '</span>';
+    }
+    html += '</div></div>';
+  }
+
+  // Parameters
+  var paramKeys = ['temperature', 'max_tokens', 'top_p', 'top_k'];
+  var params = paramKeys.filter(function(k) { return body[k] != null; });
+  if (params.length > 0) {
+    html += '<div class="req-section">';
+    html += '<div class="req-section-label">Parameters</div>';
+    html += '<div class="usage-grid">';
+    params.forEach(function(k) {
+      html += '<span class="usage-key">' + k + '</span>';
+      html += '<span class="usage-val">' + body[k] + '</span>';
+    });
+    html += '</div></div>';
+  }
+
+  // Headers
+  var headerKeys = Object.keys(headers);
+  if (headerKeys.length > 0) {
+    html += '<div class="req-section">';
+    html += '<div class="req-section-label">Headers (' + headerKeys.length + ')</div>';
+    html += '<div class="req-msg-list" style="gap:2px">';
+    headerKeys.forEach(function(k) {
+      var val = headers[k];
+      if (/auth|api.key|cookie/i.test(k) && val.length > 8) {
+        val = val.substring(0, 4) + '***';
+      }
+      html += '<div style="display:flex;gap:8px;font-size:11px;padding:2px 0">';
+      html += '<span style="color:var(--muted);min-width:100px;font-family:var(--font-mono)">' + escHtml(k) + '</span>';
+      html += '<span style="font-family:var(--font-mono);color:var(--fg)">' + escHtml(val) + '</span>';
+      html += '</div>';
+    });
+    html += '</div></div>';
+  }
+
+  return html;
+}
+
+function copyJson() {
+  const d = currentDetail;
+  if (!d) return;
+  const data = activeTab === 'response' ? d.response : d.request;
+  const jsonStr = JSON.stringify(data, null, 2);
+  navigator.clipboard.writeText(jsonStr).then(function() {
+    const btn = document.querySelector('.copy-json-btn');
+    btn.textContent = '已复制';
+    setTimeout(function() { btn.textContent = '复制'; }, 1500);
+  });
+}
+
+function syntaxHighlight(json) {
+  json = escHtml(json);
+  return json.replace(
+    /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+    function(match) {
+      let cls = 'json-number';
+      if (/^"/.test(match)) {
+        if (/:$/.test(match)) {
+          cls = 'json-key';
+        } else {
+          cls = 'json-string';
+        }
+      } else if (/true|false/.test(match)) {
+        cls = 'json-bool';
+      } else if (/null/.test(match)) {
+        cls = 'json-null';
+      }
+      return '<span class="' + cls + '">' + match + '</span>';
+    }
+  );
+}
+
+function escHtml(str) {
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ── Pagination Buttons ──
+document.querySelectorAll('.page-btn:not(.disabled)').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.page-btn').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+  });
+});
+
+// ── Init ──
 renderTable();
 </script>
 </body>
