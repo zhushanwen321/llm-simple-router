@@ -24,8 +24,7 @@
     <div class="bg-card border border-border rounded-lg overflow-hidden mb-3">
       <!-- Tab bar -->
       <div
-        class="flex items-center border-b border-border px-3"
-        style="background: oklch(0.165 0 0)"
+        class="flex items-center border-b border-border px-3 bg-muted/30 dark:bg-muted/50"
       >
         <Button
           v-for="tab in requestTabs"
@@ -389,8 +388,7 @@
     >
       <div class="bg-card">
         <div
-          class="px-3 py-1.5 border-b border-border"
-          style="background: oklch(0.165 0 0)"
+          class="flex items-center px-3 py-1.5 border-b border-border bg-muted/30 dark:bg-muted/50"
         >
           <span
             class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider"
@@ -403,8 +401,7 @@
       </div>
       <div class="bg-card">
         <div
-          class="px-3 py-1.5 border-b border-border"
-          style="background: oklch(0.165 0 0)"
+          class="flex items-center px-3 py-1.5 border-b border-border bg-muted/30 dark:bg-muted/50"
         >
           <span
             class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider"
@@ -418,8 +415,7 @@
       <!-- Global Concurrency (compact summary) -->
       <div class="bg-card">
         <div
-          class="px-3 py-1.5 border-b border-border"
-          style="background: oklch(0.165 0 0)"
+          class="flex items-center px-3 py-1.5 border-b border-border bg-muted/30 dark:bg-muted/50"
         >
           <span
             class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider"

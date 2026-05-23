@@ -35,7 +35,8 @@
     "config": "模型配置",
     "selectProviderFirst": "请先选择供应商与套餐",
     "namePlaceholder": "输入模型名称",
-    "contextCustom": "自定义"
+    "contextCustom": "自定义",
+    "contextWindow": "上下文窗口"
   },
   "patch": {
     "deepseekAnthropic": "DeepSeek 兼容 (Anthropic)",

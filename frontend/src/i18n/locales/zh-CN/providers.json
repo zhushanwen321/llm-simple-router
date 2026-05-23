@@ -152,6 +152,7 @@
     "sourcePreset": "预设"
   },
   "capabilities": {
+  "label": "能力",
   "text": "文本",
   "image": "图片",
   "audio": "音频",

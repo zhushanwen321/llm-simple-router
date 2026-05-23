@@ -110,7 +110,7 @@ function timeLabel(hour: number): string {
         {{ dayLabel(dayIndex) }}
       </div>
       <div
-        class="flex-1 relative h-full rounded-sm overflow-visible bg-white/5"
+        class="flex-1 relative h-full rounded-sm overflow-visible bg-muted/30 dark:bg-white/5"
       >
         <div
           class="absolute inset-0 grid"
@@ -119,7 +119,7 @@ function timeLabel(hour: number): string {
           <div
             v-for="h in hourMarks"
             :key="h"
-            class="border-r border-white/10 last:border-r-0"
+            class="border-r border-border/30 dark:border-white/10 last:border-r-0"
           />
         </div>
         <div
