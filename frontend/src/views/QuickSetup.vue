@@ -22,7 +22,7 @@
             variant="outline"
             class="text-[10px] px-1.5 py-0 leading-none border-green-500/30 bg-green-500/10 text-green-500"
           >
-            <CheckCircle2 class="size-2.5 mr-0.5" />
+            <Check class="size-2.5 mr-0.5 stroke-[3]" />
             {{ t("common.selected") }}
           </Badge>
         </div>
@@ -69,7 +69,7 @@
         <!-- Info bar: auto-map description -->
         <div
           v-if="clientType"
-          class="mt-2.5 px-3 py-2 rounded-md bg-primary/6 text-[11px] text-muted-foreground flex items-start gap-1.5"
+          class="mt-2.5 px-3 py-2 rounded-r-md bg-primary/8 border-l-[3px] border-l-primary text-[11px] text-muted-foreground flex items-start gap-1.5"
         >
           <Info class="size-3.5 shrink-0 text-primary mt-px" />
           <span>{{
@@ -92,7 +92,7 @@
     <Card class="ring-0">
       <CardHeader class="pb-3">
         <div class="flex items-center justify-between">
-          <CardTitle class="text-sm font-medium">{{ t("quickSetup.provider.config") }}</CardTitle>
+          <CardTitle class="text-sm font-medium">Provider Connection</CardTitle>
           <span
             v-if="selectedGroup"
             class="text-[10px] text-muted-foreground/50 flex items-center gap-1"
@@ -207,7 +207,7 @@
               <Input
                 :model-value="baseUrl"
                 readonly
-                class="font-mono md:text-xs h-7"
+                class="font-mono md:text-xs h-7 border-dashed opacity-70 text-muted-foreground"
               />
             </div>
             <div v-if="upstreamPath" class="w-48 space-y-1">
@@ -215,7 +215,7 @@
               <Input
                 :model-value="upstreamPath"
                 readonly
-                class="font-mono md:text-xs h-7"
+                class="font-mono md:text-xs h-7 border-dashed opacity-70 text-muted-foreground"
               />
             </div>
           </template>
@@ -680,7 +680,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Info, Sparkles, ChevronRight, CheckCircle2, AlertCircle } from "lucide-vue-next";
+import { Info, Sparkles, ChevronRight, Check, CheckCircle2, AlertCircle } from "lucide-vue-next";
 
 const { t } = useI18n();
 

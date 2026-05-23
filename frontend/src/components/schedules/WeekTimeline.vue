@@ -111,7 +111,7 @@ function timeLabel(hour: number): string {
       </div>
       <div
         class="flex-1 relative h-full rounded-sm overflow-visible"
-        :class="hasRules(dayIndex) ? 'bg-foreground/[0.06] dark:bg-white/[0.07]' : 'bg-foreground/[0.03] dark:bg-white/[0.03]'"
+        :class="hasRules(dayIndex) ? 'bg-black/[0.06] dark:bg-white/[0.07]' : 'bg-black/[0.03] dark:bg-white/[0.03]'"
       >
         <div
           class="absolute inset-0 grid"

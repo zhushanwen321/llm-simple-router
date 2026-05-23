@@ -50,7 +50,7 @@ const emit = defineEmits<{
       </Select>
     </div>
     <template v-if="mode !== 'none'">
-      <div :class="compact ? '' : 'w-28'" class="space-y-1">
+      <div :class="compact ? '' : 'w-24'" class="space-y-1">
         <Label class="text-xs text-muted-foreground">{{ t('providers.concurrency.maxConcurrency') }}</Label>
         <Input
           :model-value="maxConcurrency"
@@ -59,17 +59,17 @@ const emit = defineEmits<{
           @update:model-value="emit('update:maxConcurrency', Number($event))"
         />
       </div>
-      <div :class="compact ? '' : 'w-32'" class="space-y-1">
+      <div :class="compact ? '' : 'w-30'" class="space-y-1">
         <Label class="text-xs text-muted-foreground">{{ t('providers.concurrency.queueTimeout') }}</Label>
         <Input
           :model-value="queueTimeoutMs"
           type="number" min="0"
           :placeholder="t('providers.shared.queueTimeoutPlaceholder')"
-          class="text-xs md:text-xs md:text-xs h-7"
+          class="font-mono text-xs md:text-xs md:text-xs h-7"
           @update:model-value="emit('update:queueTimeoutMs', Number($event))"
         />
       </div>
-      <div :class="compact ? '' : 'w-32'" class="space-y-1">
+      <div :class="compact ? '' : 'w-30'" class="space-y-1">
         <Label class="text-xs text-muted-foreground">{{ t('providers.concurrency.maxQueueSize') }}</Label>
         <Input
           :model-value="maxQueueSize"
