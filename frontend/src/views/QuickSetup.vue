@@ -1,15 +1,5 @@
 <template>
   <div class="p-6 space-y-4 pb-20">
-    <!-- Step indicator -->
-    <Card class="py-0 ring-0">
-      <SetupSteps
-        :current-step="currentStep"
-        :client-selected="!!clientType"
-        :provider-configured="!!selectedGroup && !!selectedPlan"
-        :mappings-created="mappingEntries.length > 0"
-      />
-    </Card>
-
     <!-- Row 1: Client Selection -->
     <Card class="ring-0">
       <CardHeader class="pb-3">
@@ -36,7 +26,7 @@
             class="flex h-auto items-center gap-2.5 px-4 py-2.5 text-sm transition-all cursor-pointer"
             :class="
               clientType === c.id
-                ? 'border-primary bg-primary/5 text-primary ring-1 ring-primary/20'
+                ? 'border-primary bg-primary/12 text-primary ring-1 ring-primary/30'
                 : 'border-border hover:border-muted-foreground/30 text-muted-foreground hover:text-foreground'
             "
             @click="selectClient(c.id)"
@@ -54,8 +44,7 @@
                 {{ c.name }}
                 <Badge
                   v-if="c.popular"
-                  variant="outline"
-                  class="text-[9px] px-1 py-0 leading-none border-primary/30 text-primary/70"
+                  class="text-[9px] px-1 py-0 leading-none bg-primary/15 text-primary font-medium"
                 >
                   {{ t("quickSetup.client.popular") }}
                 </Badge>
@@ -104,7 +93,11 @@
       </CardHeader>
       <CardContent class="space-y-3">
         <!-- Group: Provider -->
-        <div class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60 mb-1.5">Provider</div>
+        <div
+          class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60 mb-1.5"
+        >
+          {{ t("quickSetup.provider.groupLabel") }}
+        </div>
         <div class="flex items-end gap-2">
           <div class="w-40 space-y-1">
             <Label class="text-xs text-muted-foreground">{{
@@ -133,8 +126,7 @@
             </Select>
           </div>
           <!-- Custom mode: no extra fields here, Format/BaseURL are in Endpoint group -->
-          <template v-if="isCustomProvider">
-          </template>
+          <template v-if="isCustomProvider"> </template>
           <!-- Preset mode: plan selector -->
           <template v-else>
             <div class="w-28 space-y-1">
@@ -162,7 +154,11 @@
         </div>
 
         <!-- Group: Endpoint -->
-        <div class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60 mb-1.5 mt-1">Endpoint</div>
+        <div
+          class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60 mb-1.5 mt-1"
+        >
+          {{ t("quickSetup.provider.endpoint") }}
+        </div>
         <div class="flex items-end gap-2">
           <div class="w-48 space-y-1">
             <Label class="text-xs text-muted-foreground">{{
@@ -174,9 +170,7 @@
               /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="anthropic">Anthropic Messages</SelectItem>
-                <SelectItem value="openai"
-                  >OpenAI Chat Completions</SelectItem
-                >
+                <SelectItem value="openai">OpenAI Chat Completions</SelectItem>
                 <SelectItem value="openai-responses"
                   >OpenAI Responses</SelectItem
                 >
@@ -185,7 +179,9 @@
           </div>
           <template v-if="isCustomProvider">
             <div class="w-80 space-y-1">
-              <Label class="text-xs text-muted-foreground">Base URL</Label>
+              <Label class="text-xs text-muted-foreground">{{
+                t("quickSetup.provider.baseUrl")
+              }}</Label>
               <Input
                 v-model="customBaseUrl"
                 placeholder="https://api.example.com/v1"
@@ -193,7 +189,9 @@
               />
             </div>
             <div class="w-48 space-y-1">
-              <Label class="text-xs text-muted-foreground">Upstream Path</Label>
+              <Label class="text-xs text-muted-foreground">{{
+                t("quickSetup.provider.upstreamPath")
+              }}</Label>
               <Input
                 v-model="customUpstreamPath"
                 placeholder="/v1/chat/completions"
@@ -203,19 +201,23 @@
           </template>
           <template v-else>
             <div class="w-72 space-y-1">
-              <Label class="text-xs text-muted-foreground">Base URL</Label>
+              <Label class="text-xs text-muted-foreground">{{
+                t("quickSetup.provider.baseUrl")
+              }}</Label>
               <Input
-                :model-value="baseUrl"
-                readonly
-                class="font-mono md:text-xs h-7 border-dashed opacity-70 text-muted-foreground"
+                v-model="presetBaseUrl"
+                placeholder="https://api.example.com/v1"
+                class="font-mono md:text-xs h-7"
               />
             </div>
-            <div v-if="upstreamPath" class="w-48 space-y-1">
-              <Label class="text-xs text-muted-foreground">Upstream Path</Label>
+            <div class="w-48 space-y-1">
+              <Label class="text-xs text-muted-foreground">{{
+                t("quickSetup.provider.upstreamPath")
+              }}</Label>
               <Input
-                :model-value="upstreamPath"
-                readonly
-                class="font-mono md:text-xs h-7 border-dashed opacity-70 text-muted-foreground"
+                v-model="presetUpstreamPath"
+                placeholder="/v1/chat/completions"
+                class="font-mono md:text-xs h-7"
               />
             </div>
           </template>
@@ -238,7 +240,11 @@
               variant="outline"
               size="sm"
               :disabled="connectionStatus === 'testing'"
-              :class="connectionStatus === 'ok' ? 'border-green-500/50 text-green-500' : ''"
+              :class="
+                connectionStatus === 'ok'
+                  ? 'border-green-500/50 text-green-500'
+                  : ''
+              "
               @click="testConnection"
             >
               <template v-if="connectionStatus === 'testing'">
@@ -273,7 +279,7 @@
         </div>
 
         <!-- Concurrency Control -->
-        <div class="border-t pt-3">
+        <div class="border-t border-border pt-3">
           <div class="flex items-center justify-between mb-2">
             <span class="text-xs font-medium text-muted-foreground">{{
               t("quickSetup.concurrency.control")
@@ -282,7 +288,7 @@
               variant="outline"
               class="text-[9px] px-1 py-0 leading-none text-muted-foreground/50"
             >
-              Optional
+              {{ t("quickSetup.concurrency.optional") }}
             </Badge>
           </div>
           <ConcurrencyControl
@@ -312,78 +318,81 @@
         </div>
       </CardHeader>
       <CardContent>
-          <p
-            v-if="modelConfigs.length === 0"
-            class="py-4 text-center text-xs text-muted-foreground"
+        <p
+          v-if="modelConfigs.length === 0"
+          class="py-4 text-center text-xs text-muted-foreground"
+        >
+          {{ t("quickSetup.model.selectProviderFirst") }}
+        </p>
+        <div
+          v-else
+          class="flex flex-col gap-px bg-border rounded-lg overflow-hidden"
+        >
+          <ModelCard
+            v-for="(model, index) in modelConfigs"
+            :key="model.name"
+            :model="model"
+            :api-type="apiType"
+            :is-deep-seek="model.name.toLowerCase().includes('deepseek')"
+            :is-non-openai-endpoint="isNonOpenaiEndpoint"
+            :capabilities="model.capabilities ?? ['text']"
+            :stream-timeout-ms="model.stream_timeout_ms ?? undefined"
+            @update:model="updateModel(index, $event)"
+            @remove="removeModel(index)"
+            @update:stream-timeout-ms="updateModelTimeout(index, $event)"
+            @toggle-capability="
+              (cap: string) => toggleModelCapability(index, cap)
+            "
+          />
+        </div>
+        <!-- Custom mode: add model input -->
+        <div v-if="isCustomProvider" class="flex gap-2 mt-2">
+          <Input
+            v-model="customModelInput"
+            :placeholder="t('quickSetup.model.namePlaceholder')"
+            @keydown.enter.prevent="handleAddCustomModel"
+            class="flex-1 md:text-xs h-7"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            @click="handleAddCustomModel"
+            :disabled="!customModelInput.trim()"
+            >{{ t("common.add") }}</Button
           >
-            {{ t("quickSetup.model.selectProviderFirst") }}
-          </p>
-          <div v-else class="flex flex-col gap-px bg-border rounded-lg overflow-hidden">
-            <ModelCard
-              v-for="(model, index) in modelConfigs"
-              :key="model.name"
-              :model="model"
-              :api-type="apiType"
-              :is-deep-seek="model.name.toLowerCase().includes('deepseek')"
-              :is-non-openai-endpoint="isNonOpenaiEndpoint"
-              :capabilities="model.capabilities ?? ['text']"
-              :stream-timeout-ms="model.stream_timeout_ms ?? undefined"
-              @update:model="updateModel(index, $event)"
-              @remove="removeModel(index)"
-              @update:stream-timeout-ms="updateModelTimeout(index, $event)"
-              @toggle-capability="
-                (cap: string) => toggleModelCapability(index, cap)
-              "
-            />
-          </div>
-          <!-- Custom mode: add model input -->
-          <div v-if="isCustomProvider" class="flex gap-2 mt-2">
-            <Input
-              v-model="customModelInput"
-              :placeholder="t('quickSetup.model.namePlaceholder')"
-              @keydown.enter.prevent="handleAddCustomModel"
-              class="flex-1 md:text-xs h-7"
-            />
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              @click="handleAddCustomModel"
-              :disabled="!customModelInput.trim()"
-              >{{ t("common.add") }}</Button
-            >
-          </div>
+        </div>
 
-          <!-- Transform Rules (collapsible) -->
-          <div class="border-t pt-3 mt-3">
-            <button
-              type="button"
-              class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground w-full text-left hover:text-foreground transition-colors"
-              @click="showTransformRules = !showTransformRules"
+        <!-- Transform Rules (collapsible) -->
+        <div class="border-t border-border pt-3 mt-3">
+          <button
+            type="button"
+            class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground w-full text-left hover:text-foreground transition-colors"
+            @click="showTransformRules = !showTransformRules"
+          >
+            <ChevronRight
+              class="size-3 transition-transform"
+              :class="showTransformRules ? 'rotate-90' : ''"
+            />
+            {{ t("quickSetup.transform.title") }}
+            <Badge
+              variant="outline"
+              class="text-[9px] px-1 py-0 leading-none text-muted-foreground/50"
             >
-              <ChevronRight
-                class="size-3 transition-transform"
-                :class="showTransformRules ? 'rotate-90' : ''"
-              />
-              {{ t("quickSetup.transform.title") }}
-              <Badge
-                variant="outline"
-                class="text-[9px] px-1 py-0 leading-none text-muted-foreground/50"
-              >
-                Optional
-              </Badge>
-            </button>
-            <div v-if="showTransformRules" class="mt-2">
-              <TransformRulesForm
-                :inject-headers="transformInjectHeaders"
-                :drop-fields="transformDropFields"
-                :request-defaults="transformRequestDefaults"
-                @update:inject-headers="transformInjectHeaders = $event"
-                @update:drop-fields="transformDropFields = $event"
-                @update:request-defaults="transformRequestDefaults = $event"
-              />
-            </div>
+              {{ t("quickSetup.transform.optional") }}
+            </Badge>
+          </button>
+          <div v-if="showTransformRules" class="mt-2">
+            <TransformRulesForm
+              :inject-headers="transformInjectHeaders"
+              :drop-fields="transformDropFields"
+              :request-defaults="transformRequestDefaults"
+              @update:inject-headers="transformInjectHeaders = $event"
+              @update:drop-fields="transformDropFields = $event"
+              @update:request-defaults="transformRequestDefaults = $event"
+            />
           </div>
+        </div>
       </CardContent>
     </Card>
 
@@ -406,6 +415,8 @@
             :entries="mappingEntries"
             :provider-groups="allProviderGroups"
             @update:targets="updateMappingTargets"
+            @update:multimodal-fallback="updateMappingMultimodalFallback"
+            @update:client-model="updateMappingClientModel"
             @toggle-active="toggleMappingActive"
             @add="addMappingEntry"
             @remove="removeMappingEntry"
@@ -446,29 +457,30 @@
               <!-- Select all -->
               <div
                 v-if="recommendedRules.some((r) => !r.exists)"
-                class="flex items-center gap-2.5 pb-1 border-b border-border/30"
+                class="flex items-center gap-2.5 pb-1 border-b border-border"
               >
                 <Checkbox
-                  :checked="
+                  :model-value="
                     recommendedRules
                       .filter((r) => !r.exists)
                       .every((r) => selectedRetryRules.has(r.name))
-                  "
-                  :indeterminate="
-                    recommendedRules.some(
-                      (r) => !r.exists && selectedRetryRules.has(r.name),
-                    ) &&
-                    !recommendedRules
-                      .filter((r) => !r.exists)
-                      .every((r) => selectedRetryRules.has(r.name))
+                      ? true
+                      : recommendedRules.some(
+                            (r) => !r.exists && selectedRetryRules.has(r.name),
+                          )
+                        ? 'indeterminate'
+                        : false
                   "
                   class="mt-0.5"
-                  @update:checked="
-                    (val: boolean | string) => {
-                      const checked = !!val;
-                      recommendedRules
-                        .filter((r) => !r.exists)
-                        .forEach((r) => toggleRetryRule(r.name, checked));
+                  @update:model-value="
+                    (val: boolean | 'indeterminate') => {
+                      const checked = val === true;
+                      setAllRetryRules(
+                        recommendedRules
+                          .filter((r) => !r.exists)
+                          .map((r) => r.name),
+                        checked,
+                      );
                     }
                   "
                 />
@@ -491,13 +503,14 @@
                 "
               >
                 <Checkbox
-                  :checked="
+                  :model-value="
                     rule.exists ? true : selectedRetryRules.has(rule.name)
                   "
                   :disabled="rule.exists"
                   class="mt-0.5"
-                  @update:checked="
-                    (val: boolean | string) => toggleRetryRule(rule.name, !!val)
+                  @update:model-value="
+                    (val: boolean | 'indeterminate') =>
+                      toggleRetryRule(rule.name, val === true)
                   "
                   @click.stop
                 />
@@ -578,9 +591,12 @@
       </template>
       <template v-if="selectedGroup">
         <span class="text-muted-foreground/40">→</span>
-        <span class="text-[11px] px-2 py-0.5 rounded bg-primary/8 text-primary font-medium">{{
-          isCustomProvider ? t("quickSetup.provider.custom") : selectedGroup
-        }}</span>
+        <span
+          class="text-[11px] px-2 py-0.5 rounded bg-primary/8 text-primary font-medium"
+          >{{
+            isCustomProvider ? t("quickSetup.provider.custom") : selectedGroup
+          }}</span
+        >
         <template v-if="selectedPlan">
           <span class="text-muted-foreground/40">/</span>
           <span class="text-foreground/80">{{ selectedPlan }}</span>
@@ -610,14 +626,14 @@
         class="flex items-center gap-1 text-[11px] text-primary"
       >
         <CheckCircle2 class="size-3.5" />
-        <span class="font-medium">Validated</span>
+        <span class="font-medium">{{ t("quickSetup.footer.validated") }}</span>
       </div>
       <div
         v-else-if="validationState === 'invalid'"
         class="flex items-center gap-1 text-[11px] text-destructive/70"
       >
         <AlertCircle class="size-3.5" />
-        <span>Invalid</span>
+        <span>{{ t("quickSetup.footer.invalid") }}</span>
       </div>
       <Button size="sm" variant="outline" @click="validateConfig">{{
         t("quickSetup.footer.validate")
@@ -666,7 +682,6 @@ import {
   DEFAULT_CLIENT_MAPPINGS,
 } from "@/components/quick-setup/types";
 
-import SetupSteps from "@/components/quick-setup/SetupSteps.vue";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -680,7 +695,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Info, Sparkles, ChevronRight, Check, CheckCircle2, AlertCircle } from "lucide-vue-next";
+import {
+  Info,
+  Sparkles,
+  ChevronRight,
+  Check,
+  CheckCircle2,
+  AlertCircle,
+} from "lucide-vue-next";
 
 const { t } = useI18n();
 
@@ -700,13 +722,13 @@ const {
   retryProviderMap,
   saving,
   connectionStatus,
-  baseUrl,
   availablePlans,
   isNonOpenaiEndpoint,
   isCustomProvider,
   customBaseUrl,
-  upstreamPath,
+  presetBaseUrl,
   customUpstreamPath,
+  presetUpstreamPath,
   concurrencyMode,
   maxConcurrency,
   queueTimeoutMs,
@@ -719,10 +741,13 @@ const {
   onProviderChange,
   onPlanChange,
   updateMappingTargets,
+  updateMappingMultimodalFallback,
+  updateMappingClientModel,
   toggleMappingActive,
   addMappingEntry,
   removeMappingEntry,
   toggleRetryRule,
+  setAllRetryRules,
   setRetryProvider,
   onConcurrencyModeChange,
   testConnection,
@@ -733,14 +758,6 @@ const {
 const customModelInput = ref("");
 const showTransformRules = ref(false);
 const validationState = ref<"idle" | "valid" | "invalid">("idle");
-
-const STEP_MAPPINGS = 2;
-
-const currentStep = computed(() => {
-  if (!clientType.value) return 0;
-  if (!selectedGroup.value || !selectedPlan.value) return 1;
-  return STEP_MAPPINGS;
-});
 
 function handleAddCustomModel() {
   if (!customModelInput.value.trim()) return;

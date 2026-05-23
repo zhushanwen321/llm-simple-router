@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" class="dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>模型映射 - LLM Router Console</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -13,370 +13,917 @@
     --bg: oklch(0.145 0 0);
     --surface: oklch(0.205 0 0);
     --surface-up: oklch(0.269 0 0);
+    --surface-header: oklch(0.165 0 0);
     --fg: oklch(0.985 0 0);
+    --muted-dim: oklch(0.556 0 0);
     --muted: oklch(0.708 0 0);
     --border: oklch(1 0 0 / 10%);
+    --border-strong: oklch(1 0 0 / 14%);
     --primary: oklch(0.68 0.13 175);
-    --primary-dim: oklch(0.48 0.12 175);
+    --primary-dim: oklch(0.68 0.13 175 / 15%);
+    --primary-ghost: oklch(0.68 0.13 175 / 8%);
     --success: oklch(0.65 0.17 150);
-    --success-bg: oklch(0.32 0.05 150);
+    --success-dim: oklch(0.65 0.17 150 / 12%);
     --warning: oklch(0.78 0.16 80);
-    --warning-bg: oklch(0.35 0.06 80);
+    --warning-dim: oklch(0.78 0.16 80 / 12%);
     --danger: oklch(0.58 0.22 25);
-    --danger-bg: oklch(0.30 0.08 25);
+    --danger-dim: oklch(0.58 0.22 25 / 12%);
     --info: oklch(0.62 0.18 250);
-    --info-bg: oklch(0.30 0.06 250);
-    --indigo: oklch(0.62 0.18 280);
-    --indigo-bg: oklch(0.30 0.06 280);
-    --amber: oklch(0.78 0.16 80);
-    --amber-bg: oklch(0.35 0.06 80);
-    --font-body: 'Inter', -apple-system, sans-serif;
-    --font-mono: 'JetBrains Mono', monospace;
+    --info-dim: oklch(0.62 0.18 250 / 12%);
+    --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
     --radius: 8px;
     --radius-sm: 6px;
+    --radius-xs: 4px;
   }
 
   body {
     font-family: var(--font-body);
     background: var(--bg);
     color: var(--fg);
+    font-size: 14px;
     line-height: 1.5;
-    padding: 2rem;
-    max-width: 1400px;
+    padding: 0;
+    margin: 0;
+  }
+
+  .page-wrap {
+    max-width: 1440px;
     margin: 0 auto;
+    padding: 20px 24px;
   }
 
-  .page-header { margin-bottom: 1.5rem; }
-  .page-header h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.02em; }
-  .page-header p { color: var(--muted); font-size: 0.8125rem; margin-top: 0.25rem; }
-
-  /* Anchor Bar */
-  .anchor-bar {
-    display: flex; gap: 1.5rem; padding: 1rem 1.25rem;
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); margin-bottom: 1rem;
+  /* ========== PAGE HEADER ========== */
+  .page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
   }
-  .anchor-item { display: flex; flex-direction: column; gap: 0.125rem; }
-  .anchor-item .label { font-size: 0.6875rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
-  .anchor-item .value { font-family: var(--font-mono); font-size: 1.5rem; font-weight: 600; }
-  .anchor-item .value.success { color: var(--success); }
-  .anchor-divider { width: 1px; background: var(--border); align-self: stretch; }
-
-  /* Filter Bar */
-  .filter-bar {
-    display: flex; gap: 0.75rem; align-items: center;
-    margin-bottom: 1rem; flex-wrap: wrap;
+  .page-header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
   }
-  .filter-bar select, .filter-bar input {
-    font-family: var(--font-body); font-size: 0.8125rem;
-    background: var(--surface); color: var(--fg);
-    border: 1px solid var(--border); border-radius: var(--radius-sm);
-    padding: 0.5rem 0.75rem; outline: none; transition: border-color 150ms;
+  .page-title {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--fg);
   }
-  .filter-bar select:focus, .filter-bar input:focus { border-color: var(--primary); }
-  .filter-bar select { min-width: 140px; cursor: pointer; }
-  .filter-bar input { min-width: 200px; }
-
-  .btn {
-    font-family: var(--font-body); font-size: 0.8125rem; font-weight: 500;
-    padding: 0.5rem 1rem; border-radius: var(--radius-sm);
-    border: 1px solid var(--border); background: var(--surface);
-    color: var(--fg); cursor: pointer; transition: all 150ms; white-space: nowrap;
+  .stat-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
   }
-  .btn:hover { background: var(--surface-up); border-color: var(--primary); }
-
-  /* Card Grid */
-  .card-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1rem;
+  .stat-badge.total {
+    background: oklch(1 0 0 / 6%);
+    color: var(--muted);
   }
+  .stat-badge.active {
+    background: var(--success-dim);
+    color: var(--success);
+  }
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .header-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 30px;
+    padding: 0 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 150ms;
+    white-space: nowrap;
+  }
+  .header-btn:hover { background: var(--surface); border-color: var(--border-strong); }
+  .header-btn.primary {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: oklch(0.145 0 0);
+    font-weight: 600;
+  }
+  .header-btn.primary:hover { background: oklch(0.72 0.14 175); }
 
-  .mapping-card {
+  /* ========== SECONDARY STRIP ========== */
+  .secondary-strip {
+    display: flex;
+    align-items: stretch;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 1rem 1.25rem;
-    transition: border-color 150ms;
-    cursor: default;
+    margin-bottom: 12px;
+    overflow: hidden;
   }
-  .mapping-card:hover { border-color: oklch(0.68 0.13 175 / 40%); }
-
-  .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem; }
-  .card-model {
-    font-family: var(--font-mono);
-    font-size: 0.9375rem;
+  .secondary-cell {
+    flex: 1;
+    padding: 8px 14px;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .secondary-cell:last-child { border-right: none; }
+  .secondary-label {
+    font-size: 10px;
     font-weight: 600;
-    color: var(--primary);
-    word-break: break-all;
+    color: var(--muted-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    line-height: 1;
+  }
+  .secondary-value {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--fg);
+    line-height: 1.3;
+  }
+  .secondary-value.text-primary { color: var(--primary); }
+  .secondary-sub {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--muted-dim);
   }
 
-  .badge {
-    display: inline-flex; align-items: center;
-    padding: 0.125rem 0.5rem; border-radius: 9999px;
-    font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.02em; white-space: nowrap;
+  /* ========== FILTER BAR ========== */
+  .filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 6px 12px;
+    margin-bottom: 12px;
   }
-  .badge-teal { background: oklch(0.30 0.06 175); color: var(--primary); }
-  .badge-indigo { background: var(--indigo-bg); color: var(--indigo); }
-  .badge-amber { background: var(--amber-bg); color: var(--amber); }
-  .badge-danger { background: var(--danger-bg); color: var(--danger); }
-  .badge-success { background: var(--success-bg); color: var(--success); }
-  .badge-muted { background: oklch(0.269 0 0); color: var(--muted); }
+  .filter-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--muted-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-right: 2px;
+  }
+  .filter-select, .filter-input {
+    height: 32px;
+    font-family: var(--font-body);
+    font-size: 13px;
+    background: var(--bg);
+    color: var(--fg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0 10px;
+    outline: none;
+    transition: border-color 150ms;
+  }
+  .filter-select:focus, .filter-input:focus { border-color: var(--primary); }
+  .filter-select { min-width: 130px; cursor: pointer; appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23707070' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; padding-right: 28px; }
+  .filter-input { min-width: 180px; }
+  .filter-input::placeholder { color: var(--muted-dim); }
+  .filter-spacer { flex: 1; }
+  .filter-count {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted-dim);
+  }
 
-  .card-body { display: flex; flex-direction: column; gap: 0.5rem; }
-  .card-row { display: flex; justify-content: space-between; align-items: center; }
-  .card-label { font-size: 0.75rem; color: var(--muted); }
-  .card-value { font-size: 0.8125rem; }
-  .card-value.mono { font-family: var(--font-mono); }
+  /* ========== MAPPING TABLE ========== */
+  .mapping-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .mapping-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+  }
+  .mapping-table th {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 7px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-header);
+    white-space: nowrap;
+  }
+  .col-model { width: 28%; }
+  .col-strategy { width: 14%; }
+  .col-providers { width: 32%; }
+  .col-status { width: 12%; }
+  .col-actions { width: 14%; }
 
-  .provider-tag {
-    display: inline-flex; align-items: center; gap: 0.25rem;
-    font-size: 0.75rem; padding: 0.125rem 0.5rem;
-    background: oklch(0.269 0 0); border-radius: 9999px;
+  .mapping-table td {
+    padding: 0 12px;
+    font-size: 13px;
+    height: 36px;
+    vertical-align: middle;
+    border-bottom: 1px solid oklch(1 0 0 / 4%);
+  }
+  .mapping-table tbody tr {
+    cursor: pointer;
+    transition: background 100ms;
+  }
+  .mapping-table tbody tr:hover { background: var(--surface-up); }
+  .mapping-table tbody tr.selected { background: oklch(0.68 0.13 175 / 12%); }
+  .mapping-table tbody tr:last-child td { border-bottom: none; }
+
+  .model-name {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
     color: var(--fg);
   }
-  .provider-tag + .provider-tag { margin-left: 0.25rem; }
 
-  .card-actions {
-    display: flex; gap: 0.75rem; margin-top: 0.75rem;
-    padding-top: 0.75rem; border-top: 1px solid var(--border);
+  /* Strategy badge: single primary style */
+  .strategy-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    background: var(--primary-dim);
+    color: var(--primary);
+    letter-spacing: 0.01em;
   }
-  .action-link {
-    font-size: 0.8125rem; color: var(--primary); cursor: pointer;
-    background: none; border: none; font-family: var(--font-body);
-    padding: 0; transition: color 150ms;
-  }
-  .action-link:hover { color: oklch(0.78 0.14 175); }
-  .action-link.danger { color: var(--danger); }
 
-  /* Add Card */
-  .add-card {
+  /* Provider tags */
+  .provider-tags {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: nowrap;
+    overflow: hidden;
+  }
+  .provider-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1px 7px;
+    border-radius: 9999px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    background: oklch(1 0 0 / 6%);
+    color: var(--muted);
+    white-space: nowrap;
+    line-height: 1.6;
+  }
+  .provider-tag .weight {
+    color: var(--muted-dim);
+    font-size: 9px;
+  }
+  .tag-sep {
+    color: var(--muted-dim);
+    font-size: 10px;
+  }
+
+  /* Status badge */
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+  }
+  .status-badge.active {
+    background: var(--success-dim);
+    color: var(--success);
+  }
+  .status-badge.inactive {
+    background: oklch(1 0 0 / 6%);
+    color: var(--muted-dim);
+  }
+  .status-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+  }
+  .status-badge.active .status-dot { background: var(--success); }
+  .status-badge.inactive .status-dot { background: var(--muted-dim); }
+
+  /* Row actions */
+  .row-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+  .row-action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: var(--radius-xs);
+    border: none;
     background: transparent;
-    border: 2px dashed oklch(1 0 0 / 15%);
-    border-radius: var(--radius);
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    min-height: 200px; cursor: pointer;
-    transition: all 150ms; color: var(--muted);
+    color: var(--muted-dim);
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 100ms;
+    font-family: var(--font-body);
   }
-  .add-card:hover {
-    border-color: var(--primary); color: var(--primary);
-    background: oklch(0.68 0.13 175 / 5%);
-  }
-  .add-icon {
-    font-size: 2rem; font-weight: 300; line-height: 1; margin-bottom: 0.5rem;
-  }
-  .add-text { font-size: 0.8125rem; }
+  .row-action-btn:hover { background: oklch(1 0 0 / 8%); color: var(--fg); }
+  .row-action-btn.danger:hover { background: var(--danger-dim); color: var(--danger); }
 
-  /* Expanded Form */
-  .add-form {
-    background: var(--surface); border: 2px solid var(--primary);
-    border-radius: var(--radius); padding: 1.25rem;
+  /* ========== EXPANDED ROW ========== */
+  .detail-row { display: none; }
+  .detail-row.visible { display: table-row; }
+  .detail-row td {
+    padding: 0 12px 12px 12px !important;
+    border-bottom: 1px solid oklch(1 0 0 / 4%) !important;
+  }
+  .detail-panel {
+    background: oklch(1 0 0 / 3%);
+    border-radius: var(--radius-sm);
+    padding: 10px 16px;
+  }
+  .detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 10px 24px;
+  }
+  .detail-field {}
+  .detail-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--muted-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 2px;
+  }
+  .detail-value {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--fg);
+  }
+  .detail-value.mono-sm { font-size: 11px; color: var(--muted); }
+
+  /* Target table inside detail */
+  .target-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 8px;
+  }
+  .target-table th {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--muted-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 4px 8px;
+    text-align: left;
+    border-bottom: 1px solid oklch(1 0 0 / 6%);
+    background: oklch(1 0 0 / 3%);
+  }
+  .target-table td {
+    padding: 4px 8px;
+    font-size: 12px;
+    height: 28px;
+    font-family: var(--font-mono);
+    border-bottom: 1px solid oklch(1 0 0 / 3%);
+  }
+  .target-table td.mono-val {
+    color: var(--primary);
+    font-weight: 500;
+  }
+  .target-table td.weight-val {
+    color: var(--muted);
+  }
+
+  /* ========== ADD NEW AREA ========== */
+  .add-area {
+    border: 2px dashed oklch(1 0 0 / 12%);
+    border-radius: var(--radius);
+    margin-top: 12px;
+    min-height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: all 150ms;
+    color: var(--muted-dim);
+    font-size: 13px;
+    font-weight: 500;
+    padding: 12px;
+  }
+  .add-area:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: var(--primary-ghost);
+  }
+  .add-area-icon {
+    font-size: 18px;
+    font-weight: 300;
+    line-height: 1;
+  }
+
+  /* Add form (hidden by default) */
+  .add-form-section {
+    background: var(--surface);
+    border: 1px solid var(--primary);
+    border-radius: var(--radius);
+    margin-top: 12px;
+    overflow: hidden;
     display: none;
   }
-  .add-form.visible { display: block; }
-  .form-title { font-size: 0.9375rem; font-weight: 600; margin-bottom: 1rem; }
-  .form-row { display: flex; gap: 0.75rem; margin-bottom: 0.75rem; align-items: center; }
+  .add-form-section.visible { display: block; }
+  .add-form-header {
+    padding: 7px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-header);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .add-form-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .add-form-body { padding: 12px 16px; }
+  .form-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .form-row:last-child { margin-bottom: 0; }
   .form-label {
-    font-size: 0.75rem; color: var(--muted); min-width: 80px; text-align: right;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    width: 90px;
+    flex-shrink: 0;
+    text-align: right;
   }
-  .form-row select, .form-row input {
-    font-family: var(--font-body); font-size: 0.8125rem;
-    background: var(--bg); color: var(--fg);
-    border: 1px solid var(--border); border-radius: var(--radius-sm);
-    padding: 0.5rem 0.75rem; outline: none; flex: 1;
+  .form-input, .form-select {
+    height: 32px;
+    font-family: var(--font-body);
+    font-size: 13px;
+    background: var(--bg);
+    color: var(--fg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0 10px;
+    outline: none;
+    flex: 1;
+    transition: border-color 150ms;
   }
-  .form-row select:focus, .form-row input:focus { border-color: var(--primary); }
-  .form-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; }
-  .btn-primary {
-    background: var(--primary); color: oklch(0.15 0 0);
-    border-color: var(--primary); font-weight: 600;
+  .form-input:focus, .form-select:focus { border-color: var(--primary); }
+  .form-input::placeholder { color: var(--muted-dim); }
+  .form-select {
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23707070' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    padding-right: 28px;
   }
-  .btn-primary:hover { background: oklch(0.72 0.14 175); }
+  .form-actions {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid oklch(1 0 0 / 4%);
+  }
+  .form-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 30px;
+    padding: 0 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 150ms;
+    white-space: nowrap;
+  }
+  .form-btn:hover { background: var(--surface-up); }
+  .form-btn.primary {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: oklch(0.145 0 0);
+    font-weight: 600;
+  }
+  .form-btn.primary:hover { background: oklch(0.72 0.14 175); }
 
-  @media (max-width: 1024px) { .card-grid { grid-template-columns: repeat(2, 1fr); } }
-  @media (max-width: 640px) { .card-grid { grid-template-columns: 1fr; } }
+  /* Delete confirm inline */
+  .delete-confirm {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: var(--danger);
+  }
+  .delete-confirm-btn {
+    font-family: var(--font-body);
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: var(--radius-xs);
+    cursor: pointer;
+    border: 1px solid var(--border);
+    font-weight: 500;
+  }
+  .delete-confirm-btn.yes { background: var(--danger); color: var(--fg); border-color: var(--danger); }
+  .delete-confirm-btn.no { background: transparent; color: var(--muted-dim); }
 </style>
 </head>
 <body>
+<div class="page-wrap">
 
-<div class="page-header">
-  <h1>模型映射</h1>
-  <p>配置客户端模型到后端 Provider 的路由策略</p>
-</div>
+  <!-- Page Header -->
+  <header class="page-header">
+    <div class="page-header-left">
+      <h1 class="page-title">Model Mappings</h1>
+      <span class="stat-badge total">5 groups</span>
+      <span class="stat-badge active">4 active</span>
+    </div>
+    <div class="header-actions">
+      <div class="header-btn" onclick="showAddForm()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+        New Mapping
+      </div>
+    </div>
+  </header>
 
-<!-- Anchor Bar -->
-<div class="anchor-bar">
-  <div class="anchor-item">
-    <span class="label">映射组总数</span>
-    <span class="value">5</span>
+  <!-- ========== SECONDARY STRIP ========== -->
+  <div class="secondary-strip">
+    <div class="secondary-cell">
+      <span class="secondary-label">Mapping Groups</span>
+      <span class="secondary-value text-primary">5</span>
+      <span class="secondary-sub">across 5 models</span>
+    </div>
+    <div class="secondary-cell">
+      <span class="secondary-label">Active Mappings</span>
+      <span class="secondary-value" style="color:var(--success)">4</span>
+      <span class="secondary-sub">80% active</span>
+    </div>
+    <div class="secondary-cell">
+      <span class="secondary-label">Providers Used</span>
+      <span class="secondary-value">6</span>
+      <span class="secondary-sub">OpenAI / Anthropic / DeepSeek / Google / Azure / Moonshot</span>
+    </div>
+    <div class="secondary-cell">
+      <span class="secondary-label">Strategy Types</span>
+      <span class="secondary-value">4</span>
+      <span class="secondary-sub">round_robin / failover / scheduled / random</span>
+    </div>
   </div>
-  <div class="anchor-divider"></div>
-  <div class="anchor-item">
-    <span class="label">活跃模型</span>
-    <span class="value success">18</span>
+
+  <!-- ========== FILTER BAR ========== -->
+  <div class="filter-bar">
+    <span class="filter-label">Filter</span>
+    <select class="filter-select" id="strategyFilter" onchange="renderTable()">
+      <option value="all">All Strategies</option>
+      <option value="round_robin">Round Robin</option>
+      <option value="failover">Failover</option>
+      <option value="scheduled">Scheduled</option>
+      <option value="random">Random</option>
+    </select>
+    <input class="filter-input" type="text" id="searchInput" placeholder="Search model name..." oninput="renderTable()" />
+    <div class="filter-spacer"></div>
+    <span class="filter-count" id="filterCount">5 of 5</span>
   </div>
-</div>
 
-<!-- Filter Bar -->
-<div class="filter-bar">
-  <select id="strategyFilter">
-    <option value="all">全部策略</option>
-    <option value="scheduled">Scheduled</option>
-    <option value="round_robin">Round Robin</option>
-    <option value="random">Random</option>
-    <option value="failover">Failover</option>
-  </select>
-  <input type="text" placeholder="搜索模型名称..." />
-</div>
+  <!-- ========== MAPPING TABLE ========== -->
+  <div class="mapping-section">
+    <table class="mapping-table">
+      <thead>
+        <tr>
+          <th class="col-model">Client Model</th>
+          <th class="col-strategy">Strategy</th>
+          <th class="col-providers">Providers</th>
+          <th class="col-status">Status</th>
+          <th class="col-actions">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="mappingTbody"></tbody>
+    </table>
+  </div>
 
-<!-- Card Grid -->
-<div class="card-grid" id="cardGrid"></div>
+  <!-- ========== ADD NEW AREA ========== -->
+  <div class="add-area" id="addAreaBtn" onclick="showAddForm()">
+    <span class="add-area-icon">+</span>
+    <span>Add Mapping Group</span>
+  </div>
+
+  <!-- Add Form -->
+  <div class="add-form-section" id="addFormSection">
+    <div class="add-form-header">
+      <span class="add-form-title">New Mapping Group</span>
+    </div>
+    <div class="add-form-body">
+      <div class="form-row">
+        <span class="form-label">Client Model</span>
+        <input class="form-input" type="text" placeholder="e.g. gpt-4o" />
+      </div>
+      <div class="form-row">
+        <span class="form-label">Strategy</span>
+        <select class="form-select">
+          <option>round_robin</option>
+          <option>failover</option>
+          <option>scheduled</option>
+          <option>random</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <span class="form-label">Provider 1</span>
+        <select class="form-select">
+          <option>OpenAI</option>
+          <option>Anthropic</option>
+          <option>DeepSeek</option>
+          <option>Google</option>
+          <option>Azure</option>
+          <option>Moonshot</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <span class="form-label">Weight</span>
+        <input class="form-input" type="text" placeholder="e.g. 60%" style="max-width:120px" />
+      </div>
+      <div class="form-actions">
+        <div class="form-btn" onclick="hideAddForm()">Cancel</div>
+        <div class="form-btn primary">Create</div>
+      </div>
+    </div>
+  </div>
+
+</div>
 
 <script>
 const mappings = [
   {
     clientModel: 'gpt-4o',
     strategy: 'round_robin',
-    strategyLabel: 'Round Robin',
-    strategyColor: 'indigo',
+    strategyLabel: 'ROUND_ROBIN',
     providers: [
-      { name: 'OpenAI', model: 'gpt-4o', weight: '60%' },
-      { name: 'Azure', model: 'gpt-4o', weight: '40%' }
+      { name: 'OpenAI', backendModel: 'gpt-4o', weight: '60%' },
+      { name: 'Azure', backendModel: 'gpt-4o', weight: '40%' }
     ],
-    status: 'active'
+    status: 'active',
+    createdAt: '2026-05-10',
+    updatedAt: '2026-05-22',
+    totalRequests: '12,847',
+    successRate: '99.2%'
   },
   {
     clientModel: 'claude-sonnet-4-20250514',
     strategy: 'failover',
-    strategyLabel: 'Failover',
-    strategyColor: 'danger',
+    strategyLabel: 'FAILOVER',
     providers: [
-      { name: 'Anthropic', model: 'claude-sonnet-4-20250514', weight: '主' },
-      { name: 'DeepSeek', model: 'deepseek-chat', weight: '备' }
+      { name: 'Anthropic', backendModel: 'claude-sonnet-4-20250514', weight: 'Primary' },
+      { name: 'DeepSeek', backendModel: 'deepseek-chat', weight: 'Fallback' }
     ],
-    status: 'active'
+    status: 'active',
+    createdAt: '2026-05-12',
+    updatedAt: '2026-05-21',
+    totalRequests: '8,234',
+    successRate: '98.7%'
   },
   {
     clientModel: 'gpt-4o-mini',
     strategy: 'scheduled',
-    strategyLabel: 'Scheduled',
-    strategyColor: 'teal',
+    strategyLabel: 'SCHEDULED',
     providers: [
-      { name: 'OpenAI', model: 'gpt-4o-mini', weight: '日间' },
-      { name: 'DeepSeek', model: 'deepseek-chat', weight: '夜间' }
+      { name: 'OpenAI', backendModel: 'gpt-4o-mini', weight: 'Daytime' },
+      { name: 'DeepSeek', backendModel: 'deepseek-chat', weight: 'Nighttime' }
     ],
-    status: 'active'
+    status: 'active',
+    createdAt: '2026-05-14',
+    updatedAt: '2026-05-20',
+    totalRequests: '5,621',
+    successRate: '99.5%'
   },
   {
     clientModel: 'deepseek-r1',
     strategy: 'random',
-    strategyLabel: 'Random',
-    strategyColor: 'amber',
+    strategyLabel: 'RANDOM',
     providers: [
-      { name: 'DeepSeek', model: 'deepseek-reasoner', weight: '50%' },
-      { name: 'Moonshot', model: 'moonshot-v1-128k', weight: '50%' }
+      { name: 'DeepSeek', backendModel: 'deepseek-reasoner', weight: '50%' },
+      { name: 'Moonshot', backendModel: 'moonshot-v1-128k', weight: '50%' }
     ],
-    status: 'active'
+    status: 'active',
+    createdAt: '2026-05-16',
+    updatedAt: '2026-05-22',
+    totalRequests: '3,102',
+    successRate: '97.8%'
   },
   {
     clientModel: 'gemini-2.5-pro',
     strategy: 'round_robin',
-    strategyLabel: 'Round Robin',
-    strategyColor: 'indigo',
+    strategyLabel: 'ROUND_ROBIN',
     providers: [
-      { name: 'Google', model: 'gemini-2.5-pro', weight: '70%' },
-      { name: 'OpenAI', model: 'gpt-4o', weight: '30%' }
+      { name: 'Google', backendModel: 'gemini-2.5-pro', weight: '70%' },
+      { name: 'OpenAI', backendModel: 'gpt-4o', weight: '30%' }
     ],
-    status: 'inactive'
+    status: 'inactive',
+    createdAt: '2026-05-18',
+    updatedAt: '2026-05-19',
+    totalRequests: '487',
+    successRate: '96.3%'
   }
 ];
 
-function renderCards() {
-  const grid = document.getElementById('cardGrid');
-  const filter = document.getElementById('strategyFilter').value;
+let expandedRow = null;
+let deleteConfirmRow = null;
 
-  const filtered = filter === 'all' ? mappings : mappings.filter(m => m.strategy === filter);
+function renderTable() {
+  const strategyFilter = document.getElementById('strategyFilter').value;
+  const searchQuery = document.getElementById('searchInput').value.toLowerCase().trim();
 
-  const cards = filtered.map(m => {
-    const providerTags = m.providers.map(p =>
-      `<span class="provider-tag">${p.name} <span class="mono" style="font-size:0.625rem;color:var(--muted)">${p.weight}</span></span>`
-    ).join('');
+  const filtered = mappings.filter(m => {
+    if (strategyFilter !== 'all' && m.strategy !== strategyFilter) return false;
+    if (searchQuery && !m.clientModel.toLowerCase().includes(searchQuery)) return false;
+    return true;
+  });
 
-    const statusBadge = m.status === 'active'
-      ? '<span class="badge badge-success">活跃</span>'
-      : '<span class="badge badge-muted">停用</span>';
+  document.getElementById('filterCount').textContent = `${filtered.length} of ${mappings.length}`;
 
-    return `<div class="mapping-card">
-      <div class="card-header">
-        <span class="card-model">${m.clientModel}</span>
-        <span class="badge badge-${m.strategyColor}">${m.strategyLabel}</span>
-      </div>
-      <div class="card-body">
-        <div class="card-row">
-          <span class="card-label">Provider 分配</span>
-        </div>
-        <div>${providerTags}</div>
-        <div class="card-row">
-          <span class="card-label">状态</span>
-          ${statusBadge}
-        </div>
-      </div>
-      <div class="card-actions">
-        <button class="action-link">编辑</button>
-        <button class="action-link danger">删除</button>
-      </div>
-    </div>`;
-  }).join('');
+  const tbody = document.getElementById('mappingTbody');
+  let html = '';
 
-  grid.innerHTML = cards + `
-    <div class="add-card" id="addCardBtn" onclick="showAddForm()">
-      <span class="add-icon">+</span>
-      <span class="add-text">新增映射组</span>
-    </div>
-    <div class="add-form" id="addForm">
-      <div class="form-title">新增映射组</div>
-      <div class="form-row">
-        <span class="form-label">客户端模型</span>
-        <input type="text" placeholder="例如 gpt-4o" />
-      </div>
-      <div class="form-row">
-        <span class="form-label">路由策略</span>
-        <select>
-          <option>Round Robin</option>
-          <option>Failover</option>
-          <option>Scheduled</option>
-          <option>Random</option>
-        </select>
-      </div>
-      <div class="form-row">
-        <span class="form-label">Provider</span>
-        <select>
-          <option>OpenAI</option>
-          <option>Anthropic</option>
-          <option>DeepSeek</option>
-          <option>Google Gemini</option>
-        </select>
-      </div>
-      <div class="form-actions">
-        <button class="btn" onclick="hideAddForm()">取消</button>
-        <button class="btn btn-primary">创建</button>
-      </div>
-    </div>
-  `;
+  filtered.forEach((m, i) => {
+    const isExpanded = expandedRow === i;
+    const isDeleting = deleteConfirmRow === i;
+
+    // Provider tags
+    const providerTagsHtml = m.providers.map(p =>
+      `<span class="provider-tag">${p.name} <span class="weight">${p.weight}</span></span>`
+    ).join('<span class="tag-sep">+</span>');
+
+    // Status
+    const statusHtml = m.status === 'active'
+      ? `<span class="status-badge active"><span class="status-dot"></span>Active</span>`
+      : `<span class="status-badge inactive"><span class="status-dot"></span>Inactive</span>`;
+
+    // Actions
+    let actionsHtml;
+    if (isDeleting) {
+      actionsHtml = `
+        <div class="delete-confirm">
+          Delete?
+          <span class="delete-confirm-btn yes" onclick="event.stopPropagation();doDelete(${i})">Y</span>
+          <span class="delete-confirm-btn no" onclick="event.stopPropagation();cancelDelete()">N</span>
+        </div>`;
+    } else {
+      actionsHtml = `
+        <div class="row-actions">
+          <span class="row-action-btn" title="Edit" onclick="event.stopPropagation();toggleRow(${i})">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </span>
+          <span class="row-action-btn" title="Copy model name" onclick="event.stopPropagation();copyModel('${m.clientModel}',this)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </span>
+          <span class="row-action-btn danger" title="Delete" onclick="event.stopPropagation();confirmDelete(${i})">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </span>
+        </div>`;
+    }
+
+    html += `
+      <tr class="${isExpanded ? 'selected' : ''}" onclick="toggleRow(${i})">
+        <td><span class="model-name">${m.clientModel}</span></td>
+        <td><span class="strategy-badge">${m.strategyLabel}</span></td>
+        <td><div class="provider-tags">${providerTagsHtml}</div></td>
+        <td>${statusHtml}</td>
+        <td>${actionsHtml}</td>
+      </tr>`;
+
+    // Expanded detail row
+    if (isExpanded) {
+      const targetRows = m.providers.map(p => `
+        <tr>
+          <td class="mono-val">${p.name}</td>
+          <td>${p.backendModel}</td>
+          <td class="weight-val">${p.weight}</td>
+        </tr>`).join('');
+
+      html += `
+        <tr class="detail-row visible" onclick="event.stopPropagation()">
+          <td colspan="5">
+            <div class="detail-panel">
+              <div class="detail-grid" style="margin-bottom:10px">
+                <div class="detail-field">
+                  <div class="detail-label">Created</div>
+                  <div class="detail-value">${m.createdAt}</div>
+                </div>
+                <div class="detail-field">
+                  <div class="detail-label">Updated</div>
+                  <div class="detail-value">${m.updatedAt}</div>
+                </div>
+                <div class="detail-field">
+                  <div class="detail-label">Total Requests</div>
+                  <div class="detail-value">${m.totalRequests}</div>
+                </div>
+                <div class="detail-field">
+                  <div class="detail-label">Success Rate</div>
+                  <div class="detail-value">${m.successRate}</div>
+                </div>
+              </div>
+              <table class="target-table">
+                <thead>
+                  <tr>
+                    <th>Provider</th>
+                    <th>Backend Model</th>
+                    <th>Weight</th>
+                  </tr>
+                </thead>
+                <tbody>${targetRows}</tbody>
+              </table>
+            </div>
+          </td>
+        </tr>`;
+    }
+  });
+
+  tbody.innerHTML = html;
+}
+
+function toggleRow(i) {
+  expandedRow = expandedRow === i ? null : i;
+  deleteConfirmRow = null;
+  renderTable();
+}
+
+function confirmDelete(i) {
+  deleteConfirmRow = i;
+  renderTable();
+}
+
+function cancelDelete() {
+  deleteConfirmRow = null;
+  renderTable();
+}
+
+function doDelete(i) {
+  /* Demo: just remove from local array */
+  const strategyFilter = document.getElementById('strategyFilter').value;
+  const searchQuery = document.getElementById('searchInput').value.toLowerCase().trim();
+  let visibleIdx = 0;
+  for (let j = 0; j < mappings.length; j++) {
+    let pass = true;
+    if (strategyFilter !== 'all' && mappings[j].strategy !== strategyFilter) pass = false;
+    if (searchQuery && !mappings[j].clientModel.toLowerCase().includes(searchQuery)) pass = false;
+    if (pass) {
+      if (visibleIdx === i) { mappings.splice(j, 1); break; }
+      visibleIdx++;
+    }
+  }
+  expandedRow = null;
+  deleteConfirmRow = null;
+  renderTable();
+}
+
+function copyModel(name, btn) {
+  navigator.clipboard.writeText(name).catch(() => {});
+  btn.style.color = 'var(--success)';
+  setTimeout(() => { btn.style.color = ''; }, 1500);
 }
 
 function showAddForm() {
-  document.getElementById('addCardBtn').style.display = 'none';
-  document.getElementById('addForm').classList.add('visible');
-}
-function hideAddForm() {
-  document.getElementById('addCardBtn').style.display = '';
-  document.getElementById('addForm').classList.remove('visible');
+  document.getElementById('addAreaBtn').style.display = 'none';
+  document.getElementById('addFormSection').classList.add('visible');
 }
 
-document.getElementById('strategyFilter').addEventListener('change', renderCards);
-renderCards();
+function hideAddForm() {
+  document.getElementById('addAreaBtn').style.display = '';
+  document.getElementById('addFormSection').classList.remove('visible');
+}
+
+renderTable();
 </script>
 </body>
 </html>

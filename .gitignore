@@ -128,3 +128,8 @@ core/dist
 router/dist
 pi-extension/dist
 .xyz-harness/workflow-state.json
+
+# AI tool artifacts
+.impeccable/
+DESIGN.md
+PRODUCT.md

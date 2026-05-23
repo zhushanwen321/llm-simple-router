@@ -16,8 +16,13 @@
     "infoBar": "{client} 使用 {format}。我们会自动映射 {models} 到你的供应商模型。"
   },
   "provider": {
+    "connection": "Provider 连接",
     "config": "供应商配置",
     "label": "供应商",
+    "groupLabel": "供应商",
+    "endpoint": "端点",
+    "baseUrl": "Base URL",
+    "upstreamPath": "Upstream Path",
     "select": "选择",
     "custom": "自定义",
     "customProvider": "自定义供应商",
@@ -52,7 +57,8 @@
     "developerRoleDesc": "developer role 转 system"
   },
   "concurrency": {
-    "control": "并发控制"
+    "control": "并发控制",
+    "optional": "可选"
   },
   "mapping": {
     "title": "模型映射",
@@ -70,13 +76,16 @@
     "times": "次"
   },
   "transform": {
-    "title": "转换规则"
+    "title": "转换规则",
+    "optional": "可选"
   },
   "footer": {
     "models": "{count} 模型",
     "mappings": "{count} 映射",
     "rules": "{count} 规则",
     "validate": "验证",
+    "validated": "已验证",
+    "invalid": "无效",
     "saving": "保存中",
     "saveConfig": "保存配置"
   },

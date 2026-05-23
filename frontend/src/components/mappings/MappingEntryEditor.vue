@@ -1,225 +1,551 @@
 <script setup lang="ts">
-import { useI18n } from 'vue-i18n'
-import { Plus, Trash2, CircleHelp, ArrowRight, Timer } from 'lucide-vue-next'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import CascadingModelSelect from '@/components/mappings/CascadingModelSelect.vue'
-import type { MappingTarget, MappingEntry } from '@/components/quick-setup/types'
-import type { ProviderGroup, SelectedValue } from '@/components/mappings/cascading-types'
+import { ref, computed } from "vue";
+import { useI18n } from "vue-i18n";
+import {
+  Plus,
+  Trash2,
+  ArrowRight,
+  Zap,
+  ChevronDown,
+  AlertTriangle,
+  Grid3x3,
+} from "lucide-vue-next";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import CascadingModelSelect from "@/components/mappings/CascadingModelSelect.vue";
+import type {
+  MappingTarget,
+  MappingEntry,
+} from "@/components/quick-setup/types";
+import type { MultimodalFallback } from "@/types/mapping";
+import type {
+  ProviderGroup,
+  SelectedValue,
+} from "@/components/mappings/cascading-types";
 
-const PROVIDER_NAME_TRUNCATE_LEN = 6
+const { t } = useI18n();
 
-const { t } = useI18n()
+const PROVIDER_NAME_TRUNCATE_LEN = 6;
 
-const props = withDefaults(defineProps<{
-  entry: MappingEntry
-  providerGroups: ProviderGroup[]
-  expanded: boolean
-  editable: boolean
-  editableClientModel?: boolean
-}>(), {
-  editable: true,
-  editableClientModel: false,
-})
+const props = withDefaults(
+  defineProps<{
+    entry: MappingEntry;
+    providerGroups: ProviderGroup[];
+    expanded: boolean;
+    editableClientModel?: boolean;
+  }>(),
+  {
+    editableClientModel: false,
+  },
+);
 
 const emit = defineEmits<{
-  'update:targets': [targets: MappingTarget[]]
-  'update:clientModel': [clientModel: string]
-}>()
+  "update:targets": [targets: MappingTarget[]];
+  "update:clientModel": [clientModel: string];
+  "update:multimodalFallback": [fallback: MultimodalFallback | undefined];
+  "toggle-active": [];
+  remove: [];
+  expand: [];
+}>();
+
+const editingClient = ref(false);
+const clientDraft = ref("");
+
+function startEditClient() {
+  if (!props.editableClientModel) return;
+  clientDraft.value = props.entry.clientModel;
+  editingClient.value = true;
+}
+
+function saveClient() {
+  const val = clientDraft.value.trim();
+  if (val && val !== props.entry.clientModel) {
+    emit("update:clientModel", val);
+  }
+  editingClient.value = false;
+}
+
+function cancelEditClient() {
+  editingClient.value = false;
+}
 
 function providerName(providerId: string): string {
-  return props.providerGroups.find(p => p.provider.id === providerId)?.provider.name ?? providerId.slice(0, PROVIDER_NAME_TRUNCATE_LEN)
+  return (
+    props.providerGroups.find((p) => p.provider.id === providerId)?.provider
+      .name ?? providerId.slice(0, PROVIDER_NAME_TRUNCATE_LEN)
+  );
 }
 
-function modelTimeout(providerId: string, modelName: string): number | null | undefined {
-  const group = props.providerGroups.find(p => p.provider.id === providerId)
-  return group?.models.find(m => m.name === modelName)?.streamTimeoutMs
-}
-
+// Failover chain
 function addTarget() {
-  const firstProvider = props.providerGroups[0]
-  const newTargets = [...props.entry.targets, {
-    backend_model: firstProvider?.models[0]?.name ?? '',
-    provider_id: firstProvider?.provider.id ?? '',
-  }]
-  emit('update:targets', newTargets)
-}
-
-function addOverflow() {
-  const firstProvider = props.providerGroups[0]
-  const newTargets = props.entry.targets.map((t: MappingTarget, i: number) => {
-    if (i === 0) {
-      return { ...t, overflow_provider_id: firstProvider?.provider.id ?? '', overflow_model: firstProvider?.models[0]?.name ?? '' }
-    }
-    return t
-  })
-  emit('update:targets', newTargets)
+  const firstProvider = props.providerGroups[0];
+  emit("update:targets", [
+    ...props.entry.targets,
+    {
+      backend_model: firstProvider?.models[0]?.name ?? "",
+      provider_id: firstProvider?.provider.id ?? "",
+    },
+  ]);
 }
 
 function removeTarget(index: number) {
-  if (props.entry.targets.length <= 1) return
-  emit('update:targets', props.entry.targets.filter((_: MappingTarget, i: number) => i !== index))
+  if (props.entry.targets.length <= 1) return;
+  emit(
+    "update:targets",
+    props.entry.targets.filter((_: MappingTarget, i: number) => i !== index),
+  );
 }
 
 function updateTargetProvider(targetIndex: number, val: SelectedValue) {
-  const newTargets = [...props.entry.targets]
-  newTargets[targetIndex] = { ...newTargets[targetIndex], provider_id: val.provider_id, backend_model: val.model }
-  emit('update:targets', newTargets)
+  const newTargets = [...props.entry.targets];
+  newTargets[targetIndex] = {
+    ...newTargets[targetIndex],
+    provider_id: val.provider_id,
+    backend_model: val.model,
+  };
+  emit("update:targets", newTargets);
+}
+
+// Overflow
+function addOverflow() {
+  const firstProvider = props.providerGroups[0];
+  const newTargets = props.entry.targets.map((t: MappingTarget, i: number) => {
+    if (i === 0) {
+      return {
+        ...t,
+        overflow_provider_id: firstProvider?.provider.id ?? "",
+        overflow_model: firstProvider?.models[0]?.name ?? "",
+      };
+    }
+    return t;
+  });
+  emit("update:targets", newTargets);
 }
 
 function updateOverflow(val: SelectedValue | undefined) {
   const newTargets = props.entry.targets.map((t: MappingTarget, i: number) => {
     if (i === 0) {
       if (val) {
-        return { ...t, overflow_provider_id: val.provider_id, overflow_model: val.model }
-      } else {
-        const { overflow_provider_id: _opid, overflow_model: _omod, ...rest } = t
-        return rest as MappingTarget
+        return {
+          ...t,
+          overflow_provider_id: val.provider_id,
+          overflow_model: val.model,
+        };
       }
+      const { overflow_provider_id: _opid, overflow_model: _omod, ...rest } = t;
+      return rest as MappingTarget;
     }
-    return t
-  })
-  emit('update:targets', newTargets)
+    return t;
+  });
+  emit("update:targets", newTargets);
 }
+
+// Multimodal fallback
+function addMultimodalFallback() {
+  const firstProvider = props.providerGroups[0];
+  emit("update:multimodalFallback", {
+    provider_id: firstProvider?.provider.id ?? "",
+    backend_model: "",
+  });
+}
+
+function handleFallbackSelect(val: SelectedValue) {
+  emit("update:multimodalFallback", {
+    provider_id: val.provider_id,
+    backend_model: val.model,
+  });
+}
+
+function removeMultimodalFallback() {
+  emit("update:multimodalFallback", undefined);
+}
+
+// Tag styling
+const tagClasses = computed(() => {
+  switch (props.entry.tag) {
+    case "def":
+      return "bg-primary/15 text-primary";
+    case "auto":
+      return "bg-green-500/15 text-green-500";
+    case "cust":
+      return "bg-blue-500/15 text-blue-500";
+    case "existing":
+      return "bg-muted/40 text-muted-foreground";
+    default:
+      return "bg-muted/40 text-muted-foreground";
+  }
+});
+
+const tagLabel = computed(() => {
+  switch (props.entry.tag) {
+    case "def":
+      return t("providers.shared.tagDefault");
+    case "auto":
+      return t("providers.shared.tagAuto");
+    case "cust":
+      return t("providers.shared.tagCustom");
+    case "existing":
+      return t("providers.shared.tagExisting");
+    default:
+      return "";
+  }
+});
+
+const hasOverflow = computed(() => !!props.entry.targets[0]?.overflow_model);
+const hasMultimodal = computed(
+  () => !!props.entry.multimodalFallback?.backend_model,
+);
 </script>
 
 <template>
   <div>
-    <!-- Collapsed: Vertical Pipeline -->
-    <div v-if="!expanded" class="flex items-start gap-3">
-      <span class="min-w-[90px] font-mono text-sm font-semibold text-foreground shrink-0 truncate" :title="entry.clientModel">
+    <!-- ============ COLLAPSED: Horizontal Pipeline ============ -->
+    <div
+      v-if="!expanded"
+      class="flex items-center gap-2 cursor-pointer select-none min-h-[28px]"
+      @click="emit('expand')"
+    >
+      <!-- Client model -->
+      <span
+        class="font-mono text-xs font-semibold text-foreground min-w-[90px] truncate shrink-0"
+        :title="entry.clientModel"
+      >
         {{ entry.clientModel }}
       </span>
-      <ArrowRight class="size-3.5 mt-0.5 shrink-0 text-muted-foreground/30" />
-      <div class="flex-1 flex flex-col gap-0 min-w-0">
-        <div v-for="(target, tIdx) in entry.targets" :key="tIdx">
-          <div
-            class="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-sm"
-            :class="tIdx === 0
-              ? 'bg-primary/10 border border-primary/20 text-primary'
-              : 'bg-muted/30 border border-border text-muted-foreground'"
-          >
-            <span class="text-[10px] font-semibold w-3.5 text-center" :class="tIdx === 0 ? 'text-primary' : 'text-muted-foreground'">
-              {{ tIdx === 0 ? '①' : tIdx === 1 ? '②' : tIdx === 2 ? '③' : `${tIdx + 1}` }}
-            </span>
-            <span class="font-mono truncate">{{ target.backend_model }}</span>
-            <span class="text-[10px] px-1 py-px rounded bg-muted/50 text-muted-foreground/50 shrink-0">{{ providerName(target.provider_id) }}</span>
-            <span v-if="modelTimeout(target.provider_id, target.backend_model)" class="text-[10px] px-1 py-px rounded bg-blue-500/10 text-blue-500/60 flex items-center gap-0.5 shrink-0">
-              <Timer class="size-2.5" />
-              {{ Math.round(modelTimeout(target.provider_id, target.backend_model)! / 1000) }}s
-            </span>
-          </div>
-          <div v-if="tIdx < entry.targets.length - 1" class="flex items-center gap-1 pl-5 py-0.5">
-            <div class="w-px h-1.5 bg-orange-400/30"></div>
-            <span class="text-[9px] text-orange-400/50">{{ t('providers.shared.switchOnFail') }}</span>
-          </div>
-        </div>
-        <div v-if="entry.targets[0]?.overflow_model" class="flex items-center gap-1.5 mt-1 pt-1.5 border-t border-dashed border-primary/10">
-          <span class="text-[10px] text-primary/40 w-3.5 text-center">⤵</span>
-          <span class="text-[10px] text-primary/30">{{ t('providers.shared.overflow') }}</span>
-          <span class="font-mono text-xs text-primary/50">{{ entry.targets[0].overflow_model }}</span>
-        </div>
-      </div>
-    </div>
 
-    <!-- Expanded: Editor -->
-    <div v-else class="space-y-1.5">
-      <!-- Client model name: editable or read-only -->
-      <div v-if="editableClientModel" class="flex items-center gap-2">
-        <span class="text-[10px] text-muted-foreground/60 shrink-0 w-6 text-center">Client</span>
-        <Input
-          :model-value="entry.clientModel"
-          class="h-7 flex-1 text-xs font-mono"
-          :placeholder="t('providers.shared.clientModel')"
-          @update:model-value="(v: string | number) => emit('update:clientModel', String(v))"
+      <!-- Arrow -->
+      <ArrowRight class="size-3 text-muted-foreground/30 shrink-0" />
+
+      <!-- Pipeline chain -->
+      <div class="flex items-center gap-1 min-w-0 flex-1 flex-wrap">
+        <!-- Primary pill -->
+        <template v-if="entry.targets.length > 0">
+          <span
+            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-mono bg-primary/10 border border-primary/20 text-primary whitespace-nowrap"
+          >
+            <span class="text-[10px] font-semibold">①</span>
+            {{ entry.targets[0].backend_model }}
+            <span class="text-[10px] opacity-60">{{
+              providerName(entry.targets[0].provider_id)
+            }}</span>
+          </span>
+        </template>
+
+        <!-- Failover pills -->
+        <template
+          v-for="(target, tIdx) in entry.targets.slice(1)"
+          :key="'fo-' + tIdx"
+        >
+          <span class="text-orange-400/40 text-xs shrink-0">|</span>
+          <span
+            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-mono bg-muted/30 border border-border text-muted-foreground whitespace-nowrap"
+          >
+            <span class="text-[10px] font-semibold">{{
+              tIdx === 0 ? "②" : tIdx === 1 ? "③" : `${tIdx + 2}`
+            }}</span>
+            {{ target.backend_model }}
+          </span>
+        </template>
+
+        <!-- Overflow pill -->
+        <template v-if="hasOverflow">
+          <span class="text-muted-foreground/30 text-xs shrink-0">|</span>
+          <span
+            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-mono border border-dashed border-primary/20 text-primary/60 whitespace-nowrap"
+          >
+            ↓ {{ entry.targets[0].overflow_model }}
+          </span>
+        </template>
+
+        <!-- Multimodal pill -->
+        <template v-if="hasMultimodal">
+          <span class="text-muted-foreground/30 text-xs shrink-0">|</span>
+          <span
+            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-mono border border-dashed border-blue-500/20 text-blue-500/60 whitespace-nowrap"
+          >
+            ♦ {{ entry.multimodalFallback!.backend_model }}
+          </span>
+        </template>
+      </div>
+
+      <!-- Tag badge -->
+      <span
+        class="text-[10px] px-1.5 py-px rounded font-medium leading-none shrink-0"
+        :class="tagClasses"
+      >
+        {{ tagLabel }}
+      </span>
+
+      <!-- Toggle -->
+      <div class="shrink-0 flex items-center" @click.stop>
+        <Switch
+          :model-value="entry.active"
+          @update:model-value="emit('toggle-active')"
+          class="scale-75"
         />
       </div>
-      <div v-else class="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-muted/20 border border-border/50">
-        <span class="text-[10px] text-muted-foreground/60 shrink-0">Client</span>
-        <span class="font-mono text-sm font-medium text-foreground truncate">{{ entry.clientModel }}</span>
-      </div>
-      <!-- Failover targets -->
-      <div v-for="(target, tIdx) in entry.targets" :key="tIdx">
-        <div class="flex items-center gap-2">
+
+      <!-- Delete -->
+      <button
+        class="shrink-0 text-muted-foreground/20 hover:text-destructive transition-colors flex items-center"
+        @click.stop="emit('remove')"
+      >
+        <Trash2 class="size-3" />
+      </button>
+
+      <!-- Hint -->
+      <span
+        class="text-[10px] text-muted-foreground/30 hidden sm:inline shrink-0 whitespace-nowrap"
+      >
+        click to edit
+      </span>
+    </div>
+
+    <!-- ============ EXPANDED: Vertical Editor ============ -->
+    <div v-else class="space-y-2">
+      <!-- Client model row -->
+      <div class="flex items-center gap-2">
+        <span
+          class="text-[10px] text-muted-foreground/60 shrink-0 w-10 uppercase tracking-wider font-medium"
+          >Client</span
+        >
+        <div
+          v-if="editingClient"
+          class="flex-1 flex items-center gap-1"
+          @click.stop
+        >
+          <Input
+            v-model="clientDraft"
+            class="h-7 flex-1 text-xs font-mono border-border"
+            placeholder="client model name"
+            @keydown.enter.prevent="saveClient"
+            @keydown.escape.prevent="cancelEditClient"
+            @blur="saveClient"
+            autofocus
+          />
+        </div>
+        <div v-else class="flex-1 flex items-center gap-1.5">
           <span
-            class="text-xs font-medium shrink-0 w-6 text-center px-1 py-0.5 rounded"
-            :class="tIdx === 0 ? 'bg-primary/10 text-primary' : 'bg-muted/30 text-muted-foreground'"
+            class="font-mono text-xs font-semibold text-foreground"
+            :class="{
+              'cursor-pointer hover:text-primary transition-colors':
+                editableClientModel,
+            }"
+            @click="startEditClient"
           >
-            {{ tIdx === 0 ? '①' : tIdx === 1 ? '②' : tIdx === 2 ? '③' : `${tIdx + 1}` }}
+            {{ entry.clientModel }}
           </span>
-          <div class="flex-1">
-            <CascadingModelSelect
-              :providers="providerGroups"
-              :model-value="{ provider_id: target.provider_id, model: target.backend_model }"
-              compact
-              :placeholder="t('providers.shared.selectModel')"
-              @update:model-value="(v: SelectedValue) => updateTargetProvider(tIdx, v)"
-            />
-          </div>
-          <Button
-            v-if="tIdx > 0 && entry.targets.length > 1"
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            class="shrink-0 text-muted-foreground/40 hover:text-destructive"
-            @click="removeTarget(tIdx)"
+          <button
+            v-if="editableClientModel"
+            class="text-[10px] text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+            @click.stop="startEditClient"
           >
-            <Trash2 class="size-3" />
-          </Button>
-        </div>
-        <div v-if="tIdx < entry.targets.length - 1" class="flex items-center gap-1 pl-8 py-0.5">
-          <div class="w-px h-1.5 bg-orange-400/30"></div>
-          <span class="text-[9px] text-orange-400/50">{{ t('providers.shared.switchOnFail') }}</span>
+            edit
+          </button>
         </div>
       </div>
 
-      <!-- Add mapping / failover button -->
-      <Button type="button" variant="ghost" size="sm" class="w-full text-xs text-muted-foreground/50" @click="addTarget">
-        <Plus class="w-3 h-3 mr-1" />
-        {{ entry.targets.length === 0 ? t('providers.shared.addMappingModel') : t('providers.shared.addFailover') }}
-      </Button>
+      <!-- ===== Failover chain ===== -->
+      <div class="pt-0.5">
+        <div class="flex items-center gap-1 mb-1">
+          <Zap class="size-3 text-muted-foreground/50" />
+          <span
+            class="text-[10px] font-medium text-muted-foreground/70 uppercase tracking-wider"
+            >Failover chain</span
+          >
+        </div>
 
-      <!-- Overflow model section -->
-      <div class="pt-2 mt-1 border-t border-dashed border-primary/15 space-y-1.5">
-        <!-- Has overflow: show select with remove button -->
-        <div v-if="entry.targets[0]?.overflow_model" class="flex items-center gap-2">
-          <span class="text-[10px] w-6 text-center px-1 py-0.5 rounded bg-primary/10 text-primary/70 shrink-0">{{ t('providers.shared.overflow') }}</span>
+        <div
+          v-for="(target, tIdx) in entry.targets"
+          :key="tIdx"
+          class="space-y-0"
+        >
+          <div class="flex items-center gap-2">
+            <span
+              class="text-xs font-medium shrink-0 w-5 text-center px-0.5 py-0.5 rounded"
+              :class="
+                tIdx === 0
+                  ? 'bg-primary/10 text-primary'
+                  : 'bg-muted/40 text-muted-foreground'
+              "
+              >{{
+                tIdx === 0
+                  ? "①"
+                  : tIdx === 1
+                    ? "②"
+                    : tIdx === 2
+                      ? "③"
+                      : `${tIdx + 1}`
+              }}</span
+            >
+            <div class="flex-1">
+              <CascadingModelSelect
+                :providers="providerGroups"
+                :model-value="{
+                  provider_id: target.provider_id,
+                  model: target.backend_model,
+                }"
+                compact
+                :placeholder="t('providers.shared.selectModel')"
+                @update:model-value="
+                  (v: SelectedValue) => updateTargetProvider(tIdx, v)
+                "
+              />
+            </div>
+            <button
+              v-if="tIdx > 0 && entry.targets.length > 1"
+              class="shrink-0 text-muted-foreground/30 hover:text-destructive transition-colors flex items-center"
+              @click="removeTarget(tIdx)"
+            >
+              <Trash2 class="size-3" />
+            </button>
+          </div>
+          <div
+            v-if="tIdx < entry.targets.length - 1"
+            class="flex items-center gap-1 pl-7 py-0.5"
+          >
+            <div class="w-px h-1.5 bg-orange-400/30"></div>
+            <span class="text-[9px] text-orange-400/50">failover on error</span>
+          </div>
+        </div>
+
+        <button
+          class="flex items-center justify-center gap-1 w-full py-1 mt-0.5 text-xs text-muted-foreground/40 border border-dashed border-border rounded hover:text-primary hover:border-primary/40 transition-colors"
+          @click="addTarget"
+        >
+          <Plus class="size-3" />
+          {{ t("mappings.addBackup") }}
+        </button>
+      </div>
+
+      <!-- ===== Context overflow ===== -->
+      <div class="pt-2 mt-1 border-t border-dashed border-primary/15">
+        <div class="flex items-center gap-1.5 mb-1">
+          <ChevronDown class="size-3 text-primary/50" />
+          <span
+            class="text-[10px] font-medium text-primary/60 uppercase tracking-wider"
+            >Context overflow</span
+          >
+          <span class="text-[9px] text-primary/40 hidden sm:inline"
+            >when context exceeds model limit</span
+          >
+        </div>
+
+        <div v-if="hasOverflow" class="flex items-center gap-2">
+          <span
+            class="text-xs shrink-0 w-5 text-center px-0.5 py-0.5 rounded bg-primary/6 text-primary/60"
+            >↓</span
+          >
           <div class="flex-1">
             <CascadingModelSelect
               :providers="providerGroups"
-              :model-value="entry.targets[0]?.overflow_provider_id && entry.targets[0]?.overflow_model ? { provider_id: entry.targets[0].overflow_provider_id, model: entry.targets[0].overflow_model } : undefined"
+              :model-value="
+                entry.targets[0]?.overflow_provider_id &&
+                entry.targets[0]?.overflow_model
+                  ? {
+                      provider_id: entry.targets[0].overflow_provider_id,
+                      model: entry.targets[0].overflow_model,
+                    }
+                  : undefined
+              "
               compact
+              dashed
               :placeholder="t('providers.shared.overflowPlaceholder')"
-              @update:model-value="(v: SelectedValue | undefined) => updateOverflow(v)"
+              @update:model-value="(v: SelectedValue) => updateOverflow(v)"
             />
           </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            class="shrink-0 text-muted-foreground/40 hover:text-destructive"
+          <button
+            class="shrink-0 text-muted-foreground/30 hover:text-destructive transition-colors flex items-center"
             @click="updateOverflow(undefined)"
           >
             <Trash2 class="size-3" />
-          </Button>
+          </button>
         </div>
-        <!-- No overflow: show add button with tooltip -->
-        <div v-else class="flex items-center gap-1.5">
-          <Button type="button" variant="ghost" size="sm" class="text-xs text-muted-foreground/50" @click="addOverflow">
-            <Plus class="w-3 h-3 mr-1" />
-            {{ t('providers.shared.addOverflow') }}
-          </Button>
-          <TooltipProvider :delay-duration="200">
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <CircleHelp class="size-3 text-muted-foreground/30 cursor-help" />
-              </TooltipTrigger>
-              <TooltipContent side="top" class="max-w-[240px] text-xs">
-                {{ t('providers.shared.overflowTooltip') }}
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+
+        <button
+          v-else
+          class="flex items-center gap-1 text-xs text-muted-foreground/50 hover:text-primary/60 transition-colors"
+          @click="addOverflow"
+        >
+          <Plus class="size-3" />
+          {{ t("providers.shared.addOverflow") }}
+        </button>
+      </div>
+
+      <!-- ===== Multimodal fallback ===== -->
+      <div class="pt-2 mt-1 border-t border-dashed border-blue-500/15">
+        <div class="flex items-center gap-1.5 mb-1">
+          <Grid3x3 class="size-3 text-blue-500/50" />
+          <span
+            class="text-[10px] font-medium text-blue-500/60 uppercase tracking-wider"
+            >Multimodal Fallback</span
+          >
+          <Badge
+            v-if="hasMultimodal"
+            variant="outline"
+            class="text-[9px] px-1.5 py-0 leading-none text-primary/60 border-primary/20"
+          >
+            {{ t("mappings.multimodalFallback.configured") }}
+          </Badge>
+        </div>
+
+        <div v-if="hasMultimodal" class="flex items-center gap-2">
+          <span
+            class="text-xs shrink-0 w-5 text-center px-0.5 py-0.5 rounded bg-blue-500/6 text-blue-500/60"
+            >♦</span
+          >
+          <div class="flex-1">
+            <CascadingModelSelect
+              :providers="providerGroups"
+              :model-value="{
+                provider_id: entry.multimodalFallback!.provider_id,
+                model: entry.multimodalFallback!.backend_model,
+              }"
+              compact
+              dashed
+              :placeholder="
+                t('mappings.multimodalFallback.selectProviderModel')
+              "
+              @update:model-value="
+                (v: SelectedValue) => handleFallbackSelect(v)
+              "
+            />
+          </div>
+          <button
+            class="shrink-0 text-muted-foreground/30 hover:text-destructive transition-colors flex items-center"
+            @click="removeMultimodalFallback"
+          >
+            <Trash2 class="size-3" />
+          </button>
+        </div>
+
+        <button
+          v-else
+          class="flex items-center gap-1 text-xs text-muted-foreground/50 hover:text-primary/60 transition-colors"
+          @click="addMultimodalFallback"
+        >
+          <Plus class="size-3" />
+          {{ t("mappings.multimodalFallback.add") }}
+        </button>
+
+        <!-- Warning box -->
+        <div
+          v-if="hasMultimodal"
+          class="mt-2 px-2.5 py-2 rounded border border-orange-400/25 bg-orange-400/5 flex gap-2"
+        >
+          <AlertTriangle class="size-3.5 text-orange-400 shrink-0 mt-0.5" />
+          <div class="text-[10px] leading-relaxed space-y-0.5">
+            <div class="text-orange-400 font-medium">
+              {{ t("mappings.multimodalFallback.sessionLockWarning") }}
+            </div>
+            <div class="text-muted-foreground/60">
+              {{ t("mappings.multimodalFallback.sessionLockReason") }}
+            </div>
+            <div class="text-muted-foreground/40">
+              {{ t("mappings.multimodalFallback.costSuggestion") }}
+            </div>
+          </div>
         </div>
       </div>
     </div>

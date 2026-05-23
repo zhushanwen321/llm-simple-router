@@ -12,7 +12,6 @@ import {
   getApiMessage,
   type ProviderGroup,
   type RecommendedRetryRule,
-  type QuickSetupPayload,
 } from "@/api/client";
 import type { MappingGroup } from "@/types/mapping";
 import type { Provider as ApiProvider } from "@/types/mapping";
@@ -21,424 +20,16 @@ import {
   type ClientType,
   type ModelConfig,
   type MappingEntry,
-  type MappingTarget,
   CLIENTS,
-  DEFAULT_CLIENT_MAPPINGS,
-  getDefaultContextWindow,
 } from "@/components/quick-setup/types";
-import { DEFAULT_CONTEXT_WINDOW, DEFAULT_STREAM_TIMEOUT_MS } from "@/constants";
-import type { Rule } from "@/types/mapping";
-import type { ConcurrencyMode } from "@/types/concurrency";
+import { DEFAULT_CONTEXT_WINDOW } from "@/constants";
 import { computeDefaultPatches } from "@/utils/model-patches";
-import router from "@/router";
+import { toProviderName } from "./quick-setup-helpers";
+import { useQuickSetupActions, type ActionCtx } from "./quick-setup-actions";
 
 const DEFAULT_CONCURRENCY = 10;
 const DEFAULT_QUEUE_TIMEOUT_MS = 120_000;
 const DEFAULT_QUEUE_SIZE = 100;
-const CONNECTION_TEST_DELAY_MS = 800;
-const POST_SAVE_REDIRECT_MS = 1500;
-
-/** Convert Chinese provider group name to valid backend name (a-zA-Z0-9_-) */
-const PROVIDER_NAME_MAP: Record<string, string> = {
-  DeepSeek: "deepseek",
-  百度千帆: "qianfan",
-  科大讯飞: "iflytek",
-  硅基流动: "siliconflow",
-  智谱: "zhipu",
-  月之暗面: "moonshot",
-  Minimax: "minimax",
-  火山引擎: "volcengine",
-  阿里云: "aliyun",
-  腾讯云: "tencent",
-  OpenCode: "opencode",
-  阶跃星辰: "stepfun",
-};
-
-function toProviderName(group: string): string {
-  return (
-    PROVIDER_NAME_MAP[group] ??
-    group
-      .toLowerCase()
-      .replace(/[^a-z0-9]/gi, "-")
-      .replace(/-+/g, "-")
-  );
-}
-
-function parseTransformRules(
-  headersInput: string,
-  dropFieldsInput: string,
-  requestDefaultsInput: string,
-  onError: (msg: string) => void,
-): NonNullable<QuickSetupPayload["transform_rules"]> | undefined | false {
-  if (!headersInput && !dropFieldsInput && !requestDefaultsInput)
-    return undefined;
-  const result: NonNullable<QuickSetupPayload["transform_rules"]> = {};
-  if (headersInput) {
-    try {
-      result.inject_headers = JSON.parse(headersInput);
-    } catch {
-      onError("injectHeadersJsonError");
-      return false;
-    }
-  }
-  if (dropFieldsInput) {
-    result.drop_fields = dropFieldsInput
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-  }
-  if (requestDefaultsInput) {
-    try {
-      result.request_defaults = JSON.parse(requestDefaultsInput);
-    } catch {
-      onError("requestDefaultsJsonError");
-      return false;
-    }
-  }
-  return Object.keys(result).length > 0 ? result : undefined;
-}
-
-/** Toggle active state for existing mappings that changed */
-async function toggleChangedMappings(
-  entries: MappingEntry[],
-): Promise<string[]> {
-  const errors: string[] = [];
-  for (const entry of entries) {
-    if (
-      entry.existing &&
-      entry.existingId &&
-      entry.originalActive !== undefined &&
-      entry.active !== entry.originalActive
-    ) {
-      try {
-        await api.toggleMappingGroup(entry.existingId);
-      } catch {
-        errors.push(entry.clientModel);
-      }
-    }
-  }
-  return errors;
-}
-
-/** Build retry rules payload from selected rules */
-function buildRetryRulesPayload(
-  rules: RecommendedRetryRule[],
-  selectedRules: Set<string>,
-  providerMap: Map<string, "general" | string>,
-): QuickSetupPayload["retry_rules"] {
-  return rules
-    .filter((r) => selectedRules.has(r.name) && !r.exists)
-    .map((r) => {
-      const binding = providerMap.get(r.name) ?? "general";
-      return {
-        name: r.name,
-        status_code: r.status_code,
-        body_pattern: r.body_pattern,
-        retry_strategy: r.retry_strategy,
-        retry_delay_ms: r.retry_delay_ms,
-        max_retries: r.max_retries,
-        max_delay_ms: r.max_delay_ms,
-        provider_shortname: binding === "general" ? null : binding,
-      };
-    });
-}
-
-interface ProviderPayloadInput {
-  isCustom: boolean;
-  selectedGroup: string;
-  selectedPlan: string;
-  apiType: "openai" | "openai-responses" | "anthropic";
-  baseUrl: string;
-  upstreamPath: string;
-  apiKey: string;
-  models: ModelConfig[];
-  concurrencyMode: ConcurrencyMode;
-  maxConcurrency: number;
-  queueTimeoutMs: number;
-  maxQueueSize: number;
-}
-
-function buildProviderPayload(
-  input: ProviderPayloadInput,
-): QuickSetupPayload["provider"] {
-  return {
-    name: input.isCustom
-      ? `custom-${Date.now()}`
-      : `${toProviderName(input.selectedGroup)}-${toProviderName(input.selectedPlan)}`,
-    api_type: input.apiType,
-    base_url: input.baseUrl,
-    upstream_path: input.upstreamPath || undefined,
-    api_key: input.apiKey,
-    models: input.models.map((m) => ({
-      name: m.name,
-      context_window: m.contextWindow,
-      patches: m.patches.length > 0 ? m.patches : undefined,
-      stream_timeout_ms: m.stream_timeout_ms ?? undefined,
-      capabilities:
-        m.capabilities && m.capabilities.length > 0
-          ? m.capabilities
-          : undefined,
-    })),
-    concurrency_mode: input.concurrencyMode,
-    max_concurrency:
-      input.concurrencyMode !== "none" ? input.maxConcurrency : undefined,
-    queue_timeout_ms:
-      input.concurrencyMode !== "none" ? input.queueTimeoutMs : undefined,
-    max_queue_size:
-      input.concurrencyMode !== "none" ? input.maxQueueSize : undefined,
-  };
-}
-
-/** Build mapping entries by merging existing DB mappings with client defaults */
-function buildMappingEntries(
-  clientType: ClientType,
-  enabledModels: ModelConfig[],
-  existingMappings: MappingGroup[],
-): MappingEntry[] {
-  let clientModelNames: string[];
-  if (clientType === "pi") {
-    clientModelNames = enabledModels.map((m) => m.name);
-  } else {
-    clientModelNames =
-      DEFAULT_CLIENT_MAPPINGS[clientType] ?? enabledModels.map((m) => m.name);
-  }
-
-  return clientModelNames.map((cmName) => {
-    const existingGroup = existingMappings.find(
-      (g) => g.client_model === cmName,
-    );
-    if (existingGroup) {
-      let rule: Rule = {};
-      try {
-        rule = JSON.parse(existingGroup.rule);
-      } catch {
-        rule = {};
-      }
-      const targets = rule.targets ?? [];
-      return {
-        clientModel: cmName,
-        targets:
-          targets.length > 0
-            ? targets.map((t) => ({
-              backend_model: t.backend_model,
-              provider_id: t.provider_id,
-              overflow_provider_id: t.overflow_provider_id,
-              overflow_model: t.overflow_model,
-            }))
-            : [
-              {
-                backend_model: enabledModels[0]?.name ?? "",
-                provider_id: "__new__",
-              },
-            ],
-        existing: true,
-        existingId: existingGroup.id,
-        tag: "existing" as const,
-        active: !!existingGroup.is_active,
-        originalActive: !!existingGroup.is_active,
-      };
-    }
-
-    const defaultTarget =
-      enabledModels[clientModelNames.indexOf(cmName)]?.name ??
-      enabledModels[enabledModels.length - 1]?.name ??
-      "";
-    return {
-      clientModel: cmName,
-      targets: [{ backend_model: defaultTarget, provider_id: "__new__" }],
-      existing: false,
-      tag: (clientType === "pi" ? "auto" : "def") as "auto" | "def",
-      active: true,
-    };
-  });
-}
-
-/** Resolve the effective apiType, preserving openai-responses for codex clients
- *  when the preset is openai-compatible. Anthropic presets are never overridden. */
-function resolveApiType(
-  clientFormat: string | undefined,
-  presetApiType: string,
-): "openai" | "openai-responses" | "anthropic" {
-  if (
-    clientFormat === "openai-responses" &&
-    (presetApiType === "openai" || presetApiType === "openai-responses")
-  ) {
-    return "openai-responses";
-  }
-  return presetApiType as "openai" | "openai-responses" | "anthropic";
-}
-
-interface QuickSetupPayloadInput {
-  isCustomProvider: boolean;
-  selectedGroup: string;
-  retryProviderMap: Map<string, "general" | string>;
-  selectedPlan: string;
-  apiType: "openai" | "openai-responses" | "anthropic";
-  baseUrl: string;
-  upstreamPath: string;
-  apiKey: string;
-  models: ModelConfig[];
-  concurrencyMode: ConcurrencyMode;
-  maxConcurrency: number;
-  queueTimeoutMs: number;
-  maxQueueSize: number;
-  mappingEntries: MappingEntry[];
-  recommendedRules: RecommendedRetryRule[];
-  selectedRetryRules: Set<string>;
-  transformRules: QuickSetupPayload["transform_rules"];
-}
-
-function buildQuickSetupPayload(
-  input: QuickSetupPayloadInput,
-): QuickSetupPayload {
-  return {
-    provider: buildProviderPayload({
-      isCustom: input.isCustomProvider,
-      selectedGroup: input.selectedGroup,
-      selectedPlan: input.selectedPlan,
-      apiType: input.apiType,
-      baseUrl: input.baseUrl,
-      upstreamPath: input.upstreamPath,
-      apiKey: input.apiKey,
-      models: input.models,
-      concurrencyMode: input.concurrencyMode,
-      maxConcurrency: input.maxConcurrency,
-      queueTimeoutMs: input.queueTimeoutMs,
-      maxQueueSize: input.maxQueueSize,
-    }),
-    mappings: input.mappingEntries
-      .filter((m) => m.targets[0]?.backend_model)
-      .map((m) => {
-        const hasAdvancedConfig =
-          m.targets.length > 1 ||
-          m.targets[0]?.overflow_model ||
-          m.multimodalFallback?.backend_model;
-        if (hasAdvancedConfig) {
-          const ruleObj: Record<string, unknown> = {
-            targets: m.targets.map((t) => {
-              const target: Record<string, unknown> = {
-                backend_model: t.backend_model,
-                provider_id: t.provider_id,
-              };
-              if (t.overflow_provider_id)
-                target.overflow_provider_id = t.overflow_provider_id;
-              if (t.overflow_model) target.overflow_model = t.overflow_model;
-              return target;
-            }),
-          };
-          if (m.multimodalFallback?.backend_model) {
-            ruleObj.multimodal_fallback = {
-              provider_id: m.multimodalFallback.provider_id,
-              backend_model: m.multimodalFallback.backend_model,
-            };
-          }
-          return {
-            client_model: m.clientModel,
-            backend_model: m.targets[0]?.backend_model ?? "",
-            rule: JSON.stringify(ruleObj),
-          };
-        }
-        return {
-          client_model: m.clientModel,
-          backend_model: m.targets[0]?.backend_model ?? "",
-        };
-      }),
-    retry_rules: buildRetryRulesPayload(
-      input.recommendedRules,
-      input.selectedRetryRules,
-      input.retryProviderMap,
-    ),
-    transform_rules: input.transformRules,
-  };
-}
-
-function makeCurrentClient(
-  clientType: Ref<ClientType>,
-): ComputedRef<(typeof CLIENTS)[number] | undefined> {
-  return computed(() => CLIENTS.find((c) => c.id === clientType.value));
-}
-
-function makeCurrentPreset(
-  selectedGroup: Ref<string>,
-  selectedPlan: Ref<string>,
-  providerGroups: Ref<ProviderGroup[]>,
-): ComputedRef<ProviderGroup["presets"][number] | undefined> {
-  return computed(() => {
-    if (!selectedGroup.value || !selectedPlan.value) return undefined;
-    const group = providerGroups.value.find(
-      (g) => g.group === selectedGroup.value,
-    );
-    if (!group) return undefined;
-    return group.presets.find((p) => p.plan === selectedPlan.value);
-  });
-}
-
-function makeBaseUrl(
-  isCustomProvider: Ref<boolean>,
-  customBaseUrl: Ref<string>,
-  currentPreset: ComputedRef<ProviderGroup["presets"][number] | undefined>,
-): ComputedRef<string> {
-  return computed(() =>
-    isCustomProvider.value
-      ? customBaseUrl.value
-      : (currentPreset.value?.baseUrl ?? ""),
-  );
-}
-
-function makeUpstreamPath(
-  isCustomProvider: Ref<boolean>,
-  customUpstreamPath: Ref<string>,
-  currentPreset: ComputedRef<ProviderGroup["presets"][number] | undefined>,
-): ComputedRef<string> {
-  return computed(() => {
-    if (isCustomProvider.value) return customUpstreamPath.value;
-    const preset = currentPreset.value;
-    if (!preset) return "";
-    const defaultPath =
-      preset.apiType === "anthropic"
-        ? "/v1/messages"
-        : preset.apiType === "openai-responses"
-          ? "/v1/responses"
-          : "/v1/chat/completions";
-    if (preset.upstreamPath && preset.upstreamPath !== defaultPath)
-      return preset.upstreamPath;
-    return "";
-  });
-}
-
-function makeAvailablePlans(
-  selectedGroup: Ref<string>,
-  providerGroups: Ref<ProviderGroup[]>,
-): ComputedRef<ProviderGroup["presets"]> {
-  return computed(() => {
-    const group = providerGroups.value.find(
-      (g) => g.group === selectedGroup.value,
-    );
-    return group?.presets ?? [];
-  });
-}
-
-function makeIsNonOpenaiEndpoint(
-  baseUrl: ComputedRef<string>,
-): ComputedRef<boolean> {
-  return computed(() => !baseUrl.value.includes("openai.com"));
-}
-
-function makeRecommendedRules(
-  selectedGroup: Ref<string>,
-  allRecommendedRules: Ref<RecommendedRetryRule[]>,
-  providerGroups: Ref<ProviderGroup[]>,
-): ComputedRef<RecommendedRetryRule[]> {
-  return computed(() => {
-    const group = selectedGroup.value;
-    const shortname =
-      providerGroups.value.find((g) => g.group === group)?.shortname ?? group;
-    return allRecommendedRules.value.filter((r) => {
-      if (!r.providers || r.providers.length === 0) return true;
-      return r.providers.includes(shortname);
-    });
-  });
-}
 
 function computeProviderGroupDisplayInfo(
   isCustomProvider: ComputedRef<boolean>,
@@ -447,19 +38,7 @@ function computeProviderGroupDisplayInfo(
   modelConfigs: Ref<ModelConfig[]>,
   allProviders: Ref<ApiProvider[]>,
   t: (key: string, params?: Record<string, unknown>) => string,
-): {
-  currentProviderGroup: ComputedRef<{
-    provider: { id: string; name: string };
-    models: { name: string; contextWindow: number }[];
-    isNew: boolean;
-  } | null>;
-  allProviderGroups: ComputedRef<
-    {
-      provider: { id: string; name: string };
-      models: { name: string; contextWindow: number }[];
-    }[]
-  >;
-} {
+) {
   const currentProviderGroup = computed(() => {
     if (!selectedGroup.value) return null;
     const tempId = isCustomProvider.value
@@ -472,14 +51,10 @@ function computeProviderGroupDisplayInfo(
       provider: { id: tempId, name: displayName },
       models: modelConfigs.value
         .filter((m) => m.enabled)
-        .map((m) => ({
-          name: m.name,
-          contextWindow: m.contextWindow,
-        })),
+        .map((m) => ({ name: m.name, contextWindow: m.contextWindow })),
       isNew: true,
     };
   });
-
   const allProviderGroups = computed(() => {
     const existing = allProviders.value.map((p) => ({
       provider: { id: p.id, name: p.name },
@@ -496,162 +71,11 @@ function computeProviderGroupDisplayInfo(
     }
     return existing;
   });
-
-  return { currentProviderGroup, allProviderGroups };
-}
-
-function buildRetryProviderMap(
-  rules: RecommendedRetryRule[],
-  currentShortname: string | undefined,
-): Map<string, "general" | string> {
-  const map = new Map<string, "general" | string>();
-  for (const rule of rules) {
-    if (rule.exists) continue;
-    const ruleProviders = rule.providers ?? [];
-    if (
-      ruleProviders.length > 0 &&
-      currentShortname &&
-      ruleProviders.includes(currentShortname)
-    ) {
-      map.set(rule.name, currentShortname);
-    } else {
-      map.set(rule.name, "general");
-    }
-  }
-  return map;
-}
-
-interface ClientDefaults {
-  group: string;
-  plan: string;
-  apiType: "openai" | "openai-responses" | "anthropic";
-  preset: ProviderGroup["presets"][number];
-}
-
-function resolveClientDefaults(
-  client: (typeof CLIENTS)[number],
-  groups: ProviderGroup[],
-): ClientDefaults | null {
-  const groupData = groups.find((g) => g.group === client.defaultProvider);
-  if (!groupData || groupData.presets.length === 0) return null;
-  const compatibleFormats =
-    client.format === "openai-responses"
-      ? ["openai-responses", "openai"]
-      : [client.format];
-  const match = groupData.presets.find(
-    (p) =>
-      compatibleFormats.includes(p.apiType) && p.plan === client.defaultPlan,
-  );
-  const preset =
-    match ??
-    groupData.presets.find((p) => compatibleFormats.includes(p.apiType)) ??
-    groupData.presets[0];
-  return {
-    group: groupData.group,
-    plan: preset.plan,
-    apiType: resolveApiType(client.format, preset.apiType),
-    preset,
-  };
-}
-
-function applyPresetModels(
-  preset: {
-    models: string[];
-    modelCapabilities?: Record<string, string[]>;
-    apiType: "openai" | "openai-responses" | "anthropic";
-  },
-  modelConfigs: Ref<ModelConfig[]>,
-  isNonOpenaiEndpoint: Ref<boolean>,
-): void {
-  modelConfigs.value = preset.models.map((name) => ({
-    name,
-    contextWindow: getDefaultContextWindow(name),
-    enabled: true,
-    patches: computeDefaultPatches(
-      name,
-      preset.apiType,
-      isNonOpenaiEndpoint.value,
-    ),
-    stream_timeout_ms: DEFAULT_STREAM_TIMEOUT_MS,
-    capabilities: preset.modelCapabilities?.[name],
-  }));
-}
-
-function applyConcurrencyMode(
-  mode: ConcurrencyMode,
-  maxConcurrency: Ref<number>,
-): void {
-  if (mode === "auto") maxConcurrency.value = DEFAULT_CONCURRENCY;
-  else if (mode === "manual") maxConcurrency.value = 3;
-}
-
-function pushCustomModel(
-  modelConfigs: Ref<ModelConfig[]>,
-  name: string,
-  apiType: "openai" | "openai-responses" | "anthropic",
-  isNonOpenaiEndpoint: Ref<boolean>,
-  contextWindow = DEFAULT_CONTEXT_WINDOW,
-): void {
-  modelConfigs.value.push({
-    name,
-    contextWindow,
-    enabled: true,
-    patches: computeDefaultPatches(name, apiType, isNonOpenaiEndpoint.value),
-    stream_timeout_ms: DEFAULT_STREAM_TIMEOUT_MS,
-    capabilities: ["text"],
-  });
-}
-
-async function fetchQuickSetupInitialData(
-  providerGroups: Ref<ProviderGroup[]>,
-  allRecommendedRules: Ref<RecommendedRetryRule[]>,
-  existingMappings: Ref<MappingGroup[]>,
-  allProviders: Ref<ApiProvider[]>,
-  selectClient: (type: ClientType) => void,
-  toastError: (msg: string) => void,
-): Promise<void> {
-  try {
-    const [groupsResult, rulesResult, mappingsResult, providersResult] =
-      await Promise.allSettled([
-        api.recommended.getProviders(),
-        api.recommended.getRetryRules(),
-        api.getMappingGroups(),
-        api.getProviders(),
-      ]);
-    if (groupsResult.status === "fulfilled")
-      providerGroups.value = groupsResult.value;
-    if (rulesResult.status === "fulfilled")
-      allRecommendedRules.value = rulesResult.value;
-    if (mappingsResult.status === "fulfilled")
-      existingMappings.value = mappingsResult.value as MappingGroup[];
-    if (providersResult.status === "fulfilled")
-      allProviders.value = providersResult.value as ApiProvider[];
-
-    selectClient("claude-code");
-  } catch (e: unknown) {
-    console.error("quickSetup.load:", e);
-    toastError(getApiMessage(e, ""));
-  }
-}
-
-async function testQuickSetupConnection(
-  apiKey: Ref<string>,
-  connectionStatus: Ref<"idle" | "testing" | "ok" | "error">,
-  toastErrorFn: (msg: string) => void,
-): Promise<void> {
-  if (!apiKey.value.trim()) {
-    connectionStatus.value = "error";
-    toastErrorFn("quickSetup.messages.fillApiKeyFirst");
-    return;
-  }
-  connectionStatus.value = "testing";
-  await new Promise((resolve) => setTimeout(resolve, CONNECTION_TEST_DELAY_MS));
-  connectionStatus.value = "ok";
+  return { allProviderGroups };
 }
 
 export function useQuickSetup() {
   const { t } = useI18n();
-
   const clientType = ref<ClientType>("claude-code");
   const providerGroups = ref<ProviderGroup[]>([]);
   const selectedGroup = ref("");
@@ -665,7 +89,7 @@ export function useQuickSetup() {
   const retryProviderMap = ref<Map<string, "general" | string>>(new Map());
   const saving = ref(false);
   const connectionStatus = ref<"idle" | "testing" | "ok" | "error">("idle");
-  const concurrencyMode = ref<ConcurrencyMode>("auto");
+  const concurrencyMode = ref<"auto" | "manual" | "none">("auto");
   const maxConcurrency = ref(DEFAULT_CONCURRENCY);
   const queueTimeoutMs = ref(DEFAULT_QUEUE_TIMEOUT_MS);
   const maxQueueSize = ref(DEFAULT_QUEUE_SIZE);
@@ -674,300 +98,180 @@ export function useQuickSetup() {
   const transformRequestDefaults = ref("");
   const existingMappings = ref<MappingGroup[]>([]);
   const allProviders = ref<ApiProvider[]>([]);
-
   const isCustomProvider = computed(() => selectedGroup.value === "__custom__");
-  const currentClient = makeCurrentClient(clientType);
-  const currentPreset = makeCurrentPreset(
-    selectedGroup,
-    selectedPlan,
-    providerGroups,
+  const currentClient = computed(() =>
+    CLIENTS.find((c) => c.id === clientType.value),
   );
+  const currentPreset = computed(() => {
+    if (!selectedGroup.value || !selectedPlan.value) return undefined;
+    const group = providerGroups.value.find(
+      (g) => g.group === selectedGroup.value,
+    );
+    return group?.presets.find((p) => p.plan === selectedPlan.value);
+  });
   const customBaseUrl = ref("");
   const customUpstreamPath = ref("");
-  const baseUrl = makeBaseUrl(isCustomProvider, customBaseUrl, currentPreset);
-  const upstreamPath = makeUpstreamPath(
-    isCustomProvider,
-    customUpstreamPath,
-    currentPreset,
+  const presetBaseUrl = ref("");
+  const presetUpstreamPath = ref("");
+
+  // Sync preset URLs when the current preset changes
+  watch(currentPreset, (preset) => {
+    if (preset && !isCustomProvider.value) {
+      presetBaseUrl.value = preset.baseUrl;
+      const defPath =
+        preset.apiType === "anthropic"
+          ? "/v1/messages"
+          : preset.apiType === "openai-responses"
+            ? "/v1/responses"
+            : "/v1/chat/completions";
+      presetUpstreamPath.value =
+        preset.upstreamPath && preset.upstreamPath !== defPath
+          ? preset.upstreamPath
+          : "";
+    }
+  });
+
+  const baseUrl = computed(() =>
+    isCustomProvider.value ? customBaseUrl.value : presetBaseUrl.value,
   );
-  const availablePlans = makeAvailablePlans(selectedGroup, providerGroups);
-  const isNonOpenaiEndpoint = makeIsNonOpenaiEndpoint(baseUrl);
-  const recommendedRules = makeRecommendedRules(
-    selectedGroup,
-    allRecommendedRules,
-    providerGroups,
+  const upstreamPath = computed(() =>
+    isCustomProvider.value
+      ? customUpstreamPath.value
+      : presetUpstreamPath.value,
   );
-  const providerGroupInfo = computeProviderGroupDisplayInfo(
+  const availablePlans = computed(
+    () =>
+      providerGroups.value.find((g) => g.group === selectedGroup.value)
+        ?.presets ?? [],
+  );
+  const isNonOpenaiEndpoint = computed(
+    () => !baseUrl.value.includes("openai.com"),
+  );
+  const recommendedRules = computed(() => {
+    const shortname =
+      providerGroups.value.find((g) => g.group === selectedGroup.value)
+        ?.shortname ?? selectedGroup.value;
+    return allRecommendedRules.value.filter(
+      (r) =>
+        !r.providers ||
+        r.providers.length === 0 ||
+        r.providers.includes(shortname),
+    );
+  });
+  const allProviderGroups = computeProviderGroupDisplayInfo(
     isCustomProvider,
     selectedGroup,
     selectedPlan,
     modelConfigs,
     allProviders,
     t,
-  );
-  const allProviderGroups = providerGroupInfo.allProviderGroups;
+  ).allProviderGroups;
 
-  function updateMappings() {
-    const enabledModels = modelConfigs.value.filter((m) => m.enabled);
-    mappingEntries.value = buildMappingEntries(
-      clientType.value,
-      enabledModels,
-      existingMappings.value,
-    );
-  }
-
-  function autoSelectRetryRules() {
-    selectedRetryRules.value = new Set(
-      recommendedRules.value.filter((r) => !r.exists).map((r) => r.name),
-    );
-  }
-
-  function initRetryProviderMap() {
-    const currentShortname = providerGroups.value.find(
-      (g) => g.group === selectedGroup.value,
-    )?.shortname;
-    retryProviderMap.value = buildRetryProviderMap(
-      recommendedRules.value,
-      currentShortname,
-    );
-  }
-
-  function setRetryProvider(name: string, value: "general" | string) {
-    const next = new Map(retryProviderMap.value);
-    next.set(name, value);
-    retryProviderMap.value = next;
-  }
-
-  function selectClient(type: ClientType) {
-    clientType.value = type;
-
-    // Auto-select default provider and plan for this client
-    const client = CLIENTS.find((c) => c.id === type);
-    if (client) {
-      const defaults = resolveClientDefaults(client, providerGroups.value);
-      if (defaults) {
-        selectedGroup.value = defaults.group;
-        selectedPlan.value = defaults.plan;
-        apiType.value = defaults.apiType;
-        applyPresetModels(defaults.preset, modelConfigs, isNonOpenaiEndpoint);
-      }
-    }
-
-    updateMappings();
-    autoSelectRetryRules();
-    initRetryProviderMap();
-  }
-
-  function onProviderChange(group: string) {
-    selectedGroup.value = group;
-    selectedPlan.value = "";
-    modelConfigs.value = [];
-    if (group === "__custom__") {
-      apiType.value = "openai";
-      customBaseUrl.value = "";
-      customUpstreamPath.value = "";
-    } else {
-      const groupData = providerGroups.value.find((g) => g.group === group);
-      if (groupData && groupData.presets.length > 0) {
-        const client = currentClient.value;
-        const compatibleFormats =
-          client?.format === "openai-responses"
-            ? ["openai-responses", "openai"]
-            : client
-              ? [client.format]
-              : [];
-        const match = client
-          ? groupData.presets.find((p) => compatibleFormats.includes(p.apiType))
-          : null;
-        const preset = match ?? groupData.presets[0];
-        selectedPlan.value = preset.plan;
-        apiType.value = resolveApiType(client?.format, preset.apiType);
-        applyPresetModels(preset, modelConfigs, isNonOpenaiEndpoint);
-      }
-    }
-    updateMappings();
-    autoSelectRetryRules();
-    initRetryProviderMap();
-  }
-
-  function onPlanChange(plan: string) {
-    selectedPlan.value = plan;
-    const group = providerGroups.value.find(
-      (g) => g.group === selectedGroup.value,
-    );
-    if (!group) return;
-    const preset = group.presets.find((p) => p.plan === plan);
-    if (!preset) return;
-    apiType.value = resolveApiType(currentClient.value?.format, preset.apiType);
-    applyPresetModels(preset, modelConfigs, isNonOpenaiEndpoint);
-    updateMappings();
-  }
+  const actionCtx: ActionCtx = {
+    t,
+    clientType,
+    providerGroups,
+    selectedGroup,
+    selectedPlan,
+    apiType,
+    apiKey,
+    modelConfigs,
+    mappingEntries,
+    allRecommendedRules,
+    selectedRetryRules,
+    retryProviderMap,
+    saving,
+    connectionStatus,
+    concurrencyMode,
+    maxConcurrency,
+    queueTimeoutMs,
+    maxQueueSize,
+    transformInjectHeaders,
+    transformDropFields,
+    transformRequestDefaults,
+    existingMappings,
+    allProviders,
+    isCustomProvider,
+    currentClient,
+    currentPreset,
+    baseUrl,
+    upstreamPath,
+    isNonOpenaiEndpoint,
+    recommendedRules,
+    customBaseUrl,
+    customUpstreamPath,
+  };
+  const actions = useQuickSetupActions(actionCtx);
 
   watch(apiType, () => {
-    for (const model of modelConfigs.value) {
-      model.patches = computeDefaultPatches(
-        model.name,
+    for (const m of modelConfigs.value) {
+      m.patches = computeDefaultPatches(
+        m.name,
         apiType.value,
         isNonOpenaiEndpoint.value,
       );
     }
   });
 
-  function toggleRetryRule(name: string, checked: boolean) {
-    const next = new Set(selectedRetryRules.value);
-    if (checked) next.add(name);
-    else next.delete(name);
-    selectedRetryRules.value = next;
-  }
-
-  function updateMappingTargets(index: number, targets: MappingTarget[]) {
-    const next = [...mappingEntries.value];
-    next[index] = { ...next[index], targets };
-    mappingEntries.value = next;
-  }
-
-  function toggleMappingActive(index: number) {
-    const next = [...mappingEntries.value];
-    next[index] = { ...next[index], active: !next[index].active };
-    mappingEntries.value = next;
-  }
-
-  function addMappingEntry(clientModel: string, targetModel: string) {
-    const existing = mappingEntries.value.filter(
-      (m) => m.clientModel !== clientModel,
-    );
-    existing.push({
-      clientModel,
-      targets: [{ backend_model: targetModel, provider_id: "__new__" }],
-      existing: false,
-      tag: "cust" as const,
-      active: true,
-    });
-    mappingEntries.value = existing;
-  }
-
-  function removeMappingEntry(clientModel: string) {
-    const entry = mappingEntries.value.find(
-      (m) => m.clientModel === clientModel,
-    );
-    if (entry?.existing) {
-      toast.error(t("quickSetup.messages.existingMappingDelete"));
-      return;
-    }
-    mappingEntries.value = mappingEntries.value.filter(
-      (m) => m.clientModel !== clientModel,
-    );
-  }
-
-  function onConcurrencyModeChange(mode: ConcurrencyMode) {
-    concurrencyMode.value = mode;
-    applyConcurrencyMode(mode, maxConcurrency);
-  }
-
-  async function testConnection() {
-    return testQuickSetupConnection(apiKey, connectionStatus, (msg) =>
-      toast.error(t(msg)),
-    );
-  }
-
-  function addCustomModel(
-    name: string,
-    contextWindow = DEFAULT_CONTEXT_WINDOW,
-  ) {
-    pushCustomModel(
-      modelConfigs,
-      name,
-      apiType.value,
-      isNonOpenaiEndpoint,
-      contextWindow,
-    );
-  }
-
-  async function submit() {
-    if (!currentPreset.value) {
-      toast.error(t("quickSetup.messages.selectProviderAndPlan"));
-      return;
-    }
-    if (!apiKey.value.trim()) {
-      toast.error(t("quickSetup.messages.fillApiKey"));
-      return;
-    }
-    saving.value = true;
+  onMounted(async () => {
     try {
-      const transformRules = parseTransformRules(
-        transformInjectHeaders.value.trim(),
-        transformDropFields.value.trim(),
-        transformRequestDefaults.value.trim(),
-        (key) => toast.error(t(`quickSetup.messages.${key}`)),
-      );
-      if (transformRules === false) return;
-      const payload = buildQuickSetupPayload({
-        isCustomProvider: isCustomProvider.value,
-        selectedGroup: selectedGroup.value,
-        retryProviderMap: retryProviderMap.value,
-        selectedPlan: selectedPlan.value,
-        apiType: apiType.value,
-        baseUrl: baseUrl.value,
-        upstreamPath: upstreamPath.value,
-        apiKey: apiKey.value.trim(),
-        models: modelConfigs.value.filter((m) => m.enabled),
-        concurrencyMode: concurrencyMode.value,
-        maxConcurrency: maxConcurrency.value,
-        queueTimeoutMs: queueTimeoutMs.value,
-        maxQueueSize: maxQueueSize.value,
-        mappingEntries: mappingEntries.value,
-        recommendedRules: recommendedRules.value,
-        selectedRetryRules: selectedRetryRules.value,
-        transformRules: transformRules,
-      });
-      await api.quickSetup(payload);
-      const toggleErrors = await toggleChangedMappings(mappingEntries.value);
-      if (toggleErrors.length > 0) {
-        toast.success(
-          t("quickSetup.messages.setupCompleteWithErrors", {
-            count: toggleErrors.length,
-          }),
-        );
-      } else {
-        toast.success(t("quickSetup.messages.setupComplete"));
-      }
-      await new Promise((r) => setTimeout(r, POST_SAVE_REDIRECT_MS));
-      router.push("/");
+      const [g, r, m, p] = await Promise.allSettled([
+        api.recommended.getProviders(),
+        api.recommended.getRetryRules(),
+        api.getMappingGroups(),
+        api.getProviders(),
+      ]);
+      if (g.status === "fulfilled") providerGroups.value = g.value;
+      if (r.status === "fulfilled") allRecommendedRules.value = r.value;
+      if (m.status === "fulfilled")
+        existingMappings.value = m.value as MappingGroup[];
+      if (p.status === "fulfilled")
+        allProviders.value = p.value as ApiProvider[];
+      actions.selectClient("claude-code");
     } catch (e: unknown) {
-      console.error("quickSetup.save:", e);
-      toast.error(getApiMessage(e, t("quickSetup.messages.setupFailed")));
-    } finally {
-      saving.value = false;
+      console.error("quickSetup.load:", e);
+      toast.error(getApiMessage(e, ""));
     }
-  }
-
-  onMounted(() => {
-    fetchQuickSetupInitialData(
-      providerGroups,
-      allRecommendedRules,
-      existingMappings,
-      allProviders,
-      selectClient,
-      (msg) => toast.error(msg),
-    );
   });
 
-  return Object.assign(
-    {
-      clientType, providerGroups, selectedGroup, selectedPlan, apiType, apiKey,
-      modelConfigs, mappingEntries, allRecommendedRules, recommendedRules,
-      selectedRetryRules, retryProviderMap, saving, connectionStatus,
-      currentClient, currentPreset, baseUrl, customBaseUrl, upstreamPath,
-      customUpstreamPath, isCustomProvider, availablePlans, isNonOpenaiEndpoint,
-      concurrencyMode, maxConcurrency, queueTimeoutMs, maxQueueSize,
-      transformInjectHeaders, transformDropFields, transformRequestDefaults,
-      existingMappings, allProviders, allProviderGroups,
-    },
-    {
-      selectClient, onProviderChange, onPlanChange, updateMappings,
-      updateMappingTargets, toggleMappingActive, addMappingEntry,
-      removeMappingEntry, toggleRetryRule, setRetryProvider,
-      onConcurrencyModeChange, testConnection, submit, addCustomModel,
-    },
-  );
+  return {
+    clientType,
+    providerGroups,
+    selectedGroup,
+    selectedPlan,
+    apiType,
+    apiKey,
+    modelConfigs,
+    mappingEntries,
+    allRecommendedRules,
+    recommendedRules,
+    selectedRetryRules,
+    retryProviderMap,
+    saving,
+    connectionStatus,
+    currentClient,
+    currentPreset,
+    baseUrl,
+    customBaseUrl,
+    presetBaseUrl,
+    upstreamPath,
+    customUpstreamPath,
+    presetUpstreamPath,
+    isCustomProvider,
+    availablePlans,
+    isNonOpenaiEndpoint,
+    concurrencyMode,
+    maxConcurrency,
+    queueTimeoutMs,
+    maxQueueSize,
+    transformInjectHeaders,
+    transformDropFields,
+    transformRequestDefaults,
+    existingMappings,
+    allProviders,
+    allProviderGroups,
+    ...actions,
+    setRetryProvider: (n: string, v: "general" | string) =>
+      void retryProviderMap.value.set(n, v),
+  };
 }

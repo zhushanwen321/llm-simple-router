@@ -17,9 +17,13 @@ const props = withDefaults(
     modelValue?: SelectedValue;
     placeholder?: string;
     compact?: boolean;
+    /** Dashed border variant (for overflow/multimodal selects) */
+    dashed?: boolean;
   }>(),
   {
     placeholder: "",
+    compact: false,
+    dashed: false,
   },
 );
 
@@ -61,6 +65,7 @@ function onUpdate(val: CascadingSelectedValue) {
     :model-value="selectedValue"
     :placeholder="resolvedPlaceholder"
     :compact="compact"
+    :dashed="dashed"
     @update:model-value="onUpdate"
   />
 </template>
