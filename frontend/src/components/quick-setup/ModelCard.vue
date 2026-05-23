@@ -143,7 +143,7 @@ function isCapabilityActive(key: string): boolean {
           :model-value="String(model.contextWindow)"
           type="number"
           min="1"
-          class="h-6 w-16 text-[11px] text-center font-mono [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          class="h-6 w-16 text-[11px] md:text-[11px] text-center font-mono px-1.5 py-0 rounded [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
           @update:model-value="updateContextWindowFromInput($event as string)"
         />
       </template>
@@ -229,10 +229,10 @@ function isCapabilityActive(key: string): boolean {
                     $event ? Number($event) * MS_PER_SECOND : undefined,
                   )
                 "
-                class="h-6 w-20 text-xs text-right [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                class="h-6 w-[72px] text-[11px] md:text-[11px] font-mono text-right px-1.5 py-0 rounded [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 min="1"
               />
-              <span class="text-xs text-muted-foreground">seconds</span>
+              <span class="text-[11px] text-muted-foreground">seconds</span>
               <Badge
                 v-if="isDefaultTimeout"
                 variant="outline"
