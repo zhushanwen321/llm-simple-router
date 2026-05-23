@@ -10,14 +10,14 @@
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
-    --bg: oklch(0.13 0 0);
-    --surface: oklch(0.18 0 0);
-    --surface-up: oklch(0.22 0 0);
-    --surface-header: oklch(0.16 0 0);
+    --bg: oklch(0.145 0 0);
+    --surface: oklch(0.205 0 0);
+    --surface-up: oklch(0.269 0 0);
+    --surface-header: oklch(0.165 0 0);
     --fg: oklch(0.985 0 0);
-    --muted: oklch(0.556 0 0);
-    --muted-light: oklch(0.708 0 0);
-    --border: oklch(1 0 0 / 8%);
+    --muted-dim: oklch(0.556 0 0);
+    --muted: oklch(0.708 0 0);
+    --border: oklch(1 0 0 / 10%);
     --border-strong: oklch(1 0 0 / 14%);
     --primary: oklch(0.68 0.13 175);
     --primary-dim: oklch(0.68 0.13 175 / 15%);
@@ -61,7 +61,7 @@
     margin-bottom: 12px;
   }
   .page-title {
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 600;
     letter-spacing: -0.01em;
     color: var(--fg);
@@ -126,14 +126,14 @@
   .active-label {
     font-size: 11px;
     font-weight: 600;
-    color: var(--muted);
+    color: var(--muted-dim);
     text-transform: uppercase;
     letter-spacing: 0.06em;
   }
   .active-sub {
     font-family: var(--font-mono);
     font-size: 11px;
-    color: var(--muted-light);
+    color: var(--muted);
   }
   .queued-tag {
     display: inline-flex;
@@ -160,7 +160,7 @@
   .concurrency-header {
     font-size: 10px;
     font-weight: 600;
-    color: var(--muted);
+    color: var(--muted-dim);
     text-transform: uppercase;
     letter-spacing: 0.06em;
     margin-bottom: 2px;
@@ -173,7 +173,7 @@
   .concurrency-name {
     font-size: 11px;
     font-weight: 500;
-    color: var(--muted-light);
+    color: var(--muted);
     width: 130px;
     flex-shrink: 0;
   }
@@ -196,7 +196,7 @@
   .concurrency-ratio {
     font-family: var(--font-mono);
     font-size: 11px;
-    color: var(--muted-light);
+    color: var(--muted);
     width: 40px;
     text-align: right;
     flex-shrink: 0;
@@ -223,7 +223,7 @@
     padding: 5px 12px;
     font-size: 13px;
     font-weight: 500;
-    color: var(--muted);
+    color: var(--muted-dim);
     cursor: pointer;
     border: none;
     background: none;
@@ -234,7 +234,7 @@
     gap: 8px;
     border-radius: 9999px;
   }
-  .request-tab:hover { color: var(--muted-light); background: oklch(1 0 0 / 5%); }
+  .request-tab:hover { color: var(--muted); background: oklch(1 0 0 / 5%); }
   .request-tab.active { color: var(--primary); background: var(--primary-ghost); }
   .tab-count {
     font-family: var(--font-mono);
@@ -243,7 +243,7 @@
     padding: 1px 6px;
     border-radius: 9999px;
     background: oklch(1 0 0 / 8%);
-    color: var(--muted-light);
+    color: var(--muted);
   }
   .request-tab.active .tab-count {
     background: var(--primary-dim);
@@ -255,7 +255,7 @@
   .req-table th {
     font-size: 11px;
     font-weight: 600;
-    color: var(--muted);
+    color: var(--muted-dim);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     padding: 7px 12px;
@@ -281,7 +281,7 @@
     transition: background 100ms;
   }
   .req-table tbody tr:hover { background: var(--surface-up); }
-  .req-table tbody tr.selected { background: var(--primary-ghost); }
+  .req-table tbody tr.selected { background: oklch(0.68 0.13 175 / 12%); }
   .req-table tbody tr:last-child td { border-bottom: none; }
 
   .req-status-dot {
@@ -291,13 +291,13 @@
     display: inline-block;
   }
   .req-status-dot.streaming { background: var(--primary); animation: pulse 1.5s infinite; }
-  .req-status-dot.syncing { background: var(--muted-light); }
+  .req-status-dot.syncing { background: var(--muted); }
   .req-status-dot.queued { background: var(--warning); animation: pulse 2s infinite; }
   .req-status-dot.completed { background: var(--success); }
   .req-status-dot.error { background: var(--danger); }
 
   .model-name { font-weight: 500; color: var(--fg); }
-  .provider-label { font-family: var(--font-mono); font-size: 11px; color: var(--muted-light); }
+  .provider-label { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
 
   .stream-badge {
     display: inline-flex;
@@ -312,7 +312,7 @@
   }
   .stream-badge.sync {
     background: oklch(1 0 0 / 6%);
-    color: var(--muted);
+    color: var(--muted-dim);
   }
   .stream-badge.queued-badge {
     background: var(--warning-dim);
@@ -336,7 +336,7 @@
   }
   .detail-label {
     font-size: 10px;
-    color: var(--muted);
+    color: var(--muted-dim);
     text-transform: uppercase;
     letter-spacing: 0.04em;
     font-weight: 600;
@@ -358,7 +358,7 @@
     border-radius: var(--radius-xs);
     border: none;
     background: transparent;
-    color: var(--muted);
+    color: var(--muted-dim);
     cursor: pointer;
     font-size: 13px;
     transition: all 100ms;
@@ -385,14 +385,14 @@
     font-weight: 500;
   }
   .kill-yes { background: var(--danger); color: var(--fg); border-color: var(--danger) !important; }
-  .kill-no { background: transparent; color: var(--muted); }
+  .kill-no { background: transparent; color: var(--muted-dim); }
 
   .empty-state {
     display: flex;
     align-items: center;
     justify-content: center;
     height: 210px;
-    color: var(--muted);
+    color: var(--muted-dim);
     font-size: 13px;
   }
 
@@ -426,7 +426,7 @@
   .secondary-label {
     font-size: 10px;
     font-weight: 600;
-    color: var(--muted);
+    color: var(--muted-dim);
     text-transform: uppercase;
     letter-spacing: 0.06em;
     line-height: 1;
@@ -444,7 +444,7 @@
   .secondary-sub {
     font-family: var(--font-mono);
     font-size: 10px;
-    color: var(--muted);
+    color: var(--muted-dim);
   }
 
   /* ========== BOTTOM: Provider Stats ========== */
@@ -466,14 +466,14 @@
   .section-title {
     font-size: 11px;
     font-weight: 600;
-    color: var(--muted);
+    color: var(--muted-dim);
     text-transform: uppercase;
     letter-spacing: 0.05em;
   }
   .section-toggle {
     font-family: var(--font-body);
     font-size: 11px;
-    color: var(--muted);
+    color: var(--muted-dim);
     background: none;
     border: none;
     cursor: pointer;
@@ -487,7 +487,7 @@
   .provider-table th {
     font-size: 11px;
     font-weight: 600;
-    color: var(--muted);
+    color: var(--muted-dim);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     padding: 6px 12px;
@@ -553,7 +553,7 @@
   .bottom-panel-title {
     font-size: 10px;
     font-weight: 600;
-    color: var(--muted);
+    color: var(--muted-dim);
     text-transform: uppercase;
     letter-spacing: 0.06em;
   }
@@ -574,9 +574,9 @@
   .status-dot-sm.warning { background: var(--warning); }
   .status-dot-sm.danger { background: var(--danger); }
   .status-dot-sm.info { background: var(--info); }
-  .status-name { font-size: 11px; font-weight: 500; flex: 1; color: var(--muted-light); }
+  .status-name { font-size: 11px; font-weight: 500; flex: 1; color: var(--muted); }
   .status-count { font-family: var(--font-mono); font-size: 11px; color: var(--fg); }
-  .status-pct { font-family: var(--font-mono); font-size: 10px; color: var(--muted); width: 36px; text-align: right; }
+  .status-pct { font-family: var(--font-mono); font-size: 10px; color: var(--muted-dim); width: 36px; text-align: right; }
 
   /* Runtime rows */
   .runtime-row {
@@ -586,23 +586,23 @@
     padding: 3px 0;
   }
   .runtime-row + .runtime-row { border-top: 1px solid oklch(1 0 0 / 4%); }
-  .runtime-label { font-size: 11px; color: var(--muted); }
+  .runtime-label { font-size: 11px; color: var(--muted-dim); }
   .runtime-value { font-family: var(--font-mono); font-size: 11px; color: var(--fg); }
 
   .heap-bar-wrap { margin-top: 4px; padding-top: 4px; border-top: 1px solid oklch(1 0 0 / 4%); }
   .heap-header { display: flex; justify-content: space-between; margin-bottom: 3px; }
-  .heap-label { font-size: 11px; color: var(--muted); }
-  .heap-value { font-family: var(--font-mono); font-size: 10px; color: var(--muted-light); }
-  .heap-bar { height: 3px; background: oklch(1 0 0 / 6%); border-radius: 2px; overflow: hidden; }
+  .heap-label { font-size: 11px; color: var(--muted-dim); }
+  .heap-value { font-family: var(--font-mono); font-size: 10px; color: var(--muted); }
+  .heap-bar { height: 4px; background: oklch(1 0 0 / 6%); border-radius: 2px; overflow: hidden; }
   .heap-bar-fill { height: 100%; background: var(--primary); border-radius: 2px; transition: width 300ms ease-out; }
 
   /* Concurrency in bottom panel */
   .conc-sm-row { display: flex; align-items: center; gap: 6px; padding: 3px 0; }
   .conc-sm-row + .conc-sm-row { border-top: 1px solid oklch(1 0 0 / 4%); }
-  .conc-sm-name { font-size: 11px; font-weight: 500; color: var(--muted-light); width: 60px; flex-shrink: 0; }
+  .conc-sm-name { font-size: 11px; font-weight: 500; color: var(--muted); width: 60px; flex-shrink: 0; }
   .conc-sm-bar { flex: 1; height: 3px; background: oklch(1 0 0 / 6%); border-radius: 2px; overflow: hidden; }
   .conc-sm-fill { height: 100%; border-radius: 2px; transition: width 300ms ease-out; }
-  .conc-sm-ratio { font-family: var(--font-mono); font-size: 10px; color: var(--muted-light); width: 36px; text-align: right; flex-shrink: 0; }
+  .conc-sm-ratio { font-family: var(--font-mono); font-size: 10px; color: var(--muted); width: 36px; text-align: right; flex-shrink: 0; }
 </style>
 </head>
 <body>
@@ -762,7 +762,7 @@
             <td class="num"><span class="pct-value text-success">100%</span></td>
             <td class="num">0.8s</td>
             <td class="num"><span class="pct-value text-success">0%</span></td>
-            <td><span style="font-size:11px;color:var(--muted)">--</span></td>
+            <td><span style="font-size:11px;color:var(--muted-dim)">--</span></td>
           </tr>
         </tbody>
       </table>
@@ -837,23 +837,19 @@
       <div class="bottom-panel-body">
         <div style="display:flex;align-items:baseline;gap:6px;margin-bottom:6px">
           <span style="font-family:var(--font-mono);font-size:20px;font-weight:700;color:var(--primary)">27</span>
-          <span style="font-family:var(--font-mono);font-size:12px;color:var(--muted)">/ 140</span>
-          <span style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-left:auto">19%</span>
+          <span style="font-family:var(--font-mono);font-size:12px;color:var(--muted-dim)">/ 140</span>
+          <span style="font-family:var(--font-mono);font-size:11px;color:var(--muted-dim);margin-left:auto">19%</span>
         </div>
         <div style="height:4px;background:oklch(1 0 0 / 6%);border-radius:2px;overflow:hidden">
           <div style="height:100%;width:19%;background:var(--primary);border-radius:2px"></div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
           <div>
-            <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;font-weight:600">P50</div>
-            <div style="font-family:var(--font-mono);font-size:12px;color:var(--success)">1.2s</div>
-          </div>
-          <div>
-            <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;font-weight:600">P99</div>
+            <div style="font-size:10px;color:var(--muted-dim);text-transform:uppercase;letter-spacing:0.04em;font-weight:600">P99</div>
             <div style="font-family:var(--font-mono);font-size:12px;color:var(--warning)">8.4s</div>
           </div>
           <div>
-            <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;font-weight:600">QPS</div>
+            <div style="font-size:10px;color:var(--muted-dim);text-transform:uppercase;letter-spacing:0.04em;font-weight:600">QPS</div>
             <div style="font-family:var(--font-mono);font-size:12px;color:var(--primary)">3.2</div>
           </div>
         </div>

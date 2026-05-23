@@ -86,7 +86,10 @@
     </div>
 
     <div class="bg-card rounded-lg border overflow-hidden relative">
-      <div v-if="loading" class="absolute inset-0 bg-background/50 flex items-center justify-center z-10">
+      <div
+        v-if="loading"
+        class="absolute inset-0 bg-background/50 flex items-center justify-center z-10"
+      >
         <div class="space-y-3 w-3/4">
           <Skeleton class="h-8 w-full" />
           <Skeleton class="h-8 w-full" />
@@ -105,10 +108,13 @@
                 t("logs.table.time")
               }}</TableHead>
               <TableHead class="text-muted-foreground">{{
-                t("logs.table.model")
+                t("logs.table.clientModel")
               }}</TableHead>
               <TableHead class="text-muted-foreground">{{
-                t("logs.table.actualForward")
+                t("logs.table.targetModel")
+              }}</TableHead>
+              <TableHead class="text-muted-foreground">{{
+                t("logs.table.latency")
               }}</TableHead>
               <TableHead class="text-muted-foreground">{{
                 t("logs.table.tags")
@@ -158,9 +164,22 @@
             <TableRow v-if="logs.length === 0 && !loading">
               <TableCell :colspan="TABLE_COL_COUNT" class="py-12 text-center">
                 <div class="flex flex-col items-center gap-2">
-                  <p class="text-sm text-muted-foreground">{{ t("logs.noLogs") }}</p>
-                  <p v-if="hasActiveFilters" class="text-xs text-muted-foreground">{{ t("logs.noLogsFilterHint") }}</p>
-                  <Button v-if="hasActiveFilters" variant="ghost" size="sm" @click="clearAllFilters">{{ t("logs.clearAllFilters") }}</Button>
+                  <p class="text-sm text-muted-foreground">
+                    {{ t("logs.noLogs") }}
+                  </p>
+                  <p
+                    v-if="hasActiveFilters"
+                    class="text-xs text-muted-foreground"
+                  >
+                    {{ t("logs.noLogsFilterHint") }}
+                  </p>
+                  <Button
+                    v-if="hasActiveFilters"
+                    variant="ghost"
+                    size="sm"
+                    @click="clearAllFilters"
+                    >{{ t("logs.clearAllFilters") }}</Button
+                  >
                 </div>
               </TableCell>
             </TableRow>
@@ -219,10 +238,22 @@
     </div>
 
     <div class="flex items-center justify-end mt-2 gap-2">
-      <span class="text-xs text-muted-foreground">{{ t("logs.cleanup.autoCleanup") }}</span>
-      <Input type="number" v-model.number="retentionDays" :min="0" :max="90" class="w-16 h-6 text-xs" />
-      <span class="text-xs text-muted-foreground">{{ t("logs.cleanup.days") }}</span>
-      <Button size="sm" @click="saveRetention" :disabled="retentionSaving">{{ t("logs.cleanup.saveSettings") }}</Button>
+      <span class="text-xs text-muted-foreground">{{
+        t("logs.cleanup.autoCleanup")
+      }}</span>
+      <Input
+        type="number"
+        v-model.number="retentionDays"
+        :min="0"
+        :max="90"
+        class="w-16 h-6 text-xs"
+      />
+      <span class="text-xs text-muted-foreground">{{
+        t("logs.cleanup.days")
+      }}</span>
+      <Button size="sm" @click="saveRetention" :disabled="retentionSaving">{{
+        t("logs.cleanup.saveSettings")
+      }}</Button>
     </div>
 
     <!-- Unified log detail dialog -->
@@ -344,7 +375,7 @@ const {
   buildFilterParams,
 } = useLogFilters();
 
-const TABLE_COL_COUNT = 8;
+const TABLE_COL_COUNT = 9;
 const DEBOUNCE_MS = 300;
 const MAX_PAGE_BUTTONS = 7;
 const PAGE_NEIGHBORS = 2;
@@ -408,17 +439,17 @@ function copyLogId(id: string) {
 const COPY_FEEDBACK_MS = 2000;
 
 const hasActiveFilters = computed(() => {
-  const params = buildFilterParams()
-  return Object.keys(params).length > 0
-})
+  const params = buildFilterParams();
+  return Object.keys(params).length > 0;
+});
 
 function clearAllFilters() {
-  period.value = "5h"
-  dateRange.value = { start: "", end: "" }
-  providerFilter.value = "all"
-  modelFilter.value = "all"
-  keyFilter.value = "all"
-  statusFilter.value = "all"
+  period.value = "5h";
+  dateRange.value = { start: "", end: "" };
+  providerFilter.value = "all";
+  modelFilter.value = "all";
+  keyFilter.value = "all";
+  statusFilter.value = "all";
 }
 
 let filterTimer: ReturnType<typeof setTimeout> | null = null;
