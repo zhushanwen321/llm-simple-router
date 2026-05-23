@@ -1,54 +1,43 @@
 <template>
-  <div class="space-y-3">
-    <!-- Toggle: structured / raw -->
-    <div class="flex items-center justify-between">
-      <span class="text-xs font-medium text-muted-foreground">{{
-        t("requestDetail.overviewTitle")
-      }}</span>
-      <Button
-        size="sm"
-        variant="outline"
-        class="h-6 gap-1 text-xs"
-        @click="showRaw = !showRaw"
-      >
-        <component :is="showRaw ? FileText : FileJson" class="h-3 w-3" />
-        {{
-          showRaw ? t("requestDetail.structured") : t("requestDetail.rawData")
-        }}
-      </Button>
-    </div>
-
-    <!-- Raw JSON view: upstream response metadata (headers + response body minus content) -->
-    <ScrollArea v-if="showRaw" class="rounded-md border flex-1">
-      <pre class="p-3 text-[11px] whitespace-pre-wrap break-words">{{
-        responseMetadataJson
-      }}</pre>
-    </ScrollArea>
-
-    <!-- Structured view (below) -->
-    <template v-if="!showRaw">
-      <!-- Row 1: model @ provider -->
-      <div class="flex items-baseline gap-1 min-w-0">
-        <span class="font-mono text-[11px] font-semibold truncate min-w-0">{{
-          overview.model
-        }}</span>
-        <span class="text-[10px] text-muted-foreground flex-shrink-0"
-          >@
-          {{
-            overview.providerName || t("requestDetail.unknownProvider")
-          }}</span
+  <div class="flex flex-col h-full">
+    <!-- Structured view -->
+    <div v-if="!showRaw" class="flex-1 overflow-y-auto">
+      <!-- Layer 1 - Identity (highest visual weight) -->
+      <div class="mb-4">
+        <div
+          class="font-mono text-[15px] font-semibold leading-tight tracking-tight"
         >
+          {{ overview.model }}
+        </div>
+        <div class="flex items-center gap-1 mt-0.5 text-[11px]">
+          <template
+            v-if="
+              overview.backendModel && overview.backendModel !== overview.model
+            "
+          >
+            <span class="font-mono text-muted-foreground">{{
+              overview.backendModel
+            }}</span>
+            <span class="text-muted-foreground">@</span>
+          </template>
+          <span class="text-muted-foreground">{{
+            overview.providerName || t("requestDetail.unknownProvider")
+          }}</span>
+        </div>
       </div>
 
       <!-- Mapping reason badge -->
-      <div v-if="overview.mappingReason" class="flex items-center gap-1.5">
+      <div v-if="overview.mappingReason" class="flex items-center gap-1.5 mb-3">
         <Badge variant="secondary" class="text-[10px]">
-          {{ t(`requestDetail.mappingReason.${overview.mappingReason}`) }}
+          {{
+            MAPPING_LABELS[overview.mappingReason] ||
+            overview.mappingReason
+          }}
         </Badge>
       </div>
 
-      <!-- Row 2: status + SSE + apiType -->
-      <div class="flex items-center gap-1.5">
+      <!-- Layer 2 - Attributes + Session (combined row) -->
+      <div class="flex items-center gap-1.5 flex-wrap mb-3">
         <Badge
           v-if="statusColor === 'pending'"
           variant="outline"
@@ -77,34 +66,97 @@
           overview.isStream ? "SSE" : t("requestDetail.nonStream")
         }}</Badge>
         <Badge variant="outline">{{ overview.apiType }}</Badge>
+
+        <template v-if="overview.sessionId">
+          <Badge variant="secondary" class="text-[10px]">Session</Badge>
+          <span
+            class="font-mono text-[11px] text-muted-foreground truncate"
+            >{{ overview.sessionId.slice(0, 8) }}</span
+          >
+        </template>
       </div>
 
-      <!-- Row 3: session (conditional) -->
-      <div v-if="overview.sessionId" class="flex items-center gap-1.5">
-        <Badge variant="secondary" class="text-[10px]">Session</Badge>
-        <span class="font-mono text-[11px] text-muted-foreground truncate">{{
-          overview.sessionId.slice(0, 8)
+      <!-- Layer 2.5 - Error banner (only when error exists) -->
+      <div
+        v-if="overview.errorMessage"
+        class="rounded-md border px-3 py-2 mb-3"
+        style="
+          background: oklch(0.3 0.08 25 / 15%);
+          border-color: oklch(0.58 0.22 25 / 30%);
+        "
+      >
+        <p class="font-mono text-xs font-semibold text-destructive break-all">
+          {{ overview.errorMessage }}
+        </p>
+        <p class="text-[10px] text-muted-foreground mt-0.5">
+          {{ overview.statusCode }} · upstream_error
+        </p>
+      </div>
+
+      <!-- Layer 3 - Retry history -->
+      <div v-if="overview.attempts.length === 0" class="mb-3">
+        <span class="text-[11px] text-muted-foreground">{{
+          t("requestDetail.noRetry")
         }}</span>
       </div>
+      <div
+        v-else
+        class="rounded-md p-2 mb-3"
+        style="background: oklch(0.18 0 0)"
+      >
+        <p
+          class="text-[9px] uppercase tracking-wider mb-1"
+          style="color: oklch(0.5 0 0)"
+        >
+          {{ t("requestDetail.attemptHistory") }}
+        </p>
+        <div
+          v-for="(attempt, i) in overview.attempts"
+          :key="i"
+          class="flex items-center gap-1 text-[11px]"
+        >
+          <span class="text-muted-foreground">#{{ i + 1 }}</span>
+          <span
+            :class="
+              isAttemptError(attempt.statusCode)
+                ? 'diff-removed'
+                : 'diff-added'
+            "
+          >
+            {{ attempt.statusCode ?? "--" }}
+          </span>
+          <span class="text-muted-foreground"
+            >{{ (attempt.latencyMs / MS_PER_SECOND).toFixed(1) }}s</span
+          >
+        </div>
+      </div>
 
-      <!-- Metrics grid -->
-      <div class="grid grid-cols-2 gap-1.5">
-        <div class="bg-muted/50 rounded-md px-2 py-1.5 min-w-0">
-          <div class="text-[10px] text-muted-foreground">
+      <!-- Layer 5 - Metrics grid (border container) -->
+      <div
+        class="grid grid-cols-2 gap-0 p-0 border rounded-md overflow-hidden mb-3"
+      >
+        <div class="px-2.5 py-1.5 min-w-0 border-b border-r">
+          <div
+            class="text-[9px] uppercase tracking-wider text-muted-foreground"
+          >
             {{ t("requestDetail.latency") }}
           </div>
           <div class="text-sm font-semibold truncate">{{ latencyText }}</div>
         </div>
-        <div class="bg-muted/50 rounded-md px-2 py-1.5 min-w-0">
-          <div class="text-[10px] text-muted-foreground">
+        <div class="px-2.5 py-1.5 min-w-0 border-b">
+          <div
+            class="text-[9px] uppercase tracking-wider text-muted-foreground"
+          >
             {{ t("requestDetail.ttft") }}
           </div>
           <div class="text-sm font-semibold truncate">
             {{ overview.ttftMs != null ? `${overview.ttftMs}ms` : "--" }}
           </div>
         </div>
-        <div class="bg-muted/50 rounded-md px-2 py-1.5 min-w-0">
-          <div class="text-[10px] text-muted-foreground">
+        <div class="px-2.5 py-1.5 min-w-0 border-b border-r">
+          <div
+            class="text-[9px] uppercase tracking-wider text-muted-foreground"
+          >
             {{
               overview.inputTokensEstimated
                 ? t("requestDetail.estInputTokens")
@@ -115,8 +167,10 @@
             {{ overview.inputTokens != null ? overview.inputTokens : "--" }}
           </div>
         </div>
-        <div class="bg-muted/50 rounded-md px-2 py-1.5 min-w-0">
-          <div class="text-[10px] text-muted-foreground">
+        <div class="px-2.5 py-1.5 min-w-0 border-b">
+          <div
+            class="text-[9px] uppercase tracking-wider text-muted-foreground"
+          >
             {{ t("requestDetail.outputTokens") }}
           </div>
           <div
@@ -126,19 +180,25 @@
             {{ outputTokenText }}
           </div>
         </div>
-        <div class="bg-muted/50 rounded-md px-2 py-1.5 min-w-0">
-          <div class="text-[10px] text-muted-foreground">
+        <div class="px-2.5 py-1.5 min-w-0 border-r">
+          <div
+            class="text-[9px] uppercase tracking-wider text-muted-foreground"
+          >
             {{ t("requestDetail.speed") }}
           </div>
           <div class="text-sm font-semibold truncate">{{ speedText }}</div>
         </div>
-        <div class="bg-muted/50 rounded-md px-2 py-1.5 min-w-0">
-          <div class="text-[10px] text-muted-foreground">
+        <div class="px-2.5 py-1.5 min-w-0">
+          <div
+            class="text-[9px] uppercase tracking-wider text-muted-foreground"
+          >
             {{ t("requestDetail.cacheRead") }}
           </div>
           <div class="text-sm font-semibold truncate">
             {{
-              overview.cacheReadTokens != null ? overview.cacheReadTokens : "--"
+              overview.cacheReadTokens != null
+                ? overview.cacheReadTokens
+                : "--"
             }}
           </div>
         </div>
@@ -146,8 +206,10 @@
 
       <!-- Cache source -->
       <div
-        v-if="overview.cacheReadTokens != null && overview.cacheReadTokens > 0"
-        class="rounded-md px-2 py-1.5 bg-muted/50"
+        v-if="
+          overview.cacheReadTokens != null && overview.cacheReadTokens > 0
+        "
+        class="rounded-md px-2 py-1.5 bg-muted/30 mb-3"
       >
         <div class="text-[10px] text-muted-foreground">
           {{ t("requestDetail.cacheSource") }}
@@ -163,46 +225,11 @@
         </div>
       </div>
 
-      <Separator />
-
-      <!-- Attempt history -->
-      <div class="space-y-1.5">
-        <span
-          class="text-[10px] text-muted-foreground uppercase tracking-wider"
-          >{{ t("requestDetail.attemptHistory") }}</span
-        >
-        <div
-          v-if="overview.attempts.length === 0"
-          class="text-[11px] text-muted-foreground"
-        >
-          {{ t("requestDetail.noRetry") }}
-        </div>
-        <div
-          v-for="(attempt, i) in overview.attempts"
-          :key="i"
-          class="flex items-center gap-1 text-[11px]"
-        >
-          <span class="text-muted-foreground">#{{ i + 1 }}</span>
-          <span
-            :class="
-              isAttemptError(attempt.statusCode) ? 'diff-removed' : 'diff-added'
-            "
-          >
-            {{ attempt.statusCode ?? "--" }}
-          </span>
-          <span class="text-muted-foreground"
-            >{{ (attempt.latencyMs / MS_PER_SECOND).toFixed(1) }}s</span
-          >
-        </div>
-      </div>
-
-      <Separator />
-
-      <!-- Metadata -->
-      <div class="space-y-1">
+      <!-- Layer 6 - Metadata (compact key-value) -->
+      <div class="space-y-0.5 text-[11px] mb-3">
         <div
           v-if="overview.clientType != null"
-          class="flex items-center justify-between text-[11px]"
+          class="flex justify-between"
         >
           <span class="text-muted-foreground">{{
             t("requestDetail.clientType")
@@ -211,17 +238,14 @@
         </div>
         <div
           v-if="overview.statusCode != null"
-          class="flex items-center justify-between text-[11px]"
+          class="flex justify-between"
         >
           <span class="text-muted-foreground">{{
             t("requestDetail.statusCodeLabel")
           }}</span>
           <span class="font-mono">{{ overview.statusCode }}</span>
         </div>
-        <div
-          v-if="overview.clientIp"
-          class="flex items-center justify-between text-[11px]"
-        >
+        <div v-if="overview.clientIp" class="flex justify-between">
           <span class="text-muted-foreground">{{
             t("requestDetail.clientIp")
           }}</span>
@@ -230,7 +254,29 @@
           }}</span>
         </div>
       </div>
-    </template>
+    </div>
+
+    <!-- Raw JSON view -->
+    <ScrollArea v-else class="flex-1 rounded-md border">
+      <pre class="p-3 text-[11px] whitespace-pre-wrap break-words">{{
+        responseMetadataJson
+      }}</pre>
+    </ScrollArea>
+
+    <!-- Toggle at bottom -->
+    <div class="pt-3 mt-auto border-t">
+      <Button
+        size="sm"
+        variant="outline"
+        class="h-6 gap-1 text-xs w-full justify-center"
+        @click="showRaw = !showRaw"
+      >
+        <component :is="showRaw ? FileText : FileJson" class="h-3 w-3" />
+        {{
+          showRaw ? t("requestDetail.structured") : t("requestDetail.rawData")
+        }}
+      </Button>
+    </div>
   </div>
 </template>
 
@@ -243,12 +289,20 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { FileJson, FileText } from "lucide-vue-next";
-import { Separator } from "@/components/ui/separator";
 import { extractResponseMetadata } from "./upstream-merge";
 
 const { t } = useI18n();
 
 const JSON_INDENT = 2;
+
+const MAPPING_LABELS: Record<string, string> = {
+  direct_format: "直连",
+  group_base_rule: "基础规则",
+  group_schedule: "定时调度",
+  fallback_provider: "回退",
+  overflow_redirect: "溢出重定向",
+  failover_retry: "故障转移",
+};
 
 const props = defineProps<{ overview: UnifiedRequestOverview }>();
 

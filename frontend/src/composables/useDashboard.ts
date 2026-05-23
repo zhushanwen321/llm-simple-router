@@ -664,8 +664,13 @@ export function useDashboard() {
   });
 
   // Watch provider/range 变化 → 重新加载窗口 + 自动选择 + 刷新
+  // skipNextFilterRefresh: autoSelectLatestWindow 会改 selectedWindowId，
+  // 触发第二个 watcher，但此时已由本 watcher 完成了 refresh，需要跳过
+  let skipNextFilterRefresh = false;
+
   watch([selectedProvider, timelineRange], async () => {
     if (!initialized.value) return;
+    skipNextFilterRefresh = true;
     await loadUsageWindows();
     autoSelectLatestWindow();
     await refresh();
@@ -677,6 +682,10 @@ export function useDashboard() {
 
   watch([selectedWindowId, modelFilter, keyFilter, clientType], () => {
     if (!initialized.value) return;
+    if (skipNextFilterRefresh) {
+      skipNextFilterRefresh = false;
+      return;
+    }
     if (filterDebounceTimer) clearTimeout(filterDebounceTimer);
     filterDebounceTimer = setTimeout(async () => {
       await refresh();

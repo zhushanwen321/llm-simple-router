@@ -9,7 +9,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { CheckIcon, CopyIcon } from "lucide-vue-next";
+import { CheckIcon, ChevronDown, CopyIcon } from "lucide-vue-next";
 import type { LogEntry } from "@/components/logs/types";
 import { PROVIDER_ID_ROUTER } from "@/components/logs/types";
 import { formatTime } from "@/utils/format";
@@ -64,11 +64,10 @@ function enhancementLabel(raw: string | null): string {
         size="xs"
         @click="emit('toggleExpand', log)"
       >
-        <span
-          class="text-xs transition-transform"
+        <ChevronDown
+          class="size-3 transition-transform"
           :class="expanded ? '' : '-rotate-90'"
-          >&#9660;</span
-        >
+        />
       </Button>
       <span v-if="isChild" class="ml-4 text-muted-foreground text-xs"
         >&#x2514;</span
@@ -98,7 +97,7 @@ function enhancementLabel(raw: string | null): string {
       </span>
     </TableCell>
 
-    <TableCell class="text-muted-foreground">{{
+    <TableCell class="font-mono text-xs text-muted-foreground whitespace-nowrap">{{
       formatTime(log.created_at)
     }}</TableCell>
 
@@ -168,7 +167,7 @@ function enhancementLabel(raw: string | null): string {
       </div>
     </TableCell>
 
-    <TableCell class="text-destructive text-xs max-w-[200px]">
+    <TableCell class="text-destructive text-xs min-w-0 max-w-[240px] lg:max-w-xs">
       <template v-if="log.error_message">
         <Tooltip :delay-duration="300">
           <TooltipTrigger as-child>

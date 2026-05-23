@@ -8,6 +8,8 @@
   "allStatus": "All Status",
   "non200": "Non-200",
   "noLogs": "No logs",
+  "noLogsFilterHint": "No logs match the current filters",
+  "clearAllFilters": "Clear all filters",
   "pagination": "Total {total}, Page {page} / {totalPages}",
   "firstPage": "First",
   "prevPage": "Previous",
@@ -17,11 +19,12 @@
     "title": "Cleanup Logs",
     "description": "Delete logs older than specified days",
     "keepRecentDays": "Keep recent days",
-    "autoCleanup": "Auto cleanup settings",
+    "autoCleanup": "Auto cleanup: keep",
     "retentionDays": "Retention days",
     "noAutoCleanup": "0 = No auto cleanup",
     "saveSettings": "Save Settings",
-    "confirmCleanup": "Confirm Cleanup"
+    "confirmCleanup": "Confirm Cleanup",
+    "days": "days"
   },
   "cleanupResult": {
     "title": "Cleanup Complete",

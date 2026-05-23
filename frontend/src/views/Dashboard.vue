@@ -389,11 +389,15 @@
           {{ t("dashboard.timeline.noData") }}
         </div>
         <!-- Day labels -->
-        <div v-if="usageWindows.length > 0" class="relative h-4 mt-1">
+        <div
+          v-if="usageWindows.length > 0"
+          class="relative h-4 mt-1 overflow-hidden"
+        >
           <span
             v-for="d in timelineDayLabels"
             :key="d.label"
-            class="absolute font-mono text-[10px] text-muted-foreground/50 -translate-x-1/2"
+            class="absolute font-mono text-[10px] text-muted-foreground/50"
+            :class="d.position === 0 ? '' : '-translate-x-1/2'"
             :style="{ left: d.position + '%' }"
           >
             {{ d.label }}
@@ -548,19 +552,25 @@ const timelineStart = computed(() => {
 
 function getWindowLeft(w: UsageWindowWithUsage): string {
   if (!timelineStart.value) return "0%";
-  const start = new Date(w.window.start_time).getTime();
+  const start = Math.max(
+    new Date(w.window.start_time).getTime(),
+    timelineStart.value.getTime(),
+  );
   const offset = start - timelineStart.value.getTime();
-  // Clip to [0%, 100%]
-  if (offset < 0) return "0%";
-  const pct = (offset / timelineDurationMs.value) * PERCENT;
-  return pct > PERCENT ? "100%" : pct + "%";
+  const pct = Math.min((offset / timelineDurationMs.value) * PERCENT, PERCENT);
+  return pct + "%";
 }
 
 function getWindowWidth(w: UsageWindowWithUsage): string {
-  const dur =
-    new Date(w.window.end_time).getTime() -
-    new Date(w.window.start_time).getTime();
-  const pct = (dur / timelineDurationMs.value) * PERCENT;
+  if (!timelineStart.value) return "0%";
+  const wStart = new Date(w.window.start_time).getTime();
+  const wEnd = new Date(w.window.end_time).getTime();
+  // Clip to visible range
+  const visStart = Math.max(wStart, timelineStart.value.getTime());
+  const now = new Date().getTime();
+  const visEnd = Math.min(wEnd, now);
+  if (visEnd <= visStart) return "0%";
+  const pct = ((visEnd - visStart) / timelineDurationMs.value) * PERCENT;
   return Math.min(pct, PERCENT) + "%";
 }
 
