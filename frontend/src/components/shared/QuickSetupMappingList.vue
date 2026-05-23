@@ -5,12 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, ArrowRight, Plus } from "lucide-vue-next";
+import { Trash2, ArrowRight, Plus, Layers } from "lucide-vue-next";
 import MappingEntryEditor from "@/components/mappings/MappingEntryEditor.vue";
 import CascadingModelSelect from "@/components/mappings/CascadingModelSelect.vue";
 import type {
   MappingTarget,
   MappingEntry,
+  MultimodalFallback,
 } from "@/components/quick-setup/types";
 import type {
   ProviderGroup,
@@ -19,13 +20,14 @@ import type {
 
 const { t } = useI18n();
 
-defineProps<{
+const props = defineProps<{
   entries: MappingEntry[];
   providerGroups: ProviderGroup[];
 }>();
 
 const emit = defineEmits<{
   "update:targets": [index: number, targets: MappingTarget[]];
+  "update:multimodal-fallback": [index: number, fallback: MultimodalFallback | undefined];
   "toggle-active": [index: number];
   add: [clientModel: string, targetModel: string];
   remove: [clientModel: string];
@@ -62,6 +64,21 @@ function handleKeydown(e: KeyboardEvent) {
     e.preventDefault();
     addMapping();
   }
+}
+
+function addMultimodalFallback(idx: number) {
+  const firstProvider = props.providerGroups[0];
+  emit("update:multimodal-fallback", idx, {
+    provider_id: firstProvider?.provider.id ?? "",
+    backend_model: "",
+  });
+}
+
+function handleFallbackSelect(idx: number, val: SelectedValue) {
+  emit("update:multimodal-fallback", idx, {
+    provider_id: val.provider_id,
+    backend_model: val.model,
+  });
 }
 </script>
 

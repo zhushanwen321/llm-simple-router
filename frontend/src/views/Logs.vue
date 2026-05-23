@@ -12,12 +12,13 @@
 
     <!-- 筛选栏 -->
     <div class="flex flex-wrap items-center gap-2 mb-4">
-      <div class="flex gap-1">
+      <div class="flex">
         <Button
           v-for="p in PERIODS"
           :key="p.value"
-          :variant="period === p.value ? 'default' : 'ghost'"
+          :variant="period === p.value ? 'default' : 'outline'"
           size="sm"
+          class="rounded-none first:rounded-l-md last:rounded-r-md -ml-px first:ml-0"
           @click="period = p.value"
         >
           {{ p.label }}
@@ -41,7 +42,7 @@
         >
       </div>
       <Select v-model="providerFilter">
-        <SelectTrigger class="w-28 truncate">
+        <SelectTrigger class="w-28 truncate h-8 text-xs">
           <SelectValue :placeholder="t('logs.allProviders')" />
         </SelectTrigger>
         <SelectContent>
@@ -52,7 +53,7 @@
         </SelectContent>
       </Select>
       <Select v-model="modelFilter">
-        <SelectTrigger class="w-32 truncate">
+        <SelectTrigger class="w-32 truncate h-8 text-xs">
           <SelectValue :placeholder="t('logs.allModels')" />
         </SelectTrigger>
         <SelectContent>
@@ -63,7 +64,7 @@
         </SelectContent>
       </Select>
       <Select v-model="keyFilter">
-        <SelectTrigger class="w-32 truncate">
+        <SelectTrigger class="w-32 truncate h-8 text-xs">
           <SelectValue :placeholder="t('logs.allKeys')" />
         </SelectTrigger>
         <SelectContent>
@@ -74,7 +75,7 @@
         </SelectContent>
       </Select>
       <Select v-model="statusFilter">
-        <SelectTrigger class="w-28 truncate">
+        <SelectTrigger class="w-28 truncate h-8 text-xs">
           <SelectValue :placeholder="t('logs.allStatus')" />
         </SelectTrigger>
         <SelectContent>
@@ -97,7 +98,7 @@
         </div>
       </div>
       <TooltipProvider :delay-duration="300">
-        <Table class="[&_td]:px-4 [&_th]:px-4">
+        <Table class="[&_td]:px-3 [&_th]:px-3">
           <TableHeader>
             <TableRow class="bg-muted">
               <TableHead class="w-10"></TableHead>

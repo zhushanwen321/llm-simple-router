@@ -17,6 +17,29 @@ import type { AdaptiveController } from "../core/concurrency/index.js";
 const PROVIDER_NAME_RE = /^[a-zA-Z0-9_-]+$/;
 const API_KEY_PREVIEW_MIN_LENGTH = 8;
 const API_KEY_PREVIEW_PREFIX_LEN = 4;
+const NEW_PROVIDER_ID = "__new__";
+
+/** Recursively replace "__new__" provider_id values with the actual provider ID */
+function replaceProviderIds(obj: unknown, providerId: string): unknown {
+  if (Array.isArray(obj)) {
+    return obj.map((item) => replaceProviderIds(item, providerId));
+  }
+  if (obj !== null && typeof obj === "object") {
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+      if (
+        (key === "provider_id" || key === "overflow_provider_id") &&
+        (value === NEW_PROVIDER_ID || value === "")
+      ) {
+        result[key] = providerId;
+      } else {
+        result[key] = replaceProviderIds(value, providerId);
+      }
+    }
+    return result;
+  }
+  return obj;
+}
 
 const QuickSetupProviderSchema = Type.Object({
   name: Type.String({ minLength: 1 }),
@@ -38,6 +61,9 @@ const QuickSetupProviderSchema = Type.Object({
 const QuickSetupMappingSchema = Type.Object({
   client_model: Type.String({ minLength: 1 }),
   backend_model: Type.String({ minLength: 1 }),
+  /** Optional pre-built rule JSON (targets, overflow, multimodal_fallback).
+   *  If provided, provider_id fields are replaced with the newly created provider's ID. */
+  rule: Type.Optional(Type.String({ minLength: 1 })),
 });
 
 const QuickSetupRetryRuleSchema = Type.Object({
@@ -133,9 +159,16 @@ export const adminQuickSetupRoutes: FastifyPluginCallback<QuickSetupRoutesOption
       // 6. Upsert mapping groups
       for (const m of body.mappings) {
         const existing = db.prepare('SELECT id FROM mapping_groups WHERE client_model = ?').get(m.client_model) as { id: string } | undefined;
-        const ruleJson = JSON.stringify({
-          targets: [{ backend_model: m.backend_model, provider_id: providerId }],
-        });
+        let ruleJson: string;
+        if (m.rule) {
+          // Replace provider_id placeholders with the newly created provider's ID
+          const ruleObj = JSON.parse(m.rule) as Record<string, unknown>;
+          ruleJson = JSON.stringify(replaceProviderIds(ruleObj, providerId));
+        } else {
+          ruleJson = JSON.stringify({
+            targets: [{ backend_model: m.backend_model, provider_id: providerId }],
+          });
+        }
         if (existing) {
           updateMappingGroup(db, existing.id, {
             client_model: m.client_model,

@@ -323,6 +323,38 @@
             @update:max-queue-size="maxQueueSize = $event"
           />
         </div>
+
+        <!-- Transform Rules (collapsible) -->
+        <div class="border-t pt-3">
+          <button
+            type="button"
+            class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground w-full text-left hover:text-foreground transition-colors"
+            @click="showTransformRules = !showTransformRules"
+          >
+            <span
+              class="iconify size-3 transition-transform"
+              :class="showTransformRules ? 'rotate-90' : ''"
+              data-icon="lucide:chevron-right"
+            ></span>
+            {{ t("quickSetup.transform.title") }}
+            <Badge
+              variant="outline"
+              class="text-[9px] px-1 py-0 leading-none text-muted-foreground/50"
+            >
+              Optional
+            </Badge>
+          </button>
+          <div v-if="showTransformRules" class="mt-2">
+            <TransformRulesForm
+              :inject-headers="transformInjectHeaders"
+              :drop-fields="transformDropFields"
+              :request-defaults="transformRequestDefaults"
+              @update:inject-headers="transformInjectHeaders = $event"
+              @update:drop-fields="transformDropFields = $event"
+              @update:request-defaults="transformRequestDefaults = $event"
+            />
+          </div>
+        </div>
       </CardContent>
     </Card>
 
@@ -443,24 +475,6 @@
           </CardContent>
         </Card>
 
-        <!-- Transform Rules -->
-        <Card>
-          <CardHeader class="pb-3">
-            <CardTitle class="text-sm font-medium">{{
-              t("quickSetup.transform.title")
-            }}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <TransformRulesForm
-              :inject-headers="transformInjectHeaders"
-              :drop-fields="transformDropFields"
-              :request-defaults="transformRequestDefaults"
-              @update:inject-headers="transformInjectHeaders = $event"
-              @update:drop-fields="transformDropFields = $event"
-              @update:request-defaults="transformRequestDefaults = $event"
-            />
-          </CardContent>
-        </Card>
       </div>
     </div>
   </div>
@@ -499,6 +513,24 @@
       </template>
     </div>
     <div class="flex items-center gap-2">
+      <!-- Validation status indicator -->
+      <div
+        v-if="validationState === 'valid'"
+        class="flex items-center gap-1 text-[11px] text-emerald-500"
+      >
+        <span class="iconify size-3.5" data-icon="lucide:check-circle-2"></span>
+        <span class="font-medium">Validated</span>
+      </div>
+      <div
+        v-else-if="validationState === 'invalid'"
+        class="flex items-center gap-1 text-[11px] text-destructive/70"
+      >
+        <span
+          class="iconify size-3.5"
+          data-icon="lucide:alert-circle"
+        ></span>
+        <span>Invalid</span>
+      </div>
       <Button size="sm" variant="outline" @click="validateConfig">{{
         t("quickSetup.footer.validate")
       }}</Button>
@@ -605,6 +637,8 @@ const {
 } = useQuickSetup();
 
 const customModelInput = ref("");
+const showTransformRules = ref(false);
+const validationState = ref<"idle" | "valid" | "invalid">("idle");
 
 function handleAddCustomModel() {
   if (!customModelInput.value.trim()) return;
@@ -658,17 +692,21 @@ function toggleModelCapability(index: number, capability: string) {
 
 function validateConfig() {
   if (!selectedGroup.value) {
+    validationState.value = "invalid";
     toast.error(t("quickSetup.messages.selectProvider"));
     return;
   }
   if (!apiKey.value.trim()) {
+    validationState.value = "invalid";
     toast.error(t("quickSetup.messages.fillApiKey"));
     return;
   }
   if (enabledModelCount.value === 0) {
+    validationState.value = "invalid";
     toast.error(t("quickSetup.messages.enableOneModel"));
     return;
   }
+  validationState.value = "valid";
   toast.success(t("quickSetup.messages.validationPassed"));
 }
 </script>

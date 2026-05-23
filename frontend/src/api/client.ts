@@ -164,7 +164,11 @@ export interface QuickSetupPayload {
     queue_timeout_ms?: number;
     max_queue_size?: number;
   };
-  mappings: Array<{ client_model: string; backend_model: string }>;
+  mappings: Array<{
+    client_model: string;
+    backend_model: string;
+    rule?: string;
+  }>;
   retry_rules: Array<{
     name: string;
     status_code: number;

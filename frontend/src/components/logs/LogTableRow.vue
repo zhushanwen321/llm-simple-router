@@ -12,7 +12,7 @@ import {
 import { CheckIcon, ChevronDown, CopyIcon } from "lucide-vue-next";
 import type { LogEntry } from "@/components/logs/types";
 import { PROVIDER_ID_ROUTER } from "@/components/logs/types";
-import { formatTime } from "@/utils/format";
+import { formatTimeHMS } from "@/utils/format";
 
 withDefaults(
   defineProps<{
@@ -52,6 +52,7 @@ function enhancementLabel(raw: string | null): string {
 
 <template>
   <TableRow
+    class="group"
     :class="{
       'bg-destructive/10': !isChild && (log.status_code ?? 0) >= 400,
       'bg-muted/20': isChild,
@@ -82,7 +83,7 @@ function enhancementLabel(raw: string | null): string {
             <Button
               variant="ghost"
               size="icon-xs"
-              class="shrink-0"
+              class="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
               @click.stop="emit('copy', log.id)"
             >
               <CheckIcon
@@ -99,7 +100,7 @@ function enhancementLabel(raw: string | null): string {
 
     <TableCell
       class="font-mono text-xs text-muted-foreground whitespace-nowrap"
-      >{{ formatTime(log.created_at) }}</TableCell
+      >{{ formatTimeHMS(log.created_at) }}</TableCell
     >
 
     <TableCell class="font-mono text-xs whitespace-nowrap">

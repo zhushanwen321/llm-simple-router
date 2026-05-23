@@ -46,24 +46,41 @@
             <!-- 版本升级 -->
             <div
               v-if="upgradeStatus?.npm.hasUpdate"
-              class="p-3 border-b border-border"
+              class="p-3.5 border-b border-border"
             >
-              <div class="flex items-center gap-2 mb-2">
+              <div class="flex items-center gap-2 mb-2.5">
                 <div
-                  class="w-4 h-4 rounded-full bg-primary flex items-center justify-center text-primary-foreground"
+                  class="w-5 h-5 rounded bg-primary/10 flex items-center justify-center text-primary"
                 >
                   <ArrowUpRight class="w-3 h-3" />
                 </div>
-                <span class="text-sm font-medium">{{
+                <span class="text-[13px] font-medium">{{
                   t("sidebar.upgrade.newVersion")
                 }}</span>
               </div>
-              <p class="text-xs text-muted-foreground mb-2">
-                {{ upgradeStatus.npm.currentVersion }} →
-                <span class="text-primary font-medium">{{
-                  upgradeStatus.npm.latestVersion
-                }}</span>
-              </p>
+              <div class="flex items-center gap-2 mb-2.5">
+                <span class="font-mono text-xs text-muted-foreground"
+                  >v{{ upgradeStatus.npm.currentVersion }}</span
+                >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="text-muted-foreground/50"
+                >
+                  <path d="M5 12h14" />
+                  <path d="m12 5 7 7-7 7" />
+                </svg>
+                <span class="font-mono text-xs font-semibold text-primary"
+                  >v{{ upgradeStatus.npm.latestVersion }}</span
+                >
+              </div>
               <Button
                 v-if="upgradeStatus.deployment === 'npm'"
                 size="sm"
@@ -103,11 +120,11 @@
             <!-- 配置同步 -->
             <div
               v-if="upgradeStatus?.config.hasUpdate"
-              class="p-3 border-b border-border"
+              class="p-3.5 border-b border-border"
             >
-              <div class="flex items-center gap-2 mb-2">
+              <div class="flex items-center gap-2 mb-2.5">
                 <div
-                  class="w-4 h-4 rounded-full bg-primary flex items-center justify-center text-primary-foreground"
+                  class="w-5 h-5 rounded bg-primary/10 flex items-center justify-center text-primary"
                 >
                   <RefreshCw class="w-3 h-3" />
                 </div>
@@ -137,7 +154,7 @@
               </div>
               <Button
                 size="sm"
-                variant="secondary"
+                variant="outline"
                 class="w-full text-xs"
                 :disabled="isSyncing"
                 @click="handleSync"
