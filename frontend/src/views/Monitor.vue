@@ -23,7 +23,10 @@
     <!-- Request Panel with Tabs -->
     <div class="bg-card border border-border rounded-lg overflow-hidden mb-3">
       <!-- Tab bar -->
-      <div class="flex items-center border-b border-border px-3" style="background: oklch(0.165 0 0)">
+      <div
+        class="flex items-center border-b border-border px-3"
+        style="background: oklch(0.165 0 0)"
+      >
         <Button
           v-for="tab in requestTabs"
           :key="tab.key"
@@ -385,7 +388,10 @@
       class="grid grid-cols-3 gap-px bg-border rounded-lg overflow-hidden border border-border"
     >
       <div class="bg-card">
-        <div class="px-3 py-1.5 border-b border-border bg-muted">
+        <div
+          class="px-3 py-1.5 border-b border-border"
+          style="background: oklch(0.165 0 0)"
+        >
           <span
             class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider"
             >{{ t("monitor.statusCodeDistribution") }}</span
@@ -396,7 +402,10 @@
         </div>
       </div>
       <div class="bg-card">
-        <div class="px-3 py-1.5 border-b border-border bg-muted">
+        <div
+          class="px-3 py-1.5 border-b border-border"
+          style="background: oklch(0.165 0 0)"
+        >
           <span
             class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider"
             >{{ t("monitor.runtime") }}</span
@@ -408,7 +417,10 @@
       </div>
       <!-- Global Concurrency (compact summary) -->
       <div class="bg-card">
-        <div class="px-3 py-1.5 border-b border-border bg-muted">
+        <div
+          class="px-3 py-1.5 border-b border-border"
+          style="background: oklch(0.165 0 0)"
+        >
           <span
             class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider"
             >{{ t("monitor.concurrency") }}</span
@@ -433,17 +445,7 @@
               :style="{ width: `${Math.min(100, globalConcurrency.pct)}%` }"
             />
           </div>
-          <div class="grid grid-cols-3 gap-2">
-            <div>
-              <div
-                class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider"
-              >
-                P50
-              </div>
-              <div class="text-xs font-mono text-success">
-                {{ p50Latency }}ms
-              </div>
-            </div>
+          <div class="grid grid-cols-2 gap-2">
             <div>
               <div
                 class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider"
