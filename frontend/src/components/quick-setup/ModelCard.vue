@@ -6,7 +6,6 @@ import { CONTEXT_WINDOW_OPTIONS } from "./types";
 import PatchChips from "./PatchChips.vue";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -98,19 +97,23 @@ function isCapabilityActive(key: string): boolean {
 
 <template>
   <div
-    class="rounded-lg border border-border bg-card transition-colors group"
+    class="transition-colors group border-b border-border last:border-b-0"
     :class="!model.enabled && 'opacity-40'"
   >
     <!-- Main row: toggle + name + ctx select + cap squares + patch btn + trash -->
     <div class="flex items-center gap-2.5 px-3 min-h-8 py-1.5">
-      <!-- Enable toggle -->
-      <Switch
-        :model-value="model.enabled"
-        @update:model-value="
-          emit('update:model', { ...model, enabled: $event as boolean })
+      <!-- Enable toggle: square checkbox matching demo -->
+      <div
+        class="shrink-0 w-3.5 h-3.5 rounded-sm border-[1.5px] flex items-center justify-center cursor-pointer transition-all"
+        :class="
+          model.enabled
+            ? 'bg-primary border-primary'
+            : 'border-border hover:border-muted-foreground/50'
         "
-        class="shrink-0 scale-75 origin-left"
-      />
+        @click="emit('update:model', { ...model, enabled: !model.enabled })"
+      >
+        <svg v-if="model.enabled" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" class="text-primary-foreground"><path d="M18 6L9 17l-5-6"/></svg>
+      </div>
 
       <!-- Model name: demo 12px mono 500 -->
       <span
@@ -143,7 +146,7 @@ function isCapabilityActive(key: string): boolean {
           :model-value="String(model.contextWindow)"
           type="number"
           min="1"
-          class="h-6 w-16 text-[11px] md:text-[11px] text-center font-mono px-1.5 py-0 rounded [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          class="h-6 w-16 !text-[11px] text-center font-mono px-1.5 py-0 rounded [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
           @update:model-value="updateContextWindowFromInput($event as string)"
         />
       </template>
@@ -232,7 +235,7 @@ function isCapabilityActive(key: string): boolean {
                     $event ? Number($event) * MS_PER_SECOND : undefined,
                   )
                 "
-                class="h-6 w-[72px] text-[11px] md:text-[11px] font-mono text-right px-1.5 py-0 rounded [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                class="h-6 w-[72px] !text-[11px] font-mono text-right px-1.5 py-0 rounded [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 min="1"
               />
               <span class="text-[11px] text-muted-foreground">seconds</span>

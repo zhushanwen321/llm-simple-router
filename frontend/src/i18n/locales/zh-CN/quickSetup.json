@@ -94,5 +94,12 @@
     "setupComplete": "快速配置完成!",
     "setupFailed": "快速配置失败",
     "loadFailed": "加载推荐配置失败"
+  },
+  "steps": {
+    "selectClient": "选择客户端",
+    "configureProvider": "配置供应商",
+    "modelMappings": "模型映射",
+    "retryRules": "重试规则",
+    "optional": "可选"
   }
 }
