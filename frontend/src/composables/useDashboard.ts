@@ -280,7 +280,8 @@ function useDashboardData(
     const key = watchKey.value;
     const now = Date.now();
     if (key === lastRefreshKey && now - lastRefreshTime < CACHE_TTL) return;
-    loading.value = true;
+    // 只在首次加载时显示 skeleton，已有数据时静默刷新避免闪烁
+    loading.value = !stats.value.totalRequests && !stats.value.totalInputTokens;
     try {
       const windowTimeRange = selectedWindow.value
         ? {
@@ -445,7 +446,9 @@ export function useDashboard() {
     );
   });
 
-  // Timeline 渲染用：按 start_time 排序，如果 selectedProvider 有值则按 provider_id 过滤
+  // Timeline 渲染用：按 start_time 排序，过滤到单个 provider，去重 router_key_id
+  // 同一 provider 同一时间可能有多个 router_key_id 的窗口，只保留 router_key_id 为 null 的
+  // 如果没有 null 窗口，则保留每个时间段的第一个窗口
   const timelineWindows = computed(() => {
     let windows = [...usageWindows.value].sort(
       (a, b) =>
@@ -457,7 +460,21 @@ export function useDashboard() {
         (w) => w.window.provider_id === selectedProvider.value,
       );
     }
-    return windows;
+    // 去重：同一 provider 同一时间段多个 router_key_id 窗口重叠
+    // 优先保留 router_key_id === null 的窗口
+    const seen = new Map<string, UsageWindowWithUsage>();
+    for (const w of windows) {
+      // 用 start_time 近似作为去重键（同一 provider 相同 start_time 视为同一窗口）
+      const key = `${w.window.provider_id}:${w.window.start_time}`;
+      const existing = seen.get(key);
+      if (!existing) {
+        seen.set(key, w);
+      } else if (w.window.router_key_id === null) {
+        // 优先保留 null key 的窗口
+        seen.set(key, w);
+      }
+    }
+    return [...seen.values()];
   });
 
   // --- Filters & params ---
