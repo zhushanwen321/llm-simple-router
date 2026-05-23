@@ -311,10 +311,40 @@ function buildQuickSetupPayload(
     }),
     mappings: input.mappingEntries
       .filter((m) => m.targets[0]?.backend_model)
-      .map((m) => ({
-        client_model: m.clientModel,
-        backend_model: m.targets[0]?.backend_model ?? "",
-      })),
+      .map((m) => {
+        const hasAdvancedConfig =
+          m.targets.length > 1 ||
+          m.targets[0]?.overflow_model ||
+          m.multimodalFallback?.backend_model;
+        if (hasAdvancedConfig) {
+          const ruleObj: Record<string, unknown> = {
+            targets: m.targets.map((t) => {
+              const target: Record<string, unknown> = {
+                backend_model: t.backend_model,
+                provider_id: t.provider_id,
+              };
+              if (t.overflow_provider_id) target.overflow_provider_id = t.overflow_provider_id;
+              if (t.overflow_model) target.overflow_model = t.overflow_model;
+              return target;
+            }),
+          };
+          if (m.multimodalFallback?.backend_model) {
+            ruleObj.multimodal_fallback = {
+              provider_id: m.multimodalFallback.provider_id,
+              backend_model: m.multimodalFallback.backend_model,
+            };
+          }
+          return {
+            client_model: m.clientModel,
+            backend_model: m.targets[0]?.backend_model ?? "",
+            rule: JSON.stringify(ruleObj),
+          };
+        }
+        return {
+          client_model: m.clientModel,
+          backend_model: m.targets[0]?.backend_model ?? "",
+        };
+      }),
     retry_rules: buildRetryRulesPayload(
       input.recommendedRules,
       input.selectedRetryRules,
