@@ -81,7 +81,9 @@
     <Card class="ring-0">
       <CardHeader class="pb-3">
         <div class="flex items-center justify-between">
-          <CardTitle class="text-sm font-medium">Provider Connection</CardTitle>
+          <CardTitle class="text-sm font-medium">{{
+            t("quickSetup.provider.connection")
+          }}</CardTitle>
           <span
             v-if="selectedGroup"
             class="text-[10px] text-muted-foreground/50 flex items-center gap-1"
@@ -365,9 +367,9 @@
 
         <!-- Transform Rules (collapsible) -->
         <div class="border-t border-border pt-3 mt-3">
-          <button
-            type="button"
-            class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground w-full text-left hover:text-foreground transition-colors"
+          <Button
+            variant="ghost"
+            class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground w-full justify-start h-auto px-0"
             @click="showTransformRules = !showTransformRules"
           >
             <ChevronRight
@@ -381,7 +383,7 @@
             >
               {{ t("quickSetup.transform.optional") }}
             </Badge>
-          </button>
+          </Button>
           <div v-if="showTransformRules" class="mt-2">
             <TransformRulesForm
               :inject-headers="transformInjectHeaders"
@@ -456,10 +458,10 @@
             <div v-else class="space-y-1.5 max-h-[320px] overflow-y-auto">
               <!-- Select all -->
               <div
-                v-if="recommendedRules.some((r) => !r.exists)"
-                class="flex items-center gap-2.5 pb-1 border-b border-border"
+                class="flex items-center gap-2.5 pb-2 border-b border-border"
               >
                 <Checkbox
+                  :disabled="recommendedRules.every((r) => r.exists)"
                   :model-value="
                     recommendedRules
                       .filter((r) => !r.exists)
@@ -484,9 +486,15 @@
                     }
                   "
                 />
-                <span class="text-xs font-medium text-muted-foreground">{{
-                  t("common.selectAll")
-                }}</span>
+                <span
+                  class="text-xs font-medium"
+                  :class="
+                    recommendedRules.every((r) => r.exists)
+                      ? 'text-muted-foreground/40'
+                      : 'text-muted-foreground'
+                  "
+                  >{{ t("common.selectAll") }}</span
+                >
               </div>
               <div
                 v-for="rule in recommendedRules"
