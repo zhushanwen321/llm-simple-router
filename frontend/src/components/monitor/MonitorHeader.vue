@@ -2,7 +2,7 @@
 <template>
   <div class="flex items-stretch bg-card border border-border rounded-lg overflow-hidden mb-3">
     <!-- Left: Active count block -->
-    <div class="flex items-center gap-3.5 px-5 py-3 border-r border-border bg-primary/[0.08] min-w-[180px]">
+    <div class="flex items-center gap-3.5 px-5 py-3 border-r border-border min-w-[180px]" style="background: oklch(0.68 0.13 175 / 8%)">
       <span class="text-[32px] font-bold text-primary font-mono leading-none">
         {{ activeCount }}
       </span>

@@ -48,6 +48,7 @@ const QuickSetupRetryRuleSchema = Type.Object({
   retry_delay_ms: Type.Number({ minimum: 100 }),
   max_retries: Type.Number({ minimum: 0, maximum: 100 }),
   max_delay_ms: Type.Number({ minimum: 100 }),
+  provider_shortname: Type.Optional(Type.Union([Type.String(), Type.Null()])),
 });
 
 const QuickSetupTransformSchema = Type.Object({
@@ -148,8 +149,9 @@ export const adminQuickSetupRoutes: FastifyPluginCallback<QuickSetupRoutesOption
         }
       }
 
-      // 7. Create retry rules
+      // 7. Create retry rules (bind to newly created provider if shortname matches)
       for (const r of body.retry_rules) {
+        const ruleProviderId = r.provider_shortname ? providerId : null;
         createRetryRule(db, {
           name: r.name,
           status_code: r.status_code,
@@ -159,6 +161,7 @@ export const adminQuickSetupRoutes: FastifyPluginCallback<QuickSetupRoutesOption
           retry_delay_ms: r.retry_delay_ms,
           max_retries: r.max_retries,
           max_delay_ms: r.max_delay_ms,
+          provider_id: ruleProviderId,
         });
       }
 
