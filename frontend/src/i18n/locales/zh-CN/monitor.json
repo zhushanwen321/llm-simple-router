@@ -11,6 +11,8 @@
   "queued": "排队",
   "copyId": "复制 ID",
   "providerStats": "Provider 统计",
+  "providerStatsHide": "Hide",
+  "providerStatsShow": "Show",
   "concurrency": "并发度",
   "statusCodeDistribution": "状态码分布",
   "runtime": "运行时",

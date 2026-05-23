@@ -1,20 +1,17 @@
 <template>
-  <div v-if="total === 0" class="text-sm text-muted-foreground">{{ t('monitor.statusCodes.noData') }}</div>
-  <div v-else class="space-y-2">
-    <div v-for="group in groups" :key="group.label" class="space-y-1">
-      <div class="flex items-center justify-between text-sm">
-        <span :class="group.textClass">{{ group.label }}</span>
-        <span class="text-muted-foreground">
-          {{ group.count }} ({{ group.percent }}%)
-        </span>
-      </div>
-      <div class="h-2 bg-foreground/10 rounded-full overflow-hidden">
-        <div
-          class="h-full rounded-full transition-all duration-300"
-          :class="group.barClass"
-          :style="{ width: `${group.percent}%` }"
-        />
-      </div>
+  <div v-if="total === 0" class="text-[13px] text-muted-foreground py-2">
+    {{ t('monitor.statusCodes.noData') }}
+  </div>
+  <div v-else>
+    <div
+      v-for="group in groups"
+      :key="group.label"
+      class="flex items-center gap-1.5 py-[3px] border-t border-foreground/[0.04] first:border-t-0"
+    >
+      <span class="size-[5px] rounded-full shrink-0" :class="group.dotClass" />
+      <span class="text-[11px] font-medium text-muted-foreground flex-1">{{ group.label }}</span>
+      <span class="font-mono text-[11px]" :class="group.textClass">{{ group.count }}</span>
+      <span class="font-mono text-[10px] text-muted-foreground w-9 text-right">{{ group.percent }}%</span>
     </div>
   </div>
 </template>
@@ -35,7 +32,7 @@ interface StatusGroup {
   count: number
   percent: string
   textClass: string
-  barClass: string
+  dotClass: string
 }
 
 const total = computed(() => {
@@ -53,32 +50,32 @@ const groups = computed<StatusGroup[]>(() => {
 
   return [
     {
-      label: t('monitor.statusCodes.success'),
+      label: '2xx',
       count: count2xx,
       percent: ((count2xx / totalVal) * 100).toFixed(1),
       textClass: 'text-success',
-      barClass: 'bg-success',
+      dotClass: 'bg-success',
     },
     {
-      label: t('monitor.statusCodes.clientError'),
+      label: '4xx',
       count: count4xx,
       percent: ((count4xx / totalVal) * 100).toFixed(1),
       textClass: 'text-warning',
-      barClass: 'bg-warning',
+      dotClass: 'bg-warning',
     },
     {
-      label: t('monitor.statusCodes.rateLimited'),
+      label: '429',
       count: count429,
       percent: ((count429 / totalVal) * 100).toFixed(1),
       textClass: 'text-info',
-      barClass: 'bg-info',
+      dotClass: 'bg-info',
     },
     {
-      label: t('monitor.statusCodes.serverError'),
+      label: '5xx',
       count: count5xx,
       percent: ((count5xx / totalVal) * 100).toFixed(1),
       textClass: 'text-danger',
-      barClass: 'bg-danger',
+      dotClass: 'bg-danger',
     },
   ].filter((g) => g.count > 0)
 })

@@ -23,23 +23,24 @@
     <!-- Request Panel with Tabs -->
     <div class="bg-card border border-border rounded-lg overflow-hidden mb-3">
       <!-- Tab bar -->
-      <div class="flex border-b border-border bg-background">
+      <div class="flex items-center border-b border-border bg-muted px-3">
         <button
           v-for="tab in requestTabs"
           :key="tab.key"
-          class="px-4 py-2 text-sm font-medium transition-colors relative"
-          :class="[
-            activeTab === tab.key
-              ? 'text-foreground'
-              : 'text-muted-foreground hover:text-foreground',
-          ]"
+          class="relative px-3.5 py-2 text-[13px] font-medium transition-colors flex items-center gap-2"
+          :class="activeTab === tab.key ? 'text-primary' : 'text-muted-foreground hover:text-foreground'"
           @click="activeTab = tab.key"
         >
           {{ tab.label }}
-          <span class="ml-1.5 font-mono text-xs">({{ tab.count }})</span>
+          <span
+            class="font-mono text-[11px] font-semibold px-1.5 py-px rounded-full"
+            :class="activeTab === tab.key ? 'bg-primary/15 text-primary' : 'bg-foreground/5 text-muted-foreground'"
+          >
+            {{ tab.count }}
+          </span>
           <span
             v-if="activeTab === tab.key"
-            class="absolute bottom-0 left-0 right-0 h-0.5 bg-primary"
+            class="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-sm"
           />
         </button>
       </div>
@@ -48,74 +49,78 @@
       <ScrollArea class="max-h-[380px]">
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead class="w-2" />
-              <TableHead>Model</TableHead>
-              <TableHead>Provider</TableHead>
-              <TableHead class="w-12">Type</TableHead>
-              <TableHead class="w-16 text-right">Elapsed</TableHead>
-              <TableHead class="w-16 text-right">TPS</TableHead>
-              <TableHead class="w-16 text-right">Output</TableHead>
-              <TableHead class="w-20" />
+            <TableRow class="border-b-0 hover:bg-transparent">
+              <TableHead class="w-9 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider py-1.5 px-3" />
+              <TableHead class="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider py-1.5 px-3">Model</TableHead>
+              <TableHead class="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider py-1.5 px-3">Provider</TableHead>
+              <TableHead class="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider py-1.5 px-3 w-16">Type</TableHead>
+              <TableHead class="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider py-1.5 px-3 text-right w-20">Elapsed</TableHead>
+              <TableHead class="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider py-1.5 px-3 text-right w-20">Speed</TableHead>
+              <TableHead class="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider py-1.5 px-3 text-right w-20">Output</TableHead>
+              <TableHead class="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider py-1.5 px-3 w-14" />
             </TableRow>
           </TableHeader>
           <TableBody>
             <template v-if="currentRequests.length === 0">
-              <TableRow>
-                <TableCell colspan="8" class="text-center text-sm text-muted-foreground py-8">
+              <TableRow class="border-b-0">
+                <TableCell colspan="8" class="text-center text-[13px] text-muted-foreground py-6">
                   {{ emptyMessage }}
                 </TableCell>
               </TableRow>
             </template>
             <template v-for="req in currentRequests" :key="req.id">
               <TableRow
-                class="cursor-pointer transition-colors"
+                class="cursor-pointer transition-colors border-b border-foreground/[0.04] hover:bg-muted/40"
                 :class="[
-                  selectedRequestId === req.id ? 'bg-muted' : 'hover:bg-muted/50',
+                  selectedRequestId === req.id ? 'bg-primary/[0.04]' : '',
                   activeTab === 'recent' ? 'opacity-60 hover:opacity-80' : '',
                 ]"
                 @click="selectRequest(req.id)"
               >
                 <!-- Status dot -->
-                <TableCell>
+                <TableCell class="px-3 py-1">
                   <span
                     class="inline-block size-2 rounded-full shrink-0"
                     :class="statusDotClass(req)"
                   />
                 </TableCell>
-                <TableCell class="text-sm truncate max-w-[200px]">
+                <TableCell class="px-3 py-1 text-[13px] font-medium truncate max-w-[200px]">
                   {{ req.model }}
                 </TableCell>
-                <TableCell class="font-mono text-xs text-muted-foreground">
+                <TableCell class="px-3 py-1 font-mono text-[11px] text-muted-foreground">
                   {{ req.providerName }}
                 </TableCell>
-                <TableCell>
-                  <Badge
+                <TableCell class="px-3 py-1">
+                  <span
                     v-if="req.isStream"
-                    variant="secondary"
-                    class="text-xs"
+                    class="inline-flex items-center px-1.5 py-px rounded-full font-mono text-[10px] font-semibold bg-primary/15 text-primary"
                   >
                     SSE
-                  </Badge>
-                  <Badge v-else variant="outline" class="text-xs">Sync</Badge>
+                  </span>
+                  <span
+                    v-else
+                    class="inline-flex items-center px-1.5 py-px rounded-full font-mono text-[10px] font-semibold bg-foreground/5 text-muted-foreground"
+                  >
+                    Sync
+                  </span>
                 </TableCell>
-                <TableCell class="text-right font-mono text-xs text-muted-foreground">
+                <TableCell class="px-3 py-1 text-right font-mono text-[12px] text-muted-foreground">
                   {{ rowElapsed(req) }}
                 </TableCell>
-                <TableCell class="text-right font-mono text-xs text-muted-foreground">
+                <TableCell class="px-3 py-1 text-right font-mono text-[12px] text-muted-foreground">
                   {{ rowTps(req) }}
                 </TableCell>
-                <TableCell class="text-right font-mono text-xs text-muted-foreground">
+                <TableCell class="px-3 py-1 text-right font-mono text-[12px] text-muted-foreground">
                   {{ rowOutputTokens(req) }}
                 </TableCell>
-                <TableCell>
+                <TableCell class="px-3 py-1">
                   <div class="flex items-center gap-0.5 justify-end" @click.stop>
                     <Tooltip>
                       <TooltipTrigger as-child>
                         <Button
                           variant="ghost"
                           size="icon-xs"
-                          class="shrink-0"
+                          class="shrink-0 h-6 w-6"
                           @click.stop="copyId(req.id)"
                         >
                           <CheckIcon v-if="copiedId === req.id" class="size-3 text-success" />
@@ -129,7 +134,7 @@
                         <Button
                           variant="ghost"
                           size="icon-xs"
-                          class="shrink-0 text-destructive hover:text-destructive"
+                          class="shrink-0 h-6 w-6 text-destructive hover:text-destructive"
                           @click.stop="openKillDialog(req.id)"
                         >
                           <XIcon class="size-3" />
@@ -140,7 +145,7 @@
                     <Button
                       variant="ghost"
                       size="icon-xs"
-                      class="shrink-0"
+                      class="shrink-0 h-6 w-6"
                       @click.stop="toggleRowExpand(req.id)"
                     >
                       <ChevronDownIcon
@@ -153,32 +158,24 @@
               </TableRow>
 
               <!-- Expanded detail row -->
-              <TableRow v-if="expandedRowId === req.id" class="bg-muted/30">
-                <TableCell colspan="8" class="px-6 py-2">
-                  <div class="grid grid-cols-3 gap-4 text-xs">
+              <TableRow v-if="expandedRowId === req.id" class="border-b border-foreground/[0.04] bg-foreground/[0.02]">
+                <TableCell colspan="8" class="px-3 py-2">
+                  <div class="bg-foreground/[0.03] rounded-md px-4 py-2 grid grid-cols-4 gap-x-6 gap-y-1.5">
                     <div>
-                      <span class="text-muted-foreground">Request ID:</span>
-                      <span class="ml-1.5 font-mono">{{ req.id }}</span>
+                      <div class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Request ID</div>
+                      <div class="font-mono text-[12px] text-foreground">{{ req.id }}</div>
                     </div>
                     <div>
-                      <span class="text-muted-foreground">Input Tokens:</span>
-                      <span class="ml-1.5 font-mono">{{ req.streamMetrics?.inputTokens ?? '--' }}</span>
+                      <div class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Input Tokens</div>
+                      <div class="font-mono text-[12px] text-foreground">{{ req.streamMetrics?.inputTokens?.toLocaleString() ?? '--' }}</div>
                     </div>
                     <div>
-                      <span class="text-muted-foreground">Output Tokens:</span>
-                      <span class="ml-1.5 font-mono">{{ req.streamMetrics?.outputTokens ?? '--' }}</span>
+                      <div class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Output Tokens</div>
+                      <div class="font-mono text-[12px] text-foreground">{{ req.streamMetrics?.outputTokens?.toLocaleString() ?? '--' }}</div>
                     </div>
                     <div>
-                      <span class="text-muted-foreground">Cache Tokens:</span>
-                      <span class="ml-1.5 font-mono">{{ req.streamMetrics?.cacheReadTokens ?? '--' }}</span>
-                    </div>
-                    <div>
-                      <span class="text-muted-foreground">TTFT:</span>
-                      <span class="ml-1.5 font-mono">{{ req.streamMetrics?.ttftMs != null ? `${req.streamMetrics.ttftMs.toFixed(0)}ms` : '--' }}</span>
-                    </div>
-                    <div>
-                      <span class="text-muted-foreground">Retry:</span>
-                      <span class="ml-1.5 font-mono">{{ req.retryCount }}</span>
+                      <div class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Cache Tokens</div>
+                      <div class="font-mono text-[12px] text-foreground">{{ req.streamMetrics?.cacheReadTokens?.toLocaleString() ?? '--' }}</div>
                     </div>
                   </div>
                 </TableCell>
@@ -221,11 +218,11 @@
     <!-- Provider Stats (collapsible) -->
     <div class="mb-3">
       <Collapsible v-model:open="providerStatsOpen">
-        <div class="flex items-center bg-card border border-border rounded-t-lg px-4 py-2">
+        <div class="flex items-center justify-between bg-card border border-border rounded-t-lg px-4 py-1.5">
+          <span class="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{{ t('monitor.providerStats') }}</span>
           <CollapsibleTrigger as-child>
-            <Button variant="ghost" size="xs" class="gap-1">
-              <ChevronRightIcon class="size-3 transition-transform" :class="{ 'rotate-90': providerStatsOpen }" />
-              <span class="text-sm font-medium text-foreground">{{ t('monitor.providerStats') }}</span>
+            <Button variant="ghost" size="xs" class="text-[11px] text-muted-foreground hover:text-foreground h-6 px-1.5">
+              {{ providerStatsOpen ? t('monitor.providerStatsHide') : t('monitor.providerStatsShow') }}
             </Button>
           </CollapsibleTrigger>
         </div>
@@ -239,41 +236,53 @@
 
     <!-- Bottom Grid -->
     <div class="grid grid-cols-3 gap-px bg-border rounded-lg overflow-hidden border border-border">
-      <div class="bg-card p-4">
-        <h3 class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">{{ t('monitor.statusCodeDistribution') }}</h3>
-        <StatusCodePanel :by-status-code="stats?.byStatusCode ?? {}" />
+      <div class="bg-card">
+        <div class="px-3 py-1.5 border-b border-border bg-muted">
+          <span class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{{ t('monitor.statusCodeDistribution') }}</span>
+        </div>
+        <div class="p-3">
+          <StatusCodePanel :by-status-code="stats?.byStatusCode ?? {}" />
+        </div>
       </div>
-      <div class="bg-card p-4">
-        <h3 class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">{{ t('monitor.runtime') }}</h3>
-        <RuntimePanel :runtime="runtime" />
+      <div class="bg-card">
+        <div class="px-3 py-1.5 border-b border-border bg-muted">
+          <span class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{{ t('monitor.runtime') }}</span>
+        </div>
+        <div class="p-3">
+          <RuntimePanel :runtime="runtime" />
+        </div>
       </div>
       <!-- Global Concurrency (compact summary) -->
-      <div class="bg-card p-4">
-        <h3 class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">{{ t('monitor.concurrency') }}</h3>
-        <div class="flex items-baseline gap-1.5 mb-2">
-          <span class="text-xl font-mono font-bold text-primary">{{ globalConcurrency.active }}</span>
-          <span class="text-xs font-mono text-muted-foreground">/ {{ globalConcurrency.total }}</span>
-          <span class="text-xs font-mono text-muted-foreground ml-auto">{{ globalConcurrency.pct }}%</span>
+      <div class="bg-card">
+        <div class="px-3 py-1.5 border-b border-border bg-muted">
+          <span class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{{ t('monitor.concurrency') }}</span>
         </div>
-        <div class="h-1 bg-foreground/10 rounded-full overflow-hidden mb-3">
-          <div
-            class="h-full rounded-full transition-all duration-300"
-            :class="globalConcurrencyBarClass"
-            :style="{ width: `${Math.min(100, globalConcurrency.pct)}%` }"
-          />
-        </div>
-        <div class="grid grid-cols-3 gap-2">
-          <div>
-            <div class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">P50</div>
-            <div class="text-xs font-mono text-success">{{ p50Latency }}ms</div>
+        <div class="p-3">
+          <div class="flex items-baseline gap-1.5 mb-2">
+            <span class="text-xl font-mono font-bold text-primary">{{ globalConcurrency.active }}</span>
+            <span class="text-xs font-mono text-muted-foreground">/ {{ globalConcurrency.total }}</span>
+            <span class="text-xs font-mono text-muted-foreground ml-auto">{{ globalConcurrency.pct }}%</span>
           </div>
-          <div>
-            <div class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">P99</div>
-            <div class="text-xs font-mono text-warning">{{ p99Latency }}ms</div>
+          <div class="h-1 bg-foreground/10 rounded-full overflow-hidden mb-3">
+            <div
+              class="h-full rounded-full transition-all duration-300"
+              :class="globalConcurrencyBarClass"
+              :style="{ width: `${Math.min(100, globalConcurrency.pct)}%` }"
+            />
           </div>
-          <div>
-            <div class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">QPS</div>
-            <div class="text-xs font-mono text-primary">{{ qps }}</div>
+          <div class="grid grid-cols-3 gap-2">
+            <div>
+              <div class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">P50</div>
+              <div class="text-xs font-mono text-success">{{ p50Latency }}ms</div>
+            </div>
+            <div>
+              <div class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">P99</div>
+              <div class="text-xs font-mono text-warning">{{ p99Latency }}ms</div>
+            </div>
+            <div>
+              <div class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">QPS</div>
+              <div class="text-xs font-mono text-primary">{{ qps }}</div>
+            </div>
           </div>
         </div>
       </div>
@@ -331,7 +340,7 @@ import {
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { CheckIcon, ChevronDownIcon, ChevronRightIcon, CopyIcon, XIcon } from 'lucide-vue-next'
+import { CheckIcon, ChevronDownIcon, CopyIcon, XIcon } from 'lucide-vue-next'
 import { api, getApiMessage } from '@/api/client'
 import { toast } from 'vue-sonner'
 import MonitorHeader from '@/components/monitor/MonitorHeader.vue'

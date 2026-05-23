@@ -1,71 +1,37 @@
 <template>
-  <div v-if="!runtime" class="text-sm text-muted-foreground">
+  <div v-if="!runtime" class="text-[13px] text-muted-foreground py-2">
     {{ t("monitor.runtimePanel.noData") }}
   </div>
-  <div v-else class="grid grid-cols-2 gap-3 text-sm">
-    <!-- 运行时间 -->
-    <div>
-      <p class="text-muted-foreground">
-        {{ t("monitor.runtimePanel.uptime") }}
-      </p>
-      <p class="font-medium text-foreground font-mono">
-        {{ formatUptime(runtime.uptimeMs) }}
-      </p>
+  <div v-else>
+    <!-- Memory RSS -->
+    <div class="flex items-center justify-between py-[3px]">
+      <span class="text-[11px] text-muted-foreground">{{ t("monitor.runtimePanel.memoryRss") }}</span>
+      <span class="font-mono text-[11px] text-foreground">{{ formatBytes(runtime.memoryUsage.rss) }}</span>
     </div>
-
-    <!-- 内存 RSS -->
-    <div>
-      <p class="text-muted-foreground">
-        {{ t("monitor.runtimePanel.memoryRss") }}
-      </p>
-      <p class="font-medium text-foreground font-mono">
-        {{ formatBytes(runtime.memoryUsage.rss) }}
-      </p>
+    <!-- Event Loop -->
+    <div class="flex items-center justify-between py-[3px] border-t border-foreground/[0.04]">
+      <span class="text-[11px] text-muted-foreground">{{ t("monitor.runtimePanel.eventLoopDelay") }}</span>
+      <span class="font-mono text-[11px] text-success">{{ runtime.eventLoopDelayMs.toFixed(1) }}ms</span>
     </div>
-
-    <!-- Heap 使用率 -->
-    <div class="col-span-2">
-      <div class="flex items-center justify-between">
-        <p class="text-muted-foreground">
-          {{ t("monitor.runtimePanel.heapUsage") }}
-        </p>
-        <p class="text-muted-foreground">
-          {{ formatBytes(runtime.memoryUsage.heapUsed) }} /
-          {{ formatBytes(runtime.memoryUsage.heapTotal) }}
-        </p>
+    <!-- Handles -->
+    <div class="flex items-center justify-between py-[3px] border-t border-foreground/[0.04]">
+      <span class="text-[11px] text-muted-foreground">{{ t("monitor.runtimePanel.activeHandles") }}</span>
+      <span class="font-mono text-[11px] text-foreground">{{ runtime.activeHandles }}</span>
+    </div>
+    <!-- Heap bar -->
+    <div class="mt-1 pt-1 border-t border-foreground/[0.04]">
+      <div class="flex justify-between mb-[3px]">
+        <span class="text-[11px] text-muted-foreground">{{ t("monitor.runtimePanel.heapUsage") }}</span>
+        <span class="font-mono text-[10px] text-muted-foreground">
+          {{ formatBytes(runtime.memoryUsage.heapUsed) }} / {{ formatBytes(runtime.memoryUsage.heapTotal) }}
+        </span>
       </div>
-      <div class="h-2 bg-foreground/10 rounded-full overflow-hidden mt-1">
+      <div class="h-[3px] bg-foreground/[0.06] rounded-sm overflow-hidden">
         <div
-          class="h-full bg-primary rounded-full transition-all duration-300"
+          class="h-full bg-primary rounded-sm transition-all duration-300"
           :style="{ width: `${heapPercent}%` }"
         />
       </div>
-    </div>
-
-    <!-- Active handles -->
-    <div>
-      <p class="text-muted-foreground">
-        {{ t("monitor.runtimePanel.activeHandles") }}
-      </p>
-      <p class="font-medium text-foreground font-mono">{{ runtime.activeHandles }}</p>
-    </div>
-
-    <!-- Active requests -->
-    <div>
-      <p class="text-muted-foreground">
-        {{ t("monitor.runtimePanel.activeRequests") }}
-      </p>
-      <p class="font-medium text-foreground font-mono">{{ runtime.activeRequests }}</p>
-    </div>
-
-    <!-- Event loop delay -->
-    <div class="col-span-2">
-      <p class="text-muted-foreground">
-        {{ t("monitor.runtimePanel.eventLoopDelay") }}
-      </p>
-      <p class="font-medium text-foreground font-mono">
-        {{ runtime.eventLoopDelayMs.toFixed(2) }}ms
-      </p>
     </div>
   </div>
 </template>
@@ -87,16 +53,7 @@ const heapPercent = computed(() => {
   if (!props.runtime || props.runtime.memoryUsage.heapTotal === 0) return 0;
   return Math.min(
     100,
-    (props.runtime.memoryUsage.heapUsed / props.runtime.memoryUsage.heapTotal) *
-      100,
+    (props.runtime.memoryUsage.heapUsed / props.runtime.memoryUsage.heapTotal) * 100,
   );
 });
-
-function formatUptime(ms: number): string {
-  const totalSeconds = Math.floor(ms / 1000);
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  return `${hours}h ${minutes}m ${seconds}s`;
-}
 </script>
