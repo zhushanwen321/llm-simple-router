@@ -28,7 +28,8 @@
     "connect": "Connect",
     "testing": "Testing",
     "connected": "Connected",
-    "test": "Test"
+    "test": "Test",
+    "autoConfigured": "Auto-configured based on your client"
   },
   "model": {
     "config": "Model Configuration",

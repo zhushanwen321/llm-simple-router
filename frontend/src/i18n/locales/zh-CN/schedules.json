@@ -62,5 +62,12 @@
   "parseRuleFailed": "路由规则格式异常，已使用默认值",
   "parseWeekFailed": "工作日格式异常，已使用默认工作日",
   "parseConcurrencyFailed": "并发规则格式异常，已使用默认配置",
-  "parseTransformFailed": "转换规则格式异常，已使用默认配置"
+  "parseTransformFailed": "转换规则格式异常，已使用默认配置",
+  "timeline.weekView": "一周时间线",
+  "stats": {
+    "groupCount": "映射组",
+    "activeRules": "活跃规则",
+    "disabledRules": "停用规则",
+    "coveredDays": "覆盖天数"
+  }
 }
