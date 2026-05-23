@@ -42,7 +42,11 @@
               </div>
             </Button>
           </PopoverTrigger>
-          <PopoverContent side="right" align="start" class="w-80 p-0">
+          <PopoverContent
+            side="right"
+            align="start"
+            class="w-80 p-0 ring-0 border border-white/[0.06] shadow-[0_4px_16px_oklch(0_0_0/0.15)] dark:shadow-[0_4px_16px_oklch(0_0_0/0.4)]"
+          >
             <!-- 版本升级 -->
             <div
               v-if="upgradeStatus?.npm.hasUpdate"

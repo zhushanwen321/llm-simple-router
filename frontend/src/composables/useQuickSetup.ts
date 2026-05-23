@@ -124,15 +124,12 @@ async function toggleChangedMappings(
 function buildRetryRulesPayload(
   rules: RecommendedRetryRule[],
   selectedRules: Set<string>,
-  providerShortname: string | undefined,
+  providerMap: Map<string, "general" | string>,
 ): QuickSetupPayload["retry_rules"] {
   return rules
     .filter((r) => selectedRules.has(r.name) && !r.exists)
     .map((r) => {
-      const ruleProviders = r.providers ?? [];
-      // 如果这条规则关联了当前 provider 的 shortname，标记绑定
-      // 后端会把这个 shortname 映射为新创建的 provider_id
-      const bound = providerShortname && ruleProviders.includes(providerShortname);
+      const binding = providerMap.get(r.name) ?? "general";
       return {
         name: r.name,
         status_code: r.status_code,
@@ -141,7 +138,7 @@ function buildRetryRulesPayload(
         retry_delay_ms: r.retry_delay_ms,
         max_retries: r.max_retries,
         max_delay_ms: r.max_delay_ms,
-        provider_shortname: bound ? providerShortname : null,
+        provider_shortname: binding === "general" ? null : binding,
       };
     });
 }
@@ -274,7 +271,7 @@ function resolveApiType(
 interface QuickSetupPayloadInput {
   isCustomProvider: boolean;
   selectedGroup: string;
-  providerShortname: string | undefined;
+  retryProviderMap: Map<string, "general" | string>;
   selectedPlan: string;
   apiType: "openai" | "openai-responses" | "anthropic";
   baseUrl: string;
@@ -348,7 +345,7 @@ function buildQuickSetupPayload(
     retry_rules: buildRetryRulesPayload(
       input.recommendedRules,
       input.selectedRetryRules,
-      input.providerShortname,
+      input.retryProviderMap,
     ),
     transform_rules: input.transformRules,
   };
@@ -601,6 +598,7 @@ export function useQuickSetup() {
   const mappingEntries = ref<MappingEntry[]>([]);
   const allRecommendedRules = ref<RecommendedRetryRule[]>([]);
   const selectedRetryRules = ref<Set<string>>(new Set());
+  const retryProviderMap = ref<Map<string, "general" | string>>(new Map());
   const saving = ref(false);
   const connectionStatus = ref<"idle" | "testing" | "ok" | "error">("idle");
   const concurrencyMode = ref<ConcurrencyMode>("auto");
@@ -660,9 +658,65 @@ export function useQuickSetup() {
     );
   }
 
+  function initRetryProviderMap() {
+    const map = new Map<string, "general" | string>();
+    const currentShortname = providerGroups.value.find(
+      (g) => g.group === selectedGroup.value,
+    )?.shortname;
+    for (const rule of recommendedRules.value) {
+      if (rule.exists) continue;
+      const ruleProviders = rule.providers ?? [];
+      if (ruleProviders.length > 0 && currentShortname && ruleProviders.includes(currentShortname)) {
+        map.set(rule.name, currentShortname);
+      } else {
+        map.set(rule.name, "general");
+      }
+    }
+    retryProviderMap.value = map;
+  }
+
+  function setRetryProvider(name: string, value: "general" | string) {
+    const next = new Map(retryProviderMap.value);
+    next.set(name, value);
+    retryProviderMap.value = next;
+  }
+
   function selectClient(type: ClientType) {
     clientType.value = type;
+
+    // Auto-select default provider and plan for this client
+    const client = CLIENTS.find((c) => c.id === type);
+    if (client && providerGroups.value.length > 0) {
+      const groupData = providerGroups.value.find(
+        (g) => g.group === client.defaultProvider,
+      );
+      if (groupData && groupData.presets.length > 0) {
+        const compatibleFormats =
+          client.format === "openai-responses"
+            ? ["openai-responses", "openai"]
+            : [client.format];
+        const match = groupData.presets.find(
+          (p) =>
+            compatibleFormats.includes(p.apiType) &&
+            p.plan === client.defaultPlan,
+        );
+        const preset =
+          match ??
+          groupData.presets.find((p) =>
+            compatibleFormats.includes(p.apiType),
+          ) ??
+          groupData.presets[0];
+
+        selectedGroup.value = groupData.group;
+        selectedPlan.value = preset.plan;
+        apiType.value = resolveApiType(client.format, preset.apiType);
+        applyPresetModels(preset, modelConfigs, isNonOpenaiEndpoint);
+      }
+    }
+
     updateMappings();
+    autoSelectRetryRules();
+    initRetryProviderMap();
   }
 
   function onProviderChange(group: string) {
@@ -811,7 +865,7 @@ export function useQuickSetup() {
       const payload = buildQuickSetupPayload({
         isCustomProvider: isCustomProvider.value,
         selectedGroup: selectedGroup.value,
-        providerShortname: providerGroups.value.find((g) => g.group === selectedGroup.value)?.shortname,
+        retryProviderMap: retryProviderMap.value,
         selectedPlan: selectedPlan.value,
         apiType: apiType.value,
         baseUrl: baseUrl.value,
@@ -871,6 +925,7 @@ export function useQuickSetup() {
     allRecommendedRules,
     recommendedRules,
     selectedRetryRules,
+    retryProviderMap,
     saving,
     connectionStatus,
     currentClient,
@@ -901,6 +956,7 @@ export function useQuickSetup() {
     addMappingEntry,
     removeMappingEntry,
     toggleRetryRule,
+    setRetryProvider,
     onConcurrencyModeChange,
     testConnection,
     submit,
