@@ -37,6 +37,59 @@
     --radius-xs: 4px;
   }
 
+  /* Light theme override */
+  html:not(.dark) {
+    --bg: oklch(0.98 0 0);
+    --surface: oklch(1 0 0);
+    --surface-up: oklch(0.95 0 0);
+    --surface-header: oklch(0.94 0 0);
+    --fg: oklch(0.15 0 0);
+    --muted-dim: oklch(0.5 0 0);
+    --muted: oklch(0.45 0 0);
+    --border: oklch(0 0 0 / 10%);
+    --border-strong: oklch(0 0 0 / 14%);
+    --primary-dim: oklch(0.68 0.13 175 / 12%);
+    --primary-ghost: oklch(0.68 0.13 175 / 6%);
+    --success-dim: oklch(0.65 0.17 150 / 10%);
+    --warning-dim: oklch(0.78 0.16 80 / 10%);
+    --danger-dim: oklch(0.58 0.22 25 / 10%);
+  }
+
+  html:not(.dark) .secondary-strip { background: var(--surface); border-color: var(--border); }
+  html:not(.dark) .schedules-panel { background: var(--surface); border-color: var(--border); }
+  html:not(.dark) .week-day-track { background: oklch(0 0 0 / 5%); }
+  html:not(.dark) .week-day-row.empty-day .week-day-track { background: oklch(0 0 0 / 3%); }
+  html:not(.dark) .week-track-mark { border-color: oklch(0 0 0 / 6%); }
+  html:not(.dark) .preview-tag { background: oklch(0 0 0 / 5%); }
+  html:not(.dark) .day-badge { background: oklch(0 0 0 / 5%); }
+  html:not(.dark) .group-count-badge { background: var(--primary-dim); }
+  html:not(.dark) .timeline-block { color: oklch(1 0 0); }
+  html:not(.dark) .timeline-block.disabled { color: var(--muted-dim); border-color: var(--muted-dim); }
+  html:not(.dark) .rule-table th { background: var(--surface-header); }
+  html:not(.dark) .toggle-switch.off { background: oklch(0 0 0 / 12%); }
+  html:not(.dark) .toggle-switch.on .toggle-knob { background: oklch(1 0 0); }
+  html:not(.dark) .toggle-switch.off .toggle-knob { background: oklch(0.4 0 0); }
+  html:not(.dark) .timeline-tooltip { background: var(--surface-up); border-color: var(--border-strong); box-shadow: 0 4px 12px oklch(0 0 0 / 15%); }
+  html:not(.dark) .target-tag { background: oklch(0 0 0 / 5%); }
+
+  .theme-toggle {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    padding: 6px 14px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--fg);
+    font-family: var(--font-body);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    z-index: 9999;
+    transition: background 150ms;
+  }
+  .theme-toggle:hover { background: var(--surface-up); }
+
   body {
     font-family: var(--font-body);
     background: var(--bg);
@@ -565,6 +618,7 @@
 </style>
 </head>
 <body>
+<button class="theme-toggle" onclick="document.documentElement.classList.toggle('dark'); this.textContent = document.documentElement.classList.contains('dark') ? 'Light' : 'Dark'">Light</button>
 <div class="page-wrap">
   <!-- Page Header -->
   <div class="page-header">
