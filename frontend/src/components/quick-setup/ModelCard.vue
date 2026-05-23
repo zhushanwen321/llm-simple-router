@@ -98,7 +98,7 @@ function isCapabilityActive(key: string): boolean {
     <div class="flex items-center gap-2.5 px-3 min-h-8 py-1.5">
       <!-- Enable toggle: square checkbox matching demo -->
       <div
-        class="shrink-0 w-3.5 h-3.5 rounded-sm border border-border flex items-center justify-center cursor-pointer transition-all"
+        class="shrink-0 w-3.5 h-3.5 rounded-sm border-[1px] border-border flex items-center justify-center cursor-pointer transition-all"
         :class="
           model.enabled
             ? 'bg-primary border-primary'
@@ -168,7 +168,7 @@ function isCapabilityActive(key: string): boolean {
         <div
           v-for="cap in capabilityIcons"
           :key="cap.key"
-          class="w-5 h-5 rounded flex items-center justify-center border transition-colors cursor-pointer"
+          class="w-5 h-5 rounded flex items-center justify-center border-[1px] transition-colors cursor-pointer"
           :class="
             cn(
               isCapabilityActive(cap.key)
@@ -185,7 +185,7 @@ function isCapabilityActive(key: string): boolean {
 
       <!-- Patch button: count + chevron, also toggles expand -->
       <div
-        class="inline-flex items-center gap-1 h-[22px] px-2 border border-border rounded cursor-pointer transition-colors shrink-0 select-none"
+        class="inline-flex items-center gap-1 h-[22px] px-2 border-[1px] border-border rounded cursor-pointer transition-colors shrink-0 select-none"
         :class="
           cn(
             model.patches.length > 0
