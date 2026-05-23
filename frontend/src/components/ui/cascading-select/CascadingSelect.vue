@@ -17,10 +17,13 @@ const props = withDefaults(
     modelValue?: CascadingSelectedValue;
     placeholder?: string;
     compact?: boolean;
+    /** Dashed border variant (for overflow/multimodal selects) */
+    dashed?: boolean;
   }>(),
   {
     placeholder: "",
     compact: false,
+    dashed: false,
   },
 );
 
@@ -59,9 +62,12 @@ function onOpenChange(val: boolean) {
   <Popover :open="open" @update:open="onOpenChange">
     <PopoverTrigger as-child>
       <div
-        class="flex h-10 w-full items-center justify-between rounded-md bg-background px-3 py-2 text-sm ring-offset-background cursor-pointer hover:bg-accent hover:text-accent-foreground"
+        class="flex w-full items-center justify-between rounded-md bg-background ring-offset-background cursor-pointer hover:bg-accent hover:text-accent-foreground"
         :class="[
-          compact ? 'h-8 text-xs px-2.5 py-1' : 'h-10 text-sm px-3 py-2',
+          compact
+            ? 'h-7 text-xs px-2 py-1 border rounded-md'
+            : 'h-10 text-sm px-3 py-2',
+          dashed ? 'border-dashed border-primary/20' : 'border-border',
           { 'ring-2 ring-ring ring-offset-2': open },
         ]"
       >

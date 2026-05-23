@@ -3,9 +3,8 @@ import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, ArrowRight, Plus, Layers } from "lucide-vue-next";
+import { ArrowRight, Plus } from "lucide-vue-next";
 import MappingEntryEditor from "@/components/mappings/MappingEntryEditor.vue";
 import CascadingModelSelect from "@/components/mappings/CascadingModelSelect.vue";
 import type {
@@ -20,26 +19,29 @@ import type {
 
 const { t } = useI18n();
 
-const props = defineProps<{
+defineProps<{
   entries: MappingEntry[];
   providerGroups: ProviderGroup[];
 }>();
 
 const emit = defineEmits<{
   "update:targets": [index: number, targets: MappingTarget[]];
-  "update:multimodal-fallback": [index: number, fallback: MultimodalFallback | undefined];
+  "update:multimodal-fallback": [
+    index: number,
+    fallback: MultimodalFallback | undefined,
+  ];
+  "update:client-model": [index: number, clientModel: string];
   "toggle-active": [index: number];
   add: [clientModel: string, targetModel: string];
   remove: [clientModel: string];
 }>();
 
-const expandedEntries = ref<Set<string>>(new Set());
+// Allow only one expanded entry at a time
+const expandedClient = ref<string | null>(null);
 
 function toggleExpand(clientModel: string) {
-  const next = new Set(expandedEntries.value);
-  if (next.has(clientModel)) next.delete(clientModel);
-  else next.add(clientModel);
-  expandedEntries.value = next;
+  expandedClient.value =
+    expandedClient.value === clientModel ? null : clientModel;
 }
 
 const newFrom = ref("");
@@ -65,131 +67,35 @@ function handleKeydown(e: KeyboardEvent) {
     addMapping();
   }
 }
-
-function addMultimodalFallback(idx: number) {
-  const firstProvider = props.providerGroups[0];
-  emit("update:multimodal-fallback", idx, {
-    provider_id: firstProvider?.provider.id ?? "",
-    backend_model: "",
-  });
-}
-
-function handleFallbackSelect(idx: number, val: SelectedValue) {
-  emit("update:multimodal-fallback", idx, {
-    provider_id: val.provider_id,
-    backend_model: val.model,
-  });
-}
 </script>
 
 <template>
   <div class="space-y-1.5">
     <div
       v-for="(entry, idx) in entries"
-      :key="entry.clientModel"
-      class="rounded-md border border-border"
+      :key="idx"
+      class="rounded-md border border-border overflow-hidden"
     >
-      <!-- Main row -->
-      <div class="flex items-start gap-2 px-3 py-2">
-        <!-- Editor: only toggle on click when collapsed; expanded editor contains interactive controls that must not trigger collapse -->
-        <div
-          class="flex-1 min-w-0"
-          :class="{ 'cursor-pointer': !expandedEntries.has(entry.clientModel) }"
-          @click="
-            !expandedEntries.has(entry.clientModel) &&
-            toggleExpand(entry.clientModel)
+      <div class="px-3 py-1.5">
+        <MappingEntryEditor
+          :entry="entry"
+          :provider-groups="providerGroups"
+          :expanded="expandedClient === entry.clientModel"
+          :editable-client-model="expandedClient === entry.clientModel"
+          @expand="toggleExpand(entry.clientModel)"
+          @update:targets="
+            (targets: MappingTarget[]) => emit('update:targets', idx, targets)
           "
-        >
-          <MappingEntryEditor
-            :entry="entry"
-            :provider-groups="providerGroups"
-            :expanded="expandedEntries.has(entry.clientModel)"
-            :editable="true"
-            @update:targets="
-              (targets: MappingTarget[]) => emit('update:targets', idx, targets)
-            "
-          />
-        </div>
-
-        <!-- Actions -->
-        <div class="flex items-center gap-1.5 shrink-0 pt-0.5">
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            class="text-muted-foreground/40 hover:text-destructive"
-            @click.stop="emit('remove', entry.clientModel)"
-          >
-            <Trash2 class="size-3" />
-          </Button>
-          <Switch
-            :model-value="entry.active"
-            @update:model-value="emit('toggle-active', idx)"
-            class="scale-75"
-            @click.stop
-          />
-        </div>
-      </div>
-
-      <!-- Multimodal Fallback (only when expanded) -->
-      <div
-        v-if="expandedEntries.has(entry.clientModel)"
-        class="px-3 pb-2 border-t border-border/30"
-      >
-        <div class="flex items-center gap-2 mb-1.5 pt-2">
-          <Layers class="w-3.5 h-3.5 text-muted-foreground/50" />
-          <span class="text-xs text-muted-foreground">{{
-            t("mappings.multimodalFallback.title")
-          }}</span>
-          <Badge
-            v-if="entry.multimodalFallback?.backend_model"
-            variant="outline"
-            class="text-[10px] px-1.5 py-0 text-primary/60 border-primary/20"
-          >
-            {{ t("mappings.multimodalFallback.configured") }}
-          </Badge>
-        </div>
-        <div v-if="entry.multimodalFallback" class="flex items-center gap-2">
-          <div class="flex-1">
-            <CascadingModelSelect
-              :providers="providerGroups"
-              :model-value="
-                entry.multimodalFallback
-                  ? {
-                      provider_id: entry.multimodalFallback.provider_id,
-                      model: entry.multimodalFallback.backend_model,
-                    }
-                  : undefined
-              "
-              :placeholder="
-                t('mappings.multimodalFallback.selectProviderModel')
-              "
-              compact
-              @update:model-value="
-                (v: SelectedValue) => handleFallbackSelect(idx, v)
-              "
-            />
-          </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            class="shrink-0 text-muted-foreground/40 hover:text-destructive"
-            @click.stop="emit('update:multimodal-fallback', idx, undefined)"
-          >
-            <Trash2 class="size-3" />
-          </Button>
-        </div>
-        <Button
-          v-else
-          type="button"
-          variant="ghost"
-          size="sm"
-          class="text-xs text-muted-foreground/50"
-          @click="addMultimodalFallback(idx)"
-        >
-          <Plus class="w-3 h-3 mr-1" />
-          {{ t("mappings.multimodalFallback.add") }}
-        </Button>
+          @update:client-model="
+            (v: string) => emit('update:client-model', idx, v)
+          "
+          @update:multimodal-fallback="
+            (fb: MultimodalFallback | undefined) =>
+              emit('update:multimodal-fallback', idx, fb)
+          "
+          @toggle-active="emit('toggle-active', idx)"
+          @remove="emit('remove', entry.clientModel)"
+        />
       </div>
     </div>
 
@@ -201,14 +107,14 @@ function handleFallbackSelect(idx: number, val: SelectedValue) {
       {{ t("providers.shared.noMappings") }}
     </p>
 
-    <!-- Add new mapping -->
+    <!-- Add new mapping row -->
     <div
       class="flex items-center gap-3 rounded-md border border-dashed border-border px-3 py-2"
     >
       <Input
         v-model="newFrom"
         :placeholder="t('providers.shared.clientModel')"
-        class="h-7 min-w-[90px] text-xs font-mono"
+        class="h-7 min-w-[90px] text-xs font-mono border-border"
         @keydown="handleKeydown"
       />
       <ArrowRight class="size-3.5 shrink-0 text-muted-foreground/30" />
@@ -225,7 +131,7 @@ function handleFallbackSelect(idx: number, val: SelectedValue) {
         variant="outline"
         class="text-[10px] shrink-0 text-muted-foreground/50"
       >
-        Custom
+        {{ t("providers.shared.tagCustom") }}
       </Badge>
       <Button
         variant="outline"

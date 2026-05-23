@@ -124,7 +124,6 @@
     "max_retries": 5,
     "max_delay_ms": 120000,
     "providers": [
-      "deepseek",
       "opencode"
     ]
   }
