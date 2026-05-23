@@ -19,6 +19,8 @@ export interface ClientMeta {
   defaultProvider: string;
   defaultPlan: string;
   descriptionKey: string;
+  /** 标记为推荐（Popular badge） */
+  popular?: boolean;
 }
 
 export interface PatchOption {
@@ -57,6 +59,7 @@ export const CLIENTS: ClientMeta[] = [
     defaultProvider: "DeepSeek",
     defaultPlan: "Anthropic",
     descriptionKey: "quickSetup.client.claudeCodeDesc",
+    popular: true,
   },
   {
     id: "codex",
@@ -69,6 +72,7 @@ export const CLIENTS: ClientMeta[] = [
     defaultProvider: "DeepSeek",
     defaultPlan: "OpenAI",
     descriptionKey: "quickSetup.client.codexDesc",
+    popular: true,
   },
   {
     id: "pi",
