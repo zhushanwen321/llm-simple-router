@@ -15,6 +15,7 @@ export function useLogs() {
   const filterParams = ref<Record<string, string>>({})
   const DEFAULT_CLEANUP_DAYS = 30
   const cleanupDays = ref(DEFAULT_CLEANUP_DAYS)
+  const loading = ref(false)
   const showCleanup = ref(false)
 
   const expandedRows = ref<Set<string>>(new Set())
@@ -28,6 +29,7 @@ export function useLogs() {
   /** 加载日志列表。传入 params 会更新内部 filter 状态供 goToPage 复用 */
   async function loadLogs(params?: Record<string, string>) {
     if (params) filterParams.value = params
+    loading.value = true
     try {
       const res = await api.getLogs({ page: page.value, limit: PAGE_SIZE, view: 'grouped', ...filterParams.value })
       logs.value = res.data
@@ -38,6 +40,8 @@ export function useLogs() {
     } catch (e: unknown) {
       console.error('Failed to load logs:', e)
       toast.error(getApiMessage(e, t('logs.messages.loadFailed')))
+    } finally {
+      loading.value = false
     }
   }
 
@@ -97,7 +101,7 @@ export function useLogs() {
   }
 
   return {
-    PAGE_SIZE,
+    PAGE_SIZE, loading,
     logs, total, page, totalPages,
     cleanupDays, showCleanup, expandedRows, childLogs, childLoading,
     logDetailOpen, selectedLogEntry,

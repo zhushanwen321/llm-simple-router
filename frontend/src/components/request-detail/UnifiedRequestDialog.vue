@@ -3,8 +3,9 @@
     <DialogContent
       class="sm:max-w-6xl max-h-[85vh] p-0 overflow-hidden flex flex-col"
     >
+      <DialogTitle class="sr-only">{{ t("requestDetail.dialogTitle") }}</DialogTitle>
       <!-- Progress bar -->
-      <div class="h-[3px] w-full overflow-hidden">
+      <div class="h-1 w-full overflow-hidden">
         <div
           v-if="progressStatus === 'pending'"
           class="h-full w-[40%] progress-active"
@@ -17,33 +18,21 @@
         <div v-else class="h-full w-full progress-active" />
       </div>
 
-      <DialogHeader class="px-4 pt-2 pb-0">
-        <DialogTitle class="text-sm flex items-center gap-2">
-          {{ t("requestDetail.dialogTitle") }}
-          <span
-            v-if="overview"
-            class="font-mono text-[11px] text-muted-foreground"
-            >{{ overview.id }}</span
-          >
-          <Button
-            v-if="overview"
-            variant="ghost"
-            size="icon-xs"
-            class="shrink-0"
-            @click="handleCopyId"
-          >
+      <!-- Top bar -->
+      <div class="flex items-center gap-2 px-4 py-2 border-b shrink-0">
+        <span class="text-sm font-semibold">{{ t("requestDetail.dialogTitle") }}</span>
+        <span v-if="overview" class="font-mono text-[11px] text-muted-foreground">{{ overview.id }}</span>
+        <div class="ml-auto flex items-center gap-1">
+          <Button v-if="overview" variant="ghost" size="icon-xs" class="shrink-0" @click="handleCopyId">
             <CheckIcon v-if="copied" class="size-3 text-success" />
             <CopyIcon v-else class="size-3" />
           </Button>
-        </DialogTitle>
-        <DialogDescription class="sr-only">{{
-          t("requestDetail.dialogDescription")
-        }}</DialogDescription>
-      </DialogHeader>
+        </div>
+      </div>
 
       <!-- Main content area -->
       <template v-if="overview">
-        <div class="flex gap-0 px-4 pb-4 min-h-0 h-[calc(85vh-80px)]">
+        <div class="flex gap-0 px-4 pb-4 min-h-0 h-[calc(85vh-100px)]">
           <!-- Left: Overview Panel -->
           <div
             class="w-[280px] border-r pr-3 flex-shrink-0 overflow-y-auto min-h-0"
@@ -114,7 +103,7 @@
 
       <!-- Empty state -->
       <template v-else>
-        <div class="flex items-center justify-center h-[calc(85vh-80px)]">
+        <div class="flex items-center justify-center h-[calc(85vh-100px)]">
           <p class="text-sm text-muted-foreground">
             {{
               props.source === "realtime"
