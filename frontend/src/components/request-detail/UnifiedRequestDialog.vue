@@ -3,7 +3,9 @@
     <DialogContent
       class="sm:max-w-6xl max-h-[85vh] p-0 overflow-hidden flex flex-col"
     >
-      <DialogTitle class="sr-only">{{ t("requestDetail.dialogTitle") }}</DialogTitle>
+      <DialogTitle class="sr-only">{{
+        t("requestDetail.dialogTitle")
+      }}</DialogTitle>
       <!-- Progress bar -->
       <div class="h-1 w-full overflow-hidden">
         <div
@@ -20,10 +22,22 @@
 
       <!-- Top bar -->
       <div class="flex items-center gap-2 px-4 py-2 border-b shrink-0">
-        <span class="text-sm font-semibold">{{ t("requestDetail.dialogTitle") }}</span>
-        <span v-if="overview" class="font-mono text-[11px] text-muted-foreground">{{ overview.id }}</span>
+        <span class="text-sm font-semibold">{{
+          t("requestDetail.dialogTitle")
+        }}</span>
+        <span
+          v-if="overview"
+          class="font-mono text-[11px] text-muted-foreground"
+          >{{ overview.id }}</span
+        >
         <div class="ml-auto flex items-center gap-1">
-          <Button v-if="overview" variant="ghost" size="icon-xs" class="shrink-0" @click="handleCopyId">
+          <Button
+            v-if="overview"
+            variant="ghost"
+            size="icon-xs"
+            class="shrink-0"
+            @click="handleCopyId"
+          >
             <CheckIcon v-if="copied" class="size-3 text-success" />
             <CopyIcon v-else class="size-3" />
           </Button>
@@ -285,7 +299,7 @@ const props = defineProps<{
     upstreamRequest?: string;
   } | null;
   // History mode
-  logEntry?: LogEntry | null;
+  logEntry?: LogEntry | UnifiedRequestOverview | null;
 }>();
 
 const emit = defineEmits<{
@@ -330,7 +344,13 @@ watch([() => props.open, () => props.logEntry], ([isOpen, logEntry]) => {
   }
   activeTab.value = "response";
   if (props.source === "history" && logEntry) {
-    loadedOverview.value = fromLogEntry(logEntry);
+    loadedOverview.value =
+      "id" in logEntry &&
+      "status" in logEntry &&
+      "attempts" in logEntry &&
+      "clientRequest" in logEntry
+        ? (logEntry as UnifiedRequestOverview)
+        : fromLogEntry(logEntry as LogEntry);
   }
 });
 </script>

@@ -29,12 +29,40 @@
               "
             />
             <div class="text-left">
-              <div class="font-medium text-sm leading-tight">{{ c.name }}</div>
+              <div class="font-medium text-sm leading-tight flex items-center gap-1.5">
+                {{ c.name }}
+                <Badge
+                  v-if="c.popular"
+                  variant="outline"
+                  class="text-[9px] px-1 py-0 leading-none border-primary/30 text-primary/70"
+                >
+                  {{ t("quickSetup.client.popular") }}
+                </Badge>
+              </div>
               <div class="text-[10px] opacity-60 leading-tight">
                 {{ c.format }} · {{ t(c.descriptionKey) }}
               </div>
             </div>
           </Button>
+        </div>
+        <!-- Info bar: auto-map description -->
+        <div
+          v-if="clientType"
+          class="mt-3 px-3 py-2 rounded-md bg-muted/30 border border-border/50 text-[11px] text-muted-foreground/70 flex items-center gap-1.5"
+        >
+          <span class="iconify size-3.5 shrink-0 text-muted-foreground/40" data-icon="lucide:info"></span>
+          <span>{{
+            t("quickSetup.client.infoBar", {
+              client: currentClient?.name ?? clientType,
+              format:
+                currentClient?.format === "anthropic"
+                  ? "Anthropic Messages API"
+                  : currentClient?.format === "openai-responses"
+                    ? "OpenAI Responses API"
+                    : "OpenAI Chat API",
+              models: defaultModelsLabel,
+            })
+          }}</span>
         </div>
       </CardContent>
     </Card>
@@ -513,7 +541,7 @@ import QuickSetupMappingList from "@/components/shared/QuickSetupMappingList.vue
 import ConcurrencyControl from "@/components/shared/ConcurrencyControl.vue";
 import TransformRulesForm from "@/components/shared/TransformRulesForm.vue";
 import type { ModelConfig } from "@/components/quick-setup/types";
-import { CLIENTS } from "@/components/quick-setup/types";
+import { CLIENTS, DEFAULT_CLIENT_MAPPINGS } from "@/components/quick-setup/types";
 
 import ProviderIcon from "@/components/icons/ProviderIcon.vue";
 import { Button } from "@/components/ui/button";
@@ -534,6 +562,7 @@ const { t } = useI18n();
 
 const {
   clientType,
+  currentClient,
   providerGroups,
   selectedGroup,
   selectedPlan,
@@ -590,6 +619,13 @@ const clientTypeLabel = computed(
   () =>
     CLIENTS.find((c) => c.id === clientType.value)?.name ?? clientType.value,
 );
+
+const defaultModelsLabel = computed(() => {
+  const models = clientType.value
+    ? DEFAULT_CLIENT_MAPPINGS[clientType.value]
+    : undefined;
+  return models ? models.join(", ") : "";
+});
 
 function updateModel(index: number, updated: ModelConfig) {
   const next = [...modelConfigs.value];

@@ -97,21 +97,19 @@ function enhancementLabel(raw: string | null): string {
       </span>
     </TableCell>
 
-    <TableCell class="font-mono text-xs text-muted-foreground whitespace-nowrap">{{
-      formatTime(log.created_at)
-    }}</TableCell>
+    <TableCell
+      class="font-mono text-xs text-muted-foreground whitespace-nowrap"
+      >{{ formatTime(log.created_at) }}</TableCell
+    >
 
-    <TableCell class="font-mono text-xs">
+    <TableCell class="font-mono text-xs whitespace-nowrap">
       {{ log.model || "-" }}
-      <Badge
-        v-if="!isChild && log.original_model"
-        variant="secondary"
-        class="ml-1 text-xs"
-        >{{ t("logs.row.replaced") }}</Badge
-      >
+      <Badge variant="secondary" class="ml-1 text-[10px] px-1 py-0">{{
+        log.api_type
+      }}</Badge>
     </TableCell>
 
-    <TableCell class="text-xs">
+    <TableCell class="text-xs whitespace-nowrap">
       <template v-if="!isChild && log.provider_id === PROVIDER_ID_ROUTER">
         <Badge variant="secondary" class="text-[10px] px-1 py-0">
           {{
@@ -124,21 +122,24 @@ function enhancementLabel(raw: string | null): string {
       <template v-else-if="log.backend_model || log.provider_name">
         <span class="font-mono">{{ log.backend_model || "-" }}</span>
         <span class="text-muted-foreground"> @ </span>
-        <Badge variant="outline" class="text-[10px] px-1 py-0">
-          {{ log.provider_name || log.provider_id || "-" }}
-        </Badge>
+        <span class="text-muted-foreground">{{
+          log.provider_name || log.provider_id || "-"
+        }}</span>
+        <Badge variant="secondary" class="ml-1 text-[10px] px-1 py-0">{{
+          log.api_type
+        }}</Badge>
       </template>
       <span v-else class="text-muted-foreground">-</span>
     </TableCell>
 
+    <TableCell class="font-mono text-xs text-muted-foreground">
+      {{
+        log.latency_ms != null ? (log.latency_ms / 1000).toFixed(1) + "s" : "-"
+      }}
+    </TableCell>
+
     <TableCell>
       <div class="flex flex-wrap gap-1">
-        <Badge
-          :variant="log.api_type === 'openai' ? 'default' : 'secondary'"
-          class="text-[10px] px-1.5 py-0"
-        >
-          {{ log.api_type }}
-        </Badge>
         <Badge
           :variant="(log.status_code ?? 0) < 400 ? 'default' : 'destructive'"
           class="text-[10px] px-1.5 py-0"
@@ -167,7 +168,9 @@ function enhancementLabel(raw: string | null): string {
       </div>
     </TableCell>
 
-    <TableCell class="text-destructive text-xs min-w-0 max-w-[240px] lg:max-w-xs">
+    <TableCell
+      class="text-destructive text-xs min-w-0 max-w-[240px] lg:max-w-xs"
+    >
       <template v-if="log.error_message">
         <Tooltip :delay-duration="300">
           <TooltipTrigger as-child>

@@ -11,7 +11,9 @@
     "openaiSdk": "OpenAI SDK",
     "openaiSdkDesc": "Direct OpenAI API calls",
     "anthropicSdk": "Anthropic SDK",
-    "anthropicSdkDesc": "Direct Anthropic API calls"
+    "anthropicSdkDesc": "Direct Anthropic API calls",
+    "popular": "Popular",
+    "infoBar": "{client} uses the {format}. We'll auto-map {models} to your provider models."
   },
   "provider": {
     "config": "Provider Configuration",

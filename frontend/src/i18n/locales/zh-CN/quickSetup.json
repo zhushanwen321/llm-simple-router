@@ -11,7 +11,9 @@
     "openaiSdk": "OpenAI SDK",
     "openaiSdkDesc": "OpenAI API 直接调用",
     "anthropicSdk": "Anthropic SDK",
-    "anthropicSdkDesc": "Anthropic API 直接调用"
+    "anthropicSdkDesc": "Anthropic API 直接调用",
+    "popular": "Popular",
+    "infoBar": "{client} 使用 {format}。我们会自动映射 {models} 到你的供应商模型。"
   },
   "provider": {
     "config": "供应商配置",

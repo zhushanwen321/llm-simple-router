@@ -208,10 +208,9 @@
           v-if="group.label"
           class="flex items-center justify-between px-3 py-1.5"
         >
-          <span
-            class="text-[11px] font-medium text-sidebar-foreground/50 uppercase tracking-wider"
-            >{{ group.label }}</span
-          >
+          <span class="text-[11px] font-medium text-sidebar-foreground/50">{{
+            group.label
+          }}</span>
           <Button
             v-if="group.expandable"
             variant="ghost"
@@ -244,7 +243,7 @@
             class="flex items-center gap-3 px-3 py-2 ml-1 rounded-lg text-sm transition-colors"
             :class="
               isActive(item.path)
-                ? 'bg-sidebar-accent text-sidebar-primary'
+                ? 'bg-primary/10 text-primary font-medium'
                 : 'text-sidebar-foreground hover:bg-sidebar-accent'
             "
           >
@@ -262,7 +261,7 @@
             class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors"
             :class="
               isActive(item.path)
-                ? 'bg-sidebar-accent text-sidebar-primary'
+                ? 'bg-primary/10 text-primary font-medium'
                 : 'text-sidebar-foreground hover:bg-sidebar-accent'
             "
           >

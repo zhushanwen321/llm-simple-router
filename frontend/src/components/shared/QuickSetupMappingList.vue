@@ -112,6 +112,68 @@ function handleKeydown(e: KeyboardEvent) {
           />
         </div>
       </div>
+
+      <!-- Multimodal Fallback (only when expanded) -->
+      <div
+        v-if="expandedEntries.has(entry.clientModel)"
+        class="px-3 pb-2 border-t border-border/30"
+      >
+        <div class="flex items-center gap-2 mb-1.5 pt-2">
+          <Layers class="w-3.5 h-3.5 text-muted-foreground/50" />
+          <span class="text-xs text-muted-foreground">{{
+            t("mappings.multimodalFallback.title")
+          }}</span>
+          <Badge
+            v-if="entry.multimodalFallback?.backend_model"
+            variant="outline"
+            class="text-[10px] px-1.5 py-0 text-primary/60 border-primary/20"
+          >
+            {{ t("mappings.multimodalFallback.configured") }}
+          </Badge>
+        </div>
+        <div v-if="entry.multimodalFallback" class="flex items-center gap-2">
+          <div class="flex-1">
+            <CascadingModelSelect
+              :providers="providerGroups"
+              :model-value="
+                entry.multimodalFallback
+                  ? {
+                      provider_id: entry.multimodalFallback.provider_id,
+                      model: entry.multimodalFallback.backend_model,
+                    }
+                  : undefined
+              "
+              :placeholder="
+                t('mappings.multimodalFallback.selectProviderModel')
+              "
+              compact
+              @update:model-value="
+                (v: SelectedValue) => handleFallbackSelect(idx, v)
+              "
+            />
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            class="shrink-0 text-muted-foreground/40 hover:text-destructive"
+            @click.stop="emit('update:multimodal-fallback', idx, undefined)"
+          >
+            <Trash2 class="size-3" />
+          </Button>
+        </div>
+        <Button
+          v-else
+          type="button"
+          variant="ghost"
+          size="sm"
+          class="text-xs text-muted-foreground/50"
+          @click="addMultimodalFallback(idx)"
+        >
+          <Plus class="w-3 h-3 mr-1" />
+          {{ t("mappings.multimodalFallback.add") }}
+        </Button>
+      </div>
     </div>
 
     <!-- Empty state -->
@@ -142,7 +204,10 @@ function handleKeydown(e: KeyboardEvent) {
           @update:model-value="(v: SelectedValue) => (newToValue = v)"
         />
       </div>
-      <Badge variant="outline" class="text-[10px] shrink-0 text-muted-foreground/50">
+      <Badge
+        variant="outline"
+        class="text-[10px] shrink-0 text-muted-foreground/50"
+      >
         Custom
       </Badge>
       <Button

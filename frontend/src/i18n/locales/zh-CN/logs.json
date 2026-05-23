@@ -41,7 +41,7 @@
     "actualForward": "实际转发",
     "tags": "标签",
     "statusCode": "状态码",
-    "latency": "延迟",
+    "latency": "耗时",
     "streaming": "流式",
     "retry": "重试",
     "failover": "故障转移",
