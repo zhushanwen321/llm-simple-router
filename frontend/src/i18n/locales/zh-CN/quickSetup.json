@@ -28,7 +28,8 @@
     "connect": "连接",
     "testing": "测试中",
     "connected": "已连接",
-    "test": "测试"
+    "test": "测试",
+    "autoConfigured": "根据客户端自动配置"
   },
   "model": {
     "config": "模型配置",

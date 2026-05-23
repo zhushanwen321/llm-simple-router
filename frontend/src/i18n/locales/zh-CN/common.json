@@ -53,5 +53,7 @@
   "new": "新",
   "saveFailed": "保存失败",
   "cascadingSelect": "请选择...",
-  "cascadingNoOptions": "暂无选项"
+  "cascadingNoOptions": "暂无选项",
+  "selected": "已选",
+  "selectAll": "全选"
 }
