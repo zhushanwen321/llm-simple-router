@@ -7,6 +7,7 @@
 3. 禁止编写自定义 CSS（应使用 Tailwind 工具类）
 4. <template> 行数上限 800 行，<script setup> 行数上限 600 行
 5. 禁止使用 Tab 缩进（仅允许 Space）
+6. 禁止使用 React Radix 风格 prop 绑定（应使用 Vue 标准 v-model）
 
 用法：
   单文件: python3 vue_rules_checker.py <absolute_path> <relative_path>
@@ -285,7 +286,38 @@ def check_vue_file(content: str, relative_path: str) -> tuple[int, list[str]]:
         exit_code = comp_exit
     issues.extend(comp_issues)
 
-    # 检查 6: 禁止在模板中硬编码中文（i18n 规范）
+    # 检查 6: 禁止使用 React Radix 风格的 prop 绑定
+    # shadcn-vue 底层是 reka-ui (Vue)，不是 Radix React
+    REACT_PROPS = [
+        (r':checked=', '@update:checked', 'v-model 或 :model-value + @update:model-value'),
+        (r':value=', '@update:value', 'v-model 或 :model-value + @update:model-value'),
+        (r'@onValueChange', '@onValueChange', '@update:model-value'),
+        (r'@onCheckedChange', '@onCheckedChange', '@update:model-value'),
+    ]
+    REACT_COMPONENTS = (
+        'Switch', 'Checkbox', 'Select', 'RadioGroup', 'Toggle',
+        'Combobox', 'TagsInput', 'Slider', 'DatePicker', 'DateRangePicker',
+    )
+
+    for i, line in enumerate(lines, 1):
+        stripped = line.strip()
+        if not stripped or stripped.startswith('//') or stripped.startswith('*'):
+            continue
+        # 只检查包含 shadcn-vue 组件名的行
+        has_target_component = any(f'<{c}' in stripped for c in REACT_COMPONENTS)
+        if not has_target_component:
+            continue
+        for prop_pattern, event_name, vue_alternative in REACT_PROPS:
+            if prop_pattern in stripped:
+                issues.append(f"  [第{i}行] 禁止使用 React Radix 风格绑定 '{prop_pattern}'")
+                issues.append(f"    请使用 Vue 标准: {vue_alternative}")
+                exit_code = 2
+            if event_name in stripped:
+                issues.append(f"  [第{i}行] 禁止使用 React Radix 风格事件 '{event_name}'")
+                issues.append(f"    请使用 Vue 标准: {vue_alternative}")
+                exit_code = 2
+
+    # 检查 7: 禁止在模板中硬编码中文（i18n 规范）
     if '/i18n/' not in relative_path and 'i18n/' not in relative_path:
         in_template = False
         for i, line in enumerate(lines, 1):

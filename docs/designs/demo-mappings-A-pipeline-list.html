@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Model Mappings — Pipeline List (方案A)</title>
+<style>
+  :root {
+    --bg: oklch(0.145 0 0);
+    --surface: oklch(0.205 0 0);
+    --surface-up: oklch(0.269 0 0);
+    --fg: oklch(0.985 0 0);
+    --muted: oklch(0.708 0 0);
+    --muted-dim: oklch(0.556 0 0);
+    --border: oklch(1 0 0 / 10%);
+    --border-strong: oklch(1 0 0 / 14%);
+    --primary: oklch(0.68 0.13 175);
+    --primary-dim: oklch(0.68 0.13 175 / 15%);
+    --primary-ghost: oklch(0.68 0.13 175 / 8%);
+    --success: oklch(0.65 0.17 150);
+    --success-dim: oklch(0.65 0.17 150 / 12%);
+    --warning: oklch(0.78 0.16 80);
+    --warning-dim: oklch(0.78 0.16 80 / 12%);
+    --danger: oklch(0.58 0.22 25);
+    --danger-dim: oklch(0.58 0.22 25 / 12%);
+    --mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+    --sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --radius: 8px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--fg); font-family:var(--sans); font-size:14px; line-height:1.5; }
+  .page { max-width:1100px; margin:0 auto; padding:20px 24px; }
+
+  /* Header */
+  .hdr { display:flex; align-items:center; gap:16px; margin-bottom:16px; }
+  .hdr-title { font-size:16px; font-weight:600; white-space:nowrap; }
+  .hdr-search { flex:1; max-width:280px; }
+  .hdr-search input {
+    width:100%; height:30px; background:var(--surface); border:1px solid var(--border);
+    border-radius:var(--radius); padding:0 10px; color:var(--fg); font-family:var(--sans); font-size:13px;
+    outline:none; transition:border-color 150ms;
+  }
+  .hdr-search input:focus { border-color:var(--primary); }
+  .hdr-search input::placeholder { color:var(--muted-dim); }
+  .hdr-count { font-family:var(--mono); font-size:11px; color:var(--muted-dim); white-space:nowrap; }
+  .hdr-btn {
+    display:inline-flex; align-items:center; gap:5px; height:30px; padding:0 12px;
+    border:1px solid var(--border); border-radius:var(--radius); background:transparent;
+    color:var(--muted); font-family:var(--sans); font-size:13px; cursor:pointer;
+    transition:all 150ms; white-space:nowrap;
+  }
+  .hdr-btn:hover { background:var(--surface); color:var(--fg); }
+  .hdr-btn.primary { background:var(--primary); border-color:var(--primary); color:oklch(0.145 0 0); font-weight:600; }
+  .hdr-btn.primary:hover { background:oklch(0.72 0.14 175); }
+  .hdr-spacer { flex:1; }
+
+  /* Pipeline list */
+  .pipe-list { display:flex; flex-direction:column; gap:6px; }
+
+  /* Collapsed pipeline row */
+  .pipe-row {
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+    padding:10px 14px; cursor:pointer; transition:all 150ms;
+  }
+  .pipe-row:hover { background:var(--surface-up); }
+  .pipe-row.expanded { border-color:var(--primary); background:var(--surface); }
+  .pipe-row.inactive { opacity:0.55; }
+
+  .pipe-summary { display:flex; align-items:center; gap:10px; min-height:36px; }
+  .pipe-model {
+    font-family:var(--mono); font-size:13px; font-weight:600; min-width:160px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .pipe-chain { flex:1; display:flex; align-items:center; gap:4px; overflow:hidden; flex-wrap:nowrap; }
+  .pipe-arrow { color:var(--muted-dim); flex-shrink:0; }
+  .pill {
+    display:inline-flex; align-items:center; gap:4px; height:24px; padding:0 8px;
+    border-radius:9999px; font-family:var(--mono); font-size:10px; font-weight:600;
+    white-space:nowrap; flex-shrink:0;
+  }
+  .pill.primary { background:var(--primary-dim); color:var(--primary); }
+  .pill.muted { background:oklch(1 0 0 / 6%); color:var(--muted); }
+  .pill.overflow { background:var(--warning-dim); color:var(--warning); border:1px dashed var(--warning); }
+  .pill.multi { background:var(--success-dim); color:var(--success); border:1px dashed var(--success); }
+  .pill-num { font-size:9px; opacity:0.6; }
+
+  .pipe-status { display:flex; align-items:center; gap:6px; flex-shrink:0; }
+  .status-dot { width:6px; height:6px; border-radius:50%; }
+  .status-dot.on { background:var(--success); }
+  .status-dot.off { background:var(--muted-dim); }
+  .pipe-actions { display:flex; gap:2px; flex-shrink:0; }
+  .icon-btn {
+    display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px;
+    border:none; background:transparent; color:var(--muted-dim); border-radius:6px;
+    cursor:pointer; transition:all 100ms;
+  }
+  .icon-btn:hover { background:oklch(1 0 0 / 8%); color:var(--fg); }
+  .icon-btn.danger:hover { background:var(--danger-dim); color:var(--danger); }
+
+  /* Expanded edit panel */
+  .pipe-edit { display:none; margin-top:12px; padding-top:12px; border-top:1px solid var(--border); }
+  .pipe-row.expanded .pipe-edit { display:block; }
+
+  .edit-section { margin-bottom:14px; }
+  .edit-section-title {
+    font-size:11px; font-weight:600; color:var(--muted-dim); text-transform:uppercase;
+    letter-spacing:0.05em; margin-bottom:8px;
+  }
+  .edit-section-title svg { vertical-align:-2px; margin-right:4px; }
+
+  /* Target list in edit */
+  .target-list { display:flex; flex-direction:column; gap:4px; }
+  .target-item {
+    display:flex; align-items:center; gap:8px; padding:6px 10px;
+    background:var(--bg); border:1px solid var(--border); border-radius:6px;
+  }
+  .target-num {
+    width:20px; height:20px; display:flex; align-items:center; justify-content:center;
+    background:var(--primary-dim); color:var(--primary); border-radius:50%;
+    font-family:var(--mono); font-size:10px; font-weight:700; flex-shrink:0;
+  }
+  .target-field { flex:1; }
+  .target-field select, .target-field input {
+    width:100%; height:28px; background:var(--surface); border:1px solid var(--border);
+    border-radius:6px; padding:0 8px; color:var(--fg); font-family:var(--mono); font-size:12px;
+    outline:none;
+  }
+  .target-field select:focus, .target-field input:focus { border-color:var(--primary); }
+  .target-field select { appearance:none; cursor:pointer;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23707070' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right 6px center; padding-right:22px;
+  }
+  .target-field input::placeholder { color:var(--muted-dim); }
+
+  /* Overflow / Multimodal section */
+  .toggle-row {
+    display:flex; align-items:center; gap:10px; padding:6px 10px;
+    background:var(--bg); border:1px solid var(--border); border-radius:6px;
+  }
+  .toggle-switch {
+    position:relative; width:36px; height:20px; background:var(--surface-up);
+    border-radius:10px; cursor:pointer; transition:background 200ms; flex-shrink:0;
+  }
+  .toggle-switch.on { background:var(--primary); }
+  .toggle-switch::after {
+    content:''; position:absolute; top:2px; left:2px; width:16px; height:16px;
+    background:var(--fg); border-radius:50%; transition:transform 200ms;
+  }
+  .toggle-switch.on::after { transform:translateX(16px); }
+  .toggle-label { font-size:12px; color:var(--muted); }
+  .toggle-fields { display:flex; gap:6px; flex:1; margin-left:8px; }
+  .toggle-fields select, .toggle-fields input {
+    height:28px; background:var(--surface); border:1px solid var(--border);
+    border-radius:6px; padding:0 8px; color:var(--fg); font-family:var(--mono); font-size:12px;
+    outline:none; flex:1;
+  }
+  .toggle-fields select { appearance:none; cursor:pointer;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23707070' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right 6px center; padding-right:22px;
+  }
+  .toggle-fields select:focus, .toggle-fields input:focus { border-color:var(--primary); }
+
+  .add-target-btn {
+    display:inline-flex; align-items:center; gap:4px; height:28px; padding:0 10px;
+    border:1px dashed var(--border); border-radius:6px; background:transparent;
+    color:var(--muted-dim); font-family:var(--sans); font-size:12px; cursor:pointer;
+    transition:all 150ms; margin-top:6px;
+  }
+  .add-target-btn:hover { border-color:var(--primary); color:var(--primary); }
+
+  .edit-footer {
+    display:flex; align-items:center; justify-content:space-between;
+    padding-top:10px; border-top:1px solid var(--border);
+  }
+  .btn {
+    display:inline-flex; align-items:center; gap:5px; height:30px; padding:0 14px;
+    border:1px solid var(--border); border-radius:6px; background:transparent;
+    font-family:var(--sans); font-size:13px; font-weight:500; cursor:pointer;
+    transition:all 150ms; color:var(--muted);
+  }
+  .btn:hover { background:var(--surface-up); color:var(--fg); }
+  .btn.primary { background:var(--primary); border-color:var(--primary); color:oklch(0.145 0 0); font-weight:600; }
+  .btn.primary:hover { background:oklch(0.72 0.14 175); }
+  .btn.danger { border-color:var(--danger); color:var(--danger); }
+  .btn.danger:hover { background:var(--danger-dim); }
+
+  .delete-inline {
+    display:flex; align-items:center; gap:6px; font-size:12px; color:var(--danger);
+  }
+  .delete-inline .btn-sm {
+    padding:2px 8px; border-radius:4px; border:1px solid var(--border);
+    font-family:var(--sans); font-size:11px; cursor:pointer; font-weight:500;
+  }
+  .delete-inline .btn-sm.yes { background:var(--danger); color:var(--fg); border-color:var(--danger); }
+  .delete-inline .btn-sm.no { background:transparent; color:var(--muted-dim); }
+
+  /* Add mapping modal */
+  .modal-overlay {
+    display:none; position:fixed; inset:0; background:oklch(0 0 0 / 60%);
+    z-index:100; align-items:center; justify-content:center;
+  }
+  .modal-overlay.visible { display:flex; }
+  .modal {
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+    width:480px; max-width:90vw; padding:16px;
+  }
+  .modal-title { font-size:14px; font-weight:600; margin-bottom:14px; }
+  .modal-close {
+    position:absolute; top:12px; right:12px; width:28px; height:28px;
+    border:none; background:transparent; color:var(--muted-dim); cursor:pointer;
+    border-radius:6px; display:flex; align-items:center; justify-content:center;
+  }
+  .modal-close:hover { background:var(--surface-up); color:var(--fg); }
+  .form-row { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+  .form-label {
+    font-size:11px; font-weight:600; color:var(--muted-dim); text-transform:uppercase;
+    letter-spacing:0.04em; width:100px; flex-shrink:0; text-align:right;
+  }
+  .form-input, .form-select {
+    flex:1; height:30px; background:var(--bg); border:1px solid var(--border);
+    border-radius:6px; padding:0 10px; color:var(--fg); font-family:var(--mono); font-size:13px;
+    outline:none;
+  }
+  .form-input:focus, .form-select:focus { border-color:var(--primary); }
+  .form-input::placeholder { color:var(--muted-dim); }
+  .form-select { appearance:none; cursor:pointer;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23707070' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right 6px center; padding-right:22px;
+  }
+  .modal-footer { display:flex; gap:6px; justify-content:flex-end; margin-top:14px; padding-top:10px; border-top:1px solid var(--border); }
+</style>
+</head>
+<body>
+<div class="page">
+  <!-- Header -->
+  <div class="hdr">
+    <h2 class="hdr-title">Model Mappings</h2>
+    <div class="hdr-search">
+      <input type="text" id="searchInput" placeholder="Search model..." oninput="render()">
+    </div>
+    <span class="hdr-count" id="countLabel"></span>
+    <div class="hdr-spacer"></div>
+    <button class="hdr-btn primary" onclick="openAddModal()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+      Add Mapping
+    </button>
+  </div>
+
+  <!-- Pipeline list -->
+  <div class="pipe-list" id="pipeList"></div>
+</div>
+
+<!-- Add Modal -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal" style="position:relative">
+    <button class="modal-close" onclick="closeAddModal()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </button>
+    <div class="modal-title">New Mapping</div>
+    <div class="form-row">
+      <span class="form-label">Client Model</span>
+      <input class="form-input" id="newModel" placeholder="e.g. gpt-4o" />
+    </div>
+    <div class="form-row">
+      <span class="form-label">Provider</span>
+      <select class="form-select" id="newProvider">
+        <option value="OpenAI">OpenAI</option>
+        <option value="Anthropic">Anthropic</option>
+        <option value="DeepSeek">DeepSeek</option>
+        <option value="Google">Google</option>
+        <option value="Azure">Azure</option>
+        <option value="Groq">Groq</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <span class="form-label">Backend Model</span>
+      <input class="form-input" id="newBackend" placeholder="same as client model if empty" />
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeAddModal()">Cancel</button>
+      <button class="btn primary" onclick="doAdd()">Create</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const PROVIDERS = ['OpenAI','Anthropic','DeepSeek','Google','Azure','Groq'];
+const ALL_MODELS = ['gpt-4o','gpt-4o-32k','gpt-4o-mini','claude-sonnet-4-20250514','deepseek-chat','deepseek-reasoner','gemini-2.5-pro','gemini-2.5-flash','llama-3.3-70b','moonshot-v1-128k'];
+
+let mappings = [
+  { id:1, client_model:'gpt-4o', targets:[{p:'OpenAI',m:'gpt-4o'},{p:'Azure',m:'gpt-4o'}], overflow:{p:'OpenAI',m:'gpt-4o-32k',on:true}, multimodal:{p:null,m:null,on:false}, is_active:true },
+  { id:2, client_model:'claude-sonnet-4-20250514', targets:[{p:'Anthropic',m:'claude-sonnet-4-20250514'},{p:'DeepSeek',m:'deepseek-chat'}], overflow:null, multimodal:{p:'Anthropic',m:'claude-sonnet-4-20250514',on:true}, is_active:true },
+  { id:3, client_model:'deepseek-r1', targets:[{p:'DeepSeek',m:'deepseek-reasoner'}], overflow:{p:'Anthropic',m:'claude-sonnet-4-20250514',on:true}, multimodal:null, is_active:true },
+  { id:4, client_model:'gemini-2.5-pro', targets:[{p:'Google',m:'gemini-2.5-pro'},{p:'OpenAI',m:'gpt-4o'}], overflow:null, multimodal:{p:'Google',m:'gemini-2.5-flash',on:true}, is_active:true },
+  { id:5, client_model:'gpt-4o-mini', targets:[{p:'OpenAI',m:'gpt-4o-mini'}], overflow:null, multimodal:null, is_active:false },
+  { id:6, client_model:'llama-3.3-70b', targets:[{p:'Groq',m:'llama-3.3-70b'},{p:'DeepSeek',m:'deepseek-chat'}], overflow:{p:'OpenAI',m:'gpt-4o',on:true}, multimodal:null, is_active:true },
+];
+
+let expanded = null;
+let deleting = null;
+let nextId = 7;
+
+function arrow() {
+  return `<span class="pipe-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></span>`;
+}
+
+function pill(cls, text, num) {
+  const n = num != null ? `<span class="pill-num">${num}</span>` : '';
+  return `<span class="pill ${cls}">${n}${text}</span>`;
+}
+
+function renderChain(m) {
+  let parts = [pill('primary', m.targets[0].p + '/' + m.targets[0].m, 1)];
+  for (let i = 1; i < m.targets.length; i++) {
+    parts.push(arrow(), pill('muted', m.targets[i].p + '/' + m.targets[i].m, i+1));
+  }
+  if (m.overflow && m.overflow.on) {
+    parts.push(arrow(), pill('overflow', 'OF:' + m.overflow.m));
+  }
+  if (m.multimodal && m.multimodal.on) {
+    parts.push(arrow(), pill('multi', 'MM:' + m.multimodal.m));
+  }
+  return parts.join('');
+}
+
+function selOpts(selected, items) {
+  return items.map(i => `<option value="${i}" ${i===selected?'selected':''}>${i}</option>`).join('');
+}
+
+function renderTargetList(m) {
+  return m.targets.map((t,i) => `
+    <div class="target-item">
+      <span class="target-num">${i+1}</span>
+      <div class="target-field"><select data-id="${m.id}" data-ti="${i}" data-field="p" onchange="updTarget(this)">${selOpts(t.p,PROVIDERS)}</select></div>
+      <div class="target-field"><input data-id="${m.id}" data-ti="${i}" data-field="m" value="${t.m}" onchange="updTarget(this)" /></div>
+      <button class="icon-btn danger" onclick="rmTarget(${m.id},${i})" ${m.targets.length<=1?'disabled':''}>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+  `).join('');
+}
+
+function renderToggleSection(m, key, label, icon) {
+  const cfg = m[key];
+  if (!cfg) return '';
+  const on = cfg.on;
+  return `
+    <div class="edit-section">
+      <div class="edit-section-title">${icon} ${label}</div>
+      <div class="toggle-row">
+        <div class="toggle-switch ${on?'on':''}" onclick="toggleOpt(${m.id},'${key}')"></div>
+        <span class="toggle-label">Enabled</span>
+        ${on ? `
+        <div class="toggle-fields">
+          <select data-id="${m.id}" data-key="${key}" data-field="p" onchange="updOpt(this)">${selOpts(cfg.p,PROVIDERS)}</select>
+          <input data-id="${m.id}" data-key="${key}" data-field="m" value="${cfg.m||''}" onchange="updOpt(this)" placeholder="model" />
+        </div>` : ''}
+      </div>
+    </div>`;
+}
+
+function render() {
+  const q = document.getElementById('searchInput').value.toLowerCase().trim();
+  const list = mappings.filter(m => !q || m.client_model.toLowerCase().includes(q));
+  document.getElementById('countLabel').textContent = `${list.length} of ${mappings.length}`;
+
+  const el = document.getElementById('pipeList');
+  el.innerHTML = list.map(m => {
+    const isExp = expanded === m.id;
+    const isDel = deleting === m.id;
+    return `
+    <div class="pipe-row ${isExp?'expanded':''} ${m.is_active?'':'inactive'}">
+      <div class="pipe-summary" onclick="toggleExpand(${m.id})">
+        <span class="pipe-model">${m.client_model}</span>
+        <div class="pipe-chain">${renderChain(m)}</div>
+        <div class="pipe-status">
+          <span class="status-dot ${m.is_active?'on':'off'}"></span>
+          <span style="font-size:11px;color:var(--muted-dim)">${m.is_active?'Active':'Off'}</span>
+        </div>
+        <div class="pipe-actions">
+          <button class="icon-btn" title="Toggle" onclick="event.stopPropagation();toggleActive(${m.id})">
+            ${m.is_active
+              ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-5"/></svg>'
+              : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M4.93 4.93l14.14 14.14"/></svg>'}
+          </button>
+          ${isDel ? `
+            <span class="delete-inline">
+              Delete?
+              <button class="btn-sm yes" onclick="event.stopPropagation();doDelete(${m.id})">Yes</button>
+              <button class="btn-sm no" onclick="event.stopPropagation();deleting=null;render()">No</button>
+            </span>
+          ` : `
+            <button class="icon-btn danger" title="Delete" onclick="event.stopPropagation();deleting=${m.id};render()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            </button>
+          `}
+        </div>
+      </div>
+      <div class="pipe-edit">
+        <div class="edit-section">
+          <div class="edit-section-title"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg> Failover Chain</div>
+          <div class="target-list">${renderTargetList(m)}</div>
+          <button class="add-target-btn" onclick="addTarget(${m.id})">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+            Add Target
+          </button>
+        </div>
+        ${renderToggleSection(m, 'overflow', 'Context Overflow',
+          '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>')}
+        ${renderToggleSection(m, 'multimodal', 'Multimodal Fallback',
+          '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>')}
+        <div class="edit-footer">
+          <div style="font-size:11px;color:var(--muted-dim)">ID: ${m.id}</div>
+          <div style="display:flex;gap:6px">
+            <button class="btn" onclick="expanded=null;render()">Cancel</button>
+            <button class="btn primary" onclick="expanded=null;render()">Save</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleExpand(id) { expanded = expanded === id ? null : id; deleting = null; render(); }
+function toggleActive(id) {
+  const m = mappings.find(x=>x.id===id);
+  if (m) { m.is_active = !m.is_active; render(); }
+}
+
+function addTarget(id) {
+  const m = mappings.find(x=>x.id===id);
+  if (m) { m.targets.push({p:'OpenAI',m:'gpt-4o'}); render(); }
+}
+function rmTarget(id, ti) {
+  const m = mappings.find(x=>x.id===id);
+  if (m && m.targets.length > 1) { m.targets.splice(ti,1); render(); }
+}
+function updTarget(el) {
+  const m = mappings.find(x=>x.id===+el.dataset.id);
+  if (m) { m.targets[+el.dataset.ti][el.dataset.field] = el.value; }
+}
+
+function toggleOpt(id, key) {
+  const m = mappings.find(x=>x.id===id);
+  if (m && m[key]) { m[key].on = !m[key].on; render(); }
+}
+function updOpt(el) {
+  const m = mappings.find(x=>x.id===+el.dataset.id);
+  if (m && m[el.dataset.key]) { m[el.dataset.key][el.dataset.field] = el.value; }
+}
+
+function doDelete(id) {
+  mappings = mappings.filter(x=>x.id!==id);
+  expanded = null; deleting = null;
+  render();
+}
+
+function openAddModal() { document.getElementById('addModal').classList.add('visible'); }
+function closeAddModal() { document.getElementById('addModal').classList.remove('visible'); }
+function doAdd() {
+  const cm = document.getElementById('newModel').value.trim();
+  if (!cm) return;
+  const pv = document.getElementById('newProvider').value;
+  let bm = document.getElementById('newBackend').value.trim() || cm;
+  mappings.push({ id:nextId++, client_model:cm, targets:[{p:pv,m:bm}], overflow:null, multimodal:null, is_active:true });
+  closeAddModal();
+  document.getElementById('newModel').value='';
+  document.getElementById('newBackend').value='';
+  render();
+}
+
+render();
+</script>
+</body>
+</html>

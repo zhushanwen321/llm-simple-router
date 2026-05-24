@@ -1,0 +1,406 @@
+/* ============================================================
+   L2 Patterns — 业务模式组件样式
+   依赖：tokens.css, l0-atoms.css, l1-composites.css
+   ============================================================ */
+
+/* === 1. StatusBadge 状态标签 === */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: var(--radius-xs);
+  font-size: 11px;
+  font-weight: 500;
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+.status-badge .dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.status-badge.success { background: var(--success-dim); color: var(--success); }
+.status-badge.success .dot { background: var(--success); }
+.status-badge.danger { background: var(--danger-dim); color: var(--danger); }
+.status-badge.danger .dot { background: var(--danger); }
+.status-badge.warning { background: var(--warning-dim); color: var(--warning); }
+.status-badge.warning .dot { background: var(--warning); }
+.status-badge.info { background: var(--info-dim); color: var(--info); }
+.status-badge.info .dot { background: var(--info); }
+.status-badge.active { background: var(--success-dim); color: var(--success); }
+.status-badge.active .dot { background: var(--success); }
+.status-badge.inactive { background: var(--surface-up); color: var(--muted-dim); }
+.status-badge.inactive .dot { background: var(--muted-dim); }
+.status-badge.pending { background: var(--warning-dim); color: var(--warning); }
+.status-badge.pending .dot { background: var(--warning); }
+/* 无圆点变体 */
+.status-badge.no-dot::before { display: none; }
+
+
+/* === 2. MetricCard 指标卡片 === */
+.metric-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  border: 1px solid var(--border);
+}
+
+/* Primary: 大数字 */
+.metric-primary-label {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.metric-primary-value {
+  font-family: var(--font-mono);
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--fg);
+}
+.metric-primary-value .unit {
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--muted);
+  margin-left: 2px;
+}
+.metric-primary-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+}
+.metric-primary-delta.up { color: var(--success); }
+.metric-primary-delta.down { color: var(--danger); }
+
+/* Secondary: 中数字 */
+.metric-secondary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.metric-sm {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+}
+.metric-sm-label {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+.metric-sm-value {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--fg);
+}
+.metric-sm-value .unit {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+  margin-left: 2px;
+}
+
+/* Tertiary: 小行内指标 */
+.metric-tertiary {
+  display: flex;
+  gap: 16px;
+  padding: 0 2px;
+}
+.metric-xs {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.metric-xs-label { font-size: 11px; color: var(--muted); }
+.metric-xs-value {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+
+/* === 3. StatsStrip 统计条 === */
+.stats-strip {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.stats-strip-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.stats-strip-value {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--fg);
+}
+/* lg 变体：页面级统计 */
+.stats-strip.lg {
+  padding: 16px 20px;
+  gap: 24px;
+}
+.stats-strip.lg .stats-strip-value {
+  font-size: 18px;
+}
+.stats-strip.lg .stats-strip-item {
+  font-size: 13px;
+}
+
+
+/* === 4. JSONViewer JSON 查看器 === */
+.json-viewer {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  overflow-x: auto;
+  max-height: 400px;
+  overflow-y: auto;
+  white-space: pre;
+}
+.json-key { color: var(--primary); }
+.json-string { color: var(--success); }
+.json-number { color: var(--warning); }
+.json-boolean { color: var(--info); }
+.json-null { color: var(--muted-dim); }
+.json-bracket { color: var(--muted); }
+
+
+/* === 5. PipelineChain 管线链可视化 === */
+.pipeline-chain {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.pipeline-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-xs);
+  font-size: 11px;
+  font-weight: 500;
+  font-family: var(--font-mono);
+}
+.pipeline-pill.primary { background: var(--primary-bg); color: var(--primary); }
+.pipeline-pill.fallback { background: var(--warning-dim); color: var(--warning); }
+.pipeline-pill.overflow { background: var(--info-dim); color: var(--info); }
+.pipeline-pill.multimodal { background: var(--success-dim); color: var(--success); }
+.pipeline-pill.muted { background: var(--surface-up); color: var(--muted-dim); }
+.pipeline-arrow {
+  color: var(--muted-dim);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+}
+
+
+/* === 6. ExecutionChain 执行链 === */
+.exec-chain {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.exec-chain-header {
+  padding: 8px 12px;
+  background: var(--surface);
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.exec-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+}
+.exec-step-num {
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 600;
+  background: var(--surface-up);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  flex-shrink: 0;
+}
+.exec-step-model { font-weight: 500; color: var(--fg); }
+.exec-step-provider { color: var(--muted); }
+.exec-step-delay { font-family: var(--font-mono); color: var(--muted-dim); margin-left: auto; }
+
+
+/* === 7. PageLayout 页面布局 === */
+.page { padding: 20px 24px; margin: 0 auto; }
+.page-sm { max-width: 1100px; }
+.page-md { max-width: 1360px; }
+.page-lg { max-width: 1440px; }
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.page-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--fg);
+  letter-spacing: -0.01em;
+}
+.page-subtitle {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+
+/* === 8. SecondaryNav 二级导航 === */
+.secondary-nav {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+.secondary-nav-item {
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--duration-fast);
+}
+.secondary-nav-item:hover { color: var(--fg); background: var(--surface-up); }
+.secondary-nav-item.active {
+  color: var(--primary);
+  background: var(--primary-ghost);
+}
+
+
+/* === 9. ChartPanel 图表面板 === */
+.chart-panel {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+}
+.chart-panel-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.chart-panel-body {
+  flex: 1;
+  position: relative;
+  min-height: 140px;
+}
+.chart-panel-body svg { width: 100%; height: 100%; }
+
+
+/* === 10. ConfirmDialog 确认弹窗 === */
+.confirm-icon {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 12px;
+}
+.confirm-icon.danger { background: var(--danger-dim); color: var(--danger); }
+.confirm-icon.warning { background: var(--warning-dim); color: var(--warning); }
+.confirm-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--fg);
+  margin-bottom: 4px;
+}
+.confirm-desc {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+
+/* === 11. InlineConfirm 行内确认 === */
+.inline-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--danger);
+  animation: inline-confirm-in var(--duration-fast) ease-out;
+}
+@keyframes inline-confirm-in {
+  from { opacity: 0; transform: translateX(-4px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+
+/* === 12. RecommendedSection 推荐区域 === */
+.recommended-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 0;
+  color: var(--warning);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.recommended-header:hover { color: var(--fg); }
+.recommended-count {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: var(--radius-xs);
+  background: var(--warning-dim);
+  color: var(--warning);
+}
+.recommended-body {
+  padding-left: 20px;
+  overflow: hidden;
+  max-height: 0;
+  transition: max-height var(--duration-slow) ease-out;
+}
+.recommended-body.expanded { max-height: 500px; }
+
+
+/* === 13. SessionWarning 会话警告 === */
+.session-warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--warning-dim);
+  border-radius: var(--radius-sm);
+  background: var(--warning-dim);
+  font-size: 12px;
+  color: var(--warning);
+}

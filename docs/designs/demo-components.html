@@ -1,0 +1,1498 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LLM Router — Component Library</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="components/tokens.css">
+  <link rel="stylesheet" href="components/l0-atoms.css">
+  <link rel="stylesheet" href="components/l1-composites.css">
+  <link rel="stylesheet" href="components/l2-patterns.css">
+  <style>
+    /* --- Page layout only --- */
+    .demo-sidebar {
+      position: fixed;
+      left: 0; top: 0;
+      width: 220px;
+      height: 100vh;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 16px 0;
+      overflow-y: auto;
+      z-index: 50;
+    }
+    .demo-sidebar-logo {
+      padding: 0 16px 12px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--fg);
+      letter-spacing: -0.01em;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 8px;
+    }
+    .demo-sidebar-logo span { color: var(--primary); }
+    .demo-sidebar a {
+      display: block;
+      padding: 3px 16px 3px 20px;
+      color: var(--muted);
+      font-size: 12px;
+      border-radius: 0;
+      transition: all 150ms;
+      text-decoration: none;
+    }
+    .demo-sidebar a:hover { color: var(--fg); background: var(--surface-up); }
+    .demo-sidebar a.active-link { color: var(--primary); background: var(--primary-ghost); }
+    .nav-group {
+      font-weight: 600; color: var(--muted-dim); font-size: 10px;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      padding: 14px 16px 4px;
+    }
+    .demo-content {
+      margin-left: 220px;
+      padding: 24px 32px 80px;
+      max-width: 960px;
+    }
+    .demo-content h2 {
+      font-size: 18px; font-weight: 700; margin-bottom: 8px;
+    }
+    .demo-section { margin-bottom: 48px; }
+    .demo-section h3 { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+    .demo-desc { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+    .demo-preview {
+      padding: 16px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      gap: 8px;
+    }
+    .demo-preview-col {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .demo-preview-block {
+      width: 100%;
+    }
+    .demo-code {
+      margin-top: 8px;
+      padding: 8px 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+      overflow-x: auto;
+      white-space: pre-wrap;
+    }
+    .demo-label {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted-dim);
+      margin-bottom: 4px;
+    }
+    .theme-toggle {
+      position: fixed;
+      top: 12px;
+      right: 16px;
+      z-index: 60;
+    }
+    .variant-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .variant-label {
+      width: 80px;
+      flex-shrink: 0;
+      font-size: 11px;
+      color: var(--muted-dim);
+      font-family: var(--font-mono);
+    }
+  </style>
+</head>
+<body>
+
+<!-- Theme toggle -->
+<button class="btn btn-ghost btn-icon theme-toggle" onclick="toggleTheme()" title="Toggle theme">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="theme-icon"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+</button>
+
+<!-- Sidebar -->
+<nav class="demo-sidebar">
+  <div class="demo-sidebar-logo"><span>&lt;/&gt;</span> Component Library</div>
+  <div class="nav-group">L0 原子组件</div>
+  <a href="#button">Button</a>
+  <a href="#input">Input</a>
+  <a href="#textarea">Textarea</a>
+  <a href="#badge">Badge</a>
+  <a href="#switch">Switch</a>
+  <a href="#select">Select</a>
+  <a href="#separator">Separator</a>
+  <a href="#skeleton">Skeleton</a>
+  <a href="#progress">Progress</a>
+  <a href="#pulsingdot">PulsingDot</a>
+  <a href="#copybutton">CopyButton</a>
+  <a href="#deltaindicator">DeltaIndicator</a>
+  <a href="#dashedaddtrigger">DashedAddTrigger</a>
+  <a href="#tagoverflow">TagOverflow</a>
+  <a href="#shimmerbar">ShimmerBar</a>
+  <a href="#label">Label</a>
+  <a href="#keymaskdisplay">KeyMaskDisplay</a>
+
+  <div class="nav-group">L1 复合组件</div>
+  <a href="#card">Card</a>
+  <a href="#table">Table</a>
+  <a href="#dialog">Dialog</a>
+  <a href="#tabs">Tabs</a>
+  <a href="#collapsible">Collapsible</a>
+  <a href="#pagination">Pagination</a>
+  <a href="#filterbar">FilterBar</a>
+  <a href="#emptystate">EmptyState</a>
+  <a href="#scrollarea">ScrollArea</a>
+  <a href="#tooltip">Tooltip</a>
+  <a href="#popover">Popover</a>
+  <a href="#stepper">Stepper</a>
+  <a href="#stickysavebar">StickySaveBar</a>
+  <a href="#formrow">FormRow</a>
+  <a href="#formsection">FormSection</a>
+  <a href="#splitpanel">SplitPanel</a>
+  <a href="#timebuttongroup">TimeButtonGroup</a>
+
+  <div class="nav-group">L2 业务模式</div>
+  <a href="#statusbadge">StatusBadge</a>
+  <a href="#metriccard">MetricCard</a>
+  <a href="#statsstrip">StatsStrip</a>
+  <a href="#jsonviewer">JSONViewer</a>
+  <a href="#pipelinechain">PipelineChain</a>
+  <a href="#executionchain">ExecutionChain</a>
+  <a href="#pagelayout">PageLayout</a>
+  <a href="#secondarynav">SecondaryNav</a>
+  <a href="#chartpanel">ChartPanel</a>
+  <a href="#confirmdialog">ConfirmDialog</a>
+  <a href="#inlineconfirm">InlineConfirm</a>
+  <a href="#recommendedsection">RecommendedSection</a>
+  <a href="#sessionwarning">SessionWarning</a>
+</nav>
+
+<!-- Content -->
+<div class="demo-content">
+  <h2>Component Library</h2>
+  <p class="demo-desc" style="margin-bottom:32px">LLM Simple Router 管理后台组件库 — 17 个原子组件、18 个复合组件、13 个业务模式</p>
+
+  <!-- ==================== L0 原子组件 ==================== -->
+
+  <section id="button" class="demo-section">
+    <h3>Button</h3>
+    <p class="demo-desc">按钮组件，支持 primary / default / danger / ghost / icon 变体和 sm / lg 尺寸</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview">
+        <div class="variant-row"><span class="variant-label">default</span><button class="btn">Default</button></div>
+        <div class="variant-row"><span class="variant-label">primary</span><button class="btn btn-primary">Primary</button></div>
+        <div class="variant-row"><span class="variant-label">danger</span><button class="btn btn-danger">Danger</button></div>
+        <div class="variant-row"><span class="variant-label">ghost</span><button class="btn btn-ghost">Ghost</button></div>
+        <div class="variant-row"><span class="variant-label">disabled</span><button class="btn" disabled>Disabled</button></div>
+        <div class="variant-row"><span class="variant-label">sm</span><button class="btn btn-sm btn-primary">Small</button></div>
+        <div class="variant-row"><span class="variant-label">lg</span><button class="btn btn-lg btn-primary">Large</button></div>
+        <div class="variant-row"><span class="variant-label">icon</span><button class="btn btn-icon" title="Settings"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
+      </div>
+      <div class="demo-code">&lt;button class="btn"&gt;Default&lt;/button&gt;
+&lt;button class="btn btn-primary"&gt;Primary&lt;/button&gt;
+&lt;button class="btn btn-danger"&gt;Danger&lt;/button&gt;
+&lt;button class="btn btn-ghost"&gt;Ghost&lt;/button&gt;
+&lt;button class="btn btn-sm btn-primary"&gt;Small&lt;/button&gt;
+&lt;button class="btn btn-lg btn-primary"&gt;Large&lt;/button&gt;
+&lt;button class="btn btn-icon"&gt;...&lt;/button&gt;</div>
+    </div>
+  </section>
+
+  <section id="input" class="demo-section">
+    <h3>Input</h3>
+    <p class="demo-desc">文本输入框，支持默认和 mono（等宽）变体</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview-block demo-preview" style="display:block;">
+        <div style="margin-bottom:8px;"><label class="label">Default input</label><input class="input" placeholder="Type something..."></div>
+        <div><label class="label">Monospace input</label><input class="input input-mono" placeholder="sk-xxxxxxxxxxxx" value="sk-proj-a1b2c3d4"></div>
+      </div>
+      <div class="demo-code">&lt;input class="input" placeholder="..."&gt;
+&lt;input class="input input-mono" placeholder="..."&gt;</div>
+    </div>
+  </section>
+
+  <section id="textarea" class="demo-section">
+    <h3>Textarea</h3>
+    <p class="demo-desc">多行文本输入，等宽字体，可拖拽调整高度</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview-block demo-preview" style="display:block;">
+        <label class="label">Response body</label>
+        <textarea class="textarea" rows="4" placeholder='{"error": {"message": "...", "type": "..."}}'></textarea>
+      </div>
+      <div class="demo-code">&lt;textarea class="textarea" rows="4"&gt;&lt;/textarea&gt;</div>
+    </div>
+  </section>
+
+  <section id="badge" class="demo-section">
+    <h3>Badge</h3>
+    <p class="demo-desc">标签/徽章，7 种语义变体 + pill 形态</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview">
+        <span class="badge badge-default">default</span>
+        <span class="badge badge-primary">primary</span>
+        <span class="badge badge-success">success</span>
+        <span class="badge badge-danger">danger</span>
+        <span class="badge badge-warning">warning</span>
+        <span class="badge badge-info">info</span>
+        <span class="badge badge-muted">muted</span>
+        <span class="badge badge-primary badge-pill">pill</span>
+        <span class="badge badge-success badge-pill">v2.1</span>
+      </div>
+      <div class="demo-code">&lt;span class="badge badge-success"&gt;success&lt;/span&gt;
+&lt;span class="badge badge-danger badge-pill"&gt;v2.1&lt;/span&gt;</div>
+    </div>
+  </section>
+
+  <section id="switch" class="demo-section">
+    <h3>Switch</h3>
+    <p class="demo-desc">开关组件，点击切换 on/off 状态</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span class="switch" onclick="this.classList.toggle('on')"></span>
+          <span style="font-size:12px;color:var(--muted)">Click to toggle</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span class="switch on" onclick="this.classList.toggle('on')"></span>
+          <span style="font-size:12px;color:var(--muted)">Active by default</span>
+        </div>
+      </div>
+      <div class="demo-code">&lt;span class="switch"&gt;&lt;/span&gt;
+&lt;span class="switch on"&gt;&lt;/span&gt;
+JS: element.classList.toggle('on')</div>
+    </div>
+  </section>
+
+  <section id="select" class="demo-section">
+    <h3>Select</h3>
+    <p class="demo-desc">下拉选择框</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview">
+        <select class="select">
+          <option>All Providers</option>
+          <option>OpenAI</option>
+          <option>Anthropic</option>
+          <option>DeepSeek</option>
+        </select>
+      </div>
+      <div class="demo-code">&lt;select class="select"&gt;
+  &lt;option&gt;OpenAI&lt;/option&gt;
+&lt;/select&gt;</div>
+    </div>
+  </section>
+
+  <section id="separator" class="demo-section">
+    <h3>Separator</h3>
+    <p class="demo-desc">分隔线，水平 hr 和垂直 v 两种</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview" style="flex-direction:column;gap:0;">
+        <div style="padding:8px 0;font-size:13px;">Section A</div>
+        <hr class="separator">
+        <div style="padding:8px 0;font-size:13px;">Section B</div>
+        <div style="padding:8px 0;font-size:13px;">Inline <span class="separator-v"></span> Vertical <span class="separator-v"></span> Separators</div>
+      </div>
+      <div class="demo-code">&lt;hr class="separator"&gt;
+&lt;span class="separator-v"&gt;&lt;/span&gt;</div>
+    </div>
+  </section>
+
+  <section id="skeleton" class="demo-section">
+    <h3>Skeleton</h3>
+    <p class="demo-desc">加载占位骨架屏</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview" style="flex-direction:column;gap:0;">
+        <div class="skeleton skeleton-title" style="width:50%"></div>
+        <div class="skeleton skeleton-text" style="width:100%"></div>
+        <div class="skeleton skeleton-text" style="width:80%"></div>
+        <div class="skeleton skeleton-text" style="width:60%"></div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:8px;">
+          <div class="skeleton skeleton-avatar"></div>
+          <div style="flex:1;">
+            <div class="skeleton skeleton-text" style="width:40%"></div>
+            <div class="skeleton skeleton-text" style="width:70%;margin-bottom:0;"></div>
+          </div>
+        </div>
+      </div>
+      <div class="demo-code">&lt;div class="skeleton skeleton-title"&gt;&lt;/div&gt;
+&lt;div class="skeleton skeleton-text"&gt;&lt;/div&gt;
+&lt;div class="skeleton skeleton-avatar"&gt;&lt;/div&gt;</div>
+    </div>
+  </section>
+
+  <section id="progress" class="demo-section">
+    <h3>Progress</h3>
+    <p class="demo-desc">进度条，支持 primary / success / warning / danger 色</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview-block demo-preview" style="display:flex;flex-direction:column;gap:12px;">
+        <div><div class="demo-label">PRIMARY 65%</div><div class="progress"><div class="progress-bar" style="width:65%"></div></div></div>
+        <div><div class="demo-label">SUCCESS 100%</div><div class="progress"><div class="progress-bar success" style="width:100%"></div></div></div>
+        <div><div class="demo-label">WARNING 42%</div><div class="progress"><div class="progress-bar warning" style="width:42%"></div></div></div>
+        <div><div class="demo-label">DANGER 18%</div><div class="progress"><div class="progress-bar danger" style="width:18%"></div></div></div>
+      </div>
+      <div class="demo-code">&lt;div class="progress"&gt;
+  &lt;div class="progress-bar" style="width:65%"&gt;&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class="progress-bar success" style="width:100%"&gt;&lt;/div&gt;</div>
+    </div>
+  </section>
+
+  <section id="pulsingdot" class="demo-section">
+    <h3>PulsingDot</h3>
+    <p class="demo-desc">脉冲圆点，5 种颜色，可选动画</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview">
+        <span class="pulse-dot success animate"></span>
+        <span class="pulse-dot danger animate"></span>
+        <span class="pulse-dot warning animate"></span>
+        <span class="pulse-dot primary animate"></span>
+        <span class="pulse-dot muted"></span>
+        <span style="font-size:12px;color:var(--muted);margin-left:8px;">← last one no animate</span>
+      </div>
+      <div class="demo-code">&lt;span class="pulse-dot success animate"&gt;&lt;/span&gt;
+&lt;span class="pulse-dot danger animate"&gt;&lt;/span&gt;
+&lt;span class="pulse-dot muted"&gt;&lt;/span&gt;</div>
+    </div>
+  </section>
+
+  <section id="copybutton" class="demo-section">
+    <h3>CopyButton</h3>
+    <p class="demo-desc">复制按钮，点击后将文本复制到剪贴板</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview">
+        <button class="copy-btn" onclick="copyText(this, 'sk-proj-a1b2c3d4e5f6')">Copy Key</button>
+        <button class="copy-btn" onclick="copyText(this, 'Hello World')">Copy Text</button>
+      </div>
+      <div class="demo-code">&lt;button class="copy-btn" onclick="copyText(this, 'text')"&gt;Copy&lt;/button&gt;</div>
+    </div>
+  </section>
+
+  <section id="deltaindicator" class="demo-section">
+    <h3>DeltaIndicator</h3>
+    <p class="demo-desc">变化趋势指示器，up（绿）/ down（红）</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview">
+        <span class="delta up">&#9650; +12.5%</span>
+        <span class="delta down">&#9660; -3.2%</span>
+        <span class="delta up">&#9650; +847</span>
+        <span class="delta down">&#9660; -12ms</span>
+      </div>
+      <div class="demo-code">&lt;span class="delta up"&gt;&amp;#9650; +12.5%&lt;/span&gt;
+&lt;span class="delta down"&gt;&amp;#9660; -3.2%&lt;/span&gt;</div>
+    </div>
+  </section>
+
+  <section id="dashedaddtrigger" class="demo-section">
+    <h3>DashedAddTrigger</h3>
+    <p class="demo-desc">虚线添加触发器，hover 高亮</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview-block demo-preview" style="display:block;max-width:400px;">
+        <div class="add-trigger">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add New Provider
+        </div>
+      </div>
+      <div class="demo-code">&lt;div class="add-trigger"&gt;
+  + Add New Provider
+&lt;/div&gt;</div>
+    </div>
+  </section>
+
+  <section id="tagoverflow" class="demo-section">
+    <h3>TagOverflow</h3>
+    <p class="demo-desc">标签溢出容器 + "+N more" 指示</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview">
+        <div class="tag-overflow">
+          <span class="badge badge-primary">gpt-4o</span>
+          <span class="badge badge-primary">gpt-4o-mini</span>
+          <span class="badge badge-primary">o1-preview</span>
+          <span class="tag-overflow-more">+5 more</span>
+        </div>
+      </div>
+      <div class="demo-code">&lt;div class="tag-overflow"&gt;
+  &lt;span class="badge badge-primary"&gt;gpt-4o&lt;/span&gt;
+  &lt;span class="tag-overflow-more"&gt;+5 more&lt;/span&gt;
+&lt;/div&gt;</div>
+    </div>
+  </section>
+
+  <section id="shimmerbar" class="demo-section">
+    <h3>ShimmerBar</h3>
+    <p class="demo-desc">闪光动画条，用于加载占位</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview" style="flex-direction:column;gap:8px;">
+        <div class="shimmer" style="height:4px;background:var(--surface-up);border-radius:var(--radius-full);"></div>
+        <div class="shimmer" style="height:4px;background:var(--surface-up);border-radius:var(--radius-full);width:75%;"></div>
+        <div class="shimmer" style="height:4px;background:var(--surface-up);border-radius:var(--radius-full);width:50%;"></div>
+      </div>
+      <div class="demo-code">&lt;div class="shimmer" style="height:4px;background:var(--surface-up);..."&gt;&lt;/div&gt;</div>
+    </div>
+  </section>
+
+  <section id="label" class="demo-section">
+    <h3>Label</h3>
+    <p class="demo-desc">表单标签</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview-block demo-preview" style="display:block;">
+        <label class="label">API Key Name</label>
+        <input class="input" placeholder="My Production Key">
+      </div>
+      <div class="demo-code">&lt;label class="label"&gt;API Key Name&lt;/label&gt;
+&lt;input class="input"&gt;</div>
+    </div>
+  </section>
+
+  <section id="keymaskdisplay" class="demo-section">
+    <h3>KeyMaskDisplay</h3>
+    <p class="demo-desc">密钥遮罩显示，带复制按钮</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview">
+        <span class="key-mask">
+          <span class="key-mask-dots">sk-proj-****...****a1b2</span>
+          <button class="copy-btn" onclick="copyText(this, 'sk-proj-a1b2c3d4e5f6g7h8')" style="font-size:11px;">Copy</button>
+        </span>
+      </div>
+      <div class="demo-code">&lt;span class="key-mask"&gt;
+  &lt;span class="key-mask-dots"&gt;sk-****...****a1b2&lt;/span&gt;
+  &lt;button class="copy-btn" onclick="copyText(this, '...')"&gt;Copy&lt;/button&gt;
+&lt;/span&gt;</div>
+    </div>
+  </section>
+
+  <!-- ==================== L1 复合组件 ==================== -->
+
+  <section id="card" class="demo-section">
+    <h3>Card</h3>
+    <p class="demo-desc">卡片容器，支持 header / body / footer 三段式和 flat / hover 变体</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview-block demo-preview" style="display:block;max-width:420px;">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Provider: OpenAI</span>
+            <span class="badge badge-success">Active</span>
+          </div>
+          <div class="card-body">
+            <p class="card-desc">GPT-4o, GPT-4o-mini, o1-preview, o1-mini</p>
+          </div>
+          <div class="card-footer">
+            <button class="btn btn-ghost btn-sm">Edit</button>
+            <button class="btn btn-sm btn-danger">Delete</button>
+          </div>
+        </div>
+      </div>
+      <div class="demo-code">&lt;div class="card"&gt;
+  &lt;div class="card-header"&gt;&lt;span class="card-title"&gt;...&lt;/span&gt;&lt;/div&gt;
+  &lt;div class="card-body"&gt;...&lt;/div&gt;
+  &lt;div class="card-footer"&gt;...&lt;/div&gt;
+&lt;/div&gt;
+Variants: .card-flat, .card-hover</div>
+    </div>
+  </section>
+
+  <section id="table" class="demo-section">
+    <h3>Table</h3>
+    <p class="demo-desc">数据表格，支持排序、错误行高亮、空状态</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview-block demo-preview" style="display:block;">
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th onclick="sortTable(this)" style="cursor:pointer">Model &#8693;</th>
+                <th onclick="sortTable(this)" style="cursor:pointer">Provider &#8693;</th>
+                <th>Status</th>
+                <th>Latency</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="font-mono">gpt-4o</td><td>OpenAI</td><td><span class="badge badge-success">active</span></td><td class="font-mono">342ms</td></tr>
+              <tr><td class="font-mono">claude-3.5</td><td>Anthropic</td><td><span class="badge badge-success">active</span></td><td class="font-mono">287ms</td></tr>
+              <tr class="row-error"><td class="font-mono">deepseek-v3</td><td>DeepSeek</td><td><span class="badge badge-danger">error</span></td><td class="font-mono">—</td></tr>
+              <tr><td class="font-mono">o1-preview</td><td>OpenAI</td><td><span class="badge badge-warning">pending</span></td><td class="font-mono">1.2s</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="demo-code">&lt;div class="table-wrap"&gt;
+  &lt;table class="table"&gt;...&lt;/table&gt;
+&lt;/div&gt;
+Row variants: .row-error for error highlight
+Sort: onclick="sortTable(this)" on &lt;th&gt;</div>
+    </div>
+  </section>
+
+  <section id="dialog" class="demo-section">
+    <h3>Dialog</h3>
+    <p class="demo-desc">模态对话框，点击按钮弹出</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview">
+        <button class="btn" onclick="openDialog('demo-dialog-default')">Open Dialog</button>
+        <button class="btn btn-danger" onclick="openDialog('demo-dialog-danger')">Danger Dialog</button>
+        <button class="btn" onclick="openDialog('demo-dialog-fullscreen')">Fullscreen Dialog</button>
+      </div>
+      <div class="demo-code">JS: openDialog('dialog-id') / closeDialog('dialog-id')
+&lt;div id="my-dialog" class="dialog-overlay"&gt;
+  &lt;div class="dialog"&gt;...&lt;/div&gt;
+&lt;/div&gt;
+Variants: .dialog-danger (red title), .dialog-fullscreen (large)</div>
+    </div>
+    <!-- Default dialog -->
+    <div id="demo-dialog-default" class="dialog-overlay">
+      <div class="dialog">
+        <div class="dialog-header">
+          <span class="dialog-title">Add Provider</span>
+          <button class="dialog-close" onclick="closeDialog('demo-dialog-default')">&#10005;</button>
+        </div>
+        <div class="dialog-body">
+          <label class="label">Provider Name</label>
+          <input class="input" placeholder="e.g. OpenAI" style="margin-bottom:12px;">
+          <label class="label">Base URL</label>
+          <input class="input input-mono" placeholder="https://api.openai.com/v1" style="margin-bottom:12px;">
+          <label class="label">API Key</label>
+          <input class="input input-mono" placeholder="sk-...">
+        </div>
+        <div class="dialog-footer">
+          <button class="btn" onclick="closeDialog('demo-dialog-default')">Cancel</button>
+          <button class="btn btn-primary">Save</button>
+        </div>
+      </div>
+    </div>
+    <!-- Danger dialog -->
+    <div id="demo-dialog-danger" class="dialog-overlay">
+      <div class="dialog dialog-danger" style="max-width:400px;">
+        <div class="dialog-header">
+          <span class="dialog-title">Delete Provider</span>
+          <button class="dialog-close" onclick="closeDialog('demo-dialog-danger')">&#10005;</button>
+        </div>
+        <div class="dialog-body">
+          <p style="font-size:13px;color:var(--muted);">Are you sure you want to delete <strong style="color:var(--fg)">OpenAI</strong>? This action cannot be undone. All mappings using this provider will be removed.</p>
+        </div>
+        <div class="dialog-footer">
+          <button class="btn" onclick="closeDialog('demo-dialog-danger')">Cancel</button>
+          <button class="btn btn-danger">Delete</button>
+        </div>
+      </div>
+    </div>
+    <!-- Fullscreen dialog -->
+    <div id="demo-dialog-fullscreen" class="dialog-overlay">
+      <div class="dialog dialog-fullscreen">
+        <div class="dialog-header">
+          <span class="dialog-title">Request Log Detail</span>
+          <button class="dialog-close" onclick="closeDialog('demo-dialog-fullscreen')">&#10005;</button>
+        </div>
+        <div class="dialog-body">
+          <div style="padding:16px;">
+            <div style="margin-bottom:12px;">
+              <span class="label">Log ID</span>
+              <span class="font-mono" style="font-size:13px;">req-2024-abc123</span>
+            </div>
+            <div style="margin-bottom:12px;">
+              <span class="label">Request Body</span>
+              <div class="json-viewer" style="max-height:200px;">{
+  <span class="json-key">"model"</span>: <span class="json-string">"gpt-4o"</span>,
+  <span class="json-key">"messages"</span>: [{"<span class="json-key">role</span>": "<span class="json-string">user</span>", "<span class="json-key">content</span>": "<span class="json-string">Hello</span>"}],
+  <span class="json-key">"stream"</span>: <span class="json-boolean">true</span>
+}</div>
+            </div>
+            <div>
+              <span class="label">Response Body</span>
+              <div class="json-viewer" style="max-height:200px;">{
+  <span class="json-key">"id"</span>: <span class="json-string">"chatcmpl-abc123"</span>,
+  <span class="json-key">"model"</span>: <span class="json-string">"gpt-4o"</span>,
+  <span class="json-key">"usage"</span>: {<span class="json-key">"prompt_tokens"</span>: <span class="json-number">12</span>, <span class="json-key">"completion_tokens"</span>: <span class="json-number">8</span>}
+}</div>
+            </div>
+          </div>
+        </div>
+        <div class="dialog-footer">
+          <button class="btn" onclick="closeDialog('demo-dialog-fullscreen')">Close</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="tabs" class="demo-section">
+    <h3>Tabs</h3>
+    <p class="demo-desc">标签页切换，支持带计数徽章的变体</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview-block demo-preview" style="display:block;">
+        <!-- Simple tabs -->
+        <div style="margin-bottom:16px;">
+          <div class="tabs-list">
+            <button class="tabs-trigger active" data-target="tab-a" onclick="switchTab(this)">General</button>
+            <button class="tabs-trigger" data-target="tab-b" onclick="switchTab(this)">Models</button>
+            <button class="tabs-trigger" data-target="tab-c" onclick="switchTab(this)">Advanced</button>
+          </div>
+          <div class="tabs-content" data-tab="tab-a">
+            <p style="font-size:13px;color:var(--muted);">General settings content here. Configure basic provider information.</p>
+          </div>
+          <div class="tabs-content" data-tab="tab-b" style="display:none;">
+            <p style="font-size:13px;color:var(--muted);">Model list configuration. Add or remove models.</p>
+          </div>
+          <div class="tabs-content" data-tab="tab-c" style="display:none;">
+            <p style="font-size:13px;color:var(--muted);">Advanced options: timeout, retries, custom headers.</p>
+          </div>
+        </div>
+        <!-- Tabs with count -->
+        <div>
+          <div class="tabs-list">
+            <button class="tabs-trigger active" data-target="tab-d" onclick="switchTab(this)">All <span class="tab-count">128</span></button>
+            <button class="tabs-trigger" data-target="tab-e" onclick="switchTab(this)">Success <span class="tab-count">112</span></button>
+            <button class="tabs-trigger" data-target="tab-f" onclick="switchTab(this)">Errors <span class="tab-count">16</span></button>
+          </div>
+          <div class="tabs-content" data-tab="tab-d">
+            <p style="font-size:13px;color:var(--muted);">Showing all 128 requests.</p>
+          </div>
+          <div class="tabs-content" data-tab="tab-e" style="display:none;">
+            <p style="font-size:13px;color:var(--success);">112 successful requests.</p>
+          </div>
+          <div class="tabs-content" data-tab="tab-f" style="display:none;">
+            <p style="font-size:13px;color:var(--danger);">16 failed requests.</p>
+          </div>
+        </div>
+      </div>
+      <div class="demo-code">&lt;div class="tabs-list"&gt;
+  &lt;button class="tabs-trigger active" data-target="tab-a" onclick="switchTab(this)"&gt;...&lt;/button&gt;
+&lt;/div&gt;
+&lt;div class="tabs-content" data-tab="tab-a"&gt;...&lt;/div&gt;
+With count: &lt;span class="tab-count"&gt;128&lt;/span&gt;</div>
+    </div>
+  </section>
+
+  <section id="collapsible" class="demo-section">
+    <h3>Collapsible</h3>
+    <p class="demo-desc">折叠面板，点击展开/收起</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview-block demo-preview" style="display:block;max-width:500px;">
+        <button class="collapsible-trigger" onclick="toggleCollapsible(this)">
+          <svg class="collapsible-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+          Request Headers (6)
+        </button>
+        <div class="collapsible-content">
+          <div style="padding:8px 0 8px 22px;">
+            <table class="table" style="font-size:12px;">
+              <tbody>
+                <tr><td class="font-mono" style="width:180px;">content-type</td><td>application/json</td></tr>
+                <tr><td class="font-mono">authorization</td><td>Bearer sk-****</td></tr>
+                <tr><td class="font-mono">x-request-id</td><td>req-abc123</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <hr class="separator">
+        <button class="collapsible-trigger" onclick="toggleCollapsible(this)">
+          <svg class="collapsible-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+          Response Body
+        </button>
+        <div class="collapsible-content">
+          <div style="padding:8px 0 8px 22px;">
+            <pre class="json-viewer" style="font-size:11px;">{"id": "chatcmpl-123", "model": "gpt-4o"}</pre>
+          </div>
+        </div>
+      </div>
+      <div class="demo-code">&lt;button class="collapsible-trigger" onclick="toggleCollapsible(this)"&gt;
+  &lt;svg class="collapsible-icon"&gt;...&lt;/svg&gt; Title
+&lt;/button&gt;
+&lt;div class="collapsible-content"&gt;...&lt;/div&gt;</div>
+    </div>
+  </section>
+
+  <section id="pagination" class="demo-section">
+    <h3>Pagination</h3>
+    <p class="demo-desc">分页控件</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview-block demo-preview" style="display:block;">
+        <div class="pagination">
+          <span class="pagination-info">Showing 1-20 of 156</span>
+          <div class="pagination-pages">
+            <button class="pagination-btn" disabled>&#9664;</button>
+            <button class="pagination-btn active">1</button>
+            <button class="pagination-btn">2</button>
+            <button class="pagination-btn">3</button>
+            <button class="pagination-btn">...</button>
+            <button class="pagination-btn">8</button>
+            <button class="pagination-btn">&#9654;</button>
+          </div>
+        </div>
+      </div>
+      <div class="demo-code">&lt;div class="pagination"&gt;
+  &lt;span class="pagination-info"&gt;Showing 1-20 of 156&lt;/span&gt;
+  &lt;div class="pagination-pages"&gt;
+    &lt;button class="pagination-btn active"&gt;1&lt;/button&gt;
+  &lt;/div&gt;
+&lt;/div&gt;</div>
+    </div>
+  </section>
+
+  <section id="filterbar" class="demo-section">
+    <h3>FilterBar</h3>
+    <p class="demo-desc">筛选栏，组合 Input + Select + 按钮</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview-block demo-preview" style="display:block;">
+        <div class="filter-bar">
+          <input class="input" placeholder="Search models...">
+          <div class="filter-divider"></div>
+          <select class="select">
+            <option>All Providers</option>
+            <option>OpenAI</option>
+            <option>Anthropic</option>
+          </select>
+          <select class="select">
+            <option>All Status</option>
+            <option>Active</option>
+            <option>Error</option>
+          </select>
+          <button class="btn btn-sm btn-primary">Filter</button>
+        </div>
+      </div>
+      <div class="demo-code">&lt;div class="filter-bar"&gt;
+  &lt;input class="input" placeholder="..."&gt;
+  &lt;div class="filter-divider"&gt;&lt;/div&gt;
+  &lt;select class="select"&gt;...&lt;/select&gt;
+&lt;/div&gt;</div>
+    </div>
+  </section>
+
+  <section id="emptystate" class="demo-section">
+    <h3>EmptyState</h3>
+    <p class="demo-desc">空状态占位</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview-block demo-preview" style="display:block;">
+        <div class="empty-state">
+          <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+          <p class="empty-state-title">No providers configured</p>
+          <p class="empty-state-desc">Add your first provider to get started.</p>
+          <button class="btn btn-primary btn-sm">Add Provider</button>
+        </div>
+      </div>
+      <div class="demo-code">&lt;div class="empty-state"&gt;
+  &lt;svg class="empty-state-icon"&gt;...&lt;/svg&gt;
+  &lt;p class="empty-state-title"&gt;No providers&lt;/p&gt;
+  &lt;p class="empty-state-desc"&gt;Add your first...&lt;/p&gt;
+&lt;/div&gt;</div>
+    </div>
+  </section>
+
+  <section id="scrollarea" class="demo-section">
+    <h3>ScrollArea</h3>
+    <p class="demo-desc">自定义滚动条区域和隐藏滚动条变体</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview" style="gap:16px;">
+        <div>
+          <div class="demo-label">SCROLL AREA</div>
+          <div class="scroll-area" style="height:100px;width:200px;background:var(--surface);border-radius:var(--radius-sm);padding:8px;">
+            <p style="font-size:12px;margin-bottom:8px;">Line 1: Custom thin scrollbar</p>
+            <p style="font-size:12px;margin-bottom:8px;">Line 2: Scrollable content</p>
+            <p style="font-size:12px;margin-bottom:8px;">Line 3: More content here</p>
+            <p style="font-size:12px;margin-bottom:8px;">Line 4: Keep scrolling</p>
+            <p style="font-size:12px;margin-bottom:8px;">Line 5: Almost there</p>
+            <p style="font-size:12px;">Line 6: End</p>
+          </div>
+        </div>
+        <div>
+          <div class="demo-label">HIDDEN SCROLLBAR</div>
+          <div class="scroll-area scroll-hidden" style="height:100px;width:200px;background:var(--surface);border-radius:var(--radius-sm);padding:8px;">
+            <p style="font-size:12px;margin-bottom:8px;">Line 1: No scrollbar visible</p>
+            <p style="font-size:12px;margin-bottom:8px;">Line 2: Still scrollable</p>
+            <p style="font-size:12px;margin-bottom:8px;">Line 3: Clean look</p>
+            <p style="font-size:12px;margin-bottom:8px;">Line 4: More content</p>
+            <p style="font-size:12px;margin-bottom:8px;">Line 5: Keep going</p>
+            <p style="font-size:12px;">Line 6: End</p>
+          </div>
+        </div>
+      </div>
+      <div class="demo-code">&lt;div class="scroll-area" style="height:100px;overflow-y:auto"&gt;...&lt;/div&gt;
+&lt;div class="scroll-area scroll-hidden"&gt;...&lt;/div&gt;</div>
+    </div>
+  </section>
+
+  <section id="tooltip" class="demo-section">
+    <h3>Tooltip</h3>
+    <p class="demo-desc">悬停工具提示</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview">
+        <div class="tooltip-trigger">
+          <button class="btn btn-sm">Hover me</button>
+          <div class="tooltip">This is a tooltip</div>
+        </div>
+        <div class="tooltip-trigger">
+          <span class="badge badge-info">info</span>
+          <div class="tooltip">Request count in last 24h</div>
+        </div>
+      </div>
+      <div class="demo-code">&lt;div class="tooltip-trigger"&gt;
+  &lt;button&gt;Hover me&lt;/button&gt;
+  &lt;div class="tooltip"&gt;This is a tooltip&lt;/div&gt;
+&lt;/div&gt;</div>
+    </div>
+  </section>
+
+  <section id="popover" class="demo-section">
+    <h3>Popover</h3>
+    <p class="demo-desc">弹出面板（需要 JS 控制定位，此处演示静态展示）</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview-block demo-preview" style="display:block;max-width:320px;">
+        <div class="popover open" style="position:relative;display:block;">
+          <div class="popover-header">
+            <span style="font-size:13px;font-weight:600;">Filter Options</span>
+          </div>
+          <div class="popover-body">
+            <label class="label">Status</label>
+            <select class="select" style="width:100%;margin-bottom:8px;">
+              <option>All</option><option>Active</option><option>Error</option>
+            </select>
+            <label class="label">Provider</label>
+            <select class="select" style="width:100%;">
+              <option>All</option><option>OpenAI</option>
+            </select>
+          </div>
+          <div class="popover-footer">
+            <button class="btn btn-sm btn-primary">Apply</button>
+          </div>
+        </div>
+      </div>
+      <div class="demo-code">&lt;div class="popover open"&gt;
+  &lt;div class="popover-header"&gt;...&lt;/div&gt;
+  &lt;div class="popover-body"&gt;...&lt;/div&gt;
+  &lt;div class="popover-footer"&gt;...&lt;/div&gt;
+&lt;/div&gt;
+Popover uses JS for positioning: toggle .open class</div>
+    </div>
+  </section>
+
+  <section id="stepper" class="demo-section">
+    <h3>Stepper</h3>
+    <p class="demo-desc">步骤条，done / current / pending 三种状态</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview">
+        <div class="stepper">
+          <div class="step done"><div class="step-node">&#10003;</div><span class="step-label">Setup</span></div>
+          <div class="step-line done"></div>
+          <div class="step done"><div class="step-node">&#10003;</div><span class="step-label">Configure</span></div>
+          <div class="step-line done"></div>
+          <div class="step current"><div class="step-node">3</div><span class="step-label">Test</span></div>
+          <div class="step-line pending"></div>
+          <div class="step pending"><div class="step-node">4</div><span class="step-label">Deploy</span></div>
+        </div>
+      </div>
+      <div class="demo-code">&lt;div class="stepper"&gt;
+  &lt;div class="step done"&gt;&lt;div class="step-node"&gt;&#10003;&lt;/div&gt;&lt;span class="step-label"&gt;...&lt;/span&gt;&lt;/div&gt;
+  &lt;div class="step-line done"&gt;&lt;/div&gt;
+  &lt;div class="step current"&gt;&lt;div class="step-node"&gt;2&lt;/div&gt;...&lt;/div&gt;
+  &lt;div class="step pending"&gt;&lt;div class="step-node"&gt;3&lt;/div&gt;...&lt;/div&gt;
+&lt;/div&gt;</div>
+    </div>
+  </section>
+
+  <section id="stickysavebar" class="demo-section">
+    <h3>StickySaveBar</h3>
+    <p class="demo-desc">固定在底部的保存栏，有变更时滑出</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview">
+        <button class="btn btn-sm" onclick="document.getElementById('demo-save-bar').classList.add('visible')">Show Save Bar</button>
+        <button class="btn btn-sm" onclick="document.getElementById('demo-save-bar').classList.remove('visible')">Hide Save Bar</button>
+      </div>
+      <div class="demo-code">&lt;div class="sticky-save-bar visible"&gt;
+  &lt;span class="save-bar-hint"&gt;Unsaved changes&lt;/span&gt;
+  &lt;button class="btn btn-primary"&gt;Save&lt;/button&gt;
+&lt;/div&gt;
+Toggle: element.classList.toggle('visible')</div>
+    </div>
+    <!-- Demo save bar -->
+    <div id="demo-save-bar" class="sticky-save-bar">
+      <div class="save-bar-hint">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        You have unsaved changes
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-sm" onclick="this.closest('.sticky-save-bar').classList.remove('visible')">Discard</button>
+        <button class="btn btn-sm btn-primary">Save Changes</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="formrow" class="demo-section">
+    <h3>FormRow</h3>
+    <p class="demo-desc">表单行，标签 + 控件 + 提示</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview-block demo-preview" style="display:block;max-width:500px;">
+        <div class="form-row">
+          <span class="form-row-label">Name</span>
+          <div class="form-row-control">
+            <input class="input" value="My Provider">
+            <div class="form-row-hint">Display name for this provider</div>
+          </div>
+        </div>
+        <div class="form-row">
+          <span class="form-row-label">Base URL</span>
+          <div class="form-row-control">
+            <input class="input input-mono" value="https://api.openai.com/v1">
+          </div>
+        </div>
+        <div class="form-row">
+          <span class="form-row-label">Enabled</span>
+          <div class="form-row-control">
+            <span class="switch on" onclick="this.classList.toggle('on')"></span>
+          </div>
+        </div>
+      </div>
+      <div class="demo-code">&lt;div class="form-row"&gt;
+  &lt;span class="form-row-label"&gt;Name&lt;/span&gt;
+  &lt;div class="form-row-control"&gt;
+    &lt;input class="input"&gt;
+    &lt;div class="form-row-hint"&gt;...&lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;</div>
+    </div>
+  </section>
+
+  <section id="formsection" class="demo-section">
+    <h3>FormSection</h3>
+    <p class="demo-desc">表单区块容器，带标题和底部操作栏</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview-block demo-preview" style="display:block;max-width:500px;">
+        <div class="form-section">
+          <div class="form-section-title">Connection Settings</div>
+          <div class="form-row">
+            <span class="form-row-label">Host</span>
+            <div class="form-row-control"><input class="input input-mono" placeholder="https://api.openai.com"></div>
+          </div>
+          <div class="form-row">
+            <span class="form-row-label">API Key</span>
+            <div class="form-row-control"><input class="input input-mono" type="password" placeholder="sk-..."></div>
+          </div>
+          <div class="form-section-actions">
+            <button class="btn btn-sm">Test Connection</button>
+            <button class="btn btn-sm btn-primary">Save</button>
+          </div>
+        </div>
+      </div>
+      <div class="demo-code">&lt;div class="form-section"&gt;
+  &lt;div class="form-section-title"&gt;...&lt;/div&gt;
+  &lt;!-- form rows --&gt;
+  &lt;div class="form-section-actions"&gt;...&lt;/div&gt;
+&lt;/div&gt;</div>
+    </div>
+  </section>
+
+  <section id="splitpanel" class="demo-section">
+    <h3>SplitPanel</h3>
+    <p class="demo-desc">左右分栏布局</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview-block demo-preview" style="display:block;height:200px;padding:0;">
+        <div class="split-panel" style="height:100%;">
+          <div class="split-panel-left scroll-area" style="padding:12px;">
+            <div style="font-size:12px;font-weight:600;margin-bottom:8px;">Providers</div>
+            <div style="padding:6px 8px;background:var(--primary-ghost);border-radius:var(--radius-xs);font-size:12px;margin-bottom:4px;color:var(--primary);">OpenAI</div>
+            <div style="padding:6px 8px;font-size:12px;margin-bottom:4px;color:var(--muted);">Anthropic</div>
+            <div style="padding:6px 8px;font-size:12px;color:var(--muted);">DeepSeek</div>
+          </div>
+          <div class="split-panel-right scroll-area" style="padding:12px;">
+            <div style="font-size:12px;font-weight:600;margin-bottom:8px;">OpenAI Details</div>
+            <p style="font-size:12px;color:var(--muted);">Base URL: https://api.openai.com/v1<br>Models: 8<br>Status: Active</p>
+          </div>
+        </div>
+      </div>
+      <div class="demo-code">&lt;div class="split-panel"&gt;
+  &lt;div class="split-panel-left"&gt;...&lt;/div&gt;
+  &lt;div class="split-panel-right"&gt;...&lt;/div&gt;
+&lt;/div&gt;</div>
+    </div>
+  </section>
+
+  <section id="timebuttongroup" class="demo-section">
+    <h3>TimeButtonGroup</h3>
+    <p class="demo-desc">时间范围按钮组</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview">
+        <div class="time-btn-group">
+          <button class="btn active" onclick="setActiveTimeBtn(this)">1h</button>
+          <button class="btn" onclick="setActiveTimeBtn(this)">6h</button>
+          <button class="btn" onclick="setActiveTimeBtn(this)">24h</button>
+          <button class="btn" onclick="setActiveTimeBtn(this)">7d</button>
+          <button class="btn" onclick="setActiveTimeBtn(this)">30d</button>
+        </div>
+      </div>
+      <div class="demo-code">&lt;div class="time-btn-group"&gt;
+  &lt;button class="btn active"&gt;1h&lt;/button&gt;
+  &lt;button class="btn"&gt;6h&lt;/button&gt;
+&lt;/div&gt;</div>
+    </div>
+  </section>
+
+  <!-- ==================== L2 业务模式 ==================== -->
+
+  <section id="statusbadge" class="demo-section">
+    <h3>StatusBadge</h3>
+    <p class="demo-desc">带圆点的状态标签，7 种状态</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview">
+        <span class="status-badge success"><span class="dot"></span>success</span>
+        <span class="status-badge danger"><span class="dot"></span>danger</span>
+        <span class="status-badge warning"><span class="dot"></span>warning</span>
+        <span class="status-badge info"><span class="dot"></span>info</span>
+        <span class="status-badge active"><span class="dot"></span>active</span>
+        <span class="status-badge inactive"><span class="dot"></span>inactive</span>
+        <span class="status-badge pending"><span class="dot"></span>pending</span>
+      </div>
+      <div class="demo-code">&lt;span class="status-badge success"&gt;&lt;span class="dot"&gt;&lt;/span&gt;success&lt;/span&gt;
+&lt;span class="status-badge danger"&gt;&lt;span class="dot"&gt;&lt;/span&gt;danger&lt;/span&gt;</div>
+    </div>
+  </section>
+
+  <section id="metriccard" class="demo-section">
+    <h3>MetricCard</h3>
+    <p class="demo-desc">指标卡片，三级：primary（大数字）、secondary（2 列网格）、tertiary（行内）</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview-block demo-preview" style="display:block;">
+        <!-- Primary -->
+        <div style="margin-bottom:16px;">
+          <div class="demo-label">PRIMARY</div>
+          <div class="metric-card">
+            <div class="metric-primary-label">Total Requests (24h)</div>
+            <div class="metric-primary-value">12,847</div>
+            <div class="metric-primary-delta up">&#9650; +12.5% vs yesterday</div>
+          </div>
+        </div>
+        <!-- Secondary -->
+        <div style="margin-bottom:16px;">
+          <div class="demo-label">SECONDARY</div>
+          <div class="metric-secondary">
+            <div class="metric-sm">
+              <div class="metric-sm-label">Avg Latency</div>
+              <div class="metric-sm-value">342<span class="unit">ms</span></div>
+            </div>
+            <div class="metric-sm">
+              <div class="metric-sm-label">Error Rate</div>
+              <div class="metric-sm-value">2.1<span class="unit">%</span></div>
+            </div>
+            <div class="metric-sm">
+              <div class="metric-sm-label">Active Keys</div>
+              <div class="metric-sm-value">8</div>
+            </div>
+            <div class="metric-sm">
+              <div class="metric-sm-label">Tokens Out</div>
+              <div class="metric-sm-value">1.2<span class="unit">M</span></div>
+            </div>
+          </div>
+        </div>
+        <!-- Tertiary -->
+        <div>
+          <div class="demo-label">TERTIARY</div>
+          <div class="metric-tertiary">
+            <div class="metric-xs"><span class="metric-xs-label">Input:</span><span class="metric-xs-value">847K</span></div>
+            <div class="metric-xs"><span class="metric-xs-label">Output:</span><span class="metric-xs-value">412K</span></div>
+            <div class="metric-xs"><span class="metric-xs-label">Cache:</span><span class="metric-xs-value">156K</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="demo-code">/* Primary */ &lt;div class="metric-card"&gt;&lt;div class="metric-primary-value"&gt;12,847&lt;/div&gt;&lt;/div&gt;
+/* Secondary */ &lt;div class="metric-secondary"&gt;&lt;div class="metric-sm"&gt;...&lt;/div&gt;&lt;/div&gt;
+/* Tertiary */ &lt;div class="metric-tertiary"&gt;&lt;div class="metric-xs"&gt;...&lt;/div&gt;&lt;/div&gt;</div>
+    </div>
+  </section>
+
+  <section id="statsstrip" class="demo-section">
+    <h3>StatsStrip</h3>
+    <p class="demo-desc">横向统计条，默认和 lg 变体</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview-block demo-preview" style="display:block;">
+        <div style="margin-bottom:12px;">
+          <div class="demo-label">DEFAULT</div>
+          <div class="stats-strip">
+            <div class="stats-strip-item"><span>Requests</span><span class="stats-strip-value">1,284</span></div>
+            <div class="stats-strip-item"><span>Errors</span><span class="stats-strip-value">23</span></div>
+            <div class="stats-strip-item"><span>Avg Latency</span><span class="stats-strip-value">342ms</span></div>
+          </div>
+        </div>
+        <div>
+          <div class="demo-label">LG (LARGE)</div>
+          <div class="stats-strip lg">
+            <div class="stats-strip-item"><span>Total</span><span class="stats-strip-value">12,847</span></div>
+            <div class="stats-strip-item"><span>Success</span><span class="stats-strip-value">98.2%</span></div>
+            <div class="stats-strip-item"><span>P99</span><span class="stats-strip-value">1.2s</span></div>
+            <div class="stats-strip-item"><span>Active</span><span class="stats-strip-value">8</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="demo-code">&lt;div class="stats-strip"&gt;
+  &lt;div class="stats-strip-item"&gt;&lt;span&gt;...&lt;/span&gt;&lt;span class="stats-strip-value"&gt;...&lt;/span&gt;&lt;/div&gt;
+&lt;/div&gt;
+Large: &lt;div class="stats-strip lg"&gt;</div>
+    </div>
+  </section>
+
+  <section id="jsonviewer" class="demo-section">
+    <h3>JSONViewer</h3>
+    <p class="demo-desc">语法高亮 JSON 查看器</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview-block demo-preview" style="display:block;">
+        <div class="json-viewer">{
+  "<span class="json-key">id</span>": "<span class="json-string">chatcmpl-abc123</span>",
+  "<span class="json-key">model</span>": "<span class="json-string">gpt-4o</span>",
+  "<span class="json-key">stream</span>": <span class="json-boolean">true</span>,
+  "<span class="json-key">usage</span>": {
+    "<span class="json-key">prompt_tokens</span>": <span class="json-number">128</span>,
+    "<span class="json-key">completion_tokens</span>": <span class="json-number">256</span>,
+    "<span class="json-key">cached</span>": <span class="json-boolean">false</span>
+  },
+  "<span class="json-key">error</span>": <span class="json-null">null</span>
+}</div>
+      </div>
+      <div class="demo-code">&lt;div class="json-viewer"&gt;
+  &lt;span class="json-key"&gt;...&lt;/span&gt;
+  &lt;span class="json-string"&gt;...&lt;/span&gt;
+  &lt;span class="json-number"&gt;...&lt;/span&gt;
+  &lt;span class="json-boolean"&gt;...&lt;/span&gt;
+  &lt;span class="json-null"&gt;...&lt;/span&gt;
+&lt;/div&gt;</div>
+    </div>
+  </section>
+
+  <section id="pipelinechain" class="demo-section">
+    <h3>PipelineChain</h3>
+    <p class="demo-desc">管线链可视化，展示请求路由路径</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview" style="flex-direction:column;gap:8px;">
+        <div class="pipeline-chain">
+          <span class="pipeline-pill primary">gpt-4o</span>
+          <span class="pipeline-arrow">&#8594;</span>
+          <span class="pipeline-pill primary">OpenAI</span>
+        </div>
+        <div class="pipeline-chain">
+          <span class="pipeline-pill primary">gpt-4o</span>
+          <span class="pipeline-arrow">&#8594;</span>
+          <span class="pipeline-pill fallback">DeepSeek</span>
+          <span class="pipeline-arrow">&#8594;</span>
+          <span class="pipeline-pill overflow">gpt-4o-mini</span>
+          <span class="pipeline-arrow">&#8594;</span>
+          <span class="pipeline-pill primary">OpenAI</span>
+        </div>
+        <div class="pipeline-chain">
+          <span class="pipeline-pill multimodal">gpt-4o</span>
+          <span class="pipeline-arrow">&#8594;</span>
+          <span class="pipeline-pill primary">Anthropic</span>
+          <span class="pipeline-arrow">&#8594;</span>
+          <span class="pipeline-pill muted">cached</span>
+        </div>
+      </div>
+      <div class="demo-code">&lt;div class="pipeline-chain"&gt;
+  &lt;span class="pipeline-pill primary"&gt;gpt-4o&lt;/span&gt;
+  &lt;span class="pipeline-arrow"&gt;&amp;#8594;&lt;/span&gt;
+  &lt;span class="pipeline-pill fallback"&gt;DeepSeek&lt;/span&gt;
+&lt;/div&gt;
+Variants: primary, fallback, overflow, multimodal, muted</div>
+    </div>
+  </section>
+
+  <section id="executionchain" class="demo-section">
+    <h3>ExecutionChain</h3>
+    <p class="demo-desc">执行链可视化，展示重试/failover 过程</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview-block demo-preview" style="display:block;">
+        <div class="exec-chain">
+          <div class="exec-chain-header">
+            <span class="pulse-dot success" style="width:6px;height:6px;"></span>
+            Execution: 3 attempts
+          </div>
+          <div class="exec-step">
+            <span class="exec-step-num">1</span>
+            <span class="exec-step-model">gpt-4o</span>
+            <span class="exec-step-provider">@OpenAI</span>
+            <span class="status-badge danger" style="margin-left:auto;"><span class="dot"></span>429</span>
+            <span class="exec-step-delay">retry 1s</span>
+          </div>
+          <div class="exec-step">
+            <span class="exec-step-num">2</span>
+            <span class="exec-step-model">gpt-4o</span>
+            <span class="exec-step-provider">@OpenAI</span>
+            <span class="status-badge danger" style="margin-left:auto;"><span class="dot"></span>429</span>
+            <span class="exec-step-delay">retry 2s</span>
+          </div>
+          <div class="exec-step">
+            <span class="exec-step-num">3</span>
+            <span class="exec-step-model">gpt-4o</span>
+            <span class="exec-step-provider">@DeepSeek</span>
+            <span class="status-badge success" style="margin-left:auto;"><span class="dot"></span>200</span>
+            <span class="exec-step-delay">287ms</span>
+          </div>
+        </div>
+      </div>
+      <div class="demo-code">&lt;div class="exec-chain"&gt;
+  &lt;div class="exec-chain-header"&gt;...&lt;/div&gt;
+  &lt;div class="exec-step"&gt;
+    &lt;span class="exec-step-num"&gt;1&lt;/span&gt;
+    &lt;span class="exec-step-model"&gt;...&lt;/span&gt;
+  &lt;/div&gt;
+&lt;/div&gt;</div>
+    </div>
+  </section>
+
+  <section id="pagelayout" class="demo-section">
+    <h3>PageLayout</h3>
+    <p class="demo-desc">页面布局容器，sm / md / lg 三种宽度</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview-block demo-preview" style="display:block;">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;">
+          <div class="page-header">
+            <div>
+              <div class="page-title">Providers</div>
+              <div class="page-subtitle">Manage your API providers</div>
+            </div>
+            <button class="btn btn-primary btn-sm">Add Provider</button>
+          </div>
+          <hr class="separator">
+          <p style="font-size:12px;color:var(--muted);">Page content area...</p>
+        </div>
+      </div>
+      <div class="demo-code">&lt;div class="page page-md"&gt;
+  &lt;div class="page-header"&gt;
+    &lt;div&gt;
+      &lt;div class="page-title"&gt;...&lt;/div&gt;
+      &lt;div class="page-subtitle"&gt;...&lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+Widths: .page-sm (1100), .page-md (1360), .page-lg (1440)</div>
+    </div>
+  </section>
+
+  <section id="secondarynav" class="demo-section">
+    <h3>SecondaryNav</h3>
+    <p class="demo-desc">二级导航栏，pill 形态</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview">
+        <div class="secondary-nav">
+          <button class="secondary-nav-item active" onclick="setActiveNav(this)">Overview</button>
+          <button class="secondary-nav-item" onclick="setActiveNav(this)">Models</button>
+          <button class="secondary-nav-item" onclick="setActiveNav(this)">Logs</button>
+          <button class="secondary-nav-item" onclick="setActiveNav(this)">Settings</button>
+        </div>
+      </div>
+      <div class="demo-code">&lt;div class="secondary-nav"&gt;
+  &lt;button class="secondary-nav-item active"&gt;Overview&lt;/button&gt;
+  &lt;button class="secondary-nav-item"&gt;Models&lt;/button&gt;
+&lt;/div&gt;</div>
+    </div>
+  </section>
+
+  <section id="chartpanel" class="demo-section">
+    <h3>ChartPanel</h3>
+    <p class="demo-desc">图表面板容器</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview-block demo-preview" style="display:block;">
+        <div class="chart-panel" style="height:180px;">
+          <div class="chart-panel-title">Request Volume (24h)</div>
+          <div class="chart-panel-body">
+            <svg viewBox="0 0 300 100" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="oklch(0.68 0.13 175 / 30%)"/>
+                  <stop offset="100%" stop-color="oklch(0.68 0.13 175 / 0%)"/>
+                </linearGradient>
+              </defs>
+              <path d="M0,80 C30,60 60,70 90,40 C120,10 150,50 180,30 C210,10 240,20 270,15 L300,10 L300,100 L0,100Z" fill="url(#g1)"/>
+              <path d="M0,80 C30,60 60,70 90,40 C120,10 150,50 180,30 C210,10 240,20 270,15 L300,10" fill="none" stroke="oklch(0.68 0.13 175)" stroke-width="2"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+      <div class="demo-code">&lt;div class="chart-panel"&gt;
+  &lt;div class="chart-panel-title"&gt;...&lt;/div&gt;
+  &lt;div class="chart-panel-body"&gt;&lt;svg&gt;...&lt;/svg&gt;&lt;/div&gt;
+&lt;/div&gt;</div>
+    </div>
+  </section>
+
+  <section id="confirmdialog" class="demo-section">
+    <h3>ConfirmDialog</h3>
+    <p class="demo-desc">确认弹窗内部内容（配合 Dialog 使用）</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview">
+        <button class="btn btn-danger btn-sm" onclick="openDialog('demo-confirm-dialog')">Show Confirm</button>
+      </div>
+      <div class="demo-code">/* Inside a Dialog body */
+&lt;div class="confirm-icon danger"&gt;&lt;svg&gt;...&lt;/svg&gt;&lt;/div&gt;
+&lt;div class="confirm-title"&gt;Delete Provider&lt;/div&gt;
+&lt;div class="confirm-desc"&gt;Are you sure?...&lt;/div&gt;</div>
+    </div>
+    <div id="demo-confirm-dialog" class="dialog-overlay">
+      <div class="dialog" style="max-width:400px;">
+        <div class="dialog-body" style="text-align:center;padding:24px;">
+          <div class="confirm-icon danger" style="margin:0 auto 12px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+          </div>
+          <div class="confirm-title">Delete Provider</div>
+          <div class="confirm-desc" style="margin-bottom:16px;">Are you sure you want to delete <strong style="color:var(--fg)">OpenAI</strong>? All associated mappings will be removed.</div>
+          <div style="display:flex;gap:8px;justify-content:center;">
+            <button class="btn" onclick="closeDialog('demo-confirm-dialog')">Cancel</button>
+            <button class="btn btn-danger">Delete</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="inlineconfirm" class="demo-section">
+    <h3>InlineConfirm</h3>
+    <p class="demo-desc">行内确认操作（替代弹窗的轻量确认）</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview">
+        <div id="inline-confirm-demo" style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:13px;">Row item</span>
+          <button class="btn btn-sm btn-danger" onclick="showInlineDemo(this)">Delete</button>
+        </div>
+      </div>
+      <div class="demo-code">&lt;span class="inline-confirm"&gt;
+  &lt;button class="btn btn-sm btn-danger"&gt;Y&lt;/button&gt;
+  &lt;button class="btn btn-sm"&gt;N&lt;/button&gt;
+&lt;/span&gt;</div>
+    </div>
+  </section>
+
+  <section id="recommendedsection" class="demo-section">
+    <h3>RecommendedSection</h3>
+    <p class="demo-desc">推荐/建议折叠区域</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview-block demo-preview" style="display:block;max-width:400px;">
+        <div class="recommended-header" onclick="toggleRecommended(this)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          Recommended Models
+          <span class="recommended-count">5</span>
+        </div>
+        <div class="recommended-body">
+          <div style="padding:4px 0;">
+            <div style="padding:6px 0;font-size:12px;display:flex;justify-content:space-between;">
+              <span class="font-mono">gpt-4o</span>
+              <span class="badge badge-success">Recommended</span>
+            </div>
+            <div style="padding:6px 0;font-size:12px;display:flex;justify-content:space-between;">
+              <span class="font-mono">claude-sonnet-4-20250514</span>
+              <span class="badge badge-success">Recommended</span>
+            </div>
+            <div style="padding:6px 0;font-size:12px;display:flex;justify-content:space-between;">
+              <span class="font-mono">deepseek-chat</span>
+              <span class="badge badge-info">Budget</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="demo-code">&lt;div class="recommended-header" onclick="toggleRecommended(this)"&gt;
+  Recommended Models &lt;span class="recommended-count"&gt;5&lt;/span&gt;
+&lt;/div&gt;
+&lt;div class="recommended-body"&gt;...&lt;/div&gt;</div>
+    </div>
+  </section>
+
+  <section id="sessionwarning" class="demo-section">
+    <h3>SessionWarning</h3>
+    <p class="demo-desc">会话警告条</p>
+    <div class="demo-preview-col">
+      <div class="demo-preview-block demo-preview" style="display:block;">
+        <div class="session-warning">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          Session model state has changed. The previously selected model may no longer be available.
+        </div>
+      </div>
+      <div class="demo-code">&lt;div class="session-warning"&gt;
+  &lt;svg&gt;...&lt;/svg&gt;
+  Warning message...
+&lt;/div&gt;</div>
+    </div>
+  </section>
+
+</div>
+
+<script src="components/l1-composites.js"></script>
+<script>
+/* Theme toggle */
+function toggleTheme() {
+  document.documentElement.classList.toggle('dark');
+}
+
+/* TimeButtonGroup active toggle */
+function setActiveTimeBtn(btn) {
+  btn.closest('.time-btn-group').querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+/* SecondaryNav active toggle */
+function setActiveNav(btn) {
+  btn.closest('.secondary-nav').querySelectorAll('.secondary-nav-item').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+/* RecommendedSection toggle */
+function toggleRecommended(header) {
+  const body = header.nextElementSibling;
+  body.classList.toggle('expanded');
+  if (body.classList.contains('expanded')) {
+    body.style.maxHeight = body.scrollHeight + 'px';
+  } else {
+    body.style.maxHeight = '0';
+  }
+}
+
+/* Inline confirm demo */
+function showInlineDemo(btn) {
+  const container = btn.closest('#inline-confirm-demo');
+  const originalHTML = container.innerHTML;
+  container.innerHTML = `
+    <span class="inline-confirm">
+      <span>Confirm delete?</span>
+      <button class="btn btn-sm btn-danger" onclick="confirmInlineAction(this)">Yes</button>
+      <button class="btn btn-sm" onclick="cancelInlineAction(this)">No</button>
+    </span>`;
+  container.dataset.original = originalHTML;
+}
+
+function confirmInlineAction(btn) {
+  const container = btn.closest('#inline-confirm-demo');
+  container.innerHTML = '<span class="badge badge-success">Deleted</span> <span style="font-size:12px;color:var(--muted);">Item removed</span>';
+  setTimeout(() => {
+    container.innerHTML = `
+      <span style="font-size:13px;">Row item</span>
+      <button class="btn btn-sm btn-danger" onclick="showInlineDemo(this)">Delete</button>`;
+  }, 2000);
+}
+
+function cancelInlineAction(btn) {
+  const container = btn.closest('#inline-confirm-demo');
+  container.innerHTML = container.dataset.original;
+}
+
+/* Sidebar active link highlight on scroll */
+const sections = document.querySelectorAll('.demo-section[id]');
+const navLinks = document.querySelectorAll('.demo-sidebar a[href^="#"]');
+
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      navLinks.forEach(link => link.classList.remove('active-link'));
+      const activeLink = document.querySelector(`.demo-sidebar a[href="#${entry.target.id}"]`);
+      if (activeLink) activeLink.classList.add('active-link');
+    }
+  });
+}, { rootMargin: '-20% 0px -70% 0px' });
+
+sections.forEach(section => observer.observe(section));
+</script>
+</body>
+</html>

@@ -65,9 +65,9 @@ function onOpenChange(val: boolean) {
         class="flex w-full items-center justify-between rounded-md bg-background ring-offset-background cursor-pointer hover:bg-accent hover:text-accent-foreground"
         :class="[
           compact
-            ? 'h-7 text-xs px-2 py-1 border rounded-md'
-            : 'h-10 text-sm px-3 py-2',
-          dashed ? 'border-dashed border-primary/20' : 'border-border',
+            ? 'h-7 text-xs px-2 py-1 rounded-md'
+            : 'h-10 text-sm px-3 py-2 border border-border rounded-md',
+          !compact && dashed ? 'border-dashed border-primary/20' : '',
           { 'ring-2 ring-ring ring-offset-2': open },
         ]"
       >

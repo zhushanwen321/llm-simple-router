@@ -223,7 +223,7 @@ const hasMultimodal = computed(
         <!-- Primary pill -->
         <template v-if="entry.targets.length > 0">
           <span
-            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-mono bg-primary/10 border-[1px] border-primary/20 text-primary whitespace-nowrap"
+            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-mono bg-primary/10 border border-border text-primary whitespace-nowrap"
           >
             <span class="text-[10px] font-semibold">①</span>
             {{ entry.targets[0].backend_model }}
@@ -242,7 +242,7 @@ const hasMultimodal = computed(
         >
           <span class="text-orange-400/40 text-xs shrink-0">|</span>
           <span
-            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-mono bg-muted/30 border-[1px] border-border text-muted-foreground whitespace-nowrap"
+            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-mono bg-muted/30 border border-border text-muted-foreground whitespace-nowrap"
           >
             <span class="text-[10px] font-semibold">{{
               tIdx === 0 ? "②" : tIdx === 1 ? "③" : `${tIdx + 2}`
@@ -255,7 +255,7 @@ const hasMultimodal = computed(
         <template v-if="hasOverflow">
           <span class="text-muted-foreground/30 text-xs shrink-0">|</span>
           <span
-            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-mono border-[1px] border-dashed border-primary/20 text-primary/60 whitespace-nowrap"
+            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-mono border border-dashed border-border text-primary/60 whitespace-nowrap"
           >
             ↓ {{ entry.targets[0].overflow_model }}
           </span>
@@ -265,7 +265,7 @@ const hasMultimodal = computed(
         <template v-if="hasMultimodal">
           <span class="text-muted-foreground/30 text-xs shrink-0">|</span>
           <span
-            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-mono border-[1px] border-dashed border-blue-500/20 text-blue-500/60 whitespace-nowrap"
+            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-mono border border-dashed border-border text-blue-500/60 whitespace-nowrap"
           >
             <Grid3x3 class="size-2.5" />
             {{ entry.multimodalFallback!.backend_model }}

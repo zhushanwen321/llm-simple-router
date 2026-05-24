@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Model Mappings — Table Expand (方案B)</title>
+<style>
+  :root {
+    --bg: oklch(0.145 0 0);
+    --surface: oklch(0.205 0 0);
+    --surface-up: oklch(0.269 0 0);
+    --fg: oklch(0.985 0 0);
+    --muted: oklch(0.708 0 0);
+    --muted-dim: oklch(0.556 0 0);
+    --border: oklch(1 0 0 / 10%);
+    --border-strong: oklch(1 0 0 / 14%);
+    --primary: oklch(0.68 0.13 175);
+    --primary-dim: oklch(0.68 0.13 175 / 15%);
+    --primary-ghost: oklch(0.68 0.13 175 / 8%);
+    --success: oklch(0.65 0.17 150);
+    --success-dim: oklch(0.65 0.17 150 / 12%);
+    --warning: oklch(0.78 0.16 80);
+    --warning-dim: oklch(0.78 0.16 80 / 12%);
+    --danger: oklch(0.58 0.22 25);
+    --danger-dim: oklch(0.58 0.22 25 / 12%);
+    --mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+    --sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --radius: 8px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--fg); font-family:var(--sans); font-size:14px; line-height:1.5; }
+  .page { max-width:1200px; margin:0 auto; padding:20px 24px; }
+
+  /* Header */
+  .hdr { display:flex; align-items:center; gap:16px; margin-bottom:12px; }
+  .hdr-title { font-size:16px; font-weight:600; }
+  .hdr-spacer { flex:1; }
+  .hdr-btn {
+    display:inline-flex; align-items:center; gap:5px; height:30px; padding:0 12px;
+    border:1px solid var(--border); border-radius:var(--radius); background:transparent;
+    color:var(--muted); font-family:var(--sans); font-size:13px; cursor:pointer; transition:all 150ms;
+  }
+  .hdr-btn:hover { background:var(--surface); color:var(--fg); }
+  .hdr-btn.primary { background:var(--primary); border-color:var(--primary); color:oklch(0.145 0 0); font-weight:600; }
+
+  /* Secondary strip */
+  .strip {
+    display:flex; background:var(--surface); border:1px solid var(--border);
+    border-radius:var(--radius); margin-bottom:12px; overflow:hidden;
+  }
+  .strip-cell {
+    flex:1; padding:8px 14px; border-right:1px solid var(--border);
+    display:flex; flex-direction:column; gap:1px;
+  }
+  .strip-cell:last-child { border-right:none; }
+  .strip-label { font-size:10px; font-weight:600; color:var(--muted-dim); text-transform:uppercase; letter-spacing:0.06em; }
+  .strip-val { font-family:var(--mono); font-size:13px; font-weight:600; color:var(--fg); }
+  .strip-sub { font-family:var(--mono); font-size:10px; color:var(--muted-dim); }
+
+  /* Filter bar */
+  .filter-bar {
+    display:flex; align-items:center; gap:8px; background:var(--surface);
+    border:1px solid var(--border); border-radius:var(--radius); padding:6px 12px; margin-bottom:12px;
+  }
+  .filter-label { font-size:10px; font-weight:600; color:var(--muted-dim); text-transform:uppercase; letter-spacing:0.06em; }
+  .filter-sel, .filter-inp {
+    height:32px; background:var(--bg); color:var(--fg); border:1px solid var(--border);
+    border-radius:6px; padding:0 10px; font-family:var(--sans); font-size:13px; outline:none;
+  }
+  .filter-sel:focus, .filter-inp:focus { border-color:var(--primary); }
+  .filter-sel { min-width:130px; appearance:none; cursor:pointer;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none" stroke='%23707070' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right 8px center; padding-right:28px;
+  }
+  .filter-inp { min-width:180px; }
+  .filter-inp::placeholder { color:var(--muted-dim); }
+  .filter-gap { flex:1; }
+  .filter-cnt { font-family:var(--mono); font-size:11px; color:var(--muted-dim); }
+
+  /* Table */
+  .tbl-wrap {
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden;
+  }
+  table { width:100%; border-collapse:collapse; table-layout:fixed; }
+  th {
+    font-size:11px; font-weight:600; color:var(--muted-dim); text-transform:uppercase;
+    letter-spacing:0.05em; padding:7px 12px; text-align:left; border-bottom:1px solid var(--border);
+    background:oklch(0.165 0 0);
+  }
+  .col-model { width:22%; }
+  .col-pipe { width:40%; }
+  .col-status { width:12%; }
+  .col-actions { width:12%; }
+  td { padding:0 12px; height:36px; vertical-align:middle; border-bottom:1px solid oklch(1 0 0 / 4%); font-size:13px; }
+  tbody tr.row-main { cursor:pointer; transition:background 100ms; }
+  tbody tr.row-main:hover { background:var(--surface-up); }
+  tbody tr.row-main.sel { background:oklch(0.68 0.13 175 / 10%); }
+  tbody tr.row-main.inactive { opacity:0.5; }
+  tbody tr:last-child td { border-bottom:none; }
+
+  .model-name { font-family:var(--mono); font-size:12px; font-weight:600; }
+
+  /* Pipeline pills */
+  .pipe-chain { display:flex; align-items:center; gap:3px; overflow:hidden; flex-wrap:nowrap; }
+  .pill {
+    display:inline-flex; align-items:center; gap:3px; height:22px; padding:0 7px;
+    border-radius:9999px; font-family:var(--mono); font-size:9px; font-weight:600; white-space:nowrap;
+  }
+  .pill.t-primary { background:var(--primary-dim); color:var(--primary); }
+  .pill.t-fallback { background:oklch(1 0 0 / 6%); color:var(--muted); }
+  .pill.t-overflow { background:var(--warning-dim); color:var(--warning); border:1px dashed oklch(0.78 0.16 80 / 40%); }
+  .pill.t-multi { background:var(--success-dim); color:var(--success); border:1px dashed oklch(0.65 0.17 150 / 40%); }
+  .pill-n { font-size:8px; opacity:0.55; }
+  .arr { color:var(--muted-dim); flex-shrink:0; font-size:10px; }
+
+  /* Status */
+  .badge {
+    display:inline-flex; align-items:center; gap:4px; padding:2px 8px;
+    border-radius:9999px; font-family:var(--mono); font-size:10px; font-weight:600;
+  }
+  .badge.on { background:var(--success-dim); color:var(--success); }
+  .badge.off { background:oklch(1 0 0 / 6%); color:var(--muted-dim); }
+  .badge-dot { width:5px; height:5px; border-radius:50%; }
+  .badge.on .badge-dot { background:var(--success); }
+  .badge.off .badge-dot { background:var(--muted-dim); }
+
+  /* Actions */
+  .acts { display:flex; gap:2px; }
+  .ib {
+    display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px;
+    border:none; background:transparent; color:var(--muted-dim); border-radius:4px;
+    cursor:pointer; transition:all 100ms;
+  }
+  .ib:hover { background:oklch(1 0 0 / 8%); color:var(--fg); }
+  .ib.dg:hover { background:var(--danger-dim); color:var(--danger); }
+
+  /* Detail panel (inline expand) */
+  .detail-row { display:none; }
+  .detail-row.vis { display:table-row; }
+  .detail-row td { padding:0 12px 12px 12px !important; }
+  .detail-panel {
+    background:oklch(1 0 0 / 3%); border:2px solid oklch(0.68 0.13 175 / 30%);
+    border-radius:6px; padding:12px 16px;
+  }
+
+  .edit-sec { margin-bottom:12px; }
+  .edit-sec:last-child { margin-bottom:0; }
+  .sec-title {
+    font-size:11px; font-weight:600; color:var(--muted-dim); text-transform:uppercase;
+    letter-spacing:0.04em; margin-bottom:6px; display:flex; align-items:center; gap:4px;
+  }
+
+  /* Target items */
+  .tgt-list { display:flex; flex-direction:column; gap:3px; }
+  .tgt-item {
+    display:flex; align-items:center; gap:8px; padding:5px 8px;
+    background:var(--bg); border:1px solid var(--border); border-radius:6px;
+  }
+  .tgt-num {
+    width:18px; height:18px; display:flex; align-items:center; justify-content:center;
+    background:var(--primary-dim); color:var(--primary); border-radius:50%;
+    font-family:var(--mono); font-size:9px; font-weight:700; flex-shrink:0;
+  }
+  .tgt-f { flex:1; }
+  .tgt-f select, .tgt-f input {
+    width:100%; height:26px; background:var(--surface); border:1px solid var(--border);
+    border-radius:4px; padding:0 6px; color:var(--fg); font-family:var(--mono); font-size:11px; outline:none;
+  }
+  .tgt-f select:focus, .tgt-f input:focus { border-color:var(--primary); }
+  .tgt-f select { appearance:none; cursor:pointer;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23707070' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right 4px center; padding-right:20px;
+  }
+
+  .add-tgt {
+    display:inline-flex; align-items:center; gap:3px; height:24px; padding:0 8px;
+    border:1px dashed var(--border); border-radius:4px; background:transparent;
+    color:var(--muted-dim); font-size:11px; cursor:pointer; transition:all 150ms; margin-top:4px;
+  }
+  .add-tgt:hover { border-color:var(--primary); color:var(--primary); }
+
+  /* Toggle row */
+  .tog-row {
+    display:flex; align-items:center; gap:8px; padding:5px 8px;
+    background:var(--bg); border:1px solid var(--border); border-radius:6px;
+  }
+  .tog-sw {
+    position:relative; width:32px; height:18px; background:var(--surface-up);
+    border-radius:9px; cursor:pointer; transition:background 200ms; flex-shrink:0;
+  }
+  .tog-sw.on { background:var(--primary); }
+  .tog-sw::after {
+    content:''; position:absolute; top:2px; left:2px; width:14px; height:14px;
+    background:var(--fg); border-radius:50%; transition:transform 200ms;
+  }
+  .tog-sw.on::after { transform:translateX(14px); }
+  .tog-lbl { font-size:11px; color:var(--muted); }
+  .tog-fields { display:flex; gap:4px; flex:1; margin-left:6px; }
+  .tog-fields select, .tog-fields input {
+    height:26px; background:var(--surface); border:1px solid var(--border);
+    border-radius:4px; padding:0 6px; color:var(--fg); font-family:var(--mono); font-size:11px; outline:none; flex:1;
+  }
+  .tog-fields select { appearance:none; cursor:pointer;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23707070' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right 4px center; padding-right:20px;
+  }
+  .tog-fields select:focus, .tog-fields input:focus { border-color:var(--primary); }
+
+  .edit-foot {
+    display:flex; justify-content:space-between; align-items:center;
+    margin-top:10px; padding-top:10px; border-top:1px solid var(--border);
+  }
+  .btn {
+    display:inline-flex; align-items:center; height:28px; padding:0 12px;
+    border:1px solid var(--border); border-radius:4px; background:transparent;
+    font-family:var(--sans); font-size:12px; font-weight:500; cursor:pointer;
+    transition:all 150ms; color:var(--muted);
+  }
+  .btn:hover { background:var(--surface-up); color:var(--fg); }
+  .btn.primary { background:var(--primary); border-color:var(--primary); color:oklch(0.145 0 0); font-weight:600; }
+  .btn.primary:hover { background:oklch(0.72 0.14 175); }
+
+  .del-inline { display:flex; align-items:center; gap:4px; font-size:11px; color:var(--danger); }
+  .del-inline .sm {
+    padding:1px 6px; border-radius:3px; border:1px solid var(--border);
+    font-size:10px; cursor:pointer; font-weight:500;
+  }
+  .del-inline .sm.y { background:var(--danger); color:var(--fg); border-color:var(--danger); }
+  .del-inline .sm.n { background:transparent; color:var(--muted-dim); }
+
+  /* Add mapping modal */
+  .overlay {
+    display:none; position:fixed; inset:0; background:oklch(0 0 0 / 60%);
+    z-index:100; align-items:center; justify-content:center;
+  }
+  .overlay.vis { display:flex; }
+  .modal { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); width:460px; max-width:90vw; padding:16px; position:relative; }
+  .modal-title { font-size:14px; font-weight:600; margin-bottom:14px; }
+  .modal-x {
+    position:absolute; top:10px; right:10px; width:28px; height:28px; border:none;
+    background:transparent; color:var(--muted-dim); cursor:pointer; border-radius:4px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .modal-x:hover { background:var(--surface-up); color:var(--fg); }
+  .fr { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+  .fl {
+    font-size:11px; font-weight:600; color:var(--muted-dim); text-transform:uppercase;
+    letter-spacing:0.04em; width:90px; flex-shrink:0; text-align:right;
+  }
+  .fi {
+    flex:1; height:28px; background:var(--bg); border:1px solid var(--border);
+    border-radius:4px; padding:0 8px; color:var(--fg); font-family:var(--mono); font-size:12px; outline:none;
+  }
+  .fi:focus { border-color:var(--primary); }
+  .fi::placeholder { color:var(--muted-dim); }
+  .fs {
+    flex:1; height:28px; background:var(--bg); border:1px solid var(--border);
+    border-radius:4px; padding:0 8px; color:var(--fg); font-family:var(--mono); font-size:12px;
+    outline:none; appearance:none; cursor:pointer;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23707070' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right 6px center; padding-right:20px;
+  }
+  .fs:focus { border-color:var(--primary); }
+  .modal-ft { display:flex; gap:6px; justify-content:flex-end; margin-top:12px; padding-top:10px; border-top:1px solid var(--border); }
+</style>
+</head>
+<body>
+<div class="page">
+  <!-- Header -->
+  <div class="hdr">
+    <h2 class="hdr-title">Model Mappings</h2>
+    <div style="flex:1"></div>
+    <button class="hdr-btn primary" onclick="openModal()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+      Add Mapping
+    </button>
+  </div>
+
+  <!-- Secondary strip -->
+  <div class="strip" id="stripBar"></div>
+
+  <!-- Filter bar -->
+  <div class="filter-bar">
+    <span class="filter-label">Filter</span>
+    <select class="filter-sel" id="fStatus" onchange="render()">
+      <option value="all">All Status</option>
+      <option value="active">Active</option>
+      <option value="inactive">Inactive</option>
+    </select>
+    <input class="filter-inp" type="text" id="fSearch" placeholder="Search model name..." oninput="render()" />
+    <div class="filter-gap"></div>
+    <span class="filter-cnt" id="fCnt"></span>
+  </div>
+
+  <!-- Table -->
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th class="col-model">Client Model</th>
+          <th class="col-pipe">Pipeline</th>
+          <th class="col-status">Status</th>
+          <th class="col-actions">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Add Modal -->
+<div class="overlay" id="modal">
+  <div class="modal">
+    <button class="modal-x" onclick="closeModal()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </button>
+    <div class="modal-title">New Mapping</div>
+    <div class="fr"><span class="fl">Client Model</span><input class="fi" id="nmModel" placeholder="e.g. gpt-4o" /></div>
+    <div class="fr"><span class="fl">Provider</span><select class="fs" id="nmProv"><option>OpenAI</option><option>Anthropic</option><option>DeepSeek</option><option>Google</option><option>Azure</option><option>Groq</option></select></div>
+    <div class="fr"><span class="fl">Backend Model</span><input class="fi" id="nmBack" placeholder="same as client if empty" /></div>
+    <div class="modal-ft">
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn primary" onclick="doAdd()">Create</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const PRV = ['OpenAI','Anthropic','DeepSeek','Google','Azure','Groq'];
+let D = [
+  { id:1, cm:'gpt-4o', tg:[{p:'OpenAI',m:'gpt-4o'},{p:'Azure',m:'gpt-4o'}], ov:{p:'OpenAI',m:'gpt-4o-32k',on:true}, mm:{p:null,m:null,on:false}, act:true },
+  { id:2, cm:'claude-sonnet-4-20250514', tg:[{p:'Anthropic',m:'claude-sonnet-4-20250514'},{p:'DeepSeek',m:'deepseek-chat'}], ov:null, mm:{p:'Anthropic',m:'claude-sonnet-4-20250514',on:true}, act:true },
+  { id:3, cm:'deepseek-r1', tg:[{p:'DeepSeek',m:'deepseek-reasoner'}], ov:{p:'Anthropic',m:'claude-sonnet-4-20250514',on:true}, mm:null, act:true },
+  { id:4, cm:'gemini-2.5-pro', tg:[{p:'Google',m:'gemini-2.5-pro'},{p:'OpenAI',m:'gpt-4o'}], ov:null, mm:{p:'Google',m:'gemini-2.5-flash',on:true}, act:true },
+  { id:5, cm:'gpt-4o-mini', tg:[{p:'OpenAI',m:'gpt-4o-mini'}], ov:null, mm:null, act:false },
+  { id:6, cm:'llama-3.3-70b', tg:[{p:'Groq',m:'llama-3.3-70b'},{p:'DeepSeek',m:'deepseek-chat'}], ov:{p:'OpenAI',m:'gpt-4o',on:true}, mm:null, act:true },
+];
+let expId=null, delId=null, nxId=7;
+
+function opts(s, arr) { return arr.map(i=>`<option value="${i}" ${i===s?'selected':''}>${i}</option>`).join(''); }
+
+function pillPip(d) {
+  let r = [`<span class="pill t-primary"><span class="pill-n">1</span>${d.tg[0].p}/${d.tg[0].m}</span>`];
+  for (let i=1;i<d.tg.length;i++) r.push(`<span class="arr">→</span><span class="pill t-fallback"><span class="pill-n">${i+1}</span>${d.tg[i].p}/${d.tg[i].m}</span>`);
+  if (d.ov&&d.ov.on) r.push(`<span class="arr">↓</span><span class="pill t-overflow">OF:${d.ov.m}</span>`);
+  if (d.mm&&d.mm.on) r.push(`<span class="arr">🖼</span><span class="pill t-multi">MM:${d.mm.m}</span>`);
+  return r.join('');
+}
+
+function tgtList(d) {
+  return d.tg.map((t,i)=>`
+    <div class="tgt-item">
+      <span class="tgt-num">${i+1}</span>
+      <div class="tgt-f"><select onchange="utgt(this)" data-id="${d.id}" data-ti="${i}" data-f="p">${opts(t.p,PRV)}</select></div>
+      <div class="tgt-f"><input onchange="utgt(this)" data-id="${d.id}" data-ti="${i}" data-f="m" value="${t.m}" /></div>
+      <button class="ib dg" onclick="event.stopPropagation();rmTgt(${d.id},${i})" ${d.tg.length<=1?'disabled':''}><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+    </div>`).join('');
+}
+
+function togSec(d, key, lbl) {
+  const c=d[key]; if(!c) return '';
+  return `<div class="edit-sec">
+    <div class="sec-title">${lbl}</div>
+    <div class="tog-row">
+      <div class="tog-sw ${c.on?'on':''}" onclick="togOpt(${d.id},'${key}')"></div>
+      <span class="tog-lbl">Enabled</span>
+      ${c.on?`<div class="tog-fields">
+        <select onchange="uopt(this)" data-id="${d.id}" data-key="${key}" data-f="p">${opts(c.p,PRV)}</select>
+        <input onchange="uopt(this)" data-id="${d.id}" data-key="${key}" data-f="m" value="${c.m||''}" placeholder="model" />
+      </div>`:''}
+    </div>
+  </div>`;
+}
+
+function render() {
+  const fs=document.getElementById('fStatus').value;
+  const fq=document.getElementById('fSearch').value.toLowerCase().trim();
+  const list=D.filter(d=>{
+    if(fs==='active'&&!d.act) return false;
+    if(fs==='inactive'&&d.act) return false;
+    if(fq&&!d.cm.toLowerCase().includes(fq)) return false;
+    return true;
+  });
+
+  // strip
+  const ac=list.filter(d=>d.act).length;
+  const provs=new Set(); list.forEach(d=>d.tg.forEach(t=>provs.add(t.p)));
+  document.getElementById('stripBar').innerHTML=`
+    <div class="strip-cell"><span class="strip-label">Mappings</span><span class="strip-val" style="color:var(--primary)">${list.length}</span><span class="strip-sub">total groups</span></div>
+    <div class="strip-cell"><span class="strip-label">Active</span><span class="strip-val" style="color:var(--success)">${ac}</span><span class="strip-sub">${Math.round(ac/list.length*100)}% active</span></div>
+    <div class="strip-cell"><span class="strip-label">Providers</span><span class="strip-val">${provs.size}</span><span class="strip-sub">${[...provs].join(' / ')}</span></div>
+    <div class="strip-cell"><span class="strip-label">Avg Targets</span><span class="strip-val">${(list.reduce((s,d)=>s+d.tg.length,0)/list.length).toFixed(1)}</span><span class="strip-sub">per mapping</span></div>`;
+  document.getElementById('fCnt').textContent=`${list.length} of ${D.length}`;
+
+  // table
+  const tb=document.getElementById('tbody');
+  tb.innerHTML=list.map(d=>{
+    const isExp=expId===d.id;
+    const isDel=delId===d.id;
+    return `
+    <tr class="row-main ${isExp?'sel':''} ${d.act?'':'inactive'}" onclick="togExp(${d.id})">
+      <td><span class="model-name">${d.cm}</span></td>
+      <td><div class="pipe-chain">${pillPip(d)}</div></td>
+      <td><span class="badge ${d.act?'on':'off'}"><span class="badge-dot"></span>${d.act?'Active':'Off'}</span></td>
+      <td>
+        ${isDel?`<div class="del-inline">Del?<button class="sm y" onclick="event.stopPropagation();doDel(${d.id})">Y</button><button class="sm n" onclick="event.stopPropagation();delId=null;render()">N</button></div>`:
+        `<div class="acts">
+          <button class="ib" title="Toggle" onclick="event.stopPropagation();togAct(${d.id})">${d.act?
+            '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-5"/></svg>':
+            '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M4.93 4.93l14.14 14.14"/></svg>'}
+          </button>
+          <button class="ib dg" title="Delete" onclick="event.stopPropagation();delId=${d.id};render()">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
+        </div>`}
+      </td>
+    </tr>
+    ${isExp?`<tr class="detail-row vis" onclick="event.stopPropagation()"><td colspan="4">
+      <div class="detail-panel">
+        <div class="edit-sec">
+          <div class="sec-title"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg> Failover Chain</div>
+          <div class="tgt-list">${tgtList(d)}</div>
+          <button class="add-tgt" onclick="addTgt(${d.id})"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg> Add Target</button>
+        </div>
+        ${togSec(d,'ov','Context Overflow')}
+        ${togSec(d,'mm','Multimodal Fallback')}
+        <div class="edit-foot">
+          <span style="font-size:10px;color:var(--muted-dim)">ID: ${d.id}</span>
+          <div style="display:flex;gap:6px">
+            <button class="btn" onclick="expId=null;render()">Cancel</button>
+            <button class="btn primary" onclick="expId=null;render()">Save</button>
+          </div>
+        </div>
+      </div>
+    </td></tr>`:''}`;
+  }).join('');
+}
+
+function togExp(id) { expId=expId===id?null:id; delId=null; render(); }
+function togAct(id) { const d=D.find(x=>x.id===id); if(d){d.act=!d.act; render();} }
+function addTgt(id) { const d=D.find(x=>x.id===id); if(d){d.tg.push({p:'OpenAI',m:'gpt-4o'}); render();} }
+function rmTgt(id,i) { const d=D.find(x=>x.id===id); if(d&&d.tg.length>1){d.tg.splice(i,1); render();} }
+function utgt(el) { const d=D.find(x=>x.id===+el.dataset.id); if(d) d.tg[+el.dataset.ti][el.dataset.f]=el.value; }
+function togOpt(id,k) { const d=D.find(x=>x.id===id); if(d&&d[k]){d[k].on=!d[k].on; render();} }
+function uopt(el) { const d=D.find(x=>x.id===+el.dataset.id); if(d&&d[el.dataset.key]) d[el.dataset.key][el.dataset.f]=el.value; }
+function doDel(id) { D=D.filter(x=>x.id!==id); expId=null; delId=null; render(); }
+
+function openModal() { document.getElementById('modal').classList.add('vis'); }
+function closeModal() { document.getElementById('modal').classList.remove('vis'); }
+function doAdd() {
+  const cm=document.getElementById('nmModel').value.trim(); if(!cm) return;
+  const pv=document.getElementById('nmProv').value;
+  const bm=document.getElementById('nmBack').value.trim()||cm;
+  D.push({id:nxId++,cm,tg:[{p:pv,m:bm}],ov:null,mm:null,act:true});
+  closeModal(); document.getElementById('nmModel').value=''; document.getElementById('nmBack').value=''; render();
+}
+
+render();
+</script>
+</body>
+</html>
