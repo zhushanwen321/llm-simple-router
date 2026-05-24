@@ -184,13 +184,25 @@
               <div class="flex items-center gap-2.5">
                 <ProviderIcon :name="providerIconName(p.name)" :size="20" />
                 <div class="flex flex-col gap-0.5 min-w-0">
-                  <span class="font-medium text-[13px] truncate">{{
-                    p.name
-                  }}</span>
+                  <div class="flex items-center gap-1.5">
+                    <span class="font-medium text-[13px] truncate">{{
+                      p.name
+                    }}</span>
+                    <Badge
+                      variant="secondary"
+                      class="text-[11px] px-1.5 py-0 shrink-0"
+                      >{{ API_TYPE_LABELS[p.api_type] ?? p.api_type }}</Badge
+                    >
+                  </div>
                   <span
                     class="font-mono text-[11px] text-muted-foreground truncate max-w-[260px]"
                   >
                     {{ buildFullUrl(p) }}
+                    <Shield
+                      v-if="p.proxy_type"
+                      class="w-3 h-3 inline ml-1 text-muted-foreground"
+                      :title="`Proxy: ${p.proxy_type.toUpperCase()}`"
+                    />
                   </span>
                 </div>
               </div>
@@ -595,10 +607,20 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
-import { RotateCw, Copy, Check, ImageIcon, Search } from "lucide-vue-next";
+import {
+  RotateCw,
+  Copy,
+  Check,
+  ImageIcon,
+  Search,
+  Shield,
+} from "lucide-vue-next";
 import ProviderIcon from "@/components/icons/ProviderIcon.vue";
 import ModelCapabilitiesEditor from "@/components/providers/ModelCapabilitiesEditor.vue";
-import { useProviderForm } from "@/composables/useProviderForm";
+import {
+  useProviderForm,
+  API_TYPE_LABELS,
+} from "@/composables/useProviderForm";
 import { useProviderActions } from "@/composables/useProviderActions";
 import { useFetchUpstreamModels } from "@/composables/useFetchUpstreamModels";
 

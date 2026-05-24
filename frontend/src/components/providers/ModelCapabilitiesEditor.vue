@@ -417,6 +417,19 @@ function isOfficialOpenai(url: string): boolean {
               "
             />
           </div>
+          <div>
+            <Label class="text-xs text-muted-foreground">{{
+              t("providers.concurrency.maxQueueSize")
+            }}</Label>
+            <Input
+              :model-value="String(props.maxQueueSize)"
+              type="number"
+              class="mt-1"
+              @update:model-value="
+                emit('update:max-queue-size', Number($event))
+              "
+            />
+          </div>
         </div>
         <!-- Proxy -->
         <ProxyConfigForm
