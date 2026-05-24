@@ -414,6 +414,7 @@ import { ref, computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { toast } from "vue-sonner";
 import { api, getApiMessage } from "@/api/client";
+import { fallbackCopy } from "@/composables/useClipboard";
 import { formatTime } from "@/utils/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -520,7 +521,7 @@ function statusDotClass(isActive: number) {
 function copyKey(k: RouterKey) {
   const raw = k.key;
   if (!raw) return;
-  navigator.clipboard.writeText(raw);
+  copyToClipboard(raw);
   copiedId.value = k.id;
   setTimeout(() => {
     if (copiedId.value === k.id) copiedId.value = null;
@@ -528,11 +529,24 @@ function copyKey(k: RouterKey) {
 }
 
 function copyRevealKey() {
-  navigator.clipboard.writeText(createdKeyValue.value);
+  copyToClipboard(createdKeyValue.value);
   revealCopied.value = true;
   setTimeout(() => {
     revealCopied.value = false;
   }, COPY_FEEDBACK_MS);
+}
+
+/** Secure Context 安全降级的剪贴板写入 */
+function copyToClipboard(text: string) {
+  try {
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(text);
+    } else {
+      fallbackCopy(text);
+    }
+  } catch {
+    fallbackCopy(text);
+  }
 }
 
 function toggleReveal(id: string) {
