@@ -165,20 +165,28 @@ export async function buildApp(
     // 本 handler 提供额外的永久保护层。
     // 代理路由在 create-proxy-handler.ts 中已有额外监听，此处覆盖所有路由。
     const sock = request.raw.socket;
-    sock.on("error", (err: NodeJS.ErrnoException) => {
+    const socketErrorHandler = (err: NodeJS.ErrnoException) => {
       if (err.code === "EPIPE" || err.code === "ECONNRESET") {
         request.log.debug({ err }, "client socket error");
       } else {
         request.log.warn({ err }, "unexpected socket error");
       }
-    });
-    reply.raw.on("error", (err: Error) => {
+    };
+    sock.on("error", socketErrorHandler);
+
+    const replyErrorHandler = (err: Error) => {
       const code = (err as { code?: string }).code;
       if (code === "EPIPE") {
         request.log.debug({ err }, "client disconnected (EPIPE)");
       } else {
         request.log.warn({ err }, "response stream error");
       }
+    };
+    reply.raw.on("error", replyErrorHandler);
+
+    reply.raw.on("close", () => {
+      sock.removeListener("error", socketErrorHandler);
+      reply.raw.removeListener("error", replyErrorHandler);
     });
 
     done();

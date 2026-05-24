@@ -206,16 +206,20 @@ class StreamProxy {
     // Node.js HTTP server 内置的 socketOnError 只处理第一次 socket error，
     // 如果第一次被其他错误消耗，后续 EPIPE 可能无 handler 导致进程崩溃。
     const sock = this.reply.raw.socket;
+    let sockErrorHandler: ((err: NodeJS.ErrnoException) => void) | undefined;
     if (sock) {
-      sock.on("error", (err: NodeJS.ErrnoException) => {
+      sockErrorHandler = (err: NodeJS.ErrnoException) => {
         if (err.code === "EPIPE" || err.code === "ECONNRESET") {
-          // 客户端已断开，正常行为
           return;
         }
         console.warn("[stream-proxy] socket error:", err.message);
-      });
+      };
+      sock.on("error", sockErrorHandler);
     }
     this.reply.raw.on("close", () => {
+      if (sockErrorHandler && sock) {
+        sock.removeListener("error", sockErrorHandler);
+      }
       if (this.resolved) return;
       if (this.state === "BUFFERING" || this.state === "STREAMING") {
         this.transition("ABORTED");
