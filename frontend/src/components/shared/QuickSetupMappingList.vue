@@ -114,7 +114,7 @@ function handleKeydown(e: KeyboardEvent) {
       <Input
         v-model="newFrom"
         :placeholder="t('providers.shared.clientModel')"
-        class="h-7 min-w-[90px] text-xs font-mono border-border"
+        class="h-7 min-w-[140px] text-xs font-mono border-border"
         @keydown="handleKeydown"
       />
       <ArrowRight class="size-3.5 shrink-0 text-muted-foreground/30" />
