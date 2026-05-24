@@ -144,19 +144,13 @@ export class AnthropicToOpenAITransform extends BaseSSETransform {
       }
 
       case "message_stop": {
-        // emit PSF as custom message_meta event before final usage
-        if (this.thinkingSignatures.length > 0 || this.cacheUsage) {
-          const meta: AnthropicProviderMeta = {};
-          if (this.thinkingSignatures.length > 0) meta.thinking_signatures = this.thinkingSignatures;
-          if (this.cacheUsage) meta.cache_usage = this.cacheUsage;
-          this.push(`event: message_meta\ndata: ${JSON.stringify({ provider_meta: { anthropic: meta } })}\n\n`);
-        }
-
         // Anthropic input_tokens excludes cache; OpenAI prompt_tokens includes cache
         const cacheRead = this.cacheUsage?.cache_read_input_tokens ?? 0;
         const cacheCreation = this.cacheUsage?.cache_creation_input_tokens ?? 0;
         const totalInput = this.inputTokens + cacheRead + cacheCreation;
-        this.pushOpenAISSE({
+
+        // 将 provider_meta 合并到 usage chunk 中，避免独立 SSE 事件导致客户端 SDK 校验失败
+        const usageChunk: Record<string, unknown> = {
           id: this.chatcmplId, object: "chat.completion.chunk",
           choices: [],
           usage: {
@@ -168,7 +162,16 @@ export class AnthropicToOpenAITransform extends BaseSSETransform {
               cached_write_tokens: cacheCreation,
             },
           },
-        });
+        };
+
+        if (this.thinkingSignatures.length > 0 || this.cacheUsage) {
+          const meta: AnthropicProviderMeta = {};
+          if (this.thinkingSignatures.length > 0) meta.thinking_signatures = this.thinkingSignatures;
+          if (this.cacheUsage) meta.cache_usage = this.cacheUsage;
+          usageChunk.provider_meta = { anthropic: meta };
+        }
+
+        this.pushOpenAISSE(usageChunk);
         this.pushDone();
         break;
       }
