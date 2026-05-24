@@ -181,9 +181,9 @@ export function createProxyHandler(config: ProxyHandlerConfig) {
       request.raw.socket.on("error", socketErrorHandler);
 
       // reply.raw (ServerResponse) error handling
-      // Node.js 中，TCP socket write 异步完成失败时（如 EPIPE），
-      // 内部 socketErrorListener → response.destroy(err) → response.emit('error')。
-      // 若无 listener，该 error 成为 uncaught exception 导致进程退出。
+      // 注意：EPIPE 从底层 socket 的 WriteWrap.onWriteComplete emit，不会传播到 reply.raw。
+      // 因此 reply.raw.on("error") 无法拦截 socket EPIPE——socket 级别由上面的 socketErrorHandler 和全局 onRequest hook 覆盖。
+      // 本 handler 仅处理 ServerResponse 自身可能产生的其他 error。
       const replyErrorHandler = (err: Error) => {
         const code = (err as { code?: string }).code;
         if (code === 'EPIPE') {

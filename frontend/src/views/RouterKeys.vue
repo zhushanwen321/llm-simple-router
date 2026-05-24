@@ -325,6 +325,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 const { t } = useI18n();
 
 import type { RouterKey } from "@/types/models";
+import { useClipboard } from "@/composables/useClipboard";
 
 const DEFAULT_FORM = {
   name: "",
@@ -340,15 +341,18 @@ const deleteTarget = ref<RouterKey | null>(null);
 const form = ref({ ...DEFAULT_FORM, allowed_models: [] as string[] });
 const errors = ref<Record<string, string>>({});
 
+const { copy: doCopy } = useClipboard();
 const copiedId = ref<string | null>(null);
 const COPY_FEEDBACK_MS = 2000;
 
-function copyKey(key: string, id: string) {
-  navigator.clipboard.writeText(key);
-  copiedId.value = id;
-  setTimeout(() => {
-    if (copiedId.value === id) copiedId.value = null;
-  }, COPY_FEEDBACK_MS);
+async function copyKey(key: string, id: string) {
+  const ok = await doCopy(key);
+  if (ok) {
+    copiedId.value = id;
+    setTimeout(() => {
+      if (copiedId.value === id) copiedId.value = null;
+    }, COPY_FEEDBACK_MS);
+  }
 }
 
 function maskKey(key: string | null): string {
