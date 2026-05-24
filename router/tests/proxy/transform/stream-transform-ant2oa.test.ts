@@ -128,9 +128,12 @@ describe("AnthropicToOpenAITransform", () => {
     t.write('event: message_stop\ndata: {"type":"message_stop"}\n\n');
     t.end();
     const result = await output;
-    expect(result).toContain("event: message_meta");
+    // provider_meta 合并在 usage chunk 中，不再是独立事件
+    expect(result).toContain('"provider_meta"');
     expect(result).toContain('"thinking_signatures"');
     expect(result).toContain('"signature":"sig_abc"');
+    // 独立的 message_meta 事件不再发送
+    expect(result).not.toContain("event: message_meta");
   });
 
   it("emits message_meta with cache usage", async () => {
@@ -144,9 +147,12 @@ describe("AnthropicToOpenAITransform", () => {
     t.write('event: message_stop\ndata: {"type":"message_stop"}\n\n');
     t.end();
     const result = await output;
-    expect(result).toContain("event: message_meta");
+    // provider_meta 合并在 usage chunk 中，不再是独立事件
+    expect(result).toContain('"provider_meta"');
     expect(result).toContain('"cache_read_input_tokens":100');
     expect(result).toContain('"cache_creation_input_tokens":50');
+    // 独立的 message_meta 事件不再发送
+    expect(result).not.toContain("event: message_meta");
   });
 
   it("no message_meta when no PSF present", async () => {
@@ -160,6 +166,7 @@ describe("AnthropicToOpenAITransform", () => {
     t.write('event: message_stop\ndata: {"type":"message_stop"}\n\n');
     t.end();
     const result = await output;
-    expect(result).not.toContain("event: message_meta");
+    // 没有 PSF 时，不应出现 provider_meta
+    expect(result).not.toContain('"provider_meta"');
   });
 });

@@ -201,7 +201,25 @@ class StreamProxy {
   registerCloseHandler(): void {
     if (this.closeHandlerRegistered) return;
     this.closeHandlerRegistered = true;
+    // EPIPE 从底层 socket 的 WriteWrap.onWriteComplete emit，reply.raw.on("error") 无法拦截。
+    // 必须直接在 socket 上注册 error handler 防止冒泡到 process uncaughtException。
+    // Node.js HTTP server 内置的 socketOnError 只处理第一次 socket error，
+    // 如果第一次被其他错误消耗，后续 EPIPE 可能无 handler 导致进程崩溃。
+    const sock = this.reply.raw.socket;
+    let sockErrorHandler: ((err: NodeJS.ErrnoException) => void) | undefined;
+    if (sock) {
+      sockErrorHandler = (err: NodeJS.ErrnoException) => {
+        if (err.code === "EPIPE" || err.code === "ECONNRESET") {
+          return;
+        }
+        console.warn("[stream-proxy] socket error:", err.message);
+      };
+      sock.on("error", sockErrorHandler);
+    }
     this.reply.raw.on("close", () => {
+      if (sockErrorHandler && sock) {
+        sock.removeListener("error", sockErrorHandler);
+      }
       if (this.resolved) return;
       if (this.state === "BUFFERING" || this.state === "STREAMING") {
         this.transition("ABORTED");
