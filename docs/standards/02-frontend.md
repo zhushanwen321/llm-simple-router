@@ -334,6 +334,56 @@ tailwind.config.js（语义映射：--primary → var(--primary)）
 <Dialog v-model:open="show" />
 ```
 
+### 4.9 Secure Context API 必须有降级方案
+
+部分浏览器 API 仅在安全上下文（HTTPS 或 localhost）中可用。
+本项目在非 HTTPS 内网环境部署时（如 `http://192.168.x.x:9981/admin`），这些 API 会静默失败。
+
+**规则：调用以下 API 前，必须检查可用性并提供 fallback。**
+
+| API | 受限条件 | 本项目使用位置 | 状态 |
+|-----|---------|---------------|------|
+| `navigator.clipboard.writeText()` | 非 HTTPS 不可用 | `useClipboard.ts` | OK（有 `execCommand` fallback） |
+| `navigator.clipboard.writeText()` | 同上 | `useProviderActions.ts:38` | ❌ 无 fallback |
+| `navigator.clipboard.writeText()` | 同上 | `RouterKeys.vue:523,531` | ❌ 无 fallback |
+
+**正确模式（参考 `useClipboard.ts`）**：
+
+```typescript
+async function copyText(text: string): Promise<void> {
+  // 优先使用 Clipboard API（HTTPS/localhost 可用）
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text)
+      return
+    } catch {
+      // Clipboard API 失败时降级
+    }
+  }
+  // Fallback: textarea + execCommand（所有环境可用）
+  const textarea = document.createElement('textarea')
+  textarea.value = text
+  textarea.style.position = 'fixed'
+  textarea.style.opacity = '0'
+  document.body.appendChild(textarea)
+  textarea.select()
+  document.execCommand('copy')
+  document.body.removeChild(textarea)
+}
+```
+
+**其他需注意的 Secure Context API**（本项目尚未使用，但新增功能时关注）：
+
+| API | 用途 | 受限条件 |
+|-----|------|---------|
+| `crypto.subtle` | 客户端加密 | 非 HTTPS 不可用 |
+| `Notification` | 桌面通知 | 非 HTTPS 不可用 |
+| `navigator.geolocation` | 地理位置 | 非 HTTPS 不可用 |
+| `navigator.mediaDevices.getUserMedia()` | 摄像头/麦克风 | 非 HTTPS 不可用 |
+| Service Worker | 离线缓存/后台同步 | 非 HTTPS 不可用 |
+
+**验证方式**：`window.isSecureContext` 返回值可判断当前上下文是否安全。
+
 ---
 
 ## 5. 组件开发规范
@@ -1277,6 +1327,7 @@ function handleConfirm() {
 | 页面切换未取消请求 | 切换页面时进行中的 API 请求继续触发状态更新 | 引入 `useApi<T>` + AbortController |
 | 组件渲染异常白屏 | 无 `config.errorHandler` 全局捕获 | 手动测试 |
 | Design Token 漂移 | `tokens.css` 与 demo `tokens.css` 不同步 | 脚本检测 |
+| Secure Context API 无 fallback | `navigator.clipboard.writeText()` 在 HTTP 下静默失败 | 人工审查（无 ESLint 规则） |
 
 ---
 

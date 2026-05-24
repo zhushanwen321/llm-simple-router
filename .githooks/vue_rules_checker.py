@@ -295,7 +295,7 @@ def check_vue_file(content: str, relative_path: str) -> tuple[int, list[str]]:
         (r'@onCheckedChange', '@onCheckedChange', '@update:model-value'),
     ]
     REACT_COMPONENTS = (
-        'Switch', 'Checkbox', 'Select', 'RadioGroup', 'Toggle',
+        'Switch', 'Checkbox', 'Select ', 'RadioGroup', 'Toggle',
         'Combobox', 'TagsInput', 'Slider', 'DatePicker', 'DateRangePicker',
     )
 

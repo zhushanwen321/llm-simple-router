@@ -452,6 +452,23 @@ docs/designs/demo-dashboard.html    →  frontend/src/views/Dashboard.vue
 3. **保持精简**：README 是概览，不是详尽文档。详细内容链接到 `docs/`
 4. **截图引用**：产品截图放在 `docs/screenshot/`，README 中使用相对路径引用
 
+### 9.5 OpenAPI / Swagger 文档
+
+**定位**：Admin API 的自动化接口文档。
+
+**生成方式**：从 Fastify JSON Schema 自动生成（`@fastify/swagger` + `@fastify/swagger-ui`）。不需要手写。
+
+**前置依赖**：Admin API 端点的 Schema 需要补全（当前 76 个端点仅 24 个有 Schema，见 `03-backend.md` 第 6.2 节）。
+
+### 9.6 Design Token 文档
+
+**定位**：前端设计令牌的权威来源。
+
+**维护规则**：
+1. 设计令牌从 `frontend/src/styles/tokens.ts`（TS 常量）作为单一来源生成 CSS 变量文件
+2. `docs/designs/components/tokens.css` 通过脚本从源文件同步，禁止手动编辑
+3. 新增 token 时：改 `tokens.ts` → 运行生成脚本 → 验证两处 tokens.css 一致
+
 ---
 
 ## 10. 文档操作规范

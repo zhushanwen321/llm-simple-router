@@ -11,9 +11,8 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import { RotateCw } from "lucide-vue-next";
+import { ChevronRight, RotateCw } from "lucide-vue-next";
 import ModelCard from "@/components/quick-setup/ModelCard.vue";
-import ConcurrencyControl from "@/components/shared/ConcurrencyControl.vue";
 import TransformRulesForm from "@/components/shared/TransformRulesForm.vue";
 import ProxyConfigForm from "@/components/shared/ProxyConfigForm.vue";
 import { CONTEXT_WINDOW_OPTIONS } from "@/composables/useProviderForm";
@@ -30,9 +29,9 @@ const newCapabilities = ref<string[]>(["text"]);
 
 const capabilityIcons = [
   { key: "text", icon: "T", label: "text" },
-  { key: "image", icon: "🖼", label: "image" },
-  { key: "audio", icon: "🎵", label: "audio" },
-  { key: "video", icon: "🎬", label: "video" },
+  { key: "image", icon: "IMG", label: "image" },
+  { key: "audio", icon: "AUD", label: "audio" },
+  { key: "video", icon: "VID", label: "video" },
 ] as const;
 
 function toggleNewCapability(key: string) {
@@ -217,19 +216,6 @@ function isOfficialOpenai(url: string): boolean {
         {{ t("providers.fields.upstreamPathHint") }}
       </p>
     </div>
-    <div class="mt-3">
-      <ProxyConfigForm
-        :proxy-type="props.proxyType"
-        :proxy-url="props.proxyUrl"
-        :proxy-username="props.proxyUsername"
-        :proxy-password="props.proxyPassword"
-        @update:proxy-type="emit('update:proxy-type', $event)"
-        @update:proxy-url="emit('update:proxy-url', $event)"
-        @update:proxy-username="emit('update:proxy-username', $event)"
-        @update:proxy-password="emit('update:proxy-password', $event)"
-        @clear="emit('clear-proxy')"
-      />
-    </div>
   </div>
 
   <!-- Section 2: Models -->
@@ -328,21 +314,23 @@ function isOfficialOpenai(url: string): boolean {
         </Select>
         <!-- Capabilities -->
         <div class="flex items-center gap-0.5 shrink-0">
-          <button
+          <Button
             v-for="cap in capabilityIcons"
             :key="cap.key"
             type="button"
-            class="w-6 h-6 rounded flex items-center justify-center border text-[11px] transition-colors"
+            variant="outline"
+            size="icon"
+            class="w-6 h-6 text-[11px] font-medium"
             :class="
               newCapabilities.includes(cap.key)
-                ? 'bg-primary/10 border-primary/30 text-primary'
-                : 'border-input text-muted-foreground/40 hover:text-muted-foreground'
+                ? 'border-primary/30 text-primary bg-primary/10'
+                : 'text-muted-foreground/40 hover:text-muted-foreground border-input'
             "
             :title="cap.label"
             @click="toggleNewCapability(cap.key)"
           >
             {{ cap.icon }}
-          </button>
+          </Button>
         </div>
         <Button
           type="button"
@@ -358,57 +346,103 @@ function isOfficialOpenai(url: string): boolean {
 
   <!-- Section 3: Advanced (collapsible, default closed) -->
   <div class="bg-card border-input border rounded-lg overflow-hidden mb-4">
-    <button
+    <Button
       type="button"
-      class="w-full flex items-center gap-2 px-5 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors"
+      variant="ghost"
+      class="w-full flex items-center gap-2 px-5 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground"
       @click="advancedOpen = !advancedOpen"
     >
-      <svg
+      <ChevronRight
         class="w-3 h-3 transition-transform duration-150"
         :class="advancedOpen ? 'rotate-90' : ''"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-      >
-        <path d="M9 18l6-6-6-6" />
-      </svg>
+      />
       {{ t("providers.fields.advancedSection") }}
-    </button>
+    </Button>
     <div v-if="advancedOpen" class="px-5 pb-5">
-      <div class="border-t border-input pt-4">
-        <div class="grid grid-cols-2 gap-4">
-          <div class="border border-input rounded-md p-3 space-y-3">
-            <div class="text-xs font-medium text-muted-foreground">
-              {{ t("providers.concurrency.title") }}
-            </div>
-            <ConcurrencyControl
-              :mode="props.concurrencyMode"
-              :max-concurrency="props.maxConcurrency"
-              :queue-timeout-ms="props.queueTimeoutMs"
-              :max-queue-size="props.maxQueueSize"
-              compact
-              @update:mode="
+      <div class="border-t border-input pt-4 space-y-4">
+        <!-- Concurrency -->
+        <div class="grid grid-cols-3 gap-3">
+          <div>
+            <Label class="text-xs text-muted-foreground">{{
+              t("providers.concurrency.mode")
+            }}</Label>
+            <Select
+              :model-value="props.concurrencyMode"
+              @update:model-value="
                 emit('update:concurrency-mode', $event as ConcurrencyMode)
               "
-              @update:max-concurrency="emit('update:max-concurrency', $event)"
-              @update:queue-timeout-ms="emit('update:queue-timeout-ms', $event)"
-              @update:max-queue-size="emit('update:max-queue-size', $event)"
+              class="mt-1"
+            >
+              <SelectTrigger class="h-8 text-[13px]">
+                <SelectValue
+                  :placeholder="t('providers.concurrency.selectMode')"
+                />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="auto">{{
+                  t("providers.concurrency.autoAdaptive")
+                }}</SelectItem>
+                <SelectItem value="manual">{{
+                  t("providers.concurrency.manual")
+                }}</SelectItem>
+                <SelectItem value="none">{{
+                  t("providers.concurrency.none")
+                }}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label class="text-xs text-muted-foreground">{{
+              t("providers.concurrency.maxConcurrency")
+            }}</Label>
+            <Input
+              :model-value="String(props.maxConcurrency)"
+              type="number"
+              class="mt-1"
+              @update:model-value="
+                emit('update:max-concurrency', Number($event))
+              "
             />
           </div>
-          <div class="border border-input rounded-md p-3 space-y-3">
-            <div class="text-xs font-medium text-muted-foreground">
-              {{ t("providers.transform.title") }}
-            </div>
-            <TransformRulesForm
-              :inject-headers="props.transformInjectHeaders"
-              :drop-fields="props.transformDropFields"
-              :request-defaults="props.transformRequestDefaults"
-              @update:inject-headers="emit('update:inject-headers', $event)"
-              @update:drop-fields="emit('update:drop-fields', $event)"
-              @update:request-defaults="emit('update:request-defaults', $event)"
+          <div>
+            <Label class="text-xs text-muted-foreground">{{
+              t("providers.concurrency.queueTimeout")
+            }}</Label>
+            <Input
+              :model-value="String(props.queueTimeoutMs)"
+              type="number"
+              class="mt-1"
+              @update:model-value="
+                emit('update:queue-timeout-ms', Number($event))
+              "
             />
           </div>
+        </div>
+        <!-- Proxy -->
+        <ProxyConfigForm
+          :proxy-type="props.proxyType"
+          :proxy-url="props.proxyUrl"
+          :proxy-username="props.proxyUsername"
+          :proxy-password="props.proxyPassword"
+          @update:proxy-type="emit('update:proxy-type', $event)"
+          @update:proxy-url="emit('update:proxy-url', $event)"
+          @update:proxy-username="emit('update:proxy-username', $event)"
+          @update:proxy-password="emit('update:proxy-password', $event)"
+          @clear="emit('clear-proxy')"
+        />
+        <!-- Transform Rules -->
+        <div class="border border-input rounded-md p-3 space-y-3">
+          <div class="text-xs font-medium text-muted-foreground">
+            {{ t("providers.transform.title") }}
+          </div>
+          <TransformRulesForm
+            :inject-headers="props.transformInjectHeaders"
+            :drop-fields="props.transformDropFields"
+            :request-defaults="props.transformRequestDefaults"
+            @update:inject-headers="emit('update:inject-headers', $event)"
+            @update:drop-fields="emit('update:drop-fields', $event)"
+            @update:request-defaults="emit('update:request-defaults', $event)"
+          />
         </div>
       </div>
     </div>

@@ -126,9 +126,42 @@ container.register('SemaphoreManager', () => new ProviderSemaphoreManager());
 const stateManager = container.get<ModelStateManager>('StateManager');
 ```
 
----
+### 2.4 Health Check 端点规范
 
-## 3. 核心层规范
+**P2 规则：`/health` 端点必须返回 DB 连通性和关键运行时指标。**
+
+当前 `/health` 存在但内容不详。生产环境应返回：
+
+- `db`: 数据库连接状态（`ok` / `error`）
+- `uptime`: 进程运行时长（秒）
+- `memory`: 堆内存使用（MB）
+- `version`: 当前版本号
+
+```typescript
+app.get("/health", async () => {
+  const dbOk = testDbConnection(db)  // 简单 SELECT 1
+  return {
+    status: dbOk ? "ok" : "degraded",
+    db: dbOk ? "ok" : "error",
+    uptime: Math.floor(process.uptime()),
+    memory: Math.floor(process.memoryUsage().heapUsed / 1024 / 1024),
+    version: PACKAGE_VERSION,
+  }
+})
+```
+
+### 2.5 Graceful Shutdown 规范
+
+**P2 规则：收到 SIGTERM 后应先排空活跃请求再关闭 DB 连接，而非立即超时退出。**
+
+当前实现有超时强制退出机制，但未显式等待活跃代理请求完成。建议改进：
+
+1. 收到 SIGTERM 后，停止接收新请求（`app.close()` 但保持现有连接）
+2. 通知所有活跃 `StreamProxy` 和 `ResilienceLayer` 尽快结束（发送 `x-shutting-down` 标记）
+3. 等待活跃请求计数归零或超过最大等待时间（建议 30s）
+4. 关闭数据库连接（`db.close()`）
+
+**正确顺序**：disconnect new connections → drain active requests → close DB → exit process
 
 核心层位于 `router/src/core/`，提供全项目共享的基础设施。**核心层不得依赖代理层、数据库层、管理 API 层**，保持方向单一。
 
@@ -330,12 +363,65 @@ const combined = [dataLine1, dataLine2].join('\n');
 
 - 流式超时通过 `STREAM_TIMEOUT_MS` 环境变量控制，默认 3000000ms
 
+#### 4.5.2.1 SSE 流背压处理
+
+**P2 规则：StreamProxy 必须检测并处理 `socket.writableNeedDrain`。**
+
+Node.js 官方文档强调 SSE 代理必须处理背压（backpressure）——上游数据流入速度快于下游客户端消费速度时，内存中缓冲的数据无限增长最终 OOM。
+
+```typescript
+// StreamProxy 正确做法：在可写端暂停/恢复
+upstreamStream.on('data', (chunk) => {
+  const canContinue = reply.raw.write(chunk)
+  if (!canContinue) {
+    upstreamStream.pause()
+    reply.raw.once('drain', () => upstreamStream.resume())
+  }
+})
+```
+
 #### 4.5.3 HTTP 调用规范
 
 - 使用原生 `http.request` 而非 axios
 - 请求 header 构建使用 `buildHeaders()`（`proxy-core.ts`）
 - 错误提取必须完整获取 `message` + `code` + `type` 三个字段
 - URL 拼接使用 `buildUpstreamUrl()` 工具函数
+
+#### 4.5.4 超时分级规范
+
+**P2 规则：流式和非流式请求必须有不同的超时配置。**
+
+当前全局 `STREAM_TIMEOUT_MS` 仅覆盖流式超时。非流式请求应配置独立的短超时：
+
+| 类型 | 默认超时 | 配置方式 |
+|------|---------|---------|
+| 流式（SSE） | 3000s | `STREAM_TIMEOUT_MS` 环境变量 |
+| 非流式（普通 POST） | 30s | 建议新增 `NON_STREAM_TIMEOUT_MS` |
+| Admin API 内部调用 | 10s | 硬编码 |
+
+#### 4.5.5 上游响应体大小限制
+
+**P2 规则：上游响应必须设置最大读取字节数。**
+
+恶意或异常的上游可能发送无限大响应导致 OOM。应在 Transport 层设置合理的 `maxBodySize`（默认建议 10MB），超出后截断并记录日志。
+
+#### 4.5.6 连接池按 Provider 隔离
+
+**P2 规则：不同 Provider 不应共享同一个 `http.Agent` 连接池。**
+
+Node.js 官方推荐为不同后端创建独立 Agent 实例。当前 `ProxyAgentFactory` 的全局 keep-alive Agent 是多 Provider 共享的（`maxSockets: 50`），单 Provider 故障时可占满所有连接影响其他 Provider。
+
+推荐改为按 Provider ID 维度缓存 Agent：
+
+```typescript
+class ProxyAgentFactory {
+  private agentPool = new Map<string, { http: Agent; https: Agent }>()
+
+  getAgentForProvider(providerId: string, url: string): Agent {
+    // 按 providerId 隔离连接池
+  }
+}
+```
 
 ### 4.6 代理共享模块
 
@@ -469,6 +555,52 @@ const models = parseModels(provider.models);
 - 加解密工具位于 `src/utils/crypto.ts`
 - 格式：`iv:authTag:ciphertext`
 
+### 5.7 Prepared Statement 缓存规范
+
+better-sqlite3 的 `.prepare()` 每次调用都编译 SQL，高频路径上重复编译浪费 CPU。
+
+**P1 规则：所有高频调用路径必须使用 `getCachedStmt()` 缓存 prepared statement。**
+
+当前覆盖情况：
+
+| 文件 | 缓存状态 | 典型调用频率 |
+|------|---------|------------|
+| `logs.ts` | 部分使用（5/12 处） | 每个代理请求 1 次 |
+| `metrics.ts` | 已使用 `getCachedStmt` | 每个代理请求 1 次 |
+| `mappings.ts` | **未缓存** | 每个代理请求 1-2 次 |
+| `providers.ts` | **未缓存** | Admin API 调用 |
+| `retry-rules.ts` | **未缓存** | 每个代理请求（规则匹配） |
+| `router-keys.ts` | **未缓存** | 每个代理请求（认证） |
+| `schedules.ts` | **未缓存** | 定时调度 |
+| `stats.ts` | **未缓存** | Dashboard 刷新 |
+
+```typescript
+// 错误：每次函数调用都重新 prepare
+function getActiveMappings(db: Database) {
+  return db.prepare("SELECT * FROM mapping_groups WHERE is_active = 1").all()
+}
+
+// 正确：用 getCachedStmt 缓存
+import { getCachedStmt } from "./helpers"
+function getActiveMappings(db: Database) {
+  return getCachedStmt(db,
+    "SELECT * FROM mapping_groups WHERE is_active = 1"
+  ).all()
+}
+```
+
+### 5.8 日志清理规范
+
+**P2 规则：批量 DELETE 必须加 LIMIT 分批执行。**
+
+当前 `deleteLogsBefore()` 可能一次 DELETE 数万行，长事务持有 WAL 锁阻塞其他代理请求的日志写入。每批建议 1000 行。
+
+### 5.9 SQL 索引审计
+
+**P2 规则：新增高频查询前必须用 `EXPLAIN QUERY PLAN` 验证索引覆盖。**
+
+日志查询的典型 WHERE 条件（`created_at`、`router_key_id`、`model`、`status_code`）需确认有对应索引。若 `EXPLAIN QUERY PLAN` 输出含 `SCAN` 则缺少索引。
+
 ---
 
 ## 6. 管理 API 规范
@@ -481,7 +613,38 @@ const models = parseModels(provider.models);
 - 认证：JWT + Cookie（`admin-auth.ts` 中间件）
 - 跳过认证的路径：`/admin/api/setup/*`、`/admin/api/login`、`/admin/api/logout`
 
-### 6.2 文件组织
+### 6.2 Schema 验证覆盖规范
+
+**P1 规则：所有 Admin API 端点请求体必须有 JSON Schema 验证。**
+
+当前覆盖：76 个端点中仅 24 个有 Schema（`mappings`、`schedules`、`usage`），其余模块（`providers`、`settings`、`logs`、`retry-rules`、`router-keys`、`quick-setup`、`import-export`、`upgrade`）无验证。
+
+**为什么需要 Schema**：
+
+1. **安全**：拒绝非法请求体，防止注入和类型混淆
+2. **性能**：Fastify 的 JSON Schema 触发 `fast-json-stringify`，序列化性能提升 2-3x
+3. **文档**：Schema 可作为 `@fastify/swagger` 的输入自动生成 OpenAPI 文档
+
+```typescript
+// 正确模式（参考现有 mappings.ts）
+const CreateProviderSchema = Type.Object({
+  name: Type.String({ minLength: 1, maxLength: 100 }),
+  api_type: Type.String(),
+  base_url: Type.String({ format: 'uri' }),
+  api_key: Type.String(),
+  models: Type.Optional(Type.String()),
+  is_active: Type.Optional(Type.Boolean()),
+})
+
+app.post("/admin/api/providers",
+  { schema: { body: CreateProviderSchema } },
+  async (request, reply) => {
+    const body = request.body as Static<typeof CreateProviderSchema>
+  }
+)
+```
+
+### 6.3 文件组织
 
 | 文件 | 领域 |
 |------|------|

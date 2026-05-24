@@ -10,6 +10,7 @@
 llm-simple-router/                    # Monorepo 根目录
 ├── .github/workflows/                # CI/CD
 ├── .githooks/                        # Git hooks
+├── .claude/hooks/                    # Claude Code hooks（AI 编码约束）
 ├── .xyz-harness/                     # 工作流状态
 ├── docs/                             # 文档
 ├── router/                           # 后端子包（npm workspace）
@@ -17,6 +18,7 @@ llm-simple-router/                    # Monorepo 根目录
 ├── pi-extension/                     # Pi 扩展子包（npm workspace）
 ├── scripts/                          # 构建/发布脚本
 ├── CLAUDE.md                         # AI 编码指南
+├── CONTEXT.md                        # 领域术语表（预留，待创建）
 ├── README.md / README.en.md          # 项目说明
 ├── package.json                      # 根配置（workspaces 声明）
 ├── eslint.config.mjs                 # ESLint 入口
@@ -430,7 +432,22 @@ router/
 - 通过 `npm prepare` 自动安装到 `.git/hooks/`
 - pre-commit 四阶段：Prettier + ESLint → vue-tsc → 代码规范 → 全部跳过开关
 
-### 6.3 .xyz-harness/
+### 6.3 .claude/hooks/
+
+```
+.claude/hooks/
+├── check-migration-file.sh     # 禁止 AI 修改已发布的 SQL 迁移文件
+└── check-dist-write.sh         # 禁止 AI 在 dist/ 中写文件
+```
+
+**用途**：在 AI 编码过程中实时拦截不合规操作，是 pre-commit hook 的补充（stock-data-crawler 项目类似实践）。
+
+**规则**：
+- 已发布的 SQL 迁移文件（`router/src/db/migrations/*.sql`）禁止修改，只能新增
+- `dist/` 目录是构建产物，禁止 AI 直接编辑
+- 新增 AI 约束时编辑对应 hook 脚本
+
+### 6.4 .xyz-harness/
 
 工作流状态目录，按日期+功能命名：
 

@@ -2,8 +2,8 @@ import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { toast } from "vue-sonner";
 import { api, getApiMessage } from "@/api/client";
+import { fallbackCopy } from "@/composables/useClipboard";
 import type { Provider } from "@/types/mapping";
-import { useClipboard } from "@/composables/useClipboard";
 
 const MASK_VISIBLE_LEN = 7;
 const MASK_ASTERISK_COUNT = 7;
@@ -35,16 +35,20 @@ export function useProviderActions() {
     return key.slice(0, MASK_VISIBLE_LEN) + "*".repeat(MASK_ASTERISK_COUNT);
   }
 
-  const { copy: doCopy } = useClipboard();
-
   async function copyKey(key: string, id: string) {
-    const ok = await doCopy(key);
-    if (ok) {
-      copiedId.value = id;
-      setTimeout(() => {
-        copiedId.value = null;
-      }, COPY_FEEDBACK_MS);
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(key);
+      } else {
+        fallbackCopy(key);
+      }
+    } catch {
+      fallbackCopy(key);
     }
+    copiedId.value = id;
+    setTimeout(() => {
+      copiedId.value = null;
+    }, COPY_FEEDBACK_MS);
   }
 
   function confirmDelete(p: Provider) {

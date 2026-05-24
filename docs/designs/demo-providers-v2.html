@@ -853,10 +853,17 @@
         <div class="form-grid" style="margin-top:14px">
           <div class="form-field full">
             <label class="form-label">代理配置 <span class="form-hint">(可选)</span></label>
-            <div class="form-row">
-              <input class="form-input" id="editProxyUrl" placeholder="http://proxy:8080">
-              <input class="form-input" id="editProxyUser" placeholder="用户名" style="max-width:120px">
-              <input class="form-input" id="editProxyPass" placeholder="密码" type="password" style="max-width:120px">
+            <div class="form-row" style="align-items:flex-end">
+              <div class="select-wrap">
+                <select id="editProxyType" onchange="onProxyTypeChange()">
+                  <option value="">无代理</option>
+                  <option value="http">HTTP/HTTPS</option>
+                  <option value="socks5">SOCKS5</option>
+                </select>
+              </div>
+              <input class="form-input" id="editProxyUrl" placeholder="http://proxy:8080" style="flex:1">
+              <input class="form-input" id="editProxyUser" placeholder="用户名" style="max-width:100px">
+              <input class="form-input" id="editProxyPass" placeholder="密码" type="password" style="max-width:100px">
             </div>
           </div>
         </div>
@@ -1187,6 +1194,18 @@ function toggleCap(key, el) {
   } else {
     newModelCaps.push(key);
     el.classList.add('active');
+  }
+}
+
+function onProxyTypeChange() {
+  const type = document.getElementById('editProxyType').value;
+  const urlInput = document.getElementById('editProxyUrl');
+  if (type === 'socks5') {
+    urlInput.placeholder = 'socks5://127.0.0.1:1080';
+  } else if (type === 'http') {
+    urlInput.placeholder = 'http://127.0.0.1:7890';
+  } else {
+    urlInput.placeholder = '';
   }
 }
 
