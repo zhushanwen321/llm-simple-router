@@ -62,30 +62,15 @@ function getTimelineTimeRange(range: TimelineRange): {
   };
 }
 
-/** 检查两个时间窗口是否有重叠 */
-function windowsOverlap(
-  a: { start_time: string; end_time: string },
-  b: { start_time: string; end_time: string },
-): boolean {
-  const aStart = new Date(a.start_time).getTime();
-  const aEnd = new Date(a.end_time).getTime();
-  const bStart = new Date(b.start_time).getTime();
-  const bEnd = new Date(b.end_time).getTime();
-  return aStart < bEnd && aEnd > bStart;
-}
-
-/** 从 usageWindows 中按 provider_id 聚合与目标窗口重叠的 output tokens */
-function aggregateProviderTokens(
+/** 从 usageWindows 中按 provider_id 聚合全部 input tokens（不依赖选中窗口） */
+function aggregateAllProviderInputTokens(
   windows: UsageWindowWithUsage[],
-  targetWindow: { start_time: string; end_time: string },
 ): Map<string, number> {
   const map = new Map<string, number>();
   for (const w of windows) {
-    if (!w.window.provider_id || w.usage.total_output_tokens <= 0) continue;
-    if (windowsOverlap(w.window, targetWindow)) {
-      const existing = map.get(w.window.provider_id) ?? 0;
-      map.set(w.window.provider_id, existing + w.usage.total_output_tokens);
-    }
+    if (!w.window.provider_id || w.usage.total_input_tokens <= 0) continue;
+    const existing = map.get(w.window.provider_id) ?? 0;
+    map.set(w.window.provider_id, existing + w.usage.total_input_tokens);
   }
   return map;
 }
@@ -512,29 +497,26 @@ export function useDashboard() {
     loadFilterOptions,
   } = useDashboardFilters(selectedProvider, providers, t);
 
-  // --- Derived: provider token labels from usageWindows ---
-  // Fix #3: 使用时间重叠匹配替代 id/exact time 匹配
+  // --- Derived: provider token labels from usageWindows (stable across provider selection) ---
+  const providerInputTokens = computed(() =>
+    aggregateAllProviderInputTokens(usageWindows.value),
+  );
+
   const providerTokenLabels = computed(() => {
     const map = new Map<string, string>();
-    const window = selectedWindow.value;
-    if (!window) return map;
-    const tokenMap = aggregateProviderTokens(usageWindows.value, window.window);
-    for (const [id, tokens] of tokenMap) {
+    for (const [id, tokens] of providerInputTokens.value) {
       map.set(id, formatProviderTokenLabel(tokens));
     }
     return map;
   });
 
-  // --- Provider sorting based on current window's output tokens ---
+  // --- Provider sorting based on total input tokens across all windows ---
   const sortedProviders = computed(() => {
-    const window = selectedWindow.value;
-    const tokenMap = window
-      ? aggregateProviderTokens(usageWindows.value, window.window)
-      : new Map<string, number>();
+    const tokenMap = providerInputTokens.value;
     return [...providers.value].sort((a, b) => {
-      const aOut = tokenMap.get(a.id) ?? 0;
-      const bOut = tokenMap.get(b.id) ?? 0;
-      return bOut - aOut;
+      const aIn = tokenMap.get(a.id) ?? 0;
+      const bIn = tokenMap.get(b.id) ?? 0;
+      return bIn - aIn;
     });
   });
 
@@ -740,8 +722,8 @@ export function useDashboard() {
     await loadProviders();
     if (providerLoadError.value) return;
     await Promise.allSettled([loadFilterOptions(), loadUsageWindows()]);
-    autoSelectLatestWindow();
     autoSelectProviderIfNeeded();
+    autoSelectLatestWindow();
     await refresh();
     await loadPrevWindowStats();
   }
@@ -751,9 +733,9 @@ export function useDashboard() {
     await loadProviders();
     if (providerLoadError.value) return;
     await loadUsageWindows();
-    autoSelectLatestWindow();
     await loadFilterOptions();
     autoSelectProviderIfNeeded();
+    autoSelectLatestWindow();
     await refresh();
     await loadPrevWindowStats();
     initialized.value = true;
