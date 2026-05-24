@@ -157,13 +157,24 @@ export async function buildApp(
   app.addHook("onRequest", (request, reply, done) => {
     (request as unknown as { receivedAt: number }).receivedAt = Date.now();
 
-    // 全局 EPIPE 防护：ServerResponse 的 write 异步完成失败时，
-    // 内部 socketErrorListener → response.destroy(err) → response.emit('error')。
-    // 若无 listener 则该 error 成为 uncaught exception。
+    // 全局 EPIPE 防护：
+    // EPIPE 从底层 socket 的 WriteWrap.onWriteComplete 触发，emit 在 socket 上，
+    // 不会传播到 reply.raw（ServerResponse）。reply.raw.on("error") 无法拦截 socket 的 EPIPE。
+    // 因此必须直接在 socket 上注册 error handler。
+    // Node.js HTTP server 内置的 socketOnError 只处理第一次 error（随后注册 noop 兜底），
+    // 本 handler 提供额外的永久保护层。
     // 代理路由在 create-proxy-handler.ts 中已有额外监听，此处覆盖所有路由。
+    const sock = request.raw.socket;
+    sock.on("error", (err: NodeJS.ErrnoException) => {
+      if (err.code === "EPIPE" || err.code === "ECONNRESET") {
+        request.log.debug({ err }, "client socket error");
+      } else {
+        request.log.warn({ err }, "unexpected socket error");
+      }
+    });
     reply.raw.on("error", (err: Error) => {
       const code = (err as { code?: string }).code;
-      if (code === 'EPIPE') {
+      if (code === "EPIPE") {
         request.log.debug({ err }, "client disconnected (EPIPE)");
       } else {
         request.log.warn({ err }, "response stream error");
