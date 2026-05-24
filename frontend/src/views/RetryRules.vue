@@ -1,5 +1,5 @@
 <template>
-  <div class="p-6">
+  <div class="page">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-lg font-semibold text-foreground">
         {{ t("retryRules.title") }}
@@ -10,7 +10,7 @@
       </Button>
     </div>
 
-    <div class="bg-card rounded-lg border overflow-hidden">
+    <Card flush>
       <Table class="[&_td]:px-4 [&_th]:px-4">
         <TableHeader>
           <TableRow class="bg-muted">
@@ -107,7 +107,7 @@
           </TableRow>
         </TableBody>
       </Table>
-    </div>
+    </Card>
 
     <!-- Create/Edit Dialog -->
     <Dialog v-model:open="dialogOpen">
@@ -414,6 +414,7 @@ import { toast } from "vue-sonner";
 import { api, getApiMessage, type RecommendedRetryRule } from "@/api/client";
 import type { Provider } from "@/types/mapping";
 import type { RetryRule } from "@/types/models";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

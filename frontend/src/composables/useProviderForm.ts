@@ -190,7 +190,7 @@ export function useProviderForm() {
     return payload;
   }
 
-  function addModel() {
+  function addModel(caps?: string[], patchList?: string[]) {
     const input = modelInput.value.trim();
     if (!input) return;
     const names = input
@@ -202,9 +202,9 @@ export function useProviderForm() {
         form.value.models.push({
           name,
           context_window: modelContextWindow.value || DEFAULT_CONTEXT_WINDOW,
-          patches: [],
+          patches: patchList ?? [],
           stream_timeout_ms: DEFAULT_STREAM_TIMEOUT_MS,
-          capabilities: ["text"],
+          capabilities: caps ?? ["text"],
         });
       }
     }

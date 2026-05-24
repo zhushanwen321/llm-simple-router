@@ -4,6 +4,26 @@
   "editProvider": "Edit Provider",
   "reloadPlugin": "Reload Plugins",
   "noProviders": "No providers yet",
+  "anchor": {
+    "total": "Total Providers",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "models": "Total Models"
+  },
+  "filter": {
+    "searchPlaceholder": "Search name or URL...",
+    "status": "Status",
+    "all": "All",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "count": "providers",
+    "noResults": "No matching results"
+  },
+  "empty": {
+    "title": "No Providers Configured",
+    "description": "Add your first upstream API provider to start routing LLM requests. Supports OpenAI, Anthropic, and all compatible APIs.",
+    "addFirst": "Add First Provider"
+  },
   "tableHeaders": {
     "name": "Name",
     "type": "Type",
@@ -48,6 +68,9 @@
     "proxyUsername": "Username",
     "proxyPassword": "Password",
     "proxyAuthOptional": "Optional",
+    "connectionSection": "Connection",
+    "modelsSection": "Models",
+    "advancedSection": "Advanced",
     "upstreamPath": "Upstream Path",
     "upstreamPathPlaceholder": "Default: /v1/chat/completions or /v1/messages",
     "upstreamPathHint": "Leave empty for API type default path",

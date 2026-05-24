@@ -169,6 +169,24 @@ Handler (handler/proxy-handler.ts)
 
 **技术栈：** Vue 3.5 + TypeScript + Vite 8 + Tailwind 3.4 + shadcn-vue 2.6 + Chart.js 4.5 + @tanstack/vue-table 8.21 + lucide-vue-next + vue-sonner
 
+**全局工具类（`frontend/src/styles/components.css`）：**
+
+| 工具类 | 用途 | 使用场景 |
+|--------|------|----------|
+| `.page` | 页面布局容器（`p-6 max-w-[1440px] mx-auto`） | 所有标准页面的最外层 div |
+
+新增页面必须使用 `.page` 作为外层容器。
+
+**Card 组件变体（`frontend/src/components/ui/card/Card.vue`）：**
+
+| 变体 | 用途 |
+|------|----------|
+| `<Card>` | 标准卡片，有 padding/gap |
+| `<Card size="sm">` | 紧凑卡片 |
+| `<Card flush>` | 无 padding + overflow-hidden，用于包裹 Table 等全宽内容 |
+
+需要 card 样式时优先使用 Card 组件而非裸 `bg-card rounded-lg border`。
+
 **路由（`frontend/src/router/index.ts`）：**
 | 路径 | 视图 | 认证 |
 |------|------|------|

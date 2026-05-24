@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>API Keys — LLM Router Console</title>
+<style>
+  :root {
+    --bg: oklch(0.145 0 0);
+    --surface: oklch(0.205 0 0);
+    --surface-up: oklch(0.269 0 0);
+    --fg: oklch(0.985 0 0);
+    --muted: oklch(0.708 0 0);
+    --muted-dim: oklch(0.556 0 0);
+    --border: oklch(1 0 0 / 10%);
+    --border-strong: oklch(1 0 0 / 14%);
+    --primary: oklch(0.68 0.13 175);
+    --primary-dim: oklch(0.68 0.13 175 / 15%);
+    --success: oklch(0.65 0.17 150);
+    --success-dim: oklch(0.65 0.17 150 / 12%);
+    --warning: oklch(0.78 0.16 80);
+    --danger: oklch(0.58 0.22 25);
+    --danger-dim: oklch(0.58 0.22 25 / 12%);
+    --info: oklch(0.62 0.18 250);
+    --info-bg: oklch(0.30 0.06 250);
+    --mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+    --sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --radius: 8px;
+    --radius-sm: 6px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 14px; line-height: 1.5; }
+  button { cursor: pointer; font-family: inherit; }
+  input { font-family: inherit; }
+
+  .page { max-width: 1360px; margin: 0 auto; padding: 20px 24px; }
+
+  /* ===== Header ===== */
+  .hdr { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+  .hdr-title { font-size: 16px; font-weight: 600; white-space: nowrap; }
+  .hdr-spacer { flex: 1; }
+  .hdr-btn {
+    display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 12px;
+    border: 1px solid var(--border); border-radius: var(--radius); background: transparent;
+    color: var(--muted); font-size: 13px; transition: all 150ms;
+  }
+  .hdr-btn:hover { background: var(--surface); color: var(--fg); }
+  .hdr-btn.primary { background: var(--primary); border-color: var(--primary); color: oklch(0.145 0 0); font-weight: 600; }
+  .hdr-btn.primary:hover { background: oklch(0.72 0.14 175); }
+  .hdr-btn svg { width: 14px; height: 14px; }
+
+  /* ===== Anchor bar ===== */
+  .anchor-bar {
+    display: flex; gap: 24px; padding: 12px 16px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); margin-bottom: 12px;
+  }
+  .anchor-item { display: flex; flex-direction: column; gap: 2px; }
+  .anchor-item .label {
+    font-size: 11px; color: var(--muted-dim); text-transform: uppercase;
+    letter-spacing: 0.05em; font-weight: 500;
+  }
+  .anchor-item .value {
+    font-family: var(--mono); font-size: 20px; font-weight: 600; line-height: 1;
+  }
+  .anchor-item .value.teal { color: var(--primary); }
+  .anchor-divider { width: 1px; background: var(--border); align-self: stretch; }
+
+  /* ===== Filter bar ===== */
+  .filter-bar {
+    display: flex; gap: 8px; align-items: center;
+    margin-bottom: 12px;
+  }
+  .search-wrap {
+    position: relative; flex: 1; max-width: 280px;
+  }
+  .search-wrap svg {
+    position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+    width: 14px; height: 14px; color: var(--muted-dim); pointer-events: none;
+  }
+  .search-wrap input {
+    width: 100%; height: 30px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 0 10px 0 30px; color: var(--fg); font-size: 13px;
+    outline: none; transition: border-color 150ms;
+  }
+  .search-wrap input::placeholder { color: var(--muted-dim); }
+  .search-wrap input:focus { border-color: var(--primary); }
+
+  /* ===== Table ===== */
+  .table-wrap {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    font-size: 11px; font-weight: 600; color: var(--muted-dim);
+    text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 8px 12px; text-align: left;
+    border-bottom: 1px solid var(--border); background: oklch(0.18 0 0);
+  }
+  thead th:last-child { text-align: right; }
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 100ms;
+  }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: oklch(0.22 0 0); }
+  tbody tr.deprecated { opacity: 0.45; }
+  tbody td {
+    padding: 8px 12px; font-size: 13px;
+    vertical-align: middle;
+  }
+  tbody td:last-child { text-align: right; }
+
+  /* Name */
+  .key-name { font-weight: 500; max-width: 200px; }
+  .key-name.deprecated-text { text-decoration: line-through; color: var(--muted); }
+
+  /* Key display */
+  .key-cell { display: flex; align-items: center; gap: 6px; }
+  .key-prefix {
+    font-family: var(--mono); font-size: 12px; font-weight: 500;
+    letter-spacing: 0.02em; color: var(--fg);
+  }
+  .key-mask {
+    font-family: var(--mono); font-size: 12px; color: var(--muted-dim);
+    letter-spacing: 0.06em;
+  }
+  .key-full {
+    font-family: var(--mono); font-size: 12px; font-weight: 500;
+    letter-spacing: 0.02em; color: var(--fg);
+    word-break: break-all;
+  }
+  .btn-icon {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 24px; height: 24px; border: none; border-radius: 4px;
+    background: transparent; color: var(--muted); transition: all 150ms;
+    flex-shrink: 0;
+  }
+  .btn-icon:hover { background: var(--surface-up); color: var(--primary); }
+  .btn-icon.copied { color: var(--success); }
+  .btn-icon svg { width: 14px; height: 14px; }
+  .btn-reveal {
+    font-size: 11px; color: var(--muted); background: none; border: 1px solid var(--border);
+    padding: 1px 6px; border-radius: 4px; transition: all 150ms; flex-shrink: 0;
+  }
+  .btn-reveal:hover { color: var(--primary); border-color: var(--primary); }
+
+  /* Model badges */
+  .model-list { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+  .model-tag {
+    font-family: var(--mono); font-size: 10px; font-weight: 500;
+    padding: 1px 6px; border-radius: 9999px;
+    background: oklch(0.269 0 0); color: var(--muted);
+  }
+  .model-tag-all {
+    font-size: 10px; font-weight: 600;
+    padding: 1px 6px; border-radius: 9999px;
+    background: var(--info-bg); color: var(--info);
+  }
+  .model-more {
+    font-family: var(--mono); font-size: 10px; font-weight: 500;
+    padding: 1px 5px; border-radius: 9999px;
+    background: var(--primary-dim); color: var(--primary);
+  }
+
+  /* Status switch */
+  .status-cell { display: flex; align-items: center; gap: 6px; }
+  .status-dot {
+    width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+  }
+  .status-dot.active { background: var(--success); box-shadow: 0 0 6px var(--success-dim); }
+  .status-dot.inactive { background: var(--muted-dim); }
+  .status-label { font-size: 12px; color: var(--muted); }
+
+  /* Date */
+  .date-cell {
+    font-family: var(--mono); font-size: 11px; color: var(--muted-dim);
+  }
+
+  /* Actions */
+  .actions { display: flex; gap: 4px; justify-content: flex-end; }
+  .act-btn {
+    display: inline-flex; align-items: center; gap: 4px;
+    height: 26px; padding: 0 8px; border: none; border-radius: 4px;
+    background: transparent; color: var(--muted); font-size: 12px;
+    transition: all 150ms;
+  }
+  .act-btn:hover { background: var(--surface-up); color: var(--fg); }
+  .act-btn.danger:hover { color: var(--danger); background: var(--danger-dim); }
+  .act-btn svg { width: 13px; height: 13px; }
+
+  /* ===== Dialog overlay ===== */
+  .overlay {
+    position: fixed; inset: 0; background: oklch(0 0 0 / 60%);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100; opacity: 0; pointer-events: none; transition: opacity 200ms;
+  }
+  .overlay.open { opacity: 1; pointer-events: auto; }
+  .dialog {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); width: 480px; max-width: 95vw;
+    max-height: 90vh; overflow-y: auto;
+    box-shadow: 0 8px 32px oklch(0 0 0 / 40%);
+    transform: translateY(8px); transition: transform 200ms;
+  }
+  .overlay.open .dialog { transform: translateY(0); }
+  .dlg-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 20px 12px; border-bottom: 1px solid var(--border);
+  }
+  .dlg-title { font-size: 15px; font-weight: 600; }
+  .dlg-close {
+    width: 28px; height: 28px; border: none; border-radius: 4px;
+    background: transparent; color: var(--muted); display: flex;
+    align-items: center; justify-content: center; transition: all 150ms;
+  }
+  .dlg-close:hover { background: var(--surface-up); color: var(--fg); }
+  .dlg-close svg { width: 16px; height: 16px; }
+  .dlg-body { padding: 16px 20px; }
+  .dlg-footer {
+    display: flex; justify-content: flex-end; gap: 8px;
+    padding: 12px 20px 16px; border-top: 1px solid var(--border);
+  }
+
+  /* Form */
+  .form-group { margin-bottom: 16px; }
+  .form-group:last-child { margin-bottom: 0; }
+  .form-label {
+    display: block; font-size: 12px; font-weight: 500; color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .form-input {
+    width: 100%; height: 32px; background: var(--bg); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 0 10px; color: var(--fg); font-size: 13px;
+    outline: none; transition: border-color 150ms;
+  }
+  .form-input:focus { border-color: var(--primary); }
+  .form-input::placeholder { color: var(--muted-dim); }
+  .form-hint { font-size: 11px; color: var(--muted-dim); margin-top: 3px; }
+
+  /* Checkbox list */
+  .check-list {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 8px; max-height: 200px;
+    overflow-y: auto;
+  }
+  .check-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 4px 6px; border-radius: 4px; cursor: pointer;
+    transition: background 100ms;
+  }
+  .check-item:hover { background: var(--surface); }
+  .check-item input[type="checkbox"] {
+    width: 14px; height: 14px; accent-color: var(--primary);
+    cursor: pointer;
+  }
+  .check-item .model-name {
+    font-family: var(--mono); font-size: 11px; color: var(--fg);
+  }
+  .check-search {
+    width: 100%; height: 28px; background: transparent; border: none;
+    border-bottom: 1px solid var(--border); padding: 0 4px 6px;
+    color: var(--fg); font-size: 12px; outline: none; margin-bottom: 6px;
+  }
+  .check-search::placeholder { color: var(--muted-dim); }
+
+  /* Key reveal banner */
+  .key-banner {
+    background: var(--primary-dim); border: 1px solid oklch(0.68 0.13 175 / 25%);
+    border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 16px;
+  }
+  .key-banner-label {
+    font-size: 11px; font-weight: 600; color: var(--primary);
+    text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;
+  }
+  .key-banner-row {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--bg); border-radius: 4px; padding: 8px 10px;
+  }
+  .key-banner-text {
+    font-family: var(--mono); font-size: 12px; font-weight: 500;
+    word-break: break-all; flex: 1; color: var(--fg);
+  }
+  .key-banner-warn {
+    font-size: 11px; color: var(--warning); margin-top: 8px;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .key-banner-warn svg { width: 12px; height: 12px; flex-shrink: 0; }
+
+  /* Toggle row (for is_active in edit) */
+  .toggle-row {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .toggle-switch {
+    position: relative; width: 36px; height: 20px; border-radius: 10px;
+    background: var(--surface-up); cursor: pointer; transition: background 150ms;
+    flex-shrink: 0;
+  }
+  .toggle-switch.on { background: var(--primary); }
+  .toggle-switch .knob {
+    position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+    border-radius: 50%; background: var(--fg); transition: transform 150ms;
+  }
+  .toggle-switch.on .knob { transform: translateX(16px); }
+  .toggle-label { font-size: 13px; color: var(--fg); }
+
+  /* Empty state */
+  .empty-row td { text-align: center; padding: 48px 16px !important; }
+  .empty-text { color: var(--muted-dim); font-size: 13px; margin-bottom: 12px; }
+</style>
+</head>
+<body>
+
+<div class="page">
+  <!-- Header -->
+  <div class="hdr">
+    <div class="hdr-title">API Keys</div>
+    <div class="hdr-spacer"></div>
+    <button class="hdr-btn" onclick="toggleAllKeys()">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+      Copy All
+    </button>
+    <button class="hdr-btn primary" onclick="openCreate()">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+      Create Key
+    </button>
+  </div>
+
+  <!-- Anchor bar -->
+  <div class="anchor-bar">
+    <div class="anchor-item">
+      <span class="label">Total Keys</span>
+      <span class="value" id="stat-total">5</span>
+    </div>
+    <div class="anchor-divider"></div>
+    <div class="anchor-item">
+      <span class="label">Active</span>
+      <span class="value teal" id="stat-active">3</span>
+    </div>
+    <div class="anchor-divider"></div>
+    <div class="anchor-item">
+      <span class="label">With Whitelist</span>
+      <span class="value" id="stat-whitelist">3</span>
+    </div>
+  </div>
+
+  <!-- Filter bar -->
+  <div class="filter-bar">
+    <div class="search-wrap">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path stroke-linecap="round" stroke-width="2" d="M21 21l-4.35-4.35"/></svg>
+      <input type="text" id="searchInput" placeholder="Search by name or key..." oninput="renderTable()"/>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Key</th>
+          <th>Whitelist</th>
+          <th>Status</th>
+          <th>Created</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="keyTable"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Create / Edit Dialog -->
+<div class="overlay" id="editOverlay" onclick="if(event.target===this)closeDialog()">
+  <div class="dialog">
+    <div class="dlg-header">
+      <div class="dlg-title" id="dlgTitle">Create Key</div>
+      <button class="dlg-close" onclick="closeDialog()">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="dlg-body" id="dlgBody"></div>
+    <div class="dlg-footer" id="dlgFooter"></div>
+  </div>
+</div>
+
+<!-- Key Reveal Dialog (after create) -->
+<div class="overlay" id="revealOverlay" onclick="if(event.target===this)closeReveal()">
+  <div class="dialog">
+    <div class="dlg-header">
+      <div class="dlg-title">Key Created</div>
+      <button class="dlg-close" onclick="closeReveal()">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="dlg-body">
+      <div class="key-banner">
+        <div class="key-banner-label">API Key</div>
+        <div class="key-banner-row">
+          <span class="key-banner-text" id="revealKeyText"></span>
+          <button class="btn-icon" id="revealCopyBtn" onclick="copyRevealKey()">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+          </button>
+        </div>
+        <div class="key-banner-warn">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+          This key is shown only once. Copy it now.
+        </div>
+      </div>
+    </div>
+    <div class="dlg-footer">
+      <button class="hdr-btn primary" onclick="closeReveal()">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete confirm -->
+<div class="overlay" id="deleteOverlay" onclick="if(event.target===this)closeDelete()">
+  <div class="dialog" style="width:400px">
+    <div class="dlg-header">
+      <div class="dlg-title">Delete Key</div>
+      <button class="dlg-close" onclick="closeDelete()">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="dlg-body">
+      <p style="font-size:13px;color:var(--muted);line-height:1.6" id="deleteMsg"></p>
+    </div>
+    <div class="dlg-footer">
+      <button class="hdr-btn" onclick="closeDelete()">Cancel</button>
+      <button class="hdr-btn" style="background:var(--danger-dim);color:var(--danger);border-color:transparent" onclick="confirmDelete()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---- Data ----
+const ALL_MODELS = [
+  'gpt-4o', 'gpt-4o-mini', 'gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-nano',
+  'claude-sonnet-4-20250514', 'claude-opus-4-20250514',
+  'deepseek-r1', 'deepseek-chat',
+  'gemini-2.5-pro', 'gemini-2.5-flash',
+  'qwen3-235b-a22b', 'qwen3-30b-a3b',
+];
+
+let keys = [
+  {
+    id: 'k1', name: 'Production',
+    key: 'sk-lsr-a3f8c2d1e5b7a9f0c3d2e1b4a5f6c7d8',
+    models: ['gpt-4o', 'claude-sonnet-4-20250514', 'deepseek-r1', 'gemini-2.5-pro',
+             'gpt-4o-mini', 'deepseek-chat', 'gemini-2.5-flash', 'qwen3-235b-a22b',
+             'gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-nano', 'claude-opus-4-20250514'],
+    active: true, created: '2025-03-15',
+  },
+  {
+    id: 'k2', name: 'Staging',
+    key: 'sk-lsr-7b2e4d6c8a0f1e3b5d7c9a2f4e6b8d0c',
+    models: ['gpt-4o-mini', 'deepseek-chat'],
+    active: true, created: '2025-04-01',
+  },
+  {
+    id: 'k3', name: 'CI/CD Pipeline',
+    key: 'sk-lsr-9e1c3a5b7d9f1e3c5a7b9d1f3e5c7a9b',
+    models: [],
+    active: true, created: '2025-04-20',
+  },
+  {
+    id: 'k4', name: 'Data Analytics',
+    key: 'sk-lsr-4d8f2c6a0e4b8d2f6a0c4e8b2d6f0a4c',
+    models: ['gpt-4o', 'gemini-2.5-pro'],
+    active: false, created: '2025-05-10',
+  },
+  {
+    id: 'k5', name: 'Legacy Migration (deprecated)',
+    key: 'sk-lsr-1a5b3c7d9e1f3a5b7c9d1e3f5a7b9c1d',
+    models: [],
+    active: false, created: '2025-01-08',
+  },
+];
+
+let revealedKeys = {}; // id -> true (key fully visible)
+let deleteTargetId = null;
+let editingKey = null;
+let revealedKeyForCopy = '';
+
+// ---- Render ----
+function maskKey(key) {
+  return key.slice(0, 11) + '\u2022'.repeat(14);
+}
+
+function renderTable() {
+  const query = document.getElementById('searchInput').value.toLowerCase();
+  const filtered = keys.filter(k =>
+    k.name.toLowerCase().includes(query) || k.key.toLowerCase().includes(query)
+  );
+
+  // Stats
+  document.getElementById('stat-total').textContent = keys.length;
+  document.getElementById('stat-active').textContent = keys.filter(k => k.active).length;
+  document.getElementById('stat-whitelist').textContent = keys.filter(k => k.models.length > 0).length;
+
+  const tbody = document.getElementById('keyTable');
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="6">
+      <div class="empty-text">${keys.length === 0 ? 'No API keys yet' : 'No matching keys'}</div>
+      ${keys.length === 0 ? '<button class="hdr-btn primary" onclick="openCreate()">Create your first key</button>' : ''}
+    </td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(k => {
+    const deprecated = !k.active && k.name.toLowerCase().includes('deprecated');
+    const revealed = revealedKeys[k.id];
+
+    // Key cell
+    let keyHtml;
+    if (revealed) {
+      keyHtml = `<span class="key-full">${k.key}</span>`;
+    } else {
+      keyHtml = `<span class="key-prefix">${k.key.slice(0, 7)}</span><span class="key-mask">${'\u2022'.repeat(17)}</span>`;
+    }
+
+    // Model badges
+    let modelHtml;
+    if (k.models.length === 0) {
+      modelHtml = '<span class="model-tag-all">All Models</span>';
+    } else {
+      const VISIBLE = 2;
+      const badges = k.models.slice(0, VISIBLE).map(m => `<span class="model-tag">${m}</span>`).join('');
+      const more = k.models.length > VISIBLE ? `<span class="model-more">+${k.models.length - VISIBLE}</span>` : '';
+      modelHtml = badges + more;
+    }
+
+    return `<tr class="${deprecated ? 'deprecated' : ''}">
+      <td><div class="key-name ${deprecated ? 'deprecated-text' : ''}">${k.name}</div></td>
+      <td>
+        <div class="key-cell">
+          ${keyHtml}
+          <button class="btn-icon" onclick="copyKey('${k.id}')" title="Copy key">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+          </button>
+          <button class="btn-reveal" onclick="revealKey('${k.id}')">${revealed ? 'Hide' : 'Show'}</button>
+        </div>
+      </td>
+      <td><div class="model-list">${modelHtml}</div></td>
+      <td>
+        <div class="status-cell">
+          <span class="status-dot ${k.active ? 'active' : 'inactive'}"></span>
+          <span class="status-label">${k.active ? 'Active' : 'Inactive'}</span>
+        </div>
+      </td>
+      <td><span class="date-cell">${k.created}</span></td>
+      <td>
+        <div class="actions">
+          <button class="act-btn" onclick="openEdit('${k.id}')">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+          </button>
+          <button class="act-btn" onclick="toggleActive('${k.id}')" title="${k.active ? 'Disable' : 'Enable'}">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${k.active ? 'M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636' : 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'}"/></svg>
+          </button>
+          <button class="act-btn danger" onclick="openDelete('${k.id}')">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          </button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ---- Actions ----
+function copyKey(id) {
+  const k = keys.find(x => x.id === id);
+  if (!k) return;
+  navigator.clipboard?.writeText(k.key);
+  // Brief visual feedback handled by browser
+}
+
+function revealKey(id) {
+  revealedKeys[id] = !revealedKeys[id];
+  renderTable();
+}
+
+function toggleActive(id) {
+  const k = keys.find(x => x.id === id);
+  if (k) { k.active = !k.active; renderTable(); }
+}
+
+function toggleAllKeys() {
+  // Demo: copy all keys (comma-separated)
+  const text = keys.filter(k => k.active).map(k => k.key).join('\n');
+  navigator.clipboard?.writeText(text);
+}
+
+// ---- Create / Edit Dialog ----
+function openCreate() {
+  editingKey = null;
+  const body = document.getElementById('dlgBody');
+  document.getElementById('dlgTitle').textContent = 'Create Key';
+  body.innerHTML = renderForm({ name: '', models: [], active: true });
+  document.getElementById('dlgFooter').innerHTML =
+    `<button class="hdr-btn" onclick="closeDialog()">Cancel</button>
+     <button class="hdr-btn primary" onclick="handleSave()">Create</button>`;
+  document.getElementById('editOverlay').classList.add('open');
+}
+
+function openEdit(id) {
+  const k = keys.find(x => x.id === id);
+  if (!k) return;
+  editingKey = k;
+  document.getElementById('dlgTitle').textContent = 'Edit Key';
+  document.getElementById('dlgBody').innerHTML = renderForm(k);
+  document.getElementById('dlgFooter').innerHTML =
+    `<button class="hdr-btn" onclick="closeDialog()">Cancel</button>
+     <button class="hdr-btn primary" onclick="handleSave()">Save</button>`;
+  document.getElementById('editOverlay').classList.add('open');
+}
+
+function renderForm(k) {
+  const checkedModels = new Set(k.models || []);
+  const modelItems = ALL_MODELS.map(m => {
+    const checked = checkedModels.has(m) ? 'checked' : '';
+    return `<label class="check-item"><input type="checkbox" value="${m}" ${checked}/><span class="model-name">${m}</span></label>`;
+  }).join('');
+
+  const toggleHtml = editingKey ? `
+    <div class="form-group">
+      <div class="toggle-row">
+        <div class="toggle-switch ${k.active ? 'on' : ''}" id="activeToggle" onclick="this.classList.toggle('on')">
+          <div class="knob"></div>
+        </div>
+        <span class="toggle-label">${k.active ? 'Active' : 'Inactive'}</span>
+      </div>
+    </div>` : '';
+
+  return `
+    <div class="form-group">
+      <label class="form-label">Name</label>
+      <input class="form-input" id="formName" type="text" placeholder="e.g. Production" value="${k.name || ''}"/>
+      <div class="form-hint">A short name to identify this key</div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Model Whitelist</label>
+      <div class="form-hint" style="margin-bottom:6px">Leave empty to allow all models</div>
+      <div class="check-list">
+        <input class="check-search" type="text" placeholder="Filter models..." oninput="filterChecks(this.value)"/>
+        <div id="checkContainer">${modelItems}</div>
+      </div>
+    </div>
+    ${toggleHtml}`;
+}
+
+function filterChecks(query) {
+  const container = document.getElementById('checkContainer');
+  const items = container.querySelectorAll('.check-item');
+  const q = query.toLowerCase();
+  items.forEach(item => {
+    const name = item.querySelector('.model-name').textContent.toLowerCase();
+    item.style.display = name.includes(q) ? '' : 'none';
+  });
+}
+
+function handleSave() {
+  const name = document.getElementById('formName').value.trim();
+  if (!name) { document.getElementById('formName').style.borderColor = 'var(--danger)'; return; }
+
+  const checked = document.querySelectorAll('#checkContainer input:checked');
+  const models = Array.from(checked).map(c => c.value);
+
+  if (editingKey) {
+    editingKey.name = name;
+    editingKey.models = models;
+    const toggle = document.getElementById('activeToggle');
+    if (toggle) editingKey.active = toggle.classList.contains('on');
+    closeDialog();
+    renderTable();
+  } else {
+    // Generate a new key
+    const newKey = 'sk-lsr-' + Array.from({length: 28}, () => '0123456789abcdef'[Math.floor(Math.random()*16)]).join('');
+    const newId = 'k' + Date.now();
+    keys.push({
+      id: newId, name, key: newKey, models, active: true,
+      created: new Date().toISOString().slice(0, 10),
+    });
+    closeDialog();
+    renderTable();
+    // Show reveal dialog
+    revealedKeyForCopy = newKey;
+    document.getElementById('revealKeyText').textContent = newKey;
+    document.getElementById('revealOverlay').classList.add('open');
+  }
+}
+
+function closeDialog() { document.getElementById('editOverlay').classList.remove('open'); }
+
+function copyRevealKey() {
+  navigator.clipboard?.writeText(revealedKeyForCopy);
+  const btn = document.getElementById('revealCopyBtn');
+  btn.classList.add('copied');
+  btn.innerHTML = '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
+  setTimeout(() => {
+    btn.classList.remove('copied');
+    btn.innerHTML = '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>';
+  }, 2000);
+}
+
+function closeReveal() { document.getElementById('revealOverlay').classList.remove('open'); }
+
+// ---- Delete ----
+function openDelete(id) {
+  deleteTargetId = id;
+  const k = keys.find(x => x.id === id);
+  document.getElementById('deleteMsg').textContent =
+    `Are you sure you want to delete "${k.name}"? All requests using this key will be rejected. This cannot be undone.`;
+  document.getElementById('deleteOverlay').classList.add('open');
+}
+function closeDelete() { document.getElementById('deleteOverlay').classList.remove('open'); deleteTargetId = null; }
+function confirmDelete() {
+  keys = keys.filter(k => k.id !== deleteTargetId);
+  closeDelete();
+  renderTable();
+}
+
+// ---- Init ----
+renderTable();
+</script>
+</body>
+</html>

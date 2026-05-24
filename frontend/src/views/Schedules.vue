@@ -1,5 +1,5 @@
 <template>
-  <div class="p-6 space-y-3">
+  <div class="page space-y-3">
     <!-- Page Header -->
     <div class="flex items-center justify-between">
       <div class="flex flex-col gap-0.5">

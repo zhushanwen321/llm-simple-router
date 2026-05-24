@@ -1,5 +1,5 @@
 <template>
-  <div class="p-6 space-y-4 pb-20">
+  <div class="page space-y-4 pb-20">
     <!-- Row 1: Client Selection -->
     <Card class="ring-0">
       <CardHeader class="pb-3">

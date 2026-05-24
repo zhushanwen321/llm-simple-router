@@ -1,94 +1,197 @@
 <!-- eslint-disable vue/multi-word-component-names -->
 <template>
-  <div class="p-6">
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-semibold text-foreground">
-        {{ t("providers.title") }}
-      </h2>
-      <div class="flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          @click="handleReload"
-          :disabled="reloading"
-        >
-          <RotateCw
-            class="w-4 h-4 mr-1"
-            :class="{ 'animate-spin': reloading }"
-          />
-          {{ t("providers.reloadPlugin") }}
-        </Button>
-        <Button @click="openCreate" class="flex items-center gap-1">
-          <svg
-            class="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+  <div class="page">
+    <!-- Zone 1: Header + Anchor Bar -->
+    <div class="mb-4">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-base font-semibold text-foreground">
+          {{ t("providers.title") }}
+        </h2>
+        <div class="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            @click="handleReload"
+            :disabled="reloading"
           >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M12 4v16m8-8H4"
+            <RotateCw
+              class="w-4 h-4 mr-1"
+              :class="{ 'animate-spin': reloading }"
             />
-          </svg>
-          {{ t("providers.addProvider") }}
-        </Button>
+            {{ t("providers.reloadPlugin") }}
+          </Button>
+        </div>
+      </div>
+
+      <!-- Anchor Bar: provider stats -->
+      <div
+        v-if="providers.length > 0"
+        class="grid grid-cols-4 bg-card border-input border rounded-lg overflow-hidden"
+      >
+        <div
+          class="flex flex-col gap-1 px-5 py-3.5 border-r border-input last:border-r-0"
+        >
+          <span
+            class="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider"
+          >
+            {{ t("providers.anchor.total") }}
+          </span>
+          <span class="font-mono text-[28px] font-bold leading-none mt-0.5">
+            {{ providers.length }}
+          </span>
+        </div>
+        <div
+          class="flex flex-col gap-1 px-5 py-3.5 border-r border-input last:border-r-0 cursor-pointer transition-colors hover:bg-foreground/[0.02]"
+          :class="{
+            'bg-primary/5 shadow-[inset_0_2px_0_var(--primary)]':
+              anchorFilter === 'enabled',
+          }"
+          @click="toggleAnchorFilter('enabled')"
+        >
+          <span
+            class="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider"
+          >
+            {{ t("providers.anchor.enabled") }}
+          </span>
+          <span
+            class="font-mono text-[28px] font-bold leading-none mt-0.5 text-success"
+          >
+            {{ anchorEnabled }}
+          </span>
+        </div>
+        <div
+          class="flex flex-col gap-1 px-5 py-3.5 border-r border-input last:border-r-0 cursor-pointer transition-colors hover:bg-foreground/[0.02]"
+          :class="{ 'bg-muted': anchorFilter === 'disabled' }"
+          @click="toggleAnchorFilter('disabled')"
+        >
+          <span
+            class="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider"
+          >
+            {{ t("providers.anchor.disabled") }}
+          </span>
+          <span
+            class="font-mono text-[28px] font-bold leading-none mt-0.5 text-muted-foreground"
+          >
+            {{ anchorDisabled }}
+          </span>
+        </div>
+        <div class="flex flex-col gap-1 px-5 py-3.5">
+          <span
+            class="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider"
+          >
+            {{ t("providers.anchor.models") }}
+          </span>
+          <span class="font-mono text-[28px] font-bold leading-none mt-0.5">
+            {{ anchorTotalModels }}
+          </span>
+        </div>
       </div>
     </div>
-    <div class="bg-card rounded-lg border overflow-hidden">
+
+    <!-- Zone 2: Filter Bar -->
+    <div class="flex items-center gap-2 mb-4">
+      <div class="relative flex-1 max-w-sm">
+        <Search
+          class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground"
+        />
+        <Input
+          v-model="searchQuery"
+          :placeholder="t('providers.filter.searchPlaceholder')"
+          class="pl-8 h-8 text-[13px]"
+        />
+      </div>
+      <Select v-model="statusFilter" @update:model-value="onStatusFilterChange">
+        <SelectTrigger class="w-28 h-8 text-[13px]">
+          <SelectValue :placeholder="t('providers.filter.status')" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">{{ t("providers.filter.all") }}</SelectItem>
+          <SelectItem value="enabled">{{
+            t("providers.filter.enabled")
+          }}</SelectItem>
+          <SelectItem value="disabled">{{
+            t("providers.filter.disabled")
+          }}</SelectItem>
+        </SelectContent>
+      </Select>
+      <span class="font-mono text-xs text-muted-foreground shrink-0">
+        {{ filteredProviders.length }} {{ t("providers.filter.count") }}
+      </span>
+      <div class="flex-1" />
+      <Button @click="openCreate" class="flex items-center gap-1.5 h-8">
+        <svg
+          class="w-3.5 h-3.5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M12 4v16m8-8H4"
+          />
+        </svg>
+        {{ t("providers.addProvider") }}
+      </Button>
+    </div>
+
+    <!-- Zone 3: Table -->
+    <Card v-if="providers.length > 0" flush class="border-input">
       <Table class="[&_td]:px-4 [&_th]:px-4">
         <TableHeader>
-          <TableRow class="bg-muted">
-            <TableHead class="text-muted-foreground">{{
-              t("providers.tableHeaders.name")
-            }}</TableHead>
-            <TableHead class="text-muted-foreground">{{
-              t("providers.tableHeaders.apiKey")
-            }}</TableHead>
-            <TableHead class="text-muted-foreground">{{
-              t("providers.tableHeaders.models")
-            }}</TableHead>
-            <TableHead class="text-muted-foreground">{{
-              t("providers.tableHeaders.concurrency")
-            }}</TableHead>
-            <TableHead class="text-muted-foreground">{{
-              t("providers.tableHeaders.status")
-            }}</TableHead>
-            <TableHead class="text-muted-foreground">{{
-              t("providers.tableHeaders.actions")
-            }}</TableHead>
+          <TableRow class="bg-muted/50 border-b border-input hover:bg-muted/50">
+            <TableHead
+              class="text-muted-foreground text-[11px] font-semibold uppercase tracking-wider"
+            >
+              {{ t("providers.tableHeaders.name") }}
+            </TableHead>
+            <TableHead
+              class="text-muted-foreground text-[11px] font-semibold uppercase tracking-wider"
+            >
+              {{ t("providers.tableHeaders.apiKey") }}
+            </TableHead>
+            <TableHead
+              class="text-muted-foreground text-[11px] font-semibold uppercase tracking-wider"
+            >
+              {{ t("providers.tableHeaders.models") }}
+            </TableHead>
+            <TableHead
+              class="text-muted-foreground text-[11px] font-semibold uppercase tracking-wider"
+            >
+              {{ t("providers.tableHeaders.concurrency") }}
+            </TableHead>
+            <TableHead
+              class="text-muted-foreground text-[11px] font-semibold uppercase tracking-wider"
+            >
+              {{ t("providers.tableHeaders.status") }}
+            </TableHead>
+            <TableHead
+              class="text-muted-foreground text-[11px] font-semibold uppercase tracking-wider"
+            >
+              {{ t("providers.tableHeaders.actions") }}
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           <TableRow
-            v-for="p in providers"
+            v-for="p in filteredProviders"
             :key="p.id"
-            :class="{ 'opacity-60': !p.is_active }"
+            class="border-b border-input"
+            :class="{ 'opacity-55 hover:opacity-75': !p.is_active }"
           >
             <TableCell>
-              <div class="space-y-0.5">
-                <!-- 名称 -->
-                <div class="flex items-center gap-2 font-medium">
-                  <ProviderIcon :name="providerIconName(p.name)" :size="18" />
-                  <span>{{ p.name }}</span>
-                </div>
-                <!-- 类型 -->
-                <div class="text-xs text-muted-foreground">
-                  <Badge variant="secondary" class="text-[11px] px-1.5 py-0">{{
-                    API_TYPE_LABELS[p.api_type] ?? p.api_type
-                  }}</Badge>
-                </div>
-                <!-- 完整地址 -->
-                <div
-                  class="text-xs text-muted-foreground flex items-center gap-1 max-w-0"
-                >
-                  <span class="truncate">{{ buildFullUrl(p) }}</span>
-                  <Shield
-                    v-if="p.proxy_type"
-                    class="w-3 h-3"
-                    :title="`Proxy: ${p.proxy_type.toUpperCase()}`"
-                  />
+              <div class="flex items-center gap-2.5">
+                <ProviderIcon :name="providerIconName(p.name)" :size="20" />
+                <div class="flex flex-col gap-0.5 min-w-0">
+                  <span class="font-medium text-[13px] truncate">{{
+                    p.name
+                  }}</span>
+                  <span
+                    class="font-mono text-[11px] text-muted-foreground truncate max-w-[260px]"
+                  >
+                    {{ buildFullUrl(p) }}
+                  </span>
                 </div>
               </div>
             </TableCell>
@@ -98,6 +201,7 @@
                   maskKey(p.api_key)
                 }}</span>
                 <Button
+                  v-if="p.api_key"
                   variant="ghost"
                   size="sm"
                   class="h-6 w-6 p-0"
@@ -112,99 +216,129 @@
               </div>
             </TableCell>
             <TableCell>
-              <div
-                class="grid gap-1"
-                :class="
-                  (p.models?.length ?? 0) > 3 ? 'grid-cols-2' : 'grid-cols-1'
-                "
-              >
-                <div
-                  v-for="m in p.models || []"
-                  :key="m.name"
-                  class="flex items-center gap-1"
+              <div class="flex items-center gap-1.5">
+                <span class="font-mono text-[13px] font-medium">
+                  {{ p.models?.length ?? 0 }}
+                </span>
+                <span class="text-xs text-muted-foreground">models</span>
+                <Badge
+                  v-if="hasImageModels(p)"
+                  variant="outline"
+                  class="text-[10px] px-1 py-0 gap-0.5 text-primary/70 border-primary/20 h-4"
                 >
-                  <Badge variant="secondary" class="text-xs max-w-[200px]">
-                    <span class="truncate block">{{ m.name }}</span>
-                    <span
-                      v-if="m.context_window"
-                      class="ml-1 text-muted-foreground"
-                      >({{ formatContextWindow(m.context_window) }})</span
-                    >
-                  </Badge>
-                  <Badge
-                    v-if="modelCapabilities(m).includes('image')"
-                    variant="outline"
-                    class="text-[10px] px-1 py-0 gap-0.5 text-primary/70 border-primary/20"
-                  >
-                    <ImageIcon class="w-2.5 h-2.5" />
-                  </Badge>
-                </div>
-                <span
-                  v-if="!p.models?.length"
-                  class="text-muted-foreground text-xs"
-                  >-</span
-                >
+                  <ImageIcon class="w-2.5 h-2.5" />
+                </Badge>
               </div>
             </TableCell>
             <TableCell>
-              <Badge v-if="p.adaptive_enabled" variant="outline">{{
-                t("common.adaptive")
-              }}</Badge>
-              <Badge v-else-if="p.max_concurrency > 0" variant="secondary">{{
-                p.max_concurrency
-              }}</Badge>
-              <span v-else class="text-muted-foreground">-</span>
+              <div class="flex items-center gap-1.5">
+                <Badge
+                  v-if="p.adaptive_enabled"
+                  variant="outline"
+                  class="text-[11px] h-5"
+                >
+                  {{ t("common.adaptive") }}
+                </Badge>
+                <Badge
+                  v-else-if="p.max_concurrency > 0"
+                  variant="secondary"
+                  class="text-[11px] h-5 font-mono"
+                >
+                  {{ p.max_concurrency }}
+                </Badge>
+                <span v-else class="text-muted-foreground text-xs">-</span>
+              </div>
             </TableCell>
             <TableCell>
-              <Button
-                variant="ghost"
-                size="sm"
-                class="gap-1.5"
-                @click="confirmToggle(p)"
-              >
+              <div class="flex items-center gap-2">
+                <Switch
+                  :model-value="!!p.is_active"
+                  @update:model-value="confirmToggle(p)"
+                />
                 <span
-                  class="relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors"
-                  :class="p.is_active ? 'bg-primary' : 'bg-input'"
+                  class="text-xs"
+                  :class="
+                    p.is_active ? 'text-foreground' : 'text-muted-foreground'
+                  "
                 >
-                  <span
-                    class="inline-block h-3 w-3 rounded-full bg-background shadow-sm transition-transform"
-                    :class="p.is_active ? 'translate-x-3.5' : 'translate-x-0.5'"
-                  />
+                  {{ p.is_active ? t("common.enabled") : t("common.disabled") }}
                 </span>
-                <Badge :variant="p.is_active ? 'default' : 'secondary'">{{
-                  p.is_active ? t("common.enabled") : t("common.disabled")
-                }}</Badge>
-              </Button>
+              </div>
             </TableCell>
             <TableCell>
               <div class="flex items-center gap-1">
                 <Button
                   variant="ghost"
                   size="sm"
+                  class="h-7 text-xs px-2 text-muted-foreground hover:text-primary"
                   @click="openEdit(p)"
-                  class="text-muted-foreground hover:text-primary"
-                  >{{ t("common.edit") }}</Button
                 >
+                  {{ t("common.edit") }}
+                </Button>
                 <Button
                   variant="ghost"
                   size="sm"
+                  class="h-7 text-xs px-2 text-muted-foreground hover:text-destructive"
                   @click="confirmDelete(p)"
-                  class="text-muted-foreground hover:text-destructive"
-                  >{{ t("common.delete") }}</Button
                 >
+                  {{ t("common.delete") }}
+                </Button>
               </div>
             </TableCell>
           </TableRow>
-          <TableRow v-if="providers.length === 0">
-            <TableCell
-              colspan="6"
-              class="text-center text-muted-foreground py-8"
-              >{{ t("providers.noProviders") }}</TableCell
-            >
-          </TableRow>
         </TableBody>
       </Table>
+    </Card>
+
+    <!-- Empty State -->
+    <div
+      v-if="providers.length === 0 && !reloading"
+      class="flex flex-col items-center justify-center py-16 text-center bg-card border-input border rounded-lg"
+    >
+      <div
+        class="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4"
+      >
+        <svg
+          class="w-6 h-6 text-primary"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          stroke-width="2"
+        >
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <path d="M12 8v8M8 12h8" />
+        </svg>
+      </div>
+      <h3 class="text-[15px] font-semibold mb-1.5">
+        {{ t("providers.empty.title") }}
+      </h3>
+      <p class="text-sm text-muted-foreground mb-5 max-w-sm">
+        {{ t("providers.empty.description") }}
+      </p>
+      <Button @click="openCreate" class="flex items-center gap-1.5">
+        <svg
+          class="w-3.5 h-3.5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          stroke-width="2"
+        >
+          <path d="M12 4v16m8-8H4" />
+        </svg>
+        {{ t("providers.empty.addFirst") }}
+      </Button>
     </div>
+
+    <!-- Filtered empty state (no results for search/filter) -->
+    <div
+      v-if="providers.length > 0 && filteredProviders.length === 0"
+      class="flex flex-col items-center justify-center py-12 text-center bg-card border-input border rounded-lg"
+    >
+      <p class="text-sm text-muted-foreground">
+        {{ t("providers.filter.noResults") }}
+      </p>
+    </div>
+
     <!-- Create/Edit Dialog -->
     <Dialog v-model:open="dialogOpen">
       <DialogContent class="sm:max-w-4xl max-h-[85vh] overflow-y-auto">
@@ -213,31 +347,20 @@
             editingId ? t("providers.editProvider") : t("providers.addProvider")
           }}</DialogTitle>
         </DialogHeader>
-        <form @submit.prevent="handleSave" class="space-y-4">
+        <form @submit.prevent="handleSave">
           <!-- 模板选择 (仅新建模式) -->
           <div
             v-if="!editingId"
-            class="rounded-md border-2 border-primary/30 bg-primary/5 p-3 space-y-2"
+            class="bg-card border-input border rounded-lg p-4 mb-4"
           >
             <div
-              class="flex items-center gap-1.5 text-xs font-semibold text-primary"
+              class="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-3 pb-2 border-b border-input"
             >
-              <svg
-                class="w-3.5 h-3.5"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path
-                  d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
-                />
-              </svg>
               {{ t("providers.template.title") }}
             </div>
-            <div class="flex gap-2">
+            <div class="flex items-center gap-2">
               <Select v-model="presetGroup" @update:model-value="onGroupChange">
-                <SelectTrigger class="flex-1 border-primary/40"
+                <SelectTrigger class="flex-1 h-8 text-[13px]"
                   ><SelectValue
                     :placeholder="t('providers.template.selectProvider')"
                 /></SelectTrigger>
@@ -259,7 +382,7 @@
                 @update:model-value="onPresetChange"
                 :disabled="!presetGroup || presetGroup === '__custom__'"
               >
-                <SelectTrigger class="flex-1 border-primary/40"
+                <SelectTrigger class="flex-1 h-8 text-[13px]"
                   ><SelectValue
                     :placeholder="t('providers.template.selectPlan')"
                 /></SelectTrigger>
@@ -274,25 +397,8 @@
               </Select>
             </div>
           </div>
-          <!-- 未选模板提示 (仅新建模式) -->
-          <div
-            v-if="!presetGroup && !editingId"
-            class="flex flex-col items-center justify-center py-10 text-muted-foreground"
-          >
-            <svg
-              class="w-10 h-10 mb-3 opacity-30"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.5"
-            >
-              <rect x="3" y="3" width="18" height="18" rx="2" />
-              <path d="M9 12l2 2 4-4" />
-            </svg>
-            <span class="text-sm">{{
-              t("providers.template.selectFirst")
-            }}</span>
-          </div>
+
+          <!-- Form: only show when preset selected or editing -->
           <template v-if="presetGroup || editingId">
             <ModelCapabilitiesEditor
               :name="form.name"
@@ -342,7 +448,7 @@
               @update:model-timeout="updateModelTimeout"
               @toggle-model-capability="toggleModelCapability"
               @fetch-upstream-models="fetchUpstreamModels"
-              @add-model="addModel"
+              @add-model="(caps: string[]) => addModel(caps)"
               @update:model-input="modelInput = $event"
               @update:context-window-select="contextWindowSelect = $event"
               @update:concurrency-mode="onConcurrencyModeChange"
@@ -368,6 +474,7 @@
         </form>
       </DialogContent>
     </Dialog>
+
     <!-- Delete Confirm AlertDialog -->
     <AlertDialog
       :open="!!deleteTarget"
@@ -394,6 +501,7 @@
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+
     <!-- Toggle Confirm AlertDialog -->
     <AlertDialog
       :open="!!toggleTarget"
@@ -444,12 +552,15 @@
     </AlertDialog>
   </div>
 </template>
+
 <script setup lang="ts">
-import { onMounted } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { toast } from "vue-sonner";
 import { api, getApiMessage } from "@/api/client";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -466,6 +577,7 @@ import {
   TableHead,
   TableCell,
 } from "@/components/ui/table";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -483,15 +595,10 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
-import { RotateCw, Copy, Check, Shield, ImageIcon } from "lucide-vue-next";
+import { RotateCw, Copy, Check, ImageIcon, Search } from "lucide-vue-next";
 import ProviderIcon from "@/components/icons/ProviderIcon.vue";
 import ModelCapabilitiesEditor from "@/components/providers/ModelCapabilitiesEditor.vue";
-import {
-  useProviderForm,
-  API_TYPE_LABELS,
-  CONTEXT_K,
-  CONTEXT_M,
-} from "@/composables/useProviderForm";
+import { useProviderForm } from "@/composables/useProviderForm";
 import { useProviderActions } from "@/composables/useProviderActions";
 import { useFetchUpstreamModels } from "@/composables/useFetchUpstreamModels";
 
@@ -551,6 +658,61 @@ const { fetchingModels, fetchUpstreamModels } = useFetchUpstreamModels(
   getCurrentPresetModels,
 );
 
+// --- Search & Filter ---
+const searchQuery = ref("");
+const statusFilter = ref("all");
+const anchorFilter = ref("");
+
+function toggleAnchorFilter(f: string) {
+  if (anchorFilter.value === f) {
+    anchorFilter.value = "";
+    statusFilter.value = "all";
+  } else {
+    anchorFilter.value = f;
+    statusFilter.value = f;
+  }
+}
+
+function onStatusFilterChange() {
+  // sync anchor filter when user changes dropdown
+  if (statusFilter.value === "all") {
+    anchorFilter.value = "";
+  } else {
+    anchorFilter.value = statusFilter.value;
+  }
+}
+
+// --- Anchor Bar stats ---
+const anchorEnabled = computed(
+  () => providers.value.filter((p) => p.is_active).length,
+);
+const anchorDisabled = computed(
+  () => providers.value.filter((p) => !p.is_active).length,
+);
+const anchorTotalModels = computed(() =>
+  providers.value.reduce((sum, p) => sum + (p.models?.length ?? 0), 0),
+);
+
+// --- Filtered providers ---
+const filteredProviders = computed(() => {
+  let list = providers.value;
+  const q = searchQuery.value.toLowerCase().trim();
+  if (q) {
+    list = list.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        p.base_url.toLowerCase().includes(q),
+    );
+  }
+  if (statusFilter.value === "enabled") {
+    list = list.filter((p) => p.is_active);
+  } else if (statusFilter.value === "disabled") {
+    list = list.filter((p) => !p.is_active);
+  }
+  return list;
+});
+
+// --- Provider icon mapping ---
 const PROVIDER_ICON_MAP: Record<string, string> = {
   deepseek: "deepseek",
   qianfan: "baidu",
@@ -585,6 +747,14 @@ function providerIconName(name: string): string {
   return lower;
 }
 
+// --- Model helpers ---
+function hasImageModels(p: {
+  models?: { capabilities?: string[] }[];
+}): boolean {
+  return (p.models ?? []).some((m) => m.capabilities?.includes("image"));
+}
+
+// --- URL display ---
 const DEFAULT_UPSTREAM_PATH: Record<string, string> = {
   anthropic: "/v1/messages",
   openai: "/v1/chat/completions",
@@ -609,22 +779,12 @@ function buildFullUrl(p: {
     }
     return `${url.origin}${pathname}${upstreamPath}`;
   } catch {
-    // URL 解析失败时 fallback 到简单拼接
     const normalized = p.base_url.replace(/\/+$/, "");
     return `${normalized}${upstreamPath}`;
   }
 }
 
-function modelCapabilities(m: { capabilities?: string[] }): string[] {
-  return m.capabilities ?? ["text"];
-}
-
-function formatContextWindow(tokens: number): string {
-  if (tokens >= CONTEXT_M) return `${tokens / CONTEXT_M}M`;
-  if (tokens >= CONTEXT_K) return `${tokens / CONTEXT_K}K`;
-  return `${tokens}`;
-}
-
+// --- Save ---
 async function handleSave() {
   if (!validate()) return;
   try {

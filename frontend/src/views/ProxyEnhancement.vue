@@ -1,5 +1,5 @@
 <template>
-  <div class="p-6 pb-16 max-w-[1000px] mx-auto">
+  <div class="page pb-16 max-w-[1000px]">
     <!-- 页面头部 -->
     <div class="mb-6">
       <h2 class="text-base font-semibold text-foreground">

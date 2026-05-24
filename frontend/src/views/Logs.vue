@@ -1,6 +1,6 @@
 <!-- eslint-disable vue/multi-word-component-names -->
 <template>
-  <div class="p-6">
+  <div class="page">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-lg font-semibold text-foreground">
         {{ t("logs.title") }}
@@ -86,7 +86,7 @@
       </Select>
     </div>
 
-    <div class="bg-card rounded-lg border overflow-hidden relative">
+    <Card flush class="relative">
       <div
         v-if="loading"
         class="absolute inset-0 bg-background/50 flex items-center justify-center z-10"
@@ -187,7 +187,7 @@
           </TableBody>
         </Table>
       </TooltipProvider>
-    </div>
+    </Card>
 
     <div class="flex items-center justify-between mt-4">
       <p class="text-sm text-muted-foreground">
@@ -348,6 +348,7 @@ import {
   AlertDialogFooter,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
+import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import UnifiedRequestDialog from "@/components/request-detail/UnifiedRequestDialog.vue";

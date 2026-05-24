@@ -1,6 +1,6 @@
 <!-- eslint-disable vue/multi-word-component-names -->
 <template>
-  <div class="p-6">
+  <div class="page">
     <!-- Page Header -->
     <div class="flex items-center justify-between mb-3">
       <h2 class="text-base font-semibold text-foreground">

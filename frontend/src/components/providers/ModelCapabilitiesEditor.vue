@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +22,31 @@ import type { ModelInfo } from "@/types/mapping";
 import type { ModelConfig } from "@/components/quick-setup/types";
 
 const { t } = useI18n();
+
+const advancedOpen = ref(false);
+
+// new model presets
+const newCapabilities = ref<string[]>(["text"]);
+
+const capabilityIcons = [
+  { key: "text", icon: "T", label: "text" },
+  { key: "image", icon: "🖼", label: "image" },
+  { key: "audio", icon: "🎵", label: "audio" },
+  { key: "video", icon: "🎬", label: "video" },
+] as const;
+
+function toggleNewCapability(key: string) {
+  if (key === "text") return;
+  const caps = newCapabilities.value;
+  newCapabilities.value = caps.includes(key)
+    ? caps.filter((c) => c !== key)
+    : [...caps, key];
+}
+
+function handleAddModel() {
+  emit("add-model", [...newCapabilities.value]);
+  newCapabilities.value = ["text"];
+}
 
 const props = defineProps<{
   // Form fields
@@ -74,7 +100,7 @@ const emit = defineEmits<{
   "update:model-timeout": [index: number, value: string | number];
   "toggle-model-capability": [index: number, capability: string];
   "fetch-upstream-models": [];
-  "add-model": [];
+  "add-model": [caps: string[]];
   "update:model-input": [value: string];
   "update:context-window-select": [value: string];
   // Concurrency
@@ -100,232 +126,291 @@ function isOfficialOpenai(url: string): boolean {
 </script>
 
 <template>
-  <!-- Form fields grid -->
-  <div class="grid grid-cols-2 gap-3">
-    <div>
-      <Label class="text-xs text-muted-foreground">{{
-        t("providers.fields.name")
-      }}</Label>
-      <Input
-        :model-value="props.name"
-        type="text"
-        required
-        class="mt-1"
-        @update:model-value="emit('update:name', String($event))"
-        @input="emit('clear-errors', 'name')"
-      />
-      <p v-if="props.errorsName" class="text-xs text-destructive mt-0.5">
-        {{ props.errorsName }}
-      </p>
+  <!-- Section 1: Connection -->
+  <div class="bg-card border-input border rounded-lg p-5 mb-4">
+    <div
+      class="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-4 pb-2.5 border-b border-input"
+    >
+      {{ t("providers.fields.connectionSection") }}
     </div>
-    <div>
-      <Label class="text-xs text-muted-foreground">{{
-        t("providers.fields.apiType")
-      }}</Label>
-      <Select
-        :model-value="props.apiType"
-        @update:model-value="emit('update:api-type', String($event))"
-        class="mt-1"
-      >
-        <SelectTrigger
-          ><SelectValue :placeholder="t('common.pleaseSelect')"
-        /></SelectTrigger>
-        <SelectContent>
-          <SelectItem value="openai">OpenAI Chat Completions</SelectItem>
-          <SelectItem value="openai-responses">OpenAI Responses</SelectItem>
-          <SelectItem value="anthropic">Anthropic Messages</SelectItem>
-        </SelectContent>
-      </Select>
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <Label class="text-xs text-muted-foreground">{{
+          t("providers.fields.name")
+        }}</Label>
+        <Input
+          :model-value="props.name"
+          type="text"
+          required
+          class="mt-1"
+          @update:model-value="emit('update:name', String($event))"
+          @input="emit('clear-errors', 'name')"
+        />
+        <p v-if="props.errorsName" class="text-xs text-destructive mt-0.5">
+          {{ props.errorsName }}
+        </p>
+      </div>
+      <div>
+        <Label class="text-xs text-muted-foreground">{{
+          t("providers.fields.apiType")
+        }}</Label>
+        <Select
+          :model-value="props.apiType"
+          @update:model-value="emit('update:api-type', String($event))"
+          class="mt-1"
+        >
+          <SelectTrigger
+            ><SelectValue :placeholder="t('common.pleaseSelect')"
+          /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="openai">OpenAI Chat Completions</SelectItem>
+            <SelectItem value="openai-responses">OpenAI Responses</SelectItem>
+            <SelectItem value="anthropic">Anthropic Messages</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div>
+        <Label class="text-xs text-muted-foreground">{{
+          t("providers.fields.baseUrl")
+        }}</Label>
+        <Input
+          :model-value="props.baseUrl"
+          type="url"
+          required
+          class="mt-1 font-mono text-xs"
+          @update:model-value="emit('update:base-url', String($event))"
+          @input="emit('clear-errors', 'base_url')"
+        />
+        <p v-if="props.errorsBaseUrl" class="text-xs text-destructive mt-0.5">
+          {{ props.errorsBaseUrl }}
+        </p>
+      </div>
+      <div>
+        <Label class="text-xs text-muted-foreground">{{
+          t("providers.fields.apiKey")
+        }}</Label>
+        <Input
+          :model-value="props.apiKey"
+          type="text"
+          :required="!props.editingId"
+          :placeholder="
+            props.editingId ? t('providers.fields.apiKeyPlaceholder') : ''
+          "
+          class="mt-1"
+          @update:model-value="emit('update:api-key', String($event))"
+          @input="emit('clear-errors', 'api_key')"
+        />
+        <p v-if="props.errorsApiKey" class="text-xs text-destructive mt-0.5">
+          {{ props.errorsApiKey }}
+        </p>
+      </div>
     </div>
-    <div>
-      <Label class="text-xs text-muted-foreground">{{
-        t("providers.fields.baseUrl")
-      }}</Label>
+    <div class="mt-3">
+      <Label class="text-xs">{{ t("providers.fields.upstreamPath") }}</Label>
       <Input
-        :model-value="props.baseUrl"
-        type="url"
-        required
+        :model-value="props.upstreamPath"
+        :placeholder="t('providers.fields.upstreamPathPlaceholder')"
         class="mt-1 font-mono text-xs"
-        @update:model-value="emit('update:base-url', String($event))"
-        @input="emit('clear-errors', 'base_url')"
+        @update:model-value="emit('update:upstream-path', String($event))"
       />
-      <p v-if="props.errorsBaseUrl" class="text-xs text-destructive mt-0.5">
-        {{ props.errorsBaseUrl }}
+      <p class="text-xs text-muted-foreground mt-0.5">
+        {{ t("providers.fields.upstreamPathHint") }}
       </p>
+    </div>
+    <div class="mt-3">
+      <ProxyConfigForm
+        :proxy-type="props.proxyType"
+        :proxy-url="props.proxyUrl"
+        :proxy-username="props.proxyUsername"
+        :proxy-password="props.proxyPassword"
+        @update:proxy-type="emit('update:proxy-type', $event)"
+        @update:proxy-url="emit('update:proxy-url', $event)"
+        @update:proxy-username="emit('update:proxy-username', $event)"
+        @update:proxy-password="emit('update:proxy-password', $event)"
+        @clear="emit('clear-proxy')"
+      />
+    </div>
+  </div>
+
+  <!-- Section 2: Models -->
+  <div class="bg-card border-input border rounded-lg p-5 mb-4">
+    <div
+      class="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-4 pb-2.5 border-b border-input"
+    >
+      {{ t("providers.fields.modelsSection") }}
     </div>
     <div>
-      <Label class="text-xs text-muted-foreground">{{
-        t("providers.fields.apiKey")
-      }}</Label>
-      <Input
-        :model-value="props.apiKey"
-        type="text"
-        :required="!props.editingId"
-        :placeholder="
-          props.editingId ? t('providers.fields.apiKeyPlaceholder') : ''
-        "
-        class="mt-1"
-        @update:model-value="emit('update:api-key', String($event))"
-        @input="emit('clear-errors', 'api_key')"
-      />
-      <p v-if="props.errorsApiKey" class="text-xs text-destructive mt-0.5">
-        {{ props.errorsApiKey }}
-      </p>
-    </div>
-  </div>
-  <div>
-    <Label class="text-xs">{{ t("providers.fields.upstreamPath") }}</Label>
-    <Input
-      :model-value="props.upstreamPath"
-      :placeholder="t('providers.fields.upstreamPathPlaceholder')"
-      class="mt-1 font-mono text-xs"
-      @update:model-value="emit('update:upstream-path', String($event))"
-    />
-    <p class="text-xs text-muted-foreground mt-0.5">
-      {{ t("providers.fields.upstreamPathHint") }}
-    </p>
-  </div>
-  <ProxyConfigForm
-    :proxy-type="props.proxyType"
-    :proxy-url="props.proxyUrl"
-    :proxy-username="props.proxyUsername"
-    :proxy-password="props.proxyPassword"
-    @update:proxy-type="emit('update:proxy-type', $event)"
-    @update:proxy-url="emit('update:proxy-url', $event)"
-    @update:proxy-username="emit('update:proxy-username', $event)"
-    @update:proxy-password="emit('update:proxy-password', $event)"
-    @clear="emit('clear-proxy')"
-  />
-  <!-- Available models -->
-  <div>
-    <div class="flex items-center justify-between mb-2">
-      <Label class="text-xs text-muted-foreground">{{
-        t("providers.fields.availableModels")
-      }}</Label>
-      <Button
-        v-if="
-          !props.editingId &&
-          props.presetGroup &&
-          props.presetGroup !== '__custom__' &&
-          (props.hasApiKey || !props.hasModelsEndpoint)
-        "
-        type="button"
-        variant="outline"
-        size="sm"
-        class="text-xs"
-        :disabled="props.fetchingModels"
-        @click="emit('fetch-upstream-models')"
-      >
-        <RotateCw
-          class="w-3 h-3 mr-1"
-          :class="{ 'animate-spin': props.fetchingModels }"
-        />
-        {{
-          props.fetchingModels
-            ? t("providers.fetchModels.loading")
-            : props.hasModelsEndpoint
-              ? t("providers.fetchModels.button")
-              : t("providers.fetchModels.buttonPreset")
-        }}
-      </Button>
-    </div>
-    <div class="grid grid-cols-2 gap-2 mb-3">
-      <div v-for="(m, i) in props.models" :key="i">
-        <ModelCard
-          :model="{
-            name: m.name,
-            contextWindow: m.context_window ?? 200000,
-            enabled: true,
-            patches: m.patches ?? [],
-          }"
-          :api-type="props.apiType"
-          :is-deep-seek="m.name.toLowerCase().includes('deepseek')"
-          :is-non-openai-endpoint="!isOfficialOpenai(props.baseUrl)"
-          :stream-timeout-ms="m.stream_timeout_ms ?? undefined"
-          :capabilities="modelCapabilities(m)"
-          @update:model="emit('update:model', i, $event)"
-          @remove="emit('remove-model', i)"
-          @update:stream-timeout-ms="
-            emit(
-              'update:model-timeout',
-              i,
-              String($event ? Math.round($event / 1000) : ''),
-            )
+      <div class="flex items-center justify-between mb-2">
+        <Label class="text-xs text-muted-foreground">{{
+          t("providers.fields.availableModels")
+        }}</Label>
+        <Button
+          v-if="
+            !props.editingId &&
+            props.presetGroup &&
+            props.presetGroup !== '__custom__' &&
+            (props.hasApiKey || !props.hasModelsEndpoint)
           "
-          @toggle-capability="
-            (cap: string) => emit('toggle-model-capability', i, cap)
-          "
-        />
+          type="button"
+          variant="outline"
+          size="sm"
+          class="text-xs"
+          :disabled="props.fetchingModels"
+          @click="emit('fetch-upstream-models')"
+        >
+          <RotateCw
+            class="w-3 h-3 mr-1"
+            :class="{ 'animate-spin': props.fetchingModels }"
+          />
+          {{
+            props.fetchingModels
+              ? t("providers.fetchModels.loading")
+              : props.hasModelsEndpoint
+                ? t("providers.fetchModels.button")
+                : t("providers.fetchModels.buttonPreset")
+          }}
+        </Button>
       </div>
-    </div>
-    <div class="flex gap-2">
-      <Input
-        :model-value="props.modelInput"
-        @update:model-value="emit('update:model-input', String($event))"
-        :placeholder="t('providers.fields.modelInputPlaceholder')"
-        @keydown.enter.prevent="emit('add-model')"
-        class="flex-1"
-      />
-      <Select
-        :model-value="props.contextWindowSelect"
-        @update:model-value="
-          emit('update:context-window-select', String($event))
-        "
-      >
-        <SelectTrigger class="w-28"
-          ><SelectValue :placeholder="t('providers.fields.context')"
-        /></SelectTrigger>
-        <SelectContent>
-          <SelectItem
-            v-for="opt in CONTEXT_WINDOW_OPTIONS"
-            :key="opt.value"
-            :value="opt.value"
-            >{{ opt.label }}</SelectItem
+      <div class="grid grid-cols-1 gap-2 mb-3">
+        <div v-for="(m, i) in props.models" :key="i">
+          <ModelCard
+            :model="{
+              name: m.name,
+              contextWindow: m.context_window ?? 200000,
+              enabled: true,
+              patches: m.patches ?? [],
+            }"
+            :api-type="props.apiType"
+            :is-deep-seek="m.name.toLowerCase().includes('deepseek')"
+            :is-non-openai-endpoint="!isOfficialOpenai(props.baseUrl)"
+            :stream-timeout-ms="m.stream_timeout_ms ?? undefined"
+            :capabilities="modelCapabilities(m)"
+            @update:model="emit('update:model', i, $event)"
+            @remove="emit('remove-model', i)"
+            @update:stream-timeout-ms="
+              emit(
+                'update:model-timeout',
+                i,
+                String($event ? Math.round($event / 1000) : ''),
+              )
+            "
+            @toggle-capability="
+              (cap: string) => emit('toggle-model-capability', i, cap)
+            "
+          />
+        </div>
+      </div>
+      <div class="flex gap-2 items-center">
+        <Input
+          :model-value="props.modelInput"
+          @update:model-value="emit('update:model-input', String($event))"
+          :placeholder="t('providers.fields.modelInputPlaceholder')"
+          @keydown.enter.prevent="handleAddModel"
+          class="flex-1"
+        />
+        <Select
+          :model-value="props.contextWindowSelect"
+          @update:model-value="
+            emit('update:context-window-select', String($event))
+          "
+        >
+          <SelectTrigger class="w-28"
+            ><SelectValue :placeholder="t('providers.fields.context')"
+          /></SelectTrigger>
+          <SelectContent>
+            <SelectItem
+              v-for="opt in CONTEXT_WINDOW_OPTIONS"
+              :key="opt.value"
+              :value="opt.value"
+              >{{ opt.label }}</SelectItem
+            >
+          </SelectContent>
+        </Select>
+        <!-- Capabilities -->
+        <div class="flex items-center gap-0.5 shrink-0">
+          <button
+            v-for="cap in capabilityIcons"
+            :key="cap.key"
+            type="button"
+            class="w-6 h-6 rounded flex items-center justify-center border text-[11px] transition-colors"
+            :class="
+              newCapabilities.includes(cap.key)
+                ? 'bg-primary/10 border-primary/30 text-primary'
+                : 'border-input text-muted-foreground/40 hover:text-muted-foreground'
+            "
+            :title="cap.label"
+            @click="toggleNewCapability(cap.key)"
           >
-        </SelectContent>
-      </Select>
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        @click="emit('add-model')"
-        :disabled="!props.modelInput.trim()"
-        >{{ t("providers.fields.addModel") }}</Button
-      >
+            {{ cap.icon }}
+          </button>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          @click="handleAddModel"
+          :disabled="!props.modelInput.trim()"
+          >{{ t("providers.fields.addModel") }}</Button
+        >
+      </div>
     </div>
   </div>
-  <!-- Concurrency + Transform -->
-  <div class="grid grid-cols-2 gap-4">
-    <div class="border rounded-md p-3 space-y-3">
-      <div class="text-xs font-medium text-muted-foreground">
-        {{ t("providers.concurrency.title") }}
+
+  <!-- Section 3: Advanced (collapsible, default closed) -->
+  <div class="bg-card border-input border rounded-lg overflow-hidden mb-4">
+    <button
+      type="button"
+      class="w-full flex items-center gap-2 px-5 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors"
+      @click="advancedOpen = !advancedOpen"
+    >
+      <svg
+        class="w-3 h-3 transition-transform duration-150"
+        :class="advancedOpen ? 'rotate-90' : ''"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+      >
+        <path d="M9 18l6-6-6-6" />
+      </svg>
+      {{ t("providers.fields.advancedSection") }}
+    </button>
+    <div v-if="advancedOpen" class="px-5 pb-5">
+      <div class="border-t border-input pt-4">
+        <div class="grid grid-cols-2 gap-4">
+          <div class="border border-input rounded-md p-3 space-y-3">
+            <div class="text-xs font-medium text-muted-foreground">
+              {{ t("providers.concurrency.title") }}
+            </div>
+            <ConcurrencyControl
+              :mode="props.concurrencyMode"
+              :max-concurrency="props.maxConcurrency"
+              :queue-timeout-ms="props.queueTimeoutMs"
+              :max-queue-size="props.maxQueueSize"
+              compact
+              @update:mode="
+                emit('update:concurrency-mode', $event as ConcurrencyMode)
+              "
+              @update:max-concurrency="emit('update:max-concurrency', $event)"
+              @update:queue-timeout-ms="emit('update:queue-timeout-ms', $event)"
+              @update:max-queue-size="emit('update:max-queue-size', $event)"
+            />
+          </div>
+          <div class="border border-input rounded-md p-3 space-y-3">
+            <div class="text-xs font-medium text-muted-foreground">
+              {{ t("providers.transform.title") }}
+            </div>
+            <TransformRulesForm
+              :inject-headers="props.transformInjectHeaders"
+              :drop-fields="props.transformDropFields"
+              :request-defaults="props.transformRequestDefaults"
+              @update:inject-headers="emit('update:inject-headers', $event)"
+              @update:drop-fields="emit('update:drop-fields', $event)"
+              @update:request-defaults="emit('update:request-defaults', $event)"
+            />
+          </div>
+        </div>
       </div>
-      <ConcurrencyControl
-        :mode="props.concurrencyMode"
-        :max-concurrency="props.maxConcurrency"
-        :queue-timeout-ms="props.queueTimeoutMs"
-        :max-queue-size="props.maxQueueSize"
-        compact
-        @update:mode="
-          emit('update:concurrency-mode', $event as ConcurrencyMode)
-        "
-        @update:max-concurrency="emit('update:max-concurrency', $event)"
-        @update:queue-timeout-ms="emit('update:queue-timeout-ms', $event)"
-        @update:max-queue-size="emit('update:max-queue-size', $event)"
-      />
-    </div>
-    <div class="border rounded-md p-3 space-y-3">
-      <div class="text-xs font-medium text-muted-foreground">
-        {{ t("providers.transform.title") }}
-      </div>
-      <TransformRulesForm
-        :inject-headers="props.transformInjectHeaders"
-        :drop-fields="props.transformDropFields"
-        :request-defaults="props.transformRequestDefaults"
-        @update:inject-headers="emit('update:inject-headers', $event)"
-        @update:drop-fields="emit('update:drop-fields', $event)"
-        @update:request-defaults="emit('update:request-defaults', $event)"
-      />
     </div>
   </div>
 </template>

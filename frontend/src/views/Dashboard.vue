@@ -1,5 +1,5 @@
 <template>
-  <div class="p-6 max-w-[1440px] mx-auto">
+  <div class="page">
     <!-- Zone 1: Header + Provider 按钮组 + Filters Popover -->
     <div class="flex items-center gap-4 mb-3">
       <h2 class="text-base font-semibold text-foreground shrink-0">
