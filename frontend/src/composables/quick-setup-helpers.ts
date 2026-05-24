@@ -420,8 +420,7 @@ export interface ProviderChangeContext {
   currentClient: ComputedRef<{ format: string } | undefined>;
   isNonOpenaiEndpoint: ComputedRef<boolean>;
   updateMappings: () => void;
-  autoSelectRetryRules: () => void;
-  initRetryProviderMap: () => void;
+  syncRetryRules: () => void;
 }
 
 export function applyProviderChange(
@@ -455,6 +454,7 @@ export function applyProviderChange(
     }
   }
   ctx.updateMappings();
+  ctx.syncRetryRules();
 }
 
 export function applyPlanChange(

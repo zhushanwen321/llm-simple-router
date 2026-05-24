@@ -121,8 +121,7 @@ export function useQuickSetupActions(ctx: ActionCtx) {
     currentClient: ctx.currentClient,
     isNonOpenaiEndpoint: ctx.isNonOpenaiEndpoint,
     updateMappings,
-    autoSelectRetryRules: () => syncRetry(ctx),
-    initRetryProviderMap: () => syncRetry(ctx),
+    syncRetryRules: () => syncRetry(ctx),
   };
   const onProviderChange = (group: string) =>
     applyProviderChange(group, providerCtx);
