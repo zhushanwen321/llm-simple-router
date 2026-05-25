@@ -55,7 +55,6 @@
   </div>
 </template>
 
-<!-- eslint-disable no-magic-numbers -->
 <script setup lang="ts">
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
@@ -68,12 +67,14 @@ const props = defineProps<{
   runtime: RuntimeMetrics | null;
 }>();
 
+const MAX_HEAP_PERCENT = 100;
+
 const heapPercent = computed(() => {
   if (!props.runtime || props.runtime.memoryUsage.heapTotal === 0) return 0;
   return Math.min(
-    100,
+    MAX_HEAP_PERCENT,
     (props.runtime.memoryUsage.heapUsed / props.runtime.memoryUsage.heapTotal) *
-      100,
+      MAX_HEAP_PERCENT,
   );
 });
 </script>

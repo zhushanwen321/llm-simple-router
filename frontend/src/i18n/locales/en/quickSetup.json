@@ -54,7 +54,11 @@
     "orphanToolResultOaDesc": "OpenAI format orphan handling",
     "general": "General Compatibility",
     "developerRole": "Developer Role",
-    "developerRoleDesc": "Convert developer role to system"
+    "developerRoleDesc": "Convert developer role to system",
+    "label": "patches",
+    "sectionTitle": "Patches",
+    "timeoutTitle": "Timeout",
+    "timeoutSeconds": "seconds"
   },
   "concurrency": {
     "control": "Concurrency Control",

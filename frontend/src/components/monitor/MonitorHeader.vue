@@ -1,4 +1,3 @@
-<!-- eslint-disable vue/multi-word-component-names -->
 <template>
   <div
     class="flex items-stretch bg-card border border-border rounded-lg overflow-hidden mb-3"
@@ -92,6 +91,11 @@
 <script setup lang="ts">
 import { useI18n } from "vue-i18n";
 import type { ProviderConcurrencySnapshot } from "@/types/monitor";
+import {
+  effectiveLimit,
+  concurrencyBarClass as barClass,
+  concurrencyRatioClass as ratioClass,
+} from "@/utils/concurrency";
 
 const { t } = useI18n();
 
@@ -102,24 +106,4 @@ defineProps<{
   queuedCount: number;
   concurrency: ProviderConcurrencySnapshot[];
 }>();
-
-function effectiveLimit(provider: ProviderConcurrencySnapshot): number {
-  return provider.adaptiveLimit ?? provider.maxConcurrency;
-}
-
-const CONCURRENCY_WARNING_THRESHOLD = 0.5;
-const CONCURRENCY_DANGER_THRESHOLD = 0.8;
-
-function barClass(active: number, max: number): string {
-  const ratio = max > 0 ? active / max : 0;
-  if (ratio >= CONCURRENCY_DANGER_THRESHOLD) return "bg-danger";
-  if (ratio >= CONCURRENCY_WARNING_THRESHOLD) return "bg-warning";
-  return "bg-primary";
-}
-
-function ratioClass(active: number, max: number): string {
-  const ratio = max > 0 ? active / max : 0;
-  if (ratio >= CONCURRENCY_DANGER_THRESHOLD) return "text-danger";
-  return "";
-}
 </script>

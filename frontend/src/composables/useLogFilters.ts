@@ -105,7 +105,8 @@ export function useLogFilters() {
       modelOptions.value = [
         ...new Set(result.rows.map((r) => r.backend_model)),
       ];
-    } catch {
+    } catch (e: unknown) {
+      console.error("useLogFilters.loadModelOptions:", e);
       modelOptions.value = [];
     }
   }

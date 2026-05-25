@@ -143,7 +143,7 @@ const structuredRef = ref<HTMLElement | null>(null);
 const props = withDefaults(
   defineProps<{
     source: DataSource;
-    apiType: "openai" | "anthropic";
+    apiType: "openai" | "openai-responses" | "anthropic";
     isStream: boolean;
     streamContent?: StreamContentSnapshot | null;
     nonStreamBody?: string | null;
@@ -238,7 +238,7 @@ const responseMeta = computed(() => {
       model: parsed.model as string | undefined,
     };
   } catch {
-    return null;
+    /* JSON 解析失败，使用默认值 */ return null;
   }
 });
 

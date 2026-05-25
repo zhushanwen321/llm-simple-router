@@ -6,8 +6,11 @@ import {
   api as ApiNamespace,
 } from "@/api/client";
 import type { MappingGroup } from "@/types/mapping";
-import type { ConcurrencyMode } from "@/types/concurrency";
 import type { Rule } from "@/types/mapping";
+import type {
+  TransformConfig,
+  ConcurrencyConfig,
+} from "@/components/shared/types";
 import {
   type ClientType,
   type ModelConfig,
@@ -17,6 +20,7 @@ import {
 } from "@/components/quick-setup/types";
 import { computeDefaultPatches } from "@/utils/model-patches";
 import { DEFAULT_STREAM_TIMEOUT_MS } from "@/constants";
+import { buildTransformRule as buildTransformRuleCore } from "@/utils/transform-domain";
 
 type Api = typeof ApiNamespace;
 
@@ -47,37 +51,26 @@ export function toProviderName(group: string): string {
 }
 
 export function parseTransformRules(
-  headersInput: string,
-  dropFieldsInput: string,
-  requestDefaultsInput: string,
+  config: TransformConfig,
   onError: (msg: string) => void,
 ): NonNullable<QuickSetupPayload["transform_rules"]> | undefined | false {
-  if (!headersInput && !dropFieldsInput && !requestDefaultsInput)
+  const { injectHeaders, dropFields, requestDefaults } = config;
+  if (!injectHeaders.trim() && !dropFields.trim() && !requestDefaults.trim())
     return undefined;
-  const result: NonNullable<QuickSetupPayload["transform_rules"]> = {};
-  if (headersInput) {
-    try {
-      result.inject_headers = JSON.parse(headersInput);
-    } catch {
-      onError("injectHeadersJsonError");
-      return false;
-    }
+
+  const { rule, errorKey } = buildTransformRuleCore({
+    injectHeaders,
+    dropFields,
+    requestDefaults,
+  });
+
+  if (errorKey) {
+    onError(errorKey);
+    return false;
   }
-  if (dropFieldsInput) {
-    result.drop_fields = dropFieldsInput
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-  }
-  if (requestDefaultsInput) {
-    try {
-      result.request_defaults = JSON.parse(requestDefaultsInput);
-    } catch {
-      onError("requestDefaultsJsonError");
-      return false;
-    }
-  }
-  return Object.keys(result).length > 0 ? result : undefined;
+  if (!rule) return undefined;
+
+  return JSON.parse(rule) as NonNullable<QuickSetupPayload["transform_rules"]>;
 }
 
 /** Toggle active state for existing mappings that changed */
@@ -95,7 +88,8 @@ export async function toggleChangedMappings(
     ) {
       try {
         await apiClient.toggleMappingGroup(entry.existingId);
-      } catch {
+      } catch (e: unknown) {
+        console.error("quick-setup-helpers.toggleChangedMappings:", e);
         errors.push(entry.clientModel);
       }
     }
@@ -135,10 +129,7 @@ interface ProviderPayloadInput {
   upstreamPath: string;
   apiKey: string;
   models: ModelConfig[];
-  concurrencyMode: ConcurrencyMode;
-  maxConcurrency: number;
-  queueTimeoutMs: number;
-  maxQueueSize: number;
+  concurrency: ConcurrencyConfig;
 }
 
 function buildProviderPayload(
@@ -162,13 +153,19 @@ function buildProviderPayload(
           ? m.capabilities
           : undefined,
     })),
-    concurrency_mode: input.concurrencyMode,
+    concurrency_mode: input.concurrency.mode,
     max_concurrency:
-      input.concurrencyMode !== "none" ? input.maxConcurrency : undefined,
+      input.concurrency.mode !== "none"
+        ? input.concurrency.max_concurrency
+        : undefined,
     queue_timeout_ms:
-      input.concurrencyMode !== "none" ? input.queueTimeoutMs : undefined,
+      input.concurrency.mode !== "none"
+        ? input.concurrency.queue_timeout_ms
+        : undefined,
     max_queue_size:
-      input.concurrencyMode !== "none" ? input.maxQueueSize : undefined,
+      input.concurrency.mode !== "none"
+        ? input.concurrency.max_queue_size
+        : undefined,
   };
 }
 
@@ -195,7 +192,7 @@ export function buildMappingEntries(
       try {
         rule = JSON.parse(existingGroup.rule);
       } catch {
-        rule = {};
+        /* JSON 解析失败，回退空对象 */ rule = {};
       }
       const targets = rule.targets ?? [];
       return {
@@ -261,10 +258,7 @@ interface QuickSetupPayloadInput {
   upstreamPath: string;
   apiKey: string;
   models: ModelConfig[];
-  concurrencyMode: ConcurrencyMode;
-  maxConcurrency: number;
-  queueTimeoutMs: number;
-  maxQueueSize: number;
+  concurrency: ConcurrencyConfig;
   mappingEntries: MappingEntry[];
   recommendedRules: RecommendedRetryRule[];
   selectedRetryRules: Set<string>;
@@ -284,10 +278,7 @@ export function buildQuickSetupPayload(
       upstreamPath: input.upstreamPath,
       apiKey: input.apiKey,
       models: input.models,
-      concurrencyMode: input.concurrencyMode,
-      maxConcurrency: input.maxConcurrency,
-      queueTimeoutMs: input.queueTimeoutMs,
-      maxQueueSize: input.maxQueueSize,
+      concurrency: input.concurrency,
     }),
     mappings: input.mappingEntries
       .filter((m) => m.targets[0]?.backend_model)

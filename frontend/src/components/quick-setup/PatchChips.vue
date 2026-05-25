@@ -8,6 +8,11 @@ import { Button } from "@/components/ui/button";
 
 const { t } = useI18n();
 
+/** 后端 normalizePatchName 将连字符转下划线存储，前端比较时需统一格式 */
+function toStorageKey(id: string): string {
+  return id.replace(/-/g, "_");
+}
+
 const props = defineProps<{
   apiType: string;
   isDeepSeek: boolean;
@@ -32,14 +37,15 @@ const visibleGroups = computed<PatchGroup[]>(() => {
 });
 
 function toggle(patchId: string) {
-  const next = props.modelValue.includes(patchId)
-    ? props.modelValue.filter((id) => id !== patchId)
-    : [...props.modelValue, patchId];
+  const key = toStorageKey(patchId);
+  const next = props.modelValue.includes(key)
+    ? props.modelValue.filter((id) => id !== key)
+    : [...props.modelValue, key];
   emit("update:modelValue", next);
 }
 
 function isActive(patchId: string): boolean {
-  return props.modelValue.includes(patchId);
+  return props.modelValue.includes(toStorageKey(patchId));
 }
 </script>
 
@@ -72,9 +78,7 @@ function isActive(patchId: string): boolean {
             :class="
               cn(
                 'size-1.5 rounded-full transition-colors',
-                isActive(item.id)
-                  ? 'bg-primary'
-                  : 'bg-border',
+                isActive(item.id) ? 'bg-primary' : 'bg-border',
               )
             "
           />

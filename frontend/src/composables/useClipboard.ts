@@ -22,6 +22,7 @@ export function useClipboard() {
       }, FEEDBACK_MS);
       return true;
     } catch {
+      /* 剪贴板写入失败，静默降级 */
       try {
         fallbackCopy(text);
         copied.value = true;
@@ -30,7 +31,7 @@ export function useClipboard() {
         }, FEEDBACK_MS);
         return true;
       } catch {
-        return false;
+        /* 剪贴板写入失败，静默降级 */ return false;
       }
     }
   }

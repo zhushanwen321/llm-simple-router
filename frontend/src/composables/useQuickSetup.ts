@@ -23,13 +23,17 @@ import {
   CLIENTS,
 } from "@/components/quick-setup/types";
 import { DEFAULT_CONTEXT_WINDOW } from "@/constants";
+import {
+  DEFAULT_CONCURRENCY_CONFIG,
+  DEFAULT_TRANSFORM_CONFIG,
+} from "@/components/shared/types";
+import type {
+  ConcurrencyConfig,
+  TransformConfig,
+} from "@/components/shared/types";
 import { computeDefaultPatches } from "@/utils/model-patches";
 import { toProviderName } from "./quick-setup-helpers";
 import { useQuickSetupActions, type ActionCtx } from "./quick-setup-actions";
-
-const DEFAULT_CONCURRENCY = 10;
-const DEFAULT_QUEUE_TIMEOUT_MS = 120_000;
-const DEFAULT_QUEUE_SIZE = 100;
 
 function computeProviderGroupDisplayInfo(
   isCustomProvider: ComputedRef<boolean>,
@@ -89,13 +93,10 @@ export function useQuickSetup() {
   const retryProviderMap = ref<Map<string, "general" | string>>(new Map());
   const saving = ref(false);
   const connectionStatus = ref<"idle" | "testing" | "ok" | "error">("idle");
-  const concurrencyMode = ref<"auto" | "manual" | "none">("auto");
-  const maxConcurrency = ref(DEFAULT_CONCURRENCY);
-  const queueTimeoutMs = ref(DEFAULT_QUEUE_TIMEOUT_MS);
-  const maxQueueSize = ref(DEFAULT_QUEUE_SIZE);
-  const transformInjectHeaders = ref("");
-  const transformDropFields = ref("");
-  const transformRequestDefaults = ref("");
+  const concurrencyConfig = ref<ConcurrencyConfig>({
+    ...DEFAULT_CONCURRENCY_CONFIG,
+  });
+  const transformConfig = ref<TransformConfig>({ ...DEFAULT_TRANSFORM_CONFIG });
   const existingMappings = ref<MappingGroup[]>([]);
   const allProviders = ref<ApiProvider[]>([]);
   const isCustomProvider = computed(() => selectedGroup.value === "__custom__");
@@ -169,37 +170,38 @@ export function useQuickSetup() {
 
   const actionCtx: ActionCtx = {
     t,
-    clientType,
-    providerGroups,
-    selectedGroup,
-    selectedPlan,
-    apiType,
-    apiKey,
-    modelConfigs,
-    mappingEntries,
-    allRecommendedRules,
-    selectedRetryRules,
-    retryProviderMap,
-    saving,
-    connectionStatus,
-    concurrencyMode,
-    maxConcurrency,
-    queueTimeoutMs,
-    maxQueueSize,
-    transformInjectHeaders,
-    transformDropFields,
-    transformRequestDefaults,
-    existingMappings,
-    allProviders,
-    isCustomProvider,
-    currentClient,
-    currentPreset,
-    baseUrl,
-    upstreamPath,
-    isNonOpenaiEndpoint,
-    recommendedRules,
-    customBaseUrl,
-    customUpstreamPath,
+    selection: {
+      clientType,
+      selectedGroup,
+      selectedPlan,
+      apiType,
+      providerGroups,
+      currentClient,
+      currentPreset,
+      isCustomProvider,
+      customBaseUrl,
+      customUpstreamPath,
+    },
+    data: {
+      modelConfigs,
+      mappingEntries,
+      apiKey,
+      baseUrl,
+      upstreamPath,
+      existingMappings,
+      allProviders,
+      allRecommendedRules,
+      recommendedRules,
+      selectedRetryRules,
+      retryProviderMap,
+      isNonOpenaiEndpoint,
+    },
+    submit: {
+      saving,
+      connectionStatus,
+      concurrencyConfig,
+      transformConfig,
+    },
   };
   const actions = useQuickSetupActions(actionCtx);
 
@@ -260,13 +262,8 @@ export function useQuickSetup() {
     isCustomProvider,
     availablePlans,
     isNonOpenaiEndpoint,
-    concurrencyMode,
-    maxConcurrency,
-    queueTimeoutMs,
-    maxQueueSize,
-    transformInjectHeaders,
-    transformDropFields,
-    transformRequestDefaults,
+    concurrencyConfig,
+    transformConfig,
     existingMappings,
     allProviders,
     allProviderGroups,

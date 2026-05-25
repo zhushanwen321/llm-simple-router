@@ -1,4 +1,3 @@
-<!-- eslint-disable vue/multi-word-component-names -->
 <template>
   <div class="page">
     <div class="flex items-center justify-between mb-4">
@@ -441,8 +440,14 @@ function copyLogId(id: string) {
 const COPY_FEEDBACK_MS = 2000;
 
 const hasActiveFilters = computed(() => {
-  const params = buildFilterParams();
-  return Object.keys(params).length > 0;
+  return (
+    providerFilter.value !== "all" ||
+    modelFilter.value !== "all" ||
+    keyFilter.value !== "all" ||
+    statusFilter.value !== "all" ||
+    !!dateRange.value.start ||
+    !!dateRange.value.end
+  );
 });
 
 function clearAllFilters() {

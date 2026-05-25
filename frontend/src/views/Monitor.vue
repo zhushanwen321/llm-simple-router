@@ -1,4 +1,3 @@
-<!-- eslint-disable vue/multi-word-component-names -->
 <template>
   <div class="page">
     <!-- Page Header -->
@@ -546,7 +545,6 @@ import RuntimePanel from "@/components/monitor/RuntimePanel.vue";
 import StatusCodePanel from "@/components/monitor/StatusCodePanel.vue";
 import ProviderStatsTable from "@/components/monitor/ProviderStatsTable.vue";
 import UnifiedRequestDialog from "@/components/request-detail/UnifiedRequestDialog.vue";
-import { useMonitorSSE } from "@/composables/useMonitorSSE";
 import { useMonitorData } from "@/composables/useMonitorData";
 import { useClipboard } from "@/composables/useClipboard";
 import type { ActiveRequest } from "@/types/monitor";
@@ -570,26 +568,9 @@ const {
   selectRequest,
   selectedStreamContent,
   logDetailData,
-  handleSSEMessage,
-  handleSSEOpen,
-  handleSSEClose,
   loadInitialData,
+  connect,
 } = useMonitorData();
-
-// --- SSE lifecycle ---
-const { connect } = useMonitorSSE(
-  "/admin/api/monitor/stream",
-  {
-    request_start: handleSSEMessage,
-    request_update: handleSSEMessage,
-    request_complete: handleSSEMessage,
-    concurrency_update: handleSSEMessage,
-    stats_update: handleSSEMessage,
-    runtime_update: handleSSEMessage,
-    stream_content_update: handleSSEMessage,
-  },
-  { onOpen: handleSSEOpen, onClose: handleSSEClose },
-);
 
 // --- Tab state ---
 type RequestTab = "active" | "queued" | "recent";

@@ -293,16 +293,7 @@
               {{ t("quickSetup.concurrency.optional") }}
             </Badge>
           </div>
-          <ConcurrencyControl
-            :mode="concurrencyMode"
-            :max-concurrency="maxConcurrency"
-            :queue-timeout-ms="queueTimeoutMs"
-            :max-queue-size="maxQueueSize"
-            @update:mode="onConcurrencyModeChange"
-            @update:max-concurrency="maxConcurrency = $event"
-            @update:queue-timeout-ms="queueTimeoutMs = $event"
-            @update:max-queue-size="maxQueueSize = $event"
-          />
+          <ConcurrencyControl v-model="concurrencyConfig" />
         </div>
       </CardContent>
     </Card>
@@ -385,14 +376,7 @@
             </Badge>
           </Button>
           <div v-if="showTransformRules" class="mt-2">
-            <TransformRulesForm
-              :inject-headers="transformInjectHeaders"
-              :drop-fields="transformDropFields"
-              :request-defaults="transformRequestDefaults"
-              @update:inject-headers="transformInjectHeaders = $event"
-              @update:drop-fields="transformDropFields = $event"
-              @update:request-defaults="transformRequestDefaults = $event"
-            />
+            <TransformRulesForm v-model="transformConfig" />
           </div>
         </div>
       </CardContent>
@@ -684,7 +668,6 @@ import ModelCard from "@/components/quick-setup/ModelCard.vue";
 import QuickSetupMappingList from "@/components/shared/QuickSetupMappingList.vue";
 import ConcurrencyControl from "@/components/shared/ConcurrencyControl.vue";
 import TransformRulesForm from "@/components/shared/TransformRulesForm.vue";
-import type { ModelConfig } from "@/components/quick-setup/types";
 import {
   CLIENTS,
   DEFAULT_CLIENT_MAPPINGS,
@@ -737,14 +720,9 @@ const {
   presetBaseUrl,
   customUpstreamPath,
   presetUpstreamPath,
-  concurrencyMode,
-  maxConcurrency,
-  queueTimeoutMs,
-  maxQueueSize,
+  concurrencyConfig,
+  transformConfig,
   allProviderGroups,
-  transformInjectHeaders,
-  transformDropFields,
-  transformRequestDefaults,
   selectClient,
   onProviderChange,
   onPlanChange,
@@ -757,10 +735,13 @@ const {
   toggleRetryRule,
   setAllRetryRules,
   setRetryProvider,
-  onConcurrencyModeChange,
   testConnection,
   submit,
   addCustomModel,
+  updateModel,
+  removeModel,
+  updateModelTimeout,
+  toggleModelCapability,
 } = useQuickSetup();
 
 const customModelInput = ref("");
@@ -787,35 +768,6 @@ const defaultModelsLabel = computed(() => {
     : undefined;
   return models ? models.join(", ") : "";
 });
-
-function updateModel(index: number, updated: ModelConfig) {
-  const next = [...modelConfigs.value];
-  next[index] = updated;
-  modelConfigs.value = next;
-}
-
-function removeModel(index: number) {
-  modelConfigs.value = modelConfigs.value.filter((_, i) => i !== index);
-}
-
-function updateModelTimeout(index: number, ms: number | undefined) {
-  const next = [...modelConfigs.value];
-  next[index] = { ...next[index], stream_timeout_ms: ms || undefined };
-  modelConfigs.value = next;
-}
-
-function toggleModelCapability(index: number, capability: string) {
-  const next = [...modelConfigs.value];
-  const model = { ...next[index] };
-  const caps = model.capabilities ?? ["text"];
-  if (caps.includes(capability)) {
-    model.capabilities = caps.filter((c) => c !== capability);
-  } else {
-    model.capabilities = [...caps, capability];
-  }
-  next[index] = model;
-  modelConfigs.value = next;
-}
 
 function validateConfig() {
   if (!selectedGroup.value) {

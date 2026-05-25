@@ -350,7 +350,7 @@ watch([() => props.open, () => props.logEntry], ([isOpen, logEntry]) => {
       "attempts" in logEntry &&
       "clientRequest" in logEntry
         ? (logEntry as UnifiedRequestOverview)
-        : fromLogEntry(logEntry as LogEntry);
+        : fromLogEntry(logEntry as LogEntry, []);
   }
 });
 </script>

@@ -1,66 +1,22 @@
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
-import type { Ref, ComputedRef } from "vue";
 import { useI18n } from "vue-i18n";
-import type { ChartData } from "chart.js";
-import { api, getApiMessage } from "@/api/client";
-import type { UsageWindowWithUsage } from "@/api/client";
+import { api, getApiMessage, type UsageWindowWithUsage } from "@/api/client";
 import { toast } from "vue-sonner";
-import { fillTimeseries } from "@/views/metrics-helpers";
-import { CHART_COLORS } from "@/styles/design-tokens";
 import { formatProviderTokenLabel } from "@/utils/token-format";
-import { formatTimeShort } from "@/utils/format";
 import { watchTheme } from "@/composables/useTheme";
 import type { Provider } from "@/types/mapping";
-
-export interface DashboardStats {
-  totalRequests: number;
-  successRate: number;
-  avgTps: number;
-  totalInputTokens: number;
-  totalOutputTokens: number;
-  startTime: string | null;
-  endTime: string | null;
-}
+import { useDashboardFilters } from "./useDashboardFilters";
+import type { DashboardStats } from "./useDashboardData";
+import { useDashboardData } from "./useDashboardData";
+import { useDashboardTimeline } from "./useDashboardTimeline";
 
 // --- Constants ---
 
-const CACHE_TTL = 5000;
 const DEBOUNCE_MS = 300;
 const PERCENT_MULTIPLIER = 100;
 const MIN_WINDOWS_FOR_DELTA = 2;
-const HOURS_PER_DAY = 24;
-const MS_PER_HOUR = 3600_000;
-const DAYS_3 = 3;
-const DAYS_7 = 7;
-const PAD_WIDTH = 2;
-
-const TIMELINE_DURATIONS: Record<TimelineRange, number> = {
-  "24h": HOURS_PER_DAY * MS_PER_HOUR,
-  "3d": DAYS_3 * HOURS_PER_DAY * MS_PER_HOUR,
-  "7d": DAYS_7 * HOURS_PER_DAY * MS_PER_HOUR,
-};
-
-export type TimelineRange = "24h" | "3d" | "7d";
 
 // --- Helpers ---
-
-/** Date → SQLite-compatible "YYYY-MM-DD HH:mm:ss" (UTC) */
-function toDateTimeStr(d: Date): string {
-  const pad = (n: number) => n.toString().padStart(PAD_WIDTH, "0");
-  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
-}
-
-function getTimelineTimeRange(range: TimelineRange): {
-  start_time: string;
-  end_time: string;
-} {
-  const now = new Date();
-  const start = new Date(now.getTime() - TIMELINE_DURATIONS[range]);
-  return {
-    start_time: toDateTimeStr(start),
-    end_time: toDateTimeStr(now),
-  };
-}
 
 /** 从 usageWindows 中按 provider_id 聚合全部 input tokens（不依赖选中窗口） */
 function aggregateAllProviderInputTokens(
@@ -75,379 +31,7 @@ function aggregateAllProviderInputTokens(
   return map;
 }
 
-// --- Timeline window merge logic ---
-
-const MERGE_GAP_MS = 60000;
-
-/** 将同一 provider 的重叠/相邻窗口合并为一个 block，聚合 usage */
-function mergeTimelineWindows(
-  windows: UsageWindowWithUsage[],
-): UsageWindowWithUsage[] {
-  const sorted = [...windows].sort(
-    (a, b) =>
-      new Date(a.window.start_time).getTime() -
-      new Date(b.window.start_time).getTime(),
-  );
-  const merged: UsageWindowWithUsage[] = [];
-  for (const w of sorted) {
-    const prev = merged[merged.length - 1];
-    const wStart = new Date(w.window.start_time).getTime();
-    const prevEnd = prev ? new Date(prev.window.end_time).getTime() : -Infinity;
-    if (
-      prev &&
-      prev.window.provider_id === w.window.provider_id &&
-      wStart <= prevEnd + MERGE_GAP_MS
-    ) {
-      if (new Date(w.window.end_time).getTime() > prevEnd) {
-        prev.window = { ...prev.window, end_time: w.window.end_time };
-      }
-      prev.usage = {
-        request_count: prev.usage.request_count + w.usage.request_count,
-        total_input_tokens:
-          prev.usage.total_input_tokens + w.usage.total_input_tokens,
-        total_output_tokens:
-          prev.usage.total_output_tokens + w.usage.total_output_tokens,
-      };
-    } else {
-      merged.push({ window: { ...w.window }, usage: { ...w.usage } });
-    }
-  }
-  return merged;
-}
-
-// --- useDashboardFilters ---
-
-function useDashboardFilters(
-  selectedProvider: Ref<string>,
-  providers: Ref<Provider[]>,
-  t: (key: string) => string,
-) {
-  const modelFilter = ref("all");
-  const keyFilter = ref("all");
-  const clientType = ref("all");
-  const allModelOptions = ref<string[]>([]);
-  const keyOptions = ref<{ id: string; name: string }[]>([]);
-
-  const modelOptions = computed(() => {
-    if (selectedProvider.value) {
-      const provider = providers.value.find(
-        (p) => p.id === selectedProvider.value,
-      );
-      if (provider) {
-        const providerModels = new Set(provider.models.map((m) => m.name));
-        return allModelOptions.value.filter((m) => providerModels.has(m));
-      }
-    }
-    return allModelOptions.value;
-  });
-
-  function buildBaseParams(): Record<string, string> {
-    const p: Record<string, string> = { period: "window" };
-    if (selectedProvider.value) p.provider_id = selectedProvider.value;
-    return p;
-  }
-
-  const statsParams = computed(() => {
-    const p = buildBaseParams();
-    if (modelFilter.value !== "all") p.backend_model = modelFilter.value;
-    if (keyFilter.value !== "all") p.router_key_id = keyFilter.value;
-    return p;
-  });
-
-  const cacheSummaryParams = computed(() => {
-    const p = buildBaseParams();
-    if (modelFilter.value !== "all") p.backend_model = modelFilter.value;
-    if (keyFilter.value !== "all") p.router_key_id = keyFilter.value;
-    if (clientType.value !== "all") p.client_type = clientType.value;
-    return p;
-  });
-
-  function tsParams(
-    metric: string,
-    timeRange?: { startTime: string; endTime: string },
-  ): { metric: string; [key: string]: string } {
-    const p: { metric: string; [key: string]: string } = {
-      period: "window",
-      metric,
-    };
-    if (selectedProvider.value) p.provider_id = selectedProvider.value;
-    if (modelFilter.value !== "all") p.backend_model = modelFilter.value;
-    if (keyFilter.value !== "all") p.router_key_id = keyFilter.value;
-    if (timeRange) {
-      p.start_time = timeRange.startTime;
-      p.end_time = timeRange.endTime;
-    }
-    return p;
-  }
-
-  async function loadFilterOptions() {
-    try {
-      const [models, keys] = await Promise.allSettled([
-        api.getAvailableModels(),
-        api.getRouterKeys(),
-      ]);
-      if (models.status === "fulfilled") allModelOptions.value = models.value;
-      if (keys.status === "fulfilled")
-        keyOptions.value = keys.value.map((k) => ({
-          id: k.id,
-          name: k.name,
-        }));
-    } catch (e: unknown) {
-      console.error("useDashboardFilters.loadFilterOptions:", e);
-      /* 非关键操作：filter 缺失不影响主仪表盘功能 */
-      toast.error(getApiMessage(e, t("dashboard.loadFilterFailed")));
-    }
-  }
-
-  return {
-    modelFilter,
-    keyFilter,
-    clientType,
-    keyOptions,
-    modelOptions,
-    statsParams,
-    cacheSummaryParams,
-    tsParams,
-    loadFilterOptions,
-  };
-}
-
-// --- useDashboardData ---
-
-function useDashboardData(
-  selectedProvider: Ref<string>,
-  statsParams: ComputedRef<Record<string, string>>,
-  cacheSummaryParams: ComputedRef<Record<string, string>>,
-  tsParams: (
-    metric: string,
-    timeRange?: { startTime: string; endTime: string },
-  ) => { metric: string; [key: string]: string },
-  selectedWindow: ComputedRef<UsageWindowWithUsage | null>,
-  watchKey: ComputedRef<string>,
-  t: (key: string) => string,
-) {
-  const stats = ref<DashboardStats>({
-    totalRequests: 0,
-    successRate: 0,
-    avgTps: 0,
-    totalInputTokens: 0,
-    totalOutputTokens: 0,
-    startTime: null,
-    endTime: null,
-  });
-  const cacheHitRate = ref(0);
-  const clientTypeBreakdown = ref<Record<string, number>>({});
-  const tpsChartData = ref<ChartData<"line"> | null>(null);
-  const inputTokensChartData = ref<ChartData<"line"> | null>(null);
-  const outputTokensChartData = ref<ChartData<"line"> | null>(null);
-  const tokenThroughputChartData = ref<ChartData<"line"> | null>(null);
-  const loading = ref(false);
-
-  function toChartData(
-    timeseries: { labels: string[]; values: number[] },
-    label: string,
-    color: string,
-  ): ChartData<"line"> {
-    return {
-      labels: timeseries.labels,
-      datasets: [
-        {
-          label,
-          data: timeseries.values,
-          borderColor: color,
-          backgroundColor: color.replace(")", " / 0.1)"),
-          fill: false,
-          tension: 0.4,
-          pointRadius: 0,
-        },
-      ],
-    };
-  }
-
-  function toThroughputChartData(
-    inputData: { labels: string[]; values: number[] },
-    outputData: { labels: string[]; values: number[] },
-    inputLabel: string,
-    outputLabel: string,
-  ): ChartData<"line"> {
-    return {
-      labels: inputData.labels,
-      datasets: [
-        {
-          label: inputLabel,
-          data: inputData.values,
-          borderColor: CHART_COLORS.teal,
-          backgroundColor: CHART_COLORS.tealFill,
-          fill: "origin",
-          tension: 0.4,
-          pointRadius: 0,
-        },
-        {
-          label: outputLabel,
-          data: outputData.values,
-          borderColor: CHART_COLORS.green,
-          backgroundColor: CHART_COLORS.greenFill,
-          fill: "origin",
-          tension: 0.4,
-          pointRadius: 0,
-        },
-      ],
-    };
-  }
-
-  const loadError = ref(false);
-
-  let lastRefreshKey = "";
-  let lastRefreshTime = 0;
-
-  async function refresh() {
-    if (!selectedProvider.value) return;
-    const key = watchKey.value;
-    const now = Date.now();
-    if (key === lastRefreshKey && now - lastRefreshTime < CACHE_TTL) return;
-    // 只在首次加载时显示 skeleton，已有数据时静默刷新避免闪烁
-    loading.value = !stats.value.totalRequests && !stats.value.totalInputTokens;
-    try {
-      const windowTimeRange = selectedWindow.value
-        ? {
-          startTime: selectedWindow.value.window.start_time,
-          endTime: selectedWindow.value.window.end_time,
-        }
-        : undefined;
-
-      // Fix #1: 将选中窗口的时间范围合并进 stats 和 cache summary 请求参数
-      const finalStatsParams: Record<string, string> = {
-        ...statsParams.value,
-      };
-      const finalCacheSummaryParams: Record<string, string> = {
-        ...cacheSummaryParams.value,
-      };
-      if (windowTimeRange) {
-        finalStatsParams.start_time = windowTimeRange.startTime;
-        finalStatsParams.end_time = windowTimeRange.endTime;
-        finalCacheSummaryParams.start_time = windowTimeRange.startTime;
-        finalCacheSummaryParams.end_time = windowTimeRange.endTime;
-      }
-
-      const [statsRes, tpsRes, inputRes, outputRes, summaryRes] =
-        await Promise.allSettled([
-          api.getStats(finalStatsParams),
-          api.getMetricsTimeseries(tsParams("total_tps", windowTimeRange)),
-          api.getMetricsTimeseries(tsParams("input_tokens", windowTimeRange)),
-          api.getMetricsTimeseries(tsParams("output_tokens", windowTimeRange)),
-          api.getMetricsSummary(finalCacheSummaryParams),
-        ]);
-
-      const fulfilled = <T>(
-        r: PromiseSettledResult<T>,
-      ): r is PromiseFulfilledResult<T> => r.status === "fulfilled";
-
-      if (fulfilled(statsRes)) stats.value = statsRes.value;
-
-      const resolvedTimeRange =
-        stats.value.startTime && stats.value.endTime
-          ? { startTime: stats.value.startTime, endTime: stats.value.endTime }
-          : windowTimeRange;
-
-      const period = "window";
-
-      if (fulfilled(tpsRes) && tpsRes.value.length > 0) {
-        const filled = fillTimeseries(tpsRes.value, period, resolvedTimeRange);
-        tpsChartData.value = toChartData(
-          filled,
-          t("dashboard.charts.tokenOutputSpeed"),
-          CHART_COLORS.indigo,
-        );
-      } else {
-        tpsChartData.value = null;
-      }
-
-      if (fulfilled(inputRes) && inputRes.value.length > 0) {
-        const filled = fillTimeseries(
-          inputRes.value,
-          period,
-          resolvedTimeRange,
-        );
-        inputTokensChartData.value = toChartData(
-          filled,
-          t("dashboard.charts.inputLegend"),
-          CHART_COLORS.teal,
-        );
-      } else {
-        inputTokensChartData.value = null;
-      }
-
-      if (fulfilled(outputRes) && outputRes.value.length > 0) {
-        const filled = fillTimeseries(
-          outputRes.value,
-          period,
-          resolvedTimeRange,
-        );
-        outputTokensChartData.value = toChartData(
-          filled,
-          t("dashboard.charts.outputLegend"),
-          CHART_COLORS.green,
-        );
-      } else {
-        outputTokensChartData.value = null;
-      }
-
-      // 堆叠面积图：input + output tokens
-      if (
-        fulfilled(inputRes) &&
-        inputRes.value.length > 0 &&
-        fulfilled(outputRes) &&
-        outputRes.value.length > 0
-      ) {
-        const filledInput = fillTimeseries(
-          inputRes.value,
-          period,
-          resolvedTimeRange,
-        );
-        const filledOutput = fillTimeseries(
-          outputRes.value,
-          period,
-          resolvedTimeRange,
-        );
-        tokenThroughputChartData.value = toThroughputChartData(
-          filledInput,
-          filledOutput,
-          t("dashboard.charts.inputLegend"),
-          t("dashboard.charts.outputLegend"),
-        );
-      } else {
-        tokenThroughputChartData.value = null;
-      }
-
-      if (fulfilled(summaryRes)) {
-        cacheHitRate.value = summaryRes.value.cache_hit_rate;
-        clientTypeBreakdown.value = summaryRes.value.client_type_breakdown;
-      }
-    } catch (e: unknown) {
-      console.error("useDashboardData.refresh:", e);
-      toast.error(getApiMessage(e, t("dashboard.loadDashboardFailed")));
-    } finally {
-      loading.value = false;
-      lastRefreshKey = key;
-      lastRefreshTime = Date.now();
-    }
-  }
-
-  return {
-    stats,
-    cacheHitRate,
-    clientTypeBreakdown,
-    tpsChartData,
-    inputTokensChartData,
-    outputTokensChartData,
-    tokenThroughputChartData,
-    loading,
-    loadError,
-    refresh,
-  };
-}
-
-// --- useDashboard ---
+// --- useDashboard (facade) ---
 
 export function useDashboard() {
   const { t } = useI18n();
@@ -455,51 +39,16 @@ export function useDashboard() {
   // --- Provider list and selection ---
   const providers = ref<Provider[]>([]);
   const selectedProvider = ref("");
+  const providerLoadError = ref(false);
 
-  // --- Timeline range ---
-  const timelineRange = ref<TimelineRange>("24h");
+  // --- Sub-composables ---
+  const filters = useDashboardFilters({ selectedProvider, providers, t });
 
-  // --- Usage windows ---
-  const usageWindows = ref<UsageWindowWithUsage[]>([]);
-  const selectedWindowId = ref<string | null>(null);
-
-  const selectedWindow = computed<UsageWindowWithUsage | null>(() => {
-    if (!selectedWindowId.value) return null;
-    return (
-      usageWindows.value.find((w) => w.window.id === selectedWindowId.value) ??
-      null
-    );
-  });
-
-  // Timeline 渲染用：过滤 provider + 合并重叠窗口
-  const timelineWindows = computed(() => {
-    let windows = usageWindows.value.filter(
-      (w) => w.window.provider_id !== null,
-    );
-    if (selectedProvider.value) {
-      windows = windows.filter(
-        (w) => w.window.provider_id === selectedProvider.value,
-      );
-    }
-    return mergeTimelineWindows(windows);
-  });
-
-  // --- Filters & params ---
-  const {
-    modelFilter,
-    keyFilter,
-    clientType,
-    keyOptions,
-    modelOptions,
-    statsParams,
-    cacheSummaryParams,
-    tsParams,
-    loadFilterOptions,
-  } = useDashboardFilters(selectedProvider, providers, t);
+  const timeline = useDashboardTimeline({ selectedProvider, t });
 
   // --- Derived: provider token labels from usageWindows (stable across provider selection) ---
   const providerInputTokens = computed(() =>
-    aggregateAllProviderInputTokens(usageWindows.value),
+    aggregateAllProviderInputTokens(timeline.usageWindows.value),
   );
 
   const providerTokenLabels = computed(() => {
@@ -520,50 +69,41 @@ export function useDashboard() {
     });
   });
 
-  // --- Watch key ---
+  // --- Watch key (cross-composite dependency fingerprint) ---
   const watchKey = computed(() =>
     JSON.stringify({
       selectedProvider: selectedProvider.value,
-      selectedWindowId: selectedWindowId.value,
-      modelFilter: modelFilter.value,
-      keyFilter: keyFilter.value,
-      clientType: clientType.value,
-      timelineRange: timelineRange.value,
+      selectedWindowId: timeline.selectedWindowId.value,
+      modelFilter: filters.modelFilter.value,
+      keyFilter: filters.keyFilter.value,
+      clientType: filters.clientType.value,
+      timelineRange: timeline.timelineRange.value,
     }),
   );
 
   // --- Data fetching ---
-  const {
-    stats,
-    cacheHitRate,
-    clientTypeBreakdown,
-    tpsChartData,
-    inputTokensChartData,
-    outputTokensChartData,
-    tokenThroughputChartData,
-    loading,
-    loadError,
-    refresh,
-  } = useDashboardData(
+  const data = useDashboardData({
     selectedProvider,
-    statsParams,
-    cacheSummaryParams,
-    tsParams,
-    selectedWindow,
+    statsParams: filters.statsParams,
+    cacheSummaryParams: filters.cacheSummaryParams,
+    tsParams: filters.tsParams,
+    selectedWindow: timeline.selectedWindow,
     watchKey,
     t,
-  );
+  });
 
   // --- Environment comparison (prev window stats) ---
   const prevWindowStats = ref<DashboardStats | null>(null);
 
   const deltaValues = computed(() => {
     const prev = prevWindowStats.value;
-    const curr = stats.value;
+    const curr = data.stats.value;
     if (!prev) return null;
     function delta(cur: number, prv: number): string {
       if (prv === 0) return cur > 0 ? "+100.0" : "0.0";
-      return (((cur - prv) / prv) * PERCENT_MULTIPLIER).toFixed(1);
+      const val = ((cur - prv) / prv) * PERCENT_MULTIPLIER;
+      const str = Math.abs(val).toFixed(1);
+      return val > 0 ? `+${str}` : str;
     }
     return {
       totalRequests: delta(curr.totalRequests, prev.totalRequests),
@@ -575,8 +115,8 @@ export function useDashboard() {
   });
 
   async function loadPrevWindowStats() {
-    const sorted = timelineWindows.value;
-    const window = selectedWindow.value;
+    const sorted = timeline.timelineWindows.value;
+    const window = timeline.selectedWindow.value;
     if (!window || sorted.length < MIN_WINDOWS_FOR_DELTA) {
       prevWindowStats.value = null;
       return;
@@ -603,62 +143,17 @@ export function useDashboard() {
     }
   }
 
-  // --- Time range text ---
-  const timeRangeText = computed(() => {
-    const start = stats.value.startTime;
-    const end = stats.value.endTime;
-    if (!start || !end) return "—";
-    try {
-      return `${formatTimeShort(start)} ~ ${formatTimeShort(end)}`;
-    } catch {
-      return "—";
-    }
-  });
-
-  const windowTimeRange = computed(() => {
-    const window = selectedWindow.value;
-    if (!window) return "";
-    try {
-      return `${formatTimeShort(window.window.start_time)} ~ ${formatTimeShort(window.window.end_time)}`;
-    } catch {
-      return "";
-    }
-  });
-
   // --- Load providers ---
-  const providerLoadError = ref(false);
-
   async function loadProviders() {
     try {
       providers.value = await api.getProviders();
       providerLoadError.value = false;
+      data.loadError.value = false;
     } catch (e: unknown) {
       console.error("useDashboard.loadProviders:", e);
       providerLoadError.value = true;
+      data.loadError.value = true;
       toast.error(getApiMessage(e, t("dashboard.loadProvidersFailed")));
-    }
-  }
-
-  // --- Load usage windows ---
-  // Fix #2: 传入 start_time/end_time 限制窗口范围
-  async function loadUsageWindows() {
-    try {
-      const range = getTimelineTimeRange(timelineRange.value);
-      usageWindows.value = await api.getUsageWindows(range);
-    } catch (e: unknown) {
-      console.error("useDashboard.loadUsageWindows:", e);
-      /* 降级：无窗口数据时 dashboard 仍可用 */
-      toast.error(getApiMessage(e, t("dashboard.loadDashboardFailed")));
-    }
-  }
-
-  // --- Auto-select latest window ---
-  function autoSelectLatestWindow() {
-    const sorted = timelineWindows.value;
-    if (sorted.length > 0) {
-      selectedWindowId.value = sorted[sorted.length - 1].window.id;
-    } else {
-      selectedWindowId.value = null;
     }
   }
 
@@ -671,48 +166,53 @@ export function useDashboard() {
 
   // --- Watchers ---
 
-  // 初始化标志，避免 onMounted 期间 watcher 重复触发
   const initialized = ref(false);
 
   // 切换 provider 时重置 modelFilter
   watch(selectedProvider, () => {
     if (
-      modelFilter.value !== "all" &&
-      !modelOptions.value.includes(modelFilter.value)
+      filters.modelFilter.value !== "all" &&
+      !filters.modelOptions.value.includes(filters.modelFilter.value)
     ) {
-      modelFilter.value = "all";
+      filters.modelFilter.value = "all";
     }
   });
 
   // Watch provider/range 变化 → 重新加载窗口 + 自动选择 + 刷新
-  // skipNextFilterRefresh: autoSelectLatestWindow 会改 selectedWindowId，
-  // 触发第二个 watcher，但此时已由本 watcher 完成了 refresh，需要跳过
   let skipNextFilterRefresh = false;
 
-  watch([selectedProvider, timelineRange], async () => {
+  watch([selectedProvider, timeline.timelineRange], async () => {
     if (!initialized.value) return;
     skipNextFilterRefresh = true;
-    await loadUsageWindows();
-    autoSelectLatestWindow();
-    await refresh();
+    await timeline.loadUsageWindows();
+    timeline.autoSelectLatestWindow();
+    await data.refresh();
     await loadPrevWindowStats();
   });
 
   // Watch selectedWindowId/filter 变化 → debounced refresh + loadPrev
   let filterDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-  watch([selectedWindowId, modelFilter, keyFilter, clientType], () => {
-    if (!initialized.value) return;
-    if (skipNextFilterRefresh) {
-      skipNextFilterRefresh = false;
-      return;
-    }
-    if (filterDebounceTimer) clearTimeout(filterDebounceTimer);
-    filterDebounceTimer = setTimeout(async () => {
-      await refresh();
-      await loadPrevWindowStats();
-    }, DEBOUNCE_MS);
-  });
+  watch(
+    [
+      timeline.selectedWindowId,
+      filters.modelFilter,
+      filters.keyFilter,
+      filters.clientType,
+    ],
+    () => {
+      if (!initialized.value) return;
+      if (skipNextFilterRefresh) {
+        skipNextFilterRefresh = false;
+        return;
+      }
+      if (filterDebounceTimer) clearTimeout(filterDebounceTimer);
+      filterDebounceTimer = setTimeout(async () => {
+        await data.refresh();
+        await loadPrevWindowStats();
+      }, DEBOUNCE_MS);
+    },
+  );
 
   // --- Watch theme changes to re-render charts ---
   let stopWatchTheme: (() => void) | null = null;
@@ -721,10 +221,13 @@ export function useDashboard() {
   async function retry() {
     await loadProviders();
     if (providerLoadError.value) return;
-    await Promise.allSettled([loadFilterOptions(), loadUsageWindows()]);
+    await Promise.allSettled([
+      filters.loadFilterOptions(),
+      timeline.loadUsageWindows(),
+    ]);
     autoSelectProviderIfNeeded();
-    autoSelectLatestWindow();
-    await refresh();
+    timeline.autoSelectLatestWindow();
+    await data.refresh();
     await loadPrevWindowStats();
   }
 
@@ -732,14 +235,14 @@ export function useDashboard() {
   onMounted(async () => {
     await loadProviders();
     if (providerLoadError.value) return;
-    await loadUsageWindows();
-    await loadFilterOptions();
+    await timeline.loadUsageWindows();
+    await filters.loadFilterOptions();
     autoSelectProviderIfNeeded();
-    autoSelectLatestWindow();
-    await refresh();
+    timeline.autoSelectLatestWindow();
+    await data.refresh();
     await loadPrevWindowStats();
     initialized.value = true;
-    stopWatchTheme = watchTheme(() => refresh());
+    stopWatchTheme = watchTheme(() => data.refresh());
   });
 
   onUnmounted(() => {
@@ -748,33 +251,44 @@ export function useDashboard() {
   });
 
   return {
+    // Provider
     providers,
     selectedProvider,
     sortedProviders,
     providerTokenLabels,
-    usageWindows,
-    selectedWindowId,
-    selectedWindow,
-    timelineWindows,
-    timelineRange,
-    modelFilter,
-    keyFilter,
-    clientType,
-    modelOptions,
-    keyOptions,
-    stats,
-    loading,
-    loadError,
-    cacheHitRate,
-    clientTypeBreakdown,
-    tpsChartData,
-    inputTokensChartData,
-    outputTokensChartData,
-    tokenThroughputChartData,
+    // Timeline
+    usageWindows: timeline.usageWindows,
+    selectedWindowId: timeline.selectedWindowId,
+    selectedWindow: timeline.selectedWindow,
+    timelineWindows: timeline.timelineWindows,
+    timelineRange: timeline.timelineRange,
+    // Filters
+    modelFilter: filters.modelFilter,
+    keyFilter: filters.keyFilter,
+    clientType: filters.clientType,
+    modelOptions: filters.modelOptions,
+    keyOptions: filters.keyOptions,
+    // Data
+    stats: data.stats,
+    loading: data.loading,
+    loadError: data.loadError,
+    cacheHitRate: data.cacheHitRate,
+    clientTypeBreakdown: data.clientTypeBreakdown,
+    tpsChartData: data.tpsChartData,
+    inputTokensChartData: data.inputTokensChartData,
+    outputTokensChartData: data.outputTokensChartData,
+    tokenThroughputChartData: data.tokenThroughputChartData,
+    timeRangeText: data.timeRangeText,
+    // Comparison
     prevWindowStats,
     deltaValues,
-    timeRangeText,
-    windowTimeRange,
+    windowTimeRange: timeline.windowTimeRange,
+    // Timeline rendering
+    getWindowStyle: timeline.getWindowStyle,
+    getWindowWidth: timeline.getWindowWidth,
+    formatWindowTooltip: timeline.formatWindowTooltip,
+    timelineDayLabels: timeline.timelineDayLabels,
+    // Actions
     retry,
   };
 }

@@ -1,4 +1,3 @@
-<!-- eslint-disable vue/multi-word-component-names -->
 <template>
   <div class="page">
     <!-- Zone 1: Header + Anchor Bar -->
@@ -413,65 +412,15 @@
           <!-- Form: only show when preset selected or editing -->
           <template v-if="presetGroup || editingId">
             <ModelCapabilitiesEditor
-              :name="form.name"
-              :api-type="form.api_type"
-              :base-url="form.base_url"
-              :api-key="form.api_key"
-              :upstream-path="form.upstream_path"
-              :proxy-type="form.proxy_type"
-              :proxy-url="form.proxy_url"
-              :proxy-username="form.proxy_username"
-              :proxy-password="form.proxy_password"
-              :errors-name="errors.name ?? ''"
-              :errors-base-url="errors.base_url ?? ''"
-              :errors-api-key="errors.api_key ?? ''"
+              v-model="editorModelValue"
               :editing-id="editingId"
-              :models="form.models"
+              :errors="errors"
               :fetching-models="fetchingModels"
-              :model-input="modelInput"
-              :context-window-select="contextWindowSelect"
               :has-models-endpoint="!!getCurrentModelsEndpoint()"
               :preset-group="presetGroup"
               :has-api-key="!!form.api_key"
-              :concurrency-mode="concurrencyMode"
-              :max-concurrency="form.max_concurrency"
-              :queue-timeout-ms="form.queue_timeout_ms"
-              :max-queue-size="form.max_queue_size"
-              :transform-inject-headers="transformForm.injectHeadersInput"
-              :transform-drop-fields="transformForm.dropFieldsInput"
-              :transform-request-defaults="transformForm.requestDefaultsInput"
-              @update:name="form.name = $event"
-              @update:api-type="form.api_type = $event"
-              @update:base-url="form.base_url = $event"
-              @update:api-key="form.api_key = $event"
-              @update:upstream-path="form.upstream_path = $event"
-              @update:proxy-type="form.proxy_type = $event"
-              @update:proxy-url="form.proxy_url = $event"
-              @update:proxy-username="form.proxy_username = $event"
-              @update:proxy-password="form.proxy_password = $event"
               @clear-errors="delete errors[$event]"
-              @clear-proxy="
-                form.proxy_url = '';
-                form.proxy_username = '';
-                form.proxy_password = '';
-              "
-              @update:model="updateModel"
-              @remove-model="removeModel"
-              @update:model-timeout="updateModelTimeout"
-              @toggle-model-capability="toggleModelCapability"
               @fetch-upstream-models="fetchUpstreamModels"
-              @add-model="(caps: string[]) => addModel(caps)"
-              @update:model-input="modelInput = $event"
-              @update:context-window-select="contextWindowSelect = $event"
-              @update:concurrency-mode="onConcurrencyModeChange"
-              @update:max-concurrency="form.max_concurrency = $event"
-              @update:queue-timeout-ms="form.queue_timeout_ms = $event"
-              @update:max-queue-size="form.max_queue_size = $event"
-              @update:inject-headers="transformForm.injectHeadersInput = $event"
-              @update:drop-fields="transformForm.dropFieldsInput = $event"
-              @update:request-defaults="
-                transformForm.requestDefaultsInput = $event
-              "
             />
           </template>
           <DialogFooter>
@@ -623,6 +572,8 @@ import {
 } from "@/composables/useProviderForm";
 import { useProviderActions } from "@/composables/useProviderActions";
 import { useFetchUpstreamModels } from "@/composables/useFetchUpstreamModels";
+import type { ProxyConfig } from "@/components/shared/types";
+import type { ProviderFormData } from "@/components/providers/types";
 
 const { t } = useI18n();
 const {
@@ -633,16 +584,10 @@ const {
   editingId,
   modelInput,
   contextWindowSelect,
-  transformForm,
+  transformConfig,
   presetHook,
   validate,
   buildPayload,
-  addModel,
-  removeModel,
-  updateModel,
-  updateModelTimeout,
-  toggleModelCapability,
-  onConcurrencyModeChange,
   openCreate,
   openEdit,
   saveTransformRules,
@@ -679,6 +624,57 @@ const { fetchingModels, fetchUpstreamModels } = useFetchUpstreamModels(
   getCurrentModelsEndpoint,
   getCurrentPresetModels,
 );
+
+const proxyConfig = computed<ProxyConfig>({
+  get: () => ({
+    proxyType: form.value.proxy_type,
+    proxyUrl: form.value.proxy_url,
+    proxyUsername: form.value.proxy_username,
+    proxyPassword: form.value.proxy_password,
+  }),
+  set: (v: ProxyConfig) => {
+    form.value.proxy_type = v.proxyType;
+    form.value.proxy_url = v.proxyUrl;
+    form.value.proxy_username = v.proxyUsername;
+    form.value.proxy_password = v.proxyPassword;
+  },
+});
+
+// --- Aggregated v-model for ModelCapabilitiesEditor ---
+const editorModelValue = computed<ProviderFormData>({
+  get: () => ({
+    name: form.value.name,
+    apiType: form.value.api_type,
+    baseUrl: form.value.base_url,
+    apiKey: form.value.api_key,
+    upstreamPath: form.value.upstream_path,
+    models: form.value.models,
+    modelInput: modelInput.value,
+    contextWindowSelect: contextWindowSelect.value,
+    concurrencyMode: concurrencyMode.value,
+    maxConcurrency: form.value.max_concurrency,
+    queueTimeoutMs: form.value.queue_timeout_ms,
+    maxQueueSize: form.value.max_queue_size,
+    transformConfig: transformConfig.value,
+    proxyConfig: proxyConfig.value,
+  }),
+  set: (v) => {
+    form.value.name = v.name;
+    form.value.api_type = v.apiType;
+    form.value.base_url = v.baseUrl;
+    form.value.api_key = v.apiKey;
+    form.value.upstream_path = v.upstreamPath;
+    form.value.models = v.models;
+    modelInput.value = v.modelInput;
+    contextWindowSelect.value = v.contextWindowSelect;
+    concurrencyMode.value = v.concurrencyMode;
+    form.value.max_concurrency = v.maxConcurrency;
+    form.value.queue_timeout_ms = v.queueTimeoutMs;
+    form.value.max_queue_size = v.maxQueueSize;
+    proxyConfig.value = v.proxyConfig;
+    transformConfig.value = v.transformConfig;
+  },
+});
 
 // --- Search & Filter ---
 const searchQuery = ref("");
@@ -800,7 +796,8 @@ function buildFullUrl(p: {
       return `${url.origin}${pathname}`;
     }
     return `${url.origin}${pathname}${upstreamPath}`;
-  } catch {
+  } catch (e: unknown) {
+    console.error("Providers.normalizeUrl:", e);
     const normalized = p.base_url.replace(/\/+$/, "");
     return `${normalized}${upstreamPath}`;
   }

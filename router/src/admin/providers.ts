@@ -122,7 +122,7 @@ function isValidHttpUrl(str: string): boolean {
 
 const CreateProviderSchema = Type.Object({
   name: Type.String({ minLength: 1 }),
-  api_type: Type.Union([Type.Literal("openai"), Type.Literal("anthropic")]),
+  api_type: Type.Union([Type.Literal("openai"), Type.Literal("openai-responses"), Type.Literal("anthropic")]),
   base_url: Type.String({ minLength: 1 }),
   upstream_path: Type.Optional(Type.String({ minLength: 1 })),
   api_key: Type.String({ minLength: 1 }),
@@ -144,7 +144,7 @@ const CreateProviderSchema = Type.Object({
 
 const UpdateProviderSchema = Type.Object({
   name: Type.Optional(Type.String({ minLength: 1 })),
-  api_type: Type.Optional(Type.Union([Type.Literal("openai"), Type.Literal("anthropic")])),
+  api_type: Type.Optional(Type.Union([Type.Literal("openai"), Type.Literal("openai-responses"), Type.Literal("anthropic")])),
   base_url: Type.Optional(Type.String({ minLength: 1 })),
   upstream_path: Type.Optional(Type.String({ minLength: 1 })),
   api_key: Type.Optional(Type.String({ minLength: 1 })),
@@ -437,7 +437,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     base_url: Type.String({ minLength: 1 }),
     models_endpoint: Type.String({ minLength: 1 }),
     api_key: Type.String({ minLength: 1 }),
-    api_type: Type.Union([Type.Literal("openai"), Type.Literal("anthropic")]),
+    api_type: Type.Union([Type.Literal("openai"), Type.Literal("openai-responses"), Type.Literal("anthropic")]),
   });
 
   app.post("/admin/api/providers/fetch-models", { schema: { body: FetchModelsSchema } }, async (request, reply) => {

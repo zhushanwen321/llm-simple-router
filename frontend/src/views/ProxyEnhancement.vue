@@ -309,6 +309,7 @@ import {
 import CascadingModelSelect from "@/components/mappings/CascadingModelSelect.vue";
 import ToggleRow from "@/components/shared/ToggleRow.vue";
 import type { ProviderGroup } from "@/components/mappings/cascading-types";
+import { toProviderGroups } from "@/composables/useProviderGroups";
 
 const { t } = useI18n();
 
@@ -395,22 +396,14 @@ const isDirty = computed(() => {
   return !isSnapshotEqual(initialConfig, snapshot());
 });
 
-const FALLBACK_CONTEXT_WINDOW = 128000;
-
 // --- 数据加载 ---
 async function loadProviders() {
   try {
     const providers = await api.getProviders();
-    providerGroups.value = providers
-      .filter((p) => p.is_active)
-      .map((p) => ({
-        provider: { id: p.id, name: p.name },
-        models: (p.models ?? []).map((m) => ({
-          name: m.name,
-          contextWindow: m.context_window ?? FALLBACK_CONTEXT_WINDOW,
-          streamTimeoutMs: m.stream_timeout_ms ?? null,
-        })),
-      }));
+    providerGroups.value = toProviderGroups(providers, {
+      activeOnly: true,
+      defaultContextWindow: 128000,
+    });
   } catch (e: unknown) {
     console.error("proxyEnhancement.loadProviders:", e);
     toast.error(t("proxyEnhancement.loadProvidersFailed"));
@@ -517,6 +510,12 @@ async function handleSave() {
         .join("; ");
       toast.error(t("proxyEnhancement.saveFailed") + ": " + failedReasons);
       return;
+    }
+    // 保存成功后，将有效条目标记为已持久化（client_type 输入框变为只读）
+    for (const entry of clientSessionHeaders.value) {
+      if (entry.client_type.trim() && entry.session_header_key.trim()) {
+        entry.persisted = true;
+      }
     }
     toast.success(t("common.saveSuccess"));
     initialConfig = snapshot();

@@ -1,4 +1,3 @@
-<!-- eslint-disable vue/multi-word-component-names -->
 <script setup lang="ts">
 import { useI18n } from "vue-i18n";
 import { Badge } from "@/components/ui/badge";
@@ -44,7 +43,8 @@ function enhancementLabel(raw: string | null): string {
       return meta.detail ? `${meta.action}: ${meta.detail}` : meta.action;
     }
     return raw;
-  } catch {
+  } catch (e: unknown) {
+    console.error("LogTableRow.formatLog:", e);
     return t("logs.row.unknown");
   }
 }
@@ -169,9 +169,7 @@ function enhancementLabel(raw: string | null): string {
       </div>
     </TableCell>
 
-    <TableCell
-      class="text-destructive text-xs min-w-0 max-w-60 lg:max-w-xs"
-    >
+    <TableCell class="text-destructive text-xs min-w-0 max-w-60 lg:max-w-xs">
       <template v-if="log.error_message">
         <Tooltip :delay-duration="300">
           <TooltipTrigger as-child>

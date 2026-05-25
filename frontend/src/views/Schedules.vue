@@ -447,43 +447,13 @@
               <div class="text-xs font-medium text-muted-foreground">
                 {{ t("schedules.form.concurrencyTitle") }}
               </div>
-              <ConcurrencyControl
-                :mode="form.concurrency_mode"
-                :max-concurrency="form.max_concurrency"
-                :queue-timeout-ms="form.queue_timeout_ms"
-                :max-queue-size="form.max_queue_size"
-                compact
-                @update:mode="
-                  (v: ConcurrencyMode) => (form.concurrency_mode = v)
-                "
-                @update:max-concurrency="
-                  (v: number) => (form.max_concurrency = v)
-                "
-                @update:queue-timeout-ms="
-                  (v: number) => (form.queue_timeout_ms = v)
-                "
-                @update:max-queue-size="
-                  (v: number) => (form.max_queue_size = v)
-                "
-              />
+              <ConcurrencyControl v-model="concurrencyConfig" compact />
             </div>
             <div class="border rounded-md p-3 space-y-3">
               <div class="text-xs font-medium text-muted-foreground">
                 {{ t("providers.transform.title") }}
               </div>
-              <TransformRulesForm
-                :inject-headers="transformForm.injectHeadersInput"
-                :drop-fields="transformForm.dropFieldsInput"
-                :request-defaults="transformForm.requestDefaultsInput"
-                compact
-                @update:inject-headers="
-                  transformForm.injectHeadersInput = $event
-                "
-                @update:drop-fields="transformForm.dropFieldsInput = $event"
-                @update:request-defaults="
-                  transformForm.requestDefaultsInput = $event
-                "
-              />
+              <TransformRulesForm v-model="transformConfig" compact />
             </div>
           </div>
 
@@ -577,15 +547,31 @@ import ConcurrencyControl from "@/components/shared/ConcurrencyControl.vue";
 import TransformRulesForm from "@/components/shared/TransformRulesForm.vue";
 import WeekTimeline from "@/components/schedules/WeekTimeline.vue";
 import type { TimelineRule } from "@/components/schedules/WeekTimeline.vue";
-import type { ConcurrencyMode } from "@/components/shared/ConcurrencyControl.vue";
+import type {
+  ConcurrencyConfig,
+  TransformConfig,
+} from "@/components/shared/types";
 import type {
   MappingTarget,
   MappingEntry,
 } from "@/components/quick-setup/types";
 import type { ProviderGroup } from "@/components/mappings/cascading-types";
-import { DEFAULT_CONTEXT_WINDOW } from "@/constants";
-import type { Schedule, SchedulePayload } from "@/types/schedule";
+import { toProviderGroups } from "@/composables/useProviderGroups";
+import type { Schedule } from "@/types/schedule";
 import type { MappingGroup, Provider } from "@/types/mapping";
+import {
+  safeParseWeek,
+  smartWeekLabel as smartWeekLabelFn,
+  parseTargets as parseTargetsFn,
+  formatHour as formatHourFn,
+  parseScheduleForEdit,
+  buildSchedulePayload,
+  validateScheduleForm,
+  buildTransformRule as buildTransformRuleFn,
+  createDefaultForm,
+  createDefaultTransformConfig,
+} from "@/utils/schedule-domain";
+import type { ScheduleForm } from "@/utils/schedule-domain";
 
 const { t } = useI18n();
 
@@ -599,33 +585,7 @@ const WEEK_LABELS = computed(() => [
   t("schedules.weekDays.sat"),
 ]);
 
-interface ScheduleForm {
-  name: string;
-  week: number[];
-  start_hour: number;
-  end_hour: number;
-  targets: MappingTarget[];
-  concurrency_mode: ConcurrencyMode;
-  max_concurrency: number;
-  queue_timeout_ms: number;
-  max_queue_size: number;
-}
-
-// eslint-disable-next-line no-magic-numbers -- ISO weekday numbers (Mon=1..Fri=5)
-const WEEKDAYS_MON_FRI: number[] = [1, 2, 3, 4, 5];
-const PAD_WIDTH = 2;
-
-const DEFAULT_FORM = (): ScheduleForm => ({
-  name: "",
-  week: [...WEEKDAYS_MON_FRI],
-  start_hour: 0,
-  end_hour: 24,
-  targets: [{ backend_model: "", provider_id: "" }],
-  concurrency_mode: "auto" as ConcurrencyMode,
-  max_concurrency: 10,
-  queue_timeout_ms: 120000,
-  max_queue_size: 100,
-});
+// ─── 状态 ───────────────────────────────────────────────
 
 const loading = ref(false);
 const groups = ref<MappingGroup[]>([]);
@@ -636,15 +596,29 @@ const dialogOpen = ref(false);
 const editingId = ref<string | null>(null);
 const formGroupId = ref("");
 const deleteTarget = ref<Schedule | null>(null);
-const form = ref<ScheduleForm>(DEFAULT_FORM());
+const form = ref<ScheduleForm>(createDefaultForm());
 const errors = ref<Record<string, string>>({});
 const formError = ref("");
+const transformConfig = ref<TransformConfig>(createDefaultTransformConfig());
 
-const transformForm = ref({
-  injectHeadersInput: "",
-  dropFieldsInput: "",
-  requestDefaultsInput: "",
+// ─── UI computed 桥接 ──────────────────────────────────
+
+const concurrencyConfig = computed<ConcurrencyConfig>({
+  get: () => ({
+    mode: form.value.concurrency_mode,
+    max_concurrency: form.value.max_concurrency,
+    queue_timeout_ms: form.value.queue_timeout_ms,
+    max_queue_size: form.value.max_queue_size,
+  }),
+  set: (v: ConcurrencyConfig) => {
+    form.value.concurrency_mode = v.mode;
+    form.value.max_concurrency = v.max_concurrency;
+    form.value.queue_timeout_ms = v.queue_timeout_ms;
+    form.value.max_queue_size = v.max_queue_size;
+  },
 });
+
+// ─── 数据 computed ─────────────────────────────────────
 
 const schedulesByGroup = computed<Record<string, Schedule[]>>(() => {
   const map: Record<string, Schedule[]> = {};
@@ -665,8 +639,7 @@ const coveredDays = computed(() => {
   const coveredSet = new Set<number>();
   for (const s of allSchedules.value) {
     if (!s.enabled) continue;
-    const days = safeParseWeek(s.week);
-    days.forEach((d) => coveredSet.add(d));
+    safeParseWeek(s.week).forEach((d) => coveredSet.add(d));
   }
   return coveredSet.size;
 });
@@ -683,67 +656,39 @@ const mappingEntry = computed<MappingEntry>(() => {
 });
 
 const providerGroups = computed<ProviderGroup[]>(() =>
-  providers.value.map((p) => ({
-    provider: { id: p.id, name: p.name },
-    models: (p.models ?? []).map((m) => ({
-      name: m.name,
-      contextWindow: m.context_window ?? DEFAULT_CONTEXT_WINDOW,
-    })),
-  })),
+  toProviderGroups(providers.value, { includeStreamTimeout: false }),
 );
 
-function safeParseWeek(weekStr: string): number[] {
-  try {
-    return JSON.parse(weekStr) as number[];
-  } catch (e: unknown) {
-    console.error("schedules.safeParseWeek:", e);
-    return [];
-  }
-}
+// ─── 领域函数的 UI 适配层 ──────────────────────────────
 
-const WEEKDAY_COUNT = 5;
-const WEEKEND_START = 6;
-const WEEKEND_END_INDEX = 2;
-const FULL_WEEK = 7;
-const FIRST_WEEKDAY = 1;
-const LAST_WEEKDAY = 5;
-
+/** smartWeekLabel 绑定当前 i18n */
 function smartWeekLabel(weekStr: string): string | null {
-  const arr = safeParseWeek(weekStr).sort((a, b) => a - b);
-  if (arr.length === FULL_WEEK) return t("schedules.everyDay");
-  if (
-    arr.length === WEEKDAY_COUNT &&
-    arr[0] === FIRST_WEEKDAY &&
-    arr[WEEKDAY_COUNT - 1] === LAST_WEEKDAY
-  )
-    return t("schedules.weekdays");
-  if (
-    arr.length === WEEKEND_END_INDEX &&
-    arr[0] === WEEKEND_START &&
-    arr[1] === FULL_WEEK
-  )
-    return t("schedules.weekend");
-  return null;
+  return smartWeekLabelFn(weekStr, t);
 }
 
-interface ParsedTarget {
-  provider: string;
-  model: string;
+/** parseTargets 绑定当前 providers */
+function parseTargets(mappingRule: string) {
+  return parseTargetsFn(mappingRule, providers.value);
 }
 
-function parseTargets(mappingRule: string): ParsedTarget[] {
-  try {
-    const parsed = JSON.parse(mappingRule) as { targets?: MappingTarget[] };
-    return (parsed.targets ?? []).map((tgt) => ({
-      provider:
-        providers.value.find((p) => p.id === tgt.provider_id)?.name ??
-        tgt.provider_id,
-      model: tgt.backend_model ?? "",
-    }));
-  } catch (e: unknown) {
-    console.error("schedules.parseTargets:", e);
-    return [];
-  }
+/** formatHour 直接透传 */
+function formatHour(h: number): string {
+  return formatHourFn(h);
+}
+
+function parseWeek(weekStr: string): string[] {
+  const labels = WEEK_LABELS.value;
+  return safeParseWeek(weekStr).map((d) => labels[d] ?? `${d}`);
+}
+
+function timelineRules(groupId: string): TimelineRule[] {
+  return (schedulesByGroup.value[groupId] ?? []).map((s) => ({
+    name: s.name,
+    days: safeParseWeek(s.week),
+    startHour: s.start_hour,
+    endHour: s.end_hour,
+    enabled: !!s.enabled,
+  }));
 }
 
 function groupAllActive(groupId: string): boolean {
@@ -755,31 +700,10 @@ function groupHasRules(groupId: string): boolean {
   return (schedulesByGroup.value[groupId]?.length ?? 0) > 0;
 }
 
-function parseWeek(weekStr: string): string[] {
-  const labels = WEEK_LABELS.value;
-  const arr = safeParseWeek(weekStr);
-  return arr.map((d) => labels[d] ?? `${d}`);
-}
-
-function timelineRules(groupId: string): TimelineRule[] {
-  return (schedulesByGroup.value[groupId] ?? []).map((s) => {
-    const days = safeParseWeek(s.week);
-    return {
-      name: s.name,
-      days,
-      startHour: s.start_hour,
-      endHour: s.end_hour,
-      enabled: !!s.enabled,
-    };
-  });
-}
+// ─── UI 事件处理 ───────────────────────────────────────
 
 function handleTargetsUpdate(targets: MappingTarget[]) {
   form.value.targets = targets;
-}
-
-function formatHour(h: number): string {
-  return `${h}`.padStart(PAD_WIDTH, "0") + ":00";
 }
 
 function applyTimePreset(start: number, end: number) {
@@ -829,12 +753,8 @@ async function loadAllSchedules() {
 function openCreate(groupId: string) {
   editingId.value = null;
   formGroupId.value = groupId;
-  form.value = DEFAULT_FORM();
-  transformForm.value = {
-    injectHeadersInput: "",
-    dropFieldsInput: "",
-    requestDefaultsInput: "",
-  };
+  form.value = createDefaultForm();
+  transformConfig.value = createDefaultTransformConfig();
   errors.value = {};
   formError.value = "";
   dialogOpen.value = true;
@@ -846,167 +766,32 @@ function openEdit(s: Schedule) {
   errors.value = {};
   formError.value = "";
 
-  let targets: MappingTarget[] = [{ backend_model: "", provider_id: "" }];
-  try {
-    const rule = JSON.parse(s.mapping_rule) as { targets?: MappingTarget[] };
-    if (rule.targets?.length) targets = rule.targets;
-  } catch (e) {
-    console.warn("Failed to parse mapping_rule:", e);
-    toast.error(t("schedules.parseRuleFailed"));
-  }
-
-  let week: number[] = [...WEEKDAYS_MON_FRI];
-  try {
-    week = JSON.parse(s.week);
-  } catch (e) {
-    console.warn("Failed to parse week:", e);
-    toast.error(t("schedules.parseWeekFailed"));
-  }
-
-  let concurrencyMode: ConcurrencyMode = "auto";
-  let maxConcurrency = 10;
-  let queueTimeoutMs = 120000;
-  let maxQueueSize = 100;
-  if (s.concurrency_rule) {
-    try {
-      const cr = JSON.parse(s.concurrency_rule) as Record<string, unknown>;
-      concurrencyMode = (cr.mode as ConcurrencyMode) || "auto";
-      if (cr.max_concurrency) maxConcurrency = cr.max_concurrency as number;
-      if (cr.queue_timeout_ms) queueTimeoutMs = cr.queue_timeout_ms as number;
-      if (cr.max_queue_size) maxQueueSize = cr.max_queue_size as number;
-    } catch (e) {
-      console.warn("Failed to parse concurrency_rule:", e);
-      toast.error(t("schedules.parseConcurrencyFailed"));
-    }
-  }
-
-  let injectHeaders = "";
-  let dropFields = "";
-  let requestDefaults = "";
-  if (s.transform_rule) {
-    try {
-      const tr = JSON.parse(s.transform_rule) as Record<string, unknown>;
-      dropFields = ((tr.drop_fields as string[]) || []).join(", ");
-      requestDefaults = tr.request_defaults
-        ? JSON.stringify(tr.request_defaults)
-        : "";
-      injectHeaders = tr.inject_headers
-        ? JSON.stringify(tr.inject_headers)
-        : "";
-    } catch (e) {
-      console.warn("Failed to parse transform_rule:", e);
-      toast.error(t("schedules.parseTransformFailed"));
-    }
-  }
-
-  form.value = {
-    name: s.name,
-    week,
-    start_hour: s.start_hour,
-    end_hour: s.end_hour,
-    targets,
-    concurrency_mode: concurrencyMode,
-    max_concurrency: maxConcurrency,
-    queue_timeout_ms: queueTimeoutMs,
-    max_queue_size: maxQueueSize,
-  };
-  transformForm.value = {
-    injectHeadersInput: injectHeaders,
-    dropFieldsInput: dropFields,
-    requestDefaultsInput: requestDefaults,
-  };
+  const { data, warnings } = parseScheduleForEdit(s, t);
+  for (const w of warnings) toast.error(w);
+  form.value = data.form;
+  transformConfig.value = data.transform;
   dialogOpen.value = true;
-}
-
-function validate(): boolean {
-  const errs: Record<string, string> = {};
-  if (!form.value.name.trim()) errs.name = t("schedules.form.nameRequired");
-  if (form.value.week.length === 0)
-    errs.week = t("schedules.form.weekRequired");
-  if (form.value.start_hour >= form.value.end_hour)
-    errs.time = t("schedules.form.timeInvalid");
-  for (const tgt of form.value.targets) {
-    if (!tgt.provider_id || !tgt.backend_model) {
-      errs.targets = t("schedules.form.targetRequired");
-      break;
-    }
-  }
-  errors.value = errs;
-  return Object.keys(errs).length === 0;
-}
-
-function buildTransformRule(): { rule: string | null; error: boolean } {
-  const { injectHeadersInput, dropFieldsInput, requestDefaultsInput } =
-    transformForm.value;
-  if (
-    !injectHeadersInput.trim() &&
-    !dropFieldsInput.trim() &&
-    !requestDefaultsInput.trim()
-  )
-    return { rule: null, error: false };
-  const dropFields = dropFieldsInput
-    ? dropFieldsInput
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean)
-    : null;
-  let requestDefaults = null;
-  if (requestDefaultsInput.trim()) {
-    try {
-      requestDefaults = JSON.parse(requestDefaultsInput);
-    } catch {
-      toast.error(t("providers.transform.requestDefaultsJsonError"));
-      return { rule: null, error: true };
-    }
-  }
-  let injectHeaders = null;
-  if (injectHeadersInput.trim()) {
-    try {
-      injectHeaders = JSON.parse(injectHeadersInput);
-    } catch {
-      toast.error(t("providers.transform.injectHeadersJsonError"));
-      return { rule: null, error: true };
-    }
-  }
-  return {
-    rule: JSON.stringify({
-      drop_fields: dropFields,
-      request_defaults: requestDefaults,
-      inject_headers: injectHeaders,
-    }),
-    error: false,
-  };
 }
 
 async function handleSave() {
   formError.value = "";
-  if (!validate()) return;
-  const { rule: transformRule, error: transformError } = buildTransformRule();
-  if (transformError) return;
+  const errs = validateScheduleForm(form.value, t);
+  errors.value = errs;
+  if (Object.keys(errs).length > 0) return;
+
+  const { rule: transformRule, errorKey: transformErrorKey } =
+    buildTransformRuleFn(transformConfig.value);
+  if (transformErrorKey) {
+    toast.error(t(transformErrorKey));
+    return;
+  }
 
   try {
-    const mappingRule = JSON.stringify({ targets: form.value.targets });
-    const concurrencyRule =
-      form.value.concurrency_mode !== "none"
-        ? JSON.stringify({
-          mode: form.value.concurrency_mode,
-          max_concurrency: form.value.max_concurrency,
-          queue_timeout_ms: form.value.queue_timeout_ms,
-          max_queue_size: form.value.max_queue_size,
-        })
-        : null;
-
-    const payload: SchedulePayload = {
-      mapping_group_id: formGroupId.value,
-      name: form.value.name,
-      week: JSON.stringify(form.value.week),
-      start_hour: form.value.start_hour,
-      end_hour: form.value.end_hour,
-      mapping_rule: mappingRule,
-      concurrency_rule: concurrencyRule,
-      transform_rule: transformRule,
-    };
-
+    const payload = buildSchedulePayload(
+      { form: form.value, transform: transformConfig.value },
+      formGroupId.value,
+      transformRule,
+    );
     if (editingId.value) await api.updateSchedule(editingId.value, payload);
     else await api.createSchedule(payload);
     dialogOpen.value = false;

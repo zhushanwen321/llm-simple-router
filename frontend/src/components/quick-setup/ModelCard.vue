@@ -195,7 +195,9 @@ function isCapabilityActive(key: string): boolean {
         "
         @click="open = !open"
       >
-        <span class="text-[11px]">{{ model.patches.length }} patches</span>
+        <span class="text-[11px]"
+          >{{ model.patches.length }} {{ t("quickSetup.patch.label") }}</span
+        >
         <span
           class="text-[8px] inline-block transition-transform"
           :class="open ? 'rotate-90' : ''"
@@ -224,7 +226,7 @@ function isCapabilityActive(key: string): boolean {
             <div
               class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1"
             >
-              Patches
+              {{ t("quickSetup.patch.sectionTitle") }}
             </div>
             <PatchChips
               :api-type="apiType"
@@ -240,7 +242,7 @@ function isCapabilityActive(key: string): boolean {
             <div
               class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1"
             >
-              Timeout
+              {{ t("quickSetup.patch.timeoutTitle") }}
             </div>
             <div class="flex items-center gap-1.5">
               <Input
@@ -255,7 +257,9 @@ function isCapabilityActive(key: string): boolean {
                 class="h-6 w-[72px] !text-[11px] font-mono text-right px-1.5 py-0 rounded [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 min="1"
               />
-              <span class="text-[11px] text-muted-foreground">seconds</span>
+              <span class="text-[11px] text-muted-foreground">{{
+                t("quickSetup.patch.timeoutSeconds")
+              }}</span>
               <Badge
                 v-if="isDefaultTimeout"
                 variant="outline"

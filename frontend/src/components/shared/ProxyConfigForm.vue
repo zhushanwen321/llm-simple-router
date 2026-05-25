@@ -1,4 +1,57 @@
-<!-- eslint-disable vue/multi-word-component-names -->
+<script setup lang="ts">
+import { computed } from "vue";
+import { useI18n } from "vue-i18n";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
+import type { ProxyConfig } from "@/components/shared/types";
+import { DEFAULT_PROXY_CONFIG } from "@/components/shared/types";
+
+const props = defineProps<{
+  modelValue: ProxyConfig;
+}>();
+
+const emit = defineEmits<{
+  "update:modelValue": [value: ProxyConfig];
+}>();
+
+const { t } = useI18n();
+
+function patch(partial: Partial<ProxyConfig>) {
+  emit("update:modelValue", { ...props.modelValue, ...partial });
+}
+
+const proxyType = computed(
+  () => props.modelValue.proxyType ?? DEFAULT_PROXY_CONFIG.proxyType,
+);
+const proxyUrl = computed(
+  () => props.modelValue.proxyUrl ?? DEFAULT_PROXY_CONFIG.proxyUrl,
+);
+const proxyUsername = computed(
+  () => props.modelValue.proxyUsername ?? DEFAULT_PROXY_CONFIG.proxyUsername,
+);
+const proxyPassword = computed(
+  () => props.modelValue.proxyPassword ?? DEFAULT_PROXY_CONFIG.proxyPassword,
+);
+
+function onTypeChange(val: unknown) {
+  const strVal =
+    typeof val === "string" ? val : val != null ? JSON.stringify(val) : "";
+  const value = strVal === "none" ? "" : strVal;
+  if (value) {
+    patch({ proxyType: value });
+  } else {
+    emit("update:modelValue", { ...DEFAULT_PROXY_CONFIG });
+  }
+}
+</script>
+
 <template>
   <div class="border border-input rounded-lg p-4 space-y-3">
     <div class="flex items-center gap-3">
@@ -39,7 +92,7 @@
               ? t('providers.fields.proxyUrlPlaceholderSocks5')
               : t('providers.fields.proxyUrlPlaceholderHttp')
           "
-          @update:model-value="emit('update:proxyUrl', $event)"
+          @update:model-value="patch({ proxyUrl: $event as string })"
         />
       </div>
       <div>
@@ -51,7 +104,7 @@
           type="text"
           class="mt-1"
           :placeholder="t('providers.fields.proxyAuthOptional')"
-          @update:model-value="emit('update:proxyUsername', $event)"
+          @update:model-value="patch({ proxyUsername: $event as string })"
         />
       </div>
       <div>
@@ -63,49 +116,9 @@
           type="password"
           class="mt-1"
           :placeholder="t('providers.fields.proxyAuthOptional')"
-          @update:model-value="emit('update:proxyPassword', $event)"
+          @update:model-value="patch({ proxyPassword: $event as string })"
         />
       </div>
     </div>
   </div>
 </template>
-
-<script setup lang="ts">
-import { useI18n } from "vue-i18n";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui/select";
-
-defineProps({
-  proxyType: { type: String, default: "" },
-  proxyUrl: { type: String, default: "" },
-  proxyUsername: { type: String, default: "" },
-  proxyPassword: { type: String, default: "" },
-});
-
-const emit = defineEmits([
-  "update:proxyType",
-  "update:proxyUrl",
-  "update:proxyUsername",
-  "update:proxyPassword",
-  "clear",
-]);
-
-const { t } = useI18n();
-
-function onTypeChange(val: unknown) {
-  const strVal =
-    typeof val === "string" ? val : val != null ? JSON.stringify(val) : "";
-  const value = strVal === "none" ? "" : strVal;
-  emit("update:proxyType", value);
-  if (!value) {
-    emit("clear");
-  }
-}
-</script>

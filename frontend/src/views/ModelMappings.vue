@@ -453,10 +453,14 @@ import type {
   MappingTarget,
   MultimodalFallback,
   Provider,
-  Rule,
 } from "@/types/mapping";
 import type { ProviderGroup } from "@/components/mappings/cascading-types";
-import { DEFAULT_CONTEXT_WINDOW } from "@/constants";
+import { toProviderGroups } from "@/composables/useProviderGroups";
+import {
+  parseMappingRule,
+  serializeRule as serializeRuleDomain,
+  buildSummaryText,
+} from "@/utils/mapping-domain";
 
 const { t } = useI18n();
 
@@ -483,14 +487,7 @@ const editMultimodal = ref<MultimodalFallback | null>(null);
 
 // --- Computed ---
 const providerGroups = computed<ProviderGroup[]>(() =>
-  providersList.value.map((p) => ({
-    provider: { id: p.id, name: p.name },
-    models: (p.models ?? []).map((m) => ({
-      name: m.name,
-      contextWindow: m.context_window ?? DEFAULT_CONTEXT_WINDOW,
-      streamTimeoutMs: m.stream_timeout_ms ?? null,
-    })),
-  })),
+  toProviderGroups(providersList.value),
 );
 
 const filteredGroups = computed(() => {
@@ -512,103 +509,26 @@ const canAdd = computed(() => {
   return cm.length > 0 && !!newTarget.value?.model;
 });
 
-const PROVIDER_NAME_TRUNCATE = 6;
+// --- Domain helpers (thin wrappers over mapping-domain) ---
 
-// --- Rule parse / serialize ---
-function parseRule(group: MappingGroup): {
-  targets: MappingTarget[];
-  overflow: { provider_id: string; model: string } | null;
-  multimodal: MultimodalFallback | null;
-} {
-  let rule: Rule = {};
-  try {
-    const parsed = JSON.parse(group.rule);
-    rule =
-      parsed.default && !parsed.targets
-        ? { targets: [parsed.default] }
-        : parsed;
-  } catch (e: unknown) {
-    console.error("ModelMappings.parseRule:", e);
-    toast.error(getApiMessage(e, t("mappings.messages.parseRuleFailed")));
+const fallbackProviderId = computed(() => providersList.value[0]?.id ?? "");
+
+/** 解析 rule JSON → 编辑状态。parseError 时 toast 提示。 */
+function parseRuleForEdit(group: MappingGroup) {
+  const result = parseMappingRule(group.rule, fallbackProviderId.value);
+  if (result.parseError) {
+    toast.error(t("mappings.messages.parseRuleFailed"));
   }
-
-  const targets: MappingTarget[] = (rule.targets ?? []).map((t) => ({
-    backend_model: t.backend_model || "",
-    provider_id: t.provider_id || "",
-    overflow_provider_id: t.overflow_provider_id,
-    overflow_model: t.overflow_model,
-  }));
-
-  const firstTarget = targets[0];
-  const overflow =
-    firstTarget?.overflow_provider_id && firstTarget?.overflow_model
-      ? {
-        provider_id: firstTarget.overflow_provider_id,
-        model: firstTarget.overflow_model,
-      }
-      : null;
-
-  const multimodal = rule.multimodal_fallback ?? null;
-
-  return {
-    targets:
-      targets.length > 0
-        ? targets
-        : [
-          {
-            backend_model: "",
-            provider_id: providersList.value[0]?.id ?? "",
-          },
-        ],
-    overflow,
-    multimodal,
-  };
+  return result.data;
 }
 
-function serializeRule(): string {
-  const targets = editTargets.value.map((t, idx) => {
-    if (idx === 0 && editOverflow.value) {
-      return {
-        backend_model: t.backend_model,
-        provider_id: t.provider_id,
-        overflow_provider_id: editOverflow.value.provider_id,
-        overflow_model: editOverflow.value.model,
-      };
-    }
-    return {
-      backend_model: t.backend_model,
-      provider_id: t.provider_id,
-    };
-  });
-
-  return JSON.stringify({
-    targets,
-    ...(editMultimodal.value
-      ? { multimodal_fallback: editMultimodal.value }
-      : {}),
-  });
-}
-
-// --- Summary text for left list ---
+/** 左侧列表摘要文本 */
 function summaryText(g: MappingGroup): string {
-  const parsed = parseRule(g);
-  const parts: string[] = [];
-  for (const t of parsed.targets) {
-    const prov = providersList.value.find((p) => p.id === t.provider_id);
-    const provName =
-      prov?.name ?? t.provider_id.slice(0, PROVIDER_NAME_TRUNCATE);
-    parts.push(provName);
-  }
-  if (parsed.overflow) {
-    const prov = providersList.value.find(
-      (p) => p.id === parsed.overflow!.provider_id,
-    );
-    parts.push("↓ " + (prov?.name ?? "OF"));
-  }
-  if (parsed.multimodal) {
-    parts.push("MM");
-  }
-  return parts.join(" → ");
+  return buildSummaryText(
+    g.rule,
+    providersList.value,
+    fallbackProviderId.value,
+  );
 }
 
 // --- Selection & edit sync ---
@@ -619,7 +539,7 @@ function selectGroup(id: string) {
 
 watch(selectedGroup, (g) => {
   if (!g) return;
-  const parsed = parseRule(g);
+  const parsed = parseRuleForEdit(g);
   editTargets.value = parsed.targets.map((t) => ({ ...t }));
   editOverflow.value = parsed.overflow ? { ...parsed.overflow } : null;
   editMultimodal.value = parsed.multimodal ? { ...parsed.multimodal } : null;
@@ -714,7 +634,11 @@ async function handleSave() {
   try {
     await api.updateMappingGroup(selectedGroup.value.id, {
       client_model: cm,
-      rule: serializeRule(),
+      rule: serializeRuleDomain(
+        editTargets.value,
+        editOverflow.value,
+        editMultimodal.value,
+      ),
     });
     await loadData();
     toast.success(t("common.saveSuccess"));
@@ -782,14 +706,16 @@ async function handleAdd() {
   if (!cm || !newTarget.value?.model) return;
 
   try {
-    const rule = JSON.stringify({
-      targets: [
+    const rule = serializeRuleDomain(
+      [
         {
           provider_id: newTarget.value.provider_id,
           backend_model: newTarget.value.model,
         },
       ],
-    });
+      null,
+      null,
+    );
     const result = await api.createMappingGroup({
       client_model: cm,
       rule,

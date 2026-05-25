@@ -10,23 +10,30 @@ export function mergeUpstreamData(
   responseBody: string | null,
 ): string {
   // 没有 upstreamResponse 包装，直接用 responseBody
-  if (!upstreamResponse) return responseBody || ''
+  if (!upstreamResponse) return responseBody || "";
 
   // 有 upstreamResponse，尝试解析并合并
   try {
-    const parsed = JSON.parse(upstreamResponse)
-    if (typeof parsed.statusCode === 'number' && (parsed.headers || parsed.body !== undefined)) {
+    const parsed = JSON.parse(upstreamResponse);
+    if (
+      typeof parsed.statusCode === "number" &&
+      (parsed.headers || parsed.body !== undefined)
+    ) {
       // body 为 null 但有 responseBody（来自 stream_text_content），合并
       if (parsed.body === null && responseBody) {
-        return JSON.stringify({ ...parsed, body: responseBody }, null, JSON_INDENT)
+        return JSON.stringify(
+          { ...parsed, body: responseBody },
+          null,
+          JSON_INDENT,
+        );
       }
       // body 有值（非流式），直接格式化展示
-      return JSON.stringify(parsed, null, JSON_INDENT)
+      return JSON.stringify(parsed, null, JSON_INDENT);
     }
     // 不是 wrapper 格式，直接返回
-    return upstreamResponse
+    return upstreamResponse;
   } catch {
-    return upstreamResponse
+    /* JSON 解析失败，使用默认值 */ return upstreamResponse;
   }
 }
 
@@ -34,69 +41,81 @@ export function mergeUpstreamData(
  * 从 LLM 响应体中移除内容字段（choices/content），
  * 只保留元数据（model, id, usage, headers 等）。
  */
-const JSON_INDENT = 2
-const CONTENT_KEYS: ReadonlySet<string> = new Set(['choices', 'content'])
+const JSON_INDENT = 2;
+const CONTENT_KEYS: ReadonlySet<string> = new Set(["choices", "content"]);
 
 export function extractResponseMetadata(
   upstreamResponse: string | null,
   responseBody: string | null,
 ): string {
-  if (!upstreamResponse && !responseBody) return ''
+  if (!upstreamResponse && !responseBody) return "";
 
   // 尝试从 upstreamResponse 中提取 wrapper
-  const wrapper = parseWrapper(upstreamResponse)
-  const headers = wrapper?.headers
-  const bodyStr = wrapper?.body ?? responseBody
+  const wrapper = parseWrapper(upstreamResponse);
+  const headers = wrapper?.headers;
+  const bodyStr = wrapper?.body ?? responseBody;
 
   if (headers) {
     // 有 headers，展示 headers + body 元数据
-    const result: Record<string, unknown> = { headers }
+    const result: Record<string, unknown> = { headers };
     if (bodyStr) {
-      result.body = parseAndStripContent(bodyStr)
+      result.body = parseAndStripContent(bodyStr);
     }
-    return JSON.stringify(result, null, JSON_INDENT)
+    return JSON.stringify(result, null, JSON_INDENT);
   }
 
   // 没有 headers，直接从 body 中提取元数据
   if (bodyStr) {
-    const stripped = parseAndStripContent(bodyStr)
-    return JSON.stringify(stripped, null, JSON_INDENT)
+    const stripped = parseAndStripContent(bodyStr);
+    return JSON.stringify(stripped, null, JSON_INDENT);
   }
 
-  return ''
+  return "";
 }
 
-function parseWrapper(raw: string | null): { headers: Record<string, unknown>; body: string | null } | null {
-  if (!raw) return null
+function parseWrapper(
+  raw: string | null,
+): { headers: Record<string, unknown>; body: string | null } | null {
+  if (!raw) return null;
   try {
-    const parsed = JSON.parse(raw)
-    if (typeof parsed.statusCode === 'number' && (parsed.headers || parsed.body !== undefined)) {
+    const parsed = JSON.parse(raw);
+    if (
+      typeof parsed.statusCode === "number" &&
+      (parsed.headers || parsed.body !== undefined)
+    ) {
       return {
         headers: parsed.headers ?? {},
-        body: typeof parsed.body === 'string' ? parsed.body : (parsed.body != null ? JSON.stringify(parsed.body) : null),
-      }
+        body:
+          typeof parsed.body === "string"
+            ? parsed.body
+            : parsed.body != null
+              ? JSON.stringify(parsed.body)
+              : null,
+      };
     }
-    return null
+    return null;
   } catch {
-    return null
+    /* JSON 解析失败，使用默认值 */ return null;
   }
 }
 
 function parseAndStripContent(bodyStr: string): unknown {
   try {
-    const obj = JSON.parse(bodyStr)
-    if (typeof obj === 'object' && obj !== null) {
-      const result: Record<string, unknown> = {}
-      for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+    const obj = JSON.parse(bodyStr);
+    if (typeof obj === "object" && obj !== null) {
+      const result: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(
+        obj as Record<string, unknown>,
+      )) {
         if (!CONTENT_KEYS.has(key)) {
-          result[key] = value
+          result[key] = value;
         }
       }
-      return result
+      return result;
     }
-    return bodyStr
+    return bodyStr;
   } catch {
     // 非 JSON（如 SSE 文本），原样返回
-    return bodyStr
+    return bodyStr;
   }
 }

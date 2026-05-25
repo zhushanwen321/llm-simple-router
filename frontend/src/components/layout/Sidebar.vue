@@ -1,4 +1,3 @@
-<!-- eslint-disable vue/multi-word-component-names -->
 <template>
   <aside
     class="w-56 h-full bg-sidebar text-sidebar-foreground flex-shrink-0 flex flex-col overflow-hidden"
@@ -444,14 +443,15 @@ const isChecking = ref(false);
 const isSyncing = ref(false);
 const isOpen = ref(false);
 
-const POLL_INTERVAL_MS = 5 * 60 * 1000; // eslint-disable-line no-magic-numbers
+const POLL_INTERVAL_MS = 300_000;
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 
 async function loadUpgradeStatus() {
   try {
     upgradeStatus.value = await getUpgradeStatus();
-  } catch {
+  } catch (e: unknown) {
+    console.error("Sidebar.loadUpgradeStatus:", e);
     upgradeStatus.value = null;
   }
 }

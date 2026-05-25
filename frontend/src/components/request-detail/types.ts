@@ -13,7 +13,7 @@ export interface UnifiedRequestOverview {
   originalModel: string | null;
   statusCode: number | null;
   isStream: boolean;
-  apiType: "openai" | "anthropic";
+  apiType: "openai" | "openai-responses" | "anthropic";
   providerName: string | null;
   clientIp: string | undefined;
   sessionId: string | null;
@@ -125,7 +125,7 @@ function extractResponseBody(upstreamResponse: string | null): string | null {
     }
     return upstreamResponse;
   } catch {
-    return upstreamResponse;
+    /* JSON 解析失败，使用默认值 */ return upstreamResponse;
   }
 }
 
@@ -180,7 +180,7 @@ export function parseMappingReason(
     }
     return undefined;
   } catch {
-    return undefined;
+    /* JSON 解析失败，使用默认值 */ return undefined;
   }
 }
 
@@ -220,9 +220,11 @@ export function fromLogEntry(
     statusCode: entry.status_code,
     isStream: !!entry.is_stream,
     apiType:
-      entry.api_type === "openai" || entry.api_type === "anthropic"
-        ? entry.api_type
-        : "openai",
+      entry.api_type === "openai" ||
+      entry.api_type === "openai-responses" ||
+      entry.api_type === "anthropic"
+        ? (entry.api_type as "openai" | "openai-responses" | "anthropic")
+        : ("openai" as const),
     providerName: entry.provider_name,
     clientIp: undefined,
     sessionId: entry.session_id ?? null,

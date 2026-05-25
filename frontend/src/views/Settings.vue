@@ -193,7 +193,8 @@ function handleFileSelect(event: Event) {
       }
       pendingImportData.value = data;
       showImportDialog.value = true;
-    } catch {
+    } catch (e: unknown) {
+      console.error("Settings.importJson:", e);
       toast.error(t("settings.importExport.invalidJson"));
     }
   };

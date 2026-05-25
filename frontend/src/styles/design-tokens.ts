@@ -39,6 +39,14 @@ export const ROLE_COLORS = {
   },
 } as const;
 
+/** Dashboard timeline 窗口强度颜色（按 output_tokens 分级） */
+export const TIMELINE_INTENSITY_COLORS = [
+  "oklch(0.28 0.02 175)", // 低
+  "oklch(0.33 0.04 175)", // 中低
+  "oklch(0.40 0.07 175)", // 中高
+  "oklch(0.48 0.10 175)", // 高
+] as const;
+
 /** SSE 事件色映射 */
 export const SSE_COLORS = {
   "message-start": "var(--color-sse-message-start)",

@@ -10,6 +10,7 @@ import {
   AlertTriangle,
   Grid3x3,
 } from "lucide-vue-next";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
@@ -291,12 +292,14 @@ const hasMultimodal = computed(
       </div>
 
       <!-- Delete -->
-      <button
-        class="shrink-0 text-muted-foreground/20 hover:text-destructive transition-colors flex items-center"
+      <Button
+        variant="ghost"
+        size="icon-xs"
+        class="shrink-0 text-muted-foreground/20 hover:text-destructive"
         @click.stop="emit('remove')"
       >
         <Trash2 class="size-3" />
-      </button>
+      </Button>
 
       <!-- Hint -->
       <span
@@ -340,13 +343,15 @@ const hasMultimodal = computed(
           >
             {{ entry.clientModel }}
           </span>
-          <button
+          <Button
             v-if="editableClientModel"
-            class="text-[10px] text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+            variant="ghost"
+            size="xs"
+            class="text-[10px] text-muted-foreground/40"
             @click.stop="startEditClient"
           >
             {{ t("mappings.editor.edit") }}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -397,13 +402,15 @@ const hasMultimodal = computed(
                 "
               />
             </div>
-            <button
+            <Button
               v-if="tIdx > 0 && entry.targets.length > 1"
-              class="shrink-0 text-muted-foreground/30 hover:text-destructive transition-colors flex items-center"
+              variant="ghost"
+              size="icon-xs"
+              class="shrink-0 text-muted-foreground/30 hover:text-destructive"
               @click="removeTarget(tIdx)"
             >
               <Trash2 class="size-3" />
-            </button>
+            </Button>
           </div>
           <div
             v-if="tIdx < entry.targets.length - 1"
@@ -416,13 +423,14 @@ const hasMultimodal = computed(
           </div>
         </div>
 
-        <button
-          class="flex items-center justify-center gap-1 w-full py-1 mt-0.5 text-xs text-muted-foreground/40 border-[1px] border-dashed border-border rounded hover:text-primary hover:border-primary/40 transition-colors"
+        <Button
+          variant="ghost"
+          class="flex items-center justify-center gap-1 w-full py-1 mt-0.5 text-xs text-muted-foreground/40 border-[1px] border-dashed border-border rounded hover:text-primary hover:border-primary/40"
           @click="addTarget"
         >
           <Plus class="size-3" />
           {{ t("mappings.addBackup") }}
-        </button>
+        </Button>
       </div>
 
       <!-- ===== Context overflow ===== -->
@@ -461,22 +469,26 @@ const hasMultimodal = computed(
               @update:model-value="(v: SelectedValue) => updateOverflow(v)"
             />
           </div>
-          <button
-            class="shrink-0 text-muted-foreground/30 hover:text-destructive transition-colors flex items-center"
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            class="shrink-0 text-muted-foreground/30 hover:text-destructive"
             @click="updateOverflow(undefined)"
           >
             <Trash2 class="size-3" />
-          </button>
+          </Button>
         </div>
 
-        <button
+        <Button
           v-else
-          class="flex items-center gap-1 text-xs text-muted-foreground/50 hover:text-primary/60 transition-colors"
+          variant="ghost"
+          size="xs"
+          class="text-xs text-muted-foreground/50 hover:text-primary/60"
           @click="addOverflow"
         >
           <Plus class="size-3" />
           {{ t("providers.shared.addOverflow") }}
-        </button>
+        </Button>
       </div>
 
       <!-- ===== Multimodal fallback ===== -->
@@ -518,22 +530,26 @@ const hasMultimodal = computed(
               "
             />
           </div>
-          <button
-            class="shrink-0 text-muted-foreground/30 hover:text-destructive transition-colors flex items-center"
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            class="shrink-0 text-muted-foreground/30 hover:text-destructive"
             @click="removeMultimodalFallback"
           >
             <Trash2 class="size-3" />
-          </button>
+          </Button>
         </div>
 
-        <button
+        <Button
           v-else
-          class="flex items-center gap-1 text-xs text-muted-foreground/50 hover:text-primary/60 transition-colors"
+          variant="ghost"
+          size="xs"
+          class="text-xs text-muted-foreground/50 hover:text-primary/60"
           @click="addMultimodalFallback"
         >
           <Plus class="size-3" />
           {{ t("mappings.multimodalFallback.add") }}
-        </button>
+        </Button>
 
         <!-- Warning box -->
         <div

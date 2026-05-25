@@ -13,7 +13,7 @@ export interface StreamContentSnapshot {
 
 export interface ActiveRequest {
   id: string;
-  apiType: "openai" | "anthropic";
+  apiType: "openai" | "openai-responses" | "anthropic";
   model: string;
   providerId: string;
   providerName: string;

@@ -257,6 +257,22 @@ Handler (handler/proxy-handler.ts)
 
 **更新规则**：当页面布局发生重大变更时，同步更新对应 demo 文件。小幅样式调整不需要更新 demo。
 
+## 临时文档目录
+
+`docs/scratch/` 存放开发过程中的临时文档（AI 分析报告、调研笔记、排查记录等）。
+
+**命名**：`YYYY-MM-DD-<简短描述>.md`
+
+**PR 合入前必须审查清空**，对每个文件判断：
+
+| 判断 | 处理 |
+|------|------|
+| 有长期参考价值 | 提升为正式文档（`docs/adr/`、`docs/standards/` 等），删除原文件 |
+| 仅当前 PR 上下文 | PR description 中提炼要点后删除 |
+| AI 中间产物 / 已解决的问题 | 直接删除 |
+
+**原则**：scratch 文件不应随 PR 合入 main。详见 `docs/scratch/README.md` 和 `docs/standards/05-documentation.md §9.7`。
+
 ## 环境变量
 
 所有 secrets 通过首次启动的 Setup 页面设置，存入 DB settings 表。
@@ -628,6 +644,7 @@ bash ~/.pi/agent/skills/merge-worktree/pre-merge-check.sh
 | 阶段 | 脚本/操作 | 说明 |
 |------|-----------|------|
 | 验证 | `bash ~/.pi/agent/skills/merge-worktree/pre-merge-check.sh` | PR push 前 + merge 前必须全部通过 |
+| 临时文档审查 | 检查 `docs/scratch/` | 有价值的提升为正式文档，无价值的删除。合并前目录应清空 |
 | 合并 | `gh pr merge <num> --merge --auto` | 使用 GitHub merge，不调用 merge-worktree-release.sh |
 | 发布 | `bash scripts/publish.sh <patch\|minor\|major>` | 替换 merge-worktree-release.sh，触发 Actions 发布 |
 | 清理 | `bash ~/.claude/skills/merge-worktree/merge-worktree.sh <branch>` | 删除 worktree + 同步其他分支 |

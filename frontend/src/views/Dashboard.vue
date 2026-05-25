@@ -284,8 +284,8 @@
         </div>
       </div>
 
-      <!-- Zone 3: Secondary charts (TPS + Cache Hit) -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      <!-- Zone 3: TPS chart -->
+      <div class="grid grid-cols-1 gap-4 mb-4">
         <div class="bg-card rounded-lg p-3">
           <div class="text-xs font-medium text-muted-foreground mb-1.5">
             {{ t("dashboard.charts.tps") }}
@@ -295,24 +295,6 @@
               v-if="tpsChartData"
               :data="tpsChartData"
               :options="miniChartOpts(tpsChartData.labels as string[])"
-            />
-            <div
-              v-else
-              class="flex items-center justify-center h-full text-muted-foreground text-sm"
-            >
-              {{ t("common.noData") }}
-            </div>
-          </div>
-        </div>
-        <div class="bg-card rounded-lg p-3">
-          <div class="text-xs font-medium text-muted-foreground mb-1.5">
-            {{ t("dashboard.charts.cacheHit") }}
-          </div>
-          <div class="h-[140px]">
-            <Line
-              v-if="cacheHitChartData"
-              :data="cacheHitChartData"
-              :options="miniChartOpts(cacheHitChartData.labels as string[])"
             />
             <div
               v-else
@@ -441,7 +423,6 @@ import { useI18n } from "vue-i18n";
 import { stackedAreaOptions, miniLineOptions } from "./metrics-helpers";
 import { useDashboard } from "@/composables/useDashboard";
 import { formatTokenCompact } from "@/utils/token-format";
-import type { UsageWindowWithUsage } from "@/api/client";
 
 ChartJS.register(
   CategoryScale,
@@ -471,11 +452,14 @@ const {
   cacheHitRate,
   tpsChartData,
   tokenThroughputChartData,
-  inputTokensChartData,
   deltaValues,
   windowTimeRange,
   timelineWindows,
   timelineRange,
+  getWindowStyle,
+  getWindowWidth,
+  formatWindowTooltip,
+  timelineDayLabels,
   retry,
 } = useDashboard();
 
@@ -501,107 +485,10 @@ function miniChartOpts(labels: string[]) {
   return miniLineOptions(labels);
 }
 
-// --- Cache hit chart: reuse inputTokensChartData as a placeholder (no dedicated cache timeseries) ---
-const cacheHitChartData = computed(() => inputTokensChartData.value);
-
 // --- Timeline zoom options ---
 const timelineZoomOptions = [
   { value: "24h" as const, label: "24h" },
   { value: "3d" as const, label: "3d" },
   { value: "7d" as const, label: "7d" },
 ];
-
-// --- Timeline constants ---
-const MS_PER_HOUR = 3600000;
-const HOURS_PER_DAY = 24;
-const DAY_MS = HOURS_PER_DAY * MS_PER_HOUR;
-const DAYS_3 = 3;
-const DAYS_7 = 7;
-const PERCENT = 100;
-const PAD_WIDTH = 2;
-
-// Timeline duration based on current zoom level
-const timelineDurationMs = computed(() => {
-  const durations: Record<string, number> = {
-    "24h": HOURS_PER_DAY * MS_PER_HOUR,
-    "3d": DAYS_3 * DAY_MS,
-    "7d": DAYS_7 * DAY_MS,
-  };
-  return durations[timelineRange.value] ?? durations["24h"];
-});
-const timelineDurationHours = computed(() =>
-  Math.round(timelineDurationMs.value / MS_PER_HOUR),
-);
-
-// Intensity thresholds (output tokens)
-const INTENSITY_T4 = 3000000;
-const INTENSITY_T3 = 1500000;
-const INTENSITY_T2 = 500000;
-
-const timelineStart = computed(() => {
-  const now = new Date();
-  return new Date(now.getTime() - timelineDurationMs.value);
-});
-
-function getWindowLeft(w: UsageWindowWithUsage): string {
-  if (!timelineStart.value) return "0%";
-  const start = Math.max(
-    new Date(w.window.start_time).getTime(),
-    timelineStart.value.getTime(),
-  );
-  const offset = start - timelineStart.value.getTime();
-  const pct = Math.min((offset / timelineDurationMs.value) * PERCENT, PERCENT);
-  return pct + "%";
-}
-
-function getWindowWidth(w: UsageWindowWithUsage): string {
-  if (!timelineStart.value) return "0%";
-  const wStart = new Date(w.window.start_time).getTime();
-  const wEnd = new Date(w.window.end_time).getTime();
-  // Clip to visible range
-  const visStart = Math.max(wStart, timelineStart.value.getTime());
-  const now = new Date().getTime();
-  const visEnd = Math.min(wEnd, now);
-  if (visEnd <= visStart) return "0%";
-  const pct = ((visEnd - visStart) / timelineDurationMs.value) * PERCENT;
-  return Math.min(pct, PERCENT) + "%";
-}
-
-function getWindowStyle(w: UsageWindowWithUsage): Record<string, string> {
-  const outputTokens = w.usage.total_output_tokens;
-  let bg: string;
-  if (outputTokens >= INTENSITY_T4) bg = "oklch(0.48 0.10 175)";
-  else if (outputTokens >= INTENSITY_T3) bg = "oklch(0.40 0.07 175)";
-  else if (outputTokens >= INTENSITY_T2) bg = "oklch(0.33 0.04 175)";
-  else bg = "oklch(0.28 0.02 175)";
-  return {
-    left: getWindowLeft(w),
-    width: getWindowWidth(w),
-    backgroundColor: bg,
-  };
-}
-
-function formatWindowTooltip(w: UsageWindowWithUsage): string {
-  const start = new Date(w.window.start_time);
-  const end = new Date(w.window.end_time);
-  const pad = (n: number) => n.toString().padStart(PAD_WIDTH, "0");
-  const startStr = `${pad(start.getMonth() + 1)}/${pad(start.getDate())} ${pad(start.getHours())}:${pad(start.getMinutes())}`;
-  const endStr = `${pad(end.getHours())}:${pad(end.getMinutes())}`;
-  return `${startStr}-${endStr} | ${formatTokenCompact(w.usage.total_output_tokens)} out`;
-}
-
-const timelineDayLabels = computed(() => {
-  if (!timelineStart.value) return [];
-  const labels: { label: string; position: number }[] = [];
-  const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  const totalDays = Math.ceil(timelineDurationHours.value / HOURS_PER_DAY);
-  for (let d = 0; d < totalDays; d++) {
-    const dayStart = new Date(timelineStart.value.getTime() + d * DAY_MS);
-    labels.push({
-      label: `${weekdays[dayStart.getDay()]} ${dayStart.getMonth() + 1}/${dayStart.getDate()}`,
-      position: ((d * HOURS_PER_DAY) / timelineDurationHours.value) * PERCENT,
-    });
-  }
-  return labels;
-});
 </script>

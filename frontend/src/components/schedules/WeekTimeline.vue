@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
+import { WEEKDAYS_MON_FRI, SATURDAY, SUNDAY } from "@/utils/schedule-domain";
 
 export interface TimelineRule {
   name: string;
@@ -26,6 +27,9 @@ const DOUBLE_DIGIT_THRESHOLD = 10;
 
 const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
 
+// 数据约定: 0=Sun, 1=Mon, ..., 6=Sat; 显示顺序: Mon-Sun
+const DISPLAY_ORDER = [...WEEKDAYS_MON_FRI, SATURDAY, SUNDAY];
+
 const BLOCK_COLORS = [
   "oklch(0.68 0.13 175 / 70%)",
   "oklch(0.68 0.13 175 / 50%)",
@@ -47,7 +51,7 @@ const dayRules = computed((): TimelineRule[][] => {
   for (const rule of props.rules) {
     for (const day of rule.days) {
       if (day >= 0 && day <= MAX_DAY_INDEX) {
-        result[day].push(rule);
+        result[DISPLAY_ORDER.indexOf(day)].push(rule);
       }
     }
   }
@@ -111,7 +115,11 @@ function timeLabel(hour: number): string {
       </div>
       <div
         class="flex-1 relative h-full rounded-sm overflow-visible"
-        :class="hasRules(dayIndex) ? 'bg-black/[0.06] dark:bg-white/[0.07]' : 'bg-black/[0.03] dark:bg-white/[0.03]'"
+        :class="
+          hasRules(dayIndex)
+            ? 'bg-black/[0.06] dark:bg-white/[0.07]'
+            : 'bg-black/[0.03] dark:bg-white/[0.03]'
+        "
       >
         <div
           class="absolute inset-0 grid"
@@ -126,7 +134,7 @@ function timeLabel(hour: number): string {
         <div
           v-for="rule in dayRules[dayIndex]"
           :key="rule.name + dayIndex"
-          class="timeline-block group"
+          class="absolute top-0.5 bottom-0.5 rounded-sm flex items-center px-1 text-[10px] font-semibold overflow-hidden whitespace-nowrap cursor-default z-10 transition-[filter] duration-100 hover:z-20 hover:brightness-[1.15] group"
           :class="[
             !rule.enabled
               ? 'bg-transparent !border-dashed border-[1.5px] border-muted-foreground/50 text-muted-foreground/60'
@@ -140,7 +148,10 @@ function timeLabel(hour: number): string {
           }"
         >
           <span v-if="!isNarrow(rule)" class="truncate">{{ rule.name }}</span>
-          <div v-if="isNarrow(rule)" class="timeline-tooltip">
+          <div
+            v-if="isNarrow(rule)"
+            class="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 bg-popover text-popover-foreground border rounded-md shadow-lg px-2.5 py-1.5 z-30 whitespace-nowrap text-[11px]"
+          >
             <div class="font-semibold whitespace-nowrap">{{ rule.name }}</div>
             <div
               class="font-mono text-[11px] text-muted-foreground whitespace-nowrap"
@@ -171,18 +182,4 @@ function timeLabel(hour: number): string {
   </div>
 </template>
 
-<style scoped>
-.timeline-block {
-  @apply absolute top-0.5 bottom-0.5 rounded-sm flex items-center px-1 text-[10px] font-semibold overflow-hidden whitespace-nowrap cursor-default z-10 transition-[filter] duration-100;
-}
-
-.timeline-block:hover {
-  @apply z-20 brightness-[1.15];
-}
-
-.timeline-tooltip {
-  @apply hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5;
-  @apply bg-popover text-popover-foreground border rounded-md shadow-lg px-2.5 py-1.5 z-30;
-  @apply whitespace-nowrap text-[11px];
-}
-</style>
+<style scoped></style>

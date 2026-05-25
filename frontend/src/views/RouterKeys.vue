@@ -12,22 +12,37 @@
     </div>
 
     <!-- Anchor bar -->
-    <div class="anchor-bar">
-      <div class="anchor-item">
-        <span class="anchor-label">{{ t("routerKeys.statTotal") }}</span>
-        <span class="anchor-value font-mono">{{ keys.length }}</span>
+    <div
+      class="flex gap-6 px-4 py-3 mb-3 rounded-lg bg-card border border-input"
+    >
+      <div class="flex flex-col gap-0.5">
+        <span
+          class="text-[11px] font-medium uppercase tracking-wider text-muted-foreground"
+          >{{ t("routerKeys.statTotal") }}</span
+        >
+        <span class="text-xl font-semibold leading-none font-mono">{{
+          keys.length
+        }}</span>
       </div>
-      <div class="anchor-divider" />
-      <div class="anchor-item">
-        <span class="anchor-label">{{ t("routerKeys.statActive") }}</span>
-        <span class="anchor-value font-mono text-primary">
+      <div class="w-px self-stretch bg-border" />
+      <div class="flex flex-col gap-0.5">
+        <span
+          class="text-[11px] font-medium uppercase tracking-wider text-muted-foreground"
+          >{{ t("routerKeys.statActive") }}</span
+        >
+        <span class="text-xl font-semibold leading-none font-mono text-primary">
           {{ activeCount }}
         </span>
       </div>
-      <div class="anchor-divider" />
-      <div class="anchor-item">
-        <span class="anchor-label">{{ t("routerKeys.statWhitelist") }}</span>
-        <span class="anchor-value font-mono">{{ whitelistCount }}</span>
+      <div class="w-px self-stretch bg-border" />
+      <div class="flex flex-col gap-0.5">
+        <span
+          class="text-[11px] font-medium uppercase tracking-wider text-muted-foreground"
+          >{{ t("routerKeys.statWhitelist") }}</span
+        >
+        <span class="text-xl font-semibold leading-none font-mono">{{
+          whitelistCount
+        }}</span>
       </div>
     </div>
 
@@ -46,7 +61,7 @@
     </div>
 
     <!-- Table -->
-    <div class="table-wrap">
+    <Card flush>
       <Table>
         <TableHeader>
           <TableRow>
@@ -248,7 +263,7 @@
           </TableRow>
         </TableBody>
       </Table>
-    </div>
+    </Card>
 
     <!-- Create / Edit Dialog -->
     <Dialog v-model:open="editDialogOpen">
@@ -290,6 +305,25 @@
                 :placeholder="t('routerKeys.modelFilterPlaceholder')"
                 class="h-7 text-xs border-0 border-b rounded-none mb-2 bg-transparent focus-visible:ring-0"
               />
+              <!-- Selected models badges -->
+              <div
+                v-if="form.allowed_models.length > 0"
+                class="flex flex-wrap gap-1 mb-2"
+              >
+                <Badge
+                  v-for="model in form.allowed_models"
+                  :key="model"
+                  variant="secondary"
+                  class="font-mono text-[10px] font-medium px-1.5 py-0 h-5 gap-1"
+                >
+                  {{ model }}
+                  <X
+                    class="w-3 h-3 cursor-pointer hover:text-destructive shrink-0"
+                    @click="removeModel(model)"
+                  />
+                </Badge>
+              </div>
+
               <div class="max-h-[200px] overflow-y-auto space-y-0.5">
                 <Label
                   v-for="model in filteredModels"
@@ -410,11 +444,12 @@
 </template>
 
 <script setup lang="ts">
+import { Card } from "@/components/ui/card";
 import { ref, computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { toast } from "vue-sonner";
 import { api, getApiMessage } from "@/api/client";
-import { fallbackCopy } from "@/composables/useClipboard";
+import { useClipboard } from "@/composables/useClipboard";
 import { formatTime } from "@/utils/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -456,6 +491,7 @@ import {
   ShieldX,
   Search,
   AlertTriangle,
+  X,
 } from "lucide-vue-next";
 import type { RouterKey } from "@/types/models";
 
@@ -518,36 +554,27 @@ function statusDotClass(isActive: number) {
 }
 
 // Actions
-function copyKey(k: RouterKey) {
+async function copyKey(k: RouterKey) {
   const raw = k.key;
   if (!raw) return;
-  copyToClipboard(raw);
+  const ok = await copyToClipboard(raw);
+  if (!ok) return;
   copiedId.value = k.id;
   setTimeout(() => {
     if (copiedId.value === k.id) copiedId.value = null;
   }, COPY_FEEDBACK_MS);
 }
 
-function copyRevealKey() {
-  copyToClipboard(createdKeyValue.value);
+async function copyRevealKey() {
+  const ok = await copyToClipboard(createdKeyValue.value);
+  if (!ok) return;
   revealCopied.value = true;
   setTimeout(() => {
     revealCopied.value = false;
   }, COPY_FEEDBACK_MS);
 }
 
-/** Secure Context 安全降级的剪贴板写入 */
-function copyToClipboard(text: string) {
-  try {
-    if (navigator.clipboard?.writeText) {
-      navigator.clipboard.writeText(text);
-    } else {
-      fallbackCopy(text);
-    }
-  } catch {
-    fallbackCopy(text);
-  }
-}
+const { copy: copyToClipboard } = useClipboard();
 
 function toggleReveal(id: string) {
   const s = revealedKeys.value;
@@ -568,6 +595,12 @@ function toggleModel(model: string, val: boolean | "indeterminate") {
     const idx = models.indexOf(model);
     if (idx >= 0) models.splice(idx, 1);
   }
+}
+
+function removeModel(model: string) {
+  const models = form.value.allowed_models;
+  const idx = models.indexOf(model);
+  if (idx >= 0) models.splice(idx, 1);
 }
 
 // Dialogs
@@ -677,41 +710,13 @@ onMounted(loadData);
 </script>
 
 <style scoped>
-.anchor-bar {
-  @apply flex gap-6 px-4 py-3 mb-3 rounded-lg bg-card border border-input;
-}
-.anchor-item {
-  @apply flex flex-col gap-0.5;
-}
-.anchor-label {
-  @apply text-[11px] font-medium uppercase tracking-wider text-muted-foreground;
-}
-.anchor-value {
-  @apply text-xl font-semibold leading-none;
-}
-.anchor-divider {
-  @apply w-px self-stretch bg-border;
-}
-
-.table-wrap {
-  @apply rounded-lg bg-card border border-input overflow-hidden;
-}
-.table-wrap :deep(tbody tr) {
+:deep(tbody tr) {
   @apply border-b border-border transition-colors duration-100;
 }
-.table-wrap :deep(tbody tr:last-child) {
+:deep(tbody tr:last-child) {
   @apply border-b-0;
 }
-.table-wrap :deep(tbody tr:hover) {
+:deep(tbody tr:hover) {
   @apply bg-accent;
-}
-.table-wrap :deep(thead) {
-  @apply bg-accent;
-}
-.table-wrap :deep(th) {
-  @apply text-[11px] font-semibold uppercase tracking-wider text-muted-foreground py-2 px-3;
-}
-.table-wrap :deep(td) {
-  @apply py-2 px-3 text-[13px] align-middle;
 }
 </style>

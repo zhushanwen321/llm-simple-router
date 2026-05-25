@@ -17,7 +17,6 @@ import { DEFAULT_CONTEXT_WINDOW, DEFAULT_STREAM_TIMEOUT_MS } from "@/constants";
 
 const CONNECTION_DELAY_MS = 800;
 const POST_SAVE_DELAY_MS = 1500;
-const DEFAULT_CONCURRENCY = 10;
 import type { Ref, ComputedRef } from "vue";
 import type {
   ClientType,
@@ -29,64 +28,76 @@ import type {
 import type { ProviderGroup, RecommendedRetryRule } from "@/api/client";
 import type { MappingGroup } from "@/types/mapping";
 import type { Provider as ApiProvider } from "@/types/mapping";
+import {
+  DEFAULT_CONCURRENCY_CONFIG,
+  DEFAULT_CONCURRENCY_MANUAL_CONFIG,
+  type TransformConfig,
+  type ConcurrencyConfig,
+} from "@/components/shared/types";
 import type { ConcurrencyMode } from "@/types/concurrency";
 import type { ProviderChangeContext } from "./quick-setup-helpers";
 
-export interface ActionCtx {
-  t: (key: string, params?: Record<string, unknown>) => string;
+/** Client/provider/plan selection state */
+export interface SelectionState {
   clientType: Ref<ClientType>;
-  providerGroups: Ref<ProviderGroup[]>;
   selectedGroup: Ref<string>;
   selectedPlan: Ref<string>;
   apiType: Ref<"openai" | "openai-responses" | "anthropic">;
-  apiKey: Ref<string>;
-  modelConfigs: Ref<ModelConfig[]>;
-  mappingEntries: Ref<MappingEntry[]>;
-  allRecommendedRules: Ref<RecommendedRetryRule[]>;
-  selectedRetryRules: Ref<Set<string>>;
-  retryProviderMap: Ref<Map<string, "general" | string>>;
-  saving: Ref<boolean>;
-  connectionStatus: Ref<string>;
-  concurrencyMode: Ref<ConcurrencyMode>;
-  maxConcurrency: Ref<number>;
-  queueTimeoutMs: Ref<number>;
-  maxQueueSize: Ref<number>;
-  transformInjectHeaders: Ref<string>;
-  transformDropFields: Ref<string>;
-  transformRequestDefaults: Ref<string>;
-  existingMappings: Ref<MappingGroup[]>;
-  allProviders: Ref<ApiProvider[]>;
-  isCustomProvider: ComputedRef<boolean>;
+  providerGroups: Ref<ProviderGroup[]>;
   currentClient: ComputedRef<
     { format: string; defaultProvider: string; defaultPlan: string } | undefined
   >;
   currentPreset: ComputedRef<
-    | {
-        apiType: string;
-        baseUrl?: string;
-        upstreamPath?: string;
-      }
-    | undefined
+    { apiType: string; baseUrl?: string; upstreamPath?: string } | undefined
   >;
-  baseUrl: ComputedRef<string>;
-  upstreamPath: ComputedRef<string>;
-  isNonOpenaiEndpoint: ComputedRef<boolean>;
-  recommendedRules: ComputedRef<RecommendedRetryRule[]>;
+  isCustomProvider: ComputedRef<boolean>;
   customBaseUrl: Ref<string>;
   customUpstreamPath: Ref<string>;
 }
 
+/** Core mutable data: models, mappings, keys, retry rules */
+export interface DataState {
+  modelConfigs: Ref<ModelConfig[]>;
+  mappingEntries: Ref<MappingEntry[]>;
+  apiKey: Ref<string>;
+  baseUrl: ComputedRef<string>;
+  upstreamPath: ComputedRef<string>;
+  existingMappings: Ref<MappingGroup[]>;
+  allProviders: Ref<ApiProvider[]>;
+  allRecommendedRules: Ref<RecommendedRetryRule[]>;
+  recommendedRules: ComputedRef<RecommendedRetryRule[]>;
+  selectedRetryRules: Ref<Set<string>>;
+  retryProviderMap: Ref<Map<string, "general" | string>>;
+  isNonOpenaiEndpoint: ComputedRef<boolean>;
+}
+
+/** Submit configuration: saving state, concurrency, transforms */
+export interface SubmitState {
+  saving: Ref<boolean>;
+  connectionStatus: Ref<string>;
+  concurrencyConfig: Ref<ConcurrencyConfig>;
+  transformConfig: Ref<TransformConfig>;
+}
+
+export interface ActionCtx {
+  t: (key: string, params?: Record<string, unknown>) => string;
+  selection: SelectionState;
+  data: DataState;
+  submit: SubmitState;
+}
+
 export function useQuickSetupActions(ctx: ActionCtx) {
   const updateMappings = () => {
-    ctx.mappingEntries.value = buildMappingEntries(
-      ctx.clientType.value,
-      ctx.modelConfigs.value.filter((m) => m.enabled),
-      ctx.existingMappings.value,
+    ctx.data.mappingEntries.value = buildMappingEntries(
+      ctx.selection.clientType.value,
+      ctx.data.modelConfigs.value.filter((m) => m.enabled),
+      ctx.data.existingMappings.value,
     );
   };
   const selectClient = (type: ClientType) => {
-    ctx.clientType.value = type;
-    const client = ctx.currentClient.value;
+    const { selection, data } = ctx;
+    selection.clientType.value = type;
+    const client = selection.currentClient.value;
     if (client) {
       const defaults = resolveClientDefaults(
         {
@@ -94,16 +105,16 @@ export function useQuickSetupActions(ctx: ActionCtx) {
           defaultPlan: client.defaultPlan,
           format: client.format,
         },
-        ctx.providerGroups.value,
+        selection.providerGroups.value,
       );
       if (defaults) {
-        ctx.selectedGroup.value = defaults.group;
-        ctx.selectedPlan.value = defaults.plan;
-        ctx.apiType.value = defaults.apiType;
+        selection.selectedGroup.value = defaults.group;
+        selection.selectedPlan.value = defaults.plan;
+        selection.apiType.value = defaults.apiType;
         applyPresetModels(
           defaults.preset,
-          ctx.modelConfigs,
-          ctx.isNonOpenaiEndpoint,
+          data.modelConfigs,
+          data.isNonOpenaiEndpoint,
         );
       }
     }
@@ -111,59 +122,60 @@ export function useQuickSetupActions(ctx: ActionCtx) {
     syncRetry(ctx);
   };
   const providerCtx: ProviderChangeContext = {
-    selectedGroup: ctx.selectedGroup,
-    selectedPlan: ctx.selectedPlan,
-    apiType: ctx.apiType,
-    modelConfigs: ctx.modelConfigs,
-    customBaseUrl: ctx.customBaseUrl,
-    customUpstreamPath: ctx.customUpstreamPath,
-    providerGroups: ctx.providerGroups,
-    currentClient: ctx.currentClient,
-    isNonOpenaiEndpoint: ctx.isNonOpenaiEndpoint,
+    selectedGroup: ctx.selection.selectedGroup,
+    selectedPlan: ctx.selection.selectedPlan,
+    apiType: ctx.selection.apiType,
+    modelConfigs: ctx.data.modelConfigs,
+    customBaseUrl: ctx.selection.customBaseUrl,
+    customUpstreamPath: ctx.selection.customUpstreamPath,
+    providerGroups: ctx.selection.providerGroups,
+    currentClient: ctx.selection.currentClient,
+    isNonOpenaiEndpoint: ctx.data.isNonOpenaiEndpoint,
     updateMappings,
     syncRetryRules: () => syncRetry(ctx),
   };
   const onProviderChange = (group: string) =>
     applyProviderChange(group, providerCtx);
   const onPlanChange = (plan: string) => {
-    ctx.selectedPlan.value = plan;
+    const { selection, data } = ctx;
+    selection.selectedPlan.value = plan;
     applyPlanChange(
       plan,
-      ctx.selectedGroup,
-      ctx.apiType,
-      ctx.currentClient,
-      ctx.modelConfigs,
-      ctx.isNonOpenaiEndpoint,
-      ctx.providerGroups,
+      selection.selectedGroup,
+      selection.apiType,
+      selection.currentClient,
+      data.modelConfigs,
+      data.isNonOpenaiEndpoint,
+      selection.providerGroups,
       updateMappings,
     );
   };
   const toggleRetryRule = (name: string, checked: boolean) => {
-    const next = new Set(ctx.selectedRetryRules.value);
+    const next = new Set(ctx.data.selectedRetryRules.value);
     if (checked) next.add(name);
     else next.delete(name);
-    ctx.selectedRetryRules.value = next;
+    ctx.data.selectedRetryRules.value = next;
   };
   const setAllRetryRules = (names: string[], checked: boolean) => {
-    const next = new Set(ctx.selectedRetryRules.value);
+    const next = new Set(ctx.data.selectedRetryRules.value);
     for (const n of names) {
       if (checked) next.add(n);
       else next.delete(n);
     }
-    ctx.selectedRetryRules.value = next;
+    ctx.data.selectedRetryRules.value = next;
   };
   const updateMappingTargets = (index: number, targets: MappingTarget[]) => {
-    ctx.mappingEntries.value = ctx.mappingEntries.value.map((e, i) =>
+    ctx.data.mappingEntries.value = ctx.data.mappingEntries.value.map((e, i) =>
       i === index ? { ...e, targets } : e,
     );
   };
   const toggleMappingActive = (index: number) => {
-    ctx.mappingEntries.value = ctx.mappingEntries.value.map((e, i) =>
+    ctx.data.mappingEntries.value = ctx.data.mappingEntries.value.map((e, i) =>
       i === index ? { ...e, active: !e.active } : e,
     );
   };
   const updateMappingClientModel = (index: number, cm: string) => {
-    ctx.mappingEntries.value = ctx.mappingEntries.value.map((e, i) =>
+    ctx.data.mappingEntries.value = ctx.data.mappingEntries.value.map((e, i) =>
       i === index ? { ...e, clientModel: cm } : e,
     );
   };
@@ -171,13 +183,15 @@ export function useQuickSetupActions(ctx: ActionCtx) {
     index: number,
     fb: MultimodalFallback | undefined,
   ) => {
-    ctx.mappingEntries.value = ctx.mappingEntries.value.map((e, i) =>
+    ctx.data.mappingEntries.value = ctx.data.mappingEntries.value.map((e, i) =>
       i === index ? { ...e, multimodalFallback: fb } : e,
     );
   };
   const addMappingEntry = (clientModel: string, targetModel: string) => {
-    ctx.mappingEntries.value = [
-      ...ctx.mappingEntries.value.filter((m) => m.clientModel !== clientModel),
+    ctx.data.mappingEntries.value = [
+      ...ctx.data.mappingEntries.value.filter(
+        (m) => m.clientModel !== clientModel,
+      ),
       {
         clientModel,
         targets: [{ backend_model: targetModel, provider_id: "__new__" }],
@@ -188,87 +202,116 @@ export function useQuickSetupActions(ctx: ActionCtx) {
     ];
   };
   const removeMappingEntry = (clientModel: string) => {
-    const entry = ctx.mappingEntries.value.find(
+    const entry = ctx.data.mappingEntries.value.find(
       (m) => m.clientModel === clientModel,
     );
     if (entry?.existing) {
       toast.error(ctx.t("quickSetup.messages.existingMappingDelete"));
       return;
     }
-    ctx.mappingEntries.value = ctx.mappingEntries.value.filter(
+    ctx.data.mappingEntries.value = ctx.data.mappingEntries.value.filter(
       (m) => m.clientModel !== clientModel,
     );
   };
   const onConcurrencyModeChange = (mode: ConcurrencyMode) => {
-    ctx.concurrencyMode.value = mode;
-    if (mode === "auto") ctx.maxConcurrency.value = DEFAULT_CONCURRENCY;
-    else if (mode === "manual") ctx.maxConcurrency.value = 3;
+    ctx.submit.concurrencyConfig.value = {
+      ...ctx.submit.concurrencyConfig.value,
+      mode,
+    };
+    if (mode === "auto")
+      ctx.submit.concurrencyConfig.value.max_concurrency =
+        DEFAULT_CONCURRENCY_CONFIG.max_concurrency;
+    else if (mode === "manual")
+      ctx.submit.concurrencyConfig.value.max_concurrency =
+        DEFAULT_CONCURRENCY_MANUAL_CONFIG.max_concurrency;
   };
   const testConnection = () => {
-    if (!ctx.apiKey.value.trim()) {
-      ctx.connectionStatus.value = "error";
+    if (!ctx.data.apiKey.value.trim()) {
+      ctx.submit.connectionStatus.value = "error";
       toast.error(ctx.t("quickSetup.messages.fillApiKeyFirst"));
       return Promise.resolve();
     }
-    ctx.connectionStatus.value = "testing";
+    ctx.submit.connectionStatus.value = "testing";
     return new Promise((r) => setTimeout(r, CONNECTION_DELAY_MS)).then(() => {
-      ctx.connectionStatus.value = "ok";
+      ctx.submit.connectionStatus.value = "ok";
     });
   };
   const addCustomModel = (name: string, cw = DEFAULT_CONTEXT_WINDOW) => {
-    ctx.modelConfigs.value.push({
+    ctx.data.modelConfigs.value.push({
       name,
       contextWindow: cw,
       enabled: true,
       patches: computeDefaultPatches(
         name,
-        ctx.apiType.value,
-        ctx.isNonOpenaiEndpoint.value,
+        ctx.selection.apiType.value,
+        ctx.data.isNonOpenaiEndpoint.value,
       ),
       stream_timeout_ms: DEFAULT_STREAM_TIMEOUT_MS,
       capabilities: ["text"],
     });
   };
+  const updateModel = (index: number, updated: ModelConfig) => {
+    const next = [...ctx.data.modelConfigs.value];
+    next[index] = updated;
+    ctx.data.modelConfigs.value = next;
+  };
+  const removeModel = (index: number) => {
+    ctx.data.modelConfigs.value = ctx.data.modelConfigs.value.filter(
+      (_, i) => i !== index,
+    );
+  };
+  const updateModelTimeout = (index: number, ms: number | undefined) => {
+    const next = [...ctx.data.modelConfigs.value];
+    next[index] = { ...next[index], stream_timeout_ms: ms || undefined };
+    ctx.data.modelConfigs.value = next;
+  };
+  const toggleModelCapability = (index: number, capability: string) => {
+    const next = [...ctx.data.modelConfigs.value];
+    const model = { ...next[index] };
+    const caps = model.capabilities ?? ["text"];
+    if (caps.includes(capability)) {
+      model.capabilities = caps.filter((c) => c !== capability);
+    } else {
+      model.capabilities = [...caps, capability];
+    }
+    next[index] = model;
+    ctx.data.modelConfigs.value = next;
+  };
   const submit = async () => {
-    if (!ctx.currentPreset.value) {
+    const { selection, data, submit: sub } = ctx;
+    if (!selection.currentPreset.value) {
       toast.error(ctx.t("quickSetup.messages.selectProviderAndPlan"));
       return;
     }
-    if (!ctx.apiKey.value.trim()) {
+    if (!data.apiKey.value.trim()) {
       toast.error(ctx.t("quickSetup.messages.fillApiKey"));
       return;
     }
-    ctx.saving.value = true;
+    sub.saving.value = true;
     try {
-      const tr = parseTransformRules(
-        ctx.transformInjectHeaders.value.trim(),
-        ctx.transformDropFields.value.trim(),
-        ctx.transformRequestDefaults.value.trim(),
-        (k) => toast.error(ctx.t(`quickSetup.messages.${k}`)),
+      const tr = parseTransformRules(sub.transformConfig.value, (k) =>
+        toast.error(ctx.t(`quickSetup.messages.${k}`)),
       );
       if (tr === false) return;
       await api.quickSetup(
         buildQuickSetupPayload({
-          isCustomProvider: ctx.isCustomProvider.value,
-          selectedGroup: ctx.selectedGroup.value,
-          retryProviderMap: ctx.retryProviderMap.value,
-          selectedPlan: ctx.selectedPlan.value,
-          apiType: ctx.apiType.value,
-          baseUrl: ctx.baseUrl.value,
-          upstreamPath: ctx.upstreamPath.value,
-          apiKey: ctx.apiKey.value.trim(),
-          models: ctx.modelConfigs.value.filter((m) => m.enabled),
-          concurrencyMode: ctx.concurrencyMode.value,
-          maxConcurrency: ctx.maxConcurrency.value,
-          queueTimeoutMs: ctx.queueTimeoutMs.value,
-          maxQueueSize: ctx.maxQueueSize.value,
-          mappingEntries: ctx.mappingEntries.value,
-          recommendedRules: ctx.recommendedRules.value,
-          selectedRetryRules: ctx.selectedRetryRules.value,
+          isCustomProvider: selection.isCustomProvider.value,
+          selectedGroup: selection.selectedGroup.value,
+          retryProviderMap: data.retryProviderMap.value,
+          selectedPlan: selection.selectedPlan.value,
+          apiType: selection.apiType.value,
+          baseUrl: data.baseUrl.value,
+          upstreamPath: data.upstreamPath.value,
+          apiKey: data.apiKey.value.trim(),
+          models: data.modelConfigs.value.filter((m) => m.enabled),
+          concurrency: sub.concurrencyConfig.value,
+          mappingEntries: data.mappingEntries.value,
+          recommendedRules: data.recommendedRules.value,
+          selectedRetryRules: data.selectedRetryRules.value,
           transformRules: tr,
         }),
       );
-      const errs = await toggleChangedMappings(api, ctx.mappingEntries.value);
+      const errs = await toggleChangedMappings(api, data.mappingEntries.value);
       toast.success(
         errs.length > 0
           ? ctx.t("quickSetup.messages.setupCompleteWithErrors", {
@@ -282,7 +325,7 @@ export function useQuickSetupActions(ctx: ActionCtx) {
       console.error("quickSetup.save:", e);
       toast.error(getApiMessage(e, ctx.t("quickSetup.messages.setupFailed")));
     } finally {
-      ctx.saving.value = false;
+      sub.saving.value = false;
     }
   };
 
@@ -302,19 +345,24 @@ export function useQuickSetupActions(ctx: ActionCtx) {
     onConcurrencyModeChange,
     testConnection,
     addCustomModel,
+    updateModel,
+    removeModel,
+    updateModelTimeout,
+    toggleModelCapability,
     submit,
   };
 }
 
 function syncRetry(ctx: ActionCtx) {
-  ctx.selectedRetryRules.value = new Set(
-    ctx.recommendedRules.value.filter((r) => !r.exists).map((r) => r.name),
+  const { selection, data } = ctx;
+  data.selectedRetryRules.value = new Set(
+    data.recommendedRules.value.filter((r) => !r.exists).map((r) => r.name),
   );
-  const sn = ctx.providerGroups.value.find(
-    (g) => g.group === ctx.selectedGroup.value,
+  const sn = selection.providerGroups.value.find(
+    (g) => g.group === selection.selectedGroup.value,
   )?.shortname;
-  ctx.retryProviderMap.value = buildRetryProviderMap(
-    ctx.recommendedRules.value,
+  data.retryProviderMap.value = buildRetryProviderMap(
+    data.recommendedRules.value,
     sn,
   );
 }

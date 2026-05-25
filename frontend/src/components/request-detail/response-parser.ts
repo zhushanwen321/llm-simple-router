@@ -59,7 +59,7 @@ export function parseOpenAIChoices(choices: unknown[]): ContentBlock[] {
               JSON_INDENT,
             );
           } catch {
-            argsStr = fn.arguments;
+            /* JSON 解析失败，使用默认值 */ argsStr = fn.arguments;
           }
         }
         result.push({
@@ -109,7 +109,7 @@ export function parseOpenAIChoices(choices: unknown[]): ContentBlock[] {
 export function tryDirectParse(
   responseBody: string | null,
   upstreamResponse: string | null,
-  apiType: "openai" | "anthropic",
+  apiType: "openai" | "openai-responses" | "anthropic",
 ): ContentBlock[] {
   // upstreamResponse 可能包含完整的响应 JSON（含 choices/usage/thinking）
   // responseBody 可能是 stream_text_content（纯文本）
@@ -121,7 +121,7 @@ export function tryDirectParse(
 
 function tryParseResponse(
   raw: string | null,
-  apiType: "openai" | "anthropic",
+  apiType: "openai" | "openai-responses" | "anthropic",
 ): ContentBlock[] {
   if (!raw) return [];
 

@@ -54,7 +54,11 @@
     "orphanToolResultOaDesc": "OpenAI 格式孤儿处理",
     "general": "通用兼容",
     "developerRole": "Developer Role",
-    "developerRoleDesc": "developer role 转 system"
+    "developerRoleDesc": "developer role 转 system",
+    "label": "补丁",
+    "sectionTitle": "补丁",
+    "timeoutTitle": "超时",
+    "timeoutSeconds": "秒"
   },
   "concurrency": {
     "control": "并发控制",
