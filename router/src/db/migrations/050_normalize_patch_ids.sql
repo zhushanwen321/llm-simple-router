@@ -1,6 +1,6 @@
 -- Normalize patch IDs in providers.models JSON from hyphen to underscore format.
 -- All patch IDs stored in DB should use underscore (thinking_consistency, orphan_tool_results, etc).
--- Frontend sends hyphen format; normalizePatchName() normalizes at write/read time.
+-- Frontend sends hyphen format, normalizePatchName normalizes at write/read time.
 -- This migration ensures existing DB data is also normalized and deduplicated.
 
 -- Step 1: Migrate old patch IDs to current canonical names (underscore format)
