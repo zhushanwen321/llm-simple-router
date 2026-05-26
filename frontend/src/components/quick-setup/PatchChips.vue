@@ -53,6 +53,7 @@ function isActive(patchId: string): boolean {
         <Button
           v-for="item in group.items"
           :key="item.id"
+          type="button"
           variant="outline"
           size="sm"
           :aria-pressed="isActive(item.id)"
