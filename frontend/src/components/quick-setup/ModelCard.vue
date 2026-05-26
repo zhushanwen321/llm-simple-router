@@ -162,6 +162,7 @@ const toggleableCapabilities = [
 
       <!-- Remove -->
       <Button
+        type="button"
         variant="ghost"
         size="icon-xs"
         class="text-muted-foreground hover:text-destructive shrink-0"
