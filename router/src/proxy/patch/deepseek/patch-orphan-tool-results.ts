@@ -112,20 +112,50 @@ export function patchOrphanToolResultsOA(body: Record<string, unknown>): void {
     }
   }
 
-  if (!removedAny) return;
+  if (removedAny) {
+    // Step 3: 合并连续 user 消息
+    let i = 1;
+    while (i < messages.length) {
+      if (messages[i].role === "user" && messages[i - 1].role === "user") {
+        const prev = messages[i - 1];
+        const curr = messages[i];
+        const prevContent = typeof prev.content === "string" ? prev.content : JSON.stringify(prev.content ?? "") as string;
+        const currContent = typeof curr.content === "string" ? curr.content : JSON.stringify(curr.content ?? "") as string;
+        prev.content = prevContent + "\n" + currContent;
+        messages.splice(i, 1);
+      } else {
+        i++;
+      }
+    }
+  }
 
-  // Step 3: 合并连续 user 消息
-  let i = 1;
-  while (i < messages.length) {
-    if (messages[i].role === "user" && messages[i - 1].role === "user") {
-      const prev = messages[i - 1];
-      const curr = messages[i];
-      const prevContent = typeof prev.content === "string" ? prev.content : JSON.stringify(prev.content ?? "") as string;
-      const currContent = typeof curr.content === "string" ? curr.content : JSON.stringify(curr.content ?? "") as string;
-      prev.content = prevContent + "\n" + currContent;
-      messages.splice(i, 1);
-    } else {
-      i++;
+  // Step 4: 修复 tool_calls 消息顺序——将插在 assistant(tool_calls) 与 tool 之间的
+  // 非 tool 消息（如用户中断、系统提醒）挪到 tool 消息之后
+  // 例如: [assistant(tool_calls=[A,B]), user(中断), tool(B), tool(A)]
+  //   →  [assistant(tool_calls=[A,B]), tool(B), tool(A), user(中断)]
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i] as Record<string, unknown>;
+    if (msg.role !== "assistant" || !msg.tool_calls || !(msg.tool_calls as unknown[]).length)
+      continue;
+    const toolCalls = msg.tool_calls as Array<Record<string, unknown>>;
+    const expectedIds = new Set<string>(toolCalls.map(tc => tc.id as string));
+    const intervening: Record<string, unknown>[] = [];
+    const toolMsgs: Record<string, unknown>[] = [];
+    const scanLimit = i + 1 + expectedIds.size * 2 + 3;
+    let j = i + 1;
+    for (; j < messages.length && j <= scanLimit; j++) {
+      const next = messages[j] as Record<string, unknown>;
+      if (next.role === "tool" && expectedIds.has(next.tool_call_id as string)) {
+        toolMsgs.push(next);
+        expectedIds.delete(next.tool_call_id as string);
+        if (expectedIds.size === 0) break;
+      } else {
+        intervening.push(next);
+      }
+    }
+    if (intervening.length > 0 && toolMsgs.length > 0 && expectedIds.size === 0) {
+      const count = intervening.length + toolMsgs.length;
+      messages.splice(i + 1, count, ...toolMsgs, ...intervening);
     }
   }
 }
