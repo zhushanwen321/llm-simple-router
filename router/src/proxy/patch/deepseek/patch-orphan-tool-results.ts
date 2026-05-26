@@ -121,6 +121,9 @@ export function patchOrphanToolResults(
  *
  * 反向跳过最后一条 assistant：它可能是正常的工具调用中间状态（模型刚返回 tool_calls，
  * 客户端还没来得及执行并回传 tool 消息）。
+ *
+ * Step 4: 重排插在 assistant(tool_calls) 和 tool 之间的非 tool 消息（如用户中断），
+ * 将 tool 消息提前到紧接 assistant 之后，满足 DeepSeek"tool_calls 后必须紧跟 tool"的校验。
  */
 export function patchOrphanToolResultsOA(body: Record<string, unknown>): void {
   const messages = body.messages as Array<Record<string, unknown>> | undefined;
@@ -182,20 +185,65 @@ export function patchOrphanToolResultsOA(body: Record<string, unknown>): void {
     }
   }
 
-  if (!changed) return;
+  if (changed) {
+    // 移除空壳 assistant（content 无实质内容且无 tool_calls）
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i] as Record<string, unknown>;
+      if (m.role !== "assistant") continue;
+      if (m.tool_calls) continue;
+      const content = m.content;
+      if (content === null || content === undefined || content === ""
+        || (Array.isArray(content) && content.length === 0)) {
+        messages.splice(i, 1);
+      }
+    }
 
-  // 合并连续 user 消息
-  let i = 1;
-  while (i < messages.length) {
-    if (messages[i].role === "user" && messages[i - 1].role === "user") {
-      const prev = messages[i - 1];
-      const curr = messages[i];
-      const prevContent = typeof prev.content === "string" ? prev.content : JSON.stringify(prev.content ?? "") as string;
-      const currContent = typeof curr.content === "string" ? curr.content : JSON.stringify(curr.content ?? "") as string;
-      prev.content = prevContent + "\n" + currContent;
-      messages.splice(i, 1);
-    } else {
-      i++;
+    // 合并连续 user 消息
+    for (let i = 1; i < messages.length;) {
+      if (messages[i].role === "user" && messages[i - 1].role === "user") {
+        const prev = messages[i - 1];
+        const curr = messages[i];
+        const prevContent = typeof prev.content === "string" ? prev.content : JSON.stringify(prev.content ?? "") as string;
+        const currContent = typeof curr.content === "string" ? curr.content : JSON.stringify(curr.content ?? "") as string;
+        prev.content = prevContent + "\n" + currContent;
+        messages.splice(i, 1);
+      } else {
+        i++;
+      }
+    }
+  }
+
+  // Step 4: 修复 tool_calls 消息顺序——将插在 assistant(tool_calls) 与 tool 之间的
+  // 非 tool 消息（如用户中断、系统提醒）挪到 tool 消息之后
+  // scanLimit 上限：每个 tool_call 最多对应 1 个 tool 消息 + 1 个可能穿插的非 tool 消息，
+  // 额外 +3 留出边界余量（额外的 user/system 消息）
+  const SCAN_LIMIT_EXTRA = 3;
+  for (let idx = 0; idx < messages.length; idx++) {
+    const msg = messages[idx] as Record<string, unknown>;
+    if (msg.role !== "assistant" || !msg.tool_calls || !(msg.tool_calls as unknown[]).length)
+      continue;
+    const toolCalls = msg.tool_calls as Array<Record<string, unknown>>;
+    const expectedIds = new Set<string>(toolCalls.map(tc => tc.id as string));
+    const intervening: Record<string, unknown>[] = [];
+    const toolMsgs: Record<string, unknown>[] = [];
+    const SCAN_SLOTS_PER_CALL = 2; // 每个 tool_call: 1 个 tool 消息 + 1 个可能穿插的消息
+    const scanLimit = idx + 1 + expectedIds.size * SCAN_SLOTS_PER_CALL + SCAN_LIMIT_EXTRA;
+    let j = idx + 1;
+    for (; j < messages.length && j <= scanLimit; j++) {
+      const next = messages[j] as Record<string, unknown>;
+      if (next.role === "tool" && expectedIds.has(next.tool_call_id as string)) {
+        toolMsgs.push(next);
+        expectedIds.delete(next.tool_call_id as string);
+        if (expectedIds.size === 0) break;
+      } else {
+        intervening.push(next);
+      }
+    }
+    if (intervening.length > 0 && toolMsgs.length > 0 && expectedIds.size === 0) {
+      const count = intervening.length + toolMsgs.length;
+      messages.splice(idx + 1, count, ...toolMsgs, ...intervening);
+      // splice 后跳过已重排的区域（toolMsgs + intervening），避免重复处理
+      idx += count;
     }
   }
 }
