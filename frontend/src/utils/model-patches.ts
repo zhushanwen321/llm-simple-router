@@ -9,15 +9,15 @@ export function computeDefaultPatches(
   const patches: string[] = [];
   const isDeepseek = modelName.toLowerCase().includes("deepseek");
   if (isDeepseek) {
-    patches.push("thinking-consistency");
+    patches.push("thinking_consistency");
     if (format === "anthropic") {
-      patches.push("orphan-tool-results");
+      patches.push("orphan_tool_results");
     } else {
-      patches.push("orphan-tool-results-oa");
+      patches.push("orphan_tool_results_oa");
     }
   }
   if (format === "openai" && isNonOpenaiEndpoint) {
-    patches.push("developer-role");
+    patches.push("developer_role");
   }
   return patches;
 }
