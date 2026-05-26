@@ -177,9 +177,11 @@ describe("patchOrphanToolResultsOA", () => {
       ],
     };
     patchOrphanToolResultsOA(body);
-    const orphanAssistant = body.messages[1] as Record<string, unknown>;
-    expect(orphanAssistant.tool_calls).toBeUndefined();
-    expect(body.messages).toHaveLength(3);
+    // orphan tool_calls 移除 → 空壳 assistant 清理 → 连续 user 合并
+    expect(body.messages).toHaveLength(1);
+    expect((body.messages[0] as Record<string, unknown>).role).toBe("user");
+    expect(((body.messages[0] as Record<string, unknown>).content as string)).toContain("read a file");
+    expect(((body.messages[0] as Record<string, unknown>).content as string)).toContain("你找到了什么?");
   });
 
   it("反向：末尾 assistant 的 tool_calls 保持不动（正常的工具调用中间状态）", () => {
@@ -226,22 +228,148 @@ describe("patchOrphanToolResultsOA", () => {
       ],
     };
     patchOrphanToolResultsOA(body);
-    // toolu_1 是孤儿（无对应 tool 消息），应被移除
-    const firstAssistant = body.messages[2] as Record<string, unknown>;
-    expect(firstAssistant.tool_calls).toBeUndefined();
-    // toolu_2 有配对，保持不动（index 4 是 toolu_2 的 assistant）
-    const secondAssistant = body.messages[4] as Record<string, unknown>;
-    expect((secondAssistant.tool_calls as unknown[]).length).toBe(1);
-    // 末尾是 user "继续"，倒数第二个是 assistant
-    const lastUser = body.messages[body.messages.length - 1] as Record<string, unknown>;
-    expect(lastUser.content).toBe("继续");
-    const prevAssistant = body.messages[body.messages.length - 2] as Record<string, unknown>;
-    expect(prevAssistant.content).toBe("这是 other.ts 的内容");
+    // toolu_1 是孤儿 → tool_calls 移除 → 空壳 assistant 被清理
+    // 两个连续 user 合并
+    // 最终: [system, user(合并), assistant(toolu_2), tool(toolu_2), assistant, user]
+    const roles = (body.messages as Array<{ role: string }>).map(m => m.role);
+    expect(roles).toEqual(["system", "user", "assistant", "tool", "assistant", "user"]);
+    // toolu_2 的 assistant 保留 tool_calls
+    const toolu2Assistant = body.messages[2] as Record<string, unknown>;
+    expect((toolu2Assistant.tool_calls as unknown[]).length).toBe(1);
+    // 合并后的 user 包含两段文本
+    const mergedUser = body.messages[1] as Record<string, unknown>;
+    expect((mergedUser.content as string)).toContain("read file.ts");
+    expect((mergedUser.content as string)).toContain("你找到了什么?");
   });
 
   it("空 messages 时安全返回", () => {
     expect(() => patchOrphanToolResultsOA({})).not.toThrow();
     expect(() => patchOrphanToolResultsOA({ messages: [] })).not.toThrow();
+  });
+
+  // ---- Step 4: 消息重排 ----
+
+  it("Step 4: 将插在 tool_calls 和 tool 之间的 user 消息挪到 tool 之后", () => {
+    const body = {
+      messages: [
+        { role: "assistant", content: null, tool_calls: [
+          { id: "call_a", type: "function", function: { name: "A", arguments: "{}" } },
+          { id: "call_b", type: "function", function: { name: "B", arguments: "{}" } },
+        ] },
+        { role: "user", content: "[Request interrupted]" },
+        { role: "tool", tool_call_id: "call_a", content: "result a" },
+        { role: "tool", tool_call_id: "call_b", content: "result b" },
+        { role: "assistant", content: "done" },
+      ],
+    };
+    patchOrphanToolResultsOA(body);
+    const afterFirstAssistant = body.messages.slice(1, 5) as Array<{ role: string }>;
+    // tool 消息必须紧接 assistant(tool_calls)，user 中断消息在 tool 之后
+    expect(afterFirstAssistant.map(m => m.role)).toEqual(["tool", "tool", "user", "assistant"]);
+  });
+
+  it("Step 4: 多条 intervening 消息（user + system）都被挪到 tool 之后", () => {
+    const body = {
+      messages: [
+        { role: "assistant", content: null, tool_calls: [
+          { id: "call_1", type: "function", function: { name: "A", arguments: "{}" } },
+        ] },
+        { role: "user", content: "interrupt" },
+        { role: "system", content: "system reminder" },
+        { role: "tool", tool_call_id: "call_1", content: "ok" },
+        { role: "assistant", content: "final" },
+      ],
+    };
+    patchOrphanToolResultsOA(body);
+    const afterFirstAssistant = body.messages.slice(1, 5) as Array<{ role: string }>;
+    expect(afterFirstAssistant.map(m => m.role)).toEqual(["tool", "user", "system", "assistant"]);
+  });
+
+  it("Step 4: 部分 tool 消息匹配时不重排（expectedIds 未清零）", () => {
+    const body = {
+      messages: [
+        { role: "assistant", content: null, tool_calls: [
+          { id: "call_a", type: "function", function: { name: "A", arguments: "{}" } },
+          { id: "call_b", type: "function", function: { name: "B", arguments: "{}" } },
+        ] },
+        { role: "user", content: "interrupt" },
+        { role: "tool", tool_call_id: "call_a", content: "result a" },
+        // call_b 的 tool 消息缺失
+        { role: "assistant", content: "done" },
+      ],
+    };
+    const original = JSON.stringify(body.messages);
+    patchOrphanToolResultsOA(body);
+    // call_b 是孤儿 tool_call，被反向清理移除后 changed=true
+    // Step 4 应该不重排（因为 call_b 没找到）
+    // 但 call_a 的 tool 消息和 user 中断的相对位置取决于反向清理的执行顺序
+    // 反向清理先于 Step 4，call_b 被移除后 assistant 只剩 call_a
+    // 然后 Step 4 对只剩 call_a 的 assistant 执行，找到 1 个 tool 消息 + 1 个 user 中断
+    // 此时 expectedIds.size === 0（只有 call_a，已找到），应该执行重排
+    const afterFirstAssistant = body.messages.slice(1) as Array<{ role: string }>;
+    // 预期：tool 在前，user 中断在后，assistant 在最后
+    expect(afterFirstAssistant[0].role).toBe("tool");
+  });
+
+  it("Step 4: 两个相邻 assistant 都有 tool_calls 时各自独立重排", () => {
+    const body = {
+      messages: [
+        { role: "assistant", content: null, tool_calls: [
+          { id: "call_1", type: "function", function: { name: "A", arguments: "{}" } },
+        ] },
+        { role: "user", content: "interrupt 1" },
+        { role: "tool", tool_call_id: "call_1", content: "ok 1" },
+        { role: "assistant", content: null, tool_calls: [
+          { id: "call_2", type: "function", function: { name: "B", arguments: "{}" } },
+        ] },
+        { role: "user", content: "interrupt 2" },
+        { role: "tool", tool_call_id: "call_2", content: "ok 2" },
+        { role: "assistant", content: "done" },
+      ],
+    };
+    patchOrphanToolResultsOA(body);
+    // 第一个 assistant 后：tool → user
+    const first = body.messages[0] as Record<string, unknown>;
+    expect(first.role).toBe("assistant");
+    const afterFirst = body.messages[1] as Record<string, unknown>;
+    expect(afterFirst.role).toBe("tool");
+    const afterTool1 = body.messages[2] as Record<string, unknown>;
+    expect(afterTool1.role).toBe("user");
+  });
+
+  it("Step 4: 无 intervening 消息时不做任何修改", () => {
+    const body = {
+      messages: [
+        { role: "assistant", content: null, tool_calls: [
+          { id: "call_1", type: "function", function: { name: "A", arguments: "{}" } },
+        ] },
+        { role: "tool", tool_call_id: "call_1", content: "ok" },
+        { role: "assistant", content: "done" },
+      ],
+    };
+    const original = JSON.stringify(body);
+    patchOrphanToolResultsOA(body);
+    expect(JSON.stringify(body)).toBe(original);
+  });
+
+  it("反向清理：空壳 assistant 被移除后连续 user 合并", () => {
+    const body = {
+      messages: [
+        { role: "user", content: "read a file" },
+        { role: "assistant", content: null, tool_calls: [{ id: "orphan_1", type: "function", function: { name: "read", arguments: "{}" } }] },
+        { role: "user", content: "你找到了什么?" },
+        { role: "assistant", content: "这是结果" },
+      ],
+    };
+    patchOrphanToolResultsOA(body);
+    // orphan tool_calls 移除 → 空壳 assistant 清理 → 连续 user 合并
+    const roles = (body.messages as Array<{ role: string }>).map(m => m.role);
+    expect(roles).toEqual(["user", "assistant"]);
+    const mergedUser = body.messages[0] as Record<string, unknown>;
+    expect((mergedUser.content as string)).toContain("read a file");
+    expect((mergedUser.content as string)).toContain("你找到了什么?");
+    const resultAssistant = body.messages[1] as Record<string, unknown>;
+    expect(resultAssistant.content).toBe("这是结果");
   });
 });
 

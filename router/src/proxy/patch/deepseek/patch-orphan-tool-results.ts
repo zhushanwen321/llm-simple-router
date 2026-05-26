@@ -186,6 +186,18 @@ export function patchOrphanToolResultsOA(body: Record<string, unknown>): void {
   }
 
   if (changed) {
+    // 移除空壳 assistant（content 无实质内容且无 tool_calls）
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i] as Record<string, unknown>;
+      if (m.role !== "assistant") continue;
+      if (m.tool_calls) continue;
+      const content = m.content;
+      if (content === null || content === undefined || content === ""
+        || (Array.isArray(content) && content.length === 0)) {
+        messages.splice(i, 1);
+      }
+    }
+
     // 合并连续 user 消息
     for (let i = 1; i < messages.length;) {
       if (messages[i].role === "user" && messages[i - 1].role === "user") {
@@ -203,6 +215,9 @@ export function patchOrphanToolResultsOA(body: Record<string, unknown>): void {
 
   // Step 4: 修复 tool_calls 消息顺序——将插在 assistant(tool_calls) 与 tool 之间的
   // 非 tool 消息（如用户中断、系统提醒）挪到 tool 消息之后
+  // scanLimit 上限：每个 tool_call 最多对应 1 个 tool 消息 + 1 个可能穿插的非 tool 消息，
+  // 额外 +3 留出边界余量（额外的 user/system 消息）
+  const SCAN_LIMIT_EXTRA = 3;
   for (let idx = 0; idx < messages.length; idx++) {
     const msg = messages[idx] as Record<string, unknown>;
     if (msg.role !== "assistant" || !msg.tool_calls || !(msg.tool_calls as unknown[]).length)
@@ -211,7 +226,8 @@ export function patchOrphanToolResultsOA(body: Record<string, unknown>): void {
     const expectedIds = new Set<string>(toolCalls.map(tc => tc.id as string));
     const intervening: Record<string, unknown>[] = [];
     const toolMsgs: Record<string, unknown>[] = [];
-    const scanLimit = idx + 1 + expectedIds.size * 2 + 3;
+    const SCAN_SLOTS_PER_CALL = 2; // 每个 tool_call: 1 个 tool 消息 + 1 个可能穿插的消息
+    const scanLimit = idx + 1 + expectedIds.size * SCAN_SLOTS_PER_CALL + SCAN_LIMIT_EXTRA;
     let j = idx + 1;
     for (; j < messages.length && j <= scanLimit; j++) {
       const next = messages[j] as Record<string, unknown>;
@@ -226,6 +242,8 @@ export function patchOrphanToolResultsOA(body: Record<string, unknown>): void {
     if (intervening.length > 0 && toolMsgs.length > 0 && expectedIds.size === 0) {
       const count = intervening.length + toolMsgs.length;
       messages.splice(idx + 1, count, ...toolMsgs, ...intervening);
+      // splice 后跳过已重排的区域（toolMsgs + intervening），避免重复处理
+      idx += count;
     }
   }
 }
