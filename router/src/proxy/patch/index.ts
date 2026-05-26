@@ -42,16 +42,16 @@ export function applyProviderPatches(
 
     if (modelPatches.length > 0) {
       // developer_role 补丁（仅 openai 格式需要）
-      if (hasPatch(modelPatches, "developer-role") && provider.api_type === "openai" && hasDeveloperRole(body)) {
+      if (hasPatch(modelPatches, "developer_role") && provider.api_type === "openai" && hasDeveloperRole(body)) {
         patchDeveloperRole(ensureCloned());
         patches.push("developer_role");
       }
 
       // DeepSeek 补丁：新旧 patch ID 都能触发，内部按 apiType 自动分发
       const dsPatches = [
-        "thinking-consistency", "thinking-param", "thinking-blocks",
+        "thinking_consistency", "thinking-param", "thinking-blocks",
         "non-ds-tools", "cache-control",
-        "orphan-tool-results", "orphan-tool-results-oa",
+        "orphan_tool_results", "orphan_tool_results_oa",
       ];
       if (dsPatches.some(p => hasPatch(modelPatches, p))) {
         applyDeepSeekPatches(ensureCloned(), provider.api_type as "openai" | "openai-responses" | "anthropic");
