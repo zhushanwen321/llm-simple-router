@@ -114,12 +114,12 @@ export const PATCH_GROUPS: PatchGroup[] = [
     labelKey: "quickSetup.patch.deepseekAnthropic",
     items: [
       {
-        id: "thinking-consistency",
+        id: "thinking_consistency",
         nameKey: "quickSetup.patch.thinkingConsistency",
         descKey: "quickSetup.patch.thinkingConsistencyDesc",
       },
       {
-        id: "orphan-tool-results",
+        id: "orphan_tool_results",
         nameKey: "quickSetup.patch.orphanToolResult",
         descKey: "quickSetup.patch.orphanToolResultDesc",
       },
@@ -130,12 +130,12 @@ export const PATCH_GROUPS: PatchGroup[] = [
     labelKey: "quickSetup.patch.deepseekOpenai",
     items: [
       {
-        id: "thinking-consistency",
+        id: "thinking_consistency",
         nameKey: "quickSetup.patch.thinkingConsistency",
         descKey: "quickSetup.patch.thinkingConsistencyDesc",
       },
       {
-        id: "orphan-tool-results-oa",
+        id: "orphan_tool_results_oa",
         nameKey: "quickSetup.patch.orphanToolResultOa",
         descKey: "quickSetup.patch.orphanToolResultOaDesc",
       },
@@ -146,7 +146,7 @@ export const PATCH_GROUPS: PatchGroup[] = [
     labelKey: "quickSetup.patch.general",
     items: [
       {
-        id: "developer-role",
+        id: "developer_role",
         nameKey: "quickSetup.patch.developerRole",
         descKey: "quickSetup.patch.developerRoleDesc",
       },
