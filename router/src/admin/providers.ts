@@ -12,7 +12,7 @@ import type { RequestTracker } from "../core/monitor/index.js";
 import type { ProxyAgentFactory } from "../proxy/transport/proxy-agent.js";
 import { HTTP_CREATED, HTTP_NOT_FOUND, HTTP_CONFLICT, HTTP_BAD_REQUEST, HTTP_OK } from "./constants.js";
 import { API_CODE, apiError } from "./api-response.js";
-import { parseModels, buildModelInfoList, type ModelEntry } from "../config/model-context.js";
+import { parseModels, buildModelInfoList, normalizePatchName, type ModelEntry } from "../config/model-context.js";
 import { getModelInfoForProvider, setModelInfoForProvider, deleteAllModelInfoForProvider } from "../db/model-info.js";
 import { buildUpstreamHeaders } from "../proxy/proxy-core.js";
 import { callGet } from "../proxy/transport/http.js";
@@ -97,7 +97,7 @@ function extractModelOverrides(models: ModelInput[]): {
     }
     const name = m.name ?? m.id;
     if (!name) continue;
-    const entry: ModelEntry = { name, patches: m.patches ?? [] };
+    const entry: ModelEntry = { name, patches: (m.patches ?? []).map(normalizePatchName) };
     if (m.stream_timeout_ms != null) entry.stream_timeout_ms = m.stream_timeout_ms;
     if (m.capabilities != null && Array.isArray(m.capabilities)) entry.capabilities = m.capabilities;
     entries.push(entry);
