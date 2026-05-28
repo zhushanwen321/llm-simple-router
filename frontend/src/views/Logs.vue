@@ -126,6 +126,9 @@
                 t("logs.table.tags")
               }}</TableHead>
               <TableHead class="text-muted-foreground">{{
+                t("logs.table.latency")
+              }}</TableHead>
+              <TableHead class="text-muted-foreground">{{
                 t("logs.table.error")
               }}</TableHead>
               <TableHead class="text-muted-foreground">{{
@@ -380,7 +383,7 @@ const {
   buildFilterParams,
 } = useLogFilters();
 
-const TABLE_COL_COUNT = 8;
+const TABLE_COL_COUNT = 9;
 const DEBOUNCE_MS = 300;
 const MAX_PAGE_BUTTONS = 7;
 const PAGE_NEIGHBORS = 2;
