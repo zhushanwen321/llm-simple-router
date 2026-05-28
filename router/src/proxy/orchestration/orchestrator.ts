@@ -38,11 +38,10 @@ export function extractThinkingLevelFromRequest(
       return body.thinking?.type ?? "off";
     }
 
-    // openai / openai-responses
-    if (body.reasoning?.effort) return body.reasoning.effort;
-    if (body.reasoning_effort) return body.reasoning_effort;
-    return "off";
+    // openai / openai-responses: reasoning.effort 优先于 reasoning_effort
+    return body.reasoning?.effort ?? body.reasoning_effort ?? "off";
   } catch {
+    // client_request 格式异常时静默降级为 off，不影响代理流程
     return "off";
   }
 }

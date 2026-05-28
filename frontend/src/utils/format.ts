@@ -99,7 +99,7 @@ const MS_PER_SECOND_FORMAT = 1000;
 
 /** latency_ms → 可读字符串 (45ms / 1.2s) */
 export function formatLatency(ms: number | null | undefined): string {
-  if (ms === null || ms === undefined) return "-";
+  if (ms === null || ms === undefined || !Number.isFinite(ms)) return "-";
   if (ms < MS_PER_SECOND_FORMAT) return `${Math.round(ms)}ms`;
   return `${(ms / MS_PER_SECOND_FORMAT).toFixed(1)}s`;
 }
