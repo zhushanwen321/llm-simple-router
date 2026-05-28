@@ -127,6 +127,11 @@ function assembleOpenaiBlocks(events: SSEEvent[]): AssembledBlock[] {
         block.eventCount++;
       }
     }
+    // refusal 降级为 text block
+    if (typeof delta.refusal === "string" && delta.refusal) {
+      textBlock.content += delta.refusal;
+      textBlock.eventCount++;
+    }
   }
   const result: AssembledBlock[] = [];
   if (thinkingBlock.content) result.push(thinkingBlock);
@@ -215,8 +220,24 @@ export function useSSEParsing(
       const choices = (d.choices || []) as Array<Record<string, unknown>>;
       const delta = choices[0]?.delta as Record<string, unknown> | undefined;
       if (delta?.role) role = delta.role as string;
+      // reasoning_content 也属于 content 的一部分（用于日志详情页展示）
+      const reasoning =
+        typeof delta?.reasoning_content === "string"
+          ? (delta.reasoning_content as string)
+          : "";
+      if (reasoning) {
+        content += reasoning;
+        contentEventCount++;
+      }
       if (delta?.content) {
         content += delta.content as string;
+        contentEventCount++;
+      }
+      // refusal 降级为文本
+      const refusal =
+        typeof delta?.refusal === "string" ? (delta.refusal as string) : "";
+      if (refusal) {
+        content += refusal;
         contentEventCount++;
       }
       if (choices[0]?.finish_reason)
