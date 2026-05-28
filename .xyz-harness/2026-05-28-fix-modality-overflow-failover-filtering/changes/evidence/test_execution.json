@@ -1,0 +1,107 @@
+{
+  "test_execution": [
+    {
+      "caseId": "TC-1-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run router/tests/modality-redirect.test.ts",
+        "验证 '部分支持 image 的 target 被过滤' 相关测试: filters out targets without image capability, keeps only compatible targets",
+        "snapshot reason 验证: expect reason='filtered-ineligible-targets' in modality-redirect.test.ts test cases",
+        "49/49 modality-redirect tests passed"
+      ],
+      "evidence": "vitest output: router/tests/modality-redirect.test.ts (49 tests) 1260ms — all passed"
+    },
+    {
+      "caseId": "TC-1-02",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run router/tests/modality-redirect.test.ts — 验证 all-ineligible + fallback 替换为 [fallback target]",
+        "npx vitest run router/tests/failover-loop-layered.test.ts — AC18: image request with fallback routes to image-capable provider",
+        "snapshot reason 验证: reason='replaced-with-fallback' in modality-redirect tests",
+        "failover-loop-layered AC18 passed: response 200, image-capable provider called, pipeline_snapshot contains modality-redirect stage with redirect_to"
+      ],
+      "evidence": "vitest: 49/49 modality-redirect passed, 5/5 failover-loop-layered passed"
+    },
+    {
+      "caseId": "TC-1-03",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run router/tests/modality-redirect.test.ts — 验证 all-ineligible + no-fallback returns empty array",
+        "snapshot reason 验证: reason='no-eligible-targets'",
+        "49/49 modality-redirect tests passed covering this scenario"
+      ],
+      "evidence": "vitest output: 49/49 modality-redirect passed"
+    },
+    {
+      "caseId": "TC-2-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run router/tests/failover-modality-filter.test.ts — TC 'AC-4: returns HTTP 400 with unsupported_modality code (OpenAI apiType)'",
+        "配置 text-only provider, 无 fallback, 发送含图片的 OpenAI 请求",
+        "验证 HTTP 400, body.error.type='invalid_request_error', body.error.code='unsupported_modality'",
+        "3/3 failover-modality-filter tests passed"
+      ],
+      "evidence": "vitest output: router/tests/failover-modality-filter.test.ts (3 tests) 313ms — all passed"
+    },
+    {
+      "caseId": "TC-2-02",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run router/tests/failover-modality-filter.test.ts — TC 'AC-5: returns HTTP 400 with unsupported_modality code (Anthropic apiType)'",
+        "配置 text-only anthropic provider, 无 fallback, 发送含图片的 Anthropic 请求",
+        "验证 HTTP 400, body.error.type='invalid_request_error', body.error.code='unsupported_modality'",
+        "3/3 failover-modality-filter tests passed"
+      ],
+      "evidence": "vitest output: router/tests/failover-modality-filter.test.ts (3 tests) 313ms — all passed"
+    },
+    {
+      "caseId": "TC-1-04",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run router/tests/modality-redirect.test.ts — 验证 no-multimodal-detected: 纯文本请求不触发过滤",
+        "验证返回原始 targets, reason='no-multimodal-detected'",
+        "npx vitest run router/tests/failover-loop-layered.test.ts — 'Fallback: non-image request — IR layer records triggered:false' passed"
+      ],
+      "evidence": "vitest: 49/49 modality-redirect passed, 5/5 failover-loop-layered passed"
+    },
+    {
+      "caseId": "TC-1-05",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run router/tests/modality-redirect.test.ts — 验证 all-targets-support-modalities: 所有 targets 支持图片时不做过滤",
+        "验证返回原始 targets, reason='all-targets-support-modalities'"
+      ],
+      "evidence": "vitest output: 49/49 modality-redirect passed"
+    },
+    {
+      "caseId": "TC-3-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run router/tests/failover-loop-layered.test.ts — AC18: IR + OF layers correctly expand target list",
+        "modality 过滤后 targets 仍然进入 overflow 扩展",
+        "npx vitest run router/tests/overflow.test.ts — 6/6 overflow tests passed",
+        "overflow logic unchanged, operates on post-filter target list"
+      ],
+      "evidence": "vitest: 5/5 failover-loop-layered passed, 6/6 overflow passed"
+    },
+    {
+      "caseId": "TC-3-02",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run router/tests/overflow.test.ts — promptTooLong 行为验证",
+        "context overflow 检测与 modality 过滤正交，不受影响",
+        "6/6 overflow tests passed"
+      ],
+      "evidence": "vitest output: router/tests/overflow.test.ts (6 tests) 145ms — all passed"
+    }
+  ]
+}

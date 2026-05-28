@@ -8,7 +8,8 @@ export type ErrorKind =
   | "upstreamConnectionFailed"
   | "concurrencyQueueFull"
   | "concurrencyTimeout"
-  | "promptTooLong";
+  | "promptTooLong"
+  | "unsupportedModality";
 
 export interface FormatAdapter {
   readonly apiType: string;

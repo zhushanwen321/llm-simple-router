@@ -19,6 +19,7 @@ export interface ProxyErrorFormatter {
   concurrencyQueueFull(providerId: string): ProxyErrorResponse;
   concurrencyTimeout(providerId: string, timeoutMs: number): ProxyErrorResponse;
   promptTooLong(): ProxyErrorResponse;
+  unsupportedModality(): ProxyErrorResponse;
 }
 
 // ---------- Error formatter factory ----------
@@ -26,7 +27,8 @@ export interface ProxyErrorFormatter {
 export type ErrorKind =
   | "modelNotFound" | "modelNotAllowed" | "providerUnavailable"
   | "providerTypeMismatch" | "upstreamConnectionFailed"
-  | "concurrencyQueueFull" | "concurrencyTimeout" | "promptTooLong";
+  | "concurrencyQueueFull" | "concurrencyTimeout" | "promptTooLong"
+  | "unsupportedModality";
 
 /**
  * 工厂函数，消除 openai/anthropic 错误格式化的重复代码。
@@ -68,6 +70,10 @@ export function createErrorFormatter(
     promptTooLong: () => ({
       statusCode: 400,
       body: formatBody("promptTooLong", "Prompt is too long: the input tokens exceed the model context window limit."),
+    }),
+    unsupportedModality: () => ({
+      statusCode: 400,
+      body: formatBody("unsupportedModality", "Request contains multimodal content but no available model supports the required modality."),
     }),
   };
 }
