@@ -151,7 +151,7 @@ function enhancementLabel(raw: string | null): string {
           {{ log.status_code || "-" }}
         </Badge>
         <Badge
-          v-if="thinkingLevel !== 'off'"
+          v-if="thinkingLevel"
           variant="outline"
           class="text-[10px] px-1.5 py-0"
         >

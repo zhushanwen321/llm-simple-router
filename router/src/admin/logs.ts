@@ -85,6 +85,23 @@ export const adminLogRoutes: FastifyPluginCallback<LogRoutesOptions> = (app, opt
       }
     }
 
+    // JSONL 回填后重新提取 thinking level（覆盖 SQL 层因 client_request 为 null 得出的 'off'）
+    if (log.client_request) {
+      try {
+        const parsed = JSON.parse(log.client_request);
+        const body = parsed?.body;
+        if (body) {
+          if (log.api_type === "anthropic") {
+            if (body.thinking?.type) log.thinking_level = body.thinking.type;
+          } else {
+            log.thinking_level = body.reasoning?.effort ?? body.reasoning_effort ?? "off";
+          }
+        }
+      } catch {
+        log.thinking_level = "off";
+      }
+    }
+
     return reply.send(log);
   });
 

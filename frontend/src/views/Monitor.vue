@@ -55,7 +55,7 @@
                   req.model
                 }}</span>
                 <Badge
-                  v-if="req.thinkingLevel && req.thinkingLevel !== 'off'"
+                  v-if="req.thinkingLevel"
                   variant="outline"
                   class="shrink-0 text-xs"
                 >
@@ -231,7 +231,7 @@
                   req.providerName
                 }}</Badge>
                 <Badge
-                  v-if="req.thinkingLevel && req.thinkingLevel !== 'off'"
+                  v-if="req.thinkingLevel"
                   variant="outline"
                   class="shrink-0 text-xs"
                 >
