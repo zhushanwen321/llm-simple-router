@@ -54,6 +54,13 @@
                 <span class="text-sm text-foreground truncate flex-1">{{
                   req.model
                 }}</span>
+                <Badge
+                  v-if="req.thinkingLevel && req.thinkingLevel !== 'off'"
+                  variant="outline"
+                  class="shrink-0 text-xs"
+                >
+                  {{ req.thinkingLevel }}
+                </Badge>
                 <Badge variant="outline" class="shrink-0 text-xs">{{
                   req.providerName
                 }}</Badge>
@@ -223,6 +230,13 @@
                 <Badge variant="outline" class="shrink-0 text-xs">{{
                   req.providerName
                 }}</Badge>
+                <Badge
+                  v-if="req.thinkingLevel && req.thinkingLevel !== 'off'"
+                  variant="outline"
+                  class="shrink-0 text-xs"
+                >
+                  {{ req.thinkingLevel }}
+                </Badge>
                 <Badge
                   v-if="req.isStream"
                   variant="outline"

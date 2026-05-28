@@ -77,6 +77,13 @@
           overview.isStream ? "SSE" : t("requestDetail.nonStream")
         }}</Badge>
         <Badge variant="outline">{{ overview.apiType }}</Badge>
+        <Badge
+          v-if="overview.thinkingLevel && overview.thinkingLevel !== 'off'"
+          variant="outline"
+          class="text-[10px]"
+        >
+          {{ overview.thinkingLevel }}
+        </Badge>
       </div>
 
       <!-- Row 3: session (conditional) -->
