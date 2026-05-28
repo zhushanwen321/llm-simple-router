@@ -1,6 +1,7 @@
 <!-- eslint-disable vue/multi-word-component-names -->
 <script setup lang="ts">
 import { useI18n } from "vue-i18n";
+import { computed } from "vue";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TableCell, TableRow } from "@/components/ui/table";
@@ -13,8 +14,9 @@ import { CheckIcon, CopyIcon } from "lucide-vue-next";
 import type { LogEntry } from "@/components/logs/types";
 import { PROVIDER_ID_ROUTER } from "@/components/logs/types";
 import { formatTime } from "@/utils/format";
+import { formatLatency } from "@/utils/format";
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     log: LogEntry;
     isChild?: boolean;
@@ -35,6 +37,8 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+
+const thinkingLevel = computed(() => props.log.thinking_level ?? "off");
 
 function enhancementLabel(raw: string | null): string {
   if (!raw) return t("logs.row.unknown");
@@ -147,6 +151,13 @@ function enhancementLabel(raw: string | null): string {
           {{ log.status_code || "-" }}
         </Badge>
         <Badge
+          v-if="thinkingLevel"
+          variant="outline"
+          class="text-[10px] px-1.5 py-0"
+        >
+          {{ thinkingLevel }}
+        </Badge>
+        <Badge
           v-if="log.is_stream"
           variant="outline"
           class="text-[10px] px-1.5 py-0"
@@ -166,6 +177,10 @@ function enhancementLabel(raw: string | null): string {
           >{{ t("logs.table.failover") }}</Badge
         >
       </div>
+    </TableCell>
+
+    <TableCell class="text-xs text-muted-foreground font-mono">
+      {{ formatLatency(log.latency_ms) }}
     </TableCell>
 
     <TableCell class="text-destructive text-xs max-w-[200px]">

@@ -32,6 +32,7 @@ export interface ActiveRequest {
   upstreamRequest?: string;
   completedAt?: number;
   mappingReason?: string;
+  thinkingLevel?: string;
 }
 
 export interface AttemptSnapshot {

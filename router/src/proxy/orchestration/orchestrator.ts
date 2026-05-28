@@ -18,6 +18,34 @@ import type { AdaptiveController } from "../../core/concurrency/index.js";
 const DEFAULT_BASE_DELAY_MS = 1000;
 const DEFAULT_FAILOVER_THRESHOLD = 400;
 
+/**
+ * 从 clientRequest JSON 中提取 thinking level。
+ * clientRequest 格式: JSON.stringify({ headers, body })
+ * Anthropic: body.thinking.type
+ * OpenAI / Responses API: body.reasoning.effort > body.reasoning_effort
+ */
+export function extractThinkingLevelFromRequest(
+  clientRequest: string | undefined,
+  apiType: "openai" | "openai-responses" | "anthropic",
+): string {
+  try {
+    if (!clientRequest) return "off";
+    const parsed = JSON.parse(clientRequest);
+    const body = parsed?.body;
+    if (!body || typeof body !== "object") return "off";
+
+    if (apiType === "anthropic") {
+      return body.thinking?.type ?? "off";
+    }
+
+    // openai / openai-responses: reasoning.effort 优先于 reasoning_effort
+    return body.reasoning?.effort ?? body.reasoning_effort ?? "off";
+  } catch {
+    // client_request 格式异常时静默降级为 off，不影响代理流程
+    return "off";
+  }
+}
+
 export interface OrchestratorConfig {
   resolved: Target;
   provider: {
@@ -165,6 +193,7 @@ export class ProxyOrchestrator {
       attempts: [],
       clientIp: request.ip,
       sessionId: config.sessionId,
+      thinkingLevel: extractThinkingLevelFromRequest(config.clientRequest, apiType),
       clientRequest: config.clientRequest,
       upstreamRequest: config.upstreamRequest,
       mappingReason: config.mappingReason,
