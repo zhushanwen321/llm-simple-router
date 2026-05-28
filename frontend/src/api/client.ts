@@ -386,6 +386,8 @@ export const api = {
     router_key_id?: string;
     provider_id?: string;
     model?: string;
+    client_model?: string;
+    backend_model?: string;
     start_time?: string;
     end_time?: string;
     status_code?: string;
