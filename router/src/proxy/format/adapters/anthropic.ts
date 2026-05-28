@@ -9,6 +9,7 @@ const ANTHROPIC_ERROR_META = {
   concurrencyQueueFull: { type: "api_error", code: "concurrency_queue_full" },
   concurrencyTimeout: { type: "api_error", code: "concurrency_timeout" },
   promptTooLong: { type: "invalid_request_error", code: "context_window_exceeded" },
+  unsupportedModality: { type: "invalid_request_error", code: "unsupported_modality" },
 };
 
 export const anthropicAdapter: FormatAdapter = {

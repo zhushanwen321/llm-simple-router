@@ -316,9 +316,9 @@ describe("computeModalityRedirectTargets", () => {
   });
 
   // ----------------------------------------------------------
-  // AC1: 有图片 + 首 target 不支持 + 有 fallback → prepend fallback
+  // AC1: 有图片 + 首 target 不支持 + 有 fallback → 替换为 fallback
   // ----------------------------------------------------------
-  it("AC1: prepends fallback target when image detected and first target lacks image capability", () => {
+  it("AC1: returns only fallback target when image detected and first target lacks image capability", () => {
   const providerAId = insertProvider(db, {
     id: "pa",
     name: "text-provider",
@@ -348,14 +348,10 @@ describe("computeModalityRedirectTargets", () => {
 
   const result = computeModalityRedirectTargets(db, targets, "gpt-5", body, snapshot);
 
-  expect(result).toHaveLength(2);
+  expect(result).toHaveLength(1);
   expect(result[0]).toEqual({
     provider_id: providerBId,
     backend_model: "vision-model",
-  });
-  expect(result[1]).toEqual({
-    provider_id: providerAId,
-    backend_model: "text-model",
   });
   });
 
@@ -386,9 +382,9 @@ describe("computeModalityRedirectTargets", () => {
   });
 
   // ----------------------------------------------------------
-  // AC3: 有图片 + 首 target 不支持 + 无 fallback → 不扩展
+  // AC3: 有图片 + 首 target 不支持 + 无 fallback → 空列表
   // ----------------------------------------------------------
-  it("AC3: returns original targets when no multimodal_fallback configured in mapping group", () => {
+  it("AC3: returns empty array when no multimodal_fallback configured in mapping group", () => {
   const providerId = insertProvider(db, {
     id: "p1",
     name: "text-provider",
@@ -408,7 +404,7 @@ describe("computeModalityRedirectTargets", () => {
 
   const result = computeModalityRedirectTargets(db, targets, "gpt-5", body, snapshot);
 
-  expect(result).toEqual(targets);
+  expect(result).toEqual([]);
   });
 
   // ----------------------------------------------------------
@@ -441,9 +437,9 @@ describe("computeModalityRedirectTargets", () => {
   });
 
   // ----------------------------------------------------------
-  // AC7: fallback provider 非 active → 不扩展
+  // AC7: fallback provider 非 active → 空列表
   // ----------------------------------------------------------
-  it("AC7: returns original targets when fallback provider is inactive", () => {
+  it("AC7: returns empty array when fallback provider is inactive", () => {
   const providerAId = insertProvider(db, {
     id: "pa",
     name: "text-provider",
@@ -473,13 +469,13 @@ describe("computeModalityRedirectTargets", () => {
 
   const result = computeModalityRedirectTargets(db, targets, "gpt-5", body, snapshot);
 
-  expect(result).toEqual(targets);
+  expect(result).toEqual([]);
   });
 
   // ----------------------------------------------------------
-  // AC8: fallback provider_id 不存在 → 不扩展
+  // AC8: fallback provider_id 不存在 → 空列表
   // ----------------------------------------------------------
-  it("AC8: returns original targets when fallback provider_id does not exist in DB", () => {
+  it("AC8: returns empty array when fallback provider_id does not exist in DB", () => {
   const providerAId = insertProvider(db, {
     id: "pa",
     name: "text-provider",
@@ -502,7 +498,7 @@ describe("computeModalityRedirectTargets", () => {
 
   const result = computeModalityRedirectTargets(db, targets, "gpt-5", body, snapshot);
 
-  expect(result).toEqual(targets);
+  expect(result).toEqual([]);
   });
 
   // ----------------------------------------------------------
@@ -597,7 +593,7 @@ describe("computeModalityRedirectTargets", () => {
 
   const result = computeModalityRedirectTargets(db, targets, "gpt-5", body, snapshot);
 
-  expect(result).toHaveLength(2);
+  expect(result).toHaveLength(1);
   expect(result[0].backend_model).toBe("vision-model");
   });
 
@@ -633,7 +629,7 @@ describe("computeModalityRedirectTargets", () => {
 
   const result = computeModalityRedirectTargets(db, targets, "claude-5", body, snapshot);
 
-  expect(result).toHaveLength(2);
+  expect(result).toHaveLength(1);
   expect(result[0].backend_model).toBe("vision-model");
   });
 
@@ -705,7 +701,7 @@ describe("computeModalityRedirectTargets", () => {
 
   const result = computeModalityRedirectTargets(db, targets, "gpt-5", body, snapshot);
 
-  expect(result).toHaveLength(2);
+  expect(result).toHaveLength(1);
   expect(result[0].backend_model).toBe("vision-model");
   });
 
@@ -741,7 +737,7 @@ describe("computeModalityRedirectTargets", () => {
 
   const result = computeModalityRedirectTargets(db, targets, "gpt-5", body, snapshot);
 
-  expect(result).toHaveLength(2);
+  expect(result).toHaveLength(1);
   expect(result[0].backend_model).toBe("vision-model");
   });
 
@@ -818,7 +814,7 @@ describe("computeModalityRedirectTargets", () => {
 
   const result = computeModalityRedirectTargets(db, targets, "gpt-5", body, snapshot);
 
-  expect(result).toHaveLength(2);
+  expect(result).toHaveLength(1);
   expect(result[0].backend_model).toBe("vision-model");
   });
 
@@ -853,7 +849,7 @@ describe("computeModalityRedirectTargets", () => {
 
   const result = computeModalityRedirectTargets(db, targets, "glm-5.1", body, snapshot);
 
-  expect(result).toHaveLength(2);
+  expect(result).toHaveLength(1);
   expect(result[0].backend_model).toBe("kimi-for-coding");
   const parsed = JSON.parse(snapshot.toJSON());
   const irStage = parsed.find((s: { stage: string }) => s.stage === "modality-redirect");
@@ -918,13 +914,13 @@ describe("computeModalityRedirectTargets", () => {
   const parsed = JSON.parse(snapshot.toJSON());
   const stage = parsed.find((s: { stage: string }) => s.stage === "modality-redirect");
   expect(stage).toBeDefined();
-  expect(stage.reason).toBe("first-target-supports-all-modalities");
+  expect(stage.reason).toBe("all-targets-support-modalities");
   });
 
   // ----------------------------------------------------------
-  // reason 验证：no-multimodal-fallback-configured
+  // reason 验证：no-eligible-targets（无 fallback 配置）
   // ----------------------------------------------------------
-  it("records reason 'no-multimodal-fallback-configured' when no fallback in rule", () => {
+  it("records reason 'no-eligible-targets' when no fallback in rule", () => {
   const providerId = insertProvider(db, {
     id: "p1",
     name: "text-provider",
@@ -946,13 +942,13 @@ describe("computeModalityRedirectTargets", () => {
   const parsed = JSON.parse(snapshot.toJSON());
   const stage = parsed.find((s: { stage: string }) => s.stage === "modality-redirect");
   expect(stage).toBeDefined();
-  expect(stage.reason).toBe("no-multimodal-fallback-configured");
+  expect(stage.reason).toBe("no-eligible-targets");
   });
 
   // ----------------------------------------------------------
-  // reason 验证：first-target-lacks-modality（成功 redirect）
+  // reason 验证：replaced-with-fallback（成功 redirect）
   // ----------------------------------------------------------
-  it("records reason 'first-target-lacks-modality' when redirect succeeds", () => {
+  it("records reason 'replaced-with-fallback' when redirect succeeds", () => {
   const providerAId = insertProvider(db, {
     id: "pa",
     name: "text-provider",
@@ -984,13 +980,13 @@ describe("computeModalityRedirectTargets", () => {
   const parsed = JSON.parse(snapshot.toJSON());
   const stage = parsed.find((s: { stage: string }) => s.stage === "modality-redirect");
   expect(stage).toBeDefined();
-  expect(stage.reason).toBe("first-target-lacks-modality");
+  expect(stage.reason).toBe("replaced-with-fallback");
   });
 
   // ----------------------------------------------------------
-  // reason 验证：fallback-provider-unavailable（inactive provider）
+  // reason 验证：no-eligible-targets（inactive provider）
   // ----------------------------------------------------------
-  it("records reason 'fallback-provider-unavailable' when fallback provider is inactive", () => {
+  it("records reason 'no-eligible-targets' when fallback provider is inactive", () => {
   const providerAId = insertProvider(db, {
     id: "pa",
     name: "text-provider",
@@ -1023,7 +1019,7 @@ describe("computeModalityRedirectTargets", () => {
   const parsed = JSON.parse(snapshot.toJSON());
   const stage = parsed.find((s: { stage: string }) => s.stage === "modality-redirect");
   expect(stage).toBeDefined();
-  expect(stage.reason).toBe("fallback-provider-unavailable");
+  expect(stage.reason).toBe("no-eligible-targets");
   });
 
   // ----------------------------------------------------------
@@ -1072,14 +1068,14 @@ describe("computeModalityRedirectTargets", () => {
 
   const result = computeModalityRedirectTargets(db, targets, "gpt-5", body, snapshot);
 
-  // fallback 不支持 audio → 不 redirect
-  expect(result).toEqual(targets);
-  expect(result).toHaveLength(1);
+  // fallback 不支持 audio → 空列表
+  expect(result).toEqual([]);
+  expect(result).toHaveLength(0);
 
   const parsed = JSON.parse(snapshot.toJSON());
   const stage = parsed.find((s: { stage: string }) => s.stage === "modality-redirect");
   expect(stage).toBeDefined();
-  expect(stage.reason).toBe("fallback-missing-modality");
+  expect(stage.reason).toBe("no-eligible-targets");
   });
 
   // ----------------------------------------------------------
@@ -1128,22 +1124,18 @@ describe("computeModalityRedirectTargets", () => {
 
   const result = computeModalityRedirectTargets(db, targets, "gpt-5", body, snapshot);
 
-  // fallback 支持所有 modalities → redirect 成功
-  expect(result).toHaveLength(2);
+  // fallback 支持所有 modalities → 替换为 fallback
+  expect(result).toHaveLength(1);
   expect(result[0]).toEqual({
     provider_id: providerBId,
     backend_model: "multimodal-model",
-  });
-  expect(result[1]).toEqual({
-    provider_id: providerAId,
-    backend_model: "text-model",
   });
 
   const parsed = JSON.parse(snapshot.toJSON());
   const stage = parsed.find((s: { stage: string }) => s.stage === "modality-redirect");
   expect(stage).toBeDefined();
   expect(stage.triggered).toBe(true);
-  expect(stage.reason).toBe("first-target-lacks-modality");
+  expect(stage.reason).toBe("replaced-with-fallback");
   });
 });
 
@@ -1154,12 +1146,13 @@ describe("computeModalityRedirectTargets — reason 覆盖补全", () => {
   it("reason: no-mapping-group — 不存在 mapping group", () => {
     const db = initDatabase(":memory:");
     seedSettings(db);
+    insertProvider(db, { id: "p1", name: "P1", models: JSON.stringify([{ name: "m1", capabilities: ["text"] }]) });
     const snap = new PipelineSnapshot();
     const targets: Target[] = [{ provider_id: "p1", backend_model: "m1" }];
     const body = openaiImageBody();
 
     const result = computeModalityRedirectTargets(db, targets, "nonexistent-model", body, snap);
-    expect(result).toEqual(targets);
+    expect(result).toEqual([]);
 
     const stage = JSON.parse(snap.toJSON()).find((s: Record<string, unknown>) => s.stage === "modality-redirect");
     expect(stage).toBeDefined();
@@ -1181,7 +1174,7 @@ describe("computeModalityRedirectTargets — reason 覆盖补全", () => {
     const body = openaiImageBody();
 
     const result = computeModalityRedirectTargets(db, targets, "test-model", body, snap);
-    expect(result).toEqual(targets);
+    expect(result).toEqual([]);
 
     const stage = JSON.parse(snap.toJSON()).find((s: Record<string, unknown>) => s.stage === "modality-redirect");
     expect(stage).toBeDefined();
@@ -1207,11 +1200,11 @@ describe("computeModalityRedirectTargets — reason 覆盖补全", () => {
     const body = openaiImageBody();
 
     const result = computeModalityRedirectTargets(db, targets, "test-model", body, snap);
-    expect(result).toEqual(targets);
+    expect(result).toEqual([]);
 
     const stage = JSON.parse(snap.toJSON()).find((s: Record<string, unknown>) => s.stage === "modality-redirect");
     expect(stage).toBeDefined();
-    expect(stage.reason).toBe("invalid-fallback-config");
+    expect(stage.reason).toBe("no-eligible-targets");
   });
 
   it("reason: internal-error — 数据库操作抛异常", () => {
@@ -1319,8 +1312,8 @@ describe("computeModalityRedirectTargets — boundary conditions", () => {
 
   const result = computeModalityRedirectTargets(db, targets, "gpt-5", body, snapshot);
 
-  // fallback 覆盖了 image → redirect 成功
-  expect(result).toHaveLength(2);
+  // fallback 覆盖了 image → 替换为 fallback
+  expect(result).toHaveLength(1);
   expect(result[0]).toEqual({
     provider_id: providerBId,
     backend_model: "mega-model",
@@ -1361,8 +1354,8 @@ describe("computeModalityRedirectTargets — boundary conditions", () => {
 
   const result = computeModalityRedirectTargets(db, targets, "gpt-5", body, snapshot);
 
-  // capabilities undefined → 默认 ["text"] → 缺 image → redirect 触发
-  expect(result).toHaveLength(2);
+  // capabilities undefined → 默认 ["text"] → 缺 image → 替换为 fallback
+  expect(result).toHaveLength(1);
   expect(result[0]).toEqual({
     provider_id: providerBId,
     backend_model: "vision-model",
@@ -1372,6 +1365,237 @@ describe("computeModalityRedirectTargets — boundary conditions", () => {
   const stage = parsed.find((s: { stage: string }) => s.stage === "modality-redirect");
   expect(stage).toBeDefined();
   expect(stage.triggered).toBe(true);
-  expect(stage.reason).toBe("first-target-lacks-modality");
+  expect(stage.reason).toBe("replaced-with-fallback");
+  });
+
+  // ----------------------------------------------------------
+  // AC-1: 部分支持过滤 — targets 中部分不支持 → 只保留支持的
+  // ----------------------------------------------------------
+  it("AC-1: filters out targets lacking modality, keeps eligible ones", () => {
+  const providerAId = insertProvider(db, {
+    id: "pa",
+    name: "text-provider",
+    models: JSON.stringify([{ name: "text-model", capabilities: ["text"] }]),
+  });
+  const providerBId = insertProvider(db, {
+    id: "pb",
+    name: "image-provider",
+    models: JSON.stringify([{ name: "vision-model", capabilities: ["text", "image"] }]),
+  });
+  const providerCId = insertProvider(db, {
+    id: "pc",
+    name: "image-provider-2",
+    models: JSON.stringify([{ name: "vision-model-2", capabilities: ["text", "image"] }]),
+  });
+
+  const targets: Target[] = [
+    { provider_id: providerAId, backend_model: "text-model" },
+    { provider_id: providerBId, backend_model: "vision-model" },
+    { provider_id: providerCId, backend_model: "vision-model-2" },
+  ];
+  const snapshot = new PipelineSnapshot();
+  const body = openaiImageBody();
+
+  const result = computeModalityRedirectTargets(db, targets, "gpt-5", body, snapshot);
+
+  expect(result).toHaveLength(2);
+  expect(result[0]).toEqual({ provider_id: providerBId, backend_model: "vision-model" });
+  expect(result[1]).toEqual({ provider_id: providerCId, backend_model: "vision-model-2" });
+
+  const stage = JSON.parse(snapshot.toJSON()).find((s: { stage: string }) => s.stage === "modality-redirect");
+  expect(stage).toBeDefined();
+  expect(stage.reason).toBe("filtered-ineligible-targets");
+  expect(stage.triggered).toBe(true);
+  });
+
+  // ----------------------------------------------------------
+  // AC-2: 全部不支持 + fallback → 替换为 fallback
+  // ----------------------------------------------------------
+  it("AC-2: replaces all targets with fallback when all filtered out", () => {
+  const providerAId = insertProvider(db, {
+    id: "pa",
+    name: "text-provider",
+    models: JSON.stringify([{ name: "text-model", capabilities: ["text"] }]),
+  });
+  const providerBId = insertProvider(db, {
+    id: "pb",
+    name: "text-provider-2",
+    models: JSON.stringify([{ name: "text-model-2", capabilities: ["text"] }]),
+  });
+  const providerCId = insertProvider(db, {
+    id: "pc",
+    name: "image-provider",
+    models: JSON.stringify([{ name: "vision-model", capabilities: ["text", "image"] }]),
+  });
+
+  insertMappingGroup(db, "gpt-5", {
+    targets: [{ provider_id: providerAId, backend_model: "text-model" }],
+    multimodal_fallback: {
+    provider_id: providerCId,
+    backend_model: "vision-model",
+    },
+  });
+
+  const targets: Target[] = [
+    { provider_id: providerAId, backend_model: "text-model" },
+    { provider_id: providerBId, backend_model: "text-model-2" },
+  ];
+  const snapshot = new PipelineSnapshot();
+  const body = openaiImageBody();
+
+  const result = computeModalityRedirectTargets(db, targets, "gpt-5", body, snapshot);
+
+  expect(result).toHaveLength(1);
+  expect(result[0]).toEqual({ provider_id: providerCId, backend_model: "vision-model" });
+
+  const stage = JSON.parse(snapshot.toJSON()).find((s: { stage: string }) => s.stage === "modality-redirect");
+  expect(stage).toBeDefined();
+  expect(stage.reason).toBe("replaced-with-fallback");
+  });
+
+  // ----------------------------------------------------------
+  // AC-3: 全部不支持 + 无 fallback → 空列表
+  // ----------------------------------------------------------
+  it("AC-3: returns empty array when all targets filtered and no fallback", () => {
+  const providerAId = insertProvider(db, {
+    id: "pa",
+    name: "text-provider",
+    models: JSON.stringify([{ name: "text-model", capabilities: ["text"] }]),
+  });
+
+  insertMappingGroup(db, "gpt-5", {
+    targets: [{ provider_id: providerAId, backend_model: "text-model" }],
+  });
+
+  const targets: Target[] = [
+    { provider_id: providerAId, backend_model: "text-model" },
+  ];
+  const snapshot = new PipelineSnapshot();
+  const body = openaiImageBody();
+
+  const result = computeModalityRedirectTargets(db, targets, "gpt-5", body, snapshot);
+
+  expect(result).toEqual([]);
+
+  const stage = JSON.parse(snapshot.toJSON()).find((s: { stage: string }) => s.stage === "modality-redirect");
+  expect(stage).toBeDefined();
+  expect(stage.reason).toBe("no-eligible-targets");
+  });
+
+  // ----------------------------------------------------------
+  // audio 模态过滤
+  // ----------------------------------------------------------
+  it("filters targets by audio modality", () => {
+  const providerAId = insertProvider(db, {
+    id: "pa",
+    name: "text-provider",
+    models: JSON.stringify([{ name: "text-model", capabilities: ["text"] }]),
+  });
+  const providerBId = insertProvider(db, {
+    id: "pb",
+    name: "audio-provider",
+    models: JSON.stringify([{ name: "audio-model", capabilities: ["text", "audio"] }]),
+  });
+
+  const targets: Target[] = [
+    { provider_id: providerAId, backend_model: "text-model" },
+    { provider_id: providerBId, backend_model: "audio-model" },
+  ];
+  const snapshot = new PipelineSnapshot();
+  const body: Record<string, unknown> = {
+    messages: [
+    {
+      role: "user",
+      content: [
+      { type: "input_audio", input_audio: { data: "base64..." } },
+      ],
+    },
+    ],
+  };
+
+  const result = computeModalityRedirectTargets(db, targets, "gpt-5", body, snapshot);
+
+  expect(result).toHaveLength(1);
+  expect(result[0]).toEqual({ provider_id: providerBId, backend_model: "audio-model" });
+
+  const stage = JSON.parse(snapshot.toJSON()).find((s: { stage: string }) => s.stage === "modality-redirect");
+  expect(stage).toBeDefined();
+  expect(stage.reason).toBe("filtered-ineligible-targets");
+  });
+
+  // ----------------------------------------------------------
+  // fallback 不支持缺失模态 → 空列表
+  // ----------------------------------------------------------
+  it("returns empty array when all targets filtered and fallback also lacks modality", () => {
+  const providerAId = insertProvider(db, {
+    id: "pa",
+    name: "text-provider",
+    models: JSON.stringify([{ name: "text-model", capabilities: ["text"] }]),
+  });
+  const providerBId = insertProvider(db, {
+    id: "pb",
+    name: "image-only-provider",
+    models: JSON.stringify([{ name: "image-model", capabilities: ["text", "image"] }]),
+  });
+
+  insertMappingGroup(db, "gpt-5", {
+    targets: [{ provider_id: providerAId, backend_model: "text-model" }],
+    multimodal_fallback: {
+    provider_id: providerBId,
+    backend_model: "image-model",
+    },
+  });
+
+  const targets: Target[] = [
+    { provider_id: providerAId, backend_model: "text-model" },
+  ];
+  const snapshot = new PipelineSnapshot();
+  // body 包含 audio，但 fallback 只支持 image
+  const body: Record<string, unknown> = {
+    messages: [
+    {
+      role: "user",
+      content: [
+      { type: "input_audio", input_audio: { data: "base64..." } },
+      ],
+    },
+    ],
+  };
+
+  const result = computeModalityRedirectTargets(db, targets, "gpt-5", body, snapshot);
+
+  expect(result).toEqual([]);
+
+  const stage = JSON.parse(snapshot.toJSON()).find((s: { stage: string }) => s.stage === "modality-redirect");
+  expect(stage).toBeDefined();
+  expect(stage.reason).toBe("no-eligible-targets");
+  });
+
+  // ----------------------------------------------------------
+  // provider 不存在时保留 target
+  // ----------------------------------------------------------
+  it("keeps target when provider does not exist in DB", () => {
+  const providerBId = insertProvider(db, {
+    id: "pb",
+    name: "image-provider",
+    models: JSON.stringify([{ name: "vision-model", capabilities: ["text", "image"] }]),
+  });
+
+  const targets: Target[] = [
+    { provider_id: "non-existent-provider", backend_model: "unknown-model" },
+    { provider_id: providerBId, backend_model: "vision-model" },
+  ];
+  const snapshot = new PipelineSnapshot();
+  const body = openaiImageBody();
+
+  const result = computeModalityRedirectTargets(db, targets, "gpt-5", body, snapshot);
+
+  // provider 不存在 → 保留（安全行为），所以两个 target 都在
+  expect(result).toHaveLength(2);
+  expect(result).toEqual(targets);
+
+  const stage = JSON.parse(snapshot.toJSON()).find((s: { stage: string }) => s.stage === "modality-redirect");
+  expect(stage).toBeDefined();
+  expect(stage.reason).toBe("all-targets-support-modalities");
   });
 });

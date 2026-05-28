@@ -98,6 +98,58 @@ _Avoid_: 流超时、SSE 超时
 记录最终失败请求（resilience done/abort 且 status >= 400）的错误摘要，包括从上游响应体提取的 error_type 和 error_message。用于事后诊断分析，不用于实时展示。与 Request Log 通过 request_log_id 关联。
 _Avoid_: 错误日志（与 Request Log 混淆时）
 
+## LLM API 错误规范
+
+路由器作为 LLM API 代理，返回的错误响应必须与上游 API 的错误格式一致，确保客户端 SDK 能正常解析。新增 `ErrorKind` 和 `errorMeta` 时必须遵循以下规范：
+
+### 错误体格式
+
+**OpenAI 系列**（openai / responses apiType）：
+```json
+{ "error": { "message": "...", "type": "...", "code": "...", "param": null } }
+```
+
+**Anthropic**（anthropic apiType）：
+```json
+{ "type": "error", "error": { "type": "...", "message": "..." } }
+```
+
+注意：Anthropic 没有 `code` 和 `param` 字段。
+
+### HTTP Status + type 映射规则
+
+| 场景分类 | HTTP Status | OpenAI type | Anthropic type |
+|---------|------------|-------------|----------------|
+| 请求参数/格式错误 | 400 | `invalid_request_error` | `invalid_request_error` |
+| 认证失败 | 401 | `authentication_error` | `authentication_error` |
+| 权限不足 | 403 | `permission_error` | `permission_error` / `billing_error` |
+| 资源不存在 | 404 | `not_found_error` | `not_found_error` |
+| 速率限制 | 429 | `rate_limit_error` | `rate_limit_error` |
+| 服务端错误 | 500 | `server_error` | `api_error` |
+| 上游错误 | 502 | `upstream_error` | `api_error` |
+| 服务不可用 | 503 | `server_error` | `api_error` |
+| 超时 | 504 | `server_error` | `timeout_error` |
+
+### 新增 ErrorKind 的检查清单
+
+1. 在 `proxy-core.ts` 的 `ErrorKind` 联合类型中添加新值
+2. 在 `createErrorFormatter` 中注册 statusCode 和 message
+3. 在 `shared-error-meta.ts` 的 `OPENAI_FAMILY_ERROR_META` 中添加 type + code
+4. 在 `anthropic.ts` 的 `ANTHROPIC_ERROR_META` 中添加 type + code
+5. HTTP Status 选择应与上表一致（客户端错误 4xx，服务端错误 5xx）
+
+### 已知 code 值（自定义，不对应上游官方值）
+
+| code | 用途 |
+|------|------|
+| `model_not_found` | 映射组中无此 Client Model |
+| `model_not_allowed` | Router Key 的 allowed_models 不包含此 Client Model |
+| `context_window_exceeded` | 请求 token 超过模型上下文窗口 |
+| `unsupported_modality` | 请求包含模型不支持的模态（image/audio） |
+| `provider_unavailable` | Provider 不可用 |
+| `concurrency_queue_full` | Provider 并发队列已满 |
+| `concurrency_timeout` | Provider 并发等待超时 |
+
 ## Flagged Ambiguities
 
 - **"重试"** 在日常用语中常笼统覆盖 Retry 和 Failover 两种行为。CONTEXT 中明确区分：Retry = 同一 Target 重试，Failover = 换 Target。

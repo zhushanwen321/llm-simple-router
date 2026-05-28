@@ -217,6 +217,24 @@ export async function executeFailoverLoop(
   // 2. modality-redirect 层：模态重定向 → 可能 prepend fallback target
   allTargets = computeModalityRedirectTargets(db, allTargets, clientModel, ctx.body, precomputeSnapshot);
 
+  // 2a. modality-redirect 层返回空列表 → 提前报错（无 target 支持请求模态）
+  if (allTargets.length === 0) {
+    const logId = randomUUID();
+    const startTime = Date.now();
+    const isStream = (ctx.body as Record<string, unknown>).stream === true;
+    const rCtx: RejectParams = {
+      db, logId, apiType: ctx.apiType, model: clientModel,
+      startTime, isStream, routerKeyId: request.routerKey?.id ?? null,
+      originalBody: rawBody, clientHeaders: cliHdrs,
+      isFailover: false, originalRequestId: null,
+      sessionId: ctx.metadata.get("session_id") as string | undefined,
+      pipelineSnapshot: precomputeSnapshot.toJSON(),
+      matcher, logFileWriter,
+    };
+    return rejectAndReply(reply, rCtx, errors.unsupportedModality(),
+      `No eligible target: request modalities not supported by any available model`);
+  }
+
   // 3. OF 层：为每个 target 预计算 overflow
   const targetsBeforeOF = allTargets.length;
   const ofResult = expandOverflowTargets(allTargets, db, ctx.body);
