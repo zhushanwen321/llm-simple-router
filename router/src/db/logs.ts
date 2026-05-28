@@ -112,7 +112,7 @@ function rawInsertRequestLog(
     log.id, log.api_type, log.model, log.provider_id, log.status_code,
     log.client_status_code ?? null,
     log.latency_ms, log.is_stream, log.error_message, log.created_at,
-    preserveDetail ? (log.client_request ?? null) : null,
+    log.client_request ?? null,
     preserveDetail ? (log.upstream_request ?? null) : null,
     preserveDetail ? (log.upstream_response ?? null) : null,
     log.is_retry ?? 0, log.is_failover ?? 0, log.original_request_id ?? null,
