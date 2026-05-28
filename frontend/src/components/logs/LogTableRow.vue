@@ -14,6 +14,7 @@ import { CheckIcon, CopyIcon } from "lucide-vue-next";
 import type { LogEntry } from "@/components/logs/types";
 import { PROVIDER_ID_ROUTER } from "@/components/logs/types";
 import { formatTime } from "@/utils/format";
+import { formatLatency } from "@/utils/format";
 import { extractThinkingLevel } from "@/utils/thinking-level";
 
 const props = withDefaults(
@@ -179,6 +180,10 @@ function enhancementLabel(raw: string | null): string {
           >{{ t("logs.table.failover") }}</Badge
         >
       </div>
+    </TableCell>
+
+    <TableCell class="text-xs text-muted-foreground font-mono">
+      {{ formatLatency(log.latency_ms) }}
     </TableCell>
 
     <TableCell class="text-destructive text-xs max-w-[200px]">
