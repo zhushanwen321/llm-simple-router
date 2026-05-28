@@ -78,7 +78,7 @@
         }}</Badge>
         <Badge variant="outline">{{ overview.apiType }}</Badge>
         <Badge
-          v-if="overview.thinkingLevel && overview.thinkingLevel !== 'off'"
+          v-if="overview.thinkingLevel"
           variant="outline"
           class="text-[10px]"
         >
