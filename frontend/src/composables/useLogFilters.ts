@@ -20,14 +20,16 @@ export function useLogFilters() {
   const period = ref<PeriodValue>("5h");
   const dateRange = ref({ start: "", end: "" });
   const providerFilter = ref("all");
-  const modelFilter = ref("all");
+  const clientModelFilter = ref("all");
+  const backendModelFilter = ref("all");
   const keyFilter = ref("all");
   const apiTypeFilter = ref("all");
   const statusFilter = ref("all");
 
   const providers = ref<Provider[]>([]);
   const routerKeys = ref<{ id: string; name: string }[]>([]);
-  const modelOptions = ref<string[]>([]);
+  const clientModelOptions = ref<string[]>([]);
+  const backendModelOptions = ref<string[]>([]);
 
   const hasDateRange = computed(
     () =>
@@ -40,14 +42,6 @@ export function useLogFilters() {
     const { start, end } = dateRange.value;
     if (!start || !end) return "";
     return start >= end ? t("logs.validation.endTimeAfterStart") : "";
-  });
-
-  const filteredModelOptions = computed(() => {
-    if (providerFilter.value === "all") return modelOptions.value;
-    const provider = providers.value.find((p) => p.id === providerFilter.value);
-    if (!provider) return modelOptions.value;
-    const providerModels = new Set(provider.models.map((m) => m.name));
-    return modelOptions.value.filter((m) => providerModels.has(m));
   });
 
   const PERIOD_MS: Record<string, number> = {
@@ -71,7 +65,10 @@ export function useLogFilters() {
     if (apiTypeFilter.value !== "all") params.api_type = apiTypeFilter.value;
     if (providerFilter.value !== "all")
       params.provider_id = providerFilter.value;
-    if (modelFilter.value !== "all") params.model = modelFilter.value;
+    if (clientModelFilter.value !== "all")
+      params.client_model = clientModelFilter.value;
+    if (backendModelFilter.value !== "all")
+      params.backend_model = backendModelFilter.value;
     if (keyFilter.value !== "all") params.router_key_id = keyFilter.value;
     if (statusFilter.value !== "all") params.status_code = statusFilter.value;
     return params;
@@ -101,12 +98,19 @@ export function useLogFilters() {
 
   async function loadModelOptions() {
     try {
-      const result = await api.getMetricsSummary({ period: "30d" });
-      modelOptions.value = [
-        ...new Set(result.rows.map((r) => r.backend_model)),
-      ];
+      const [summaryResult, availableModels] = await Promise.allSettled([
+        api.getMetricsSummary({ period: "30d" }),
+        api.getAvailableModels(),
+      ]);
+      clientModelOptions.value =
+        availableModels.status === "fulfilled" ? availableModels.value : [];
+      backendModelOptions.value =
+        summaryResult.status === "fulfilled"
+          ? [...new Set(summaryResult.value.rows.map((r) => r.backend_model))]
+          : [];
     } catch {
-      modelOptions.value = [];
+      clientModelOptions.value = [];
+      backendModelOptions.value = [];
     }
   }
 
@@ -120,13 +124,15 @@ export function useLogFilters() {
     dateRange,
     dateRangeError,
     providerFilter,
-    modelFilter,
+    clientModelFilter,
+    backendModelFilter,
     keyFilter,
     apiTypeFilter,
     statusFilter,
     providers,
     routerKeys,
-    filteredModelOptions,
+    clientModelOptions,
+    backendModelOptions,
     hasDateRange,
     clearDateRange,
     buildFilterParams,

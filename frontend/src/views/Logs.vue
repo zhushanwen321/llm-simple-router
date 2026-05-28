@@ -55,13 +55,28 @@
           }}</SelectItem>
         </SelectContent>
       </Select>
-      <Select v-model="modelFilter">
+      <Select v-model="clientModelFilter">
         <SelectTrigger class="w-32 truncate">
-          <SelectValue :placeholder="t('logs.allModels')" />
+          <SelectValue :placeholder="t('logs.filters.allClientModels')" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">{{ t("logs.allModels") }}</SelectItem>
-          <SelectItem v-for="m in filteredModelOptions" :key="m" :value="m">{{
+          <SelectItem value="all">{{
+            t("logs.filters.allClientModels")
+          }}</SelectItem>
+          <SelectItem v-for="m in clientModelOptions" :key="m" :value="m">{{
+            m
+          }}</SelectItem>
+        </SelectContent>
+      </Select>
+      <Select v-model="backendModelFilter">
+        <SelectTrigger class="w-32 truncate">
+          <SelectValue :placeholder="t('logs.filters.allBackendModels')" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">{{
+            t("logs.filters.allBackendModels")
+          }}</SelectItem>
+          <SelectItem v-for="m in backendModelOptions" :key="m" :value="m">{{
             m
           }}</SelectItem>
         </SelectContent>
@@ -353,12 +368,14 @@ const {
   dateRange,
   dateRangeError,
   providerFilter,
-  modelFilter,
+  clientModelFilter,
+  backendModelFilter,
   keyFilter,
   statusFilter,
   providers,
   routerKeys,
-  filteredModelOptions,
+  clientModelOptions,
+  backendModelOptions,
   clearDateRange,
   buildFilterParams,
 } = useLogFilters();
@@ -427,7 +444,15 @@ const COPY_FEEDBACK_MS = 2000;
 
 let filterTimer: ReturnType<typeof setTimeout> | null = null;
 watch(
-  [period, dateRange, providerFilter, modelFilter, keyFilter, statusFilter],
+  [
+    period,
+    dateRange,
+    providerFilter,
+    clientModelFilter,
+    backendModelFilter,
+    keyFilter,
+    statusFilter,
+  ],
   () => {
     page.value = 1;
     if (filterTimer) clearTimeout(filterTimer);
