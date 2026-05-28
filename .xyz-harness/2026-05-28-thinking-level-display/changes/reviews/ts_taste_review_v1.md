@@ -1,6 +1,6 @@
 ---
-verdict: fail
-must_fix: 2
+verdict: pass
+must_fix: 0
 ---
 
 # Taste Review — thinking-level-display
