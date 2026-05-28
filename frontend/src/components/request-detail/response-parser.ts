@@ -164,7 +164,6 @@ export function parseResponsesOutput(output: unknown[]): ContentBlock[] {
 export function tryDirectParse(
   responseBody: string | null,
   upstreamResponse: string | null,
-  _apiType: "openai" | "anthropic",
 ): ContentBlock[] {
   const raw = responseBody || upstreamResponse;
   if (!raw) return [];

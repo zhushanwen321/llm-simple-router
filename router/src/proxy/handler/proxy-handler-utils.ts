@@ -140,7 +140,15 @@ export function serializeBlocksForStorage(blocks: ContentBlock[] | undefined, ap
     return JSON.stringify({ content });
   }
   // OpenAI / openai-responses：按类型保留结构，前端 parseOpenAIChoices 可完整解析
-  const message: Record<string, unknown> = {};
+  const message: {
+    reasoning_content?: string;
+    content?: string;
+    tool_calls?: Array<{
+      id: string;
+      type: "function";
+      function: { name: string; arguments: string };
+    }>;
+  } = {};
   const thinkingParts = blocks.filter(b => b.type === "thinking");
   const textParts = blocks.filter(b => b.type === "text");
   const toolParts = blocks.filter(b => b.type === "tool_use");

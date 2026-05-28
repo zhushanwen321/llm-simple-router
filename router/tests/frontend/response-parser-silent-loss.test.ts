@@ -91,7 +91,6 @@ function parseResponsesOutput(output: unknown[]): ContentBlock[] {
 function tryDirectParse(
   responseBody: string | null,
   upstreamResponse: string | null,
-  _apiType: "openai" | "anthropic",
 ): ContentBlock[] {
   const raw = responseBody || upstreamResponse;
   if (!raw) return [];
@@ -305,7 +304,7 @@ describe("tryDirectParse - edge cases", () => {
     const responseBody = JSON.stringify({
       output: [{ type: "custom_type", data: "..." }],
     });
-    const result = tryDirectParse(responseBody, null, "openai");
+    const result = tryDirectParse(responseBody, null);
     expect(result).toEqual([]);
   });
 
@@ -316,7 +315,7 @@ describe("tryDirectParse - edge cases", () => {
       headers: {},
       body: "not-json",
     });
-    const result = tryDirectParse(responseBody, null, "anthropic");
+    const result = tryDirectParse(responseBody, null);
     // JSON.parse("not-json") fails → falls back to outer data
     // outer has statusCode/headers but no content/choices/output → returns []
     expect(result).toEqual([]);

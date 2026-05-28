@@ -96,12 +96,18 @@ function assembleOpenaiBlocks(events: SSEEvent[]): AssembledBlock[] {
     const choices = (d.choices ?? []) as Array<Record<string, unknown>>;
     const delta = choices[0]?.delta as Record<string, unknown> | undefined;
     if (!delta) continue;
-    if (
-      typeof delta.reasoning_content === "string" &&
-      delta.reasoning_content
-    ) {
-      thinkingBlock.content += delta.reasoning_content;
-      thinkingBlock.eventCount++;
+    // 多种 Provider 的思考内容字段名（与后端 stream-extractor.ts REASONING_FIELDS 保持同步）
+    for (const field of [
+      "reasoning_content",
+      "reasoning",
+      "reasoning_text",
+    ] as const) {
+      const val = delta[field];
+      if (typeof val === "string" && val) {
+        thinkingBlock.content += val;
+        thinkingBlock.eventCount++;
+        break;
+      }
     }
     if (typeof delta.content === "string" && delta.content) {
       textBlock.content += delta.content;
