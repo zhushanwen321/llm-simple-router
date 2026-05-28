@@ -150,6 +150,8 @@ export function insertRequestLog(
 type LogFilterOptions = {
   api_type?: string;
   model?: string;
+  client_model?: string;
+  backend_model?: string;
   router_key_id?: string;
   provider_id?: string;
   start_time?: string;
@@ -170,6 +172,14 @@ function buildLogWhereClause(
   if (options.model) {
     where += " AND rl.model LIKE ?";
     params.push(`%${options.model}%`);
+  }
+  if (options.client_model) {
+    where += " AND rl.model LIKE ?";
+    params.push(`%${options.client_model}%`);
+  }
+  if (options.backend_model) {
+    where += " AND rl.id IN (SELECT request_log_id FROM request_metrics WHERE backend_model LIKE ?)";
+    params.push(`%${options.backend_model}%`);
   }
   if (options.router_key_id) {
     where += " AND rl.router_key_id = ?";
@@ -204,6 +214,8 @@ export function getRequestLogs(
     limit: number;
     api_type?: string;
     model?: string;
+    client_model?: string;
+    backend_model?: string;
     router_key_id?: string;
     provider_id?: string;
     start_time?: string;
@@ -342,6 +354,8 @@ export function getRequestLogsGrouped(
     limit: number;
     api_type?: string;
     model?: string;
+    client_model?: string;
+    backend_model?: string;
     router_key_id?: string;
     provider_id?: string;
     start_time?: string;
