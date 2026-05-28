@@ -11,6 +11,8 @@ const LogQuerySchema = Type.Object({
   limit: Type.Optional(Type.String()),
   api_type: Type.Optional(Type.String()),
   model: Type.Optional(Type.String()),
+  client_model: Type.Optional(Type.String()),
+  backend_model: Type.Optional(Type.String()),
   router_key_id: Type.Optional(Type.String()),
   provider_id: Type.Optional(Type.String()),
   start_time: Type.Optional(Type.String()),
@@ -44,6 +46,8 @@ export const adminLogRoutes: FastifyPluginCallback<LogRoutesOptions> = (app, opt
       limit,
       api_type: query.api_type || undefined,
       model: query.model || undefined,
+      client_model: query.client_model || undefined,
+      backend_model: query.backend_model || undefined,
       router_key_id: query.router_key_id || undefined,
       provider_id: query.provider_id || undefined,
       start_time: query.start_time || undefined,
@@ -78,6 +82,23 @@ export const adminLogRoutes: FastifyPluginCallback<LogRoutesOptions> = (app, opt
         if (log.upstream_response === null && fileEntry.upstream_response !== null) {
           log.upstream_response = fileEntry.upstream_response;
         }
+      }
+    }
+
+    // JSONL 回填后重新提取 thinking level（覆盖 SQL 层因 client_request 为 null 得出的 'off'）
+    if (log.client_request) {
+      try {
+        const parsed = JSON.parse(log.client_request);
+        const body = parsed?.body;
+        if (body) {
+          if (log.api_type === "anthropic") {
+            if (body.thinking?.type) log.thinking_level = body.thinking.type;
+          } else {
+            log.thinking_level = body.reasoning?.effort ?? body.reasoning_effort ?? "off";
+          }
+        }
+      } catch {
+        log.thinking_level = "off";
       }
     }
 

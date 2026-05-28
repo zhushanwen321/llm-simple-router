@@ -7,6 +7,12 @@
   "allKeys": "All Keys",
   "allStatus": "All Status",
   "non200": "Non-200",
+  "filters": {
+    "clientModel": "Client Model",
+    "allClientModels": "All Client Models",
+    "backendModel": "Target Model",
+    "allBackendModels": "All Target Models"
+  },
   "noLogs": "No logs",
   "pagination": "Total {total}, Page {page} / {totalPages}",
   "firstPage": "First",
