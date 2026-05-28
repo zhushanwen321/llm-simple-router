@@ -139,8 +139,33 @@ export function serializeBlocksForStorage(blocks: ContentBlock[] | undefined, ap
     });
     return JSON.stringify({ content });
   }
-  const text = blocks.filter(b => b.type === "text" || b.type === "thinking").map(b => b.content).join("");
-  return JSON.stringify({ choices: [{ message: { content: text } }] });
+  // OpenAI / openai-responses：按类型保留结构，前端 parseOpenAIChoices 可完整解析
+  const message: {
+    reasoning_content?: string;
+    content?: string;
+    tool_calls?: Array<{
+      id: string;
+      type: "function";
+      function: { name: string; arguments: string };
+    }>;
+  } = {};
+  const thinkingParts = blocks.filter(b => b.type === "thinking");
+  const textParts = blocks.filter(b => b.type === "text");
+  const toolParts = blocks.filter(b => b.type === "tool_use");
+  if (thinkingParts.length > 0) {
+    message.reasoning_content = thinkingParts.map(b => b.content).join("");
+  }
+  if (textParts.length > 0) {
+    message.content = textParts.map(b => b.content).join("");
+  }
+  if (toolParts.length > 0) {
+    message.tool_calls = toolParts.map((b, i) => ({
+      id: `call_storage_${i}`,
+      type: "function",
+      function: { name: b.name ?? "", arguments: b.content },
+    }));
+  }
+  return JSON.stringify({ choices: [{ message }] });
 }
 
 /** 从请求体中提取最后一次工具调用记录 */
