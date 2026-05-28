@@ -139,7 +139,7 @@ export function serializeBlocksForStorage(blocks: ContentBlock[] | undefined, ap
     });
     return JSON.stringify({ content });
   }
-  const text = blocks.filter(b => b.type === "text").map(b => b.content).join("");
+  const text = blocks.filter(b => b.type === "text" || b.type === "thinking").map(b => b.content).join("");
   return JSON.stringify({ choices: [{ message: { content: text } }] });
 }
 
