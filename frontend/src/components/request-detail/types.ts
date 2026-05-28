@@ -246,6 +246,8 @@ export function fromLogEntry(entry: LogEntry): UnifiedRequestOverview {
     clientType: entry.client_type ?? null,
     cacheReadTokensEstimated: entry.cache_read_tokens_estimated ?? null,
     mappingReason: parseMappingReason(entry.pipeline_snapshot),
-    thinkingLevel: extractThinkingLevel(entry.client_request, entry.api_type),
+    thinkingLevel:
+      entry.thinking_level ??
+      extractThinkingLevel(entry.client_request, entry.api_type),
   };
 }
