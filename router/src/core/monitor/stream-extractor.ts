@@ -28,7 +28,8 @@ export function extractStreamText(line: string, apiType: "openai" | "openai-resp
     const choices = obj.choices as Array<Record<string, unknown>> | undefined;
     const delta = choices?.[0]?.delta as Record<string, unknown> | undefined;
     const text = (delta?.content as string) ?? "";
-    const reasoning = (delta?.reasoning_content as string) ?? "";
+    // 多种 Provider 的思考字段名：reasoning_content（标准）、reasoning、reasoning_text
+    const reasoning = (delta?.reasoning_content as string) || (delta?.reasoning as string) || (delta?.reasoning_text as string) || "";
 
     // OpenAI 不像 Anthropic 那样为不同 content type 分配独立 index。
     // 策略：reasoning → OPENAI_BLOCK_REASONING, text → OPENAI_BLOCK_TEXT,
@@ -39,6 +40,11 @@ export function extractStreamText(line: string, apiType: "openai" | "openai-resp
     }
     if (text) {
       return { text, block: { index: OPENAI_BLOCK_TEXT, type: "text", content: text } };
+    }
+    // refusal 降级为 text block（内容审核拒绝原因）
+    const refusal = (delta?.refusal as string) ?? "";
+    if (refusal) {
+      return { text: refusal, block: { index: OPENAI_BLOCK_TEXT, type: "text", content: refusal } };
     }
     const toolCalls = delta?.tool_calls as Array<Record<string, unknown>> | undefined;
     if (toolCalls) {
@@ -75,6 +81,24 @@ export function extractStreamText(line: string, apiType: "openai" | "openai-resp
       const thinking = (obj.delta as string) ?? "";
       const outputIndex = (obj.output_index as number) ?? 0;
       return { text: "", block: { index: outputIndex, type: "thinking" as const, content: thinking } };
+    }
+    // o3/o4-mini 完整推理文本（非 summary）
+    if (type === "response.reasoning_text.delta") {
+      const thinking = (obj.delta as string) ?? "";
+      const outputIndex = (obj.output_index as number) ?? 0;
+      return { text: "", block: thinking ? { index: outputIndex, type: "thinking" as const, content: thinking } : empty.block };
+    }
+    // 内容审核拒绝降级为 text
+    if (type === "response.refusal.delta") {
+      const refusal = (obj.delta as string) ?? "";
+      const outputIndex = (obj.output_index as number) ?? 0;
+      return { text: refusal, block: refusal ? { index: outputIndex, type: "text" as const, content: refusal } : empty.block };
+    }
+    // 代码解释器输出降级为 text
+    if (type === "response.code_interpreter_call_code.delta") {
+      const code = (obj.delta as string) ?? "";
+      const outputIndex = (obj.output_index as number) ?? 0;
+      return { text: code, block: code ? { index: outputIndex, type: "text" as const, content: code } : empty.block };
     }
     return empty;
   }
