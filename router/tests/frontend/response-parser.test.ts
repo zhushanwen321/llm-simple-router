@@ -101,7 +101,6 @@ function parseResponsesOutput(output: unknown[]): ContentBlock[] {
 function tryDirectParse(
   responseBody: string | null,
   upstreamResponse: string | null,
-  _apiType: "openai" | "anthropic",
 ): ContentBlock[] {
   const raw = responseBody || upstreamResponse;
   if (!raw) return [];
@@ -129,7 +128,7 @@ function tryDirectParse(
 describe("tryDirectParse - format auto-detection", () => {
   it("parses Anthropic format {content:[{type:'text'}]}", () => {
     const raw = JSON.stringify({ content: [{ type: "text", text: "hi" }] });
-    const result = tryDirectParse(raw, null, "anthropic");
+    const result = tryDirectParse(raw, null);
     expect(result).toHaveLength(1);
     expect(result[0].type).toBe("text");
     expect(result[0].content).toBe("hi");
@@ -137,7 +136,7 @@ describe("tryDirectParse - format auto-detection", () => {
 
   it("parses OpenAI Chat format {choices:[{message:{content}}]}", () => {
     const raw = JSON.stringify({ choices: [{ message: { content: "hi" } }] });
-    const result = tryDirectParse(raw, null, "openai");
+    const result = tryDirectParse(raw, null);
     expect(result).toHaveLength(1);
     expect(result[0].type).toBe("text");
     expect(result[0].content).toBe("hi");
@@ -147,7 +146,7 @@ describe("tryDirectParse - format auto-detection", () => {
     const raw = JSON.stringify({
       output: [{ type: "message", content: [{ type: "output_text", text: "hi" }] }],
     });
-    const result = tryDirectParse(raw, null, "openai");
+    const result = tryDirectParse(raw, null);
     expect(result).toHaveLength(1);
     expect(result[0].type).toBe("text");
     expect(result[0].content).toBe("hi");
@@ -159,24 +158,24 @@ describe("tryDirectParse - format auto-detection", () => {
       headers: {},
       body: JSON.stringify({ content: [{ type: "text", text: "hi" }] }),
     });
-    const result = tryDirectParse(raw, null, "anthropic");
+    const result = tryDirectParse(raw, null);
     expect(result).toHaveLength(1);
     expect(result[0].content).toBe("hi");
   });
 
   it("returns empty array for non-JSON responseBody", () => {
-    const result = tryDirectParse("not-json", null, "openai");
+    const result = tryDirectParse("not-json", null);
     expect(result).toEqual([]);
   });
 
   it("returns empty array when both inputs are null", () => {
-    const result = tryDirectParse(null, null, "openai");
+    const result = tryDirectParse(null, null);
     expect(result).toEqual([]);
   });
 
   it("falls back to upstreamResponse when responseBody is null", () => {
     const upstream = JSON.stringify({ content: [{ type: "text", text: "hi" }] });
-    const result = tryDirectParse(null, upstream, "anthropic");
+    const result = tryDirectParse(null, upstream);
     expect(result).toHaveLength(1);
     expect(result[0].content).toBe("hi");
   });
@@ -184,7 +183,7 @@ describe("tryDirectParse - format auto-detection", () => {
   it("prefers responseBody over upstreamResponse when both provided", () => {
     const responseBody = JSON.stringify({ content: [{ type: "text", text: "fromBody" }] });
     const upstream = JSON.stringify({ content: [{ type: "text", text: "fromUpstream" }] });
-    const result = tryDirectParse(responseBody, upstream, "anthropic");
+    const result = tryDirectParse(responseBody, upstream);
     expect(result[0].content).toBe("fromBody");
   });
 });
