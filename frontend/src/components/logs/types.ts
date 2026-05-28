@@ -33,4 +33,5 @@ export interface LogEntry {
   client_type: string | null;
   cache_read_tokens_estimated: number | null;
   pipeline_snapshot?: string | null;
+  thinking_level?: string;
 }

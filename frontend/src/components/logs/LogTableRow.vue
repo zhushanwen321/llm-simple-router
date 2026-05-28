@@ -15,7 +15,6 @@ import type { LogEntry } from "@/components/logs/types";
 import { PROVIDER_ID_ROUTER } from "@/components/logs/types";
 import { formatTime } from "@/utils/format";
 import { formatLatency } from "@/utils/format";
-import { extractThinkingLevel } from "@/utils/thinking-level";
 
 const props = withDefaults(
   defineProps<{
@@ -39,9 +38,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 
-const thinkingLevel = computed(() =>
-  extractThinkingLevel(props.log.client_request, props.log.api_type),
-);
+const thinkingLevel = computed(() => props.log.thinking_level ?? "off");
 
 function enhancementLabel(raw: string | null): string {
   if (!raw) return t("logs.row.unknown");
