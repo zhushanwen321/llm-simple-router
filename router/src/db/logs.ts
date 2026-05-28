@@ -30,6 +30,7 @@ export interface RequestLog {
 /** 列表查询扩展字段：JOIN providers 获得 provider_name */
 export interface RequestLogListRow extends RequestLog {
   provider_name: string | null;
+  thinking_level: string;
   child_count?: number;
 }
 
@@ -42,7 +43,12 @@ const LOG_LIST_SELECT = `rl.id, rl.api_type, rl.model, rl.provider_id, rl.status
             rm.input_tokens, rm.output_tokens, rm.cache_read_tokens, rm.ttft_ms,
             rm.tokens_per_second, rm.stop_reason, rm.backend_model, rm.is_complete AS metrics_complete,
             rm.input_tokens_estimated, rm.client_type, rm.cache_read_tokens_estimated,
-            COALESCE(p.name, rl.provider_id) AS provider_name`;
+            COALESCE(p.name, rl.provider_id) AS provider_name,
+            CASE
+              WHEN rl.client_request IS NULL THEN 'off'
+              WHEN rl.api_type = 'anthropic' THEN COALESCE(json_extract(rl.client_request, '$.body.thinking.type'), 'off')
+              ELSE COALESCE(json_extract(rl.client_request, '$.body.reasoning.effort'), json_extract(rl.client_request, '$.body.reasoning_effort'), 'off')
+            END AS thinking_level`;
 const LOG_LIST_JOIN = `LEFT JOIN providers p ON p.id = rl.provider_id LEFT JOIN request_metrics rm ON rm.request_log_id = rl.id`;
 
 export interface RequestLogInsert {
@@ -106,7 +112,7 @@ function rawInsertRequestLog(
     log.id, log.api_type, log.model, log.provider_id, log.status_code,
     log.client_status_code ?? null,
     log.latency_ms, log.is_stream, log.error_message, log.created_at,
-    preserveDetail ? (log.client_request ?? null) : null,
+    log.client_request ?? null,
     preserveDetail ? (log.upstream_request ?? null) : null,
     preserveDetail ? (log.upstream_response ?? null) : null,
     log.is_retry ?? 0, log.is_failover ?? 0, log.original_request_id ?? null,
@@ -150,6 +156,8 @@ export function insertRequestLog(
 type LogFilterOptions = {
   api_type?: string;
   model?: string;
+  client_model?: string;
+  backend_model?: string;
   router_key_id?: string;
   provider_id?: string;
   start_time?: string;
@@ -170,6 +178,14 @@ function buildLogWhereClause(
   if (options.model) {
     where += " AND rl.model LIKE ?";
     params.push(`%${options.model}%`);
+  }
+  if (options.client_model) {
+    where += " AND rl.model LIKE ?";
+    params.push(`%${options.client_model}%`);
+  }
+  if (options.backend_model) {
+    where += " AND rl.id IN (SELECT request_log_id FROM request_metrics WHERE backend_model LIKE ?)";
+    params.push(`%${options.backend_model}%`);
   }
   if (options.router_key_id) {
     where += " AND rl.router_key_id = ?";
@@ -204,6 +220,8 @@ export function getRequestLogs(
     limit: number;
     api_type?: string;
     model?: string;
+    client_model?: string;
+    backend_model?: string;
     router_key_id?: string;
     provider_id?: string;
     start_time?: string;
@@ -226,12 +244,19 @@ export function getRequestLogs(
   return { data, total };
 }
 
+const LOG_DETAIL_THINKING_LEVEL = `,
+            CASE
+              WHEN rl.client_request IS NULL THEN 'off'
+              WHEN rl.api_type = 'anthropic' THEN COALESCE(json_extract(rl.client_request, '$.body.thinking.type'), 'off')
+              ELSE COALESCE(json_extract(rl.client_request, '$.body.reasoning.effort'), json_extract(rl.client_request, '$.body.reasoning_effort'), 'off')
+            END AS thinking_level`;
+
 export function getRequestLogById(db: Database.Database, id: string): RequestLogListRow | undefined {
   return db.prepare(
     `SELECT rl.*, rm.input_tokens, rm.output_tokens, rm.cache_read_tokens, rm.ttft_ms,
             rm.tokens_per_second, rm.stop_reason, rm.backend_model, rm.is_complete AS metrics_complete,
             rm.input_tokens_estimated, rm.client_type, rm.cache_read_tokens_estimated,
-            COALESCE(p.name, rl.provider_id) AS provider_name
+            COALESCE(p.name, rl.provider_id) AS provider_name${LOG_DETAIL_THINKING_LEVEL}
      FROM request_logs rl
      LEFT JOIN providers p ON p.id = rl.provider_id
      LEFT JOIN request_metrics rm ON rm.request_log_id = rl.id
@@ -342,6 +367,8 @@ export function getRequestLogsGrouped(
     limit: number;
     api_type?: string;
     model?: string;
+    client_model?: string;
+    backend_model?: string;
     router_key_id?: string;
     provider_id?: string;
     start_time?: string;

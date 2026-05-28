@@ -41,6 +41,7 @@ export interface ActiveRequest {
   clientIp?: string;
   sessionId?: string;
   mappingReason?: MappingReason;
+  thinkingLevel?: string;
   clientRequest?: string;
   upstreamRequest?: string;
   completedAt?: number;

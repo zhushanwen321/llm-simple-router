@@ -1,0 +1,119 @@
+{
+  "test_execution": [
+    {
+      "caseId": "TC-A-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run router/tests/orchestration-thinking-level.test.ts",
+        "test 'OpenAI: reasoning_effort 高优先级' passes: extractThinkingLevelFromRequest with reasoning_effort='high' returns 'high'"
+      ],
+      "evidence": "orchestration-thinking-level.test.ts: 11 tests passed"
+    },
+    {
+      "caseId": "TC-A-02",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run router/tests/orchestration-thinking-level.test.ts",
+        "test 'Anthropic: thinking.type' passes: extractThinkingLevelFromRequest with thinking.type='enabled' returns 'enabled'"
+      ],
+      "evidence": "orchestration-thinking-level.test.ts: 11 tests passed"
+    },
+    {
+      "caseId": "TC-A-03",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run router/tests/orchestration-thinking-level.test.ts",
+        "test '无 thinking 参数 → off' passes: extractThinkingLevelFromRequest with no thinking fields returns 'off'"
+      ],
+      "evidence": "orchestration-thinking-level.test.ts: 11 tests passed"
+    },
+    {
+      "caseId": "TC-A-04",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run router/tests/orchestration-thinking-level.test.ts",
+        "test 'OpenAI: reasoning.effort 优先于 reasoning_effort' passes: when both set, returns reasoning.effort value 'low'"
+      ],
+      "evidence": "orchestration-thinking-level.test.ts: 11 tests passed"
+    },
+    {
+      "caseId": "TC-A-05",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "verified by code review: frontend/src/utils/thinking-level.ts extractThinkingLevel function",
+        "vue-tsc --noEmit passes confirming type correctness",
+        "frontend ESLint passes"
+      ],
+      "evidence": "frontend type check + lint passed"
+    },
+    {
+      "caseId": "TC-A-06",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "verified by code review: extractThinkingLevel returns 'off' when clientRequestJson is null/undefined",
+        "vue-tsc --noEmit passes"
+      ],
+      "evidence": "frontend type check + lint passed"
+    },
+    {
+      "caseId": "TC-B-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run router/tests/admin/logs-filter.test.ts",
+        "test 'test_client_model_filter_returns_matching_logs' passes: GET /admin/api/logs?client_model=ds-flash returns matching logs"
+      ],
+      "evidence": "logs-filter.test.ts: 11 tests passed"
+    },
+    {
+      "caseId": "TC-B-02",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run router/tests/admin/logs-filter.test.ts",
+        "test 'test_backend_model_filter_returns_matching_logs' passes: GET /admin/api/logs?backend_model=xxx returns matching logs"
+      ],
+      "evidence": "logs-filter.test.ts: 11 tests passed"
+    },
+    {
+      "caseId": "TC-B-03",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run router/tests/admin/logs-filter.test.ts",
+        "test 'test_combined_filters_return_intersection' passes: combined client_model + backend_model returns correct intersection",
+        "test 'test_combined_filters_no_match_returns_empty' passes: no match returns empty"
+      ],
+      "evidence": "logs-filter.test.ts: 11 tests passed"
+    },
+    {
+      "caseId": "TC-B-04",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run router/tests/admin/logs-filter.test.ts",
+        "test 'test_original_model_param_still_works' passes: GET /admin/api/logs?model=xxx still works as before"
+      ],
+      "evidence": "logs-filter.test.ts: 11 tests passed"
+    },
+    {
+      "caseId": "TC-C-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "code review: formatLatency(45) === '45ms' verified by node eval",
+        "code review: formatLatency(1200) === '1.2s' verified by node eval",
+        "code review: formatLatency(null) === '-' verified by node eval",
+        "code review: LogTableRow.vue imports and calls formatLatency(log.latency_ms)",
+        "code review: Logs.vue has TableHead for latency column"
+      ],
+      "evidence": "node eval output: 45→45ms, 1200→1.2s, null→-"
+    }
+  ]
+}

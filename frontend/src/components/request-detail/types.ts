@@ -1,5 +1,6 @@
 import type { ActiveRequest } from "@/types/monitor";
 import type { LogEntry } from "@/components/logs/types";
+import { extractThinkingLevel } from "@/utils/thinking-level";
 
 export type DataSource = "realtime" | "history";
 
@@ -43,6 +44,7 @@ export interface UnifiedRequestOverview {
   clientType: string | null;
   cacheReadTokensEstimated: number | null;
   mappingReason?: string;
+  thinkingLevel: string;
 }
 
 export function fromActiveRequest(
@@ -98,6 +100,7 @@ export function fromActiveRequest(
     clientType: null,
     cacheReadTokensEstimated: m?.cacheReadTokensEstimated ?? null,
     mappingReason: req.mappingReason,
+    thinkingLevel: req.thinkingLevel ?? "off",
   };
 }
 
@@ -243,5 +246,8 @@ export function fromLogEntry(entry: LogEntry): UnifiedRequestOverview {
     clientType: entry.client_type ?? null,
     cacheReadTokensEstimated: entry.cache_read_tokens_estimated ?? null,
     mappingReason: parseMappingReason(entry.pipeline_snapshot),
+    thinkingLevel:
+      entry.thinking_level ??
+      extractThinkingLevel(entry.client_request, entry.api_type),
   };
 }
