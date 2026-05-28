@@ -112,7 +112,9 @@ function patchDeveloperRole(body: Record<string, unknown>): void {
 function needsDeepSeekPatch(body: Record<string, unknown>, provider: ProviderInfo): boolean {
   if (provider.base_url.includes("deepseek")) return true;
   const model = (body.model as string) ?? "";
-  return model.includes("deepseek");
+  if (model.includes("deepseek")) return true;
+  if (provider.base_url.includes("opencode.ai")) return true;
+  return false;
 }
 
 /**
