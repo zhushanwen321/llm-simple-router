@@ -246,4 +246,38 @@ export function patchOrphanToolResultsOA(body: Record<string, unknown>): void {
       idx += count;
     }
   }
+
+  // Step 5: 合并连续的 assistant 消息（OpenAI 格式不允许连续同角色消息）
+  for (let i = 1; i < messages.length;) {
+    const prev = messages[i - 1] as Record<string, unknown>;
+    const curr = messages[i] as Record<string, unknown>;
+    if (prev.role !== "assistant" || curr.role !== "assistant") {
+      i++;
+      continue;
+    }
+    // 合并 content
+    const prevContent = typeof prev.content === "string" ? prev.content : JSON.stringify(prev.content ?? "");
+    const currContent = typeof curr.content === "string" ? curr.content : JSON.stringify(curr.content ?? "");
+    const mergedContent = (prevContent + "\n" + currContent).replace(/^\s+|\s+$/g, "");
+    prev.content = mergedContent || null;
+    // 合并 tool_calls
+    if (curr.tool_calls && (curr.tool_calls as unknown[]).length > 0) {
+      if (!prev.tool_calls) {
+        prev.tool_calls = [];
+      }
+      (prev.tool_calls as Array<Record<string, unknown>>).push(...(curr.tool_calls as Array<Record<string, unknown>>));
+    }
+    messages.splice(i, 1);
+  }
+
+  // Step 6: 为带 tool_calls 的 assistant 消息补充 reasoning_content
+  // Kimi/Moonshot 等启用了 thinking 的模型要求 tool_calls 消息必须包含该字段
+  for (const msg of messages) {
+    const m = msg as Record<string, unknown>;
+    if (m.role === "assistant" && m.tool_calls && (m.tool_calls as unknown[]).length > 0) {
+      if (!("reasoning_content" in m)) {
+        m.reasoning_content = "";
+      }
+    }
+  }
 }
