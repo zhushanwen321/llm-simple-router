@@ -168,7 +168,7 @@ describe("patchOrphanToolResultsOA", () => {
 
   // ---- 反向：移除孤儿 tool_calls ----
 
-  it("反向：移除非末尾 assistant 中无对应 tool 消息的 tool_call 条目", () => {
+  it("反向：为非末尾 assistant 的孤儿 tool_call 补入合成 tool 消息", () => {
     const body = {
       messages: [
         { role: "user", content: "read a file" },
@@ -177,11 +177,15 @@ describe("patchOrphanToolResultsOA", () => {
       ],
     };
     patchOrphanToolResultsOA(body);
-    // orphan tool_calls 移除 → 空壳 assistant 清理 → 连续 user 合并
-    expect(body.messages).toHaveLength(1);
-    expect((body.messages[0] as Record<string, unknown>).role).toBe("user");
-    expect(((body.messages[0] as Record<string, unknown>).content as string)).toContain("read a file");
-    expect(((body.messages[0] as Record<string, unknown>).content as string)).toContain("你找到了什么?");
+    // orphan_1 补入合成 tool 消息，assistant 的 tool_calls 保持不变
+    expect(body.messages).toHaveLength(4);
+    const roles = (body.messages as Array<{ role: string }>).map(m => m.role);
+    expect(roles).toEqual(["user", "assistant", "tool", "user"]);
+    const assistant = body.messages[1] as Record<string, unknown>;
+    expect((assistant.tool_calls as unknown[]).length).toBe(1);
+    const syntheticTool = body.messages[2] as Record<string, unknown>;
+    expect(syntheticTool.tool_call_id).toBe("orphan_1");
+    expect(syntheticTool.content).toBe("[context truncated]");
   });
 
   it("反向：末尾 assistant 的 tool_calls 保持不动（正常的工具调用中间状态）", () => {
@@ -196,7 +200,7 @@ describe("patchOrphanToolResultsOA", () => {
     expect(lastAssistant.tool_calls).toHaveLength(1);
   });
 
-  it("反向：部分配对时只移除未配对的 tool_call，保留已配对的", () => {
+  it("反向：部分配对时为未配对的 tool_call 补入合成 tool 消息，保留已配对的", () => {
     const body = {
       messages: [
         { role: "assistant", content: null, tool_calls: [
@@ -208,10 +212,19 @@ describe("patchOrphanToolResultsOA", () => {
       ],
     };
     patchOrphanToolResultsOA(body);
+    // assistant 的 tool_calls 保持不变（matched + orphan 都保留）
     const firstAssistant = body.messages[0] as Record<string, unknown>;
     const calls = firstAssistant.tool_calls as Array<Record<string, unknown>>;
-    expect(calls).toHaveLength(1);
-    expect(calls[0].id).toBe("matched");
+    expect(calls).toHaveLength(2);
+    expect(calls.map(c => c.id)).toEqual(["matched", "orphan"]);
+    // orphan 补入合成 tool 消息在 assistant 后面（在原有 tool 消息之前）
+    const roles = (body.messages as Array<{ role: string }>).map(m => m.role);
+    expect(roles).toEqual(["assistant", "tool", "tool", "assistant"]);
+    const syntheticTool = body.messages[1] as Record<string, unknown>;
+    expect(syntheticTool.tool_call_id).toBe("orphan");
+    expect(syntheticTool.content).toBe("[context truncated]");
+    const realTool = body.messages[2] as Record<string, unknown>;
+    expect(realTool.tool_call_id).toBe("matched");
   });
 
   it("反向：Claude Code 截断场景的完整消息链修复", () => {
@@ -228,18 +241,21 @@ describe("patchOrphanToolResultsOA", () => {
       ],
     };
     patchOrphanToolResultsOA(body);
-    // toolu_1 是孤儿 → tool_calls 移除 → 空壳 assistant 被清理
-    // 两个连续 user 合并
-    // 最终: [system, user(合并), assistant(toolu_2), tool(toolu_2), assistant, user]
+    // toolu_1 是孤儿 → 补入合成 tool 消息
+    // toolu_2 已配对，不补入
+    // 最终: [system, user, assistant(toolu_1), tool(toolu_1, synthetic), user, assistant(toolu_2), tool(toolu_2), assistant, user]
     const roles = (body.messages as Array<{ role: string }>).map(m => m.role);
-    expect(roles).toEqual(["system", "user", "assistant", "tool", "assistant", "user"]);
+    expect(roles).toEqual(["system", "user", "assistant", "tool", "user", "assistant", "tool", "assistant", "user"]);
+    // toolu_1 的合成 tool 消息
+    const syntheticTool = body.messages[3] as Record<string, unknown>;
+    expect(syntheticTool.tool_call_id).toBe("toolu_1");
+    expect(syntheticTool.content).toBe("[context truncated]");
     // toolu_2 的 assistant 保留 tool_calls
-    const toolu2Assistant = body.messages[2] as Record<string, unknown>;
+    const toolu2Assistant = body.messages[5] as Record<string, unknown>;
     expect((toolu2Assistant.tool_calls as unknown[]).length).toBe(1);
-    // 合并后的 user 包含两段文本
-    const mergedUser = body.messages[1] as Record<string, unknown>;
-    expect((mergedUser.content as string)).toContain("read file.ts");
-    expect((mergedUser.content as string)).toContain("你找到了什么?");
+    // toolu_1 的 assistant 保留 tool_calls
+    const toolu1Assistant = body.messages[2] as Record<string, unknown>;
+    expect((toolu1Assistant.tool_calls as unknown[]).length).toBe(1);
   });
 
   it("空 messages 时安全返回", () => {
@@ -285,7 +301,7 @@ describe("patchOrphanToolResultsOA", () => {
     expect(afterFirstAssistant.map(m => m.role)).toEqual(["tool", "user", "system", "assistant"]);
   });
 
-  it("Step 4: 部分 tool 消息匹配时不重排（expectedIds 未清零）", () => {
+  it("Step 4: 部分 tool 消息匹配时补入合成消息后重排", () => {
     const body = {
       messages: [
         { role: "assistant", content: null, tool_calls: [
@@ -298,17 +314,15 @@ describe("patchOrphanToolResultsOA", () => {
         { role: "assistant", content: "done" },
       ],
     };
-    const original = JSON.stringify(body.messages);
     patchOrphanToolResultsOA(body);
-    // call_b 是孤儿 tool_call，被反向清理移除后 changed=true
-    // Step 4 应该不重排（因为 call_b 没找到）
-    // 但 call_a 的 tool 消息和 user 中断的相对位置取决于反向清理的执行顺序
-    // 反向清理先于 Step 4，call_b 被移除后 assistant 只剩 call_a
-    // 然后 Step 4 对只剩 call_a 的 assistant 执行，找到 1 个 tool 消息 + 1 个 user 中断
-    // 此时 expectedIds.size === 0（只有 call_a，已找到），应该执行重排
-    const afterFirstAssistant = body.messages.slice(1) as Array<{ role: string }>;
-    // 预期：tool 在前，user 中断在后，assistant 在最后
-    expect(afterFirstAssistant[0].role).toBe("tool");
+    // call_b 补入合成 tool 消息后，assistant 有两个 tool_calls 都有配对
+    // Step 4 可以正常重排
+    const roles = (body.messages as Array<{ role: string }>).map(m => m.role);
+    // 预期: assistant → tool(call_b, synthetic) → tool(call_a) → user → assistant
+    expect(roles).toEqual(["assistant", "tool", "tool", "user", "assistant"]);
+    const syntheticTool = body.messages[1] as Record<string, unknown>;
+    expect(syntheticTool.tool_call_id).toBe("call_b");
+    expect(syntheticTool.content).toBe("[context truncated]");
   });
 
   it("Step 4: 两个相邻 assistant 都有 tool_calls 时各自独立重排", () => {
@@ -352,7 +366,7 @@ describe("patchOrphanToolResultsOA", () => {
     expect(JSON.stringify(body)).toBe(original);
   });
 
-  it("反向清理：空壳 assistant 被移除后连续 user 合并", () => {
+  it("反向补入：assistant 的 tool_calls 保留，不再有空壳清理", () => {
     const body = {
       messages: [
         { role: "user", content: "read a file" },
@@ -362,13 +376,16 @@ describe("patchOrphanToolResultsOA", () => {
       ],
     };
     patchOrphanToolResultsOA(body);
-    // orphan tool_calls 移除 → 空壳 assistant 清理 → 连续 user 合并
+    // orphan_1 补入合成 tool 消息，assistant 的 tool_calls 保持不变
+    // 不再有"空壳清理"逻辑
     const roles = (body.messages as Array<{ role: string }>).map(m => m.role);
-    expect(roles).toEqual(["user", "assistant"]);
-    const mergedUser = body.messages[0] as Record<string, unknown>;
-    expect((mergedUser.content as string)).toContain("read a file");
-    expect((mergedUser.content as string)).toContain("你找到了什么?");
-    const resultAssistant = body.messages[1] as Record<string, unknown>;
+    expect(roles).toEqual(["user", "assistant", "tool", "user", "assistant"]);
+    const assistant = body.messages[1] as Record<string, unknown>;
+    expect((assistant.tool_calls as unknown[]).length).toBe(1);
+    const syntheticTool = body.messages[2] as Record<string, unknown>;
+    expect(syntheticTool.tool_call_id).toBe("orphan_1");
+    expect(syntheticTool.content).toBe("[context truncated]");
+    const resultAssistant = body.messages[4] as Record<string, unknown>;
     expect(resultAssistant.content).toBe("这是结果");
   });
 });
