@@ -94,12 +94,27 @@
     "group": "智谱",
     "presets": [
       {
-      "plan": "Coding Plan",
-    "presetName": "zhipu-coding-plan",
-    "apiType": "openai",
-    "baseUrl": "https://open.bigmodel.cn",
-    "upstreamPath": "/api/coding/paas/v4/chat/completions",
-    "modelsEndpoint": "/v1/models",
+        "plan": "Coding Plan",
+        "presetName": "zhipu-coding-plan",
+        "apiType": "openai",
+        "baseUrl": "https://open.bigmodel.cn",
+        "upstreamPath": "/api/coding/paas/v4/chat/completions",
+        "modelsEndpoint": "/v1/models",
+        "models": [
+          "glm-5.1",
+          "glm-5",
+          "glm-5-turbo",
+          "glm-4.7",
+          "glm-4.5-air"
+        ]
+      },
+      {
+        "plan": "Coding Plan (Anthropic)",
+        "presetName": "zhipu-coding-plan-anthropic",
+        "apiType": "anthropic",
+        "baseUrl": "https://open.bigmodel.cn",
+        "upstreamPath": "/api/anthropic/v1/messages",
+        "modelsEndpoint": "/api/anthropic/v1/models",
         "models": [
           "glm-5.1",
           "glm-5",

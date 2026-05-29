@@ -647,26 +647,29 @@ function makeQuickSetupSubmit(
 
 function applyPresetEndpointsLogic(
   endpoints: Ref<ProviderEndpoint[]>,
-  presetBaseUrl: string,
-  presetUpstreamPath?: string,
+  presets: Array<{ apiType: string; baseUrl: string; upstreamPath?: string }>,
 ) {
-  const hasCustomPath = !!presetUpstreamPath;
-  endpoints.value = [
-    {
-      api_type: "openai",
-      base_url: presetBaseUrl,
-      upstream_path: hasCustomPath
-        ? presetUpstreamPath!
-        : "/v1/chat/completions",
+  const seen = new Set<string>();
+  const result: ProviderEndpoint[] = [];
+  for (const preset of presets) {
+    if (seen.has(preset.apiType)) continue;
+    seen.add(preset.apiType);
+    result.push({
+      api_type: preset.apiType as ProviderEndpoint["api_type"],
+      base_url: preset.baseUrl,
+      upstream_path: preset.upstreamPath || null,
       api_key: null,
-    },
-    {
-      api_type: "anthropic",
-      base_url: presetBaseUrl,
-      upstream_path: hasCustomPath ? presetUpstreamPath! : "/v1/messages",
+    });
+  }
+  if (result.length === 0 && presets.length > 0) {
+    result.push({
+      api_type: presets[0].apiType as ProviderEndpoint["api_type"],
+      base_url: presets[0].baseUrl,
+      upstream_path: presets[0].upstreamPath || null,
       api_key: null,
-    },
-  ];
+    });
+  }
+  endpoints.value = result;
 }
 
 interface ProviderChangeContext {
@@ -682,7 +685,9 @@ interface ProviderChangeContext {
   isNonOpenaiEndpoint: ComputedRef<boolean>;
   updateMappings: () => void;
   autoSelectRetryRules: () => void;
-  applyPresetEndpoints: (baseUrl: string, upstreamPath?: string) => void;
+  applyPresetEndpoints: (
+    presets: Array<{ apiType: string; baseUrl: string; upstreamPath?: string }>,
+  ) => void;
 }
 
 function makeOnProviderChange(ctx: ProviderChangeContext) {
@@ -720,7 +725,7 @@ function makeOnProviderChange(ctx: ProviderChangeContext) {
         ctx.selectedPlan.value = preset.plan;
         ctx.apiType.value = resolveApiType(client?.format, preset.apiType);
         applyPresetModels(preset, ctx.modelConfigs, ctx.isNonOpenaiEndpoint);
-        ctx.applyPresetEndpoints(preset.baseUrl, preset.upstreamPath);
+        ctx.applyPresetEndpoints(groupData.presets);
       }
     }
     ctx.updateMappings();
@@ -742,14 +747,15 @@ function makeOnPlanChange(ctx: ProviderChangeContext) {
       preset.apiType,
     );
     applyPresetModels(preset, ctx.modelConfigs, ctx.isNonOpenaiEndpoint);
-    ctx.applyPresetEndpoints(preset.baseUrl, preset.upstreamPath);
+    ctx.applyPresetEndpoints(group.presets);
     ctx.updateMappings();
   };
 }
 
 function makeApplyPresetEndpoints(endpoints: Ref<ProviderEndpoint[]>) {
-  return (presetBaseUrl: string, presetUpstreamPath?: string) =>
-    applyPresetEndpointsLogic(endpoints, presetBaseUrl, presetUpstreamPath);
+  return (
+    presets: Array<{ apiType: string; baseUrl: string; upstreamPath?: string }>,
+  ) => applyPresetEndpointsLogic(endpoints, presets);
 }
 
 export function useQuickSetup() {
