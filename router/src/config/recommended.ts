@@ -12,6 +12,8 @@ export interface ProviderPreset {
   models: string[]
   /** 由 API handler 补充：模型名 → capabilities 映射 */
   modelCapabilities?: Record<string, string[]>
+  /** 隐藏 preset，不在 plan 下拉菜单显示，但 endpoints 生成仍遍历 */
+  hidden?: boolean
 }
 
 export interface ProviderGroup {

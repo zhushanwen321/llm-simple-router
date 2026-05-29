@@ -15,9 +15,10 @@ import ModelCard from "@/components/quick-setup/ModelCard.vue";
 import ConcurrencyControl from "@/components/shared/ConcurrencyControl.vue";
 import TransformRulesForm from "@/components/shared/TransformRulesForm.vue";
 import ProxyConfigForm from "@/components/shared/ProxyConfigForm.vue";
+import EndpointEditor from "@/components/providers/EndpointEditor.vue";
 import { CONTEXT_WINDOW_OPTIONS } from "@/composables/useProviderForm";
 import type { ConcurrencyMode } from "@/types/concurrency";
-import type { ModelInfo } from "@/types/mapping";
+import type { ModelInfo, ProviderEndpoint } from "@/types/mapping";
 import type { ModelConfig } from "@/components/quick-setup/types";
 
 const { t } = useI18n();
@@ -54,6 +55,8 @@ const props = defineProps<{
   transformInjectHeaders: string;
   transformDropFields: string;
   transformRequestDefaults: string;
+  endpoints: ProviderEndpoint[];
+  sharedKey: string;
 }>();
 
 const emit = defineEmits<{
@@ -86,6 +89,8 @@ const emit = defineEmits<{
   "update:inject-headers": [value: string];
   "update:drop-fields": [value: string];
   "update:request-defaults": [value: string];
+  // Endpoints
+  "update:endpoints": [value: ProviderEndpoint[]];
   // Proxy clear
   "clear-proxy": [];
 }>();
@@ -100,7 +105,7 @@ function isOfficialOpenai(url: string): boolean {
 </script>
 
 <template>
-  <!-- Form fields grid -->
+  <!-- Name + Shared Key -->
   <div class="grid grid-cols-2 gap-3">
     <div>
       <Label class="text-xs text-muted-foreground">{{
@@ -120,71 +125,33 @@ function isOfficialOpenai(url: string): boolean {
     </div>
     <div>
       <Label class="text-xs text-muted-foreground">{{
-        t("providers.fields.apiType")
-      }}</Label>
-      <Select
-        :model-value="props.apiType"
-        @update:model-value="emit('update:api-type', String($event))"
-        class="mt-1"
-      >
-        <SelectTrigger
-          ><SelectValue :placeholder="t('common.pleaseSelect')"
-        /></SelectTrigger>
-        <SelectContent>
-          <SelectItem value="openai">OpenAI Chat Completions</SelectItem>
-          <SelectItem value="openai-responses">OpenAI Responses</SelectItem>
-          <SelectItem value="anthropic">Anthropic Messages</SelectItem>
-        </SelectContent>
-      </Select>
-    </div>
-    <div>
-      <Label class="text-xs text-muted-foreground">{{
-        t("providers.fields.baseUrl")
-      }}</Label>
-      <Input
-        :model-value="props.baseUrl"
-        type="url"
-        required
-        class="mt-1 font-mono text-xs"
-        @update:model-value="emit('update:base-url', String($event))"
-        @input="emit('clear-errors', 'base_url')"
-      />
-      <p v-if="props.errorsBaseUrl" class="text-xs text-destructive mt-0.5">
-        {{ props.errorsBaseUrl }}
-      </p>
-    </div>
-    <div>
-      <Label class="text-xs text-muted-foreground">{{
         t("providers.fields.apiKey")
       }}</Label>
       <Input
         :model-value="props.apiKey"
-        type="text"
+        type="password"
         :required="!props.editingId"
         :placeholder="
           props.editingId ? t('providers.fields.apiKeyPlaceholder') : ''
         "
-        class="mt-1"
+        class="mt-1 font-mono text-xs"
         @update:model-value="emit('update:api-key', String($event))"
         @input="emit('clear-errors', 'api_key')"
       />
       <p v-if="props.errorsApiKey" class="text-xs text-destructive mt-0.5">
         {{ props.errorsApiKey }}
       </p>
+      <p class="text-xs text-muted-foreground mt-0.5">
+        {{ t("providers.fields.sharedKeyHint") }}
+      </p>
     </div>
   </div>
-  <div>
-    <Label class="text-xs">{{ t("providers.fields.upstreamPath") }}</Label>
-    <Input
-      :model-value="props.upstreamPath"
-      :placeholder="t('providers.fields.upstreamPathPlaceholder')"
-      class="mt-1 font-mono text-xs"
-      @update:model-value="emit('update:upstream-path', String($event))"
-    />
-    <p class="text-xs text-muted-foreground mt-0.5">
-      {{ t("providers.fields.upstreamPathHint") }}
-    </p>
-  </div>
+  <!-- Endpoint editor (multi-api-type) -->
+  <EndpointEditor
+    :model-value="props.endpoints"
+    :shared-key="props.sharedKey"
+    @update:model-value="emit('update:endpoints', $event)"
+  />
   <ProxyConfigForm
     :proxy-type="props.proxyType"
     :proxy-url="props.proxyUrl"

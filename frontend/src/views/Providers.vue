@@ -44,6 +44,12 @@
               t("providers.tableHeaders.name")
             }}</TableHead>
             <TableHead class="text-muted-foreground">{{
+              t("providers.tableHeaders.apiType")
+            }}</TableHead>
+            <TableHead class="text-muted-foreground">{{
+              t("providers.tableHeaders.baseUrl")
+            }}</TableHead>
+            <TableHead class="text-muted-foreground">{{
               t("providers.tableHeaders.apiKey")
             }}</TableHead>
             <TableHead class="text-muted-foreground">{{
@@ -67,48 +73,96 @@
             :class="{ 'opacity-60': !p.is_active }"
           >
             <TableCell>
-              <div class="space-y-0.5">
-                <!-- 名称 -->
-                <div class="flex items-center gap-2 font-medium">
-                  <ProviderIcon :name="providerIconName(p.name)" :size="18" />
-                  <span>{{ p.name }}</span>
-                </div>
-                <!-- 类型 -->
-                <div class="text-xs text-muted-foreground">
-                  <Badge variant="secondary" class="text-[11px] px-1.5 py-0">{{
-                    API_TYPE_LABELS[p.api_type] ?? p.api_type
-                  }}</Badge>
-                </div>
-                <!-- 完整地址 -->
-                <div
-                  class="text-xs text-muted-foreground flex items-center gap-1 max-w-0"
-                >
-                  <span class="truncate">{{ buildFullUrl(p) }}</span>
-                  <Shield
-                    v-if="p.proxy_type"
-                    class="w-3 h-3"
-                    :title="`Proxy: ${p.proxy_type.toUpperCase()}`"
-                  />
-                </div>
+              <div class="flex items-center gap-2 font-medium">
+                <ProviderIcon :name="providerIconName(p.name)" :size="18" />
+                <span>{{ p.name }}</span>
+                <Shield
+                  v-if="p.proxy_type"
+                  class="w-3 h-3 text-muted-foreground"
+                  :title="`Proxy: ${p.proxy_type.toUpperCase()}`"
+                />
               </div>
             </TableCell>
             <TableCell>
-              <div class="flex items-center gap-1">
-                <span class="font-mono text-xs text-muted-foreground">{{
-                  maskKey(p.api_key)
-                }}</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  class="h-6 w-6 p-0"
-                  @click="copyKey(p.api_key, p.id)"
+              <div class="space-y-0.5">
+                <template
+                  v-for="(ep, i) in getDisplayEndpoints(p)"
+                  :key="ep.api_type"
                 >
-                  <component
-                    :is="copiedId === p.id ? Check : Copy"
-                    class="w-3.5 h-3.5"
-                    :class="{ 'text-success': copiedId === p.id }"
-                  />
-                </Button>
+                  <div
+                    v-if="i > 0"
+                    class="border-t border-dashed border-border my-0.5"
+                  ></div>
+                  <Badge variant="secondary" class="text-[11px] px-1.5 py-0">
+                    {{ API_TYPE_LABELS[ep.api_type] ?? ep.api_type }}
+                  </Badge>
+                </template>
+              </div>
+            </TableCell>
+            <TableCell>
+              <div class="space-y-0.5">
+                <template
+                  v-for="(ep, i) in getDisplayEndpoints(p)"
+                  :key="ep.api_type"
+                >
+                  <div
+                    v-if="i > 0"
+                    class="border-t border-dashed border-border my-0.5"
+                  ></div>
+                  <div
+                    class="font-mono text-[10px] text-muted-foreground truncate max-w-[260px]"
+                    :title="ep.base_url + (getUpstreamPath(ep) ?? '')"
+                  >
+                    {{ ep.base_url }}{{ getUpstreamPath(ep) ?? "" }}
+                  </div>
+                </template>
+              </div>
+            </TableCell>
+            <TableCell>
+              <div class="space-y-0.5">
+                <template
+                  v-for="(ep, i) in getDisplayEndpoints(p)"
+                  :key="ep.api_type"
+                >
+                  <div
+                    v-if="i > 0"
+                    class="border-t border-dashed border-border my-0.5"
+                  ></div>
+                  <div class="flex items-center gap-1">
+                    <span
+                      v-if="ep.api_key"
+                      class="font-mono text-[10px] text-muted-foreground"
+                    >
+                      {{ maskKey(ep.api_key) }}
+                    </span>
+                    <span
+                      v-else
+                      class="text-[10px] text-emerald-600 dark:text-emerald-400"
+                      >shared</span
+                    >
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      class="h-5 w-5 p-0"
+                      @click="
+                        copyKey(
+                          ep.api_key || p.api_key,
+                          `${p.id}-${ep.api_type}`,
+                        )
+                      "
+                    >
+                      <component
+                        :is="
+                          copiedId === `${p.id}-${ep.api_type}` ? Check : Copy
+                        "
+                        class="w-3 h-3"
+                        :class="{
+                          'text-success': copiedId === `${p.id}-${ep.api_type}`,
+                        }"
+                      />
+                    </Button>
+                  </div>
+                </template>
               </div>
             </TableCell>
             <TableCell>
@@ -197,7 +251,7 @@
           </TableRow>
           <TableRow v-if="providers.length === 0">
             <TableCell
-              colspan="6"
+              colspan="8"
               class="text-center text-muted-foreground py-8"
               >{{ t("providers.noProviders") }}</TableCell
             >
@@ -322,6 +376,8 @@
               :transform-inject-headers="transformForm.injectHeadersInput"
               :transform-drop-fields="transformForm.dropFieldsInput"
               :transform-request-defaults="transformForm.requestDefaultsInput"
+              :endpoints="form.endpoints"
+              :shared-key="form.api_key"
               @update:name="form.name = $event"
               @update:api-type="form.api_type = $event"
               @update:base-url="form.base_url = $event"
@@ -354,6 +410,7 @@
               @update:request-defaults="
                 transformForm.requestDefaultsInput = $event
               "
+              @update:endpoints="form.endpoints = $event"
             />
           </template>
           <DialogFooter>
@@ -493,6 +550,7 @@ import {
   CONTEXT_M,
 } from "@/composables/useProviderForm";
 import { useProviderActions } from "@/composables/useProviderActions";
+import type { Provider } from "@/types/mapping";
 import { useFetchUpstreamModels } from "@/composables/useFetchUpstreamModels";
 
 const { t } = useI18n();
@@ -591,32 +649,29 @@ const DEFAULT_UPSTREAM_PATH: Record<string, string> = {
   "openai-responses": "/v1/responses",
 };
 
-function buildFullUrl(p: {
-  base_url: string;
-  upstream_path?: string | null;
-  api_type: string;
-}): string {
-  const upstreamPath =
-    p.upstream_path ||
-    DEFAULT_UPSTREAM_PATH[p.api_type] ||
-    "/v1/chat/completions";
-  try {
-    const url = new URL(p.base_url);
-    const pathname = url.pathname.replace(/\/+$/, "");
-    const normalizedUpstream = upstreamPath.replace(/\/+$/, "");
-    if (pathname.endsWith(normalizedUpstream)) {
-      return `${url.origin}${pathname}`;
-    }
-    return `${url.origin}${pathname}${upstreamPath}`;
-  } catch {
-    // URL 解析失败时 fallback 到简单拼接
-    const normalized = p.base_url.replace(/\/+$/, "");
-    return `${normalized}${upstreamPath}`;
-  }
-}
-
 function modelCapabilities(m: { capabilities?: string[] }): string[] {
   return m.capabilities ?? ["text"];
+}
+
+interface EndpointDisplay {
+  api_type: string;
+  base_url: string;
+  api_key?: string | null;
+}
+
+function getUpstreamPath(ep: EndpointDisplay): string | undefined {
+  return DEFAULT_UPSTREAM_PATH[ep.api_type];
+}
+
+function getDisplayEndpoints(p: Provider): EndpointDisplay[] {
+  if (p.endpoints && p.endpoints.length > 0) {
+    return p.endpoints.map((ep) => ({
+      api_type: ep.api_type,
+      base_url: ep.base_url,
+      api_key: ep.api_key,
+    }));
+  }
+  return [{ api_type: p.api_type, base_url: p.base_url, api_key: p.api_key }];
 }
 
 function formatContextWindow(tokens: number): string {

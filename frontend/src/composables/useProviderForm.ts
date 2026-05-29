@@ -2,7 +2,7 @@ import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import * as z from "zod";
 import type { ProviderPayload } from "@/api/client";
-import type { Provider, ModelInfo } from "@/types/mapping";
+import type { Provider, ModelInfo, ProviderEndpoint } from "@/types/mapping";
 import { DEFAULT_CONTEXT_WINDOW, DEFAULT_STREAM_TIMEOUT_MS } from "@/constants";
 import type { ModelConfig } from "@/components/quick-setup/types";
 import { useTransformRules } from "@/composables/useTransformRules";
@@ -25,6 +25,7 @@ interface FormState {
   base_url: string;
   upstream_path: string;
   api_key: string;
+  endpoints: ProviderEndpoint[];
   models: ModelInfo[];
   is_active: boolean;
   max_concurrency: number;
@@ -43,6 +44,7 @@ const DEFAULT_FORM: FormState = {
   base_url: "",
   upstream_path: "",
   api_key: "",
+  endpoints: [],
   models: [],
   is_active: true,
   max_concurrency: DEFAULT_CONCURRENCY_AUTO,
@@ -91,6 +93,7 @@ type ProviderFormPayload = Pick<
   | "proxy_url"
   | "proxy_username"
   | "proxy_password"
+  | "endpoints"
 > & { api_key?: string };
 
 export function useProviderForm() {
@@ -138,6 +141,21 @@ export function useProviderForm() {
     }
     if (!editingId.value && !form.value.api_key.trim())
       errs.api_key = t("providers.validation.apiKeyRequired");
+    // endpoints 校验
+    if (form.value.endpoints.length > 0) {
+      const eps = form.value.endpoints;
+      for (let i = 0; i < eps.length; i++) {
+        if (!eps[i].base_url.trim()) {
+          errs[`endpoint_${i}_base_url`] = t(
+            "providers.validation.baseUrlRequired",
+          );
+        }
+      }
+      const types = eps.map((e) => e.api_type);
+      if (new Set(types).size !== types.length) {
+        errs.endpoints = t("providers.validation.duplicateApiType");
+      }
+    }
     if (concurrencyMode.value !== "none") {
       const mc = form.value.max_concurrency;
       if (!mc || mc < 1 || mc > MAX_CONCURRENCY)
@@ -164,6 +182,15 @@ export function useProviderForm() {
       api_type: form.value.api_type,
       base_url: form.value.base_url,
       upstream_path: form.value.upstream_path || undefined,
+      endpoints:
+        form.value.endpoints.length > 0
+          ? form.value.endpoints.map((ep) => ({
+            api_type: ep.api_type,
+            base_url: ep.base_url,
+            upstream_path: ep.upstream_path || undefined,
+            api_key: ep.api_key || undefined,
+          }))
+          : undefined,
       models: form.value.models.map((m) => ({
         name: m.name,
         context_window: m.context_window ?? undefined,
@@ -257,7 +284,7 @@ export function useProviderForm() {
 
   function openCreate() {
     editingId.value = null;
-    form.value = { ...DEFAULT_FORM, models: [] };
+    form.value = { ...DEFAULT_FORM, models: [], endpoints: [] };
     concurrencyMode.value = "auto";
     modelInput.value = "";
     modelContextWindow.value = DEFAULT_CONTEXT_WINDOW;
@@ -279,6 +306,12 @@ export function useProviderForm() {
       base_url: p.base_url,
       upstream_path: p.upstream_path || "",
       api_key: "",
+      endpoints: (p.endpoints ?? []).map((ep) => ({
+        api_type: ep.api_type,
+        base_url: ep.base_url,
+        upstream_path: ep.upstream_path ?? null,
+        api_key: ep.api_key ?? null,
+      })),
       models: (p.models || []).map((m) => ({
         name: m.name,
         context_window: m.context_window ?? DEFAULT_CONTEXT_WINDOW,

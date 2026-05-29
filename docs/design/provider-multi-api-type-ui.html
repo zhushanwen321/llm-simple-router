@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Provider Multi-API-Type - UI Demo v3</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:oklch(.98 .005 260);color:oklch(.18 .02 260);padding:24px;line-height:1.5}
+h1{font-size:18px;font-weight:600;margin-bottom:6px}
+h2{font-size:14px;font-weight:600;margin:28px 0 10px;padding-bottom:6px;border-bottom:1px solid oklch(.88 .01 260);color:oklch(.35 .02 260)}
+h3{font-size:13px;font-weight:500;margin:12px 0 6px;color:oklch(.35 .02 260)}
+.sub{font-size:11px;color:oklch(.5 .02 260);margin-bottom:12px}
+:root{--bg:oklch(1 0 0);--bg-m:oklch(.96 .005 260);--bg-m50:oklch(.96 .005 260/.5);--bd:oklch(.9 .01 260);--fg:oklch(.18 .02 260);--mu:oklch(.5 .02 260);--pri:oklch(.45 .18 260);--pri-fg:oklch(1 0 0);--pri-05:oklch(.45 .18 260/.05);--des:oklch(.55 .2 25);--suc:oklch(.55 .15 150);--wrn:oklch(.65 .15 80);--fm:'SF Mono',SFMono-Regular,ui-monospace,Menlo,monospace}
+.b{display:inline-flex;align-items:center;gap:3px;padding:1px 7px;border-radius:9999px;font-size:10px;font-weight:500;line-height:16px;white-space:nowrap}
+.b-d{background:var(--pri);color:var(--pri-fg)}.b-s{background:var(--bg-m);color:var(--mu)}.b-o{background:transparent;border:1px solid var(--bd);color:var(--mu)}.b-op{background:transparent;border:1px solid oklch(.45 .18 260/.2);color:oklch(.45 .18 260/.7)}
+.btn{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:6px;font-size:11px;cursor:pointer;border:1px solid var(--bd);background:var(--bg);color:var(--fg)}
+.btn:hover{background:var(--bg-m)}.btn-p{background:var(--pri);color:var(--pri-fg);border-color:var(--pri)}
+.btn-sm{padding:2px 8px;font-size:10px}.btn-gh{border:none;background:transparent;color:var(--mu)}.btn-gh:hover{background:var(--bg-m);color:var(--fg)}
+.btn-icon{width:22px;height:22px;padding:0;justify-content:center;border:none;background:transparent;cursor:pointer;border-radius:4px;color:var(--mu);font-size:12px}
+.btn-icon:hover{background:var(--bg-m)}
+.inp{padding:3px 8px;border:1px solid var(--bd);border-radius:5px;font-size:11px;font-family:var(--fm);background:var(--bg);color:var(--fg);width:100%;height:24px}
+.inp:focus{outline:none;border-color:var(--pri);box-shadow:0 0 0 2px oklch(.45 .18 260/.1)}
+.inp-ro{background:var(--bg-m);color:var(--mu)}
+.lbl{font-size:10px;color:var(--mu);display:block;margin-bottom:1px}
+.tbl-w{background:var(--bg);border:1px solid var(--bd);border-radius:8px;overflow:hidden}
+table{width:100%;border-collapse:collapse;font-size:11px}
+th{background:var(--bg-m);padding:7px 12px;text-align:left;font-weight:500;font-size:10px;color:var(--mu);border-bottom:1px solid var(--bd)}
+td{padding:8px 12px;border-bottom:1px solid oklch(.94 .005 260);vertical-align:top}
+tr:last-child td{border-bottom:none}tr:hover{background:oklch(.98 .005 260)}
+.ep-rows{display:flex;flex-direction:column}
+.ep-row{display:flex;align-items:center;gap:6px;padding:2px 0;font-size:10px}
+.ep-row+.ep-row{border-top:1px dashed oklch(.88 .01 260);padding-top:3px;margin-top:2px}
+.ep-card{border:1px solid var(--bd);border-radius:6px;padding:10px 12px;margin-bottom:6px}
+.ep-card-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.ep-card-r1{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.ep-card-r2{display:flex;align-items:center;gap:8px}
+.add-chip{display:inline-flex;align-items:center;padding:2px 8px;border:1px dashed var(--bd);border-radius:5px;font-size:10px;color:var(--mu);cursor:pointer}
+.add-chip:hover{border-color:var(--pri);color:var(--pri);background:var(--pri-05)}
+.add-chip.off{opacity:.35;cursor:not-allowed;pointer-events:none}
+.sk-area{margin-top:6px;padding-top:6px;border-top:1px solid oklch(.94 .005 260);display:flex;align-items:center;gap:6px}
+.note{background:oklch(.96 .02 80);border:1px solid oklch(.88 .04 80);border-radius:6px;padding:8px 12px;margin:10px 0;font-size:11px;color:oklch(.3 .04 60)}
+.note strong{color:oklch(.25 .04 40)}.note ul{margin-left:14px;margin-top:3px}.note li{margin-bottom:1px}
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px}
+.cmp-l{font-size:10px;color:var(--mu);margin-bottom:3px}
+pre{background:var(--bg-m);padding:8px;border-radius:5px;font-size:9px;font-family:var(--fm);overflow-x:auto;line-height:1.5}
+.tag-row{display:flex;flex-wrap:wrap;gap:3px}
+.m-grid{display:grid;grid-template-columns:1fr 1fr;gap:3px}
+.m-box{background:var(--bg-m50);border-radius:4px;padding:3px 6px;min-width:0}
+.m-box-l{font-size:9px;color:var(--mu)}.m-box-v{font-size:12px;font-weight:600}
+.d-row{display:flex;align-items:center;justify-content:space-between;font-size:10px;padding:1px 0}
+.d-lbl{color:var(--mu)}.d-val{font-family:var(--fm)}
+.d-hl{background:oklch(.96 .02 80/.5);margin:0 -6px;padding:1px 6px;border-radius:3px}
+.sec{margin-bottom:36px}
+.card{background:var(--bg);border:1px solid var(--bd);border-radius:8px;overflow:hidden}
+.card-hd{padding:10px 14px 6px;display:flex;align-items:center;justify-content:space-between}
+.card-tt{font-size:12px;font-weight:500}.card-bd{padding:0 14px 14px}
+.arrow{color:oklch(.55 .15 80);font-weight:600;font-size:10px}
+</style>
+</head>
+<body>
+
+<h1>Provider Multi-API-Type UI Demo v3</h1>
+<p class="sub">基于 Providers.vue / Logs.vue / QuickSetup.vue 真实布局。v3: 三列分离 + 紧凑表单 + 箭头日志</p>
+
+<!-- ══════════ 1. Provider 列表 ══════════ -->
+<div class="sec">
+<h2>1. Provider 列表页</h2>
+<p class="sub">API Type / Base URL / API Key 各自独立一列，内部按 api_type 顺序分行，虚线分隔形成视觉分组</p>
+
+<div class="tbl-w">
+<table>
+<thead><tr>
+  <th style="width:140px">Name</th>
+  <th style="width:200px">API Type</th>
+  <th style="width:260px">Base URL</th>
+  <th>API Key</th>
+  <th>Models</th>
+  <th>Concurrency</th>
+  <th>Status</th>
+  <th></th>
+</tr></thead>
+<tbody>
+<!-- 单 endpoint -->
+<tr>
+  <td><div style="display:flex;align-items:center;gap:6px;font-weight:500;"><span style="font-size:13px">🟢</span> openai-official</div></td>
+  <td><div class="ep-rows"><div class="ep-row"><span class="b b-s">OpenAI</span></div></div></td>
+  <td><div class="ep-rows"><div class="ep-row"><span style="font-family:var(--fm);font-size:10px;color:var(--mu)">https://api.openai.com/v1/chat/completions</span></div></div></td>
+  <td><div class="ep-rows"><div class="ep-row" style="height:18px"><span style="font-family:var(--fm);font-size:10px;color:var(--mu)">sk-...a1b2</span> <button class="btn-icon" title="Copy" style="width:16px;height:16px;font-size:10px">📋</button></div></div></td>
+  <td><span class="b b-s">32</span></td>
+  <td><span class="b b-s">10</span></td>
+  <td><span class="b b-d" style="font-size:9px">On</span></td>
+  <td><button class="btn btn-gh btn-sm">Edit</button></td>
+</tr>
+<!-- 双 endpoint -->
+<tr>
+  <td><div style="display:flex;align-items:center;gap:6px;font-weight:500;"><span style="font-size:13px">🔷</span> zhipu-glm</div></td>
+  <td><div class="ep-rows">
+    <div class="ep-row"><span class="b b-s">OpenAI</span></div>
+    <div class="ep-row"><span class="b b-o">Anthropic</span></div>
+  </div></td>
+  <td><div class="ep-rows">
+    <div class="ep-row"><span style="font-family:var(--fm);font-size:10px;color:var(--mu)">https://open.bigmodel.cn/api/paas/v1/chat/completions</span></div>
+    <div class="ep-row"><span style="font-family:var(--fm);font-size:10px;color:var(--mu)">https://open.bigmodel.cn/api/paas/v1/messages</span></div>
+  </div></td>
+  <td><div class="ep-rows">
+    <div class="ep-row" style="height:18px"><span style="font-family:var(--fm);font-size:10px;color:var(--mu)">sk-...x3y4</span> <button class="btn-icon" title="Copy" style="width:16px;height:16px;font-size:10px">📋</button></div>
+    <div class="ep-row" style="height:18px"><span style="font-family:var(--fm);font-size:10px;color:var(--suc)">shared</span> <button class="btn-icon" title="Copy shared" style="width:16px;height:16px;font-size:10px">📋</button></div>
+  </div></td>
+  <td><span class="b b-s">18</span></td>
+  <td><span class="b b-o">Adaptive</span></td>
+  <td><span class="b b-d" style="font-size:9px">On</span></td>
+  <td><button class="btn btn-gh btn-sm">Edit</button></td>
+</tr>
+<!-- 三 endpoint -->
+<tr>
+  <td><div style="display:flex;align-items:center;gap:6px;font-weight:500;"><span style="font-size:13px">☁️</span> azure-proxy <span style="font-size:9px;color:var(--mu)" title="Proxy: HTTP">🔒</span></div></td>
+  <td><div class="ep-rows">
+    <div class="ep-row"><span class="b b-s">OpenAI</span></div>
+    <div class="ep-row"><span class="b b-op">Responses</span></div>
+    <div class="ep-row"><span class="b b-o">Anthropic</span></div>
+  </div></td>
+  <td><div class="ep-rows">
+    <div class="ep-row"><span style="font-family:var(--fm);font-size:10px;color:var(--mu)">https://azure.example.com/openai</span></div>
+    <div class="ep-row"><span style="font-family:var(--fm);font-size:10px;color:var(--mu)">https://azure.example.com/responses</span></div>
+    <div class="ep-row"><span style="font-family:var(--fm);font-size:10px;color:var(--mu)">https://azure.example.com/anthropic</span></div>
+  </div></td>
+  <td><div class="ep-rows">
+    <div class="ep-row" style="height:18px"><span style="font-family:var(--fm);font-size:10px;color:var(--mu)">azure-...m1</span> <button class="btn-icon" title="Copy" style="width:16px;height:16px;font-size:10px">📋</button></div>
+    <div class="ep-row" style="height:18px"><span style="font-family:var(--fm);font-size:10px;color:var(--mu)">azure-...m1</span> <button class="btn-icon" title="Copy" style="width:16px;height:16px;font-size:10px">📋</button></div>
+    <div class="ep-row" style="height:18px"><span style="font-family:var(--fm);font-size:10px;color:var(--suc)">shared</span> <button class="btn-icon" title="Copy shared" style="width:16px;height:16px;font-size:10px">📋</button></div>
+  </div></td>
+  <td><span class="b b-s">45</span></td>
+  <td><span class="b b-s">20</span></td>
+  <td><span class="b b-d" style="font-size:9px">On</span></td>
+  <td><button class="btn btn-gh btn-sm">Edit</button></td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<div class="note"><strong>变更说明：</strong>
+<ul>
+<li>API Type / Base URL / API Key 各自独立一列。列内按 endpoint 的 api_type 顺序分行，虚线分隔</li>
+<li>三列的行顺序完全对齐（第 1 行都是 OpenAI，第 2 行都是 Anthropic），形成视觉分组</li>
+<li>Name 列恢复简洁（icon + name + proxy 标记），不再塞 endpoint 信息</li>
+</ul></div>
+</div>
+
+<!-- ══════════ 2. Provider 编辑表单 ══════════ -->
+<div class="sec">
+<h2>2. Provider 编辑表单</h2>
+<p class="sub">紧凑两行布局：Row1 = api_type + api_key + remove；Row2 = base_url + upstream_path。Shared key 紧跟 Provider name。支持预设模板自动填充</p>
+
+<div class="card" style="max-width:580px;">
+<div class="card-hd"><span class="card-tt">Edit Provider</span></div>
+<div class="card-bd" style="padding-top:8px">
+  <!-- Provider name + shared key -->
+  <div style="display:flex;align-items:flex-end;gap:8px;margin-bottom:10px">
+    <div style="width:160px"><span class="lbl">Name</span><input class="inp" value="zhipu-glm"></div>
+    <div style="width:180px"><span class="lbl">Shared API Key <span style="font-size:9px;opacity:.6">(fallback)</span></span><input class="inp" type="password" value="sk-...x3y4"></div>
+    <span style="font-size:9px;color:var(--mu);padding-bottom:4px">Used when endpoint key is empty</span>
+  </div>
+
+  <!-- Endpoint 列表 -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+    <span style="font-size:10px;font-weight:500;color:var(--mu);text-transform:uppercase;letter-spacing:.5px">Endpoints</span>
+    <span class="b b-s" style="font-size:9px">2 / 3</span>
+  </div>
+
+  <!-- Endpoint 1: OpenAI -->
+  <div class="ep-card">
+    <div class="ep-card-r1">
+      <span class="b b-s" style="min-width:68px">OpenAI</span>
+      <input class="inp" type="password" value="sk-...x3y4" placeholder="API Key (empty = shared)" style="flex:1;max-width:170px;height:22px;font-size:10px">
+      <button class="btn btn-gh btn-sm" style="color:var(--des);font-size:10px;padding:1px 6px">Remove</button>
+    </div>
+    <div class="ep-card-r2">
+      <div style="flex:1"><span class="lbl">Base URL</span><input class="inp" value="https://open.bigmodel.cn/api/paas" style="height:22px;font-size:10px"></div>
+      <div style="width:160px"><span class="lbl">Upstream Path</span><input class="inp" placeholder="/v1/chat/completions" style="height:22px;font-size:10px;color:var(--mu)"></div>
+    </div>
+  </div>
+
+  <!-- Endpoint 2: Anthropic -->
+  <div class="ep-card">
+    <div class="ep-card-r1">
+      <span class="b b-o" style="min-width:68px">Anthropic</span>
+      <input class="inp" type="password" placeholder="API Key (empty = shared)" style="flex:1;max-width:170px;height:22px;font-size:10px;color:var(--suc)">
+      <button class="btn btn-gh btn-sm" style="color:var(--des);font-size:10px;padding:1px 6px">Remove</button>
+    </div>
+    <div class="ep-card-r2">
+      <div style="flex:1"><span class="lbl">Base URL</span><input class="inp" value="https://open.bigmodel.cn/api/paas" style="height:22px;font-size:10px"></div>
+      <div style="width:160px"><span class="lbl">Upstream Path</span><input class="inp" value="/v1/messages" style="height:22px;font-size:10px"></div>
+    </div>
+  </div>
+
+  <!-- Add -->
+  <div style="display:flex;gap:4px;padding:2px 0">
+    <span class="add-chip off">✓ OpenAI</span>
+    <span class="add-chip">+ Responses</span>
+    <span class="add-chip off">✓ Anthropic</span>
+  </div>
+
+  <div style="margin-top:10px;padding-top:8px;border-top:1px solid oklch(.94 .005 260)">
+    <h3 style="font-size:11px;margin:0 0 6px">预设模板场景（新建 Provider）</h3>
+    <p style="font-size:10px;color:var(--mu);margin-bottom:6px">选择推荐 Provider 模板后，自动生成 OpenAI + Anthropic 两个 endpoint（base_url + path 自动填充）。用户只需填写一个 Shared API Key</p>
+    <!-- Endpoint 1: OpenAI (auto-filled) -->
+    <div class="ep-card" style="background:var(--pri-05);border-color:oklch(.45 .18 260/.15)">
+      <div class="ep-card-r1">
+        <span class="b b-s" style="min-width:68px">OpenAI</span>
+        <input class="inp" type="password" placeholder="API Key (empty = shared)" style="flex:1;max-width:170px;height:22px;font-size:10px;border-color:oklch(.45 .18 260/.3)">
+      </div>
+      <div class="ep-card-r2">
+        <div style="flex:1"><span class="lbl">Base URL</span><input class="inp inp-ro" value="https://open.bigmodel.cn/api/paas" style="height:22px;font-size:10px"></div>
+        <div style="width:160px"><span class="lbl">Upstream Path</span><input class="inp inp-ro" value="/v1/chat/completions" style="height:22px;font-size:10px"></div>
+      </div>
+    </div>
+    <!-- Endpoint 2: Anthropic (auto-filled) -->
+    <div class="ep-card" style="background:var(--pri-05);border-color:oklch(.45 .18 260/.15)">
+      <div class="ep-card-r1">
+        <span class="b b-o" style="min-width:68px">Anthropic</span>
+        <input class="inp" type="password" placeholder="API Key (empty = shared)" style="flex:1;max-width:170px;height:22px;font-size:10px;border-color:oklch(.45 .18 260/.3)">
+      </div>
+      <div class="ep-card-r2">
+        <div style="flex:1"><span class="lbl">Base URL</span><input class="inp inp-ro" value="https://open.bigmodel.cn/api/paas" style="height:22px;font-size:10px"></div>
+        <div style="width:160px"><span class="lbl">Upstream Path</span><input class="inp inp-ro" value="/v1/messages" style="height:22px;font-size:10px"></div>
+      </div>
+    </div>
+    <p style="font-size:9px;color:var(--mu)">模板自动生成 OpenAI + Anthropic 两个 endpoint，用户只填 Shared API Key。openai-responses 视 provider 支持情况可选添加</p>
+  </div>
+
+  <!-- 下方不变 -->
+  <div style="margin-top:8px;padding-top:8px;border-top:1px solid oklch(.94 .005 260);font-size:10px;color:var(--mu)">Models, Concurrency, Proxy 等区域保持现有 UI 不变</div>
+  <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:12px;padding-top:8px;border-top:1px solid oklch(.94 .005 260)">
+    <button class="btn">Cancel</button><button class="btn btn-p">Save</button>
+  </div>
+</div>
+</div>
+
+<div class="note"><strong>变更说明：</strong>
+<ul>
+<li>Shared API Key 紧跟 Provider Name 右侧，一行排列。Endpoint 的 API Key 为空时自动 fallback</li>
+<li>每个 endpoint 紧凑两行：Row1 = api_type badge + api_key input(inline) + remove；Row2 = base_url + upstream_path（label 在上方）</li>
+<li>API Key input 使用 placeholder 提示，无 label，与 badge 高度对齐</li>
+<li>预设模板自动生成 OpenAI + Anthropic 两个 endpoint（base_url + path readonly），用户只需填写一个 Shared API Key。openai-responses 视 provider 支持情况可选</li>
+<li>统一列表模式，单 endpoint 就是列表只有一项</li>
+</ul></div>
+</div>
+
+<!-- ══════════ 3. QuickSetup ══════════ -->
+<div class="sec">
+<h2>3. 快速配置页面</h2>
+<p class="sub">Provider Config 区域支持多 endpoint + Shared Key，与 Provider 编辑表单一致</p>
+
+<div class="card" style="max-width:860px;">
+<div class="card-hd"><span class="card-tt">Provider Config</span></div>
+<div class="card-bd" style="padding-top:6px">
+  <!-- Row 1: provider + shared key -->
+  <div style="display:flex;align-items:flex-end;gap:6px;margin-bottom:8px">
+    <div style="width:110px"><span class="lbl">Provider</span><select class="inp" style="height:22px;padding:2px 6px;font-size:10px"><option>智谱 GLM</option></select></div>
+    <div style="width:80px"><span class="lbl">Plan</span><select class="inp" style="height:22px;padding:2px 6px;font-size:10px"><option>GLM-4-Plus</option></select></div>
+    <div style="width:170px"><span class="lbl">Shared API Key <span style="font-size:8px;opacity:.6">(fallback)</span></span><input class="inp" type="password" value="sk-xxx" style="height:22px;font-size:10px"></div>
+    <button class="btn btn-sm" style="height:22px">Test</button>
+  </div>
+
+  <!-- Endpoint 列表 -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">
+    <span style="font-size:9px;font-weight:500;color:var(--mu);text-transform:uppercase;letter-spacing:.5px">Endpoints</span>
+    <span class="b b-s" style="font-size:8px">2</span>
+  </div>
+
+  <!-- Endpoint 1 -->
+  <div class="ep-card" style="padding:6px 10px">
+    <div class="ep-card-r1" style="margin-bottom:3px">
+      <span class="b b-s" style="min-width:68px;font-size:9px">OpenAI</span>
+      <input class="inp" type="password" placeholder="API Key (empty = shared)" style="flex:1;max-width:160px;height:20px;font-size:9px">
+      <button class="btn-icon" style="width:18px;height:18px;font-size:10px" title="Remove">×</button>
+    </div>
+    <div class="ep-card-r2">
+      <div style="flex:1"><span class="lbl">Base URL</span><input class="inp inp-ro" value="https://open.bigmodel.cn/api/paas" style="height:20px;font-size:9px"></div>
+      <div style="width:140px"><span class="lbl">Upstream Path</span><input class="inp inp-ro" value="/v1/chat/completions" style="height:20px;font-size:9px"></div>
+    </div>
+  </div>
+
+  <!-- Endpoint 2 -->
+  <div class="ep-card" style="padding:6px 10px">
+    <div class="ep-card-r1" style="margin-bottom:3px">
+      <span class="b b-o" style="min-width:68px;font-size:9px">Anthropic</span>
+      <input class="inp" type="password" placeholder="API Key (empty = shared)" style="flex:1;max-width:160px;height:20px;font-size:9px;color:var(--suc)">
+      <button class="btn-icon" style="width:18px;height:18px;font-size:10px" title="Remove">×</button>
+    </div>
+    <div class="ep-card-r2">
+      <div style="flex:1"><span class="lbl">Base URL</span><input class="inp inp-ro" value="https://open.bigmodel.cn/api/paas" style="height:20px;font-size:9px"></div>
+      <div style="width:140px"><span class="lbl">Upstream Path</span><input class="inp inp-ro" value="/v1/messages" style="height:20px;font-size:9px"></div>
+    </div>
+  </div>
+
+  <!-- Add -->
+  <div style="display:flex;gap:4px;padding:2px 0">
+    <span class="add-chip off" style="font-size:9px">✓ OpenAI</span>
+    <span class="add-chip" style="font-size:9px">+ Responses</span>
+    <span class="add-chip off" style="font-size:9px">✓ Anthropic</span>
+  </div>
+
+  <div style="margin-top:6px;padding-top:6px;border-top:1px solid oklch(.94 .005 260);font-size:10px;color:var(--mu)">Models, Concurrency, Mappings 等区域保持不变</div>
+</div>
+</div>
+
+<div class="note"><strong>变更说明：</strong>
+<ul>
+<li>Shared API Key 与 Provider 选择同行，紧跟 Plan 右侧</li>
+<li>Endpoint 列表紧凑两行（同 Provider 编辑表单）。预设模式 base_url/path readonly</li>
+<li>Test Connection 测试第一个 endpoint 连通性</li>
+</ul></div>
+</div>
+
+<!-- ══════════ 4. 请求日志 ══════════ -->
+<div class="sec">
+<h2>4. 请求日志</h2>
+
+<h3>4a. 列表行 Tags 列</h3>
+<p class="sub">格式转换时显示 openai <span class="arrow">→</span> anthropic 箭头</p>
+
+<div class="tbl-w">
+<table>
+<thead><tr><th style="width:10px"></th><th>ID</th><th>Time</th><th>Model</th><th>Actual Forward</th><th>Tags</th><th>Latency</th><th></th></tr></thead>
+<tbody>
+<!-- 无转换 -->
+<tr>
+  <td></td>
+  <td style="font-family:var(--fm);font-size:10px;color:var(--mu)">a1b2c3d4</td>
+  <td style="font-size:10px;color:var(--mu)">12:34:56</td>
+  <td style="font-family:var(--fm);font-size:10px">gpt-4o</td>
+  <td style="font-size:10px"><span style="font-family:var(--fm)">gpt-4o</span> <span style="color:var(--mu)">@</span> <span class="b b-o" style="font-size:8px;padding:0 4px">openai-official</span></td>
+  <td><div class="tag-row"><span class="b b-d">openai</span><span class="b b-s">200</span><span class="b b-o">SSE</span></div></td>
+  <td style="font-family:var(--fm);font-size:10px;color:var(--mu)">1.2s</td>
+  <td><button class="btn btn-gh btn-sm" style="font-size:10px">Detail</button></td>
+</tr>
+<!-- 格式转换 -->
+<tr>
+  <td></td>
+  <td style="font-family:var(--fm);font-size:10px;color:var(--mu)">e5f6g7h8</td>
+  <td style="font-size:10px;color:var(--mu)">12:35:01</td>
+  <td style="font-family:var(--fm);font-size:10px">claude-3.5</td>
+  <td style="font-size:10px"><span style="font-family:var(--fm)">claude-3.5-sonnet</span> <span style="color:var(--mu)">@</span> <span class="b b-o" style="font-size:8px;padding:0 4px">zhipu-glm</span></td>
+  <td><div class="tag-row"><span class="b b-d">openai</span><span class="arrow">→</span><span class="b b-o">anthropic</span><span class="b b-s">200</span><span class="b b-o">SSE</span></div></td>
+  <td style="font-family:var(--fm);font-size:10px;color:var(--mu)">2.8s</td>
+  <td><button class="btn btn-gh btn-sm" style="font-size:10px">Detail</button></td>
+</tr>
+<!-- responses 精确匹配 -->
+<tr>
+  <td></td>
+  <td style="font-family:var(--fm);font-size:10px;color:var(--mu)">i9j0k1l2</td>
+  <td style="font-size:10px;color:var(--mu)">12:36:15</td>
+  <td style="font-family:var(--fm);font-size:10px">gpt-4o</td>
+  <td style="font-size:10px"><span style="font-family:var(--fm)">gpt-4o</span> <span style="color:var(--mu)">@</span> <span class="b b-o" style="font-size:8px;padding:0 4px">azure-proxy</span></td>
+  <td><div class="tag-row"><span class="b b-d">responses</span><span class="b b-s">200</span></div></td>
+  <td style="font-family:var(--fm);font-size:10px;color:var(--mu)">0.9s</td>
+  <td><button class="btn btn-gh btn-sm" style="font-size:10px">Detail</button></td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<div class="note"><strong>Tags 列变更：</strong>
+<ul>
+<li>格式转换时显示 <code>openai <span class="arrow">→</span> anthropic</code>，直观表示客户端类型 → 上游类型</li>
+<li>无转换时只显示客户端 api_type Badge，不出现箭头</li>
+<li>箭头用暖色（warning 系）标识</li>
+</ul></div>
+
+<h3>4b. 请求详情面板</h3>
+<p class="sub">Metadata 区域显示完整路由链，格式转换行暖色高亮</p>
+
+<div class="card" style="max-width:320px;">
+<div class="card-bd" style="padding:10px">
+  <!-- model @ provider -->
+  <div style="display:flex;align-items:baseline;gap:3px">
+    <span style="font-family:var(--fm);font-size:11px;font-weight:600">claude-3.5-sonnet</span>
+    <span style="font-size:10px;color:var(--mu)">@ zhipu-glm</span>
+  </div>
+  <!-- tags -->
+  <div style="display:flex;align-items:center;gap:3px;margin-top:5px">
+    <span class="b b-o" style="font-size:9px;padding:0 5px">200</span>
+    <span class="b b-o" style="font-size:9px;padding:0 5px">SSE</span>
+    <span class="b b-d" style="font-size:9px;padding:0 5px">openai</span>
+    <span class="arrow">→</span>
+    <span class="b b-o" style="font-size:9px;padding:0 5px">anthropic</span>
+  </div>
+  <!-- metrics -->
+  <div class="m-grid" style="margin-top:6px">
+    <div class="m-box"><div class="m-box-l">Latency</div><div class="m-box-v">2.8s</div></div>
+    <div class="m-box"><div class="m-box-l">TTFT</div><div class="m-box-v">320ms</div></div>
+    <div class="m-box"><div class="m-box-l">Input</div><div class="m-box-v">1,240</div></div>
+    <div class="m-box"><div class="m-box-l">Output</div><div class="m-box-v">512</div></div>
+  </div>
+  <div style="border-top:1px solid oklch(.94 .005 260);margin:6px 0"></div>
+  <!-- metadata -->
+  <div style="font-size:9px;color:var(--mu);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Metadata</div>
+  <div class="d-row"><span class="d-lbl">Client API Type</span><span class="d-val">openai</span></div>
+  <div class="d-row d-hl"><span class="d-lbl">Upstream API Type</span><span class="d-val" style="color:oklch(.45 .12 60)">anthropic</span></div>
+  <div class="d-row d-hl"><span class="d-lbl">Upstream Base URL</span><span class="d-val" style="color:oklch(.45 .12 60);font-size:9px">https://open.bigmodel.cn/.../v1/messages</span></div>
+  <div class="d-row"><span class="d-lbl">Status Code</span><span class="d-val">200</span></div>
+</div>
+</div>
+
+<div class="note"><strong>详情面板变更：</strong>
+<ul>
+<li>Tags 区域同步显示 <code>openai <span class="arrow">→</span> anthropic</code> 箭头</li>
+<li>Metadata 中 Upstream API Type / Base URL 暖色高亮（仅格式转换时）</li>
+<li>无转换时 upstream = client，正常显示不高亮</li>
+</ul></div>
+</div>
+
+</body>
+</html>
