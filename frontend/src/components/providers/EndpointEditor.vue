@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,6 +44,15 @@ const emit = defineEmits<{
   "update:modelValue": [value: ProviderEndpoint[]];
 }>();
 
+/** 是否展开 per-endpoint API Key 编辑（渐进式披露） */
+const showPerEndpointKeys = ref(
+  /* 初始展开条件：任一 endpoint 已有自定义 key */
+  props.modelValue.some(
+    (ep) =>
+      ep.api_key !== null && ep.api_key !== undefined && ep.api_key !== "",
+  ),
+);
+
 const usedApiTypes = computed(
   () => new Set(props.modelValue.map((e) => e.api_type)),
 );
@@ -81,6 +90,7 @@ function updateField<K extends keyof ProviderEndpoint>(
 
 <template>
   <div class="space-y-2">
+    <!-- Header: title + add buttons -->
     <div class="flex items-center justify-between">
       <Label class="text-xs text-muted-foreground">{{
         t("providers.endpoints.title")
@@ -109,17 +119,42 @@ function updateField<K extends keyof ProviderEndpoint>(
         </div>
       </template>
     </div>
+
+    <!-- Per-endpoint toggle -->
+    <div
+      v-if="!readonly"
+      class="flex items-center gap-2 text-[11px] text-muted-foreground"
+    >
+      <button
+        type="button"
+        class="underline decoration-dotted underline-offset-2 hover:text-foreground transition-colors"
+        @click="showPerEndpointKeys = !showPerEndpointKeys"
+      >
+        {{
+          showPerEndpointKeys
+            ? t("providers.endpoints.hidePerEndpointKeys")
+            : t("providers.endpoints.showPerEndpointKeys")
+        }}
+      </button>
+      <span v-if="sharedKey && !showPerEndpointKeys" class="opacity-70">
+        {{ t("providers.endpoints.allUseSharedKey") }}
+      </span>
+    </div>
+
+    <!-- Endpoint cards -->
     <div
       v-for="(ep, i) in modelValue"
       :key="i"
       class="rounded-md border bg-muted/30 p-2.5 space-y-2"
     >
-      <!-- Row 1: api_type badge + api_key + remove -->
+      <!-- Row 1: badge + (optional) api_key + remove -->
       <div class="flex items-center gap-2">
         <Badge variant="secondary" class="text-[11px] px-1.5 py-0 shrink-0">
           {{ t(`providers.endpoints.apiTypes.${ep.api_type}`) }}
         </Badge>
-        <div class="flex-1 min-w-0">
+
+        <!-- Per-endpoint API Key: only shown when toggled -->
+        <div v-if="showPerEndpointKeys" class="flex-1 min-w-0">
           <Input
             :model-value="ep.api_key ?? ''"
             type="password"
@@ -135,6 +170,14 @@ function updateField<K extends keyof ProviderEndpoint>(
             "
           />
         </div>
+        <!-- When not expanded: show hint if custom key is set -->
+        <div
+          v-else-if="ep.api_key"
+          class="flex-1 text-[10px] text-muted-foreground"
+        >
+          {{ t("providers.endpoints.customKeySet") }}
+        </div>
+
         <Button
           v-if="!readonly"
           type="button"

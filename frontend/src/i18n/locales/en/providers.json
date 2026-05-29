@@ -164,7 +164,11 @@
       "openai": "OpenAI",
       "openai-responses": "Responses",
       "anthropic": "Anthropic"
-    }
+    },
+    "showPerEndpointKeys": "Set API Key per endpoint",
+    "hidePerEndpointKeys": "Hide per-endpoint API Keys",
+    "allUseSharedKey": "All endpoints use the shared key",
+    "customKeySet": "Custom key set"
   },
   "capabilities": {
     "text": "Text",
