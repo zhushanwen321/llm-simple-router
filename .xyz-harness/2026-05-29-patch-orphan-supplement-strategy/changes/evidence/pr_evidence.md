@@ -7,4 +7,4 @@ branch: fix/fallback-patch
 
 # PR Evidence
 
-PR #174 updated with description referencing spec and plan.
+PR #174 is OPEN, title verified via `gh pr view 174 --json title`.
