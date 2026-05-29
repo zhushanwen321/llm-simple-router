@@ -96,8 +96,18 @@ export function computeModalityRedirectTargets(
   snapshot: PipelineSnapshot,
 ): Target[] {
   try {
-    // 1. 空列表直接返回
-    if (targets.length === 0) return targets;
+    // 1. 空列表 → 记录诊断信息后返回（运维排查 400 时可看到 modality-redirect 阶段记录）
+    if (targets.length === 0) {
+      snapshot.add({
+        stage: "modality-redirect",
+        triggered: false,
+        original_model: "",
+        redirect_to: "",
+        redirect_provider: "",
+        reason: "empty-targets-input",
+      } satisfies StageRecord);
+      return targets;
+    }
 
     // 2. 检测多模态内容
     const modalities = detectModalities(body);
@@ -269,8 +279,9 @@ export function computeModalityRedirectTargets(
 
     return [fbTarget];
   } catch (err: unknown) {
-    // 异常安全：返回原始 targets，但记录诊断信息
-    console.error('computeModalityRedirectTargets: internal error, falling back to original targets', err);
+    // 异常安全：返回空数组，让 failover-loop 统一走 unsupportedModality 错误路径
+    // 避免将多模态请求发给不支持模态的 provider（比返回原始 targets 更安全）
+    console.error('computeModalityRedirectTargets: internal error, returning empty targets', err);
     snapshot.add({
       stage: "modality-redirect",
       triggered: false,
@@ -279,6 +290,6 @@ export function computeModalityRedirectTargets(
       redirect_provider: "",
       reason: "internal-error",
     } satisfies StageRecord);
-    return targets;
+    return [];
   }
 }
