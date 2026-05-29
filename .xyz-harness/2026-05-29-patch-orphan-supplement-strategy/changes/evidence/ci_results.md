@@ -1,6 +1,6 @@
 ---
 ci_passed: true
-ci_url: https://github.com/zhushanwen321/llm-simple-router/actions/runs/26619618486
+ci_url: https://github.com/zhushanwen321/llm-simple-router/actions/runs/26619558746
 commit_sha: bdaa876af5ed92e4f759fe5f5fbb2bbd6c9f4d5c
 ---
 
