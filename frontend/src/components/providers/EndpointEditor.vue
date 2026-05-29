@@ -44,13 +44,20 @@ const emit = defineEmits<{
   "update:modelValue": [value: ProviderEndpoint[]];
 }>();
 
-/** 是否展开 per-endpoint API Key 编辑（渐进式披露） */
-const showPerEndpointKeys = ref(
-  /* 初始展开条件：任一 endpoint 已有自定义 key */
+/** 是否有任一 endpoint 使用自定义 key */
+const hasCustomKeys = computed(() =>
   props.modelValue.some(
     (ep) =>
       ep.api_key !== null && ep.api_key !== undefined && ep.api_key !== "",
   ),
+);
+
+/** 手动展开/收起控制 */
+const manuallyExpanded = ref(false);
+
+/** 是否展开 per-endpoint API Key 编辑（渐进式披露） */
+const showPerEndpointKeys = computed(
+  () => manuallyExpanded.value || hasCustomKeys.value,
 );
 
 const usedApiTypes = computed(
@@ -125,17 +132,19 @@ function updateField<K extends keyof ProviderEndpoint>(
       v-if="!readonly"
       class="flex items-center gap-2 text-[11px] text-muted-foreground"
     >
-      <button
+      <Button
         type="button"
-        class="underline decoration-dotted underline-offset-2 hover:text-foreground transition-colors"
-        @click="showPerEndpointKeys = !showPerEndpointKeys"
+        variant="link"
+        size="sm"
+        class="h-auto p-0 text-[11px] text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground"
+        @click="manuallyExpanded = !manuallyExpanded"
       >
         {{
           showPerEndpointKeys
             ? t("providers.endpoints.hidePerEndpointKeys")
             : t("providers.endpoints.showPerEndpointKeys")
         }}
-      </button>
+      </Button>
       <span v-if="sharedKey && !showPerEndpointKeys" class="opacity-70">
         {{ t("providers.endpoints.allUseSharedKey") }}
       </span>
