@@ -1,0 +1,106 @@
+{
+  "test_execution": [
+    {
+      "caseId": "TC-1-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "vitest: '反向：部分配对时为未配对的 tool_call 补入合成 tool 消息，保留已配对的' 测试通过",
+        "验证 assistant.tool_calls 保持长度 2，合成 tool 消息 tool_call_id='orphan'，content='[context truncated]'"
+      ],
+      "evidence": "vitest 31 passed, test at patch.test.ts:207"
+    },
+    {
+      "caseId": "TC-1-02",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "vitest: '反向：为非末尾 assistant 的孤儿 tool_call 补入合成 tool 消息' 测试通过",
+        "验证消息链长度 4，roles=[user, assistant, tool, user]，合成 tool content='[context truncated]'"
+      ],
+      "evidence": "vitest 31 passed, test at patch.test.ts:183"
+    },
+    {
+      "caseId": "TC-2-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "vitest: '移除没有对应 tool_calls 的 tool 消息' 测试通过",
+        "验证 call_ghost tool 消息被删除，连续 user 合并"
+      ],
+      "evidence": "vitest 31 passed, test at patch.test.ts:125"
+    },
+    {
+      "caseId": "TC-3-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "vitest: 'Step 4: 将插在 tool_calls 和 tool 之间的 user 消息挪到 tool 之后' 测试通过",
+        "vitest: 'Step 4: 多条 intervening 消息（user + system）都被挪到 tool 之后' 测试通过",
+        "vitest: 'Step 4: 部分 tool 消息匹配时补入合成消息后重排' 测试通过"
+      ],
+      "evidence": "vitest 31 passed, tests at patch.test.ts:282, 299, 309"
+    },
+    {
+      "caseId": "TC-4-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "vitest: 'Step 4: 无 intervening 消息时不做任何修改' 测试通过",
+        "验证 JSON.stringify(body) === original（幂等性）"
+      ],
+      "evidence": "vitest 31 passed, test at patch.test.ts:345"
+    },
+    {
+      "caseId": "TC-5-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "vitest: '反向：末尾 assistant 的 tool_calls 保持不动' 测试验证末尾 assistant 跳过",
+        "空 ID 场景：源码中 !id continue 分支确保空 id 不补不删"
+      ],
+      "evidence": "vitest 31 passed + code review of orphan detection loop line ~168"
+    },
+    {
+      "caseId": "TC-5-02",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "vitest: '反向：末尾 assistant 的 tool_calls 保持不动（正常的工具调用中间状态）' 测试通过",
+        "验证末尾 assistant 的 tool_calls 未被修改"
+      ],
+      "evidence": "vitest 31 passed, test at patch.test.ts:195"
+    },
+    {
+      "caseId": "TC-6-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "vitest: '反向：为非末尾 assistant 的孤儿 tool_call 补入合成 tool 消息' 测试通过",
+        "验证 syntheticTool.content === '[context truncated]'",
+        "验证 syntheticTool.tool_call_id === 'orphan_1'（复用原始 id，无随机生成）"
+      ],
+      "evidence": "vitest 31 passed, test at patch.test.ts:183"
+    },
+    {
+      "caseId": "TC-6-02",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "grep 'reasoning_content' router/src/proxy/patch/deepseek/patch-orphan-tool-results.ts → 0 matches",
+        "确认 patchOrphanToolResultsOA 不再注入 reasoning_content"
+      ],
+      "evidence": "grep exit code 1 (no matches)"
+    },
+    {
+      "caseId": "TC-6-03",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "grep 'opencode.ai' router/src/proxy/patch/index.ts → 0 matches",
+        "确认 needsDeepSeekPatch 不含 opencode.ai 条件"
+      ],
+      "evidence": "grep exit code 1 (no matches)"
+    }
+  ]
+}
