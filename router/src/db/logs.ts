@@ -25,6 +25,8 @@ export interface RequestLog {
   original_model: string | null;
   stream_text_content: string | null;
   session_id: string | null;
+  upstream_api_type: string | null;
+  upstream_base_url: string | null;
 }
 
 /** 列表查询扩展字段：JOIN providers 获得 provider_name */
@@ -44,6 +46,7 @@ const LOG_LIST_SELECT = `rl.id, rl.api_type, rl.model, rl.provider_id, rl.status
             rm.tokens_per_second, rm.stop_reason, rm.backend_model, rm.is_complete AS metrics_complete,
             rm.input_tokens_estimated, rm.client_type, rm.cache_read_tokens_estimated,
             COALESCE(p.name, rl.provider_id) AS provider_name,
+            rl.upstream_api_type, rl.upstream_base_url,
             CASE
               WHEN rl.client_request IS NULL THEN 'off'
               WHEN rl.api_type = 'anthropic' THEN COALESCE(json_extract(rl.client_request, '$.body.thinking.type'), 'off')
@@ -80,6 +83,8 @@ export interface RequestLogInsert {
   resilience_reason?: string | null;
   mapping_reason?: string | null;
   failover_trigger?: string | null;
+  upstream_api_type?: string | null;
+  upstream_base_url?: string | null;
 }
 
 export interface LogWriteContext {
@@ -105,9 +110,10 @@ function rawInsertRequestLog(
     `INSERT INTO request_logs (id, api_type, model, provider_id, status_code, client_status_code, latency_ms,
       is_stream, error_message, created_at, client_request, upstream_request, upstream_response,
       is_retry, is_failover, original_request_id, router_key_id, original_model, session_id, pipeline_snapshot,
-      transport_kind, abort_reason, error_code, headers_sent, resilience_action, resilience_reason, mapping_reason, failover_trigger)
+      transport_kind, abort_reason, error_code, headers_sent, resilience_action, resilience_reason, mapping_reason, failover_trigger,
+      upstream_api_type, upstream_base_url)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-      ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     log.id, log.api_type, log.model, log.provider_id, log.status_code,
     log.client_status_code ?? null,
@@ -127,6 +133,8 @@ function rawInsertRequestLog(
     log.resilience_reason ?? null,
     log.mapping_reason ?? null,
     log.failover_trigger ?? null,
+    log.upstream_api_type ?? null,
+    log.upstream_base_url ?? null,
   );
 }
 
@@ -256,7 +264,8 @@ export function getRequestLogById(db: Database.Database, id: string): RequestLog
     `SELECT rl.*, rm.input_tokens, rm.output_tokens, rm.cache_read_tokens, rm.ttft_ms,
             rm.tokens_per_second, rm.stop_reason, rm.backend_model, rm.is_complete AS metrics_complete,
             rm.input_tokens_estimated, rm.client_type, rm.cache_read_tokens_estimated,
-            COALESCE(p.name, rl.provider_id) AS provider_name${LOG_DETAIL_THINKING_LEVEL}
+            COALESCE(p.name, rl.provider_id) AS provider_name${LOG_DETAIL_THINKING_LEVEL},
+            rl.upstream_api_type, rl.upstream_base_url
      FROM request_logs rl
      LEFT JOIN providers p ON p.id = rl.provider_id
      LEFT JOIN request_metrics rm ON rm.request_log_id = rl.id

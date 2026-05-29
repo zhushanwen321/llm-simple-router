@@ -7,7 +7,7 @@ import type {
 } from "../transform/plugin-types.js";
 import { pluginMatches } from "../transform/plugin-types.js";
 
-type ApiType = "openai" | "openai-responses" | "anthropic";
+import type { ApiType } from "../../core/types.js";
 
 /** Apply a request-phase plugin method (beforeRequest/afterRequest) to the pipeline context */
 function applyRequestTransform(

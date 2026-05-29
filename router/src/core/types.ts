@@ -85,6 +85,9 @@ export interface MetricsResult {
 
 // ========== 来自原 proxy/types.ts 公共部分 ==========
 
+/** Provider endpoint API 类型（openai / openai-responses / anthropic） */
+export type ApiType = "openai" | "openai-responses" | "anthropic";
+
 export type RawHeaders = Record<string, string | string[] | undefined>;
 
 export type TransportResult =
@@ -151,6 +154,23 @@ export interface ResilienceAttempt {
   error_code?: string | null;
   /** response headers 是否已发送，影响重试/failover 决策 */
   headers_sent?: boolean | null;
+}
+
+/** Provider endpoint — stored in providers.endpoints JSON field */
+export interface ProviderEndpoint {
+  api_type: ApiType;
+  base_url: string;
+  upstream_path?: string | null;
+  api_key?: string | null; // null = fallback 到 provider.api_key
+}
+
+/** resolveEndpoint() 的输出 — 所有下游消费者只消费此对象 */
+export interface ResolvedEndpoint {
+  api_type: ApiType;
+  base_url: string;
+  upstream_path: string | null;
+  api_key: string; // 已解密的最终 key（永远不会是 null）
+  needs_transform: boolean; // 是否需要 FormatRegistry 格式转换
 }
 
 /** 流式传输阶段状态 */
