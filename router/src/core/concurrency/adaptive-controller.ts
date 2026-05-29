@@ -18,10 +18,10 @@ const CLIMB_LEVEL_WEIGHT = 2;
 const DROP_BASE = 5;
 const DROP_CAPACITY_WEIGHT = 2;
 const DROP_LEVEL_WEIGHT = 2;
-const KEEP_RATIO_MIN = 0.5;
 const COOLDOWN_BASE_MS = 10_000;
 const COOLDOWN_LEVEL_MS = 10_000;
-const SAFE_ZONE_DIVISOR = 2;
+/** 满额时保留半数成功计数器的除数 */
+const AT_MAX_COUNTER_HALVE_DIVISOR = 2;
 
 interface AdaptiveEntry {
   state: AdaptiveState;
@@ -33,7 +33,6 @@ interface AdaptiveEntry {
 interface AdaptiveProfile {
   climbThreshold: number;
   dropThreshold: number;
-  keepRatio: number;
   cooldownMs: number;
 }
 
@@ -46,16 +45,15 @@ export class AdaptiveController {
   ) {}
 
   init(providerId: string, config: { max: number }, semParams: { queueTimeoutMs: number; maxQueueSize: number }): void {
-    const initialLimit = config.max;
+    const max = this.clampMax(config.max);
     this.entries.set(providerId, {
       state: {
-        currentLimit: initialLimit,
-        limitReached: false,
+        currentLimit: max,
         consecutiveSuccesses: 0,
         consecutiveFailures: 0,
         cooldownUntil: 0,
       },
-      max: config.max,
+      max,
       queueTimeoutMs: semParams.queueTimeoutMs,
       maxQueueSize: semParams.maxQueueSize,
     });
@@ -90,11 +88,12 @@ export class AdaptiveController {
     if (p.adaptive_enabled) {
       const existing = this.entries.get(providerId);
       if (existing) {
-        existing.max = p.max_concurrency;
+        const max = this.clampMax(p.max_concurrency);
+        existing.max = max;
         existing.queueTimeoutMs = p.queue_timeout_ms;
         existing.maxQueueSize = p.max_queue_size;
         existing.state.currentLimit = Math.min(
-          Math.max(existing.state.currentLimit, ADAPTIVE_MIN), existing.max,
+          Math.max(existing.state.currentLimit, ADAPTIVE_MIN), max,
         );
         this.syncToSemaphore(providerId);
       } else {
@@ -113,6 +112,12 @@ export class AdaptiveController {
     }
   }
 
+  /** 将 max_concurrency 钳制到 >= ADAPTIVE_MIN，防止 NaN/undefined 泄漏到 deriveProfile */
+  private clampMax(value: number): number {
+    const n = Number(value);
+    return Number.isFinite(n) && n >= ADAPTIVE_MIN ? n : ADAPTIVE_MIN;
+  }
+
   /** 根据当前位置和容量推导行为参数，实现水位梯度控制 */
   private deriveProfile(currentLimit: number, max: number): AdaptiveProfile {
     const level = Math.min(1, currentLimit / max);
@@ -121,7 +126,6 @@ export class AdaptiveController {
     return {
       climbThreshold: Math.max(CLIMB_BASE, Math.round(CLIMB_BASE + capacity * CLIMB_CAPACITY_WEIGHT + level * CLIMB_LEVEL_WEIGHT)),
       dropThreshold: Math.max(1, Math.round(DROP_BASE - capacity * DROP_CAPACITY_WEIGHT - level * DROP_LEVEL_WEIGHT)),
-      keepRatio: currentLimit > 1 ? 1 - 1 / currentLimit : KEEP_RATIO_MIN,
       cooldownMs: Math.round(COOLDOWN_BASE_MS + level * COOLDOWN_LEVEL_MS),
     };
   }
@@ -129,30 +133,23 @@ export class AdaptiveController {
   private transitionSuccess(providerId: string, entry: AdaptiveEntry, result: AdaptiveResult): void {
     const s = entry.state;
 
-    // 冷却期内不累计成功计数
-    if (Date.now() < s.cooldownUntil) return;
-
+    // V3: 冷却期不阻止成功累积（翻转语义：冷却期只阻止下降）
     s.consecutiveSuccesses++;
     s.consecutiveFailures = 0;
-
-    // 利用率信号：请求排过队说明 limit 被实际触及
-    if (result.wasQueued) {
-      s.limitReached = true;
-    }
 
     const profile = this.deriveProfile(s.currentLimit, entry.max);
 
     if (s.consecutiveSuccesses >= profile.climbThreshold) {
-      // 利用率门控：安全区(limit <= max/2) 或 limitReached 才爬升
-      const safeZone = s.currentLimit <= Math.floor(entry.max / SAFE_ZONE_DIVISOR);
-      if (safeZone || s.limitReached) {
-        const prevLimit = s.currentLimit;
-        s.currentLimit = Math.min(s.currentLimit + 1, entry.max);
+      const prevLimit = s.currentLimit;
+      s.currentLimit = Math.min(s.currentLimit + 1, entry.max);
+      // 满额时保留半数计数器，避免反复从 0 开始爬升
+      if (s.currentLimit === entry.max) {
+        s.consecutiveSuccesses = Math.floor(s.consecutiveSuccesses / AT_MAX_COUNTER_HALVE_DIVISOR);
+        this.logger?.debug?.({ providerId, prevLimit, newLimit: s.currentLimit, action: "at_max_counter_cycle" }, "Adaptive: at max, counters preserved");
+      } else {
+        s.consecutiveSuccesses = 0;
         this.logger?.info?.({ providerId, requestId: result.requestId, prevLimit, newLimit: s.currentLimit, action: "limit_increased" }, "Adaptive: limit increased by 1");
       }
-      // 无论是否爬升，都重置计数周期
-      s.consecutiveSuccesses = 0;
-      s.limitReached = false;
       this.syncToSemaphore(providerId);
     }
   }
@@ -172,24 +169,32 @@ export class AdaptiveController {
     }
 
     const s = entry.state;
+
+    // V3: 冷却期前置检查——阻止进一步下降，但不重置成功计数
+    if (Date.now() < s.cooldownUntil) {
+      this.logger?.debug?.({ providerId, statusCode, action: "failure_blocked_by_cooldown" }, "Adaptive: failure blocked by cooldown");
+      return;
+    }
+
     s.consecutiveFailures++;
     s.consecutiveSuccesses = 0;
 
     if (statusCode === RATE_LIMIT_STATUS) {
-      // 429 和信号量错误：丢 1 格 + 冷却
+      // 429: 固定 -1 + 冷却期
       const profile = this.deriveProfile(s.currentLimit, entry.max);
       const prevLimit = s.currentLimit;
-      s.currentLimit = Math.max(Math.floor(s.currentLimit * profile.keepRatio), ADAPTIVE_MIN);
+      s.currentLimit = Math.max(s.currentLimit - 1, ADAPTIVE_MIN);
       s.cooldownUntil = Date.now() + profile.cooldownMs;
       s.consecutiveFailures = 0;
       this.syncToSemaphore(providerId);
       this.logger?.warn?.({ providerId, requestId: result.requestId, prevLimit, newLimit: s.currentLimit, cooldownMs: profile.cooldownMs, statusCode, action: "rate_limit_backoff" }, "Adaptive: 429/semaphore, lost 1 slot and entered cooldown");
     } else {
-      // 5xx / 网络错误（statusCode=undefined）：连续失败退避
+      // 5xx / 网络错误（statusCode=undefined）：连续失败退避 + 冷却期
       const profile = this.deriveProfile(s.currentLimit, entry.max);
       if (s.consecutiveFailures >= profile.dropThreshold) {
         const prevLimit = s.currentLimit;
         s.currentLimit = Math.max(s.currentLimit - 1, ADAPTIVE_MIN);
+        s.cooldownUntil = Date.now() + profile.cooldownMs;
         s.consecutiveFailures = 0;
         this.syncToSemaphore(providerId);
         this.logger?.warn?.({ providerId, requestId: result.requestId, prevLimit, newLimit: s.currentLimit, statusCode, retryRuleMatched: result.retryRuleMatched ?? false, action: "failure_backoff" }, "Adaptive: sustained failures, decreased concurrency");
