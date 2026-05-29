@@ -14,8 +14,11 @@ import {
   type RecommendedRetryRule,
   type QuickSetupPayload,
 } from "@/api/client";
-import type { MappingGroup } from "@/types/mapping";
-import type { Provider as ApiProvider } from "@/types/mapping";
+import type {
+  MappingGroup,
+  Provider as ApiProvider,
+  ProviderEndpoint,
+} from "@/types/mapping";
 import { toast } from "vue-sonner";
 import {
   type ClientType,
@@ -151,19 +154,12 @@ interface ProviderPayloadInput {
   maxConcurrency: number;
   queueTimeoutMs: number;
   maxQueueSize: number;
+  endpoints: ProviderEndpoint[];
 }
 
 function buildProviderPayload(
   input: ProviderPayloadInput,
 ): QuickSetupPayload["provider"] {
-  const endpoints = [
-    {
-      api_type: input.apiType,
-      base_url: input.baseUrl,
-      upstream_path: input.upstreamPath || undefined,
-      api_key: input.apiKey,
-    },
-  ];
   return {
     name: input.isCustom
       ? `custom-${Date.now()}`
@@ -172,7 +168,12 @@ function buildProviderPayload(
     base_url: input.baseUrl,
     upstream_path: input.upstreamPath || undefined,
     api_key: input.apiKey,
-    endpoints,
+    endpoints: input.endpoints.map((ep) => ({
+      api_type: ep.api_type,
+      base_url: ep.base_url,
+      upstream_path: ep.upstream_path ?? undefined,
+      api_key: ep.api_key ?? undefined,
+    })),
     models: input.models.map((m) => ({
       name: m.name,
       context_window: m.contextWindow,
@@ -289,6 +290,7 @@ interface QuickSetupPayloadInput {
   recommendedRules: RecommendedRetryRule[];
   selectedRetryRules: Set<string>;
   transformRules: QuickSetupPayload["transform_rules"];
+  endpoints: ProviderEndpoint[];
 }
 
 function buildQuickSetupPayload(
@@ -308,6 +310,7 @@ function buildQuickSetupPayload(
       maxConcurrency: input.maxConcurrency,
       queueTimeoutMs: input.queueTimeoutMs,
       maxQueueSize: input.maxQueueSize,
+      endpoints: input.endpoints,
     }),
     mappings: input.mappingEntries
       .filter((m) => m.targets[0]?.backend_model)
@@ -555,6 +558,200 @@ async function testQuickSetupConnection(
   connectionStatus.value = "ok";
 }
 
+function makeQuickSetupSubmit(
+  currentPreset: ComputedRef<ProviderGroup["presets"][number] | undefined>,
+  sharedKey: Ref<string>,
+  apiKey: Ref<string>,
+  isCustomProvider: ComputedRef<boolean>,
+  selectedGroup: Ref<string>,
+  selectedPlan: Ref<string>,
+  apiType: Ref<"openai" | "openai-responses" | "anthropic">,
+  baseUrl: ComputedRef<string>,
+  upstreamPath: ComputedRef<string>,
+  modelConfigs: Ref<ModelConfig[]>,
+  concurrencyMode: Ref<ConcurrencyMode>,
+  maxConcurrency: Ref<number>,
+  queueTimeoutMs: Ref<number>,
+  maxQueueSize: Ref<number>,
+  mappingEntries: Ref<MappingEntry[]>,
+  recommendedRules: ComputedRef<RecommendedRetryRule[]>,
+  selectedRetryRules: Ref<Set<string>>,
+  transformInjectHeaders: Ref<string>,
+  transformDropFields: Ref<string>,
+  transformRequestDefaults: Ref<string>,
+  endpoints: Ref<ProviderEndpoint[]>,
+  saving: Ref<boolean>,
+  t: (key: string, params?: Record<string, unknown>) => string,
+) {
+  return async function submit() {
+    if (!currentPreset.value) {
+      toast.error(t("quickSetup.messages.selectProviderAndPlan"));
+      return;
+    }
+    if (!sharedKey.value.trim() && !apiKey.value.trim()) {
+      toast.error(t("quickSetup.messages.fillApiKey"));
+      return;
+    }
+    saving.value = true;
+    try {
+      const transformRules = parseTransformRules(
+        transformInjectHeaders.value.trim(),
+        transformDropFields.value.trim(),
+        transformRequestDefaults.value.trim(),
+        (key) => toast.error(t(`quickSetup.messages.${key}`)),
+      );
+      if (transformRules === false) return;
+      const payload = buildQuickSetupPayload({
+        isCustomProvider: isCustomProvider.value,
+        selectedGroup: selectedGroup.value,
+        selectedPlan: selectedPlan.value,
+        apiType: apiType.value,
+        baseUrl: baseUrl.value,
+        upstreamPath: upstreamPath.value,
+        apiKey: sharedKey.value.trim() || apiKey.value.trim(),
+        models: modelConfigs.value,
+        concurrencyMode: concurrencyMode.value,
+        maxConcurrency: maxConcurrency.value,
+        queueTimeoutMs: queueTimeoutMs.value,
+        maxQueueSize: maxQueueSize.value,
+        mappingEntries: mappingEntries.value,
+        recommendedRules: recommendedRules.value,
+        selectedRetryRules: selectedRetryRules.value,
+        transformRules: transformRules,
+        endpoints: endpoints.value.map((ep) => ({
+          ...ep,
+          api_key: ep.api_key ?? (sharedKey.value.trim() || null),
+        })),
+      });
+      await api.quickSetup(payload);
+      const toggleErrors = await toggleChangedMappings(mappingEntries.value);
+      if (toggleErrors.length > 0) {
+        toast.success(
+          t("quickSetup.messages.setupCompleteWithErrors", {
+            count: toggleErrors.length,
+          }),
+        );
+      } else {
+        toast.success(t("quickSetup.messages.setupComplete"));
+      }
+      await new Promise((r) => setTimeout(r, POST_SAVE_REDIRECT_MS));
+      router.push("/");
+    } catch (e: unknown) {
+      console.error("quickSetup.save:", e);
+      toast.error(getApiMessage(e, t("quickSetup.messages.setupFailed")));
+    } finally {
+      saving.value = false;
+    }
+  };
+}
+
+function applyPresetEndpointsLogic(
+  endpoints: Ref<ProviderEndpoint[]>,
+  presetBaseUrl: string,
+  presetUpstreamPath?: string,
+) {
+  const hasCustomPath = !!presetUpstreamPath;
+  endpoints.value = [
+    {
+      api_type: "openai",
+      base_url: presetBaseUrl,
+      upstream_path: hasCustomPath
+        ? presetUpstreamPath!
+        : "/v1/chat/completions",
+      api_key: null,
+    },
+    {
+      api_type: "anthropic",
+      base_url: presetBaseUrl,
+      upstream_path: hasCustomPath ? presetUpstreamPath! : "/v1/messages",
+      api_key: null,
+    },
+  ];
+}
+
+interface ProviderChangeContext {
+  selectedGroup: Ref<string>;
+  selectedPlan: Ref<string>;
+  apiType: Ref<"openai" | "openai-responses" | "anthropic">;
+  modelConfigs: Ref<ModelConfig[]>;
+  endpoints: Ref<ProviderEndpoint[]>;
+  customBaseUrl: Ref<string>;
+  customUpstreamPath: Ref<string>;
+  providerGroups: Ref<ProviderGroup[]>;
+  currentClient: ComputedRef<(typeof CLIENTS)[number] | undefined>;
+  isNonOpenaiEndpoint: ComputedRef<boolean>;
+  updateMappings: () => void;
+  autoSelectRetryRules: () => void;
+  applyPresetEndpoints: (baseUrl: string, upstreamPath?: string) => void;
+}
+
+function makeOnProviderChange(ctx: ProviderChangeContext) {
+  return (group: string) => {
+    ctx.selectedGroup.value = group;
+    ctx.selectedPlan.value = "";
+    ctx.modelConfigs.value = [];
+    ctx.endpoints.value = [];
+    if (group === "__custom__") {
+      ctx.apiType.value = "openai";
+      ctx.customBaseUrl.value = "";
+      ctx.customUpstreamPath.value = "";
+      ctx.endpoints.value = [
+        {
+          api_type: "openai",
+          base_url: "",
+          upstream_path: null,
+          api_key: null,
+        },
+      ];
+    } else {
+      const groupData = ctx.providerGroups.value.find((g) => g.group === group);
+      if (groupData && groupData.presets.length > 0) {
+        const client = ctx.currentClient.value;
+        const compatibleFormats =
+          client?.format === "openai-responses"
+            ? ["openai-responses", "openai"]
+            : client
+              ? [client.format]
+              : [];
+        const match = client
+          ? groupData.presets.find((p) => compatibleFormats.includes(p.apiType))
+          : null;
+        const preset = match ?? groupData.presets[0];
+        ctx.selectedPlan.value = preset.plan;
+        ctx.apiType.value = resolveApiType(client?.format, preset.apiType);
+        applyPresetModels(preset, ctx.modelConfigs, ctx.isNonOpenaiEndpoint);
+        ctx.applyPresetEndpoints(preset.baseUrl, preset.upstreamPath);
+      }
+    }
+    ctx.updateMappings();
+    ctx.autoSelectRetryRules();
+  };
+}
+
+function makeOnPlanChange(ctx: ProviderChangeContext) {
+  return (plan: string) => {
+    ctx.selectedPlan.value = plan;
+    const group = ctx.providerGroups.value.find(
+      (g) => g.group === ctx.selectedGroup.value,
+    );
+    if (!group) return;
+    const preset = group.presets.find((p) => p.plan === plan);
+    if (!preset) return;
+    ctx.apiType.value = resolveApiType(
+      ctx.currentClient.value?.format,
+      preset.apiType,
+    );
+    applyPresetModels(preset, ctx.modelConfigs, ctx.isNonOpenaiEndpoint);
+    ctx.applyPresetEndpoints(preset.baseUrl, preset.upstreamPath);
+    ctx.updateMappings();
+  };
+}
+
+function makeApplyPresetEndpoints(endpoints: Ref<ProviderEndpoint[]>) {
+  return (presetBaseUrl: string, presetUpstreamPath?: string) =>
+    applyPresetEndpointsLogic(endpoints, presetBaseUrl, presetUpstreamPath);
+}
+
 export function useQuickSetup() {
   const { t } = useI18n();
 
@@ -564,6 +761,8 @@ export function useQuickSetup() {
   const selectedPlan = ref("");
   const apiType = ref<"openai" | "openai-responses" | "anthropic">("anthropic");
   const apiKey = ref("");
+  const sharedKey = ref("");
+  const endpoints = ref<ProviderEndpoint[]>([]);
   const modelConfigs = ref<ModelConfig[]>([]);
   const mappingEntries = ref<MappingEntry[]>([]);
   const allRecommendedRules = ref<RecommendedRetryRule[]>([]);
@@ -631,49 +830,26 @@ export function useQuickSetup() {
     updateMappings();
   }
 
-  function onProviderChange(group: string) {
-    selectedGroup.value = group;
-    selectedPlan.value = "";
-    modelConfigs.value = [];
-    if (group === "__custom__") {
-      apiType.value = "openai";
-      customBaseUrl.value = "";
-      customUpstreamPath.value = "";
-    } else {
-      const groupData = providerGroups.value.find((g) => g.group === group);
-      if (groupData && groupData.presets.length > 0) {
-        const client = currentClient.value;
-        const compatibleFormats =
-          client?.format === "openai-responses"
-            ? ["openai-responses", "openai"]
-            : client
-              ? [client.format]
-              : [];
-        const match = client
-          ? groupData.presets.find((p) => compatibleFormats.includes(p.apiType))
-          : null;
-        const preset = match ?? groupData.presets[0];
-        selectedPlan.value = preset.plan;
-        apiType.value = resolveApiType(client?.format, preset.apiType);
-        applyPresetModels(preset, modelConfigs, isNonOpenaiEndpoint);
-      }
-    }
-    updateMappings();
-    autoSelectRetryRules();
-  }
+  const applyPresetEndpoints = makeApplyPresetEndpoints(endpoints);
 
-  function onPlanChange(plan: string) {
-    selectedPlan.value = plan;
-    const group = providerGroups.value.find(
-      (g) => g.group === selectedGroup.value,
-    );
-    if (!group) return;
-    const preset = group.presets.find((p) => p.plan === plan);
-    if (!preset) return;
-    apiType.value = resolveApiType(currentClient.value?.format, preset.apiType);
-    applyPresetModels(preset, modelConfigs, isNonOpenaiEndpoint);
-    updateMappings();
-  }
+  const providerChangeCtx: ProviderChangeContext = {
+    selectedGroup,
+    selectedPlan,
+    apiType,
+    modelConfigs,
+    endpoints,
+    customBaseUrl,
+    customUpstreamPath,
+    providerGroups,
+    currentClient,
+    isNonOpenaiEndpoint,
+    updateMappings,
+    autoSelectRetryRules,
+    applyPresetEndpoints,
+  };
+
+  const onProviderChange = makeOnProviderChange(providerChangeCtx);
+  const onPlanChange = makeOnPlanChange(providerChangeCtx);
 
   watch(apiType, () => {
     for (const model of modelConfigs.value) {
@@ -738,7 +914,7 @@ export function useQuickSetup() {
   }
 
   async function testConnection() {
-    return testQuickSetupConnection(apiKey, connectionStatus, (msg) =>
+    return testQuickSetupConnection(sharedKey, connectionStatus, (msg) =>
       toast.error(t(msg)),
     );
   }
@@ -756,62 +932,31 @@ export function useQuickSetup() {
     );
   }
 
-  async function submit() {
-    if (!currentPreset.value) {
-      toast.error(t("quickSetup.messages.selectProviderAndPlan"));
-      return;
-    }
-    if (!apiKey.value.trim()) {
-      toast.error(t("quickSetup.messages.fillApiKey"));
-      return;
-    }
-    saving.value = true;
-    try {
-      const transformRules = parseTransformRules(
-        transformInjectHeaders.value.trim(),
-        transformDropFields.value.trim(),
-        transformRequestDefaults.value.trim(),
-        (key) => toast.error(t(`quickSetup.messages.${key}`)),
-      );
-      if (transformRules === false) return;
-      const payload = buildQuickSetupPayload({
-        isCustomProvider: isCustomProvider.value,
-        selectedGroup: selectedGroup.value,
-        selectedPlan: selectedPlan.value,
-        apiType: apiType.value,
-        baseUrl: baseUrl.value,
-        upstreamPath: upstreamPath.value,
-        apiKey: apiKey.value.trim(),
-        models: modelConfigs.value,
-        concurrencyMode: concurrencyMode.value,
-        maxConcurrency: maxConcurrency.value,
-        queueTimeoutMs: queueTimeoutMs.value,
-        maxQueueSize: maxQueueSize.value,
-        mappingEntries: mappingEntries.value,
-        recommendedRules: recommendedRules.value,
-        selectedRetryRules: selectedRetryRules.value,
-        transformRules: transformRules,
-      });
-      await api.quickSetup(payload);
-      const toggleErrors = await toggleChangedMappings(mappingEntries.value);
-      if (toggleErrors.length > 0) {
-        toast.success(
-          t("quickSetup.messages.setupCompleteWithErrors", {
-            count: toggleErrors.length,
-          }),
-        );
-      } else {
-        toast.success(t("quickSetup.messages.setupComplete"));
-      }
-      await new Promise((r) => setTimeout(r, POST_SAVE_REDIRECT_MS));
-      router.push("/");
-    } catch (e: unknown) {
-      console.error("quickSetup.save:", e);
-      toast.error(getApiMessage(e, t("quickSetup.messages.setupFailed")));
-    } finally {
-      saving.value = false;
-    }
-  }
+  const submit = makeQuickSetupSubmit(
+    currentPreset,
+    sharedKey,
+    apiKey,
+    isCustomProvider,
+    selectedGroup,
+    selectedPlan,
+    apiType,
+    baseUrl,
+    upstreamPath,
+    modelConfigs,
+    concurrencyMode,
+    maxConcurrency,
+    queueTimeoutMs,
+    maxQueueSize,
+    mappingEntries,
+    recommendedRules,
+    selectedRetryRules,
+    transformInjectHeaders,
+    transformDropFields,
+    transformRequestDefaults,
+    endpoints,
+    saving,
+    t,
+  );
 
   onMounted(() => {
     fetchQuickSetupInitialData(
@@ -831,6 +976,8 @@ export function useQuickSetup() {
     selectedPlan,
     apiType,
     apiKey,
+    sharedKey,
+    endpoints,
     modelConfigs,
     mappingEntries,
     allRecommendedRules,

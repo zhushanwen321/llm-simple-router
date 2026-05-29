@@ -47,7 +47,7 @@
         }}</CardTitle>
       </CardHeader>
       <CardContent class="space-y-4">
-        <!-- Line 1: Provider / Plan / Format / BaseURL / APIKey -->
+        <!-- Line 1: Provider / Plan / Shared API Key / Test -->
         <div class="flex items-end gap-2">
           <div class="w-40 space-y-1">
             <Label class="text-xs text-muted-foreground">{{
@@ -75,110 +75,35 @@
               </SelectContent>
             </Select>
           </div>
-          <!-- Custom mode: show format + editable base url -->
-          <template v-if="isCustomProvider">
-            <div class="w-48 space-y-1">
-              <Label class="text-xs text-muted-foreground">{{
-                t("quickSetup.provider.format")
-              }}</Label>
-              <Select v-model="apiType">
-                <SelectTrigger class="w-full text-xs data-[size=default]:h-7"
-                  ><SelectValue
-                /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="anthropic">Anthropic Messages</SelectItem>
-                  <SelectItem value="openai"
-                    >OpenAI Chat Completions</SelectItem
-                  >
-                  <SelectItem value="openai-responses"
-                    >OpenAI Responses</SelectItem
-                  >
-                </SelectContent>
-              </Select>
-            </div>
-            <div class="w-80 space-y-1">
-              <Label class="text-xs text-muted-foreground">Base URL</Label>
-              <Input
-                v-model="customBaseUrl"
-                placeholder="https://api.example.com/v1"
-                class="font-mono md:text-xs h-7"
-              />
-            </div>
-            <div class="w-48 space-y-1">
-              <Label class="text-xs text-muted-foreground">Upstream Path</Label>
-              <Input
-                v-model="customUpstreamPath"
-                placeholder="/v1/chat/completions"
-                class="font-mono md:text-xs h-7"
-              />
-            </div>
-          </template>
-          <!-- Preset mode: show plan + readonly base url -->
-          <template v-else>
-            <div class="w-28 space-y-1">
-              <Label class="text-xs text-muted-foreground">{{
-                t("quickSetup.provider.plan")
-              }}</Label>
-              <Select
-                :model-value="selectedPlan"
-                @update:model-value="(v: unknown) => onPlanChange(v as string)"
-              >
-                <SelectTrigger class="w-full text-xs data-[size=default]:h-7"
-                  ><SelectValue :placeholder="t('quickSetup.provider.select')"
-                /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem
-                    v-for="p in availablePlans"
-                    :key="p.plan"
-                    :value="p.plan"
-                    >{{ p.plan }}</SelectItem
-                  >
-                </SelectContent>
-              </Select>
-            </div>
-            <div class="w-48 space-y-1">
-              <Label class="text-xs text-muted-foreground">{{
-                t("quickSetup.provider.format")
-              }}</Label>
-              <Select v-model="apiType">
-                <SelectTrigger class="w-full text-xs data-[size=default]:h-7"
-                  ><SelectValue
-                /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="anthropic">Anthropic Messages</SelectItem>
-                  <SelectItem value="openai"
-                    >OpenAI Chat Completions</SelectItem
-                  >
-                  <SelectItem value="openai-responses"
-                    >OpenAI Responses</SelectItem
-                  >
-                </SelectContent>
-              </Select>
-            </div>
-            <div class="w-72 space-y-1">
-              <Label class="text-xs text-muted-foreground">Base URL</Label>
-              <Input
-                :model-value="baseUrl"
-                readonly
-                class="font-mono md:text-xs h-7"
-              />
-            </div>
-            <!-- 非默认 upstream path（如百度千帆） -->
-            <div v-if="upstreamPath" class="w-48 space-y-1">
-              <Label class="text-xs text-muted-foreground">Upstream Path</Label>
-              <Input
-                :model-value="upstreamPath"
-                readonly
-                class="font-mono md:text-xs h-7"
-              />
-            </div>
-          </template>
+          <!-- Preset mode: Plan select -->
+          <div v-if="!isCustomProvider" class="w-28 space-y-1">
+            <Label class="text-xs text-muted-foreground">{{
+              t("quickSetup.provider.plan")
+            }}</Label>
+            <Select
+              :model-value="selectedPlan"
+              @update:model-value="(v: unknown) => onPlanChange(v as string)"
+            >
+              <SelectTrigger class="w-full text-xs data-[size=default]:h-7"
+                ><SelectValue :placeholder="t('quickSetup.provider.select')"
+              /></SelectTrigger>
+              <SelectContent>
+                <SelectItem
+                  v-for="p in availablePlans"
+                  :key="p.plan"
+                  :value="p.plan"
+                  >{{ p.plan }}</SelectItem
+                >
+              </SelectContent>
+            </Select>
+          </div>
+          <!-- Shared API Key -->
           <div class="w-64 space-y-1">
             <Label class="text-xs text-muted-foreground">{{
               t("quickSetup.provider.apiKey")
             }}</Label>
             <Input
-              v-model="apiKey"
+              v-model="sharedKey"
               type="password"
               :placeholder="t('quickSetup.provider.apiKeyPlaceholder')"
               class="md:text-xs h-7"
@@ -222,6 +147,16 @@
               <template v-else>{{ t("quickSetup.provider.test") }}</template>
             </Button>
           </div>
+        </div>
+
+        <!-- Line 2: Endpoints -->
+        <div v-if="endpoints.length > 0" class="border-t pt-3">
+          <EndpointEditor
+            :model-value="endpoints"
+            :shared-key="sharedKey"
+            :readonly="!isCustomProvider"
+            @update:model-value="endpoints = $event"
+          />
         </div>
 
         <!-- Line 2: Model Cards -->
@@ -512,6 +447,7 @@ import ModelCard from "@/components/quick-setup/ModelCard.vue";
 import QuickSetupMappingList from "@/components/shared/QuickSetupMappingList.vue";
 import ConcurrencyControl from "@/components/shared/ConcurrencyControl.vue";
 import TransformRulesForm from "@/components/shared/TransformRulesForm.vue";
+import EndpointEditor from "@/components/providers/EndpointEditor.vue";
 import type { ModelConfig } from "@/components/quick-setup/types";
 import { CLIENTS } from "@/components/quick-setup/types";
 
@@ -539,6 +475,8 @@ const {
   selectedPlan,
   apiType,
   apiKey,
+  sharedKey,
+  endpoints,
   modelConfigs,
   mappingEntries,
   allRecommendedRules,
@@ -546,13 +484,9 @@ const {
   selectedRetryRules,
   saving,
   connectionStatus,
-  baseUrl,
   availablePlans,
   isNonOpenaiEndpoint,
   isCustomProvider,
-  customBaseUrl,
-  upstreamPath,
-  customUpstreamPath,
   concurrencyMode,
   maxConcurrency,
   queueTimeoutMs,
@@ -625,7 +559,7 @@ function validateConfig() {
     toast.error(t("quickSetup.messages.selectProvider"));
     return;
   }
-  if (!apiKey.value.trim()) {
+  if (!sharedKey.value.trim() && !apiKey.value.trim()) {
     toast.error(t("quickSetup.messages.fillApiKey"));
     return;
   }
