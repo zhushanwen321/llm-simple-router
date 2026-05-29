@@ -154,7 +154,7 @@
           <EndpointEditor
             :model-value="endpoints"
             :shared-key="sharedKey"
-            :readonly="!isCustomProvider"
+            :readonly="false"
             @update:model-value="endpoints = $event"
           />
         </div>

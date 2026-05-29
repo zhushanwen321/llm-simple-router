@@ -21,8 +21,9 @@ export function useProviderPresets(form: {
   const availablePlans = computed(() => {
     if (!presetGroup.value) return [];
     return (
-      providerPresets.value.find((g) => g.group === presetGroup.value)
-        ?.presets ?? []
+      providerPresets.value
+        .find((g) => g.group === presetGroup.value)
+        ?.presets.filter((p) => !p.hidden) ?? []
     );
   });
 

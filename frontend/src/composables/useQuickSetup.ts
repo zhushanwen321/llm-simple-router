@@ -388,7 +388,7 @@ function makeAvailablePlans(
     const group = providerGroups.value.find(
       (g) => g.group === selectedGroup.value,
     );
-    return group?.presets ?? [];
+    return group?.presets.filter((p) => !p.hidden) ?? [];
   });
 }
 
