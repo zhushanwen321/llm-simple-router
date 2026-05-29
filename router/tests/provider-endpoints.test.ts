@@ -5,6 +5,7 @@ import Database from "better-sqlite3";
 import { buildApp } from "../src/index.js";
 import { initDatabase } from "../src/db/index.js";
 import { encrypt } from "../src/utils/crypto.js";
+import { parseEndpoints } from "../src/db/providers.js";
 import { makeConfig, seedSettings, login, TEST_ENCRYPTION_KEY } from "./helpers/test-setup.js";
 
 function closeServer(server: Server): Promise<void> {
