@@ -52,7 +52,8 @@
     "upstreamPathPlaceholder": "默认: /v1/chat/completions 或 /v1/messages",
     "upstreamPathHint": "留空使用 API 类型默认路径",
     "timeoutLabel": "超时(秒)",
-    "timeoutPlaceholder": "默认"
+    "timeoutPlaceholder": "默认",
+    "sharedKeyHint": "作为 Endpoint 的默认 API Key，留空则保持原密钥不变"
   },
   "concurrency": {
     "title": "并发控制",
@@ -153,10 +154,10 @@
     "sourcePreset": "预设"
   },
   "capabilities": {
-  "text": "文本",
-  "image": "图片",
-  "audio": "音频",
-  "video": "视频"
+    "text": "文本",
+    "image": "图片",
+    "audio": "音频",
+    "video": "视频"
   },
   "endpoints": {
     "title": "Endpoints",

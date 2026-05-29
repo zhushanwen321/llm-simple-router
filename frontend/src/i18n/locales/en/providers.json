@@ -52,7 +52,8 @@
     "upstreamPathPlaceholder": "Default: /v1/chat/completions or /v1/messages",
     "upstreamPathHint": "Leave empty for API type default path",
     "timeoutLabel": "Timeout(s)",
-    "timeoutPlaceholder": "Default"
+    "timeoutPlaceholder": "Default",
+    "sharedKeyHint": "Default fallback key for endpoints. Leave empty to keep original."
   },
   "concurrency": {
     "title": "Concurrency Control",
@@ -160,9 +161,9 @@
     "hint": "Each API type can only have one endpoint. Leave API Key empty to use the shared key."
   },
   "capabilities": {
-  "text": "Text",
-  "image": "Image",
-  "audio": "Audio",
-  "video": "Video"
+    "text": "Text",
+    "image": "Image",
+    "audio": "Audio",
+    "video": "Video"
   }
 }
