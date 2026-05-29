@@ -9,12 +9,11 @@ must_fix: 0
 
 | 检查项 | 结果 | 说明 |
 |--------|------|------|
-| 内容充实度 | PASS | 非空洞框架。包含完整 Background（含历史迭代次数、commit 范围、竞品调研）、5 个 Functional Requirements（带场景/行为对照表）、10 个 Acceptance Criteria、6 个 Constraints、2 个 Business Use Cases、Complexity Assessment。每段均有实质性内容。 |
-| 验收标准可测性 | PASS | 全部 10 个 AC 均采用 Given/When/Then 格式，具体到数据结构（如 `tool_calls: [{id: "call_abc"}, {id: "call_def"}]`、`role: "tool", tool_call_id: "call_def"`）和预期结果（"合成 tool 消息插入"、"正向删除"、"幂等性"、"JSON 序列化前后一致"）。无模糊表述。 |
-| 项目特异性 | PASS | 明确引用本项目函数名（`patchOrphanToolResultsOA`、`needsDeepSeekPatch`、`patchThinkingConsistency`）、测试文件路径（`router/tests/patch.test.ts`）、代码架构细节（6 Steps、Step 5/6 的具体行为）、commit 历史（`8250c30 → a0393cc`）、DB 数据（548 条消息、2 条 400 错误、2026-05-26）。非通用模板。 |
-| 技术细节 | PASS | 包含精确字段名（`tool_calls`、`tool_call_id`、`reasoning_content`、`content`、`role`）、API 签名（`body: Record<string, unknown> → void`）、具体数据结构示例、provider 特定逻辑分离策略。 |
-| 用户场景/业务规则 | PASS | UC-1（Claude Code compact 后请求 DeepSeek）和 UC-2（failover 跨 provider 消息链兼容）两个具体场景，与 spec 需求直接关联。 |
-| 数据/代码可验证性 | PASS | 所有关键声明均通过文件系统和 git 验证：`patchOrphanToolResultsOA` 函数 ✅ 存在（6 Steps）、`needsDeepSeekPatch` + `opencode.ai` hack ✅（`index.ts:116`）、Step 6 `reasoning_content` 注入 ✅（`patch-orphan-tool-results.ts:273-279`）、`patchThinkingConsistency` ✅（`patch-thinking.ts:151`）、测试文件 ✅（532 行，17 处引用）、commit `a0393cc` ✅（描述吻合）。 |
+| 内容充实度 | PASS | Spec 包含 Background、5 条 FR、10 条 AC、Constraints、业务用例、复杂度评估，结构完整 |
+| 验收标准可测试性 | PASS | 所有 10 条 AC 均为 Given/When/Then 格式，包含具体 ID（`call_abc`）、字段路径（`tool_calls[].id`）、行为定义（删除/补入/重排/合并），可量化验证 |
+| 技术细节具体性 | PASS | 包含具体函数名（`patchOrphanToolResultsOA`、`needsDeepSeekPatch`）、commit hash（`8250c30`、`a0393cc`）、文件路径（`router/tests/patch.test.ts`）、测试命令（`npx vitest run router/tests/patch.test.ts`）、字段名（`tool_call_id`、`reasoning_content`） |
+| 项目针对性 | PASS | 完全针对本项目的 DeepSeek patch 体系，引用了现有代码行为（Step 5/6）、DB 数据（548 条请求、2 条 400 错误）、opencode.ai hack |
+| 关键事实可验证性 | PASS | 通过文件系统验证：commit `8250c30` 和 `a0393cc` 均存在；`patchOrphanToolResultsOA` 存在于 3 个文件中；`needsDeepSeekPatch` 中 opencode.ai hack 存在（`index.ts:116`）；Step 6 reasoning_content 注入逻辑存在；测试文件 `router/tests/patch.test.ts` 存在（532 行，17 处引用目标函数） |
 
 ### MUST_FIX 问题
 
@@ -22,4 +21,4 @@ must_fix: 0
 
 ### 总结
 
-deliverable 真实可信。spec 内容详实且项目特定性强，全部 10 条验收标准均为可测试的 Given/When/Then 格式。关键声明（函数名、代码结构、commit 历史、DB 数据）均通过代码审查和 git log 验证。未发现伪造或严重缺失的证据。
+Spec 内容详实，验收标准全部使用 Given/When/Then 格式且可量化验证，包含大量具体的技术细节和项目特定的代码引用。关键事实（commit、函数名、文件路径、现有代码行为）已在代码库中验证为真实存在，无任何伪造或空洞信号。
