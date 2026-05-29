@@ -121,7 +121,8 @@
           "glm-5-turbo",
           "glm-4.7",
           "glm-4.5-air"
-        ]
+        ],
+        "hidden": true
       },
       {
         "plan": "API",

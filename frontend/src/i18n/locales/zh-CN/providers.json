@@ -161,10 +161,15 @@
     "video": "视频"
   },
   "endpoints": {
-    "title": "Endpoints",
-    "add": "添加 Endpoint",
+    "title": "端点",
+    "add": "添加端点",
     "useSharedKey": "使用共享 API Key",
     "apiKeyPlaceholder": "输入 API Key",
-    "hint": "每个 API 类型只能配置一个 endpoint。API Key 留空则使用共享 Key。"
+    "hint": "每个 API 类型只能配置一个端点。API Key 留空则使用共享 Key。",
+    "apiTypes": {
+      "openai": "OpenAI",
+      "openai-responses": "Responses",
+      "anthropic": "Anthropic"
+    }
   }
 }

@@ -159,7 +159,12 @@
     "add": "Add Endpoint",
     "useSharedKey": "Use shared API Key",
     "apiKeyPlaceholder": "Enter API Key",
-    "hint": "Each API type can only have one endpoint. Leave API Key empty to use the shared key."
+    "hint": "Each API type can only have one endpoint. Leave API Key empty to use the shared key.",
+    "apiTypes": {
+      "openai": "OpenAI",
+      "openai-responses": "Responses",
+      "anthropic": "Anthropic"
+    }
   },
   "capabilities": {
     "text": "Text",

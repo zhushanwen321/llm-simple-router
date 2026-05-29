@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Trash2Icon } from "lucide-vue-next";
+import { Trash2Icon, CheckIcon, PlusIcon } from "lucide-vue-next";
 import type { ProviderEndpoint } from "@/types/mapping";
 
 const { t } = useI18n();
@@ -16,10 +16,22 @@ const ALL_API_TYPES: Array<ProviderEndpoint["api_type"]> = [
   "anthropic",
 ];
 
-const API_TYPE_SHORT: Record<string, string> = {
-  openai: "OpenAI",
-  "openai-responses": "Responses",
-  anthropic: "Anthropic",
+const API_TYPE_COLOR: Record<string, string> = {
+  openai:
+    "bg-emerald-100 text-emerald-700 border-emerald-300 hover:bg-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-400 dark:border-emerald-700 dark:hover:bg-emerald-800/50",
+  "openai-responses":
+    "bg-blue-100 text-blue-700 border-blue-300 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-400 dark:border-blue-700 dark:hover:bg-blue-800/50",
+  anthropic:
+    "bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200 dark:bg-amber-900/40 dark:text-amber-400 dark:border-amber-700 dark:hover:bg-amber-800/50",
+};
+
+const API_TYPE_SELECTED_COLOR: Record<string, string> = {
+  openai:
+    "bg-emerald-200 text-emerald-800 border-emerald-400 dark:bg-emerald-800/60 dark:text-emerald-300 dark:border-emerald-500",
+  "openai-responses":
+    "bg-blue-200 text-blue-800 border-blue-400 dark:bg-blue-800/60 dark:text-blue-300 dark:border-blue-500",
+  anthropic:
+    "bg-amber-200 text-amber-800 border-amber-400 dark:bg-amber-800/60 dark:text-amber-300 dark:border-amber-500",
 };
 
 const props = defineProps<{
@@ -35,8 +47,6 @@ const emit = defineEmits<{
 const usedApiTypes = computed(
   () => new Set(props.modelValue.map((e) => e.api_type)),
 );
-
-// availableApiTypes removed — add buttons iterate ALL_API_TYPES directly
 
 function addEndpoint(apiType: ProviderEndpoint["api_type"]) {
   if (usedApiTypes.value.has(apiType)) return;
@@ -76,20 +86,27 @@ function updateField<K extends keyof ProviderEndpoint>(
         t("providers.endpoints.title")
       }}</Label>
       <template v-if="!readonly">
-        <Button
-          v-for="at in ALL_API_TYPES"
-          :key="at"
-          type="button"
-          variant="ghost"
-          size="sm"
-          class="h-6 text-[10px] gap-0.5 px-2"
-          :disabled="usedApiTypes.has(at)"
-          @click="addEndpoint(at)"
-        >
-          <template v-if="usedApiTypes.has(at)">&#10003;</template>
-          <template v-else>+</template>
-          {{ API_TYPE_SHORT[at] ?? at }}
-        </Button>
+        <div class="flex items-center gap-1.5">
+          <Button
+            v-for="at in ALL_API_TYPES"
+            :key="at"
+            type="button"
+            :variant="'outline'"
+            size="sm"
+            class="h-6 text-[10px] gap-0.5 px-2.5 border font-medium transition-colors"
+            :class="
+              usedApiTypes.has(at)
+                ? API_TYPE_SELECTED_COLOR[at]
+                : API_TYPE_COLOR[at]
+            "
+            :disabled="usedApiTypes.has(at)"
+            @click="addEndpoint(at)"
+          >
+            <CheckIcon v-if="usedApiTypes.has(at)" class="w-3 h-3" />
+            <PlusIcon v-else class="w-3 h-3" />
+            {{ t(`providers.endpoints.apiTypes.${at}`) }}
+          </Button>
+        </div>
       </template>
     </div>
     <div
@@ -100,7 +117,7 @@ function updateField<K extends keyof ProviderEndpoint>(
       <!-- Row 1: api_type badge + api_key + remove -->
       <div class="flex items-center gap-2">
         <Badge variant="secondary" class="text-[11px] px-1.5 py-0 shrink-0">
-          {{ API_TYPE_SHORT[ep.api_type] ?? ep.api_type }}
+          {{ t(`providers.endpoints.apiTypes.${ep.api_type}`) }}
         </Badge>
         <div class="flex-1 min-w-0">
           <Input
@@ -132,7 +149,7 @@ function updateField<K extends keyof ProviderEndpoint>(
       </div>
       <!-- Row 2: base_url + upstream_path -->
       <div class="flex items-end gap-2">
-        <div class="flex-1 min-w-0 space-y-0.5">
+        <div class="min-w-0 space-y-0.5" style="flex: 6">
           <Label class="text-[10px] text-muted-foreground">Base URL</Label>
           <Input
             :model-value="ep.base_url"
@@ -144,7 +161,7 @@ function updateField<K extends keyof ProviderEndpoint>(
             @update:model-value="updateField(i, 'base_url', String($event))"
           />
         </div>
-        <div class="w-48 space-y-0.5">
+        <div class="space-y-0.5" style="flex: 4">
           <Label class="text-[10px] text-muted-foreground">{{
             t("providers.fields.upstreamPath")
           }}</Label>
