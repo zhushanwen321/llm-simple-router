@@ -11,6 +11,7 @@ export function useProviderPresets(form: {
     base_url: string;
     models: ModelInfo[];
     upstream_path: string;
+    endpoints: import("@/types/mapping").ProviderEndpoint[];
   };
 }) {
   const providerPresets = ref<ProviderGroup[]>([]);
@@ -32,14 +33,31 @@ export function useProviderPresets(form: {
       form.value.api_type = "openai";
       form.value.base_url = "";
       form.value.models = [];
+      form.value.endpoints = [];
       return;
     }
-    const plans = providerPresets.value.find(
+    const group = providerPresets.value.find(
       (g) => g.group === presetGroup.value,
-    )?.presets;
+    );
+    const plans = group?.presets;
     if (plans?.length) {
       presetPlan.value = plans[0].plan;
       onPresetChange();
+      // Auto-generate endpoints from all presets in the group
+      const seen = new Set<string>();
+      const endpoints: import("@/types/mapping").ProviderEndpoint[] = [];
+      for (const preset of plans) {
+        if (seen.has(preset.apiType)) continue;
+        seen.add(preset.apiType);
+        endpoints.push({
+          api_type:
+            preset.apiType as import("@/types/mapping").ProviderEndpoint["api_type"],
+          base_url: preset.baseUrl,
+          upstream_path: preset.upstreamPath || null,
+          api_key: null,
+        });
+      }
+      form.value.endpoints = endpoints;
     } else {
       presetPlan.value = "";
     }
