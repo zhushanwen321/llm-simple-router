@@ -36,6 +36,7 @@
     "@sinclair/typebox": "^0.34.49",
     "better-sqlite3": "^11.9.1",
     "dotenv": "^16.4.7",
+    "eslint-plugin-vue": "^10.9.1",
     "fastify": "^5.3.3",
     "fastify-plugin": "^5.1.0",
     "gpt-tokenizer": "^3.4.0",
