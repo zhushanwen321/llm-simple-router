@@ -1,0 +1,230 @@
+{
+  "test_cases": [
+    {
+      "id": "TC-1-01",
+      "type": "api",
+      "title": "验证 transport-executor.ts 已被删除",
+      "description": "C1: 死代码删除 — 验证 transport-executor.ts 不再存在于 src/ 目录中",
+      "steps": [
+        "运行: ls router/src/proxy/orchestration/transport-executor.ts 2>&1",
+        "验证输出包含 'No such file' 或类似信息",
+        "运行: rg 'transport-executor' router/src/ --include '*.ts' || true",
+        "验证无任何文件引用 transport-executor"
+      ]
+    },
+    {
+      "id": "TC-1-02",
+      "type": "api",
+      "title": "删除后 tsc 编译零错误",
+      "description": "C1: 删除 transport-executor.ts 后 tsc 编译通过，无未解析的 import",
+      "steps": [
+        "运行: npx tsc --noEmit",
+        "验证退出码为 0",
+        "验证 stderr 为空"
+      ]
+    },
+    {
+      "id": "TC-2-01",
+      "type": "api",
+      "title": "buildApp 返回结构包含 app/db/usageWindowTracker/tracker/close",
+      "description": "C6: buildApp 重构后返回对象字段完整",
+      "steps": [
+        "在测试中调用 buildApp({ config, db })",
+        "解构返回对象: { app, db, usageWindowTracker, tracker, close }",
+        "验证 app 是 FastifyInstance（有 .inject 方法）",
+        "验证 db 是 Database 实例",
+        "验证 usageWindowTracker 是 UsageWindowTracker 实例",
+        "验证 tracker 是 RequestTracker 实例",
+        "验证 close 是函数"
+      ]
+    },
+    {
+      "id": "TC-2-02",
+      "type": "api",
+      "title": "buildApp 拆分出四个子函数",
+      "description": "C6: 验证 createAppInstance / registerAppHooks / composeContainer / registerRoutes 存在",
+      "steps": [
+        "读取 router/src/index.ts",
+        "验证存在 createAppInstance 函数声明（function createAppInstance）",
+        "验证存在 registerAppHooks 函数声明",
+        "验证存在 composeContainer 函数声明",
+        "验证存在 registerRoutes 函数声明",
+        "验证 buildApp 函数体仅有 4 个子函数调用"
+      ]
+    },
+    {
+      "id": "TC-3-01",
+      "type": "integration",
+      "title": "admin/providers.ts 不直接 import proxy 层 HTTP 模块",
+      "description": "C4: 验证 admin→proxy 跨层隔离 — admin/providers.ts 使用 IProviderConnectivityChecker 而非直接 callGet",
+      "steps": [
+        "读取 router/src/admin/providers.ts",
+        "验证无 'callGet' import",
+        "验证无 'buildUpstreamHeaders' import",
+        "验证无 'RawHeaders' import",
+        "验证使用 connectivityChecker.fetchModels() 执行 get 请求"
+      ]
+    },
+    {
+      "id": "TC-3-02",
+      "type": "integration",
+      "title": "admin/routes.ts 通过 stateRegistry 查询 hook 而非 import proxyPipeline",
+      "description": "C4: 验证 admin/routes.ts 使用 StateRegistry.getRegisteredHooks() 而非直接引用 proxyPipeline",
+      "steps": [
+        "读取 router/src/admin/routes.ts",
+        "验证无 'proxyPipeline' import",
+        "验证使用 options.stateRegistry.getRegisteredHooks()",
+        "验证 StateRegistry 接口包含 getRegisteredHooks 方法"
+      ]
+    },
+    {
+      "id": "TC-3-03",
+      "type": "integration",
+      "title": "admin 层使用 IProxyCacheInvalidator 接口而非 ProxyAgentFactory 类型",
+      "description": "C4: 验证 admin/providers.ts 通过接口而非具体类型引用 proxy 层",
+      "steps": [
+        "读取 router/src/admin/providers.ts",
+        "验证 import 的类型是 IProxyCacheInvalidator 而非 ProxyAgentFactory",
+        "验证 IProxyCacheInvalidator 定义在 core/registry.ts"
+      ]
+    },
+    {
+      "id": "TC-4-01",
+      "type": "api",
+      "title": "ILogSink 接口包含四个必需方法",
+      "description": "C5: 验证 ILogSink 接口定义完整",
+      "steps": [
+        "读取 router/src/core/log-sink.ts",
+        "验证 ILogSink 接口存在",
+        "验证包含 insertRequestLog(log: Record<string, unknown>): void",
+        "验证包含 insertMetrics(metrics: Record<string, unknown>): void",
+        "验证包含 updateLogStreamContent(logId: string, textContent: string): void",
+        "验证包含 updateLogClientStatus(logId: string, clientStatusCode: number): void"
+      ]
+    },
+    {
+      "id": "TC-4-02",
+      "type": "api",
+      "title": "DbLogSink 正确实现 ILogSink",
+      "description": "C5: 验证 DbLogSink 将所有方法委托给 DB 函数",
+      "steps": [
+        "读取 router/src/proxy/log-sink/db-log-sink.ts",
+        "验证类声明 class DbLogSink implements ILogSink",
+        "验证 insertRequestLog 委托给 insertRequestLog(this.db, ...)",
+        "验证 insertMetrics 委托给 insertMetrics(this.db, ...)",
+        "验证 updateLogStreamContent 委托给 updateLogStreamContent(this.db, ...)",
+        "验证 updateLogClientStatus 委托给 updateLogClientStatus(this.db, ...)"
+      ]
+    },
+    {
+      "id": "TC-4-03",
+      "type": "api",
+      "title": "InMemoryLogSink 正确实现 ILogSink",
+      "description": "C5: 验证 InMemoryLogSink 将日志存储在内存并可在测试中使用",
+      "steps": [
+        "创建 InMemoryLogSink 实例",
+        "调用 insertRequestLog({ id: 'test', body: 'data' })",
+        "验证 logs 数组包含该条目",
+        "调用 insertMetrics({ tokens: 100 })",
+        "验证 metrics 数组包含该条目",
+        "调用 updateLogStreamContent('id1', 'stream')",
+        "验证 streamContent.get('id1') === 'stream'",
+        "调用 updateLogClientStatus('id1', 200)",
+        "验证 clientStatuses.get('id1') === 200",
+        "调用 reset()",
+        "验证所有数组和 Map 为空"
+      ]
+    },
+    {
+      "id": "TC-5-01",
+      "type": "api",
+      "title": "SetupDeps 接口包含 10 个必需字段",
+      "description": "C3: 验证 SetupDeps 所有字段均为必需（非可选）",
+      "steps": [
+        "读取 router/src/proxy/pipeline/types.ts",
+        "验证 SetupDeps 接口存在",
+        "验证字段列表: db, container, orchestrator, matcher, tracker, retryBaseDelayMs, logFileWriter, errors, usageWindowTracker, proxyAgentFactory, logSink",
+        "验证每个字段声明不包含 ? 可选标记"
+      ]
+    },
+    {
+      "id": "TC-5-02",
+      "type": "api",
+      "title": "RequestDeps 接口包含 9 个必需字段",
+      "description": "C3: 验证 RequestDeps 所有字段均为必需",
+      "steps": [
+        "读取 router/src/proxy/pipeline/types.ts",
+        "验证 RequestDeps 接口存在",
+        "验证字段列表: cachedTargets, overflowIndices, resolveResult, precomputeSnapshot, decryptedApiKeys, enhancementConfig, adapter, defaultUpstreamPath, clientHeaders, precomputedClientReq, concurrencyOverride",
+        "验证每个字段声明不包含 ? 可选标记"
+      ]
+    },
+    {
+      "id": "TC-5-03",
+      "type": "api",
+      "title": "PipelineDeps 由 setup + request 两个必需字段组成",
+      "description": "C3: 验证 PipelineDeps 的结构正确",
+      "steps": [
+        "读取 router/src/proxy/pipeline/types.ts",
+        "验证 PipelineDeps interface { setup: SetupDeps; request: RequestDeps }",
+        "验证 concurrencyOverride 类型为 ConcurrencyOverride | null（不含 undefined）"
+      ]
+    },
+    {
+      "id": "TC-6-01",
+      "type": "api",
+      "title": "precomputeRoutes 纯函数存在且返回 PrecomputeResult",
+      "description": "C2: 验证 precomputeRoutes() 从 executeFailoverLoop 中提取",
+      "steps": [
+        "读取 router/src/proxy/handler/failover-loop.ts",
+        "验证存在 precomputeRoutes 函数声明（function precomputeRoutes）",
+        "验证 PrecomputeResult 接口包含: allTargets, overflowIndices, resolveResult, precomputeSnapshot, enhancementConfig, pendingToolErrors, precomputedClientReq, rejectReply",
+        "验证 precomputeRoutes 无副作用（无外部队闭包、无 global state 修改）"
+      ]
+    },
+    {
+      "id": "TC-6-02",
+      "type": "api",
+      "title": "executeFailoverLoop 先调用 precomputeRoutes 再进入循环",
+      "description": "C2: 验证 executeFailoverLoop 的正确执行顺序",
+      "steps": [
+        "读取 router/src/proxy/handler/failover-loop.ts",
+        "验证 executeFailoverLoop 中先调用 const precomputeResult = precomputeRoutes(...)",
+        "验证如果 precomputeResult.rejectReply 非空则直接 return",
+        "验证循环体使用 allTargets 而非重新解析映射"
+      ]
+    },
+    {
+      "id": "TC-7-01",
+      "type": "manual",
+      "title": "ADR 0014 存在于 docs/adr/ 目录",
+      "description": "C7: 验证架构决策记录已写入",
+      "steps": [
+        "运行: ls docs/adr/0014-*.md",
+        "验证文件存在",
+        "读取文件内容",
+        "验证标题为 ADR 0014: Transform 浅层格式适配器不重构",
+        "验证包含 Considered Options 章节（至少 2 个选项）",
+        "验证包含 Decision 章节（选择方案 2: 保持现状）",
+        "验证包含 Rationale 章节（说明导航价值 > 合并收益）",
+        "验证包含 Consequences 章节"
+      ]
+    },
+    {
+      "id": "TC-7-02",
+      "type": "api",
+      "title": "全量验证：tsc + lint + test + build 全部通过",
+      "description": "回归验证 — 所有检查通过确保重构不引入功能退化",
+      "steps": [
+        "运行: npx tsc --noEmit",
+        "验证退出码为 0",
+        "运行: cd router && npx eslint . --max-warnings=0",
+        "验证退出码为 0",
+        "运行: npm test",
+        "验证测试全部通过（1741 passed）",
+        "运行: npm run build",
+        "验证构建成功"
+      ]
+    }
+  ]
+}
