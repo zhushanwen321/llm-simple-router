@@ -6,7 +6,7 @@ SET endpoints = json_array(
     json_object(
       'api_type', api_type,
       'base_url', base_url,
-      'upstream_path', CASE WHEN upstream_path IS NULL THEN json('null') ELSE json(upstream_path) END,
+      'upstream_path', CASE WHEN upstream_path IS NULL THEN json('null') ELSE upstream_path END,
       'api_key', CASE WHEN api_key IS NULL THEN json('null') ELSE api_key END
     )
   )
