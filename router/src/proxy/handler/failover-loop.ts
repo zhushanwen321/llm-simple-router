@@ -196,19 +196,23 @@ export async function executeFailoverLoop(
   // resolveMapping 返回 null 时，需要用占位 snapshot 做错误日志
   const rejectSnapshot = new PipelineSnapshot();
 
+  /** 构建 RejectParams，消除 4 处重复构造 */
+  const buildRejectCtx = (logId: string, snapshot: PipelineSnapshot, overrides?: Partial<RejectParams>): RejectParams => ({
+    db, logId, apiType: ctx.apiType, model: clientModel,
+    startTime: Date.now(),
+    isStream: (ctx.body as Record<string, unknown>).stream === true,
+    routerKeyId: request.routerKey?.id ?? null,
+    originalBody: rawBody, clientHeaders: cliHdrs,
+    isFailover: false, originalRequestId: null,
+    sessionId: ctx.metadata.get("session_id") as string | undefined,
+    pipelineSnapshot: snapshot.toJSON(),
+    matcher, logFileWriter,
+    ...overrides,
+  });
+
   if (!resolveResult) {
     const logId = randomUUID();
-    const startTime = Date.now();
-    const isStream = (ctx.body as Record<string, unknown>).stream === true;
-    const rCtx: RejectParams = {
-      db, logId, apiType: ctx.apiType, model: clientModel,
-      startTime, isStream, routerKeyId: request.routerKey?.id ?? null, originalBody: rawBody, clientHeaders: cliHdrs,
-      isFailover: false, originalRequestId: null,
-      sessionId: ctx.metadata.get("session_id") as string | undefined,
-      pipelineSnapshot: rejectSnapshot.toJSON(),
-      matcher, logFileWriter,
-    };
-    return rejectAndReply(reply, rCtx, errors.modelNotFound(clientModel), `No mapping found for model '${clientModel}'`);
+    return rejectAndReply(reply, buildRejectCtx(logId, rejectSnapshot), errors.modelNotFound(clientModel), `No mapping found for model '${clientModel}'`);
   }
 
   let allTargets = resolveResult.allTargets ?? [resolveResult.target];
@@ -216,6 +220,12 @@ export async function executeFailoverLoop(
 
   // 2. modality-redirect 层：模态重定向 → 可能 prepend fallback target
   allTargets = computeModalityRedirectTargets(db, allTargets, clientModel, ctx.body, precomputeSnapshot);
+
+  // 2a. modality-redirect 层返回空列表 → 提前报错（无 target 支持请求模态）
+  if (allTargets.length === 0) {
+    return rejectAndReply(reply, buildRejectCtx(randomUUID(), precomputeSnapshot), errors.unsupportedModality(),
+      `No eligible target: request modalities not supported by any available model`);
+  }
 
   // 3. OF 层：为每个 target 预计算 overflow
   const targetsBeforeOF = allTargets.length;
@@ -239,18 +249,7 @@ export async function executeFailoverLoop(
     allTargets = filtered;
     overflowIndices = newOverflowIndices;
     if (allTargets.length === 0) {
-      const logId = randomUUID();
-      const startTime = Date.now();
-      const isStream = (ctx.body as Record<string, unknown>).stream === true;
-      const rCtx: RejectParams = {
-        db, logId, apiType: ctx.apiType, model: clientModel,
-        startTime, isStream, routerKeyId: request.routerKey?.id ?? null, originalBody: rawBody, clientHeaders: cliHdrs,
-        isFailover: false, originalRequestId: null,
-        sessionId: ctx.metadata.get("session_id") as string | undefined,
-        pipelineSnapshot: precomputeSnapshot.toJSON(),
-        matcher, logFileWriter,
-      };
-      return rejectAndReply(reply, rCtx, errors.modelNotAllowed(clientModel),
+      return rejectAndReply(reply, buildRejectCtx(randomUUID(), precomputeSnapshot), errors.modelNotAllowed(clientModel),
         `No allowed model available for '${clientModel}'`);
     }
   }
@@ -290,14 +289,11 @@ export async function executeFailoverLoop(
     const isStream = currentBody.stream === true;
     const iterationSnapshot = new PipelineSnapshot(precomputeSnapshot.getStages());
 
-    const rCtx: RejectParams = {
-      db, logId, apiType: ctx.apiType, model: clientModel,
-      startTime, isStream, routerKeyId, originalBody: rawBody, clientHeaders: cliHdrs,
-      isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null,
-      sessionId: ctx.metadata.get("session_id") as string | undefined,
-      pipelineSnapshot: iterationSnapshot.toJSON(),
-      matcher, logFileWriter,
-    };
+    const rCtx: RejectParams = buildRejectCtx(logId, iterationSnapshot, {
+      startTime,
+      isFailover: isFailoverIteration,
+      originalRequestId: isFailoverIteration ? rootLogId : null,
+    });
 
     // --- 选第一个非 excluded target ---
     const filtered = filterExcluded(cachedTargets, excludeTargets);

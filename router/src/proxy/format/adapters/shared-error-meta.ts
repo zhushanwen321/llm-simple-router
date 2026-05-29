@@ -13,4 +13,5 @@ export const OPENAI_FAMILY_ERROR_META: Record<ErrorKind, { type: string; code: s
   concurrencyQueueFull: { type: "server_error", code: "concurrency_queue_full" },
   concurrencyTimeout: { type: "server_error", code: "concurrency_timeout" },
   promptTooLong: { type: "invalid_request_error", code: "context_window_exceeded" },
+  unsupportedModality: { type: "invalid_request_error", code: "unsupported_modality" },
 };

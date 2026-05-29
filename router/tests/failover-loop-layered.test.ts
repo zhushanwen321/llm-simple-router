@@ -290,18 +290,15 @@ describe("Failover-loop layered routing (TDD - expecting FAIL)", () => {
   });
   });
 
-  describe("AC19: IR_F excluded after failure — no deadloop", () => {
-  it("test_irFallbackFails_excluded_noDeadloop", async () => {
-    // 设置：
-  // - mapping group: targets=[A(text-only, 返回 200)], multimodal_fallback={B(返回 500)}
-    // - 请求包含图片
-    // - 预期：先尝试 B（IR_F），失败，exclude B，然后尝试 A，成功
-    // - 总日志数 ≤ 5（无死循环到 MAX_FAILOVER_ITERATIONS）
+  describe("AC19: IR_F replaced — only fallback target attempted", () => {
+  it("test_irFallbackReplaced_onlyFallbackAttempted", async () => {
+    // 新行为：全部不支持 image → 替换为 fallback B → 只尝试 B
+    // B 失败后不再尝试 A（A 不支持 image，已被过滤）
 
     let textOnlyCalls = 0;
     let imageCapableCalls = 0;
 
-    // A: text-only, 返回 200
+    // A: text-only, 返回 200（不应被调用）
     const textOnly = await createMockBackend((_req, res) => {
     textOnlyCalls++;
     res.writeHead(200, { "Content-Type": "application/json" });
@@ -340,12 +337,13 @@ describe("Failover-loop layered routing (TDD - expecting FAIL)", () => {
     payload: makeImageRequestBody("gpt-4"),
     });
 
-    // 应该最终成功（A 返回 200）
-    expect(response.statusCode).toBe(200);
+    // B (fallback) 失败后无更多 target → 5xx
+    expect(response.statusCode).toBeGreaterThanOrEqual(500);
 
-    // IR_F (B) 被调用一次后 exclude，A 被调用一次
+    // 只有 B (image-capable fallback) 被调用
     expect(imageCapableCalls).toBe(1);
-    expect(textOnlyCalls).toBe(1);
+    // A (text-only) 不应被调用（被 modality 过滤排除）
+    expect(textOnlyCalls).toBe(0);
 
     // 总日志数 ≤ 5（无死循环）
     const logs = db.prepare("SELECT * FROM request_logs").all() as Array<Record<string, unknown>>;
@@ -477,9 +475,11 @@ describe("Failover-loop layered routing (TDD - expecting FAIL)", () => {
     // 应返回 5xx 错误
     expect(response.statusCode).toBeGreaterThanOrEqual(500);
 
-    // 重构后 IR 层会 prepend B，所以 B 和 A 都会被尝试
+    // 新行为：全部不支持 image → 替换为 fallback B → 只尝试 B
+    // B 失败后无更多 target
     expect(imageCapableCalls).toBeGreaterThanOrEqual(1);
-    expect(textOnlyCalls).toBeGreaterThanOrEqual(1);
+    // A (text-only) 不应被调用（被 modality 过滤排除）
+    expect(textOnlyCalls).toBe(0);
 
     // 总请求数 ≤ 5（无死循环）
     const totalCalls = imageCapableCalls + textOnlyCalls;

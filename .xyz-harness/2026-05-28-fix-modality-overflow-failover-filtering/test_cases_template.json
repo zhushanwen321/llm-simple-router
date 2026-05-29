@@ -1,0 +1,106 @@
+{
+  "test_cases": [
+    {
+      "id": "TC-1-01",
+      "type": "integration",
+      "title": "Modality 过滤 — 部分支持",
+      "description": "AC-1: targets 中部分不支持 image 的被过滤掉，仅保留支持的",
+      "steps": [
+        "配置映射组 targets = [A(无image), B(有image), C(有image)]",
+        "发送含图片请求",
+        "验证返回 [B, C]，snapshot reason = filtered-ineligible-targets"
+      ]
+    },
+    {
+      "id": "TC-1-02",
+      "type": "integration",
+      "title": "Modality 过滤 — 全部不支持 + fallback",
+      "description": "AC-2: 全部不支持时替换为 fallback target",
+      "steps": [
+        "配置映射组 targets = [A(无image)]，multimodal_fallback = B(有image)",
+        "发送含图片请求",
+        "验证返回 [B]，snapshot reason = replaced-with-fallback"
+      ]
+    },
+    {
+      "id": "TC-1-03",
+      "type": "integration",
+      "title": "Modality 过滤 — 全部不支持 + 无 fallback → 空列表",
+      "description": "AC-3: 无 fallback 时返回空列表",
+      "steps": [
+        "配置映射组 targets = [A(无image)]，无 multimodal_fallback",
+        "发送含图片请求",
+        "验证返回 []，snapshot reason = no-eligible-targets"
+      ]
+    },
+    {
+      "id": "TC-2-01",
+      "type": "api",
+      "title": "空列表提前报错 — OpenAI 格式",
+      "description": "AC-4: modality 返回空列表时返回 HTTP 400 + unsupported_modality code",
+      "steps": [
+        "配置映射组 targets = [A(无image)]，无 fallback",
+        "POST /v1/chat/completions 含图片",
+        "验证 HTTP 400",
+        "验证 body.error.type = invalid_request_error",
+        "验证 body.error.code = unsupported_modality"
+      ]
+    },
+    {
+      "id": "TC-2-02",
+      "type": "api",
+      "title": "空列表提前报错 — Anthropic 格式",
+      "description": "AC-5: 同 TC-2-01 但 apiType = anthropic",
+      "steps": [
+        "配置映射组 targets = [A(无image)]，无 fallback",
+        "POST /v1/messages 含图片",
+        "验证 HTTP 400 + body.error.code = unsupported_modality"
+      ]
+    },
+    {
+      "id": "TC-1-04",
+      "type": "integration",
+      "title": "无多模态内容 — 不触发过滤",
+      "description": "AC-6: 纯文本请求不触发 modality 过滤",
+      "steps": [
+        "配置映射组 targets = [A, B]",
+        "发送纯文本请求",
+        "验证返回 [A, B]，reason = no-multimodal-detected"
+      ]
+    },
+    {
+      "id": "TC-1-05",
+      "type": "integration",
+      "title": "全部支持模态 — 不触发过滤",
+      "description": "AC-7: 所有 targets 支持检测到的模态时不做任何过滤",
+      "steps": [
+        "配置映射组 targets = [A(有image), B(有image)]",
+        "发送含图片请求",
+        "验证返回 [A, B]，reason = all-targets-support-modalities"
+      ]
+    },
+    {
+      "id": "TC-3-01",
+      "type": "integration",
+      "title": "Overflow 对过滤后列表仍生效",
+      "description": "AC-8: modality 过滤后的 targets 仍能被 overflow 扩展",
+      "steps": [
+        "配置 modality 过滤后 targets = [B(有image, 8k窗口)]",
+        "B 配置 overflow_model",
+        "发送含图片 + 超长 token 请求",
+        "验证返回 [B'(overflow), B]"
+      ]
+    },
+    {
+      "id": "TC-3-02",
+      "type": "integration",
+      "title": "promptTooLong 行为不变",
+      "description": "AC-9: 上下文溢出错误不受 modality 过滤影响",
+      "steps": [
+        "配置映射组 targets = [A(text-only, 4k窗口)]",
+        "发送超长纯文本请求",
+        "验证 promptTooLong 错误行为与改动前一致"
+      ]
+    }
+  ]
+}
