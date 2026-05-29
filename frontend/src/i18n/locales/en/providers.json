@@ -88,7 +88,8 @@
     "apiKeyRequired": "Please enter API Key",
     "concurrencyRange": "Range {min}-{max}",
     "negativeNotAllowed": "Cannot be negative",
-    "queueSizeRange": "Range {min}-{max}"
+    "queueSizeRange": "Range {min}-{max}",
+    "duplicateApiType": "API types must be unique within a provider"
   },
   "confirmDelete": {
     "title": "Confirm Delete",
@@ -150,6 +151,13 @@
     "failed": "Failed to fetch upstream models",
     "sourceUpstream": "Upstream",
     "sourcePreset": "Preset"
+  },
+  "endpoints": {
+    "title": "Endpoints",
+    "add": "Add Endpoint",
+    "useSharedKey": "Use shared API Key",
+    "apiKeyPlaceholder": "Enter API Key",
+    "hint": "Each API type can only have one endpoint. Leave API Key empty to use the shared key."
   },
   "capabilities": {
   "text": "Text",

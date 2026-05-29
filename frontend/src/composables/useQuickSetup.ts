@@ -156,6 +156,14 @@ interface ProviderPayloadInput {
 function buildProviderPayload(
   input: ProviderPayloadInput,
 ): QuickSetupPayload["provider"] {
+  const endpoints = [
+    {
+      api_type: input.apiType,
+      base_url: input.baseUrl,
+      upstream_path: input.upstreamPath || undefined,
+      api_key: input.apiKey,
+    },
+  ];
   return {
     name: input.isCustom
       ? `custom-${Date.now()}`
@@ -164,6 +172,7 @@ function buildProviderPayload(
     base_url: input.baseUrl,
     upstream_path: input.upstreamPath || undefined,
     api_key: input.apiKey,
+    endpoints,
     models: input.models.map((m) => ({
       name: m.name,
       context_window: m.contextWindow,

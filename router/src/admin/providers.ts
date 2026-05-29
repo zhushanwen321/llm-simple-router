@@ -1,9 +1,10 @@
-import { FastifyPluginCallback } from "fastify";
+import { FastifyPluginCallback, FastifyReply } from "fastify";
 import Database from "better-sqlite3";
 import { Type, Static } from "@sinclair/typebox";
 import type { Provider } from "../db/index.js";
 import type { RawHeaders } from "../proxy/types.js";
 import { getAllProviders, getProviderById, createProvider, updateProvider, deleteProvider, getAllMappingGroups, updateMappingGroup, PROVIDER_CONCURRENCY_DEFAULTS } from "../db/index.js";
+import { parseEndpoints, serializeEndpoints } from "../db/providers.js";
 import { encrypt, decrypt } from "../utils/crypto.js";
 import { getSetting } from "../db/settings.js";
 import type { StateRegistry } from "../core/registry.js";
@@ -40,10 +41,11 @@ function cascadeProviderDisable(db: Database.Database, providerId: string): Casc
     let shouldDisable = false;
 
     // 归一化旧格式 { default, windows } → { targets }（向后兼容 migration 026 前数据）
-    // eslint-disable-next-line taste/no-deprecated-rule-format
-    if (!Array.isArray(rule.targets) && typeof rule.default === "object" && rule.default !== null) {
-      // eslint-disable-next-line taste/no-deprecated-rule-format
-      rule.targets = [rule.default];
+    if (!Array.isArray(rule.targets)) {
+      const legacyDefault = rule["default"];
+      if (typeof legacyDefault === "object" && legacyDefault !== null) {
+        rule.targets = [legacyDefault];
+      }
     }
 
     const targets = rule.targets as Array<Record<string, string>> | undefined;
@@ -120,12 +122,61 @@ function isValidHttpUrl(str: string): boolean {
   }
 }
 
+interface EndpointInput {
+  api_type: "openai" | "openai-responses" | "anthropic";
+  base_url: string;
+  upstream_path?: string | null;
+  api_key?: string | null;
+}
+
+interface ProcessedEndpoint {
+  api_type: "openai" | "openai-responses" | "anthropic";
+  base_url: string;
+  upstream_path: string | null;
+  api_key: string | null;
+}
+
+/** 校验 endpoints 数组并加密 api_key。成功返回处理后的数组，失败返回错误信息 */
+function validateAndEncryptEndpoints(
+  endpoints: EndpointInput[],
+  encryptionKey: string,
+): { ok: true; processed: ProcessedEndpoint[] } | { ok: false; message: string } {
+  const apiTypes = endpoints.map(e => e.api_type);
+  if (new Set(apiTypes).size !== apiTypes.length) {
+    return { ok: false, message: "endpoints 中存在重复的 api_type" };
+  }
+  for (const ep of endpoints) {
+    if (!isValidHttpUrl(ep.base_url)) {
+      return { ok: false, message: `endpoint (${ep.api_type}) base_url 格式无效，必须是以 http:// 或 https:// 开头的合法 URL` };
+    }
+  }
+  const processed = endpoints.map(e => ({
+    api_type: e.api_type,
+    base_url: e.base_url,
+    upstream_path: e.upstream_path ?? null,
+    api_key: e.api_key ? encrypt(e.api_key, encryptionKey) : null,
+  }));
+  return { ok: true, processed };
+}
+
+const EndpointSchema = Type.Object({
+  api_type: Type.Union([
+    Type.Literal("openai"),
+    Type.Literal("openai-responses"),
+    Type.Literal("anthropic"),
+  ]),
+  base_url: Type.String({ minLength: 1 }),
+  upstream_path: Type.Optional(Type.Union([Type.String({ minLength: 1 }), Type.Null()])),
+  api_key: Type.Optional(Type.Union([Type.String({ minLength: 1 }), Type.Null()])),
+});
+
 const CreateProviderSchema = Type.Object({
   name: Type.String({ minLength: 1 }),
-  api_type: Type.Union([Type.Literal("openai"), Type.Literal("anthropic")]),
-  base_url: Type.String({ minLength: 1 }),
+  api_type: Type.Optional(Type.Union([Type.Literal("openai"), Type.Literal("anthropic"), Type.Literal("openai-responses")])),
+  base_url: Type.Optional(Type.String({ minLength: 1 })),
   upstream_path: Type.Optional(Type.String({ minLength: 1 })),
-  api_key: Type.String({ minLength: 1 }),
+  api_key: Type.Optional(Type.String({ minLength: 1 })),
+  endpoints: Type.Optional(Type.Array(EndpointSchema, { minItems: 1 })),
   models: Type.Optional(Type.Array(Type.Union([
     Type.String(),
     Type.Object({ name: Type.String(), context_window: Type.Optional(Type.Number()), patches: Type.Optional(Type.Array(Type.String())), stream_timeout_ms: Type.Optional(Type.Number({ minimum: 0, maximum: 86_400_000 })), capabilities: Type.Optional(Type.Array(Type.String())) }),
@@ -144,10 +195,11 @@ const CreateProviderSchema = Type.Object({
 
 const UpdateProviderSchema = Type.Object({
   name: Type.Optional(Type.String({ minLength: 1 })),
-  api_type: Type.Optional(Type.Union([Type.Literal("openai"), Type.Literal("anthropic")])),
+  api_type: Type.Optional(Type.Union([Type.Literal("openai"), Type.Literal("anthropic"), Type.Literal("openai-responses")])),
   base_url: Type.Optional(Type.String({ minLength: 1 })),
   upstream_path: Type.Optional(Type.String({ minLength: 1 })),
   api_key: Type.Optional(Type.String({ minLength: 1 })),
+  endpoints: Type.Optional(Type.Array(EndpointSchema, { minItems: 1 })),
   models: Type.Optional(Type.Array(Type.Union([
     Type.String(),
     Type.Object({ name: Type.String(), context_window: Type.Optional(Type.Number()), patches: Type.Optional(Type.Array(Type.String())), stream_timeout_ms: Type.Optional(Type.Number({ minimum: 0, maximum: 86_400_000 })), capabilities: Type.Optional(Type.Array(Type.String())) }),
@@ -170,6 +222,120 @@ interface ProviderRoutesOptions {
   tracker?: RequestTracker;
   adaptiveController?: AdaptiveController;
   proxyAgentFactory?: ProxyAgentFactory;
+}
+
+interface ProviderHandlerDeps {
+  db: Database.Database;
+  stateRegistry?: StateRegistry;
+  tracker?: RequestTracker;
+  adaptiveController?: AdaptiveController;
+}
+
+async function handleCreateProvider(
+  body: Static<typeof CreateProviderSchema>,
+  reply: FastifyReply,
+  deps: ProviderHandlerDeps,
+) {
+  const { db, stateRegistry, tracker, adaptiveController } = deps;
+  if (!PROVIDER_NAME_RE.test(body.name)) {
+    return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.VALIDATION_FAILED, "Provider 名称仅允许英文大小写字母、数字、横线和下划线"));
+  }
+  const existing = db.prepare("SELECT id FROM providers WHERE name = ?").get(body.name) as { id: string } | undefined;
+  if (existing) {
+    return reply.code(HTTP_CONFLICT).send(apiError(API_CODE.CONFLICT_NAME, `Provider 名称 '${body.name}' 已存在`));
+  }
+  const encryptionKey = getSetting(db, "encryption_key")!;
+
+  // ---- endpoints 解析 ----
+  let legacyApiType: "openai" | "openai-responses" | "anthropic";
+  let legacyBaseUrl: string;
+  let legacyUpstreamPath: string | null;
+  let legacyApiKeyPlain: string;
+  let endpointsSerialized: string | null;
+
+  if (body.endpoints && body.endpoints.length > 0) {
+    const result = validateAndEncryptEndpoints(body.endpoints, encryptionKey);
+    if (!result.ok) {
+      return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.VALIDATION_FAILED, result.message));
+    }
+    endpointsSerialized = serializeEndpoints(result.processed);
+    legacyApiType = body.endpoints[0].api_type;
+    legacyBaseUrl = body.endpoints[0].base_url;
+    legacyUpstreamPath = body.endpoints[0].upstream_path ?? null;
+    legacyApiKeyPlain = body.endpoints[0].api_key ?? body.api_key ?? "";
+    if (!legacyApiKeyPlain) {
+      return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.VALIDATION_FAILED, "第一个 endpoint 需要提供 api_key 或使用旧 api_key 字段"));
+    }
+  } else {
+    if (!body.api_type || !body.base_url || !body.api_key) {
+      return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.VALIDATION_FAILED, "缺少 endpoints 时，api_type/base_url/api_key 为必填"));
+    }
+    if (!isValidHttpUrl(body.base_url)) {
+      return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.VALIDATION_FAILED, "base_url 格式无效，必须是以 http:// 或 https:// 开头的合法 URL"));
+    }
+    legacyApiType = body.api_type;
+    legacyBaseUrl = body.base_url;
+    legacyUpstreamPath = body.upstream_path ?? null;
+    legacyApiKeyPlain = body.api_key;
+    endpointsSerialized = serializeEndpoints([{
+      api_type: body.api_type,
+      base_url: body.base_url,
+      upstream_path: body.upstream_path ?? null,
+      api_key: null,
+    }]);
+  }
+
+  const encryptedKey = encrypt(legacyApiKeyPlain, encryptionKey);
+  const { entries: normalizedModels, overrides: contextOverrides } = extractModelOverrides((body.models ?? []) as ModelInput[]);
+  const isAdaptiveEnabled = body.adaptive_enabled ?? 0;
+
+  const effectiveProxyType = body.proxy_url?.trim() ? body.proxy_type : null;
+  const effectiveProxyUrl = body.proxy_url?.trim() || null;
+
+  const encryptedProxyUsername = (effectiveProxyType && body.proxy_username) ? encrypt(body.proxy_username, encryptionKey) : null;
+  const encryptedProxyPassword = (effectiveProxyType && body.proxy_password) ? encrypt(body.proxy_password, encryptionKey) : null;
+  const id = createProvider(db, {
+    name: body.name,
+    api_type: legacyApiType,
+    base_url: legacyBaseUrl,
+    upstream_path: legacyUpstreamPath,
+    api_key: encryptedKey,
+    api_key_preview: legacyApiKeyPlain.length > API_KEY_PREVIEW_MIN_LENGTH ? `${legacyApiKeyPlain.slice(0, API_KEY_PREVIEW_PREFIX_LEN)}...${legacyApiKeyPlain.slice(-API_KEY_PREVIEW_PREFIX_LEN)}` : "****",
+    models: JSON.stringify(normalizedModels),
+    is_active: body.is_active ?? 1,
+    max_concurrency: body.max_concurrency ?? PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency,
+    queue_timeout_ms: body.queue_timeout_ms ?? PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms,
+    max_queue_size: body.max_queue_size ?? PROVIDER_CONCURRENCY_DEFAULTS.max_queue_size,
+    adaptive_enabled: isAdaptiveEnabled,
+    proxy_type: effectiveProxyType,
+    proxy_url: effectiveProxyUrl,
+    proxy_username: encryptedProxyUsername,
+    proxy_password: encryptedProxyPassword,
+    endpoints: endpointsSerialized,
+  });
+  if (contextOverrides.length > 0) {
+    setModelInfoForProvider(db, id, contextOverrides.map(o => ({ model_name: o.name, context_window: o.context_window })));
+  }
+  if (!isAdaptiveEnabled) {
+    stateRegistry?.updateProviderConcurrency(id, {
+      maxConcurrency: body.max_concurrency ?? PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency,
+      queueTimeoutMs: body.queue_timeout_ms ?? PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms,
+      maxQueueSize: body.max_queue_size ?? PROVIDER_CONCURRENCY_DEFAULTS.max_queue_size,
+    });
+  }
+  adaptiveController?.syncProvider(id, {
+    adaptive_enabled: isAdaptiveEnabled,
+    max_concurrency: body.max_concurrency ?? PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency,
+    queue_timeout_ms: body.queue_timeout_ms ?? PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms,
+    max_queue_size: body.max_queue_size ?? PROVIDER_CONCURRENCY_DEFAULTS.max_queue_size,
+  });
+  tracker?.updateProviderConfig(id, {
+    name: body.name,
+    maxConcurrency: body.max_concurrency ?? PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency,
+    queueTimeoutMs: body.queue_timeout_ms ?? PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms,
+    maxQueueSize: body.max_queue_size ?? PROVIDER_CONCURRENCY_DEFAULTS.max_queue_size,
+  });
+  return reply.code(HTTP_CREATED).send({ id });
 }
 
 export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> = (app, options, done) => {
@@ -200,6 +366,12 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
         proxy_url: s.proxy_url,
         proxy_username: s.proxy_username ? decrypt(s.proxy_username, encryptionKey) : null,
         proxy_password: s.proxy_password ? decrypt(s.proxy_password, encryptionKey) : null,
+        endpoints: parseEndpoints(s.endpoints).map(ep => ({
+          api_type: ep.api_type,
+          base_url: ep.base_url,
+          upstream_path: ep.upstream_path ?? null,
+          api_key: ep.api_key ? decrypt(ep.api_key, encryptionKey) : "",
+        })),
         concurrency_status: stateRegistry?.getProviderStatus(s.id) ?? { active: 0, queued: 0 },
         created_at: s.created_at,
         updated_at: s.updated_at,
@@ -208,69 +380,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
   });
 
   app.post("/admin/api/providers", { schema: { body: CreateProviderSchema } }, async (request, reply) => {
-    const body = request.body as Static<typeof CreateProviderSchema>;
-    if (!PROVIDER_NAME_RE.test(body.name)) {
-      return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.VALIDATION_FAILED, "Provider 名称仅允许英文大小写字母、数字、横线和下划线"));
-    }
-    const existing = db.prepare("SELECT id FROM providers WHERE name = ?").get(body.name) as { id: string } | undefined;
-    if (existing) {
-      return reply.code(HTTP_CONFLICT).send(apiError(API_CODE.CONFLICT_NAME, `Provider 名称 '${body.name}' 已存在`));
-    }
-    if (!isValidHttpUrl(body.base_url)) {
-      return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.VALIDATION_FAILED, "base_url 格式无效，必须是以 http:// 或 https:// 开头的合法 URL"));
-    }
-    const encryptedKey = encrypt(body.api_key, getSetting(db, "encryption_key")!);
-    const { entries: normalizedModels, overrides: contextOverrides } = extractModelOverrides((body.models ?? []) as ModelInput[]);
-    const isAdaptiveEnabled = body.adaptive_enabled ?? 0;
-
-    // 将空 proxy_url 视为不使用代理
-    const effectiveProxyType = body.proxy_url?.trim() ? body.proxy_type : null;
-    const effectiveProxyUrl = body.proxy_url?.trim() || null;
-
-    const encryptedProxyUsername = (effectiveProxyType && body.proxy_username) ? encrypt(body.proxy_username, getSetting(db, "encryption_key")!) : null;
-    const encryptedProxyPassword = (effectiveProxyType && body.proxy_password) ? encrypt(body.proxy_password, getSetting(db, "encryption_key")!) : null;
-    const id = createProvider(db, {
-      name: body.name,
-      api_type: body.api_type,
-      base_url: body.base_url,
-      upstream_path: body.upstream_path ?? null,
-      api_key: encryptedKey,
-      api_key_preview: body.api_key.length > API_KEY_PREVIEW_MIN_LENGTH ? `${body.api_key.slice(0, API_KEY_PREVIEW_PREFIX_LEN)}...${body.api_key.slice(-API_KEY_PREVIEW_PREFIX_LEN)}` : "****",
-      models: JSON.stringify(normalizedModels),
-      is_active: body.is_active ?? 1,
-      max_concurrency: body.max_concurrency ?? PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency,
-      queue_timeout_ms: body.queue_timeout_ms ?? PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms,
-      max_queue_size: body.max_queue_size ?? PROVIDER_CONCURRENCY_DEFAULTS.max_queue_size,
-      adaptive_enabled: isAdaptiveEnabled,
-      proxy_type: effectiveProxyType,
-      proxy_url: effectiveProxyUrl,
-      proxy_username: encryptedProxyUsername,
-      proxy_password: encryptedProxyPassword,
-    });
-    if (contextOverrides.length > 0) {
-      setModelInfoForProvider(db, id, contextOverrides.map(o => ({ model_name: o.name, context_window: o.context_window })));
-    }
-    // 当 adaptive 启用时，由 syncProvider 全权管理信号量（避免重复调用 updateConfig）
-    if (!isAdaptiveEnabled) {
-      stateRegistry?.updateProviderConcurrency(id, {
-        maxConcurrency: body.max_concurrency ?? PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency,
-        queueTimeoutMs: body.queue_timeout_ms ?? PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms,
-        maxQueueSize: body.max_queue_size ?? PROVIDER_CONCURRENCY_DEFAULTS.max_queue_size,
-      });
-    }
-    adaptiveController?.syncProvider(id, {
-      adaptive_enabled: isAdaptiveEnabled,
-      max_concurrency: body.max_concurrency ?? PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency,
-      queue_timeout_ms: body.queue_timeout_ms ?? PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms,
-      max_queue_size: body.max_queue_size ?? PROVIDER_CONCURRENCY_DEFAULTS.max_queue_size,
-    });
-    tracker?.updateProviderConfig(id, {
-      name: body.name,
-      maxConcurrency: body.max_concurrency ?? PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency,
-      queueTimeoutMs: body.queue_timeout_ms ?? PROVIDER_CONCURRENCY_DEFAULTS.queue_timeout_ms,
-      maxQueueSize: body.max_queue_size ?? PROVIDER_CONCURRENCY_DEFAULTS.max_queue_size,
-    });
-    return reply.code(HTTP_CREATED).send({ id });
+    return handleCreateProvider(request.body as Static<typeof CreateProviderSchema>, reply, { db, stateRegistry, tracker, adaptiveController });
   });
 
   app.put("/admin/api/providers/:id", { schema: { body: UpdateProviderSchema } }, async (request, reply) => {
@@ -283,7 +393,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     if (body.name !== undefined && !PROVIDER_NAME_RE.test(body.name)) {
       return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.VALIDATION_FAILED, "Provider 名称仅允许英文大小写字母、数字、横线和下划线"));
     }
-    const fields: Partial<Pick<Provider, 'name' | 'api_type' | 'base_url' | 'upstream_path' | 'api_key' | 'api_key_preview' | 'models' | 'is_active' | 'max_concurrency' | 'queue_timeout_ms' | 'max_queue_size' | 'adaptive_enabled' | 'proxy_type' | 'proxy_url' | 'proxy_username' | 'proxy_password'>> = {};
+    const fields: Partial<Pick<Provider, 'name' | 'api_type' | 'base_url' | 'upstream_path' | 'api_key' | 'api_key_preview' | 'models' | 'is_active' | 'max_concurrency' | 'queue_timeout_ms' | 'max_queue_size' | 'adaptive_enabled' | 'proxy_type' | 'proxy_url' | 'proxy_username' | 'proxy_password' | 'endpoints'>> = {};
     if (body.name !== undefined) fields.name = body.name;
     if (body.api_type !== undefined) fields.api_type = body.api_type;
     if (body.base_url !== undefined) {
@@ -328,6 +438,24 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     }
     if (body.proxy_password !== undefined && effectiveProxyType) {
       fields.proxy_password = body.proxy_password ? encrypt(body.proxy_password, getSetting(db, "encryption_key")!) : null;
+    }
+    // ---- endpoints 处理 ----
+    if (body.endpoints) {
+      const ek = getSetting(db, "encryption_key")!;
+      const result = validateAndEncryptEndpoints(body.endpoints, ek);
+      if (!result.ok) {
+        return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.VALIDATION_FAILED, result.message));
+      }
+      fields.endpoints = serializeEndpoints(result.processed);
+      // 同步旧字段 = endpoints[0]
+      fields.api_type = body.endpoints[0].api_type;
+      fields.base_url = body.endpoints[0].base_url;
+      fields.upstream_path = body.endpoints[0].upstream_path ?? null;
+      const primaryApiKey = body.endpoints[0].api_key;
+      if (primaryApiKey) {
+        fields.api_key = encrypt(primaryApiKey, ek);
+        fields.api_key_preview = primaryApiKey.length > API_KEY_PREVIEW_MIN_LENGTH ? `${primaryApiKey.slice(0, API_KEY_PREVIEW_PREFIX_LEN)}...${primaryApiKey.slice(-API_KEY_PREVIEW_PREFIX_LEN)}` : "****";
+      }
     }
     updateProvider(db, id, fields);
     proxyAgentFactory?.invalidate(id);

@@ -1,0 +1,310 @@
+{
+  "segId": "seg_16",
+  "turnRange": {
+    "start": 33,
+    "end": 33
+  },
+  "userMessage": "1. OK，但是apikey的height好像比其他列要大，调成一样的，视觉上统一。\n2. provider编辑表单中，apikey在endpoints中，用i",
+  "timestamp": 1780055685616,
+  "turns": [
+    {
+      "turnIndex": 0,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "thinking",
+            "thinking": "The user wants me to update the demo HTML file with specific fixes:\n1. Provider list: API key column height should match other columns - make them all inline text only, no input fields\n2. Provider edit form: API key should be inline with api_type badge (no label above it, use placeholder instead). Other fields keep labels on top. Preset template should auto-fill both openai + anthropic endpoints (most providers support both).\n3. OK (QuickSetup)\n4. OK (Logs)\n\nLet me make targeted edits to the HTML file.",
+            "thinkingSignature": "reasoning_content"
+          },
+          {
+            "type": "toolCall",
+            "id": "call_8915c9a91a414525a9f9c9c4",
+            "name": "edit",
+            "arguments": {
+              "path": "/Users/zhushanwen/Code/llm-simple-router-workspace/feat-multi-api-type-support/docs/design/provider-multi-api-type-ui.html",
+              "edits": [
+                {
+                  "oldText": "  <td><div class=\"ep-rows\"><div class=\"ep-row\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--mu)\">sk-...a1b2</span> <button class=\"btn-icon\" title=\"Copy\">📋</button></div></div></td>",
+                  "newText": "  <td><div class=\"ep-rows\"><div class=\"ep-row\" style=\"height:18px\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--mu)\">sk-...a1b2</span> <button class=\"btn-icon\" title=\"Copy\" style=\"width:16px;height:16px;font-size:10px\">📋</button></div></div></td>"
+                },
+                {
+                  "oldText": "    <div class=\"ep-row\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--mu)\">sk-...x3y4</span> <button class=\"btn-icon\" title=\"Copy\">📋</button></div>\n    <div class=\"ep-row\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--suc)\">shared</span> <button class=\"btn-icon\" title=\"Copy shared\">📋</button></div>",
+                  "newText": "    <div class=\"ep-row\" style=\"height:18px\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--mu)\">sk-...x3y4</span> <button class=\"btn-icon\" title=\"Copy\" style=\"width:16px;height:16px;font-size:10px\">📋</button></div>\n    <div class=\"ep-row\" style=\"height:18px\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--suc)\">shared</span> <button class=\"btn-icon\" title=\"Copy shared\" style=\"width:16px;height:16px;font-size:10px\">📋</button></div>"
+                },
+                {
+                  "oldText": "    <div class=\"ep-row\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--mu)\">azure-...m1</span> <button class=\"btn-icon\" title=\"Copy\">📋</button></div>\n    <div class=\"ep-row\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--mu)\">azure-...m1</span> <button class=\"btn-icon\" title=\"Copy\">📋</button></div>\n    <div class=\"ep-row\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--suc)\">shared</span> <button class=\"btn-icon\" title=\"Copy shared\">📋</button></div>",
+                  "newText": "    <div class=\"ep-row\" style=\"height:18px\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--mu)\">azure-...m1</span> <button class=\"btn-icon\" title=\"Copy\" style=\"width:16px;height:16px;font-size:10px\">📋</button></div>\n    <div class=\"ep-row\" style=\"height:18px\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--mu)\">azure-...m1</span> <button class=\"btn-icon\" title=\"Copy\" style=\"width:16px;height:16px;font-size:10px\">📋</button></div>\n    <div class=\"ep-row\" style=\"height:18px\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--suc)\">shared</span> <button class=\"btn-icon\" title=\"Copy shared\" style=\"width:16px;height:16px;font-size:10px\">📋</button></div>"
+                }
+              ]
+            }
+          }
+        ],
+        "api": "openai-completions",
+        "provider": "router-openai",
+        "model": "glm-5.1",
+        "usage": {
+          "input": 16708,
+          "output": 1023,
+          "cacheRead": 128640,
+          "cacheWrite": 0,
+          "totalTokens": 146371,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          }
+        },
+        "stopReason": "toolUse",
+        "timestamp": 1780055685616,
+        "responseId": "202605291954456dab7b1c04bd4172"
+      },
+      "toolResults": [
+        {
+          "role": "toolResult",
+          "toolCallId": "call_8915c9a91a414525a9f9c9c4",
+          "toolName": "edit",
+          "content": [
+            {
+              "type": "text",
+              "text": "Successfully replaced 3 block(s) in /Users/zhushanwen/Code/llm-simple-router-workspace/feat-multi-api-type-support/docs/design/provider-multi-api-type-ui.html."
+            }
+          ],
+          "details": {
+            "diff": "     ...\n  85 <tr>\n  86   <td><div style=\"display:flex;align-items:center;gap:6px;font-weight:500;\"><span style=\"font-size:13px\">🟢</span> openai-official</div></td>\n  87   <td><div class=\"ep-rows\"><div class=\"ep-row\"><span class=\"b b-s\">OpenAI</span></div></div></td>\n  88   <td><div class=\"ep-rows\"><div class=\"ep-row\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--mu)\">https://api.openai.com/v1/chat/completions</span></div></div></td>\n- 89   <td><div class=\"ep-rows\"><div class=\"ep-row\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--mu)\">sk-...a1b2</span> <button class=\"btn-icon\" title=\"Copy\">📋</button></div></div></td>\n+ 89   <td><div class=\"ep-rows\"><div class=\"ep-row\" style=\"height:18px\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--mu)\">sk-...a1b2</span> <button class=\"btn-icon\" title=\"Copy\" style=\"width:16px;height:16px;font-size:10px\">📋</button></div></div></td>\n  90   <td><span class=\"b b-s\">32</span></td>\n  91   <td><span class=\"b b-s\">10</span></td>\n  92   <td><span class=\"b b-d\" style=\"font-size:9px\">On</span></td>\n  93   <td><button class=\"btn btn-gh btn-sm\">Edit</button></td>\n     ...\n 103     <div class=\"ep-row\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--mu)\">https://open.bigmodel.cn/api/paas/v1/chat/completions</span></div>\n 104     <div class=\"ep-row\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--mu)\">https://open.bigmodel.cn/api/paas/v1/messages</span></div>\n 105   </div></td>\n 106   <td><div class=\"ep-rows\">\n-107     <div class=\"ep-row\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--mu)\">sk-...x3y4</span> <button class=\"btn-icon\" title=\"Copy\">📋</button></div>\n-108     <div class=\"ep-row\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--suc)\">shared</span> <button class=\"btn-icon\" title=\"Copy shared\">📋</button></div>\n+107     <div class=\"ep-row\" style=\"height:18px\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--mu)\">sk-...x3y4</span> <button class=\"btn-icon\" title=\"Copy\" style=\"width:16px;height:16px;font-size:10px\">📋</button></div>\n+108     <div class=\"ep-row\" style=\"height:18px\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--suc)\">shared</span> <button class=\"btn-icon\" title=\"Copy shared\" style=\"width:16px;height:16px;font-size:10px\">📋</button></div>\n 109   </div></td>\n 110   <td><span class=\"b b-s\">18</span></td>\n 111   <td><span class=\"b b-o\">Adaptive</span></td>\n 112   <td><span class=\"b b-d\" style=\"font-size:9px\">On</span></td>\n     ...\n 125     <div class=\"ep-row\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--mu)\">https://azure.example.com/responses</span></div>\n 126     <div class=\"ep-row\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--mu)\">https://azure.example.com/anthropic</span></div>\n 127   </div></td>\n 128   <td><div class=\"ep-rows\">\n-129     <div class=\"ep-row\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--mu)\">azure-...m1</span> <button class=\"btn-icon\" title=\"Copy\">📋</button></div>\n-130     <div class=\"ep-row\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--mu)\">azure-...m1</span> <button class=\"btn-icon\" title=\"Copy\">📋</button></div>\n-131     <div class=\"ep-row\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--suc)\">shared</span> <button class=\"btn-icon\" title=\"Copy shared\">📋</button></div>\n+129     <div class=\"ep-row\" style=\"height:18px\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--mu)\">azure-...m1</span> <button class=\"btn-icon\" title=\"Copy\" style=\"width:16px;height:16px;font-size:10px\">📋</button></div>\n+130     <div class=\"ep-row\" style=\"height:18px\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--mu)\">azure-...m1</span> <button class=\"btn-icon\" title=\"Copy\" style=\"width:16px;height:16px;font-size:10px\">📋</button></div>\n+131     <div class=\"ep-row\" style=\"height:18px\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--suc)\">shared</span> <button class=\"btn-icon\" title=\"Copy shared\" style=\"width:16px;height:16px;font-size:10px\">📋</button></div>\n 132   </div></td>\n 133   <td><span class=\"b b-s\">45</span></td>\n 134   <td><span class=\"b b-s\">20</span></td>\n 135   <td><span class=\"b b-d\" style=\"font-size:9px\">On</span></td>\n     ...",
+            "patch": "--- /Users/zhushanwen/Code/llm-simple-router-workspace/feat-multi-api-type-support/docs/design/provider-multi-api-type-ui.html\n+++ /Users/zhushanwen/Code/llm-simple-router-workspace/feat-multi-api-type-support/docs/design/provider-multi-api-type-ui.html\n@@ -85,9 +85,9 @@\n <tr>\n   <td><div style=\"display:flex;align-items:center;gap:6px;font-weight:500;\"><span style=\"font-size:13px\">🟢</span> openai-official</div></td>\n   <td><div class=\"ep-rows\"><div class=\"ep-row\"><span class=\"b b-s\">OpenAI</span></div></div></td>\n   <td><div class=\"ep-rows\"><div class=\"ep-row\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--mu)\">https://api.openai.com/v1/chat/completions</span></div></div></td>\n-  <td><div class=\"ep-rows\"><div class=\"ep-row\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--mu)\">sk-...a1b2</span> <button class=\"btn-icon\" title=\"Copy\">📋</button></div></div></td>\n+  <td><div class=\"ep-rows\"><div class=\"ep-row\" style=\"height:18px\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--mu)\">sk-...a1b2</span> <button class=\"btn-icon\" title=\"Copy\" style=\"width:16px;height:16px;font-size:10px\">📋</button></div></div></td>\n   <td><span class=\"b b-s\">32</span></td>\n   <td><span class=\"b b-s\">10</span></td>\n   <td><span class=\"b b-d\" style=\"font-size:9px\">On</span></td>\n   <td><button class=\"btn btn-gh btn-sm\">Edit</button></td>\n@@ -103,10 +103,10 @@\n     <div class=\"ep-row\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--mu)\">https://open.bigmodel.cn/api/paas/v1/chat/completions</span></div>\n     <div class=\"ep-row\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--mu)\">https://open.bigmodel.cn/api/paas/v1/messages</span></div>\n   </div></td>\n   <td><div class=\"ep-rows\">\n-    <div class=\"ep-row\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--mu)\">sk-...x3y4</span> <button class=\"btn-icon\" title=\"Copy\">📋</button></div>\n-    <div class=\"ep-row\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--suc)\">shared</span> <button class=\"btn-icon\" title=\"Copy shared\">📋</button></div>\n+    <div class=\"ep-row\" style=\"height:18px\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--mu)\">sk-...x3y4</span> <button class=\"btn-icon\" title=\"Copy\" style=\"width:16px;height:16px;font-size:10px\">📋</button></div>\n+    <div class=\"ep-row\" style=\"height:18px\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--suc)\">shared</span> <button class=\"btn-icon\" title=\"Copy shared\" style=\"width:16px;height:16px;font-size:10px\">📋</button></div>\n   </div></td>\n   <td><span class=\"b b-s\">18</span></td>\n   <td><span class=\"b b-o\">Adaptive</span></td>\n   <td><span class=\"b b-d\" style=\"font-size:9px\">On</span></td>\n@@ -125,11 +125,11 @@\n     <div class=\"ep-row\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--mu)\">https://azure.example.com/responses</span></div>\n     <div class=\"ep-row\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--mu)\">https://azure.example.com/anthropic</span></div>\n   </div></td>\n   <td><div class=\"ep-rows\">\n-    <div class=\"ep-row\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--mu)\">azure-...m1</span> <button class=\"btn-icon\" title=\"Copy\">📋</button></div>\n-    <div class=\"ep-row\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--mu)\">azure-...m1</span> <button class=\"btn-icon\" title=\"Copy\">📋</button></div>\n-    <div class=\"ep-row\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--suc)\">shared</span> <button class=\"btn-icon\" title=\"Copy shared\">📋</button></div>\n+    <div class=\"ep-row\" style=\"height:18px\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--mu)\">azure-...m1</span> <button class=\"btn-icon\" title=\"Copy\" style=\"width:16px;height:16px;font-size:10px\">📋</button></div>\n+    <div class=\"ep-row\" style=\"height:18px\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--mu)\">azure-...m1</span> <button class=\"btn-icon\" title=\"Copy\" style=\"width:16px;height:16px;font-size:10px\">📋</button></div>\n+    <div class=\"ep-row\" style=\"height:18px\"><span style=\"font-family:var(--fm);font-size:10px;color:var(--suc)\">shared</span> <button class=\"btn-icon\" title=\"Copy shared\" style=\"width:16px;height:16px;font-size:10px\">📋</button></div>\n   </div></td>\n   <td><span class=\"b b-s\">45</span></td>\n   <td><span class=\"b b-s\">20</span></td>\n   <td><span class=\"b b-d\" style=\"font-size:9px\">On</span></td>\n",
+            "firstChangedLine": 89
+          },
+          "isError": false,
+          "timestamp": 1780055703322
+        }
+      ]
+    },
+    {
+      "turnIndex": 1,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "现在来修复编辑表单——使用内联的 api_key（不设置标签，使用占位符），并更新预设模板以同时支持 openai 和 anthropic。"
+          },
+          {
+            "type": "toolCall",
+            "id": "call_485cedc2ef7e48ae8d444da7",
+            "name": "edit",
+            "arguments": {
+              "edits": [
+                {
+                  "newText": "  <!-- Endpoint 1: OpenAI -->\n  <div class=\"ep-card\">\n    <div class=\"ep-card-r1\">\n      <span class=\"b b-s\" style=\"min-width:68px\">OpenAI</span>\n      <input class=\"inp\" type=\"password\" value=\"sk-...x3y4\" placeholder=\"API Key (empty = shared)\" style=\"flex:1;max-width:170px;height:22px;font-size:10px\">\n      <button class=\"btn btn-gh btn-sm\" style=\"color:var(--des);font-size:10px;padding:1px 6px\">Remove</button>\n    </div>\n    <div class=\"ep-card-r2\">\n      <div style=\"flex:1\"><span class=\"lbl\">Base URL</span><input class=\"inp\" value=\"https://open.bigmodel.cn/api/paas\" style=\"height:22px;font-size:10px\"></div>\n      <div style=\"width:160px\"><span class=\"lbl\">Upstream Path</span><input class=\"inp\" placeholder=\"/v1/chat/completions\" style=\"height:22px;font-size:10px;color:var(--mu)\"></div>\n    </div>\n  </div>\n\n  <!-- Endpoint 2: Anthropic -->\n  <div class=\"ep-card\">\n    <div class=\"ep-card-r1\">\n      <span class=\"b b-o\" style=\"min-width:68px\">Anthropic</span>\n      <input class=\"inp\" type=\"password\" placeholder=\"API Key (empty = shared)\" style=\"flex:1;max-width:170px;height:22px;font-size:10px;color:var(--suc)\">\n      <button class=\"btn btn-gh btn-sm\" style=\"color:var(--des);font-size:10px;padding:1px 6px\">Remove</button>\n    </div>\n    <div class=\"ep-card-r2\">\n      <div style=\"flex:1\"><span class=\"lbl\">Base URL</span><input class=\"inp\" value=\"https://open.bigmodel.cn/api/paas\" style=\"height:22px;font-size:10px\"></div>\n      <div style=\"width:160px\"><span class=\"lbl\">Upstream Path</span><input class=\"inp\" value=\"/v1/messages\" style=\"height:22px;font-size:10px\"></div>\n    </div>\n  </div>",
+                  "oldText": "  <!-- Endpoint 1: OpenAI -->\n  <div class=\"ep-card\">\n    <div class=\"ep-card-r1\">\n      <span class=\"b b-s\" style=\"min-width:68px\">OpenAI</span>\n      <div style=\"flex:1;max-width:180px\"><span class=\"lbl\">API Key</span><input class=\"inp\" type=\"password\" value=\"sk-...x3y4\" placeholder=\"Empty = shared key\" style=\"height:22px;font-size:10px\"></div>\n      <button class=\"btn btn-gh btn-sm\" style=\"color:var(--des);font-size:10px;padding:1px 6px\">Remove</button>\n    </div>\n    <div class=\"ep-card-r2\">\n      <div style=\"flex:1\"><span class=\"lbl\">Base URL</span><input class=\"inp\" value=\"https://open.bigmodel.cn/api/paas\" style=\"height:22px;font-size:10px\"></div>\n      <div style=\"width:160px\"><span class=\"lbl\">Upstream Path</span><input class=\"inp\" placeholder=\"/v1/chat/completions\" style=\"height:22px;font-size:10px;color:var(--mu)\"></div>\n    </div>\n  </div>\n\n  <!-- Endpoint 2: Anthropic -->\n  <div class=\"ep-card\">\n    <div class=\"ep-card-r1\">\n      <span class=\"b b-o\" style=\"min-width:68px\">Anthropic</span>\n      <div style=\"flex:1;max-width:180px\"><span class=\"lbl\">API Key</span><input class=\"inp\" type=\"password\" placeholder=\"Empty = shared key\" style=\"height:22px;font-size:10px;color:var(--suc)\"></div>\n      <button class=\"btn btn-gh btn-sm\" style=\"color:var(--des);font-size:10px;padding:1px 6px\">Remove</button>\n    </div>\n    <div class=\"ep-card-r2\">\n      <div style=\"flex:1\"><span class=\"lbl\">Base URL</span><input class=\"inp\" value=\"https://open.bigmodel.cn/api/paas\" style=\"height:22px;font-size:10px\"></div>\n      <div style=\"width:160px\"><span class=\"lbl\">Upstream Path</span><input class=\"inp\" value=\"/v1/messages\" style=\"height:22px;font-size:10px\"></div>\n    </div>\n  </div>"
+                },
+                {
+                  "newText": "  <div style=\"margin-top:10px;padding-top:8px;border-top:1px solid oklch(.94 .005 260)\">\n    <h3 style=\"font-size:11px;margin:0 0 6px\">预设模板场景（新建 Provider）</h3>\n    <p style=\"font-size:10px;color:var(--mu);margin-bottom:6px\">选择推荐 Provider 模板后，自动生成 OpenAI + Anthropic 两个 endpoint（base_url + path 自动填充）。用户只需填写一个 Shared API Key</p>\n    <!-- Endpoint 1: OpenAI (auto-filled) -->\n    <div class=\"ep-card\" style=\"background:var(--pri-05);border-color:oklch(.45 .18 260/.15)\">\n      <div class=\"ep-card-r1\">\n        <span class=\"b b-s\" style=\"min-width:68px\">OpenAI</span>\n        <input class=\"inp\" type=\"password\" placeholder=\"API Key (empty = shared)\" style=\"flex:1;max-width:170px;height:22px;font-size:10px;border-color:oklch(.45 .18 260/.3)\">\n      </div>\n      <div class=\"ep-card-r2\">\n        <div style=\"flex:1\"><span class=\"lbl\">Base URL</span><input class=\"inp inp-ro\" value=\"https://open.bigmodel.cn/api/paas\" style=\"height:22px;font-size:10px\"></div>\n        <div style=\"width:160px\"><span class=\"lbl\">Upstream Path</span><input class=\"inp inp-ro\" value=\"/v1/chat/completions\" style=\"height:22px;font-size:10px\"></div>\n      </div>\n    </div>\n    <!-- Endpoint 2: Anthropic (auto-filled) -->\n    <div class=\"ep-card\" style=\"background:var(--pri-05);border-color:oklch(.45 .18 260/.15)\">\n      <div class=\"ep-card-r1\">\n        <span class=\"b b-o\" style=\"min-width:68px\">Anthropic</span>\n        <input class=\"inp\" type=\"password\" placeholder=\"API Key (empty = shared)\" style=\"flex:1;max-width:170px;height:22px;font-size:10px;border-color:oklch(.45 .18 260/.3)\">\n      </div>\n      <div class=\"ep-card-r2\">\n        <div style=\"flex:1\"><span class=\"lbl\">Base URL</span><input class=\"inp inp-ro\" value=\"https://open.bigmodel.cn/api/paas\" style=\"height:22px;font-size:10px\"></div>\n        <div style=\"width:160px\"><span class=\"lbl\">Upstream Path</span><input class=\"inp inp-ro\" value=\"/v1/messages\" style=\"height:22px;font-size:10px\"></div>\n      </div>\n    </div>\n    <p style=\"font-size:9px;color:var(--mu)\">模板自动生成 OpenAI + Anthropic 两个 endpoint，用户只填 Shared API Key。openai-responses 视 provider 支持情况可选添加</p>\n  </div>",
+                  "oldText": "  <!-- 预设模板场景说明 -->\n  <div style=\"margin-top:10px;padding-top:8px;border-top:1px solid oklch(.94 .005 260)\">\n    <h3 style=\"font-size:11px;margin:0 0 6px\">预设模板场景（新建 Provider）</h3>\n    <p style=\"font-size:10px;color:var(--mu);margin-bottom:6px\">选择推荐 Provider 模板后，表单自动填充：name + endpoints（base_url + upstream_path）+ models + concurrency。用户只需填写 Shared API Key</p>\n    <div class=\"ep-card\" style=\"background:var(--pri-05);border-color:oklch(.45 .18 260/.15)\">\n      <div class=\"ep-card-r1\">\n        <span class=\"b b-s\" style=\"min-width:68px\">OpenAI</span>\n        <div style=\"flex:1;max-width:180px\"><span class=\"lbl\">API Key</span><input class=\"inp\" type=\"password\" value=\"\" placeholder=\"Enter your key...\" style=\"height:22px;font-size:10px;border-color:oklch(.45 .18 260/.3)\"></div>\n      </div>\n      <div class=\"ep-card-r2\">\n        <div style=\"flex:1\"><span class=\"lbl\">Base URL</span><input class=\"inp inp-ro\" value=\"https://open.bigmodel.cn/api/paas\" style=\"height:22px;font-size:10px\"></div>\n        <div style=\"width:160px\"><span class=\"lbl\">Upstream Path</span><input class=\"inp inp-ro\" value=\"/v1/chat/completions\" style=\"height:22px;font-size:10px\"></div>\n      </div>\n    </div>\n    <p style=\"font-size:9px;color:var(--mu)\">↑ 模板自动填充 Base URL 和 Path，用户只需填 Shared API Key</p>\n  </div>"
+                },
+                {
+                  "newText": "<li>每个 endpoint 紧凑两行：Row1 = api_type badge + api_key input(inline) + remove；Row2 = base_url + upstream_path（label 在上方）</li>\n<li>API Key input 使用 placeholder 提示，无 label，与 badge 高度对齐</li>\n<li>预设模板自动生成 OpenAI + Anthropic 两个 endpoint（base_url + path readonly），用户只需填写一个 Shared API Key。openai-responses 视 provider 支持情况可选</li>",
+                  "oldText": "<li>每个 endpoint 紧凑两行：Row1 = api_type badge + api_key input + remove；Row2 = base_url + upstream_path</li>\n<li>预设模板自动填充所有 endpoint（base_url + path readonly），用户只需填写一个 Shared API Key</li>"
+                }
+              ],
+              "path": "/Users/zhushanwen/Code/llm-simple-router-workspace/feat-multi-api-type-support/docs/design/provider-multi-api-type-ui.html"
+            }
+          }
+        ],
+        "api": "openai-completions",
+        "provider": "router-openai",
+        "model": "glm-5.1",
+        "usage": {
+          "input": 1070,
+          "output": 2589,
+          "cacheRead": 145344,
+          "cacheWrite": 0,
+          "totalTokens": 149003,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          }
+        },
+        "stopReason": "toolUse",
+        "timestamp": 1780055703323,
+        "responseId": "20260529195503516fcca7e7de4cc0"
+      },
+      "toolResults": [
+        {
+          "role": "toolResult",
+          "toolCallId": "call_485cedc2ef7e48ae8d444da7",
+          "toolName": "edit",
+          "content": [
+            {
+              "type": "text",
+              "text": "Successfully replaced 3 block(s) in /Users/zhushanwen/Code/llm-simple-router-workspace/feat-multi-api-type-support/docs/design/provider-multi-api-type-ui.html."
+            }
+          ],
+          "details": {
+            "diff": "     ...\n 171   <!-- Endpoint 1: OpenAI -->\n 172   <div class=\"ep-card\">\n 173     <div class=\"ep-card-r1\">\n 174       <span class=\"b b-s\" style=\"min-width:68px\">OpenAI</span>\n-175       <div style=\"flex:1;max-width:180px\"><span class=\"lbl\">API Key</span><input class=\"inp\" type=\"password\" value=\"sk-...x3y4\" placeholder=\"Empty = shared key\" style=\"height:22px;font-size:10px\"></div>\n+175       <input class=\"inp\" type=\"password\" value=\"sk-...x3y4\" placeholder=\"API Key (empty = shared)\" style=\"flex:1;max-width:170px;height:22px;font-size:10px\">\n 176       <button class=\"btn btn-gh btn-sm\" style=\"color:var(--des);font-size:10px;padding:1px 6px\">Remove</button>\n 177     </div>\n 178     <div class=\"ep-card-r2\">\n 179       <div style=\"flex:1\"><span class=\"lbl\">Base URL</span><input class=\"inp\" value=\"https://open.bigmodel.cn/api/paas\" style=\"height:22px;font-size:10px\"></div>\n     ...\n 184   <!-- Endpoint 2: Anthropic -->\n 185   <div class=\"ep-card\">\n 186     <div class=\"ep-card-r1\">\n 187       <span class=\"b b-o\" style=\"min-width:68px\">Anthropic</span>\n-188       <div style=\"flex:1;max-width:180px\"><span class=\"lbl\">API Key</span><input class=\"inp\" type=\"password\" placeholder=\"Empty = shared key\" style=\"height:22px;font-size:10px;color:var(--suc)\"></div>\n+188       <input class=\"inp\" type=\"password\" placeholder=\"API Key (empty = shared)\" style=\"flex:1;max-width:170px;height:22px;font-size:10px;color:var(--suc)\">\n 189       <button class=\"btn btn-gh btn-sm\" style=\"color:var(--des);font-size:10px;padding:1px 6px\">Remove</button>\n 190     </div>\n 191     <div class=\"ep-card-r2\">\n 192       <div style=\"flex:1\"><span class=\"lbl\">Base URL</span><input class=\"inp\" value=\"https://open.bigmodel.cn/api/paas\" style=\"height:22px;font-size:10px\"></div>\n     ...\n 200     <span class=\"add-chip\">+ Responses</span>\n 201     <span class=\"add-chip off\">✓ Anthropic</span>\n 202   </div>\n 203 \n-204   <!-- 预设模板场景说明 -->\n 205   <div style=\"margin-top:10px;padding-top:8px;border-top:1px solid oklch(.94 .005 260)\">\n 206     <h3 style=\"font-size:11px;margin:0 0 6px\">预设模板场景（新建 Provider）</h3>\n-207     <p style=\"font-size:10px;color:var(--mu);margin-bottom:6px\">选择推荐 Provider 模板后，表单自动填充：name + endpoints（base_url + upstream_path）+ models + concurrency。用户只需填写 Shared API Key</p>\n+206     <p style=\"font-size:10px;color:var(--mu);margin-bottom:6px\">选择推荐 Provider 模板后，自动生成 OpenAI + Anthropic 两个 endpoint（base_url + path 自动填充）。用户只需填写一个 Shared API Key</p>\n+207     <!-- Endpoint 1: OpenAI (auto-filled) -->\n 208     <div class=\"ep-card\" style=\"background:var(--pri-05);border-color:oklch(.45 .18 260/.15)\">\n 209       <div class=\"ep-card-r1\">\n 210         <span class=\"b b-s\" style=\"min-width:68px\">OpenAI</span>\n-211         <div style=\"flex:1;max-width:180px\"><span class=\"lbl\">API Key</span><input class=\"inp\" type=\"password\" value=\"\" placeholder=\"Enter your key...\" style=\"height:22px;font-size:10px;border-color:oklch(.45 .18 260/.3)\"></div>\n+211         <input class=\"inp\" type=\"password\" placeholder=\"API Key (empty = shared)\" style=\"flex:1;max-width:170px;height:22px;font-size:10px;border-color:oklch(.45 .18 260/.3)\">\n 212       </div>\n 213       <div class=\"ep-card-r2\">\n 214         <div style=\"flex:1\"><span class=\"lbl\">Base URL</span><input class=\"inp inp-ro\" value=\"https://open.bigmodel.cn/api/paas\" style=\"height:22px;font-size:10px\"></div>\n 215         <div style=\"width:160px\"><span class=\"lbl\">Upstream Path</span><input class=\"inp inp-ro\" value=\"/v1/chat/completions\" style=\"height:22px;font-size:10px\"></div>\n 216       </div>\n 217     </div>\n-218     <p style=\"font-size:9px;color:var(--mu)\">↑ 模板自动填充 Base URL 和 Path，用户只需填 Shared API Key</p>\n+218     <!-- Endpoint 2: Anthropic (auto-filled) -->\n+219     <div class=\"ep-card\" style=\"background:var(--pri-05);border-color:oklch(.45 .18 260/.15)\">\n+220       <div class=\"ep-card-r1\">\n+221         <span class=\"b b-o\" style=\"min-width:68px\">Anthropic</span>\n+222         <input class=\"inp\" type=\"password\" placeholder=\"API Key (empty = shared)\" style=\"flex:1;max-width:170px;height:22px;font-size:10px;border-color:oklch(.45 .18 260/.3)\">\n+223       </div>\n+224       <div class=\"ep-card-r2\">\n+225         <div style=\"flex:1\"><span class=\"lbl\">Base URL</span><input class=\"inp inp-ro\" value=\"https://open.bigmodel.cn/api/paas\" style=\"height:22px;font-size:10px\"></div>\n+226         <div style=\"width:160px\"><span class=\"lbl\">Upstream Path</span><input class=\"inp inp-ro\" value=\"/v1/messages\" style=\"height:22px;font-size:10px\"></div>\n+227       </div>\n+228     </div>\n+229     <p style=\"font-size:9px;color:var(--mu)\">模板自动生成 OpenAI + Anthropic 两个 endpoint，用户只填 Shared API Key。openai-responses 视 provider 支持情况可选添加</p>\n 219   </div>\n 220 \n 221   <!-- 下方不变 -->\n 222   <div style=\"margin-top:8px;padding-top:8px;border-top:1px solid oklch(.94 .005 260);font-size:10px;color:var(--mu)\">Models, Concurrency, Proxy 等区域保持现有 UI 不变</div>\n     ...\n 228 \n 229 <div class=\"note\"><strong>变更说明：</strong>\n 230 <ul>\n 231 <li>Shared API Key 紧跟 Provider Name 右侧，一行排列。Endpoint 的 API Key 为空时自动 fallback</li>\n-232 <li>每个 endpoint 紧凑两行：Row1 = api_type badge + api_key input + remove；Row2 = base_url + upstream_path</li>\n-233 <li>预设模板自动填充所有 endpoint（base_url + path readonly），用户只需填写一个 Shared API Key</li>\n+243 <li>每个 endpoint 紧凑两行：Row1 = api_type badge + api_key input(inline) + remove；Row2 = base_url + upstream_path（label 在上方）</li>\n+244 <li>API Key input 使用 placeholder 提示，无 label，与 badge 高度对齐</li>\n+245 <li>预设模板自动生成 OpenAI + Anthropic 两个 endpoint（base_url + path readonly），用户只需填写一个 Shared API Key。openai-responses 视 provider 支持情况可选</li>\n 234 <li>统一列表模式，单 endpoint 就是列表只有一项</li>\n 235 </ul></div>\n 236 </div>\n 237 \n     ...",
+            "patch": "--- /Users/zhushanwen/Code/llm-simple-router-workspace/feat-multi-api-type-support/docs/design/provider-multi-api-type-ui.html\n+++ /Users/zhushanwen/Code/llm-simple-router-workspace/feat-multi-api-type-support/docs/design/provider-multi-api-type-ui.html\n@@ -171,9 +171,9 @@\n   <!-- Endpoint 1: OpenAI -->\n   <div class=\"ep-card\">\n     <div class=\"ep-card-r1\">\n       <span class=\"b b-s\" style=\"min-width:68px\">OpenAI</span>\n-      <div style=\"flex:1;max-width:180px\"><span class=\"lbl\">API Key</span><input class=\"inp\" type=\"password\" value=\"sk-...x3y4\" placeholder=\"Empty = shared key\" style=\"height:22px;font-size:10px\"></div>\n+      <input class=\"inp\" type=\"password\" value=\"sk-...x3y4\" placeholder=\"API Key (empty = shared)\" style=\"flex:1;max-width:170px;height:22px;font-size:10px\">\n       <button class=\"btn btn-gh btn-sm\" style=\"color:var(--des);font-size:10px;padding:1px 6px\">Remove</button>\n     </div>\n     <div class=\"ep-card-r2\">\n       <div style=\"flex:1\"><span class=\"lbl\">Base URL</span><input class=\"inp\" value=\"https://open.bigmodel.cn/api/paas\" style=\"height:22px;font-size:10px\"></div>\n@@ -184,9 +184,9 @@\n   <!-- Endpoint 2: Anthropic -->\n   <div class=\"ep-card\">\n     <div class=\"ep-card-r1\">\n       <span class=\"b b-o\" style=\"min-width:68px\">Anthropic</span>\n-      <div style=\"flex:1;max-width:180px\"><span class=\"lbl\">API Key</span><input class=\"inp\" type=\"password\" placeholder=\"Empty = shared key\" style=\"height:22px;font-size:10px;color:var(--suc)\"></div>\n+      <input class=\"inp\" type=\"password\" placeholder=\"API Key (empty = shared)\" style=\"flex:1;max-width:170px;height:22px;font-size:10px;color:var(--suc)\">\n       <button class=\"btn btn-gh btn-sm\" style=\"color:var(--des);font-size:10px;padding:1px 6px\">Remove</button>\n     </div>\n     <div class=\"ep-card-r2\">\n       <div style=\"flex:1\"><span class=\"lbl\">Base URL</span><input class=\"inp\" value=\"https://open.bigmodel.cn/api/paas\" style=\"height:22px;font-size:10px\"></div>\n@@ -200,23 +200,34 @@\n     <span class=\"add-chip\">+ Responses</span>\n     <span class=\"add-chip off\">✓ Anthropic</span>\n   </div>\n \n-  <!-- 预设模板场景说明 -->\n   <div style=\"margin-top:10px;padding-top:8px;border-top:1px solid oklch(.94 .005 260)\">\n     <h3 style=\"font-size:11px;margin:0 0 6px\">预设模板场景（新建 Provider）</h3>\n-    <p style=\"font-size:10px;color:var(--mu);margin-bottom:6px\">选择推荐 Provider 模板后，表单自动填充：name + endpoints（base_url + upstream_path）+ models + concurrency。用户只需填写 Shared API Key</p>\n+    <p style=\"font-size:10px;color:var(--mu);margin-bottom:6px\">选择推荐 Provider 模板后，自动生成 OpenAI + Anthropic 两个 endpoint（base_url + path 自动填充）。用户只需填写一个 Shared API Key</p>\n+    <!-- Endpoint 1: OpenAI (auto-filled) -->\n     <div class=\"ep-card\" style=\"background:var(--pri-05);border-color:oklch(.45 .18 260/.15)\">\n       <div class=\"ep-card-r1\">\n         <span class=\"b b-s\" style=\"min-width:68px\">OpenAI</span>\n-        <div style=\"flex:1;max-width:180px\"><span class=\"lbl\">API Key</span><input class=\"inp\" type=\"password\" value=\"\" placeholder=\"Enter your key...\" style=\"height:22px;font-size:10px;border-color:oklch(.45 .18 260/.3)\"></div>\n+        <input class=\"inp\" type=\"password\" placeholder=\"API Key (empty = shared)\" style=\"flex:1;max-width:170px;height:22px;font-size:10px;border-color:oklch(.45 .18 260/.3)\">\n       </div>\n       <div class=\"ep-card-r2\">\n         <div style=\"flex:1\"><span class=\"lbl\">Base URL</span><input class=\"inp inp-ro\" value=\"https://open.bigmodel.cn/api/paas\" style=\"height:22px;font-size:10px\"></div>\n         <div style=\"width:160px\"><span class=\"lbl\">Upstream Path</span><input class=\"inp inp-ro\" value=\"/v1/chat/completions\" style=\"height:22px;font-size:10px\"></div>\n       </div>\n     </div>\n-    <p style=\"font-size:9px;color:var(--mu)\">↑ 模板自动填充 Base URL 和 Path，用户只需填 Shared API Key</p>\n+    <!-- Endpoint 2: Anthropic (auto-filled) -->\n+    <div class=\"ep-card\" style=\"background:var(--pri-05);border-color:oklch(.45 .18 260/.15)\">\n+      <div class=\"ep-card-r1\">\n+        <span class=\"b b-o\" style=\"min-width:68px\">Anthropic</span>\n+        <input class=\"inp\" type=\"password\" placeholder=\"API Key (empty = shared)\" style=\"flex:1;max-width:170px;height:22px;font-size:10px;border-color:oklch(.45 .18 260/.3)\">\n+      </div>\n+      <div class=\"ep-card-r2\">\n+        <div style=\"flex:1\"><span class=\"lbl\">Base URL</span><input class=\"inp inp-ro\" value=\"https://open.bigmodel.cn/api/paas\" style=\"height:22px;font-size:10px\"></div>\n+        <div style=\"width:160px\"><span class=\"lbl\">Upstream Path</span><input class=\"inp inp-ro\" value=\"/v1/messages\" style=\"height:22px;font-size:10px\"></div>\n+      </div>\n+    </div>\n+    <p style=\"font-size:9px;color:var(--mu)\">模板自动生成 OpenAI + Anthropic 两个 endpoint，用户只填 Shared API Key。openai-responses 视 provider 支持情况可选添加</p>\n   </div>\n \n   <!-- 下方不变 -->\n   <div style=\"margin-top:8px;padding-top:8px;border-top:1px solid oklch(.94 .005 260);font-size:10px;color:var(--mu)\">Models, Concurrency, Proxy 等区域保持现有 UI 不变</div>\n@@ -228,10 +239,11 @@\n \n <div class=\"note\"><strong>变更说明：</strong>\n <ul>\n <li>Shared API Key 紧跟 Provider Name 右侧，一行排列。Endpoint 的 API Key 为空时自动 fallback</li>\n-<li>每个 endpoint 紧凑两行：Row1 = api_type badge + api_key input + remove；Row2 = base_url + upstream_path</li>\n-<li>预设模板自动填充所有 endpoint（base_url + path readonly），用户只需填写一个 Shared API Key</li>\n+<li>每个 endpoint 紧凑两行：Row1 = api_type badge + api_key input(inline) + remove；Row2 = base_url + upstream_path（label 在上方）</li>\n+<li>API Key input 使用 placeholder 提示，无 label，与 badge 高度对齐</li>\n+<li>预设模板自动生成 OpenAI + Anthropic 两个 endpoint（base_url + path readonly），用户只需填写一个 Shared API Key。openai-responses 视 provider 支持情况可选</li>\n <li>统一列表模式，单 endpoint 就是列表只有一项</li>\n </ul></div>\n </div>\n \n",
+            "firstChangedLine": 175
+          },
+          "isError": false,
+          "timestamp": 1780055739257
+        }
+      ]
+    },
+    {
+      "turnIndex": 2,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "现在修复 QuickSetup 端点部分，使其使用相同的内联 api_key 样式："
+          },
+          {
+            "type": "toolCall",
+            "id": "call_2433e6cd263d446d88917385",
+            "name": "edit",
+            "arguments": {
+              "edits": [
+                {
+                  "newText": "  <!-- Endpoint 1 -->\n  <div class=\"ep-card\" style=\"padding:6px 10px\">\n    <div class=\"ep-card-r1\" style=\"margin-bottom:3px\">\n      <span class=\"b b-s\" style=\"min-width:68px;font-size:9px\">OpenAI</span>\n      <input class=\"inp\" type=\"password\" placeholder=\"API Key (empty = shared)\" style=\"flex:1;max-width:160px;height:20px;font-size:9px\">\n      <button class=\"btn-icon\" style=\"width:18px;height:18px;font-size:10px\" title=\"Remove\">×</button>\n    </div>\n    <div class=\"ep-card-r2\">\n      <div style=\"flex:1\"><span class=\"lbl\">Base URL</span><input class=\"inp inp-ro\" value=\"https://open.bigmodel.cn/api/paas\" style=\"height:20px;font-size:9px\"></div>\n      <div style=\"width:140px\"><span class=\"lbl\">Upstream Path</span><input class=\"inp inp-ro\" value=\"/v1/chat/completions\" style=\"height:20px;font-size:9px\"></div>\n    </div>\n  </div>\n\n  <!-- Endpoint 2 -->\n  <div class=\"ep-card\" style=\"padding:6px 10px\">\n    <div class=\"ep-card-r1\" style=\"margin-bottom:3px\">\n      <span class=\"b b-o\" style=\"min-width:68px;font-size:9px\">Anthropic</span>\n      <input class=\"inp\" type=\"password\" placeholder=\"API Key (empty = shared)\" style=\"flex:1;max-width:160px;height:20px;font-size:9px;color:var(--suc)\">\n      <button class=\"btn-icon\" style=\"width:18px;height:18px;font-size:10px\" title=\"Remove\">×</button>\n    </div>\n    <div class=\"ep-card-r2\">\n      <div style=\"flex:1\"><span class=\"lbl\">Base URL</span><input class=\"inp inp-ro\" value=\"https://open.bigmodel.cn/api/paas\" style=\"height:20px;font-size:9px\"></div>\n      <div style=\"width:140px\"><span class=\"lbl\">Upstream Path</span><input class=\"inp inp-ro\" value=\"/v1/messages\" style=\"height:20px;font-size:9px\"></div>\n    </div>\n  </div>",
+                  "oldText": "  <!-- Endpoint 1 -->\n  <div class=\"ep-card\" style=\"padding:6px 10px\">\n    <div class=\"ep-card-r1\" style=\"margin-bottom:3px\">\n      <span class=\"b b-s\" style=\"min-width:68px;font-size:9px\">OpenAI</span>\n      <div style=\"flex:1;max-width:170px\"><input class=\"inp\" type=\"password\" value=\"sk-xxx\" style=\"height:20px;font-size:9px\"></div>\n      <button class=\"btn-icon\" style=\"width:18px;height:18px;font-size:10px\" title=\"Remove\">×</button>\n    </div>\n    <div class=\"ep-card-r2\">\n      <div style=\"flex:1\"><input class=\"inp inp-ro\" value=\"https://open.bigmodel.cn/api/paas\" style=\"height:20px;font-size:9px\"></div>\n      <div style=\"width:140px\"><input class=\"inp inp-ro\" value=\"/v1/chat/completions\" style=\"height:20px;font-size:9px\"></div>\n    </div>\n  </div>\n\n  <!-- Endpoint 2 -->\n  <div class=\"ep-card\" style=\"padding:6px 10px\">\n    <div class=\"ep-card-r1\" style=\"margin-bottom:3px\">\n      <span class=\"b b-o\" style=\"min-width:68px;font-size:9px\">Anthropic</span>\n      <div style=\"flex:1;max-width:170px\"><input class=\"inp\" type=\"password\" placeholder=\"shared\" style=\"height:20px;font-size:9px;color:var(--suc)\"></div>\n      <button class=\"btn-icon\" style=\"width:18px;height:18px;font-size:10px\" title=\"Remove\">×</button>\n    </div>\n    <div class=\"ep-card-r2\">\n      <div style=\"flex:1\"><input class=\"inp inp-ro\" value=\"https://open.bigmodel.cn/api/paas\" style=\"height:20px;font-size:9px\"></div>\n      <div style=\"width:140px\"><input class=\"inp inp-ro\" value=\"/v1/messages\" style=\"height:20px;font-size:9px\"></div>\n    </div>\n  </div>"
+                }
+              ],
+              "path": "/Users/zhushanwen/Code/llm-simple-router-workspace/feat-multi-api-type-support/docs/design/provider-multi-api-type-ui.html"
+            }
+          }
+        ],
+        "api": "openai-completions",
+        "provider": "router-openai",
+        "model": "glm-5.1",
+        "usage": {
+          "input": 2678,
+          "output": 1171,
+          "cacheRead": 146368,
+          "cacheWrite": 0,
+          "totalTokens": 150217,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          }
+        },
+        "stopReason": "toolUse",
+        "timestamp": 1780055739259,
+        "responseId": "202605291955399fe7291feb18444f"
+      },
+      "toolResults": [
+        {
+          "role": "toolResult",
+          "toolCallId": "call_2433e6cd263d446d88917385",
+          "toolName": "edit",
+          "content": [
+            {
+              "type": "text",
+              "text": "Successfully replaced 1 block(s) in /Users/zhushanwen/Code/llm-simple-router-workspace/feat-multi-api-type-support/docs/design/provider-multi-api-type-ui.html."
+            }
+          ],
+          "details": {
+            "diff": "     ...\n 272   <!-- Endpoint 1 -->\n 273   <div class=\"ep-card\" style=\"padding:6px 10px\">\n 274     <div class=\"ep-card-r1\" style=\"margin-bottom:3px\">\n 275       <span class=\"b b-s\" style=\"min-width:68px;font-size:9px\">OpenAI</span>\n-276       <div style=\"flex:1;max-width:170px\"><input class=\"inp\" type=\"password\" value=\"sk-xxx\" style=\"height:20px;font-size:9px\"></div>\n+276       <input class=\"inp\" type=\"password\" placeholder=\"API Key (empty = shared)\" style=\"flex:1;max-width:160px;height:20px;font-size:9px\">\n 277       <button class=\"btn-icon\" style=\"width:18px;height:18px;font-size:10px\" title=\"Remove\">×</button>\n 278     </div>\n 279     <div class=\"ep-card-r2\">\n-280       <div style=\"flex:1\"><input class=\"inp inp-ro\" value=\"https://open.bigmodel.cn/api/paas\" style=\"height:20px;font-size:9px\"></div>\n-281       <div style=\"width:140px\"><input class=\"inp inp-ro\" value=\"/v1/chat/completions\" style=\"height:20px;font-size:9px\"></div>\n+280       <div style=\"flex:1\"><span class=\"lbl\">Base URL</span><input class=\"inp inp-ro\" value=\"https://open.bigmodel.cn/api/paas\" style=\"height:20px;font-size:9px\"></div>\n+281       <div style=\"width:140px\"><span class=\"lbl\">Upstream Path</span><input class=\"inp inp-ro\" value=\"/v1/chat/completions\" style=\"height:20px;font-size:9px\"></div>\n 282     </div>\n 283   </div>\n 284 \n 285   <!-- Endpoint 2 -->\n 286   <div class=\"ep-card\" style=\"padding:6px 10px\">\n 287     <div class=\"ep-card-r1\" style=\"margin-bottom:3px\">\n 288       <span class=\"b b-o\" style=\"min-width:68px;font-size:9px\">Anthropic</span>\n-289       <div style=\"flex:1;max-width:170px\"><input class=\"inp\" type=\"password\" placeholder=\"shared\" style=\"height:20px;font-size:9px;color:var(--suc)\"></div>\n+289       <input class=\"inp\" type=\"password\" placeholder=\"API Key (empty = shared)\" style=\"flex:1;max-width:160px;height:20px;font-size:9px;color:var(--suc)\">\n 290       <button class=\"btn-icon\" style=\"width:18px;height:18px;font-size:10px\" title=\"Remove\">×</button>\n 291     </div>\n 292     <div class=\"ep-card-r2\">\n-293       <div style=\"flex:1\"><input class=\"inp inp-ro\" value=\"https://open.bigmodel.cn/api/paas\" style=\"height:20px;font-size:9px\"></div>\n-294       <div style=\"width:140px\"><input class=\"inp inp-ro\" value=\"/v1/messages\" style=\"height:20px;font-size:9px\"></div>\n+293       <div style=\"flex:1\"><span class=\"lbl\">Base URL</span><input class=\"inp inp-ro\" value=\"https://open.bigmodel.cn/api/paas\" style=\"height:20px;font-size:9px\"></div>\n+294       <div style=\"width:140px\"><span class=\"lbl\">Upstream Path</span><input class=\"inp inp-ro\" value=\"/v1/messages\" style=\"height:20px;font-size:9px\"></div>\n 295     </div>\n 296   </div>\n 297 \n 298   <!-- Add -->\n     ...",
+            "patch": "--- /Users/zhushanwen/Code/llm-simple-router-workspace/feat-multi-api-type-support/docs/design/provider-multi-api-type-ui.html\n+++ /Users/zhushanwen/Code/llm-simple-router-workspace/feat-multi-api-type-support/docs/design/provider-multi-api-type-ui.html\n@@ -272,27 +272,27 @@\n   <!-- Endpoint 1 -->\n   <div class=\"ep-card\" style=\"padding:6px 10px\">\n     <div class=\"ep-card-r1\" style=\"margin-bottom:3px\">\n       <span class=\"b b-s\" style=\"min-width:68px;font-size:9px\">OpenAI</span>\n-      <div style=\"flex:1;max-width:170px\"><input class=\"inp\" type=\"password\" value=\"sk-xxx\" style=\"height:20px;font-size:9px\"></div>\n+      <input class=\"inp\" type=\"password\" placeholder=\"API Key (empty = shared)\" style=\"flex:1;max-width:160px;height:20px;font-size:9px\">\n       <button class=\"btn-icon\" style=\"width:18px;height:18px;font-size:10px\" title=\"Remove\">×</button>\n     </div>\n     <div class=\"ep-card-r2\">\n-      <div style=\"flex:1\"><input class=\"inp inp-ro\" value=\"https://open.bigmodel.cn/api/paas\" style=\"height:20px;font-size:9px\"></div>\n-      <div style=\"width:140px\"><input class=\"inp inp-ro\" value=\"/v1/chat/completions\" style=\"height:20px;font-size:9px\"></div>\n+      <div style=\"flex:1\"><span class=\"lbl\">Base URL</span><input class=\"inp inp-ro\" value=\"https://open.bigmodel.cn/api/paas\" style=\"height:20px;font-size:9px\"></div>\n+      <div style=\"width:140px\"><span class=\"lbl\">Upstream Path</span><input class=\"inp inp-ro\" value=\"/v1/chat/completions\" style=\"height:20px;font-size:9px\"></div>\n     </div>\n   </div>\n \n   <!-- Endpoint 2 -->\n   <div class=\"ep-card\" style=\"padding:6px 10px\">\n     <div class=\"ep-card-r1\" style=\"margin-bottom:3px\">\n       <span class=\"b b-o\" style=\"min-width:68px;font-size:9px\">Anthropic</span>\n-      <div style=\"flex:1;max-width:170px\"><input class=\"inp\" type=\"password\" placeholder=\"shared\" style=\"height:20px;font-size:9px;color:var(--suc)\"></div>\n+      <input class=\"inp\" type=\"password\" placeholder=\"API Key (empty = shared)\" style=\"flex:1;max-width:160px;height:20px;font-size:9px;color:var(--suc)\">\n       <button class=\"btn-icon\" style=\"width:18px;height:18px;font-size:10px\" title=\"Remove\">×</button>\n     </div>\n     <div class=\"ep-card-r2\">\n-      <div style=\"flex:1\"><input class=\"inp inp-ro\" value=\"https://open.bigmodel.cn/api/paas\" style=\"height:20px;font-size:9px\"></div>\n-      <div style=\"width:140px\"><input class=\"inp inp-ro\" value=\"/v1/messages\" style=\"height:20px;font-size:9px\"></div>\n+      <div style=\"flex:1\"><span class=\"lbl\">Base URL</span><input class=\"inp inp-ro\" value=\"https://open.bigmodel.cn/api/paas\" style=\"height:20px;font-size:9px\"></div>\n+      <div style=\"width:140px\"><span class=\"lbl\">Upstream Path</span><input class=\"inp inp-ro\" value=\"/v1/messages\" style=\"height:20px;font-size:9px\"></div>\n     </div>\n   </div>\n \n   <!-- Add -->\n",
+            "firstChangedLine": 276
+          },
+          "isError": false,
+          "timestamp": 1780055756748
+        }
+      ]
+    },
+    {
+      "turnIndex": 3,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "toolCall",
+            "id": "call_48878520cc4c44bea4203377",
+            "name": "bash",
+            "arguments": {
+              "command": "open /Users/zhushanwen/Code/llm-simple-router-workspace/feat-multi-api-type-support/docs/design/provider-multi-api-type-ui.html"
+            }
+          }
+        ],
+        "api": "openai-completions",
+        "provider": "router-openai",
+        "model": "glm-5.1",
+        "usage": {
+          "input": 1268,
+          "output": 41,
+          "cacheRead": 148992,
+          "cacheWrite": 0,
+          "totalTokens": 150301,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          }
+        },
+        "stopReason": "toolUse",
+        "timestamp": 1780055756750,
+        "responseId": "202605291955566011c30f0fed4185"
+      },
+      "toolResults": [
+        {
+          "role": "toolResult",
+          "toolCallId": "call_48878520cc4c44bea4203377",
+          "toolName": "bash",
+          "content": [
+            {
+              "type": "text",
+              "text": "(no output)"
+            }
+          ],
+          "isError": false,
+          "timestamp": 1780055761079
+        }
+      ]
+    },
+    {
+      "turnIndex": 4,
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "改好了。3 处调整：\n\n**1. 列表页 API Key 列**：固定行高 `height:18px`，copy 按钮缩小到 `16x16`，与 API Type / Base URL 列的行高对齐。\n\n**2. 编辑表单 API Key**：去掉 label，改用 placeholder `\"API Key (empty = shared)\"`，直接 inline 在 badge 和 remove 之间。Row1 高度 = badge 高度 = input 高度，视觉对齐。预设模板场景现在展示 **OpenAI + Anthropic 两个 endpoint 都自动填充**（base_url + path readonly），openai-responses 看情况可选。\n\n**3. QuickSetup**：同步使用 inline api_key（placeholder 而非带 label 的 input），与编辑表单一致。\n\n刷新浏览器看看效果。"
+          }
+        ],
+        "api": "openai-completions",
+        "provider": "router-openai",
+        "model": "glm-5.1",
+        "usage": {
+          "input": 100,
+          "output": 181,
+          "cacheRead": 150208,
+          "cacheWrite": 0,
+          "totalTokens": 150489,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          }
+        },
+        "stopReason": "stop",
+        "timestamp": 1780055761081,
+        "responseId": "20260529195601b2c05c530c2a4dc5"
+      },
+      "toolResults": []
+    }
+  ]
+}
