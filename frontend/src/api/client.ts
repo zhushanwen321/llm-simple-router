@@ -90,6 +90,12 @@ export interface ProviderPayload {
   base_url: string;
   upstream_path?: string;
   api_key?: string;
+  endpoints?: Array<{
+    api_type: "openai" | "openai-responses" | "anthropic";
+    base_url: string;
+    upstream_path?: string | null;
+    api_key?: string | null;
+  }>;
   models?: Array<
     | string
     | {
@@ -153,6 +159,12 @@ export interface QuickSetupPayload {
     base_url: string;
     upstream_path?: string;
     api_key: string;
+    endpoints?: Array<{
+      api_type: "openai" | "openai-responses" | "anthropic";
+      base_url: string;
+      upstream_path?: string;
+      api_key?: string;
+    }>;
     models: Array<{
       name: string;
       context_window?: number;

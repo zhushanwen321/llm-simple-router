@@ -88,7 +88,8 @@
     "apiKeyRequired": "请输入 API Key",
     "concurrencyRange": "范围 {min}-{max}",
     "negativeNotAllowed": "不能为负数",
-    "queueSizeRange": "范围 {min}-{max}"
+    "queueSizeRange": "范围 {min}-{max}",
+    "duplicateApiType": "同一供应商内 API 类型不能重复"
   },
   "confirmDelete": {
     "title": "确认删除",
@@ -156,5 +157,12 @@
   "image": "图片",
   "audio": "音频",
   "video": "视频"
+  },
+  "endpoints": {
+    "title": "Endpoints",
+    "add": "添加 Endpoint",
+    "useSharedKey": "使用共享 API Key",
+    "apiKeyPlaceholder": "输入 API Key",
+    "hint": "每个 API 类型只能配置一个 endpoint。API Key 留空则使用共享 Key。"
   }
 }

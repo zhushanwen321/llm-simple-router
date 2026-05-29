@@ -15,9 +15,10 @@ import ModelCard from "@/components/quick-setup/ModelCard.vue";
 import ConcurrencyControl from "@/components/shared/ConcurrencyControl.vue";
 import TransformRulesForm from "@/components/shared/TransformRulesForm.vue";
 import ProxyConfigForm from "@/components/shared/ProxyConfigForm.vue";
+import EndpointEditor from "@/components/providers/EndpointEditor.vue";
 import { CONTEXT_WINDOW_OPTIONS } from "@/composables/useProviderForm";
 import type { ConcurrencyMode } from "@/types/concurrency";
-import type { ModelInfo } from "@/types/mapping";
+import type { ModelInfo, ProviderEndpoint } from "@/types/mapping";
 import type { ModelConfig } from "@/components/quick-setup/types";
 
 const { t } = useI18n();
@@ -54,6 +55,8 @@ const props = defineProps<{
   transformInjectHeaders: string;
   transformDropFields: string;
   transformRequestDefaults: string;
+  endpoints: ProviderEndpoint[];
+  sharedKey: string;
 }>();
 
 const emit = defineEmits<{
@@ -86,6 +89,8 @@ const emit = defineEmits<{
   "update:inject-headers": [value: string];
   "update:drop-fields": [value: string];
   "update:request-defaults": [value: string];
+  // Endpoints
+  "update:endpoints": [value: ProviderEndpoint[]];
   // Proxy clear
   "clear-proxy": [];
 }>();
@@ -185,6 +190,12 @@ function isOfficialOpenai(url: string): boolean {
       {{ t("providers.fields.upstreamPathHint") }}
     </p>
   </div>
+  <!-- Endpoint editor (multi-api-type) -->
+  <EndpointEditor
+    :model-value="props.endpoints"
+    :shared-key="props.sharedKey"
+    @update:model-value="emit('update:endpoints', $event)"
+  />
   <ProxyConfigForm
     :proxy-type="props.proxyType"
     :proxy-url="props.proxyUrl"

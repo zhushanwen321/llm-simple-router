@@ -74,10 +74,16 @@
                   <span>{{ p.name }}</span>
                 </div>
                 <!-- 类型 -->
-                <div class="text-xs text-muted-foreground">
-                  <Badge variant="secondary" class="text-[11px] px-1.5 py-0">{{
-                    API_TYPE_LABELS[p.api_type] ?? p.api_type
-                  }}</Badge>
+                <div
+                  class="text-xs text-muted-foreground flex flex-wrap gap-0.5"
+                >
+                  <Badge
+                    v-for="ep in getDisplayEndpoints(p)"
+                    :key="ep.api_type"
+                    variant="secondary"
+                    class="text-[11px] px-1.5 py-0"
+                    >{{ API_TYPE_LABELS[ep.api_type] ?? ep.api_type }}</Badge
+                  >
                 </div>
                 <!-- 完整地址 -->
                 <div
@@ -322,6 +328,8 @@
               :transform-inject-headers="transformForm.injectHeadersInput"
               :transform-drop-fields="transformForm.dropFieldsInput"
               :transform-request-defaults="transformForm.requestDefaultsInput"
+              :endpoints="form.endpoints"
+              :shared-key="form.api_key"
               @update:name="form.name = $event"
               @update:api-type="form.api_type = $event"
               @update:base-url="form.base_url = $event"
@@ -354,6 +362,7 @@
               @update:request-defaults="
                 transformForm.requestDefaultsInput = $event
               "
+              @update:endpoints="form.endpoints = $event"
             />
           </template>
           <DialogFooter>
@@ -493,6 +502,7 @@ import {
   CONTEXT_M,
 } from "@/composables/useProviderForm";
 import { useProviderActions } from "@/composables/useProviderActions";
+import type { Provider } from "@/types/mapping";
 import { useFetchUpstreamModels } from "@/composables/useFetchUpstreamModels";
 
 const { t } = useI18n();
@@ -617,6 +627,23 @@ function buildFullUrl(p: {
 
 function modelCapabilities(m: { capabilities?: string[] }): string[] {
   return m.capabilities ?? ["text"];
+}
+
+interface EndpointDisplay {
+  api_type: string;
+  base_url: string;
+  api_key?: string | null;
+}
+
+function getDisplayEndpoints(p: Provider): EndpointDisplay[] {
+  if (p.endpoints && p.endpoints.length > 0) {
+    return p.endpoints.map((ep) => ({
+      api_type: ep.api_type,
+      base_url: ep.base_url,
+      api_key: ep.api_key,
+    }));
+  }
+  return [{ api_type: p.api_type, base_url: p.base_url, api_key: p.api_key }];
 }
 
 function formatContextWindow(tokens: number): string {

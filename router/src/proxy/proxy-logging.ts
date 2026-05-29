@@ -81,6 +81,8 @@ export function logResilienceResult(
     resilienceReason?: string | null;
     mappingReason?: string | null;
     failoverTrigger?: string | null;
+    upstreamApiType?: string | null;
+    upstreamBaseUrl?: string | null;
   },
   attempts: ResilienceAttempt[],
   result: TransportResult,
@@ -117,6 +119,8 @@ export function logResilienceResult(
       resilience_reason: attemptResilienceReason,
       mapping_reason: params.mappingReason ?? null,
       failover_trigger: params.failoverTrigger ?? null,
+      upstream_api_type: params.upstreamApiType ?? null,
+      upstream_base_url: params.upstreamBaseUrl ?? null,
     };
 
     // 构建 writeContext（所有路径共享，error/stream_error 路径 status >= 400 所以 preserveDetail=true，但文件写入仍需执行）

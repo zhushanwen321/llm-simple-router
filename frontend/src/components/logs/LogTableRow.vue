@@ -143,6 +143,13 @@ function enhancementLabel(raw: string | null): string {
           class="text-[10px] px-1.5 py-0"
         >
           {{ log.api_type }}
+          <template
+            v-if="
+              log.upstream_api_type && log.upstream_api_type !== log.api_type
+            "
+          >
+            → {{ log.upstream_api_type }}
+          </template>
         </Badge>
         <Badge
           :variant="(log.status_code ?? 0) < 400 ? 'default' : 'destructive'"
