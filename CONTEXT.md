@@ -12,9 +12,17 @@ _Avoid_: 请求模型、输入模型
 一个 **Provider** + 一个目标模型的组合，是映射解析的输出，也是最终调用上游 API 时使用的模型和端点。管理员在映射组 UI 上配置的每一行就是一个 Target。
 _Avoid_: 后端模型（单独使用时）、目标端点
 
-**Provider（供应商端点）**:
-一个 API 端点及其凭证（base_url + api_key）。同一个 LLM 供应商（如智谱）如果有多个 API Key，对应多个 Provider。Provider 持有模型列表、并发配置、网络代理等。
+**Provider（供应商）**:
+一个 LLM 后端供应商实体，包含一个或多个 **Endpoint**、模型列表、并发配置、网络代理等。Provider 是管理维度（共享 models、并发池、代理），Endpoint 是连接维度（各自的 api_type/base_url/api_key）。
 _Avoid_: 供应商（过于笼统）、后端
+
+**Endpoint（端点）**:
+Provider 下的一个协议连接点，由 `{api_type, base_url, upstream_path, api_key}` 组成。一个 Provider 可有多个 Endpoint（每种 api_type 最多一个），运行时根据客户端 api_type 选择匹配的 Endpoint。api_key 为空时 fallback 到 Provider 级共享 key。
+_Avoid_: 接入点、连接点
+
+**ResolvedEndpoint（解析后端点）**:
+`resolveEndpoint()` 的输出，包含经过选择和 key 解密后的最终连接信息 `{api_type, base_url, upstream_path, api_key, needs_transform}`。所有下游消费者（patch/plugin/transport）只消费此对象，不感知 Endpoint 的存储结构。
+_Avoid_: 目标端点（与 Target 混淆）
 
 **Model（模型）**:
 Provider 的附属属性，拥有元数据（capabilities、context_window 等）。模型元数据有四个来源层级：用户手动配置 > 内置白名单 > 外部模型目录 > 默认值。同一个模型名可以出现在多个 Provider 下，但每个 Provider 各自管理自己的模型列表。
