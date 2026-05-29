@@ -12,7 +12,8 @@
     "models": "Models",
     "concurrency": "Concurrency",
     "status": "Status",
-    "actions": "Actions"
+    "actions": "Actions",
+    "apiType": "API Type"
   },
   "template": {
     "title": "Template Selection",

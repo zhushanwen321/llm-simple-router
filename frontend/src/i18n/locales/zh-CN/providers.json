@@ -12,7 +12,8 @@
     "models": "模型",
     "concurrency": "并发",
     "status": "状态",
-    "actions": "操作"
+    "actions": "操作",
+    "apiType": "API 类型"
   },
   "quickConfig": {
     "title": "快速配置",
