@@ -1,6 +1,6 @@
 ---
-verdict: fail
-must_fix: 1
+verdict: pass
+must_fix: 0
 ---
 
 ## Gate Review — Phase 5 (PR)
@@ -9,18 +9,19 @@ must_fix: 1
 
 | 检查项 | 结果 | 说明 |
 |--------|------|------|
-| PR URL 格式有效 | PASS | `https://github.com/zhushanwen321/llm-simple-router/pull/174` 是有效 GitHub URL 格式 |
-| PR 真实存在 | PASS | `gh pr view 174` 确认 PR #174 是 OPEN 状态，title 和 branch name 与证据声明一致 |
-| Git commit 存在 | PASS | 声明的 commit SHA `bdaa876af5ed92e4f759fe5f5fbb2bbd6c9f4d5c` 通过 `git rev-parse` 确认有效，且在 PR 的 commit 历史中 |
-| 实际代码变更 | PASS | `main..fix/fallback-patch` diff 包含实际业务代码变更（patch-orphan-tool-results.ts 等），非仅 harness 文件 |
-| CI URL 有效 | FAIL | 声明的 CI URL 返回 404（run ID 26619618486 不存在）。实际该 commit 的 CI run ID 为 26619558746 |
-| CI 结论匹配 | PASS | `ci_results.md` 声明结论为 `action_required`，与 `gh run list` 返回的实际结论一致 |
-| 有具体 CI 输出 | PASS | `ci_results.md` 列出了本地等效检查项（tsc/eslint/vitest/build）及通过状态，非仅一句话 |
+| PR URL 格式有效 | PASS | `https://github.com/zhushanwen321/llm-simple-router/pull/174` 是合法的 GitHub URL |
+| PR 真实存在 | PASS | `gh pr view 174` 确认 PR #174 OPEN，标题、分支名与 deliverable 一致 |
+| 有实际代码变更 | PASS | `git diff 90a9924^..90a9924` 显示 `patch-orphan-tool-results.ts` 有实质重构（delete→supplement），非 stub/TODO |
+| CI 运行记录真实 | PASS | `gh run view 26619558746` 确认 Run ID 存在，结论 `action_required`，与 deliverable 声明一致 |
+| CI 状态诚实申报 | PASS | deliverable 准确报告 `action_required`，未谎称 passed，并补充了本地等价检查结果 |
+| 本地检查有证据支撑 | PASS | `test_results.md` 包含 vitest/eslint/tsc 的原始命令行输出，test 文件有 31 个 `it()`（匹配声明的 31 passed） |
+| 存在 git commit 证据 | PASS | PR 有 22 个 commits，feature commit `90a9924` 描述了 `feat: refactor patchOrphanToolResultsOA from delete to supplement strategy` |
+| commit SHA 可验证 | PASS | `bdaa876af5` 在 PR 的 commit 历史中可定位 |
 
 ### MUST_FIX 问题
 
-1. **CI URL 无法访问** — CI 结果文件中声明的 URL `https://github.com/zhushanwen321/llm-simple-router/actions/runs/26619618486` 返回 HTTP 404。该 commit SHA (`bdaa876af5ed92e4f759fe5f5fbb2bbd6c9f4d5c`) 的实际 CI run ID 是 `26619558746`，URL 应为 `https://github.com/zhushanwen321/llm-simple-router/actions/runs/26619558746`。需修正 `ci_results.md` 中的 `ci_url` 字段。
+无。
 
 ### 总结
 
-PR evidence 整体可信。PR #174 确实存在且 OPEN，commit SHA 验证通过，分支包含实际业务代码变更。CI 结果的核心声明（conclusion 为 `action_required`）与事实一致。唯一的 concrete 缺陷是 CI URL 中使用了错误的 run ID，导致链接失效。这更可能是文档编写时的笔误（copy-paste 了错误 ID）而非故意伪造，但仍需修复以确保可验证性。
+Phase 5 deliverable 可信。PR #174 真实存在且可验证，CI 状态诚实申报为 `action_required` 而非编造成 passed。本地检查有原始命令输出和测试文件佐证。代码变更是实质性的功能重构（delete→supplement strategy），非空壳实现。未发现确凿伪造证据。
