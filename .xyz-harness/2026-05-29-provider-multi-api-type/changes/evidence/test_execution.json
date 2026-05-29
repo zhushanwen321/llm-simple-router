@@ -1,0 +1,304 @@
+{
+  "test_execution": [
+    {
+      "caseId": "TC-1-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "运行 resolve-endpoint.test.ts（22 个 parseEndpoints/resolveEndpoint 测试全部通过）",
+        "创建 migration-endpoints.test.ts: INSERT 旧格式 provider（api_type/base_url/api_key 列）",
+        "执行 051 迁移 SQL",
+        "SELECT endpoints FROM providers → 验证 JSON 数组包含旧字段值"
+      ],
+      "evidence": "migration-endpoints.test.ts 通过，resolve-endpoint.test.ts 全部通过"
+    },
+    {
+      "caseId": "TC-1-02",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "migration-endpoints.test.ts: 执行迁移 SQL 一次",
+        "手动修改 endpoints 值",
+        "再次执行迁移 SQL",
+        "验证 endpoints 值未被覆盖（幂等）"
+      ],
+      "evidence": "migration-endpoints.test.ts 'idempotent' 测试通过"
+    },
+    {
+      "caseId": "TC-1-03",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "resolve-endpoint.test.ts: 创建 provider with openai+anthropic endpoints",
+        "调用 resolveEndpoint(provider, 'openai', key)",
+        "验证返回 openai endpoint，needs_transform=false"
+      ],
+      "evidence": "resolve-endpoint.test.ts '精确匹配' 测试通过"
+    },
+    {
+      "caseId": "TC-1-04",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "resolve-endpoint.test.ts: 创建 provider with only anthropic endpoint",
+        "调用 resolveEndpoint(provider, 'openai', key)",
+        "验证返回 anthropic endpoint，needs_transform=true"
+      ],
+      "evidence": "resolve-endpoint.test.ts '无匹配返回第一个+transform' 测试通过"
+    },
+    {
+      "caseId": "TC-1-05",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "resolve-endpoint.test.ts: 创建 provider with openai-responses endpoint",
+        "调用 resolveEndpoint(provider, 'openai-responses', key)",
+        "验证精确匹配，needs_transform=false"
+      ],
+      "evidence": "resolve-endpoint.test.ts openai-responses 测试通过"
+    },
+    {
+      "caseId": "TC-1-06",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "resolve-endpoint.test.ts: 创建 provider with only openai endpoint",
+        "调用 resolveEndpoint(provider, 'openai-responses', key)",
+        "验证返回 openai endpoint，needs_transform=true"
+      ],
+      "evidence": "resolve-endpoint.test.ts openai-responses fallback 测试通过"
+    },
+    {
+      "caseId": "TC-1-07",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "resolve-endpoint.test.ts: 创建 endpoint with api_key='endpoint-key'",
+        "resolve for that endpoint",
+        "验证返回 endpoint key（非 shared key）"
+      ],
+      "evidence": "resolve-endpoint.test.ts key override 测试通过"
+    },
+    {
+      "caseId": "TC-1-08",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "resolve-endpoint.test.ts: 创建 endpoint with api_key=null",
+        "resolve for that endpoint",
+        "验证返回 shared provider key"
+      ],
+      "evidence": "resolve-endpoint.test.ts null key fallback 测试通过"
+    },
+    {
+      "caseId": "TC-2-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "POST /admin/api/providers with endpoints array",
+        "验证 200 响应",
+        "GET /admin/api/providers/:id",
+        "验证 endpoints 数组返回含解密后 keys"
+      ],
+      "evidence": "provider-endpoints.test.ts 'creates provider with endpoints' 通过"
+    },
+    {
+      "caseId": "TC-2-02",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "POST /admin/api/providers with [{api_type:'openai'}, {api_type:'openai'}]",
+        "验证 400 响应",
+        "验证错误消息包含 api_type uniqueness"
+      ],
+      "evidence": "provider-endpoints.test.ts duplicate api_type 测试通过"
+    },
+    {
+      "caseId": "TC-2-03",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "POST /admin/api/providers with endpoints: []",
+        "验证 400 响应（schema 校验 minItems: 1）"
+      ],
+      "evidence": "provider-endpoints.test.ts empty endpoints 测试通过"
+    },
+    {
+      "caseId": "TC-2-04",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "创建 provider with 1 endpoint",
+        "PUT /admin/api/providers/:id 添加第 2 个 endpoint",
+        "GET provider",
+        "验证返回 2 个 endpoints"
+      ],
+      "evidence": "provider-endpoints.test.ts PUT 更新测试通过"
+    },
+    {
+      "caseId": "TC-2-05",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "POST with endpoint api_key='test-key-123'",
+        "直接查 DB SELECT endpoints FROM providers → 验证 api_key 不是明文",
+        "GET /admin/api/providers/:id → 验证 api_key='test-key-123' 解密正确"
+      ],
+      "evidence": "provider-endpoints.test.ts 加密 roundtrip 测试通过"
+    },
+    {
+      "caseId": "TC-3-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "创建 provider with openai+anthropic endpoints via Admin API",
+        "创建 mapping_group + mapping_rule",
+        "POST /v1/chat/completions with mock upstream",
+        "验证请求到达 openai endpoint URL（无格式转换）"
+      ],
+      "evidence": "proxy-endpoint-routing.test.ts TC-3-01 测试通过"
+    },
+    {
+      "caseId": "TC-3-02",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "创建 provider with only anthropic endpoint",
+        "POST /v1/chat/completions",
+        "验证请求到达 anthropic endpoint URL（OA→Ant 转换）"
+      ],
+      "evidence": "proxy-endpoint-routing.test.ts TC-3-02 测试通过"
+    },
+    {
+      "caseId": "TC-3-03",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "创建 provider with only anthropic endpoint",
+        "POST /v1/chat/completions（openai 格式）",
+        "查询 request_logs",
+        "验证 api_type='openai', upstream_api_type='anthropic', upstream_base_url 有值"
+      ],
+      "evidence": "proxy-endpoint-routing.test.ts TC-3-03 日志字段验证通过"
+    },
+    {
+      "caseId": "TC-3-04",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "创建 provider with openai endpoint",
+        "POST /v1/chat/completions（openai 格式）",
+        "查询 request_logs",
+        "验证 upstream_api_type='openai'（与 api_type 相同）"
+      ],
+      "evidence": "proxy-endpoint-routing.test.ts TC-3-04 测试通过"
+    },
+    {
+      "caseId": "TC-3-05",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "创建 endpoint with upstream_path='/custom/path'",
+        "发送请求",
+        "验证 upstream URL 包含 '/custom/path'"
+      ],
+      "evidence": "proxy-endpoint-routing.test.ts TC-3-05 upstream_path 测试通过"
+    },
+    {
+      "caseId": "TC-4-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "UI 测试 — 类型为 'ui'，本阶段不执行自动化测试",
+        "通过代码审查验证: Providers.vue 中 getDisplayEndpoints() 遍历 endpoints 数组渲染 badge"
+      ],
+      "evidence": "code_review: Providers.vue 遍历 provider.endpoints 渲染多个 API Type badge"
+    },
+    {
+      "caseId": "TC-4-02",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "UI 测试 — 类型为 'ui'，本阶段不执行自动化测试",
+        "通过代码审查验证: EndpointEditor.vue 支持 addEndpoint/removeEndpoint 方法，最少保留 1 个 endpoint"
+      ],
+      "evidence": "code_review: EndpointEditor.vue 有 addEndpoint 和 removeEndpoint 方法，disabled 条件检查 endpoints.length <= 1"
+    },
+    {
+      "caseId": "TC-4-03",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "UI 测试 — 类型为 'ui'，本阶段不执行自动化测试",
+        "通过代码审查验证: LogTableRow.vue 中当 upstream_api_type !== api_type 时显示箭头格式"
+      ],
+      "evidence": "code_review: LogTableRow.vue 条件渲染 'openai → anthropic' 箭头"
+    },
+    {
+      "caseId": "TC-4-04",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "通过 Admin API 模拟 QuickSetup payload（endpoints 数组格式）",
+        "POST /admin/api/providers with endpoints",
+        "GET 验证返回 endpoints 数组格式正确"
+      ],
+      "evidence": "provider-endpoints.test.ts 涵盖此场景，useQuickSetup.ts 代码审查确认输出 endpoints 格式"
+    },
+    {
+      "caseId": "TC-E2E-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "migration-endpoints.test.ts: INSERT 旧格式 provider → 执行 051 迁移 → 验证 endpoints 填充",
+        "通过 Admin API 创建新 provider with openai+anthropic endpoints",
+        "创建 mapping_group + mapping_rule",
+        "POST /v1/chat/completions → 验证路由到 openai endpoint（无 transform）",
+        "POST /v1/messages → 验证路由到 anthropic endpoint（无 transform）",
+        "删除 openai endpoint，POST /v1/chat/completions → 验证 transform 到 anthropic",
+        "查询 request_logs: upstream_api_type='anthropic', upstream_base_url 有值",
+        "migration-endpoints.test.ts: 验证迁移幂等性"
+      ],
+      "evidence": "proxy-endpoint-routing.test.ts E2E-01 测试 + migration-endpoints.test.ts 全部通过"
+    },
+    {
+      "caseId": "TC-E2E-02",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "创建 provider with 2 endpoints 各有自己的 api_key",
+        "直接查 DB: 验证 endpoints 中 api_key 是密文（非明文）",
+        "GET /admin/api/providers/:id: 验证 api_key 解密为明文",
+        "发送请求 → 验证使用 endpoint 对应的 key",
+        "更新 endpoint 1 的 api_key 为 null",
+        "发送请求 → 验证使用 shared provider key"
+      ],
+      "evidence": "proxy-endpoint-routing.test.ts E2E-02 加密 roundtrip 测试通过"
+    },
+    {
+      "caseId": "TC-E2E-03",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "创建 provider with [{openai}, {openai-responses}, {anthropic}]",
+        "验证 openai-responses endpoint 精确匹配逻辑（resolveEndpoint 单元测试覆盖）",
+        "删除 openai-responses endpoint → 验证 fallback 到 openai + transform",
+        "查询 request_logs 验证 upstream_api_type 字段"
+      ],
+      "evidence": "resolve-endpoint.test.ts openai-responses 匹配/fallback 测试通过，proxy-endpoint-routing.test.ts 路由验证通过"
+    },
+    {
+      "caseId": "TC-E2E-04",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "创建 provider with only anthropic endpoint",
+        "mock upstream 触发 anthropic 格式响应",
+        "发送 openai 请求（触发 OA→Ant 转换）",
+        "验证 mock upstream 收到的请求是 anthropic 格式（非 openai）",
+        "间接证明 patch/plugin 层使用 resolved api_type"
+      ],
+      "evidence": "proxy-endpoint-routing.test.ts TC-3-02 验证了 OA→Ant 转换后 upstream 收到 anthropic 格式请求"
+    }
+  ]
+}

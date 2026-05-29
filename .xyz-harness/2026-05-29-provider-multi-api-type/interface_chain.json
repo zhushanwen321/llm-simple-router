@@ -1,0 +1,112 @@
+{
+  "version": "1.0.0",
+  "methods": [
+    {
+      "name": "resolveEndpoint",
+      "class": "resolve-endpoint",
+      "module": "resolve-endpoint",
+      "params": [
+        { "name": "provider", "type": "Provider" },
+        { "name": "clientApiType", "type": "string" },
+        { "name": "encryptionKey", "type": "string" }
+      ],
+      "returns": "ResolvedEndpoint",
+      "edgeCases": [
+        "endpoints null/empty → throws",
+        "no api_type match → returns first endpoint with needs_transform=true",
+        "api_key null → fallback to provider.api_key"
+      ]
+    },
+    {
+      "name": "parseEndpoints",
+      "class": "providers",
+      "module": "providers",
+      "params": [
+        { "name": "endpointsJson", "type": "string | null" }
+      ],
+      "returns": "ProviderEndpoint[]",
+      "edgeCases": [
+        "null → returns empty array []",
+        "invalid JSON → throws",
+        "empty array after parse → resolveEndpoint throws"
+      ]
+    },
+    {
+      "name": "serializeEndpoints",
+      "class": "providers",
+      "module": "providers",
+      "params": [
+        { "name": "endpoints", "type": "ProviderEndpoint[]" }
+      ],
+      "returns": "string",
+      "edgeCases": []
+    },
+    {
+      "name": "validateEndpoints",
+      "class": "admin-providers",
+      "module": "admin/providers",
+      "params": [
+        { "name": "endpoints", "type": "unknown" }
+      ],
+      "returns": "{ valid: boolean; error?: string }",
+      "edgeCases": [
+        "empty array → 400",
+        "duplicate api_type → 400",
+        "missing base_url → 400"
+      ]
+    },
+    {
+      "name": "encryptEndpointKeys",
+      "class": "admin-providers",
+      "module": "admin/providers",
+      "params": [
+        { "name": "endpoints", "type": "ProviderEndpoint[]" },
+        { "name": "key", "type": "string" }
+      ],
+      "returns": "ProviderEndpoint[]",
+      "edgeCases": [
+        "api_key null → skip encryption"
+      ]
+    }
+  ],
+  "data_flows": [
+    {
+      "id": "flow-proxy-request",
+      "description": "Full proxy request with endpoint resolution",
+      "chain": [
+        "failover-loop.getProviderById → Provider",
+        "resolveEndpoint(provider, clientApiType, encryptionKey) → ResolvedEndpoint",
+        "transport.buildTransportFn(resolvedEndpoint) → TransportFn",
+        "log-helpers.insertSuccessLog(resolvedEndpoint.api_type, resolvedEndpoint.base_url)"
+      ]
+    },
+    {
+      "id": "flow-admin-create",
+      "description": "Admin API create provider with endpoints",
+      "chain": [
+        "admin/providers.validateEndpoints(endpoints) → validation",
+        "admin/providers.encryptEndpointKeys(endpoints, encryptionKey) → encrypted",
+        "db/providers.createProvider(db, {endpoints: serialized, ...}) → id"
+      ]
+    },
+    {
+      "id": "flow-admin-get",
+      "description": "Admin API get provider with decrypted endpoints",
+      "chain": [
+        "db/providers.getProviderById(db, id) → Provider",
+        "providers.parseEndpoints(provider.endpoints) → ProviderEndpoint[]",
+        "decrypt each endpoint api_key → response"
+      ]
+    },
+    {
+      "id": "flow-migration",
+      "description": "DB migration from old fields to endpoints",
+      "chain": [
+        "migration 051 SQL: ALTER TABLE ADD endpoints",
+        "migration 051 SQL: SELECT WHERE endpoints IS NULL",
+        "providers.serializeEndpoints([{api_type, base_url, upstream_path, api_key}]) → JSON",
+        "UPDATE providers SET endpoints = JSON"
+      ]
+    }
+  ]
+}

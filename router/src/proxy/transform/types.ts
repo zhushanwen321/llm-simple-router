@@ -7,8 +7,7 @@ export type TransformDirection =
   // 二级：Responses ↔ Chat
   | "openai-to-openai-responses" | "openai-responses-to-openai";
 
-/** 所有支持的 API 格式类型 */
-export type ApiType = "openai" | "openai-responses" | "anthropic";
+export type { ApiType } from "../../core/types.js";
 
 // ---------- Anthropic Content Block 类型 ----------
 
