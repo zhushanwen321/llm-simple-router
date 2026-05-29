@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { PlusIcon, Trash2Icon } from "lucide-vue-next";
+import { Trash2Icon } from "lucide-vue-next";
 import type { ProviderEndpoint } from "@/types/mapping";
 
 const { t } = useI18n();
@@ -36,15 +36,10 @@ const usedApiTypes = computed(
   () => new Set(props.modelValue.map((e) => e.api_type)),
 );
 
-const availableApiTypes = computed(() =>
-  ALL_API_TYPES.filter((t) => !usedApiTypes.value.has(t)),
-);
+// availableApiTypes removed — add buttons iterate ALL_API_TYPES directly
 
-const canAdd = computed(() => availableApiTypes.value.length > 0);
-
-function addEndpoint() {
-  if (!canAdd.value) return;
-  const apiType = availableApiTypes.value[0];
+function addEndpoint(apiType: ProviderEndpoint["api_type"]) {
+  if (usedApiTypes.value.has(apiType)) return;
   const next = [
     ...props.modelValue,
     {
@@ -80,18 +75,22 @@ function updateField<K extends keyof ProviderEndpoint>(
       <Label class="text-xs text-muted-foreground">{{
         t("providers.endpoints.title")
       }}</Label>
-      <Button
-        v-if="!readonly"
-        type="button"
-        variant="outline"
-        size="sm"
-        class="h-6 text-xs gap-1"
-        :disabled="!canAdd"
-        @click="addEndpoint"
-      >
-        <PlusIcon class="w-3 h-3" />
-        {{ t("providers.endpoints.add") }}
-      </Button>
+      <template v-if="!readonly">
+        <Button
+          v-for="at in ALL_API_TYPES"
+          :key="at"
+          type="button"
+          variant="ghost"
+          size="sm"
+          class="h-6 text-[10px] gap-0.5 px-2"
+          :disabled="usedApiTypes.has(at)"
+          @click="addEndpoint(at)"
+        >
+          <template v-if="usedApiTypes.has(at)">&#10003;</template>
+          <template v-else>+</template>
+          {{ API_TYPE_SHORT[at] ?? at }}
+        </Button>
+      </template>
     </div>
     <div
       v-for="(ep, i) in modelValue"
