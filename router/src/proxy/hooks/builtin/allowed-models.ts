@@ -29,7 +29,7 @@ export const allowedModelsHook: PipelineHook = {
     if (!allowedModels || allowedModels.length === 0) return;
 
     if (!allowedModels.includes(resolved.backend_model)) {
-      const errors = ctx.deps?.errors;
+      const errors = ctx.deps!.setup.errors;
       const err = errors?.modelNotAllowed(resolved.backend_model);
       throw new PipelineAbort(err?.statusCode ?? HTTP_FORBIDDEN, err?.body ?? {
         error: { type: "model_not_allowed", message: `Model '${resolved.backend_model}' not allowed` },

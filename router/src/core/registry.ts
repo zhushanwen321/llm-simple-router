@@ -13,6 +13,11 @@ export interface ProviderConcurrencyParams {
   max_queue_size: number;
 }
 
+/** Provider 代理缓存失效接口 — admin 层通过此接口清除 proxy 层的代理缓存 */
+export interface IProxyCacheInvalidator {
+  invalidate(providerId: string): void;
+}
+
 export interface StateRegistry {
   /** 刷新重试规则缓存（RetryRuleMatcher.load） */
   refreshRetryRules(): void;
@@ -32,4 +37,6 @@ export interface StateRegistry {
   getAdaptiveStatus(providerId: string): import("./concurrency/types.js").AdaptiveState | undefined;
   /** 从 DB 重新读取所有 provider 配置，重建信号量/adaptive/tracker 缓存（导入配置后调用） */
   reinitializeProviders(): void;
+  /** 获取已注册的 pipeline hooks 列表（供 admin API 查询） */
+  getRegisteredHooks(): Record<string, { name: string; priority: number }[]>;
 }

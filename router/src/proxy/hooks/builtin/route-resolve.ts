@@ -1,11 +1,6 @@
 /**
  * post_route hook: 从候选 target 列表中选取第一个非 excluded 的 target，
  * 查询 provider，校验 is_active。
- *
- * 从 failover-loop.ts while 循环内的 target 选择逻辑提取。
- * 当无可用 target 或 provider 不可用时抛出 PipelineAbort(503)。
- *
- * 依赖：ctx.deps.db、ctx.deps.cachedTargets、ctx.excludeTargets
  */
 import type { PipelineHook, PipelineContext } from "../../pipeline/types.js";
 import { PipelineAbort } from "../../pipeline/types.js";
@@ -20,11 +15,13 @@ export const routeResolveHook: PipelineHook = {
   priority: 0,
   core: true,
   execute(ctx: PipelineContext): void {
-    const db = ctx.deps?.db ?? ctx.metadata.get("db") as Database.Database;
-    const cachedTargets = ctx.deps?.cachedTargets ?? ctx.metadata.get("cachedTargets") as Target[] ?? [];
+    // db: 优先从 setup deps，fallback 到 metadata（兼容测试）
+    const db = ctx.deps?.setup?.db ?? ctx.metadata.get("db") as Database.Database | undefined;
+    if (!db) return;
+    // cachedTargets: 优先从 request deps，fallback 到 metadata
+    const cachedTargets = ctx.deps?.request?.cachedTargets ?? ctx.metadata.get("cachedTargets") as Target[] ?? [];
     const excludeTargets = ctx.excludeTargets ?? ctx.metadata.get("excludeTargets") as Target[] ?? [];
 
-    // filterExcluded: 从 cachedTargets 中排除 excludeTargets
     const available = cachedTargets.filter(
       (t) =>
         !excludeTargets.some(

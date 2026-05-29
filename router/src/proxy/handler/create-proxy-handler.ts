@@ -24,10 +24,11 @@ import { SERVICE_KEYS } from "../../core/container.js";
 import type { ServiceContainer } from "../../core/container.js";
 import type { FormatRegistry } from "../format/registry.js";
 import type { ProxyAgentFactory } from "../transport/proxy-agent.js";
+import type { ILogSink } from "../../core/log-sink.js";
 import { createPipelineContext } from "../pipeline/context.js";
 import { proxyPipeline } from "../pipeline/pipeline.js";
 import { executeFailoverLoop, type FailoverLoopDeps } from "./failover-loop.js";
-import { PipelineAbort } from "../pipeline/types.js";
+import { PipelineAbort, type SetupDeps } from "../pipeline/types.js";
 import { registerBuiltinHooks } from "../pipeline/register-hooks.js";
 
 // ---------- Factory config ----------
@@ -205,9 +206,10 @@ export function createProxyHandler(config: ProxyHandlerConfig) {
       });
 
       // 创建 pipeline context（预填可用依赖）
+      // SetupDeps 在 pre_route 阶段只填充 db + container，在 failover-loop 中补全
       const ctx = createPipelineContext(request, reply, apiType, {
-        db,
-        container,
+        setup: { db, container } as SetupDeps,
+        request: {} as never,
       });
 
       // 执行 pre_route 阶段 hooks（client-detection 在此阶段设置 client_type / session_id）
@@ -225,11 +227,15 @@ export function createProxyHandler(config: ProxyHandlerConfig) {
         throw e;
       }
 
+      const logSink = (() => {
+        try { return container.resolve<ILogSink>(SERVICE_KEYS.logSink as string); } catch { return undefined; }
+      })();
       const deps: FailoverLoopDeps = {
         db,
         container,
         orchestrator,
         proxyAgentFactory: container.resolve<ProxyAgentFactory>(SERVICE_KEYS.proxyAgentFactory),
+        logSink,
       };
 
       const result = await executeFailoverLoop(ctx, apiTypeErrors, deps, defaultUpstreamPath, adapter ?? {

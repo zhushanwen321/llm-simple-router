@@ -11,6 +11,7 @@ export const SERVICE_KEYS = {
   formatRegistry: "formatRegistry",
   logFileWriter: "logFileWriter",
   proxyAgentFactory: "proxyAgentFactory",
+  logSink: "logSink",
 } as const;
 
 export type ServiceKey = (typeof SERVICE_KEYS)[keyof typeof SERVICE_KEYS];

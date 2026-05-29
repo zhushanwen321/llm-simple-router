@@ -26,8 +26,8 @@ export const enhancementPreprocessHook: PipelineHook = {
   execute(ctx: PipelineContext): void {
     const { request, body, metadata } = ctx;
     const sessionId = metadata.get("session_id") as string | undefined;
-    const db = ctx.deps?.db;
-    const container = ctx.deps?.container;
+    const db = ctx.deps?.setup?.db;
+    const container = ctx.deps?.setup?.container;
     if (!db || !container) return;
 
     const enhancementConfig = loadEnhancementConfig(db);

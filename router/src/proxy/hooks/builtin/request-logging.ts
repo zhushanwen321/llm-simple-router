@@ -28,12 +28,12 @@ export const requestLoggingHook: PipelineHook = {
   phase: "post_response",
   priority: 900,
   execute(ctx: PipelineContext): void | Promise<void> {
-    const db = ctx.deps?.db;
-    const container = ctx.deps?.container;
+    const db = ctx.deps!.setup.db;
+    const container = ctx.deps!.setup.container;
     const startTime = ctx.iterationStartTime ?? 0;
     const resilienceResult = ctx.resilienceResult;
-    const matcher = ctx.deps?.matcher ?? null;
-    const logFileWriter = ctx.deps?.logFileWriter ?? null;
+    const matcher = ctx.deps!.setup.matcher;
+    const logFileWriter = ctx.deps!.setup.logFileWriter;
 
     if (!db || !resilienceResult) return;
 

@@ -46,6 +46,9 @@ import Database from "better-sqlite3";
 import { LogFileWriter } from "./storage/log-file-writer.js";
 import { ProxyAgentFactory } from "./proxy/transport/proxy-agent.js";
 import { registerBuiltinHooks } from "./proxy/pipeline/register-hooks.js";
+import { proxyPipeline } from "./proxy/pipeline/pipeline.js";
+import { ProxyConnectivityChecker } from "./proxy/transport/provider-connectivity.js";
+import { DbLogSink } from "./proxy/log-sink/db-log-sink.js";
 import { scheduleLogFileMaintenance } from "./storage/log-file-compressor.js";
 import { getDetailLogEnabled, getLogFileRetentionDays } from "./db/settings.js";
 import { dirname, join } from "node:path";
@@ -89,28 +92,9 @@ export function initializeProviderState(
   }
 }
 
-export async function buildApp(
-  options?: AppOptions
-): Promise<{
-  app: FastifyInstance;
-  db: Database.Database;
-  usageWindowTracker: UsageWindowTracker;
-  tracker: RequestTracker;
-  close: () => Promise<void>;
-}> {
-  const config = options?.config ?? getBaseConfig();
+// --- Extracted helper functions for buildApp ---
 
-  // 允许外部传入已初始化的 DB（测试用），否则自行创建
-  let db: Database.Database;
-  if (options?.db) {
-    db = options.db;
-  } else {
-    db = initDatabase(config.DB_PATH);
-  }
-
-  // 加载外部模型目录（ai-model-directory），fallback 到硬编码白名单
-  loadModelDirectory();
-
+function createAppInstance(config: Config): FastifyInstance {
   const isDev = process.env.NODE_ENV !== "production";
 
   const MAX_BODY_SIZE_MB = 50;
@@ -152,6 +136,10 @@ export async function buildApp(
     return new Error(message);
   });
 
+  return app;
+}
+
+function registerAppHooks(app: FastifyInstance, db: Database.Database): void {
   // 记录请求到达时间，供全局错误处理计算延迟
   app.addHook("onRequest", (request, reply, done) => {
     (request as unknown as { receivedAt: number }).receivedAt = Date.now();
@@ -255,19 +243,39 @@ export async function buildApp(
 
     return payload
   })
+}
 
-  loadRecommendedConfig(path.resolve(__dirname, '../config'));
-  startUpgradeChecker({
-    ...options?.upgradeCheckerOptions,
-    configDir: path.resolve(__dirname, '../config'),
-  });
+interface ComposeContainerParams {
+  db: Database.Database;
+  appLog: FastifyInstance['log'];
+  config: Config;
+  pluginsDir: string;
+  __dirname: string;
+  logsDir: string;
+  isMemoryDb: boolean;
+}
+
+interface ComposedServices {
+  container: ServiceContainer;
+  matcher: RetryRuleMatcher;
+  semaphoreManager: SemaphoreManager;
+  tracker: RequestTracker;
+  usageWindowTracker: UsageWindowTracker;
+  adaptiveController: AdaptiveController;
+  proxyAgentFactory: ProxyAgentFactory;
+  logFileWriter: LogFileWriter | null;
+  pluginRegistry: PluginRegistry;
+}
+
+function composeContainer(params: ComposeContainerParams): ComposedServices {
+  const { db, appLog, pluginsDir, logsDir, isMemoryDb } = params;
 
   const container = new ServiceContainer();
   container.register(SERVICE_KEYS.db, () => db);
   container.register(SERVICE_KEYS.matcher, (c) => { const m = new RetryRuleMatcher(); m.load(c.resolve(SERVICE_KEYS.db)); return m; });
   container.register(SERVICE_KEYS.semaphoreManager, () => new SemaphoreManager());
   container.register(SERVICE_KEYS.tracker, (c) => {
-    const t = new RequestTracker({ semaphoreManager: c.resolve(SERVICE_KEYS.semaphoreManager), logger: app.log });
+    const t = new RequestTracker({ semaphoreManager: c.resolve(SERVICE_KEYS.semaphoreManager), logger: appLog });
     t.startPushInterval();
     return t;
   });
@@ -279,8 +287,6 @@ export async function buildApp(
   container.register(SERVICE_KEYS.sessionTracker, () => new SessionTracker(DEFAULT_LOOP_PREVENTION_CONFIG.sessionTracker));
 
   // 文件日志写入器
-  const isMemoryDb = config.DB_PATH === ":memory:";
-  const logsDir = isMemoryDb ? "" : join(dirname(config.DB_PATH), "logs");
   // :memory: 模式注册 null，避免 DB 日志记录被 isFileWriter 逻辑抑制
   const logFileWriter = isMemoryDb
     ? null
@@ -289,14 +295,13 @@ export async function buildApp(
 
   // 注册 AdaptiveController（依赖已注册的 semaphoreManager）
   container.register(SERVICE_KEYS.adaptiveController, (c) => {
-    const ac = new AdaptiveController(c.resolve(SERVICE_KEYS.semaphoreManager), app.log);
+    const ac = new AdaptiveController(c.resolve(SERVICE_KEYS.semaphoreManager), appLog);
     return ac;
   });
 
   // 注册 PluginRegistry（从 DB 和 plugins 目录加载转换插件）
   const pluginRegistry = new PluginRegistry();
   pluginRegistry.loadFromDB(db);
-  const pluginsDir = path.resolve(__dirname, "../plugins/transform");
   pluginRegistry.scanPluginsDir(pluginsDir);
   container.register(SERVICE_KEYS.pluginRegistry, () => pluginRegistry);
 
@@ -316,6 +321,9 @@ export async function buildApp(
   // 注册 ProxyAgentFactory
   container.register(SERVICE_KEYS.proxyAgentFactory, () => new ProxyAgentFactory());
 
+  // 注册 ILogSink
+  container.register(SERVICE_KEYS.logSink, () => new DbLogSink(db));
+
   // 从容器解析所有服务
   const matcher = container.resolve<RetryRuleMatcher>(SERVICE_KEYS.matcher);
   const semaphoreManager = container.resolve<SemaphoreManager>(SERVICE_KEYS.semaphoreManager);
@@ -329,6 +337,28 @@ export async function buildApp(
 
   // 从 DB 读取已有 provider 的并发配置，初始化信号量/adaptive/tracker（共享逻辑）
   initializeProviderState(db, semaphoreManager, adaptiveController, tracker);
+
+  return {
+    container,
+    matcher,
+    semaphoreManager,
+    tracker,
+    usageWindowTracker,
+    adaptiveController,
+    proxyAgentFactory,
+    logFileWriter,
+    pluginRegistry,
+  };
+}
+
+function registerRoutes(
+  app: FastifyInstance,
+  db: Database.Database,
+  services: ComposedServices,
+  params: { closeRef: { fn: () => Promise<void> }; logsDir: string; frontendDist: string; config: Config },
+): void {
+  const { closeRef, logsDir, frontendDist } = params;
+  const { matcher, semaphoreManager, tracker, adaptiveController, logFileWriter, pluginRegistry, proxyAgentFactory, container } = services;
 
   app.register(authMiddleware, { db });
 
@@ -366,19 +396,12 @@ export async function buildApp(
       adaptiveController.removeAll();
       initializeProviderState(db, semaphoreManager, adaptiveController, tracker);
     },
+    getRegisteredHooks: () => proxyPipeline.getAllHooks(),
   };
 
-  // Late-bound close ref — close 函数在 adminRoutes 注册之后才定义，
-  // 但 restart API 需要在运行时调用它
-  const closeRef = { fn: async () => {} };
-
-  app.register(adminRoutes, { db, stateRegistry, tracker, adaptiveController, logFileWriter, logsDir, closeFn: () => closeRef.fn(), pluginRegistry, proxyAgentFactory });
+  app.register(adminRoutes, { db, stateRegistry, tracker, adaptiveController, logFileWriter, logsDir, closeFn: () => closeRef.fn(), pluginRegistry, proxyAgentFactory, connectivityChecker: new ProxyConnectivityChecker() });
 
   // 前端静态文件服务（生产环境）
-  const frontendDist = path.resolve(
-    process.env.FRONTEND_DIST || path.join(__dirname, "../frontend-dist")
-  );
-
   if (existsSync(frontendDist)) {
     app.register(fastifyStatic, {
       root: frontendDist,
@@ -405,6 +428,52 @@ export async function buildApp(
   app.get("/health", async () => {
     return { status: "ok" };
   });
+}
+
+export async function buildApp(
+  options?: AppOptions
+): Promise<{
+  app: FastifyInstance;
+  db: Database.Database;
+  usageWindowTracker: UsageWindowTracker;
+  tracker: RequestTracker;
+  close: () => Promise<void>;
+}> {
+  const config = options?.config ?? getBaseConfig();
+
+  // 允许外部传入已初始化的 DB（测试用），否则自行创建
+  let db: Database.Database;
+  if (options?.db) {
+    db = options.db;
+  } else {
+    db = initDatabase(config.DB_PATH);
+  }
+
+  // 加载外部模型目录（ai-model-directory），fallback 到硬编码白名单
+  loadModelDirectory();
+
+  const app = createAppInstance(config);
+  registerAppHooks(app, db);
+
+  loadRecommendedConfig(path.resolve(__dirname, '../config'));
+  startUpgradeChecker({
+    ...options?.upgradeCheckerOptions,
+    configDir: path.resolve(__dirname, '../config'),
+  });
+
+  const isMemoryDb = config.DB_PATH === ":memory:";
+  const logsDir = isMemoryDb ? "" : join(dirname(config.DB_PATH), "logs");
+  const pluginsDir = path.resolve(__dirname, "../plugins/transform");
+
+  const services = composeContainer({ db, appLog: app.log, config, pluginsDir, __dirname, logsDir, isMemoryDb });
+
+  // Late-bound close ref — close 函数在 adminRoutes 注册之后才定义，
+  // 但 restart API 需要在运行时调用它
+  const closeRef = { fn: async () => {} };
+  const frontendDist = path.resolve(
+    process.env.FRONTEND_DIST || path.join(__dirname, "../frontend-dist")
+  );
+  registerRoutes(app, db, services, { closeRef, logsDir, frontendDist, config });
 
   const logCleanup = scheduleLogCleanup(db, app.log);
 
@@ -419,15 +488,15 @@ export async function buildApp(
     stopUpgradeChecker();
     logCleanup.stop();
     dbSizeMonitor.stop();
-    tracker.stopPushInterval();
+    services.tracker.stopPushInterval();
     // 关闭所有 SSE 长连接，防止 app.close() 因 hijack 的连接无限等待
-    tracker.closeAllClients();
-    semaphoreManager.removeAll();
-    proxyAgentFactory.invalidateAll();
-    const sessionTracker = container.resolve<SessionTracker>(SERVICE_KEYS.sessionTracker);
+    services.tracker.closeAllClients();
+    services.semaphoreManager.removeAll();
+    services.proxyAgentFactory.invalidateAll();
+    const sessionTracker = services.container.resolve<SessionTracker>(SERVICE_KEYS.sessionTracker);
     sessionTracker.stop();
     // Flush LogFileWriter 的 WriteStream 缓冲数据到磁盘
-    await logFileWriter?.stop();
+    await services.logFileWriter?.stop();
     // 等待活跃代理请求自然完成，超时后强制关闭所有连接。
     // 先调用 app.close() 停止接受新连接并等待现有连接结束，
     // 如果 2 秒内未完成则调用 closeAllConnections() 强制断开，防止 SSE 长连接导致无限等待。
@@ -461,8 +530,8 @@ export async function buildApp(
   return {
     app,
     db,
-    usageWindowTracker,
-    tracker,
+    usageWindowTracker: services.usageWindowTracker,
+    tracker: services.tracker,
     close,
   };
 }

@@ -1,6 +1,6 @@
 import Database from "better-sqlite3";
 import type { LogFileWriter } from "../storage/log-file-writer.js";
-import { shouldPreserveDetail, type RetryMatcher } from "../proxy/log-detail-policy.js";
+import { shouldPreserveDetail, type RetryMatcher } from "../core/log-detail-policy.js";
 import { getCachedStmt } from "./helpers.js";
 
 type CountRow = { count: number };

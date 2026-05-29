@@ -432,27 +432,32 @@ describe("TC-5-01: builtin:transport-execute calls orchestrator.handle", () => {
     const mockMatcher = { load: vi.fn() };
 
     ctx.deps = {
-      container: mockContainer,
-      adapter: { beforeSendProxy: vi.fn() },
-      orchestrator: mockOrchestrator,
-      tracker: undefined,
-      matcher: mockMatcher,
-      clientHeaders: {},
-      precomputedClientReq: "{}",
-      retryBaseDelayMs: 1000,
-      enhancementConfig: { stream_loop_enabled: false } as { tool_call_loop_enabled: boolean; stream_loop_enabled: boolean; tool_round_limit_enabled: boolean; tool_error_logging_enabled: boolean },
-      cachedTargets: [ctx.resolved],
-      concurrencyOverride: undefined,
-      errors: undefined,
-      logFileWriter: undefined,
-      usageWindowTracker: undefined,
-      db: undefined,
-      defaultUpstreamPath: undefined,
-      decryptedApiKeys: undefined,
-      precomputeSnapshot: undefined,
-      resolveResult: undefined,
-      proxyAgentFactory: undefined,
-      overflowIndices: undefined,
+      setup: {
+        container: mockContainer as never,
+        orchestrator: mockOrchestrator as never,
+        tracker: undefined as never,
+        matcher: mockMatcher as never,
+        errors: undefined as never,
+        logFileWriter: undefined as never,
+        usageWindowTracker: undefined as never,
+        proxyAgentFactory: undefined as never,
+        db: undefined as never,
+        retryBaseDelayMs: 1000,
+      },
+      request: {
+        adapter: { beforeSendProxy: vi.fn() } as never,
+        clientHeaders: {},
+        precomputedClientReq: "{}",
+        retryBaseDelayMs: 1000,
+        enhancementConfig: { stream_loop_enabled: false } as { tool_call_loop_enabled: boolean; stream_loop_enabled: boolean; tool_round_limit_enabled: boolean; tool_error_logging_enabled: boolean },
+        cachedTargets: [ctx.resolved] as never,
+        concurrencyOverride: undefined as never,
+        defaultUpstreamPath: undefined as never,
+        decryptedApiKeys: undefined as never,
+        precomputeSnapshot: undefined as never,
+        resolveResult: undefined as never,
+        overflowIndices: undefined as never,
+      },
     };
     ctx.iterationStartTime = Date.now();
     ctx.metadata.set("apiKey", "sk-test-key");
@@ -473,7 +478,7 @@ describe("TC-5-01: builtin:transport-execute calls orchestrator.handle", () => {
     expect(ctx.resilienceResult).toBe(mockResilienceResult);
 
     // 验证 adapter.beforeSendProxy 被调用
-    expect(ctx.deps!.adapter!.beforeSendProxy).toHaveBeenCalled();
+    expect(ctx.deps!.request.adapter.beforeSendProxy).toHaveBeenCalled();
   });
 
   it("TC-5-01: transport-execute propagates orchestrator errors", async () => {
@@ -514,27 +519,31 @@ describe("TC-5-01: builtin:transport-execute calls orchestrator.handle", () => {
     };
 
     ctx.deps = {
-      container: mockContainer,
-      adapter: { beforeSendProxy: vi.fn() },
-      orchestrator: mockOrchestrator,
-      tracker: undefined,
-      matcher: { load: vi.fn() },
-      clientHeaders: {},
-      precomputedClientReq: "{}",
-      retryBaseDelayMs: 1000,
-      enhancementConfig: { stream_loop_enabled: false } as { tool_call_loop_enabled: boolean; stream_loop_enabled: boolean; tool_round_limit_enabled: boolean; tool_error_logging_enabled: boolean },
-      cachedTargets: [ctx.resolved],
-      concurrencyOverride: undefined,
-      errors: undefined,
-      logFileWriter: undefined,
-      usageWindowTracker: undefined,
-      db: undefined,
-      defaultUpstreamPath: undefined,
-      decryptedApiKeys: undefined,
-      precomputeSnapshot: undefined,
-      resolveResult: undefined,
-      proxyAgentFactory: undefined,
-      overflowIndices: undefined,
+      setup: {
+        container: mockContainer as never,
+        orchestrator: mockOrchestrator as never,
+        tracker: undefined as never,
+        matcher: { load: vi.fn() } as never,
+        errors: undefined as never,
+        logFileWriter: undefined as never,
+        usageWindowTracker: undefined as never,
+        proxyAgentFactory: undefined as never,
+        db: undefined as never,
+        retryBaseDelayMs: 1000,
+      },
+      request: {
+        adapter: { beforeSendProxy: vi.fn() } as never,
+        clientHeaders: {},
+        precomputedClientReq: "{}",
+        enhancementConfig: { stream_loop_enabled: false } as { tool_call_loop_enabled: boolean; stream_loop_enabled: boolean; tool_round_limit_enabled: boolean; tool_error_logging_enabled: boolean },
+        cachedTargets: [ctx.resolved] as never,
+        concurrencyOverride: undefined as never,
+        defaultUpstreamPath: undefined as never,
+        decryptedApiKeys: undefined as never,
+        precomputeSnapshot: undefined as never,
+        resolveResult: undefined as never,
+        overflowIndices: undefined as never,
+      },
     };
     ctx.iterationStartTime = Date.now();
     ctx.metadata.set("apiKey", "sk-test");
@@ -599,27 +608,31 @@ describe("TC-5-01: builtin:transport-execute calls orchestrator.handle", () => {
     };
 
     ctx.deps = {
-      container: mockContainer,
-      adapter: { beforeSendProxy: vi.fn() },
-      orchestrator: mockOrchestrator,
-      tracker: undefined,
-      matcher: { load: vi.fn() },
-      clientHeaders: {},
-      precomputedClientReq: "{}",
-      retryBaseDelayMs: 1000,
-      enhancementConfig: { stream_loop_enabled: false } as { tool_call_loop_enabled: boolean; stream_loop_enabled: boolean; tool_round_limit_enabled: boolean; tool_error_logging_enabled: boolean },
-      cachedTargets: [resolved],
-      concurrencyOverride: undefined,
-      errors: undefined,
-      logFileWriter: undefined,
-      usageWindowTracker: undefined,
-      db: undefined,
-      defaultUpstreamPath: undefined,
-      decryptedApiKeys: undefined,
-      precomputeSnapshot: undefined,
-      resolveResult: undefined,
-      proxyAgentFactory: undefined,
-      overflowIndices: undefined,
+      setup: {
+        container: mockContainer as never,
+        orchestrator: mockOrchestrator as never,
+        tracker: undefined as never,
+        matcher: { load: vi.fn() } as never,
+        errors: undefined as never,
+        logFileWriter: undefined as never,
+        usageWindowTracker: undefined as never,
+        proxyAgentFactory: undefined as never,
+        db: undefined as never,
+        retryBaseDelayMs: 1000,
+      },
+      request: {
+        adapter: { beforeSendProxy: vi.fn() } as never,
+        clientHeaders: {},
+        precomputedClientReq: "{}",
+        enhancementConfig: { stream_loop_enabled: false } as { tool_call_loop_enabled: boolean; stream_loop_enabled: boolean; tool_round_limit_enabled: boolean; tool_error_logging_enabled: boolean },
+        cachedTargets: [resolved] as never,
+        concurrencyOverride: undefined as never,
+        defaultUpstreamPath: undefined as never,
+        decryptedApiKeys: undefined as never,
+        precomputeSnapshot: undefined as never,
+        resolveResult: undefined as never,
+        overflowIndices: undefined as never,
+      },
     };
     ctx.iterationStartTime = Date.now();
     ctx.metadata.set("apiKey", "sk-test");

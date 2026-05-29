@@ -2,20 +2,18 @@ import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
 import { Type, Static } from "@sinclair/typebox";
 import type { Provider } from "../db/index.js";
-import type { RawHeaders } from "../proxy/types.js";
 import { getAllProviders, getProviderById, createProvider, updateProvider, deleteProvider, getAllMappingGroups, updateMappingGroup, PROVIDER_CONCURRENCY_DEFAULTS } from "../db/index.js";
 import { encrypt, decrypt } from "../utils/crypto.js";
 import { getSetting } from "../db/settings.js";
 import type { StateRegistry } from "../core/registry.js";
 import type { AdaptiveController } from "../core/concurrency/index.js";
 import type { RequestTracker } from "../core/monitor/index.js";
-import type { ProxyAgentFactory } from "../proxy/transport/proxy-agent.js";
+import type { IProxyCacheInvalidator } from "../core/registry.js";
 import { HTTP_CREATED, HTTP_NOT_FOUND, HTTP_CONFLICT, HTTP_BAD_REQUEST, HTTP_OK, PROVIDER_NAME_RE, isValidHttpUrl, formatApiKeyPreview } from "./utils.js";
 import { API_CODE, apiError } from "./api-response.js";
 import { parseModels, buildModelInfoList, normalizePatchName, type ModelEntry } from "../config/model-context.js";
 import { getModelInfoForProvider, setModelInfoForProvider, deleteAllModelInfoForProvider } from "../db/model-info.js";
-import { buildUpstreamHeaders } from "../proxy/proxy-core.js";
-import { callGet } from "../proxy/transport/http.js";
+import type { IProviderConnectivityChecker } from "../core/provider-connectivity.js";
 
 const FETCH_MODELS_BODY_PREVIEW_LENGTH = 200;
 
@@ -157,11 +155,12 @@ interface ProviderRoutesOptions {
   stateRegistry?: StateRegistry;
   tracker?: RequestTracker;
   adaptiveController?: AdaptiveController;
-  proxyAgentFactory?: ProxyAgentFactory;
+  proxyAgentFactory?: IProxyCacheInvalidator;
+  connectivityChecker?: IProviderConnectivityChecker;
 }
 
 export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> = (app, options, done) => {
-  const { db, stateRegistry, tracker, adaptiveController, proxyAgentFactory } = options;
+  const { db, stateRegistry, tracker, adaptiveController, proxyAgentFactory, connectivityChecker } = options;
 
   app.get("/admin/api/providers", async (_request, reply) => {
     const encryptionKey = getSetting(db, "encryption_key")!;
@@ -431,16 +430,8 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
   app.post("/admin/api/providers/fetch-models", { schema: { body: FetchModelsSchema } }, async (request, reply) => {
     const { base_url, models_endpoint, api_key, api_type } = request.body as Static<typeof FetchModelsSchema>;
 
-    const backend = { base_url };
-    const clientHeaders: Record<string, string> = {};
     try {
-      const result = await callGet(
-        backend,
-        api_key,
-        clientHeaders as RawHeaders,
-        models_endpoint,
-        (cliHdrs, key) => buildUpstreamHeaders(cliHdrs, key, undefined, api_type),
-      );
+      const result = await connectivityChecker!.fetchModels(base_url, api_key, models_endpoint, api_type);
 
       if (result.statusCode !== HTTP_OK) {
         return reply.code(HTTP_BAD_REQUEST).send(apiError(

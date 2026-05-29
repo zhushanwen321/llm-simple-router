@@ -7,7 +7,7 @@ export function createPipelineContext(
   request: FastifyRequest,
   reply: FastifyReply,
   apiType: string,
-  deps?: PipelineDeps,
+  deps: PipelineDeps,
 ): PipelineContext {
   const body = request.body as Record<string, unknown>;
   const clientModel = (body.model as string) || "unknown";
@@ -34,7 +34,7 @@ export function createPipelineContext(
     clientRequest: "",
     upstreamRequest: "",
     snapshot: new PipelineSnapshot(),
-    deps: deps ?? {},
+    deps,
     excludeTargets: [],
     mappingReason: undefined,
     isFailoverIteration: false,

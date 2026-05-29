@@ -24,14 +24,14 @@ import type { Provider } from "../../../db/providers.js";
 import type { ApiType } from "../../transform/types.js";
 
 export async function executeTransportHook(ctx: PipelineContext): Promise<void> {
-  const container = ctx.deps!.container!;
+  const container = ctx.deps!.setup.container;
   const formatRegistry = container.resolve<FormatRegistry>(SERVICE_KEYS.formatRegistry);
-  const adapter = ctx.deps!.adapter!;
-  const orchestrator = ctx.deps!.orchestrator!;
-  const tracker = ctx.deps!.tracker;
-  const matcher = ctx.deps!.matcher!;
+  const adapter = ctx.deps!.request!.adapter;
+  const orchestrator = ctx.deps!.setup.orchestrator;
+  const tracker = ctx.deps!.setup.tracker;
+  const matcher = ctx.deps!.setup.matcher;
   const proxyAgentFactory = container.resolve<ProxyAgentFactory | undefined>(SERVICE_KEYS.proxyAgentFactory);
-  const retryBaseDelayMs = ctx.deps!.retryBaseDelayMs ?? getConfig().RETRY_BASE_DELAY_MS;
+  const retryBaseDelayMs = ctx.deps!.setup.retryBaseDelayMs ?? getConfig().RETRY_BASE_DELAY_MS;
 
   // route-resolve hook 通过 getProviderById 设置，运行时是完整 Provider 对象
   const provider = ctx.provider as unknown as Provider;
@@ -46,8 +46,8 @@ export async function executeTransportHook(ctx: PipelineContext): Promise<void> 
   adapter.beforeSendProxy?.(ctx.body, isStream);
 
   // 构建日志数据
-  const cliHdrs = ctx.deps!.clientHeaders!;
-  const clientRequest = ctx.deps!.precomputedClientReq!;
+  const cliHdrs = ctx.deps!.request!.clientHeaders;
+  const clientRequest = ctx.deps!.request!.precomputedClientReq;
   const reqBodyStr = JSON.stringify(ctx.body);
   const upstreamRequest = JSON.stringify({
     url: buildUpstreamUrl(provider.base_url, ctx.effectiveUpstreamPath),
@@ -113,10 +113,10 @@ export async function executeTransportHook(ctx: PipelineContext): Promise<void> 
     : undefined;
 
   // 构建 transport 函数
-  const enhancementConfig = ctx.deps!.enhancementConfig!;
-  const cachedTargets = ctx.deps!.cachedTargets!;
+  const enhancementConfig = ctx.deps!.request!.enhancementConfig;
+  const cachedTargets = ctx.deps!.request!.cachedTargets;
   const isFailover = cachedTargets.length > 1;
-  const concurrencyOverride = ctx.deps!.concurrencyOverride ?? undefined;
+  const concurrencyOverride = ctx.deps!.request!.concurrencyOverride ?? undefined;
   const effectiveMappingReason = ctx.mappingReason!;
 
   const transportFn = buildTransportFn({

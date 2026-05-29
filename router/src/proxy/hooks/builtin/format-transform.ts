@@ -17,9 +17,11 @@ export const formatTransformHook: PipelineHook = {
   priority: 0,
   core: true,
   execute(ctx: PipelineContext): void {
-    const container = ctx.deps?.container ?? ctx.metadata.get("container") as ServiceContainer;
-    const formatRegistry = container!.resolve<FormatRegistry>(SERVICE_KEYS.formatRegistry);
-    const defaultUpstreamPath = ctx.deps?.defaultUpstreamPath ?? ctx.metadata.get("defaultUpstreamPath") as string ?? "";
+    const container = ctx.deps?.setup?.container ?? ctx.metadata.get("container") as ServiceContainer | undefined;
+    if (!container) return;
+    const formatRegistry = container.resolve<FormatRegistry>(SERVICE_KEYS.formatRegistry);
+    // 优先使用 request deps 中的 upstream path，fallback 到 metadata
+    const defaultUpstreamPath = ctx.deps?.request?.defaultUpstreamPath ?? ctx.metadata.get("defaultUpstreamPath") as string ?? "";
     const provider = ctx.provider!;
     const clientApiType = ctx.apiType as ApiType;
     const providerApiType = provider.api_type as ApiType;

@@ -14,6 +14,7 @@ import type { LogFileWriter } from "../../storage/log-file-writer.js";
 import type { ProxyErrorFormatter } from "../proxy-core.js";
 import type { UsageWindowTracker } from "../routing/usage-window-tracker.js";
 import type { ProxyAgentFactory } from "../transport/proxy-agent.js";
+import type { ILogSink } from "../../core/log-sink.js";
 
 /** Hook 挂载阶段 */
 export type HookPhase =
@@ -65,37 +66,48 @@ export interface ProviderInfo {
   created_at: string;
 }
 
-/**
- * PipelineDeps — 固定依赖集合（L1→L2 通道注入）。
- * 所有字段可选，允许逐步填充（先创建空对象，再由 failover-loop 设置）。
- */
-export interface PipelineDeps {
-  db?: Database.Database;
-  container?: ServiceContainer;
-  cachedTargets?: Target[];
-  overflowIndices?: Set<number>;
-  resolveResult?: ResolveResult;
-  precomputeSnapshot?: PipelineSnapshot;
-  decryptedApiKeys?: Map<string, string>;
-  enhancementConfig?: {
+/** SetupDeps — 应用生命周期级依赖，不随请求变化 */
+export interface SetupDeps {
+  db: Database.Database;
+  container: ServiceContainer;
+  orchestrator: ProxyOrchestrator;
+  matcher: RetryRuleMatcher;
+  tracker: RequestTracker;
+  retryBaseDelayMs: number;
+  logFileWriter: LogFileWriter | null;
+  errors: ProxyErrorFormatter;
+  usageWindowTracker: UsageWindowTracker;
+  proxyAgentFactory: ProxyAgentFactory;
+  logSink: ILogSink;
+}
+
+/** RequestDeps — 请求级依赖，单次 failover 迭代内不变化 */
+export interface RequestDeps {
+  cachedTargets: Target[];
+  overflowIndices: Set<number>;
+  resolveResult: ResolveResult;
+  precomputeSnapshot: PipelineSnapshot;
+  decryptedApiKeys: Map<string, string>;
+  enhancementConfig: {
     tool_call_loop_enabled: boolean;
     stream_loop_enabled: boolean;
     tool_round_limit_enabled: boolean;
     tool_error_logging_enabled: boolean;
   };
-  adapter?: FormatAdapter;
-  orchestrator?: ProxyOrchestrator;
-  matcher?: RetryRuleMatcher;
-  tracker?: RequestTracker;
-  defaultUpstreamPath?: string;
-  clientHeaders?: RawHeaders;
-  precomputedClientReq?: string;
-  retryBaseDelayMs?: number;
-  concurrencyOverride?: ConcurrencyOverride | null;
-  logFileWriter?: LogFileWriter | null;
-  errors?: ProxyErrorFormatter;
-  usageWindowTracker?: UsageWindowTracker;
-  proxyAgentFactory?: ProxyAgentFactory;
+  adapter: FormatAdapter;
+  defaultUpstreamPath: string;
+  clientHeaders: RawHeaders;
+  precomputedClientReq: string;
+  concurrencyOverride: ConcurrencyOverride | null;
+}
+
+/**
+ * PipelineDeps — 结构化依赖集合。
+ * 所有字段必需，在 failover-loop 中统一填充。
+ */
+export interface PipelineDeps {
+  setup: SetupDeps;
+  request: RequestDeps;
 }
 
 /**
@@ -135,7 +147,7 @@ export interface PipelineContext {
   upstreamRequest: string;
   snapshot: PipelineSnapshot;
 
-  // L1→L2 通道（固定依赖，由 PipelineDeps 定义）
+  // L1→L2 通道（固定依赖，由 PipelineDeps 定义，failover-loop 中填充）
   deps?: PipelineDeps;
 
   // 迭代级字段（每次 failover 迭代重置）

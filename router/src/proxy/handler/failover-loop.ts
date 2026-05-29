@@ -21,6 +21,7 @@ import { extractFailedToolResults } from "./proxy-handler-utils.js";
 import { logToolErrors } from "../tool-error-logger.js";
 import { PipelineAbort, type PipelineContext, type ProviderInfo } from "../pipeline/types.js";
 import { PipelineSnapshot } from "../pipeline-snapshot.js";
+import type { ILogSink } from "../../core/log-sink.js";
 import { proxyPipeline } from "../pipeline/pipeline.js";
 import type { ProxyErrorFormatter } from "../proxy-core.js";
 import type { FormatAdapter } from "../format/types.js";
@@ -43,6 +44,7 @@ export interface FailoverLoopDeps {
   container: ServiceContainer;
   orchestrator: ProxyOrchestrator;
   proxyAgentFactory?: ProxyAgentFactory;
+  logSink?: ILogSink;
 }
 
 // ---------- Reject helper ----------
@@ -108,37 +110,54 @@ function makeRejectCtx(
 
 // ---------- Main failover loop ----------
 
-export async function executeFailoverLoop(
-  ctx: PipelineContext, errors: ProxyErrorFormatter,
-  deps: FailoverLoopDeps, upstreamPath: string, adapter: FormatAdapter,
-): Promise<FastifyReply> {
+/** L1 路由预计算的结果 */
+interface PrecomputeResult {
+  allTargets: Target[];
+  overflowIndices: Set<number>;
+  resolveResult: import("../../core/types.js").ResolveResult;
+  precomputeSnapshot: PipelineSnapshot;
+  enhancementConfig: import("../routing/enhancement-config.js").EnhancementConfig;
+  pendingToolErrors: import("./proxy-handler-utils.js").FailedToolResult[] | null;
+  precomputedClientReq: string;
+  rejectReply: FastifyReply | null;
+}
+
+/** L1: 路由预计算 — resolveMapping → IR → OF → allowed_models filter */
+function precomputeRoutes(
+  ctx: PipelineContext,
+  errors: ProxyErrorFormatter,
+  db: Database.Database,
+  cliHdrs: RawHeaders,
+  matcher: RetryRuleMatcher | undefined,
+  logFileWriter: import("../../storage/log-file-writer.js").LogFileWriter | undefined,
+): PrecomputeResult {
   const { request, reply } = ctx;
-  const { db, container, orchestrator } = deps;
-  const config = getConfig();
-  const tracker = container.resolve<RequestTracker>(SERVICE_KEYS.tracker);
-  const usageWindowTracker = container.resolve<UsageWindowTracker>(SERVICE_KEYS.usageWindowTracker);
-  const matcher = container.resolve<RetryRuleMatcher>(SERVICE_KEYS.matcher);
-  const logFileWriter = container.resolve<import("../../storage/log-file-writer.js").LogFileWriter>(SERVICE_KEYS.logFileWriter);
-  const enhancementConfig = loadEnhancementConfig(db);
-  const clientModel = ctx.clientModel;
   const rawBody = ctx.rawBody;
-  const cliHdrs = request.headers as RawHeaders;
+  const clientModel = ctx.clientModel;
+  const enhancementConfig = loadEnhancementConfig(db);
+  const precomputeSnapshot = new PipelineSnapshot();
   const precomputedClientReq = JSON.stringify({ headers: sanitizeHeadersForLog(cliHdrs as Record<string, string>), body: rawBody });
 
-  // === L1: 路由预计算 ===
-  const precomputeSnapshot = new PipelineSnapshot();
   const resolveResult = resolveMapping(db, clientModel, { now: new Date() });
   if (!resolveResult) {
-    return rejectAndReply(reply, makeRejectCtx(ctx, db, randomUUID(), cliHdrs, matcher, logFileWriter, precomputeSnapshot),
-      errors.modelNotFound(clientModel), `No mapping found for model '${clientModel}'`);
+    return {
+      allTargets: [], overflowIndices: new Set(), resolveResult: null as never,
+      precomputeSnapshot, enhancementConfig, pendingToolErrors: null,
+      precomputedClientReq, rejectReply: rejectAndReply(reply, makeRejectCtx(ctx, db, randomUUID(), cliHdrs, matcher, logFileWriter, precomputeSnapshot),
+        errors.modelNotFound(clientModel), `No mapping found for model '${clientModel}'`),
+    };
   }
 
   let allTargets = resolveResult.allTargets ?? [resolveResult.target];
   allTargets = computeModalityRedirectTargets(db, allTargets, clientModel, ctx.body, precomputeSnapshot);
 
   if (allTargets.length === 0) {
-    return rejectAndReply(reply, makeRejectCtx(ctx, db, randomUUID(), cliHdrs, matcher, logFileWriter, precomputeSnapshot),
-      errors.unsupportedModality(), `No eligible target: request modalities not supported by any available model`);
+    return {
+      allTargets: [], overflowIndices: new Set(), resolveResult,
+      precomputeSnapshot, enhancementConfig, pendingToolErrors: null,
+      precomputedClientReq, rejectReply: rejectAndReply(reply, makeRejectCtx(ctx, db, randomUUID(), cliHdrs, matcher, logFileWriter, precomputeSnapshot),
+        errors.unsupportedModality(), `No eligible target: request modalities not supported by any available model`),
+    };
   }
 
   const beforeOF = allTargets.length;
@@ -149,10 +168,13 @@ export async function executeFailoverLoop(
   const { targets: filteredTargets, overflowIndices } = applyAllowedModelsFilter(
     allTargets, request.routerKey?.allowed_models ?? undefined, ofResult.overflowIndices);
   if (filteredTargets.length === 0) {
-    return rejectAndReply(reply, makeRejectCtx(ctx, db, randomUUID(), cliHdrs, matcher, logFileWriter, precomputeSnapshot),
-      errors.modelNotAllowed(clientModel), `No allowed model available for '${clientModel}'`);
+    return {
+      allTargets: [], overflowIndices, resolveResult,
+      precomputeSnapshot, enhancementConfig, pendingToolErrors: null,
+      precomputedClientReq, rejectReply: rejectAndReply(reply, makeRejectCtx(ctx, db, randomUUID(), cliHdrs, matcher, logFileWriter, precomputeSnapshot),
+        errors.modelNotAllowed(clientModel), `No allowed model available for '${clientModel}'`),
+    };
   }
-  allTargets = filteredTargets;
 
   // 工具错误提取
   let pendingToolErrors: import("./proxy-handler-utils.js").FailedToolResult[] | null = null;
@@ -164,29 +186,62 @@ export async function executeFailoverLoop(
     }
   }
 
-  // === L1 → L2 通道（注入到 ctx.deps，同时保持 metadata 兼容） ===
-  ctx.deps!.db = db;
-  ctx.deps!.container = container;
-  ctx.deps!.cachedTargets = allTargets;
-  ctx.deps!.overflowIndices = overflowIndices;
-  ctx.deps!.resolveResult = resolveResult;
-  ctx.deps!.precomputeSnapshot = precomputeSnapshot;
-  ctx.deps!.decryptedApiKeys = new Map<string, string>();
-  ctx.deps!.enhancementConfig = enhancementConfig;
-  ctx.deps!.adapter = adapter;
-  ctx.deps!.orchestrator = orchestrator;
-  ctx.deps!.matcher = matcher;
-  ctx.deps!.tracker = tracker;
-  ctx.deps!.defaultUpstreamPath = upstreamPath;
-  ctx.deps!.clientHeaders = cliHdrs;
-  ctx.deps!.precomputedClientReq = precomputedClientReq;
-  ctx.deps!.retryBaseDelayMs = config.RETRY_BASE_DELAY_MS;
-  ctx.deps!.concurrencyOverride = resolveResult.concurrency_override;
-  ctx.deps!.logFileWriter = logFileWriter;
-  ctx.deps!.errors = errors;
-  ctx.deps!.usageWindowTracker = usageWindowTracker;
+  return {
+    allTargets: filteredTargets, overflowIndices, resolveResult,
+    precomputeSnapshot, enhancementConfig, pendingToolErrors,
+    precomputedClientReq, rejectReply: null,
+  };
+}
+export async function executeFailoverLoop(
+  ctx: PipelineContext, errors: ProxyErrorFormatter,
+  deps: FailoverLoopDeps, upstreamPath: string, adapter: FormatAdapter,
+): Promise<FastifyReply> {
+  const { request, reply } = ctx;
+  const { db, container, orchestrator } = deps;
+  const config = getConfig();
+  const tracker = container.resolve<RequestTracker>(SERVICE_KEYS.tracker);
+  const usageWindowTracker = container.resolve<UsageWindowTracker>(SERVICE_KEYS.usageWindowTracker);
+  const matcher = container.resolve<RetryRuleMatcher>(SERVICE_KEYS.matcher);
+  const logFileWriter = container.resolve<import("../../storage/log-file-writer.js").LogFileWriter>(SERVICE_KEYS.logFileWriter);
+  const cliHdrs = request.headers as RawHeaders;
 
-  if (pendingToolErrors) ctx.metadata.set("pendingToolErrors", pendingToolErrors);
+  // === L1: 路由预计算（纯函数，无副作用） ===
+  const precomputeResult = precomputeRoutes(ctx, errors, db, cliHdrs, matcher, logFileWriter ?? undefined);
+  if (precomputeResult.rejectReply) return precomputeResult.rejectReply;
+
+  const {
+    allTargets, overflowIndices, resolveResult, precomputeSnapshot,
+    enhancementConfig, pendingToolErrors, precomputedClientReq,
+  } = precomputeResult;
+  let mutablePendingToolErrors = pendingToolErrors;
+  const rawBody = ctx.rawBody;
+  const clientModel = ctx.clientModel;
+
+  // === L1 → L2 通道（注入到 ctx.deps） ===
+  ctx.deps!.setup.db = db;
+  ctx.deps!.setup.container = container;
+  ctx.deps!.setup.orchestrator = orchestrator;
+  ctx.deps!.setup.matcher = matcher;
+  ctx.deps!.setup.tracker = tracker;
+  ctx.deps!.setup.retryBaseDelayMs = config.RETRY_BASE_DELAY_MS;
+  ctx.deps!.setup.logFileWriter = logFileWriter;
+  ctx.deps!.setup.errors = errors;
+  ctx.deps!.setup.usageWindowTracker = usageWindowTracker;
+  if (deps.logSink) ctx.deps!.setup.logSink = deps.logSink;
+
+  ctx.deps!.request!.cachedTargets = allTargets;
+  ctx.deps!.request!.overflowIndices = overflowIndices;
+  ctx.deps!.request!.resolveResult = resolveResult;
+  ctx.deps!.request!.precomputeSnapshot = precomputeSnapshot;
+  ctx.deps!.request!.decryptedApiKeys = new Map<string, string>();
+  ctx.deps!.request!.enhancementConfig = enhancementConfig;
+  ctx.deps!.request!.adapter = adapter;
+  ctx.deps!.request!.defaultUpstreamPath = upstreamPath;
+  ctx.deps!.request!.clientHeaders = cliHdrs;
+  ctx.deps!.request!.precomputedClientReq = precomputedClientReq;
+  ctx.deps!.request!.concurrencyOverride = resolveResult.concurrency_override ?? null;
+
+  if (mutablePendingToolErrors) ctx.metadata.set("pendingToolErrors", mutablePendingToolErrors);
 
   // === L3: while(true) 循环壳 ===
   const excludeTargets: Target[] = [];
@@ -237,8 +292,8 @@ export async function executeFailoverLoop(
     ctx.mappingReason = mapReason;
 
     const flushToolErrors = (pId: string, model: string) => {
-      if (!pendingToolErrors) return;
-      logToolErrors(pendingToolErrors, { db, providerId: pId, backendModel: model,
+      if (!mutablePendingToolErrors) return;
+      logToolErrors(mutablePendingToolErrors, { db, providerId: pId, backendModel: model,
         clientAgentType: ctx.metadata.get("client_type") as string ?? "unknown",
         requestLogId: logId, routerKeyId, sessionId: ctx.metadata.get("session_id") as string | undefined });
     };
@@ -294,7 +349,7 @@ export async function executeFailoverLoop(
             failoverTrigger: `action_${rr.action}`,
           }, rr.attempts, rr.result, startTime);
           if (ctx.provider) flushToolErrors(ctx.provider.id, ctx.resolved?.backend_model ?? clientModel);
-          pendingToolErrors = null;
+          mutablePendingToolErrors = null;
           lastFailoverTrigger = rr.action;
           excludeTargets.push(ctx.resolved!);
           continue;

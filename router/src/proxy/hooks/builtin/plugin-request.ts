@@ -17,7 +17,7 @@ export const pluginRequestHook: PipelineHook = {
   phase: "pre_transport",
   priority: 250,
   execute(ctx: PipelineContext): void {
-    const container = ctx.deps?.container;
+    const container = ctx.deps?.setup?.container;
     if (!container) return;
 
     const pluginRegistry = container.resolve<PluginRegistry>(SERVICE_KEYS.pluginRegistry);

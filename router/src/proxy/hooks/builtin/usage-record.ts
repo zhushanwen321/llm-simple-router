@@ -9,7 +9,7 @@ export const usageRecordHook: PipelineHook = {
   phase: "post_response",
   priority: 120,
   execute(ctx: PipelineContext): void {
-    const usageWindowTracker = ctx.deps?.usageWindowTracker
+    const usageWindowTracker = ctx.deps?.setup?.usageWindowTracker
       ?? (ctx.metadata.get("container") as ServiceContainer | undefined)
         ?.resolve<UsageWindowTracker>(SERVICE_KEYS.usageWindowTracker);
     if (!usageWindowTracker) return;

@@ -29,10 +29,10 @@ export const errorLoggingHook: PipelineHook = {
   phase: "on_error",
   priority: 900,
   execute(ctx: PipelineContext): void {
-    const db = ctx.deps?.db;
     const startTime = ctx.iterationStartTime ?? 0;
-    const matcher = ctx.deps?.matcher ?? null;
-    const logFileWriter = ctx.deps?.logFileWriter ?? null;
+    const db = ctx.deps?.setup?.db;
+    const matcher = ctx.deps?.setup?.matcher;
+    const logFileWriter = ctx.deps?.setup?.logFileWriter;
     const errorInfo = ctx.metadata.get("errorInfo") as ErrorInfo | undefined;
 
     if (!db || !startTime) return;

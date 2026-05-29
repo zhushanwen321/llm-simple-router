@@ -21,7 +21,7 @@ export const clientDetectionHook: PipelineHook = {
   priority: 200,
   execute(ctx: PipelineContext): void {
     const headers = ctx.request.headers as Record<string, string>;
-    const db = ctx.deps?.db ?? ctx.metadata.get("db") as Database.Database | undefined;
+    const db = ctx.deps?.setup?.db ?? ctx.metadata.get("db") as Database.Database | undefined;
 
     // 从 DB 加载配置，无 DB 时使用默认配置
     const config = db ? getClientSessionHeaders(db) : DEFAULT_CLIENT_SESSION_HEADERS;

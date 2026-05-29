@@ -27,7 +27,7 @@ export const cacheEstimationHook: PipelineHook = {
   priority: 200,
   execute(ctx: PipelineContext): void {
     try {
-      const db = ctx.deps?.db ?? ctx.metadata.get("db") as Database.Database;
+      const db = ctx.deps?.setup?.db ?? ctx.metadata.get("db") as Database.Database;
       if (!db) return;
 
       // 开关控制

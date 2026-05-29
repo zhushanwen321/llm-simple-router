@@ -50,6 +50,38 @@ function makeContext(overrides: Partial<PipelineContext> = {}): PipelineContext 
     clientRequest: "",
     upstreamRequest: "",
     snapshot: {} as PipelineContext["snapshot"],
+    deps: {
+      setup: {
+        db: {} as any,
+        container: {} as any,
+        orchestrator: {} as any,
+        matcher: null as any,
+        tracker: {} as any,
+        retryBaseDelayMs: 1000,
+        logFileWriter: null,
+        errors: {} as any,
+        usageWindowTracker: {} as any,
+        proxyAgentFactory: {} as any,
+      },
+      request: {
+        cachedTargets: undefined as any,
+        overflowIndices: undefined as any,
+        resolveResult: undefined as any,
+        precomputeSnapshot: undefined as any,
+        decryptedApiKeys: undefined as any,
+        enhancementConfig: {
+          tool_call_loop_enabled: false,
+          stream_loop_enabled: false,
+          tool_round_limit_enabled: false,
+          tool_error_logging_enabled: false,
+        },
+        adapter: {} as any,
+        defaultUpstreamPath: "",
+        clientHeaders: {},
+        precomputedClientReq: "",
+        concurrencyOverride: null,
+      },
+    },
     ...overrides,
   };
 }

@@ -20,7 +20,7 @@ export const overflowRedirectHook: PipelineHook = {
     const { resolved, body } = ctx;
     if (!resolved) return;
 
-    const db = ctx.deps?.db;
+    const db = ctx.deps?.setup?.db;
     if (!db) return;
 
     const overflowResult = applyOverflowRedirect(resolved, db, body);
