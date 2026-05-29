@@ -170,6 +170,10 @@
       "openai": "OpenAI",
       "openai-responses": "Responses",
       "anthropic": "Anthropic"
-    }
+    },
+    "showPerEndpointKeys": "为每个端点单独设置 API Key",
+    "hidePerEndpointKeys": "收起单独 API Key 设置",
+    "allUseSharedKey": "所有端点将使用共享 Key",
+    "customKeySet": "已设置独立 Key"
   }
 }
