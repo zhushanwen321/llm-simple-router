@@ -25,6 +25,7 @@ const API_TYPE_SHORT: Record<string, string> = {
 const props = defineProps<{
   modelValue: ProviderEndpoint[];
   sharedKey?: string;
+  readonly?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -80,6 +81,7 @@ function updateField<K extends keyof ProviderEndpoint>(
         t("providers.endpoints.title")
       }}</Label>
       <Button
+        v-if="!readonly"
         type="button"
         variant="outline"
         size="sm"
@@ -105,6 +107,7 @@ function updateField<K extends keyof ProviderEndpoint>(
           <Input
             :model-value="ep.api_key ?? ''"
             type="password"
+            :disabled="readonly"
             :placeholder="
               sharedKey
                 ? t('providers.endpoints.useSharedKey')
@@ -117,6 +120,7 @@ function updateField<K extends keyof ProviderEndpoint>(
           />
         </div>
         <Button
+          v-if="!readonly"
           type="button"
           variant="ghost"
           size="sm"
@@ -135,6 +139,7 @@ function updateField<K extends keyof ProviderEndpoint>(
             :model-value="ep.base_url"
             type="url"
             required
+            :disabled="readonly"
             placeholder="https://api.example.com/v1"
             class="h-6 text-xs font-mono"
             @update:model-value="updateField(i, 'base_url', String($event))"
@@ -146,6 +151,7 @@ function updateField<K extends keyof ProviderEndpoint>(
           }}</Label>
           <Input
             :model-value="ep.upstream_path ?? ''"
+            :disabled="readonly"
             :placeholder="t('providers.fields.upstreamPathPlaceholder')"
             class="h-6 text-xs font-mono"
             @update:model-value="
