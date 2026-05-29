@@ -547,9 +547,10 @@ describe("computeModalityRedirectTargets", () => {
   });
 
   // ----------------------------------------------------------
-  // AC10（原）: 异常安全 → 返回原始 targets
+  // AC10: provider 不存在时 target 被保留（保守策略）
+  // 此场景不触发 catch，而是走 "provider 不存在 → 保留" 的正常路径
   // ----------------------------------------------------------
-  it("returns original targets when internal logic throws exception", () => {
+  it("keeps target when provider does not exist in DB", () => {
   const targets: Target[] = [
     { provider_id: "pa", backend_model: "text-model" },
   ];
@@ -1218,7 +1219,7 @@ describe("computeModalityRedirectTargets — reason 覆盖补全", () => {
   const body = openaiImageBody();
 
   const result = computeModalityRedirectTargets(db, targets, "test-model", body, snap);
-  expect(result).toEqual(targets);
+  expect(result).toEqual([]);
 
   const stage = JSON.parse(snap.toJSON()).find((s: Record<string, unknown>) => s.stage === "modality-redirect");
   expect(stage).toBeDefined();
