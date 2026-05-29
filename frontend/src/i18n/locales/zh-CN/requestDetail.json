@@ -32,6 +32,8 @@
   "cacheSourceApi": "API 上报",
   "cacheSourceEstimated": "预估（前缀匹配）",
   "clientIp": "Client IP",
+  "upstreamApiType": "上游 API 类型",
+  "upstreamBaseUrl": "上游 Base URL",
   "reply": "回复",
   "thinking": "思考",
   "toolUse": "工具调用",

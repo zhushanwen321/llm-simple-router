@@ -65,6 +65,7 @@ export interface TransportFnParams {
   injectedHeaders?: Record<string, string>;
   timeoutContext?: { modelId: string; providerId: string };
   proxyAgentFactory?: ProxyAgentFactory;
+  resolvedBaseUrl: string;
 }
 
 export function buildTransportFn(p: TransportFnParams): (target: Target) => Promise<TransportResult> {
@@ -73,7 +74,7 @@ export function buildTransportFn(p: TransportFnParams): (target: Target) => Prom
     return p.injectedHeaders ? { ...base, ...p.injectedHeaders } : base;
   };
   const agent = p.proxyAgentFactory
-    ? (p.proxyAgentFactory.getAgent(p.provider) ?? p.proxyAgentFactory.getKeepAliveAgent(p.provider.base_url))
+    ? (p.proxyAgentFactory.getAgent(p.provider) ?? p.proxyAgentFactory.getKeepAliveAgent(p.resolvedBaseUrl))
     : undefined;
   // _target 未使用 — resilience 层始终传入当前 resolved target；
   // 跨 target failover 由外层 executeFailoverLoop 的 ProviderSwitchNeeded 处理

@@ -1,0 +1,214 @@
+{
+  "test_cases": [
+    {
+      "id": "TC-1-01",
+      "type": "integration",
+      "title": "Migration converts old fields to endpoints JSON",
+      "description": "Existing provider with api_type/base_url/api_key → endpoints array populated correctly",
+      "steps": ["insert provider with old schema", "run migration", "SELECT endpoints FROM providers WHERE id=?", "verify endpoints JSON matches old fields"]
+    },
+    {
+      "id": "TC-1-02",
+      "type": "integration",
+      "title": "Migration is idempotent",
+      "description": "Running migration twice does not re-process already-migrated providers",
+      "steps": ["run migration once", "modify endpoints manually", "run migration again", "verify endpoints unchanged"]
+    },
+    {
+      "id": "TC-1-03",
+      "type": "api",
+      "title": "resolveEndpoint exact match returns correct endpoint",
+      "description": "Provider with openai+anthropic endpoints, client sends openai → returns openai endpoint",
+      "steps": ["create provider with 2 endpoints", "call resolveEndpoint(provider, 'openai', key)", "verify returns openai endpoint, needs_transform=false"]
+    },
+    {
+      "id": "TC-1-04",
+      "type": "api",
+      "title": "resolveEndpoint no match returns first endpoint with transform",
+      "description": "Provider with only anthropic endpoint, client sends openai → returns anthropic with needs_transform=true",
+      "steps": ["create provider with 1 anthropic endpoint", "call resolveEndpoint(provider, 'openai', key)", "verify returns anthropic endpoint, needs_transform=true"]
+    },
+    {
+      "id": "TC-1-05",
+      "type": "api",
+      "title": "resolveEndpoint openai-responses exact match",
+      "description": "Provider with openai-responses endpoint, client sends responses → exact match",
+      "steps": ["create provider with openai-responses endpoint", "call resolveEndpoint(provider, 'openai-responses', key)", "verify exact match, needs_transform=false"]
+    },
+    {
+      "id": "TC-1-06",
+      "type": "api",
+      "title": "resolveEndpoint openai-responses fallback to openai",
+      "description": "Provider with only openai endpoint, client sends openai-responses → fallback with transform",
+      "steps": ["create provider with only openai endpoint", "call resolveEndpoint(provider, 'openai-responses', key)", "verify returns openai endpoint, needs_transform=true"]
+    },
+    {
+      "id": "TC-1-07",
+      "type": "api",
+      "title": "resolveEndpoint endpoint key overrides shared key",
+      "description": "Endpoint with own api_key takes priority over provider shared key",
+      "steps": ["create provider with shared key + endpoint with own key", "resolve for that endpoint", "verify returned key is endpoint key"]
+    },
+    {
+      "id": "TC-1-08",
+      "type": "api",
+      "title": "resolveEndpoint null api_key falls back to shared key",
+      "description": "Endpoint with api_key=null uses provider.api_key",
+      "steps": ["create provider with shared key + endpoint with null key", "resolve for that endpoint", "verify returned key is shared key"]
+    },
+    {
+      "id": "TC-2-01",
+      "type": "integration",
+      "title": "POST /admin/api/providers creates with endpoints format",
+      "description": "Create provider with 2 endpoints, verify DB storage and API response",
+      "steps": ["POST with endpoints array", "verify 201 response", "GET provider", "verify endpoints returned with decrypted keys"]
+    },
+    {
+      "id": "TC-2-02",
+      "type": "integration",
+      "title": "POST rejects duplicate api_type in endpoints",
+      "description": "Create provider with 2 openai endpoints → 400",
+      "steps": ["POST with [{api_type:'openai'}, {api_type:'openai'}]", "verify 400 response", "verify error message mentions api_type uniqueness"]
+    },
+    {
+      "id": "TC-2-03",
+      "type": "integration",
+      "title": "POST rejects empty endpoints array",
+      "description": "Create provider with no endpoints → 400",
+      "steps": ["POST with endpoints: []", "verify 400 response"]
+    },
+    {
+      "id": "TC-2-04",
+      "type": "integration",
+      "title": "PUT updates endpoints correctly",
+      "description": "Update provider to add/remove endpoints",
+      "steps": ["create provider with 1 endpoint", "PUT to add 2nd endpoint", "GET provider", "verify 2 endpoints"]
+    },
+    {
+      "id": "TC-2-05",
+      "type": "integration",
+      "title": "Endpoint api_key encrypted in DB, decrypted in API response",
+      "description": "Full encryption roundtrip for endpoint keys",
+      "steps": ["POST with endpoint api_key='test-key-123'", "read DB directly → verify ciphertext not plaintext", "GET /admin/api/providers/:id → verify api_key='test-key-123'"]
+    },
+    {
+      "id": "TC-3-01",
+      "type": "integration",
+      "title": "OpenAI request routes to matched endpoint without transform",
+      "description": "Full proxy flow: create multi-endpoint provider, send openai request, verify no format conversion",
+      "steps": ["create provider with openai + anthropic endpoints", "send POST /v1/chat/completions", "verify request goes to openai endpoint URL", "verify no format transform"]
+    },
+    {
+      "id": "TC-3-02",
+      "type": "integration",
+      "title": "OpenAI request transforms to anthropic endpoint",
+      "description": "Provider with only anthropic, client sends openai → format transform happens",
+      "steps": ["create provider with only anthropic endpoint", "send POST /v1/chat/completions", "verify request goes to anthropic endpoint", "verify format transform applied"]
+    },
+    {
+      "id": "TC-3-03",
+      "type": "integration",
+      "title": "Request log records upstream_api_type and upstream_base_url",
+      "description": "After format-transform request, verify log fields",
+      "steps": ["create provider with anthropic only", "send openai request", "query request_logs", "verify api_type='openai', upstream_api_type='anthropic', upstream_base_url recorded"]
+    },
+    {
+      "id": "TC-3-04",
+      "type": "integration",
+      "title": "Request log upstream_api_type equals api_type when no transform",
+      "description": "No-transform request → upstream_api_type = api_type",
+      "steps": ["create provider with openai endpoint", "send openai request", "verify upstream_api_type='openai'"]
+    },
+    {
+      "id": "TC-3-05",
+      "type": "integration",
+      "title": "Custom upstream_path overrides default",
+      "description": "Endpoint with upstream_path='/custom/path' → actual URL uses custom path",
+      "steps": ["create provider with upstream_path='/custom/path'", "send request", "verify actual upstream URL contains '/custom/path'"]
+    },
+    {
+      "id": "TC-4-01",
+      "type": "ui",
+      "title": "Provider list shows multiple endpoint badges and key rows",
+      "description": "Provider with 3 endpoints → API Type column shows 3 badges, API Key column shows 3 rows",
+      "steps": ["create provider with 3 endpoints via API", "render Providers.vue", "verify 3 badges in API Type column", "verify 3 key rows with copy buttons"]
+    },
+    {
+      "id": "TC-4-02",
+      "type": "ui",
+      "title": "Endpoint editor add/remove works correctly",
+      "description": "Add and remove endpoints in provider form",
+      "steps": ["open provider create dialog", "verify 1 default endpoint", "click add → anthropic", "verify 2 endpoints", "remove first → verify 1 endpoint"]
+    },
+    {
+      "id": "TC-4-03",
+      "type": "ui",
+      "title": "Log table shows arrow for format transform",
+      "description": "Log entry with api_type=openai, upstream_api_type=anthropic → shows openai → anthropic",
+      "steps": ["render LogTableRow with transform log entry", "verify Tags column shows 'openai → anthropic' arrow"]
+    },
+    {
+      "id": "TC-4-04",
+      "type": "integration",
+      "title": "QuickSetup creates provider with endpoints format",
+      "description": "QuickSetup payload produces valid endpoints provider",
+      "steps": ["fill QuickSetup form", "submit", "GET created provider", "verify endpoints array format"]
+    },
+    {
+      "id": "TC-E2E-01",
+      "type": "integration",
+      "title": "E2E: Migrate → Create multi-endpoint → Route → Log",
+      "description": "Full lifecycle: migration, create provider with 2 endpoints, send requests, verify routing and logging",
+      "steps": [
+        "start with old-schema DB",
+        "run migration → verify endpoints populated",
+        "create new provider with openai+anthropic endpoints via Admin API",
+        "send openai request → verify routes to openai endpoint, no transform",
+        "send anthropic request → verify routes to anthropic endpoint, no transform",
+        "delete openai endpoint, send openai request → verify transform to anthropic",
+        "check request_logs: upstream_api_type='anthropic', upstream_base_url recorded",
+        "restart server → verify migration idempotent"
+      ]
+    },
+    {
+      "id": "TC-E2E-02",
+      "type": "integration",
+      "title": "E2E: Endpoint key encryption full roundtrip",
+      "description": "Create provider with per-endpoint keys, verify encryption at rest, correct key at runtime",
+      "steps": [
+        "create provider with 2 endpoints, each with own api_key",
+        "read DB → verify both keys are ciphertext",
+        "GET /admin/api/providers/:id → verify both keys decrypted",
+        "send request to endpoint 1 → verify uses endpoint 1 key",
+        "send request to endpoint 2 → verify uses endpoint 2 key",
+        "update endpoint 1 key to null → verify fallback to shared key",
+        "send request → verify uses shared key"
+      ]
+    },
+    {
+      "id": "TC-E2E-03",
+      "type": "integration",
+      "title": "E2E: openai-responses endpoint selection",
+      "description": "Verify openai-responses exact match and fallback to openai",
+      "steps": [
+        "create provider with [{openai}, {openai-responses}, {anthropic}]",
+        "send POST /v1/responses → verify routes to openai-responses endpoint",
+        "remove openai-responses endpoint",
+        "send POST /v1/responses → verify fallback to openai with transform",
+        "verify request_log: api_type='openai-responses', upstream_api_type='openai'"
+      ]
+    },
+    {
+      "id": "TC-E2E-04",
+      "type": "integration",
+      "title": "E2E: Patch and plugin layers use resolved endpoint api_type",
+      "description": "Verify patch conditions and plugin hooks use the resolved endpoint api_type, not provider.api_type",
+      "steps": [
+        "create provider with [{anthropic}], mock upstream that triggers developer_role patch",
+        "send openai request (triggers transform to anthropic)",
+        "verify patch layer receives api_type='anthropic' (resolved), not 'openai' (client)",
+        "verify plugin hooks receive correct resolved api_type"
+      ]
+    }
+  ]
+}

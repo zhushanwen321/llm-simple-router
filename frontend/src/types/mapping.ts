@@ -1,3 +1,11 @@
+/** Provider Endpoint（多 API 类型支持） */
+export interface ProviderEndpoint {
+  api_type: "openai" | "openai-responses" | "anthropic";
+  base_url: string;
+  upstream_path?: string | null;
+  api_key?: string | null;
+}
+
 /** 旧版单模型映射（列表项响应） */
 export interface ModelMapping {
   id: string;
@@ -46,6 +54,7 @@ export interface Provider {
   proxy_url: string | null;
   proxy_username: string | null;
   proxy_password: string | null;
+  endpoints?: ProviderEndpoint[];
 }
 
 /** Provider 精简信息（映射配置、下拉选择等场景使用） */

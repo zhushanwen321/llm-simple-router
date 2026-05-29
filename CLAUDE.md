@@ -143,6 +143,8 @@ Handler (handler/proxy-handler.ts)
 | `session_model_states` | 会话模型状态（router_key_id + session_id 联合唯一） |
 | `session_model_history` | 会话模型变更历史 |
 
+**迁移向后兼容记录**：详见 [`docs/migration-compat.md`](docs/migration-compat.md)。记录了每次 DB 迁移后老版本代码仍可运行的兼容逻辑，版本稳定后可据此清理旧列。
+
 **监控层 `src/monitor/`：**
 - `request-tracker.ts` — `RequestTracker`：活跃请求 Map + 最近完成列表（200 条/5min TTL）+ SSE 广播（6 种事件）
 - `stats-aggregator.ts` — `StatsAggregator`：环形缓冲区（1000）存储延迟样本，计算 p50/p99
