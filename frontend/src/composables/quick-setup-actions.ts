@@ -9,6 +9,7 @@ import {
   resolveClientDefaults,
   applyProviderChange,
   applyPlanChange,
+  applyPresetEndpoints,
   parseTransformRules,
   toggleChangedMappings,
 } from "./quick-setup-helpers";
@@ -117,6 +118,13 @@ export function useQuickSetupActions(ctx: ActionCtx) {
           data.modelConfigs,
           data.isNonOpenaiEndpoint,
         );
+        // Generate endpoints from the group's presets
+        const groupData = selection.providerGroups.value.find(
+          (g) => g.group === defaults.group,
+        );
+        if (groupData) {
+          applyPresetEndpoints(data.endpoints, groupData.presets);
+        }
       }
     }
     updateMappings();
@@ -132,6 +140,7 @@ export function useQuickSetupActions(ctx: ActionCtx) {
     providerGroups: ctx.selection.providerGroups,
     currentClient: ctx.selection.currentClient,
     isNonOpenaiEndpoint: ctx.data.isNonOpenaiEndpoint,
+    endpoints: ctx.data.endpoints,
     updateMappings,
     syncRetryRules: () => syncRetry(ctx),
   };
@@ -148,6 +157,7 @@ export function useQuickSetupActions(ctx: ActionCtx) {
       data.modelConfigs,
       data.isNonOpenaiEndpoint,
       selection.providerGroups,
+      data.endpoints,
       updateMappings,
     );
   };
@@ -310,6 +320,13 @@ export function useQuickSetupActions(ctx: ActionCtx) {
           recommendedRules: data.recommendedRules.value,
           selectedRetryRules: data.selectedRetryRules.value,
           transformRules: tr,
+          endpoints:
+            data.endpoints.value.length > 0
+              ? data.endpoints.value.map((ep) => ({
+                ...ep,
+                api_key: ep.api_key || data.apiKey.value.trim() || null,
+              }))
+              : undefined,
         }),
       );
       const errs = await toggleChangedMappings(api, data.mappingEntries.value);

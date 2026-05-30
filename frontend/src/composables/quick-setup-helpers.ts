@@ -5,7 +5,7 @@ import {
   type QuickSetupPayload,
   api as ApiNamespace,
 } from "@/api/client";
-import type { MappingGroup } from "@/types/mapping";
+import type { MappingGroup, ProviderEndpoint } from "@/types/mapping";
 import type { Rule } from "@/types/mapping";
 import type {
   TransformConfig,
@@ -130,6 +130,7 @@ interface ProviderPayloadInput {
   apiKey: string;
   models: ModelConfig[];
   concurrency: ConcurrencyConfig;
+  endpoints?: ProviderEndpoint[];
 }
 
 function buildProviderPayload(
@@ -166,6 +167,9 @@ function buildProviderPayload(
       input.concurrency.mode !== "none"
         ? input.concurrency.max_queue_size
         : undefined,
+    ...(input.endpoints && input.endpoints.length > 0
+      ? { endpoints: input.endpoints }
+      : {}),
   };
 }
 
@@ -263,6 +267,7 @@ interface QuickSetupPayloadInput {
   recommendedRules: RecommendedRetryRule[];
   selectedRetryRules: Set<string>;
   transformRules: QuickSetupPayload["transform_rules"];
+  endpoints?: ProviderEndpoint[];
 }
 
 export function buildQuickSetupPayload(
@@ -279,6 +284,7 @@ export function buildQuickSetupPayload(
       apiKey: input.apiKey,
       models: input.models,
       concurrency: input.concurrency,
+      endpoints: input.endpoints,
     }),
     mappings: input.mappingEntries
       .filter((m) => m.targets[0]?.backend_model)
@@ -410,6 +416,7 @@ export interface ProviderChangeContext {
   providerGroups: Ref<ProviderGroup[]>;
   currentClient: ComputedRef<{ format: string } | undefined>;
   isNonOpenaiEndpoint: ComputedRef<boolean>;
+  endpoints: Ref<ProviderEndpoint[]>;
   updateMappings: () => void;
   syncRetryRules: () => void;
 }
@@ -421,10 +428,14 @@ export function applyProviderChange(
   ctx.selectedGroup.value = group;
   ctx.selectedPlan.value = "";
   ctx.modelConfigs.value = [];
+  ctx.endpoints.value = [];
   if (group === "__custom__") {
     ctx.apiType.value = "openai";
     ctx.customBaseUrl.value = "";
     ctx.customUpstreamPath.value = "";
+    ctx.endpoints.value = [
+      { api_type: "openai", base_url: "", upstream_path: null, api_key: null },
+    ];
   } else {
     const groupData = ctx.providerGroups.value.find((g) => g.group === group);
     if (groupData && groupData.presets.length > 0) {
@@ -442,6 +453,8 @@ export function applyProviderChange(
       ctx.selectedPlan.value = preset.plan;
       ctx.apiType.value = resolveApiType(client?.format, preset.apiType);
       applyPresetModels(preset, ctx.modelConfigs, ctx.isNonOpenaiEndpoint);
+      // Generate endpoints from all presets in the group (dedup by api_type)
+      applyPresetEndpoints(ctx.endpoints, groupData.presets);
     }
   }
   ctx.updateMappings();
@@ -456,6 +469,7 @@ export function applyPlanChange(
   modelConfigs: Ref<ModelConfig[]>,
   isNonOpenaiEndpoint: ComputedRef<boolean>,
   providerGroups: Ref<ProviderGroup[]>,
+  endpoints: Ref<ProviderEndpoint[]>,
   updateMappings: () => void,
 ): void {
   const group = providerGroups.value.find(
@@ -466,5 +480,26 @@ export function applyPlanChange(
   if (!preset) return;
   apiType.value = resolveApiType(currentClient.value?.format, preset.apiType);
   applyPresetModels(preset, modelConfigs, isNonOpenaiEndpoint);
+  applyPresetEndpoints(endpoints, group.presets);
   updateMappings();
+}
+
+/** Deduplicate presets by api_type and generate endpoint entries */
+export function applyPresetEndpoints(
+  endpoints: Ref<ProviderEndpoint[]>,
+  presets: Array<{ apiType: string; baseUrl: string; upstreamPath?: string }>,
+): void {
+  const seen = new Set<string>();
+  const result: ProviderEndpoint[] = [];
+  for (const preset of presets) {
+    if (seen.has(preset.apiType)) continue;
+    seen.add(preset.apiType);
+    result.push({
+      api_type: preset.apiType as ProviderEndpoint["api_type"],
+      base_url: preset.baseUrl,
+      upstream_path: preset.upstreamPath || null,
+      api_key: null,
+    });
+  }
+  endpoints.value = result;
 }

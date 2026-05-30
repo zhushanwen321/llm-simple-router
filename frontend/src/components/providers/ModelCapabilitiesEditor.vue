@@ -196,72 +196,28 @@ function isOfficialOpenai(url: string): boolean {
       </div>
       <div>
         <Label class="text-xs text-muted-foreground">{{
-          t("providers.fields.apiType")
-        }}</Label>
-        <Select
-          :model-value="props.modelValue.apiType"
-          @update:model-value="emitUpdate({ apiType: String($event) })"
-          class="mt-1"
-        >
-          <SelectTrigger
-            ><SelectValue :placeholder="t('common.pleaseSelect')"
-          /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="openai">OpenAI Chat Completions</SelectItem>
-            <SelectItem value="openai-responses">OpenAI Responses</SelectItem>
-            <SelectItem value="anthropic">Anthropic Messages</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <div>
-        <Label class="text-xs text-muted-foreground">{{
-          t("providers.fields.baseUrl")
-        }}</Label>
-        <Input
-          :model-value="props.modelValue.baseUrl"
-          type="url"
-          required
-          class="mt-1 font-mono text-xs"
-          @update:model-value="emitUpdate({ baseUrl: String($event) })"
-          @input="emit('clear-errors', 'base_url')"
-        />
-        <p v-if="props.errors.base_url" class="text-xs text-destructive mt-0.5">
-          {{ props.errors.base_url }}
-        </p>
-      </div>
-      <div>
-        <Label class="text-xs text-muted-foreground">{{
           t("providers.fields.apiKey")
         }}</Label>
         <Input
           :model-value="props.modelValue.apiKey"
-          type="text"
+          type="password"
           :required="!props.editingId"
           :placeholder="
             props.editingId ? t('providers.fields.apiKeyPlaceholder') : ''
           "
-          class="mt-1"
+          class="mt-1 font-mono text-xs"
           @update:model-value="emitUpdate({ apiKey: String($event) })"
           @input="emit('clear-errors', 'api_key')"
         />
         <p v-if="props.errors.api_key" class="text-xs text-destructive mt-0.5">
           {{ props.errors.api_key }}
         </p>
+        <p class="text-xs text-muted-foreground mt-0.5">
+          {{ t("providers.fields.sharedKeyHint") }}
+        </p>
       </div>
     </div>
-    <div class="mt-3">
-      <Label class="text-xs">{{ t("providers.fields.upstreamPath") }}</Label>
-      <Input
-        :model-value="props.modelValue.upstreamPath"
-        :placeholder="t('providers.fields.upstreamPathPlaceholder')"
-        class="mt-1 font-mono text-xs"
-        @update:model-value="emitUpdate({ upstreamPath: String($event) })"
-      />
-      <p class="text-xs text-muted-foreground mt-0.5">
-        {{ t("providers.fields.upstreamPathHint") }}
-      </p>
-    </div>
-    <!-- Multi-endpoint support (PR #177) -->
+    <!-- Multi-endpoint editor -->
     <EndpointEditor
       :model-value="props.endpoints"
       :shared-key="props.sharedKey"

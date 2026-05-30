@@ -165,8 +165,8 @@ export interface QuickSetupPayload {
     endpoints?: Array<{
       api_type: "openai" | "openai-responses" | "anthropic";
       base_url: string;
-      upstream_path?: string;
-      api_key?: string;
+      upstream_path?: string | null;
+      api_key?: string | null;
     }>;
     models: Array<{
       name: string;

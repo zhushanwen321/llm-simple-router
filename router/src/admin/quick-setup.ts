@@ -1,7 +1,7 @@
 import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
 import { Type, Static } from "@sinclair/typebox";
-import { createProvider } from "../db/providers.js";
+import { createProvider, PROVIDER_CONCURRENCY_DEFAULTS } from "../db/providers.js";
 import { createMappingGroup, updateMappingGroup } from "../db/mappings.js";
 import { createRetryRule } from "../db/retry-rules.js";
 import { upsertTransformRule } from "../db/transform-rules.js";
@@ -9,7 +9,6 @@ import { encrypt } from "../utils/crypto.js";
 import { getSetting } from "../db/settings.js";
 import { HTTP_CREATED, HTTP_BAD_REQUEST, HTTP_CONFLICT } from "./constants.js";
 import { API_CODE, apiError } from "./api-response.js";
-import { PROVIDER_CONCURRENCY_DEFAULTS } from "../db/providers.js";
 import type { StateRegistry } from "../core/registry.js";
 import type { RequestTracker } from "../core/monitor/index.js";
 import type { AdaptiveController } from "../core/concurrency/index.js";
@@ -41,6 +40,13 @@ function replaceProviderIds(obj: unknown, providerId: string): unknown {
   return obj;
 }
 
+const QuickSetupEndpointSchema = Type.Object({
+  api_type: Type.Union([Type.Literal("openai"), Type.Literal("openai-responses"), Type.Literal("anthropic")]),
+  base_url: Type.String({ minLength: 1 }),
+  upstream_path: Type.Optional(Type.Union([Type.String({ minLength: 1 }), Type.Null()])),
+  api_key: Type.Optional(Type.Union([Type.String({ minLength: 1 }), Type.Null()])),
+});
+
 const QuickSetupProviderSchema = Type.Object({
   name: Type.String({ minLength: 1 }),
   api_type: Type.Union([Type.Literal("openai"), Type.Literal("openai-responses"), Type.Literal("anthropic")]),
@@ -54,6 +60,7 @@ const QuickSetupProviderSchema = Type.Object({
     stream_timeout_ms: Type.Optional(Type.Number()),
     capabilities: Type.Optional(Type.Array(Type.String())),
   })),
+  endpoints: Type.Optional(Type.Array(QuickSetupEndpointSchema, { minItems: 1 })),
   concurrency_mode: Type.Optional(Type.Union([Type.Literal("auto"), Type.Literal("manual"), Type.Literal("none")])),
   max_concurrency: Type.Optional(Type.Number()),
   queue_timeout_ms: Type.Optional(Type.Number()),
@@ -158,6 +165,16 @@ export const adminQuickSetupRoutes: FastifyPluginCallback<QuickSetupRoutesOption
         queue_timeout_ms: queueTimeoutMs,
         max_queue_size: maxQueueSize,
         adaptive_enabled: adaptiveEnabled,
+        ...(body.provider.endpoints && body.provider.endpoints.length > 0
+          ? {
+            endpoints: JSON.stringify(body.provider.endpoints.map(ep => ({
+              api_type: ep.api_type,
+              base_url: ep.base_url,
+              upstream_path: ep.upstream_path ?? null,
+              api_key: ep.api_key ? encrypt(ep.api_key, encryptionKey) : (body.provider.api_key ? encrypt(body.provider.api_key, encryptionKey) : null),
+            }))),
+          }
+          : {}),
       });
 
       // 6. Upsert mapping groups
