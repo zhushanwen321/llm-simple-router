@@ -26,7 +26,7 @@ import type {
   MultimodalFallback,
 } from "@/components/quick-setup/types";
 import type { ProviderGroup, RecommendedRetryRule } from "@/api/client";
-import type { MappingGroup } from "@/types/mapping";
+import type { MappingGroup, ProviderEndpoint } from "@/types/mapping";
 import type { Provider as ApiProvider } from "@/types/mapping";
 import {
   DEFAULT_CONCURRENCY_CONFIG,
@@ -69,6 +69,7 @@ export interface DataState {
   selectedRetryRules: Ref<Set<string>>;
   retryProviderMap: Ref<Map<string, "general" | string>>;
   isNonOpenaiEndpoint: ComputedRef<boolean>;
+  endpoints: Ref<ProviderEndpoint[]>;
 }
 
 /** Submit configuration: saving state, concurrency, transforms */

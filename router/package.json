@@ -1,6 +1,6 @@
 {
   "name": "llm-simple-router",
-  "version": "0.11.25",
+  "version": "0.11.29",
   "description": "LLM API proxy router with OpenAI/Anthropic support, model mapping, retry strategies, and admin dashboard",
   "license": "MIT",
   "author": "ZZzzswszzZZ",
@@ -36,6 +36,7 @@
     "@sinclair/typebox": "^0.34.49",
     "better-sqlite3": "^11.9.1",
     "dotenv": "^16.4.7",
+    "eslint-plugin-vue": "^10.9.1",
     "fastify": "^5.3.3",
     "fastify-plugin": "^5.1.0",
     "gpt-tokenizer": "^3.4.0",

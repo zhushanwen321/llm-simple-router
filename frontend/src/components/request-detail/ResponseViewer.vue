@@ -12,7 +12,11 @@
       >
         <component :is="showRaw ? FileText : FileJson" class="h-3 w-3" />
         {{
-          showRaw ? t("requestDetail.structured") : t("requestDetail.rawJson")
+          showRaw
+            ? t("requestDetail.structured")
+            : props.isStream
+              ? t("requestDetail.rawSse")
+              : t("requestDetail.rawJson")
         }}
       </Button>
     </div>

@@ -28,6 +28,8 @@
   "noRetry": "No retries",
   "statusCodeLabel": "Status Code",
   "clientType": "Client Type",
+  "upstreamApiType": "Upstream API Type",
+  "upstreamBaseUrl": "Upstream Base URL",
   "cacheSource": "Cache Source",
   "cacheSourceApi": "API Reported",
   "cacheSourceEstimated": "Estimated (Prefix Match)",

@@ -127,10 +127,8 @@
               </SelectContent>
             </Select>
           </div>
-          <!-- Custom mode: no extra fields here, Format/BaseURL are in Endpoint group -->
-          <template v-if="isCustomProvider"> </template>
           <!-- Preset mode: plan selector -->
-          <template v-else>
+          <template v-if="!isCustomProvider">
             <div class="w-28 space-y-1">
               <Label class="text-xs text-muted-foreground">{{
                 t("quickSetup.provider.plan")
@@ -153,82 +151,13 @@
               </Select>
             </div>
           </template>
-        </div>
-
-        <!-- Group: Endpoint -->
-        <div
-          class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60 mb-1.5 mt-1"
-        >
-          {{ t("quickSetup.provider.endpoint") }}
-        </div>
-        <div class="flex items-end gap-2">
-          <div class="w-48 space-y-1">
-            <Label class="text-xs text-muted-foreground">{{
-              t("quickSetup.provider.format")
-            }}</Label>
-            <Select v-model="apiType">
-              <SelectTrigger class="w-full text-xs data-[size=default]:h-7"
-                ><SelectValue
-              /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="anthropic">Anthropic Messages</SelectItem>
-                <SelectItem value="openai">OpenAI Chat Completions</SelectItem>
-                <SelectItem value="openai-responses"
-                  >OpenAI Responses</SelectItem
-                >
-              </SelectContent>
-            </Select>
-          </div>
-          <template v-if="isCustomProvider">
-            <div class="w-80 space-y-1">
-              <Label class="text-xs text-muted-foreground">{{
-                t("quickSetup.provider.baseUrl")
-              }}</Label>
-              <Input
-                v-model="customBaseUrl"
-                placeholder="https://api.example.com/v1"
-                class="font-mono md:text-xs h-7"
-              />
-            </div>
-            <div class="w-48 space-y-1">
-              <Label class="text-xs text-muted-foreground">{{
-                t("quickSetup.provider.upstreamPath")
-              }}</Label>
-              <Input
-                v-model="customUpstreamPath"
-                placeholder="/v1/chat/completions"
-                class="font-mono md:text-xs h-7"
-              />
-            </div>
-          </template>
-          <template v-else>
-            <div class="w-72 space-y-1">
-              <Label class="text-xs text-muted-foreground">{{
-                t("quickSetup.provider.baseUrl")
-              }}</Label>
-              <Input
-                v-model="presetBaseUrl"
-                placeholder="https://api.example.com/v1"
-                class="font-mono md:text-xs h-7"
-              />
-            </div>
-            <div class="w-48 space-y-1">
-              <Label class="text-xs text-muted-foreground">{{
-                t("quickSetup.provider.upstreamPath")
-              }}</Label>
-              <Input
-                v-model="presetUpstreamPath"
-                placeholder="/v1/chat/completions"
-                class="font-mono md:text-xs h-7"
-              />
-            </div>
-          </template>
+          <!-- Shared API Key -->
           <div class="w-64 space-y-1">
             <Label class="text-xs text-muted-foreground">{{
               t("quickSetup.provider.apiKey")
             }}</Label>
             <Input
-              v-model="apiKey"
+              v-model="sharedKey"
               type="password"
               :placeholder="t('quickSetup.provider.apiKeyPlaceholder')"
               class="md:text-xs h-7"
@@ -278,6 +207,16 @@
               <template v-else>{{ t("quickSetup.provider.test") }}</template>
             </Button>
           </div>
+        </div>
+
+        <!-- Endpoint Editor (multi-preset endpoints) -->
+        <div v-if="endpoints.length > 0" class="border-t border-border pt-3">
+          <EndpointEditor
+            :model-value="endpoints"
+            :shared-key="sharedKey"
+            :readonly="false"
+            @update:model-value="endpoints = $event"
+          />
         </div>
 
         <!-- Concurrency Control -->
@@ -668,6 +607,7 @@ import ModelCard from "@/components/quick-setup/ModelCard.vue";
 import QuickSetupMappingList from "@/components/shared/QuickSetupMappingList.vue";
 import ConcurrencyControl from "@/components/shared/ConcurrencyControl.vue";
 import TransformRulesForm from "@/components/shared/TransformRulesForm.vue";
+import EndpointEditor from "@/components/providers/EndpointEditor.vue";
 import {
   CLIENTS,
   DEFAULT_CLIENT_MAPPINGS,
@@ -705,6 +645,8 @@ const {
   selectedPlan,
   apiType,
   apiKey,
+  sharedKey,
+  endpoints,
   modelConfigs,
   mappingEntries,
   allRecommendedRules,
@@ -716,10 +658,6 @@ const {
   availablePlans,
   isNonOpenaiEndpoint,
   isCustomProvider,
-  customBaseUrl,
-  presetBaseUrl,
-  customUpstreamPath,
-  presetUpstreamPath,
   concurrencyConfig,
   transformConfig,
   allProviderGroups,
@@ -775,7 +713,7 @@ function validateConfig() {
     toast.error(t("quickSetup.messages.selectProvider"));
     return;
   }
-  if (!apiKey.value.trim()) {
+  if (!sharedKey.value.trim() && !apiKey.value.trim()) {
     validationState.value = "invalid";
     toast.error(t("quickSetup.messages.fillApiKey"));
     return;

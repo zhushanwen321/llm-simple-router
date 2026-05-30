@@ -2,6 +2,7 @@ import Database from "better-sqlite3";
 import { randomUUID } from "crypto";
 import { buildUpdateQuery, deleteById } from "./helpers.js";
 import { parseModels } from "../config/model-context.js";
+import type { ProviderEndpoint } from "../core/types.js";
 
 export interface Provider {
   id: string;
@@ -22,6 +23,8 @@ export interface Provider {
   proxy_url: string | null;
   proxy_username: string | null;
   proxy_password: string | null;
+  /** @internal 原始 JSON 文本，业务层用 parseEndpoints() 解析 */
+  endpoints?: string;
   created_at: string;
   updated_at: string;
 }
@@ -51,8 +54,39 @@ export const PROVIDER_CONCURRENCY_DEFAULTS = {
 } as const;
 
 const PROVIDER_FIELDS = new Set([
-  "name", "api_type", "base_url", "upstream_path", "api_key", "api_key_preview", "models", "is_active", "max_concurrency", "queue_timeout_ms", "max_queue_size", "adaptive_enabled", "proxy_type", "proxy_url", "proxy_username", "proxy_password",
+  "name", "api_type", "base_url", "upstream_path", "api_key", "api_key_preview", "models", "is_active", "max_concurrency", "queue_timeout_ms", "max_queue_size", "adaptive_enabled", "proxy_type", "proxy_url", "proxy_username", "proxy_password", "endpoints",
 ]);
+
+const VALID_API_TYPES = new Set(["openai", "openai-responses", "anthropic"]);
+
+/** 解析 endpoints JSON 文本为类型安全的数组 */
+export function parseEndpoints(endpointsJson: string | null | undefined): ProviderEndpoint[] {
+  if (!endpointsJson) return [];
+  const parsed: unknown[] = JSON.parse(endpointsJson) as unknown[];
+  if (!Array.isArray(parsed)) {
+    throw new Error(`Invalid endpoints JSON: not an array`);
+  }
+  // Validate every element is a non-null object with required fields
+  for (let i = 0; i < parsed.length; i++) {
+    const item = parsed[i];
+    if (item === null || typeof item !== "object" || Array.isArray(item)) {
+      throw new Error(`Invalid endpoints JSON: element [${i}] is not an object`);
+    }
+    const obj = item as Record<string, unknown>;
+    if (typeof obj.api_type !== "string" || !VALID_API_TYPES.has(obj.api_type)) {
+      throw new Error(`Invalid endpoints JSON: element [${i}] has invalid api_type '${typeof obj.api_type === "string" ? obj.api_type : JSON.stringify(obj.api_type)}', must be one of: openai, openai-responses, anthropic`);
+    }
+    if (typeof obj.base_url !== "string" || obj.base_url.trim() === "") {
+      throw new Error(`Invalid endpoints JSON: element [${i}] has invalid base_url, must be a non-empty string`);
+    }
+  }
+  return parsed as ProviderEndpoint[];
+}
+
+/** 将 endpoints 数组序列化为 JSON 文本（用于 DB 写入） */
+export function serializeEndpoints(endpoints: ProviderEndpoint[]): string {
+  return JSON.stringify(endpoints);
+}
 
 export function getActiveProviders(
   db: Database.Database,
@@ -90,13 +124,14 @@ export function createProvider(
     proxy_url?: string | null;
     proxy_username?: string | null;
     proxy_password?: string | null;
+    endpoints?: string;
   },
 ): string {
   const id = randomUUID();
   const now = new Date().toISOString();
   db.prepare(
-    `INSERT INTO providers (id, name, api_type, base_url, upstream_path, api_key, api_key_preview, models, is_active, max_concurrency, queue_timeout_ms, max_queue_size, adaptive_enabled, proxy_type, proxy_url, proxy_username, proxy_password, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO providers (id, name, api_type, base_url, upstream_path, api_key, api_key_preview, models, is_active, max_concurrency, queue_timeout_ms, max_queue_size, adaptive_enabled, proxy_type, proxy_url, proxy_username, proxy_password, endpoints, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     id, provider.name, provider.api_type, provider.base_url,
     provider.upstream_path ?? null,
@@ -111,6 +146,7 @@ export function createProvider(
     provider.proxy_url ?? null,
     provider.proxy_username ?? null,
     provider.proxy_password ?? null,
+    provider.endpoints ?? null,
     now, now,
   );
   return id;
@@ -119,7 +155,7 @@ export function createProvider(
 export function updateProvider(
   db: Database.Database,
   id: string,
-  fields: Partial<Pick<Provider, "name" | "api_type" | "base_url" | "upstream_path" | "api_key" | "api_key_preview" | "models" | "is_active" | "max_concurrency" | "queue_timeout_ms" | "max_queue_size" | "adaptive_enabled" | "proxy_type" | "proxy_url" | "proxy_username" | "proxy_password">>,
+  fields: Partial<Pick<Provider, "name" | "api_type" | "base_url" | "upstream_path" | "api_key" | "api_key_preview" | "models" | "is_active" | "max_concurrency" | "queue_timeout_ms" | "max_queue_size" | "adaptive_enabled" | "proxy_type" | "proxy_url" | "proxy_username" | "proxy_password" | "endpoints">>,
 ): void {
   buildUpdateQuery(db, "providers", id, fields, PROVIDER_FIELDS, { updatedAt: true });
 }

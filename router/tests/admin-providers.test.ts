@@ -205,7 +205,8 @@ describe("Provider CRUD", () => {
     });
     expect(res.statusCode).toBe(400);
     const body = res.json()
-    expect(body.code).toBe(40001)
+    // 缺少 endpoints 时 api_type/base_url/api_key 为必填 → VALIDATION_FAILED
+    expect(body.code).toBe(40002)
     expect(body.data).toBeNull()
   });
 

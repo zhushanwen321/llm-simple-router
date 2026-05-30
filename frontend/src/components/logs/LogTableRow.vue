@@ -139,6 +139,13 @@ function enhancementLabel(raw: string | null): string {
     <TableCell>
       <div class="flex flex-wrap gap-1">
         <Badge
+          v-if="log.upstream_api_type && log.upstream_api_type !== log.api_type"
+          :variant="log.api_type === 'openai' ? 'default' : 'secondary'"
+          class="text-[10px] px-1.5 py-0"
+        >
+          {{ log.api_type }} → {{ log.upstream_api_type }}
+        </Badge>
+        <Badge
           :variant="(log.status_code ?? 0) < 400 ? 'default' : 'destructive'"
           class="text-[10px] px-1.5 py-0"
         >

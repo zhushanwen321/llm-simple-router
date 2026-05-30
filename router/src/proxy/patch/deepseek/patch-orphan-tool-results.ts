@@ -117,7 +117,7 @@ export function patchOrphanToolResults(
  *
  * 检测两种方向的不匹配：
  * - 正向：role:"tool" 消息的 tool_call_id 无对应 assistant tool_calls[].id → 移除孤儿 tool 消息
- * - 反向：非末尾 assistant 的 tool_calls[].id 无对应 tool 消息 → 移除该 tool_call 条目
+ * - 反向：非末尾 assistant 的 tool_calls[].id 无对应 tool 消息 → 补入合成 tool 消息
  *
  * 反向跳过最后一条 assistant：它可能是正常的工具调用中间状态（模型刚返回 tool_calls，
  * 客户端还没来得及执行并回传 tool 消息）。
@@ -130,7 +130,6 @@ export function patchOrphanToolResultsOA(body: Record<string, unknown>): void {
   if (!messages || !Array.isArray(messages) || messages.length === 0) return;
 
   // ---- 正向：移除孤儿 tool 消息 ----
-  // 收集所有 assistant tool_calls IDs
   const knownToolCallIds = new Set<string>();
   for (const msg of messages) {
     if (msg.role !== "assistant") continue;
@@ -141,7 +140,6 @@ export function patchOrphanToolResultsOA(body: Record<string, unknown>): void {
     }
   }
 
-  // 移除无主 tool 消息（逆序遍历避免索引偏移）
   let changed = false;
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i];
@@ -153,8 +151,7 @@ export function patchOrphanToolResultsOA(body: Record<string, unknown>): void {
     }
   }
 
-  // ---- 反向：移除孤儿 tool_calls 条目（非末尾 assistant）----
-  // 收集所有 tool 消息的 ID
+  // ---- 反向：为孤儿 tool_call 补入合成 tool 消息 ----
   const knownToolMsgIds = new Set<string>();
   for (const msg of messages) {
     if (msg.role !== "tool") continue;
@@ -162,42 +159,37 @@ export function patchOrphanToolResultsOA(body: Record<string, unknown>): void {
     if (toolCallId) knownToolMsgIds.add(toolCallId);
   }
 
-  const lastMsgIdx = messages.length - 1;
-  for (let i = 0; i <= lastMsgIdx; i++) {
+  // 逆序遍历 assistant，这样 splice 插入不影响前面 assistant 的索引
+  for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i];
     if (msg.role !== "assistant") continue;
     // 跳过最后一条 assistant：它可能是正常的工具调用中间状态
-    if (i === lastMsgIdx) break;
+    if (i === messages.length - 1) continue;
     const toolCalls = msg.tool_calls as Array<Record<string, unknown>> | undefined;
     if (!toolCalls || toolCalls.length === 0) continue;
-    const before = toolCalls.length;
-    const filtered = toolCalls.filter(tc => {
+
+    const orphans: string[] = [];
+    for (const tc of toolCalls) {
       const id = tc.id as string | undefined;
-      return !id || knownToolMsgIds.has(id);
-    });
-    if (filtered.length < before) {
-      if (filtered.length === 0) {
-        delete msg.tool_calls;
-      } else {
-        msg.tool_calls = filtered;
+      // 空 id 忽略：不补不删
+      if (!id) continue;
+      if (!knownToolMsgIds.has(id)) {
+        orphans.push(id);
       }
-      changed = true;
     }
+    if (orphans.length === 0) continue;
+
+    // 在该 assistant 后面插入合成 tool 消息
+    const syntheticMsgs = orphans.map(id => ({
+      role: "tool",
+      tool_call_id: id,
+      content: "[context truncated]",
+    }));
+    messages.splice(i + 1, 0, ...syntheticMsgs);
+    changed = true;
   }
 
   if (changed) {
-    // 移除空壳 assistant（content 无实质内容且无 tool_calls）
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const m = messages[i] as Record<string, unknown>;
-      if (m.role !== "assistant") continue;
-      if (m.tool_calls) continue;
-      const content = m.content;
-      if (content === null || content === undefined || content === ""
-        || (Array.isArray(content) && content.length === 0)) {
-        messages.splice(i, 1);
-      }
-    }
-
     // 合并连续 user 消息
     for (let i = 1; i < messages.length;) {
       if (messages[i].role === "user" && messages[i - 1].role === "user") {
@@ -215,8 +207,6 @@ export function patchOrphanToolResultsOA(body: Record<string, unknown>): void {
 
   // Step 4: 修复 tool_calls 消息顺序——将插在 assistant(tool_calls) 与 tool 之间的
   // 非 tool 消息（如用户中断、系统提醒）挪到 tool 消息之后
-  // scanLimit 上限：每个 tool_call 最多对应 1 个 tool 消息 + 1 个可能穿插的非 tool 消息，
-  // 额外 +3 留出边界余量（额外的 user/system 消息）
   const SCAN_LIMIT_EXTRA = 3;
   for (let idx = 0; idx < messages.length; idx++) {
     const msg = messages[idx] as Record<string, unknown>;
@@ -226,7 +216,7 @@ export function patchOrphanToolResultsOA(body: Record<string, unknown>): void {
     const expectedIds = new Set<string>(toolCalls.map(tc => tc.id as string));
     const intervening: Record<string, unknown>[] = [];
     const toolMsgs: Record<string, unknown>[] = [];
-    const SCAN_SLOTS_PER_CALL = 2; // 每个 tool_call: 1 个 tool 消息 + 1 个可能穿插的消息
+    const SCAN_SLOTS_PER_CALL = 2;
     const scanLimit = idx + 1 + expectedIds.size * SCAN_SLOTS_PER_CALL + SCAN_LIMIT_EXTRA;
     let j = idx + 1;
     for (; j < messages.length && j <= scanLimit; j++) {
@@ -242,7 +232,6 @@ export function patchOrphanToolResultsOA(body: Record<string, unknown>): void {
     if (intervening.length > 0 && toolMsgs.length > 0 && expectedIds.size === 0) {
       const count = intervening.length + toolMsgs.length;
       messages.splice(idx + 1, count, ...toolMsgs, ...intervening);
-      // splice 后跳过已重排的区域（toolMsgs + intervening），避免重复处理
       idx += count;
     }
   }

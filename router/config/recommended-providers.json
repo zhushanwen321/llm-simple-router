@@ -113,6 +113,22 @@
         ]
       },
       {
+        "plan": "Coding Plan (Anthropic)",
+        "presetName": "zhipu-coding-plan-anthropic",
+        "apiType": "anthropic",
+        "baseUrl": "https://open.bigmodel.cn",
+        "upstreamPath": "/api/anthropic/v1/messages",
+        "modelsEndpoint": "/api/anthropic/v1/models",
+        "models": [
+          "glm-5.1",
+          "glm-5",
+          "glm-5-turbo",
+          "glm-4.7",
+          "glm-4.5-air"
+        ],
+        "hidden": true
+      },
+      {
         "plan": "API",
         "presetName": "zhipu",
         "apiType": "openai",

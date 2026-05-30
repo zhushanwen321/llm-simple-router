@@ -15,10 +15,12 @@ import { ChevronRight, RotateCw } from "lucide-vue-next";
 import ModelCard from "@/components/quick-setup/ModelCard.vue";
 import TransformRulesForm from "@/components/shared/TransformRulesForm.vue";
 import ProxyConfigForm from "@/components/shared/ProxyConfigForm.vue";
+import EndpointEditor from "@/components/providers/EndpointEditor.vue";
 import { CONTEXT_WINDOW_OPTIONS } from "@/composables/useProviderForm";
 import { DEFAULT_CONTEXT_WINDOW, DEFAULT_STREAM_TIMEOUT_MS } from "@/constants";
 import type { ProviderFormData } from "./types";
 import type { ConcurrencyMode } from "@/types/concurrency";
+import type { ProviderEndpoint } from "@/types/mapping";
 import type { ModelConfig } from "@/components/quick-setup/types";
 
 const { t } = useI18n();
@@ -51,12 +53,17 @@ const props = defineProps<{
   hasModelsEndpoint: boolean;
   presetGroup: string;
   hasApiKey: boolean;
+  // Multi-endpoint support (PR #177)
+  endpoints: ProviderEndpoint[];
+  sharedKey: string;
 }>();
 
 const emit = defineEmits<{
   "update:modelValue": [value: ProviderFormData];
   "clear-errors": [field: string];
   "fetch-upstream-models": [];
+  // Multi-endpoint support (PR #177)
+  "update:endpoints": [value: ProviderEndpoint[]];
 }>();
 
 function emitUpdate(patch: Partial<ProviderFormData>) {
@@ -254,6 +261,12 @@ function isOfficialOpenai(url: string): boolean {
         {{ t("providers.fields.upstreamPathHint") }}
       </p>
     </div>
+    <!-- Multi-endpoint support (PR #177) -->
+    <EndpointEditor
+      :model-value="props.endpoints"
+      :shared-key="props.sharedKey"
+      @update:model-value="emit('update:endpoints', $event)"
+    />
   </div>
 
   <!-- Section 2: Models -->

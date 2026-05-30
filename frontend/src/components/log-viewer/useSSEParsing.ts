@@ -40,6 +40,114 @@ export interface DeltaGroup {
 
 const MAX_VISIBLE_DELTAS = 3;
 
+// Anthropic SSE 组装：将 delta 事件拼接为完整 content block
+function assembleAnthropicBlocks(events: SSEEvent[]): AssembledBlock[] {
+  const blocks: AssembledBlock[] = [];
+  let cur: AssembledBlock | null = null;
+  for (const ev of events) {
+    if (ev.type !== "data") continue;
+    const d = ev.data as Record<string, unknown>;
+    if (d.type === "content_block_start") {
+      const blk = d.content_block as Record<string, unknown>;
+      cur = {
+        type: typeof blk?.type === "string" ? blk.type : "",
+        content: "",
+        eventCount: 0,
+        toolName: typeof blk?.name === "string" ? blk.name : undefined,
+      };
+      if (cur.type === "tool_use" && blk?.input) {
+        const inputObj = blk.input as Record<string, unknown>;
+        if (Object.keys(inputObj).length > 0)
+          cur.content = JSON.stringify(inputObj, null, JSON_INDENT);
+      }
+      continue;
+    }
+    if (d.type === "content_block_delta" && cur) {
+      const delta = d.delta as Record<string, string>;
+      cur.content += delta.thinking || delta.text || delta.partial_json || "";
+      cur.eventCount++;
+      continue;
+    }
+    if (d.type === "content_block_stop" && cur) {
+      blocks.push(cur);
+      cur = null;
+    }
+  }
+  if (cur) blocks.push(cur);
+  return blocks;
+}
+
+// OpenAI SSE 组装：reasoning/text/tool_calls 需独立 block
+function assembleOpenaiBlocks(events: SSEEvent[]): AssembledBlock[] {
+  const thinkingBlock: AssembledBlock = {
+    type: "thinking",
+    content: "",
+    eventCount: 0,
+  };
+  const textBlock: AssembledBlock = {
+    type: "text",
+    content: "",
+    eventCount: 0,
+  };
+  const toolBlocks = new Map<number, AssembledBlock>();
+  for (const ev of events) {
+    if (ev.type !== "data") continue;
+    const d = ev.data as Record<string, unknown>;
+    const choices = (d.choices ?? []) as Array<Record<string, unknown>>;
+    const delta = choices[0]?.delta as Record<string, unknown> | undefined;
+    if (!delta) continue;
+    // 多种 Provider 的思考内容字段名（与后端 stream-extractor.ts REASONING_FIELDS 保持同步）
+    for (const field of [
+      "reasoning_content",
+      "reasoning",
+      "reasoning_text",
+    ] as const) {
+      const val = delta[field];
+      if (typeof val === "string" && val) {
+        thinkingBlock.content += val;
+        thinkingBlock.eventCount++;
+        break;
+      }
+    }
+    if (typeof delta.content === "string" && delta.content) {
+      textBlock.content += delta.content;
+      textBlock.eventCount++;
+    }
+    const toolCalls = delta.tool_calls as
+      | Array<Record<string, unknown>>
+      | undefined;
+    if (Array.isArray(toolCalls)) {
+      for (const tc of toolCalls) {
+        const idx = typeof tc.index === "number" ? tc.index : 0;
+        const fn = tc.function as Record<string, unknown> | undefined;
+        if (!toolBlocks.has(idx)) {
+          toolBlocks.set(idx, {
+            type: "tool_use",
+            content: "",
+            eventCount: 0,
+            toolName: typeof fn?.name === "string" ? fn.name : "",
+          });
+        }
+        const block = toolBlocks.get(idx)!;
+        if (typeof fn?.arguments === "string") block.content += fn.arguments;
+        block.eventCount++;
+      }
+    }
+    // refusal 降级为 text block
+    if (typeof delta.refusal === "string" && delta.refusal) {
+      textBlock.content += delta.refusal;
+      textBlock.eventCount++;
+    }
+  }
+  const result: AssembledBlock[] = [];
+  if (thinkingBlock.content) result.push(thinkingBlock);
+  for (const block of toolBlocks.values()) {
+    if (block.content || block.toolName) result.push(block);
+  }
+  if (textBlock.content) result.push(textBlock);
+  return result;
+}
+
 export function useSSEParsing(
   body: Ref<string | undefined>,
   isStream: boolean,
@@ -70,42 +178,14 @@ export function useSSEParsing(
     return events;
   });
 
-  // Anthropic SSE 组装：将 delta 事件拼接为完整 content block
+  // SSE 组装：将 delta 事件拼接为完整 content block
+  // 支持 Anthropic（content_block_start/delta/stop）和 OpenAI（choices[].delta）
   const assembledBlocks = computed<AssembledBlock[]>(() => {
     if (!isStream || !body.value) return [];
-    const blocks: AssembledBlock[] = [];
-    let cur: AssembledBlock | null = null;
-    for (const ev of sseEvents.value) {
-      if (ev.type !== "data") continue;
-      const d = ev.data as Record<string, unknown>;
-      if (d.type === "content_block_start") {
-        const blk = d.content_block as Record<string, unknown>;
-        cur = {
-          type: typeof blk?.type === "string" ? blk.type : "",
-          content: "",
-          eventCount: 0,
-          toolName: typeof blk?.name === "string" ? blk.name : undefined,
-        };
-        if (cur.type === "tool_use" && blk?.input) {
-          const inputObj = blk.input as Record<string, unknown>;
-          if (Object.keys(inputObj).length > 0)
-            cur.content = JSON.stringify(inputObj, null, JSON_INDENT);
-        }
-        continue;
-      }
-      if (d.type === "content_block_delta" && cur) {
-        const delta = d.delta as Record<string, string>;
-        cur.content += delta.thinking || delta.text || delta.partial_json || "";
-        cur.eventCount++;
-        continue;
-      }
-      if (d.type === "content_block_stop" && cur) {
-        blocks.push(cur);
-        cur = null;
-      }
+    if (apiType === "anthropic") {
+      return assembleAnthropicBlocks(sseEvents.value);
     }
-    if (cur) blocks.push(cur);
-    return blocks;
+    return assembleOpenaiBlocks(sseEvents.value);
   });
 
   const sseMeta = computed<SSEMeta>(() => {
@@ -149,8 +229,24 @@ export function useSSEParsing(
       const choices = (d.choices || []) as Array<Record<string, unknown>>;
       const delta = choices[0]?.delta as Record<string, unknown> | undefined;
       if (delta?.role) role = delta.role as string;
+      // reasoning_content 也属于 content 的一部分（用于日志详情页展示）
+      const reasoning =
+        typeof delta?.reasoning_content === "string"
+          ? (delta.reasoning_content as string)
+          : "";
+      if (reasoning) {
+        content += reasoning;
+        contentEventCount++;
+      }
       if (delta?.content) {
         content += delta.content as string;
+        contentEventCount++;
+      }
+      // refusal 降级为文本
+      const refusal =
+        typeof delta?.refusal === "string" ? (delta.refusal as string) : "";
+      if (refusal) {
+        content += refusal;
         contentEventCount++;
       }
       if (choices[0]?.finish_reason)

@@ -13,8 +13,11 @@ import {
   type ProviderGroup,
   type RecommendedRetryRule,
 } from "@/api/client";
-import type { MappingGroup } from "@/types/mapping";
-import type { Provider as ApiProvider } from "@/types/mapping";
+import type {
+  MappingGroup,
+  Provider as ApiProvider,
+  ProviderEndpoint,
+} from "@/types/mapping";
 import { toast } from "vue-sonner";
 import {
   type ClientType,
@@ -86,6 +89,8 @@ export function useQuickSetup() {
   const selectedPlan = ref("");
   const apiType = ref<"openai" | "openai-responses" | "anthropic">("anthropic");
   const apiKey = ref("");
+  const sharedKey = ref("");
+  const endpoints = ref<ProviderEndpoint[]>([]);
   const modelConfigs = ref<ModelConfig[]>([]);
   const mappingEntries = ref<MappingEntry[]>([]);
   const allRecommendedRules = ref<RecommendedRetryRule[]>([]);
@@ -195,6 +200,7 @@ export function useQuickSetup() {
       selectedRetryRules,
       retryProviderMap,
       isNonOpenaiEndpoint,
+      endpoints,
     },
     submit: {
       saving,
@@ -243,6 +249,8 @@ export function useQuickSetup() {
     selectedPlan,
     apiType,
     apiKey,
+    sharedKey,
+    endpoints,
     modelConfigs,
     mappingEntries,
     allRecommendedRules,

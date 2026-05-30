@@ -475,6 +475,18 @@ export async function main() {
 
   // 全局兜底：防止未捕获异常导致进程崩溃
   process.on("uncaughtException", (err) => {
+    const code = (err as NodeJS.ErrnoException).code;
+    // EPIPE/ECONNRESET 是客户端断连后的正常网络错误，不影响服务稳定性
+    if (code === "EPIPE" || code === "ECONNRESET") {
+      try {
+        app.log.warn({ err }, "Client disconnected (EPIPE/ECONNRESET)");
+      /* eslint-disable taste/no-silent-catch -- app.log 可能已崩溃 */
+      } catch {
+        console.warn("Client disconnected:", (err as Error).message);
+      }
+      /* eslint-enable taste/no-silent-catch */
+      return;
+    }
     try {
       app.log.fatal({ err }, "Uncaught exception");
     /* eslint-disable taste/no-silent-catch -- app.log 可能已崩溃，console 是最后手段 */

@@ -43,6 +43,8 @@ export interface RequestLogParams extends LogRetryMeta {
   resilience_reason?: string | null;
   mapping_reason?: string | null;
   failover_trigger?: string | null;
+  upstream_api_type?: string | null;
+  upstream_base_url?: string | null;
 }
 
 /** 插入成功请求日志，供 openai/anthropic 插件共享 */
@@ -54,7 +56,8 @@ export function insertSuccessLog(
     clientReq, upstreamReq, status, respBody, upHdrs,
     isRetry = false, isFailover = false, originalRequestId = null, routerKeyId = null, originalModel = null,
     sessionId = null, pipelineSnapshot = null, matcher, logFileWriter,
-    transport_kind, abort_reason, error_code, headers_sent, resilience_action, resilience_reason, mapping_reason, failover_trigger } = params;
+    transport_kind, abort_reason, error_code, headers_sent, resilience_action, resilience_reason, mapping_reason, failover_trigger,
+    upstream_api_type, upstream_base_url } = params;
 
   const writeContext: LogWriteContext | undefined = (matcher || logFileWriter) ? {
     matcher,
@@ -81,6 +84,8 @@ export function insertSuccessLog(
     resilience_reason: resilience_reason ?? null,
     mapping_reason: mapping_reason ?? null,
     failover_trigger: failover_trigger ?? null,
+    upstream_api_type: upstream_api_type ?? null,
+    upstream_base_url: upstream_base_url ?? null,
   }, writeContext);
 }
 
@@ -110,6 +115,8 @@ export interface RejectedLogParams extends LogRetryMeta {
   resilience_action?: string | null;
   resilience_reason?: string | null;
   failover_trigger?: string | null;
+  upstream_api_type?: string | null;
+  upstream_base_url?: string | null;
 }
 
 /** Log a request rejected before reaching upstream */
@@ -119,7 +126,8 @@ export function insertRejectedLog(params: RejectedLogParams): void {
     providerId = null, isFailover = false, originalRequestId = null, originalModel = null,
     sessionId = null, pipelineSnapshot = null, matcher, logFileWriter,
     mapping_reason, transport_kind, abort_reason, error_code, headers_sent,
-    resilience_action, resilience_reason, failover_trigger } = params;
+    resilience_action, resilience_reason, failover_trigger,
+    upstream_api_type, upstream_base_url } = params;
 
   const writeContext: LogWriteContext | undefined = (matcher || logFileWriter) ? {
     matcher,
@@ -152,5 +160,7 @@ export function insertRejectedLog(params: RejectedLogParams): void {
     resilience_reason: resilience_reason ?? null,
     mapping_reason: mapping_reason ?? null,
     failover_trigger: failover_trigger ?? null,
+    upstream_api_type: upstream_api_type ?? null,
+    upstream_base_url: upstream_base_url ?? null,
   }, writeContext);
 }

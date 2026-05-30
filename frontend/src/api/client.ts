@@ -65,6 +65,8 @@ export interface ProviderPreset {
   models: string[];
   /** 模型名 → capabilities 映射（由后端补充） */
   modelCapabilities?: Record<string, string[]>;
+  /** 隐藏 preset，不在 plan 下拉菜单显示，但 endpoints 生成仍遍历 */
+  hidden?: boolean;
 }
 
 export interface ProviderGroup {
@@ -91,6 +93,12 @@ export interface ProviderPayload {
   base_url: string;
   upstream_path?: string;
   api_key?: string;
+  endpoints?: Array<{
+    api_type: "openai" | "openai-responses" | "anthropic";
+    base_url: string;
+    upstream_path?: string | null;
+    api_key?: string | null;
+  }>;
   models?: Array<
     | string
     | {
@@ -154,6 +162,12 @@ export interface QuickSetupPayload {
     base_url: string;
     upstream_path?: string;
     api_key: string;
+    endpoints?: Array<{
+      api_type: "openai" | "openai-responses" | "anthropic";
+      base_url: string;
+      upstream_path?: string;
+      api_key?: string;
+    }>;
     models: Array<{
       name: string;
       context_window?: number;

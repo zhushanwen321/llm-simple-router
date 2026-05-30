@@ -47,6 +47,8 @@ export interface UnifiedRequestOverview {
   cacheReadTokensEstimated: number | null;
   mappingReason?: string;
   thinkingLevel: string;
+  upstreamApiType: string | null;
+  upstreamBaseUrl: string | null;
 }
 
 export function fromActiveRequest(
@@ -105,6 +107,8 @@ export function fromActiveRequest(
     cacheReadTokensEstimated: m?.cacheReadTokensEstimated ?? null,
     mappingReason: req.mappingReason,
     thinkingLevel: req.thinkingLevel ?? "off",
+    upstreamApiType: null,
+    upstreamBaseUrl: null,
   };
 }
 
@@ -275,5 +279,7 @@ export function fromLogEntry(
     thinkingLevel:
       entry.thinking_level ??
       extractThinkingLevel(entry.client_request, entry.api_type),
+    upstreamApiType: entry.upstream_api_type ?? null,
+    upstreamBaseUrl: entry.upstream_base_url ?? null,
   };
 }

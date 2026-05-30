@@ -259,6 +259,31 @@
             overview.clientIp
           }}</span>
         </div>
+        <div
+          v-if="
+            overview.upstreamApiType &&
+            overview.upstreamApiType !== overview.apiType
+          "
+          class="flex items-center justify-between text-[11px]"
+        >
+          <span class="text-muted-foreground">{{
+            t("requestDetail.upstreamApiType")
+          }}</span>
+          <span class="font-mono text-warning-dark"
+            >{{ overview.apiType }} → {{ overview.upstreamApiType }}</span
+          >
+        </div>
+        <div
+          v-if="overview.upstreamBaseUrl"
+          class="flex items-center justify-between text-[11px]"
+        >
+          <span class="text-muted-foreground">{{
+            t("requestDetail.upstreamBaseUrl")
+          }}</span>
+          <span class="font-mono truncate max-w-[160px]">{{
+            overview.upstreamBaseUrl
+          }}</span>
+        </div>
       </div>
     </div>
 

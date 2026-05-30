@@ -7,6 +7,20 @@ const OPENAI_BLOCK_REASONING = 0;
 const OPENAI_BLOCK_TEXT = 1;
 const OPENAI_BLOCK_TOOLS = 2;
 
+// Responses SSE 事件类型 → block 类型映射
+// 与 transform/types-responses.ts 的 RESPONSES_SSE_EVENTS 保持同步
+const RESPONSES_DELTA_MAP: Record<string, "text" | "thinking" | "tool_use"> = {
+  "response.output_text.delta": "text",
+  "response.function_call_arguments.delta": "tool_use",
+  "response.reasoning_summary_text.delta": "thinking",
+  "response.reasoning_text.delta": "thinking",
+  "response.refusal.delta": "text",
+  "response.code_interpreter_call_code.delta": "text",
+};
+
+// 多种 Provider 的思考内容字段名（按优先级排列）
+const REASONING_FIELDS = ["reasoning_content", "reasoning", "reasoning_text"] as const;
+
 export interface StreamExtraction {
   text: string;
   block?: { index: number; type: ContentBlock["type"]; content: string; name?: string } | null;
@@ -28,7 +42,15 @@ export function extractStreamText(line: string, apiType: "openai" | "openai-resp
     const choices = obj.choices as Array<Record<string, unknown>> | undefined;
     const delta = choices?.[0]?.delta as Record<string, unknown> | undefined;
     const text = (delta?.content as string) ?? "";
-    const reasoning = (delta?.reasoning_content as string) ?? "";
+    // 多种 Provider 的思考字段名：reasoning_content（标准）、reasoning、reasoning_text
+    let reasoning = "";
+    for (const field of REASONING_FIELDS) {
+      const val = delta?.[field];
+      if (typeof val === "string" && val) {
+        reasoning = val;
+        break;
+      }
+    }
 
     // OpenAI 不像 Anthropic 那样为不同 content type 分配独立 index。
     // 策略：reasoning → OPENAI_BLOCK_REASONING, text → OPENAI_BLOCK_TEXT,
@@ -39,6 +61,11 @@ export function extractStreamText(line: string, apiType: "openai" | "openai-resp
     }
     if (text) {
       return { text, block: { index: OPENAI_BLOCK_TEXT, type: "text", content: text } };
+    }
+    // refusal 降级为 text block（内容审核拒绝原因）
+    const refusal = (delta?.refusal as string) ?? "";
+    if (refusal) {
+      return { text: refusal, block: { index: OPENAI_BLOCK_TEXT, type: "text", content: refusal } };
     }
     const toolCalls = delta?.tool_calls as Array<Record<string, unknown>> | undefined;
     if (toolCalls) {
@@ -60,21 +87,13 @@ export function extractStreamText(line: string, apiType: "openai" | "openai-resp
     // Responses SSE uses named events, but line format is "data: {json}" (same as Anthropic)
     // The event type is in the data JSON's "type" field
     const type = obj.type as string;
-
-    if (type === "response.output_text.delta") {
-      const text = (obj.delta as string) ?? "";
+    const blockType = RESPONSES_DELTA_MAP[type];
+    if (blockType) {
+      const delta = (obj.delta as string) ?? "";
       const outputIndex = (obj.output_index as number) ?? 0;
-      return { text, block: text ? { index: outputIndex, type: "text" as const, content: text } : empty.block };
-    }
-    if (type === "response.function_call_arguments.delta") {
-      const partialJson = (obj.delta as string) ?? "";
-      const outputIndex = (obj.output_index as number) ?? 0;
-      return { text: "", block: { index: outputIndex, type: "tool_use" as const, content: partialJson } };
-    }
-    if (type === "response.reasoning_summary_text.delta") {
-      const thinking = (obj.delta as string) ?? "";
-      const outputIndex = (obj.output_index as number) ?? 0;
-      return { text: "", block: { index: outputIndex, type: "thinking" as const, content: thinking } };
+      if (delta) {
+        return { text: blockType === "text" ? delta : "", block: { index: outputIndex, type: blockType, content: delta } };
+      }
     }
     return empty;
   }

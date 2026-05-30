@@ -1,8 +1,8 @@
 /**
  * MRL（Modality Redirect）预计算层
  *
- * 纯函数：检测请求体是否包含多模态内容（图片、音频等），若首 target 不支持
- * 且配置了 multimodal_fallback，则将 fallback target prepend 到列表头部。
+ * 纯函数：检测请求体是否包含多模态内容（图片、音频等），过滤不支持对应模态的 targets，
+ * 必要时用 multimodal_fallback 替换全部被过滤的 targets。
  */
 import type Database from "better-sqlite3";
 import type { Target } from "../../core/types.js";
@@ -83,7 +83,10 @@ function supportsModality(capabilities: string[] | undefined, modality: string):
 }
 
 /**
- * MRL 层主函数。异常安全：任何内部错误均 catch 并返回原始 targets。
+ * MRL 层主函数。采用 filter+replace 策略：
+ * 1. 过滤不支持请求模态的 targets
+ * 2. 全部过滤完时尝试用 multimodal_fallback 替换
+ * 异常安全：任何内部错误均 catch 并返回原始 targets。
  */
 export function computeModalityRedirectTargets(
   db: Database.Database,
@@ -93,13 +96,21 @@ export function computeModalityRedirectTargets(
   snapshot: PipelineSnapshot,
 ): Target[] {
   try {
-  // 空列表直接返回
-    if (targets.length === 0) return targets;
+    // 1. 空列表 → 记录诊断信息后返回（运维排查 400 时可看到 modality-redirect 阶段记录）
+    if (targets.length === 0) {
+      snapshot.add({
+        stage: "modality-redirect",
+        triggered: false,
+        original_model: "",
+        redirect_to: "",
+        redirect_provider: "",
+        reason: "empty-targets-input",
+      } satisfies StageRecord);
+      return targets;
+    }
 
-    // 检测多模态内容
+    // 2. 检测多模态内容
     const modalities = detectModalities(body);
-
-    // 无多模态内容 → no-op
     if (modalities.size === 0) {
       snapshot.add({
         stage: "modality-redirect",
@@ -112,41 +123,70 @@ export function computeModalityRedirectTargets(
       return targets;
     }
 
-    // 检查首 target 的 provider 是否已支持所有检测到的模态
-    const firstTarget = targets[0];
-    const provider = getProviderById(db, firstTarget.provider_id);
-    if (provider) {
-      const entries = parseModels(provider.models);
-      const entry = entries.find(e => e.name === firstTarget.backend_model);
-      const firstTargetCapabilities = entry?.capabilities ?? [];
-      const allSupported = [...modalities].every(m => supportsModality(firstTargetCapabilities, m));
-      if (allSupported) {
-        snapshot.add({
-          stage: "modality-redirect",
-          triggered: false,
-          original_model: firstTarget.backend_model,
-          redirect_to: "",
-          redirect_provider: "",
-          reason: "first-target-supports-all-modalities",
-        } satisfies StageRecord);
-        return targets;
+    // 3. 过滤：遍历所有 targets，检查每个是否支持所有检测到的模态
+    const eligible: Target[] = [];
+    for (const target of targets) {
+      const provider = getProviderById(db, target.provider_id);
+      if (!provider) {
+        // provider 不存在 → 保留（安全行为）
+        eligible.push(target);
+        continue;
       }
+      const entries = parseModels(provider.models);
+      const entry = entries.find(e => e.name === target.backend_model);
+      const capabilities = entry?.capabilities ?? [];
+      const allSupported = [...modalities].every(m => supportsModality(capabilities, m));
+      if (allSupported) {
+        eligible.push(target);
+      }
+      // 不支持 → 过滤掉
     }
 
-    // 查找 multimodal_fallback 配置
+    // 4. 全部支持 → 不需要过滤
+    if (eligible.length === targets.length) {
+      snapshot.add({
+        stage: "modality-redirect",
+        triggered: false,
+        original_model: targets[0].backend_model,
+        redirect_to: "",
+        redirect_provider: "",
+        reason: "all-targets-support-modalities",
+      } satisfies StageRecord);
+      return targets;
+    }
+
+    // 5. 部分过滤 → 返回 eligible
+    if (eligible.length > 0) {
+      snapshot.add({
+        stage: "modality-redirect",
+        triggered: true,
+        original_model: targets[0].backend_model,
+        redirect_to: "",
+        redirect_provider: "",
+        reason: "filtered-ineligible-targets",
+        detected_modalities: [...modalities],
+      } satisfies StageRecord);
+      return eligible;
+    }
+
+    // 6. 全部过滤完 → 尝试 fallback
+    const firstOriginalModel = targets[0].backend_model;
+
+    // 6a. 查找映射组
     const group = getMappingGroup(db, clientModel);
     if (!group) {
       snapshot.add({
         stage: "modality-redirect",
         triggered: false,
-        original_model: firstTarget.backend_model,
+        original_model: firstOriginalModel,
         redirect_to: "",
         redirect_provider: "",
         reason: "no-mapping-group",
       } satisfies StageRecord);
-      return targets;
+      return [];
     }
 
+    // 6b. 解析 rule
     let rule: Record<string, unknown>;
     try {
       rule = JSON.parse(group.rule) as Record<string, unknown>;
@@ -154,25 +194,26 @@ export function computeModalityRedirectTargets(
       snapshot.add({
         stage: "modality-redirect",
         triggered: false,
-        original_model: firstTarget.backend_model,
+        original_model: firstOriginalModel,
         redirect_to: "",
         redirect_provider: "",
         reason: "rule-parse-error",
       } satisfies StageRecord);
-      return targets;
+      return [];
     }
 
+    // 6c. 检查 multimodal_fallback 配置
     const fallback = rule.multimodal_fallback;
     if (fallback == null || typeof fallback !== "object") {
       snapshot.add({
         stage: "modality-redirect",
         triggered: false,
-        original_model: firstTarget.backend_model,
+        original_model: firstOriginalModel,
         redirect_to: "",
         redirect_provider: "",
-        reason: "no-multimodal-fallback-configured",
+        reason: "no-eligible-targets",
       } satisfies StageRecord);
-      return targets;
+      return [];
     }
     const fb = fallback as Record<string, unknown>;
     const fbProviderId = fb.provider_id;
@@ -181,63 +222,46 @@ export function computeModalityRedirectTargets(
       snapshot.add({
         stage: "modality-redirect",
         triggered: false,
-        original_model: firstTarget.backend_model,
+        original_model: firstOriginalModel,
         redirect_to: "",
         redirect_provider: "",
-        reason: "invalid-fallback-config",
+        reason: "no-eligible-targets",
       } satisfies StageRecord);
-      return targets;
+      return [];
     }
 
-    // fallback provider 必须存在且 active
+    // 6d. fallback provider 必须存在且 active
     const fbProvider = getProviderById(db, fbProviderId);
     if (!fbProvider || fbProvider.is_active !== 1) {
       snapshot.add({
         stage: "modality-redirect",
         triggered: false,
-        original_model: firstTarget.backend_model,
+        original_model: firstOriginalModel,
         redirect_to: fbBackendModel,
         redirect_provider: fbProviderId,
-        reason: "fallback-provider-unavailable",
+        reason: "no-eligible-targets",
       } satisfies StageRecord);
-      return targets;
+      return [];
     }
 
-    // 检查 fallback model 是否覆盖所有首 target 缺失的模态
-    const firstTargetCapabilities = provider
-      ? parseModels(provider.models).find(e => e.name === firstTarget.backend_model)?.capabilities ?? []
-      : [];
-    const missingModalities = [...modalities].filter(m => !supportsModality(firstTargetCapabilities, m));
+    // 6e. fallback 必须覆盖所有检测到的模态
     const fbEntry = parseModels(fbProvider.models).find(e => e.name === fbBackendModel);
     const fbCapabilities = fbEntry?.capabilities ?? [];
-    const fbMissing = missingModalities.filter(m => !supportsModality(fbCapabilities, m));
+    const fbMissing = [...modalities].filter(m => !supportsModality(fbCapabilities, m));
     if (fbMissing.length > 0) {
       snapshot.add({
         stage: "modality-redirect",
         triggered: false,
-        original_model: firstTarget.backend_model,
+        original_model: firstOriginalModel,
         redirect_to: fbBackendModel,
         redirect_provider: fbProviderId,
-        reason: "fallback-missing-modality",
+        reason: "no-eligible-targets",
         detected_modalities: [...modalities],
       } satisfies StageRecord);
-      return targets;
+      return [];
     }
 
-    // prepend fallback target（如果与首 target 相同则跳过，避免重复消耗 failover 迭代）
-    if (fbProviderId === firstTarget.provider_id && fbBackendModel === firstTarget.backend_model) {
-      snapshot.add({
-        stage: "modality-redirect",
-        triggered: false,
-        original_model: firstTarget.backend_model,
-        redirect_to: fbBackendModel,
-        redirect_provider: fbProviderId,
-        reason: "fallback-same-as-first-target",
-        detected_modalities: [...modalities],
-      } satisfies StageRecord);
-      return targets;
-    }
-
+    // 6f. fallback 覆盖所有模态 → 替换
     const fbTarget: Target = {
       provider_id: fbProviderId,
       backend_model: fbBackendModel,
@@ -246,17 +270,18 @@ export function computeModalityRedirectTargets(
     snapshot.add({
       stage: "modality-redirect",
       triggered: true,
-      original_model: firstTarget.backend_model,
+      original_model: firstOriginalModel,
       redirect_to: fbBackendModel,
       redirect_provider: fbProviderId,
-      reason: "first-target-lacks-modality",
+      reason: "replaced-with-fallback",
       detected_modalities: [...modalities],
     } satisfies StageRecord);
 
-    return [fbTarget, ...targets];
+    return [fbTarget];
   } catch (err: unknown) {
-  // 异常安全：返回原始 targets，但记录诊断信息
-    console.error('computeModalityRedirectTargets: internal error, falling back to original targets', err);
+    // 异常安全：返回空数组，让 failover-loop 统一走 unsupportedModality 错误路径
+    // 避免将多模态请求发给不支持模态的 provider（比返回原始 targets 更安全）
+    console.error('computeModalityRedirectTargets: internal error, returning empty targets', err);
     snapshot.add({
       stage: "modality-redirect",
       triggered: false,
@@ -265,6 +290,6 @@ export function computeModalityRedirectTargets(
       redirect_provider: "",
       reason: "internal-error",
     } satisfies StageRecord);
-    return targets;
+    return [];
   }
 }

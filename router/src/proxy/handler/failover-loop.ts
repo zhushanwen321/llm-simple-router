@@ -12,14 +12,14 @@
  * - 内置 hook 负责日志/溢出/patches 等，此文件只关注 failover 循环控制
  */
 import { randomUUID } from "crypto";
-import type { FastifyReply } from "fastify";
+import type { FastifyReply, FastifyRequest } from "fastify";
 import { ProviderSwitchNeeded } from "../../core/errors.js";
 import { SemaphoreQueueFullError, SemaphoreTimeoutError } from "../../core/errors.js";
 import { getProviderById, updateLogClientStatus, insertRequestLog, updateLogStreamContent } from "../../db/index.js";
 import { logUpstreamError, extractErrorInfo } from "../../db/upstream-error-logs.js";
 import { getSetting } from "../../db/settings.js";
-import { decrypt } from "../../utils/crypto.js";
 import { resolveMapping, filterExcluded } from "../routing/mapping-resolver.js";
+import { resolveEndpoint } from "../routing/resolve-endpoint.js";
 import { expandOverflowTargets } from "../routing/overflow.js";
 import { computeModalityRedirectTargets } from "../routing/modality-redirect.js";
 import { getConfig } from "../../config/index.js";
@@ -128,8 +128,472 @@ function rejectAndReply(
     matcher: params.matcher, logFileWriter: params.logFileWriter,
     mapping_reason: params.mappingReason ?? null,
   });
-  try { afterLog?.(); } catch { /* tool error log 写入失败不影响响应 */ } // eslint-disable-line taste/no-silent-catch
+  try { afterLog?.(); } catch (e: unknown) { /* tool error log 写入失败不影响响应 */ void e; }
   return reply.code(error.statusCode).send(error.body);
+}
+
+// ---------- Precompute routing targets ----------
+
+export type PrecomputeResult =
+  | { ok: true; cachedTargets: Target[]; overflowIndices: Set<number>; resolveResult: NonNullable<ReturnType<typeof resolveMapping>>; pendingToolErrors: FailedToolResult[] | null }
+  | { ok: false; errorCode: "no_mapping" | "unsupported_modality" | "no_allowed_model" };
+
+export function precomputeFailoverTargets(input: {
+  db: Database.Database;
+  clientModel: string;
+  body: Record<string, unknown>;
+  precomputeSnapshot: PipelineSnapshot;
+  allowedModels: string[] | undefined;
+  enhancementConfig: ReturnType<typeof loadEnhancementConfig>;
+}): PrecomputeResult {
+  const { db, clientModel, body, precomputeSnapshot, allowedModels, enhancementConfig } = input;
+
+  // 1. resolveMapping — 只调一次
+  const resolveResult = resolveMapping(db, clientModel, { now: new Date() });
+  if (!resolveResult) {
+    return { ok: false, errorCode: "no_mapping" };
+  }
+
+  let allTargets = resolveResult.allTargets ?? [resolveResult.target];
+
+  // 2. modality-redirect 层
+  allTargets = computeModalityRedirectTargets(db, allTargets, clientModel, body, precomputeSnapshot);
+  if (allTargets.length === 0) {
+    return { ok: false, errorCode: "unsupported_modality" };
+  }
+
+  // 3. OF 层
+  const targetsBeforeOF = allTargets.length;
+  const ofResult = expandOverflowTargets(allTargets, db, body);
+  allTargets = ofResult.targets;
+  precomputeSnapshot.add({ stage: "overflow", triggered: allTargets.length > targetsBeforeOF });
+
+  // 4. allowed_models 过滤
+  let overflowIndices = ofResult.overflowIndices;
+  if (allowedModels && allowedModels.length > 0) {
+    const newOverflowIndices = new Set<number>();
+    const filtered: Target[] = [];
+    for (let i = 0; i < allTargets.length; i++) {
+      if (allowedModels.includes(allTargets[i].backend_model)) {
+        if (overflowIndices.has(i)) newOverflowIndices.add(filtered.length);
+        filtered.push(allTargets[i]);
+      }
+    }
+    allTargets = filtered;
+    overflowIndices = newOverflowIndices;
+    if (allTargets.length === 0) {
+      return { ok: false, errorCode: "no_allowed_model" };
+    }
+  }
+
+  // 5. 工具错误日志提取
+  let pendingToolErrors: FailedToolResult[] | null = null;
+  if (enhancementConfig.tool_error_logging_enabled) {
+    const failures = extractFailedToolResults(body);
+    if (failures.length > 0) {
+      pendingToolErrors = failures;
+    }
+  }
+
+  return { ok: true, cachedTargets: allTargets, overflowIndices, resolveResult, pendingToolErrors };
+}
+
+// ---------- Iteration setup ----------
+
+export type IterationSetupResult =
+  | { ok: true; transportFn: ReturnType<typeof buildTransportFn>; upstreamReqBase: string; pipelineSnapshot: string; resolvedEndpoint: ReturnType<typeof resolveEndpoint>; flushCurrentErrors: () => void }
+  | { ok: false; reply: FastifyReply };
+
+export function buildIterationSetup(params: {
+  formatRegistry: FormatRegistry;
+  pluginRegistry: PluginRegistry;
+  currentBody: Record<string, unknown>;
+  ctxApiType: string;
+  clientApiType: string;
+  provider: NonNullable<ReturnType<typeof getProviderById>>;
+  resolved: Target;
+  upstreamPath: string;
+  encryptionKey: string | null;
+  cliHdrs: RawHeaders;
+  reply: FastifyReply;
+  startTime: number;
+  logId: string;
+  clientModel: string;
+  precomputedClientReq: string;
+  enhancementConfig: ReturnType<typeof loadEnhancementConfig>;
+  tracker: RequestTracker;
+  matcher: RetryRuleMatcher;
+  request: FastifyRequest;
+  adapter: FormatAdapter;
+  proxyAgentFactory?: ProxyAgentFactory;
+  iterationSnapshot: PipelineSnapshot;
+  effectiveMappingReason: MappingReason;
+  isStream: boolean;
+  isFailover: boolean;
+  flushToolErrors: (providerId: string, model: string, reqLogId: string) => void;
+  errors: ProxyErrorFormatter;
+  rCtx: RejectParams;
+}): IterationSetupResult {
+  const {
+    formatRegistry, pluginRegistry, provider, resolved, upstreamPath,
+    cliHdrs, reply, startTime, logId, clientModel,
+    enhancementConfig, tracker, matcher, request, adapter, proxyAgentFactory,
+    iterationSnapshot, effectiveMappingReason, isStream, isFailover, flushToolErrors, errors, rCtx,
+  } = params;
+  let currentBody = params.currentBody;
+  const ctxApiType = params.ctxApiType as ApiType;
+  const clientApiType = params.clientApiType as ApiType;
+
+  // encryptionKey check
+  if (!params.encryptionKey) {
+    return {
+      ok: false,
+      reply: rejectAndReply(reply, rCtx, errors.providerUnavailable(),
+        `Encryption key not configured`, provider.id,
+        () => flushToolErrors(provider.id, resolved.backend_model ?? clientModel, logId)),
+    };
+  }
+
+  const resolvedEndpoint = resolveEndpoint(provider, clientApiType, params.encryptionKey);
+  const flushCurrentErrors = () => flushToolErrors(provider.id, resolved.backend_model ?? clientModel, logId);
+
+  // --- 格式转换 + upstreamPath 决策 ---
+  const resolvedPath = resolveUpstreamPath(formatRegistry, currentBody, ctxApiType, resolvedEndpoint.api_type as ApiType, resolvedEndpoint.upstream_path ?? undefined, upstreamPath, resolved.backend_model ?? clientModel ?? "");
+  currentBody = resolvedPath.body;
+  const effectiveApiType = resolvedPath.effectiveApiType;
+  const effectiveUpstreamPath = resolvedPath.effectiveUpstreamPath;
+  const needsTransform = resolvedPath.needsTransform;
+
+  // --- routing ---
+  currentBody = { ...currentBody, model: resolved.backend_model };
+  iterationSnapshot.add({ stage: "routing", client_model: clientModel, backend_model: resolved.backend_model, provider_id: resolved.provider_id, strategy: isFailover ? "failover" : "scheduled", mapping_reason: effectiveMappingReason });
+
+  // --- Plugin 调整 body 和 headers ---
+  const pluginResult = applyPluginAdjustments(pluginRegistry, currentBody, clientApiType, { id: provider.id, name: provider.name, base_url: resolvedEndpoint.base_url, api_type: resolvedEndpoint.api_type });
+  const injectedHeaders = pluginResult.headers;
+
+  // --- Provider patches ---
+  const providerModels = parseModels(provider.models || "[]");
+  const { body: patchedBody, meta: patchMeta } = applyProviderPatches(currentBody, {
+    base_url: resolvedEndpoint.base_url,
+    api_type: resolvedEndpoint.api_type,
+    models: providerModels,
+  });
+  iterationSnapshot.add({ stage: "provider_patch", types: patchMeta.types });
+
+  // --- API key (resolvedEndpoint.api_key 已解密) ---
+  const apiKey = resolvedEndpoint.api_key;
+
+  // --- beforeSendProxy + Build logging data ---
+  adapter.beforeSendProxy?.(patchedBody, isStream);
+  const reqBodyStr = JSON.stringify(patchedBody);
+  const upstreamReqBase = JSON.stringify({
+    url: buildUpstreamUrl(resolvedEndpoint.base_url, effectiveUpstreamPath),
+    headers: sanitizeHeadersForLog(buildUpstreamHeaders(cliHdrs, apiKey, Buffer.byteLength(reqBodyStr), effectiveApiType)),
+    body: reqBodyStr,
+  });
+
+  // --- Stream transforms ---
+  const formatTransform = needsTransform ? formatRegistry.createStreamTransform(resolvedEndpoint.api_type, ctxApiType, resolved.backend_model) : undefined;
+  if (formatTransform) {
+    formatTransform.on("warning", (err) => request.log.warn({ err, logId }, "formatTransform warning"));
+  }
+
+  const responseTransform = needsTransform ? (bodyStr: string): string => {
+    try {
+      const parsed = JSON.parse(bodyStr) as Record<string, unknown>;
+      if (parsed.type === "error" || parsed.error) {
+        return formatRegistry.transformError(parsed, resolvedEndpoint.api_type, ctxApiType);
+      }
+      let transformed = formatRegistry.transformResponse(parsed, resolvedEndpoint.api_type, ctxApiType);
+      if (pluginRegistry && !isStream) {
+        try {
+          const respCtx: ResponseTransformContext = {
+            response: transformed,
+            sourceApiType: resolvedEndpoint.api_type as "openai" | "openai-responses" | "anthropic",
+            targetApiType: clientApiType,
+            provider: { id: provider.id, name: provider.name, base_url: resolvedEndpoint.base_url, api_type: resolvedEndpoint.api_type },
+          };
+          pluginRegistry.applyBeforeResponse(respCtx);
+          pluginRegistry.applyAfterResponse(respCtx);
+          transformed = respCtx.response;
+        } catch (e: unknown) { /* response hooks best-effort */ void e; }
+      }
+      return JSON.stringify(transformed);
+    } catch (err) {
+      request.log.error({ err }, "responseTransform failed");
+      return bodyStr;
+    }
+  } : undefined;
+
+  // --- Build transport function ---
+  const streamLoopEnabled = enhancementConfig.stream_loop_enabled;
+  const transportFn = buildTransportFn({
+    provider, apiKey, body: patchedBody, cliHdrs, reply, upstreamPath: effectiveUpstreamPath, apiType: effectiveApiType,
+    isStream, startTime, logId, effectiveModel: clientModel,
+    streamTimeoutMs: getModelStreamTimeout(provider, resolved.backend_model),
+    tracker, matcher, request,
+    streamLoopEnabled, formatTransform, responseTransform, injectedHeaders,
+    timeoutContext: { modelId: resolved.backend_model, providerId: provider.id },
+    proxyAgentFactory,
+    resolvedBaseUrl: resolvedEndpoint.base_url,
+  });
+
+  const pipelineSnapshot = iterationSnapshot.toJSON();
+
+  return { ok: true, transportFn, upstreamReqBase, pipelineSnapshot, resolvedEndpoint, flushCurrentErrors };
+}
+
+// ---------- Resilience result processing ----------
+
+export type ResilienceResultAction =
+  | { action: "continue"; trigger: string | null }
+  | { action: "reply"; reply: FastifyReply };
+
+export async function processResilienceResult(params: {
+  orchestrator: ProxyOrchestrator;
+  request: FastifyRequest;
+  reply: FastifyReply;
+  clientApiType: "openai" | "openai-responses" | "anthropic";
+  resolved: Target;
+  provider: NonNullable<ReturnType<typeof getProviderById>>;
+  clientModel: string;
+  isStream: boolean;
+  logId: string;
+  sessionId: string | undefined;
+  clientReq: string;
+  upstreamReqBase: string;
+  effectiveMappingReason: MappingReason;
+  retryBaseDelayMs: number;
+  isFailover: boolean;
+  matcher: RetryRuleMatcher;
+  transportFn: ReturnType<typeof buildTransportFn>;
+  concurrencyOverride: NonNullable<ReturnType<typeof resolveMapping>>['concurrency_override'];
+  db: Database.Database;
+  tracker: RequestTracker;
+  usageWindowTracker: UsageWindowTracker | undefined;
+  errors: ProxyErrorFormatter;
+  rCtx: RejectParams;
+  pipelineSnapshot: string;
+  flushCurrentErrors: () => void;
+  adapter: FormatAdapter;
+  logFileWriter: import("../../storage/log-file-writer.js").LogFileWriter | null | undefined;
+  resolvedEndpoint: ReturnType<typeof resolveEndpoint>;
+  rootLogId: string;
+  isFailoverIteration: boolean;
+  ctx: PipelineContext;
+  routerKeyId: string | null;
+  lastFailoverTrigger: string | null;
+  startTime: number;
+}): Promise<ResilienceResultAction> {
+  const {
+    orchestrator, request, reply, clientApiType,
+    resolved, provider, clientModel, isStream, logId, sessionId,
+    clientReq, upstreamReqBase, concurrencyOverride: _concurrencyOverride, effectiveMappingReason,
+    retryBaseDelayMs, isFailover, matcher, transportFn,
+    db, tracker, usageWindowTracker, errors, rCtx,
+    pipelineSnapshot, flushCurrentErrors, adapter, logFileWriter,
+    resolvedEndpoint, rootLogId, isFailoverIteration, ctx, routerKeyId, lastFailoverTrigger,
+    startTime,
+  } = params;
+
+  try {
+    const resilienceResult = await orchestrator.handle(
+      request, reply, clientApiType,
+      { resolved, provider, clientModel, isStream, trackerId: logId, sessionId, clientRequest: clientReq, upstreamRequest: upstreamReqBase, concurrencyOverride: _concurrencyOverride, mappingReason: effectiveMappingReason },
+      { retryBaseDelayMs, isFailover, ruleMatcher: matcher, transportFn },
+    );
+
+    // 日志记录
+    const lastLogId = logResilienceResult(
+      db,
+      {
+        apiType: clientApiType,
+        model: clientModel, providerId: provider.id, isStream,
+        clientReq, upstreamReqBase, logId, routerKeyId, originalModel: null, sessionId,
+        failover: { isFailoverIteration, rootLogId },
+        pipelineSnapshot,
+        matcher, logFileWriter,
+        resilienceAction: resilienceResult.finalDecision?.action,
+        resilienceReason: resilienceResult.finalDecision?.action === "abort"
+          ? (resilienceResult.finalDecision as { action: "abort"; reason: string }).reason
+          : null,
+        mappingReason: effectiveMappingReason,
+        failoverTrigger: lastFailoverTrigger,
+        upstreamApiType: resolvedEndpoint.api_type,
+        upstreamBaseUrl: resolvedEndpoint.base_url,
+      },
+      resilienceResult.attempts, resilienceResult.result, startTime,
+    );
+    collectTransportMetrics(db, clientApiType, resilienceResult.result, isStream, lastLogId, provider.id, resolved.backend_model, request, routerKeyId, getTransportStatusCode(resilienceResult.result), ctx.metadata.get("client_type") as string | undefined, ctx.metadata.get("session_id") as string | undefined, tracker, ctx.metadata);
+
+    // flush tool errors
+    flushCurrentErrors();
+
+    // Stream timeout
+    if (resilienceResult.result.kind === "stream_abort" && resilienceResult.result.timeoutContext) {
+      const { modelId, providerId } = resilienceResult.result.timeoutContext;
+      const msg = `Stream timeout: no data received for ${resilienceResult.result.timeoutMs}ms (model: ${modelId}, provider: ${providerId})`;
+      const errBody = clientApiType === "anthropic"
+        ? { type: "error", error: { type: "api_error", message: msg } }
+        : { error: { message: msg, type: "server_error", code: "stream_timeout" } };
+      try { reply.raw.write(`data: ${JSON.stringify(errBody)}\n\n`); } catch (e: unknown) { /* client disconnected */ void e; }
+      try { reply.raw.end(); } catch (e: unknown) { /* client disconnected */ void e; }
+    }
+
+    const tr = resilienceResult.result;
+    const succeeded = tr.kind === "success" || tr.kind === "stream_success" || tr.kind === "stream_abort";
+    if (succeeded) usageWindowTracker?.recordRequest(provider.id, routerKeyId ?? undefined);
+
+    // 失败时写入 upstream_error_logs
+    if (!succeeded) {
+      const body = 'body' in tr ? tr.body : '';
+      const { errorType, errorMessage } = extractErrorInfo(body);
+      const trStatusCode = getTransportStatusCode(tr);
+      if (trStatusCode !== null) {
+        logUpstreamError(db, {
+          request_log_id: lastLogId,
+          provider_id: provider.id,
+          backend_model: resolved.backend_model ?? clientModel,
+          status_code: trStatusCode,
+          error_type: errorType,
+          error_message: errorMessage,
+          client_agent_type: ctx.metadata.get("client_type") as string ?? "unknown",
+          router_key_id: routerKeyId,
+          session_id: ctx.metadata.get("session_id") as string | null ?? null,
+          retry_count: resilienceResult.attempts.length - 1,
+        });
+      }
+    }
+
+    // 流式内容日志
+    if (isStream && tracker) {
+      const sc = tracker.get(logId)?.streamContent;
+      const blocks = sc?.blocks;
+      const hasStructured = blocks && blocks.length > 0 && blocks.some((b: { type: string }) => b.type !== "text");
+      const content = hasStructured
+        ? serializeBlocksForStorage(blocks, clientApiType)
+        : (sc?.textContent || "");
+      if (content) {
+        updateLogStreamContent(db, lastLogId, content);
+      }
+    }
+
+    // Failover 场景：如果失败且 headers 未发送，继续下一个 target
+    if (isFailover && !reply.raw.headersSent) {
+      const failed = tr.kind === "throw"
+        || ("statusCode" in tr && tr.statusCode >= HTTP_ERROR_THRESHOLD);
+      if (failed) {
+        const trigger = tr.kind === "throw" ? "throw" : `status_${("statusCode" in tr ? tr.statusCode : 0)}`;
+        return { action: "continue", trigger };
+      }
+    }
+
+    // 发送响应（orchestrator 对部分场景不发送）
+    if (!reply.raw.headersSent) {
+      if (tr.kind === "success") {
+        return { action: "reply", reply: reply.code(tr.statusCode).send(tr.body) };
+      }
+      if (tr.kind === "stream_error") {
+        const trStatus = getTransportStatusCode(tr);
+        if (trStatus !== null) updateLogClientStatus(db, lastLogId, trStatus);
+        const formattedBody = adapter.formatError(
+          'body' in tr ? tr.body : "stream error",
+        ) ?? { error: { message: "stream error", type: "server_error" } };
+        reply.header("content-type", "application/json");
+        return { action: "reply", reply: reply.code(tr.statusCode).send(formattedBody) };
+      }
+      if (tr.kind === "throw" || (tr.kind === "error" && tr.statusCode >= HTTP_ERROR_THRESHOLD)) {
+        const err = errors.upstreamConnectionFailed();
+        updateLogClientStatus(db, lastLogId, err.statusCode);
+        return { action: "reply", reply: reply.code(err.statusCode).send(err.body) };
+      }
+      // 未知 TransportResult kind 的兜底响应
+      return { action: "reply", reply: reply.code(UPSTREAM_ERROR_STATUS).send(
+        adapter.formatError("Unhandled transport result") ?? { error: { message: "Unhandled transport result", type: "server_error" } },
+      ) };
+    }
+
+    return { action: "reply", reply };
+  } catch (e: unknown) {
+    if (e instanceof PipelineAbort) {
+      return { action: "reply", reply: reply.code(e.statusCode).send(e.body) };
+    }
+
+    if (e instanceof ProviderSwitchNeeded) {
+      if (reply.raw.headersSent) return { action: "reply", reply };
+      // 补写失败日志
+      if (e.attempts && e.attempts.length > 0) {
+        const fakeResult = e.lastResult ?? { kind: "throw" as const, error: new Error("provider switch") };
+        logResilienceResult(
+          db,
+          {
+            apiType: clientApiType,
+            model: clientModel, providerId: provider.id, isStream,
+            clientReq, upstreamReqBase, logId, routerKeyId, originalModel: null, sessionId,
+            failover: { isFailoverIteration, rootLogId },
+            pipelineSnapshot,
+            matcher, logFileWriter,
+            resilienceAction: "failover",
+            resilienceReason: "provider_switch_needed",
+            mappingReason: effectiveMappingReason,
+            failoverTrigger: e.constructor.name,
+            upstreamApiType: resolvedEndpoint.api_type,
+            upstreamBaseUrl: resolvedEndpoint.base_url,
+          },
+          e.attempts, fakeResult, startTime,
+        );
+      }
+      flushCurrentErrors();
+      return { action: "continue", trigger: e.constructor.name };
+    }
+
+    if (e instanceof SemaphoreQueueFullError) {
+      return {
+        action: "reply",
+        reply: rejectAndReply(reply, rCtx, errors.concurrencyQueueFull(provider.id),
+          `Concurrency queue full for provider '${provider.id}'`, provider.id,
+          flushCurrentErrors),
+      };
+    }
+    if (e instanceof SemaphoreTimeoutError) {
+      return {
+        action: "reply",
+        reply: rejectAndReply(reply, rCtx, errors.concurrencyTimeout(provider.id, (e as SemaphoreTimeoutError).timeoutMs),
+          `Concurrency wait timeout for provider '${provider.id}' (${(e as SemaphoreTimeoutError).timeoutMs}ms)`, provider.id,
+          flushCurrentErrors),
+      };
+    }
+
+    // 请求被主动 kill（abort + reply destroy），直接退出不写日志
+    if (e instanceof Error && e.name === "AbortError") {
+      return { action: "reply", reply };
+    }
+
+    // 其他未知错误
+    const errMsg = e instanceof Error ? e.message : JSON.stringify(e);
+    request.log.debug({ logId, error: errMsg, action: "upstream_error" });
+    insertRequestLog(db, {
+      id: logId, api_type: clientApiType,
+      model: clientModel, provider_id: provider.id,
+      status_code: UPSTREAM_ERROR_STATUS, latency_ms: Date.now() - startTime, is_stream: isStream ? 1 : 0,
+      error_message: errMsg || "Upstream connection failed", created_at: new Date().toISOString(),
+      client_request: clientReq, upstream_request: upstreamReqBase,
+      is_failover: isFailoverIteration ? 1 : 0, original_request_id: isFailoverIteration ? rootLogId : null,
+      router_key_id: routerKeyId, original_model: null,
+      session_id: ctx.metadata.get("session_id") as string | undefined,
+      pipeline_snapshot: pipelineSnapshot,
+      transport_kind: "throw",
+      mapping_reason: rCtx.mappingReason ?? null,
+      upstream_api_type: resolvedEndpoint.api_type,
+      upstream_base_url: resolvedEndpoint.base_url,
+    }, (matcher || logFileWriter) ? {
+      matcher, logFileWriter, responseBody: null,
+    } : undefined);
+    flushCurrentErrors();
+    const err = errors.upstreamConnectionFailed();
+    return { action: "reply", reply: reply.code(err.statusCode).send(err.body) };
+  }
 }
 
 // ---------- Main failover loop ----------
@@ -138,7 +602,6 @@ function rejectAndReply(
  * 执行 failover 循环。每次迭代通过 pipeline 处理请求，
  * 失败时将 target 加入 excludeTargets 并继续。
  */
-// eslint-disable-next-line max-lines-per-function
 export async function executeFailoverLoop(
   ctx: PipelineContext,
   errors: ProxyErrorFormatter,
@@ -182,89 +645,52 @@ export async function executeFailoverLoop(
   const sanitizedClientHeaders = sanitizeHeadersForLog(cliHdrs as Record<string, string>);
   const precomputedClientReq = JSON.stringify({ headers: sanitizedClientHeaders, body: rawBody });
 
-  // BP-H3: 请求级 API Key 缓存，避免同一 provider 重复解密
-  const decryptedApiKeys = new Map<string, string>();
+  // BP-H3: encryptionKey 用于 resolveEndpoint 解密
   const encryptionKey = getSetting(db, "encryption_key");
 
   // === 循环前：路由决策（resolveMapping → IR → OF 分层预计算） ===
-
   const precomputeSnapshot = new PipelineSnapshot();
-
-  // 1. resolveMapping — 只调一次，不传 excludeTargets（exclude 在循环内处理）
-  const resolveResult = resolveMapping(db, clientModel, { now: new Date() });
+  const precomputeResult = precomputeFailoverTargets({
+    db, clientModel: ctx.clientModel, body: ctx.body,
+    precomputeSnapshot,
+    allowedModels: request.routerKey?.allowed_models ?? undefined,
+    enhancementConfig,
+  });
 
   // resolveMapping 返回 null 时，需要用占位 snapshot 做错误日志
   const rejectSnapshot = new PipelineSnapshot();
 
-  if (!resolveResult) {
-    const logId = randomUUID();
-    const startTime = Date.now();
-    const isStream = (ctx.body as Record<string, unknown>).stream === true;
-    const rCtx: RejectParams = {
-      db, logId, apiType: ctx.apiType, model: clientModel,
-      startTime, isStream, routerKeyId: request.routerKey?.id ?? null, originalBody: rawBody, clientHeaders: cliHdrs,
-      isFailover: false, originalRequestId: null,
-      sessionId: ctx.metadata.get("session_id") as string | undefined,
-      pipelineSnapshot: rejectSnapshot.toJSON(),
-      matcher, logFileWriter,
-    };
-    return rejectAndReply(reply, rCtx, errors.modelNotFound(clientModel), `No mapping found for model '${clientModel}'`);
+  /** 构建 RejectParams，消除 4 处重复构造 */
+  const buildRejectCtx = (logId: string, snapshot: PipelineSnapshot, overrides?: Partial<RejectParams>): RejectParams => ({
+    db, logId, apiType: ctx.apiType, model: clientModel,
+    startTime: Date.now(),
+    isStream: (ctx.body as Record<string, unknown>).stream === true,
+    routerKeyId: request.routerKey?.id ?? null,
+    originalBody: rawBody, clientHeaders: cliHdrs,
+    isFailover: false, originalRequestId: null,
+    sessionId: ctx.metadata.get("session_id") as string | undefined,
+    pipelineSnapshot: snapshot.toJSON(),
+    matcher, logFileWriter,
+    ...overrides,
+  });
+
+  if (!precomputeResult.ok) {
+    if (precomputeResult.errorCode === "no_mapping") {
+      return rejectAndReply(reply, buildRejectCtx(randomUUID(), rejectSnapshot), errors.modelNotFound(clientModel), `No mapping found for model '${clientModel}'`);
+    }
+    if (precomputeResult.errorCode === "unsupported_modality") {
+      return rejectAndReply(reply, buildRejectCtx(randomUUID(), precomputeSnapshot), errors.unsupportedModality(),
+        `No eligible target: request modalities not supported by any available model`);
+    }
+    return rejectAndReply(reply, buildRejectCtx(randomUUID(), precomputeSnapshot), errors.modelNotAllowed(clientModel),
+      `No allowed model available for '${clientModel}'`);
   }
 
-  let allTargets = resolveResult.allTargets ?? [resolveResult.target];
+  const { cachedTargets, overflowIndices, resolveResult } = precomputeResult;
   const concurrencyOverride = resolveResult.concurrency_override;
-
-  // 2. modality-redirect 层：模态重定向 → 可能 prepend fallback target
-  allTargets = computeModalityRedirectTargets(db, allTargets, clientModel, ctx.body, precomputeSnapshot);
-
-  // 3. OF 层：为每个 target 预计算 overflow
-  const targetsBeforeOF = allTargets.length;
-  const ofResult = expandOverflowTargets(allTargets, db, ctx.body);
-  allTargets = ofResult.targets;
-  precomputeSnapshot.add({ stage: "overflow", triggered: allTargets.length > targetsBeforeOF });
-
-  // 4. allowed_models 过滤：MRL fallback 和 overflow 扩展的 target 也必须受约束
-  const allowedModels = request.routerKey?.allowed_models;
-  let overflowIndices = ofResult.overflowIndices;
-  if (allowedModels && allowedModels.length > 0) {
-    // 重建 overflowIndices：filter 会改变 index，需同步更新
-    const newOverflowIndices = new Set<number>();
-    const filtered: Target[] = [];
-    for (let i = 0; i < allTargets.length; i++) {
-      if (allowedModels.includes(allTargets[i].backend_model)) {
-        if (overflowIndices.has(i)) newOverflowIndices.add(filtered.length);
-        filtered.push(allTargets[i]);
-      }
-    }
-    allTargets = filtered;
-    overflowIndices = newOverflowIndices;
-    if (allTargets.length === 0) {
-      const logId = randomUUID();
-      const startTime = Date.now();
-      const isStream = (ctx.body as Record<string, unknown>).stream === true;
-      const rCtx: RejectParams = {
-        db, logId, apiType: ctx.apiType, model: clientModel,
-        startTime, isStream, routerKeyId: request.routerKey?.id ?? null, originalBody: rawBody, clientHeaders: cliHdrs,
-        isFailover: false, originalRequestId: null,
-        sessionId: ctx.metadata.get("session_id") as string | undefined,
-        pipelineSnapshot: precomputeSnapshot.toJSON(),
-        matcher, logFileWriter,
-      };
-      return rejectAndReply(reply, rCtx, errors.modelNotAllowed(clientModel),
-        `No allowed model available for '${clientModel}'`);
-    }
-  }
-
-  // 预计算完成，缓存到循环外
-  const cachedTargets = allTargets;
-
-  // 工具错误日志提取（循环外一次性执行）
-  if (enhancementConfig.tool_error_logging_enabled) {
-    const failures = extractFailedToolResults(ctx.body);
-    if (failures.length > 0) {
-      request.log.info({ failures: failures.length, sessionId: ctx.metadata.get("session_id") }, "Tool error results detected");
-      pendingToolErrors = failures;
-    }
+  pendingToolErrors = precomputeResult.pendingToolErrors;
+  if (pendingToolErrors) {
+    request.log.info({ failures: pendingToolErrors.length, sessionId: ctx.metadata.get("session_id") }, "Tool error results detected");
   }
 
   // === while(true)：纯执行循环 ===
@@ -286,18 +712,15 @@ export async function executeFailoverLoop(
     const routerKeyId = request.routerKey?.id ?? null;
 
     // 浅拷贝：后续操作只修改顶层属性（model），嵌套对象不被修改
-    let currentBody = { ...ctx.body };
+    const currentBody = { ...ctx.body };
     const isStream = currentBody.stream === true;
     const iterationSnapshot = new PipelineSnapshot(precomputeSnapshot.getStages());
 
-    const rCtx: RejectParams = {
-      db, logId, apiType: ctx.apiType, model: clientModel,
-      startTime, isStream, routerKeyId, originalBody: rawBody, clientHeaders: cliHdrs,
-      isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null,
-      sessionId: ctx.metadata.get("session_id") as string | undefined,
-      pipelineSnapshot: iterationSnapshot.toJSON(),
-      matcher, logFileWriter,
-    };
+    const rCtx: RejectParams = buildRejectCtx(logId, iterationSnapshot, {
+      startTime,
+      isFailover: isFailoverIteration,
+      originalRequestId: isFailoverIteration ? rootLogId : null,
+    });
 
     // --- 选第一个非 excluded target ---
     const filtered = filterExcluded(cachedTargets, excludeTargets);
@@ -338,297 +761,66 @@ export async function executeFailoverLoop(
       continue;
     }
 
-
-    // 当前迭代的工具错误刷新闭包（统一 6 处调用）
-    const flushCurrentErrors = () => flushToolErrors(provider.id, resolved.backend_model ?? clientModel, logId);
-
-    // --- 格式转换 + upstreamPath 决策 ---
-    const resolvedPath = resolveUpstreamPath(formatRegistry, currentBody, ctx.apiType as ApiType, provider.api_type as ApiType, provider.upstream_path ?? undefined, upstreamPath, resolved.backend_model ?? clientModel ?? "");
-    currentBody = resolvedPath.body;
-    const effectiveApiType = resolvedPath.effectiveApiType;
-    const effectiveUpstreamPath = resolvedPath.effectiveUpstreamPath;
-    const needsTransform = resolvedPath.needsTransform;
-
-    // --- routing ---
-    currentBody = { ...currentBody, model: resolved.backend_model };
-    iterationSnapshot.add({ stage: "routing", client_model: clientModel, backend_model: resolved.backend_model, provider_id: resolved.provider_id, strategy: cachedTargets.length > 1 ? "failover" : "scheduled", mapping_reason: effectiveMappingReason });
-
-    // --- Plugin 调整 body 和 headers ---
-    const pluginResult = applyPluginAdjustments(pluginRegistry, currentBody, clientApiType, provider);
-    const injectedHeaders = pluginResult.headers;
-
-    // --- Provider patches ---
-    const providerModels = parseModels(provider.models || "[]");
-    const { body: patchedBody, meta: patchMeta } = applyProviderPatches(currentBody, {
-      base_url: provider.base_url,
-      api_type: provider.api_type,
-      models: providerModels,
-    });
-    iterationSnapshot.add({ stage: "provider_patch", types: patchMeta.types });
-
-    // --- API key ---
-    if (!encryptionKey) {
-      return rejectAndReply(reply, rCtx, errors.providerUnavailable(),
-        `Encryption key not configured`, provider.id,
-        flushCurrentErrors);
-    }
-    let apiKey = decryptedApiKeys.get(provider.id);
-    if (!apiKey) {
-      apiKey = decrypt(provider.api_key, encryptionKey);
-      decryptedApiKeys.set(provider.id, apiKey);
-    }
-
-    // --- beforeSendProxy + Build logging data ---
-    adapter.beforeSendProxy?.(patchedBody, isStream);
-    const reqBodyStr = JSON.stringify(patchedBody);
-    const clientReq = precomputedClientReq;
-    const upstreamReqBase = JSON.stringify({
-      url: buildUpstreamUrl(provider.base_url, effectiveUpstreamPath),
-      headers: sanitizeHeadersForLog(buildUpstreamHeaders(cliHdrs, apiKey, Buffer.byteLength(reqBodyStr), effectiveApiType)),
-      body: reqBodyStr,
-    });
-
-    // --- Stream transforms ---
-    // source=上游格式, target=客户端格式 — 流从上游流向客户端需要反向转换
-    const formatTransform = needsTransform ? formatRegistry.createStreamTransform(provider.api_type, ctx.apiType, resolved.backend_model) : undefined;
-    if (formatTransform) {
-      formatTransform.on("warning", (err) => request.log.warn({ err, logId }, "formatTransform warning"));
-    }
-
-    const responseTransform = needsTransform ? (bodyStr: string): string => {
-      try {
-        const parsed = JSON.parse(bodyStr) as Record<string, unknown>;
-        if (parsed.type === "error" || parsed.error) {
-          return formatRegistry.transformError(parsed, provider.api_type, ctx.apiType);
-        }
-        let transformed = formatRegistry.transformResponse(parsed, provider.api_type, ctx.apiType);
-        if (pluginRegistry && !isStream) {
-          try {
-            const respCtx: ResponseTransformContext = {
-              response: transformed,
-              sourceApiType: provider.api_type as "openai" | "openai-responses" | "anthropic",
-              targetApiType: clientApiType,
-              provider: { id: provider.id, name: provider.name, base_url: provider.base_url, api_type: provider.api_type },
-            };
-            pluginRegistry.applyBeforeResponse(respCtx);
-            pluginRegistry.applyAfterResponse(respCtx);
-            transformed = respCtx.response;
-          } catch { /* response hooks best-effort */ } // eslint-disable-line taste/no-silent-catch
-        }
-        return JSON.stringify(transformed);
-      } catch (err) {
-        request.log.error({ err }, "responseTransform failed");
-        return bodyStr;
-      }
-    } : undefined;
-
-    // --- Build transport function ---
-    const streamLoopEnabled = enhancementConfig.stream_loop_enabled;
-    const transportFn = buildTransportFn({
-      provider, apiKey, body: patchedBody, cliHdrs, reply, upstreamPath: effectiveUpstreamPath, apiType: effectiveApiType,
-      isStream, startTime, logId, effectiveModel: clientModel,
-      streamTimeoutMs: getModelStreamTimeout(provider, resolved.backend_model),
-      tracker, matcher, request,
-      streamLoopEnabled, formatTransform, responseTransform, injectedHeaders,
-      timeoutContext: { modelId: resolved.backend_model, providerId: provider.id },
-      proxyAgentFactory: deps.proxyAgentFactory,
-    });
-
-    const pipelineSnapshot = iterationSnapshot.toJSON();
-
-    // --- Execute through orchestrator ---
+    // --- resolveEndpoint + setup (异常时 failover 到下一个 target) ---
     try {
-      const resilienceResult = await orchestrator.handle(
-        request, reply, clientApiType,
-        { resolved, provider, clientModel, isStream, trackerId: logId, sessionId: ctx.metadata.get("session_id") as string | undefined, clientRequest: clientReq, upstreamRequest: upstreamReqBase, concurrencyOverride, mappingReason: effectiveMappingReason },
-        { retryBaseDelayMs: config.RETRY_BASE_DELAY_MS, isFailover, ruleMatcher: matcher, transportFn },
-      );
+      const setupResult = buildIterationSetup({
+        formatRegistry, pluginRegistry, currentBody,
+        ctxApiType: ctx.apiType, clientApiType,
+        provider, resolved, upstreamPath, encryptionKey,
+        cliHdrs, reply, startTime, logId, clientModel,
+        precomputedClientReq, enhancementConfig,
+        tracker, matcher, request, adapter,
+        proxyAgentFactory: deps.proxyAgentFactory,
+        iterationSnapshot, effectiveMappingReason, isStream, isFailover,
+        flushToolErrors, errors, rCtx,
+      });
+      if (!setupResult.ok) return setupResult.reply;
 
-      // 日志记录
-      const lastLogId = logResilienceResult(
-        db,
-        {
-          apiType: clientApiType,
-          model: clientModel, providerId: provider.id, isStream,
-          clientReq, upstreamReqBase, logId, routerKeyId, originalModel: null, sessionId: ctx.metadata.get("session_id") as string | undefined,
-          failover: { isFailoverIteration, rootLogId: rootLogId! },
-          pipelineSnapshot,
-          matcher, logFileWriter,
-          resilienceAction: resilienceResult.finalDecision?.action,
-          resilienceReason: resilienceResult.finalDecision?.action === "abort"
-            ? (resilienceResult.finalDecision as { action: "abort"; reason: string }).reason
-            : null,
-          mappingReason: effectiveMappingReason,
-          failoverTrigger: lastFailoverTrigger,
-        },
-        resilienceResult.attempts, resilienceResult.result, startTime,
-      );
-      collectTransportMetrics(db, clientApiType, resilienceResult.result, isStream, lastLogId, provider.id, resolved.backend_model, request, routerKeyId, getTransportStatusCode(resilienceResult.result), ctx.metadata.get("client_type") as string | undefined, ctx.metadata.get("session_id") as string | undefined, tracker, ctx.metadata);
+      const resultAction = await processResilienceResult({
+        orchestrator, request, reply, clientApiType,
+        resolved, provider, clientModel, isStream, logId,
+        sessionId: ctx.metadata.get("session_id") as string | undefined,
+        clientReq: precomputedClientReq, upstreamReqBase: setupResult.upstreamReqBase,
+        concurrencyOverride, effectiveMappingReason,
+        retryBaseDelayMs: config.RETRY_BASE_DELAY_MS,
+        isFailover, matcher, transportFn: setupResult.transportFn,
+        db, tracker, usageWindowTracker, errors, rCtx,
+        pipelineSnapshot: setupResult.pipelineSnapshot,
+        flushCurrentErrors: setupResult.flushCurrentErrors,
+        adapter, logFileWriter, resolvedEndpoint: setupResult.resolvedEndpoint,
+        rootLogId: rootLogId!, isFailoverIteration,
+        ctx, routerKeyId, lastFailoverTrigger, startTime,
+      });
 
-      // flush tool errors
-      flushToolErrors(provider.id, resolved.backend_model ?? clientModel, lastLogId);
-
-      // Stream timeout
-      if (resilienceResult.result.kind === "stream_abort" && resilienceResult.result.timeoutContext) {
-        const { modelId, providerId } = resilienceResult.result.timeoutContext;
-        const msg = `Stream timeout: no data received for ${resilienceResult.result.timeoutMs}ms (model: ${modelId}, provider: ${providerId})`;
-        const errBody = clientApiType === "anthropic"
-          ? { type: "error", error: { type: "api_error", message: msg } }
-          : { error: { message: msg, type: "server_error", code: "stream_timeout" } };
-        try { reply.raw.write(`data: ${JSON.stringify(errBody)}\n\n`); } catch { /* client disconnected */ } // eslint-disable-line taste/no-silent-catch
-        try { reply.raw.end(); } catch { /* client disconnected */ } // eslint-disable-line taste/no-silent-catch
-      }
-
-      const tr = resilienceResult.result;
-      const succeeded = tr.kind === "success" || tr.kind === "stream_success" || tr.kind === "stream_abort";
-      if (succeeded) usageWindowTracker?.recordRequest(provider.id, routerKeyId ?? undefined);
-
-      // 失败时写入 upstream_error_logs
-      if (!succeeded) {
-        const body = 'body' in tr ? tr.body : '';
-        const { errorType, errorMessage } = extractErrorInfo(body);
-        const trStatusCode = getTransportStatusCode(tr);
-        if (trStatusCode !== null) {
-          logUpstreamError(db, {
-            request_log_id: lastLogId,
-            provider_id: provider.id,
-            backend_model: resolved.backend_model ?? clientModel,
-            status_code: trStatusCode,
-            error_type: errorType,
-            error_message: errorMessage,
-            client_agent_type: ctx.metadata.get("client_type") as string ?? "unknown",
-            router_key_id: routerKeyId,
-            session_id: ctx.metadata.get("session_id") as string | null ?? null,
-            retry_count: resilienceResult.attempts.length - 1,
-          });
-        }
-      }
-
-      // 流式内容日志
-      if (isStream && tracker) {
-        const sc = tracker.get(logId)?.streamContent;
-        const blocks = sc?.blocks;
-        const hasStructured = blocks && blocks.length > 0 && blocks.some((b: { type: string }) => b.type !== "text");
-        const content = hasStructured
-          ? serializeBlocksForStorage(blocks, clientApiType)
-          : (sc?.textContent || "");
-        if (content) {
-          updateLogStreamContent(db, lastLogId, content);
-        }
-      }
-
-      // Failover 场景：如果失败且 headers 未发送，继续下一个 target
-      if (isFailover && !reply.raw.headersSent) {
-        const failed = tr.kind === "throw"
-          || ("statusCode" in tr && tr.statusCode >= HTTP_ERROR_THRESHOLD);
-        if (failed) {
-          lastFailoverTrigger = tr.kind === "throw" ? "throw" : `status_${("statusCode" in tr ? tr.statusCode : 0)}`;
-          excludeTargets.push(resolved);
-          continue;
-        }
-      }
-
-      // 发送响应（orchestrator 对部分场景不发送）
-      if (!reply.raw.headersSent) {
-        if (tr.kind === "success") {
-          return reply.code(tr.statusCode).send(tr.body);
-        }
-        if (tr.kind === "stream_error") {
-          // stream_error + headersSent 已在 orchestrator.sendResponse 中处理
-          // 此处为 !headersSent 分支：格式化错误体并发送
-          const trStatus = getTransportStatusCode(tr);
-          if (trStatus !== null) updateLogClientStatus(db, lastLogId, trStatus);
-          const formattedBody = adapter.formatError(
-            'body' in tr ? tr.body : "stream error",
-          ) ?? { error: { message: "stream error", type: "server_error" } };
-          reply.header("content-type", "application/json");
-          return reply.code(tr.statusCode).send(formattedBody);
-        }
-        if (tr.kind === "throw" || (tr.kind === "error" && tr.statusCode >= HTTP_ERROR_THRESHOLD)) {
-          const err = errors.upstreamConnectionFailed();
-          updateLogClientStatus(db, lastLogId, err.statusCode);
-          return reply.code(err.statusCode).send(err.body);
-        }
-        // 未知 TransportResult kind 的兜底响应
-        return reply.code(UPSTREAM_ERROR_STATUS).send(
-          adapter.formatError("Unhandled transport result") ?? { error: { message: "Unhandled transport result", type: "server_error" } },
-        );
-      }
-
-      return reply;
-    } catch (e: unknown) {
-      if (e instanceof PipelineAbort) {
-        return reply.code(e.statusCode).send(e.body);
-      }
-
-      if (e instanceof ProviderSwitchNeeded) {
-        if (reply.raw.headersSent) return reply;
-        // 补写失败日志
-        if (e.attempts && e.attempts.length > 0) {
-          const fakeResult = e.lastResult ?? { kind: "throw" as const, error: new Error("provider switch") };
-          logResilienceResult(
-            db,
-            {
-              apiType: clientApiType,
-              model: clientModel, providerId: provider.id, isStream,
-              clientReq, upstreamReqBase, logId, routerKeyId, originalModel: null, sessionId: ctx.metadata.get("session_id") as string | undefined,
-              failover: { isFailoverIteration, rootLogId: rootLogId! },
-              pipelineSnapshot,
-              matcher, logFileWriter,
-              resilienceAction: "failover",
-              resilienceReason: "provider_switch_needed",
-              mappingReason: effectiveMappingReason,
-              failoverTrigger: e.constructor.name,
-            },
-            e.attempts, fakeResult, startTime,
-          );
-        }
-        flushCurrentErrors();
-        lastFailoverTrigger = e.constructor.name;
+      if (resultAction.action === "continue") {
+        lastFailoverTrigger = resultAction.trigger;
         excludeTargets.push(resolved);
         continue;
       }
-
-      if (e instanceof SemaphoreQueueFullError) {
-        return rejectAndReply(reply, rCtx, errors.concurrencyQueueFull(provider.id),
-          `Concurrency queue full for provider '${provider.id}'`, provider.id,
-          flushCurrentErrors);
-      }
-      if (e instanceof SemaphoreTimeoutError) {
-        return rejectAndReply(reply, rCtx, errors.concurrencyTimeout(provider.id, (e as SemaphoreTimeoutError).timeoutMs),
-          `Concurrency wait timeout for provider '${provider.id}' (${(e as SemaphoreTimeoutError).timeoutMs}ms)`, provider.id,
-          flushCurrentErrors);
-      }
-
-      // 请求被主动 kill（abort + reply destroy），直接退出不写日志
-      if (e instanceof Error && e.name === "AbortError") {
-        return reply;
-      }
-
-      // 其他未知错误
-      const errMsg = e instanceof Error ? e.message : JSON.stringify(e);
-      request.log.debug({ logId, error: errMsg, action: "upstream_error" });
-      insertRequestLog(db, {
-        id: logId, api_type: clientApiType,
-        model: clientModel, provider_id: provider.id,
-        status_code: UPSTREAM_ERROR_STATUS, latency_ms: Date.now() - startTime, is_stream: isStream ? 1 : 0,
-        error_message: errMsg || "Upstream connection failed", created_at: new Date().toISOString(),
-        client_request: clientReq, upstream_request: upstreamReqBase,
-        is_failover: isFailoverIteration ? 1 : 0, original_request_id: isFailoverIteration ? rootLogId : null,
-        router_key_id: routerKeyId, original_model: null,
-        session_id: ctx.metadata.get("session_id") as string | undefined,
-        pipeline_snapshot: pipelineSnapshot,
-        transport_kind: "throw",
+      return resultAction.reply;
+    } catch (setupErr: unknown) {
+      // resolveEndpoint 或 setup 阶段异常 → failover 到下一个 target
+      const errMsg = setupErr instanceof Error ? setupErr.message : JSON.stringify(setupErr);
+      request.log.error({ logId, error: errMsg, providerId: resolved.provider_id, action: "endpoint_setup_failed" }, "resolveEndpoint/setup failed");
+      insertRejectedLog({
+        db, logId, apiType: clientApiType as "openai" | "openai-responses" | "anthropic",
+        model: clientModel, statusCode: UPSTREAM_ERROR_STATUS,
+        errorMessage: `Endpoint setup failed: ${errMsg}`,
+        startTime, isStream, routerKeyId,
+        originalBody: rawBody, clientHeaders: cliHdrs,
+        providerId: resolved.provider_id, originalModel: null,
+        isFailover: isFailoverIteration, originalRequestId: isFailoverIteration ? rootLogId : null,
+        sessionId: ctx.metadata.get("session_id") as string | undefined,
+        pipelineSnapshot: iterationSnapshot.toJSON(),
+        matcher, logFileWriter,
         mapping_reason: rCtx.mappingReason ?? null,
-      }, (matcher || logFileWriter) ? {
-        matcher, logFileWriter, responseBody: null,
-      } : undefined);
-      flushCurrentErrors();
-      const err = errors.upstreamConnectionFailed();
-      return reply.code(err.statusCode).send(err.body);
+      });
+      excludeTargets.push(resolved);
+      continue;
     }
   }
 }
+
 
 // --- 格式转换 + upstreamPath 决策 ---
 function resolveUpstreamPath(

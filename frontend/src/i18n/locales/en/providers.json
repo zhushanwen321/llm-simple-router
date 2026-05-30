@@ -32,7 +32,8 @@
     "models": "Models",
     "concurrency": "Concurrency",
     "status": "Status",
-    "actions": "Actions"
+    "actions": "Actions",
+    "apiType": "API Type"
   },
   "template": {
     "title": "Template Selection",
@@ -75,7 +76,8 @@
     "upstreamPathPlaceholder": "Default: /v1/chat/completions or /v1/messages",
     "upstreamPathHint": "Leave empty for API type default path",
     "timeoutLabel": "Timeout(s)",
-    "timeoutPlaceholder": "Default"
+    "timeoutPlaceholder": "Default",
+    "sharedKeyHint": "Default fallback key for endpoints. Leave empty to keep original."
   },
   "concurrency": {
     "title": "Concurrency Control",
@@ -111,7 +113,8 @@
     "apiKeyRequired": "Please enter API Key",
     "concurrencyRange": "Range {min}-{max}",
     "negativeNotAllowed": "Cannot be negative",
-    "queueSizeRange": "Range {min}-{max}"
+    "queueSizeRange": "Range {min}-{max}",
+    "duplicateApiType": "API types must be unique within a provider"
   },
   "confirmDelete": {
     "title": "Confirm Delete",
@@ -174,11 +177,27 @@
     "sourceUpstream": "Upstream",
     "sourcePreset": "Preset"
   },
+  "endpoints": {
+    "title": "Endpoints",
+    "add": "Add Endpoint",
+    "useSharedKey": "Use shared API Key",
+    "apiKeyPlaceholder": "Enter API Key",
+    "hint": "Each API type can only have one endpoint. Leave API Key empty to use the shared key.",
+    "apiTypes": {
+      "openai": "OpenAI",
+      "openai-responses": "Responses",
+      "anthropic": "Anthropic"
+    },
+    "showPerEndpointKeys": "Set API Key per endpoint",
+    "hidePerEndpointKeys": "Hide per-endpoint API Keys",
+    "allUseSharedKey": "All endpoints use the shared key",
+    "customKeySet": "Custom key set"
+  },
   "capabilities": {
-  "label": "Capabilities",
-  "text": "Text",
-  "image": "Image",
-  "audio": "Audio",
-  "video": "Video"
+    "label": "Capabilities",
+    "text": "Text",
+    "image": "Image",
+    "audio": "Audio",
+    "video": "Video"
   }
 }
