@@ -1,0 +1,142 @@
+{
+  "test_execution": [
+    {
+      "caseId": "TC-1-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run tests/adaptive-controller.test.ts --reporter=verbose",
+        "AC-1 suite: 'init(max=0) clamps to max=1, currentLimit=1' — PASS",
+        "AC-1 suite: 'deriveProfile(1,1) returns valid numerics' — PASS",
+        "AC-1 suite: 'init(max=NaN) clamps to max=1' — PASS",
+        "AC-1 suite: 'init(max=undefined) clamps to max=1' — PASS",
+        "AC-1 suite: 'init(max=-1) clamps to max=1' — PASS"
+      ],
+      "evidence": "62 tests passed, 0 failed (vitest output)"
+    },
+    {
+      "caseId": "TC-1-02",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run tests/adaptive-controller.test.ts --reporter=verbose",
+        "AC-1 suite: 'syncProvider(max_concurrency=0) clamps to 1' — PASS",
+        "AC-1 suite: 'syncProvider(max_concurrency=NaN) clamps to 1' — PASS"
+      ],
+      "evidence": "62 tests passed, 0 failed (vitest output)"
+    },
+    {
+      "caseId": "TC-2-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run tests/adaptive-controller.test.ts --reporter=verbose",
+        "AC-2 suite: 'limit=8 (high watermark) climbs without wasQueued' — PASS",
+        "AC-2 suite: 'limit=6 climbs without wasQueued' — PASS"
+      ],
+      "evidence": "62 tests passed, 0 failed (vitest output)"
+    },
+    {
+      "caseId": "TC-3-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run tests/adaptive-controller.test.ts --reporter=verbose",
+        "AC-3 suite: 'successes accumulate and climb during cooldown' — PASS",
+        "AC-3 suite: '429 during cooldown is blocked (no further drop)' — PASS",
+        "AC-3 suite: '5xx during cooldown is blocked (no failure count)' — PASS"
+      ],
+      "evidence": "62 tests passed, 0 failed (vitest output)"
+    },
+    {
+      "caseId": "TC-4-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run tests/adaptive-controller.test.ts --reporter=verbose",
+        "AC-4 suite: '429 drops exactly 1: limit=6→5' — PASS",
+        "AC-4 suite: '429 drops exactly 1: limit=3→2' — PASS",
+        "AC-4 suite: '429 drops exactly 1: limit=2→1' — PASS",
+        "AC-4 suite: '429 at limit=1 stays at 1 (ADAPTIVE_MIN)' — PASS",
+        "AC-4 suite: '429 at max=1 stays at 1' — PASS",
+        "AC-4 suite: '429 enters cooldown' — PASS",
+        "AC-4 suite: '429 syncs to semaphore' — PASS"
+      ],
+      "evidence": "62 tests passed, 0 failed (vitest output)"
+    },
+    {
+      "caseId": "TC-5-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run tests/adaptive-controller.test.ts --reporter=verbose",
+        "AC-5 suite: 'at max: consecutiveSuccesses halved instead of reset' — PASS (5→2)",
+        "AC-5 suite: 'at max: subsequent climb needs fewer successes' — PASS",
+        "AC-5 suite: 'below max: consecutiveSuccesses resets to 0 on climb' — PASS"
+      ],
+      "evidence": "62 tests passed, 0 failed (vitest output)"
+    },
+    {
+      "caseId": "TC-6-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run tests/adaptive-controller.test.ts --reporter=verbose",
+        "AC-6 suite: '10 rapid 429s only drop 1 slot (cooldown protection)' — PASS (10→9)"
+      ],
+      "evidence": "62 tests passed, 0 failed (vitest output)"
+    },
+    {
+      "caseId": "TC-7-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run tests/adaptive-controller.test.ts --reporter=verbose",
+        "AC-7 suite: 'recovers from limit=1 to max=10 with consecutive successes' — PASS (step-by-step climb 1→10)"
+      ],
+      "evidence": "62 tests passed, 0 failed (vitest output)"
+    },
+    {
+      "caseId": "TC-8-01",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run tests/adaptive-controller.test.ts --reporter=verbose",
+        "AC-8 suite: '5xx during cooldown does not reset consecutiveSuccesses' — PASS (stays 4)",
+        "AC-8 suite: '429 during cooldown does not reset consecutiveSuccesses' — PASS (stays 4)"
+      ],
+      "evidence": "62 tests passed, 0 failed (vitest output)"
+    },
+    {
+      "caseId": "TC-8-02",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run tests/adaptive-controller.test.ts --reporter=verbose",
+        "5xx suite: 'enters cooldown after 5xx drop (V3 change)' — PASS",
+        "5xx suite: 'drops 1 after consecutive dropThreshold failures' — PASS"
+      ],
+      "evidence": "62 tests passed, 0 failed (vitest output)"
+    },
+    {
+      "caseId": "TC-3-02",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run tests/adaptive-controller.test.ts --reporter=verbose",
+        "E2E suite: 'E15: rapid recovery during cooldown' — PASS (429→9, 5 successes→10)"
+      ],
+      "evidence": "62 tests passed, 0 failed (vitest output)"
+    },
+    {
+      "caseId": "TC-3-03",
+      "round": 1,
+      "passed": true,
+      "execute_steps": [
+        "npx vitest run tests/adaptive-controller.test.ts --reporter=verbose",
+        "E2E suite: 'E18: success interrupts failure chain' — PASS (alternating, no drop)"
+      ],
+      "evidence": "62 tests passed, 0 failed (vitest output)"
+    }
+  ]
+}
