@@ -50,13 +50,13 @@ export function formatTimeHMS(iso: string): string {
   const d = parseUtc(iso);
   const parts = new Intl.DateTimeFormat(currentLocale(), {
     ...TZ_OPTS,
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
     hour12: false,
   }).formatToParts(d);
-  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
-  return `${get('hour')}:${get('minute')}:${get('second')}`;
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return `${get("hour")}:${get("minute")}:${get("second")}`;
 }
 
 /** 月日时分：4/25 20:00（用于长周期图表标签） */
@@ -107,4 +107,13 @@ export function formatContextWindow(n: number): string {
   if (n >= CONTEXT_MILLION) return `${n / CONTEXT_MILLION}M`;
   if (n >= CONTEXT_THOUSAND) return `${n / CONTEXT_THOUSAND}K`;
   return `${n}`;
+}
+
+const MS_PER_SECOND_FORMAT = 1000;
+
+/** latency_ms → 可读字符串 (45ms / 1.2s) */
+export function formatLatency(ms: number | null | undefined): string {
+  if (ms === null || ms === undefined || !Number.isFinite(ms)) return "-";
+  if (ms < MS_PER_SECOND_FORMAT) return `${Math.round(ms)}ms`;
+  return `${(ms / MS_PER_SECOND_FORMAT).toFixed(1)}s`;
 }

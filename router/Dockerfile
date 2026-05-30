@@ -20,6 +20,9 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
+# better-sqlite3 native addon 编译需要
+RUN apk add --no-cache python3 make g++
+
 # 安装 monorepo 所有依赖（workspace）
 COPY package.json package-lock.json ./
 COPY router/package.json router/package.json

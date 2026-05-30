@@ -1,0 +1,81 @@
+{
+  "test_cases": [
+    {
+      "id": "TC-A-01",
+      "type": "integration",
+      "title": "OpenAI reasoning_effort 提取到 ActiveRequest",
+      "description": "发送 reasoning_effort=high 的 OpenAI 请求，验证 buildActiveRequest 返回 thinkingLevel=high",
+      "steps": ["构建 clientRequest JSON 含 reasoning_effort: 'high'", "调用 buildActiveRequest", "验证结果 thinkingLevel === 'high'"]
+    },
+    {
+      "id": "TC-A-02",
+      "type": "integration",
+      "title": "Anthropic thinking.type 提取到 ActiveRequest",
+      "description": "发送 thinking.type=enabled 的 Anthropic 请求，验证 thinkingLevel=enabled",
+      "steps": ["构建 clientRequest JSON 含 thinking: { type: 'enabled' }", "调用 buildActiveRequest", "验证结果 thinkingLevel === 'enabled'"]
+    },
+    {
+      "id": "TC-A-03",
+      "type": "integration",
+      "title": "无 thinking 参数返回 off",
+      "description": "发送普通请求，验证 thinkingLevel=off",
+      "steps": ["构建 clientRequest JSON 不含 thinking 相关字段", "调用 buildActiveRequest", "验证结果 thinkingLevel === 'off'"]
+    },
+    {
+      "id": "TC-A-04",
+      "type": "integration",
+      "title": "reasoning.effort 优先于 reasoning_effort",
+      "description": "同时发送 reasoning.effort=low 和 reasoning_effort=high，验证取 low",
+      "steps": ["构建 clientRequest JSON 含 reasoning.effort='low' 和 reasoning_effort='high'", "调用 buildActiveRequest", "验证结果 thinkingLevel === 'low'"]
+    },
+    {
+      "id": "TC-A-05",
+      "type": "integration",
+      "title": "前端 extractThinkingLevel 从日志 client_request 提取",
+      "description": "验证前端工具函数从 client_request JSON 提取 thinking level",
+      "steps": ["传入 client_request JSON 字符串和 apiType", "验证返回正确的 thinking level 字符串"]
+    },
+    {
+      "id": "TC-A-06",
+      "type": "integration",
+      "title": "前端 extractThinkingLevel 处理 null client_request",
+      "description": "client_request 为 null 时返回 off",
+      "steps": ["传入 null 和 'openai'", "验证返回 'off'"]
+    },
+    {
+      "id": "TC-B-01",
+      "type": "api",
+      "title": "client_model 过滤日志",
+      "description": "GET /admin/api/logs?client_model=ds-flash 返回正确结果",
+      "steps": ["插入测试日志（model=ds-flash, backend_model=deepseek-v4-flash）", "GET /admin/api/logs?client_model=ds-flash", "验证返回包含该日志"]
+    },
+    {
+      "id": "TC-B-02",
+      "type": "api",
+      "title": "backend_model 过滤日志",
+      "description": "GET /admin/api/logs?backend_model=deepseek-v4-flash 返回正确结果",
+      "steps": ["插入测试日志", "GET /admin/api/logs?backend_model=deepseek-v4-flash", "验证返回包含该日志"]
+    },
+    {
+      "id": "TC-B-03",
+      "type": "api",
+      "title": "client_model + backend_model 组合过滤",
+      "description": "同时使用两个过滤条件返回交集",
+      "steps": ["插入两条日志（不同组合）", "GET /admin/api/logs?client_model=ds-flash&backend_model=deepseek-v4-flash", "验证只返回匹配交集"]
+    },
+    {
+      "id": "TC-B-04",
+      "type": "api",
+      "title": "原 model 参数向后兼容",
+      "description": "GET /admin/api/logs?model=xxx 仍正常工作",
+      "steps": ["插入测试日志", "GET /admin/api/logs?model=ds-flash", "验证返回包含该日志"]
+    },
+    {
+      "id": "TC-C-01",
+      "type": "manual",
+      "title": "日志表格耗时列格式化展示",
+      "description": "验证不同 latency_ms 值的格式化输出",
+      "steps": ["查看有 latency_ms=45 的日志行", "验证显示 '45ms'", "查看有 latency_ms=1200 的日志行", "验证显示 '1.2s'"]
+    }
+  ]
+}

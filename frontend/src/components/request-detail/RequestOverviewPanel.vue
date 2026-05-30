@@ -121,6 +121,13 @@
         >
           {{ overview.sessionId.slice(0, 8) }}
         </span>
+        <Badge
+          v-if="overview.thinkingLevel"
+          variant="outline"
+          class="text-[10px]"
+        >
+          {{ overview.thinkingLevel }}
+        </Badge>
       </div>
 
       <!-- Layer 2.5 - Error banner (only when error exists) -->

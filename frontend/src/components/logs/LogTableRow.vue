@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from "vue-i18n";
+import { computed } from "vue";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TableCell, TableRow } from "@/components/ui/table";
@@ -11,9 +12,9 @@ import {
 import { CheckIcon, ChevronDown, CopyIcon } from "lucide-vue-next";
 import type { LogEntry } from "@/components/logs/types";
 import { PROVIDER_ID_ROUTER } from "@/components/logs/types";
-import { formatTimeHMS } from "@/utils/format";
+import { formatTimeHMS, formatLatency } from "@/utils/format";
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     log: LogEntry;
     isChild?: boolean;
@@ -34,6 +35,8 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+
+const thinkingLevel = computed(() => props.log.thinking_level ?? "off");
 
 function enhancementLabel(raw: string | null): string {
   if (!raw) return t("logs.row.unknown");
@@ -133,12 +136,6 @@ function enhancementLabel(raw: string | null): string {
       <span v-else class="text-muted-foreground">-</span>
     </TableCell>
 
-    <TableCell class="font-mono text-xs text-muted-foreground">
-      {{
-        log.latency_ms != null ? (log.latency_ms / 1000).toFixed(1) + "s" : "-"
-      }}
-    </TableCell>
-
     <TableCell>
       <div class="flex flex-wrap gap-1">
         <Badge
@@ -146,6 +143,13 @@ function enhancementLabel(raw: string | null): string {
           class="text-[10px] px-1.5 py-0"
         >
           {{ log.status_code || "-" }}
+        </Badge>
+        <Badge
+          v-if="thinkingLevel"
+          variant="outline"
+          class="text-[10px] px-1.5 py-0"
+        >
+          {{ thinkingLevel }}
         </Badge>
         <Badge
           v-if="log.is_stream"
@@ -167,6 +171,10 @@ function enhancementLabel(raw: string | null): string {
           >{{ t("logs.table.failover") }}</Badge
         >
       </div>
+    </TableCell>
+
+    <TableCell class="text-xs text-muted-foreground font-mono">
+      {{ formatLatency(log.latency_ms) }}
     </TableCell>
 
     <TableCell class="text-destructive text-xs min-w-0 max-w-60 lg:max-w-xs">

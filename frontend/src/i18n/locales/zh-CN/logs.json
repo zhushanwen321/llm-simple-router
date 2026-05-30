@@ -7,6 +7,12 @@
   "allKeys": "全部密钥",
   "allStatus": "全部状态",
   "non200": "非 200",
+  "filters": {
+    "clientModel": "客户端模型",
+    "allClientModels": "全部客户端模型",
+    "backendModel": "目标模型",
+    "allBackendModels": "全部目标模型"
+  },
   "noLogs": "暂无日志",
   "noLogsFilterHint": "当前筛选条件下没有匹配的日志",
   "clearAllFilters": "清除所有筛选",
