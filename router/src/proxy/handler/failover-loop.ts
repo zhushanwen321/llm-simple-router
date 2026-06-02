@@ -430,17 +430,6 @@ export async function processResilienceResult(params: {
     // flush tool errors
     flushCurrentErrors();
 
-    // Stream timeout
-    if (resilienceResult.result.kind === "stream_abort" && resilienceResult.result.timeoutContext) {
-      const { modelId, providerId } = resilienceResult.result.timeoutContext;
-      const msg = `Stream timeout: no data received for ${resilienceResult.result.timeoutMs}ms (model: ${modelId}, provider: ${providerId})`;
-      const errBody = clientApiType === "anthropic"
-        ? { type: "error", error: { type: "api_error", message: msg } }
-        : { error: { message: msg, type: "server_error", code: "stream_timeout" } };
-      try { reply.raw.write(`data: ${JSON.stringify(errBody)}\n\n`); } catch (e: unknown) { /* client disconnected */ void e; }
-      try { reply.raw.end(); } catch (e: unknown) { /* client disconnected */ void e; }
-    }
-
     const tr = resilienceResult.result;
     const succeeded = tr.kind === "success" || tr.kind === "stream_success" || tr.kind === "stream_abort";
     if (succeeded) usageWindowTracker?.recordRequest(provider.id, routerKeyId ?? undefined);
