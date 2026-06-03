@@ -8,7 +8,7 @@ on:
       - '.xyz-harness/**'
       - 'LICENSE'
   pull_request:
-    branches: [main, develop]
+    branches: [main, develop, 'dev-*']
     paths-ignore:
       - '**.md'
       - 'docs/**'
@@ -30,6 +30,8 @@ jobs:
       - run: cd router && npm run build
       - run: cd pi-extension && npx tsc --noEmit
       - run: npm run test -w router
+      - run: cd frontend && npx vue-tsc -b --noEmit
+      - run: cd frontend && npx eslint . --max-warnings=0
 
   docker:
     needs: test
