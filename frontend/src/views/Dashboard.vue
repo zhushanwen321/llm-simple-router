@@ -1,253 +1,385 @@
 <template>
-  <div class="p-6">
-    <!-- 顶部：provider 按钮组 -->
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-semibold text-foreground">
+  <div class="page">
+    <!-- Zone 1: Header + Provider 按钮组 + Filters Popover -->
+    <div class="flex items-center gap-4 mb-3">
+      <h2 class="text-base font-semibold text-foreground shrink-0">
         {{ t("dashboard.title") }}
       </h2>
-      <div class="flex gap-1">
+      <div class="flex-1 overflow-x-auto flex gap-1 scrollbar-none">
         <Button
           v-for="p in sortedProviders"
           :key="p.id"
           :variant="selectedProvider === p.id ? 'default' : 'ghost'"
           size="sm"
+          class="h-[30px] px-3 text-[13px] gap-1.5 shrink-0"
           @click="selectedProvider = p.id"
         >
           {{ p.name }}
+          <span
+            v-if="providerTokenLabels.get(p.id)"
+            class="font-mono text-[11px] font-medium"
+            :class="
+              selectedProvider === p.id
+                ? 'text-primary-foreground/60'
+                : 'text-muted-foreground'
+            "
+          >
+            {{ providerTokenLabels.get(p.id) }}
+          </span>
         </Button>
       </div>
+      <Popover>
+        <PopoverTrigger as-child>
+          <Button
+            variant="outline"
+            size="sm"
+            class="h-[30px] px-2.5 text-[13px] gap-1.5 shrink-0"
+          >
+            <Filter class="w-3.5 h-3.5" />
+            {{ t("dashboard.filters.button") }}
+            <Badge
+              v-if="activeFilterCount > 0"
+              class="h-4 min-w-4 px-1 text-[10px] font-mono font-semibold bg-primary text-primary-foreground"
+            >
+              {{ activeFilterCount }}
+            </Badge>
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="end" class="w-80 space-y-3">
+          <div>
+            <Label class="text-xs text-muted-foreground mb-1 block">{{
+              t("dashboard.filters.model")
+            }}</Label>
+            <Select v-model="modelFilter">
+              <SelectTrigger class="h-8 text-[13px]">
+                <SelectValue :placeholder="t('common.allModels')" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{{ t("common.allModels") }}</SelectItem>
+                <SelectItem v-for="m in modelOptions" :key="m" :value="m">{{
+                  m
+                }}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label class="text-xs text-muted-foreground mb-1 block">{{
+              t("dashboard.filters.key")
+            }}</Label>
+            <Select v-model="keyFilter">
+              <SelectTrigger class="h-8 text-[13px]">
+                <SelectValue :placeholder="t('common.allKeys')" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{{ t("common.allKeys") }}</SelectItem>
+                <SelectItem
+                  v-for="rk in keyOptions"
+                  :key="rk.id"
+                  :value="rk.id"
+                  >{{ rk.name }}</SelectItem
+                >
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label class="text-xs text-muted-foreground mb-1 block">{{
+              t("dashboard.filters.clientType")
+            }}</Label>
+            <Select v-model="clientType">
+              <SelectTrigger class="h-8 text-[13px]">
+                <SelectValue :placeholder="t('dashboard.clientType.all')" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{{
+                  t("dashboard.clientType.all")
+                }}</SelectItem>
+                <SelectItem value="claude-code">{{
+                  t("dashboard.clientType.claude-code")
+                }}</SelectItem>
+                <SelectItem value="codex">{{
+                  t("dashboard.clientType.codex")
+                }}</SelectItem>
+                <SelectItem value="pi">{{
+                  t("dashboard.clientType.pi")
+                }}</SelectItem>
+                <SelectItem value="openai-sdk">{{
+                  t("dashboard.clientType.openai-sdk")
+                }}</SelectItem>
+                <SelectItem value="anthropic-sdk">{{
+                  t("dashboard.clientType.anthropic-sdk")
+                }}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </PopoverContent>
+      </Popover>
     </div>
 
-    <!-- 时间粒度 tab -->
-    <div class="flex gap-1 mb-4">
-      <Button
-        v-for="t in periodTabs"
-        :key="t.value"
-        :variant="periodTab === t.value ? 'default' : 'ghost'"
-        size="sm"
-        @click="periodTab = t.value"
-      >
-        {{ t.label }}
-      </Button>
-    </div>
-
-    <!-- 时间范围 -->
-    <div class="flex items-center gap-2 mb-4 text-sm text-muted-foreground">
-      <template v-if="periodTab === 'custom'">
-        <Input type="datetime-local" v-model="customStart" class="w-44" />
-        <span>~</span>
-        <Input type="datetime-local" v-model="customEnd" class="w-44" />
-      </template>
-      <span v-else>{{ timeRangeText }}</span>
-    </div>
-
-    <!-- 模型 + 密钥筛选 -->
-    <div class="flex items-center gap-3 mb-4">
-      <Select v-model="modelFilter">
-        <SelectTrigger class="w-44">
-          <SelectValue :placeholder="t('common.allModels')" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">{{ t("common.allModels") }}</SelectItem>
-          <SelectItem v-for="m in modelOptions" :key="m" :value="m">{{
-            m
-          }}</SelectItem>
-        </SelectContent>
-      </Select>
-      <Select v-model="keyFilter">
-        <SelectTrigger class="w-48">
-          <SelectValue :placeholder="t('common.allKeys')" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">{{ t("common.allKeys") }}</SelectItem>
-          <SelectItem v-for="rk in keyOptions" :key="rk.id" :value="rk.id">{{
-            rk.name
-          }}</SelectItem>
-        </SelectContent>
-      </Select>
-      <Select v-model="clientType">
-        <SelectTrigger class="w-40">
-          <SelectValue :placeholder="t('dashboard.clientType.all')" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">{{
-            t("dashboard.clientType.all")
-          }}</SelectItem>
-          <SelectItem value="claude-code">{{
-            t("dashboard.clientType.claude-code")
-          }}</SelectItem>
-          <SelectItem value="codex">{{
-            t("dashboard.clientType.codex")
-          }}</SelectItem>
-          <SelectItem value="pi">{{ t("dashboard.clientType.pi") }}</SelectItem>
-          <SelectItem value="openai-sdk">{{
-            t("dashboard.clientType.openai-sdk")
-          }}</SelectItem>
-          <SelectItem value="anthropic-sdk">{{
-            t("dashboard.clientType.anthropic-sdk")
-          }}</SelectItem>
-        </SelectContent>
-      </Select>
-    </div>
-
-    <!-- 数据区 -->
+    <!-- Error state -->
     <div v-if="loadError" class="text-center py-20">
       <p class="text-muted-foreground mb-3">{{ t("dashboard.loadError") }}</p>
       <Button variant="outline" size="sm" @click="retry">{{
         t("dashboard.retry")
       }}</Button>
     </div>
-    <div v-else-if="loading" class="text-center text-muted-foreground py-20">
-      {{ t("common.loading") }}
+
+    <!-- Empty provider state -->
+    <div
+      v-else-if="providers.length === 0 && !loading"
+      class="text-center py-16"
+    >
+      <p class="text-muted-foreground">{{ t("dashboard.empty.noProvider") }}</p>
+      <Button variant="outline" size="sm" class="mt-3" as-child>
+        <router-link to="/providers">{{
+          t("dashboard.empty.goToProviders")
+        }}</router-link>
+      </Button>
     </div>
-    <template v-else>
-      <!-- 指标卡片 6 卡一行 -->
-      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-        <Card>
-          <CardContent class="p-4">
-            <p class="text-sm text-muted-foreground">
+
+    <!-- Skeleton state -->
+    <div v-else-if="loading" class="space-y-4">
+      <div class="grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-4">
+        <div class="space-y-3">
+          <Skeleton class="h-24 w-full rounded-lg" />
+          <Skeleton class="h-24 w-full rounded-lg" />
+          <div class="grid grid-cols-2 gap-2">
+            <Skeleton class="h-16 rounded-lg" />
+            <Skeleton class="h-16 rounded-lg" />
+          </div>
+        </div>
+        <Skeleton class="h-64 rounded-lg" />
+      </div>
+    </div>
+
+    <!-- Main content -->
+    <div v-else>
+      <!-- Zone 2: Metrics + Primary Chart -->
+      <div class="grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-4 mb-4">
+        <!-- Left: metric cards -->
+        <div class="flex flex-col gap-4">
+          <!-- Input Token (large) -->
+          <div class="bg-card rounded-lg px-5 py-4">
+            <div class="text-xs text-muted-foreground">
+              {{ t("dashboard.stats.inputTokens") }}
+            </div>
+            <div
+              class="font-mono text-[32px] font-bold leading-none mt-1 text-teal"
+            >
+              {{ formatTokenCompact(stats.totalInputTokens) }}
+            </div>
+            <div
+              v-if="deltaValues"
+              class="font-mono text-[11px] mt-1.5"
+              :class="
+                deltaValues.totalInputTokens.startsWith('+')
+                  ? 'text-success'
+                  : deltaValues.totalInputTokens.startsWith('-')
+                    ? 'text-danger'
+                    : 'text-muted-foreground'
+              "
+            >
+              {{ deltaValues.totalInputTokens }}
+            </div>
+            <div
+              v-else
+              class="font-mono text-[11px] mt-1.5 text-muted-foreground"
+            >
+              {{ t("dashboard.delta.noPrev") }}
+            </div>
+          </div>
+          <!-- Output Token (large) -->
+          <div class="bg-card rounded-lg px-5 py-4">
+            <div class="text-xs text-muted-foreground">
+              {{ t("dashboard.stats.outputTokens") }}
+            </div>
+            <div class="font-mono text-[32px] font-bold leading-none mt-1">
+              {{ formatTokenCompact(stats.totalOutputTokens) }}
+            </div>
+            <div
+              v-if="deltaValues"
+              class="font-mono text-[11px] mt-1.5"
+              :class="
+                deltaValues.totalOutputTokens.startsWith('+')
+                  ? 'text-success'
+                  : deltaValues.totalOutputTokens.startsWith('-')
+                    ? 'text-danger'
+                    : 'text-muted-foreground'
+              "
+            >
+              {{ deltaValues.totalOutputTokens }}
+            </div>
+            <div
+              v-else
+              class="font-mono text-[11px] mt-1.5 text-muted-foreground"
+            >
+              {{ t("dashboard.delta.noPrev") }}
+            </div>
+          </div>
+          <!-- TPS + Cache Hit (secondary, grid 2-col) -->
+          <div class="grid grid-cols-2 gap-3">
+            <div class="bg-card rounded-lg px-3.5 py-2.5">
+              <div class="text-[11px] text-muted-foreground">
+                {{ t("dashboard.stats.avgTps") }}
+              </div>
+              <div class="font-mono text-lg font-semibold leading-none mt-0.5">
+                {{ stats.avgTps.toFixed(1)
+                }}<span class="text-xs font-normal text-muted-foreground ml-0.5"
+                  >t/s</span
+                >
+              </div>
+            </div>
+            <div class="bg-card rounded-lg px-3.5 py-2.5">
+              <div class="text-[11px] text-muted-foreground">
+                {{ t("dashboard.stats.cacheHitRate") }}
+              </div>
+              <div class="font-mono text-lg font-semibold leading-none mt-0.5">
+                {{ cacheHitRate.toFixed(1)
+                }}<span class="text-xs font-normal text-muted-foreground ml-0.5"
+                  >%</span
+                >
+              </div>
+            </div>
+          </div>
+          <!-- Inline tertiary metrics -->
+          <div class="flex gap-4 px-0.5">
+            <span class="text-[11px] text-muted-foreground">
               {{ t("dashboard.stats.totalRequests") }}
-            </p>
-            <p class="text-2xl font-bold text-foreground mt-1">
-              {{ stats.totalRequests.toLocaleString() }}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent class="p-4">
-            <p class="text-sm text-muted-foreground">
+              <span class="font-mono text-[13px] font-medium text-foreground">{{
+                stats.totalRequests.toLocaleString()
+              }}</span>
+            </span>
+            <span class="text-[11px] text-muted-foreground">
               {{ t("dashboard.stats.successRate") }}
-            </p>
-            <p class="text-2xl font-bold text-success mt-1">
-              {{ (stats.successRate * 100).toFixed(1) }}%
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent class="p-4">
-            <p class="text-sm text-muted-foreground">
-              {{ t("dashboard.stats.tokenOutputSpeed") }}
-            </p>
-            <p class="text-2xl font-bold text-foreground mt-1">
-              {{ stats.avgTps.toFixed(1) }}
-              <span class="text-sm font-normal text-muted-foreground">t/s</span>
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent class="p-4">
-            <p class="text-sm text-muted-foreground">
-              {{ t("dashboard.stats.tokenInputTotal") }}
-            </p>
-            <p class="text-2xl font-bold text-foreground mt-1">
-              {{ stats.totalInputTokens.toLocaleString() }}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent class="p-4">
-            <p class="text-sm text-muted-foreground">
-              {{ t("dashboard.stats.tokenOutputTotal") }}
-            </p>
-            <p class="text-2xl font-bold text-foreground mt-1">
-              {{ stats.totalOutputTokens.toLocaleString() }}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent class="p-4">
-            <p class="text-sm text-muted-foreground">
-              {{ t("dashboard.stats.cacheHitRate") }}
-            </p>
-            <p class="text-2xl font-bold text-primary mt-1">
-              <template v-if="stats.totalInputTokens > 0">
-                {{ cacheHitRate.toFixed(1) }}%
-              </template>
-              <template v-else>
-                <span class="text-base font-normal text-muted-foreground">{{
-                  t("dashboard.noCacheData")
-                }}</span>
-              </template>
-            </p>
-          </CardContent>
-        </Card>
+              <span class="font-mono text-[13px] font-medium text-foreground"
+                >{{ (stats.successRate * 100).toFixed(1) }}%</span
+              >
+            </span>
+            <span class="text-[11px] text-muted-foreground">
+              {{ t("dashboard.window.label") }}
+              <span class="font-mono text-[13px] font-medium text-foreground">{{
+                windowTimeRange
+              }}</span>
+            </span>
+          </div>
+        </div>
+
+        <!-- Right: Token Throughput stacked area chart -->
+        <div class="bg-card rounded-lg p-3.5 flex flex-col">
+          <div class="text-xs font-medium text-muted-foreground mb-2">
+            {{ t("dashboard.charts.tokenThroughput") }}
+          </div>
+          <div class="flex-1 min-h-[180px]">
+            <Line
+              v-if="tokenThroughputChartData"
+              :data="tokenThroughputChartData"
+              :options="stackedAreaOpts"
+            />
+            <div
+              v-else
+              class="flex items-center justify-center h-full text-muted-foreground text-sm"
+            >
+              {{ t("common.noData") }}
+            </div>
+          </div>
+        </div>
       </div>
 
-      <!-- 3 个 chart -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-        <Card>
-          <CardHeader>
-            <CardTitle class="text-sm font-medium text-foreground">{{
-              t("dashboard.charts.tokenOutputSpeed")
-            }}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div class="h-56">
-              <Line
-                v-if="tpsChartData"
-                :key="'tps-' + periodTab + '-' + selectedProvider"
-                :data="tpsChartData"
-                :options="chartOptions(tpsChartData.labels as string[])"
-              />
-              <div
-                v-else
-                class="flex items-center justify-center h-full text-muted-foreground text-sm"
-              >
-                {{ t("common.noData") }}
-              </div>
+      <!-- Zone 3: TPS chart -->
+      <div class="grid grid-cols-1 gap-4 mb-4">
+        <div class="bg-card rounded-lg p-3">
+          <div class="text-xs font-medium text-muted-foreground mb-1.5">
+            {{ t("dashboard.charts.tps") }}
+          </div>
+          <div class="h-[140px]">
+            <Line
+              v-if="tpsChartData"
+              :data="tpsChartData"
+              :options="miniChartOpts(tpsChartData.labels as string[])"
+            />
+            <div
+              v-else
+              class="flex items-center justify-center h-full text-muted-foreground text-sm"
+            >
+              {{ t("common.noData") }}
             </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle class="text-sm font-medium text-foreground">{{
-              t("dashboard.charts.tokenInputTotal")
-            }}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div class="h-56">
-              <Line
-                v-if="inputTokensChartData"
-                :key="'input-' + periodTab + '-' + selectedProvider"
-                :data="inputTokensChartData"
-                :options="chartOptions(inputTokensChartData.labels as string[])"
-              />
-              <div
-                v-else
-                class="flex items-center justify-center h-full text-muted-foreground text-sm"
-              >
-                {{ t("common.noData") }}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle class="text-sm font-medium text-foreground">{{
-              t("dashboard.charts.tokenOutputTotal")
-            }}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div class="h-56">
-              <Line
-                v-if="outputTokensChartData"
-                :key="'output-' + periodTab + '-' + selectedProvider"
-                :data="outputTokensChartData"
-                :options="
-                  chartOptions(outputTokensChartData.labels as string[])
-                "
-              />
-              <div
-                v-else
-                class="flex items-center justify-center h-full text-muted-foreground text-sm"
-              >
-                {{ t("common.noData") }}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
-    </template>
+
+      <!-- Zone 4: Timeline window navigator -->
+      <div class="bg-card rounded-lg px-4 py-2.5">
+        <div class="flex items-center justify-between mb-1.5">
+          <div class="flex items-center gap-3">
+            <span class="font-mono text-xs font-medium text-foreground">{{
+              windowTimeRange
+            }}</span>
+            <div class="flex gap-0.5">
+              <Button
+                v-for="opt in timelineZoomOptions"
+                :key="opt.value"
+                :variant="timelineRange === opt.value ? 'secondary' : 'ghost'"
+                size="sm"
+                class="h-5 px-1.5 text-[10px] font-mono"
+                @click="timelineRange = opt.value"
+              >
+                {{ opt.label }}
+              </Button>
+            </div>
+          </div>
+          <span class="text-[11px] text-muted-foreground/60">{{
+            t("dashboard.timeline.hint")
+          }}</span>
+        </div>
+        <TooltipProvider v-if="usageWindows.length > 0">
+          <div
+            class="relative h-7 rounded overflow-hidden border border-border/50 bg-muted/20"
+          >
+            <div
+              v-for="w in timelineWindows"
+              :key="w.window.id"
+              class="absolute top-0 bottom-0 rounded-sm cursor-pointer transition-[filter] duration-150 hover:brightness-125"
+              :class="
+                selectedWindowId === w.window.id
+                  ? 'ring-2 ring-primary ring-inset brightness-130 z-[2]'
+                  : ''
+              "
+              :style="getWindowStyle(w)"
+              @click="selectedWindowId = w.window.id"
+            >
+              <Tooltip v-if="getWindowWidth(w) !== '0%'">
+                <TooltipTrigger as-child>
+                  <div class="w-full h-full" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  {{ formatWindowTooltip(w) }}
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          </div>
+        </TooltipProvider>
+        <div
+          v-if="usageWindows.length === 0"
+          class="h-7 flex items-center justify-center text-[11px] text-muted-foreground"
+        >
+          {{ t("dashboard.timeline.noData") }}
+        </div>
+        <!-- Day labels -->
+        <div
+          v-if="usageWindows.length > 0"
+          class="relative h-4 mt-1 overflow-hidden"
+        >
+          <span
+            v-for="d in timelineDayLabels"
+            :key="d.label"
+            class="absolute font-mono text-[10px] text-muted-foreground/50"
+            :class="d.position === 0 ? '' : '-translate-x-1/2'"
+            :style="{ left: d.position + '%' }"
+          >
+            {{ d.label }}
+          </span>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -260,11 +392,18 @@ import {
   LineElement,
   Tooltip as ChartTooltip,
   Legend,
+  Filler,
 } from "chart.js";
 import { Line } from "vue-chartjs";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -272,10 +411,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Filter } from "lucide-vue-next";
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
-import { lineOptions } from "./metrics-helpers";
+import { stackedAreaOptions, miniLineOptions } from "./metrics-helpers";
 import { useDashboard } from "@/composables/useDashboard";
+import { formatTokenCompact } from "@/utils/token-format";
 
 ChartJS.register(
   CategoryScale,
@@ -284,40 +431,64 @@ ChartJS.register(
   LineElement,
   ChartTooltip,
   Legend,
+  Filler,
 );
 
 const {
-  sortedProviders,
+  providers,
   selectedProvider,
-  periodTab,
-  customStart,
-  customEnd,
+  sortedProviders,
+  providerTokenLabels,
+  usageWindows,
+  selectedWindowId,
   modelFilter,
   keyFilter,
   clientType,
   modelOptions,
   keyOptions,
-  timeRangeText,
   stats,
   loading,
   loadError,
   cacheHitRate,
   tpsChartData,
-  inputTokensChartData,
-  outputTokensChartData,
+  tokenThroughputChartData,
+  deltaValues,
+  windowTimeRange,
+  timelineWindows,
+  timelineRange,
+  getWindowStyle,
+  getWindowWidth,
+  formatWindowTooltip,
+  timelineDayLabels,
   retry,
 } = useDashboard();
 
 const { t } = useI18n();
 
-const periodTabs = computed(() => [
-  { label: t("dashboard.period.last5Hours"), value: "window" as const },
-  { label: t("dashboard.period.weekly"), value: "weekly" as const },
-  { label: t("dashboard.period.monthly"), value: "monthly" as const },
-  { label: t("dashboard.period.custom"), value: "custom" as const },
-]);
+// --- Filter active count ---
+const activeFilterCount = computed(() => {
+  let count = 0;
+  if (modelFilter.value !== "all") count++;
+  if (keyFilter.value !== "all") count++;
+  if (clientType.value !== "all") count++;
+  return count;
+});
 
-function chartOptions(labels: string[]): ReturnType<typeof lineOptions> {
-  return lineOptions("", labels);
+// --- Stacked area chart options ---
+const stackedAreaOpts = computed(() => {
+  if (!tokenThroughputChartData.value) return {};
+  return stackedAreaOptions(tokenThroughputChartData.value.labels as string[]);
+});
+
+// --- Secondary chart options ---
+function miniChartOpts(labels: string[]) {
+  return miniLineOptions(labels);
 }
+
+// --- Timeline zoom options ---
+const timelineZoomOptions = [
+  { value: "24h" as const, label: "24h" },
+  { value: "3d" as const, label: "3d" },
+  { value: "7d" as const, label: "7d" },
+];
 </script>

@@ -41,21 +41,29 @@ LLM API 代理路由器。接收 Claude Code / Cursor 等客户端请求，通�
 
 ## 管理后台
 
-| Provider 管理 + 并发控制                                    | 实时监控                                    |
-| ----------------------------------------------------- | --------------------------------------- |
-| ![Provider](docs/screenshot/provider_concurrency.png) | ![Monitor](docs/screenshot/monitor.png) |
+| 快速配置                                     | Dashboard                                    |
+| ------------------------------------------- | ------------------------------------------- |
+| ![Quick Setup](docs/screenshots/quick-setup.png) | ![Dashboard](docs/screenshots/dashboard.png) |
 
-| 模型映射                                          | 重试规则                                |
-| --------------------------------------------- | ----------------------------------- |
-| ![Mapping](docs/screenshot/model_mapping.png) | ![Retry](docs/screenshot/retry.png) |
+| Provider 管理                                    | 添加 Provider                                    |
+| ----------------------------------------------- | ---------------------------------------------- |
+| ![Providers](docs/screenshots/providers.png)     | ![Add Provider](docs/screenshots/add-provider.png) |
 
-| Dashboard                                   | 请求日志                             |
-| ------------------------------------------- | -------------------------------- |
-| ![Dashboard](docs/screenshot/dashboard.png) | ![Logs](docs/screenshot/log.png) |
+| 模型映射                                            | 重试规则                                          |
+| ------------------------------------------------- | ------------------------------------------------ |
+| ![Model Mapping](docs/screenshots/model-mapping.png) | ![Retry Rules](docs/screenshots/retry-rules.png) |
+
+| API 密钥                                    | 系统设置                                            |
+| ------------------------------------------- | --------------------------------------------------- |
+| ![API Keys](docs/screenshots/apikeys.png)    | ![System Settings](docs/screenshots/system-settings.png) |
+
+| 实时监控                                    | 请求日志                                            |
+| ----------------------------------------- | -------------------------------------------------- |
+| ![Monitor](docs/screenshots/monitor.png)   | ![Request Logs](docs/screenshots/request-logs.png) |
 
 | 代理增强 (实验性)                                              |
-| ------------------------------------------------------- |
-| ![Proxy Enhancement](docs/screenshot/proxy_enhance.png) |
+| ----------------------------------------------------------- |
+| ![Proxy Enhancement](docs/screenshots/proxy_enhance.png)      |
 
 ## 快速开始
 

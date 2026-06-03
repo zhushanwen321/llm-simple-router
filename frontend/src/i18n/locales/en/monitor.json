@@ -11,6 +11,8 @@
   "queued": "Queued",
   "copyId": "Copy ID",
   "providerStats": "Provider Stats",
+  "providerStatsHide": "Hide Stats",
+  "providerStatsShow": "Show Stats",
   "concurrency": "Concurrency",
   "statusCodeDistribution": "Status Code Distribution",
   "runtime": "Runtime",

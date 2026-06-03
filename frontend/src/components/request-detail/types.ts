@@ -14,7 +14,7 @@ export interface UnifiedRequestOverview {
   originalModel: string | null;
   statusCode: number | null;
   isStream: boolean;
-  apiType: "openai" | "anthropic";
+  apiType: "openai" | "openai-responses" | "anthropic";
   providerName: string | null;
   clientIp: string | undefined;
   sessionId: string | null;
@@ -32,6 +32,8 @@ export interface UnifiedRequestOverview {
     error: string | null;
     latencyMs: number;
     providerId: string;
+    model?: string;
+    apiType?: string;
   }[];
   status: "pending" | "completed" | "failed";
   clientRequest: string | null;
@@ -90,6 +92,8 @@ export function fromActiveRequest(
       error: a.error,
       latencyMs: a.latencyMs,
       providerId: a.providerId,
+      model: a.model,
+      apiType: a.apiType,
     })),
     status: req.status,
     clientRequest: req.clientRequest ?? null,
@@ -128,7 +132,7 @@ function extractResponseBody(upstreamResponse: string | null): string | null {
     }
     return upstreamResponse;
   } catch {
-    return upstreamResponse;
+    /* JSON 解析失败，使用默认值 */ return upstreamResponse;
   }
 }
 
@@ -183,7 +187,7 @@ export function parseMappingReason(
     }
     return undefined;
   } catch {
-    return undefined;
+    /* JSON 解析失败，使用默认值 */ return undefined;
   }
 }
 
@@ -194,7 +198,10 @@ function isRouterInternalError(msg: string | null | undefined): boolean {
   );
 }
 
-export function fromLogEntry(entry: LogEntry): UnifiedRequestOverview {
+export function fromLogEntry(
+  entry: LogEntry,
+  children?: LogEntry[],
+): UnifiedRequestOverview {
   const inputTokens = entry.input_tokens ?? null;
   const outputTokens = entry.output_tokens ?? null;
   const ttftMs = entry.ttft_ms ?? null;
@@ -220,9 +227,11 @@ export function fromLogEntry(entry: LogEntry): UnifiedRequestOverview {
     statusCode: entry.status_code,
     isStream: !!entry.is_stream,
     apiType:
-      entry.api_type === "openai" || entry.api_type === "anthropic"
-        ? entry.api_type
-        : "openai",
+      entry.api_type === "openai" ||
+      entry.api_type === "openai-responses" ||
+      entry.api_type === "anthropic"
+        ? (entry.api_type as "openai" | "openai-responses" | "anthropic")
+        : ("openai" as const),
     providerName: entry.provider_name,
     clientIp: undefined,
     sessionId: entry.session_id ?? null,
@@ -235,7 +244,24 @@ export function fromLogEntry(entry: LogEntry): UnifiedRequestOverview {
     cacheWriteTokens: null,
     stopReason: entry.stop_reason ?? null,
     isComplete: !!entry.metrics_complete,
-    attempts: [],
+    attempts: [
+      ...(children ?? []).map((child) => ({
+        statusCode: child.status_code,
+        error: child.error_message,
+        latencyMs: child.latency_ms ?? 0,
+        providerId: child.provider_id ?? "",
+        model: child.backend_model ?? child.model ?? undefined,
+        apiType: child.api_type,
+      })),
+      {
+        statusCode: entry.status_code,
+        error: entry.error_message,
+        latencyMs: entry.latency_ms ?? 0,
+        providerId: entry.provider_id ?? "",
+        model: entry.backend_model ?? entry.model ?? undefined,
+        apiType: entry.api_type,
+      },
+    ],
     status:
       (entry.status_code ?? 0) >= HTTP_ERROR_THRESHOLD ? "failed" : "completed",
     clientRequest: entry.client_request,

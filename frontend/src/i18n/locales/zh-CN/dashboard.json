@@ -1,23 +1,42 @@
 {
   "title": "仪表盘",
   "stats": {
-    "totalRequests": "总请求数",
-    "successRate": "成功率",
-    "tokenOutputSpeed": "Token 输出速度",
-    "tokenInputTotal": "Token 输入总量",
-    "tokenOutputTotal": "Token 输出总量",
-    "cacheHitRate": "缓存命中率"
+    "inputTokens": "输入 Token",
+    "outputTokens": "输出 Token",
+    "avgTps": "平均 TPS",
+    "cacheHitRate": "缓存命中率",
+    "totalRequests": "请求数",
+    "successRate": "成功率"
   },
   "charts": {
-    "tokenOutputSpeed": "Token 输出速度 (t/s)",
-    "tokenInputTotal": "Token 输入总量",
-    "tokenOutputTotal": "Token 输出总量"
+    "tokenThroughput": "Token 吞吐量",
+    "inputLegend": "输入",
+    "outputLegend": "输出",
+    "tps": "输出速度 (TPS)",
+    "cacheHit": "缓存命中率"
   },
-  "period": {
-    "last5Hours": "最近5小时",
-    "weekly": "本周",
-    "monthly": "本月",
-    "custom": "自定义"
+  "provider": {
+    "all": "全部供应商"
+  },
+  "filters": {
+    "button": "筛选",
+    "model": "模型",
+    "key": "密钥",
+    "clientType": "客户端类型"
+  },
+  "timeline": {
+    "range": "{start} ~ {end}",
+    "hint": "点击窗口查看详情",
+    "noData": "暂无使用记录"
+  },
+  "delta": {
+    "vsPrev": "较上窗口 {value}",
+    "up": "+{pct}%",
+    "down": "-{pct}%",
+    "noPrev": "无历史数据"
+  },
+  "window": {
+    "label": "窗口"
   },
   "clientType": {
     "all": "全部",
@@ -33,5 +52,9 @@
   "loadProvidersFailed": "加载供应商列表失败",
   "loadDashboardFailed": "加载仪表盘数据失败",
   "loadFilterFailed": "加载筛选项失败",
-  "loadOutputTokensFailed": "加载供应商排序数据失败"
+  "loadOutputTokensFailed": "加载供应商排序数据失败",
+  "empty": {
+    "noProvider": "尚未配置供应商",
+    "goToProviders": "前往配置"
+  }
 }

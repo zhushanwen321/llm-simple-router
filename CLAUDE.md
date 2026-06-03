@@ -171,6 +171,24 @@ Handler (handler/proxy-handler.ts)
 
 **技术栈：** Vue 3.5 + TypeScript + Vite 8 + Tailwind 3.4 + shadcn-vue 2.6 + Chart.js 4.5 + @tanstack/vue-table 8.21 + lucide-vue-next + vue-sonner
 
+**全局工具类（`frontend/src/styles/components.css`）：**
+
+| 工具类 | 用途 | 使用场景 |
+|--------|------|----------|
+| `.page` | 页面布局容器（`p-6 max-w-[1440px] mx-auto`） | 所有标准页面的最外层 div |
+
+新增页面必须使用 `.page` 作为外层容器。
+
+**Card 组件变体（`frontend/src/components/ui/card/Card.vue`）：**
+
+| 变体 | 用途 |
+|------|----------|
+| `<Card>` | 标准卡片，有 padding/gap |
+| `<Card size="sm">` | 紧凑卡片 |
+| `<Card flush>` | 无 padding + overflow-hidden，用于包裹 Table 等全宽内容 |
+
+需要 card 样式时优先使用 Card 组件而非裸 `bg-card rounded-lg border`。
+
 **路由（`frontend/src/router/index.ts`）：**
 | 路径 | 视图 | 认证 |
 |------|------|------|
@@ -220,6 +238,42 @@ Handler (handler/proxy-handler.ts)
 | `logs/` | 请求详情日志文件（按 logId 命名） | `cat ~/.llm-simple-router/logs/<logId>.json` 查完整请求/响应内容 |
 
 **排查生产问题时**，先用 `request_logs` 表定位 logId，再从 `logs/` 目录读取完整请求体和响应体，这是复现和定位 bug 的关键数据源。
+
+## 设计 Demo 目录
+
+`docs/designs/` 是管理后台所有页面的 HTML 交互原型目录。每个文件是自包含的 HTML（内联 CSS + JS），可直接在浏览器打开预览。
+
+| 文件 | 页面 | 路由 |
+|------|------|------|
+| `index.html` | 目录索引 | — |
+| `demo-dashboard.html` | 仪表盘 | `/` |
+| `demo-monitor.html` | 实时监控 | `/monitor` |
+| `demo-logs.html` | 请求日志 | `/logs` |
+| `demo-providers.html` | Provider 管理 | `/providers` |
+| `demo-mappings.html` | 模型映射 | `/mappings` |
+| `demo-retry-rules.html` | 重试规则 | `/retry-rules` |
+| `demo-router-keys.html` | 路由密钥 | `/router-keys` |
+| `demo-proxy-enhancement.html` | 代理增强 | `/proxy-enhancement` |
+
+**用途**：前端页面重构时的视觉参考和交互规格。Demo 中使用的设计 token 与 `tokens.css` 保持一致。
+
+**更新规则**：当页面布局发生重大变更时，同步更新对应 demo 文件。小幅样式调整不需要更新 demo。
+
+## 临时文档目录
+
+`docs/scratch/` 存放开发过程中的临时文档（AI 分析报告、调研笔记、排查记录等）。
+
+**命名**：`YYYY-MM-DD-<简短描述>.md`
+
+**PR 合入前必须审查清空**，对每个文件判断：
+
+| 判断 | 处理 |
+|------|------|
+| 有长期参考价值 | 提升为正式文档（`docs/adr/`、`docs/standards/` 等），删除原文件 |
+| 仅当前 PR 上下文 | PR description 中提炼要点后删除 |
+| AI 中间产物 / 已解决的问题 | 直接删除 |
+
+**原则**：scratch 文件不应随 PR 合入 main。详见 `docs/scratch/README.md` 和 `docs/standards/05-documentation.md §9.7`。
 
 ## 环境变量
 
@@ -592,6 +646,7 @@ bash ~/.pi/agent/skills/merge-worktree/pre-merge-check.sh
 | 阶段 | 脚本/操作 | 说明 |
 |------|-----------|------|
 | 验证 | `bash ~/.pi/agent/skills/merge-worktree/pre-merge-check.sh` | PR push 前 + merge 前必须全部通过 |
+| 临时文档审查 | 检查 `docs/scratch/` | 有价值的提升为正式文档，无价值的删除。合并前目录应清空 |
 | 合并 | `gh pr merge <num> --merge --auto` | 使用 GitHub merge，不调用 merge-worktree-release.sh |
 | 发布 | `bash scripts/publish.sh <patch\|minor\|major>` | 替换 merge-worktree-release.sh，触发 Actions 发布 |
 | 清理 | `bash ~/.claude/skills/merge-worktree/merge-worktree.sh <branch>` | 删除 worktree + 同步其他分支 |

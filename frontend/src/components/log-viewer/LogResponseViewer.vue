@@ -1,31 +1,46 @@
 <template>
-  <Tabs :default-value="mode ?? 'structured'" :model-value="mode" class="w-full">
+  <Tabs
+    :default-value="mode ?? 'structured'"
+    :model-value="mode"
+    class="w-full"
+  >
     <!-- 粘性控制栏：结构化/原始切换 + 复制 -->
-    <div v-if="!mode" class="flex items-center justify-between py-2 border-b mb-2 sticky top-0 z-10 bg-background">
+    <div
+      v-if="!mode"
+      class="flex items-center justify-between py-2 border-b mb-2 sticky top-0 z-10 bg-background"
+    >
       <TabsList>
-        <TabsTrigger value="structured">{{ t('logs.viewer.structured') }}</TabsTrigger>
-        <TabsTrigger value="raw">{{ isStream ? t('logs.viewer.rawSseText') : t('logs.viewer.rawJson') }}</TabsTrigger>
+        <TabsTrigger value="structured">{{
+          t("logs.viewer.structured")
+        }}</TabsTrigger>
+        <TabsTrigger value="raw">{{
+          isStream ? t("logs.viewer.rawSseText") : t("logs.viewer.rawJson")
+        }}</TabsTrigger>
       </TabsList>
       <Button variant="ghost" size="xs" class="h-auto py-1" @click="copyRaw">
-        {{ copied ? t('logs.viewer.copied') : t('logs.viewer.copy') }}
+        {{ copied ? t("logs.viewer.copied") : t("logs.viewer.copy") }}
       </Button>
     </div>
 
     <TabsContent value="structured" class="space-y-3">
       <template v-if="parseError">
-        <div class="text-destructive text-sm">{{ t('logs.viewer.parseError') }}</div>
+        <div class="text-destructive text-sm">
+          {{ t("logs.viewer.parseError") }}
+        </div>
       </template>
       <template v-else>
         <!-- Status -->
         <div class="flex items-center gap-2">
-          <Badge :variant="statusVariant">status: {{ parsed!.statusCode }}</Badge>
+          <Badge :variant="statusVariant"
+            >status: {{ parsed!.statusCode }}</Badge
+          >
         </div>
 
         <!-- Headers -->
         <Collapsible>
           <CollapsibleTrigger as-child>
             <Button variant="ghost" size="xs" class="px-0 h-auto text-xs">
-              {{ t('logs.viewer.headers', { count: headerEntries.length }) }}
+              {{ t("logs.viewer.headers", { count: headerEntries.length }) }}
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent>
@@ -33,8 +48,10 @@
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead class="w-1/3">{{ t('logs.viewer.key') }}</TableHead>
-                    <TableHead>{{ t('logs.viewer.value') }}</TableHead>
+                    <TableHead class="w-1/3">{{
+                      t("logs.viewer.key")
+                    }}</TableHead>
+                    <TableHead>{{ t("logs.viewer.value") }}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -52,52 +69,94 @@
         <template v-if="!isStream">
           <template v-if="apiType === 'openai'">
             <div class="flex flex-wrap gap-2">
-              <StatPill v-if="parsedBody.id" label="id" :value="String(parsedBody.id)" />
-              <StatPill v-if="parsedBody.model" label="model" :value="String(parsedBody.model)" :highlight="true" />
-              <StatPill v-if="parsedBody.system_fingerprint" label="fingerprint" :value="String(parsedBody.system_fingerprint)" />
+              <StatPill
+                v-if="parsedBody.id"
+                label="id"
+                :value="String(parsedBody.id)"
+              />
+              <StatPill
+                v-if="parsedBody.model"
+                label="model"
+                :value="String(parsedBody.model)"
+                :highlight="true"
+              />
+              <StatPill
+                v-if="parsedBody.system_fingerprint"
+                label="fingerprint"
+                :value="String(parsedBody.system_fingerprint)"
+              />
             </div>
             <div v-if="openaiChoices.length" class="space-y-2">
-              <div class="text-xs font-medium text-muted-foreground">Choices</div>
-              <Card v-for="(choice, idx) in openaiChoices" :key="idx" class="bg-muted/40">
+              <div class="text-xs font-medium text-muted-foreground">
+                Choices
+              </div>
+              <Card
+                v-for="(choice, idx) in openaiChoices"
+                :key="idx"
+                class="bg-muted/40"
+              >
                 <CardHeader class="pb-2 flex flex-row items-center gap-2">
-                  <Badge variant="secondary">{{ choice.role || 'assistant' }}</Badge>
-                  <Badge v-if="choice.finish_reason" variant="outline">{{ choice.finish_reason }}</Badge>
+                  <Badge variant="secondary">{{
+                    choice.role || "assistant"
+                  }}</Badge>
+                  <Badge v-if="choice.finish_reason" variant="outline">{{
+                    choice.finish_reason
+                  }}</Badge>
                 </CardHeader>
                 <CardContent>
                   <Collapsible>
                     <CollapsibleTrigger as-child>
-                      <Button variant="ghost" size="xs" class="px-0 h-auto text-xs">{{ t('logs.viewer.content') }}</Button>
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        class="px-0 h-auto text-xs"
+                        >{{ t("logs.viewer.content") }}</Button
+                      >
                     </CollapsibleTrigger>
                     <CollapsibleContent>
-                      <pre class="mt-1 whitespace-pre-wrap break-all text-xs bg-muted rounded-md p-2 border">{{ choice.content }}</pre>
+                      <pre
+                        class="mt-1 whitespace-pre-wrap break-all text-xs bg-muted rounded-md p-2 border"
+                        >{{ choice.content }}</pre
+                      >
                     </CollapsibleContent>
                   </Collapsible>
                 </CardContent>
               </Card>
             </div>
-            <div v-if="openaiUsage" class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div
+              v-if="openaiUsage"
+              class="grid grid-cols-2 sm:grid-cols-4 gap-2"
+            >
               <Card class="bg-muted/40">
                 <CardContent class="py-2 px-3 text-xs">
                   <div class="text-muted-foreground">prompt_tokens</div>
-                  <div class="font-medium">{{ openaiUsage.prompt_tokens ?? '-' }}</div>
+                  <div class="font-medium">
+                    {{ openaiUsage.prompt_tokens ?? "-" }}
+                  </div>
                 </CardContent>
               </Card>
               <Card class="bg-muted/40">
                 <CardContent class="py-2 px-3 text-xs">
                   <div class="text-muted-foreground">completion_tokens</div>
-                  <div class="font-medium">{{ openaiUsage.completion_tokens ?? '-' }}</div>
+                  <div class="font-medium">
+                    {{ openaiUsage.completion_tokens ?? "-" }}
+                  </div>
                 </CardContent>
               </Card>
               <Card class="bg-muted/40">
                 <CardContent class="py-2 px-3 text-xs">
                   <div class="text-muted-foreground">total_tokens</div>
-                  <div class="font-medium">{{ openaiUsage.total_tokens ?? '-' }}</div>
+                  <div class="font-medium">
+                    {{ openaiUsage.total_tokens ?? "-" }}
+                  </div>
                 </CardContent>
               </Card>
               <Card class="bg-muted/40">
                 <CardContent class="py-2 px-3 text-xs">
                   <div class="text-muted-foreground">cached_tokens</div>
-                  <div class="font-medium">{{ openaiUsage.cached_tokens ?? '-' }}</div>
+                  <div class="font-medium">
+                    {{ openaiUsage.cached_tokens ?? "-" }}
+                  </div>
                 </CardContent>
               </Card>
             </div>
@@ -105,43 +164,81 @@
 
           <template v-if="apiType === 'anthropic'">
             <div class="flex flex-wrap gap-2">
-              <StatPill v-if="parsedBody.id" label="id" :value="String(parsedBody.id)" />
-              <StatPill v-if="parsedBody.type" label="type" :value="String(parsedBody.type)" />
-              <StatPill v-if="parsedBody.model" label="model" :value="String(parsedBody.model)" :highlight="true" />
-              <StatPill v-if="parsedBody.stop_reason" label="stop_reason" :value="String(parsedBody.stop_reason)" />
+              <StatPill
+                v-if="parsedBody.id"
+                label="id"
+                :value="String(parsedBody.id)"
+              />
+              <StatPill
+                v-if="parsedBody.type"
+                label="type"
+                :value="String(parsedBody.type)"
+              />
+              <StatPill
+                v-if="parsedBody.model"
+                label="model"
+                :value="String(parsedBody.model)"
+                :highlight="true"
+              />
+              <StatPill
+                v-if="parsedBody.stop_reason"
+                label="stop_reason"
+                :value="String(parsedBody.stop_reason)"
+              />
             </div>
             <div v-if="anthropicContentBlocks.length" class="space-y-2">
-              <div class="text-xs font-medium text-muted-foreground">Content</div>
-              <div v-for="(block, idx) in anthropicContentBlocks" :key="idx" class="rounded-md border p-3">
+              <div class="text-xs font-medium text-muted-foreground">
+                Content
+              </div>
+              <div
+                v-for="(block, idx) in anthropicContentBlocks"
+                :key="idx"
+                class="rounded-md border p-3"
+              >
                 <div class="flex items-center gap-2 mb-2">
-                  <Badge :class="blockClass(block.type)">{{ block.type }}</Badge>
-                  <span v-if="block.text" class="text-sm">{{ block.text }}</span>
+                  <Badge :class="blockClass(block.type)">{{
+                    block.type
+                  }}</Badge>
+                  <span v-if="block.text" class="text-sm">{{
+                    block.text
+                  }}</span>
                 </div>
               </div>
             </div>
-            <div v-if="anthropicUsage" class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div
+              v-if="anthropicUsage"
+              class="grid grid-cols-2 sm:grid-cols-4 gap-2"
+            >
               <Card class="bg-muted/40">
                 <CardContent class="py-2 px-3 text-xs">
                   <div class="text-muted-foreground">input_tokens</div>
-                  <div class="font-medium">{{ anthropicUsage.input_tokens ?? '-' }}</div>
+                  <div class="font-medium">
+                    {{ anthropicUsage.input_tokens ?? "-" }}
+                  </div>
                 </CardContent>
               </Card>
               <Card class="bg-muted/40">
                 <CardContent class="py-2 px-3 text-xs">
                   <div class="text-muted-foreground">output_tokens</div>
-                  <div class="font-medium">{{ anthropicUsage.output_tokens ?? '-' }}</div>
+                  <div class="font-medium">
+                    {{ anthropicUsage.output_tokens ?? "-" }}
+                  </div>
                 </CardContent>
               </Card>
               <Card class="bg-muted/40">
                 <CardContent class="py-2 px-3 text-xs">
                   <div class="text-muted-foreground">cache_creation</div>
-                  <div class="font-medium">{{ anthropicUsage.cache_creation_input_tokens ?? '-' }}</div>
+                  <div class="font-medium">
+                    {{ anthropicUsage.cache_creation_input_tokens ?? "-" }}
+                  </div>
                 </CardContent>
               </Card>
               <Card class="bg-muted/40">
                 <CardContent class="py-2 px-3 text-xs">
                   <div class="text-muted-foreground">cache_read</div>
-                  <div class="font-medium">{{ anthropicUsage.cache_read_input_tokens ?? '-' }}</div>
+                  <div class="font-medium">
+                    {{ anthropicUsage.cache_read_input_tokens ?? "-" }}
+                  </div>
                 </CardContent>
               </Card>
             </div>
@@ -152,8 +249,22 @@
         <template v-else>
           <div class="space-y-3">
             <div class="flex gap-1">
-              <Button variant="ghost" :class="streamTab === 'assembled' ? 'bg-secondary' : ''" size="xs" class="h-auto py-1" @click="streamTab = 'assembled'">{{ t('logs.viewer.completeResponse') }}</Button>
-              <Button variant="ghost" :class="streamTab === 'raw-events' ? 'bg-secondary' : ''" size="xs" class="h-auto py-1" @click="streamTab = 'raw-events'">{{ t('logs.viewer.rawEvents') }}</Button>
+              <Button
+                variant="ghost"
+                :class="streamTab === 'assembled' ? 'bg-secondary' : ''"
+                size="xs"
+                class="h-auto py-1"
+                @click="streamTab = 'assembled'"
+                >{{ t("logs.viewer.completeResponse") }}</Button
+              >
+              <Button
+                variant="ghost"
+                :class="streamTab === 'raw-events' ? 'bg-secondary' : ''"
+                size="xs"
+                class="h-auto py-1"
+                @click="streamTab = 'raw-events'"
+                >{{ t("logs.viewer.rawEvents") }}</Button
+              >
             </div>
 
             <!-- 完整响应 -->
@@ -162,50 +273,118 @@
               <template v-if="apiType === 'anthropic'">
                 <div class="flex flex-wrap gap-2">
                   <StatPill v-if="sseMeta.id" label="id" :value="sseMeta.id" />
-                  <StatPill v-if="sseMeta.model" label="model" :value="sseMeta.model" :highlight="true" />
-                  <StatPill label="input" :value="String(sseMeta.inputTokens)" />
+                  <StatPill
+                    v-if="sseMeta.model"
+                    label="model"
+                    :value="sseMeta.model"
+                    :highlight="true"
+                  />
+                  <StatPill
+                    label="input"
+                    :value="String(sseMeta.inputTokens)"
+                  />
                 </div>
-                <div v-for="(blk, idx) in assembledBlocks" :key="idx" :class="['rounded-md border p-3', blockBorderClass(blk.type)]">
+                <div
+                  v-for="(blk, idx) in assembledBlocks"
+                  :key="idx"
+                  :class="['rounded-md border p-3', blockBorderClass(blk.type)]"
+                >
                   <div class="flex items-center gap-2 mb-2">
                     <Badge :class="blockClass(blk.type)">{{ blk.type }}</Badge>
-                    <span class="text-xs text-muted-foreground">{{ t('logs.viewer.deltaEvents', { count: blk.eventCount }) }}</span>
-                    <span v-if="blk.toolName" class="text-xs font-mono">{{ blk.toolName }}</span>
+                    <span class="text-xs text-muted-foreground">{{
+                      t("logs.viewer.deltaEvents", { count: blk.eventCount })
+                    }}</span>
+                    <span v-if="blk.toolName" class="text-xs font-mono">{{
+                      blk.toolName
+                    }}</span>
                   </div>
-                  <template v-if="blk.content.length > 500 && !expandedBlock[idx]">
-                    <pre class="whitespace-pre-wrap break-all text-sm bg-muted rounded-md p-3 border">{{ blk.content.slice(0, 500) }}...</pre>
-                    <Button variant="link" size="xs" class="px-0" @click="expandedBlock[idx] = true">{{ t('logs.viewer.expandAll') }}</Button>
+                  <template
+                    v-if="blk.content.length > 500 && !expandedBlock[idx]"
+                  >
+                    <pre
+                      class="whitespace-pre-wrap break-all text-sm bg-muted rounded-md p-3 border"
+                      >{{ blk.content.slice(0, 500) }}...</pre
+                    >
+                    <Button
+                      variant="link"
+                      size="xs"
+                      class="px-0"
+                      @click="expandedBlock[idx] = true"
+                      >{{ t("logs.viewer.expandAll") }}</Button
+                    >
                   </template>
-                  <pre v-else class="whitespace-pre-wrap break-all text-sm bg-muted rounded-md p-3 border max-h-[40vh] overflow-auto">{{ blk.content }}</pre>
+                  <pre
+                    v-else
+                    class="whitespace-pre-wrap break-all text-sm bg-muted rounded-md p-3 border max-h-[40vh] overflow-auto"
+                    >{{ blk.content }}</pre
+                  >
                 </div>
                 <div class="flex flex-wrap gap-2">
-                  <StatPill label="stop_reason" :value="sseMeta.stopReason || '-'" />
-                  <StatPill label="output_tokens" :value="String(sseMeta.outputTokens || '-')" />
+                  <StatPill
+                    label="stop_reason"
+                    :value="sseMeta.stopReason || '-'"
+                  />
+                  <StatPill
+                    label="output_tokens"
+                    :value="String(sseMeta.outputTokens || '-')"
+                  />
                 </div>
               </template>
 
               <!-- OpenAI SSE 组装 -->
               <template v-if="apiType === 'openai' && openaiAssembled">
                 <div class="flex flex-wrap gap-2">
-                  <StatPill v-if="openaiAssembled.role" label="role" :value="openaiAssembled.role" />
-                  <StatPill label="content delta" :value="String(openaiAssembled.contentEventCount)" />
-                  <StatPill v-if="openaiAssembled.finishReason" label="finish" :value="openaiAssembled.finishReason" />
+                  <StatPill
+                    v-if="openaiAssembled.role"
+                    label="role"
+                    :value="openaiAssembled.role"
+                  />
+                  <StatPill
+                    label="content delta"
+                    :value="String(openaiAssembled.contentEventCount)"
+                  />
+                  <StatPill
+                    v-if="openaiAssembled.finishReason"
+                    label="finish"
+                    :value="openaiAssembled.finishReason"
+                  />
                 </div>
-                <div :class="['rounded-md border p-3', blockBorderClass('text')]">
-                  <pre class="whitespace-pre-wrap break-all text-sm bg-muted rounded-md p-3 max-h-[40vh] overflow-auto">{{ openaiAssembled.content }}</pre>
+                <div
+                  :class="['rounded-md border p-3', blockBorderClass('text')]"
+                >
+                  <pre
+                    class="whitespace-pre-wrap break-all text-sm bg-muted rounded-md p-3 max-h-[40vh] overflow-auto"
+                    >{{ openaiAssembled.content }}</pre
+                  >
                 </div>
-                <div v-if="openaiAssembled.usage" class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  <Card class="bg-muted/40"><CardContent class="py-2 px-3 text-xs">
-                    <div class="text-muted-foreground">prompt_tokens</div>
-                    <div class="font-medium">{{ openaiAssembled.usage.prompt_tokens ?? '-' }}</div>
-                  </CardContent></Card>
-                  <Card class="bg-muted/40"><CardContent class="py-2 px-3 text-xs">
-                    <div class="text-muted-foreground">completion_tokens</div>
-                    <div class="font-medium">{{ openaiAssembled.usage.completion_tokens ?? '-' }}</div>
-                  </CardContent></Card>
-                  <Card class="bg-muted/40"><CardContent class="py-2 px-3 text-xs">
-                    <div class="text-muted-foreground">total_tokens</div>
-                    <div class="font-medium">{{ openaiAssembled.usage.total_tokens ?? '-' }}</div>
-                  </CardContent></Card>
+                <div
+                  v-if="openaiAssembled.usage"
+                  class="grid grid-cols-2 sm:grid-cols-4 gap-2"
+                >
+                  <Card class="bg-muted/40"
+                    ><CardContent class="py-2 px-3 text-xs">
+                      <div class="text-muted-foreground">prompt_tokens</div>
+                      <div class="font-medium">
+                        {{ openaiAssembled.usage.prompt_tokens ?? "-" }}
+                      </div>
+                    </CardContent></Card
+                  >
+                  <Card class="bg-muted/40"
+                    ><CardContent class="py-2 px-3 text-xs">
+                      <div class="text-muted-foreground">completion_tokens</div>
+                      <div class="font-medium">
+                        {{ openaiAssembled.usage.completion_tokens ?? "-" }}
+                      </div>
+                    </CardContent></Card
+                  >
+                  <Card class="bg-muted/40"
+                    ><CardContent class="py-2 px-3 text-xs">
+                      <div class="text-muted-foreground">total_tokens</div>
+                      <div class="font-medium">
+                        {{ openaiAssembled.usage.total_tokens ?? "-" }}
+                      </div>
+                    </CardContent></Card
+                  >
                 </div>
               </template>
             </template>
@@ -214,55 +393,93 @@
             <template v-if="streamTab === 'raw-events'">
               <template v-if="apiType === 'openai'">
                 <div v-if="openaiSseRole" class="text-sm">
-                  <span class="text-muted-foreground">role:</span> {{ openaiSseRole }}
+                  <span class="text-muted-foreground">role:</span>
+                  {{ openaiSseRole }}
                 </div>
                 <div v-if="openaiSseFirstContent" class="text-sm">
-                  <span class="text-muted-foreground">first content delta:</span> {{ openaiSseFirstContent }}
+                  <span class="text-muted-foreground"
+                    >first content delta:</span
+                  >
+                  {{ openaiSseFirstContent }}
                 </div>
                 <div v-if="openaiSseFinishReason" class="text-sm">
-                  <span class="text-muted-foreground">finish_reason:</span> {{ openaiSseFinishReason }}
+                  <span class="text-muted-foreground">finish_reason:</span>
+                  {{ openaiSseFinishReason }}
                 </div>
-                <div v-if="openaiSseCollapsedCount > 0" class="text-xs text-muted-foreground">
-                  {{ t('logs.viewer.collapsedEvents', { count: openaiSseCollapsedCount }) }}
+                <div
+                  v-if="openaiSseCollapsedCount > 0"
+                  class="text-xs text-muted-foreground"
+                >
+                  {{
+                    t("logs.viewer.collapsedEvents", {
+                      count: openaiSseCollapsedCount,
+                    })
+                  }}
                 </div>
-                <div v-if="openaiSseUsage" class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  <Card class="bg-muted/40"><CardContent class="py-2 px-3 text-xs">
-                    <div class="text-muted-foreground">prompt_tokens</div>
-                    <div class="font-medium">{{ openaiSseUsage.prompt_tokens ?? '-' }}</div>
-                  </CardContent></Card>
-                  <Card class="bg-muted/40"><CardContent class="py-2 px-3 text-xs">
-                    <div class="text-muted-foreground">completion_tokens</div>
-                    <div class="font-medium">{{ openaiSseUsage.completion_tokens ?? '-' }}</div>
-                  </CardContent></Card>
-                  <Card class="bg-muted/40"><CardContent class="py-2 px-3 text-xs">
-                    <div class="text-muted-foreground">total_tokens</div>
-                    <div class="font-medium">{{ openaiSseUsage.total_tokens ?? '-' }}</div>
-                  </CardContent></Card>
-                  <Card class="bg-muted/40"><CardContent class="py-2 px-3 text-xs">
-                    <div class="text-muted-foreground">cached_tokens</div>
-                    <div class="font-medium">{{ openaiSseUsage.cached_tokens ?? '-' }}</div>
-                  </CardContent></Card>
+                <div
+                  v-if="openaiSseUsage"
+                  class="grid grid-cols-2 sm:grid-cols-4 gap-2"
+                >
+                  <Card class="bg-muted/40"
+                    ><CardContent class="py-2 px-3 text-xs">
+                      <div class="text-muted-foreground">prompt_tokens</div>
+                      <div class="font-medium">
+                        {{ openaiSseUsage.prompt_tokens ?? "-" }}
+                      </div>
+                    </CardContent></Card
+                  >
+                  <Card class="bg-muted/40"
+                    ><CardContent class="py-2 px-3 text-xs">
+                      <div class="text-muted-foreground">completion_tokens</div>
+                      <div class="font-medium">
+                        {{ openaiSseUsage.completion_tokens ?? "-" }}
+                      </div>
+                    </CardContent></Card
+                  >
+                  <Card class="bg-muted/40"
+                    ><CardContent class="py-2 px-3 text-xs">
+                      <div class="text-muted-foreground">total_tokens</div>
+                      <div class="font-medium">
+                        {{ openaiSseUsage.total_tokens ?? "-" }}
+                      </div>
+                    </CardContent></Card
+                  >
+                  <Card class="bg-muted/40"
+                    ><CardContent class="py-2 px-3 text-xs">
+                      <div class="text-muted-foreground">cached_tokens</div>
+                      <div class="font-medium">
+                        {{ openaiSseUsage.cached_tokens ?? "-" }}
+                      </div>
+                    </CardContent></Card
+                  >
                 </div>
               </template>
               <template v-if="apiType === 'anthropic'">
-                <SseEventLine v-if="anthropicMessageStart"
+                <SseEventLine
+                  v-if="anthropicMessageStart"
                   event-type="message_start"
                   :summary="`id=${anthropicMessageStart.id} model=${anthropicMessageStart.model} input_tokens=${anthropicMessageStart.input_tokens}`"
                 />
-                <SseEventLine v-for="(item, idx) in anthropicContentBlockStarts" :key="'cbs-' + idx"
+                <SseEventLine
+                  v-for="(item, idx) in anthropicContentBlockStarts"
+                  :key="'cbs-' + idx"
                   event-type="content_block_start"
                   :summary="`[${item.index}] ${item.type}`"
                 />
-                <SseEventLine v-for="(group, idx) in anthropicDeltaGroups" :key="'dg-' + idx"
+                <SseEventLine
+                  v-for="(group, idx) in anthropicDeltaGroups"
+                  :key="'dg-' + idx"
                   event-type="content_block_delta"
                   :summary="formatDeltaGroupSummary(group)"
                 />
-                <SseEventLine v-if="anthropicMessageDelta"
+                <SseEventLine
+                  v-if="anthropicMessageDelta"
                   event-type="message_delta"
                   :summary="`output_tokens=${anthropicMessageDelta.output_tokens} stop_reason=${anthropicMessageDelta.stop_reason}`"
                   :highlight="true"
                 />
-                <SseEventLine v-if="anthropicMessageStop"
+                <SseEventLine
+                  v-if="anthropicMessageStop"
                   event-type="message_stop"
                   :summary="t('logs.viewer.streamEnd')"
                 />
@@ -280,135 +497,176 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { useClipboard } from '@/composables/useClipboard'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader } from '@/components/ui/card'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import JsonCopyBlock from './JsonCopyBlock.vue'
-import StatPill from './StatPill.vue'
-import SseEventLine from './SseEventLine.vue'
-import { blockClass, blockBorderClass } from './logColors'
-import { useSSEParsing } from './useSSEParsing'
+import { computed, reactive, ref } from "vue";
+import { useI18n } from "vue-i18n";
+import { useClipboard } from "@/composables/useClipboard";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import JsonCopyBlock from "./JsonCopyBlock.vue";
+import StatPill from "./StatPill.vue";
+import SseEventLine from "./SseEventLine.vue";
+import { blockClass, blockBorderClass } from "./logColors";
+import { useSSEParsing } from "./useSSEParsing";
 
 const props = defineProps<{
-  raw: string
-  apiType: 'openai' | 'anthropic'
-  isStream: boolean
+  raw: string;
+  apiType: "openai" | "openai-responses" | "anthropic";
+  isStream: boolean;
   /** 外部控制显示模式时传入 */
-  mode?: 'structured' | 'raw'
-}>()
+  mode?: "structured" | "raw";
+}>();
 
-const { t } = useI18n()
+const { t } = useI18n();
 const parsed = computed(() => {
   try {
-    return JSON.parse(props.raw) as { statusCode?: number; headers?: Record<string, string>; body?: string }
+    return JSON.parse(props.raw) as {
+      statusCode?: number;
+      headers?: Record<string, string>;
+      body?: string;
+    };
   } catch {
-    return null
+    /* JSON 解析失败，使用默认值 */ return null;
   }
-})
+});
 
-const parseError = computed(() => parsed.value === null)
+const parseError = computed(() => parsed.value === null);
 
-const HTTP_ERROR_THRESHOLD = 400
+const HTTP_ERROR_THRESHOLD = 400;
 
 const statusVariant = computed(() => {
-  const code = parsed.value?.statusCode ?? 0
-  return code >= HTTP_ERROR_THRESHOLD ? 'destructive' : 'default'
-})
+  const code = parsed.value?.statusCode ?? 0;
+  return code >= HTTP_ERROR_THRESHOLD ? "destructive" : "default";
+});
 
 const headerEntries = computed(() => {
-  const headers = parsed.value?.headers || {}
-  return Object.entries(headers)
-})
+  const headers = parsed.value?.headers || {};
+  return Object.entries(headers);
+});
 
 const parsedBody = computed(() => {
   if (!props.isStream && parsed.value?.body) {
     try {
-      return JSON.parse(parsed.value.body) as Record<string, unknown>
+      return JSON.parse(parsed.value.body) as Record<string, unknown>;
     } catch {
-      return {} as Record<string, unknown>
+      /* JSON 解析失败，使用默认值 */ return {} as Record<string, unknown>;
     }
   }
-  return {} as Record<string, unknown>
-})
+  return {} as Record<string, unknown>;
+});
 
 // Non-streaming OpenAI
 const openaiChoices = computed(() => {
   const choices = (parsedBody.value.choices || []) as Array<{
-    index?: number
-    message?: { role?: string; content?: string }
-    finish_reason?: string
-  }>
+    index?: number;
+    message?: { role?: string; content?: string };
+    finish_reason?: string;
+  }>;
   return choices.map((c) => ({
-    role: c.message?.role || 'assistant',
-    content: c.message?.content || '',
-    finish_reason: c.finish_reason || '',
-  }))
-})
+    role: c.message?.role || "assistant",
+    content: c.message?.content || "",
+    finish_reason: c.finish_reason || "",
+  }));
+});
 
 const openaiUsage = computed(() => {
-  const u = parsedBody.value.usage as Record<string, number> | undefined
-  if (!u) return null
+  const u = parsedBody.value.usage as Record<string, number> | undefined;
+  if (!u) return null;
   return {
     prompt_tokens: u.prompt_tokens,
     completion_tokens: u.completion_tokens,
     total_tokens: u.total_tokens,
-    cached_tokens: (u as Record<string, unknown>).cached_tokens ?? ((u as Record<string, unknown>).prompt_tokens_details as Record<string, number> | undefined)?.cached_tokens,
-  }
-})
+    cached_tokens:
+      (u as Record<string, unknown>).cached_tokens ??
+      (
+        (u as Record<string, unknown>).prompt_tokens_details as
+          | Record<string, number>
+          | undefined
+      )?.cached_tokens,
+  };
+});
 
 // Non-streaming Anthropic
 const anthropicContentBlocks = computed(() => {
-  const content = (parsedBody.value.content || []) as Array<{ type: string; text?: string }>
-  return content
-})
+  const content = (parsedBody.value.content || []) as Array<{
+    type: string;
+    text?: string;
+  }>;
+  return content;
+});
 
 const anthropicUsage = computed(() => {
-  const u = parsedBody.value.usage as Record<string, number> | undefined
-  if (!u) return null
+  const u = parsedBody.value.usage as Record<string, number> | undefined;
+  if (!u) return null;
   return {
     input_tokens: u.input_tokens,
     output_tokens: u.output_tokens,
     cache_creation_input_tokens: u.cache_creation_input_tokens,
     cache_read_input_tokens: u.cache_read_input_tokens,
-  }
-})
+  };
+});
 
 // SSE 解析（composable）
-const bodyForSSE = computed(() => parsed.value?.body)
+const bodyForSSE = computed(() => parsed.value?.body);
 const {
-  assembledBlocks, sseMeta, openaiAssembled,
-  anthropicMessageStart, anthropicContentBlockStarts, anthropicDeltaGroups,
-  anthropicMessageDelta, anthropicMessageStop,
-  openaiSseRole, openaiSseFirstContent, openaiSseFinishReason,
-  openaiSseCollapsedCount, openaiSseUsage,
-} = useSSEParsing(bodyForSSE, props.isStream, props.apiType)
+  assembledBlocks,
+  sseMeta,
+  openaiAssembled,
+  anthropicMessageStart,
+  anthropicContentBlockStarts,
+  anthropicDeltaGroups,
+  anthropicMessageDelta,
+  anthropicMessageStop,
+  openaiSseRole,
+  openaiSseFirstContent,
+  openaiSseFinishReason,
+  openaiSseCollapsedCount,
+  openaiSseUsage,
+} = useSSEParsing(bodyForSSE, props.isStream, props.apiType);
 
-const expandedBlock = reactive<Record<number, boolean>>({})
-const streamTab = ref<'assembled' | 'raw-events'>('assembled')
-const { copied, copy: clipboardCopy } = useClipboard()
+const expandedBlock = reactive<Record<number, boolean>>({});
+const streamTab = ref<"assembled" | "raw-events">("assembled");
+const { copied, copy: clipboardCopy } = useClipboard();
 
 async function copyRaw() {
-  await clipboardCopy(props.raw)
+  await clipboardCopy(props.raw);
 }
 
 interface DeltaGroup {
-  deltaType: string
-  kept: number
-  folded: number
-  foldedChars: number
+  deltaType: string;
+  kept: number;
+  folded: number;
+  foldedChars: number;
 }
 
 function formatDeltaGroupSummary(group: DeltaGroup): string {
-  const base = t('logs.viewer.deltaGroupSummary', { deltaType: group.deltaType, kept: group.kept })
+  const base = t("logs.viewer.deltaGroupSummary", {
+    deltaType: group.deltaType,
+    kept: group.kept,
+  });
   if (group.folded > 0) {
-    return base + t('logs.viewer.deltaFoldedInfo', { folded: group.folded, chars: group.foldedChars })
+    return (
+      base +
+      t("logs.viewer.deltaFoldedInfo", {
+        folded: group.folded,
+        chars: group.foldedChars,
+      })
+    );
   }
-  return base
+  return base;
 }
 </script>

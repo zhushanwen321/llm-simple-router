@@ -71,6 +71,7 @@ export interface ProviderPreset {
 
 export interface ProviderGroup {
   group: string;
+  shortname: string;
   presets: ProviderPreset[];
 }
 
@@ -164,8 +165,8 @@ export interface QuickSetupPayload {
     endpoints?: Array<{
       api_type: "openai" | "openai-responses" | "anthropic";
       base_url: string;
-      upstream_path?: string;
-      api_key?: string;
+      upstream_path?: string | null;
+      api_key?: string | null;
     }>;
     models: Array<{
       name: string;
@@ -177,7 +178,11 @@ export interface QuickSetupPayload {
     queue_timeout_ms?: number;
     max_queue_size?: number;
   };
-  mappings: Array<{ client_model: string; backend_model: string }>;
+  mappings: Array<{
+    client_model: string;
+    backend_model: string;
+    rule?: string;
+  }>;
   retry_rules: Array<{
     name: string;
     status_code: number;
@@ -186,6 +191,7 @@ export interface QuickSetupPayload {
     retry_delay_ms: number;
     max_retries: number;
     max_delay_ms: number;
+    provider_shortname?: string | null;
   }>;
   transform_rules?: {
     inject_headers?: Record<string, string>;
@@ -532,6 +538,8 @@ export const api = {
   getUsageWindows: (params?: {
     router_key_id?: string;
     provider_id?: string;
+    start_time?: string;
+    end_time?: string;
   }) =>
     request<UsageWindowWithUsage[]>("get", "/usage/windows", undefined, {
       params,

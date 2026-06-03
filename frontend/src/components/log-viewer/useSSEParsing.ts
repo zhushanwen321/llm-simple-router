@@ -151,7 +151,7 @@ function assembleOpenaiBlocks(events: SSEEvent[]): AssembledBlock[] {
 export function useSSEParsing(
   body: Ref<string | undefined>,
   isStream: boolean,
-  apiType: "openai" | "anthropic",
+  apiType: "openai" | "openai-responses" | "anthropic",
 ) {
   const sseEvents = computed<SSEEvent[]>(() => {
     if (!isStream || !body.value) return [];
@@ -169,7 +169,10 @@ export function useSSEParsing(
         const data = JSON.parse(payload) as Record<string, unknown>;
         events.push({ type: "data", data });
       } catch {
-        events.push({ type: "raw", data: payload });
+        /* JSON 解析失败，跳过该事件 */ events.push({
+          type: "raw",
+          data: payload,
+        });
       }
     }
     return events;

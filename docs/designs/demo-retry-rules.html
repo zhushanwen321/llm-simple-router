@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>重试规则 - LLM Router Console</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: oklch(0.145 0 0);
+    --surface: oklch(0.205 0 0);
+    --surface-up: oklch(0.269 0 0);
+    --fg: oklch(0.985 0 0);
+    --muted: oklch(0.708 0 0);
+    --border: oklch(1 0 0 / 10%);
+    --primary: oklch(0.68 0.13 175);
+    --success: oklch(0.65 0.17 150);
+    --success-bg: oklch(0.32 0.05 150);
+    --warning: oklch(0.78 0.16 80);
+    --warning-bg: oklch(0.35 0.06 80);
+    --danger: oklch(0.58 0.22 25);
+    --danger-bg: oklch(0.30 0.08 25);
+    --info: oklch(0.62 0.18 250);
+    --info-bg: oklch(0.30 0.06 250);
+    --font-body: 'Inter', -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+    --radius: 8px;
+    --radius-sm: 6px;
+  }
+
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.5;
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .page-header { margin-bottom: 1.5rem; }
+  .page-header h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.02em; }
+  .page-header p { color: var(--muted); font-size: 0.8125rem; margin-top: 0.25rem; }
+
+  .anchor-bar {
+    display: flex; gap: 1.5rem; padding: 1rem 1.25rem;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); margin-bottom: 1rem;
+  }
+  .anchor-item { display: flex; flex-direction: column; gap: 0.125rem; }
+  .anchor-item .label { font-size: 0.6875rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .anchor-item .value { font-family: var(--font-mono); font-size: 1.5rem; font-weight: 600; }
+  .anchor-item .value.success { color: var(--success); }
+  .anchor-divider { width: 1px; background: var(--border); align-self: stretch; }
+
+  /* Recommended Section */
+  .recommended-section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); margin-bottom: 1rem; overflow: hidden;
+  }
+  .recommended-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0.75rem 1rem; cursor: pointer; transition: background 100ms;
+  }
+  .recommended-header:hover { background: oklch(0.22 0 0); }
+  .recommended-header h3 {
+    font-size: 0.8125rem; font-weight: 600;
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+  .recommended-header .chevron {
+    transition: transform 200ms; font-size: 0.75rem; color: var(--muted);
+  }
+  .recommended-header .chevron.open { transform: rotate(90deg); }
+  .recommended-body { display: none; border-top: 1px solid var(--border); }
+  .recommended-body.visible { display: block; }
+  .rec-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0.5rem 1rem; border-bottom: 1px solid var(--border);
+    font-size: 0.8125rem;
+  }
+  .rec-item:last-child { border-bottom: none; }
+  .rec-name { font-weight: 500; }
+  .rec-desc { color: var(--muted); font-size: 0.75rem; }
+
+  .btn {
+    font-family: var(--font-body); font-size: 0.8125rem; font-weight: 500;
+    padding: 0.5rem 1rem; border-radius: var(--radius-sm);
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--fg); cursor: pointer; transition: all 150ms; white-space: nowrap;
+  }
+  .btn:hover { background: var(--surface-up); border-color: var(--primary); }
+  .btn-primary {
+    background: var(--primary); color: oklch(0.15 0 0);
+    border-color: var(--primary); font-weight: 600;
+  }
+  .btn-primary:hover { background: oklch(0.72 0.14 175); }
+  .btn-sm { font-size: 0.75rem; padding: 0.25rem 0.5rem; }
+
+  /* Filter Bar */
+  .filter-bar {
+    display: flex; gap: 0.75rem; align-items: center;
+    margin-bottom: 1rem; flex-wrap: wrap;
+  }
+  .filter-bar select {
+    font-family: var(--font-body); font-size: 0.8125rem;
+    background: var(--surface); color: var(--fg);
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 0.5rem 0.75rem; outline: none; cursor: pointer;
+  }
+  .filter-bar select:focus { border-color: var(--primary); }
+
+  /* Table */
+  .table-wrap {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    font-size: 0.6875rem; font-weight: 600; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 0.625rem 0.75rem; text-align: left;
+    border-bottom: 1px solid var(--border); background: oklch(0.18 0 0);
+  }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background 100ms; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: oklch(0.22 0 0); }
+  tbody td {
+    padding: 0.5rem 0.75rem; font-size: 0.8125rem;
+    height: 36px; vertical-align: middle;
+  }
+
+  .mono { font-family: var(--font-mono); font-size: 0.8125rem; }
+  .mono-sm { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); }
+
+  .badge {
+    display: inline-flex; align-items: center;
+    padding: 0.125rem 0.5rem; border-radius: 9999px;
+    font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.02em; white-space: nowrap;
+  }
+  .badge-teal { background: oklch(0.30 0.06 175); color: var(--primary); }
+  .badge-amber { background: oklch(0.35 0.06 80); color: var(--warning); }
+  .badge-success { background: var(--success-bg); color: var(--success); }
+  .badge-muted { background: oklch(0.269 0 0); color: var(--muted); }
+
+  .inline-code {
+    font-family: var(--font-mono); font-size: 0.75rem;
+    background: oklch(0.269 0 0); padding: 0.125rem 0.375rem;
+    border-radius: 4px; color: var(--fg);
+  }
+
+  /* Switch Toggle */
+  .switch {
+    position: relative; width: 36px; height: 20px;
+    background: oklch(0.269 0 0); border-radius: 10px;
+    cursor: pointer; transition: background 200ms; border: none; outline: none;
+  }
+  .switch.active { background: var(--primary); }
+  .switch::after {
+    content: ''; position: absolute;
+    width: 16px; height: 16px; border-radius: 50%;
+    background: var(--fg); top: 2px; left: 2px;
+    transition: transform 200ms;
+  }
+  .switch.active::after { transform: translateX(16px); }
+
+  .actions { display: flex; gap: 0.75rem; align-items: center; }
+  .action-link {
+    font-size: 0.8125rem; color: var(--primary); cursor: pointer;
+    background: none; border: none; font-family: var(--font-body);
+    padding: 0; transition: color 150ms;
+  }
+  .action-link:hover { color: oklch(0.78 0.14 175); }
+  .action-link.danger { color: var(--danger); }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>重试规则</h1>
+  <p>配置 API 请求失败时的自动重试策略</p>
+</div>
+
+<!-- Anchor Bar -->
+<div class="anchor-bar">
+  <div class="anchor-item">
+    <span class="label">规则总数</span>
+    <span class="value">6</span>
+  </div>
+  <div class="anchor-divider"></div>
+  <div class="anchor-item">
+    <span class="label">启用中</span>
+    <span class="value success">4</span>
+  </div>
+</div>
+
+<!-- Recommended Rules -->
+<div class="recommended-section">
+  <div class="recommended-header" onclick="toggleRecommended()">
+    <h3>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+      推荐规则
+      <span style="color:var(--muted);font-weight:400;font-size:0.75rem">3 条可一键启用</span>
+    </h3>
+    <span class="chevron" id="recChevron">&#9654;</span>
+  </div>
+  <div class="recommended-body" id="recBody">
+    <div class="rec-item">
+      <div>
+        <span class="rec-name">Rate Limit 重试</span>
+        <span class="rec-desc" style="margin-left:0.5rem">状态码 429，指数退避</span>
+      </div>
+      <button class="btn btn-sm btn-primary" onclick="alert('启用推荐规则（demo）')">一键启用</button>
+    </div>
+    <div class="rec-item">
+      <div>
+        <span class="rec-name">服务端错误重试</span>
+        <span class="rec-desc" style="margin-left:0.5rem">状态码 500/502/503，固定延迟</span>
+      </div>
+      <button class="btn btn-sm btn-primary" onclick="alert('启用推荐规则（demo）')">一键启用</button>
+    </div>
+    <div class="rec-item">
+      <div>
+        <span class="rec-name">上下文溢出降级</span>
+        <span class="rec-desc" style="margin-left:0.5rem">匹配 context_length_exceeded，Failover</span>
+      </div>
+      <button class="btn btn-sm btn-primary" onclick="alert('启用推荐规则（demo）')">一键启用</button>
+    </div>
+  </div>
+</div>
+
+<!-- Filter Bar -->
+<div class="filter-bar">
+  <select>
+    <option>全部策略</option>
+    <option>Fixed</option>
+    <option>Exponential</option>
+  </select>
+  <select>
+    <option>全部状态</option>
+    <option>启用</option>
+    <option>禁用</option>
+  </select>
+  <div style="flex:1"></div>
+  <button class="btn btn-primary" onclick="alert('新增规则表单（demo）')">+ 新增规则</button>
+</div>
+
+<!-- Table -->
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>名称</th>
+        <th>匹配条件</th>
+        <th>策略</th>
+        <th>延迟</th>
+        <th>最大重试</th>
+        <th>启用</th>
+        <th>操作</th>
+      </tr>
+    </thead>
+    <tbody id="ruleTable"></tbody>
+  </table>
+</div>
+
+<script>
+const rules = [
+  {
+    name: 'Rate Limit 退避',
+    statusCode: '429',
+    bodyPattern: 'rate_limit',
+    strategy: 'exponential',
+    strategyLabel: 'Exponential',
+    strategyColor: 'amber',
+    delay: '1000ms',
+    maxRetry: 3,
+    enabled: true
+  },
+  {
+    name: '服务端错误重试',
+    statusCode: '500, 502, 503',
+    bodyPattern: '*',
+    strategy: 'fixed',
+    strategyLabel: 'Fixed',
+    strategyColor: 'teal',
+    delay: '2000ms',
+    maxRetry: 2,
+    enabled: true
+  },
+  {
+    name: 'DeepSeek 超载降级',
+    statusCode: '503',
+    bodyPattern: 'overloaded',
+    strategy: 'exponential',
+    strategyLabel: 'Exponential',
+    strategyColor: 'amber',
+    delay: '2000ms',
+    maxRetry: 3,
+    enabled: true
+  },
+  {
+    name: '连接超时重试',
+    statusCode: 'ETIMEDOUT',
+    bodyPattern: '*',
+    strategy: 'fixed',
+    strategyLabel: 'Fixed',
+    strategyColor: 'teal',
+    delay: '3000ms',
+    maxRetry: 1,
+    enabled: true
+  },
+  {
+    name: '上下文溢出 Failover',
+    statusCode: '400',
+    bodyPattern: 'context_length_exceeded',
+    strategy: 'fixed',
+    strategyLabel: 'Fixed',
+    strategyColor: 'teal',
+    delay: '0ms',
+    maxRetry: 1,
+    enabled: false
+  },
+  {
+    name: '模型过载重试',
+    statusCode: '529',
+    bodyPattern: '*',
+    strategy: 'exponential',
+    strategyLabel: 'Exponential',
+    strategyColor: 'amber',
+    delay: '5000ms',
+    maxRetry: 5,
+    enabled: false
+  }
+];
+
+function renderTable() {
+  const tbody = document.getElementById('ruleTable');
+  tbody.innerHTML = rules.map((r, i) => {
+    const matchCond = `<span class="inline-code">${r.statusCode}</span>`
+      + (r.bodyPattern !== '*' ? ` <span style="color:var(--muted);font-size:0.75rem">+ body:</span> <span class="inline-code">${r.bodyPattern}</span>` : '');
+
+    return `<tr>
+      <td style="font-weight:500">${r.name}</td>
+      <td>${matchCond}</td>
+      <td><span class="badge badge-${r.strategyColor}">${r.strategyLabel}</span></td>
+      <td class="mono">${r.delay}</td>
+      <td class="mono">${r.maxRetry}</td>
+      <td>
+        <button class="switch ${r.enabled ? 'active' : ''}" onclick="toggleRule(${i})"></button>
+      </td>
+      <td>
+        <div class="actions">
+          <button class="action-link">编辑</button>
+          <button class="action-link danger">删除</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function toggleRule(index) {
+  rules[index].enabled = !rules[index].enabled;
+  renderTable();
+}
+
+function toggleRecommended() {
+  const body = document.getElementById('recBody');
+  const chevron = document.getElementById('recChevron');
+  body.classList.toggle('visible');
+  chevron.classList.toggle('open');
+}
+
+renderTable();
+</script>
+</body>
+</html>

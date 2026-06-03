@@ -1,372 +1,37 @@
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
-import type { Ref, ComputedRef } from "vue";
 import { useI18n } from "vue-i18n";
-import type { ChartData } from "chart.js";
-import { api, getApiMessage } from "@/api/client";
+import { api, getApiMessage, type UsageWindowWithUsage } from "@/api/client";
 import { toast } from "vue-sonner";
-import { fillTimeseries } from "@/views/metrics-helpers";
-import { CHART_COLORS } from "@/styles/design-tokens";
-import { formatTimeShort, toIsoStart, toIsoEnd } from "@/utils/format";
+import { formatProviderTokenLabel } from "@/utils/token-format";
 import { watchTheme } from "@/composables/useTheme";
 import type { Provider } from "@/types/mapping";
+import { useDashboardFilters } from "./useDashboardFilters";
+import type { DashboardStats } from "./useDashboardData";
+import { useDashboardData } from "./useDashboardData";
+import { useDashboardTimeline } from "./useDashboardTimeline";
 
-export interface DashboardStats {
-  totalRequests: number;
-  successRate: number;
-  avgTps: number;
-  totalInputTokens: number;
-  totalOutputTokens: number;
-  startTime: string | null;
-  endTime: string | null;
+// --- Constants ---
+
+const DEBOUNCE_MS = 300;
+const PERCENT_MULTIPLIER = 100;
+const MIN_WINDOWS_FOR_DELTA = 2;
+
+// --- Helpers ---
+
+/** 从 usageWindows 中按 provider_id 聚合全部 input tokens（不依赖选中窗口） */
+function aggregateAllProviderInputTokens(
+  windows: UsageWindowWithUsage[],
+): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const w of windows) {
+    if (!w.window.provider_id || w.usage.total_input_tokens <= 0) continue;
+    const existing = map.get(w.window.provider_id) ?? 0;
+    map.set(w.window.provider_id, existing + w.usage.total_input_tokens);
+  }
+  return map;
 }
 
-type TimeseriesParamsResult = {
-  period?: string;
-  metric: string;
-  provider_id?: string;
-  backend_model?: string;
-  router_key_id?: string;
-  start_time?: string;
-  end_time?: string;
-};
-
-// --- useDashboardFilters ---
-
-function useDashboardFilters(
-  periodTab: Ref<"window" | "weekly" | "monthly" | "custom">,
-  customStart: Ref<string>,
-  customEnd: Ref<string>,
-  selectedProvider: Ref<string>,
-  providers: Ref<Provider[]>,
-  t: (key: string) => string,
-) {
-  const modelFilter = ref("all");
-  const keyFilter = ref("all");
-  const clientType = ref("all");
-  const allModelOptions = ref<string[]>([]);
-  const keyOptions = ref<{ id: string; name: string }[]>([]);
-
-  const modelOptions = computed(() => {
-    if (selectedProvider.value) {
-      const provider = providers.value.find(
-        (p) => p.id === selectedProvider.value,
-      );
-      if (provider) {
-        const providerModels = new Set(provider.models.map((m) => m.name));
-        return allModelOptions.value.filter((m) => providerModels.has(m));
-      }
-    }
-    return allModelOptions.value;
-  });
-
-  const apiStartTime = computed(() => {
-    if (periodTab.value === "custom" && customStart.value) {
-      return toIsoStart(customStart.value);
-    }
-    return undefined;
-  });
-
-  const apiEndTime = computed(() => {
-    if (periodTab.value === "custom" && customEnd.value) {
-      return toIsoEnd(customEnd.value);
-    }
-    return undefined;
-  });
-
-  const statsParams = computed(() => {
-    const p: Record<string, string> = {};
-    if (periodTab.value !== "custom") {
-      p.period = periodTab.value;
-    } else if (apiStartTime.value && apiEndTime.value) {
-      p.start_time = apiStartTime.value;
-      p.end_time = apiEndTime.value;
-    }
-    if (selectedProvider.value) p.provider_id = selectedProvider.value;
-    if (modelFilter.value !== "all") p.backend_model = modelFilter.value;
-    if (keyFilter.value !== "all") p.router_key_id = keyFilter.value;
-    return p;
-  });
-
-  const cacheSummaryParams = computed(() => {
-    const p: Record<string, string> = {};
-    if (periodTab.value !== "custom") {
-      p.period = periodTab.value;
-    } else if (apiStartTime.value && apiEndTime.value) {
-      p.start_time = apiStartTime.value;
-      p.end_time = apiEndTime.value;
-    }
-    if (selectedProvider.value) p.provider_id = selectedProvider.value;
-    if (modelFilter.value !== "all") p.backend_model = modelFilter.value;
-    if (keyFilter.value !== "all") p.router_key_id = keyFilter.value;
-    if (clientType.value !== "all") p.client_type = clientType.value;
-    return p;
-  });
-
-  const timeseriesPeriod = computed(() => {
-    if (
-      periodTab.value === "custom" &&
-      apiStartTime.value &&
-      apiEndTime.value
-    ) {
-      return "monthly";
-    }
-    return periodTab.value as "window" | "weekly" | "monthly";
-  });
-
-  function tsParams(metric: string): TimeseriesParamsResult {
-    const p: TimeseriesParamsResult = { metric };
-    if (periodTab.value !== "custom") {
-      p.period = periodTab.value;
-    } else if (apiStartTime.value && apiEndTime.value) {
-      p.start_time = apiStartTime.value;
-      p.end_time = apiEndTime.value;
-    }
-    if (selectedProvider.value) p.provider_id = selectedProvider.value;
-    if (modelFilter.value !== "all") p.backend_model = modelFilter.value;
-    if (keyFilter.value !== "all") p.router_key_id = keyFilter.value;
-    return p;
-  }
-
-  async function loadFilterOptions() {
-    try {
-      const [models, keys] = await Promise.allSettled([
-        api.getAvailableModels(),
-        api.getRouterKeys(),
-      ]);
-      if (models.status === "fulfilled") allModelOptions.value = models.value;
-      if (keys.status === "fulfilled") keyOptions.value = keys.value;
-    } catch (e: unknown) {
-      console.error("Failed to load filter options:", e);
-      /* 非关键操作：filter 缺失不影响主仪表盘功能 */
-      toast.error(getApiMessage(e, t("dashboard.loadFilterFailed")));
-    }
-  }
-
-  return {
-    modelFilter,
-    keyFilter,
-    clientType,
-    allModelOptions,
-    keyOptions,
-    modelOptions,
-    apiStartTime,
-    apiEndTime,
-    statsParams,
-    cacheSummaryParams,
-    timeseriesPeriod,
-    tsParams,
-    loadFilterOptions,
-  };
-}
-
-// --- useDashboardData ---
-
-function useDashboardData(
-  selectedProvider: Ref<string>,
-  periodTab: Ref<"window" | "weekly" | "monthly" | "custom">,
-  providers: Ref<Provider[]>,
-  apiStartTime: ComputedRef<string | undefined>,
-  apiEndTime: ComputedRef<string | undefined>,
-  statsParams: ComputedRef<Record<string, string>>,
-  cacheSummaryParams: ComputedRef<Record<string, string>>,
-  timeseriesPeriod: ComputedRef<"window" | "weekly" | "monthly">,
-  tsParams: (metric: string) => TimeseriesParamsResult,
-  watchKey: ComputedRef<string>,
-  t: (key: string) => string,
-) {
-  const stats = ref<DashboardStats>({
-    totalRequests: 0,
-    successRate: 0,
-    avgTps: 0,
-    totalInputTokens: 0,
-    totalOutputTokens: 0,
-    startTime: null,
-    endTime: null,
-  });
-  const cacheHitRate = ref(0);
-  const clientTypeBreakdown = ref<Record<string, number>>({});
-  const tpsChartData = ref<ChartData<"line"> | null>(null);
-  const inputTokensChartData = ref<ChartData<"line"> | null>(null);
-  const outputTokensChartData = ref<ChartData<"line"> | null>(null);
-  const loading = ref(false);
-  const providerOutputTokens = ref<Record<string, number>>({});
-
-  function toChartData(
-    timeseries: { labels: string[]; values: number[] },
-    label: string,
-    color: string,
-  ): ChartData<"line"> {
-    return {
-      labels: timeseries.labels,
-      datasets: [
-        {
-          label,
-          data: timeseries.values,
-          borderColor: color,
-          backgroundColor: color.replace(")", " / 0.1)"),
-          fill: false,
-          tension: 0.4,
-          pointRadius: 0,
-        },
-      ],
-    };
-  }
-
-  const loadError = ref(false);
-
-  async function loadProviders() {
-    try {
-      providers.value = await api.getProviders();
-      loadError.value = false;
-    } catch (e: unknown) {
-      console.error("Failed to load providers:", e);
-      loadError.value = true;
-      toast.error(getApiMessage(e, t("dashboard.loadProvidersFailed")));
-    }
-  }
-
-  async function loadProviderOutputTokens() {
-    if (providers.value.length === 0) return;
-    if (
-      periodTab.value === "custom" &&
-      !(apiStartTime.value && apiEndTime.value)
-    )
-      return;
-    const params: Record<string, string> = { ...statsParams.value };
-    delete params.provider_id;
-    delete params.backend_model;
-    delete params.router_key_id;
-    try {
-      const summary = await api.getMetricsSummary(params);
-      const map: Record<string, number> = {};
-      if (summary.rows && Array.isArray(summary.rows)) {
-        for (const row of summary.rows) {
-          if (row.provider_id) {
-            map[row.provider_id] = row.total_output_tokens || 0;
-          }
-        }
-      }
-      providerOutputTokens.value = map;
-    } catch (e: unknown) {
-      console.error("Failed to load output tokens:", e);
-      /* 非关键操作：provider 排序降级为默认顺序 */
-      toast.error(getApiMessage(e, t("dashboard.loadOutputTokensFailed")));
-    }
-  }
-
-  const DEBOUNCE_MS = 300;
-  const CACHE_TTL = 5000;
-  let lastRefreshKey = "";
-  let lastRefreshTime = 0;
-  let refreshTimer: ReturnType<typeof setTimeout> | null = null;
-
-  async function refresh() {
-    if (!selectedProvider.value) return;
-    if (
-      periodTab.value === "custom" &&
-      !(apiStartTime.value && apiEndTime.value)
-    )
-      return;
-    const key = watchKey.value;
-    const now = Date.now();
-    if (key === lastRefreshKey && now - lastRefreshTime < CACHE_TTL) return;
-    loading.value = true;
-    try {
-      const [statsRes, tpsRes, inputRes, outputRes, summaryRes] =
-        await Promise.allSettled([
-          api.getStats(statsParams.value),
-          api.getMetricsTimeseries(tsParams("total_tps")),
-          api.getMetricsTimeseries(tsParams("input_tokens")),
-          api.getMetricsTimeseries(tsParams("output_tokens")),
-          api.getMetricsSummary(cacheSummaryParams.value),
-        ]);
-
-      const fulfilled = <T>(
-        r: PromiseSettledResult<T>,
-      ): r is PromiseFulfilledResult<T> => r.status === "fulfilled";
-
-      if (fulfilled(statsRes)) stats.value = statsRes.value;
-
-      const period = timeseriesPeriod.value;
-      const timeRange =
-        stats.value.startTime && stats.value.endTime
-          ? { startTime: stats.value.startTime, endTime: stats.value.endTime }
-          : undefined;
-
-      if (fulfilled(tpsRes) && tpsRes.value.length > 0) {
-        const filled = fillTimeseries(tpsRes.value, period, timeRange);
-        tpsChartData.value = toChartData(
-          filled,
-          t("dashboard.charts.tokenOutputSpeed"),
-          CHART_COLORS.indigo,
-        );
-      } else {
-        tpsChartData.value = null;
-      }
-
-      if (fulfilled(inputRes) && inputRes.value.length > 0) {
-        const filled = fillTimeseries(inputRes.value, period, timeRange);
-        inputTokensChartData.value = toChartData(
-          filled,
-          t("dashboard.charts.tokenInputTotal"),
-          CHART_COLORS.teal,
-        );
-      } else {
-        inputTokensChartData.value = null;
-      }
-
-      if (fulfilled(outputRes) && outputRes.value.length > 0) {
-        const filled = fillTimeseries(outputRes.value, period, timeRange);
-        outputTokensChartData.value = toChartData(
-          filled,
-          t("dashboard.charts.tokenOutputTotal"),
-          CHART_COLORS.green,
-        );
-      } else {
-        outputTokensChartData.value = null;
-      }
-
-      if (fulfilled(summaryRes)) {
-        cacheHitRate.value = summaryRes.value.cache_hit_rate;
-        clientTypeBreakdown.value = summaryRes.value.client_type_breakdown;
-      }
-    } catch (e: unknown) {
-      console.error("Failed to load dashboard:", e);
-      toast.error(getApiMessage(e, t("dashboard.loadDashboardFailed")));
-    } finally {
-      loading.value = false;
-      lastRefreshKey = key;
-      lastRefreshTime = Date.now();
-    }
-  }
-
-  // debounced watch on watchKey
-  watch(watchKey, () => {
-    if (refreshTimer) clearTimeout(refreshTimer);
-    refreshTimer = setTimeout(() => refresh(), DEBOUNCE_MS);
-  });
-
-  onUnmounted(() => {
-    if (refreshTimer) clearTimeout(refreshTimer);
-  });
-
-  return {
-    stats,
-    cacheHitRate,
-    clientTypeBreakdown,
-    tpsChartData,
-    inputTokensChartData,
-    outputTokensChartData,
-    loading,
-    loadError,
-    providerOutputTokens,
-    loadProviders,
-    loadProviderOutputTokens,
-    refresh,
-  };
-}
-
-// --- useDashboard ---
+// --- useDashboard (facade) ---
 
 export function useDashboard() {
   const { t } = useI18n();
@@ -374,186 +39,256 @@ export function useDashboard() {
   // --- Provider list and selection ---
   const providers = ref<Provider[]>([]);
   const selectedProvider = ref("");
+  const providerLoadError = ref(false);
 
-  // --- Period tab ---
-  const periodTab = ref<"window" | "weekly" | "monthly" | "custom">("window");
-  const customStart = ref("");
-  const customEnd = ref("");
+  // --- Sub-composables ---
+  const filters = useDashboardFilters({ selectedProvider, providers, t });
 
-  // --- Filters & params ---
-  const {
-    modelFilter,
-    keyFilter,
-    clientType,
-    keyOptions,
-    modelOptions,
-    apiStartTime,
-    apiEndTime,
-    statsParams,
-    cacheSummaryParams,
-    timeseriesPeriod,
-    tsParams,
-    loadFilterOptions,
-  } = useDashboardFilters(
-    periodTab,
-    customStart,
-    customEnd,
-    selectedProvider,
-    providers,
-    t,
+  const timeline = useDashboardTimeline({ selectedProvider, t });
+
+  // --- Derived: provider token labels from usageWindows (stable across provider selection) ---
+  const providerInputTokens = computed(() =>
+    aggregateAllProviderInputTokens(timeline.usageWindows.value),
+  );
+
+  const providerTokenLabels = computed(() => {
+    const map = new Map<string, string>();
+    for (const [id, tokens] of providerInputTokens.value) {
+      map.set(id, formatProviderTokenLabel(tokens));
+    }
+    return map;
+  });
+
+  // --- Provider sorting based on total input tokens across all windows ---
+  const sortedProviders = computed(() => {
+    const tokenMap = providerInputTokens.value;
+    return [...providers.value].sort((a, b) => {
+      const aIn = tokenMap.get(a.id) ?? 0;
+      const bIn = tokenMap.get(b.id) ?? 0;
+      return bIn - aIn;
+    });
+  });
+
+  // --- Watch key (cross-composite dependency fingerprint) ---
+  const watchKey = computed(() =>
+    JSON.stringify({
+      selectedProvider: selectedProvider.value,
+      selectedWindowId: timeline.selectedWindowId.value,
+      modelFilter: filters.modelFilter.value,
+      keyFilter: filters.keyFilter.value,
+      clientType: filters.clientType.value,
+      timelineRange: timeline.timelineRange.value,
+    }),
   );
 
   // --- Data fetching ---
-  const watchKey = computed(() =>
-    JSON.stringify({
-      periodTab: periodTab.value,
-      selectedProvider: selectedProvider.value,
-      modelFilter: modelFilter.value,
-      keyFilter: keyFilter.value,
-      clientType: clientType.value,
-      customStart: customStart.value,
-      customEnd: customEnd.value,
-    }),
-  );
-
-  const {
-    stats,
-    cacheHitRate,
-    clientTypeBreakdown,
-    tpsChartData,
-    inputTokensChartData,
-    outputTokensChartData,
-    loading,
-    loadError,
-    providerOutputTokens,
-    loadProviders,
-    loadProviderOutputTokens,
-    refresh,
-  } = useDashboardData(
+  const data = useDashboardData({
     selectedProvider,
-    periodTab,
-    providers,
-    apiStartTime,
-    apiEndTime,
-    statsParams,
-    cacheSummaryParams,
-    timeseriesPeriod,
-    tsParams,
+    statsParams: filters.statsParams,
+    cacheSummaryParams: filters.cacheSummaryParams,
+    tsParams: filters.tsParams,
+    selectedWindow: timeline.selectedWindow,
     watchKey,
     t,
-  );
-
-  // --- Derived ---
-  const sortedProviders = computed(() =>
-    [...providers.value].sort((a, b) => {
-      const aOut = providerOutputTokens.value[a.id] ?? 0;
-      const bOut = providerOutputTokens.value[b.id] ?? 0;
-      return bOut - aOut;
-    }),
-  );
-
-  const timeRangeText = computed(() => {
-    const start = stats.value.startTime;
-    const end = stats.value.endTime;
-    if (!start || !end) return "—";
-    try {
-      return `${formatTimeShort(start)} ~ ${formatTimeShort(end)}`;
-    } catch {
-      return "—";
-    }
   });
 
-  // --- Auto-select top provider after tokens are loaded ---
-  async function autoSelectIfNeeded() {
-    if (
-      Object.keys(providerOutputTokens.value).length > 0 &&
-      !selectedProvider.value
-    ) {
-      const top = sortedProviders.value[0];
-      if (top) selectedProvider.value = top.id;
+  // --- Environment comparison (prev window stats) ---
+  const prevWindowStats = ref<DashboardStats | null>(null);
+
+  const deltaValues = computed(() => {
+    const prev = prevWindowStats.value;
+    const curr = data.stats.value;
+    if (!prev) return null;
+    function delta(cur: number, prv: number): string {
+      if (prv === 0) return cur > 0 ? "+100.0" : "0.0";
+      const val = ((cur - prv) / prv) * PERCENT_MULTIPLIER;
+      const str = Math.abs(val).toFixed(1);
+      return val > 0 ? `+${str}` : str;
+    }
+    return {
+      totalRequests: delta(curr.totalRequests, prev.totalRequests),
+      successRate: delta(curr.successRate, prev.successRate),
+      avgTps: delta(curr.avgTps, prev.avgTps),
+      totalInputTokens: delta(curr.totalInputTokens, prev.totalInputTokens),
+      totalOutputTokens: delta(curr.totalOutputTokens, prev.totalOutputTokens),
+    };
+  });
+
+  async function loadPrevWindowStats() {
+    const sorted = timeline.timelineWindows.value;
+    const window = timeline.selectedWindow.value;
+    if (!window || sorted.length < MIN_WINDOWS_FOR_DELTA) {
+      prevWindowStats.value = null;
+      return;
+    }
+    const idx = sorted.findIndex((w) => w.window.id === window.window.id);
+    if (idx < 1) {
+      prevWindowStats.value = null;
+      return;
+    }
+    const prevWindow = sorted[idx - 1];
+    try {
+      const params: Record<string, string> = {
+        period: "window",
+        start_time: prevWindow.window.start_time,
+        end_time: prevWindow.window.end_time,
+      };
+      if (selectedProvider.value) params.provider_id = selectedProvider.value;
+      const result = await api.getStats(params);
+      prevWindowStats.value = result;
+    } catch (e: unknown) {
+      console.error("useDashboard.loadPrevWindowStats:", e);
+      /* 非关键：环比数据缺失不影响主功能 */
+      prevWindowStats.value = null;
+    }
+  }
+
+  // --- Load providers ---
+  async function loadProviders() {
+    try {
+      providers.value = await api.getProviders();
+      providerLoadError.value = false;
+      data.loadError.value = false;
+    } catch (e: unknown) {
+      console.error("useDashboard.loadProviders:", e);
+      providerLoadError.value = true;
+      data.loadError.value = true;
+      toast.error(getApiMessage(e, t("dashboard.loadProvidersFailed")));
+    }
+  }
+
+  // --- Auto-select top provider ---
+  function autoSelectProviderIfNeeded() {
+    if (!selectedProvider.value && sortedProviders.value.length > 0) {
+      selectedProvider.value = sortedProviders.value[0].id;
     }
   }
 
   // --- Watchers ---
-  // 副作用：离开自定义日期模式时清空日期
-  watch(periodTab, () => {
-    if (periodTab.value !== "custom") {
-      customStart.value = "";
-      customEnd.value = "";
-    }
-  });
 
-  // 副作用：切换 provider 时重置 modelFilter
+  const initialized = ref(false);
+
+  // 切换 provider 时重置 modelFilter
   watch(selectedProvider, () => {
     if (
-      modelFilter.value !== "all" &&
-      !modelOptions.value.includes(modelFilter.value)
+      filters.modelFilter.value !== "all" &&
+      !filters.modelOptions.value.includes(filters.modelFilter.value)
     ) {
-      modelFilter.value = "all";
+      filters.modelFilter.value = "all";
     }
   });
 
-  // periodTab 变化时重新加载 provider 排序数据
-  watch(periodTab, async () => {
-    if (providers.value.length > 0) {
-      await loadProviderOutputTokens();
-      await autoSelectIfNeeded();
-    }
+  // Watch provider/range 变化 → 重新加载窗口 + 自动选择 + 刷新
+  let skipNextFilterRefresh = false;
+
+  watch([selectedProvider, timeline.timelineRange], async () => {
+    if (!initialized.value) return;
+    skipNextFilterRefresh = true;
+    await timeline.loadUsageWindows();
+    timeline.autoSelectLatestWindow();
+    await data.refresh();
+    await loadPrevWindowStats();
   });
+
+  // Watch selectedWindowId/filter 变化 → debounced refresh + loadPrev
+  let filterDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+  watch(
+    [
+      timeline.selectedWindowId,
+      filters.modelFilter,
+      filters.keyFilter,
+      filters.clientType,
+    ],
+    () => {
+      if (!initialized.value) return;
+      if (skipNextFilterRefresh) {
+        skipNextFilterRefresh = false;
+        return;
+      }
+      if (filterDebounceTimer) clearTimeout(filterDebounceTimer);
+      filterDebounceTimer = setTimeout(async () => {
+        await data.refresh();
+        await loadPrevWindowStats();
+      }, DEBOUNCE_MS);
+    },
+  );
 
   // --- Watch theme changes to re-render charts ---
   let stopWatchTheme: (() => void) | null = null;
 
-  // 加载失败时的重试函数
+  // --- Retry ---
   async function retry() {
     await loadProviders();
-    if (!loadError.value) {
-      await Promise.allSettled([
-        loadFilterOptions(),
-        loadProviderOutputTokens(),
-      ]);
-      await autoSelectIfNeeded();
-      await refresh();
-    }
+    if (providerLoadError.value) return;
+    await Promise.allSettled([
+      filters.loadFilterOptions(),
+      timeline.loadUsageWindows(),
+    ]);
+    autoSelectProviderIfNeeded();
+    timeline.autoSelectLatestWindow();
+    await data.refresh();
+    await loadPrevWindowStats();
   }
 
+  // --- Lifecycle ---
   onMounted(async () => {
     await loadProviders();
-    if (loadError.value) return;
-    await loadFilterOptions();
-    if (providers.value.length > 0) {
-      await loadProviderOutputTokens();
-    }
-    await autoSelectIfNeeded();
-    await refresh();
-    stopWatchTheme = watchTheme(() => refresh());
+    if (providerLoadError.value) return;
+    await timeline.loadUsageWindows();
+    await filters.loadFilterOptions();
+    autoSelectProviderIfNeeded();
+    timeline.autoSelectLatestWindow();
+    await data.refresh();
+    await loadPrevWindowStats();
+    initialized.value = true;
+    stopWatchTheme = watchTheme(() => data.refresh());
   });
 
   onUnmounted(() => {
     if (stopWatchTheme) stopWatchTheme();
+    if (filterDebounceTimer) clearTimeout(filterDebounceTimer);
   });
 
   return {
+    // Provider
     providers,
     selectedProvider,
     sortedProviders,
-    periodTab,
-    customStart,
-    customEnd,
-    modelFilter,
-    keyFilter,
-    clientType,
-    modelOptions,
-    keyOptions,
-    timeRangeText,
-    stats,
-    loading,
-    loadError,
-    cacheHitRate,
-    clientTypeBreakdown,
-    tpsChartData,
-    inputTokensChartData,
-    outputTokensChartData,
+    providerTokenLabels,
+    // Timeline
+    usageWindows: timeline.usageWindows,
+    selectedWindowId: timeline.selectedWindowId,
+    selectedWindow: timeline.selectedWindow,
+    timelineWindows: timeline.timelineWindows,
+    timelineRange: timeline.timelineRange,
+    // Filters
+    modelFilter: filters.modelFilter,
+    keyFilter: filters.keyFilter,
+    clientType: filters.clientType,
+    modelOptions: filters.modelOptions,
+    keyOptions: filters.keyOptions,
+    // Data
+    stats: data.stats,
+    loading: data.loading,
+    loadError: data.loadError,
+    cacheHitRate: data.cacheHitRate,
+    clientTypeBreakdown: data.clientTypeBreakdown,
+    tpsChartData: data.tpsChartData,
+    inputTokensChartData: data.inputTokensChartData,
+    outputTokensChartData: data.outputTokensChartData,
+    tokenThroughputChartData: data.tokenThroughputChartData,
+    timeRangeText: data.timeRangeText,
+    // Comparison
+    prevWindowStats,
+    deltaValues,
+    windowTimeRange: timeline.windowTimeRange,
+    // Timeline rendering
+    getWindowStyle: timeline.getWindowStyle,
+    getWindowWidth: timeline.getWindowWidth,
+    formatWindowTooltip: timeline.formatWindowTooltip,
+    timelineDayLabels: timeline.timelineDayLabels,
+    // Actions
     retry,
   };
 }

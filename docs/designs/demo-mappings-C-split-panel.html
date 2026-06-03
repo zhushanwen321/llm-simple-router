@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Model Mappings — Split Panel (方案C)</title>
+<style>
+  :root {
+    --bg: oklch(0.145 0 0);
+    --surface: oklch(0.205 0 0);
+    --surface-up: oklch(0.269 0 0);
+    --fg: oklch(0.985 0 0);
+    --muted: oklch(0.708 0 0);
+    --muted-dim: oklch(0.556 0 0);
+    --border: oklch(1 0 0 / 10%);
+    --border-strong: oklch(1 0 0 / 14%);
+    --primary: oklch(0.68 0.13 175);
+    --primary-dim: oklch(0.68 0.13 175 / 15%);
+    --primary-ghost: oklch(0.68 0.13 175 / 8%);
+    --success: oklch(0.65 0.17 150);
+    --success-dim: oklch(0.65 0.17 150 / 12%);
+    --warning: oklch(0.78 0.16 80);
+    --warning-dim: oklch(0.78 0.16 80 / 12%);
+    --danger: oklch(0.58 0.22 25);
+    --danger-dim: oklch(0.58 0.22 25 / 12%);
+    --mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+    --sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --radius: 8px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--fg); font-family:var(--sans); font-size:14px; line-height:1.5; }
+  .page { max-width:1360px; margin:0 auto; padding:20px 24px; }
+
+  /* Header */
+  .hdr { display:flex; align-items:center; gap:16px; margin-bottom:16px; }
+  .hdr-title { font-size:16px; font-weight:600; }
+  .hdr-spacer { flex:1; }
+  .hdr-btn {
+    display:inline-flex; align-items:center; gap:5px; height:30px; padding:0 12px;
+    border:1px solid var(--border); border-radius:var(--radius); background:transparent;
+    color:var(--muted); font-family:var(--sans); font-size:13px; cursor:pointer; transition:all 150ms;
+  }
+  .hdr-btn:hover { background:var(--surface); color:var(--fg); }
+  .hdr-btn.primary { background:var(--primary); border-color:var(--primary); color:oklch(0.145 0 0); font-weight:600; }
+
+  /* Split layout */
+  .split { display:flex; gap:16px; min-height:calc(100vh - 100px); }
+
+  /* Left list */
+  .left {
+    width:340px; flex-shrink:0; display:flex; flex-direction:column; gap:8px;
+  }
+  .left-search input {
+    width:100%; height:30px; background:var(--surface); border:1px solid var(--border);
+    border-radius:var(--radius); padding:0 10px; color:var(--fg); font-family:var(--sans); font-size:13px;
+    outline:none; transition:border-color 150ms;
+  }
+  .left-search input:focus { border-color:var(--primary); }
+  .left-search input::placeholder { color:var(--muted-dim); }
+  .left-count { font-family:var(--mono); font-size:10px; color:var(--muted-dim); padding:0 2px; }
+
+  .left-list { display:flex; flex-direction:column; gap:2px; flex:1; overflow-y:auto; }
+
+  .left-item {
+    display:flex; align-items:center; gap:10px; padding:8px 12px;
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+    cursor:pointer; transition:all 150ms;
+  }
+  .left-item:hover { background:var(--surface-up); }
+  .left-item.sel { border-color:var(--primary); background:oklch(0.68 0.13 175 / 10%); }
+  .left-item.inactive { opacity:0.45; }
+
+  .li-info { flex:1; min-width:0; }
+  .li-model { font-family:var(--mono); font-size:12px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .li-summary { font-size:10px; color:var(--muted-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px; }
+
+  .li-badge {
+    display:inline-flex; align-items:center; gap:3px; padding:1px 6px; border-radius:9999px;
+    font-family:var(--mono); font-size:9px; font-weight:600; flex-shrink:0;
+  }
+  .li-badge.on { background:var(--success-dim); color:var(--success); }
+  .li-badge.off { background:oklch(1 0 0 / 6%); color:var(--muted-dim); }
+  .li-dot { width:4px; height:4px; border-radius:50%; }
+  .li-badge.on .li-dot { background:var(--success); }
+  .li-badge.off .li-dot { background:var(--muted-dim); }
+
+  /* Right panel */
+  .right {
+    flex:1; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+
+  .right-empty {
+    flex:1; display:flex; align-items:center; justify-content:center;
+    color:var(--muted-dim); font-size:13px; flex-direction:column; gap:8px;
+  }
+
+  .right-hdr {
+    display:flex; align-items:center; gap:12px; padding:12px 16px;
+    border-bottom:1px solid var(--border); background:oklch(0.165 0 0);
+  }
+  .right-hdr-model { font-family:var(--mono); font-size:14px; font-weight:700; flex:1; }
+  .right-hdr-actions { display:flex; gap:2px; }
+  .ib {
+    display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px;
+    border:none; background:transparent; color:var(--muted-dim); border-radius:6px;
+    cursor:pointer; transition:all 100ms;
+  }
+  .ib:hover { background:oklch(1 0 0 / 8%); color:var(--fg); }
+  .ib.dg:hover { background:var(--danger-dim); color:var(--danger); }
+
+  .right-body { flex:1; padding:16px; overflow-y:auto; }
+
+  /* Edit sections */
+  .sec { margin-bottom:18px; }
+  .sec:last-child { margin-bottom:0; }
+  .sec-hdr {
+    display:flex; align-items:center; gap:6px; margin-bottom:8px;
+  }
+  .sec-title {
+    font-size:12px; font-weight:600; color:var(--muted); flex:1;
+  }
+  .sec-badge {
+    font-family:var(--mono); font-size:10px; color:var(--muted-dim);
+    padding:1px 6px; background:oklch(1 0 0 / 6%); border-radius:4px;
+  }
+
+  /* Target list */
+  .tgt-list { display:flex; flex-direction:column; gap:4px; }
+  .tgt-item {
+    display:flex; align-items:center; gap:8px; padding:8px 12px;
+    background:var(--bg); border:1px solid var(--border); border-radius:6px;
+  }
+  .tgt-num {
+    width:22px; height:22px; display:flex; align-items:center; justify-content:center;
+    background:var(--primary-dim); color:var(--primary); border-radius:50%;
+    font-family:var(--mono); font-size:10px; font-weight:700; flex-shrink:0;
+  }
+  .tgt-fields { display:flex; gap:6px; flex:1; }
+  .tf { flex:1; display:flex; flex-direction:column; gap:2px; }
+  .tf-label { font-size:9px; font-weight:600; color:var(--muted-dim); text-transform:uppercase; letter-spacing:0.04em; }
+  .tf select, .tf input {
+    width:100%; height:28px; background:var(--surface); border:1px solid var(--border);
+    border-radius:4px; padding:0 8px; color:var(--fg); font-family:var(--mono); font-size:12px; outline:none;
+  }
+  .tf select:focus, .tf input:focus { border-color:var(--primary); }
+  .tf select { appearance:none; cursor:pointer;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23707070' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right 6px center; padding-right:20px;
+  }
+  .tf input::placeholder { color:var(--muted-dim); }
+
+  .add-tgt {
+    display:inline-flex; align-items:center; gap:4px; height:28px; padding:0 10px;
+    border:1px dashed var(--border); border-radius:6px; background:transparent;
+    color:var(--muted-dim); font-family:var(--sans); font-size:12px; cursor:pointer; transition:all 150ms; margin-top:6px;
+  }
+  .add-tgt:hover { border-color:var(--primary); color:var(--primary); }
+
+  /* Toggle section (overflow/multimodal) */
+  .tog-card {
+    background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:10px 12px;
+  }
+  .tog-top { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+  .tog-sw {
+    position:relative; width:36px; height:20px; background:var(--surface-up);
+    border-radius:10px; cursor:pointer; transition:background 200ms; flex-shrink:0;
+  }
+  .tog-sw.on { background:var(--primary); }
+  .tog-sw::after {
+    content:''; position:absolute; top:2px; left:2px; width:16px; height:16px;
+    background:var(--fg); border-radius:50%; transition:transform 200ms;
+  }
+  .tog-sw.on::after { transform:translateX(16px); }
+  .tog-label { font-size:12px; font-weight:500; color:var(--fg); flex:1; }
+  .tog-hint { font-size:10px; color:var(--muted-dim); }
+
+  .tog-fields { display:flex; gap:8px; }
+  .tog-fields.disabled { opacity:0.35; pointer-events:none; }
+  .tog-f { flex:1; display:flex; flex-direction:column; gap:2px; }
+  .tog-f-label { font-size:9px; font-weight:600; color:var(--muted-dim); text-transform:uppercase; letter-spacing:0.04em; }
+  .tog-f select, .tog-f input {
+    width:100%; height:28px; background:var(--surface); border:1px solid var(--border);
+    border-radius:4px; padding:0 8px; color:var(--fg); font-family:var(--mono); font-size:12px; outline:none;
+  }
+  .tog-f select { appearance:none; cursor:pointer;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23707070' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right 6px center; padding-right:20px;
+  }
+  .tog-f select:focus, .tog-f input:focus { border-color:var(--primary); }
+
+  /* Session lock warning */
+  .warn-row {
+    display:flex; align-items:center; gap:6px; margin-top:6px; padding:4px 8px;
+    background:var(--warning-dim); border-radius:4px;
+  }
+  .warn-row svg { flex-shrink:0; }
+  .warn-text { font-size:10px; color:var(--warning); }
+
+  /* Divider */
+  .sec-div { border-top:1px solid var(--border); margin:14px 0; }
+
+  /* Footer */
+  .right-foot {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 16px; border-top:1px solid var(--border); background:oklch(0.165 0 0);
+  }
+  .foot-info { font-family:var(--mono); font-size:10px; color:var(--muted-dim); }
+  .foot-btns { display:flex; gap:6px; }
+  .btn {
+    display:inline-flex; align-items:center; height:30px; padding:0 14px;
+    border:1px solid var(--border); border-radius:6px; background:transparent;
+    font-family:var(--sans); font-size:13px; font-weight:500; cursor:pointer; transition:all 150ms; color:var(--muted);
+  }
+  .btn:hover { background:var(--surface-up); color:var(--fg); }
+  .btn.primary { background:var(--primary); border-color:var(--primary); color:oklch(0.145 0 0); font-weight:600; }
+  .btn.primary:hover { background:oklch(0.72 0.14 175); }
+  .btn.danger { border-color:var(--danger); color:var(--danger); }
+  .btn.danger:hover { background:var(--danger-dim); }
+
+  /* Delete confirm */
+  .del-bar { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--danger); }
+  .del-bar .sm { padding:2px 8px; border-radius:4px; border:1px solid var(--border); font-size:11px; cursor:pointer; font-weight:500; }
+  .del-bar .sm.y { background:var(--danger); color:var(--fg); border-color:var(--danger); }
+  .del-bar .sm.n { background:transparent; color:var(--muted-dim); }
+
+  /* Add modal */
+  .overlay {
+    display:none; position:fixed; inset:0; background:oklch(0 0 0 / 60%);
+    z-index:100; align-items:center; justify-content:center;
+  }
+  .overlay.vis { display:flex; }
+  .modal { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); width:460px; max-width:90vw; padding:16px; position:relative; }
+  .modal-title { font-size:14px; font-weight:600; margin-bottom:14px; }
+  .modal-x {
+    position:absolute; top:10px; right:10px; width:28px; height:28px; border:none;
+    background:transparent; color:var(--muted-dim); cursor:pointer; border-radius:4px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .modal-x:hover { background:var(--surface-up); color:var(--fg); }
+  .fr { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+  .fl { font-size:11px; font-weight:600; color:var(--muted-dim); text-transform:uppercase; letter-spacing:0.04em; width:90px; flex-shrink:0; text-align:right; }
+  .fi {
+    flex:1; height:28px; background:var(--bg); border:1px solid var(--border);
+    border-radius:4px; padding:0 8px; color:var(--fg); font-family:var(--mono); font-size:12px; outline:none;
+  }
+  .fi:focus { border-color:var(--primary); }
+  .fi::placeholder { color:var(--muted-dim); }
+  .fs {
+    flex:1; height:28px; background:var(--bg); border:1px solid var(--border);
+    border-radius:4px; padding:0 8px; color:var(--fg); font-family:var(--mono); font-size:12px;
+    outline:none; appearance:none; cursor:pointer;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23707070' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right 6px center; padding-right:20px;
+  }
+  .fs:focus { border-color:var(--primary); }
+  .modal-ft { display:flex; gap:6px; justify-content:flex-end; margin-top:12px; padding-top:10px; border-top:1px solid var(--border); }
+</style>
+</head>
+<body>
+<div class="page">
+  <!-- Header -->
+  <div class="hdr">
+    <h2 class="hdr-title">Model Mappings</h2>
+    <div class="hdr-spacer"></div>
+    <button class="hdr-btn primary" onclick="openModal()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+      Add Mapping
+    </button>
+  </div>
+
+  <!-- Split layout -->
+  <div class="split">
+    <!-- Left: list -->
+    <div class="left">
+      <div class="left-search"><input type="text" id="searchInp" placeholder="Search model..." oninput="render()" /></div>
+      <div class="left-count" id="listCount"></div>
+      <div class="left-list" id="leftList"></div>
+    </div>
+
+    <!-- Right: detail -->
+    <div class="right" id="rightPanel"></div>
+  </div>
+</div>
+
+<!-- Add Modal -->
+<div class="overlay" id="modal">
+  <div class="modal">
+    <button class="modal-x" onclick="closeModal()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </button>
+    <div class="modal-title">New Mapping</div>
+    <div class="fr"><span class="fl">Client Model</span><input class="fi" id="nmModel" placeholder="e.g. gpt-4o" /></div>
+    <div class="fr"><span class="fl">Provider</span><select class="fs" id="nmProv"><option>OpenAI</option><option>Anthropic</option><option>DeepSeek</option><option>Google</option><option>Azure</option><option>Groq</option></select></div>
+    <div class="fr"><span class="fl">Backend Model</span><input class="fi" id="nmBack" placeholder="same as client if empty" /></div>
+    <div class="modal-ft">
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn primary" onclick="doAdd()">Create</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const PRV = ['OpenAI','Anthropic','DeepSeek','Google','Azure','Groq'];
+let D = [
+  { id:1, cm:'gpt-4o', tg:[{p:'OpenAI',m:'gpt-4o'},{p:'Azure',m:'gpt-4o'}], ov:{p:'OpenAI',m:'gpt-4o-32k',on:true}, mm:{p:null,m:null,on:false}, act:true },
+  { id:2, cm:'claude-sonnet-4-20250514', tg:[{p:'Anthropic',m:'claude-sonnet-4-20250514'},{p:'DeepSeek',m:'deepseek-chat'}], ov:null, mm:{p:'Anthropic',m:'claude-sonnet-4-20250514',on:true}, act:true },
+  { id:3, cm:'deepseek-r1', tg:[{p:'DeepSeek',m:'deepseek-reasoner'}], ov:{p:'Anthropic',m:'claude-sonnet-4-20250514',on:true}, mm:null, act:true },
+  { id:4, cm:'gemini-2.5-pro', tg:[{p:'Google',m:'gemini-2.5-pro'},{p:'OpenAI',m:'gpt-4o'}], ov:null, mm:{p:'Google',m:'gemini-2.5-flash',on:true}, act:true },
+  { id:5, cm:'gpt-4o-mini', tg:[{p:'OpenAI',m:'gpt-4o-mini'}], ov:null, mm:null, act:false },
+  { id:6, cm:'llama-3.3-70b', tg:[{p:'Groq',m:'llama-3.3-70b'},{p:'DeepSeek',m:'deepseek-chat'}], ov:{p:'OpenAI',m:'gpt-4o',on:true}, mm:null, act:true },
+];
+let selId = 1;
+let delConfirm = false;
+let nxId = 7;
+
+function opts(s, arr) { return arr.map(i=>`<option value="${i}" ${i===s?'selected':''}>${i}</option>`).join(''); }
+
+function summary(d) {
+  let parts = [d.tg[0].p];
+  for (let i=1;i<d.tg.length;i++) parts.push('→ '+d.tg[i].p);
+  if (d.ov&&d.ov.on) parts.push('↓ OF');
+  if (d.mm&&d.mm.on) parts.push('🖼 MM');
+  return parts.join(' ');
+}
+
+function render() {
+  const q = document.getElementById('searchInp').value.toLowerCase().trim();
+  const list = D.filter(d => !q || d.cm.toLowerCase().includes(q));
+  document.getElementById('listCount').textContent = `${list.length} of ${D.length} mappings`;
+
+  // Left list
+  document.getElementById('leftList').innerHTML = list.map(d => `
+    <div class="left-item ${selId===d.id?'sel':''} ${d.act?'':'inactive'}" onclick="select(${d.id})">
+      <div class="li-info">
+        <div class="li-model">${d.cm}</div>
+        <div class="li-summary">${summary(d)}</div>
+      </div>
+      <span class="li-badge ${d.act?'on':'off'}"><span class="li-dot"></span>${d.act?'ON':'OFF'}</span>
+    </div>
+  `).join('');
+
+  // Right panel
+  const d = D.find(x => x.id === selId);
+  const rp = document.getElementById('rightPanel');
+  if (!d) {
+    rp.innerHTML = '<div class="right-empty"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>Select a mapping to edit</div>';
+    return;
+  }
+
+  // Targets
+  const tgtHtml = d.tg.map((t,i) => `
+    <div class="tgt-item">
+      <span class="tgt-num">${i+1}</span>
+      <div class="tgt-fields">
+        <div class="tf"><span class="tf-label">Provider</span><select onchange="utgt(this)" data-id="${d.id}" data-ti="${i}" data-f="p">${opts(t.p,PRV)}</select></div>
+        <div class="tf"><span class="tf-label">Backend Model</span><input onchange="utgt(this)" data-id="${d.id}" data-ti="${i}" data-f="m" value="${t.m}" /></div>
+      </div>
+      <button class="ib dg" onclick="rmTgt(${d.id},${i})" ${d.tg.length<=1?'disabled':''}>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>`).join('');
+
+  // Overflow section
+  let ovHtml = '';
+  if (d.ov) {
+    ovHtml = `
+    <div class="sec">
+      <div class="sec-hdr">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span class="sec-title">Context Overflow</span>
+        <span class="sec-badge">${d.ov.on ? 'Enabled' : 'Disabled'}</span>
+      </div>
+      <div class="tog-card">
+        <div class="tog-top">
+          <div class="tog-sw ${d.ov.on?'on':''}" onclick="togOpt(${d.id},'ov')"></div>
+          <span class="tog-label">Switch to larger model on overflow</span>
+        </div>
+        <div class="tog-fields ${d.ov.on?'':'disabled'}">
+          <div class="tog-f"><span class="tog-f-label">Provider</span><select onchange="uopt(this)" data-id="${d.id}" data-key="ov" data-f="p">${opts(d.ov.p,PRV)}</select></div>
+          <div class="tog-f"><span class="tog-f-label">Model</span><input onchange="uopt(this)" data-id="${d.id}" data-key="ov" data-f="m" value="${d.ov.m||''}" placeholder="model name" /></div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // Multimodal section
+  let mmHtml = '';
+  if (d.mm) {
+    mmHtml = `
+    <div class="sec">
+      <div class="sec-hdr">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+        <span class="sec-title">Multimodal Fallback</span>
+        <span class="sec-badge">${d.mm.on ? 'Enabled' : 'Disabled'}</span>
+      </div>
+      <div class="tog-card">
+        <div class="tog-top">
+          <div class="tog-sw ${d.mm.on?'on':''}" onclick="togOpt(${d.id},'mm')"></div>
+          <span class="tog-label">Redirect image requests to multimodal model</span>
+        </div>
+        <div class="tog-fields ${d.mm.on?'':'disabled'}">
+          <div class="tog-f"><span class="tog-f-label">Provider</span><select onchange="uopt(this)" data-id="${d.id}" data-key="mm" data-f="p">${opts(d.mm.p,PRV)}</select></div>
+          <div class="tog-f"><span class="tog-f-label">Model</span><input onchange="uopt(this)" data-id="${d.id}" data-key="mm" data-f="m" value="${d.mm.m||''}" placeholder="model name" /></div>
+        </div>
+        ${d.mm.on ? `<div class="warn-row">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <span class="warn-text">Session lock active — changes apply to new sessions only</span>
+        </div>` : ''}
+      </div>
+    </div>`;
+  }
+
+  rp.innerHTML = `
+    <div class="right-hdr">
+      <span class="right-hdr-model">${d.cm}</span>
+      <span class="li-badge ${d.act?'on':'off'}" style="height:22px;display:inline-flex;align-items:center"><span class="li-dot"></span>${d.act?'Active':'Inactive'}</span>
+      <div class="right-hdr-actions">
+        <button class="ib" title="${d.act?'Disable':'Enable'}" onclick="togAct(${d.id})">
+          ${d.act
+            ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-5"/></svg>'
+            : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M4.93 4.93l14.14 14.14"/></svg>'}
+        </button>
+      </div>
+    </div>
+    <div class="right-body">
+      <div class="sec">
+        <div class="sec-hdr">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          <span class="sec-title">Failover Chain</span>
+          <span class="sec-badge">${d.tg.length} target${d.tg.length>1?'s':''}</span>
+        </div>
+        <div class="tgt-list">${tgtHtml}</div>
+        <button class="add-tgt" onclick="addTgt(${d.id})">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          Add Target
+        </button>
+      </div>
+
+      <div class="sec-div"></div>
+      ${ovHtml}
+      ${mmHtml}
+    </div>
+    <div class="right-foot">
+      ${delConfirm ? `
+        <div class="del-bar">
+          Delete this mapping?
+          <button class="sm y" onclick="doDel(${d.id})">Yes, delete</button>
+          <button class="sm n" onclick="delConfirm=false;render()">Cancel</button>
+        </div>
+      ` : `
+        <span class="foot-info">ID: ${d.id}</span>
+        <div class="foot-btns">
+          <button class="btn danger" onclick="delConfirm=true;render()">Delete</button>
+          <button class="btn primary" onclick="/* save */">Save Changes</button>
+        </div>
+      `}
+    </div>`;
+}
+
+function select(id) { selId = id; delConfirm = false; render(); }
+function togAct(id) { const d=D.find(x=>x.id===id); if(d){d.act=!d.act; render();} }
+function addTgt(id) { const d=D.find(x=>x.id===id); if(d){d.tg.push({p:'OpenAI',m:'gpt-4o'}); render();} }
+function rmTgt(id,i) { const d=D.find(x=>x.id===id); if(d&&d.tg.length>1){d.tg.splice(i,1); render();} }
+function utgt(el) { const d=D.find(x=>x.id===+el.dataset.id); if(d) d.tg[+el.dataset.ti][el.dataset.f]=el.value; }
+function togOpt(id,k) { const d=D.find(x=>x.id===id); if(d&&d[k]){d[k].on=!d[k].on; render();} }
+function uopt(el) { const d=D.find(x=>x.id===+el.dataset.id); if(d&&d[el.dataset.key]) d[el.dataset.key][el.dataset.f]=el.value; }
+function doDel(id) { D=D.filter(x=>x.id!==id); if(!D.length) selId=null; else selId=D[0].id; delConfirm=false; render(); }
+
+function openModal() { document.getElementById('modal').classList.add('vis'); }
+function closeModal() { document.getElementById('modal').classList.remove('vis'); }
+function doAdd() {
+  const cm=document.getElementById('nmModel').value.trim(); if(!cm) return;
+  const pv=document.getElementById('nmProv').value;
+  const bm=document.getElementById('nmBack').value.trim()||cm;
+  D.push({id:nxId++,cm,tg:[{p:pv,m:bm}],ov:null,mm:null,act:true});
+  closeModal(); selId=nxId-1; document.getElementById('nmModel').value=''; document.getElementById('nmBack').value=''; render();
+}
+
+render();
+</script>
+</body>
+</html>

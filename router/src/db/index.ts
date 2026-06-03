@@ -152,6 +152,52 @@ function runApplicationMigrations(db: Database.Database): void {
     }
     db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)").run(markerKey, "done");
   })();
+
+  // 050: patches 名称标准化 — 连字符 → 下划线 + 去重
+  const patchMarker = "app_migration_050_patch_name_normalize";
+  const patchDone = db.prepare("SELECT value FROM settings WHERE key = ?").get(patchMarker) as { value: string } | undefined;
+  if (!patchDone) {
+    const providers = db.prepare("SELECT id, models FROM providers").all() as { id: string; models: string }[];
+    const update = db.prepare("UPDATE providers SET models = ? WHERE id = ?");
+
+    db.transaction(() => {
+      let patched = 0;
+      for (const p of providers) {
+        try {
+          // eslint-disable-next-line taste/no-raw-json-parse-models -- 迁移代码需要操作原始 JSON 结构
+          const raw = JSON.parse(p.models);
+          if (!Array.isArray(raw)) continue;
+
+          let changed = false;
+          for (const entry of raw) {
+            if (typeof entry !== "object" || entry === null) continue;
+            const patches = (entry as Record<string, unknown>).patches;
+            if (!Array.isArray(patches)) continue;
+
+            const normalized = patches.map((v: unknown) =>
+              typeof v === "string" ? v.replace(/-/g, "_") : v,
+            );
+            const deduped = [...new Set(normalized as string[])];
+
+            if (deduped.length !== patches.length ||
+                deduped.some((v, i) => v !== patches[i])) {
+              (entry as Record<string, unknown>).patches = deduped;
+              changed = true;
+            }
+          }
+
+          if (changed) {
+            update.run(JSON.stringify(raw), p.id);
+            patched++;
+          }
+        } catch { /* JSON parse failed — skip */ } // eslint-disable-line taste/no-silent-catch
+      }
+      if (patched > 0) {
+        console.log(`[migration-050] Normalized patch names in ${patched} provider(s)`);
+      }
+      db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)").run(patchMarker, "done");
+    })();
+  }
 }
 
 // --- Re-export from per-table modules ---

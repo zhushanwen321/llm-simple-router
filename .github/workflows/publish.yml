@@ -1,6 +1,9 @@
 name: Publish
 
 on:
+  push:
+    branches:
+      - 'dev-*'
   workflow_dispatch:
     inputs:
       bump_type:
@@ -15,6 +18,8 @@ on:
 
 jobs:
   publish:
+    # dev-* 分支只走 beta 发布，不升级版本，不创建 GitHub Release
+    # main 分支走正式发布流程
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -31,8 +36,9 @@ jobs:
           cache: npm
           registry-url: 'https://registry.npmjs.org'
 
-      # ── 步骤 1: 升级版本号 ──────────────────────────
-      - name: Bump version
+      # ── 步骤 1: 升级版本号 (仅 main) ────────────────────────
+      - name: Bump version (main only)
+        if: github.event_name == 'workflow_dispatch'
         run: |
           OLD_VERSION=$(jq -r '.version' router/package.json)
           cd router && npm version ${{ github.event.inputs.bump_type }} --no-git-tag-version
@@ -40,8 +46,9 @@ jobs:
           echo "OLD_VERSION=$OLD_VERSION" >> $GITHUB_ENV
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
 
-      # ── 步骤 2: 提交 + 打 tag ────────────────────────
-      - name: Commit and tag
+      # ── 步骤 2: 提交 + 打 tag (仅 main) ──────────────────
+      - name: Commit and tag (main only)
+        if: github.event_name == 'workflow_dispatch'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -50,8 +57,9 @@ jobs:
           git tag v${{ env.NEW_VERSION }}
           git push origin main --tags
 
-      # ── 步骤 4: 创建 GitHub Release ──────────────────
-      - name: Create Release
+      # ── 步骤 3: 创建 GitHub Release (仅 main) ─────────────────
+      - name: Create Release (main only)
+        if: github.event_name == 'workflow_dispatch'
         run: |
           gh release create v${{ env.NEW_VERSION }} \
             --title "v${{ env.NEW_VERSION }}" \
@@ -59,6 +67,28 @@ jobs:
             --notes "## v${{ env.NEW_VERSION }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── 步骤 3.5: dev 分支计算 beta 版本号 ────────────
+      - name: Compute dev beta version
+        id: dev_version
+        if: github.event_name == 'push'
+        run: |
+          BRANCH="${{ github.ref_name }}"
+          if [[ "$BRANCH" =~ ^dev-(.+)$ ]]; then
+            BASE_VERSION="${BASH_REMATCH[1]}"
+          else
+            echo "Error: branch $BRANCH is not dev-*" >&2
+            exit 1
+          fi
+          SHORT_SHA="${GITHUB_SHA::7}"
+          BETA_VERSION="${BASE_VERSION}-dev.${SHORT_SHA}"
+          echo "beta_version=$BETA_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Resolved dev beta version: $BETA_VERSION"
+
+      - name: Apply dev beta version to package.json
+        if: github.event_name == 'push'
+        working-directory: router
+        run: npm version "${{ steps.dev_version.outputs.beta_version }}" --no-git-tag-version --allow-same-version
 
       # ── 步骤 4: 构建 ────────────────────────────────
       - name: Build
@@ -68,22 +98,32 @@ jobs:
           cd ../frontend && npm run build
 
       # ── 步骤 5: Publish llm-simple-router (OIDC) ───
+      # main (workflow_dispatch) → npm publish (默认 tag=latest)
+      # dev-* (push) → npm publish --tag beta
       # setup-node 用 registry-url 时会设置 NODE_AUTH_TOKEN=GITHUB_TOKEN 并写 .npmrc
       # 必须在 step-level env 覆盖空值 + 删 .npmrc，npm 才会检测 OIDC 环境并走 trusted publishing
       - name: Publish llm-simple-router to npm
-        run: rm -f "$RUNNER_TEMP/.npmrc" && cd router && npm publish
+        run: |
+          rm -f "$RUNNER_TEMP/.npmrc"
+          if [ "${{ github.event_name }}" = "push" ]; then
+            cd router && npm publish --tag beta
+          else
+            cd router && npm publish
+          fi
         env:
           NODE_AUTH_TOKEN: ""
           NPM_CONFIG_USERCONFIG: ""
 
-      # ── 步骤 6: Docker 镜像 ─────────────────────────
+      # ── 步骤 6: Docker 镜像 (仅 main) ──────────────────
       - uses: docker/login-action@v4
+        if: github.event_name == 'workflow_dispatch'
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: docker/metadata-action@v6
+        if: github.event_name == 'workflow_dispatch'
         id: meta
         with:
           images: ghcr.io/${{ github.repository }}
@@ -93,6 +133,7 @@ jobs:
             type=raw,value=latest
 
       - uses: docker/build-push-action@v7
+        if: github.event_name == 'workflow_dispatch'
         with:
           context: .
           file: ./router/Dockerfile
@@ -100,8 +141,9 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-      # ── 步骤 7: Release Asset ───────────────────────
+      # ── 步骤 7: Release Asset (仅 main) ──────────────────
       - name: Prepare and upload dist archive
+        if: github.event_name == 'workflow_dispatch'
         run: |
           mkdir -p package/dist/db/migrations package/frontend-dist
           mkdir -p package/frontend-dist && cp -r frontend/dist/* package/frontend-dist/
@@ -115,3 +157,16 @@ jobs:
           gh release upload v${{ env.NEW_VERSION }} llm-simple-router-linux-x64.tar.gz --clobber
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── 步骤 8: dev 分支打印安装说明 ──────────────────
+      - name: Print install instructions (dev only)
+        if: github.event_name == 'push'
+        run: |
+          echo "=========================================="
+          echo "Dev beta version published: ${{ steps.dev_version.outputs.beta_version }}"
+          echo ""
+          echo "Install with:"
+          echo "  npm install -g llm-simple-router@${{ steps.dev_version.outputs.beta_version }}"
+          echo "  # or latest beta:"
+          echo "  npm install -g llm-simple-router@beta"
+          echo "=========================================="

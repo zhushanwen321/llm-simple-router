@@ -1,27 +1,23 @@
-<!-- eslint-disable vue/multi-word-component-names -->
 <template>
-  <div class="p-6">
+  <div class="page">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-lg font-semibold text-foreground">
         {{ t("logs.title") }}
       </h2>
-      <Button
-        variant="outline"
-        class="text-destructive border-destructive hover:bg-destructive/10"
-        @click="showCleanup = true"
-      >
+      <Button variant="ghost" size="sm" @click="showCleanup = true">
         {{ t("logs.cleanupLogs") }}
       </Button>
     </div>
 
     <!-- 筛选栏 -->
     <div class="flex flex-wrap items-center gap-2 mb-4">
-      <div class="flex gap-1">
+      <div class="flex">
         <Button
           v-for="p in PERIODS"
           :key="p.value"
-          :variant="period === p.value ? 'default' : 'ghost'"
+          :variant="period === p.value ? 'default' : 'outline'"
           size="sm"
+          class="rounded-none first:rounded-l-md last:rounded-r-md -ml-px first:ml-0"
           @click="period = p.value"
         >
           {{ p.label }}
@@ -45,7 +41,7 @@
         >
       </div>
       <Select v-model="providerFilter">
-        <SelectTrigger class="w-28 truncate">
+        <SelectTrigger class="w-28 truncate h-8 text-xs">
           <SelectValue :placeholder="t('logs.allProviders')" />
         </SelectTrigger>
         <SelectContent>
@@ -56,7 +52,7 @@
         </SelectContent>
       </Select>
       <Select v-model="clientModelFilter">
-        <SelectTrigger class="w-32 truncate">
+        <SelectTrigger class="w-32 truncate h-8 text-xs">
           <SelectValue :placeholder="t('logs.filters.allClientModels')" />
         </SelectTrigger>
         <SelectContent>
@@ -82,7 +78,7 @@
         </SelectContent>
       </Select>
       <Select v-model="keyFilter">
-        <SelectTrigger class="w-32 truncate">
+        <SelectTrigger class="w-32 truncate h-8 text-xs">
           <SelectValue :placeholder="t('logs.allKeys')" />
         </SelectTrigger>
         <SelectContent>
@@ -93,7 +89,7 @@
         </SelectContent>
       </Select>
       <Select v-model="statusFilter">
-        <SelectTrigger class="w-28 truncate">
+        <SelectTrigger class="w-28 truncate h-8 text-xs">
           <SelectValue :placeholder="t('logs.allStatus')" />
         </SelectTrigger>
         <SelectContent>
@@ -104,9 +100,19 @@
       </Select>
     </div>
 
-    <div class="bg-card rounded-lg border overflow-hidden">
+    <Card flush class="relative">
+      <div
+        v-if="loading"
+        class="absolute inset-0 bg-background/50 flex items-center justify-center z-10"
+      >
+        <div class="space-y-3 w-3/4">
+          <Skeleton class="h-8 w-full" />
+          <Skeleton class="h-8 w-full" />
+          <Skeleton class="h-8 w-5/6" />
+        </div>
+      </div>
       <TooltipProvider :delay-duration="300">
-        <Table class="[&_td]:px-4 [&_th]:px-4">
+        <Table class="[&_td]:px-3 [&_th]:px-3">
           <TableHeader>
             <TableRow class="bg-muted">
               <TableHead class="w-10"></TableHead>
@@ -117,10 +123,13 @@
                 t("logs.table.time")
               }}</TableHead>
               <TableHead class="text-muted-foreground">{{
-                t("logs.table.model")
+                t("logs.table.clientModel")
               }}</TableHead>
               <TableHead class="text-muted-foreground">{{
-                t("logs.table.actualForward")
+                t("logs.table.targetModel")
+              }}</TableHead>
+              <TableHead class="text-muted-foreground">{{
+                t("logs.table.latency")
               }}</TableHead>
               <TableHead class="text-muted-foreground">{{
                 t("logs.table.tags")
@@ -170,17 +179,32 @@
               </template>
             </template>
 
-            <TableRow v-if="logs.length === 0">
-              <TableCell
-                :colspan="TABLE_COL_COUNT"
-                class="text-center text-muted-foreground py-8"
-                >{{ t("logs.noLogs") }}</TableCell
-              >
+            <TableRow v-if="logs.length === 0 && !loading">
+              <TableCell :colspan="TABLE_COL_COUNT" class="py-12 text-center">
+                <div class="flex flex-col items-center gap-2">
+                  <p class="text-sm text-muted-foreground">
+                    {{ t("logs.noLogs") }}
+                  </p>
+                  <p
+                    v-if="hasActiveFilters"
+                    class="text-xs text-muted-foreground"
+                  >
+                    {{ t("logs.noLogsFilterHint") }}
+                  </p>
+                  <Button
+                    v-if="hasActiveFilters"
+                    variant="ghost"
+                    size="sm"
+                    @click="clearAllFilters"
+                    >{{ t("logs.clearAllFilters") }}</Button
+                  >
+                </div>
+              </TableCell>
             </TableRow>
           </TableBody>
         </Table>
       </TooltipProvider>
-    </div>
+    </Card>
 
     <div class="flex items-center justify-between mt-4">
       <p class="text-sm text-muted-foreground">
@@ -228,8 +252,26 @@
           :disabled="page >= totalPages"
           >{{ t("logs.lastPage") }}</Button
         >
-        >
       </div>
+    </div>
+
+    <div class="flex items-center justify-end mt-2 gap-2">
+      <span class="text-xs text-muted-foreground">{{
+        t("logs.cleanup.autoCleanup")
+      }}</span>
+      <Input
+        type="number"
+        v-model.number="retentionDays"
+        :min="0"
+        :max="90"
+        class="w-16 h-6 text-xs"
+      />
+      <span class="text-xs text-muted-foreground">{{
+        t("logs.cleanup.days")
+      }}</span>
+      <Button size="sm" @click="saveRetention" :disabled="retentionSaving">{{
+        t("logs.cleanup.saveSettings")
+      }}</Button>
     </div>
 
     <!-- Unified log detail dialog -->
@@ -253,36 +295,7 @@
           }}</Label>
           <Input v-model.number="cleanupDays" type="number" :min="1" />
         </div>
-        <Separator />
-        <div class="space-y-3">
-          <div class="text-sm font-medium">
-            {{ t("logs.cleanup.autoCleanup") }}
-          </div>
-          <div class="flex items-center gap-3">
-            <Label class="whitespace-nowrap">{{
-              t("logs.cleanup.retentionDays")
-            }}</Label>
-            <Input
-              type="number"
-              v-model.number="retentionDays"
-              :min="0"
-              :max="90"
-              class="w-20"
-            />
-            <span class="text-xs text-muted-foreground">{{
-              t("logs.cleanup.noAutoCleanup")
-            }}</span>
-          </div>
-          <div class="flex justify-end">
-            <Button
-              size="sm"
-              @click="saveRetention"
-              :disabled="retentionSaving"
-            >
-              {{ t("logs.cleanup.saveSettings") }}
-            </Button>
-          </div>
-        </div>
+
         <DialogFooter>
           <Button variant="outline" @click="showCleanup = false">{{
             t("common.cancel")
@@ -352,8 +365,8 @@ import {
   AlertDialogFooter,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
+import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Separator } from "@/components/ui/separator";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import UnifiedRequestDialog from "@/components/request-detail/UnifiedRequestDialog.vue";
 import LogTableRow from "@/components/logs/LogTableRow.vue";
@@ -408,6 +421,7 @@ const {
   handleCleanup,
   toggleExpand,
   openLogDetail,
+  loading,
 } = useLogs();
 
 const pageNumbers = computed(() => {
@@ -444,6 +458,28 @@ function copyLogId(id: string) {
 }
 
 const COPY_FEEDBACK_MS = 2000;
+
+const hasActiveFilters = computed(() => {
+  return (
+    providerFilter.value !== "all" ||
+    clientModelFilter.value !== "all" ||
+    backendModelFilter.value !== "all" ||
+    keyFilter.value !== "all" ||
+    statusFilter.value !== "all" ||
+    !!dateRange.value.start ||
+    !!dateRange.value.end
+  );
+});
+
+function clearAllFilters() {
+  period.value = "5h";
+  dateRange.value = { start: "", end: "" };
+  providerFilter.value = "all";
+  clientModelFilter.value = "all";
+  backendModelFilter.value = "all";
+  keyFilter.value = "all";
+  statusFilter.value = "all";
+}
 
 let filterTimer: ReturnType<typeof setTimeout> | null = null;
 watch(

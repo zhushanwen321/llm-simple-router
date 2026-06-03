@@ -8,6 +8,11 @@ import { Button } from "@/components/ui/button";
 
 const { t } = useI18n();
 
+/** 后端 normalizePatchName 将连字符转下划线存储，前端比较时需统一格式 */
+function toStorageKey(id: string): string {
+  return id.replace(/-/g, "_");
+}
+
 const props = defineProps<{
   apiType: string;
   isDeepSeek: boolean;
@@ -32,21 +37,22 @@ const visibleGroups = computed<PatchGroup[]>(() => {
 });
 
 function toggle(patchId: string) {
-  const next = props.modelValue.includes(patchId)
-    ? props.modelValue.filter((id) => id !== patchId)
-    : [...props.modelValue, patchId];
+  const key = toStorageKey(patchId);
+  const next = props.modelValue.includes(key)
+    ? props.modelValue.filter((id) => id !== key)
+    : [...props.modelValue, key];
   emit("update:modelValue", next);
 }
 
 function isActive(patchId: string): boolean {
-  return props.modelValue.includes(patchId);
+  return props.modelValue.includes(toStorageKey(patchId));
 }
 </script>
 
 <template>
   <div class="space-y-3">
     <div v-for="group in visibleGroups" :key="group.key">
-      <p class="mb-1.5 text-xs font-medium text-[var(--muted-foreground)]">
+      <p class="mb-1.5 text-xs font-medium text-muted-foreground">
         {{ t(group.labelKey) }}
       </p>
       <div class="flex flex-wrap gap-1.5">
@@ -62,8 +68,8 @@ function isActive(patchId: string): boolean {
             cn(
               'inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium transition-all cursor-pointer select-none',
               isActive(item.id)
-                ? 'border-[var(--ring)] bg-[var(--primary)]/10 text-[var(--primary)]'
-                : 'border-[var(--border)] bg-transparent text-[var(--muted-foreground)] hover:border-[var(--muted-foreground)] hover:text-[var(--foreground)]',
+                ? 'border-ring bg-primary/10 text-primary'
+                : 'border-border bg-transparent text-muted-foreground hover:border-muted-foreground hover:text-foreground',
             )
           "
           @click="toggle(item.id)"
@@ -72,9 +78,7 @@ function isActive(patchId: string): boolean {
             :class="
               cn(
                 'size-1.5 rounded-full transition-colors',
-                isActive(item.id)
-                  ? 'bg-[var(--primary)]'
-                  : 'bg-[var(--border)]',
+                isActive(item.id) ? 'bg-primary' : 'bg-border',
               )
             "
           />

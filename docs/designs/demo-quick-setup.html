@@ -1,0 +1,2078 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quick Setup Redesign — Step Progress + Collapsed Advanced</title>
+<style>
+  :root {
+    --bg: oklch(0.145 0 0);
+    --surface: oklch(0.205 0 0);
+    --surface-up: oklch(0.269 0 0);
+    --fg: oklch(0.985 0 0);
+    --muted: oklch(0.708 0 0);
+    --border: oklch(1 0 0 / 10%);
+    --primary: oklch(0.68 0.13 175);
+    --primary-dim: oklch(0.68 0.13 175 / 20%);
+    --primary-bg: oklch(0.68 0.13 175 / 8%);
+    --success: oklch(0.65 0.17 150);
+    --success-dim: oklch(0.65 0.17 150 / 15%);
+    --warning: oklch(0.78 0.16 80);
+    --danger: oklch(0.577 0.245 27.325);
+    --info: oklch(0.62 0.18 250);
+    --mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+    --sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  /* Tab switcher */
+  .tab-bar {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    display: flex;
+    gap: 0;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+  }
+  .tab-btn {
+    padding: 12px 20px;
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 150ms;
+  }
+  .tab-btn:hover { color: var(--fg); background: oklch(1 0 0 / 5%); }
+  .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+  .panel { display: none; padding: 24px; max-width: 1280px; margin: 0 auto; }
+  .panel.active { display: block; }
+
+  .panel-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 16px;
+  }
+
+  .approach-desc {
+    background: oklch(0.68 0.13 175 / 8%);
+    border-left: 3px solid var(--primary);
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    border-radius: 0 8px 8px 0;
+  }
+  .approach-desc h3 { font-size: 14px; font-weight: 600; color: var(--primary); margin-bottom: 4px; }
+  .approach-desc p { font-size: 13px; color: var(--muted); line-height: 1.5; }
+
+  /* Card */
+  .card {
+    background: var(--surface);
+    border-radius: 8px;
+    box-shadow: 0 0 0 1px var(--border);
+    margin-bottom: 16px;
+  }
+  .card-header {
+    padding: 12px 16px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .card-title { font-size: 14px; font-weight: 600; }
+  .card-content { padding: 12px 16px 16px; }
+
+  /* Badge */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 8px;
+    border-radius: 9999px;
+    font-size: 10px;
+    font-weight: 500;
+    height: 20px;
+  }
+  .badge-primary { background: var(--primary); color: var(--bg); }
+  .badge-secondary { background: oklch(1 0 0 / 10%); color: var(--muted); }
+  .badge-outline { border: 1px solid var(--border); color: var(--muted); }
+  .badge-success { background: var(--success-dim); color: var(--success); }
+  .badge-optional { background: oklch(0.62 0.18 250 / 12%); color: var(--info); }
+
+  /* Step progress */
+  .step-bar {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+    padding: 16px 20px;
+  }
+  .step-node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .step-circle {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+    border: 2px solid var(--border);
+    color: var(--muted);
+    background: var(--surface);
+    transition: all 200ms;
+  }
+  .step-circle.done {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: var(--bg);
+  }
+  .step-circle.current {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: var(--primary-bg);
+  }
+  .step-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+    text-align: center;
+    max-width: 80px;
+    line-height: 1.3;
+  }
+  .step-label.current { color: var(--fg); }
+  .step-connector {
+    flex: 1;
+    height: 2px;
+    background: var(--border);
+    margin-top: 14px;
+    min-width: 24px;
+  }
+  .step-connector.done { background: var(--primary); opacity: 0.5; }
+
+  /* Client selector */
+  .client-grid {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .client-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--muted);
+    font-family: var(--sans);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 150ms;
+  }
+  .client-btn:hover {
+    border-color: oklch(1 0 0 / 20%);
+    color: var(--fg);
+  }
+  .client-btn.active {
+    border-color: var(--primary);
+    background: oklch(0.68 0.13 175 / 12%);
+    color: var(--primary);
+    box-shadow: 0 0 0 1px oklch(0.68 0.13 175 / 30%);
+  }
+  .client-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: white;
+  }
+  .client-name { font-weight: 500; }
+  .client-meta { font-size: 10px; opacity: 0.6; }
+  .client-desc {
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 8px;
+    line-height: 1.4;
+  }
+  .client-feedback {
+    margin-top: 10px;
+    padding: 8px 12px;
+    background: oklch(0.68 0.13 175 / 6%);
+    border-radius: 6px;
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.5;
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .client-feedback svg { flex-shrink: 0; margin-top: 1px; }
+  .client-feedback strong { color: var(--fg); font-weight: 500; }
+  .recommended-tag {
+    font-size: 9px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: oklch(0.68 0.13 175 / 15%);
+    color: var(--primary);
+    font-weight: 500;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+
+  /* Form row */
+  .form-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .form-label {
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .form-input, .form-select {
+    height: 28px;
+    padding: 0 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--fg);
+    font-family: var(--sans);
+    font-size: 12px;
+    outline: none;
+  }
+  .form-input.mono { font-family: var(--mono); font-size: 12px; }
+  .form-input:focus, .form-select:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px oklch(0.68 0.13 175 / 20%);
+  }
+  .form-input[readonly] {
+    color: var(--muted);
+    border-style: dashed;
+    opacity: 0.7;
+  }
+  .form-required { color: var(--danger); font-size: 13px; margin-left: 2px; }
+  .format-locked {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 10px;
+    height: 28px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: oklch(1 0 0 / 3%);
+    font-size: 12px;
+    color: var(--muted);
+    cursor: default;
+  }
+  .format-locked svg { opacity: 0.5; }
+  .verify-btn {
+    height: 28px;
+    padding: 0 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--muted);
+    font-family: var(--sans);
+    font-size: 12px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 150ms;
+  }
+  .verify-btn:hover { border-color: oklch(1 0 0 / 20%); color: var(--fg); }
+  .verify-btn.verified {
+    border-color: var(--success);
+    color: var(--success);
+  }
+  .form-divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 10px 0;
+  }
+  .row-label {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 6px;
+  }
+
+  /* Button */
+  .btn {
+    height: 28px;
+    padding: 0 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--fg);
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 150ms;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn:hover { background: oklch(1 0 0 / 5%); }
+  .btn-primary {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: var(--bg);
+  }
+  .btn-primary:hover { opacity: 0.85; background: var(--primary); }
+  .btn-sm { height: 24px; font-size: 11px; padding: 0 8px; }
+
+  /* Model list (accordion rows) */
+  .model-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    background: var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .model-row {
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+  }
+  .model-row.disabled-row { opacity: 0.4; }
+  .model-main {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 12px;
+    min-height: 32px;
+  }
+  .model-toggle {
+    width: 14px;
+    height: 14px;
+    border: 1.5px solid var(--border);
+    border-radius: 3px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 150ms;
+  }
+  .model-toggle.on {
+    background: var(--primary);
+    border-color: var(--primary);
+  }
+  .model-name {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    min-width: 160px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .model-ctx-select {
+    height: 24px;
+    padding: 0 4px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 11px;
+    width: 64px;
+    text-align: center;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 24 24' fill='none' stroke='%23708080' stroke-width='3'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 3px center;
+    padding-right: 12px;
+  }
+  .model-cap-badges {
+    display: flex;
+    gap: 3px;
+    flex-shrink: 0;
+  }
+  .cap-dot {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 150ms;
+  }
+  .cap-dot.active {
+    background: var(--primary-bg);
+    border-color: oklch(0.68 0.13 175 / 30%);
+    color: var(--primary);
+  }
+  .model-patch-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--muted);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 150ms;
+    height: 22px;
+    font-family: var(--sans);
+  }
+  .model-patch-btn:hover { border-color: oklch(1 0 0 / 20%); color: var(--fg); }
+  .model-patch-btn.has-patches {
+    background: var(--primary-bg);
+    border-color: oklch(0.68 0.13 175 / 25%);
+    color: var(--primary);
+  }
+  .model-patch-btn .chevron-sm {
+    font-size: 8px;
+    transition: transform 150ms;
+    display: inline-block;
+  }
+  .model-patch-btn .chevron-sm.open { transform: rotate(90deg); }
+  .model-trash {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    opacity: 0;
+    transition: all 150ms;
+    cursor: pointer;
+    margin-left: auto;
+  }
+  .model-row:hover .model-trash { opacity: 1; }
+  .model-trash:hover { color: var(--danger); }
+  .model-detail {
+    display: none;
+    padding: 8px 12px 10px 36px;
+    border-top: 1px solid var(--border);
+  }
+  .model-detail.open { display: block; }
+  .detail-section {
+    margin-bottom: 8px;
+  }
+  .detail-section:last-child { margin-bottom: 0; }
+  .detail-label {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 4px;
+  }
+  .patch-chips {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+  .patch-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 150ms;
+  }
+  .patch-chip.active {
+    background: var(--primary-bg);
+    color: var(--primary);
+  }
+  .patch-chip.inactive {
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+  .patch-chip .dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    transition: background 150ms;
+  }
+  .patch-chip.active .dot { background: var(--primary); }
+  .patch-chip.inactive .dot { background: var(--border); }
+  .detail-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .detail-input {
+    height: 24px;
+    padding: 0 6px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--fg);
+    font-family: var(--mono);
+    font-size: 11px;
+    width: 72px;
+    text-align: right;
+  }
+  .detail-input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px oklch(0.68 0.13 175 / 20%);
+    outline: none;
+  }
+  .detail-unit {
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  /* Mapping entry */
+  .mapping-entry {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 6px;
+    overflow: hidden;
+    transition: border-color 150ms;
+  }
+  .mapping-entry:hover { border-color: oklch(1 0 0 / 18%); }
+  .mapping-entry.inactive { opacity: 0.4; }
+  .mapping-entry.expanded { border-color: var(--primary); box-shadow: 0 0 0 1px oklch(0.68 0.13 175 / 15%); }
+
+  /* Collapsed state: horizontal pipeline */
+  .map-collapsed {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    cursor: pointer;
+  }
+  .map-client {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    min-width: 140px;
+    flex-shrink: 0;
+  }
+  .map-arrow { color: oklch(1 0 0 / 15%); flex-shrink: 0; }
+  .map-chain {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+  }
+  .map-target-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  .map-target-pill.primary { background: oklch(0.68 0.13 175 / 10%); border: 1px solid oklch(0.68 0.13 175 / 20%); color: var(--primary); }
+  .map-target-pill.failover { background: oklch(1 0 0 / 4%); border: 1px solid var(--border); color: var(--muted); }
+  .map-target-pill .num { font-size: 10px; font-weight: 600; }
+  .map-target-pill .provider { font-size: 10px; opacity: 0.5; }
+  .map-failover-sep { color: oklch(0.78 0.16 80 / 40%); font-size: 10px; }
+  .map-overflow-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    border: 1px dashed oklch(0.68 0.13 175 / 20%);
+    font-family: var(--mono);
+    font-size: 11px;
+    color: oklch(0.68 0.13 175 / 50%);
+    white-space: nowrap;
+  }
+  .map-tag {
+    font-size: 9px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+  .map-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    margin-left: auto;
+  }
+  .map-toggle {
+    width: 28px;
+    height: 16px;
+    border-radius: 8px;
+    background: var(--primary);
+    position: relative;
+    cursor: pointer;
+  }
+  .map-toggle.off { background: oklch(1 0 0 / 15%); }
+  .map-toggle-knob {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: white;
+    position: absolute;
+    top: 2px;
+    right: 2px;
+  }
+  .map-toggle.off .map-toggle-knob { right: auto; left: 2px; background: var(--muted); }
+  .map-delete {
+    color: var(--muted);
+    opacity: 0.3;
+    cursor: pointer;
+    transition: opacity 150ms;
+  }
+  .map-delete:hover { opacity: 1; color: var(--danger); }
+  .map-expand-hint {
+    font-size: 10px;
+    color: var(--muted);
+    opacity: 0;
+    transition: opacity 150ms;
+  }
+  .mapping-entry:hover .map-expand-hint { opacity: 0.5; }
+
+  /* Expanded state: vertical editor */
+  .map-expanded {
+    border-top: 1px solid var(--border);
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .map-edit-label {
+    font-size: 10px;
+    color: var(--muted);
+    opacity: 0.6;
+    flex-shrink: 0;
+    width: 50px;
+  }
+  .map-edit-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .map-edit-select {
+    flex: 1;
+    height: 28px;
+    padding: 0 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--fg);
+    font-size: 12px;
+    outline: none;
+  }
+  .map-edit-select:focus { border-color: var(--primary); }
+  .map-target-badge {
+    font-size: 11px;
+    font-weight: 600;
+    width: 20px;
+    text-align: center;
+    flex-shrink: 0;
+    padding: 2px 0;
+    border-radius: 4px;
+  }
+  .map-target-badge.primary { background: oklch(0.68 0.13 175 / 10%); color: var(--primary); }
+  .map-target-badge.failover { background: oklch(1 0 0 / 5%); color: var(--muted); }
+  .map-failover-line {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 0 1px 56px;
+  }
+  .map-failover-line-bar { width: 1px; height: 6px; background: oklch(0.78 0.16 80 / 30%); }
+  .map-failover-line-text { font-size: 9px; color: oklch(0.78 0.16 80 / 50%); }
+  .map-overflow-section {
+    margin-top: 4px;
+    padding-top: 6px;
+    border-top: 1px dashed oklch(0.68 0.13 175 / 15%);
+  }
+  .map-overflow-header {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 6px;
+  }
+  .map-overflow-label {
+    font-size: 10px;
+    color: oklch(0.68 0.13 175 / 50%);
+  }
+  .map-add-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 4px 0;
+    font-size: 11px;
+    color: var(--muted);
+    opacity: 0.5;
+    cursor: pointer;
+    border: 1px dashed var(--border);
+    border-radius: 4px;
+    transition: all 150ms;
+  }
+  .map-add-btn:hover { opacity: 0.8; border-color: var(--primary); color: var(--primary); }
+
+  /* Multimodal fallback section */
+  .map-multimodal-section {
+    margin-top: 4px;
+    padding-top: 6px;
+    border-top: 1px dashed oklch(0.62 0.18 250 / 15%);
+  }
+  .map-multimodal-header {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-bottom: 6px;
+  }
+  .map-multimodal-icon { color: oklch(0.62 0.18 250 / 50%); }
+  .map-multimodal-label { font-size: 11px; color: oklch(0.62 0.18 250 / 60%); }
+  .map-multimodal-badge {
+    font-size: 9px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    border: 1px solid oklch(0.62 0.18 250 / 20%);
+    color: oklch(0.62 0.18 250 / 60%);
+  }
+  .map-multimodal-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    border: 1px dashed oklch(0.62 0.18 250 / 20%);
+    font-family: var(--mono);
+    font-size: 11px;
+    color: oklch(0.62 0.18 250 / 50%);
+    white-space: nowrap;
+  }
+  .map-warning-box {
+    margin-top: 6px;
+    padding: 8px 10px;
+    border-radius: 4px;
+    border: 1px solid oklch(0.78 0.16 80 / 25%);
+    background: oklch(0.78 0.16 80 / 5%);
+    display: flex;
+    gap: 8px;
+  }
+  .map-warning-icon { color: var(--warning); flex-shrink: 0; margin-top: 1px; }
+  .map-warning-text { font-size: 11px; line-height: 1.5; }
+  .map-warning-text .title { color: var(--warning); font-weight: 500; }
+  .map-warning-text .detail { color: oklch(0.78 0.16 80 / 60%); }
+  .map-warning-text .suggestion { color: oklch(0.78 0.16 80 / 45%); }
+  .map-section-label {
+    font-size: 10px;
+    color: var(--muted);
+    opacity: 0.5;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 2px;
+    margin-bottom: 4px;
+  }
+
+  /* Add new mapping row — same visual structure as collapsed entry */
+  .mapping-add-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+    margin-top: 6px;
+    transition: border-color 150ms;
+  }
+  .mapping-add-row:hover { border-color: oklch(1 0 0 / 18%); }
+  .mapping-add-input {
+    min-width: 140px;
+    height: 24px;
+    padding: 0 8px;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    border-radius: 0;
+    background: transparent;
+    color: var(--fg);
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    outline: none;
+    flex-shrink: 0;
+  }
+  .mapping-add-input::placeholder { color: var(--muted); opacity: 0.4; font-weight: 400; }
+  .mapping-add-input:focus { border-bottom-color: var(--primary); }
+  .mapping-add-select {
+    flex: 1;
+    height: 24px;
+    padding: 0 10px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--muted);
+    font-size: 12px;
+    outline: none;
+  }
+  .mapping-add-select:focus { border-color: var(--primary); }
+  .mapping-add-btn {
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0.4;
+    transition: all 150ms;
+    flex-shrink: 0;
+  }
+  .mapping-add-btn:hover { opacity: 1; border-color: var(--primary); color: var(--primary); background: oklch(0.68 0.13 175 / 6%); }
+
+  /* Tags */
+  .tag-def { background: oklch(0.68 0.13 175 / 15%); color: var(--primary); }
+  .tag-auto { background: oklch(0.65 0.17 150 / 15%); color: var(--success); }
+  .tag-existing { background: oklch(1 0 0 / 8%); color: var(--muted); }
+  .tag-cust { background: oklch(0.62 0.18 250 / 12%); color: var(--info); }
+
+  /* Retry rule */
+  .retry-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px;
+    border-radius: 6px;
+    transition: background 150ms;
+  }
+  .retry-item:hover { background: oklch(1 0 0 / 3%); }
+  .retry-checkbox {
+    width: 16px;
+    height: 16px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    flex-shrink: 0;
+    margin-top: 1px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .retry-checkbox.checked {
+    background: var(--primary);
+    border-color: var(--primary);
+  }
+  .retry-checkbox.disabled { background: oklch(1 0 0 / 12%); cursor: not-allowed; border-color: oklch(1 0 0 / 15%); }
+  .retry-name { font-size: 12px; font-weight: 500; }
+  .retry-detail { font-size: 10px; color: var(--muted); margin-top: 2px; font-family: var(--mono); }
+  .retry-badge {
+    font-size: 9px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    border: 1px solid;
+    font-weight: 500;
+    display: inline-block;
+    line-height: 1.4;
+  }
+
+  /* Provider select dropdown on retry rules */
+  .retry-provider-select {
+    position: relative;
+    display: inline-block;
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+  .retry-provider-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-size: 10px;
+    cursor: pointer;
+    transition: all 150ms;
+    white-space: nowrap;
+  }
+  .retry-provider-btn:hover { border-color: oklch(1 0 0 / 25%); }
+  .retry-provider-btn.active { border-color: var(--primary); color: var(--primary); background: oklch(0.68 0.13 175 / 6%); }
+  .retry-provider-btn .arrow { font-size: 8px; opacity: 0.5; }
+  .retry-provider-dropdown {
+    position: absolute;
+    top: calc(100% + 2px);
+    right: 0;
+    min-width: 140px;
+    background: oklch(0.18 0.02 260);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 3px;
+    z-index: 100;
+    box-shadow: 0 4px 16px oklch(0 0 0 / 40%);
+  }
+  .retry-provider-option {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    color: var(--fg);
+    cursor: pointer;
+    transition: background 100ms;
+  }
+  .retry-provider-option:hover { background: oklch(1 0 0 / 6%); }
+  .retry-provider-option.selected { background: oklch(0.68 0.13 175 / 10%); color: var(--primary); }
+  .retry-provider-option .check {
+    width: 12px;
+    font-size: 10px;
+    color: var(--primary);
+    text-align: center;
+  }
+  .retry-provider-option .label { flex: 1; }
+  .retry-provider-option .hint { font-size: 9px; color: var(--muted); opacity: 0.5; }
+
+  /* Advanced section (collapsed) */
+  .advanced-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 0;
+    color: var(--muted);
+    font-size: 12px;
+    cursor: pointer;
+    border: none;
+    background: none;
+    font-family: var(--sans);
+    transition: color 150ms;
+  }
+  .advanced-toggle:hover { color: var(--fg); }
+  .advanced-content { display: none; }
+  .advanced-content.open { display: block; }
+  .chevron { transition: transform 150ms; display: inline-block; }
+  .chevron.open { transform: rotate(90deg); }
+
+  /* Footer bar */
+  .footer-bar {
+    position: fixed;
+    bottom: 0;
+    left: 224px;
+    right: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 8px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 10;
+    backdrop-filter: blur(8px);
+  }
+  .footer-summary {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .footer-summary .sep { color: oklch(1 0 0 / 15%); }
+  .footer-provider {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .footer-provider-badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: oklch(0.68 0.13 175 / 8%);
+    color: var(--primary);
+    font-weight: 500;
+  }
+  .footer-stat {
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+  .footer-stat .num { color: var(--fg); font-weight: 600; }
+  .footer-stat .unit { color: var(--muted); }
+  .footer-actions { display: flex; align-items: center; gap: 8px; }
+  .footer-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 4px;
+  }
+  .footer-status.ok {
+    background: oklch(0.65 0.17 150 / 8%);
+    color: var(--success);
+  }
+  .footer-status.unchecked {
+    background: oklch(1 0 0 / 4%);
+    color: var(--muted);
+    opacity: 0.5;
+  }
+  .btn-saving {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    opacity: 0.7;
+    pointer-events: none;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spin { animation: spin 1s linear infinite; }
+
+  /* Auto-recommend hint */
+  .auto-hint {
+    font-size: 11px;
+    color: var(--muted);
+    opacity: 0.7;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  /* Divider */
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 12px 0;
+  }
+
+  /* Tab layout for Row 3 */
+  .row3-grid {
+    display: grid;
+    grid-template-columns: 3fr 2fr;
+    gap: 16px;
+  }
+</style>
+</head>
+<body>
+
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('a')">A: Steps + Collapsed Advanced</button>
+  <button class="tab-btn" onclick="switchTab('b')">B: Current Layout (Reference)</button>
+</div>
+
+<!-- ============================================ -->
+<!-- APPROACH A: Steps + Collapsed Advanced       -->
+<!-- ============================================ -->
+<div id="panel-a" class="panel active">
+  <div class="approach-desc">
+    <h3>Approach A: Steps + Collapsed Advanced</h3>
+    <p>4-step progress indicator at top. Provider Config split into two cards: Connection + Models. Concurrency Control in Connection card (border-t). Transform Rules collapsed under Model Config. Retry Rules with provider dropdown. Mappings with failover/overflow/multimodal.</p>
+  </div>
+
+  <!-- Step Progress -->
+  <div class="card" style="margin-bottom:16px;">
+    <div class="step-bar">
+      <div class="step-node">
+        <div class="step-circle done">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M18 6L9 17l-5-6"/></svg>
+        </div>
+        <div class="step-label">Select Client</div>
+      </div>
+      <div class="step-connector done"></div>
+      <div class="step-node">
+        <div class="step-circle done">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M18 6L9 17l-5-6"/></svg>
+        </div>
+        <div class="step-label">Configure Provider</div>
+      </div>
+      <div class="step-connector done"></div>
+      <div class="step-node">
+        <div class="step-circle current">3</div>
+        <div class="step-label current">Model Mappings</div>
+      </div>
+      <div class="step-connector"></div>
+      <div class="step-node">
+        <div class="step-circle">4</div>
+        <div class="step-label">Retry Rules</div>
+        <span class="badge badge-optional" style="margin-top:2px;">Optional</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 1: Client Selection (done) -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Select Client</span>
+      <span class="badge badge-success" style="font-size:10px;">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M18 6L9 17l-5-6"/></svg>
+        Selected
+      </span>
+    </div>
+    <div class="card-content">
+      <div class="client-desc">Choose the tool that will connect to this router. We'll auto-configure the API format and default model mappings.</div>
+      <div class="client-grid">
+        <div class="client-btn active">
+          <div class="client-icon" style="background:#D97757;">C</div>
+          <div>
+            <div class="client-name">Claude Code<span class="recommended-tag">Popular</span></div>
+            <div class="client-meta">Anthropic API · CLI coding assistant</div>
+          </div>
+        </div>
+        <div class="client-btn">
+          <div class="client-icon" style="background:#74AA9C;">CX</div>
+          <div>
+            <div class="client-name">Codex CLI<span class="recommended-tag">Popular</span></div>
+            <div class="client-meta">OpenAI Responses API · CLI coding agent</div>
+          </div>
+        </div>
+        <div class="client-btn">
+          <div class="client-icon" style="background:oklch(0.55 0.15 160);">P</div>
+          <div>
+            <div class="client-name">Pi</div>
+            <div class="client-meta">Anthropic API · Agent framework</div>
+          </div>
+        </div>
+        <div class="client-btn">
+          <div class="client-icon" style="background:#10a37f;">OA</div>
+          <div>
+            <div class="client-name">OpenAI SDK</div>
+            <div class="client-meta">OpenAI API · Direct SDK calls</div>
+          </div>
+        </div>
+        <div class="client-btn">
+          <div class="client-icon" style="background:#D4976A;">AN</div>
+          <div>
+            <div class="client-name">Anthropic SDK</div>
+            <div class="client-meta">Anthropic API · Direct SDK calls</div>
+          </div>
+        </div>
+      </div>
+      <div class="client-feedback">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+        <span><strong>Claude Code</strong> uses the Anthropic Messages API. We'll auto-map <strong>sonnet, opus, haiku</strong> to your provider models.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 2a: Provider Connection (done) -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Provider Connection</span>
+      <span class="auto-hint">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+        Auto-configured based on your client
+      </span>
+    </div>
+    <div class="card-content">
+      <!-- Row 1: Provider + Plan -->
+      <div class="row-label">Provider</div>
+      <div class="form-row">
+        <div class="form-group" style="width:200px;">
+          <span class="form-label">Provider</span>
+          <div class="form-select" style="display:flex;align-items:center;color:var(--fg);">DeepSeek</div>
+        </div>
+        <div class="form-group" style="width:160px;">
+          <span class="form-label">Plan</span>
+          <div class="form-select" style="display:flex;align-items:center;color:var(--fg);">Anthropic</div>
+        </div>
+      </div>
+
+      <hr class="form-divider">
+
+      <!-- Row 2: Format + Base URL + API Key + Verify -->
+      <div class="row-label">Endpoint</div>
+      <div class="form-row">
+        <div class="form-group" style="width:200px;">
+          <span class="form-label">Format</span>
+          <div class="form-select" style="display:flex;align-items:center;color:var(--fg);">Anthropic Messages</div>
+        </div>
+        <div class="form-group" style="width:320px;">
+          <span class="form-label">Base URL</span>
+          <input class="form-input mono" value="https://api.deepseek.com" style="width:100%;">
+        </div>
+        <div class="form-group" style="width:240px;">
+          <span class="form-label">API Key<span class="form-required">*</span></span>
+          <input class="form-input" type="password" value="sk-xxxx" style="width:100%;">
+        </div>
+        <div class="form-group">
+          <span class="form-label" style="visibility:hidden;">Verify</span>
+          <div class="verify-btn verified">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M18 6L9 17l-5-6"/></svg>
+            Verified
+          </div>
+        </div>
+      </div>
+
+      <!-- Concurrency Control -->
+      <div style="border-top:1px solid var(--border);padding-top:10px;margin-top:12px;">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+          <span style="font-size:11px;font-weight:500;color:var(--muted);">Concurrency Control</span>
+          <span style="font-size:9px;color:var(--muted);opacity:0.5;">Optional</span>
+        </div>
+        <div style="display:flex;align-items:end;gap:8px;flex-wrap:wrap;">
+          <div class="form-group" style="width:144px;">
+            <span class="form-label">Mode</span>
+            <div class="form-select" style="display:flex;align-items:center;color:var(--fg);">Auto-adaptive</div>
+          </div>
+          <div class="form-group" style="width:100px;">
+            <span class="form-label">Max</span>
+            <input class="form-input" type="number" value="10" style="width:100%;">
+          </div>
+          <div class="form-group" style="width:120px;">
+            <span class="form-label">Queue timeout</span>
+            <input class="form-input mono" value="120000" style="width:100%;">
+          </div>
+          <div class="form-group" style="width:120px;">
+            <span class="form-label">Queue size</span>
+            <input class="form-input" type="number" value="100" style="width:100%;">
+          </div>
+        </div>
+        <div style="font-size:9px;color:var(--muted);opacity:0.4;margin-top:4px;">Adaptive mode auto-adjusts concurrency based on error rate</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 2b: Model Config (done) -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Model Configuration</span>
+      <span class="badge badge-secondary">7/8 models</span>
+    </div>
+    <div class="card-content">
+      <div class="model-list">
+        <!-- Model 1: enabled, no patches -->
+        <div class="model-row">
+          <div class="model-main">
+            <div class="model-toggle on"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M18 6L9 17l-5-6"/></svg></div>
+            <div class="model-name">deepseek-chat</div>
+            <select class="model-ctx-select"><option>8K</option><option>16K</option><option>32K</option><option>64K</option><option selected>128K</option><option>160K</option><option>200K</option><option>256K</option><option>1M</option></select>
+            <div class="model-cap-badges">
+              <div class="cap-dot active" title="Text"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg></div><div class="cap-dot active" title="Image"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div><div class="cap-dot" title="Audio"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/></svg></div><div class="cap-dot" title="Video"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></div>
+            </div>
+            <div class="model-patch-btn" onclick="toggleDetail(this)">0 patches <span class="chevron-sm">&#9654;</span></div>
+            <div class="model-trash"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></div>
+          </div>
+          <div class="model-detail">
+            <div class="detail-section">
+              <div class="detail-label">Patches</div>
+              <div class="patch-chips">
+                <div class="patch-chip inactive"><span class="dot"></span>Thinking Consistency</div>
+                <div class="patch-chip inactive"><span class="dot"></span>Orphan Tool Result</div>
+                <div class="patch-chip inactive"><span class="dot"></span>Developer Role</div>
+              </div>
+            </div>
+            <div class="detail-section">
+              <div class="detail-label">Timeout</div>
+              <div class="detail-row">
+                <input class="detail-input" value="3000">
+                <span class="detail-unit">seconds</span>
+                <span class="badge badge-outline" style="font-size:9px;height:16px;">Default</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Model 2: enabled, 2 patches, expanded -->
+        <div class="model-row">
+          <div class="model-main">
+            <div class="model-toggle on"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M18 6L9 17l-5-6"/></svg></div>
+            <div class="model-name">deepseek-reasoner</div>
+            <select class="model-ctx-select"><option>8K</option><option>16K</option><option>32K</option><option>64K</option><option>128K</option><option>160K</option><option>200K</option><option>256K</option><option selected>1M</option></select>
+            <div class="model-cap-badges">
+              <div class="cap-dot active" title="Text"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg></div><div class="cap-dot" title="Image"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div><div class="cap-dot" title="Audio"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/></svg></div><div class="cap-dot" title="Video"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></div>
+            </div>
+            <div class="model-patch-btn has-patches" onclick="toggleDetail(this)">2 patches <span class="chevron-sm open">&#9654;</span></div>
+            <div class="model-trash"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></div>
+          </div>
+          <div class="model-detail open">
+            <div class="detail-section">
+              <div class="detail-label">Patches</div>
+              <div class="patch-chips">
+                <div class="patch-chip active"><span class="dot"></span>Thinking Consistency</div>
+                <div class="patch-chip active"><span class="dot"></span>Orphan Tool Result</div>
+                <div class="patch-chip inactive"><span class="dot"></span>Developer Role</div>
+              </div>
+            </div>
+            <div class="detail-section">
+              <div class="detail-label">Timeout</div>
+              <div class="detail-row">
+                <input class="detail-input" value="3000">
+                <span class="detail-unit">seconds</span>
+                <span class="badge badge-outline" style="font-size:9px;height:16px;">Default</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Model 3: enabled, no patches -->
+        <div class="model-row">
+          <div class="model-main">
+            <div class="model-toggle on"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M18 6L9 17l-5-6"/></svg></div>
+            <div class="model-name">deepseek-v3-0324</div>
+            <select class="model-ctx-select"><option>8K</option><option>16K</option><option>32K</option><option>64K</option><option selected>128K</option><option>160K</option><option>200K</option><option>256K</option><option>1M</option></select>
+            <div class="model-cap-badges">
+              <div class="cap-dot active" title="Text"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg></div><div class="cap-dot active" title="Image"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div><div class="cap-dot" title="Audio"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/></svg></div><div class="cap-dot" title="Video"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></div>
+            </div>
+            <div class="model-patch-btn" onclick="toggleDetail(this)">0 patches <span class="chevron-sm">&#9654;</span></div>
+            <div class="model-trash"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></div>
+          </div>
+          <div class="model-detail">
+            <div class="detail-section">
+              <div class="detail-label">Patches</div>
+              <div class="patch-chips">
+                <div class="patch-chip inactive"><span class="dot"></span>Thinking Consistency</div>
+                <div class="patch-chip inactive"><span class="dot"></span>Orphan Tool Result</div>
+              </div>
+            </div>
+            <div class="detail-section">
+              <div class="detail-label">Timeout</div>
+              <div class="detail-row">
+                <input class="detail-input" value="3000">
+                <span class="detail-unit">seconds</span>
+                <span class="badge badge-outline" style="font-size:9px;height:16px;">Default</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Model 4: enabled, 2 patches -->
+        <div class="model-row">
+          <div class="model-main">
+            <div class="model-toggle on"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M18 6L9 17l-5-6"/></svg></div>
+            <div class="model-name">deepseek-r1-0528</div>
+            <select class="model-ctx-select"><option>8K</option><option>16K</option><option>32K</option><option>64K</option><option>128K</option><option>160K</option><option>200K</option><option>256K</option><option selected>1M</option></select>
+            <div class="model-cap-badges">
+              <div class="cap-dot active" title="Text"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg></div><div class="cap-dot" title="Image"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div><div class="cap-dot" title="Audio"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/></svg></div><div class="cap-dot" title="Video"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></div>
+            </div>
+            <div class="model-patch-btn has-patches" onclick="toggleDetail(this)">2 patches <span class="chevron-sm">&#9654;</span></div>
+            <div class="model-trash"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></div>
+          </div>
+          <div class="model-detail">
+            <div class="detail-section">
+              <div class="detail-label">Patches</div>
+              <div class="patch-chips">
+                <div class="patch-chip active"><span class="dot"></span>Thinking Consistency</div>
+                <div class="patch-chip active"><span class="dot"></span>Orphan Tool Result</div>
+              </div>
+            </div>
+            <div class="detail-section">
+              <div class="detail-label">Timeout</div>
+              <div class="detail-row">
+                <input class="detail-input" value="3000">
+                <span class="detail-unit">seconds</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Model 5: enabled -->
+        <div class="model-row">
+          <div class="model-main">
+            <div class="model-toggle on"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M18 6L9 17l-5-6"/></svg></div>
+            <div class="model-name">deepseek-v4</div>
+            <select class="model-ctx-select"><option>8K</option><option>16K</option><option>32K</option><option>64K</option><option>128K</option><option>160K</option><option>200K</option><option>256K</option><option selected>1M</option></select>
+            <div class="model-cap-badges">
+              <div class="cap-dot active" title="Text"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg></div><div class="cap-dot active" title="Image"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div><div class="cap-dot" title="Audio"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/></svg></div><div class="cap-dot active" title="Video"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></div>
+            </div>
+            <div class="model-patch-btn" onclick="toggleDetail(this)">0 patches <span class="chevron-sm">&#9654;</span></div>
+            <div class="model-trash"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></div>
+          </div>
+          <div class="model-detail">
+            <div class="detail-section">
+              <div class="detail-label">Patches</div>
+              <div class="patch-chips">
+                <div class="patch-chip inactive"><span class="dot"></span>Developer Role</div>
+              </div>
+            </div>
+            <div class="detail-section">
+              <div class="detail-label">Timeout</div>
+              <div class="detail-row">
+                <input class="detail-input" value="3000">
+                <span class="detail-unit">seconds</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Model 6: disabled -->
+        <div class="model-row disabled-row">
+          <div class="model-main">
+            <div class="model-toggle"></div>
+            <div class="model-name">deepseek-chat-v3-0324</div>
+            <select class="model-ctx-select"><option>8K</option><option>16K</option><option>32K</option><option>64K</option><option selected>128K</option><option>160K</option><option>200K</option><option>256K</option><option>1M</option></select>
+            <div class="model-cap-badges">
+              <div class="cap-dot active" title="Text"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg></div><div class="cap-dot" title="Image"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div><div class="cap-dot" title="Audio"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/></svg></div><div class="cap-dot" title="Video"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></div>
+            </div>
+            <div class="model-patch-btn" onclick="toggleDetail(this)">0 patches <span class="chevron-sm">&#9654;</span></div>
+            <div class="model-trash"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></div>
+          </div>
+          <div class="model-detail">
+            <div class="detail-section">
+              <div class="detail-label">Timeout</div>
+              <div class="detail-row">
+                <input class="detail-input" value="3000">
+                <span class="detail-unit">seconds</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Model 7 -->
+        <div class="model-row">
+          <div class="model-main">
+            <div class="model-toggle on"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M18 6L9 17l-5-6"/></svg></div>
+            <div class="model-name">deepseek-r1-distill</div>
+            <select class="model-ctx-select"><option>8K</option><option>16K</option><option>32K</option><option>64K</option><option selected>128K</option><option>160K</option><option>200K</option><option>256K</option><option>1M</option></select>
+            <div class="model-cap-badges">
+              <div class="cap-dot active" title="Text"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg></div><div class="cap-dot" title="Image"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div><div class="cap-dot" title="Audio"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/></svg></div><div class="cap-dot" title="Video"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></div>
+            </div>
+            <div class="model-patch-btn" onclick="toggleDetail(this)">0 patches <span class="chevron-sm">&#9654;</span></div>
+            <div class="model-trash"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></div>
+          </div>
+          <div class="model-detail">
+            <div class="detail-section">
+              <div class="detail-label">Patches</div>
+              <div class="patch-chips">
+                <div class="patch-chip inactive"><span class="dot"></span>Thinking Consistency</div>
+              </div>
+            </div>
+            <div class="detail-section">
+              <div class="detail-label">Timeout</div>
+              <div class="detail-row">
+                <input class="detail-input" value="3000">
+                <span class="detail-unit">seconds</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Model 8 -->
+        <div class="model-row">
+          <div class="model-main">
+            <div class="model-toggle on"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M18 6L9 17l-5-6"/></svg></div>
+            <div class="model-name">deepseek-v3.2</div>
+            <select class="model-ctx-select"><option>8K</option><option>16K</option><option>32K</option><option>64K</option><option>128K</option><option>160K</option><option>200K</option><option>256K</option><option selected>1M</option></select>
+            <div class="model-cap-badges">
+              <div class="cap-dot active" title="Text"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg></div><div class="cap-dot active" title="Image"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div><div class="cap-dot" title="Audio"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/></svg></div><div class="cap-dot" title="Video"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></div>
+            </div>
+            <div class="model-patch-btn" onclick="toggleDetail(this)">0 patches <span class="chevron-sm">&#9654;</span></div>
+            <div class="model-trash"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></div>
+          </div>
+          <div class="model-detail">
+            <div class="detail-section">
+              <div class="detail-label">Patches</div>
+              <div class="patch-chips">
+                <div class="patch-chip inactive"><span class="dot"></span>Developer Role</div>
+              </div>
+            </div>
+            <div class="detail-section">
+              <div class="detail-label">Timeout</div>
+              <div class="detail-row">
+                <input class="detail-input" value="3000">
+                <span class="detail-unit">seconds</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Transform Rules (collapsed, optional) -->
+      <hr class="divider">
+      <button class="advanced-toggle" onclick="toggleAdvanced(this)">
+        <span class="chevron">&#9654;</span>
+        Transform Rules
+        <span class="badge badge-secondary" style="font-size:9px;margin-left:4px;">Optional</span>
+      </button>
+      <div class="advanced-content" id="adv-content">
+        <div style="padding:8px 0;">
+          <div style="font-size:10px;color:var(--muted);opacity:0.5;margin-bottom:8px;">Modify requests before forwarding to upstream provider</div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div class="form-group">
+              <span class="form-label">Inject Headers <span style="font-family:var(--mono);opacity:0.4;">JSON</span></span>
+              <input class="form-input mono" placeholder='{"x-custom": "value"}' style="width:100%;">
+            </div>
+            <div class="form-group">
+              <span class="form-label">Drop Fields <span style="font-family:var(--mono);opacity:0.4;">comma-separated</span></span>
+              <input class="form-input mono" placeholder="logprobs, frequency_penalty" style="width:100%;">
+            </div>
+            <div class="form-group">
+              <span class="form-label">Request Defaults <span style="font-family:var(--mono);opacity:0.4;">JSON</span></span>
+              <input class="form-input mono" placeholder='{"max_tokens": 4096}' style="width:100%;">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 3 + 4: Mappings + Retry Rules -->
+  <div class="row3-grid">
+    <!-- Mappings -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Model Mappings</span>
+        <span class="badge badge-secondary">3 items</span>
+      </div>
+      <div class="card-content">
+
+        <!-- Entry 1: sonnet - COLLAPSED, single target -->
+        <div class="mapping-entry">
+          <div class="map-collapsed">
+            <span class="map-client">sonnet</span>
+            <svg class="map-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            <div class="map-chain">
+              <span class="map-target-pill primary"><span class="num">①</span> deepseek-chat</span>
+            </div>
+            <span class="map-tag tag-def">Default</span>
+            <div class="map-actions">
+              <div class="map-toggle"><div class="map-toggle-knob"></div></div>
+              <svg class="map-delete" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+              <span class="map-expand-hint">click to edit</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Entry 2: opus - EXPANDED, showing all 3 features: failover + overflow + multimodal -->
+        <div class="mapping-entry expanded">
+          <div class="map-collapsed">
+            <span class="map-client">opus</span>
+            <svg class="map-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            <div class="map-chain">
+              <span class="map-target-pill primary"><span class="num">①</span> deepseek-reasoner</span>
+              <span class="map-failover-sep">&rsaquo;</span>
+              <span class="map-target-pill failover"><span class="num">②</span> deepseek-r1-0528</span>
+              <span class="map-failover-sep">|</span>
+              <span class="map-overflow-pill">&darr; deepseek-chat</span>
+              <span class="map-failover-sep">|</span>
+              <span class="map-multimodal-pill">&diams; gpt-4o</span>
+            </div>
+            <span class="map-tag tag-def">Default</span>
+            <div class="map-actions">
+              <div class="map-toggle"><div class="map-toggle-knob"></div></div>
+              <svg class="map-delete" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+            </div>
+          </div>
+          <!-- Expanded editor -->
+          <div class="map-expanded">
+            <div class="map-edit-row">
+              <span class="map-edit-label">Client</span>
+              <span class="map-client" style="min-width:0;font-size:12px;">opus</span>
+            </div>
+
+            <!-- === Section 1: Failover chain === -->
+            <div class="map-section-label">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+              Failover chain
+            </div>
+            <!-- Primary target -->
+            <div class="map-edit-row">
+              <span class="map-target-badge primary">①</span>
+              <select class="map-edit-select">
+                <option>DeepSeek / deepseek-reasoner</option>
+                <option>DeepSeek / deepseek-chat</option>
+                <option>DeepSeek / deepseek-v3-0324</option>
+                <option>DeepSeek / deepseek-v4</option>
+              </select>
+            </div>
+            <div class="map-failover-line">
+              <div class="map-failover-line-bar"></div>
+              <span class="map-failover-line-text">failover on error</span>
+            </div>
+            <!-- Failover target -->
+            <div class="map-edit-row">
+              <span class="map-target-badge failover">②</span>
+              <select class="map-edit-select">
+                <option>DeepSeek / deepseek-r1-0528</option>
+                <option>DeepSeek / deepseek-chat</option>
+                <option>DeepSeek / deepseek-v4</option>
+              </select>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity:0.3;cursor:pointer;"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+            </div>
+            <!-- Add failover -->
+            <div class="map-add-btn">+ Add failover target</div>
+
+            <!-- === Section 2: Context overflow === -->
+            <div class="map-overflow-section">
+              <div class="map-overflow-header">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="oklch(0.68 0.13 175 / 40%)" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                <span class="map-overflow-label">Context overflow</span>
+                <span style="font-size:9px;color:oklch(0.68 0.13 175 / 35%);">when context exceeds model limit</span>
+              </div>
+              <div class="map-edit-row">
+                <span class="map-target-badge" style="background:oklch(0.68 0.13 175 / 6%);color:oklch(0.68 0.13 175 / 50%);">&darr;</span>
+                <select class="map-edit-select" style="border-style:dashed;border-color:oklch(0.68 0.13 175 / 20%);">
+                  <option>DeepSeek / deepseek-chat</option>
+                  <option>DeepSeek / deepseek-v3-0324</option>
+                </select>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity:0.3;cursor:pointer;"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+              </div>
+            </div>
+
+            <!-- === Section 3: Multimodal fallback === -->
+            <div class="map-multimodal-section">
+              <div class="map-multimodal-header">
+                <svg class="map-multimodal-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/><line x1="17" y1="17" x2="22" y2="17"/></svg>
+                <span class="map-multimodal-label">Multimodal Fallback</span>
+                <span class="map-multimodal-badge">Configured</span>
+              </div>
+              <div class="map-edit-row">
+                <span class="map-target-badge" style="background:oklch(0.62 0.18 250 / 6%);color:oklch(0.62 0.18 250 / 50%);">&diams;</span>
+                <select class="map-edit-select" style="border-style:dashed;border-color:oklch(0.62 0.18 250 / 20%);">
+                  <option>SiliconFlow / gpt-4o</option>
+                  <option>DeepSeek / deepseek-chat</option>
+                </select>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity:0.3;cursor:pointer;"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+              </div>
+              <!-- Session lock warning -->
+              <div class="map-warning-box">
+                <svg class="map-warning-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                <div class="map-warning-text">
+                  <div class="title">Session lock: once a request contains images/audio/video, the entire session will route to the fallback model.</div>
+                  <div class="detail">Clients send full conversation history each turn; prior media triggers persistent redirection. Recovers after compact or new session.</div>
+                  <div class="suggestion">Pick a fallback model with similar pricing to avoid cost spikes.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Entry 3: haiku - COLLAPSED, existing, inactive -->
+        <div class="mapping-entry inactive">
+          <div class="map-collapsed">
+            <span class="map-client">haiku</span>
+            <svg class="map-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            <div class="map-chain">
+              <span class="map-target-pill primary"><span class="num">①</span> deepseek-v3-0324</span>
+            </div>
+            <span class="map-tag tag-existing">Existing</span>
+            <div class="map-actions">
+              <div class="map-toggle off"><div class="map-toggle-knob"></div></div>
+              <svg class="map-delete" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Add new mapping — same visual structure as collapsed entry -->
+        <div class="mapping-add-row">
+          <input class="mapping-add-input" placeholder="model-name">
+          <svg class="map-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          <select class="mapping-add-select">
+            <option>Select model...</option>
+            <option>DeepSeek / deepseek-chat</option>
+            <option>DeepSeek / deepseek-reasoner</option>
+            <option>DeepSeek / deepseek-v3-0324</option>
+            <option>DeepSeek / deepseek-v4</option>
+          </select>
+          <span class="map-tag tag-cust" style="opacity:0.4;">Custom</span>
+          <div class="mapping-add-btn" title="Add mapping">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Retry Rules -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Retry Rules</span>
+        <span style="display:flex;align-items:center;gap:6px;">
+          <span class="badge badge-secondary">3 selected</span>
+        </span>
+      </div>
+      <div class="card-content">
+        <!-- Select all row -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--border);">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <div class="retry-checkbox checked" style="width:14px;height:14px;">
+              <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M18 6L9 17l-5-6"/></svg>
+            </div>
+            <span style="font-size:11px;color:var(--muted);">Select all</span>
+          </div>
+        </div>
+
+        <!-- Rule 1: General 429 - configured (exists in DB) -->
+        <div class="retry-item" style="opacity:0.5;cursor:default;">
+          <div class="retry-checkbox checked disabled">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M18 6L9 17l-5-6"/></svg>
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;align-items:center;gap:4px;">
+              <span class="retry-name">429 Too Many Requests</span>
+              <span class="retry-badge" style="background:oklch(1 0 0 / 8%);color:var(--muted);">General</span>
+              <span class="retry-badge" style="background:oklch(1 0 0 / 6%);color:var(--muted);border-color:var(--border);">Configured</span>
+            </div>
+            <div class="retry-detail">429 · .* · exponential · 5s · 10x · 60s max</div>
+          </div>
+        </div>
+
+        <!-- Rule 2: General 503 - configured -->
+        <div class="retry-item" style="opacity:0.5;cursor:default;">
+          <div class="retry-checkbox checked disabled">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M18 6L9 17l-5-6"/></svg>
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;align-items:center;gap:4px;">
+              <span class="retry-name">503 Service Unavailable</span>
+              <span class="retry-badge" style="background:oklch(1 0 0 / 8%);color:var(--muted);">General</span>
+              <span class="retry-badge" style="background:oklch(1 0 0 / 6%);color:var(--muted);border-color:var(--border);">Configured</span>
+            </div>
+            <div class="retry-detail">503 · .* · exponential · 5s · 10x · 60s max</div>
+          </div>
+        </div>
+
+        <!-- Rule 3: DeepSeek concurrency - selected, with provider dropdown OPEN -->
+        <div class="retry-item">
+          <div class="retry-checkbox checked">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M18 6L9 17l-5-6"/></svg>
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;align-items:center;gap:4px;">
+              <span class="retry-name">DeepSeek 并发限流 (429)</span>
+            </div>
+            <div class="retry-detail">429 · Too many requests.*concurrency · exponential · 2s · 5x · 120s max</div>
+          </div>
+          <!-- Provider dropdown - OPEN state -->
+          <div class="retry-provider-select">
+            <div class="retry-provider-btn active">
+              DeepSeek <span class="arrow">&darr;</span>
+            </div>
+            <div class="retry-provider-dropdown">
+              <div class="retry-provider-option">
+                <span class="check">&nbsp;</span>
+                <span class="label">General</span>
+                <span class="hint">Global</span>
+              </div>
+              <div class="retry-provider-option selected">
+                <span class="check">&check;</span>
+                <span class="label">DeepSeek</span>
+                <span class="hint">Provider-only</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Rule 4: Another General rule user changed to DeepSeek -->
+        <div class="retry-item">
+          <div class="retry-checkbox checked">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M18 6L9 17l-5-6"/></svg>
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;align-items:center;gap:4px;">
+              <span class="retry-name">DeepSeek 过载 (503)</span>
+            </div>
+            <div class="retry-detail">503 · .* · exponential · 2s · 5x · 120s max</div>
+          </div>
+          <!-- Provider dropdown - CLOSED state, set to DeepSeek -->
+          <div class="retry-provider-select">
+            <div class="retry-provider-btn active">
+              DeepSeek <span class="arrow">&darr;</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Rule 5: General rule kept as global -->
+        <div class="retry-item">
+          <div class="retry-checkbox checked">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M18 6L9 17l-5-6"/></svg>
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;align-items:center;gap:4px;">
+              <span class="retry-name">上游超时 (544)</span>
+            </div>
+            <div class="retry-detail">544 · .*timeout.* · exponential · 3s · 3x · 30s max</div>
+          </div>
+          <!-- Provider dropdown - CLOSED state, set to General -->
+          <div class="retry-provider-select">
+            <div class="retry-provider-btn">
+              General <span class="arrow">&darr;</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer bar (Approach A) -->
+  <div class="footer-bar">
+    <div class="footer-summary">
+      <div class="footer-provider">
+        <span class="footer-provider-badge">Claude Code</span>
+        <span class="sep">&rarr;</span>
+        <span class="footer-provider-badge">DeepSeek / Anthropic</span>
+      </div>
+      <span class="sep">·</span>
+      <span class="footer-stat"><span class="num">8</span> <span class="unit">models</span></span>
+      <span class="sep">·</span>
+      <span class="footer-stat"><span class="num">3</span> <span class="unit">mappings</span></span>
+      <span class="sep">·</span>
+      <span class="footer-stat"><span class="num">3</span> <span class="unit">rules</span></span>
+    </div>
+    <div class="footer-actions">
+      <div class="footer-status ok">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M18 6L9 17l-5-6"/></svg>
+        Validated
+      </div>
+      <div class="btn">Validate</div>
+      <div class="btn btn-primary btn-saving">
+        <svg class="spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2a10 10 0 0 1 10 10"/></svg>
+        Saving...
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- APPROACH B: Current Layout (Reference)       -->
+<!-- ============================================ -->
+<div id="panel-b" class="panel">
+  <div class="approach-desc">
+    <h3>Approach B: Current Layout (Reference)</h3>
+    <p>The existing QuickSetup layout as implemented today. All sections in a single scroll, no step indicator, no visual distinction between required and optional. Advanced settings (Concurrency, Transform) are always visible.</p>
+  </div>
+
+  <!-- Row 1: Client Selection -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Select Client</span>
+    </div>
+    <div class="card-content">
+      <div class="client-grid">
+        <div class="client-btn active">
+          <div class="client-icon" style="background:#D97757;">C</div>
+          <div>
+            <div class="client-name">Claude Code</div>
+            <div class="client-meta">anthropic · Anthropic CLI</div>
+          </div>
+        </div>
+        <div class="client-btn">
+          <div class="client-icon" style="background:#74AA9C;">CX</div>
+          <div>
+            <div class="client-name">Codex CLI</div>
+            <div class="client-meta">openai-responses · OpenAI</div>
+          </div>
+        </div>
+        <div class="client-btn">
+          <div class="client-icon" style="background:oklch(0.55 0.15 160);">P</div>
+          <div>
+            <div class="client-name">Pi</div>
+            <div class="client-meta">anthropic · Agent framework</div>
+          </div>
+        </div>
+        <div class="client-btn">
+          <div class="client-icon" style="background:#10a37f;">OA</div>
+          <div>
+            <div class="client-name">OpenAI SDK</div>
+            <div class="client-meta">openai · Direct API</div>
+          </div>
+        </div>
+        <div class="client-btn">
+          <div class="client-icon" style="background:#D4976A;">AN</div>
+          <div>
+            <div class="client-name">Anthropic SDK</div>
+            <div class="client-meta">anthropic · Direct API</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 2: Provider Config (giant single card) -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Provider Configuration</span>
+    </div>
+    <div class="card-content" style="display:flex;flex-direction:column;gap:12px;">
+      <!-- Connection row -->
+      <div class="form-row">
+        <div class="form-group" style="width:160px;">
+          <span class="form-label">Provider</span>
+          <div class="form-select" style="display:flex;align-items:center;color:var(--fg);">DeepSeek</div>
+        </div>
+        <div class="form-group" style="width:112px;">
+          <span class="form-label">Plan</span>
+          <div class="form-select" style="display:flex;align-items:center;color:var(--fg);">Anthropic</div>
+        </div>
+        <div class="form-group" style="width:176px;">
+          <span class="form-label">Format</span>
+          <div class="form-select" style="display:flex;align-items:center;color:var(--fg);">Anthropic Messages</div>
+        </div>
+        <div class="form-group" style="width:288px;">
+          <span class="form-label">Base URL</span>
+          <input class="form-input mono" value="https://api.deepseek.com" readonly style="width:100%;">
+        </div>
+        <div class="form-group" style="width:256px;">
+          <span class="form-label">API Key</span>
+          <input class="form-input" type="password" value="sk-xxxx" style="width:100%;">
+        </div>
+        <div class="form-group">
+          <span class="form-label" style="visibility:hidden;">Action</span>
+          <div class="btn" style="color:var(--success);border-color:var(--success);">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M18 6L9 17l-5-6"/></svg>
+            Connected
+          </div>
+        </div>
+      </div>
+
+      <hr class="divider">
+
+      <!-- Model cards -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+        <span class="form-label" style="font-weight:500;">Model Configuration</span>
+        <span class="badge badge-secondary">8/8</span>
+      </div>
+      <div class="model-grid">
+        <div class="model-card"><div class="model-name">deepseek-chat</div></div>
+        <div class="model-card"><div class="model-name">deepseek-reasoner</div></div>
+        <div class="model-card"><div class="model-name">deepseek-v3-0324</div></div>
+        <div class="model-card"><div class="model-name">deepseek-r1-0528</div></div>
+        <div class="model-card"><div class="model-name">deepseek-v4</div></div>
+        <div class="model-card"><div class="model-name">deepseek-chat-v3-0324</div></div>
+        <div class="model-card"><div class="model-name">deepseek-r1-distill</div></div>
+        <div class="model-card"><div class="model-name">deepseek-v3.2</div></div>
+      </div>
+
+      <hr class="divider">
+
+      <!-- Concurrency (always visible in current layout) -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+        <span class="form-label" style="font-weight:500;">Concurrency Control</span>
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="width:144px;">
+          <span class="form-label">Mode</span>
+          <div class="form-select" style="display:flex;align-items:center;color:var(--fg);">Auto-adaptive</div>
+        </div>
+        <div class="form-group" style="width:112px;">
+          <span class="form-label">Max</span>
+          <input class="form-input" type="number" value="10" style="width:100%;">
+        </div>
+        <div class="form-group" style="width:128px;">
+          <span class="form-label">Queue Timeout</span>
+          <input class="form-input mono" value="120000" style="width:100%;">
+        </div>
+        <div class="form-group" style="width:128px;">
+          <span class="form-label">Max Queue</span>
+          <input class="form-input" type="number" value="100" style="width:100%;">
+        </div>
+        <span style="font-size:10px;color:var(--muted);">Auto-adaptive adjusts concurrency based on provider response patterns</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 3: Mappings + Retry + Transform -->
+  <div class="row3-grid">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Model Mappings</span>
+        <span class="badge badge-secondary">3 items</span>
+      </div>
+      <div class="card-content">
+        <div class="mapping-row"><span class="mapping-from">sonnet</span><span class="mapping-arrow">&rarr;</span><span class="mapping-to">deepseek-chat</span><span class="mapping-tag tag-def">Default</span></div>
+        <div class="mapping-row"><span class="mapping-from">opus</span><span class="mapping-arrow">&rarr;</span><span class="mapping-to">deepseek-reasoner</span><span class="mapping-tag tag-def">Default</span></div>
+        <div class="mapping-row"><span class="mapping-from">haiku</span><span class="mapping-arrow">&rarr;</span><span class="mapping-to">deepseek-v3-0324</span><span class="mapping-tag tag-def">Default</span></div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:16px;">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Retry Rules</span>
+          <span class="badge badge-secondary">3 selected</span>
+        </div>
+        <div class="card-content">
+          <div class="retry-item"><div class="retry-checkbox checked"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M18 6L9 17l-5-6"/></svg></div><div><div class="retry-name">DeepSeek Rate Limit</div><div class="retry-detail">429 · exponential · 2s · 3x</div></div></div>
+          <div class="retry-item"><div class="retry-checkbox checked"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M18 6L9 17l-5-6"/></svg></div><div><div class="retry-name">DeepSeek Server Error</div><div class="retry-detail">500/502/503 · exponential · 2s · 3x</div></div></div>
+          <div class="retry-item"><div class="retry-checkbox checked"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M18 6L9 17l-5-6"/></svg></div><div><div class="retry-name">General Overload</div><div class="retry-detail">429/500 · exponential · 1s · 2x</div></div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Transform Rules</span>
+        </div>
+        <div class="card-content" style="display:flex;flex-direction:column;gap:6px;">
+          <div class="form-group"><span class="form-label">Inject Headers</span><input class="form-input mono" placeholder='{"x-custom": "value"}' style="width:100%;"></div>
+          <div class="form-group"><span class="form-label">Drop Fields</span><input class="form-input mono" placeholder="logprobs, frequency_penalty" style="width:100%;"></div>
+          <div class="form-group"><span class="form-label">Request Defaults</span><input class="form-input mono" placeholder='{"max_tokens": 4096}' style="width:100%;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer-bar">
+    <div class="footer-summary">
+      <span class="badge badge-secondary">Claude Code</span>
+      <span class="sep">&rarr;</span>
+      <span class="badge badge-secondary">DeepSeek</span>
+      <span class="sep">·</span>
+      <span>8 models</span>
+      <span class="sep">·</span>
+      <span>3 mappings</span>
+      <span class="sep">·</span>
+      <span>3 rules</span>
+    </div>
+    <div class="footer-actions">
+      <div class="btn">Validate</div>
+      <div class="btn btn-primary">Save Config</div>
+    </div>
+  </div>
+</div>
+
+<script>
+function switchTab(id) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-' + id).classList.add('active');
+  event.target.classList.add('active');
+}
+
+function toggleAdvanced(btn) {
+  const content = btn.nextElementSibling;
+  const chevron = btn.querySelector('.chevron');
+  content.classList.toggle('open');
+  chevron.classList.toggle('open');
+}
+
+function toggleDetail(btn) {
+  const row = btn.closest('.model-row');
+  const detail = row.querySelector('.model-detail');
+  const chevron = btn.querySelector('.chevron-sm');
+  detail.classList.toggle('open');
+  if (chevron) chevron.classList.toggle('open');
+}
+</script>
+
+</body>
+</html>

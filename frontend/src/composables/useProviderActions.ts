@@ -2,8 +2,8 @@ import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { toast } from "vue-sonner";
 import { api, getApiMessage } from "@/api/client";
-import type { Provider } from "@/types/mapping";
 import { useClipboard } from "@/composables/useClipboard";
+import type { Provider } from "@/types/mapping";
 
 const MASK_VISIBLE_LEN = 7;
 const MASK_ASTERISK_COUNT = 7;
@@ -35,10 +35,10 @@ export function useProviderActions() {
     return key.slice(0, MASK_VISIBLE_LEN) + "*".repeat(MASK_ASTERISK_COUNT);
   }
 
-  const { copy: doCopy } = useClipboard();
+  const { copy: clipboardCopy } = useClipboard();
 
   async function copyKey(key: string, id: string) {
-    const ok = await doCopy(key);
+    const ok = await clipboardCopy(key);
     if (ok) {
       copiedId.value = id;
       setTimeout(() => {
@@ -61,7 +61,8 @@ export function useProviderActions() {
         toggleDependencies.value = (
           await api.getProviderDependencies(p.id)
         ).references;
-      } catch {
+      } catch (e: unknown) {
+        console.error("useProviderActions.doSave:", e);
         toggleDependencies.value = [];
       }
     }

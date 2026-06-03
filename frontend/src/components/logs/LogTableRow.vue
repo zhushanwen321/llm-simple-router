@@ -1,4 +1,3 @@
-<!-- eslint-disable vue/multi-word-component-names -->
 <script setup lang="ts">
 import { useI18n } from "vue-i18n";
 import { computed } from "vue";
@@ -10,11 +9,10 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { CheckIcon, CopyIcon } from "lucide-vue-next";
+import { CheckIcon, ChevronDown, CopyIcon } from "lucide-vue-next";
 import type { LogEntry } from "@/components/logs/types";
 import { PROVIDER_ID_ROUTER } from "@/components/logs/types";
-import { formatTime } from "@/utils/format";
-import { formatLatency } from "@/utils/format";
+import { formatTimeHMS, formatLatency } from "@/utils/format";
 
 const props = withDefaults(
   defineProps<{
@@ -48,7 +46,8 @@ function enhancementLabel(raw: string | null): string {
       return meta.detail ? `${meta.action}: ${meta.detail}` : meta.action;
     }
     return raw;
-  } catch {
+  } catch (e: unknown) {
+    console.error("LogTableRow.formatLog:", e);
     return t("logs.row.unknown");
   }
 }
@@ -56,6 +55,7 @@ function enhancementLabel(raw: string | null): string {
 
 <template>
   <TableRow
+    class="group"
     :class="{
       'bg-destructive/10': !isChild && (log.status_code ?? 0) >= 400,
       'bg-muted/20': isChild,
@@ -68,11 +68,10 @@ function enhancementLabel(raw: string | null): string {
         size="xs"
         @click="emit('toggleExpand', log)"
       >
-        <span
-          class="text-xs transition-transform"
+        <ChevronDown
+          class="size-3 transition-transform"
           :class="expanded ? '' : '-rotate-90'"
-          >&#9660;</span
-        >
+        />
       </Button>
       <span v-if="isChild" class="ml-4 text-muted-foreground text-xs"
         >&#x2514;</span
@@ -87,7 +86,7 @@ function enhancementLabel(raw: string | null): string {
             <Button
               variant="ghost"
               size="icon-xs"
-              class="shrink-0"
+              class="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
               @click.stop="emit('copy', log.id)"
             >
               <CheckIcon
@@ -102,21 +101,19 @@ function enhancementLabel(raw: string | null): string {
       </span>
     </TableCell>
 
-    <TableCell class="text-muted-foreground">{{
-      formatTime(log.created_at)
-    }}</TableCell>
+    <TableCell
+      class="font-mono text-xs text-muted-foreground whitespace-nowrap"
+      >{{ formatTimeHMS(log.created_at) }}</TableCell
+    >
 
-    <TableCell class="font-mono text-xs">
+    <TableCell class="font-mono text-xs whitespace-nowrap">
       {{ log.model || "-" }}
-      <Badge
-        v-if="!isChild && log.original_model"
-        variant="secondary"
-        class="ml-1 text-xs"
-        >{{ t("logs.row.replaced") }}</Badge
-      >
+      <Badge variant="secondary" class="ml-1 text-[10px] px-1 py-0">{{
+        log.api_type
+      }}</Badge>
     </TableCell>
 
-    <TableCell class="text-xs">
+    <TableCell class="text-xs whitespace-nowrap">
       <template v-if="!isChild && log.provider_id === PROVIDER_ID_ROUTER">
         <Badge variant="secondary" class="text-[10px] px-1 py-0">
           {{
@@ -129,9 +126,12 @@ function enhancementLabel(raw: string | null): string {
       <template v-else-if="log.backend_model || log.provider_name">
         <span class="font-mono">{{ log.backend_model || "-" }}</span>
         <span class="text-muted-foreground"> @ </span>
-        <Badge variant="outline" class="text-[10px] px-1 py-0">
-          {{ log.provider_name || log.provider_id || "-" }}
-        </Badge>
+        <span class="text-muted-foreground">{{
+          log.provider_name || log.provider_id || "-"
+        }}</span>
+        <Badge variant="secondary" class="ml-1 text-[10px] px-1 py-0">{{
+          log.api_type
+        }}</Badge>
       </template>
       <span v-else class="text-muted-foreground">-</span>
     </TableCell>
@@ -139,17 +139,11 @@ function enhancementLabel(raw: string | null): string {
     <TableCell>
       <div class="flex flex-wrap gap-1">
         <Badge
+          v-if="log.upstream_api_type && log.upstream_api_type !== log.api_type"
           :variant="log.api_type === 'openai' ? 'default' : 'secondary'"
           class="text-[10px] px-1.5 py-0"
         >
-          {{ log.api_type }}
-          <template
-            v-if="
-              log.upstream_api_type && log.upstream_api_type !== log.api_type
-            "
-          >
-            → {{ log.upstream_api_type }}
-          </template>
+          {{ log.api_type }} → {{ log.upstream_api_type }}
         </Badge>
         <Badge
           :variant="(log.status_code ?? 0) < 400 ? 'default' : 'destructive'"
@@ -190,7 +184,7 @@ function enhancementLabel(raw: string | null): string {
       {{ formatLatency(log.latency_ms) }}
     </TableCell>
 
-    <TableCell class="text-destructive text-xs max-w-[200px]">
+    <TableCell class="text-destructive text-xs min-w-0 max-w-60 lg:max-w-xs">
       <template v-if="log.error_message">
         <Tooltip :delay-duration="300">
           <TooltipTrigger as-child>

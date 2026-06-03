@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sidebar Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --font-sans: 'Geist', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+
+  /* Light */
+  --bg-page: oklch(1 0 0);
+  --bg-sidebar: oklch(0.975 0 0);
+  --bg-sidebar-hover: oklch(0.955 0 0);
+  --bg-sidebar-active: oklch(0.48 0.12 175 / 8%);
+  --bg-card: oklch(1 0 0);
+  --text-primary: oklch(0.145 0 0);
+  --text-secondary: oklch(0.556 0 0);
+  --text-muted: oklch(0.556 0 0 / 60%);
+  --text-active: oklch(0.48 0.12 175);
+  --accent: oklch(0.48 0.12 175);
+  --accent-light: oklch(0.48 0.12 175 / 8%);
+  --border-subtle: oklch(0.922 0 0);
+  --divider: oklch(0.922 0 0);
+  --icon-muted: oklch(0.556 0 0);
+  --icon-active: oklch(0.48 0.12 175);
+  --badge-bg: oklch(0.48 0.12 175);
+  --badge-text: oklch(0.985 0 0);
+  --badge-update-bg: oklch(0.577 0.245 27.325 / 10%);
+  --badge-update-text: oklch(0.577 0.245 27.325);
+  --bottom-hover: oklch(0.955 0 0);
+}
+
+.dark {
+  --bg-page: oklch(0.145 0 0);
+  --bg-sidebar: oklch(0.175 0 0);
+  --bg-sidebar-hover: oklch(0.22 0 0);
+  --bg-sidebar-active: oklch(0.68 0.13 175 / 10%);
+  --bg-card: oklch(0.205 0 0);
+  --text-primary: oklch(0.985 0 0);
+  --text-secondary: oklch(0.708 0 0);
+  --text-muted: oklch(0.708 0 0 / 50%);
+  --text-active: oklch(0.68 0.13 175);
+  --accent: oklch(0.68 0.13 175);
+  --accent-light: oklch(0.68 0.13 175 / 10%);
+  --border-subtle: oklch(1 0 0 / 6%);
+  --divider: oklch(1 0 0 / 6%);
+  --icon-muted: oklch(0.556 0 0);
+  --icon-active: oklch(0.68 0.13 175);
+  --badge-bg: oklch(0.68 0.13 175);
+  --badge-text: oklch(0.985 0 0);
+  --badge-update-bg: oklch(0.704 0.191 22.216 / 12%);
+  --badge-update-text: oklch(0.704 0.191 22.216);
+  --bottom-hover: oklch(0.22 0 0);
+}
+
+html { font-size: 14px; }
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-page);
+  color: var(--text-primary);
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ========== SIDEBAR ========== */
+.sidebar {
+  width: 224px;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  background: var(--bg-sidebar);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+/* -- Header / Brand -- */
+.sidebar-header {
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.brand-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--badge-bg);
+  color: var(--badge-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.brand-icon svg { width: 18px; height: 18px; }
+.brand-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  cursor: pointer;
+}
+.brand-name {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.brand-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.version-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 16px;
+  padding: 0 5px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  background: var(--accent-light);
+  color: var(--text-active);
+  width: fit-content;
+}
+.update-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 16px;
+  padding: 0 5px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 500;
+  background: var(--badge-update-bg);
+  color: var(--badge-update-text);
+  flex-shrink: 0;
+}
+
+/* -- Nav -- */
+.sidebar-nav {
+  flex: 1;
+  padding: 8px;
+  overflow-y: auto;
+}
+.sidebar-nav::-webkit-scrollbar { width: 0; }
+
+/* Group divider */
+.nav-divider {
+  margin: 6px 12px;
+  height: 1px;
+  background: var(--divider);
+}
+
+/* Group label */
+.nav-group-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  user-select: none;
+}
+.nav-group-label button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  display: flex;
+  align-items: center;
+  padding: 2px;
+  border-radius: 4px;
+  transition: color 150ms;
+}
+.nav-group-label button:hover { color: var(--text-secondary); }
+.nav-group-label svg {
+  width: 14px;
+  height: 14px;
+  transition: transform 200ms ease-out;
+}
+.nav-group-label svg.collapsed { transform: rotate(-90deg); }
+
+/* Collapsible container */
+.nav-group-items {
+  overflow: hidden;
+  transition: max-height 200ms ease-out, opacity 200ms ease-out;
+}
+.nav-group-items.collapsed {
+  max-height: 0 !important;
+  opacity: 0;
+}
+
+/* Nav item */
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 150ms, color 150ms;
+  margin: 1px 0;
+}
+.nav-item:hover {
+  background: var(--bg-sidebar-hover);
+  color: var(--text-primary);
+}
+.nav-item.active {
+  background: var(--bg-sidebar-active);
+  color: var(--text-active);
+  font-weight: 500;
+}
+.nav-item svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+.nav-item.active svg {
+  opacity: 1;
+}
+
+/* -- Bottom -- */
+.sidebar-bottom {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.bottom-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: background 150ms, color 150ms;
+  width: 100%;
+  text-align: left;
+  font-family: var(--font-sans);
+}
+.bottom-btn:hover {
+  background: var(--bottom-hover);
+  color: var(--text-primary);
+}
+.bottom-btn svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
+/* ========== CONTENT AREA (fake) ========== */
+.content {
+  flex: 1;
+  padding: 24px;
+  max-width: 1440px;
+}
+.content-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+.content-card {
+  background: var(--bg-card);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+.content-metric {
+  font-family: var(--font-mono);
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.content-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+/* ========== THEME TOGGLE ========== */
+.theme-toggle {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 100;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 150ms;
+}
+.theme-toggle:hover { background: var(--bg-sidebar-hover); }
+
+/* ========== ANNOTATIONS ========== */
+.annotation {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  max-width: 320px;
+  background: var(--bg-card);
+  border-radius: 8px;
+  padding: 16px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  border: 1px solid var(--divider);
+}
+.annotation strong { color: var(--text-primary); }
+.annotation ul { margin-top: 8px; padding-left: 16px; }
+.annotation li { margin-bottom: 4px; }
+.annotation .tag {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  background: var(--accent-light);
+  color: var(--text-active);
+  margin-right: 4px;
+}
+
+/* ========== POPOVER ========== */
+.popover-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: none;
+}
+.popover-overlay.open { display: block; }
+
+.popover {
+  position: fixed;
+  top: 8px;
+  left: 232px;
+  width: 300px;
+  background: var(--bg-card);
+  border-radius: 10px;
+  border: 1px solid var(--divider);
+  box-shadow: 0 4px 16px oklch(0 0 0 / 0.15);
+  z-index: 91;
+  display: none;
+  overflow: hidden;
+}
+.dark .popover { box-shadow: 0 4px 16px oklch(0 0 0 / 0.4); }
+.popover.open { display: block; }
+
+.popover-section {
+  padding: 14px;
+}
+.popover-section + .popover-section {
+  border-top: 1px solid var(--divider);
+}
+.popover-section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.popover-icon-teal {
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  background: var(--accent-light);
+  color: var(--text-active);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.popover-section-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+/* Version row */
+.popover-version-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.popover-version-current {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.popover-version-latest {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-active);
+}
+
+/* Buttons */
+.popover-btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  height: 30px;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--badge-text);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 150ms;
+}
+.popover-btn-primary:hover { opacity: 0.85; }
+
+.popover-btn-secondary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 30px;
+  border: 1px solid var(--divider);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 150ms;
+}
+.popover-btn-secondary:hover { background: var(--bg-sidebar-hover); }
+
+/* Description */
+.popover-desc {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+
+/* Source row */
+.popover-source-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.popover-source-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.popover-select {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 1;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--divider);
+  border-radius: 5px;
+  font-size: 11px;
+  color: var(--text-primary);
+  background: transparent;
+}
+
+/* Footer */
+.popover-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-top: 1px solid var(--divider);
+}
+.popover-footer-time {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.popover-footer-link {
+  background: none;
+  border: none;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-active);
+  cursor: pointer;
+  padding: 0;
+}
+.popover-footer-link:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<!-- ========== SIDEBAR ========== -->
+<aside class="sidebar" id="sidebar">
+  <!-- Brand header (no border-bottom, tonal separation only) -->
+  <div class="sidebar-header" id="brand-trigger">
+    <div class="brand-icon">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+    </div>
+    <div class="brand-info">
+      <span class="brand-name">LLM Simple Router</span>
+      <div class="brand-meta">
+        <span class="version-badge">v1.4.2</span>
+        <span class="update-badge">1 update</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Navigation -->
+  <nav class="sidebar-nav">
+    <!-- Dashboard (standalone) -->
+    <a class="nav-item active" href="#">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+      仪表盘
+    </a>
+
+    <div class="nav-divider"></div>
+
+    <!-- Group: Agent Config -->
+    <div class="nav-group-label">
+      <span>智能体配置</span>
+      <button onclick="toggleGroup(this)" aria-label="Toggle group">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+    </div>
+    <div class="nav-group-items" style="max-height: 300px; opacity: 1;">
+      <a class="nav-item" href="#">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        快速配置
+      </a>
+      <a class="nav-item" href="#">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></svg>
+        供应商
+      </a>
+      <a class="nav-item" href="#">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/><line x1="12" x2="12" y1="8" y2="16"/><polyline points="16 12 12 16 8 12"/></svg>
+        模型映射
+      </a>
+      <a class="nav-item" href="#">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 18v3c0 .6.4 1 1 1h4v-3h3v-3h2l1.4-1.4a6.5 6.5 0 1 0-4-4Z"/><circle cx="16.5" cy="7.5" r=".5"/></svg>
+        密钥管理
+      </a>
+      <a class="nav-item" href="#">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 2H18c1.1 0 2 .9 2 2v2.5"/><path d="M2 12c0-4.7 0-7 1.5-8.5S7.3 2 12 2"/><path d="M22 12c0 4.7 0 7-1.5 8.5S16.7 22 12 22c-3.4 0-5.6 0-7.2-.6"/><path d="m14.5 13.5-2-2"/><circle cx="11" cy="11" r="2"/><path d="m6.5 17.5 2-2"/></svg>
+        重试规则
+      </a>
+      <a class="nav-item" href="#">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 2h15a2.5 2.5 0 0 1 2.5 2.5v15a2.5 2.5 0 0 1-2.5 2.5h-15A2.5 2.5 0 0 1 2 19.5v-15A2.5 2.5 0 0 1 4.5 2z"/><path d="m9.5 14.5 5-5"/><path d="m14.5 14.5-5-5"/></svg>
+        定时计划
+      </a>
+      <a class="nav-item" href="#">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4V2"/><path d="M15 16v-2"/><path d="M8 9h2"/><path d="M20 9h2"/><path d="M17.8 11.8 19 13"/><path d="M15 9h.01"/><path d="M17.8 6.2 19 5"/><path d="m3 21 9-9"/><path d="M12.2 6.2 11 5"/></svg>
+        代理增强
+      </a>
+    </div>
+
+    <div class="nav-divider"></div>
+
+    <!-- Group: Monitoring (non-collapsible) -->
+    <div class="nav-group-label">
+      <span>监控</span>
+    </div>
+    <a class="nav-item" href="#">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/></svg>
+      实时监控
+    </a>
+    <a class="nav-item" href="#">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>
+      请求日志
+    </a>
+
+    <div class="nav-divider"></div>
+
+    <!-- Settings (standalone) -->
+    <a class="nav-item" href="#">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+      系统设置
+    </a>
+  </nav>
+
+  <!-- Bottom (no border-top, tonal gap) -->
+  <div class="sidebar-bottom">
+    <button class="bottom-btn" onclick="toggleTheme()">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+      切换亮色
+    </button>
+    <button class="bottom-btn">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+      English
+    </button>
+    <button class="bottom-btn">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+      退出登录
+    </button>
+  </div>
+</aside>
+
+<!-- ========== FAKE CONTENT ========== -->
+<main class="content">
+  <h2 class="content-title">仪表盘</h2>
+  <div class="content-card">
+    <div class="content-metric">3.2M</div>
+    <div class="content-label">Input Tokens</div>
+  </div>
+  <div class="content-card">
+    <div class="content-metric" style="color: var(--text-primary);">842K</div>
+    <div class="content-label">Output Tokens</div>
+  </div>
+  <div class="content-card" style="padding: 12px 20px;">
+    <div style="display: flex; gap: 24px; font-size: 12px; color: var(--text-secondary);">
+      <span>请求数 <span style="font-family: var(--font-mono); color: var(--text-primary);">12,847</span></span>
+      <span>成功率 <span style="font-family: var(--font-mono); color: var(--text-primary);">99.2%</span></span>
+      <span>窗口 <span style="font-family: var(--font-mono); color: var(--text-primary);">14:00 ~ 19:00</span></span>
+    </div>
+  </div>
+</main>
+
+<!-- ========== VERSION POPOVER ========== -->
+<div class="popover-overlay" id="popover-overlay" onclick="closePopover(event)"></div>
+<div class="popover" id="popover">
+  <!-- New version -->
+  <div class="popover-section">
+    <div class="popover-section-header">
+      <div class="popover-icon-teal">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>
+      </div>
+      <span class="popover-section-title">New Version Available</span>
+    </div>
+    <div class="popover-version-row">
+      <span class="popover-version-current">v1.4.2</span>
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+      <span class="popover-version-latest">v1.5.0</span>
+    </div>
+    <button class="popover-btn-primary">
+      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+      One-Click Upgrade
+    </button>
+  </div>
+  <!-- Config sync -->
+  <div class="popover-section">
+    <div class="popover-section-header">
+      <div class="popover-icon-teal">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+      </div>
+      <span class="popover-section-title">Config Updated</span>
+    </div>
+    <p class="popover-desc">Recommended providers and retry rules have new defaults.</p>
+    <div class="popover-source-row">
+      <span class="popover-source-label">Source</span>
+      <div class="popover-select">
+        <span>GitHub</span>
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </div>
+    </div>
+    <button class="popover-btn-secondary">Sync Config</button>
+  </div>
+  <!-- Footer -->
+  <div class="popover-footer">
+    <span class="popover-footer-time">Checked 3 min ago</span>
+    <button class="popover-footer-link">Check Now</button>
+  </div>
+</div>
+
+<!-- Theme toggle -->
+<button class="theme-toggle" onclick="toggleTheme()">Toggle Theme</button>
+
+<!-- Annotation -->
+<div class="annotation" id="annotation">
+  <strong>Sidebar 调整说明</strong>
+  <ul>
+    <li><span class="tag">无边框</span> 移除 header/bottom 的 border，靠色调分层</li>
+    <li><span class="tag">暗色 bg</span> sidebar oklch(0.175)，比 page(0.145) 亮但比 card(0.205) 暗</li>
+    <li><span class="tag">选中态</span> teal 文字 + 微弱 teal 背景，非实色填充</li>
+    <li><span class="tag">分组标签</span> 去掉 uppercase，中文 11px 无 letter-spacing</li>
+    <li><span class="tag">divider</span> 1px oklch(1 0 0 / 6%)，极微弱分隔</li>
+  </ul>
+</div>
+
+<script>
+function toggleGroup(btn) {
+  const svg = btn.querySelector('svg');
+  const items = btn.closest('.nav-group-label').nextElementSibling;
+  if (items.classList.contains('collapsed')) {
+    items.classList.remove('collapsed');
+    items.style.maxHeight = items.scrollHeight + 'px';
+    svg.classList.remove('collapsed');
+  } else {
+    items.classList.add('collapsed');
+    svg.classList.add('collapsed');
+  }
+}
+
+function toggleTheme() {
+  document.documentElement.classList.toggle('dark');
+  const isDark = document.documentElement.classList.contains('dark');
+  const btn = document.querySelector('.sidebar-bottom .bottom-btn');
+  if (btn) {
+    btn.innerHTML = isDark
+      ? '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>切换亮色'
+      : '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>切换暗色';
+  }
+}
+
+function togglePopover() {
+  const p = document.getElementById('popover');
+  const o = document.getElementById('popover-overlay');
+  p.classList.toggle('open');
+  o.classList.toggle('open');
+}
+
+function closePopover(e) {
+  const p = document.getElementById('popover');
+  const o = document.getElementById('popover-overlay');
+  p.classList.remove('open');
+  o.classList.remove('open');
+}
+
+// Bind events
+document.getElementById('brand-trigger').addEventListener('click', togglePopover);
+</script>
+</body>
+</html>

@@ -45,6 +45,20 @@ export function formatTimeHM(date: Date): string {
   });
 }
 
+/** 时分秒：14:32:18（用于日志表格等紧凑场景） */
+export function formatTimeHMS(iso: string): string {
+  const d = parseUtc(iso);
+  const parts = new Intl.DateTimeFormat(currentLocale(), {
+    ...TZ_OPTS,
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(d);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return `${get("hour")}:${get("minute")}:${get("second")}`;
+}
+
 /** 月日时分：4/25 20:00（用于长周期图表标签） */
 export function formatTimeMDH(date: Date): string {
   return date.toLocaleString(currentLocale(), {
