@@ -22,7 +22,11 @@
   "clientIdentification": {
     "title": "客户端识别",
     "description": "配置客户端 session header 映射，用于识别请求来源。携带对应 header 的请求将被识别为该客户端类型。",
-    "addEntry": "新增条目"
+    "addEntry": "新增条目",
+    "placeholder": {
+      "type": "客户端类型",
+      "header": "Header 名称"
+    }
   },
   "toolErrorLogging": {
     "title": "工具调用错误日志",
@@ -41,5 +45,23 @@
   "saveFailed": "保存失败",
   "loadProvidersFailed": "加载 Provider 列表失败",
   "aiRetryRuleGen": "AI 重试规则生成",
-  "aiRetryRuleGenDesc": "配置用于自动分析请求响应并生成重试规则的 AI 模型。模型通过已配置的 Provider 直接调用。"
+  "aiRetryRuleGenDesc": "配置用于自动分析请求响应并生成重试规则的 AI 模型。模型通过已配置的 Provider 直接调用。",
+  "subtitle": "配置请求转发增强策略、循环检测、Token 管理和 AI 辅助功能",
+  "unsavedChanges": "有未保存的更改",
+  "alwaysOn": "始终开启",
+  "sections": {
+    "loopDetection": "循环检测",
+    "errorHandling": "错误处理",
+    "clientIdentification": "客户端识别",
+    "tokenManagement": "Token 管理",
+    "aiFeatures": "AI 功能"
+  },
+  "contextOverflow": {
+    "title": "上下文溢出重定向",
+    "description": "请求 token 数超过当前模型上下文窗口时，自动重定向到支持更大上下文的模型。基于 gpt-tokenizer 精确计算 token 数。"
+  },
+  "sessionState": {
+    "title": "会话模型状态跟踪",
+    "description": "跟踪每个会话的模型使用状态，确保同一会话的后续请求路由到相同的 Provider，避免上下文切换导致模型行为不一致。"
+  }
 }

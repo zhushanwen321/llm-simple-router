@@ -49,18 +49,29 @@ export function parseOpenAIChoices(choices: unknown[]): ContentBlock[] {
     if (Array.isArray(toolCalls)) {
       for (const tc of toolCalls) {
         const t = tc as Record<string, unknown>;
-        const fn = (t.function ?? {}) as Record<string, unknown>;
-        const args =
-          typeof fn.arguments === "string"
-            ? fn.arguments
-            : JSON.stringify(fn, null, JSON_INDENT);
-        const name =
-          typeof t.name === "string"
-            ? t.name
-            : typeof fn.name === "string"
+        const fn = t.function as Record<string, unknown> | undefined;
+        let argsStr = "";
+        if (fn && typeof fn.arguments === "string") {
+          try {
+            argsStr = JSON.stringify(
+              JSON.parse(fn.arguments),
+              null,
+              JSON_INDENT,
+            );
+          } catch {
+            /* JSON 解析失败，使用默认值 */ argsStr = fn.arguments;
+          }
+        }
+        result.push({
+          type: "tool_use",
+          content: argsStr,
+          name:
+            typeof fn?.name === "string"
               ? fn.name
-              : "";
-        result.push({ type: "tool_use", content: args, name });
+              : typeof t.name === "string"
+                ? t.name
+                : "",
+        });
       }
     }
 
@@ -164,8 +175,20 @@ export function parseResponsesOutput(output: unknown[]): ContentBlock[] {
 export function tryDirectParse(
   responseBody: string | null,
   upstreamResponse: string | null,
+  apiType: "openai" | "openai-responses" | "anthropic",
 ): ContentBlock[] {
-  const raw = responseBody || upstreamResponse;
+  // upstreamResponse 可能包含完整的响应 JSON（含 choices/usage/thinking）
+  // responseBody 可能是 stream_text_content（纯文本）
+  // 优先尝试 upstreamResponse，再 fallback 到 responseBody
+  const fromUpstream = tryParseResponse(upstreamResponse, apiType);
+  if (fromUpstream.length > 0) return fromUpstream;
+  return tryParseResponse(responseBody, apiType);
+}
+
+function tryParseResponse(
+  raw: string | null,
+  apiType: "openai" | "openai-responses" | "anthropic",
+): ContentBlock[] {
   if (!raw) return [];
 
   let data: unknown;
@@ -186,16 +209,25 @@ export function tryDirectParse(
 
   const parsed = data as Record<string, unknown>;
 
-  // 格式自动检测，不依赖 apiType（"openai-responses" 在前端被降级为 "openai"，但实际响应格式不同）
-  if (Array.isArray(parsed.content)) {
+  if (apiType === "anthropic" && Array.isArray(parsed.content)) {
     return parseAnthropicContent(parsed.content);
   }
 
-  if (Array.isArray(parsed.choices)) {
+  if (apiType === "openai" && Array.isArray(parsed.choices)) {
     return parseOpenAIChoices(parsed.choices);
   }
 
-  // Responses API 格式：{ object: "response", output: [{ type: "message"/"function_call"/"reasoning" }] }
+  if (apiType === "openai-responses" && Array.isArray(parsed.output)) {
+    return parseResponsesOutput(parsed.output);
+  }
+
+  // 格式自动检测 fallback（apiType 与实际格式不匹配时兜底）
+  if (Array.isArray(parsed.content)) {
+    return parseAnthropicContent(parsed.content);
+  }
+  if (Array.isArray(parsed.choices)) {
+    return parseOpenAIChoices(parsed.choices);
+  }
   if (Array.isArray(parsed.output)) {
     return parseResponsesOutput(parsed.output);
   }

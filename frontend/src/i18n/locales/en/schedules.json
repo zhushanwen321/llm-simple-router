@@ -62,5 +62,12 @@
   "parseRuleFailed": "Invalid rule format, using defaults",
   "parseWeekFailed": "Invalid week format, using defaults",
   "parseConcurrencyFailed": "Invalid concurrency format, using defaults",
-  "parseTransformFailed": "Invalid transform format, using defaults"
+  "parseTransformFailed": "Invalid transform format, using defaults",
+  "weekTimeline": "Weekly Timeline",
+  "stats": {
+    "groups": "Groups",
+    "active": "Active Rules",
+    "inactive": "Inactive Rules",
+    "coveredDays": "Days Covered"
+  }
 }

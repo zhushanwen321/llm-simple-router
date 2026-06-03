@@ -108,7 +108,8 @@ export function useLogFilters() {
         summaryResult.status === "fulfilled"
           ? [...new Set(summaryResult.value.rows.map((r) => r.backend_model))]
           : [];
-    } catch {
+    } catch (e: unknown) {
+      console.error("useLogFilters.loadModelOptions:", e);
       clientModelOptions.value = [];
       backendModelOptions.value = [];
     }

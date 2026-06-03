@@ -95,8 +95,8 @@ export function useFetchUpstreamModels(
       }
 
       addModelsToForm(modelIds, t("providers.fetchModels.sourceUpstream"));
-    } catch {
-      // 兜底2: 上游调用失败，使用预设模型
+    } catch (e: unknown) {
+      console.error("useFetchUpstreamModels.fetch:", e);
       applyPresetModels();
     } finally {
       fetchingModels.value = false;

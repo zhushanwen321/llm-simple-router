@@ -13,7 +13,7 @@ export interface StreamContentSnapshot {
 
 export interface ActiveRequest {
   id: string;
-  apiType: "openai" | "anthropic";
+  apiType: "openai" | "openai-responses" | "anthropic";
   model: string;
   providerId: string;
   providerName: string;
@@ -40,6 +40,8 @@ export interface AttemptSnapshot {
   error: string | null;
   latencyMs: number;
   providerId: string;
+  model?: string;
+  apiType?: string;
 }
 
 export interface StreamMetricsSnapshot {

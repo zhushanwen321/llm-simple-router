@@ -299,7 +299,8 @@ async function handleSave() {
     errors.push(t("retryRules.messages.statusCodeRange"));
   try {
     new RegExp(form.value.body_pattern);
-  } catch {
+  } catch (e: unknown) {
+    console.error("AiRulePreviewDialog.validateRule:", e);
     errors.push(t("retryRules.messages.bodyPatternInvalid"));
   }
   if (!form.value.body_pattern.trim())

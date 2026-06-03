@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>分时段映射 - LLM Router Console</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: oklch(0.145 0 0);
+    --surface: oklch(0.205 0 0);
+    --surface-up: oklch(0.269 0 0);
+    --surface-header: oklch(0.165 0 0);
+    --fg: oklch(0.985 0 0);
+    --muted-dim: oklch(0.556 0 0);
+    --muted: oklch(0.708 0 0);
+    --border: oklch(1 0 0 / 10%);
+    --border-strong: oklch(1 0 0 / 14%);
+    --primary: oklch(0.68 0.13 175);
+    --primary-dim: oklch(0.68 0.13 175 / 15%);
+    --primary-ghost: oklch(0.68 0.13 175 / 8%);
+    --success: oklch(0.65 0.17 150);
+    --success-dim: oklch(0.65 0.17 150 / 12%);
+    --warning: oklch(0.78 0.16 80);
+    --warning-dim: oklch(0.78 0.16 80 / 12%);
+    --danger: oklch(0.58 0.22 25);
+    --danger-dim: oklch(0.58 0.22 25 / 12%);
+    --info: oklch(0.62 0.18 250);
+    --info-dim: oklch(0.62 0.18 250 / 12%);
+    --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+    --radius: 8px;
+    --radius-sm: 6px;
+    --radius-xs: 4px;
+  }
+
+  /* Light theme override */
+  html:not(.dark) {
+    --bg: oklch(0.98 0 0);
+    --surface: oklch(1 0 0);
+    --surface-up: oklch(0.95 0 0);
+    --surface-header: oklch(0.94 0 0);
+    --fg: oklch(0.15 0 0);
+    --muted-dim: oklch(0.5 0 0);
+    --muted: oklch(0.45 0 0);
+    --border: oklch(0 0 0 / 10%);
+    --border-strong: oklch(0 0 0 / 14%);
+    --primary-dim: oklch(0.68 0.13 175 / 12%);
+    --primary-ghost: oklch(0.68 0.13 175 / 6%);
+    --success-dim: oklch(0.65 0.17 150 / 10%);
+    --warning-dim: oklch(0.78 0.16 80 / 10%);
+    --danger-dim: oklch(0.58 0.22 25 / 10%);
+  }
+
+  html:not(.dark) .secondary-strip { background: var(--surface); border-color: var(--border); }
+  html:not(.dark) .schedules-panel { background: var(--surface); border-color: var(--border); }
+  html:not(.dark) .week-day-track { background: oklch(0 0 0 / 5%); }
+  html:not(.dark) .week-day-row.empty-day .week-day-track { background: oklch(0 0 0 / 3%); }
+  html:not(.dark) .week-track-mark { border-color: oklch(0 0 0 / 6%); }
+  html:not(.dark) .preview-tag { background: oklch(0 0 0 / 5%); }
+  html:not(.dark) .day-badge { background: oklch(0 0 0 / 5%); }
+  html:not(.dark) .group-count-badge { background: var(--primary-dim); }
+  html:not(.dark) .timeline-block { color: oklch(1 0 0); }
+  html:not(.dark) .timeline-block.disabled { color: var(--muted-dim); border-color: var(--muted-dim); }
+  html:not(.dark) .rule-table th { background: var(--surface-header); }
+  html:not(.dark) .toggle-switch.off { background: oklch(0 0 0 / 12%); }
+  html:not(.dark) .toggle-switch.on .toggle-knob { background: oklch(1 0 0); }
+  html:not(.dark) .toggle-switch.off .toggle-knob { background: oklch(0.4 0 0); }
+  html:not(.dark) .timeline-tooltip { background: var(--surface-up); border-color: var(--border-strong); box-shadow: 0 4px 12px oklch(0 0 0 / 15%); }
+  html:not(.dark) .target-tag { background: oklch(0 0 0 / 5%); }
+
+  .theme-toggle {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    padding: 6px 14px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--fg);
+    font-family: var(--font-body);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    z-index: 9999;
+    transition: background 150ms;
+  }
+  .theme-toggle:hover { background: var(--surface-up); }
+
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--fg);
+    font-size: 14px;
+    line-height: 1.5;
+    padding: 0;
+    margin: 0;
+  }
+
+  .page-wrap {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 20px 24px;
+  }
+
+  /* ========== PAGE HEADER ========== */
+  .page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .page-header-left {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .page-title {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--fg);
+  }
+  .page-desc {
+    font-size: 11px;
+    color: var(--muted-dim);
+    font-weight: 500;
+  }
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: var(--radius-sm);
+    border: none;
+    background: var(--primary);
+    color: oklch(0.12 0.04 175);
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 150ms;
+    white-space: nowrap;
+  }
+  .btn-primary:hover { filter: brightness(1.1); }
+  .btn-primary svg { width: 14px; height: 14px; }
+
+  /* ========== SECONDARY STRIP ========== */
+  .secondary-strip {
+    display: flex;
+    align-items: stretch;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+  .secondary-cell {
+    flex: 1;
+    padding: 8px 14px;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .secondary-cell:last-child { border-right: none; }
+  .secondary-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--muted-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    line-height: 1;
+  }
+  .secondary-value {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--fg);
+    line-height: 1.3;
+  }
+  .secondary-value.text-success { color: var(--success); }
+  .secondary-value.text-warning { color: var(--warning); }
+
+  /* ========== SCHEDULES TABLE ========== */
+  .schedules-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  /* Group row */
+  .group-row {
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    height: 40px;
+    border-bottom: 1px solid oklch(1 0 0 / 4%);
+    cursor: pointer;
+    transition: background 100ms;
+    gap: 10px;
+    user-select: none;
+  }
+  .group-row:hover { background: var(--surface-up); }
+  .group-row.expanded { background: oklch(1 0 0 / 3%); }
+  .group-row.expanded:hover { background: var(--surface-up); }
+
+  .chevron {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    color: var(--muted-dim);
+    transition: transform 150ms ease;
+    flex-shrink: 0;
+  }
+  .group-row.expanded .chevron { transform: rotate(90deg); }
+  .chevron svg { width: 14px; height: 14px; }
+
+  .group-model {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--fg);
+    flex-shrink: 0;
+  }
+
+  .group-count-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1px 7px;
+    border-radius: 9999px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    background: var(--primary-dim);
+    color: var(--primary);
+    flex-shrink: 0;
+  }
+
+  .group-preview-tags {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .preview-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 6px;
+    border-radius: var(--radius-xs);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+    background: oklch(1 0 0 / 5%);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .group-status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .group-status-dot.all-active { background: var(--success); }
+  .group-status-dot.partial { background: var(--warning); }
+
+  /* Expanded content */
+  .group-expanded {
+    display: none;
+    border-bottom: 1px solid oklch(1 0 0 / 4%);
+  }
+  .group-expanded.visible { display: block; }
+
+  /* Timeline visualization */
+  .timeline-section {
+    padding: 10px 14px;
+    border-bottom: 1px solid oklch(1 0 0 / 4%);
+  }
+  .timeline-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  /* Week timeline: 7 rows */
+  .week-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+  .week-day-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 24px;
+  }
+  .week-day-row.empty-day {
+    opacity: 0.35;
+  }
+  .week-day-label {
+    width: 28px;
+    flex-shrink: 0;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+    text-align: right;
+  }
+  .week-day-track {
+    flex: 1;
+    position: relative;
+    height: 100%;
+    display: grid;
+    grid-template-columns: repeat(24, 1fr);
+    background: oklch(1 0 0 / 4%);
+    border-radius: 3px;
+    overflow: visible;
+  }
+  .week-track-mark {
+    border-right: 1px solid oklch(1 0 0 / 8%);
+  }
+  .week-track-mark:last-child { border-right: none; }
+
+  .timeline-block {
+    position: absolute;
+    top: 1px;
+    bottom: 1px;
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    padding: 0 4px;
+    font-size: 10px;
+    font-weight: 600;
+    color: oklch(0.145 0 0);
+    overflow: hidden;
+    white-space: nowrap;
+    cursor: default;
+    transition: filter 100ms;
+    z-index: 1;
+  }
+  .timeline-block:hover { filter: brightness(1.15); z-index: 2; }
+  .timeline-block.disabled {
+    background: transparent !important;
+    border: 1.5px dashed var(--muted-dim);
+    color: var(--muted-dim);
+  }
+  .timeline-block .block-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Tooltip */
+  .timeline-tooltip {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--surface-up);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-xs);
+    padding: 6px 10px;
+    font-size: 12px;
+    white-space: nowrap;
+    z-index: 100;
+    pointer-events: none;
+    box-shadow: 0 4px 12px oklch(0 0 0 / 40%);
+  }
+  .timeline-tooltip .tt-name {
+    font-weight: 600;
+    color: var(--fg);
+    margin-bottom: 2px;
+  }
+  .timeline-tooltip .tt-time {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .timeline-block:hover .timeline-tooltip { display: block; }
+
+  /* Hour labels footer */
+  .week-hour-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 2px;
+  }
+  .week-hour-labels {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(24, 1fr);
+  }
+  .week-hour {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--muted-dim);
+    text-align: left;
+    padding-left: 1px;
+    line-height: 16px;
+  }
+
+  /* Day labels below timeline */
+  .timeline-day-row {
+    display: flex;
+    gap: 2px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+  }
+  .day-indicator {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--muted-dim);
+    padding: 1px 4px;
+    border-radius: 2px;
+    background: oklch(1 0 0 / 4%);
+  }
+
+  /* Rule table (inside expanded group) */
+  .rule-table-wrap {
+    padding: 0 14px 6px 44px;
+  }
+  .rule-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .rule-table th {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 6px 10px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-header);
+  }
+  .rule-table td {
+    padding: 0 10px;
+    font-size: 13px;
+    height: 36px;
+    vertical-align: middle;
+    border-bottom: 1px solid oklch(1 0 0 / 4%);
+  }
+  .rule-table tbody tr {
+    transition: background 100ms;
+  }
+  .rule-table tbody tr:hover { background: var(--surface-up); }
+  .rule-table tbody tr:last-child td { border-bottom: none; }
+
+  .rule-name {
+    font-weight: 500;
+    color: var(--fg);
+  }
+
+  /* Day badges */
+  .day-badges {
+    display: flex;
+    gap: 2px;
+    flex-wrap: wrap;
+  }
+  .day-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+    background: oklch(1 0 0 / 5%);
+    line-height: 1.4;
+  }
+  .day-badge.active-day {
+    background: oklch(1 0 0 / 10%);
+    color: var(--muted);
+  }
+  .day-badge.inactive-day {
+    color: var(--muted-dim);
+    opacity: 0.4;
+  }
+  .day-range-label {
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  /* Time range */
+  .time-range {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--fg);
+    font-weight: 500;
+  }
+
+  /* Status badges */
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .status-badge.enabled {
+    color: var(--success);
+  }
+  .status-badge.enabled .status-dot {
+    background: var(--success);
+  }
+  .status-badge.disabled {
+    color: var(--muted-dim);
+  }
+  .status-badge.disabled .status-dot {
+    background: var(--muted-dim);
+  }
+
+  /* Targets */
+  .target-tags {
+    display: flex;
+    gap: 3px;
+    flex-wrap: wrap;
+  }
+  .target-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 500;
+    background: oklch(1 0 0 / 5%);
+    white-space: nowrap;
+  }
+  .target-provider {
+    color: var(--muted-dim);
+    font-family: var(--font-mono);
+    font-size: 10px;
+  }
+  .target-model {
+    color: var(--muted);
+  }
+
+  /* Actions */
+  .actions-cell {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* Toggle switch */
+  .toggle-switch {
+    position: relative;
+    width: 30px;
+    height: 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 150ms;
+    flex-shrink: 0;
+  }
+  .toggle-switch.on {
+    background: var(--primary);
+  }
+  .toggle-switch.off {
+    background: oklch(1 0 0 / 15%);
+  }
+  .toggle-switch .toggle-knob {
+    position: absolute;
+    top: 2px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--fg);
+    transition: left 150ms;
+  }
+  .toggle-switch.on .toggle-knob { left: 16px; }
+  .toggle-switch.off .toggle-knob { left: 2px; }
+
+  .action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: var(--radius-xs);
+    border: none;
+    background: transparent;
+    color: var(--muted-dim);
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 100ms;
+    font-family: var(--font-body);
+  }
+  .action-btn:hover { background: oklch(1 0 0 / 8%); color: var(--fg); }
+  .action-btn.delete:hover { background: var(--danger-dim); color: var(--danger); }
+
+  /* ========== RESPONSIVE ========== */
+  @media (max-width: 900px) {
+    .secondary-strip { flex-wrap: wrap; }
+    .secondary-cell { flex: 1 1 45%; }
+    .group-preview-tags { display: none; }
+  }
+</style>
+</head>
+<body>
+<button class="theme-toggle" onclick="document.documentElement.classList.toggle('dark'); this.textContent = document.documentElement.classList.contains('dark') ? 'Light' : 'Dark'">Light</button>
+<div class="page-wrap">
+  <!-- Page Header -->
+  <div class="page-header">
+    <div class="page-header-left">
+      <div class="page-title">分时段映射</div>
+      <div class="page-desc">为映射组配置不同时间段的路由规则，实现高峰分流与成本优化</div>
+    </div>
+    <button class="btn-primary">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      新建时段
+    </button>
+  </div>
+
+  <!-- Secondary Strip -->
+  <div class="secondary-strip">
+    <div class="secondary-cell">
+      <div class="secondary-label">映射组数</div>
+      <div class="secondary-value">5</div>
+    </div>
+    <div class="secondary-cell">
+      <div class="secondary-label">活跃规则</div>
+      <div class="secondary-value text-success">8</div>
+    </div>
+    <div class="secondary-cell">
+      <div class="secondary-label">停用规则</div>
+      <div class="secondary-value text-warning">2</div>
+    </div>
+    <div class="secondary-cell">
+      <div class="secondary-label">覆盖天数</div>
+      <div class="secondary-value">7/7</div>
+    </div>
+  </div>
+
+  <!-- Schedules Panel -->
+  <div class="schedules-panel" id="schedulesPanel"></div>
+</div>
+
+<script>
+const DAY_SHORT = ['一', '二', '三', '四', '五', '六', '日'];
+const DAY_FULL  = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+/* Timeline block colors — primary with varying opacity */
+const BLOCK_COLORS = [
+  'oklch(0.68 0.13 175 / 70%)',
+  'oklch(0.68 0.13 175 / 50%)',
+  'oklch(0.68 0.13 175 / 35%)',
+  'oklch(0.68 0.13 175 / 25%)',
+];
+
+const GROUPS = [
+  {
+    model: 'gpt-4o',
+    rules: [
+      { name: '工作日白天', days: [0,1,2,3,4], start: '09:00', end: '18:00', enabled: true, targets: [{provider:'OpenAI', model:'gpt-4o'}] },
+      { name: '工作日夜间', days: [0,1,2,3,4], start: '18:00', end: '24:00', enabled: true, targets: [{provider:'DeepSeek', model:'deepseek-chat'}] },
+      { name: '周末全天',   days: [5,6],        start: '00:00', end: '24:00', enabled: true, targets: [{provider:'DeepSeek', model:'deepseek-chat'}] },
+    ]
+  },
+  {
+    model: 'claude-sonnet-4-20250514',
+    rules: [
+      { name: '主力时段', days: [0,1,2,3,4,5,6], start: '00:00', end: '24:00', enabled: true, targets: [{provider:'Anthropic', model:'claude-sonnet-4-20250514'}] },
+      { name: '降级备用', days: [0,1,2,3,4,5,6], start: '00:00', end: '24:00', enabled: false, targets: [{provider:'DeepSeek', model:'deepseek-chat'}] },
+    ]
+  },
+  {
+    model: 'gpt-4o-mini',
+    rules: [
+      { name: '日间', days: [0,1,2,3,4], start: '08:00', end: '20:00', enabled: true, targets: [{provider:'OpenAI', model:'gpt-4o-mini'}] },
+      { name: '夜间', days: [0,1,2,3,4], start: '20:00', end: '24:00', enabled: true, targets: [{provider:'DeepSeek', model:'deepseek-chat'}] },
+      { name: '周末', days: [5,6], start: '00:00', end: '24:00', enabled: true, targets: [{provider:'OpenAI', model:'gpt-4o-mini'}] },
+    ]
+  },
+  {
+    model: 'deepseek-r1',
+    rules: [
+      { name: '全时段', days: [0,1,2,3,4,5,6], start: '00:00', end: '24:00', enabled: true, targets: [{provider:'DeepSeek', model:'deepseek-reasoner'},{provider:'Moonshot', model:'moonshot-v1-128k'}] },
+    ]
+  },
+  {
+    model: 'gemini-2.5-pro',
+    rules: [
+      { name: '测试时段', days: [0,1,2,3,4], start: '10:00', end: '16:00', enabled: true, targets: [{provider:'Google', model:'gemini-2.5-pro'}] },
+      { name: '非测试',   days: [0,1,2,3,4], start: '16:00', end: '24:00', enabled: false, targets: [{provider:'OpenAI', model:'gpt-4o'}] },
+      { name: '周末',     days: [5,6], start: '00:00', end: '24:00', enabled: true, targets: [{provider:'Google', model:'gemini-2.5-pro'}] },
+    ]
+  },
+];
+
+/* Parse "HH:MM" to hours offset (0-24) */
+function timeToHours(t) {
+  const [h, m] = t.split(':').map(Number);
+  return h + m / 60;
+}
+
+/* Format day range label */
+function dayRangeLabel(days) {
+  if (days.length === 7) return '每天';
+  /* Check contiguous */
+  const sorted = [...days].sort((a, b) => a - b);
+  if (sorted.length === 5 && sorted[0] === 0 && sorted[4] === 4) return '周一~周五';
+  if (sorted.length === 2 && sorted[0] === 5 && sorted[1] === 6) return '周六~周日';
+  return sorted.map(d => '周' + DAY_SHORT[d]).join(' ');
+}
+
+/* Build timeline blocks for a group's Monday (representative day) */
+function buildTimelineHTML(rules) {
+  /* 7-day grid: each day gets its own track */
+  const dayNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+  let html = '<div class="week-timeline">';
+
+  for (let d = 0; d < 7; d++) {
+    /* Find rules that cover this day */
+    const dayRules = rules.filter(r => r.days.includes(d));
+
+    html += `<div class="week-day-row${dayRules.length === 0 ? ' empty-day' : ''}">`;
+    html += `<div class="week-day-label">${dayNames[d]}</div>`;
+    html += `<div class="week-day-track">`;
+
+    /* Track grid marks */
+    for (let h = 0; h < 24; h++) {
+      html += `<div class="week-track-mark"></div>`;
+    }
+
+    /* Render blocks */
+    dayRules.forEach((rule, i) => {
+      const startH = timeToHours(rule.start);
+      const endH   = timeToHours(rule.end);
+      if (endH <= startH) return; /* skip overnight in new data, should not happen */
+      const leftPct  = (startH / 24 * 100).toFixed(2);
+      const widthPct = ((endH - startH) / 24 * 100).toFixed(2);
+      const showLabel = (endH - startH) >= 5;
+      const color = BLOCK_COLORS[i % BLOCK_COLORS.length];
+      const cls = rule.enabled ? '' : ' disabled';
+      const bg  = rule.enabled ? `background:${color}` : '';
+      html += `<div class="timeline-block${cls}" style="left:${leftPct}%;width:${widthPct}%;${bg}">
+        ${showLabel ? `<span class="block-label">${rule.name}</span>` : ''}
+        <div class="timeline-tooltip">
+          <div class="tt-name">${rule.name}</div>
+          <div class="tt-time">${rule.start}-${rule.end}</div>
+        </div>
+      </div>`;
+    });
+
+    html += '</div></div>';
+  }
+
+  /* Hour labels footer */
+  html += '<div class="week-hour-row"><div class="week-day-label"></div><div class="week-hour-labels">';
+  for (let h = 0; h < 24; h++) {
+    html += `<div class="week-hour">${h % 3 === 0 ? String(h).padStart(2,'0') : ''}</div>`;
+  }
+  html += '</div></div>';
+  html += '</div>';
+  return html;
+}
+
+/* Build day badges for a rule */
+function dayBadgesHTML(days) {
+  if (days.length === 7) return '<span class="day-range-label">每天</span>';
+  const sorted = [...days].sort((a, b) => a - b);
+  /* contiguous weekday range */
+  if (sorted.length === 5 && sorted[0] === 0 && sorted[4] === 4) return '<span class="day-range-label">周一~周五</span>';
+  if (sorted.length === 2 && sorted[0] === 5 && sorted[1] === 6) return '<span class="day-range-label">周六~周日</span>';
+  return '<div class="day-badges">' + sorted.map(d => `<span class="day-badge active-day">${DAY_SHORT[d]}</span>`).join('') + '</div>';
+}
+
+/* Build target tags */
+function targetTagsHTML(targets) {
+  return '<div class="target-tags">' + targets.map(t =>
+    `<span class="target-tag"><span class="target-provider">${t.provider}/</span><span class="target-model">${t.model}</span></span>`
+  ).join('') + '</div>';
+}
+
+/* Build the entire panel */
+function render() {
+  const panel = document.getElementById('schedulesPanel');
+  let html = '';
+
+  GROUPS.forEach((group, gi) => {
+    const activeCount = group.rules.filter(r => r.enabled).length;
+    const allActive = activeCount === group.rules.length;
+    const dotCls = allActive ? 'all-active' : 'partial';
+    const previewNames = group.rules.slice(0, 3).map(r => r.name);
+
+    html += `<div class="group-row" data-group="${gi}">
+      <span class="chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+      <span class="group-model">${group.model}</span>
+      <span class="group-count-badge">${group.rules.length} 规则</span>
+      <span class="group-preview-tags">${previewNames.map(n => `<span class="preview-tag">${n}</span>`).join('')}</span>
+      <span class="group-status-dot ${dotCls}"></span>
+    </div>`;
+
+    html += `<div class="group-expanded" data-expanded="${gi}">
+      <div class="timeline-section">
+        <div class="timeline-label">24h 时间线（周一视图）</div>
+        ${buildTimelineHTML(group.rules)}
+      </div>
+      <div class="rule-table-wrap">
+        <table class="rule-table">
+          <thead>
+            <tr>
+              <th style="width:16%">名称</th>
+              <th style="width:14%">星期</th>
+              <th style="width:14%">时间段</th>
+              <th style="width:10%">状态</th>
+              <th style="width:30%">目标</th>
+              <th style="width:16%">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${group.rules.map(rule => `<tr>
+              <td><span class="rule-name">${rule.name}</span></td>
+              <td>${dayBadgesHTML(rule.days)}</td>
+              <td><span class="time-range">${rule.start}-${rule.end}</span></td>
+              <td><span class="status-badge ${rule.enabled ? 'enabled' : 'disabled'}"><span class="status-dot"></span>${rule.enabled ? '启用' : '停用'}</span></td>
+              <td>${targetTagsHTML(rule.targets)}</td>
+              <td><div class="actions-cell">
+                <span class="toggle-switch ${rule.enabled ? 'on' : 'off'}"><span class="toggle-knob"></span></span>
+                <button class="action-btn" title="编辑">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                </button>
+                <button class="action-btn delete" title="删除">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                </button>
+              </div></td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+  });
+
+  panel.innerHTML = html;
+
+  /* Toggle expand/collapse */
+  panel.querySelectorAll('.group-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const gi = row.dataset.group;
+      const expanded = panel.querySelector(`[data-expanded="${gi}"]`);
+      row.classList.toggle('expanded');
+      expanded.classList.toggle('visible');
+    });
+  });
+}
+
+render();
+</script>
+</body>
+</html>

@@ -1,13 +1,15 @@
 <template>
   <div v-if="!localeLoaded" />
   <template v-else>
-    <div v-if="isAuthenticated" class="h-screen flex overflow-hidden">
-      <Sidebar />
-      <main class="flex-1 overflow-auto bg-muted">
-        <router-view />
-      </main>
-    </div>
-    <router-view v-else />
+    <TooltipProvider>
+      <div v-if="isAuthenticated" class="h-screen flex overflow-hidden">
+        <Sidebar />
+        <main class="flex-1 overflow-auto bg-muted">
+          <router-view />
+        </main>
+      </div>
+      <router-view v-else />
+    </TooltipProvider>
   </template>
   <Teleport to="body">
     <Toaster
@@ -23,6 +25,7 @@
 import { computed } from "vue";
 import Sidebar from "@/components/layout/Sidebar.vue";
 import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { isDark } from "@/composables/useTheme";
 import { localeLoaded } from "@/i18n";
 import { isAuthenticated } from "@/router";

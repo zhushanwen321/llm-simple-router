@@ -1,0 +1,724 @@
+[
+  {
+    "id": 1,
+    "name": "Dashboard",
+    "description": "Dashboard 页面视图及数据筛选、时间线 composable。feat 新增了 3 个 composable 用于数据聚合、筛选和时间线展示。",
+    "featFiles": [
+      "src/views/Dashboard.vue",
+      "src/composables/useDashboard.ts",
+      "src/composables/useDashboardData.ts",
+      "src/composables/useDashboardFilters.ts",
+      "src/composables/useDashboardTimeline.ts"
+    ],
+    "mainFiles": [
+      "src/views/Dashboard.vue",
+      "src/composables/useDashboard.ts"
+    ],
+    "notes": "feat 新增 useDashboardData.ts, useDashboardFilters.ts, useDashboardTimeline.ts"
+  },
+  {
+    "id": 2,
+    "name": "Providers",
+    "description": "Provider 管理页面视图、Capabilities 编辑器及相关 composable。feat 新增了 types.ts 类型定义。",
+    "featFiles": [
+      "src/views/Providers.vue",
+      "src/components/providers/ModelCapabilitiesEditor.vue",
+      "src/components/providers/types.ts",
+      "src/composables/useProviderActions.ts",
+      "src/composables/useProviderForm.ts"
+    ],
+    "mainFiles": [
+      "src/views/Providers.vue",
+      "src/components/providers/ModelCapabilitiesEditor.vue",
+      "src/composables/useProviderActions.ts",
+      "src/composables/useProviderForm.ts"
+    ],
+    "notes": "feat 新增 components/providers/types.ts"
+  },
+  {
+    "id": 3,
+    "name": "Provider Groups & Presets",
+    "description": "Provider 预设、分组管理和上游模型拉取 composable。",
+    "featFiles": [
+      "src/composables/useProviderPresets.ts",
+      "src/composables/useProviderGroups.ts",
+      "src/composables/useFetchUpstreamModels.ts"
+    ],
+    "mainFiles": [
+      "src/composables/useProviderPresets.ts",
+      "src/composables/useFetchUpstreamModels.ts"
+    ],
+    "notes": "feat 新增 useProviderGroups.ts"
+  },
+  {
+    "id": 4,
+    "name": "Shared Provider Config",
+    "description": "共享的 Provider 配置表单组件（代理配置、并发控制开关行及相关类型）。",
+    "featFiles": [
+      "src/components/shared/ProxyConfigForm.vue",
+      "src/components/shared/ConcurrencyControl.vue",
+      "src/components/shared/ToggleRow.vue",
+      "src/components/shared/types.ts"
+    ],
+    "mainFiles": [
+      "src/components/shared/ProxyConfigForm.vue",
+      "src/components/shared/ConcurrencyControl.vue"
+    ],
+    "notes": "feat 新增 ToggleRow.vue, types.ts"
+  },
+  {
+    "id": 5,
+    "name": "Concurrency Types & Utils",
+    "description": "并发控制类型定义和工具函数。",
+    "featFiles": [
+      "src/types/concurrency.ts",
+      "src/utils/concurrency.ts"
+    ],
+    "mainFiles": [
+      "src/types/concurrency.ts"
+    ],
+    "notes": "feat 新增 utils/concurrency.ts"
+  },
+  {
+    "id": 6,
+    "name": "Logs Page",
+    "description": "请求日志页面视图、日志列表 composable 和表格行组件。",
+    "featFiles": [
+      "src/views/Logs.vue",
+      "src/composables/useLogs.ts",
+      "src/composables/useLogFilters.ts",
+      "src/composables/useLogRetention.ts",
+      "src/components/logs/LogTableRow.vue"
+    ],
+    "mainFiles": [
+      "src/views/Logs.vue",
+      "src/composables/useLogs.ts",
+      "src/composables/useLogFilters.ts",
+      "src/composables/useLogRetention.ts",
+      "src/components/logs/LogTableRow.vue"
+    ],
+    "notes": "完全一致，无差异"
+  },
+  {
+    "id": 7,
+    "name": "Log Types & Viewer Infrastructure",
+    "description": "日志类型定义、颜色常量、请求块解析器、SSE 解析逻辑和信息横幅组件。",
+    "featFiles": [
+      "src/components/logs/types.ts",
+      "src/components/log-viewer/logColors.ts",
+      "src/components/log-viewer/requestBlockParser.ts",
+      "src/components/log-viewer/useSSEParsing.ts",
+      "src/components/log-viewer/InfoBanner.vue"
+    ],
+    "mainFiles": [
+      "src/components/logs/types.ts",
+      "src/components/log-viewer/logColors.ts",
+      "src/components/log-viewer/requestBlockParser.ts",
+      "src/components/log-viewer/useSSEParsing.ts",
+      "src/components/log-viewer/InfoBanner.vue"
+    ],
+    "notes": "完全一致，无差异"
+  },
+  {
+    "id": 8,
+    "name": "Log Viewer — Request/Response",
+    "description": "日志详情中的请求/响应查看器、JSON 复制块及统计标签。",
+    "featFiles": [
+      "src/components/log-viewer/LogRequestViewer.vue",
+      "src/components/log-viewer/LogResponseViewer.vue",
+      "src/components/log-viewer/JsonCopyBlock.vue",
+      "src/components/log-viewer/StatPill.vue",
+      "src/components/log-viewer/TagPill.vue"
+    ],
+    "mainFiles": [
+      "src/components/log-viewer/LogRequestViewer.vue",
+      "src/components/log-viewer/LogResponseViewer.vue",
+      "src/components/log-viewer/JsonCopyBlock.vue",
+      "src/components/log-viewer/StatPill.vue",
+      "src/components/log-viewer/TagPill.vue"
+    ],
+    "notes": "完全一致，无差异"
+  },
+  {
+    "id": 9,
+    "name": "Log Viewer — Events",
+    "description": "SSE 事件行与消息行渲染组件。",
+    "featFiles": [
+      "src/components/log-viewer/MessageRow.vue",
+      "src/components/log-viewer/SseEventLine.vue"
+    ],
+    "mainFiles": [
+      "src/components/log-viewer/MessageRow.vue",
+      "src/components/log-viewer/SseEventLine.vue"
+    ],
+    "notes": "完全一致，无差异"
+  },
+  {
+    "id": 10,
+    "name": "Monitor",
+    "description": "实时监控页面视图及并发面板、Provider 统计表、运行时面板。",
+    "featFiles": [
+      "src/views/Monitor.vue",
+      "src/components/monitor/ConcurrencyPanel.vue",
+      "src/components/monitor/MonitorHeader.vue",
+      "src/components/monitor/ProviderStatsTable.vue",
+      "src/components/monitor/RuntimePanel.vue"
+    ],
+    "mainFiles": [
+      "src/views/Monitor.vue",
+      "src/components/monitor/ConcurrencyPanel.vue",
+      "src/components/monitor/MonitorHeader.vue",
+      "src/components/monitor/ProviderStatsTable.vue",
+      "src/components/monitor/RuntimePanel.vue"
+    ],
+    "notes": "完全一致，无差异"
+  },
+  {
+    "id": 11,
+    "name": "Monitor — Status & SSE",
+    "description": "状态码面板、监控数据聚合、SSE 实时通信 composable 及指标辅助函数。",
+    "featFiles": [
+      "src/components/monitor/StatusCodePanel.vue",
+      "src/composables/useMonitorData.ts",
+      "src/composables/useMonitorSSE.ts",
+      "src/views/metrics-helpers.ts"
+    ],
+    "mainFiles": [
+      "src/components/monitor/StatusCodePanel.vue",
+      "src/composables/useMonitorData.ts",
+      "src/composables/useMonitorSSE.ts",
+      "src/views/metrics-helpers.ts"
+    ],
+    "notes": "完全一致，无差异"
+  },
+  {
+    "id": 12,
+    "name": "Model Mappings",
+    "description": "模型映射页面。feat 用 CascadingModelSelect + MappingEntryEditor + mapping-domain 替代了 main 的 MappingGroupDeleteDialog + ModelMappingCard，入口文件不变。",
+    "featFiles": [
+      "src/views/ModelMappings.vue",
+      "src/components/mappings/cascading-types.ts",
+      "src/components/mappings/CascadingModelSelect.vue",
+      "src/components/mappings/MappingEntryEditor.vue",
+      "src/utils/mapping-domain.ts"
+    ],
+    "mainFiles": [
+      "src/views/ModelMappings.vue",
+      "src/components/mappings/MappingGroupDeleteDialog.vue",
+      "src/components/mappings/ModelMappingCard.vue"
+    ],
+    "notes": "feat 新增 cascading-types.ts, CascadingModelSelect.vue, MappingEntryEditor.vue, mapping-domain.ts; REMOVED MappingGroupDeleteDialog.vue, ModelMappingCard.vue"
+  },
+  {
+    "id": 13,
+    "name": "Quick Setup",
+    "description": "快速设置页面视图及 actions/helpers composable 拆分。",
+    "featFiles": [
+      "src/views/QuickSetup.vue",
+      "src/composables/useQuickSetup.ts",
+      "src/composables/quick-setup-actions.ts",
+      "src/composables/quick-setup-helpers.ts",
+      "src/components/quick-setup/ModelCard.vue"
+    ],
+    "mainFiles": [
+      "src/views/QuickSetup.vue",
+      "src/composables/useQuickSetup.ts",
+      "src/components/quick-setup/ModelCard.vue"
+    ],
+    "notes": "feat 新增 quick-setup-actions.ts, quick-setup-helpers.ts"
+  },
+  {
+    "id": 14,
+    "name": "Quick Setup — Sub-components",
+    "description": "快速设置子组件（Patch 芯片、类型定义、映射列表）。",
+    "featFiles": [
+      "src/components/quick-setup/PatchChips.vue",
+      "src/components/quick-setup/types.ts",
+      "src/components/shared/QuickSetupMappingList.vue"
+    ],
+    "mainFiles": [
+      "src/components/quick-setup/PatchChips.vue",
+      "src/components/quick-setup/types.ts",
+      "src/components/shared/QuickSetupMappingList.vue"
+    ],
+    "notes": "完全一致，无差异"
+  },
+  {
+    "id": 15,
+    "name": "Request Detail — Core",
+    "description": "统一请求详情弹窗、概览面板、Diff 查看器、类型定义和响应解析器。",
+    "featFiles": [
+      "src/components/request-detail/UnifiedRequestDialog.vue",
+      "src/components/request-detail/RequestOverviewPanel.vue",
+      "src/components/request-detail/RequestDiffViewer.vue",
+      "src/components/request-detail/types.ts",
+      "src/components/request-detail/response-parser.ts"
+    ],
+    "mainFiles": [
+      "src/components/request-detail/UnifiedRequestDialog.vue",
+      "src/components/request-detail/RequestOverviewPanel.vue",
+      "src/components/request-detail/RequestDiffViewer.vue",
+      "src/components/request-detail/types.ts",
+      "src/components/request-detail/response-parser.ts"
+    ],
+    "notes": "完全一致，无差异"
+  },
+  {
+    "id": 16,
+    "name": "Request Detail — Advanced",
+    "description": "AI 规则预览、内容块渲染、响应查看器和上游合并逻辑。",
+    "featFiles": [
+      "src/components/request-detail/AiRulePreviewDialog.vue",
+      "src/components/request-detail/ContentBlockRenderer.vue",
+      "src/components/request-detail/ResponseViewer.vue",
+      "src/components/request-detail/upstream-merge.ts"
+    ],
+    "mainFiles": [
+      "src/components/request-detail/AiRulePreviewDialog.vue",
+      "src/components/request-detail/ContentBlockRenderer.vue",
+      "src/components/request-detail/ResponseViewer.vue",
+      "src/components/request-detail/upstream-merge.ts"
+    ],
+    "notes": "完全一致，无差异"
+  },
+  {
+    "id": 17,
+    "name": "Retry Rules",
+    "description": "重试规则页面、推荐规则组件、验收测试及领域工具函数。",
+    "featFiles": [
+      "src/views/RetryRules.vue",
+      "src/components/retry-rules/RecommendedRules.vue",
+      "src/views/__tests__/retry-rules-ac.test.ts",
+      "src/utils/retry-domain.ts"
+    ],
+    "mainFiles": [
+      "src/views/RetryRules.vue",
+      "src/components/retry-rules/RecommendedRules.vue",
+      "src/views/__tests__/retry-rules-ac.test.ts"
+    ],
+    "notes": "feat 新增 utils/retry-domain.ts"
+  },
+  {
+    "id": 18,
+    "name": "Proxy Enhancement",
+    "description": "代理增强页面、转换规则表单及 domain 工具函数。",
+    "featFiles": [
+      "src/views/ProxyEnhancement.vue",
+      "src/components/shared/TransformRulesForm.vue",
+      "src/composables/useTransformRules.ts",
+      "src/utils/transform-domain.ts"
+    ],
+    "mainFiles": [
+      "src/views/ProxyEnhancement.vue",
+      "src/components/shared/TransformRulesForm.vue",
+      "src/composables/useTransformRules.ts"
+    ],
+    "notes": "feat 新增 utils/transform-domain.ts"
+  },
+  {
+    "id": 19,
+    "name": "Router Keys & Schedules",
+    "description": "路由密钥管理和定时调度页面，feat 新增了 WeekTimeline 组件和 schedule-domain 工具。",
+    "featFiles": [
+      "src/views/RouterKeys.vue",
+      "src/views/Schedules.vue",
+      "src/components/schedules/WeekTimeline.vue",
+      "src/utils/schedule-domain.ts"
+    ],
+    "mainFiles": [
+      "src/views/RouterKeys.vue",
+      "src/views/Schedules.vue"
+    ],
+    "notes": "feat 新增 WeekTimeline.vue, schedule-domain.ts"
+  },
+  {
+    "id": 20,
+    "name": "Settings & Setup & Login",
+    "description": "系统设置、首次设置、登录页面及 settings API 客户端。",
+    "featFiles": [
+      "src/views/Settings.vue",
+      "src/views/Setup.vue",
+      "src/views/Login.vue",
+      "src/api/settings-api.ts"
+    ],
+    "mainFiles": [
+      "src/views/Settings.vue",
+      "src/views/Setup.vue",
+      "src/views/Login.vue",
+      "src/api/settings-api.ts"
+    ],
+    "notes": "完全一致，无差异"
+  },
+  {
+    "id": 21,
+    "name": "App Infrastructure",
+    "description": "应用入口、Vue 路由、全局常量和 TypeScript 类型声明。",
+    "featFiles": [
+      "src/App.vue",
+      "src/main.ts",
+      "src/router/index.ts",
+      "src/constants.ts",
+      "src/env.d.ts"
+    ],
+    "mainFiles": [
+      "src/App.vue",
+      "src/main.ts",
+      "src/router/index.ts",
+      "src/constants.ts",
+      "src/env.d.ts"
+    ],
+    "notes": "完全一致，无差异"
+  },
+  {
+    "id": 22,
+    "name": "API & Lib",
+    "description": "API 客户端基础封装、工具函数和模型类型定义。",
+    "featFiles": [
+      "src/api/client.ts",
+      "src/lib/utils.ts",
+      "src/types/models.ts"
+    ],
+    "mainFiles": [
+      "src/api/client.ts",
+      "src/lib/utils.ts",
+      "src/types/models.ts"
+    ],
+    "notes": "完全一致，无差异"
+  },
+  {
+    "id": 23,
+    "name": "Types",
+    "description": "映射、监控、调度领域类型定义。",
+    "featFiles": [
+      "src/types/mapping.ts",
+      "src/types/monitor.ts",
+      "src/types/schedule.ts"
+    ],
+    "mainFiles": [
+      "src/types/mapping.ts",
+      "src/types/monitor.ts",
+      "src/types/schedule.ts"
+    ],
+    "notes": "完全一致，无差异"
+  },
+  {
+    "id": 24,
+    "name": "Utils — Formatting",
+    "description": "通用格式化、状态标签映射和 token 格式化工具。",
+    "featFiles": [
+      "src/utils/format.ts",
+      "src/utils/status.ts",
+      "src/utils/token-format.ts"
+    ],
+    "mainFiles": [
+      "src/utils/format.ts",
+      "src/utils/status.ts"
+    ],
+    "notes": "feat 新增 utils/token-format.ts"
+  },
+  {
+    "id": 25,
+    "name": "Styles & Design Tokens",
+    "description": "全局样式、组件样式、设计令牌 CSS 变量和 TS 定义。",
+    "featFiles": [
+      "src/style.css",
+      "src/styles/components.css",
+      "src/styles/design-tokens.ts",
+      "src/styles/tokens.css"
+    ],
+    "mainFiles": [
+      "src/style.css",
+      "src/styles/components.css",
+      "src/styles/design-tokens.ts",
+      "src/styles/tokens.css"
+    ],
+    "notes": "完全一致，无差异"
+  },
+  {
+    "id": 26,
+    "name": "Icons",
+    "description": "Provider 图标动态渲染组件。",
+    "featFiles": [
+      "src/components/icons/ProviderIcon.vue"
+    ],
+    "mainFiles": [
+      "src/components/icons/ProviderIcon.vue"
+    ],
+    "notes": "完全一致，无差异"
+  },
+  {
+    "id": 27,
+    "name": "Layout",
+    "description": "侧边栏导航和认证布局组件。",
+    "featFiles": [
+      "src/components/layout/Sidebar.vue",
+      "src/components/layout/AuthLayout.vue"
+    ],
+    "mainFiles": [
+      "src/components/layout/Sidebar.vue"
+    ],
+    "notes": "feat 新增 AuthLayout.vue"
+  },
+  {
+    "id": 28,
+    "name": "i18n Infrastructure",
+    "description": "国际化基础设施（初始化、日期时间、数字格式化）。",
+    "featFiles": [
+      "src/i18n/index.ts",
+      "src/i18n/datetime.ts",
+      "src/i18n/number.ts"
+    ],
+    "mainFiles": [
+      "src/i18n/index.ts",
+      "src/i18n/datetime.ts",
+      "src/i18n/number.ts"
+    ],
+    "notes": "完全一致，无差异"
+  },
+  {
+    "id": 29,
+    "name": "i18n — Common & Login & Setup",
+    "description": "通用、登录、设置页面的中英文翻译。",
+    "featFiles": [
+      "src/i18n/locales/en/common.json",
+      "src/i18n/locales/zh-CN/common.json",
+      "src/i18n/locales/en/login.json",
+      "src/i18n/locales/zh-CN/login.json",
+      "src/i18n/locales/en/setup.json"
+    ],
+    "mainFiles": [
+      "src/i18n/locales/en/common.json",
+      "src/i18n/locales/zh-CN/common.json",
+      "src/i18n/locales/en/login.json",
+      "src/i18n/locales/zh-CN/login.json",
+      "src/i18n/locales/en/setup.json"
+    ],
+    "notes": "完全一致，无差异"
+  },
+  {
+    "id": 30,
+    "name": "i18n — Setup & Dashboard & Sidebar",
+    "description": "设置、仪表盘、侧边栏的中英文翻译。",
+    "featFiles": [
+      "src/i18n/locales/zh-CN/setup.json",
+      "src/i18n/locales/en/dashboard.json",
+      "src/i18n/locales/zh-CN/dashboard.json",
+      "src/i18n/locales/en/sidebar.json",
+      "src/i18n/locales/zh-CN/sidebar.json"
+    ],
+    "mainFiles": [
+      "src/i18n/locales/zh-CN/setup.json",
+      "src/i18n/locales/en/dashboard.json",
+      "src/i18n/locales/zh-CN/dashboard.json",
+      "src/i18n/locales/en/sidebar.json",
+      "src/i18n/locales/zh-CN/sidebar.json"
+    ],
+    "notes": "完全一致，无差异"
+  },
+  {
+    "id": 31,
+    "name": "i18n — Settings & Providers",
+    "description": "系统设置、Provider、代理增强的英文翻译。",
+    "featFiles": [
+      "src/i18n/locales/en/settings.json",
+      "src/i18n/locales/zh-CN/settings.json",
+      "src/i18n/locales/en/providers.json",
+      "src/i18n/locales/zh-CN/providers.json",
+      "src/i18n/locales/en/proxyEnhancement.json"
+    ],
+    "mainFiles": [
+      "src/i18n/locales/en/settings.json",
+      "src/i18n/locales/zh-CN/settings.json",
+      "src/i18n/locales/en/providers.json",
+      "src/i18n/locales/zh-CN/providers.json",
+      "src/i18n/locales/en/proxyEnhancement.json"
+    ],
+    "notes": "完全一致，无差异"
+  },
+  {
+    "id": 32,
+    "name": "i18n — Proxy Enhancement & Mappings",
+    "description": "代理增强、模型映射、定时调度的中英文翻译。",
+    "featFiles": [
+      "src/i18n/locales/zh-CN/proxyEnhancement.json",
+      "src/i18n/locales/en/mappings.json",
+      "src/i18n/locales/zh-CN/mappings.json",
+      "src/i18n/locales/en/schedules.json",
+      "src/i18n/locales/zh-CN/schedules.json"
+    ],
+    "mainFiles": [
+      "src/i18n/locales/zh-CN/proxyEnhancement.json",
+      "src/i18n/locales/en/mappings.json",
+      "src/i18n/locales/zh-CN/mappings.json",
+      "src/i18n/locales/en/schedules.json",
+      "src/i18n/locales/zh-CN/schedules.json"
+    ],
+    "notes": "完全一致，无差异"
+  },
+  {
+    "id": 33,
+    "name": "i18n — Router Keys & Retry Rules",
+    "description": "路由密钥、重试规则、快速设置的英文翻译。",
+    "featFiles": [
+      "src/i18n/locales/en/routerKeys.json",
+      "src/i18n/locales/zh-CN/routerKeys.json",
+      "src/i18n/locales/en/retryRules.json",
+      "src/i18n/locales/zh-CN/retryRules.json",
+      "src/i18n/locales/en/quickSetup.json"
+    ],
+    "mainFiles": [
+      "src/i18n/locales/en/routerKeys.json",
+      "src/i18n/locales/zh-CN/routerKeys.json",
+      "src/i18n/locales/en/retryRules.json",
+      "src/i18n/locales/zh-CN/retryRules.json",
+      "src/i18n/locales/en/quickSetup.json"
+    ],
+    "notes": "完全一致，无差异"
+  },
+  {
+    "id": 34,
+    "name": "i18n — Quick Setup & Logs & Monitor",
+    "description": "快速设置、请求日志、实时监控的中英文翻译。",
+    "featFiles": [
+      "src/i18n/locales/zh-CN/quickSetup.json",
+      "src/i18n/locales/en/logs.json",
+      "src/i18n/locales/zh-CN/logs.json",
+      "src/i18n/locales/en/monitor.json",
+      "src/i18n/locales/zh-CN/monitor.json"
+    ],
+    "mainFiles": [
+      "src/i18n/locales/zh-CN/quickSetup.json",
+      "src/i18n/locales/en/logs.json",
+      "src/i18n/locales/zh-CN/logs.json",
+      "src/i18n/locales/en/monitor.json",
+      "src/i18n/locales/zh-CN/monitor.json"
+    ],
+    "notes": "完全一致，无差异"
+  },
+  {
+    "id": 35,
+    "name": "i18n — Request Detail",
+    "description": "请求详情的中英文翻译。",
+    "featFiles": [
+      "src/i18n/locales/en/requestDetail.json",
+      "src/i18n/locales/zh-CN/requestDetail.json"
+    ],
+    "mainFiles": [
+      "src/i18n/locales/en/requestDetail.json",
+      "src/i18n/locales/zh-CN/requestDetail.json"
+    ],
+    "notes": "完全一致，无差异"
+  },
+  {
+    "id": 36,
+    "name": "Assets — Icons (batch 1)",
+    "description": "Provider 图标 SVG — Alibaba, Anthropic, Baidu, Claude。",
+    "featFiles": [
+      "src/assets/icons/alibaba.svg",
+      "src/assets/icons/anthropic.svg",
+      "src/assets/icons/anthropic-dark.svg",
+      "src/assets/icons/baidu.svg",
+      "src/assets/icons/claude.svg"
+    ],
+    "mainFiles": [
+      "src/assets/icons/alibaba.svg",
+      "src/assets/icons/anthropic.svg",
+      "src/assets/icons/anthropic-dark.svg",
+      "src/assets/icons/baidu.svg",
+      "src/assets/icons/claude.svg"
+    ],
+    "notes": "完全一致，无差异"
+  },
+  {
+    "id": 37,
+    "name": "Assets — Icons (batch 2)",
+    "description": "Provider 图标 SVG — Codex, DeepSeek, Iflytek, Kimi, MiniMax。",
+    "featFiles": [
+      "src/assets/icons/codex.svg",
+      "src/assets/icons/deepseek.svg",
+      "src/assets/icons/iflytek.svg",
+      "src/assets/icons/kimi.svg",
+      "src/assets/icons/minimax.svg"
+    ],
+    "mainFiles": [
+      "src/assets/icons/codex.svg",
+      "src/assets/icons/deepseek.svg",
+      "src/assets/icons/iflytek.svg",
+      "src/assets/icons/kimi.svg",
+      "src/assets/icons/minimax.svg"
+    ],
+    "notes": "完全一致，无差异"
+  },
+  {
+    "id": 38,
+    "name": "Assets — Icons (batch 3)",
+    "description": "Provider 图标 SVG — Moonshot, OpenAI, Opencode。",
+    "featFiles": [
+      "src/assets/icons/moonshot.svg",
+      "src/assets/icons/moonshot-dark.svg",
+      "src/assets/icons/openai.svg",
+      "src/assets/icons/openai-dark.svg",
+      "src/assets/icons/opencode.svg"
+    ],
+    "mainFiles": [
+      "src/assets/icons/moonshot.svg",
+      "src/assets/icons/moonshot-dark.svg",
+      "src/assets/icons/openai.svg",
+      "src/assets/icons/openai-dark.svg",
+      "src/assets/icons/opencode.svg"
+    ],
+    "notes": "完全一致，无差异"
+  },
+  {
+    "id": 39,
+    "name": "Assets — Icons (batch 4)",
+    "description": "Provider 图标 SVG — Opencode Dark, Pi, Qwen, SiliconCloud。",
+    "featFiles": [
+      "src/assets/icons/opencode-dark.svg",
+      "src/assets/icons/pi.svg",
+      "src/assets/icons/pi-dark.svg",
+      "src/assets/icons/qwen.svg",
+      "src/assets/icons/siliconcloud.svg"
+    ],
+    "mainFiles": [
+      "src/assets/icons/opencode-dark.svg",
+      "src/assets/icons/pi.svg",
+      "src/assets/icons/pi-dark.svg",
+      "src/assets/icons/qwen.svg",
+      "src/assets/icons/siliconcloud.svg"
+    ],
+    "notes": "完全一致，无差异"
+  },
+  {
+    "id": 40,
+    "name": "Assets — Icons (batch 5)",
+    "description": "Provider 图标 SVG — StepFun, TencentCloud, VolcEngine, Zhipu。",
+    "featFiles": [
+      "src/assets/icons/stepfun.svg",
+      "src/assets/icons/tencentcloud.svg",
+      "src/assets/icons/volcengine.svg",
+      "src/assets/icons/zhipu.svg"
+    ],
+    "mainFiles": [
+      "src/assets/icons/stepfun.svg",
+      "src/assets/icons/tencentcloud.svg",
+      "src/assets/icons/volcengine.svg",
+      "src/assets/icons/zhipu.svg"
+    ],
+    "notes": "完全一致，无差异"
+  },
+  {
+    "id": 41,
+    "name": "Assets — Other",
+    "description": "Hero 图片和 Vite 图标。",
+    "featFiles": [
+      "src/assets/hero.png",
+      "src/assets/vite.svg"
+    ],
+    "mainFiles": [
+      "src/assets/hero.png",
+      "src/assets/vite.svg"
+    ],
+    "notes": "完全一致，无差异"
+  }
+]

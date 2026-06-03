@@ -24,7 +24,8 @@
           "deepseek-v4-pro"
         ]
       }
-    ]
+    ],
+    "shortname": "deepseek"
   },
   {
     "group": "百度千帆",
@@ -47,7 +48,8 @@
         ],
         "upstreamPath": "/chat/completions"
       }
-    ]
+    ],
+    "shortname": "qianfan"
   },
   {
     "group": "科大讯飞",
@@ -67,7 +69,8 @@
           "lite"
         ]
       }
-    ]
+    ],
+    "shortname": "iflytek"
   },
   {
     "group": "硅基流动",
@@ -88,7 +91,8 @@
           "moonshotai/Kimi-K2.5"
         ]
       }
-    ]
+    ],
+    "shortname": "siliconflow"
   },
   {
     "group": "智谱",
@@ -139,7 +143,8 @@
           "glm-4.6"
         ]
       }
-    ]
+    ],
+    "shortname": "zhipu"
   },
   {
     "group": "月之暗面",
@@ -169,7 +174,8 @@
           "moonshot-v1-128k"
         ]
       }
-    ]
+    ],
+    "shortname": "moonshot"
   },
   {
     "group": "Minimax",
@@ -199,7 +205,8 @@
           "MiniMax-M2"
         ]
       }
-    ]
+    ],
+    "shortname": "minimax"
   },
   {
     "group": "火山引擎",
@@ -230,7 +237,8 @@
           "doubao-seed-code-preview-251028"
         ]
       }
-    ]
+    ],
+    "shortname": "volcengine"
   },
   {
     "group": "阿里云",
@@ -264,7 +272,8 @@
           "qwen3-coder-next"
         ]
       }
-    ]
+    ],
+    "shortname": "aliyun"
   },
   {
     "group": "腾讯云",
@@ -299,7 +308,8 @@
           "hunyuan-turbos-latest"
         ]
       }
-    ]
+    ],
+    "shortname": "tencent"
   },
   {
     "group": "OpenCode",
@@ -335,7 +345,8 @@
           "minimax-m2.5"
         ]
       }
-    ]
+    ],
+    "shortname": "opencode"
   },
   {
     "group": "阶跃星辰",
@@ -366,6 +377,7 @@
           "step-1-32k"
         ]
       }
-    ]
+    ],
+    "shortname": "stepfun"
   }
 ]

@@ -1,78 +1,109 @@
 <template>
-  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-    <!-- 活跃请求 -->
-    <Card>
-      <CardContent class="p-4">
-        <p class="text-sm text-muted-foreground">{{ t('monitor.header.activeRequests') }}</p>
-        <p class="text-2xl font-bold text-foreground mt-1">{{ activeCount }}</p>
-        <p class="text-xs text-muted-foreground mt-1">
-          {{ t('monitor.header.streamNonStream', { stream: streamCount, nonStream: activeCount - streamCount }) }}
-        </p>
-      </CardContent>
-    </Card>
+  <div
+    class="flex items-stretch bg-card border border-border rounded-lg overflow-hidden mb-3"
+  >
+    <!-- Left: Active count block -->
+    <div
+      class="flex items-center gap-3.5 px-5 py-3 border-r border-border min-w-[180px]"
+      style="background: oklch(0.68 0.13 175 / 8%)"
+    >
+      <span class="text-[32px] font-bold text-primary font-mono leading-none">
+        {{ activeCount }}
+      </span>
+      <div class="flex flex-col gap-0.5">
+        <span
+          class="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider"
+        >
+          {{ t("monitor.header.activeRequests") }}
+        </span>
+        <span class="font-mono text-[11px] text-muted-foreground">
+          {{
+            t("monitor.header.streamNonStream", {
+              stream: streamCount,
+              nonStream: activeCount - streamCount,
+            })
+          }}
+        </span>
+      </div>
+      <span
+        v-if="queuedCount > 0"
+        class="inline-flex items-center gap-1 ml-3 px-2 py-0.5 rounded-full font-mono text-[11px] font-semibold bg-warning/10 text-warning"
+      >
+        {{ queuedCount }} {{ t("monitor.queued") }}
+      </span>
+    </div>
 
-    <!-- 错误率 -->
-    <Card>
-      <CardContent class="p-4">
-        <p class="text-sm text-muted-foreground">{{ t('monitor.header.errorRate') }}</p>
-        <p class="text-2xl font-bold text-foreground mt-1">{{ errorRate }}%</p>
-        <p class="text-xs text-muted-foreground mt-1">
-          {{ stats?.errorCount ?? 0 }} / {{ stats?.totalRequests ?? 0 }}
-        </p>
-      </CardContent>
-    </Card>
-
-    <!-- P50 延迟 -->
-    <Card>
-      <CardContent class="p-4">
-        <p class="text-sm text-muted-foreground">{{ t('monitor.header.p50Latency') }}</p>
-        <p class="text-2xl font-bold text-foreground mt-1">{{ p50Latency }}ms</p>
-        <p class="text-xs text-muted-foreground mt-1">
-          {{ t('monitor.header.avgLatency', { value: stats?.avgLatencyMs?.toFixed(0) ?? '--' }) }}
-        </p>
-      </CardContent>
-    </Card>
-
-    <!-- 重试率 -->
-    <Card>
-      <CardContent class="p-4">
-        <p class="text-sm text-muted-foreground">{{ t('monitor.header.retryRate') }}</p>
-        <p class="text-2xl font-bold text-foreground mt-1">{{ retryRate }}%</p>
-        <p class="text-xs text-muted-foreground mt-1">
-          {{ stats?.retryCount ?? 0 }} / {{ stats?.totalRequests ?? 0 }}
-        </p>
-      </CardContent>
-    </Card>
+    <!-- Right: Concurrency bars -->
+    <div class="flex-1 px-4 py-2.5 flex flex-col gap-1 justify-center">
+      <span
+        class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-0.5"
+      >
+        {{ t("monitor.concurrency") }}
+      </span>
+      <div
+        v-if="concurrency.length === 0"
+        class="text-[11px] text-muted-foreground py-1"
+      >
+        {{ t("monitor.concurrencyPanel.noData") }}
+      </div>
+      <div
+        v-for="provider in concurrency"
+        :key="provider.providerId"
+        class="flex items-center gap-1.5"
+      >
+        <span
+          class="text-[11px] font-medium text-muted-foreground w-[130px] shrink-0 truncate"
+          :title="provider.providerName"
+        >
+          {{ provider.providerName }}
+        </span>
+        <div class="flex-1 h-1 bg-foreground/[0.06] rounded-sm overflow-hidden">
+          <div
+            v-if="effectiveLimit(provider) > 0"
+            class="h-full rounded-sm transition-all duration-300"
+            :class="barClass(provider.active, effectiveLimit(provider))"
+            :style="{
+              width: `${Math.min(100, (provider.active / effectiveLimit(provider)) * 100)}%`,
+            }"
+          />
+        </div>
+        <span
+          class="font-mono text-[11px] text-muted-foreground w-10 text-right shrink-0"
+          :class="ratioClass(provider.active, effectiveLimit(provider))"
+        >
+          <template v-if="provider.adaptiveEnabled">
+            {{ provider.active }}/{{
+              provider.adaptiveLimit ?? provider.maxConcurrency
+            }}
+          </template>
+          <template v-else-if="provider.maxConcurrency === 0">
+            {{ t("monitor.concurrencyPanel.unlimited") }}
+          </template>
+          <template v-else>
+            {{ provider.active }}/{{ provider.maxConcurrency }}
+          </template>
+        </span>
+      </div>
+    </div>
   </div>
 </template>
 
-<!-- eslint-disable no-magic-numbers -->
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { Card, CardContent } from '@/components/ui/card'
-import type { StatsSnapshot } from '@/types/monitor'
+import { useI18n } from "vue-i18n";
+import type { ProviderConcurrencySnapshot } from "@/types/monitor";
+import {
+  effectiveLimit,
+  concurrencyBarClass as barClass,
+  concurrencyRatioClass as ratioClass,
+} from "@/utils/concurrency";
 
-const { t } = useI18n()
+const { t } = useI18n();
 
-const props = defineProps<{
-  stats: StatsSnapshot | null
-  activeCount: number
-  streamCount: number
-}>()
-
-const errorRate = computed(() => {
-  if (!props.stats || props.stats.totalRequests === 0) return '0.0'
-  return ((props.stats.errorCount / props.stats.totalRequests) * 100).toFixed(1)
-})
-
-const retryRate = computed(() => {
-  if (!props.stats || props.stats.totalRequests === 0) return '0.0'
-  return ((props.stats.retryCount / props.stats.totalRequests) * 100).toFixed(1)
-})
-
-const p50Latency = computed(() => {
-  if (!props.stats) return '--'
-  return props.stats.p50LatencyMs.toFixed(0)
-})
+defineProps<{
+  stats: import("@/types/monitor").StatsSnapshot | null;
+  activeCount: number;
+  streamCount: number;
+  queuedCount: number;
+  concurrency: ProviderConcurrencySnapshot[];
+}>();
 </script>

@@ -8,7 +8,6 @@ export interface ConcurrencyConfig {
 /** Internal state of adaptive concurrency for a provider. */
 export interface AdaptiveState {
   currentLimit: number;
-  limitReached: boolean;
   consecutiveSuccesses: number;
   consecutiveFailures: number;
   cooldownUntil: number;

@@ -14,6 +14,8 @@
     "allBackendModels": "全部目标模型"
   },
   "noLogs": "暂无日志",
+  "noLogsFilterHint": "当前筛选条件下没有匹配的日志",
+  "clearAllFilters": "清除所有筛选",
   "pagination": "共 {total} 条，第 {page} / {totalPages} 页",
   "firstPage": "首页",
   "prevPage": "上一页",
@@ -23,11 +25,12 @@
     "title": "清理日志",
     "description": "删除指定天数之前的日志",
     "keepRecentDays": "保留最近天数",
-    "autoCleanup": "自动清理设置",
+    "autoCleanup": "自动清理：保留",
     "retentionDays": "保留天数",
     "noAutoCleanup": "0 = 不自动清理",
     "saveSettings": "保存设置",
-    "confirmCleanup": "确认清理"
+    "confirmCleanup": "确认清理",
+    "days": "天"
   },
   "cleanupResult": {
     "title": "清理完成",
@@ -39,10 +42,12 @@
     "time": "时间",
     "type": "类型",
     "model": "模型",
+    "clientModel": "客户端模型",
+    "targetModel": "目标模型",
     "actualForward": "实际转发",
     "tags": "标签",
     "statusCode": "状态码",
-    "latency": "延迟",
+    "latency": "耗时",
     "streaming": "流式",
     "retry": "重试",
     "failover": "故障转移",

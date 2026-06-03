@@ -1,5 +1,15 @@
-import { ref, shallowRef, triggerRef, computed, watch, onUnmounted } from "vue";
+import {
+  ref,
+  shallowRef,
+  triggerRef,
+  computed,
+  watch,
+  onUnmounted,
+  type Ref,
+  type ShallowRef,
+} from "vue";
 import { api } from "@/api/client";
+import { useMonitorSSE } from "./useMonitorSSE";
 import type {
   ActiveRequest,
   ProviderConcurrencySnapshot,
@@ -44,6 +54,112 @@ function diffActiveRequests(
   return [...missing, ...kept];
 }
 
+// ─── 提取的模块级函数（减少 useMonitorData 函数体行数） ───
+
+function handleSSEMessageImpl(
+  event: MessageEvent,
+  deps: {
+    recentCompleted: Ref<ActiveRequest[]>;
+    activeRequests: ShallowRef<ActiveRequest[]>;
+    concurrency: Ref<ProviderConcurrencySnapshot[]>;
+    stats: Ref<StatsSnapshot | null>;
+    runtime: Ref<RuntimeMetrics | null>;
+  },
+): void {
+  let data: unknown;
+  try {
+    data = JSON.parse(event.data);
+  } catch {
+    /* 非 JSON 数据，跳过 */ return;
+  }
+
+  switch (event.type) {
+    case "request_start": {
+      const req = data as ActiveRequest;
+      if (!deps.recentCompleted.value.some((r) => r.id === req.id)) {
+        deps.activeRequests.value.unshift(req);
+        triggerRef(deps.activeRequests);
+      }
+      break;
+    }
+    case "request_update": {
+      deps.activeRequests.value = data as ActiveRequest[];
+      break;
+    }
+    case "request_complete": {
+      const completed = data as ActiveRequest;
+      deps.activeRequests.value = deps.activeRequests.value.filter(
+        (r) => r.id !== completed.id,
+      );
+      deps.recentCompleted.value.unshift(completed);
+      if (deps.recentCompleted.value.length > RECENT_COMPLETED_MAX) {
+        deps.recentCompleted.value.length = RECENT_COMPLETED_MAX;
+      }
+      break;
+    }
+    case "concurrency_update": {
+      deps.concurrency.value = data as ProviderConcurrencySnapshot[];
+      break;
+    }
+    case "stats_update": {
+      deps.stats.value = data as StatsSnapshot;
+      break;
+    }
+    case "stream_content_update": {
+      // 后端已改为轻量推送：只含 id + totalChars + streamMetrics（不含 streamContent）
+      const updates = data as Array<{
+        id: string;
+        totalChars: number;
+        streamMetrics: StreamMetricsSnapshot | null;
+      }>;
+      for (const update of updates) {
+        const req = deps.activeRequests.value.find((r) => r.id === update.id);
+        if (req) {
+          req.streamTotalChars = update.totalChars;
+          if (update.streamMetrics) req.streamMetrics = update.streamMetrics;
+        }
+      }
+      triggerRef(deps.activeRequests);
+      break;
+    }
+    case "runtime_update": {
+      deps.runtime.value = data as RuntimeMetrics;
+      break;
+    }
+  }
+}
+
+async function loadInitialDataImpl(
+  activeRequests: ShallowRef<ActiveRequest[]>,
+  recentCompleted: Ref<ActiveRequest[]>,
+  stats: Ref<StatsSnapshot | null>,
+  concurrency: Ref<ProviderConcurrencySnapshot[]>,
+  runtime: Ref<RuntimeMetrics | null>,
+): Promise<void> {
+  try {
+    const [active, recent, statsData, concurrencyData, runtimeData] =
+      await Promise.allSettled([
+        api.getMonitorActive(),
+        api.getMonitorRecent(),
+        api.getMonitorStats(),
+        api.getMonitorConcurrency(),
+        api.getMonitorRuntime(),
+      ]);
+
+    if (active.status === "fulfilled") activeRequests.value = active.value;
+    if (recent.status === "fulfilled") recentCompleted.value = recent.value;
+    if (statsData.status === "fulfilled") stats.value = statsData.value;
+    if (concurrencyData.status === "fulfilled")
+      concurrency.value = concurrencyData.value;
+    if (runtimeData.status === "fulfilled") runtime.value = runtimeData.value;
+  } catch (e) {
+    console.error("Failed to load initial monitor data:", e);
+    stats.value = null;
+    concurrency.value = [];
+    runtime.value = null;
+  }
+}
+
 /**
  * 监控页数据层：初始加载 + SSE 事件驱动状态更新 + 非流式响应体按需加载。
  * 所有响应式状态均由此 composable 持有，UI 组件只做绑定。
@@ -69,68 +185,14 @@ export function useMonitorData() {
 
   // --- SSE event handlers ---
 
-  function handleSSEMessage(event: MessageEvent) {
-    let data: unknown;
-    try {
-      data = JSON.parse(event.data);
-    } catch {
-      return;
-    }
-
-    switch (event.type) {
-      case "request_start": {
-        const req = data as ActiveRequest;
-        if (!recentCompleted.value.some((r) => r.id === req.id)) {
-          activeRequests.value.unshift(req);
-        }
-        break;
-      }
-      case "request_update": {
-        activeRequests.value = data as ActiveRequest[];
-        break;
-      }
-      case "request_complete": {
-        const completed = data as ActiveRequest;
-        activeRequests.value = activeRequests.value.filter(
-          (r) => r.id !== completed.id,
-        );
-        recentCompleted.value.unshift(completed);
-        if (recentCompleted.value.length > RECENT_COMPLETED_MAX) {
-          recentCompleted.value.length = RECENT_COMPLETED_MAX;
-        }
-        break;
-      }
-      case "concurrency_update": {
-        concurrency.value = data as ProviderConcurrencySnapshot[];
-        break;
-      }
-      case "stats_update": {
-        stats.value = data as StatsSnapshot;
-        break;
-      }
-      case "stream_content_update": {
-        // 后端已改为轻量推送：只含 id + totalChars + streamMetrics（不含 streamContent）
-        const updates = data as Array<{
-          id: string;
-          totalChars: number;
-          streamMetrics: StreamMetricsSnapshot | null;
-        }>;
-        for (const update of updates) {
-          const req = activeRequests.value.find((r) => r.id === update.id);
-          if (req) {
-            req.streamTotalChars = update.totalChars;
-            if (update.streamMetrics) req.streamMetrics = update.streamMetrics;
-          }
-        }
-        triggerRef(activeRequests);
-        break;
-      }
-      case "runtime_update": {
-        runtime.value = data as RuntimeMetrics;
-        break;
-      }
-    }
-  }
+  const handleSSEMessage = (event: MessageEvent) =>
+    handleSSEMessageImpl(event, {
+      recentCompleted,
+      activeRequests,
+      concurrency,
+      stats,
+      runtime,
+    });
 
   async function handleSSEOpen() {
     connected.value = true;
@@ -149,30 +211,30 @@ export function useMonitorData() {
 
   // --- Initial data loading ---
 
-  async function loadInitialData() {
-    try {
-      const [active, recent, statsData, concurrencyData, runtimeData] =
-        await Promise.allSettled([
-          api.getMonitorActive(),
-          api.getMonitorRecent(),
-          api.getMonitorStats(),
-          api.getMonitorConcurrency(),
-          api.getMonitorRuntime(),
-        ]);
+  const loadInitialData = () =>
+    loadInitialDataImpl(
+      activeRequests,
+      recentCompleted,
+      stats,
+      concurrency,
+      runtime,
+    );
 
-      if (active.status === "fulfilled") activeRequests.value = active.value;
-      if (recent.status === "fulfilled") recentCompleted.value = recent.value;
-      if (statsData.status === "fulfilled") stats.value = statsData.value;
-      if (concurrencyData.status === "fulfilled")
-        concurrency.value = concurrencyData.value;
-      if (runtimeData.status === "fulfilled") runtime.value = runtimeData.value;
-    } catch (e) {
-      console.error("Failed to load initial monitor data:", e);
-      stats.value = null;
-      concurrency.value = [];
-      runtime.value = null;
-    }
-  }
+  // --- SSE connection (封装在内部，消费者无需手动绑定 handler) ---
+
+  const { connect, disconnect } = useMonitorSSE(
+    "/admin/api/monitor/stream",
+    {
+      request_start: handleSSEMessage,
+      request_update: handleSSEMessage,
+      request_complete: handleSSEMessage,
+      concurrency_update: handleSSEMessage,
+      stats_update: handleSSEMessage,
+      runtime_update: handleSSEMessage,
+      stream_content_update: handleSSEMessage,
+    },
+    { onOpen: handleSSEOpen, onClose: handleSSEClose },
+  );
 
   // --- Log detail loading (non-stream body + request diff data) ---
 
@@ -235,7 +297,7 @@ export function useMonitorData() {
               (typeof parsed.body === "string" ? parsed.body : raw) ??
               undefined;
           } catch {
-            responseBody = raw;
+            /* JSON 解析失败，使用原始文本 */ responseBody = raw;
           }
         }
       }
@@ -385,10 +447,9 @@ export function useMonitorData() {
     // Log detail data
     logDetailData,
     nonStreamBodyLoading,
-    // SSE handlers (for useMonitorSSE)
-    handleSSEMessage,
-    handleSSEOpen,
-    handleSSEClose,
+    // SSE lifecycle
+    connect,
+    disconnect,
     // Lifecycle
     loadInitialData,
   };

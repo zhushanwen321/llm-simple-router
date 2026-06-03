@@ -53,5 +53,7 @@
   "new": "New",
   "saveFailed": "Save failed",
   "cascadingSelect": "Please select...",
-  "cascadingNoOptions": "No options"
+  "cascadingNoOptions": "No options",
+  "selected": "Selected",
+  "selectAll": "Select all"
 }

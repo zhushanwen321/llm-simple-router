@@ -1,26 +1,39 @@
 {
-  "title": "API 密钥",
+  "title": "API Keys",
   "createKey": "创建密钥",
   "editKey": "编辑密钥",
+  "keyCreated": "密钥已创建",
+  "keyShownOnce": "此密钥仅显示一次，请立即复制保存。",
+  "showKey": "显示",
+  "hideKey": "隐藏",
+  "searchPlaceholder": "搜索名称或密钥...",
+  "statTotal": "密钥总数",
+  "statActive": "活跃",
+  "statWhitelist": "有白名单",
+  "modelFilterPlaceholder": "过滤模型...",
   "tableHeaders": {
     "name": "名称",
     "key": "密钥",
-    "whitelist": "白名单模型",
+    "whitelist": "白名单",
     "status": "状态",
     "createdAt": "创建时间",
     "actions": "操作"
   },
   "noKeys": "暂无密钥",
+  "noKeysHint": "点击上方按钮创建第一个 API 密钥",
+  "noMatch": "没有匹配的密钥",
   "confirmDeleteTitle": "确认删除",
   "confirmDeleteDesc": "确定要删除密钥「{name}」吗？使用此密钥的所有请求将被拒绝，此操作不可撤销。",
   "whitelistLabel": "白名单模型",
-  "whitelistHint": "不选择 = 允许所有模型",
+  "whitelistHint": "不勾选 = 允许所有模型",
   "noModels": "暂无可用模型，请先配置模型映射",
   "placeholder": {
-    "name": "例如：生产环境"
+    "name": "例如：Production"
   },
   "loadFailed": "加载 API 密钥失败，请检查连接后重试",
   "saveFailed": "保存密钥失败，名称需唯一且至少 1 个字符",
   "deleteFailed": "删除密钥失败，请稍后重试",
-  "nameRequired": "请输入名称"
+  "nameRequired": "请输入名称",
+  "toggleActiveFailed": "切换状态失败",
+  "moreModels": "+{count}"
 }

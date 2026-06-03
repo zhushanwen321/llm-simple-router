@@ -22,7 +22,11 @@
   "clientIdentification": {
     "title": "Client Identification",
     "description": "Configure client session header mapping to identify request sources. Requests with matching headers will be identified as the corresponding client type.",
-    "addEntry": "Add Entry"
+    "addEntry": "Add Entry",
+    "placeholder": {
+      "type": "Client type",
+      "header": "Header name"
+    }
   },
   "toolErrorLogging": {
     "title": "Tool Error Logging",
@@ -41,5 +45,23 @@
   "saveFailed": "Failed to save",
   "loadProvidersFailed": "Failed to load provider list",
   "aiRetryRuleGen": "AI Retry Rule Generation",
-  "aiRetryRuleGenDesc": "Configure the AI model for automatically analyzing request responses and generating retry rules. The model is invoked directly through configured Providers."
+  "aiRetryRuleGenDesc": "Configure the AI model for automatically analyzing request responses and generating retry rules. The model is invoked directly through configured Providers.",
+  "subtitle": "Configure proxy enhancement strategies, loop detection, token management, and AI-assisted features",
+  "unsavedChanges": "You have unsaved changes",
+  "alwaysOn": "Always on",
+  "sections": {
+    "loopDetection": "Loop Detection",
+    "errorHandling": "Error Handling",
+    "clientIdentification": "Client Identification",
+    "tokenManagement": "Token Management",
+    "aiFeatures": "AI Features"
+  },
+  "contextOverflow": {
+    "title": "Context Overflow Redirect",
+    "description": "Automatically redirects to a model with a larger context window when request tokens exceed the current model's limit. Uses gpt-tokenizer for accurate token counting."
+  },
+  "sessionState": {
+    "title": "Session Model State Tracking",
+    "description": "Tracks model usage state per session, ensuring subsequent requests from the same session route to the same Provider. Prevents model behavior inconsistencies caused by context switching."
+  }
 }

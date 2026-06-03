@@ -1,82 +1,126 @@
 <template>
-  <div class="space-y-3">
-    <!-- Toggle: structured / raw -->
-    <div class="flex items-center justify-between">
-      <span class="text-xs font-medium text-muted-foreground">{{
-        t("requestDetail.overviewTitle")
-      }}</span>
-      <Button
-        size="sm"
-        variant="outline"
-        class="h-6 gap-1 text-xs"
-        @click="showRaw = !showRaw"
-      >
-        <component :is="showRaw ? FileText : FileJson" class="h-3 w-3" />
-        {{
-          showRaw ? t("requestDetail.structured") : t("requestDetail.rawData")
-        }}
-      </Button>
-    </div>
+  <div class="flex flex-col h-full">
+    <!-- Structured view -->
+    <div v-if="!showRaw" class="flex-1 overflow-y-auto">
+      <!-- Execution Chain -->
+      <div class="rounded-md border overflow-hidden mb-3">
+        <!-- Header -->
+        <div class="flex items-center gap-2 px-2.5 py-2 border-b bg-muted/20">
+          <span
+            class="text-[10px] uppercase tracking-wider text-muted-foreground font-medium"
+          >
+            {{ t("requestDetail.executionChain") }}
+          </span>
+          <span class="flex-1" />
+          <span class="text-[13px] font-medium">{{ overview.model }}</span>
+          <Badge variant="secondary" class="text-[10px] px-1 py-0">{{
+            overview.apiType
+          }}</Badge>
+          <Badge
+            v-if="overview.mappingReason"
+            class="text-[10px] px-2 py-0 rounded-full bg-primary/20 text-primary border-0"
+          >
+            {{
+              MAPPING_LABELS[overview.mappingReason] || overview.mappingReason
+            }}
+          </Badge>
+        </div>
+        <!-- Steps -->
+        <div class="px-2.5 py-1">
+          <div
+            v-for="(attempt, idx) in overview.attempts"
+            :key="idx"
+            class="py-1.5"
+            :class="{ 'border-t border-border/50': idx > 0 }"
+          >
+            <!-- Line 1: #N model @ provider (scrollable) -->
+            <div class="flex items-center gap-0 text-[11px]">
+              <span
+                class="text-muted-foreground/60 font-mono text-[10px] w-5 shrink-0"
+                >#{{ idx + 1 }}</span
+              >
+              <span
+                class="flex-1 min-w-0 overflow-x-auto whitespace-nowrap scrollbar-none"
+              >
+                <span class="font-mono">{{
+                  attempt.model || overview.backendModel || "-"
+                }}</span>
+                <span class="text-muted-foreground">
+                  @ {{ getProviderName(attempt.providerId) }}</span
+                >
+              </span>
+            </div>
+            <!-- Line 2: status + latency + apiType + retry/final -->
+            <div class="flex items-center gap-1.5 pl-5 mt-0.5 flex-wrap">
+              <Badge
+                :variant="
+                  (attempt.statusCode ?? 0) < HTTP_ERROR_THRESHOLD
+                    ? 'default'
+                    : 'destructive'
+                "
+                class="text-[9px] px-1 py-0"
+              >
+                {{ attempt.statusCode || "-" }}
+              </Badge>
+              <span class="text-muted-foreground/60 font-mono text-[11px]">
+                {{ formatLatency(attempt.latencyMs) }}
+              </span>
+              <Badge variant="secondary" class="text-[9px] px-1 py-0">
+                {{ attempt.apiType || overview.apiType }}
+              </Badge>
+              <Badge
+                v-if="idx === 0 && overview.attempts.length > 1"
+                class="text-[9px] px-1 py-0 rounded bg-warning/15 text-warning border-0"
+              >
+                {{ t("requestDetail.executionRetry") }}
+              </Badge>
+              <Badge
+                v-if="
+                  idx === overview.attempts.length - 1 &&
+                  overview.attempts.length > 1
+                "
+                class="text-[9px] px-1 py-0 rounded bg-success/15 text-success border-0"
+              >
+                {{ t("requestDetail.executionFinal") }}
+              </Badge>
+            </div>
+          </div>
+        </div>
+      </div>
 
-    <!-- Raw JSON view: upstream response metadata (headers + response body minus content) -->
-    <ScrollArea v-if="showRaw" class="rounded-md border flex-1">
-      <pre class="p-3 text-[11px] whitespace-pre-wrap break-words">{{
-        responseMetadataJson
-      }}</pre>
-    </ScrollArea>
-
-    <!-- Structured view (below) -->
-    <template v-if="!showRaw">
-      <!-- Row 1: model @ provider -->
-      <div class="flex items-baseline gap-1 min-w-0">
-        <span class="font-mono text-[11px] font-semibold truncate min-w-0">{{
-          overview.model
-        }}</span>
-        <span class="text-[10px] text-muted-foreground flex-shrink-0"
-          >@
+      <!-- Badges + Session -->
+      <div class="flex items-center gap-1.5 mb-3">
+        <Badge
+          :variant="overview.status === 'completed' ? 'default' : 'destructive'"
+          class="text-[10px] px-1.5 py-0"
+        >
+          <span
+            class="inline-block w-1.5 h-1.5 rounded-full mr-1"
+            :class="
+              overview.status === 'completed' ? 'bg-success' : 'bg-destructive'
+            "
+          />
           {{
-            overview.providerName || t("requestDetail.unknownProvider")
-          }}</span
-        >
-      </div>
-
-      <!-- Mapping reason badge -->
-      <div v-if="overview.mappingReason" class="flex items-center gap-1.5">
-        <Badge variant="secondary" class="text-[10px]">
-          {{ t(`requestDetail.mappingReason.${overview.mappingReason}`) }}
-        </Badge>
-      </div>
-
-      <!-- Row 2: status + SSE + apiType -->
-      <div class="flex items-center gap-1.5">
-        <Badge
-          v-if="statusColor === 'pending'"
-          variant="outline"
-          class="border-warning/30 bg-warning-light text-warning-dark"
-        >
-          <span class="w-1.5 h-1.5 rounded-full bg-warning animate-pulse" />
-          {{ t("requestDetail.pending") }}
+            overview.status === "completed"
+              ? t("requestDetail.completed")
+              : t("requestDetail.failed")
+          }}
         </Badge>
         <Badge
-          v-else-if="statusColor === 'error'"
+          v-if="overview.isStream"
           variant="outline"
-          class="border-danger/30 bg-danger-light text-danger-dark"
+          class="text-[10px] px-1.5 py-0"
+          >SSE</Badge
         >
-          {{ overview.statusCode ?? t("requestDetail.failed") }}
-        </Badge>
-        <Badge
-          v-else
-          variant="outline"
-          class="border-success/30 bg-success-light text-success-dark"
-        >
-          <span class="w-1.5 h-1.5 rounded-full bg-success" />
-          {{ t("requestDetail.completed") }}
-        </Badge>
-
-        <Badge variant="outline">{{
-          overview.isStream ? "SSE" : t("requestDetail.nonStream")
+        <Badge variant="secondary" class="text-[10px] px-1.5 py-0">{{
+          overview.apiType
         }}</Badge>
-        <Badge variant="outline">{{ overview.apiType }}</Badge>
+        <span
+          v-if="overview.sessionId"
+          class="font-mono text-[10px] text-muted-foreground ml-1"
+        >
+          {{ overview.sessionId.slice(0, 8) }}
+        </span>
         <Badge
           v-if="overview.thinkingLevel"
           variant="outline"
@@ -86,32 +130,49 @@
         </Badge>
       </div>
 
-      <!-- Row 3: session (conditional) -->
-      <div v-if="overview.sessionId" class="flex items-center gap-1.5">
-        <Badge variant="secondary" class="text-[10px]">Session</Badge>
-        <span class="font-mono text-[11px] text-muted-foreground truncate">{{
-          overview.sessionId.slice(0, 8)
-        }}</span>
+      <!-- Layer 2.5 - Error banner (only when error exists) -->
+      <div
+        v-if="overview.errorMessage"
+        class="rounded-md border px-3 py-2 mb-3"
+        style="
+          background: oklch(0.3 0.08 25 / 15%);
+          border-color: oklch(0.58 0.22 25 / 30%);
+        "
+      >
+        <p class="font-mono text-xs font-semibold text-destructive break-all">
+          {{ overview.errorMessage }}
+        </p>
+        <p class="text-[10px] text-muted-foreground mt-0.5">
+          {{ overview.statusCode }} · upstream_error
+        </p>
       </div>
 
       <!-- Metrics grid -->
-      <div class="grid grid-cols-2 gap-1.5">
-        <div class="bg-muted/50 rounded-md px-2 py-1.5 min-w-0">
-          <div class="text-[10px] text-muted-foreground">
+      <div
+        class="grid grid-cols-2 gap-0 p-0 border rounded-md overflow-hidden mb-3"
+      >
+        <div class="px-2.5 py-1.5 min-w-0 border-b border-r">
+          <div
+            class="text-[9px] uppercase tracking-wider text-muted-foreground"
+          >
             {{ t("requestDetail.latency") }}
           </div>
           <div class="text-sm font-semibold truncate">{{ latencyText }}</div>
         </div>
-        <div class="bg-muted/50 rounded-md px-2 py-1.5 min-w-0">
-          <div class="text-[10px] text-muted-foreground">
+        <div class="px-2.5 py-1.5 min-w-0 border-b">
+          <div
+            class="text-[9px] uppercase tracking-wider text-muted-foreground"
+          >
             {{ t("requestDetail.ttft") }}
           </div>
           <div class="text-sm font-semibold truncate">
             {{ overview.ttftMs != null ? `${overview.ttftMs}ms` : "--" }}
           </div>
         </div>
-        <div class="bg-muted/50 rounded-md px-2 py-1.5 min-w-0">
-          <div class="text-[10px] text-muted-foreground">
+        <div class="px-2.5 py-1.5 min-w-0 border-b border-r">
+          <div
+            class="text-[9px] uppercase tracking-wider text-muted-foreground"
+          >
             {{
               overview.inputTokensEstimated
                 ? t("requestDetail.estInputTokens")
@@ -122,8 +183,10 @@
             {{ overview.inputTokens != null ? overview.inputTokens : "--" }}
           </div>
         </div>
-        <div class="bg-muted/50 rounded-md px-2 py-1.5 min-w-0">
-          <div class="text-[10px] text-muted-foreground">
+        <div class="px-2.5 py-1.5 min-w-0 border-b">
+          <div
+            class="text-[9px] uppercase tracking-wider text-muted-foreground"
+          >
             {{ t("requestDetail.outputTokens") }}
           </div>
           <div
@@ -133,14 +196,18 @@
             {{ outputTokenText }}
           </div>
         </div>
-        <div class="bg-muted/50 rounded-md px-2 py-1.5 min-w-0">
-          <div class="text-[10px] text-muted-foreground">
+        <div class="px-2.5 py-1.5 min-w-0 border-r">
+          <div
+            class="text-[9px] uppercase tracking-wider text-muted-foreground"
+          >
             {{ t("requestDetail.speed") }}
           </div>
           <div class="text-sm font-semibold truncate">{{ speedText }}</div>
         </div>
-        <div class="bg-muted/50 rounded-md px-2 py-1.5 min-w-0">
-          <div class="text-[10px] text-muted-foreground">
+        <div class="px-2.5 py-1.5 min-w-0">
+          <div
+            class="text-[9px] uppercase tracking-wider text-muted-foreground"
+          >
             {{ t("requestDetail.cacheRead") }}
           </div>
           <div class="text-sm font-semibold truncate">
@@ -154,7 +221,7 @@
       <!-- Cache source -->
       <div
         v-if="overview.cacheReadTokens != null && overview.cacheReadTokens > 0"
-        class="rounded-md px-2 py-1.5 bg-muted/50"
+        class="rounded-md px-2 py-1.5 bg-muted/30 mb-3"
       >
         <div class="text-[10px] text-muted-foreground">
           {{ t("requestDetail.cacheSource") }}
@@ -170,65 +237,21 @@
         </div>
       </div>
 
-      <Separator />
-
-      <!-- Attempt history -->
-      <div class="space-y-1.5">
-        <span
-          class="text-[10px] text-muted-foreground uppercase tracking-wider"
-          >{{ t("requestDetail.attemptHistory") }}</span
-        >
-        <div
-          v-if="overview.attempts.length === 0"
-          class="text-[11px] text-muted-foreground"
-        >
-          {{ t("requestDetail.noRetry") }}
-        </div>
-        <div
-          v-for="(attempt, i) in overview.attempts"
-          :key="i"
-          class="flex items-center gap-1 text-[11px]"
-        >
-          <span class="text-muted-foreground">#{{ i + 1 }}</span>
-          <span
-            :class="
-              isAttemptError(attempt.statusCode) ? 'diff-removed' : 'diff-added'
-            "
-          >
-            {{ attempt.statusCode ?? "--" }}
-          </span>
-          <span class="text-muted-foreground"
-            >{{ (attempt.latencyMs / MS_PER_SECOND).toFixed(1) }}s</span
-          >
-        </div>
-      </div>
-
-      <Separator />
-
-      <!-- Metadata -->
-      <div class="space-y-1">
-        <div
-          v-if="overview.clientType != null"
-          class="flex items-center justify-between text-[11px]"
-        >
+      <!-- Layer 6 - Metadata (compact key-value) -->
+      <div class="space-y-0.5 text-[11px] mb-3">
+        <div v-if="overview.clientType != null" class="flex justify-between">
           <span class="text-muted-foreground">{{
             t("requestDetail.clientType")
           }}</span>
           <span class="font-mono">{{ clientTypeLabel }}</span>
         </div>
-        <div
-          v-if="overview.statusCode != null"
-          class="flex items-center justify-between text-[11px]"
-        >
+        <div v-if="overview.statusCode != null" class="flex justify-between">
           <span class="text-muted-foreground">{{
             t("requestDetail.statusCodeLabel")
           }}</span>
           <span class="font-mono">{{ overview.statusCode }}</span>
         </div>
-        <div
-          v-if="overview.clientIp"
-          class="flex items-center justify-between text-[11px]"
-        >
+        <div v-if="overview.clientIp" class="flex justify-between">
           <span class="text-muted-foreground">{{
             t("requestDetail.clientIp")
           }}</span>
@@ -262,7 +285,29 @@
           }}</span>
         </div>
       </div>
-    </template>
+    </div>
+
+    <!-- Raw JSON view -->
+    <ScrollArea v-else class="flex-1 rounded-md border">
+      <pre class="p-3 text-[11px] whitespace-pre-wrap break-words">{{
+        responseMetadataJson
+      }}</pre>
+    </ScrollArea>
+
+    <!-- Toggle at bottom -->
+    <div class="pt-3 mt-auto border-t">
+      <Button
+        size="sm"
+        variant="outline"
+        class="h-6 gap-1 text-xs w-full justify-center"
+        @click="showRaw = !showRaw"
+      >
+        <component :is="showRaw ? FileText : FileJson" class="h-3 w-3" />
+        {{
+          showRaw ? t("requestDetail.structured") : t("requestDetail.rawData")
+        }}
+      </Button>
+    </div>
   </div>
 </template>
 
@@ -275,12 +320,20 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { FileJson, FileText } from "lucide-vue-next";
-import { Separator } from "@/components/ui/separator";
 import { extractResponseMetadata } from "./upstream-merge";
 
 const { t } = useI18n();
 
 const JSON_INDENT = 2;
+
+const MAPPING_LABELS: Record<string, string> = {
+  direct_format: "直连",
+  group_base_rule: "基础规则",
+  group_schedule: "定时调度",
+  fallback_provider: "回退",
+  overflow_redirect: "溢出重定向",
+  failover_retry: "故障转移",
+};
 
 const props = defineProps<{ overview: UnifiedRequestOverview }>();
 
@@ -321,17 +374,6 @@ const responseMetadataJson = computed(() => {
   );
 });
 
-const statusColor = computed(() => {
-  if (props.overview.status === "pending") return "pending";
-  const code = props.overview.statusCode;
-  if (
-    props.overview.status === "failed" ||
-    (code != null && code >= HTTP_ERROR_THRESHOLD)
-  )
-    return "error";
-  return "success";
-});
-
 const isOutputPending = computed(
   () =>
     props.overview.status === "pending" && props.overview.outputTokens != null,
@@ -361,7 +403,17 @@ const speedText = computed(() => {
   return "--";
 });
 
-function isAttemptError(statusCode: number | null): boolean {
-  return statusCode != null && statusCode >= HTTP_ERROR_THRESHOLD;
+function getProviderName(providerId: string): string {
+  // 如果尝试的 provider 与最终结果相同，使用 overview 上的 providerName
+  const lastAttempt =
+    props.overview.attempts[props.overview.attempts.length - 1];
+  return lastAttempt && providerId === lastAttempt.providerId
+    ? props.overview.providerName || providerId
+    : providerId;
+}
+
+function formatLatency(ms: number): string {
+  if (ms <= 0) return "-";
+  return (ms / MS_PER_SECOND).toFixed(1) + "s";
 }
 </script>

@@ -11,11 +11,18 @@
     "openaiSdk": "OpenAI SDK",
     "openaiSdkDesc": "Direct OpenAI API calls",
     "anthropicSdk": "Anthropic SDK",
-    "anthropicSdkDesc": "Direct Anthropic API calls"
+    "anthropicSdkDesc": "Direct Anthropic API calls",
+    "popular": "Popular",
+    "infoBar": "{client} uses the {format}. We'll auto-map {models} to your provider models."
   },
   "provider": {
+    "connection": "Provider Connection",
     "config": "Provider Configuration",
     "label": "Provider",
+    "groupLabel": "Provider",
+    "endpoint": "Endpoint",
+    "baseUrl": "Base URL",
+    "upstreamPath": "Upstream Path",
     "select": "Select",
     "custom": "Custom",
     "customProvider": "Custom Provider",
@@ -26,13 +33,15 @@
     "connect": "Connect",
     "testing": "Testing",
     "connected": "Connected",
-    "test": "Test"
+    "test": "Test",
+    "autoConfigured": "Auto-configured based on your client"
   },
   "model": {
     "config": "Model Configuration",
     "selectProviderFirst": "Please select a provider and plan first",
     "namePlaceholder": "Enter model name",
-    "contextCustom": "Custom"
+    "contextCustom": "Custom",
+    "contextWindow": "Context Window"
   },
   "patch": {
     "deepseekAnthropic": "DeepSeek Compatible (Anthropic)",
@@ -45,10 +54,15 @@
     "orphanToolResultOaDesc": "OpenAI format orphan handling",
     "general": "General Compatibility",
     "developerRole": "Developer Role",
-    "developerRoleDesc": "Convert developer role to system"
+    "developerRoleDesc": "Convert developer role to system",
+    "label": "patches",
+    "sectionTitle": "Patches",
+    "timeoutTitle": "Timeout",
+    "timeoutSeconds": "seconds"
   },
   "concurrency": {
-    "control": "Concurrency Control"
+    "control": "Concurrency Control",
+    "optional": "Optional"
   },
   "mapping": {
     "title": "Model Mappings",
@@ -66,13 +80,16 @@
     "times": "times"
   },
   "transform": {
-    "title": "Transform Rules"
+    "title": "Transform Rules",
+    "optional": "Optional"
   },
   "footer": {
     "models": "{count} models",
     "mappings": "{count} mappings",
     "rules": "{count} rules",
     "validate": "Validate",
+    "validated": "Validated",
+    "invalid": "Invalid",
     "saving": "Saving",
     "saveConfig": "Save Config"
   },
@@ -90,5 +107,12 @@
     "setupComplete": "Quick setup complete!",
     "setupFailed": "Quick setup failed",
     "loadFailed": "Failed to load recommended configuration"
+  },
+  "steps": {
+    "selectClient": "Select Client",
+    "configureProvider": "Configure Provider",
+    "modelMappings": "Model Mappings",
+    "retryRules": "Retry Rules",
+    "optional": "Optional"
   }
 }

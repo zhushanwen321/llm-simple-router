@@ -565,7 +565,7 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     base_url: Type.String({ minLength: 1 }),
     models_endpoint: Type.String({ minLength: 1 }),
     api_key: Type.String({ minLength: 1 }),
-    api_type: Type.Union([Type.Literal("openai"), Type.Literal("anthropic")]),
+    api_type: Type.Union([Type.Literal("openai"), Type.Literal("openai-responses"), Type.Literal("anthropic")]),
   });
 
   app.post("/admin/api/providers/fetch-models", { schema: { body: FetchModelsSchema } }, async (request, reply) => {

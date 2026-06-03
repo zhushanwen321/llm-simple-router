@@ -1,7 +1,7 @@
 import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
 import { Type, Static } from "@sinclair/typebox";
-import { createProvider } from "../db/providers.js";
+import { createProvider, PROVIDER_CONCURRENCY_DEFAULTS } from "../db/providers.js";
 import { createMappingGroup, updateMappingGroup } from "../db/mappings.js";
 import { createRetryRule } from "../db/retry-rules.js";
 import { upsertTransformRule } from "../db/transform-rules.js";
@@ -9,7 +9,6 @@ import { encrypt } from "../utils/crypto.js";
 import { getSetting } from "../db/settings.js";
 import { HTTP_CREATED, HTTP_BAD_REQUEST, HTTP_CONFLICT } from "./constants.js";
 import { API_CODE, apiError } from "./api-response.js";
-import { PROVIDER_CONCURRENCY_DEFAULTS } from "../db/providers.js";
 import type { StateRegistry } from "../core/registry.js";
 import type { RequestTracker } from "../core/monitor/index.js";
 import type { AdaptiveController } from "../core/concurrency/index.js";
@@ -17,6 +16,36 @@ import type { AdaptiveController } from "../core/concurrency/index.js";
 const PROVIDER_NAME_RE = /^[a-zA-Z0-9_-]+$/;
 const API_KEY_PREVIEW_MIN_LENGTH = 8;
 const API_KEY_PREVIEW_PREFIX_LEN = 4;
+const NEW_PROVIDER_ID = "__new__";
+
+/** Recursively replace "__new__" provider_id values with the actual provider ID */
+function replaceProviderIds(obj: unknown, providerId: string): unknown {
+  if (Array.isArray(obj)) {
+    return obj.map((item) => replaceProviderIds(item, providerId));
+  }
+  if (obj !== null && typeof obj === "object") {
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+      if (
+        (key === "provider_id" || key === "overflow_provider_id") &&
+        (value === NEW_PROVIDER_ID || value === "")
+      ) {
+        result[key] = providerId;
+      } else {
+        result[key] = replaceProviderIds(value, providerId);
+      }
+    }
+    return result;
+  }
+  return obj;
+}
+
+const QuickSetupEndpointSchema = Type.Object({
+  api_type: Type.Union([Type.Literal("openai"), Type.Literal("openai-responses"), Type.Literal("anthropic")]),
+  base_url: Type.String({ minLength: 1 }),
+  upstream_path: Type.Optional(Type.Union([Type.String({ minLength: 1 }), Type.Null()])),
+  api_key: Type.Optional(Type.Union([Type.String({ minLength: 1 }), Type.Null()])),
+});
 
 const QuickSetupProviderSchema = Type.Object({
   name: Type.String({ minLength: 1 }),
@@ -28,7 +57,10 @@ const QuickSetupProviderSchema = Type.Object({
     name: Type.String(),
     context_window: Type.Optional(Type.Number()),
     patches: Type.Optional(Type.Array(Type.String())),
+    stream_timeout_ms: Type.Optional(Type.Number()),
+    capabilities: Type.Optional(Type.Array(Type.String())),
   })),
+  endpoints: Type.Optional(Type.Array(QuickSetupEndpointSchema, { minItems: 1 })),
   concurrency_mode: Type.Optional(Type.Union([Type.Literal("auto"), Type.Literal("manual"), Type.Literal("none")])),
   max_concurrency: Type.Optional(Type.Number()),
   queue_timeout_ms: Type.Optional(Type.Number()),
@@ -38,6 +70,9 @@ const QuickSetupProviderSchema = Type.Object({
 const QuickSetupMappingSchema = Type.Object({
   client_model: Type.String({ minLength: 1 }),
   backend_model: Type.String({ minLength: 1 }),
+  /** Optional pre-built rule JSON (targets, overflow, multimodal_fallback).
+   *  If provided, provider_id fields are replaced with the newly created provider's ID. */
+  rule: Type.Optional(Type.String({ minLength: 1 })),
 });
 
 const QuickSetupRetryRuleSchema = Type.Object({
@@ -48,6 +83,7 @@ const QuickSetupRetryRuleSchema = Type.Object({
   retry_delay_ms: Type.Number({ minimum: 100 }),
   max_retries: Type.Number({ minimum: 0, maximum: 100 }),
   max_delay_ms: Type.Number({ minimum: 100 }),
+  provider_shortname: Type.Optional(Type.Union([Type.String(), Type.Null()])),
 });
 
 const QuickSetupTransformSchema = Type.Object({
@@ -106,6 +142,8 @@ export const adminQuickSetupRoutes: FastifyPluginCallback<QuickSetupRoutesOption
         name: m.name,
         ...(m.context_window != null ? { context_window: m.context_window } : {}),
         ...(m.patches && m.patches.length > 0 ? { patches: m.patches } : {}),
+        ...(m.stream_timeout_ms != null ? { stream_timeout_ms: m.stream_timeout_ms } : {}),
+        ...(m.capabilities && m.capabilities.length > 0 ? { capabilities: m.capabilities } : {}),
       }));
       const adaptiveEnabled = body.provider.concurrency_mode === 'auto' ? 1 : 0;
       const maxConcurrency = body.provider.max_concurrency ?? PROVIDER_CONCURRENCY_DEFAULTS.max_concurrency;
@@ -127,14 +165,31 @@ export const adminQuickSetupRoutes: FastifyPluginCallback<QuickSetupRoutesOption
         queue_timeout_ms: queueTimeoutMs,
         max_queue_size: maxQueueSize,
         adaptive_enabled: adaptiveEnabled,
+        ...(body.provider.endpoints && body.provider.endpoints.length > 0
+          ? {
+            endpoints: JSON.stringify(body.provider.endpoints.map(ep => ({
+              api_type: ep.api_type,
+              base_url: ep.base_url,
+              upstream_path: ep.upstream_path ?? null,
+              api_key: ep.api_key ? encrypt(ep.api_key, encryptionKey) : (body.provider.api_key ? encrypt(body.provider.api_key, encryptionKey) : null),
+            }))),
+          }
+          : {}),
       });
 
       // 6. Upsert mapping groups
       for (const m of body.mappings) {
         const existing = db.prepare('SELECT id FROM mapping_groups WHERE client_model = ?').get(m.client_model) as { id: string } | undefined;
-        const ruleJson = JSON.stringify({
-          targets: [{ backend_model: m.backend_model, provider_id: providerId }],
-        });
+        let ruleJson: string;
+        if (m.rule) {
+          // Replace provider_id placeholders with the newly created provider's ID
+          const ruleObj = JSON.parse(m.rule) as Record<string, unknown>;
+          ruleJson = JSON.stringify(replaceProviderIds(ruleObj, providerId));
+        } else {
+          ruleJson = JSON.stringify({
+            targets: [{ backend_model: m.backend_model, provider_id: providerId }],
+          });
+        }
         if (existing) {
           updateMappingGroup(db, existing.id, {
             client_model: m.client_model,
@@ -148,8 +203,9 @@ export const adminQuickSetupRoutes: FastifyPluginCallback<QuickSetupRoutesOption
         }
       }
 
-      // 7. Create retry rules
+      // 7. Create retry rules (bind to newly created provider if shortname matches)
       for (const r of body.retry_rules) {
+        const ruleProviderId = r.provider_shortname ? providerId : null;
         createRetryRule(db, {
           name: r.name,
           status_code: r.status_code,
@@ -159,6 +215,7 @@ export const adminQuickSetupRoutes: FastifyPluginCallback<QuickSetupRoutesOption
           retry_delay_ms: r.retry_delay_ms,
           max_retries: r.max_retries,
           max_delay_ms: r.max_delay_ms,
+          provider_id: ruleProviderId,
         });
       }
 

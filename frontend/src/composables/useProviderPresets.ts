@@ -101,7 +101,8 @@ export function useProviderPresets(form: {
     try {
       const result = await api.recommended.getProviders();
       providerPresets.value = result;
-    } catch {
+    } catch (e: unknown) {
+      console.error("useProviderPresets.loadPresets:", e);
       providerPresets.value = [];
     }
   }
