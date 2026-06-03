@@ -29,6 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      id-token: write  # 启用 OIDC trusted publishing
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -40,6 +41,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          registry-url: 'https://registry.npmjs.org'
 
       - name: Compute beta version
         id: version
@@ -81,9 +83,12 @@ jobs:
         run: node scripts/prepublish.mjs
 
       - name: Publish to npm with tag=beta
-        run: |
-          npm config set //registry.npmjs.org/:_authToken ${{ secrets.NPM_TOKEN }}
-          cd router && npm publish --tag beta
+        # 使用 npm trusted publishing (OIDC) 避免 automation token 被 2FA 拦截
+        # 必须在 step-level env 覆盖空值 + 删 .npmrc，npm 才会检测 OIDC 环境并走 trusted publishing
+        run: rm -f "$RUNNER_TEMP/.npmrc" && cd router && npm publish --tag beta
+        env:
+          NODE_AUTH_TOKEN: ""
+          NPM_CONFIG_USERCONFIG: ""
 
       - name: Print install instructions
         run: |
