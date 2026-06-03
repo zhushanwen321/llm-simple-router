@@ -49,12 +49,30 @@
         <div class="flex gap-0 px-4 pb-4 min-h-0 h-[calc(85vh-100px)]">
           <!-- Left: Overview Panel -->
           <div
-            class="w-[280px] border-r pr-3 flex-shrink-0 overflow-y-auto min-h-0"
+            class="w-[280px] border-r pr-3 flex-shrink-0 min-h-0 flex flex-col"
           >
-            <RequestOverviewPanel :overview="overview" />
+            <div class="flex-1 overflow-y-auto min-h-0">
+              <RequestOverviewPanel :overview="overview" :show-raw="showRaw" />
+            </div>
 
-            <!-- AI Retry Rule Generate Button -->
-            <div class="mt-4 border-t pt-4">
+            <!-- Sticky footer: raw data toggle + generate retry rule -->
+            <div class="border-t pt-3 space-y-2 shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                class="h-6 gap-1 text-xs w-full justify-center"
+                @click="showRaw = !showRaw"
+              >
+                <component
+                  :is="showRaw ? FileText : FileJson"
+                  class="h-3 w-3"
+                />
+                {{
+                  showRaw
+                    ? t("requestDetail.structured")
+                    : t("requestDetail.rawData")
+                }}
+              </Button>
               <Button
                 variant="default"
                 size="sm"
@@ -180,7 +198,13 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { CheckIcon, CopyIcon, Sparkles } from "lucide-vue-next";
+import {
+  CheckIcon,
+  CopyIcon,
+  FileJson,
+  FileText,
+  Sparkles,
+} from "lucide-vue-next";
 import { useClipboard } from "@/composables/useClipboard";
 import { api, getApiMessage } from "@/api/client";
 import AiRulePreviewDialog from "./AiRulePreviewDialog.vue";
@@ -214,6 +238,7 @@ function createDefaultRuleForm() {
 }
 
 const generating = ref(false);
+const showRaw = ref(false);
 const configPromptOpen = ref(false);
 const previewOpen = ref(false);
 const generatedRule = ref<{

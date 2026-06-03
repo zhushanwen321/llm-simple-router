@@ -293,33 +293,16 @@
         responseMetadataJson
       }}</pre>
     </ScrollArea>
-
-    <!-- Toggle at bottom -->
-    <div class="pt-3 mt-auto border-t">
-      <Button
-        size="sm"
-        variant="outline"
-        class="h-6 gap-1 text-xs w-full justify-center"
-        @click="showRaw = !showRaw"
-      >
-        <component :is="showRaw ? FileText : FileJson" class="h-3 w-3" />
-        {{
-          showRaw ? t("requestDetail.structured") : t("requestDetail.rawData")
-        }}
-      </Button>
-    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import type { UnifiedRequestOverview } from "./types";
 import { MS_PER_SECOND, HTTP_ERROR_THRESHOLD } from "./types";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FileJson, FileText } from "lucide-vue-next";
 import { extractResponseMetadata } from "./upstream-merge";
 
 const { t } = useI18n();
@@ -335,9 +318,10 @@ const MAPPING_LABELS: Record<string, string> = {
   failover_retry: "故障转移",
 };
 
-const props = defineProps<{ overview: UnifiedRequestOverview }>();
-
-const showRaw = ref(false);
+const props = defineProps<{
+  overview: UnifiedRequestOverview;
+  showRaw: boolean;
+}>();
 
 const clientTypeLabel = computed(() => {
   const ct = props.overview.clientType;
