@@ -21,6 +21,11 @@ concurrency:
 
 jobs:
   publish-beta:
+    # 仅在 PR 合并（commit message 以 "Merge pull request" 开头）或手动触发时发布
+    # 避免首次 push 分支时浪费一次 beta 发布
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'Merge pull request'))
     runs-on: ubuntu-latest
     permissions:
       contents: read
