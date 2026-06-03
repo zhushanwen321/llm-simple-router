@@ -82,9 +82,9 @@ jobs:
 
       - name: Publish to npm with tag=beta
         working-directory: router
-        run: npm publish --tag beta
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          npm config set //registry.npmjs.org/:_authToken ${{ secrets.NPM_TOKEN }}
+          npm publish --tag beta
 
       - name: Print install instructions
         run: |
