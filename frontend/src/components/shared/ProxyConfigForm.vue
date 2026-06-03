@@ -114,6 +114,7 @@ function onTypeChange(val: unknown) {
         <Input
           :model-value="proxyPassword"
           type="password"
+          autocomplete="new-password"
           class="mt-1"
           :placeholder="t('providers.fields.proxyAuthOptional')"
           @update:model-value="patch({ proxyPassword: $event as string })"

@@ -201,6 +201,7 @@ function isOfficialOpenai(url: string): boolean {
         <Input
           :model-value="props.modelValue.apiKey"
           type="password"
+          autocomplete="new-password"
           :required="!props.editingId"
           :placeholder="
             props.editingId ? t('providers.fields.apiKeyPlaceholder') : ''

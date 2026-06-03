@@ -159,6 +159,7 @@
             <Input
               v-model="sharedKey"
               type="password"
+              autocomplete="new-password"
               :placeholder="t('quickSetup.provider.apiKeyPlaceholder')"
               class="md:text-xs h-7"
             />
