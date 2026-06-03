@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LLM Simple Router — UI Design System</title>
+<style>
+  :root {
+    --bg: oklch(0.145 0 0);
+    --surface: oklch(0.205 0 0);
+    --surface-up: oklch(0.269 0 0);
+    --fg: oklch(0.985 0 0);
+    --muted: oklch(0.708 0 0);
+    --border: oklch(1 0 0 / 10%);
+    --primary: oklch(0.68 0.13 175);
+    --primary-dim: oklch(0.68 0.13 175 / 20%);
+    --mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+    --sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 48px 24px;
+  }
+
+  .header {
+    margin-bottom: 48px;
+  }
+  .header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    letter-spacing: -0.02em;
+  }
+  .header p {
+    color: var(--muted);
+    font-size: 15px;
+    max-width: 560px;
+  }
+
+  .design-token-bar {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+  .token-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: var(--surface);
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .token-swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+  }
+
+  .section-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 12px;
+  }
+
+  .pages-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 48px;
+  }
+
+  .page-card {
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 0 0 1px var(--border);
+    text-decoration: none;
+    color: var(--fg);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: background 150ms, box-shadow 150ms;
+    cursor: pointer;
+  }
+  .page-card:hover {
+    background: var(--surface-up);
+    box-shadow: 0 0 0 1px oklch(0.68 0.13 175 / 30%);
+  }
+  .page-card-title {
+    font-size: 15px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .page-card-route {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .page-card-desc {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.4;
+  }
+  .page-card-tag {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .tag-core { background: oklch(0.68 0.13 175 / 15%); color: oklch(0.68 0.13 175); }
+  .tag-config { background: oklch(0.62 0.18 250 / 15%); color: oklch(0.62 0.18 250); }
+  .tag-data { background: oklch(0.65 0.17 150 / 15%); color: oklch(0.65 0.17 150); }
+  .tag-auth { background: oklch(0.78 0.16 80 / 15%); color: oklch(0.78 0.16 80); }
+
+  .principles {
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 0 0 1px var(--border);
+  }
+  .principles h2 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--primary);
+  }
+  .principles ul {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .principles li {
+    font-size: 13px;
+    color: var(--muted);
+    padding-left: 16px;
+    position: relative;
+  }
+  .principles li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 7px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--primary);
+  }
+  .principles code {
+    font-family: var(--mono);
+    font-size: 12px;
+    background: oklch(1 0 0 / 8%);
+    padding: 1px 4px;
+    border-radius: 3px;
+    color: var(--fg);
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <h1>LLM Simple Router — Design System</h1>
+    <p>Operator's Console. 10 页管理后台的交互原型，基于 Anchor + Panel 设计语言。深色优先，信息密集，精准控制。</p>
+    <div class="design-token-bar">
+      <div class="token-chip">
+        <span class="token-swatch" style="background: oklch(0.68 0.13 175);"></span>
+        Circuit Teal
+      </div>
+      <div class="token-chip">
+        <span class="token-swatch" style="background: oklch(0.145 0 0); border: 1px solid oklch(1 0 0 / 15%);"></span>
+        Neutral Carbon
+      </div>
+      <div class="token-chip">
+        <span class="token-swatch" style="background: oklch(0.65 0.17 150);"></span>
+        Success
+      </div>
+      <div class="token-chip">
+        <span class="token-swatch" style="background: oklch(0.78 0.16 80);"></span>
+        Warning
+      </div>
+      <div class="token-chip">
+        <span class="token-swatch" style="background: oklch(0.58 0.22 25);"></span>
+        Danger
+      </div>
+      <div class="token-chip">JetBrains Mono</div>
+      <div class="token-chip">Geist Sans</div>
+    </div>
+  </div>
+
+  <div class="section-label">Core Pages</div>
+  <div class="pages-grid">
+    <a class="page-card" href="demo-dashboard.html">
+      <div>
+        <span class="page-card-title">Dashboard</span>
+        <span class="page-card-tag tag-core">Core</span>
+      </div>
+      <div class="page-card-route">/</div>
+      <div class="page-card-desc">Health Anchor + Token Throughput 图表。一眼判断系统健康度，钻取指标详情。</div>
+    </a>
+    <a class="page-card" href="demo-monitor.html">
+      <div>
+        <span class="page-card-title">Monitor</span>
+        <span class="page-card-tag tag-core">Real-time</span>
+      </div>
+      <div class="page-card-route">/monitor</div>
+      <div class="page-card-desc">SSE 实时推送。活跃请求、Provider 并发状态、Kill 操作。运维值班核心页。</div>
+    </a>
+    <a class="page-card" href="demo-logs.html">
+      <div>
+        <span class="page-card-title">Request Logs</span>
+        <span class="page-card-tag tag-data">Data</span>
+      </div>
+      <div class="page-card-route">/logs</div>
+      <div class="page-card-desc">全量请求日志。可展开子请求、5 维筛选、分页浏览。问题排查入口。</div>
+    </a>
+    <a class="page-card" href="demo-providers.html">
+      <div>
+        <span class="page-card-title">Providers</span>
+        <span class="page-card-tag tag-config">Config</span>
+      </div>
+      <div class="page-card-route">/providers</div>
+      <div class="page-card-desc">API 供应商管理。CRUD + 连接测试 + 并发配置 + 模型同步。</div>
+    </a>
+  </div>
+
+  <div class="section-label">Configuration</div>
+  <div class="pages-grid">
+    <a class="page-card" href="demo-quick-setup.html">
+      <div>
+        <span class="page-card-title">Quick Setup</span>
+        <span class="page-card-tag tag-core">Core</span>
+      </div>
+      <div class="page-card-route">/quick-setup</div>
+      <div class="page-card-desc">快速配置向导。选择客户端，一步完成 Provider、模型、映射、重试规则的初始配置。</div>
+    </a>
+    <a class="page-card" href="demo-mappings.html">
+      <div>
+        <span class="page-card-title">Model Mappings</span>
+        <span class="page-card-tag tag-config">Config</span>
+      </div>
+      <div class="page-card-route">/mappings</div>
+      <div class="page-card-desc">客户端模型到 Provider 的路由映射。卡片式布局，4 种策略。</div>
+    </a>
+    <a class="page-card" href="demo-retry-rules.html">
+      <div>
+        <span class="page-card-title">Retry Rules</span>
+        <span class="page-card-tag tag-config">Config</span>
+      </div>
+      <div class="page-card-route">/retry-rules</div>
+      <div class="page-card-desc">重试策略配置。状态码 + body pattern 匹配，推荐规则一键启用。</div>
+    </a>
+    <a class="page-card" href="demo-router-keys.html">
+      <div>
+        <span class="page-card-title">Router Keys</span>
+        <span class="page-card-tag tag-auth">Auth</span>
+      </div>
+      <div class="page-card-route">/router-keys</div>
+      <div class="page-card-desc">客户端认证密钥管理。密钥遮罩、模型白名单、会话配置。</div>
+    </a>
+    <a class="page-card" href="demo-schedules.html">
+      <div>
+        <span class="page-card-title">Schedules</span>
+        <span class="page-card-tag tag-config">Config</span>
+      </div>
+      <div class="page-card-route">/schedules</div>
+      <div class="page-card-desc">分时段映射规则。7天时间线可视化，按映射组展开管理时段规则。</div>
+    </a>
+    <a class="page-card" href="demo-proxy-enhancement.html">
+      <div>
+        <span class="page-card-title">Proxy Enhancement</span>
+        <span class="page-card-tag tag-config">Config</span>
+      </div>
+      <div class="page-card-route">/proxy-enhancement</div>
+      <div class="page-card-desc">代理增强开关。6 个功能模块 + 客户端识别配置。编辑→保存模式。</div>
+    </a>
+  </div>
+
+  <div class="section-label">Component Library</div>
+  <div class="pages-grid">
+    <a class="page-card" href="demo-components.html">
+      <div>
+        <span class="page-card-title">Component Library</span>
+        <span class="page-card-tag tag-core">Components</span>
+      </div>
+      <div class="page-card-route">/components</div>
+      <div class="page-card-desc">抽离的可复用 UI 组件库。L0 原子组件 (17) + L1 复合组件 (18) + L2 业务模式 (13)，含交互行为。</div>
+    </a>
+    <a class="page-card" href="demo-sidebar.html">
+      <div>
+        <span class="page-card-title">Sidebar</span>
+        <span class="page-card-tag tag-core">Layout</span>
+      </div>
+      <div class="page-card-route">/sidebar</div>
+      <div class="page-card-desc">全局侧边栏导航。品牌信息、分组菜单、折叠、亮暗模式切换、版本更新提示。</div>
+    </a>
+  </div>
+
+  <div class="section-label">Mappings Variants</div>
+  <div class="pages-grid">
+    <a class="page-card" href="demo-mappings-A-pipeline-list.html">
+      <div>
+        <span class="page-card-title">Mappings A — Pipeline List</span>
+      </div>
+      <div class="page-card-route">方案 A</div>
+      <div class="page-card-desc">管线式列表。折叠/展开内联编辑，Pipeline chain pills 可视化。</div>
+    </a>
+    <a class="page-card" href="demo-mappings-B-table-expand.html">
+      <div>
+        <span class="page-card-title">Mappings B — Table Expand</span>
+      </div>
+      <div class="page-card-route">方案 B</div>
+      <div class="page-card-desc">表格展开行。可展开内联编辑，表格式紧凑布局。</div>
+    </a>
+    <a class="page-card" href="demo-mappings-C-split-panel.html">
+      <div>
+        <span class="page-card-title">Mappings C — Split Panel</span>
+      </div>
+      <div class="page-card-route">方案 C</div>
+      <div class="page-card-desc">主从分栏。左侧列表 + 右侧详情编辑面板。</div>
+    </a>
+  </div>
+
+  <div class="section-label">Design Principles</div>
+  <div class="principles">
+    <h2>Operator's Console</h2>
+    <ul>
+      <li>Anchor + Panel: 核心指标做锚点，其余信息内联。一眼判断，按需钻取。</li>
+      <li>Data-Is-Mono: 所有数值使用 <code>font-mono</code> (JetBrains Mono)。标签使用 body font。</li>
+      <li>Single Accent: Circuit Teal 是唯一主色。状态色只用于语义（success/warning/danger/info）。</li>
+      <li>Flat-By-Default: 无阴影卡片、无装饰边框、无渐变。信息本身提供视觉层次。</li>
+      <li>Select over Buttons: 筛选器用下拉框，不用按钮组。防止 20+ 选项溢出。</li>
+      <li>Dense Tables: 紧凑行高 36px，表头 muted 色。数据密度优先于留白。</li>
+      <li>Action Links: 操作用文字链接式按钮，不用 icon-only。明确语义，降低认知成本。</li>
+    </ul>
+  </div>
+</div>
+
+</body>
+</html>

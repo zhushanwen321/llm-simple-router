@@ -1,0 +1,144 @@
+{
+  "test_cases": [
+    {
+      "id": "TC-1-01",
+      "type": "integration",
+      "title": "init(max=0) clamps to max=1, no NaN",
+      "description": "Verify that init with max=0 produces currentLimit=1 and deriveProfile returns valid numerics",
+      "steps": [
+        "ctrl.init('p1', { max: 0 }, { queueTimeoutMs: 5000, maxQueueSize: 10 })",
+        "assert ctrl.getStatus('p1').currentLimit === 1",
+        "assert deriveProfile(1, 1) returns climbThreshold=4, dropThreshold=3, cooldownMs=20000"
+      ]
+    },
+    {
+      "id": "TC-1-02",
+      "type": "integration",
+      "title": "syncProvider(max_concurrency=0) clamps to 1",
+      "description": "Verify that syncProvider with max_concurrency=0 produces currentLimit=1",
+      "steps": [
+        "ctrl.syncProvider('p1', { adaptive_enabled: 1, max_concurrency: 0, queue_timeout_ms: 5000, max_queue_size: 10 })",
+        "assert ctrl.getStatus('p1').currentLimit === 1"
+      ]
+    },
+    {
+      "id": "TC-2-01",
+      "type": "integration",
+      "title": "High watermark climbs without limitReached",
+      "description": "Verify limit=8 with max=10 climbs to 9 after climbThreshold successes without wasQueued",
+      "steps": [
+        "initAtLimit('p1', 10, 8)",
+        "report 5 successes without wasQueued",
+        "assert currentLimit === 9"
+      ]
+    },
+    {
+      "id": "TC-3-01",
+      "type": "integration",
+      "title": "Cooldown blocks drops but not climbs",
+      "description": "Verify that after 429 drops limit, successes during cooldown can climb back",
+      "steps": [
+        "initAtLimit('p1', 10, 10)",
+        "send 429 → limit=9, cooldown starts",
+        "send 5 successes during cooldown → limit=10",
+        "send 429 during cooldown → no drop"
+      ]
+    },
+    {
+      "id": "TC-4-01",
+      "type": "integration",
+      "title": "429 uses fixed -1 drop",
+      "description": "Verify 429 drops exactly 1 slot regardless of current limit",
+      "steps": [
+        "initAtLimit('p1', 10, 6)",
+        "send 429",
+        "assert currentLimit === 5"
+      ]
+    },
+    {
+      "id": "TC-6-01",
+      "type": "integration",
+      "title": "10 rapid 429s only drop 1 slot",
+      "description": "Verify cooldown prevents cascading drops from burst 429s",
+      "steps": [
+        "initAtLimit('p1', 10, 10)",
+        "send 10 429s in rapid succession",
+        "assert currentLimit === 9"
+      ]
+    },
+    {
+      "id": "TC-5-01",
+      "type": "integration",
+      "title": "At-max success counter halves instead of resetting",
+      "description": "Verify consecutiveSuccesses=floor(n/2) when limit already at max",
+      "steps": [
+        "initAtLimit('p1', 10, 10)",
+        "send 5 successes (climbThreshold=5)",
+        "assert consecutiveSuccesses === 2"
+      ]
+    },
+    {
+      "id": "TC-7-01",
+      "type": "integration",
+      "title": "Full recovery from limit=1 to max=10",
+      "description": "Verify 36 consecutive successes recover limit from 1 to 10",
+      "steps": [
+        "initAtLimit('p1', 10, 1)",
+        "send 36 consecutive successes",
+        "assert currentLimit === 10"
+      ]
+    },
+    {
+      "id": "TC-8-01",
+      "type": "integration",
+      "title": "Cooldown failure does not reset success counter",
+      "description": "Verify that a failure during cooldown does not clear consecutiveSuccesses",
+      "steps": [
+        "initAtLimit('p1', 10, 10)",
+        "send 429 → limit=9, cooldown starts",
+        "send 4 successes → consecutiveSuccesses=4",
+        "send 5xx during cooldown",
+        "assert consecutiveSuccesses === 4"
+      ]
+    },
+    {
+      "id": "TC-8-02",
+      "type": "integration",
+      "title": "5xx drop triggers cooldown",
+      "description": "Verify that 5xx path enters cooldown after dropping",
+      "steps": [
+        "initAtLimit('p1', 10, 6)",
+        "send dropThreshold consecutive 5xx",
+        "assert cooldownUntil > 0"
+      ]
+    },
+    {
+      "id": "TC-3-02",
+      "type": "integration",
+      "title": "E15 scenario: rapid recovery during cooldown",
+      "description": "Verify E15 from design doc - 429 then 5 successes during cooldown fully recover",
+      "steps": [
+        "initAtLimit('p1', 10, 10)",
+        "send 429 → limit=9",
+        "send 5 successes during cooldown",
+        "assert currentLimit === 10"
+      ]
+    },
+    {
+      "id": "TC-3-03",
+      "type": "integration",
+      "title": "E18 scenario: success interrupts failure chain",
+      "description": "Verify E18 - alternating success/failure does not trigger drop",
+      "steps": [
+        "initAtLimit('p1', 10, 6)",
+        "send 5xx → f=1",
+        "send success → f=0 (reset)",
+        "send 5xx → f=1",
+        "send success → f=0 (reset)",
+        "send 5xx → f=1",
+        "send 5xx → f=2",
+        "assert currentLimit === 6 (dropThreshold=3, only 2 consecutive)"
+      ]
+    }
+  ]
+}

@@ -11,11 +11,18 @@
     "openaiSdk": "OpenAI SDK",
     "openaiSdkDesc": "OpenAI API 直接调用",
     "anthropicSdk": "Anthropic SDK",
-    "anthropicSdkDesc": "Anthropic API 直接调用"
+    "anthropicSdkDesc": "Anthropic API 直接调用",
+    "popular": "Popular",
+    "infoBar": "{client} 使用 {format}。我们会自动映射 {models} 到你的供应商模型。"
   },
   "provider": {
+    "connection": "供应商配置",
     "config": "供应商配置",
     "label": "供应商",
+    "groupLabel": "供应商",
+    "endpoint": "端点",
+    "baseUrl": "Base URL",
+    "upstreamPath": "Upstream Path",
     "select": "选择",
     "custom": "自定义",
     "customProvider": "自定义供应商",
@@ -26,13 +33,15 @@
     "connect": "连接",
     "testing": "测试中",
     "connected": "已连接",
-    "test": "测试"
+    "test": "测试",
+    "autoConfigured": "根据客户端自动配置"
   },
   "model": {
     "config": "模型配置",
     "selectProviderFirst": "请先选择供应商与套餐",
     "namePlaceholder": "输入模型名称",
-    "contextCustom": "自定义"
+    "contextCustom": "自定义",
+    "contextWindow": "上下文窗口"
   },
   "patch": {
     "deepseekAnthropic": "DeepSeek 兼容 (Anthropic)",
@@ -45,10 +54,15 @@
     "orphanToolResultOaDesc": "OpenAI 格式孤儿处理",
     "general": "通用兼容",
     "developerRole": "Developer Role",
-    "developerRoleDesc": "developer role 转 system"
+    "developerRoleDesc": "developer role 转 system",
+    "label": "补丁",
+    "sectionTitle": "补丁",
+    "timeoutTitle": "超时",
+    "timeoutSeconds": "秒"
   },
   "concurrency": {
-    "control": "并发控制"
+    "control": "并发控制",
+    "optional": "可选"
   },
   "mapping": {
     "title": "模型映射",
@@ -66,13 +80,16 @@
     "times": "次"
   },
   "transform": {
-    "title": "转换规则"
+    "title": "转换规则",
+    "optional": "可选"
   },
   "footer": {
     "models": "{count} 模型",
     "mappings": "{count} 映射",
     "rules": "{count} 规则",
     "validate": "验证",
+    "validated": "已验证",
+    "invalid": "无效",
     "saving": "保存中",
     "saveConfig": "保存配置"
   },
@@ -90,5 +107,12 @@
     "setupComplete": "快速配置完成!",
     "setupFailed": "快速配置失败",
     "loadFailed": "加载推荐配置失败"
+  },
+  "steps": {
+    "selectClient": "选择客户端",
+    "configureProvider": "配置供应商",
+    "modelMappings": "模型映射",
+    "retryRules": "重试规则",
+    "optional": "可选"
   }
 }

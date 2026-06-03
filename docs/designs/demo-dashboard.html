@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Redesign — Usage Window + Timeline</title>
+<style>
+  :root {
+    --bg: oklch(0.145 0 0);
+    --surface: oklch(0.205 0 0);
+    --surface-up: oklch(0.269 0 0);
+    --fg: oklch(0.985 0 0);
+    --muted: oklch(0.708 0 0);
+    --muted-dim: oklch(0.556 0 0);
+    --border: oklch(1 0 0 / 10%);
+    --primary: oklch(0.68 0.13 175);
+    --primary-dim: oklch(0.68 0.13 175 / 15%);
+    --success: oklch(0.65 0.17 150);
+    --success-dim: oklch(0.65 0.17 150 / 12%);
+    --danger: oklch(0.58 0.22 25);
+    --chart-teal: oklch(0.58 0.14 175);
+    --chart-green: oklch(0.65 0.17 150);
+    --chart-indigo: oklch(0.65 0.14 260);
+    --mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+    --sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  .page { padding: 20px 24px; max-width: 1360px; margin: 0 auto; }
+
+  /* ===== Zone 1: Header + Provider Row ===== */
+  .zone-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 12px;
+  }
+  .page-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--fg);
+    white-space: nowrap;
+  }
+  .provider-scroll {
+    flex: 1;
+    overflow-x: auto;
+    display: flex;
+    gap: 4px;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .provider-scroll::-webkit-scrollbar { display: none; }
+  .prov-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 30px;
+    padding: 0 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--muted);
+    font-family: var(--sans);
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 150ms;
+  }
+  .prov-btn:hover { background: var(--surface); color: var(--fg); }
+  .prov-btn.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: oklch(0.145 0 0);
+  }
+  .prov-btn.active .prov-token { color: oklch(0.145 0 0 / 55%); }
+  .prov-token {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted-dim);
+  }
+  .filters-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 30px;
+    padding: 0 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--muted);
+    font-family: var(--sans);
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 150ms;
+  }
+  .filters-trigger:hover { background: var(--surface); color: var(--fg); }
+  .filter-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 9999px;
+    background: var(--primary);
+    color: oklch(0.145 0 0);
+    font-size: 10px;
+    font-weight: 600;
+    font-family: var(--mono);
+  }
+
+  /* ===== Zone 2: Metrics + Primary Chart ===== */
+  .zone-metrics {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .metrics-group {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .metric-primary {
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 16px 20px;
+    box-shadow: 0 0 0 1px var(--border);
+  }
+  .metric-primary-label {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .metric-primary-value {
+    font-family: var(--mono);
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--fg);
+  }
+  .metric-primary-value .unit {
+    font-size: 16px;
+    font-weight: 400;
+    color: var(--muted);
+    margin-left: 2px;
+  }
+  .metric-primary-delta {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    margin-top: 6px;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .metric-primary-delta.up { color: var(--success); }
+  .metric-primary-delta.down { color: var(--danger); }
+  .metrics-secondary {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .metric-sm {
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 10px 14px;
+    box-shadow: 0 0 0 1px var(--border);
+  }
+  .metric-sm-label {
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 2px;
+  }
+  .metric-sm-value {
+    font-family: var(--mono);
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--fg);
+  }
+  .metric-sm-value .unit {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--muted);
+    margin-left: 2px;
+  }
+  .metrics-tertiary {
+    display: flex;
+    gap: 16px;
+    padding: 0 2px;
+  }
+  .metric-xs {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+  }
+  .metric-xs-label { font-size: 11px; color: var(--muted); }
+  .metric-xs-value {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+  }
+
+  /* Primary chart */
+  .chart-primary {
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 14px 16px;
+    box-shadow: 0 0 0 1px var(--border);
+    display: flex;
+    flex-direction: column;
+  }
+  .chart-primary-title {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .chart-primary-body {
+    flex: 1;
+    position: relative;
+    min-height: 180px;
+  }
+  .chart-primary-body svg { width: 100%; height: 100%; }
+
+  /* ===== Zone 3: Secondary Charts ===== */
+  .zone-charts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .chart-card {
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 12px 14px;
+    box-shadow: 0 0 0 1px var(--border);
+  }
+  .chart-card-title {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .chart-card-body {
+    height: 140px;
+    position: relative;
+  }
+  .chart-card-body svg { width: 100%; height: 100%; }
+
+  /* ===== Zone 4: Timeline ===== */
+  .zone-timeline {
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 10px 16px;
+    box-shadow: 0 0 0 1px var(--border);
+  }
+  .timeline-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .timeline-range {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--fg);
+    font-weight: 500;
+  }
+  .timeline-hint {
+    font-size: 11px;
+    color: var(--muted-dim);
+  }
+
+  /*
+   * Timeline track: proportional positioning.
+   * The track represents 7 days (168h). Windows are positioned
+   * at their actual start/end offsets, with gaps where no requests occurred.
+   */
+  .timeline-track {
+    position: relative;
+    height: 28px;
+    background: var(--surface-up);
+    border-radius: 4px;
+    overflow: hidden;
+    cursor: pointer;
+  }
+
+  /* A usage window block */
+  .tw {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    border-radius: 3px;
+    transition: filter 150ms, outline-color 150ms;
+    cursor: pointer;
+  }
+  .tw:hover { filter: brightness(1.2); }
+  .tw.selected {
+    outline: 2px solid var(--primary);
+    outline-offset: -1px;
+    filter: brightness(1.3);
+    z-index: 2;
+  }
+
+  /* Intensity: token throughput level */
+  .tw.i1 { background: oklch(0.28 0.02 175); }
+  .tw.i2 { background: oklch(0.33 0.04 175); }
+  .tw.i3 { background: oklch(0.40 0.07 175); }
+  .tw.i4 { background: oklch(0.48 0.10 175); }
+
+  /* Tooltip on hover */
+  .tw .tw-tip {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: oklch(0.25 0 0);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--fg);
+    white-space: nowrap;
+    z-index: 10;
+    pointer-events: none;
+  }
+  .tw:hover .tw-tip { display: block; }
+
+  /* Day labels */
+  .timeline-days {
+    position: relative;
+    height: 16px;
+    margin-top: 4px;
+  }
+  .timeline-day {
+    position: absolute;
+    font-size: 10px;
+    color: var(--muted-dim);
+    font-family: var(--mono);
+    transform: translateX(-50%);
+  }
+
+  /* Hour ticks */
+  .timeline-ticks {
+    position: relative;
+    height: 8px;
+    margin-top: 2px;
+  }
+  .timeline-tick {
+    position: absolute;
+    width: 1px;
+    height: 4px;
+    background: var(--muted-dim);
+    opacity: 0.3;
+    top: 0;
+  }
+  .timeline-tick.major {
+    height: 6px;
+    opacity: 0.5;
+  }
+
+  /* ===== SVG helpers ===== */
+  .g-line { stroke: var(--border); stroke-width: 1; }
+  .plot-line { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .plot-area { stroke-width: 0; }
+
+  /* ===== Responsive ===== */
+  @media (max-width: 900px) {
+    .zone-metrics { grid-template-columns: 1fr; }
+    .zone-charts { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ===== Zone 1: Header + Providers ===== -->
+  <div class="zone-header">
+    <h2 class="page-title">Dashboard</h2>
+    <div class="provider-scroll">
+      <button class="prov-btn active">
+        OpenAI
+        <span class="prov-token">3.2M</span>
+      </button>
+      <button class="prov-btn">
+        Anthropic
+        <span class="prov-token">1.8M</span>
+      </button>
+      <button class="prov-btn">
+        DeepSeek
+        <span class="prov-token">0.5M</span>
+      </button>
+      <button class="prov-btn">
+        Google
+        <span class="prov-token">0.2M</span>
+      </button>
+      <button class="prov-btn">
+        Mistral
+        <span class="prov-token">0.1M</span>
+      </button>
+      <button class="prov-btn">
+        Groq
+      </button>
+    </div>
+    <button class="filters-trigger">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M6 12h12M9 18h6"/></svg>
+      Filters
+      <span class="filter-badge">2</span>
+    </button>
+  </div>
+
+  <!-- ===== Zone 2: Metrics + Primary Chart ===== -->
+  <div class="zone-metrics">
+    <div class="metrics-group">
+      <div class="metric-primary">
+        <div class="metric-primary-label">Input Tokens</div>
+        <div class="metric-primary-value">3.2<span class="unit">M</span></div>
+        <div class="metric-primary-delta up">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M18 15l-6-6-6 6"/></svg>
+          +12% vs prev
+        </div>
+      </div>
+      <div class="metric-primary">
+        <div class="metric-primary-label">Output Tokens</div>
+        <div class="metric-primary-value">842<span class="unit">K</span></div>
+        <div class="metric-primary-delta up">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M18 15l-6-6-6 6"/></svg>
+          +8% vs prev
+        </div>
+      </div>
+      <div class="metrics-secondary">
+        <div class="metric-sm">
+          <div class="metric-sm-label">Avg TPS</div>
+          <div class="metric-sm-value">48.2<span class="unit">t/s</span></div>
+        </div>
+        <div class="metric-sm">
+          <div class="metric-sm-label">Cache Hit</div>
+          <div class="metric-sm-value" style="color: var(--primary);">73.5<span class="unit">%</span></div>
+        </div>
+      </div>
+      <div class="metrics-tertiary">
+        <div class="metric-xs">
+          <span class="metric-xs-label">Requests</span>
+          <span class="metric-xs-value">12,847</span>
+        </div>
+        <div class="metric-xs">
+          <span class="metric-xs-label">Success</span>
+          <span class="metric-xs-value" style="color: var(--success);">99.2%</span>
+        </div>
+        <div class="metric-xs">
+          <span class="metric-xs-label">Window</span>
+          <span class="metric-xs-value">14:00 ~ 19:00</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-primary">
+      <div class="chart-primary-title">Token Throughput</div>
+      <div class="chart-primary-body">
+        <svg viewBox="0 0 600 180" preserveAspectRatio="none">
+          <line class="g-line" x1="0" y1="45" x2="600" y2="45"/>
+          <line class="g-line" x1="0" y1="90" x2="600" y2="90"/>
+          <line class="g-line" x1="0" y1="135" x2="600" y2="135"/>
+          <path class="plot-area" style="fill: oklch(0.65 0.17 150 / 0.25);"
+            d="M0,140 C30,135 60,120 90,125 C120,130 150,110 180,115
+               C210,120 240,100 270,105 C300,110 330,95 360,100
+               C390,105 420,90 450,95 C480,100 510,110 540,105
+               C570,100 600,98 600,98 L600,180 L0,180 Z"/>
+          <path class="plot-line" style="stroke: var(--chart-green);"
+            d="M0,140 C30,135 60,120 90,125 C120,130 150,110 180,115
+               C210,120 240,100 270,105 C300,110 330,95 360,100
+               C390,105 420,90 450,95 C480,100 510,110 540,105
+               C570,100 600,98 600,98"/>
+          <path class="plot-area" style="fill: oklch(0.58 0.14 175 / 0.20);"
+            d="M0,105 C30,95 60,78 90,85 C120,92 150,68 180,75
+               C210,82 240,58 270,65 C300,72 330,52 360,60
+               C390,68 420,48 450,55 C480,62 510,72 540,68
+               C570,64 600,60 600,60 L600,140
+               C570,100 540,105 510,110 C480,100 450,95 420,90
+               C390,105 360,100 330,95 C300,110 270,105 240,100
+               C210,120 180,115 150,110 C120,130 90,125 60,120
+               C30,135 0,140 0,140 Z"/>
+          <path class="plot-line" style="stroke: var(--chart-teal);"
+            d="M0,105 C30,95 60,78 90,85 C120,92 150,68 180,75
+               C210,82 240,58 270,65 C300,72 330,52 360,60
+               C390,68 420,48 450,55 C480,62 510,72 540,68
+               C570,64 600,60 600,60"/>
+          <rect x="16" y="10" width="8" height="8" rx="2" fill="var(--chart-teal)" opacity="0.7"/>
+          <text x="28" y="18" fill="var(--muted)" font-size="10" font-family="var(--sans)">Input</text>
+          <rect x="66" y="10" width="8" height="8" rx="2" fill="var(--chart-green)" opacity="0.7"/>
+          <text x="78" y="18" fill="var(--muted)" font-size="10" font-family="var(--sans)">Output</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Zone 3: Secondary Charts ===== -->
+  <div class="zone-charts">
+    <div class="chart-card">
+      <div class="chart-card-title">Output Speed (TPS)</div>
+      <div class="chart-card-body">
+        <svg viewBox="0 0 600 140" preserveAspectRatio="none">
+          <line class="g-line" x1="0" y1="35" x2="600" y2="35"/>
+          <line class="g-line" x1="0" y1="70" x2="600" y2="70"/>
+          <line class="g-line" x1="0" y1="105" x2="600" y2="105"/>
+          <path class="plot-line" style="stroke: var(--chart-indigo);"
+            d="M0,110 C30,105 60,85 90,92 C120,100 150,75 180,80
+               C210,85 240,65 270,72 C300,78 330,62 360,68
+               C390,74 420,58 450,64 C480,70 510,78 540,74
+               C570,70 600,66 600,66"/>
+        </svg>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-title">Cache Hit Rate</div>
+      <div class="chart-card-body">
+        <svg viewBox="0 0 600 140" preserveAspectRatio="none">
+          <line class="g-line" x1="0" y1="35" x2="600" y2="35"/>
+          <line class="g-line" x1="0" y1="70" x2="600" y2="70"/>
+          <line class="g-line" x1="0" y1="105" x2="600" y2="105"/>
+          <path class="plot-area" style="fill: var(--primary-dim);"
+            d="M0,95 C30,92 60,80 90,85 C120,90 150,72 180,78
+               C210,84 240,68 270,74 C300,80 330,65 360,70
+               C390,75 420,60 450,66 C480,72 510,78 540,74
+               C570,70 600,68 600,68 L600,140 L0,140 Z"/>
+          <path class="plot-line" style="stroke: var(--primary);"
+            d="M0,95 C30,92 60,80 90,85 C120,90 150,72 180,78
+               C210,84 240,68 270,74 C300,80 330,65 360,70
+               C390,75 420,60 450,66 C480,72 510,78 540,74
+               C570,70 600,68 600,68"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Zone 4: Timeline ===== -->
+  <div class="zone-timeline">
+    <div class="timeline-header">
+      <span class="timeline-range">May 23, 14:00 ~ 19:00</span>
+      <span class="timeline-hint">Click a window to view</span>
+    </div>
+    <div class="timeline-track" id="timeline"></div>
+    <div class="timeline-ticks" id="ticks"></div>
+    <div class="timeline-days" id="day-labels"></div>
+  </div>
+
+</div>
+
+<script>
+/**
+ * Realistic timeline simulation.
+ *
+ * UsageWindowTracker creates windows on-demand (forward mode: [now, now+5h]).
+ * Windows are NOT evenly spaced. They appear where requests actually happened,
+ * with gaps during idle periods (nights, weekends).
+ *
+ * This demo simulates 7 days of real usage data.
+ */
+
+// Track spans 7 days starting from May 17 00:00
+const TRACK_START = new Date('2026-05-17T00:00:00');
+const TRACK_END   = new Date('2026-05-24T00:00:00');
+const TRACK_MS    = TRACK_END.getTime() - TRACK_START.getTime();
+
+// Simulated usage windows: { start (hours from TRACK_START), duration (hours), intensity 1-4, tokenOutput (millions) }
+// Gaps represent idle periods (overnight, weekend with no usage)
+const windows = [
+  // Sat May 17 — light morning usage
+  { start: 2,    dur: 5, i: 2, out: 0.8, in: 1.2 },
+  { start: 9,    dur: 5, i: 1, out: 0.3, in: 0.5 },
+  // gap: 14:00 - no more requests Saturday
+  // Sun May 18 — barely used
+  { start: 30,   dur: 5, i: 1, out: 0.1, in: 0.2 },
+  // gap: all Sunday quiet
+  // Mon May 19 — heavy work day
+  { start: 50,   dur: 5, i: 4, out: 2.1, in: 4.0 },
+  { start: 55,   dur: 5, i: 3, out: 1.5, in: 2.8 },
+  // small gap: lunch break
+  { start: 62,   dur: 5, i: 4, out: 3.2, in: 5.1 },
+  { start: 67,   dur: 5, i: 2, out: 0.8, in: 1.4 },
+  // gap: evening
+  // Tue May 20 — moderate
+  { start: 74,   dur: 5, i: 3, out: 1.2, in: 2.0 },
+  { start: 79,   dur: 5, i: 2, out: 0.7, in: 1.1 },
+  // gap: afternoon meeting, no API calls
+  { start: 88,   dur: 5, i: 3, out: 1.8, in: 3.2 },
+  // Wed May 21 — heavy debugging session
+  { start: 98,   dur: 5, i: 4, out: 3.5, in: 5.8 },
+  { start: 103,  dur: 5, i: 4, out: 2.8, in: 4.5 },
+  { start: 108,  dur: 5, i: 3, out: 1.0, in: 1.8 },
+  // gap: late night
+  // Thu May 22
+  { start: 122,  dur: 5, i: 3, out: 1.4, in: 2.5 },
+  { start: 127,  dur: 5, i: 2, out: 0.6, in: 1.0 },
+  { start: 134,  dur: 5, i: 3, out: 1.6, in: 2.9 },
+  // gap: evening
+  // Fri May 23 (today)
+  { start: 146,  dur: 5, i: 4, out: 3.2, in: 5.5 },  // ← selected window
+  { start: 151,  dur: 5, i: 4, out: 2.4, in: 3.8 },   // current active window
+];
+
+const SELECTED_IDX = windows.length - 1; // select latest window
+const track = document.getElementById('timeline');
+const ticksEl = document.getElementById('ticks');
+const dayLabelsEl = document.getElementById('day-labels');
+
+function hoursToPercent(h) {
+  return (h / (TRACK_MS / 3600000)) * 100;
+}
+
+function formatHour(h) {
+  const totalMinutes = Math.floor(h * 60);
+  const d = new Date(TRACK_START.getTime() + totalMinutes * 60000);
+  const day = d.getDate();
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${d.getMonth() + 1}/${day} ${hh}:${mm}`;
+}
+
+// Render windows
+windows.forEach((w, idx) => {
+  const el = document.createElement('div');
+  el.className = `tw i${w.i}` + (idx === SELECTED_IDX ? ' selected' : '');
+  el.style.left = hoursToPercent(w.start) + '%';
+  el.style.width = hoursToPercent(w.dur) + '%';
+
+  // Tooltip
+  const tip = document.createElement('div');
+  tip.className = 'tw-tip';
+  tip.textContent = `${formatHour(w.start)} ~ ${formatHour(w.start + w.dur)}  ${w.in}M in / ${w.out}M out`;
+  el.appendChild(tip);
+
+  // Click to select
+  el.addEventListener('click', () => {
+    document.querySelectorAll('.tw.selected').forEach(s => s.classList.remove('selected'));
+    el.classList.add('selected');
+    document.querySelector('.timeline-range').textContent =
+      `${formatHour(w.start)} ~ ${formatHour(w.start + w.dur)}`;
+  });
+
+  track.appendChild(el);
+});
+
+// Hour ticks: every 6h minor, every 12h major
+for (let h = 0; h < TRACK_MS / 3600000; h += 6) {
+  const tick = document.createElement('div');
+  tick.className = 'timeline-tick' + (h % 12 === 0 ? ' major' : '');
+  tick.style.left = hoursToPercent(h) + '%';
+  ticksEl.appendChild(tick);
+}
+
+// Day labels: midnight each day
+for (let d = 0; d < 7; d++) {
+  const h = d * 24;
+  const label = document.createElement('span');
+  label.className = 'timeline-day';
+  label.style.left = hoursToPercent(h) + '%';
+  const date = new Date(TRACK_START.getTime() + h * 3600000);
+  const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  label.textContent = `${weekdays[date.getDay()]} ${date.getMonth()+1}/${date.getDate()}`;
+  dayLabelsEl.appendChild(label);
+}
+</script>
+</body>
+</html>

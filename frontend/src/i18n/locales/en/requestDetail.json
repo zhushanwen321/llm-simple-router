@@ -67,5 +67,9 @@
   "fallback_provider": "Provider Match",
   "overflow_redirect": "Overflow Redirect",
   "failover_retry": "Failover Retry"
-  }
+  },
+  "executionChain": "Execution Chain",
+  "executionRetry": "retry",
+  "executionFinal": "final",
+  "firstExecution": "first"
 }

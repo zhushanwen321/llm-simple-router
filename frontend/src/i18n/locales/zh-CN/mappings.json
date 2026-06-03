@@ -51,6 +51,18 @@
     "saveFailed": "保存失败",
     "parseRuleFailed": "路由规则格式异常，已使用默认配置"
   },
+  "editor": {
+    "clientLabel": "客户端",
+    "edit": "编辑",
+    "clientInputPlaceholder": "客户端模型名称",
+    "clickToEdit": "点击编辑",
+    "failoverChain": "故障转移链",
+    "failoverOnError": "失败时切换",
+    "contextOverflow": "上下文溢出",
+    "contextOverflowHint": "上下文超限时切换",
+    "multimodalFallback": "多模态回退",
+    "new": "新增"
+  },
   "selectProviderModel": "选择供应商 / 模型",
   "multimodalFallback": {
   "title": "多模态 Fallback",

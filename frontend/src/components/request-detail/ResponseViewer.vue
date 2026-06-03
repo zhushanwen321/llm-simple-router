@@ -43,6 +43,46 @@
                 props.status === 'pending' && i === blocks.length - 1
               "
             />
+            <!-- Usage -->
+            <div v-if="responseMeta?.usage" class="rounded-md border mt-2">
+              <div
+                class="flex items-center gap-1.5 px-2.5 py-1.5 border-b bg-muted/20"
+              >
+                <span class="text-xs font-medium">Usage</span>
+              </div>
+              <div class="grid grid-cols-2 gap-0">
+                <template
+                  v-for="key in [
+                    'prompt_tokens',
+                    'completion_tokens',
+                    'total_tokens',
+                    'input_tokens',
+                    'output_tokens',
+                  ]"
+                  :key="key"
+                >
+                  <div
+                    v-if="responseMeta.usage[key] != null"
+                    class="px-2.5 py-1.5 text-xs"
+                  >
+                    <span class="text-muted-foreground">{{ key }}</span>
+                    <span class="font-mono font-semibold block">{{
+                      Number(responseMeta.usage[key]).toLocaleString()
+                    }}</span>
+                  </div>
+                </template>
+              </div>
+            </div>
+            <!-- Stop reason -->
+            <div
+              v-if="responseMeta?.stopReason"
+              class="flex items-center gap-1.5 mt-2 text-xs"
+            >
+              <span class="text-muted-foreground">Stop reason</span>
+              <Badge variant="default" class="text-[10px] px-1.5 py-0">{{
+                responseMeta.stopReason
+              }}</Badge>
+            </div>
           </div>
         </template>
         <template v-if="blocks.length === 0">
@@ -107,7 +147,7 @@ const structuredRef = ref<HTMLElement | null>(null);
 const props = withDefaults(
   defineProps<{
     source: DataSource;
-    apiType: "openai" | "anthropic";
+    apiType: "openai" | "openai-responses" | "anthropic";
     isStream: boolean;
     streamContent?: StreamContentSnapshot | null;
     nonStreamBody?: string | null;
@@ -153,7 +193,7 @@ const blocks = computed<ContentBlock[]>(() => {
     const streamBlocks = props.streamContent?.blocks;
     if (streamBlocks && streamBlocks.length > 0) return streamBlocks;
     if (props.responseBody) {
-      const direct = tryDirectParse(props.responseBody, null);
+      const direct = tryDirectParse(props.responseBody, null, props.apiType);
       if (direct.length > 0) return direct;
     }
     // blocks 为空时回退到 rawChunks：至少让用户看到流式内容
@@ -167,6 +207,7 @@ const blocks = computed<ContentBlock[]>(() => {
   const direct = tryDirectParse(
     props.responseBody ?? null,
     props.upstreamResponse ?? null,
+    props.apiType,
   );
   if (direct.length > 0) return direct;
 
@@ -183,6 +224,26 @@ const blocks = computed<ContentBlock[]>(() => {
     content: b.content,
     ...(b.toolName ? { name: b.toolName } : {}),
   }));
+});
+
+// Extract usage and stop_reason from response body
+const responseMeta = computed(() => {
+  const raw = props.responseBody || props.upstreamResponse || "";
+  if (!raw) return null;
+  try {
+    const data = JSON.parse(raw);
+    const parsed = data.body ? JSON.parse(data.body) : data;
+    return {
+      usage: parsed.usage as Record<string, unknown> | undefined,
+      stopReason:
+        ((parsed.choices?.[0] as Record<string, unknown> | undefined)
+          ?.finish_reason as string | undefined) ||
+        (parsed.stop_reason as string | undefined),
+      model: parsed.model as string | undefined,
+    };
+  } catch {
+    /* JSON 解析失败，使用默认值 */ return null;
+  }
 });
 
 // Raw content for raw view: merge upstreamResponse (headers) with responseBody (stream_text_content)

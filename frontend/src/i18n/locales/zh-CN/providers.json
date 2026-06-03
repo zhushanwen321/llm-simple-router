@@ -4,6 +4,26 @@
   "editProvider": "编辑供应商",
   "reloadPlugin": "重载插件",
   "noProviders": "暂无供应商",
+  "anchor": {
+    "total": "Provider 总数",
+    "enabled": "启用",
+    "disabled": "禁用",
+    "models": "模型总数"
+  },
+  "filter": {
+    "searchPlaceholder": "搜索名称或 URL...",
+    "status": "状态",
+    "all": "全部",
+    "enabled": "启用",
+    "disabled": "禁用",
+    "count": "个供应商",
+    "noResults": "无匹配结果"
+  },
+  "empty": {
+    "title": "尚未配置任何 Provider",
+    "description": "添加第一个上游 API 供应商以开始路由 LLM 请求。支持 OpenAI、Anthropic 及所有兼容接口。",
+    "addFirst": "添加第一个 Provider"
+  },
   "tableHeaders": {
     "name": "名称",
     "type": "类型",
@@ -49,6 +69,9 @@
     "proxyUsername": "用户名",
     "proxyPassword": "密码",
     "proxyAuthOptional": "可选",
+    "connectionSection": "连接配置",
+    "modelsSection": "模型管理",
+    "advancedSection": "高级配置",
     "upstreamPath": "上游路径",
     "upstreamPathPlaceholder": "默认: /v1/chat/completions 或 /v1/messages",
     "upstreamPathHint": "留空使用 API 类型默认路径",
@@ -155,6 +178,7 @@
     "sourcePreset": "预设"
   },
   "capabilities": {
+    "label": "能力",
     "text": "文本",
     "image": "图片",
     "audio": "音频",

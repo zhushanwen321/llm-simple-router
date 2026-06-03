@@ -266,7 +266,7 @@ import { formatSize } from "@/utils/format";
 
 const props = defineProps<{
   raw: string;
-  apiType: "openai" | "anthropic";
+  apiType: "openai" | "openai-responses" | "anthropic";
   showUrl?: boolean;
   /** 外部控制显示模式时传入，组件内部不渲染 tabs 和复制按钮 */
   mode?: "structured" | "raw";
@@ -282,7 +282,7 @@ const parsed = computed<Record<string, unknown>>(() => {
   try {
     return JSON.parse(props.raw) as Record<string, unknown>;
   } catch {
-    return {};
+    /* JSON 解析失败，使用默认值 */ return {};
   }
 });
 
@@ -291,7 +291,7 @@ const parseError = computed(() => {
     JSON.parse(props.raw);
     return false;
   } catch {
-    return true;
+    /* JSON 解析失败，使用默认值 */ return true;
   }
 });
 
@@ -319,7 +319,7 @@ const body = computed(() => {
     try {
       return JSON.parse(raw) as Record<string, unknown>;
     } catch {
-      return {};
+      /* JSON 解析失败，使用默认值 */ return {};
     }
   }
   return (raw || {}) as Record<string, unknown>;

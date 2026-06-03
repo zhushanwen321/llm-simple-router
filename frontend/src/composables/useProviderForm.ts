@@ -8,15 +8,14 @@ import type { ModelConfig } from "@/components/quick-setup/types";
 import { useTransformRules } from "@/composables/useTransformRules";
 import { useProviderPresets } from "@/composables/useProviderPresets";
 import type { ConcurrencyMode } from "@/types/concurrency";
+import {
+  DEFAULT_CONCURRENCY_CONFIG,
+  DEFAULT_CONCURRENCY_MANUAL_CONFIG,
+} from "@/components/shared/types";
 
-const DEFAULT_CONCURRENCY = 3;
-const DEFAULT_CONCURRENCY_AUTO = 10;
-const DEFAULT_QUEUE_TIMEOUT_MS = 120_000;
-const DEFAULT_QUEUE_SIZE = 10;
 const MAX_CONCURRENCY = 100;
 const MAX_QUEUE_SIZE = 1000;
-const CONTEXT_K = 1000;
-const CONTEXT_M = 1_000_000;
+
 const MS_PER_SECOND = 1000;
 
 interface FormState {
@@ -47,9 +46,9 @@ const DEFAULT_FORM: FormState = {
   endpoints: [],
   models: [],
   is_active: true,
-  max_concurrency: DEFAULT_CONCURRENCY_AUTO,
-  queue_timeout_ms: DEFAULT_QUEUE_TIMEOUT_MS,
-  max_queue_size: DEFAULT_QUEUE_SIZE,
+  max_concurrency: DEFAULT_CONCURRENCY_CONFIG.max_concurrency,
+  queue_timeout_ms: DEFAULT_CONCURRENCY_CONFIG.queue_timeout_ms,
+  max_queue_size: DEFAULT_CONCURRENCY_CONFIG.max_queue_size,
   adaptive_enabled: true,
   proxy_type: "",
   proxy_url: "",
@@ -75,7 +74,7 @@ export const API_TYPE_LABELS: Record<string, string> = {
   anthropic: "Anthropic Messages",
 };
 
-export { CONTEXT_WINDOW_OPTIONS, MS_PER_SECOND, CONTEXT_K, CONTEXT_M };
+export { CONTEXT_WINDOW_OPTIONS, MS_PER_SECOND };
 
 type ProviderFormPayload = Pick<
   ProviderPayload,
@@ -98,7 +97,7 @@ type ProviderFormPayload = Pick<
 
 export function useProviderForm() {
   const { t } = useI18n();
-  const { transformForm, loadTransformRules, saveTransformRules } =
+  const { transformConfig, loadTransformRules, saveTransformRules } =
     useTransformRules();
 
   const form = ref<FormState>({ ...DEFAULT_FORM });
@@ -205,7 +204,7 @@ export function useProviderForm() {
         concurrencyMode.value === "none" ? 0 : form.value.queue_timeout_ms,
       max_queue_size:
         concurrencyMode.value === "none"
-          ? DEFAULT_QUEUE_SIZE
+          ? DEFAULT_CONCURRENCY_MANUAL_CONFIG.max_queue_size
           : form.value.max_queue_size,
       adaptive_enabled: concurrencyMode.value === "auto" ? 1 : 0,
       proxy_type: form.value.proxy_type || null,
@@ -217,7 +216,7 @@ export function useProviderForm() {
     return payload;
   }
 
-  function addModel() {
+  function addModel(caps?: string[], patchList?: string[]) {
     const input = modelInput.value.trim();
     if (!input) return;
     const names = input
@@ -229,9 +228,9 @@ export function useProviderForm() {
         form.value.models.push({
           name,
           context_window: modelContextWindow.value || DEFAULT_CONTEXT_WINDOW,
-          patches: [],
+          patches: patchList ?? [],
           stream_timeout_ms: DEFAULT_STREAM_TIMEOUT_MS,
-          capabilities: ["text"],
+          capabilities: caps ?? ["text"],
         });
       }
     }
@@ -269,11 +268,12 @@ export function useProviderForm() {
     concurrencyMode.value = mode;
     if (mode === "auto") {
       if (!form.value.max_concurrency || form.value.max_concurrency < 1)
-        form.value.max_concurrency = DEFAULT_CONCURRENCY_AUTO;
+        form.value.max_concurrency = DEFAULT_CONCURRENCY_CONFIG.max_concurrency;
       form.value.adaptive_enabled = true;
     } else if (mode === "manual") {
       if (!form.value.max_concurrency || form.value.max_concurrency < 1)
-        form.value.max_concurrency = DEFAULT_CONCURRENCY;
+        form.value.max_concurrency =
+          DEFAULT_CONCURRENCY_MANUAL_CONFIG.max_concurrency;
       form.value.adaptive_enabled = false;
     }
   }
@@ -321,9 +321,13 @@ export function useProviderForm() {
       })),
       is_active: !!p.is_active,
       max_concurrency:
-        concurrencyMode.value === "none" ? DEFAULT_CONCURRENCY_AUTO : mc,
-      queue_timeout_ms: p.queue_timeout_ms ?? DEFAULT_QUEUE_TIMEOUT_MS,
-      max_queue_size: p.max_queue_size ?? DEFAULT_QUEUE_SIZE,
+        concurrencyMode.value === "none"
+          ? DEFAULT_CONCURRENCY_CONFIG.max_concurrency
+          : mc,
+      queue_timeout_ms:
+        p.queue_timeout_ms ?? DEFAULT_CONCURRENCY_CONFIG.queue_timeout_ms,
+      max_queue_size:
+        p.max_queue_size ?? DEFAULT_CONCURRENCY_CONFIG.max_queue_size,
       adaptive_enabled: concurrencyMode.value === "auto",
       proxy_type: p.proxy_type || "",
       proxy_url: p.proxy_url || "",
@@ -348,7 +352,7 @@ export function useProviderForm() {
     modelInput,
     modelContextWindow,
     contextWindowSelect,
-    transformForm,
+    transformConfig,
     presetHook,
     validate,
     buildPayload,
