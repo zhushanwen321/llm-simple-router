@@ -53,7 +53,7 @@ class StreamProxy {
     private readonly loopGuard: StreamLoopGuard | undefined,
     formatTransform?: Transform,
     private readonly timeoutContext?: { modelId: string; providerId: string },
-    private readonly onTimeoutAbort?: () => void,
+    private readonly onTimeoutAbort?: (timeoutMs: number) => void,
   ) {
     this.formatTransform = formatTransform;
     this.sseHeaders = filterHeaders(rawUpstreamHeaders);
@@ -114,9 +114,9 @@ class StreamProxy {
         this.pendingResult = result;
       }
     } else {
-      // stream_abort 且 headers 已发送时，必须 end reply 避免客户端挂起
-      // 但如果有 timeoutContext，让 handler 层负责写入错误 SSE 后再 end
-      if (kind === "stream_abort" && this.headersSent && !extra.timeoutContext) {
+      // stream_abort（非 deferred）且 headers 已发送时，立即 end reply 避免客户端挂起
+      // idle_timeout 使用 deferred 模式，由 resetIdleTimer 的 setImmediate 负责 end reply
+      if (kind === "stream_abort" && this.headersSent) {
         // eslint-disable-next-line taste/no-silent-catch -- reply may already be destroyed, warn is sufficient
         try { this.reply.raw.end(); } catch { console.warn("[stream-proxy] reply.raw.end() failed, likely already destroyed"); }
       }
@@ -151,12 +151,19 @@ class StreamProxy {
     if (!isFinite(this.timeoutMs) || this.timeoutMs <= 0) return; // 0 或 Infinity 表示禁用超时
     this.idleTimer = setTimeout(() => {
       if (this.resolved) return;
-      // 在 terminal() 调用 reply.raw.end() 之前，同步写入超时错误 SSE
-      // 必须同步执行，确保 inject() 能正确收集响应体
+      // 在 terminal() 之前同步写入超时错误 SSE，确保 inject() 能正确收集响应体
       if (this.onTimeoutAbort) {
-        try { this.onTimeoutAbort(); } catch { /* reply may be destroyed */ } // eslint-disable-line taste/no-silent-catch
+        try { this.onTimeoutAbort(this.timeoutMs); } catch { /* reply may be destroyed */ } // eslint-disable-line taste/no-silent-catch
       }
-      this.terminal("stream_abort", { metrics: this.collectMetrics(false), timeoutContext: this.timeoutContext, timeoutMs: this.timeoutMs, abortReason: "idle_timeout" as const });
+      // deferred 模式：先 resolve 让 handler 链路（日志写入等）在 microtask 中完成，
+      // reply.raw.end() 延迟到 setImmediate（macrotask），保证 inject() 返回时日志已写入。
+      this.terminal("stream_abort", { metrics: this.collectMetrics(false), timeoutContext: this.timeoutContext, timeoutMs: this.timeoutMs, abortReason: "idle_timeout" as const }, true);
+      setImmediate(() => {
+        if (this.headersSent) {
+          try { this.reply.raw.end(); } catch { /* reply may be destroyed */ } // eslint-disable-line taste/no-silent-catch
+        }
+        this.cleanup();
+      });
     }, this.timeoutMs);
   }
 
@@ -386,7 +393,7 @@ export function callStream(
   loopGuard?: StreamLoopGuard,
   formatTransform?: import("stream").Transform,
   timeoutContext?: { modelId: string; providerId: string },
-  onTimeoutAbort?: () => void,
+  onTimeoutAbort?: (timeoutMs: number) => void,
   agent?: Agent,
 ): Promise<TransportResult> {
   return new Promise((resolve) => {

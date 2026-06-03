@@ -107,10 +107,23 @@ export function buildTransportFn(p: TransportFnParams): (target: Target) => Prom
         });
       }
       const checkEarlyError = p.matcher ? (data: string) => p.matcher!.test(UPSTREAM_SUCCESS, data, p.provider.id) : undefined;
+      // 在 pipe 销毁前同步写入超时错误 SSE，避免 handler 层异步写入时与残留 chunk 拼接
+      const onTimeoutAbort = p.timeoutContext
+        ? (actualTimeoutMs: number) => {
+          const { modelId, providerId } = p.timeoutContext!;
+          const msg = `Stream timeout: no data received for ${actualTimeoutMs}ms (model: ${modelId}, provider: ${providerId})`;
+          const errBody = p.apiType === "anthropic"
+            ? { type: "error", error: { type: "api_error", message: msg } }
+            : { error: { message: msg, type: "server_error", code: "stream_timeout" } };
+          try {
+            p.reply.raw.write(`data: ${JSON.stringify(errBody)}\n\n`);
+          } catch { /* reply may be destroyed */ } // eslint-disable-line taste/no-silent-catch
+        }
+        : undefined;
       const streamResult = await callStream(
         p.provider, p.apiKey, p.body, p.cliHdrs, p.reply, p.streamTimeoutMs,
         p.upstreamPath, buildHeaders, metricsTransform, checkEarlyError, undefined, streamLoopGuard, p.formatTransform,
-        p.timeoutContext, undefined, agent,
+        p.timeoutContext, onTimeoutAbort, agent,
       );
       const m = (streamResult.kind === "stream_success" || streamResult.kind === "stream_abort")
         ? streamResult.metrics : undefined;
