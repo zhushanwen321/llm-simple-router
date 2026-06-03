@@ -186,6 +186,7 @@ function isOfficialOpenai(url: string): boolean {
           :model-value="props.modelValue.name"
           type="text"
           required
+          autocomplete="off"
           class="mt-1"
           @update:model-value="emitUpdate({ name: String($event) })"
           @input="emit('clear-errors', 'name')"
@@ -202,6 +203,7 @@ function isOfficialOpenai(url: string): boolean {
           :model-value="props.modelValue.apiKey"
           type="password"
           :required="!props.editingId"
+          autocomplete="new-password"
           :placeholder="
             props.editingId ? t('providers.fields.apiKeyPlaceholder') : ''
           "

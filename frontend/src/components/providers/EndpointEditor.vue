@@ -167,6 +167,7 @@ function updateField<K extends keyof ProviderEndpoint>(
           <Input
             :model-value="ep.api_key ?? ''"
             type="password"
+            autocomplete="new-password"
             :disabled="readonly"
             :placeholder="
               sharedKey
