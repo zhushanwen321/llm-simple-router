@@ -439,7 +439,7 @@ export const adminRetryRuleRoutes: FastifyPluginCallback<RetryRuleRoutesOptions>
           { role: "user", content: userPrompt },
         ],
         maxTokens: 2048,
-        timeoutMs: 30_000,
+        timeoutMs: 300_000,
       });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Unknown error";

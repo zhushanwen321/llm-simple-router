@@ -470,6 +470,13 @@ export async function buildApp(
 
 
 export async function main() {
+  // 启动期一次性 WARN：DEV_SKIP_AUTH=1 跳过 admin token 校验（仅 loopback 放行）
+  if (process.env.DEV_SKIP_AUTH === "1") {
+    console.warn(
+      "\n⚠️  [SECURITY] DEV_SKIP_AUTH=1 — admin API is unauthenticated for loopback requests.\n" +
+        "    Do NOT use in production. Setup flow is unchanged — password still required.\n",
+    );
+  }
   const { app, close } = await buildApp();
   const config = getConfig();
 

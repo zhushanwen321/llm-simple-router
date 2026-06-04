@@ -53,7 +53,7 @@
     --foreground: oklch(0.985 0 0);
     --card: oklch(0.205 0 0);
     --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
+    --popover: oklch(0.23 0 0);
     --popover-foreground: oklch(0.985 0 0);
     --primary: oklch(0.68 0.13 175);
     --primary-foreground: oklch(0.205 0 0);
@@ -65,8 +65,8 @@
     --accent-foreground: oklch(0.985 0 0);
     --destructive: oklch(0.65 0.13 25);
     --destructive-foreground: oklch(0.985 0 0);
-    --border: oklch(1 0 0 / 8%);
-    --input: oklch(1 0 0 / 8%);
+    --border: oklch(1 0 0 / 14%);
+    --input: oklch(1 0 0 / 14%);
     --ring: oklch(0.78 0.1 175);
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
@@ -85,6 +85,15 @@
   body {
     @apply bg-background text-foreground;
     @apply font-sans;
+  }
+  /* 覆盖 Tailwind preflight 中硬编码的 gray-200 default border-color，
+     让所有未指定颜色的 border / border-b / border-t / border-r / border-l
+     跟随 --border token (亮色 = oklch(0.922 0 0), 暗色 = oklch(1 0 0 / 14%))。
+     这避免在暗色模式下表格行/卡片分隔线出现刺眼的亮色边框。 */
+  *,
+  ::before,
+  ::after {
+    border-color: var(--border);
   }
   .theme {
     --font-heading: var(--font-sans);

@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Modal 对比度修复 - Before & After</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Inter', -apple-system, sans-serif;
+  background: oklch(0.12 0 0);
+  color: oklch(0.9 0 0);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Layout */
+.page { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+.header { text-align: center; margin-bottom: 2rem; }
+.header h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem; }
+.header p { color: oklch(0.6 0 0); font-size: 0.875rem; }
+
+.compare-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+@media (max-width: 900px) {
+  .compare-grid { grid-template-columns: 1fr; }
+}
+
+/* Section label */
+.section-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.section-label .badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+.badge-before { background: oklch(0.55 0.18 25); color: white; }
+.badge-after { background: oklch(0.65 0.17 150); color: white; }
+
+/* Mock page container */
+.mock-page {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid oklch(1 0 0 / 10%);
+}
+
+/* ===== LIGHT THEME ===== */
+.mock-page.light { background: oklch(1 0 0); }
+.mock-page.light .mock-content {
+  padding: 1rem 1.5rem;
+  font-size: 0.8125rem;
+  color: oklch(0.145 0 0);
+}
+.mock-page.light .mock-row {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  border: 1px solid oklch(0.922 0 0);
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.mock-page.light .mock-id {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  color: oklch(0.556 0 0);
+}
+
+/* ===== DARK THEME ===== */
+.mock-page.dark { background: oklch(0.145 0 0); }
+.mock-page.dark .mock-content {
+  padding: 1rem 1.5rem;
+  font-size: 0.8125rem;
+  color: oklch(0.985 0 0);
+}
+.mock-page.dark .mock-row {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  border: 1px solid oklch(1 0 0 / 8%);
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: oklch(0.205 0 0);
+}
+.mock-page.dark .mock-id {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  color: oklch(0.708 0 0);
+}
+
+/* Status dot */
+.status-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.status-dot.success { background: oklch(0.65 0.17 150); }
+.status-dot.error { background: oklch(0.58 0.22 25); }
+
+/* ===== OVERLAY + MODAL ===== */
+.modal-scene {
+  position: relative;
+  min-height: 320px;
+}
+
+/* BEFORE: overlay too light */
+.overlay-before-light {
+  position: absolute; inset: 0;
+  background: oklch(0 0 0 / 10%);
+}
+.overlay-before-dark {
+  position: absolute; inset: 0;
+  background: oklch(0 0 0 / 10%);
+}
+
+/* AFTER: overlay with more depth */
+.overlay-after-light {
+  position: absolute; inset: 0;
+  background: oklch(0 0 0 / 24%);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.overlay-after-dark {
+  position: absolute; inset: 0;
+  background: oklch(0 0 0 / 40%);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+/* BEFORE: modal body - same as bg */
+.modal-before-light {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 320px;
+  background: oklch(1 0 0);           /* --popover = --background = pure white */
+  border: 1px solid oklch(0.922 0 0); /* --border, very subtle */
+  border-radius: 12px;
+  padding: 1.25rem;
+  color: oklch(0.145 0 0);
+  z-index: 10;
+}
+.modal-before-dark {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 320px;
+  background: oklch(0.205 0 0);        /* --popover, L=0.205 vs bg L=0.145, delta=0.06 */
+  border: 1px solid oklch(1 0 0 / 8%); /* --border dark, nearly invisible */
+  border-radius: 12px;
+  padding: 1.25rem;
+  color: oklch(0.985 0 0);
+  z-index: 10;
+}
+
+/* AFTER: modal body - lifted */
+.modal-after-light {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 320px;
+  background: oklch(1 0 0);              /* pure white body is fine when overlay is darker */
+  border: 1px solid oklch(0 0 0 / 8%);
+  border-radius: 12px;
+  padding: 1.25rem;
+  color: oklch(0.145 0 0);
+  z-index: 10;
+  box-shadow:
+    0 4px 6px -1px oklch(0 0 0 / 0.08),
+    0 10px 15px -3px oklch(0 0 0 / 0.06),
+    0 0 0 1px oklch(0 0 0 / 0.04);
+}
+.modal-after-dark {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 320px;
+  background: oklch(0.23 0 0);           /* lifted to L=0.23, delta from bg (0.145) = 0.085 */
+  border: 1px solid oklch(1 0 0 / 14%);  /* stronger border */
+  border-radius: 12px;
+  padding: 1.25rem;
+  color: oklch(0.985 0 0);
+  z-index: 10;
+  box-shadow:
+    0 4px 6px -1px oklch(0 0 0 / 0.3),
+    0 10px 15px -3px oklch(0 0 0 / 0.2),
+    0 0 0 1px oklch(1 0 0 / 6%);
+}
+
+/* Modal content */
+.modal-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.modal-close {
+  width: 28px; height: 28px;
+  border-radius: 6px;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+}
+.light .modal-close { background: oklch(0.95 0 0); color: oklch(0.4 0 0); }
+.dark .modal-close { background: oklch(0.28 0 0); color: oklch(0.7 0 0); }
+
+.modal-field {
+  margin-bottom: 0.75rem;
+}
+.modal-field label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+}
+.light .modal-field label { color: oklch(0.4 0 0); }
+.dark .modal-field label { color: oklch(0.6 0 0); }
+
+.modal-field .value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8125rem;
+  padding: 0.375rem 0.625rem;
+  border-radius: 6px;
+}
+.light .modal-field .value { background: oklch(0.97 0 0); color: oklch(0.2 0 0); }
+.dark .modal-field .value { background: oklch(0.16 0 0); color: oklch(0.9 0 0); }
+
+.modal-footer {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+.btn {
+  padding: 0.375rem 0.875rem;
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+}
+.btn-primary { background: oklch(0.58 0.14 175); color: white; }
+.btn-ghost-light { background: oklch(0.95 0 0); color: oklch(0.3 0 0); }
+.btn-ghost-dark { background: oklch(0.269 0 0); color: oklch(0.9 0 0); }
+
+/* Annotation arrows */
+.annotation {
+  position: absolute;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  white-space: nowrap;
+  z-index: 20;
+  pointer-events: none;
+}
+.annotation.problem {
+  background: oklch(0.58 0.22 25 / 90%);
+  color: white;
+}
+.annotation.fixed {
+  background: oklch(0.65 0.17 150 / 90%);
+  color: white;
+}
+
+/* Delta info */
+.delta-strip {
+  margin-top: 2rem;
+  padding: 1rem 1.5rem;
+  background: oklch(0.18 0 0);
+  border-radius: 10px;
+  border: 1px solid oklch(1 0 0 / 8%);
+}
+.delta-strip h2 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+.delta-table {
+  width: 100%;
+  font-size: 0.8125rem;
+  border-collapse: collapse;
+}
+.delta-table th {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  color: oklch(0.6 0 0);
+  font-weight: 500;
+  border-bottom: 1px solid oklch(1 0 0 / 8%);
+}
+.delta-table td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid oklch(1 0 0 / 5%);
+}
+.delta-table code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+  background: oklch(0.25 0 0);
+}
+.delta-table .removed { color: oklch(0.65 0.15 25); }
+.delta-table .added { color: oklch(0.65 0.17 150); }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="header">
+    <h1>Modal 对比度修复</h1>
+    <p>Before (当前) vs After (修复) — 亮色 + 暗色四组对比</p>
+  </div>
+
+  <div class="compare-grid">
+    <!-- ═══ Light Before ═══ -->
+    <div>
+      <div class="section-label">
+        Light — Before <span class="badge badge-before">当前</span>
+      </div>
+      <div class="mock-page light">
+        <div class="modal-scene">
+          <div class="mock-content">
+            <div class="mock-row"><span class="status-dot success"></span> req-8a3f1b <span class="mock-id">POST /v1/chat/completions</span></div>
+            <div class="mock-row"><span class="status-dot success"></span> req-2c7d9e <span class="mock-id">POST /v1/chat/completions</span></div>
+            <div class="mock-row"><span class="status-dot error"></span> req-5b4a2f <span class="mock-id">POST /v1/messages</span></div>
+            <div class="mock-row"><span class="status-dot success"></span> req-1e9c3d <span class="mock-id">POST /v1/chat/completions</span></div>
+          </div>
+          <div class="overlay-before-light"></div>
+          <div class="modal-before-light">
+            <div class="modal-title">
+              请求详情
+              <button class="modal-close">×</button>
+            </div>
+            <div class="modal-field">
+              <label>Request ID</label>
+              <div class="value">req-5b4a2f</div>
+            </div>
+            <div class="modal-field">
+              <label>Model</label>
+              <div class="value">gpt-4o → provider-a</div>
+            </div>
+            <div class="modal-field">
+              <label>Status</label>
+              <div class="value">429 Rate Limited</div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-ghost-light">取消</button>
+              <button class="btn btn-primary">生成重试规则</button>
+            </div>
+          </div>
+          <div class="annotation problem" style="top: 8px; right: 8px;">overlay 10% → 几乎看不到</div>
+          <div class="annotation problem" style="bottom: 8px; left: 8px;">modal 与背景同色 (L=1.0)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ Light After ═══ -->
+    <div>
+      <div class="section-label">
+        Light — After <span class="badge badge-after">修复</span>
+      </div>
+      <div class="mock-page light">
+        <div class="modal-scene">
+          <div class="mock-content">
+            <div class="mock-row"><span class="status-dot success"></span> req-8a3f1b <span class="mock-id">POST /v1/chat/completions</span></div>
+            <div class="mock-row"><span class="status-dot success"></span> req-2c7d9e <span class="mock-id">POST /v1/chat/completions</span></div>
+            <div class="mock-row"><span class="status-dot error"></span> req-5b4a2f <span class="mock-id">POST /v1/messages</span></div>
+            <div class="mock-row"><span class="status-dot success"></span> req-1e9c3d <span class="mock-id">POST /v1/chat/completions</span></div>
+          </div>
+          <div class="overlay-after-light"></div>
+          <div class="modal-after-light">
+            <div class="modal-title">
+              请求详情
+              <button class="modal-close">×</button>
+            </div>
+            <div class="modal-field">
+              <label>Request ID</label>
+              <div class="value">req-5b4a2f</div>
+            </div>
+            <div class="modal-field">
+              <label>Model</label>
+              <div class="value">gpt-4o → provider-a</div>
+            </div>
+            <div class="modal-field">
+              <label>Status</label>
+              <div class="value">429 Rate Limited</div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-ghost-light">取消</button>
+              <button class="btn btn-primary">生成重试规则</button>
+            </div>
+          </div>
+          <div class="annotation fixed" style="top: 8px; right: 8px;">overlay 24% + blur → 明显变暗</div>
+          <div class="annotation fixed" style="bottom: 8px; left: 8px;">shadow 产生物理层级</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ Dark Before ═══ -->
+    <div>
+      <div class="section-label">
+        Dark — Before <span class="badge badge-before">当前</span>
+      </div>
+      <div class="mock-page dark">
+        <div class="modal-scene">
+          <div class="mock-content">
+            <div class="mock-row"><span class="status-dot success"></span> req-8a3f1b <span class="mock-id">POST /v1/chat/completions</span></div>
+            <div class="mock-row"><span class="status-dot success"></span> req-2c7d9e <span class="mock-id">POST /v1/chat/completions</span></div>
+            <div class="mock-row"><span class="status-dot error"></span> req-5b4a2f <span class="mock-id">POST /v1/messages</span></div>
+            <div class="mock-row"><span class="status-dot success"></span> req-1e9c3d <span class="mock-id">POST /v1/chat/completions</span></div>
+          </div>
+          <div class="overlay-before-dark"></div>
+          <div class="modal-before-dark">
+            <div class="modal-title">
+              请求详情
+              <button class="modal-close">×</button>
+            </div>
+            <div class="modal-field">
+              <label>Request ID</label>
+              <div class="value">req-5b4a2f</div>
+            </div>
+            <div class="modal-field">
+              <label>Model</label>
+              <div class="value">gpt-4o → provider-a</div>
+            </div>
+            <div class="modal-field">
+              <label>Status</label>
+              <div class="value">429 Rate Limited</div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-ghost-dark">取消</button>
+              <button class="btn btn-primary">生成重试规则</button>
+            </div>
+          </div>
+          <div class="annotation problem" style="top: 8px; right: 8px;">overlay 10% → 完全透明</div>
+          <div class="annotation problem" style="bottom: 8px; left: 8px;">popover L=0.205 vs bg L=0.145, 差 0.06</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ Dark After ═══ -->
+    <div>
+      <div class="section-label">
+        Dark — After <span class="badge badge-after">修复</span>
+      </div>
+      <div class="mock-page dark">
+        <div class="modal-scene">
+          <div class="mock-content">
+            <div class="mock-row"><span class="status-dot success"></span> req-8a3f1b <span class="mock-id">POST /v1/chat/completions</span></div>
+            <div class="mock-row"><span class="status-dot success"></span> req-2c7d9e <span class="mock-id">POST /v1/chat/completions</span></div>
+            <div class="mock-row"><span class="status-dot error"></span> req-5b4a2f <span class="mock-id">POST /v1/messages</span></div>
+            <div class="mock-row"><span class="status-dot success"></span> req-1e9c3d <span class="mock-id">POST /v1/chat/completions</span></div>
+          </div>
+          <div class="overlay-after-dark"></div>
+          <div class="modal-after-dark">
+            <div class="modal-title">
+              请求详情
+              <button class="modal-close">×</button>
+            </div>
+            <div class="modal-field">
+              <label>Request ID</label>
+              <div class="value">req-5b4a2f</div>
+            </div>
+            <div class="modal-field">
+              <label>Model</label>
+              <div class="value">gpt-4o → provider-a</div>
+            </div>
+            <div class="modal-field">
+              <label>Status</label>
+              <div class="value">429 Rate Limited</div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-ghost-dark">取消</button>
+              <button class="btn btn-primary">生成重试规则</button>
+            </div>
+          </div>
+          <div class="annotation fixed" style="top: 8px; right: 8px;">overlay 40% + blur → 背景明显压暗</div>
+          <div class="annotation fixed" style="bottom: 8px; left: 8px;">L=0.23 + border 14% + shadow → 清晰浮出</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delta table -->
+  <div class="delta-strip">
+    <h2>Token 变更清单</h2>
+    <table class="delta-table">
+      <thead>
+        <tr>
+          <th>Token</th>
+          <th>Before</th>
+          <th>After</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>--color-overlay-light</code></td>
+          <td class="removed"><code>oklch(0 0 0 / 10%)</code></td>
+          <td class="added"><code>oklch(0 0 0 / 20%)</code></td>
+        </tr>
+        <tr>
+          <td><code>.dark --popover</code></td>
+          <td class="removed"><code>oklch(0.205 0 0)</code></td>
+          <td class="added"><code>oklch(0.23 0 0)</code></td>
+        </tr>
+        <tr>
+          <td><code>.dark --border</code></td>
+          <td class="removed"><code>oklch(1 0 0 / 8%)</code></td>
+          <td class="added"><code>oklch(1 0 0 / 14%)</code></td>
+        </tr>
+        <tr>
+          <td><code>DialogContent shadow</code></td>
+          <td class="removed">none</td>
+          <td class="added"><code>shadow-elevated</code> (token)</td>
+        </tr>
+        <tr>
+          <td><code>.dark backdrop-filter</code></td>
+          <td class="removed">none</td>
+          <td class="added"><code>backdrop-blur-sm</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+</body>
+</html>
