@@ -121,6 +121,14 @@ export default {
         lg: 'var(--radius-lg)',
         xl: 'var(--radius-xl)',
       },
+      borderColor: ({ theme }) => ({
+        ...theme('colors'),
+        DEFAULT: 'var(--border)',
+      }),
+      divideColor: ({ theme }) => ({
+        ...theme('colors'),
+        DEFAULT: 'var(--border)',
+      }),
       fontFamily: {
         sans: ['var(--font-sans)'],
         heading: ['var(--font-heading)'],
