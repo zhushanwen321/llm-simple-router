@@ -101,15 +101,7 @@ echo ""
 NEW_VERSION=$(gh release list --limit 1 --json tagName -q '.[0].tagName' | sed 's/^v//')
 echo "版本: $NEW_VERSION"
 
-# 验证 npm
-echo -n "检查 @llm-router/core: "
-CORE_VER=$(npm info @llm-router/core version 2>/dev/null || echo "FAILED")
-if [[ "$CORE_VER" == "$NEW_VERSION" ]]; then
-  echo "✅ $CORE_VER"
-else
-  echo "❌ 期望 $NEW_VERSION, 实际 $CORE_VER"
-fi
-
+# 验证 npm（@llm-router/core 已废弃，独立版本，不做版本一致性校验）
 echo -n "检查 llm-simple-router: "
 ROUTER_VER=$(npm info llm-simple-router version 2>/dev/null || echo "FAILED")
 if [[ "$ROUTER_VER" == "$NEW_VERSION" ]]; then
