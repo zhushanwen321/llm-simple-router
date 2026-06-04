@@ -14,6 +14,29 @@ interface AdminAuthOptions {
 
 const HTTP_UNAUTHORIZED = 401;
 
+// DEV_SKIP_AUTH=1 时跳过 admin token 校验，但仅放行 loopback 来源的请求。
+// 用途：本地开发时免登录。仅作用于 admin API，不影响 router_keys 代理认证。
+// 不签 cookie、不写 DB、不调 setup；未初始化时仍需人工走 setup 流程。
+// 每次请求时读取 env，便于测试时切换；生产环境绝不允许启用。
+function isDevSkipAuthEnabled(): boolean {
+  return process.env.DEV_SKIP_AUTH === "1";
+}
+
+function isLoopbackIp(ip: string | undefined): boolean {
+  if (!ip) return false;
+  // Node dual-stack 下 IPv4 客户端可能得到 "::ffff:127.0.0.1"
+  const IPV4_MAPPED_PREFIX = "::ffff:";
+  const IPV4_MAPPED_PREFIX_LENGTH = IPV4_MAPPED_PREFIX.length;
+  const normalized = ip.startsWith(IPV4_MAPPED_PREFIX)
+    ? ip.slice(IPV4_MAPPED_PREFIX_LENGTH)
+    : ip;
+  return (
+    normalized === "127.0.0.1" ||
+    normalized === "::1" ||
+    normalized === "0:0:0:0:0:0:0:1"
+  );
+}
+
 const adminAuthRaw: FastifyPluginCallback<AdminAuthOptions> = (app, options, done) => {
   app.register(cookie);
 
@@ -28,6 +51,16 @@ const adminAuthRaw: FastifyPluginCallback<AdminAuthOptions> = (app, options, don
 
     // 非 admin API 路径跳过
     if (!path.startsWith("/admin/api/")) return;
+
+    // Dev 模式：仅放行 loopback 访问的 admin API
+    if (isDevSkipAuthEnabled()) {
+      if (!isLoopbackIp(request.ip)) {
+        return reply
+          .code(HTTP_UNAUTHORIZED)
+          .send(apiError(API_CODE.TOKEN_INVALID, "DEV_SKIP_AUTH requires loopback access"));
+      }
+      return;
+    }
 
     // 未初始化时返回 needsSetup
     if (!isInitialized(options.db)) {

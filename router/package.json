@@ -20,7 +20,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "dev": "PORT=9980 tsx watch src/index.ts",
+    "dev": "PORT=9980 DEV_SKIP_AUTH=1 tsx watch src/index.ts",
     "build": "tsc",
     "build:full": "tsc && node scripts/build.mjs",
     "start": "node dist/index.js",
