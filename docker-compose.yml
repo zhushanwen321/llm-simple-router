@@ -10,11 +10,7 @@ services:
     ports:
       - "${PORT:-9981}:9981"
     environment:
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
-      - JWT_SECRET=${JWT_SECRET}
       - TZ=Asia/Shanghai
-      - DB_PATH=/app/data/router.db
     volumes:
       - ~/.llm-simple-router:/app/data
     env_file:

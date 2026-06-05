@@ -268,8 +268,13 @@ pi
 **方式一：直接拉取镜像（推荐）**
 
 ```bash
-# 一键启动，数据持久化到 ~/.llm-simple-router/
+# 1. 复制环境变量模板（可选，默认配置无需修改）
+cp .env.example .env
+
+# 2. 一键启动，数据持久化到 ~/.llm-simple-router/
 docker compose up -d
+
+# 3. 访问 http://localhost:9981/admin 完成首次 Setup（设置管理员密码）
 ```
 
 `docker-compose.yml` 默认从 ghcr.io 拉取预构建镜像，数据映射到宿主机 `~/.llm-simple-router/`。
@@ -281,13 +286,12 @@ docker run -d \
   --name llm-router \
   -p 9981:9981 \
   -v ~/.llm-simple-router:/app/data \
-  -e DB_PATH=/app/data/router.db \
   -e TZ=Asia/Shanghai \
   --restart unless-stopped \
   ghcr.io/zhushanwen321/llm-simple-router:latest
 ```
 
-环境变量通过 Setup 页面设置，不需要 `.env` 文件。
+首次访问 `/admin` 页面会引导设置管理员密码，**不需要预先配置密码或密钥**。
 
 **方式二：本地构建**
 
@@ -407,7 +411,9 @@ Router 收到请求后：认证 → 按映射规则找到后端 Provider → 多
 
 ## 环境变量
 
-所有密钥通过 Setup 页面设置，以下为可选配置：
+所有密钥（管理员密码、加密密钥、JWT 密钥）通过首次 Setup 页面设置，存储在 SQLite 数据库中，**不需要通过环境变量配置**。
+
+以下为可选的服务端配置（详见 `.env.example`）：
 
 | 变量                    | 默认值                              | 说明           |
 | --------------------- | -------------------------------- | ------------ |
@@ -416,7 +422,6 @@ Router 收到请求后：认证 → 按映射规则找到后端 Provider → 多
 | `LOG_LEVEL`           | `info`                           | 日志级别         |
 | `TZ`                  | `Asia/Shanghai`                  | 时区设置         |
 | `STREAM_TIMEOUT_MS`   | `3000000`                        | 流式代理空闲超时（ms） |
-| `RETRY_MAX_ATTEMPTS`  | `3`                              | 最大重试次数       |
 | `RETRY_BASE_DELAY_MS` | `1000`                           | 重试基础延迟（ms）   |
 
 ## 开发

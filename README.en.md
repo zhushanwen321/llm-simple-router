@@ -260,8 +260,13 @@ pi
 **Option 1: Pull pre-built image (recommended)**
 
 ```bash
-# One-click start with data persistence to ~/.llm-simple-router/
+# 1. Copy the env template (optional, defaults work out of the box)
+cp .env.example .env
+
+# 2. One-click start with data persistence to ~/.llm-simple-router/
 docker compose up -d
+
+# 3. Visit http://localhost:9981/admin to complete the initial Setup (set admin password)
 ```
 
 `docker-compose.yml` pulls the pre-built image from ghcr.io by default, with data mapped to `~/.llm-simple-router/` on the host.
@@ -273,13 +278,12 @@ docker run -d \
   --name llm-router \
   -p 9981:9981 \
   -v ~/.llm-simple-router:/app/data \
-  -e DB_PATH=/app/data/router.db \
   -e TZ=Asia/Shanghai \
   --restart unless-stopped \
   ghcr.io/zhushanwen321/llm-simple-router:latest
 ```
 
-Environment variables are set through the Setup page; no `.env` file needed.
+On first visit to `/admin`, you'll be guided to set an admin password. **No pre-configured password or secrets needed.**
 
 **Option 2: Build locally**
 
@@ -399,7 +403,9 @@ When the Router receives a request: Authentication → find backend Provider via
 
 ## Environment Variables
 
-All secrets are set through the Setup page. Optional configuration:
+All secrets (admin password, encryption key, JWT secret) are set through the initial Setup page and stored in the SQLite database. **No environment variables needed for secrets.**
+
+Optional server configuration (see `.env.example` for details):
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -408,7 +414,6 @@ All secrets are set through the Setup page. Optional configuration:
 | `LOG_LEVEL` | `info` | Log level |
 | `TZ` | `Asia/Shanghai` | Timezone |
 | `STREAM_TIMEOUT_MS` | `3000000` | Stream proxy idle timeout (ms) |
-| `RETRY_MAX_ATTEMPTS` | `3` | Max retry attempts |
 | `RETRY_BASE_DELAY_MS` | `1000` | Retry base delay (ms) |
 
 ## Development
