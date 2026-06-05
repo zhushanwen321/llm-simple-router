@@ -132,9 +132,9 @@ bash ${STAGES('3-post-merge-ci')}
   // ─── 阶段 4: Publish ───────────────────────────
   phase('4-publish');
   await agent({
-    description: '4-publish: 版本 bump → tag → push → 等 Release CI',
+    description: '4-publish: push → 调 scripts/publish.sh → 等 publish workflow 完成',
     prompt: `## 任务
-版本 bump、打 tag、推送、等待 Release CI 构建完成。
+触发 publish workflow 并等待其完成，构建 npm 包 + Docker 镜像 + GitHub Release。
 
 ## 执行
 \`\`\`bash
@@ -143,16 +143,17 @@ bash ${STAGES('4-publish')}
 \`\`\`
 
 ## 说明
-- 项目可能使用 scripts/publish.sh（GitHub Actions）或自行 bump
-- 版本号从 package.json 读取
-- 自动同步子项目 package.json 版本
-- 等待 Release CI 构建产物（最多 15 分钟）
+- stages/4-publish.sh 行为：**优先**检测仓库根 \`scripts/publish.sh\`；**有则调用**（它会 \`gh workflow run publish.yml --ref main -f bump_type=<VERSION_TYPE>\`），**没有则自执行** \`npm version\` + tag + push
+- publish.yml 走 **stable 路径**（workflow_dispatch 触发）：bump version → commit + tag + push → 创建 GitHub Release → \`npm publish --tag latest\` → 构建并 push Docker image → 上传 dist archive asset
+- 版本号从 router/package.json 读取（router 是 npm 发布包）；子包（pi-extension / frontend）不参与 npm 发布
+- 等待 publish workflow CI 完成（**不是** release workflow，最长 15 分钟）
 
 ## 失败处理
-- Release CI 失败 → gh run view --log-failed，修复后重跑
+- publish workflow 失败 → \`gh run view --log-failed\`，修复后重跑（重跑用 \`gh workflow run\` 或重跑当前 job）
+- scripts/publish.sh 不存在（说明项目升级过发布机制）→ 自执行路径仍能跑通，AI 继续
 - 版本 bump 冲突 → 检查是否有未提交变更
 
-报告新版本号。`,
+报告新版本号 + publish workflow URL。`,
   });
 
   // ─── 阶段 5: Release ───────────────────────────
@@ -206,6 +207,36 @@ bash ${STAGES('6-verify')}
   });
 
   // ─── 阶段 7: Cleanup ───────────────────────────
+  // ─── 阶段 6.5: 硬门禁（同步 JS 检查，绕过 AI 决策）───
+  // [MANDATORY] 阶段 6 必须通过，否则禁止清理 worktree
+  {
+    const _fs = require('node:fs');
+    const _stateFile = _path.join(WS, '.merge-worktree-state.env');
+    if (!_fs.existsSync(_stateFile)) {
+      throw new Error(
+        '硬门禁阻断: 状态文件不存在 — 必须先完成阶段 0 (stages/0-init.sh)'
+      );
+    }
+    const _state = _fs.readFileSync(_stateFile, 'utf8');
+    const _m = _state.match(/^BRANCH_NAME="([^"]+)"/m);
+    if (!_m) {
+      throw new Error('硬门禁阻断: 状态文件缺少 BRANCH_NAME');
+    }
+    const _branchSafe = _m[1].replace(/\//g, '-');
+    const _gate = _path.join(
+      WS, '.merge-checkpoints', _branchSafe, 'deliverables-verified'
+    );
+    if (!_fs.existsSync(_gate)) {
+      throw new Error(
+        `硬门禁阻断 [MANDATORY]: 阶段 6 交付物确认未通过\n` +
+        `  缺少 checkpoint: ${_gate}\n` +
+        `  必须先运行阶段 6 (stages/6-verify.sh) 并 exit 0。\n` +
+        `  禁止绕过此检查执行清理。`
+      );
+    }
+    log(`硬门禁通过: deliverables-verified (${_gate})`);
+  }
+
   phase('7-cleanup');
   await agent({
     description: '7-cleanup: 删除 worktree + 同步其他 worktree + 清理临时文件',
@@ -218,11 +249,12 @@ cd ${WS}
 bash ${STAGES('7-cleanup')}
 \`\`\`
 
-## 门禁
-阶段 6 必须通过（checkpoint deliverables-verified 存在）。未通过则脚本拒绝执行。
+## 门禁（双重保护）
+1. **Workflow 层硬门禁**（已通过）: merge-worktree.js 在调用本阶段前已同步校验 checkpoint deliverables-verified 存在，缺少则 throw 阻断
+2. **Bash 层软门禁**: stages/7-cleanup.sh 自身也会调用 is_checkpoint 校验，AI agent 不要尝试绕过
 
 ## 失败处理
-- "安全阻断：交付物未确认" → 必须先运行阶段 6
+- "安全阻断：交付物未确认" → 极不可能发生（已在 workflow 层拦截）。如发生说明 checkpoint 被手动删除，需重跑阶段 6
 - worktree 删除失败 → 手动: cd ${WS}/main && git worktree remove ../${WT_DIR}
 
 报告清理完成状态。`,

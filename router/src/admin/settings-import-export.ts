@@ -49,6 +49,22 @@ export const adminImportExportRoutes: FastifyPluginCallback<ImportExportOptions>
         if (typeof row.api_key === "string" && row.api_key) {
           try { row.api_key = decrypt(row.api_key, encryptionKey); } catch { /* eslint-disable-line taste/no-silent-catch -- 无法解密则保留原值 */ }
         }
+        // 解密 endpoints JSON 内嵌套的 api_key
+        if (typeof row.endpoints === "string" && row.endpoints) {
+          try {
+            const eps = JSON.parse(row.endpoints) as Record<string, unknown>[];
+            for (const ep of eps) {
+              if (typeof ep.api_key === "string" && ep.api_key) {
+                ep.api_key = decrypt(ep.api_key, encryptionKey);
+              }
+            }
+            row.endpoints = JSON.stringify(eps);
+          } catch { /* eslint-disable-line taste/no-silent-catch -- 无法解密则保留原值 */ }
+        }
+        // 解密 proxy_password
+        if (typeof row.proxy_password === "string" && row.proxy_password) {
+          try { row.proxy_password = decrypt(row.proxy_password, encryptionKey); } catch { /* eslint-disable-line taste/no-silent-catch -- 无法解密则保留原值 */ }
+        }
       }
       for (const row of (data.router_keys || []) as Record<string, unknown>[]) {
         if (typeof row.key_encrypted === "string") {
@@ -90,6 +106,22 @@ export const adminImportExportRoutes: FastifyPluginCallback<ImportExportOptions>
       for (const row of (importData.providers || []) as Record<string, unknown>[]) {
         if (typeof row.api_key === "string" && row.api_key) {
           row.api_key = encrypt(row.api_key, encryptionKey);
+        }
+        // 重加密 endpoints JSON 内嵌套的 api_key
+        if (typeof row.endpoints === "string" && row.endpoints) {
+          try {
+            const eps = JSON.parse(row.endpoints) as Record<string, unknown>[];
+            for (const ep of eps) {
+              if (typeof ep.api_key === "string" && ep.api_key) {
+                ep.api_key = encrypt(ep.api_key, encryptionKey);
+              }
+            }
+            row.endpoints = JSON.stringify(eps);
+          } catch { /* eslint-disable-line taste/no-silent-catch -- 无法解析则保留原值 */ }
+        }
+        // 重加密 proxy_password
+        if (typeof row.proxy_password === "string" && row.proxy_password) {
+          row.proxy_password = encrypt(row.proxy_password, encryptionKey);
         }
       }
       for (const row of (importData.router_keys || []) as Record<string, unknown>[]) {

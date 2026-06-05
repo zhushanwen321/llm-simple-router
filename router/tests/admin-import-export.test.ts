@@ -269,6 +269,118 @@ describe("Config Import/Export API", () => {
       expect(loginRes.statusCode).toBe(200);
     });
 
+    it("decrypts endpoints JSON api_key on export", async () => {
+      const plainApiKey1 = "sk-ep1-plaintext-key";
+      const plainApiKey2 = "sk-ep2-plaintext-key";
+      const encryptedApikey1 = encrypt(plainApiKey1, TEST_ENCRYPTION_KEY);
+      const encryptedApikey2 = encrypt(plainApiKey2, TEST_ENCRYPTION_KEY);
+      const endpoints = JSON.stringify([
+        { api_type: "openai", base_url: "https://ep1.test.com", upstream_path: null, api_key: encryptedApikey1 },
+        { api_type: "anthropic", base_url: "https://ep2.test.com", upstream_path: "/v1", api_key: encryptedApikey2 },
+      ]);
+      const now = new Date().toISOString();
+      db.prepare(
+        "INSERT INTO providers (id, name, api_type, base_url, api_key, is_active, endpoints, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      ).run("ep-test-id", "EP Provider", "openai", "https://api.test.com", encryptedApikey1, 1, endpoints, now, now);
+
+      const res = await app.inject({
+        method: "GET",
+        url: "/admin/api/settings/export",
+        headers: { cookie },
+      });
+      const body = res.json().data;
+      const provider = body.data.providers.find((p: any) => p.id === "ep-test-id");
+      // 顶层 api_key 应被解密
+      expect(provider.api_key).toBe(plainApiKey1);
+      // endpoints JSON 内的 api_key 也应被解密
+      const exportedEps = JSON.parse(provider.endpoints);
+      expect(exportedEps[0].api_key).toBe(plainApiKey1);
+      expect(exportedEps[1].api_key).toBe(plainApiKey2);
+    });
+
+    it("decrypts proxy_password on export", async () => {
+      const plainProxyPassword = "my-secret-proxy-pass";
+      const encryptedProxyPassword = encrypt(plainProxyPassword, TEST_ENCRYPTION_KEY);
+      const encryptedApiKey = encrypt("sk-test", TEST_ENCRYPTION_KEY);
+      const now = new Date().toISOString();
+      db.prepare(
+        "INSERT INTO providers (id, name, api_type, base_url, api_key, is_active, proxy_type, proxy_url, proxy_password, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      ).run("proxy-test-id", "Proxy Provider", "openai", "https://api.test.com", encryptedApiKey, 1, "socks5", "socks5://proxy.test.com:1080", encryptedProxyPassword, now, now);
+
+      const res = await app.inject({
+        method: "GET",
+        url: "/admin/api/settings/export",
+        headers: { cookie },
+      });
+      const body = res.json().data;
+      const provider = body.data.providers.find((p: any) => p.id === "proxy-test-id");
+      expect(provider.proxy_password).toBe(plainProxyPassword);
+    });
+
+    it("re-encrypts endpoints JSON api_key on import", async () => {
+      const plainApiKey1 = "sk-import-ep1-key";
+      const plainApiKey2 = "sk-import-ep2-key";
+      const now = new Date().toISOString();
+      const endpoints = JSON.stringify([
+        { api_type: "openai", base_url: "https://ep1.test.com", upstream_path: null, api_key: plainApiKey1 },
+        { api_type: "anthropic", base_url: "https://ep2.test.com", upstream_path: "/v1", api_key: plainApiKey2 },
+      ]);
+      const exportData = {
+        version: 1,
+        data: {
+          providers: [{
+            id: "import-ep-id", name: "Import EP Provider", api_type: "openai",
+            base_url: "https://api.test.com", api_key: plainApiKey1,
+            is_active: 1, endpoints, created_at: now, updated_at: now,
+          }],
+        },
+      };
+
+      await app.inject({
+        method: "POST",
+        url: "/admin/api/settings/import",
+        payload: exportData,
+        headers: { cookie, "content-type": "application/json" },
+      });
+
+      const row = db.prepare("SELECT api_key, endpoints FROM providers WHERE id = ?").get("import-ep-id") as { api_key: string; endpoints: string };
+      // 顶层 api_key 应被重加密
+      expect(decrypt(row.api_key, TEST_ENCRYPTION_KEY)).toBe(plainApiKey1);
+      // endpoints JSON 内的 api_key 也应被重加密
+      const importedEps = JSON.parse(row.endpoints);
+      expect(decrypt(importedEps[0].api_key, TEST_ENCRYPTION_KEY)).toBe(plainApiKey1);
+      expect(decrypt(importedEps[1].api_key, TEST_ENCRYPTION_KEY)).toBe(plainApiKey2);
+    });
+
+    it("re-encrypts proxy_password on import", async () => {
+      const plainProxyPassword = "import-proxy-secret";
+      const plainApiKey = "sk-import-proxy-test";
+      const now = new Date().toISOString();
+      const exportData = {
+        version: 1,
+        data: {
+          providers: [{
+            id: "import-proxy-id", name: "Import Proxy Provider", api_type: "openai",
+            base_url: "https://api.test.com", api_key: plainApiKey,
+            is_active: 1, proxy_type: "socks5", proxy_url: "socks5://proxy.test.com:1080",
+            proxy_password: plainProxyPassword,
+            created_at: now, updated_at: now,
+          }],
+        },
+      };
+
+      await app.inject({
+        method: "POST",
+        url: "/admin/api/settings/import",
+        payload: exportData,
+        headers: { cookie, "content-type": "application/json" },
+      });
+
+      const row = db.prepare("SELECT api_key, proxy_password FROM providers WHERE id = ?").get("import-proxy-id") as { api_key: string; proxy_password: string };
+      expect(decrypt(row.api_key, TEST_ENCRYPTION_KEY)).toBe(plainApiKey);
+      expect(decrypt(row.proxy_password, TEST_ENCRYPTION_KEY)).toBe(plainProxyPassword);
+    });
+
     it("preserves local log_retention_days value from export", async () => {
       const exportRes = await app.inject({
         method: "GET",
