@@ -1,9 +1,10 @@
 #!/bin/bash
 # beta-publish.sh — Beta prerelease 发布
 #
-# 用法: bash beta-publish.sh [目标版本号]
+# 用法: bash beta-publish.sh [-y] [目标版本号]
 # 示例: bash beta-publish.sh 1.0.3
-#       bash beta-publish.sh          # 自动 patch bump
+#       bash beta-publish.sh -y          # 跳过交互确认（AI/CI 调用）
+#       bash beta-publish.sh              # 自动 patch bump
 #
 # 流程:
 #   1. 前置检查（gh CLI、工作区状态、当前分支）
@@ -20,7 +21,16 @@
 
 set -euo pipefail
 
-TARGET_VERSION="${1:-}"
+AUTO_YES=false
+TARGET_VERSION=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -y|--yes) AUTO_YES=true; shift ;;
+    -*) echo "未知选项: $1"; exit 1 ;;
+    *)  TARGET_VERSION="$1"; shift ;;
+  esac
+done
 
 # ── 颜色定义 ──────────────────────────────────────
 RED='\033[0;31m'
@@ -103,10 +113,14 @@ echo "  npm tag:    beta"
 echo "  CI 将发布:  ${TARGET_VERSION}-beta.{SHA}"
 echo ""
 echo -n "确认发布？[y/N] "
-read -r answer
-if [[ "$answer" != "y" && "$answer" != "Y" ]]; then
-  info "已取消"
-  exit 0
+if [[ "$AUTO_YES" == true ]]; then
+  echo "y (auto)"
+else
+  read -r answer
+  if [[ "$answer" != "y" && "$answer" != "Y" ]]; then
+    info "已取消"
+    exit 0
+  fi
 fi
 echo ""
 
@@ -152,21 +166,28 @@ echo ""
 
 info "=== 步骤 5: 提交推送本地变更 ==="
 
-# 检查是否有未提交变更
-if ! git diff --quiet HEAD 2>/dev/null; then
+# 检查是否有未提交变更（含 untracked files）
+if [ -n "$(git status --porcelain)" ]; then
   echo ""
   warn "有未提交的变更:"
   git status --short
   echo ""
-  echo -n "是否自动提交并推送？[y/N] "
-  read -r auto_commit
-  if [[ "$auto_commit" == "y" || "$auto_commit" == "Y" ]]; then
+  if [[ "$AUTO_YES" == true ]]; then
+    echo "  → 自动提交"
     git add -A
     git commit -m "chore: beta ${TARGET_VERSION} preparation"
     ok "已自动提交"
   else
-    error "请先手动提交变更后重试"
-    exit 1
+    echo -n "是否自动提交并推送？[y/N] "
+    read -r auto_commit
+    if [[ "$auto_commit" == "y" || "$auto_commit" == "Y" ]]; then
+      git add -A
+      git commit -m "chore: beta ${TARGET_VERSION} preparation"
+      ok "已自动提交"
+    else
+      error "请先手动提交变更后重试"
+      exit 1
+    fi
   fi
 fi
 
@@ -204,14 +225,15 @@ info "等待 GitHub Actions 创建 workflow run..."
 
 # 等待 run 出现（最多 60 秒）
 RUN_ID=""
+GH_TMP="/tmp/beta-publish-run.json"
 for i in $(seq 1 12); do
   sleep 5
-  RUN_ID=$(gh run list \
+  gh run list \
     --workflow=publish.yml \
     --branch="$BETA_BRANCH" \
     --limit 1 \
-    --json databaseId \
-    --jq '.[0].databaseId' 2>/dev/null || true)
+    --json databaseId > "$GH_TMP" 2>/dev/null || true
+  RUN_ID=$(jq -r '.[0].databaseId // empty' "$GH_TMP" 2>/dev/null || true)
   if [[ -n "$RUN_ID" ]]; then
     break
   fi
@@ -229,10 +251,11 @@ echo "  查看日志: gh run view $RUN_ID"
 echo ""
 
 # 轮询状态
+GH_STATUS_TMP="/tmp/beta-publish-status.json"
 while true; do
-  STATUS_JSON=$(gh run view "$RUN_ID" --json status,conclusion 2>/dev/null || echo "{}")
-  STATE=$(echo "$STATUS_JSON" | jq -r '.status // empty')
-  CONCLUSION=$(echo "$STATUS_JSON" | jq -r '.conclusion // empty')
+  gh run view "$RUN_ID" --json status,conclusion > "$GH_STATUS_TMP" 2>/dev/null || true
+  STATE=$(jq -r '.status // empty' "$GH_STATUS_TMP" 2>/dev/null || true)
+  CONCLUSION=$(jq -r '.conclusion // empty' "$GH_STATUS_TMP" 2>/dev/null || true)
 
   if [[ "$STATE" == "completed" ]]; then
     if [[ "$CONCLUSION" == "success" ]]; then
@@ -242,7 +265,8 @@ while true; do
       error "CI 失败: $CONCLUSION"
       echo ""
       echo "=== 失败日志 ==="
-      gh run view "$RUN_ID" --log-failed 2>&1 | tail -40
+      gh run view "$RUN_ID" --log-failed > /tmp/beta-publish-failed.log 2>&1 || true
+      tail -40 /tmp/beta-publish-failed.log
       exit 1
     fi
   fi

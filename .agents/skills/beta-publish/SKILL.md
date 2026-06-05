@@ -17,10 +17,11 @@ description: >-
 ## 执行
 
 ```bash
-bash beta-publish.sh [目标版本号]
+bash beta-publish.sh [-y] [目标版本号]
 ```
 
 参数：
+- `-y` / `--yes`：跳过交互确认（AI 调用时必带）
 - `目标版本号`（可选）：如 `1.0.3`。不传则 patch bump 自动计算
 - 必须在 worktree 根目录执行（需要 `router/package.json` 和 git）
 - bash timeout >= 300s（CI 构建约 2-3 分钟）
