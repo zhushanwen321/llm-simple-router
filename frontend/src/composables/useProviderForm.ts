@@ -1,6 +1,5 @@
 import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
-import * as z from "zod";
 import type { ProviderPayload } from "@/api/client";
 import type { Provider, ModelInfo, ProviderEndpoint } from "@/types/mapping";
 import { DEFAULT_CONTEXT_WINDOW, DEFAULT_STREAM_TIMEOUT_MS } from "@/constants";
@@ -117,31 +116,34 @@ export function useProviderForm() {
   const presetHook = useProviderPresets(form);
 
   function validate(): boolean {
-    const schema = z.object({
-      name: z
-        .string()
-        .min(1, t("providers.validation.nameRequired"))
-        .regex(/^[a-zA-Z0-9_-]+$/, t("providers.validation.namePattern")),
-      base_url: z
-        .string()
-        .min(1, t("providers.validation.baseUrlRequired"))
-        .url(t("providers.validation.baseUrlInvalid")),
-    });
     const errs: Record<string, string> = {};
-    const result = schema.safeParse({
-      name: form.value.name.trim(),
-      base_url: form.value.base_url.trim(),
-    });
-    if (!result.success) {
-      for (const issue of result.error.issues) {
-        const field = issue.path[0] as string;
-        if (!errs[field]) errs[field] = issue.message;
+
+    // Name validation (always required)
+    if (!form.value.name.trim()) {
+      errs.name = t("providers.validation.nameRequired");
+    } else if (!/^[a-zA-Z0-9_-]+$/.test(form.value.name.trim())) {
+      errs.name = t("providers.validation.namePattern");
+    }
+
+    // Base URL or endpoints: 当有 endpoints 时通过 endpoint level 校验，否则校验顶层 base_url
+    const hasEndpoints = form.value.endpoints.length > 0;
+    if (!hasEndpoints) {
+      if (!form.value.base_url.trim()) {
+        errs.base_url = t("providers.validation.baseUrlRequired");
+      } else {
+        try {
+          new URL(form.value.base_url.trim());
+        } catch {
+          errs.base_url = t("providers.validation.baseUrlInvalid");
+        }
       }
     }
+
     if (!editingId.value && !form.value.api_key.trim())
       errs.api_key = t("providers.validation.apiKeyRequired");
+
     // endpoints 校验
-    if (form.value.endpoints.length > 0) {
+    if (hasEndpoints) {
       const eps = form.value.endpoints;
       for (let i = 0; i < eps.length; i++) {
         if (!eps[i].base_url.trim()) {
@@ -179,7 +181,10 @@ export function useProviderForm() {
     const payload: ProviderFormPayload = {
       name: form.value.name,
       api_type: form.value.api_type,
-      base_url: form.value.base_url,
+      base_url:
+        form.value.endpoints.length > 0 && !form.value.base_url
+          ? form.value.endpoints[0].base_url
+          : form.value.base_url,
       upstream_path: form.value.upstream_path || undefined,
       endpoints:
         form.value.endpoints.length > 0
