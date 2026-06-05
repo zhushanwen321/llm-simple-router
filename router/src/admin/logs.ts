@@ -1,7 +1,7 @@
 import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
 import { Type, Static } from "@sinclair/typebox";
-import { getRequestLogs, getRequestLogsGrouped, getRequestLogById, getRequestLogChildren, deleteLogsBefore } from "../db/index.js";
+import { getRequestLogs, getRequestLogsGrouped, getRequestLogById, getRequestLogChildren, deleteLogsBefore, extractThinkingLevel } from "../db/index.js";
 import type { LogFileWriter } from "../storage/log-file-writer.js";
 import { HTTP_NOT_FOUND } from "./constants.js";
 import { API_CODE, apiError } from "./api-response.js";
@@ -86,19 +86,11 @@ export const adminLogRoutes: FastifyPluginCallback<LogRoutesOptions> = (app, opt
     }
 
     // JSONL 回填后重新提取 thinking level（覆盖 SQL 层因 client_request 为 null 得出的 'off'）
-    if (log.client_request) {
-      try {
-        const parsed = JSON.parse(log.client_request);
-        const body = parsed?.body;
-        if (body) {
-          if (log.api_type === "anthropic") {
-            if (body.thinking?.type) log.thinking_level = body.thinking.type;
-          } else {
-            log.thinking_level = body.reasoning?.effort ?? body.reasoning_effort ?? "off";
-          }
-        }
-      } catch {
-        log.thinking_level = "off";
+    // 兼容历史数据：thinking_level === 'off' 且 client_request 存在时重新计算
+    if (log.thinking_level === 'off' && log.client_request) {
+      const computed = extractThinkingLevel(log.api_type, log.client_request);
+      if (computed !== 'off') {
+        log.thinking_level = computed;
       }
     }
 

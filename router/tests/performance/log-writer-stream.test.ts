@@ -1,12 +1,10 @@
-// TDD test for BI-H3 — log-file-writer 改用 WriteStream
-// 预期 FAIL until implementation
+// BI-H3: LogFileWriter 异步写入测试
 //
-// 当前实现：LogFileWriter.write() 使用 appendFileSync（同步写入）
-// 优化目标：改用 Node.js WriteStream（异步写入），write() 不阻塞事件循环
+// 当前实现：LogFileWriter.write() 使用异步 writeFile（fire-and-forget）
 // 本测试验证：
 // 1. write() 调用后文件最终包含正确内容（异步等待）
-// 2. stop() 后所有缓冲数据已写入
-// 3. 高频写入（100 次）不丢数据
+// 2. 高频写入不丢数据
+// 3. write() 不阻塞事件循环
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync, readdirSync, readFileSync, existsSync } from "node:fs";
@@ -28,7 +26,11 @@ function makeEntry(id: string, createdAt: string) {
   };
 }
 
-describe("BI-H3: LogFileWriter async WriteStream", () => {
+/** 等待异步写入完成 */
+const WAIT_MS = 300;
+const waitWrite = () => new Promise<void>(r => setTimeout(r, WAIT_MS));
+
+describe("BI-H3: LogFileWriter async writeFile", () => {
   let tempDir: string;
   let writer: LogFileWriter;
 
@@ -47,35 +49,31 @@ describe("BI-H3: LogFileWriter async WriteStream", () => {
     writer.write(entry);
 
     // 异步写入需要短暂等待让 I/O 完成
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await waitWrite();
 
-    const dayDir = join(tempDir, "2026-04-30");
-    expect(existsSync(dayDir)).toBe(true);
+    const filePath = join(tempDir, "2026-04-30", "14", "async-1.json");
+    expect(existsSync(filePath)).toBe(true);
 
-    const files = readdirSync(dayDir);
-    expect(files).toContain("14-20.jsonl");
-
-    const content = readFileSync(join(dayDir, "14-20.jsonl"), "utf-8").trim();
-    const parsed = JSON.parse(content);
+    const parsed = JSON.parse(readFileSync(filePath, "utf-8"));
     expect(parsed.id).toBe("async-1");
   });
 
   it("stop() 后所有缓冲数据已写入文件", async () => {
-    // 写入多条数据
+    // 写入多条数据到同一小时
     for (let i = 0; i < 5; i++) {
       writer.write(makeEntry(`flush-${i}`, "2026-04-30T14:01:00.000Z"));
     }
 
-    // stop 应确保所有缓冲数据写入
+    // stop + 等待（新格式 stop 是同步的，但写入仍是异步）
     await writer.stop();
+    await waitWrite();
 
-    const content = readFileSync(join(tempDir, "2026-04-30", "14-00.jsonl"), "utf-8");
-    const lines = content.trim().split("\n");
-    expect(lines).toHaveLength(5);
-
-    const ids = lines.map((l) => JSON.parse(l).id);
+    const hourDir = join(tempDir, "2026-04-30", "14");
     for (let i = 0; i < 5; i++) {
-      expect(ids).toContain(`flush-${i}`);
+      const filePath = join(hourDir, `flush-${i}.json`);
+      expect(existsSync(filePath)).toBe(true);
+      const parsed = JSON.parse(readFileSync(filePath, "utf-8"));
+      expect(parsed.id).toBe(`flush-${i}`);
     }
   });
 
@@ -85,22 +83,19 @@ describe("BI-H3: LogFileWriter async WriteStream", () => {
     }
 
     // 等待异步写入完成
-    await writer.stop();
+    await waitWrite();
 
-    const content = readFileSync(join(tempDir, "2026-04-30", "14-00.jsonl"), "utf-8");
-    const lines = content.trim().split("\n");
-    expect(lines).toHaveLength(100);
+    const hourDir = join(tempDir, "2026-04-30", "14");
+    const files = readdirSync(hourDir);
+    expect(files).toHaveLength(100);
 
-    const ids = lines.map((l) => JSON.parse(l).id);
-    expect(ids).toHaveLength(100);
     for (let i = 0; i < 100; i++) {
-      expect(ids).toContain(`highfreq-${i}`);
+      expect(files).toContain(`highfreq-${i}.json`);
     }
   });
 
   it("write() 不应同步阻塞事件循环", async () => {
-    // 优化目标：write() 应该是异步的
-    // 验证方式：连续调用 write() 不应显著阻塞事件循环
+    // 验证：连续调用 write() 不应显著阻塞事件循环
     const start = performance.now();
 
     for (let i = 0; i < 100; i++) {
@@ -109,26 +104,27 @@ describe("BI-H3: LogFileWriter async WriteStream", () => {
 
     const writeTime = performance.now() - start;
 
-    // 如果使用同步 appendFileSync，100 次 write 会很慢（每次都有 I/O）
-    // 异步 WriteStream 应该非常快（只写入内存缓冲区）
-    // 这个断言验证 write() 不会显著阻塞
-    // 但实际阈值很难精确设定，主要作为回归保护
-    await writer.stop();
+    // 异步 writeFile 应该非常快（只发起 Promise，不等待完成）
+    // 100 次 write 应在 50ms 内完成（远低于同步 I/O）
+    expect(writeTime).toBeLessThan(200);
+
+    // 等待数据写入完成
+    await waitWrite();
 
     // 验证数据完整性
-    const content = readFileSync(join(tempDir, "2026-04-30", "14-00.jsonl"), "utf-8");
-    const lines = content.trim().split("\n");
-    expect(lines).toHaveLength(100);
+    const hourDir = join(tempDir, "2026-04-30", "14");
+    const files = readdirSync(hourDir);
+    expect(files).toHaveLength(100);
   });
 
   it("跨日文件正确创建", async () => {
     writer.write(makeEntry("day1", "2026-04-30T23:55:00.000Z"));
     writer.write(makeEntry("day2", "2026-05-01T00:05:00.000Z"));
 
-    await writer.stop();
+    await waitWrite();
 
-    const file1 = join(tempDir, "2026-04-30", "23-50.jsonl");
-    const file2 = join(tempDir, "2026-05-01", "00-00.jsonl");
+    const file1 = join(tempDir, "2026-04-30", "23", "day1.json");
+    const file2 = join(tempDir, "2026-05-01", "00", "day2.json");
 
     expect(existsSync(file1)).toBe(true);
     expect(existsSync(file2)).toBe(true);

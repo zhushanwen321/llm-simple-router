@@ -250,6 +250,7 @@ export {
   deleteOldestLogs,
   getLogCount,
   updateLogPipelineSnapshot,
+  extractThinkingLevel,
 } from "./logs.js";
 export type { RequestLog, RequestLogGroupedRow, RequestLogListRow } from "./logs.js";
 
