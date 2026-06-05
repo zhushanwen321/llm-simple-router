@@ -4,6 +4,19 @@
 
 本文档记录所有"迁移后老版本代码仍可正常运行"的数据库变更。版本稳定后可清理对应迁移和旧列。
 
+## 053: add_thinking_level (2026-06-05)
+
+**关联 ADR**: `docs/adr/0007-log-storage-and-query-optimization.md`
+
+| 操作 | 类型 | 影响 |
+|------|------|------|
+| `ALTER TABLE request_logs ADD COLUMN thinking_level TEXT NOT NULL DEFAULT 'off'` | 新增列 | 旧代码不读此列，无影响 |
+| `CREATE INDEX idx_request_logs_thinking_level` | 新增索引 | 旧代码不使用此索引，无影响 |
+
+**回退兼容性**: 老代码通过 `json_extract(client_request)` 计算 thinking_level，新列被忽略。新代码直接读 `thinking_level` 列，`COALESCE(rl.thinking_level, 'off')` 兼容未升级的行。
+
+**旧逻辑清理条件**: 当所有行的 `thinking_level` 列已填充正确值（不再依赖查询时 json_extract fallback）时，可移除 admin/logs.ts 中的 `extractThinkingLevel` fallback 和 `LOG_LIST_SELECT` 中的 COALESCE。
+
 ## 051: provider_endpoints (2026-05-29)
 
 **关联 ADR**: `docs/adr/0006-provider-multi-api-type-endpoints.md`

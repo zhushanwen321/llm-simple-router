@@ -3,6 +3,22 @@ import type { LogFileWriter } from "../storage/log-file-writer.js";
 import { shouldPreserveDetail, type RetryMatcher } from "../proxy/log-detail-policy.js";
 import { getCachedStmt } from "./helpers.js";
 
+/** 从 client_request JSON 中提取 thinking_level，按 api_type 分支处理 */
+export function extractThinkingLevel(apiType: string, clientRequest: string | null): string {
+  if (!clientRequest) return "off";
+  try {
+    const parsed = JSON.parse(clientRequest);
+    const body = parsed?.body;
+    if (!body || typeof body !== "object") return "off";
+    if (apiType === "anthropic") {
+      return body.thinking?.type ?? "off";
+    }
+    return body.reasoning?.effort ?? body.reasoning_effort ?? "off";
+  } catch {
+    return "off";
+  }
+}
+
 type CountRow = { count: number };
 
 export interface RequestLog {
@@ -47,11 +63,7 @@ const LOG_LIST_SELECT = `rl.id, rl.api_type, rl.model, rl.provider_id, rl.status
             rm.input_tokens_estimated, rm.client_type, rm.cache_read_tokens_estimated,
             COALESCE(p.name, rl.provider_id) AS provider_name,
             rl.upstream_api_type, rl.upstream_base_url,
-            CASE
-              WHEN rl.client_request IS NULL THEN 'off'
-              WHEN rl.api_type = 'anthropic' THEN COALESCE(json_extract(rl.client_request, '$.body.thinking.type'), 'off')
-              ELSE COALESCE(json_extract(rl.client_request, '$.body.reasoning.effort'), json_extract(rl.client_request, '$.body.reasoning_effort'), 'off')
-            END AS thinking_level`;
+            COALESCE(rl.thinking_level, 'off') AS thinking_level`;
 const LOG_LIST_JOIN = `LEFT JOIN providers p ON p.id = rl.provider_id LEFT JOIN request_metrics rm ON rm.request_log_id = rl.id`;
 
 export interface RequestLogInsert {
@@ -85,6 +97,7 @@ export interface RequestLogInsert {
   failover_trigger?: string | null;
   upstream_api_type?: string | null;
   upstream_base_url?: string | null;
+  thinking_level?: string;
 }
 
 export interface LogWriteContext {
@@ -111,9 +124,9 @@ function rawInsertRequestLog(
       is_stream, error_message, created_at, client_request, upstream_request, upstream_response,
       is_retry, is_failover, original_request_id, router_key_id, original_model, session_id, pipeline_snapshot,
       transport_kind, abort_reason, error_code, headers_sent, resilience_action, resilience_reason, mapping_reason, failover_trigger,
-      upstream_api_type, upstream_base_url)
+      upstream_api_type, upstream_base_url, thinking_level)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     log.id, log.api_type, log.model, log.provider_id, log.status_code,
     log.client_status_code ?? null,
@@ -135,6 +148,7 @@ function rawInsertRequestLog(
     log.failover_trigger ?? null,
     log.upstream_api_type ?? null,
     log.upstream_base_url ?? null,
+    log.thinking_level ?? extractThinkingLevel(log.api_type, log.client_request ?? null),
   );
 }
 
@@ -252,19 +266,14 @@ export function getRequestLogs(
   return { data, total };
 }
 
-const LOG_DETAIL_THINKING_LEVEL = `,
-            CASE
-              WHEN rl.client_request IS NULL THEN 'off'
-              WHEN rl.api_type = 'anthropic' THEN COALESCE(json_extract(rl.client_request, '$.body.thinking.type'), 'off')
-              ELSE COALESCE(json_extract(rl.client_request, '$.body.reasoning.effort'), json_extract(rl.client_request, '$.body.reasoning_effort'), 'off')
-            END AS thinking_level`;
-
 export function getRequestLogById(db: Database.Database, id: string): RequestLogListRow | undefined {
-  return db.prepare(
+  return getCachedStmt(
+    db,
     `SELECT rl.*, rm.input_tokens, rm.output_tokens, rm.cache_read_tokens, rm.ttft_ms,
             rm.tokens_per_second, rm.stop_reason, rm.backend_model, rm.is_complete AS metrics_complete,
             rm.input_tokens_estimated, rm.client_type, rm.cache_read_tokens_estimated,
-            COALESCE(p.name, rl.provider_id) AS provider_name${LOG_DETAIL_THINKING_LEVEL},
+            COALESCE(p.name, rl.provider_id) AS provider_name,
+            COALESCE(rl.thinking_level, 'off') AS thinking_level,
             rl.upstream_api_type, rl.upstream_base_url
      FROM request_logs rl
      LEFT JOIN providers p ON p.id = rl.provider_id

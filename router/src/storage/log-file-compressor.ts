@@ -1,14 +1,54 @@
-import { readdirSync, readFileSync, writeFileSync, unlinkSync, rmSync, existsSync } from "node:fs";
+import { readdirSync, readFileSync, writeFileSync, unlinkSync, rmSync, existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { gzipSync } from "node:zlib";
-import { WINDOW_MINUTES, localDateStr } from "./types.js";
+import { localDateStr } from "./types.js";
 
 const SECONDS_PER_MINUTE = 60;
 const MS_PER_SECOND = 1000;
-const COMPRESSION_INTERVAL_MS = WINDOW_MINUTES * SECONDS_PER_MINUTE * MS_PER_SECOND;
+const COMPRESSION_INTERVAL_MINUTES = 10;
+const COMPRESSION_INTERVAL_MS = COMPRESSION_INTERVAL_MINUTES * SECONDS_PER_MINUTE * MS_PER_SECOND;
 
-/** 将已结束窗口的 .jsonl 文件压缩为 .jsonl.gz */
-export function compressFinishedFiles(baseDir: string, now: Date): number {
+/** 压缩新格式：遍历 {date}/{HH}/*.json，mtime 超过 10 分钟的压缩为 .json.gz */
+function compressNewFormatFiles(baseDir: string, now: Date): number {
+  let compressed = 0;
+  if (!existsSync(baseDir)) return 0;
+
+  const dayDirs = readdirSync(baseDir, { withFileTypes: true })
+    .filter(d => d.isDirectory() && /^\d{4}-\d{2}-\d{2}$/.test(d.name));
+
+  for (const dayDir of dayDirs) {
+    const dayPath = join(baseDir, dayDir.name);
+    const hourDirs = readdirSync(dayPath, { withFileTypes: true })
+      .filter(d => d.isDirectory() && /^\d{2}$/.test(d.name));
+
+    for (const hourDir of hourDirs) {
+      const hourPath = join(dayPath, hourDir.name);
+      const files = readdirSync(hourPath);
+
+      for (const file of files) {
+        if (!file.endsWith(".json") || file.endsWith(".json.gz")) continue;
+
+        const filePath = join(hourPath, file);
+        try {
+          const stat = statSync(filePath);
+          if (now.getTime() - stat.mtimeMs > COMPRESSION_INTERVAL_MS) {
+            const content = readFileSync(filePath);
+            writeFileSync(filePath + ".gz", gzipSync(content));
+            unlinkSync(filePath);
+            compressed++;
+          }
+        } catch {
+          /* 新格式文件可能正在被写入，跳过 */
+          continue;
+        }
+      }
+    }
+  }
+  return compressed;
+}
+
+/** 压缩旧格式：将已结束窗口的 .jsonl 文件压缩为 .jsonl.gz */
+function compressLegacyJsonlFiles(baseDir: string, now: Date): number {
   let compressed = 0;
   if (!existsSync(baseDir)) return 0;
 
@@ -30,24 +70,28 @@ export function compressFinishedFiles(baseDir: string, now: Date): number {
 
       // 使用 UTC 时间构建窗口结束时间
       const dateParts = dayDir.name.split("-").map(Number);
-      const windowEnd = new Date(Date.UTC(dateParts[0], dateParts[1] - 1, dateParts[2], fileHour, fileMinute + WINDOW_MINUTES));
+      const windowEnd = new Date(Date.UTC(dateParts[0], dateParts[1] - 1, dateParts[2], fileHour, fileMinute + COMPRESSION_INTERVAL_MINUTES));
 
       if (now >= windowEnd) {
         const filePath = join(dirPath, file);
         try {
           const content = readFileSync(filePath);
-          const gzipped = gzipSync(content);
-          writeFileSync(filePath + ".gz", gzipped);
+          writeFileSync(filePath + ".gz", gzipSync(content));
           unlinkSync(filePath);
           compressed++;
-        // eslint-disable-next-line taste/no-silent-catch
         } catch {
-          // 文件可能正在被写入，跳过
+          /* 旧格式文件可能正在被写入，跳过 */
+          continue;
         }
       }
     }
   }
   return compressed;
+}
+
+/** 压缩所有已结束的文件（新格式 + 旧格式）。对外接口，供测试和维护调用 */
+export function compressFinishedFiles(baseDir: string, now: Date): number {
+  return compressNewFormatFiles(baseDir, now) + compressLegacyJsonlFiles(baseDir, now);
 }
 
 /** 删除超过保留天数的日期目录 */
@@ -86,10 +130,12 @@ export function scheduleLogFileMaintenance(
 
   const doMaintenance = () => {
     const now = new Date();
-    const compressed = compressFinishedFiles(baseDir, now);
+    const newCompressed = compressNewFormatFiles(baseDir, now);
+    const legacyCompressed = compressLegacyJsonlFiles(baseDir, now);
     const deleted = cleanExpiredDirs(baseDir, options.retentionDays, now);
-    if (compressed > 0 || deleted > 0) {
-      options.log.info(`Log file maintenance: compressed ${compressed} files, deleted ${deleted} dirs`);
+    const totalCompressed = newCompressed + legacyCompressed;
+    if (totalCompressed > 0 || deleted > 0) {
+      options.log.info(`Log file maintenance: compressed ${totalCompressed} files (${newCompressed} new + ${legacyCompressed} legacy), deleted ${deleted} dirs`);
     }
   };
 
