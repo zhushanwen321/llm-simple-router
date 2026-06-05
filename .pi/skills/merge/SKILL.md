@@ -27,7 +27,7 @@ description: >-
 
 ```bash
 cd /Users/zhushanwen/Code/llm-simple-router-workspace
-bash ~/.agents/skills/merge-worktree/stages/0-init.sh <worktree-dir> [patch|minor|major]
+bash .pi/skills/merge/stages/0-init.sh <worktree-dir> [patch|minor|major]
 ```
 
 参数：
@@ -40,9 +40,9 @@ bash ~/.agents/skills/merge-worktree/stages/0-init.sh <worktree-dir> [patch|mino
 
 ```bash
 cd /Users/zhushanwen/Code/llm-simple-router-workspace
-bash ~/.agents/skills/merge-worktree/stages/1-local-check.sh
-bash ~/.agents/skills/merge-worktree/stages/2-pr-merge.sh
-bash ~/.agents/skills/merge-worktree/stages/3-post-merge-ci.sh
+bash .pi/skills/merge/stages/1-local-check.sh
+bash .pi/skills/merge/stages/2-pr-merge.sh
+bash .pi/skills/merge/stages/3-post-merge-ci.sh
 ```
 
 | 阶段 | 功能 | 幂等条件 |
@@ -72,7 +72,7 @@ bash scripts/publish.sh patch
 
 ```bash
 cd /Users/zhushanwen/Code/llm-simple-router-workspace
-bash ~/.agents/skills/merge-worktree/stages/5-release.sh
+bash .pi/skills/merge/stages/5-release.sh
 ```
 
 生成 commit 清单 → release notes → 创建/更新 GitHub Release。
@@ -114,7 +114,7 @@ docker images llm-simple-router:latest --format "{{.Repository}}:{{.Tag}}" 2>/de
 
 ```bash
 cd /Users/zhushanwen/Code/llm-simple-router-workspace
-bash ~/.agents/skills/merge-worktree/stages/7-cleanup.sh
+bash .pi/skills/merge/stages/7-cleanup.sh
 ```
 
 删除 feature worktree + 同步其他 worktree + 清理临时文件。
@@ -155,7 +155,7 @@ bash ~/.agents/skills/merge-worktree/stages/7-cleanup.sh
 # 2. 在 feature worktree 中修复
 # 3. 重跑同一阶段
 cd /Users/zhushanwen/Code/llm-simple-router-workspace
-bash ~/.agents/skills/merge-worktree/stages/N-name.sh
+bash .pi/skills/merge/stages/N-name.sh
 ```
 
 ## 文件结构
