@@ -88,8 +88,9 @@ export function useQuickSetup() {
   const selectedGroup = ref("");
   const selectedPlan = ref("");
   const apiType = ref<"openai" | "openai-responses" | "anthropic">("anthropic");
+  // sharedKey 是页面绑定的 API Key 输入框，同时作为提交和测试连接的 key
   const apiKey = ref("");
-  const sharedKey = ref("");
+  const sharedKey = apiKey;
   const endpoints = ref<ProviderEndpoint[]>([]);
   const modelConfigs = ref<ModelConfig[]>([]);
   const mappingEntries = ref<MappingEntry[]>([]);

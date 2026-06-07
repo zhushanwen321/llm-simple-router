@@ -148,9 +148,11 @@ export const MODEL_CAPABILITIES: Record<string, string[]> = {
   "qwen3.5-flash": ["text", "image"],
   // ── 火山引擎 ── Doubao Seed 2.0 Pro 规格：Input Text, Images, Video
   "doubao-seed-2-0-pro-260215": ["text", "image", "video"],
-  // ── 小米 MiMo ── 只有 omni 版本支持图片，pro 版本是纯文本
+  // ── 小米 MiMo ──
+  "mimo-v2.5-pro": ["text", "image"],
+  "mimo-v2.5": ["text", "image"],
   "mimo-v2-omni": ["text", "image", "audio", "video"],
-  "mimo-v2.5": ["text", "image", "audio", "video"],
+  "mimo-v2-pro": ["text"],
 }
 
 export const DEFAULT_CONTEXT_WINDOW = 200000
