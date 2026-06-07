@@ -4,7 +4,7 @@ import { useI18n } from "vue-i18n";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { ArrowRight, Plus } from "lucide-vue-next";
+import { ArrowRight, Plus, Grid3x3 } from "lucide-vue-next";
 import MappingEntryEditor from "@/components/mappings/MappingEntryEditor.vue";
 import CascadingModelSelect from "@/components/mappings/CascadingModelSelect.vue";
 import type {
@@ -32,7 +32,11 @@ const emit = defineEmits<{
   ];
   "update:client-model": [index: number, clientModel: string];
   "toggle-active": [index: number];
-  add: [clientModel: string, targetModel: string];
+  add: [
+    clientModel: string,
+    targetModel: string,
+    multimodalFallback?: MultimodalFallback,
+  ];
   remove: [clientModel: string];
 }>();
 
@@ -46,18 +50,31 @@ function toggleExpand(clientModel: string) {
 
 const newFrom = ref("");
 const newToValue = ref<SelectedValue | undefined>();
+const newMultimodalValue = ref<SelectedValue | undefined>();
+const showMultimodal = ref(false);
 
 function canAdd(): boolean {
   return newFrom.value.trim().length > 0 && !!newToValue.value?.model;
+}
+
+function buildMultimodalFallback(): MultimodalFallback | undefined {
+  if (!showMultimodal.value || !newMultimodalValue.value?.model)
+    return undefined;
+  return {
+    provider_id: newMultimodalValue.value.provider_id,
+    backend_model: newMultimodalValue.value.model,
+  };
 }
 
 function addMapping() {
   const from = newFrom.value.trim();
   const to = newToValue.value;
   if (from && to) {
-    emit("add", from, to.model);
+    emit("add", from, to.model, buildMultimodalFallback());
     newFrom.value = "";
     newToValue.value = undefined;
+    newMultimodalValue.value = undefined;
+    showMultimodal.value = false;
   }
 }
 
@@ -109,39 +126,81 @@ function handleKeydown(e: KeyboardEvent) {
 
     <!-- Add new mapping row -->
     <div
-      class="flex items-center gap-3 rounded-md border border-dashed border-border px-3 py-2"
+      class="rounded-md border border-dashed border-border px-3 py-2 space-y-1.5"
     >
-      <Input
-        v-model="newFrom"
-        :placeholder="t('providers.shared.clientModel')"
-        class="h-7 min-w-[140px] text-xs font-mono border-border"
-        @keydown="handleKeydown"
-      />
-      <ArrowRight class="size-3.5 shrink-0 text-muted-foreground/30" />
-      <div class="flex-1 min-w-0">
-        <CascadingModelSelect
-          :providers="providerGroups"
-          :model-value="newToValue"
-          compact
-          :placeholder="t('providers.shared.selectModel')"
-          @update:model-value="(v: SelectedValue) => (newToValue = v)"
+      <div class="flex items-center gap-2">
+        <Input
+          v-model="newFrom"
+          :placeholder="t('providers.shared.clientModel')"
+          class="h-7 flex-1 min-w-0 text-xs font-mono border-border"
+          @keydown="handleKeydown"
         />
+        <ArrowRight class="size-3.5 shrink-0 text-muted-foreground/30" />
+        <div class="flex-[2] min-w-0">
+          <CascadingModelSelect
+            :providers="providerGroups"
+            :model-value="newToValue"
+            compact
+            :placeholder="t('providers.shared.selectModel')"
+            @update:model-value="(v: SelectedValue) => (newToValue = v)"
+          />
+        </div>
+        <Badge
+          variant="outline"
+          class="text-[10px] shrink-0 text-muted-foreground/50"
+        >
+          {{ t("providers.shared.tagCustom") }}
+        </Badge>
+        <Button
+          variant="outline"
+          size="icon-xs"
+          class="shrink-0"
+          :disabled="!canAdd()"
+          @click="addMapping"
+        >
+          <Plus class="size-3" />
+        </Button>
       </div>
-      <Badge
-        variant="outline"
-        class="text-[10px] shrink-0 text-muted-foreground/50"
-      >
-        {{ t("providers.shared.tagCustom") }}
-      </Badge>
-      <Button
-        variant="outline"
-        size="icon-xs"
-        class="shrink-0"
-        :disabled="!canAdd()"
-        @click="addMapping"
-      >
-        <Plus class="size-3" />
-      </Button>
+
+      <!-- Multimodal fallback (optional) -->
+      <div class="flex items-center gap-2">
+        <Button
+          type="button"
+          variant="ghost"
+          size="xs"
+          class="text-[10px] text-blue-500/60 hover:text-blue-500"
+          @click="showMultimodal = !showMultimodal"
+        >
+          <Grid3x3 class="size-3 mr-1" />
+          {{
+            showMultimodal
+              ? t("mappings.multimodalFallback.collapse")
+              : t("mappings.multimodalFallback.add")
+          }}
+        </Button>
+        <div
+          v-if="showMultimodal"
+          class="flex items-center gap-2 flex-1 min-w-0"
+        >
+          <span class="text-[10px] text-blue-500/50 shrink-0">
+            <Grid3x3 class="size-2.5" />
+          </span>
+          <div class="flex-1 min-w-0">
+            <CascadingModelSelect
+              :providers="providerGroups"
+              :model-value="newMultimodalValue"
+              compact
+              dashed
+              :placeholder="
+                t('mappings.multimodalFallback.selectProviderModel')
+              "
+              @update:model-value="
+                (v: SelectedValue) => (newMultimodalValue = v)
+              "
+            />
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>

@@ -192,7 +192,11 @@ export function useQuickSetupActions(ctx: ActionCtx) {
       i === index ? { ...e, multimodalFallback: fb } : e,
     );
   };
-  const addMappingEntry = (clientModel: string, targetModel: string) => {
+  const addMappingEntry = (
+    clientModel: string,
+    targetModel: string,
+    multimodalFallback?: MultimodalFallback,
+  ) => {
     ctx.data.mappingEntries.value = [
       ...ctx.data.mappingEntries.value.filter(
         (m) => m.clientModel !== clientModel,
@@ -200,6 +204,7 @@ export function useQuickSetupActions(ctx: ActionCtx) {
       {
         clientModel,
         targets: [{ backend_model: targetModel, provider_id: "__new__" }],
+        ...(multimodalFallback ? { multimodalFallback } : {}),
         existing: false,
         tag: "cust" as const,
         active: true,
