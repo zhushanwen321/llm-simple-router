@@ -190,6 +190,23 @@ generate_auto_release_notes() {
 }
 
 # ════════════════════════════════════════════════════
+# 脚本级变量（phase_init 中赋值，--from 跳过时需有默认值）
+# ════════════════════════════════════════════════════
+WS_ROOT=""
+MAIN_WT=""
+BRANCH_NAME=""
+PR_NUMBER=""
+PR_TITLE=""
+PR_STATE=""
+GH_REPO="${GH_REPO:-}"
+GH_REMOTE="origin"
+LOG_FILE="${LOG_FILE:-}"
+NEW_VERSION=""
+TAG=""
+RELEASE_URL=""
+COMMIT_FILE=""
+
+# ════════════════════════════════════════════════════
 # 参数解析
 # ════════════════════════════════════════════════════
 
@@ -264,7 +281,6 @@ phase_init() {
     # 环境检测
     BRANCH_NAME=$(git -C "$WORKTREE_DIR" branch --show-current)
     WS_ROOT=$(find_workspace_root "$WORKTREE_DIR")
-
     if [[ -z "$WS_ROOT" ]]; then
         echo -e "${RED}Error: 未找到 workspace root（向上查找 .bare/ 或 .git/）${NC}"
         exit 1
@@ -277,7 +293,6 @@ phase_init() {
     fi
 
     # 自动检测 GitHub repo
-    GH_REPO="${GH_REPO:-}"
     if [[ -z "$GH_REPO" ]]; then
         local _remote_url
         _remote_url=$(git -C "$WORKTREE_DIR" remote get-url github 2>/dev/null \
