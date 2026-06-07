@@ -90,6 +90,11 @@ export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
   "step-2-16k": 16000,
   "step-1-8k": 8000,
   "step-1-32k": 32000,
+  // 小米 MiMo
+  "mimo-v2.5-pro": 1000000,
+  "mimo-v2.5": 1000000,
+  "mimo-v2-omni": 128000,
+  "mimo-v2-pro": 128000,
   // 硅基流动
   "deepseek-ai/DeepSeek-V3.2-Exp": 128000,
   "deepseek-ai/DeepSeek-R1": 128000,
