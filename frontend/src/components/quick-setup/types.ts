@@ -188,7 +188,8 @@ export function getDefaultContextWindow(modelName: string): number {
     m.includes("v3.2") || // DeepSeek V3.2
     m.includes("r1") || // DeepSeek R1
     m.includes("reasoner") || // OpenAI reasoner
-    m.includes("qwen3.6") // Qwen 3.6 series
+    m.includes("qwen3.6") || // Qwen 3.6 series
+    m.includes("mimo-v2.5") // 小米 MiMo V2.5 系列（Pro / 标准）
   )
     return CONTEXT_1M;
   // 256K context window models

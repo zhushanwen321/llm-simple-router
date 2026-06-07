@@ -12,8 +12,12 @@ export interface ProviderPreset {
   models: string[]
   /** 由 API handler 补充：模型名 → capabilities 映射 */
   modelCapabilities?: Record<string, string[]>
-  /** 隐藏 preset，不在 plan 下拉菜单显示，但 endpoints 生成仍遍历 */
-  hidden?: boolean
+  /** 内嵌多个 endpoint 配置（如同时提供 openai + anthropic） */
+  endpoints?: Array<{
+    apiType: 'openai' | 'openai-responses' | 'anthropic'
+    baseUrl: string
+    upstreamPath?: string
+  }>
 }
 
 export interface ProviderGroup {

@@ -21,9 +21,8 @@ export function useProviderPresets(form: {
   const availablePlans = computed(() => {
     if (!presetGroup.value) return [];
     return (
-      providerPresets.value
-        .find((g) => g.group === presetGroup.value)
-        ?.presets.filter((p) => !p.hidden) ?? []
+      providerPresets.value.find((g) => g.group === presetGroup.value)
+        ?.presets ?? []
     );
   });
 
@@ -40,25 +39,30 @@ export function useProviderPresets(form: {
     const group = providerPresets.value.find(
       (g) => g.group === presetGroup.value,
     );
-    const plans = group?.presets;
-    if (plans?.length) {
-      presetPlan.value = plans[0].plan;
+    const preset = group?.presets[0];
+    if (preset) {
+      presetPlan.value = preset.plan;
       onPresetChange();
-      // Auto-generate endpoints from all presets in the group
-      const seen = new Set<string>();
-      const endpoints: import("@/types/mapping").ProviderEndpoint[] = [];
-      for (const preset of plans) {
-        if (seen.has(preset.apiType)) continue;
-        seen.add(preset.apiType);
-        endpoints.push({
+      // Auto-generate endpoints from preset's embedded endpoints or fallback to single
+      if (preset.endpoints && preset.endpoints.length > 0) {
+        form.value.endpoints = preset.endpoints.map((ep) => ({
           api_type:
-            preset.apiType as import("@/types/mapping").ProviderEndpoint["api_type"],
-          base_url: preset.baseUrl,
-          upstream_path: preset.upstreamPath || null,
+            ep.apiType as import("@/types/mapping").ProviderEndpoint["api_type"],
+          base_url: ep.baseUrl,
+          upstream_path: ep.upstreamPath || null,
           api_key: null,
-        });
+        }));
+      } else {
+        form.value.endpoints = [
+          {
+            api_type:
+              preset.apiType as import("@/types/mapping").ProviderEndpoint["api_type"],
+            base_url: preset.baseUrl,
+            upstream_path: preset.upstreamPath || null,
+            api_key: null,
+          },
+        ];
       }
-      form.value.endpoints = endpoints;
     } else {
       presetPlan.value = "";
     }
