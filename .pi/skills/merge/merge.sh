@@ -460,7 +460,8 @@ phase_post_merge_ci() {
     main_sha=$(git -C "$MAIN_WT" rev-parse "$GH_REMOTE/main")
     echo "  main SHA: $main_sha"
 
-    bash "$SCRIPT_DIR/wait-for-ci.sh" "$main_sha" || {
+    local gh_flag="${GH_REPO:+--repo $GH_REPO}"
+    bash "$SCRIPT_DIR/wait-for-ci.sh" "$main_sha" $gh_flag || {
         local wait_exit=$?
         if [[ $wait_exit -eq 3 ]]; then
             echo -e "  ${GREEN}项目无 CI workflow，跳过等待${NC}"
