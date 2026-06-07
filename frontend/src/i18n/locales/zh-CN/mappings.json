@@ -67,6 +67,7 @@
   "multimodalFallback": {
   "title": "多模态 Fallback",
   "add": "添加多模态 Fallback",
+  "collapse": "收起多模态",
   "configured": "已配置",
   "selectProvider": "选择供应商",
   "modelPlaceholder": "模型名称（如 gpt-4o）",

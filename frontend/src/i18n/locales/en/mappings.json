@@ -67,6 +67,7 @@
   "multimodalFallback": {
   "title": "Multimodal Fallback",
   "add": "Add Multimodal Fallback",
+  "collapse": "Collapse multimodal",
   "configured": "Configured",
   "selectProvider": "Select Provider",
   "modelPlaceholder": "Model name (e.g. gpt-4o)",
