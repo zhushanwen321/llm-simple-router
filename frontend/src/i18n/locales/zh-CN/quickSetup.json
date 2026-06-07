@@ -106,7 +106,9 @@
     "setupCompleteWithErrors": "快速配置完成!{count} 个映射状态切换失败",
     "setupComplete": "快速配置完成!",
     "setupFailed": "快速配置失败",
-    "loadFailed": "加载推荐配置失败"
+    "loadFailed": "加载推荐配置失败",
+    "connectionOk": "连接测试成功，AI 已正常响应",
+    "connectionFailed": "连接测试失败"
   },
   "steps": {
     "selectClient": "选择客户端",

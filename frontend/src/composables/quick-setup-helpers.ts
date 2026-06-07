@@ -453,8 +453,7 @@ export function applyProviderChange(
       ctx.selectedPlan.value = preset.plan;
       ctx.apiType.value = resolveApiType(client?.format, preset.apiType);
       applyPresetModels(preset, ctx.modelConfigs, ctx.isNonOpenaiEndpoint);
-      // Generate endpoints from all presets in the group (dedup by api_type)
-      applyPresetEndpoints(ctx.endpoints, groupData.presets);
+      applyPresetEndpoints(ctx.endpoints, preset);
     }
   }
   ctx.updateMappings();
@@ -480,26 +479,42 @@ export function applyPlanChange(
   if (!preset) return;
   apiType.value = resolveApiType(currentClient.value?.format, preset.apiType);
   applyPresetModels(preset, modelConfigs, isNonOpenaiEndpoint);
-  applyPresetEndpoints(endpoints, group.presets);
+  applyPresetEndpoints(endpoints, preset);
   updateMappings();
 }
 
-/** Deduplicate presets by api_type and generate endpoint entries */
+/** Generate endpoint entries from a preset.
+ * If the preset has an explicit `endpoints` array, use it directly.
+ * Otherwise fall back to deriving from the preset's own apiType/baseUrl. */
 export function applyPresetEndpoints(
   endpoints: Ref<ProviderEndpoint[]>,
-  presets: Array<{ apiType: string; baseUrl: string; upstreamPath?: string }>,
+  preset: {
+    apiType: string;
+    baseUrl: string;
+    upstreamPath?: string;
+    endpoints?: Array<{
+      apiType: string;
+      baseUrl: string;
+      upstreamPath?: string;
+    }>;
+  },
 ): void {
-  const seen = new Set<string>();
-  const result: ProviderEndpoint[] = [];
-  for (const preset of presets) {
-    if (seen.has(preset.apiType)) continue;
-    seen.add(preset.apiType);
-    result.push({
+  if (preset.endpoints && preset.endpoints.length > 0) {
+    endpoints.value = preset.endpoints.map((ep) => ({
+      api_type: ep.apiType as ProviderEndpoint["api_type"],
+      base_url: ep.baseUrl,
+      upstream_path: ep.upstreamPath || null,
+      api_key: null,
+    }));
+    return;
+  }
+  // Fallback: single endpoint from preset itself
+  endpoints.value = [
+    {
       api_type: preset.apiType as ProviderEndpoint["api_type"],
       base_url: preset.baseUrl,
       upstream_path: preset.upstreamPath || null,
       api_key: null,
-    });
-  }
-  endpoints.value = result;
+    },
+  ];
 }

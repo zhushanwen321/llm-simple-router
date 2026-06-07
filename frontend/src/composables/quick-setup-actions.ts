@@ -16,7 +16,6 @@ import {
 import { computeDefaultPatches } from "@/utils/model-patches";
 import { DEFAULT_CONTEXT_WINDOW, DEFAULT_STREAM_TIMEOUT_MS } from "@/constants";
 
-const CONNECTION_DELAY_MS = 800;
 const POST_SAVE_DELAY_MS = 1500;
 import type { Ref, ComputedRef } from "vue";
 import type {
@@ -118,13 +117,8 @@ export function useQuickSetupActions(ctx: ActionCtx) {
           data.modelConfigs,
           data.isNonOpenaiEndpoint,
         );
-        // Generate endpoints from the group's presets
-        const groupData = selection.providerGroups.value.find(
-          (g) => g.group === defaults.group,
-        );
-        if (groupData) {
-          applyPresetEndpoints(data.endpoints, groupData.presets);
-        }
+        // Generate endpoints from the selected preset
+        applyPresetEndpoints(data.endpoints, defaults.preset);
       }
     }
     updateMappings();
@@ -236,16 +230,37 @@ export function useQuickSetupActions(ctx: ActionCtx) {
       ctx.submit.concurrencyConfig.value.max_concurrency =
         DEFAULT_CONCURRENCY_MANUAL_CONFIG.max_concurrency;
   };
-  const testConnection = () => {
+  const testConnection = async () => {
     if (!ctx.data.apiKey.value.trim()) {
       ctx.submit.connectionStatus.value = "error";
       toast.error(ctx.t("quickSetup.messages.fillApiKeyFirst"));
-      return Promise.resolve();
+      return;
+    }
+    // Use first endpoint or provider-level config
+    const ep = ctx.data.endpoints.value[0];
+    const firstModel = ctx.data.modelConfigs.value.find((m) => m.enabled)?.name;
+    if (!ep && !ctx.selection.currentPreset.value) {
+      toast.error(ctx.t("quickSetup.messages.selectProviderAndPlan"));
+      return;
     }
     ctx.submit.connectionStatus.value = "testing";
-    return new Promise((r) => setTimeout(r, CONNECTION_DELAY_MS)).then(() => {
+    try {
+      await api.testConnection({
+        api_type: ep?.api_type ?? ctx.selection.apiType.value,
+        base_url: ep?.base_url ?? ctx.data.baseUrl.value,
+        upstream_path: ep?.upstream_path ?? ctx.data.upstreamPath.value ?? null,
+        api_key: ctx.data.apiKey.value.trim(),
+        model: firstModel,
+      });
       ctx.submit.connectionStatus.value = "ok";
-    });
+      toast.success(ctx.t("quickSetup.messages.connectionOk"));
+    } catch (e: unknown) {
+      ctx.submit.connectionStatus.value = "error";
+      console.error("quickSetup.testConnection:", e);
+      toast.error(
+        getApiMessage(e, ctx.t("quickSetup.messages.connectionFailed")),
+      );
+    }
   };
   const addCustomModel = (name: string, cw = DEFAULT_CONTEXT_WINDOW) => {
     ctx.data.modelConfigs.value.push({
