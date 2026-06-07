@@ -106,7 +106,9 @@
     "setupCompleteWithErrors": "Quick setup complete! {count} mapping toggle(s) failed",
     "setupComplete": "Quick setup complete!",
     "setupFailed": "Quick setup failed",
-    "loadFailed": "Failed to load recommended configuration"
+    "loadFailed": "Failed to load recommended configuration",
+    "connectionOk": "Connection test passed, AI responded normally",
+    "connectionFailed": "Connection test failed"
   },
   "steps": {
     "selectClient": "Select Client",

@@ -65,8 +65,12 @@ export interface ProviderPreset {
   models: string[];
   /** 模型名 → capabilities 映射（由后端补充） */
   modelCapabilities?: Record<string, string[]>;
-  /** 隐藏 preset，不在 plan 下拉菜单显示，但 endpoints 生成仍遍历 */
-  hidden?: boolean;
+  /** 内嵌多个 endpoint 配置（如同时提供 openai + anthropic） */
+  endpoints?: Array<{
+    apiType: "openai" | "openai-responses" | "anthropic";
+    baseUrl: string;
+    upstreamPath?: string;
+  }>;
 }
 
 export interface ProviderGroup {
@@ -572,4 +576,18 @@ export const api = {
       "/quick-setup",
       data,
     ),
+
+  testConnection: (data: {
+    api_type: "openai" | "openai-responses" | "anthropic";
+    base_url: string;
+    upstream_path?: string | null;
+    api_key: string;
+    model?: string;
+  }) =>
+    request<{
+      ok: boolean;
+      model?: string;
+      latency_ms?: number;
+      error?: string;
+    }>("post", "/test-connection", data),
 };

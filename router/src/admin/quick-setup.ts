@@ -1,13 +1,15 @@
 import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
 import { Type, Static } from "@sinclair/typebox";
+import { request as httpRequest } from "http";
+import { request as httpsRequest } from "https";
 import { createProvider, PROVIDER_CONCURRENCY_DEFAULTS } from "../db/providers.js";
 import { createMappingGroup, updateMappingGroup } from "../db/mappings.js";
 import { createRetryRule } from "../db/retry-rules.js";
 import { upsertTransformRule } from "../db/transform-rules.js";
 import { encrypt } from "../utils/crypto.js";
 import { getSetting } from "../db/settings.js";
-import { HTTP_CREATED, HTTP_BAD_REQUEST, HTTP_CONFLICT } from "./constants.js";
+import { HTTP_CREATED, HTTP_BAD_REQUEST, HTTP_BAD_GATEWAY, HTTP_CONFLICT } from "./constants.js";
 import { API_CODE, apiError } from "./api-response.js";
 import type { StateRegistry } from "../core/registry.js";
 import type { RequestTracker } from "../core/monitor/index.js";
@@ -257,5 +259,177 @@ export const adminQuickSetupRoutes: FastifyPluginCallback<QuickSetupRoutesOption
     return reply.code(HTTP_CREATED).send({ success: true, provider_id: providerId });
   });
 
+  // ---------- Test Connection ----------
+
+  const TestConnectionSchema = Type.Object({
+    api_type: Type.Union([Type.Literal("openai"), Type.Literal("openai-responses"), Type.Literal("anthropic")]),
+    base_url: Type.String({ minLength: 1 }),
+    upstream_path: Type.Optional(Type.Union([Type.String({ minLength: 1 }), Type.Null()])),
+    api_key: Type.String({ minLength: 1 }),
+    model: Type.Optional(Type.String()),
+  });
+
+  app.post("/admin/api/test-connection", { schema: { body: TestConnectionSchema } }, async (request, reply) => {
+    const body = request.body as Static<typeof TestConnectionSchema>;
+    const apiType = body.api_type;
+    const baseUrl = body.base_url.replace(/\/+$/, "");
+    const upstreamPath = body.upstream_path ?? null;
+    const apiKey = body.api_key;
+
+    // Determine model and path based on api_type
+    let targetPath: string;
+    let reqBody: Record<string, unknown>;
+    let authHeader: string;
+
+    if (apiType === "anthropic") {
+      targetPath = upstreamPath ?? "/v1/messages";
+      reqBody = {
+        model: body.model ?? "claude-3-5-haiku-20241022",
+        max_tokens: 32,
+        messages: [{ role: "user", content: "Hi" }],
+      };
+      authHeader = `x-api-key`;
+    } else {
+      // openai or openai-responses
+      targetPath = upstreamPath ?? "/v1/chat/completions";
+      reqBody = {
+        model: body.model ?? "gpt-4o-mini",
+        max_tokens: 32,
+        messages: [
+          { role: "system", content: "You are a helpful assistant." },
+          { role: "user", content: "Say hi in one word." },
+        ],
+      };
+      authHeader = "authorization";
+    }
+
+    // Build full URL with dedup logic
+    const fullUrl = buildTestUrl(baseUrl, targetPath);
+
+    try {
+      const result = await sendTestRequest(fullUrl, apiType, apiKey, authHeader, reqBody);
+      return reply.send({ ok: true, model: body.model, latency_ms: result.latencyMs });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : JSON.stringify(err);
+      return reply.code(HTTP_BAD_GATEWAY).send({ ok: false, error: message });
+    }
+  });
+
   done();
 };
+
+// ---------- Test Connection Helpers ----------
+
+const TEST_REQUEST_TIMEOUT_MS = 15_000;
+
+const HTTPS_DEFAULT_PORT = 443;
+const HTTP_DEFAULT_PORT = 80;
+const HTTP_SUCCESS_MIN = 200;
+const HTTP_SUCCESS_MAX = 300;
+
+/** Build full URL, applying dedup logic for base_url already containing the path */
+function buildTestUrl(baseUrl: string, upstreamPath: string): string {
+  const KNOWN_SUFFIXES = ["/chat/completions", "/messages", "/responses"];
+  const normalized = baseUrl.replace(/\/+$/, "");
+  if (normalized.endsWith(upstreamPath)) return normalized;
+  for (const suffix of KNOWN_SUFFIXES) {
+    if (normalized.endsWith(suffix)) return normalized;
+  }
+  // Check for /v1 prefix overlap
+  const versionMatch = upstreamPath.match(/^(\/v\d+)(.*)/);
+  if (versionMatch) {
+    const [, prefix, rest] = versionMatch;
+    if (normalized.endsWith(prefix)) return `${normalized}${rest}`;
+  }
+  // Generic overlap detection
+  const segments = upstreamPath.split("/");
+  const MIN_OVERLAP_SEGMENTS = 2;
+  for (let len = segments.length - 1; len >= MIN_OVERLAP_SEGMENTS; len--) {
+    const candidate = segments.slice(0, len).join("/");
+    if (candidate.length > 0 && normalized.endsWith(candidate)) {
+      return `${normalized}${upstreamPath.slice(candidate.length)}`;
+    }
+  }
+  if (!upstreamPath.startsWith("/")) return `${normalized}/${upstreamPath}`;
+  return `${normalized}${upstreamPath}`;
+}
+
+interface TestResult {
+  latencyMs: number;
+}
+
+/** Send a real test request to the upstream provider */
+function sendTestRequest(
+  fullUrl: string,
+  apiType: string,
+  apiKey: string,
+  authHeaderKey: string,
+  reqBody: Record<string, unknown>,
+): Promise<TestResult> {
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
+    const url = new URL(fullUrl);
+    const payload = JSON.stringify(reqBody);
+
+    const headers: Record<string, string> = {
+      "content-type": "application/json",
+      "accept": "application/json",
+      "user-agent": "llm-simple-router/test-connection",
+    };
+    if (authHeaderKey === "x-api-key") {
+      headers["x-api-key"] = apiKey;
+      headers["anthropic-version"] = "2023-06-01";
+      headers["content-type"] = "application/json";
+    } else {
+      headers["authorization"] = `Bearer ${apiKey}`;
+    }
+
+    const options = {
+      hostname: url.hostname,
+      port: url.port || (url.protocol === "https:" ? HTTPS_DEFAULT_PORT : HTTP_DEFAULT_PORT),
+      path: url.pathname + url.search,
+      method: "POST",
+      headers: { ...headers, "content-length": `${Buffer.byteLength(payload)}` },
+    };
+
+    const mod = url.protocol === "https:" ? httpsRequest : httpRequest;
+    const req = mod(options, (res: import("http").IncomingMessage) => {
+      const chunks: Buffer[] = [];
+      res.on("data", (chunk: Buffer) => chunks.push(chunk));
+      res.on("end", () => {
+        const statusCode = res.statusCode ?? 0;
+        const body = Buffer.concat(chunks).toString("utf-8");
+        const latencyMs = Date.now() - start;
+
+        if (statusCode >= HTTP_SUCCESS_MIN && statusCode < HTTP_SUCCESS_MAX) {
+          resolve({ latencyMs });
+        } else {
+          // Try to extract error message from response
+          let errMsg = `HTTP ${statusCode}`;
+          try {
+            const parsed = JSON.parse(body) as Record<string, unknown>;
+            const error = parsed.error as Record<string, unknown> | undefined;
+            if (error?.message) {
+              errMsg = typeof error.message === "string" ? error.message : JSON.stringify(error.message);
+            } else if (parsed.message) {
+              errMsg = typeof parsed.message === "string" ? parsed.message : JSON.stringify(parsed.message);
+            }
+          } catch {
+            // response body is not valid JSON, keep default HTTP error
+            void 0;
+          }
+          reject(new Error(errMsg));
+        }
+      });
+      res.on("error", (err: Error) => reject(err));
+    });
+
+    req.setTimeout(TEST_REQUEST_TIMEOUT_MS, () => {
+      req.destroy();
+      reject(new Error("Connection timed out"));
+    });
+    req.on("error", (err: Error) => reject(err));
+    req.write(payload);
+    req.end();
+  });
+}
