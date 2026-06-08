@@ -9,7 +9,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { CheckIcon, ChevronDown, CopyIcon } from "lucide-vue-next";
+import { CheckIcon, ChevronDown, CopyIcon } from "@lucide/vue";
 import type { LogEntry } from "@/components/logs/types";
 import { PROVIDER_ID_ROUTER } from "@/components/logs/types";
 import { formatTimeHMS, formatLatency } from "@/utils/format";

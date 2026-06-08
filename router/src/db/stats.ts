@@ -1,7 +1,6 @@
 import Database from "better-sqlite3";
-import { getMetricsDetailDays } from "./settings.js";
-import { queryAggStats } from "./metrics-10min.js";
-import { SECONDS_PER_DAY, MS_PER_SECOND } from "../core/constants.js";
+import { queryAggStats, BUCKET_SECONDS } from "./metrics-10min.js";
+import { MS_PER_SECOND } from "../core/constants.js";
 
 /** 获取指定条件下的最近一条 metric 的 created_at（用于窗口补齐定位，不限制 is_complete） */
 export function getLatestMetricTime(
@@ -28,7 +27,7 @@ export function getLatestMetricTime(
 
 export interface Stats {
   totalRequests: number;
-  successRate: number;
+  successRate: number | null;
   avgTps: number;
   totalInputTokens: number;
   totalOutputTokens: number;
@@ -43,6 +42,18 @@ interface StatsRow {
   total_output_tokens: number;
 }
 
+// BUCKET_SECONDS imported from metrics-10min
+
+/**
+ * Compute the bucket boundary: floor(now / 600s) * 600s.
+ * Data before this boundary is fully settled (in metrics_10min).
+ * Data at or after this boundary may still be incomplete (in request_metrics).
+ */
+function computeBucketBoundary(): string {
+  const bucketStartSec = Math.floor(Date.now() / MS_PER_SECOND / BUCKET_SECONDS) * BUCKET_SECONDS;
+  return new Date(bucketStartSec * MS_PER_SECOND).toISOString();
+}
+
 export function getStats(
   db: Database.Database,
   startTime: string,
@@ -51,6 +62,65 @@ export function getStats(
   providerId?: string,
   backendModel?: string,
   clientType?: string,
+): Stats {
+  const boundary = computeBucketBoundary();
+
+  // Pure agg: entire range is before the current bucket
+  if (endTime <= boundary) {
+    const aggStats = queryAggStats(db, startTime, endTime, routerKeyId, providerId, backendModel, clientType);
+    return {
+      totalRequests: aggStats.totalRequests,
+      successRate: null, // agg table does not store status_code
+      avgTps: aggStats.avgTps,
+      totalInputTokens: aggStats.totalInputTokens,
+      totalOutputTokens: aggStats.totalOutputTokens,
+      is_approximate: true,
+    };
+  }
+
+  // Pure detail: entire range is within the current bucket
+  if (startTime >= boundary) {
+    return queryDetailStats(db, startTime, endTime, routerKeyId, providerId, backendModel, clientType, false);
+  }
+
+  // Cross-boundary: agg segment [start, boundary) + detail segment [boundary, end)
+  const aggStats = queryAggStats(db, startTime, boundary, routerKeyId, providerId, backendModel, clientType);
+  const detailStats = queryDetailStats(db, boundary, endTime, routerKeyId, providerId, backendModel, clientType, false);
+
+  const mergedTotalRequests = detailStats.totalRequests + aggStats.totalRequests;
+  const mergedTotalInputTokens = detailStats.totalInputTokens + aggStats.totalInputTokens;
+  const mergedTotalOutputTokens = detailStats.totalOutputTokens + aggStats.totalOutputTokens;
+  let mergedAvgTps = 0;
+  if (mergedTotalRequests > 0) {
+    mergedAvgTps = ((detailStats.avgTps) * detailStats.totalRequests + aggStats.avgTps * aggStats.totalRequests) / mergedTotalRequests;
+  }
+  // successRate from detail segment only; agg has no status_code
+  const mergedSuccessCount = detailStats.successRate !== null
+    ? detailStats.successRate * detailStats.totalRequests
+    : 0;
+  const successRate = mergedTotalRequests > 0
+    ? mergedSuccessCount / mergedTotalRequests
+    : null;
+
+  return {
+    totalRequests: mergedTotalRequests,
+    successRate,
+    avgTps: mergedAvgTps,
+    totalInputTokens: mergedTotalInputTokens,
+    totalOutputTokens: mergedTotalOutputTokens,
+    is_approximate: true,
+  };
+}
+
+function queryDetailStats(
+  db: Database.Database,
+  startTime: string,
+  endTime: string,
+  routerKeyId?: string,
+  providerId?: string,
+  backendModel?: string,
+  clientType?: string,
+  _isApproximate: boolean = false,
 ): Stats {
   const conditions = [
     "rm.created_at >= datetime(?)",
@@ -87,55 +157,12 @@ export function getStats(
   `).get(...params) as StatsRow;
 
   const total = row?.total_requests ?? 0;
-  const detailDays = getMetricsDetailDays(db);
-  const now = new Date();
-  const cutoffTime = new Date(now.getTime() - detailDays * SECONDS_PER_DAY * MS_PER_SECOND).toISOString();
-  const isApproximate = endTime > cutoffTime;
-
-  if (!isApproximate) {
-    // 全量走聚合表
-    const aggStats = queryAggStats(db, startTime, endTime, routerKeyId, providerId, backendModel, clientType);
-    return {
-      totalRequests: aggStats.totalRequests,
-      successRate: 0,
-      avgTps: aggStats.avgTps,
-      totalInputTokens: aggStats.totalInputTokens,
-      totalOutputTokens: aggStats.totalOutputTokens,
-      is_approximate: true,
-    };
-  }
-
-  if (startTime >= cutoffTime) {
-    // 全量走明细表
-    return {
-      totalRequests: total,
-      successRate: total > 0 ? (row?.success_count ?? 0) / total : 0,
-      avgTps: row?.avg_tps ?? 0,
-      totalInputTokens: row?.total_input_tokens ?? 0,
-      totalOutputTokens: row?.total_output_tokens ?? 0,
-      is_approximate: false,
-    };
-  }
-
-  // 跨越分界线：聚合表段
-  const aggStats = queryAggStats(db, startTime, cutoffTime, routerKeyId, providerId, backendModel, clientType);
-
-  // 合并：totalRequests/totalInputTokens/totalOutputTokens 求和，avg_tps 加权平均
-  const mergedTotalRequests = total + aggStats.totalRequests;
-  const mergedTotalInputTokens = (row?.total_input_tokens ?? 0) + aggStats.totalInputTokens;
-  const mergedTotalOutputTokens = (row?.total_output_tokens ?? 0) + aggStats.totalOutputTokens;
-  const mergedSuccessCount = row?.success_count ?? 0; // 聚合表无 status_code，只取明细段成功数
-  let mergedAvgTps = 0;
-  if (total + aggStats.totalRequests > 0) {
-    mergedAvgTps = ((row?.avg_tps ?? 0) * total + aggStats.avgTps * aggStats.totalRequests) / (total + aggStats.totalRequests);
-  }
-
   return {
-    totalRequests: mergedTotalRequests,
-    successRate: mergedTotalRequests > 0 ? mergedSuccessCount / mergedTotalRequests : 0,
-    avgTps: mergedAvgTps,
-    totalInputTokens: mergedTotalInputTokens,
-    totalOutputTokens: mergedTotalOutputTokens,
-    is_approximate: true,
+    totalRequests: total,
+    successRate: total > 0 ? (row?.success_count ?? 0) / total : 0,
+    avgTps: row?.avg_tps ?? 0,
+    totalInputTokens: row?.total_input_tokens ?? 0,
+    totalOutputTokens: row?.total_output_tokens ?? 0,
+    is_approximate: _isApproximate,
   };
 }

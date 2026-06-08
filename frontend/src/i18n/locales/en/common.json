@@ -56,5 +56,6 @@
   "cascadingSelect": "Please select...",
   "cascadingNoOptions": "No options",
   "selected": "Selected",
-  "selectAll": "Select all"
+  "selectAll": "Select all",
+  "ok": "OK"
 }

@@ -11,6 +11,8 @@
     "requestLogsHint": "Complete request/response logs stored in files. Used for debugging and audit. Deleted automatically after retention period.",
     "metricsDetailHint": "Full-resolution metrics (per-request TTFT, TPS, token counts). Beyond this window, data is aggregated into 10-minute buckets by provider + model.",
     "metricsExceedsLog": "Metrics detail days must not exceed log retention days",
+    "daysUnit": "days",
+    "metricsDetailUnit": "days detail",
     "lifecycle": {
       "now": "now",
       "detailEnd": "{days}d detail",

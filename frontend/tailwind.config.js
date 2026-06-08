@@ -149,7 +149,6 @@ export default {
         toast: 'var(--z-toast)',
       },
       spacing: {
-        'dense-xs': 'var(--spacing-dense-xs)',
         'dense-sm': 'var(--spacing-dense-sm)',
         'dense-md': 'var(--spacing-dense-md)',
       },

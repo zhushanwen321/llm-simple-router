@@ -103,11 +103,11 @@ export const adminDashboardRoutes: FastifyPluginCallback<DashboardRoutesOptions>
 /** Get per-provider total input tokens for last 30 days (for sorting/labels) */
 function getProviderTokenSummary(db: Database.Database): Record<string, number> {
   const rows = db.prepare(
-    `SELECT provider_id, COALESCE(SUM(input_tokens), 0) AS total_input_tokens
-     FROM request_metrics
-     WHERE created_at >= datetime('now', '-${PROVIDER_TOKEN_LOOKBACK_DAYS} days')
+    `SELECT provider_id, COALESCE(SUM(sum_input_tokens), 0) AS total_input_tokens
+     FROM metrics_10min
+     WHERE bucket_time >= datetime('now', '-' || ? || ' days')
      GROUP BY provider_id`,
-  ).all() as { provider_id: string; total_input_tokens: number }[];
+  ).all(PROVIDER_TOKEN_LOOKBACK_DAYS) as { provider_id: string; total_input_tokens: number }[];
 
   const result: Record<string, number> = {};
   for (const r of rows) {

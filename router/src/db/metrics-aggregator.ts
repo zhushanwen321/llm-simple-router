@@ -4,18 +4,13 @@ import Database from "better-sqlite3";
 
 const MS_PER_SEC = 1000;
 const BUCKET_SEC = 600; // 10 minutes
-const AGGREGATE_INTERVAL_MS = BUCKET_SEC * MS_PER_SEC; // 10 minutes
 const TRIGGER_OFFSET_SEC = 300; // 5 minutes after bucket boundary
 const TRIGGER_MINUTE_VALUES = "5,15,25,35,45,55";
 const TRIGGER_MINUTES = TRIGGER_MINUTE_VALUES.split(",").map(Number);
 
-// Align to :05/:15/:25/:35/:45/:55 — 5 minutes after each bucket boundary
-const INITIAL_DELAY_MS = computeMsToNextTrigger();
-
 function computeMsToNextTrigger(): number {
   const now = new Date();
   const min = now.getMinutes();
-  // Find next trigger at :05, :15, :25, :35, :45, :55
   const triggers = TRIGGER_MINUTES;
   let nextMin = triggers.find((t) => t > min);
   let addHours = 0;
@@ -43,7 +38,7 @@ export interface MetricsAggregatorHandle {
  * It computes the bucket that just closed: the one whose boundary
  * was 5 minutes ago (i.e., floor((now - 5min) / 600) * 600).
  */
-function runAggregation(db: Database.Database, log: { info: (msg: string) => void }): void {
+function runAggregation(db: Database.Database, log: { warn: (msg: string) => void; info: (msg: string) => void }): void {
   const nowMs = Date.now();
   // The bucket that just ended: its start boundary is floor((now - 5min) / 600) * 600
   const bucketStartSec = Math.floor((nowMs / MS_PER_SEC - TRIGGER_OFFSET_SEC) / BUCKET_SEC) * BUCKET_SEC;
@@ -111,30 +106,32 @@ function runAggregation(db: Database.Database, log: { info: (msg: string) => voi
 
 export function scheduleMetricsAggregator(
   db: Database.Database,
-  log: { info: (msg: string) => void },
+  log: { warn: (msg: string) => void; info: (msg: string) => void },
 ): MetricsAggregatorHandle {
-  let initialTimer: ReturnType<typeof setTimeout> | null = null;
-  let intervalTimer: ReturnType<typeof setInterval> | null = null;
+  let stopped = false;
+  let currentTimer: ReturnType<typeof setTimeout> | null = null;
 
-  const doAggregate = () => {
-    try {
-      runAggregation(db, log);
-    } catch (e) {
-      log.info(`Metrics aggregator skipped: ${e instanceof Error ? e.message : JSON.stringify(e)}`);
-    }
+  const scheduleNext = () => {
+    if (stopped) return;
+    const delay = computeMsToNextTrigger();
+    currentTimer = setTimeout(() => {
+      if (stopped) return;
+      try {
+        runAggregation(db, log);
+      } catch (e) {
+        log.warn(`Metrics aggregator skipped: ${e instanceof Error ? e.message : JSON.stringify(e)}`);
+      }
+      // Schedule the next run after this one completes
+      scheduleNext();
+    }, delay);
   };
 
-  // Delay first run to next aligned trigger point (:05/:15/...)
-  initialTimer = setTimeout(() => {
-    doAggregate();
-    // Then every 10 minutes
-    intervalTimer = setInterval(doAggregate, AGGREGATE_INTERVAL_MS);
-  }, INITIAL_DELAY_MS);
+  scheduleNext();
 
   return {
     stop: () => {
-      if (initialTimer) { clearTimeout(initialTimer); initialTimer = null; }
-      if (intervalTimer) { clearInterval(intervalTimer); intervalTimer = null; }
+      stopped = true;
+      if (currentTimer) { clearTimeout(currentTimer); currentTimer = null; }
     },
   };
 }

@@ -45,7 +45,7 @@
 <script setup lang="ts">
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Moon, Sun } from "lucide-vue-next";
+import { Moon, Sun } from "@lucide/vue";
 import { useTheme } from "@/composables/useTheme";
 
 const { isDark, toggleTheme } = useTheme();

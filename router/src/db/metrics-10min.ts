@@ -4,6 +4,10 @@ import type { MetricsPeriod, MetricsMetric, MetricsSummaryRow, MetricsTimeseries
 
 const MILLISECONDS_PER_SECOND = 1000;
 
+// Shared with metrics.ts — bucket boundary computation constants
+export const BUCKET_SECONDS = 600;
+export { MILLISECONDS_PER_SECOND };
+
 // --- metrics_10min table types ---
 
 export interface Metrics10minRow {
@@ -28,80 +32,7 @@ export interface Metrics10minRow {
   sum_tool_use_duration_ms: number;
 }
 
-// --- UPSERT ---
-
-const UPSERT_AGG_SQL = `
-INSERT INTO metrics_10min (
-  bucket_time, router_key_id, provider_id, backend_model, client_type, api_type,
-  request_count, sum_input_tokens, sum_output_tokens, sum_cache_read_tokens,
-  sum_cache_creation_tokens, sum_total_duration_ms, sum_ttft_ms,
-  sum_thinking_tokens, sum_text_tokens, sum_tool_use_tokens,
-  sum_thinking_duration_ms, sum_text_duration_ms, sum_tool_use_duration_ms
-) VALUES (
-  datetime(floor(unixepoch() / 600) * 600, 'unixepoch'),
-  COALESCE(?, ''),
-  ?, ?, ?, ?,
-  1, ?, ?, ?, ?, ?, ?,
-  ?, ?, ?, ?, ?, ?
-)
-ON CONFLICT (bucket_time, router_key_id, provider_id, backend_model, client_type, api_type)
-DO UPDATE SET
-  request_count = request_count + 1,
-  sum_input_tokens = sum_input_tokens + excluded.sum_input_tokens,
-  sum_output_tokens = sum_output_tokens + excluded.sum_output_tokens,
-  sum_cache_read_tokens = sum_cache_read_tokens + excluded.sum_cache_read_tokens,
-  sum_cache_creation_tokens = sum_cache_creation_tokens + excluded.sum_cache_creation_tokens,
-  sum_total_duration_ms = sum_total_duration_ms + excluded.sum_total_duration_ms,
-  sum_ttft_ms = sum_ttft_ms + excluded.sum_ttft_ms,
-  sum_thinking_tokens = sum_thinking_tokens + excluded.sum_thinking_tokens,
-  sum_text_tokens = sum_text_tokens + excluded.sum_text_tokens,
-  sum_tool_use_tokens = sum_tool_use_tokens + excluded.sum_tool_use_tokens,
-  sum_thinking_duration_ms = sum_thinking_duration_ms + excluded.sum_thinking_duration_ms,
-  sum_text_duration_ms = sum_text_duration_ms + excluded.sum_text_duration_ms,
-  sum_tool_use_duration_ms = sum_tool_use_duration_ms + excluded.sum_tool_use_duration_ms
-`;
-
-export function upsertAggBucket(
-  db: Database.Database,
-  entry: {
-    router_key_id?: string | null;
-    provider_id: string;
-    backend_model: string;
-    client_type?: string;
-    api_type: string;
-    input_tokens?: number | null;
-    output_tokens?: number | null;
-    cache_read_tokens?: number | null;
-    cache_creation_tokens?: number | null;
-    total_duration_ms?: number | null;
-    ttft_ms?: number | null;
-    thinking_tokens?: number | null;
-    text_tokens?: number | null;
-    tool_use_tokens?: number | null;
-    thinking_duration_ms?: number | null;
-    non_thinking_duration_ms?: number | null;
-  },
-): void {
-  getCachedStmt(db, UPSERT_AGG_SQL).run(
-    entry.router_key_id ?? null,
-    entry.provider_id,
-    entry.backend_model,
-    entry.client_type ?? "unknown",
-    entry.api_type,
-    entry.input_tokens ?? 0,
-    entry.output_tokens ?? 0,
-    entry.cache_read_tokens ?? 0,
-    entry.cache_creation_tokens ?? 0,
-    entry.total_duration_ms ?? 0,
-    entry.ttft_ms ?? 0,
-    entry.thinking_tokens ?? 0,
-    entry.text_tokens ?? 0,
-    entry.tool_use_tokens ?? 0,
-    entry.thinking_duration_ms ?? 0,
-    entry.non_thinking_duration_ms ?? 0,
-    0, // tool_use_duration_ms — MetricsInsert 不提供细分，归入 non_thinking_duration_ms
-  );
-}
+// 单条 upsert 已废弃，聚合逻辑统一由 metrics-aggregator.ts 批量 INSERT...SELECT 处理
 
 // --- Activity chart query ---
 

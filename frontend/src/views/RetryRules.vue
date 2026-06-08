@@ -485,7 +485,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Plus, X, Loader2 } from "lucide-vue-next";
+import { Plus, X, Loader2 } from "@lucide/vue";
 import RecommendedRules from "@/components/retry-rules/RecommendedRules.vue";
 
 const { t } = useI18n();

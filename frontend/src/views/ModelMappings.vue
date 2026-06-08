@@ -433,7 +433,7 @@ import {
   AlertTriangle,
   ArrowRightLeft,
   Image as ImageIcon,
-} from "lucide-vue-next";
+} from "@lucide/vue";
 import { api, getApiMessage } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

@@ -54,22 +54,9 @@ function pad(n: number): string {
 }
 
 function formatRangeLabel(start: Date, end: Date): string {
-  const months = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-  ];
-  const sm = months[start.getMonth()];
-  const em = months[end.getMonth()];
+  const formatter = new Intl.DateTimeFormat(undefined, { month: "short" });
+  const sm = formatter.format(start);
+  const em = formatter.format(end);
   const sameDay =
     start.getFullYear() === end.getFullYear() &&
     start.getMonth() === end.getMonth() &&
@@ -203,22 +190,4 @@ export function useTimeSelector(_input: UseTimeSelectorInput) {
     customStartDate: customStart,
     customEndDate: customEnd,
   };
-}
-
-// --- Internal helpers ---
-
-const MONTHS_PER_YEAR = 12;
-const DAYS_PER_MONTH_MAX = 31;
-
-export function parseDatePortion(value: string): Date | null {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  if (!m) return null;
-  const y = Number(m[1]);
-  const mo = Number(m[2]);
-  const da = Number(m[3]);
-  if (mo < 1 || mo > MONTHS_PER_YEAR || da < 1 || da > DAYS_PER_MONTH_MAX) {
-    return null;
-  }
-  const d = new Date(y, mo - 1, da);
-  return Number.isNaN(d.getTime()) ? null : d;
 }

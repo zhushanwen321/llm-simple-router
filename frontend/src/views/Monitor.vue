@@ -537,7 +537,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { CheckIcon, ChevronDownIcon, CopyIcon, XIcon } from "lucide-vue-next";
+import { CheckIcon, ChevronDownIcon, CopyIcon, XIcon } from "@lucide/vue";
 import { api, getApiMessage } from "@/api/client";
 import { toast } from "vue-sonner";
 import MonitorHeader from "@/components/monitor/MonitorHeader.vue";

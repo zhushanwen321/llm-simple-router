@@ -133,7 +133,7 @@ import { ref, computed, watch, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FileJson, FileText, ArrowDown } from "lucide-vue-next";
+import { FileJson, FileText, ArrowDown } from "@lucide/vue";
 import ContentBlockRenderer from "./ContentBlockRenderer.vue";
 import { tryDirectParse } from "./response-parser";
 import type { DataSource } from "./types";

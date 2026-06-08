@@ -3,9 +3,9 @@ import Database from "better-sqlite3";
 import { Type } from "@sinclair/typebox";
 import { getWindowsInRange, getWindowUsage } from "../db/usage-windows.js";
 import { getProviderById } from "../db/index.js";
-import { SECONDS_PER_DAY, MS_PER_SECOND } from "../core/constants.js";
+import { MS_PER_SECOND } from "../core/constants.js";
+import { BUCKET_SECONDS } from "../db/metrics-10min.js";
 import { resolveTimeRange } from "../utils/time-range.js";
-import { getMetricsDetailDays } from "../db/settings.js";
 
 interface UsageRoutesOptions {
   db: Database.Database;
@@ -23,6 +23,14 @@ interface DailyUsageRow {
   request_count: number;
   total_input_tokens: number;
   total_output_tokens: number;
+}
+
+// Use shared bucket boundary from metrics-10min
+// BUCKET_SECONDS imported from metrics-10min
+
+function computeBucketBoundary(): string {
+  const bucketStartSec = Math.floor(Date.now() / MS_PER_SECOND / BUCKET_SECONDS) * BUCKET_SECONDS;
+  return new Date(bucketStartSec * MS_PER_SECOND).toISOString();
 }
 
 function queryAggDailyUsage(
@@ -60,32 +68,7 @@ function queryAggDailyUsage(
   `).all(...params) as DailyUsageRow[];
 }
 
-function mergeDailyUsageResults(
-  detailResult: DailyUsageRow[],
-  aggResult: DailyUsageRow[],
-): DailyUsageRow[] {
-  if (detailResult.length === 0) return aggResult;
-  if (aggResult.length === 0) return detailResult;
-
-  const dateMap = new Map<string, DailyUsageRow>();
-  for (const row of detailResult) {
-    dateMap.set(row.date, { ...row });
-  }
-  for (const row of aggResult) {
-    const existing = dateMap.get(row.date);
-    if (existing) {
-      existing.request_count += row.request_count;
-      existing.total_input_tokens += row.total_input_tokens;
-      existing.total_output_tokens += row.total_output_tokens;
-    } else {
-      dateMap.set(row.date, { ...row });
-    }
-  }
-
-  return Array.from(dateMap.values()).sort((a, b) => a.date.localeCompare(b.date));
-}
-
-function getDailyUsage(
+function queryDetailDailyUsage(
   db: Database.Database,
   startTime: string,
   endTime: string,
@@ -107,18 +90,7 @@ function getDailyUsage(
     params.push(providerId);
   }
 
-  const detailDays = getMetricsDetailDays(db);
-  const now = new Date();
-  const cutoffTime = new Date(now.getTime() - detailDays * SECONDS_PER_DAY * MS_PER_SECOND).toISOString();
-
-  if (endTime <= cutoffTime) {
-    // 全量走聚合表
-    return queryAggDailyUsage(db, startTime, endTime, routerKeyId, providerId);
-  }
-
-  if (startTime >= cutoffTime) {
-    // 全量走明细表（现有逻辑）
-    return db.prepare(`
+  return db.prepare(`
     SELECT
       date(rm.created_at) AS date,
       COUNT(*) AS request_count,
@@ -129,29 +101,52 @@ function getDailyUsage(
     GROUP BY date(rm.created_at)
     ORDER BY date ASC
   `).all(...params) as DailyUsageRow[];
+}
+
+function mergeDailyUsageResults(
+  a: DailyUsageRow[],
+  b: DailyUsageRow[],
+): DailyUsageRow[] {
+  if (a.length === 0) return b;
+  if (b.length === 0) return a;
+
+  const dateMap = new Map<string, DailyUsageRow>();
+  for (const row of [...a, ...b]) {
+    const existing = dateMap.get(row.date);
+    if (existing) {
+      existing.request_count += row.request_count;
+      existing.total_input_tokens += row.total_input_tokens;
+      existing.total_output_tokens += row.total_output_tokens;
+    } else {
+      dateMap.set(row.date, { ...row });
+    }
   }
 
-  // 跨越分界线：明细段 + 聚合段，按 date 合并
-  const detailResult = db.prepare(`
-    SELECT
-      date(rm.created_at) AS date,
-      COUNT(*) AS request_count,
-      COALESCE(SUM(rm.input_tokens), 0) AS total_input_tokens,
-      COALESCE(SUM(rm.output_tokens), 0) AS total_output_tokens
-    FROM request_metrics rm
-    WHERE rm.created_at >= datetime(?) AND rm.created_at < datetime(?)
-    ${routerKeyId ? "AND rm.router_key_id = ?" : ""}
-    ${providerId ? "AND rm.provider_id = ?" : ""}
-    GROUP BY date(rm.created_at)
-    ORDER BY date ASC
-  `).all(...[
-    startTime, cutoffTime,
-    ...(routerKeyId ? [routerKeyId] : []),
-    ...(providerId ? [providerId] : []),
-  ]) as DailyUsageRow[];
+  return Array.from(dateMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+}
 
-  const aggResult = queryAggDailyUsage(db, cutoffTime, endTime, routerKeyId, providerId);
+function getDailyUsage(
+  db: Database.Database,
+  startTime: string,
+  endTime: string,
+  routerKeyId?: string,
+  providerId?: string,
+): DailyUsageRow[] {
+  const boundary = computeBucketBoundary();
 
+  // Pure agg: entire range is before the current bucket
+  if (endTime <= boundary) {
+    return queryAggDailyUsage(db, startTime, endTime, routerKeyId, providerId);
+  }
+
+  // Pure detail: entire range is within the current bucket
+  if (startTime >= boundary) {
+    return queryDetailDailyUsage(db, startTime, endTime, routerKeyId, providerId);
+  }
+
+  // Cross-boundary: agg segment [start, boundary) + detail segment [boundary, end)
+  const aggResult = queryAggDailyUsage(db, startTime, boundary, routerKeyId, providerId);
+  const detailResult = queryDetailDailyUsage(db, boundary, endTime, routerKeyId, providerId);
   return mergeDailyUsageResults(detailResult, aggResult);
 }
 

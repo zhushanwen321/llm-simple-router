@@ -56,5 +56,6 @@
   "cascadingSelect": "请选择...",
   "cascadingNoOptions": "暂无选项",
   "selected": "已选",
-  "selectAll": "全选"
+  "selectAll": "全选",
+  "ok": "确定"
 }

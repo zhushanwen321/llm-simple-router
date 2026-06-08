@@ -34,7 +34,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Download, Upload, HardDrive, RotateCcw } from "lucide-vue-next";
+import { Download, Upload, HardDrive, RotateCcw } from "@lucide/vue";
 
 const { t } = useI18n();
 
@@ -80,7 +80,10 @@ const lifecycleError = computed<string>(() => validationError.value);
 
 const detailSegmentPct = computed(() => {
   const log = Math.max(retentionDays.value, 1);
-  return Math.max(0, Math.min(PERCENT_MAX, (metricsDetailDays.value / log) * PERCENT_MAX));
+  return Math.max(
+    0,
+    Math.min(PERCENT_MAX, (metricsDetailDays.value / log) * PERCENT_MAX),
+  );
 });
 const aggregatedSegmentPct = computed(
   () => PERCENT_MAX - detailSegmentPct.value,
@@ -275,7 +278,9 @@ onMounted(loadSettings);
                 :max="RETENTION_MAX"
                 class="w-24 font-mono text-center"
               />
-              <span class="text-xs text-muted-foreground">days</span>
+              <span class="text-xs text-muted-foreground">{{
+                t("settings.retention.daysUnit")
+              }}</span>
             </div>
             <p
               class="text-xs text-muted-foreground leading-relaxed min-h-[30px]"
@@ -302,7 +307,9 @@ onMounted(loadSettings);
                 :max="METRICS_DETAIL_MAX"
                 class="w-24 font-mono text-center"
               />
-              <span class="text-xs text-muted-foreground">days detail</span>
+              <span class="text-xs text-muted-foreground">{{
+                t("settings.retention.metricsDetailUnit")
+              }}</span>
             </div>
             <p
               class="text-xs text-muted-foreground leading-relaxed min-h-[30px]"
