@@ -91,6 +91,19 @@ export function getLogFileRetentionDays(db: Database.Database): number {
   return row ? parseInt(row.value, 10) : DEFAULT_LOG_FILE_RETENTION_DAYS;
 }
 
+// ---------- Metrics Detail Days ----------
+
+const DEFAULT_METRICS_DETAIL_DAYS = 7;
+
+export function getMetricsDetailDays(db: Database.Database): number {
+  const val = getSetting(db, "metrics_detail_days");
+  return val ? parseInt(val, 10) : DEFAULT_METRICS_DETAIL_DAYS;
+}
+
+export function setMetricsDetailDays(db: Database.Database, days: number): void {
+  setSetting(db, "metrics_detail_days", days.toString());
+}
+
 // ---------- Client Session Headers ----------
 
 export interface ClientSessionHeaderEntry {

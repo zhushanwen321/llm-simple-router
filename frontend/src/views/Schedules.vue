@@ -505,7 +505,7 @@
 import { ref, computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { toast } from "vue-sonner";
-import { Plus, ChevronRight, Pencil, Trash2 } from "lucide-vue-next";
+import { Plus, ChevronRight, Pencil, Trash2 } from "@lucide/vue";
 import { api, getApiMessage } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

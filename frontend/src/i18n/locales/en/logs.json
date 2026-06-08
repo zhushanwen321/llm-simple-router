@@ -75,7 +75,9 @@
   "retention": {
     "saved": "Log retention days updated",
     "updateFailed": "Failed to update retention days",
-    "loadFailed": "Failed to load retention days, using default"
+    "loadFailed": "Failed to load retention days, using default",
+    "loadMetricsDetailFailed": "Failed to load metrics detail days, using default",
+    "bothSaved": "Retention policy updated"
   },
   "generateRetryRule": "Generate Retry Rule",
   "analyzing": "Analyzing...",

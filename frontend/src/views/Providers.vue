@@ -604,14 +604,7 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
-import {
-  RotateCw,
-  Copy,
-  Check,
-  ImageIcon,
-  Search,
-  Shield,
-} from "lucide-vue-next";
+import { RotateCw, Copy, Check, ImageIcon, Search, Shield } from "@lucide/vue";
 import ProviderIcon from "@/components/icons/ProviderIcon.vue";
 import ModelCapabilitiesEditor from "@/components/providers/ModelCapabilitiesEditor.vue";
 import {

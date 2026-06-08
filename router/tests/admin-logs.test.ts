@@ -178,7 +178,7 @@ describe("Stats API", () => {
     expect(res.statusCode).toBe(200);
     const stats = res.json().data;
     expect(stats.totalRequests).toBe(0);
-    expect(stats.successRate).toBe(0);
+    expect(stats.successRate).toBeNull();
     expect(stats.avgTps).toBe(0);
     expect(stats.totalInputTokens).toBe(0);
     expect(stats.totalOutputTokens).toBe(0);

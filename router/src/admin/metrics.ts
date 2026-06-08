@@ -2,6 +2,7 @@ import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
 import { Type, Static } from "@sinclair/typebox";
 import { getMetricsSummary, getMetricsTimeseries, getClientTypeBreakdown } from "../db/index.js";
+import { queryAggActivity } from "../db/metrics-10min.js";
 import type { MetricsPeriod, MetricsMetric } from "../db/metrics.js";
 import { resolveTimeRange } from "../utils/time-range.js";
 import type { DashboardPeriod } from "../utils/time-range.js";
@@ -41,6 +42,11 @@ const TimeseriesQuerySchema = Type.Object({
   router_key_id: Type.Optional(Type.String()),
   start_time: Type.Optional(Type.String()),
   end_time: Type.Optional(Type.String()),
+});
+
+const ActivityQuerySchema = Type.Object({
+  router_key_id: Type.Optional(Type.String()),
+  provider_id: Type.Optional(Type.String()),
 });
 
 const DASHBOARD_PERIODS = new Set(["window", "weekly", "monthly"]);
@@ -88,6 +94,15 @@ export const adminMetricsRoutes: FastifyPluginCallback<MetricsRoutesOptions> = (
     const { startTime, endTime, legacyPeriod } = resolveMetricsTime(query, db, query.router_key_id, query.provider_id);
     const timeseries = getMetricsTimeseries(db, legacyPeriod as MetricsPeriod, metric, query.provider_id, query.backend_model, query.router_key_id, startTime, endTime);
     return reply.send(timeseries);
+  });
+
+  app.get("/admin/api/metrics/activity", { schema: { querystring: ActivityQuerySchema } }, async (request, reply) => {
+    const query = request.query as Static<typeof ActivityQuerySchema>;
+    const buckets = queryAggActivity(db, {
+      routerKeyId: query.router_key_id,
+      providerId: query.provider_id,
+    });
+    return reply.send({ buckets });
   });
 
   done();

@@ -18,7 +18,7 @@ import {
   ImageIcon,
   Volume2,
   Video,
-} from "lucide-vue-next";
+} from "@lucide/vue";
 import ModelCard from "@/components/quick-setup/ModelCard.vue";
 import TransformRulesForm from "@/components/shared/TransformRulesForm.vue";
 import ProxyConfigForm from "@/components/shared/ProxyConfigForm.vue";

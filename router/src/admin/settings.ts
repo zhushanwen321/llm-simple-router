@@ -8,6 +8,7 @@ import {
   getLogTableMaxSizeMb, setLogTableMaxSizeMb,
   getSetting, getTokenEstimationEnabled, setTokenEstimationEnabled,
   getClientSessionHeaders, setClientSessionHeaders,
+  getMetricsDetailDays, setMetricsDetailDays,
 } from "../db/settings.js";
 import { HTTP_BAD_REQUEST } from "./constants.js";
 import { API_CODE, apiError } from "./api-response.js";
@@ -116,6 +117,26 @@ export const adminSettingsRoutes: FastifyPluginCallback<SettingsOptions> = (app,
     }
     setClientSessionHeaders(db, entries as Array<{ client_type: string; session_header_key: string }>);
     return { success: true };
+  });
+
+  // --- Metrics Detail Days ---
+
+  app.get("/admin/api/settings/metrics-detail-days", async () => {
+    return { days: getMetricsDetailDays(db) };
+  });
+
+  const MAX_METRICS_DETAIL_DAYS = 30;
+
+  app.put("/admin/api/settings/metrics-detail-days", async (request, reply) => {
+    const { days } = request.body as { days: number };
+    if (!Number.isInteger(days) || days < 1 || days > MAX_METRICS_DETAIL_DAYS) {
+      return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.BAD_REQUEST, "days must be integer 1-30"));
+    }
+    if (days > getLogRetentionDays(db)) {
+      return reply.code(HTTP_BAD_REQUEST).send(apiError(API_CODE.BAD_REQUEST, "metrics_detail_days must not exceed log_retention_days"));
+    }
+    setMetricsDetailDays(db, days);
+    return { days };
   });
 
   done();

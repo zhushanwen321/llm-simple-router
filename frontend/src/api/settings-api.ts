@@ -19,6 +19,16 @@ export function updateTokenEstimation(enabled: boolean) {
   return request<{ success: boolean }>("put", "/settings/token-estimation", { enabled });
 }
 
+// --- Metrics Detail Days ---
+
+export function getMetricsDetailDays() {
+  return request<{ days: number }>("get", "/settings/metrics-detail-days");
+}
+
+export function setMetricsDetailDays(days: number) {
+  return request<{ days: number }>("put", "/settings/metrics-detail-days", { days });
+}
+
 // --- Client Session Headers ---
 
 export function getClientSessionHeaders() {

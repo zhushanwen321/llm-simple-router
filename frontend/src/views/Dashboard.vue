@@ -153,6 +153,21 @@
 
     <!-- Main content -->
     <div v-else>
+      <!-- Time Range Selector -->
+      <TimeRangeSelector
+        :time-range-label="timeRangeLabel"
+        :active-range="activeRange"
+        :show-custom="showCustom"
+        :custom-start-date="customStartDate"
+        :custom-end-date="customEndDate"
+        :custom-error="customError"
+        :select-quick-range="selectQuickRange"
+        :toggle-custom="toggleCustom"
+        :apply-custom="applyCustom"
+        @update:custom-start-date="customStartDate = $event"
+        @update:custom-end-date="customEndDate = $event"
+      />
+
       <!-- Zone 2: Metrics + Primary Chart -->
       <div class="grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-4 mb-4">
         <!-- Left: metric cards -->
@@ -250,9 +265,11 @@
             </span>
             <span class="text-[11px] text-muted-foreground">
               {{ t("dashboard.stats.successRate") }}
-              <span class="font-mono text-[13px] font-medium text-foreground"
-                >{{ (stats.successRate * 100).toFixed(1) }}%</span
-              >
+              <span class="font-mono text-[13px] font-medium text-foreground">{{
+                stats.successRate !== null
+                  ? (stats.successRate * 100).toFixed(1) + "%"
+                  : "--"
+              }}</span>
             </span>
             <span class="text-[11px] text-muted-foreground">
               {{ t("dashboard.window.label") }}
@@ -305,80 +322,6 @@
           </div>
         </div>
       </div>
-
-      <!-- Zone 4: Timeline window navigator -->
-      <div class="bg-card rounded-lg px-4 py-2.5">
-        <div class="flex items-center justify-between mb-1.5">
-          <div class="flex items-center gap-3">
-            <span class="font-mono text-xs font-medium text-foreground">{{
-              windowTimeRange
-            }}</span>
-            <div class="flex gap-0.5">
-              <Button
-                v-for="opt in timelineZoomOptions"
-                :key="opt.value"
-                :variant="timelineRange === opt.value ? 'secondary' : 'ghost'"
-                size="sm"
-                class="h-5 px-1.5 text-[10px] font-mono"
-                @click="timelineRange = opt.value"
-              >
-                {{ opt.label }}
-              </Button>
-            </div>
-          </div>
-          <span class="text-[11px] text-muted-foreground/60">{{
-            t("dashboard.timeline.hint")
-          }}</span>
-        </div>
-        <TooltipProvider v-if="usageWindows.length > 0">
-          <div
-            class="relative h-7 rounded overflow-hidden border border-border/50 bg-muted/20"
-          >
-            <div
-              v-for="w in timelineWindows"
-              :key="w.window.id"
-              class="absolute top-0 bottom-0 rounded-sm cursor-pointer transition-[filter] duration-150 hover:brightness-125"
-              :class="
-                selectedWindowId === w.window.id
-                  ? 'ring-2 ring-primary ring-inset brightness-130 z-[2]'
-                  : ''
-              "
-              :style="getWindowStyle(w)"
-              @click="selectedWindowId = w.window.id"
-            >
-              <Tooltip v-if="getWindowWidth(w) !== '0%'">
-                <TooltipTrigger as-child>
-                  <div class="w-full h-full" />
-                </TooltipTrigger>
-                <TooltipContent>
-                  {{ formatWindowTooltip(w) }}
-                </TooltipContent>
-              </Tooltip>
-            </div>
-          </div>
-        </TooltipProvider>
-        <div
-          v-if="usageWindows.length === 0"
-          class="h-7 flex items-center justify-center text-[11px] text-muted-foreground"
-        >
-          {{ t("dashboard.timeline.noData") }}
-        </div>
-        <!-- Day labels -->
-        <div
-          v-if="usageWindows.length > 0"
-          class="relative h-4 mt-1 overflow-hidden"
-        >
-          <span
-            v-for="d in timelineDayLabels"
-            :key="d.label"
-            class="absolute font-mono text-[10px] text-muted-foreground/50"
-            :class="d.position === 0 ? '' : '-translate-x-1/2'"
-            :style="{ left: d.position + '%' }"
-          >
-            {{ d.label }}
-          </span>
-        </div>
-      </div>
     </div>
   </div>
 </template>
@@ -398,7 +341,6 @@ import { Line } from "vue-chartjs";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
 import {
   Popover,
   PopoverTrigger,
@@ -411,18 +353,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { Filter } from "lucide-vue-next";
+import { Filter } from "@lucide/vue";
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { stackedAreaOptions, miniLineOptions } from "./metrics-helpers";
 import { useDashboard } from "@/composables/useDashboard";
 import { formatTokenCompact } from "@/utils/token-format";
+import TimeRangeSelector from "@/components/dashboard/TimeRangeSelector.vue";
 
 ChartJS.register(
   CategoryScale,
@@ -439,8 +376,6 @@ const {
   selectedProvider,
   sortedProviders,
   providerTokenLabels,
-  usageWindows,
-  selectedWindowId,
   modelFilter,
   keyFilter,
   clientType,
@@ -454,12 +389,15 @@ const {
   tokenThroughputChartData,
   deltaValues,
   windowTimeRange,
-  timelineWindows,
-  timelineRange,
-  getWindowStyle,
-  getWindowWidth,
-  formatWindowTooltip,
-  timelineDayLabels,
+  activeRange,
+  timeRangeLabel,
+  showCustom,
+  customStartDate,
+  customEndDate,
+  customError,
+  selectQuickRange,
+  toggleCustom,
+  applyCustom,
   retry,
 } = useDashboard();
 
@@ -484,11 +422,4 @@ const stackedAreaOpts = computed(() => {
 function miniChartOpts(labels: string[]) {
   return miniLineOptions(labels);
 }
-
-// --- Timeline zoom options ---
-const timelineZoomOptions = [
-  { value: "24h" as const, label: "24h" },
-  { value: "3d" as const, label: "3d" },
-  { value: "7d" as const, label: "7d" },
-];
 </script>

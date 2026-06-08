@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Redesign — Visual Time Selector + Filters</title>
+<style>
+  :root {
+    --bg: oklch(0.145 0 0);
+    --surface: oklch(0.205 0 0);
+    --surface-up: oklch(0.269 0 0);
+    --fg: oklch(0.985 0 0);
+    --muted: oklch(0.708 0 0);
+    --muted-dim: oklch(0.556 0 0);
+    --border: oklch(1 0 0 / 10%);
+    --primary: oklch(0.68 0.13 175);
+    --primary-dim: oklch(0.68 0.13 175 / 15%);
+    --primary-text: oklch(0.145 0 0);
+    --success: oklch(0.65 0.17 150);
+    --success-dim: oklch(0.65 0.17 150 / 12%);
+    --danger: oklch(0.58 0.22 25);
+    --chart-teal: oklch(0.58 0.14 175);
+    --chart-green: oklch(0.65 0.17 150);
+    --chart-indigo: oklch(0.65 0.14 260);
+    --chart-amber: oklch(0.78 0.16 80);
+    --mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+    --sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+  .page { padding: 20px 24px; max-width: 1360px; margin: 0 auto; }
+
+  /* ===== Zone 0: Header Row ===== */
+  .zone-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  .page-title {
+    font-size: 16px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  /* ===== Provider pills ===== */
+  .provider-scroll {
+    flex: 1;
+    overflow-x: auto;
+    display: flex;
+    gap: 4px;
+    scrollbar-width: none;
+  }
+  .provider-scroll::-webkit-scrollbar { display: none; }
+  .prov-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 28px;
+    padding: 0 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--muted);
+    font-family: var(--sans);
+    font-size: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 150ms;
+  }
+  .prov-btn:hover { background: var(--surface); color: var(--fg); }
+  .prov-btn.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: var(--primary-text);
+  }
+  .prov-btn.active .prov-token { color: var(--primary-text); opacity: 0.55; }
+  .prov-token {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--muted-dim);
+  }
+
+  /* ===== Filter popover trigger ===== */
+  .filter-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 28px;
+    padding: 0 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--muted);
+    font-family: var(--sans);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 150ms;
+  }
+  .filter-trigger:hover { background: var(--surface); color: var(--fg); }
+  .filter-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 14px;
+    height: 14px;
+    padding: 0 3px;
+    border-radius: 9999px;
+    background: var(--primary);
+    color: var(--primary-text);
+    font-size: 9px;
+    font-weight: 600;
+    font-family: var(--mono);
+  }
+
+  /* ===== Filter Popover ===== */
+  .filter-popover {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    width: 260px;
+    background: var(--surface-up);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    z-index: 50;
+    display: none;
+    box-shadow: 0 8px 24px oklch(0 0 0 / 0.3);
+  }
+  .filter-popover.show { display: block; }
+  .filter-group { margin-bottom: 10px; }
+  .filter-group:last-child { margin-bottom: 0; }
+  .filter-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .filter-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .filter-chip {
+    height: 24px;
+    padding: 0 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 150ms;
+  }
+  .filter-chip:hover { background: var(--surface); color: var(--fg); }
+  .filter-chip.active {
+    background: var(--primary-dim);
+    border-color: var(--primary);
+    color: var(--primary);
+  }
+
+  /* ===== Zone 1: Time Range Selector ===== */
+  .zone-time {
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 12px 16px;
+    box-shadow: 0 0 0 1px var(--border);
+    margin-bottom: 14px;
+  }
+  .time-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .time-label {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--fg);
+  }
+  .time-hint {
+    font-size: 11px;
+    color: var(--muted-dim);
+  }
+
+  /* Quick range pills */
+  .quick-ranges {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 10px;
+    background: var(--surface-up);
+    border-radius: 6px;
+    padding: 2px;
+  }
+  .quick-range-btn {
+    flex: 1;
+    height: 26px;
+    border: none;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 150ms;
+  }
+  .quick-range-btn:hover { color: var(--fg); }
+  .quick-range-btn.active {
+    background: var(--primary);
+    color: var(--primary-text);
+    box-shadow: 0 1px 3px oklch(0 0 0 / 0.2);
+  }
+  .quick-range-btn .badge {
+    display: inline-block;
+    font-size: 8px;
+    vertical-align: super;
+    margin-left: 1px;
+    opacity: 0.6;
+  }
+
+  /* Visual timeline track */
+  .timeline-track {
+    position: relative;
+    height: 40px;
+    background: var(--surface-up);
+    border-radius: 4px;
+    overflow: hidden;
+    cursor: crosshair;
+  }
+
+  /* Activity bars (mini histogram) */
+  .act-bar {
+    position: absolute;
+    bottom: 0;
+    width: 2px;
+    border-radius: 1px 1px 0 0;
+    background: var(--primary);
+    opacity: 0.5;
+    transition: opacity 150ms;
+  }
+  .timeline-track:hover .act-bar { opacity: 0.3; }
+  .timeline-track:hover .act-bar.highlighted { opacity: 0.9; }
+
+  /* Selection overlay */
+  .selection-overlay {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    border-radius: 3px;
+    border: 1.5px solid var(--primary);
+    background: var(--primary-dim);
+    pointer-events: none;
+    transition: left 200ms, width 200ms;
+  }
+  .selection-handle {
+    position: absolute;
+    top: 50%;
+    width: 6px;
+    height: 20px;
+    border-radius: 2px;
+    background: var(--primary);
+    transform: translateY(-50%);
+    pointer-events: auto;
+    cursor: ew-resize;
+  }
+  .selection-handle.left { left: -3px; }
+  .selection-handle.right { right: -3px; }
+
+  /* Tick marks */
+  .timeline-ticks {
+    position: relative;
+    height: 14px;
+    margin-top: 4px;
+  }
+  .tick-label {
+    position: absolute;
+    font-size: 9px;
+    color: var(--muted-dim);
+    font-family: var(--mono);
+    transform: translateX(-50%);
+    white-space: nowrap;
+  }
+  .tick-label.now {
+    color: var(--primary);
+    font-weight: 600;
+  }
+
+  /* Aggregation zone indicator */
+  .agg-indicator {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    background: repeating-linear-gradient(
+      -45deg,
+      oklch(0.68 0.13 175 / 0.05),
+      oklch(0.68 0.13 175 / 0.05) 2px,
+      transparent 2px,
+      transparent 6px
+    );
+    pointer-events: none;
+    border-radius: 3px;
+  }
+  .agg-label {
+    position: absolute;
+    top: 2px;
+    font-size: 8px;
+    color: var(--muted-dim);
+    font-family: var(--mono);
+    letter-spacing: 0.05em;
+  }
+
+  /* ===== Zone 2: Metrics Cards ===== */
+  .zone-metrics {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr;
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+  .metrics-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .metric-primary {
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 14px 18px;
+    box-shadow: 0 0 0 1px var(--border);
+  }
+  .metric-primary-label {
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+  .metric-primary-value {
+    font-family: var(--mono);
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .metric-primary-value .unit {
+    font-size: 14px;
+    font-weight: 400;
+    color: var(--muted);
+    margin-left: 2px;
+  }
+  .metric-delta {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    margin-top: 4px;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 500;
+  }
+  .metric-delta.up { color: var(--success); }
+  .metric-delta.down { color: var(--danger); }
+  .metrics-row2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .metric-sm {
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 10px 14px;
+    box-shadow: 0 0 0 1px var(--border);
+  }
+  .metric-sm-label {
+    font-size: 10px;
+    color: var(--muted);
+    margin-bottom: 2px;
+  }
+  .metric-sm-value {
+    font-family: var(--mono);
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1;
+  }
+  .metric-sm-value .unit {
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--muted);
+    margin-left: 1px;
+  }
+  .metrics-meta {
+    display: flex;
+    gap: 14px;
+    padding: 0 2px;
+  }
+  .metric-xs-label { font-size: 10px; color: var(--muted); }
+  .metric-xs-value { font-family: var(--mono); font-size: 12px; font-weight: 500; color: var(--muted-dim); }
+
+  /* Primary chart */
+  .chart-primary {
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 12px 14px;
+    box-shadow: 0 0 0 1px var(--border);
+    display: flex;
+    flex-direction: column;
+  }
+  .chart-primary-title {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .chart-primary-body {
+    flex: 1;
+    position: relative;
+    min-height: 160px;
+  }
+  .chart-primary-body svg { width: 100%; height: 100%; }
+
+  /* ===== Zone 3: Secondary Charts ===== */
+  .zone-charts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .chart-card {
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 10px 12px;
+    box-shadow: 0 0 0 1px var(--border);
+  }
+  .chart-card-title {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .chart-card-body {
+    height: 120px;
+  }
+  .chart-card-body svg { width: 100%; height: 100%; }
+
+  /* SVG helpers */
+  .g-line { stroke: var(--border); stroke-width: 1; }
+  .plot-line { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .plot-area { stroke-width: 0; }
+
+  /* Data source indicator */
+  .data-source {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 9px;
+    color: var(--muted-dim);
+    font-family: var(--mono);
+    padding: 2px 6px;
+    background: var(--surface-up);
+    border-radius: 3px;
+  }
+  .data-source .dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+  }
+  .data-source .dot.detail { background: var(--primary); }
+  .data-source .dot.agg { background: var(--chart-amber); }
+
+  /* ===== Custom Date Picker ===== */
+  .custom-range-row {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 8px 10px;
+    background: var(--surface-up);
+    border-radius: 6px;
+    animation: slideDown 150ms ease;
+  }
+  .custom-range-row.show { display: flex; }
+  @keyframes slideDown {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .date-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .date-input-wrap label {
+    font-size: 10px;
+    color: var(--muted);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    min-width: 24px;
+  }
+  .date-input {
+    height: 26px;
+    padding: 0 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--fg);
+    font-family: var(--mono);
+    font-size: 11px;
+    outline: none;
+    transition: border-color 150ms;
+    width: 130px;
+  }
+  .date-input:focus { border-color: var(--primary); }
+  .date-separator {
+    color: var(--muted-dim);
+    font-size: 12px;
+  }
+  .date-apply-btn {
+    height: 26px;
+    padding: 0 10px;
+    background: var(--primary);
+    color: var(--primary-text);
+    border: none;
+    border-radius: 4px;
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    margin-left: auto;
+    transition: filter 150ms;
+  }
+  .date-apply-btn:hover { filter: brightness(1.1); }
+  .date-error {
+    font-size: 10px;
+    color: var(--danger);
+    display: none;
+  }
+  .date-error.show { display: inline; }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .zone-metrics { grid-template-columns: 1fr; }
+    .zone-charts { grid-template-columns: 1fr; }
+    .custom-range-row { flex-wrap: wrap; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ===== Zone 0: Header + Providers ===== -->
+  <div class="zone-header">
+    <h2 class="page-title">Dashboard</h2>
+    <div class="provider-scroll">
+      <button class="prov-btn active">OpenAI <span class="prov-token">3.2M</span></button>
+      <button class="prov-btn">Anthropic <span class="prov-token">1.8M</span></button>
+      <button class="prov-btn">DeepSeek <span class="prov-token">0.5M</span></button>
+      <button class="prov-btn">Google <span class="prov-token">0.2M</span></button>
+    </div>
+    <div style="position:relative;">
+      <button class="filter-trigger" id="filter-btn" onclick="toggleFilters()">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M6 12h12M9 18h6"/></svg>
+        Filters
+        <span class="filter-badge">2</span>
+      </button>
+      <div class="filter-popover" id="filter-popover">
+        <div class="filter-group">
+          <div class="filter-label">Model</div>
+          <div class="filter-options">
+            <button class="filter-chip active">All</button>
+            <button class="filter-chip">gpt-4o</button>
+            <button class="filter-chip">gpt-4.1</button>
+            <button class="filter-chip">o3</button>
+            <button class="filter-chip">o4-mini</button>
+          </div>
+        </div>
+        <div class="filter-group">
+          <div class="filter-label">Secret Key</div>
+          <div class="filter-options">
+            <button class="filter-chip active">All</button>
+            <button class="filter-chip">pi-agent</button>
+            <button class="filter-chip">cc-agent</button>
+            <button class="filter-chip">test</button>
+          </div>
+        </div>
+        <div class="filter-group">
+          <div class="filter-label">Client</div>
+          <div class="filter-options">
+            <button class="filter-chip active">All</button>
+            <button class="filter-chip">pi</button>
+            <button class="filter-chip">claude-code</button>
+            <button class="filter-chip">unknown</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Zone 1: Visual Time Range Selector ===== -->
+  <div class="zone-time">
+    <div class="time-header">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="time-label" id="range-label">Jun 1 14:00 ~ Jun 8 14:00</span>
+        <span class="data-source">
+          <span class="dot detail"></span> detail
+          <span class="dot agg"></span> aggregated
+        </span>
+      </div>
+      <span class="time-hint">Drag handles to select range</span>
+    </div>
+
+    <!-- Quick range pills -->
+    <div class="quick-ranges">
+      <button class="quick-range-btn" onclick="selectRange(5, this)">5h</button>
+      <button class="quick-range-btn" onclick="selectRange(24, this)">24h</button>
+      <button class="quick-range-btn active" onclick="selectRange(168, this)">7d</button>
+      <button class="quick-range-btn" onclick="selectRange(720, this)">30d</button>
+      <button class="quick-range-btn" id="custom-btn" onclick="toggleCustomRange(this)">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px;"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        Custom
+      </button>
+    </div>
+
+    <!-- Custom date range (hidden by default) -->
+    <div class="custom-range-row" id="custom-range">
+      <div class="date-input-wrap">
+        <label>From</label>
+        <input type="date" class="date-input" id="date-start" />
+      </div>
+      <span class="date-separator">~</span>
+      <div class="date-input-wrap">
+        <label>To</label>
+        <input type="date" class="date-input" id="date-end" />
+      </div>
+      <span class="date-error" id="date-error">Invalid range</span>
+      <button class="date-apply-btn" onclick="applyCustomRange()">Apply</button>
+    </div>
+
+    <!-- Visual activity timeline with selection -->
+    <div class="timeline-track" id="timeline">
+      <!-- Aggregation zone indicator (left portion = >7d ago) -->
+      <div class="agg-indicator" id="agg-zone" style="left:0;width:76.7%"></div>
+      <div class="agg-label" id="agg-label" style="left:34%">AGGREGATED</div>
+      <!-- Activity bars generated by JS -->
+      <!-- Selection overlay -->
+      <div class="selection-overlay" id="selection">
+        <div class="selection-handle left"></div>
+        <div class="selection-handle right"></div>
+      </div>
+    </div>
+    <div class="timeline-ticks" id="ticks"></div>
+  </div>
+
+  <!-- ===== Zone 2: Metrics + Primary Chart ===== -->
+  <div class="zone-metrics">
+    <div class="metrics-group">
+      <div class="metric-primary">
+        <div class="metric-primary-label">Input Tokens</div>
+        <div class="metric-primary-value">3.2<span class="unit">M</span></div>
+        <div class="metric-delta up">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M18 15l-6-6-6 6"/></svg>
+          +12% vs prev
+        </div>
+      </div>
+      <div class="metric-primary">
+        <div class="metric-primary-label">Output Tokens</div>
+        <div class="metric-primary-value">842<span class="unit">K</span></div>
+        <div class="metric-delta up">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M18 15l-6-6-6 6"/></svg>
+          +8% vs prev
+        </div>
+      </div>
+      <div class="metrics-row2">
+        <div class="metric-sm">
+          <div class="metric-sm-label">Avg TPS</div>
+          <div class="metric-sm-value">48.2<span class="unit">t/s</span></div>
+        </div>
+        <div class="metric-sm">
+          <div class="metric-sm-label">Cache Hit</div>
+          <div class="metric-sm-value" style="color:var(--primary);">73.5<span class="unit">%</span></div>
+        </div>
+      </div>
+      <div class="metrics-meta">
+        <span class="metric-xs-label">Requests</span>
+        <span class="metric-xs-value">12,847</span>
+        <span class="metric-xs-label">Success</span>
+        <span class="metric-xs-value" style="color:var(--success);">99.2%</span>
+      </div>
+    </div>
+    <div class="chart-primary">
+      <div class="chart-primary-title">Token Throughput</div>
+      <div class="chart-primary-body">
+        <svg viewBox="0 0 600 160" preserveAspectRatio="none">
+          <line class="g-line" x1="0" y1="40" x2="600" y2="40"/>
+          <line class="g-line" x1="0" y1="80" x2="600" y2="80"/>
+          <line class="g-line" x1="0" y1="120" x2="600" y2="120"/>
+          <path class="plot-area" style="fill:oklch(0.65 0.17 150 / 0.25);"
+            d="M0,130 C40,120 80,100 120,108 C160,116 200,90 240,95
+               C280,100 320,82 360,88 C400,94 440,78 480,84
+               C520,90 560,95 600,92 L600,160 L0,160 Z"/>
+          <path class="plot-line" style="stroke:var(--chart-green);"
+            d="M0,130 C40,120 80,100 120,108 C160,116 200,90 240,95
+               C280,100 320,82 360,88 C400,94 440,78 480,84
+               C520,90 560,95 600,92"/>
+          <path class="plot-area" style="fill:oklch(0.58 0.14 175 / 0.20);"
+            d="M0,95 C40,85 80,68 120,75 C160,82 200,58 240,65
+               C280,72 320,52 360,58 C400,64 440,48 480,55
+               C520,62 560,68 600,65 L600,130
+               C560,95 520,90 480,84 C440,78 400,94 360,88
+               C320,82 280,100 240,95 C200,90 160,116 120,108
+               C80,100 40,120 0,130 Z"/>
+          <path class="plot-line" style="stroke:var(--chart-teal);"
+            d="M0,95 C40,85 80,68 120,75 C160,82 200,58 240,65
+               C280,72 320,52 360,58 C400,64 440,48 480,55
+               C520,62 560,68 600,65"/>
+          <rect x="14" y="6" width="7" height="7" rx="2" fill="var(--chart-teal)" opacity="0.7"/>
+          <text x="25" y="12" fill="var(--muted)" font-size="9" font-family="var(--sans)">Input</text>
+          <rect x="58" y="6" width="7" height="7" rx="2" fill="var(--chart-green)" opacity="0.7"/>
+          <text x="69" y="12" fill="var(--muted)" font-size="9" font-family="var(--sans)">Output</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Zone 3: Secondary Charts ===== -->
+  <div class="zone-charts">
+    <div class="chart-card">
+      <div class="chart-card-title">Output Speed (TPS)</div>
+      <div class="chart-card-body">
+        <svg viewBox="0 0 600 120" preserveAspectRatio="none">
+          <line class="g-line" x1="0" y1="30" x2="600" y2="30"/>
+          <line class="g-line" x1="0" y1="60" x2="600" y2="60"/>
+          <line class="g-line" x1="0" y1="90" x2="600" y2="90"/>
+          <path class="plot-line" style="stroke:var(--chart-indigo);"
+            d="M0,95 C40,88 80,72 120,80 C160,88 200,65 240,70
+               C280,75 320,58 360,64 C400,70 440,55 480,60
+               C520,65 560,70 600,68"/>
+        </svg>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-title">Cache Hit Rate</div>
+      <div class="chart-card-body">
+        <svg viewBox="0 0 600 120" preserveAspectRatio="none">
+          <line class="g-line" x1="0" y1="30" x2="600" y2="30"/>
+          <line class="g-line" x1="0" y1="60" x2="600" y2="60"/>
+          <line class="g-line" x1="0" y1="90" x2="600" y2="90"/>
+          <path class="plot-area" style="fill:var(--primary-dim);"
+            d="M0,82 C40,78 80,68 120,72 C160,76 200,62 240,66
+               C280,70 320,58 360,62 C400,66 440,54 480,58
+               C520,62 560,66 600,64 L600,120 L0,120 Z"/>
+          <path class="plot-line" style="stroke:var(--primary);"
+            d="M0,82 C40,78 80,68 120,72 C160,76 200,62 240,66
+               C280,70 320,58 360,62 C400,66 440,54 480,58
+               C520,62 560,66 600,64"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ===== Configuration =====
+const METRICS_DETAIL_DAYS = 7;    // days of full-resolution data
+const TOTAL_RANGE_DAYS = 30;      // total visible range
+const NOW = new Date('2026-06-08T14:00:00');
+const RANGE_START = new Date(NOW.getTime() - TOTAL_RANGE_DAYS * 86400000);
+const RANGE_MS = TOTAL_RANGE_DAYS * 86400000;
+
+// Current selection: last 7 days
+let selStart = new Date(NOW.getTime() - 7 * 86400000);
+let selEnd = new Date(NOW.getTime());
+
+const track = document.getElementById('timeline');
+const selection = document.getElementById('selection');
+const rangeLabel = document.getElementById('range-label');
+const aggZone = document.getElementById('agg-zone');
+const aggLabel = document.getElementById('agg-label');
+const ticksEl = document.getElementById('ticks');
+
+// ===== Generate activity bars =====
+function genActivity() {
+  const bars = [];
+  const barCount = 300;
+  for (let i = 0; i < barCount; i++) {
+    const t = i / barCount;
+    const date = new Date(RANGE_START.getTime() + t * RANGE_MS);
+    const hour = date.getHours();
+    const dayOfWeek = date.getDay();
+    // More activity during work hours, less on weekends
+    const isWorkHour = hour >= 9 && hour < 19;
+    const isWeekday = dayOfWeek >= 1 && dayOfWeek <= 5;
+    let intensity = Math.random();
+    if (isWorkHour && isWeekday) intensity = 0.4 + Math.random() * 0.6;
+    else if (isWorkHour || isWeekday) intensity = 0.1 + Math.random() * 0.3;
+    else intensity = Math.random() * 0.15;
+
+    const height = intensity * 32 + 4;
+    bars.push({ pct: t, height });
+  }
+  return bars;
+}
+
+const activity = genActivity();
+
+// Render activity bars
+activity.forEach(b => {
+  const el = document.createElement('div');
+  el.className = 'act-bar';
+  el.style.left = (b.pct * 100) + '%';
+  el.style.height = b.height + 'px';
+  el.style.opacity = 0.3 + (b.height / 36) * 0.5;
+  track.insertBefore(el, selection);
+});
+
+// ===== Aggregation zone =====
+function updateAggZone() {
+  const detailStart = new Date(NOW.getTime() - METRICS_DETAIL_DAYS * 86400000);
+  const aggStartPct = 0;
+  const aggEndPct = Math.max(0, (detailStart.getTime() - RANGE_START.getTime()) / RANGE_MS * 100);
+  aggZone.style.left = aggStartPct + '%';
+  aggZone.style.width = aggEndPct + '%';
+  aggLabel.style.left = (aggStartPct + aggEndPct) / 2 + '%';
+  if (aggEndPct < 10) {
+    aggLabel.style.display = 'none';
+  } else {
+    aggLabel.style.display = 'block';
+  }
+}
+updateAggZone();
+
+// ===== Selection =====
+function pctToTime(pct) {
+  return new Date(RANGE_START.getTime() + pct * RANGE_MS);
+}
+function timeToPct(d) {
+  return (d.getTime() - RANGE_START.getTime()) / RANGE_MS;
+}
+
+function formatDate(d) {
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${months[d.getMonth()]} ${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
+function updateSelection() {
+  const leftPct = timeToPct(selStart) * 100;
+  const rightPct = timeToPct(selEnd) * 100;
+  selection.style.left = leftPct + '%';
+  selection.style.width = (rightPct - leftPct) + '%';
+  rangeLabel.textContent = `${formatDate(selStart)} ~ ${formatDate(selEnd)}`;
+
+  // Highlight activity bars in selection
+  document.querySelectorAll('.act-bar').forEach((bar, i) => {
+    const pct = activity[i].pct * 100;
+    bar.classList.toggle('highlighted', pct >= leftPct && pct <= rightPct);
+  });
+}
+updateSelection();
+
+// ===== Drag handles =====
+let dragging = null;
+const LEFT = 'left', RIGHT = 'right';
+
+function getX(e) {
+  const rect = track.getBoundingClientRect();
+  return (e.clientX - rect.left) / rect.width;
+}
+
+track.addEventListener('mousedown', e => {
+  const rect = track.getBoundingClientRect();
+  const x = (e.clientX - rect.left) / rect.width;
+  const leftPct = timeToPct(selStart);
+  const rightPct = timeToPct(selEnd);
+
+  // Check if near a handle
+  if (Math.abs(x - leftPct) < 0.015) dragging = LEFT;
+  else if (Math.abs(x - rightPct) < 0.015) dragging = RIGHT;
+  else {
+    // Click to reposition: set both edges around click point
+    const snap = 7 * 86400000 / RANGE_MS; // 7 day width
+    const center = x;
+    selStart = pctToTime(Math.max(0, center - snap / 2));
+    selEnd = pctToTime(Math.min(1, center + snap / 2));
+    updateSelection();
+    clearActiveRange();
+  }
+});
+
+document.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  const x = Math.max(0, Math.min(1, getX(e)));
+  if (dragging === LEFT) {
+    selStart = pctToTime(Math.min(x, timeToPct(selEnd) - 0.01));
+  } else {
+    selEnd = pctToTime(Math.max(x, timeToPct(selStart) + 0.01));
+  }
+  updateSelection();
+});
+
+document.addEventListener('mouseup', () => { dragging = null; });
+
+// ===== Quick range buttons =====
+function selectRange(hours, btn) {
+  document.querySelectorAll('.quick-range-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  selEnd = new Date(NOW.getTime());
+  selStart = new Date(NOW.getTime() - hours * 3600000);
+  updateSelection();
+}
+
+function clearActiveRange() {
+  document.querySelectorAll('.quick-range-btn').forEach(b => b.classList.remove('active'));
+}
+
+// ===== Tick marks =====
+function renderTicks() {
+  // Show day boundaries
+  for (let d = 0; d <= TOTAL_RANGE_DAYS; d += 3) {
+    const date = new Date(RANGE_START.getTime() + d * 86400000);
+    const pct = (d / TOTAL_RANGE_DAYS) * 100;
+    const label = document.createElement('span');
+    label.className = 'tick-label' + (d === TOTAL_RANGE_DAYS ? ' now' : '');
+    label.style.left = pct + '%';
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    label.textContent = d === TOTAL_RANGE_DAYS ? 'now' : `${months[date.getMonth()]}/${date.getDate()}`;
+    ticksEl.appendChild(label);
+  }
+}
+renderTicks();
+
+// ===== Custom date range =====
+const customRange = document.getElementById('custom-range');
+const customBtn = document.getElementById('custom-btn');
+const dateStart = document.getElementById('date-start');
+const dateEnd = document.getElementById('date-end');
+const dateError = document.getElementById('date-error');
+
+// Set default dates
+function toLocalISOString(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+const MIN_DATE = new Date(NOW.getTime() - 90 * 86400000); // max 90 days back
+dateStart.min = toLocalISOString(MIN_DATE);
+dateStart.max = toLocalISOString(NOW);
+dateEnd.min = toLocalISOString(MIN_DATE);
+dateEnd.max = toLocalISOString(NOW);
+
+function toggleCustomRange(btn) {
+  const showing = customRange.classList.toggle('show');
+  if (showing) {
+    // Pre-fill with current selection rounded to day boundaries
+    dateStart.value = toLocalISOString(selStart);
+    dateEnd.value = toLocalISOString(selEnd);
+    dateError.classList.remove('show');
+    // Deactivate other buttons
+    document.querySelectorAll('.quick-range-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  } else {
+    btn.classList.remove('active');
+  }
+}
+
+function applyCustomRange() {
+  dateError.classList.remove('show');
+  const startVal = dateStart.value;
+  const endVal = dateEnd.value;
+  if (!startVal || !endVal) {
+    dateError.textContent = 'Select both dates';
+    dateError.classList.add('show');
+    return;
+  }
+  const s = new Date(startVal + 'T00:00:00');
+  const e = new Date(endVal + 'T23:59:59');
+  if (s >= e) {
+    dateError.textContent = 'Start must be before end';
+    dateError.classList.add('show');
+    return;
+  }
+  if (s < MIN_DATE) {
+    dateError.textContent = 'Max 90 days back';
+    dateError.classList.add('show');
+    return;
+  }
+  if (e > NOW) {
+    dateError.textContent = 'End cannot be in future';
+    dateError.classList.add('show');
+    return;
+  }
+  // Extend range to include the custom period
+  const customStart = s.getTime();
+  const customEnd = e.getTime();
+  const rangeStart = Math.min(RANGE_START.getTime(), customStart);
+  const rangeEnd = Math.max(NOW.getTime(), customEnd);
+  // For demo, we just set selection (in real app would re-query data)
+  selStart = s;
+  selEnd = e;
+  updateSelection();
+}
+
+// When a quick range is selected, hide custom row
+const origSelectRange = selectRange;
+selectRange = function(hours, btn) {
+  customRange.classList.remove('show');
+  customBtn.classList.remove('active');
+  origSelectRange(hours, btn);
+};
+
+// ===== Filter popover =====
+function toggleFilters() {
+  const p = document.getElementById('filter-popover');
+  p.classList.toggle('show');
+}
+document.addEventListener('click', e => {
+  const p = document.getElementById('filter-popover');
+  const btn = document.getElementById('filter-btn');
+  if (!p.contains(e.target) && !btn.contains(e.target)) {
+    p.classList.remove('show');
+  }
+});
+document.querySelectorAll('.filter-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    const siblings = chip.parentElement.querySelectorAll('.filter-chip');
+    siblings.forEach(s => s.classList.remove('active'));
+    chip.classList.add('active');
+  });
+});
+</script>
+</body>
+</html>

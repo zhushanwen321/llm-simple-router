@@ -492,7 +492,7 @@ import {
   Search,
   AlertTriangle,
   X,
-} from "lucide-vue-next";
+} from "@lucide/vue";
 import type { RouterKey } from "@/types/models";
 
 const { t } = useI18n();

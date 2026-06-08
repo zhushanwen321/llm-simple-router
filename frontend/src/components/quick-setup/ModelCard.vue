@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
-import { Trash2, Type, ImageIcon, Volume2, Video } from "lucide-vue-next";
+import { Trash2, Type, ImageIcon, Volume2, Video } from "@lucide/vue";
 import { cn } from "@/lib/utils";
 import { DEFAULT_STREAM_TIMEOUT_MS } from "@/constants";
 

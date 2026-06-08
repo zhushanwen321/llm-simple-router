@@ -1,0 +1,163 @@
+{
+  "test_cases": [
+    {
+      "id": "TC-1-01",
+      "type": "integration",
+      "title": "insertMetrics 双写 metrics_10min",
+      "steps": [
+        "调用 insertMetrics() 插入一条指标",
+        "查询 metrics_10min 确认桶行 request_count = 1",
+        "再次插入同一桶的指标",
+        "查询确认 request_count = 2"
+      ]
+    },
+    {
+      "id": "TC-1-02",
+      "type": "integration",
+      "title": "聚合表 NULL router_key_id 处理",
+      "steps": [
+        "插入 router_key_id = null 的指标",
+        "查询 metrics_10min 确认 router_key_id 存储为空字符串",
+        "再次插入 null router_key_id",
+        "确认 UPSERT 更新而非插入新行"
+      ]
+    },
+    {
+      "id": "TC-1-03",
+      "type": "api",
+      "title": "GET /admin/api/settings/metrics-detail-days 返回默认值",
+      "steps": [
+        "GET /admin/api/settings/metrics-detail-days",
+        "验证 200 + { days: 7 }"
+      ]
+    },
+    {
+      "id": "TC-1-04",
+      "type": "api",
+      "title": "PUT /admin/api/settings/metrics-detail-days 校验",
+      "steps": [
+        "PUT body { days: 3 } → 200 + { days: 3 }",
+        "PUT body { days: 0 } → 400",
+        "PUT body { days: 31 } → 400"
+      ]
+    },
+    {
+      "id": "TC-2-01",
+      "type": "integration",
+      "title": "deleteMetricsBefore 清理明细保留聚合",
+      "steps": [
+        "插入 >detail_days 的明细 + 聚合数据",
+        "调用 runLogCleanup()",
+        "确认 request_metrics 行被删除",
+        "确认 metrics_10min 行保留"
+      ]
+    },
+    {
+      "id": "TC-3-01",
+      "type": "integration",
+      "title": "查询路由 ≤detail_days 走明细表",
+      "steps": [
+        "设置 detail_days = 7",
+        "调用 getMetricsSummary(period='24h')",
+        "验证 SQL 中只出现 request_metrics"
+      ]
+    },
+    {
+      "id": "TC-3-02",
+      "type": "integration",
+      "title": "查询路由 >detail_days 走聚合表",
+      "steps": [
+        "设置 detail_days = 7",
+        "调用 getMetricsSummary(period='30d')",
+        "验证 SQL 中只出现 metrics_10min"
+      ]
+    },
+    {
+      "id": "TC-3-03",
+      "type": "integration",
+      "title": "查询路由跨分界线 UNION",
+      "steps": [
+        "设置 detail_days = 7",
+        "调用 getStats(start_time=now-10d, end_time=now)",
+        "验证数据包含两个时段且不重复"
+      ]
+    },
+    {
+      "id": "TC-3-04",
+      "type": "integration",
+      "title": "TPS 细分从聚合表重算",
+      "steps": [
+        "插入含 thinking_tokens/text_tokens 的指标",
+        "调用 getMetricsTimeseries(metric='text_tps', period='30d')",
+        "验证返回合理的 TPS 值"
+      ]
+    },
+    {
+      "id": "TC-4-01",
+      "type": "api",
+      "title": "GET /admin/api/metrics/activity 返回活动桶",
+      "steps": [
+        "GET /admin/api/metrics/activity",
+        "验证 200 + { buckets: [...] }",
+        "每个 bucket 含 bucket_time + request_count"
+      ]
+    },
+    {
+      "id": "TC-5-01",
+      "type": "ui",
+      "title": "Dashboard 快速按钮切换时间范围",
+      "steps": [
+        "加载 Dashboard 页面",
+        "点击 7d 按钮",
+        "验证统计卡片数据刷新",
+        "点击 30d 按钮",
+        "验证聚合区域高亮"
+      ]
+    },
+    {
+      "id": "TC-5-02",
+      "type": "ui",
+      "title": "Dashboard Custom 日期选择",
+      "steps": [
+        "点击 Custom 按钮",
+        "验证日期输入行展开",
+        "选择 From/To 日期",
+        "点击 Apply",
+        "验证图表刷新"
+      ]
+    },
+    {
+      "id": "TC-5-03",
+      "type": "ui",
+      "title": "活动图空状态降级",
+      "steps": [
+        "清空 metrics_10min",
+        "加载 Dashboard",
+        "验证活动图显示空白 + 'No data yet' 提示"
+      ]
+    },
+    {
+      "id": "TC-7-01",
+      "type": "ui",
+      "title": "Settings 双栏保留策略",
+      "steps": [
+        "加载 Settings 页面",
+        "验证左右两栏显示 Log 和 Metrics 配置",
+        "修改 metrics detail 为 3",
+        "点击 Save",
+        "验证 toast 提示成功"
+      ]
+    },
+    {
+      "id": "TC-7-02",
+      "type": "ui",
+      "title": "Settings 校验 metrics > logs 报错",
+      "steps": [
+        "设置 log retention = 7",
+        "设置 metrics detail = 14",
+        "点击 Save",
+        "验证显示校验错误"
+      ]
+    }
+  ]
+}

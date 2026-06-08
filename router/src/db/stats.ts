@@ -1,4 +1,6 @@
 import Database from "better-sqlite3";
+import { queryAggStats, BUCKET_SECONDS } from "./metrics-10min.js";
+import { MS_PER_SECOND } from "../core/constants.js";
 
 /** 获取指定条件下的最近一条 metric 的 created_at（用于窗口补齐定位，不限制 is_complete） */
 export function getLatestMetricTime(
@@ -25,10 +27,11 @@ export function getLatestMetricTime(
 
 export interface Stats {
   totalRequests: number;
-  successRate: number;
+  successRate: number | null;
   avgTps: number;
   totalInputTokens: number;
   totalOutputTokens: number;
+  is_approximate: boolean;
 }
 
 interface StatsRow {
@@ -39,6 +42,18 @@ interface StatsRow {
   total_output_tokens: number;
 }
 
+// BUCKET_SECONDS imported from metrics-10min
+
+/**
+ * Compute the bucket boundary: floor(now / 600s) * 600s.
+ * Data before this boundary is fully settled (in metrics_10min).
+ * Data at or after this boundary may still be incomplete (in request_metrics).
+ */
+function computeBucketBoundary(): string {
+  const bucketStartSec = Math.floor(Date.now() / MS_PER_SECOND / BUCKET_SECONDS) * BUCKET_SECONDS;
+  return new Date(bucketStartSec * MS_PER_SECOND).toISOString();
+}
+
 export function getStats(
   db: Database.Database,
   startTime: string,
@@ -46,6 +61,66 @@ export function getStats(
   routerKeyId?: string,
   providerId?: string,
   backendModel?: string,
+  clientType?: string,
+): Stats {
+  const boundary = computeBucketBoundary();
+
+  // Pure agg: entire range is before the current bucket
+  if (endTime <= boundary) {
+    const aggStats = queryAggStats(db, startTime, endTime, routerKeyId, providerId, backendModel, clientType);
+    return {
+      totalRequests: aggStats.totalRequests,
+      successRate: null, // agg table does not store status_code
+      avgTps: aggStats.avgTps,
+      totalInputTokens: aggStats.totalInputTokens,
+      totalOutputTokens: aggStats.totalOutputTokens,
+      is_approximate: true,
+    };
+  }
+
+  // Pure detail: entire range is within the current bucket
+  if (startTime >= boundary) {
+    return queryDetailStats(db, startTime, endTime, routerKeyId, providerId, backendModel, clientType, false);
+  }
+
+  // Cross-boundary: agg segment [start, boundary) + detail segment [boundary, end)
+  const aggStats = queryAggStats(db, startTime, boundary, routerKeyId, providerId, backendModel, clientType);
+  const detailStats = queryDetailStats(db, boundary, endTime, routerKeyId, providerId, backendModel, clientType, false);
+
+  const mergedTotalRequests = detailStats.totalRequests + aggStats.totalRequests;
+  const mergedTotalInputTokens = detailStats.totalInputTokens + aggStats.totalInputTokens;
+  const mergedTotalOutputTokens = detailStats.totalOutputTokens + aggStats.totalOutputTokens;
+  let mergedAvgTps = 0;
+  if (mergedTotalRequests > 0) {
+    mergedAvgTps = ((detailStats.avgTps) * detailStats.totalRequests + aggStats.avgTps * aggStats.totalRequests) / mergedTotalRequests;
+  }
+  // successRate from detail segment only; agg has no status_code
+  const mergedSuccessCount = detailStats.successRate !== null
+    ? detailStats.successRate * detailStats.totalRequests
+    : 0;
+  const successRate = mergedTotalRequests > 0
+    ? mergedSuccessCount / mergedTotalRequests
+    : null;
+
+  return {
+    totalRequests: mergedTotalRequests,
+    successRate,
+    avgTps: mergedAvgTps,
+    totalInputTokens: mergedTotalInputTokens,
+    totalOutputTokens: mergedTotalOutputTokens,
+    is_approximate: true,
+  };
+}
+
+function queryDetailStats(
+  db: Database.Database,
+  startTime: string,
+  endTime: string,
+  routerKeyId?: string,
+  providerId?: string,
+  backendModel?: string,
+  clientType?: string,
+  _isApproximate: boolean = false,
 ): Stats {
   const conditions = [
     "rm.created_at >= datetime(?)",
@@ -63,6 +138,10 @@ export function getStats(
   if (backendModel) {
     conditions.push("rm.backend_model = ?");
     params.push(backendModel);
+  }
+  if (clientType) {
+    conditions.push("rm.client_type = ?");
+    params.push(clientType);
   }
   const where = conditions.join(" AND ");
 
@@ -84,5 +163,6 @@ export function getStats(
     avgTps: row?.avg_tps ?? 0,
     totalInputTokens: row?.total_input_tokens ?? 0,
     totalOutputTokens: row?.total_output_tokens ?? 0,
+    is_approximate: _isApproximate,
   };
 }

@@ -1,0 +1,1251 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Time Selector v3 — Critique Fix Demo</title>
+<style>
+  :root {
+    --bg: oklch(0.145 0 0);
+    --surface: oklch(0.205 0 0);
+    --surface-up: oklch(0.269 0 0);
+    --surface-hover: oklch(0.238 0 0);
+    --fg: oklch(0.985 0 0);
+    --muted: oklch(0.708 0 0);
+    --muted-dim: oklch(0.556 0 0);
+    --border: oklch(1 0 0 / 10%);
+    --primary: oklch(0.68 0.13 175);
+    --primary-dim: oklch(0.68 0.13 175 / 15%);
+    --primary-text: oklch(0.145 0 0);
+    --success: oklch(0.65 0.17 150);
+    --success-dim: oklch(0.65 0.17 150 / 12%);
+    --danger: oklch(0.58 0.22 25);
+    --mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+    --sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+  .page { padding: 20px 24px; max-width: 1200px; margin: 0 auto; }
+
+  .section-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    margin: 28px 0 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--mono);
+    letter-spacing: 0.04em;
+  }
+  .section-title:first-child { margin-top: 0; }
+
+  .label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .fix-tag {
+    font-size: 9px;
+    font-family: var(--mono);
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 3px;
+    letter-spacing: 0.04em;
+  }
+  .fix-tag.p1 { background: oklch(0.58 0.22 25 / 0.2); color: oklch(0.7 0.2 25); }
+  .fix-tag.p2 { background: oklch(0.78 0.16 80 / 0.2); color: oklch(0.78 0.16 80); }
+
+  /* ======================================
+     ZONE 1: TIME RANGE SELECTOR (v3)
+     ====================================== */
+  .zone-time {
+    background: var(--surface);
+    border-radius: 10px;
+    padding: 14px 18px;
+    box-shadow: 0 0 0 1px var(--border);
+    margin-bottom: 14px;
+  }
+
+  /* --- Time header row --- */
+  .time-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .time-header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .time-label {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--fg);
+  }
+
+  /* [P2 FIX] Legend: aggregation zone explanation */
+  .time-legend {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 10px;
+    color: var(--muted);
+    font-family: var(--mono);
+  }
+  .legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .legend-swatch {
+    width: 12px;
+    height: 8px;
+    border-radius: 2px;
+  }
+  .legend-swatch.bar { background: var(--primary); opacity: 0.7; }
+  .legend-swatch.agg {
+    background: repeating-linear-gradient(
+      -45deg,
+      oklch(0.68 0.13 175 / 0.12),
+      oklch(0.68 0.13 175 / 0.12) 2px,
+      transparent 2px,
+      transparent 4px
+    );
+    border: 1px solid var(--border);
+  }
+  .legend-swatch.selected {
+    background: var(--primary-dim);
+    border: 1.5px solid var(--primary);
+  }
+
+  /* [P2 FIX] Hint: readable contrast */
+  .time-hint {
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  /* --- [P1 FIX] Quick range: segmented control, larger targets --- */
+  .quick-ranges {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 12px;
+    background: var(--surface-up);
+    border-radius: 7px;
+    padding: 3px;
+  }
+  .quick-range-btn {
+    flex: 1;
+    height: 28px;
+    border: none;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 150ms;
+  }
+  .quick-range-btn:hover { color: var(--fg); background: var(--surface-hover); }
+  .quick-range-btn.active {
+    background: var(--primary);
+    color: var(--primary-text);
+    box-shadow: 0 1px 4px oklch(0 0 0 / 0.25);
+  }
+  .quick-range-btn svg { vertical-align: -1px; margin-right: 2px; }
+
+  /* --- [P1 FIX] Timeline: taller track, thicker bars --- */
+  .timeline-wrapper {
+    position: relative;
+    margin: 0 4px;
+  }
+  .timeline-track {
+    position: relative;
+    height: 56px;                       /* was 40px */
+    background: var(--surface-up);
+    border-radius: 5px;
+    overflow: hidden;
+    cursor: crosshair;
+    user-select: none;
+  }
+
+  /* Aggregation zone (hatched pattern for older data) */
+  .agg-zone {
+    position: absolute;
+    top: 0; bottom: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      -45deg,
+      oklch(0.68 0.13 175 / 0.06),
+      oklch(0.68 0.13 175 / 0.06) 2px,
+      transparent 2px,
+      transparent 6px
+    );
+    border-radius: 5px 0 0 5px;
+  }
+  .agg-label-inline {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 8px;
+    font-family: var(--mono);
+    letter-spacing: 0.08em;
+    color: var(--muted-dim);
+    text-transform: uppercase;
+    pointer-events: none;
+  }
+
+  /* Activity bars — thicker, rounded */
+  .act-bar {
+    position: absolute;
+    bottom: 0;
+    border-radius: 2px 2px 0 0;
+    background: var(--primary);
+    transition: opacity 100ms;
+    will-change: opacity;
+  }
+  .timeline-track:hover .act-bar { opacity: 0.25; }
+  .timeline-track:hover .act-bar.highlighted { opacity: 0.85; }
+
+  /* [P2 FIX] Selection overlay with drag handles */
+  .selection-overlay {
+    position: absolute;
+    top: 0; bottom: 0;
+    border-radius: 4px;
+    border: 2px solid var(--primary);
+    background: var(--primary-dim);
+    pointer-events: none;
+    transition: left 180ms ease-out, width 180ms ease-out;
+  }
+  .selection-overlay.dragging {
+    transition: none;
+  }
+  .sel-handle {
+    position: absolute;
+    top: 50%;
+    width: 8px;
+    height: 24px;
+    border-radius: 3px;
+    background: var(--primary);
+    transform: translateY(-50%);
+    pointer-events: auto;
+    cursor: ew-resize;
+    transition: transform 100ms, box-shadow 100ms;
+    box-shadow: 0 1px 4px oklch(0 0 0 / 0.3);
+  }
+  .sel-handle:hover, .sel-handle:active {
+    transform: translateY(-50%) scaleY(1.15);
+    box-shadow: 0 2px 8px oklch(0.68 0.13 175 / 0.4);
+  }
+  .sel-handle.left { left: -4px; }
+  .sel-handle.right { right: -4px; }
+
+  /* Tick labels */
+  .timeline-ticks {
+    position: relative;
+    height: 16px;
+    margin-top: 4px;
+  }
+  .tick-label {
+    position: absolute;
+    font-size: 9px;
+    color: var(--muted-dim);
+    font-family: var(--mono);
+    transform: translateX(-50%);
+    white-space: nowrap;
+  }
+  .tick-label.now {
+    color: var(--primary);
+    font-weight: 600;
+  }
+
+  /* Tooltip on hover */
+  .timeline-tooltip {
+    position: absolute;
+    top: -30px;
+    padding: 3px 8px;
+    background: var(--surface-up);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--fg);
+    pointer-events: none;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 120ms;
+    z-index: 10;
+  }
+  .timeline-tooltip.visible { opacity: 1; }
+
+  /* --- [P1 FIX] Custom date picker (calendar popover) --- */
+  .custom-range-panel {
+    display: none;
+    margin-top: 10px;
+    padding: 12px;
+    background: var(--surface-up);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    animation: slideDown 180ms ease-out;
+  }
+  .custom-range-panel.show { display: block; }
+  @keyframes slideDown {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .custom-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .date-field {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .date-field-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+    min-width: 28px;
+  }
+  .date-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 30px;
+    padding: 0 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    color: var(--fg);
+    font-family: var(--mono);
+    font-size: 12px;
+    cursor: pointer;
+    transition: border-color 150ms, background 150ms;
+  }
+  .date-btn:hover { border-color: var(--primary); background: var(--surface-hover); }
+  .date-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+  .date-btn svg { opacity: 0.5; }
+  .date-btn .chevron { margin-left: 2px; }
+
+  .date-sep {
+    color: var(--muted-dim);
+    font-size: 14px;
+  }
+  .date-apply-btn {
+    height: 30px;
+    padding: 0 14px;
+    background: var(--primary);
+    color: var(--primary-text);
+    border: none;
+    border-radius: 5px;
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    margin-left: auto;
+    transition: filter 150ms;
+  }
+  .date-apply-btn:hover { filter: brightness(1.1); }
+  .date-apply-btn:active { filter: brightness(0.95); }
+  .date-error {
+    width: 100%;
+    margin-top: 6px;
+    font-size: 11px;
+    color: var(--danger);
+    font-family: var(--mono);
+    display: none;
+  }
+  .date-error.show { display: block; }
+
+  /* Calendar popover */
+  .calendar-popover {
+    position: absolute;
+    z-index: 60;
+    background: var(--surface-up);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    box-shadow: 0 10px 30px oklch(0 0 0 / 0.4);
+    display: none;
+  }
+  .calendar-popover.show { display: block; }
+  .cal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .cal-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--fg);
+    font-family: var(--mono);
+  }
+  .cal-nav {
+    width: 24px; height: 24px;
+    display: flex; align-items: center; justify-content: center;
+    background: none; border: 1px solid var(--border);
+    border-radius: 4px; color: var(--muted); cursor: pointer;
+  }
+  .cal-nav:hover { color: var(--fg); border-color: var(--primary); }
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 32px);
+    gap: 2px;
+    text-align: center;
+  }
+  .cal-day-header {
+    font-size: 9px;
+    color: var(--muted-dim);
+    font-weight: 600;
+    padding: 2px 0;
+  }
+  .cal-day {
+    width: 30px; height: 28px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 4px;
+    font-size: 11px;
+    color: var(--muted);
+    cursor: pointer;
+    border: none;
+    background: none;
+    font-family: var(--mono);
+    transition: all 100ms;
+  }
+  .cal-day:hover { background: var(--surface-hover); color: var(--fg); }
+  .cal-day.today { color: var(--primary); font-weight: 600; }
+  .cal-day.selected { background: var(--primary); color: var(--primary-text); font-weight: 600; }
+  .cal-day.in-range { background: var(--primary-dim); color: var(--primary); }
+  .cal-day.outside { color: var(--muted-dim); opacity: 0.4; }
+  .cal-day.disabled { opacity: 0.3; cursor: default; }
+  .cal-day.disabled:hover { background: none; color: var(--muted-dim); }
+
+  /* ===== Comparison zone: old vs new ===== */
+  .comparison {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 20px;
+  }
+  .comparison-card {
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+  }
+  .comparison-label {
+    font-size: 10px;
+    font-family: var(--mono);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .comparison-label.old { color: var(--danger); }
+  .comparison-label.new { color: var(--success); }
+
+  /* Old timeline (replica of current production) */
+  .old-track {
+    position: relative;
+    height: 40px;
+    background: var(--surface-up);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 8px 0;
+  }
+  .old-bar {
+    position: absolute;
+    bottom: 0;
+    width: 2px;
+    background: var(--primary);
+    opacity: 0.4;
+  }
+  .old-selection {
+    position: absolute;
+    top: 0; bottom: 0;
+    border: 1.5px solid var(--primary);
+    background: var(--primary-dim);
+    pointer-events: none;
+  }
+  .old-ticks {
+    position: relative;
+    height: 12px;
+    margin-top: 2px;
+  }
+  .old-tick {
+    position: absolute;
+    font-size: 9px;
+    color: var(--muted-dim);
+    font-family: var(--mono);
+    transform: translateX(-50%);
+  }
+  .old-hint {
+    font-size: 11px;
+    color: oklch(0.556 0 0 / 0.6);
+    margin-top: 4px;
+  }
+  .old-quick-btns {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 8px;
+  }
+  .old-quick-btn {
+    height: 20px;
+    padding: 0 6px;
+    border: none;
+    border-radius: 3px;
+    background: transparent;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 10px;
+    cursor: pointer;
+  }
+  .old-quick-btn.active {
+    background: var(--surface-up);
+    color: var(--fg);
+  }
+  .old-custom-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+    align-items: center;
+  }
+  .old-date-input {
+    height: 26px;
+    padding: 0 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--fg);
+    font-family: var(--mono);
+    font-size: 11px;
+    width: 130px;
+    outline: none;
+  }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .comparison { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ===== NEW DESIGN ===== -->
+  <div class="section-title">v3 DESIGN (all 6 fixes applied)</div>
+
+  <div class="zone-time" id="zone-time-v3">
+    <!-- Header row with legend -->
+    <div class="time-header">
+      <div class="time-header-left">
+        <span class="time-label" id="range-label">Jun 1 14:00 ~ Jun 8 14:00</span>
+        <!-- [P2 FIX] Aggregation zone legend -->
+        <span class="time-legend">
+          <span class="legend-item"><span class="legend-swatch agg"></span> daily agg.</span>
+          <span class="legend-item"><span class="legend-swatch bar"></span> hourly</span>
+          <span class="legend-item"><span class="legend-swatch selected"></span> selected</span>
+        </span>
+      </div>
+      <!-- [P2 FIX] Readable hint -->
+      <span class="time-hint">Drag handles or click to select range</span>
+    </div>
+
+    <!-- [P1 FIX] Larger quick-range segmented control -->
+    <div class="quick-ranges">
+      <button class="quick-range-btn" data-hours="5">5h</button>
+      <button class="quick-range-btn" data-hours="24">24h</button>
+      <button class="quick-range-btn active" data-hours="168">7d</button>
+      <button class="quick-range-btn" data-hours="720">30d</button>
+      <button class="quick-range-btn" id="custom-toggle">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        Custom
+      </button>
+    </div>
+
+    <!-- [P1 FIX] Custom date panel with styled calendar buttons -->
+    <div class="custom-range-panel" id="custom-panel">
+      <div class="custom-row">
+        <div class="date-field">
+          <span class="date-field-label">From</span>
+          <button class="date-btn" id="start-cal-btn">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <span id="start-display">2026-06-01</span>
+            <svg class="chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+        </div>
+        <span class="date-sep">~</span>
+        <div class="date-field">
+          <span class="date-field-label">To</span>
+          <button class="date-btn" id="end-cal-btn">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <span id="end-display">2026-06-08</span>
+            <svg class="chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+        </div>
+        <button class="date-apply-btn" id="apply-btn">Apply</button>
+      </div>
+      <div class="date-error" id="date-error"></div>
+    </div>
+
+    <!-- [P1 FIX] Timeline: 56px track, thicker bars, drag handles -->
+    <div class="timeline-wrapper">
+      <div class="timeline-tooltip" id="tooltip"></div>
+      <div class="timeline-track" id="timeline-track">
+        <div class="agg-zone" id="agg-zone"></div>
+        <div class="agg-label-inline" id="agg-label">DAILY AGGREGATED</div>
+        <!-- Selection overlay with drag handles -->
+        <div class="selection-overlay" id="selection">
+          <div class="sel-handle left" data-handle="left"></div>
+          <div class="sel-handle right" data-handle="right"></div>
+        </div>
+      </div>
+      <div class="timeline-ticks" id="ticks"></div>
+    </div>
+
+    <!-- Calendar popovers (start / end) -->
+    <div class="calendar-popover" id="cal-start">
+      <div class="cal-header">
+        <button class="cal-nav" id="cal-start-prev"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
+        <span class="cal-title" id="cal-start-title"></span>
+        <button class="cal-nav" id="cal-start-next"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></button>
+      </div>
+      <div class="cal-grid" id="cal-start-grid"></div>
+    </div>
+    <div class="calendar-popover" id="cal-end">
+      <div class="cal-header">
+        <button class="cal-nav" id="cal-end-prev"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
+        <span class="cal-title" id="cal-end-title"></span>
+        <button class="cal-nav" id="cal-end-next"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></button>
+      </div>
+      <div class="cal-grid" id="cal-end-grid"></div>
+    </div>
+  </div>
+
+  <!-- ===== COMPARISON: Old vs New ===== -->
+  <div class="section-title">COMPARISON: before vs after</div>
+
+  <div class="comparison">
+    <!-- OLD -->
+    <div class="comparison-card">
+      <div class="comparison-label old">BEFORE (current production)</div>
+      <div class="label-row">
+        <span style="font-family:var(--mono);font-size:11px;color:var(--fg);">Jun 1 14:00 ~ Jun 8 14:00</span>
+        <span class="fix-tag p1">h-5 / text-[10px]</span>
+      </div>
+      <div class="old-quick-btns">
+        <button class="old-quick-btn">5h</button>
+        <button class="old-quick-btn">24h</button>
+        <button class="old-quick-btn active">7d</button>
+        <button class="old-quick-btn">30d</button>
+        <button class="old-quick-btn">Custom</button>
+      </div>
+      <div class="old-track" id="old-track">
+        <div class="old-selection" style="left:76%;width:24%;"></div>
+      </div>
+      <div class="old-ticks">
+        <span class="old-tick" style="left:0%">May/9</span>
+        <span class="old-tick" style="left:33%">May/19</span>
+        <span class="old-tick" style="left:66%">May/29</span>
+        <span class="old-tick" style="left:100%;color:var(--primary);font-weight:600;">now</span>
+      </div>
+      <p class="old-hint">Click timeline to select 7d range</p>
+      <div class="old-custom-row">
+        <span style="font-size:10px;color:var(--muted);">From</span>
+        <input type="date" class="old-date-input" value="2026-06-01" />
+        <span style="font-size:10px;color:var(--muted);">To</span>
+        <input type="date" class="old-date-input" value="2026-06-08" />
+      </div>
+    </div>
+
+    <!-- NEW -->
+    <div class="comparison-card">
+      <div class="comparison-label new">AFTER (v3 with fixes)</div>
+      <div class="label-row">
+        <span style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--fg);">Jun 1 14:00 ~ Jun 8 14:00</span>
+        <span class="fix-tag p1">h-7 / text-xs</span>
+      </div>
+      <div class="quick-ranges" style="margin-bottom:8px;">
+        <button class="quick-range-btn" style="font-size:12px;height:28px;">5h</button>
+        <button class="quick-range-btn" style="font-size:12px;height:28px;">24h</button>
+        <button class="quick-range-btn active" style="font-size:12px;height:28px;">7d</button>
+        <button class="quick-range-btn" style="font-size:12px;height:28px;">30d</button>
+        <button class="quick-range-btn" style="font-size:12px;height:28px;">Custom</button>
+      </div>
+      <div style="position:relative;">
+        <div id="new-mini-track" style="position:relative;height:56px;background:var(--surface-up);border-radius:5px;overflow:hidden;margin:8px 0;cursor:crosshair;">
+          <div id="new-mini-sel" style="position:absolute;top:0;bottom:0;border:2px solid var(--primary);background:var(--primary-dim);border-radius:4px;pointer-events:none;"></div>
+        </div>
+        <div class="timeline-ticks" style="margin-top:4px;">
+          <span class="tick-label" style="left:0%">May/9</span>
+          <span class="tick-label" style="left:33%">May/19</span>
+          <span class="tick-label" style="left:66%">May/29</span>
+          <span class="tick-label now" style="left:100%">now</span>
+        </div>
+      </div>
+      <p style="font-size:11px;color:var(--muted);margin-top:6px;">Drag handles or click to select range</p>
+      <div style="display:flex;gap:6px;margin-top:6px;align-items:center;">
+        <span style="font-size:11px;color:var(--muted);font-weight:500;">From</span>
+        <button class="date-btn" style="height:30px;font-size:12px;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          2026-06-01
+        </button>
+        <span class="date-sep">~</span>
+        <span style="font-size:11px;color:var(--muted);font-weight:500;">To</span>
+        <button class="date-btn" style="height:30px;font-size:12px;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          2026-06-08
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== CHANGELOG ===== -->
+  <div class="section-title">CHANGELOG</div>
+  <div style="background:var(--surface);border-radius:8px;padding:14px 18px;border:1px solid var(--border);">
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead>
+        <tr style="border-bottom:1px solid var(--border);">
+          <th style="text-align:left;padding:4px 8px;color:var(--muted);font-family:var(--mono);font-weight:600;font-size:10px;letter-spacing:0.04em;">SEV</th>
+          <th style="text-align:left;padding:4px 8px;color:var(--muted);font-family:var(--mono);font-weight:600;font-size:10px;letter-spacing:0.04em;">ISSUE</th>
+          <th style="text-align:left;padding:4px 8px;color:var(--muted);font-family:var(--mono);font-weight:600;font-size:10px;letter-spacing:0.04em;">FIX</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:6px 8px;"><span class="fix-tag p1">P1</span></td>
+          <td style="padding:6px 8px;color:var(--fg);">Timeline bars 2px wide, 40px track height</td>
+          <td style="padding:6px 8px;color:var(--muted);">Per-6h aggregation, 5px bars, 56px track. 120 bars instead of 720</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:6px 8px;"><span class="fix-tag p1">P1</span></td>
+          <td style="padding:6px 8px;color:var(--fg);">Native &lt;input type="date"&gt;</td>
+          <td style="padding:6px 8px;color:var(--muted);">Calendar button with popover. On-brand, consistent cross-browser</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:6px 8px;"><span class="fix-tag p1">P1</span></td>
+          <td style="padding:6px 8px;color:var(--fg);">Quick range buttons 20px / 10px text</td>
+          <td style="padding:6px 8px;color:var(--muted);">Segmented control: 28px height, 12px font. Touch-friendly</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:6px 8px;"><span class="fix-tag p2">P2</span></td>
+          <td style="padding:6px 8px;color:var(--fg);">Hint text at 11px / muted-foreground/60</td>
+          <td style="padding:6px 8px;color:var(--muted);">11px / var(--muted) (no alpha reduction). Contrast ~4.5:1</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:6px 8px;"><span class="fix-tag p2">P2</span></td>
+          <td style="padding:6px 8px;color:var(--fg);">Aggregation zone hatched, no legend</td>
+          <td style="padding:6px 8px;color:var(--muted);">3-item legend swatch row next to time label</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 8px;"><span class="fix-tag p2">P2</span></td>
+          <td style="padding:6px 8px;color:var(--fg);">Click-only selection, no drag</td>
+          <td style="padding:6px 8px;color:var(--muted);">Drag handles on selection edges. Hover tooltip on bars</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<script>
+// ===== Constants =====
+const TOTAL_RANGE_DAYS = 30;
+const DETAIL_DAYS = 7;
+const NOW = new Date('2026-06-08T14:00:00');
+const RANGE_START = new Date(NOW.getTime() - TOTAL_RANGE_DAYS * 86400000);
+const RANGE_MS = TOTAL_RANGE_DAYS * 86400000;
+const DAY_MS = 86400000;
+const BUCKET_HOURS = 6;          // [P1 FIX] aggregate per 6h → ~120 bars
+const BARS_TOTAL = Math.floor(TOTAL_RANGE_DAYS * 24 / BUCKET_HOURS);
+const BAR_WIDTH_PX = 5;          // [P1 FIX] was 2px (with 1px gap)
+const BAR_GAP_PX = 1.5;
+const TRACK_HEIGHT = 56;         // [P1 FIX] was 40px
+
+let selStart = new Date(NOW.getTime() - 7 * DAY_MS);
+let selEnd = new Date(NOW.getTime());
+let customStart = new Date(selStart);
+let customEnd = new Date(selEnd);
+
+// ===== DOM refs =====
+const track = document.getElementById('timeline-track');
+const selOverlay = document.getElementById('selection');
+const rangeLabel = document.getElementById('range-label');
+const tooltip = document.getElementById('tooltip');
+const aggZone = document.getElementById('agg-zone');
+const aggLabel = document.getElementById('agg-label');
+const ticksEl = document.getElementById('ticks');
+
+// ===== Generate activity data (per BUCKET_HOURS) =====
+function genBuckets() {
+  const buckets = [];
+  for (let i = 0; i < BARS_TOTAL; i++) {
+    const t = i / BARS_TOTAL;
+    const date = new Date(RANGE_START.getTime() + t * RANGE_MS);
+    const hour = date.getHours();
+    const dow = date.getDay();
+    const isWork = hour >= 9 && hour < 19;
+    const isWkday = dow >= 1 && dow <= 5;
+    let intensity = Math.random();
+    if (isWork && isWkday) intensity = 0.35 + Math.random() * 0.65;
+    else if (isWork || isWkday) intensity = 0.08 + Math.random() * 0.25;
+    else intensity = Math.random() * 0.12;
+    buckets.push({ pct: t, intensity, date });
+  }
+  return buckets;
+}
+const buckets = genBuckets();
+
+// ===== Render bars =====
+// Calculate total bar + gap width to center the histogram
+function renderBars() {
+  // Remove old bars
+  track.querySelectorAll('.act-bar').forEach(el => el.remove());
+
+  const trackWidth = track.getBoundingClientRect().width;
+  const totalBarSpace = BARS_TOTAL * (BAR_WIDTH_PX + BAR_GAP_PX) - BAR_GAP_PX;
+  const scale = Math.min(1, (trackWidth - 8) / totalBarSpace); // 4px padding each side
+  const effectiveBarWidth = BAR_WIDTH_PX * scale;
+  const effectiveGap = BAR_GAP_PX * scale;
+  const offsetLeft = (trackWidth - BARS_TOTAL * (effectiveBarWidth + effectiveGap) + effectiveGap) / 2;
+
+  buckets.forEach((b, i) => {
+    const el = document.createElement('div');
+    el.className = 'act-bar';
+    const height = b.intensity * (TRACK_HEIGHT - 8) + 4;
+    const left = offsetLeft + i * (effectiveBarWidth + effectiveGap);
+    el.style.cssText = `
+      left: ${left}px;
+      width: ${effectiveBarWidth}px;
+      height: ${height}px;
+      opacity: ${0.2 + b.intensity * 0.6};
+    `;
+    el.dataset.index = i;
+    track.insertBefore(el, selOverlay);
+  });
+}
+renderBars();
+window.addEventListener('resize', renderBars);
+
+// ===== Aggregation zone =====
+function updateAggZone() {
+  const detailStartPct = ((NOW.getTime() - DETAIL_DAYS * DAY_MS) - RANGE_START.getTime()) / RANGE_MS * 100;
+  if (detailStartPct > 5) {
+    aggZone.style.left = '0%';
+    aggZone.style.width = detailStartPct + '%';
+    aggLabel.style.left = (detailStartPct / 2) + '%';
+    aggLabel.style.display = '';
+  } else {
+    aggZone.style.width = '0%';
+    aggLabel.style.display = 'none';
+  }
+}
+updateAggZone();
+
+// ===== Selection =====
+function timeToPct(d) { return (d.getTime() - RANGE_START.getTime()) / RANGE_MS; }
+function pctToTime(p) { return new Date(RANGE_START.getTime() + p * RANGE_MS); }
+
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function fmtDate(d) {
+  return `${MONTHS[d.getMonth()]} ${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
+function updateSelection() {
+  const l = timeToPct(selStart) * 100;
+  const r = timeToPct(selEnd) * 100;
+  selOverlay.style.left = l + '%';
+  selOverlay.style.width = (r - l) + '%';
+  rangeLabel.textContent = `${fmtDate(selStart)} ~ ${fmtDate(selEnd)}`;
+
+  // Highlight bars
+  track.querySelectorAll('.act-bar').forEach(bar => {
+    const idx = +bar.dataset.index;
+    const pct = buckets[idx].pct * 100;
+    bar.classList.toggle('highlighted', pct >= l && pct <= r);
+  });
+}
+updateSelection();
+
+// ===== [P2 FIX] Drag handles =====
+let dragging = null; // 'left' | 'right' | null
+
+function getX(e) {
+  const rect = track.getBoundingClientRect();
+  return Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+}
+
+track.addEventListener('mousedown', e => {
+  // Check if a handle was clicked
+  if (e.target.classList.contains('sel-handle')) {
+    dragging = e.target.dataset.handle;
+    selOverlay.classList.add('dragging');
+    e.preventDefault();
+    return;
+  }
+  // Otherwise: click to reposition selection around click point
+  const x = getX(e);
+  const snapPct = 7 * DAY_MS / RANGE_MS;
+  selStart = pctToTime(Math.max(0, x - snapPct / 2));
+  selEnd = pctToTime(Math.min(1, x + snapPct / 2));
+  clearActiveRange();
+  updateSelection();
+});
+
+document.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  const x = getX(e);
+  if (dragging === 'left') {
+    selStart = pctToTime(Math.min(x, timeToPct(selEnd) - 0.005));
+  } else {
+    selEnd = pctToTime(Math.max(x, timeToPct(selStart) + 0.005));
+  }
+  updateSelection();
+});
+
+document.addEventListener('mouseup', () => {
+  dragging = null;
+  selOverlay.classList.remove('dragging');
+});
+
+// Touch support
+track.addEventListener('touchstart', e => {
+  if (e.target.classList.contains('sel-handle')) {
+    dragging = e.target.dataset.handle;
+    selOverlay.classList.add('dragging');
+    e.preventDefault();
+  }
+}, { passive: false });
+
+document.addEventListener('touchmove', e => {
+  if (!dragging) return;
+  const touch = e.touches[0];
+  const rect = track.getBoundingClientRect();
+  const x = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width));
+  if (dragging === 'left') {
+    selStart = pctToTime(Math.min(x, timeToPct(selEnd) - 0.005));
+  } else {
+    selEnd = pctToTime(Math.max(x, timeToPct(selStart) + 0.005));
+  }
+  updateSelection();
+}, { passive: false });
+
+document.addEventListener('touchend', () => {
+  dragging = null;
+  selOverlay.classList.remove('dragging');
+});
+
+// ===== Hover tooltip on bars =====
+track.addEventListener('mousemove', e => {
+  if (dragging) { tooltip.classList.remove('visible'); return; }
+  const bar = e.target.closest('.act-bar');
+  if (bar) {
+    const idx = +bar.dataset.index;
+    const b = buckets[idx];
+    const reqs = Math.round(b.intensity * 500);
+    tooltip.textContent = `${fmtDate(b.date)} · ${reqs} req`;
+    const rect = track.getBoundingClientRect();
+    const barRect = bar.getBoundingClientRect();
+    tooltip.style.left = (barRect.left - rect.left + barRect.width / 2) + 'px';
+    tooltip.classList.add('visible');
+  } else {
+    tooltip.classList.remove('visible');
+  }
+});
+track.addEventListener('mouseleave', () => tooltip.classList.remove('visible'));
+
+// ===== Quick range buttons =====
+function clearActiveRange() {
+  document.querySelectorAll('.quick-range-btn').forEach(b => b.classList.remove('active'));
+}
+
+document.querySelectorAll('.quick-range-btn[data-hours]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    clearActiveRange();
+    btn.classList.add('active');
+    const hours = +btn.dataset.hours;
+    selEnd = new Date(NOW.getTime());
+    selStart = new Date(NOW.getTime() - hours * 3600000);
+    updateSelection();
+    closeCustomPanel();
+  });
+});
+
+// ===== Custom range toggle =====
+const customToggle = document.getElementById('custom-toggle');
+const customPanel = document.getElementById('custom-panel');
+
+function closeCustomPanel() {
+  customPanel.classList.remove('show');
+  customToggle.classList.remove('active');
+}
+
+customToggle.addEventListener('click', () => {
+  const showing = customPanel.classList.toggle('show');
+  if (showing) {
+    clearActiveRange();
+    customToggle.classList.add('active');
+    customStart = new Date(selStart);
+    customEnd = new Date(selEnd);
+    updateDateDisplays();
+    calStartMonth = new Date(customStart.getFullYear(), customStart.getMonth(), 1);
+    calEndMonth = new Date(customEnd.getFullYear(), customEnd.getMonth(), 1);
+  } else {
+    customToggle.classList.remove('active');
+  }
+});
+
+function updateDateDisplays() {
+  document.getElementById('start-display').textContent = isoDate(customStart);
+  document.getElementById('end-display').textContent = isoDate(customEnd);
+}
+
+function isoDate(d) {
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+function pad(n) { return String(n).padStart(2, '0'); }
+
+// ===== Apply button =====
+document.getElementById('apply-btn').addEventListener('click', () => {
+  const err = document.getElementById('date-error');
+  err.classList.remove('show');
+  if (customStart >= customEnd) {
+    err.textContent = 'Start must be before end';
+    err.classList.add('show');
+    return;
+  }
+  const span = customEnd - customStart;
+  if (span < DAY_MS) {
+    err.textContent = 'Range must be at least 1 day';
+    err.classList.add('show');
+    return;
+  }
+  if (span > 90 * DAY_MS) {
+    err.textContent = 'Range cannot exceed 90 days';
+    err.classList.add('show');
+    return;
+  }
+  if (customEnd > NOW) {
+    err.textContent = 'End cannot be in the future';
+    err.classList.add('show');
+    return;
+  }
+  selStart = new Date(customStart);
+  selEnd = new Date(customEnd);
+  updateSelection();
+  closeCustomPanel();
+});
+
+// ===== Calendar popover =====
+let calStartMonth, calEndMonth;
+calStartMonth = new Date(customStart.getFullYear(), customStart.getMonth(), 1);
+calEndMonth = new Date(customEnd.getFullYear(), customEnd.getMonth(), 1);
+
+const DAY_NAMES = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+function renderCalendar(gridId, titleId, monthDate, selectedDate, rangeStart, rangeEnd, onSelect) {
+  const grid = document.getElementById(gridId);
+  const title = document.getElementById(titleId);
+  grid.innerHTML = '';
+
+  const y = monthDate.getFullYear();
+  const m = monthDate.getMonth();
+  title.textContent = `${MONTHS[m]} ${y}`;
+
+  // Day headers
+  DAY_NAMES.forEach(d => {
+    const el = document.createElement('div');
+    el.className = 'cal-day-header';
+    el.textContent = d;
+    grid.appendChild(el);
+  });
+
+  const firstDay = new Date(y, m, 1).getDay();
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+
+  // Empty cells before first day
+  for (let i = 0; i < firstDay; i++) {
+    const el = document.createElement('div');
+    el.className = 'cal-day outside';
+    grid.appendChild(el);
+  }
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const el = document.createElement('button');
+    el.className = 'cal-day';
+    el.textContent = d;
+
+    const cellDate = new Date(y, m, d);
+    const isToday = cellDate.toDateString() === NOW.toDateString();
+    const isSelected = selectedDate && cellDate.toDateString() === selectedDate.toDateString();
+    const inRange = rangeStart && rangeEnd &&
+      cellDate > rangeStart && cellDate < rangeEnd;
+    const isDisabled = cellDate > NOW;
+
+    if (isToday) el.classList.add('today');
+    if (isSelected) el.classList.add('selected');
+    else if (inRange) el.classList.add('in-range');
+    if (isDisabled) el.classList.add('disabled');
+
+    if (!isDisabled) {
+      el.addEventListener('click', () => onSelect(cellDate));
+    }
+    grid.appendChild(el);
+  }
+}
+
+// Start calendar
+document.getElementById('start-cal-btn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  const cal = document.getElementById('cal-start');
+  const showing = cal.classList.toggle('show');
+  document.getElementById('cal-end').classList.remove('show');
+  if (showing) {
+    const btnRect = e.currentTarget.getBoundingClientRect();
+    const zoneRect = document.getElementById('zone-time-v3').getBoundingClientRect();
+    cal.style.left = (btnRect.left - zoneRect.left) + 'px';
+    cal.style.top = (btnRect.bottom - zoneRect.top + 4) + 'px';
+    renderCalendar('cal-start-grid', 'cal-start-title', calStartMonth, customStart, null, null, (d) => {
+      customStart = d;
+      updateDateDisplays();
+      cal.classList.remove('show');
+    });
+  }
+});
+
+document.getElementById('cal-start-prev').addEventListener('click', () => {
+  calStartMonth.setMonth(calStartMonth.getMonth() - 1);
+  renderCalendar('cal-start-grid', 'cal-start-title', calStartMonth, customStart, null, null, (d) => {
+    customStart = d;
+    updateDateDisplays();
+    document.getElementById('cal-start').classList.remove('show');
+  });
+});
+document.getElementById('cal-start-next').addEventListener('click', () => {
+  calStartMonth.setMonth(calStartMonth.getMonth() + 1);
+  renderCalendar('cal-start-grid', 'cal-start-title', calStartMonth, customStart, null, null, (d) => {
+    customStart = d;
+    updateDateDisplays();
+    document.getElementById('cal-start').classList.remove('show');
+  });
+});
+
+// End calendar
+document.getElementById('end-cal-btn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  const cal = document.getElementById('cal-end');
+  const showing = cal.classList.toggle('show');
+  document.getElementById('cal-start').classList.remove('show');
+  if (showing) {
+    const btnRect = e.currentTarget.getBoundingClientRect();
+    const zoneRect = document.getElementById('zone-time-v3').getBoundingClientRect();
+    cal.style.left = (btnRect.left - zoneRect.left) + 'px';
+    cal.style.top = (btnRect.bottom - zoneRect.top + 4) + 'px';
+    renderCalendar('cal-end-grid', 'cal-end-title', calEndMonth, customEnd, null, null, (d) => {
+      customEnd = new Date(d.getTime() + 23 * 3600000 + 59 * 60000);
+      updateDateDisplays();
+      cal.classList.remove('show');
+    });
+  }
+});
+
+document.getElementById('cal-end-prev').addEventListener('click', () => {
+  calEndMonth.setMonth(calEndMonth.getMonth() - 1);
+  renderCalendar('cal-end-grid', 'cal-end-title', calEndMonth, customEnd, null, null, (d) => {
+    customEnd = new Date(d.getTime() + 23 * 3600000 + 59 * 60000);
+    updateDateDisplays();
+    document.getElementById('cal-end').classList.remove('show');
+  });
+});
+document.getElementById('cal-end-next').addEventListener('click', () => {
+  calEndMonth.setMonth(calEndMonth.getMonth() + 1);
+  renderCalendar('cal-end-grid', 'cal-end-title', calEndMonth, customEnd, null, null, (d) => {
+    customEnd = new Date(d.getTime() + 23 * 3600000 + 59 * 60000);
+    updateDateDisplays();
+    document.getElementById('cal-end').classList.remove('show');
+  });
+});
+
+// Close calendars on outside click
+document.addEventListener('click', (e) => {
+  ['cal-start', 'cal-end'].forEach(id => {
+    const cal = document.getElementById(id);
+    if (!cal.contains(e.target) && !e.target.closest('.date-btn')) {
+      cal.classList.remove('show');
+    }
+  });
+});
+
+// ===== Tick marks =====
+(function renderTicks() {
+  for (let d = 0; d <= TOTAL_RANGE_DAYS; d += 3) {
+    const date = new Date(RANGE_START.getTime() + d * DAY_MS);
+    const pct = (d / TOTAL_RANGE_DAYS) * 100;
+    const span = document.createElement('span');
+    span.className = 'tick-label' + (d === TOTAL_RANGE_DAYS ? ' now' : '');
+    span.style.left = pct + '%';
+    span.textContent = d === TOTAL_RANGE_DAYS ? 'now' : `${MONTHS[date.getMonth()]}/${date.getDate()}`;
+    ticksEl.appendChild(span);
+  }
+})();
+
+// ===== Render comparison mini-bars =====
+// OLD: 2px thin bars
+(function renderOldTrack() {
+  const oldTrack = document.getElementById('old-track');
+  const oldBars = 300;
+  for (let i = 0; i < oldBars; i++) {
+    const el = document.createElement('div');
+    el.className = 'old-bar';
+    const t = i / oldBars;
+    const h = Math.random() * 28 + 4;
+    el.style.left = (t * 100) + '%';
+    el.style.height = h + 'px';
+    el.style.opacity = 0.3 + (h / 32) * 0.3;
+    oldTrack.insertBefore(el, oldTrack.firstChild);
+  }
+})();
+
+// NEW: thicker bars in comparison card
+(function renderNewMiniTrack() {
+  const track = document.getElementById('new-mini-track');
+  const sel = document.getElementById('new-mini-sel');
+  const miniBars = 120;
+  for (let i = 0; i < miniBars; i++) {
+    const el = document.createElement('div');
+    el.className = 'act-bar';
+    const t = i / miniBars;
+    const h = Math.random() * 40 + 6;
+    const trackWidth = track.getBoundingClientRect().width || 500;
+    const bw = Math.max(3, (trackWidth - 8) / miniBars - 1.5);
+    el.style.cssText = `
+      left: ${4 + i * (bw + 1.5)}px;
+      width: ${bw}px;
+      height: ${h}px;
+      opacity: ${0.2 + (h / 46) * 0.5};
+      border-radius: 2px 2px 0 0;
+      background: var(--primary);
+    `;
+    track.insertBefore(el, sel);
+  }
+  // Position selection
+  sel.style.left = '76%';
+  sel.style.width = '24%';
+})();
+</script>
+</body>
+</html>
