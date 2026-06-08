@@ -44,7 +44,7 @@ NC='\033[0m'
 LOG_FILE="${LOG_FILE:-}"
 
 _valid_log_level() { case "$1" in INFO|WARN|ERROR|PHASE|CMD|HOOK|CHECK|CI) return 0 ;; *) return 1 ;; esac; }
-log()       { [[ -n "$LOG_FILE" ]] && _valid_log_level "$1" && echo "[$(date +%Y-%m-%dT%H:%M:%S)] [$1] $2" >> "$LOG_FILE"; }
+log()       { [[ -n "$LOG_FILE" ]] || return 0; _valid_log_level "$1" && echo "[$(date +%Y-%m-%dT%H:%M:%S)] [$1] $2" >> "$LOG_FILE"; }
 log_info()  { log "INFO" "$*"; }
 log_warn()  { log "WARN" "$*"; }
 log_error() { log "ERROR" "$*"; }
