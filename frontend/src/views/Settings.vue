@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { toast } from "vue-sonner";
-import { api, getApiMessage } from "@/api/client";
+import { getApiMessage } from "@/api/client";
 import {
   getDbSizeInfo,
   setDbSizeThresholds,
@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
+import { Separator } from "@/components/ui/separator";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,7 +34,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Download, Upload, HardDrive } from "lucide-vue-next";
+import { Download, Upload, HardDrive, RotateCcw } from "lucide-vue-next";
 
 const { t } = useI18n();
 
@@ -45,11 +46,22 @@ const DATE_SLICE_END = 10;
 
 const RETENTION_MIN = 0;
 const RETENTION_MAX = 90;
+const METRICS_DETAIL_MIN = 1;
+const METRICS_DETAIL_MAX = 30;
+const DEFAULT_RETENTION_DAYS = 3;
+const DEFAULT_METRICS_DETAIL_DAYS = 7;
 const SIZE_MB_MIN = 1;
 const DEFAULT_DB_MAX_SIZE_MB = 1024;
 const DEFAULT_LOG_TABLE_MAX_SIZE_MB = 800;
 
-const { retentionDays, saveRetention } = useLogRetention();
+const {
+  retentionDays,
+  metricsDetailDays,
+  validationError,
+  loadRetention,
+  loadMetricsDetail,
+  saveBoth,
+} = useLogRetention();
 
 const dbSizeInfo = ref<DbSizeInfoResponse | null>(null);
 const dbMaxSizeMb = ref(DEFAULT_DB_MAX_SIZE_MB);
@@ -61,9 +73,28 @@ const showImportDialog = ref(false);
 const pendingImportData = ref<ConfigExportResponse | null>(null);
 const fileInput = ref<HTMLInputElement>();
 
-const retentionError = ref("");
 const dbMaxSizeError = ref("");
 const logTableMaxSizeError = ref("");
+
+const lifecycleError = computed<string>(() => validationError.value);
+
+const detailSegmentPct = computed(() => {
+  const log = Math.max(retentionDays.value, 1);
+  return Math.max(0, Math.min(100, (metricsDetailDays.value / log) * 100));
+});
+const aggregatedSegmentPct = computed(
+  () => PERCENT_MAX - detailSegmentPct.value,
+);
+
+const effectiveRetentionDays = computed(() =>
+  Math.max(RETENTION_MIN, Math.min(RETENTION_MAX, retentionDays.value)),
+);
+const effectiveMetricsDetailDays = computed(() =>
+  Math.max(
+    METRICS_DETAIL_MIN,
+    Math.min(METRICS_DETAIL_MAX, metricsDetailDays.value),
+  ),
+);
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";
@@ -78,43 +109,30 @@ function formatBytes(bytes: number): string {
 async function loadSettings() {
   loading.value = true;
   try {
-    const [sizeInfo, retention] = await Promise.allSettled([
+    const [sizeInfo, retention, metrics] = await Promise.allSettled([
       getDbSizeInfo(),
-      api.getLogRetention(),
+      loadRetention(),
+      loadMetricsDetail(),
     ]);
     if (sizeInfo.status === "fulfilled") {
       dbSizeInfo.value = sizeInfo.value;
       dbMaxSizeMb.value = sizeInfo.value.thresholds.dbMaxSizeMb;
       logTableMaxSizeMb.value = sizeInfo.value.thresholds.logTableMaxSizeMb;
     }
-    if (retention.status === "fulfilled") {
-      retentionDays.value = retention.value.days;
-    }
+    void retention;
+    void metrics;
   } finally {
     loading.value = false;
   }
 }
 
-function validateRetention(): boolean {
-  retentionError.value = "";
-  const val = retentionDays.value;
-  if (!Number.isInteger(val)) {
-    retentionError.value = t("settings.retention.integerRequired");
-    return false;
-  }
-  if (val < RETENTION_MIN || val > RETENTION_MAX) {
-    retentionError.value = t("settings.retention.rangeError", {
-      min: RETENTION_MIN,
-      max: RETENTION_MAX,
-    });
-    return false;
-  }
-  return true;
+function resetRetentionDefaults() {
+  retentionDays.value = DEFAULT_RETENTION_DAYS;
+  metricsDetailDays.value = DEFAULT_METRICS_DETAIL_DAYS;
 }
 
 async function handleSaveRetention() {
-  if (!validateRetention()) return;
-  await saveRetention();
+  await saveBoth();
 }
 
 function validateThresholds(): boolean {
@@ -238,27 +256,115 @@ onMounted(loadSettings);
         <CardDescription>{{ t("settings.retention.desc") }}</CardDescription>
       </CardHeader>
       <CardContent>
-        <div class="flex items-end gap-4">
-          <div class="space-y-1">
-            <Label for="retention-days">{{
-              t("settings.retention.daysLabel")
-            }}</Label>
-            <Input
-              id="retention-days"
-              v-model.number="retentionDays"
-              type="number"
-              :min="RETENTION_MIN"
-              :max="RETENTION_MAX"
-              class="w-32"
-              @input="retentionError = ''"
-            />
-            <p v-if="retentionError" class="text-sm text-destructive mt-1">
-              {{ retentionError }}
+        <div
+          class="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-4 items-start"
+        >
+          <div class="space-y-2">
+            <Label
+              for="retention-days"
+              class="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+            >
+              {{ t("settings.retention.requestLogsCol") }}
+            </Label>
+            <div class="flex items-center gap-2">
+              <Input
+                id="retention-days"
+                v-model.number="retentionDays"
+                type="number"
+                :min="RETENTION_MIN"
+                :max="RETENTION_MAX"
+                class="w-24 font-mono text-center"
+              />
+              <span class="text-xs text-muted-foreground">days</span>
+            </div>
+            <p
+              class="text-xs text-muted-foreground leading-relaxed min-h-[30px]"
+            >
+              {{ t("settings.retention.requestLogsHint") }}
             </p>
           </div>
-          <Button size="sm" :disabled="loading" @click="handleSaveRetention">{{
-            t("common.save")
-          }}</Button>
+
+          <Separator orientation="vertical" class="hidden md:block h-full" />
+
+          <div class="space-y-2">
+            <Label
+              for="metrics-detail-days"
+              class="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+            >
+              {{ t("settings.retention.metricsDetailCol") }}
+            </Label>
+            <div class="flex items-center gap-2">
+              <Input
+                id="metrics-detail-days"
+                v-model.number="metricsDetailDays"
+                type="number"
+                :min="METRICS_DETAIL_MIN"
+                :max="METRICS_DETAIL_MAX"
+                class="w-24 font-mono text-center"
+              />
+              <span class="text-xs text-muted-foreground">days detail</span>
+            </div>
+            <p
+              class="text-xs text-muted-foreground leading-relaxed min-h-[30px]"
+            >
+              {{ t("settings.retention.metricsDetailHint") }}
+            </p>
+          </div>
+        </div>
+
+        <!-- Visual lifecycle bar -->
+        <div class="mt-4 space-y-1">
+          <div class="flex h-1.5 w-full overflow-hidden rounded-full bg-muted">
+            <div
+              class="bg-primary transition-all"
+              :style="{ width: detailSegmentPct + '%' }"
+            />
+            <div
+              class="bg-primary/35 transition-all"
+              :style="{ width: aggregatedSegmentPct + '%' }"
+            />
+          </div>
+          <div
+            class="flex justify-between text-[10px] font-mono text-muted-foreground"
+          >
+            <span class="text-primary font-medium">{{
+              t("settings.retention.lifecycle.now")
+            }}</span>
+            <span>{{
+              t("settings.retention.lifecycle.detailEnd", {
+                days: effectiveMetricsDetailDays,
+              })
+            }}</span>
+            <span>{{
+              t("settings.retention.lifecycle.totalEnd", {
+                days: effectiveRetentionDays,
+              })
+            }}</span>
+            <span>{{ t("settings.retention.lifecycle.expired") }}</span>
+          </div>
+        </div>
+
+        <p v-if="lifecycleError" class="text-sm text-destructive mt-2">
+          {{ lifecycleError }}
+        </p>
+
+        <div class="flex justify-end gap-2 pt-3 mt-3 border-t">
+          <Button
+            variant="ghost"
+            size="sm"
+            :disabled="loading"
+            @click="resetRetentionDefaults"
+          >
+            <RotateCcw class="mr-1.5 h-3.5 w-3.5" />
+            {{ t("common.reset") }}
+          </Button>
+          <Button
+            size="sm"
+            :disabled="loading || !!lifecycleError"
+            @click="handleSaveRetention"
+          >
+            {{ t("common.save") }}
+          </Button>
         </div>
       </CardContent>
     </Card>

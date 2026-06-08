@@ -306,77 +306,82 @@
         </div>
       </div>
 
-      <!-- Zone 4: Timeline window navigator -->
+      <!-- Zone 4: Visual Time Range Selector -->
       <div class="bg-card rounded-lg px-4 py-2.5">
         <div class="flex items-center justify-between mb-1.5">
           <div class="flex items-center gap-3">
-            <span class="font-mono text-xs font-medium text-foreground">{{
-              windowTimeRange
-            }}</span>
+            <span class="font-mono text-xs font-medium text-foreground">
+              {{ timeRangeLabel }}
+            </span>
             <div class="flex gap-0.5">
               <Button
-                v-for="opt in timelineZoomOptions"
+                v-for="opt in quickRangeOptions"
                 :key="opt.value"
-                :variant="timelineRange === opt.value ? 'secondary' : 'ghost'"
+                :variant="activeRange === opt.value ? 'secondary' : 'ghost'"
                 size="sm"
                 class="h-5 px-1.5 text-[10px] font-mono"
-                @click="timelineRange = opt.value"
+                @click="selectQuickRange(opt.value)"
               >
-                {{ opt.label }}
+                {{ t(opt.labelKey) }}
+              </Button>
+              <Button
+                :variant="showCustom ? 'secondary' : 'ghost'"
+                size="sm"
+                class="h-5 px-1.5 text-[10px] font-mono"
+                @click="toggleCustom"
+              >
+                {{ t("dashboard.timeSelector.custom") }}
               </Button>
             </div>
           </div>
-          <span class="text-[11px] text-muted-foreground/60">{{
-            t("dashboard.timeline.hint")
-          }}</span>
+          <span class="text-[11px] text-muted-foreground/60">
+            {{ t("dashboard.timeSelector.hint") }}
+          </span>
         </div>
-        <TooltipProvider v-if="usageWindows.length > 0">
-          <div
-            class="relative h-7 rounded overflow-hidden border border-border/50 bg-muted/20"
-          >
-            <div
-              v-for="w in timelineWindows"
-              :key="w.window.id"
-              class="absolute top-0 bottom-0 rounded-sm cursor-pointer transition-[filter] duration-150 hover:brightness-125"
-              :class="
-                selectedWindowId === w.window.id
-                  ? 'ring-2 ring-primary ring-inset brightness-130 z-[2]'
-                  : ''
-              "
-              :style="getWindowStyle(w)"
-              @click="selectedWindowId = w.window.id"
-            >
-              <Tooltip v-if="getWindowWidth(w) !== '0%'">
-                <TooltipTrigger as-child>
-                  <div class="w-full h-full" />
-                </TooltipTrigger>
-                <TooltipContent>
-                  {{ formatWindowTooltip(w) }}
-                </TooltipContent>
-              </Tooltip>
-            </div>
+        <ActivityTimeline
+          :buckets="activityBuckets"
+          :selection-start="timeSelection.startTime"
+          :selection-end="timeSelection.endTime"
+          :total-range-days="totalRangeDays"
+          :detail-days="detailDays"
+          :range-start="rangeStart"
+          @update:selection="onTimelineSelection"
+        />
+        <div v-if="showCustom" class="mt-2 space-y-1.5">
+          <div class="flex flex-wrap items-center gap-2">
+            <Label class="text-xs text-muted-foreground">{{
+              t("dashboard.timeSelector.startDate")
+            }}</Label>
+            <Input
+              v-model="customStart"
+              type="date"
+              class="h-7 w-[150px] text-[12px]"
+            />
+            <Label class="text-xs text-muted-foreground">{{
+              t("dashboard.timeSelector.endDate")
+            }}</Label>
+            <Input
+              v-model="customEnd"
+              type="date"
+              class="h-7 w-[150px] text-[12px]"
+            />
+            <Button size="sm" class="h-7" @click="applyCustom">
+              {{ t("dashboard.timeSelector.apply") }}
+            </Button>
           </div>
-        </TooltipProvider>
+          <p
+            v-if="customError"
+            class="text-xs text-danger font-mono"
+            role="alert"
+          >
+            {{ customError }}
+          </p>
+        </div>
         <div
-          v-if="usageWindows.length === 0"
+          v-if="activityBuckets.length === 0"
           class="h-7 flex items-center justify-center text-[11px] text-muted-foreground"
         >
           {{ t("dashboard.timeline.noData") }}
-        </div>
-        <!-- Day labels -->
-        <div
-          v-if="usageWindows.length > 0"
-          class="relative h-4 mt-1 overflow-hidden"
-        >
-          <span
-            v-for="d in timelineDayLabels"
-            :key="d.label"
-            class="absolute font-mono text-[10px] text-muted-foreground/50"
-            :class="d.position === 0 ? '' : '-translate-x-1/2'"
-            :style="{ left: d.position + '%' }"
-          >
-            {{ d.label }}
-          </span>
         </div>
       </div>
     </div>
@@ -411,18 +416,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Input } from "@/components/ui/input";
 import { Filter } from "lucide-vue-next";
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { stackedAreaOptions, miniLineOptions } from "./metrics-helpers";
 import { useDashboard } from "@/composables/useDashboard";
 import { formatTokenCompact } from "@/utils/token-format";
+import ActivityTimeline from "@/components/dashboard/ActivityTimeline.vue";
+import type { QuickRange } from "@/composables/useTimeSelector";
 
 ChartJS.register(
   CategoryScale,
@@ -439,8 +441,6 @@ const {
   selectedProvider,
   sortedProviders,
   providerTokenLabels,
-  usageWindows,
-  selectedWindowId,
   modelFilter,
   keyFilter,
   clientType,
@@ -454,12 +454,21 @@ const {
   tokenThroughputChartData,
   deltaValues,
   windowTimeRange,
-  timelineWindows,
-  timelineRange,
-  getWindowStyle,
-  getWindowWidth,
-  formatWindowTooltip,
-  timelineDayLabels,
+  activeRange,
+  timeSelection,
+  timeRangeLabel,
+  showCustom,
+  customStart,
+  customEnd,
+  customError,
+  activityBuckets,
+  detailDays,
+  rangeStart,
+  totalRangeDays,
+  selectQuickRange,
+  toggleCustom,
+  applyCustom,
+  setCustomRange,
   retry,
 } = useDashboard();
 
@@ -485,10 +494,21 @@ function miniChartOpts(labels: string[]) {
   return miniLineOptions(labels);
 }
 
-// --- Timeline zoom options ---
-const timelineZoomOptions = [
-  { value: "24h" as const, label: "24h" },
-  { value: "3d" as const, label: "3d" },
-  { value: "7d" as const, label: "7d" },
+// --- Quick range buttons ---
+interface QuickRangeOption {
+  value: QuickRange;
+  labelKey: string;
+}
+
+const quickRangeOptions: QuickRangeOption[] = [
+  { value: "5h", labelKey: "dashboard.timeSelector.quick.5h" },
+  { value: "24h", labelKey: "dashboard.timeSelector.quick.24h" },
+  { value: "7d", labelKey: "dashboard.timeSelector.quick.7d" },
+  { value: "30d", labelKey: "dashboard.timeSelector.quick.30d" },
 ];
+
+// --- ActivityTimeline click handler ---
+function onTimelineSelection(sel: { start: Date; end: Date }) {
+  setCustomRange(sel.start, sel.end);
+}
 </script>

@@ -29,6 +29,27 @@
     "hint": "点击窗口查看详情",
     "noData": "暂无使用记录"
   },
+  "timeSelector": {
+    "quick": {
+      "5h": "5h",
+      "24h": "24h",
+      "7d": "7d",
+      "30d": "30d"
+    },
+    "custom": "自定义",
+    "startDate": "开始日期",
+    "endDate": "结束日期",
+    "apply": "应用",
+    "hint": "点击活动柱选中 7 天区间，或选择快速范围",
+    "customError": {
+      "format": "日期格式错误（YYYY-MM-DD）",
+      "order": "开始日期必须早于结束日期",
+      "tooShort": "范围至少 1 天",
+      "tooLong": "范围不能超过 90 天",
+      "future": "结束日期不能晚于今天",
+      "tooOld": "开始日期不能早于 30 天前"
+    }
+  },
   "delta": {
     "vsPrev": "较上窗口 {value}",
     "up": "+{pct}%",

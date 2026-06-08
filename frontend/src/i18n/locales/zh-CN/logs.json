@@ -75,7 +75,9 @@
   "retention": {
     "saved": "日志保留天数已更新",
     "updateFailed": "更新保留天数失败",
-    "loadFailed": "加载保留天数失败，使用默认值"
+    "loadFailed": "加载保留天数失败，使用默认值",
+    "loadMetricsDetailFailed": "加载指标明细天数失败，使用默认值",
+    "bothSaved": "保留策略已更新"
   },
   "generateRetryRule": "生成重试规则",
   "analyzing": "分析中...",

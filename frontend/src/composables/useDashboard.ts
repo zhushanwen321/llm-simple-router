@@ -3,18 +3,18 @@ import { useI18n } from "vue-i18n";
 import { api, getApiMessage, type UsageWindowWithUsage } from "@/api/client";
 import { toast } from "vue-sonner";
 import { formatProviderTokenLabel } from "@/utils/token-format";
+import { formatTimeShort } from "@/utils/format";
 import { watchTheme } from "@/composables/useTheme";
 import type { Provider } from "@/types/mapping";
 import { useDashboardFilters } from "./useDashboardFilters";
 import type { DashboardStats } from "./useDashboardData";
 import { useDashboardData } from "./useDashboardData";
-import { useDashboardTimeline } from "./useDashboardTimeline";
+import { useTimeSelector } from "./useTimeSelector";
 
 // --- Constants ---
 
 const DEBOUNCE_MS = 300;
 const PERCENT_MULTIPLIER = 100;
-const MIN_WINDOWS_FOR_DELTA = 2;
 
 // --- Helpers ---
 
@@ -43,12 +43,34 @@ export function useDashboard() {
 
   // --- Sub-composables ---
   const filters = useDashboardFilters({ selectedProvider, providers, t });
+  const timeSelector = useTimeSelector({ selectedProvider, t });
 
-  const timeline = useDashboardTimeline({ selectedProvider, t });
+  // --- Usage windows (kept for provider token sort; not driving time selection) ---
+  const usageWindows = ref<UsageWindowWithUsage[]>([]);
+  const selectedWindowId = ref("");
+
+  async function loadUsageWindows() {
+    try {
+      const params: { provider_id?: string } = {};
+      if (selectedProvider.value) params.provider_id = selectedProvider.value;
+      usageWindows.value = await api.getUsageWindows(params);
+      if (
+        selectedWindowId.value &&
+        !usageWindows.value.some((w) => w.window.id === selectedWindowId.value)
+      ) {
+        selectedWindowId.value = "";
+      }
+    } catch (e: unknown) {
+      console.error("useDashboard.loadUsageWindows:", e);
+      /* 非关键：provider 排序数据缺失不影响主仪表盘功能 */
+      usageWindows.value = [];
+      selectedWindowId.value = "";
+    }
+  }
 
   // --- Derived: provider token labels from usageWindows (stable across provider selection) ---
   const providerInputTokens = computed(() =>
-    aggregateAllProviderInputTokens(timeline.usageWindows.value),
+    aggregateAllProviderInputTokens(usageWindows.value),
   );
 
   const providerTokenLabels = computed(() => {
@@ -69,15 +91,45 @@ export function useDashboard() {
     });
   });
 
+  // --- Synthesize selectedWindow from timeSelector for useDashboardData ---
+  // useDashboardData 的接口要求 `selectedWindow: ComputedRef<UsageWindowWithUsage | null>`，
+  // 内部从 `selectedWindow.value.window.start_time/end_time` 读取时间范围。
+  // 我们合成一个镜像 timeSelector.timeSelection 的对象，避免改动 useDashboardData 签名。
+  const selectedWindowFromTime = computed<UsageWindowWithUsage | null>(() => {
+    const sel = timeSelector.timeSelection.value;
+    if (!sel) return null;
+    return {
+      window: {
+        id: `time-selector-${sel.source}`,
+        router_key_id: null,
+        provider_id: selectedProvider.value || null,
+        provider_name: null,
+        start_time: sel.startTime.toISOString(),
+        end_time: sel.endTime.toISOString(),
+        created_at: new Date().toISOString(),
+      },
+      usage: {
+        request_count: 0,
+        total_input_tokens: 0,
+        total_output_tokens: 0,
+      },
+    };
+  });
+
+  // --- Inline tertiary metrics label (Zone 2 保持旧格式：MM/DD HH:MM) ---
+  const windowTimeRange = computed(() => {
+    const sel = timeSelector.timeSelection.value;
+    return `${formatTimeShort(sel.startTime.toISOString())} ~ ${formatTimeShort(sel.endTime.toISOString())}`;
+  });
+
   // --- Watch key (cross-composite dependency fingerprint) ---
   const watchKey = computed(() =>
     JSON.stringify({
       selectedProvider: selectedProvider.value,
-      selectedWindowId: timeline.selectedWindowId.value,
+      timeSelection: timeSelector.timeSelection.value,
       modelFilter: filters.modelFilter.value,
       keyFilter: filters.keyFilter.value,
       clientType: filters.clientType.value,
-      timelineRange: timeline.timelineRange.value,
     }),
   );
 
@@ -87,12 +139,12 @@ export function useDashboard() {
     statsParams: filters.statsParams,
     cacheSummaryParams: filters.cacheSummaryParams,
     tsParams: filters.tsParams,
-    selectedWindow: timeline.selectedWindow,
+    selectedWindow: selectedWindowFromTime,
     watchKey,
     t,
   });
 
-  // --- Environment comparison (prev window stats) ---
+  // --- Environment comparison (prev range stats) ---
   const prevWindowStats = ref<DashboardStats | null>(null);
 
   const deltaValues = computed(() => {
@@ -115,23 +167,20 @@ export function useDashboard() {
   });
 
   async function loadPrevWindowStats() {
-    const sorted = timeline.timelineWindows.value;
-    const window = timeline.selectedWindow.value;
-    if (!window || sorted.length < MIN_WINDOWS_FOR_DELTA) {
+    const sel = timeSelector.timeSelection.value;
+    const dur = sel.endTime.getTime() - sel.startTime.getTime();
+    if (dur <= 0) {
       prevWindowStats.value = null;
       return;
     }
-    const idx = sorted.findIndex((w) => w.window.id === window.window.id);
-    if (idx < 1) {
-      prevWindowStats.value = null;
-      return;
-    }
-    const prevWindow = sorted[idx - 1];
+    // prev = 与当前选区等长、紧邻其前的范围
+    const prevEnd = new Date(sel.startTime.getTime());
+    const prevStart = new Date(prevEnd.getTime() - dur);
     try {
       const params: Record<string, string> = {
         period: "window",
-        start_time: prevWindow.window.start_time,
-        end_time: prevWindow.window.end_time,
+        start_time: prevStart.toISOString(),
+        end_time: prevEnd.toISOString(),
       };
       if (selectedProvider.value) params.provider_id = selectedProvider.value;
       const result = await api.getStats(params);
@@ -178,41 +227,32 @@ export function useDashboard() {
     }
   });
 
-  // Watch provider/range 变化 → 重新加载窗口 + 自动选择 + 刷新
+  // Watch provider / time range 变化 → 重新加载数据
   let skipNextFilterRefresh = false;
 
-  watch([selectedProvider, timeline.timelineRange], async () => {
+  watch([selectedProvider, timeSelector.timeSelection], async () => {
     if (!initialized.value) return;
     skipNextFilterRefresh = true;
-    await timeline.loadUsageWindows();
-    timeline.autoSelectLatestWindow();
+    await Promise.allSettled([loadUsageWindows(), timeSelector.loadActivity()]);
     await data.refresh();
     await loadPrevWindowStats();
   });
 
-  // Watch selectedWindowId/filter 变化 → debounced refresh + loadPrev
+  // Watch filter 变化 → debounced refresh + loadPrev
   let filterDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-  watch(
-    [
-      timeline.selectedWindowId,
-      filters.modelFilter,
-      filters.keyFilter,
-      filters.clientType,
-    ],
-    () => {
-      if (!initialized.value) return;
-      if (skipNextFilterRefresh) {
-        skipNextFilterRefresh = false;
-        return;
-      }
-      if (filterDebounceTimer) clearTimeout(filterDebounceTimer);
-      filterDebounceTimer = setTimeout(async () => {
-        await data.refresh();
-        await loadPrevWindowStats();
-      }, DEBOUNCE_MS);
-    },
-  );
+  watch([filters.modelFilter, filters.keyFilter, filters.clientType], () => {
+    if (!initialized.value) return;
+    if (skipNextFilterRefresh) {
+      skipNextFilterRefresh = false;
+      return;
+    }
+    if (filterDebounceTimer) clearTimeout(filterDebounceTimer);
+    filterDebounceTimer = setTimeout(async () => {
+      await data.refresh();
+      await loadPrevWindowStats();
+    }, DEBOUNCE_MS);
+  });
 
   // --- Watch theme changes to re-render charts ---
   let stopWatchTheme: (() => void) | null = null;
@@ -223,10 +263,10 @@ export function useDashboard() {
     if (providerLoadError.value) return;
     await Promise.allSettled([
       filters.loadFilterOptions(),
-      timeline.loadUsageWindows(),
+      loadUsageWindows(),
+      timeSelector.loadActivity(),
     ]);
     autoSelectProviderIfNeeded();
-    timeline.autoSelectLatestWindow();
     await data.refresh();
     await loadPrevWindowStats();
   }
@@ -235,10 +275,12 @@ export function useDashboard() {
   onMounted(async () => {
     await loadProviders();
     if (providerLoadError.value) return;
-    await timeline.loadUsageWindows();
-    await filters.loadFilterOptions();
+    await Promise.allSettled([
+      loadUsageWindows(),
+      filters.loadFilterOptions(),
+      timeSelector.loadActivity(),
+    ]);
     autoSelectProviderIfNeeded();
-    timeline.autoSelectLatestWindow();
     await data.refresh();
     await loadPrevWindowStats();
     initialized.value = true;
@@ -256,12 +298,27 @@ export function useDashboard() {
     selectedProvider,
     sortedProviders,
     providerTokenLabels,
-    // Timeline
-    usageWindows: timeline.usageWindows,
-    selectedWindowId: timeline.selectedWindowId,
-    selectedWindow: timeline.selectedWindow,
-    timelineWindows: timeline.timelineWindows,
-    timelineRange: timeline.timelineRange,
+    // Time selector (new — replaces old timeline window navigator)
+    activeRange: timeSelector.activeRange,
+    timeSelection: timeSelector.timeSelection,
+    timeRangeLabel: timeSelector.timeRangeLabel,
+    showCustom: timeSelector.showCustom,
+    customStart: timeSelector.customStart,
+    customEnd: timeSelector.customEnd,
+    customError: timeSelector.customError,
+    activityBuckets: timeSelector.activityBuckets,
+    detailDays: timeSelector.detailDays,
+    rangeStart: timeSelector.rangeStart,
+    totalRangeDays: timeSelector.totalRangeDays,
+    selectQuickRange: timeSelector.selectQuickRange,
+    toggleCustom: timeSelector.toggleCustom,
+    applyCustom: timeSelector.applyCustom,
+    setCustomRange: timeSelector.setCustomRange,
+    // Usage windows (kept for provider token sort; not driving time selection)
+    usageWindows,
+    selectedWindowId,
+    // Alias for Zone 2 inline tertiary metrics
+    windowTimeRange,
     // Filters
     modelFilter: filters.modelFilter,
     keyFilter: filters.keyFilter,
@@ -282,12 +339,6 @@ export function useDashboard() {
     // Comparison
     prevWindowStats,
     deltaValues,
-    windowTimeRange: timeline.windowTimeRange,
-    // Timeline rendering
-    getWindowStyle: timeline.getWindowStyle,
-    getWindowWidth: timeline.getWindowWidth,
-    formatWindowTooltip: timeline.formatWindowTooltip,
-    timelineDayLabels: timeline.timelineDayLabels,
     // Actions
     retry,
   };

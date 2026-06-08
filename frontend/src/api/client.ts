@@ -305,6 +305,15 @@ export interface DailyUsage {
   total_output_tokens: number;
 }
 
+export interface ActivityBucket {
+  bucket_time: string;
+  request_count: number;
+}
+
+export interface ActivityResponse {
+  buckets: ActivityBucket[];
+}
+
 export interface AiRetryConfig {
   provider_id: string;
   model: string;
@@ -548,6 +557,8 @@ export const api = {
     request<UsageWindowWithUsage[]>("get", "/usage/windows", undefined, {
       params,
     }),
+  getMetricsActivity: (params?: { router_key_id?: string; provider_id?: string }) =>
+    request<ActivityResponse>("get", "/metrics/activity", undefined, { params }),
   getUsageWeekly: (params?: { router_key_id?: string }) =>
     request<DailyUsage[]>("get", "/usage/weekly", undefined, { params }),
   getUsageMonthly: (params?: { router_key_id?: string }) =>

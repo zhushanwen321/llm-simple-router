@@ -29,6 +29,27 @@
     "hint": "Click a window to view",
     "noData": "No usage data"
   },
+  "timeSelector": {
+    "quick": {
+      "5h": "5h",
+      "24h": "24h",
+      "7d": "7d",
+      "30d": "30d"
+    },
+    "custom": "Custom",
+    "startDate": "Start date",
+    "endDate": "End date",
+    "apply": "Apply",
+    "hint": "Click an activity bar to select a 7-day window, or pick a quick range",
+    "customError": {
+      "format": "Invalid date format (YYYY-MM-DD)",
+      "order": "Start date must be before end date",
+      "tooShort": "Range must be at least 1 day",
+      "tooLong": "Range cannot exceed 90 days",
+      "future": "End date cannot be in the future",
+      "tooOld": "Start date cannot be more than 30 days ago"
+    }
+  },
   "delta": {
     "vsPrev": "vs prev {value}",
     "up": "+{pct}%",
