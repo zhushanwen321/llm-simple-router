@@ -279,6 +279,7 @@ interface StatsResponse {
   totalOutputTokens: number;
   startTime: string;
   endTime: string;
+  isApproximate?: boolean;
 }
 
 export interface UsageWindowWithUsage {

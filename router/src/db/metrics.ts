@@ -187,6 +187,8 @@ function mergeSummaryResults(detail: MetricsSummaryRow[], agg: MetricsSummaryRow
       const mergedOutputTokens = existing.total_output_tokens + row.total_output_tokens;
       const mergedCacheTokens = existing.total_cache_hit_tokens + row.total_cache_hit_tokens;
       const mergedRequestCount = existing.request_count + row.request_count;
+      const oldRequestCount = existing.request_count;
+      const oldAvgTps = existing.avg_tps;
       existing.avg_ttft_ms = mergedRequestCount > 0
         ? ((existing.avg_ttft_ms ?? 0) * existing.request_count + (row.avg_ttft_ms ?? 0) * row.request_count) / mergedRequestCount
         : null;
@@ -194,8 +196,9 @@ function mergeSummaryResults(detail: MetricsSummaryRow[], agg: MetricsSummaryRow
       existing.total_input_tokens = mergedInputTokens;
       existing.total_output_tokens = mergedOutputTokens;
       existing.total_cache_hit_tokens = mergedCacheTokens;
-      existing.avg_tps = (mergedOutputTokens > 0 && mergedInputTokens + mergedOutputTokens > 0)
-        ? mergedOutputTokens * MS_PER_SECOND / (mergedInputTokens + mergedOutputTokens) : null;
+      existing.avg_tps = mergedRequestCount > 0
+        ? ((oldAvgTps ?? 0) * oldRequestCount + (row.avg_tps ?? 0) * row.request_count) / mergedRequestCount
+        : null;
       existing.cache_hit_rate = mergedInputTokens > 0 ? mergedCacheTokens * PERCENT / mergedInputTokens : null;
     }
   }

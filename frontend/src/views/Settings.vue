@@ -80,7 +80,7 @@ const lifecycleError = computed<string>(() => validationError.value);
 
 const detailSegmentPct = computed(() => {
   const log = Math.max(retentionDays.value, 1);
-  return Math.max(0, Math.min(100, (metricsDetailDays.value / log) * 100));
+  return Math.max(0, Math.min(PERCENT_MAX, (metricsDetailDays.value / log) * PERCENT_MAX));
 });
 const aggregatedSegmentPct = computed(
   () => PERCENT_MAX - detailSegmentPct.value,
