@@ -73,6 +73,10 @@ export function buildTransportFn(p: TransportFnParams): (target: Target) => Prom
     const base = buildUpstreamHeaders(cliHdrs, key, bytes, p.apiType);
     return p.injectedHeaders ? { ...base, ...p.injectedHeaders } : base;
   };
+  // 使用 resolvedBaseUrl（endpoint 级别）而非 provider.base_url，
+  // 当 provider 配置多个 endpoints（不同 api_type 对应不同 base_url）时，
+  // provider.base_url 可能指向错误的 endpoint。
+  const effectiveBackend = { base_url: p.resolvedBaseUrl };
   const agent = p.proxyAgentFactory
     ? (p.proxyAgentFactory.getAgent(p.provider) ?? p.proxyAgentFactory.getKeepAliveAgent(p.resolvedBaseUrl))
     : undefined;
@@ -121,7 +125,7 @@ export function buildTransportFn(p: TransportFnParams): (target: Target) => Prom
         }
         : undefined;
       const streamResult = await callStream(
-        p.provider, p.apiKey, p.body, p.cliHdrs, p.reply, p.streamTimeoutMs,
+        effectiveBackend, p.apiKey, p.body, p.cliHdrs, p.reply, p.streamTimeoutMs,
         p.upstreamPath, buildHeaders, metricsTransform, checkEarlyError, undefined, streamLoopGuard, p.formatTransform,
         p.timeoutContext, onTimeoutAbort, agent,
       );
@@ -130,7 +134,7 @@ export function buildTransportFn(p: TransportFnParams): (target: Target) => Prom
       if (m) p.tracker?.update(p.logId, { streamMetrics: toStreamMetrics(m) });
       return streamResult;
     }
-    let result = await callNonStream(p.provider, p.apiKey, p.body, p.cliHdrs, p.upstreamPath, buildHeaders, agent);
+    let result = await callNonStream(effectiveBackend, p.apiKey, p.body, p.cliHdrs, p.upstreamPath, buildHeaders, agent);
     if (result.kind === "success") {
       const mr = MetricsExtractor.fromNonStreamResponse(p.apiType, result.body);
       if (mr) p.tracker?.update(p.logId, { streamMetrics: toStreamMetrics(mr) });
