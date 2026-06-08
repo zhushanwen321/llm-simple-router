@@ -2,6 +2,7 @@ import Database from "better-sqlite3";
 import { randomUUID } from "crypto";
 import { MS_PER_SECOND } from "../core/constants.js";
 import { getCachedStmt } from "./helpers.js";
+import { upsertAggBucket } from "./metrics-10min.js";
 
 export type MetricsPeriod = "1h" | "5h" | "6h" | "24h" | "7d" | "30d";
 export type MetricsMetric = "ttft" | "tps" | "text_tps" | "thinking_tps" | "tool_use_tps" | "non_thinking_tps" | "total_tps" | "tokens" | "cache_rate" | "request_count" | "input_tokens" | "output_tokens" | "cache_hit_tokens";
@@ -84,9 +85,20 @@ function rawInsertMetrics(db: Database.Database, m: MetricsInsert & { id: string
   );
 }
 
+let lastAggError: unknown = null;
+
+export function getAggWriteError(): unknown { return lastAggError; }
+
 export function insertMetrics(db: Database.Database, m: MetricsInsert): string {
   const id = randomUUID();
   rawInsertMetrics(db, { ...m, id });
+  try {
+    upsertAggBucket(db, m);
+    lastAggError = null;
+  } catch (e: unknown) {
+    lastAggError = e;
+    console.error("upsertMetrics10min:", e);
+  }
   return id;
 }
 
@@ -288,4 +300,13 @@ export function getMetricsTimeseries(
     avg_value: r.avg_value,
     count: r.count,
   }));
+}
+
+export function deleteMetricsBefore(db: Database.Database, beforeDate: string): number {
+  const stmt = getCachedStmt(
+    db,
+    `DELETE FROM request_metrics WHERE created_at < ?`
+  );
+  const result = stmt.run(beforeDate);
+  return result.changes;
 }
