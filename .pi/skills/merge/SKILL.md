@@ -70,7 +70,7 @@ bash .pi/skills/merge/cleanup.sh <worktree-dir> --skip-sync
 | `[patch\|minor\|major]` | 否 | 版本类型，默认 `patch` |
 | `--notes <file>` | 否 | 指定 release notes 文件 |
 | `--draft` | 否 | 创建 Draft Release |
-| `--from <N>` | 否 | 从阶段 N 继续执行（0-6） |
+| `--from <N>` | 否 | 从阶段 N 继续执行（1-6），阶段 0 始终执行 |
 
 ## 7 阶段流程
 
