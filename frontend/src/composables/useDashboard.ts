@@ -28,7 +28,7 @@ export function useDashboard() {
 
   // --- Sub-composables ---
   const filters = useDashboardFilters({ selectedProvider, providers, t });
-  const timeSelector = useTimeSelector({ selectedProvider, t });
+  const timeSelector = useTimeSelector({ selectedProvider });
 
   // --- Derived: provider token labels from overview response ---
   const providerTokenLabels = computed(() => {
@@ -59,7 +59,7 @@ export function useDashboard() {
     };
   });
 
-  // --- Inline tertiary metrics label (Zone 2 保持旧格式：MM/DD HH:MM) ---
+  // --- Inline tertiary metrics label ---
   const windowTimeRange = computed(() => {
     const sel = timeSelector.timeSelection.value;
     return `${formatTimeShort(sel.startTime.toISOString())} ~ ${formatTimeShort(sel.endTime.toISOString())}`;
@@ -119,7 +119,7 @@ export function useDashboard() {
     }
   }
 
-  // --- Auto-select top provider (uses alphabetically first, will re-sort after data loads) ---
+  // --- Auto-select top provider ---
   function autoSelectProviderIfNeeded() {
     if (!selectedProvider.value && providers.value.length > 0) {
       selectedProvider.value = providers.value[0].id;
@@ -129,6 +129,7 @@ export function useDashboard() {
   // --- Watchers ---
 
   const initialized = ref(false);
+  let skipNextFilterRefresh = false;
 
   // 切换 provider 时重置 modelFilter
   watch(selectedProvider, () => {
@@ -140,16 +141,14 @@ export function useDashboard() {
     }
   });
 
-  // Watch provider / time range 变化 → 重新加载数据
-  let skipNextFilterRefresh = false;
-
+  // Provider 或时间范围变化 → 刷新数据
   watch([selectedProvider, timeSelector.timeSelection], async () => {
     if (!initialized.value) return;
     skipNextFilterRefresh = true;
-    await Promise.allSettled([data.refresh(), timeSelector.loadActivity()]);
+    await data.refresh();
   });
 
-  // Watch filter 变化 → debounced refresh
+  // Filter 变化 → debounced refresh
   let filterDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   watch([filters.modelFilter, filters.keyFilter, filters.clientType], () => {
@@ -172,26 +171,15 @@ export function useDashboard() {
     await loadProviders();
     if (providerLoadError.value) return;
     autoSelectProviderIfNeeded();
-    await Promise.allSettled([
-      filters.loadFilterOptions(),
-      timeSelector.loadActivity(),
-      data.refresh(),
-    ]);
+    await Promise.allSettled([filters.loadFilterOptions(), data.refresh()]);
   }
 
   // --- Lifecycle ---
-  // Stage 1: GET /providers (must complete first)
-  // Stage 2: GET /dashboard/overview + GET /metrics/activity (parallel)
   onMounted(async () => {
     await loadProviders();
     if (providerLoadError.value) return;
     autoSelectProviderIfNeeded();
-    // Load filter options (router-keys) + activity in parallel with overview
-    await Promise.allSettled([
-      data.refresh(),
-      timeSelector.loadActivity(),
-      filters.loadFilterOptions(),
-    ]);
+    await Promise.allSettled([data.refresh(), filters.loadFilterOptions()]);
     initialized.value = true;
     stopWatchTheme = watchTheme(() => data.refresh());
   });
@@ -212,17 +200,14 @@ export function useDashboard() {
     timeSelection: timeSelector.timeSelection,
     timeRangeLabel: timeSelector.timeRangeLabel,
     showCustom: timeSelector.showCustom,
-    customStart: timeSelector.customStart,
-    customEnd: timeSelector.customEnd,
     customError: timeSelector.customError,
-    activityBuckets: timeSelector.activityBuckets,
-    detailDays: timeSelector.detailDays,
-    rangeStart: timeSelector.rangeStart,
     totalRangeDays: timeSelector.totalRangeDays,
     selectQuickRange: timeSelector.selectQuickRange,
     toggleCustom: timeSelector.toggleCustom,
     applyCustom: timeSelector.applyCustom,
-    setCustomRange: timeSelector.setCustomRange,
+    // Custom date (Date refs for Calendar datetime picker)
+    customStartDate: timeSelector.customStartDate,
+    customEndDate: timeSelector.customEndDate,
     // Alias for Zone 2 inline tertiary metrics
     windowTimeRange,
     // Filters

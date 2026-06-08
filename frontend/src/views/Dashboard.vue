@@ -153,9 +153,9 @@
 
     <!-- Main content -->
     <div v-else>
-      <!-- Time Range Selector (between filter and metrics) -->
+      <!-- Time Range Selector -->
       <div class="bg-card rounded-lg px-4 py-2.5 mb-3">
-        <div class="flex items-center justify-between mb-1.5">
+        <div class="flex items-center justify-between">
           <div class="flex items-center gap-3">
             <span class="font-mono text-xs font-medium text-foreground">
               {{ timeRangeLabel }}
@@ -166,7 +166,7 @@
                 :key="opt.value"
                 :variant="activeRange === opt.value ? 'secondary' : 'ghost'"
                 size="sm"
-                class="h-5 px-1.5 text-[10px] font-mono"
+                class="h-7 px-3 text-xs font-mono"
                 @click="selectQuickRange(opt.value)"
               >
                 {{ t(opt.labelKey) }}
@@ -174,44 +174,114 @@
               <Button
                 :variant="showCustom ? 'secondary' : 'ghost'"
                 size="sm"
-                class="h-5 px-1.5 text-[10px] font-mono"
+                class="h-7 px-3 text-xs font-mono"
                 @click="toggleCustom"
               >
                 {{ t("dashboard.timeSelector.custom") }}
               </Button>
             </div>
           </div>
-          <span class="text-[11px] text-muted-foreground/60">
-            {{ t("dashboard.timeSelector.hint") }}
-          </span>
         </div>
-        <ActivityTimeline
-          :buckets="activityBuckets"
-          :selection-start="timeSelection.startTime"
-          :selection-end="timeSelection.endTime"
-          :total-range-days="totalRangeDays"
-          :detail-days="detailDays"
-          :range-start="rangeStart"
-          @update:selection="onTimelineSelection"
-        />
+
+        <!-- Custom datetime picker (expanded below) -->
         <div v-if="showCustom" class="mt-2 space-y-1.5">
           <div class="flex flex-wrap items-center gap-2">
             <Label class="text-xs text-muted-foreground">{{
               t("dashboard.timeSelector.startDate")
             }}</Label>
-            <Input
-              v-model="customStart"
-              type="date"
-              class="h-7 w-[150px] text-[12px]"
-            />
+            <Popover
+              v-model:open="startPopoverOpen"
+              @update:open="
+                (v: boolean) => {
+                  if (v) syncStartPopover();
+                }
+              "
+            >
+              <PopoverTrigger as-child>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  class="h-7 px-2.5 text-xs font-mono"
+                >
+                  {{ formatDatetimeLabel(customStartDate) }}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent class="w-auto p-0" align="start">
+                <div class="p-2">
+                  <Calendar
+                    :model-value="startCalDate"
+                    @update:model-value="onStartCalUpdate"
+                  />
+                  <div class="flex items-center gap-1.5 px-2 pb-2 pt-1">
+                    <Input
+                      v-model="startHourInput"
+                      class="h-7 w-12 text-center text-xs font-mono"
+                      placeholder="HH"
+                    />
+                    <span class="text-xs text-muted-foreground">:</span>
+                    <Input
+                      v-model="startMinuteInput"
+                      class="h-7 w-12 text-center text-xs font-mono"
+                      placeholder="MM"
+                    />
+                    <Button
+                      size="sm"
+                      class="h-7 ml-auto"
+                      @click="confirmStartDate"
+                      >OK</Button
+                    >
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
             <Label class="text-xs text-muted-foreground">{{
               t("dashboard.timeSelector.endDate")
             }}</Label>
-            <Input
-              v-model="customEnd"
-              type="date"
-              class="h-7 w-[150px] text-[12px]"
-            />
+            <Popover
+              v-model:open="endPopoverOpen"
+              @update:open="
+                (v: boolean) => {
+                  if (v) syncEndPopover();
+                }
+              "
+            >
+              <PopoverTrigger as-child>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  class="h-7 px-2.5 text-xs font-mono"
+                >
+                  {{ formatDatetimeLabel(customEndDate) }}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent class="w-auto p-0" align="start">
+                <div class="p-2">
+                  <Calendar
+                    :model-value="endCalDate"
+                    @update:model-value="onEndCalUpdate"
+                  />
+                  <div class="flex items-center gap-1.5 px-2 pb-2 pt-1">
+                    <Input
+                      v-model="endHourInput"
+                      class="h-7 w-12 text-center text-xs font-mono"
+                      placeholder="HH"
+                    />
+                    <span class="text-xs text-muted-foreground">:</span>
+                    <Input
+                      v-model="endMinuteInput"
+                      class="h-7 w-12 text-center text-xs font-mono"
+                      placeholder="MM"
+                    />
+                    <Button
+                      size="sm"
+                      class="h-7 ml-auto"
+                      @click="confirmEndDate"
+                      >OK</Button
+                    >
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
             <Button size="sm" class="h-7" @click="applyCustom">
               {{ t("dashboard.timeSelector.apply") }}
             </Button>
@@ -223,12 +293,6 @@
           >
             {{ customError }}
           </p>
-        </div>
-        <div
-          v-if="activityBuckets.length === 0"
-          class="h-7 flex items-center justify-center text-[11px] text-muted-foreground"
-        >
-          {{ t("dashboard.timeline.noData") }}
         </div>
       </div>
 
@@ -384,8 +448,6 @@
           </div>
         </div>
       </div>
-
-
     </div>
   </div>
 </template>
@@ -419,13 +481,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Calendar } from "@/components/ui/calendar";
+import { CalendarDate } from "@internationalized/date";
+import type { DateValue } from "@internationalized/date";
 import { Filter } from "lucide-vue-next";
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { stackedAreaOptions, miniLineOptions } from "./metrics-helpers";
 import { useDashboard } from "@/composables/useDashboard";
 import { formatTokenCompact } from "@/utils/token-format";
-import ActivityTimeline from "@/components/dashboard/ActivityTimeline.vue";
 import type { QuickRange } from "@/composables/useTimeSelector";
 
 ChartJS.register(
@@ -457,20 +521,14 @@ const {
   deltaValues,
   windowTimeRange,
   activeRange,
-  timeSelection,
   timeRangeLabel,
   showCustom,
-  customStart,
-  customEnd,
+  customStartDate,
+  customEndDate,
   customError,
-  activityBuckets,
-  detailDays,
-  rangeStart,
-  totalRangeDays,
   selectQuickRange,
   toggleCustom,
   applyCustom,
-  setCustomRange,
   retry,
 } = useDashboard();
 
@@ -509,8 +567,92 @@ const quickRangeOptions: QuickRangeOption[] = [
   { value: "30d", labelKey: "dashboard.timeSelector.quick.30d" },
 ];
 
-// --- ActivityTimeline click handler ---
-function onTimelineSelection(sel: { start: Date; end: Date }) {
-  setCustomRange(sel.start, sel.end);
+// --- Datetime picker helpers ---
+const startPopoverOpen = ref(false);
+const endPopoverOpen = ref(false);
+const startCalDate = ref<CalendarDate | undefined>();
+const startHourInput = ref("00");
+const startMinuteInput = ref("00");
+const endCalDate = ref<CalendarDate | undefined>();
+const endHourInput = ref("00");
+const endMinuteInput = ref("00");
+
+const PAD_LENGTH = 2;
+
+function dtPad(n: number): string {
+  return n.toString().padStart(PAD_LENGTH, "0");
+}
+
+function jsDateToCalendarDate(d: Date): CalendarDate {
+  return new CalendarDate(d.getFullYear(), d.getMonth() + 1, d.getDate());
+}
+
+function formatDatetimeLabel(d: Date): string {
+  return `${d.getFullYear()}-${dtPad(d.getMonth() + 1)}-${dtPad(d.getDate())} ${dtPad(d.getHours())}:${dtPad(d.getMinutes())}`;
+}
+
+function handleCalUpdate(
+  val: DateValue | DateValue[] | undefined,
+): CalendarDate | undefined {
+  if (!val) return undefined;
+  const dv = Array.isArray(val) ? val[0] : val;
+  if (dv) return new CalendarDate(dv.year, dv.month, dv.day);
+  return undefined;
+}
+
+function syncStartPopover() {
+  const d = customStartDate.value;
+  startCalDate.value = jsDateToCalendarDate(d);
+  startHourInput.value = dtPad(d.getHours());
+  startMinuteInput.value = dtPad(d.getMinutes());
+}
+
+function syncEndPopover() {
+  const d = customEndDate.value;
+  endCalDate.value = jsDateToCalendarDate(d);
+  endHourInput.value = dtPad(d.getHours());
+  endMinuteInput.value = dtPad(d.getMinutes());
+}
+
+function onStartCalUpdate(val: DateValue | DateValue[] | undefined) {
+  startCalDate.value = handleCalUpdate(val);
+}
+
+function onEndCalUpdate(val: DateValue | DateValue[] | undefined) {
+  endCalDate.value = handleCalUpdate(val);
+}
+
+function confirmStartDate() {
+  if (startCalDate.value) {
+    const h = parseInt(startHourInput.value, 10) || 0;
+    const m = parseInt(startMinuteInput.value, 10) || 0;
+    customStartDate.value = new Date(
+      startCalDate.value.year,
+      startCalDate.value.month - 1,
+      startCalDate.value.day,
+      h,
+      m,
+      0,
+      0,
+    );
+  }
+  startPopoverOpen.value = false;
+}
+
+function confirmEndDate() {
+  if (endCalDate.value) {
+    const h = parseInt(endHourInput.value, 10) || 0;
+    const m = parseInt(endMinuteInput.value, 10) || 0;
+    customEndDate.value = new Date(
+      endCalDate.value.year,
+      endCalDate.value.month - 1,
+      endCalDate.value.day,
+      h,
+      m,
+      0,
+      0,
+    );
+  }
+  endPopoverOpen.value = false;
 }
 </script>

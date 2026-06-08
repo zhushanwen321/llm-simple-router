@@ -1,20 +1,10 @@
 import { ref, computed } from "vue";
 import type { Ref } from "vue";
-import { api, getApiMessage } from "@/api/client";
-import { toast } from "vue-sonner";
+import { useI18n } from "vue-i18n";
 
 // --- Types ---
 
 export type QuickRange = "5h" | "24h" | "7d" | "30d";
-
-export interface ActivityBucket {
-  bucket_time: string;
-  request_count: number;
-}
-
-export interface ActivityResponse {
-  buckets: ActivityBucket[];
-}
 
 export interface TimeSelection {
   startTime: Date;
@@ -24,7 +14,6 @@ export interface TimeSelection {
 
 export interface UseTimeSelectorInput {
   selectedProvider: Ref<string>;
-  t: (key: string) => string;
 }
 
 // --- Constants ---
@@ -33,21 +22,13 @@ const HOURS_PER_DAY = 24;
 const MS_PER_HOUR = 3600_000;
 const DAY_MS = HOURS_PER_DAY * MS_PER_HOUR;
 const TOTAL_RANGE_DAYS = 30;
-const DETAIL_DAYS = 7;
 const PAD_WIDTH = 2;
-const MIN_CUSTOM_DAYS = 1;
 const MAX_CUSTOM_DAYS = 90;
 const HOURS_IN_5H = 5;
 const DAYS_IN_7D = 7;
 const DAYS_IN_30D = 30;
 const HOURS_IN_24H = 24;
 const DAY_IN_24H = 1;
-const MONTHS_PER_YEAR = 12;
-const DAYS_PER_MONTH_MAX = 31;
-const END_OF_DAY_HOUR = 23;
-const END_OF_DAY_MINUTE = 59;
-const END_OF_DAY_SECOND = 59;
-const END_OF_DAY_MS = 999;
 
 const QUICK_RANGE_MS: Record<QuickRange, number> = {
   "5h": HOURS_IN_5H * MS_PER_HOUR,
@@ -63,41 +44,13 @@ const QUICK_RANGE_DAYS: Record<QuickRange, number> = {
   "30d": DAYS_IN_30D,
 };
 
-const MIN_CUSTOM_MS = MIN_CUSTOM_DAYS * DAY_MS;
+const MIN_CUSTOM_MS = MS_PER_HOUR;
 const MAX_CUSTOM_MS = MAX_CUSTOM_DAYS * DAY_MS;
 
 // --- Helpers ---
 
 function pad(n: number): string {
   return n.toString().padStart(PAD_WIDTH, "0");
-}
-
-function toDateTimeLocalInput(d: Date): string {
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
-function parseDateInput(value: string, isEnd: boolean): Date | null {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  if (!m) return null;
-  const y = Number(m[1]);
-  const mo = Number(m[2]);
-  const da = Number(m[3]);
-  if (mo < 1 || mo > MONTHS_PER_YEAR || da < 1 || da > DAYS_PER_MONTH_MAX) {
-    return null;
-  }
-  const d = new Date(y, mo - 1, da);
-  if (Number.isNaN(d.getTime())) return null;
-  if (isEnd) {
-    d.setHours(
-      END_OF_DAY_HOUR,
-      END_OF_DAY_MINUTE,
-      END_OF_DAY_SECOND,
-      END_OF_DAY_MS,
-    );
-  } else {
-    d.setHours(0, 0, 0, 0);
-  }
-  return d;
 }
 
 function formatRangeLabel(start: Date, end: Date): string {
@@ -129,22 +82,21 @@ function formatRangeLabel(start: Date, end: Date): string {
 
 // --- Composable ---
 
-export function useTimeSelector({ selectedProvider, t }: UseTimeSelectorInput) {
+export function useTimeSelector(_input: UseTimeSelectorInput) {
+  const { t } = useI18n();
+
   const activeRange = ref<QuickRange | "custom" | null>("7d");
   const showCustom = ref(false);
-  const customStart = ref("");
-  const customEnd = ref("");
+  const customStart = ref<Date>(new Date());
+  const customEnd = ref<Date>(new Date());
   const customError = ref("");
-  const activityBuckets = ref<ActivityBucket[]>([]);
-  const detailDays = DETAIL_DAYS;
+  const selectionFromCustom = ref<{ start: Date; end: Date } | null>(null);
 
   // --- Range bounds ---
   const rangeStart = computed(() => {
     const now = new Date();
     return new Date(now.getTime() - TOTAL_RANGE_DAYS * DAY_MS);
   });
-  const rangeEnd = computed(() => new Date());
-  const totalRangeDays = TOTAL_RANGE_DAYS;
 
   // --- Current selection ---
   const timeSelection = computed<TimeSelection>(() => {
@@ -164,7 +116,6 @@ export function useTimeSelector({ selectedProvider, t }: UseTimeSelectorInput) {
         source: range,
       };
     }
-    // Default: last 7 days
     return {
       startTime: new Date(now.getTime() - QUICK_RANGE_MS["7d"]),
       endTime: now,
@@ -172,26 +123,10 @@ export function useTimeSelector({ selectedProvider, t }: UseTimeSelectorInput) {
     };
   });
 
-  const selectionFromCustom = ref<{ start: Date; end: Date } | null>(null);
-
   const timeRangeLabel = computed(() => {
     const sel = timeSelection.value;
     return formatRangeLabel(sel.startTime, sel.endTime);
   });
-
-  // --- Activity data loading ---
-  async function loadActivity() {
-    try {
-      const params: { provider_id?: string } = {};
-      if (selectedProvider.value) params.provider_id = selectedProvider.value;
-      const resp = await api.getMetricsActivity(params);
-      activityBuckets.value = resp.buckets ?? [];
-    } catch (e: unknown) {
-      console.error("useTimeSelector.loadActivity:", e);
-      activityBuckets.value = [];
-      toast.error(getApiMessage(e, t("dashboard.loadDashboardFailed")));
-    }
-  }
 
   // --- Quick range selection ---
   function selectQuickRange(range: QuickRange) {
@@ -205,8 +140,8 @@ export function useTimeSelector({ selectedProvider, t }: UseTimeSelectorInput) {
     showCustom.value = !showCustom.value;
     if (showCustom.value) {
       const sel = timeSelection.value;
-      customStart.value = toDateTimeLocalInput(sel.startTime);
-      customEnd.value = toDateTimeLocalInput(sel.endTime);
+      customStart.value = new Date(sel.startTime);
+      customEnd.value = new Date(sel.endTime);
       activeRange.value = "custom";
       customError.value = "";
     } else if (activeRange.value === "custom") {
@@ -216,9 +151,13 @@ export function useTimeSelector({ selectedProvider, t }: UseTimeSelectorInput) {
 
   function applyCustom() {
     customError.value = "";
-    const start = parseDateInput(customStart.value, false);
-    const end = parseDateInput(customEnd.value, true);
-    if (!start || !end) {
+    const start = customStart.value;
+    const end = customEnd.value;
+    if (!(start instanceof Date) || !(end instanceof Date)) {
+      customError.value = t("dashboard.timeSelector.customError.format");
+      return;
+    }
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
       customError.value = t("dashboard.timeSelector.customError.format");
       return;
     }
@@ -244,46 +183,42 @@ export function useTimeSelector({ selectedProvider, t }: UseTimeSelectorInput) {
       customError.value = t("dashboard.timeSelector.customError.tooOld");
       return;
     }
-    selectionFromCustom.value = { start, end };
+    selectionFromCustom.value = { start: new Date(start), end: new Date(end) };
     activeRange.value = "custom";
     showCustom.value = false;
-  }
-
-  /**
-   * 直接设置自定义范围（用于 ActivityTimeline 点击事件）。
-   * 跳过表单输入校验，但仍然夹紧到允许的范围内。
-   */
-  function setCustomRange(start: Date, end: Date) {
-    const clampedEnd = new Date(Math.min(end.getTime(), Date.now()));
-    const minStart = rangeStart.value.getTime();
-    const clampedStart = new Date(Math.max(start.getTime(), minStart));
-    if (clampedStart.getTime() >= clampedEnd.getTime()) return;
-    const span = clampedEnd.getTime() - clampedStart.getTime();
-    if (span < MIN_CUSTOM_MS || span > MAX_CUSTOM_MS) return;
-    selectionFromCustom.value = { start: clampedStart, end: clampedEnd };
-    activeRange.value = "custom";
-    showCustom.value = false;
-    customError.value = "";
   }
 
   return {
     activeRange,
     showCustom,
-    customStart,
-    customEnd,
     customError,
-    activityBuckets,
-    detailDays,
-    rangeStart,
-    rangeEnd,
-    totalRangeDays,
     quickRangeDays: QUICK_RANGE_DAYS,
+    totalRangeDays: TOTAL_RANGE_DAYS,
     timeSelection,
     timeRangeLabel,
     selectQuickRange,
     toggleCustom,
     applyCustom,
-    setCustomRange,
-    loadActivity,
+    // Custom range Date refs for Calendar datetime picker binding
+    customStartDate: customStart,
+    customEndDate: customEnd,
   };
+}
+
+// --- Internal helpers ---
+
+const MONTHS_PER_YEAR = 12;
+const DAYS_PER_MONTH_MAX = 31;
+
+export function parseDatePortion(value: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const da = Number(m[3]);
+  if (mo < 1 || mo > MONTHS_PER_YEAR || da < 1 || da > DAYS_PER_MONTH_MAX) {
+    return null;
+  }
+  const d = new Date(y, mo - 1, da);
+  return Number.isNaN(d.getTime()) ? null : d;
 }
