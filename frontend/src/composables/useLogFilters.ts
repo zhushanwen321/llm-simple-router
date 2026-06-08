@@ -5,6 +5,16 @@ import { api, getApiMessage } from "@/api/client";
 import type { Provider, Rule } from "@/types/mapping";
 import { toIsoStart, toIsoEnd } from "@/utils/format";
 
+/** 安全解析 mapping group 的 rule JSON，格式异常返回 null */
+function parseRuleJson(rule: string): Rule | null {
+  try {
+    return JSON.parse(rule) as Rule;
+  } catch {
+    /* rule JSON 格式异常，跳过该映射组 */
+    return null;
+  }
+}
+
 const PERIODS = [
   { label: "1h", value: "1h" },
   { label: "5h", value: "5h" },
@@ -104,13 +114,11 @@ export function useLogFilters() {
       const backendSet = new Set<string>();
       for (const g of groups) {
         if (g.client_model) clientSet.add(g.client_model);
-        try {
-          const rule: Rule = JSON.parse(g.rule);
+        const rule: Rule | null = parseRuleJson(g.rule);
+        if (rule) {
           for (const t of rule.targets ?? []) {
             if (t.backend_model) backendSet.add(t.backend_model);
           }
-        } catch {
-          /* rule 格式异常，跳过 */
         }
       }
       clientModelOptions.value = [...clientSet].sort();
