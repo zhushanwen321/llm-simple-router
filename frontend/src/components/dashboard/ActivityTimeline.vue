@@ -37,20 +37,7 @@ const INTENSITY_LOW = 0.25;
 const OPACITY_HIGHLIGHTED = 0.9;
 const OPACITY_DIMMED = 0.5;
 
-const MONTH_LABELS = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-];
+const monthFormatter = new Intl.DateTimeFormat(undefined, { month: "short" });
 
 // --- Helpers ---
 
@@ -148,7 +135,7 @@ const ticks = computed<Tick[]>(() => {
       left,
       label: isNow
         ? "now"
-        : `${MONTH_LABELS[date.getMonth()]}/${pad(date.getDate())}`,
+        : `${monthFormatter.format(date)}/${pad(date.getDate())}`,
       isNow,
     });
   }
@@ -196,7 +183,7 @@ function barStyle(b: BarLayout) {
 <template>
   <div class="relative">
     <div
-      class="relative overflow-hidden rounded bg-muted/30 border border-border/50"
+      class="relative overflow-hidden rounded bg-muted/30 border border-border/50 mx-5"
       :style="{ height: TRACK_HEIGHT + 'px' }"
     >
       <!-- Aggregation zone (left portion = older than detailDays) -->
@@ -224,7 +211,7 @@ function barStyle(b: BarLayout) {
       />
     </div>
     <!-- Tick labels -->
-    <div class="relative h-4 mt-1">
+    <div class="relative h-4 mt-1 mx-5">
       <span
         v-for="(t, i) in ticks"
         :key="i"

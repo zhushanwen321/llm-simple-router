@@ -115,38 +115,6 @@
       </Popover>
     </div>
 
-    <!-- Custom date picker (below filter bar) -->
-    <div v-if="showCustom" class="mb-3 bg-card rounded-lg px-4 py-2.5">
-      <div class="flex flex-wrap items-center gap-2">
-        <Label class="text-xs text-muted-foreground">{{
-          t("dashboard.timeSelector.startDate")
-        }}</Label>
-        <Input
-          v-model="customStart"
-          type="date"
-          class="h-7 w-[150px] text-[12px]"
-        />
-        <Label class="text-xs text-muted-foreground">{{
-          t("dashboard.timeSelector.endDate")
-        }}</Label>
-        <Input
-          v-model="customEnd"
-          type="date"
-          class="h-7 w-[150px] text-[12px]"
-        />
-        <Button size="sm" class="h-7" @click="applyCustom">
-          {{ t("dashboard.timeSelector.apply") }}
-        </Button>
-      </div>
-      <p
-        v-if="customError"
-        class="text-xs text-danger font-mono mt-1.5"
-        role="alert"
-      >
-        {{ customError }}
-      </p>
-    </div>
-
     <!-- Error state -->
     <div v-if="loadError" class="text-center py-20">
       <p class="text-muted-foreground mb-3">{{ t("dashboard.loadError") }}</p>
@@ -226,6 +194,36 @@
           :range-start="rangeStart"
           @update:selection="onTimelineSelection"
         />
+        <div v-if="showCustom" class="mt-2 space-y-1.5">
+          <div class="flex flex-wrap items-center gap-2">
+            <Label class="text-xs text-muted-foreground">{{
+              t("dashboard.timeSelector.startDate")
+            }}</Label>
+            <Input
+              v-model="customStart"
+              type="date"
+              class="h-7 w-[150px] text-[12px]"
+            />
+            <Label class="text-xs text-muted-foreground">{{
+              t("dashboard.timeSelector.endDate")
+            }}</Label>
+            <Input
+              v-model="customEnd"
+              type="date"
+              class="h-7 w-[150px] text-[12px]"
+            />
+            <Button size="sm" class="h-7" @click="applyCustom">
+              {{ t("dashboard.timeSelector.apply") }}
+            </Button>
+          </div>
+          <p
+            v-if="customError"
+            class="text-xs text-danger font-mono"
+            role="alert"
+          >
+            {{ customError }}
+          </p>
+        </div>
         <div
           v-if="activityBuckets.length === 0"
           class="h-7 flex items-center justify-center text-[11px] text-muted-foreground"
