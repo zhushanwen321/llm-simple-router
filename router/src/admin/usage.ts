@@ -3,6 +3,8 @@ import Database from "better-sqlite3";
 import { Type } from "@sinclair/typebox";
 import { getWindowsInRange, getWindowUsage } from "../db/usage-windows.js";
 import { getProviderById } from "../db/index.js";
+import { MS_PER_SECOND } from "../core/constants.js";
+import { BUCKET_SECONDS } from "../db/metrics-10min.js";
 import { resolveTimeRange } from "../utils/time-range.js";
 
 interface UsageRoutesOptions {
@@ -23,7 +25,50 @@ interface DailyUsageRow {
   total_output_tokens: number;
 }
 
-function getDailyUsage(
+// Use shared bucket boundary from metrics-10min
+// BUCKET_SECONDS imported from metrics-10min
+
+function computeBucketBoundary(): string {
+  const bucketStartSec = Math.floor(Date.now() / MS_PER_SECOND / BUCKET_SECONDS) * BUCKET_SECONDS;
+  return new Date(bucketStartSec * MS_PER_SECOND).toISOString();
+}
+
+function queryAggDailyUsage(
+  db: Database.Database,
+  startTime: string,
+  endTime: string,
+  routerKeyId?: string,
+  providerId?: string,
+): DailyUsageRow[] {
+  const conditions = [
+    "m.bucket_time >= datetime(?)",
+    "m.bucket_time < datetime(?)",
+  ];
+  const params: unknown[] = [startTime, endTime];
+
+  if (routerKeyId) {
+    conditions.push("m.router_key_id = ?");
+    params.push(routerKeyId);
+  }
+  if (providerId) {
+    conditions.push("m.provider_id = ?");
+    params.push(providerId);
+  }
+
+  return db.prepare(`
+    SELECT
+      date(m.bucket_time) AS date,
+      SUM(m.request_count) AS request_count,
+      SUM(m.sum_input_tokens) AS total_input_tokens,
+      SUM(m.sum_output_tokens) AS total_output_tokens
+    FROM metrics_10min m
+    WHERE ${conditions.join(" AND ")}
+    GROUP BY date(m.bucket_time)
+    ORDER BY date ASC
+  `).all(...params) as DailyUsageRow[];
+}
+
+function queryDetailDailyUsage(
   db: Database.Database,
   startTime: string,
   endTime: string,
@@ -56,6 +101,53 @@ function getDailyUsage(
     GROUP BY date(rm.created_at)
     ORDER BY date ASC
   `).all(...params) as DailyUsageRow[];
+}
+
+function mergeDailyUsageResults(
+  a: DailyUsageRow[],
+  b: DailyUsageRow[],
+): DailyUsageRow[] {
+  if (a.length === 0) return b;
+  if (b.length === 0) return a;
+
+  const dateMap = new Map<string, DailyUsageRow>();
+  for (const row of [...a, ...b]) {
+    const existing = dateMap.get(row.date);
+    if (existing) {
+      existing.request_count += row.request_count;
+      existing.total_input_tokens += row.total_input_tokens;
+      existing.total_output_tokens += row.total_output_tokens;
+    } else {
+      dateMap.set(row.date, { ...row });
+    }
+  }
+
+  return Array.from(dateMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function getDailyUsage(
+  db: Database.Database,
+  startTime: string,
+  endTime: string,
+  routerKeyId?: string,
+  providerId?: string,
+): DailyUsageRow[] {
+  const boundary = computeBucketBoundary();
+
+  // Pure agg: entire range is before the current bucket
+  if (endTime <= boundary) {
+    return queryAggDailyUsage(db, startTime, endTime, routerKeyId, providerId);
+  }
+
+  // Pure detail: entire range is within the current bucket
+  if (startTime >= boundary) {
+    return queryDetailDailyUsage(db, startTime, endTime, routerKeyId, providerId);
+  }
+
+  // Cross-boundary: agg segment [start, boundary) + detail segment [boundary, end)
+  const aggResult = queryAggDailyUsage(db, startTime, boundary, routerKeyId, providerId);
+  const detailResult = queryDetailDailyUsage(db, boundary, endTime, routerKeyId, providerId);
+  return mergeDailyUsageResults(detailResult, aggResult);
 }
 
 function resolveProviderName(db: Database.Database, providerId: string | null): string | null {

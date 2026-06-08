@@ -29,6 +29,27 @@
     "hint": "点击窗口查看详情",
     "noData": "暂无使用记录"
   },
+  "timeSelector": {
+    "quick": {
+      "5h": "5h",
+      "24h": "24h",
+      "7d": "7d",
+      "30d": "30d"
+    },
+    "custom": "自定义",
+    "startDate": "开始日期",
+    "endDate": "结束日期",
+    "apply": "应用",
+    "hint": "\u62d6\u52a8\u9009\u533a\u79fb\u52a8 \u00b7 \u62d6\u52a8\u9009\u533a\u5916\u7ed8\u5236 \u00b7 \u6eda\u8f6e\u7f29\u653e",
+    "customError": {
+      "format": "日期格式错误（YYYY-MM-DD）",
+      "order": "开始日期必须早于结束日期",
+      "tooShort": "范围至少 1 天",
+      "tooLong": "范围不能超过 90 天",
+      "future": "结束日期不能晚于今天",
+      "tooOld": "开始日期不能早于 30 天前"
+    }
+  },
   "delta": {
     "vsPrev": "较上窗口 {value}",
     "up": "+{pct}%",
@@ -53,8 +74,14 @@
   "loadDashboardFailed": "加载仪表盘数据失败",
   "loadFilterFailed": "加载筛选项失败",
   "loadOutputTokensFailed": "加载供应商排序数据失败",
+  "legend": {
+    "aggregated": "\u805a\u5408",
+    "detail": "\u8be6\u7ec6",
+    "selected": "\u5df2\u9009",
+    "viewport": "\u89c6\u53e3"
+  },
   "empty": {
-    "noProvider": "尚未配置供应商",
-    "goToProviders": "前往配置"
+    "noProvider": "\u5c1a\u672a\u914d\u7f6e\u4f9b\u5e94\u5546",
+    "goToProviders": "\u524d\u5f80\u914d\u7f6e"
   }
 }

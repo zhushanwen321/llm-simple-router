@@ -1,11 +1,24 @@
 {
   "title": "系统设置",
   "retention": {
-    "title": "日志保留策略",
-    "desc": "超过保留天数的日志将被自动清理",
+    "title": "数据保留策略",
+    "desc": "控制请求日志和指标数据的保留时长。超出明细保留期的数据会按 10 分钟桶聚合存储。",
     "daysLabel": "保留天数",
     "integerRequired": "请输入整数",
-    "rangeError": "请输入 {min}-{max} 之间的整数"
+    "rangeError": "请输入 {min}-{max} 之间的整数",
+    "requestLogsCol": "请求日志",
+    "metricsDetailCol": "指标明细",
+    "requestLogsHint": "保存完整请求/响应日志到文件，用于调试和审计，超过保留期自动删除。",
+    "metricsDetailHint": "完整分辨率的指标明细（每次请求的 TTFT、TPS、token 数）。超过此天数的请求会被按 10 分钟桶按 provider+model 聚合。",
+    "metricsExceedsLog": "指标明细天数不能超过请求日志保留天数",
+    "daysUnit": "天",
+    "metricsDetailUnit": "天（明细）",
+    "lifecycle": {
+      "now": "现在",
+      "detailEnd": "{days}d 明细",
+      "totalEnd": "{days}d 总计",
+      "expired": "已过期"
+    }
   },
   "storage": {
     "title": "存储管理",

@@ -296,7 +296,7 @@ import {
 } from "@/api/settings-api";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, Plus, Trash2, Bot, ChevronRight } from "lucide-vue-next";
+import { Loader2, Plus, Trash2, Bot, ChevronRight } from "@lucide/vue";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";

@@ -29,6 +29,27 @@
     "hint": "Click a window to view",
     "noData": "No usage data"
   },
+  "timeSelector": {
+    "quick": {
+      "5h": "5h",
+      "24h": "24h",
+      "7d": "7d",
+      "30d": "30d"
+    },
+    "custom": "Custom",
+    "startDate": "Start date",
+    "endDate": "End date",
+    "apply": "Apply",
+    "hint": "Drag inside selection to move \u00b7 Drag outside to draw \u00b7 Scroll to zoom",
+    "customError": {
+      "format": "Invalid date format (YYYY-MM-DD)",
+      "order": "Start date must be before end date",
+      "tooShort": "Range must be at least 1 day",
+      "tooLong": "Range cannot exceed 90 days",
+      "future": "End date cannot be in the future",
+      "tooOld": "Start date cannot be more than 30 days ago"
+    }
+  },
   "delta": {
     "vsPrev": "vs prev {value}",
     "up": "+{pct}%",
@@ -53,6 +74,12 @@
   "loadDashboardFailed": "Failed to load dashboard data",
   "loadFilterFailed": "Failed to load filter options",
   "loadOutputTokensFailed": "Failed to load provider ranking data",
+  "legend": {
+    "aggregated": "Aggregated",
+    "detail": "Detail",
+    "selected": "Selected",
+    "viewport": "Viewport"
+  },
   "empty": {
     "noProvider": "No providers configured",
     "goToProviders": "Go to Providers"

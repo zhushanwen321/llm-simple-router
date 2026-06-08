@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Settings — Retention Card Redesign</title>
+<style>
+  :root {
+    --bg: oklch(0.145 0 0);
+    --surface: oklch(0.205 0 0);
+    --surface-up: oklch(0.269 0 0);
+    --fg: oklch(0.985 0 0);
+    --muted: oklch(0.708 0 0);
+    --muted-dim: oklch(0.556 0 0);
+    --border: oklch(1 0 0 / 10%);
+    --primary: oklch(0.68 0.13 175);
+    --primary-dim: oklch(0.68 0.13 175 / 15%);
+    --danger: oklch(0.58 0.22 25);
+    --mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+    --sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+  .page { padding: 20px 24px; max-width: 1360px; margin: 0 auto; }
+
+  h2 { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+  .card-header {
+    padding: 14px 20px 0;
+  }
+  .card-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--fg);
+    margin-bottom: 2px;
+  }
+  .card-desc {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+  .card-body {
+    padding: 0 20px 16px;
+  }
+
+  /* === Retention Grid === */
+  .retention-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    align-items: start;
+  }
+  .retention-col {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .retention-col-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* Input group */
+  .input-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .input-group input {
+    width: 72px;
+    height: 32px;
+    background: var(--surface-up);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--fg);
+    font-family: var(--mono);
+    font-size: 13px;
+    text-align: center;
+    outline: none;
+    transition: border-color 150ms;
+  }
+  .input-group input:focus {
+    border-color: var(--primary);
+  }
+  .input-group .suffix {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  /* Hint text */
+  .hint {
+    font-size: 11px;
+    color: var(--muted-dim);
+    line-height: 1.4;
+    min-height: 30px;
+  }
+
+  /* Visual bar */
+  .retention-bar {
+    display: flex;
+    gap: 3px;
+    height: 6px;
+    border-radius: 3px;
+    overflow: hidden;
+    background: var(--surface-up);
+  }
+  .retention-bar .detail-seg {
+    background: var(--primary);
+    border-radius: 3px;
+    transition: flex 300ms;
+  }
+  .retention-bar .agg-seg {
+    background: var(--primary);
+    opacity: 0.35;
+    border-radius: 3px;
+    transition: flex 300ms;
+  }
+  .retention-bar .expired-seg {
+    background: transparent;
+    transition: flex 300ms;
+  }
+
+  /* Data lifecycle label */
+  .lifecycle {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: var(--muted-dim);
+    margin-top: 2px;
+    font-family: var(--mono);
+  }
+  .lifecycle .now-marker { color: var(--primary); font-weight: 500; }
+
+  /* Divider */
+  .col-divider {
+    width: 1px;
+    background: var(--border);
+    align-self: stretch;
+  }
+
+  /* Save button */
+  .save-row {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    margin-top: 12px;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 30px;
+    padding: 0 14px;
+    border: none;
+    border-radius: 6px;
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 150ms;
+  }
+  .btn-primary {
+    background: var(--primary);
+    color: oklch(0.145 0 0);
+  }
+  .btn-primary:hover { filter: brightness(1.1); }
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+  .btn-ghost:hover { background: var(--surface-up); color: var(--fg); }
+
+  /* Validation */
+  .error-text {
+    font-size: 11px;
+    color: var(--danger);
+  }
+
+  /* Toast notification */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--surface-up);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-size: 13px;
+    color: var(--fg);
+    opacity: 0;
+    transform: translateY(8px);
+    transition: all 200ms;
+    pointer-events: none;
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* Responsive */
+  @media (max-width: 600px) {
+    .retention-grid { grid-template-columns: 1fr; }
+    .col-divider { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <h2>Settings</h2>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">Data Retention</div>
+      <div class="card-desc">Control how long request logs and metrics data are retained. Metrics beyond the detail threshold are aggregated into 10-minute buckets.</div>
+    </div>
+    <div class="card-body">
+      <div class="retention-grid">
+        <!-- Left: Log Retention -->
+        <div class="retention-col">
+          <div class="retention-col-title">Request Logs</div>
+          <div class="input-group">
+            <input type="number" id="log-days" value="30" min="1" max="90" />
+            <span class="suffix">days</span>
+          </div>
+          <div class="hint">
+            Complete request/response logs stored in files. Used for debugging and audit.
+            Deleted automatically after retention period.
+          </div>
+        </div>
+
+        <!-- Divider -->
+        <div style="display:flex;">
+          <div class="col-divider"></div>
+        </div>
+
+        <!-- Right: Metrics Retention -->
+        <div class="retention-col">
+          <div class="retention-col-title">Metrics Detail</div>
+          <div class="input-group">
+            <input type="number" id="metrics-days" value="7" min="1" max="30" />
+            <span class="suffix">days detail</span>
+          </div>
+          <div class="hint">
+            <strong id="detail-label">7</strong>d full-resolution metrics (per-request TTFT, TPS, token counts).
+            Beyond this, data is aggregated into 10-minute buckets by provider + model.
+          </div>
+        </div>
+      </div>
+
+      <!-- Visual lifecycle bar -->
+      <div style="margin-top: 16px;">
+        <div class="retention-bar" id="lifecycle-bar">
+          <!-- Filled by JS -->
+        </div>
+        <div class="lifecycle">
+          <span class="now-marker">now</span>
+          <span id="lc-detail-end">7d detail</span>
+          <span id="lc-agg-end">30d aggregated</span>
+          <span>expired</span>
+        </div>
+      </div>
+
+      <div class="save-row">
+        <button class="btn btn-ghost" onclick="resetDefaults()">Reset</button>
+        <button class="btn btn-primary" onclick="save()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reference: current storage card unchanged -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title" style="display:flex;align-items:center;gap:6px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3"/></svg>
+        Storage
+      </div>
+      <div class="card-desc">Monitor database and log file storage usage.</div>
+    </div>
+    <div class="card-body">
+      <div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">
+        (Unchanged from current implementation — see Settings.vue)
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const logInput = document.getElementById('log-days');
+const metricsInput = document.getElementById('metrics-days');
+const detailLabel = document.getElementById('detail-label');
+const bar = document.getElementById('lifecycle-bar');
+const lcDetailEnd = document.getElementById('lc-detail-end');
+const lcAggEnd = document.getElementById('lc-agg-end');
+
+function updateBar() {
+  const logDays = Math.max(1, parseInt(logInput.value) || 30);
+  const metricsDays = Math.max(1, Math.min(parseInt(metricsInput.value) || 7, logDays));
+  detailLabel.textContent = metricsDays;
+
+  // Normalize to logDays = 100%
+  const detailPct = (metricsDays / logDays) * 100;
+  const aggPct = ((logDays - metricsDays) / logDays) * 100;
+
+  bar.innerHTML = `
+    <div class="detail-seg" style="flex:${detailPct}"></div>
+    <div class="agg-seg" style="flex:${aggPct}"></div>
+  `;
+  // Only show 2 segments: detail + aggregated (no expired since we show active range)
+  lcDetailEnd.textContent = `${metricsDays}d detail`;
+  lcAggEnd.textContent = `${logDays}d total`;
+}
+
+logInput.addEventListener('input', updateBar);
+metricsInput.addEventListener('input', updateBar);
+updateBar();
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+function save() {
+  const logDays = parseInt(logInput.value);
+  const metricsDays = parseInt(metricsInput.value);
+  if (metricsDays > logDays) {
+    showToast('Metrics detail days must be ≤ log retention days');
+    return;
+  }
+  if (metricsDays < 1 || logDays < 1) {
+    showToast('Minimum 1 day');
+    return;
+  }
+  showToast(`Saved: logs ${logDays}d, metrics detail ${metricsDays}d`);
+}
+
+function resetDefaults() {
+  logInput.value = 30;
+  metricsInput.value = 7;
+  updateBar();
+  showToast('Reset to defaults');
+}
+</script>
+</body>
+</html>

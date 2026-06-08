@@ -198,13 +198,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import {
-  CheckIcon,
-  CopyIcon,
-  FileJson,
-  FileText,
-  Sparkles,
-} from "lucide-vue-next";
+import { CheckIcon, CopyIcon, FileJson, FileText, Sparkles } from "@lucide/vue";
 import { useClipboard } from "@/composables/useClipboard";
 import { api, getApiMessage } from "@/api/client";
 import AiRulePreviewDialog from "./AiRulePreviewDialog.vue";

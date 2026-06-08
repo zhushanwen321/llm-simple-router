@@ -39,6 +39,7 @@ import { UsageWindowTracker } from "./proxy/routing/usage-window-tracker.js";
 import { SessionTracker, DEFAULT_LOOP_PREVENTION_CONFIG } from "./core/loop-prevention/index.js";
 import { scheduleLogCleanup } from "./db/log-cleaner.js";
 import { scheduleDbSizeMonitor } from "./db/db-size-monitor.js";
+import { scheduleMetricsAggregator } from "./db/metrics-aggregator.js";
 import { startUpgradeChecker, stopUpgradeChecker } from "./admin/upgrade.js";
 import { CheckerOptions } from "./upgrade/checker.js";
 import fastifyStatic from "@fastify/static";
@@ -409,6 +410,8 @@ export async function buildApp(
 
   const logCleanup = scheduleLogCleanup(db, app.log);
 
+  const metricsAggregator = scheduleMetricsAggregator(db, app.log);
+
   const dbSizeMonitor = scheduleDbSizeMonitor(db, config.DB_PATH, {
     log: app.log,
   });
@@ -419,6 +422,7 @@ export async function buildApp(
     closed = true;
     stopUpgradeChecker();
     logCleanup.stop();
+    metricsAggregator.stop();
     dbSizeMonitor.stop();
     tracker.stopPushInterval();
     // 关闭所有 SSE 长连接，防止 app.close() 因 hijack 的连接无限等待

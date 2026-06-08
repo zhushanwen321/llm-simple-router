@@ -388,7 +388,7 @@ import {
   Globe,
   CalendarClock,
   Wand2,
-} from "lucide-vue-next";
+} from "@lucide/vue";
 import { api, getApiMessage } from "@/api/client";
 import {
   getUpgradeStatus,

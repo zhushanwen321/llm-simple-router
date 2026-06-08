@@ -1,0 +1,1427 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Timeline Zoom Demo — Dashboard Time Selector v4</title>
+<style>
+  :root {
+    --bg: oklch(0.145 0 0);
+    --surface: oklch(0.205 0 0);
+    --surface-up: oklch(0.269 0 0);
+    --surface-hover: oklch(0.238 0 0);
+    --fg: oklch(0.985 0 0);
+    --muted: oklch(0.708 0 0);
+    --muted-dim: oklch(0.556 0 0);
+    --border: oklch(1 0 0 / 10%);
+    --primary: oklch(0.68 0.13 175);
+    --primary-dim: oklch(0.68 0.13 175 / 15%);
+    --primary-text: oklch(0.145 0 0);
+    --success: oklch(0.65 0.17 150);
+    --danger: oklch(0.58 0.22 25);
+    --mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+    --sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+  .page { padding: 20px 24px; max-width: 1200px; margin: 0 auto; }
+
+  /* ===== Section ===== */
+  .section-title {
+    font-size: 13px; font-weight: 600; color: var(--muted);
+    margin: 32px 0 12px; padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--mono); letter-spacing: 0.04em;
+  }
+  .section-title:first-child { margin-top: 0; }
+  .hint-block {
+    background: var(--surface); border-radius: 8px; padding: 12px 16px;
+    border: 1px solid var(--border); margin-bottom: 16px;
+    font-size: 12px; color: var(--muted); line-height: 1.7;
+  }
+  .hint-block kbd {
+    display: inline-block; padding: 1px 5px; border-radius: 3px;
+    background: var(--surface-up); border: 1px solid var(--border);
+    font-family: var(--mono); font-size: 10px; color: var(--fg);
+  }
+
+  /* ===== Zone: Time Range Selector ===== */
+  .zone-time {
+    background: var(--surface); border-radius: 10px;
+    padding: 14px 18px;
+    box-shadow: 0 0 0 1px var(--border);
+    margin-bottom: 14px;
+  }
+
+  /* --- Header row --- */
+  .time-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 10px; gap: 12px;
+  }
+  .time-header-left {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .time-label {
+    font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--fg);
+  }
+
+  /* Zoom level badge */
+  .zoom-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 4px;
+    background: var(--surface-up); border: 1px solid var(--border);
+    font-family: var(--mono); font-size: 10px; color: var(--muted);
+    letter-spacing: 0.03em; transition: all 150ms;
+  }
+  .zoom-badge.zoomed { border-color: var(--primary); color: var(--primary); }
+
+  /* Legend */
+  .time-legend {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 10px; color: var(--muted); font-family: var(--mono);
+  }
+  .legend-item { display: inline-flex; align-items: center; gap: 3px; }
+  .legend-swatch { width: 10px; height: 6px; border-radius: 1.5px; }
+  .legend-swatch.bar { background: var(--primary); opacity: 0.7; }
+  .legend-swatch.agg {
+    background: repeating-linear-gradient(-45deg,
+      oklch(0.68 0.13 175 / 0.12), oklch(0.68 0.13 175 / 0.12) 1.5px,
+      transparent 1.5px, transparent 4px);
+    border: 1px solid var(--border);
+  }
+  .legend-swatch.selected {
+    background: var(--primary-dim); border: 1.5px solid var(--primary);
+  }
+  .legend-swatch.viewport {
+    background: var(--primary); opacity: 0.3; border: 1px solid var(--primary);
+  }
+
+  .time-hint {
+    font-size: 11px; color: var(--muted); white-space: nowrap;
+  }
+
+  /* --- Quick ranges --- */
+  .quick-ranges {
+    display: flex; gap: 2px; margin-bottom: 12px;
+    background: var(--surface-up); border-radius: 7px; padding: 3px;
+  }
+  .quick-range-btn {
+    flex: 1; height: 28px; border: none; border-radius: 5px;
+    background: transparent; color: var(--muted);
+    font-family: var(--mono); font-size: 12px; font-weight: 500;
+    cursor: pointer; transition: all 150ms;
+  }
+  .quick-range-btn:hover { color: var(--fg); background: var(--surface-hover); }
+  .quick-range-btn.active {
+    background: var(--primary); color: var(--primary-text);
+    box-shadow: 0 1px 4px oklch(0 0 0 / 0.25);
+  }
+  .quick-range-btn svg { vertical-align: -1px; margin-right: 2px; }
+
+  /* --- Timeline container --- */
+  .timeline-container { position: relative; }
+
+  /* --- Mini-map (overview strip) --- */
+  .minimap {
+    position: relative; height: 20px; margin-bottom: 6px;
+    background: var(--surface-up); border-radius: 3px;
+    overflow: hidden; cursor: pointer; opacity: 0.7;
+    transition: opacity 150ms;
+  }
+  .minimap:hover { opacity: 1; }
+  .minimap-bar {
+    position: absolute; bottom: 0; border-radius: 1px 1px 0 0;
+    background: var(--primary); opacity: 0.35;
+  }
+  .minimap-viewport {
+    position: absolute; top: 0; bottom: 0;
+    border: 1.5px solid var(--primary); background: var(--primary-dim);
+    border-radius: 2px; pointer-events: none;
+    transition: left 100ms ease-out, width 100ms ease-out;
+  }
+  .minimap-selection {
+    position: absolute; top: 0; bottom: 0;
+    border: 1px solid oklch(0.68 0.13 175 / 0.5);
+    background: oklch(0.68 0.13 175 / 0.08);
+    pointer-events: none;
+  }
+
+  /* --- Main timeline track --- */
+  .timeline-wrapper { position: relative; margin: 0 2px; }
+  .timeline-track {
+    position: relative; height: 56px;
+    background: var(--surface-up); border-radius: 5px;
+    overflow: hidden; cursor: crosshair; user-select: none;
+  }
+  .timeline-track.panning { cursor: grabbing; }
+  .timeline-track.handle-hover { cursor: ew-resize; }
+
+  /* Aggregation zone */
+  .agg-zone {
+    position: absolute; top: 0; bottom: 0; pointer-events: none;
+    background: repeating-linear-gradient(-45deg,
+      oklch(0.68 0.13 175 / 0.05), oklch(0.68 0.13 175 / 0.05) 2px,
+      transparent 2px, transparent 6px);
+  }
+  .agg-label-inline {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    font-size: 8px; font-family: var(--mono); letter-spacing: 0.08em;
+    color: var(--muted-dim); text-transform: uppercase; pointer-events: none;
+  }
+
+  /* Activity bars */
+  .act-bar {
+    position: absolute; bottom: 0; border-radius: 2px 2px 0 0;
+    background: var(--primary); will-change: opacity;
+  }
+  .timeline-track:hover .act-bar { opacity: 0.2; }
+  .timeline-track:hover .act-bar.highlighted { opacity: 0.85; }
+  .timeline-track.panning .act-bar { opacity: 0.15; }
+  .timeline-track.panning .act-bar.highlighted { opacity: 0.6; }
+
+  /* Selection overlay */
+  .selection-overlay {
+    position: absolute; top: 0; bottom: 0; border-radius: 4px;
+    border: 2px solid var(--primary); background: var(--primary-dim);
+    cursor: grab;
+    pointer-events: auto;
+    transition: left 180ms ease-out, width 180ms ease-out;
+  }
+  .selection-overlay.smooth { transition: left 180ms ease-out, width 180ms ease-out; }
+  .selection-overlay.no-transition { transition: none; }
+  .selection-overlay.drawing {
+    border-style: dashed;
+    background: oklch(0.68 0.13 175 / 0.12);
+  }
+  .selection-overlay.moving {
+    border-color: oklch(0.68 0.13 175 / 0.8);
+    background: oklch(0.68 0.13 175 / 0.2);
+    cursor: grabbing;
+  }
+
+  /* Live time label while drawing */
+  .draw-label {
+    position: absolute; top: -22px; padding: 1px 6px;
+    background: var(--primary); color: var(--primary-text);
+    border-radius: 3px; font-family: var(--mono); font-size: 9px;
+    pointer-events: none; white-space: nowrap;
+    transform: translateX(-50%);
+    display: none;
+  }
+  .draw-label.visible { display: block; }
+  .draw-label::after {
+    content: ''; position: absolute; top: 100%; left: 50%;
+    transform: translateX(-50%);
+    border: 3px solid transparent;
+    border-top-color: var(--primary);
+  }
+
+  /* Drag handles */
+  .sel-handle {
+    position: absolute; top: 50%; width: 8px; height: 24px;
+    border-radius: 3px; background: var(--primary);
+    transform: translateY(-50%); pointer-events: auto; cursor: ew-resize;
+    box-shadow: 0 1px 4px oklch(0 0 0 / 0.3);
+    transition: transform 100ms, box-shadow 100ms, width 100ms;
+  }
+  .sel-handle:hover, .sel-handle:active {
+    transform: translateY(-50%) scaleY(1.15);
+    box-shadow: 0 2px 8px oklch(0.68 0.13 175 / 0.4);
+    width: 10px;
+  }
+  .sel-handle.left { left: -4px; }
+  .sel-handle.right { right: -4px; }
+
+  /* Tick labels */
+  .timeline-ticks { position: relative; height: 18px; margin-top: 3px; }
+  .tick-label {
+    position: absolute; font-size: 9px; color: var(--muted-dim);
+    font-family: var(--mono); transform: translateX(-50%); white-space: nowrap;
+    transition: opacity 100ms;
+  }
+  .tick-label.now { color: var(--primary); font-weight: 600; }
+  .tick-label.hidden { opacity: 0; }
+
+  /* Tooltip */
+  .timeline-tooltip {
+    position: absolute; top: -32px; padding: 3px 8px;
+    background: var(--surface-up); border: 1px solid var(--border);
+    border-radius: 4px; font-family: var(--mono); font-size: 10px;
+    color: var(--fg); pointer-events: none; white-space: nowrap;
+    opacity: 0; transition: opacity 100ms; z-index: 10;
+  }
+  .timeline-tooltip.visible { opacity: 1; }
+
+  /* Reset zoom button */
+  .zoom-reset {
+    position: absolute; top: 4px; right: 4px;
+    width: 22px; height: 22px; border-radius: 4px;
+    background: var(--surface-up); border: 1px solid var(--border);
+    color: var(--muted); cursor: pointer; font-size: 12px;
+    display: none; align-items: center; justify-content: center;
+    z-index: 5; transition: all 100ms;
+  }
+  .zoom-reset:hover { border-color: var(--primary); color: var(--primary); }
+  .zoom-reset.visible { display: flex; }
+
+  /* --- Custom date picker --- */
+  .custom-range-panel {
+    display: none; margin-top: 10px; padding: 12px;
+    background: var(--surface-up); border-radius: 8px;
+    border: 1px solid var(--border);
+    animation: slideDown 180ms ease-out;
+  }
+  .custom-range-panel.show { display: block; }
+  @keyframes slideDown {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .custom-row {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+  .date-field { display: flex; align-items: center; gap: 6px; }
+  .date-field-label { font-size: 11px; font-weight: 500; color: var(--muted); min-width: 28px; }
+  .date-btn {
+    display: inline-flex; align-items: center; gap: 4px;
+    height: 30px; padding: 0 10px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 5px;
+    color: var(--fg); font-family: var(--mono); font-size: 12px;
+    cursor: pointer; transition: border-color 150ms, background 150ms;
+  }
+  .date-btn:hover { border-color: var(--primary); background: var(--surface-hover); }
+  .date-btn svg { opacity: 0.5; }
+  .date-btn .chevron { margin-left: 2px; }
+  .date-sep { color: var(--muted-dim); font-size: 14px; }
+  .date-apply-btn {
+    height: 30px; padding: 0 14px; background: var(--primary);
+    color: var(--primary-text); border: none; border-radius: 5px;
+    font-family: var(--sans); font-size: 12px; font-weight: 500;
+    cursor: pointer; margin-left: auto; transition: filter 150ms;
+  }
+  .date-apply-btn:hover { filter: brightness(1.1); }
+  .date-error {
+    width: 100%; margin-top: 6px; font-size: 11px;
+    color: var(--danger); font-family: var(--mono); display: none;
+  }
+  .date-error.show { display: block; }
+
+  /* Calendar popover */
+  .calendar-popover {
+    position: absolute; z-index: 60; background: var(--surface-up);
+    border: 1px solid var(--border); border-radius: 8px; padding: 10px;
+    box-shadow: 0 10px 30px oklch(0 0 0 / 0.4); display: none;
+  }
+  .calendar-popover.show { display: block; }
+
+  /* Time row inside calendar */
+  .cal-time-row {
+    display: flex; align-items: center; gap: 6px;
+    margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border);
+  }
+  .cal-time-label {
+    font-size: 10px; color: var(--muted); font-family: var(--mono);
+    font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .cal-time-input {
+    width: 44px; height: 26px; padding: 0 4px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 4px; color: var(--fg); font-family: var(--mono);
+    font-size: 12px; text-align: center; outline: none;
+    transition: border-color 150ms;
+  }
+  .cal-time-input:focus { border-color: var(--primary); }
+  .cal-time-sep {
+    color: var(--muted-dim); font-size: 14px; font-weight: 600;
+  }
+  .cal-time-confirm {
+    margin-left: auto; height: 26px; padding: 0 10px;
+    background: var(--primary); color: var(--primary-text);
+    border: none; border-radius: 4px; font-family: var(--sans);
+    font-size: 11px; font-weight: 500; cursor: pointer;
+    transition: filter 150ms;
+  }
+  .cal-time-confirm:hover { filter: brightness(1.1); }
+  .cal-header {
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;
+  }
+  .cal-title { font-size: 12px; font-weight: 600; color: var(--fg); font-family: var(--mono); }
+  .cal-nav {
+    width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
+    background: none; border: 1px solid var(--border); border-radius: 4px;
+    color: var(--muted); cursor: pointer;
+  }
+  .cal-nav:hover { color: var(--fg); border-color: var(--primary); }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 32px); gap: 2px; text-align: center; }
+  .cal-day-header { font-size: 9px; color: var(--muted-dim); font-weight: 600; padding: 2px 0; }
+  .cal-day {
+    width: 30px; height: 28px; display: flex; align-items: center; justify-content: center;
+    border-radius: 4px; font-size: 11px; color: var(--muted);
+    cursor: pointer; border: none; background: none;
+    font-family: var(--mono); transition: all 100ms;
+  }
+  .cal-day:hover { background: var(--surface-hover); color: var(--fg); }
+  .cal-day.today { color: var(--primary); font-weight: 600; }
+  .cal-day.selected { background: var(--primary); color: var(--primary-text); font-weight: 600; }
+  .cal-day.disabled { opacity: 0.3; cursor: default; }
+  .cal-day.disabled:hover { background: none; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="section-title">Timeline with Zoom + Pan</div>
+
+  <div class="hint-block">
+    <strong style="color:var(--fg);">Interaction guide</strong><br>
+    <kbd>Drag inside selection</kbd> Move selection left/right
+    &nbsp;&middot;&nbsp;
+    <kbd>Drag outside selection</kbd> Draw new selection
+    &nbsp;&middot;&nbsp;
+    <kbd>Drag handles</kbd> Resize selection edges
+    &nbsp;&middot;&nbsp;
+    <kbd>Scroll</kbd> Zoom in/out
+    &nbsp;&middot;&nbsp;
+    <kbd>Shift+Drag</kbd> Pan when zoomed
+    &nbsp;&middot;&nbsp;
+    <kbd>Click minimap</kbd> Jump viewport
+    <br>
+    Granularity auto-switches: <strong>daily</strong> (full view) &rarr; <strong>6h</strong> (~14 days) &rarr; <strong>hourly</strong> (~3 days) &rarr; <strong>15min</strong> (&lt;1 day)
+  </div>
+
+  <!-- ===== Time Range Selector ===== -->
+  <div class="zone-time" id="zone-time">
+    <div class="time-header">
+      <div class="time-header-left">
+        <span class="time-label" id="range-label">Jun 1 14:00 ~ Jun 8 14:00</span>
+        <span class="zoom-badge" id="zoom-badge">30d &middot; daily</span>
+        <span class="time-legend">
+          <span class="legend-item"><span class="legend-swatch agg"></span> agg.</span>
+          <span class="legend-item"><span class="legend-swatch bar"></span> detail</span>
+          <span class="legend-item"><span class="legend-swatch selected"></span> selected</span>
+          <span class="legend-item"><span class="legend-swatch viewport"></span> viewport</span>
+        </span>
+      </div>
+      <span class="time-hint">Drag inside selection to move · Drag outside to draw · Scroll to zoom</span>
+    </div>
+
+    <div class="quick-ranges">
+      <button class="quick-range-btn" data-hours="5">5h</button>
+      <button class="quick-range-btn" data-hours="24">24h</button>
+      <button class="quick-range-btn active" data-hours="168">7d</button>
+      <button class="quick-range-btn" data-hours="720">30d</button>
+      <button class="quick-range-btn" id="custom-toggle">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        Custom
+      </button>
+    </div>
+
+    <div class="custom-range-panel" id="custom-panel">
+      <div class="custom-row">
+        <div class="date-field">
+          <span class="date-field-label">From</span>
+          <button class="date-btn" id="start-cal-btn">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <span id="start-display">2026-06-01 00:00</span>
+            <svg class="chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+        </div>
+        <span class="date-sep">~</span>
+        <div class="date-field">
+          <span class="date-field-label">To</span>
+          <button class="date-btn" id="end-cal-btn">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <span id="end-display">2026-06-08 23:59</span>
+            <svg class="chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+        </div>
+        <button class="date-apply-btn" id="apply-btn">Apply</button>
+      </div>
+      <div class="date-error" id="date-error"></div>
+    </div>
+
+    <div class="timeline-container">
+      <!-- Mini-map overview -->
+      <div class="minimap" id="minimap">
+        <div class="minimap-selection" id="minimap-sel"></div>
+        <div class="minimap-viewport" id="minimap-vp"></div>
+      </div>
+
+      <!-- Main timeline -->
+      <div class="timeline-wrapper">
+        <div class="timeline-tooltip" id="tooltip"></div>
+        <div class="timeline-track" id="timeline-track">
+          <div class="agg-zone" id="agg-zone"></div>
+          <div class="agg-label-inline" id="agg-label">DAILY AGGREGATED</div>
+          <button class="zoom-reset" id="zoom-reset" title="Reset zoom">&times;</button>
+          <div class="selection-overlay smooth" id="selection">
+            <div class="sel-handle left" data-handle="left"></div>
+            <div class="sel-body" id="sel-body"></div>
+            <div class="sel-handle right" data-handle="right"></div>
+            <div class="draw-label" id="draw-label"></div>
+          </div>
+        </div>
+        <div class="timeline-ticks" id="ticks"></div>
+      </div>
+    </div>
+
+    <!-- Calendar popovers -->
+    <div class="calendar-popover" id="cal-start">
+      <div class="cal-header">
+        <button class="cal-nav" id="cal-start-prev"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
+        <span class="cal-title" id="cal-start-title"></span>
+        <button class="cal-nav" id="cal-start-next"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></button>
+      </div>
+      <div class="cal-grid" id="cal-start-grid"></div>
+      <div class="cal-time-row">
+        <span class="cal-time-label">Time</span>
+        <input class="cal-time-input" type="text" id="cal-start-hour" maxlength="2" placeholder="HH">
+        <span class="cal-time-sep">:</span>
+        <input class="cal-time-input" type="text" id="cal-start-min" maxlength="2" placeholder="MM">
+        <button class="cal-time-confirm" id="cal-start-ok">OK</button>
+      </div>
+    </div>
+    <div class="calendar-popover" id="cal-end">
+      <div class="cal-header">
+        <button class="cal-nav" id="cal-end-prev"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
+        <span class="cal-title" id="cal-end-title"></span>
+        <button class="cal-nav" id="cal-end-next"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></button>
+      </div>
+      <div class="cal-grid" id="cal-end-grid"></div>
+      <div class="cal-time-row">
+        <span class="cal-time-label">Time</span>
+        <input class="cal-time-input" type="text" id="cal-end-hour" maxlength="2" placeholder="HH">
+        <span class="cal-time-sep">:</span>
+        <input class="cal-time-input" type="text" id="cal-end-min" maxlength="2" placeholder="MM">
+        <button class="cal-time-confirm" id="cal-end-ok">OK</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ===== Constants =====
+const TOTAL_RANGE_DAYS = 30;
+const DETAIL_DAYS = 7;
+const NOW = new Date('2026-06-08T14:00:00');
+const RANGE_START = new Date(NOW.getTime() - TOTAL_RANGE_DAYS * 86400000);
+const RANGE_MS = TOTAL_RANGE_DAYS * 86400000;
+const DAY_MS = 86400000;
+const HOUR_MS = 3600000;
+const TRACK_HEIGHT = 56;
+
+// Zoom limits
+const MIN_VIEW_DAYS = 0.25;   // 6 hours — max zoom in
+const MAX_VIEW_DAYS = 30;     // full range — max zoom out
+const ZOOM_FACTOR = 1.35;     // per scroll tick
+
+// Granularity thresholds (visible days → bucket hours)
+const GRANULARITY_LEVELS = [
+  { maxDays: 30,  hours: 24,  label: 'daily'  },
+  { maxDays: 14,  hours: 6,   label: '6h'     },
+  { maxDays: 3,   hours: 1,   label: 'hourly' },
+  { maxDays: 0,   hours: 0.25, label: '15min'  },
+];
+
+// ===== State =====
+// Viewport: what portion of the 30-day range is visible
+let viewStartMs = RANGE_START.getTime();
+let viewEndMs = NOW.getTime();
+
+// Selection: user's chosen time range
+let selStart = new Date(NOW.getTime() - 7 * DAY_MS);
+let selEnd = new Date(NOW);
+let customStart = new Date(selStart);
+let customEnd = new Date(selEnd);
+
+// Interaction
+let dragging = null; // 'left' | 'right' | 'pan' | null
+let panAnchorX = 0;
+let panAnchorViewStart = 0;
+let panAnchorViewEnd = 0;
+
+// ===== DOM =====
+const track = document.getElementById('timeline-track');
+const selOverlay = document.getElementById('selection');
+const rangeLabel = document.getElementById('range-label');
+const tooltip = document.getElementById('tooltip');
+const aggZone = document.getElementById('agg-zone');
+const aggLabel = document.getElementById('agg-label');
+const ticksEl = document.getElementById('ticks');
+const zoomBadge = document.getElementById('zoom-badge');
+const zoomResetBtn = document.getElementById('zoom-reset');
+const minimap = document.getElementById('minimap');
+const minimapVp = document.getElementById('minimap-vp');
+const minimapSel = document.getElementById('minimap-sel');
+const drawLabel = document.getElementById('draw-label');
+
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function pad(n) { return String(n).padStart(2, '0'); }
+function fmtDate(d) {
+  return `${MONTHS[d.getMonth()]} ${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function fmtDateFull(d) {
+  return `${MONTHS[d.getMonth()]} ${d.getDate()}, ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+// ===== Generate dense activity data (per hour, 720 buckets) =====
+function generateHourlyData() {
+  const data = [];
+  const totalHours = TOTAL_RANGE_DAYS * 24;
+  for (let i = 0; i < totalHours; i++) {
+    const date = new Date(RANGE_START.getTime() + i * HOUR_MS);
+    const hour = date.getHours();
+    const dow = date.getDay();
+    const isWork = hour >= 9 && hour < 19;
+    const isWkday = dow >= 1 && dow <= 5;
+    let intensity = Math.random();
+    if (isWork && isWkday) intensity = 0.3 + Math.random() * 0.7;
+    else if (isWork || isWkday) intensity = 0.05 + Math.random() * 0.2;
+    else intensity = Math.random() * 0.1;
+    data.push({ time: date.getTime(), intensity });
+  }
+  return data;
+}
+const hourlyData = generateHourlyData();
+
+// ===== Granularity selection =====
+function getViewDays() {
+  return (viewEndMs - viewStartMs) / DAY_MS;
+}
+
+function getGranularity() {
+  const days = getViewDays();
+  for (const g of GRANULARITY_LEVELS) {
+    if (days > g.maxDays || g.maxDays === 0) return g;
+  }
+  return GRANULARITY_LEVELS[0];
+}
+
+// ===== Aggregate data to current granularity =====
+function aggregateToBuckets() {
+  const g = getGranularity();
+  const bucketMs = g.hours * HOUR_MS;
+  const buckets = [];
+
+  // Find first bucket start >= viewStartMs
+  let t = Math.floor(viewStartMs / bucketMs) * bucketMs;
+  // But don't go before RANGE_START
+  t = Math.max(t, RANGE_START.getTime());
+
+  while (t < viewEndMs) {
+    const end = Math.min(t + bucketMs, viewEndMs);
+    let sumIntensity = 0;
+    let count = 0;
+    for (const d of hourlyData) {
+      if (d.time >= t && d.time < end) {
+        sumIntensity += d.intensity;
+        count++;
+      }
+    }
+    buckets.push({
+      time: t,
+      endTime: end,
+      intensity: count > 0 ? sumIntensity / count : 0,
+      count: Math.round((count > 0 ? sumIntensity / count : 0) * 500),
+    });
+    t = end;
+  }
+  return buckets;
+}
+
+// ===== Render everything =====
+function render() {
+  const g = getGranularity();
+  const buckets = aggregateToBuckets();
+  const viewDays = getViewDays();
+  const viewMs = viewEndMs - viewStartMs;
+  const isZoomed = viewDays < MAX_VIEW_DAYS - 0.5;
+
+  // --- Zoom badge ---
+  const daysLabel = viewDays >= 1 ? `${viewDays.toFixed(1)}d` : `${(viewDays * 24).toFixed(0)}h`;
+  zoomBadge.textContent = `${daysLabel} · ${g.label}`;
+  zoomBadge.classList.toggle('zoomed', isZoomed);
+
+  // --- Reset button ---
+  zoomResetBtn.classList.toggle('visible', isZoomed);
+
+  // --- Range label ---
+  rangeLabel.textContent = `${fmtDate(new Date(selStart.getTime()))} ~ ${fmtDate(new Date(selEnd.getTime()))}`;
+
+  // --- Clear old bars ---
+  track.querySelectorAll('.act-bar').forEach(el => el.remove());
+
+  // --- Render bars ---
+  const trackWidth = track.getBoundingClientRect().width;
+  if (buckets.length === 0 || trackWidth === 0) return;
+
+  const barGap = Math.max(0.5, Math.min(2, trackWidth / buckets.length * 0.12));
+  const barWidth = Math.max(2, (trackWidth - barGap * (buckets.length - 1)) / buckets.length);
+  const maxIntensity = Math.max(0.01, ...buckets.map(b => b.intensity));
+
+  const selStartPct = (selStart.getTime() - viewStartMs) / viewMs;
+  const selEndPct = (selEnd.getTime() - viewStartMs) / viewMs;
+
+  buckets.forEach((b, i) => {
+    const el = document.createElement('div');
+    el.className = 'act-bar';
+    const height = (b.intensity / maxIntensity) * (TRACK_HEIGHT - 6) + 3;
+    const left = i * (barWidth + barGap);
+    const bStartPct = (b.time - viewStartMs) / viewMs;
+    const bEndPct = (b.endTime - viewStartMs) / viewMs;
+    const highlighted = bStartPct >= selStartPct - 0.001 && bEndPct <= selEndPct + 0.001;
+
+    el.style.cssText = `
+      left: ${left}px; width: ${barWidth}px; height: ${height}px;
+      opacity: ${highlighted ? 0.85 : 0.25};
+    `;
+    el.dataset.index = i;
+    track.insertBefore(el, selOverlay);
+  });
+
+  // --- Selection overlay ---
+  const selLeft = Math.max(0, selStartPct) * 100;
+  const selRight = Math.min(1, selEndPct) * 100;
+  selOverlay.style.left = selLeft + '%';
+  selOverlay.style.width = Math.max(0, selRight - selLeft) + '%';
+  selOverlay.style.display = (selRight <= 0 || selLeft >= 100) ? 'none' : '';
+
+  // --- Aggregation zone ---
+  const detailStartMs = NOW.getTime() - DETAIL_DAYS * DAY_MS;
+  const aggStartPct = Math.max(0, (RANGE_START.getTime() - viewStartMs) / viewMs);
+  const aggEndPct = (detailStartMs - viewStartMs) / viewMs;
+  if (aggEndPct > aggStartPct + 0.02) {
+    aggZone.style.left = (aggStartPct * 100) + '%';
+    aggZone.style.width = ((aggEndPct - aggStartPct) * 100) + '%';
+    aggZone.style.display = '';
+    aggLabel.style.left = ((aggStartPct + aggEndPct) / 2 * 100) + '%';
+    aggLabel.style.display = aggEndPct - aggStartPct > 0.08 ? '' : 'none';
+  } else {
+    aggZone.style.display = 'none';
+    aggLabel.style.display = 'none';
+  }
+
+  // --- Ticks ---
+  renderTicks(viewMs, g);
+
+  // --- Mini-map ---
+  renderMinimap();
+}
+
+// ===== Ticks =====
+function renderTicks(viewMs, g) {
+  ticksEl.innerHTML = '';
+  const viewDays = viewMs / DAY_MS;
+
+  // Adaptive tick interval
+  let tickIntervalMs;
+  if (viewDays > 20) tickIntervalMs = 3 * DAY_MS;
+  else if (viewDays > 10) tickIntervalMs = DAY_MS;
+  else if (viewDays > 3) tickIntervalMs = 12 * HOUR_MS;
+  else if (viewDays > 1) tickIntervalMs = 6 * HOUR_MS;
+  else tickIntervalMs = HOUR_MS;
+
+  const trackWidth = track.getBoundingClientRect().width;
+  const minTickPx = 40;
+  if (tickIntervalMs / viewMs * trackWidth < minTickPx) {
+    tickIntervalMs *= 2;
+  }
+
+  let t = Math.ceil(viewStartMs / tickIntervalMs) * tickIntervalMs;
+  while (t < viewEndMs) {
+    const pct = (t - viewStartMs) / viewMs * 100;
+    if (pct >= -0.5 && pct <= 100.5) {
+      const date = new Date(t);
+      const isNow = Math.abs(t - NOW.getTime()) < tickIntervalMs / 2;
+      const span = document.createElement('span');
+      span.className = 'tick-label' + (isNow ? ' now' : '');
+
+      let label;
+      if (viewDays > 10) {
+        label = isNow ? 'now' : `${MONTHS[date.getMonth()]}/${date.getDate()}`;
+      } else if (viewDays > 1) {
+        label = isNow ? 'now' : `${date.getDate()}日 ${pad(date.getHours())}:00`;
+      } else {
+        label = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+      }
+
+      span.style.left = pct + '%';
+      span.textContent = label;
+      ticksEl.appendChild(span);
+    }
+    t += tickIntervalMs;
+  }
+
+  // "now" marker if not already added
+  if (NOW.getTime() >= viewStartMs && NOW.getTime() <= viewEndMs) {
+    const nowPct = (NOW.getTime() - viewStartMs) / viewMs * 100;
+    if (!ticksEl.querySelector('.now')) {
+      const span = document.createElement('span');
+      span.className = 'tick-label now';
+      span.style.left = nowPct + '%';
+      span.textContent = 'now';
+      ticksEl.appendChild(span);
+    }
+  }
+}
+
+// ===== Mini-map =====
+function renderMinimap() {
+  // Render mini bars (sparse, always daily)
+  minimap.querySelectorAll('.minimap-bar').forEach(el => el.remove());
+
+  const mmWidth = minimap.getBoundingClientRect().width;
+  const dailyMs = DAY_MS;
+  for (let t = RANGE_START.getTime(); t < NOW.getTime(); t += dailyMs) {
+    const end = Math.min(t + dailyMs, NOW.getTime());
+    let sum = 0, count = 0;
+    for (const d of hourlyData) {
+      if (d.time >= t && d.time < end) { sum += d.intensity; count++; }
+    }
+    const intensity = count > 0 ? sum / count : 0;
+    const el = document.createElement('div');
+    el.className = 'minimap-bar';
+    const pct = (t - RANGE_START.getTime()) / RANGE_MS * 100;
+    const widthPct = dailyMs / RANGE_MS * 100;
+    el.style.cssText = `left:${pct}%;width:${widthPct}%;height:${3 + intensity * 15}px;`;
+    minimap.insertBefore(el, minimapVp);
+  }
+
+  // Viewport indicator
+  const vpLeft = (viewStartMs - RANGE_START.getTime()) / RANGE_MS * 100;
+  const vpWidth = (viewEndMs - viewStartMs) / RANGE_MS * 100;
+  minimapVp.style.left = vpLeft + '%';
+  minimapVp.style.width = vpWidth + '%';
+
+  // Selection indicator
+  const selLeft = (selStart.getTime() - RANGE_START.getTime()) / RANGE_MS * 100;
+  const selWidth = (selEnd.getTime() - selStart.getTime()) / RANGE_MS * 100;
+  minimapSel.style.left = selLeft + '%';
+  minimapSel.style.width = selWidth + '%';
+}
+
+// ===== Zoom =====
+function zoom(deltaFactor, centerMs) {
+  const viewMs = viewEndMs - viewStartMs;
+  let newViewMs = viewMs * deltaFactor;
+
+  // Clamp
+  const minMs = MIN_VIEW_DAYS * DAY_MS;
+  const maxMs = MAX_VIEW_DAYS * DAY_MS;
+  newViewMs = Math.max(minMs, Math.min(maxMs, newViewMs));
+
+  // Center on cursor
+  const centerRatio = (centerMs - viewStartMs) / viewMs;
+  let newStart = centerMs - centerRatio * newViewMs;
+  let newEnd = newStart + newViewMs;
+
+  // Clamp to bounds
+  if (newStart < RANGE_START.getTime()) {
+    newEnd += RANGE_START.getTime() - newStart;
+    newStart = RANGE_START.getTime();
+  }
+  if (newEnd > NOW.getTime()) {
+    newStart -= newEnd - NOW.getTime();
+    newEnd = NOW.getTime();
+  }
+  newStart = Math.max(RANGE_START.getTime(), newStart);
+  newEnd = Math.min(NOW.getTime(), newEnd);
+
+  viewStartMs = newStart;
+  viewEndMs = newEnd;
+  render();
+}
+
+function resetZoom() {
+  viewStartMs = RANGE_START.getTime();
+  viewEndMs = NOW.getTime();
+  render();
+}
+
+// Wheel zoom
+track.addEventListener('wheel', e => {
+  e.preventDefault();
+  const rect = track.getBoundingClientRect();
+  const cursorPct = (e.clientX - rect.left) / rect.width;
+  const cursorMs = viewStartMs + cursorPct * (viewEndMs - viewStartMs);
+  const factor = e.deltaY > 0 ? 1 / ZOOM_FACTOR : ZOOM_FACTOR;
+  zoom(factor, cursorMs);
+}, { passive: false });
+
+// Reset button
+zoomResetBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  resetZoom();
+});
+
+// ===== Pan =====
+function startPan(e) {
+  dragging = 'pan';
+  panAnchorX = e.clientX;
+  panAnchorViewStart = viewStartMs;
+  panAnchorViewEnd = viewEndMs;
+  track.classList.add('panning');
+  selOverlay.classList.remove('smooth');
+}
+
+function movePan(e) {
+  const rect = track.getBoundingClientRect();
+  const dx = e.clientX - panAnchorX;
+  const viewMs = panAnchorViewEnd - panAnchorViewStart;
+  const msPerPx = viewMs / rect.width;
+  const dMs = -dx * msPerPx;
+
+  let newStart = panAnchorViewStart + dMs;
+  let newEnd = panAnchorViewEnd + dMs;
+
+  // Clamp
+  if (newStart < RANGE_START.getTime()) {
+    newEnd += RANGE_START.getTime() - newStart;
+    newStart = RANGE_START.getTime();
+  }
+  if (newEnd > NOW.getTime()) {
+    newStart -= newEnd - NOW.getTime();
+    newEnd = NOW.getTime();
+  }
+
+  viewStartMs = Math.max(RANGE_START.getTime(), newStart);
+  viewEndMs = Math.min(NOW.getTime(), newEnd);
+  render();
+}
+
+// ===== Selection handles =====
+function getCursorMs(e) {
+  const rect = track.getBoundingClientRect();
+  const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+  return viewStartMs + pct * (viewEndMs - viewStartMs);
+}
+
+function updateSelectionFromDrag(e) {
+  const ms = getCursorMs(e);
+  const viewMs = viewEndMs - viewStartMs;
+  const minGap = viewMs * 0.005;
+  if (dragging === 'left') {
+    selStart = new Date(Math.min(ms, selEnd.getTime() - minGap));
+  } else if (dragging === 'right') {
+    selEnd = new Date(Math.max(ms, selStart.getTime() + minGap));
+  }
+  render();
+}
+
+// Also listen on selection overlay directly for move
+document.getElementById('selection').addEventListener('mousedown', e => {
+  // Handle drag takes priority (edges)
+  if (e.target.classList.contains('sel-handle')) {
+    return; // let track handler deal with it via bubble
+  }
+  // Click on selection body → start move
+  e.stopPropagation(); // prevent track's mousedown from firing
+  const clickMs = getCursorMs(e);
+  dragging = 'move';
+  moveAnchorMs = clickMs;
+  moveOrigStart = selStart.getTime();
+  moveOrigEnd = selEnd.getTime();
+  selOverlay.classList.remove('smooth');
+  selOverlay.classList.add('no-transition', 'moving');
+  e.preventDefault();
+});
+let drawAnchorMs = 0;
+let moveAnchorMs = 0;     // for move-selection: cursor start position
+let moveOrigStart = 0;    // original selStart at move begin
+let moveOrigEnd = 0;      // original selEnd at move begin
+
+// ===== Mouse events =====
+track.addEventListener('mousedown', e => {
+  // Ignore clicks on reset button
+  if (e.target === zoomResetBtn || e.target.closest('.zoom-reset')) return;
+
+  // 1) Handle drag: adjust selection edge
+  if (e.target.classList.contains('sel-handle')) {
+    dragging = e.target.dataset.handle; // 'left' | 'right'
+    selOverlay.classList.remove('smooth');
+    selOverlay.classList.add('no-transition');
+    e.preventDefault();
+    return;
+  }
+
+  // 2) Shift+drag or middle-button: pan (when zoomed)
+  const isZoomed = getViewDays() < MAX_VIEW_DAYS - 0.5;
+  if ((e.shiftKey || e.button === 1) && isZoomed) {
+    startPan(e);
+    e.preventDefault();
+    return;
+  }
+
+  // 3) Click outside selection → draw new selection
+  // (clicks inside selection are intercepted by selection overlay's own listener)
+  dragging = 'draw';
+  drawAnchorMs = getCursorMs(e);
+  selStart = new Date(drawAnchorMs);
+  selEnd = new Date(drawAnchorMs);
+  selOverlay.classList.remove('smooth');
+  selOverlay.classList.add('no-transition', 'drawing');
+  drawLabel.classList.remove('visible');
+  clearActiveRange();
+  render();
+  e.preventDefault();
+});
+
+document.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  if (dragging === 'pan') {
+    movePan(e);
+  } else if (dragging === 'draw') {
+    // Extend selection to cursor
+    const ms = getCursorMs(e);
+    if (ms >= drawAnchorMs) {
+      selStart = new Date(drawAnchorMs);
+      selEnd = new Date(ms);
+    } else {
+      selStart = new Date(ms);
+      selEnd = new Date(drawAnchorMs);
+    }
+    render();
+    // Update draw label at cursor edge
+    const viewMs = viewEndMs - viewStartMs;
+    const endPct = (ms - viewStartMs) / viewMs;
+    drawLabel.textContent = fmtDate(new Date(ms));
+    drawLabel.style.left = (endPct * 100) + '%';
+    drawLabel.classList.add('visible');
+  } else if (dragging === 'move') {
+    // Move entire selection by delta
+    const ms = getCursorMs(e);
+    const deltaMs = ms - moveAnchorMs;
+    let newStart = moveOrigStart + deltaMs;
+    let newEnd = moveOrigEnd + deltaMs;
+    const selSpan = moveOrigEnd - moveOrigStart;
+    // Clamp to viewport bounds
+    if (newStart < viewStartMs) {
+      newStart = viewStartMs;
+      newEnd = viewStartMs + selSpan;
+    }
+    if (newEnd > viewEndMs) {
+      newEnd = viewEndMs;
+      newStart = viewEndMs - selSpan;
+    }
+    selStart = new Date(Math.max(RANGE_START.getTime(), newStart));
+    selEnd = new Date(Math.min(NOW.getTime(), newEnd));
+    render();
+  } else {
+    // 'left' | 'right' handle drag
+    updateSelectionFromDrag(e);
+  }
+});
+
+document.addEventListener('mouseup', () => {
+  if (dragging === 'draw') {
+    const g = getGranularity();
+    const minMs = g.hours * HOUR_MS;
+    if (selEnd.getTime() - selStart.getTime() < minMs) {
+      const center = drawAnchorMs;
+      selStart = new Date(Math.max(viewStartMs, center - minMs / 2));
+      selEnd = new Date(Math.min(viewEndMs, center + minMs / 2));
+      render();
+    }
+    drawLabel.classList.remove('visible');
+  }
+  if (dragging) {
+    track.classList.remove('panning');
+    track.style.cursor = '';
+    selOverlay.classList.remove('drawing', 'moving', 'no-transition');
+    selOverlay.classList.add('smooth');
+  }
+  dragging = null;
+});
+
+// ===== Touch: pinch zoom + single-finger draw + two-finger pan ===== */
+let lastTouchDist = 0;
+let lastTouchCenter = 0;
+let singleTouchTimer = null;
+let singleTouchStartMs = 0;
+
+track.addEventListener('touchstart', e => {
+  // Handle drag on touch
+  if (e.target.classList.contains('sel-handle')) {
+    dragging = e.target.dataset.handle;
+    selOverlay.classList.remove('smooth');
+    e.preventDefault();
+    return;
+  }
+  if (e.touches.length === 2) {
+    // Two-finger: pinch zoom
+    clearTimeout(singleTouchTimer);
+    dragging = null;
+    const dx = e.touches[1].clientX - e.touches[0].clientX;
+    lastTouchDist = Math.abs(dx);
+    lastTouchCenter = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+    e.preventDefault();
+  } else if (e.touches.length === 1) {
+    // Single finger: start drawing selection after a short hold,
+    // otherwise begin pan for quick flicks when zoomed
+    const touch = e.touches[0];
+    const rect = track.getBoundingClientRect();
+    const pct = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width));
+    singleTouchStartMs = viewStartMs + pct * (viewEndMs - viewStartMs);
+
+    const isZoomed = getViewDays() < MAX_VIEW_DAYS - 0.5;
+    if (isZoomed) {
+      // Zoomed: start drawing immediately (pan via minimap)
+      dragging = 'draw';
+      drawAnchorMs = singleTouchStartMs;
+      selStart = new Date(drawAnchorMs);
+      selEnd = new Date(drawAnchorMs);
+      selOverlay.classList.remove('smooth');
+      selOverlay.classList.add('drawing');
+      drawLabel.classList.remove('visible');
+      clearActiveRange();
+      render();
+    } else {
+      // Full view: draw selection
+      dragging = 'draw';
+      drawAnchorMs = singleTouchStartMs;
+      selStart = new Date(drawAnchorMs);
+      selEnd = new Date(drawAnchorMs);
+      selOverlay.classList.remove('smooth');
+      selOverlay.classList.add('drawing');
+      drawLabel.classList.remove('visible');
+      clearActiveRange();
+      render();
+    }
+    e.preventDefault();
+  }
+}, { passive: false });
+
+track.addEventListener('touchmove', e => {
+  if (e.touches.length === 2) {
+    // Pinch zoom
+    const dx = e.touches[1].clientX - e.touches[0].clientX;
+    const dist = Math.abs(dx);
+    const center = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+    const rect = track.getBoundingClientRect();
+    const centerPct = (center - rect.left) / rect.width;
+    const centerMs = viewStartMs + centerPct * (viewEndMs - viewStartMs);
+    if (lastTouchDist > 0) {
+      zoom(dist / lastTouchDist, centerMs);
+    }
+    lastTouchDist = dist;
+    e.preventDefault();
+  } else if (e.touches.length === 1) {
+    const ms = getCursorMs({ clientX: e.touches[0].clientX });
+    if (dragging === 'draw') {
+      if (ms >= drawAnchorMs) {
+        selStart = new Date(drawAnchorMs);
+        selEnd = new Date(ms);
+      } else {
+        selStart = new Date(ms);
+        selEnd = new Date(drawAnchorMs);
+      }
+      render();
+    } else if (dragging === 'pan') {
+      movePan({ clientX: e.touches[0].clientX });
+    } else if (dragging === 'left' || dragging === 'right') {
+      updateSelectionFromDrag({ clientX: e.touches[0].clientX });
+    }
+    e.preventDefault();
+  }
+}, { passive: false });
+
+track.addEventListener('touchend', () => {
+  lastTouchDist = 0;
+  if (dragging === 'draw') {
+    const g = getGranularity();
+    const minMs = g.hours * HOUR_MS;
+    if (selEnd.getTime() - selStart.getTime() < minMs) {
+      const center = drawAnchorMs;
+      selStart = new Date(Math.max(viewStartMs, center - minMs / 2));
+      selEnd = new Date(Math.min(viewEndMs, center + minMs / 2));
+      render();
+    }
+    drawLabel.classList.remove('visible');
+    selOverlay.classList.remove('drawing', 'moving', 'no-transition');
+  }
+  if (dragging) {
+    track.classList.remove('panning');
+    selOverlay.classList.add('smooth');
+  }
+  dragging = null;
+});
+
+// ===== Mini-map click to jump viewport =====
+minimap.addEventListener('click', e => {
+  const rect = minimap.getBoundingClientRect();
+  const pct = (e.clientX - rect.left) / rect.width;
+  const centerMs = RANGE_START.getTime() + pct * RANGE_MS;
+  const viewMs = viewEndMs - viewStartMs;
+  let newStart = centerMs - viewMs / 2;
+  let newEnd = centerMs + viewMs / 2;
+  if (newStart < RANGE_START.getTime()) {
+    newEnd += RANGE_START.getTime() - newStart;
+    newStart = RANGE_START.getTime();
+  }
+  if (newEnd > NOW.getTime()) {
+    newStart -= newEnd - NOW.getTime();
+    newEnd = NOW.getTime();
+  }
+  viewStartMs = Math.max(RANGE_START.getTime(), newStart);
+  viewEndMs = Math.min(NOW.getTime(), newEnd);
+  render();
+});
+
+// ===== Hover tooltip =====
+track.addEventListener('mousemove', e => {
+  if (dragging) { tooltip.classList.remove('visible'); return; }
+  const bar = e.target.closest('.act-bar');
+  if (bar) {
+    const buckets = aggregateToBuckets();
+    const idx = +bar.dataset.index;
+    const b = buckets[idx];
+    if (b) {
+      const g = getGranularity();
+      tooltip.textContent = `${fmtDateFull(new Date(b.time))} · ${b.count} req · ${g.label}`;
+      const rect = track.getBoundingClientRect();
+      const barRect = bar.getBoundingClientRect();
+      tooltip.style.left = (barRect.left - rect.left + barRect.width / 2) + 'px';
+      tooltip.classList.add('visible');
+    }
+  } else {
+    tooltip.classList.remove('visible');
+  }
+});
+track.addEventListener('mouseleave', () => tooltip.classList.remove('visible'));
+
+// ===== Quick range buttons =====
+function clearActiveRange() {
+  document.querySelectorAll('.quick-range-btn').forEach(b => b.classList.remove('active'));
+}
+
+document.querySelectorAll('.quick-range-btn[data-hours]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    clearActiveRange();
+    btn.classList.add('active');
+    const hours = +btn.dataset.hours;
+    selEnd = new Date(NOW.getTime());
+    selStart = new Date(NOW.getTime() - hours * 3600000);
+    // Zoom to fit selection
+    const margin = (selEnd.getTime() - selStart.getTime()) * 0.1;
+    viewStartMs = Math.max(RANGE_START.getTime(), selStart.getTime() - margin);
+    viewEndMs = Math.min(NOW.getTime(), selEnd.getTime() + margin);
+    render();
+    closeCustomPanel();
+  });
+});
+
+// ===== Custom range =====
+const customToggle = document.getElementById('custom-toggle');
+const customPanel = document.getElementById('custom-panel');
+
+function closeCustomPanel() {
+  customPanel.classList.remove('show');
+  customToggle.classList.remove('active');
+}
+
+customToggle.addEventListener('click', () => {
+  const showing = customPanel.classList.toggle('show');
+  if (showing) {
+    clearActiveRange();
+    customToggle.classList.add('active');
+    customStart = new Date(selStart);
+    customEnd = new Date(selEnd);
+    updateDateDisplays();
+    calStartMonth = new Date(customStart.getFullYear(), customStart.getMonth(), 1);
+    calEndMonth = new Date(customEnd.getFullYear(), customEnd.getMonth(), 1);
+  } else {
+    customToggle.classList.remove('active');
+  }
+});
+
+function updateDateDisplays() {
+  document.getElementById('start-display').textContent = fmtDateTime(customStart);
+  document.getElementById('end-display').textContent = fmtDateTime(customEnd);
+}
+function fmtDateTime(d) {
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function isoDate(d) { return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+
+document.getElementById('apply-btn').addEventListener('click', () => {
+  const err = document.getElementById('date-error');
+  err.classList.remove('show');
+  if (customStart >= customEnd) { err.textContent = 'Start must be before end'; err.classList.add('show'); return; }
+  const span = customEnd - customStart;
+  if (span < HOUR_MS) { err.textContent = 'Range must be at least 1 hour'; err.classList.add('show'); return; }
+  if (span > 90 * DAY_MS) { err.textContent = 'Range cannot exceed 90 days'; err.classList.add('show'); return; }
+  if (customEnd > NOW) { err.textContent = 'End cannot be in the future'; err.classList.add('show'); return; }
+  selStart = new Date(customStart);
+  selEnd = new Date(customEnd);
+  // Zoom to fit
+  const margin = (selEnd - selStart) * 0.1;
+  viewStartMs = Math.max(RANGE_START.getTime(), selStart.getTime() - margin);
+  viewEndMs = Math.min(NOW.getTime(), selEnd.getTime() + margin);
+  render();
+  closeCustomPanel();
+});
+
+// ===== Calendar popovers =====
+let calStartMonth, calEndMonth;
+calStartMonth = new Date(customStart.getFullYear(), customStart.getMonth(), 1);
+calEndMonth = new Date(customEnd.getFullYear(), customEnd.getMonth(), 1);
+const DAY_NAMES = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+function renderCalendar(gridId, titleId, monthDate, selectedDate, onSelect) {
+  const grid = document.getElementById(gridId);
+  const title = document.getElementById(titleId);
+  grid.innerHTML = '';
+  const y = monthDate.getFullYear(), m = monthDate.getMonth();
+  title.textContent = `${MONTHS[m]} ${y}`;
+  DAY_NAMES.forEach(d => { const el = document.createElement('div'); el.className = 'cal-day-header'; el.textContent = d; grid.appendChild(el); });
+  const firstDay = new Date(y, m, 1).getDay();
+  for (let i = 0; i < firstDay; i++) { const el = document.createElement('div'); grid.appendChild(el); }
+  for (let d = 1; d <= new Date(y, m+1, 0).getDate(); d++) {
+    const el = document.createElement('button');
+    el.className = 'cal-day'; el.textContent = d;
+    const cellDate = new Date(y, m, d);
+    if (cellDate.toDateString() === NOW.toDateString()) el.classList.add('today');
+    if (selectedDate && cellDate.toDateString() === selectedDate.toDateString()) el.classList.add('selected');
+    if (cellDate > NOW) el.classList.add('disabled');
+    if (cellDate <= NOW) el.addEventListener('click', () => onSelect(cellDate));
+    grid.appendChild(el);
+  }
+}
+
+// Sync time inputs when opening calendar
+function syncTimeInputs(prefix, date) {
+  document.getElementById(`cal-${prefix}-hour`).value = pad(date.getHours());
+  document.getElementById(`cal-${prefix}-min`).value = pad(date.getMinutes());
+}
+
+// Read date + time inputs into customStart/customEnd
+function readStartTime() {
+  const h = parseInt(document.getElementById('cal-start-hour').value, 10);
+  const m = parseInt(document.getElementById('cal-start-min').value, 10);
+  customStart.setHours(isNaN(h) ? 0 : Math.max(0, Math.min(23, h)), isNaN(m) ? 0 : Math.max(0, Math.min(59, m)), 0, 0);
+}
+function readEndTime() {
+  const h = parseInt(document.getElementById('cal-end-hour').value, 10);
+  const m = parseInt(document.getElementById('cal-end-min').value, 10);
+  customEnd.setHours(isNaN(h) ? 23 : Math.max(0, Math.min(23, h)), isNaN(m) ? 59 : Math.max(0, Math.min(59, m)), 59, 0);
+}
+
+// --- Start calendar ---
+function openStartCal(positionEl) {
+  const cal = document.getElementById('cal-start');
+  document.getElementById('cal-end').classList.remove('show');
+  cal.classList.add('show');
+  const btnRect = positionEl.getBoundingClientRect();
+  const zoneRect = document.getElementById('zone-time').getBoundingClientRect();
+  cal.style.left = (btnRect.left - zoneRect.left) + 'px';
+  cal.style.top = (btnRect.bottom - zoneRect.top + 4) + 'px';
+  syncTimeInputs('start', customStart);
+  renderCalendar('cal-start-grid', 'cal-start-title', calStartMonth, customStart, d => {
+    // Date selected: update date part, keep time from inputs
+    readStartTime();
+    customStart.setFullYear(d.getFullYear(), d.getMonth(), d.getDate());
+  });
+}
+
+function refreshStartCal() {
+  readStartTime();
+  renderCalendar('cal-start-grid','cal-start-title', calStartMonth, customStart, d => {
+    readStartTime();
+    customStart.setFullYear(d.getFullYear(), d.getMonth(), d.getDate());
+  });
+}
+
+document.getElementById('start-cal-btn').addEventListener('click', e => {
+  e.stopPropagation();
+  const cal = document.getElementById('cal-start');
+  if (cal.classList.contains('show')) { cal.classList.remove('show'); return; }
+  openStartCal(e.currentTarget);
+});
+document.getElementById('cal-start-prev').addEventListener('click', () => {
+  calStartMonth.setMonth(calStartMonth.getMonth()-1);
+  refreshStartCal();
+});
+document.getElementById('cal-start-next').addEventListener('click', () => {
+  calStartMonth.setMonth(calStartMonth.getMonth()+1);
+  refreshStartCal();
+});
+document.getElementById('cal-start-ok').addEventListener('click', () => {
+  readStartTime();
+  updateDateDisplays();
+  document.getElementById('cal-start').classList.remove('show');
+});
+
+// --- End calendar ---
+function openEndCal(positionEl) {
+  const cal = document.getElementById('cal-end');
+  document.getElementById('cal-start').classList.remove('show');
+  cal.classList.add('show');
+  const btnRect = positionEl.getBoundingClientRect();
+  const zoneRect = document.getElementById('zone-time').getBoundingClientRect();
+  cal.style.left = (btnRect.left - zoneRect.left) + 'px';
+  cal.style.top = (btnRect.bottom - zoneRect.top + 4) + 'px';
+  syncTimeInputs('end', customEnd);
+  renderCalendar('cal-end-grid', 'cal-end-title', calEndMonth, customEnd, d => {
+    readEndTime();
+    customEnd.setFullYear(d.getFullYear(), d.getMonth(), d.getDate());
+  });
+}
+
+function refreshEndCal() {
+  readEndTime();
+  renderCalendar('cal-end-grid','cal-end-title', calEndMonth, customEnd, d => {
+    readEndTime();
+    customEnd.setFullYear(d.getFullYear(), d.getMonth(), d.getDate());
+  });
+}
+
+document.getElementById('end-cal-btn').addEventListener('click', e => {
+  e.stopPropagation();
+  const cal = document.getElementById('cal-end');
+  if (cal.classList.contains('show')) { cal.classList.remove('show'); return; }
+  openEndCal(e.currentTarget);
+});
+document.getElementById('cal-end-prev').addEventListener('click', () => {
+  calEndMonth.setMonth(calEndMonth.getMonth()-1);
+  refreshEndCal();
+});
+document.getElementById('cal-end-next').addEventListener('click', () => {
+  calEndMonth.setMonth(calEndMonth.getMonth()+1);
+  refreshEndCal();
+});
+document.getElementById('cal-end-ok').addEventListener('click', () => {
+  readEndTime();
+  updateDateDisplays();
+  document.getElementById('cal-end').classList.remove('show');
+});
+
+// Auto-advance hour→min input
+['cal-start-hour', 'cal-end-hour'].forEach(id => {
+  document.getElementById(id).addEventListener('input', e => {
+    if (e.target.value.length >= 2) {
+      const minId = id.replace('hour', 'min');
+      document.getElementById(minId).focus();
+    }
+  });
+});
+
+document.addEventListener('click', e => {
+  ['cal-start','cal-end'].forEach(id => {
+    const cal = document.getElementById(id);
+    if (!cal.contains(e.target) && !e.target.closest('.date-btn')) cal.classList.remove('show');
+  });
+});
+
+// ===== Init =====
+render();
+window.addEventListener('resize', render);
+</script>
+</body>
+</html>

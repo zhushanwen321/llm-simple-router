@@ -1,35 +1,20 @@
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
-import { api, getApiMessage, type UsageWindowWithUsage } from "@/api/client";
+import { api, getApiMessage } from "@/api/client";
 import { toast } from "vue-sonner";
 import { formatProviderTokenLabel } from "@/utils/token-format";
+import { formatTimeShort } from "@/utils/format";
 import { watchTheme } from "@/composables/useTheme";
 import type { Provider } from "@/types/mapping";
 import { useDashboardFilters } from "./useDashboardFilters";
-import type { DashboardStats } from "./useDashboardData";
 import { useDashboardData } from "./useDashboardData";
-import { useDashboardTimeline } from "./useDashboardTimeline";
+import { useTimeSelector } from "./useTimeSelector";
+import type { TimeSelection } from "./useTimeSelector";
 
 // --- Constants ---
 
 const DEBOUNCE_MS = 300;
 const PERCENT_MULTIPLIER = 100;
-const MIN_WINDOWS_FOR_DELTA = 2;
-
-// --- Helpers ---
-
-/** 从 usageWindows 中按 provider_id 聚合全部 input tokens（不依赖选中窗口） */
-function aggregateAllProviderInputTokens(
-  windows: UsageWindowWithUsage[],
-): Map<string, number> {
-  const map = new Map<string, number>();
-  for (const w of windows) {
-    if (!w.window.provider_id || w.usage.total_input_tokens <= 0) continue;
-    const existing = map.get(w.window.provider_id) ?? 0;
-    map.set(w.window.provider_id, existing + w.usage.total_input_tokens);
-  }
-  return map;
-}
 
 // --- useDashboard (facade) ---
 
@@ -43,60 +28,66 @@ export function useDashboard() {
 
   // --- Sub-composables ---
   const filters = useDashboardFilters({ selectedProvider, providers, t });
+  const timeSelector = useTimeSelector({ selectedProvider });
 
-  const timeline = useDashboardTimeline({ selectedProvider, t });
-
-  // --- Derived: provider token labels from usageWindows (stable across provider selection) ---
-  const providerInputTokens = computed(() =>
-    aggregateAllProviderInputTokens(timeline.usageWindows.value),
-  );
-
+  // --- Derived: provider token labels from overview response ---
   const providerTokenLabels = computed(() => {
     const map = new Map<string, string>();
-    for (const [id, tokens] of providerInputTokens.value) {
+    const summary = data.providerTokenSummary.value;
+    for (const [id, tokens] of Object.entries(summary)) {
       map.set(id, formatProviderTokenLabel(tokens));
     }
     return map;
   });
 
-  // --- Provider sorting based on total input tokens across all windows ---
+  // --- Provider sorting based on total input tokens from overview ---
   const sortedProviders = computed(() => {
-    const tokenMap = providerInputTokens.value;
+    const tokenMap = data.providerTokenSummary.value;
     return [...providers.value].sort((a, b) => {
-      const aIn = tokenMap.get(a.id) ?? 0;
-      const bIn = tokenMap.get(b.id) ?? 0;
+      const aIn = tokenMap[a.id] ?? 0;
+      const bIn = tokenMap[b.id] ?? 0;
       return bIn - aIn;
     });
+  });
+
+  // --- Convert timeSelector.timeSelection (Date) to ISO string for useDashboardData ---
+  const timeSelectionForData = computed(() => {
+    const sel: TimeSelection = timeSelector.timeSelection.value;
+    return {
+      startTime: sel.startTime.toISOString(),
+      endTime: sel.endTime.toISOString(),
+    };
+  });
+
+  // --- Inline tertiary metrics label ---
+  const windowTimeRange = computed(() => {
+    const sel = timeSelector.timeSelection.value;
+    return `${formatTimeShort(sel.startTime.toISOString())} ~ ${formatTimeShort(sel.endTime.toISOString())}`;
   });
 
   // --- Watch key (cross-composite dependency fingerprint) ---
   const watchKey = computed(() =>
     JSON.stringify({
       selectedProvider: selectedProvider.value,
-      selectedWindowId: timeline.selectedWindowId.value,
+      timeSelection: timeSelector.timeSelection.value,
       modelFilter: filters.modelFilter.value,
       keyFilter: filters.keyFilter.value,
       clientType: filters.clientType.value,
-      timelineRange: timeline.timelineRange.value,
     }),
   );
 
   // --- Data fetching ---
   const data = useDashboardData({
     selectedProvider,
-    statsParams: filters.statsParams,
-    cacheSummaryParams: filters.cacheSummaryParams,
-    tsParams: filters.tsParams,
-    selectedWindow: timeline.selectedWindow,
+    filterParams: filters.filterParams,
+    timeSelection: timeSelectionForData,
     watchKey,
     t,
   });
 
-  // --- Environment comparison (prev window stats) ---
-  const prevWindowStats = ref<DashboardStats | null>(null);
-
+  // --- Environment comparison (prev range stats from overview response) ---
   const deltaValues = computed(() => {
-    const prev = prevWindowStats.value;
+    const prev = data.prevStats.value;
     const curr = data.stats.value;
     if (!prev) return null;
     function delta(cur: number, prv: number): string {
@@ -114,35 +105,6 @@ export function useDashboard() {
     };
   });
 
-  async function loadPrevWindowStats() {
-    const sorted = timeline.timelineWindows.value;
-    const window = timeline.selectedWindow.value;
-    if (!window || sorted.length < MIN_WINDOWS_FOR_DELTA) {
-      prevWindowStats.value = null;
-      return;
-    }
-    const idx = sorted.findIndex((w) => w.window.id === window.window.id);
-    if (idx < 1) {
-      prevWindowStats.value = null;
-      return;
-    }
-    const prevWindow = sorted[idx - 1];
-    try {
-      const params: Record<string, string> = {
-        period: "window",
-        start_time: prevWindow.window.start_time,
-        end_time: prevWindow.window.end_time,
-      };
-      if (selectedProvider.value) params.provider_id = selectedProvider.value;
-      const result = await api.getStats(params);
-      prevWindowStats.value = result;
-    } catch (e: unknown) {
-      console.error("useDashboard.loadPrevWindowStats:", e);
-      /* 非关键：环比数据缺失不影响主功能 */
-      prevWindowStats.value = null;
-    }
-  }
-
   // --- Load providers ---
   async function loadProviders() {
     try {
@@ -159,14 +121,15 @@ export function useDashboard() {
 
   // --- Auto-select top provider ---
   function autoSelectProviderIfNeeded() {
-    if (!selectedProvider.value && sortedProviders.value.length > 0) {
-      selectedProvider.value = sortedProviders.value[0].id;
+    if (!selectedProvider.value && providers.value.length > 0) {
+      selectedProvider.value = providers.value[0].id;
     }
   }
 
   // --- Watchers ---
 
   const initialized = ref(false);
+  let skipNextFilterRefresh = false;
 
   // 切换 provider 时重置 modelFilter
   watch(selectedProvider, () => {
@@ -178,41 +141,27 @@ export function useDashboard() {
     }
   });
 
-  // Watch provider/range 变化 → 重新加载窗口 + 自动选择 + 刷新
-  let skipNextFilterRefresh = false;
-
-  watch([selectedProvider, timeline.timelineRange], async () => {
+  // Provider 或时间范围变化 → 刷新数据
+  watch([selectedProvider, timeSelector.timeSelection], async () => {
     if (!initialized.value) return;
     skipNextFilterRefresh = true;
-    await timeline.loadUsageWindows();
-    timeline.autoSelectLatestWindow();
     await data.refresh();
-    await loadPrevWindowStats();
   });
 
-  // Watch selectedWindowId/filter 变化 → debounced refresh + loadPrev
+  // Filter 变化 → debounced refresh
   let filterDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-  watch(
-    [
-      timeline.selectedWindowId,
-      filters.modelFilter,
-      filters.keyFilter,
-      filters.clientType,
-    ],
-    () => {
-      if (!initialized.value) return;
-      if (skipNextFilterRefresh) {
-        skipNextFilterRefresh = false;
-        return;
-      }
-      if (filterDebounceTimer) clearTimeout(filterDebounceTimer);
-      filterDebounceTimer = setTimeout(async () => {
-        await data.refresh();
-        await loadPrevWindowStats();
-      }, DEBOUNCE_MS);
-    },
-  );
+  watch([filters.modelFilter, filters.keyFilter, filters.clientType], () => {
+    if (!initialized.value) return;
+    if (skipNextFilterRefresh) {
+      skipNextFilterRefresh = false;
+      return;
+    }
+    if (filterDebounceTimer) clearTimeout(filterDebounceTimer);
+    filterDebounceTimer = setTimeout(async () => {
+      await data.refresh();
+    }, DEBOUNCE_MS);
+  });
 
   // --- Watch theme changes to re-render charts ---
   let stopWatchTheme: (() => void) | null = null;
@@ -221,26 +170,16 @@ export function useDashboard() {
   async function retry() {
     await loadProviders();
     if (providerLoadError.value) return;
-    await Promise.allSettled([
-      filters.loadFilterOptions(),
-      timeline.loadUsageWindows(),
-    ]);
     autoSelectProviderIfNeeded();
-    timeline.autoSelectLatestWindow();
-    await data.refresh();
-    await loadPrevWindowStats();
+    await Promise.allSettled([filters.loadFilterOptions(), data.refresh()]);
   }
 
   // --- Lifecycle ---
   onMounted(async () => {
     await loadProviders();
     if (providerLoadError.value) return;
-    await timeline.loadUsageWindows();
-    await filters.loadFilterOptions();
     autoSelectProviderIfNeeded();
-    timeline.autoSelectLatestWindow();
-    await data.refresh();
-    await loadPrevWindowStats();
+    await Promise.allSettled([data.refresh(), filters.loadFilterOptions()]);
     initialized.value = true;
     stopWatchTheme = watchTheme(() => data.refresh());
   });
@@ -256,12 +195,21 @@ export function useDashboard() {
     selectedProvider,
     sortedProviders,
     providerTokenLabels,
-    // Timeline
-    usageWindows: timeline.usageWindows,
-    selectedWindowId: timeline.selectedWindowId,
-    selectedWindow: timeline.selectedWindow,
-    timelineWindows: timeline.timelineWindows,
-    timelineRange: timeline.timelineRange,
+    // Time selector
+    activeRange: timeSelector.activeRange,
+    timeSelection: timeSelector.timeSelection,
+    timeRangeLabel: timeSelector.timeRangeLabel,
+    showCustom: timeSelector.showCustom,
+    customError: timeSelector.customError,
+    totalRangeDays: timeSelector.totalRangeDays,
+    selectQuickRange: timeSelector.selectQuickRange,
+    toggleCustom: timeSelector.toggleCustom,
+    applyCustom: timeSelector.applyCustom,
+    // Custom date (Date refs for Calendar datetime picker)
+    customStartDate: timeSelector.customStartDate,
+    customEndDate: timeSelector.customEndDate,
+    // Alias for Zone 2 inline tertiary metrics
+    windowTimeRange,
     // Filters
     modelFilter: filters.modelFilter,
     keyFilter: filters.keyFilter,
@@ -280,14 +228,7 @@ export function useDashboard() {
     tokenThroughputChartData: data.tokenThroughputChartData,
     timeRangeText: data.timeRangeText,
     // Comparison
-    prevWindowStats,
     deltaValues,
-    windowTimeRange: timeline.windowTimeRange,
-    // Timeline rendering
-    getWindowStyle: timeline.getWindowStyle,
-    getWindowWidth: timeline.getWindowWidth,
-    formatWindowTooltip: timeline.formatWindowTooltip,
-    timelineDayLabels: timeline.timelineDayLabels,
     // Actions
     retry,
   };

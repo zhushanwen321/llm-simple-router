@@ -205,7 +205,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Sparkles, CheckCircle2 } from "lucide-vue-next";
+import { Sparkles, CheckCircle2 } from "@lucide/vue";
 
 interface RuleFormData {
   name: string;
