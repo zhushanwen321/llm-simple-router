@@ -98,6 +98,7 @@ export interface RequestLogInsert {
   upstream_api_type?: string | null;
   upstream_base_url?: string | null;
   thinking_level?: string;
+  backend_model?: string | null;
 }
 
 export interface LogWriteContext {
@@ -124,9 +125,9 @@ function rawInsertRequestLog(
       is_stream, error_message, created_at, client_request, upstream_request, upstream_response,
       is_retry, is_failover, original_request_id, router_key_id, original_model, session_id, pipeline_snapshot,
       transport_kind, abort_reason, error_code, headers_sent, resilience_action, resilience_reason, mapping_reason, failover_trigger,
-      upstream_api_type, upstream_base_url, thinking_level)
+      upstream_api_type, upstream_base_url, thinking_level, backend_model)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     log.id, log.api_type, log.model, log.provider_id, log.status_code,
     log.client_status_code ?? null,
@@ -149,6 +150,7 @@ function rawInsertRequestLog(
     log.upstream_api_type ?? null,
     log.upstream_base_url ?? null,
     log.thinking_level ?? extractThinkingLevel(log.api_type, log.client_request ?? null),
+    log.backend_model ?? null,
   );
 }
 
@@ -206,8 +208,8 @@ function buildLogWhereClause(
     params.push(`%${options.client_model}%`);
   }
   if (options.backend_model) {
-    where += " AND rl.id IN (SELECT request_log_id FROM request_metrics WHERE backend_model LIKE ?)";
-    params.push(`%${options.backend_model}%`);
+    where += " AND rl.id IN (SELECT request_log_id FROM request_metrics WHERE backend_model = ?)";
+    params.push(options.backend_model);
   }
   if (options.router_key_id) {
     where += " AND rl.router_key_id = ?";

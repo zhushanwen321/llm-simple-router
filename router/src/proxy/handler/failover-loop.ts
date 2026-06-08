@@ -576,6 +576,7 @@ export async function processResilienceResult(params: {
       mapping_reason: rCtx.mappingReason ?? null,
       upstream_api_type: resolvedEndpoint.api_type,
       upstream_base_url: resolvedEndpoint.base_url,
+      backend_model: resolved.backend_model,
     }, (matcher || logFileWriter) ? {
       matcher, logFileWriter, responseBody: null,
     } : undefined);
@@ -745,6 +746,7 @@ export async function executeFailoverLoop(
         pipelineSnapshot: iterationSnapshot.toJSON(),
         matcher, logFileWriter,
         mapping_reason: rCtx.mappingReason ?? null,
+        backend_model: resolved.backend_model,
       });
       excludeTargets.push(resolved);
       continue;
@@ -803,6 +805,7 @@ export async function executeFailoverLoop(
         pipelineSnapshot: iterationSnapshot.toJSON(),
         matcher, logFileWriter,
         mapping_reason: rCtx.mappingReason ?? null,
+        backend_model: resolved.backend_model,
       });
       excludeTargets.push(resolved);
       continue;

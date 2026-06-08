@@ -69,14 +69,23 @@ else
 fi
 ```
 
-### 6. 确认 PR 状态
+### 6. 等待 CI 并确认结果 [MANDATORY]
+
+PR 创建后必须等待 CI 全部完成并确认通过。使用轮询脚本：
 
 ```bash
-gh pr view --json statusCheckRollup \
-  --jq '[.statusCheckRollup[] | .name + ": " + (.conclusion // "pending")] | .[]'
+# 用法: PR 编号作为参数，或省略则自动检测当前分支的 PR
+bash .pi/skills/pull-request/wait-ci.sh [PR_NUMBER]
 ```
 
-如有 check 立即失败（非 pending/queued），分析原因并修复。
+脚本行为：
+- 每 30 秒轮询一次 CI 状态
+- 所有 check 都达到终态（success/failure/cancelled/timed_out）后退出
+- 全部 success → 退出码 0
+- 任一失败 → 退出码 1，并打印失败项
+- 超时 10 分钟 → 退出码 2
+
+如有 check 失败，分析原因并修复后重新 push。
 
 ## Pre-merge 验证详情
 

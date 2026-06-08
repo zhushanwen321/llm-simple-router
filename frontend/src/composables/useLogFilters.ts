@@ -2,8 +2,18 @@ import { ref, computed, onMounted } from "vue";
 import { toast } from "vue-sonner";
 import { useI18n } from "vue-i18n";
 import { api, getApiMessage } from "@/api/client";
-import type { Provider } from "@/types/mapping";
+import type { Provider, Rule } from "@/types/mapping";
 import { toIsoStart, toIsoEnd } from "@/utils/format";
+
+/** 安全解析 mapping group 的 rule JSON，格式异常返回 null */
+function parseRuleJson(rule: string): Rule | null {
+  try {
+    return JSON.parse(rule) as Rule;
+  } catch {
+    /* rule JSON 格式异常，跳过该映射组 */
+    return null;
+  }
+}
 
 const PERIODS = [
   { label: "1h", value: "1h" },
@@ -96,18 +106,23 @@ export function useLogFilters() {
     }
   }
 
+  /** 从映射组提取 client_model 和 backend_model 列表，避免扫描 metrics 大表 */
   async function loadModelOptions() {
     try {
-      const [summaryResult, availableModels] = await Promise.allSettled([
-        api.getMetricsSummary({ period: "30d" }),
-        api.getAvailableModels(),
-      ]);
-      clientModelOptions.value =
-        availableModels.status === "fulfilled" ? availableModels.value : [];
-      backendModelOptions.value =
-        summaryResult.status === "fulfilled"
-          ? [...new Set(summaryResult.value.rows.map((r) => r.backend_model))]
-          : [];
+      const groups = await api.getMappingGroups();
+      const clientSet = new Set<string>();
+      const backendSet = new Set<string>();
+      for (const g of groups) {
+        if (g.client_model) clientSet.add(g.client_model);
+        const rule: Rule | null = parseRuleJson(g.rule);
+        if (rule) {
+          for (const t of rule.targets ?? []) {
+            if (t.backend_model) backendSet.add(t.backend_model);
+          }
+        }
+      }
+      clientModelOptions.value = [...clientSet].sort();
+      backendModelOptions.value = [...backendSet].sort();
     } catch (e: unknown) {
       console.error("useLogFilters.loadModelOptions:", e);
       clientModelOptions.value = [];

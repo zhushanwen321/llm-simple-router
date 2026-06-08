@@ -67,6 +67,7 @@ export const errorLoggingHook: PipelineHook = {
         pipelineSnapshot: snapshot,
         matcher: matcher as RetryMatcher | null,
         logFileWriter: logFileWriter as LogFileWriter | null,
+        backend_model: ctx.resolved?.backend_model ?? null,
       });
     } else {
       // upstream error 路径：使用 insertRequestLog
@@ -88,6 +89,7 @@ export const errorLoggingHook: PipelineHook = {
         original_model: null,
         session_id: sessionId,
         pipeline_snapshot: snapshot,
+        backend_model: ctx.resolved?.backend_model ?? null,
       }, (matcher || logFileWriter) ? {
         matcher,
         logFileWriter: logFileWriter as LogFileWriter | null,
