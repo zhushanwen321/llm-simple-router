@@ -282,6 +282,19 @@ interface StatsResponse {
   isApproximate?: boolean;
 }
 
+interface DashboardOverviewResponse {
+  stats: StatsResponse;
+  prev_stats: Omit<StatsResponse, "startTime" | "endTime"> | null;
+  cache_hit_rate: number;
+  client_type_breakdown: Record<string, number>;
+  timeseries: {
+    tps: TimeseriesRawRow[];
+    input_tokens: TimeseriesRawRow[];
+    output_tokens: TimeseriesRawRow[];
+  };
+  provider_token_summary: Record<string, number>;
+}
+
 export interface UsageWindowWithUsage {
   window: {
     id: string;
@@ -558,8 +571,28 @@ export const api = {
     request<UsageWindowWithUsage[]>("get", "/usage/windows", undefined, {
       params,
     }),
-  getMetricsActivity: (params?: { router_key_id?: string; provider_id?: string }) =>
-    request<ActivityResponse>("get", "/metrics/activity", undefined, { params }),
+  getMetricsActivity: (params?: {
+    router_key_id?: string;
+    provider_id?: string;
+  }) =>
+    request<ActivityResponse>("get", "/metrics/activity", undefined, {
+      params,
+    }),
+
+  getDashboardOverview: (params: {
+    provider_id?: string;
+    start_time: string;
+    end_time: string;
+    router_key_id?: string;
+    backend_model?: string;
+    client_type?: string;
+  }) =>
+    request<DashboardOverviewResponse>(
+      "get",
+      "/dashboard/overview",
+      undefined,
+      { params },
+    ),
   getUsageWeekly: (params?: { router_key_id?: string }) =>
     request<DailyUsage[]>("get", "/usage/weekly", undefined, { params }),
   getUsageMonthly: (params?: { router_key_id?: string }) =>

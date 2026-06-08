@@ -50,6 +50,7 @@ export function getStats(
   routerKeyId?: string,
   providerId?: string,
   backendModel?: string,
+  clientType?: string,
 ): Stats {
   const conditions = [
     "rm.created_at >= datetime(?)",
@@ -67,6 +68,10 @@ export function getStats(
   if (backendModel) {
     conditions.push("rm.backend_model = ?");
     params.push(backendModel);
+  }
+  if (clientType) {
+    conditions.push("rm.client_type = ?");
+    params.push(clientType);
   }
   const where = conditions.join(" AND ");
 
@@ -89,7 +94,7 @@ export function getStats(
 
   if (!isApproximate) {
     // 全量走聚合表
-    const aggStats = queryAggStats(db, startTime, endTime, routerKeyId, providerId, backendModel);
+    const aggStats = queryAggStats(db, startTime, endTime, routerKeyId, providerId, backendModel, clientType);
     return {
       totalRequests: aggStats.totalRequests,
       successRate: 0,
@@ -113,7 +118,7 @@ export function getStats(
   }
 
   // 跨越分界线：聚合表段
-  const aggStats = queryAggStats(db, startTime, cutoffTime, routerKeyId, providerId, backendModel);
+  const aggStats = queryAggStats(db, startTime, cutoffTime, routerKeyId, providerId, backendModel, clientType);
 
   // 合并：totalRequests/totalInputTokens/totalOutputTokens 求和，avg_tps 加权平均
   const mergedTotalRequests = total + aggStats.totalRequests;

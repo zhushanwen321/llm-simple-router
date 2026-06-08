@@ -1,13 +1,12 @@
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
-import { api, getApiMessage, type UsageWindowWithUsage } from "@/api/client";
+import { api, getApiMessage } from "@/api/client";
 import { toast } from "vue-sonner";
 import { formatProviderTokenLabel } from "@/utils/token-format";
 import { formatTimeShort } from "@/utils/format";
 import { watchTheme } from "@/composables/useTheme";
 import type { Provider } from "@/types/mapping";
 import { useDashboardFilters } from "./useDashboardFilters";
-import type { DashboardStats } from "./useDashboardData";
 import { useDashboardData } from "./useDashboardData";
 import { useTimeSelector } from "./useTimeSelector";
 import type { TimeSelection } from "./useTimeSelector";
@@ -16,21 +15,6 @@ import type { TimeSelection } from "./useTimeSelector";
 
 const DEBOUNCE_MS = 300;
 const PERCENT_MULTIPLIER = 100;
-
-// --- Helpers ---
-
-/** 从 usageWindows 中按 provider_id 聚合全部 input tokens（不依赖选中窗口） */
-function aggregateAllProviderInputTokens(
-  windows: UsageWindowWithUsage[],
-): Map<string, number> {
-  const map = new Map<string, number>();
-  for (const w of windows) {
-    if (!w.window.provider_id || w.usage.total_input_tokens <= 0) continue;
-    const existing = map.get(w.window.provider_id) ?? 0;
-    map.set(w.window.provider_id, existing + w.usage.total_input_tokens);
-  }
-  return map;
-}
 
 // --- useDashboard (facade) ---
 
@@ -46,48 +30,22 @@ export function useDashboard() {
   const filters = useDashboardFilters({ selectedProvider, providers, t });
   const timeSelector = useTimeSelector({ selectedProvider, t });
 
-  // --- Usage windows (kept for provider token sort; not driving time selection) ---
-  const usageWindows = ref<UsageWindowWithUsage[]>([]);
-  const selectedWindowId = ref("");
-
-  async function loadUsageWindows() {
-    try {
-      const params: { provider_id?: string } = {};
-      if (selectedProvider.value) params.provider_id = selectedProvider.value;
-      usageWindows.value = await api.getUsageWindows(params);
-      if (
-        selectedWindowId.value &&
-        !usageWindows.value.some((w) => w.window.id === selectedWindowId.value)
-      ) {
-        selectedWindowId.value = "";
-      }
-    } catch (e: unknown) {
-      console.error("useDashboard.loadUsageWindows:", e);
-      /* 非关键：provider 排序数据缺失不影响主仪表盘功能 */
-      usageWindows.value = [];
-      selectedWindowId.value = "";
-    }
-  }
-
-  // --- Derived: provider token labels from usageWindows (stable across provider selection) ---
-  const providerInputTokens = computed(() =>
-    aggregateAllProviderInputTokens(usageWindows.value),
-  );
-
+  // --- Derived: provider token labels from overview response ---
   const providerTokenLabels = computed(() => {
     const map = new Map<string, string>();
-    for (const [id, tokens] of providerInputTokens.value) {
+    const summary = data.providerTokenSummary.value;
+    for (const [id, tokens] of Object.entries(summary)) {
       map.set(id, formatProviderTokenLabel(tokens));
     }
     return map;
   });
 
-  // --- Provider sorting based on total input tokens across all windows ---
+  // --- Provider sorting based on total input tokens from overview ---
   const sortedProviders = computed(() => {
-    const tokenMap = providerInputTokens.value;
+    const tokenMap = data.providerTokenSummary.value;
     return [...providers.value].sort((a, b) => {
-      const aIn = tokenMap.get(a.id) ?? 0;
-      const bIn = tokenMap.get(b.id) ?? 0;
+      const aIn = tokenMap[a.id] ?? 0;
+      const bIn = tokenMap[b.id] ?? 0;
       return bIn - aIn;
     });
   });
@@ -127,11 +85,9 @@ export function useDashboard() {
     t,
   });
 
-  // --- Environment comparison (prev range stats) ---
-  const prevWindowStats = ref<DashboardStats | null>(null);
-
+  // --- Environment comparison (prev range stats from overview response) ---
   const deltaValues = computed(() => {
-    const prev = prevWindowStats.value;
+    const prev = data.prevStats.value;
     const curr = data.stats.value;
     if (!prev) return null;
     function delta(cur: number, prv: number): string {
@@ -149,32 +105,6 @@ export function useDashboard() {
     };
   });
 
-  async function loadPrevWindowStats() {
-    const sel = timeSelector.timeSelection.value;
-    const dur = sel.endTime.getTime() - sel.startTime.getTime();
-    if (dur <= 0) {
-      prevWindowStats.value = null;
-      return;
-    }
-    // prev = 与当前选区等长、紧邻其前的范围
-    const prevEnd = new Date(sel.startTime.getTime());
-    const prevStart = new Date(prevEnd.getTime() - dur);
-    try {
-      const params: Record<string, string> = {
-        period: "window",
-        start_time: prevStart.toISOString(),
-        end_time: prevEnd.toISOString(),
-      };
-      if (selectedProvider.value) params.provider_id = selectedProvider.value;
-      const result = await api.getStats(params);
-      prevWindowStats.value = result;
-    } catch (e: unknown) {
-      console.error("useDashboard.loadPrevWindowStats:", e);
-      /* 非关键：环比数据缺失不影响主功能 */
-      prevWindowStats.value = null;
-    }
-  }
-
   // --- Load providers ---
   async function loadProviders() {
     try {
@@ -189,10 +119,10 @@ export function useDashboard() {
     }
   }
 
-  // --- Auto-select top provider ---
+  // --- Auto-select top provider (uses alphabetically first, will re-sort after data loads) ---
   function autoSelectProviderIfNeeded() {
-    if (!selectedProvider.value && sortedProviders.value.length > 0) {
-      selectedProvider.value = sortedProviders.value[0].id;
+    if (!selectedProvider.value && providers.value.length > 0) {
+      selectedProvider.value = providers.value[0].id;
     }
   }
 
@@ -216,12 +146,10 @@ export function useDashboard() {
   watch([selectedProvider, timeSelector.timeSelection], async () => {
     if (!initialized.value) return;
     skipNextFilterRefresh = true;
-    await Promise.allSettled([loadUsageWindows(), timeSelector.loadActivity()]);
-    await data.refresh();
-    await loadPrevWindowStats();
+    await Promise.allSettled([data.refresh(), timeSelector.loadActivity()]);
   });
 
-  // Watch filter 变化 → debounced refresh + loadPrev
+  // Watch filter 变化 → debounced refresh
   let filterDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   watch([filters.modelFilter, filters.keyFilter, filters.clientType], () => {
@@ -233,7 +161,6 @@ export function useDashboard() {
     if (filterDebounceTimer) clearTimeout(filterDebounceTimer);
     filterDebounceTimer = setTimeout(async () => {
       await data.refresh();
-      await loadPrevWindowStats();
     }, DEBOUNCE_MS);
   });
 
@@ -244,28 +171,27 @@ export function useDashboard() {
   async function retry() {
     await loadProviders();
     if (providerLoadError.value) return;
+    autoSelectProviderIfNeeded();
     await Promise.allSettled([
       filters.loadFilterOptions(),
-      loadUsageWindows(),
       timeSelector.loadActivity(),
+      data.refresh(),
     ]);
-    autoSelectProviderIfNeeded();
-    await data.refresh();
-    await loadPrevWindowStats();
   }
 
   // --- Lifecycle ---
+  // Stage 1: GET /providers (must complete first)
+  // Stage 2: GET /dashboard/overview + GET /metrics/activity (parallel)
   onMounted(async () => {
     await loadProviders();
     if (providerLoadError.value) return;
-    await Promise.allSettled([
-      loadUsageWindows(),
-      filters.loadFilterOptions(),
-      timeSelector.loadActivity(),
-    ]);
     autoSelectProviderIfNeeded();
-    await data.refresh();
-    await loadPrevWindowStats();
+    // Load filter options (router-keys) + activity in parallel with overview
+    await Promise.allSettled([
+      data.refresh(),
+      timeSelector.loadActivity(),
+      filters.loadFilterOptions(),
+    ]);
     initialized.value = true;
     stopWatchTheme = watchTheme(() => data.refresh());
   });
@@ -281,7 +207,7 @@ export function useDashboard() {
     selectedProvider,
     sortedProviders,
     providerTokenLabels,
-    // Time selector (new — replaces old timeline window navigator)
+    // Time selector
     activeRange: timeSelector.activeRange,
     timeSelection: timeSelector.timeSelection,
     timeRangeLabel: timeSelector.timeRangeLabel,
@@ -297,9 +223,6 @@ export function useDashboard() {
     toggleCustom: timeSelector.toggleCustom,
     applyCustom: timeSelector.applyCustom,
     setCustomRange: timeSelector.setCustomRange,
-    // Usage windows (kept for provider token sort; not driving time selection)
-    usageWindows,
-    selectedWindowId,
     // Alias for Zone 2 inline tertiary metrics
     windowTimeRange,
     // Filters
@@ -320,7 +243,6 @@ export function useDashboard() {
     tokenThroughputChartData: data.tokenThroughputChartData,
     timeRangeText: data.timeRangeText,
     // Comparison
-    prevWindowStats,
     deltaValues,
     // Actions
     retry,

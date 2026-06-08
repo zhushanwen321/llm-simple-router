@@ -456,6 +456,7 @@ export function getMetricsTimeseries(
   routerKeyId?: string,
   startTime?: string,
   endTime?: string,
+  clientType?: string,
 ): MetricsTimeseriesRow[] {
   const detailDays = getMetricsDetailDays(db);
   const { effectiveStart, effectiveEnd } = computeEffectiveTimeRange(period, startTime, endTime);
@@ -463,7 +464,7 @@ export function getMetricsTimeseries(
   const cutoffTime = new Date(now.getTime() - detailDays * SECONDS_PER_DAY * MS_PER_SECOND).toISOString();
 
   if (effectiveEnd <= cutoffTime) {
-    return queryAggTimeseries(db, period, metric, providerId, backendModel, routerKeyId, startTime, endTime);
+    return queryAggTimeseries(db, period, metric, providerId, backendModel, routerKeyId, startTime, endTime, clientType);
   }
   if (effectiveStart >= cutoffTime) {
     const bucketSec = (startTime && endTime)
@@ -476,6 +477,7 @@ export function getMetricsTimeseries(
     if (providerId) { conditions.push("rm.provider_id = ?"); params.push(providerId); }
     if (backendModel) { conditions.push("rm.backend_model = ?"); params.push(backendModel); }
     if (routerKeyId) { conditions.push("rm.router_key_id = ?"); params.push(routerKeyId); }
+    if (clientType) { conditions.push("rm.client_type = ?"); params.push(clientType); }
 
     const where = conditions.join(" AND ");
     const expr = METRIC_EXPR[metric];
@@ -510,6 +512,7 @@ export function getMetricsTimeseries(
   if (providerId) { detailConditions.push("rm.provider_id = ?"); detailParams.push(providerId); }
   if (backendModel) { detailConditions.push("rm.backend_model = ?"); detailParams.push(backendModel); }
   if (routerKeyId) { detailConditions.push("rm.router_key_id = ?"); detailParams.push(routerKeyId); }
+  if (clientType) { detailConditions.push("rm.client_type = ?"); detailParams.push(clientType); }
   const detailWhere = detailConditions.join(" AND ");
 
   const detailRows = db.prepare(`
@@ -534,6 +537,7 @@ export function getMetricsTimeseries(
   const aggParams: unknown[] = [cutoffTime, effectiveEnd, ...aggRouterKeyParam];
   if (providerId) { aggConditions.push("m.provider_id = ?"); aggParams.push(providerId); }
   if (backendModel) { aggConditions.push("m.backend_model = ?"); aggParams.push(backendModel); }
+  if (clientType) { aggConditions.push("m.client_type = ?"); aggParams.push(clientType); }
   const aggWhere = aggConditions.join(" AND ");
 
   const aggTotalSec = (new Date(effectiveEnd).getTime() - new Date(cutoffTime).getTime()) / MS_PER_SECOND;

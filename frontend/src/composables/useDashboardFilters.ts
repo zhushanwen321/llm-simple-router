@@ -18,8 +18,19 @@ export function useDashboardFilters({
   const modelFilter = ref("all");
   const keyFilter = ref("all");
   const clientType = ref("all");
-  const allModelOptions = ref<string[]>([]);
   const keyOptions = ref<{ id: string; name: string }[]>([]);
+
+  // Derive model options from active providers (matches old getAvailableModels behavior)
+  const allModelOptions = computed(() => {
+    const set = new Set<string>();
+    for (const p of providers.value) {
+      if (!p.is_active) continue;
+      for (const m of p.models) {
+        set.add(m.name);
+      }
+    }
+    return [...set].sort();
+  });
 
   const modelOptions = computed(() => {
     if (selectedProvider.value) {
@@ -45,16 +56,11 @@ export function useDashboardFilters({
 
   async function loadFilterOptions() {
     try {
-      const [models, keys] = await Promise.allSettled([
-        api.getAvailableModels(),
-        api.getRouterKeys(),
-      ]);
-      if (models.status === "fulfilled") allModelOptions.value = models.value;
-      if (keys.status === "fulfilled")
-        keyOptions.value = keys.value.map((k) => ({
-          id: k.id,
-          name: k.name,
-        }));
+      const keysRes = await api.getRouterKeys();
+      keyOptions.value = keysRes.map((k) => ({
+        id: k.id,
+        name: k.name,
+      }));
     } catch (e: unknown) {
       console.error("useDashboardFilters.loadFilterOptions:", e);
       /* 非关键操作：filter 缺失不影响主仪表盘功能 */

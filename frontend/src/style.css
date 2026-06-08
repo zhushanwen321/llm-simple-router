@@ -1,3 +1,6 @@
+
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap');
+
 @import "./styles/tokens.css";
 @import "./styles/components.css";
 
@@ -97,5 +100,16 @@
   }
   .theme {
     --font-heading: var(--font-sans);
+  }
+}
+
+
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
   }
 }

@@ -16,6 +16,7 @@ const StatsQuerySchema = Type.Object({
   router_key_id: Type.Optional(Type.String()),
   provider_id: Type.Optional(Type.String()),
   backend_model: Type.Optional(Type.String()),
+  client_type: Type.Optional(Type.String()),
 });
 
 interface StatsRoutesOptions {
@@ -42,7 +43,7 @@ export const adminStatsRoutes: FastifyPluginCallback<StatsRoutesOptions> = (app,
       endTime = range.endTime;
     }
 
-    const stats = getStats(options.db, startTime, endTime, query.router_key_id, query.provider_id, query.backend_model);
+    const stats = getStats(options.db, startTime, endTime, query.router_key_id, query.provider_id, query.backend_model, query.client_type);
     return reply.send({ ...stats, startTime, endTime });
   });
 

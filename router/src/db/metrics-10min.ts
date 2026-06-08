@@ -251,6 +251,7 @@ export function queryAggTimeseries(
   routerKeyId?: string,
   startTime?: string,
   endTime?: string,
+  clientType?: string,
 ): MetricsTimeseriesRow[] {
   const totalSec = (startTime && endTime)
     ? (new Date(endTime).getTime() - new Date(startTime).getTime()) / MILLISECONDS_PER_SECOND
@@ -263,6 +264,7 @@ export function queryAggTimeseries(
   if (providerId) { conditions.push("m.provider_id = ?"); params.push(providerId); }
   if (backendModel) { conditions.push("m.backend_model = ?"); params.push(backendModel); }
   if (routerKeyId) { conditions.push("m.router_key_id = ?"); params.push(routerKeyId); }
+  if (clientType) { conditions.push("m.client_type = ?"); params.push(clientType); }
 
   const where = conditions.join(" AND ");
   const expr = AGG_METRIC_EXPR[metric];
@@ -302,6 +304,7 @@ export function queryAggStats(
   routerKeyId?: string,
   providerId?: string,
   backendModel?: string,
+  clientType?: string,
 ): AggStats {
   const conditions = [
     "m.bucket_time >= datetime(?)",
@@ -312,6 +315,7 @@ export function queryAggStats(
   if (routerKeyId) { conditions.push("m.router_key_id = ?"); params.push(routerKeyId); }
   if (providerId) { conditions.push("m.provider_id = ?"); params.push(providerId); }
   if (backendModel) { conditions.push("m.backend_model = ?"); params.push(backendModel); }
+  if (clientType) { conditions.push("m.client_type = ?"); params.push(clientType); }
 
   const where = conditions.join(" AND ");
 
