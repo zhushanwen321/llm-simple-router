@@ -1,7 +1,6 @@
 import { ref, computed } from "vue";
 import type { Ref, ComputedRef } from "vue";
 import { api, getApiMessage } from "@/api/client";
-import type { UsageWindowWithUsage } from "@/api/client";
 import { toast } from "vue-sonner";
 import { fillTimeseries } from "@/views/metrics-helpers";
 import { CHART_COLORS } from "@/styles/design-tokens";
@@ -20,13 +19,8 @@ export interface DashboardStats {
 
 export interface DashboardDataInput {
   selectedProvider: Ref<string>;
-  statsParams: ComputedRef<Record<string, string>>;
-  cacheSummaryParams: ComputedRef<Record<string, string>>;
-  tsParams: (
-    metric: string,
-    timeRange?: { startTime: string; endTime: string },
-  ) => { metric: string; [key: string]: string };
-  selectedWindow: ComputedRef<UsageWindowWithUsage | null>;
+  filterParams: ComputedRef<Record<string, string>>;
+  timeSelection: ComputedRef<{ startTime: string; endTime: string }>;
   watchKey: ComputedRef<string>;
   t: (key: string) => string;
 }
@@ -35,10 +29,8 @@ const CACHE_TTL = 5000;
 
 export function useDashboardData({
   selectedProvider,
-  statsParams,
-  cacheSummaryParams,
-  tsParams,
-  selectedWindow,
+  filterParams,
+  timeSelection,
   watchKey,
   t,
 }: DashboardDataInput) {
@@ -116,6 +108,29 @@ export function useDashboardData({
   let lastRefreshKey = "";
   let lastRefreshTime = 0;
 
+  function buildApiParams(): Record<string, string> {
+    const ts = timeSelection.value;
+    return {
+      ...filterParams.value,
+      period: "window",
+      start_time: ts.startTime,
+      end_time: ts.endTime,
+    };
+  }
+
+  function buildTsParams(metric: string) {
+    const base = buildApiParams();
+    return {
+      period: base.period,
+      metric,
+      provider_id: base.provider_id,
+      backend_model: base.backend_model,
+      router_key_id: base.router_key_id,
+      start_time: base.start_time,
+      end_time: base.end_time,
+    };
+  }
+
   async function refresh() {
     if (!selectedProvider.value) return;
     const key = watchKey.value;
@@ -124,33 +139,18 @@ export function useDashboardData({
     // 只在首次加载时显示 skeleton，已有数据时静默刷新避免闪烁
     loading.value = !stats.value.totalRequests && !stats.value.totalInputTokens;
     try {
-      const windowTimeRange = selectedWindow.value
-        ? {
-          startTime: selectedWindow.value.window.start_time,
-          endTime: selectedWindow.value.window.end_time,
-        }
-        : undefined;
-
-      const finalStatsParams: Record<string, string> = {
-        ...statsParams.value,
+      const timeRange = {
+        startTime: timeSelection.value.startTime,
+        endTime: timeSelection.value.endTime,
       };
-      const finalCacheSummaryParams: Record<string, string> = {
-        ...cacheSummaryParams.value,
-      };
-      if (windowTimeRange) {
-        finalStatsParams.start_time = windowTimeRange.startTime;
-        finalStatsParams.end_time = windowTimeRange.endTime;
-        finalCacheSummaryParams.start_time = windowTimeRange.startTime;
-        finalCacheSummaryParams.end_time = windowTimeRange.endTime;
-      }
 
       const [statsRes, tpsRes, inputRes, outputRes, summaryRes] =
         await Promise.allSettled([
-          api.getStats(finalStatsParams),
-          api.getMetricsTimeseries(tsParams("total_tps", windowTimeRange)),
-          api.getMetricsTimeseries(tsParams("input_tokens", windowTimeRange)),
-          api.getMetricsTimeseries(tsParams("output_tokens", windowTimeRange)),
-          api.getMetricsSummary(finalCacheSummaryParams),
+          api.getStats(buildApiParams()),
+          api.getMetricsTimeseries(buildTsParams("total_tps")),
+          api.getMetricsTimeseries(buildTsParams("input_tokens")),
+          api.getMetricsTimeseries(buildTsParams("output_tokens")),
+          api.getMetricsSummary(buildApiParams()),
         ]);
 
       const fulfilled = <T>(
@@ -162,7 +162,7 @@ export function useDashboardData({
       const resolvedTimeRange =
         stats.value.startTime && stats.value.endTime
           ? { startTime: stats.value.startTime, endTime: stats.value.endTime }
-          : windowTimeRange;
+          : timeRange;
 
       const period = "window";
 

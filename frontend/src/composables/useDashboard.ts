@@ -10,6 +10,7 @@ import { useDashboardFilters } from "./useDashboardFilters";
 import type { DashboardStats } from "./useDashboardData";
 import { useDashboardData } from "./useDashboardData";
 import { useTimeSelector } from "./useTimeSelector";
+import type { TimeSelection } from "./useTimeSelector";
 
 // --- Constants ---
 
@@ -91,28 +92,12 @@ export function useDashboard() {
     });
   });
 
-  // --- Synthesize selectedWindow from timeSelector for useDashboardData ---
-  // useDashboardData 的接口要求 `selectedWindow: ComputedRef<UsageWindowWithUsage | null>`，
-  // 内部从 `selectedWindow.value.window.start_time/end_time` 读取时间范围。
-  // 我们合成一个镜像 timeSelector.timeSelection 的对象，避免改动 useDashboardData 签名。
-  const selectedWindowFromTime = computed<UsageWindowWithUsage | null>(() => {
-    const sel = timeSelector.timeSelection.value;
-    if (!sel) return null;
+  // --- Convert timeSelector.timeSelection (Date) to ISO string for useDashboardData ---
+  const timeSelectionForData = computed(() => {
+    const sel: TimeSelection = timeSelector.timeSelection.value;
     return {
-      window: {
-        id: `time-selector-${sel.source}`,
-        router_key_id: null,
-        provider_id: selectedProvider.value || null,
-        provider_name: null,
-        start_time: sel.startTime.toISOString(),
-        end_time: sel.endTime.toISOString(),
-        created_at: new Date().toISOString(),
-      },
-      usage: {
-        request_count: 0,
-        total_input_tokens: 0,
-        total_output_tokens: 0,
-      },
+      startTime: sel.startTime.toISOString(),
+      endTime: sel.endTime.toISOString(),
     };
   });
 
@@ -136,10 +121,8 @@ export function useDashboard() {
   // --- Data fetching ---
   const data = useDashboardData({
     selectedProvider,
-    statsParams: filters.statsParams,
-    cacheSummaryParams: filters.cacheSummaryParams,
-    tsParams: filters.tsParams,
-    selectedWindow: selectedWindowFromTime,
+    filterParams: filters.filterParams,
+    timeSelection: timeSelectionForData,
     watchKey,
     t,
   });
