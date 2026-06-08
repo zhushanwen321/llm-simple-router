@@ -1,4 +1,7 @@
 import Database from "better-sqlite3";
+import { getMetricsDetailDays } from "./settings.js";
+import { queryAggStats } from "./metrics-10min.js";
+import { SECONDS_PER_DAY, MS_PER_SECOND } from "../core/constants.js";
 
 /** 获取指定条件下的最近一条 metric 的 created_at（用于窗口补齐定位，不限制 is_complete） */
 export function getLatestMetricTime(
@@ -29,6 +32,7 @@ export interface Stats {
   avgTps: number;
   totalInputTokens: number;
   totalOutputTokens: number;
+  is_approximate: boolean;
 }
 
 interface StatsRow {
@@ -78,11 +82,55 @@ export function getStats(
   `).get(...params) as StatsRow;
 
   const total = row?.total_requests ?? 0;
+  const detailDays = getMetricsDetailDays(db);
+  const now = new Date();
+  const cutoffTime = new Date(now.getTime() - detailDays * SECONDS_PER_DAY * MS_PER_SECOND).toISOString();
+  const isApproximate = endTime > cutoffTime;
+
+  if (!isApproximate) {
+    // 全量走聚合表
+    const aggStats = queryAggStats(db, startTime, endTime, routerKeyId, providerId, backendModel);
+    return {
+      totalRequests: aggStats.totalRequests,
+      successRate: 0,
+      avgTps: aggStats.avgTps,
+      totalInputTokens: aggStats.totalInputTokens,
+      totalOutputTokens: aggStats.totalOutputTokens,
+      is_approximate: true,
+    };
+  }
+
+  if (startTime >= cutoffTime) {
+    // 全量走明细表
+    return {
+      totalRequests: total,
+      successRate: total > 0 ? (row?.success_count ?? 0) / total : 0,
+      avgTps: row?.avg_tps ?? 0,
+      totalInputTokens: row?.total_input_tokens ?? 0,
+      totalOutputTokens: row?.total_output_tokens ?? 0,
+      is_approximate: false,
+    };
+  }
+
+  // 跨越分界线：聚合表段
+  const aggStats = queryAggStats(db, startTime, cutoffTime, routerKeyId, providerId, backendModel);
+
+  // 合并：totalRequests/totalInputTokens/totalOutputTokens 求和，avg_tps 加权平均
+  const mergedTotalRequests = total + aggStats.totalRequests;
+  const mergedTotalInputTokens = (row?.total_input_tokens ?? 0) + aggStats.totalInputTokens;
+  const mergedTotalOutputTokens = (row?.total_output_tokens ?? 0) + aggStats.totalOutputTokens;
+  const mergedSuccessCount = row?.success_count ?? 0; // 聚合表无 status_code，只取明细段成功数
+  let mergedAvgTps = 0;
+  if (total + aggStats.totalRequests > 0) {
+    mergedAvgTps = ((row?.avg_tps ?? 0) * total + aggStats.avgTps * aggStats.totalRequests) / (total + aggStats.totalRequests);
+  }
+
   return {
-    totalRequests: total,
-    successRate: total > 0 ? (row?.success_count ?? 0) / total : 0,
-    avgTps: row?.avg_tps ?? 0,
-    totalInputTokens: row?.total_input_tokens ?? 0,
-    totalOutputTokens: row?.total_output_tokens ?? 0,
+    totalRequests: mergedTotalRequests,
+    successRate: mergedTotalRequests > 0 ? mergedSuccessCount / mergedTotalRequests : 0,
+    avgTps: mergedAvgTps,
+    totalInputTokens: mergedTotalInputTokens,
+    totalOutputTokens: mergedTotalOutputTokens,
+    is_approximate: true,
   };
 }

@@ -28,6 +28,7 @@ export function getProxyApiType(url: string): string | null {
 }
 
 export const MS_PER_SECOND = 1000;
+export const SECONDS_PER_DAY = 86_400;
 
 // 上游成功状态码
 export const UPSTREAM_SUCCESS = 200;
