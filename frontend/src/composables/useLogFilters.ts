@@ -2,7 +2,7 @@ import { ref, computed, onMounted } from "vue";
 import { toast } from "vue-sonner";
 import { useI18n } from "vue-i18n";
 import { api, getApiMessage } from "@/api/client";
-import type { Provider } from "@/types/mapping";
+import type { Provider, Rule } from "@/types/mapping";
 import { toIsoStart, toIsoEnd } from "@/utils/format";
 
 const PERIODS = [
@@ -96,18 +96,25 @@ export function useLogFilters() {
     }
   }
 
+  /** 从映射组提取 client_model 和 backend_model 列表，避免扫描 metrics 大表 */
   async function loadModelOptions() {
     try {
-      const [summaryResult, availableModels] = await Promise.allSettled([
-        api.getMetricsSummary({ period: "30d" }),
-        api.getAvailableModels(),
-      ]);
-      clientModelOptions.value =
-        availableModels.status === "fulfilled" ? availableModels.value : [];
-      backendModelOptions.value =
-        summaryResult.status === "fulfilled"
-          ? [...new Set(summaryResult.value.rows.map((r) => r.backend_model))]
-          : [];
+      const groups = await api.getMappingGroups();
+      const clientSet = new Set<string>();
+      const backendSet = new Set<string>();
+      for (const g of groups) {
+        if (g.client_model) clientSet.add(g.client_model);
+        try {
+          const rule: Rule = JSON.parse(g.rule);
+          for (const t of rule.targets ?? []) {
+            if (t.backend_model) backendSet.add(t.backend_model);
+          }
+        } catch {
+          /* rule 格式异常，跳过 */
+        }
+      }
+      clientModelOptions.value = [...clientSet].sort();
+      backendModelOptions.value = [...backendSet].sort();
     } catch (e: unknown) {
       console.error("useLogFilters.loadModelOptions:", e);
       clientModelOptions.value = [];
