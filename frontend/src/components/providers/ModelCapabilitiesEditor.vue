@@ -11,7 +11,14 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import { ChevronRight, RotateCw } from "lucide-vue-next";
+import {
+  ChevronRight,
+  RotateCw,
+  Type,
+  ImageIcon,
+  Volume2,
+  Video,
+} from "lucide-vue-next";
 import ModelCard from "@/components/quick-setup/ModelCard.vue";
 import TransformRulesForm from "@/components/shared/TransformRulesForm.vue";
 import ProxyConfigForm from "@/components/shared/ProxyConfigForm.vue";
@@ -31,10 +38,10 @@ const advancedOpen = ref(false);
 const newCapabilities = ref<string[]>(["text"]);
 
 const capabilityIcons = [
-  { key: "text", icon: "T", label: "text" },
-  { key: "image", icon: "IMG", label: "image" },
-  { key: "audio", icon: "AUD", label: "audio" },
-  { key: "video", icon: "VID", label: "video" },
+  { key: "text", icon: Type, label: "text" },
+  { key: "image", icon: ImageIcon, label: "image" },
+  { key: "audio", icon: Volume2, label: "audio" },
+  { key: "video", icon: Video, label: "video" },
 ] as const;
 
 function toggleNewCapability(key: string) {
@@ -331,7 +338,7 @@ function isOfficialOpenai(url: string): boolean {
             :title="cap.label"
             @click="toggleNewCapability(cap.key)"
           >
-            {{ cap.icon }}
+            <component :is="cap.icon" class="size-[11px]" />
           </Button>
         </div>
         <Button

@@ -147,6 +147,7 @@ export function logResilienceResult(
         router_key_id: params.routerKeyId, original_model: params.originalModel,
         session_id: params.sessionId,
         pipeline_snapshot: params.pipelineSnapshot ?? null,
+        backend_model: attempt.target.backend_model,
         ...diagnosticFields,
       }, attemptWriteContext);
     } else if (attempt.error) {
@@ -165,6 +166,7 @@ export function logResilienceResult(
         router_key_id: params.routerKeyId, original_model: params.originalModel,
         session_id: params.sessionId,
         pipeline_snapshot: params.pipelineSnapshot ?? null,
+        backend_model: attempt.target.backend_model,
         ...diagnosticFields,
       }, attemptWriteContext);
     } else if (attempt.statusCode !== UPSTREAM_SUCCESS) {
@@ -181,6 +183,7 @@ export function logResilienceResult(
         router_key_id: params.routerKeyId, original_model: params.originalModel,
         session_id: params.sessionId,
         pipeline_snapshot: params.pipelineSnapshot ?? null,
+        backend_model: attempt.target.backend_model,
         ...diagnosticFields,
       }, attemptWriteContext);
     } else {
@@ -202,6 +205,7 @@ export function logResilienceResult(
         pipelineSnapshot: params.pipelineSnapshot,
         matcher: params.matcher,
         logFileWriter: params.logFileWriter,
+        backend_model: attempt.target.backend_model,
         ...diagnosticFields,
       });
       lastSuccessLogId = attemptLogId;

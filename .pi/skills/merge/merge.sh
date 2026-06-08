@@ -44,7 +44,7 @@ NC='\033[0m'
 LOG_FILE="${LOG_FILE:-}"
 
 _valid_log_level() { case "$1" in INFO|WARN|ERROR|PHASE|CMD|HOOK|CHECK|CI) return 0 ;; *) return 1 ;; esac; }
-log()       { [[ -n "$LOG_FILE" ]] && _valid_log_level "$1" && echo "[$(date +%Y-%m-%dT%H:%M:%S)] [$1] $2" >> "$LOG_FILE"; }
+log()       { [[ -n "$LOG_FILE" ]] || return 0; _valid_log_level "$1" && echo "[$(date +%Y-%m-%dT%H:%M:%S)] [$1] $2" >> "$LOG_FILE"; }
 log_info()  { log "INFO" "$*"; }
 log_warn()  { log "WARN" "$*"; }
 log_error() { log "ERROR" "$*"; }
@@ -242,8 +242,8 @@ if [[ -n "$NOTES_FILE" ]] && [[ ! -f "$NOTES_FILE" ]]; then
     exit 1
 fi
 
-if [[ ! "$FROM_PHASE" =~ ^[0-6]$ ]]; then
-    echo -e "${RED}Error: --from 必须是 0-6 的数字${NC}"
+if [[ ! "$FROM_PHASE" =~ ^[1-6]$ ]] && [[ "$FROM_PHASE" != "0" ]]; then
+    echo -e "${RED}Error: --from 必须是 1-6 的数字${NC}"
     exit 1
 fi
 
@@ -944,10 +944,8 @@ phase_verify() {
 # 主流程
 # ════════════════════════════════════════════════════
 
-# 阶段 0 始终执行
-if [[ $FROM_PHASE -le 0 ]]; then
-    phase_init
-fi
+# 阶段 0 始终执行（初始化变量，其他阶段依赖）
+phase_init
 
 # 阶段 1-6 按 --from 跳过
 if [[ $FROM_PHASE -le 1 ]]; then

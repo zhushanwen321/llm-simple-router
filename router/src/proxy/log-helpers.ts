@@ -45,6 +45,7 @@ export interface RequestLogParams extends LogRetryMeta {
   failover_trigger?: string | null;
   upstream_api_type?: string | null;
   upstream_base_url?: string | null;
+  backend_model?: string | null;
 }
 
 /** 插入成功请求日志，供 openai/anthropic 插件共享 */
@@ -57,7 +58,7 @@ export function insertSuccessLog(
     isRetry = false, isFailover = false, originalRequestId = null, routerKeyId = null, originalModel = null,
     sessionId = null, pipelineSnapshot = null, matcher, logFileWriter,
     transport_kind, abort_reason, error_code, headers_sent, resilience_action, resilience_reason, mapping_reason, failover_trigger,
-    upstream_api_type, upstream_base_url } = params;
+    upstream_api_type, upstream_base_url, backend_model } = params;
 
   const writeContext: LogWriteContext | undefined = (matcher || logFileWriter) ? {
     matcher,
@@ -86,6 +87,7 @@ export function insertSuccessLog(
     failover_trigger: failover_trigger ?? null,
     upstream_api_type: upstream_api_type ?? null,
     upstream_base_url: upstream_base_url ?? null,
+    backend_model: backend_model ?? null,
   }, writeContext);
 }
 
@@ -117,6 +119,7 @@ export interface RejectedLogParams extends LogRetryMeta {
   failover_trigger?: string | null;
   upstream_api_type?: string | null;
   upstream_base_url?: string | null;
+  backend_model?: string | null;
 }
 
 /** Log a request rejected before reaching upstream */
@@ -127,7 +130,7 @@ export function insertRejectedLog(params: RejectedLogParams): void {
     sessionId = null, pipelineSnapshot = null, matcher, logFileWriter,
     mapping_reason, transport_kind, abort_reason, error_code, headers_sent,
     resilience_action, resilience_reason, failover_trigger,
-    upstream_api_type, upstream_base_url } = params;
+    upstream_api_type, upstream_base_url, backend_model } = params;
 
   const writeContext: LogWriteContext | undefined = (matcher || logFileWriter) ? {
     matcher,
@@ -162,5 +165,6 @@ export function insertRejectedLog(params: RejectedLogParams): void {
     failover_trigger: failover_trigger ?? null,
     upstream_api_type: upstream_api_type ?? null,
     upstream_base_url: upstream_base_url ?? null,
+    backend_model: backend_model ?? null,
   }, writeContext);
 }

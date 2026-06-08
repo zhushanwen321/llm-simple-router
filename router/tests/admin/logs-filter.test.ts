@@ -119,18 +119,18 @@ describe("Admin API: log filtering by client_model and backend_model", () => {
   });
 
   // ----------------------------------------------------------------
-  // Test 4: backend_model LIKE partial match
+  // Test 4: backend_model exact match
   // ----------------------------------------------------------------
-  it("test_backend_model_partial_match_returns_multiple_logs", async () => {
+  it("test_backend_model_exact_match_returns_log", async () => {
     const res = await app.inject({
       method: "GET",
-      url: "/admin/api/logs?backend_model=gpt-4o",
+      url: "/admin/api/logs?backend_model=gpt-4o-2024-08-06",
       headers: { cookie },
     });
     expect(res.statusCode).toBe(200);
     const body = res.json().data;
-    // Should match log-1 (gpt-4o-2024-08-06) and log-3 (gpt-4o-mini-2024-07-18)
-    expect(body.total).toBe(2);
+    expect(body.total).toBe(1);
+    expect(body.data[0].backend_model).toBe("gpt-4o-2024-08-06");
   });
 
   // ----------------------------------------------------------------
@@ -217,7 +217,7 @@ describe("Admin API: log filtering by client_model and backend_model", () => {
   it("test_grouped_view_respects_backend_model_filter", async () => {
     const res = await app.inject({
       method: "GET",
-      url: "/admin/api/logs?view=grouped&backend_model=claude",
+      url: "/admin/api/logs?view=grouped&backend_model=claude-3-opus-20240229",
       headers: { cookie },
     });
     expect(res.statusCode).toBe(200);
