@@ -210,7 +210,7 @@ export function queryAggSummary(
 
 // --- Timeseries query (供 BG3 使用) ---
 
-const AGG_METRIC_EXPR: Record<MetricsMetric, string> = {
+export const AGG_METRIC_EXPR: Record<MetricsMetric, string> = {
   ttft: "SUM(m.sum_ttft_ms) / CASE WHEN SUM(m.request_count) > 0 THEN SUM(m.request_count) ELSE 1 END",
   tps: "CASE WHEN SUM(m.sum_total_duration_ms) > 0 THEN CAST(SUM(m.sum_output_tokens) AS REAL) * 1000.0 / SUM(m.sum_total_duration_ms) ELSE NULL END",
   text_tps: "CASE WHEN SUM(m.sum_text_duration_ms) > 0 THEN CAST(SUM(m.sum_text_tokens) AS REAL) * 1000.0 / SUM(m.sum_text_duration_ms) ELSE NULL END",

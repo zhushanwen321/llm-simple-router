@@ -1,8 +1,9 @@
 import Database from "better-sqlite3";
 import { randomUUID } from "crypto";
-import { MS_PER_SECOND } from "../core/constants.js";
+import { MS_PER_SECOND, SECONDS_PER_DAY } from "../core/constants.js";
 import { getCachedStmt } from "./helpers.js";
-import { upsertAggBucket } from "./metrics-10min.js";
+import { queryAggSummary, queryAggTimeseries, AGG_METRIC_EXPR, upsertAggBucket } from "./metrics-10min.js";
+import { getMetricsDetailDays } from "./settings.js";
 
 export type MetricsPeriod = "1h" | "5h" | "6h" | "24h" | "7d" | "30d";
 export type MetricsMetric = "ttft" | "tps" | "text_tps" | "thinking_tps" | "tool_use_tps" | "non_thinking_tps" | "total_tps" | "tokens" | "cache_rate" | "request_count" | "input_tokens" | "output_tokens" | "cache_hit_tokens";
@@ -114,6 +115,7 @@ const PERIOD_OFFSET: Record<MetricsPeriod, string> = {
 // 精确 DATA_POINT_COUNT 个数据点：总秒数 / DATA_POINT_COUNT，最小 MIN_BUCKET_SEC 秒避免过细
 const MIN_BUCKET_SEC = 60;
 const DATA_POINT_COUNT = 10;
+const PERCENT = 100;
 
 function calcBucketSec(totalSec: number): number {
   return Math.max(MIN_BUCKET_SEC, Math.round(totalSec / DATA_POINT_COUNT));
@@ -146,6 +148,108 @@ const PERIOD_TOTAL_SEC: Record<MetricsPeriod, number> = {
   "30d": 2592000,
 };
 
+// --- Metrics routing helpers (BG3: detail/agg table routing) ---
+
+function computeEffectiveTimeRange(period: MetricsPeriod, startTime?: string, endTime?: string) {
+  if (startTime && endTime) return { effectiveStart: startTime, effectiveEnd: endTime };
+  const now = new Date();
+  const end = now.toISOString();
+  const durations: Record<MetricsPeriod, number> = {
+    "1h": 3600_000,
+    "5h": 18000_000,
+    "6h": 21600_000,
+    "24h": 86400_000,
+    "7d": 604800_000,
+    "30d": 2592000_000,
+  };
+  const start = new Date(now.getTime() - durations[period]).toISOString();
+  return { effectiveStart: start, effectiveEnd: end };
+}
+
+function queryAggRouterKeyIdCondition(routerKeyId?: string): {
+  aggRouterKeyWhere: string;
+  aggRouterKeyParam: unknown[];
+} {
+  return routerKeyId
+    ? { aggRouterKeyWhere: "COALESCE(m.router_key_id, '') = COALESCE(?, '')", aggRouterKeyParam: [routerKeyId] }
+    : { aggRouterKeyWhere: "1=1", aggRouterKeyParam: [] };
+}
+
+function mergeSummaryResults(detail: MetricsSummaryRow[], agg: MetricsSummaryRow[]): MetricsSummaryRow[] {
+  const map = new Map<string, MetricsSummaryRow>();
+  for (const row of [...detail, ...agg]) {
+    const key = `${row.provider_id}|${row.backend_model}|${row.client_type}`;
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, { ...row });
+    } else {
+      const mergedInputTokens = existing.total_input_tokens + row.total_input_tokens;
+      const mergedOutputTokens = existing.total_output_tokens + row.total_output_tokens;
+      const mergedCacheTokens = existing.total_cache_hit_tokens + row.total_cache_hit_tokens;
+      const mergedRequestCount = existing.request_count + row.request_count;
+      existing.avg_ttft_ms = mergedRequestCount > 0
+        ? ((existing.avg_ttft_ms ?? 0) * existing.request_count + (row.avg_ttft_ms ?? 0) * row.request_count) / mergedRequestCount
+        : null;
+      existing.request_count = mergedRequestCount;
+      existing.total_input_tokens = mergedInputTokens;
+      existing.total_output_tokens = mergedOutputTokens;
+      existing.total_cache_hit_tokens = mergedCacheTokens;
+      existing.avg_tps = (mergedOutputTokens > 0 && mergedInputTokens + mergedOutputTokens > 0)
+        ? mergedOutputTokens * MS_PER_SECOND / (mergedInputTokens + mergedOutputTokens) : null;
+      existing.cache_hit_rate = mergedInputTokens > 0 ? mergedCacheTokens * PERCENT / mergedInputTokens : null;
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => b.request_count - a.request_count);
+}
+
+function mergeTimeseriesResults(detail: MetricsTimeseriesRow[], agg: MetricsTimeseriesRow[]): MetricsTimeseriesRow[] {
+  const map = new Map<string, MetricsTimeseriesRow>();
+  for (const row of [...detail, ...agg]) {
+    const existing = map.get(row.time_bucket);
+    if (!existing) {
+      map.set(row.time_bucket, { ...row });
+    } else {
+      const totalCount = (existing.count ?? 0) + (row.count ?? 0);
+      existing.avg_value = totalCount > 0
+        ? ((existing.avg_value ?? 0) * (existing.count ?? 0) + (row.avg_value ?? 0) * (row.count ?? 0)) / totalCount
+        : null;
+      existing.count = totalCount;
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => a.time_bucket.localeCompare(b.time_bucket));
+}
+
+function mergeBreakdownResults(a: ClientTypeBreakdown, b: ClientTypeBreakdown): ClientTypeBreakdown {
+  const result: ClientTypeBreakdown = { ...a };
+  for (const [k, v] of Object.entries(b)) {
+    result[k] = (result[k] ?? 0) + v;
+  }
+  return result;
+}
+
+function queryAggClientTypeBreakdown(
+  db: Database.Database,
+  startTime: string,
+  endTime: string,
+  providerId?: string,
+  backendModel?: string,
+  routerKeyId?: string,
+): ClientTypeBreakdown {
+  const { aggRouterKeyWhere, aggRouterKeyParam } = queryAggRouterKeyIdCondition(routerKeyId);
+  const conditions = ["bucket_time >= datetime(?)", "bucket_time < datetime(?)", aggRouterKeyWhere];
+  const params: unknown[] = [startTime, endTime, ...aggRouterKeyParam];
+  if (providerId) { conditions.push("provider_id = ?"); params.push(providerId); }
+  if (backendModel) { conditions.push("backend_model = ?"); params.push(backendModel); }
+  const rows = db.prepare(
+    `SELECT client_type, SUM(request_count) AS cnt FROM metrics_10min WHERE ${conditions.join(" AND ")} GROUP BY client_type`,
+  ).all(...params) as { client_type: string; cnt: number }[];
+  const breakdown: ClientTypeBreakdown = {};
+  for (const r of rows) {
+    breakdown[r.client_type] = r.cnt;
+  }
+  return breakdown;
+}
+
 function buildTimeCondition(
   period: MetricsPeriod,
   startTime?: string,
@@ -175,20 +279,52 @@ export function getMetricsSummary(
   endTime?: string,
   clientType?: string,
 ): MetricsSummaryRow[] {
-  const { timeWhere, timeParams } = buildTimeCondition(period, startTime, endTime);
-  const conditions = [timeWhere];
-  const params: unknown[] = [...timeParams];
-  const joins = ["LEFT JOIN providers p ON p.id = rm.provider_id"];
+  const detailDays = getMetricsDetailDays(db);
+  const { effectiveStart, effectiveEnd } = computeEffectiveTimeRange(period, startTime, endTime);
+  const now = new Date();
+  const cutoffTime = new Date(now.getTime() - detailDays * SECONDS_PER_DAY * MS_PER_SECOND).toISOString();
 
-  if (providerId) { conditions.push("rm.provider_id = ?"); params.push(providerId); }
-  if (backendModel) { conditions.push("rm.backend_model = ?"); params.push(backendModel); }
-  if (routerKeyId) {
-    conditions.push("rm.router_key_id = ?");
-    params.push(routerKeyId);
+  if (effectiveEnd <= cutoffTime) {
+    return queryAggSummary(db, period, providerId, backendModel, routerKeyId, startTime, endTime, clientType);
   }
-  if (clientType) { conditions.push("rm.client_type = ?"); params.push(clientType); }
+  if (effectiveStart >= cutoffTime) {
+    const { timeWhere, timeParams } = buildTimeCondition(period, startTime, endTime);
+    const conditions = [timeWhere];
+    const params: unknown[] = [...timeParams];
+    const joins = ["LEFT JOIN providers p ON p.id = rm.provider_id"];
 
-  return db.prepare(`
+    if (providerId) { conditions.push("rm.provider_id = ?"); params.push(providerId); }
+    if (backendModel) { conditions.push("rm.backend_model = ?"); params.push(backendModel); }
+    if (routerKeyId) { conditions.push("rm.router_key_id = ?"); params.push(routerKeyId); }
+    if (clientType) { conditions.push("rm.client_type = ?"); params.push(clientType); }
+
+    return db.prepare(`
+      SELECT
+        rm.provider_id, COALESCE(p.name, rm.provider_id) AS provider_name, rm.backend_model, rm.client_type,
+        COUNT(*) AS request_count, AVG(rm.ttft_ms) AS avg_ttft_ms, NULL AS p50_ttft_ms, NULL AS p95_ttft_ms,
+        CASE WHEN SUM(rm.total_duration_ms) > 0 THEN CAST(SUM(rm.output_tokens) AS REAL) * 1000.0 / SUM(rm.total_duration_ms) ELSE NULL END AS avg_tps,
+        COALESCE(SUM(rm.input_tokens), 0) AS total_input_tokens, COALESCE(SUM(rm.output_tokens), 0) AS total_output_tokens,
+        COALESCE(SUM(rm.cache_read_tokens), 0) AS total_cache_hit_tokens,
+        CASE WHEN SUM(rm.input_tokens) > 0 THEN SUM(rm.cache_read_tokens) * 100.0 / SUM(rm.input_tokens) ELSE NULL END AS cache_hit_rate
+      FROM request_metrics rm
+      ${joins.join(" ")}
+      WHERE ${conditions.join(" AND ")}
+      GROUP BY rm.provider_id, rm.backend_model, rm.client_type ORDER BY request_count DESC
+    `).all(...params) as MetricsSummaryRow[];
+  }
+
+  // Cross-boundary: detail segment + agg segment → merge
+  const { timeWhere: detailTimeWhere, timeParams: detailTimeParams } = buildTimeCondition(period, effectiveStart, cutoffTime);
+  const detailConditions = [detailTimeWhere];
+  const detailParams: unknown[] = [...detailTimeParams];
+  const detailJoins = ["LEFT JOIN providers p ON p.id = rm.provider_id"];
+
+  if (providerId) { detailConditions.push("rm.provider_id = ?"); detailParams.push(providerId); }
+  if (backendModel) { detailConditions.push("rm.backend_model = ?"); detailParams.push(backendModel); }
+  if (routerKeyId) { detailConditions.push("rm.router_key_id = ?"); detailParams.push(routerKeyId); }
+  if (clientType) { detailConditions.push("rm.client_type = ?"); detailParams.push(clientType); }
+
+  const detailResult = db.prepare(`
     SELECT
       rm.provider_id, COALESCE(p.name, rm.provider_id) AS provider_name, rm.backend_model, rm.client_type,
       COUNT(*) AS request_count, AVG(rm.ttft_ms) AS avg_ttft_ms, NULL AS p50_ttft_ms, NULL AS p95_ttft_ms,
@@ -197,10 +333,43 @@ export function getMetricsSummary(
       COALESCE(SUM(rm.cache_read_tokens), 0) AS total_cache_hit_tokens,
       CASE WHEN SUM(rm.input_tokens) > 0 THEN SUM(rm.cache_read_tokens) * 100.0 / SUM(rm.input_tokens) ELSE NULL END AS cache_hit_rate
     FROM request_metrics rm
-    ${joins.join(" ")}
-    WHERE ${conditions.join(" AND ")}
+    ${detailJoins.join(" ")}
+    WHERE ${detailConditions.join(" AND ")}
     GROUP BY rm.provider_id, rm.backend_model, rm.client_type ORDER BY request_count DESC
-  `).all(...params) as MetricsSummaryRow[];
+  `).all(...detailParams) as MetricsSummaryRow[];
+
+  const { aggRouterKeyWhere, aggRouterKeyParam } = queryAggRouterKeyIdCondition(routerKeyId);
+  const aggConditions = ["m.bucket_time >= datetime(?)", "m.bucket_time < datetime(?)", aggRouterKeyWhere];
+  const aggParams: unknown[] = [cutoffTime, effectiveEnd, ...aggRouterKeyParam];
+  if (providerId) { aggConditions.push("m.provider_id = ?"); aggParams.push(providerId); }
+  if (backendModel) { aggConditions.push("m.backend_model = ?"); aggParams.push(backendModel); }
+  if (clientType) { aggConditions.push("m.client_type = ?"); aggParams.push(clientType); }
+  const aggWhere = aggConditions.join(" AND ");
+
+  const aggResult = db.prepare(`
+    SELECT
+      m.provider_id, COALESCE(p.name, m.provider_id) AS provider_name,
+      m.backend_model, m.client_type,
+      SUM(m.request_count) AS request_count,
+      CASE WHEN SUM(m.request_count) > 0 THEN SUM(m.sum_ttft_ms) / SUM(m.request_count) ELSE NULL END AS avg_ttft_ms,
+      NULL AS p50_ttft_ms, NULL AS p95_ttft_ms,
+      CASE WHEN SUM(m.sum_total_duration_ms) > 0
+        THEN CAST(SUM(m.sum_output_tokens) AS REAL) * 1000.0 / SUM(m.sum_total_duration_ms)
+        ELSE NULL END AS avg_tps,
+      SUM(m.sum_input_tokens) AS total_input_tokens,
+      SUM(m.sum_output_tokens) AS total_output_tokens,
+      SUM(m.sum_cache_read_tokens) AS total_cache_hit_tokens,
+      CASE WHEN SUM(m.sum_input_tokens) > 0
+        THEN SUM(m.sum_cache_read_tokens) * 100.0 / SUM(m.sum_input_tokens)
+        ELSE NULL END AS cache_hit_rate
+    FROM metrics_10min m
+    LEFT JOIN providers p ON p.id = m.provider_id
+    WHERE ${aggWhere}
+    GROUP BY m.provider_id, m.backend_model, m.client_type
+    ORDER BY request_count DESC
+  `).all(...aggParams) as MetricsSummaryRow[];
+
+  return mergeSummaryResults(detailResult, aggResult);
 }
 
 export interface ClientTypeBreakdown {
@@ -216,26 +385,41 @@ export function getClientTypeBreakdown(
   startTime?: string,
   endTime?: string,
 ): ClientTypeBreakdown {
-  const { timeWhere, timeParams } = buildTimeCondition(period, startTime, endTime);
-  const conditions = [timeWhere];
-  const params: unknown[] = [...timeParams];
+  const detailDays = getMetricsDetailDays(db);
+  const { effectiveStart, effectiveEnd } = computeEffectiveTimeRange(period, startTime, endTime);
+  const now = new Date();
+  const cutoffTime = new Date(now.getTime() - detailDays * SECONDS_PER_DAY * MS_PER_SECOND).toISOString();
 
-  if (providerId) { conditions.push("rm.provider_id = ?"); params.push(providerId); }
-  if (backendModel) { conditions.push("rm.backend_model = ?"); params.push(backendModel); }
-  if (routerKeyId) { conditions.push("rm.router_key_id = ?"); params.push(routerKeyId); }
-
-  const rows = db.prepare(`
-    SELECT rm.client_type, COUNT(*) AS cnt
-    FROM request_metrics rm
-    WHERE ${conditions.join(" AND ")}
-    GROUP BY rm.client_type
-  `).all(...params) as { client_type: string; cnt: number }[];
-
-  const breakdown: ClientTypeBreakdown = {};
-  for (const r of rows) {
-    breakdown[r.client_type] = r.cnt;
+  if (effectiveEnd <= cutoffTime) {
+    return queryAggClientTypeBreakdown(db, effectiveStart, effectiveEnd, providerId, backendModel, routerKeyId);
   }
-  return breakdown;
+  if (effectiveStart >= cutoffTime) {
+    const { timeWhere, timeParams } = buildTimeCondition(period, startTime, endTime);
+    const conditions = [timeWhere];
+    const params: unknown[] = [...timeParams];
+
+    if (providerId) { conditions.push("rm.provider_id = ?"); params.push(providerId); }
+    if (backendModel) { conditions.push("rm.backend_model = ?"); params.push(backendModel); }
+    if (routerKeyId) { conditions.push("rm.router_key_id = ?"); params.push(routerKeyId); }
+
+    const rows = db.prepare(`
+      SELECT rm.client_type, COUNT(*) AS cnt
+      FROM request_metrics rm
+      WHERE ${conditions.join(" AND ")}
+      GROUP BY rm.client_type
+    `).all(...params) as { client_type: string; cnt: number }[];
+
+    const breakdown: ClientTypeBreakdown = {};
+    for (const r of rows) {
+      breakdown[r.client_type] = r.cnt;
+    }
+    return breakdown;
+  }
+
+  // Cross-boundary: detail segment + agg segment → merge
+  const detailBreakdown = getClientTypeBreakdown(db, period, providerId, backendModel, routerKeyId, effectiveStart, cutoffTime);
+  const aggBreakdown = queryAggClientTypeBreakdown(db, cutoffTime, effectiveEnd, providerId, backendModel, routerKeyId);
+  return mergeBreakdownResults(detailBreakdown, aggBreakdown);
 }
 
 export interface MetricsTimeseriesRow {
@@ -270,36 +454,107 @@ export function getMetricsTimeseries(
   startTime?: string,
   endTime?: string,
 ): MetricsTimeseriesRow[] {
-  const bucketSec = (startTime && endTime)
-    ? calcBucketSec((new Date(endTime).getTime() - new Date(startTime).getTime()) / MS_PER_SECOND)
-    : calcBucketSec(PERIOD_TOTAL_SEC[period]);
-  const { timeWhere, timeParams } = buildTimeCondition(period, startTime, endTime);
-  const conditions = [timeWhere];
-  const params: unknown[] = [...timeParams];
+  const detailDays = getMetricsDetailDays(db);
+  const { effectiveStart, effectiveEnd } = computeEffectiveTimeRange(period, startTime, endTime);
+  const now = new Date();
+  const cutoffTime = new Date(now.getTime() - detailDays * SECONDS_PER_DAY * MS_PER_SECOND).toISOString();
 
-  if (providerId) { conditions.push("rm.provider_id = ?"); params.push(providerId); }
-  if (backendModel) { conditions.push("rm.backend_model = ?"); params.push(backendModel); }
-  if (routerKeyId) { conditions.push("rm.router_key_id = ?"); params.push(routerKeyId); }
+  if (effectiveEnd <= cutoffTime) {
+    return queryAggTimeseries(db, period, metric, providerId, backendModel, routerKeyId, startTime, endTime);
+  }
+  if (effectiveStart >= cutoffTime) {
+    const bucketSec = (startTime && endTime)
+      ? calcBucketSec((new Date(endTime).getTime() - new Date(startTime).getTime()) / MS_PER_SECOND)
+      : calcBucketSec(PERIOD_TOTAL_SEC[period]);
+    const { timeWhere, timeParams } = buildTimeCondition(period, startTime, endTime);
+    const conditions = [timeWhere];
+    const params: unknown[] = [...timeParams];
 
-  const where = conditions.join(" AND ");
+    if (providerId) { conditions.push("rm.provider_id = ?"); params.push(providerId); }
+    if (backendModel) { conditions.push("rm.backend_model = ?"); params.push(backendModel); }
+    if (routerKeyId) { conditions.push("rm.router_key_id = ?"); params.push(routerKeyId); }
+
+    const where = conditions.join(" AND ");
+    const expr = METRIC_EXPR[metric];
+
+    const rows = db.prepare(`
+      SELECT
+        (unixepoch(rm.created_at) / CAST(? AS INTEGER)) * CAST(? AS INTEGER) AS bucket_key,
+        ${expr} AS avg_value,
+        COUNT(*) AS count
+      FROM request_metrics rm
+      WHERE ${where}
+      GROUP BY bucket_key
+      ORDER BY bucket_key ASC
+    `).all(bucketSec, bucketSec, ...params) as { bucket_key: number; avg_value: number | null; count: number }[];
+
+    return rows.map((r) => ({
+      time_bucket: new Date(r.bucket_key * MS_PER_SECOND).toISOString(),
+      avg_value: r.avg_value,
+      count: r.count,
+    }));
+  }
+
+  // Cross-boundary: detail segment + agg segment → merge
+  const totalDetailSec = (new Date(cutoffTime).getTime() - new Date(effectiveStart).getTime()) / MS_PER_SECOND;
+  const detailBucketSec = calcBucketSec(totalDetailSec);
+  const { aggRouterKeyWhere, aggRouterKeyParam } = queryAggRouterKeyIdCondition(routerKeyId);
   const expr = METRIC_EXPR[metric];
 
-  const rows = db.prepare(`
+  // Detail segment query
+  const detailConditions = ["rm.created_at >= datetime(?) AND rm.created_at < datetime(?)"];
+  const detailParams: unknown[] = [effectiveStart, cutoffTime];
+  if (providerId) { detailConditions.push("rm.provider_id = ?"); detailParams.push(providerId); }
+  if (backendModel) { detailConditions.push("rm.backend_model = ?"); detailParams.push(backendModel); }
+  if (routerKeyId) { detailConditions.push("rm.router_key_id = ?"); detailParams.push(routerKeyId); }
+  const detailWhere = detailConditions.join(" AND ");
+
+  const detailRows = db.prepare(`
     SELECT
       (unixepoch(rm.created_at) / CAST(? AS INTEGER)) * CAST(? AS INTEGER) AS bucket_key,
       ${expr} AS avg_value,
       COUNT(*) AS count
     FROM request_metrics rm
-    WHERE ${where}
+    WHERE ${detailWhere}
     GROUP BY bucket_key
     ORDER BY bucket_key ASC
-  `).all(bucketSec, bucketSec, ...params) as { bucket_key: number; avg_value: number | null; count: number }[];
+  `).all(detailBucketSec, detailBucketSec, ...detailParams) as { bucket_key: number; avg_value: number | null; count: number }[];
 
-  return rows.map((r) => ({
+  const detailResult: MetricsTimeseriesRow[] = detailRows.map((r) => ({
     time_bucket: new Date(r.bucket_key * MS_PER_SECOND).toISOString(),
     avg_value: r.avg_value,
     count: r.count,
   }));
+
+  // Agg segment query
+  const aggConditions = ["m.bucket_time >= datetime(?)", "m.bucket_time < datetime(?)", aggRouterKeyWhere];
+  const aggParams: unknown[] = [cutoffTime, effectiveEnd, ...aggRouterKeyParam];
+  if (providerId) { aggConditions.push("m.provider_id = ?"); aggParams.push(providerId); }
+  if (backendModel) { aggConditions.push("m.backend_model = ?"); aggParams.push(backendModel); }
+  const aggWhere = aggConditions.join(" AND ");
+
+  const aggTotalSec = (new Date(effectiveEnd).getTime() - new Date(cutoffTime).getTime()) / MS_PER_SECOND;
+  const aggBucketSec = calcBucketSec(aggTotalSec);
+  const aggExpr = AGG_METRIC_EXPR[metric];
+
+  const aggRows = db.prepare(`
+    SELECT
+      (unixepoch(m.bucket_time) / CAST(? AS INTEGER)) * CAST(? AS INTEGER) AS bucket_key,
+      ${aggExpr} AS avg_value,
+      SUM(m.request_count) AS count
+    FROM metrics_10min m
+    WHERE ${aggWhere}
+    GROUP BY bucket_key
+    ORDER BY bucket_key ASC
+  `).all(aggBucketSec, aggBucketSec, ...aggParams) as { bucket_key: number; avg_value: number | null; count: number }[];
+
+  const aggResult: MetricsTimeseriesRow[] = aggRows.map((r) => ({
+    time_bucket: new Date(r.bucket_key * MS_PER_SECOND).toISOString(),
+    avg_value: r.avg_value,
+    count: r.count,
+  }));
+
+  return mergeTimeseriesResults(detailResult, aggResult);
 }
 
 export function deleteMetricsBefore(db: Database.Database, beforeDate: string): number {
