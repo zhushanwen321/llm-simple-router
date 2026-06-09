@@ -542,15 +542,6 @@ async function loadData() {
   }
 }
 
-async function loadProviders() {
-  try {
-    providers.value = await api.getProviders();
-  } catch (e: unknown) {
-    console.error("RetryRules.loadProviders:", e);
-    toast.error(getApiMessage(e, t("retryRules.messages.loadFailed")));
-  }
-}
-
 async function loadRecommended() {
   try {
     recommendedRules.value = await api.recommended.getRetryRules();
@@ -639,7 +630,16 @@ async function onRecommendedAdded() {
 
 onMounted(async () => {
   loading.value = true;
-  await Promise.allSettled([loadData(), loadRecommended(), loadProviders()]);
-  loading.value = false;
+  try {
+    const init = await api.getRetryRulesInit();
+    rules.value = init.rules;
+    providers.value = init.providers as Provider[];
+    recommendedRules.value = init.recommended_rules;
+  } catch (e: unknown) {
+    console.error("RetryRules.init:", e);
+    toast.error(getApiMessage(e, t("retryRules.messages.loadFailed")));
+  } finally {
+    loading.value = false;
+  }
 });
 </script>

@@ -61,7 +61,7 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (app, opti
   app.register(adminUsageRoutes, { db: options.db });
   app.register(adminQuickSetupRoutes, { db: options.db, stateRegistry: options.stateRegistry, tracker: options.tracker, adaptiveController: options.adaptiveController });
   app.register(adminUpgradeRoutes, { db: options.db, closeFn: options.closeFn ?? (async () => {}) });
-  app.register(adminDashboardRoutes, { db: options.db });
+  app.register(adminDashboardRoutes, { db: options.db, stateRegistry: options.stateRegistry });
   app.register(adminTransformRuleRoutes, { db: options.db, pluginRegistry: options.pluginRegistry });
 
   // Pipeline hooks 查询

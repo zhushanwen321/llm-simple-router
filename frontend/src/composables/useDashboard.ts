@@ -1,6 +1,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { api, getApiMessage } from "@/api/client";
+import type { DashboardInitResponse } from "@/api/client";
 import { toast } from "vue-sonner";
 import { formatProviderTokenLabel } from "@/utils/token-format";
 import { formatTimeShort } from "@/utils/format";
@@ -105,18 +106,43 @@ export function useDashboard() {
     };
   });
 
-  // --- Load providers ---
-  async function loadProviders() {
-    try {
-      providers.value = await api.getProviders();
-      providerLoadError.value = false;
-      data.loadError.value = false;
-    } catch (e: unknown) {
-      console.error("useDashboard.loadProviders:", e);
-      providerLoadError.value = true;
-      data.loadError.value = true;
-      toast.error(getApiMessage(e, t("dashboard.loadProvidersFailed")));
+  // --- Build init params from current state ---
+  function buildInitParams() {
+    const ts = timeSelector.timeSelection.value;
+    const fp = filters.filterParams.value;
+    const params: {
+      start_time: string;
+      end_time: string;
+      provider_id?: string;
+      router_key_id?: string;
+      backend_model?: string;
+      client_type?: string;
+    } = {
+      start_time: ts.startTime.toISOString(),
+      end_time: ts.endTime.toISOString(),
+    };
+    if (fp.provider_id) params.provider_id = fp.provider_id;
+    if (fp.router_key_id) params.router_key_id = fp.router_key_id;
+    if (fp.backend_model) params.backend_model = fp.backend_model;
+    if (fp.client_type) params.client_type = fp.client_type;
+    return params;
+  }
+
+  // --- Apply init response to all sub-composables ---
+  function applyInitResponse(init: DashboardInitResponse) {
+    // Providers
+    if (init.providers) {
+      providers.value = init.providers;
     }
+    // Router keys → filters
+    if (init.router_keys) {
+      filters.initWithData(init.router_keys);
+    }
+    // Overview data
+    data.initWithData(init);
+    // Clear errors
+    providerLoadError.value = false;
+    data.loadError.value = false;
   }
 
   // --- Auto-select top provider ---
@@ -168,18 +194,34 @@ export function useDashboard() {
 
   // --- Retry ---
   async function retry() {
-    await loadProviders();
-    if (providerLoadError.value) return;
+    try {
+      const params = buildInitParams();
+      const init = await api.getDashboardInit(params);
+      applyInitResponse(init);
+    } catch (e: unknown) {
+      console.error("useDashboard.retry:", e);
+      providerLoadError.value = true;
+      data.loadError.value = true;
+      toast.error(getApiMessage(e, t("dashboard.loadProvidersFailed")));
+      return;
+    }
     autoSelectProviderIfNeeded();
-    await Promise.allSettled([filters.loadFilterOptions(), data.refresh()]);
   }
 
   // --- Lifecycle ---
   onMounted(async () => {
-    await loadProviders();
-    if (providerLoadError.value) return;
+    try {
+      const params = buildInitParams();
+      const init = await api.getDashboardInit(params);
+      applyInitResponse(init);
+    } catch (e: unknown) {
+      console.error("useDashboard.onMounted:", e);
+      providerLoadError.value = true;
+      data.loadError.value = true;
+      toast.error(getApiMessage(e, t("dashboard.loadProvidersFailed")));
+      return;
+    }
     autoSelectProviderIfNeeded();
-    await Promise.allSettled([data.refresh(), filters.loadFilterOptions()]);
     initialized.value = true;
     stopWatchTheme = watchTheme(() => data.refresh());
   });

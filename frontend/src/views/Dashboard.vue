@@ -341,6 +341,7 @@ import { Line } from "vue-chartjs";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import {
   Popover,
   PopoverTrigger,

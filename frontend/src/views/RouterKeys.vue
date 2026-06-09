@@ -693,13 +693,9 @@ async function handleDelete() {
 // Data loading
 async function loadData() {
   try {
-    const [keysRes, modelsRes] = await Promise.allSettled([
-      api.getRouterKeys(),
-      api.getAvailableModels(),
-    ]);
-    if (keysRes.status === "fulfilled") keys.value = keysRes.value;
-    if (modelsRes.status === "fulfilled")
-      availableModels.value = modelsRes.value;
+    const init = await api.getRouterKeysInit();
+    keys.value = init.keys;
+    availableModels.value = init.available_models;
   } catch (e: unknown) {
     console.error("routerKeys.load:", e);
     toast.error(getApiMessage(e, t("routerKeys.loadFailed")));

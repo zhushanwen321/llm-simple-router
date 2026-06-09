@@ -610,13 +610,14 @@ function updateMultimodal(val: SelectedValue) {
 
 // --- Data loading ---
 async function loadData() {
-  const results = await Promise.allSettled([
-    api.getMappingGroups(),
-    api.getProviders(),
-  ]);
-  if (results[0].status === "fulfilled") groups.value = results[0].value;
-  if (results[1].status === "fulfilled")
-    providersList.value = results[1].value as Provider[];
+  try {
+    const init = await api.getMappingGroupsInit();
+    groups.value = init.groups;
+    providersList.value = init.providers as Provider[];
+  } catch (e: unknown) {
+    console.error("ModelMappings.init:", e);
+    toast.error(getApiMessage(e, t("mappings.messages.saveFailed")));
+  }
 
   // Auto-select first if nothing selected
   if (!selectedId.value && groups.value.length > 0) {

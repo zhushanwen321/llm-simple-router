@@ -641,7 +641,6 @@ const {
   availablePlans,
   onGroupChange,
   onPresetChange,
-  loadPresets,
   getCurrentModelsEndpoint,
   getCurrentPresetModels,
 } = presetHook;
@@ -883,6 +882,13 @@ async function handleSave() {
 }
 
 onMounted(async () => {
-  await Promise.allSettled([loadPresets(), loadProviders()]);
+  try {
+    const init = await api.getProvidersInit();
+    providers.value = init.providers;
+    providerPresets.value = init.recommended;
+  } catch (e: unknown) {
+    console.error("Providers.init:", e);
+    toast.error(getApiMessage(e, t("providers.toast.loadFailed")));
+  }
 });
 </script>
