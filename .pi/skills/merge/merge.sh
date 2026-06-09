@@ -525,13 +525,42 @@ phase_publish() {
     TAG=""
 
     if [[ -n "$publish_sh" ]]; then
-        # 幂等检查：当前版本 release 已存在则跳过
+        # 幂等检查：当前版本 release 已存在，且该版本 >= main 上最新 tag
         local cur_ver
         cur_ver=$(read_project_version "$MAIN_WT")
-        if [[ -n "$cur_ver" ]] && gh release view "v$cur_ver" $gh_flag --json tagName >/dev/null 2>&1; then
-            echo -e "  ${GREEN}⏭️  Release v$cur_ver 已存在，跳过发布脚本${NC}"
-            NEW_VERSION="$cur_ver"
-            TAG="v$NEW_VERSION"
+        local latest_tag=""
+        latest_tag=$(git -C "$MAIN_WT" tag --sort=-v:refname | head -1 2>/dev/null || true)
+        local latest_tag_ver="${latest_tag#v}"
+
+        local need_bump=false
+        if [[ -z "$cur_ver" ]]; then
+            need_bump=true
+            echo -e "  ${YELLOW}⚠️  无法读取当前版本，需要 bump${NC}"
+        elif gh release view "v$cur_ver" $gh_flag --json tagName >/dev/null 2>&1; then
+            # Release 存在，检查是否比 main 上最新 tag 还旧
+            if [[ -n "$latest_tag_ver" ]] && [[ "$latest_tag_ver" != "$cur_ver" ]]; then
+                # 版本不匹配：PR 分支版本落后于 main 最新 tag
+                echo -e "  ${YELLOW}⚠️  当前版本 v$cur_ver 与 main 最新 tag $latest_tag 不一致${NC}"
+                echo -e "  ${YELLOW}    强制触发 bump（避免发布已存在的版本）${NC}"
+                log_warn "版本冲突: cur=$cur_ver, latest_tag=$latest_tag_ver, 强制 bump"
+                need_bump=true
+            else
+                echo -e "  ${GREEN}⏭️  Release v$cur_ver 已存在且版本一致，跳过发布脚本${NC}"
+                NEW_VERSION="$cur_ver"
+                TAG="v$NEW_VERSION"
+            fi
+        else
+            # Release 不存在，正常发布
+            : # fall through to else branch
+        fi
+
+        if [[ "$need_bump" == "true" ]]; then
+            echo "  触发 GitHub Actions 发布脚本（bump $VERSION_TYPE）..."
+            log_info "强制触发 publish.sh ($VERSION_TYPE), cur=$cur_ver, latest_tag=$latest_tag_ver"
+        fi
+
+        if [[ "$need_bump" != "true" ]]; then
+            : # already set NEW_VERSION and TAG above, skip publish
         else
             if grep -q 'gh workflow run' "$publish_sh"; then
                 echo "  检测到 GitHub Actions 发布脚本"
