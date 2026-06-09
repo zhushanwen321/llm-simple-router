@@ -140,6 +140,24 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
+      # ── 步骤 6.5: Docker 推送到阿里云 ACR (仅 main) ────────
+      - name: Login to Alibaba Cloud ACR
+        if: github.event_name == 'workflow_dispatch'
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ secrets.ACR_REGISTRY }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Push to Alibaba Cloud ACR
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          ACR_IMAGE="${{ secrets.ACR_REGISTRY }}/zhushanwen321/llm-simple-router"
+          docker buildx imagetools create \
+            --tag ${ACR_IMAGE}:v${{ env.NEW_VERSION }} \
+            --tag ${ACR_IMAGE}:latest \
+            ghcr.io/${{ github.repository }}:v${{ env.NEW_VERSION }}
+
       # ── 步骤 7: Release Asset (仅 main) ──────────────────
       - name: Prepare and upload dist archive
         if: github.event_name == 'workflow_dispatch'
