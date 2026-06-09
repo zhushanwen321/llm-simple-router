@@ -139,6 +139,7 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          provenance: false
 
       # ── 步骤 6.5: Docker 推送到阿里云 ACR (仅 main) ────────
       - name: Login to Alibaba Cloud ACR
