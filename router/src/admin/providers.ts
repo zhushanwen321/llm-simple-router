@@ -5,6 +5,7 @@ import type { Provider } from "../db/index.js";
 import type { RawHeaders } from "../proxy/types.js";
 import { getAllProviders, getProviderById, createProvider, updateProvider, deleteProvider, getAllMappingGroups, updateMappingGroup, PROVIDER_CONCURRENCY_DEFAULTS } from "../db/index.js";
 import { parseEndpoints, serializeEndpoints } from "../db/providers.js";
+import { getRecommendedProviders } from "../config/recommended.js";
 import { encrypt, decrypt } from "../utils/crypto.js";
 import { getSetting } from "../db/settings.js";
 import type { StateRegistry } from "../core/registry.js";
@@ -13,7 +14,7 @@ import type { RequestTracker } from "../core/monitor/index.js";
 import type { ProxyAgentFactory } from "../proxy/transport/proxy-agent.js";
 import { HTTP_CREATED, HTTP_NOT_FOUND, HTTP_CONFLICT, HTTP_BAD_REQUEST, HTTP_OK } from "./constants.js";
 import { API_CODE, apiError } from "./api-response.js";
-import { parseModels, buildModelInfoList, normalizePatchName, type ModelEntry } from "../config/model-context.js";
+import { parseModels, buildModelInfoList, normalizePatchName, lookupCapabilities, type ModelEntry } from "../config/model-context.js";
 import { getModelInfoForProvider, setModelInfoForProvider, deleteAllModelInfoForProvider } from "../db/model-info.js";
 import { buildUpstreamHeaders } from "../proxy/proxy-core.js";
 import { callGet } from "../proxy/transport/http.js";
@@ -338,45 +339,78 @@ async function handleCreateProvider(
   return reply.code(HTTP_CREATED).send({ id });
 }
 
+/** 序列化 provider 列表，解密敏感字段、展开 models/endpoints。供多个端点复用 */
+export function serializeProviders(
+  db: Database.Database,
+  providers: Provider[],
+  encryptionKey: string,
+  concurrencyStatus?: (id: string) => { active: number; queued: number },
+) {
+  return providers.map((s) => {
+    const modelEntries = parseModels(s.models || "[]");
+    const overrides = new Map(
+      getModelInfoForProvider(db, s.id).map(m => [m.model_name, m.context_window]),
+    );
+    return {
+      id: s.id,
+      name: s.name,
+      api_type: s.api_type,
+      base_url: s.base_url,
+      upstream_path: s.upstream_path,
+      api_key: s.api_key ? decrypt(s.api_key, encryptionKey) : "",
+      models: buildModelInfoList(modelEntries, overrides),
+      is_active: s.is_active,
+      max_concurrency: s.max_concurrency,
+      queue_timeout_ms: s.queue_timeout_ms,
+      max_queue_size: s.max_queue_size,
+      adaptive_enabled: s.adaptive_enabled,
+      proxy_type: s.proxy_type,
+      proxy_url: s.proxy_url,
+      proxy_username: s.proxy_username ? decrypt(s.proxy_username, encryptionKey) : null,
+      proxy_password: s.proxy_password ? decrypt(s.proxy_password, encryptionKey) : null,
+      endpoints: parseEndpoints(s.endpoints).map(ep => ({
+        api_type: ep.api_type,
+        base_url: ep.base_url,
+        upstream_path: ep.upstream_path ?? null,
+        api_key: ep.api_key ? decrypt(ep.api_key, encryptionKey) : "",
+      })),
+      concurrency_status: concurrencyStatus?.(s.id) ?? { active: 0, queued: 0 },
+      created_at: s.created_at,
+      updated_at: s.updated_at,
+    };
+  });
+}
+
 export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> = (app, options, done) => {
   const { db, stateRegistry, tracker, adaptiveController, proxyAgentFactory } = options;
 
   app.get("/admin/api/providers", async (_request, reply) => {
     const encryptionKey = getSetting(db, "encryption_key")!;
     const providers = getAllProviders(db);
-    return reply.send(providers.map((s) => {
-      const modelEntries = parseModels(s.models || "[]");
-      const overrides = new Map(
-        getModelInfoForProvider(db, s.id).map(m => [m.model_name, m.context_window]),
-      );
-      return {
-        id: s.id,
-        name: s.name,
-        api_type: s.api_type,
-        base_url: s.base_url,
-        upstream_path: s.upstream_path,
-        api_key: s.api_key ? decrypt(s.api_key, encryptionKey) : "",
-        models: buildModelInfoList(modelEntries, overrides),
-        is_active: s.is_active,
-        max_concurrency: s.max_concurrency,
-        queue_timeout_ms: s.queue_timeout_ms,
-        max_queue_size: s.max_queue_size,
-        adaptive_enabled: s.adaptive_enabled,
-        proxy_type: s.proxy_type,
-        proxy_url: s.proxy_url,
-        proxy_username: s.proxy_username ? decrypt(s.proxy_username, encryptionKey) : null,
-        proxy_password: s.proxy_password ? decrypt(s.proxy_password, encryptionKey) : null,
-        endpoints: parseEndpoints(s.endpoints).map(ep => ({
-          api_type: ep.api_type,
-          base_url: ep.base_url,
-          upstream_path: ep.upstream_path ?? null,
-          api_key: ep.api_key ? decrypt(ep.api_key, encryptionKey) : "",
-        })),
-        concurrency_status: stateRegistry?.getProviderStatus(s.id) ?? { active: 0, queued: 0 },
-        created_at: s.created_at,
-        updated_at: s.updated_at,
-      };
-    }));
+    return reply.send(serializeProviders(db, providers, encryptionKey, (id) =>
+      stateRegistry?.getProviderStatus(id) ?? { active: 0, queued: 0 },
+    ));
+  });
+
+  app.get("/admin/api/providers/init", async (_request, reply) => {
+    const encryptionKey = getSetting(db, "encryption_key")!;
+    const providers = getAllProviders(db);
+    const serialized = serializeProviders(db, providers, encryptionKey, (id) =>
+      stateRegistry?.getProviderStatus(id) ?? { active: 0, queued: 0 },
+    );
+
+    const recommended = getRecommendedProviders();
+    for (const group of recommended) {
+      for (const preset of group.presets) {
+        const capMap: Record<string, string[]> = {};
+        for (const m of preset.models) {
+          capMap[m] = lookupCapabilities(m);
+        }
+        preset.modelCapabilities = capMap;
+      }
+    }
+
+    return reply.send({ providers: serialized, recommended });
   });
 
   app.post("/admin/api/providers", { schema: { body: CreateProviderSchema } }, async (request, reply) => {

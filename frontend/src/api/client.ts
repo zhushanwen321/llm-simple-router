@@ -383,6 +383,100 @@ export async function request<T>(
   return body.data;
 }
 
+// --- Init Response Types ---
+
+interface ProviderSummary {
+  id: string;
+  name: string;
+}
+
+type ProviderFull = Provider;
+
+type RouterKeySummary = { id: string; name: string };
+
+export interface DashboardInitResponse {
+  stats: StatsResponse | null;
+  prev_stats: Omit<StatsResponse, "startTime" | "endTime"> | null;
+  cache_hit_rate: number | null;
+  client_type_breakdown: Record<string, number> | null;
+  timeseries: {
+    tps: TimeseriesRawRow[];
+    input_tokens: TimeseriesRawRow[];
+    output_tokens: TimeseriesRawRow[];
+  } | null;
+  provider_token_summary: Record<string, number> | null;
+  providers: ProviderFull[] | null;
+  router_keys: RouterKeySummary[] | null;
+}
+
+interface MonitorInitResponse {
+  active: ActiveRequest[] | null;
+  recent: ActiveRequest[] | null;
+  stats: StatsSnapshot | null;
+  concurrency: ProviderConcurrencySnapshot[] | null;
+  runtime: RuntimeMetrics | null;
+}
+
+interface LogsInitResponse {
+  providers: ProviderSummary[] | null;
+  router_keys: RouterKeySummary[] | null;
+  client_models: string[] | null;
+  backend_models: string[] | null;
+  log_retention_days: number | null;
+}
+
+interface ProvidersInitResponse {
+  providers: ProviderFull[];
+  recommended: ProviderGroup[];
+}
+
+interface MappingGroupsInitResponse {
+  groups: MappingGroup[];
+  providers: ProviderFull[];
+}
+
+interface RetryRulesInitResponse {
+  rules: RetryRule[];
+  providers: ProviderSummary[];
+  recommended_rules: RecommendedRetryRule[];
+}
+
+interface RouterKeysInitResponse {
+  keys: RouterKeyPublic[];
+  available_models: string[];
+}
+
+interface ProxyEnhancementInitResponse {
+  config: ProxyEnhancementConfig;
+  providers: ProviderFull[];
+}
+
+interface SchedulesInitResponse {
+  schedules: Schedule[];
+  mapping_groups: MappingGroup[];
+  providers: ProviderFull[];
+}
+
+interface SettingsInitResponse {
+  db_size: {
+    totalBytes: number;
+    logTableBytes: number;
+    logCount: number;
+    lastChecked: string | null;
+    logFileBytes: number;
+    thresholds: { dbMaxSizeMb: number; logTableMaxSizeMb: number };
+  };
+  log_retention_days: number;
+  metrics_detail_days: number;
+}
+
+interface QuickSetupInitResponse {
+  provider_groups: ProviderGroup[];
+  recommended_rules: RecommendedRetryRule[];
+  existing_mappings: MappingGroup[];
+  existing_providers: ProviderFull[];
+}
+
 // --- API ---
 
 export const api = {
@@ -593,6 +687,36 @@ export const api = {
       undefined,
       { params },
     ),
+  // --- Init API methods ---
+  getDashboardInit: (params: {
+    provider_id?: string;
+    start_time: string;
+    end_time: string;
+    router_key_id?: string;
+    backend_model?: string;
+    client_type?: string;
+  }) =>
+    request<DashboardInitResponse>("get", "/dashboard/init", undefined, {
+      params,
+    }),
+  getMonitorInit: () => request<MonitorInitResponse>("get", "/monitor/init"),
+  getLogsInit: () => request<LogsInitResponse>("get", "/logs/init"),
+  getProvidersInit: () =>
+    request<ProvidersInitResponse>("get", "/providers/init"),
+  getMappingGroupsInit: () =>
+    request<MappingGroupsInitResponse>("get", "/mapping-groups/init"),
+  getRetryRulesInit: () =>
+    request<RetryRulesInitResponse>("get", "/retry-rules/init"),
+  getRouterKeysInit: () =>
+    request<RouterKeysInitResponse>("get", "/router-keys/init"),
+  getProxyEnhancementInit: () =>
+    request<ProxyEnhancementInitResponse>("get", "/proxy-enhancement/init"),
+  getSchedulesInit: () =>
+    request<SchedulesInitResponse>("get", "/schedules/init"),
+  getSettingsInit: () => request<SettingsInitResponse>("get", "/settings/init"),
+  getQuickSetupInit: () =>
+    request<QuickSetupInitResponse>("get", "/quick-setup/init"),
+
   getUsageWeekly: (params?: { router_key_id?: string }) =>
     request<DailyUsage[]>("get", "/usage/weekly", undefined, { params }),
   getUsageMonthly: (params?: { router_key_id?: string }) =>

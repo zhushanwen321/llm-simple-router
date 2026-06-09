@@ -397,28 +397,25 @@ const isDirty = computed(() => {
 });
 
 // --- 数据加载 ---
-async function loadProviders() {
+async function loadInit() {
   try {
-    const providers = await api.getProviders();
-    providerGroups.value = toProviderGroups(providers, {
-      activeOnly: true,
-      defaultContextWindow: 128000,
-    });
-  } catch (e: unknown) {
-    console.error("proxyEnhancement.loadProviders:", e);
-    toast.error(t("proxyEnhancement.loadProvidersFailed"));
-  }
-}
+    const init = await api.getProxyEnhancementInit();
 
-async function loadConfig() {
-  try {
-    const data = await api.getProxyEnhancement();
+    // Config
+    const data = init.config;
     toolRoundLimitEnabled.value = data.tool_round_limit_enabled;
     toolCallLoopEnabled.value = data.tool_call_loop_enabled;
     streamLoopEnabled.value = data.stream_loop_enabled;
     toolErrorLoggingEnabled.value = data.tool_error_logging_enabled;
     aiRetryConfig.value = data.ai_retry_config ?? undefined;
 
+    // Providers
+    providerGroups.value = toProviderGroups(init.providers, {
+      activeOnly: true,
+      defaultContextWindow: 128000,
+    });
+
+    // Token estimation + client session headers (sub-resources, still parallel)
     const [tokenResult, headersResult] = await Promise.allSettled([
       getTokenEstimation(),
       getClientSessionHeaders(),
@@ -435,7 +432,7 @@ async function loadConfig() {
 
     initialConfig = snapshot();
   } catch (e: unknown) {
-    console.error("proxyEnhancement.loadConfig:", e);
+    console.error("proxyEnhancement.loadInit:", e);
     loadError.value = getApiMessage(e, t("proxyEnhancement.loadFailed"));
   } finally {
     loading.value = false;
@@ -527,8 +524,5 @@ async function handleSave() {
   }
 }
 
-onMounted(() => {
-  loadConfig();
-  loadProviders();
-});
+onMounted(loadInit);
 </script>

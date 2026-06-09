@@ -8,7 +8,9 @@ import {
   createRetryRule,
   updateRetryRule,
   deleteRetryRule,
+  getAllProviders,
 } from "../db/index.js";
+import { getRecommendedRetryRules } from "../config/recommended.js";
 import { callLLM } from "../utils/llm-client.js";
 import { getActiveRetryRules } from "../db/retry-rules.js";
 import { getRequestLogById } from "../db/logs.js";
@@ -289,6 +291,22 @@ export const adminRetryRuleRoutes: FastifyPluginCallback<RetryRuleRoutesOptions>
   app.get("/admin/api/retry-rules", async (_request, reply) => {
     const rules = getAllRetryRules(db);
     return reply.send(rules);
+  });
+
+  app.get("/admin/api/retry-rules/init", async (_request, reply) => {
+    const rules = getAllRetryRules(db);
+    const providers = getAllProviders(db).map(p => ({ id: p.id, name: p.name }));
+
+    const recommendedRaw = getRecommendedRetryRules();
+    const existing = new Set<string>(
+      (db.prepare("SELECT name FROM retry_rules").all() as { name: string }[]).map(r => r.name),
+    );
+    const recommended_rules = recommendedRaw.map(r => ({
+      ...r,
+      exists: existing.has(r.name),
+    }));
+
+    return reply.send({ rules, providers, recommended_rules });
   });
 
   app.post("/admin/api/retry-rules", { schema: { body: CreateRetryRuleSchema } }, async (request, reply) => {

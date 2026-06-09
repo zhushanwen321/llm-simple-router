@@ -723,23 +723,7 @@ function toggleWeekDay(day: number) {
   delete errors.value.week;
 }
 
-async function loadGroups() {
-  try {
-    groups.value = await api.getMappingGroups();
-  } catch (e: unknown) {
-    console.error("schedules.loadGroups:", e);
-    toast.error(getApiMessage(e, t("schedules.loadGroupsFailed")));
-  }
-}
-
-async function loadProviders() {
-  try {
-    providers.value = await api.getProviders();
-  } catch (e: unknown) {
-    console.error("schedules.loadProviders:", e);
-    toast.error(getApiMessage(e, t("schedules.loadProvidersFailed")));
-  }
-}
+// loadGroups/loadProviders loaded via init endpoint in onMounted
 
 async function loadAllSchedules() {
   try {
@@ -826,7 +810,16 @@ async function handleDelete() {
 
 onMounted(async () => {
   loading.value = true;
-  await Promise.allSettled([loadGroups(), loadProviders(), loadAllSchedules()]);
-  loading.value = false;
+  try {
+    const init = await api.getSchedulesInit();
+    allSchedules.value = init.schedules;
+    groups.value = init.mapping_groups;
+    providers.value = init.providers;
+  } catch (e: unknown) {
+    console.error("schedules.loadInit:", e);
+    toast.error(getApiMessage(e, t("schedules.loadGroupsFailed")));
+  } finally {
+    loading.value = false;
+  }
 });
 </script>

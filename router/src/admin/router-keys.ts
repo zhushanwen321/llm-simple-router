@@ -105,6 +105,13 @@ export const adminRouterKeyRoutes: FastifyPluginCallback<RouterKeyRoutesOptions>
     return reply.send({ success: true });
   });
 
+  app.get("/admin/api/router-keys/init", async (_request, reply) => {
+    const keys = getAllRouterKeys(db);
+    const serialized = keys.map((rk) => toPublicRouterKey(rk, db));
+    const availableModels = getAvailableModels(db);
+    return reply.send({ keys: serialized, available_models: availableModels });
+  });
+
   app.get("/admin/api/models/available", async (_request, reply) => {
     const models = getAvailableModels(db);
     return reply.send(models);

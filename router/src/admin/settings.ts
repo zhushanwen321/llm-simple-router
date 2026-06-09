@@ -139,6 +139,36 @@ export const adminSettingsRoutes: FastifyPluginCallback<SettingsOptions> = (app,
     return { days };
   });
 
+  // --- Settings Init ---
+
+  app.get("/admin/api/settings/init", async () => {
+    // db_size
+    const DEFAULT_SIZE_INFO = { totalBytes: 0, logTableBytes: 0, logCount: 0, lastChecked: null };
+    const raw = getSetting(db, "db_size_info");
+    let sizeInfo = DEFAULT_SIZE_INFO;
+    if (raw) {
+      try { sizeInfo = JSON.parse(raw); } catch { /* eslint-disable-line taste/no-silent-catch -- 损坏的缓存值，回退默认 */ }
+    }
+    let logFileBytes = 0;
+    if (logsDir) {
+      try { logFileBytes = calcDirSize(logsDir); } catch { /* eslint-disable-line taste/no-silent-catch -- 目录可能不存在 */ }
+    }
+    const dbSize = {
+      ...sizeInfo,
+      logFileBytes,
+      thresholds: {
+        dbMaxSizeMb: getDbMaxSizeMb(db),
+        logTableMaxSizeMb: getLogTableMaxSizeMb(db),
+      },
+    };
+
+    return {
+      db_size: dbSize,
+      log_retention_days: getLogRetentionDays(db),
+      metrics_detail_days: getMetricsDetailDays(db),
+    };
+  });
+
   done();
 };
 

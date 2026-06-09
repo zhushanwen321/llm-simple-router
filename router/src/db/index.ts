@@ -270,7 +270,7 @@ export type { MetricsSummaryRow, MetricsTimeseriesRow, MetricsPeriod, MetricsMet
 
 export type { Metrics10minRow } from "./metrics-10min.js";
 
-export { getStats, getLatestMetricTime } from "./stats.js";
+export { getStats, getLatestMetricTime, computeBucketBoundary } from "./stats.js";
 export type { Stats } from "./stats.js";
 
 export { getSetting, setSetting, isInitialized } from "./settings.js";

@@ -9,6 +9,10 @@ import { createRetryRule } from "../db/retry-rules.js";
 import { upsertTransformRule } from "../db/transform-rules.js";
 import { encrypt } from "../utils/crypto.js";
 import { getSetting } from "../db/settings.js";
+import { getRecommendedProviders, getRecommendedRetryRules } from "../config/recommended.js";
+import { lookupCapabilities } from "../config/model-context.js";
+import { getAllMappingGroups, getAllProviders } from "../db/index.js";
+import { serializeProviders } from "./providers.js";
 import { HTTP_CREATED, HTTP_BAD_REQUEST, HTTP_BAD_GATEWAY, HTTP_CONFLICT } from "./constants.js";
 import { API_CODE, apiError } from "./api-response.js";
 import type { StateRegistry } from "../core/registry.js";
@@ -257,6 +261,42 @@ export const adminQuickSetupRoutes: FastifyPluginCallback<QuickSetupRoutesOption
     });
 
     return reply.code(HTTP_CREATED).send({ success: true, provider_id: providerId });
+  });
+
+  app.get("/admin/api/quick-setup/init", async (_request, reply) => {
+    // provider_groups (recommended providers with capabilities)
+    const groups = getRecommendedProviders();
+    for (const group of groups) {
+      for (const preset of group.presets) {
+        const capMap: Record<string, string[]> = {};
+        for (const m of preset.models) {
+          capMap[m] = lookupCapabilities(m);
+        }
+        preset.modelCapabilities = capMap;
+      }
+    }
+
+    // recommended_rules (with exists flag)
+    const rules = getRecommendedRetryRules();
+    const existing = new Set<string>(
+      (db.prepare("SELECT name FROM retry_rules").all() as { name: string }[]).map((r) => r.name),
+    );
+    const recommendedRules = rules.map(r => ({ ...r, exists: existing.has(r.name) }));
+
+    // existing_mappings
+    const existingMappings = getAllMappingGroups(db);
+
+    // existing_providers
+    const encryptionKey = getSetting(db, "encryption_key")!;
+    const providers = getAllProviders(db);
+    const serializedProviders = serializeProviders(db, providers, encryptionKey);
+
+    return reply.send({
+      provider_groups: groups,
+      recommended_rules: recommendedRules,
+      existing_mappings: existingMappings,
+      existing_providers: serializedProviders,
+    });
   });
 
   // ---------- Test Connection ----------

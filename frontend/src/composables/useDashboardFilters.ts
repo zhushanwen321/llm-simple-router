@@ -54,6 +54,11 @@ export function useDashboardFilters({
     return p;
   });
 
+  /** 从 init 响应直接填充 keyOptions */
+  function initWithData(routerKeys: { id: string; name: string }[]) {
+    keyOptions.value = routerKeys;
+  }
+
   async function loadFilterOptions() {
     try {
       const keysRes = await api.getRouterKeys();
@@ -75,6 +80,7 @@ export function useDashboardFilters({
     keyOptions,
     modelOptions,
     filterParams,
+    initWithData,
     loadFilterOptions,
   };
 }

@@ -8,8 +8,12 @@ import {
   createSchedule,
   updateSchedule,
   deleteSchedule,
+  getAllMappingGroups,
+  getAllProviders,
 } from "../db/index.js";
 import { getMappingGroupById, getProviderById } from "../db/index.js";
+import { serializeProviders } from "./providers.js";
+import { getSetting } from "../db/settings.js";
 import { HTTP_BAD_REQUEST, HTTP_CREATED, HTTP_NOT_FOUND } from "./constants.js";
 import { API_CODE, apiError } from "./api-response.js";
 
@@ -258,6 +262,15 @@ export const adminScheduleRoutes: FastifyPluginCallback<ScheduleRoutesOptions> =
     const newEnabled = existing.enabled ? 0 : 1;
     updateSchedule(db, id, { enabled: newEnabled });
     return reply.send({ success: true, enabled: newEnabled });
+  });
+
+  app.get("/admin/api/schedules/init", async (_request, reply) => {
+    const schedules = getAllSchedules(db);
+    const mappingGroups = getAllMappingGroups(db);
+    const encryptionKey = getSetting(db, "encryption_key")!;
+    const providers = getAllProviders(db);
+    const serializedProviders = serializeProviders(db, providers, encryptionKey);
+    return reply.send({ schedules, mapping_groups: mappingGroups, providers: serializedProviders });
   });
 
   done();

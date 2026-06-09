@@ -8,7 +8,10 @@ import {
   deleteMappingGroup,
   getProviderById,
   getMappingGroupById,
+  getAllProviders,
 } from "../db/index.js";
+import { getSetting } from "../db/settings.js";
+import { serializeProviders } from "./providers.js";
 import { HTTP_BAD_REQUEST, HTTP_CREATED, HTTP_CONFLICT, HTTP_NOT_FOUND } from "./constants.js";
 import { parseModels } from "../config/model-context.js";
 import { API_CODE, apiError } from "./api-response.js";
@@ -117,6 +120,14 @@ export const adminGroupRoutes: FastifyPluginCallback<GroupRoutesOptions> = (app,
   app.get("/admin/api/mapping-groups", async (_request, reply) => {
     const groups = getAllMappingGroups(db);
     return reply.send(groups);
+  });
+
+  app.get("/admin/api/mapping-groups/init", async (_request, reply) => {
+    const groups = getAllMappingGroups(db);
+    const encryptionKey = getSetting(db, "encryption_key")!;
+    const providers = getAllProviders(db);
+    const serialized = serializeProviders(db, providers, encryptionKey);
+    return reply.send({ groups, providers: serialized });
   });
 
   app.post("/admin/api/mapping-groups", { schema: { body: CreateGroupSchema } }, async (request, reply) => {
