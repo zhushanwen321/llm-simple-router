@@ -16,7 +16,9 @@ export function getTokenEstimation() {
 }
 
 export function updateTokenEstimation(enabled: boolean) {
-  return request<{ success: boolean }>("put", "/settings/token-estimation", { enabled });
+  return request<{ success: boolean }>("put", "/settings/token-estimation", {
+    enabled,
+  });
 }
 
 // --- Metrics Detail Days ---
@@ -26,7 +28,9 @@ export function getMetricsDetailDays() {
 }
 
 export function setMetricsDetailDays(days: number) {
-  return request<{ days: number }>("put", "/settings/metrics-detail-days", { days });
+  return request<{ days: number }>("put", "/settings/metrics-detail-days", {
+    days,
+  });
 }
 
 // --- Client Session Headers ---
@@ -38,7 +42,9 @@ export function getClientSessionHeaders() {
   );
 }
 
-export function updateClientSessionHeaders(entries: ClientSessionHeaderEntry[]) {
+export function updateClientSessionHeaders(
+  entries: ClientSessionHeaderEntry[],
+) {
   return request<{ success: boolean }>(
     "put",
     "/settings/client-session-headers",
@@ -107,6 +113,8 @@ export interface UpgradeStatus {
   deployment: "npm" | "docker" | "unknown";
   syncSource: "github" | "gitee";
   restartMethod: "process_manager" | "self_spawn";
+  releaseNotes: string | null;
+  releaseVersion: string | null;
   lastCheckedAt: string | null;
 }
 
@@ -119,7 +127,9 @@ export function triggerUpgradeCheck() {
 }
 
 export function executeUpgrade(version: string) {
-  return request<{ ok: boolean; version: string }>("post", "/upgrade/execute", { version });
+  return request<{ ok: boolean; version: string }>("post", "/upgrade/execute", {
+    version,
+  });
 }
 
 export function restartServer() {

@@ -49,6 +49,9 @@
     "restartTimeout": "Restart timed out, please refresh manually",
     "restartFailed": "Restart failed",
     "upgradeDescBefore": "Will execute",
-    "upgradeDescAfter": ". Service restart is required after upgrade."
+    "upgradeDescAfter": ". Service restart is required after upgrade.",
+    "releaseNotes": "Release Notes",
+    "chinaMirror": "For China network, use Alibaba Cloud mirror:",
+    "copyFailed": "Copy failed"
   }
 }
