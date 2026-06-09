@@ -44,7 +44,7 @@
           <PopoverContent
             side="right"
             align="start"
-            class="w-80 p-0 ring-0 border border-white/[0.06] shadow-[0_4px_16px_oklch(0_0_0/0.15)] dark:shadow-[0_4px_16px_oklch(0_0_0/0.4)]"
+            class="w-[640px] p-0 ring-0 border border-white/[0.06] shadow-[0_4px_16px_oklch(0_0_0/0.15)] dark:shadow-[0_4px_16px_oklch(0_0_0/0.4)]"
           >
             <!-- 版本升级 -->
             <div
@@ -84,6 +84,18 @@
                   >v{{ upgradeStatus.npm.latestVersion }}</span
                 >
               </div>
+              <!-- Release Notes -->
+              <div v-if="upgradeStatus.releaseNotes" class="mb-2.5">
+                <span class="text-[11px] font-medium text-muted-foreground">{{
+                  t("sidebar.upgrade.releaseNotes")
+                }}</span>
+                <div
+                  ref="releaseNotesEl"
+                  class="release-notes mt-1 text-xs text-muted-foreground max-h-64 overflow-y-auto break-words"
+                >
+                  {{ upgradeStatus.releaseNotes }}
+                </div>
+              </div>
               <Button
                 v-if="upgradeStatus.deployment === 'npm'"
                 size="sm"
@@ -113,11 +125,47 @@
                         : "Unknown",
                   })
                 }}
-                <code
-                  class="block mt-1 text-warning bg-warning-dark/10 p-1 rounded"
-                  >docker pull
-                  ghcr.io/zhushanwen321/llm-simple-router:latest</code
-                >
+                <div class="flex items-start gap-1 mt-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    class="h-5 w-5 shrink-0 text-warning/70 hover:text-warning"
+                    @click="
+                      copyToClipboard(
+                        'docker pull ghcr.io/zhushanwen321/llm-simple-router:latest',
+                      )
+                    "
+                  >
+                    <Copy class="w-3 h-3" />
+                  </Button>
+                  <code
+                    class="block text-warning bg-warning-dark/10 p-1 rounded break-all"
+                    >docker pull
+                    ghcr.io/zhushanwen321/llm-simple-router:latest</code
+                  >
+                </div>
+                <span class="block mt-1.5 text-warning/80">{{
+                  t("sidebar.upgrade.chinaMirror")
+                }}</span>
+                <div class="flex items-start gap-1 mt-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    class="h-5 w-5 shrink-0 text-warning/70 hover:text-warning"
+                    @click="
+                      copyToClipboard(
+                        'docker pull crpi-x8jmi4kluhnn27nd.cn-shanghai.personal.cr.aliyuncs.com/zhushanwen321/llm-simple-router:latest',
+                      )
+                    "
+                  >
+                    <Copy class="w-3 h-3" />
+                  </Button>
+                  <code
+                    class="block text-warning bg-warning-dark/10 p-1 rounded break-all"
+                    >docker pull
+                    crpi-x8jmi4kluhnn27nd.cn-shanghai.personal.cr.aliyuncs.com/zhushanwen321/llm-simple-router:latest</code
+                  >
+                </div>
               </div>
             </div>
             <!-- 配置同步 -->
@@ -388,6 +436,7 @@ import {
   Globe,
   CalendarClock,
   Wand2,
+  Copy,
 } from "@lucide/vue";
 import { api, getApiMessage } from "@/api/client";
 import {
@@ -425,6 +474,7 @@ import {
 import { toast } from "vue-sonner";
 import type { AcceptableValue } from "reka-ui";
 import { useTheme } from "@/composables/useTheme";
+import { marked } from "marked";
 
 const { isDark, toggleTheme } = useTheme();
 const { t } = useI18n();
@@ -437,6 +487,7 @@ async function handleSwitchLocale() {
 const appVersion = __APP_VERSION__;
 
 const upgradeStatus = ref<UpgradeStatus | null>(null);
+const releaseNotesEl = ref<HTMLElement | null>(null);
 const showUpgradeConfirm = ref(false);
 const isUpgrading = ref(false);
 const isChecking = ref(false);
@@ -446,6 +497,16 @@ const isOpen = ref(false);
 const POLL_INTERVAL_MS = 300_000;
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+watch(
+  () => [upgradeStatus.value?.releaseNotes, releaseNotesEl.value] as const,
+  async ([notes, el]) => {
+    if (el && notes) {
+      el.innerHTML = await marked.parse(notes, { async: true });
+    }
+  },
+  { flush: "post" },
+);
 
 async function loadUpgradeStatus() {
   try {
@@ -668,6 +729,16 @@ async function doRestart() {
       isUpgrading.value = false;
     }
   }, POLL_INTERVAL_MS);
+}
+
+async function copyToClipboard(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast.success(t("common.copied"));
+  } catch (e: unknown) {
+    console.error("sidebar.copyToClipboard:", e);
+    toast.error(getApiMessage(e, t("sidebar.upgrade.copyFailed")));
+  }
 }
 
 async function handleLogout() {

@@ -18,6 +18,8 @@ export interface ConfigStatus {
 export interface UpgradeStatus {
   npm: NpmStatus
   config: ConfigStatus
+  releaseNotes: string | null
+  releaseVersion: string | null
   lastCheckedAt: string | null
 }
 
@@ -29,6 +31,8 @@ export interface CheckerOptions {
 
 const DEFAULT_NPM_REGISTRY = 'https://registry.npmjs.org/llm-simple-router'
 const DEFAULT_GITHUB_CONFIG_BASE = 'https://raw.githubusercontent.com/zhushanwen321/llm-simple-router/main/router/config'
+const GITHUB_RELEASES_API = 'https://api.github.com/repos/zhushanwen321/llm-simple-router/releases/tags'
+const GITEE_RELEASES_API = 'https://gitee.com/api/v5/repos/zzzzswszzzz/llm-simple-router/releases/tags'
 const CHECK_TIMEOUT_MS = 5000
 const HTTP_STATUS_REDIRECT_LOWER = 300
 const HTTP_STATUS_REDIRECT_UPPER = 400
@@ -68,6 +72,18 @@ export async function fetchJson(url: string, redirects = 0): Promise<unknown> {
   })
 }
 
+async function fetchReleaseNotes(version: string, source: 'github' | 'gitee'): Promise<string | null> {
+  const apiUrl = source === 'gitee'
+    ? `${GITEE_RELEASES_API}/${version}`
+    : `${GITHUB_RELEASES_API}/${version}`
+  try {
+    const data = await fetchJson(apiUrl) as { body?: string }
+    return data?.body ?? null
+  } catch {
+    return null
+  }
+}
+
 export function createUpgradeChecker(options?: CheckerOptions) {
   const npmRegistryUrl = options?.npmRegistryUrl ?? DEFAULT_NPM_REGISTRY
   const configBaseUrl = options?.configBaseUrl ?? DEFAULT_GITHUB_CONFIG_BASE
@@ -82,6 +98,8 @@ export function createUpgradeChecker(options?: CheckerOptions) {
     providerChanges: 0,
     retryRuleChanges: 0,
   }
+  let releaseNotes: string | null = null
+  let releaseVersion: string | null = null
   let lastCheckedAt: string | null = null
 
   async function checkNpm(): Promise<void> {
@@ -129,11 +147,23 @@ export function createUpgradeChecker(options?: CheckerOptions) {
 
   async function check(sourceOverride?: string): Promise<void> {
     await Promise.allSettled([checkNpm(), checkConfig(sourceOverride)])
+
+    // 获取 release notes（有新版本时才获取）
+    const latestVer = npmStatus.latestVersion
+    if (latestVer && npmStatus.hasUpdate) {
+      const source: 'github' | 'gitee' = sourceOverride?.includes('gitee.com') ? 'gitee' : 'github'
+      releaseNotes = await fetchReleaseNotes(latestVer, source)
+      releaseVersion = releaseNotes ? latestVer : null
+    } else {
+      releaseNotes = null
+      releaseVersion = null
+    }
+
     lastCheckedAt = new Date().toISOString()
   }
 
   function getStatus(): UpgradeStatus {
-    return { npm: { ...npmStatus }, config: { ...configStatus }, lastCheckedAt }
+    return { npm: { ...npmStatus }, config: { ...configStatus }, releaseNotes, releaseVersion, lastCheckedAt }
   }
 
   return { check, getStatus }
