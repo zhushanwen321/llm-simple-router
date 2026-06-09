@@ -152,11 +152,14 @@ jobs:
       - name: Push to Alibaba Cloud ACR
         if: github.event_name == 'workflow_dispatch'
         run: |
-          ACR_IMAGE="${{ secrets.ACR_REGISTRY }}/zhushanwen321/llm-simple-router"
-          docker buildx imagetools create \
-            --tag ${ACR_IMAGE}:v${{ env.NEW_VERSION }} \
-            --tag ${ACR_IMAGE}:latest \
-            ghcr.io/${{ github.repository }}:v${{ env.NEW_VERSION }}
+          GHCR_IMAGE="ghcr.io/${{ github.repository }}:v${{ env.NEW_VERSION }}"
+          GHCR_LATEST="ghcr.io/${{ github.repository }}:latest"
+          ACR_BASE="${{ secrets.ACR_REGISTRY }}/zhushanwen321/llm-simple-router"
+          docker pull ${GHCR_IMAGE}
+          docker tag ${GHCR_IMAGE} ${ACR_BASE}:v${{ env.NEW_VERSION }}
+          docker tag ${GHCR_IMAGE} ${ACR_BASE}:latest
+          docker push ${ACR_BASE}:v${{ env.NEW_VERSION }}
+          docker push ${ACR_BASE}:latest
 
       # ── 步骤 7: Release Asset (仅 main) ──────────────────
       - name: Prepare and upload dist archive
