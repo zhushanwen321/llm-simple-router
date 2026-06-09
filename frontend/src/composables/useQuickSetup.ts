@@ -224,18 +224,11 @@ export function useQuickSetup() {
 
   onMounted(async () => {
     try {
-      const [g, r, m, p] = await Promise.allSettled([
-        api.recommended.getProviders(),
-        api.recommended.getRetryRules(),
-        api.getMappingGroups(),
-        api.getProviders(),
-      ]);
-      if (g.status === "fulfilled") providerGroups.value = g.value;
-      if (r.status === "fulfilled") allRecommendedRules.value = r.value;
-      if (m.status === "fulfilled")
-        existingMappings.value = m.value as MappingGroup[];
-      if (p.status === "fulfilled")
-        allProviders.value = p.value as ApiProvider[];
+      const init = await api.getQuickSetupInit();
+      providerGroups.value = init.provider_groups;
+      allRecommendedRules.value = init.recommended_rules;
+      existingMappings.value = init.existing_mappings;
+      allProviders.value = init.existing_providers;
       actions.selectClient("claude-code");
     } catch (e: unknown) {
       console.error("quickSetup.load:", e);

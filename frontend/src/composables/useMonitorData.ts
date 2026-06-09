@@ -137,21 +137,12 @@ async function loadInitialDataImpl(
   runtime: Ref<RuntimeMetrics | null>,
 ): Promise<void> {
   try {
-    const [active, recent, statsData, concurrencyData, runtimeData] =
-      await Promise.allSettled([
-        api.getMonitorActive(),
-        api.getMonitorRecent(),
-        api.getMonitorStats(),
-        api.getMonitorConcurrency(),
-        api.getMonitorRuntime(),
-      ]);
-
-    if (active.status === "fulfilled") activeRequests.value = active.value;
-    if (recent.status === "fulfilled") recentCompleted.value = recent.value;
-    if (statsData.status === "fulfilled") stats.value = statsData.value;
-    if (concurrencyData.status === "fulfilled")
-      concurrency.value = concurrencyData.value;
-    if (runtimeData.status === "fulfilled") runtime.value = runtimeData.value;
+    const init = await api.getMonitorInit();
+    if (init.active) activeRequests.value = init.active;
+    if (init.recent) recentCompleted.value = init.recent;
+    if (init.stats) stats.value = init.stats;
+    if (init.concurrency) concurrency.value = init.concurrency;
+    if (init.runtime) runtime.value = init.runtime;
   } catch (e) {
     console.error("Failed to load initial monitor data:", e);
     stats.value = null;

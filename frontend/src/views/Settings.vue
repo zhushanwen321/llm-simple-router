@@ -3,8 +3,8 @@ import { ref, computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { toast } from "vue-sonner";
 import { getApiMessage } from "@/api/client";
+import { api } from "@/api/client";
 import {
-  getDbSizeInfo,
   setDbSizeThresholds,
   exportConfig,
   importConfig,
@@ -54,14 +54,8 @@ const SIZE_MB_MIN = 1;
 const DEFAULT_DB_MAX_SIZE_MB = 1024;
 const DEFAULT_LOG_TABLE_MAX_SIZE_MB = 800;
 
-const {
-  retentionDays,
-  metricsDetailDays,
-  validationError,
-  loadRetention,
-  loadMetricsDetail,
-  saveBoth,
-} = useLogRetention();
+const { retentionDays, metricsDetailDays, validationError, saveBoth } =
+  useLogRetention();
 
 const dbSizeInfo = ref<DbSizeInfoResponse | null>(null);
 const dbMaxSizeMb = ref(DEFAULT_DB_MAX_SIZE_MB);
@@ -112,18 +106,12 @@ function formatBytes(bytes: number): string {
 async function loadSettings() {
   loading.value = true;
   try {
-    const [sizeInfo, retention, metrics] = await Promise.allSettled([
-      getDbSizeInfo(),
-      loadRetention(),
-      loadMetricsDetail(),
-    ]);
-    if (sizeInfo.status === "fulfilled") {
-      dbSizeInfo.value = sizeInfo.value;
-      dbMaxSizeMb.value = sizeInfo.value.thresholds.dbMaxSizeMb;
-      logTableMaxSizeMb.value = sizeInfo.value.thresholds.logTableMaxSizeMb;
-    }
-    void retention;
-    void metrics;
+    const init = await api.getSettingsInit();
+    dbSizeInfo.value = init.db_size;
+    dbMaxSizeMb.value = init.db_size.thresholds.dbMaxSizeMb;
+    logTableMaxSizeMb.value = init.db_size.thresholds.logTableMaxSizeMb;
+    retentionDays.value = init.log_retention_days;
+    metricsDetailDays.value = init.metrics_detail_days;
   } finally {
     loading.value = false;
   }

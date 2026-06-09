@@ -1,7 +1,8 @@
 import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
 import { Type, Static } from "@sinclair/typebox";
-import { getRequestLogs, getRequestLogsGrouped, getRequestLogById, getRequestLogChildren, deleteLogsBefore, extractThinkingLevel } from "../db/index.js";
+import { getRequestLogs, getRequestLogsGrouped, getRequestLogById, getRequestLogChildren, deleteLogsBefore, extractThinkingLevel, getAllProviders, getAllRouterKeys, getAllMappingGroups } from "../db/index.js";
+import { getLogRetentionDays } from "../db/settings.js";
 import type { LogFileWriter } from "../storage/log-file-writer.js";
 import { HTTP_NOT_FOUND } from "./constants.js";
 import { API_CODE, apiError } from "./api-response.js";
@@ -34,6 +35,33 @@ interface LogRoutesOptions {
 
 export const adminLogRoutes: FastifyPluginCallback<LogRoutesOptions> = (app, options, done) => {
   const { db, logFileWriter } = options;
+
+  app.get("/admin/api/logs/init", async () => {
+    const [providersResult, routerKeysResult, groupsResult, retentionResult] = await Promise.allSettled([
+      Promise.resolve(getAllProviders(db).map(p => ({ id: p.id, name: p.name }))),
+      Promise.resolve(getAllRouterKeys(db).map(rk => ({ id: rk.id, name: rk.name }))),
+      (async () => {
+        const groups = getAllMappingGroups(db);
+        const clientModels = [...new Set(groups.filter(g => g.is_active).map(g => g.client_model))].sort();
+        const backendModels = [...new Set(groups.flatMap(g => {
+          try {
+            const rule = JSON.parse(g.rule);
+            return (Array.isArray(rule.targets) ? rule.targets : []).map((t: { backend_model?: string }) => t.backend_model);
+          } catch { return [] }
+        }).filter(Boolean))].sort();
+        return { client_models: clientModels, backend_models: backendModels };
+      })(),
+      Promise.resolve(getLogRetentionDays(db)),
+    ]);
+
+    return {
+      providers: providersResult.status === "fulfilled" ? providersResult.value : null,
+      router_keys: routerKeysResult.status === "fulfilled" ? routerKeysResult.value : null,
+      client_models: groupsResult.status === "fulfilled" ? groupsResult.value.client_models : null,
+      backend_models: groupsResult.status === "fulfilled" ? groupsResult.value.backend_models : null,
+      log_retention_days: retentionResult.status === "fulfilled" ? retentionResult.value : null,
+    };
+  });
 
   app.get("/admin/api/logs", { schema: { querystring: LogQuerySchema } }, async (request, reply) => {
     const query = request.query as Static<typeof LogQuerySchema>;

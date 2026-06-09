@@ -18,6 +18,24 @@ export const adminMonitorRoutes: FastifyPluginCallback<MonitorRoutesOptions> = (
     return;
   }
 
+  app.get("/admin/api/monitor/init", async () => {
+    const [activeResult, recentResult, statsResult, concurrencyResult, runtimeResult] = await Promise.allSettled([
+      tracker.getActive(),
+      tracker.getRecent(),
+      tracker.getStats(),
+      tracker.getConcurrency(),
+      tracker.getRuntime(),
+    ]);
+
+    return {
+      active: activeResult.status === "fulfilled" ? activeResult.value : null,
+      recent: recentResult.status === "fulfilled" ? recentResult.value : null,
+      stats: statsResult.status === "fulfilled" ? statsResult.value : null,
+      concurrency: concurrencyResult.status === "fulfilled" ? concurrencyResult.value : null,
+      runtime: runtimeResult.status === "fulfilled" ? runtimeResult.value : null,
+    };
+  });
+
   app.get("/admin/api/monitor/active", async () => tracker.getActive());
   app.get("/admin/api/monitor/recent", async () => tracker.getRecent());
   app.get("/admin/api/monitor/stats", async () => tracker.getStats());

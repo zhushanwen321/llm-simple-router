@@ -130,8 +130,23 @@ export function useLogFilters() {
     }
   }
 
-  onMounted(() => {
-    Promise.allSettled([loadProviders(), loadRouterKeys(), loadModelOptions()]);
+  onMounted(async () => {
+    try {
+      const init = await api.getLogsInit();
+      if (init.providers)
+        providers.value = init.providers as unknown as Provider[];
+      if (init.router_keys) routerKeys.value = init.router_keys;
+      if (init.client_models) clientModelOptions.value = init.client_models;
+      if (init.backend_models) backendModelOptions.value = init.backend_models;
+    } catch (e: unknown) {
+      console.error("useLogFilters.init:", e);
+      // fallback: 逐个加载
+      await Promise.allSettled([
+        loadProviders(),
+        loadRouterKeys(),
+        loadModelOptions(),
+      ]);
+    }
   });
 
   return {

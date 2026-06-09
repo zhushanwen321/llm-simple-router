@@ -1,6 +1,7 @@
 import { ref, computed } from "vue";
 import type { Ref, ComputedRef } from "vue";
 import { api, getApiMessage } from "@/api/client";
+import type { DashboardInitResponse } from "@/api/client";
 import { toast } from "vue-sonner";
 import { fillTimeseries } from "@/views/metrics-helpers";
 import { CHART_COLORS } from "@/styles/design-tokens";
@@ -111,6 +112,94 @@ export function useDashboardData({
 
   let lastRefreshKey = "";
   let lastRefreshTime = 0;
+
+  /** 从 init 响应直接填充所有 ref，跳过网络请求 */
+  function initWithData(init: DashboardInitResponse) {
+    // Stats（可能为 null——init 端点在 overview 失败时返回 null）
+    if (init.stats) {
+      stats.value = {
+        totalRequests: init.stats.totalRequests,
+        successRate: init.stats.successRate,
+        avgTps: init.stats.avgTps,
+        totalInputTokens: init.stats.totalInputTokens,
+        totalOutputTokens: init.stats.totalOutputTokens,
+        startTime: init.stats.startTime,
+        endTime: init.stats.endTime,
+      };
+    }
+
+    // Prev stats
+    prevStats.value = init.prev_stats;
+
+    // Cache hit rate & client type breakdown
+    cacheHitRate.value = init.cache_hit_rate ?? 0;
+    clientTypeBreakdown.value = init.client_type_breakdown ?? {};
+
+    // Provider token summary
+    providerTokenSummary.value = init.provider_token_summary ?? {};
+
+    // Timeseries charts
+    const ts = timeSelection.value;
+    const resolvedTimeRange =
+      stats.value.startTime && stats.value.endTime
+        ? { startTime: stats.value.startTime, endTime: stats.value.endTime }
+        : { startTime: ts.startTime, endTime: ts.endTime };
+    const period = "window";
+
+    const tpsTs = init.timeseries?.tps ?? [];
+    const inputTs = init.timeseries?.input_tokens ?? [];
+    const outputTs = init.timeseries?.output_tokens ?? [];
+
+    if (tpsTs.length > 0) {
+      const filled = fillTimeseries(tpsTs, period, resolvedTimeRange);
+      tpsChartData.value = toChartData(
+        filled,
+        t("dashboard.charts.tokenOutputSpeed"),
+        CHART_COLORS.indigo,
+      );
+    } else {
+      tpsChartData.value = null;
+    }
+
+    if (inputTs.length > 0) {
+      const filled = fillTimeseries(inputTs, period, resolvedTimeRange);
+      inputTokensChartData.value = toChartData(
+        filled,
+        t("dashboard.charts.inputLegend"),
+        CHART_COLORS.teal,
+      );
+    } else {
+      inputTokensChartData.value = null;
+    }
+
+    if (outputTs.length > 0) {
+      const filled = fillTimeseries(outputTs, period, resolvedTimeRange);
+      outputTokensChartData.value = toChartData(
+        filled,
+        t("dashboard.charts.outputLegend"),
+        CHART_COLORS.green,
+      );
+    } else {
+      outputTokensChartData.value = null;
+    }
+
+    if (inputTs.length > 0 && outputTs.length > 0) {
+      const filledInput = fillTimeseries(inputTs, period, resolvedTimeRange);
+      const filledOutput = fillTimeseries(outputTs, period, resolvedTimeRange);
+      tokenThroughputChartData.value = toThroughputChartData(
+        filledInput,
+        filledOutput,
+        t("dashboard.charts.inputLegend"),
+        t("dashboard.charts.outputLegend"),
+      );
+    } else {
+      tokenThroughputChartData.value = null;
+    }
+
+    // Mark cache as fresh
+    lastRefreshKey = watchKey.value;
+    lastRefreshTime = Date.now();
+  }
 
   async function refresh() {
     if (!selectedProvider.value) return;
@@ -254,6 +343,7 @@ export function useDashboardData({
     tokenThroughputChartData,
     loading,
     loadError,
+    initWithData,
     refresh,
     timeRangeText,
   };

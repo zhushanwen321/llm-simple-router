@@ -3,6 +3,8 @@ import Database from "better-sqlite3";
 import { Type, Static } from "@sinclair/typebox";
 import { getSetting, setSetting } from "../db/settings.js";
 import { clearEnhancementConfigCache } from "../proxy/routing/enhancement-config.js";
+import { getAllProviders } from "../db/index.js";
+import { serializeProviders } from "./providers.js";
 
 const UpdateProxyEnhancementSchema = Type.Object({
   tool_call_loop_enabled: Type.Boolean(),
@@ -67,6 +69,42 @@ export const adminProxyEnhancementRoutes: FastifyPluginCallback<ProxyEnhancement
       setSetting(db, "ai_retry_config", ai_retry_config ? JSON.stringify(ai_retry_config) : "");
     }
     return reply.send({ success: true });
+  });
+
+  app.get("/admin/api/proxy-enhancement/init", async (_request, reply) => {
+    // config
+    const raw = getSetting(db, "proxy_enhancement");
+    const defaults = { tool_call_loop_enabled: false, stream_loop_enabled: false, tool_round_limit_enabled: true, tool_error_logging_enabled: false };
+    let config = defaults;
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        config = {
+          tool_call_loop_enabled: parsed.tool_call_loop_enabled ?? false,
+          stream_loop_enabled: parsed.stream_loop_enabled ?? false,
+          tool_round_limit_enabled: parsed.tool_round_limit_enabled ?? true,
+          tool_error_logging_enabled: parsed.tool_error_logging_enabled ?? false,
+        };
+      } catch { /* eslint-disable-line taste/no-silent-catch -- 损坏的 JSON，回退默认 */ }
+    }
+    const aiConfigRaw = getSetting(db, "ai_retry_config");
+    let aiRetryConfig: { provider_id: string; model: string } | null = null;
+    if (aiConfigRaw) {
+      try {
+        aiRetryConfig = JSON.parse(aiConfigRaw) as { provider_id: string; model: string };
+      } catch (e: unknown) {
+        console.error('proxyEnhancementInit.parseAiConfig:', e);
+        aiRetryConfig = null;
+      }
+    }
+    const fullConfig = { ...config, ai_retry_config: aiRetryConfig };
+
+    // providers — simplified list with id, name, models for AI Retry selection
+    const encryptionKey = getSetting(db, "encryption_key")!;
+    const providers = getAllProviders(db);
+    const serializedProviders = serializeProviders(db, providers, encryptionKey);
+
+    return reply.send({ config: fullConfig, providers: serializedProviders });
   });
 
   done();
