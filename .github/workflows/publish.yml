@@ -155,7 +155,7 @@ jobs:
           GHCR_IMAGE="ghcr.io/${{ github.repository }}:v${{ env.NEW_VERSION }}"
           GHCR_LATEST="ghcr.io/${{ github.repository }}:latest"
           ACR_BASE="${{ secrets.ACR_REGISTRY }}/zhushanwen321/llm-simple-router"
-          docker pull ${GHCR_IMAGE}
+          docker pull --platform linux/amd64 ${GHCR_IMAGE}
           docker tag ${GHCR_IMAGE} ${ACR_BASE}:v${{ env.NEW_VERSION }}
           docker tag ${GHCR_IMAGE} ${ACR_BASE}:latest
           docker push ${ACR_BASE}:v${{ env.NEW_VERSION }}
