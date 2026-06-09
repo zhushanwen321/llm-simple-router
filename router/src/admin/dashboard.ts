@@ -1,7 +1,7 @@
 import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
 import { Type, Static } from "@sinclair/typebox";
-import { getStats, getMetricsSummary, getMetricsTimeseries, getClientTypeBreakdown, getAllProviders, getAllRouterKeys } from "../db/index.js";
+import { getStats, getMetricsSummary, getMetricsTimeseries, getClientTypeBreakdown, getAllProviders, getAllRouterKeys, computeBucketBoundary } from "../db/index.js";
 import type { MetricsPeriod, MetricsMetric } from "../db/metrics.js";
 import { getSetting } from "../db/settings.js";
 import { serializeProviders } from "./providers.js";
@@ -18,7 +18,6 @@ const OverviewQuerySchema = Type.Object({
 
 const PERCENT_MULTIPLIER = 100;
 const PCT_ROUND_DIGITS = 10;
-const PROVIDER_TOKEN_LOOKBACK_DAYS = 30;
 
 interface DashboardRoutesOptions {
   db: Database.Database;
@@ -67,8 +66,8 @@ async function computeOverview(db: Database.Database, query: Static<typeof Overv
     : 0;
   const breakdown = getClientTypeBreakdown(db, legacyPeriod, providerId, backendModel, routerKeyId, startTime, endTime);
 
-  // 5. Provider token summary
-  const providerTokenSummary = getProviderTokenSummary(db);
+  // 5. Provider token summary (same time range as overview)
+  const providerTokenSummary = getProviderTokenSummary(db, startTime, endTime);
 
   return {
     stats: {
@@ -134,18 +133,39 @@ export const adminDashboardRoutes: FastifyPluginCallback<DashboardRoutesOptions>
   done();
 };
 
-/** Get per-provider total input tokens for last 30 days (for sorting/labels) */
-function getProviderTokenSummary(db: Database.Database): Record<string, number> {
-  const rows = db.prepare(
-    `SELECT provider_id, COALESCE(SUM(sum_input_tokens), 0) AS total_input_tokens
-     FROM metrics_10min
-     WHERE bucket_time >= datetime('now', '-' || ? || ' days')
-     GROUP BY provider_id`,
-  ).all(PROVIDER_TOKEN_LOOKBACK_DAYS) as { provider_id: string; total_input_tokens: number }[];
-
+/** Get per-provider total input tokens for the given time range (for sorting/labels).
+ *  Uses the same cross-boundary merge as getStats(): metrics_10min (settled) + request_metrics (current bucket).
+ */
+function getProviderTokenSummary(db: Database.Database, startTime: string, endTime: string): Record<string, number> {
   const result: Record<string, number> = {};
-  for (const r of rows) {
-    result[r.provider_id] = r.total_input_tokens;
+  const boundary = computeBucketBoundary();
+
+  // 1. Aggregated data from metrics_10min (everything before the current bucket)
+  const aggEnd = endTime <= boundary ? endTime : boundary;
+  if (startTime < aggEnd) {
+    const rows = db.prepare(
+      `SELECT provider_id, COALESCE(SUM(sum_input_tokens), 0) AS total_input_tokens
+       FROM metrics_10min
+       WHERE bucket_time >= datetime(?) AND bucket_time < datetime(?)
+       GROUP BY provider_id`,
+    ).all(startTime, aggEnd) as { provider_id: string; total_input_tokens: number }[];
+    for (const r of rows) {
+      result[r.provider_id] = (result[r.provider_id] ?? 0) + r.total_input_tokens;
+    }
   }
+
+  // 2. Real-time data from request_metrics (current bucket to now)
+  if (endTime > boundary && boundary > startTime) {
+    const detailRows = db.prepare(
+      `SELECT provider_id, COALESCE(SUM(input_tokens), 0) AS total_input_tokens
+       FROM request_metrics
+       WHERE created_at >= datetime(?) AND created_at < datetime(?)
+       GROUP BY provider_id`,
+    ).all(boundary, endTime) as { provider_id: string; total_input_tokens: number }[];
+    for (const r of detailRows) {
+      result[r.provider_id] = (result[r.provider_id] ?? 0) + r.total_input_tokens;
+    }
+  }
+
   return result;
 }

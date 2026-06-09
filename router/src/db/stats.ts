@@ -49,7 +49,7 @@ interface StatsRow {
  * Data before this boundary is fully settled (in metrics_10min).
  * Data at or after this boundary may still be incomplete (in request_metrics).
  */
-function computeBucketBoundary(): string {
+export function computeBucketBoundary(): string {
   const bucketStartSec = Math.floor(Date.now() / MS_PER_SECOND / BUCKET_SECONDS) * BUCKET_SECONDS;
   return new Date(bucketStartSec * MS_PER_SECOND).toISOString();
 }

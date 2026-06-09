@@ -148,7 +148,7 @@ export function useDashboard() {
   // --- Auto-select top provider ---
   function autoSelectProviderIfNeeded() {
     if (!selectedProvider.value && providers.value.length > 0) {
-      selectedProvider.value = providers.value[0].id;
+      selectedProvider.value = sortedProviders.value[0].id;
     }
   }
 
