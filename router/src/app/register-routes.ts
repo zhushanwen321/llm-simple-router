@@ -23,7 +23,6 @@ import { ProxyConnectivityChecker } from "../proxy/transport/provider-connectivi
 import { PluginRegistry } from "../proxy/transform/plugin-registry.js";
 import type { StateRegistry } from "../core/registry.js";
 import type { Config } from "../config/index.js";
-import type { RetryRuleMatcher } from "../proxy/orchestration/retry-rules.js";
 
 export interface RegisterRoutesOptions {
   db: Database.Database;
@@ -36,7 +35,6 @@ export interface RegisterRoutesOptions {
   logFileWriter: LogFileWriter | null;
   logsDir: string;
   isMemoryDb: boolean;
-  matcher: RetryRuleMatcher;
   pluginRegistry: PluginRegistry;
   proxyAgentFactory: ProxyAgentFactory;
   connectivityChecker: ProxyConnectivityChecker;

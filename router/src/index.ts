@@ -129,7 +129,6 @@ export async function buildApp(
     logFileWriter,
     logsDir,
     isMemoryDb,
-    matcher,
     pluginRegistry,
     proxyAgentFactory,
     connectivityChecker,
