@@ -1,4 +1,5 @@
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
 import type { FastifyInstance } from "fastify";
 import fastifyStatic from "@fastify/static";
@@ -92,8 +93,9 @@ export function registerRoutes(
   });
 
   // 前端静态文件服务（生产环境）
+  const __filename = fileURLToPath(import.meta.url);
   const frontendDist = path.resolve(
-    process.env.FRONTEND_DIST || path.join(path.dirname(import.meta.url.replace("file://", "")), "../../frontend-dist"),
+    process.env.FRONTEND_DIST || path.join(path.dirname(__filename), "../../frontend-dist"),
   );
 
   if (existsSync(frontendDist)) {

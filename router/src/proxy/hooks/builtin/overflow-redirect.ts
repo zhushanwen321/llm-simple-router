@@ -17,6 +17,7 @@ export const overflowRedirectHook: PipelineHook = {
   name: "builtin:overflow-redirect",
   phase: "post_route",
   priority: 100,
+  core: true,
   execute(ctx: PipelineContext): void {
     const { resolved, body } = ctx;
     if (!resolved) return;

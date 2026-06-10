@@ -30,6 +30,128 @@ import Database from "better-sqlite3";
 const HTTP_ERROR_THRESHOLD = 400;
 const UPSTREAM_ERROR_STATUS = 502;
 
+// ---------- Error type handling for resilience catch block ----------
+
+interface ErrorHandlerContext {
+  reply: FastifyReply;
+  request: FastifyRequest;
+  db: Database.Database;
+  errors: import("../proxy-core.js").ProxyErrorFormatter;
+  rCtx: RejectParams;
+  provider: NonNullable<ReturnType<typeof import("../../db/index.js").getProviderById>>;
+  clientApiType: "openai" | "openai-responses" | "anthropic";
+  clientModel: string;
+  isStream: boolean;
+  logId: string;
+  sessionId: string | undefined;
+  clientReq: string;
+  upstreamReqBase: string;
+  routerKeyId: string | null;
+  pipelineSnapshot: string;
+  matcher: RetryRuleMatcher;
+  logFileWriter: LogFileWriter | null | undefined;
+  resolved: Target;
+  resolvedEndpoint: ReturnType<typeof resolveEndpoint>;
+  rootLogId: string;
+  isFailoverIteration: boolean;
+  ctx: PipelineContext;
+  rCtxMappingReason: string | null;
+  flushCurrentErrors: () => void;
+  startTime: number;
+}
+
+function handleResilienceError(
+  e: unknown,
+  ctx: ErrorHandlerContext,
+): ResilienceResultAction {
+  const {
+    reply, request, db, errors, rCtx, provider,
+    clientApiType, clientModel, isStream, logId, sessionId,
+    clientReq, upstreamReqBase, routerKeyId, pipelineSnapshot,
+    matcher, logFileWriter, resolved, resolvedEndpoint,
+    rootLogId, isFailoverIteration, ctx: pipelineCtx,
+    rCtxMappingReason, flushCurrentErrors, startTime,
+  } = ctx;
+
+  if (e instanceof PipelineAbort) {
+    return { action: "reply", reply: reply.code(e.statusCode).send(e.body) };
+  }
+
+  if (e instanceof ProviderSwitchNeeded) {
+    if (reply.raw.headersSent) return { action: "reply", reply };
+    if (e.attempts && e.attempts.length > 0) {
+      const fakeResult = e.lastResult ?? { kind: "throw" as const, error: new Error("provider switch") };
+      logResilienceResult(
+        db,
+        {
+          apiType: clientApiType,
+          model: clientModel, providerId: provider.id, isStream,
+          clientReq, upstreamReqBase, logId, routerKeyId, originalModel: null, sessionId,
+          failover: { isFailoverIteration, rootLogId },
+          pipelineSnapshot,
+          matcher, logFileWriter,
+          resilienceAction: "failover",
+          resilienceReason: "provider_switch_needed",
+          mappingReason: pipelineCtx.metadata.get("mappingReason") as string | undefined ?? "direct",
+          failoverTrigger: e.constructor.name,
+          upstreamApiType: resolvedEndpoint.api_type,
+          upstreamBaseUrl: resolvedEndpoint.base_url,
+        },
+        e.attempts, fakeResult, startTime,
+      );
+    }
+    flushCurrentErrors();
+    return { action: "continue", trigger: e.constructor.name };
+  }
+
+  if (e instanceof SemaphoreQueueFullError) {
+    return {
+      action: "reply",
+      reply: rejectAndReply(reply, rCtx, errors.concurrencyQueueFull(provider.id),
+        `Concurrency queue full for provider '${provider.id}'`, provider.id,
+        flushCurrentErrors),
+    };
+  }
+  if (e instanceof SemaphoreTimeoutError) {
+    return {
+      action: "reply",
+      reply: rejectAndReply(reply, rCtx, errors.concurrencyTimeout(provider.id, e.timeoutMs),
+        `Concurrency wait timeout for provider '${provider.id}' (${e.timeoutMs}ms)`, provider.id,
+        flushCurrentErrors),
+    };
+  }
+
+  // 请求被主动 kill（abort + reply destroy），直接退出不写日志
+  if (e instanceof Error && e.name === "AbortError") {
+    return { action: "reply", reply };
+  }
+
+  // 其他未知错误
+  const errMsg = e instanceof Error ? e.message : JSON.stringify(e);
+  request.log.debug({ logId, error: errMsg, action: "upstream_error" });
+  insertRequestLog(db, {
+    id: logId, api_type: clientApiType,
+    model: clientModel, provider_id: provider.id,
+    status_code: UPSTREAM_ERROR_STATUS, latency_ms: Date.now() - startTime, is_stream: isStream ? 1 : 0,
+    error_message: errMsg || "Upstream connection failed", created_at: new Date().toISOString(),
+    client_request: clientReq, upstream_request: upstreamReqBase,
+    is_failover: isFailoverIteration ? 1 : 0, original_request_id: isFailoverIteration ? rootLogId : null,
+    router_key_id: routerKeyId, original_model: null,
+    session_id: pipelineCtx.metadata.get("session_id") as string | undefined,
+    pipeline_snapshot: pipelineSnapshot,
+    transport_kind: "throw",
+    mapping_reason: rCtxMappingReason,
+    upstream_api_type: resolvedEndpoint.api_type,
+    upstream_base_url: resolvedEndpoint.base_url,
+    backend_model: resolved.backend_model,
+  }, (matcher || logFileWriter) ? {
+    matcher, logFileWriter, responseBody: null,
+  } : undefined);
+  flushCurrentErrors();
+  const err = errors.upstreamConnectionFailed();
+  return { action: "reply", reply: reply.code(err.statusCode).send(err.body) };
+}
+
 // ---------- Resilience result processing ----------
 
 export type ResilienceResultAction =
@@ -75,7 +197,7 @@ export async function processResilienceResult(params: {
   const {
     orchestrator, request, reply, clientApiType,
     resolved, provider, clientModel, isStream, logId, sessionId,
-    clientReq, upstreamReqBase, concurrencyOverride: _concurrencyOverride, effectiveMappingReason,
+    clientReq, upstreamReqBase, concurrencyOverride, effectiveMappingReason,
     retryBaseDelayMs, isFailover, matcher, transportFn,
     db, tracker, usageWindowTracker, errors, rCtx,
     pipelineSnapshot, flushCurrentErrors, adapter, logFileWriter,
@@ -86,7 +208,7 @@ export async function processResilienceResult(params: {
   try {
     const resilienceResult = await orchestrator.handle(
       request, reply, clientApiType,
-      { resolved, provider, clientModel, isStream, trackerId: logId, sessionId, clientRequest: clientReq, upstreamRequest: upstreamReqBase, concurrencyOverride: _concurrencyOverride, mappingReason: effectiveMappingReason },
+      { resolved, provider, clientModel, isStream, trackerId: logId, sessionId, clientRequest: clientReq, upstreamRequest: upstreamReqBase, concurrencyOverride, mappingReason: effectiveMappingReason },
       { retryBaseDelayMs, isFailover, ruleMatcher: matcher, transportFn },
     );
 
@@ -191,83 +313,14 @@ export async function processResilienceResult(params: {
 
     return { action: "reply", reply };
   } catch (e: unknown) {
-    if (e instanceof PipelineAbort) {
-      return { action: "reply", reply: reply.code(e.statusCode).send(e.body) };
-    }
-
-    if (e instanceof ProviderSwitchNeeded) {
-      if (reply.raw.headersSent) return { action: "reply", reply };
-      // 补写失败日志
-      if (e.attempts && e.attempts.length > 0) {
-        const fakeResult = e.lastResult ?? { kind: "throw" as const, error: new Error("provider switch") };
-        logResilienceResult(
-          db,
-          {
-            apiType: clientApiType,
-            model: clientModel, providerId: provider.id, isStream,
-            clientReq, upstreamReqBase, logId, routerKeyId, originalModel: null, sessionId,
-            failover: { isFailoverIteration, rootLogId },
-            pipelineSnapshot,
-            matcher, logFileWriter,
-            resilienceAction: "failover",
-            resilienceReason: "provider_switch_needed",
-            mappingReason: effectiveMappingReason,
-            failoverTrigger: e.constructor.name,
-            upstreamApiType: resolvedEndpoint.api_type,
-            upstreamBaseUrl: resolvedEndpoint.base_url,
-          },
-          e.attempts, fakeResult, startTime,
-        );
-      }
-      flushCurrentErrors();
-      return { action: "continue", trigger: e.constructor.name };
-    }
-
-    if (e instanceof SemaphoreQueueFullError) {
-      return {
-        action: "reply",
-        reply: rejectAndReply(reply, rCtx, errors.concurrencyQueueFull(provider.id),
-          `Concurrency queue full for provider '${provider.id}'`, provider.id,
-          flushCurrentErrors),
-      };
-    }
-    if (e instanceof SemaphoreTimeoutError) {
-      return {
-        action: "reply",
-        reply: rejectAndReply(reply, rCtx, errors.concurrencyTimeout(provider.id, (e as SemaphoreTimeoutError).timeoutMs),
-          `Concurrency wait timeout for provider '${provider.id}' (${(e as SemaphoreTimeoutError).timeoutMs}ms)`, provider.id,
-          flushCurrentErrors),
-      };
-    }
-
-    // 请求被主动 kill（abort + reply destroy），直接退出不写日志
-    if (e instanceof Error && e.name === "AbortError") {
-      return { action: "reply", reply };
-    }
-
-    // 其他未知错误
-    const errMsg = e instanceof Error ? e.message : JSON.stringify(e);
-    request.log.debug({ logId, error: errMsg, action: "upstream_error" });
-    insertRequestLog(db, {
-      id: logId, api_type: clientApiType,
-      model: clientModel, provider_id: provider.id,
-      status_code: UPSTREAM_ERROR_STATUS, latency_ms: Date.now() - startTime, is_stream: isStream ? 1 : 0,
-      error_message: errMsg || "Upstream connection failed", created_at: new Date().toISOString(),
-      client_request: clientReq, upstream_request: upstreamReqBase,
-      is_failover: isFailoverIteration ? 1 : 0, original_request_id: isFailoverIteration ? rootLogId : null,
-      router_key_id: routerKeyId, original_model: null,
-      session_id: ctx.metadata.get("session_id") as string | undefined,
-      pipeline_snapshot: pipelineSnapshot,
-      transport_kind: "throw",
-      mapping_reason: rCtx.mappingReason ?? null,
-      upstream_api_type: resolvedEndpoint.api_type,
-      upstream_base_url: resolvedEndpoint.base_url,
-      backend_model: resolved.backend_model,
-    }, (matcher || logFileWriter) ? {
-      matcher, logFileWriter, responseBody: null,
-    } : undefined);
-    flushCurrentErrors();
-    const err = errors.upstreamConnectionFailed();
-    return { action: "reply", reply: reply.code(err.statusCode).send(err.body) };
+    return handleResilienceError(e, {
+      reply, request, db, errors, rCtx, provider,
+      clientApiType, clientModel, isStream, logId, sessionId,
+      clientReq, upstreamReqBase, routerKeyId, pipelineSnapshot,
+      matcher, logFileWriter, resolved, resolvedEndpoint,
+      rootLogId, isFailoverIteration, ctx,
+      rCtxMappingReason: rCtx.mappingReason ?? null,
+      flushCurrentErrors, startTime,
+    });
   }
 }

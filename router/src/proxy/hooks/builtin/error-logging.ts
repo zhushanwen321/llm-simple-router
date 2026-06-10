@@ -31,6 +31,7 @@ export const errorLoggingHook: PipelineHook = {
   name: "builtin:error-logging",
   phase: "on_error",
   priority: 900,
+  core: true,
   execute(ctx: PipelineContext): void {
     const db = ctx.metadata.get("db") as Database.Database;
     const startTime = ctx.metadata.get("startTime") as number;
