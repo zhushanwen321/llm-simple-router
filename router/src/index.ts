@@ -1,59 +1,31 @@
 #!/usr/bin/env node
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { existsSync } from "node:fs";
-import { randomUUID } from "crypto";
-import Fastify, { FastifyInstance } from "fastify";
-import { insertRequestLog } from "./db/logs.js";
-import { HTTP_NOT_FOUND, HTTP_INTERNAL_ERROR, getProxyApiType } from "./core/constants.js";
-import { loadModelDirectory } from "./config/model-context.js";
-import { API_CODE, ApiResponse, apiError, isAdminApiResponse, statusToApiCode } from "./admin/api-response.js";
-
-const PROVIDER_DEFAULT_QUEUE_TIMEOUT_MS = 5000;
-const PROVIDER_DEFAULT_MAX_QUEUE_SIZE = 100;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-import { getConfig, getBaseConfig, Config } from "./config/index.js";
+import { getConfig, getBaseConfig, type Config } from "./config/index.js";
 import { initDatabase, getAllProviders } from "./db/index.js";
-import { loadRecommendedConfig } from "./config/recommended.js";
-import { authMiddleware } from "./middleware/auth.js";
-import { createProxyHandler } from "./proxy/handler/create-proxy-handler.js";
-import { adminRoutes } from "./admin/routes.js";
-import { RetryRuleMatcher } from "./proxy/orchestration/retry-rules.js";
-import { PluginRegistry } from "./proxy/transform/plugin-registry.js";
-import { FormatRegistry } from "./proxy/format/registry.js";
-import { openaiAdapter } from "./proxy/format/adapters/openai.js";
-import { anthropicAdapter } from "./proxy/format/adapters/anthropic.js";
-import { responsesAdapter } from "./proxy/format/adapters/responses.js";
-import { openaiToAnthropicConverter } from "./proxy/format/converters/openai-anthropic.js";
-import { anthropicToOpenAIConverter } from "./proxy/format/converters/anthropic-openai.js";
-import { openaiToResponsesConverter } from "./proxy/format/converters/openai-responses.js";
-import { responsesToOpenAIConverter } from "./proxy/format/converters/responses-openai.js";
-import { responsesToAnthropicConverter } from "./proxy/format/converters/responses-anthropic.js";
-import { anthropicToResponsesConverter } from "./proxy/format/converters/anthropic-responses.js";
 import { SemaphoreManager, AdaptiveController } from "./core/concurrency/index.js";
-import type { StateRegistry } from "./core/registry.js";
 import { RequestTracker } from "./core/monitor/index.js";
 import { UsageWindowTracker } from "./proxy/routing/usage-window-tracker.js";
-import { SessionTracker, DEFAULT_LOOP_PREVENTION_CONFIG } from "./core/loop-prevention/index.js";
-import { scheduleLogCleanup } from "./db/log-cleaner.js";
-import { scheduleDbSizeMonitor } from "./db/db-size-monitor.js";
-import { scheduleMetricsAggregator } from "./db/metrics-aggregator.js";
-import { startUpgradeChecker, stopUpgradeChecker } from "./admin/upgrade.js";
 import { CheckerOptions } from "./upgrade/checker.js";
-import fastifyStatic from "@fastify/static";
-import { ServiceContainer, SERVICE_KEYS } from "./core/container.js";
+import { SERVICE_KEYS } from "./core/container.js";
 import Database from "better-sqlite3";
-import { LogFileWriter } from "./storage/log-file-writer.js";
 import { ProxyAgentFactory } from "./proxy/transport/proxy-agent.js";
 import { ProxyConnectivityChecker } from "./proxy/transport/provider-connectivity.js";
-import { hookRegistry } from "./proxy/pipeline/hook-registry.js";
-import { clearEnhancementConfigCache } from "./proxy/routing/enhancement-config.js";
-import { registerBuiltinHooks } from "./proxy/pipeline/register-hooks.js";
-import { scheduleLogFileMaintenance } from "./storage/log-file-compressor.js";
-import { getDetailLogEnabled, getLogFileRetentionDays } from "./db/settings.js";
-import { dirname, join } from "node:path";
+import { PluginRegistry } from "./proxy/transform/plugin-registry.js";
+import { RetryRuleMatcher } from "./proxy/orchestration/retry-rules.js";
+import { loadModelDirectory } from "./config/model-context.js";
+
+// --- Extracted app modules ---
+import { createAppInstance } from "./app/create-app.js";
+import { composeContainer } from "./app/compose-container.js";
+import { registerAppHooks } from "./app/register-hooks.js";
+import { registerRoutes } from "./app/register-routes.js";
+
+const PROVIDER_DEFAULT_QUEUE_TIMEOUT_MS = 5000;
+const PROVIDER_DEFAULT_MAX_QUEUE_SIZE = 100;
 
 export interface AppOptions {
   config?: Config;
@@ -97,7 +69,7 @@ export function initializeProviderState(
 export async function buildApp(
   options?: AppOptions
 ): Promise<{
-  app: FastifyInstance;
+  app: import("fastify").FastifyInstance;
   db: Database.Database;
   usageWindowTracker: UsageWindowTracker;
   tracker: RequestTracker;
@@ -116,358 +88,53 @@ export async function buildApp(
   // 加载外部模型目录（ai-model-directory），fallback 到硬编码白名单
   loadModelDirectory();
 
-  const isDev = process.env.NODE_ENV !== "production";
+  // Step 1: 创建 Fastify 实例 + 全局 hooks
+  const app = createAppInstance({ config, db, upgradeCheckerOptions: options?.upgradeCheckerOptions });
 
-  const MAX_BODY_SIZE_MB = 50;
-  const KB = 1024;
-  const MB = KB * KB;
+  // Step 2: 注册所有服务到容器
+  const { container, logFileWriter, logsDir, isMemoryDb } = composeContainer(db, { config }, app);
 
-  const app = Fastify({
-    // Claude Code 图片请求含 base64 编码，单张可达数十 MB
-    bodyLimit: MAX_BODY_SIZE_MB * MB,
-    logger: {
-      level: config.LOG_LEVEL,
-      ...(isDev
-        ? {
-          transport: {
-            target: "pino-pretty",
-            options: {
-              translateTime: "SYS:yyyy-mm-dd HH:MM:ss.l",
-              ignore: "pid,hostname",
-            },
-          },
-        }
-        : {}),
-    },
-    // 统一 schema validation 错误格式为 { error: { message } }
-    ajv: {
-      customOptions: {
-        messages: true,
-      },
-    },
-  });
-
-  app.setSchemaErrorFormatter((errors) => {
-    const message = errors
-      .map((e) => {
-        const field = e.instancePath ? e.instancePath.slice(1) : e.params?.missingProperty ?? "field";
-        return `${field} ${e.message}`;
-      })
-      .join("; ");
-    return new Error(message);
-  });
-
-  // 记录请求到达时间，供全局错误处理计算延迟
-  app.addHook("onRequest", (request, reply, done) => {
-    (request as unknown as { receivedAt: number }).receivedAt = Date.now();
-
-    // 全局 EPIPE 防护：
-    // EPIPE 从底层 socket 的 WriteWrap.onWriteComplete 触发，emit 在 socket 上，
-    // 不会传播到 reply.raw（ServerResponse）。reply.raw.on("error") 无法拦截 socket 的 EPIPE。
-    // 因此必须直接在 socket 上注册 error handler。
-    // Node.js HTTP server 内置的 socketOnError 只处理第一次 error（随后注册 noop 兜底），
-    // 本 handler 提供额外的永久保护层。
-    // 代理路由在 create-proxy-handler.ts 中已有额外监听，此处覆盖所有路由。
-    const sock = request.raw.socket;
-    const socketErrorHandler = (err: NodeJS.ErrnoException) => {
-      if (err.code === "EPIPE" || err.code === "ECONNRESET") {
-        request.log.debug({ err }, "client socket error");
-      } else {
-        request.log.warn({ err }, "unexpected socket error");
-      }
-    };
-    sock.on("error", socketErrorHandler);
-
-    const replyErrorHandler = (err: Error) => {
-      const code = (err as { code?: string }).code;
-      if (code === "EPIPE") {
-        request.log.debug({ err }, "client disconnected (EPIPE)");
-      } else {
-        request.log.warn({ err }, "response stream error");
-      }
-    };
-    reply.raw.on("error", replyErrorHandler);
-
-    reply.raw.on("close", () => {
-      sock.removeListener("error", socketErrorHandler);
-      reply.raw.removeListener("error", replyErrorHandler);
-    });
-
-    done();
-  });
-
-  // 统一错误处理：代理路由保持 {error:{message}}，Admin API 使用信封格式
-  app.setErrorHandler((error: Error, request, reply) => {
-    const fastifyError = error as Error & { statusCode?: number; validation?: unknown[] };
-    const status = fastifyError.statusCode ?? HTTP_INTERNAL_ERROR;
-
-    // 代理路由保持原有格式，并记录到 request_logs
-    if (!isAdminApiResponse(request.url)) {
-      const proxyApiType = getProxyApiType(request.url);
-      if (proxyApiType) {
-        request.log.error({ statusCode: status, err: error }, `Proxy request error: ${fastifyError.message}`);
-        const body = request.body as Record<string, unknown> | undefined;
-        const receivedAt = (request as unknown as { receivedAt?: number }).receivedAt;
-        const latencyMs = receivedAt ? Date.now() - receivedAt : 0;
-        try {
-          insertRequestLog(db, {
-            id: randomUUID(),
-            api_type: proxyApiType,
-            model: (body?.model as string) || null,
-            provider_id: null,
-            status_code: status,
-            latency_ms: latencyMs,
-            is_stream: body?.stream === true ? 1 : 0,
-            error_message: fastifyError.message,
-            created_at: new Date().toISOString(),
-            client_request: JSON.stringify({ headers: request.headers, ...(body ? { body } : {}) }),
-            router_key_id: request.routerKey?.id ?? null,
-          });
-        } catch (logErr) {
-          request.log.error({ err: logErr }, "Failed to log proxy error to request_logs");
-        }
-      }
-      return reply.code(status).send({ error: { message: fastifyError.message } });
-    }
-
-    // Admin API — 统一信封错误格式
-    const code = statusToApiCode(status);
-    return reply.code(status).send(apiError(code, fastifyError.message));
-  });
-
-  // onSend hook：自动包装 Admin API 成功响应为信封格式
-  app.addHook('onSend', async (request, reply, payload) => {
-    if (!isAdminApiResponse(request.url, reply.getHeader('content-type') as string | undefined)) {
-      return payload
-    }
-
-    // 已是错误信封（errorHandler 已包装）或已是信封格式 — 跳过
-    if (typeof payload === 'string') {
-      try {
-        const parsed = JSON.parse(payload)
-        if (parsed !== null && typeof parsed === 'object' && 'code' in parsed) return payload // errorHandler 或路由已手动包装
-        // 复用已解析结果，避免二次 JSON.parse
-        const wrapped: ApiResponse<unknown> = {
-          code: API_CODE.SUCCESS,
-          message: 'ok',
-          data: parsed,
-        }
-        return JSON.stringify(wrapped)
-      } catch {
-        return payload
-      }
-    }
-
-    return payload
-  })
-
-  loadRecommendedConfig(path.resolve(__dirname, '../config'));
-  startUpgradeChecker({
-    ...options?.upgradeCheckerOptions,
-    configDir: path.resolve(__dirname, '../config'),
-  });
-
-  const container = new ServiceContainer();
-  container.register(SERVICE_KEYS.db, () => db);
-  container.register(SERVICE_KEYS.matcher, (c) => { const m = new RetryRuleMatcher(); m.load(c.resolve(SERVICE_KEYS.db)); return m; });
-  container.register(SERVICE_KEYS.semaphoreManager, () => new SemaphoreManager());
-  container.register(SERVICE_KEYS.tracker, (c) => {
-    const t = new RequestTracker({ semaphoreManager: c.resolve(SERVICE_KEYS.semaphoreManager), logger: app.log });
-    t.startPushInterval();
-    return t;
-  });
-  container.register(SERVICE_KEYS.usageWindowTracker, (c) => {
-    const uwt = new UsageWindowTracker(c.resolve(SERVICE_KEYS.db));
-    uwt.reconcileOnStartup();
-    return uwt;
-  });
-  container.register(SERVICE_KEYS.sessionTracker, () => new SessionTracker(DEFAULT_LOOP_PREVENTION_CONFIG.sessionTracker));
-
-  // 文件日志写入器
-  const isMemoryDb = config.DB_PATH === ":memory:";
-  const logsDir = isMemoryDb ? "" : join(dirname(config.DB_PATH), "logs");
-  // :memory: 模式注册 null，避免 DB 日志记录被 isFileWriter 逻辑抑制
-  const logFileWriter = isMemoryDb
-    ? null
-    : new LogFileWriter(logsDir, { enabled: getDetailLogEnabled(db) });
-  container.register(SERVICE_KEYS.logFileWriter, () => logFileWriter);
-
-  // 注册 AdaptiveController（依赖已注册的 semaphoreManager）
-  container.register(SERVICE_KEYS.adaptiveController, (c) => {
-    const ac = new AdaptiveController(c.resolve(SERVICE_KEYS.semaphoreManager), app.log);
-    return ac;
-  });
-
-  // 注册 PluginRegistry（从 DB 和 plugins 目录加载转换插件）
-  const pluginRegistry = new PluginRegistry();
-  pluginRegistry.loadFromDB(db);
-  const pluginsDir = path.resolve(__dirname, "../plugins/transform");
-  pluginRegistry.scanPluginsDir(pluginsDir);
-  container.register(SERVICE_KEYS.pluginRegistry, () => pluginRegistry);
-
-  // 注册 FormatRegistry（3 adapters + 6 converters 覆盖所有格式转换）
-  const formatRegistry = new FormatRegistry();
-  formatRegistry.registerAdapter(openaiAdapter);
-  formatRegistry.registerAdapter(anthropicAdapter);
-  formatRegistry.registerAdapter(responsesAdapter);
-  formatRegistry.registerConverter(openaiToAnthropicConverter);
-  formatRegistry.registerConverter(anthropicToOpenAIConverter);
-  formatRegistry.registerConverter(openaiToResponsesConverter);
-  formatRegistry.registerConverter(responsesToOpenAIConverter);
-  formatRegistry.registerConverter(responsesToAnthropicConverter);
-  formatRegistry.registerConverter(anthropicToResponsesConverter);
-  container.register(SERVICE_KEYS.formatRegistry, () => formatRegistry);
-
-  // 注册 ProxyAgentFactory
-  container.register(SERVICE_KEYS.proxyAgentFactory, () => new ProxyAgentFactory());
-  const connectivityChecker = new ProxyConnectivityChecker();
-
-  // 从容器解析所有服务
+  // 从容器解析服务
   const matcher = container.resolve<RetryRuleMatcher>(SERVICE_KEYS.matcher);
   const semaphoreManager = container.resolve<SemaphoreManager>(SERVICE_KEYS.semaphoreManager);
   const tracker = container.resolve<RequestTracker>(SERVICE_KEYS.tracker);
   const usageWindowTracker = container.resolve<UsageWindowTracker>(SERVICE_KEYS.usageWindowTracker);
   const adaptiveController = container.resolve<AdaptiveController>(SERVICE_KEYS.adaptiveController);
   const proxyAgentFactory = container.resolve<ProxyAgentFactory>(SERVICE_KEYS.proxyAgentFactory);
+  const pluginRegistry = container.resolve<PluginRegistry>(SERVICE_KEYS.pluginRegistry);
 
   // Wire adaptive controller to tracker
   tracker.setAdaptiveStatusProvider(adaptiveController);
 
-  // 从 DB 读取已有 provider 的并发配置，初始化信号量/adaptive/tracker（共享逻辑）
+  // 从 DB 读取已有 provider 的并发配置，初始化信号量/adaptive/tracker 缓存
   initializeProviderState(db, semaphoreManager, adaptiveController, tracker);
 
-  app.register(authMiddleware, { db });
-
-  // 注册内置 hooks 到 hookRegistry（供 Admin API 查询）
-  registerBuiltinHooks();
-
-  // --- New pipeline-based proxy handlers (Phase 3) ---
-  const openaiHandler = createProxyHandler({
-    apiType: "openai",
-    paths: ["/v1/chat/completions", "/chat/completions"],
-  });
-  const anthropicHandler = createProxyHandler({
-    apiType: "anthropic",
-    paths: ["/v1/messages"],
-  });
-  const responsesHandler = createProxyHandler({
-    apiType: "openai-responses",
-    paths: ["/v1/responses", "/responses"],
-  });
-  app.register(openaiHandler, { db, container });
-  app.register(anthropicHandler, { db, container });
-  app.register(responsesHandler, { db, container });
-
-  // StateRegistry — Admin 层通过此接口触发 proxy 层状态刷新，消除 admin→proxy 依赖
-  const stateRegistry: StateRegistry = {
-    refreshRetryRules: () => matcher.load(db),
-    updateProviderConcurrency: (providerId, cfg) => semaphoreManager.updateConfig(providerId, cfg),
-    removeProvider: (providerId) => semaphoreManager.remove(providerId),
-    removeAllProviders: () => semaphoreManager.removeAll(),
-    getProviderStatus: (providerId) => semaphoreManager.getStatus(providerId),
-    syncAdaptiveProvider: (providerId, cfg) => adaptiveController.syncProvider(providerId, cfg),
-    removeAdaptiveProvider: (providerId) => adaptiveController.remove(providerId),
-    getAdaptiveStatus: (providerId) => adaptiveController.getStatus(providerId),
-    reinitializeProviders: () => {
-      adaptiveController.removeAll();
-      initializeProviderState(db, semaphoreManager, adaptiveController, tracker);
-    },
-    clearEnhancementCache: () => clearEnhancementConfigCache(),
-    getPipelineHooks: () => hookRegistry.getAll(),
-  };
-
-  // Late-bound close ref — close 函数在 adminRoutes 注册之后才定义，
-  // 但 restart API 需要在运行时调用它
-  const closeRef = { fn: async () => {} };
-
-  app.register(adminRoutes, { db, stateRegistry, tracker, adaptiveController, logFileWriter, logsDir, closeFn: () => closeRef.fn(), pluginRegistry, proxyAgentFactory, connectivityChecker });
-
-  // 前端静态文件服务（生产环境）
-  const frontendDist = path.resolve(
-    process.env.FRONTEND_DIST || path.join(__dirname, "../frontend-dist")
-  );
-
-  if (existsSync(frontendDist)) {
-    app.register(fastifyStatic, {
-      root: frontendDist,
-      prefix: "/admin/",
-      wildcard: false,
-    });
-
-    // SPA fallback: /admin/ 下非 API 路径返回 index.html
-    app.setNotFoundHandler((request, reply) => {
-      if (
-        (request.url.startsWith("/admin/") || request.url === "/admin") &&
-        !request.url.startsWith("/admin/api")
-      ) {
-        return reply.sendFile("index.html");
-      }
-      reply.code(HTTP_NOT_FOUND).send({ error: { message: "Not Found" } });
-    });
-  } else {
-    app.log.debug(
-      `Frontend dist not found at ${frontendDist}, skipping static serving`
-    );
-  }
-
-  app.get("/health", async () => {
-    return { status: "ok" };
+  // Step 3: 注册 auth + proxy handlers + 构建 StateRegistry
+  const { stateRegistry } = registerAppHooks(app, db, container, {
+    matcher,
+    semaphoreManager,
+    adaptiveController,
   });
 
-  const logCleanup = scheduleLogCleanup(db, app.log);
-
-  const metricsAggregator = scheduleMetricsAggregator(db, app.log);
-
-  const dbSizeMonitor = scheduleDbSizeMonitor(db, config.DB_PATH, {
-    log: app.log,
+  // Step 4: 注册 admin routes + 静态文件 + 定时任务 + close 函数
+  const connectivityChecker = new ProxyConnectivityChecker();
+  const close = registerRoutes(app, {
+    db,
+    config,
+    container,
+    tracker,
+    semaphoreManager,
+    adaptiveController,
+    stateRegistry,
+    logFileWriter,
+    logsDir,
+    isMemoryDb,
+    matcher,
+    pluginRegistry,
+    proxyAgentFactory,
+    connectivityChecker,
+    initializeProviderStateFn: () => initializeProviderState(db, semaphoreManager, adaptiveController, tracker),
   });
-
-  let closed = false;
-  let close = async () => {
-    if (closed) return;
-    closed = true;
-    stopUpgradeChecker();
-    logCleanup.stop();
-    metricsAggregator.stop();
-    dbSizeMonitor.stop();
-    tracker.stopPushInterval();
-    // 关闭所有 SSE 长连接，防止 app.close() 因 hijack 的连接无限等待
-    tracker.closeAllClients();
-    semaphoreManager.removeAll();
-    proxyAgentFactory.invalidateAll();
-    const sessionTracker = container.resolve<SessionTracker>(SERVICE_KEYS.sessionTracker);
-    sessionTracker.stop();
-    // Flush LogFileWriter 的 WriteStream 缓冲数据到磁盘
-    await logFileWriter?.stop();
-    // 等待活跃代理请求自然完成，超时后强制关闭所有连接。
-    // 先调用 app.close() 停止接受新连接并等待现有连接结束，
-    // 如果 2 秒内未完成则调用 closeAllConnections() 强制断开，防止 SSE 长连接导致无限等待。
-    const CLOSE_GRACE_PERIOD_MS = 2_000;
-    const forceClose = typeof app.server.closeAllConnections === 'function'
-      ? setTimeout(() => app.server.closeAllConnections!(), CLOSE_GRACE_PERIOD_MS)
-      : null;
-    if (forceClose) forceClose.unref();
-    await app.close();
-    if (forceClose) clearTimeout(forceClose);
-    db.close();
-  };
-
-  // 文件压缩和清理任务（仅非 :memory: 模式）
-  if (!isMemoryDb) {
-    const logFileMaintenance = scheduleLogFileMaintenance(logsDir, {
-      retentionDays: getLogFileRetentionDays(db),
-      log: app.log,
-    });
-    // 注册到 close
-    const prevClose = close;
-    close = async () => {
-      logFileMaintenance.stop();
-      await prevClose();
-    };
-  }
-
-  // 将最终版 close 函数绑定到 late-bound ref（供 restart API 运行时调用）
-  closeRef.fn = close;
 
   return {
     app,

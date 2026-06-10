@@ -1,0 +1,116 @@
+{
+  "test_cases": [
+    {
+      "id": "TC-1-01",
+      "type": "integration",
+      "title": "buildApp returns valid app structure",
+      "description": "buildApp with in-memory DB returns { app, db, usageWindowTracker, tracker, close }",
+      "steps": ["call buildApp({ db: inMemory })", "verify all 5 properties exist"]
+    },
+    {
+      "id": "TC-1-02",
+      "type": "integration",
+      "title": "buildApp /health endpoint works",
+      "description": "After buildApp, GET /health returns { status: 'ok' }",
+      "steps": ["buildApp", "app.inject GET /health", "verify 200 + body"]
+    },
+    {
+      "id": "TC-2-01",
+      "type": "unit",
+      "title": "ProxyPipeline.emit core hook error propagates",
+      "description": "When a core hook throws, emit() re-throws the error",
+      "steps": ["register hook with core=true that throws", "call emit()", "verify error propagates"]
+    },
+    {
+      "id": "TC-2-02",
+      "type": "unit",
+      "title": "ProxyPipeline.emit non-core hook error caught",
+      "description": "When a non-core hook throws, emit() catches and logs, continues to next hook",
+      "steps": ["register hook A (non-core, throws)", "register hook B (non-core, succeeds)", "call emit()", "verify B executed, no error thrown"]
+    },
+    {
+      "id": "TC-2-03",
+      "type": "unit",
+      "title": "ProxyPipeline.getAllHooks returns all registered hooks",
+      "description": "After registering 9 builtin hooks, getAllHooks returns them grouped by phase",
+      "steps": ["register 9 hooks", "call getAllHooks()", "verify structure matches old hookRegistry.getAll()"]
+    },
+    {
+      "id": "TC-2-04",
+      "type": "unit",
+      "title": "ProxyPipeline.register is idempotent",
+      "description": "Registering same hook name twice only keeps one",
+      "steps": ["register hook 'foo'", "register hook 'foo' again", "verify only 1 hook in chain"]
+    },
+    {
+      "id": "TC-3-01",
+      "type": "unit",
+      "title": "stream-oa2ant text delta conversion",
+      "description": "OpenAI text delta converts to Anthropic content_block_delta(text_delta)",
+      "steps": ["feed chunk with delta.content='hello'", "verify output: message_start + block_start(text) + block_delta(text)"]
+    },
+    {
+      "id": "TC-3-02",
+      "type": "unit",
+      "title": "stream-oa2ant thinking delta conversion",
+      "description": "OpenAI reasoning_content converts to Anthropic thinking_delta",
+      "steps": ["feed chunk with delta.reasoning_content='think'", "verify thinking block emitted"]
+    },
+    {
+      "id": "TC-3-03",
+      "type": "unit",
+      "title": "stream-oa2ant tool_calls multi-index",
+      "description": "Multiple tool_call indices handled correctly with block transitions",
+      "steps": ["feed tool_call index 0 (id+name)", "feed tool_call index 0 (args)", "feed tool_call index 1 (id+name)", "verify correct block_start/stop sequence"]
+    },
+    {
+      "id": "TC-3-04",
+      "type": "unit",
+      "title": "stream-oa2ant finish_reason mapping",
+      "description": "finish_reason maps to correct Anthropic stop_reason",
+      "steps": ["feed finish_reason='stop'", "verify stop_reason='end_turn'", "feed finish_reason='tool_calls'", "verify stop_reason='tool_use'"]
+    },
+    {
+      "id": "TC-3-05",
+      "type": "unit",
+      "title": "stream-oa2ant usage extraction",
+      "description": "Usage chunk with no choices triggers stop sequence with correct token counts",
+      "steps": ["feed chunk with usage only (no choices)", "verify message_delta with correct token counts"]
+    },
+    {
+      "id": "TC-4-01",
+      "type": "unit",
+      "title": "precomputeFailoverTargets no mapping",
+      "description": "When resolveMapping returns null, returns { ok: false, errorCode: 'no_mapping' }",
+      "steps": ["call with unmapped model", "verify error code"]
+    },
+    {
+      "id": "TC-4-02",
+      "type": "unit",
+      "title": "precomputeFailoverTargets unsupported modality",
+      "description": "When modality redirect empties targets, returns 'unsupported_modality'",
+      "steps": ["setup targets that get filtered by modality", "verify error code"]
+    },
+    {
+      "id": "TC-4-03",
+      "type": "unit",
+      "title": "rejectAndReply constructs correct response",
+      "description": "rejectAndReply calls insertRejectedLog and sends correct status code",
+      "steps": ["call rejectAndReply with 404 error", "verify reply.code(404).send() called"]
+    },
+    {
+      "id": "TC-4-04",
+      "type": "integration",
+      "title": "failover loop single target success",
+      "description": "With one target and successful transport, returns 200",
+      "steps": ["setup 1 target + mock backend returning 200", "call executeFailoverLoop", "verify 200 response"]
+    },
+    {
+      "id": "TC-4-05",
+      "type": "integration",
+      "title": "failover loop exhausts all targets",
+      "description": "When all targets fail, returns 503 with exhausted message",
+      "steps": ["setup 3 targets, all returning 500", "call executeFailoverLoop", "verify 503 with 'exhausted' message"]
+    }
+  ]
+}
