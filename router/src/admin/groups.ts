@@ -12,7 +12,7 @@ import {
 } from "../db/index.js";
 import { getSetting } from "../db/settings.js";
 import { serializeProviders } from "./providers.js";
-import { HTTP_BAD_REQUEST, HTTP_CREATED, HTTP_CONFLICT, HTTP_NOT_FOUND } from "./constants.js";
+import { HTTP_BAD_REQUEST, HTTP_CREATED, HTTP_CONFLICT, HTTP_NOT_FOUND } from "../core/constants.js";
 import { parseModels } from "../config/model-context.js";
 import { API_CODE, apiError } from "./api-response.js";
 
