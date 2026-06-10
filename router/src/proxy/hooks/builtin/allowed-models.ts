@@ -16,6 +16,7 @@ export const allowedModelsHook: PipelineHook = {
   name: "builtin:allowed-models",
   phase: "post_route",
   priority: 50,
+  core: true,
   execute(ctx: PipelineContext): void {
     const { request, resolved } = ctx;
     if (!resolved) return;

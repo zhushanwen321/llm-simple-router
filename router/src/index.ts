@@ -164,11 +164,9 @@ export async function main() {
     if (code === "EPIPE" || code === "ECONNRESET") {
       try {
         app.log.warn({ err }, "Client disconnected (EPIPE/ECONNRESET)");
-      /* eslint-disable taste/no-silent-catch -- app.log 可能已崩溃 */
       } catch {
         console.warn("Client disconnected:", (err as Error).message);
       }
-      /* eslint-enable taste/no-silent-catch */
       return;
     }
     try {

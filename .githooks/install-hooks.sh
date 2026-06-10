@@ -291,6 +291,27 @@ else
 fi
 
 # ============================================================================
+# 5. 临时文件检测
+# ============================================================================
+
+print_section "[临时文件检测]"
+
+if [ "$SKIP_TEMP_FILE_CHECK" != "1" ]; then
+    TEMP_PATTERNS='^\.(bg[0-9]+|tracer?)[0-9a-z-]*-result\.md$'
+    TEMP_FILES=$(echo "$STAGED_FILES" | grep -E "$TEMP_PATTERNS" || true)
+    if [ -n "$TEMP_FILES" ]; then
+        echo -e "${YELLOW}[WARN] 检测到 subagent 临时产物:${NC}"
+        echo "$TEMP_FILES" | sed 's/^/  - /'
+        echo -e "${YELLOW}这些文件不应随 PR 合入。建议删除或移到 .xyz-harness/ 目录。${NC}"
+        echo -e "${YELLOW}[HINT] 设置 SKIP_TEMP_FILE_CHECK=1 跳过此项检查${NC}"
+    else
+        echo -e "${GREEN}[OK] 未检测到临时文件${NC}"
+    fi
+else
+    echo -e "${YELLOW}[SKIP] 临时文件检测已跳过${NC}"
+fi
+
+# ============================================================================
 # 全部通过
 # ============================================================================
 
@@ -305,6 +326,7 @@ echo -e "  ${YELLOW}SKIP_FRONTEND_LINT=1${NC}      - 跳过 ESLint"
 echo -e "  ${YELLOW}SKIP_TYPE_CHECK=1${NC}          - 跳过 vue-tsc"
 echo -e "  ${YELLOW}SKIP_CODE_RULES_CHECK=1${NC}   - 跳过代码规范"
 echo -e "  ${YELLOW}SKIP_BACKEND_LINT=1${NC}       - 跳过后端 ESLint"
+echo -e "  ${YELLOW}SKIP_TEMP_FILE_CHECK=1${NC}    - 跳过临时文件检测"
 echo ""
 
 exit 0
@@ -330,6 +352,7 @@ echo -e "  ${GREEN}[+]${NC} 前端 ESLint 代码检查"
 echo -e "  ${GREEN}[+]${NC} 后端 ESLint 代码检查（router/）"
 echo -e "  ${GREEN}[+]${NC} vue-tsc 类型检查（全量，与 CI 等价）"
 echo -e "  ${GREEN}[+]${NC} Vue 组件规范检查（禁止原生 HTML、Emoji、自定义 CSS）"
+echo -e "  ${GREEN}[+]${NC} 临时文件检测（subagent 产物）"
 echo ""
 echo -e "${CYAN}Hook 脚本位置:${NC} .githooks/"
 echo ""

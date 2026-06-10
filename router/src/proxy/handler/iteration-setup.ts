@@ -148,7 +148,7 @@ export function buildIterationSetup(params: {
           pluginRegistry.applyBeforeResponse(respCtx);
           pluginRegistry.applyAfterResponse(respCtx);
           transformed = respCtx.response;
-        } catch (e: unknown) { /* response hooks best-effort */ void e; }
+        } catch (e: unknown) { request.log.debug({ err: e }, "response transform plugin hook failed"); }
       }
       return JSON.stringify(transformed);
     } catch (err) {

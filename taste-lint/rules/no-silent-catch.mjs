@@ -14,18 +14,41 @@ export default {
       emptyCatch: '空 catch 块吞掉了错误，至少需要记录日志。',
       consoleOnly:
         'catch 块只有 console 调用 —— 底层错误未传播给调用方或用户。考虑：返回错误响应 / 设置错误状态 / toast 提示 / 重抛。',
+      voidCatchParam:
+        'catch 块仅使用 void 吞掉错误参数，等同于空 catch。应记录日志（request.log.warn）或重抛。',
     },
   },
   create(context) {
     function isOnlyConsole(body) {
       if (body.length !== 1) return false;
       const stmt = body[0];
-      return (
+      if (
         stmt.type === 'ExpressionStatement' &&
         stmt.expression.type === 'CallExpression' &&
         stmt.expression.callee.type === 'MemberExpression' &&
         stmt.expression.callee.object.type === 'Identifier' &&
         stmt.expression.callee.object.name === 'console'
+      ) {
+        // console.warn 表示开发者有意降级（非关键错误），允许
+        const method = stmt.expression.callee.property;
+        if (method.type === 'Identifier' && method.name === 'warn') return false;
+        return true;
+      }
+      return false;
+    }
+
+    /** 检测 `catch (e) { void e; }` —— 用 void 吞掉 catch 参数，绕过空 catch 检测 */
+    function isOnlyVoidOfCatchParam(body, catchParam) {
+      if (body.length !== 1) return false;
+      const stmt = body[0];
+      if (stmt.type !== 'ExpressionStatement') return false;
+      const expr = stmt.expression;
+      return (
+        expr.type === 'UnaryExpression' &&
+        expr.operator === 'void' &&
+        expr.argument.type === 'Identifier' &&
+        catchParam?.type === 'Identifier' &&
+        expr.argument.name === catchParam.name
       );
     }
 
@@ -36,6 +59,8 @@ export default {
 
         if (body.length === 0) {
           context.report({ node, messageId: 'emptyCatch' });
+        } else if (isOnlyVoidOfCatchParam(body, node.param)) {
+          context.report({ node, messageId: 'voidCatchParam' });
         } else if (isOnlyConsole(body)) {
           context.report({ node, messageId: 'consoleOnly' });
         }

@@ -77,6 +77,6 @@ export function rejectAndReply(
     matcher: params.matcher, logFileWriter: params.logFileWriter,
     mapping_reason: params.mappingReason ?? null,
   });
-  try { afterLog?.(); } catch (e: unknown) { /* tool error log 写入失败不影响响应 */ void e; }
+  try { afterLog?.(); } catch (e: unknown) { /* tool error log 写入失败不影响响应 */ console.warn("afterLog callback failed:", (e as Error).message); }
   return reply.code(error.statusCode).send(error.body);
 }
