@@ -15,28 +15,10 @@ import { setSetting } from "../src/db/settings.js";
 import { hashPassword } from "../src/utils/password.js";
 import { encrypt } from "../src/utils/crypto.js";
 import type { Provider } from "../src/db/providers.js";
-import type { ProxyErrorFormatter } from "../src/proxy/proxy-core.js";
-import type { RejectParams } from "../src/proxy/handler/reject-helpers.js";
 import type { Target } from "../src/core/types.js";
-import type { FastifyReply, FastifyRequest } from "fastify";
+import { makeErrors, makeMockReply, makeMockRequest, makeRCtx } from "./helpers/test-mock-factories.js";
 
-// ---------- Mock factories ----------
-
-const ERROR_503 = { statusCode: 503, body: { error: { message: "Provider unavailable" } } };
-
-function makeErrors(): ProxyErrorFormatter {
-  return {
-    modelNotFound: () => ({ statusCode: 404, body: {} }),
-    modelNotAllowed: () => ({ statusCode: 403, body: {} }),
-    providerUnavailable: () => ERROR_503,
-    providerTypeMismatch: () => ({ statusCode: 400, body: {} }),
-    upstreamConnectionFailed: () => ({ statusCode: 502, body: {} }),
-    concurrencyQueueFull: () => ({ statusCode: 503, body: {} }),
-    concurrencyTimeout: () => ({ statusCode: 504, body: {} }),
-    promptTooLong: () => ({ statusCode: 400, body: {} }),
-    unsupportedModality: () => ({ statusCode: 400, body: {} }),
-  };
-}
+// ---------- Local mock factories ----------
 
 function makeProvider(overrides: Partial<Provider> = {}): Provider {
   return {
@@ -68,43 +50,6 @@ function makeFormatAdapter() {
     defaultPath: "/v1/chat/completions",
     errorMeta: {},
     formatError: (message: string) => ({ error: { message, type: "server_error" } }),
-  };
-}
-
-function makeMockReply() {
-  const codeFn = vi.fn().mockReturnThis();
-  const sendFn = vi.fn().mockReturnThis();
-  const headerFn = vi.fn().mockReturnThis();
-  return {
-    code: codeFn,
-    send: sendFn,
-    header: headerFn,
-    raw: { headersSent: false },
-    statusCode: 200,
-  } as unknown as FastifyReply;
-}
-
-function makeMockRequest() {
-  return {
-    log: { warn: vi.fn(), error: vi.fn(), debug: vi.fn(), info: vi.fn() },
-    headers: {},
-  } as unknown as FastifyRequest;
-}
-
-function makeRCtx(db: Database.Database): RejectParams {
-  return {
-    db,
-    logId: "test-log-id",
-    apiType: "openai",
-    model: "gpt-4",
-    startTime: Date.now(),
-    isStream: false,
-    routerKeyId: null,
-    originalBody: { model: "gpt-4", messages: [] },
-    clientHeaders: {},
-    isFailover: false,
-    originalRequestId: null,
-    sessionId: undefined,
   };
 }
 

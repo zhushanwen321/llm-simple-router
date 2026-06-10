@@ -19,70 +19,12 @@ import { RetryRuleMatcher } from "../src/proxy/orchestration/retry-rules.js";
 import { initDatabase } from "../src/db/index.js";
 import { setSetting } from "../src/db/settings.js";
 import { hashPassword } from "../src/utils/password.js";
-import type { ProxyErrorFormatter } from "../src/proxy/proxy-core.js";
-import type { RejectParams } from "../src/proxy/handler/reject-helpers.js";
 import type { Target, ResolvedEndpoint } from "../src/core/types.js";
-import type { FastifyReply, FastifyRequest } from "fastify";
 import type { PipelineContext } from "../src/proxy/pipeline/types.js";
 import type { ProxyOrchestrator } from "../src/proxy/orchestration/orchestrator.js";
+import { makeErrors, makeMockReply, makeMockRequest, makeRCtx } from "./helpers/test-mock-factories.js";
 
-// ---------- Mock factories ----------
-
-const ERROR_502 = { statusCode: 502, body: { error: { message: "Upstream connection failed" } } };
-const ERROR_503 = { statusCode: 503, body: { error: { message: "Queue full" } } };
-const ERROR_504 = { statusCode: 504, body: { error: { message: "Timeout" } } };
-
-function makeErrors(): ProxyErrorFormatter {
-  return {
-    modelNotFound: () => ({ statusCode: 404, body: {} }),
-    modelNotAllowed: () => ({ statusCode: 403, body: {} }),
-    providerUnavailable: () => ERROR_503,
-    providerTypeMismatch: () => ({ statusCode: 400, body: {} }),
-    upstreamConnectionFailed: () => ERROR_502,
-    concurrencyQueueFull: () => ERROR_503,
-    concurrencyTimeout: () => ERROR_504,
-    promptTooLong: () => ({ statusCode: 400, body: {} }),
-    unsupportedModality: () => ({ statusCode: 400, body: {} }),
-  };
-}
-
-function makeMockReply() {
-  const codeFn = vi.fn().mockReturnThis();
-  const sendFn = vi.fn().mockReturnThis();
-  const headerFn = vi.fn().mockReturnThis();
-  return {
-    code: codeFn,
-    send: sendFn,
-    header: headerFn,
-    raw: { headersSent: false },
-    statusCode: 200,
-  } as unknown as FastifyReply;
-}
-
-function makeMockRequest() {
-  return {
-    log: { warn: vi.fn(), error: vi.fn(), debug: vi.fn(), info: vi.fn() },
-    headers: {},
-  } as unknown as FastifyRequest;
-}
-
-function makeRCtx(db: Database.Database): RejectParams {
-  return {
-    db,
-    logId: "test-log-id",
-    apiType: "openai",
-    model: "gpt-4",
-    startTime: Date.now(),
-    isStream: false,
-    routerKeyId: null,
-    originalBody: { model: "gpt-4", messages: [] },
-    clientHeaders: {},
-    isFailover: false,
-    originalRequestId: null,
-    sessionId: undefined,
-    mappingReason: "direct_format",
-  };
-}
+// ---------- Local mock factories ----------
 
 function makeResolvedEndpoint(): ResolvedEndpoint {
   return {
