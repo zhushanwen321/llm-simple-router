@@ -13,13 +13,13 @@ import { getRecommendedProviders, getRecommendedRetryRules } from "../config/rec
 import { lookupCapabilities } from "../config/model-context.js";
 import { getAllMappingGroups, getAllProviders } from "../db/index.js";
 import { serializeProviders } from "./providers.js";
-import { HTTP_CREATED, HTTP_BAD_REQUEST, HTTP_BAD_GATEWAY, HTTP_CONFLICT } from "./constants.js";
+import { HTTP_CREATED, HTTP_BAD_REQUEST, HTTP_BAD_GATEWAY, HTTP_CONFLICT } from "../core/constants.js";
 import { API_CODE, apiError } from "./api-response.js";
 import type { StateRegistry } from "../core/registry.js";
 import type { RequestTracker } from "../core/monitor/index.js";
 import type { AdaptiveController } from "../core/concurrency/index.js";
 
-const PROVIDER_NAME_RE = /^[a-zA-Z0-9_-]+$/;
+import { PROVIDER_NAME_RE } from "./utils.js";
 const API_KEY_PREVIEW_MIN_LENGTH = 8;
 const API_KEY_PREVIEW_PREFIX_LEN = 4;
 const NEW_PROVIDER_ID = "__new__";

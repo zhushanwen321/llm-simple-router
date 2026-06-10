@@ -2,7 +2,7 @@ import { FastifyPluginCallback, FastifyReply } from "fastify";
 import Database from "better-sqlite3";
 import { Type, Static } from "@sinclair/typebox";
 import type { Provider } from "../db/index.js";
-import type { RawHeaders } from "../proxy/types.js";
+import type { RawHeaders } from "../core/types.js";
 import { getAllProviders, getProviderById, createProvider, updateProvider, deleteProvider, getAllMappingGroups, updateMappingGroup, PROVIDER_CONCURRENCY_DEFAULTS } from "../db/index.js";
 import { parseEndpoints, serializeEndpoints } from "../db/providers.js";
 import { getRecommendedProviders } from "../config/recommended.js";
@@ -11,13 +11,13 @@ import { getSetting } from "../db/settings.js";
 import type { StateRegistry } from "../core/registry.js";
 import type { AdaptiveController } from "../core/concurrency/index.js";
 import type { RequestTracker } from "../core/monitor/index.js";
+import type { ProviderConnectivityChecker } from "../core/provider-connectivity.js";
 import type { ProxyAgentFactory } from "../proxy/transport/proxy-agent.js";
-import { HTTP_CREATED, HTTP_NOT_FOUND, HTTP_CONFLICT, HTTP_BAD_REQUEST, HTTP_OK } from "./constants.js";
+import { HTTP_CREATED, HTTP_NOT_FOUND, HTTP_CONFLICT, HTTP_BAD_REQUEST, HTTP_OK } from "../core/constants.js";
 import { API_CODE, apiError } from "./api-response.js";
 import { parseModels, buildModelInfoList, normalizePatchName, lookupCapabilities, type ModelEntry } from "../config/model-context.js";
 import { getModelInfoForProvider, setModelInfoForProvider, deleteAllModelInfoForProvider } from "../db/model-info.js";
-import { buildUpstreamHeaders } from "../proxy/proxy-core.js";
-import { callGet } from "../proxy/transport/http.js";
+
 
 const API_KEY_PREVIEW_MIN_LENGTH = 8;
 const FETCH_MODELS_BODY_PREVIEW_LENGTH = 200;
@@ -111,17 +111,7 @@ function extractModelOverrides(models: ModelInput[]): {
   return { entries, overrides };
 }
 const API_KEY_PREVIEW_PREFIX_LEN = 4;
-const PROVIDER_NAME_RE = /^[a-zA-Z0-9_-]+$/;
-
-/** 校验 base_url 是否为合法的 HTTP(S) URL */
-function isValidHttpUrl(str: string): boolean {
-  try {
-    const url = new URL(str);
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
+import { PROVIDER_NAME_RE, isValidHttpUrl } from "./utils.js";
 
 interface EndpointInput {
   api_type: "openai" | "openai-responses" | "anthropic";
@@ -223,6 +213,7 @@ interface ProviderRoutesOptions {
   tracker?: RequestTracker;
   adaptiveController?: AdaptiveController;
   proxyAgentFactory?: ProxyAgentFactory;
+  connectivityChecker?: ProviderConnectivityChecker;
 }
 
 interface ProviderHandlerDeps {
@@ -382,7 +373,7 @@ export function serializeProviders(
 }
 
 export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> = (app, options, done) => {
-  const { db, stateRegistry, tracker, adaptiveController, proxyAgentFactory } = options;
+  const { db, stateRegistry, tracker, adaptiveController, proxyAgentFactory, connectivityChecker } = options;
 
   app.get("/admin/api/providers", async (_request, reply) => {
     const encryptionKey = getSetting(db, "encryption_key")!;
@@ -608,12 +599,12 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
     const backend = { base_url };
     const clientHeaders: Record<string, string> = {};
     try {
-      const result = await callGet(
+      const result = await connectivityChecker!.fetchModels(
         backend,
         api_key,
         clientHeaders as RawHeaders,
         models_endpoint,
-        (cliHdrs, key) => buildUpstreamHeaders(cliHdrs, key, undefined, api_type),
+        api_type,
       );
 
       if (result.statusCode !== HTTP_OK) {

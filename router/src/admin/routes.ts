@@ -21,11 +21,11 @@ import { adminImportExportRoutes } from "./settings-import-export.js";
 import { adminTransformRuleRoutes } from "./transform-rules.js";
 import { adminDashboardRoutes } from "./dashboard.js";
 import { adminScheduleRoutes } from "./schedules.js";
-import { hookRegistry } from "../proxy/pipeline/hook-registry.js";
 import type { StateRegistry } from "../core/registry.js";
 import type { RequestTracker } from "../core/monitor/index.js";
 import type { AdaptiveController } from "../core/concurrency/index.js";
 import type { ProxyAgentFactory } from "../proxy/transport/proxy-agent.js";
+import type { ProviderConnectivityChecker } from "../core/provider-connectivity.js";
 
 interface AdminRoutesOptions {
   db: Database.Database;
@@ -37,6 +37,7 @@ interface AdminRoutesOptions {
   pluginRegistry?: import("../proxy/transform/plugin-registry.js").PluginRegistry;
   closeFn?: () => Promise<void>;
   proxyAgentFactory?: ProxyAgentFactory;
+  connectivityChecker?: ProviderConnectivityChecker;
 }
 
 export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (app, options, done) => {
@@ -44,7 +45,7 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (app, opti
   app.register(adminSetupRoutes, { db: options.db });
   app.register(adminAuthPlugin, { db: options.db });
   app.register(adminLoginRoutes, { db: options.db });
-  app.register(adminProviderRoutes, { db: options.db, stateRegistry: options.stateRegistry, tracker: options.tracker, adaptiveController: options.adaptiveController, proxyAgentFactory: options.proxyAgentFactory });
+  app.register(adminProviderRoutes, { db: options.db, stateRegistry: options.stateRegistry, tracker: options.tracker, adaptiveController: options.adaptiveController, proxyAgentFactory: options.proxyAgentFactory, connectivityChecker: options.connectivityChecker });
   app.register(adminMappingRoutes, { db: options.db });
   app.register(adminGroupRoutes, { db: options.db });
   app.register(adminScheduleRoutes, { db: options.db });
@@ -53,7 +54,7 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (app, opti
   app.register(adminRouterKeyRoutes, { db: options.db });
   app.register(adminStatsRoutes, { db: options.db });
   app.register(adminMetricsRoutes, { db: options.db });
-  app.register(adminProxyEnhancementRoutes, { db: options.db });
+  app.register(adminProxyEnhancementRoutes, { db: options.db, stateRegistry: options.stateRegistry });
   app.register(adminMonitorRoutes, { tracker: options.tracker });
   app.register(adminSettingsRoutes, { db: options.db, logsDir: options.logsDir });
   app.register(adminImportExportRoutes, { db: options.db, stateRegistry: options.stateRegistry, pluginRegistry: options.pluginRegistry });
@@ -66,7 +67,7 @@ export const adminRoutes: FastifyPluginCallback<AdminRoutesOptions> = (app, opti
 
   // Pipeline hooks 查询
   app.get("/admin/api/pipeline/hooks", async () => {
-    return { hooks: hookRegistry.getAll() };
+    return { hooks: options.stateRegistry.getPipelineHooks() };
   });
 
   done();

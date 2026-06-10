@@ -1,6 +1,6 @@
 import Database from "better-sqlite3";
 import type { LogFileWriter } from "../storage/log-file-writer.js";
-import { shouldPreserveDetail, type RetryMatcher } from "../proxy/log-detail-policy.js";
+import { shouldPreserveDetail, type RetryMatcher } from "../core/log-detail-policy.js";
 import { getCachedStmt } from "./helpers.js";
 
 /** 从 client_request JSON 中提取 thinking_level，按 api_type 分支处理 */

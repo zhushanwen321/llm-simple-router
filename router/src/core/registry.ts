@@ -32,4 +32,8 @@ export interface StateRegistry {
   getAdaptiveStatus(providerId: string): import("./concurrency/types.js").AdaptiveState | undefined;
   /** 从 DB 重新读取所有 provider 配置，重建信号量/adaptive/tracker 缓存（导入配置后调用） */
   reinitializeProviders(): void;
+  /** 清除代理增强配置缓存（enhancement-config） */
+  clearEnhancementCache(): void;
+  /** 获取已注册的 pipeline hooks（按 phase 分组） */
+  getPipelineHooks(): Record<string, Array<{ name: string; priority: number }>>;
 }

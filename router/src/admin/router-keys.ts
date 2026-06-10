@@ -8,7 +8,7 @@ import {
 } from "../db/index.js";
 import type { RouterKey } from "../db/index.js";
 import { getSetting } from "../db/settings.js";
-import { HTTP_CREATED, HTTP_NOT_FOUND } from "./constants.js";
+import { HTTP_CREATED, HTTP_NOT_FOUND } from "../core/constants.js";
 import { API_CODE, apiError } from "./api-response.js";
 
 const KEY_RANDOM_BYTES = 32;

@@ -2,9 +2,9 @@ import { FastifyPluginCallback } from "fastify";
 import Database from "better-sqlite3";
 import { Type, Static } from "@sinclair/typebox";
 import { getSetting, setSetting } from "../db/settings.js";
-import { clearEnhancementConfigCache } from "../proxy/routing/enhancement-config.js";
 import { getAllProviders } from "../db/index.js";
 import { serializeProviders } from "./providers.js";
+import type { StateRegistry } from "../core/registry.js";
 
 const UpdateProxyEnhancementSchema = Type.Object({
   tool_call_loop_enabled: Type.Boolean(),
@@ -20,10 +20,11 @@ const UpdateProxyEnhancementSchema = Type.Object({
 
 interface ProxyEnhancementOptions {
   db: Database.Database;
+  stateRegistry?: StateRegistry;
 }
 
 export const adminProxyEnhancementRoutes: FastifyPluginCallback<ProxyEnhancementOptions> = (app, options, done) => {
-  const { db } = options;
+  const { db, stateRegistry } = options;
 
   app.get("/admin/api/proxy-enhancement", async (_request, reply) => {
     const raw = getSetting(db, "proxy_enhancement");
@@ -63,7 +64,7 @@ export const adminProxyEnhancementRoutes: FastifyPluginCallback<ProxyEnhancement
       tool_error_logging_enabled: enhancementFields.tool_error_logging_enabled,
     };
     setSetting(db, "proxy_enhancement", JSON.stringify(config));
-    clearEnhancementConfigCache();
+    stateRegistry?.clearEnhancementCache();
     // ai_retry_config is stored in a separate settings key
     if (ai_retry_config !== undefined) {
       setSetting(db, "ai_retry_config", ai_retry_config ? JSON.stringify(ai_retry_config) : "");

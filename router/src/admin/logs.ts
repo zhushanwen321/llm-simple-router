@@ -4,7 +4,7 @@ import { Type, Static } from "@sinclair/typebox";
 import { getRequestLogs, getRequestLogsGrouped, getRequestLogById, getRequestLogChildren, deleteLogsBefore, extractThinkingLevel, getAllProviders, getAllRouterKeys, getAllMappingGroups } from "../db/index.js";
 import { getLogRetentionDays } from "../db/settings.js";
 import type { LogFileWriter } from "../storage/log-file-writer.js";
-import { HTTP_NOT_FOUND } from "./constants.js";
+import { HTTP_NOT_FOUND } from "../core/constants.js";
 import { API_CODE, apiError } from "./api-response.js";
 
 const LogQuerySchema = Type.Object({

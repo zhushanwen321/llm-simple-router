@@ -47,6 +47,9 @@ import { ServiceContainer, SERVICE_KEYS } from "./core/container.js";
 import Database from "better-sqlite3";
 import { LogFileWriter } from "./storage/log-file-writer.js";
 import { ProxyAgentFactory } from "./proxy/transport/proxy-agent.js";
+import { ProxyConnectivityChecker } from "./proxy/transport/provider-connectivity.js";
+import { hookRegistry } from "./proxy/pipeline/hook-registry.js";
+import { clearEnhancementConfigCache } from "./proxy/routing/enhancement-config.js";
 import { registerBuiltinHooks } from "./proxy/pipeline/register-hooks.js";
 import { scheduleLogFileMaintenance } from "./storage/log-file-compressor.js";
 import { getDetailLogEnabled, getLogFileRetentionDays } from "./db/settings.js";
@@ -317,6 +320,7 @@ export async function buildApp(
 
   // 注册 ProxyAgentFactory
   container.register(SERVICE_KEYS.proxyAgentFactory, () => new ProxyAgentFactory());
+  const connectivityChecker = new ProxyConnectivityChecker();
 
   // 从容器解析所有服务
   const matcher = container.resolve<RetryRuleMatcher>(SERVICE_KEYS.matcher);
@@ -368,13 +372,15 @@ export async function buildApp(
       adaptiveController.removeAll();
       initializeProviderState(db, semaphoreManager, adaptiveController, tracker);
     },
+    clearEnhancementCache: () => clearEnhancementConfigCache(),
+    getPipelineHooks: () => hookRegistry.getAll(),
   };
 
   // Late-bound close ref — close 函数在 adminRoutes 注册之后才定义，
   // 但 restart API 需要在运行时调用它
   const closeRef = { fn: async () => {} };
 
-  app.register(adminRoutes, { db, stateRegistry, tracker, adaptiveController, logFileWriter, logsDir, closeFn: () => closeRef.fn(), pluginRegistry, proxyAgentFactory });
+  app.register(adminRoutes, { db, stateRegistry, tracker, adaptiveController, logFileWriter, logsDir, closeFn: () => closeRef.fn(), pluginRegistry, proxyAgentFactory, connectivityChecker });
 
   // 前端静态文件服务（生产环境）
   const frontendDist = path.resolve(

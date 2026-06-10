@@ -18,7 +18,7 @@ import { getProviderById } from "../db/providers.js";
 import { getSetting } from "../db/settings.js";
 import { decrypt } from "../utils/crypto.js";
 import type { StateRegistry } from "../core/registry.js";
-import { HTTP_OK, HTTP_BAD_REQUEST, HTTP_CREATED, HTTP_NOT_FOUND } from "./constants.js";
+import { HTTP_OK, HTTP_BAD_REQUEST, HTTP_CREATED, HTTP_NOT_FOUND } from "../core/constants.js";
 import { API_CODE, apiError } from "./api-response.js";
 
 // AI 重试规则的 system prompt 模板（内联避免运行时文件依赖）
