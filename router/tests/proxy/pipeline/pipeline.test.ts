@@ -1,15 +1,14 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { ProxyPipeline } from "../../../src/proxy/pipeline/pipeline.js";
 import type { PipelineContext } from "../../../src/proxy/pipeline/types.js";
 
 function createMockContext(): PipelineContext {
   return {
-    request: {} as any,
-    reply: {} as any,
+    request: { log: { warn: vi.fn() } } as unknown as PipelineContext["request"],
+    reply: {} as PipelineContext["reply"],
     rawBody: {},
     clientModel: "gpt-4",
     apiType: "openai",
-    sessionId: undefined,
     body: {},
     isStream: false,
     resolved: null,
@@ -22,7 +21,7 @@ function createMockContext(): PipelineContext {
     rootLogId: null,
     clientRequest: "",
     upstreamRequest: "",
-    snapshot: { toJSON: () => "{}" } as any,
+    snapshot: { toJSON: () => "{}" } as unknown as PipelineContext["snapshot"],
   };
 }
 
@@ -91,7 +90,7 @@ describe("ProxyPipeline", () => {
     expect(order).toEqual(["async"]);
   });
 
-  it("stops execution when a hook throws", async () => {
+  it("catches error from non-core hook and continues execution", async () => {
     const order: string[] = [];
     const pipeline = new ProxyPipeline();
 
@@ -99,7 +98,22 @@ describe("ProxyPipeline", () => {
     pipeline.register({ name: "b", phase: "pre_route", priority: 200, execute: () => { throw new Error("boom"); } });
     pipeline.register({ name: "c", phase: "pre_route", priority: 300, execute: () => { order.push("c"); } });
 
-    await expect(pipeline.emit("pre_route", createMockContext())).rejects.toThrow("boom");
+    const ctx = createMockContext();
+    await pipeline.emit("pre_route", ctx);
+    // a 执行，b 抛异常被 catch，c 继续执行
+    expect(order).toEqual(["a", "c"]);
+    expect(ctx.request.log.warn).toHaveBeenCalled();
+  });
+
+  it("propagates error from core hook and stops execution", async () => {
+    const order: string[] = [];
+    const pipeline = new ProxyPipeline();
+
+    pipeline.register({ name: "a", phase: "pre_route", priority: 100, execute: () => { order.push("a"); } });
+    pipeline.register({ name: "b", phase: "pre_route", priority: 200, core: true, execute: () => { throw new Error("core boom"); } });
+    pipeline.register({ name: "c", phase: "pre_route", priority: 300, execute: () => { order.push("c"); } });
+
+    await expect(pipeline.emit("pre_route", createMockContext())).rejects.toThrow("core boom");
     expect(order).toEqual(["a"]);
   });
 });

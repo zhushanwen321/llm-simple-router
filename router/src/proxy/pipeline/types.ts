@@ -21,6 +21,8 @@ export interface PipelineHook {
   phase: HookPhase;
   /** 优先级（0-99 基础设施, 100-199 内置功能, 200-299 外部插件, 900-999 观察者） */
   priority: number;
+  /** true = 异常直接传播（关键路径 hook），false/undefined = catch + log 降级 */
+  core?: boolean;
   /** 钩子逻辑 */
   execute(ctx: PipelineContext): void | Promise<void>;
 }

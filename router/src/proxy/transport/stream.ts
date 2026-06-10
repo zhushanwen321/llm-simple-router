@@ -117,7 +117,6 @@ class StreamProxy {
       // stream_abort（非 deferred）且 headers 已发送时，立即 end reply 避免客户端挂起
       // idle_timeout 使用 deferred 模式，由 resetIdleTimer 的 setImmediate 负责 end reply
       if (kind === "stream_abort" && this.headersSent) {
-        // eslint-disable-next-line taste/no-silent-catch -- reply may already be destroyed, warn is sufficient
         try { this.reply.raw.end(); } catch { console.warn("[stream-proxy] reply.raw.end() failed, likely already destroyed"); }
       }
       this.cleanup();

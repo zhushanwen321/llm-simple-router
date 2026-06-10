@@ -24,6 +24,7 @@ export const enhancementPreprocessHook: PipelineHook = {
   name: "builtin:enhancement-preprocess",
   phase: "pre_route",
   priority: 110,
+  core: true,
   execute(ctx: PipelineContext): void {
     const { request, body, metadata } = ctx;
     const sessionId = metadata.get("session_id") as string | undefined;

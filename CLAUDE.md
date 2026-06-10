@@ -310,6 +310,8 @@ proxyPipeline.register(hook);  // 必须
 
 每个 spec 的验收标准（AC）必须有对应的测试用例。测试评审环节强制检查 AC 覆盖矩阵。
 
+`test_cases_template.json` 中定义的每个 TC 必须在编码阶段实现对应测试。编码评审时检查 TC 覆盖率：已实现 TC / 总 TC 应为 100%。未实现的 TC 需标注原因（如「被已有测试隐式覆盖」「场景需要 mock 复杂依赖延后处理」）。
+
 ```
 AC1: 开关 OFF → 测试 xxxx
 AC2: 开关 ON + 无 session_id → 测试 xxxx
@@ -398,6 +400,7 @@ AC2: 开关 ON + 无 session_id → 测试 xxxx
 | **数据消费者完整性** | 新增数据字段时必须列出所有消费点（DB、SSE、Admin API、前端） | cache_read_tokens_estimated 漏了实时监控同步 |
 | **前端控件模式一致** | 保存按钮模式页面新增控件不得直调 API | ProxyEnhancement.vue Switch 直调 API |
 | **Hook 注册验证** | 新增 Hook 时除了注册到 `hookRegistry`，还需注册到 `proxyPipeline` 并验证 emit 路径 | 所有 hooks 仅注册到 hookRegistry，从未被执行 |
+| **Hook core 标记** | 新增 PipelineHook 时必须评估是否需要 `core: true`。关键路径 hook（请求校验、认证、安全策略）标记为 core，异常时传播而非静默降级 | 所有 9 个内置 hook 均未标记 core，安全类 hook 异常被静默吞掉 |
 
 ### 转换层类型安全规范
 

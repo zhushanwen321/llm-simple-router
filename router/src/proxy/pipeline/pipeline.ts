@@ -1,5 +1,19 @@
 import type { PipelineContext, HookPhase, PipelineHook } from "./types.js";
 
+const ALL_PHASES: HookPhase[] = [
+  "pre_route",
+  "post_route",
+  "pre_transport",
+  "post_response",
+  "on_error",
+  "on_stream_event",
+];
+
+export interface HookSummary {
+  name: string;
+  priority: number;
+}
+
 export class ProxyPipeline {
   private hooksByPhase = new Map<HookPhase, PipelineHook[]>();
 
@@ -20,11 +34,34 @@ export class ProxyPipeline {
     }));
   }
 
+  /** 获取某阶段的 hook 摘要（Admin API 用） */
+  getByPhase(phase: HookPhase): HookSummary[] {
+    return (this.hooksByPhase.get(phase) ?? []).map((h) => ({
+      name: h.name,
+      priority: h.priority,
+    }));
+  }
+
+  /** 获取所有阶段的 hook 摘要（Admin API 用） */
+  getAllHooks(): Record<string, HookSummary[]> {
+    return Object.fromEntries(
+      ALL_PHASES.map((phase) => [phase, this.getByPhase(phase)]),
+    );
+  }
+
   /** 触发指定阶段的所有钩子 */
   async emit(phase: HookPhase, ctx: PipelineContext): Promise<void> {
     const hooks = this.hooksByPhase.get(phase) ?? [];
     for (const hook of hooks) {
-      await hook.execute(ctx);
+      if (hook.core === true) {
+        await hook.execute(ctx);
+      } else {
+        try {
+          await hook.execute(ctx);
+        } catch (err: unknown) {
+          ctx.request.log.warn({ hook: hook.name, err }, "non-core hook error");
+        }
+      }
     }
   }
 }

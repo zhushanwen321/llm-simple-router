@@ -132,7 +132,8 @@ fallow scan $(git diff main...HEAD --name-only)
 ### 1. 收集变更上下文
 
 ```bash
-cd /Users/zhushanwen/Code/llm-simple-router-workspace/main
+# 在当前 worktree 目录下执行，不要 cd 到其他 worktree
+BRANCH=$(git branch --show-current)
 git diff --stat main...HEAD
 git diff main...HEAD --name-only
 ```
