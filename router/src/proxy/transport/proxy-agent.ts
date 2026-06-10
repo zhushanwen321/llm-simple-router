@@ -3,6 +3,7 @@ import * as https from "https";
 import type { Agent } from "http";
 import { HttpsProxyAgent } from "https-proxy-agent";
 import { SocksProxyAgent } from "socks-proxy-agent";
+import type { IProxyAgentInvalidator } from "../../core/proxy-agent-types.js";
 
 interface CachedEntry {
   agent: Agent;
@@ -17,7 +18,7 @@ export interface ProxyConfig {
   proxy_password: string | null;
 }
 
-export class ProxyAgentFactory {
+export class ProxyAgentFactory implements IProxyAgentInvalidator {
   private readonly cache = new Map<string, CachedEntry>();
 
   // 全局 keep-alive agents，无代理的 provider 复用 TCP 连接

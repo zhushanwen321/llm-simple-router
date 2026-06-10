@@ -12,8 +12,8 @@ import type { StateRegistry } from "../core/registry.js";
 import type { AdaptiveController } from "../core/concurrency/index.js";
 import type { RequestTracker } from "../core/monitor/index.js";
 import type { ProviderConnectivityChecker } from "../core/provider-connectivity.js";
-import type { ProxyAgentFactory } from "../proxy/transport/proxy-agent.js";
-import { HTTP_CREATED, HTTP_NOT_FOUND, HTTP_CONFLICT, HTTP_BAD_REQUEST, HTTP_OK } from "../core/constants.js";
+import type { IProxyAgentInvalidator } from "../core/proxy-agent-types.js";
+import { HTTP_CREATED, HTTP_NOT_FOUND, HTTP_CONFLICT, HTTP_BAD_REQUEST, HTTP_OK, HTTP_SERVICE_UNAVAILABLE } from "../core/constants.js";
 import { API_CODE, apiError } from "./api-response.js";
 import { parseModels, buildModelInfoList, normalizePatchName, lookupCapabilities, type ModelEntry } from "../config/model-context.js";
 import { getModelInfoForProvider, setModelInfoForProvider, deleteAllModelInfoForProvider } from "../db/model-info.js";
@@ -212,7 +212,7 @@ interface ProviderRoutesOptions {
   stateRegistry?: StateRegistry;
   tracker?: RequestTracker;
   adaptiveController?: AdaptiveController;
-  proxyAgentFactory?: ProxyAgentFactory;
+  proxyAgentFactory?: IProxyAgentInvalidator;
   connectivityChecker?: ProviderConnectivityChecker;
 }
 
@@ -598,8 +598,11 @@ export const adminProviderRoutes: FastifyPluginCallback<ProviderRoutesOptions> =
 
     const backend = { base_url };
     const clientHeaders: Record<string, string> = {};
+    if (!connectivityChecker) {
+      return reply.code(HTTP_SERVICE_UNAVAILABLE).send(apiError(API_CODE.BAD_REQUEST, "Connectivity checker not available"));
+    }
     try {
-      const result = await connectivityChecker!.fetchModels(
+      const result = await connectivityChecker.fetchModels(
         backend,
         api_key,
         clientHeaders as RawHeaders,

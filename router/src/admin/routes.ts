@@ -24,7 +24,7 @@ import { adminScheduleRoutes } from "./schedules.js";
 import type { StateRegistry } from "../core/registry.js";
 import type { RequestTracker } from "../core/monitor/index.js";
 import type { AdaptiveController } from "../core/concurrency/index.js";
-import type { ProxyAgentFactory } from "../proxy/transport/proxy-agent.js";
+import type { IProxyAgentInvalidator } from "../core/proxy-agent-types.js";
 import type { ProviderConnectivityChecker } from "../core/provider-connectivity.js";
 
 interface AdminRoutesOptions {
@@ -36,7 +36,7 @@ interface AdminRoutesOptions {
   logsDir?: string;
   pluginRegistry?: import("../proxy/transform/plugin-registry.js").PluginRegistry;
   closeFn?: () => Promise<void>;
-  proxyAgentFactory?: ProxyAgentFactory;
+  proxyAgentFactory?: IProxyAgentInvalidator;
   connectivityChecker?: ProviderConnectivityChecker;
 }
 

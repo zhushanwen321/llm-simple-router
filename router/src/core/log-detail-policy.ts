@@ -1,4 +1,4 @@
-// src/proxy/log-detail-policy.ts
+// src/core/log-detail-policy.ts
 
 const HTTP_ERROR_THRESHOLD = 400;
 
