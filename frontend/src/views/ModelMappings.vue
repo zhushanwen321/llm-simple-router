@@ -148,45 +148,71 @@
                 </span>
               </div>
               <div class="flex flex-col gap-1.5">
-                <div
-                  v-for="(tgt, tIdx) in editTargets"
-                  :key="tIdx"
-                  class="flex items-center gap-2 px-3 py-2 bg-background border border-border rounded-md"
-                >
-                  <span
-                    class="w-[22px] h-[22px] flex items-center justify-center rounded-full text-[10px] font-mono font-bold shrink-0"
-                    :class="
-                      tIdx === 0
-                        ? 'bg-primary/15 text-primary'
-                        : 'bg-muted/40 text-muted-foreground'
-                    "
+                <template v-for="(tgt, tIdx) in editTargets" :key="tIdx">
+                  <div
+                    v-if="dropIndex === tIdx && dropBefore"
+                    class="h-0.5 bg-primary rounded-full"
+                  />
+                  <div
+                    :draggable="editTargets.length > 1"
+                    :class="[
+                      'flex items-center gap-2 px-3 py-2 bg-background border border-border rounded-md transition-opacity',
+                      dragIndex === tIdx ? 'opacity-50' : '',
+                    ]"
+                    :style="{
+                      cursor:
+                        editTargets.length > 1
+                          ? dragIndex !== null
+                            ? 'grabbing'
+                            : 'grab'
+                          : 'default',
+                    }"
+                    @dragstart="handleDragStart(tIdx, $event)"
+                    @dragover.prevent="handleDragOver(tIdx, $event)"
+                    @drop.prevent="handleDrop()"
+                    @dragend="handleDragEnd()"
                   >
-                    {{ tIdx + 1 }}
-                  </span>
-                  <div class="flex-1">
-                    <CascadingModelSelect
-                      :providers="providerGroups"
-                      :model-value="{
-                        provider_id: tgt.provider_id,
-                        model: tgt.backend_model,
-                      }"
-                      compact
-                      :placeholder="t('mappings.selectProviderModel')"
-                      @update:model-value="
-                        (v: SelectedValue) => updateTarget(tIdx, v)
+                    <span
+                      class="w-[22px] h-[22px] flex items-center justify-center rounded-full text-[10px] font-mono font-bold shrink-0"
+                      :class="
+                        tIdx === 0
+                          ? 'bg-primary/15 text-primary'
+                          : 'bg-muted/40 text-muted-foreground'
                       "
-                    />
+                    >
+                      {{ tIdx + 1 }}
+                    </span>
+                    <div class="flex-1" @dragstart.stop.prevent>
+                      <CascadingModelSelect
+                        :providers="providerGroups"
+                        :model-value="{
+                          provider_id: tgt.provider_id,
+                          model: tgt.backend_model,
+                        }"
+                        compact
+                        :placeholder="t('mappings.selectProviderModel')"
+                        @update:model-value="
+                          (v: SelectedValue) => updateTarget(tIdx, v)
+                        "
+                      />
+                    </div>
+                    <div @dragstart.stop.prevent>
+                      <Button
+                        v-if="editTargets.length > 1"
+                        variant="ghost"
+                        size="icon-xs"
+                        class="shrink-0 text-muted-foreground/30 hover:text-destructive"
+                        @click="removeTarget(tIdx)"
+                      >
+                        <X class="w-3 h-3" />
+                      </Button>
+                    </div>
                   </div>
-                  <Button
-                    v-if="editTargets.length > 1"
-                    variant="ghost"
-                    size="icon-xs"
-                    class="shrink-0 text-muted-foreground/30 hover:text-destructive"
-                    @click="removeTarget(tIdx)"
-                  >
-                    <X class="w-3 h-3" />
-                  </Button>
-                </div>
+                </template>
+                <div
+                  v-if="dropIndex === editTargets.length"
+                  class="h-0.5 bg-primary rounded-full"
+                />
               </div>
               <Button
                 variant="ghost"
@@ -461,6 +487,7 @@ import {
   serializeRule as serializeRuleDomain,
   buildSummaryText,
 } from "@/utils/mapping-domain";
+import { moveItem } from "@/utils/array";
 
 const { t } = useI18n();
 
@@ -566,6 +593,56 @@ function updateTarget(index: number, val: SelectedValue) {
     provider_id: val.provider_id,
     backend_model: val.model,
   };
+}
+
+// --- Drag & Drop ---
+const dragIndex = ref<number | null>(null);
+const dropIndex = ref<number | null>(null);
+const dropBefore = ref(true);
+
+function handleDragStart(idx: number, e: DragEvent) {
+  dragIndex.value = idx;
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", idx.toString());
+  }
+}
+
+function handleDragOver(idx: number, e: DragEvent) {
+  if (dragIndex.value === null) return;
+  if (dragIndex.value === idx) {
+    dropIndex.value = null;
+    return;
+  }
+
+  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+  const HALF = 2;
+  const midY = rect.top + rect.height / HALF;
+  const before = e.clientY < midY;
+
+  let insertIdx = before ? idx : idx + 1;
+  if (dragIndex.value < insertIdx) insertIdx--;
+
+  if (insertIdx === dragIndex.value) {
+    dropIndex.value = null;
+  } else {
+    dropIndex.value = insertIdx;
+    dropBefore.value = before;
+  }
+}
+
+function handleDrop() {
+  if (dragIndex.value === null || dropIndex.value === null) return;
+  editTargets.value = moveItem(
+    editTargets.value,
+    dragIndex.value,
+    dropIndex.value,
+  );
+}
+
+function handleDragEnd() {
+  dragIndex.value = null;
+  dropIndex.value = null;
 }
 
 // --- Overflow ---
