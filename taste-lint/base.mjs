@@ -87,6 +87,13 @@ export default [
     rules: tasteRules,
   },
   {
-    ignores: ['**/node_modules/**', '**/dist/**', '**/frontend-dist/**', 'frontend/.vite/**', '**/*.d.ts', '**/*.generated.*', '**/*.test.ts', '**/*.spec.ts'],
+    ignores: ['**/node_modules/**', '**/dist/**', '**/frontend-dist/**', 'frontend/.vite/**', '**/*.d.ts', '**/*.generated.*'],
+  },
+  // 测试文件：放宽 no-magic-numbers（测试数据中的字面量是必要的）
+  {
+    files: ['**/*.test.ts', '**/*.spec.ts', '**/__tests__/**'],
+    rules: {
+      'no-magic-numbers': 'off',
+    },
   },
 ];
