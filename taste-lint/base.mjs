@@ -96,4 +96,8 @@ export default [
       'no-magic-numbers': 'off',
     },
   },
+  // router 测试文件：保留忽略（历史代码，全量 lint 会失败）
+  {
+    ignores: ['router/**/*.test.ts', 'router/**/*.spec.ts'],
+  },
 ];
