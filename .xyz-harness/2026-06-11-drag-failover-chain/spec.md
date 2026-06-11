@@ -17,7 +17,7 @@ GitHub issue [#198](https://github.com/zhushanwen321/llm-simple-router/issues/19
 - FR-1.1 当 `editTargets.length >= 2` 时，每个 target 行启用 HTML5 原生拖拽（`draggable="true"`），整行可作为拖动源
 - FR-1.2 鼠标悬停在可拖行上时显示 `cursor: grab`；按下时显示 `cursor: grabbing`
 - FR-1.3 当 `editTargets.length <= 1` 时，行不启用拖拽，`cursor: default`
-- FR-1.4 拖拽起点必须在行的"非控件区"上发起。"非控件区"指整行 `<div>` 中除 `CascadingModelSelect` 和删除按钮 `<Button>` 之外的剩余区域。在 `CascadingModelSelect` 和删除按钮上 `@mousedown.stop` 阻断事件冒泡，浏览器 `draggable` 监听器就不会触发拖拽开始（避免与下拉点击/删除点击冲突）
+- FR-1.4 拖拽起点必须在行的"非控件区"上发起。"非控件区"指整行 `<div>` 中除 `CascadingModelSelect` 和删除按钮 `<Button>` 之外的剩余区域。在 `CascadingModelSelect` 和删除按钮的容器上绑定 `@dragstart.stop.prevent`，显式拦截浏览器原生 `dragstart` 事件（`stopPropagation` 阻止冒泡 + `preventDefault` 阻止浏览器启动拖拽），确保在控件区域操作时不会误触发拖拽（避免与下拉点击/删除点击冲突）
 
 ### FR-2 视觉反馈
 
@@ -52,12 +52,13 @@ GitHub issue [#198](https://github.com/zhushanwen321/llm-simple-router/issues/19
 | AC-3 | 拖动到任一其他 target 行的上半/下半 | 出现放置指示线（2px 蓝色横线），指示线在该行顶部（鼠标在上半）或底部（鼠标在下半） |
 | AC-4 | 释放鼠标完成 drop | `editTargets.value` 的顺序按预期更新；DOM 中 ① ② ③ 顺序同步 |
 | AC-5 | 拖动结束后点击"保存" | API `updateMappingGroup` 请求的 `rule.targets` 数组顺序与 UI 一致 |
-| AC-6 | 在 `CascadingModelSelect` 上 `mousedown` 并移动 | **不**触发拖拽；下拉行为正常 |
-| AC-7 | 在删除按钮上 `mousedown` 并移动 | **不**触发拖拽；按钮点击行为正常 |
+| AC-6 | 对 `CascadingModelSelect` 触发 `dragstart` 事件（模拟浏览器原生拖拽启动）| dragstart 被拦截，不触发拖拽；下拉行为正常 |
+| AC-7 | 对删除按钮触发 `dragstart` 事件（模拟浏览器原生拖拽启动）| dragstart 被拦截，不触发拖拽；按钮点击行为正常 |
 | AC-8 | `editTargets.length === 1` 时 | 行不具有 `draggable="true"` 属性；`cursor: default` |
 | AC-9 | 拖动到同一位置释放（被拖行 = 目标行） | 数组顺序不变；无报错；指示线不显示 |
 | AC-10 | 在 `MappingEntryEditor.vue`（QuickSetup 入口）操作故障转移链 | 行为完全保持现状，无拖拽 |
 | AC-11 | 纯函数 `moveItem([a,b,c,d], 0, 2)` | 返回 `[b,c,a,d]`；原数组不变（immutable） |
+| AC-12 | 拖拽完成（未点击保存）后 | `updateMappingGroup` API **未**被调用（可通过 `vi.spyOn(api, 'updateMappingGroup')` 断言调用次数为 0） |
 
 ## Decisions Made
 
@@ -86,7 +87,7 @@ GitHub issue [#198](https://github.com/zhushanwen321/llm-simple-router/issues/19
 - 拖拽核心逻辑（数组重排）必须抽出为**纯函数**，便于单元测试
 - 遵循项目 lint/格式规范（`npm run lint` 必须 0 warning）
 - 遵循 `frontend/<style scoped>` 内只允许 `@apply` 的硬性规范
-- 不使用 emoji；拖拽手柄或视觉指示用 `lucide-vue-next` 图标（如 `GripVertical`），若仅靠 CSS 也可
+- 不使用 emoji；拖拽手柄或视觉指示用 `@lucide/vue` 图标（如 `GripVertical`），若仅靠 CSS 也可
 
 ### 已有约束（来自 CLAUDE.md / CONTEXT.md）
 - 故障转移语义已在 `CONTEXT.md:55-57` 定义，本 spec 不修改
