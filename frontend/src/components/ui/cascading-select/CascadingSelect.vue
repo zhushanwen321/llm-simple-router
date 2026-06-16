@@ -85,7 +85,7 @@ function onOpenChange(val: boolean) {
     <PopoverContent
       :align="'start'"
       :side-offset="4"
-      class="z-[200] w-auto min-w-56 overflow-visible p-1"
+      class="z-[200] w-auto min-w-56 max-h-[80vh] overflow-y-auto p-1"
     >
       <div
         v-for="group in groups"
@@ -108,7 +108,7 @@ function onOpenChange(val: boolean) {
         <!-- Level 2 -->
         <div
           v-if="hoveredGroupKey === group.key && group.options.length > 0"
-          class="absolute left-full top-0 ml-0.5 min-w-48 rounded-md bg-popover p-1 text-popover-foreground shadow-md"
+          class="absolute left-full top-0 ml-0.5 min-w-48 max-h-[80vh] overflow-y-auto rounded-md bg-popover p-1 text-popover-foreground shadow-md"
           @mouseenter="hoveredGroupKey = group.key"
         >
           <div
