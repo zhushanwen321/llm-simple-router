@@ -644,7 +644,7 @@ phase_publish() {
             local tag_sha
             tag_sha=$(git -C "${op_dir}" rev-parse "$TAG" 2>/dev/null || echo "")
             if [[ -n "$tag_sha" ]]; then
-                bash "$SCRIPT_DIR/wait-for-ci.sh" "$tag_sha" --timeout 900 --workflow "Release" --verify-release "$TAG" $gh_flag 2>&1 || {
+                bash "$SCRIPT_DIR/wait-for-ci.sh" "$tag_sha" --timeout 1800 --workflow "Release" --verify-release "$TAG" $gh_flag 2>&1 || {
                     local wait_exit=$?
                     if [[ $wait_exit -eq 1 ]]; then
                         echo -e "  ${RED}❌ Release CI 构建失败！查看日志: gh run view --log-failed${NC}"

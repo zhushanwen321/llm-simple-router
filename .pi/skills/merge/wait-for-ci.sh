@@ -1,7 +1,7 @@
 #!/bin/bash
 # wait-for-ci.sh — 等待 GitHub Actions CI 完成
 #
-# 用法: wait-for-ci.sh <commit-sha> [--timeout 600] [--workflow <name>] [--verify-release <tag> [--repo <owner/repo>]]
+# 用法: wait-for-ci.sh <commit-sha> [--timeout 1800] [--workflow <name>] [--verify-release <tag> [--repo <owner/repo>]]
 #
 # 场景 1: gh pr merge 后，push 到 main 触发 ci.yml
 # 场景 2: 推送修复后等待 CI 重新运行
@@ -25,10 +25,10 @@ _ci_log() {
     [[ -n "${MERGE_LOG_FILE:-}" ]] && echo "[$(date +%Y-%m-%dT%H:%M:%S)] [CI] $*" >> "$MERGE_LOG_FILE"
 }
 
-REF="${1:?Usage: wait-for-ci.sh <commit-sha> [--timeout 600] [--workflow <name>] [--verify-release <tag>]}"
+REF="${1:?Usage: wait-for-ci.sh <commit-sha> [--timeout 1800] [--workflow <name>] [--verify-release <tag>]}"
 shift || true
 
-TIMEOUT=600           # 默认 10 分钟
+TIMEOUT=1800          # 默认 30 分钟（Docker build 可能较久）
 WORKFLOW=""           # 可选过滤特定 workflow
 VERIFY_RELEASE_TAG="" # 可选：CI 通过后验证 Draft Release 产物
 GH_REPO=""            # 可选：gh --repo 参数
@@ -104,8 +104,8 @@ fi
 echo ""
 
 ELAPSED=0
-POLL_INTERVAL=15
-TRIGGER_WAIT=120   # CI 触发检测窗口：120s（8 次 × 15s）
+POLL_INTERVAL=30
+TRIGGER_WAIT=120   # CI 触发检测窗口：120s（4 次 × 30s）
 FIRST_POLL=true
 
 while true; do
@@ -202,7 +202,7 @@ while true; do
         echo ""
         echo "  建议:"
         echo "    1. 手动检查: gh run list --commit $REF"
-        echo "    2. 增加超时: wait-for-ci.sh $REF --timeout 1200"
+        echo "    2. 增加超时: wait-for-ci.sh $REF --timeout 3600"
         echo "    3. 确认通过后继续后续流程"
         exit 2  # exit 2 = timeout, AI 应询问用户
     fi
