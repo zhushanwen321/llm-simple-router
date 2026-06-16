@@ -88,10 +88,12 @@ find_pr_for_branch() {
 # ── 版本管理 ──────────────────────────────────────
 
 read_project_version() {
+    # 版本真相源是 router/package.json（子包），根 package.json 是 workspace 配置。
+    # 历史上有个 .bare/custom-hooks/read-version.sh 做这事，已内联以消除对
+    # .bare 的依赖（.bare 不在 git 工作树内，clone 后不存在）。
     local dir="${1:-$MAIN_WT}"
-    local hook_path="${WS_ROOT}/.bare/custom-hooks/read-version.sh"
-    if [[ -f "$hook_path" ]]; then
-        bash "$hook_path" "$dir" 2>/dev/null && return
+    if [[ -f "$dir/router/package.json" ]]; then
+        node -p "require('$dir/router/package.json').version" 2>/dev/null && return
     fi
     node -p "require('$dir/package.json').version" 2>/dev/null || echo ""
 }
@@ -118,7 +120,10 @@ sync_sub_package_versions() {
 run_hook() {
     local hook_name="$1"
     shift
-    local hook_script="${WS_ROOT}/.bare/custom-hooks/$hook_name"
+    # 钩子存放在 skill 自身目录下（hooks/），确保 skill 自包含、可移植。
+    # 历史上曾用 ${WS_ROOT}/.bare/custom-hooks/，但 .bare 不在 git 工作树内，
+    # clone 后不存在，导致钩子被静默跳过。
+    local hook_script="$SCRIPT_DIR/hooks/$hook_name"
     if [[ -x "$hook_script" ]]; then
         echo ""
         echo -e "  ${CYAN}🔧 执行项目钩子: $hook_name${NC}"
@@ -369,8 +374,9 @@ phase_local_check() {
     echo -e "${BOLD}═══ 阶段 1/6: 本地验证 ═══${NC}"
     log_phase "阶段 1: 本地验证"
 
-    run_hook "pre-merge.sh" "$WORKTREE_DIR"
-
+    # 历史上有 .bare/custom-hooks/pre-merge.sh 做 router→根 package.json 版本
+    # 同步，已移除：版本真相源是 router/package.json，read_project_version
+    # 内部已优先读它，根 package.json 的 version 字段不再维护。
     bash "$SCRIPT_DIR/pre-merge-check.sh" "$WORKTREE_DIR" || {
         echo ""
         echo -e "${RED}${BOLD}⛔ 本地验证失败！修复后重新运行：${NC}"
@@ -606,9 +612,9 @@ phase_publish() {
 
             sync_sub_package_versions "$op_dir" "$NEW_VERSION"
 
-            run_hook "post-bump.sh" "$op_dir" || {
-                echo -e "  ${RED}Error: post-bump 钩子失败${NC}"; exit 1
-            }
+            # 历史上有 .bare/custom-hooks/post-bump.sh 同步子包版本，已移除：
+            # 本项目版本 bump 由 GitHub Actions 远程完成，本地 post-bump 路径
+            # 不会被触发；sync_sub_package_versions 已覆盖本地场景。
 
             (
                 cd "$op_dir"
@@ -638,7 +644,7 @@ phase_publish() {
             local tag_sha
             tag_sha=$(git -C "${op_dir}" rev-parse "$TAG" 2>/dev/null || echo "")
             if [[ -n "$tag_sha" ]]; then
-                bash "$SCRIPT_DIR/wait-for-ci.sh" "$tag_sha" --timeout 900 --workflow "Release" --verify-release "$TAG" $gh_flag 2>&1 || {
+                bash "$SCRIPT_DIR/wait-for-ci.sh" "$tag_sha" --timeout 1800 --workflow "Release" --verify-release "$TAG" $gh_flag 2>&1 || {
                     local wait_exit=$?
                     if [[ $wait_exit -eq 1 ]]; then
                         echo -e "  ${RED}❌ Release CI 构建失败！查看日志: gh run view --log-failed${NC}"
