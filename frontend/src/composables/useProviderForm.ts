@@ -2,7 +2,11 @@ import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import type { ProviderPayload } from "@/api/client";
 import type { Provider, ModelInfo, ProviderEndpoint } from "@/types/mapping";
-import { DEFAULT_CONTEXT_WINDOW, DEFAULT_STREAM_TIMEOUT_MS } from "@/constants";
+import {
+  DEFAULT_CONTEXT_WINDOW,
+  DEFAULT_STREAM_TIMEOUT_MS,
+  DEFAULT_NON_STREAM_TIMEOUT_MS,
+} from "@/constants";
 import type { ModelConfig } from "@/components/quick-setup/types";
 import { useTransformRules } from "@/composables/useTransformRules";
 import { useProviderPresets } from "@/composables/useProviderPresets";
@@ -200,6 +204,7 @@ export function useProviderForm() {
         context_window: m.context_window ?? undefined,
         patches: m.patches ?? undefined,
         stream_timeout_ms: m.stream_timeout_ms ?? undefined,
+        non_stream_timeout_ms: m.non_stream_timeout_ms ?? undefined,
         capabilities: m.capabilities ?? undefined,
       })),
       is_active: form.value.is_active ? 1 : 0,
@@ -235,6 +240,7 @@ export function useProviderForm() {
           context_window: modelContextWindow.value || DEFAULT_CONTEXT_WINDOW,
           patches: patchList ?? [],
           stream_timeout_ms: DEFAULT_STREAM_TIMEOUT_MS,
+          non_stream_timeout_ms: DEFAULT_NON_STREAM_TIMEOUT_MS,
           capabilities: caps ?? ["text"],
         });
       }
@@ -265,8 +271,18 @@ export function useProviderForm() {
 
   function updateModelTimeout(index: number, seconds: string | number) {
     const val = Number(seconds);
+    // 保留 0（禁用语义）：仅空串/undefined 归一化为 null（用默认值）
     form.value.models[index].stream_timeout_ms =
-      val > 0 ? val * MS_PER_SECOND : null;
+      seconds === "" || seconds === undefined ? null : val * MS_PER_SECOND;
+  }
+
+  function updateModelNonStreamTimeout(
+    index: number,
+    seconds: string | number,
+  ) {
+    const val = Number(seconds);
+    form.value.models[index].non_stream_timeout_ms =
+      seconds === "" || seconds === undefined ? null : val * MS_PER_SECOND;
   }
 
   function onConcurrencyModeChange(mode: ConcurrencyMode) {
@@ -322,6 +338,7 @@ export function useProviderForm() {
         context_window: m.context_window ?? DEFAULT_CONTEXT_WINDOW,
         patches: m.patches ?? [],
         stream_timeout_ms: m.stream_timeout_ms ?? null,
+        non_stream_timeout_ms: m.non_stream_timeout_ms ?? null,
         capabilities: m.capabilities ?? ["text"],
       })),
       is_active: !!p.is_active,
@@ -365,6 +382,7 @@ export function useProviderForm() {
     removeModel,
     updateModel,
     updateModelTimeout,
+    updateModelNonStreamTimeout,
     toggleModelCapability,
     onConcurrencyModeChange,
     isOfficialOpenai,

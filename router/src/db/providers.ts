@@ -29,22 +29,41 @@ export interface Provider {
   updated_at: string;
 }
 
-/** 默认流式超时 10 分钟 */
-export const DEFAULT_STREAM_TIMEOUT_MS = 600_000;
+/** 默认流式超时 5 分钟 */
+export const DEFAULT_STREAM_TIMEOUT_MS = 300_000;
 
-/** 从 provider 的 models JSON 中查找指定模型的超时值 */
+/** 默认非流式超时 10 分钟 */
+export const DEFAULT_NON_STREAM_TIMEOUT_MS = 600_000;
+
+/** 0 表示禁用超时（返回 Infinity）；undefined/null/未设置 使用默认值 */
+function resolveTimeout(value: number | undefined, fallback: number): number {
+  return value === 0 ? Number.POSITIVE_INFINITY : value ?? fallback;
+}
+
+/** 从 provider 的 models JSON 中查找指定模型的流式/非流式超时值。
+ *  stream: entry.stream_timeout_ms ?? DEFAULT_STREAM_TIMEOUT_MS，0→Infinity
+ *  nonStream: entry.non_stream_timeout_ms ?? DEFAULT_NON_STREAM_TIMEOUT_MS，0→Infinity */
+export function getModelTimeouts(
+  provider: Provider,
+  backendModel: string,
+): { stream: number; nonStream: number } {
+  const entries = parseModels(provider.models);
+  const entry = entries.find(m => m.name === backendModel);
+  if (!entry) {
+    return { stream: DEFAULT_STREAM_TIMEOUT_MS, nonStream: DEFAULT_NON_STREAM_TIMEOUT_MS };
+  }
+  return {
+    stream: resolveTimeout(entry.stream_timeout_ms, DEFAULT_STREAM_TIMEOUT_MS),
+    nonStream: resolveTimeout(entry.non_stream_timeout_ms, DEFAULT_NON_STREAM_TIMEOUT_MS),
+  };
+}
+
+/** @deprecated 改用 getModelTimeouts。保留为薄包装以兼容现有调用方（iteration-setup 等）。 */
 export function getModelStreamTimeout(
   provider: Provider,
   backendModel: string,
 ): number {
-  const entries = parseModels(provider.models);
-  const entry = entries.find(m => m.name === backendModel);
-  if (!entry) return DEFAULT_STREAM_TIMEOUT_MS;
-  const timeout = entry.stream_timeout_ms;
-  // stream_timeout_ms: 0 表示禁用超时，返回 Infinity；
-  // undefined/null/未设置 表示使用默认值
-  if (timeout === 0) return Number.POSITIVE_INFINITY;
-  return timeout ?? DEFAULT_STREAM_TIMEOUT_MS;
+  return getModelTimeouts(provider, backendModel).stream;
 }
 
 export const PROVIDER_CONCURRENCY_DEFAULTS = {

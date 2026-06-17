@@ -24,7 +24,11 @@ import TransformRulesForm from "@/components/shared/TransformRulesForm.vue";
 import ProxyConfigForm from "@/components/shared/ProxyConfigForm.vue";
 import EndpointEditor from "@/components/providers/EndpointEditor.vue";
 import { CONTEXT_WINDOW_OPTIONS } from "@/composables/useProviderForm";
-import { DEFAULT_CONTEXT_WINDOW, DEFAULT_STREAM_TIMEOUT_MS } from "@/constants";
+import {
+  DEFAULT_CONTEXT_WINDOW,
+  DEFAULT_STREAM_TIMEOUT_MS,
+  DEFAULT_NON_STREAM_TIMEOUT_MS,
+} from "@/constants";
 import type { ProviderFormData } from "./types";
 import type { ConcurrencyMode } from "@/types/concurrency";
 import type { ProviderEndpoint } from "@/types/mapping";
@@ -96,6 +100,7 @@ function handleAddModel() {
           DEFAULT_CONTEXT_WINDOW,
         patches: [],
         stream_timeout_ms: DEFAULT_STREAM_TIMEOUT_MS,
+        non_stream_timeout_ms: DEFAULT_NON_STREAM_TIMEOUT_MS,
         capabilities: [...newCapabilities.value],
       });
     }
@@ -126,9 +131,19 @@ function updateModel(index: number, updated: ModelConfig) {
 
 function updateModelStreamTimeout(index: number, ms: number | undefined) {
   const models = [...props.modelValue.models];
+  // 保留 0（禁用语义）：仅 undefined 归一化为 null（用默认值）
   models[index] = {
     ...models[index],
-    stream_timeout_ms: ms && ms > 0 ? ms : null,
+    stream_timeout_ms: ms === undefined ? null : ms,
+  };
+  emitUpdate({ models });
+}
+
+function updateModelNonStreamTimeout(index: number, ms: number | undefined) {
+  const models = [...props.modelValue.models];
+  models[index] = {
+    ...models[index],
+    non_stream_timeout_ms: ms === undefined ? null : ms,
   };
   emitUpdate({ models });
 }
@@ -287,10 +302,14 @@ function isOfficialOpenai(url: string): boolean {
               !isOfficialOpenai(props.modelValue.baseUrl)
             "
             :stream-timeout-ms="m.stream_timeout_ms ?? undefined"
+            :non-stream-timeout-ms="m.non_stream_timeout_ms ?? undefined"
             :capabilities="modelCapabilities(m)"
             @update:model="updateModel(i, $event)"
             @remove="removeModel(i)"
             @update:stream-timeout-ms="updateModelStreamTimeout(i, $event)"
+            @update:non-stream-timeout-ms="
+              updateModelNonStreamTimeout(i, $event)
+            "
             @toggle-capability="(cap: string) => toggleModelCapability(i, cap)"
           />
         </div>

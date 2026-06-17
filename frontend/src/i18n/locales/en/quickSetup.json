@@ -58,7 +58,10 @@
     "label": "patches",
     "sectionTitle": "Patches",
     "timeoutTitle": "Timeout",
-    "timeoutSeconds": "seconds"
+    "timeoutSeconds": "seconds",
+    "streamTimeoutLabel": "Stream timeout (s)",
+    "nonStreamTimeoutLabel": "Non-stream timeout (s)",
+    "disabled": "Disabled"
   },
   "concurrency": {
     "control": "Concurrency Control",

@@ -135,6 +135,8 @@ export function registerRoutes(
     dbSizeMonitor.stop();
     tracker.stopPushInterval();
     tracker.closeAllClients();
+    // 先终止所有 inflight 请求（复用 kill 机制同步释放信号量），再清空信号量配置
+    tracker.abortAllInflight();
     semaphoreManager.removeAll();
     proxyAgentFactory.invalidateAll();
     const sessionTracker = container.resolve<SessionTracker>(SERVICE_KEYS.sessionTracker);

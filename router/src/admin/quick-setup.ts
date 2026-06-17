@@ -64,6 +64,7 @@ const QuickSetupProviderSchema = Type.Object({
     context_window: Type.Optional(Type.Number()),
     patches: Type.Optional(Type.Array(Type.String())),
     stream_timeout_ms: Type.Optional(Type.Number()),
+    non_stream_timeout_ms: Type.Optional(Type.Number()),
     capabilities: Type.Optional(Type.Array(Type.String())),
   })),
   endpoints: Type.Optional(Type.Array(QuickSetupEndpointSchema, { minItems: 1 })),
@@ -149,6 +150,7 @@ export const adminQuickSetupRoutes: FastifyPluginCallback<QuickSetupRoutesOption
         ...(m.context_window != null ? { context_window: m.context_window } : {}),
         ...(m.patches && m.patches.length > 0 ? { patches: m.patches } : {}),
         ...(m.stream_timeout_ms != null ? { stream_timeout_ms: m.stream_timeout_ms } : {}),
+        ...(m.non_stream_timeout_ms != null ? { non_stream_timeout_ms: m.non_stream_timeout_ms } : {}),
         ...(m.capabilities && m.capabilities.length > 0 ? { capabilities: m.capabilities } : {}),
       }));
       const adaptiveEnabled = body.provider.concurrency_mode === 'auto' ? 1 : 0;

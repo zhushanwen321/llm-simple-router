@@ -41,6 +41,7 @@ export interface ModelConfig {
   enabled: boolean;
   patches: string[];
   stream_timeout_ms?: number;
+  non_stream_timeout_ms?: number;
   capabilities?: string[];
 }
 

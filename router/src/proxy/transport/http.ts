@@ -4,8 +4,26 @@ import type { Agent } from "http";
 import { UPSTREAM_SUCCESS, filterHeaders } from "../types.js";
 import { buildUpstreamUrl } from "../proxy-core.js";
 import type { RawHeaders, TransportResult } from "../types.js";
+import { DEFAULT_GET_TIMEOUT_MS } from "../../core/constants.js";
 // Re-export callStream from stream-proxy.ts for external consumers
 export { callStream } from "./stream.js";
+
+// ---------- Transport options ----------
+
+/** 非流式/流式调用通用可选项：客户端断连信号 + 上游无活动超时。 */
+export interface TransportCallOpts {
+  signal?: AbortSignal;
+}
+
+/** callNonStream 选项：timeoutMs=0/Infinity 表示禁用超时。 */
+export interface NonStreamCallOpts extends TransportCallOpts {
+  timeoutMs?: number;
+}
+
+/** callGet 选项：仅超时（admin 探测，无客户端 signal 关联）。 */
+export interface GetCallOpts {
+  timeoutMs?: number;
+}
 
 // ---------- Constants ----------
 
@@ -67,6 +85,7 @@ export function callNonStream(
   upstreamPath: string,
   buildHeaders: BuildHeadersFn,
   agent?: Agent,
+  opts?: NonStreamCallOpts,
 ): Promise<TransportResult> {
   return new Promise((resolve) => {
     const url = new URL(buildUpstreamUrl(backend.base_url, upstreamPath));
@@ -79,6 +98,25 @@ export function callNonStream(
     const options = buildRequestOptions(url, upstreamHeaders);
 
     const req = _transportInternals.createUpstreamRequest(url, options, agent);
+
+    // 上游无活动超时：0/Infinity 跳过（与 StreamProxy idleTimer 守卫对称）。
+    // destroy 必须带 error 参数，否则不 emit 'error' 事件，Promise 永挂。
+    const timeoutMs = opts?.timeoutMs;
+    if (timeoutMs !== undefined && Number.isFinite(timeoutMs) && timeoutMs > 0) {
+      req.setTimeout(timeoutMs);
+      req.on("timeout", () => req.destroy(new Error("upstream inactivity timeout")));
+    }
+
+    // 客户端断连：abort 信号穿透到上游 socket，立即切断连接。
+    if (opts?.signal) {
+      const signal = opts.signal;
+      const abort = () => req.destroy(new Error("client aborted"));
+      if (signal.aborted) {
+        abort();
+      } else {
+        signal.addEventListener("abort", abort, { once: true });
+      }
+    }
 
     req.on("response", (res) => {
       const chunks: Buffer[] = [];
@@ -134,6 +172,7 @@ export function callGet(
   upstreamPath: string,
   buildHeaders: (cliHdrs: RawHeaders, key: string) => Record<string, string>,
   agent?: Agent,
+  opts?: GetCallOpts,
 ): Promise<GetTransportResult> {
   return new Promise((resolve, reject) => {
     const url = new URL(buildUpstreamUrl(backend.base_url, upstreamPath));
@@ -141,6 +180,9 @@ export function callGet(
     const options = buildRequestOptions(url, headers, "GET");
 
     const req = _transportInternals.createUpstreamRequest(url, options, agent);
+    // GET 探测默认 30s 超时；destroy(error) 触发 'error' 事件 → reject。
+    req.setTimeout(opts?.timeoutMs ?? DEFAULT_GET_TIMEOUT_MS);
+    req.on("timeout", () => req.destroy(new Error("GET timeout")));
     req.on("response", (res) => {
       const chunks: Buffer[] = [];
       res.on("data", (chunk: Buffer) => chunks.push(chunk));

@@ -1,0 +1,184 @@
+{
+  "schema_version": "1.0",
+  "feature": "transport-timeout-resource-cleanup",
+  "methods": [
+    {
+      "name": "callNonStream",
+      "class": "transport",
+      "module": "router/src/proxy/transport/http.ts",
+      "params": [
+        { "name": "backend", "type": "{ base_url: string }" },
+        { "name": "apiKey", "type": "string" },
+        { "name": "body", "type": "Record<string, unknown>" },
+        { "name": "clientHeaders", "type": "RawHeaders" },
+        { "name": "upstreamPath", "type": "string" },
+        { "name": "buildHeaders", "type": "BuildHeadersFn" },
+        { "name": "agent", "type": "Agent | undefined", "optional": true },
+        { "name": "opts", "type": "{ signal?: AbortSignal; timeoutMs?: number } | undefined", "optional": true }
+      ],
+      "returns": "Promise<TransportResult>",
+      "edge_cases": ["signal abort → req.destroy(abortError) → resolve throw", "timeoutMs 正值 → setTimeout + on timeout destroy(timeoutError)", "timeoutMs 0/Infinity 跳过"]
+    },
+    {
+      "name": "callStream",
+      "class": "transport",
+      "module": "router/src/proxy/transport/stream.ts",
+      "params": [
+        { "name": "...existing", "type": "(见现有签名)" },
+        { "name": "agent", "type": "Agent | undefined", "optional": true },
+        { "name": "opts", "type": "{ signal?: AbortSignal; connectTimeoutMs?: number } | undefined", "optional": true }
+      ],
+      "returns": "Promise<TransportResult>",
+      "edge_cases": ["响应头前 connectTimeoutMs setTimeout", "响应头后交 StreamProxy idleTimer", "非200分支补 upstreamRes on error"]
+    },
+    {
+      "name": "callGet",
+      "class": "transport",
+      "module": "router/src/proxy/transport/http.ts",
+      "params": [
+        { "name": "...existing", "type": "(见现有签名)" },
+        { "name": "opts", "type": "{ timeoutMs?: number } | undefined", "optional": true }
+      ],
+      "returns": "Promise<GetTransportResult>",
+      "edge_cases": ["默认 timeoutMs = DEFAULT_GET_TIMEOUT_MS(30000)"]
+    },
+    {
+      "name": "transportFn",
+      "class": "transport",
+      "module": "router/src/proxy/transport/transport-fn.ts",
+      "params": [
+        { "name": "target", "type": "Target" },
+        { "name": "signal", "type": "AbortSignal | undefined", "optional": true }
+      ],
+      "returns": "Promise<TransportResult>",
+      "edge_cases": ["signal 由 orchestrator 传入 fn(target, signal)"]
+    },
+    {
+      "name": "execute",
+      "class": "ResilienceLayer",
+      "module": "router/src/proxy/orchestration/resilience.ts",
+      "params": [
+        { "name": "targets", "type": "() => Target[]" },
+        { "name": "fn", "type": "(target: Target, signal?: AbortSignal) => Promise<TransportResult>" },
+        { "name": "config", "type": "ResilienceConfig" },
+        { "name": "signal", "type": "AbortSignal | undefined", "optional": true }
+      ],
+      "returns": "Promise<ResilienceResult>",
+      "edge_cases": ["每轮 attempt 前查 signal.aborted → 短路返回 throw", "sleep(delayMs) 后再查一次"]
+    },
+    {
+      "name": "handle",
+      "class": "ProxyOrchestrator",
+      "module": "router/src/proxy/orchestration/orchestrator.ts",
+      "params": [
+        { "name": "request", "type": "FastifyRequest" },
+        { "name": "reply", "type": "FastifyReply" },
+        { "name": "apiType", "type": "'openai' | 'openai-responses' | 'anthropic'" },
+        { "name": "config", "type": "OrchestratorConfig" },
+        { "name": "ctx", "type": "HandleContext | undefined", "optional": true }
+      ],
+      "returns": "Promise<ResilienceResult>",
+      "edge_cases": ["reply.raw close + writableEnded 判断 → abort（幂等 listener）", "adaptive 调用前查 signal.aborted 过滤客户端断连", "signal 传入 transport"]
+    },
+    {
+      "name": "withSlot",
+      "class": "SemaphoreScope",
+      "module": "router/src/proxy/orchestration/scope.ts",
+      "params": [
+        { "name": "providerId", "type": "string" },
+        { "name": "signal", "type": "AbortSignal" },
+        { "name": "onQueued", "type": "() => void" },
+        { "name": "fn", "type": "() => Promise<T>" },
+        { "name": "concurrencyOverride", "type": "ConcurrencyOverride | undefined", "optional": true },
+        { "name": "reqId", "type": "string | undefined", "optional": true }
+      ],
+      "returns": "Promise<T>",
+      "edge_cases": ["acquire 抛错时 token undefined → 跳过 release(undefined)", "reqId 传给 acquire 存入 reqTokenMap"]
+    },
+    {
+      "name": "release",
+      "class": "SemaphoreManager",
+      "module": "router/src/core/concurrency/semaphore.ts",
+      "params": [
+        { "name": "providerId", "type": "string" },
+        { "name": "token", "type": "AcquireToken | undefined", "optional": true },
+        { "name": "logger", "type": "Logger | undefined", "optional": true }
+      ],
+      "returns": "void",
+      "edge_cases": ["token undefined → return", "token.released===true → return（幂等）", "否则设 released=true 后递减/dequeue", "成功后同步 reqTokenMap.delete(reqId)（自然完成自动清理）", "generation 不匹配 → 跳过（现有）"]
+    },
+    {
+      "name": "releaseByReqId",
+      "class": "SemaphoreManager",
+      "module": "router/src/core/concurrency/semaphore.ts",
+      "params": [{ "name": "reqId", "type": "string" }],
+      "returns": "void",
+      "edge_cases": ["取 TokenRecord{token,providerId} 后 release（幂等）", "token 不存在（排队中未 acquire）→ noop，不递减 current"]
+    },
+    {
+      "name": "killRequest",
+      "class": "RequestTracker",
+      "module": "router/src/core/monitor/request-tracker.ts",
+      "params": [{ "name": "id", "type": "string" }],
+      "returns": "boolean",
+      "edge_cases": ["同步调 releaseSlotProvider（request id 去重幂等）", "未找到回调 → false"]
+    },
+    {
+      "name": "setReleaseSlotProvider",
+      "class": "RequestTracker",
+      "module": "router/src/core/monitor/request-tracker.ts",
+      "params": [{ "name": "fn", "type": "(reqId: string) => void" }],
+      "returns": "void",
+      "edge_cases": ["绑定 semaphore.releaseByReqId"]
+    },
+    {
+      "name": "abortAllInflight",
+      "class": "RequestTracker",
+      "module": "router/src/core/monitor/request-tracker.ts",
+      "params": [],
+      "returns": "void",
+      "edge_cases": ["遍历 killCallbacks 调用并清空，复用 kill 机制"]
+    },
+    {
+      "name": "getModelTimeouts",
+      "class": "db",
+      "module": "router/src/db/providers.ts",
+      "params": [
+        { "name": "provider", "type": "Provider" },
+        { "name": "backendModel", "type": "string" }
+      ],
+      "returns": "{ stream: number; nonStream: number }",
+      "edge_cases": ["stream_timeout_ms=0 → stream=Infinity", "non_stream_timeout_ms=0 → nonStream=Infinity", "未配置 → stream=DEFAULT_STREAM_TIMEOUT_MS(300000), nonStream=DEFAULT_NON_STREAM_TIMEOUT_MS(600000)"]
+    },
+    {
+      "name": "cleanup",
+      "class": "StreamProxy",
+      "module": "router/src/proxy/transport/stream.ts",
+      "params": [],
+      "returns": "void",
+      "edge_cases": ["destroy upstreamRes/upstreamReq（幂等，检查 destroyed）", "destroy 3 个 Transform（现有）"]
+    }
+  ],
+  "data_flows": [
+    {
+      "id": "flow-client-disconnect",
+      "description": "客户端断连 → 上游资源销毁 → 槽位释放",
+      "chain": ["ProxyOrchestrator.handle(reply.raw close)", "controller.abort()", "ResilienceLayer.execute(signal.aborted check)", "transportFn(target, signal)", "callStream/callNonStream(signal)", "req.destroy(abortError)", "resolve throw", "SemaphoreScope.withSlot finally release"]
+    },
+    {
+      "id": "flow-upstream-hang-timeout",
+      "description": "上游 hang → 无活动超时 → 槽位释放",
+      "chain": ["callStream/callNonStream(setTimeout)", "req.on timeout", "req.destroy(timeoutError)", "resolve throw", "SemaphoreScope.withSlot finally release"]
+    },
+    {
+      "id": "flow-kill",
+      "description": "运维 kill → 同步释放槽位",
+      "chain": ["RequestTracker.killRequest(id)", "complete(id)", "releaseSlotProvider(id)", "SemaphoreManager.releaseByReqId(reqId)", "reqTokenMap 取 token", "SemaphoreManager.release（token.released 幂等）", "withSlot finally release 跳过（已 released）"]
+    },
+    {
+      "id": "flow-timeout-config",
+      "description": "模型超时配置 → transport",
+      "chain": ["getModelTimeouts(provider, model)", "iteration-setup.ts", "TransportFnParams.streamTimeoutMs/nonStreamTimeoutMs", "callStream(connectTimeoutMs) / callNonStream(timeoutMs)"]
+    }
+  ]
+}

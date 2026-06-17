@@ -58,7 +58,7 @@ export interface HandleContext {
   failoverThreshold?: number;
   isFailover?: boolean;
   ruleMatcher?: RetryRuleMatcher;
-  transportFn: (target: Target) => Promise<TransportResult>;
+  transportFn: (target: Target, signal?: AbortSignal) => Promise<TransportResult>;
 }
 
 /**
@@ -95,11 +95,17 @@ export class ProxyOrchestrator {
   ): Promise<ResilienceResult> {
     const providerId = config.provider.id;
     const controller = new AbortController();
-    // 客户端断连时自动 abort（保留原有行为）
-    request.raw.on("close", () => {
-      if (!request.raw.readableEnded) {
-        controller.abort();
-      }
+    // 客户端断连检测：监听 reply.raw（响应端），用 writableEnded 判断响应未完成才 abort。
+    // 旧逻辑监听 request.raw + readableEnded 对 POST 请求恒为 true（body 已读完），close 永不 abort。
+    //
+    // 注意：failover 循环会复用同一 reply 多次调用 handle()，每次都 new 一个独立的
+    // AbortController。此处必须每次都挂载新的 close listener，让该迭代的 controller
+    // 绑定到 close 事件。若用 WeakSet 去重（旧实现），迭代 2+ 的 controller 永远不
+    // 会因客户端断连 abort，导致上游连接泄漏 + Promise 永挂。controller.abort() 幂等，
+    // 多 listener 各 abort 各自的 controller互不干扰；listener 数量受 MAX_FAILOVER_ITERATIONS
+    // 上界约束（通常 ≤5），reply.raw 关闭后随对象 GC 一起回收，无永久泄漏。
+    reply.raw.on("close", () => {
+      if (!reply.raw.writableEnded) controller.abort();
     });
     const trackerReq = this.buildActiveRequest(request, config, apiType);
     let wasEverQueued = false;
@@ -125,9 +131,10 @@ export class ProxyOrchestrator {
                 trackerReq.queued = false;
                 this.deps.trackerScope.markQueued(trackerReq.id, false);
               }
-              return this.executeResilience(config, ctx);
+              return this.executeResilience(config, ctx, controller.signal);
             },
             config.concurrencyOverride,
+            trackerReq.id,
           );
         },
         (result) => this.extractTrackStatus(result),
@@ -144,17 +151,27 @@ export class ProxyOrchestrator {
       // 如果有重试尝试（非 throw 类型），说明 resilience 层的重试规则匹配了，
       // 意味着这是一个"有意义的失败"——即使上游返回 200 body error 也应该计入退避
       const retryRuleMatched = status === "failed" && result.attempts.length > 1;
-      this.deps.adaptiveController?.onRequestComplete(providerId, { success: status === "completed", statusCode, retryRuleMatched, requestId: config.trackerId, wasQueued: wasEverQueued });
+      // 客户端断连不计入 provider 失败统计，避免误降并发
+      if (!controller.signal.aborted) {
+        this.deps.adaptiveController?.onRequestComplete(providerId, { success: status === "completed", statusCode, retryRuleMatched, requestId: config.trackerId, wasQueued: wasEverQueued });
+      }
       this.sendResponse(reply, result.result, ctx);
       return result;
     } catch (e) {
       if (e instanceof ProviderSwitchNeeded) {
         const lastResult = e.lastResult;
         const statusCode = lastResult && "statusCode" in lastResult ? lastResult.statusCode : undefined;
-        this.deps.adaptiveController?.onRequestComplete(providerId, { success: false, statusCode, retryRuleMatched: true, requestId: config.trackerId, wasQueued: wasEverQueued });
+        // 客户端断连不计入 provider 失败统计
+        if (!controller.signal.aborted) {
+          this.deps.adaptiveController?.onRequestComplete(providerId, { success: false, statusCode, retryRuleMatched: true, requestId: config.trackerId, wasQueued: wasEverQueued });
+        }
       } else if (e instanceof SemaphoreTimeoutError || e instanceof SemaphoreQueueFullError) {
         // 信号量超时或队列满：说明并发压力大，上报给自适应控制器
-        this.deps.adaptiveController?.onRequestComplete(providerId, { success: false, statusCode: 429, requestId: config.trackerId });
+        // 客户端断连触发的 acquire abort 走 AbortError 而非 SemaphoreError；
+        // queueTimeout 与断连竞态时归类为非 provider 失败更合理
+        if (!controller.signal.aborted) {
+          this.deps.adaptiveController?.onRequestComplete(providerId, { success: false, statusCode: 429, requestId: config.trackerId });
+        }
       }
       throw e;
     }
@@ -189,6 +206,7 @@ export class ProxyOrchestrator {
   private async executeResilience(
     config: OrchestratorConfig,
     ctx?: HandleContext,
+    signal?: AbortSignal,
   ): Promise<ResilienceResult> {
     if (!ctx?.transportFn) throw new Error("HandleContext.transportFn is required");
     const resilienceConfig: ResilienceConfig = {
@@ -202,6 +220,7 @@ export class ProxyOrchestrator {
       () => [config.resolved],
       ctx.transportFn,
       resilienceConfig,
+      signal,
     );
   }
 

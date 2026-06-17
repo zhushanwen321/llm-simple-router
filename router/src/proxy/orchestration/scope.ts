@@ -12,8 +12,9 @@ export class SemaphoreScope {
     onQueued: () => void,
     fn: () => Promise<T>,
     concurrencyOverride?: ConcurrencyOverride,
+    reqId?: string,
   ): Promise<T> {
-    const token = await this.manager.acquire(providerId, signal, onQueued, undefined, concurrencyOverride);
+    const token = await this.manager.acquire(providerId, signal, onQueued, undefined, concurrencyOverride, reqId);
     try {
       return await fn();
     } finally {

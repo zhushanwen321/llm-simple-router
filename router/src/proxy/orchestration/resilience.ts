@@ -195,10 +195,24 @@ export class ResilienceLayer {
     return { action: "done" };
   }
 
+  /** 客户端断连短路结果（不重试、不触发 failover/adaptive 退避） */
+  private clientAbortedResult(
+    allAttempts: ResilienceAttempt[],
+    excludedTargets: Target[],
+  ): ResilienceResult {
+    return {
+      result: { kind: "throw", error: new Error("client aborted") },
+      attempts: allAttempts,
+      excludedTargets,
+      finalDecision: { action: "abort", reason: "client_aborted" },
+    };
+  }
+
   async execute(
     targets: () => Target[],
-    fn: (target: Target) => Promise<TransportResult>,
+    fn: (target: Target, signal?: AbortSignal) => Promise<TransportResult>,
     config: ResilienceConfig,
+    signal?: AbortSignal,
   ): Promise<ResilienceResult> {
     const allAttempts: ResilienceAttempt[] = [];
     const excludedTargets: Target[] = [];
@@ -213,6 +227,9 @@ export class ResilienceLayer {
     };
 
     while (true) {
+      // 客户端断连短路：不重试、不触发 failover
+      if (signal?.aborted) return this.clientAbortedResult(allAttempts, excludedTargets);
+
       if (globalAttemptIndex >= (config.iterationCap ?? DEFAULT_ITERATION_CAP)) {
         return {
           result: lastResult ?? { kind: "error" as const, statusCode: 502, body: "Iteration cap exceeded", headers: {}, sentHeaders: {}, sentBody: "" },
@@ -242,7 +259,7 @@ export class ResilienceLayer {
 
       let transportResult: TransportResult;
       try {
-        transportResult = await fn(currentTarget);
+        transportResult = await fn(currentTarget, signal);
       } catch (err: unknown) {
         const errMsg = err instanceof Error ? err.message : JSON.stringify(err);
         transportResult = { kind: "throw", error: err instanceof Error ? err : new Error(errMsg) };
@@ -284,6 +301,8 @@ export class ResilienceLayer {
         case "retry":
           globalAttemptIndex++;
           await sleep(decision.delayMs);
+          // sleep 期间客户端可能断连，再次检查避免无效重试
+          if (signal?.aborted) return this.clientAbortedResult(allAttempts, excludedTargets);
           continue;
         case "failover":
           excludedTargets.push(decision.excludeTarget);

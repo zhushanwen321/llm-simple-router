@@ -12,7 +12,7 @@ import type { FormatAdapter } from "../format/types.js";
 import type { FormatRegistry } from "../format/registry.js";
 import { sanitizeHeadersForLog } from "../proxy-logging.js";
 import { buildUpstreamHeaders, buildUpstreamUrl } from "../proxy-core.js";
-import { getModelStreamTimeout } from "../../db/providers.js";
+import { getModelTimeouts } from "../../db/providers.js";
 import { buildTransportFn } from "../transport/transport-fn.js";
 import { parseModels } from "../../config/model-context.js";
 import { applyProviderPatches } from "../patch/index.js";
@@ -162,7 +162,8 @@ export function buildIterationSetup(params: {
   const transportFn = buildTransportFn({
     provider, apiKey, body: patchedBody, cliHdrs, reply, upstreamPath: effectiveUpstreamPath, apiType: effectiveApiType,
     isStream, startTime, logId, effectiveModel: clientModel,
-    streamTimeoutMs: getModelStreamTimeout(provider, resolved.backend_model),
+    nonStreamTimeoutMs: getModelTimeouts(provider, resolved.backend_model).nonStream,
+    streamTimeoutMs: getModelTimeouts(provider, resolved.backend_model).stream,
     tracker, matcher, request,
     streamLoopEnabled, formatTransform, responseTransform, injectedHeaders,
     timeoutContext: { modelId: resolved.backend_model, providerId: provider.id },
