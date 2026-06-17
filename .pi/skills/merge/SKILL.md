@@ -21,6 +21,33 @@ description: PR 合并 + 版本发布一体化流程（阶段 0-6），含本地
 - **版本管理**：workspace root `1.0.3`；子包独立版本（router `1.0.4` / pi-extension `0.1.0` / frontend `0.0.0`）
 - **禁止本地发布**：必须走 GitHub Actions
 
+## 两个发布入口
+
+根据 worktree 状态选择入口：
+
+| 场景 | 入口 | 说明 |
+|------|------|------|
+| feature worktree 还在（含 PR 已合并但未清理） | `merge.sh <wt> patch` | 阶段 2 幂等跳过已合并 PR，直接走发布流程；一站式完成发布+验证+清理 |
+| worktree 已删 / 只想发布 main 上已合并的改动 | `scripts/publish.sh patch` | 不依赖 worktree，前置检查 main 是否有未发布改动，触发完整发布链路 |
+
+**禁止裸 `gh pr merge`** [MANDATORY]：任何 PR 合并必须走上述两个入口之一。
+裸合并（GitHub UI / `gh pr merge`）只产出 GHCR `latest`（由 `ci.yml` 在 push main 时推送），
+**不会**发布 npm 包、不会打 GitHub Release、不会推阿里云 ACR，导致三处产物版本割裂。
+
+### 产物验证范围
+
+两个入口都会验证交付物：
+
+| 产物 | merge.sh 阶段 6 | publish.sh 步骤 4 |
+|------|-----------------|-------------------|
+| GitHub Release + Asset | ✅ | ✅ |
+| npm 包 | ✅ | ✅ |
+| Docker GHCR | ✅ | ✅ |
+| 阿里云 ACR | ℹ️ 依赖 CI success | ℹ️ 依赖 CI success |
+
+> 阿里云 ACR 无公开查询 API，与 GHCR 在同一 workflow 步骤（6.5）推送，
+> workflow success 即保证 ACR 已推（CI 失败会让整条流水线失败）。
+
 ## 调用方式
 
 ### 主流程（阶段 0-6）
