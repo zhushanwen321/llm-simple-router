@@ -947,6 +947,24 @@ phase_verify() {
         fi
     fi
 
+    # 检查 4: Docker 镜像 (GHCR)
+    echo ""
+    echo "  检查 4: Docker 镜像 (GHCR)..."
+    local ghcr_owner="${GH_REPO%/*}"
+    local ghcr_pkg="${GH_REPO#*/}"
+    local ghcr_tag_found=""
+    ghcr_tag_found=$(gh api "/users/$ghcr_owner/packages/container/$ghcr_pkg/versions" \
+        --paginate --jq '.[] | .metadata.container.tags[]?' 2>/dev/null \
+        | grep -Fx "$TAG" || true)
+    if [[ -n "$ghcr_tag_found" ]]; then
+        echo -e "    ${GREEN}✅ PASS: GHCR $TAG 存在${NC}"
+        echo -e "    ${GREEN}    阿里云 ACR 同 workflow 推送，由 CI success 保证${NC}"
+    else
+        echo -e "    ${RED}❌ FAIL: GHCR $TAG 未找到${NC}"
+        verify_pass=false
+        issues="${issues}\n    - GHCR Docker tag $TAG 缺失"
+    fi
+
     # 汇总
     echo ""
     echo "══════════════════════════════════════════════════"

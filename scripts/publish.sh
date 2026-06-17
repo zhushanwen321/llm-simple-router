@@ -49,6 +49,49 @@ fi
 echo "✅ 代码状态正常"
 echo ""
 
+# ── 步骤 1.5: 检查未发布改动 ─────────────────────────
+# publish.sh 作为「已合并未发布」的兜底入口，发布前检测
+# main 是否真的有未发布的合并 commit，避免无内容的新版本。
+# 用 ls-remote 查远程 tag，避免 bare repo 下本地 rejected tag
+# 干扰 `git fetch --tags`（rejected 会让新 tag 拉不下来）。
+echo "=== 步骤 1.5: 检查未发布改动 ==="
+LATEST_TAG=$(git ls-remote --tags origin 2>/dev/null \
+  | grep -oE 'refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$' \
+  | sed 's|refs/tags/||' | sort -V | tail -1 || echo "")
+if [[ -z "$LATEST_TAG" ]]; then
+  echo "  (无历史 tag，首次发布)"
+else
+  # fetch main 分支（不碰 tags，不受 rejected tag 影响）+ 单独 fetch latest tag
+  git fetch origin main 2>/dev/null || true
+  git fetch origin tag "$LATEST_TAG" 2>/dev/null || true
+  TAG_COMMIT=$(git rev-parse "$LATEST_TAG^{commit}" 2>/dev/null || echo "")
+  MAIN_COMMIT=$(git rev-parse origin/main 2>/dev/null || echo "")
+  if [[ -z "$TAG_COMMIT" || -z "$MAIN_COMMIT" ]]; then
+    echo "  ⚠️  无法读取 commit，跳过检查"
+  elif [[ "$TAG_COMMIT" == "$MAIN_COMMIT" ]]; then
+    echo "  ⚠️  main HEAD 与最新 tag $LATEST_TAG 一致，没有未发布改动"
+    echo "      继续发布会产生仅 bump 版本号的无内容新版本"
+    echo -n "  是否仍要发布？[y/N] "
+    read -r answer
+    if [[ "$answer" != "y" && "$answer" != "Y" ]]; then
+      echo "已取消"
+      exit 0
+    fi
+  elif git merge-base --is-ancestor "$TAG_COMMIT" "$MAIN_COMMIT" 2>/dev/null; then
+    AHEAD=$(git rev-list "$LATEST_TAG..origin/main" --count 2>/dev/null || echo "?")
+    echo "  ✅ main 领先 $LATEST_TAG 共 $AHEAD 个 commit，有未发布改动"
+  else
+    echo "  ⚠️  main 与 $LATEST_TAG 已分叉，请检查 git log 确认"
+    echo -n "  是否仍要发布？[y/N] "
+    read -r answer
+    if [[ "$answer" != "y" && "$answer" != "Y" ]]; then
+      echo "已取消"
+      exit 0
+    fi
+  fi
+fi
+echo ""
+
 # ── 步骤 2: 触发 Publish workflow ────────────────────
 echo "=== 步骤 2: 触发 GitHub Actions Publish workflow ==="
 WORKFLOW_RUN=$(gh workflow run publish.yml --ref main -f bump_type="$VERSION_TYPE" 2>&1)
@@ -117,6 +160,24 @@ if echo "$ASSETS" | grep -q "llm-simple-router-linux-x64.tar.gz"; then
   echo "✅ $ASSETS"
 else
   echo "❌ $ASSETS"
+fi
+
+# 验证 Docker (GHCR)
+# image 命名约定: ghcr.io/${{ github.repository }}，故 package 名 = repo 名
+# 阿里云 ACR 无公开查询 API，与 GHCR 在同一 workflow 步骤推送，
+# workflow success 即保证 ACR 已推（CI 失败会让整条流水线失败）。
+echo -n "检查 Docker (GHCR): "
+REPO_SLUG=$(gh repo view --json nameWithOwner -q '.nameWithOwner' 2>/dev/null || echo "")
+REPO_OWNER="${REPO_SLUG%/*}"
+REPO_NAME="${REPO_SLUG#*/}"
+GHCR_TAG_FOUND=$(gh api "/users/$REPO_OWNER/packages/container/$REPO_NAME/versions" \
+  --paginate --jq '.[] | .metadata.container.tags[]?' 2>/dev/null \
+  | grep -Fx "v$NEW_VERSION" || true)
+if [[ -n "$GHCR_TAG_FOUND" ]]; then
+  echo "✅ v$NEW_VERSION"
+  echo "    阿里云 ACR: 同 workflow 推送 (步骤 6.5)，依赖 CI success"
+else
+  echo "❌ GHCR 缺 v$NEW_VERSION tag"
 fi
 
 echo ""
