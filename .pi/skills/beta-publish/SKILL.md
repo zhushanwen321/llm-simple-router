@@ -30,14 +30,20 @@ bash beta-publish.sh [-y] [目标版本号]
 ## 版本号规则
 
 ```
-当前正式版 1.0.2 → beta 目标 1.0.3 → CI 发布 1.0.3-beta.{SHA}
+当前正式版 1.0.2 → beta 目标 1.0.3
+首次发布 → CI 查 registry → 1.0.3-beta.1
+重复跑   → CI 查到 beta.1 存在 → 1.0.3-beta.2
 ```
 
 | 规则 | 说明 |
 |------|------|
-| 格式 | `{next}-beta.{shortSha}`（合法 semver prerelease） |
+| 格式 | `{next}-beta.{N}`（N 为递增整数，semver prerelease 标准） |
 | next | 当前 version 的 patch bump，或用户指定 |
-| 排序 | `1.0.3-beta.a1b < 1.0.3-beta.f4e < 1.0.3`（正式版始终大于 beta） |
+| N | CI 查询 npm registry 该系列已发布最大编号 +1，首次为 beta.1 |
+| 重复跑 | 同分支重跑自动递增 N，npm publish 不冲突（registry 无重复版本） |
+| 排序 | `1.0.3-beta.1 < 1.0.3-beta.2 < 1.0.3`（semver 标准排序，正式版始终大于 beta） |
+| @beta | npm dist-tag 滚动指向最新 beta（如 beta.2 发布后 @beta 指向 beta.2） |
+| @latest | 不受影响，始终指向最后一个正式版 |
 
 ## 发布产物
 
@@ -48,7 +54,7 @@ bash beta-publish.sh [-y] [目标版本号]
 | `@beta` | 最新 beta 版本（滚动覆盖） | `npm i -g llm-simple-router@beta` |
 | `@latest` | 最后一个正式版（不受 beta 影响） | `npm i -g llm-simple-router` |
 
-精确拉某次 beta：`npm i -g llm-simple-router@1.0.3-beta.a1b2c3d`
+精确拉某次 beta：`npm i -g llm-simple-router@1.0.3-beta.2`
 
 ### Docker（GHCR + 阿里云 ACR）
 

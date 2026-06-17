@@ -279,9 +279,14 @@ echo ""
 
 info "=== 步骤 9: 安装说明 ==="
 
-# 获取发布的 beta 版本号（从 CI 日志或 npm registry）
-SHORT_SHA=$(git log --format='%h' -1 "$BETA_BRANCH" 2>/dev/null || echo "unknown")
-BETA_VERSION="${TARGET_VERSION}-beta.${SHORT_SHA}"
+# 获取实际发布的 beta 版本号：CI 查 npm registry 递增计算，本地无法预估。
+# 从 dist-tags.beta 拉取最准确（指向刚发布的版本）。查询失败显示占位符提示自查。
+ACTUAL_BETA=$(npm view llm-simple-router dist-tags.beta 2>/dev/null || echo "")
+if [[ -n "$ACTUAL_BETA" ]]; then
+  BETA_VERSION="$ACTUAL_BETA"
+else
+  BETA_VERSION="${TARGET_VERSION}-beta.N（查看 npm info 或 CI 日志确认实际编号）"
+fi
 
 echo ""
 echo "============================================"
