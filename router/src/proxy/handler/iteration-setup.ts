@@ -159,7 +159,7 @@ export function buildIterationSetup(params: {
 
   // --- Build transport function ---
   const streamLoopEnabled = enhancementConfig.stream_loop_enabled;
-  // 单次 parseModels 解析复用，避免对 provider.models JSON 重复解析两次
+  // 合并 stream/nonStream 超时查询，单次 parseModels（applyProviderPatches 内另有一次解析）
   const modelTimeouts = getModelTimeouts(provider, resolved.backend_model);
   const transportFn = buildTransportFn({
     provider, apiKey, body: patchedBody, cliHdrs, reply, upstreamPath: effectiveUpstreamPath, apiType: effectiveApiType,

@@ -476,9 +476,21 @@ export function callStream(
 
       if (statusCode !== UPSTREAM_SUCCESS) {
         const chunks: Buffer[] = [];
+        // 非 2xx body 兜底超时：connect timeout 已在响应头到达时清零（L474），
+        // 若上游发半截 body 后静默挂住（不 FIN 不 RST，CDN/反代常见故障），
+        // end/error 均不触发 → resolveOnce 永不调用 → slot 泄漏。
+        // 复用 connectTimeoutMs 作为 body 读取上限，与 200 路径 idleTimer 同源。
+        const bodyGuard = hasConnectTimeout
+          ? setTimeout(() => upstreamRes.destroy(new Error("upstream error-body timeout")), connectTimeoutMs)
+          : null;
+        if (bodyGuard) bodyGuard.unref();
+        const finishBody = (r: Parameters<typeof resolveOnce>[0]) => {
+          if (bodyGuard) clearTimeout(bodyGuard);
+          resolveOnce(r);
+        };
         upstreamRes.on("data", (chunk: Buffer) => chunks.push(chunk));
         upstreamRes.on("end", () => {
-          resolveOnce({
+          finishBody({
             kind: "stream_error",
             statusCode,
             body: Buffer.concat(chunks).toString("utf-8"),
@@ -488,7 +500,7 @@ export function callStream(
         });
         // 非 2xx body 传输中连接中断：无 listener 会 uncaughtException + Promise 永挂（slot 泄漏）。
         // 与 200 分支 proxy.onUpstreamError 对称，与 callNonStream(http.ts) 同路径一致。
-        upstreamRes.on("error", (err: Error) => resolveOnce({ kind: "throw", error: err }));
+        upstreamRes.on("error", (err: Error) => finishBody({ kind: "throw", error: err }));
         return;
       }
 

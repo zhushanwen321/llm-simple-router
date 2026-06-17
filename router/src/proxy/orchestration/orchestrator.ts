@@ -99,17 +99,11 @@ export class ProxyOrchestrator {
     const providerId = config.provider.id;
     const controller = new AbortController();
     // 客户端断连检测：监听 reply.raw（响应端），用 writableEnded 判断响应未完成才 abort。
-    // 旧逻辑监听 request.raw + readableEnded 对 POST 请求恒为 true（body 已读完），close 永不 abort。
-    //
-    // 注意：failover 循环会复用同一 reply 多次调用 handle()，每次都 new 一个独立的
-    // AbortController。此处必须每次都挂载新的 close listener，让该迭代的 controller
-    // 绑定到 close 事件。若用 WeakSet 去重（旧实现），迭代 2+ 的 controller 永远不
-    // 会因客户端断连 abort，导致上游连接泄漏 + Promise 永挂。controller.abort() 幂等，
-    // 多 listener 各 abort 各自的 controller互不干扰；listener 数量受 MAX_FAILOVER_ITERATIONS
-    // 上界约束（通常 ≤5），reply.raw 关闭后随对象 GC 一起回收，无永久泄漏。
-    // 提高上限覆盖 failover 多次挂载的 close listener，避免 MaxListenersExceededWarning。
+    // 旧逻辑监听 request.raw + readableEnded，对 POST 请求 readableEnded 恒为 true（body 已读完），
+    // 导致 close 永不 abort。failover 循环复用同一 reply 多次调用 handle()，每次 new 一个独立
+    // AbortController 并挂载新 close listener，故需提高 listener 上限（覆盖 MAX_FAILOVER_ITERATIONS）；
     // close 只触发一次，listener 随 reply.raw GC 回收，无永久泄漏。
-    // 防御：reply.raw 在测试中可能是简化 mock（非 EventEmitter），此时跳过。
+    // 防御：reply.raw 在测试中可能是简化 mock（非 EventEmitter），typeof 守卫跳过。
     const rawEmitter = reply.raw as { getMaxListeners?: () => number; setMaxListeners?: (n: number) => void };
     if (typeof rawEmitter.setMaxListeners === "function") {
       const current = typeof rawEmitter.getMaxListeners === "function" ? rawEmitter.getMaxListeners() : 0;
@@ -127,7 +121,7 @@ export class ProxyOrchestrator {
           // kill 回调必须在 tracker.start() 之后注册，确保请求已在 activeMap 中
           this.deps.trackerScope.registerKillCallback(trackerReq.id, () => {
             controller.abort();
-            try { reply.raw.destroy(); } catch { /* reply may already be destroyed */ } // eslint-disable-line taste/no-silent-catch
+            try { reply.raw.destroy(); } catch (e) { request.log.debug({ err: e }, "reply.raw.destroy failed (already destroyed)"); }
           });
           return this.deps.semaphoreScope.withSlot(
             providerId,

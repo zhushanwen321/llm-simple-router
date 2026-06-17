@@ -19,8 +19,6 @@ import {
 const MAX_CONCURRENCY = 100;
 const MAX_QUEUE_SIZE = 1000;
 
-const MS_PER_SECOND = 1000;
-
 interface FormState {
   name: string;
   api_type: string;
@@ -77,7 +75,7 @@ export const API_TYPE_LABELS: Record<string, string> = {
   anthropic: "Anthropic Messages",
 };
 
-export { CONTEXT_WINDOW_OPTIONS, MS_PER_SECOND };
+export { CONTEXT_WINDOW_OPTIONS };
 
 type ProviderFormPayload = Pick<
   ProviderPayload,

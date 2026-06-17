@@ -108,13 +108,21 @@ export function callNonStream(
     }
 
     // 客户端断连：abort 信号穿透到上游 socket，立即切断连接。
-    if (opts?.signal) {
-      const signal = opts.signal;
-      const abort = () => req.destroy(new Error("client aborted"));
-      if (signal.aborted) {
-        abort();
+    // resolveOnce 在 Promise settle 时移除 abort listener，避免重试累积残留
+    // （与 callStream 的 resolveOnce 模式对称）。
+    const clientSignal = opts?.signal;
+    const onClientAbort = clientSignal ? () => req.destroy(new Error("client aborted")) : undefined;
+    const resolveOnce: typeof resolve = (r) => {
+      if (onClientAbort && clientSignal && !clientSignal.aborted) {
+        clientSignal.removeEventListener("abort", onClientAbort);
+      }
+      resolve(r);
+    };
+    if (onClientAbort && clientSignal) {
+      if (clientSignal.aborted) {
+        onClientAbort();
       } else {
-        signal.addEventListener("abort", abort, { once: true });
+        clientSignal.addEventListener("abort", onClientAbort, { once: true });
       }
     }
 
@@ -127,7 +135,7 @@ export function callNonStream(
         const headers = filterHeaders(res.headers as RawHeaders);
 
         if (statusCode >= UPSTREAM_SUCCESS && statusCode < UPSTREAM_SUCCESS + UPSTREAM_SUCCESS_RANGE) {
-          resolve({
+          resolveOnce({
             kind: "success",
             statusCode,
             body: responseBody,
@@ -136,7 +144,7 @@ export function callNonStream(
             sentBody: payload,
           });
         } else {
-          resolve({
+          resolveOnce({
             kind: "error",
             statusCode,
             body: responseBody,
@@ -148,10 +156,10 @@ export function callNonStream(
       });
       // 上游响应过程中连接中断时，IncomingMessage 发射 'error' 事件。
       // 无 listener 会导致 uncaught exception 使进程退出。
-      res.on("error", (error) => resolve({ kind: "throw", error }));
+      res.on("error", (error) => resolveOnce({ kind: "throw", error }));
     });
 
-    req.on("error", (error) => resolve({ kind: "throw", error }));
+    req.on("error", (error) => resolveOnce({ kind: "throw", error }));
     req.write(payload);
     req.end();
   });
