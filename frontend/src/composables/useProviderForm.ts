@@ -57,25 +57,14 @@ const DEFAULT_FORM: FormState = {
   proxy_password: "",
 };
 
-const CONTEXT_WINDOW_OPTIONS = [
-  { label: "8K", value: "8000" },
-  { label: "16K", value: "16000" },
-  { label: "32K", value: "32000" },
-  { label: "64K", value: "64000" },
-  { label: "128K", value: "128000" },
-  { label: "160K", value: "160000" },
-  { label: "200K", value: "200000" },
-  { label: "256K", value: "256000" },
-  { label: "1M", value: "1000000" },
-] as const;
+// CONTEXT_WINDOW_OPTIONS 统一为 number value（单一来源：quick-setup/types.ts）
+export { CONTEXT_WINDOW_OPTIONS } from "@/components/quick-setup/types";
 
 export const API_TYPE_LABELS: Record<string, string> = {
   openai: "OpenAI Chat Completions",
   "openai-responses": "OpenAI Responses",
   anthropic: "Anthropic Messages",
 };
-
-export { CONTEXT_WINDOW_OPTIONS };
 
 type ProviderFormPayload = Pick<
   ProviderPayload,

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildUpstreamUrl } from "../src/proxy/proxy-core.js";
+import { buildUpstreamUrl } from "../src/proxy/transport/shared.js";
 
 describe("buildUpstreamUrl", () => {
   // --- Basic: clean base_url + standard upstreamPath ---

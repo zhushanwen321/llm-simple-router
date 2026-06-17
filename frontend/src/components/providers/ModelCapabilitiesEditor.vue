@@ -335,7 +335,7 @@ function isOfficialOpenai(url: string): boolean {
             <SelectItem
               v-for="opt in CONTEXT_WINDOW_OPTIONS"
               :key="opt.value"
-              :value="opt.value"
+              :value="String(opt.value)"
               >{{ opt.label }}</SelectItem
             >
           </SelectContent>

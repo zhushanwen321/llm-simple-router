@@ -75,73 +75,8 @@ export function createErrorFormatter(
   };
 }
 
-// ---------- URL utilities ----------
-
-/**
- * 已知上游 API 路径后缀（不含 /v1 等版本前缀）。
- * 用于检测 base_url 中是否已包含完整路径。
- */
-const KNOWN_API_SUFFIXES = [
-  "/chat/completions",
-  "/messages",
-  "/responses",
-] as const;
-
-/**
- * 拼接上游 URL，自动处理 base_url 已包含部分或完整 API 路径的情况。
- *
- * 兼容场景：
- * - base_url = `https://host/v1`, upstreamPath = `/v1/chat/completions` → `https://host/v1/chat/completions`
- * - base_url = `https://host/v1/chat/completions`, upstreamPath = `/v1/chat/completions` → `https://host/v1/chat/completions`
- * - base_url = `https://host/chat/completions`, upstreamPath = `/v1/chat/completions` → `https://host/chat/completions`
- * - base_url = `https://host/v1/`, upstreamPath = `/v1/chat/completions` → `https://host/v1/chat/completions`
- * - base_url = `https://host/api/paas/v4`, upstreamPath = `/api/paas/v4/chat/completions` → `https://host/api/paas/v4/chat/completions`
- */
-export function buildUpstreamUrl(baseUrl: string, upstreamPath: string): string {
-  const normalized = baseUrl.replace(/\/+$/, "");
-
-  // 1) 完全匹配：base_url 已包含完整 upstreamPath
-  if (normalized.endsWith(upstreamPath)) return normalized;
-
-  // 2) 检测 base_url 是否已包含已知 API 路径后缀
-  //    例如 `https://host/v1/chat/completions` → 已包含，直接返回
-  for (const suffix of KNOWN_API_SUFFIXES) {
-    if (normalized.endsWith(suffix)) return normalized;
-  }
-
-  // 3) 从 upstreamPath 中找到 base_url 的重叠部分，只追加非重叠尾部
-  //    例如 base_url = `https://host/api/paas/v4`, upstreamPath = `/api/paas/v4/chat/completions`
-  //    → 重叠 `/api/paas/v4`，追加 `/chat/completions`
-  //    例如 base_url = `https://host/v1`, upstreamPath = `/v1/chat/completions`
-  //    → 重叠 `/v1`，追加 `/chat/completions`
-  const overlap = findPathOverlap(normalized, upstreamPath);
-  if (overlap.length > 0) {
-    const rest = upstreamPath.slice(overlap.length);
-    return `${normalized}${rest}`;
-  }
-
-  // 4) 确保拼接处有且仅有一个 /
-  if (!upstreamPath.startsWith("/")) return `${normalized}/${upstreamPath}`;
-  return `${normalized}${upstreamPath}`;
-}
-
-/**
- * 找出 base_url 末尾与 upstreamPath 开头的最长重叠路径段。
- * 例如 base_url = `https://host/api/v4`, upstreamPath = `/api/v4/chat/completions` → 返回 `/api/v4`
- */
-function findPathOverlap(baseUrl: string, upstreamPath: string): string {
-  // 将 upstreamPath 按 / 拆分，逐段检查是否与 baseUrl 末尾匹配
-  const segments = upstreamPath.split("/");
-  // segments[0] 是空字符串（因为 upstreamPath 以 / 开头），至少需要 2 段才有意义
-  const MIN_OVERLAP_SEGMENTS = 2;
-  for (let len = segments.length - 1; len >= MIN_OVERLAP_SEGMENTS; len--) {
-    const candidate = segments.slice(0, len).join("/");
-    if (candidate.length > 0 && baseUrl.endsWith(candidate)) {
-      return candidate;
-    }
-  }
-  return "";
-}
+// buildUpstreamUrl / findPathOverlap / KNOWN_API_SUFFIXES 已下沉至 ./transport/shared.ts
+// （打破 proxy-core ↔ transport/http 循环依赖）
 
 // ---------- Header utilities ----------
 

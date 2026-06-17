@@ -2,16 +2,16 @@ import { PassThrough, Transform } from "stream";
 import type { Agent, ClientRequest, IncomingMessage } from "http";
 import type { FastifyReply } from "fastify";
 import { UPSTREAM_SUCCESS, filterHeaders } from "../types.js";
-import { buildUpstreamUrl } from "../proxy-core.js";
 import type { RawHeaders, StreamState, TransportResult, MetricsResult } from "../types.js";
 import type { SSEMetricsTransform } from "../../metrics/sse-metrics-transform.js";
 import type { StreamLoopGuard } from "../../core/loop-prevention/index.js";
 import {
+  buildUpstreamUrl,
   _transportInternals,
   buildRequestOptions,
   type BuildHeadersFn,
   type TransportCallOpts,
-} from "./http.js";
+} from "./shared.js";
 
 const UPSTREAM_BAD_GATEWAY = 502;
 const BUFFER_SIZE_LIMIT = 4096;

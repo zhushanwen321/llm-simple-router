@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 import type { ModelConfig } from "./types";
 import { CONTEXT_WINDOW_OPTIONS } from "./types";
 import PatchChips from "./PatchChips.vue";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {

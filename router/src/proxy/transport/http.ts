@@ -1,19 +1,20 @@
-import { request as httpRequestFn } from "http";
-import { request as httpsRequestFn } from "https";
 import type { Agent } from "http";
 import { UPSTREAM_SUCCESS, filterHeaders } from "../types.js";
-import { buildUpstreamUrl } from "../proxy-core.js";
 import type { RawHeaders, TransportResult } from "../types.js";
 import { DEFAULT_GET_TIMEOUT_MS } from "../../core/constants.js";
-// Re-export callStream from stream-proxy.ts for external consumers
+import {
+  buildUpstreamUrl,
+  _transportInternals,
+  buildRequestOptions,
+  type BuildHeadersFn,
+  type TransportCallOpts,
+} from "./shared.js";
+// Re-export callStream from stream.ts for external consumers
 export { callStream } from "./stream.js";
+// 兼容测试 mock：transport.test.ts 经 http 模块命名空间修改 _transportInternals 属性
+export { _transportInternals } from "./shared.js";
 
-// ---------- Transport options ----------
-
-/** 非流式/流式调用通用可选项：客户端断连信号 + 上游无活动超时。 */
-export interface TransportCallOpts {
-  signal?: AbortSignal;
-}
+// TransportCallOpts 定义在 ./shared.ts（http/stream 共享）
 
 /** callNonStream 选项：timeoutMs=0/Infinity 表示禁用超时。 */
 export interface NonStreamCallOpts extends TransportCallOpts {
@@ -29,51 +30,6 @@ export interface GetCallOpts {
 
 const UPSTREAM_BAD_GATEWAY = 502;
 const UPSTREAM_SUCCESS_RANGE = 100;
-const HTTPS_DEFAULT_PORT = 443;
-const HTTP_DEFAULT_PORT = 80;
-
-// ---------- Request utilities ----------
-
-export interface UpstreamRequestOptions {
-  hostname: string;
-  port: number;
-  path: string;
-  method: string;
-  headers: Record<string, string>;
-}
-
-export const _transportInternals = {
-  createUpstreamRequest(url: URL, options: UpstreamRequestOptions, agent?: Agent) {
-    const opts = agent ? { ...options, agent } : options;
-    return url.protocol === "https:"
-      ? httpsRequestFn(opts)
-      : httpRequestFn(opts);
-  },
-};
-
-export function buildRequestOptions(
-  url: URL,
-  headers: Record<string, string>,
-  method = "POST",
-): UpstreamRequestOptions {
-  return {
-    hostname: url.hostname,
-    port:
-      Number(url.port) ||
-      (url.protocol === "https:" ? HTTPS_DEFAULT_PORT : HTTP_DEFAULT_PORT),
-    path: url.pathname,
-    method,
-    headers,
-  };
-}
-
-// ---------- BuildHeaders type ----------
-
-export type BuildHeadersFn = (
-  cliHdrs: RawHeaders,
-  key: string,
-  bytes?: number,
-) => Record<string, string>;
 
 // ---------- callNonStream ----------
 
