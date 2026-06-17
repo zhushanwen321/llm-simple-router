@@ -531,38 +531,60 @@ phase_publish() {
     TAG=""
 
     if [[ -n "$publish_sh" ]]; then
-        # 幂等检查：当前版本 release 已存在，且该版本 >= main 上最新 tag
+        # 幂等检查：用 commit SHA 判断 main 是否有未发布改动。
+        # [HISTORICAL] 原逻辑用「package.json 版本 == tag 版本」字符串相等判断，
+        # 但 PR 合并不 bump 版本（bump 是 skill 职责），导致 main 领先于 tag 时
+        # 仍被误判为「已发布」而跳过发布（PR #205 漏发 1.1.2 即因此触发）。
+        # 正确判据：最新 tag 的 commit 是否已追上 main HEAD。
+        # 与 scripts/publish.sh 步骤 1.5 保持一致的判断逻辑。
         local cur_ver
         cur_ver=$(read_project_version "$MAIN_WT")
+
+        # 用 ls-remote 查远程 tag，避免 bare repo 本地 rejected tag 干扰
         local latest_tag=""
-        latest_tag=$(git -C "$MAIN_WT" tag --sort=-v:refname | head -1 2>/dev/null || true)
-        local latest_tag_ver="${latest_tag#v}"
+        latest_tag=$(git -C "$MAIN_WT" ls-remote --tags "$GH_REMOTE" 2>/dev/null \
+            | grep -oE 'refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$' \
+            | sed 's|refs/tags/||' | sort -V | tail -1 || echo "")
 
         local need_bump=false
         if [[ -z "$cur_ver" ]]; then
             need_bump=true
             echo -e "  ${YELLOW}⚠️  无法读取当前版本，需要 bump${NC}"
-        elif gh release view "v$cur_ver" $gh_flag --json tagName >/dev/null 2>&1; then
-            # Release 存在，检查是否比 main 上最新 tag 还旧
-            if [[ -n "$latest_tag_ver" ]] && [[ "$latest_tag_ver" != "$cur_ver" ]]; then
-                # 版本不匹配：PR 分支版本落后于 main 最新 tag
-                echo -e "  ${YELLOW}⚠️  当前版本 v$cur_ver 与 main 最新 tag $latest_tag 不一致${NC}"
-                echo -e "  ${YELLOW}    强制触发 bump（避免发布已存在的版本）${NC}"
-                log_warn "版本冲突: cur=$cur_ver, latest_tag=$latest_tag_ver, 强制 bump"
+            log_warn "无法读取当前版本"
+        elif [[ -z "$latest_tag" ]]; then
+            need_bump=true
+            echo "  无历史 tag，首次发布"
+            log_info "无历史 tag，首次发布"
+        else
+            git -C "$MAIN_WT" fetch "$GH_REMOTE" main 2>&1 | tail -1
+            git -C "$MAIN_WT" fetch "$GH_REMOTE" tag "$latest_tag" 2>&1 | tail -1 || true
+            local tag_commit main_head
+            tag_commit=$(git -C "$MAIN_WT" rev-parse "${latest_tag}^{commit}" 2>/dev/null || echo "")
+            main_head=$(git -C "$MAIN_WT" rev-parse "$GH_REMOTE/main" 2>/dev/null || echo "")
+
+            if [[ -z "$tag_commit" || -z "$main_head" ]]; then
                 need_bump=true
-            else
-                echo -e "  ${GREEN}⏭️  Release v$cur_ver 已存在且版本一致，跳过发布脚本${NC}"
+                echo -e "  ${YELLOW}⚠️  无法读取 commit，触发 bump${NC}"
+                log_warn "无法读取 commit (tag=$latest_tag)"
+            elif [[ "$tag_commit" == "$main_head" ]]; then
+                # main HEAD 就是最新 tag → 真的没新东西，跳过
+                echo -e "  ${GREEN}⏭️  main HEAD 已是 $latest_tag，跳过发布脚本${NC}"
+                log_info "跳过发布: main HEAD == $latest_tag"
                 NEW_VERSION="$cur_ver"
                 TAG="v$NEW_VERSION"
+            else
+                # main 领先于 tag → 有未发布改动，必须 bump
+                local ahead_count
+                ahead_count=$(git -C "$MAIN_WT" rev-list --count "${latest_tag}..$GH_REMOTE/main" 2>/dev/null || echo "?")
+                echo "  main 领先 $latest_tag 共 $ahead_count 个 commit，触发 bump"
+                log_info "未发布改动: $latest_tag..$GH_REMOTE/main = $ahead_count commits"
+                need_bump=true
             fi
-        else
-            # Release 不存在，正常发布
-            : # fall through to else branch
         fi
 
         if [[ "$need_bump" == "true" ]]; then
             echo "  触发 GitHub Actions 发布脚本（bump $VERSION_TYPE）..."
-            log_info "强制触发 publish.sh ($VERSION_TYPE), cur=$cur_ver, latest_tag=$latest_tag_ver"
+            log_info "触发 publish.sh ($VERSION_TYPE), cur=$cur_ver, latest_tag=$latest_tag"
         fi
 
         if [[ "$need_bump" != "true" ]]; then
