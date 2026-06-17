@@ -18,6 +18,9 @@ import { extractThinkingLevel } from "../../db/logs.js";
 
 const DEFAULT_BASE_DELAY_MS = 1000;
 const DEFAULT_FAILOVER_THRESHOLD = 400;
+// reply.raw close listener 上限：覆盖 MAX_FAILOVER_ITERATIONS(10) + Fastify/socket 自身 listener。
+// failover 循环复用同一 reply 多次挂载 close listener，不提高上限会触发 MaxListenersExceededWarning。
+const REPLY_CLOSE_MAX_LISTENERS = 16;
 
 /**
  * 从 clientRequest JSON 中提取 thinking level。
@@ -104,6 +107,14 @@ export class ProxyOrchestrator {
     // 会因客户端断连 abort，导致上游连接泄漏 + Promise 永挂。controller.abort() 幂等，
     // 多 listener 各 abort 各自的 controller互不干扰；listener 数量受 MAX_FAILOVER_ITERATIONS
     // 上界约束（通常 ≤5），reply.raw 关闭后随对象 GC 一起回收，无永久泄漏。
+    // 提高上限覆盖 failover 多次挂载的 close listener，避免 MaxListenersExceededWarning。
+    // close 只触发一次，listener 随 reply.raw GC 回收，无永久泄漏。
+    // 防御：reply.raw 在测试中可能是简化 mock（非 EventEmitter），此时跳过。
+    const rawEmitter = reply.raw as { getMaxListeners?: () => number; setMaxListeners?: (n: number) => void };
+    if (typeof rawEmitter.setMaxListeners === "function") {
+      const current = typeof rawEmitter.getMaxListeners === "function" ? rawEmitter.getMaxListeners() : 0;
+      if (current < REPLY_CLOSE_MAX_LISTENERS) rawEmitter.setMaxListeners(REPLY_CLOSE_MAX_LISTENERS);
+    }
     reply.raw.on("close", () => {
       if (!reply.raw.writableEnded) controller.abort();
     });

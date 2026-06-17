@@ -269,22 +269,6 @@ export function useProviderForm() {
       : [...caps, capability];
   }
 
-  function updateModelTimeout(index: number, seconds: string | number) {
-    const val = Number(seconds);
-    // 保留 0（禁用语义）：仅空串/undefined 归一化为 null（用默认值）
-    form.value.models[index].stream_timeout_ms =
-      seconds === "" || seconds === undefined ? null : val * MS_PER_SECOND;
-  }
-
-  function updateModelNonStreamTimeout(
-    index: number,
-    seconds: string | number,
-  ) {
-    const val = Number(seconds);
-    form.value.models[index].non_stream_timeout_ms =
-      seconds === "" || seconds === undefined ? null : val * MS_PER_SECOND;
-  }
-
   function onConcurrencyModeChange(mode: ConcurrencyMode) {
     concurrencyMode.value = mode;
     if (mode === "auto") {
@@ -381,8 +365,6 @@ export function useProviderForm() {
     addModel,
     removeModel,
     updateModel,
-    updateModelTimeout,
-    updateModelNonStreamTimeout,
     toggleModelCapability,
     onConcurrencyModeChange,
     isOfficialOpenai,

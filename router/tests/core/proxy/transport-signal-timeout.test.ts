@@ -140,6 +140,37 @@ describe("callNonStream signal + timeout", () => {
       await close();
     }
   });
+
+  it("signal 先于 timeout 触发时 resolve 'client aborted'（signal+timeout 组合竞态）", async () => {
+    // 同时设置 timeoutMs 与 signal：signal 在 timeout 前触发 → 应 resolve 'client aborted' 而非 timeout
+    const { port, close } = await createMockBackend(() => {
+      /* hang */
+    });
+
+    try {
+      const controller = new AbortController();
+      const resultPromise = callNonStream(
+        { base_url: `http://127.0.0.1:${port}` },
+        "sk-test",
+        { model: "gpt-4" },
+        {},
+        "/v1/chat/completions",
+        (_h, key) => ({ Authorization: `Bearer ${key}` }),
+        undefined,
+        { timeoutMs: 200, signal: controller.signal },
+      );
+      // timeoutMs=200，在 50ms 时 signal abort → signal 赢，不走 timeout
+      await tick(50);
+      controller.abort();
+
+      const result = await resultPromise;
+      expect(result.kind).toBe("throw");
+      if (result.kind !== "throw") return;
+      expect(result.error.message).toBe("client aborted");
+    } finally {
+      await close();
+    }
+  });
 });
 
 // ---------- callStream: signal abort during TTFT ----------

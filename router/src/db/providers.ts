@@ -29,7 +29,11 @@ export interface Provider {
   updated_at: string;
 }
 
-/** 默认流式超时 5 分钟 */
+/**
+ * 默认流式超时 5 分钟。
+ * 行为变更：v1.1.x 起从 600s(10min) 降为 300s(5min)，影响未显式配置 stream_timeout_ms 的 provider。
+ * 长跑流式生成（长推理/长输出）若超 5min 会被中断，需在 provider/model 配置中显式调大或设 0(禁用)。
+ */
 export const DEFAULT_STREAM_TIMEOUT_MS = 300_000;
 
 /** 默认非流式超时 10 分钟 */

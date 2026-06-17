@@ -449,13 +449,23 @@ export function callStream(
     }
 
     // 客户端断连：abort 信号穿透到上游 socket，立即切断连接。
-    if (opts?.signal) {
-      const signal = opts.signal;
-      const abort = () => upstreamReq.destroy(new Error("client aborted"));
-      if (signal.aborted) {
-        abort();
+    // resolveOnce 在 Promise settle 时移除 abort listener，避免重试累积残留
+    // （listener 受 ITERATION_CAP 上界约束，非进程级泄漏，此处显式清理保持干净）。
+    const clientSignal = opts?.signal;
+    const onClientAbort = clientSignal
+      ? () => upstreamReq.destroy(new Error("client aborted"))
+      : undefined;
+    const resolveOnce: typeof effectiveResolve = (r) => {
+      if (onClientAbort && clientSignal && !clientSignal.aborted) {
+        clientSignal.removeEventListener("abort", onClientAbort);
+      }
+      effectiveResolve(r);
+    };
+    if (onClientAbort && clientSignal) {
+      if (clientSignal.aborted) {
+        onClientAbort();
       } else {
-        signal.addEventListener("abort", abort, { once: true });
+        clientSignal.addEventListener("abort", onClientAbort, { once: true });
       }
     }
 
@@ -468,7 +478,7 @@ export function callStream(
         const chunks: Buffer[] = [];
         upstreamRes.on("data", (chunk: Buffer) => chunks.push(chunk));
         upstreamRes.on("end", () => {
-          effectiveResolve({
+          resolveOnce({
             kind: "stream_error",
             statusCode,
             body: Buffer.concat(chunks).toString("utf-8"),
@@ -476,6 +486,9 @@ export function callStream(
             sentHeaders: upstreamHeaders,
           });
         });
+        // 非 2xx body 传输中连接中断：无 listener 会 uncaughtException + Promise 永挂（slot 泄漏）。
+        // 与 200 分支 proxy.onUpstreamError 对称，与 callNonStream(http.ts) 同路径一致。
+        upstreamRes.on("error", (err: Error) => resolveOnce({ kind: "throw", error: err }));
         return;
       }
 
@@ -491,7 +504,7 @@ export function callStream(
         upstreamRes, upstreamReq,
       );
 
-      proxy.bindResolve(effectiveResolve);
+      proxy.bindResolve(resolveOnce);
       proxy.registerCloseHandler();
 
       // 无 early error checker 时直接开始流式传输
@@ -504,7 +517,7 @@ export function callStream(
       upstreamRes.on("error", (err: Error) => proxy.onUpstreamError(err));
     });
 
-    upstreamReq.on("error", (error) => effectiveResolve({ kind: "throw", error }));
+    upstreamReq.on("error", (error) => resolveOnce({ kind: "throw", error }));
     upstreamReq.write(payload);
     upstreamReq.end();
   });

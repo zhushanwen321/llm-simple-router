@@ -70,6 +70,35 @@ describe("killRequest → semaphore release", () => {
     expect(semaphoreManager.getStatus("p1").active).toBe(0);
   });
 
+  it("kill 后槽位可被新请求立即 acquire（端到端复用验证）", async () => {
+    // 比 active===0 更强：直接验证 kill 后新请求能 acquire（证明槽位真释放可复用，而非计数归零却仍占用）
+    const orchestrator = createOrchestrator(semaphoreManager, tracker, new AdaptiveController(semaphoreManager))!;
+    const { reply } = makeReply();
+    const handlePromise = orchestrator.handle(makeRequest(), reply, "openai", makeConfig("req-kill2"), { transportFn: hangUntilAbort() });
+
+    await tick(20);
+    expect(semaphoreManager.getStatus("p1").active).toBe(1);
+
+    tracker.killRequest("req-kill2");
+    await handlePromise;
+    expect(semaphoreManager.getStatus("p1").active).toBe(0);
+
+    // kill 后立即发第二个请求：maxConcurrency=1，仅当槽位真释放才能立即 acquire
+    let resolveSecond!: () => void;
+    const secondTransport = (_t: Target, signal?: AbortSignal) => new Promise<TransportResult>((resolve) => {
+      resolveSecond = () => resolve({ kind: "success", statusCode: 200, body: "ok", headers: {}, sentHeaders: {}, sentBody: "" });
+      signal?.addEventListener("abort", () => resolve(throwResult()), { once: true });
+    });
+    const secondReply = makeReply();
+    const secondPromise = orchestrator.handle(makeRequest(), secondReply.reply, "openai", makeConfig("req-second"), { transportFn: secondTransport });
+    await tick(20);
+    expect(semaphoreManager.getStatus("p1").active).toBe(1); // 成功 acquire → 槽位真可复用
+
+    resolveSecond();
+    await secondPromise;
+    expect(semaphoreManager.getStatus("p1").active).toBe(0);
+  });
+
   it("kill 后请求自然完成（竞态）→ 不双重 release，active 不超减为负", async () => {
     const orchestrator = createOrchestrator(semaphoreManager, tracker, new AdaptiveController(semaphoreManager))!;
     let resolveTransport!: () => void;
