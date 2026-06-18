@@ -2,7 +2,11 @@ import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import type { ProviderPayload } from "@/api/client";
 import type { Provider, ModelInfo, ProviderEndpoint } from "@/types/mapping";
-import { DEFAULT_CONTEXT_WINDOW, DEFAULT_STREAM_TIMEOUT_MS } from "@/constants";
+import {
+  DEFAULT_CONTEXT_WINDOW,
+  DEFAULT_STREAM_TIMEOUT_MS,
+  DEFAULT_NON_STREAM_TIMEOUT_MS,
+} from "@/constants";
 import type { ModelConfig } from "@/components/quick-setup/types";
 import { useTransformRules } from "@/composables/useTransformRules";
 import { useProviderPresets } from "@/composables/useProviderPresets";
@@ -14,8 +18,6 @@ import {
 
 const MAX_CONCURRENCY = 100;
 const MAX_QUEUE_SIZE = 1000;
-
-const MS_PER_SECOND = 1000;
 
 interface FormState {
   name: string;
@@ -55,25 +57,14 @@ const DEFAULT_FORM: FormState = {
   proxy_password: "",
 };
 
-const CONTEXT_WINDOW_OPTIONS = [
-  { label: "8K", value: "8000" },
-  { label: "16K", value: "16000" },
-  { label: "32K", value: "32000" },
-  { label: "64K", value: "64000" },
-  { label: "128K", value: "128000" },
-  { label: "160K", value: "160000" },
-  { label: "200K", value: "200000" },
-  { label: "256K", value: "256000" },
-  { label: "1M", value: "1000000" },
-] as const;
+// CONTEXT_WINDOW_OPTIONS 统一为 number value（单一来源：quick-setup/types.ts）
+export { CONTEXT_WINDOW_OPTIONS } from "@/components/quick-setup/types";
 
 export const API_TYPE_LABELS: Record<string, string> = {
   openai: "OpenAI Chat Completions",
   "openai-responses": "OpenAI Responses",
   anthropic: "Anthropic Messages",
 };
-
-export { CONTEXT_WINDOW_OPTIONS, MS_PER_SECOND };
 
 type ProviderFormPayload = Pick<
   ProviderPayload,
@@ -200,6 +191,7 @@ export function useProviderForm() {
         context_window: m.context_window ?? undefined,
         patches: m.patches ?? undefined,
         stream_timeout_ms: m.stream_timeout_ms ?? undefined,
+        non_stream_timeout_ms: m.non_stream_timeout_ms ?? undefined,
         capabilities: m.capabilities ?? undefined,
       })),
       is_active: form.value.is_active ? 1 : 0,
@@ -235,6 +227,7 @@ export function useProviderForm() {
           context_window: modelContextWindow.value || DEFAULT_CONTEXT_WINDOW,
           patches: patchList ?? [],
           stream_timeout_ms: DEFAULT_STREAM_TIMEOUT_MS,
+          non_stream_timeout_ms: DEFAULT_NON_STREAM_TIMEOUT_MS,
           capabilities: caps ?? ["text"],
         });
       }
@@ -261,12 +254,6 @@ export function useProviderForm() {
     model.capabilities = hasIt
       ? caps.filter((c) => c !== capability)
       : [...caps, capability];
-  }
-
-  function updateModelTimeout(index: number, seconds: string | number) {
-    const val = Number(seconds);
-    form.value.models[index].stream_timeout_ms =
-      val > 0 ? val * MS_PER_SECOND : null;
   }
 
   function onConcurrencyModeChange(mode: ConcurrencyMode) {
@@ -322,6 +309,7 @@ export function useProviderForm() {
         context_window: m.context_window ?? DEFAULT_CONTEXT_WINDOW,
         patches: m.patches ?? [],
         stream_timeout_ms: m.stream_timeout_ms ?? null,
+        non_stream_timeout_ms: m.non_stream_timeout_ms ?? null,
         capabilities: m.capabilities ?? ["text"],
       })),
       is_active: !!p.is_active,
@@ -364,7 +352,6 @@ export function useProviderForm() {
     addModel,
     removeModel,
     updateModel,
-    updateModelTimeout,
     toggleModelCapability,
     onConcurrencyModeChange,
     isOfficialOpenai,

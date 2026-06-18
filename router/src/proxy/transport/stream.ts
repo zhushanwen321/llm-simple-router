@@ -1,26 +1,36 @@
 import { PassThrough, Transform } from "stream";
-import type { Agent } from "http";
+import type { Agent, ClientRequest, IncomingMessage } from "http";
 import type { FastifyReply } from "fastify";
 import { UPSTREAM_SUCCESS, filterHeaders } from "../types.js";
-import { buildUpstreamUrl } from "../proxy-core.js";
 import type { RawHeaders, StreamState, TransportResult, MetricsResult } from "../types.js";
 import type { SSEMetricsTransform } from "../../metrics/sse-metrics-transform.js";
 import type { StreamLoopGuard } from "../../core/loop-prevention/index.js";
 import {
+  buildUpstreamUrl,
   _transportInternals,
   buildRequestOptions,
   type BuildHeadersFn,
-} from "./http.js";
+  type TransportCallOpts,
+} from "./shared.js";
 
 const UPSTREAM_BAD_GATEWAY = 502;
 const BUFFER_SIZE_LIMIT = 4096;
 const END_REPLY_TIMEOUT_MS = 1000;
 
+/** callStream 选项：connectTimeoutMs 为响应头前的无活动超时（复用 stream timeout 语义）。 */
+export interface StreamCallOpts extends TransportCallOpts {
+  connectTimeoutMs?: number;
+}
+
 // ---------- StreamProxy ----------
 
 type StreamTerminalKind = "stream_success" | "stream_error" | "stream_abort";
 
-class StreamProxy {
+/**
+ * SSE 流式代理状态机。导出仅为单元测试，非公开 API。
+ * 负责 buffering/streaming 状态转换、idle 超时、上游资源销毁。
+ */
+export class StreamProxy {
   private state: StreamState = "BUFFERING";
   private resolved = false;
   private resolveFn: ((result: TransportResult) => void) | null = null;
@@ -38,7 +48,7 @@ class StreamProxy {
   private readonly pipeEntry: PassThrough | SSEMetricsTransform;
   private readonly formatTransform: Transform | undefined;
 
-  // 流式阶段 SSE error 扫描缓冲（跨 chunk 边界匹配）
+  // 流式阶段 SSE error 扫描缓冲(跨 chunk 边界匹配)
   private sseScanBuffer = "";
   private static readonly SSE_SCAN_MAX = 8 * 1024; // eslint-disable-line no-magic-numbers -- 8KB scan buffer
 
@@ -54,6 +64,8 @@ class StreamProxy {
     formatTransform?: Transform,
     private readonly timeoutContext?: { modelId: string; providerId: string },
     private readonly onTimeoutAbort?: (timeoutMs: number) => void,
+    private readonly upstreamRes?: IncomingMessage,
+    private readonly upstreamReq?: ClientRequest,
   ) {
     this.formatTransform = formatTransform;
     this.sseHeaders = filterHeaders(rawUpstreamHeaders);
@@ -101,12 +113,12 @@ class StreamProxy {
         result = { kind: "stream_error", ...base, body: extra.body as string, headers: this.sseHeaders, headersSent: this.headersSent || undefined };
         break;
       case "stream_abort":
-        result = { kind: "stream_abort", ...base, metrics: extra.metrics as MetricsResult | undefined, timeoutContext: extra.timeoutContext as { modelId: string; providerId: string } | undefined, timeoutMs: extra.timeoutMs as number | undefined, abortReason: extra.abortReason as "idle_timeout" | "client_disconnect" | "loop_detection" | undefined };
+        result = { kind: "stream_abort", ...base, metrics: extra.metrics as MetricsResult | undefined, timeoutContext: extra.timeoutContext as { modelId: string; providerId: string } | undefined, timeoutMs: extra.timeoutMs as number | undefined, abortReason: extra.abortReason as "idle_timeout" | "client_disconnect" | "loop_detection" | "pipe_error" | undefined };
         break;
     }
 
-    // deferred 模式：先 resolve 让 handler 链路（日志写入等）在 microtask 中执行，
-    // cleanup 由调用方在 setImmediate（macrotask）中处理。
+    // deferred 模式:先 resolve 让 handler 链路(日志写入等)在 microtask 中执行,
+    // cleanup 由调用方在 setImmediate(macrotask)中处理。
     if (deferred) {
       if (this.resolveFn) {
         this.resolveFn(result);
@@ -114,12 +126,15 @@ class StreamProxy {
         this.pendingResult = result;
       }
     } else {
-      // stream_abort（非 deferred）且 headers 已发送时，立即 end reply 避免客户端挂起
-      // idle_timeout 使用 deferred 模式，由 resetIdleTimer 的 setImmediate 负责 end reply
+      // stream_abort(非 deferred)且 headers 已发送时,立即 end reply 避免客户端挂起
+      // idle_timeout 使用 deferred 模式,由 resetIdleTimer 的 setImmediate 负责 end reply
       if (kind === "stream_abort" && this.headersSent) {
         try { this.reply.raw.end(); } catch { console.warn("[stream-proxy] reply.raw.end() failed, likely already destroyed"); }
       }
-      this.cleanup();
+      // cleanup 透传 cause：让上游 destroy(err) emit 'error' 事件链，与 CLAUDE.md
+      // 「destroy 必须 error 参数」规范一致。无 cause 时 destroy(undefined) 等价 destroy()，
+      // 不 emit 'error'，自然结束路径（onEnd/stream_success）行为不变。
+      this.cleanup(extra.error as Error | undefined);
       if (this.resolveFn) {
         this.resolveFn(result);
       } else {
@@ -128,9 +143,13 @@ class StreamProxy {
     }
   }
 
-  private cleanup(): void {
+  private cleanup(cause?: Error): void {
     if (this.idleTimer) clearTimeout(this.idleTimer);
     this.idleTimer = null;
+    // 销毁上游资源，避免连接泄漏（幂等：destroyed 标志保护重复调用）。
+    // 传 cause 时 destroy(err) 会 emit 'error'，触发 onUpstreamError（resolved 守卫保护下为 noop）。
+    if (this.upstreamRes && !this.upstreamRes.destroyed && typeof this.upstreamRes.destroy === "function") this.upstreamRes.destroy(cause);
+    if (this.upstreamReq && !this.upstreamReq.destroyed && typeof this.upstreamReq.destroy === "function") this.upstreamReq.destroy(cause);
     if (this.formatTransform && !this.formatTransform.destroyed) this.formatTransform.destroy();
     if (!this.passThrough.destroyed) this.passThrough.destroy();
     if (this.metricsTransform && !this.metricsTransform.destroyed) this.metricsTransform.destroy();
@@ -138,8 +157,8 @@ class StreamProxy {
 
   private collectMetrics(isComplete: boolean): MetricsResult | undefined {
     if (!this.metricsTransform) return undefined;
-    // 在读取 metrics 之前 flush SSE parser 缓冲区，确保 [DONE] / message_stop
-    // 等末尾事件已被处理。否则 extractor.complete 可能为 false，导致 is_complete=0。
+    // 在读取 metrics 之前 flush SSE parser 缓冲区,确保 [DONE] / message_stop
+    // 等末尾事件已被处理。否则 extractor.complete 可能为 false,导致 is_complete=0。
     this.metricsTransform.flushParser();
     const result = this.metricsTransform.getExtractor().getMetrics();
     return isComplete ? result : { ...result, is_complete: 0 };
@@ -150,12 +169,12 @@ class StreamProxy {
     if (!isFinite(this.timeoutMs) || this.timeoutMs <= 0) return; // 0 或 Infinity 表示禁用超时
     this.idleTimer = setTimeout(() => {
       if (this.resolved) return;
-      // 在 terminal() 之前同步写入超时错误 SSE，确保 inject() 能正确收集响应体
+      // 在 terminal() 之前同步写入超时错误 SSE,确保 inject() 能正确收集响应体
       if (this.onTimeoutAbort) {
         try { this.onTimeoutAbort(this.timeoutMs); } catch { /* reply may be destroyed */ } // eslint-disable-line taste/no-silent-catch
       }
-      // deferred 模式：先 resolve 让 handler 链路（日志写入等）在 microtask 中完成，
-      // reply.raw.end() 延迟到 setImmediate（macrotask），保证 inject() 返回时日志已写入。
+      // deferred 模式:先 resolve 让 handler 链路(日志写入等)在 microtask 中完成,
+      // reply.raw.end() 延迟到 setImmediate(macrotask),保证 inject() 返回时日志已写入。
       this.terminal("stream_abort", { metrics: this.collectMetrics(false), timeoutContext: this.timeoutContext, timeoutMs: this.timeoutMs, abortReason: "idle_timeout" as const }, true);
       setImmediate(() => {
         if (this.headersSent) {
@@ -164,12 +183,13 @@ class StreamProxy {
         this.cleanup();
       });
     }, this.timeoutMs);
+    this.idleTimer.unref();
   }
 
   startStreaming(): void {
     if (this.headersSent) return;
     if (this.reply.raw.headersSent) {
-      // headers 已由其他代码路径（如前一次 retry 的 StreamProxy）发送，
+      // headers 已由其他代码路径(如前一次 retry 的 StreamProxy)发送,
       // 仅更新状态机避免 BUFFERING 阶段的重复逻辑
       this.transition("STREAMING");
       this.headersSent = true;
@@ -180,7 +200,7 @@ class StreamProxy {
     try {
       this.reply.raw.writeHead(this.statusCode, this.sseHeaders);
     } catch {
-    // 客户端在 state transition 和 writeHead 之间断连，可安全忽略
+    // 客户端在 state transition 和 writeHead 之间断连,可安全忽略
       this.terminal("stream_abort", { abortReason: "client_disconnect" as const });
       return;
     }
@@ -190,16 +210,25 @@ class StreamProxy {
     if (this.formatTransform) {
       this.formatTransform.pipe(this.passThrough, { end: true });
     }
-    // 手动转发而非 pipe，避免 Node.js 在 dest 上自动注册 close/finish handler
+    // 手动转发而非 pipe,避免 Node.js 在 dest 上自动注册 close/finish handler
     this.passThrough.on("data", (chunk: Buffer) => {
       try {
         this.reply.raw.write(chunk);
       } catch { // eslint-disable-line taste/no-silent-catch
-        // 客户端已断开，写已销毁的 socket 会抛出异常，可安全忽略
+        // 客户端已断开,写已销毁的 socket 会抛出异常,可安全忽略
       }
     });
-    // 不在 passThrough end 事件中调用 reply.raw.end()，
+    // 不在 passThrough end 事件中调用 reply.raw.end(),
     // 因为 onEnd() 统一管理响应结束时机，确保日志在 reply end 之前写入
+    // passThrough 异常若不处理会冒泡 uncaughtException；此处直接走 terminal 保证 Promise resolve，
+    // 避免 callStream 永挂（cleanup 的 upstreamRes.destroy() 无 error 时不 emit 'error'，
+    // onUpstreamError 兜底不触发，是旧实现的隐藏 bug）。
+    this.passThrough.on("error", (err: Error) => {
+      console.warn("[stream-proxy] passThrough error:", err.message);
+      if (!this.resolved) {
+        this.terminal("stream_abort", { abortReason: "pipe_error" as const, error: err });
+      }
+    });
     for (const c of this.bufferChunks) this.pipeEntry.write(c);
     this.bufferChunks.length = 0;
   }
@@ -207,10 +236,10 @@ class StreamProxy {
   registerCloseHandler(): void {
     if (this.closeHandlerRegistered) return;
     this.closeHandlerRegistered = true;
-    // EPIPE 从底层 socket 的 WriteWrap.onWriteComplete emit，reply.raw.on("error") 无法拦截。
+    // EPIPE 从底层 socket 的 WriteWrap.onWriteComplete emit,reply.raw.on("error") 无法拦截。
     // 必须直接在 socket 上注册 error handler 防止冒泡到 process uncaughtException。
-    // Node.js HTTP server 内置的 socketOnError 只处理第一次 socket error，
-    // 如果第一次被其他错误消耗，后续 EPIPE 可能无 handler 导致进程崩溃。
+    // Node.js HTTP server 内置的 socketOnError 只处理第一次 socket error,
+    // 如果第一次被其他错误消耗,后续 EPIPE 可能无 handler 导致进程崩溃。
     const sock = this.reply.raw.socket;
     let sockErrorHandler: ((err: NodeJS.ErrnoException) => void) | undefined;
     if (sock) {
@@ -242,7 +271,7 @@ class StreamProxy {
       this.bufferChunks.push(chunk);
       this.totalBuffered += chunk.length;
 
-      // 快速路径：检查大小限制（无需 concat）
+      // 快速路径:检查大小限制(无需 concat)
       if (this.totalBuffered >= BUFFER_SIZE_LIMIT) {
         const buf = Buffer.concat(this.bufferChunks);
         const text = buf.toString("utf-8");
@@ -255,10 +284,10 @@ class StreamProxy {
         return;
       }
 
-      // 快速路径：检查当前 chunk 是否包含 \n\n
+      // 快速路径:检查当前 chunk 是否包含 \n\n
       const chunkStr = chunk.toString("utf-8");
       const hasNewlinePair = chunkStr.includes("\n\n");
-      // 跨 chunk 边界检测：上一个 chunk 以 \n 结尾 + 当前以 \n 开头
+      // 跨 chunk 边界检测:上一个 chunk 以 \n 结尾 + 当前以 \n 开头
       const crossBoundary = this.lastChunkEndedWithNewline && chunkStr.startsWith("\n");
       this.lastChunkEndedWithNewline = chunkStr.endsWith("\n");
 
@@ -277,22 +306,22 @@ class StreamProxy {
       return;
     }
 
-    // STREAMING 阶段：扫描 SSE error event（处理跨 chunk 边界）
+    // STREAMING 阶段:扫描 SSE error event(处理跨 chunk 边界)
     if (this.state === "STREAMING" && this.checkEarlyError) {
       this.sseScanBuffer += chunk.toString("utf-8");
-      // 保留最近 SSE_SCAN_MAX 字符，避免无限增长
+      // 保留最近 SSE_SCAN_MAX 字符,避免无限增长
       if (this.sseScanBuffer.length > StreamProxy.SSE_SCAN_MAX) {
         this.sseScanBuffer = this.sseScanBuffer.slice(-StreamProxy.SSE_SCAN_MAX);
       }
-      // 快速启发式：只在扫描窗口出现 SSE error 标记时才执行正则匹配
+      // 快速启发式:只在扫描窗口出现 SSE error 标记时才执行正则匹配
       if (this.sseScanBuffer.includes("event: error") || this.sseScanBuffer.includes('"type":"error"')) {
         if (this.checkEarlyError(this.sseScanBuffer)) {
           this.terminal("stream_error", { body: this.sseScanBuffer });
-          // headers 已发送：必须结束 reply 避免 client hang
+          // headers 已发送:必须结束 reply 避免 client hang
           if (this.headersSent) {
             setImmediate(() => {
               try { this.reply.raw.end(); } catch { // eslint-disable-line taste/no-silent-catch
-                // reply 可能已 destroyed，安全忽略
+                // reply 可能已 destroyed,安全忽略
               }
             });
           }
@@ -325,25 +354,25 @@ class StreamProxy {
       this.transition("COMPLETED");
     }
 
-    // 通过 terminal 的 deferred 模式统一 resolve：
-    // 先 resolve Promise，让 handler 链路（日志写入等）在 microtask 中执行。
-    // reply.raw.end() 延迟到 setImmediate（macrotask），确保 microtask 先完成。
-    // light-my-request 监听 reply.raw 的 end 事件判定响应完成，
+    // 通过 terminal 的 deferred 模式统一 resolve:
+    // 先 resolve Promise,让 handler 链路(日志写入等)在 microtask 中执行。
+    // reply.raw.end() 延迟到 setImmediate(macrotask),确保 microtask 先完成。
+    // light-my-request 监听 reply.raw 的 end 事件判定响应完成,
     // 这保证了 inject() 返回时日志已经写入 DB。
     const metrics = this.collectMetrics(true);
     this.terminal("stream_success", { metrics }, true);
 
-    // 延迟结束管道和响应，属于 reply 层面操作，不属于 StreamProxy 状态管理。
+    // 延迟结束管道和响应,属于 reply 层面操作,不属于 StreamProxy 状态管理。
     //
-    // 当 formatTransform 存在时（如 OpenAI→Anthropic 转换），Transform 链的 flush
-    // 通过 process.nextTick 异步传播。pipeEntry.end() 后不能同步调用 reply.raw.end()，
-    // 否则 formatTransform._flush() 中的 ensureTerminated()（发送 message_stop）
-    // 尚未执行，连接就被关闭，导致客户端收到 "stream ended before message_stop"。
+    // 当 formatTransform 存在时(如 OpenAI→Anthropic 转换),Transform 链的 flush
+    // 通过 process.nextTick 异步传播。pipeEntry.end() 后不能同步调用 reply.raw.end(),
+    // 否则 formatTransform._flush() 中的 ensureTerminated()(发送 message_stop)
+    // 尚未执行,连接就被关闭,导致客户端收到 "stream ended before message_stop"。
     setImmediate(() => {
       const endReply = () => {
         if (this.headersSent) {
           try { this.reply.raw.end(); } catch { // eslint-disable-line taste/no-silent-catch
-            // reply 可能已 destroyed，安全忽略
+            // reply 可能已 destroyed,安全忽略
           }
         }
         this.cleanup();
@@ -352,9 +381,9 @@ class StreamProxy {
       this.pipeEntry.end();
 
       if (this.formatTransform) {
-        // 等 passThrough end 事件触发（整个 transform 链 flush 完成后），再关闭 reply
+        // 等 passThrough end 事件触发(整个 transform 链 flush 完成后),再关闭 reply
         this.passThrough.once("end", endReply);
-        // 安全超时兜底，防止 end 事件未触发导致连接挂起
+        // 安全超时兜底,防止 end 事件未触发导致连接挂起
         setTimeout(endReply, END_REPLY_TIMEOUT_MS).unref();
       } else {
         endReply();
@@ -364,6 +393,10 @@ class StreamProxy {
 
   onUpstreamError(err: Error): void {
     if (this.resolved) return;
+    // 状态机一致：上游错误视为中止（resolved=true 不保证 state 已转终态）
+    if (this.state === "BUFFERING" || this.state === "STREAMING") {
+      this.transition("ABORTED");
+    }
     this.resolved = true;
     this.cleanup();
     const result: TransportResult = { kind: "throw", error: err, headersSent: this.headersSent };
@@ -394,6 +427,7 @@ export function callStream(
   timeoutContext?: { modelId: string; providerId: string },
   onTimeoutAbort?: (timeoutMs: number) => void,
   agent?: Agent,
+  opts?: StreamCallOpts,
 ): Promise<TransportResult> {
   return new Promise((resolve) => {
     const effectiveResolve = compatResolve ?? resolve;
@@ -404,14 +438,59 @@ export function callStream(
 
     const upstreamReq = _transportInternals.createUpstreamRequest(url, options, agent);
 
+    // 响应头前无活动超时（拿到 upstreamRes 后改由 StreamProxy.idleTimer 接管）。
+    // destroy(error) 触发 'error' 事件 → effectiveResolve({kind:'throw'})。
+    const connectTimeoutMs = opts?.connectTimeoutMs;
+    const hasConnectTimeout =
+      connectTimeoutMs !== undefined && Number.isFinite(connectTimeoutMs) && connectTimeoutMs > 0;
+    if (hasConnectTimeout) {
+      upstreamReq.setTimeout(connectTimeoutMs);
+      upstreamReq.on("timeout", () => upstreamReq.destroy(new Error("upstream inactivity timeout (pre-response)")));
+    }
+
+    // 客户端断连：abort 信号穿透到上游 socket，立即切断连接。
+    // resolveOnce 在 Promise settle 时移除 abort listener，避免重试累积残留
+    // （listener 受 ITERATION_CAP 上界约束，非进程级泄漏，此处显式清理保持干净）。
+    const clientSignal = opts?.signal;
+    const onClientAbort = clientSignal
+      ? () => upstreamReq.destroy(new Error("client aborted"))
+      : undefined;
+    const resolveOnce: typeof effectiveResolve = (r) => {
+      if (onClientAbort && clientSignal && !clientSignal.aborted) {
+        clientSignal.removeEventListener("abort", onClientAbort);
+      }
+      effectiveResolve(r);
+    };
+    if (onClientAbort && clientSignal) {
+      if (clientSignal.aborted) {
+        onClientAbort();
+      } else {
+        clientSignal.addEventListener("abort", onClientAbort, { once: true });
+      }
+    }
+
     upstreamReq.on("response", (upstreamRes) => {
+      // 响应头已到达：清除响应头前 socket 超时，避免与 StreamProxy.idleTimer 竞争
+      if (hasConnectTimeout) upstreamReq.setTimeout(0);
       const statusCode = upstreamRes.statusCode || UPSTREAM_BAD_GATEWAY;
 
       if (statusCode !== UPSTREAM_SUCCESS) {
         const chunks: Buffer[] = [];
+        // 非 2xx body 兜底超时：connect timeout 已在响应头到达时清零（L474），
+        // 若上游发半截 body 后静默挂住（不 FIN 不 RST，CDN/反代常见故障），
+        // end/error 均不触发 → resolveOnce 永不调用 → slot 泄漏。
+        // 复用 connectTimeoutMs 作为 body 读取上限，与 200 路径 idleTimer 同源。
+        const bodyGuard = hasConnectTimeout
+          ? setTimeout(() => upstreamRes.destroy(new Error("upstream error-body timeout")), connectTimeoutMs)
+          : null;
+        if (bodyGuard) bodyGuard.unref();
+        const finishBody = (r: Parameters<typeof resolveOnce>[0]) => {
+          if (bodyGuard) clearTimeout(bodyGuard);
+          resolveOnce(r);
+        };
         upstreamRes.on("data", (chunk: Buffer) => chunks.push(chunk));
         upstreamRes.on("end", () => {
-          effectiveResolve({
+          finishBody({
             kind: "stream_error",
             statusCode,
             body: Buffer.concat(chunks).toString("utf-8"),
@@ -419,6 +498,9 @@ export function callStream(
             sentHeaders: upstreamHeaders,
           });
         });
+        // 非 2xx body 传输中连接中断：无 listener 会 uncaughtException + Promise 永挂（slot 泄漏）。
+        // 与 200 分支 proxy.onUpstreamError 对称，与 callNonStream(http.ts) 同路径一致。
+        upstreamRes.on("error", (err: Error) => finishBody({ kind: "throw", error: err }));
         return;
       }
 
@@ -431,9 +513,10 @@ export function callStream(
         checkEarlyError,
         timeoutMs,
         loopGuard, formatTransform, timeoutContext, onTimeoutAbort,
+        upstreamRes, upstreamReq,
       );
 
-      proxy.bindResolve(effectiveResolve);
+      proxy.bindResolve(resolveOnce);
       proxy.registerCloseHandler();
 
       // 无 early error checker 时直接开始流式传输
@@ -446,7 +529,7 @@ export function callStream(
       upstreamRes.on("error", (err: Error) => proxy.onUpstreamError(err));
     });
 
-    upstreamReq.on("error", (error) => effectiveResolve({ kind: "throw", error }));
+    upstreamReq.on("error", (error) => resolveOnce({ kind: "throw", error }));
     upstreamReq.write(payload);
     upstreamReq.end();
   });

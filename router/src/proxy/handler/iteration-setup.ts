@@ -11,8 +11,9 @@ import type { ProxyErrorFormatter } from "../proxy-core.js";
 import type { FormatAdapter } from "../format/types.js";
 import type { FormatRegistry } from "../format/registry.js";
 import { sanitizeHeadersForLog } from "../proxy-logging.js";
-import { buildUpstreamHeaders, buildUpstreamUrl } from "../proxy-core.js";
-import { getModelStreamTimeout } from "../../db/providers.js";
+import { buildUpstreamHeaders } from "../proxy-core.js";
+import { buildUpstreamUrl } from "../transport/shared.js";
+import { getModelTimeouts } from "../../db/providers.js";
 import { buildTransportFn } from "../transport/transport-fn.js";
 import { parseModels } from "../../config/model-context.js";
 import { applyProviderPatches } from "../patch/index.js";
@@ -159,10 +160,13 @@ export function buildIterationSetup(params: {
 
   // --- Build transport function ---
   const streamLoopEnabled = enhancementConfig.stream_loop_enabled;
+  // 合并 stream/nonStream 超时查询，单次 parseModels（applyProviderPatches 内另有一次解析）
+  const modelTimeouts = getModelTimeouts(provider, resolved.backend_model);
   const transportFn = buildTransportFn({
     provider, apiKey, body: patchedBody, cliHdrs, reply, upstreamPath: effectiveUpstreamPath, apiType: effectiveApiType,
     isStream, startTime, logId, effectiveModel: clientModel,
-    streamTimeoutMs: getModelStreamTimeout(provider, resolved.backend_model),
+    nonStreamTimeoutMs: modelTimeouts.nonStream,
+    streamTimeoutMs: modelTimeouts.stream,
     tracker, matcher, request,
     streamLoopEnabled, formatTransform, responseTransform, injectedHeaders,
     timeoutContext: { modelId: resolved.backend_model, providerId: provider.id },

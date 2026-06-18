@@ -41,6 +41,7 @@ export function toProviderGroups(
       };
       if (includeStreamTimeout) {
         model.streamTimeoutMs = m.stream_timeout_ms ?? null;
+        model.nonStreamTimeoutMs = m.non_stream_timeout_ms ?? null;
       }
       return model;
     }),

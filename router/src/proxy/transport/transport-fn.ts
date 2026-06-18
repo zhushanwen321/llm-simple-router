@@ -56,6 +56,7 @@ export interface TransportFnParams {
   logId: string;
   effectiveModel: string;
   streamTimeoutMs: number;
+  nonStreamTimeoutMs?: number;
   tracker?: RequestTracker;
   matcher?: RetryRuleMatcher;
   request: FastifyRequest;
@@ -68,7 +69,7 @@ export interface TransportFnParams {
   resolvedBaseUrl: string;
 }
 
-export function buildTransportFn(p: TransportFnParams): (target: Target) => Promise<TransportResult> {
+export function buildTransportFn(p: TransportFnParams): (target: Target, signal?: AbortSignal) => Promise<TransportResult> {
   const buildHeaders = (cliHdrs: RawHeaders, key: string, bytes?: number) => {
     const base = buildUpstreamHeaders(cliHdrs, key, bytes, p.apiType);
     return p.injectedHeaders ? { ...base, ...p.injectedHeaders } : base;
@@ -82,7 +83,7 @@ export function buildTransportFn(p: TransportFnParams): (target: Target) => Prom
     : undefined;
   // _target 未使用 — resilience 层始终传入当前 resolved target；
   // 跨 target failover 由外层 executeFailoverLoop 的 ProviderSwitchNeeded 处理
-  return async (_target: Target) => {
+  return async (_target: Target, signal?: AbortSignal) => {
     if (p.isStream) {
       let streamLoopGuard: StreamLoopGuard | undefined;
       if (p.streamLoopEnabled) {
@@ -128,13 +129,17 @@ export function buildTransportFn(p: TransportFnParams): (target: Target) => Prom
         effectiveBackend, p.apiKey, p.body, p.cliHdrs, p.reply, p.streamTimeoutMs,
         p.upstreamPath, buildHeaders, metricsTransform, checkEarlyError, undefined, streamLoopGuard, p.formatTransform,
         p.timeoutContext, onTimeoutAbort, agent,
+        { signal, connectTimeoutMs: p.streamTimeoutMs },
       );
       const m = (streamResult.kind === "stream_success" || streamResult.kind === "stream_abort")
         ? streamResult.metrics : undefined;
       if (m) p.tracker?.update(p.logId, { streamMetrics: toStreamMetrics(m) });
       return streamResult;
     }
-    let result = await callNonStream(effectiveBackend, p.apiKey, p.body, p.cliHdrs, p.upstreamPath, buildHeaders, agent);
+    let result = await callNonStream(
+      effectiveBackend, p.apiKey, p.body, p.cliHdrs, p.upstreamPath, buildHeaders, agent,
+      { signal, timeoutMs: p.nonStreamTimeoutMs },
+    );
     if (result.kind === "success") {
       const mr = MetricsExtractor.fromNonStreamResponse(p.apiType, result.body);
       if (mr) p.tracker?.update(p.logId, { streamMetrics: toStreamMetrics(mr) });

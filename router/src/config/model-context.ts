@@ -7,6 +7,7 @@ export interface ModelInfo {
   context_window: number | null
   patches: string[]
   stream_timeout_ms?: number
+  non_stream_timeout_ms?: number
   capabilities?: string[]
 }
 
@@ -15,6 +16,7 @@ export interface ModelEntry {
   context_window?: number
   patches?: string[]
   stream_timeout_ms?: number
+  non_stream_timeout_ms?: number
   capabilities?: string[]
 }
 
@@ -264,7 +266,7 @@ export function parseModels(raw: string): ModelEntry[] {
           ? { name: item, patches: [], capabilities: lookupCapabilities(item) }
           : null
       }
-      const obj = item as { name?: string; id?: string; patches?: string[]; stream_timeout_ms?: number; capabilities?: string[] } | null
+      const obj = item as { name?: string; id?: string; patches?: string[]; stream_timeout_ms?: number; non_stream_timeout_ms?: number; capabilities?: string[] } | null
       if (!obj) return null
       const modelName = obj.name ?? obj.id
       if (!modelName) return null
@@ -276,6 +278,7 @@ export function parseModels(raw: string): ModelEntry[] {
         patches,
       }
       if (obj.stream_timeout_ms != null) entry.stream_timeout_ms = obj.stream_timeout_ms
+      if (obj.non_stream_timeout_ms != null) entry.non_stream_timeout_ms = obj.non_stream_timeout_ms
       // capabilities: 显式 > model-directory > 硬编码白名单 > 默认 ["text"]
       entry.capabilities = obj.capabilities ?? lookupCapabilities(modelName)
       return entry
@@ -298,6 +301,7 @@ export function buildModelInfoList(
       patches: entry.patches ?? [],
     }
     if (entry.stream_timeout_ms != null) info.stream_timeout_ms = entry.stream_timeout_ms
+    if (entry.non_stream_timeout_ms != null) info.non_stream_timeout_ms = entry.non_stream_timeout_ms
     if (entry.capabilities != null) info.capabilities = entry.capabilities
     return info
   })

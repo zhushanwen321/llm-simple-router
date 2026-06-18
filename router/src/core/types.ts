@@ -122,7 +122,7 @@ export type TransportResult =
       sentHeaders: Record<string, string>;
       timeoutContext?: { modelId: string; providerId: string };
       timeoutMs?: number;
-      abortReason?: "idle_timeout" | "client_disconnect" | "loop_detection";
+      abortReason?: "idle_timeout" | "client_disconnect" | "loop_detection" | "pipe_error";
     }
   | {
       kind: "error";

@@ -33,6 +33,10 @@ export const SECONDS_PER_DAY = 86_400;
 // 上游成功状态码
 export const UPSTREAM_SUCCESS = 200;
 
+// callGet（admin 探测 /v1/models）默认超时：30s。
+// 仅响应头前超时，与流式 idleTimer 无关。
+export const DEFAULT_GET_TIMEOUT_MS = 30_000;
+
 /** 过滤掉不应转发给下游的 hop-by-hop headers */
 const SKIP_DOWNSTREAM = new Set([
   "content-length",

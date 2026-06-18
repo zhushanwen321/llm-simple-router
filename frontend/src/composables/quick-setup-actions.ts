@@ -14,7 +14,11 @@ import {
   toggleChangedMappings,
 } from "./quick-setup-helpers";
 import { computeDefaultPatches } from "@/utils/model-patches";
-import { DEFAULT_CONTEXT_WINDOW, DEFAULT_STREAM_TIMEOUT_MS } from "@/constants";
+import {
+  DEFAULT_CONTEXT_WINDOW,
+  DEFAULT_STREAM_TIMEOUT_MS,
+  DEFAULT_NON_STREAM_TIMEOUT_MS,
+} from "@/constants";
 
 const POST_SAVE_DELAY_MS = 1500;
 import type { Ref, ComputedRef } from "vue";
@@ -85,6 +89,19 @@ export interface ActionCtx {
   selection: SelectionState;
   data: DataState;
   submit: SubmitState;
+}
+
+/** 更新模型的某个超时字段（流式/非流式）。透传 ms：undefined 表示未设置，0 表示禁用（后端 resolveTimeout 返回 Infinity）。 */
+function setModelTimeout(
+  modelConfigs: Ref<ModelConfig[]>,
+  index: number,
+  field: "stream_timeout_ms" | "non_stream_timeout_ms",
+  ms: number | undefined,
+): void {
+  const next = [...modelConfigs.value];
+  const patch: Partial<ModelConfig> = { [field]: ms };
+  next[index] = { ...next[index], ...patch };
+  modelConfigs.value = next;
 }
 
 export function useQuickSetupActions(ctx: ActionCtx) {
@@ -278,6 +295,7 @@ export function useQuickSetupActions(ctx: ActionCtx) {
         ctx.data.isNonOpenaiEndpoint.value,
       ),
       stream_timeout_ms: DEFAULT_STREAM_TIMEOUT_MS,
+      non_stream_timeout_ms: DEFAULT_NON_STREAM_TIMEOUT_MS,
       capabilities: ["text"],
     });
   };
@@ -290,11 +308,6 @@ export function useQuickSetupActions(ctx: ActionCtx) {
     ctx.data.modelConfigs.value = ctx.data.modelConfigs.value.filter(
       (_, i) => i !== index,
     );
-  };
-  const updateModelTimeout = (index: number, ms: number | undefined) => {
-    const next = [...ctx.data.modelConfigs.value];
-    next[index] = { ...next[index], stream_timeout_ms: ms || undefined };
-    ctx.data.modelConfigs.value = next;
   };
   const toggleModelCapability = (index: number, capability: string) => {
     const next = [...ctx.data.modelConfigs.value];
@@ -385,7 +398,10 @@ export function useQuickSetupActions(ctx: ActionCtx) {
     addCustomModel,
     updateModel,
     removeModel,
-    updateModelTimeout,
+    updateModelTimeout: (i: number, ms: number | undefined) =>
+      setModelTimeout(ctx.data.modelConfigs, i, "stream_timeout_ms", ms),
+    updateModelNonStreamTimeout: (i: number, ms: number | undefined) =>
+      setModelTimeout(ctx.data.modelConfigs, i, "non_stream_timeout_ms", ms),
     toggleModelCapability,
     submit,
   };

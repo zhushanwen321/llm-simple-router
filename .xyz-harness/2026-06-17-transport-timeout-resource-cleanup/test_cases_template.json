@@ -1,0 +1,130 @@
+{
+  "test_cases": [
+    {
+      "id": "TC-1-01",
+      "type": "integration",
+      "title": "kill 流式 TTFT 请求 → 并发度立即下降 + upstreamReq 销毁",
+      "description": "AC-1。构造流式请求 acquire 槽位后 kill，验证 getConcurrency().active 递减、activeMap 残留为空、upstreamReq.destroyed。",
+      "steps": ["buildApp + mock 上游 hold 响应", "POST /v1/chat/completions stream=true", "确认 getConcurrency().active=1", "DELETE /admin/api/monitor/request/:id", "验证 active=0 且 upstreamReq destroyed"]
+    },
+    {
+      "id": "TC-1-02",
+      "type": "integration",
+      "title": "kill 非流式请求 → 并发度下降",
+      "description": "AC-2。非流式 callNonStream 路径，同样验证槽位释放。",
+      "steps": ["同 TC-1-01 但 stream=false", "验证 kill 后 active 递减"]
+    },
+    {
+      "id": "TC-2-01",
+      "type": "integration",
+      "title": "客户端流式 TTFT 断连 → upstreamReq 销毁 + 不 retry",
+      "description": "AC-3, AC-9。request.raw.destroy() 模拟断连，验证槽位释放、resilience attempts=1。",
+      "steps": ["发流式请求", "TTFT 阶段 request.raw.destroy()", "验证 active=0", "验证 upstreamReq.destroyed", "验证未触发 retry"]
+    },
+    {
+      "id": "TC-2-02",
+      "type": "integration",
+      "title": "客户端非流式断连 → upstreamReq 销毁",
+      "description": "AC-3b。非流式 signal 接入验证。",
+      "steps": ["发非流式请求", "destroy 客户端", "验证 active 递减 + upstreamReq destroyed"]
+    },
+    {
+      "id": "TC-3-01",
+      "type": "integration",
+      "title": "上游真 hang → 无活动超时结束 + 槽位释放",
+      "description": "AC-4。mock 上游 accept 不响应，注入小 timeoutMs。",
+      "steps": ["stream_timeout_ms=200 注入", "mock 上游不回响应", "验证 200ms 后 throw + active=0"]
+    },
+    {
+      "id": "TC-3-02",
+      "type": "integration",
+      "title": "非流式上游 hang → 超时结束",
+      "description": "AC-4。non_stream_timeout_ms 注入。",
+      "steps": ["non_stream_timeout_ms=200", "验证超时 throw + 槽位释放"]
+    },
+    {
+      "id": "TC-4-01",
+      "type": "integration",
+      "title": "loop_detection 触发 → upstreamRes 销毁",
+      "description": "AC-8。构造重复 chunk 触发 loop guard，验证 upstreamRes.destroyed。",
+      "steps": ["开启 stream loop detection", "mock 上游发重复 chunk", "验证 terminal(stream_abort)", "验证 upstreamRes.destroyed===true"]
+    },
+    {
+      "id": "TC-4-02",
+      "type": "integration",
+      "title": "upstream_error → upstreamRes/upstreamReq 销毁",
+      "description": "AC-8。上游 emit error，验证 cleanup 销毁两端。",
+      "steps": ["mock 上游 emit error", "验证 onUpstreamError 后资源销毁"]
+    },
+    {
+      "id": "TC-5-01",
+      "type": "integration",
+      "title": "kill 排队中请求 → 不抛 TypeError",
+      "description": "AC-10。max_concurrency=1，第二个排队中 kill。",
+      "steps": ["max_concurrency=1", "发请求1占槽", "发请求2排队", "kill 请求2", "验证无 TypeError，semaphore.current 正常"]
+    },
+    {
+      "id": "TC-6-01",
+      "type": "integration",
+      "title": "graceful shutdown → inflight 请求被 abort",
+      "description": "AC-11。inflight 请求存在时 close()。",
+      "steps": ["发 inflight 请求", "调用 close()", "验证 killCallbacks 全部调用", "验证 upstreamReq 销毁"]
+    },
+    {
+      "id": "TC-7-01",
+      "type": "integration",
+      "title": "callGet 超时保护",
+      "description": "AC-12。连通性探测 hang → 超时。",
+      "steps": ["mock 探测上游 hang", "注入小 timeoutMs", "验证超时结束"]
+    },
+    {
+      "id": "TC-8-01",
+      "type": "integration",
+      "title": "释放信号量幂等（无双重 release）",
+      "description": "AC-13。kill 后请求又自然完成（竞态），验证 current 不超减。",
+      "steps": ["kill 请求", "模拟 transport 同时 resolve", "验证 semaphore.current 递减一次"]
+    },
+    {
+      "id": "TC-9-01",
+      "type": "unit",
+      "title": "getModelTimeouts 返回正确超时值",
+      "description": "FR-4。配置值/默认值/0=Infinity。",
+      "steps": ["配置 stream=400000 non_stream=700000 → 返回对应值", "未配置 → 300000/600000", "0 → Infinity"]
+    },
+    {
+      "id": "TC-9-03",
+      "type": "integration",
+      "title": "流式 idle 超时保留且默认值生效（300s 回归保护）",
+      "description": "AC-5。验证 STREAMING 阶段 chunk 间隔超 stream_timeout_ms 仍超时，且默认值收紧到 300s 后行为正确。",
+      "steps": ["注入 stream_timeout_ms=200", "mock 上游发一个 chunk 后停顿超过 200ms", "验证 terminal(stream_abort, abortReason=idle_timeout)", "验证默认值 300000 生效（未配置时）"]
+    },
+    {
+      "id": "TC-9-02",
+      "type": "unit",
+      "title": "parseModels 解析 non_stream_timeout_ms",
+      "description": "FR-4。JSON → ModelEntry 字段映射。",
+      "steps": ["构造含 non_stream_timeout_ms 的 models JSON", "parseModels 后验证字段"]
+    },
+    {
+      "id": "TC-10-01",
+      "type": "ui",
+      "title": "ModelCard 主行渲染双超时输入框",
+      "description": "AC-6。组件测试验证主行两个 Input，默认 300/600。",
+      "steps": ["mount ModelCard", "验证主行两个 number input", "验证默认值 300/600"]
+    },
+    {
+      "id": "TC-10-02",
+      "type": "ui",
+      "title": "0 值显示禁用标记",
+      "description": "AC-7。输入 0 时显示禁用文案。",
+      "steps": ["设 streamTimeoutMs=0", "验证显示禁用 Badge"]
+    },
+    {
+      "id": "TC-11-01",
+      "type": "integration",
+      "title": "adaptive 不因客户端断连误降并发",
+      "description": "G5-001。客户端断连后 consecutiveFailures 不增加。",
+      "steps": ["启用 adaptive", "客户端断连", "验证 currentLimit 不变"]
+    }
+  ]
+}

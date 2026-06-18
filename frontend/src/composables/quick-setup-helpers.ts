@@ -19,7 +19,10 @@ import {
   getDefaultContextWindow,
 } from "@/components/quick-setup/types";
 import { computeDefaultPatches } from "@/utils/model-patches";
-import { DEFAULT_STREAM_TIMEOUT_MS } from "@/constants";
+import {
+  DEFAULT_STREAM_TIMEOUT_MS,
+  DEFAULT_NON_STREAM_TIMEOUT_MS,
+} from "@/constants";
 import { buildTransformRule as buildTransformRuleCore } from "@/utils/transform-domain";
 
 type Api = typeof ApiNamespace;
@@ -149,6 +152,7 @@ function buildProviderPayload(
       context_window: m.contextWindow,
       patches: m.patches.length > 0 ? m.patches : undefined,
       stream_timeout_ms: m.stream_timeout_ms ?? undefined,
+      non_stream_timeout_ms: m.non_stream_timeout_ms ?? undefined,
       capabilities:
         m.capabilities && m.capabilities.length > 0
           ? m.capabilities
@@ -372,6 +376,7 @@ export function applyPresetModels(
       isNonOpenaiEndpoint.value,
     ),
     stream_timeout_ms: DEFAULT_STREAM_TIMEOUT_MS,
+    non_stream_timeout_ms: DEFAULT_NON_STREAM_TIMEOUT_MS,
     capabilities: preset.modelCapabilities?.[name],
   }));
 }

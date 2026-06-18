@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 import type { ModelConfig } from "./types";
 import { CONTEXT_WINDOW_OPTIONS } from "./types";
 import PatchChips from "./PatchChips.vue";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -14,12 +15,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
-import { Trash2, Type, ImageIcon, Volume2, Video } from "@lucide/vue";
+import { Trash2, Type, ImageIcon, Volume2, Video, Clock } from "@lucide/vue";
 import { cn } from "@/lib/utils";
-import { DEFAULT_STREAM_TIMEOUT_MS } from "@/constants";
+import {
+  DEFAULT_STREAM_TIMEOUT_MS,
+  DEFAULT_NON_STREAM_TIMEOUT_MS,
+} from "@/constants";
 
 const MS_PER_SECOND = 1000;
 const DEFAULT_TIMEOUT_SECONDS = DEFAULT_STREAM_TIMEOUT_MS / MS_PER_SECOND;
+const DEFAULT_NON_STREAM_TIMEOUT_SECONDS =
+  DEFAULT_NON_STREAM_TIMEOUT_MS / MS_PER_SECOND;
 
 const { t } = useI18n();
 
@@ -29,6 +35,7 @@ const props = defineProps<{
   isDeepSeek: boolean;
   isNonOpenaiEndpoint: boolean;
   streamTimeoutMs?: number;
+  nonStreamTimeoutMs?: number;
   capabilities?: string[];
 }>();
 
@@ -36,6 +43,7 @@ const emit = defineEmits<{
   "update:model": [value: ModelConfig];
   remove: [];
   "update:stream-timeout-ms": [value: number | undefined];
+  "update:non-stream-timeout-ms": [value: number | undefined];
   "toggle-capability": [capability: string];
 }>();
 
@@ -74,7 +82,26 @@ const displayTimeoutSeconds = computed(() => {
   return DEFAULT_TIMEOUT_SECONDS;
 });
 
-const isDefaultTimeout = computed(() => props.streamTimeoutMs === undefined);
+const displayNonStreamTimeoutSeconds = computed(() => {
+  if (
+    props.nonStreamTimeoutMs !== undefined &&
+    props.nonStreamTimeoutMs !== null
+  ) {
+    return Math.round(props.nonStreamTimeoutMs / MS_PER_SECOND);
+  }
+  return DEFAULT_NON_STREAM_TIMEOUT_SECONDS;
+});
+
+const isDefaultStreamTimeout = computed(
+  () => props.streamTimeoutMs === undefined,
+);
+const isDisabledStreamTimeout = computed(() => props.streamTimeoutMs === 0);
+const isDefaultNonStreamTimeout = computed(
+  () => props.nonStreamTimeoutMs === undefined,
+);
+const isDisabledNonStreamTimeout = computed(
+  () => props.nonStreamTimeoutMs === 0,
+);
 
 const capabilityIcons = [
   { key: "text", icon: Type, label: "text" },
@@ -183,6 +210,78 @@ function isCapabilityActive(key: string): boolean {
         </div>
       </div>
 
+      <!-- Dual timeout inputs: stream + non-stream (seconds) -->
+      <div class="flex items-center gap-1 shrink-0">
+        <div
+          class="flex items-center gap-0.5"
+          :title="t('quickSetup.patch.streamTimeoutLabel')"
+        >
+          <Clock class="size-3 text-muted-foreground/70 shrink-0" />
+          <Input
+            type="number"
+            :model-value="displayTimeoutSeconds"
+            @update:model-value="
+              emit(
+                'update:stream-timeout-ms',
+                $event === '' || $event === null || $event === undefined
+                  ? undefined
+                  : Number($event) * MS_PER_SECOND,
+              )
+            "
+            class="h-6 w-[52px] !text-[11px] font-mono text-right px-1.5 py-0 rounded [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            min="0"
+          />
+          <Badge
+            v-if="isDisabledStreamTimeout"
+            variant="outline"
+            class="text-[9px] px-1 py-0 h-4 font-normal text-muted-foreground"
+          >
+            {{ t("quickSetup.patch.disabled") }}
+          </Badge>
+          <Badge
+            v-else-if="isDefaultStreamTimeout"
+            variant="outline"
+            class="text-[9px] px-1 py-0 h-4 font-normal text-muted-foreground"
+          >
+            {{ t("providers.fields.timeoutPlaceholder") }}
+          </Badge>
+        </div>
+        <div
+          class="flex items-center gap-0.5"
+          :title="t('quickSetup.patch.nonStreamTimeoutLabel')"
+        >
+          <Clock class="size-3 text-muted-foreground/40 shrink-0" />
+          <Input
+            type="number"
+            :model-value="displayNonStreamTimeoutSeconds"
+            @update:model-value="
+              emit(
+                'update:non-stream-timeout-ms',
+                $event === '' || $event === null || $event === undefined
+                  ? undefined
+                  : Number($event) * MS_PER_SECOND,
+              )
+            "
+            class="h-6 w-[52px] !text-[11px] font-mono text-right px-1.5 py-0 rounded [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            min="0"
+          />
+          <Badge
+            v-if="isDisabledNonStreamTimeout"
+            variant="outline"
+            class="text-[9px] px-1 py-0 h-4 font-normal text-muted-foreground"
+          >
+            {{ t("quickSetup.patch.disabled") }}
+          </Badge>
+          <Badge
+            v-else-if="isDefaultNonStreamTimeout"
+            variant="outline"
+            class="text-[9px] px-1 py-0 h-4 font-normal text-muted-foreground"
+          >
+            {{ t("providers.fields.timeoutPlaceholder") }}
+          </Badge>
+        </div>
+      </div>
+
       <!-- Patch button: count + chevron, also toggles expand -->
       <div
         class="inline-flex items-center gap-1 h-[22px] px-2 border-[1px] border-border rounded cursor-pointer transition-colors shrink-0 select-none"
@@ -235,39 +334,6 @@ function isCapabilityActive(key: string): boolean {
               :model-value="model.patches"
               @update:model-value="updatePatches"
             />
-          </div>
-
-          <!-- Timeout -->
-          <div v-if="streamTimeoutMs !== undefined">
-            <div
-              class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1"
-            >
-              {{ t("quickSetup.patch.timeoutTitle") }}
-            </div>
-            <div class="flex items-center gap-1.5">
-              <Input
-                type="number"
-                :model-value="displayTimeoutSeconds"
-                @update:model-value="
-                  emit(
-                    'update:stream-timeout-ms',
-                    $event ? Number($event) * MS_PER_SECOND : undefined,
-                  )
-                "
-                class="h-6 w-[72px] !text-[11px] font-mono text-right px-1.5 py-0 rounded [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                min="1"
-              />
-              <span class="text-[11px] text-muted-foreground">{{
-                t("quickSetup.patch.timeoutSeconds")
-              }}</span>
-              <Badge
-                v-if="isDefaultTimeout"
-                variant="outline"
-                class="text-[9px] px-1 py-0 h-4 font-normal text-muted-foreground"
-              >
-                {{ t("providers.fields.timeoutPlaceholder") }}
-              </Badge>
-            </div>
           </div>
         </div>
       </CollapsibleContent>

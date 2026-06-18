@@ -24,6 +24,7 @@ export interface ModelInfo {
   context_window: number | null;
   patches: string[];
   stream_timeout_ms?: number | null;
+  non_stream_timeout_ms?: number | null;
   capabilities?: string[];
 }
 

@@ -105,6 +105,8 @@ export async function buildApp(
 
   // Wire adaptive controller to tracker
   tracker.setAdaptiveStatusProvider(adaptiveController);
+  // 绑定信号量释放回调：kill 时按 reqId 同步释放槽位（防 kill 不释放信号量）
+  tracker.setReleaseSlotProvider((reqId) => semaphoreManager.releaseByReqId(reqId));
 
   // 从 DB 读取已有 provider 的并发配置，初始化信号量/adaptive/tracker 缓存
   initializeProviderState(db, semaphoreManager, adaptiveController, tracker);
