@@ -270,9 +270,13 @@
             :is-non-openai-endpoint="isNonOpenaiEndpoint"
             :capabilities="model.capabilities ?? ['text']"
             :stream-timeout-ms="model.stream_timeout_ms ?? undefined"
+            :non-stream-timeout-ms="model.non_stream_timeout_ms ?? undefined"
             @update:model="updateModel(index, $event)"
             @remove="removeModel(index)"
             @update:stream-timeout-ms="updateModelTimeout(index, $event)"
+            @update:non-stream-timeout-ms="
+              updateModelNonStreamTimeout(index, $event)
+            "
             @toggle-capability="
               (cap: string) => toggleModelCapability(index, cap)
             "
@@ -680,6 +684,7 @@ const {
   updateModel,
   removeModel,
   updateModelTimeout,
+  updateModelNonStreamTimeout,
   toggleModelCapability,
 } = useQuickSetup();
 

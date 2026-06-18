@@ -178,7 +178,7 @@ describe("Stream timeout integration", () => {
 
     const timeout = getModelStreamTimeout(provider, "glm-5.1");
     expect(timeout).toBe(DEFAULT_STREAM_TIMEOUT_MS);
-    expect(timeout).toBe(600_000);
+    expect(timeout).toBe(300_000);
   });
 
   it("should resolve default timeout when model not found in provider", () => {

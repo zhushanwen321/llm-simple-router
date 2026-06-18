@@ -279,20 +279,36 @@ echo ""
 
 info "=== 步骤 9: 安装说明 ==="
 
-# 获取发布的 beta 版本号（从 CI 日志或 npm registry）
-SHORT_SHA=$(git log --format='%h' -1 "$BETA_BRANCH" 2>/dev/null || echo "unknown")
-BETA_VERSION="${TARGET_VERSION}-beta.${SHORT_SHA}"
+# 获取实际发布的 beta 版本号：CI 查 npm registry 递增计算，本地无法预估。
+# 从 dist-tags.beta 拉取最准确（指向刚发布的版本）。查询失败显示占位符提示自查。
+ACTUAL_BETA=$(npm view llm-simple-router dist-tags.beta 2>/dev/null || echo "")
+if [[ -n "$ACTUAL_BETA" ]]; then
+  BETA_VERSION="$ACTUAL_BETA"
+else
+  BETA_VERSION="${TARGET_VERSION}-beta.N（查看 npm info 或 CI 日志确认实际编号）"
+fi
 
 echo ""
 echo "============================================"
 ok "Beta 发布完成！"
 echo "  版本: $BETA_VERSION"
-echo "  npm tag: @beta"
 echo ""
-echo "安装方式:"
-echo "  npm install -g llm-simple-router@beta"
-echo "  npm install -g llm-simple-router@${BETA_VERSION}"
+echo "── npm ──────────────────────────────────────"
+echo "  安装:  npm install -g llm-simple-router@beta            # 最新 beta"
+echo "         npm install -g llm-simple-router@${BETA_VERSION}  # 精确版本"
+echo "  启动:  llm-simple-router"
+echo "  访问:  http://localhost:9981          (API 代理)"
+echo "         http://localhost:9981/admin/   (管理后台，首次进入 /setup)"
 echo ""
-echo "查看所有 beta 版本:"
+echo "── Docker ────────────────────────────────────"
+echo "  GHCR 拉取:"
+echo "    docker pull ghcr.io/zhushanwen321/llm-simple-router:beta"
+echo "  阿里云 ACR 拉取 (国内更快，<ACR_REGISTRY> 替换为你的 registry 地址):"
+echo "    docker pull <ACR_REGISTRY>/zhushanwen321/llm-simple-router:beta"
+echo "  运行 (数据持久化到 ~/.llm-simple-router):"
+echo "    docker run -d --name router -p 9981:9981 -v ~/.llm-simple-router:/app/data -e TZ=Asia/Shanghai --restart unless-stopped ghcr.io/zhushanwen321/llm-simple-router:beta"
+echo "  访问: http://localhost:9981/admin/"
+echo ""
+echo "── 查看所有 beta 版本 ──"
 echo "  npm info llm-simple-router versions --json | jq '.[] | select(contains(\"beta\"))'"
 echo "============================================"

@@ -1,9 +1,10 @@
 ---
 name: beta-publish
 description: >-
-  Use when the user wants to publish a beta prerelease npm package for
-  llm-simple-router. Triggers: "beta 发布", "beta publish", "发beta包",
-  "beta包". Not for official releases (use merge skill instead).
+  Use when the user wants to publish a beta prerelease for llm-simple-router.
+  Publishes both npm package (@beta dist-tag) and Docker image (:beta tag).
+  Triggers: "beta 发布", "beta publish", "发beta包", "beta包", "docker beta".
+  Not for official releases (use merge skill instead).
 ---
 
 # Beta Prerelease 发布（llm-simple-router）
@@ -11,7 +12,7 @@ description: >-
 ## 适用范围
 
 - 项目：`llm-simple-router`
-- **适用**：发布 `--tag beta` 的 prerelease 包到 npm
+- **适用**：发布 prerelease 到 npm（`--tag beta`）和 Docker（`:beta` tag）
 - **不适用**：正式发布（用 merge skill）、单文件调试、本地测试
 
 ## 执行
@@ -29,18 +30,43 @@ bash beta-publish.sh [-y] [目标版本号]
 ## 版本号规则
 
 ```
-当前正式版 1.0.2 → beta 目标 1.0.3 → CI 发布 1.0.3-beta.{SHA}
+当前正式版 1.0.2 → beta 目标 1.0.3
+首次发布 → CI 查 registry → 1.0.3-beta.1
+重复跑   → CI 查到 beta.1 存在 → 1.0.3-beta.2
 ```
 
 | 规则 | 说明 |
 |------|------|
-| 格式 | `{next}-beta.{shortSha}`（合法 semver prerelease） |
+| 格式 | `{next}-beta.{N}`（N 为递增整数，semver prerelease 标准） |
 | next | 当前 version 的 patch bump，或用户指定 |
-| 排序 | `1.0.3-beta.a1b < 1.0.3-beta.f4e < 1.0.3`（正式版始终大于 beta） |
-| @beta | npm dist-tag 自动指向最新 beta |
+| N | CI 查询 npm registry 该系列已发布最大编号 +1，首次为 beta.1 |
+| 重复跑 | 同分支重跑自动递增 N，npm publish 不冲突（registry 无重复版本） |
+| 排序 | `1.0.3-beta.1 < 1.0.3-beta.2 < 1.0.3`（semver 标准排序，正式版始终大于 beta） |
+| @beta | npm dist-tag 滚动指向最新 beta（如 beta.2 发布后 @beta 指向 beta.2） |
 | @latest | 不受影响，始终指向最后一个正式版 |
 
-同一目标版本可多次发布（每次 SHA 不同）。正式版发布后 `@latest` 覆盖。
+## 发布产物
+
+### npm
+
+| dist-tag | 指向 | 拉取 |
+|----------|------|------|
+| `@beta` | 最新 beta 版本（滚动覆盖） | `npm i -g llm-simple-router@beta` |
+| `@latest` | 最后一个正式版（不受 beta 影响） | `npm i -g llm-simple-router` |
+
+精确拉某次 beta：`npm i -g llm-simple-router@1.0.3-beta.2`
+
+### Docker（GHCR + 阿里云 ACR）
+
+| tag | 指向 | GHCR 拉取 |
+|-----|------|-----------|
+| `:beta` | 最新 beta（滚动覆盖） | `docker pull ghcr.io/zhushanwen321/llm-simple-router:beta` |
+| `:1.0.3-beta.sha` | 精确 beta（每次不同） | `docker pull ghcr.io/.../llm-simple-router:1.0.3-beta.a1b2c3d` |
+| `:latest` / `:v1.0.2` | 正式版（不受 beta 影响） | `docker pull ghcr.io/.../llm-simple-router:latest` |
+
+阿里云 ACR 同步推送相同 tag（`beta` 滚动 + 精确版），`latest` 仅正式发布时更新。
+
+**关键保证**：beta 发布**永远不会**覆盖 `latest`——`latest` 仅在 main 分支正式发布（workflow_dispatch）时产生。
 
 ## 失败处理
 
@@ -52,8 +78,12 @@ bash beta-publish.sh [-y] [目标版本号]
 
 ## CI 触发
 
-`publish.yml`：`beta-*` 分支 push → 自动计算版本号 → `npm publish --tag beta`。
-不创建 GitHub Release、不推送 Docker 镜像（仅 main 正式发布）。
+`publish.yml`：`beta-*` 分支 push → 自动计算版本号 → 同步发布：
+
+1. `npm publish --tag beta`（prerelease 包）
+2. Docker 镜像推送 GHCR + 阿里云 ACR（tag：精确版 `1.0.3-beta.sha` + 滚动 `beta`）
+
+**不创建 GitHub Release、不升级正式版本号、不占用 `latest`**——这些仅在 main 正式发布时发生。
 
 ---
 

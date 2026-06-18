@@ -59,8 +59,8 @@ describe("BP-M3: StreamProxy BUFFERING optimization", () => {
   beforeEach(() => {
     vi.resetModules();
     mockReq = createMockUpstreamReq();
-    vi.doMock("../../src/proxy/transport/http.js", async () => {
-      const actual = await vi.importActual("../../src/proxy/transport/http.js") as any;
+    vi.doMock("../../src/proxy/transport/shared.js", async () => {
+      const actual = await vi.importActual("../../src/proxy/transport/shared.js") as any;
       actual._transportInternals.createUpstreamRequest = () => mockReq;
       return actual;
     });

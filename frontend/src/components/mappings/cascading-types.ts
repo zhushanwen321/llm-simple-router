@@ -1,18 +1,19 @@
-import type { ProviderSummary } from '@/types/mapping'
+import type { ProviderSummary } from "@/types/mapping";
 
 export interface ModelOption {
-  name: string
-  contextWindow: number
-  streamTimeoutMs?: number | null
+  name: string;
+  contextWindow: number;
+  streamTimeoutMs?: number | null;
+  nonStreamTimeoutMs?: number | null;
 }
 
 export interface ProviderGroup {
-  provider: ProviderSummary
-  models: ModelOption[]
-  isNew?: boolean
+  provider: ProviderSummary;
+  models: ModelOption[];
+  isNew?: boolean;
 }
 
 export interface SelectedValue {
-  provider_id: string
-  model: string
+  provider_id: string;
+  model: string;
 }

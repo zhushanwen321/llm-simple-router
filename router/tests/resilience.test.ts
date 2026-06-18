@@ -249,7 +249,7 @@ describe("ResilienceLayer.execute()", () => {
     const result = await layer.execute(targets, fn, defaultConfig());
     expect(result.result).toEqual(makeSuccess(200));
     expect(result.attempts).toHaveLength(1);
-    expect(fn).toHaveBeenCalledWith(t1);
+    expect(fn).toHaveBeenCalledWith(t1, undefined);
   });
 
   it("重试成功：第一次 429 第二次 200", async () => {

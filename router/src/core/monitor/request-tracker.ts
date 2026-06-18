@@ -59,6 +59,8 @@ export class RequestTracker {
   readonly runtimeCollector: RuntimeCollector;
   private readonly semaphoreManager?: ISemaphoreStatus;
   private adaptiveStatusProvider?: IAdaptiveStatus;
+  /** kill 时同步释放信号量的回调（绑定到 semaphoreManager.releaseByReqId） */
+  private releaseSlotProvider?: (reqId: string) => void;
 
   constructor(deps?: {
     semaphoreManager?: ISemaphoreStatus;
@@ -73,6 +75,11 @@ export class RequestTracker {
 
   setAdaptiveStatusProvider(provider: IAdaptiveStatus): void {
     this.adaptiveStatusProvider = provider;
+  }
+
+  /** 注入信号量释放回调，kill 时同步释放槽位（防 kill 不释放信号量） */
+  setReleaseSlotProvider(fn: (reqId: string) => void): void {
+    this.releaseSlotProvider = fn;
   }
 
   // --- Core methods ---
@@ -273,11 +280,21 @@ export class RequestTracker {
     this.killCallbacks.delete(id);
     this.logger?.info?.({ reqId: id }, "Tracker: killRequest");
     callback();
+    // 同步释放信号量槽位（releaseByReqId 幂等：未 acquire 的排队请求 noop）
+    this.releaseSlotProvider?.(id);
     // transport 可能尚未 resolve（上游未响应时 StreamProxy 不存在），强制完成请求
     if (this.activeMap.has(id)) {
       this.complete(id, { status: "failed" });
     }
     return true;
+  }
+
+  /** 优雅关闭时终止所有 inflight 请求，复用 kill 机制（含信号量释放 + tracker 完成） */
+  abortAllInflight(): void {
+    const ids = [...this.killCallbacks.keys()];
+    for (const id of ids) {
+      this.killRequest(id);
+    }
   }
 
   // --- Stats / monitoring ---

@@ -58,7 +58,10 @@
     "label": "补丁",
     "sectionTitle": "补丁",
     "timeoutTitle": "超时",
-    "timeoutSeconds": "秒"
+    "timeoutSeconds": "秒",
+    "streamTimeoutLabel": "流式超时（秒）",
+    "nonStreamTimeoutLabel": "非流式超时（秒）",
+    "disabled": "禁用"
   },
   "concurrency": {
     "control": "并发控制",
