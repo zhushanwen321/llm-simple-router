@@ -37,11 +37,13 @@ const emit = defineEmits<{
 
 const LEAVE_DELAY_MS = 150;
 const SUBMENU_GAP_PX = 2;
+const VIEWPORT_MARGIN_PX = 8;
 
 const open = ref(false);
 const hoveredGroupKey = ref<string | null>(null);
 const groupRefs = ref<Map<string, HTMLElement>>(new Map());
-const submenuPosition = ref({ top: 0, left: 0 });
+const submenuRef = ref<HTMLElement | null>(null);
+const submenuPosition = ref({ top: 0, left: 0, maxHeight: 0 });
 let leaveTimer: ReturnType<typeof setTimeout> | null = null;
 
 function setGroupRef(key: string, el: unknown) {
@@ -79,9 +81,21 @@ function positionSubmenu(groupKey: string) {
   const el = groupRefs.value.get(groupKey);
   if (!el) return;
   const rect = el.getBoundingClientRect();
+  const viewportH = window.innerHeight;
+  const available = viewportH - VIEWPORT_MARGIN_PX - VIEWPORT_MARGIN_PX;
+  // Natural submenu height (may exceed viewport); clamp to available space.
+  const naturalH = submenuRef.value?.scrollHeight ?? 0;
+  const maxHeight = Math.min(available, naturalH || available);
+  // Anchor to the group's top, then nudge up so the menu stays in the viewport.
+  let top = rect.top;
+  if (top + maxHeight > viewportH - VIEWPORT_MARGIN_PX) {
+    top = viewportH - VIEWPORT_MARGIN_PX - maxHeight;
+  }
+  if (top < VIEWPORT_MARGIN_PX) top = VIEWPORT_MARGIN_PX;
   submenuPosition.value = {
-    top: rect.top,
+    top,
     left: rect.right + SUBMENU_GAP_PX,
+    maxHeight,
   };
 }
 
@@ -102,6 +116,24 @@ function selectOption(groupKey: string, value: string) {
 function onOpenChange(val: boolean) {
   open.value = val;
   if (!val) hoveredGroupKey.value = null;
+}
+
+// Reka-ui's DismissableLayer treats the teleported submenu as "outside" the
+// PopoverContent, so a click on a model option fires pointer-down-outside →
+// closes the popover → unmounts the submenu before @click resolves. Mark the
+// submenu with data-cascading-submenu and preventDefault on those events when
+// the target is inside it, so clicks on submenu items reach selectOption().
+function isInsideSubmenu(event: Event): boolean {
+  const target = event.target as HTMLElement | null;
+  return !!target?.closest("[data-cascading-submenu]");
+}
+
+function onPointerDownOutside(event: Event) {
+  if (isInsideSubmenu(event)) event.preventDefault();
+}
+
+function onInteractOutside(event: Event) {
+  if (isInsideSubmenu(event)) event.preventDefault();
 }
 </script>
 
@@ -133,6 +165,8 @@ function onOpenChange(val: boolean) {
       :align="'start'"
       :side-offset="4"
       class="z-[200] w-auto min-w-56 max-h-[80vh] overflow-y-auto p-1"
+      @pointer-down-outside="onPointerDownOutside"
+      @interact-outside="onInteractOutside"
     >
       <div
         v-for="group in groups"
@@ -162,10 +196,15 @@ function onOpenChange(val: boolean) {
             hoveredGroupKey &&
             groups.find((g) => g.key === hoveredGroupKey)?.options.length
           "
-          class="fixed z-[201] min-w-48 max-h-[80vh] overflow-y-auto rounded-md bg-popover p-1 text-popover-foreground shadow-md"
+          ref="submenuRef"
+          data-cascading-submenu
+          class="fixed z-[201] min-w-48 overflow-y-auto rounded-md bg-popover p-1 text-popover-foreground shadow-md"
           :style="{
             top: `${submenuPosition.top}px`,
             left: `${submenuPosition.left}px`,
+            maxHeight: submenuPosition.maxHeight
+              ? `${submenuPosition.maxHeight}px`
+              : '80vh',
           }"
           @mouseenter="onSubmenuEnter"
           @mouseleave="onSubmenuLeave"
