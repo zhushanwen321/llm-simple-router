@@ -138,8 +138,8 @@ run_hook() {
         if [[ $hook_exit -ne 0 ]]; then
             [[ -n "$LOG_FILE" ]] && { echo "--- Hook: $hook_name (FAILED exit=$hook_exit) ---" >> "$LOG_FILE"; cat "$hook_tmp" >> "$LOG_FILE" 2>/dev/null; echo "---" >> "$LOG_FILE"; }
             rm -f "$hook_tmp"
-            echo -e "  ${RED}❌ 钩子 $hook_name 失败（退出码 $hook_exit）${NC}"
-            log_error "钩子 $hook_name 失败（退出码 $hook_exit）"
+            echo -e "  ${RED}❌ 钩子 $hook_name 失败（退出码 ${hook_exit}）${NC}"
+            log_error "钩子 $hook_name 失败（退出码 ${hook_exit}）"
             return 1
         fi
         [[ -n "$LOG_FILE" ]] && { echo "--- Hook: $hook_name (OK) ---" >> "$LOG_FILE"; cat "$hook_tmp" >> "$LOG_FILE" 2>/dev/null; echo "---" >> "$LOG_FILE"; }
@@ -583,7 +583,7 @@ phase_publish() {
         fi
 
         if [[ "$need_bump" == "true" ]]; then
-            echo "  触发 GitHub Actions 发布脚本（bump $VERSION_TYPE）..."
+            echo "  触发 GitHub Actions 发布脚本（bump ${VERSION_TYPE}）..."
             log_info "触发 publish.sh ($VERSION_TYPE), cur=$cur_ver, latest_tag=$latest_tag"
         fi
 
