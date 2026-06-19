@@ -8,6 +8,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import type { CascadingGroup, CascadingSelectedValue } from "./types";
+import type { PointerDownOutsideEvent } from "reka-ui";
 
 const { t } = useI18n();
 
@@ -36,7 +37,6 @@ const emit = defineEmits<{
 }>();
 
 const LEAVE_DELAY_MS = 150;
-const SUBMENU_GAP_PX = 2;
 
 const open = ref(false);
 const hoveredGroupKey = ref<string | null>(null);
@@ -72,7 +72,9 @@ function onSubmenuEnter() {
 }
 
 function onSubmenuLeave() {
-  hoveredGroupKey.value = null;
+  leaveTimer = setTimeout(() => {
+    hoveredGroupKey.value = null;
+  }, LEAVE_DELAY_MS);
 }
 
 function positionSubmenu(groupKey: string) {
@@ -81,8 +83,21 @@ function positionSubmenu(groupKey: string) {
   const rect = el.getBoundingClientRect();
   submenuPosition.value = {
     top: rect.top,
-    left: rect.right + SUBMENU_GAP_PX,
+    left: rect.right,
   };
+}
+
+/**
+ * reka-ui DismissableLayer 检测 pointerdown outside 时会关闭 Popover。
+ * 子菜单 Teleport 到 body 后不在 [data-dismissable-layer] 内，
+ * 被误判为外部点击。用 reka-ui 提供的 pointerDownOutside 事件，
+ * 当点击目标在子菜单内时 preventDefault() 阻止关闭。
+ */
+function onPointerDownOutside(e: PointerDownOutsideEvent) {
+  const target = e.detail.originalEvent.target as HTMLElement | undefined;
+  if (target?.closest("[data-cascade-submenu]")) {
+    e.preventDefault();
+  }
 }
 
 const displayText = computed(() => {
@@ -133,6 +148,7 @@ function onOpenChange(val: boolean) {
       :align="'start'"
       :side-offset="4"
       class="z-[200] w-auto min-w-56 max-h-[80vh] overflow-y-auto p-1"
+      @pointer-down-outside="onPointerDownOutside"
     >
       <div
         v-for="group in groups"
@@ -162,6 +178,7 @@ function onOpenChange(val: boolean) {
             hoveredGroupKey &&
             groups.find((g) => g.key === hoveredGroupKey)?.options.length
           "
+          data-cascade-submenu
           class="fixed z-[201] min-w-48 max-h-[80vh] overflow-y-auto rounded-md bg-popover p-1 text-popover-foreground shadow-md"
           :style="{
             top: `${submenuPosition.top}px`,
