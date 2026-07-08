@@ -1,5 +1,6 @@
 import { request as httpRequest } from "http";
 import { request as httpsRequest } from "https";
+import { buildUpstreamUrl } from "../proxy/transport/shared.js";
 
 const DEFAULT_STATUS_CODE = 502;
 const HTTP_OK = 200;
@@ -39,8 +40,12 @@ interface ChatCompletionResponse {
 }
 
 export function callLLM(options: CallLLMOptions): Promise<CallLLMResult> {
+  // 复用代理层 buildUpstreamUrl，确保与正常代理请求使用同一套 URL 拼接逻辑，
+  // 兼容 base_url 已含完整 endpoint 而 upstream_path 为空的 provider 配置。
+  // 若用 new URL(path, baseUrl)，当 path 为绝对路径时会丢弃 baseUrl 的 path 部分，
+  // 导致 https://host/zen/go/v1/chat/completions + 默认 path → https://host/v1/chat/completions (404)。
   const path = options.upstreamPath ?? DEFAULT_UPSTREAM_PATH;
-  const url = new URL(path, options.baseUrl);
+  const url = new URL(buildUpstreamUrl(options.baseUrl, path));
 
   const requestBody: Record<string, unknown> = {
     model: options.model,
@@ -90,7 +95,7 @@ export function callLLM(options: CallLLMOptions): Promise<CallLLMResult> {
         const statusCode = res.statusCode ?? DEFAULT_STATUS_CODE;
 
         if (statusCode < HTTP_OK || statusCode >= HTTP_MULTIPLE_CHOICES) {
-          reject(new Error(`LLM API error: status code ${statusCode}`));
+          reject(new Error(`LLM API error: status ${statusCode} from ${url.href}`));
           return;
         }
 

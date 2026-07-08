@@ -42,6 +42,27 @@ function createMockLLMServer(
   });
 }
 
+/** Mock LLM server that captures the request path — 用于验证 callLLM 的 URL 拼接 */
+function createMockLLMServerWithCapture(
+  response: Record<string, unknown>,
+  capturePath?: { value: string },
+): Promise<{ server: Server; port: number }> {
+  const server = createServer((req, res) => {
+    if (capturePath && req.url) {
+      capturePath.value = req.url;
+    }
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify(response));
+  });
+  return new Promise((resolve) => {
+    server.listen(0, () => {
+      const addr = server.address();
+      const port = typeof addr === "object" && addr ? addr.port : 0;
+      resolve({ server, port });
+    });
+  });
+}
+
 function closeMockServer(server: Server): Promise<void> {
   return new Promise((resolve) => {
     server.close(() => resolve());
@@ -948,6 +969,167 @@ describe("AI Retry Rule", () => {
       const responseBodySection = userMessage!.content.split("Response Body:\n")[1];
       expect(responseBodySection).toBeDefined();
       expect(responseBodySection!.length).toBeLessThanOrEqual(4000);
+    } finally {
+      await closeMockServer(mockLLM.server);
+    }
+  });
+
+  // ===== URL 拼接修复 (callLLM 复用 buildUpstreamUrl) =====
+
+  const VALID_RULE_RESPONSE = {
+    choices: [
+      {
+        message: {
+          content: JSON.stringify({
+            summary: "检测到 503 过载",
+            name: "URL Test 503 Retry",
+            status_code: 503,
+            body_pattern: "overloaded",
+            retry_strategy: "exponential",
+            retry_delay_ms: 5000,
+            max_retries: 10,
+            max_delay_ms: 60000,
+          }),
+        },
+      },
+    ],
+  };
+
+  /** 简化：插入错误日志 + 配 AI config 指向 providerId */
+  async function setupErrorLogAndConfig(providerId: string, logId: string) {
+    await app.inject({
+      method: "PUT",
+      url: "/admin/api/proxy-enhancement",
+      headers: { cookie, "content-type": "application/json" },
+      payload: {
+        tool_call_loop_enabled: false,
+        stream_loop_enabled: false,
+        tool_round_limit_enabled: true,
+        tool_error_logging_enabled: false,
+        ai_retry_config: { provider_id: providerId, model: "test-model" },
+      },
+    });
+    insertRequestLog(db, {
+      id: logId,
+      api_type: "openai",
+      model: "test-model",
+      provider_id: providerId,
+      status_code: 503,
+      latency_ms: 32,
+      is_stream: 0,
+      error_message: "overloaded",
+      created_at: new Date().toISOString(),
+    });
+  }
+
+  it("TC-URL-1: upstream_path=null + base_url 含完整 endpoint → 复用 base_url (复现 nuc5 opencode 404)", async () => {
+    const capturedPath = { value: "" };
+    const mockLLM = await createMockLLMServerWithCapture(VALID_RULE_RESPONSE, capturedPath);
+    try {
+      // base_url 已含完整 endpoint，upstream_path 不传（默认 null）
+      const providerId = createProvider(db, {
+        name: "Opencode Go",
+        api_type: "openai",
+        base_url: `http://127.0.0.1:${mockLLM.port}/zen/go/v1/chat/completions`,
+        api_key: encryptedApiKey,
+        is_active: 1,
+        max_concurrency: 10,
+        queue_timeout_ms: 30000,
+        max_queue_size: 100,
+      });
+
+      await setupErrorLogAndConfig(providerId, "url-test-log-1");
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/admin/api/retry-rules/ai-generate",
+        headers: { cookie, "content-type": "application/json" },
+        payload: { log_id: "url-test-log-1" },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.data.success).toBe(true);
+      // 关键断言：请求打到了 base_url 的完整 path，而非被 new URL 截断为 /v1/chat/completions
+      expect(capturedPath.value).toBe("/zen/go/v1/chat/completions");
+    } finally {
+      await closeMockServer(mockLLM.server);
+    }
+  });
+
+  it("TC-URL-2: upstream_path=null + base_url 仅 origin → 追加默认 /v1/chat/completions (回归保护)", async () => {
+    const capturedPath = { value: "" };
+    const mockLLM = await createMockLLMServerWithCapture(VALID_RULE_RESPONSE, capturedPath);
+    try {
+      // base_url 仅 origin（如 https://api.deepseek.com），upstream_path 不传（默认 null）
+      const providerId = createProvider(db, {
+        name: "DeepSeek Origin Only",
+        api_type: "openai",
+        base_url: `http://127.0.0.1:${mockLLM.port}`,
+        api_key: encryptedApiKey,
+        is_active: 1,
+        max_concurrency: 10,
+        queue_timeout_ms: 30000,
+        max_queue_size: 100,
+      });
+
+      await setupErrorLogAndConfig(providerId, "url-test-log-2");
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/admin/api/retry-rules/ai-generate",
+        headers: { cookie, "content-type": "application/json" },
+        payload: { log_id: "url-test-log-2" },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.data.success).toBe(true);
+      // 默认 path 被追加
+      expect(capturedPath.value).toBe("/v1/chat/completions");
+    } finally {
+      await closeMockServer(mockLLM.server);
+    }
+  });
+
+  it("TC-EP-1: provider 仅配 endpoints 数组 (ADR 0006) → resolveEndpoint 正确解析 openai endpoint", async () => {
+    const capturedPath = { value: "" };
+    const mockLLM = await createMockLLMServerWithCapture(VALID_RULE_RESPONSE, capturedPath);
+    try {
+      // 旧字段 base_url/upstream_path 为占位空值，真实端点只在 endpoints 数组里
+      const providerId = createProvider(db, {
+        name: "Multi Endpoint Provider",
+        api_type: "openai",
+        base_url: "",
+        upstream_path: null,
+        api_key: encryptedApiKey,
+        is_active: 1,
+        max_concurrency: 10,
+        queue_timeout_ms: 30000,
+        max_queue_size: 100,
+        endpoints: JSON.stringify([
+          {
+            api_type: "openai",
+            base_url: `http://127.0.0.1:${mockLLM.port}/zen/go/v1/chat/completions`,
+            upstream_path: null,
+          },
+        ]),
+      });
+
+      await setupErrorLogAndConfig(providerId, "ep-test-log-1");
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/admin/api/retry-rules/ai-generate",
+        headers: { cookie, "content-type": "application/json" },
+        payload: { log_id: "ep-test-log-1" },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.data.success).toBe(true);
+      // resolveEndpoint 应从 endpoints 数组取出 openai endpoint 的 base_url
+      expect(capturedPath.value).toBe("/zen/go/v1/chat/completions");
     } finally {
       await closeMockServer(mockLLM.server);
     }

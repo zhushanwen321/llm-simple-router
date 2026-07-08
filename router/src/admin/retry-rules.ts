@@ -16,7 +16,7 @@ import { getActiveRetryRules } from "../db/retry-rules.js";
 import { getRequestLogById } from "../db/logs.js";
 import { getProviderById } from "../db/providers.js";
 import { getSetting } from "../db/settings.js";
-import { decrypt } from "../utils/crypto.js";
+import { resolveEndpoint } from "../proxy/routing/resolve-endpoint.js";
 import type { StateRegistry } from "../core/registry.js";
 import { HTTP_OK, HTTP_BAD_REQUEST, HTTP_CREATED, HTTP_NOT_FOUND } from "../core/constants.js";
 import { API_CODE, apiError } from "./api-response.js";
@@ -427,14 +427,16 @@ export const adminRetryRuleRoutes: FastifyPluginCallback<RetryRuleRoutesOptions>
       return reply.send({ success: false, error: "AI provider not found" });
     }
 
-    // 6. Decrypt API key
+    // 6. Resolve openai endpoint (兼容 legacy 字段与 ADR 0006 endpoints 数组) + decrypt api key
+    // AI 生成固定走 openai chat 格式，与 resolveEndpoint 的消费者一致，
+    // 避免直读 provider.base_url/upstream_path 旧字段在 endpoints 配置形态下拿到空值。
     const encryptionKey = getSetting(db, "encryption_key");
     if (!encryptionKey) {
       return reply.send({ success: false, error: "Encryption key not set" });
     }
-    let apiKey: string;
+    let endpoint: { base_url: string; upstream_path: string | null; api_key: string };
     try {
-      apiKey = decrypt(provider.api_key, encryptionKey);
+      endpoint = resolveEndpoint(provider, "openai", encryptionKey);
     } catch {
       return reply.send({ success: false, error: "Failed to decrypt API key" });
     }
@@ -448,9 +450,9 @@ export const adminRetryRuleRoutes: FastifyPluginCallback<RetryRuleRoutesOptions>
     let llmResult: { content: string };
     try {
       llmResult = await callLLM({
-        baseUrl: provider.base_url,
-        upstreamPath: provider.upstream_path,
-        apiKey,
+        baseUrl: endpoint.base_url,
+        upstreamPath: endpoint.upstream_path,
+        apiKey: endpoint.api_key,
         model: aiConfig.model,
         messages: [
           { role: "system", content: systemPrompt },
