@@ -74,8 +74,9 @@ describe("getStats with computeBucketBoundary routing", () => {
     seedAgg(oneHourAgo, { requestCount: 5, sumInputTokens: 500, sumOutputTokens: 250 });
 
     // Query a range entirely before the current bucket (1 day ago to 30 min ago)
-    const start = new Date(Date.now() - 86400_000).toISOString();
-    const end = new Date(Date.now() - 1800_000).toISOString();
+    // Use SQLite datetime format to match computeBucketBoundary output
+    const start = toSQLiteDatetime(new Date(Date.now() - 86400_000));
+    const end = toSQLiteDatetime(new Date(Date.now() - 1800_000));
 
     const stats = getStats(db, start, end);
     expect(stats.totalRequests).toBe(5);
@@ -93,8 +94,9 @@ describe("getStats with computeBucketBoundary routing", () => {
     seedDetail("m-cross-detail", now, { statusCode: 200, inputTokens: 200, outputTokens: 100, totalDurationMs: 1000 });
 
     // Query a wide range that spans from 2 hours ago to 1 min from now
-    const start = new Date(Date.now() - 7200_000).toISOString();
-    const end = new Date(Date.now() + 60_000).toISOString();
+    // Use SQLite datetime format to match computeBucketBoundary output
+    const start = toSQLiteDatetime(new Date(Date.now() - 7200_000));
+    const end = toSQLiteDatetime(new Date(Date.now() + 60_000));
 
     const stats = getStats(db, start, end);
     expect(stats.totalRequests).toBe(11); // 10 agg + 1 detail
@@ -105,8 +107,8 @@ describe("getStats with computeBucketBoundary routing", () => {
   });
 
   it("empty database returns zero stats", () => {
-    const start = new Date(Date.now() - 3600_000).toISOString();
-    const end = new Date(Date.now() + 60_000).toISOString();
+    const start = toSQLiteDatetime(new Date(Date.now() - 3600_000));
+    const end = toSQLiteDatetime(new Date(Date.now() + 60_000));
 
     const stats = getStats(db, start, end);
     expect(stats.totalRequests).toBe(0);

@@ -2,6 +2,7 @@ import Database from "better-sqlite3";
 import { randomUUID } from "crypto";
 import { MS_PER_SECOND } from "../core/constants.js";
 import { getCachedStmt } from "./helpers.js";
+import { toSqliteDatetime } from "../utils/datetime.js";
 import { queryAggSummary, queryAggTimeseries } from "./metrics-10min.js";
 
 export type MetricsPeriod = "1h" | "5h" | "6h" | "24h" | "7d" | "30d";
@@ -167,7 +168,7 @@ const BUCKET_SECONDS = 600; // 10 minutes
  */
 function computeBucketBoundary(): string {
   const bucketStartSec = Math.floor(Date.now() / MS_PER_SECOND / BUCKET_SECONDS) * BUCKET_SECONDS;
-  return new Date(bucketStartSec * MS_PER_SECOND).toISOString();
+  return toSqliteDatetime(new Date(bucketStartSec * MS_PER_SECOND));
 }
 
 function queryAggRouterKeyIdCondition(routerKeyId?: string): {

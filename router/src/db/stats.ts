@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import { queryAggStats, BUCKET_SECONDS } from "./metrics-10min.js";
 import { MS_PER_SECOND } from "../core/constants.js";
+import { toSqliteDatetime } from "../utils/datetime.js";
 
 /** 获取指定条件下的最近一条 metric 的 created_at（用于窗口补齐定位，不限制 is_complete） */
 export function getLatestMetricTime(
@@ -51,7 +52,7 @@ interface StatsRow {
  */
 export function computeBucketBoundary(): string {
   const bucketStartSec = Math.floor(Date.now() / MS_PER_SECOND / BUCKET_SECONDS) * BUCKET_SECONDS;
-  return new Date(bucketStartSec * MS_PER_SECOND).toISOString();
+  return toSqliteDatetime(new Date(bucketStartSec * MS_PER_SECOND));
 }
 
 export function getStats(
