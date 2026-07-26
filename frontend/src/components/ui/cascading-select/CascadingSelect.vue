@@ -100,6 +100,23 @@ function onPointerDownOutside(e: PointerDownOutsideEvent) {
   }
 }
 
+/**
+ * [HISTORICAL] capture 阶段拦截子菜单内 pointerdown，阻止其冒泡到 document。
+ *
+ * 根因：子菜单 Teleport 到 body 后不在任何 DismissableLayer 内。reka-ui 的
+ * Dialog（外层 DismissableLayer）在 document 上监听 pointerdown，判定点击落在
+ * 自己 layer 外就把整个 Dialog 关闭——这是「Dialog 内选模型选不中」的根因。
+ * 上面的 onPointerDownOutside.preventDefault 只拦得住 Popover 自身 dismiss，
+ * 拦不住外层 Dialog；在 capture 阶段 stopPropagation 才能从根上切断。
+ *
+ * 不影响后续 click：pointerdown.preventDefault 只阻止默认行为（焦点转移等），
+ * 不阻止浏览器后续派发 click 事件，selectOption 仍正常触发。
+ * 实测验证：ModelMappings 新建分组 Dialog + Schedules 规则 Dialog 均恢复正常。
+ */
+function onSubmenuPointerDown(e: PointerEvent) {
+  e.stopPropagation();
+}
+
 const displayText = computed(() => {
   if (!props.modelValue) return "";
   const group = props.groups.find((g) => g.key === props.modelValue!.groupKey);
@@ -186,6 +203,7 @@ function onOpenChange(val: boolean) {
           }"
           @mouseenter="onSubmenuEnter"
           @mouseleave="onSubmenuLeave"
+          @pointerdown.capture="onSubmenuPointerDown"
         >
           <div
             v-for="option in groups.find((g) => g.key === hoveredGroupKey)
