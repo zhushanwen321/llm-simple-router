@@ -124,4 +124,79 @@ describe("OpenAIToAnthropicTransform", () => {
     const stopIdx = result.indexOf("event: message_stop");
     expect(deltaIdx).toBeLessThan(stopIdx);
   });
+
+  // ============================================================
+  // UTF-8 边界测试
+  // ============================================================
+
+  it("UTF-8: 中文字符跨 chunk 传输（回归测试）", async () => {
+    const t = new OpenAIToAnthropicTransform("gpt-4");
+    const output = collectOutput(t);
+
+    // 构造包含中文的 OpenAI SSE chunk
+    const fullChunk = 'data: {"choices":[{"delta":{"content":"执行审计"}}]}\n\n';
+    const buffer = Buffer.from(fullChunk, "utf-8");
+
+    // "执" 是 3 字节 UTF-8 (0xE6 0x89 0xA7)，在第 2 字节处截断
+    const charOffset = buffer.indexOf(Buffer.from("执"));
+    const splitPoint = charOffset + 2; // "执" 的前 2 字节
+    const chunk1 = buffer.subarray(0, splitPoint);
+    const chunk2 = buffer.subarray(splitPoint);
+
+    // 当前实现：chunk.toString('utf-8') 会产生 U+FFFD
+    // 这是回归测试，记录当前行为
+    t.write(chunk1);
+    t.write(chunk2);
+    t.write('data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n');
+    t.write('data: {"usage":{"prompt_tokens":10,"completion_tokens":5}}\n\n');
+    t.end();
+
+    const result = await output;
+    // 应该包含 content_block_delta 事件
+    expect(result).toContain("event: content_block_delta");
+    // 当前行为：可能包含 U+FFFD（乱码）
+    // 修复后：应该包含完整的 "执行审计"
+    expect(result).toContain("text_delta");
+  });
+
+  it("UTF-8: 完整中文字符不产生乱码", async () => {
+    const t = new OpenAIToAnthropicTransform("gpt-4");
+    const output = collectOutput(t);
+
+    // 完整 chunk，不截断
+    t.write('data: {"choices":[{"delta":{"content":"执行审计"}}]}\n\n');
+    t.write('data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n');
+    t.write('data: {"usage":{"prompt_tokens":10,"completion_tokens":5}}\n\n');
+    t.end();
+
+    const result = await output;
+    expect(result).toContain("执行审计");
+    expect(result).not.toContain("\uFFFD");
+  });
+
+  it("UTF-8: reasoning_content 中文字符跨 chunk", async () => {
+    const t = new OpenAIToAnthropicTransform("o1");
+    const output = collectOutput(t);
+
+    // 构造包含中文的 reasoning_content
+    const fullChunk = 'data: {"choices":[{"delta":{"reasoning_content":"让我思考一下"}}]}\n\n';
+    const buffer = Buffer.from(fullChunk, "utf-8");
+
+    // "让" 是 3 字节 UTF-8，在第 1 字节处截断
+    const charOffset = buffer.indexOf(Buffer.from("让"));
+    const splitPoint = charOffset + 1;
+    const chunk1 = buffer.subarray(0, splitPoint);
+    const chunk2 = buffer.subarray(splitPoint);
+
+    t.write(chunk1);
+    t.write(chunk2);
+    t.write('data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n');
+    t.write('data: {"usage":{"prompt_tokens":10,"completion_tokens":5}}\n\n');
+    t.end();
+
+    const result = await output;
+    // 应该包含 thinking 事件
+    expect(result).toContain("event: content_block_start");
+    expect(result).toContain("thinking_delta");
+  });
 });

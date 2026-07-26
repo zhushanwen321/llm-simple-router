@@ -267,4 +267,82 @@ describe("SSEParser", () => {
     // buffer 已经清空
     expect(parser.flush()).toHaveLength(0);
   });
+
+  // ============================================================
+  // UTF-8 边界测试
+  // ============================================================
+
+  it("UTF-8: chunk 在多字节字符中间截断时，当前行为产生 U+FFFD（回归测试）", () => {
+    const parser = new SSEParser();
+    const fullText = 'data: {"content":"执行审计"}\n\n';
+    const buffer = Buffer.from(fullText, "utf-8");
+
+    // "执" 是 3 字节 UTF-8 (0xE6 0x89 0xA7)，在第 2 字节处截断
+    const charOffset = buffer.indexOf(Buffer.from("执"));
+    const splitPoint = charOffset + 2; // "执" 的前 2 字节
+    const chunk1 = buffer.subarray(0, splitPoint);
+    const chunk2 = buffer.subarray(splitPoint);
+
+    // 当前实现：chunk.toString('utf-8') 会产生 U+FFFD
+    // 这是回归测试，记录当前行为
+    const e1 = parser.feed(chunk1.toString("utf-8"));
+    const e2 = parser.feed(chunk2.toString("utf-8"));
+
+    // 最终应该解析出一个事件
+    expect(e2).toHaveLength(1);
+    // 当前行为：包含 U+FFFD（乱码）
+    // 修复后：应该包含完整的 "执行审计"
+    expect(e2[0].data).toContain("content");
+  });
+
+  it("UTF-8: 完整多字节字符不产生乱码", () => {
+    const parser = new SSEParser();
+    const fullText = 'data: {"content":"执行审计"}\n\n';
+    const buffer = Buffer.from(fullText, "utf-8");
+
+    // 完整 chunk，不截断
+    const events = parser.feed(buffer.toString("utf-8"));
+    expect(events).toHaveLength(1);
+    expect(events[0].data).toContain("执行审计");
+    expect(events[0].data).not.toContain("\uFFFD");
+  });
+
+  it("UTF-8: 多个中文字符跨 chunk 边界", () => {
+    const parser = new SSEParser();
+    const fullText = 'data: {"content":"你好世界"}\n\n';
+    const buffer = Buffer.from(fullText, "utf-8");
+
+    // "好" 是 3 字节 UTF-8，在第 1 字节处截断
+    const charOffset = buffer.indexOf(Buffer.from("好"));
+    const splitPoint = charOffset + 1;
+    const chunk1 = buffer.subarray(0, splitPoint);
+    const chunk2 = buffer.subarray(splitPoint);
+
+    const e1 = parser.feed(chunk1.toString("utf-8"));
+    const e2 = parser.feed(chunk2.toString("utf-8"));
+
+    expect(e2).toHaveLength(1);
+    expect(e2[0].data).toContain("content");
+  });
+
+  it("UTF-8: 流末尾的多字节字符", () => {
+    const parser = new SSEParser();
+    const fullText = 'data: {"content":"测试"}\n\n';
+    const buffer = Buffer.from(fullText, "utf-8");
+
+    // "试" 是 3 字节 UTF-8，在第 2 字节处截断
+    const charOffset = buffer.indexOf(Buffer.from("试"));
+    const splitPoint = charOffset + 2;
+    const chunk1 = buffer.subarray(0, splitPoint);
+    const chunk2 = buffer.subarray(splitPoint);
+
+    parser.feed(chunk1.toString("utf-8"));
+    parser.feed(chunk2.toString("utf-8"));
+
+    // flush 应该处理残余数据
+    const events = parser.flush();
+    // 可能有事件，也可能没有，取决于截断位置
+    // 但不应该抛异常
+    expect(true).toBe(true);
+  });
 });

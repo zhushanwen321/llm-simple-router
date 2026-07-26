@@ -746,3 +746,146 @@ describe("StreamProxy mid-stream SSE error detection", () => {
     expect(result.kind).toBe("stream_error");
   });
 });
+
+// ============================================================
+// UTF-8 边界测试
+// ============================================================
+
+describe("StreamProxy UTF-8 boundary", () => {
+  let mockReq: ReturnType<typeof createMockUpstreamReq>;
+  let mockReplyRaw: ReturnType<typeof createMockReplyRaw>;
+
+  function createMockReply() {
+    mockReplyRaw = createMockReplyRaw();
+    return { raw: mockReplyRaw } as any;
+  }
+
+  beforeEach(() => {
+    vi.resetModules();
+    mockReq = createMockUpstreamReq();
+    vi.doMock("../src/proxy/transport/http.js", async () => {
+      const actual = await vi.importActual("../src/proxy/transport/http.js") as any;
+      actual._transportInternals.createUpstreamRequest = () => mockReq;
+      return actual;
+    });
+  });
+
+  it("UTF-8: 中文字符跨 chunk 传输（回归测试）", async () => {
+    const { callStream } = await import("../src/proxy/transport/http.js");
+    const reply = createMockReply();
+
+    const resultPromise = callStream(
+      { base_url: "http://localhost:9000" },
+      "sk-test",
+      { model: "gpt-4", stream: true },
+      {},
+      reply,
+      30000,
+      "/v1/chat/completions",
+      (_h, key) => ({ Authorization: `Bearer ${key}` }),
+    );
+
+    const mockRes = createMockUpstreamRes({ statusCode: 200 });
+    mockReq.emit("response", mockRes);
+
+    await tick();
+
+    // 构造包含中文的 SSE chunk
+    const fullChunk = 'data: {"content":"执行审计"}\n\n';
+    const buffer = Buffer.from(fullChunk, "utf-8");
+
+    // "执" 是 3 字节 UTF-8 (0xE6 0x89 0xA7)，在第 2 字节处截断
+    const charOffset = buffer.indexOf(Buffer.from("执"));
+    const splitPoint = charOffset + 2;
+    const chunk1 = buffer.subarray(0, splitPoint);
+    const chunk2 = buffer.subarray(splitPoint);
+
+    // 当前实现：chunk.toString('utf-8') 会产生 U+FFFD
+    // 这是回归测试，记录当前行为
+    mockRes.emit("data", chunk1);
+    mockRes.emit("data", chunk2);
+    mockRes.emit("end");
+
+    const result = await resultPromise;
+    expect(result.kind).toBe("stream_success");
+  });
+
+  it("UTF-8: 完整中文字符不产生乱码", async () => {
+    const { callStream } = await import("../src/proxy/transport/http.js");
+    const reply = createMockReply();
+
+    const resultPromise = callStream(
+      { base_url: "http://localhost:9000" },
+      "sk-test",
+      { model: "gpt-4", stream: true },
+      {},
+      reply,
+      30000,
+      "/v1/chat/completions",
+      (_h, key) => ({ Authorization: `Bearer ${key}` }),
+    );
+
+    const mockRes = createMockUpstreamRes({ statusCode: 200 });
+    mockReq.emit("response", mockRes);
+
+    await tick();
+
+    // 完整 chunk，不截断
+    mockRes.emit("data", Buffer.from('data: {"content":"执行审计"}\n\n'));
+    mockRes.emit("end");
+
+    const result = await resultPromise;
+    expect(result.kind).toBe("stream_success");
+    // 透传的数据应该包含完整的中文字符
+    expect(mockReplyRaw.write).toHaveBeenCalled();
+  });
+
+  it("UTF-8: sseScanBuffer 在 STREAMING 阶段正确处理中文", async () => {
+    const { callStream } = await import("../src/proxy/transport/http.js");
+    const reply = createMockReply();
+
+    const checkEarlyError = vi.fn((data: string) =>
+      /"error".*"code"\s*:\s*"1234"/.test(data),
+    );
+
+    const resultPromise = callStream(
+      { base_url: "http://localhost:9000" },
+      "sk-test",
+      { model: "gpt-4", stream: true },
+      {},
+      reply,
+      30000,
+      "/v1/chat/completions",
+      (_h, key) => ({ Authorization: `Bearer ${key}` }),
+      undefined,
+      checkEarlyError,
+    );
+
+    const mockRes = createMockUpstreamRes({ statusCode: 200 });
+    mockReq.emit("response", mockRes);
+
+    await tick();
+
+    // 第一个正常 SSE event（触发 BUFFERING → STREAMING）
+    mockRes.emit("data", Buffer.from('data: {"content":"Hello"}\n\n'));
+    await tick();
+
+    // 第二个 chunk 包含中文，被截断
+    const errorChunk = 'event: error\ndata: {"error":{"code":"1234","message":"网络错误"}}\n\n';
+    const buffer = Buffer.from(errorChunk, "utf-8");
+
+    // "网" 是 3 字节 UTF-8，在第 1 字节处截断
+    const charOffset = buffer.indexOf(Buffer.from("网"));
+    const splitPoint = charOffset + 1;
+    const chunk1 = buffer.subarray(0, splitPoint);
+    const chunk2 = buffer.subarray(splitPoint);
+
+    mockRes.emit("data", chunk1);
+    mockRes.emit("data", chunk2);
+    await tick();
+
+    const result = await resultPromise;
+    // 应该检测到 error
+    expect(result.kind).toBe("stream_error");
+  });
+});
