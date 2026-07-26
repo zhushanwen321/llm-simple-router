@@ -1,0 +1,6 @@
+{
+  "testRunner": {
+    "cwd": "router",
+    "command": "npx vitest run tests/sse-parser.test.ts tests/proxy/transform/stream-transform-oa2ant.test.ts tests/sse-metrics-transform.test.ts tests/transport.test.ts"
+  }
+}
