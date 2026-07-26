@@ -50,6 +50,9 @@ export class StreamProxy {
 
   // 流式阶段 SSE error 扫描缓冲(跨 chunk 边界匹配)
   private sseScanBuffer = "";
+  // 使用 TextDecoder 的 stream 模式处理 UTF-8 多字节字符边界
+  // 避免 chunk.toString('utf-8') 在多字节字符截断时产生 U+FFFD
+  private sseDecoder = new TextDecoder("utf-8", { fatal: false });
   private static readonly SSE_SCAN_MAX = 8 * 1024; // eslint-disable-line no-magic-numbers -- 8KB scan buffer
 
   constructor(
@@ -308,7 +311,9 @@ export class StreamProxy {
 
     // STREAMING 阶段:扫描 SSE error event(处理跨 chunk 边界)
     if (this.state === "STREAMING" && this.checkEarlyError) {
-      this.sseScanBuffer += chunk.toString("utf-8");
+      // 使用 stream: true 模式，TextDecoder 会缓存不完整的字节序列
+      // 等下一个 chunk 到达时再拼接解码，避免产生 U+FFFD
+      this.sseScanBuffer += this.sseDecoder.decode(chunk, { stream: true });
       // 保留最近 SSE_SCAN_MAX 字符,避免无限增长
       if (this.sseScanBuffer.length > StreamProxy.SSE_SCAN_MAX) {
         this.sseScanBuffer = this.sseScanBuffer.slice(-StreamProxy.SSE_SCAN_MAX);
