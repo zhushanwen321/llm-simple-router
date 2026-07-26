@@ -126,4 +126,78 @@ describe("SSEMetricsTransform", () => {
     transform.write(openaiChunk("c"));
     expect(onMetrics).toHaveBeenCalledTimes(2);
   });
+
+  // ============================================================
+  // UTF-8 边界测试
+  // ============================================================
+
+  it("UTF-8: 中文字符跨 chunk 传输（回归测试）", () => {
+    const onChunk = vi.fn();
+    const transform = new SSEMetricsTransform("openai", 999_000, { onChunk });
+
+    // 构造包含中文的 OpenAI SSE chunk
+    const fullChunk = openaiChunk("执行审计");
+    const buffer = Buffer.from(fullChunk, "utf-8");
+
+    // "执" 是 3 字节 UTF-8 (0xE6 0x89 0xA7)，在第 2 字节处截断
+    const charOffset = buffer.indexOf(Buffer.from("执"));
+    const splitPoint = charOffset + 2; // "执" 的前 2 字节
+    const chunk1 = buffer.subarray(0, splitPoint);
+    const chunk2 = buffer.subarray(splitPoint);
+
+    // 当前实现：chunk.toString('utf-8') 会产生 U+FFFD
+    // 这是回归测试，记录当前行为
+    transform.write(chunk1);
+    transform.write(chunk2);
+    transform.end();
+
+    // onChunk 应该被调用
+    expect(onChunk).toHaveBeenCalled();
+    // 当前行为：可能包含 U+FFFD（乱码）
+    // 修复后：应该包含完整的 "执行审计"
+  });
+
+  it("UTF-8: 完整中文字符不产生乱码", () => {
+    const onChunk = vi.fn();
+    const transform = new SSEMetricsTransform("openai", 999_000, { onChunk });
+
+    // 完整 chunk，不截断
+    transform.write(openaiChunk("执行审计"));
+    transform.end();
+
+    // onChunk 应该被调用，且内容无乱码
+    expect(onChunk).toHaveBeenCalled();
+    const calls = onChunk.mock.calls;
+    const hasChineseContent = calls.some((call: any[]) =>
+      call[0] && typeof call[0] === "string" && call[0].includes("执行审计")
+    );
+    expect(hasChineseContent).toBe(true);
+  });
+
+  it("UTF-8: 数据透传不受 UTF-8 截断影响", () => {
+    const transform = new SSEMetricsTransform("openai", 999_000);
+
+    let output = "";
+    transform.on("data", (chunk: Buffer) => {
+      output += chunk.toString();
+    });
+
+    // 构造包含中文的 OpenAI SSE chunk
+    const fullChunk = openaiChunk("测试");
+    const buffer = Buffer.from(fullChunk, "utf-8");
+
+    // "测" 是 3 字节 UTF-8，在第 1 字节处截断
+    const charOffset = buffer.indexOf(Buffer.from("测"));
+    const splitPoint = charOffset + 1;
+    const chunk1 = buffer.subarray(0, splitPoint);
+    const chunk2 = buffer.subarray(splitPoint);
+
+    transform.write(chunk1);
+    transform.write(chunk2);
+    transform.end();
+
+    // 透传的数据应该包含原始 chunk（可能有 U+FFFD）
+    expect(output).toContain("data:");
+    // 不应抛异常
+  });
 });

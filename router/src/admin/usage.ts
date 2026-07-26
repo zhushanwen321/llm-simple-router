@@ -6,6 +6,7 @@ import { getProviderById } from "../db/index.js";
 import { MS_PER_SECOND } from "../core/constants.js";
 import { BUCKET_SECONDS } from "../db/metrics-10min.js";
 import { resolveTimeRange } from "../utils/time-range.js";
+import { toSqliteDatetime } from "../utils/datetime.js";
 
 interface UsageRoutesOptions {
   db: Database.Database;
@@ -30,7 +31,7 @@ interface DailyUsageRow {
 
 function computeBucketBoundary(): string {
   const bucketStartSec = Math.floor(Date.now() / MS_PER_SECOND / BUCKET_SECONDS) * BUCKET_SECONDS;
-  return new Date(bucketStartSec * MS_PER_SECOND).toISOString();
+  return toSqliteDatetime(new Date(bucketStartSec * MS_PER_SECOND));
 }
 
 function queryAggDailyUsage(
