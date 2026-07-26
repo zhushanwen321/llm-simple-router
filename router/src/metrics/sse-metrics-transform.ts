@@ -32,6 +32,9 @@ export class SSEMetricsTransform extends Transform {
   private throttleMs: number;
   private lastCallbackTime: number = 0;
   private flushed = false;
+  // 使用 TextDecoder 的 stream 模式处理 UTF-8 多字节字符边界
+  // 避免 chunk.toString('utf-8') 在多字节字符截断时产生 U+FFFD
+  private decoder = new TextDecoder("utf-8", { fatal: false });
 
   constructor(
     apiType: "openai" | "openai-responses" | "anthropic",
@@ -49,7 +52,9 @@ export class SSEMetricsTransform extends Transform {
   }
 
   _transform(chunk: Buffer, _encoding: BufferEncoding, callback: TransformCallback): void {
-    const text = chunk.toString("utf-8");
+    // 使用 stream: true 模式，TextDecoder 会缓存不完整的字节序列
+    // 等下一个 chunk 到达时再拼接解码，避免产生 U+FFFD
+    const text = this.decoder.decode(chunk, { stream: true });
     const events = this.parser.feed(text);
     for (const event of events) {
       this.extractor.processEvent(event);
@@ -63,6 +68,18 @@ export class SSEMetricsTransform extends Transform {
   }
 
   _flush(callback: TransformCallback): void {
+    // 处理 TextDecoder 中缓存的残余字节（流结束时可能有不完整的字节序列）
+    const remaining = this.decoder.decode();
+    if (remaining) {
+      const events = this.parser.feed(remaining);
+      for (const event of events) {
+        this.extractor.processEvent(event);
+        this.emitContentDelta(event);
+        if (event.data != null && this.onChunk) {
+          this.onChunk(`data: ${event.data}`);
+        }
+      }
+    }
     const events = this.parser.flush();
     for (const event of events) {
       this.extractor.processEvent(event);
@@ -78,6 +95,15 @@ export class SSEMetricsTransform extends Transform {
 
   /** Flush SSE parser 缓冲区并处理残余事件，确保 extractor 状态完整 */
   flushParser(): void {
+    // 处理 TextDecoder 中缓存的残余字节
+    const remaining = this.decoder.decode();
+    if (remaining) {
+      const events = this.parser.feed(remaining);
+      for (const event of events) {
+        this.extractor.processEvent(event);
+        this.emitContentDelta(event);
+      }
+    }
     const events = this.parser.flush();
     for (const event of events) {
       this.extractor.processEvent(event);
