@@ -14,10 +14,12 @@
 import { randomUUID } from "crypto";
 import type { FastifyReply } from "fastify";
 import { getProviderById } from "../../db/index.js";
+import { getSessionBinding } from "../../db/session-states.js";
 import { insertRejectedLog } from "../log-helpers.js";
 import { getSetting } from "../../db/settings.js";
 import { resolveMapping, filterExcluded } from "../routing/mapping-resolver.js";
 import { expandOverflowTargets } from "../routing/overflow.js";
+import type { CircuitBreaker } from "../routing/circuit-breaker.js";
 import { computeModalityRedirectTargets } from "../routing/modality-redirect.js";
 import { getConfig } from "../../config/index.js";
 import type { ProxyErrorFormatter } from "../proxy-core.js";
@@ -28,7 +30,7 @@ import { loadEnhancementConfig } from "../routing/enhancement-config.js";
 import { extractFailedToolResults } from "./proxy-handler-utils.js";
 import type { FailedToolResult } from "./proxy-handler-utils.js";
 import { logToolErrors } from "../tool-error-logger.js";
-import type { Target, MappingReason } from "../../core/types.js";
+import type { Target, MappingReason, ResolveResult } from "../../core/types.js";
 import type { RawHeaders } from "../types.js";
 import type { PipelineContext } from "../pipeline/types.js";
 import { PipelineSnapshot } from "../pipeline-snapshot.js";
@@ -125,6 +127,152 @@ export function precomputeFailoverTargets(input: {
   }
 
   return { ok: true, cachedTargets: allTargets, overflowIndices, resolveResult, pendingToolErrors };
+}
+
+// ---------- Circuit breaker routing helpers (design §4.4 + §5.3) ----------
+
+/** 判定 target 是否当前熔断中（OPEN 且冷却未过）。无配置 / 无 key → false */
+function isTargetMelting(
+  circuitBreaker: CircuitBreaker,
+  target: Target,
+  resolveResult: ResolveResult,
+  now: number,
+): boolean {
+  if (!target.circuit_breaker?.enabled) return false;
+  const key = circuitBreaker.buildCircuitKey(
+    resolveResult.group_id ?? null,
+    resolveResult.schedule_id,
+    target.provider_id,
+    target.backend_model,
+  );
+  if (key === null) return false;
+  return circuitBreaker.shouldSkip(key, target.circuit_breaker, now);
+}
+
+/**
+ * 计算 filtered 中首个「非 overflow 预置目标」的插入位置。
+ * overflow 预置目标保持原位在前，绑定模型前移不越过它们（设计文档 §5.3 步骤 2）。
+ */
+function firstNonOverflowInsertPos(
+  filtered: Target[],
+  cachedTargets: Target[],
+  overflowIndices: Set<number>,
+): number {
+  for (let i = 0; i < filtered.length; i++) {
+    const cachedIdx = cachedTargets.findIndex(
+      t => t.provider_id === filtered[i].provider_id && t.backend_model === filtered[i].backend_model,
+    );
+    if (cachedIdx >= 0 && overflowIndices.has(cachedIdx)) continue;
+    return i;
+  }
+  return filtered.length;
+}
+
+/**
+ * 两条例外路径（provider 不可用 / endpoint setup 异常）的熔断计数（设计文档 §4.5）。
+ *
+ * 这两条路径在 failover-loop 直接 continue、不经 processResilienceResult，
+ * 故在此单独计数（同 throw 语义：无 statusCode、不参与白名单匹配，计入 fail）。
+ * 门控：仅当链上有 CB target 且 resolved 自身配置了 CB 时才构造 key 计数。
+ */
+function recordCircuitBreakerFailure(
+  circuitBreaker: CircuitBreaker | undefined,
+  resolveResult: ResolveResult,
+  resolved: Target,
+  cachedTargets: Target[],
+): void {
+  if (!circuitBreaker) return;
+  if (!cachedTargets.some(t => t.circuit_breaker?.enabled)) return;
+  if (!resolved.circuit_breaker?.enabled) return;
+  const key = circuitBreaker.buildCircuitKey(
+    resolveResult.group_id ?? null,
+    resolveResult.schedule_id,
+    resolved.provider_id,
+    resolved.backend_model,
+  );
+  if (key === null) return;
+  circuitBreaker.recordResult(key, false, resolved.circuit_breaker, Date.now());
+}
+
+/**
+ * 应用熔断选路：绑定优先重排 + shouldSkip 过滤 + 全链回退 fail-open（设计文档 §4.4 + §5.3）。
+ *
+ * circuitBreaker 为 undefined（未注册单例）时直接透传 filterExcluded 结果，零行为变更。
+ *
+ * @returns ok=true 时 targets 至少 1 个；ok=false 时无可用候选（fail-open 已用尽或无未排除 target）
+ */
+function applyCircuitBreakerRouting(args: {
+  circuitBreaker: CircuitBreaker | undefined;
+  cachedTargets: Target[];
+  excludeTargets: Target[];
+  overflowIndices: Set<number>;
+  resolveResult: ResolveResult;
+  isFailoverIteration: boolean;
+  failOpenUsed: boolean;
+  sessionId: string | undefined;
+  routerKeyId: string | null;
+  db: Database.Database;
+}): { ok: true; targets: Target[]; cbSkipHit: boolean; failOpenUsed: boolean; bindingTarget: Target | null }
+  | { ok: false } {
+  const {
+    circuitBreaker, cachedTargets, excludeTargets, overflowIndices, resolveResult,
+    isFailoverIteration, failOpenUsed: prevFailOpenUsed, sessionId, routerKeyId, db,
+  } = args;
+
+  let filtered = filterExcluded(cachedTargets, excludeTargets);
+  let cbSkipHit = false;
+  let bindingTarget: Target | null = null;
+  const now = Date.now();
+  const hasAnyCb = circuitBreaker ? cachedTargets.some(t => t.circuit_breaker?.enabled) : false;
+
+  // a) 绑定优先（仅首次迭代，设计文档 §5.3 步骤 2）
+  if (circuitBreaker && hasAnyCb && !isFailoverIteration && sessionId && routerKeyId && resolveResult.group_id) {
+    const binding = getSessionBinding(db, routerKeyId, sessionId, resolveResult.group_id);
+    if (binding && binding.providerId) {
+      const bindingIdx = filtered.findIndex(
+        t => t.provider_id === binding.providerId && t.backend_model === binding.currentModel,
+      );
+      if (bindingIdx >= 0) {
+        const candidate = filtered[bindingIdx];
+        const bindingCachedIdx = cachedTargets.findIndex(
+          t => t.provider_id === binding.providerId && t.backend_model === binding.currentModel,
+        );
+        const isBindingOverflow = bindingCachedIdx >= 0 && overflowIndices.has(bindingCachedIdx);
+        // 绑定模型熔断中 → 不前移（§5.3 步骤 4：忽略绑定，由 b) shouldSkip 过滤移除）
+        // 绑定模型自身即 overflow 预置目标 → 无需前移
+        if (!isTargetMelting(circuitBreaker, candidate, resolveResult, now) && !isBindingOverflow) {
+          const insertPos = firstNonOverflowInsertPos(filtered, cachedTargets, overflowIndices);
+          if (bindingIdx > insertPos) {
+            const [bt] = filtered.splice(bindingIdx, 1);
+            filtered.splice(insertPos, 0, bt);
+          }
+          bindingTarget = candidate;
+        }
+      }
+    }
+  }
+
+  // b) shouldSkip 过滤（设计文档 §4.4，每迭代）
+  if (circuitBreaker && hasAnyCb) {
+    filtered = filtered.filter(t => {
+      if (!isTargetMelting(circuitBreaker, t, resolveResult, now)) return true;
+      cbSkipHit = true;
+      return false;
+    });
+  }
+
+  // c) 全链回退 fail-open（设计文档 §4.4，单次性）
+  if (filtered.length === 0) {
+    if (circuitBreaker && !prevFailOpenUsed) {
+      const fallbackTarget = filterExcluded(cachedTargets, excludeTargets)[0];
+      if (fallbackTarget) {
+        return { ok: true, targets: [fallbackTarget], cbSkipHit, failOpenUsed: true, bindingTarget: null };
+      }
+    }
+    return { ok: false };
+  }
+
+  return { ok: true, targets: filtered, cbSkipHit, failOpenUsed: prevFailOpenUsed, bindingTarget };
 }
 
 
@@ -231,6 +379,12 @@ export async function executeFailoverLoop(
   // === while(true)：纯执行循环 ===
   let failoverIteration = 0;
   let lastFailoverTrigger: string | null = null;
+  let failOpenUsed = false; // 全链回退单次性 flag（设计文档 §4.4）
+
+  // 熔断状态机（未注册单例时为 undefined，CB 逻辑零开销跳过，向后兼容）
+  const circuitBreaker = container.has(SERVICE_KEYS.circuitBreaker)
+    ? container.resolve<CircuitBreaker>(SERVICE_KEYS.circuitBreaker)
+    : undefined;
 
   while (true) {
   // 请求被 kill 后 reply 已销毁，直接退出避免浪费 failover 迭代
@@ -257,21 +411,39 @@ export async function executeFailoverLoop(
       originalRequestId: isFailoverIteration ? rootLogId : null,
     });
 
-    // --- 选第一个非 excluded target ---
-    const filtered = filterExcluded(cachedTargets, excludeTargets);
-    if (filtered.length === 0) {
+    // --- 选路（熔断过滤 + 绑定优先 + 全链回退，设计文档 §4.4 + §5.3）---
+    const sessionId = ctx.metadata.get("session_id") as string | undefined;
+    const routingResult = applyCircuitBreakerRouting({
+      circuitBreaker, cachedTargets, excludeTargets, overflowIndices,
+      resolveResult, isFailoverIteration, failOpenUsed, sessionId, routerKeyId, db,
+    });
+    if (!routingResult.ok) {
       return rejectAndReply(reply, rCtx, errors.upstreamConnectionFailed(),
         `All failover targets exhausted (${excludeTargets.length} attempted)`);
     }
+    failOpenUsed = routingResult.failOpenUsed;
+    const filtered = routingResult.targets;
+    const cbSkipHit = routingResult.cbSkipHit;
 
     const resolved = filtered[0];
     const isFailover = cachedTargets.length > 1;
 
-    // effectiveMappingReason: 首次迭代用 resolveResult.reason，溢出时覆盖
+    // effectiveMappingReason: 首次迭代用 resolveResult.reason；熔断/绑定/溢出覆盖（设计文档 §5.3 步骤 5）
     let effectiveMappingReason: MappingReason = isFailoverIteration ? "failover_retry" : resolveResult.mappingReason;
-    // 只有当前 target 是 overflow 扩展产生的才标记
     const resolvedIdx = cachedTargets.findIndex(t => t.provider_id === resolved.provider_id && t.backend_model === resolved.backend_model);
-    if (overflowIndices.has(resolvedIdx)) effectiveMappingReason = "overflow_redirect";
+    const isOverflowResolved = overflowIndices.has(resolvedIdx);
+    // 绑定优先命中：resolved 是绑定模型且非 overflow 预置目标（overflow_redirect 优先级更高）
+    const bindingTarget = routingResult.bindingTarget;
+    const isBindingResolved = !isOverflowResolved && bindingTarget !== null
+      && resolved.provider_id === bindingTarget.provider_id
+      && resolved.backend_model === bindingTarget.backend_model;
+    if (isOverflowResolved) {
+      effectiveMappingReason = "overflow_redirect";
+    } else if (isBindingResolved) {
+      effectiveMappingReason = "session_affinity";
+    } else if (cbSkipHit) {
+      effectiveMappingReason = "circuit_breaker_skip";
+    }
 
     // 将 mappingReason 注入 rCtx，使后续 rejectAndReply 能写入诊断字段
     rCtx.mappingReason = effectiveMappingReason;
@@ -293,6 +465,8 @@ export async function executeFailoverLoop(
         mapping_reason: rCtx.mappingReason ?? null,
         backend_model: resolved.backend_model,
       });
+      // 例处路径计数：provider 不可用同 throw 语义计入 fail（设计文档 §4.5）
+      recordCircuitBreakerFailure(circuitBreaker, resolveResult, resolved, cachedTargets);
       excludeTargets.push(resolved);
       continue;
     }
@@ -326,6 +500,7 @@ export async function executeFailoverLoop(
         adapter, logFileWriter, resolvedEndpoint: setupResult.resolvedEndpoint,
         rootLogId: rootLogId!, isFailoverIteration,
         ctx, routerKeyId, lastFailoverTrigger, startTime,
+        circuitBreaker, cachedTargets, resolveResult,
       });
 
       if (resultAction.action === "continue") {
@@ -352,6 +527,8 @@ export async function executeFailoverLoop(
         mapping_reason: rCtx.mappingReason ?? null,
         backend_model: resolved.backend_model,
       });
+      // 例处路径计数：endpoint setup 异常同 throw 语义计入 fail（设计文档 §4.5）
+      recordCircuitBreakerFailure(circuitBreaker, resolveResult, resolved, cachedTargets);
       excludeTargets.push(resolved);
       continue;
     }

@@ -36,6 +36,11 @@ export class ServiceContainer {
     this.factories.set(key, factory);
   }
 
+  /** 检查是否注册了某服务（仅查工厂表，不触发实例化）。用于可选依赖的门控。 */
+  has(key: string): boolean {
+    return this.factories.has(key);
+  }
+
   /** 获取服务实例。首次调用时执行工厂并缓存。 */
   resolve<T>(key: string): T {
     if (this.cache.has(key)) return this.cache.get(key) as T;
