@@ -81,10 +81,12 @@ export function getSessionBinding(
   groupId: string,
 ): SessionBinding | null {
   if (!routerKeyId || !sessionId) return null;
-  const row = db.prepare(
-    `SELECT * FROM session_model_states
+  const row = db
+    .prepare(
+      `SELECT * FROM session_model_states
      WHERE router_key_id = ? AND session_id = ? AND group_id = ?`,
-  ).get(routerKeyId, sessionId, groupId) as SessionBindingRow | undefined;
+    )
+    .get(routerKeyId, sessionId, groupId) as SessionBindingRow | undefined;
   if (!row) return null;
 
   const cutoff = new Date(Date.now() - BINDING_TTL_MS).toISOString();
@@ -105,10 +107,13 @@ export function getSessionBinding(
 }
 
 /** 删除 last_active_at 早于 cutoff 的绑定，返回删除条数 */
-export function deleteSessionBindingsBefore(db: Database.Database, cutoff: string): number {
-  const result = db.prepare(
-    "DELETE FROM session_model_states WHERE last_active_at < ?",
-  ).run(cutoff);
+export function deleteSessionBindingsBefore(
+  db: Database.Database,
+  cutoff: string,
+): number {
+  const result = db
+    .prepare("DELETE FROM session_model_states WHERE last_active_at < ?")
+    .run(cutoff);
   return result.changes;
 }
 
@@ -135,10 +140,13 @@ export function scheduleSessionBindingCleanup(
     cleaning = true;
     try {
       const deleted = runSessionBindingCleanup(db);
-      if (deleted > 0) log.info(`Session binding cleanup: deleted ${deleted} records`);
+      if (deleted > 0)
+        log.info(`Session binding cleanup: deleted ${deleted} records`);
     } catch (e) {
       // DB 可能已关闭（测试清理、进程关闭等）
-      log.info(`Session binding cleanup skipped: ${e instanceof Error ? e.message : JSON.stringify(e)}`);
+      log.info(
+        `Session binding cleanup skipped: ${e instanceof Error ? e.message : JSON.stringify(e)}`,
+      );
     } finally {
       cleaning = false;
     }
@@ -150,8 +158,14 @@ export function scheduleSessionBindingCleanup(
 
   return {
     stop: () => {
-      if (initialTimer) { clearTimeout(initialTimer); initialTimer = null; }
-      if (intervalTimer) { clearInterval(intervalTimer); intervalTimer = null; }
+      if (initialTimer) {
+        clearTimeout(initialTimer);
+        initialTimer = null;
+      }
+      if (intervalTimer) {
+        clearInterval(intervalTimer);
+        intervalTimer = null;
+      }
     },
   };
 }
