@@ -141,8 +141,8 @@ const ROUTER_INTERNAL_ERROR_PREFIXES = [
   "stream_error: upstream returned 200 but body contains error",
 ];
 
-// 注意：此函数与 router/src/utils/mapping-reason-parser.ts 保持同步
-// 修改此函数时必须同步修改 router 端并确保测试通过
+// 本函数是 mapping_reason 解析的唯一副本（后端 parser 已于熔断特性 W7 删除）
+// 新增 MappingReason 取值时同步更新 KNOWN_MAPPING_REASONS 与 RequestOverviewPanel.vue 的 MAPPING_LABELS
 const KNOWN_MAPPING_REASONS = new Set([
   "direct_format",
   "group_base_rule",

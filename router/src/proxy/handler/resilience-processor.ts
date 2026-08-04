@@ -204,7 +204,8 @@ function isBindingInvalidated(
   const provider = getProviderById(db, binding.providerId);
   if (!provider || provider.is_active !== PROVIDER_ACTIVE) return true;
 
-  // ③c：绑定模型熔断中
+  // ③c：绑定模型熔断中（OPEN 且冷却未过）。用只读 isOpenAndCooling 避免 shouldSkip 副作用
+  // （shouldSkip 在冷却结束时转 CLOSED + 清空 events，绑定失效判定不应改变状态机）
   const bindingTarget = cachedTargets.find(
     t => t.provider_id === binding.providerId && t.backend_model === binding.currentModel,
   );
@@ -215,7 +216,7 @@ function isBindingInvalidated(
       bindingTarget.provider_id,
       bindingTarget.backend_model,
     );
-    if (key !== null && circuitBreaker.shouldSkip(key, bindingTarget.circuit_breaker, Date.now())) {
+    if (key !== null && circuitBreaker.isOpenAndCooling(key, bindingTarget.circuit_breaker, Date.now())) {
       return true;
     }
   }
@@ -248,7 +249,7 @@ function shouldUpsertBinding(
  * 内部自带「链上有 CB target」门控：无配置则零开销返回（§4.5 门控承诺）。
  * 调用方负责 circuitBreaker 非 undefined（未注册 CB 单例时不应调用）。
  */
-function applyCircuitBreakerAndBinding(args: {
+export function applyCircuitBreakerAndBinding(args: {
   circuitBreaker: CircuitBreaker;
   cachedTargets: Target[];
   resolveResult: ResolveResult;

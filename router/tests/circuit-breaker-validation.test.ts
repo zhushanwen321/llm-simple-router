@@ -122,6 +122,13 @@ describe("validateCircuitBreaker (unit)", () => {
       plainTarget(),
     ];
     expect(validateCircuitBreaker(noCodes)).toBeUndefined();
+
+    // status_codes [] (empty array) → rejected (语义未定义，必须显式 omit 字段表示“全部计入”)
+    const emptyCodes = [
+      { circuit_breaker: { ...makeValidCb(), status_codes: [] } },
+      plainTarget(),
+    ];
+    expect(validateCircuitBreaker(emptyCodes)).toContain("at least one status code");
   });
 
   it("TC6: enabled must be boolean", () => {

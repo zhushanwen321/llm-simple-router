@@ -125,6 +125,27 @@ export class CircuitBreaker {
     return false;
   }
 
+  /**
+   * 只读判定某 key 是否处于熔断中（OPEN 且冷却未过）。**无副作用**——不转换状态、不清空 events。
+   *
+   * 用于绑定失效判定（§3 条件③c）等「谓词必须纯」的场景；
+   * 路由侧选路应继续用 shouldSkip（冷却结束时转 CLOSED 恢复可尝试）。
+   *
+   * @returns true=OPEN 且冷却未过；false=key 为 null / 无状态 / CLOSED / 冷却结束（不转换）
+   */
+  isOpenAndCooling(
+    key: string | null,
+    config: CircuitBreakerConfig,
+    now: number = Date.now(),
+  ): boolean {
+    if (key === null) return false;
+    const state = this.states.get(key);
+    if (state === undefined || state.state === "closed") return false;
+    if (state.openedAt === null) return false;
+    const cooldownMs = config.cooldown_sec * MS_PER_SECOND;
+    return now - state.openedAt < cooldownMs;
+  }
+
   /** 惰性获取或创建某 key 的熔断状态 */
   private getOrCreateState(key: string): CircuitState {
     let state = this.states.get(key);

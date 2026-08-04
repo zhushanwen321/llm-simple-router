@@ -84,6 +84,11 @@ function validateSingleCircuitBreaker(
     if (!Array.isArray(statusCodes)) {
       return `${label}.status_codes must be an array of integers between ${STATUS_CODE_MIN} and ${STATUS_CODE_MAX}`;
     }
+    // 空数组语义未定义（countCircuitEvent 会把它当作“全部不计数”，仅 throw 计入，几乎不熔断）
+    // 明确拒绝：要么不填（缺省=全部计入），要么填至少一个状态码
+    if (statusCodes.length === 0) {
+      return `${label}.status_codes must contain at least one status code (omit the field to count all failures)`;
+    }
     for (const code of statusCodes) {
       if (
         typeof code !== "number" ||

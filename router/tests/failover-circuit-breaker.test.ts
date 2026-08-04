@@ -552,4 +552,33 @@ describe("Failover-loop circuit breaker + session affinity integration", () => {
     expect(bindings[0].provider_id).toBe("p2");
     expect(bindings[0].current_model).toBe("gpt-4");
   });
+
+  it("TC16: overflow 绑定不被普通请求劫持（§3 条件③ 配置级基准）", async () => {
+    const p1 = await createControllableBackend({ getStatus: () => 200 });
+    const p2 = await createControllableBackend({ getStatus: () => 200 });
+    servers.push(p1.server, p2.server);
+    setupProvider(db, "p1", `http://127.0.0.1:${p1.port}`);
+    setupProvider(db, "p2", `http://127.0.0.1:${p2.port}`);
+    setupProvider(db, "ov_p", "http://127.0.0.1:9"); // overflow 目标 provider（普通请求不会调用）
+    setupGroup(db, "gpt-4", [
+      // t1 配 CB（门控：链上有 CB target 才启用绑定机制）
+      { backend_model: "gpt-4", provider_id: "p1", circuit_breaker: cbConfig() },
+      // t2 配 overflow 目标 ov_p:ov_m
+      { backend_model: "gpt-4", provider_id: "p2", overflow_provider_id: "ov_p", overflow_model: "ov_m" },
+    ]);
+    setupRouterKey(db);
+    // 预置绑定到 overflow 目标（模拟之前一次 overflow 请求建立的绑定）
+    insertBinding(db, "mg-gpt-4", "ov_p", "ov_m");
+    await buildAppWith(db);
+
+    // 普通请求（body 小，不触发 overflow）→ 运行时链 [t1, t2]，绑定 ov_p:ov_m 不在链上 → 绑定不前移，走 t1
+    const resp = await sendRequest(app!);
+    expect(resp.statusCode).toBe(200);
+
+    // 断言：绑定不被覆盖——ov_p:ov_m 仍在 configLevelTargetKeys 中（含 overflow 扩展目标），条件③ 不失效
+    const bindings = getBindings(db);
+    expect(bindings).toHaveLength(1);
+    expect(bindings[0].provider_id).toBe("ov_p");
+    expect(bindings[0].current_model).toBe("ov_m");
+  });
 });
