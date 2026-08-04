@@ -7,9 +7,9 @@
  * - isOpenAndCooling 纯谓词（无副作用，design §3 条件③c）
  */
 import { describe, it, expect, vi } from "vitest";
-import { applyCircuitBreakerAndBinding } from "../src/proxy/handler/resilience-processor.js";
+import { applyCircuitBreakerAndBinding, countCircuitEvent } from "../src/proxy/handler/resilience-processor.js";
 import { CircuitBreaker } from "../src/proxy/routing/circuit-breaker.js";
-import type { CircuitBreakerConfig, Target, ResolveResult } from "../src/core/types.js";
+import type { CircuitBreakerConfig, Target, ResolveResult, TransportResult } from "../src/core/types.js";
 
 const CB_CONFIG: CircuitBreakerConfig = {
   enabled: true,
@@ -211,5 +211,99 @@ describe("isOpenAndCooling: 纯谓词无副作用（§3 条件③c）", () => {
     const cb = new CircuitBreaker();
     expect(cb.isOpenAndCooling(null, CB_CONFIG)).toBe(false);
     expect(cb.isOpenAndCooling("g1:base:p1:no-such-model", CB_CONFIG)).toBe(false);
+  });
+});
+
+describe("countCircuitEvent 纯函数：§4.5 计数点表逐行验证", () => {
+  // 构造各 kind 的 TransportResult（最小字段）
+  const throwTr: TransportResult = { kind: "throw", error: new Error("boom") };
+  const errorOf = (code: number): TransportResult => ({
+    kind: "success", statusCode: code, body: "", headers: {}, sentHeaders: {}, sentBody: "",
+  });
+  const streamError: TransportResult = {
+    kind: "stream_error", statusCode: 200, body: "", headers: {}, sentHeaders: {},
+  };
+  const streamAbort: TransportResult = {
+    kind: "stream_abort", statusCode: 200, sentHeaders: {},
+  };
+  const success: TransportResult = {
+    kind: "success", statusCode: 200, body: "", headers: {}, sentHeaders: {}, sentBody: "",
+  };
+
+  // §4.5 表格逐行：返回 false=fail / true=ok / null=不计
+
+  it("throw 始终计 fail（不受白名单限制）", () => {
+    expect(countCircuitEvent(throwTr, { ...CB_CONFIG, status_codes: [429] })).toBe(false);
+    expect(countCircuitEvent(throwTr, { ...CB_CONFIG, status_codes: [503] })).toBe(false);
+    expect(countCircuitEvent(throwTr, CB_CONFIG)).toBe(false); // 无白名单
+  });
+
+  it("statusCode>=400 且在白名单 → fail", () => {
+    expect(countCircuitEvent(errorOf(429), { ...CB_CONFIG, status_codes: [429] })).toBe(false);
+    expect(countCircuitEvent(errorOf(503), CB_CONFIG)).toBe(false); // 无白名单=全部计入
+  });
+
+  it("B6: stream_error (statusCode<400) 不产生任何事件 → null", () => {
+    // stream_error 的 statusCode<400，不达阈值，无失败语义
+    expect(countCircuitEvent(streamError, CB_CONFIG)).toBe(null);
+    expect(countCircuitEvent(streamError, { ...CB_CONFIG, status_codes: [200] })).toBe(null);
+  });
+
+  it("白名单外失败 (statusCode>=400 但不在 status_codes) → null（不稀释分母）", () => {
+    // §4.5 行5：不产生任何事件（不计 fail 也不计 ok）
+    expect(countCircuitEvent(errorOf(500), { ...CB_CONFIG, status_codes: [429] })).toBe(null);
+    expect(countCircuitEvent(errorOf(418), { ...CB_CONFIG, status_codes: [429, 503] })).toBe(null);
+  });
+
+  it("success / stream_success / stream_abort → ok", () => {
+    expect(countCircuitEvent(success, CB_CONFIG)).toBe(true);
+    const streamSuccess: TransportResult = {
+      kind: "stream_success", statusCode: 200, sentHeaders: {},
+    };
+    expect(countCircuitEvent(streamSuccess, CB_CONFIG)).toBe(true);
+    expect(countCircuitEvent(streamAbort, CB_CONFIG)).toBe(true);
+  });
+});
+
+describe("T2: 白名单内外混合仍触发 OPEN（§4.5 白名单语义 + §10 混合场景）", () => {
+  it("status_codes=[429] 时 10×白内429 + 5×白外500 → 仅 10 次429计入，failure_rate=10/10=100% OPEN", () => {
+    const cb = new CircuitBreaker();
+    const key = cb.buildCircuitKey("g1", undefined, "p1", "m1")!;
+    const config429: CircuitBreakerConfig = { ...CB_CONFIG, status_codes: [429], min_samples: 5 };
+    const target429 = { ...TARGET_T1, circuit_breaker: config429 };
+
+    // 10 次白名单内 429（计 fail）
+    const T0 = 1_000_000;
+    for (let i = 0; i < 10; i++) {
+      cb.recordResult(key, false, config429, T0 + i);
+    }
+    // 5 次白名单外 500（不产生任何事件，不计入分母）
+    for (let i = 0; i < 5; i++) {
+      // countCircuitEvent 返回 null → applyCircuitBreakerAndBinding 不调 recordResult
+      const counted = countCircuitEvent(
+        { kind: "success", statusCode: 500, body: "", headers: {}, sentHeaders: {}, sentBody: "" },
+        config429,
+      );
+      expect(counted).toBe(null); // 白名单外：不产生事件
+    }
+
+    // 断言：仅 10 次 fail 计入，failure_rate = 10/10 = 100% ≥ 阈值 → OPEN
+    // shouldSkip 传同一时间基准 T0+100（在冷却期内），避免 Date.now() 导致冷却起算偏移
+    expect(cb.shouldSkip(key, config429, T0 + 100)).toBe(true);
+    // 白名单外 500 不稀释分母（若错误计入 ok，分母=15，失败率=10/15=66% < 90% 不 OPEN）
+  });
+
+  it("白名单外失败不阻止白名单内 OPEN（反证：若白外错误计 ok，分母被稀释，OPEN 不触发）", () => {
+    const cb = new CircuitBreaker();
+    const key = cb.buildCircuitKey("g2", undefined, "p1", "m2")!;
+    // 配置：failure_rate=0.9, min_samples=10，让“被稀释”场景下不达标
+    const config: CircuitBreakerConfig = { ...CB_CONFIG, status_codes: [429], failure_rate: 0.9, min_samples: 10 };
+
+    // 10 次白内 429（fail）
+    const T0 = 2_000_000;
+    for (let i = 0; i < 10; i++) cb.recordResult(key, false, config, T0 + i);
+    // 模拟 20 次白外 500：正确实现下不产生事件
+    // （若错误实现把白外计为 ok，20 ok + 10 fail → 10/30=33% < 90%，不 OPEN）
+    expect(cb.shouldSkip(key, config, T0 + 100)).toBe(true); // 正确实现：仍 OPEN
   });
 });

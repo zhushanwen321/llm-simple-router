@@ -581,4 +581,112 @@ describe("Failover-loop circuit breaker + session affinity integration", () => {
     expect(bindings[0].provider_id).toBe("ov_p");
     expect(bindings[0].current_model).toBe("ov_m");
   });
+
+  // ========== TC17-TC19: §4.5 例外路径计数 / overflow 排序 / 回退成功绑定（设计文档 §10 补全）==========
+
+  it("TC17 (T3): provider 停用的 503 continue 路径计入 fail → 累计达标后 OPEN，后续请求跳过（§4.5 行2）", async () => {
+    // 设计文档 §4.5：provider 不可用（is_active=0）在 failover-loop continue 点计入 fail（不经 processResilienceResult）
+    // 本测试验证：反复请求一个首个 target 停用的 group，该 target 的 CB 状态应累计 fail 直至 OPEN
+    const p2 = await createControllableBackend({ getStatus: () => 200 });
+    servers.push(p2.server);
+    setupProvider(db, "p1", "http://127.0.0.1:9", 0); // p1 停用→每次请求都走 503 continue 路径
+    setupProvider(db, "p2", `http://127.0.0.1:${p2.port}`);
+    setupGroup(db, "gpt-4", [
+      { backend_model: "gpt-4", provider_id: "p1", circuit_breaker: cbConfig() }, // min_samples=1
+      { backend_model: "gpt-4", provider_id: "p2" },
+    ]);
+    setupRouterKey(db);
+    await buildAppWith(db);
+
+    // 请求1 (sess-prime): t1(p1停用→503 continue 计 fail) → t2 success（用独立 session 避免绑定干扰）
+    const r1 = await sendRequest(app!, "gpt-4", "sess-prime");
+    expect(r1.statusCode).toBe(200);
+    // 请求2 (sess-verify 无绑定): t1 应已 OPEN（1 次 503 continue 计入即可，min_samples=1）→ skip → 直接走 t2
+    const r2 = await sendRequest(app!, "gpt-4", "sess-verify");
+    expect(r2.statusCode).toBe(200);
+
+    const logs = getLogs(db);
+    // 请求2 应体现 circuit_breaker_skip（证明 503 continue 路径的计数已使 t1 OPEN）
+    const req2Log = logs[logs.length - 1] as Record<string, unknown>;
+    expect(req2Log.mapping_reason).toBe("circuit_breaker_skip");
+    expect(req2Log.provider_id).toBe("p2");
+  });
+
+  it("TC18 (T4): 绑定模型同时配 overflow，超限请求先走 overflow 目标（绑定优先不越过 overflow 预置）(§5.3 步骤2)", async () => {
+    // 设计文档 §5.3 步骤2：绑定模型前移不得越过 overflow 预置目标
+    let overflowCalled = false;
+    let bindingCalled = false;
+    const overflowBackend = await createControllableBackend({
+      getStatus: () => 200,
+      onCall: () => { overflowCalled = true; },
+    });
+    const bindingBackend = await createControllableBackend({
+      getStatus: () => 200,
+      onCall: () => { bindingCalled = true; },
+    });
+    servers.push(overflowBackend.server, bindingBackend.server);
+    setupProvider(db, "ov_p", `http://127.0.0.1:${overflowBackend.port}`);
+    setupProvider(db, "p1", `http://127.0.0.1:${bindingBackend.port}`);
+    setupGroup(db, "gpt-4", [
+      // t1 = 绑定模型，同时配 overflow 目标 ov_p:ov_m
+      { backend_model: "gpt-4", provider_id: "p1", overflow_provider_id: "ov_p", overflow_model: "ov_m", circuit_breaker: cbConfig() },
+      { backend_model: "gpt-4", provider_id: "p1" },
+    ]);
+    setupRouterKey(db);
+    // 预置绑定到 t1（绑定模型自身配 overflow）
+    insertBinding(db, "mg-gpt-4", "p1", "gpt-4");
+    await buildAppWith(db);
+
+    // 超限请求：context 超大→触发 overflow 扩展。overflow 预置目标应先于绑定模型被调用
+    const hugeBody = JSON.stringify({
+      model: "gpt-4",
+      messages: [{ role: "user", content: "x".repeat(500_000) }], // 远超阈值触发 overflow
+      max_tokens: 1,
+    });
+    const resp = await app!.inject({
+      method: "POST",
+      url: "/v1/chat/completions",
+      headers: { "content-type": "application/json", authorization: `Bearer ${API_KEY}`, [SESSION_HEADER]: SESSION_ID },
+      payload: JSON.parse(hugeBody),
+    });
+    expect(resp.statusCode).toBe(200);
+
+    // 断言：overflow 目标被调用（证明绑定未越过 overflow 预置）
+    expect(overflowCalled).toBe(true);
+    // 绑定模型未被调用（overflow 成功后不走绑定模型）
+    expect(bindingCalled).toBe(false);
+  });
+
+  it("TC19 (T6): 全链 OPEN 回退真实尝试首个 target 且成功 → 无绑定场景写绑定至回退目标（§4.4 + §3）", async () => {
+    // 设计文档 §10 最后一行：全链 OPEN 回退成功侧的绑定写入行为断言
+    let p1Status = 500;
+    const p1 = await createControllableBackend({ getStatus: () => p1Status });
+    const p2 = await createControllableBackend({ getStatus: () => 500 });
+    servers.push(p1.server, p2.server);
+    setupProvider(db, "p1", `http://127.0.0.1:${p1.port}`);
+    setupProvider(db, "p2", `http://127.0.0.1:${p2.port}`);
+    setupGroup(db, "gpt-4", [
+      // 两 target 都 min_samples=1，请求1 即可使全链 OPEN
+      { backend_model: "gpt-4", provider_id: "p1", circuit_breaker: cbConfig() },
+      { backend_model: "gpt-4", provider_id: "p2", circuit_breaker: cbConfig() },
+    ]);
+    setupRouterKey(db);
+    await buildAppWith(db);
+
+    // 请求1 (sess-prime): t1(500)+t2(500) 全 fail → 全 OPEN → 502（不写绑定，失败不写）
+    await sendRequest(app!, "gpt-4", "sess-prime");
+    // 恢复 p1 为 200（回退真实尝试应成功）
+    p1Status = 200;
+    // 请求2 (sess-verify 无绑定): 全链 OPEN → fail-open 回退 filterExcluded[0]=t1 → 真实 t1(200) 成功
+    const resp = await sendRequest(app!, "gpt-4", "sess-verify");
+    expect(resp.statusCode).toBe(200);
+
+    // 断言：回退成功后，无绑定场景按 §3 条件① 写绑定至回退目标 t1（DB 行断言）
+    const bindings = getBindings(db);
+    // sess-prime 失败不写绑定；sess-verify 回退成功写 t1 → 共 1 行
+    expect(bindings).toHaveLength(1);
+    expect(bindings[0].provider_id).toBe("p1");
+    expect(bindings[0].current_model).toBe("gpt-4");
+    expect(bindings[0].session_id).toBe("sess-verify");
+  });
 });

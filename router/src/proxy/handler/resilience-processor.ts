@@ -167,7 +167,7 @@ function handleResilienceError(
  * - success/stream_success/stream_abort → ok
  * - stream_error（statusCode<400，未达阈值无失败语义）→ 不计
  */
-function countCircuitEvent(tr: TransportResult, cbConfig: CircuitBreakerConfig): boolean | null {
+export function countCircuitEvent(tr: TransportResult, cbConfig: CircuitBreakerConfig): boolean | null {
   if (tr.kind === "throw") return false;
   const trStatusCode = getTransportStatusCode(tr);
   if (trStatusCode !== null && trStatusCode >= HTTP_ERROR_THRESHOLD) {
