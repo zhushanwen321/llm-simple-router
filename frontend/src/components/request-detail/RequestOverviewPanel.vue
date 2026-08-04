@@ -316,6 +316,8 @@ const MAPPING_LABELS: Record<string, string> = {
   fallback_provider: "回退",
   overflow_redirect: "溢出重定向",
   failover_retry: "故障转移",
+  circuit_breaker_skip: "熔断跳过",
+  session_affinity: "会话亲和",
 };
 
 const props = defineProps<{

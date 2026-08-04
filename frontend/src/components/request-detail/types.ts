@@ -150,6 +150,8 @@ const KNOWN_MAPPING_REASONS = new Set([
   "fallback_provider",
   "overflow_redirect",
   "failover_retry",
+  "circuit_breaker_skip",
+  "session_affinity",
 ]);
 
 /**
