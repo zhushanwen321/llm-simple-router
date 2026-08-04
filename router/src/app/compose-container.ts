@@ -22,6 +22,7 @@ import { UsageWindowTracker } from "../proxy/routing/usage-window-tracker.js";
 import { SessionTracker, DEFAULT_LOOP_PREVENTION_CONFIG } from "../core/loop-prevention/index.js";
 import { LogFileWriter } from "../storage/log-file-writer.js";
 import { ProxyAgentFactory } from "../proxy/transport/proxy-agent.js";
+import { CircuitBreaker } from "../proxy/routing/circuit-breaker.js";
 import { getDetailLogEnabled } from "../db/settings.js";
 import type { Config } from "../config/index.js";
 
@@ -106,6 +107,9 @@ export function composeContainer(
 
   // ProxyAgentFactory
   container.register(SERVICE_KEYS.proxyAgentFactory, () => new ProxyAgentFactory());
+
+  // CircuitBreaker（全局熔断状态机，无依赖内存单例）
+  container.register(SERVICE_KEYS.circuitBreaker, () => new CircuitBreaker());
 
   return { container, logFileWriter, logsDir, isMemoryDb };
 }
