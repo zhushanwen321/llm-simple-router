@@ -11,6 +11,7 @@ import { RequestTracker } from "../core/monitor/index.js";
 import { AdaptiveController } from "../core/concurrency/index.js";
 import { SemaphoreManager } from "../core/concurrency/index.js";
 import { scheduleLogCleanup } from "../db/log-cleaner.js";
+import { scheduleSessionBindingCleanup } from "../db/session-states.js";
 import { scheduleDbSizeMonitor } from "../db/db-size-monitor.js";
 import { scheduleMetricsAggregator } from "../db/metrics-aggregator.js";
 import { scheduleLogFileMaintenance } from "../storage/log-file-compressor.js";
@@ -122,6 +123,7 @@ export function registerRoutes(
   });
 
   const logCleanup = scheduleLogCleanup(db, app.log);
+  const bindingCleanup = scheduleSessionBindingCleanup(db, app.log);
   const metricsAggregator = scheduleMetricsAggregator(db, app.log);
   const dbSizeMonitor = scheduleDbSizeMonitor(db, config.DB_PATH, { log: app.log });
 
@@ -131,6 +133,7 @@ export function registerRoutes(
     closed = true;
     stopUpgradeChecker();
     logCleanup.stop();
+    bindingCleanup.stop();
     metricsAggregator.stop();
     dbSizeMonitor.stop();
     tracker.stopPushInterval();
