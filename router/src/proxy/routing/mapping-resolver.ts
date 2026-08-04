@@ -1,7 +1,6 @@
 import Database from "better-sqlite3";
 import type { Target, ResolveContext, ResolveResult, ConcurrencyOverride, MappingReason } from "../../core/types.js";
 import { getMappingGroup, getActiveProviderByName, getActiveProvidersWithModels, getActiveSchedulesForGroup } from "../../db/index.js";
-import type { MappingGroup } from "../../db/index.js";
 import { parseModels } from "../../config/model-context.js";
 import type { Schedule } from "../../db/schedules.js";
 
@@ -85,11 +84,11 @@ export function filterExcluded(targets: Target[], excludeTargets: Target[] | und
  * 误判绑定失效（overflow 绑定被普通请求劫持、schedule 窗口边界抖动等，见设计文档 §3）；
  * 配置级集合随配置变更而变、与请求无关。
  *
- * 纯函数，不查 DB：multimodal_fallback 存于 group.rule（已传入）；provider 活跃状态
+ * 纯函数，不查 DB：multimodal_fallback 从 resolveMapping 上游已 parse 的 rule 对象提取（避免重复 parse）；provider 活跃状态
  * 属运行时失效判定的另一支（条件③），不纳入配置级集合。
  */
 function buildConfigLevelTargetKeys(
-  group: MappingGroup,
+  parsedRule: Record<string, unknown>,
   baseTargets: Target[],
   schedules: Schedule[],
 ): Set<string> {
@@ -112,9 +111,8 @@ function buildConfigLevelTargetKeys(
   }
 
   // c) multimodal_fallback（base rule 级，modality-redirect 整体替换链的 fallback target）
-  //    group.rule 合法性已由 resolveMapping 上游 parse baseTargets 验证（失败即 return null），此处安全 parse
-  const rule = JSON.parse(group.rule) as Record<string, unknown>;
-  const fallback = rule.multimodal_fallback;
+  //    parsedRule 已由 resolveMapping 上游 parse（失败即 return null），此处直接取字段
+  const fallback = parsedRule.multimodal_fallback;
   if (fallback != null && typeof fallback === "object") {
     const fb = fallback as Record<string, unknown>;
     if (typeof fb.provider_id === "string" && typeof fb.backend_model === "string") {
@@ -202,10 +200,12 @@ export function resolveMapping(
     return null;
   }
 
-  // 3. 解析 base targets
+  // 3. 解析 base targets（parse 一次，parsedRule 同时供 buildConfigLevelTargetKeys 提取 multimodal_fallback）
   let baseTargets: Target[];
+  let parsedRule: Record<string, unknown>;
   try {
-    baseTargets = parseTargets(JSON.parse(group.rule));
+    parsedRule = JSON.parse(group.rule) as Record<string, unknown>;
+    baseTargets = parseTargets(parsedRule);
   } catch {
     console.warn(`[mapping-resolver] Failed to parse rule for client_model '${group.client_model}'`);
     return null;
@@ -254,6 +254,6 @@ export function resolveMapping(
     // schedule 命中但 mapping_rule 解析为空回退 base（mappingReason=group_base_rule）时必须 undefined，
     // 避免该请求的熔断事件误入 schedule key（base 与 schedule 通常 CB 参数不同，串扰致判定漂移）
     schedule_id: mappingReason === "group_schedule" ? matchedSchedule?.id : undefined,
-    configLevelTargetKeys: buildConfigLevelTargetKeys(group, baseTargets, schedules),
+    configLevelTargetKeys: buildConfigLevelTargetKeys(parsedRule, baseTargets, schedules),
   };
 }
