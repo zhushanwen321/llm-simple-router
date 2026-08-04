@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import type { Target, ResolveContext, ResolveResult, ConcurrencyOverride, MappingReason } from "../../core/types.js";
 import { getMappingGroup, getActiveProviderByName, getActiveProvidersWithModels, getActiveSchedulesForGroup } from "../../db/index.js";
+import type { MappingGroup } from "../../db/index.js";
 import { parseModels } from "../../config/model-context.js";
 import type { Schedule } from "../../db/schedules.js";
 
@@ -73,6 +74,57 @@ export function filterExcluded(targets: Target[], excludeTargets: Target[] | und
   );
 }
 
+// ---------- Config-level target keys (circuit-breaker / session affinity) ----------
+
+/**
+ * 派生该 group 的配置级目标集合（`${provider_id}:${backend_model}`），供 session 绑定失效判定使用。
+ *
+ * 配置级 = base rule targets + 全部 schedule mapping_rule targets + overflow 扩展目标
+ * + multimodal_fallback 替换目标。与运行时链（cachedTargets）刻意区分：运行时链随
+ * overflow 扩展 / modality 过滤 / schedule 切换逐请求变化，按运行时链判「不在链上」会
+ * 误判绑定失效（overflow 绑定被普通请求劫持、schedule 窗口边界抖动等，见设计文档 §3）；
+ * 配置级集合随配置变更而变、与请求无关。
+ *
+ * 纯函数，不查 DB：multimodal_fallback 存于 group.rule（已传入）；provider 活跃状态
+ * 属运行时失效判定的另一支（条件③），不纳入配置级集合。
+ */
+function buildConfigLevelTargetKeys(
+  group: MappingGroup,
+  baseTargets: Target[],
+  schedules: Schedule[],
+): Set<string> {
+  const keys = new Set<string>();
+
+  const addTarget = (t: Target): void => {
+    keys.add(`${t.provider_id}:${t.backend_model}`);
+    // overflow 扩展目标：配置了即纳入（不论运行时是否触发溢出，配置存在即属配置级集合）
+    if (t.overflow_provider_id && t.overflow_model) {
+      keys.add(`${t.overflow_provider_id}:${t.overflow_model}`);
+    }
+  };
+
+  // a) base rule targets
+  for (const t of baseTargets) addTarget(t);
+
+  // b) 全部 schedule 的 mapping_rule targets（不只 matchedSchedule——窗口切换不应误判失效）
+  for (const s of schedules) {
+    for (const t of parseScheduleTargets(s.mapping_rule)) addTarget(t);
+  }
+
+  // c) multimodal_fallback（base rule 级，modality-redirect 整体替换链的 fallback target）
+  //    group.rule 合法性已由 resolveMapping 上游 parse baseTargets 验证（失败即 return null），此处安全 parse
+  const rule = JSON.parse(group.rule) as Record<string, unknown>;
+  const fallback = rule.multimodal_fallback;
+  if (fallback != null && typeof fallback === "object") {
+    const fb = fallback as Record<string, unknown>;
+    if (typeof fb.provider_id === "string" && typeof fb.backend_model === "string") {
+      keys.add(`${fb.provider_id}:${fb.backend_model}`);
+    }
+  }
+
+  return keys;
+}
+
 // ---------- Schedule matching ----------
 
 const ALL_WEEK_DAYS = [0, 1, 2, 3, 4, 5, 6] as const; // eslint-disable-line no-magic-numbers
@@ -130,7 +182,7 @@ export function resolveMapping(
     if (provider) {
       const modelEntries = parseModels(provider.models);
       if (modelEntries.some(m => m.name === backendModel)) {
-        return { target: { backend_model: backendModel, provider_id: provider.id }, targetCount: 1, mappingReason: "direct_format" as MappingReason };
+        return { target: { backend_model: backendModel, provider_id: provider.id }, targetCount: 1, mappingReason: "direct_format" as MappingReason, group_id: null, schedule_id: undefined };
       }
     }
     return null;
@@ -144,7 +196,7 @@ export function resolveMapping(
     for (const p of providers) {
       const modelEntries = parseModels(p.models);
       if (modelEntries.some(m => m.name === clientModel)) {
-        return { target: { backend_model: clientModel, provider_id: p.id }, targetCount: 1, mappingReason: "fallback_provider" as MappingReason };
+        return { target: { backend_model: clientModel, provider_id: p.id }, targetCount: 1, mappingReason: "fallback_provider" as MappingReason, group_id: null, schedule_id: undefined };
       }
     }
     return null;
@@ -197,5 +249,11 @@ export function resolveMapping(
     targetCount: activeTargets.length,
     allTargets: activeTargets,
     mappingReason,
+    group_id: group.id,
+    // schedule_id 按 mappingReason 门控（设计文档 §4.2）：仅 group_schedule 路径透传 matchedSchedule.id；
+    // schedule 命中但 mapping_rule 解析为空回退 base（mappingReason=group_base_rule）时必须 undefined，
+    // 避免该请求的熔断事件误入 schedule key（base 与 schedule 通常 CB 参数不同，串扰致判定漂移）
+    schedule_id: mappingReason === "group_schedule" ? matchedSchedule?.id : undefined,
+    configLevelTargetKeys: buildConfigLevelTargetKeys(group, baseTargets, schedules),
   };
 }

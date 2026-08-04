@@ -137,7 +137,9 @@ export function expandOverflowTargets(
       const result = applyOverflowRedirect(target, db, body);
       if (result) {
         overflowIndices.add(expanded.length);
-        expanded.push({ provider_id: result.provider_id, backend_model: result.backend_model });
+        // 派生溢出 target 继承源 target 的 circuit_breaker 配置（引用同一对象，非复制）：
+        // 源 target 无配置时 target.circuit_breaker 为 undefined，派生 target 同样不带
+        expanded.push({ provider_id: result.provider_id, backend_model: result.backend_model, circuit_breaker: target.circuit_breaker });
       }
     // eslint-disable-next-line taste/no-silent-catch -- 单target溢出失败不阻塞其余target
     } catch (err: unknown) {
