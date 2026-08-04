@@ -9,17 +9,19 @@ import {
   ChevronDown,
   AlertTriangle,
   Grid3x3,
+  ShieldAlert,
 } from "@lucide/vue";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import CascadingModelSelect from "@/components/mappings/CascadingModelSelect.vue";
+import CircuitBreakerDialog from "@/components/mappings/CircuitBreakerDialog.vue";
 import type {
   MappingTarget,
   MappingEntry,
 } from "@/components/quick-setup/types";
-import type { MultimodalFallback } from "@/types/mapping";
+import type { MultimodalFallback, CircuitBreakerConfig } from "@/types/mapping";
 import type {
   ProviderGroup,
   SelectedValue,
@@ -198,6 +200,32 @@ const hasOverflow = computed(() => !!props.entry.targets[0]?.overflow_model);
 const hasMultimodal = computed(
   () => !!props.entry.multimodalFallback?.backend_model,
 );
+
+// Circuit breaker（target 级熔断配置）
+const cbTargetIndex = ref<number | null>(null);
+
+function openCircuitBreaker(index: number) {
+  cbTargetIndex.value = index;
+}
+
+function closeCircuitBreaker() {
+  cbTargetIndex.value = null;
+}
+
+function handleSaveCircuitBreaker(config: CircuitBreakerConfig | undefined) {
+  if (cbTargetIndex.value === null) return;
+  const idx = cbTargetIndex.value;
+  const newTargets = props.entry.targets.map((tgt, i) => {
+    if (i !== idx) return tgt;
+    if (config) {
+      return { ...tgt, circuit_breaker: config };
+    }
+    const { circuit_breaker: _cb, ...rest } = tgt;
+    return rest as MappingTarget;
+  });
+  emit("update:targets", newTargets);
+  closeCircuitBreaker();
+}
 </script>
 
 <template>
@@ -403,6 +431,20 @@ const hasMultimodal = computed(
               />
             </div>
             <Button
+              variant="ghost"
+              size="icon-xs"
+              class="shrink-0"
+              :class="
+                target.circuit_breaker?.enabled
+                  ? 'text-warning'
+                  : 'text-muted-foreground/30'
+              "
+              :aria-label="t('mappings.circuitBreaker.toggleButton')"
+              @click="openCircuitBreaker(tIdx)"
+            >
+              <ShieldAlert class="size-3" />
+            </Button>
+            <Button
               v-if="tIdx > 0 && entry.targets.length > 1"
               variant="ghost"
               size="icon-xs"
@@ -571,5 +613,13 @@ const hasMultimodal = computed(
         </div>
       </div>
     </div>
+
+    <CircuitBreakerDialog
+      v-if="cbTargetIndex !== null"
+      :target="entry.targets[cbTargetIndex]"
+      :model-value="true"
+      @update:model-value="closeCircuitBreaker"
+      @save="handleSaveCircuitBreaker"
+    />
   </div>
 </template>

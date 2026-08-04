@@ -70,6 +70,8 @@ export function parseMappingRule(
     provider_id: tgt.provider_id || "",
     overflow_provider_id: tgt.overflow_provider_id,
     overflow_model: tgt.overflow_model,
+    // 透传熔断配置：白名单缺此字段会导致加载即丢弃，编辑保存后配置静默消失
+    circuit_breaker: tgt.circuit_breaker,
   }));
 
   const firstTarget = targets[0];
@@ -110,20 +112,18 @@ export function serializeRule(
   overflow: OverflowTarget | null,
   multimodal: MultimodalFallback | null,
 ): string {
-  const serializedTargets = targets.map((tgt, idx) => {
-    if (idx === 0 && overflow) {
-      return {
-        backend_model: tgt.backend_model,
-        provider_id: tgt.provider_id,
+  const serializedTargets = targets.map((tgt, idx) => ({
+    backend_model: tgt.backend_model,
+    provider_id: tgt.provider_id,
+    ...(idx === 0 && overflow
+      ? {
         overflow_provider_id: overflow.provider_id,
         overflow_model: overflow.model,
-      };
-    }
-    return {
-      backend_model: tgt.backend_model,
-      provider_id: tgt.provider_id,
-    };
-  });
+      }
+      : {}),
+    // 有配置才写入，无配置不出现字段（向后兼容）
+    ...(tgt.circuit_breaker ? { circuit_breaker: tgt.circuit_breaker } : {}),
+  }));
 
   return JSON.stringify({
     targets: serializedTargets,

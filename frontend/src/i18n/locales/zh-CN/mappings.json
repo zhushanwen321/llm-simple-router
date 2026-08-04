@@ -75,5 +75,21 @@
   "sessionLockWarning": "注意：一旦请求中包含图片、音频或视频，整个会话将持续路由到 fallback 模型。",
   "sessionLockReason": "原因：客户端每轮发送完整对话历史，历史中的多媒体内容会持续触发重定向。客户端执行 compact 或开启新会话后自动恢复。",
   "costSuggestion": "建议：选择与原始模型价位相近的 fallback 模型，避免成本差异过大。"
+  },
+  "circuitBreaker": {
+    "toggleButton": "熔断配置",
+    "title": "熔断配置",
+    "description": "配置该目标的故障熔断规则，达到失败阈值后自动跳过并走下一个目标",
+    "enabled": "启用熔断",
+    "windowSec": "时间窗口（秒）",
+    "failureRate": "失败率阈值（%）",
+    "minSamples": "最小样本数",
+    "cooldownSec": "冷却时长（秒）",
+    "statusCodes": "状态码白名单",
+    "statusCodesPlaceholder": "如 429,500,502,503（留空 = 全部）",
+    "statusCodesHint": "仅计入指定状态码的失败；连接错误始终计入。留空表示所有失败都计入。",
+    "clear": "清除配置",
+    "cancel": "取消",
+    "save": "保存"
   }
 }

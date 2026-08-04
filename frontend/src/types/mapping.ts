@@ -64,12 +64,29 @@ export interface ProviderSummary {
   name: string;
 }
 
+/** 熔断配置（target 级，与后端 core/types.ts CircuitBreakerConfig 镜像） */
+export interface CircuitBreakerConfig {
+  enabled: boolean;
+  /** 滑动时间窗口（秒），默认 60 */
+  window_sec: number;
+  /** 失败率阈值 0~1，默认 0.9 */
+  failure_rate: number;
+  /** 窗口内最小样本数（防少量失败误熔断），默认 10 */
+  min_samples: number;
+  /** 熔断持续时长（秒），默认 300 */
+  cooldown_sec: number;
+  /** 可选：仅过滤指定状态码的失败；缺省=所有失败计入 */
+  status_codes?: number[];
+}
+
 /** 映射目标（backend_model + provider_id 对） */
 export interface MappingTarget {
   backend_model: string;
   provider_id: string;
   overflow_provider_id?: string;
   overflow_model?: string;
+  /** 熔断配置（可选，无配置=无熔断行为，向后兼容） */
+  circuit_breaker?: CircuitBreakerConfig;
 }
 
 /** 多模态 Fallback 配置 */

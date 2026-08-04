@@ -75,5 +75,21 @@
   "sessionLockWarning": "Note: Once a request contains images, audio, or video, the entire session will be persistently routed to the fallback model.",
   "sessionLockReason": "Reason: The client sends the full conversation history each turn, and multimedia content in history keeps triggering redirects. Session auto-recovers after client compact or new session.",
   "costSuggestion": "Tip: Choose a fallback model with similar pricing to the original model."
+  },
+  "circuitBreaker": {
+    "toggleButton": "Circuit breaker",
+    "title": "Circuit Breaker",
+    "description": "Configure circuit breaker rules for this target. Trips on failure threshold and skips to the next target.",
+    "enabled": "Enabled",
+    "windowSec": "Window (sec)",
+    "failureRate": "Failure rate (%)",
+    "minSamples": "Min samples",
+    "cooldownSec": "Cooldown (sec)",
+    "statusCodes": "Status codes",
+    "statusCodesPlaceholder": "e.g. 429,500,502,503 (empty = all)",
+    "statusCodesHint": "Only failures with listed status codes are counted; connection errors always count. Empty means all failures count.",
+    "clear": "Clear",
+    "cancel": "Cancel",
+    "save": "Save"
   }
 }
