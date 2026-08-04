@@ -54,7 +54,6 @@ describe("routing passthrough (circuit-breaker affinity W4)", () => {
     expect(result!.mappingReason).toBe("group_base_rule");
     expect(result!.group_id).toBe("g1");
     expect(result!.schedule_id).toBeUndefined();
-    expect(result!.configLevelTargetKeys).toBeDefined();
     expect(result!.configLevelTargetKeys!.has("p1:gpt-4o")).toBe(true);
     expect(result!.configLevelTargetKeys!.has("p2:claude-3")).toBe(true);
   });
@@ -209,7 +208,6 @@ describe("routing passthrough (circuit-breaker affinity W4)", () => {
     );
 
     const result = resolveMapping(db, "m1", { now: new Date("2024-01-01T10:00:00") });
-    expect(result!.configLevelTargetKeys).toBeDefined();
     expect(result!.configLevelTargetKeys!.has("p1:gpt-4o")).toBe(true);
     // base 与 schedule 指向同一 key，去重后仅 1 个
     expect(result!.configLevelTargetKeys!.size).toBe(1);

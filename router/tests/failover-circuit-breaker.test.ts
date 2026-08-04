@@ -413,7 +413,8 @@ describe("Failover-loop circuit breaker + session affinity integration", () => {
     const logs = getLogs(db);
     // 请求2 应有 provider_id=p1 的日志（t1 未被 skip，真实尝试 418）
     const req2P1Log = logs.find((l, i) => i >= logs.length - 2 && l.provider_id === "p1");
-    expect(req2P1Log).toBeDefined();
+    // 强断言：不仅存在，且是真实尝试的 418（证明未被 CB skip）
+    expect(req2P1Log?.status_code).toBe(418);
   });
 
   // ========== TC11-TC12: group 绑定 ==========
