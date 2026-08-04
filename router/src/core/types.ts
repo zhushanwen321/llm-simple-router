@@ -14,11 +14,28 @@ export interface Logger {
 
 // ========== 来自原 proxy/strategy/types.ts ==========
 
+/** Target 级熔断配置（模型映射故障转移链熔断） */
+export interface CircuitBreakerConfig {
+  enabled: boolean;
+  /** 滑动时间窗口（秒），默认 60 */
+  window_sec: number;
+  /** 失败率阈值 0~1，默认 0.9 */
+  failure_rate: number;
+  /** 窗口内最小样本数（防 1 次失败=100% 误熔断），默认 10 */
+  min_samples: number;
+  /** 熔断持续时长（秒），默认 300 */
+  cooldown_sec: number;
+  /** 可选：仅过滤有 statusCode 的失败（每项 400~599）；缺省=所有失败计入。throw（连接级错误）不受此限 */
+  status_codes?: number[];
+}
+
 export interface Target {
   backend_model: string;
   provider_id: string;
   overflow_provider_id?: string;
   overflow_model?: string;
+  /** 熔断配置（可选，无配置=无熔断行为，向后兼容） */
+  circuit_breaker?: CircuitBreakerConfig;
 }
 
 export interface ResolveContext {
@@ -38,7 +55,9 @@ export type MappingReason =
   | "group_schedule"
   | "fallback_provider"
   | "overflow_redirect"
-  | "failover_retry";
+  | "failover_retry"
+  | "circuit_breaker_skip"
+  | "session_affinity";
 
 export interface ResolveResult {
   target: Target;
@@ -49,6 +68,14 @@ export interface ResolveResult {
   allTargets?: Target[];
   /** 映射解析原因，标识走了哪条解析路径 */
   mappingReason: MappingReason;
+  // 以下三字段为熔断/亲和特性预留，设为可选以允许本类型独立演进——
+  // 由 W4 resolveMapping 填充（填充后运行时恒有值）：
+  /** group 维度：熔断状态 key 构造用（direct/fallback 路径为 null 不构造 key）。可选 */
+  group_id?: string | null;
+  /** schedule 维度：仅 mappingReason==='group_schedule' 才有值，否则 undefined。可选 */
+  schedule_id?: string | undefined;
+  /** 该 group 配置级目标集合的 `${provider_id}:${backend_model}`，供 session 绑定失效判定。可选 */
+  configLevelTargetKeys?: Set<string>;
 }
 
 // ========== 来自原 proxy/types.ts 公共部分 ==========

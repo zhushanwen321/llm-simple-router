@@ -134,3 +134,18 @@ pi-extension/dist
 DESIGN.md
 PRODUCT.md
 .pi/infinite-context/
+
+# Coding Workflow (cw) 中间产物 — 机器消费，不进 git
+.cw/
+.cw-*.json
+.cw-*.md
+wave-*.json
+wave-*.md
+clarify.json
+clarify-*.json
+design-review.json
+plan.json
+exec-review.json
+retrospect.json
+closeout.json
+test.json
